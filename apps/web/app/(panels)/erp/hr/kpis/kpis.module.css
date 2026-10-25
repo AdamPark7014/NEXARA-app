@@ -1,0 +1,277 @@
+/* KPIs de personas: las cifras se muestran tal cual llegan. En el teléfono, un dato por renglón. */
+
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.cifras {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ui-s3);
+  margin: 0;
+}
+
+.cifra {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 14px 16px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+}
+
+.cifra dt {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.cifra dd {
+  margin: 0;
+  font-size: 22px;
+  font-weight: var(--ui-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--ui-fg);
+}
+
+.cifra small {
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-regular);
+  color: var(--ui-fg-3);
+}
+
+.aviso {
+  color: var(--ui-warning-text);
+}
+
+.ok {
+  color: var(--ui-success-text);
+}
+
+.paneles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-s4);
+}
+
+.panel {
+  min-width: 0;
+  padding: 16px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: var(--ui-fw-semibold);
+}
+
+.panel p {
+  margin: 2px 0 12px;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.barras {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 72px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.barras li {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+
+.barra {
+  width: 100%;
+  border-radius: 3px;
+  background: var(--ui-brand);
+}
+
+.vacio {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.areas,
+.cargas,
+.permisos,
+.evaluaciones {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.area,
+.carga,
+.permiso,
+.evaluacion {
+  display: grid;
+  gap: 2px 12px;
+  min-width: 0;
+}
+
+.area {
+  grid-template-columns: minmax(0, 140px) minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.carga,
+.evaluacion {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.nombre {
+  display: block;
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.nombre:hover {
+  color: var(--ui-brand-text);
+}
+
+.meta {
+  display: block;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.numero {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.pista {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ui-surface-2, var(--ui-border));
+  overflow: hidden;
+}
+
+.pista > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--ui-brand);
+}
+
+.tabla {
+  min-width: 0;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+  overflow: clip;
+}
+
+.cabecera,
+.ingeniero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) 7rem 6rem minmax(8rem, 1fr) 8rem;
+  gap: 8px 16px;
+  align-items: center;
+  padding: 12px 16px;
+}
+
+.cabecera {
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+  border-bottom: 1px solid var(--ui-border-subtle, var(--ui-border));
+}
+
+.ingenieros {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ingeniero {
+  border-bottom: 1px solid var(--ui-border-subtle, var(--ui-border));
+}
+
+.ingeniero:last-child {
+  border-bottom: 0;
+}
+
+.cierre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cierre .pista {
+  flex: 1;
+}
+
+@media (max-width: 900px) {
+  .paneles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .cifras {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .area,
+  .carga,
+  .evaluacion,
+  .permiso {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+  }
+
+  .numero {
+    text-align: left;
+  }
+
+  .cabecera {
+    display: none;
+  }
+
+  .ingeniero {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+  }
+
+  .ingeniero > * {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .cierre {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

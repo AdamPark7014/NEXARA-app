@@ -1,27 +1,32 @@
 "use client";
 
 /**
- * ERP · Indicadores de personas
- * Plantilla, asistencia, puntualidad, carga, permisos y productividad de órdenes de trabajo.
+ * ERP · KPIs de personas
+ * Las cifras salen de `hr/dashboard` y del promedio de cierre. Esta pantalla no las recalcula.
  */
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
-import InlineAlert from "@/components/ui/InlineAlert";
-import FilterToolbar from "@/components/FilterToolbar";
-import HrModuleRail from "@/components/hr/HrModuleRail";
-import { SkeletonList } from "@/components/PageState";
+import {
+  Alert,
+  Button,
+  EmptyState,
+  FilterChip,
+  FilterChips,
+  LinkButton,
+  ListFooter,
+  ModuleToolbar,
+  PageHead,
+  SearchInput,
+  SkeletonRows,
+  StatusBadge,
+} from "@/components/base";
 import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
-import { getHrSubmoduleConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
-import { DashGrid, DashCol, DashPanel, StatStrip, DashPill } from "@/components/dashboard/DashKit";
+import s from "./kpis.module.css";
 
 interface EngineerRow {
   engineerId: number;
@@ -129,10 +134,11 @@ async function apiFetch(path: string, token: string) {
   return res.json();
 }
 
+type FiltroCierre = "todos" | "altos" | "revisar";
+
 export default function HrKpisPage() {
   const { user } = useUser();
   useHrManagementGuard();
-  const viewCfg = useMemo(() => getHrSubmoduleConfig(user, "kpis"), [user]);
   const token = user?.token ?? "";
 
   const [insights, setInsights] = useState<PeopleInsights | null>(null);
@@ -141,6 +147,7 @@ export default function HrKpisPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQ, setSearchQ] = useState("");
   const deferredQ = useDeferredValue(searchQ);
+  const [cierre, setCierre] = useState<FiltroCierre>("todos");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -162,267 +169,306 @@ export default function HrKpisPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  // Promedio de cierre de todos los ingenieros que llegaron, no de la lista filtrada.
   const avgCompletion = useMemo(() => engineers.length
     ? Math.round(engineers.reduce((s, e) => s + e.completionRate, 0) / engineers.length)
     : 0, [engineers]);
 
-  const visibleEngineers = useMemo(() => {
+  const porTexto = useMemo(() => {
     const q = deferredQ.trim().toLowerCase();
     if (!q) return engineers;
     return engineers.filter((e) => e.engineerName.toLowerCase().includes(q));
   }, [engineers, deferredQ]);
+
+  const cuentas = useMemo(() => ({
+    todos: porTexto.length,
+    altos: porTexto.filter((e) => e.completionRate >= 80).length,
+    revisar: porTexto.filter((e) => e.completionRate < 80).length,
+  }), [porTexto]);
+
+  const visibleEngineers = useMemo(() => {
+    if (cierre === "altos") return porTexto.filter((e) => e.completionRate >= 80);
+    if (cierre === "revisar") return porTexto.filter((e) => e.completionRate < 80);
+    return porTexto;
+  }, [porTexto, cierre]);
 
   const presenceMax = useMemo(
     () => Math.max(1, ...(insights?.trends.present14d ?? []).map((x) => x.count)),
     [insights],
   );
 
-  const columns: Column<EngineerRow>[] = [
-    { key: "engineerName", label: "Ingeniero" },
-    { key: "totalActivities", label: "Órdenes (90 días)", width: 140, numeric: true, align: "right", render: (r) => <span style={{ fontVariantNumeric: "tabular-nums" }}>{r.totalActivities}</span> },
-    { key: "completed", label: "Cerradas", width: 100, numeric: true, align: "right", render: (r) => <span style={{ fontVariantNumeric: "tabular-nums" }}>{r.completed}</span> },
-    {
-      key: "completionRate", label: "Cierre",
-      render: (r) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 120 }}>
-          <div aria-hidden="true" style={{ flex: 1, height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
-            <div style={{
-              height: "100%", width: `${Math.min(100, Math.max(0, r.completionRate))}%`,
-              background: r.completionRate >= 80 ? "var(--success)" : r.completionRate >= 60 ? "var(--primary)" : "var(--warning)",
-              borderRadius: 3,
-            }} />
-          </div>
-          <Tag size="sm" variant={r.completionRate >= 80 ? "positive" : r.completionRate >= 60 ? "accent" : "warning"}>
-            <span style={{ fontVariantNumeric: "tabular-nums" }}>{r.completionRate}%</span>
-          </Tag>
-        </div>
-      ),
-      width: 190,
-    },
-    {
-      key: "avgDurationMin", label: "Minutos por orden", width: 150, numeric: true, align: "right",
-      render: (r) => r.avgDurationMin != null
-        ? <span style={{ fontVariantNumeric: "tabular-nums" }}>{r.avgDurationMin} min</span>
-        : <span style={{ color: "var(--text-tertiary)" }}>Sin dato</span>,
-    },
-  ];
-
   const k = insights?.kpis;
   const initialLoading = loading && !insights;
+  const hayFiltros = Boolean(searchQ.trim()) || cierre !== "todos";
+  const quitar = () => {
+    setSearchQ("");
+    setCierre("todos");
+  };
+  const unidad = visibleEngineers.length === 1 ? "ingeniero" : "ingenieros";
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Recursos Humanos"
-        title="Indicadores de personas"
-        subtitle={viewCfg.subtitle || "Asistencia, puntualidad, carga de trabajo, rotación, permisos y productividad en campo."}
-        meta={insights?.generatedAt ? (
-          <Tag variant="default" size="sm">
-            Actualizado {new Date(insights.generatedAt).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-          </Tag>
-        ) : undefined}
-        actions={
-          <Button variant="ghost" size="sm" loading={loading && !!insights} onClick={() => void load()}>Actualizar</Button>
-        }
-      />
+    <div className={s.pagina}>
+      <PageHead title="KPIs de personas" back={{ href: "/erp/hr", label: "Plantilla" }} />
 
-      <HrModuleRail />
+      {initialLoading ? <SkeletonRows rows={5} label="Cargando indicadores" /> : null}
 
-      {initialLoading && <SkeletonList rows={5} />}
+      {error ? (
+        <Alert tone={insights ? "warning" : "danger"} role="alert" action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}>
+          {error}
+        </Alert>
+      ) : null}
 
-      {error && insights && (
-        <InlineAlert
-          variant="warning"
-          title="No se pudo actualizar"
-          message={`${error} Mostramos la última información cargada.`}
-          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
-          style={{ marginBottom: 12 }}
-        />
-      )}
-      {error && !insights && !loading && (
-        <InlineAlert
-          variant="danger"
-          title="No se pudieron cargar los indicadores"
-          message={error}
-          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
-        />
-      )}
-
-      {insights && k && (
+      {insights && k ? (
         <>
-          <StatStrip
-            stats={[
-              { label: "Plantilla activa", value: k.headcount, sub: `${k.hires12m} altas en 12 meses`, big: true },
-              { label: "Rotación", value: `${nf1.format(k.turnoverPct)}%`, tone: k.turnoverPct > 15 ? "warning" : "positive", sub: `${k.inactiveOrBaja} bajas o inactivas` },
-              { label: "Puntualidad (30 días)", value: `${nf1.format(k.punctualityPct)}%`, tone: k.punctualityPct >= 90 ? "positive" : "warning" },
-              { label: "Presentes por día", value: nf1.format(k.avgDailyPresent), tone: "accent" },
-              { label: "Permisos por aprobar", value: k.pendingLeaves, tone: k.pendingLeaves ? "warning" : "default" },
-              { label: "Cierre de órdenes", value: `${avgCompletion}%`, sub: "Promedio de ingenieros, 90 días" },
-            ]}
-          />
-
-          {insights.alerts.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "16px 0" }}>
-              {insights.alerts.map((a) => (
-                <InlineAlert key={a.message} variant={a.severity === "danger" ? "danger" : "warning"} message={a.message} dense />
-              ))}
+          <dl className={s.cifras}>
+            <div className={s.cifra}>
+              <dt>Plantilla activa</dt>
+              <dd>
+                {k.headcount}
+                <br />
+                <small>{k.hires12m} altas en 12 meses</small>
+              </dd>
             </div>
-          )}
+            <div className={s.cifra}>
+              <dt>Rotación</dt>
+              <dd className={k.turnoverPct > 15 ? s.aviso : s.ok}>
+                {nf1.format(k.turnoverPct)}%
+                <br />
+                <small>{k.inactiveOrBaja} bajas o inactivas</small>
+              </dd>
+            </div>
+            <div className={s.cifra}>
+              <dt>Puntualidad (30 días)</dt>
+              <dd className={k.punctualityPct >= 90 ? s.ok : s.aviso}>{nf1.format(k.punctualityPct)}%</dd>
+            </div>
+            <div className={s.cifra}>
+              <dt>Presentes por día</dt>
+              <dd>{nf1.format(k.avgDailyPresent)}</dd>
+            </div>
+            <div className={s.cifra}>
+              <dt>Permisos por aprobar</dt>
+              <dd className={k.pendingLeaves ? s.aviso : undefined}>{k.pendingLeaves}</dd>
+            </div>
+            <div className={s.cifra}>
+              <dt>Cierre de órdenes</dt>
+              <dd>
+                {avgCompletion}%
+                <br />
+                <small>Promedio de ingenieros, 90 días</small>
+              </dd>
+            </div>
+          </dl>
 
-          <div style={{ marginTop: 16 }}>
-            <DashGrid>
-              <DashCol span={6}>
-                <DashPanel title="Presencia en los últimos 14 días" subtitle="Personas con jornada registrada por día">
-                  <ol aria-label="Personas presentes por día" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", alignItems: "flex-end", gap: 4, height: 72 }}>
-                    {insights.trends.present14d.map((p) => (
-                      <li
-                        key={p.date}
-                        title={`${shortDay(p.date)}: ${p.count}`}
-                        aria-label={`${shortDay(p.date)}: ${p.count} ${p.count === 1 ? "persona" : "personas"}`}
-                        style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}
-                      >
-                        <div aria-hidden="true" style={{
-                          width: "100%",
-                          height: `${Math.max(4, (p.count / presenceMax) * 56)}px`,
-                          background: "var(--primary)",
-                          borderRadius: 3,
-                          opacity: p.count ? 1 : 0.25,
-                        }} />
-                      </li>
-                    ))}
-                  </ol>
-                  <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <DashPill tone={k.lateEvents30d ? "warning" : "positive"}>Tardanzas (30 días): {k.lateEvents30d}</DashPill>
-                    <DashPill tone={k.lunchLate30d ? "warning" : "neutral"}>Regresos tarde de comida: {k.lunchLate30d}</DashPill>
-                    <DashPill tone="accent">Calificación promedio: {nf1.format(k.avgPerformanceRating)} de 5</DashPill>
-                  </div>
-                </DashPanel>
-              </DashCol>
-              <DashCol span={6}>
-                <DashPanel title="Personas por área" subtitle="Plantilla activa">
-                  {insights.distributions.byDepartment.length === 0 ? (
-                    <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Nadie tiene área asignada todavía.</span>
-                  ) : (
-                    <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-                      {insights.distributions.byDepartment.slice(0, 8).map((d) => (
-                        <li key={d.name} style={{ display: "grid", gridTemplateColumns: "minmax(90px, 140px) 1fr 36px", gap: 10, alignItems: "center" }}>
-                          <span style={{ fontSize: 12.5, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={d.name}>{d.name}</span>
-                          <div aria-hidden="true" style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                            <div style={{
-                              height: "100%",
-                              width: `${(d.count / Math.max(1, k.headcount)) * 100}%`,
-                              background: "var(--primary)", borderRadius: 3,
-                            }} />
-                          </div>
-                          <span style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{d.count}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </DashPanel>
-              </DashCol>
-              <DashCol span={6}>
-                <DashPanel title="Mayor carga de trabajo" subtitle="Horas promedio por día, últimos 30 días">
-                  <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10, maxHeight: 240, overflowY: "auto" }}>
-                    {insights.workloadTop.map((w) => (
-                      <li key={w.userId} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, gap: 8 }}>
-                        <div style={{ minWidth: 0 }}>
-                          <Link href={`/erp/hr/${w.userId}`} style={{ fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}>{w.nombre}</Link>
-                          <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{[w.department, `${days(w.daysPresent)} con asistencia`].filter(Boolean).join(" · ")}</div>
-                        </div>
-                        <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <strong style={{ fontVariantNumeric: "tabular-nums" }}>{nf1.format(w.avgMinutes / 60)} h</strong>
-                          {w.lateCount > 0 && (
-                            <div style={{ fontSize: 12, color: "var(--state-warning-text)" }}>
-                              {w.lateCount === 1 ? "1 tardanza" : `${w.lateCount} tardanzas`}
-                            </div>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                    {!insights.workloadTop.length && <li style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Sin asistencia en los últimos 30 días.</li>}
-                  </ul>
-                </DashPanel>
-              </DashCol>
-              <DashCol span={6}>
-                <DashPanel title="Permisos por aprobar" subtitle="Solicitudes en espera de Recursos Humanos">
-                  <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8, maxHeight: 240, overflowY: "auto" }}>
-                    {insights.pendingLeaveQueue.map((l) => (
-                      <li key={l.id} style={{ fontSize: 13, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
-                        <strong>{l.user.nombre}</strong> · {LEAVE_TYPE_LABEL[l.type] ?? "Otro permiso"} · {days(l.days)}
-                        <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                          Desde el {new Date(l.startDate).toLocaleDateString("es-MX", { day: "numeric", month: "long" })}
-                        </div>
-                      </li>
-                    ))}
-                    {!insights.pendingLeaveQueue.length && <li style={{ fontSize: 13, color: "var(--text-tertiary)" }}>No hay permisos pendientes.</li>}
-                  </ul>
-                  {insights.pendingLeaveQueue.length > 0 && (
-                    <Link href="/erp/hr" style={{ display: "inline-block", marginTop: 10, fontSize: 13, color: "var(--primary)", padding: "6px 0" }}>
-                      Revisar en Plantilla → Permisos
-                    </Link>
-                  )}
-                </DashPanel>
-              </DashCol>
-            </DashGrid>
+          {insights.alerts.map((a) => (
+            <Alert key={a.message} tone={a.severity === "danger" ? "danger" : "warning"}>
+              {a.message}
+            </Alert>
+          ))}
+
+          <div className={s.paneles}>
+            <section className={s.panel} aria-label="Presencia en los últimos 14 días">
+              <h2>Presencia en 14 días</h2>
+              <p>Personas con jornada registrada por día.</p>
+              <ol className={s.barras} aria-label="Personas presentes por día">
+                {insights.trends.present14d.map((p) => (
+                  <li key={p.date} title={`${shortDay(p.date)}: ${p.count}`}>
+                    <span
+                      className={s.barra}
+                      style={{ height: `${Math.max(4, (p.count / presenceMax) * 56)}px`, opacity: p.count ? 1 : 0.25 }}
+                      aria-label={`${shortDay(p.date)}: ${p.count} ${p.count === 1 ? "persona" : "personas"}`}
+                    />
+                  </li>
+                ))}
+              </ol>
+              <ul className={s.cargas}>
+                <li className={s.carga}>
+                  <span>Tardanzas (30 días)</span>
+                  <span className={s.numero}>{k.lateEvents30d}</span>
+                </li>
+                <li className={s.carga}>
+                  <span>Regresos tarde de comida</span>
+                  <span className={s.numero}>{k.lunchLate30d}</span>
+                </li>
+                <li className={s.carga}>
+                  <span>Calificación promedio</span>
+                  <span className={s.numero}>{nf1.format(k.avgPerformanceRating)} de 5</span>
+                </li>
+              </ul>
+            </section>
+
+            <section className={s.panel} aria-label="Personas por área">
+              <h2>Personas por área</h2>
+              <p>Plantilla activa.</p>
+              {insights.distributions.byDepartment.length === 0 ? (
+                <p className={s.vacio}>Nadie tiene área asignada.</p>
+              ) : (
+                <ul className={s.areas}>
+                  {insights.distributions.byDepartment.slice(0, 8).map((d) => (
+                    <li key={d.name} className={s.area}>
+                      <span className={s.nombre}>{d.name}</span>
+                      <span className={s.pista} aria-hidden="true">
+                        <span style={{ width: `${(d.count / Math.max(1, k.headcount)) * 100}%` }} />
+                      </span>
+                      <span className={s.numero}>{d.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className={s.panel} aria-label="Mayor carga de trabajo">
+              <h2>Mayor carga</h2>
+              <p>Horas promedio por día, últimos 30 días.</p>
+              {insights.workloadTop.length === 0 ? (
+                <p className={s.vacio}>Sin asistencia en los últimos 30 días.</p>
+              ) : (
+                <ul className={s.cargas}>
+                  {insights.workloadTop.map((w) => (
+                    <li key={w.userId} className={s.carga}>
+                      <span>
+                        <Link href={`/erp/hr/${w.userId}`} className={s.nombre}>{w.nombre}</Link>
+                        <span className={s.meta}>{[w.department, `${days(w.daysPresent)} con asistencia`].filter(Boolean).join(" · ")}</span>
+                      </span>
+                      <span className={s.numero}>
+                        {nf1.format(w.avgMinutes / 60)} h
+                        {w.lateCount > 0 ? (
+                          <span className={s.meta}>{w.lateCount === 1 ? "1 tardanza" : `${w.lateCount} tardanzas`}</span>
+                        ) : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className={s.panel} aria-label="Permisos por aprobar">
+              <h2>Permisos por aprobar</h2>
+              <p>Solicitudes en espera.</p>
+              {insights.pendingLeaveQueue.length === 0 ? (
+                <p className={s.vacio}>No hay permisos pendientes.</p>
+              ) : (
+                <ul className={s.permisos}>
+                  {insights.pendingLeaveQueue.map((l) => (
+                    <li key={l.id} className={s.permiso}>
+                      <span className={s.nombre}>{l.user.nombre}</span>
+                      <span>{LEAVE_TYPE_LABEL[l.type] ?? "Otro permiso"}</span>
+                      <span className={s.numero}>{days(l.days)}</span>
+                      <span className={s.meta}>
+                        Desde el {new Date(l.startDate).toLocaleDateString("es-MX", { day: "numeric", month: "long" })}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {insights.pendingLeaveQueue.length > 0 ? (
+                <p>
+                  <Link href="/erp/hr" className={s.nombre}>Revisar en Plantilla</Link>
+                </p>
+              ) : null}
+            </section>
           </div>
 
-          <Section title="Productividad en campo" subtitle="Órdenes de trabajo de los últimos 90 días">
-            <FilterToolbar
-              search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar ingeniero…", ariaLabel: "Buscar ingeniero" }}
-              onClear={() => setSearchQ("")}
-              resultCount={visibleEngineers.length}
-              rightActions={engineers.length > 0 ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconLeft="⬇"
-                  onClick={() => exportToExcel(visibleEngineers, [
-                    { key: "engineerName", label: "Ingeniero" },
-                    { key: "totalActivities", label: "Órdenes (90 días)" },
-                    { key: "completed", label: "Cerradas" },
-                    { key: "completionRate", label: "% de cierre", format: (v) => `${String(v)}%` },
-                    { key: "avgDurationMin", label: "Minutos promedio por orden" },
-                  ], "indicadores-ingenieros")}
-                >
-                  Exportar a Excel
-                </Button>
-              ) : undefined}
+          <section className={s.tabla} aria-label="Productividad en campo">
+            <ModuleToolbar
+              search={
+                <SearchInput
+                  aria-label="Buscar ingeniero"
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  placeholder="Nombre"
+                />
+              }
+              chips={
+                <FilterChips ariaLabel="Filtrar por cierre">
+                  <FilterChip active={cierre === "todos"} count={cuentas.todos} onClick={() => setCierre("todos")}>Todos</FilterChip>
+                  <FilterChip active={cierre === "altos"} count={cuentas.altos} onClick={() => setCierre(cierre === "altos" ? "todos" : "altos")}>Cierre alto</FilterChip>
+                  <FilterChip active={cierre === "revisar"} count={cuentas.revisar} onClick={() => setCierre(cierre === "revisar" ? "todos" : "revisar")}>Por revisar</FilterChip>
+                </FilterChips>
+              }
+              end={
+                <>
+                  {hayFiltros ? <LinkButton onClick={quitar}>Quitar filtros</LinkButton> : null}
+                  {engineers.length > 0 ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => exportToExcel(visibleEngineers, [
+                        { key: "engineerName", label: "Ingeniero" },
+                        { key: "totalActivities", label: "Órdenes (90 días)" },
+                        { key: "completed", label: "Cerradas" },
+                        { key: "completionRate", label: "% de cierre", format: (v) => `${String(v)}%` },
+                        { key: "avgDurationMin", label: "Minutos promedio por orden" },
+                      ], "indicadores-ingenieros")}
+                    >
+                      Excel
+                    </Button>
+                  ) : null}
+                </>
+              }
             />
-            <DataTable
-              columns={columns}
-              rows={visibleEngineers}
-              rowKey={(r) => r.engineerId}
-              ariaLabel="Productividad por ingeniero"
-              emptyTitle={searchQ ? "Ningún ingeniero coincide" : "Sin datos"}
-              emptyDescription={searchQ ? "Prueba con otro nombre." : "No hay órdenes cerradas en los últimos 90 días."}
-            />
-          </Section>
+            {visibleEngineers.length === 0 ? (
+              <EmptyState
+                title={hayFiltros ? "Ningún ingeniero coincide." : "No hay órdenes en los últimos 90 días."}
+                tone="neutral"
+                action={hayFiltros ? <Button size="sm" onClick={quitar}>Quitar filtros</Button> : undefined}
+              />
+            ) : (
+              <>
+                <div className={s.cabecera} aria-hidden="true">
+                  <span>Ingeniero</span>
+                  <span>Órdenes</span>
+                  <span>Cerradas</span>
+                  <span>Cierre</span>
+                  <span>Minutos</span>
+                </div>
+                <ul className={s.ingenieros}>
+                  {visibleEngineers.map((r) => (
+                    <li key={r.engineerId} className={s.ingeniero}>
+                      <span className={s.nombre}>{r.engineerName}</span>
+                      <span className={s.numero}>{r.totalActivities}</span>
+                      <span className={s.numero}>{r.completed}</span>
+                      <span className={s.cierre}>
+                        <span className={s.pista} aria-hidden="true">
+                          <span style={{ width: `${Math.min(100, Math.max(0, r.completionRate))}%` }} />
+                        </span>
+                        <StatusBadge
+                          label={`${r.completionRate}%`}
+                          tone={r.completionRate >= 80 ? "success" : r.completionRate >= 60 ? "brand" : "warning"}
+                          size="sm"
+                        />
+                      </span>
+                      <span className={s.numero}>{r.avgDurationMin != null ? `${r.avgDurationMin} min` : "Sin dato"}</span>
+                    </li>
+                  ))}
+                </ul>
+                <ListFooter total={visibleEngineers.length} unit={unidad} />
+              </>
+            )}
+          </section>
 
-          {insights.recentReviews.length > 0 && (
-            <Section
-              title="Evaluaciones recientes"
-              subtitle={`${k.reviewsCount} ${k.reviewsCount === 1 ? "evaluación" : "evaluaciones"} en total · promedio ${nf1.format(k.avgPerformanceRating)} de 5`}
-            >
-              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+          {insights.recentReviews.length > 0 ? (
+            <section className={s.panel} aria-label="Evaluaciones recientes">
+              <h2>Evaluaciones recientes</h2>
+              <p>
+                {k.reviewsCount} {k.reviewsCount === 1 ? "evaluación" : "evaluaciones"} en total · promedio {nf1.format(k.avgPerformanceRating)} de 5.
+              </p>
+              <ul className={s.evaluaciones}>
                 {insights.recentReviews.map((r) => (
-                  <li key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 13, padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
+                  <li key={r.id} className={s.evaluacion}>
                     <span>
-                      <strong>{r.user.nombre}</strong> · {REVIEW_PERIOD_LABEL[r.period] ?? "Otro periodo"} · evaluó {r.reviewer.nombre}
+                      <span className={s.nombre}>{r.user.nombre}</span>
+                      <span className={s.meta}>{REVIEW_PERIOD_LABEL[r.period] ?? "Otro periodo"} · evaluó {r.reviewer.nombre}</span>
                     </span>
-                    <span style={{ display: "flex", gap: 6 }}>
-                      <Tag size="sm" variant={r.overallRating >= 4 ? "positive" : r.overallRating >= 3 ? "accent" : "warning"}>
-                        <span style={{ fontVariantNumeric: "tabular-nums" }}>{nf1.format(r.overallRating)} de 5</span>
-                      </Tag>
-                      <Tag size="sm" variant="default">{REVIEW_STATUS_LABEL[r.status] ?? "Sin estado"}</Tag>
-                    </span>
+                    <span className={s.numero}>{nf1.format(r.overallRating)} de 5</span>
+                    <span>{REVIEW_STATUS_LABEL[r.status] ?? "Sin estado"}</span>
                   </li>
                 ))}
               </ul>
-            </Section>
-          )}
+              <ListFooter total={insights.recentReviews.length} unit={insights.recentReviews.length === 1 ? "evaluación" : "evaluaciones"} />
+            </section>
+          ) : null}
         </>
-      )}
-    </>
+      ) : null}
+    </div>
   );
 }
