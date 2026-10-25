@@ -185,8 +185,9 @@ export default function AsignadasPorMiView({
           </span>
           <span className={s.actividadTexto}>
             <span className={s.titulo}>{a.titulo}</span>
-            <span className={s.sub}>
-              <span className={c.folio}>{a.anNumber}</span> · {kindLabel(a)}
+            <span className={`${s.sub} nx-asig-meta`}>
+              <span className={c.folio}>{a.anNumber}</span>
+              <span className="nx-asig-tipo">{kindLabel(a)}</span>
             </span>
           </span>
         </span>
@@ -352,8 +353,7 @@ export default function AsignadasPorMiView({
         icon={<OutboxOutlinedIcon />}
         tone="neutral"
         titleAs="h2"
-        title="No asignaste actividades en este rango"
-        description="Cuando le asignes algo a tu equipo, aquí ves cómo va cada persona. Prueba con otro rango de fechas."
+        title="No asignaste actividades en este rango."
       />
     );
   } else {
@@ -377,7 +377,8 @@ export default function AsignadasPorMiView({
         rowActionsLabel="Acciones"
         flush
         ariaLabel="Actividades que asignaste"
-        emptyTitle="Ninguna asignación coincide con estos filtros"
+        emptyTitle="Ninguna asignación coincide con estos filtros."
+        emptyDescription=""
         emptyAction={
           hayFiltro ? (
             <Button size="sm" iconStart={<CloseIcon />} onClick={quitarFiltros}>
@@ -390,7 +391,38 @@ export default function AsignadasPorMiView({
   }
 
   return (
-    <div className={s.vista}>
+    <div className={`${s.vista} nx-asig-vista`}>
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .nx-asig-tipo::before { content: " \\00B7 "; }
+            @media (max-width: 480px) {
+              .nx-asig-vista table,
+              .nx-asig-vista tbody,
+              .nx-asig-vista tr,
+              .nx-asig-vista td {
+                display: block;
+                width: auto !important;
+              }
+              .nx-asig-vista thead { display: none; }
+              .nx-asig-vista tr {
+                border-bottom: 1px solid var(--ui-border);
+              }
+              .nx-asig-vista tr:last-child { border-bottom: 0; }
+              .nx-asig-vista td {
+                border-bottom: 0;
+                text-align: left !important;
+              }
+              .nx-asig-vista [class*="rowActions"] {
+                opacity: 1;
+                justify-content: flex-start;
+              }
+              .nx-asig-meta { display: grid; gap: 2px; }
+              .nx-asig-tipo::before { content: none; }
+            }
+          `,
+        }}
+      />
       {total > 0 ? (
         <StatRow cols={4} ariaLabel="Resumen de lo que asignaste">
           <Stat
