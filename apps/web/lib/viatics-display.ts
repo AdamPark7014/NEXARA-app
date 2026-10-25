@@ -96,7 +96,7 @@ export function revisarCuadreReparto(
 ): string | undefined {
   if (partes.length === 0) return undefined;
   if (partes.some((p) => !p.actividadId.trim())) {
-    return "Cada parte necesita la actividad a la que se carga. Completa la que falta o quítala.";
+    return "Cada parte necesita la actividad a la que se carga: completa la que falta o quítala.";
   }
   const totalCent = centavosViatico(total);
   const sumaCent = partes.reduce((acc, p) => acc + centavosViatico(p.monto), 0);

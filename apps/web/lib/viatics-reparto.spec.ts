@@ -35,6 +35,28 @@ describe("cuadre del reparto en la pantalla", () => {
     expect(aviso).toContain("actividad");
   });
 
+  it("pide la actividad que falta en una sola frase", () => {
+    // El texto viejo eran dos frases. El hecho es el mismo: cada parte carga
+    // a una actividad, y la que no la trae se completa o se quita.
+    const viejo =
+      "Cada parte necesita la actividad a la que se carga. Completa la que falta o quítala.";
+    const aviso = revisarCuadreReparto([parte("", "1200"), parte("  ", "0")], 1200);
+    const frases = (texto: string) => texto.split(/(?<=[.!?])\s+/).filter((f) => f.trim());
+    expect(frases(viejo)).toEqual([
+      "Cada parte necesita la actividad a la que se carga.",
+      "Completa la que falta o quítala.",
+    ]);
+    expect(aviso).toBe(
+      "Cada parte necesita la actividad a la que se carga: completa la que falta o quítala.",
+    );
+    expect(frases(aviso ?? "")).toHaveLength(1);
+    expect(aviso).not.toBe(viejo);
+    expect(aviso).toContain("la actividad a la que se carga");
+    expect(aviso).toContain("completa la que falta o quítala");
+    expect(aviso).not.toContain("Faltan");
+    expect(aviso).not.toContain("Sobran");
+  });
+
   it("cuenta en centavos enteros", () => {
     expect(centavosViatico("1200.55")).toBe(120055);
     expect(centavosViatico("")).toBe(0);
