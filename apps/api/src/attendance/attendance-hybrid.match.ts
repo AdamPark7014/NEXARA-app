@@ -112,6 +112,17 @@ export function horaEntradaGuardada(valor?: string | null): string | null {
 }
 
 /**
+ * Minutos de gracia de `work_schedules.graciaMin`.
+ * Si no viene, o no es un número ≥ 0, quedan los 15 de siempre.
+ */
+export function graciaMinGuardada(valor?: number | null): number {
+  if (typeof valor !== 'number' || !Number.isFinite(valor) || valor < 0) {
+    return RETARDO_GRACE_MINUTES;
+  }
+  return Math.round(valor);
+}
+
+/**
  * Hora de entrada contra la que se mide el retardo, en America/Mexico_City.
  *
  * Si la persona tiene `horaEntrada` guardada, manda esa. Si no (o no es `HH:MM`),
@@ -139,7 +150,7 @@ export function expectedEndHm(scheduleKey?: ScheduleLateKey): string | null {
 export function isLateVsSchedule(
   atIso: string | null | undefined,
   scheduleKey?: ScheduleLateKey,
-  opts?: { graceMinutes?: number; tz?: string; horaEntrada?: string | null },
+  opts?: { graceMinutes?: number | null; tz?: string; horaEntrada?: string | null },
 ): boolean {
   if (!atIso) return false;
   const hm = expectedStartHm(scheduleKey, opts?.horaEntrada);
@@ -148,7 +159,7 @@ export function isLateVsSchedule(
   if (Number.isNaN(at.getTime())) return false;
 
   const tz = opts?.tz || WORKDAY_TIMEZONE;
-  const grace = (opts?.graceMinutes ?? RETARDO_GRACE_MINUTES) * 60_000;
+  const grace = graciaMinGuardada(opts?.graceMinutes) * 60_000;
   const [hh, mm] = hm.split(':').map((n) => Number(n));
   if (!Number.isFinite(hh) || !Number.isFinite(mm)) return false;
 
@@ -219,6 +230,8 @@ export function hybridTimeFlags(opts: {
   scheduleKey?: ScheduleLateKey;
   /** `work_schedules.horaEntrada`. Vacía o inválida: manda la plantilla. */
   horaEntrada?: string | null;
+  /** `work_schedules.graciaMin`. Si no viene, 15 minutos. */
+  graciaMin?: number | null;
 }): HybridFlag[] {
   const flags: HybridFlag[] = [];
   const hasErp = Boolean(opts.erpCheckIn);
@@ -251,6 +264,7 @@ export function hybridTimeFlags(opts: {
   if (
     isLateVsSchedule(arrival, opts.scheduleKey, {
       horaEntrada: opts.horaEntrada,
+      graceMinutes: opts.graciaMin,
       tz: WORKDAY_TIMEZONE,
     })
   ) {

@@ -8,18 +8,19 @@ import { NotificationHierarchyService } from './notification-hierarchy.service.j
 
 const VIGILANTE = 90;
 
-function armar(opts: { roleKey: string; horaEntrada?: string | null; sinFila?: boolean }) {
+function armar(opts: { roleKey: string; horaEntrada?: string | null; graciaMin?: number | null; sinFila?: boolean }) {
   const createNotification = jest.fn(async () => ({}));
-  const fila = opts.sinFila
-    ? { nombre: 'Ana López', employeeNumber: 'NXR1', roleKey: opts.roleKey, tipoContrato: null, role: { orgRoleKey: null }, horario: null }
-    : {
-        nombre: 'Ana López',
-        employeeNumber: 'NXR1',
-        roleKey: opts.roleKey,
-        tipoContrato: null,
-        role: { orgRoleKey: null },
-        horario: opts.horaEntrada === undefined ? null : { horaEntrada: opts.horaEntrada },
-      };
+  const tieneHorario = !opts.sinFila && (opts.horaEntrada !== undefined || opts.graciaMin !== undefined);
+  const fila = {
+    nombre: 'Ana López',
+    employeeNumber: 'NXR1',
+    roleKey: opts.roleKey,
+    tipoContrato: null,
+    role: { orgRoleKey: null },
+    horario: tieneHorario
+      ? { horaEntrada: opts.horaEntrada ?? null, graciaMin: opts.graciaMin ?? null }
+      : null,
+  };
   const prisma = {
     user: {
       findUnique: jest.fn(async (args: { select?: { managerId?: boolean } }) => {
@@ -33,7 +34,10 @@ function armar(opts: { roleKey: string; horaEntrada?: string | null; sinFila?: b
   return { servicio, createNotification };
 }
 
-async function aviso(opts: { roleKey: string; horaEntrada?: string | null; sinFila?: boolean }, at: string) {
+async function aviso(
+  opts: { roleKey: string; horaEntrada?: string | null; graciaMin?: number | null; sinFila?: boolean },
+  at: string,
+) {
   const { servicio, createNotification } = armar(opts);
   await servicio.notifyAttendanceChange(4, 'ATTENDANCE_CHECKIN', 'Ana López', 'Recepción', new Date(at));
   expect(createNotification).toHaveBeenCalledTimes(1);
@@ -77,5 +81,11 @@ describe('aviso de entrada contra el horario propio', () => {
     const tarde = await aviso({ roleKey: 'ceo', horaEntrada: '09:00' }, '2026-10-20T15:20:00.000Z');
     expect(tarde.title).toBe('Ana López llegó con retardo');
     expect(tarde.message).toContain('Su horario inicia a las 9:00');
+  });
+
+  it('con graciaMin 5, las 10:10 ya son retardo contra las 10:00', async () => {
+    const n = await aviso({ roleKey: 'administrativo', graciaMin: 5 }, '2026-10-20T16:10:00.000Z');
+    expect(n.title).toBe('Ana López llegó con retardo');
+    expect(n.message).toContain('Su horario inicia a las 10:00');
   });
 });

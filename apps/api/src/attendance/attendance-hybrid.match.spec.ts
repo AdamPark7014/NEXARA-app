@@ -5,6 +5,7 @@ import {
   expectedEndHm,
   expectedStartHm,
   findAcsMatchKey,
+  graciaMinGuardada,
   horaEntradaGuardada,
   hybridTimeFlags,
   isLateVsSchedule,
@@ -182,5 +183,26 @@ describe('attendance-hybrid.match', () => {
         horaEntrada: '09:00',
       }),
     ).toContain('retardo');
+  });
+
+  it('usa graciaMin del horario y, si no viene, los 15 minutos', () => {
+    const tz = 'America/Mexico_City';
+    // 10:10 MX. Con 15 min de gracia no es retardo; con 5 sí. Contra las 10:00.
+    const diezDiez = '2026-10-20T16:10:00.000Z';
+    expect(graciaMinGuardada(null)).toBe(15);
+    expect(graciaMinGuardada(undefined)).toBe(15);
+    expect(graciaMinGuardada(-1)).toBe(15);
+    expect(graciaMinGuardada(5)).toBe(5);
+    expect(graciaMinGuardada(0)).toBe(0);
+
+    expect(isLateVsSchedule(diezDiez, 'office_hours', { tz })).toBe(false);
+    expect(isLateVsSchedule(diezDiez, 'office_hours', { tz, graceMinutes: 5 })).toBe(true);
+    expect(isLateVsSchedule(diezDiez, 'office_hours', { tz, graceMinutes: null })).toBe(false);
+    expect(
+      hybridTimeFlags({ erpCheckIn: diezDiez, scheduleKey: 'office_hours', graciaMin: 5 }),
+    ).toContain('retardo');
+    expect(
+      hybridTimeFlags({ erpCheckIn: diezDiez, scheduleKey: 'office_hours' }),
+    ).not.toContain('retardo');
   });
 });

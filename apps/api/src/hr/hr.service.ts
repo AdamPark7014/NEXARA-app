@@ -386,7 +386,7 @@ export class HrService {
       }),
       this.prisma.workSchedule.findMany({
         where: { companyId: tenantId },
-        select: { userId: true, horaEntrada: true },
+        select: { userId: true, horaEntrada: true, graciaMin: true },
       }),
     ]);
 
@@ -402,9 +402,9 @@ export class HrService {
     // Antes era `timestamp.getHours()` contra un 09:15 fijo. `getHours()` es la
     // hora local del proceso, que en el contenedor es UTC: una entrada a las
     // 08:30 de México se leía como las 14:30 y contaba retardo. Con eso, la
-    // plantilla entera salía impuntual. La gracia sigue en 15 min. Si el editor
-    // no guardó horaEntrada (o no es HH:MM), manda la plantilla: 10:00 para
-    // oficina y contratista; 24/7 y visitante no marcan retardo.
+    // plantilla entera salía impuntual. Si el editor no guardó horaEntrada (o no
+    // es HH:MM), manda la plantilla: 10:00 para oficina y contratista; 24/7 y
+    // visitante no marcan retardo. Si guardó graciaMin, esa sustituye los 15 min.
     const horarioPorUsuario = new Map<number, ReturnType<typeof buildAccessScheduleAssignment>>();
     for (const u of staff) {
       horarioPorUsuario.set(
@@ -418,9 +418,9 @@ export class HrService {
         }),
       );
     }
-    const horaEntradaPorUsuario = new Map<number, string | null>();
+    const propioPorUsuario = new Map<number, { horaEntrada: string | null; graciaMin: number | null }>();
     for (const h of horariosPropios) {
-      horaEntradaPorUsuario.set(h.userId, h.horaEntrada);
+      propioPorUsuario.set(h.userId, { horaEntrada: h.horaEntrada, graciaMin: h.graciaMin });
     }
     const lateByUser = new Map<number, number>();
     const presentDaysByUser = new Map<number, number>();
@@ -428,13 +428,15 @@ export class HrService {
     for (const e of entries30) {
       const plantilla = horarioPorUsuario.get(e.userId);
       if (!plantilla) continue;
-      const horaEntrada = horaEntradaPorUsuario.get(e.userId) ?? null;
+      const propio = propioPorUsuario.get(e.userId);
+      const horaEntrada = propio?.horaEntrada ?? null;
       // Sin hora propia y sin plantilla con horario (24/7, visitante): no hay retardo.
       if (!expectedStartHm(plantilla.key, horaEntrada)) continue;
       entradasConHorario += 1;
       if (
         isLateVsSchedule(e.timestamp.toISOString(), plantilla.key, {
           horaEntrada,
+          graceMinutes: propio?.graciaMin ?? null,
           tz: WORKDAY_TIMEZONE,
         })
       ) {

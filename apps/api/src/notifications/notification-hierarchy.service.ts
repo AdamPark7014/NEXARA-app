@@ -169,7 +169,7 @@ export class NotificationHierarchyService {
           roleKey: true,
           tipoContrato: true,
           role: { select: { orgRoleKey: true } },
-          horario: { select: { horaEntrada: true } },
+          horario: { select: { horaEntrada: true, graciaMin: true } },
         },
       });
       if (!user) return;
@@ -178,8 +178,9 @@ export class NotificationHierarchyService {
       const entrada = type === 'ATTENDANCE_CHECKIN';
       const hora = horaAviso(at);
 
-      // Retardo contra su hora de entrada, en America/Mexico_City, con 15 min de gracia.
+      // Retardo contra su hora de entrada, en America/Mexico_City.
       // Si el editor le guardó horaEntrada, manda esa. Si no, la plantilla (10:00).
+      // graciaMin guardada sustituye los 15 minutos; si no viene, se quedan.
       let horarioEsperado: string | null = null;
       if (entrada) {
         const plantilla = buildAccessScheduleAssignment({
@@ -190,9 +191,11 @@ export class NotificationHierarchyService {
           tipoContrato: user.tipoContrato,
         });
         const horaEntrada = user.horario?.horaEntrada ?? null;
+        const graciaMin = user.horario?.graciaMin ?? null;
         if (
           isLateVsSchedule(at.toISOString(), plantilla.key, {
             horaEntrada,
+            graceMinutes: graciaMin,
             tz: WORKDAY_TIMEZONE,
           })
         ) {

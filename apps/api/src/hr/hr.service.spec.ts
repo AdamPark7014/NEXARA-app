@@ -73,7 +73,7 @@ describe('HrService puntualidad contra horaEntrada', () => {
   function armar(opts: {
     staff: ReturnType<typeof persona>[];
     entries: Array<{ userId: number; timestamp: Date }>;
-    horarios: Array<{ userId: number; horaEntrada: string | null }>;
+    horarios: Array<{ userId: number; horaEntrada: string | null; graciaMin?: number | null }>;
   }) {
     const vacio = () => ({
       count: jest.fn().mockResolvedValue(0),
@@ -122,11 +122,27 @@ describe('HrService puntualidad contra horaEntrada', () => {
     expect(prisma.workSchedule.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { companyId: 7 },
-        select: { userId: true, horaEntrada: true },
+        select: { userId: true, horaEntrada: true, graciaMin: true },
       }),
     );
     expect(out.kpis.lateEvents30d).toBe(3);
     expect(out.kpis.punctualityPct).toBe(40);
     expect(out.lateLeaders.map((l) => l.userId).sort()).toEqual([1, 3, 5]);
+  });
+
+  it('con graciaMin 5 cuenta las 10:10; sin gracia se queda en 15 y no', async () => {
+    const { svc } = armar({
+      staff: [persona(1, 'administrativo'), persona(2, 'administrativo')],
+      horarios: [{ userId: 1, horaEntrada: null, graciaMin: 5 }],
+      entries: [
+        entrada(1, '2026-10-20T16:10:00.000Z'),
+        entrada(2, '2026-10-20T16:10:00.000Z'),
+      ],
+    });
+
+    const out = await svc.getPeopleInsights(7);
+    expect(out.kpis.lateEvents30d).toBe(1);
+    expect(out.kpis.punctualityPct).toBe(50);
+    expect(out.lateLeaders.map((l) => l.userId)).toEqual([1]);
   });
 });
