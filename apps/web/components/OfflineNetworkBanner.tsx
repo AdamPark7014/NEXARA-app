@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useUser } from "./UserContext";
-import { OFFLINE_QUEUE_STORAGE_KEY } from "@/lib/offline-queue";
+import { flushOfflineQueue, OFFLINE_QUEUE_STORAGE_KEY } from "@/lib/offline-queue";
 
 const countQueued = () => {
   try {
@@ -14,6 +14,21 @@ const countQueued = () => {
     return 0;
   }
 };
+
+function authHeader(userToken?: string | null): string | undefined {
+  if (userToken) return `Bearer ${userToken}`;
+  try {
+    const raw =
+      typeof window !== "undefined"
+        ? window.sessionStorage.getItem("clientSession") || window.sessionStorage.getItem("branchSession")
+        : null;
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as { token?: string };
+    return parsed?.token ? `Bearer ${parsed.token}` : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function hasPortalSession(): boolean {
   try {
@@ -76,6 +91,21 @@ export default function OfflineNetworkBanner() {
   const fgVar = "var(--foreground)";
   const borderVar = "var(--border)";
 
+  const lineas: string[] = [];
+  if (!online) lineas.push("Sin conexión");
+  if (offlineDegraded && online) {
+    lineas.push("Sesión sin validar");
+    lineas.push("reconecta para sincronizar");
+  }
+  if (queued > 0) {
+    lineas.push(`${queued} ${queued === 1 ? "operación" : "operaciones"} pendiente(s) de envío`);
+  }
+  if (queued === 0 && showOffline && !offlineDegraded) lineas.push("Modo sin conexión");
+
+  const reintentar = () => {
+    void flushOfflineQueue(() => authHeader(user?.token));
+  };
+
   return (
     <div
       role="status"
@@ -85,6 +115,10 @@ export default function OfflineNetworkBanner() {
         left: 0,
         right: 0,
         zIndex: 200000,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 2,
         padding: "8px 12px",
         fontSize: 13,
         fontWeight: 600,
@@ -94,10 +128,30 @@ export default function OfflineNetworkBanner() {
         borderBottom: `1px solid ${borderVar}`,
       }}
     >
-      {!online && "Sin conexión · "}
-      {offlineDegraded && online && "Sesión sin validar · reconecta para sincronizar · "}
-      {queued > 0 && `${queued} operación${queued === 1 ? "" : "es"} pendiente(s) de envío`}
-      {queued === 0 && showOffline && !offlineDegraded && "Modo sin conexión"}
+      {lineas.map((linea) => (
+        <span key={linea} style={{ display: "block", maxWidth: "100%" }}>
+          {linea}
+        </span>
+      ))}
+      {queued > 0 && (
+        <button
+          type="button"
+          onClick={reintentar}
+          style={{
+            margin: 0,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+            color: "inherit",
+            font: "inherit",
+            fontWeight: 700,
+            textDecoration: "underline",
+            cursor: "pointer",
+          }}
+        >
+          Reintentar
+        </button>
+      )}
     </div>
   );
 }

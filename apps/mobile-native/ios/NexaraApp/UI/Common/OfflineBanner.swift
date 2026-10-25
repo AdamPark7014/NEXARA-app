@@ -3,7 +3,7 @@ import SwiftUI
 /// Banda de conexión de arriba (Android `OfflineBanner`): ámbar #B45309 sin red,
 /// azul #0369A1 con cambios pendientes de subir; texto blanco 12 SemiBold. El
 /// color llega hasta la barra de estado, como `statusBarsPadding` en Android.
-/// Con red y pendientes, tocarla reintenta el envío.
+/// Con pendientes, «Reintentar» llama al mismo `replay`. Un dato por renglón.
 struct OfflineBanner: View {
     @ObservedObject private var network = NetworkMonitor.shared
     @State private var pending = 0
@@ -17,19 +17,11 @@ struct OfflineBanner: View {
             if DemoMode.isActive {
                 // Modo demostración: nada sale del teléfono, no hay banda de conexión.
                 EmptyView()
-            } else if !network.isOnline {
+            } else if !network.isOnline || pending > 0 {
                 banda(
-                    pending > 0
-                        ? "Sin conexión · \(pending) en cola (incl. fotos)"
-                        : "Sin conexión · cambios y fotos se encolan localmente",
-                    color: Self.ambar,
-                    tocable: false
-                )
-            } else if pending > 0 {
-                banda(
-                    "Pendientes de sync: \(pending) · toca para reintentar",
-                    color: Self.azul,
-                    tocable: true
+                    lineas(online: network.isOnline, pending: pending),
+                    color: network.isOnline ? Self.azul : Self.ambar,
+                    reintentar: pending > 0
                 )
             }
         }
@@ -41,33 +33,53 @@ struct OfflineBanner: View {
         }
     }
 
-    @ViewBuilder
-    private func banda(_ texto: String, color: Color, tocable: Bool) -> some View {
-        let contenido = Text(texto)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(Color.white)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(color.ignoresSafeArea(edges: .top))
-        if tocable {
-            Button {
-                guard !syncing else { return }
-                Task {
-                    syncing = true
-                    await OfflineSyncCoordinator.shared.replay()
-                    pending = OfflineMutationQueue.shared.pendingCount
-                    syncing = false
-                }
-            } label: {
-                contenido.contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint("Reintenta enviar los cambios pendientes")
-        } else {
-            contenido
-                .accessibilityAddTraits(.isStaticText)
+    private func lineas(online: Bool, pending: Int) -> [String] {
+        if !online && pending > 0 {
+            return ["Sin conexión", "\(pending) en cola (incl. fotos)"]
         }
+        if !online {
+            return ["Sin conexión", "cambios y fotos se encolan localmente"]
+        }
+        if pending > 0 {
+            return ["Pendientes de sync: \(pending)"]
+        }
+        return []
+    }
+
+    @ViewBuilder
+    private func banda(_ lineas: [String], color: Color, reintentar: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(lineas.enumerated()), id: \.offset) { _, linea in
+                Text(linea)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if reintentar {
+                Button {
+                    guard !syncing else { return }
+                    Task {
+                        syncing = true
+                        await OfflineSyncCoordinator.shared.replay()
+                        pending = OfflineMutationQueue.shared.pendingCount
+                        syncing = false
+                    }
+                } label: {
+                    Text("Reintentar")
+                        .font(.system(size: 12, weight: .semibold))
+                        .underline()
+                        .foregroundStyle(Color.white)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Reintenta enviar los cambios pendientes")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(color.ignoresSafeArea(edges: .top))
     }
 }
 
