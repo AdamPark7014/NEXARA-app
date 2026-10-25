@@ -17,17 +17,11 @@ function avisosDelDia(d: DiaKpi): ReactNode[] {
   if (d.retardo) out.push(<Badge key="r" tone="warning">Retardo {horasEnPalabras(d.minutosTarde)}</Badge>);
   if (d.conJornada && d.uniformeOk === false) out.push(<Badge key="u" tone="danger">Sin uniforme</Badge>);
   if (d.abierta) out.push(<Badge key="a" tone="success" dot>En jornada</Badge>);
-  if (d.sinSalida) {
-    out.push(
-      <Badge key="s" tone="warning" title="No checó salida: se contó hasta el cierre automático">
-        Sin salida
-      </Badge>,
-    );
-  }
-  if (d.cierreAutomatico) out.push(<Badge key="c" tone="violet" title="La puso el cierre automático de las 23:30">Salida automática</Badge>);
+  if (d.sinSalida) out.push(<Badge key="s" tone="warning">Sin salida</Badge>);
+  if (d.cierreAutomatico) out.push(<Badge key="c" tone="violet">Salida automática</Badge>);
   if (d.conJornada && d.actividadesFueraDeJornada) {
     out.push(
-      <Badge key="o" tone="warning" title="Empezaron sin checar entrada: no suman productividad">
+      <Badge key="o" tone="warning">
         {d.actividadesFueraDeJornada === 1 ? "1 sin checar entrada" : `${d.actividadesFueraDeJornada} sin checar entrada`}
       </Badge>,
     );
@@ -41,7 +35,7 @@ function sinJornada(d: DiaKpi): ReactNode {
   if (d.faltaJustificada) return <Badge tone="violet">Falta justificada</Badge>;
   if (d.actividadesFueraDeJornada) {
     return (
-      <Badge tone="warning" title="Trabajó sin checar entrada: esas actividades no cuentan">
+      <Badge tone="warning">
         {d.actividadesFueraDeJornada === 1 ? "1 sin checar entrada" : `${d.actividadesFueraDeJornada} sin checar entrada`}
       </Badge>
     );
@@ -70,7 +64,7 @@ function Pista({ d, escala }: { d: DiaKpi; escala: EscalaDias }) {
           b.tipo === "productivo"
             ? `${horaMx(b.inicio)}–${horaMx(b.fin)} · ${nombres.join(" + ") || "Actividad"}`
             : b.tipo === "comida"
-              ? `Comida ${horaMx(b.inicio)}–${horaMx(b.fin)} (no cuenta como jornada)`
+              ? `Comida ${horaMx(b.inicio)}–${horaMx(b.fin)}`
               : `Jornada ${horaMx(b.inicio)}–${horaMx(b.fin)}`;
         return (
           <span

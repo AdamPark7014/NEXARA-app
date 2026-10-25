@@ -321,19 +321,27 @@
     display: none !important;
   }
   .actFila {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "act cuenta"
-      "dia dur"
-      "porque porque";
+      "act"
+      "dia"
+      "dur"
+      "cuenta"
+      "porque";
     row-gap: 4px;
   }
   .actFila > :nth-child(1) { grid-area: dia; }
   .actFila > :nth-child(2) { grid-area: act; }
   .actFila > :nth-child(3) { display: none; }
+  .actFila > :nth-child(4),
+  .actFila > :nth-child(5) {
+    justify-self: start;
+    text-align: left;
+  }
   .actFila > :nth-child(4) { grid-area: dur; }
   .actFila > :nth-child(5) { grid-area: cuenta; }
-  .actFila > :nth-child(4)::before { content: "Duró "; color: var(--ui-fg-3); font-weight: 400; }
+  .actFila > :nth-child(1)::before { content: "Día "; color: var(--ui-fg-3); font-weight: 400; }
+  .actFila > :nth-child(4)::before { content: "Duración "; color: var(--ui-fg-3); font-weight: 400; }
   .actFila > :nth-child(5)::before { content: "Cuenta "; color: var(--ui-fg-3); font-weight: 400; }
   .actFila > :nth-child(6) { grid-area: porque; }
   .actFila > :nth-child(6) > * { white-space: normal; height: auto; padding: 3px 8px; line-height: 1.35; }
@@ -349,16 +357,58 @@
     padding: 0 var(--ui-s4);
   }
   .dia {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "etiqueta resumen"
-      "pista pista";
+      "etiqueta"
+      "resumen"
+      "pista";
   }
-  .diaEtiqueta,
+  .diaEtiqueta {
+    padding-bottom: 0;
+  }
   .diaResumen {
+    text-align: left;
+    padding-top: 0;
     padding-bottom: 4px;
   }
   .diaPista {
-    padding: 0 var(--ui-s4) var(--ui-s3);
+    padding: var(--ui-s2) var(--ui-s4) var(--ui-s3);
   }
+}
+
+/* Horas extra: en teléfono, un dato por renglón. */
+.extraFila {
+  grid-template-columns: minmax(11rem, 1.4fr) 6.5rem 6.5rem minmax(9rem, 1fr) minmax(11rem, 1.1fr);
+  column-gap: var(--ui-s4);
+}
+
+@media (max-width: 960px) {
+  .extraCabeza {
+    display: none !important;
+  }
+  .extraFila {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "dia"
+      "calc"
+      "auto"
+      "estado"
+      "acc";
+    row-gap: 6px;
+    align-items: start;
+  }
+  .extraFila > :nth-child(1) { grid-area: dia; }
+  .extraFila > :nth-child(2) { grid-area: calc; justify-self: start; text-align: left; }
+  .extraFila > :nth-child(3) { grid-area: auto; }
+  .extraFila > :nth-child(4) { grid-area: estado; }
+  .extraFila > :nth-child(5) { grid-area: acc; }
+  .extraFila > :nth-child(2)::before,
+  .extraFila > :nth-child(3)::before,
+  .extraFila > :nth-child(4)::before {
+    color: var(--ui-fg-3);
+    font-weight: 400;
+  }
+  .extraFila > :nth-child(2)::before { content: "Calculado "; }
+  .extraFila > :nth-child(3)::before { content: "Autorizar "; }
+  .extraFila > :nth-child(4)::before { content: "Estado "; }
 }

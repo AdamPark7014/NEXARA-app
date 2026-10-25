@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
-import { Alert, Avatar, Badge, Button, Card, CardHead, EmptyState, InfoPopover, PageHead, SkeletonRows, tabla } from "@/components/base";
+import { Alert, Avatar, Badge, Button, Card, CardHead, EmptyState, PageHead, SkeletonRows, tabla } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { PRESETS_NOMINA, RangoSelector } from "@/components/pizarra/PizarraKpi";
 import DiasEnLinea from "@/components/kpis/DiasEnLinea";
@@ -14,13 +14,11 @@ import { formatApiError } from "@/lib/erp-api";
 import { rangoDePreset, type BoardRange, type RangoPreset } from "@/lib/team-board-api";
 import { KPIS_PATH, fechaCorta, fetchKpisPersona, formatPctKpi, horaMx, rangoDesdeUrl, type KpisPersonaResponse } from "@/lib/kpis-equipo";
 import {
-  PESOS_CUMPLIMIENTO,
   actividadesDelRango,
   estadoDeEntrega,
   fechaHoraMx,
   horasEnPalabras,
   porQueCuenta,
-  resumenEnPalabras,
   revisionDeEntrega,
   tonoCumplimiento,
   tonoProductividad,
@@ -57,7 +55,7 @@ export default function KpisPersonaPage() {
       setData(await fetchKpisPersona(token, userId, rango));
     } catch (e) {
       // Si ya se veía un rango, se queda a la vista; solo se avisa.
-      setError(formatApiError(e, "No se pudo cargar el detalle"));
+      setError(formatApiError(e, "No se pudo cargar el detalle."));
     } finally {
       setCargando(false);
     }
@@ -90,26 +88,15 @@ export default function KpisPersonaPage() {
         title={data?.persona.nombre ?? "Detalle"}
         description={data ? [data.persona.puesto, data.horario.etiqueta].filter(Boolean).join(" · ") : undefined}
         actions={
-          <>
-            <RangoSelector
-              presets={PRESETS_NOMINA}
-              preset={preset}
-              rango={rango}
-              onChange={(p, r) => {
-                setPreset(p);
-                setRango(r);
-              }}
-            />
-            {data ? (
-              <InfoPopover label="¿Cómo se calcula?" title="Cómo se calcula">
-                <ul>
-                  {data.supuestos.map((x) => (
-                    <li key={x}>{x}</li>
-                  ))}
-                </ul>
-              </InfoPopover>
-            ) : null}
-          </>
+          <RangoSelector
+            presets={PRESETS_NOMINA}
+            preset={preset}
+            rango={rango}
+            onChange={(p, r) => {
+              setPreset(p);
+              setRango(r);
+            }}
+          />
         }
       />
 
@@ -139,11 +126,7 @@ export default function KpisPersonaPage() {
             <div className={st.resumen}>
               <div className={st.cifra}>
                 <Avatar url={data.persona.avatarUrl} name={data.persona.nombre} size={48} />
-                <div
-                  title={
-                    hayCumplimiento ? (pctGrande == null ? "Sin entregas que medir en estas fechas" : PESOS_CUMPLIMIENTO) : undefined
-                  }
-                >
+                <div>
                   <div
                     className={st.pct}
                     data-tono={hayCumplimiento ? tonoCumplimiento(pctGrande) : tonoProductividad(pctGrande)}
@@ -153,21 +136,28 @@ export default function KpisPersonaPage() {
                   <div className={st.pctEtiqueta}>{hayCumplimiento ? "cumplimiento" : "productividad"}</div>
                 </div>
               </div>
-              <div className={st.lectura}>
-                <p className={st.lecturaTexto}>
-                  {resumenEnPalabras(t, { conHorario: data.horario.entrada != null })}
-                </p>
-                <div className={st.datos}>
-                  <span>{t.diasConJornada} días con jornada</span>
-                  {hayCumplimiento ? (
-                    <span title="Minutos con el reloj de una actividad corriendo ÷ minutos en jornada">
-                      Tiempo en actividades {formatPctKpi(t.productividadPct)}
-                    </span>
-                  ) : null}
-                  <span title="Horas en jornada sin ninguna actividad abierta">Sin actividad {horasEnPalabras(t.minutosInactivos)}</span>
-                  {t.minutosExtra ? <span title="Arriba de 8 h netas entre semana, o todo lo del fin de semana">Extra {horasEnPalabras(t.minutosExtra)}</span> : null}
+              <dl className={st.datos}>
+                <div className={st.dato}>
+                  <dt>Días con jornada</dt>
+                  <dd>{t.diasConJornada}</dd>
                 </div>
-              </div>
+                {hayCumplimiento ? (
+                  <div className={st.dato}>
+                    <dt>Tiempo en actividades</dt>
+                    <dd>{formatPctKpi(t.productividadPct)}</dd>
+                  </div>
+                ) : null}
+                <div className={st.dato}>
+                  <dt>Sin actividad</dt>
+                  <dd>{horasEnPalabras(t.minutosInactivos)}</dd>
+                </div>
+                {t.minutosExtra ? (
+                  <div className={st.dato}>
+                    <dt>Extra</dt>
+                    <dd>{horasEnPalabras(t.minutosExtra)}</dd>
+                  </div>
+                ) : null}
+              </dl>
             </div>
             {/* De qué está hecho el cumplimiento: cada parte con su dato y lo que pesa. */}
             {partes.length ? (
@@ -183,10 +173,8 @@ export default function KpisPersonaPage() {
                     <span className={s.barra} aria-hidden="true">
                       <span className={s.barraProductiva} style={{ width: `${Math.max(0, Math.min(100, p.pct))}%` }} />
                     </span>
-                    <span className={st.parteDetalle}>
-                      {p.detalle}
-                      {p.peso > 0 ? ` · pesa ${p.peso} %` : ""}
-                    </span>
+                    <span className={st.parteDetalle}>{p.detalle}</span>
+                    {p.peso > 0 ? <span className={st.parteDetalle}>Pesa {p.peso} %</span> : null}
                   </li>
                 ))}
               </ul>
@@ -195,34 +183,16 @@ export default function KpisPersonaPage() {
 
           {entregas ? (
             <Card>
-              <CardHead
-                title="Entregas"
-                actions={
-                  <InfoPopover label="Cómo se miden las entregas" title="Cómo se miden">
-                    <p className={st.popParrafo}>
-                      <strong className={st.fuerte}>A tiempo</strong> es que la entregó antes de su límite; cuenta la
-                      hora en que la persona la entregó, no la hora en que el jefe la aprobó. Sin límite, cuenta a
-                      tiempo. <strong className={st.fuerte}>Sin entregar</strong> es que su límite ya pasó y no la ha
-                      entregado. <strong className={st.fuerte}>Aprobada a la primera</strong> es que el jefe no se la
-                      devolvió. <strong className={st.fuerte}>Tiempo</strong> es lo que de verdad trabajó en ella (su
-                      reloj) contra su tiempo máximo, o su estimado + 25 % si no tiene máximo.
-                    </p>
-                  </InfoPopover>
-                }
-              />
+              <CardHead title="Entregas" />
               {entregas.length ? (
                 <div className={tabla.tabla} role="table" aria-label="Entregas del rango">
                   <div className={`${tabla.cabeza} ${st.entFila} ${st.entCabeza}`} role="row">
                     <span role="columnheader">Actividad</span>
                     <span role="columnheader">Límite</span>
-                    <span role="columnheader" title="Cuándo la entregó la persona, no cuándo la aprobó el jefe">
-                      Entregada
-                    </span>
+                    <span role="columnheader">Entregada</span>
                     <span role="columnheader">Estado</span>
                     <span role="columnheader">Revisión</span>
-                    <span role="columnheader" title="Lo que trabajó en ella contra su tiempo máximo">
-                      Tiempo
-                    </span>
+                    <span role="columnheader">Tiempo</span>
                   </div>
                   {entregas.map((e, i) => {
                     const estado = estadoDeEntrega(e);
@@ -258,7 +228,6 @@ export default function KpisPersonaPage() {
                         <span
                           role="cell"
                           className={e.tiempo === "adecuado" || e.tiempo == null ? `${tabla.tenue} ${st.num}` : st.num}
-                          title={e.minutosPlan ? `Estimado: ${horasEnPalabras(e.minutosPlan)}` : undefined}
                         >
                           {e.minutosReales == null && e.minutosMaximo == null
                             ? "—"
@@ -273,7 +242,7 @@ export default function KpisPersonaPage() {
                   })}
                 </div>
               ) : (
-                <EmptyState title="Sin entregas en estas fechas" />
+                <EmptyState title="Sin entregas en estas fechas." />
               )}
             </Card>
           ) : null}
@@ -292,34 +261,22 @@ export default function KpisPersonaPage() {
             {data.dias.length ? (
               <DiasEnLinea dias={data.dias} />
             ) : (
-              <EmptyState icon={<EventBusyOutlinedIcon fontSize="inherit" aria-hidden="true" />} title="Sin jornadas en estas fechas" />
+              <EmptyState icon={<EventBusyOutlinedIcon fontSize="inherit" aria-hidden="true" />} title="Sin jornadas en estas fechas." />
             )}
           </Card>
 
           <Card>
-            <CardHead
-              title="Actividades"
-              actions={
-                <InfoPopover label="Cómo se cuentan las actividades" title="Cómo se cuentan">
-                  <p className={st.popParrafo}>
-                    <strong className={st.fuerte}>Duración</strong> es el tiempo real: de «Iniciar» (o la foto
-                    de entrada) al fin. <strong className={st.fuerte}>Cuenta</strong> es la parte que cayó
-                    dentro de sus horas laboradas; lo que pasa en la comida o fuera de la jornada no suma. Una actividad
-                    empezada sin checar entrada no cuenta.
-                  </p>
-                </InfoPopover>
-              }
-            />
+            <CardHead title="Actividades" />
             {actividades.length || diasFuera.length ? (
               <div className={tabla.tabla} role="table" aria-label="Actividades del rango">
                 <div className={`${tabla.cabeza} ${s.actFila} ${s.actCabeza}`} role="row">
                   <span role="columnheader">Día</span>
                   <span role="columnheader">Actividad</span>
                   <span role="columnheader">Horario</span>
-                  <span role="columnheader" className={tabla.num} title="Del inicio real al fin real">
+                  <span role="columnheader" className={tabla.num}>
                     Duración
                   </span>
-                  <span role="columnheader" className={tabla.num} title="Lo que cayó dentro de sus horas laboradas">
+                  <span role="columnheader" className={tabla.num}>
                     Cuenta
                   </span>
                   <span role="columnheader" />
@@ -358,15 +315,13 @@ export default function KpisPersonaPage() {
                     <span role="cell" className={tabla.num}>—</span>
                     <span role="cell" className={`${tabla.num} ${tabla.fuerte}`}>0 min</span>
                     <span role="cell">
-                      <Badge tone="danger" title="Empezó sin checar entrada, así que no suma productividad">
-                        No cuenta
-                      </Badge>
+                      <Badge tone="danger">No cuenta</Badge>
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <EmptyState title="Sin actividades en estas fechas" />
+              <EmptyState title="Sin actividades en estas fechas." />
             )}
           </Card>
 
