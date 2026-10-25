@@ -315,7 +315,7 @@ export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, lo
             <Dato label="Combustible" valor={combustible || "—"} />
           </div>
           <p className={styles.mini} style={{ margin: "0 0 10px" }}>
-            Revisa las fotos. Toca cualquiera para repetirla.
+            Revisa las fotos: toca cualquiera para repetirla.
           </p>
           <div className={styles.rejilla}>
             {[...SLOTS_VUELTA, SLOT_TABLERO].map((slot) => (

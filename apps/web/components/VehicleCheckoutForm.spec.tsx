@@ -25,6 +25,17 @@ async function subirVuelta(user: ReturnType<typeof userEvent.setup>) {
   }
 }
 
+/** Paso 4: la nota queda encima de las fotos ya tomadas. */
+async function llegarAConfirmar(user: ReturnType<typeof userEvent.setup>) {
+  await subirVuelta(user);
+  await user.click(screen.getByRole("button", { name: "Siguiente" }));
+  await user.upload(entradaDe(SLOT_TABLERO), imagen("tablero"));
+  await user.click(screen.getByRole("button", { name: "Siguiente" }));
+  await user.type(screen.getByRole("spinbutton"), "120345");
+  await user.click(screen.getByRole("button", { name: "1/2" }));
+  await user.click(screen.getByRole("button", { name: "Siguiente" }));
+}
+
 describe("VehicleCheckoutForm", () => {
   it("no deja pasar del primer paso sin las seis fotos, y dice cuáles faltan", async () => {
     const user = userEvent.setup();
@@ -42,6 +53,23 @@ describe("VehicleCheckoutForm", () => {
     await user.click(screen.getByRole("button", { name: "Siguiente" }));
     expect(screen.getByRole("alert")).toHaveTextContent(/Faltan 5 fotos/);
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("en confirmar, el aviso sobre las fotos cabe en una frase", async () => {
+    const user = userEvent.setup();
+    render(<VehicleCheckoutForm mode="salida" onSubmit={vi.fn(async () => undefined)} />);
+    await llegarAConfirmar(user);
+
+    const aviso = screen.getByText("Revisa las fotos: toca cualquiera para repetirla.");
+    // El texto viejo eran dos frases.
+    const textoViejo = "Revisa las fotos. Toca cualquiera para repetirla.";
+    expect(screen.queryByText(textoViejo)).not.toBeInTheDocument();
+    expect(aviso.textContent).toBe("Revisa las fotos: toca cualquiera para repetirla.");
+
+    const fotos = aviso.nextElementSibling;
+    expect(fotos).toHaveTextContent("Frente");
+    expect(fotos).toHaveTextContent("Tablero");
+    expect(fotos?.compareDocumentPosition(aviso) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 
   it("con la vuelta completa pasa al tablero, y sin tablero no avanza", async () => {
