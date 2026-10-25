@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
 import { FormSection, PageHead, SkeletonRows } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import {
@@ -60,19 +59,12 @@ export default function AutoAsignarmePage() {
   return (
     <div className={s.pagina}>
       <PageHead
-        breadcrumbs={[
-          { label: "Actividades", href: "/erp/pizarra" },
-          { label: "Mis actividades", href: "/erp/pizarra?vista=mias" },
-          { label: "Auto-asignarme" },
-        ]}
-        back={{ href: "/erp/pizarra?vista=mias", label: "Volver a Mis actividades" }}
-        icon={<PanToolOutlinedIcon />}
-        title="Auto-asignarme una actividad"
-        description="Queda solo a tu nombre, como ejecución directa. Ponle día, hora y cuánto te va a tomar; después la acomodas en tu cola."
+        back={{ href: "/erp/pizarra?vista=mias", label: "Mis actividades" }}
+        title="Nueva actividad"
       />
 
       <div className={s.pasos}>
-        <FormSection step={1} done={Boolean(kind)} title="¿Qué tipo de actividad es?">
+        <FormSection step={1} done={Boolean(kind)} title="Tipo">
           <RejillaOpciones ariaLabel="Tipo de actividad">
             {allowedKinds.map((id) => {
               const opt = ACTIVITY_KINDS[id];
@@ -83,7 +75,6 @@ export default function AutoAsignarmePage() {
                   onClick={() => setKind(id)}
                   icon={<ActivityKindIcon kind={opt.icon} variant="badge" size={36} />}
                   title={opt.title}
-                  help={opt.help}
                 />
               );
             })}
@@ -96,10 +87,9 @@ export default function AutoAsignarmePage() {
             title={
               <span className={s.titulo}>
                 <ActivityKindIcon kind={kindMeta.icon} size={18} />
-                <span>{kindMeta.title} · para ti</span>
+                <span>{kindMeta.title}</span>
               </span>
             }
-            description="Título, lugar, día y hora. Al guardar vuelves a tu cola con la actividad resaltada."
           >
             <OpsActivityForm
               key={kind}
@@ -119,7 +109,7 @@ export default function AutoAsignarmePage() {
             />
           </FormSection>
         ) : (
-          <p className={s.siguiente}>Elige un tipo para continuar.</p>
+          <p className={s.siguiente}>Elige un tipo.</p>
         )}
       </div>
     </div>

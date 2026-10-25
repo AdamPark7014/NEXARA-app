@@ -124,3 +124,9 @@
     display: none;
   }
 }
+
+@media (max-width: 480px) {
+  .esqueletos {
+    grid-template-columns: 1fr;
+  }
+}

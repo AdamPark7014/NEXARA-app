@@ -10,6 +10,22 @@
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
 }
 
+/* Subtipos de tarea: en escritorio se acomodan; en el teléfono, uno por renglón. */
+.tipos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+@media (max-width: 480px) {
+  .rejilla,
+  .rejilla[data-min="220"],
+  .tipos {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
+
 .tarjeta {
   position: relative;
   display: grid;
