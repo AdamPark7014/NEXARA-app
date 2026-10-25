@@ -101,29 +101,7 @@ export default function ChecadasRechazadas({ token, desde, hasta }: { token: str
               />
             </span>
             <InfoPopover label="¿Qué es esto?" title="Intentos rechazados">
-              <p className={estilo.popParrafo}>
-                Checadas que el servidor <strong className={estilo.fuerte}>no</strong> registró. No cuentan
-                como jornada ni llegan a nómina; quedan aquí para que se pueda ver quién intentó checar, desde
-                dónde y con qué teléfono.
-              </p>
-              <ul className={estilo.popLista}>
-                <li>
-                  <strong className={estilo.fuerte}>Ubicación simulada</strong>: el teléfono avisó que el
-                  punto lo produjo una app de GPS falso. Sus jefes reciben el aviso.
-                </li>
-                <li>
-                  <strong className={estilo.fuerte}>Viaje imposible</strong>: la distancia desde su checada
-                  anterior no se puede recorrer en ese tiempo.
-                </li>
-                <li>
-                  <strong className={estilo.fuerte}>Ubicación guardada</strong>: el teléfono mandó una
-                  posición de hace más de media hora en vez de medir una nueva.
-                </li>
-                <li>
-                  <strong className={estilo.fuerte}>Desde el navegador</strong>: alguien abrió la web para
-                  checar. Solo se checa desde la app; si no puede usar su teléfono, su jefe registra la checada.
-                </li>
-              </ul>
+              <p className={estilo.popParrafo}>El servidor no registró estas checadas.</p>
             </InfoPopover>
           </>
         }
@@ -146,8 +124,7 @@ export default function ChecadasRechazadas({ token, desde, hasta }: { token: str
           ) : null}
           {porGpsFalso > 0 ? (
             <Alert tone="warning">
-              {porGpsFalso === 1 ? "1 intento" : `${porGpsFalso} intentos`} con ubicación simulada en estas fechas. Sus
-              jefes ya recibieron el aviso.
+              {porGpsFalso === 1 ? "1 intento" : `${porGpsFalso} intentos`} con ubicación simulada en estas fechas.
             </Alert>
           ) : null}
         </div>
@@ -157,7 +134,7 @@ export default function ChecadasRechazadas({ token, desde, hasta }: { token: str
         <SkeletonRows rows={4} label="Buscando intentos rechazados" />
       ) : visibles.length ? (
         <div className={tabla.tabla} role="table" aria-label="Intentos de checada rechazados">
-          <div className={`${tabla.cabeza} ${estilo.rechazos}`} role="row">
+          <div className={`${tabla.cabeza} ${estilo.rechazos} ${estilo.cabecera}`} role="row">
             <span role="columnheader">Cuándo</span>
             <span role="columnheader">Persona</span>
             <span role="columnheader">Intentó</span>
@@ -168,24 +145,32 @@ export default function ChecadasRechazadas({ token, desde, hasta }: { token: str
           {visibles.map((r) => (
             <div key={r.id} className={`${tabla.fila} ${estilo.rechazos}`} role="row">
               <span className={tabla.num} role="cell">
+                <span className={estilo.dato}>Cuándo</span>
                 {fechaHora(r.at)}
               </span>
               <span className={tabla.celda} role="cell">
+                <span className={estilo.dato}>Persona</span>
                 <span className={tabla.fuerte}>{r.persona?.nombre ?? "—"}</span>
                 <span className={tabla.tenue}>{r.persona?.puesto ?? r.persona?.email ?? ""}</span>
               </span>
-              <span role="cell">{r.type === "salida" ? "Salida" : "Entrada"}</span>
+              <span role="cell">
+                <span className={estilo.dato}>Intentó</span>
+                {r.type === "salida" ? "Salida" : "Entrada"}
+              </span>
               <span className={tabla.celda} role="cell">
+                <span className={estilo.dato}>Motivo</span>
                 <Badge tone={TONO[r.motivo] ?? "outline"} dot>
                   {r.motivoEtiqueta || MOTIVO_RECHAZO_ETIQUETA[r.motivo] || r.motivo}
                 </Badge>
                 {r.detalle ? <span className={tabla.tenue}>{r.detalle}</span> : null}
               </span>
               <span className={tabla.celda} role="cell">
+                <span className={estilo.dato}>Aparato</span>
                 <span className={tabla.tenue}>{r.origen ? ORIGEN_ETIQUETA[r.origen] ?? r.origen : "—"}</span>
                 <span className={tabla.tenue}>{r.deviceInfo ?? ""}</span>
               </span>
               <span role="cell">
+                <span className={estilo.dato}>Dónde</span>
                 {r.lat != null && r.lng != null ? (
                   <a
                     href={googleMapsPointUrl(r.lat, r.lng)}

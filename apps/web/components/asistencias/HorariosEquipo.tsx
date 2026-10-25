@@ -125,19 +125,8 @@ export default function HorariosEquipo({
         actions={
           <InfoPopover label="¿Cómo funciona?" title="Horario de cada persona">
             <p className={estilo.popParrafo}>
-              Vacío significa <strong className={estilo.fuerte}>lo de siempre</strong>: entrada 10:00 y salida
-              18:00, 15 minutos de tolerancia, de lunes a viernes, jornada de 8 h netas de comida.
+              Vacío usa la plantilla de 10:00 a 18:00, 15 minutos, lunes a viernes y 8 horas.
             </p>
-            <ul className={estilo.popLista}>
-              <li>Cada casilla se decide por separado: cambiar la hora de entrada no cambia sus días ni su jornada.</li>
-              <li>La hora de salida es informativa. La jornada se mide con las checadas, no con ella.</li>
-              <li>
-                Poner una hora de entrada a quien no tenía (dirección 24/7, visitante) hace que a partir de ahí sí se
-                le cuenten retardos y tiempo extra.
-              </li>
-              <li>Borrar todo y guardar devuelve a la persona a su plantilla.</li>
-              <li>De esto salen el retardo y el tiempo extra, y de ahí la pre-nómina: queda registrado quién lo cambió.</li>
-            </ul>
           </InfoPopover>
         }
       />
@@ -171,12 +160,13 @@ export default function HorariosEquipo({
         error ? null : <SkeletonRows rows={4} label="Cargando horarios" />
       ) : personas.length ? (
         <div className={tabla.tabla} role="table" aria-label="Horario de cada persona">
-          <div className={`${tabla.cabeza} ${estilo.horarios}`} role="row">
+          <div className={`${tabla.cabeza} ${estilo.horarios} ${estilo.cabecera}`} role="row">
             <span role="columnheader">Persona</span>
             <span role="columnheader">Días</span>
             <span role="columnheader">Entra</span>
             <span role="columnheader">Sale</span>
-            <span role="columnheader">Jornada / tolerancia</span>
+            <span role="columnheader">Jornada</span>
+            <span role="columnheader">Tolerancia</span>
             <span role="columnheader">Origen</span>
             <span role="columnheader" />
           </div>
@@ -188,10 +178,12 @@ export default function HorariosEquipo({
             return (
               <div key={p.id} className={`${tabla.fila} ${estilo.horarios}`} role="row">
                 <span className={tabla.celda} role="cell">
+                  <span className={estilo.dato}>Persona</span>
                   <span className={tabla.fuerte}>{p.nombre}</span>
                   <span className={tabla.tenue}>{p.puesto ?? ""}</span>
                 </span>
                 <span role="cell">
+                  <span className={estilo.dato}>Días</span>
                   <span className={estilo.dias}>
                     {DIAS_SEMANA.map((d) => (
                       <Button
@@ -210,6 +202,7 @@ export default function HorariosEquipo({
                   </span>
                 </span>
                 <span role="cell">
+                  <span className={estilo.dato}>Entra</span>
                   <DateInput
                     type="time"
                     controlSize="sm"
@@ -220,6 +213,7 @@ export default function HorariosEquipo({
                   />
                 </span>
                 <span role="cell">
+                  <span className={estilo.dato}>Sale</span>
                   <DateInput
                     type="time"
                     controlSize="sm"
@@ -229,7 +223,8 @@ export default function HorariosEquipo({
                     onChange={(e) => editar(p.id, { horaSalida: e.target.value })}
                   />
                 </span>
-                <span className={estilo.acciones} role="cell">
+                <span role="cell">
+                  <span className={estilo.dato}>Jornada</span>
                   <Input
                     type="number"
                     controlSize="sm"
@@ -242,6 +237,9 @@ export default function HorariosEquipo({
                     aria-label={`Jornada diaria de ${p.nombre}, en horas`}
                     onChange={(e) => editar(p.id, { jornadaHoras: e.target.value })}
                   />
+                </span>
+                <span role="cell">
+                  <span className={estilo.dato}>Tolerancia</span>
                   <Input
                     type="number"
                     controlSize="sm"
@@ -255,6 +253,7 @@ export default function HorariosEquipo({
                   />
                 </span>
                 <span role="cell">
+                  <span className={estilo.dato}>Origen</span>
                   <span className={tabla.tenue}>{propio ? "Propio" : "Plantilla"}</span>
                 </span>
                 <span className={estilo.acciones} role="cell">

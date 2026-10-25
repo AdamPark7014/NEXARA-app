@@ -3,8 +3,7 @@
  *
  * Tres rejillas que usan los estilos de `tabla` (`components/base/tabla.module.css`):
  * intentos rechazados, horarios por persona y aprobación de horas extra. Renglón denso,
- * números a la derecha, y en teléfono cada fila se apila en dos renglones en vez de
- * obligar a un scroll horizontal.
+ * números a la derecha. En teléfono, horarios y rechazos dejan un dato por renglón.
  */
 
 /* ─── Intentos rechazados ────────────────────────────────────────────── */
@@ -19,7 +18,7 @@
 
 .horarios {
   grid-template-columns:
-    minmax(11rem, 1.4fr) minmax(8rem, 0.9fr) 6rem 6rem minmax(9rem, 1fr) 5.5rem 7.5rem;
+    minmax(10rem, 1.3fr) minmax(16rem, 1fr) 6.5rem 6.5rem 5.75rem 5.75rem 5.25rem 7rem;
   column-gap: var(--ui-s4);
 }
 
@@ -69,10 +68,16 @@
   gap: 6px;
 }
 
-/* Teléfono y tableta: la fila se apila en vez de encogerse hasta ser ilegible. */
+/* Nombre del dato: en la tabla lo dice la cabecera; en teléfono, el propio renglón. */
+.dato {
+  display: none;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  color: var(--ui-fg-3);
+}
+
+/* Teléfono y tableta: horas extra se apilan de dos en dos. Horarios y rechazos, un dato por renglón. */
 @media (max-width: 960px) {
-  .rechazos,
-  .horarios,
   .extra {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 4px 8px;
@@ -80,8 +85,43 @@
     padding-bottom: 10px;
   }
 
+  div.rechazos,
+  div.horarios {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 8px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .cabecera.rechazos,
+  .cabecera.horarios {
+    display: none;
+  }
+
+  .dato {
+    display: block;
+  }
+
+  .horarios > span,
+  .rechazos > span {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    justify-self: stretch;
+    text-align: left;
+    gap: 2px;
+    min-width: 0;
+  }
+
   .acciones {
     justify-content: flex-start;
+  }
+
+  /* La hora nativa no cabe en 6 rem cuando el reloj del teléfono se dibuja más grande. */
+  .horarios .campoCorto {
+    max-width: 8.5rem;
   }
 }
 
@@ -130,21 +170,9 @@
   gap: var(--ui-s3);
 }
 
-/* Ventanita de ayuda: párrafos y lista con el mismo ritmo. */
+/* Ventanita de ayuda: una frase. */
 .popParrafo {
-  margin: 0 0 var(--ui-s2);
-}
-
-.popLista {
   margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: var(--ui-s1);
-}
-
-.fuerte {
-  color: var(--ui-fg);
-  font-weight: 650;
 }
 
 /* Avisos dentro de una tarjeta, con el mismo margen que su cabecera. */
