@@ -82,7 +82,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 
 private fun ClientDto.subtitleLine(): String =
     listOfNotNull(taxId?.takeIf { it.isNotBlank() }, legalName?.takeIf { it.isNotBlank() })
-        .joinToString(" · ")
+        .joinToString("\n")
         .ifBlank { "Sin datos fiscales" }
 
 // ── Padrón ──────────────────────────────────────────────────────────────────
@@ -231,9 +231,9 @@ fun ClientsListScreen(
                                     .mapNotNull { ClientSector.fromApi(it)?.shortLabel }
                                     .joinToString(" · ")
                                     .ifBlank { null },
-                                // El chip dice «Inactivo»: el encargado baja a esta línea.
+                                // El chip dice «Inactivo»: el encargado baja a su propio renglón.
                                 encargado.takeIf { inactivo && state.showOwner },
-                            ).joinToString(" · ").ifBlank { null },
+                            ).joinToString("\n").ifBlank { null },
                             chipText = when {
                                 inactivo -> ClientRules.STATUS_INACTIVO
                                 state.showOwner -> encargado
@@ -381,20 +381,10 @@ fun ClientDetailScreen(
                     ClientFactRow("Razón social", client.legalName)
                     ClientFactRow("RFC", client.taxId)
                     ClientFactRow("Dirección", client.fiscalAddress)
-                    ClientFactRow(
-                        "CP / régimen",
-                        listOfNotNull(
-                            client.fiscalZipCode?.takeIf { it.isNotBlank() },
-                            client.fiscalRegime?.takeIf { it.isNotBlank() },
-                        ).joinToString(" · "),
-                    )
-                    ClientFactRow(
-                        "Contacto",
-                        listOfNotNull(
-                            client.billingEmail?.takeIf { it.isNotBlank() },
-                            client.billingPhone?.takeIf { it.isNotBlank() },
-                        ).joinToString(" · "),
-                    )
+                    ClientFactRow("Código postal", client.fiscalZipCode)
+                    ClientFactRow("Régimen", client.fiscalRegime)
+                    ClientFactRow("Correo", client.billingEmail)
+                    ClientFactRow("Teléfono", client.billingPhone)
                 }
             }
 

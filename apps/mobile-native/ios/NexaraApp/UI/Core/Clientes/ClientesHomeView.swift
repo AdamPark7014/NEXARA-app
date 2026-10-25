@@ -222,17 +222,17 @@ struct ClientesHomeView: View {
         let fiscal = [c.taxId, c.legalName]
             .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-            .joined(separator: " · ")
+            .joined(separator: "\n")
         let ownerName = (c.owner?.nombre ?? "")
             .split(whereSeparator: { $0.isWhitespace })
             .prefix(2)
             .joined(separator: " ")
         let encargado = ownerName.isEmpty ? "Sin encargado" : ownerName
         let sectores = c.clientSectors.map(\.padronEtiqueta).joined(separator: " · ")
-        // El chip dice «Inactivo»: el encargado baja a esta línea.
+        // El chip dice «Inactivo»: el encargado baja a su propio renglón.
         let meta = [sectores, (c.isInactive && showOwner) ? encargado : ""]
             .filter { !$0.isEmpty }
-            .joined(separator: " · ")
+            .joined(separator: "\n")
         let chip: String = c.isInactive ? "Inactivo" : (showOwner ? encargado : "Ver")
         let nombre = c.name.trimmingCharacters(in: .whitespaces)
         return NxListRow(
