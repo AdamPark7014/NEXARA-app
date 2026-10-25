@@ -36,6 +36,13 @@ export async function fetchVentanaWeb(token: string): Promise<VentanaWeb> {
 const formatoHasta = (iso: string) =>
   new Date(iso).toLocaleString("es-MX", { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
 
+/** Una frase: la ventana (si hay fecha), la marca desde el navegador, y la cámara con la ubicación. */
+export function textoAvisoAbierto(hasta: string | null): string {
+  const hecho =
+    "queda marcada como hecha desde el navegador: permite la cámara y la ubicación cuando el navegador te lo pida y, si puedes, usa la app NEXARA.";
+  return hasta ? `Abierto hasta el ${formatoHasta(hasta)}: tu checada ${hecho}` : `Tu checada ${hecho}`;
+}
+
 /** `setTimeout` no aguanta más de ~24 días; más allá basta con la consulta periódica. */
 const MAX_ESPERA_MS = 2_000_000_000;
 
@@ -91,8 +98,7 @@ export default function ChecarEnWeb({ token }: { token: string | null | undefine
     return (
       <div className={s.checar}>
         <Alert tone="warning" role="status" title="Checar desde la web está habilitado temporalmente">
-          {ventana.hasta ? `Abierto hasta el ${formatoHasta(ventana.hasta)}. ` : ""}Tu checada queda marcada como hecha desde el
-          navegador. Permite la cámara y la ubicación cuando el navegador te lo pida; si puedes, usa la app NEXARA.
+          {textoAvisoAbierto(ventana.hasta)}
         </Alert>
         <AttendanceForm compact />
       </div>
