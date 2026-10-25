@@ -16,7 +16,7 @@ struct SessionExpiredAlert: ViewModifier {
         content.alert("Sesión expirada", isPresented: $aviso.isPresented) {
             Button("Iniciar sesión") { aviso.acknowledge() }
         } message: {
-            Text("Tu sesión ya no es válida. Inicia sesión de nuevo para continuar.")
+            Text("Tu sesión expiró o ya no es válida y hay que iniciar sesión de nuevo.")
         }
     }
 }

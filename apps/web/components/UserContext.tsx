@@ -87,6 +87,9 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const USER_STORAGE_KEY = 'nexara_user';
 
+const AVISO_SESION_TERMINADA =
+	'Tu sesión expiró o ya no es válida y hay que iniciar sesión de nuevo.';
+
 /**
  * Marcador que ocupa el lugar del JWT en el estado persistido.
  *
@@ -355,7 +358,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 				cache: 'no-store',
 			});
 			if (response.status === 401 || response.status === 403) {
-				kickSession('Tu sesión expiró. Vuelve a iniciar sesión para continuar.');
+				kickSession(AVISO_SESION_TERMINADA);
 				return false;
 			}
 			if (!response.ok) return false;
@@ -391,7 +394,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 				if (cancelled) return;
 
 				if (response.status === 401 || response.status === 403) {
-					kickSession('Tu sesión ya no es válida. Inicia sesión de nuevo.');
+					kickSession(AVISO_SESION_TERMINADA);
 					return;
 				}
 
@@ -450,7 +453,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 				if (!online) {
 					setUser({ ...storedUser, offlineDegraded: true });
 				} else {
-					kickSession('Tu sesión expiró. Vuelve a iniciar sesión para continuar.');
+					kickSession(AVISO_SESION_TERMINADA);
 				}
 			} else {
 				setUser(storedUser);
@@ -471,7 +474,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 			setUser((prev) => {
 				if (!prev?.offlineDegraded) return prev;
 				if (isSessionExpired(prev)) {
-					kickSession('Tu sesión expiró. Vuelve a iniciar sesión para continuar.');
+					kickSession(AVISO_SESION_TERMINADA);
 					return null;
 				}
 				const { offlineDegraded: _o, ...rest } = prev;
@@ -501,7 +504,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 			const msLeft = expiresMs - Date.now();
 			setSessionExpiringSoon(msLeft > 0 && msLeft <= 5 * 60_000);
 			if (msLeft <= 0) {
-				kickSession('Tu sesión expiró. Vuelve a iniciar sesión para continuar.');
+				kickSession(AVISO_SESION_TERMINADA);
 			}
 		};
 		tick();
