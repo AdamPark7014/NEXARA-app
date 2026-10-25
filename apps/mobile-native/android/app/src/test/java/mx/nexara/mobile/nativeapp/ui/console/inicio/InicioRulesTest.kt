@@ -134,7 +134,7 @@ class InicioRulesTest {
 
     @Test
     fun detalleDeSiguienteUsaLugarYPlan() {
-        assertEquals("Farmacia San Rafael · 2 h", InicioRules.detalleSiguiente(act(1, cliente = "Farmacia San Rafael", minutosPlan = 120.0)))
+        assertEquals("Farmacia San Rafael\n2 h", InicioRules.detalleSiguiente(act(1, cliente = "Farmacia San Rafael", minutosPlan = 120.0)))
         assertEquals("Tarea", InicioRules.detalleSiguiente(act(1)))
         assertEquals("Obra Norte", InicioRules.lugar(act(1, proyecto = "Obra Norte")))
     }
