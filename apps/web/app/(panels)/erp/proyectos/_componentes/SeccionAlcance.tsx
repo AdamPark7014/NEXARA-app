@@ -18,6 +18,10 @@ import {
 import type { SeccionProps } from "./tipos";
 import styles from "./secciones.module.css";
 
+/** Una frase: copia los bloques como entregables y no los duplica si ya están. */
+export const avisoAlcanceCotizacion =
+  "Copia los bloques de alcance de la cotización como entregables: si ya los trajiste, no se duplican.";
+
 type Edicion = { kind: TipoAlcance; titulo: string; detalle: string };
 
 export default function SeccionAlcance({ proyecto: p, token, ocupado, mutar, confirmar }: SeccionProps) {
@@ -93,7 +97,7 @@ export default function SeccionAlcance({ proyecto: p, token, ocupado, mutar, con
           }
         >
           {" "}
-          Copia los bloques de alcance de la cotización como entregables. Si ya los trajiste, no se duplican.
+          {avisoAlcanceCotizacion}
         </Alert>
       ) : null}
 
