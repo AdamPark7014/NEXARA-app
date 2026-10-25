@@ -630,8 +630,7 @@ export class ViaticosService {
 
     if (!['Aprobado', 'Pagado'].includes(viatico.estatus)) {
       throw new BadRequestException(
-        `Este viático está en «${viatico.estatus}»: todavía no se ha entregado dinero que comprobar. ` +
-          'Espera a que se autorice y vuelve a intentarlo.',
+        `Este viático está en «${viatico.estatus}»: todavía no se ha entregado dinero que comprobar, espera a que se autorice y vuelve a intentarlo.`,
       );
     }
 
@@ -645,8 +644,7 @@ export class ViaticosService {
     const entregadoCent = aCentavos(viatico.montoAprobado ?? viatico.montoSolicitado);
     if (comprobadoCent > entregadoCent * 2) {
       throw new BadRequestException(
-        'Lo comprobado supera al doble de lo entregado. Revisa la cifra; si de verdad se gastó ' +
-          'tanto de más, levanta un viático nuevo por la diferencia en vez de inflar este.',
+        'Lo comprobado supera al doble de lo entregado: revisa la cifra y, si de verdad se gastó tanto de más, levanta un viático nuevo por la diferencia en vez de inflar este.',
       );
     }
 
@@ -712,8 +710,7 @@ export class ViaticosService {
     if (administra) return;
     if (Number(viatico.usuarioId) === Number(actor?.id)) return;
     throw new ForbiddenException(
-      `Solo puedes ${accion} tus propios viáticos. Este es de otra persona: ` +
-        'pídeselo a quien administra viáticos.',
+      `Solo puedes ${accion} tus propios viáticos: este es de otra persona, pídeselo a quien administra viáticos.`,
     );
   }
 
@@ -864,13 +861,12 @@ export class ViaticosService {
       const solicitadoCent = aCentavos(amount);
       if (!Number.isFinite(aprobadoCent) || aprobadoCent <= 0) {
         throw new BadRequestException(
-          'El monto autorizado tiene que ser mayor que cero. Si no vas a autorizar nada, rechaza la solicitud.',
+          'El monto autorizado tiene que ser mayor que cero: si no vas a autorizar nada, rechaza la solicitud.',
         );
       }
       if (aprobadoCent > solicitadoCent) {
         throw new BadRequestException(
-          `No puedes autorizar más de lo solicitado (${(solicitadoCent / 100).toFixed(2)}). ` +
-            'Si hace falta más dinero, que la persona levante otro viático por la diferencia.',
+          `No puedes autorizar más de lo solicitado (${(solicitadoCent / 100).toFixed(2)}): si hace falta más dinero, que la persona levante otro viático por la diferencia.`,
         );
       }
     }
