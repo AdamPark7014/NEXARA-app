@@ -75,7 +75,7 @@ class HerramientasChecklistRulesTest {
         assertEquals("1 de 3 listas", HerramientasChecklistRules.progresoTexto(items))
     }
 
-    // ── Mensaje (mismo texto que el 400 del API) ────────────────────────────
+    // ── Mensaje (una frase: lo que falta palomear) ──────────────────────────
 
     @Test
     fun emptyMessageWhenNothingIsPending() {
@@ -85,8 +85,7 @@ class HerramientasChecklistRulesTest {
     @Test
     fun singularMessage() {
         assertEquals(
-            "Falta palomear el checklist de herramientas antes de iniciar: Escalera. " +
-                "Si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.",
+            "Falta palomear el checklist de herramientas antes de iniciar: Escalera.",
             HerramientasChecklistRules.mensajePendiente(listOf("Escalera")),
         )
     }
@@ -94,8 +93,7 @@ class HerramientasChecklistRulesTest {
     @Test
     fun pluralMessage() {
         assertEquals(
-            "Faltan palomear el checklist de herramientas antes de iniciar: Escalera, Taladro. " +
-                "Si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.",
+            "Faltan palomear el checklist de herramientas antes de iniciar: Escalera, Taladro.",
             HerramientasChecklistRules.mensajePendiente(listOf("Escalera", "Taladro")),
         )
     }
@@ -104,8 +102,7 @@ class HerramientasChecklistRulesTest {
     fun longListIsTruncatedWithHowManyAreLeft() {
         val pendientes = listOf("A", "B", "C", "D", "E", "F")
         assertEquals(
-            "Faltan palomear el checklist de herramientas antes de iniciar: A, B, C, D y 2 más. " +
-                "Si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.",
+            "Faltan palomear el checklist de herramientas antes de iniciar: A, B, C, D y 2 más.",
             HerramientasChecklistRules.mensajePendiente(pendientes),
         )
     }

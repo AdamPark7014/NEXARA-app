@@ -44,8 +44,8 @@ import retrofit2.HttpException
  * «Herramientas a ocupar» del detalle de la OT.
  *
  * Regla del dueño: antes de atender la instalación o el servicio se palomea el
- * checklist. Mientras quede un renglón sin palomear, `iniciar` contesta 400 con el
- * texto de [HerramientasChecklistRules.mensajePendiente].
+ * checklist. Mientras quede un renglón sin palomear, `iniciar` se niega. El aviso
+ * local es una frase: [HerramientasChecklistRules.mensajePendiente].
  *
  * No se pinta nada cuando la OT no pide herramientas (o cuando quien mira no la
  * tiene asignada: el API contesta 403).
@@ -151,6 +151,13 @@ fun HerramientasChecklistSection(
 private fun cantidadTexto(cantidad: Double): String =
     if (cantidad % 1.0 == 0.0) cantidad.toLong().toString() else cantidad.toString()
 
+/** Cantidad, serie y SKU, cada uno en su renglón. */
+private fun datosDe(req: HerramientaRequisitoDto): List<String> = listOfNotNull(
+    req.cantidad?.takeIf { it > 0 }?.let { "x${cantidadTexto(it)}" },
+    req.herramienta?.serie?.takeIf { it.isNotBlank() }?.let { "Serie $it" },
+    req.producto?.sku?.takeIf { it.isNotBlank() },
+)
+
 /** Un renglón: qué es, cómo está y las dos únicas respuestas posibles. */
 @Composable
 private fun HerramientaRequisitoRow(
@@ -164,11 +171,7 @@ private fun HerramientaRequisitoRow(
         false -> "Falta" to CoreActivityRules.ROJO
         else -> "Sin revisar" to CoreActivityRules.GRIS
     }
-    val detalle = listOfNotNull(
-        req.cantidad?.takeIf { it > 0 }?.let { "x${cantidadTexto(it)}" },
-        req.herramienta?.serie?.takeIf { it.isNotBlank() }?.let { "Serie $it" },
-        req.producto?.sku?.takeIf { it.isNotBlank() },
-    ).joinToString(" · ")
+    val datos = datosDe(req)
 
     Column(
         Modifier.fillMaxWidth(),
@@ -187,8 +190,8 @@ private fun HerramientaRequisitoRow(
                     fontWeight = FontWeight.SemiBold,
                     color = NxColors.Slate,
                 )
-                if (detalle.isNotBlank()) {
-                    Text(detalle, fontSize = 11.5.sp, color = NxColors.Muted, maxLines = 1)
+                datos.forEach { linea ->
+                    Text(linea, fontSize = 11.5.sp, color = NxColors.Muted)
                 }
             }
             ToneChip(estado.first, estado.second)

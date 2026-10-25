@@ -9,10 +9,9 @@ import mx.nexara.mobile.nativeapp.data.api.HerramientaRequisitoDto
  * OT check list de herramientas a ocupar». Quien asigna dice qué hay que llevar; quien
  * ejecuta palomea cada renglón antes de poder iniciar.
  *
- * Espejo de `estadoChecklist` y `mensajeChecklistPendiente` en
- * apps/api/src/activities/tools/herramientas-checklist.helpers.ts. El API manda ya
- * `pendientes`/`listos`/`completo`, pero la app los recalcula para pintar sin esperar
- * la respuesta y para decir lo mismo que el servidor cuando no hay red.
+ * El estado (`pendientes`/`listos`/`completo`) espeja a `estadoChecklist` en
+ * apps/api/src/activities/tools/herramientas-checklist.helpers.ts. La app lo
+ * recalcula para pintar sin esperar la respuesta. El aviso de iniciar es una frase.
  */
 object HerramientasChecklistRules {
 
@@ -44,8 +43,8 @@ object HerramientasChecklistRules {
     }
 
     /**
-     * El mismo texto que devuelve el API en el 400 de `iniciar`. Dice exactamente qué
-     * falta: «no puedes iniciar» a secas manda al técnico a llamar por teléfono.
+     * Aviso de una frase cuando no se puede iniciar: nombra lo que falta palomear.
+     * «no puedes iniciar» a secas manda al técnico a llamar por teléfono.
      */
     fun mensajePendiente(pendientes: List<String>): String {
         if (pendientes.isEmpty()) return ""
@@ -57,7 +56,6 @@ object HerramientasChecklistRules {
                 ""
             }
         val falta = if (pendientes.size == 1) "Falta" else "Faltan"
-        return "$falta palomear el checklist de herramientas antes de iniciar: " +
-            "$muestra$resto. Si algo no lo traes o está dañado, márcalo y avisa a tu supervisor."
+        return "$falta palomear el checklist de herramientas antes de iniciar: $muestra$resto."
     }
 }
