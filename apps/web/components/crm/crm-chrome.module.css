@@ -369,3 +369,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 390px) {
+  .poMetaGrid {
+    grid-template-columns: 1fr;
+  }
+}
