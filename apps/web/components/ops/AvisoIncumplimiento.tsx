@@ -29,34 +29,39 @@ export default function AvisoIncumplimiento({ estatus, inc }: { estatus?: string
   if (!vigente) {
     return (
       <Alert tone="warning" role="status" title={`No se cumplió el ${formatDateTime(inc.registradoAt)} y se reprogramó`}>
-        {[
-          inc.reprogramadaPara ? `Nueva fecha: ${formatDateTime(inc.reprogramadaPara)}` : null,
-          inc.reprogramadaPor?.nombre ? `por ${inc.reprogramadaPor.nombre}` : null,
-          inc.motivoReprogramacion ? `Motivo: ${inc.motivoReprogramacion}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
+        <Renglones
+          lineas={[
+            inc.reprogramadaPara ? `Nueva fecha: ${formatDateTime(inc.reprogramadaPara)}` : null,
+            inc.reprogramadaPor?.nombre ? `Reprogramada por ${inc.reprogramadaPor.nombre}` : null,
+            inc.motivoReprogramacion ? `Motivo: ${inc.motivoReprogramacion}` : null,
+          ]}
+        />
       </Alert>
     );
   }
 
   return (
-    <Alert tone="danger" role="status" title={`No cumplida · ${inc.causaEtiqueta}`}>
-      <span>
-        {quien} · {formatDateTime(inc.registradoAt)}
-      </span>
-      {pendientes ? (
-        <>
-          <br />
-          <span>Pendiente de entrega: {pendientes}</span>
-        </>
-      ) : null}
-      {inc.observaciones ? (
-        <>
-          <br />
-          <span>Observaciones: {inc.observaciones}</span>
-        </>
-      ) : null}
+    <Alert tone="danger" role="status" title="No cumplida">
+      <Renglones
+        lineas={[
+          inc.causaEtiqueta,
+          quien,
+          formatDateTime(inc.registradoAt),
+          pendientes ? `Pendiente de entrega: ${pendientes}` : null,
+          inc.observaciones ? `Observaciones: ${inc.observaciones}` : null,
+        ]}
+      />
     </Alert>
   );
+}
+
+/** Cada dato en su propio renglón. Un `<span>` porque el aviso vive dentro de otro. */
+function Renglones({ lineas }: { lineas: Array<string | null | false | undefined> }) {
+  const visibles = lineas.filter((linea): linea is string => Boolean(linea));
+  if (!visibles.length) return null;
+  return visibles.map((linea, i) => (
+    <span key={i} style={{ display: "block" }}>
+      {linea}
+    </span>
+  ));
 }
