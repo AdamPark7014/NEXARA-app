@@ -163,7 +163,7 @@ describe("AsistenteIA", () => {
     const caja = await screen.findByLabelText("Instrucción para la IA");
     await usuario.type(caja, "que Carolina revise el DVR");
     await usuario.click(screen.getByRole("button", { name: "Interpretar" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/tardó demasiado.*Tu instrucción sigue aquí/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/tardó demasiado en contestar y tu instrucción sigue aquí/);
     expect(caja).toHaveValue("que Carolina revise el DVR");
     expect(screen.getByRole("button", { name: "Interpretar" })).toBeEnabled();
   });

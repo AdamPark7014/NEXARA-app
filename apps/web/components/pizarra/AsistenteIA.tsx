@@ -97,7 +97,8 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
       setEditandoTexto({});
     } catch (e) {
       // Lo escrito o dictado no se borra: basta volver a tocar «Interpretar».
-      setError(`${formatApiError(e, "La IA no respondió.")} Tu instrucción sigue aquí: vuelve a tocar «Interpretar».`);
+      const motivo = formatApiError(e, "La IA no respondió").replace(/\.+$/, "");
+      setError(`${motivo} y tu instrucción sigue aquí: vuelve a tocar «Interpretar».`);
     } finally {
       setPensando(false);
     }
@@ -169,7 +170,7 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
           <AutoAwesomeOutlinedIcon className={s.icono} aria-hidden />
           <strong>Asignar con IA</strong>
           <span className={c.tenue}>
-            Escríbelo o díctalo como se lo dirías a alguien: quién, qué, dónde, para cuándo y cuánto tarda. Nada se crea hasta que confirmes.
+            Escríbelo o díctalo como se lo dirías a alguien: quién, qué, dónde, para cuándo y cuánto tarda, y nada se crea hasta que confirmes.
           </span>
         </div>
         <Textarea
@@ -409,7 +410,7 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
               <div className={c.fila}>
                 {est.creada ? (
                   <>
-                    <span className={c.ok}>Creada{est.creada.folio ? ` · ${est.creada.folio}` : ""}. Ya se le avisó.</span>
+                    <span className={c.ok}>Creada{est.creada.folio ? ` · ${est.creada.folio}` : ""} y ya se le avisó.</span>
                     <ButtonLink href={`/erp/actividades/${est.creada.id}`} size="sm" iconEnd={<ArrowForwardIcon />}>
                       Abrir
                     </ButtonLink>
