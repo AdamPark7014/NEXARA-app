@@ -67,6 +67,8 @@ import mx.nexara.mobile.nativeapp.ui.console.clients.ClientsListScreen
 import mx.nexara.mobile.nativeapp.ui.console.clients.NewClientScreen
 import mx.nexara.mobile.nativeapp.ui.console.cotizaciones.CotizacionDetalleScreen
 import mx.nexara.mobile.nativeapp.ui.console.cotizaciones.CotizacionesScreen
+import mx.nexara.mobile.nativeapp.ui.console.cotizaciones.NxBarraClaraCotizaciones
+import mx.nexara.mobile.nativeapp.ui.console.cotizaciones.NxInkStatusBarIcons
 import mx.nexara.mobile.nativeapp.ui.console.gastos.GastosScreen
 import mx.nexara.mobile.nativeapp.ui.console.herramientas.HerramientasScreen
 import mx.nexara.mobile.nativeapp.ui.console.inicio.InicioScreen
@@ -83,6 +85,7 @@ import mx.nexara.mobile.nativeapp.ui.console.viaticos.NuevoViaticoScreen
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.RepartoViaticoScreen
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.ViaticoDetalleScreen
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.ViaticosScreen
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTab
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTabBar
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
@@ -490,10 +493,13 @@ fun ConsoleNavHost(
     val enInicio = (currentRoute ?: startRoute) == ConsoleRoutes.Inicio
     /** El detalle de actividad lleva su dock con la acción grande: ahí la barra inferior estorba. */
     val conBarraInferior = currentRoute != ConsoleRoutes.ActivityDetail
+    // Solo cotizaciones: barra clara y la flecha de volver en tinta. El resto sigue en teal.
+    val barraClara = currentRoute == ConsoleRoutes.Cotizaciones ||
+        currentRoute == ConsoleRoutes.CotizacionDetalle
+    val tintaBarra = if (barraClara) NxColors.Slate else Color.White
 
-    // La barra superior es teal con letras blancas: iconos claros en la barra de
-    // estado mientras se ve. En Inicio el fondo es claro y vuelven los oscuros.
-    if (!enInicio) NxLightStatusBarIcons()
+    // La barra teal lleva iconos claros. En Inicio y en cotizaciones el fondo es claro.
+    if (barraClara) NxInkStatusBarIcons() else if (!enInicio) NxLightStatusBarIcons()
     Scaffold(
         topBar = {
             if (!enInicio) TopAppBar(
@@ -501,19 +507,19 @@ fun ConsoleNavHost(
                     Text(
                         currentTitle,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color.White,
+                        color = tintaBarra,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
                 },
-                colors = NxBrandTopAppBarColors(),
+                colors = if (barraClara) NxBarraClaraCotizaciones() else NxBrandTopAppBarColors(),
                 navigationIcon = {
                     if (showBack) {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Volver",
-                                tint = Color.White,
+                                tint = tintaBarra,
                             )
                         }
                     }
@@ -536,7 +542,7 @@ fun ConsoleNavHost(
                                 Icon(
                                     Icons.Default.Notifications,
                                     contentDescription = if (unreadCount > 0) "Notificaciones, $unreadCount sin leer" else "Notificaciones",
-                                    tint = Color.White,
+                                    tint = tintaBarra,
                                 )
                             }
                         }

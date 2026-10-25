@@ -80,9 +80,10 @@ struct CotizacionDetalleView: View {
             arrancado = true
             await cargar(refresco: false)
         }
+        .barraClaraDelSistema(titulo: "Cotización")
         .navigationDestination(item: $pdfAbierto) { pdf in
             PDFViewerScreen(title: pdf.titulo, data: pdf.data)
-                .nxBrandNavBar(title: pdf.titulo, showsBell: false)
+                .barraClaraDelSistema(titulo: pdf.titulo, campana: false)
         }
     }
 

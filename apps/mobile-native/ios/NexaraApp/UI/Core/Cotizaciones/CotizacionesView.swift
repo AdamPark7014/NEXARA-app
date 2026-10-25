@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// El estado de la cotización con el tono del design system (Android `Estado.tono()`).
 extension CotizacionesRules.Estado {
@@ -27,8 +28,9 @@ extension CotizacionesRules.Estado {
 /// El filtro y la búsqueda no vuelven a pedir nada al servidor.
 ///
 /// Va dentro del `NavigationStack` del hub «Más» (o de la cubierta del shell):
-/// aquí no se crea otro. La barra teal la pone quien abre la pantalla; el
-/// detalle que se apila desde aquí la recibe en `navigationDestination`.
+/// aquí no se crea otro. La barra clara y el volver los pone esta pantalla:
+/// el shell sigue pintando la teal, y aquí se tapa. El detalle y el PDF, que
+/// se apilan desde aquí, llevan la suya.
 struct CotizacionesView: View {
     @State private var datos: [CotizacionResumen]?
     @State private var cargando = true
@@ -109,9 +111,9 @@ struct CotizacionesView: View {
             arrancado = true
             await cargar(refresco: false)
         }
+        .barraClaraCotizaciones(titulo: "Cotizaciones")
         .navigationDestination(item: $destino) { item in
             CotizacionDetalleView(cotizacionId: item.id)
-                .nxBrandNavBar(title: "Cotización")
         }
     }
 
@@ -125,7 +127,7 @@ struct CotizacionesView: View {
         if sinRegistros {
             NxEmptyState(
                 title: "Sin cotizaciones",
-                subtitle: "Todavía no hay ninguna cotización en esta empresa. La primera se arma desde la computadora."
+                subtitle: "Todavía no hay ninguna cotización en esta empresa."
             )
         } else if !consulta.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             NxEmptyState(
@@ -385,5 +387,227 @@ private struct TarjetaDeCotizacion: View {
     private var folio: String {
         let texto = (cotizacion.folio ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         return texto.isEmpty ? "Sin folio" : texto
+    }
+}
+
+// MARK: - Barra clara
+
+/// Cuántas pantallas de cotizaciones piden la hora en tinta. Al salir la última,
+/// vuelve el blanco de la barra teal del resto de la app.
+private enum HoraEnTintaDeCotizaciones {
+    private static var activas = 0
+
+    @MainActor
+    static func entrar() {
+        activas += 1
+        NxStatusBar.textoBlanco(false)
+    }
+
+    @MainActor
+    static func salir() {
+        activas = max(0, activas - 1)
+        if activas == 0 { NxStatusBar.textoBlanco(true) }
+    }
+}
+
+/// La hora en negro mientras esta pantalla está delante. Un segundo `onAppear`
+/// (el shell acaba de pedir hora blanca al abrir la cubierta) no la deja blanca.
+private struct HoraEnTintaModifier: ViewModifier {
+    @State private var activo = false
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                guard !activo else { return }
+                activo = true
+                HoraEnTintaDeCotizaciones.entrar()
+                DispatchQueue.main.async {
+                    guard activo else { return }
+                    NxStatusBar.textoBlanco(false)
+                }
+            }
+            .onDisappear {
+                guard activo else { return }
+                activo = false
+                HoraEnTintaDeCotizaciones.salir()
+            }
+    }
+}
+
+/// Tapa la barra teal que pone el shell y dibuja una clara, con volver y campana.
+/// El detalle no la usa: al empujarse, esta se va y la del sistema queda a la vista.
+private struct BarraClaraCotizacionesModifier: ViewModifier {
+    let titulo: String
+
+    func body(content: Content) -> some View {
+        content
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationBarHidden(true)
+            .background {
+                OcultaBarraNavegacion()
+                    .frame(width: 0, height: 0)
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                BarraClaraCotizaciones(titulo: titulo)
+            }
+            .modifier(HoraEnTintaModifier())
+    }
+}
+
+/// Barra del sistema en claro: título en tinta, flecha de volver y, si cabe, la campana.
+/// La usa el detalle y el PDF, donde la barra ya es de esta pantalla (y el PDF
+/// necesita en ella «Guardar» y «Compartir»).
+private struct BarraClaraDelSistemaModifier: ViewModifier {
+    let titulo: String
+    let campana: Bool
+    @Environment(\.nxOpenNotifications) private var abrirNotificaciones
+
+    func body(content: Content) -> some View {
+        content
+            .navigationTitle(titulo)
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarHidden(false)
+            .toolbar(.visible, for: .navigationBar)
+            .toolbarBackground(NxColors.surface, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarRole(.editor)
+            .toolbar {
+                if campana, let abrirNotificaciones {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        CampanaClara(action: abrirNotificaciones)
+                    }
+                }
+            }
+            .modifier(HoraEnTintaModifier())
+    }
+}
+
+/// Título centrado, volver a la izquierda, campana a la derecha. Fondo del lienzo.
+private struct BarraClaraCotizaciones: View {
+    let titulo: String
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.nxOpenNotifications) private var abrirNotificaciones
+
+    var body: some View {
+        ZStack {
+            Text(titulo)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(NxColors.fg)
+                .lineLimit(1)
+                .padding(.horizontal, 56)
+                .accessibilityAddTraits(.isHeader)
+            HStack(spacing: 0) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.backward")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(NxColors.fg)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Volver")
+                Spacer(minLength: 0)
+                if let abrirNotificaciones {
+                    CampanaClara(action: abrirNotificaciones)
+                }
+            }
+        }
+        .padding(.horizontal, 4)
+        .frame(height: 44)
+        .frame(maxWidth: .infinity)
+        .background(NxColors.surface)
+    }
+}
+
+/// Campana en tinta (la del shell es blanca, para la barra teal).
+private struct CampanaClara: View {
+    let action: () -> Void
+    @ObservedObject private var badge = NotificationsBadgeStore.shared
+
+    var body: some View {
+        Button(action: action) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "bell.fill")
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(NxColors.fg)
+                if badge.unreadCount > 0 {
+                    NxCountBadge(count: badge.unreadCount)
+                        .fixedSize()
+                        .offset(x: 10, y: -8)
+                }
+            }
+            .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(badge.unreadCount > 0 ? "Notificaciones, \(badge.unreadCount) sin leer" : "Notificaciones")
+        .accessibilityIdentifier("bell-button")
+    }
+}
+
+/// El shell deja la barra teal puesta desde fuera. Esta vista, metida en el
+/// controlador visible, la esconde mientras la lista está delante y la devuelve
+/// al empujar el detalle o al volver a Más.
+private struct OcultaBarraNavegacion: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Controlador { Controlador() }
+    func updateUIViewController(_ uiViewController: Controlador, context: Context) {}
+
+    final class Controlador: UIViewController {
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            view.isUserInteractionEnabled = false
+            view.backgroundColor = .clear
+        }
+
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            ocultar()
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            ocultar()
+        }
+
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            navegacion?.setNavigationBarHidden(false, animated: false)
+        }
+
+        private func ocultar() {
+            navegacion?.setNavigationBarHidden(true, animated: false)
+        }
+
+        /// El representable no es la pantalla empujada: hay que subir hasta el
+        /// `NavigationStack`. Sin eso la teal del shell se queda encima.
+        private var navegacion: UINavigationController? {
+            var actual: UIViewController? = self
+            var saltos = 0
+            while let paso = actual, saltos < 12 {
+                saltos += 1
+                if let nav = paso as? UINavigationController { return nav }
+                if let nav = paso.navigationController { return nav }
+                if let padre = paso.parent {
+                    actual = padre
+                } else {
+                    actual = paso.presentingViewController
+                }
+            }
+            return nil
+        }
+    }
+}
+
+extension View {
+    /// Barra clara propia, con volver. Tapa la teal del shell.
+    func barraClaraCotizaciones(titulo: String) -> some View {
+        modifier(BarraClaraCotizacionesModifier(titulo: titulo))
+    }
+
+    /// Barra clara del sistema, con volver. `campana` en falso deja el sitio
+    /// a otras acciones (guardar y compartir un PDF).
+    func barraClaraDelSistema(titulo: String, campana: Bool = true) -> some View {
+        modifier(BarraClaraDelSistemaModifier(titulo: titulo, campana: campana))
     }
 }

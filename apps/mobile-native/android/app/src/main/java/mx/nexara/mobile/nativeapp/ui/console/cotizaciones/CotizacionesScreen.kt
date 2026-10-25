@@ -181,8 +181,7 @@ private fun VacioDeCotizaciones(
     when {
         sinRegistros -> NxEmptyState(
             title = "Sin cotizaciones",
-            subtitle = "Todavía no hay ninguna cotización en esta empresa. " +
-                "La primera se arma desde la computadora.",
+            subtitle = "Todavía no hay ninguna cotización en esta empresa.",
         )
         consulta.isNotBlank() -> NxEmptyState(
             title = "Sin coincidencias",
