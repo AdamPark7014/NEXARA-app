@@ -1,4 +1,5 @@
 import {
+  MENSAJE_SIN_CONEXION_FUERA_DE_VENTANA,
   MENSAJE_UBICACION_SIMULADA,
   MOTIVO_VALIDACION,
   clienteNativoSinIdentidad,
@@ -294,6 +295,17 @@ describe('detalles del contrato que los clientes ya escribieron', () => {
     expect(MENSAJE_UBICACION_SIMULADA).toBe(
       'Detectamos una ubicación simulada. Desactiva cualquier app de GPS falso para checar.',
     );
+  });
+
+  it('deja la checada tardía en una frase y cita el texto viejo', () => {
+    const viejo =
+      'La checada se guardó sin conexión y llegó fuera de la ventana permitida (12 h): no se registra sola. Avisamos a tu jefe para que la revise.';
+    expect(MENSAJE_SIN_CONEXION_FUERA_DE_VENTANA).toBe(
+      'La checada se guardó sin conexión y llegó fuera de la ventana permitida (12 h): no se registra sola, avisamos a tu jefe para que la revise.',
+    );
+    expect(MENSAJE_SIN_CONEXION_FUERA_DE_VENTANA).not.toBe(viejo);
+    expect(MENSAJE_SIN_CONEXION_FUERA_DE_VENTANA.includes('(12 h)')).toBe(true);
+    expect(viejo).toContain('no se registra sola. Avisamos a tu jefe');
   });
 
   it('REVISAR pesa más que PENDIENTE y PENDIENTE más que OK', () => {
