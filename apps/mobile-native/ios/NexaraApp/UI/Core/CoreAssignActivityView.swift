@@ -147,8 +147,6 @@ struct CoreAssignActivityView: View {
                 }
             } header: {
                 Text("1 · Tipo de actividad")
-            } footer: {
-                Text("Solo se muestran tipos válidos para \(displayName). Campo David: tarea/proyecto/obra · Soporte Antonio: tarea/proyecto/servicio · Josué (obra): todo menos servicio · Daniela/Mónica: tarea/comercial · Encargados: + comercial.")
             }
 
             if kind != nil && despachoOnly && !bridgeNeeded {

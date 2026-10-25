@@ -116,24 +116,25 @@ struct CoreActivityFormView: View {
 
             if kind == .tarea {
                 Section {
-                    CoreFlowLayout(spacing: 8) {
-                        ForEach(CoreTareaTipo.all) { tipo in
-                            let on = tareaTipoId == tipo.id
-                            Button {
-                                tareaTipoId = tipo.id
-                            } label: {
-                                Label(tipo.label, systemImage: tipo.symbol)
+                    ForEach(CoreTareaTipo.all) { tipo in
+                        let on = tareaTipoId == tipo.id
+                        Button {
+                            tareaTipoId = tipo.id
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: tipo.symbol)
                                     .symbolRenderingMode(.hierarchical)
-                                    .font(.subheadline.weight(on ? .bold : .regular))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .foregroundStyle(on ? Color.accentColor : Color.primary)
-                                    .background(on ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.08), in: Capsule())
+                                    .foregroundStyle(Color.accentColor)
+                                    .frame(width: 28)
+                                Text(tipo.label)
+                                    .font(.body.weight(on ? .bold : .regular))
+                                    .foregroundStyle(Color.primary)
+                                Spacer()
+                                Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(on ? Color.accentColor : Color.secondary)
                             }
-                            .buttonStyle(.borderless)
                         }
                     }
-                    .padding(.vertical, 4)
                     if tareaTipoId == "otro" {
                         TextField("Especifica el tipo (ej. Visita a proveedor)", text: $tareaOtro)
                     }
