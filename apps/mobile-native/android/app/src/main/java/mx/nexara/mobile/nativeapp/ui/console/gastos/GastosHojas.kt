@@ -3,8 +3,6 @@ package mx.nexara.mobile.nativeapp.ui.console.gastos
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,9 +11,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -35,10 +35,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -291,6 +293,56 @@ private fun AccionesDeGasto(
     }
 }
 
+/**
+ * Una opción del alta, sola en su renglón: el nombre y, si está elegida, la paloma.
+ *
+ * Categoría y día son listas, no una tira de pastillas. La hoja ya es la
+ * superficie, así que el renglón no lleva caja.
+ */
+@Composable
+private fun OpcionDeAlta(
+    texto: String,
+    elegida: Boolean,
+    habilitada: Boolean,
+    onElegir: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = AlturaToque)
+                .alpha(if (habilitada) 1f else 0.5f)
+                .selectable(
+                    selected = elegida,
+                    enabled = habilitada,
+                    role = Role.RadioButton,
+                    onClick = onElegir,
+                ),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                texto,
+                fontSize = 14.sp,
+                fontWeight = if (elegida) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (elegida) NxColors.Slate else NxUi.Fg2,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (elegida) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    tint = NxColors.Brand,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+        NxRowDivider()
+    }
+}
+
 /** El botón principal de una hoja, con su estado de «enviando» a la vista. */
 @Composable
 private fun BotonDeAccion(
@@ -361,7 +413,7 @@ private fun DatoDeGasto(etiqueta: String, valor: String?) {
  * deshabilitado sin explicación es la forma más rápida de que alguien cierre la
  * app pensando que está rota.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HojaDeAltaDeGasto(
     enviando: Boolean,
@@ -430,32 +482,27 @@ internal fun HojaDeAltaDeGasto(
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 NxDenseSectionHeader(title = "Categoría")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.fillMaxWidth()) {
                     GastosRules.CATEGORIAS.forEach { opcion ->
-                        FilterChip(
-                            selected = categoria == opcion,
-                            onClick = { categoria = opcion },
-                            enabled = !enviando,
-                            label = { Text(opcion) },
-                            modifier = Modifier.heightIn(min = AlturaToque),
+                        OpcionDeAlta(
+                            texto = opcion,
+                            elegida = categoria == opcion,
+                            habilitada = !enviando,
+                            onElegir = { categoria = opcion },
                         )
                     }
                 }
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                NxDenseSectionHeader(
-                    title = "¿Cuándo?",
-                    hint = "Un gasto de más atrás se captura en la computadora.",
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NxDenseSectionHeader(title = "¿Cuándo?")
+                Column(Modifier.fillMaxWidth()) {
                     dias.forEach { opcion ->
-                        FilterChip(
-                            selected = dia.fecha == opcion.fecha,
-                            onClick = { dia = opcion },
-                            enabled = !enviando,
-                            label = { Text(opcion.etiqueta) },
-                            modifier = Modifier.heightIn(min = AlturaToque),
+                        OpcionDeAlta(
+                            texto = opcion.etiqueta,
+                            elegida = dia.fecha == opcion.fecha,
+                            habilitada = !enviando,
+                            onElegir = { dia = opcion },
                         )
                     }
                 }
@@ -470,10 +517,7 @@ internal fun HojaDeAltaDeGasto(
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                NxDenseSectionHeader(
-                    title = "Foto del ticket",
-                    hint = "Obligatoria: sin ella el gasto no se puede deducir.",
-                )
+                NxDenseSectionHeader(title = "Foto del ticket")
                 ticket?.let { foto ->
                     Image(
                         bitmap = foto.preview.asImageBitmap(),

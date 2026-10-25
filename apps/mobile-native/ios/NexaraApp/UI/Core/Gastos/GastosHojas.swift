@@ -224,6 +224,43 @@ private struct DatoDeGasto: View {
     }
 }
 
+/// Una opción del alta, sola en su renglón (`OpcionDeAlta`): el nombre y, si
+/// está elegida, la paloma. Sin caja: la hoja ya es la superficie.
+private struct OpcionDeAlta: View {
+    let texto: String
+    let elegida: Bool
+    var habilitada: Bool = true
+    let accion: () -> Void
+
+    var body: some View {
+        Button(action: accion) {
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Text(texto)
+                        .font(.system(size: 14, weight: elegida ? .semibold : .regular))
+                        .foregroundStyle(elegida ? NxColors.fg : NxColors.fg2)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if elegida {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(NxColors.brand)
+                            .frame(width: 18, height: 18)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .frame(minHeight: 48)
+                NxRowDivider()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!habilitada)
+        .opacity(habilitada ? 1 : 0.5)
+        .accessibilityAddTraits(elegida ? AccessibilityTraits.isSelected : [])
+    }
+}
+
 /// El botón principal de una hoja (`BotonDeAccion`): píldora de marca de 56,
 /// con su «Enviando…» a la vista.
 private struct BotonDeAccionGasto: View {
@@ -313,9 +350,9 @@ struct HojaDeAltaDeGasto: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     NxDenseSectionHeader(title: "Categoría")
-                    CoreFlowLayout(spacing: 8) {
+                    VStack(spacing: 0) {
                         ForEach(GastosRules.categorias, id: \.self) { opcion in
-                            FinanzasChip(texto: opcion, elegido: categoria == opcion, habilitado: !enviando) {
+                            OpcionDeAlta(texto: opcion, elegida: categoria == opcion, habilitada: !enviando) {
                                 categoria = opcion
                             }
                         }
@@ -323,13 +360,10 @@ struct HojaDeAltaDeGasto: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    NxDenseSectionHeader(
-                        title: "¿Cuándo?",
-                        hint: "Un gasto de más atrás se captura en la computadora."
-                    )
-                    CoreFlowLayout(spacing: 8) {
+                    NxDenseSectionHeader(title: "¿Cuándo?")
+                    VStack(spacing: 0) {
                         ForEach(dias) { opcion in
-                            FinanzasChip(texto: opcion.etiqueta, elegido: diaElegido == opcion.id, habilitado: !enviando) {
+                            OpcionDeAlta(texto: opcion.etiqueta, elegida: diaElegido == opcion.id, habilitada: !enviando) {
                                 diaElegido = opcion.id
                             }
                         }
@@ -341,10 +375,7 @@ struct HojaDeAltaDeGasto: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    NxDenseSectionHeader(
-                        title: "Foto del ticket",
-                        hint: "Obligatoria: sin ella el gasto no se puede deducir."
-                    )
+                    NxDenseSectionHeader(title: "Foto del ticket")
                     if let ticket {
                         Image(uiImage: ticket.image)
                             .resizable()
