@@ -56,7 +56,7 @@ export default function Modal({
 
   const requestClose = () => {
     if (dirty) {
-      const ok = onDirtyClose ? onDirtyClose() : window.confirm("Hay cambios sin guardar. ¿Cerrar de todos modos?");
+      const ok = onDirtyClose ? onDirtyClose() : window.confirm("Hay cambios sin guardar, ¿cerrar de todos modos?");
       if (!ok) return;
     }
     onClose();
