@@ -153,6 +153,7 @@
 
 .drawer {
   width: min(420px, 100vw);
+  max-width: none;
   background: var(--surface, #fff);
   color: var(--text-primary, #0f172a);
   box-shadow: -12px 0 40px color-mix(in srgb, #0b1524 18%, transparent);
@@ -163,11 +164,38 @@
 
 .drawerHead {
   display: grid;
-  grid-template-columns: 52px 1fr auto;
+  grid-template-columns: 52px 1fr;
+  max-width: none;
   gap: 12px;
   align-items: start;
   padding: 16px 16px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--border, #e2e8f0) 90%, transparent);
+}
+
+.back {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+  cursor: pointer;
+}
+
+.back:hover {
+  color: var(--text-primary, #0f172a);
+}
+
+.back:focus-visible {
+  outline: 2px solid color-mix(in srgb, #0e7490 55%, transparent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .drawerHead h2 {
@@ -183,18 +211,13 @@
   color: var(--text-secondary, #64748b);
 }
 
-.close {
-  border: none;
-  background: transparent;
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-  color: var(--text-tertiary, #94a3b8);
-  padding: 2px 6px;
+.drawerHead .badge {
+  margin-top: 8px;
 }
 
 .drawerBody {
   overflow: auto;
+  max-width: none;
   padding: 14px 16px 24px;
   display: grid;
   gap: 18px;
@@ -271,7 +294,7 @@
 
 .metaGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 

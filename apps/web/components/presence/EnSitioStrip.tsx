@@ -82,9 +82,7 @@ export function EnSitioStrip({
             {items.length} {items.length === 1 ? "persona" : "personas"}
           </span>
         </header>
-        <p className={styles.hint}>
-          Presencia por control de acceso. Pulsa a alguien para ver puertas de hoy, actividades y CRM.
-        </p>
+        <p className={styles.hint}>Presencia por control de acceso.</p>
         {error && (
           <p className={styles.hint} data-tone="error">
             {error}
@@ -112,10 +110,8 @@ export function EnSitioStrip({
                   />
                   <div className={styles.body}>
                     <strong>{h.personName || h.personId}</strong>
-                    <span>
-                      {h.lastDoor || "Acceso"}
-                      {h.erpUser?.role?.nombre ? ` · ${h.erpUser.role.nombre}` : ""}
-                    </span>
+                    <span>{h.lastDoor || "Acceso"}</span>
+                    {h.erpUser?.role?.nombre ? <span>{h.erpUser.role.nombre}</span> : null}
                     <em>{relAgeEs(h.lastAt)}</em>
                   </div>
                 </button>
