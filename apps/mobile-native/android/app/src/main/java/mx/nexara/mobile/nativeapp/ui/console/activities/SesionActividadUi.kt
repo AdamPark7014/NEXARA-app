@@ -256,15 +256,17 @@ fun PausarDeEquipoPanel(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val encabezado = listOfNotNull(
+                        a.anNumber?.takeIf { it.isNotBlank() },
+                        a.titulo?.takeIf { it.isNotBlank() },
+                    )
                     Text(
-                        listOfNotNull(a.anNumber?.takeIf { it.isNotBlank() }, a.titulo?.takeIf { it.isNotBlank() })
-                            .joinToString(" · ")
-                            .ifBlank { "Actividad #${a.id}" },
+                        encabezado.joinToString("\n").ifBlank { "Actividad #${a.id}" },
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = NxColors.Slate,
                         modifier = Modifier.weight(1f),
-                        maxLines = 2,
+                        maxLines = if (encabezado.size > 1) 3 else 2,
                     )
                     if (a.enPausa == true) {
                         ToneChip("En pausa", CoreActivityRules.NARANJA)
