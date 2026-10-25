@@ -234,22 +234,20 @@ fun MoreDatoCard(
     }
 }
 
-/** Los datos en rejilla de dos columnas: lo que cabe sin apretar en 360 dp. */
+/**
+ * Un dato por renglón. En el teléfono dos o tres cifras en la misma fila se
+ * aprietan. [columnas] se queda en la firma porque la ficha de una persona
+ * todavía lo pasa; ya no parte la lista.
+ */
 @Composable
 fun MoreRejillaDeDatos(
     datos: List<KpisEquipoRules.Dato>,
     modifier: Modifier = Modifier,
-    columnas: Int = 2,
+    @Suppress("UNUSED_PARAMETER") columnas: Int = 1,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        datos.chunked(columnas).forEach { fila ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                fila.forEach { dato -> MoreDatoCard(dato, modifier = Modifier.weight(1f)) }
-                repeat(columnas - fila.size) { Spacer(Modifier.weight(1f)) }
-            }
+        datos.forEach { dato ->
+            MoreDatoCard(dato, modifier = Modifier.fillMaxWidth())
         }
     }
 }
