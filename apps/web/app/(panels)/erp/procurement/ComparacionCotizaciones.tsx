@@ -64,15 +64,43 @@ export default function ComparacionCotizaciones({
 
   return (
     <section className={s.comparacion} aria-labelledby="comparacion-titulo">
+      <style>{`
+        [data-cmp-cot-meta] {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          flex-wrap: wrap;
+          font-size: 12px;
+          color: var(--text-tertiary);
+        }
+        @media (max-width: 390px) {
+          [data-cmp-cot-meta] {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+          }
+          [data-cmp-cot-punto] { display: none; }
+        }
+      `}</style>
       <div className={s.comparacionCabeza}>
         <div style={{ display: "grid", gap: 4 }}>
           <h2 id="comparacion-titulo" className={s.comparacionTitulo}>
             {rfq.requisition?.title ?? "Cotización"}
           </h2>
-          <span style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 12, color: "var(--text-tertiary)" }}>
-            {rfq.rfqNumber}
-            {rfq.requisition?.reqNumber ? ` · ${rfq.requisition.reqNumber}` : ""}
-            {rfq.dueDate ? ` · responder antes del ${fechaCorta(rfq.dueDate)}` : ""}
+          <span data-cmp-cot-meta>
+            <span>{rfq.rfqNumber}</span>
+            {rfq.requisition?.reqNumber ? (
+              <span>
+                <span data-cmp-cot-punto> · </span>
+                {rfq.requisition.reqNumber}
+              </span>
+            ) : null}
+            {rfq.dueDate ? (
+              <span>
+                <span data-cmp-cot-punto> · </span>
+                {`responder antes del ${fechaCorta(rfq.dueDate)}`}
+              </span>
+            ) : null}
             <Tag variant={varianteRfq(rfq.status)} size="sm">{RFQ_STATUS[rfq.status] ?? "Sin estado"}</Tag>
           </span>
         </div>
@@ -90,7 +118,7 @@ export default function ComparacionCotizaciones({
 
       {editable && (
         <p className={s.ayuda} style={{ margin: "0 0 12px" }}>
-          Captura el precio que te dio cada proveedor y guarda cada renglón. Se puede adjudicar cuando el proveedor tenga todos sus renglones con precio.
+          Captura el precio que te dio cada proveedor, guarda cada renglón y se puede adjudicar cuando el proveedor tenga todos sus renglones con precio.
         </p>
       )}
 
