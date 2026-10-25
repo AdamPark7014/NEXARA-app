@@ -16,7 +16,8 @@ struct EscanerDeHerramientas: View {
     }
 }
 
-/// La herramienta leída: nombre, código y serie, su estado, el del préstamo y quién la tiene.
+/// La herramienta leída: nombre, modelo, código y serie (un dato por renglón), su estado,
+/// el del préstamo y quién la tiene.
 struct HerramientaEscaneadaVista: View {
     let r: HerramientaPorCodigo
 
@@ -30,9 +31,7 @@ struct HerramientaEscaneadaVista: View {
     }
 
     var body: some View {
-        let detalle = [r.codigo?.nilSiVacio, r.item?.serialNumber?.nilSiVacio.map { "Serie \($0)" }]
-            .compactMap { $0 }
-            .joined(separator: " · ")
+        let detalle = EscaneoReglas.codigoYSerie(r)
         VStack(alignment: .leading, spacing: 8) {
             Text(EscaneoReglas.nombreHerramienta(r))
                 .font(.system(size: 16, weight: .bold))

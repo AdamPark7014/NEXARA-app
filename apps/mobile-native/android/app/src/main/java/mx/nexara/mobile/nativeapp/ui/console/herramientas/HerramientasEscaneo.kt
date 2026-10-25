@@ -67,10 +67,7 @@ internal fun HerramientaEscaneada(r: HerramientaPorCodigoDto) {
         color = NxColors.Slate,
     )
     Text(
-        listOfNotNull(
-            r.codigo?.takeIf { it.isNotBlank() },
-            r.item?.serialNumber?.takeIf { it.isNotBlank() }?.let { "Serie $it" },
-        ).joinToString(" · "),
+        EscaneoRules.codigoYSerie(r),
         style = MaterialTheme.typography.labelMedium,
         color = NxColors.Muted,
     )

@@ -412,20 +412,30 @@ enum EscaneoReglas {
         }
     }
 
-    /// «La tiene Juan Pérez · AN-0123» o «En el kit de Ana López»; nil si está libre.
+    /// Quién la tiene y, si hay folio, el folio en el renglón de abajo.
+    /// Antes iban juntos: «La tiene Juan Pérez · AN-0123». Nil si está libre.
+    /// El kit sigue en un renglón: «En el kit de Ana López».
     static func quienLaTiene(_ r: HerramientaPorCodigo) -> String? {
         if let p = r.prestamo {
             let quien = p.usuario?.nombre?.nilSiVacio ?? "alguien"
             let verbo = p.status == "IN_USE" ? "La tiene" : "La pidió"
-            return ["\(verbo) \(quien)", p.activity?.anNumber?.nilSiVacio].compactMap { $0 }.joined(separator: " · ")
+            return ["\(verbo) \(quien)", p.activity?.anNumber?.nilSiVacio].compactMap { $0 }.joined(separator: "\n")
         }
         guard let kit = r.kit else { return nil }
         return "En el kit de \(kit.user?.nombre?.nilSiVacio ?? "alguien")"
     }
 
+    /// Nombre y, si hay modelo, el modelo en el renglón de abajo. Antes: «Multímetro · Fluke 117».
     static func nombreHerramienta(_ r: HerramientaPorCodigo) -> String {
         let partes = [r.item?.toolName?.nilSiVacio, r.item?.model?.nilSiVacio].compactMap { $0 }
-        return partes.isEmpty ? "Herramienta" : partes.joined(separator: " · ")
+        return partes.isEmpty ? "Herramienta" : partes.joined(separator: "\n")
+    }
+
+    /// Código y serie, un dato por renglón. Antes iban juntos: «MUL-12345 · Serie …».
+    static func codigoYSerie(_ r: HerramientaPorCodigo) -> String {
+        [r.codigo?.nilSiVacio, r.item?.serialNumber?.nilSiVacio.map { "Serie \($0)" }]
+            .compactMap { $0 }
+            .joined(separator: "\n")
     }
 
     static let permisoGenerico = "No tienes permisos para esta acción"
