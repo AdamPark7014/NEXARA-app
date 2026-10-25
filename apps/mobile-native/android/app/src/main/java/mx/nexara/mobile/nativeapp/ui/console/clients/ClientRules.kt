@@ -26,15 +26,15 @@ object ClientRules {
         return if (inactivo) {
             "«$quien» volverá a estar activo en el padrón."
         } else {
-            "«$quien» quedará inactivo. Sus datos y su historial se conservan y podrás reactivarlo después."
+            "«$quien» quedará inactivo: sus datos y su historial se conservan y podrás reactivarlo después."
         }
     }
 
     const val DELETE_TITLE = "Eliminar cliente"
 
     fun deleteMessage(nombre: String?): String =
-        "¿Eliminar «${displayName(nombre)}» del padrón? Esta acción no se puede deshacer. " +
-            "Si solo ya no trabajan con él, mejor desactívalo."
+        "¿Eliminar «${displayName(nombre)}» del padrón sin poder deshacerlo y, " +
+            "si solo ya no trabajan con él, mejor desactivándolo?"
 
     // ── Proyectos del cliente (operational-projects) ────────────────────────
     // Mismos permisos que el cliente: `puedeDesactivar` / `puedeEliminar`.
@@ -63,15 +63,15 @@ object ClientRules {
         return if (inactivo) {
             "«$cual» volverá a estar activo."
         } else {
-            "«$cual» quedará inactivo. Sus actividades y su historial se conservan y podrás reactivarlo después."
+            "«$cual» quedará inactivo: sus actividades y su historial se conservan y podrás reactivarlo después."
         }
     }
 
     const val PROJECT_DELETE_TITLE = "Eliminar proyecto"
 
     fun projectDeleteMessage(titulo: String?): String =
-        "¿Eliminar «${projectName(titulo)}»? Dejará de aparecer en las listas y esta acción no se puede " +
-            "deshacer. Si solo está detenido, mejor desactívalo."
+        "¿Eliminar «${projectName(titulo)}», que dejará de aparecer en las listas, sin poder deshacerlo y, " +
+            "si solo está detenido, mejor desactivándolo?"
 
     private fun projectName(titulo: String?): String = titulo?.trim().orEmpty().ifBlank { "Proyecto sin nombre" }
 

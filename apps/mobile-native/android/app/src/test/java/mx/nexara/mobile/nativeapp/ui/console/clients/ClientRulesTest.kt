@@ -4,6 +4,7 @@ import mx.nexara.mobile.nativeapp.data.api.ClientDto
 import mx.nexara.mobile.nativeapp.data.api.ClientPermissionsDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -76,7 +77,7 @@ class ClientRulesTest {
         assertTrue(ClientRules.projectToggleMessage("Torre A", inactivo = false).contains("quedará inactivo"))
         val borrar = ClientRules.projectDeleteMessage("Torre A")
         assertTrue(borrar.contains("«Torre A»"))
-        assertTrue(borrar.contains("no se puede deshacer"))
+        assertTrue(borrar.contains("sin poder deshacerlo"))
         assertTrue(ClientRules.projectDeleteMessage(null).contains("«Proyecto sin nombre»"))
     }
 
@@ -91,7 +92,67 @@ class ClientRulesTest {
 
         val borrar = ClientRules.deleteMessage("Acme")
         assertTrue(borrar.contains("«Acme»"))
-        assertTrue("eliminar debe avisar que no se deshace", borrar.contains("no se puede deshacer"))
+        assertTrue("eliminar debe avisar que no se deshace", borrar.contains("sin poder deshacerlo"))
         assertTrue(ClientRules.deleteMessage("  ").contains("«Sin nombre»"))
     }
+
+    @Test
+    fun avisosDeDesactivarYEliminarCabenEnUnaFrase() {
+        val viejoDesactivarCliente =
+            "«Acme» quedará inactivo. Sus datos y su historial se conservan y podrás reactivarlo después."
+        val viejoEliminarCliente =
+            "¿Eliminar «Acme» del padrón? Esta acción no se puede deshacer. Si solo ya no trabajan con él, mejor desactívalo."
+        val viejoDesactivarProyecto =
+            "«Torre A» quedará inactivo. Sus actividades y su historial se conservan y podrás reactivarlo después."
+        val viejoEliminarProyecto =
+            "¿Eliminar «Torre A»? Dejará de aparecer en las listas y esta acción no se puede deshacer. Si solo está detenido, mejor desactívalo."
+
+        assertEquals(2, frases(viejoDesactivarCliente).size)
+        assertEquals(3, frases(viejoEliminarCliente).size)
+        assertEquals(2, frases(viejoDesactivarProyecto).size)
+        assertEquals(3, frases(viejoEliminarProyecto).size)
+
+        val desactivarCliente = ClientRules.toggleActiveMessage("Acme", inactivo = false)
+        val eliminarCliente = ClientRules.deleteMessage("Acme")
+        val desactivarProyecto = ClientRules.projectToggleMessage("Torre A", inactivo = false)
+        val eliminarProyecto = ClientRules.projectDeleteMessage("Torre A")
+
+        assertNotEquals(viejoDesactivarCliente, desactivarCliente)
+        assertNotEquals(viejoEliminarCliente, eliminarCliente)
+        assertNotEquals(viejoDesactivarProyecto, desactivarProyecto)
+        assertNotEquals(viejoEliminarProyecto, eliminarProyecto)
+        assertEquals(1, frases(desactivarCliente).size)
+        assertEquals(1, frases(eliminarCliente).size)
+        assertEquals(1, frases(desactivarProyecto).size)
+        assertEquals(1, frases(eliminarProyecto).size)
+
+        assertTrue(desactivarCliente.contains("sus datos y su historial se conservan"))
+        assertTrue(desactivarCliente.contains("podrás reactivarlo después"))
+        assertTrue(eliminarCliente.contains("del padrón"))
+        assertTrue(eliminarCliente.contains("sin poder deshacerlo"))
+        assertTrue(eliminarCliente.contains("si solo ya no trabajan con él"))
+        assertTrue(eliminarCliente.contains("desactiv"))
+        assertTrue(desactivarProyecto.contains("sus actividades y su historial se conservan"))
+        assertTrue(desactivarProyecto.contains("podrás reactivarlo después"))
+        assertTrue(eliminarProyecto.contains("dejará de aparecer en las listas"))
+        assertTrue(eliminarProyecto.contains("sin poder deshacerlo"))
+        assertTrue(eliminarProyecto.contains("si solo está detenido"))
+        assertTrue(eliminarProyecto.contains("desactiv"))
+
+        assertEquals("Desactivar", ClientRules.toggleActiveConfirmLabel(inactivo = false))
+        assertEquals("Eliminar cliente", ClientRules.DELETE_TITLE)
+        assertEquals("Desactivar proyecto", ClientRules.projectToggleTitle(inactivo = false))
+        assertEquals("Eliminar proyecto", ClientRules.PROJECT_DELETE_TITLE)
+        assertEquals(
+            "«Acme» volverá a estar activo en el padrón.",
+            ClientRules.toggleActiveMessage("Acme", inactivo = true),
+        )
+        assertEquals(
+            "«Torre A» volverá a estar activo.",
+            ClientRules.projectToggleMessage("Torre A", inactivo = true),
+        )
+    }
+
+    private fun frases(texto: String): List<String> =
+        texto.trim().split(Regex("(?<=[.!?])\\s+")).map { it.trim() }.filter { it.isNotEmpty() }
 }
