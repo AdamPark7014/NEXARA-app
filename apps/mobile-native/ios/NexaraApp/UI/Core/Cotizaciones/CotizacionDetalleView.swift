@@ -105,7 +105,7 @@ struct CotizacionDetalleView: View {
         if grupos.isEmpty {
             NxEmptyState(
                 title: "Sin partidas",
-                subtitle: "Esta cotización todavía no tiene conceptos capturados. Se agregan desde la computadora."
+                subtitle: "Esta cotización todavía no tiene conceptos capturados; se agregan desde la computadora."
             )
         } else {
             // La clave lleva el índice además del grupo: dos grupos con la misma
