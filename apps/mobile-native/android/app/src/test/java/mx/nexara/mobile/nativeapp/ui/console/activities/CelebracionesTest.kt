@@ -19,7 +19,7 @@ class CelebracionesTest {
     @Test
     fun miCumpleanosMeFelicitaPorMiPrimerNombre() {
         assertEquals(
-            "¡Feliz cumpleaños, Carolina! 🎂 Todo el equipo te desea un gran día",
+            "¡Feliz cumpleaños, Carolina: todo el equipo te desea un gran día! 🎂",
             Celebraciones.linea(cumple("carolina Juárez Álvarez", yo = true)),
         )
     }
@@ -38,7 +38,12 @@ class CelebracionesTest {
         assertEquals("Pedro Ruiz cumple 3 años en NEXARA 🎉", Celebraciones.linea(aniversario("Pedro Ruiz", 3)))
         assertEquals("Pedro Ruiz cumple 1 año en NEXARA 🎉", Celebraciones.linea(aniversario("Pedro Ruiz", 1)))
         assertEquals("Hoy es aniversario de Pedro Ruiz en NEXARA 🎉", Celebraciones.linea(aniversario("Pedro Ruiz", null)))
-        assertEquals("¡Felicidades, Pedro! 🎉 Hoy cumples 2 años en NEXARA", Celebraciones.linea(aniversario("Pedro", 2, yo = true)))
+        assertEquals(
+            "¡Felicidades, Carolina: hoy cumples 3 años en NEXARA! 🎉",
+            Celebraciones.linea(aniversario("Carolina Juárez Álvarez", 3, yo = true)),
+        )
+        assertEquals("¡Felicidades, Pedro: hoy cumples 2 años en NEXARA! 🎉", Celebraciones.linea(aniversario("Pedro", 2, yo = true)))
+        assertEquals("¡Felicidades, Pedro: hoy es tu aniversario en NEXARA! 🎉", Celebraciones.linea(aniversario("Pedro", null, yo = true)))
     }
 
     @Test
@@ -56,7 +61,7 @@ class CelebracionesTest {
         assertEquals("Pedro Ruiz · 4 años en NEXARA 🎉", Celebraciones.etiqueta(otros[1]))
 
         val conLaMia = otros + cumple("Luis Mora", yo = true)
-        assertEquals("¡Feliz cumpleaños, Luis! 🎂 Todo el equipo te desea un gran día", Celebraciones.titulo(conLaMia))
+        assertEquals("¡Feliz cumpleaños, Luis: todo el equipo te desea un gran día! 🎂", Celebraciones.titulo(conLaMia))
         assertEquals(listOf("Ana López", "Pedro Ruiz"), Celebraciones.enFila(conLaMia).map { it.nombre })
     }
 

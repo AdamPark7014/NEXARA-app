@@ -34,21 +34,22 @@ object Celebraciones {
 
     private fun tiempo(anios: Int): String = if (anios == 1) "1 año" else "$anios años"
 
-    /** Una línea por celebración. Nunca lleva la edad: en cumpleaños `anios` se ignora. */
+    /** Una frase por celebración. Nunca lleva la edad: en cumpleaños `anios` se ignora. */
     fun linea(c: CelebracionDto): String {
         val yo = c.soyYo == true
         return when {
             esCumpleanos(c) && yo -> {
                 val quien = primerNombre(c.nombre)
-                val saludo = if (quien.isBlank()) "¡Feliz cumpleaños!" else "¡Feliz cumpleaños, $quien!"
-                "$saludo 🎂 Todo el equipo te desea un gran día"
+                val saludo = if (quien.isBlank()) "¡Feliz cumpleaños" else "¡Feliz cumpleaños, $quien"
+                "$saludo: todo el equipo te desea un gran día! 🎂"
             }
             esCumpleanos(c) -> "Hoy es cumpleaños de ${nombreCorto(c.nombre)} 🎂"
             yo -> {
                 val quien = primerNombre(c.nombre)
-                val saludo = if (quien.isBlank()) "¡Felicidades!" else "¡Felicidades, $quien!"
+                val saludo = if (quien.isBlank()) "¡Felicidades" else "¡Felicidades, $quien"
                 val anios = c.anios?.takeIf { it > 0 }
-                if (anios != null) "$saludo 🎉 Hoy cumples ${tiempo(anios)} en NEXARA" else "$saludo 🎉 Hoy es tu aniversario en NEXARA"
+                val hecho = if (anios != null) "hoy cumples ${tiempo(anios)} en NEXARA" else "hoy es tu aniversario en NEXARA"
+                "$saludo: $hecho! 🎉"
             }
             else -> {
                 val anios = c.anios?.takeIf { it > 0 }

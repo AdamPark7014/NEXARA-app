@@ -41,14 +41,9 @@ struct CelebracionesBanner: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(visibles) { c in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(c.titulo)
-                            .font(.subheadline.weight(.bold))
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(c.detalle)
-                            .font(.caption)
-                            .opacity(0.9)
-                    }
+                    Text(c.titulo)
+                        .font(.subheadline.weight(.bold))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 if resto > 0 {
                     Text(resto == 1 ? "y 1 celebración más hoy" : "y \(resto) celebraciones más hoy")

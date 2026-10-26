@@ -45,23 +45,21 @@ export function primerNombre(nombre: string | null | undefined): string {
 const tiempoEnNexara = (anios: number) => (anios === 1 ? "1 año" : `${anios} años`);
 
 /**
- * Texto del aviso: `titulo` en negritas y `detalle` a un lado.
+ * Texto del aviso, una frase en `titulo`.
  * Cumpleaños nunca menciona años; aniversario solo los años en la empresa.
+ * `detalle` queda vacío: el deseo va en la misma frase, y el banner no pinta un segundo renglón.
  */
 export function textoCelebracion(c: Celebracion): { titulo: string; detalle: string | null } {
   const anios = c.tipo === "aniversario" && typeof c.anios === "number" && c.anios >= 1 ? c.anios : null;
   if (c.soyYo) {
     const quien = primerNombre(c.nombre);
     if (c.tipo === "cumpleanos") {
-      return {
-        titulo: quien ? `¡Feliz cumpleaños, ${quien}! 🎂` : "¡Feliz cumpleaños! 🎂",
-        detalle: "Todo el equipo te desea un gran día",
-      };
+      const saludo = quien ? `¡Feliz cumpleaños, ${quien}` : "¡Feliz cumpleaños";
+      return { titulo: `${saludo}: todo el equipo te desea un gran día! 🎂`, detalle: null };
     }
-    return {
-      titulo: quien ? `¡Felicidades, ${quien}! 🎉` : "¡Felicidades! 🎉",
-      detalle: anios ? `Hoy cumples ${tiempoEnNexara(anios)} en NEXARA` : "Hoy es tu aniversario en NEXARA",
-    };
+    const saludo = quien ? `¡Felicidades, ${quien}` : "¡Felicidades";
+    const hecho = anios ? `hoy cumples ${tiempoEnNexara(anios)} en NEXARA` : "hoy es tu aniversario en NEXARA";
+    return { titulo: `${saludo}: ${hecho}! 🎉`, detalle: null };
   }
   const quien = (c.nombre || "").trim() || "alguien del equipo";
   if (c.tipo === "cumpleanos") {
