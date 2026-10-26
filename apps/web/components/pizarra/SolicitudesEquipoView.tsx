@@ -174,9 +174,16 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
   const meta = (r: PeerRequestItem, lado: "recibida" | "enviada") => (
     <div className={s.bloqueMeta}>
       <StatusBadge size="sm" label={estadoLabel(r.status)} tone={estadoTono(r.status, lado)} />
-      <span className={s.pista}>
-        {lado === "recibida" ? "Te la pidieron" : "La enviaste"} el {fechaCorta(r.createdAt)}
-        {r.activity ? ` · ${r.activity.anNumber}` : ""}
+      <span className={s.pista} data-fecha-folio="">
+        <span>
+          {lado === "recibida" ? "Te la pidieron" : "La enviaste"} el {fechaCorta(r.createdAt)}
+        </span>
+        {r.activity ? (
+          <>
+            <span data-sep=""> · </span>
+            <span>{r.activity.anNumber}</span>
+          </>
+        ) : null}
       </span>
       {r.rejectReason ? <span className={s.pista}>Motivo: {r.rejectReason}</span> : null}
     </div>
@@ -245,6 +252,20 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
 
   return (
     <div className={s.vista}>
+      {/* A 390 px la fecha y el folio van en renglones distintos. En escritorio siguen juntos. */}
+      <style>{`
+        @media (max-width: 390px) {
+          [data-fecha-folio] {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: var(--ui-s1);
+          }
+          [data-fecha-folio] [data-sep] {
+            display: none;
+          }
+        }
+      `}</style>
       {error ? (
         <Alert
           tone="danger"
@@ -264,8 +285,8 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
           Pedirle una actividad a un compañero
         </h3>
         <p className={s.intro}>
-          Aquí le pides a cualquier compañero de la empresa que haga una actividad. Si
-          acepta, la actividad queda a su nombre y tú la sigues en «Enviadas».
+          Aquí le pides a cualquier compañero de la empresa que haga una actividad y, si acepta, la
+          actividad queda a su nombre y tú la sigues en «Enviadas».
         </p>
         <div className={s.formulario}>
           <div className={s.rejilla}>
