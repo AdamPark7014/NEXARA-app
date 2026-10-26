@@ -11,11 +11,7 @@ export default function ErpNotFound() {
             <path d="m16 16 4.5 4.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
           </svg>
         </span>
-        <h2 className={styles.title}>No encontramos lo que buscas</h2>
-        <p className={styles.text}>
-          Puede que el registro se haya borrado o que el enlace esté incompleto. Usa el menú de la izquierda
-          o vuelve al inicio.
-        </p>
+        <h2 className={styles.title}>No encontramos lo que buscas.</h2>
         <div className={styles.actions}>
           <Link href="/erp" className={styles.btnPrimary}>
             Ir al inicio

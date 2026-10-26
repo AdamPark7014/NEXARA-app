@@ -1,22 +1,20 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import styles from "./PanelState.module.scss";
 
 /**
- * Pantalla de error de un panel (para `error.tsx`). Habla con la persona, no
- * con el programador: qué pasó, que no perdió nada y qué puede hacer. El
- * detalle técnico queda plegado para quien lo tenga que reportar.
+ * Pantalla de error de un panel (para `error.tsx`). Una frase y Reintentar.
+ * El detalle técnico queda plegado para quien lo tenga que reportar.
  */
 export default function PanelError({
   error,
   reset,
-  homeHref = "/erp",
   scope = "panel",
 }: {
   error: Error & { digest?: string };
   reset: () => void;
+  /** Se conserva para quien ya lo pasa; el estado ya no enlaza al inicio. */
   homeHref?: string;
   /** Nombre corto para el registro de consola (erp, finance, hr…). */
   scope?: string;
@@ -35,18 +33,11 @@ export default function PanelError({
             <circle cx="12" cy="17" r="1" fill="currentColor" />
           </svg>
         </span>
-        <h2 className={styles.title}>Esta sección no cargó bien</h2>
-        <p className={styles.text}>
-          No perdiste nada de lo que ya estaba guardado. Vuelve a intentarlo; si sigue pasando, avisa a
-          soporte{error.digest ? " con el código de abajo" : ""}.
-        </p>
+        <h2 className={styles.title}>Esta sección no cargó bien.</h2>
         <div className={styles.actions}>
           <button type="button" className={styles.btnPrimary} onClick={reset}>
             Reintentar
           </button>
-          <Link href={homeHref} className={styles.btn}>
-            Ir al inicio
-          </Link>
         </div>
         {error.digest ? (
           <p className={styles.code}>
