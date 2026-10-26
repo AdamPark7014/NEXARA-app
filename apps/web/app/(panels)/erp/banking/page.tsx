@@ -2,13 +2,13 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { todayStamp } from "@/components/finance/download";
+import s from "./banking.module.css";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot from "@/components/ui/StatusDot";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import {
   FinanceField,
@@ -94,6 +94,9 @@ const emptyTxForm = {
   concept: "",
 };
 
+/** Respaldo cuando el servidor no da causa; también decide si el aviso de recarga la repite. */
+const CUENTAS_SIN_CARGAR = "No se pudieron cargar las cuentas bancarias.";
+
 export default function BankingPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpFinanceSectionConfig(user, "banking"), [user]);
@@ -134,7 +137,7 @@ export default function BankingPage() {
       // La cuenta elegida se refresca con su saldo nuevo; si ya no existe, se toma la primera.
       setSelected((prev) => (prev ? (list.find((a) => a.id === prev.id) ?? list[0] ?? null) : (list[0] ?? null)));
     } catch (e) {
-      setError(formatApiError(e, "No se pudieron cargar las cuentas bancarias"));
+      setError(formatApiError(e, CUENTAS_SIN_CARGAR));
     } finally { setLoading(false); }
   }, [token]);
 
@@ -168,7 +171,7 @@ export default function BankingPage() {
         setTxParcial(total > acumuladas.length ? { cargadas: acumuladas.length, total } : null);
       } catch (e) {
         if (!vivo) return;
-        setTxError(formatApiError(e, "No se pudieron cargar los movimientos"));
+        setTxError(formatApiError(e, "No se pudieron cargar los movimientos."));
         setTxs([]);
         setTxParcial(null);
       } finally {
@@ -428,9 +431,9 @@ export default function BankingPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Finanzas"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
+        title="Bancos"
+        backHref="/erp/contabilidad"
+        backLabel="Contabilidad"
         density="ops"
         actions={
           <>
@@ -441,24 +444,30 @@ export default function BankingPage() {
       />
       <FinanceModuleRail />
 
-      <div style={{ marginBottom: 18 }}>
-        <MetricStrip metrics={metrics} ariaLabel="Resumen de bancos" />
-      </div>
+      {accounts.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <MetricStrip metrics={metrics} ariaLabel="Resumen de bancos" />
+        </div>
+      )}
 
       {loading && accounts.length === 0 && (
-        <EmptyState title="Cargando cuentas…" description="Consultando cuentas bancarias." />
+        <p className={s.frase} role="status">Cargando cuentas.</p>
       )}
       {!loading && error && accounts.length === 0 && (
-        <EmptyState
-          title="No se pudieron cargar las cuentas"
-          description={error}
+        <InlineAlert
+          variant="danger"
+          message={error}
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
         />
       )}
       {error && accounts.length > 0 && (
         <InlineAlert
           variant="warning"
-          message={`No se pudo actualizar; se muestran los saldos anteriores. ${error}`}
+          message={
+            error === CUENTAS_SIN_CARGAR
+              ? "No se pudo actualizar; se muestran los saldos anteriores."
+              : `No se pudo actualizar; se muestran los saldos anteriores. ${error}`
+          }
           onDismiss={() => setError(null)}
           action={
             <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
@@ -470,16 +479,9 @@ export default function BankingPage() {
 
       {(accounts.length > 0 || (!loading && !error)) && (
         <>
-          <Section title="Cuentas" subtitle="El saldo manda; elige una cuenta para ver sus movimientos.">
+          <Section title="Cuentas">
             {accounts.length === 0 && (
-              <EmptyState
-                icon="🏦"
-                title="Todavía no hay cuentas bancarias"
-                description="La cuenta bancaria es el primer dato del módulo: sin ella no hay saldo, ni movimientos, ni conciliación. Da de alta la que usa la operación con su saldo del día que arrancas."
-                action={cfg.canCreate
-                  ? <Button size="sm" variant="primary" iconLeft="+" onClick={openNewAccount}>Crear la primera cuenta</Button>
-                  : undefined}
-              />
+              <p className={s.frase} role="status">No hay cuentas.</p>
             )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 10 }}>
               {accounts.map((a) => {
@@ -580,13 +582,13 @@ export default function BankingPage() {
               {loadingTx && txs.length === 0
                 ? <div aria-busy="true" style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando movimientos…</div>
                 : txError
-                  ? <EmptyState title="No se pudieron cargar los movimientos" description={txError} action={<Button size="sm" variant="secondary" onClick={() => setTxReload((n) => n + 1)}>Reintentar</Button>} />
+                  ? <InlineAlert variant="danger" message={txError} action={<Button size="sm" variant="secondary" onClick={() => setTxReload((n) => n + 1)}>Reintentar</Button>} />
                   : (
                     <>
                       {txParcial && (
                         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "0 0 12px" }}>
                           <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
-                            Se cargaron los {txParcial.cargadas} movimientos más recientes de {txParcial.total}. La búsqueda y los filtros solo miran los cargados.
+                            Se muestran {txParcial.cargadas} de {txParcial.total} movimientos; la búsqueda y los filtros solo miran los cargados.
                           </p>
                           <Button size="sm" variant="secondary" onClick={() => setTxTandas((n) => n + 1)} disabled={loadingTx}>
                             Cargar más
@@ -598,8 +600,8 @@ export default function BankingPage() {
                         rows={visibleTxs}
                         rowKey={(t) => t.id}
                         ariaLabel={`Movimientos de ${selected.name}`}
-                        emptyTitle={txs.length > 0 ? "Ningún movimiento con estos filtros" : "Sin movimientos"}
-                        emptyDescription={txs.length > 0 ? "Cambia la búsqueda o el tipo para ver más." : "Registra el primer movimiento o importa el estado de cuenta."}
+                        emptyTitle={txs.length > 0 ? "Nada coincide con estos filtros." : "No hay movimientos."}
+                        emptyDescription=""
                       />
                       {visibleTxs.length > 0 && (
                         <div className="nx-bank-totals" aria-label="Totales de los movimientos visibles">
