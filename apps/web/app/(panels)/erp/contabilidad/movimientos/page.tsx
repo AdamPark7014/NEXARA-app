@@ -87,6 +87,8 @@ export default function MovimientosPage() {
   } | null>(null);
   const [detail, setDetail] = useState<LedgerRow | null>(null);
   const [angosto, setAngosto] = useState(false);
+  // A 390 px la frase no cabe al lado de Anterior / Siguiente.
+  const [avisoAbajo, setAvisoAbajo] = useState(false);
 
   // La última consulta pedida es la que se pinta. Teclear en el buscador lanza
   // una petición por letra y sin esto la respuesta lenta de «fac» podía llegar
@@ -138,6 +140,14 @@ export default function MovimientosPage() {
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1200px)");
     const sync = () => setAngosto(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 720px)");
+    const sync = () => setAvisoAbajo(mq.matches);
     sync();
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
@@ -579,11 +589,13 @@ export default function MovimientosPage() {
           <div
             style={{
               display: "flex",
+              flexWrap: avisoAbajo ? "wrap" : "nowrap",
               alignItems: "center",
               gap: 10,
               marginTop: 10,
               fontSize: 12,
               color: "var(--text-secondary)",
+              ...(avisoAbajo ? { width: "100%", maxWidth: "100%", minWidth: 0 } : {}),
             }}
           >
             {/* `loading` también bloquea: dos clics seguidos en «Siguiente»
@@ -613,7 +625,22 @@ export default function MovimientosPage() {
                 Filtra o acorta el periodo para ver el resto.
               </span>
             )}
-            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-tertiary)" }}>
+            <span
+              style={
+                avisoAbajo
+                  ? {
+                      flexBasis: "100%",
+                      boxSizing: "border-box",
+                      width: "100%",
+                      maxWidth: "calc(100vw - 32px)",
+                      minWidth: 0,
+                      fontSize: 11,
+                      lineHeight: 1.45,
+                      color: "var(--text-tertiary)",
+                    }
+                  : { marginLeft: "auto", fontSize: 11, color: "var(--text-tertiary)" }
+              }
+            >
               {NATURALEZA_HINT}
             </span>
           </div>

@@ -209,4 +209,4 @@ export const TIPO_OPTIONS: { value: string; label: string }[] = [
 ];
 
 export const NATURALEZA_HINT =
-  "Efectivo = ya pasó por banco o caja. Devengado = registrado pero aún no cobrado o pagado. Se muestran por separado para no sumar dos veces el mismo peso.";
+  "Efectivo (ya pasó por banco o caja) y devengado (registrado pero aún no cobrado o pagado) se muestran por separado para no sumar dos veces el mismo peso.";
