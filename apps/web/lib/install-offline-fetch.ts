@@ -146,7 +146,7 @@ async function getWithApiCache(abs: string, nativeExec: () => Promise<Response>)
     const hit = await readApiGetCache(abs, tag);
     if (hit) return responseFromApiCache(hit, true);
     throw new Error(
-      "No se pudo contactar la API. Comprueba que nexara-api esté activo o recarga con Ctrl+F5.",
+      "No se pudo contactar la API: comprueba que nexara-api esté activo o recarga con Ctrl+F5.",
     );
   }
 }
