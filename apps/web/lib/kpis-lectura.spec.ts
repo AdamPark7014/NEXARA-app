@@ -6,6 +6,7 @@ import {
   avisosDePersona,
   bloquesDelDia,
   detalleDeFila,
+  partesDeFila,
   entregasDelEquipo,
   entregasEnPalabras,
   escalaDeDias,
@@ -160,6 +161,27 @@ describe("cumplimiento", () => {
     expect(detalleDeFila({ ...t, entregas: undefined })).toBe("3 h 10 min en actividades de 24 h");
     expect(detalleDeFila({ ...t, entregas: entregas({ medidas: 0, revisadas: 0 }) })).toBe("Sin entregas · 3 h 10 min en actividades de 24 h");
     expect(detalleDeFila({ ...t, minutosLaborados: 0, entregas: entregas({ revisadas: 0 }) })).toBe("17/18 a tiempo · Sin jornada");
+  });
+
+  it("un dato por renglón: el texto viejo juntaba las cifras en una sola línea", () => {
+    const t = { ...base, minutosProductivos: 190, minutosLaborados: 1440, entregas: entregas() };
+    const viejo = "17/18 a tiempo · 18/18 a la primera · 3 h 10 min en actividades de 24 h";
+    const viejoSinEntregas = "Sin entregas · 3 h 10 min en actividades de 24 h";
+    const viejoSinJornada = "17/18 a tiempo · Sin jornada";
+
+    expect(partesDeFila(t)).toEqual(["17/18 a tiempo", "18/18 a la primera", "3 h 10 min en actividades de 24 h"]);
+    expect(partesDeFila(t).join(" · ")).toBe(viejo);
+    expect(partesDeFila(t)).not.toContain(viejo);
+
+    const sinEntregas = partesDeFila({ ...t, entregas: entregas({ medidas: 0, revisadas: 0 }) });
+    expect(sinEntregas).toEqual(["Sin entregas", "3 h 10 min en actividades de 24 h"]);
+    expect(sinEntregas.join(" · ")).toBe(viejoSinEntregas);
+    expect(sinEntregas).not.toContain(viejoSinEntregas);
+
+    const sinJornada = partesDeFila({ ...t, minutosLaborados: 0, entregas: entregas({ revisadas: 0 }) });
+    expect(sinJornada).toEqual(["17/18 a tiempo", "Sin jornada"]);
+    expect(sinJornada.join(" · ")).toBe(viejoSinJornada);
+    expect(sinJornada).not.toContain(viejoSinJornada);
   });
 });
 
