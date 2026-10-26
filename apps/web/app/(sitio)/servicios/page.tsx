@@ -7,6 +7,7 @@ import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
 import ip from "@/components/sitio/interior.module.css";
 import TarjetasRuta from "@/components/sitio/TarjetasRuta";
+import SimuladorCobertura from "@/components/sitio/SimuladorCobertura";
 import { GUIAS } from "@/lib/guias";
 import Aurora from "@/components/sitio/Aurora";
 import Flecha from "@/components/sitio/Flecha";
@@ -353,8 +354,24 @@ export default function PropuestaServicios() {
         </div>
       </section>
 
+      {/* Simulador de cobertura */}
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="simulador-titulo">
+        <div className={s.contenedor}>
+          <div className={s.cabeza} data-aparecer>
+            <div>
+              <p className={s.antetitulo}>Pruébalo</p>
+              <h2 id="simulador-titulo" className={s.titulo}>
+                Diseña la cobertura <span className={s.tenue}>de una tienda.</span>
+              </h2>
+            </div>
+            <p className={s.lead}>Mueve y gira las cámaras. Así pensamos cada proyecto: primero las zonas de riesgo, después cuántas cámaras.</p>
+          </div>
+          <SimuladorCobertura />
+        </div>
+      </section>
+
       {/* Lo que se entrega */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="entregas-titulo">
+      <section className={s.seccion} aria-labelledby="entregas-titulo">
         <div className={s.contenedor}>
           <div className={s.cabeza} data-aparecer>
             <div>
@@ -386,7 +403,7 @@ export default function PropuestaServicios() {
       </section>
 
       {/* Método */}
-      <section className={s.seccion} aria-label="Método">
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Método">
         <div className={s.contenedor}>
           <Metodo
             antetitulo="Método"
@@ -402,7 +419,7 @@ export default function PropuestaServicios() {
       </section>
 
       {/* Cómo se contrata */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="modalidades-titulo">
+      <section className={s.seccion} aria-labelledby="modalidades-titulo">
         <div className={s.contenedor}>
           <div className={s.centro} data-aparecer>
             <p className={s.antetitulo}>Cómo trabajamos contigo</p>
@@ -432,10 +449,10 @@ export default function PropuestaServicios() {
         </div>
       </section>
 
-      <Certificaciones />
+      <Certificaciones gris />
 
       {/* Industrias */}
-      <section id="industrias" className={`${s.seccion} ${s.seccionAlt} ${p.ancla}`} aria-labelledby="industrias-servicios">
+      <section id="industrias" className={`${s.seccion} ${p.ancla}`} aria-labelledby="industrias-servicios">
         <div className={s.contenedor}>
           <header className={s.centro} data-aparecer>
             <p className={s.antetitulo}>Industrias</p>
@@ -458,7 +475,7 @@ export default function PropuestaServicios() {
       </section>
 
       {/* Guías del blog */}
-      <section className={s.seccion} aria-labelledby="guias-servicios">
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="guias-servicios">
         <div className={s.contenedor}>
           <div className={s.cabeza} data-aparecer>
             <div>

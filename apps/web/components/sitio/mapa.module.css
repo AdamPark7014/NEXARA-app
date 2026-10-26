@@ -1,0 +1,280 @@
+/* Mapa interactivo de cobertura: estados que responden al cursor, ruta que se dibuja y ficha del estado. */
+
+.marco {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr);
+  gap: clamp(24px, 4vw, 56px);
+  align-items: center;
+  margin-top: clamp(40px, 5vw, 64px);
+}
+
+.lienzo {
+  position: relative;
+}
+
+.lienzo svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  touch-action: manipulation;
+}
+
+.estado {
+  fill: var(--mapa-estado);
+  stroke: var(--mapa-borde);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  cursor: pointer;
+  transition: fill 0.2s var(--ease), opacity 0.2s var(--ease);
+}
+
+.estado[data-modo="campo"] {
+  fill: color-mix(in srgb, var(--accent) 34%, var(--mapa-estado));
+}
+
+.estado[data-modo="base"] {
+  fill: var(--accent);
+}
+
+.estado:hover {
+  fill: color-mix(in srgb, var(--accent) 22%, var(--mapa-estado-hover));
+}
+
+.estado[data-modo="campo"]:hover {
+  fill: color-mix(in srgb, var(--accent) 52%, var(--mapa-estado));
+}
+
+.estado[data-activo] {
+  fill: color-mix(in srgb, var(--accent) 70%, var(--card));
+}
+
+.estado[data-modo="base"][data-activo],
+.estado[data-modo="base"]:hover {
+  fill: color-mix(in srgb, var(--accent) 85%, #000);
+}
+
+/* El estado activo se redibuja encima con su contorno, para que el borde no quede bajo los vecinos. */
+.contorno {
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.ruta {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  pointer-events: none;
+  animation: trazo 0.7s var(--ease-out) both;
+}
+
+@keyframes trazo {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+.destino {
+  fill: var(--card);
+  stroke: var(--accent);
+  stroke-width: 3;
+  pointer-events: none;
+}
+
+.halo {
+  fill: var(--accent);
+  opacity: 0.35;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: halo 2s var(--ease-out) infinite;
+}
+
+@keyframes halo {
+  from {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(3.6);
+    opacity: 0;
+  }
+}
+
+.sede {
+  fill: var(--accent);
+  stroke: var(--card);
+  stroke-width: 2.5;
+  pointer-events: none;
+}
+
+.etiqueta {
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  fill: var(--fg);
+  paint-order: stroke;
+  stroke: var(--mapa-halo);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+/* ── Ficha del estado ───────────────────────────────────────────────────── */
+
+.ficha {
+  padding: clamp(24px, 3vw, 32px);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  box-shadow: var(--sombra-md), inset 0 0 0 1px var(--line-soft);
+}
+
+.elegir {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-3);
+}
+
+.elegir select {
+  min-height: 44px;
+  padding: 0 40px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%236b7a90' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 14px center;
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  appearance: none;
+}
+
+.elegir select:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.nombre {
+  margin-top: 24px;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 2.8vw, 36px);
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.modo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--control);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.modo i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.detalle {
+  margin-top: 14px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--fg-2);
+}
+
+.ciudades {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.ciudades a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg-2);
+  transition: color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+
+.ciudades a:hover {
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.accion {
+  margin-top: 24px;
+}
+
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 16px;
+  font-size: 13.5px;
+  color: var(--fg-2);
+}
+
+.leyenda span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leyenda i,
+.modo i {
+  display: inline-block;
+}
+
+.leyenda i {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.colorBase {
+  background: var(--accent);
+}
+
+.colorCampo {
+  background: color-mix(in srgb, var(--accent) 34%, var(--mapa-estado));
+}
+
+.colorExtendida {
+  background: var(--mapa-estado);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+@media (max-width: 1068px) {
+  .marco {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ruta,
+  .halo {
+    animation: none;
+  }
+}

@@ -13,9 +13,7 @@ import Flecha from "@/components/sitio/Flecha";
 import Metodo, { type PasoMetodo } from "@/components/sitio/Metodo";
 import Industrias, { type Industria } from "@/components/sitio/Industrias";
 import Galeria, { type FotoGaleria } from "@/components/sitio/Galeria";
-import MapaMexico from "@/components/sitio/MapaMexico";
-import ListaCiudades from "@/components/sitio/ListaCiudades";
-import Sincronia from "@/components/sitio/Sincronia";
+import MapaInteractivo from "@/components/sitio/MapaInteractivo";
 import Ecosistema from "@/components/sitio/Ecosistema";
 import { GlifoAnios, GlifoEstados, GlifoRespuesta, GlifoSitios } from "@/components/sitio/Glifos";
 import Preguntas, { type Pregunta } from "@/components/sitio/Preguntas";
@@ -491,33 +489,20 @@ export default async function PropuestaInicio() {
 
       {/* ── Cobertura ── */}
       <section className={s.seccion} aria-labelledby="cobertura-titulo">
-        <Sincronia className={`${s.contenedor} ${s.cobertura}`}>
-          <div data-aparecer>
-            <p className={s.antetitulo}>Cobertura</p>
-            <h2 id="cobertura-titulo" className={s.titulo}>
-              Base en Puebla y CDMX. <span className={s.tenue}>Alcance nacional.</span>
-            </h2>
-            <p className={s.lead}>Diagnóstico en sitio en el centro del país y proyectos multisede en toda la República.</p>
-            <dl className={s.datos}>
-              <div className={s.dato}>
-                <dt className={s.datoEtiqueta}>Base de operación</dt>
-                <dd className={s.datoValor}>Puebla y Ciudad de México</dd>
-              </div>
-              <div className={s.dato}>
-                <dt className={s.datoEtiqueta}>Diagnóstico en sitio</dt>
-                <dd className={s.datoValor}>Centro del país</dd>
-              </div>
-              <div className={s.dato}>
-                <dt className={s.datoEtiqueta}>Proyectos multisede</dt>
-                <dd className={s.datoValor}>Toda la República</dd>
-              </div>
-            </dl>
-            <ListaCiudades />
+        <div className={s.contenedor}>
+          <div className={s.cabeza} data-aparecer>
+            <div>
+              <p className={s.antetitulo}>Cobertura</p>
+              <h2 id="cobertura-titulo" className={s.titulo}>
+                Base en Puebla y CDMX. <span className={s.tenue}>Alcance nacional.</span>
+              </h2>
+            </div>
+            <p className={s.lead}>Toca tu estado en el mapa, o elígelo, y te decimos cómo lo atendemos.</p>
           </div>
           <div data-aparecer>
-            <MapaMexico />
+            <MapaInteractivo />
           </div>
-        </Sincronia>
+        </div>
       </section>
 
       {/* ── Preguntas frecuentes ── */}

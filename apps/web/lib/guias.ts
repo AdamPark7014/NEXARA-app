@@ -21,6 +21,8 @@ export type Guia = {
   publicada: string;
   /** Solución a la que lleva el cierre de la guía. */
   solucion: { href: string; label: string };
+  /** Demo interactiva al terminar de leer (hoy solo el simulador de cobertura de cámaras). */
+  interactivo?: "cctv";
   secciones: SeccionGuia[];
 };
 
@@ -35,6 +37,7 @@ export const GUIAS: Guia[] = [
     foto: "monitoreo-pantallas-cctv",
     publicada: "2026-10-26",
     solucion: { href: "/servicios#cctv", label: "Ver videovigilancia" },
+    interactivo: "cctv",
     secciones: [
       {
         titulo: "Empieza por el riesgo, no por la cámara",
