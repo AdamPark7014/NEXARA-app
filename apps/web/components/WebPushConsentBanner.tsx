@@ -62,8 +62,7 @@ export default function WebPushConsentBanner() {
         id="nexara-web-push-banner-desc"
         style={{ margin: "0 0 12px", color: "var(--text-secondary, #64748b)", lineHeight: 1.5 }}
       >
-        Recibe avisos de operación aunque no tengas la pestaña abierta (como Gmail o Slack en el navegador).
-        El siguiente paso es el permiso oficial de tu navegador: solo se pide una vez.
+        Recibe avisos de operación aunque no tengas la pestaña abierta (como Gmail o Slack en el navegador): el siguiente paso es el permiso oficial de tu navegador, que solo se pide una vez.
       </p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button
