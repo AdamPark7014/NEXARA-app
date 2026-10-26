@@ -3,8 +3,8 @@
  *
  * Tres rejillas que usan los estilos de `tabla` (`components/base/tabla.module.css`):
  * intentos rechazados, horarios por persona y aprobación de horas extra. Renglón denso,
- * números a la derecha, y en teléfono cada fila se apila en dos renglones en vez de
- * obligar a un scroll horizontal.
+ * números a la derecha. En tableta cada fila se apila en dos renglones; en teléfono,
+ * horarios y rechazos dejan un dato por renglón.
  */
 
 /* ─── Intentos rechazados ────────────────────────────────────────────── */
@@ -69,7 +69,15 @@
   gap: 6px;
 }
 
-/* Teléfono y tableta: la fila se apila en vez de encogerse hasta ser ilegible. */
+/* Nombre del dato: en la tabla lo dice la cabecera; en teléfono, el propio renglón. */
+.dato {
+  display: none;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  color: var(--ui-fg-3);
+}
+
+/* Tableta: la fila se apila en vez de encogerse hasta ser ilegible. */
 @media (max-width: 960px) {
   .rechazos,
   .horarios,
@@ -82,6 +90,42 @@
 
   .acciones {
     justify-content: flex-start;
+  }
+}
+
+/* Teléfono: en horarios y rechazos, un dato por renglón y con su nombre. */
+@media (max-width: 560px) {
+  div.rechazos,
+  div.horarios {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .cabecera.rechazos,
+  .cabecera.horarios {
+    display: none;
+  }
+
+  .dato {
+    display: block;
+  }
+
+  .horarios > span,
+  .rechazos > span {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    justify-self: stretch;
+    text-align: left;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  /* La hora nativa no cabe en 6 rem cuando el reloj del teléfono se dibuja más grande. */
+  .horarios .campoCorto {
+    max-width: 8.5rem;
   }
 }
 
@@ -130,7 +174,7 @@
   gap: var(--ui-s3);
 }
 
-/* Ventanita de ayuda: párrafos y lista con el mismo ritmo. */
+/* Ventanita de ayuda: párrafos y lista con el mismo ritmo, una frase por renglón. */
 .popParrafo {
   margin: 0 0 var(--ui-s2);
 }
