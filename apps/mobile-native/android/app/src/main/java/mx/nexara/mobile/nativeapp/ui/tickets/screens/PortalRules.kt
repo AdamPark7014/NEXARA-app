@@ -173,11 +173,11 @@ internal fun toggleCoordinateSign(raw: String): String {
 /** Error de coordenadas para el formulario de sucursal, o `null` si están bien (o vacías). */
 internal fun branchCoordinatesError(latitud: String, longitud: String): String? {
     if (latitud.isNotBlank()) {
-        val lat = parseCoordinate(latitud) ?: return "Latitud inválida. Ejemplo: 19.0414"
+        val lat = parseCoordinate(latitud) ?: return "Latitud inválida, ejemplo: 19.0414"
         if (lat < -90.0 || lat > 90.0) return "La latitud va de -90 a 90"
     }
     if (longitud.isNotBlank()) {
-        val lng = parseCoordinate(longitud) ?: return "Longitud inválida. Ejemplo: -98.2063"
+        val lng = parseCoordinate(longitud) ?: return "Longitud inválida, ejemplo: -98.2063"
         if (lng < -180.0 || lng > 180.0) return "La longitud va de -180 a 180"
     }
     return null
