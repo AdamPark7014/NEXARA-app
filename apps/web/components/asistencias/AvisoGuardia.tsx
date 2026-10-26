@@ -49,7 +49,7 @@ export default function AvisoGuardia({
   const verbo = sinGuardia.length === 1 ? "no tiene" : "no tienen";
   return (
     <Alert tone="warning" title="Fin de semana sin guardia">
-      {`El ${diaCorto(fecha)} es fin de semana y ${quien} ${verbo} guardia: sin guardia no se puede checar ese día. Prográmala en Asistencias → Guardias.`}
+      {`El ${diaCorto(fecha)} es fin de semana y ${quien} ${verbo} guardia: sin guardia no se puede checar ese día, prográmala en Asistencias → Guardias.`}
     </Alert>
   );
 }
