@@ -199,8 +199,8 @@ export default function UbicacionActividadCard({
           </h3>
           <p className={s.sub}>
             {estado?.exigeMismaUbicacion === true
-              ? `Mantente a no más de ${radio} m del punto donde iniciaste: la foto de salida solo se acepta dentro de ese radio.`
-              : "La foto de salida lleva tu ubicación. En este tipo de actividad no hace falta que coincida con el punto de inicio."}
+              ? `La foto de salida solo se acepta a no más de ${radio} m del punto de inicio.`
+              : "La foto de salida lleva tu ubicación y no tiene que coincidir con el inicio."}
           </p>
         </div>
         {chipEstado}
@@ -296,10 +296,35 @@ export default function UbicacionActividadCard({
             <li key={a.id} className={s.justificada}>
               <IconLabel icon={TaskAltIcon} size={16} gap={4} iconColor={VERDE}>
                 <strong>Justificada</strong>
-              </IconLabel>{" "}
-              · salida de las {hora(a.detectedAt)}, hasta {formatoDistancia(a.maxDistanciaM)}
-              {a.justificacion ? ` · «${a.justificacion}»` : ""}
-              {a.fotoUrl ? " · con foto" : ""}
+              </IconLabel>
+              <span>
+                <span className={s.lecturaSep} aria-hidden="true">
+                  {" · "}
+                </span>
+                salida de las {hora(a.detectedAt)}
+              </span>
+              <span>
+                <span className={s.lecturaSep} aria-hidden="true">
+                  {", "}
+                </span>
+                hasta {formatoDistancia(a.maxDistanciaM)}
+              </span>
+              {a.justificacion ? (
+                <span>
+                  <span className={s.lecturaSep} aria-hidden="true">
+                    {" · "}
+                  </span>
+                  «{a.justificacion}»
+                </span>
+              ) : null}
+              {a.fotoUrl ? (
+                <span>
+                  <span className={s.lecturaSep} aria-hidden="true">
+                    {" · "}
+                  </span>
+                  con foto
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -326,7 +351,11 @@ export default function UbicacionActividadCard({
                   const fuera = p.distanciaM != null && p.distanciaM > radio;
                   return (
                     <li key={`${p.at}-${i}`} title={fechaHora(p.at)} className={s.lectura} data-fuera={fuera ? "true" : undefined}>
-                      {hora(p.at)} · <strong>{formatoDistancia(p.distanciaM)}</strong>
+                      <span>{hora(p.at)}</span>
+                      <span className={s.lecturaSep} aria-hidden="true">
+                        {" · "}
+                      </span>
+                      <strong>{formatoDistancia(p.distanciaM)}</strong>
                     </li>
                   );
                 })}
@@ -447,11 +476,15 @@ export function JustificarSalidaDialog({
               Justificar salida de zona
             </h3>
             <p className={s.dialogoD}>
-              Saliste a las {hora(alerta.detectedAt)} y llegaste a {formatoDistancia(alerta.maxDistanciaM)} del punto de inicio
-              {alerta.abierta ? "; sigues fuera." : `; regresaste a las ${hora(alerta.returnedAt)}.`}
+              {alerta.abierta ? "Sigues fuera de la zona." : "Ya regresaste a la zona."}
             </p>
           </div>
         </header>
+        <dl className={s.dialogoDatos}>
+          <Dato etiqueta="Salida" valor={hora(alerta.detectedAt)} />
+          <Dato etiqueta="Se alejó hasta" valor={formatoDistancia(alerta.maxDistanciaM)} />
+          {alerta.abierta ? null : <Dato etiqueta="Regreso" valor={hora(alerta.returnedAt)} />}
+        </dl>
 
         <label className={s.campo}>
           <span className={s.etiqueta}>
