@@ -1,5 +1,20 @@
 # RELEVO
 
+- **26-10 ~13:15 (claude-code) — `deploy/update.sh` ya no reconstruye el transcriptor en cada despliegue.**
+  - Sesión lateral del coordinador. `up -d --build transcriptor` corría siempre; con la caché de build vacía rehacía
+    whisper y el modelo (imagen de 2.5 GB) aunque solo cambiara el web, y así se llenó el disco el 26-10.
+  - Ahora `build_transcriptor` va como `build_api`/`build_web`: solo si cambió `deploy/docker/Dockerfile.transcriptor`
+    entre revisiones (o sin commitear), con `--force-all`, si falta `nexara-transcriptor:latest`, o si cambió su bloque
+    `build` de `docker compose config` (compose o `WHISPER_MODEL` del `.env`), que se anota en
+    `/var/lib/nexara/transcriptor-build.conf` (el primer deploy solo lo anota). Si no, `up -d --no-build transcriptor`.
+  - `check_disk_before_build` antes de cada build (api, web, transcriptor): con `/` ≥ 90 % corre
+    `docker builder prune -f` y lo avisa en el log; con `--no-auto-prune` solo avisa.
+  - Probado: `bash -n` y corrida en seco con docker y df simulados (solo web, cambio de Dockerfile, de `WHISPER_MODEL`,
+    imagen faltante, `--force-all`, `--no-auto-prune`, cambio sin commitear).
+  - Ojo: el primer deploy después de cambiar `update.sh` corre la versión vieja (git reemplaza el archivo y bash sigue
+    leyendo el anterior).
+  - Despliegue: pendiente.
+
 - **26-10 ~13:10 (claude-code) — Causa del disco lleno: `audit_logs` pesa 14 GB (de 15 GB de la base).**
   - 5.5 millones de filas en un mes. 3.3 M (9.8 GB) son `integra POST_OK`: el interceptor de mutaciones auditaba
     cada POST del webhook de los terminales Hikvision (`/api/integra/hik/<empresa>/<token>`, ~56 mil al día, sin
