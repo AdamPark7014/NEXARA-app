@@ -64,10 +64,8 @@ export const tipoBase = (entityType: string): string => String(entityType).toUpp
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 });
 
 export function mensajeDeAutorizacion(tipo: TipoConTope, monto: number, yaSolicitada: boolean): string {
-  return (
-    `${ETIQUETA_TOPE[tipo]} es de ${MXN.format(monto)} y, por su monto, necesita la autorización de dirección. ` +
-    (yaSolicitada
-      ? 'Ya se pidió y sigue esperando su respuesta: te avisamos cuando la resuelva.'
-      : 'Se la pedimos ahora: te avisamos cuando la resuelva.')
-  );
+  const hecho = `${ETIQUETA_TOPE[tipo]} es de ${MXN.format(monto)} y, por su monto, necesita la autorización de dirección`;
+  return yaSolicitada
+    ? `${hecho}: ya se pidió y sigue esperando su respuesta; te avisamos cuando la resuelva.`
+    : `${hecho}: se la pedimos ahora y te avisamos cuando la resuelva.`;
 }
