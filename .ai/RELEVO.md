@@ -38,6 +38,9 @@
     verdad es borrar las filas viejas de `audit_logs` (~10 GB, pendiente de Adam).
   - Trampa en el servidor: `deploy/docker/Dockerfile.web` tiene un cambio local desde el 24-09 (`CACHEBUST` fijo). Por
     él, todo deploy sin revisión nueva (`--no-pull` o sin commits) reconstruye api y web. No se tocó.
+  - 2.º deploy (~13:24, `/tmp/deploy-transcriptor-1924.log`, solo `.ai/RELEVO.md`): «Anotada la configuración de build
+    del transcriptor…» y «Transcriptor sin cambios: se levanta sin reconstruir.»; la imagen siguió en `ee69f1aea048`,
+    disco 90 % (7.7 GB libres) antes y después, EXIT=0. Sello: `/var/lib/nexara/transcriptor-build.conf`.
 
 - **26-10 ~13:10 (claude-code) — Causa del disco lleno: `audit_logs` pesa 14 GB (de 15 GB de la base).**
   - 5.5 millones de filas en un mes. 3.3 M (9.8 GB) son `integra POST_OK`: el interceptor de mutaciones auditaba
