@@ -120,7 +120,7 @@ export default function FAQ() {
 
       <div className={styles.faqList}>
         {faqs.length === 0 && (
-          <div className={styles.faqEmpty}>Sin resultados. Prueba otra palabra o categoría.</div>
+          <div className={styles.faqEmpty}>Sin resultados, prueba otra palabra o categoría.</div>
         )}
         {faqs.map((item) => {
           const globalIndex = items.findIndex((x) => x.q === item.q);
