@@ -1,7 +1,7 @@
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import ChecarEnWeb, { fetchVentanaWeb } from "./ChecarEnWeb";
+import ChecarEnWeb, { fetchVentanaWeb, textoAvisoAbierto } from "./ChecarEnWeb";
 
 // El formulario real trae cámara y sockets: aquí solo importa cuándo se muestra.
 vi.mock("next/dynamic", () => ({ default: () => () => <div data-testid="formulario-checada">formulario</div> }));
@@ -18,6 +18,31 @@ describe("ChecarEnWeb", () => {
     await waitFor(() => expect(f).toHaveBeenCalled());
     expect(screen.getByText(/Abre la app NEXARA/)).toBeTruthy();
     expect(screen.queryByTestId("formulario-checada")).toBeNull();
+  });
+
+  it("abierta: el ámbar cabe en una frase, con la fecha real", async () => {
+    const hasta = "2026-10-31T00:00:00.000Z";
+    const fecha = new Date(hasta).toLocaleString("es-MX", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    const aviso = textoAvisoAbierto(hasta);
+
+    expect(aviso).toBe(
+      `Abierto hasta el ${fecha}; tu checada queda marcada como hecha desde el navegador: permite la cámara y la ubicación cuando el navegador te lo pida y, si puedes, usa la app NEXARA.`,
+    );
+    expect(textoAvisoAbierto(null)).toBe(
+      "Tu checada queda marcada como hecha desde el navegador: permite la cámara y la ubicación cuando el navegador te lo pida y, si puedes, usa la app NEXARA.",
+    );
+
+    vi.stubGlobal("fetch", respuesta({ abierta: true, hasta }));
+    render(<ChecarEnWeb token="tok" />);
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toContain(aviso);
+    expect(screen.getByTestId("formulario-checada")).toBeTruthy();
   });
 
   it("abierta: avisa que es temporal y hasta cuándo, y ofrece el formulario", async () => {
