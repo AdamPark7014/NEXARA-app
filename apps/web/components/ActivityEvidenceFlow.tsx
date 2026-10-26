@@ -1704,14 +1704,14 @@ const ActivityEvidenceFlow = () => {
                       ? `${MOMENTO_LABEL[campoTarget.momento]} · campo`
                       : `Foto de evidencia ${flowData.evidencePhotos.length + 1} de ${photoRequired}`}
               </p>
-              <p className={styles.dialogSub}>¿Se ve bien? Si salió oscura o movida, toma otra.</p>
+              <p className={styles.dialogSub}>Si salió oscura o movida, toma otra.</p>
             </div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={pendingPhoto.dataUrl} alt="Foto que tomaste" className={styles.previewImg} />
             <div className={styles.dialogMeta}>
               {(() => {
                 const punto = puntoDeFoto(pendingPhoto.latitude, pendingPhoto.longitude);
-                if (!punto) return <>Sin ubicación GPS. La evidencia se guarda igual.</>;
+                if (!punto) return <>Sin ubicación GPS: la evidencia se guarda igual.</>;
                 return (
                   <>
                     Ubicación capturada: {punto.latitude.toFixed(5)}, {punto.longitude.toFixed(5)} ·{' '}
@@ -1946,10 +1946,10 @@ const ActivityEvidenceFlow = () => {
                 </span>
               </span>
               <span className={styles.rejectedHint}>
-                <strong>Instrucciones:</strong> Corrige el paso actual.{' '}
+                <strong>Instrucciones:</strong>{' '}
                 {rejectedList.length > 1
-                  ? 'Luego podrás corregir los demás pasos indicados.'
-                  : 'Al terminar, se enviará nuevamente a revisión.'}
+                  ? 'Corrige el paso actual y después los demás pasos indicados.'
+                  : 'Corrige el paso actual para enviarla de nuevo a revisión.'}
               </span>
             </span>
           </Alert>
@@ -2112,9 +2112,9 @@ const ActivityEvidenceFlow = () => {
               ? 'Actualiza equipos por grupo, serie, modelo y al menos una foto de evidencia/sticker por mantenimiento.'
               : porCampos
                 ? camposFaltan === 0
-                  ? 'Ya documentaste todos los campos. Continúa al siguiente paso.'
-                  : 'Toma la foto con la cámara o adjunta una imagen que ya tengas (galería, archivo, captura). En el escritorio también puedes arrastrarla o pegarla con Ctrl+V.'
-                : `Toma o adjunta ${photoRequired} fotos de evidencia. En el escritorio puedes arrastrarlas o pegarlas con Ctrl+V.`}
+                  ? 'Ya documentaste todos los campos: continúa al siguiente paso.'
+                  : 'Toma o adjunta la foto de cada campo que falta, y en el escritorio también puedes arrastrarla o pegarla con Ctrl+V.'
+                : `Toma o adjunta ${photoRequired} fotos de evidencia, y en el escritorio también puedes arrastrarlas o pegarlas con Ctrl+V.`}
           </p>
 
           {porCampos ? (
@@ -2688,7 +2688,7 @@ const ActivityEvidenceFlow = () => {
             Paso: Hoja de Servicio (PDF)
           </h3>
           <p className={styles.stepDescription}>
-            Carga el PDF de la hoja de servicio con arrastrar y soltar o selección manual. Solo PDF.
+            Carga solo el PDF de la hoja de servicio, arrastrándolo o eligiéndolo.
           </p>
           <div
             onDragOver={(event) => {
@@ -2863,7 +2863,7 @@ const ActivityEvidenceFlow = () => {
           </h2>
           <p className={styles.completedText}>
             {isFlowLocked
-              ? 'Los pasos están guardados. Un administrador debe aprobar o rechazar antes de que puedas modificar algo.'
+              ? 'Los pasos están guardados y no se pueden modificar hasta que un administrador los apruebe o los rechace.'
               : 'Todos los pasos han sido completados correctamente y se encuentran guardados en el sistema.'}
           </p>
           {!isFlowLocked && (

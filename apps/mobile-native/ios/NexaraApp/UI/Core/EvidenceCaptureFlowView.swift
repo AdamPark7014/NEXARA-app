@@ -214,7 +214,7 @@ struct EvidenceCaptureFlowView: View {
                 label: busy ? "Guardando…" : "Siguiente paso · \(tomadas) de \(photoRequired)",
                 enabled: !busy,
                 systemImage: nil,
-                hint: "Ya tienes las fotos. Puedes tomar más antes de seguir.",
+                hint: "Ya tienes las fotos y puedes tomar más antes de seguir.",
                 onPrimary: { Task { await sendEvidencePhotos() } },
                 secondaryLabel: "Tomar otra",
                 secondarySystemImage: "camera.fill",
@@ -225,7 +225,7 @@ struct EvidenceCaptureFlowView: View {
                 label: busy ? "Subiendo…" : "Seleccionar PDF",
                 enabled: !busy,
                 systemImage: busy ? nil : "doc.text",
-                hint: "Carga la hoja de servicio firmada. Solo PDF.",
+                hint: "Carga solo el PDF de la hoja de servicio firmada.",
                 onPrimary: {
                     message = nil
                     errorText = nil
@@ -386,13 +386,13 @@ struct EvidenceCaptureFlowView: View {
             let labels = rejected.map { CoreEvidence.label($0, coreKind: coreKind) }.joined(separator: ", ")
             let notes = (flow?.reviewNotes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             bannerText(
-                "Te devolvieron: \(labels.isEmpty ? "algunos pasos" : labels). Corrige solo eso."
-                    + (notes.isEmpty ? "" : "\n«\(notes)»"),
+                "Te devolvieron \(labels.isEmpty ? "algunos pasos" : labels): corrige solo eso."
+                    + (notes.isEmpty ? "" : " «\(notes)»"),
                 icon: "arrow.uturn.backward.circle.fill",
                 color: CorePalette.orange
             )
         } else if isLocked {
-            bannerText("Enviada. Queda en revisión: tu superior la aprueba o te la devuelve.", icon: "paperplane.fill", color: CorePalette.blue)
+            bannerText("Enviada a revisión: tu superior la aprueba o te la devuelve.", icon: "paperplane.fill", color: CorePalette.blue)
         } else {
             let index = (steps.firstIndex(of: currentStep) ?? 0) + 1
             Text("Paso \(min(index, steps.count)) de \(steps.count)")
@@ -462,15 +462,9 @@ struct EvidenceCaptureFlowView: View {
                         )
                     }
                 }
-                HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 8) {
                     ForEach(momentos, id: \.self) { momento in
                         campoSlot(campo, momento: momento)
-                    }
-                    // Los campos de menos de tres momentos no estiran los huecos.
-                    if momentos.count < CoreEvidence.momentos.count {
-                        ForEach(0..<(CoreEvidence.momentos.count - momentos.count), id: \.self) { _ in
-                            Color.clear.frame(maxWidth: .infinity).frame(height: 1)
-                        }
                     }
                 }
             }
@@ -524,7 +518,7 @@ struct EvidenceCaptureFlowView: View {
             Text(CoreEvidence.momentoLabel(momento))
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(taken ? Color.primary : Color.secondary)
-            HStack(spacing: 4) {
+            VStack(spacing: 4) {
                 Button {
                     guard let campoId = campo.id else { return }
                     errorText = nil
@@ -605,11 +599,11 @@ struct EvidenceCaptureFlowView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(comercial
                      ? (isEntry
-                        ? "Tómala al iniciar la actividad. Se guarda con tu ubicación."
-                        : "Tómala al concluir la actividad. Se guarda con tu ubicación; no tiene que ser donde iniciaste. Con esta foto envías tu evidencia.")
+                        ? "Tómala al iniciar la actividad, con tu ubicación GPS obligatoria."
+                        : "Tómala al concluir la actividad, con tu ubicación GPS obligatoria y sin tener que ser donde iniciaste, para enviar tu evidencia.")
                      : (isEntry
-                        ? "Tómala al llegar. Se guarda con tu ubicación y marca el centro de tu zona de \(ActivityGeofence.radioM) m."
-                        : "Tómala al terminar. Si tu actividad lo pide, a \(ActivityGeofence.radioM) m o menos de donde iniciaste. Con esta foto envías tu evidencia."))
+                        ? "Tómala al llegar: se guarda con tu ubicación y marca el centro de tu zona de \(ActivityGeofence.radioM) m."
+                        : "Tómala al terminar, a \(ActivityGeofence.radioM) m o menos de donde iniciaste si la actividad lo pide, para enviar tu evidencia."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 if dockHost == nil {
@@ -652,7 +646,7 @@ struct EvidenceCaptureFlowView: View {
             }
         case CoreEvidence.serviceSheetPdf:
             VStack(alignment: .leading, spacing: 8) {
-                Text("Carga el PDF de la hoja de servicio firmada. Solo PDF.")
+                Text("Carga solo el PDF de la hoja de servicio firmada.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 if dockHost == nil {
@@ -680,8 +674,8 @@ struct EvidenceCaptureFlowView: View {
         let faltan = CoreEvidence.missingCampoPhotos(campos)
         return VStack(alignment: .leading, spacing: 10) {
             Text(faltan == 0
-                 ? "Ya documentaste todos los campos. Continúa al siguiente paso."
-                 : "Toma o adjunta las fotos de cada campo en «Fotos por campo». Faltan \(faltan).")
+                 ? "Ya documentaste todos los campos: continúa al siguiente paso."
+                 : "Toma o adjunta las fotos de cada campo en «Fotos por campo»: faltan \(faltan).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             if dockHost == nil {
@@ -699,7 +693,7 @@ struct EvidenceCaptureFlowView: View {
 
     private var evidencePhotosAction: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Toma o adjunta al menos \(photoRequired) fotos del trabajo. Si hay GPS se guarda; si no, la foto igual vale.")
+            Text("Toma o adjunta al menos \(photoRequired) fotos del trabajo, con o sin GPS.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             if isCorrection && !(flow?.photoList.isEmpty ?? true) {
@@ -711,7 +705,7 @@ struct EvidenceCaptureFlowView: View {
             // (AuthenticatedImage). Antes solo se veían las de esta sesión y la gente creía
             // que había que empezar de cero aunque el contador sí las sumaba.
             if !confirmedPhotoURLs.isEmpty || !pendingPhotos.isEmpty {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 90), spacing: 8)], spacing: 8) {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     ForEach(Array(confirmedPhotoURLs.enumerated()), id: \.offset) { index, url in
                         let local = pendingPhotoMatching(url: url, index: index)
                         ZStack(alignment: .topTrailing) {
@@ -855,13 +849,12 @@ struct EvidenceCaptureFlowView: View {
                 label: CoreEvidence.label(CoreEvidence.exitPhoto, coreKind: coreKind)
             )
         case CoreEvidence.evidencePhotos:
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array((flow?.photoList ?? []).enumerated()), id: \.offset) { _, url in
-                        AuthenticatedImage(url: url)
-                            .frame(width: 72, height: 72)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array((flow?.photoList ?? []).enumerated()), id: \.offset) { _, url in
+                    AuthenticatedImage(url: url)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 96)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
             }
         case CoreEvidence.serviceSheetPdf:

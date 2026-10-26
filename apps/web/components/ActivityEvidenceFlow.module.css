@@ -842,8 +842,34 @@
   .actionGrid {
     grid-template-columns: minmax(0, 1fr);
   }
-  .momentos {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Bajo 768 px cada momento, miniatura y dato va en su propio renglón. */
+  .momentos,
+  .momentos[data-cols="2"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .campoHead {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .evidenceGalleryGrid,
+  .inventoryFieldsGrid,
+  .thumbs {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .thumbs {
+    justify-items: start;
+  }
+  .evidencePhotoTile {
+    height: 96px;
+    padding-bottom: 0;
+  }
+  .inventoryHeaderRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .prevList {
+    grid-template-columns: minmax(0, 1fr);
   }
   .inventoryFooterRow {
     flex-direction: column;
@@ -851,6 +877,10 @@
   }
   .dialogActions > * {
     flex: 1 1 100%;
+  }
+  .sigFoot {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
