@@ -7,10 +7,10 @@ import Reloj from "./Reloj";
 import { TicketSoporte, TopologiaRed } from "./MiniInterfaces";
 
 const CAMARAS: (Foto & { id: string; lugar: string; deteccion?: React.CSSProperties })[] = [
-  { ...foto("control-acceso-torniquetes", "180px"), id: "CAM 01", lugar: "Acceso principal", deteccion: { top: "40%", left: "50%", width: "22%", height: "42%" } },
-  { ...foto("campo-mastil-antenas", "180px"), id: "CAM 02", lugar: "Perímetro norte" },
+  { ...foto("control-acceso-torniquetes", "180px"), id: "CAM 01", lugar: "Acceso", deteccion: { top: "40%", left: "50%", width: "22%", height: "42%" } },
+  { ...foto("campo-mastil-antenas", "180px"), id: "CAM 02", lugar: "Perímetro" },
   { ...foto("control-acceso-terminal-facial", "180px"), id: "CAM 03", lugar: "Recepción" },
-  { ...foto("monitoreo-sala-videowall", "180px"), id: "CAM 04", lugar: "Sala de monitoreo" },
+  { ...foto("monitoreo-sala-videowall", "180px"), id: "CAM 04", lugar: "Monitoreo" },
 ];
 
 const VISTAS = [

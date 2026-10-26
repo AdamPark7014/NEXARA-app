@@ -567,6 +567,20 @@ a.portada:hover img,
   overflow-wrap: anywhere;
 }
 
+/* Avance de lectura: línea fija justo bajo el encabezado (64 px). */
+.barraLectura {
+  position: fixed;
+  top: 64px;
+  left: 0;
+  z-index: 45;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--aurora-2) 80%, var(--accent)));
+  transform: scaleX(0);
+  transform-origin: left;
+  pointer-events: none;
+}
+
 /* Guías: secciones con título, párrafos y listas. */
 .prosa {
   margin-top: clamp(40px, 5vw, 56px);

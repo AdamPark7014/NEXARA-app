@@ -482,18 +482,21 @@
 
 /* ── Equipo ─────────────────────────────────────────────────────────────── */
 
+/* Hasta cinco personas en una fila: con cuatro columnas fijas la quinta quedaba sola abajo. */
 .equipo {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 16px;
   margin-top: clamp(40px, 5vw, 64px);
 }
 
+/* Iniciales arriba y nombre debajo: en cinco columnas, el nombre al lado se partía en tres renglones. */
 .persona {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px;
   border-radius: var(--radius-lg);
   background: var(--tile);
   box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line-soft);

@@ -8,6 +8,8 @@
  */
 
 .sitio {
+  /* Deja animar alturas hacia `auto` (el acordeón de preguntas). */
+  interpolate-size: allow-keywords;
   --bg: #ffffff;
   --bg-alt: #f6f8fb;
   --tile: #f6f8fb;
@@ -124,31 +126,7 @@
   box-sizing: border-box;
 }
 
-/*
- * Reseteo con el peso de una sola clase: gana a los estilos globales de la plataforma
- * (h1–h4, p y a traen su propia letra, color y margen) y pierde ante cualquier clase
- * de este sistema declarada después.
- */
-.sitio :where(h1, h2, h3, h4, p, figure, figcaption, ul, ol, li, dl, dd, dt) {
-  margin: 0;
-  color: inherit;
-  font-family: inherit;
-}
-
-.sitio :where(ul, ol) {
-  padding: 0;
-  list-style: none;
-}
-
-.sitio :where(img) {
-  display: block;
-  max-width: 100%;
-}
-
-.sitio :where(a) {
-  color: inherit;
-  text-decoration: none;
-}
+/* El reseteo de h1–h4, p, listas, imágenes y enlaces vive en `sitio-documento.css` (ver la nota ahí). */
 
 .sitio :focus-visible {
   outline: 2px solid var(--accent);
@@ -850,9 +828,10 @@
   color: var(--fg-3);
 }
 
+/* Flota sobre la esquina del tablero, sin tapar su barra (ahí va el indicador «En vivo»). */
 .flotanteRed {
-  top: 0;
-  right: -18px;
+  top: -46px;
+  right: -26px;
   width: 200px;
   padding: 12px 14px;
   animation: flota 9s -6s ease-in-out infinite;
@@ -2320,6 +2299,25 @@
   line-height: 1.6;
   color: var(--fg-2);
   animation: panelEntra 0.45s var(--ease-out) both;
+}
+
+/* Abrir y cerrar con deslizamiento donde el navegador lo permite (::details-content); en el resto abre al instante. */
+.pregunta::details-content {
+  block-size: 0;
+  overflow-y: clip;
+  transition:
+    block-size 0.35s var(--ease-out),
+    content-visibility 0.35s allow-discrete;
+}
+
+.pregunta[open]::details-content {
+  block-size: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pregunta::details-content {
+    transition: none;
+  }
 }
 
 /* ── Integración (diagrama del ecosistema) ──────────────────────────────── */

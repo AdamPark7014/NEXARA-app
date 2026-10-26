@@ -20,7 +20,7 @@ type VisualServicio = {
 };
 
 const SERVICIOS: Record<string, VisualServicio> = {
-  "erp-industrial": { foto: "monitoreo-videowall", icono: "layers", ancla: "software", arte: "grafica" },
+  "erp-industrial": { foto: "sala-monitoreo-videowall-nexara", icono: "layers", ancla: "software", arte: "grafica" },
   "camaras-cctv": { foto: "monitoreo-pantallas-cctv", icono: "camera", ancla: "cctv", fotoBloque: "monitoreo-sala-videowall" },
   "equipo-de-computo": { foto: "cableado-interno-pc-guantes-taller", icono: "monitor", ancla: "computo", fotoBloque: "tecnico-ensamble-chasis-pc-taller" },
   "redes-y-conectividad": { foto: "campo-enlace-antena-ciudad", icono: "wifi", ancla: "redes", arte: "red" },
@@ -28,8 +28,8 @@ const SERVICIOS: Record<string, VisualServicio> = {
   "ciberseguridad-empresas": { foto: "control-acceso-torniquetes", icono: "lock", ancla: "redes", arte: "red" },
   "infraestructura-ti": { foto: "campo-instalacion-rack", icono: "server", ancla: "computo", arte: "red" },
   "mesa-de-ayuda-ti": { foto: "equipo-tecnico-nexara-uniforme", icono: "headset", ancla: "soporte", arte: "soporte" },
-  "automatizacion-de-procesos": { foto: "monitoreo-videowall", icono: "code", ancla: "software", arte: "grafica" },
-  "servicios-gestionados-ti": { foto: "sala-monitoreo-videowall-nexara", icono: "refresh", ancla: "soporte", arte: "soporte" },
+  "automatizacion-de-procesos": { foto: "sala-monitoreo-videowall-nexara", icono: "code", ancla: "software", arte: "grafica" },
+  "servicios-gestionados-ti": { foto: "monitoreo-pantallas-cctv", icono: "refresh", ancla: "soporte", arte: "soporte" },
 };
 
 /** Cómo se nombra cada sección de /servicios en el enlace «Ver … en Servicios». */
@@ -50,7 +50,7 @@ type VisualIndustria = { icono: PublicIconName; foto?: string };
 const INDUSTRIAS: Record<string, VisualIndustria> = {
   retail: { icono: "store", foto: "monitoreo-pantallas-cctv" },
   manufactura: { icono: "factory", foto: "campo-enlace-antena-ciudad" },
-  hospitalidad: { icono: "hotel", foto: "monitoreo-videowall" },
+  hospitalidad: { icono: "hotel", foto: "tecnico-nexara-entrega-equipo-sitio" },
   salud: { icono: "hospital", foto: "campo-instalacion-rack" },
   educacion: { icono: "school", foto: "control-acceso-torniquetes" },
   gobierno: { icono: "landmark", foto: "sala-monitoreo-videowall-nexara" },

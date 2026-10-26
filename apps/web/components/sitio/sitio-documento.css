@@ -21,6 +21,32 @@ body:has([data-sitio])::after {
   content: none !important;
 }
 
+/*
+ * Reseteo del sitio con peso de tres elementos (0,0,3): gana a los estilos globales de la plataforma (h1–h4, p y a
+ * traen letra, color y margen con peso 0,0,1) y pierde siempre ante cualquier clase de los módulos, cargue en el
+ * orden que cargue cada hoja. Con el peso de una clase empataba con ellas y en Contacto descentraba el hero.
+ */
+html body :where([data-sitio]) :is(h1, h2, h3, h4, p, figure, figcaption, ul, ol, li, dl, dd, dt) {
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+}
+
+html body :where([data-sitio]) :is(ul, ol) {
+  padding: 0;
+  list-style: none;
+}
+
+html body :where([data-sitio]) :is(img) {
+  display: block;
+  max-width: 100%;
+}
+
+html body :where([data-sitio]) :is(a) {
+  color: inherit;
+  text-decoration: none;
+}
+
 /* La plataforma topa main/section a --content-max desde 1100 px: aquí cada sección mide lo que su diseño dice. */
 html body:has([data-sitio]) [data-sitio] :where(main, section, article) {
   max-width: none;
