@@ -226,6 +226,47 @@ describe('buscarHerramientaPorCodigo', () => {
       /Escanea la etiqueta/,
     );
   });
+
+  it('deja los dos errores de la etiqueta en una frase y cita el texto viejo', async () => {
+    // El texto viejo eran dos frases. Pedir completar códigos, o corregir uno, se queda.
+    const viejo = {
+      ninguna:
+        'Ninguna herramienta tiene la etiqueta «MUL-12345». Si es una herramienta anterior a la nomenclatura, pide a almacén «Completar códigos» en el inventario.',
+      duplicada:
+        'Hay 2 herramientas con el código «MUL-12345». Corrige el código de una de ellas en el inventario.',
+    };
+    const nuevo = {
+      ninguna:
+        'Ninguna herramienta tiene la etiqueta «MUL-12345»: si es anterior a la nomenclatura, pide a almacén «Completar códigos» en el inventario.',
+      duplicada:
+        'Hay 2 herramientas con el código «MUL-12345»: corrige el código de una de ellas en el inventario.',
+    };
+
+    const sinEtiqueta = build({ items: [[], []] });
+    const duplicada = build({ items: [[MULTIMETRO, { ...MULTIMETRO, id: 43 }]] });
+    const casos = [
+      sinEtiqueta.service.buscarHerramientaPorCodigo('MUL-12345', ENCARGADO, EMPRESA).then(
+        () => Promise.reject(new Error('debio fallar')),
+        (error: unknown) => error,
+      ),
+      duplicada.service.buscarHerramientaPorCodigo('MUL-12345', ENCARGADO, EMPRESA).then(
+        () => Promise.reject(new Error('debio fallar')),
+        (error: unknown) => error,
+      ),
+    ] as const;
+    const [ninguna, repetida] = await Promise.all(casos);
+    const mensajes = { ninguna, duplicada: repetida };
+
+    for (const clave of ['ninguna', 'duplicada'] as const) {
+      const error = mensajes[clave] as { message?: string; getResponse?: () => unknown };
+      const respuesta = typeof error.getResponse === 'function' ? error.getResponse() : error.message;
+      const mensaje = typeof respuesta === 'string' ? respuesta : error.message;
+      expect(viejo[clave]).toMatch(/\.\s+[A-ZÁÉÍÓÚÑ]/);
+      expect(mensaje).toBe(nuevo[clave]);
+      expect(mensaje).not.toBe(viejo[clave]);
+      expect(String(mensaje).split('. ')).toEqual([nuevo[clave]]);
+    }
+  });
 });
 
 describe('códigos que faltaban', () => {
