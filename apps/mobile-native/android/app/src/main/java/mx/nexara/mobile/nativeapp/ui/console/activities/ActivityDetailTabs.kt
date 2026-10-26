@@ -187,8 +187,9 @@ fun ActivityInfoTab(
                         ADetailRow("Responsable", a.responsable?.nombre ?: "—")
                         ADetailRow("Creador", a.creador?.nombre ?: "—")
                         if (!a.client?.name.isNullOrBlank()) ADetailRow("Cliente", a.client!!.name!!)
-                        val branch = listOfNotNull(a.branchName, a.branchCity, a.branchState).filter { it.isNotBlank() }.joinToString(" · ")
-                        if (branch.isNotBlank()) ADetailRow("Sucursal", branch)
+                        if (!a.branchName.isNullOrBlank()) ADetailRow("Sucursal", a.branchName!!)
+                        if (!a.branchCity.isNullOrBlank()) ADetailRow("Ciudad", a.branchCity!!)
+                        if (!a.branchState.isNullOrBlank()) ADetailRow("Estado", a.branchState!!)
                         if (!a.branchAddress.isNullOrBlank()) ADetailRow("Dirección", a.branchAddress!!)
                         NxStatusLabels.priority(a.prioridad)?.let { ADetailRow("Prioridad", it) }
                         if (!a.ticketType.isNullOrBlank()) ADetailRow("Tipo de servicio", NxStatusLabels.label(a.ticketType))
