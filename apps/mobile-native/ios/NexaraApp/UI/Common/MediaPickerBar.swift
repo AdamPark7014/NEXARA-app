@@ -66,6 +66,13 @@ struct MediaPickerBar: View {
             "No se pudo adjuntar",
             isPresented: Binding(get: { importError != nil }, set: { if !$0 { importError = nil } })
         ) {
+            Button("Reintentar") {
+                importError = nil
+                // El aviso tiene que cerrarse antes de volver a presentar el selector.
+                Task { @MainActor in
+                    showDocPicker = true
+                }
+            }
             Button("Entendido", role: .cancel) { importError = nil }
         } message: {
             Text(importError ?? "")
@@ -101,10 +108,18 @@ struct MediaPickerBar: View {
                     }
                 }
                 if !results.isEmpty { onPicked(results) }
-            case .failure:
-                importError = "No se pudo leer el archivo. Intenta con otro o vuelve a elegirlo."
+            case .failure(let error):
+                if isUserCancellation(error) { break }
+                importError = "No se pudo leer el archivo; intenta con otro o vuelve a elegirlo."
             }
         }
+    }
+
+    /// Cancelar el selector no es un fallo de lectura: si no, Reintentar no dejaría salir.
+    private func isUserCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        let ns = error as NSError
+        return ns.domain == NSCocoaErrorDomain && ns.code == NSUserCancelledError
     }
 
     private func mime(forExtension ext: String) -> String {
