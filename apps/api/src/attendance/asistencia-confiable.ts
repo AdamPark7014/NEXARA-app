@@ -97,7 +97,7 @@ export function ventanaWebCheckin(valor: string | null | undefined, ahora: Date)
 
 /** 422 cuando una captura sin conexión llegó fuera de la ventana (más de 12 h tarde, o con el reloj adelantado). */
 export const MENSAJE_SIN_CONEXION_FUERA_DE_VENTANA =
-  'La checada se guardó sin conexión y llegó fuera de la ventana permitida (12 h): no se registra sola. Avisamos a tu jefe para que la revise.';
+  'La checada se guardó sin conexión y llegó fuera de la ventana permitida (12 h): no se registra sola, avisamos a tu jefe para que la revise.';
 
 /** 422 cuando el teléfono reporta ubicación simulada. */
 export const MENSAJE_UBICACION_SIMULADA =
