@@ -233,7 +233,7 @@ fun BarcodeScannerDialog(
                         ) {
                             Text(
                                 if (permisoNegado) {
-                                    "Sin permiso de cámara no se puede escanear. Dalo aquí o en Ajustes, " +
+                                    "Sin permiso de cámara no se puede escanear: dalo aquí o en Ajustes, " +
                                         "o cierra y escribe el código a mano."
                                 } else {
                                     "Necesitamos permiso de cámara para leer el código."
