@@ -79,6 +79,7 @@ internal fun TarjetaKit(
 ) {
     val titulo = HerramientasRules.tituloPieza(asignacion)
     val identificacion = HerramientasRules.identificacionPieza(asignacion)
+    val renglones = HerramientasRules.renglonesPieza(asignacion)
     val abiertos = HerramientasRules.eventosAbiertos(asignacion)
     val revisionVencida = HerramientasRules.revisionVencida(asignacion, hoy)
     val estadoPieza = HerramientasRules.etiquetaEstadoPieza(asignacion.inventoryItem?.status)
@@ -102,11 +103,12 @@ internal fun TarjetaKit(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+        // Código, modelo y serie, uno por renglón. Con dos se cortaba la serie.
         Text(
-            identificacion,
+            renglones.joinToString("\n").ifEmpty { identificacion },
             style = MaterialTheme.typography.labelMedium,
             color = NxColors.Muted,
-            maxLines = 2,
+            maxLines = 3,
             overflow = TextOverflow.Ellipsis,
         )
         if (desdeCuando.isNotEmpty()) {
@@ -184,6 +186,7 @@ internal fun TarjetaPrestamo(
 ) {
     val titulo = HerramientasRules.tituloPrestamo(prestamo)
     val identificacion = HerramientasRules.identificacionPrestamo(prestamo)
+    val renglones = HerramientasRules.renglonesPrestamo(prestamo)
     val estado = HerramientasRules.etiquetaEstado(prestamo.status)
     val plazo = HerramientasRules.textoPlazo(prestamo.expectedReturnDate, hoy)
         ?.takeIf { HerramientasRules.estaAbierto(prestamo) }
@@ -210,8 +213,9 @@ internal fun TarjetaPrestamo(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+            // Modelo y serie, cada uno en su renglón. Dos líneas alcanzan: la serie es la segunda.
             Text(
-                identificacion,
+                renglones.joinToString("\n").ifEmpty { identificacion },
                 style = MaterialTheme.typography.labelMedium,
                 color = NxColors.Muted,
                 maxLines = 2,

@@ -212,14 +212,23 @@ object HerramientasRules {
             ?: "Herramienta sin nombre"
     }
 
-    /** «MUL-12345 · Makita HP1640 · Serie 4419B» — con lo que haya, en ese orden. */
-    fun identificacionPieza(asignacion: KitAsignacionDto): String {
+    /**
+     * Código, modelo y serie, cada uno listo para su renglón y en ese orden.
+     *
+     * Vacío si no hay nada: la pantalla pone entonces «Sin identificación registrada».
+     */
+    fun renglonesPieza(asignacion: KitAsignacionDto): List<String> {
         val item = asignacion.inventoryItem
-        val partes = listOfNotNull(
+        return listOfNotNull(
             item?.codigoInterno?.trim()?.ifEmpty { null },
             item?.model?.trim()?.ifEmpty { null },
             item?.serialNumber?.trim()?.ifEmpty { null }?.let { "Serie $it" },
         )
+    }
+
+    /** «MUL-12345 · Makita HP1640 · Serie 4419B» — la misma identificación, dicha de un tirón. */
+    fun identificacionPieza(asignacion: KitAsignacionDto): String {
+        val partes = renglonesPieza(asignacion)
         return if (partes.isEmpty()) "Sin identificación registrada" else partes.joinToString(" · ")
     }
 
@@ -229,11 +238,14 @@ object HerramientasRules {
             ?: prestamo.model?.trim()?.ifEmpty { null }
             ?: "Herramienta sin nombre"
 
+    /** Modelo y serie del préstamo, cada uno en su renglón. El préstamo no trae código interno. */
+    fun renglonesPrestamo(prestamo: PrestamoHerramientaDto): List<String> = listOfNotNull(
+        prestamo.model?.trim()?.ifEmpty { null },
+        prestamo.serialNumber?.trim()?.ifEmpty { null }?.let { "Serie $it" },
+    )
+
     fun identificacionPrestamo(prestamo: PrestamoHerramientaDto): String {
-        val partes = listOfNotNull(
-            prestamo.model?.trim()?.ifEmpty { null },
-            prestamo.serialNumber?.trim()?.ifEmpty { null }?.let { "Serie $it" },
-        )
+        val partes = renglonesPrestamo(prestamo)
         return if (partes.isEmpty()) "Sin identificación registrada" else partes.joinToString(" · ")
     }
 
