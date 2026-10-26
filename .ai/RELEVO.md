@@ -21,6 +21,21 @@
   - El video del hero actual (Studio, `hero-video` id 6) es una animación neón del logo: la propuesta no lo usa.
   - Verificado: tipos del web OK; Chrome headless a 1536/1180/375 en claro y oscuro, sin desborde horizontal ni
     errores de consola; menú, pestañas, galería, método y contadores probados por CDP.
+  - Desplegada la primera versión (4951bd9b) en https://nexara.com.mx/propuesta.
+  - Segunda ronda (Adam: «aún le falta mucho», «< 24 h no se ve bien», «las cards de Puebla · CDMX se ven feas»,
+    «qué fotos dejar y cuáles quitar», «lo vectorizado agrégalo todo»):
+    - Cifras → `virtudes`: cuatro tarjetas con frase completa y glifo vectorial animado (`Glifos.tsx`): 10+ años,
+      200+ sitios, 32 estados (silueta de México) y «Un día hábil» para la primera respuesta. Van fijas en la página,
+      ya no leen `home_metricas` del Studio (ahí sigue «Puebla · CDMX» / «< 24 h»).
+    - Mapa vectorial propio (`MapaMexico.tsx`) con los 32 estados de `mxAdmin1Paths.ts` simplificados a 22 KB
+      (`mexicoEstados.ts`; silueta de 7.5 KB en `mexicoSilueta.ts`), base Puebla/CDMX en azul y rutas animadas desde
+      Puebla a 11 ciudades. Reemplaza la infografía raster saturada. Índices: 21 Puebla, 31 CDMX, 30 Tlaxcala, 20 Edomex.
+    - Diagrama del ecosistema (`Ecosistema.tsx`, sección «Integración»), preguntas frecuentes en `details`
+      (`Preguntas.tsx`) y marca de agua vectorial por industria.
+    - Fotos fuera: `cableado-interno-pc-guantes-taller`, `tecnico-ensamble-chasis-pc-taller`,
+      `tecnicos-mantenimiento-pc-colaboracion` (hacían ver a NEXARA como taller de PC), `campo-levantamiento-patio`
+      (persona posando), `equipo-nexara-espalda`. Entran a la galería las de campo (punto de acceso en altura, video
+      wall, torniquetes) y el equipo.
   - Falta: visto bueno del dueño; después llevar el sistema a `(public)` (layout, Servicios, Proyectos, Nosotros,
     Contacto, Blog, Soluciones, Cobertura) y restilar el banner de cookies y el contacto flotante.
 

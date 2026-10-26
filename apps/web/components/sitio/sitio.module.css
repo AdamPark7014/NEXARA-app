@@ -14,6 +14,10 @@
   --tile-alt: #ffffff;
   --card: #ffffff;
   --sobre-tile: #ffffff;
+  --mapa-estado: #dae3ee;
+  --mapa-estado-hover: #c8d5e5;
+  --mapa-borde: #ffffff;
+  --mapa-halo: var(--bg);
   --fg: #0a2540;
   --fg-2: #425466;
   --fg-3: #5b6b80;
@@ -79,6 +83,9 @@
   --tile-alt: #101b2c;
   --card: #0f1a2b;
   --sobre-tile: #16233a;
+  --mapa-estado: #15223a;
+  --mapa-estado-hover: #1c2d4a;
+  --mapa-borde: #060b14;
   --fg: #f2f5f9;
   --fg-2: #a3b0c2;
   --fg-3: #8b98aa;
@@ -176,6 +183,7 @@
 .seccionAlt {
   --tile: var(--tile-alt);
   --sobre-tile: var(--bg-alt);
+  --mapa-halo: var(--bg-alt);
   background: var(--bg-alt);
 }
 
@@ -954,7 +962,7 @@
   }
 }
 
-/* ── Declaración y cifras ───────────────────────────────────────────────── */
+/* ── Declaración y virtudes ─────────────────────────────────────────────── */
 
 .declaracion {
   font-family: var(--font-display);
@@ -965,43 +973,135 @@
   text-wrap: balance;
 }
 
-.cifras {
+.virtudes {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: clamp(56px, 6vw, 88px);
-  border-top: 1px solid var(--line);
+  gap: 16px;
+  margin-top: clamp(48px, 5vw, 72px);
 }
 
-.cifra {
-  padding: 28px 24px 0 0;
+.virtud {
+  display: flex;
+  flex-direction: column;
+  min-height: 272px;
+  padding: 28px;
+  border-radius: var(--radius-xl);
+  background: var(--tile);
+  box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line-soft);
 }
 
-.cifra + .cifra {
-  padding-left: 24px;
-  border-left: 1px solid var(--line);
+.virtudArte {
+  height: 72px;
+  margin-bottom: 40px;
 }
 
-.cifraValor {
+.virtudValor {
   display: block;
   font-family: var(--font-display);
-  font-size: clamp(40px, 4.4vw, 64px);
+  font-size: clamp(34px, 3.2vw, 46px);
   line-height: 1;
   font-weight: 600;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
 }
 
-.cifraValorTexto {
-  font-size: clamp(26px, 2.6vw, 36px);
-  line-height: calc(clamp(40px, 4.4vw, 64px) * 1);
-  letter-spacing: -0.03em;
+.virtudTexto {
+  margin-top: 10px;
+  font-size: 15.5px;
+  line-height: 1.45;
+  color: var(--fg-2);
 }
 
-.cifraEtiqueta {
+/* Glifos vectoriales de las virtudes */
+.glifo {
   display: block;
-  margin-top: 12px;
-  font-size: 15px;
-  color: var(--fg-2);
+  width: auto;
+  height: 72px;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.glifoBarra,
+.glifoBarraFuerte {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: crece 1.1s var(--ease-out) both;
+}
+
+.glifoBarra {
+  fill: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.glifoBarraFuerte {
+  fill: var(--accent);
+}
+
+.glifoPunto {
+  fill: var(--line);
+}
+
+.glifoPuntoOn {
+  fill: var(--accent);
+  animation: titila 2.6s ease-in-out infinite;
+}
+
+.glifoMapa path {
+  fill: color-mix(in srgb, var(--accent) 18%, transparent);
+  stroke: var(--tile);
+  stroke-width: 4;
+  stroke-linejoin: round;
+}
+
+.glifoPin {
+  fill: var(--accent);
+  animation: late 2.4s ease-in-out infinite;
+}
+
+.glifoBurbuja {
+  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.glifoTecleo {
+  fill: var(--accent);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tecleo 1.3s ease-in-out infinite;
+}
+
+.glifoVisto {
+  fill: var(--ok);
+}
+
+.glifoPalomita {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@keyframes titila {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes tecleo {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+/* Las animaciones de entrada arrancan cuando el bloque aparece, no al cargar. */
+.sitio [data-oculto] :is(.glifoBarra, .glifoBarraFuerte, .barras i, .pasitos i, .linea path) {
+  animation: none;
 }
 
 /* ── Servicios (bento con mini interfaces) ──────────────────────────────── */
@@ -1565,12 +1665,30 @@
 }
 
 .panelTexto {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-height: 420px;
   background: var(--tile);
   animation: panelEntra 0.6s var(--ease-out) both;
+}
+
+/* Ícono de la industria en línea fina, grande y tenue, como marca de agua. */
+.panelMarca {
+  position: absolute;
+  right: -36px;
+  bottom: -44px;
+  z-index: -1;
+  color: var(--accent);
+  opacity: 0.09;
+  pointer-events: none;
+}
+
+.panelMarca svg {
+  stroke-width: 0.45;
 }
 
 .panelIcono {
@@ -1794,12 +1912,12 @@
   height: 16px;
 }
 
-/* ── Cobertura ──────────────────────────────────────────────────────────── */
+/* ── Cobertura (mapa vectorial de México) ───────────────────────────────── */
 
 .cobertura {
   display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: clamp(40px, 5vw, 80px);
+  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+  gap: clamp(40px, 5vw, 72px);
   align-items: center;
 }
 
@@ -1807,34 +1925,141 @@
   font-size: clamp(34px, 3.6vw, 50px);
 }
 
-.mapa {
+.mapaMx {
   position: relative;
-  overflow: hidden;
-  border-radius: var(--radius-xl);
-  background: var(--tile-alt);
-  box-shadow: var(--sombra-md), inset 0 0 0 1px var(--line-soft);
 }
 
-.mapa img {
+.mapaMx svg {
+  display: block;
   width: 100%;
   height: auto;
+  overflow: visible;
 }
 
-.mapaOscuro {
-  display: none !important;
+.mapaEstados path {
+  fill: var(--mapa-estado);
+  stroke: var(--mapa-borde);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  transition: fill 0.3s var(--ease);
 }
 
-:global(html[data-public-theme="dark"]) .mapaClaro {
-  display: none !important;
+.mapaEstados path:hover {
+  fill: var(--mapa-estado-hover);
 }
 
-:global(html[data-public-theme="dark"]) .mapaOscuro {
-  display: block !important;
+.mapaEstados .mapaBase,
+.mapaEstados .mapaBase:hover {
+  fill: var(--accent);
+}
+
+.mapaRuta {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 38%, transparent);
+  stroke-width: 1.4;
+}
+
+.mapaFlujo {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-dasharray: 5 100;
+  animation: viaje 4.2s linear infinite;
+}
+
+.mapaCiudad circle {
+  fill: var(--card);
+  stroke: var(--accent);
+  stroke-width: 2.2;
+}
+
+.mapaCiudad text,
+.mapaSede text {
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  fill: var(--fg-2);
+  paint-order: stroke;
+  stroke: var(--mapa-halo);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+}
+
+.mapaSede circle {
+  fill: var(--accent);
+  stroke: var(--card);
+  stroke-width: 2.5;
+}
+
+.mapaSede text {
+  font-size: 17px;
+  font-weight: 700;
+  fill: var(--fg);
+}
+
+.mapaSede .mapaPulso {
+  stroke: none;
+  opacity: 0.4;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulso 2.4s var(--ease-out) infinite;
+}
+
+@keyframes pulso {
+  from {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  to {
+    transform: scale(4.2);
+    opacity: 0;
+  }
+}
+
+@keyframes viaje {
+  from {
+    stroke-dashoffset: 5;
+  }
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+.mapaLeyenda {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 24px;
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--fg-2);
+}
+
+.mapaLeyenda span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leyendaBase,
+.leyendaCiudad {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.leyendaBase {
+  background: var(--accent);
+}
+
+.leyendaCiudad {
+  background: var(--card);
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 .datos {
   display: grid;
-  gap: 0;
   margin-top: 36px;
   border-top: 1px solid var(--line);
 }
@@ -1849,16 +2074,14 @@
 }
 
 .datoValor {
-  font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 16px;
   font-weight: 600;
-  letter-spacing: -0.03em;
+  text-align: right;
 }
 
 .datoEtiqueta {
   font-size: 15px;
   color: var(--fg-2);
-  text-align: right;
 }
 
 .ciudades {
@@ -1885,6 +2108,206 @@
 .ciudad:hover {
   color: var(--fg);
   box-shadow: inset 0 0 0 1px var(--fg-3);
+}
+
+/* ── Preguntas frecuentes ───────────────────────────────────────────────── */
+
+.faq {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+  gap: clamp(40px, 6vw, 96px);
+  align-items: start;
+}
+
+.preguntas {
+  border-top: 1px solid var(--line);
+}
+
+.pregunta {
+  border-bottom: 1px solid var(--line);
+}
+
+.pregunta summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 0;
+  font-family: var(--font-display);
+  font-size: clamp(18px, 1.6vw, 21px);
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  list-style: none;
+  cursor: pointer;
+}
+
+.pregunta summary::-webkit-details-marker {
+  display: none;
+}
+
+.preguntaMas {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--fg-2);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  transition: transform 0.35s var(--ease-out), stroke 0.2s var(--ease);
+}
+
+.pregunta[open] .preguntaMas {
+  transform: rotate(45deg);
+  stroke: var(--accent);
+}
+
+.pregunta summary:hover .preguntaMas {
+  stroke: var(--fg);
+}
+
+.pregunta p {
+  max-width: 62ch;
+  padding-bottom: 26px;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--fg-2);
+  animation: panelEntra 0.45s var(--ease-out) both;
+}
+
+/* ── Integración (diagrama del ecosistema) ──────────────────────────────── */
+
+.integra {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: clamp(40px, 6vw, 96px);
+  align-items: center;
+}
+
+.integraLista {
+  display: grid;
+  gap: 14px;
+  margin-top: 32px;
+}
+
+.integraLista li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.integraLista svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.eco {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  margin-inline: auto;
+  aspect-ratio: 1;
+}
+
+.eco > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.ecoAnillo {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.2;
+}
+
+.ecoAnilloFuera {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 8;
+}
+
+.ecoGira {
+  transform-origin: 280px 280px;
+  animation: gira 90s linear infinite;
+}
+
+.ecoSatelite {
+  fill: var(--accent);
+  opacity: 0.45;
+}
+
+.ecoLinea {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.4;
+}
+
+.ecoPulso {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-dasharray: 12 100;
+  animation: viaje 2.8s linear infinite;
+}
+
+.ecoOnda {
+  fill: color-mix(in srgb, var(--accent) 16%, transparent);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: onda 3s var(--ease-out) infinite;
+}
+
+.ecoNucleo {
+  fill: var(--card);
+  filter: drop-shadow(0 10px 24px rgba(10, 37, 64, 0.16));
+}
+
+.ecoNodo {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px 7px 7px;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: var(--sombra-md), inset 0 0 0 1px var(--line-soft);
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+
+.ecoIcono {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+@keyframes gira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes onda {
+  from {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1.9);
+    opacity: 0;
+  }
 }
 
 /* ── Cierre ─────────────────────────────────────────────────────────────── */
@@ -1984,19 +2407,11 @@
   .panelTexto {
     min-height: 0;
   }
-  .cifras {
+  .virtudes {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    border-top: 0;
   }
-  .cifra,
-  .cifra + .cifra {
-    padding: 24px 0 0;
-    border-left: 0;
-    border-top: 1px solid var(--line);
-  }
-  .cifra:nth-child(even) {
-    padding-left: 24px;
-    border-left: 1px solid var(--line);
+  .integra {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2068,5 +2483,39 @@
   }
   .guias i:nth-child(n + 3) {
     display: none;
+  }
+}
+
+@media (max-width: 734px) {
+  .virtudes {
+    grid-template-columns: 1fr;
+  }
+  .virtud {
+    min-height: 0;
+  }
+  .mapaCiudad text {
+    display: none;
+  }
+  .mapaSede text {
+    font-size: 26px;
+  }
+  .ecoNodo {
+    gap: 6px;
+    padding: 4px 10px 4px 4px;
+    font-size: 11.5px;
+  }
+  .ecoIcono {
+    width: 22px;
+    height: 22px;
+  }
+  .ecoIcono svg {
+    width: 13px;
+    height: 13px;
+  }
+}
+
+@media (max-width: 1068px) {
+  .faq {
+    grid-template-columns: 1fr;
   }
 }

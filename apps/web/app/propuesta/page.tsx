@@ -8,14 +8,16 @@ import Flecha from "@/components/sitio/Flecha";
 import Metodo, { type PasoMetodo } from "@/components/sitio/Metodo";
 import Industrias, { type Industria } from "@/components/sitio/Industrias";
 import Galeria, { type FotoGaleria } from "@/components/sitio/Galeria";
+import MapaMexico from "@/components/sitio/MapaMexico";
+import Ecosistema from "@/components/sitio/Ecosistema";
+import { GlifoAnios, GlifoEstados, GlifoRespuesta, GlifoSitios } from "@/components/sitio/Glifos";
+import Preguntas, { type Pregunta } from "@/components/sitio/Preguntas";
 import PublicIcon from "@/app/components/PublicIcon";
 import {
   fetchPageSection,
   DEFAULT_CTA,
-  DEFAULT_METRICAS,
   DEFAULT_PROCESO,
   type CtaContent,
-  type MetricaItem,
   type ProcesoItem,
 } from "@/lib/page-content-api";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
@@ -31,7 +33,15 @@ const w = (nombre: string) => ({
 const FOTOS_METODO = [
   { src: "/fotos/campo-enlace-antena-ciudad.jpg", alt: "Técnico de NEXARA revisando un enlace en azotea" },
   { src: "/fotos/campo-instalacion-rack.jpg", alt: "Técnicos de NEXARA instalando un rack" },
-  { ...w("tecnicos-mantenimiento-pc-colaboracion"), alt: "Técnicos de NEXARA dando mantenimiento a un equipo" },
+  { ...w("sala-monitoreo-videowall-nexara"), alt: "Sala de monitoreo con video wall instalada por NEXARA" },
+];
+
+/** Lo que respalda a NEXARA, dicho en frases (sin tarjetas de una palabra). */
+const VIRTUDES = [
+  { valor: "10+", texto: "años instalando y sosteniendo tecnología en campo.", Glifo: GlifoAnios },
+  { valor: "200+", texto: "sitios implementados para empresas de todo el país.", Glifo: GlifoSitios },
+  { valor: "32", texto: "estados donde ya hemos trabajado, con base en Puebla y CDMX.", Glifo: GlifoEstados },
+  { valor: "Un día hábil", texto: "es lo que tarda, por lo general, nuestra primera respuesta.", Glifo: GlifoRespuesta },
 ];
 
 const INDUSTRIAS: Industria[] = [
@@ -85,16 +95,47 @@ const INDUSTRIAS: Industria[] = [
   },
 ];
 
-const DETRAS: FotoGaleria[] = [
-  { ...w("tecnico-nexara-entrega-equipo-sitio"), alt: "Técnico de NEXARA entregando equipo en sitio", tema: "Entrega", pie: "El equipo llega a sitio listo para instalar." },
-  { ...w("equipo-taller-ensamble-pc-nexara"), alt: "Ensamble de equipo en el taller de NEXARA", tema: "Taller", pie: "Cada equipo se arma y se prueba antes de salir." },
-  { ...w("sala-monitoreo-videowall-nexara"), alt: "Sala de monitoreo con video wall instalada por NEXARA", tema: "Monitoreo", pie: "Salas de monitoreo listas para operar el primer día." },
-  { ...w("cableado-interno-pc-guantes-taller"), alt: "Cableado interno de un equipo de cómputo", tema: "Detalle", pie: "Cableado limpio, etiquetado y documentado." },
-  { ...w("descarga-equipo-camioneta-nexara"), alt: "Descarga de equipo de la camioneta de NEXARA", tema: "Logística", pie: "Flotilla propia, del almacén al sitio." },
-  { ...w("tecnico-ensamble-chasis-pc-taller"), alt: "Técnico de NEXARA ensamblando un equipo", tema: "Cómputo", pie: "Equipos estandarizados para toda la operación." },
+/** Respuestas tomadas de lo que el sitio ya promete (servicios, contacto y cobertura). */
+const PREGUNTAS: Pregunta[] = [
+  {
+    p: "¿Hacen el diagnóstico en sitio?",
+    r: "Sí. Recorremos el sitio, levantamos riesgos y priorizamos lo que realmente mueve tu operación. En Puebla, la Ciudad de México y el centro del país vamos en persona.",
+  },
+  {
+    p: "¿Atienden fuera de Puebla y la Ciudad de México?",
+    r: "Sí. Hacemos proyectos multisede en toda la República; el diagnóstico en sitio es en el centro del país y el resto se coordina proyecto por proyecto.",
+  },
+  {
+    p: "¿Qué recibo al terminar la instalación?",
+    r: "Una propuesta con alcance cerrado desde el inicio y, al entregar, la memoria técnica de lo instalado con la evidencia de cada etapa.",
+  },
+  {
+    p: "¿Siguen dando soporte después del arranque?",
+    r: "Sí. Tenemos mesa de ayuda con SLA, atención remota y en sitio, monitoreo y mejoras para cuando el proyecto ya está operando.",
+  },
+  {
+    p: "¿Cuánto tardan en responder?",
+    r: "Nuestra primera respuesta suele llegar en menos de un día hábil. En una llamada breve te decimos qué instalar, qué posponer y un presupuesto realista.",
+  },
+  {
+    p: "¿Con qué marcas trabajan?",
+    r: "Integramos tecnología de fabricantes líderes como Hikvision, Ubiquiti, Cisco, TP‑Link, Dell, HP y Lenovo, entre otros. Elegimos el equipo según tu riesgo y tu presupuesto.",
+  },
 ];
 
-const esTexto = (valor: string) => !/\d/.test(valor);
+/*
+ * Galería: trabajo de campo primero. Fuera las tomas de reparación de PC (hacían ver a NEXARA como
+ * taller de cómputo) y la foto posando junto al patio de tráileres.
+ */
+const DETRAS: FotoGaleria[] = [
+  { src: "/fotos/campo-instalacion-ap-altura.jpg", alt: "Técnico de NEXARA instalando un punto de acceso en altura", tema: "Instalación", pie: "Trabajo en altura con equipo de seguridad." },
+  { src: "/fotos/monitoreo-videowall.jpg", alt: "Video wall de videovigilancia instalado por NEXARA", tema: "Video wall", pie: "Muros de video listos para operar el primer día." },
+  { src: "/fotos/control-acceso-torniquetes.jpg", alt: "Torniquetes de control de acceso instalados por NEXARA", tema: "Control de acceso", pie: "Torniquetes con reconocimiento facial en operación." },
+  { ...w("tecnico-nexara-entrega-equipo-sitio"), alt: "Técnico de NEXARA entregando equipo en sitio", tema: "Entrega", pie: "El equipo llega a sitio listo para instalar." },
+  { ...w("descarga-equipo-camioneta-nexara"), alt: "Descarga de equipo de la camioneta de NEXARA", tema: "Logística", pie: "Flotilla propia, del almacén al sitio." },
+  { ...w("equipo-taller-ensamble-pc-nexara"), alt: "Ensamble de equipo en el taller de NEXARA", tema: "Taller", pie: "Cada equipo se arma y se prueba antes de salir." },
+  { src: "/fotos/equipo-nexara-polos.jpg", alt: "Integrantes del equipo NEXARA", tema: "Equipo", pie: "Las mismas personas instalan y dan soporte." },
+];
 
 function Guias() {
   return (
@@ -108,12 +149,10 @@ function Guias() {
 }
 
 export default async function PropuestaInicio() {
-  const [metricasData, procesoData, ctaData] = await Promise.all([
-    fetchPageSection<{ items: MetricaItem[] }>("home_metricas"),
+  const [procesoData, ctaData] = await Promise.all([
     fetchPageSection<{ items: ProcesoItem[] }>("home_proceso"),
     fetchPageSection<CtaContent>("home_cta"),
   ]);
-  const metricas = (metricasData?.items?.length ? metricasData.items : DEFAULT_METRICAS).slice(0, 4);
   const proceso = (procesoData?.items?.length ? procesoData.items : DEFAULT_PROCESO).slice(0, 3);
   const pasos: PasoMetodo[] = proceso.map((p, i) => ({ num: p.num, titulo: p.title, texto: p.text, foto: FOTOS_METODO[i % 3] }));
   const cta = ctaData ?? DEFAULT_CTA;
@@ -172,22 +211,25 @@ export default async function PropuestaInicio() {
 
       <Marcas />
 
-      {/* ── Declaración y cifras ── */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="NEXARA en cifras">
+      {/* ── Por qué NEXARA ── */}
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Por qué NEXARA">
         <Guias />
         <div className={s.contenedor}>
           <p className={s.antetitulo} data-aparecer>
             Por qué NEXARA
           </p>
           <p className={s.declaracion} data-aparecer>
-            Más de diez años instalando y sosteniendo la tecnología que protege y conecta a empresas en todo México.{" "}
-            <span className={s.tenue}>Con las mismas personas de principio a fin.</span>
+            Una sola firma responsable de la tecnología que protege y conecta tu operación.{" "}
+            <span className={s.tenue}>Del diagnóstico al soporte, con las mismas personas.</span>
           </p>
-          <ul className={s.cifras} data-aparecer>
-            {metricas.map((m) => (
-              <li key={`${m.value}-${m.label}`} className={s.cifra}>
-                <Cifra valor={m.value} className={`${s.cifraValor} ${esTexto(m.value) ? s.cifraValorTexto : ""}`} />
-                <span className={s.cifraEtiqueta}>{m.label}</span>
+          <ul className={s.virtudes}>
+            {VIRTUDES.map(({ valor, texto, Glifo }) => (
+              <li key={valor} className={s.virtud} data-aparecer>
+                <div className={s.virtudArte}>
+                  <Glifo />
+                </div>
+                <Cifra valor={valor} className={s.virtudValor} />
+                <p className={s.virtudTexto}>{texto}</p>
               </li>
             ))}
           </ul>
@@ -360,21 +402,31 @@ export default async function PropuestaInicio() {
         </div>
       </section>
 
-      {/* ── Equipo ── */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Nuestro equipo">
-        <div className={s.contenedor}>
-          <figure className={s.equipo} data-aparecer>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img {...w("equipo-tecnico-nexara-uniforme")} sizes="(max-width: 1280px) 100vw, 1200px" alt="Equipo técnico de NEXARA" loading="lazy" decoding="async" />
-          </figure>
-          <div className={s.equipoPie} data-aparecer>
-            <p className={s.declaracion}>
-              Las personas que diseñan tu proyecto <span className={s.tenue}>son las que lo instalan y las que te atienden después.</span>
+      {/* ── Integración ── */}
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="integra-titulo">
+        <div className={`${s.contenedor} ${s.integra}`}>
+          <div data-aparecer>
+            <p className={s.antetitulo}>Integración</p>
+            <h2 id="integra-titulo" className={s.titulo}>
+              Un solo sistema. <span className={s.tenue}>Todo conectado.</span>
+            </h2>
+            <p className={s.lead}>
+              Cámaras, red, cómputo y soporte se diseñan juntos, se documentan juntos y los atiende el mismo equipo.
             </p>
-            <Link href="/nosotros" className={s.enlace}>
-              Conoce al equipo
-              <Flecha />
-            </Link>
+            <ul className={s.integraLista}>
+              <li>
+                <PublicIcon name="fileCheck" size={20} /> Memoria técnica de cada entrega
+              </li>
+              <li>
+                <PublicIcon name="camera" size={20} /> Evidencia fotográfica de lo instalado
+              </li>
+              <li>
+                <PublicIcon name="headset" size={20} /> Un solo contacto para todo el soporte
+              </li>
+            </ul>
+          </div>
+          <div data-aparecer>
+            <Ecosistema />
           </div>
         </div>
       </section>
@@ -395,8 +447,27 @@ export default async function PropuestaInicio() {
         </div>
       </section>
 
+      {/* ── Equipo ── */}
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Nuestro equipo">
+        <div className={s.contenedor}>
+          <figure className={s.equipo} data-aparecer>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img {...w("equipo-tecnico-nexara-uniforme")} sizes="(max-width: 1280px) 100vw, 1200px" alt="Equipo técnico de NEXARA" loading="lazy" decoding="async" />
+          </figure>
+          <div className={s.equipoPie} data-aparecer>
+            <p className={s.declaracion}>
+              Las personas que diseñan tu proyecto <span className={s.tenue}>son las que lo instalan y las que te atienden después.</span>
+            </p>
+            <Link href="/nosotros" className={s.enlace}>
+              Conoce al equipo
+              <Flecha />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* ── Industrias ── */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="industrias-titulo">
+      <section className={s.seccion} aria-labelledby="industrias-titulo">
         <div className={s.contenedor}>
           <header className={s.centro} data-aparecer>
             <p className={s.antetitulo}>Industrias</p>
@@ -411,8 +482,8 @@ export default async function PropuestaInicio() {
         </div>
       </section>
 
-      {/* ── Detrás de cada proyecto ── */}
-      <section className={s.seccion} aria-labelledby="detras-titulo">
+      {/* ── Trabajo real ── */}
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="detras-titulo">
         <div className={s.contenedor}>
           <div className={s.cabeza} data-aparecer>
             <div>
@@ -421,7 +492,7 @@ export default async function PropuestaInicio() {
                 Detrás de cada proyecto.
               </h2>
             </div>
-            <p className={s.lead}>Nuestro equipo, nuestro taller y nuestra flotilla. Ninguna foto es de banco de imágenes.</p>
+            <p className={s.lead}>Instalaciones, equipo y flotilla propios. Ninguna foto es de banco de imágenes.</p>
           </div>
         </div>
         <div data-aparecer>
@@ -430,25 +501,26 @@ export default async function PropuestaInicio() {
       </section>
 
       {/* ── Cobertura ── */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="cobertura-titulo">
+      <section className={s.seccion} aria-labelledby="cobertura-titulo">
         <div className={`${s.contenedor} ${s.cobertura}`}>
           <div data-aparecer>
             <p className={s.antetitulo}>Cobertura</p>
             <h2 id="cobertura-titulo" className={s.titulo}>
               Base en Puebla y CDMX. <span className={s.tenue}>Alcance nacional.</span>
             </h2>
+            <p className={s.lead}>Diagnóstico en sitio en el centro del país y proyectos multisede en toda la República.</p>
             <dl className={s.datos}>
               <div className={s.dato}>
-                <dt className={s.datoValor}>32</dt>
-                <dd className={s.datoEtiqueta}>estados con presencia</dd>
+                <dt className={s.datoEtiqueta}>Base de operación</dt>
+                <dd className={s.datoValor}>Puebla y Ciudad de México</dd>
               </div>
               <div className={s.dato}>
-                <dt className={s.datoValor}>+200</dt>
-                <dd className={s.datoEtiqueta}>puntos atendidos</dd>
+                <dt className={s.datoEtiqueta}>Diagnóstico en sitio</dt>
+                <dd className={s.datoValor}>Centro del país</dd>
               </div>
               <div className={s.dato}>
-                <dt className={s.datoValor}>En sitio</dt>
-                <dd className={s.datoEtiqueta}>diagnóstico en el centro del país</dd>
+                <dt className={s.datoEtiqueta}>Proyectos multisede</dt>
+                <dd className={s.datoValor}>Toda la República</dd>
               </div>
             </dl>
             <nav className={s.ciudades} aria-label="Ciudades">
@@ -466,28 +538,25 @@ export default async function PropuestaInicio() {
               </Link>
             </nav>
           </div>
-          <figure className={s.mapa} data-aparecer>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              className={s.mapaClaro}
-              src="/fotos/mapa-cobertura-nexara-claro-1600.webp"
-              srcSet="/fotos/mapa-cobertura-nexara-claro-1200.webp 1200w, /fotos/mapa-cobertura-nexara-claro-1600.webp 1600w, /fotos/mapa-cobertura-nexara-claro-2000.webp 2000w"
-              sizes="(max-width: 1068px) 100vw, 720px"
-              alt="Mapa de cobertura de NEXARA en México"
-              loading="lazy"
-              decoding="async"
-            />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              className={s.mapaOscuro}
-              src="/fotos/mapa-cobertura-nexara-oscuro-1600.webp"
-              srcSet="/fotos/mapa-cobertura-nexara-oscuro-1200.webp 1200w, /fotos/mapa-cobertura-nexara-oscuro-1600.webp 1600w, /fotos/mapa-cobertura-nexara-oscuro-2000.webp 2000w"
-              sizes="(max-width: 1068px) 100vw, 720px"
-              alt="Mapa de cobertura de NEXARA en México"
-              loading="lazy"
-              decoding="async"
-            />
-          </figure>
+          <div data-aparecer>
+            <MapaMexico />
+          </div>
+        </div>
+      </section>
+
+      {/* ── Preguntas frecuentes ── */}
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="faq-titulo">
+        <div className={`${s.contenedor} ${s.faq}`}>
+          <div data-aparecer>
+            <p className={s.antetitulo}>Preguntas frecuentes</p>
+            <h2 id="faq-titulo" className={s.titulo}>
+              Lo que todos <span className={s.tenue}>nos preguntan.</span>
+            </h2>
+            <p className={s.lead}>¿Tienes otra duda? Escríbenos y te contesta una persona del equipo.</p>
+          </div>
+          <div data-aparecer>
+            <Preguntas preguntas={PREGUNTAS} />
+          </div>
         </div>
       </section>
 
@@ -518,7 +587,7 @@ export default async function PropuestaInicio() {
             </div>
             <ul className={s.finalGarantias}>
               <li>
-                <PublicIcon name="clock" size={18} /> Respuesta en menos de 24 h hábiles
+                <PublicIcon name="clock" size={18} /> Primera respuesta en un día hábil
               </li>
               <li>
                 <PublicIcon name="mapPin" size={18} /> Diagnóstico en sitio
