@@ -77,7 +77,7 @@ export function validarPickup(
     return {
       valido: false,
       motivo: 'YA_RECOGIDA',
-      mensaje: 'Esta solicitud ya se recogió. Pide una nueva si necesitas la herramienta otra vez.',
+      mensaje: 'Esta solicitud ya se recogió: pide una nueva si necesitas la herramienta otra vez.',
     };
   }
 
@@ -86,7 +86,7 @@ export function validarPickup(
     return {
       valido: false,
       motivo: 'SIN_CODIGO',
-      mensaje: 'La solicitud no tiene código de recolección. Debe aprobarse primero.',
+      mensaje: 'La solicitud no tiene código de recolección: debe aprobarse primero.',
     };
   }
 
@@ -102,7 +102,7 @@ export function validarPickup(
     return {
       valido: false,
       motivo: 'VENCIDO',
-      mensaje: 'El código venció. Pide a tu supervisor que vuelva a aprobar la solicitud.',
+      mensaje: 'El código venció: pide a tu supervisor que vuelva a aprobar la solicitud.',
     };
   }
 
