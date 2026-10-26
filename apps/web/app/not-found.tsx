@@ -1,7 +1,32 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import { Inter_Tight } from "next/font/google";
 import styles from "@/components/ui/PanelState.module.scss";
+import "@/components/sitio/sitio-documento.css";
+import s from "@/components/sitio/sitio.module.css";
+import Encabezado from "@/components/sitio/Encabezado";
+import Pie from "@/components/sitio/Pie";
+import NoEncontrado from "@/components/sitio/NoEncontrado";
+
+const display = Inter_Tight({ subsets: ["latin"], weight: ["500", "600", "700"], display: "swap", variable: "--sitio-display" });
+
+/** El dominio público (y el servidor local) ven el 404 del sitio; los paneles, el suyo. */
+const esSitioPublico = (host: string) => /^(www\.)?nexara\.com\.mx$/.test(host) || /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host);
 
 export default function NotFound() {
+  const h = headers();
+  const host = (h.get("x-forwarded-host") || h.get("host") || "").split(",")[0].trim().toLowerCase();
+
+  if (esSitioPublico(host)) {
+    return (
+      <div className={`${s.sitio} ${display.variable}`} data-sitio>
+        <Encabezado />
+        <NoEncontrado />
+        <Pie />
+      </div>
+    );
+  }
+
   return (
     <main className={styles.wrap} style={{ minHeight: "100vh", background: "var(--bg, var(--ui-bg))" }}>
       <div className={styles.card}>
