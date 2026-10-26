@@ -60,7 +60,7 @@ struct NuevoViaticoView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     NxSectionHeader(title: "¿En qué?")
-                    CoreFlowLayout(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 8) {
                         ForEach(Viatico.categorias, id: \.clave) { item in
                             ChipDeFiltroMaterial(
                                 texto: item.etiqueta,
@@ -69,6 +69,7 @@ struct NuevoViaticoView: View {
                                 fondoActivo: NxColors.brandSoft2,
                                 textoActivo: NxColors.brandDeep,
                                 alto: viaticoAlturaToque,
+                                llenaAncho: true,
                                 habilitado: !enviando
                             ) {
                                 categoria = item.clave
