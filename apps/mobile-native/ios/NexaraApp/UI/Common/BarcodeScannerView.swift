@@ -285,7 +285,7 @@ struct BarcodeScannerSheet: View {
                 }
             case .denegado:
                 sinCamara(
-                    "Sin permiso de cámara no se puede escanear. Dalo aquí o en Ajustes, o cierra y escribe el código a mano.",
+                    "Sin permiso de cámara no se puede escanear: dalo aquí o en Ajustes, o cierra y escribe el código a mano.",
                     boton: "Dar permiso"
                 ) {
                     abrirAjustes()
