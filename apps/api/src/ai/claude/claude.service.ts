@@ -177,7 +177,7 @@ export class ClaudeService {
     const usadas = this.llamadasPorDia.get(clave) ?? 0;
     if (usadas >= tope) {
       throw new ServiceUnavailableException(
-        `Se alcanzó el tope diario de ${tope} consultas a la IA para esta empresa. Vuelve a intentarlo mañana.`,
+        `Se alcanzó el tope diario de ${tope} consultas a la IA para esta empresa: vuelve a intentarlo mañana.`,
       );
     }
     // Limpia los días anteriores para que el mapa no crezca.
@@ -230,18 +230,18 @@ export class ClaudeService {
       if (error instanceof Anthropic.AuthenticationError) {
         this.logger.error(`[${peticion.proceso}] ANTHROPIC_API_KEY inválida`);
         throw new ServiceUnavailableException(
-          'La clave de la IA no es válida. Revisa ANTHROPIC_API_KEY en el servidor.',
+          'La clave de la IA no es válida: revisa ANTHROPIC_API_KEY en el servidor.',
         );
       }
       if (error instanceof Anthropic.RateLimitError) {
         if (tipoDeError(error) === 'budget_exceeded') {
           this.logger.error(`[${peticion.proceso}] presupuesto mensual de IA agotado en la puerta`);
           throw new ServiceUnavailableException(
-            'Se acabó el presupuesto de IA de este mes. Avísale al administrador.',
+            'Se acabó el presupuesto de IA de este mes: avísale al administrador.',
           );
         }
         throw new ServiceUnavailableException(
-          'La IA está saturada en este momento. Intenta de nuevo en un minuto.',
+          'La IA está saturada en este momento: intenta de nuevo en un minuto.',
         );
       }
       if (error instanceof Anthropic.BadRequestError && /no está permitido/.test(error.message)) {
@@ -254,7 +254,7 @@ export class ClaudeService {
         this.logger.error(
           `[${peticion.proceso}] ${modelo} → ${error.status ?? 'sin estado'} ${tipoDeError(error) ?? ''}`.trim(),
         );
-        throw new ServiceUnavailableException('La IA no respondió. Intenta de nuevo.');
+        throw new ServiceUnavailableException('La IA no respondió: intenta de nuevo.');
       }
       throw error;
     }
@@ -266,12 +266,12 @@ export class ClaudeService {
 
     if (respuesta.stop_reason === 'refusal') {
       throw new ServiceUnavailableException(
-        'La IA no quiso procesar esa instrucción. Reescríbela con otras palabras.',
+        'La IA no quiso procesar esa instrucción: reescríbela con otras palabras.',
       );
     }
     if (respuesta.stop_reason === 'max_tokens') {
       throw new ServiceUnavailableException(
-        'El texto es demasiado largo para procesarlo de una vez. Divídelo.',
+        'El texto es demasiado largo para procesarlo de una vez: divídelo.',
       );
     }
     return { respuesta, uso };
@@ -297,7 +297,7 @@ export class ClaudeService {
       // Sin el contenido en el log: puede traer nombres o datos de la empresa.
       this.logger.error(`[${peticion.proceso}] respuesta no es JSON (${texto.length} caracteres)`);
       throw new ServiceUnavailableException(
-        'La IA respondió en un formato inesperado. Intenta de nuevo.',
+        'La IA respondió en un formato inesperado: intenta de nuevo.',
       );
     }
   }

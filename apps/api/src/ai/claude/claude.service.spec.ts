@@ -110,4 +110,84 @@ describe('ClaudeService', () => {
     const svc = conCliente(jest.fn().mockRejectedValue(error));
     await expect(svc.texto({ proceso: 'p', companyId: 1, sistema: [], usuario: 'x' })).rejects.toThrow(/presupuesto de IA/);
   });
+
+  it('cada aviso es una sola frase y cita el texto de dos oraciones', async () => {
+    const peticion = { proceso: 'p', companyId: 1, sistema: [] as string[], usuario: 'x' };
+    const cuerpo = (tipo: string) => ({ type: 'error', error: { type: tipo, message: 'x' } });
+    const fallo = (ErrorClase: new (...args: ConstructorParameters<typeof Anthropic.APIError>) => Anthropic.APIError, status: number, tipo: string) =>
+      new ErrorClase(status, cuerpo(tipo), 'x', new Headers());
+    const topePrevio = process.env.CLAUDE_TOPE_DIARIO;
+    delete process.env.CLAUDE_TOPE_DIARIO;
+
+    const casos: { viejo: string; nuevo: string; disparar: () => Promise<unknown> }[] = [
+      {
+        viejo: 'La IA no respondió. Intenta de nuevo.',
+        nuevo: 'La IA no respondió: intenta de nuevo.',
+        disparar: () => conCliente(jest.fn().mockRejectedValue(fallo(Anthropic.InternalServerError, 500, 'api_error'))).texto(peticion),
+      },
+      {
+        viejo: 'La IA está saturada en este momento. Intenta de nuevo en un minuto.',
+        nuevo: 'La IA está saturada en este momento: intenta de nuevo en un minuto.',
+        disparar: () => conCliente(jest.fn().mockRejectedValue(fallo(Anthropic.RateLimitError, 429, 'rate_limit_error'))).texto(peticion),
+      },
+      {
+        viejo: 'La IA respondió en un formato inesperado. Intenta de nuevo.',
+        nuevo: 'La IA respondió en un formato inesperado: intenta de nuevo.',
+        disparar: () =>
+          conCliente(jest.fn().mockResolvedValue(respuesta('no es json'))).json({ ...peticion, esquema: {} }),
+      },
+      {
+        viejo: 'La IA no quiso procesar esa instrucción. Reescríbela con otras palabras.',
+        nuevo: 'La IA no quiso procesar esa instrucción: reescríbela con otras palabras.',
+        disparar: () =>
+          conCliente(jest.fn().mockResolvedValue(respuesta('', { stop_reason: 'refusal' }))).texto(peticion),
+      },
+      {
+        viejo: 'El texto es demasiado largo para procesarlo de una vez. Divídelo.',
+        nuevo: 'El texto es demasiado largo para procesarlo de una vez: divídelo.',
+        disparar: () =>
+          conCliente(jest.fn().mockResolvedValue(respuesta('{"a":', { stop_reason: 'max_tokens' }))).texto(peticion),
+      },
+      {
+        viejo: 'Se acabó el presupuesto de IA de este mes. Avísale al administrador.',
+        nuevo: 'Se acabó el presupuesto de IA de este mes: avísale al administrador.',
+        disparar: () => conCliente(jest.fn().mockRejectedValue(fallo(Anthropic.RateLimitError, 429, 'budget_exceeded'))).texto(peticion),
+      },
+      {
+        viejo: 'Se alcanzó el tope diario de 300 consultas a la IA para esta empresa. Vuelve a intentarlo mañana.',
+        nuevo: 'Se alcanzó el tope diario de 300 consultas a la IA para esta empresa: vuelve a intentarlo mañana.',
+        disparar: async () => {
+          const svc = conCliente(jest.fn().mockResolvedValue(respuesta('ok')));
+          for (let i = 0; i < 300; i++) await svc.texto(peticion);
+          return svc.texto(peticion);
+        },
+      },
+      {
+        viejo: 'La clave de la IA no es válida. Revisa ANTHROPIC_API_KEY en el servidor.',
+        nuevo: 'La clave de la IA no es válida: revisa ANTHROPIC_API_KEY en el servidor.',
+        disparar: () => conCliente(jest.fn().mockRejectedValue(fallo(Anthropic.AuthenticationError, 401, 'authentication_error'))).texto(peticion),
+      },
+    ];
+
+    try {
+      for (const { viejo, nuevo, disparar } of casos) {
+        const [cabeza, cola] = viejo.split('. ');
+        expect(viejo.split('. ')).toHaveLength(2);
+        expect(`${cabeza}: ${cola.charAt(0).toLowerCase()}${cola.slice(1)}`).toBe(nuevo);
+        let error: unknown;
+        try {
+          await disparar();
+          error = undefined;
+        } catch (e) {
+          error = e;
+        }
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe(nuevo);
+        expect((error as Error).message).not.toBe(viejo);
+      }
+    } finally {
+      if (topePrevio === undefined) delete process.env.CLAUDE_TOPE_DIARIO;
+      else process.env.CLAUDE_TOPE_DIARIO = topePrevio;
+    }
+  });
 });
