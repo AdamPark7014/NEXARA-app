@@ -131,15 +131,16 @@ object ActivitySuperiorRules {
     fun estaCancelada(a: ActivityDto): Boolean =
         a.estatus.trim().equals("Cancelada", ignoreCase = true) || !a.cancelledAt.isNullOrBlank()
 
-    /** «Cancelada por Luis Pérez · El cliente pospuso el servicio». */
+    /**
+     * Quién la canceló y, si hay motivo, el motivo en el renglón de abajo.
+     * Antes iban juntos: «Cancelada por Luis Pérez · El cliente pospuso el servicio».
+     */
     fun avisoCancelada(a: ActivityDto): String? {
         if (!estaCancelada(a)) return null
         val quien = a.cancelledBy?.nombre?.trim().orEmpty()
         val motivo = a.cancelReason?.trim().orEmpty()
-        return buildString {
-            append(if (quien.isBlank()) "Cancelada" else "Cancelada por $quien")
-            if (motivo.isNotBlank()) append(" · ").append(motivo)
-        }
+        val linea = if (quien.isBlank()) "Cancelada" else "Cancelada por $quien"
+        return if (motivo.isBlank()) linea else "$linea\n$motivo"
     }
 
     /** Aviso rojo del detalle de una «No cumplida». La fecha la pone la pantalla. */

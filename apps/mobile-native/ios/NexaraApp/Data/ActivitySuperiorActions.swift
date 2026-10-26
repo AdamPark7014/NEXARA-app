@@ -191,14 +191,16 @@ struct ActivityNoCumplidaAviso: Equatable {
     let pendientes: String?
 }
 
-/// Aviso «Cancelada por X · motivo» del detalle (`cancelReason` y `cancelledBy.nombre`).
+/// Quién la canceló y, si hay motivo, el motivo en el renglón de abajo
+/// (`cancelReason` y `cancelledBy.nombre`).
+/// Antes iban juntos: «Cancelada por Luis Pérez · El cliente pospuso el servicio».
 enum ActivityCancelNotice {
     static func text(motivo: String?, canceladaPor: String?) -> String? {
         let reason = (motivo ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let by = (canceladaPor ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !reason.isEmpty || !by.isEmpty else { return nil }
         let quien = by.isEmpty ? "Cancelada" : "Cancelada por \(by)"
-        return reason.isEmpty ? quien : "\(quien) · \(reason)"
+        return reason.isEmpty ? quien : "\(quien)\n\(reason)"
     }
 }
 

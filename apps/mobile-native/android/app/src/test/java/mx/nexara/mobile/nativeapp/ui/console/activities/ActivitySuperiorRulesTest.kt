@@ -10,6 +10,7 @@ import mx.nexara.mobile.nativeapp.data.api.CausaIncumplimientoDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -106,8 +107,33 @@ class ActivitySuperiorRulesTest {
             cancelledAt = "2026-09-17T15:00:00.000Z",
             cancelledBy = ActivityPersonRefDto(id = 4, nombre = "Luis Pérez"),
         )
-        assertEquals("Cancelada por Luis Pérez · El cliente pospuso el servicio", ActivitySuperiorRules.avisoCancelada(cancelada))
+        assertEquals("Cancelada por Luis Pérez\nEl cliente pospuso el servicio", ActivitySuperiorRules.avisoCancelada(cancelada))
         assertEquals("Cancelada", ActivitySuperiorRules.avisoCancelada(activa.copy(estatus = "Cancelada")))
+    }
+
+    @Test
+    fun unDatoPorRenglon() {
+        // Texto viejo, a 390 px, en un solo renglón: «Cancelada por Luis Pérez · El cliente pospuso el servicio».
+        val viejo = "Cancelada por Luis Pérez · El cliente pospuso el servicio"
+        val cancelada = ActivityDto(
+            id = 1,
+            estatus = "Cancelada",
+            cancelReason = "El cliente pospuso el servicio",
+            cancelledAt = "2026-09-17T15:00:00.000Z",
+            cancelledBy = ActivityPersonRefDto(id = 4, nombre = "Luis Pérez"),
+        )
+        val texto = ActivitySuperiorRules.avisoCancelada(cancelada)!!
+        assertEquals("Cancelada por Luis Pérez\nEl cliente pospuso el servicio", texto)
+        assertEquals(listOf("Cancelada por Luis Pérez", "El cliente pospuso el servicio"), texto.split("\n"))
+        assertNotEquals(viejo, texto)
+        assertFalse(texto.contains(" · "))
+        // Sin motivo no queda un renglón vacío. Quién puede cancelar no cambia.
+        assertEquals("Cancelada por Luis Pérez", ActivitySuperiorRules.avisoCancelada(cancelada.copy(cancelReason = " ")))
+        assertEquals("Cancelada por Luis Pérez", ActivitySuperiorRules.avisoCancelada(cancelada.copy(cancelReason = null)))
+        assertFalse(ActivitySuperiorRules.avisoCancelada(cancelada.copy(cancelReason = " "))!!.contains("\n"))
+        val soloMotivo = cancelada.copy(cancelledBy = null)
+        assertEquals("Cancelada\nEl cliente pospuso el servicio", ActivitySuperiorRules.avisoCancelada(soloMotivo))
+        assertEquals(listOf(ActivitySuperiorRules.Accion.CANCELAR), ActivitySuperiorRules.botones(ActivityAccionesDto(puedeCancelar = true)))
     }
 
     // ── No cumplida y reprogramar ───────────────────────────────────────────
