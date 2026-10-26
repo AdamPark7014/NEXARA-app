@@ -155,3 +155,33 @@
     max-width: 50%;
   }
 }
+
+/* A 390 px cada dato va en su renglón: el nombre deja de compartir fila con la existencia
+   y el detalle puede partirse. En escritorio siguen juntos y el detalle en una línea. */
+@media (max-width: 390px) {
+  .resultado {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    row-gap: var(--ui-s1);
+  }
+
+  .texto {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .lado {
+    grid-column: 2;
+    grid-row: 2;
+    justify-items: start;
+    max-width: none;
+    text-align: start;
+  }
+
+  .detalle {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+}

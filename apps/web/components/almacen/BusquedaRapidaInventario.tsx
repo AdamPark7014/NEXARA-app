@@ -16,7 +16,7 @@
  */
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Alert, FilterChip, FilterChips, SearchInput } from "@/components/base";
+import { Alert, Button, FilterChip, FilterChips, SearchInput } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import {
   buscarInventario,
@@ -264,7 +264,16 @@ export default function BusquedaRapidaInventario({
       </div>
 
       {error ? (
-        <Alert tone="neutral" dense role="status">
+        <Alert
+          tone="neutral"
+          dense
+          role="status"
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void buscar(texto, tipo)}>
+              Reintentar
+            </Button>
+          }
+        >
           {error}
         </Alert>
       ) : null}
