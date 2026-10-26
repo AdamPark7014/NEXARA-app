@@ -59,6 +59,20 @@ function shortDate(iso: string) {
   });
 }
 
+/** A 390 px, persona, canal, fecha e hilo van cada uno en su renglón. En escritorio siguen juntos. */
+const SEARCH_HIT_PHONE_CSS = `
+@media (max-width: 390px) {
+  .nx-chat-search-hit-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .nx-chat-search-hit-sep {
+    display: none;
+  }
+}
+`;
+
 export default function ChannelHeader({
   detail,
   starred,
@@ -165,6 +179,7 @@ export default function ChannelHeader({
 
   return (
     <>
+      <style>{SEARCH_HIT_PHONE_CSS}</style>
       <header className={styles.channelHeader}>
         <button
           type="button"
@@ -317,20 +332,25 @@ export default function ChannelHeader({
                   <div className={styles.searchHits}>
                     {searchHits.map((h) => (
                       <button key={h.id} type="button" className={styles.searchHit} onClick={() => onPickHit(h)}>
-                        <div className={styles.searchHitMeta}>
+                        <div className={`${styles.searchHitMeta} nx-chat-search-hit-meta`}>
                           <strong>{h.author.nombre}</strong>
                           {h.channel && searchScope === "all" ? (
                             <span>
-                              {" "}
-                              · {h.channel.kind === "PUBLIC" ? "#" : ""}
+                              <span className="nx-chat-search-hit-sep"> · </span>
+                              {h.channel.kind === "PUBLIC" ? "#" : ""}
                               {h.channel.name}
                             </span>
                           ) : null}
                           <span>
-                            {" "}
-                            · {shortDate(h.createdAt)} {formatClock(h.createdAt)}
+                            <span className="nx-chat-search-hit-sep"> · </span>
+                            {shortDate(h.createdAt)} {formatClock(h.createdAt)}
                           </span>
-                          {h.parentId ? <span> · en un hilo</span> : null}
+                          {h.parentId ? (
+                            <span>
+                              <span className="nx-chat-search-hit-sep"> · </span>
+                              en un hilo
+                            </span>
+                          ) : null}
                         </div>
                         {h.replyTo?.deleted && <div className={styles.replyCite}>Mensaje eliminado</div>}
                         <div className={styles.searchHitBody}>
