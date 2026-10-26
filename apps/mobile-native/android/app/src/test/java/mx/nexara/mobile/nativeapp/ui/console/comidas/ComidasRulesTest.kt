@@ -101,9 +101,29 @@ class ComidasRulesTest {
         assertEquals("— rechazó: «No avisaste»", ComidasRules.decisionEquipo(rechazada))
         assertNull(ComidasRules.decisionPropia(ComidaRegistroDto(id = 3, revisionEstado = "PENDIENTE")))
         assertEquals(
-            "Registraste tu salida a comer. Tu justificación quedó por aprobar.",
+            "Registraste tu salida a comer: tu justificación quedó por aprobar.",
             ComidasRules.mensajeRegistro(ComidasRules.SALIDA, conMotivo = true),
         )
         assertEquals("Registraste tu regreso de comer.", ComidasRules.mensajeRegistro(ComidasRules.REGRESO, conMotivo = false))
+    }
+
+    @Test
+    fun elAvisoDeLaComidaCabeEnUnaFrase() {
+        assertEquals(
+            "Registraste tu salida a comer: tu justificación quedó por aprobar.",
+            ComidasRules.mensajeRegistro(ComidasRules.SALIDA, conMotivo = true),
+        )
+        assertEquals(
+            "Registraste tu salida a comer: ¡buen provecho!",
+            ComidasRules.mensajeRegistro(ComidasRules.SALIDA, conMotivo = false),
+        )
+        assertEquals(
+            "Registraste tu regreso: tu justificación quedó por aprobar.",
+            ComidasRules.mensajeRegistro(ComidasRules.REGRESO, conMotivo = true),
+        )
+        assertEquals(
+            "Registraste tu regreso de comer.",
+            ComidasRules.mensajeRegistro(ComidasRules.REGRESO, conMotivo = false),
+        )
     }
 }
