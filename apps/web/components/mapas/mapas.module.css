@@ -1,0 +1,114 @@
+/* NEXARA · Mapas del panel (MapLibre + OpenFreeMap). Solo tokens --ui-* con respaldo. */
+
+/* ── Vista previa (foto del mapa con pin al centro) ───────────────────────── */
+
+.vista {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: var(--ui-bg-2, #eef2f8);
+  display: grid;
+  place-items: center;
+}
+
+.vistaImagen {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vistaAviso {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--ui-fg-3, #64748b);
+  text-align: center;
+}
+
+/* Pin centrado: la foto se toma con el punto exactamente al centro. */
+.pin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -22px 0 0 -11px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: #dc2626;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.35);
+  pointer-events: none;
+}
+
+.atribucion {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  line-height: 14px;
+  color: #334155;
+  background: rgba(255, 255, 255, 0.75);
+  pointer-events: none;
+}
+
+/* ── Mapa para fijar ubicación ─────────────────────────────────────────── */
+
+.marco {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--ui-radius-md, 10px);
+  border: 1px solid var(--ui-border-subtle, rgba(15, 106, 214, 0.2));
+  background: var(--ui-bg-2, #eef2f8);
+}
+
+.mapa {
+  position: absolute;
+  inset: 0;
+}
+
+.aviso {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  padding: 12px;
+  font-size: 12px;
+  color: var(--ui-fg-3, #64748b);
+  text-align: center;
+  pointer-events: none;
+}
+
+.marco[data-estado="fallo"] .mapa {
+  visibility: hidden;
+}
+
+.ayuda {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.88);
+  pointer-events: none;
+}
+
+/* El pin del mapa editable (marcador de MapLibre, anclado abajo). */
+.pinMapa {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: #dc2626;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.35);
+  cursor: grab;
+}

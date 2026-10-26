@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useBranchPortalSession } from "@/components/portal/BranchPortalShell";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
+import MapaVistaPrevia from "@/components/mapas/MapaVistaPrevia";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import styles from "../tickets.module.css";
@@ -115,7 +116,6 @@ export default function BranchTicketsPage() {
     longitud: null as number | null,
     address: "",
   });
-  const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
   const openRequests = requests.filter((request) => String(request.status || '').toUpperCase() !== 'CLOSED');
 
@@ -255,14 +255,6 @@ export default function BranchTicketsPage() {
     const lat = ticket.activityEvidence?.entryLatitude ?? ticket.activityEvidence?.exitLatitude ?? null;
     const lng = ticket.activityEvidence?.entryLongitude ?? ticket.activityEvidence?.exitLongitude ?? null;
     return { lat, lng };
-  };
-
-  const getStaticMapPreviewUrl = (lat?: number | null, lng?: number | null) => {
-    if (!lat || !lng) return "";
-    if (GOOGLE_MAPS_API_KEY) {
-      return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=16&size=1200x420&maptype=roadmap&markers=color:red%7C${lat},${lng}&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`;
-    }
-    return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=1200x420&markers=${lat},${lng},red-pushpin`;
   };
 
   const shouldReplacePdfWithMap = (file: { label: string; kind: "image" | "pdf" | "file" }, ticket: Ticket) => {
@@ -632,7 +624,6 @@ export default function BranchTicketsPage() {
                             const mapReplacement = shouldReplacePdfWithMap(file, ticket);
                             const coords = getTicketMapCoords(ticket);
                             const mapUrl = getMapsUrl(coords.lat, coords.lng);
-                            const mapPreviewUrl = getStaticMapPreviewUrl(coords.lat, coords.lng);
 
                             const fileHref = mapReplacement ? mapUrl : file.url;
                             return (
@@ -649,7 +640,13 @@ export default function BranchTicketsPage() {
                               >
                                 <span className={styles.ticketFileLabel}>{mapReplacement ? "Mapa de llegada" : file.label}</span>
                                 {mapReplacement ? (
-                                  <img src={mapPreviewUrl} alt="Mapa de llegada" className={styles.ticketFileImage} />
+                                  <MapaVistaPrevia
+                                    lat={coords.lat}
+                                    lng={coords.lng}
+                                    altura={180}
+                                    alt="Mapa de llegada"
+                                    className={styles.ticketFileImage}
+                                  />
                                 ) : file.kind === "image" ? (
                                   <img src={file.url} alt={file.label} className={styles.ticketFileImage} />
                                 ) : (

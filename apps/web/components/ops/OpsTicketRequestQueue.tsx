@@ -12,8 +12,7 @@ import {
   listApprovedTicketRequests,
   type ClientTicketRequestRow,
 } from "@/lib/ops-activities-api";
-
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+import MapaVistaPrevia from "@/components/mapas/MapaVistaPrevia";
 
 function hasCoordinates(lat?: number | null, lng?: number | null) {
   return typeof lat === "number" && typeof lng === "number" && !Number.isNaN(lat) && !Number.isNaN(lng);
@@ -22,14 +21,6 @@ function hasCoordinates(lat?: number | null, lng?: number | null) {
 function getMapsUrl(lat?: number | null, lng?: number | null) {
   if (!hasCoordinates(lat, lng)) return "";
   return `https://www.google.com/maps?q=${lat},${lng}`;
-}
-
-function getStaticMapPreviewUrl(lat?: number | null, lng?: number | null) {
-  if (!hasCoordinates(lat, lng)) return "";
-  if (GOOGLE_MAPS_API_KEY) {
-    return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=16&size=800x280&maptype=roadmap&markers=color:red%7C${lat},${lng}&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`;
-  }
-  return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=800x280&markers=${lat},${lng},red-pushpin`;
 }
 
 function formatDateTime(value?: string | null) {
@@ -124,12 +115,9 @@ export default function OpsTicketRequestQueue() {
               {request.address || "—"} {request.city || ""} {request.state || ""}
             </p>
             {hasCoordinates(request.latitud, request.longitud) && (
-              <img
-                src={getStaticMapPreviewUrl(request.latitud, request.longitud)}
-                alt="Mapa sucursal"
-                style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 8, marginTop: 10 }}
-                loading="lazy"
-              />
+              <div style={{ borderRadius: 8, overflow: "hidden", marginTop: 10 }}>
+                <MapaVistaPrevia lat={request.latitud} lng={request.longitud} altura={160} alt="Mapa sucursal" />
+              </div>
             )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
               {hasCoordinates(request.latitud, request.longitud) && (

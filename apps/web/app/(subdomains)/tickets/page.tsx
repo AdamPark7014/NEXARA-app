@@ -6,6 +6,7 @@ import { Socket } from "socket.io-client";
 import { usePortalSession } from "@/components/portal/PortalShell";
 import { writeClientSession } from "@/lib/portal-session";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
+import MapaVistaPrevia from "@/components/mapas/MapaVistaPrevia";
 import BranchesForm from "@/components/BranchesForm";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import { buildApiUrl, getSocketBaseUrl, getApiAssetOrigin } from "@/lib/api-base";
@@ -154,7 +155,6 @@ export default function ClientTicketsPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [requests, setRequests] = useState<TicketRequest[]>([]);
   const [evidenceLoadErrors, setEvidenceLoadErrors] = useState<Record<string, boolean>>({});
-  const [mapPreviewErrors, setMapPreviewErrors] = useState<Record<string, number>>({});
   const [pendingFeedback, setPendingFeedback] = useState<PendingFeedback[]>([]);
   const [clientProjects, setClientProjects] = useState<ClientProject[]>([]);
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>("");
@@ -191,7 +191,6 @@ export default function ClientTicketsPage() {
     dueAt: "",
   });
 
-  const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
     const raw = url.trim();
@@ -368,20 +367,6 @@ export default function ClientTicketsPage() {
   const getMapsUrl = (lat?: number | null, lng?: number | null) => {
     if (!lat || !lng) return "";
     return `https://www.google.com/maps?q=${lat},${lng}`;
-  };
-  const getStaticMapPreviewUrl = (lat?: number | null, lng?: number | null) => {
-    if (!lat || !lng) return "";
-    if (GOOGLE_MAPS_API_KEY) {
-      return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=16&size=1200x420&maptype=roadmap&markers=color:red%7C${lat},${lng}&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`;
-    }
-    return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=1200x420&markers=${lat},${lng},red-pushpin`;
-  };
-  const getFallbackStaticMapPreviewUrl = (lat?: number | null, lng?: number | null) => {
-    if (!lat || !lng) return "";
-    if (GOOGLE_MAPS_API_KEY) {
-      return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&scale=2&size=1200x420&maptype=hybrid&markers=color:red%7C${lat},${lng}&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`;
-    }
-    return `https://static-maps.yandex.ru/1.x/?ll=${lng},${lat}&size=650,420&z=15&l=map&pt=${lng},${lat},pm2rdm`;
   };
   const clientAvatarUrl = profile?.logoUrl || session?.client?.logoUrl || "";
 
@@ -1309,7 +1294,6 @@ export default function ClientTicketsPage() {
                             const mapReplacement = shouldReplacePdfWithMap(file, ticket);
                             const coords = getTicketMapCoords(ticket);
                             const mapUrl = getMapsUrl(coords.lat, coords.lng);
-                            const mapPreviewUrl = getStaticMapPreviewUrl(coords.lat, coords.lng);
 
                             const fileHref = mapReplacement ? mapUrl : file.url;
                             return (
@@ -1326,7 +1310,13 @@ export default function ClientTicketsPage() {
                               >
                                 <span className={styles.ticketFileLabel}>{mapReplacement ? "Mapa de llegada" : file.label}</span>
                                 {mapReplacement ? (
-                                  <img src={mapPreviewUrl} alt="Mapa de llegada" className={styles.ticketFileImage} />
+                                  <MapaVistaPrevia
+                                    lat={coords.lat}
+                                    lng={coords.lng}
+                                    altura={180}
+                                    alt="Mapa de llegada"
+                                    className={styles.ticketFileImage}
+                                  />
                                 ) : file.kind === "image" ? (
                                   <img src={file.url} alt={file.label} className={styles.ticketFileImage} />
                                 ) : (
@@ -1378,30 +1368,19 @@ export default function ClientTicketsPage() {
                           {(() => {
                             const lat = arrivalEvidenceFor(ticket)?.latitud;
                             const lng = arrivalEvidenceFor(ticket)?.longitud;
-                            const mapKey = `${ticket.id}-arrival-map`;
-                            const failCount = mapPreviewErrors[mapKey] || 0;
-                            const src = failCount === 0
-                              ? getStaticMapPreviewUrl(lat, lng)
-                              : getFallbackStaticMapPreviewUrl(lat, lng);
-
                             return (
                               <button
                                 type="button"
                                 className={styles.ticketMapPreviewLink}
                                 onClick={() => void openExternalUrl(getMapsUrl(lat, lng))}
                               >
-                                {failCount >= 2 ? (
-                                  <div className={styles.ticketMapPreviewFallback}>
-                                    Vista previa no disponible en este navegador. Haz clic para abrir el mapa completo.
-                                  </div>
-                                ) : (
-                                  <img
-                                    className={styles.ticketMapPreviewImage}
-                                    src={src}
-                                    alt="Vista previa ubicación de llegada"
-                                    onError={() => setMapPreviewErrors((prev) => ({ ...prev, [mapKey]: failCount + 1 }))}
-                                  />
-                                )}
+                                <MapaVistaPrevia
+                                  lat={lat}
+                                  lng={lng}
+                                  altura={240}
+                                  zoom={16}
+                                  alt="Vista previa ubicación de llegada"
+                                />
                               </button>
                             );
                           })()}
@@ -1614,6 +1593,7 @@ export default function ClientTicketsPage() {
                         onClick={() => void openExternalUrl(getMapsUrl(request.latitud, request.longitud))}
                         style={{
                           display: "block",
+                          width: "100%",
                           padding: 0,
                           textAlign: "left",
                           borderRadius: 12,
@@ -1623,30 +1603,12 @@ export default function ClientTicketsPage() {
                           cursor: "pointer",
                         }}
                       >
-                        {(() => {
-                          const mapKey = `${request.id}-map`;
-                          const failCount = mapPreviewErrors[mapKey] || 0;
-                          const src = failCount === 0
-                            ? getStaticMapPreviewUrl(request.latitud, request.longitud)
-                            : getFallbackStaticMapPreviewUrl(request.latitud, request.longitud);
-
-                          if (failCount >= 2) {
-                            return (
-                              <div style={{ height: 180, display: "grid", placeItems: "center", color: "var(--text-secondary)", fontSize: 12 }}>
-                                Vista previa de mapa no disponible
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <img
-                              src={src}
-                              alt="Vista previa de ubicación"
-                              style={{ display: "block", width: "100%", height: 180, objectFit: "cover" }}
-                              onError={() => setMapPreviewErrors((prev) => ({ ...prev, [mapKey]: failCount + 1 }))}
-                            />
-                          );
-                        })()}
+                        <MapaVistaPrevia
+                          lat={request.latitud}
+                          lng={request.longitud}
+                          altura={180}
+                          alt="Vista previa de ubicación"
+                        />
                       </button>
                     )}
                     {Array.isArray(request.evidenceUrls) && request.evidenceUrls.length > 0 && (
