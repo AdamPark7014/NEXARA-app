@@ -345,10 +345,9 @@ private struct MarcadorReparto: View {
                     title: "Total a repartir",
                     subtitle: "Es el monto solicitado; la suma tiene que dar esto, al centavo."
                 )
-                HStack(alignment: .top, spacing: 14) {
-                    ImporteLabel(titulo: "Total", centavos: totalCentavos)
-                    ImporteLabel(titulo: "Repartido", centavos: sumaCentavos)
-                }
+                // Un dato por renglón: en el teléfono total y repartido juntos se pisan.
+                ImporteLabel(titulo: "Total", centavos: totalCentavos)
+                ImporteLabel(titulo: "Repartido", centavos: sumaCentavos)
                 Text(estado)
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(color)

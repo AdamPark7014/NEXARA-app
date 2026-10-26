@@ -389,13 +389,9 @@ private fun Marcador(totalCentavos: Long, sumaCentavos: Long, cuadre: CuadreRepa
                 title = "Total a repartir",
                 subtitle = "Es el monto solicitado; la suma tiene que dar esto, al centavo.",
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Importe("Total", totalCentavos, NxTone.Neutral, Modifier.weight(1f))
-                Importe("Repartido", sumaCentavos, NxTone.Neutral, Modifier.weight(1f))
-            }
+            // Un dato por renglón: en el teléfono total y repartido juntos se pisan.
+            Importe("Total", totalCentavos, NxTone.Neutral, Modifier.fillMaxWidth())
+            Importe("Repartido", sumaCentavos, NxTone.Neutral, Modifier.fillMaxWidth())
             Text(
                 estado,
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
