@@ -114,7 +114,7 @@ export class CodigosBarrasService {
     if (actual && !variantesDeBusqueda(actual).includes(codigo) && !dto.reemplazar) {
       // Cambiarlo en silencio dejaría sin leer las cajas que ya están en el anaquel.
       throw new ConflictException(
-        `El producto ya tiene el código ${actual}. Si cambió de empaque, confirma que quieres reemplazarlo.`,
+        `El producto ya tiene el código ${actual}: si cambió de empaque, confirma que quieres reemplazarlo.`,
       );
     }
 
