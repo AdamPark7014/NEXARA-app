@@ -188,11 +188,18 @@
 .horas {
   display: grid;
   grid-template-columns: 1fr 1fr auto;
+  grid-auto-flow: row dense;
   gap: var(--ui-s3);
   margin: 0;
   padding: var(--ui-s3);
   border-radius: var(--ui-radius);
   background: var(--ui-bg-2);
+}
+
+/* En una columna de ~100 px el motivo de revisión quedaba en seis renglones: la hora
+   con insignia toma el renglón entero y el tiempo se queda en la última columna. */
+.horas > div:has(.insignias) {
+  grid-column: 1 / -1;
 }
 
 .horas dt {
@@ -209,6 +216,7 @@
 }
 
 .horasTiempo {
+  grid-column: -2;
   text-align: right;
 }
 

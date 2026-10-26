@@ -75,8 +75,11 @@
     (ficha, columna Entrada/Salida de la tabla y tarjetas móviles) y en el aviso de ubicación de la columna Estado.
   - Desplegado (269f04e2, `/root/deploy-insignias.log`, sin «Attempt 1 failed»). Verificado por DOM con el CSS servido
     (`86a0a84a27af517b.css`), sin iniciar sesión: ficha a 343/480/760 px sin solape con la foto y dentro de la tarjeta;
-    tabla a 900 px ya no fuerza scroll horizontal. Pendiente: en la tarjeta del teléfono (375 px) la columna Entrada
-    mide ~100 px y el motivo queda en ~6 renglones; si molesta, `.horas > div:has(.insignias) { grid-column: 1 / -1 }`.
+    tabla a 900 px ya no fuerza scroll horizontal.
+  - Tarjeta del teléfono (Adam: «que esa columna ocupe todo el ancho»): `.horas > div:has(.insignias)` toma el renglón
+    entero, `.horasTiempo` va en la última columna y `.horas` usa `grid-auto-flow: row dense`. A 343 px el motivo pasa
+    de 97×126 px (~7 renglones) a 285×36 (2); sin insignias la tarjeta queda igual; solo con salida, entrada y tiempo
+    siguen arriba.
 
 - **26-10 ~05:10 UTC (claude-code, R-1) — Transcriptor aparte para dictado (whisper `small`, 1 CPU).**
   - Decisión del coordinador (opción b): el turbo q8_0 tardaba en un dictado lo que dura el audio y el dictado
