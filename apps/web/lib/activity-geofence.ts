@@ -75,10 +75,7 @@ export function puntoReal(lat: unknown, lng: unknown): PuntoGeo | null {
 
 /** Mismo texto con el que la API rechaza la foto de salida fuera del radio. */
 export function mensajeSalidaFueraDeZona(distancia: number, radioM = RADIO_ACTIVIDAD_M): string {
-  return (
-    `La salida se registra donde iniciaste la actividad: estás a ${distancia} m y el máximo es ${radioM} m. ` +
-    "Regresa al punto de inicio para tomar la foto de salida."
-  );
+  return `La salida se registra donde iniciaste la actividad: estás a ${distancia} m y el máximo es ${radioM} m; regresa al punto de inicio para tomar la foto de salida.`;
 }
 
 /** «35 m» o «1.2 km». */

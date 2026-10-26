@@ -85,8 +85,8 @@ object ActivityGeofence {
     }
 
     fun mensajeSalida(distancia: Int, radio: Int = RADIO_M): String =
-        "La salida se registra donde iniciaste la actividad: estás a $distancia m y el máximo es $radio m. " +
-            "Regresa al punto de inicio para tomar la foto de salida."
+        "La salida se registra donde iniciaste la actividad: estás a $distancia m y el máximo es $radio m; " +
+            "regresa al punto de inicio para tomar la foto de salida."
 
     /** Distancia de un punto al inicio de la geocerca, o null si no hay contra qué medir. */
     fun distanciaAlInicio(geocerca: GeocercaDto?, lat: Double?, lng: Double?): Int? {
