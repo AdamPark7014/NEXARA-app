@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { findIndustryLanding, findServiceLanding, getProgrammaticLandings } from "@/lib/seo/programmatic-landings";
 import { isIndustryHubSlug } from "@/lib/seo/industry-hubs";
 import { getPageKeywords, categoryFromSlug } from "@/lib/seo/keywords";
+import { recortarDescripcion, tituloConRemate } from "@/lib/seo/textos";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { GEO_CITIES, isGeoServiceSlug } from "@/lib/seo/geo-cities";
 import { JsonLd } from "@/lib/seo/json-ld";
@@ -49,8 +50,10 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   }
 
   const path = `/soluciones/${industry.slug}/${service.slug}`;
-  const title = `${service.name} para ${industry.name} en Puebla y CDMX | NEXARA`;
-  const description = `Cotiza ${service.name} para ${industry.name}: ${service.summary} Instalación y soporte en Puebla, CDMX y todo México. Respuesta en horario laboral.`;
+  const title = tituloConRemate(`${service.name} para ${industry.name}`, "en Puebla y CDMX");
+  const description = recortarDescripcion(
+    `${service.summary} Para ${industry.name.toLowerCase()}, con instalación y soporte en Puebla, CDMX y todo México.`,
+  );
   const ogImage = fotoOg(fotoSolucion(industry.slug, service.slug));
 
   const category = categoryFromSlug(service.slug);

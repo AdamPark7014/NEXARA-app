@@ -69,8 +69,15 @@ function encuadre(puntos: { x: number; y: number }[], aspecto = 21 / 9): string 
   return `${x0.toFixed(0)} ${y0.toFixed(0)} ${w.toFixed(0)} ${h.toFixed(0)}`;
 }
 
+/** Curva suave de Puebla a un punto del mapa, abombada hacia arriba (la usan este mapa y el interactivo). */
+export function curvaDesdeBase(c: { x: number; y: number }) {
+  return ruta(c);
+}
+
+export const BASE_MAPA = ORIGEN;
+
 /** Curva suave de Puebla a la ciudad, abombada hacia arriba. */
-function ruta(c: Ciudad) {
+function ruta(c: { x: number; y: number }) {
   const mx = (ORIGEN.x + c.x) / 2;
   const my = (ORIGEN.y + c.y) / 2;
   const dx = c.x - ORIGEN.x;

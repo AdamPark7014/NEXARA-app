@@ -1,5 +1,20 @@
 # RELEVO
 
+- **26-10 ~15:55 (claude-code) — Mapa interactivo de cobertura, simulador de cámaras y metadatos recortados.**
+  - Rastreo de las 169 URL del sitemap en producción (script de la sesión): todo 200, un h1 por página, 157 enlaces
+    internos y 82 imágenes sin rotos, JSON-LD válido, sin títulos repetidos. Faltaba: 147 descripciones de más de
+    170 caracteres y 34 títulos de más de 70. `lib/seo/textos.ts` (`recortarDescripcion`, `tituloConRemate`) los
+    deja en ~150 y ≤70 en soluciones, cobertura y guías.
+  - `components/sitio/MapaInteractivo.tsx` (+ `mapa.module.css`) en la portada: los 32 estados por modo de atención
+    (base Puebla/CDMX; campo: Tlaxcala, Edomex, Querétaro, Guanajuato, Morelos, Hidalgo; el resto por fases), ruta
+    animada desde Puebla, ficha con las ciudades que tienen página y «Cotizar en …». Con teclado y en el teléfono se
+    usa el selector de la ficha; el SVG es aria-hidden. Proyectos conserva el mapa sincronizado con la lista.
+  - `components/sitio/SimuladorCobertura.tsx` (+ `simulador.module.css`) en Servicios y en la guía de
+    videovigilancia (`interactivo: "cctv"` en `lib/guias.ts`): plano de tienda con góndolas y muros que tapan la vista
+    (rayos con oclusión), cámaras que se arrastran y giran (táctil, ratón y teclado: flechas, Q/E), cobertura del
+    piso y de Acceso, Caja y Almacén (cubierta con ≥70 %). Arranca en 35 % con el almacén a ciegas a propósito.
+  - `MapaMexico` exporta `curvaDesdeBase` y `BASE_MAPA` para el mapa interactivo.
+
 - **26-10 ~15:35 (claude-code) — Las 86 páginas de Soluciones ya son indexables (Adam lo pidió).**
   - Salían `noindex, follow` porque heredaban la metadata de Studio «soluciones» de `soluciones/layout.tsx`, cuyo
     valor por omisión en `lib/page-seo.ts` es `noIndex: true` (pensado para el índice `/soluciones`, que redirige a

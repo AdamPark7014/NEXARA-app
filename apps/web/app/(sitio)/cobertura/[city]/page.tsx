@@ -5,6 +5,7 @@ import { GEO_CITIES, GEO_MONEY_LINKS, GEO_SERVICE_SLUGS, findGeoCity } from "@/l
 import { findServiceLanding } from "@/lib/seo/programmatic-landings";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { JsonLd } from "@/lib/seo/json-ld";
+import { recortarDescripcion } from "@/lib/seo/textos";
 import PublicIcon from "@/app/components/PublicIcon";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
@@ -36,7 +37,9 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
 
   const path = `/cobertura/${city.slug}`;
   const title = `CCTV, redes y soporte TI en ${city.name} | NEXARA`;
-  const description = `Instalación de cámaras CCTV, redes Wi‑Fi, cómputo y soporte TI en ${city.name}, ${city.region}. ${city.blurb.slice(0, 120)} Cotiza con NEXARA.`;
+  const description = recortarDescripcion(
+    `CCTV, redes Wi‑Fi, cómputo y soporte TI en ${city.name}${city.name === city.region ? "" : `, ${city.region}`}. ${city.blurb}`,
+  );
   const imagen = "/fotos/mapa-cobertura-nexara.jpg";
 
   return {

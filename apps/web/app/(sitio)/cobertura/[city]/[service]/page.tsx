@@ -6,6 +6,7 @@ import { findServiceLanding } from "@/lib/seo/programmatic-landings";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { getPageKeywords, categoryFromSlug } from "@/lib/seo/keywords";
 import { JsonLd } from "@/lib/seo/json-ld";
+import { recortarDescripcion } from "@/lib/seo/textos";
 import PublicIcon from "@/app/components/PublicIcon";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
@@ -47,7 +48,7 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   const path = `/cobertura/${city.slug}/${service.slug}`;
   const title = `${service.name} en ${city.name} | NEXARA`;
   const placeLabel = city.name === city.region ? city.name : `${city.name}, ${city.region}`;
-  const description = `${service.summary} Servicio en ${placeLabel}: instalación, documentación y soporte. Agenda un diagnóstico con NEXARA.`;
+  const description = recortarDescripcion(`${service.name} en ${placeLabel}. ${service.summary} Instalación, documentación y soporte.`);
   const ogImage = fotoOg(visualServicio(service.slug).foto);
   const category = categoryFromSlug(service.slug);
   const keywords = [

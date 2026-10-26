@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { fetchNewsBySlug, normalizeNewsImageUrl, toPlainExcerpt } from "@/lib/public-news";
 import { GUIAS, findGuia, type Guia } from "@/lib/guias";
 import { JsonLd } from "@/lib/seo/json-ld";
+import { recortarDescripcion } from "@/lib/seo/textos";
 import PublicIcon from "@/app/components/PublicIcon";
 import s from "@/components/sitio/sitio.module.css";
 import i from "@/components/sitio/interior.module.css";
@@ -11,6 +12,7 @@ import Migas from "@/components/sitio/Migas";
 import Directorio from "@/components/sitio/Directorio";
 import Cierre from "@/components/sitio/Cierre";
 import Flecha from "@/components/sitio/Flecha";
+import SimuladorCobertura from "@/components/sitio/SimuladorCobertura";
 import { foto, fotoOg } from "@/components/sitio/fotos";
 
 type Params = { slug: string };
@@ -33,7 +35,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
   const path = `/blog/${params.slug}`;
   const titulo = post?.title ?? guia!.titulo;
-  const description = post ? toPlainExcerpt(post.summary, post.content, 155) : guia!.resumen;
+  const description = post ? toPlainExcerpt(post.summary, post.content, 155) : recortarDescripcion(guia!.resumen);
   const ogImage = absoluta(post ? normalizeNewsImageUrl(post.coverImageUrl) : fotoOg(guia!.foto));
   const publicada = post ? post.publishedAt || post.createdAt : guia!.publicada;
 
@@ -209,6 +211,18 @@ function GuiaPagina({ guia }: { guia: Guia }) {
           <Pie />
         </div>
       </article>
+
+      {guia.interactivo === "cctv" ? (
+        <section className={s.seccion} aria-labelledby="pruebalo-titulo" style={{ paddingTop: 0 }}>
+          <div className={s.contenedor}>
+            <p className={s.antetitulo}>Pruébalo</p>
+            <h2 id="pruebalo-titulo" className={s.titulo}>
+              Mueve las cámaras <span className={s.tenue}>y mira qué queda a ciegas.</span>
+            </h2>
+            <SimuladorCobertura />
+          </div>
+        </section>
+      ) : null}
 
       <OtrasGuias actual={guia.slug} />
 

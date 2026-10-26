@@ -1,0 +1,262 @@
+/* Simulador de cobertura de videovigilancia: plano, conos de visión y tablero de resultados. */
+
+.simulador {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr);
+  gap: clamp(20px, 3vw, 40px);
+  align-items: start;
+  margin-top: clamp(40px, 5vw, 64px);
+  padding: clamp(16px, 2.4vw, 28px);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  box-shadow: var(--sombra-xl), inset 0 0 0 1px var(--line-soft);
+}
+
+.plano svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-lg);
+  background: var(--bg-alt);
+  touch-action: none;
+  user-select: none;
+}
+
+.piso {
+  fill: var(--tile);
+}
+
+.ciego {
+  fill: var(--rec);
+  opacity: 0.35;
+}
+
+.zona,
+.zonaOk {
+  fill: color-mix(in srgb, var(--rec) 9%, transparent);
+  stroke: color-mix(in srgb, var(--rec) 55%, transparent);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  transition: fill 0.25s var(--ease), stroke 0.25s var(--ease);
+}
+
+.zonaOk {
+  fill: color-mix(in srgb, var(--ok) 12%, transparent);
+  stroke: color-mix(in srgb, var(--ok) 70%, transparent);
+  stroke-dasharray: none;
+}
+
+.zonaTexto {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  text-anchor: middle;
+  fill: var(--fg-2);
+  pointer-events: none;
+}
+
+.cono,
+.conoElegido {
+  fill: color-mix(in srgb, var(--accent) 14%, transparent);
+  stroke: color-mix(in srgb, var(--accent) 40%, transparent);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.conoElegido {
+  fill: color-mix(in srgb, var(--accent) 22%, transparent);
+  stroke: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.gondola {
+  fill: var(--fg-3);
+  opacity: 0.55;
+}
+
+.muro {
+  fill: none;
+  stroke: var(--fg-2);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.camara {
+  outline: none;
+}
+
+.brazo {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 3 3;
+}
+
+.agarre {
+  fill: transparent;
+  cursor: grab;
+}
+
+.agarre:active {
+  cursor: grabbing;
+}
+
+.giro {
+  fill: var(--card);
+  stroke: var(--accent);
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.cuerpo {
+  fill: var(--accent);
+  stroke: var(--card);
+  stroke-width: 3;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 8px rgba(0, 40, 120, 0.25));
+  transition: r 0.15s var(--ease);
+}
+
+.camara:hover .cuerpo,
+.camara[data-elegida] .cuerpo {
+  r: 15;
+}
+
+.camara:focus-visible .cuerpo {
+  stroke: var(--fg);
+  stroke-width: 3;
+}
+
+.numero {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  text-anchor: middle;
+  fill: #ffffff;
+  pointer-events: none;
+}
+
+.ayuda {
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: var(--fg-3);
+  text-align: center;
+}
+
+/* ── Tablero ────────────────────────────────────────────────────────────── */
+
+.tablero {
+  display: grid;
+  gap: 16px;
+  padding: 8px 4px;
+}
+
+.medida {
+  display: grid;
+  gap: 2px;
+  font-size: 15px;
+  color: var(--fg-2);
+}
+
+.cifra {
+  font-family: var(--font-display);
+  font-size: clamp(48px, 5vw, 64px);
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.barra {
+  overflow: hidden;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--control);
+}
+
+.barra i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--ok) 80%, var(--accent)));
+  transition: width 0.3s var(--ease);
+}
+
+.zonas {
+  display: grid;
+  gap: 8px;
+}
+
+.zonas li {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--rec) 7%, var(--tile));
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.zonas li svg {
+  color: var(--rec);
+}
+
+.zonas li[data-ok] {
+  background: color-mix(in srgb, var(--ok) 9%, var(--tile));
+}
+
+.zonas li[data-ok] svg {
+  color: var(--ok);
+}
+
+.zonas b {
+  font-weight: 600;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.veredicto {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--fg-2);
+}
+
+.botones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.botones button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.textoBoton {
+  padding: 8px 4px;
+  border: 0;
+  background: none;
+  color: var(--fg-2);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.textoBoton:hover:not(:disabled) {
+  color: var(--fg);
+}
+
+.cta {
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (max-width: 1068px) {
+  .simulador {
+    grid-template-columns: 1fr;
+  }
+}
