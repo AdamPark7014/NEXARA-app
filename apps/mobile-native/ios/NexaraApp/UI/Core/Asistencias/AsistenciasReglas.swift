@@ -158,8 +158,8 @@ struct AvisosChecada: View {
     }
 }
 
-/// «Falta justificada · motivo», con quién la justificó. Sin caja: una línea de
-/// color de 2 a la izquierda basta (Android `FaltaJustificadaNota`).
+/// Etiqueta y motivo, cada uno en su renglón, y quién la justificó. Sin caja: una
+/// línea de color de 2 a la izquierda basta (Android `FaltaJustificadaNota`).
 struct FaltaJustificadaNota: View {
     let justificacion: AttendanceJustification
 
@@ -323,10 +323,11 @@ enum FaltasJustificadas {
         lista.first { String($0.fecha.prefix(10)) == fecha }
     }
 
-    /// «Falta justificada · Incapacidad del IMSS».
+    /// La etiqueta y, si hay motivo, el motivo en el renglón de abajo.
+    /// Antes iban juntos: «Falta justificada · Incapacidad del IMSS».
     static func texto(_ j: AttendanceJustification) -> String {
         let motivo = j.motivo.trimmingCharacters(in: .whitespacesAndNewlines)
-        return motivo.isEmpty ? etiqueta : "\(etiqueta) · \(motivo)"
+        return motivo.isEmpty ? etiqueta : "\(etiqueta)\n\(motivo)"
     }
 
     /// «Justificó Christian Ruiz» para la línea de abajo.

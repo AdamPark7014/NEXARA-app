@@ -6,11 +6,12 @@ import mx.nexara.mobile.nativeapp.data.api.AttendanceJustificacionDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeUserDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Un día justificado se lee «Falta justificada · motivo»: ni ausente ni asistió. */
+/** Un día justificado se lee «Falta justificada» y el motivo debajo: ni ausente ni asistió. */
 class FaltasJustificadasTest {
 
     private val incapacidad = AttendanceJustificacionDto(
@@ -32,10 +33,28 @@ class FaltasJustificadasTest {
 
     @Test
     fun textoYQuien() {
-        assertEquals("Falta justificada · Incapacidad del IMSS", FaltasJustificadas.texto(incapacidad))
+        assertEquals("Falta justificada\nIncapacidad del IMSS", FaltasJustificadas.texto(incapacidad))
         assertEquals("Falta justificada", FaltasJustificadas.texto(incapacidad.copy(motivo = " ")))
+        assertEquals("Falta justificada", FaltasJustificadas.texto(incapacidad.copy(motivo = null)))
         assertEquals("Justificó Christian Ruiz", FaltasJustificadas.quien(incapacidad))
         assertNull(FaltasJustificadas.quien(incapacidad.copy(justificadaPor = null)))
+    }
+
+    @Test
+    fun unDatoPorRenglon() {
+        // Texto viejo, a 390 px, en un solo renglón: «Falta justificada · Incapacidad del IMSS».
+        val viejo = "Falta justificada · Incapacidad del IMSS"
+        val texto = FaltasJustificadas.texto(incapacidad)
+        assertEquals("Falta justificada\nIncapacidad del IMSS", texto)
+        assertEquals(listOf("Falta justificada", "Incapacidad del IMSS"), texto.split("\n"))
+        assertNotEquals(viejo, texto)
+        assertFalse(texto.contains(" · "))
+        // Sin motivo no queda un renglón vacío. Cómo se justifica la falta no cambia.
+        assertEquals("Falta justificada", FaltasJustificadas.texto(incapacidad.copy(motivo = " ")))
+        assertEquals("Falta justificada", FaltasJustificadas.texto(incapacidad.copy(motivo = null)))
+        assertFalse(FaltasJustificadas.texto(incapacidad.copy(motivo = " ")).contains("\n"))
+        assertTrue(FaltasJustificadas.motivoOk("Incapacidad del IMSS"))
+        assertFalse(FaltasJustificadas.motivoOk("corto"))
     }
 
     @Test
