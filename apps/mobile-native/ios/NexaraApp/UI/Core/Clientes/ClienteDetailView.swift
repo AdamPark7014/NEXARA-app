@@ -213,8 +213,10 @@ struct ClienteDetailView: View {
             dato("Razón social", client.legalName)
             dato("RFC", client.taxId)
             dato("Dirección", client.fiscalAddress)
-            dato("CP / régimen", Self.unir([client.fiscalZipCode, client.fiscalRegime]))
-            dato("Contacto", Self.unir([client.billingEmail, client.billingPhone]))
+            dato("Código postal", client.fiscalZipCode)
+            dato("Régimen", client.fiscalRegime)
+            dato("Correo", client.billingEmail)
+            dato("Teléfono", client.billingPhone)
         }
     }
 
@@ -344,10 +346,6 @@ struct ClienteDetailView: View {
     private static func nombre(_ value: String?) -> String { texto(value) ?? "Sin nombre" }
 
     private static func nombreProyecto(_ value: String?) -> String { texto(value) ?? "Proyecto sin nombre" }
-
-    private static func unir(_ values: [String?]) -> String {
-        values.compactMap { texto($0) }.joined(separator: " · ")
-    }
 
     /// `projectStatusLabel`: ACTIVE → Activo, ON_HOLD → Inactivo, COMPLETED → Terminado.
     private static func estatusProyecto(_ status: String?) -> String {
