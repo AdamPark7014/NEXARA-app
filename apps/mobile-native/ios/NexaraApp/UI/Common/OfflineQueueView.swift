@@ -56,11 +56,11 @@ private enum OfflineMutationKind {
 }
 
 /// Cola de cambios sin conexión — igual que `OfflineQueueScreen` de Android:
-/// encabezado con el estado de la red, tarjeta de pendientes / con reintentos /
-/// red, «Sincronizar ahora» y «Vaciar cola», y una línea de tiempo de cambios
-/// que se desliza a la derecha para reintentar y a la izquierda para descartar
-/// (los dos con su botón, y descartar siempre con confirmación). Al volver la
-/// red se sincroniza sola.
+/// encabezado con el estado de la red, un dato por renglón (pendientes,
+/// reintentos y red), «Sincronizar ahora» y «Vaciar cola», y una línea de
+/// tiempo de cambios que se desliza a la derecha para reintentar y a la
+/// izquierda para descartar (los dos con su botón, y descartar siempre con
+/// confirmación). Al volver la red se sincroniza sola. El vacío es una frase.
 struct OfflineQueueView: View {
     @ObservedObject private var network = NetworkMonitor.shared
     @State private var items: [QueuedMutation] = []
@@ -125,7 +125,7 @@ struct OfflineQueueView: View {
                 fila {
                     NxEmptyState(
                         title: "Todo sincronizado",
-                        subtitle: "No hay mutaciones pendientes en este dispositivo."
+                        subtitle: ""
                     )
                 }
             } else {
@@ -222,11 +222,11 @@ struct OfflineQueueView: View {
     }
 
     private var tarjetaEstado: some View {
-        HStack(alignment: .top, spacing: 16) {
-            cifra("\(items.count)", "Pendientes", color: NxColors.fg, grande: true)
-            cifra("\(withErrors)", "Con reintentos", color: NxColors.warning, grande: true)
-            cifra(network.isOnline ? "Online" : "Offline", "Red",
-                  color: network.isOnline ? NxColors.success : NxColors.warning, grande: false)
+        VStack(alignment: .leading, spacing: 8) {
+            dato("Pendientes", "\(items.count)", color: NxColors.fg)
+            dato("Con reintentos", "\(withErrors)", color: NxColors.warning)
+            dato("Red", network.isOnline ? "Online" : "Offline",
+                 color: network.isOnline ? NxColors.success : NxColors.warning)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -234,18 +234,20 @@ struct OfflineQueueView: View {
             items.isEmpty ? NxColors.successSoft : NxColors.warningSoft,
             in: RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
         )
-        .accessibilityElement(children: .combine)
     }
 
-    private func cifra(_ valor: String, _ etiqueta: String, color: Color, grande: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(valor)
-                .font(.system(size: grande ? 22 : 14, weight: .bold))
-                .foregroundStyle(color)
+    /// Un dato por renglón: etiqueta a la izquierda, valor a la derecha.
+    private func dato(_ etiqueta: String, _ valor: String, color: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(etiqueta)
-                .font(NxType.labelSmall)
+                .font(NxType.bodySmall)
                 .foregroundStyle(NxColors.muted)
+            Spacer(minLength: 8)
+            Text(valor)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(color)
         }
+        .accessibilityElement(children: .combine)
     }
 
     private func renglon(_ item: QueuedMutation, primero: Bool, ultimo: Bool) -> some View {
