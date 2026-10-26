@@ -60,6 +60,7 @@ import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl
 import mx.nexara.mobile.nativeapp.ui.common.LocationPermissionBanner
 import mx.nexara.mobile.nativeapp.ui.common.ProtectedImage
+import mx.nexara.mobile.nativeapp.ui.common.rememberAsegurarUbicacion
 import mx.nexara.mobile.nativeapp.ui.common.rememberCameraCapture
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDenseSectionHeader
@@ -426,7 +427,7 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                         photoBase64 = photoBase64,
                     )
                 }
-                val gpsNota = if (type == "entrada") encenderGps() else apagarGps()
+                val gpsNota = if (type == "entrada") encenderGps(checadaConUbicacion = coords != null) else apagarGps()
                 val base = res.message
                     ?: if (type == "entrada") "Entrada registrada" else "Salida registrada"
                 val geo = AttendanceCheckIn.notaGps(
@@ -476,12 +477,17 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun encenderGps(): String {
+    /**
+     * @param checadaConUbicacion la checada llevó coordenadas: el servidor ya guardó ese punto en
+     * el recorrido, así que el siguiente sale a los 30 min y no a los segundos.
+     */
+    private suspend fun encenderGps(checadaConUbicacion: Boolean): String {
         val app = getApplication<Application>()
         if (!JornadaGps.canTrack(app)) return " · sin permiso de ubicación: no se comparte el trayecto"
         runCatching { withContext(Dispatchers.IO) { repo.gpsUpdateConsent(true) } }
+        if (checadaConUbicacion) JornadaGps.marcarPuntoEnviado(app)
         JornadaGps.start(app)
-        return " · compartiendo ubicación de jornada"
+        return " · se toma tu ubicación cada 30 min hasta tu salida"
     }
 
     private suspend fun apagarGps(): String {
@@ -1048,6 +1054,8 @@ private fun MiJornadaCard(
         vm.checkIn(tipo, dataUrl)
     }
 
+    val asegurarUbicacion = rememberAsegurarUbicacion()
+
     val abierta = state.current?.isOpen == true
     val hayEntrada = state.misChecadas.any { it.type.equals("entrada", true) }
     val haySalida = state.misChecadas.any { it.type.equals("salida", true) }
@@ -1119,8 +1127,11 @@ private fun MiJornadaCard(
         if (siguiente != null || state.checkInLoading) {
             Button(
                 onClick = {
-                    pendiente = siguiente
-                    tomarFoto()
+                    // Primero permiso y ubicación encendida (diálogo del sistema); luego la foto.
+                    asegurarUbicacion {
+                        pendiente = siguiente
+                        tomarFoto()
+                    }
                 },
                 enabled = siguiente != null && !state.checkInLoading,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),

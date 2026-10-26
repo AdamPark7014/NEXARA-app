@@ -23,6 +23,9 @@ struct InicioView: View {
     @StateObject private var attendance = AttendanceVM()
     @Environment(\.scenePhase) private var scenePhase
     @State private var photoType: String?
+    /// Checada que espera a que se resuelva el aviso de ubicación (permiso o ubicación apagada).
+    @State private var tipoPendiente: String?
+    @State private var avisoUbicacion: AvisoUbicacionChecada?
     @State private var pausando: MyActivityItem?
 
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
@@ -43,7 +46,7 @@ struct InicioView: View {
                 if muestraJornada {
                     InicioJornadaHero(
                         vm: attendance,
-                        onMark: { photoType = $0 },
+                        onMark: { marcar($0) },
                         onComida: onOpenComidas,
                         onVerJornada: onOpenAsistencia
                     )
@@ -86,6 +89,11 @@ struct InicioView: View {
                 onCancel: { photoType = nil }
             )
         }
+        .avisoUbicacionChecada($avisoUbicacion) {
+            let tipo = tipoPendiente
+            tipoPendiente = nil
+            photoType = tipo
+        }
         .alert(
             "No se pudo checar",
             isPresented: Binding(
@@ -103,6 +111,18 @@ struct InicioView: View {
             PausarPropiaSheet(activityId: item.id) { _ in
                 pausando = nil
                 Task { await store.load(enabled: true) }
+            }
+        }
+    }
+
+    /// Antes de la foto de la checada: permiso y ubicación encendida (ver `AvisoUbicacionChecada`).
+    private func marcar(_ tipo: String) {
+        Task { @MainActor in
+            if let aviso = await AvisoUbicacionChecada.revisar() {
+                tipoPendiente = tipo
+                avisoUbicacion = aviso
+            } else {
+                photoType = tipo
             }
         }
     }

@@ -30,4 +30,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                      didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("APNs: fallo de registro - \(error.localizedDescription)")
     }
+
+    /// Latido silencioso del GPS de jornada (`gps-latido`, el servidor lleva 35 min sin un punto).
+    /// Solo mide con el permiso «Siempre» (ver `ShiftGpsTracker`); se le dan unos segundos a la
+    /// lectura antes de devolverle el control a iOS.
+    func application(_ application: UIApplication,
+                     didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+                     fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        guard (userInfo["event"] as? String) == "gps-latido" else {
+            completionHandler(.noData)
+            return
+        }
+        Task { @MainActor in
+            ShiftGpsTracker.shared.latido()
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            completionHandler(.newData)
+        }
+    }
 }

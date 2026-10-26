@@ -168,9 +168,15 @@ final class PushManager: NSObject, UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        let content = notification.request.content
+        // Recordatorio del GPS de jornada con la app abierta: no hace falta el aviso, se mide ya.
+        if Self.text(content.userInfo, "event") == "gps-latido" {
+            Task { @MainActor in await ShiftGpsTracker.shared.resumeIfNeeded() }
+            completionHandler([])
+            return
+        }
         // La campana del shell se refresca con cada push, no solo cada 45 s.
         Task { @MainActor in await NotificationsBadgeStore.shared.refresh() }
-        let content = notification.request.content
         if Self.isChat(content.userInfo),
            let channelId = Self.chatChannelId(userInfo: content.userInfo, threadIdentifier: content.threadIdentifier),
            ActiveConversation.shared.isOpen(channelId) {

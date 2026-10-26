@@ -28,6 +28,13 @@ class NexaraFirebaseService : FirebaseMessagingService() {
 
     /** Corre en un hilo de FCM: la descarga del avatar puede bloquear unos segundos. */
     override fun onMessageReceived(message: RemoteMessage) {
+        // Latido del GPS de jornada (el servidor lleva 35 min sin un punto): no se muestra nada;
+        // se toma un punto, o se pide tocar para reanudar si Android cerró el servicio.
+        if (message.data["event"] == "gps-latido") {
+            runCatching { mx.nexara.mobile.nativeapp.util.JornadaGps.latido(applicationContext) }
+                .onFailure { Log.w(TAG, "Latido de GPS: ${it.message}") }
+            return
+        }
         try {
             val payload = PushPayload.from(
                 data = message.data,

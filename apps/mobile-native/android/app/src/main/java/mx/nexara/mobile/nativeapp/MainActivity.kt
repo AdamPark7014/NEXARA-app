@@ -171,6 +171,13 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Jornada abierta y Android cerró el GPS de jornada (ahorro de batería, actualización,
+        // reinicio): con la app al frente se puede volver a encender, en cualquier pantalla.
+        mx.nexara.mobile.nativeapp.util.JornadaGps.reanudarSiHaceFalta(this)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)

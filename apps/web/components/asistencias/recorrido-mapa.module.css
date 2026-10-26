@@ -1,0 +1,38 @@
+/* NEXARA · Asistencias: mapa del recorrido (MapLibre + OpenFreeMap). Solo tokens --ui-*. */
+
+.marco {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--ui-radius-md, 10px);
+  border: 1px solid var(--ui-border-subtle);
+  background: var(--ui-bg-2, #eef2f8);
+}
+
+.mapa {
+  position: absolute;
+  inset: 0;
+}
+
+.aviso {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  padding: var(--ui-s3);
+  text-align: center;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  pointer-events: none;
+}
+
+.aviso a {
+  pointer-events: auto;
+  color: var(--ui-brand-text);
+  font-weight: 600;
+}
+
+.marco[data-estado="fallo"] .mapa {
+  visibility: hidden;
+}
