@@ -86,7 +86,7 @@ export function textoAvisoAtraso(input: {
   if (input.paraQuienLaTiene) {
     return {
       title: TITULO_AVISO_ATRASO,
-      message: `Tu actividad ${pieza} está atrasada. Asegúrate de cumplirla en tiempo y forma.`,
+      message: `Tu actividad ${pieza} está atrasada: asegúrate de cumplirla en tiempo y forma.`,
     };
   }
   const nombre = (input.nombreResponsable || '').trim() || 'el responsable';
