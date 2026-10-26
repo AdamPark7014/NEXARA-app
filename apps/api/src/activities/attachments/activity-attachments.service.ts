@@ -253,7 +253,7 @@ export class ActivityAttachmentsService {
     try {
       return await vistaPreviaHtml(buffer, nombre, mimeType);
     } catch {
-      throw new BadRequestException('No se pudo leer el archivo para la vista previa. Descárgalo para abrirlo.');
+      throw new BadRequestException('No se pudo leer el archivo para la vista previa: descárgalo para abrirlo.');
     }
   }
 }

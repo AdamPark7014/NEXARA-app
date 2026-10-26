@@ -1,4 +1,7 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import {
   ActivityAttachmentsService,
   EXTENSIONES_ADJUNTO,
@@ -80,5 +83,43 @@ describe('adjuntos de actividades', () => {
   it('una actividad de otra empresa no existe', async () => {
     const { service } = build({ activity: { findFirst: jest.fn().mockResolvedValue(null) } });
     await expect(service.listar(9, { id: 21 }, 2)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('si no se puede leer el archivo, el aviso cabe en una frase', async () => {
+    const viejo = 'No se pudo leer el archivo para la vista previa. Descárgalo para abrirlo.';
+    const frase = 'No se pudo leer el archivo para la vista previa: descárgalo para abrirlo.';
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'adjuntos-'));
+    const dir = path.join(root, 'actividades-adjuntos');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'roto.xlsx'), Buffer.from('no es un libro de Excel'));
+    const antes = process.env.UPLOADS_ROOT;
+    process.env.UPLOADS_ROOT = root;
+    const fila = {
+      id: 5,
+      activityId: 9,
+      companyId: 1,
+      nombre: 'Propuesta Toks.xlsx',
+      fileUrl: '/uploads/actividades-adjuntos/roto.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
+    const { service, prisma } = build();
+    prisma.activityAttachment.findFirst.mockResolvedValue(fila);
+    try {
+      let message = '';
+      try {
+        await service.vistaPrevia(9, 5, 1);
+      } catch (e) {
+        expect(e).toBeInstanceOf(BadRequestException);
+        const cuerpo = (e as BadRequestException).getResponse();
+        message = typeof cuerpo === 'string' ? cuerpo : String((cuerpo as { message?: unknown }).message ?? '');
+      }
+      expect(message).toBe(frase);
+      expect(message).not.toBe(viejo);
+      expect(message.includes('. ')).toBe(false);
+    } finally {
+      if (antes === undefined) delete process.env.UPLOADS_ROOT;
+      else process.env.UPLOADS_ROOT = antes;
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 });
