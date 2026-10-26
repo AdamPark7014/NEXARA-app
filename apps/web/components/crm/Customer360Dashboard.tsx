@@ -14,6 +14,7 @@ import {
 } from "@/lib/client-snapshot-api";
 import { formatOpportunityStage, isClosedOpportunityStage } from "@/lib/sales-api";
 import type { SalesClient } from "@/lib/sales-api";
+import styles from "./Customer360Dashboard.module.css";
 
 type TimelineEvent = {
   id: string;
@@ -151,6 +152,30 @@ type Props = {
   snapshot: ClientSnapshot;
   timeline: TimelineEvent[];
 };
+
+/** Dos datos que antes iban en un renglón («AN-1042 · Cambiar el NVR»). En teléfono, uno por renglón. */
+function DatosEnLinea({ partes, fuerte }: { partes: string[]; fuerte?: boolean }) {
+  const visibles = partes.map((p) => p.trim()).filter(Boolean);
+  if (visibles.length === 0) return null;
+  return (
+    <div className={`${styles.linea} ${fuerte ? styles.fuerte : styles.meta}`}>
+      {visibles.flatMap((parte, i) => {
+        const dato = (
+          <span key={`d-${i}`} className={styles.dato}>
+            {parte}
+          </span>
+        );
+        if (i === 0) return [dato];
+        return [
+          <span key={`s-${i}`} className={styles.sep} aria-hidden="true">
+            {" · "}
+          </span>,
+          dato,
+        ];
+      })}
+    </div>
+  );
+}
 
 export default function Customer360Dashboard({ client, snapshot, timeline }: Props) {
   const stats = snapshot.stats;
@@ -325,9 +350,7 @@ export default function Customer360Dashboard({ client, snapshot, timeline }: Pro
                     }}
                   >
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{rowStr(row, "title")}</div>
-                    <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>
-                      {rowStr(row, "projectType") || "Proyecto"} · {rowStr(row, "status")}
-                    </div>
+                    <DatosEnLinea partes={[rowStr(row, "projectType") || "Proyecto", rowStr(row, "status")]} />
                   </div>
                 );
                 return (
@@ -376,12 +399,8 @@ export default function Customer360Dashboard({ client, snapshot, timeline }: Pro
                           background: "var(--surface)",
                         }}
                       >
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>
-                          {rowStr(row, "anNumber")} · {rowStr(row, "titulo")}
-                        </div>
-                        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>
-                          {rowStr(row, "estatus")} · {rowStr(row, "branchName")}
-                        </div>
+                        <DatosEnLinea fuerte partes={[rowStr(row, "anNumber"), rowStr(row, "titulo")]} />
+                        <DatosEnLinea partes={[rowStr(row, "estatus"), rowStr(row, "branchName")]} />
                       </div>
                     </CrossPanelLink>
                   </li>
@@ -412,9 +431,7 @@ export default function Customer360Dashboard({ client, snapshot, timeline }: Pro
                       <div style={{ fontWeight: 600, fontSize: 13 }}>
                         {rowStr(row, "description").slice(0, 72)}
                       </div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>
-                        {rowStr(row, "status")} · {rowStr(row, "urgency")}
-                      </div>
+                      <DatosEnLinea partes={[rowStr(row, "status"), rowStr(row, "urgency")]} />
                     </div>
                   </li>
                 );
