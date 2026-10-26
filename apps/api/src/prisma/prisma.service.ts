@@ -16,11 +16,13 @@ const SOFT_DELETE_MODELS = new Set<string>([
 ]);
 
 /** Models excluded from audit logging (high-volume or internal) */
-const AUDIT_EXCLUDED = new Set<string>([
+export const AUDIT_EXCLUDED = new Set<string>([
   'AuditLog', 'KpiSnapshot', 'LocationTracking', 'Notification',
   'NewsletterSubscriber', 'SystemSetting', 'UserPreference',
   // Una fila por mensaje visible: no vale la pena auditar cada palomita.
   'ChatMessageRead',
+  // Eventos que empujan los terminales Hikvision: la tabla misma es el registro (860 mil copias, 592 MB en un mes).
+  'IntegraPushEvent',
 ]);
 
 /**
