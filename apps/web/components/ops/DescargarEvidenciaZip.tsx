@@ -37,7 +37,7 @@ export default function DescargarEvidenciaZip({ activityId, anNumber, titulo, si
       setError(
         esErrorDePermiso(e)
           ? "No tienes permiso para descargar la evidencia de esta actividad."
-          : formatApiError(e, "No se pudo descargar la evidencia. Intenta de nuevo."),
+          : formatApiError(e, "No se pudo descargar la evidencia, intenta de nuevo."),
       );
     } finally {
       setDescargando(false);
@@ -58,6 +58,11 @@ export default function DescargarEvidenciaZip({ activityId, anNumber, titulo, si
       <span aria-live="polite" className={s.estado} data-error={error ? "true" : undefined}>
         {error ?? listo ?? ""}
       </span>
+      {error ? (
+        <Button size={size} variant="secondary" onClick={() => void descargar()} disabled={descargando}>
+          Reintentar
+        </Button>
+      ) : null}
     </div>
   );
 }
