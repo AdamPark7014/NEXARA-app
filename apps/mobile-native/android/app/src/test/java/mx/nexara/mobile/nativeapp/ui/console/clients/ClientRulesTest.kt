@@ -76,7 +76,7 @@ class ClientRulesTest {
         assertTrue(ClientRules.projectToggleMessage("Torre A", inactivo = false).contains("quedará inactivo"))
         val borrar = ClientRules.projectDeleteMessage("Torre A")
         assertTrue(borrar.contains("«Torre A»"))
-        assertTrue(borrar.contains("no se puede deshacer"))
+        assertTrue(borrar.contains("para siempre"))
         assertTrue(ClientRules.projectDeleteMessage(null).contains("«Proyecto sin nombre»"))
     }
 
@@ -91,7 +91,31 @@ class ClientRulesTest {
 
         val borrar = ClientRules.deleteMessage("Acme")
         assertTrue(borrar.contains("«Acme»"))
-        assertTrue("eliminar debe avisar que no se deshace", borrar.contains("no se puede deshacer"))
+        assertTrue("eliminar debe avisar que no se deshace", borrar.contains("para siempre"))
         assertTrue(ClientRules.deleteMessage("  ").contains("«Sin nombre»"))
+    }
+
+    @Test
+    fun avisosDeDesactivarYEliminar() {
+        assertEquals(
+            "«Acme» quedará inactivo: sus datos y su historial se conservan y podrás reactivarlo después.",
+            ClientRules.toggleActiveMessage("Acme", inactivo = false),
+        )
+        // Eliminar dice que es para siempre y, aparte, que se puede desactivar.
+        assertEquals(
+            "«Acme» se eliminará del padrón para siempre; si solo ya no trabajan con él, mejor desactívalo.",
+            ClientRules.deleteMessage("Acme"),
+        )
+        assertEquals(
+            "«Torre A» quedará inactivo: sus actividades y su historial se conservan y podrás reactivarlo después.",
+            ClientRules.projectToggleMessage("Torre A", inactivo = false),
+        )
+        assertEquals(
+            "El proyecto «Torre A» se eliminará para siempre y sus actividades conservarán su historial; " +
+                "si solo está detenido, mejor desactívalo.",
+            ClientRules.projectDeleteMessage("Torre A"),
+        )
+        assertEquals("«Acme» volverá a estar activo en el padrón.", ClientRules.toggleActiveMessage("Acme", inactivo = true))
+        assertEquals("«Torre A» volverá a estar activo.", ClientRules.projectToggleMessage("Torre A", inactivo = true))
     }
 }
