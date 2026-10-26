@@ -355,7 +355,7 @@ private struct AdjuntoAbierto: Identifiable {
     let url: URL
 }
 
-/// Un renglón: icono del tipo, nombre (2 líneas) y «2.3 MB · Luis Joel · hoy 13:39».
+/// Un renglón: icono del tipo, nombre (2 líneas) y, debajo, tamaño, quién lo subió y la hora, cada uno en su línea.
 /// Tocarlo lo abre; «…» (o mantenerlo presionado) ofrece Quitar si se puede.
 private struct AdjuntoFila: View {
     let adjunto: ActivityAdjunto
@@ -368,7 +368,7 @@ private struct AdjuntoFila: View {
 
     var body: some View {
         let tipo = ActivityAdjuntosRules.tipo(adjunto)
-        let meta = ActivityAdjuntosRules.meta(adjunto)
+        let lineas = ActivityAdjuntosRules.lineas(adjunto)
         HStack(alignment: .center, spacing: 8) {
             Button(action: onAbrir) {
                 HStack(alignment: .center, spacing: 12) {
@@ -384,11 +384,16 @@ private struct AdjuntoFila: View {
                             .foregroundStyle(NxColors.fg)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
-                        if !meta.isEmpty {
-                            Text(meta)
-                                .font(.system(size: 12))
-                                .foregroundStyle(NxColors.muted)
-                                .lineLimit(1)
+                        if !lineas.isEmpty {
+                            VStack(alignment: .leading, spacing: 1) {
+                                ForEach(Array(lineas.enumerated()), id: \.offset) { _, linea in
+                                    Text(linea)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(NxColors.muted)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+                                }
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -400,7 +405,7 @@ private struct AdjuntoFila: View {
             .disabled(bloqueado)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(tipo.etiqueta), \(adjunto.nombre)")
-            .accessibilityValue(meta)
+            .accessibilityValue(lineas.joined(separator: ", "))
             .accessibilityHint("Abre el archivo")
 
             if ocupado {

@@ -282,7 +282,7 @@ fun ActividadAdjuntosSection(
     }
 }
 
-/** Icono por tipo, nombre en 1–2 líneas y «2.3 MB · Luis Joel · hoy 13:39». */
+/** Icono por tipo, nombre en 1–2 líneas, y tamaño, quién lo subió y la hora, cada uno en su renglón. */
 @Composable
 private fun RenglonDeAdjunto(
     adjunto: AdjuntoDto,
@@ -294,7 +294,7 @@ private fun RenglonDeAdjunto(
     val nombre = ActividadAdjuntosRules.nombre(adjunto)
     val tipo = ActividadAdjuntosRules.tipo(adjunto.tipo, nombre)
     val color = Color(tipo.color)
-    val pie = remember(adjunto) { ActividadAdjuntosRules.pie(adjunto) }
+    val lineas = remember(adjunto) { ActividadAdjuntosRules.lineas(adjunto) }
 
     Row(
         Modifier
@@ -328,8 +328,18 @@ private fun RenglonDeAdjunto(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (pie.isNotEmpty()) {
-                Text(pie, fontSize = 11.5.sp, color = NxColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (lineas.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    lineas.forEach { linea ->
+                        Text(
+                            linea,
+                            fontSize = 11.5.sp,
+                            color = NxColors.Muted,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
         when {
