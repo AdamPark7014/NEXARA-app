@@ -79,7 +79,12 @@
   - Tarjeta del teléfono (Adam: «que esa columna ocupe todo el ancho»): `.horas > div:has(.insignias)` toma el renglón
     entero, `.horasTiempo` va en la última columna y `.horas` usa `grid-auto-flow: row dense`. A 343 px el motivo pasa
     de 97×126 px (~7 renglones) a 285×36 (2); sin insignias la tarjeta queda igual; solo con salida, entrada y tiempo
-    siguen arriba.
+    siguen arriba. Desplegado (d05d1ec8, `/root/deploy-insignias-movil.log`) y medido con el CSS servido.
+  - **Incidente de disco (18:44–18:47 UTC):** al reconstruir `nexara-transcriptor` el disco llegó a 100 %:
+    `nexara-db` quedó reiniciándose («could not write lock file postmaster.pid»; se recuperó sola a las 18:47:19, redo
+    normal) y Redis rechazó escrituras (MISCONF, ya sano). `docker builder prune -f` liberó ~5 GB: 97 % → 90 %.
+    `/api/health` responde 503 mientras el disco esté ≥ 90 % (`thresholdPercent: 0.9`); `/api/health/live` da 200.
+    Quedan ~3 GB en imágenes `prev`/`rollback` de Ágora, ARTA y ZYNORATEK (no tocadas) y 33 GB en containerd.
 
 - **26-10 ~05:10 UTC (claude-code, R-1) — Transcriptor aparte para dictado (whisper `small`, 1 CPU).**
   - Decisión del coordinador (opción b): el turbo q8_0 tardaba en un dictado lo que dura el audio y el dictado
