@@ -319,7 +319,8 @@ class CotizacionesRulesTest {
 
     @Test
     fun theClientLineLeadsWithTheCompany() {
-        assertEquals("Bachoco · Ing. Pérez", CotizacionesRules.clienteTexto(cotizacion()))
+        // Empresa arriba y contacto en el renglón de abajo.
+        assertEquals("Bachoco\nIng. Pérez", CotizacionesRules.clienteTexto(cotizacion()))
         assertEquals("Bachoco", CotizacionesRules.clienteTexto(cotizacion(clienteNombre = null)))
         assertEquals("Ing. Pérez", CotizacionesRules.clienteTexto(cotizacion(clienteEmpresa = null)))
         // Cuando empresa y contacto son la misma cadena no se repite.
@@ -354,7 +355,7 @@ class CotizacionesRulesTest {
     fun theAuthorLineOnlyMentionsTheRevisionWhenThereIsOne() {
         assertEquals("Elaboró Ana López", CotizacionesRules.autoriaTexto(cotizacion()))
         assertEquals(
-            "Elaboró Ana López · revisión 3",
+            "Elaboró Ana López\nrevisión 3",
             CotizacionesRules.autoriaTexto(cotizacion(revision = 3)),
         )
         assertNull(CotizacionesRules.autoriaTexto(cotizacion(elaboro = null, revision = 1)))
@@ -362,7 +363,7 @@ class CotizacionesRulesTest {
 
     @Test
     fun theContextLineJoinsProjectAndSegment() {
-        assertEquals("CCTV planta 2 · Comercial", CotizacionesRules.contextoTexto(cotizacion()))
+        assertEquals("CCTV planta 2\nComercial", CotizacionesRules.contextoTexto(cotizacion()))
         assertEquals("Comercial", CotizacionesRules.contextoTexto(cotizacion(projectName = null)))
         assertNull(
             CotizacionesRules.contextoTexto(cotizacion(projectName = null, segmentoEtiqueta = null)),
@@ -535,9 +536,9 @@ class CotizacionesRulesTest {
         assertEquals(1_450_050L, CotizacionesRules.centavos(fila.total))
         assertEquals("$14,500.50", CotizacionesRules.montoTexto(fila))
         assertEquals(CotizacionesRules.Estado.ENVIADA, CotizacionesRules.estadoDe(fila))
-        assertEquals("Bachoco · Ing. Pérez", CotizacionesRules.clienteTexto(fila))
+        assertEquals("Bachoco\nIng. Pérez", CotizacionesRules.clienteTexto(fila))
         assertEquals(listOf("JA"), CotizacionesRules.siglas(fila))
-        assertEquals("Elaboró Ana López · revisión 2", CotizacionesRules.autoriaTexto(fila))
+        assertEquals("Elaboró Ana López\nrevisión 2", CotizacionesRules.autoriaTexto(fila))
         assertEquals("AN-0031", fila.actividades?.firstOrNull()?.anNumber)
     }
 

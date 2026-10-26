@@ -225,27 +225,27 @@ object CotizacionesRules {
 
     /**
      * A quién se le cotizó. La empresa manda sobre el contacto: en una lista se
-     * busca «Bachoco», no «Ing. Pérez».
+     * busca «Bachoco», no «Ing. Pérez». Cada uno va en su renglón.
      */
     fun clienteTexto(row: CotizacionResumenDto): String {
         val empresa = row.clienteEmpresa?.trim()?.ifEmpty { null }
         val persona = row.clienteNombre?.trim()?.ifEmpty { null }
         return when {
             empresa != null && persona != null && !empresa.equals(persona, ignoreCase = true) ->
-                "$empresa · $persona"
+                "$empresa\n$persona"
             empresa != null -> empresa
             persona != null -> persona
             else -> "Sin cliente"
         }
     }
 
-    /** Proyecto y segmento en una línea; ninguno es obligatorio. */
+    /** Proyecto y segmento, cada uno en su renglón; ninguno es obligatorio. */
     fun contextoTexto(row: CotizacionResumenDto): String? {
         val partes = listOfNotNull(
             row.projectName?.trim()?.ifEmpty { null },
             etiquetaSegmento(row),
         )
-        return partes.joinToString(" · ").ifEmpty { null }
+        return partes.joinToString("\n").ifEmpty { null }
     }
 
     /**
@@ -262,7 +262,7 @@ object CotizacionesRules {
         return listOfNotNull(row.elaboro?.siglas?.trim()?.ifEmpty { null })
     }
 
-    /** «Elaboró Ana López · revisión 2» — el folio en palabras, corto. */
+    /** «Elaboró Ana López» y, debajo, «revisión 2» si no es la primera. */
     fun autoriaTexto(row: CotizacionResumenDto): String? {
         val quien = row.elaboro?.nombre?.trim()?.ifEmpty { null }
         val revision = row.revision ?: 1
@@ -270,7 +270,7 @@ object CotizacionesRules {
             quien?.let { "Elaboró $it" },
             if (revision > 1) "revisión $revision" else null,
         )
-        return partes.joinToString(" · ").ifEmpty { null }
+        return partes.joinToString("\n").ifEmpty { null }
     }
 
     // ── Vigencia ─────────────────────────────────────────────────────────────

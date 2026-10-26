@@ -299,7 +299,8 @@ private fun TarjetaDeCotizacion(
                     CotizacionesRules.clienteTexto(cotizacion),
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = NxColors.Slate,
-                    maxLines = 2,
+                    // Empresa y contacto van en renglones aparte: una empresa larga no tapa al contacto.
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
                 CotizacionesRules.contextoTexto(cotizacion)?.let { contexto ->
@@ -307,7 +308,7 @@ private fun TarjetaDeCotizacion(
                         contexto,
                         style = MaterialTheme.typography.bodySmall,
                         color = NxColors.Muted,
-                        maxLines = 2,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -361,12 +362,14 @@ private fun TarjetaDeCotizacion(
         val siglas = CotizacionesRules.siglas(cotizacion)
         val autoria = CotizacionesRules.autoriaTexto(cotizacion)
         if (siglas.isNotEmpty() || autoria != null) {
+            // Quién la elaboró, la revisión y las siglas, cada uno en su renglón: las siglas
+            // no se pegan a «revisión 2».
             Text(
                 listOfNotNull(autoria, siglas.takeIf { it.isNotEmpty() }?.joinToString(" · "))
-                    .joinToString(" — "),
+                    .joinToString("\n"),
                 style = MaterialTheme.typography.labelSmall,
                 color = NxColors.Muted,
-                maxLines = 2,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }

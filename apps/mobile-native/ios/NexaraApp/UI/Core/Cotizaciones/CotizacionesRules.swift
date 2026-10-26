@@ -214,20 +214,20 @@ enum CotizacionesRules {
 
     // MARK: - Textos de la tarjeta
 
-    /// A quién se le cotizó. La empresa manda sobre el contacto.
+    /// A quién se le cotizó. La empresa manda sobre el contacto. Cada uno va en su renglón.
     static func clienteTexto(_ row: CotizacionResumen) -> String {
         let empresa = limpio(row.clienteEmpresa)
         let persona = limpio(row.clienteNombre)
         if let empresa, let persona, empresa.caseInsensitiveCompare(persona) != .orderedSame {
-            return "\(empresa) · \(persona)"
+            return "\(empresa)\n\(persona)"
         }
         return empresa ?? persona ?? "Sin cliente"
     }
 
-    /// Proyecto y segmento en una línea; ninguno es obligatorio.
+    /// Proyecto y segmento, cada uno en su renglón; ninguno es obligatorio.
     static func contextoTexto(_ row: CotizacionResumen) -> String? {
         let partes = [limpio(row.projectName), etiquetaSegmento(row)].compactMap { $0 }
-        return partes.isEmpty ? nil : partes.joined(separator: " · ")
+        return partes.isEmpty ? nil : partes.joined(separator: "\n")
     }
 
     /// Siglas de quienes intervinieron, sin repetir y en orden. Si nadie quedó
@@ -241,14 +241,14 @@ enum CotizacionesRules {
         return [limpio(row.elaboro?.siglas)].compactMap { $0 }
     }
 
-    /// «Elaboró Ana López · revisión 2» — el folio en palabras, corto.
+    /// «Elaboró Ana López» y, debajo, «revisión 2» si no es la primera.
     static func autoriaTexto(_ row: CotizacionResumen) -> String? {
         let revision = row.revision ?? 1
         let partes = [
             limpio(row.elaboro?.nombre).map { "Elaboró \($0)" },
             revision > 1 ? "revisión \(revision)" : nil,
         ].compactMap { $0 }
-        return partes.isEmpty ? nil : partes.joined(separator: " · ")
+        return partes.isEmpty ? nil : partes.joined(separator: "\n")
     }
 
     // MARK: - Vigencia
