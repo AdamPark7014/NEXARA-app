@@ -173,6 +173,11 @@ if [[ "$TRANSCRIPTOR_ON" == true ]]; then
   # si cambió su Dockerfile o WHISPER_MODEL; si no, la caché de Docker lo deja igual en segundos.
   echo "Starting transcriptor..."
   DOCKER_BUILDKIT=1 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build transcriptor
+  # Whisper `small` solo para dictado: sin --build (la imagen casi nunca cambia); si falta, se construye.
+  if grep -Eq '^TRANSCRIPTOR_DICTADO_URL=.+' "$ENV_FILE"; then
+    echo "Starting transcriptor-dictado..."
+    DOCKER_BUILDKIT=1 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d transcriptor-dictado
+  fi
 fi
 
 if [[ "$RUN_MIGRATE" == true ]]; then
