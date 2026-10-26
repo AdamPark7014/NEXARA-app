@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import {
   buildDayRoutePoints,
   googleMapsRouteUrl,
   pointCoords,
   type GpsCoordPoint,
 } from "@/lib/gps-map-links";
-import { staticRouteMapUrl } from "@/lib/static-map";
 import { useVisibleOnce } from "@/lib/use-visible-once";
+import { huecosDelRecorrido } from "@/lib/recorrido-huecos";
+import { duracionCorta } from "@/components/asistencias/formato";
+import RecorridoMapa from "@/components/asistencias/RecorridoMapa";
 
 type TrajectoryPoint = GpsCoordPoint & {
   id?: number;
@@ -30,14 +32,6 @@ type Props = {
   compact?: boolean;
 };
 
-/**
- * Cada cambio de URL de la imagen es una imagen nueva que alguien tiene que
- * pagar. Las pantallas de asistencia refrescan cada 15 s y la de GPS cada 30 s:
- * sin este freno, un turno de ocho horas con la pestaña abierta pedía cientos
- * de mapas del mismo recorrido. La imagen se renueva como mucho cada 5 minutos.
- */
-const MAP_REFRESH_MS = 5 * 60_000;
-
 function fmtTime(iso?: string): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
@@ -50,36 +44,19 @@ export default function GpsTrajectoryPreview({ trajectory, attendances, compact 
     [attendances, trajectory],
   );
   const routeUrl = useMemo(() => googleMapsRouteUrl(routePoints), [routePoints]);
-
-  // La URL ya viene redondeada a 5 decimales y muestreada: si el recorrido no
-  // cambió de verdad, sale la misma cadena y el navegador no vuelve a pedirla.
-  const candidateUrl = useMemo(
-    () => staticRouteMapUrl(routePoints, {
-      width: compact ? 480 : 640,
-      height: compact ? 200 : 280,
-    }),
-    [routePoints, compact],
-  );
-
-  const [shownUrl, setShownUrl] = useState("");
-  const lastChangeRef = useRef(0);
-
-  useEffect(() => {
-    if (!visible || !candidateUrl) return;
-    if (candidateUrl === shownUrl) return;
-
-    const elapsed = Date.now() - lastChangeRef.current;
-    if (!shownUrl || elapsed >= MAP_REFRESH_MS) {
-      lastChangeRef.current = Date.now();
-      setShownUrl(candidateUrl);
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      lastChangeRef.current = Date.now();
-      setShownUrl(candidateUrl);
-    }, MAP_REFRESH_MS - elapsed);
-    return () => window.clearTimeout(timer);
-  }, [visible, candidateUrl, shownUrl]);
+  // Tramos de más de 40 min sin un punto: se dicen en la lista, entre los puntos que los rodean.
+  const huecos = useMemo(() => {
+    const ultima = (tipo: string) =>
+      (attendances ?? []).filter((a) => a.type === tipo).map((a) => a.timestamp).sort().pop() ?? null;
+    const entrada = ultima("entrada");
+    const salida = ultima("salida");
+    return huecosDelRecorrido({
+      puntos: trajectory.map((p) => p.ultimaActualizacion),
+      entrada,
+      salida,
+      enJornada: Boolean(entrada && !salida),
+    });
+  }, [attendances, trajectory]);
 
   if (trajectory.length === 0 && routePoints.length === 0) {
     return (
@@ -91,36 +68,11 @@ export default function GpsTrajectoryPreview({ trajectory, attendances, compact 
 
   return (
     <div ref={containerRef} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {shownUrl ? (
-        <a href={routeUrl ?? shownUrl} target="_blank" rel="noopener noreferrer" style={{ display: "block" }}>
-          <img
-            src={shownUrl}
-            alt="Recorrido GPS del día"
-            loading="lazy"
-            decoding="async"
-            style={{
-              width: "100%",
-              maxHeight: compact ? 200 : 280,
-              objectFit: "cover",
-              borderRadius: 10,
-              border: "1px solid var(--border)",
-            }}
-          />
-        </a>
+      {/* El mapa se crea al acercarse a la vista: no pesa en la carga de la página. */}
+      {visible ? (
+        <RecorridoMapa puntos={routePoints} altura={compact ? 200 : 280} enlaceMaps={routeUrl} />
       ) : (
-        <div
-          style={{
-            height: compact ? 200 : 280,
-            borderRadius: 10,
-            border: "1px dashed var(--border)",
-            display: "grid",
-            placeItems: "center",
-            fontSize: 11.5,
-            color: "var(--text-tertiary)",
-          }}
-        >
-          {candidateUrl ? "Cargando mapa del recorrido…" : "Sin mapa del recorrido."}
-        </div>
+        <div style={{ height: compact ? 200 : 280 }} aria-hidden="true" />
       )}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11 }}>
@@ -136,14 +88,23 @@ export default function GpsTrajectoryPreview({ trajectory, attendances, compact 
 
       {!compact && trajectory.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 220, overflowY: "auto" }}>
-          {trajectory.map((pt, i) => {
+          {huecos.length &&
+          new Date(huecos[0]!.desde).getTime() < new Date(trajectory[0]?.ultimaActualizacion ?? 0).getTime() ? (
+            <HuecoFila desde={huecos[0]!.desde} hasta={huecos[0]!.hasta} minutos={huecos[0]!.minutos} />
+          ) : null}
+          {(() => {
+            const mostrados = new Set<string>();
+            return trajectory.map((pt, i) => {
             const c = pointCoords(pt);
             if (!c) return null;
             const isFirst = i === 0;
             const isLast = i === trajectory.length - 1;
+            const t = pt.ultimaActualizacion ? new Date(pt.ultimaActualizacion).getTime() : NaN;
+            const hueco = huecos.find((h) => !mostrados.has(h.desde) && new Date(h.desde).getTime() === t);
+            if (hueco) mostrados.add(hueco.desde);
             return (
+              <div key={pt.id ?? i} style={{ display: "contents" }}>
               <div
-                key={pt.id ?? i}
                 style={{
                   display: "flex",
                   gap: 8,
@@ -161,10 +122,34 @@ export default function GpsTrajectoryPreview({ trajectory, attendances, compact 
                 {isFirst ? <span style={{ fontSize: 9, fontWeight: 700, color: "#15803d" }}>INICIO</span> : null}
                 {isLast && !isFirst ? <span style={{ fontSize: 9, fontWeight: 700, color: "#1d4ed8" }}>FIN</span> : null}
               </div>
+              {hueco ? <HuecoFila desde={hueco.desde} hasta={hueco.hasta} minutos={hueco.minutos} /> : null}
+              </div>
             );
-          })}
+            });
+          })()}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** «Sin ubicación de 08:20 a 13:12 · 4 h 52»: un tramo sin puntos, en rojo suave. */
+function HuecoFila({ desde, hasta, minutos }: { desde: string; hasta: string | null; minutos: number }) {
+  return (
+    <div
+      role="note"
+      style={{
+        padding: "6px 8px",
+        fontSize: 11,
+        fontWeight: 600,
+        borderRadius: 6,
+        color: "var(--ui-danger-text, #b91c1c)",
+        background: "var(--ui-danger-bg, #fef2f2)",
+      }}
+    >
+      {hasta
+        ? `Sin ubicación de ${fmtTime(desde)} a ${fmtTime(hasta)} · ${duracionCorta(minutos * 60_000)}`
+        : `Sin ubicación desde las ${fmtTime(desde)} · ${duracionCorta(minutos * 60_000)}`}
     </div>
   );
 }

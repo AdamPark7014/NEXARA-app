@@ -1,5 +1,38 @@
 # RELEVO
 
+- **25-10 ~22:30 (claude-code) — GPS de jornada: un punto cada 30 min, entrada sin ubicación y mapa del recorrido.**
+  - Adam (23-10, detalle de Iván Camargo, id 10): «aparece rota la del gps… no muestra ubicación desde la una… debe
+    tomarse cada media hora… este usuario siempre dice que no muestra su ubicación al iniciar jornada».
+  - Causas (con datos): (1) 08:29 la rotación de contraseñas cerró su sesión: traefik registra cada `POST /api/gps`
+    con 401 cada ~5 min hasta que volvió a entrar a las 13:12 (`lastLoginAt`); el servicio de Android vivía, pero el
+    punto se tiraba. (2) Ráfaga: la checada guarda un punto y el servicio mandaba otro a los segundos, y con actividad
+    cada 5–10 min. (3) Sin actividad el pedido llevaba `setMinUpdateDistanceMeters(500)`: quien no se mueve no manda
+    nada (usuarios 15, 58). (4) Android 14 no deja reabrir un servicio de ubicación desde segundo plano: si el
+    fabricante lo cierra, se acaba hasta abrir Asistencias (probable en 40 y 57: horas sin puntos con actividad
+    abierta; desde el servidor no se puede confirmar). (5) Iván en octubre checó 11 veces sin ubicación (permiso negado o ubicación apagada); la app no la
+    pedía. (6) El mapa del recorrido era `/api/static-map` → Google Static Maps 403 «You must enable Billing» → 503.
+  - API: `gps/cadencia-jornada.ts` (hora del punto = la del teléfono con topes; no se guarda un punto a < 20 min de
+    otro; la geocerca y la entrada sí lo usan). `AttendanceService.asignarUbicacionPosterior` + columna
+    `Attendance.ubicacionPosteriorAt` (migración `20261025120000_ubicacion_posterior_entrada`, aditiva): entrada sin
+    coordenadas toma el primer punto de los 30 min siguientes, sigue a revisión con motivo «Ubicación tomada N min
+    después de checar (al checar: …)» y sitio/distancia medidos. `GpsLatidoCronService` (cada 5 min): jornada abierta
+    + consentimiento + 35 min sin punto → `PushDispatchService.sendGpsLatido` (Android: datos prioridad alta cada 30
+    min; iOS: recordatorio visible como mucho cada hora).
+  - Android 1.0.8 (18): `JornadaGpsReglas` (probadas en JVM) + servicio reescrito: alarma `setAndAllowWhileIdle` cada
+    30 min con lectura fina y reintento a 5 min (×3), GPS continuo a 30 min sin mínimo de distancia, latido FCM,
+    puntos que fallan (401) guardados con su hora y reenviados, avisos «Tu sesión se cerró» / «Toca para seguir
+    registrando tu ubicación» / «Tu ubicación está apagada», reanudación en `MainActivity.onStart`, receptor de
+    reinicio/actualización. Checada: `rememberAsegurarUbicacion` pide permiso y el diálogo del sistema para encender la
+    ubicación antes de la foto. Sin `ACCESS_BACKGROUND_LOCATION` (declaración de Play).
+  - iOS 1.0.1 (11): `ShiftGpsTracker` con lecturas sueltas al abrir y cada 30 min con la app abierta, pendientes con
+    su hora; aviso de permiso/ubicación apagada antes de checar (`UbicacionChecada.swift`); latido silencioso solo si
+    algún día hay «Siempre». **No se agregó «Siempre»** (2.5.4, 07-10): sin `NSLocationAlwaysAndWhenInUseUsageDescription`
+    iOS no deja medir con la app cerrada; el recordatorio del servidor pide abrirla. Decisión de Adam.
+  - Web: `RecorridoMapa` (MapLibre + OpenFreeMap) en vez de la imagen; línea de tiempo con «Entrada sin ubicación: …»,
+    «Ubicación tomada a las …» y huecos de > 40 min (`lib/recorrido-huecos.ts`).
+  - Pendiente: desplegar API/web con `--with-migrate` (lo hace el coordinador); subir AAB a Play (Adam); probar en el
+    teléfono de Iván. `ClientLocationPicker` también usa `/api/static-map` (sigue roto sin facturación).
+
 - **25-10 (claude-code) — «Asignar con IA» hasta arriba de Actividades, tarjeta completa y dictado en vivo.**
   - Adam: «que el asignador de IA esté hasta arriba en actividades… y ya esté completo» y «mucho más intuitivo el
     dictado como en FinanVoz… se tarda mucho, hay que interpretar».

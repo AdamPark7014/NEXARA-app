@@ -7,6 +7,8 @@ import { parseWorkDate, workDateColumn, workDayBounds } from '../common/time/wor
 import { ActivityGeofenceService } from '../activities/geofence/activity-geofence.service.js';
 import { puedeVerGpsDireccion } from '../attendance/asistencia-confiable.js';
 import { registrarEstadoUbicacion } from '../attendance/estado-ubicacion.js';
+import { AttendanceService } from '../attendance/attendance.service.js';
+import { ESPACIADO_MINIMO_MS, esPuntoReciente, hayPuntoCercano, horaDelPunto } from './cadencia-jornada.js';
 
 @Injectable()
 export class GpsService {
@@ -15,6 +17,7 @@ export class GpsService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly geofence?: ActivityGeofenceService,
+    @Optional() private readonly attendance?: AttendanceService,
   ) {}
 
   /**
@@ -104,15 +107,79 @@ export class GpsService {
       createGpsDto.usuarioId,
       resolvedCompanyId,
     );
+
+    // Hora del punto: la del teléfono al medirlo (un punto que esperó en la cola sin conexión o
+    // a que volviera la sesión queda en su lugar del recorrido), sin futuro ni más de un día.
+    const ahora = new Date();
+    const at = horaDelPunto(createGpsDto.ultimaActualizacion ?? null, ahora);
+    if (!at) {
+      return { skipped: true as const, reason: 'punto de hace más de un día' };
+    }
+    const reciente = esPuntoReciente(at, ahora);
+    const mock = typeof createGpsDto.mockLocation === 'boolean' ? createGpsDto.mockLocation : null;
+
+    // Lo que hace un punto aunque no se guarde: una entrada sin ubicación lo toma y, si es «de
+    // ahora», prueba que la ubicación está encendida y lo mide la geocerca de la actividad.
+    const efectos = () => {
+      // Ubicación simulada no completa una checada (la checada simulada se rechaza). Vale también
+      // un punto que llega tarde (cola sin conexión): la ventana se mide contra la hora de checar.
+      if (mock !== true) {
+        void Promise.resolve(
+          this.attendance?.asignarUbicacionPosterior({
+            userId: createGpsDto.usuarioId!,
+            companyId: resolvedCompanyId,
+            latitude: punto.lat,
+            longitude: punto.lng,
+            at,
+          }),
+        ).catch(() => undefined);
+      }
+      if (!reciente) return;
+      // Un punto recibido prueba que la ubicación ya está encendida: cierra un tramo «apagada».
+      void registrarEstadoUbicacion(this.prisma, {
+        userId: createGpsDto.usuarioId!,
+        companyId: resolvedCompanyId,
+        estado: 'ENCENDIDA',
+        fuente: 'GPS',
+      });
+      // Geocerca de actividades: se mide sin hacer esperar al teléfono.
+      void Promise.resolve(
+        this.geofence?.evaluarPunto({
+          userId: createGpsDto.usuarioId!,
+          latitude: punto.lat,
+          longitude: punto.lng,
+          actividadId: actividadId ?? null,
+        }),
+      ).catch(() => undefined);
+    };
+
+    // Un punto cada 30 min (Adam, 23-10): si ya hay uno guardado a menos de 20 min, este no se
+    // guarda. Corta las ráfagas de la checada + primer punto y de las apps que mandaban cada 5 min.
+    const cercanos = await this.prisma['locationTracking'].findMany({
+      where: {
+        usuarioId: createGpsDto.usuarioId,
+        ultimaActualizacion: {
+          gt: new Date(at.getTime() - ESPACIADO_MINIMO_MS),
+          lt: new Date(at.getTime() + ESPACIADO_MINIMO_MS),
+        },
+      },
+      select: { ultimaActualizacion: true },
+      take: 5,
+    });
+    if (hayPuntoCercano(at, cercanos.map((c: { ultimaActualizacion: Date }) => c.ultimaActualizacion))) {
+      efectos();
+      return { skipped: true as const, reason: 'ya hay un punto en los últimos 20 min' };
+    }
+
     const data: Prisma.LocationTrackingUncheckedCreateInput = {
       usuarioId: createGpsDto.usuarioId,
       latitud: punto.lat,
       longitud: punto.lng,
       velocidadKmh: createGpsDto.velocidadKmh ?? null,
       estaActivo: createGpsDto.estaActivo ?? true,
-      ultimaActualizacion: createGpsDto.ultimaActualizacion,
+      ultimaActualizacion: at,
       // null cuando la app no lo informa: «no lo sé» y «no era simulada» no son lo mismo.
-      mockLocation: typeof createGpsDto.mockLocation === 'boolean' ? createGpsDto.mockLocation : null,
+      mockLocation: mock,
       companyId: resolvedCompanyId,
       ...(actividadId ? { actividadId } : {}),
     };
@@ -131,22 +198,7 @@ export class GpsService {
       }
       throw err;
     }
-    // Un punto recibido prueba que la ubicación ya está encendida: cierra un tramo «apagada».
-    void registrarEstadoUbicacion(this.prisma, {
-      userId: createGpsDto.usuarioId,
-      companyId: resolvedCompanyId,
-      estado: 'ENCENDIDA',
-      fuente: 'GPS',
-    });
-    // Geocerca de actividades: se mide sin hacer esperar al teléfono.
-    void Promise.resolve(
-      this.geofence?.evaluarPunto({
-        userId: createGpsDto.usuarioId,
-        latitude: punto.lat,
-        longitude: punto.lng,
-        actividadId: actividadId ?? null,
-      }),
-    ).catch(() => undefined);
+    efectos();
     return creado;
   }
 

@@ -196,7 +196,9 @@ final class ConsoleRepository {
         lng: Double,
         speedKmh: Double? = nil,
         actividadId: Int? = nil,
-        mockLocation: Bool? = nil
+        mockLocation: Bool? = nil,
+        /// Hora en que se midió (un punto que se reenvía al volver la sesión); nil = ahora.
+        medidoEn: Date? = nil
     ) async throws {
         struct Body: Encodable {
             let latitud: Double
@@ -209,7 +211,7 @@ final class ConsoleRepository {
         }
         _ = try await api.postJSON("gps", body: Body(
             latitud: lat, longitud: lng, velocidadKmh: speedKmh, estaActivo: true,
-            ultimaActualizacion: ConsoleHelpers.isoNow(),
+            ultimaActualizacion: medidoEn.map { ISO8601DateFormatter().string(from: $0) } ?? ConsoleHelpers.isoNow(),
             actividadId: actividadId,
             mockLocation: mockLocation
         ))

@@ -17,6 +17,14 @@
     -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!--
+      GPS de jornada cada 30 min: la alarma despierta el teléfono un momento para medir y
+      enviar el punto. Tras reiniciar o actualizar la app con la jornada abierta solo se muestra
+      el aviso «Toca para seguir registrando tu ubicación» (Android no deja reabrir el servicio
+      de ubicación desde segundo plano sin «todo el tiempo»).
+    -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -57,6 +65,21 @@
             android:exported="false"
             android:stopWithTask="false"
             android:foregroundServiceType="location" />
+
+        <!-- Alarma de cada 30 min del GPS de jornada. -->
+        <receiver
+            android:name=".util.JornadaGpsAlarmReceiver"
+            android:exported="false" />
+
+        <!-- Reinicio o actualización con la jornada abierta: aviso para reanudar el GPS. -->
+        <receiver
+            android:name=".util.JornadaGpsBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Botones de las notificaciones: responder y marcar como leído sin abrir la app. -->
         <receiver

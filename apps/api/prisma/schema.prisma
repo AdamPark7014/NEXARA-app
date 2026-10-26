@@ -1977,6 +1977,10 @@ model Attendance {
   registradaPorId  Int?
   motivoRegistro   String?
   registradaPor    User?        @relation("AttendanceRegistradaPor", fields: [registradaPorId], references: [id], onDelete: SetNull)
+  /// Solo entradas que llegaron sin coordenadas: hora del primer punto del GPS de jornada (dentro
+  /// de los 30 min siguientes) que se les asignó como ubicación. null = la ubicación es la de la
+  /// checada (o no hay). Ver `attendance/ubicacion-posterior.ts`.
+  ubicacionPosteriorAt DateTime?
   companyId      Int
   user           User           @relation(fields: [userId], references: [id])
   company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)

@@ -414,7 +414,7 @@ final class AttendanceVM: ObservableObject {
                 )
                 let gps: String
                 if type == "entrada" {
-                    gps = await encenderGps()
+                    gps = await encenderGps(checadaConUbicacion: coords != nil)
                 } else {
                     gps = await apagarGps()
                 }
@@ -445,12 +445,14 @@ final class AttendanceVM: ObservableObject {
     }
 
     /// Entrada: consentimiento en el API + seguimiento. Sin permiso no se enciende nada.
-    private func encenderGps() async -> String {
+    /// Si la checada llevó ubicación, el servidor ya guardó ese punto: el siguiente sale a los 30 min.
+    private func encenderGps(checadaConUbicacion: Bool) async -> String {
         let tracker = ShiftGpsTracker.shared
         guard tracker.canTrack else { return " · sin permiso de ubicación: no se comparte el trayecto" }
         _ = try? await AsistenciasRepository.shared.setGpsConsent(true)
+        if checadaConUbicacion { tracker.marcarPuntoEnviado() }
         tracker.start()
-        return " · compartiendo ubicación de jornada"
+        return " · se toma tu ubicación cada 30 min (con la app abierta)"
     }
 
     /// Salida (o «Dejar de compartir»): se apagan el seguimiento y el consentimiento.
@@ -476,6 +478,9 @@ struct AttendanceView: View {
     @ObservedObject private var pedida = AsistenciasPestanaPedida.shared
     @State private var photoType: String?
     @State private var photo: CorePhotoItem?
+    /// Checada que espera a que se resuelva el aviso de ubicación (permiso o ubicación apagada).
+    @State private var tipoPendiente: String?
+    @State private var avisoUbicacion: AvisoUbicacionChecada?
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -545,6 +550,11 @@ struct AttendanceView: View {
         .fullScreenCover(item: $photo) { item in
             CorePhotoViewer(item: item)
         }
+        .avisoUbicacionChecada($avisoUbicacion) {
+            let tipo = tipoPendiente
+            tipoPendiente = nil
+            photoType = tipo
+        }
         .alert(
             "No se pudo checar",
             isPresented: Binding(
@@ -556,6 +566,18 @@ struct AttendanceView: View {
             Button("Entendido", role: .cancel) { vm.clearBloqueo() }
         } message: { mensaje in
             Text(mensaje + "\n\n" + ChecadaRechazo.ayuda(mensaje))
+        }
+    }
+
+    /// Antes de la foto de la checada: permiso y ubicación encendida (ver `AvisoUbicacionChecada`).
+    private func marcar(_ tipo: String) {
+        Task { @MainActor in
+            if let aviso = await AvisoUbicacionChecada.revisar() {
+                tipoPendiente = tipo
+                avisoUbicacion = aviso
+            } else {
+                photoType = tipo
+            }
         }
     }
 
@@ -576,7 +598,7 @@ struct AttendanceView: View {
             ScrollView {
                 AsistenciasEquipoTab(
                     vm: vm,
-                    onMark: { photoType = $0 },
+                    onMark: { marcar($0) },
                     onPhoto: { photo = $0 }
                 )
                 .padding(16)

@@ -67,6 +67,7 @@ import {
   type ValidacionChecada,
 } from './asistencia-confiable.js';
 import { estadoPorFalla, registrarEstadoUbicacion, tramosSinUbicacionDe } from './estado-ubicacion.js';
+import { minutosDespues, motivoUbicacionPosterior, puntoSirveParaEntrada } from './ubicacion-posterior.js';
 
 @Injectable()
 export class AttendanceService {
@@ -320,6 +321,7 @@ export class AttendanceService {
         offline: true,
         cierreAutomatico: true,
         accuracyM: true,
+        ubicacionPosteriorAt: true,
       },
     });
     const correcciones = await this.correccionesDe(filas.map((f) => f.id));
@@ -341,6 +343,7 @@ export class AttendanceService {
       uniformeOk?: boolean | null;
       uniformeRevisadoPorId?: number | null;
       uniformeRevisadoAt?: Date | null;
+      ubicacionPosteriorAt?: Date | null;
     },
     correcciones?: Map<number, Array<Record<string, unknown>>>,
   ) {
@@ -358,6 +361,8 @@ export class AttendanceService {
       uniformeOk: att.uniformeOk ?? null,
       uniformeRevisadoPorId: att.uniformeRevisadoPorId ?? null,
       uniformeRevisadoAt: att.uniformeRevisadoAt ? att.uniformeRevisadoAt.toISOString() : null,
+      // Entrada sin ubicación completada con el primer punto del GPS de jornada: hora de ese punto.
+      ubicacionPosteriorAt: att.ubicacionPosteriorAt ? att.ubicacionPosteriorAt.toISOString() : null,
     };
   }
 
@@ -860,6 +865,75 @@ export class AttendanceService {
    * modelo) queda sólo la oficina: es preferible no acusar a nadie de estar
    * fuera de sitio por un fallo de lectura.
    */
+  /**
+   * Entrada que llegó sin coordenadas: se le asigna el primer punto del GPS de jornada que llegue
+   * en los 30 min siguientes, marcado como tomado después (`ubicacionPosteriorAt`), y se miden
+   * con él el sitio y la distancia. Ver `ubicacion-posterior.ts`.
+   *
+   * La llama `GpsService.create` con cada punto real y reciente; casi siempre no hay nada que
+   * hacer (la entrada ya tiene ubicación o ya pasó la ventana) y sale con una consulta.
+   * Nunca lanza: un fallo aquí no puede tumbar el envío del punto.
+   */
+  async asignarUbicacionPosterior(params: {
+    userId: number;
+    companyId: number;
+    latitude: number;
+    longitude: number;
+    at: Date;
+  }): Promise<boolean> {
+    try {
+      const coords = this.realCoords(params.latitude, params.longitude);
+      if (!coords) return false;
+      const entrada = await this.prisma.attendance.findFirst({
+        where: {
+          userId: params.userId,
+          type: 'entrada',
+          workDate: workDateColumn(params.at),
+          entryLatitude: null,
+          ubicacionPosteriorAt: null,
+          ...companyWhere(params.companyId),
+        },
+        orderBy: { timestamp: 'desc' },
+        select: { id: true, timestamp: true, motivoValidacion: true, validacion: true, accuracyM: true },
+      });
+      if (!entrada || !puntoSirveParaEntrada(entrada.timestamp, params.at)) return false;
+
+      const ubicacion = evaluarUbicacion({
+        coords,
+        accuracyM: null,
+        sitios: await this.sitiosPermitidos(params.userId, entrada.timestamp, params.companyId),
+      });
+      const motivo = motivoUbicacionPosterior(
+        minutosDespues(entrada.timestamp, params.at),
+        entrada.motivoValidacion,
+      );
+      // updateMany con las mismas condiciones: si dos puntos llegan juntos, solo uno la llena.
+      const { count } = await this.prisma.attendance.updateMany({
+        where: { id: entrada.id, entryLatitude: null, ubicacionPosteriorAt: null },
+        data: {
+          entryLatitude: coords.latitude,
+          entryLongitude: coords.longitude,
+          ubicacionPosteriorAt: params.at,
+          // Sigue a revisión: el punto es de después, no del momento de checar.
+          validacion: combinarValidacion((entrada.validacion as ValidacionChecada) || 'OK', 'REVISAR'),
+          motivoValidacion: motivo,
+          fueraDeSitio: ubicacion.fueraDeSitio,
+          distanciaSitioM: ubicacion.distanciaSitioM,
+          sitioNombre: ubicacion.sitioNombre,
+        },
+      });
+      if (count > 0) {
+        this.logger.log(
+          `Entrada ${entrada.id} (userId=${params.userId}) sin ubicación: se le asignó el punto de ${params.at.toISOString()}`,
+        );
+      }
+      return count > 0;
+    } catch (err) {
+      this.logger.warn(`No se pudo asignar la ubicación posterior de la entrada: ${(err as Error).message}`);
+      return false;
+    }
+  }
+
   private async sitiosPermitidos(userId: number, at: Date, tenantId: number): Promise<SitioPermitido[]> {
     const sitios: SitioPermitido[] = [sitioOficina()];
     const prisma = this.prisma as any;

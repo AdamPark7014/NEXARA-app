@@ -138,6 +138,78 @@ export class PushDispatchService {
     return { data, priority, collapseKey, kind, threadId };
   }
 
+  /**
+   * Latido del GPS de jornada (`gps/gps-latido.cron.service.ts`): la jornada sigue abierta y no ha
+   * llegado un punto en más de media hora.
+   *
+   * - Android: mensaje solo de datos y prioridad alta (`event: gps-latido`). FCM lo entrega aunque
+   *   el teléfono esté en reposo; la app toma un punto sin mostrar nada, o —si Android le cerró el
+   *   GPS de jornada— avisa «Toca para seguir registrando tu ubicación».
+   * - iOS: con `recordatorio`, una notificación visible que reemplaza a la anterior (sin permiso
+   *   «Siempre», iOS no deja medir con la app cerrada: hay que abrirla). Sin `recordatorio`, un
+   *   push silencioso que la app usa solo si tuviera ese permiso.
+   *
+   * Solo FCM: un latido no tiene sentido en el navegador.
+   */
+  async sendGpsLatido(
+    userId: number,
+    recordatorio?: { title: string; body: string } | null,
+  ): Promise<number> {
+    if (!this.tryInitFirebase()) return 0;
+    const rows = await this.prisma.userPushEndpoint.findMany({
+      where: { userId, fcmToken: { not: null } },
+      select: { id: true, fcmToken: true, webPushEndpoint: true },
+    });
+    const data: Record<string, string> = {
+      event: 'gps-latido',
+      kind: 'gps',
+      title: recordatorio?.title ?? '',
+      body: recordatorio?.body ?? '',
+      sent_at: new Date().toISOString(),
+    };
+    let enviados = 0;
+    for (const row of rows) {
+      if (!row.fcmToken) continue;
+      try {
+        await admin.messaging().send({
+          token: row.fcmToken,
+          data,
+          android: { priority: 'high', ttl: 15 * 60_000, collapseKey: 'gps-latido' },
+          apns: recordatorio
+            ? {
+                headers: { 'apns-priority': '10', 'apns-push-type': 'alert', 'apns-collapse-id': 'gps-latido' },
+                payload: {
+                  aps: {
+                    alert: { title: recordatorio.title, body: recordatorio.body },
+                    sound: 'default',
+                    threadId: 'gps-jornada',
+                  },
+                  data,
+                },
+              }
+            : {
+                headers: { 'apns-priority': '5', 'apns-push-type': 'background' },
+                payload: { aps: { contentAvailable: true }, data },
+              },
+        });
+        enviados += 1;
+      } catch (e) {
+        const code = (e as { code?: string } | null)?.code || '';
+        const tokenTail = row.fcmToken.length > 8 ? row.fcmToken.slice(-8) : row.fcmToken;
+        if (DEAD_FCM_TOKEN_CODES.has(code)) {
+          await (row.webPushEndpoint
+            ? this.prisma.userPushEndpoint.update({ where: { id: row.id }, data: { fcmToken: null } })
+            : this.prisma.userPushEndpoint.delete({ where: { id: row.id } })
+          ).catch(() => undefined);
+          this.logger.log(`FCM token …${tokenTail} ya no existe (${code}); eliminado`);
+        } else {
+          this.logger.warn(`Latido GPS: FCM falló token …${tokenTail}: ${e instanceof Error ? e.message : e}`);
+        }
+      }
+    }
+    return enviados;
+  }
+
   async sendToUser(userId: number, payload: PushPayload): Promise<void> {
     const rows = await this.prisma.userPushEndpoint.findMany({ where: { userId } });
     const { data, collapseKey, kind, threadId } = this.buildData(userId, payload);

@@ -321,13 +321,15 @@ class ConsoleRepository(context: Context) {
         speedKmh: Double?,
         activityId: Long? = null,
         mockLocation: Boolean? = null,
+        /** Hora en que se midió (un punto que se reenvía tras volver la sesión); null = ahora. */
+        enMs: Long? = null,
     ) =
         api.postGpsLocation(
             mx.nexara.mobile.nativeapp.data.api.PostGpsLocationRequest(
                 latitud = lat,
                 longitud = lng,
                 velocidadKmh = speedKmh,
-                ultimaActualizacion = java.time.Instant.now().toString(),
+                ultimaActualizacion = (enMs?.let { java.time.Instant.ofEpochMilli(it) } ?: java.time.Instant.now()).toString(),
                 actividadId = activityId,
                 mockLocation = mockLocation,
             )

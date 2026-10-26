@@ -37,6 +37,12 @@
   color: var(--ui-fg-3);
 }
 
+/* Entrada sin ubicación y tramos sin puntos: se tienen que ver, no perderse en gris. */
+.sinUbicacion {
+  color: var(--ui-danger-text);
+  font-weight: 600;
+}
+
 .vacio {
   margin: 0;
   font-size: var(--ui-text-sm);

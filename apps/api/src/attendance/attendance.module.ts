@@ -21,5 +21,7 @@ import { ExcelModule } from '../common/excel.module.js';
     AttendanceJustificationsService,
     AttendanceCierreCronService,
   ],
+  // El GPS de jornada completa con su primer punto la entrada que llegó sin ubicación.
+  exports: [AttendanceService],
 })
 export class AttendanceModule {}
