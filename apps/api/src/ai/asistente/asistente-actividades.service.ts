@@ -17,6 +17,14 @@ export type RespuestaAsistente = {
   propuestas: PropuestaActividad[];
   aclaracion: string | null;
   uso: UsoClaude;
+  /**
+   * Clientes y proyectos activos para que la tarjeta pueda cambiar el tipo (un servicio pide
+   * cliente; una obra, proyecto) sin otra llamada. No van a la IA: no cuestan tokens.
+   */
+  opciones: {
+    clientes: Array<{ id: number; nombre: string }>;
+    proyectos: Array<{ id: number; nombre: string; clientId: number }>;
+  };
 };
 
 /** Interpreta instrucciones en lenguaje natural y propone actividades (no crea nada). */
@@ -56,6 +64,12 @@ export class AsistenteActividadesService {
       propuestas: acciones.map((a) => construirPropuesta(a, catalogos, { creadoPorId: Number(user.id), ahora, instruccion })),
       aclaracion: datos?.aclaracion ?? (acciones.length ? null : 'No encontré ninguna actividad en el texto. ¿Qué hay que hacer y quién?'),
       uso,
+      opciones: {
+        clientes: catalogos.clientes
+          .map((c) => ({ id: c.id, nombre: c.name }))
+          .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
+        proyectos: catalogos.proyectos.map((p) => ({ id: p.id, nombre: p.title, clientId: p.clientId })),
+      },
     };
   }
 

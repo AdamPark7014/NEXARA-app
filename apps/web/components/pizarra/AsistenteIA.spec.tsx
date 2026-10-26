@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PropuestaActividad } from "@/lib/asistente-ia-api";
@@ -17,6 +17,8 @@ vi.mock("@/components/UserContext", () => ({
 }));
 // El micrófono se prueba aparte; aquí solo estorba.
 vi.mock("@/components/DictadoBoton", () => ({ default: () => null }));
+// La onda dibuja en un canvas, que jsdom no tiene.
+vi.mock("@/app/(panels)/erp/reuniones/OndaVoz", () => ({ default: () => null }));
 vi.mock("@/lib/asistente-ia-api", async (original) => ({ ...(await original<typeof import("@/lib/asistente-ia-api")>()), ...api }));
 
 import AsistenteIA from "./AsistenteIA";
@@ -95,12 +97,20 @@ describe("AsistenteIA", () => {
     api.estadoAsistente.mockResolvedValue({ disponible: true, modelo: "claude-haiku-5-5" });
     api.personasAsignables.mockResolvedValue([
       { id: 8, nombre: "Carolina Pérez", email: "soporte@nexara.com.mx" },
-      { id: 7, nombre: "Jorge Méndez", email: "compras@ejemplo.mx" },
+      // Del equipo de soporte: recibe tarea, proyecto y servicio.
+      { id: 7, nombre: "Jorge Méndez", email: "alejandro.gonzalez@nexara.com.mx" },
     ]);
     api.interpretar.mockResolvedValue({
       propuestas: [servicio, compra],
       aclaracion: null,
       uso: { modelo: "claude-haiku-5-5", tokensEntrada: 4000, tokensSalida: 300, usdAprox: 0.0003 },
+      opciones: {
+        clientes: [
+          { id: 1, nombre: "Grupo Tox" },
+          { id: 2, nombre: "Banorte" },
+        ],
+        proyectos: [{ id: 30, nombre: "CCTV Nave 2", clientId: 1 }],
+      },
     });
     let id = 100;
     api.crearActividad.mockImplementation(async () => ({ id: ++id, anNumber: `AN-0${id}` }));
@@ -111,12 +121,12 @@ describe("AsistenteIA", () => {
     const usuario = userEvent.setup();
     render(<AsistenteIA />);
     await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Carolina revise el DVR y Jorge compre conectores");
-    await usuario.click(screen.getByRole("button", { name: "Interpretar" }));
+    await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
 
     // Lo que leerá quien la hace y la agenda que se guardará, editables antes de crear.
     expect(await screen.findByText("El DVR de la caja no graba desde ayer.")).toBeInTheDocument();
     expect(screen.getAllByLabelText(/^Día|^Del/)[0]).toHaveValue("2026-10-24");
-    expect(screen.getAllByLabelText(/Al \(último día/)[1]).toHaveValue("2026-10-23");
+    expect(screen.getAllByLabelText(/^Último día/)[1]).toHaveValue("2026-10-23");
     // A la compra le falta la duración: no se puede crear hasta elegirla.
     expect(screen.getByText(/No lo dijiste: elige cuánto tarda/)).toBeInTheDocument();
     expect(screen.getByText("Indica cuánto tiempo toma.")).toBeInTheDocument();
@@ -139,7 +149,7 @@ describe("AsistenteIA", () => {
     const usuario = userEvent.setup();
     render(<AsistenteIA />);
     await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Carolina revise el DVR");
-    await usuario.click(screen.getByRole("button", { name: "Interpretar" }));
+    await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
     await usuario.click(await screen.findByRole("button", { name: "Editar texto" }));
     const titulo = screen.getByLabelText(/^Título/);
     await usuario.clear(titulo);
@@ -162,9 +172,75 @@ describe("AsistenteIA", () => {
     render(<AsistenteIA />);
     const caja = await screen.findByLabelText("Instrucción para la IA");
     await usuario.type(caja, "que Carolina revise el DVR");
-    await usuario.click(screen.getByRole("button", { name: "Interpretar" }));
+    await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/tardó demasiado.*Tu instrucción sigue aquí/);
     expect(caja).toHaveValue("que Carolina revise el DVR");
-    expect(screen.getByRole("button", { name: "Interpretar" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Preparar actividades/ })).toBeEnabled();
+  });
+
+  it("se puede cambiar el tipo: una compra pasa a servicio con su cliente y su tipo de servicio", async () => {
+    const usuario = userEvent.setup();
+    render(<AsistenteIA />);
+    await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Jorge compre conectores");
+    await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
+    expect(await screen.findByText(/Esto entendí · 2 actividades/)).toBeInTheDocument();
+
+    const tipo = screen.getAllByLabelText(/^Tipo$|^Tipo \*/)[1];
+    // Solo los tipos que esa persona recibe (las reglas de «Asignar»).
+    expect([...(tipo as HTMLSelectElement).options].map((o) => o.value)).toEqual(["tarea", "servicio", "proyecto"]);
+    await usuario.selectOptions(tipo, "servicio");
+    await usuario.selectOptions(screen.getAllByLabelText(/^Tipo de servicio/)[1], "CORRECTIVO");
+    // Un servicio pide cliente: se elige de la lista de la empresa.
+    expect(screen.getByText(/Un servicio necesita un cliente registrado/)).toBeInTheDocument();
+    await usuario.selectOptions(screen.getAllByLabelText(/^Cliente/)[1], "2");
+    await usuario.selectOptions(screen.getAllByLabelText(/Cuánto tiempo toma/)[1], "60");
+    await usuario.click(screen.getAllByRole("button", { name: "Confirmar y asignar" })[1]);
+
+    await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
+    expect(api.crearActividad.mock.calls[0][1]).toMatchObject({
+      coreKind: "servicio",
+      activityType: "INTERNAL",
+      ticketType: "CORRECTIVO",
+      clientId: 2,
+      tiempoEstimadoMin: 60,
+    });
+    expect(api.crearActividad.mock.calls[0][1].ticketTypeCustom).toBeUndefined();
+  });
+
+  it("al dictar, el texto sale en vivo y al terminar se prepara solo (una llamada)", async () => {
+    class Falso {
+      static ultimo: Falso | null = null;
+      lang = "";
+      continuous = false;
+      interimResults = false;
+      onresult: ((e: { resultIndex: number; results: unknown[] }) => void) | null = null;
+      onerror: ((e: { error: string }) => void) | null = null;
+      onend: (() => void) | null = null;
+      start = vi.fn();
+      stop = vi.fn(() => queueMicrotask(() => this.onend?.()));
+      abort = vi.fn(() => queueMicrotask(() => this.onend?.()));
+      constructor() {
+        Falso.ultimo = this;
+      }
+    }
+    (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition = Falso;
+    try {
+      const usuario = userEvent.setup();
+      render(<AsistenteIA />);
+      await usuario.click(await screen.findByRole("button", { name: "Dictar la instrucción" }));
+      expect(screen.getByText(/Te escucho/)).toBeInTheDocument();
+      act(() =>
+        Falso.ultimo!.onresult?.({ resultIndex: 0, results: [{ isFinal: false, 0: { transcript: "que Carolina revise el DVR" } }] }),
+      );
+      expect(screen.getByLabelText("Instrucción para la IA")).toHaveValue("que Carolina revise el DVR");
+      expect(api.interpretar).not.toHaveBeenCalled();
+      await usuario.click(screen.getByRole("button", { name: "Terminar de dictar" }));
+      await waitFor(() => expect(api.interpretar).toHaveBeenCalledTimes(1));
+      expect(api.interpretar).toHaveBeenCalledWith("tok", "que Carolina revise el DVR");
+      expect(await screen.findByText(/Esto entendí/)).toBeInTheDocument();
+      expect(screen.getByText("El dictado usa el reconocimiento de voz de tu navegador.")).toBeInTheDocument();
+    } finally {
+      delete (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
+    }
   });
 });

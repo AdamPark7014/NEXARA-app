@@ -1,5 +1,29 @@
 # RELEVO
 
+- **25-10 (claude-code) — «Asignar con IA» hasta arriba de Actividades, tarjeta completa y dictado en vivo.**
+  - Adam: «que el asignador de IA esté hasta arriba en actividades… y ya esté completo» y «mucho más intuitivo el
+    dictado como en FinanVoz… se tarda mucho, hay que interpretar».
+  - `ModulePage` tiene el slot `lead` (bajo el encabezado, antes de los KPI; `.lead:empty` no deja hueco). La pizarra
+    pone ahí `AsistenteIA` en todas las pestañas (el componente no pinta nada si no es CEO/superadmin o sin IA).
+  - Dictado (`lib/use-dictado-vivo.ts`): micrófono grande; reconocimiento del navegador es-MX con resultados
+    intermedios, texto en vivo en la caja y onda (`OndaVoz`); se detiene a los 1.8 s de silencio o con un toque y
+    entonces interpreta solo, una llamada por dictado; sin voz en 8 s avisa; permiso negado con instrucciones.
+    Sin reconocimiento (Firefox): `DictadoBoton` (whisper) de respaldo y también interpreta solo. Lo escrito:
+    «Preparar actividades» (Ctrl+Enter). Línea de privacidad. `DictadoBoton` del resto (actas) se queda con
+    whisper a propósito (decisión «sin proveedores»; whisper va a ~1.2× tiempo real con el servidor cargado).
+  - Tarjeta: tipo y subtipo editables (mismo mapeo que el API: coreKind, activityType, ticketType,
+    ticketTypeCustom), solo los tipos que esa persona recibe; cliente de toda la empresa y proyecto (el API
+    devuelve `opciones` con clientes y proyectos, sin pasar por la IA); obra/proyecto sin fechas toma el periodo de
+    la etapa vigente (`obtenerProgramacion` + `periodoPorOmision`, con `projectMilestoneId`); bloqueos y encargo
+    con el tipo efectivo; «Esto entendí · N actividades · listo en X s».
+  - Capturas a 1536 px (vista Vite temporal con API y voz simuladas, ya borrada; DOM sin desbordes ni solapes):
+    `.ai/eval-ia/capturas-asignar-con-ia-2026-10-25/` (inicio, escuchando con texto en vivo, entendiendo,
+    tarjetas, cambio de tipo, oscuro, teléfono 390). Medido en la vista: 1.83 s de silencio hasta «Entendiendo»
+    y ~0.5 s de la respuesta a las tarjetas; real ≈ 1.8 s + IA (p50 1.8 s) + 0.5 s ≈ 4 s; con un toque ≈ 2.5 s.
+  - Pruebas: vitest de pizarra, dictado, ModulePage y lib (104), jest del asistente (24), tipos web y API. El
+    editor de cotizaciones se pasó de tiempo con la máquina cargada (no usa nada de esto). Sin desplegar: lo
+    despliega el coordinador al final. Cambio visual notable: que Adam vea las capturas antes del despliegue.
+
 - **26-10 ~04:00 UTC (claude-code, R-1) — Transcriptor: large-v3-turbo-q8_0 con tope de 3 CPU (medido otra vez).**
   - Condición del coordinador: límite de CPU que deje al menos un núcleo a los demás y, con ese límite, ≤ ~0.8 ×
     tiempo real con voz de sala. Banco repetido con `--cpus 3` y 3 hilos (4 vCPU = 2 núcleos con SMT):

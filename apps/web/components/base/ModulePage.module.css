@@ -7,8 +7,14 @@
   min-width: 0;
 }
 
-.before {
+.before,
+.lead {
   margin-bottom: var(--ui-page-gap, 24px);
+}
+
+/* Un bloque que no pinta nada (p. ej. sin permiso) no deja hueco. */
+.lead:empty {
+  display: none;
 }
 
 .before > * {
