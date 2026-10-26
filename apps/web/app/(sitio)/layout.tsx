@@ -16,8 +16,8 @@ const display = Inter_Tight({
 });
 
 /**
- * Sitio público 2026 (aprobado por el dueño el 26-10-2026): portada, Servicios, Nosotros, Proyectos y Contacto.
- * Blog, Soluciones, Cobertura y Legal siguen en `(public)` con el layout anterior hasta rehacerlos.
+ * Sitio público 2026 (aprobado por el dueño el 26-10-2026): todas las páginas públicas, de la portada a Soluciones,
+ * Cobertura, Blog, Preguntas, Legal y la firma de cotizaciones, con el mismo encabezado, pie y tipografía.
  */
 export default function SitioLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

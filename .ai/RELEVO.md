@@ -1,6 +1,30 @@
 # RELEVO
 
-- **26-10 ~13:45 (claude-code) — Sitio 2026, ronda de mejoras tipo Apple/Stripe/Linear (aún sin desplegar al escribir esto).**
+- **26-10 ~14:20 (claude-code) — Todas las subrutas públicas pasan al sitio 2026; `(public)` ya no existe.**
+  - Se movieron a `app/(sitio)`: `soluciones/[industry]` y `[industry]/[service]`, `cobertura/[city]` y
+    `[city]/[service]`, `blog` y `blog/[slug]`, `qa`, `Nexara-Ingenieros`, `cotizaciones/firmar/[token]`,
+    `device/register` y `legal/*` (antes `app/legal`, sin encabezado). Misma URL, mismos metadatos, JSON-LD,
+    `generateStaticParams`, `revalidate` y nombres de `data-track-conversion` (las landings conservan
+    `landing_primary_cta`… porque el rastreador cuenta como conversión lo que lleva «primary»; `Cierre` acepta
+    `medicion`). `/soluciones/*` sigue saliendo `noindex`: lo hereda de `soluciones/layout.tsx` (Studio «soluciones»);
+    no se cambió, es decisión de Adam/Studio.
+  - Piezas nuevas en `components/sitio`: `HeroInterior`, `Migas`, `TarjetasRuta` (no `Rutas.tsx`: choca con
+    `rutas.ts` en Windows), `Directorio` (reemplaza `SeoInterlinkHub`), `ArteServicio`, `visuales.ts` (foto real,
+    ícono y mini interfaz por servicio/industria, `MODO_CIUDAD`, `NOMBRE_LINEA`), `interior.module.css`.
+    `MapaMexico` acepta `destacar` (ciudad) y `acercar` (encuadre 21:9 de la ruta). `fotos.ts` sabe de las fotos que
+    solo existen en webp 1200/1920 y da `fotoOg()`. Se quitaron las fotos de Unsplash.
+  - Legal con índice (`legal/IndiceLegal.tsx`) y `legal.module.css` con los tokens del sitio; el texto legal no
+    cambió (solo se quitaron los `style={{ color: "#fff" }}`). Marca ya sin estilos en línea.
+  - `(sitio)/error.tsx` y `(sitio)/not-found.tsx` propios; `cotizaciones/layout.tsx` la deja `noindex`; el aviso de
+    cookies es una tarjeta flotante con los tokens del sitio. La prueba de firma ahora busca la etiqueta «Correo».
+  - `lib/seo/programmatic-landings.ts` con acentos («Cámaras CCTV e IP», «Logística y distribución»…): cambian los
+    títulos de las landings. `FormularioContacto` ya lee `?industry=`.
+  - Borrados por no tener uso: `app/(public)/*` (layout, `_shared/public.module.css`, `mxAdmin1Paths.ts`, etc.),
+    `Header`, `Footer`, `FloatingContactForm`, `PublicPageHero`, `SeoInterlinkHub`, `PublicScrollReveal`,
+    `PublicSiteThemeLock`, `HomeHero`, `EditorialImage`, `CoverageMap`, `LogoStrip`, `FAQ`, carruseles.
+    Quedaron carpetas vacías en `app/(public)` que el sandbox no dejó borrar (git no las ve).
+
+- **26-10 ~13:45 (claude-code) — Sitio 2026, ronda de mejoras tipo Apple/Stripe/Linear (desplegada 13:55).**
   - Fotos en webp por tamaño: `scripts/fotos-sitio.py` genera `public/fotos/v/<nombre>-{480,960,1440}.webp` (39
     archivos, 2.35 MB) y `components/sitio/fotos.ts` (`foto(nombre, sizes)`) arma `src`/`srcSet`/`sizes` sin pasar
     del ancho real del JPG. Ninguna página del sitio baja ya los JPG originales.
