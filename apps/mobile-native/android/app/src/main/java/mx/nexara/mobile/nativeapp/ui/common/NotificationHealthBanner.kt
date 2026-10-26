@@ -73,17 +73,17 @@ fun NotificationHealthBanner(
     val (titulo, texto, boton) = when (problema) {
         NotificationHealth.Problema.AVISOS_APAGADOS -> Triple(
             "Los avisos de NEXARA están apagados",
-            "No te llegarán actividades, revisiones ni mensajes. Actívalos en Ajustes.",
+            "No te llegarán actividades, revisiones ni mensajes, así que actívalos en Ajustes.",
             "Activar avisos",
         )
         NotificationHealth.Problema.CANAL_SILENCIADO -> Triple(
             "Tus avisos llegan sin sonido",
-            "El teléfono silenció un tipo de aviso de NEXARA. Elige «Sonido y ventana emergente» o importancia «Alta».",
+            "El teléfono silenció un tipo de aviso de NEXARA, así que elige «Sonido y ventana emergente» o importancia «Alta».",
             "Activar sonido",
         )
         NotificationHealth.Problema.BATERIA_RESTRINGIDA -> Triple(
             "Tus avisos pueden llegar tarde",
-            "El ahorro de batería tiene a NEXARA restringida. En Batería elige «Sin restricciones».",
+            "El ahorro de batería tiene a NEXARA restringida, así que en Batería elige «Sin restricciones».",
             "Abrir ajustes",
         )
     }
