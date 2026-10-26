@@ -72,7 +72,7 @@ export class AttendanceHybridService {
     const users = await this.loadUsers(currentUser, tenantId, opts.selfOnly === true);
     const userIds = users.map((u) => u.id);
 
-    const [memberships, attendances, days, acsRaw, people] = await Promise.all([
+    const [memberships, attendances, days, acsRaw, people, horarios] = await Promise.all([
       this.prisma.userCompany.findMany({
         where: { companyId: tenantId, userId: { in: userIds } },
         select: { userId: true, employeeNumber: true },
@@ -116,17 +116,26 @@ export class AttendanceHybridService {
         },
         select: { personId: true, personCode: true, personName: true },
       }),
+      this.prisma.workSchedule.findMany({
+        where: { companyId: tenantId, userId: { in: userIds } },
+        select: { userId: true, horaEntrada: true, graciaMin: true },
+      }),
     ]);
 
-    // Plantilla ACS por usuario (retardo vs horario oficina/contratista).
+    const propioPorUsuario = new Map<number, { horaEntrada: string | null; graciaMin: number | null }>();
+    for (const h of horarios) {
+      propioPorUsuario.set(h.userId, { horaEntrada: h.horaEntrada, graciaMin: h.graciaMin });
+    }
+
+    // Plantilla ACS por usuario. La horaEntrada guardada, si es HH:MM, la sustituye.
     const scheduleByUser = new Map<number, string>();
     for (const u of users) {
       const assignment = buildAccessScheduleAssignment({
         employeeNumber: u.employeeNumber,
         isActive: true,
-        roleKey: (u as { roleKey?: string | null }).roleKey,
-        orgRoleKey: (u as { role?: { orgRoleKey?: string | null } }).role?.orgRoleKey,
-        tipoContrato: (u as { tipoContrato?: string | null }).tipoContrato,
+        roleKey: u.roleKey,
+        orgRoleKey: u.role?.orgRoleKey,
+        tipoContrato: u.tipoContrato,
       });
       scheduleByUser.set(u.id, assignment.key);
     }
@@ -226,6 +235,9 @@ export class AttendanceHybridService {
             : 'AUSENTE';
 
       const scheduleKey = scheduleByUser.get(u.id) ?? null;
+      const propio = propioPorUsuario.get(u.id);
+      const horaEntrada = propio?.horaEntrada ?? null;
+      const graciaMin = propio?.graciaMin ?? null;
       const flags = hybridTimeFlags({
         erpCheckIn: checkIn,
         erpCheckOut: checkOut,
@@ -235,6 +247,8 @@ export class AttendanceHybridService {
         acsMinutes: acs?.minutes ?? null,
         acsPasses: acs?.passes,
         scheduleKey,
+        horaEntrada,
+        graciaMin,
       });
       if (!keys.length) flags.unshift('sin_numero_empleado');
 
@@ -254,7 +268,7 @@ export class AttendanceHybridService {
         flags,
         suggestion,
         scheduleKey,
-        expectedStart: expectedStartHm(scheduleKey),
+        expectedStart: expectedStartHm(scheduleKey, horaEntrada),
         user: {
           id: u.id,
           nombre: u.nombre,
@@ -361,8 +375,10 @@ export class AttendanceHybridService {
       email: true,
       employeeNumber: true,
       departmentId: true,
+      roleKey: true,
+      tipoContrato: true,
       department: { select: { nombre: true } },
-      role: { select: { accesoConsoleAdmin: true } },
+      role: { select: { accesoConsoleAdmin: true, orgRoleKey: true } },
     } as const;
 
     if (selfOnly) {
