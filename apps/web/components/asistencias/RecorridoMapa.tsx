@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { MAPLIBRE_WORKER_URL } from "@/app/components/BrandMap";
+import { ESTILO_MAPA_URL, cargarMapLibre, type MapLibreModule } from "@/lib/maplibre-cargar";
 import s from "./recorrido-mapa.module.css";
 
 /**
@@ -12,25 +12,12 @@ import s from "./recorrido-mapa.module.css";
  * Antes era una imagen de `/api/static-map`, que pide el mapa a Google Static Maps desde el
  * servidor. Sin facturación en Google Cloud (al 23-10-2026) Google contesta 403 «You must enable
  * Billing», el API responde 503 y la imagen salía rota. Este mapa se dibuja en el navegador con
- * MapLibre y teselas de OpenFreeMap, igual que el mapa del sitio público: sin clave ni costo.
+ * MapLibre y teselas de OpenFreeMap (`lib/maplibre-cargar.ts`): sin clave ni costo.
  */
 
-const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const COLOR_RUTA = "#2563eb";
 const COLOR_INICIO = "#16a34a";
 const COLOR_FIN = "#1d4ed8";
-
-type MapLibreModule = typeof import("maplibre-gl");
-let libPromise: Promise<MapLibreModule> | null = null;
-const loadMapLibre = (): Promise<MapLibreModule> => {
-  if (!libPromise) {
-    libPromise = import("maplibre-gl").then((lib) => {
-      lib.setWorkerUrl(MAPLIBRE_WORKER_URL);
-      return lib;
-    });
-  }
-  return libPromise;
-};
 
 export type PuntoMapa = { lat: number; lng: number };
 
@@ -94,12 +81,12 @@ export default function RecorridoMapa({
 
     void (async () => {
       try {
-        lib = await loadMapLibre();
+        lib = await cargarMapLibre();
         if (cancelado) return;
         const first = datosRef.current.puntos.features[0]!.geometry.coordinates;
         const map = new lib.Map({
           container: host,
-          style: STYLE_URL,
+          style: ESTILO_MAPA_URL,
           center: first,
           zoom: 14,
           attributionControl: { compact: true },

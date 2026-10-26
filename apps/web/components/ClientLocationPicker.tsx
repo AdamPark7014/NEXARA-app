@@ -1,8 +1,8 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./ClientLocationPicker.module.css";
-import { useVisibleOnce } from "@/lib/use-visible-once";
-import { googleMapsLink, staticMapUrl } from "@/lib/static-map";
+import { googleMapsLink } from "@/lib/static-map";
+import MapaUbicacion from "@/components/mapas/MapaUbicacion";
 import {
   DEBOUNCE_MS,
   MIN_QUERY_LENGTH,
@@ -42,14 +42,16 @@ const toNumber = (value?: number | null) => {
  * manejador de clic. Y colgaba `places.Autocomplete` del input, que pide
  * predicciones en cada tecla.
  *
- * Ahora: campo de texto normal, vista previa como imagen estática cacheada por
- * nuestra API, y búsqueda de Places solo cuando el usuario la pide (≥4
- * caracteres, 400 ms de espera, México, sesión que se cierra al elegir). Quien
- * ya tiene el punto puede pegar coordenadas o un enlace de Google Maps: eso no
- * cuesta nada.
+ * Ahora: campo de texto normal y búsqueda de Places solo cuando el usuario la
+ * pide (≥4 caracteres, 400 ms de espera, México, sesión que se cierra al
+ * elegir). Quien ya tiene el punto puede pegar coordenadas o un enlace de
+ * Google Maps: eso no cuesta nada.
+ *
+ * El mapa (26-10-2026) es de MapLibre + OpenFreeMap, sin clave ni costo: la
+ * imagen de Google Static Maps salía rota (403, el proyecto no tiene
+ * facturación). El pin se arrastra, o se toca el mapa, para fijar el punto exacto.
  */
 export default function ClientLocationPicker({ label, value, onChange, height = 220 }: ClientLocationPickerProps) {
-  const [previewRef, previewVisible] = useVisibleOnce<HTMLDivElement>();
   const searchRef = useRef<PlacesSearch | null>(null);
   const debounceRef = useRef<number | null>(null);
   const [inputValue, setInputValue] = useState(value.address || "");
@@ -62,10 +64,6 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
   const lat = toNumber(value.latitud);
   const lng = toNumber(value.longitud);
 
-  const previewUrl = useMemo(
-    () => (previewVisible ? staticMapUrl(lat, lng, { zoom: 16, width: 600, height: 300 }) : ""),
-    [previewVisible, lat, lng],
-  );
   const mapsLink = useMemo(() => googleMapsLink(lat, lng), [lat, lng]);
 
   const getSearch = useCallback(() => {
@@ -190,25 +188,15 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
         </ul>
       )}
 
-      <div ref={previewRef} style={{ minHeight: height }}>
-        {previewUrl ? (
-          <a href={mapsLink || previewUrl} target="_blank" rel="noopener noreferrer">
-            <img
-              className={styles.previewImage}
-              src={previewUrl}
-              alt="Ubicación seleccionada"
-              loading="lazy"
-              style={{ maxHeight: height }}
-            />
-          </a>
-        ) : (
-          <div className={styles.previewPlaceholder} style={{ minHeight: height }}>
-            {lat !== null && lng !== null
-              ? "Cargando vista previa…"
-              : "Sin ubicación: busca la dirección o pega las coordenadas."}
-          </div>
-        )}
-      </div>
+      <MapaUbicacion
+        lat={lat}
+        lng={lng}
+        altura={height}
+        onMover={(nuevaLat, nuevaLng) => {
+          onChange({ ...value, latitud: nuevaLat, longitud: nuevaLng });
+          setStatus("Ubicación ajustada en el mapa");
+        }}
+      />
 
       {lat !== null && lng !== null && (
         <div className={styles.hint}>

@@ -18,6 +18,7 @@ import {
   pdfText,
 } from '../common/pdf/nexara-pdf-theme';
 import { cacheKeyFor, getStaticMapImage, isUsableCoordinate } from '../common/maps/static-map-cache.js';
+import { dibujarMapaOsm, type LienzoPdf } from '../common/maps/osm-teselas.js';
 
 export type TicketEvidence = {
   archivoUrl: string;
@@ -414,9 +415,20 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
             arrivalCoordinates.latitud,
             arrivalCoordinates.longitud,
           );
+          // Sin la imagen de Google (403 sin facturación desde el 23-10-2026), el mapa se arma con
+          // teselas de OpenStreetMap (`common/maps/osm-teselas.ts`).
+          const conTeselas = !mapBuffer && await dibujarMapaOsm(doc as unknown as LienzoPdf, {
+            x,
+            y,
+            ancho: evidenceWidth,
+            alto: evidenceHeight,
+            lat: Number(arrivalCoordinates.latitud),
+            lng: Number(arrivalCoordinates.longitud),
+            zoom: 16,
+          });
           if (mapBuffer) {
             doc.image(mapBuffer, x, y, { fit: [evidenceWidth, evidenceHeight], align: 'center', valign: 'center' });
-          } else {
+          } else if (!conTeselas) {
             doc.rect(x, y, evidenceWidth, evidenceHeight).fill(PDF_COLORS.softGray);
             doc.fillColor(PDF_COLORS.muted).font('Helvetica').fontSize(9)
               .text('Mapa no disponible', x + 8, y + 60, { width: evidenceWidth - 16, align: 'center' });

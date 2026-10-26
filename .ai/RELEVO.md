@@ -1,5 +1,23 @@
 # RELEVO
 
+- **26-10 ~12:30 (claude-code) — Mapas sin Google Static Maps: ubicación de sucursal, vistas previas y PDF.**
+  - Coordinador (Adam: «continua»): `ClientLocationPicker` seguía con la imagen de Google Static Maps (403 «You must
+    enable Billing»). Se cambió en todos los usos de la web y del API; las apps no usan mapas estáticos (Android
+    declara Maps SDK sin usarlo; iOS usa MapKit).
+  - Web: `lib/maplibre-cargar.ts` (carga única de MapLibre + estilo OpenFreeMap). `components/mapas/MapaUbicacion`
+    (pin arrastrable y clic para fijar; en `ClientLocationPicker` → sucursales de Clientes/BranchesForm y el portal de
+    tickets) y `MapaVistaPrevia` (foto del mapa: MapLibre dibuja fuera de pantalla con `preserveDrawingBuffer`, se
+    guarda como JPEG y se destruye; cola de uno y caché por punto, para no agotar los contextos WebGL en listas).
+    Vistas previas en el portal de tickets (`/tickets`: archivos con mapa de llegada, mapa de llegada, solicitudes),
+    `/tickets/[branch]` y la cola de OPS (`OpsTicketRequestQueue`). `lib/static-map.ts` queda con `hasUsableCoords` y
+    `googleMapsLink`; ya nadie usa `/api/static-map`.
+  - API: `common/maps/osm-teselas.ts` arma el mapa del reporte de ticket/OT con teselas de tile.openstreetmap.org
+    (User-Agent propio, caché en disco 30 días, crédito «© OpenStreetMap») cuando no hay imagen de Google; antes el
+    PDF decía «Mapa no disponible» (el respaldo `staticmap.openstreetmap.de` ya no existe: ENOTFOUND).
+  - Probado: PDF real con teselas (se ve la Explanada con el pin), foto offscreen de MapLibre 6.11.2 en navegador
+    (JPEG con contenido), vitest web 1274/1274, jest API 3787/3787, tipos limpios.
+  - Sin sesión real: el portal de clientes y el formulario de sucursales no se vieron con datos en producción.
+
 - **26-10 ~11:15 (claude-code) — Web pública 2026: propuesta completa de la portada en `/propuesta` (sin indexar).**
   - Adam (por el dueño): el sitio «se ve sobresaturado, no limpio… gusta pero no encanta»; quiere nivel Apple/Stripe,
     «llévalo al extremo premium». Libre albedrío en colores, fotos, secciones y acomodo.
