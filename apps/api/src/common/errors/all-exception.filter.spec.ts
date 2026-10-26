@@ -58,6 +58,23 @@ describe('mapPrismaError', () => {
     );
   });
 
+  it('deja el choque y el texto largo en una frase y cita el texto viejo', () => {
+    const viejoChoque = 'Otro cambio se guardó al mismo tiempo. Vuelve a intentarlo.';
+    const viejoLargo = 'Uno de los textos es demasiado largo. Acórtalo e intenta de nuevo.';
+    const choque = mapPrismaError(prismaError('PrismaClientKnownRequestError', 'P2034'));
+    const largo = mapPrismaError(prismaError('PrismaClientKnownRequestError', 'P2000'));
+
+    expect(choque?.message).toBe('Otro cambio se guardó al mismo tiempo: vuelve a intentarlo.');
+    expect(choque?.message).not.toBe(viejoChoque);
+    expect(choque?.errorCode).toBe('WRITE_CONFLICT');
+    expect(choque?.status).toBe(HttpStatus.CONFLICT);
+
+    expect(largo?.message).toBe('Uno de los textos es demasiado largo: acórtalo e intenta de nuevo.');
+    expect(largo?.message).not.toBe(viejoLargo);
+    expect(largo?.errorCode).toBe('VALUE_TOO_LONG');
+    expect(largo?.status).toBe(HttpStatus.BAD_REQUEST);
+  });
+
   it('deja pasar codigos de Prisma desconocidos', () => {
     // Sin mapeo conocido se trata como error interno: mejor un 500 generico
     // que inventar un codigo que no corresponde.

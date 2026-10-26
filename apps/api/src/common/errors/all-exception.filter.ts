@@ -171,13 +171,13 @@ export function mapPrismaError(
       case 'P2000':
         return {
           status: HttpStatus.BAD_REQUEST,
-          message: 'Uno de los textos es demasiado largo. Acórtalo e intenta de nuevo.',
+          message: 'Uno de los textos es demasiado largo: acórtalo e intenta de nuevo.',
           errorCode: 'VALUE_TOO_LONG',
         };
       case 'P2034':
         return {
           status: HttpStatus.CONFLICT,
-          message: 'Otro cambio se guardó al mismo tiempo. Vuelve a intentarlo.',
+          message: 'Otro cambio se guardó al mismo tiempo: vuelve a intentarlo.',
           errorCode: 'WRITE_CONFLICT',
         };
       default:
