@@ -167,6 +167,28 @@ describe('UsersDelegationService.crear', () => {
     await expect(servicio.crear({ id: 2 }, alta('ing_soporte'), 7)).rejects.toThrow(/no está configurado/);
   });
 
+  it('cita el texto viejo «Ese tipo de usuario no está configurado. Avisa a dirección.» y lo deja en una frase, al crear y al editar', async () => {
+    const viejo = 'Ese tipo de usuario no está configurado. Avisa a dirección.';
+    const frase = 'Ese tipo de usuario no está configurado: avisa a dirección.';
+    const { servicio, prisma } = crear({ sinRol: 'ing_soporte' });
+    const alCrear = await messageOf(servicio.crear({ id: 2 }, alta('ing_soporte'), 7));
+    prisma.user.findFirst.mockImplementation(async ({ where }: any) =>
+      where.id === 8
+        ? { id: 8, nombre: 'David', email: 'operaciones@nexara.com.mx', managerId: 1, avatarUrl: null, isActive: true }
+        : null,
+    );
+    const alEditar = await messageOf(servicio.actualizarFoto({ id: 1 }, 8, { roleKey: 'ing_soporte' }, 7));
+
+    expect(alCrear).toContain('no está configurado');
+    expect(alEditar).toContain('no está configurado');
+    expect(alCrear).not.toBe(viejo);
+    expect(alEditar).not.toBe(viejo);
+    expect(alCrear).toBe(frase);
+    expect(alEditar).toBe(frase);
+    expect(alCrear.includes('. ')).toBe(false);
+    expect(alEditar.includes('. ')).toBe(false);
+  });
+
   it('deja el rastro en la auditoría sin la contraseña', async () => {
     const { servicio, log } = crear();
     await servicio.crear({ id: 2 }, alta('ing_soporte'), 7);
@@ -373,3 +395,12 @@ describe('UsersDelegationService.cambiarActivo', () => {
     await expect(servicio.cambiarActivo({ id: 1 }, 99, false, 7)).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+async function messageOf(run: Promise<unknown>): Promise<string> {
+  try {
+    await run;
+  } catch (e) {
+    return (e as Error).message;
+  }
+  throw new Error('debio rechazar');
+}
