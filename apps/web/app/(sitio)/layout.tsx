@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
 import { Inter_Tight } from "next/font/google";
 import "@/components/sitio/sitio-documento.css";
 import s from "@/components/sitio/sitio.module.css";
 import Encabezado from "@/components/sitio/Encabezado";
 import Pie from "@/components/sitio/Pie";
 import Aparecer from "@/components/sitio/Aparecer";
+import ExtrasSitio from "@/components/sitio/ExtrasSitio";
 
 /** Letra de exhibición para titulares y cifras; el texto corrido sigue en Inter. */
 const display = Inter_Tight({
@@ -15,21 +15,17 @@ const display = Inter_Tight({
 });
 
 /**
- * Propuesta del sitio público 2026, en una ruta aparte y sin indexar mientras
- * el dueño la aprueba. Cuando se apruebe, estas piezas pasan a `(public)`.
+ * Sitio público 2026 (aprobado por el dueño el 26-10-2026): portada, Servicios, Nosotros, Proyectos y Contacto.
+ * Blog, Soluciones, Cobertura y Legal siguen en `(public)` con el layout anterior hasta rehacerlos.
  */
-export const metadata: Metadata = {
-  title: "NEXARA · Propuesta de sitio",
-  robots: { index: false, follow: false },
-};
-
-export default function PropuestaLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function SitioLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className={`${s.sitio} ${display.variable}`} data-sitio>
       <Encabezado />
       {children}
       <Pie />
       <Aparecer />
+      <ExtrasSitio />
     </div>
   );
 }

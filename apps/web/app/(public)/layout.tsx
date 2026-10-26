@@ -10,18 +10,15 @@ const FloatingContactForm = dynamic(() => import("../components/FloatingContactF
 const PublicTrafficTracker = dynamic(() => import("../../components/PublicTrafficTracker"), { ssr: false });
 const PublicScrollReveal = dynamic(() => import("../../components/PublicScrollReveal"), { ssr: false });
 
-/** Páginas con hero full-bleed bajo el header transparente. */
+/**
+ * Páginas con hero full-bleed bajo el header transparente. Portada, Servicios, Nosotros, Proyectos y Contacto
+ * ya viven en `(sitio)` con su propio layout.
+ */
 const isFlushHeroPath = (pathname: string | null) => {
   if (!pathname) return false;
   const p = pathname.replace(/\/+$/, "") || "/";
   return (
-    p === "/" ||
-    p === "/nexara" ||
-    p === "/servicios" ||
     p === "/soluciones" ||
-    p === "/nosotros" ||
-    p === "/contacto" ||
-    p === "/proyectos" ||
     p === "/cobertura" ||
     p === "/blog" ||
     p === "/Nexara-Ingenieros" ||

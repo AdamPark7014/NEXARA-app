@@ -1,3 +1,6 @@
+import type { Metadata } from "next";
+import { buildStudioPageMetadata } from "@/lib/page-seo";
+import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import Link from "next/link";
 import s from "@/components/sitio/sitio.module.css";
 import { ruta } from "@/components/sitio/rutas";
@@ -24,6 +27,10 @@ import {
 } from "@/lib/page-content-api";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("home");
+}
+
 export const dynamic = "force-dynamic";
 
 /** Fotos en webp con dos anchos (1200 y 1920) de /public/fotos. */
@@ -36,6 +43,15 @@ const FOTOS_METODO = [
   { src: "/fotos/campo-enlace-antena-ciudad.jpg", alt: "Técnico de NEXARA revisando un enlace en azotea" },
   { src: "/fotos/campo-instalacion-rack.jpg", alt: "Técnicos de NEXARA instalando un rack" },
   { ...w("sala-monitoreo-videowall-nexara"), alt: "Sala de monitoreo con video wall instalada por NEXARA" },
+];
+
+/** Servicios para los datos estructurados de la portada (anclas de /servicios). */
+const SERVICIOS_SEO: [string, string][] = [
+  ["cctv", "Videovigilancia inteligente"],
+  ["redes", "Redes y Wi‑Fi empresarial"],
+  ["computo", "Infraestructura y cómputo"],
+  ["soporte", "Soporte y gestión TI"],
+  ["software", "Plataformas a la medida"],
 ];
 
 /** Lo que respalda a NEXARA, dicho en frases (sin tarjetas de una palabra). */
@@ -162,6 +178,25 @@ export default async function PropuestaInicio() {
 
   return (
     <main aria-label="NEXARA, inicio">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          name: "NEXARA | CCTV, redes y soporte TI en México",
+          url: siteBaseUrl(),
+          description: "Integramos CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en Puebla, CDMX y cobertura nacional.",
+          isPartOf: { "@type": "WebSite", name: "NEXARA", url: siteBaseUrl() },
+          mainEntity: {
+            "@type": "ItemList",
+            itemListElement: SERVICIOS_SEO.map((nombre, i) => ({
+              "@type": "ListItem",
+              position: i + 1,
+              name: nombre[1],
+              url: `${siteBaseUrl()}/servicios#${nombre[0]}`,
+            })),
+          },
+        }}
+      />
       {/* ── Hero ── */}
       <section className={s.hero} aria-labelledby="hero-titulo">
         <Aurora />

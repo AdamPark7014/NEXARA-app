@@ -1,5 +1,18 @@
 # RELEVO
 
+- **26-10 ~13:30 (claude-code) — Sitio público 2026 publicado: el dueño aprobó la propuesta.**
+  - `app/propuesta` pasó a `app/(sitio)` (grupo de rutas con su propio layout): `/`, `/servicios`, `/nosotros`,
+    `/proyectos` y `/contacto`. Se borraron las páginas anteriores de `(public)` (`page.tsx`, `nexara/`,
+    `servicios/`, `nosotros/`, `proyectos/`, `contacto/`); `serviciosImagery.ts` y `proyectosSectorCovers.ts` se
+    movieron a `(public)/soluciones/`, único lugar que los usaba. Blog, Soluciones, Cobertura y Legal siguen en
+    `(public)` con el layout y el encabezado anteriores.
+  - Cada página lleva `buildStudioPageMetadata(<clave>)` y los datos estructurados que tenían las anteriores; sin
+    `noindex`. El layout de `(sitio)` monta `PublicTrafficTracker` y `CookieConsentBanner` (`ExtrasSitio.tsx`); el
+    contacto flotante (`FloatingContactForm`) ya no aparece en esas cinco páginas. `(sitio)/error.tsx` reusa el de
+    `(public)`. `BASE_SITIO` quedó en "" y el middleware manda `/propuesta/*` → `/*` con 308.
+  - Ya no se usan desde Studio: `home_metricas`, el video del hero (`hero-video`) ni las fotos de `page_*`; siguen
+    `home_proceso`, `home_cta` y los metadatos SEO.
+
 - **26-10 ~13:15 (claude-code) — `deploy/update.sh` ya no reconstruye el transcriptor en cada despliegue.**
   - Sesión lateral del coordinador. `up -d --build transcriptor` corría siempre; con la caché de build vacía rehacía
     whisper y el modelo (imagen de 2.5 GB) aunque solo cambiara el web, y así se llenó el disco el 26-10.

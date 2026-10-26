@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { buildStudioPageMetadata } from "@/lib/page-seo";
+import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
 import Aurora from "@/components/sitio/Aurora";
@@ -13,10 +15,11 @@ import { ruta } from "@/components/sitio/rutas";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
-export const metadata: Metadata = {
-  title: "Servicios · NEXARA (propuesta)",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("servicios");
+}
+
+export const dynamic = "force-dynamic";
 
 /** Lo que vemos en casi todos los sitios y cómo lo resolvemos. */
 const PROBLEMAS: { titulo: string; texto: string; solucion: string }[] = [
@@ -191,6 +194,23 @@ export default function PropuestaServicios() {
 
   return (
     <main aria-label="Servicios de NEXARA">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: "Servicios NEXARA",
+          url: `${siteBaseUrl()}/servicios`,
+          description: "Videovigilancia, redes Wi‑Fi, cómputo, infraestructura y soporte TI bajo el mismo contrato.",
+          mainEntity: {
+            "@type": "ItemList",
+            itemListElement: SERVICIOS.map((sv, i) => ({
+              "@type": "ListItem",
+              position: i + 1,
+              item: { "@type": "Service", name: sv.titulo, description: sv.texto, url: `${siteBaseUrl()}/servicios#${sv.id}` },
+            })),
+          },
+        }}
+      />
       <section className={p.hero} aria-labelledby="servicios-hero">
         <Aurora />
         <div className={`${s.contenedor} ${s.centro}`}>
