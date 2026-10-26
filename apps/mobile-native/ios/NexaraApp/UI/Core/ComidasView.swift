@@ -373,11 +373,11 @@ struct ComidasView: View {
                 notice = CoreError.queuedOffline.errorDescription
             } else if checkIn {
                 notice = reason != nil
-                    ? "Registraste tu salida a comer. Tu justificación quedó por aprobar."
-                    : "Registraste tu salida a comer. ¡Buen provecho!"
+                    ? "Registraste tu salida a comer: tu justificación quedó por aprobar."
+                    : "Registraste tu salida a comer: ¡buen provecho!"
             } else {
                 notice = reason != nil
-                    ? "Registraste tu regreso. Tu justificación quedó por aprobar."
+                    ? "Registraste tu regreso: tu justificación quedó por aprobar."
                     : "Registraste tu regreso de comer."
             }
             await load()
