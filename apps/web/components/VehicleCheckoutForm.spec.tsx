@@ -4,7 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import VehicleCheckoutForm from "./VehicleCheckoutForm";
-import { ETIQUETA_SLOT, SLOTS_VUELTA, SLOT_TABLERO, type SlotChecklist } from "@/lib/vehiculos-api";
+import styles from "@/app/(panels)/erp/vehiculos/vehiculos-core.module.css";
+import { ETIQUETA_SLOT, formatoKm, SLOTS_VUELTA, SLOT_TABLERO, type SlotChecklist } from "@/lib/vehiculos-api";
 
 /**
  * El checklist por pasos. Lo que no puede pasar: salir sin las fotos, o
@@ -25,6 +26,17 @@ async function subirVuelta(user: ReturnType<typeof userEvent.setup>) {
   }
 }
 
+/** Paso 4: la nota queda encima de las fotos ya tomadas. */
+async function llegarAConfirmar(user: ReturnType<typeof userEvent.setup>) {
+  await subirVuelta(user);
+  await user.click(screen.getByRole("button", { name: "Siguiente" }));
+  await user.upload(entradaDe(SLOT_TABLERO), imagen("tablero"));
+  await user.click(screen.getByRole("button", { name: "Siguiente" }));
+  await user.type(screen.getByRole("spinbutton"), "120345");
+  await user.click(screen.getByRole("button", { name: "1/2" }));
+  await user.click(screen.getByRole("button", { name: "Siguiente" }));
+}
+
 describe("VehicleCheckoutForm", () => {
   it("no deja pasar del primer paso sin las seis fotos, y dice cuáles faltan", async () => {
     const user = userEvent.setup();
@@ -42,6 +54,22 @@ describe("VehicleCheckoutForm", () => {
     await user.click(screen.getByRole("button", { name: "Siguiente" }));
     expect(screen.getByRole("alert")).toHaveTextContent(/Faltan 5 fotos/);
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("en confirmar, el aviso sobre las fotos cabe en una frase", async () => {
+    const user = userEvent.setup();
+    render(<VehicleCheckoutForm mode="salida" onSubmit={vi.fn(async () => undefined)} />);
+    await llegarAConfirmar(user);
+
+    // El aviso va justo encima de las fotos que se pueden repetir.
+    const aviso = screen.getByText("Revisa las fotos: toca cualquiera para repetirla.");
+    const fotos = aviso.nextElementSibling;
+    expect(fotos).toHaveTextContent("Frente");
+    expect(fotos).toHaveTextContent("Tablero");
+
+    const resumen = screen.getByText("7 de 7").closest(`.${styles.resumenConfirmacion}`);
+    const cifras = [...(resumen?.querySelectorAll(`.${styles.datoValor}`) ?? [])].map((n) => n.textContent);
+    expect(cifras).toEqual(["7 de 7", formatoKm(120345), "1/2"]);
   });
 
   it("con la vuelta completa pasa al tablero, y sin tablero no avanza", async () => {
