@@ -88,7 +88,7 @@ export default function ClientDetailShell({ id, children }: { id: string; childr
       <div className={chrome.detailShell}>
         <header style={{ marginBottom: 14 }}>
           <Link href="/crm/clients" className={chrome.detailBack}>
-            ← Clientes
+            ‹ Clientes
           </Link>
           <h1 className={chrome.detailTitle}>
             {loading ? `Cliente #${id}` : title}
