@@ -85,6 +85,12 @@ describe('codigo-barras', () => {
       expect(motivoCodigoInvalido('CÓDIGO-Ñ')).toMatch(/caracteres/);
       expect(motivoCodigoInvalido('036000291453')).toMatch(/verificador/);
     });
+
+    it('el verificador malo se avisa en una frase, con el texto común a web y teléfono', () => {
+      expect(motivoCodigoInvalido('036000291453')).toBe(
+        'Parece un UPC/EAN pero el dígito verificador no cuadra: vuelve a escanearlo.',
+      );
+    });
   });
 
   describe('variantes de búsqueda', () => {

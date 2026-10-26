@@ -96,7 +96,7 @@ export function motivoCodigoInvalido(valor: unknown): string | null {
     return 'El código trae caracteres que un lector no puede leer';
   }
   if (sospechoso) {
-    return 'Parece un UPC/EAN pero el dígito verificador no cuadra. Vuelve a escanearlo.';
+    return 'Parece un UPC/EAN pero el dígito verificador no cuadra: vuelve a escanearlo.';
   }
   return null;
 }

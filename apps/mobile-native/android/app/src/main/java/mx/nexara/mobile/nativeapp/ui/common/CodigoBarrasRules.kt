@@ -69,7 +69,7 @@ object CodigoBarrasRules {
             c.codigo.length < LARGO_MINIMO -> "El código es demasiado corto (mínimo $LARGO_MINIMO caracteres)"
             c.codigo.length > LARGO_MAXIMO -> "El código es demasiado largo (máximo $LARGO_MAXIMO caracteres)"
             !IMPRIMIBLE.matches(c.codigo) -> "El código trae caracteres que un lector no puede leer"
-            c.sospechoso -> "Parece un UPC/EAN pero el dígito verificador no cuadra. Vuelve a escanearlo."
+            c.sospechoso -> "Parece un UPC/EAN pero el dígito verificador no cuadra: vuelve a escanearlo."
             else -> null
         }
     }

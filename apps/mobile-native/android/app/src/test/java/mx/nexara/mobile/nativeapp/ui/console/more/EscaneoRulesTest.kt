@@ -128,7 +128,7 @@ class EscaneoRulesTest {
     fun validaComoLoPrimeroQueSeBusca() {
         // Con Almacén, un UPC con el verificador mal se rechaza como artículo.
         assertEquals(
-            "Parece un UPC/EAN pero el dígito verificador no cuadra. Vuelve a escanearlo.",
+            "Parece un UPC/EAN pero el dígito verificador no cuadra: vuelve a escanearlo.",
             EscaneoRules.motivoInvalido("750105536302", true),
         )
         // Sin Almacén se valida como etiqueta (como hoy): eso no la rechaza.

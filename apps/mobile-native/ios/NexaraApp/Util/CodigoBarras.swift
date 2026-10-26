@@ -105,7 +105,7 @@ enum CodigoBarras {
         if c.codigo.count < largoMinimo { return "El código es demasiado corto (mínimo \(largoMinimo) caracteres)" }
         if c.codigo.count > largoMaximo { return "El código es demasiado largo (máximo \(largoMaximo) caracteres)" }
         if !imprimible(c.codigo) { return "El código trae caracteres que un lector no puede leer" }
-        if c.sospechoso { return "Parece un UPC/EAN pero el dígito verificador no cuadra. Vuelve a escanearlo." }
+        if c.sospechoso { return "Parece un UPC/EAN pero el dígito verificador no cuadra: vuelve a escanearlo." }
         return nil
     }
 

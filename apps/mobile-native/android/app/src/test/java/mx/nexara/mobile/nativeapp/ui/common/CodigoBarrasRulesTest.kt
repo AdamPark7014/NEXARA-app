@@ -29,7 +29,7 @@ class CodigoBarrasRulesTest {
         assertEquals(Tipo.INTERNO, c.tipo)
         assertTrue(c.sospechoso)
         assertEquals(
-            "Parece un UPC/EAN pero el dígito verificador no cuadra. Vuelve a escanearlo.",
+            "Parece un UPC/EAN pero el dígito verificador no cuadra: vuelve a escanearlo.",
             CodigoBarrasRules.motivoInvalido("7501055363026"),
         )
     }
