@@ -539,7 +539,7 @@ private fun RenglonParaAtender(r: EquipoEstado.RenglonAtencion, onClick: () -> U
                 fontSize = 12.5.sp,
                 fontWeight = if (r.colorPrincipal != null) FontWeight.SemiBold else FontWeight.Normal,
                 color = r.colorPrincipal?.let { Color(it) } ?: NxColors.Slate,
-                maxLines = 2,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
             r.secundaria?.let {
@@ -548,7 +548,7 @@ private fun RenglonParaAtender(r: EquipoEstado.RenglonAtencion, onClick: () -> U
                     fontSize = 12.sp,
                     fontWeight = if (r.colorSecundaria != null) FontWeight.SemiBold else FontWeight.Normal,
                     color = r.colorSecundaria?.let { c -> Color(c) } ?: NxColors.Muted,
-                    maxLines = 2,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -690,17 +690,18 @@ private fun PersonBoardCard(
             EquipoEstado.contexto(user, ahora),
             fontSize = 11.sp,
             color = if (aro == EquipoAro.RETRASO) aroColor else NxColors.Muted,
-            maxLines = 2,
+            // Folio, encargo y atraso, o la entrada y el «sin nada hace»: uno por renglón.
+            maxLines = 4,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
-        // Sin nada abierto: el folio y cuándo terminó lo último («Última: AN-0091 · ayer 18:11»).
+        // Sin nada abierto: folio y hora de lo último, cada uno en su renglón.
         EquipoEstado.ultimaDeTarjeta(user, ahora)?.let { ultima ->
             Text(
                 ultima,
                 fontSize = 11.sp,
                 color = NxColors.Muted,
-                maxLines = 1,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
             )

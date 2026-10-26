@@ -635,9 +635,10 @@ enum ActividadesEquipo {
         return "Sin actividad asignada"
     }
 
-    /// «AN-1042 · Despacho · Atrasado 1 h 20 min». Sin nada abierto (07-10), su jornada
-    /// de hoy: «Entró 10:05 · sin nada hace 2 h 15 min», «Salió 18:02» o «Sin entrada
-    /// hoy»; con la API vieja (sin `entradaHoyAt`) se queda el rótulo del estado.
+    /// Android `EquipoEstado.contexto`: folio, encargo y atraso, cada uno en su renglón
+    /// («AN-1042», «Despacho», «Atrasado 1 h 20 min»). Sin nada abierto (07-10), su
+    /// jornada de hoy: «Entró 10:05» y, abajo, «sin nada hace 2 h 15 min»; o «Salió 18:02»
+    /// o «Sin entrada hoy»; con la API vieja (sin `entradaHoyAt`) se queda el rótulo del estado.
     static func contexto(_ user: TeamBoardUser, now: Date = Date()) -> String {
         let abierta = user.openActivities?.first
         var partes: [String] = []
@@ -649,28 +650,36 @@ enum ActividadesEquipo {
         } else {
             partes.append(ActividadesTexto.estadoTexto(user, now: now))
         }
-        return partes.joined(separator: " · ")
+        return renglones(partes)
     }
 
-    /// Web `jornadaSinNada`: «Entró 10:05 · sin nada hace 2 h 15 min», «Salió 18:02» o
-    /// «Sin entrada hoy».
+    /// Web `jornadaSinNada`: «Entró 10:05» y, en el renglón de abajo, «sin nada hace
+    /// 2 h 15 min»; «Salió 18:02» o «Sin entrada hoy».
     static func jornadaSinNada(_ user: TeamBoardUser, ahora: Date = Date()) -> String {
         guard CoreFormat.date(user.entradaHoyAt) != nil else { return "Sin entrada hoy" }
         if CoreFormat.date(user.salidaHoyAt) != nil { return "Salió \(ActividadesTexto.hora(user.salidaHoyAt))" }
         let entro = "Entró \(ActividadesTexto.hora(user.entradaHoyAt))"
         if let minutos = ActividadesTexto.minutosDesde(user.idleSinceAt, ahora: ahora), minutos >= 1 {
-            return "\(entro) · sin nada hace \(ActividadesTexto.minutosPizarra(minutos))"
+            return renglones([entro, "sin nada hace \(ActividadesTexto.minutosPizarra(minutos))"])
         }
         return entro
     }
 
-    /// Línea extra de la tarjeta sin nada abierto: «Última: AN-0091 · ayer 18:11». En
-    /// «libre» no: el contexto ya dice cuándo terminó.
+    /// Extra de la tarjeta sin nada abierto: folio y hora aparte («Última: AN-0091» y
+    /// «ayer 18:11»). En «libre» no: el contexto ya dice cuándo terminó.
     static func ultimaEnTarjeta(_ user: TeamBoardUser, ahora: Date = Date()) -> String? {
         guard (user.openActivities ?? []).isEmpty, user.currentActivity == nil, estado(user) != "libre" else {
             return nil
         }
         return ultimaActividadCorta(user, ahora: ahora)
+    }
+
+    /// Un dato por renglón (Android `EquipoEstado.renglones`). Lo vacío no ocupa línea.
+    static func renglones(_ partes: [String?]) -> String {
+        partes
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
     }
 
     /// El estado del API, sin espacios y en minúsculas.
@@ -833,24 +842,24 @@ enum ActividadesEquipo {
         return que.isEmpty ? "Última" : "Última: \(que)"
     }
 
-    /// «Última: AN-0085 · ayer 17:15, a tiempo» · «…, con 40 min de atraso» · «Sin
-    /// actividades terminadas».
+    /// «Última: AN-0085» y, abajo, «ayer 17:15, a tiempo» (o «…, con 40 min de atraso»);
+    /// «Sin actividades terminadas».
     static func ultimaActividad(_ user: TeamBoardUser, ahora: Date = Date()) -> String {
         guard let corta = ultimaActividadCorta(user, ahora: ahora) else { return "Sin actividades terminadas" }
         return "\(corta), \(comoEntrego(user.lastFinished?.lateMinutes))"
     }
 
-    /// «Última: AN-0080 · lun 5 oct 18:38»; nil sin nada terminado.
+    /// «Última: AN-0080» y «lun 5 oct 18:38», cada uno en su renglón; nil sin nada terminado.
     static func ultimaActividadCorta(_ user: TeamBoardUser, ahora: Date = Date()) -> String? {
         guard let f = user.lastFinished else { return nil }
         let cuando = ActividadesTexto.cuandoMx(f.finishedAt, ahora: ahora)
-        return cuando.isEmpty ? ultimaCabeza(f) : "\(ultimaCabeza(f)) · \(cuando)"
+        return renglones([ultimaCabeza(f), cuando])
     }
 
     /// Un atrasado en «Para atender hoy».
     struct Atrasado: Identifiable {
         let persona: TeamBoardUser
-        /// «AN-0091 · Depurar base de clientes»; vacío si no hay ni folio ni título.
+        /// Folio y título, cada uno en su renglón; vacío si no hay ni folio ni título.
         let actividad: String
         let minutosAtraso: Int?
         /// «no la ha iniciado», «pasó su hora límite»… nil si el API no dice por qué.
@@ -875,10 +884,10 @@ enum ActividadesEquipo {
         /// Ver `ultimaActividad`.
         let ultima: String
 
-        /// El renglón ámbar: «Entró 08:57 · sin nada desde que entró (hace 1 h 50 min)».
+        /// El renglón ámbar: «Entró 08:57» y, abajo, «sin nada desde que entró (hace 1 h 50 min)».
         /// nil con la API vieja: entonces el renglón principal es `ultima`.
         var jornada: String? {
-            let texto = [entrada, sinNadaDesde].compactMap { $0 }.joined(separator: " · ")
+            let texto = ActividadesEquipo.renglones([entrada, sinNadaDesde])
             return texto.isEmpty ? nil : texto
         }
 
@@ -888,7 +897,7 @@ enum ActividadesEquipo {
     /// Alguien que hoy no ha checado entrada.
     struct SinEntrada: Identifiable {
         let persona: TeamBoardUser
-        /// «Última: AN-0080 · lun 5 oct 18:38» · «Sin actividades terminadas».
+        /// «Última: AN-0080» y «lun 5 oct 18:38» · «Sin actividades terminadas».
         let ultima: String
         /// «hace 2 días» desde lo último que terminó; nil si nunca terminó nada.
         let haceCuanto: String?
@@ -964,7 +973,7 @@ enum ActividadesEquipo {
         let base = (minutos ?? 0) > 0 ? "Atrasada · \(ActividadesTexto.minutosPizarra(minutos))" : "Atrasada"
         return Atrasado(
             persona: user,
-            actividad: [folio, titulo].compactMap { $0 }.joined(separator: " · "),
+            actividad: renglones([folio, titulo]),
             minutosAtraso: minutos,
             motivo: motivo,
             detalle: [base, motivo].compactMap { $0 }.joined(separator: " · ")
