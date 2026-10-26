@@ -7,7 +7,7 @@ export const DRAFT_APPROVAL_PREFIX = "[Aprobado borrador]";
 
 export const draftGateConfirmCopy = {
   CONFIRM_MESSAGE:
-    "¿Aprobar borrador y marcar como pagado? Se registrará la aprobación en la nota del pago.",
+    "¿Aprobar borrador y marcar como pagado, registrando la aprobación en la nota del pago?",
   CONFIRM_LABEL: "Aprobar borrador",
 } as const;
 
