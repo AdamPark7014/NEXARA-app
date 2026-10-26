@@ -1,5 +1,12 @@
 # RELEVO
 
+- **26-10 ~15:45 (claude-code) — 404 público con el diseño del sitio; tres despliegues del web en la tarde.**
+  - `app/not-found.tsx` mira el host: en `nexara.com.mx`, `www` y localhost pinta `Encabezado` + `NoEncontrado` +
+    `Pie`; en los subdominios de panel deja la tarjeta de siempre. `(sitio)/not-found.tsx` usa el mismo
+    `components/sitio/NoEncontrado.tsx`.
+  - Desplegados solo web: `9ee68cff` (subrutas), `f9eb368c` (guías y Servicios) y `b50c2f14` (404). Disco al 92 %
+    (5.9 GB libres) tras cada build con prune; ver la nota de `audit_logs` más abajo.
+
 - **26-10 ~15:20 (claude-code) — Blog con guías permanentes, Servicios más completo y limpieza de texto repetido.**
   - `lib/guias.ts`: cuatro guías del equipo (videovigilancia, Wi‑Fi en horas pico, memoria técnica, soporte con SLA)
     que `blog/[slug]` muestra cuando Studio no tiene una nota con ese slug; el índice del blog las presenta solas
