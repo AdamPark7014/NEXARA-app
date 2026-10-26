@@ -37,3 +37,5 @@
 {"etiqueta": "c7-t8-30-t3", "version": "sala", "segundos": 30, "partes": 8, "audio_s": 224.4, "proceso_s": 160.0, "rtf": 0.713, "wer": 0.5306, "bucles": 0}
 {"etiqueta": "c7-t8-20-ac1100-t2", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 141.7, "rtf": 0.632, "wer": 0.5403, "bucles": 0}
 {"etiqueta": "c7-t5-20-ac1100-t3", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 189.9, "rtf": 0.846, "wer": 0.5379, "bucles": 0}
+{"etiqueta": "c8-t8-20-t3", "version": "limpia", "segundos": 20, "partes": 12, "audio_s": 224.2, "proceso_s": 242.9, "rtf": 1.083, "wer": 0.2078, "bucles": 0}
+{"etiqueta": "c8-t8-20-t3", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 175.5, "rtf": 0.782, "wer": 0.5281, "bucles": 0}

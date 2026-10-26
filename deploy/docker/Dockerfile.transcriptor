@@ -8,13 +8,15 @@
 # 3 CPU y 3 hilos como en el compose; banco con FLEURS es_419 de 22 voces; «sala» = voz lejana con eco y
 # ruido; partes de 20 s como las sube la web):
 #   modelo                                WER limpio  WER sala  × tiempo real (limpio/sala)  RAM
-#   large-v3-turbo-q8_0, audio_ctx 1100     13.9 %     54.0 %    0.78 / 0.58               ~1.1 GB  ← por omisión
+#   large-v3-turbo-q8_0                     20.8 %     52.8 %    1.08 / 0.78               ~1.1 GB  ← por omisión
+#   large-v3-turbo-q8_0, audio_ctx 1100     13.9 %     54.0 %    0.78 / 0.58  (no se usa, ver abajo)
 #   large-v3-turbo-q8_0, partes de 30 s        –       53.1 %       – / 0.71
 #   large-v3-turbo-q5_0, audio_ctx 1100     21.3 %     53.8 %    1.18 / 0.85               ~0.8 GB
 #   medium-q5_0 (sin tope)                  24.9 %     62.1 %    1.58 / 1.05               ~0.7 GB
 #   small (el de antes)                     22.3 %     65.5 %    0.30 / 0.23               ~0.6 GB
-# q8_0 corre más rápido que q5_0 en este CPU (menos trabajo para descomprimir pesos) y no repitió
-# oraciones como q5_0. Sin fallback de temperatura (temperature_inc 0) no ganó tiempo y metió bucles.
+# q8_0 corre más rápido que q5_0 en este CPU (menos trabajo para descomprimir pesos). Sin fallback de
+# temperatura (temperature_inc 0) no ganó tiempo y metió bucles.
+# audio_ctx no se manda: en un mismo servidor, tras una petición sin él, las que lo traen salen inventadas.
 # La voz leída no tiene pausas; una junta sí (el VAD se las salta), así que en una junta va más holgado.
 # Banco: apps/api/scripts/banco-transcriptor.
 FROM debian:bookworm-slim AS build

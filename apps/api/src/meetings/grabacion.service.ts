@@ -20,7 +20,6 @@ import { ClaudeService, type UsoClaude } from '../ai/claude/claude.service.js';
 import { MEETING_DEFAULTS, type AgreementKind, type MeetingType } from './meeting-rhythm.js';
 import { MeetingsService } from './meetings.service.js';
 import {
-  AUDIO_CTX_PARTE,
   MAX_PARTES,
   carpetaGrabacion,
   msValidos,
@@ -215,7 +214,7 @@ export class GrabacionService implements OnModuleInit {
     try {
       const buffer = await fs.readFile(path.join(dir, audio));
       const prompt = await this.promptParte(companyId, grabacion.id, parte);
-      const texto = await this.transcriptor.transcribir(buffer, audio, mimeDe(ext), 600_000, { prompt, audioCtx: AUDIO_CTX_PARTE });
+      const texto = await this.transcriptor.transcribir(buffer, audio, mimeDe(ext), 600_000, { prompt });
       await this.marcarParte(fila.id, 'LISTA', texto, null);
       await this.borrarAudio(dir, audio);
     } catch (error) {

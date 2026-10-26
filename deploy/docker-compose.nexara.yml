@@ -246,7 +246,7 @@ services:
     mem_limit: ${TRANSCRIPTOR_MEM_LIMIT:-2048m}
     # Prioridad baja frente a los demás servicios del servidor (comparte 4 vCPU con todo): si hay
     # pelea por CPU, whisper espera. Tope de 3 CPU: siempre queda un vCPU para el resto (medido: el API
-    # responde en ~50 ms mientras transcribe y whisper va a 0.58 × tiempo real con voz de sala).
+    # responde en ~50 ms mientras transcribe y whisper va a 0.78 × tiempo real con voz de sala).
     cpu_shares: ${TRANSCRIPTOR_CPU_SHARES:-512}
     cpus: ${TRANSCRIPTOR_CPUS:-3}
     environment:
