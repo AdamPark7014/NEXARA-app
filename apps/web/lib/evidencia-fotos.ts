@@ -45,8 +45,8 @@ export function mensajeFotoNoGuardada(
 ): string {
   if (esErrorDeRed(err)) {
     return accion === "quitar"
-      ? "Sin conexión: la foto NO se quitó. Intenta de nuevo cuando tengas señal."
-      : "Sin conexión: la foto NO se guardó. Sigue aquí en la vista previa; cuando tengas señal toca enviar otra vez.";
+      ? "Sin conexión: la foto NO se quitó; intenta de nuevo cuando tengas señal."
+      : "Sin conexión: la foto NO se guardó y sigue aquí en la vista previa; cuando tengas señal, toca enviar otra vez.";
   }
   return formatApiError(err, fallback);
 }
