@@ -151,12 +151,13 @@ struct PausarDeEquipoSection: View {
         let sesion = actividad.sesion
         let folio = (actividad.anNumber ?? "").trimmingCharacters(in: .whitespaces)
         let titulo = (actividad.titulo ?? "").trimmingCharacters(in: .whitespaces)
-        let encabezado = [folio, titulo].filter { !$0.isEmpty }.joined(separator: " · ")
+        let partes = [folio, titulo].filter { !$0.isEmpty }
+        let encabezado = partes.joined(separator: "\n")
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(encabezado.isEmpty ? "Actividad #\(actividad.id)" : encabezado)
                     .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
+                    .lineLimit(partes.count > 1 ? 3 : 2)
                 Spacer(minLength: 8)
                 if sesion.enPausa {
                     CoreChip(icon: "pause.circle.fill", text: "En pausa", color: CorePalette.orange)
