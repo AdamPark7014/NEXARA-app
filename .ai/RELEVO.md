@@ -1,5 +1,29 @@
 # RELEVO
 
+- **26-10 ~11:15 (claude-code) — Web pública 2026: propuesta completa de la portada en `/propuesta` (sin indexar).**
+  - Adam (por el dueño): el sitio «se ve sobresaturado, no limpio… gusta pero no encanta»; quiere nivel Apple/Stripe,
+    «llévalo al extremo premium». Libre albedrío en colores, fotos, secciones y acomodo.
+  - Se construyó aparte para no tocar lo publicado: `app/propuesta/{layout,page}.tsx` + `components/sitio/*`
+    (sistema visual nuevo: `sitio.module.css`, `encabezado.module.css`, `pie.module.css`, `sitio-documento.css`).
+    Nada de `(public)` cambió; `/propuesta` lleva `robots: noindex` y el logo/pie apuntan a `/propuesta`; el resto
+    de enlaces van a las páginas actuales.
+  - Diseño: claro (blanco/gris niebla, texto tinta `#0a2540`) y oscuro (tinta `#060b14`), un solo azul de acción
+    `#0060f0`, Inter Tight para titulares (next/font en el layout) e Inter para texto. Degradado vivo con los colores
+    del isotipo solo en hero y cierre (`Aurora`). Hero con tablero de monitoreo ilustrado en HTML (`Tablero`, cámaras
+    con fotos reales y reloj de CDMX en vivo), menú desplegable de Servicios/Industrias con iconos (`Encabezado`),
+    bento de servicios con mini interfaces (topología de red animada, ticket con SLA, gráfica), método que se cuenta al
+    bajar (`Metodo`, índice fijo), control segmentado de industrias con «Lo que instalamos» (`Industrias`), galería
+    deslizable (`Galeria`), contadores (`Cifra`), cobertura con el mapa claro/oscuro y pie estilo Apple.
+  - Trampas del CSS global de la plataforma (`layout.css`): topa `main/section` a `--content-max` desde 1100 px si el
+    body no tiene `.public-friendly`, y da letra/color/margen a h1–h4, p y a. Se neutraliza en `sitio-documento.css`
+    (selector con `html body:has([data-sitio])`) y con el reseteo `.sitio :where(...)` (peso de una clase). En los
+    módulos de encabezado/pie las reglas van con dos clases (`.barra .x`, `.pie .x`) para no empatar con el reseteo.
+  - El video del hero actual (Studio, `hero-video` id 6) es una animación neón del logo: la propuesta no lo usa.
+  - Verificado: tipos del web OK; Chrome headless a 1536/1180/375 en claro y oscuro, sin desborde horizontal ni
+    errores de consola; menú, pestañas, galería, método y contadores probados por CDP.
+  - Falta: visto bueno del dueño; después llevar el sistema a `(public)` (layout, Servicios, Proyectos, Nosotros,
+    Contacto, Blog, Soluciones, Cobertura) y restilar el banner de cookies y el contacto flotante.
+
 - **26-10 ~10:30 (claude-code) — Asistencias: la insignia larga ya no se encima con la foto de la checada.**
   - Adam (captura de la ficha del día): en la tarjeta ENTRADA, «Revisar: Ubicación tomada 26 min después de
     checar (al checar: …)» se salía por debajo de la foto y del borde. El `Badge` base (`piezas.module.css`) es

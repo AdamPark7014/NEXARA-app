@@ -1,0 +1,28 @@
+/*
+ * Reglas de documento del sitio público (no caben en un módulo porque no llevan clase propia).
+ * Todas se limitan a páginas que montan `[data-sitio]`.
+ */
+
+/* El fondo del documento sigue al tema (rebote del scroll en iOS/macOS). */
+html:has([data-sitio]),
+html:has([data-sitio]) body {
+  background: #ffffff;
+}
+
+html[data-public-theme="dark"]:has([data-sitio]),
+html[data-public-theme="dark"]:has([data-sitio]) body {
+  background: #000000;
+}
+
+/* Sin el brillo decorativo que la plataforma pinta en body::before. */
+body:has([data-sitio])::before,
+body:has([data-sitio])::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* La plataforma topa main/section a --content-max desde 1100 px: aquí cada sección mide lo que su diseño dice. */
+html body:has([data-sitio]) [data-sitio] :where(main, section, article) {
+  max-width: none;
+  margin-inline: 0;
+}
