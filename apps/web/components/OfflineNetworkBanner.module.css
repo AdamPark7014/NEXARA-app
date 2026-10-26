@@ -1,0 +1,39 @@
+/* Banda de conexión. En escritorio, una línea con « · », como siempre; en teléfono, un dato por renglón. */
+.lineas {
+  display: inline;
+}
+
+.reintentar {
+  margin: 0 0 0 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.reintentar:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+@media (max-width: 560px) {
+  .lineas {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .sep {
+    display: none;
+  }
+
+  .reintentar {
+    margin: 4px 0 0;
+    min-height: 32px;
+  }
+}

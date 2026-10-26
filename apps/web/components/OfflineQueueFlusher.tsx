@@ -2,25 +2,16 @@
 
 import { useEffect } from "react";
 import { useUser } from "./UserContext";
-import { flushOfflineQueue, getOfflineQueueLength, purgarColaOffline } from "@/lib/offline-queue";
+import {
+  flushOfflineQueue,
+  getOfflineQueueLength,
+  portalSessionBearer,
+  purgarColaOffline,
+} from "@/lib/offline-queue";
 import { authCacheTag, revalidateHotApiCache } from "@/lib/offline-api-cache";
 import { getNativeFetch } from "@/lib/native-fetch";
 import { isCapacitorNative } from "@/lib/capacitor-env";
 import { getActiveCompanyId } from "@/lib/tenant";
-
-function portalSessionBearer(): string | undefined {
-  try {
-    const raw =
-      typeof window !== "undefined"
-        ? window.sessionStorage.getItem("clientSession") || window.sessionStorage.getItem("branchSession")
-        : null;
-    if (!raw) return undefined;
-    const p = JSON.parse(raw) as { token?: string };
-    return p?.token ? `Bearer ${p.token}` : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 /**
  * Al volver la conexión, reenvía las escrituras encoladas (ver `enqueueOfflineFetch`).

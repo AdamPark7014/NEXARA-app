@@ -85,7 +85,38 @@ export function enqueueOfflineFetch(input: Omit<QueuedFetch, "id" | "createdAt">
   return item;
 }
 
-export async function flushOfflineQueue(getAuthHeader: () => string | undefined): Promise<void> {
+/** «Bearer …» de la sesión del portal de clientes o de sucursal de esta pestaña, si la hay. */
+export function portalSessionBearer(): string | undefined {
+  try {
+    const raw =
+      typeof window !== "undefined"
+        ? window.sessionStorage.getItem("clientSession") || window.sessionStorage.getItem("branchSession")
+        : null;
+    if (!raw) return undefined;
+    const p = JSON.parse(raw) as { token?: string };
+    return p?.token ? `Bearer ${p.token}` : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** El envío que está corriendo; las llamadas que lleguen mientras tanto esperan ese mismo. */
+let envioEnCurso: Promise<void> | null = null;
+
+/**
+ * Reenvía la cola. Un solo envío a la vez: el reintento a mano, el evento `online`, el de
+ * visibilidad y el intervalo pueden coincidir, y dos envíos simultáneos leerían la misma cola
+ * antes de que el primero la reescriba (cada operación saldría dos veces).
+ */
+export function flushOfflineQueue(getAuthHeader: () => string | undefined): Promise<void> {
+  if (envioEnCurso) return envioEnCurso;
+  envioEnCurso = enviarCola(getAuthHeader).finally(() => {
+    envioEnCurso = null;
+  });
+  return envioEnCurso;
+}
+
+async function enviarCola(getAuthHeader: () => string | undefined): Promise<void> {
   if (typeof window === "undefined" || !navigator.onLine) return;
   const auth = getAuthHeader();
   if (!auth) return;
