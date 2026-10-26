@@ -83,6 +83,11 @@ export function pesosViatico(centavos: number): string {
 /** Una fila del editor de reparto, todavía como texto de formulario. */
 export type ParteForm = { actividadId: string; monto: string; nota: string };
 
+/** Concordancia de la pista: una parte suma; de dos en adelante, las N partes suman. */
+export function frasePartesSuman(cuantas: number): string {
+  return cuantas === 1 ? "la parte suma" : `las ${cuantas} partes suman`;
+}
+
 /**
  * ¿Cuadra el reparto con el total del viático?
  *
@@ -96,7 +101,7 @@ export function revisarCuadreReparto(
 ): string | undefined {
   if (partes.length === 0) return undefined;
   if (partes.some((p) => !p.actividadId.trim())) {
-    return "Cada parte necesita la actividad a la que se carga. Completa la que falta o quítala.";
+    return "Cada parte necesita la actividad a la que se carga: completa la que falta o quítala.";
   }
   const totalCent = centavosViatico(total);
   const sumaCent = partes.reduce((acc, p) => acc + centavosViatico(p.monto), 0);

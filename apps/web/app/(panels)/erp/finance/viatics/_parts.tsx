@@ -8,6 +8,7 @@ import { financeInputStyle } from "@/components/finance/FinanceModuleShell";
 import type { ViaticoLiquidacion } from "@/lib/viatics-api";
 import {
   centavosViatico as centavos,
+  frasePartesSuman,
   pesosViatico as dinero,
   type ParteForm,
 } from "@/lib/viatics-display";
@@ -249,10 +250,10 @@ export function RepartoEditor({
     partes.length === 0
       ? "Sin repartir, el gasto entero carga a la actividad de arriba."
       : diferencia === 0
-        ? `Cuadra: las ${partes.length} partes suman ${dinero(totalCent)}.`
+        ? `Cuadra: ${frasePartesSuman(partes.length)} ${dinero(totalCent)}.`
         : diferencia > 0
           ? `Faltan ${dinero(diferencia)} por repartir de ${dinero(totalCent)}.`
-          : `Sobran ${dinero(-diferencia)}: las partes suman más que el viático.`;
+          : `Sobran ${dinero(-diferencia)}: ${frasePartesSuman(partes.length)} más que el viático.`;
 
   return (
     <div style={{ display: "grid", gap: 8 }}>
