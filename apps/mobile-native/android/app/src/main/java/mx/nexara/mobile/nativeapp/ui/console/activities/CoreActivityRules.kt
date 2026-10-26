@@ -583,7 +583,10 @@ object CoreActivityRules {
     fun pasosCorregidos(ev: TeamEvidenceDto?, revisiones: List<TeamEvidenceReviewDto>): List<String> =
         if (esCorreccion(ev, revisiones)) ultimaDevolucion(revisiones)?.pasos.orEmpty() else emptyList()
 
-    /** Barra de quien revisa cuando lo que llega es una corrección. */
+    /**
+     * Aviso de quien revisa, en una frase. La hora, si la hay, va en el renglón
+     * de abajo. Aprobar y devolver no cambian.
+     */
     fun correccionTexto(
         correctionSubmittedAt: String?,
         revisiones: List<TeamEvidenceReviewDto>,
@@ -596,14 +599,20 @@ object CoreActivityRules {
         } else {
             " (rehízo toda la actividad)"
         }
-        val cuando = formatWhen(correctionSubmittedAt, zone)?.let { " · $it" }.orEmpty()
-        return "Corrigió lo que se le devolvió$que$cuando. Revisa la corrección y apruébala o devuélvela de nuevo."
+        val frase = "Corrigió lo que se le devolvió$que: revisa la corrección y apruébala o devuélvela de nuevo."
+        val hora = formatWhen(correctionSubmittedAt, zone)
+        return if (hora.isNullOrBlank()) frase else "$frase\n$hora"
     }
 
+    /** Aviso de quien sigue corrigiendo, en una frase. Sin reenvío, solo dice el paso. */
     fun corrigiendoTexto(pasos: List<String>, reviewNotes: String?, avisarReenvio: Boolean): String {
         val notas = reviewNotes?.takeIf { it.isNotBlank() }?.let { " · «$it»" }.orEmpty()
-        val aviso = if (avisarReenvio) ". Cuando envíe la corrección podrás aprobarla o devolverla otra vez." else ""
-        return "Está corrigiendo: ${pasos.joinToString(", ") { stepLabel(it) }}$notas$aviso"
+        val base = "Está corrigiendo: ${pasos.joinToString(", ") { stepLabel(it) }}$notas"
+        return if (avisarReenvio) {
+            "$base: cuando envíe la corrección podrás aprobarla o devolverla otra vez."
+        } else {
+            base
+        }
     }
 
     fun memberRolUi(reparte: Boolean, rol: String?): Tone = when {
