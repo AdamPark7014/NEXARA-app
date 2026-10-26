@@ -13,6 +13,38 @@ import s from "./almacen.module.css";
 
 type StockRow = ReturnType<typeof mapStockLevelToRow>;
 
+/**
+ * A 390 px cada dato del movimiento va en su renglón: tipo, cantidad, origen,
+ * destino, folio y hora. En escritorio siguen en la misma línea. El corte es
+ * 480 px para cubrir el teléfono (390) sin partir el escritorio (1440).
+ */
+const HISTORIAL_TELEFONO = `
+@media (max-width: 480px) {
+  [data-nx-historial] .nxHpTipo,
+  [data-nx-historial] .nxHpCantidad,
+  [data-nx-historial] .nxHpOrigen,
+  [data-nx-historial] .nxHpDestino,
+  [data-nx-historial] .nxHpFolio,
+  [data-nx-historial] .nxHpHora {
+    display: block;
+  }
+  [data-nx-historial] .nxHpOrigen,
+  [data-nx-historial] .nxHpDestino {
+    overflow-wrap: anywhere;
+  }
+  [data-nx-historial] .nxHpCantidad,
+  [data-nx-historial] .nxHpOrigen,
+  [data-nx-historial] .nxHpDestino,
+  [data-nx-historial] .nxHpHora {
+    margin-top: 2px;
+  }
+  [data-nx-historial] .nxHpSp,
+  [data-nx-historial] .nxHpSep {
+    display: none;
+  }
+}
+`;
+
 export type TrazaProducto = {
   productId: number;
   sku: string;
@@ -101,7 +133,8 @@ export default function HistorialProducto({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <aside className={s.cajon}>
+      <aside className={s.cajon} data-nx-historial="">
+        <style>{HISTORIAL_TELEFONO}</style>
         <header className={s.cajonCabeza}>
           <div className={s.cajonTexto}>
             <p className={s.rotulo}>Historial del producto</p>
@@ -152,19 +185,21 @@ export default function HistorialProducto({
                         state={estadoDelMovimiento(m.type)}
                         title={
                           <>
-                            <Badge tone={TONO_DE_VARIANTE[varianteMovimiento(m.type)]} size="sm">
+                            <Badge tone={TONO_DE_VARIANTE[varianteMovimiento(m.type)]} size="sm" className="nxHpTipo">
                               {etiquetaMovimiento(m.type)}
-                            </Badge>{" "}
-                            <strong className={s.cifra}>{cantidad(m.quantity)}</strong>
-                            {" · "}
-                            {m.fromWarehouse?.name ?? "—"} → {m.toWarehouse?.name ?? "—"}
+                            </Badge>
+                            <span className="nxHpSp"> </span>
+                            <strong className={`${s.cifra} nxHpCantidad`}>{cantidad(m.quantity)}</strong>
+                            <span className="nxHpSep"> · </span>
+                            <span className="nxHpOrigen">{m.fromWarehouse?.name ?? "—"}</span>
+                            <span className="nxHpDestino"> → {m.toWarehouse?.name ?? "—"}</span>
                           </>
                         }
                         meta={
                           <>
-                            <code className={claseMono}>{m.movementNumber}</code>
-                            {" · "}
-                            <time dateTime={m.createdAt}>{fechaHoraCorta(m.createdAt)}</time>
+                            <code className={`${claseMono} nxHpFolio`}>{m.movementNumber}</code>
+                            <span className="nxHpSep"> · </span>
+                            <time className="nxHpHora" dateTime={m.createdAt}>{fechaHoraCorta(m.createdAt)}</time>
                           </>
                         }
                       >
