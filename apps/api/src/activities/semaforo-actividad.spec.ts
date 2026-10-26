@@ -276,7 +276,7 @@ describe('texto del aviso', () => {
     ).toEqual({
       title: 'Actividad atrasada',
       message:
-        'Tu actividad AN-1042 · Actualizar archivo SLA está atrasada. Asegúrate de cumplirla en tiempo y forma.',
+        'Tu actividad AN-1042 · Actualizar archivo SLA está atrasada: asegúrate de cumplirla en tiempo y forma.',
     });
   });
 
