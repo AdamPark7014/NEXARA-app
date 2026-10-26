@@ -1,5 +1,16 @@
 # RELEVO
 
+- **26-10 ~06:00 UTC (claude-code, R-1) — Transcriptor aparte para dictado (whisper `small`, 1 CPU).**
+  - Decisión del coordinador (opción b): el turbo q8_0 tardaba en un dictado lo que dura el audio y el dictado
+    de 2 min podía pasar del límite de 100 s. Ahora `/api/ai/voz/transcribir` usa `TranscriptorService.dictar`:
+    va a `TRANSCRIPTOR_DICTADO_URL` (servicio `transcriptor-dictado` del compose) y, si falla o tarda más del 70 %
+    del plazo, cae al principal con el tiempo que quede. Las partes de juntas siguen en el turbo. Una falla del de
+    dictado no marca al principal como caído. Pruebas: 4 nuevas en `transcriptor.service.spec.ts`.
+  - Medido con la imagen small (dictado sintético es-ES, opus 32 kbps): 1 CPU / 1 hilo → 19 s en 10.5 s y 110 s
+    en 48 s; 1 CPU / 2 hilos peor (11.3 / 54.6 s); 1.5 CPU / 2 hilos 7.5 / 36 s; 2 CPU 5.8 / 27 s; RAM ~0.73 GB.
+    Por omisión 1 CPU, 1 hilo, `cpu_shares` 256, 1 GB (variables `TRANSCRIPTOR_DICTADO_*` / `WHISPER_DICTADO_*`).
+  - `update.sh` levanta `transcriptor-dictado` sin `--build` si `TRANSCRIPTOR_DICTADO_URL` está en el `.env`.
+
 - **25-10 ~22:30 (claude-code) — GPS de jornada: un punto cada 30 min, entrada sin ubicación y mapa del recorrido.**
   - Adam (23-10, detalle de Iván Camargo, id 10): «aparece rota la del gps… no muestra ubicación desde la una… debe
     tomarse cada media hora… este usuario siempre dice que no muestra su ubicación al iniciar jornada».

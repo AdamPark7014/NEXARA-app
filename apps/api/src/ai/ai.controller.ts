@@ -92,7 +92,7 @@ export class AiController {
     const ext = extensionAudio(file.mimetype);
     if (!ext) throw new BadRequestException('Ese archivo no es de audio.');
     // El API corta toda petición a los 120 s: el dictado debe transcribirse antes.
-    const texto = await this.transcriptor.transcribir(file.buffer, `dictado.${ext}`, file.mimetype, 100_000);
+    const texto = await this.transcriptor.dictar(file.buffer, `dictado.${ext}`, file.mimetype, 100_000);
     return { texto };
   }
 }

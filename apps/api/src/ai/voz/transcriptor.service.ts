@@ -6,7 +6,10 @@ import { limpiarTextoWhisper, promptTranscriptor } from './transcriptor.js';
  *
  * - `TRANSCRIPTOR_URL` apunta al contenedor (en Docker: `http://transcriptor:8080`). Sin
  *   ella, la voz propia queda apagada y la web usa el dictado del navegador.
- * - El servidor de whisper atiende una petición a la vez: las demás esperan su turno.
+ * - `TRANSCRIPTOR_DICTADO_URL` (opcional, `http://transcriptor-dictado:8080`): whisper `small` aparte
+ *   para el dictado (voz cercana, audio corto). No hace fila detrás de las partes de una junta y
+ *   contesta en ~½ de lo que dura el audio con 1 CPU; si no responde, el dictado cae al principal.
+ * - Cada servidor de whisper atiende una petición a la vez: las demás esperan su turno.
  */
 @Injectable()
 export class TranscriptorService {
@@ -15,6 +18,11 @@ export class TranscriptorService {
 
   url(): string | null {
     const raw = (process.env.TRANSCRIPTOR_URL || '').trim().replace(/\/+$/, '');
+    return raw || null;
+  }
+
+  urlDictado(): string | null {
+    const raw = (process.env.TRANSCRIPTOR_DICTADO_URL || '').trim().replace(/\/+$/, '');
     return raw || null;
   }
 
@@ -54,12 +62,44 @@ export class TranscriptorService {
         'El transcriptor no está configurado: falta TRANSCRIPTOR_URL en el servidor.',
       );
     }
+    return this.pedir(base, true, audio, nombre, mime, timeoutMs, opciones.prompt);
+  }
+
+  /**
+   * Dictado corto (voz cercana): al transcriptor de dictado si está configurado; si falla o tarda más
+   * del 70 % del plazo, al principal con el tiempo que quede.
+   */
+  async dictar(audio: Buffer, nombre: string, mime: string, timeoutMs = 100_000): Promise<string> {
+    const dictado = this.urlDictado();
+    if (!dictado) return this.transcribir(audio, nombre, mime, timeoutMs);
+    const t0 = Date.now();
+    try {
+      return await this.pedir(dictado, false, audio, nombre, mime, Math.round(timeoutMs * 0.7));
+    } catch (error) {
+      const resta = timeoutMs - (Date.now() - t0);
+      if (!this.url() || resta < 5_000) throw error;
+      this.logger.warn(`el de dictado falló; va al principal con ${Math.round(resta / 1000)} s`);
+      return this.transcribir(audio, nombre, mime, resta);
+    }
+  }
+
+  /** Una petición a un whisper-server. `principal` = el de `TRANSCRIPTOR_URL` (el que mide `disponible`). */
+  private async pedir(
+    base: string,
+    principal: boolean,
+    audio: Buffer,
+    nombre: string,
+    mime: string,
+    timeoutMs: number,
+    prompt?: string,
+  ): Promise<string> {
+    const quien = principal ? '' : 'dictado: ';
     const form = new FormData();
     form.append('file', new Blob([new Uint8Array(audio)], { type: mime || 'application/octet-stream' }), nombre);
     form.append('response_format', 'json');
     form.append('language', 'es');
     form.append('temperature', '0');
-    form.append('prompt', opciones.prompt?.trim() || promptTranscriptor());
+    form.append('prompt', prompt?.trim() || promptTranscriptor());
 
     const t0 = Date.now();
     let respuesta: Response;
@@ -70,20 +110,20 @@ export class TranscriptorService {
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
-      this.ultimoPing = { at: Date.now(), ok: false };
-      this.logger.error(`no responde: ${(error as Error).message}`);
+      if (principal) this.ultimoPing = { at: Date.now(), ok: false };
+      this.logger.error(`${quien}no responde: ${(error as Error).message}`);
       throw new ServiceUnavailableException('El transcriptor no respondió: intenta de nuevo.');
     }
     const cuerpo = await respuesta.text();
     if (!respuesta.ok) {
-      this.logger.error(`HTTP ${respuesta.status}: ${cuerpo.slice(0, 200)}`);
+      this.logger.error(`${quien}HTTP ${respuesta.status}: ${cuerpo.slice(0, 200)}`);
       throw new ServiceUnavailableException('El transcriptor no pudo leer ese audio.');
     }
     let texto = cuerpo;
     try {
       const json = JSON.parse(cuerpo) as { text?: string; error?: string };
       if (json.error) {
-        this.logger.error(`error: ${json.error}`);
+        this.logger.error(`${quien}error: ${json.error}`);
         throw new ServiceUnavailableException('El transcriptor no pudo leer ese audio.');
       }
       texto = json.text ?? '';
@@ -92,7 +132,7 @@ export class TranscriptorService {
     }
     const limpio = limpiarTextoWhisper(texto);
     this.logger.log(
-      `${(audio.length / 1024).toFixed(0)} KB → ${limpio.length} caracteres en ${((Date.now() - t0) / 1000).toFixed(1)} s`,
+      `${quien}${(audio.length / 1024).toFixed(0)} KB → ${limpio.length} caracteres en ${((Date.now() - t0) / 1000).toFixed(1)} s`,
     );
     return limpio;
   }

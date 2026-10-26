@@ -70,6 +70,8 @@ services:
       JOBS_RUN_WORKERS: ${JOBS_RUN_WORKERS:-1}
       # Transcriptor propio (perfil `transcriptor`). Vacío = sin voz propia.
       TRANSCRIPTOR_URL: ${TRANSCRIPTOR_URL:-}
+      # Whisper `small` solo para dictado; vacío = el dictado usa TRANSCRIPTOR_URL.
+      TRANSCRIPTOR_DICTADO_URL: ${TRANSCRIPTOR_DICTADO_URL:-}
       # SaaS hard multi-tenant: set to 0 when all clients send X-Company-Id
       TENANT_ALLOW_PRIMARY_FALLBACK: ${TENANT_ALLOW_PRIMARY_FALLBACK:-1}
       CORS_ORIGIN: ${CORS_ORIGIN:-}
@@ -201,6 +203,7 @@ services:
       REDIS_URL: redis://redis:6379
       JOBS_RUN_WORKERS: "1"
       TRANSCRIPTOR_URL: ${TRANSCRIPTOR_URL:-}
+      TRANSCRIPTOR_DICTADO_URL: ${TRANSCRIPTOR_DICTADO_URL:-}
       JWT_SECRET: ${JWT_SECRET}
       UPLOADS_ROOT: /app/uploads
     command: ["node", "/app/apps/api/dist/worker.js"]
@@ -253,6 +256,29 @@ services:
       WHISPER_THREADS: ${WHISPER_THREADS:-3}
       # Banderas extra de whisper-server (p. ej. --suppress-nst), medidas en el banco del transcriptor.
       WHISPER_ARGS: ${WHISPER_ARGS:-}
+    networks:
+      - internal
+
+  # Whisper `small` solo para dictado (voz cercana, audio corto): no hace fila detrás de las partes de
+  # una junta ni espera al modelo grande. En la API: TRANSCRIPTOR_DICTADO_URL=http://transcriptor-dictado:8080
+  # (si no responde, el dictado cae al principal). Medido (26-10, 1 CPU, 1 hilo): 19 s de dictado → 10.5 s,
+  # 110 s → 48 s, ~0.73 GB (con 1.5 CPU y 2 hilos: 7.5 s y 36 s; con 2 CPU: 5.8 s y 27 s).
+  # Misma receta que el principal; si la imagen ya existe no se reconstruye.
+  transcriptor-dictado:
+    profiles: ["transcriptor"]
+    image: nexara-transcriptor-dictado
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.transcriptor
+      args:
+        WHISPER_MODEL: ${WHISPER_DICTADO_MODEL:-small}
+    container_name: nexara-transcriptor-dictado
+    restart: unless-stopped
+    mem_limit: ${TRANSCRIPTOR_DICTADO_MEM_LIMIT:-1024m}
+    cpu_shares: ${TRANSCRIPTOR_DICTADO_CPU_SHARES:-256}
+    cpus: ${TRANSCRIPTOR_DICTADO_CPUS:-1}
+    environment:
+      WHISPER_THREADS: ${WHISPER_DICTADO_THREADS:-1}
     networks:
       - internal
 
