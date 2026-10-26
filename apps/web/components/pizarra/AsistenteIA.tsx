@@ -1,21 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import MicNoneOutlinedIcon from "@mui/icons-material/MicNoneOutlined";
 import { Alert, Badge, Button, ButtonLink, Card, DateInput, Field, Input, Select, Textarea } from "@/components/base";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
 import DictadoBoton from "@/components/DictadoBoton";
+import OndaVoz from "@/app/(panels)/erp/reuniones/OndaVoz";
 import { unirDictado } from "@/lib/use-dictado";
+import { useDictadoVivo } from "@/lib/use-dictado-vivo";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { formatMinutes } from "@/lib/activity-labels";
+import { kindsForAssignment } from "@/lib/activity-kinds";
+import { periodoPorOmision } from "@/lib/actividad-periodo";
+import { hoyISO } from "@/lib/proyecto-plan";
+import { obtenerProgramacion } from "@/lib/proyectos-api";
 import { resolveV2RoleKey } from "@/lib/user-access";
-import { ROLES } from "@/lib/rbac";
+import { ROLES, type RoleKey } from "@/lib/rbac";
 import {
   DURACIONES_MIN,
+  ETIQUETA_TIPO,
+  SUBTIPOS_TAREA,
+  TIPOS,
+  TIPOS_SERVICIO,
   agendaFinal,
   bloqueos,
+  conProyecto,
   crearActividad,
   encargoElegido,
   estadoAsistente,
@@ -23,8 +35,11 @@ import {
   pasoEquipo,
   payloadFinal,
   personasAsignables,
+  proyectoEfectivo,
   reglaEncargo,
+  subtipoEfectivo,
   sumarAlEquipo,
+  tipoEfectivo,
   type Ajustes,
   type Encargo,
   type PersonaAsignable,
@@ -32,6 +47,7 @@ import {
   type PropuestaActividad,
   type RespuestaAsistente,
 } from "@/lib/asistente-ia-api";
+import type { ActivityKind } from "@/lib/activity-kinds";
 import c from "./comun.module.css";
 import s from "./AsistenteIA.module.css";
 
@@ -44,27 +60,22 @@ type Estado = {
   descartada?: boolean;
 };
 
+/** Etapa del proyecto que se propuso para una tarjeta (como «Asignar»). */
+type EtapaPropuesta = { nombre: string | null };
+
 /**
- * «Que Antonio vaya a Tox a las 3 con el cliente» → la IA propone tipo, persona, cliente,
- * día, plazo y duración; el CEO revisa, corrige lo que haga falta y confirma una por una o
- * todas juntas. Solo se muestra al CEO y si el servidor tiene la IA activa.
+ * «Asignar con IA», hasta arriba de Actividades para el CEO. Se dicta con un toque (el texto
+ * aparece en vivo y al callar se prepara solo) o se escribe y «Preparar actividades». La IA
+ * propone tipo, persona, cliente, día, plazo y duración; el CEO corrige lo que haga falta y
+ * confirma una por una o todas. Solo se muestra al CEO y si el servidor tiene la IA activa.
  */
 export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
   const { user, token } = useUser();
   const [disponible, setDisponible] = useState(false);
-  const [texto, setTexto] = useState("");
-  const [pensando, setPensando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [respuesta, setRespuesta] = useState<RespuestaAsistente | null>(null);
-  const [ajustes, setAjustes] = useState<Record<number, Ajustes>>({});
-  const [estados, setEstados] = useState<Record<number, Estado>>({});
-  const [editandoTexto, setEditandoTexto] = useState<Record<number, boolean>>({});
-  const [creandoTodas, setCreandoTodas] = useState(false);
   const [personas, setPersonas] = useState<PersonaAsignable[]>([]);
   const v2 = useMemo(() => resolveV2RoleKey(user), [user]);
   // Solo el CEO asigna con IA (la matriz del API lo vuelve a exigir).
   const esCeo = v2 === ROLES.CEO || Boolean(user?.isSuperAdmin);
-  const personasOrdenadas = useMemo(() => [...personas].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")), [personas]);
 
   useEffect(() => {
     if (!token || !esCeo) return;
@@ -84,26 +95,109 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
   }, [token, esCeo]);
 
   if (!esCeo || !disponible || !token) return null;
+  return (
+    <Contenido
+      token={token}
+      personas={personas}
+      creadorEmail={user?.email ?? null}
+      isSuperAdmin={Boolean(user?.isSuperAdmin)}
+      v2={v2}
+      onCreada={onCreada}
+    />
+  );
+}
 
-  const enviar = async () => {
-    if (!texto.trim() || pensando) return;
-    setPensando(true);
-    setError(null);
-    try {
-      const r = await interpretar(token, texto);
-      setRespuesta(r);
-      setAjustes({});
-      setEstados({});
-      setEditandoTexto({});
-    } catch (e) {
-      // Lo escrito o dictado no se borra: basta volver a tocar «Interpretar».
-      setError(`${formatApiError(e, "La IA no respondió.")} Tu instrucción sigue aquí: vuelve a tocar «Interpretar».`);
-    } finally {
-      setPensando(false);
+function Contenido({
+  token,
+  personas,
+  creadorEmail,
+  isSuperAdmin,
+  v2,
+  onCreada,
+}: {
+  token: string;
+  personas: PersonaAsignable[];
+  creadorEmail: string | null;
+  isSuperAdmin: boolean;
+  v2: RoleKey | null;
+  onCreada?: () => void;
+}) {
+  const [texto, setTexto] = useState("");
+  const [pensando, setPensando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [respuesta, setRespuesta] = useState<RespuestaAsistente | null>(null);
+  const [listoEnMs, setListoEnMs] = useState<number | null>(null);
+  const [ajustes, setAjustes] = useState<Record<number, Ajustes>>({});
+  const [estados, setEstados] = useState<Record<number, Estado>>({});
+  const [etapas, setEtapas] = useState<Record<number, EtapaPropuesta>>({});
+  const [editandoTexto, setEditandoTexto] = useState<Record<number, boolean>>({});
+  const [creandoTodas, setCreandoTodas] = useState(false);
+  const personasOrdenadas = useMemo(() => [...personas].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")), [personas]);
+  /** Lo que ya estaba escrito cuando empezó el dictado: lo dicho se agrega después. */
+  const base = useRef("");
+  const pensandoRef = useRef(false);
+  /** Cada interpretación nueva invalida las etapas que se estaban pidiendo para la anterior. */
+  const generacion = useRef(0);
+  /** Proyecto del que se pidió la etapa, por tarjeta (si cambia, la respuesta vieja se ignora). */
+  const etapaPedida = useRef<Record<number, number>>({});
+
+  const enviar = useCallback(
+    async (instruccion: string) => {
+      const limpio = instruccion.trim();
+      if (!limpio || pensandoRef.current) return;
+      pensandoRef.current = true;
+      setPensando(true);
+      setError(null);
+      const inicio = performance.now();
+      try {
+        const r = await interpretar(token, limpio);
+        generacion.current += 1;
+        etapaPedida.current = {};
+        setRespuesta(r);
+        setListoEnMs(Math.round(performance.now() - inicio));
+        setAjustes({});
+        setEstados({});
+        setEtapas({});
+        setEditandoTexto({});
+      } catch (e) {
+        // Lo escrito o dictado no se borra: basta volver a intentar.
+        setError(`${formatApiError(e, "La IA no respondió.")} Tu instrucción sigue aquí: vuelve a tocar «Preparar actividades».`);
+      } finally {
+        pensandoRef.current = false;
+        setPensando(false);
+      }
+    },
+    [token],
+  );
+
+  // Dictado: al callar ~2 s (o con un toque) se interpreta solo, una vez por dictado.
+  const dictado = useDictadoVivo({
+    alTerminar: (dicho) => {
+      const completo = unirDictado(base.current, dicho).slice(0, 2000);
+      setTexto(completo);
+      void enviar(completo);
+    },
+  });
+  const escuchando = dictado.estado === "escuchando";
+  const ocupado = dictado.estado !== "inactivo" || pensando;
+  const textoVisible = dictado.estado !== "inactivo" ? unirDictado(base.current, dictado.texto) : texto;
+
+  const tocarMicrofono = () => {
+    if (escuchando) {
+      dictado.detener();
+      return;
     }
+    // Una instrucción nueva después de preparar empieza en blanco; si había algo escrito, se suma.
+    base.current = respuesta ? "" : texto;
+    if (respuesta) setRespuesta(null);
+    setError(null);
+    dictado.iniciar();
   };
 
   const ajustar = (i: number, cambio: Ajustes) => setAjustes((prev) => ({ ...prev, [i]: { ...prev[i], ...cambio } }));
+
+  const propuestas = useMemo(() => respuesta?.propuestas ?? [], [respuesta]);
+  const opciones = respuesta?.opciones;
 
   /** Todo lo que la tarjeta necesita para mostrarse y crearse con lo que se eligió. */
   const armar = (p: PropuestaActividad, i: number) => {
@@ -112,17 +206,43 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
     const destino = personas.find((x) => x.id === responsableId);
     // Sin la lista de personas no se sabe a quién va: no se aplican las reglas por persona.
     const destinoEmail = destino ? destino.email ?? null : undefined;
-    const payload = payloadFinal(p, aj, { destinoEmail });
+    const payload = payloadFinal(p, aj, { destinoEmail, proyectos: opciones?.proyectos });
     const agenda = agendaFinal(p, aj);
-    const motivos = bloqueos(p, payload, {
-      creadorEmail: user?.email,
-      destinoEmail,
-      v2Role: v2,
-      isSuperAdmin: user?.isSuperAdmin,
-      agenda,
-    });
+    const motivos = bloqueos(p, payload, { creadorEmail, destinoEmail, v2Role: v2, isSuperAdmin, agenda });
     return { aj, payload, agenda, destinoEmail, motivos };
   };
+
+  // Obra o proyecto sin fechas dichas: el periodo de la etapa vigente, como propone «Asignar».
+  const proyectosPorTarjeta = propuestas
+    .map((p, i) => {
+      const aj = ajustes[i] || {};
+      const id = proyectoEfectivo(p, aj);
+      return id && !agendaFinal(p, aj).dia && aj.dia === undefined && !etapas[i] ? `${i}:${id}` : null;
+    })
+    .filter(Boolean)
+    .join(",");
+  useEffect(() => {
+    if (!proyectosPorTarjeta) return;
+    const gen = generacion.current;
+    for (const par of proyectosPorTarjeta.split(",")) {
+      const [i, id] = par.split(":").map(Number);
+      etapaPedida.current[i] = id;
+      setEtapas((prev) => ({ ...prev, [i]: { nombre: null } }));
+      obtenerProgramacion(token, id)
+        .then((prog) => {
+          if (gen !== generacion.current || etapaPedida.current[i] !== id) return;
+          const propuesta = periodoPorOmision(prog.etapas, { inicio: prog.proyecto.inicio, fin: prog.proyecto.fin }, hoyISO());
+          if (!propuesta) return;
+          const etapa = prog.etapas.find((e) => e.hitoId === propuesta.hitoId);
+          setEtapas((prev) => ({ ...prev, [i]: { nombre: etapa?.nombre ?? "Todo el proyecto" } }));
+          setAjustes((prev) => ({
+            ...prev,
+            [i]: { ...prev[i], dia: propuesta.inicio, hasta: propuesta.fin, etapaId: propuesta.hitoId },
+          }));
+        })
+        .catch(() => undefined);
+    }
+  }, [proyectosPorTarjeta, token]);
 
   const crear = async (i: number, p: PropuestaActividad) => {
     const { payload, destinoEmail, motivos } = armar(p, i);
@@ -150,7 +270,6 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
     return true;
   };
 
-  const propuestas = respuesta?.propuestas ?? [];
   const pendientes = propuestas.map((p, i) => ({ p, i })).filter(({ i }) => !estados[i]?.creada && !estados[i]?.descartada);
   const listas = pendientes.filter(({ p, i }) => armar(p, i).motivos.length === 0);
 
@@ -162,46 +281,113 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
     setCreandoTodas(false);
   };
 
+  const limpiar = () => {
+    dictado.cancelar();
+    setRespuesta(null);
+    setTexto("");
+    setError(null);
+    base.current = "";
+  };
+
+  const estadoLinea = escuchando
+    ? "Te escucho… cuando termines de hablar lo preparo solo."
+    : dictado.estado === "terminando" || pensando
+      ? "Entendiendo…"
+      : respuesta && propuestas.length
+        ? null
+        : dictado.soportado
+          ? "Toca el micrófono y dilo como se lo dirías a alguien: quién, qué, dónde, para cuándo y cuánto tarda."
+          : "Escribe la instrucción: quién, qué, dónde, para cuándo y cuánto tarda.";
+
   return (
     <Card pad className={s.caja} aria-label="Asignar con IA">
       <div className={c.pila}>
         <div className={c.fila}>
           <AutoAwesomeOutlinedIcon className={s.icono} aria-hidden />
           <strong>Asignar con IA</strong>
-          <span className={c.tenue}>
-            Escríbelo o díctalo como se lo dirías a alguien: quién, qué, dónde, para cuándo y cuánto tarda. Nada se crea hasta que confirmes.
-          </span>
+          <span className={c.tenue}>Nada se crea hasta que confirmes.</span>
         </div>
-        <Textarea
-          rows={2}
-          value={texto}
-          maxLength={2000}
-          placeholder="Ej.: que Antonio vaya a Tox mañana a las 3 a revisar las cámaras, le lleva 2 horas; y que Carolina mande la cotización de Banorte para el viernes"
-          aria-label="Instrucción para la IA"
-          onChange={(e) => setTexto(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void enviar();
-          }}
-        />
-        <div className={c.fila}>
-          <DictadoBoton onTexto={(frase) => setTexto((t) => unirDictado(t, frase).slice(0, 2000))} disabled={pensando} />
-          <Button variant="primary" className={c.tap} onClick={() => void enviar()} disabled={!texto.trim() || pensando} aria-busy={pensando}>
-            {pensando ? "Interpretando…" : "Interpretar"}
-          </Button>
-          {respuesta ? (
-            <Button
-              variant="ghost"
-              className={c.tap}
-              onClick={() => {
-                setRespuesta(null);
-                setTexto("");
+
+        <div className={s.entrada}>
+          {dictado.soportado ? (
+            <div className={s.micro} data-activo={escuchando ? "true" : undefined}>
+              <span className={s.anillo} aria-hidden="true" />
+              <button
+                type="button"
+                className={s.botonMicro}
+                onClick={tocarMicrofono}
+                disabled={!escuchando && ocupado}
+                aria-pressed={escuchando}
+                aria-label={escuchando ? "Terminar de dictar" : "Dictar la instrucción"}
+                title={escuchando ? "Terminar de dictar" : "Dictar la instrucción"}
+              >
+                {escuchando ? <span className={s.cuadro} aria-hidden="true" /> : <MicNoneOutlinedIcon aria-hidden />}
+              </button>
+            </div>
+          ) : null}
+
+          <div className={s.campo}>
+            <Textarea
+              rows={2}
+              value={textoVisible}
+              maxLength={2000}
+              readOnly={dictado.estado !== "inactivo"}
+              data-vivo={escuchando ? "true" : undefined}
+              className={s.instruccion}
+              placeholder="Ej.: que Antonio vaya mañana a las 3 a Tox a revisar las cámaras, le lleva 2 horas; y que Carolina mande la cotización de Banorte para el viernes"
+              aria-label="Instrucción para la IA"
+              onChange={(e) => setTexto(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void enviar(texto);
               }}
-            >
+            />
+            <div className={s.estado} aria-live="polite" data-vacio={estadoLinea ? undefined : "true"}>
+              {escuchando ? <OndaVoz analizador={dictado.analizador} activo={escuchando} /> : null}
+              {dictado.estado === "terminando" || pensando ? <span className={s.puntos} aria-hidden="true" /> : null}
+              {estadoLinea ? <span className={escuchando ? s.oyendo : c.tenue}>{estadoLinea}</span> : null}
+            </div>
+          </div>
+        </div>
+
+        <div className={c.fila}>
+          <Button
+            variant={dictado.soportado ? "secondary" : "primary"}
+            className={c.tap}
+            onClick={() => void enviar(texto)}
+            disabled={!texto.trim() || ocupado}
+            aria-busy={pensando}
+            kbd="Ctrl+Enter"
+          >
+            {pensando ? "Preparando…" : "Preparar actividades"}
+          </Button>
+          {!dictado.soportado ? (
+            <DictadoBoton
+              disabled={pensando}
+              onTexto={(frase) => {
+                // Respaldo (sin reconocimiento en el navegador): al volver el texto se prepara solo.
+                const completo = unirDictado(texto, frase).slice(0, 2000);
+                setTexto(completo);
+                void enviar(completo);
+              }}
+            />
+          ) : null}
+          {respuesta || texto ? (
+            <Button variant="ghost" className={c.tap} onClick={limpiar} disabled={pensando}>
               Limpiar
             </Button>
           ) : null}
         </div>
+        <p className={s.privacidad}>
+          {dictado.soportado
+            ? "El dictado usa el reconocimiento de voz de tu navegador."
+            : "Si dictas, la voz se pasa a texto en el servidor de NEXARA."}
+        </p>
 
+        {dictado.error ? (
+          <Alert tone="warning" role="alert">
+            {dictado.error}
+          </Alert>
+        ) : null}
         {error ? (
           <Alert tone="danger" role="alert">
             {error}
@@ -213,12 +399,21 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
           </Alert>
         ) : null}
 
+        {propuestas.length ? (
+          <h3 className={s.esto}>
+            Esto entendí{propuestas.length > 1 ? ` · ${propuestas.length} actividades` : ""}
+            {listoEnMs != null ? <span className={c.tenue}> · listo en {(listoEnMs / 1000).toFixed(1)} s</span> : null}
+          </h3>
+        ) : null}
+
         {propuestas.map((p, i) => {
           const est = estados[i] || {};
           if (est.descartada) return null;
           const { aj, payload, agenda, destinoEmail, motivos } = armar(p, i);
+          const tipo = tipoEfectivo(p, aj);
+          const subtipo = subtipoEfectivo(p, aj);
           const falta = (campo: string) => p.faltantes.includes(campo);
-          const regla = reglaEncargo(p.tipo, destinoEmail, encargoElegido(p, aj));
+          const regla = reglaEncargo(tipo, destinoEmail, encargoElegido(p, aj));
           const editando = Boolean(editandoTexto[i]);
           const titulo = String(payload.titulo ?? p.titulo);
           const indicaciones = typeof payload.indicaciones === "string" ? payload.indicaciones : "";
@@ -229,15 +424,27 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
           const resto = personasOrdenadas.filter((x) => !sugeridas.some((o) => o.id === x.id));
           const responsableFuera = p.responsable && !personas.some((x) => x.id === p.responsable!.id) ? [p.responsable] : [];
           const pide = (campo: string, nota: string) => (falta(campo) ? `No lo dijiste: ${nota}` : undefined);
+          const permitidos = kindsForAssignment({ creatorEmail: creadorEmail, targetEmail: destinoEmail ?? undefined, v2Role: v2, isSuperAdmin });
+          const tiposVisibles: ActivityKind[] = TIPOS.filter((t) => permitidos.includes(t) || t === tipo);
+          const clienteId = payload.clientId ? Number(payload.clientId) : null;
+          const clientesSugeridos = p.cliente ? [p.cliente] : p.clienteCandidatos;
+          const otrosClientes = (opciones?.clientes ?? []).filter((x) => !clientesSugeridos.some((o) => o.id === x.id));
+          const proyectoId = proyectoEfectivo(p, aj);
+          const proyectosLista = [
+            ...(p.proyecto ? [p.proyecto] : []),
+            ...p.proyectoCandidatos,
+            ...(opciones?.proyectos ?? []),
+          ].filter((x, k, arr) => arr.findIndex((y) => y.id === x.id) === k);
+          const etapa = etapas[i]?.nombre;
 
           return (
             <div key={i} className={s.propuesta}>
               <div className={c.filaEntre}>
                 <div className={c.fila}>
-                  <ActivityKindIcon kind={p.tipo} />
+                  <ActivityKindIcon kind={tipo} />
                   <strong>{titulo}</strong>
                   <Badge tone="brand" size="sm">
-                    {p.tipoEtiqueta}
+                    {ETIQUETA_TIPO[tipo]}
                   </Badge>
                 </div>
                 {!est.creada ? (
@@ -269,11 +476,37 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
               ) : indicaciones ? (
                 <p className={s.indicaciones}>{indicaciones}</p>
               ) : null}
-              <p className={s.resumen}>{p.resumen}</p>
-              {p.razonTipo ? <p className={c.tenue}>Por qué {p.tipoEtiqueta.toLowerCase()}: {p.razonTipo}</p> : null}
+              {/* El resumen es el de la IA: si se cambió el tipo, ya no aplica (los campos lo dicen). */}
+              {tipo === p.tipo ? <p className={s.resumen}>{p.resumen}</p> : null}
 
               {!est.creada ? (
                 <div className={s.ajustes}>
+                  <Field label="Tipo" required>
+                    <Select value={tipo} onChange={(e) => ajustar(i, { tipo: e.target.value as ActivityKind, subtipo: undefined })}>
+                      {tiposVisibles.map((t) => (
+                        <option key={t} value={t}>
+                          {ETIQUETA_TIPO[t]}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  {tipo === "tarea" || tipo === "servicio" ? (
+                    <Field label={tipo === "tarea" ? "Tipo de tarea" : "Tipo de servicio"} required>
+                      <Select value={subtipo ?? ""} onChange={(e) => ajustar(i, { subtipo: e.target.value })}>
+                        {tipo === "tarea"
+                          ? SUBTIPOS_TAREA.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))
+                          : TIPOS_SERVICIO.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.label}
+                              </option>
+                            ))}
+                      </Select>
+                    </Field>
+                  ) : null}
                   <Field label="Responsable" required hint={!p.responsable && p.textoResponsable ? `Dijiste «${p.textoResponsable}»` : undefined}>
                     <Select
                       value={responsableId ? String(responsableId) : ""}
@@ -298,29 +531,54 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
                       </optgroup>
                     </Select>
                   </Field>
-                  {!p.cliente && p.clienteCandidatos.length ? (
-                    <Field label="Cliente" required={p.tipo === "servicio"} hint={p.textoCliente ? `Dijiste «${p.textoCliente}»` : undefined}>
+                  {!conProyecto(tipo) && (clientesSugeridos.length || otrosClientes.length) ? (
+                    <Field
+                      label="Cliente"
+                      required={tipo === "servicio"}
+                      hint={!p.cliente && p.textoCliente ? `Dijiste «${p.textoCliente}»` : undefined}
+                    >
                       <Select
-                        value={aj.clientId ? String(aj.clientId) : ""}
+                        value={clienteId ? String(clienteId) : ""}
                         onChange={(e) => ajustar(i, { clientId: Number(e.target.value) || null })}
                       >
-                        <option value="">{p.tipo === "servicio" ? "Elige el cliente" : "Sin cliente"}</option>
-                        {p.clienteCandidatos.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.nombre}
-                          </option>
-                        ))}
+                        <option value="">{tipo === "servicio" ? "Elige el cliente" : "Sin cliente"}</option>
+                        {clientesSugeridos.length ? (
+                          <optgroup label={p.cliente ? "El que dijiste" : "Coinciden con lo que dijiste"}>
+                            {clientesSugeridos.map((o) => (
+                              <option key={o.id} value={o.id}>
+                                {o.nombre}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ) : null}
+                        {otrosClientes.length ? (
+                          <optgroup label="Todos los clientes">
+                            {otrosClientes.map((o) => (
+                              <option key={o.id} value={o.id}>
+                                {o.nombre}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ) : null}
                       </Select>
                     </Field>
                   ) : null}
-                  {!p.proyecto && p.proyectoCandidatos.length ? (
+                  {conProyecto(tipo) ? (
                     <Field label="Proyecto" required>
                       <Select
-                        value={aj.projectId ? String(aj.projectId) : ""}
-                        onChange={(e) => ajustar(i, { projectId: Number(e.target.value) || null })}
+                        value={proyectoId ? String(proyectoId) : ""}
+                        onChange={(e) => {
+                          // Otro proyecto: se vuelve a proponer el periodo de su etapa.
+                          setEtapas((prev) => {
+                            const copia = { ...prev };
+                            delete copia[i];
+                            return copia;
+                          });
+                          ajustar(i, { projectId: Number(e.target.value) || null, dia: undefined, hasta: undefined, etapaId: undefined });
+                        }}
                       >
                         <option value="">Elige el proyecto</option>
-                        {p.proyectoCandidatos.map((o) => (
+                        {proyectosLista.map((o) => (
                           <option key={o.id} value={o.id}>
                             {o.nombre}
                           </option>
@@ -330,15 +588,15 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
                   ) : null}
                   <Field
                     label={agenda.hasta ? "Del" : "Día"}
-                    required={p.tipo === "servicio" || p.tipo === "obra"}
-                    hint={agenda.dia ? undefined : pide("fecha", "¿para cuándo?")}
+                    required={tipo === "servicio" || tipo === "obra"}
+                    hint={etapa ? `Etapa: ${etapa}` : agenda.dia ? undefined : pide("fecha", "¿para cuándo?")}
                   >
                     <DateInput value={agenda.dia ?? ""} onChange={(e) => ajustar(i, { dia: e.target.value })} />
                   </Field>
-                  <Field label="Hora" hint={agenda.dia && !agenda.horaDicha ? "No la dijiste: revisa la hora" : undefined}>
+                  <Field label="Hora" hint={agenda.dia && !agenda.horaDicha ? "No la dijiste: revísala" : undefined}>
                     <Input type="time" value={agenda.hora ?? ""} disabled={!agenda.dia} onChange={(e) => ajustar(i, { hora: e.target.value })} />
                   </Field>
-                  <Field label="Al (último día, si dura varios)" optional>
+                  <Field label="Último día" optional>
                     <DateInput
                       value={agenda.hasta ?? ""}
                       min={agenda.dia ?? undefined}

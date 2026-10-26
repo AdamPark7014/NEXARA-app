@@ -44,3 +44,182 @@
   font-size: var(--ui-fs-caption);
   color: var(--ui-fg-muted);
 }
+
+/* ─── Dictar o escribir (patrón de FinanVoz: micrófono grande y texto en vivo) ─── */
+.entrada {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.micro {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+}
+
+/* Halo que late mientras escucha (cambia de forma, no solo de color). */
+.anillo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--ui-brand-soft);
+  opacity: 0;
+  transform: scale(0.85);
+  pointer-events: none;
+}
+
+.micro[data-activo="true"] .anillo {
+  opacity: 1;
+  animation: latido 1.4s var(--ui-ease-in-out, ease-in-out) infinite;
+}
+
+@keyframes latido {
+  0%,
+  100% {
+    transform: scale(0.9);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+.botonMicro {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ui-brand);
+  color: var(--ui-fg-on-brand);
+  cursor: pointer;
+  box-shadow: var(--ui-shadow-sm);
+  transition: transform var(--ui-duration-fast, 120ms) var(--ui-ease-out, ease-out),
+    background var(--ui-duration-fast, 120ms) var(--ui-ease-out, ease-out);
+}
+
+.botonMicro svg {
+  font-size: 28px;
+}
+
+.botonMicro:hover:not(:disabled) {
+  background: var(--ui-brand-hover);
+}
+
+.botonMicro:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.botonMicro:focus-visible {
+  outline: 2px solid var(--ui-ring);
+  outline-offset: 3px;
+}
+
+.botonMicro:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Escuchando: el ícono pasa a un cuadro de «terminar». */
+.cuadro {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: currentColor;
+}
+
+.campo {
+  flex: 1;
+  display: grid;
+  gap: var(--ui-s1);
+  min-width: 0;
+}
+
+.instruccion[data-vivo="true"] {
+  border-color: var(--ui-brand);
+}
+
+.estado {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  min-height: 32px;
+  min-width: 0;
+  flex-wrap: wrap;
+  color: var(--ui-brand);
+}
+
+/* Sin nada que decir (ya hay tarjetas), la línea no ocupa espacio. */
+.estado[data-vacio="true"] {
+  min-height: 0;
+}
+
+.oyendo {
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-brand-text);
+  font-weight: var(--ui-fw-medium, 500);
+}
+
+/* «Entendiendo…»: tres puntos que se encienden por turnos. */
+.puntos {
+  display: inline-block;
+  width: 24px;
+  height: 6px;
+  background:
+    radial-gradient(circle closest-side, var(--ui-brand) 90%, transparent) 0 50% / 6px 6px no-repeat,
+    radial-gradient(circle closest-side, var(--ui-brand) 90%, transparent) 50% 50% / 6px 6px no-repeat,
+    radial-gradient(circle closest-side, var(--ui-brand) 90%, transparent) 100% 50% / 6px 6px no-repeat;
+  animation: puntos 1s steps(3, end) infinite;
+}
+
+@keyframes puntos {
+  0% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.35;
+  }
+}
+
+.privacidad {
+  margin: 0;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-3);
+}
+
+.esto {
+  margin: var(--ui-s2) 0 0;
+  font-size: var(--ui-fs-section);
+  line-height: var(--ui-lh-section);
+  font-weight: var(--ui-fw-section);
+  color: var(--ui-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .micro[data-activo="true"] .anillo,
+  .puntos {
+    animation: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .entrada {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .campo {
+    width: 100%;
+  }
+}

@@ -8,6 +8,27 @@ import { Stat, StatRow } from "./piezas";
 import { Tabs } from "./PageHead";
 
 describe("ModulePage · plantilla de módulo", () => {
+  it("«lead» va justo bajo el encabezado, antes de los KPI, y si no pinta nada no deja hueco", () => {
+    const Nada = () => null;
+    const { container, rerender } = render(
+      <ModulePage title="Actividades" lead={<section aria-label="Asignar con IA">IA</section>} stats={<div>KPI</div>}>
+        <p>Lista</p>
+      </ModulePage>,
+    );
+    const ia = screen.getByRole("region", { name: "Asignar con IA" });
+    const kpi = screen.getByText("KPI");
+    expect(ia.compareDocumentPosition(kpi) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Actividades" }).compareDocumentPosition(ia) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    rerender(
+      <ModulePage title="Actividades" lead={<Nada />}>
+        <p>Lista</p>
+      </ModulePage>,
+    );
+    // El contenedor queda vacío y el CSS (`.lead:empty`) lo oculta.
+    const vacios = [...container.querySelectorAll("div")].filter((d) => d.childNodes.length === 0 && d.className.includes("lead"));
+    expect(vacios).toHaveLength(1);
+  });
+
   it("pinta encabezado, pestañas, KPI, barra, contenido y pie en ese orden", () => {
     render(
       <ModulePage

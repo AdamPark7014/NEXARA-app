@@ -79,6 +79,11 @@ export type ModulePageProps = {
   head?: ReactNode;
   /** `<Tabs/>` con contadores, pegadas al borde inferior del encabezado. */
   tabs?: ReactNode;
+  /**
+   * Lo primero bajo el encabezado, antes de los KPI (p. ej. «Asignar con IA» en Actividades).
+   * Si el bloque no pinta nada, el hueco no se ve.
+   */
+  lead?: ReactNode;
   /** Franja de KPI: `<StatRow><Stat/>…</StatRow>`. */
   stats?: ReactNode;
   /** Aviso o bloque entre los KPI y la lista (`<Alert/>`). */
@@ -116,6 +121,7 @@ export function ModulePage({
   tertiaryActions,
   head,
   tabs,
+  lead,
   stats,
   before,
   toolbar,
@@ -179,6 +185,7 @@ export function ModulePage({
   return (
     <div className={[s.page, className].filter(Boolean).join(" ")} style={style} data-loading={loading ? "true" : undefined}>
       {encabezado}
+      {lead ? <div className={s.lead}>{lead}</div> : null}
       {stats}
       {before ? <div className={s.before}>{before}</div> : null}
       {hayTarjeta ? (

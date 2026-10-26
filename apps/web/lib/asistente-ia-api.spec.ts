@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agendaFinal, bloqueos, pasoEquipo, payloadFinal, reglaEncargo, type PropuestaActividad } from "./asistente-ia-api";
+import { agendaFinal, bloqueos, pasoEquipo, payloadFinal, reglaEncargo, subtipoEfectivo, type PropuestaActividad } from "./asistente-ia-api";
 
 const base: PropuestaActividad = {
   tipo: "servicio",
@@ -134,5 +134,22 @@ describe("asistente IA en la pizarra", () => {
       indicaciones: "Cupo: 1 persona.",
     });
     expect(pasoEquipo(base, base.payload)).toBeNull();
+  });
+
+  it("cambiar el tipo rehace los campos como el API (coreKind, activityType, ticketType, ticketTypeCustom)", () => {
+    const proyectos = [{ id: 30, nombre: "CCTV Nave 2", clientId: 5 }];
+    // Servicio → tarea Junta.
+    const tarea = payloadFinal(lista, { tipo: "tarea", subtipo: "Junta" });
+    expect(tarea).toMatchObject({ coreKind: "tarea", activityType: "INTERNAL", ticketType: "OTRO", ticketTypeCustom: "Junta" });
+    // Servicio → obra: proyecto (y su cliente) y la etapa propuesta.
+    const obra = payloadFinal(lista, { tipo: "obra", projectId: 30, etapaId: 7 }, { proyectos });
+    expect(obra).toMatchObject({ coreKind: "obra", activityType: "CLIENT", ticketType: "INSTALACION", projectId: 30, clientId: 5, projectMilestoneId: 7 });
+    expect(obra.ticketTypeCustom).toBeUndefined();
+    // Sin proyecto, una obra no se crea.
+    expect(bloqueos(lista, payloadFinal(lista, { tipo: "obra" }), {})).toContain("Elige el proyecto.");
+    // Comercial y de vuelta a servicio: el subtipo por omisión de cada uno.
+    expect(payloadFinal(lista, { tipo: "comercial" })).toMatchObject({ ticketType: "OTRO", ticketTypeCustom: "COMERCIAL" });
+    expect(subtipoEfectivo({ ...lista, tipo: "tarea", payload: { ...lista.payload, ticketTypeCustom: "Entrega" } }, { tipo: "servicio" })).toBe("PREVENTIVO");
+    expect(subtipoEfectivo(lista, { tipo: "tarea" })).toBe("Otro");
   });
 });

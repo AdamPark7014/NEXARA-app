@@ -3,11 +3,13 @@
  *
  * La IA solo propone: cada propuesta trae el cuerpo listo para `POST /activities`, que es
  * quien crea, notifica y revisa permisos como en el alta manual. La tarjeta deja corregir
- * cada campo con las mismas reglas del formulario «Asignar» (día y hora, último día si dura
- * varios, tiempo estimado obligatorio, encargo según la persona).
+ * cada campo con las mismas reglas del formulario «Asignar» (tipo y subtipo, día y hora, último
+ * día si dura varios, tiempo estimado obligatorio, encargo según la persona, etapa del proyecto).
  */
 import { buildApiUrl } from "@/lib/api-base";
 import {
+  ACTIVITY_KINDS,
+  TAREA_TIPOS,
   canOfferAssignmentCharge,
   forcesDespachoOnly,
   forcesEjecucionOnly,
@@ -52,10 +54,14 @@ export type PropuestaActividad = {
   payload: Record<string, unknown>;
 };
 
+export type ProyectoOpcion = Referencia & { clientId: number };
+
 export type RespuestaAsistente = {
   propuestas: PropuestaActividad[];
   aclaracion: string | null;
-  uso: { modelo: string; tokensEntrada: number; tokensSalida: number; usdAprox: number | null };
+  uso: { modelo: string; tokensEntrada: number; tokensSalida: number; usdAprox: number | null } | null;
+  /** Clientes y proyectos activos, para cambiar el tipo en la tarjeta (no pasan por la IA). */
+  opciones?: { clientes: Referencia[]; proyectos: ProyectoOpcion[] };
 };
 
 export type PersonaAsignable = { id: number; nombre: string; email?: string | null };
@@ -112,6 +118,11 @@ export function crearActividad(token: string, payload: Record<string, unknown>) 
 
 /** Lo que la persona cambió en la tarjeta. `""` en día/último día = quitarlo. */
 export type Ajustes = {
+  tipo?: ActivityKind;
+  /** Subtipo de tarea (etiqueta de `TAREA_TIPOS`) o tipo de servicio (`TIPOS_SERVICIO`). */
+  subtipo?: string;
+  /** Etapa del cronograma del proyecto (la que propone «Asignar»). */
+  etapaId?: number | null;
   responsableId?: number;
   clientId?: number | null;
   projectId?: number | null;
@@ -124,6 +135,54 @@ export type Ajustes = {
   prioridad?: Prioridad;
   encargo?: Encargo | null;
 };
+
+export const TIPOS: ActivityKind[] = ["tarea", "servicio", "obra", "proyecto", "comercial"];
+export const ETIQUETA_TIPO: Record<ActivityKind, string> = Object.fromEntries(
+  TIPOS.map((t) => [t, ACTIVITY_KINDS[t].title]),
+) as Record<ActivityKind, string>;
+
+/** Tipos de servicio (mismos valores que `ticketType` del API). */
+export const TIPOS_SERVICIO = [
+  { id: "PREVENTIVO", label: "Preventivo" },
+  { id: "CORRECTIVO", label: "Correctivo" },
+  { id: "EMERGENCIA", label: "Emergencia" },
+  { id: "INSTALACION", label: "Instalación" },
+] as const;
+
+/** Subtipos de tarea (los de «Asignar»: viajan en `ticketTypeCustom`). */
+export const SUBTIPOS_TAREA = TAREA_TIPOS.map((t) => t.label);
+
+export const conProyecto = (tipo: ActivityKind) => tipo === "obra" || tipo === "proyecto";
+
+/** El tipo que va a quedar: el que eligió la persona o el que propuso la IA. */
+export function tipoEfectivo(p: PropuestaActividad, aj: Ajustes): ActivityKind {
+  return aj.tipo ?? p.tipo;
+}
+
+/** Subtipo vigente según el tipo: el elegido, el de la IA o el de omisión del API. */
+export function subtipoEfectivo(p: PropuestaActividad, aj: Ajustes): string | null {
+  const tipo = tipoEfectivo(p, aj);
+  if (tipo === "tarea") {
+    const ia = p.tipo === "tarea" ? String(p.payload.ticketTypeCustom ?? "") : "";
+    const elegido = aj.subtipo && SUBTIPOS_TAREA.includes(aj.subtipo) ? aj.subtipo : null;
+    return elegido ?? (SUBTIPOS_TAREA.includes(ia) ? ia : "Otro");
+  }
+  if (tipo === "servicio") {
+    const validos: string[] = TIPOS_SERVICIO.map((t) => t.id);
+    const ia = p.tipo === "servicio" ? String(p.payload.ticketType ?? "") : "";
+    const elegido = aj.subtipo && validos.includes(aj.subtipo) ? aj.subtipo : null;
+    return elegido ?? (validos.includes(ia) ? ia : "PREVENTIVO");
+  }
+  return null;
+}
+
+/** Proyecto vigente (solo obra y proyecto): el elegido o el que encontró la IA. */
+export function proyectoEfectivo(p: PropuestaActividad, aj: Ajustes): number | null {
+  if (!conProyecto(tipoEfectivo(p, aj))) return null;
+  if (aj.projectId !== undefined) return aj.projectId || null;
+  const ia = Number(p.payload.projectId ?? p.proyecto?.id ?? 0);
+  return ia || null;
+}
 
 /** Tiempos de la lista de la tarjeta (el formulario va de 5 en 5 minutos hasta 12 h). */
 export const DURACIONES_MIN = [15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 480, 600, 720];
@@ -175,17 +234,34 @@ const CAMPOS_FECHA = ["fechaInicio", "fechaEntregaEsperada", "fechaMaxima", "per
 export function payloadFinal(
   p: PropuestaActividad,
   aj: Ajustes,
-  ctx: { destinoEmail?: string | null } = {},
+  ctx: { destinoEmail?: string | null; proyectos?: ProyectoOpcion[] } = {},
 ): Record<string, unknown> {
   const out: Record<string, unknown> = { ...p.payload };
   if (aj.responsableId) out.responsableId = aj.responsableId;
+  // Tipo y subtipo con el mismo mapeo que el API (y que «Asignar»).
+  const tipo = tipoEfectivo(p, aj);
+  const subtipo = subtipoEfectivo(p, aj);
+  out.coreKind = tipo;
+  out.activityType = conProyecto(tipo) ? "CLIENT" : "INTERNAL";
+  out.ticketType = tipo === "obra" ? "INSTALACION" : tipo === "tarea" || tipo === "comercial" ? "OTRO" : tipo === "servicio" ? subtipo : p.tipo === "proyecto" ? (p.payload.ticketType ?? "PREVENTIVO") : "PREVENTIVO";
+  if (tipo === "comercial") out.ticketTypeCustom = "COMERCIAL";
+  else if (tipo === "tarea") out.ticketTypeCustom = subtipo;
+  else delete out.ticketTypeCustom;
   if (aj.clientId !== undefined) {
     if (aj.clientId) out.clientId = aj.clientId;
     else delete out.clientId;
   }
-  if (aj.projectId !== undefined) {
-    if (aj.projectId) out.projectId = aj.projectId;
-    else delete out.projectId;
+  const proyecto = proyectoEfectivo(p, aj);
+  if (proyecto) {
+    out.projectId = proyecto;
+    // Como el formulario: el cliente de una obra o proyecto es el del proyecto.
+    const delProyecto = ctx.proyectos?.find((x) => x.id === proyecto)?.clientId;
+    if (delProyecto && aj.clientId === undefined) out.clientId = delProyecto;
+    if (aj.etapaId) out.projectMilestoneId = aj.etapaId;
+    else delete out.projectMilestoneId;
+  } else {
+    delete out.projectId;
+    delete out.projectMilestoneId;
   }
   if (aj.titulo !== undefined && aj.titulo.trim()) out.titulo = aj.titulo.trim().slice(0, 200);
   if (aj.indicaciones !== undefined) {
@@ -214,7 +290,7 @@ export function payloadFinal(
       }
     }
   }
-  const encargo = reglaEncargo(p.tipo, ctx.destinoEmail, encargoElegido(p, aj)).valor;
+  const encargo = reglaEncargo(tipo, ctx.destinoEmail, encargoElegido(p, aj)).valor;
   if (encargo) out.assignmentCharge = encargo;
   else delete out.assignmentCharge;
   return out;
@@ -237,18 +313,19 @@ export function bloqueos(
   },
 ): string[] {
   const out: string[] = [];
+  const tipo = (payload.coreKind as ActivityKind | undefined) ?? p.tipo;
   if (!payload.responsableId) out.push("Elige a quién se le asigna.");
-  if (p.tipo === "servicio" && !payload.clientId) out.push("Un servicio necesita un cliente registrado.");
-  if ((p.tipo === "obra" || p.tipo === "proyecto") && !payload.projectId) out.push("Elige el proyecto.");
-  if ((p.tipo === "servicio" || p.tipo === "obra") && !payload.fechaInicio) {
-    out.push(p.tipo === "servicio" ? "Indica el día del servicio." : "Indica el día de la obra.");
+  if (tipo === "servicio" && !payload.clientId) out.push("Un servicio necesita un cliente registrado.");
+  if (conProyecto(tipo) && !payload.projectId) out.push("Elige el proyecto.");
+  if ((tipo === "servicio" || tipo === "obra") && !payload.fechaInicio) {
+    out.push(tipo === "servicio" ? "Indica el día del servicio." : "Indica el día de la obra.");
   }
   if (!payload.tiempoEstimadoMin) out.push("Indica cuánto tiempo toma.");
   if (ctx.agenda?.dia && ctx.agenda.hasta && ctx.agenda.hasta < ctx.agenda.dia) {
     out.push("El último día no puede ser antes del primero.");
   }
   if (payload.responsableId && ctx.destinoEmail !== undefined) {
-    if (reglaEncargo(p.tipo, ctx.destinoEmail, null).ofrecer && !payload.assignmentCharge) {
+    if (reglaEncargo(tipo, ctx.destinoEmail, null).ofrecer && !payload.assignmentCharge) {
       out.push("Elige si la hace en persona o la reparte a su equipo.");
     }
     const permitidos = kindsForAssignment({
@@ -257,8 +334,8 @@ export function bloqueos(
       v2Role: ctx.v2Role,
       isSuperAdmin: ctx.isSuperAdmin,
     });
-    if (!permitidos.includes(p.tipo)) {
-      out.push(`A esta persona no se le puede asignar ${p.tipoEtiqueta.toLowerCase()}.`);
+    if (!permitidos.includes(tipo)) {
+      out.push(`A esta persona no se le puede asignar ${ETIQUETA_TIPO[tipo].toLowerCase()}.`);
     }
   }
   return out;
@@ -282,7 +359,7 @@ export function pasoEquipo(
     userId,
     rol: "LEAD",
     horasPlan,
-    ...(forcesDespachoOnly(destinoEmail, p.tipo) ? { indicaciones: formatDispatchHeadcountNote(1) } : {}),
+    ...(forcesDespachoOnly(destinoEmail, (payload.coreKind as ActivityKind | undefined) ?? p.tipo) ? { indicaciones: formatDispatchHeadcountNote(1) } : {}),
   };
 }
 

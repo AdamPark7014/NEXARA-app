@@ -252,6 +252,10 @@ export default function PizarraPage() {
     <Tabs ariaLabel="Vista de actividades" items={pestanasVisibles(ids)} value={vistaActiva} onChange={cambiarVista} />
   );
 
+  // «Asignar con IA» hasta arriba, en todas las pestañas; solo lo ve quien lo tiene (el
+  // componente no pinta nada si no es el CEO o si la IA no está disponible).
+  const asistente = <AsistenteIA onCreada={() => void load()} />;
+
   if (cargandoEquipo) {
     return (
       <div className={p.pagina}>
@@ -269,6 +273,7 @@ export default function PizarraPage() {
           title="Actividades"
           description={DESCRIPCION[vistaActiva]}
           tabs={pestanasNodo(["mias", "solicitudes"])}
+          lead={asistente}
           card={false}
         >
           {vistaActiva === "solicitudes" ? <SolicitudesEquipoView token={token} /> : <MisActividadesView />}
@@ -487,16 +492,8 @@ export default function PizarraPage() {
             </>
           ) : null
         }
-        before={
-          verEquipo || verAsignadas ? (
-            <>
-              {avisoRefresco}
-              <AsistenteIA onCreada={() => void load()} />
-            </>
-          ) : (
-            avisoRefresco
-          )
-        }
+        lead={asistente}
+        before={avisoRefresco}
         toolbar={barraEquipo}
         card={verEquipo}
         listLabel={verEquipo ? "Personas del equipo" : undefined}
