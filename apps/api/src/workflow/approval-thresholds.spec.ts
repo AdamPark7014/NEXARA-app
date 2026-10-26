@@ -41,8 +41,12 @@ describe('tipoBase / mensaje', () => {
     expect(tipoBase('PURCHASE_ORDER')).toBe('PURCHASE_ORDER');
   });
   it('el mensaje dice el monto y si la solicitud ya estaba abierta', () => {
-    expect(mensajeDeAutorizacion('COTIZACION', 250000, false)).toMatch(/La cotización es de \$250,000\.00.*Se la pedimos ahora/);
-    expect(mensajeDeAutorizacion('PURCHASE_ORDER', 30000, true)).toMatch(/La orden de compra.*Ya se pidió/);
+    expect(mensajeDeAutorizacion('COTIZACION', 250000, false)).toBe(
+      'La cotización es de $250,000.00 y, por su monto, necesita la autorización de dirección: se la pedimos ahora y te avisamos cuando la resuelva.',
+    );
+    expect(mensajeDeAutorizacion('PURCHASE_ORDER', 30000, true)).toBe(
+      'La orden de compra es de $30,000.00 y, por su monto, necesita la autorización de dirección: ya se pidió y sigue esperando su respuesta; te avisamos cuando la resuelva.',
+    );
   });
 });
 
@@ -126,7 +130,7 @@ describe('ApprovalThresholdService.exigir', () => {
 
   it('con la solicitud ya abierta no la duplica y avisa que sigue esperando', async () => {
     const { servicio, workflow } = crear({ abierta: true });
-    await expect(servicio.exigir(cot())).rejects.toThrow(/Ya se pidió y sigue esperando/);
+    await expect(servicio.exigir(cot())).rejects.toThrow(/: ya se pidió y sigue esperando su respuesta; te avisamos/);
     expect(workflow.requestApproval).not.toHaveBeenCalled();
   });
 
