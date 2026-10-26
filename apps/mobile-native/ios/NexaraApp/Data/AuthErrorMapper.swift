@@ -2,7 +2,7 @@ import Foundation
 
 /// Mensajes claros para el acceso (paridad con `AuthErrorMapper.kt` de Android).
 ///
-/// Por qué existe: `ApiError.toUserMessage` contesta «Sesión expirada. Inicia sesión de
+/// Por qué existe: `ApiError.toUserMessage` contesta «Sesión expirada, inicia sesión de
 /// nuevo.» a CUALQUIER 401. En un login eso es una mentira: no hay sesión que haya
 /// expirado. Quien se equivocó de contraseña, quien tiene la cuenta bloqueada y quien
 /// no tenía conexión veían la misma frase. Apple reportó justamente eso al revisar la

@@ -28,7 +28,7 @@ class AttendanceCheckInTest {
     @Test
     fun `otros errores no se disfrazan de gps falso`() {
         assertFalse(AttendanceCheckIn.esUbicacionSimulada(400, "Ya registraste tu entrada de hoy"))
-        assertFalse(AttendanceCheckIn.esUbicacionSimulada(null, "Sin conexión. Revisa tu red e intenta de nuevo."))
+        assertFalse(AttendanceCheckIn.esUbicacionSimulada(null, "Sin conexión, revisa tu red e intenta de nuevo."))
         assertFalse(AttendanceCheckIn.esUbicacionSimulada(500, "Error del servidor"))
     }
 

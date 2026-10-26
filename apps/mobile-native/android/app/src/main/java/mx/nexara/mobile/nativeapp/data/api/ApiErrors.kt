@@ -21,19 +21,19 @@ fun Throwable.toUserMessage(fallback: String = "No se pudo completar la operaci�
     when (this) {
         is HttpException -> {
             when (code()) {
-                401 -> return "Sesión expirada. Inicia sesión de nuevo."
+                401 -> return "Sesión expirada, inicia sesión de nuevo."
                 403 -> return serverMessage() ?: "Sin permisos para esta acción."
                 404 -> return serverMessage() ?: "Recurso no encontrado."
-                in 500..599 -> return "Error del servidor. Intenta más tarde."
+                in 500..599 -> return "Error del servidor, intenta más tarde."
             }
             // 400 / 409 / 422 y demás: el servidor sabe mejor que nosotros qué
             // salió mal, y ya lo dice en español.
             serverMessage()?.let { return it }
-            if (code() == 400) return "Datos inválidos. Revisa el formulario."
-            if (code() == 409) return "El registro cambió mientras lo editabas. Vuelve a intentarlo."
+            if (code() == 400) return "Datos inválidos, revisa el formulario."
+            if (code() == 409) return "El registro cambió mientras lo editabas, vuelve a intentarlo."
             return fallback
         }
-        is IOException -> return "Sin conexión. Revisa tu red e intenta de nuevo."
+        is IOException -> return "Sin conexión, revisa tu red e intenta de nuevo."
     }
     return message?.takeIf { it.isNotBlank() } ?: fallback
 }

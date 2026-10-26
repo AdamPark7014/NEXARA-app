@@ -87,7 +87,7 @@ class ComidasRulesTest {
             ),
         )
         assertTrue(ComidasRules.pideMotivoPorError("Ya pasó la hora de regreso de comida (4:00 p.m.): escribe por qué regresas a esta hora."))
-        assertFalse(ComidasRules.pideMotivoPorError("Sin conexión. Revisa tu red e intenta de nuevo."))
+        assertFalse(ComidasRules.pideMotivoPorError("Sin conexión, revisa tu red e intenta de nuevo."))
         assertFalse(ComidasRules.justificacionValida("  ok  "))
         assertTrue(ComidasRules.justificacionValida("Junta con cliente"))
     }
