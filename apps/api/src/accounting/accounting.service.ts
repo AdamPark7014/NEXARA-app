@@ -372,7 +372,7 @@ export class AccountingService {
     const status = await this.getSatAgrupadorStatus(companyId);
     if (!status.readyForBalanzaExport) {
       throw new BadRequestException(
-        `Faltan ${status.missingAccounts.length} cuenta(s) sin agrupador SAT asignado. Complétalas antes de exportar el Catálogo de cuentas.`,
+        `Faltan ${status.missingAccounts.length} cuenta(s) sin agrupador SAT asignado: complétalas antes de exportar el Catálogo de cuentas.`,
       );
     }
     const company = companyId ? await this.prisma.companyProfile.findUnique({ where: { id: companyId }, select: { rfc: true } }) : null;
@@ -421,7 +421,7 @@ export class AccountingService {
     const status = await this.getSatAgrupadorStatus(companyId);
     if (!status.readyForBalanzaExport) {
       throw new BadRequestException(
-        `Faltan ${status.missingAccounts.length} cuenta(s) sin agrupador SAT asignado. Complétalas antes de exportar la Balanza.`,
+        `Faltan ${status.missingAccounts.length} cuenta(s) sin agrupador SAT asignado: complétalas antes de exportar la Balanza.`,
       );
     }
     const company = companyId ? await this.prisma.companyProfile.findUnique({ where: { id: companyId }, select: { rfc: true } }) : null;
@@ -2025,8 +2025,8 @@ export class AccountingService {
       // El PAC pudo haber timbrado aunque no devolvió el UUID: revertir a borrador invitaría a un
       // segundo timbrado. Se deja en STAMPING (bloquea reintentos) hasta que alguien lo revise.
       throw new BadRequestException(
-        `El proveedor de timbrado (${stamp.provider}) respondió sin UUID. La factura ${invoice.invoiceNumber} ` +
-          'quedó en «timbrando» para evitar un doble timbrado: revisa en el portal del proveedor si se emitió antes de reintentar.',
+        `El proveedor de timbrado (${stamp.provider}) respondió sin UUID: la factura ${invoice.invoiceNumber} ` +
+          'quedó en «timbrando» para evitar un doble timbrado; revisa en el portal del proveedor si se emitió antes de reintentar.',
       );
     }
 
@@ -2394,7 +2394,7 @@ export class AccountingService {
         locked.matchStatus !== 'NOT_REQUIRED'
       ) {
         throw new BadRequestException(
-          `3-way match pendiente (${locked.matchStatus}). Resuelve variaciones o exime el match antes de pagar.`,
+          `3-way match pendiente (${locked.matchStatus}): resuelve variaciones o exime el match antes de pagar.`,
         );
       }
 
@@ -2920,7 +2920,7 @@ export class AccountingService {
         // pantalla de configuración, que es donde se resuelve.
         ? 'Todavía no se pueden timbrar facturas: falta conectar el servicio de timbrado.'
         : env === 'production' && !csd.configured && provider !== 'facturama'
-          ? 'Falta el certificado de sello digital. Sin él las facturas no se pueden sellar.'
+          ? 'Falta el certificado de sello digital: sin él las facturas no se pueden sellar.'
           : null;
     return {
       provider,

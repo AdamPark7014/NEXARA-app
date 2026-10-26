@@ -759,7 +759,7 @@ export default function InvoicingPage() {
     notices.push({
       id: "csd",
       level: "warning",
-      text: "Falta el certificado de sello digital. Sin él las facturas no se pueden sellar.",
+      text: "Falta el certificado de sello digital: sin él las facturas no se pueden sellar.",
       action: { label: "Configuración", href: "/erp/settings" },
     });
   }
