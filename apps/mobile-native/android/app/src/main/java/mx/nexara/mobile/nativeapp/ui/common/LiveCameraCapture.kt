@@ -105,6 +105,9 @@ class GeoPhoto(
 
 const val GPS_REQUIRED_MESSAGE = "No se pudo obtener tu ubicación: activa el GPS y da permiso de ubicación"
 
+/** Vista previa, antes de enviar. Una frase: si no se ve bien porque salió oscura o movida, se toma otra. */
+const val AVISO_REVISAR_FOTO = "Si no se ve bien porque salió oscura o movida, toma otra."
+
 /** Mismo tamaño y calidad que la web (grabFrame): lado mayor 1280 px, JPEG 0.6. */
 object LivePhotoEncoding {
     const val MAX_EDGE_PX = 1280
@@ -464,7 +467,7 @@ fun GeoPhotoPreviewDialog(
             ) {
                 Text(title, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
                 Text(
-                    "¿Se ve bien? Si salió oscura o movida, toma otra.",
+                    AVISO_REVISAR_FOTO,
                     fontSize = 13.sp,
                     color = NxColors.Muted,
                 )
