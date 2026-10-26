@@ -357,7 +357,7 @@ export class UsersDelegationService {
         accesoContabilidad: true,
       },
     });
-    if (!rol) throw new BadRequestException('Ese tipo de usuario no está configurado. Avisa a dirección.');
+    if (!rol) throw new BadRequestException('Ese tipo de usuario no está configurado: avisa a dirección.');
     const conPoderes = Boolean(
       rol.accesoConsoleAdmin || rol.accesoGestionUsuarios || rol.accesoGestionTienda || rol.accesoGestionWeb || rol.accesoContabilidad,
     );
@@ -480,7 +480,7 @@ export class UsersDelegationService {
 
     if (direccion && cambio.roleKey !== undefined) {
       const rol = await this.prisma.role.findFirst({ where: { orgRoleKey: cambio.roleKey }, select: { id: true } });
-      if (!rol) throw new BadRequestException('Ese tipo de usuario no está configurado. Avisa a dirección.');
+      if (!rol) throw new BadRequestException('Ese tipo de usuario no está configurado: avisa a dirección.');
       data.roleId = rol.id;
     }
     if (direccion && cambio.departmentId !== undefined) {
