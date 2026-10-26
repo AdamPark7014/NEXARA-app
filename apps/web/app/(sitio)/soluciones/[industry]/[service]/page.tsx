@@ -71,6 +71,8 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
       "Nexara",
     ],
     alternates: { canonical: path },
+    // Explícito: el layout trae la metadata de Studio «soluciones», que es noindex para el índice /soluciones.
+    robots: { index: true, follow: true },
     openGraph: {
       type: "website",
       locale: "es_MX",

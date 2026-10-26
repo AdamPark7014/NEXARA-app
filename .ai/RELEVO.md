@@ -1,5 +1,12 @@
 # RELEVO
 
+- **26-10 ~15:35 (claude-code) — Las 86 páginas de Soluciones ya son indexables (Adam lo pidió).**
+  - Salían `noindex, follow` porque heredaban la metadata de Studio «soluciones» de `soluciones/layout.tsx`, cuyo
+    valor por omisión en `lib/page-seo.ts` es `noIndex: true` (pensado para el índice `/soluciones`, que redirige a
+    `/servicios`). Ahora `[industry]` y `[industry]/[service]` fijan `robots: { index: true, follow: true }` en su
+    `generateMetadata`; el layout y la entrada de Studio quedan para el índice. `robots.txt` ya permitía
+    `/soluciones/` y el sitemap ya las listaba.
+
 - **26-10 ~15:45 (claude-code) — 404 público con el diseño del sitio; tres despliegues del web en la tarde.**
   - `app/not-found.tsx` mira el host: en `nexara.com.mx`, `www` y localhost pinta `Encabezado` + `NoEncontrado` +
     `Pie`; en los subdominios de panel deja la tarjeta de siempre. `(sitio)/not-found.tsx` usa el mismo
