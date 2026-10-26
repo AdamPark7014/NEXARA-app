@@ -408,7 +408,7 @@ enum PagosRules {
 
     /// Qué NO hace esta pantalla. Se dice al pie, sin botón que eche al navegador.
     static let limite =
-        "Consulta. Registrar un pago, autorizarlo, marcarlo pagado o anularlo se hacen desde la computadora."
+        "Consulta: registrar un pago, autorizarlo, marcarlo pagado o anularlo se hacen desde la computadora."
 
     // MARK: - Utilidades
 

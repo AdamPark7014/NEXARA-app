@@ -497,7 +497,7 @@ object PagosRules {
 
     /** Qué NO hace esta pantalla. Se dice al pie, sin botón que eche al navegador. */
     const val LIMITE =
-        "Consulta. Registrar un pago, autorizarlo, marcarlo pagado o anularlo se hacen desde la computadora."
+        "Consulta: registrar un pago, autorizarlo, marcarlo pagado o anularlo se hacen desde la computadora."
 
     private val ESPANOL = Locale.forLanguageTag("es-MX")
     private val FORMATO_CORTO = NxFormat.patron("d MMM")
