@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { Fragment, type CSSProperties } from "react";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { STATUS_LABELS, type TeamBoardUser } from "@/lib/team-board-api";
 import {
   ARO_DE_ESTADO,
   actividadesDeTarjeta,
-  contextoActividad,
+  partesContextoActividad,
   iniciales,
   queHace,
   tintaPersona,
@@ -100,6 +100,16 @@ function claseDeEstadoActividad(estado: string): string {
   return "";
 }
 
+/** En escritorio van en un renglón; a 390 px `.apilar` pone un dato por línea. */
+function datosJuntos(partes: string[], separador: string) {
+  return partes.map((parte, i) => (
+    <Fragment key={`${i}:${parte}`}>
+      {i > 0 ? <span className={s.sep}>{separador}</span> : null}
+      <span>{parte}</span>
+    </Fragment>
+  ));
+}
+
 export default function EquipoPersonaCard({
   user,
   isSelf = false,
@@ -115,7 +125,8 @@ export default function EquipoPersonaCard({
   const estado = ARO_DE_ESTADO[user.status] ?? "retraso";
   const lineas = actividadesDeTarjeta(user);
   const actividad = queHace(user);
-  const contexto = contextoActividad(user, ahora);
+  // Solo sin nada abierto, como siempre: con actividades, la lista ya dice folio y estado.
+  const contextoPartes = lineas.length === 0 ? partesContextoActividad(user, ahora) : [];
   // Sin nada abierto: folio y cuándo terminó lo último. En «libre» el contexto ya dice
   // «Terminó 13:39, a tiempo» y repetirlo sobra.
   const ultima = lineas.length === 0 && user.status !== "libre" ? ultimaActividadCorta(user, ahora) : null;
@@ -135,8 +146,10 @@ export default function EquipoPersonaCard({
               <span className={[s.estado, claseDeEstadoActividad(linea.estado)].filter(Boolean).join(" ")}>
                 {linea.estado}
               </span>
-              <span className={s.folio}>
-                <span className={s.an}>{linea.folio}</span> {linea.titulo}
+              <span className={[s.folio, s.apilar].join(" ")}>
+                {linea.folio ? <span className={s.an}>{linea.folio}</span> : null}
+                {linea.folio && linea.titulo ? <span className={s.sep}> </span> : null}
+                {linea.titulo ? <span>{linea.titulo}</span> : null}
               </span>
             </span>
           ))}
@@ -147,7 +160,9 @@ export default function EquipoPersonaCard({
           <span className={s.actividad} title={actividad}>
             {actividad}
           </span>
-          {contexto ? <span className={s.contexto}>{contexto}</span> : null}
+          {contextoPartes.length > 0 ? (
+            <span className={[s.contexto, s.apilar].join(" ")}>{datosJuntos(contextoPartes, " · ")}</span>
+          ) : null}
           {ultima ? <span className={s.contexto}>{ultima}</span> : null}
         </>
       )}

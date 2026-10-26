@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, type ReactNode } from "react";
+import { Fragment, useId, useState, type ReactNode } from "react";
 import { Card, CardHead } from "@/components/base";
 import { AvatarAro } from "@/components/pizarra/EquipoPersonaCard";
 import { ARO_DE_ESTADO, atencionEquipo } from "@/components/pizarra/equipo-estado";
 import type { TeamBoardUser } from "@/lib/team-board-api";
 import s from "./AtencionEquipo.module.css";
+import layout from "./EquipoPersonaCard.module.css";
 
 /** Renglones por columna antes de «Ver N más»: que la lista de gente no quede hasta abajo. */
 const VISIBLES = 5;
@@ -109,11 +110,11 @@ export default function AtencionEquipo({
     persona: x.persona,
     principal:
       x.folio || x.titulo ? (
-        <>
+        <span className={layout.apilar}>
           {x.folio ? <span className={s.folio}>{x.folio}</span> : null}
-          {x.folio && x.titulo ? " · " : null}
-          {x.titulo}
-        </>
+          {x.folio && x.titulo ? <span className={layout.sep}> · </span> : null}
+          {x.titulo ? <span>{x.titulo}</span> : null}
+        </span>
       ) : (
         "Actividad sin datos"
       ),
@@ -121,12 +122,27 @@ export default function AtencionEquipo({
   }));
 
   const sinNada: Renglon[] = a.sinNada.map((x) => {
-    const jornada = [x.entrada, x.sinNadaDesde].filter(Boolean).join(" · ");
+    const jornada = [x.entrada, x.sinNadaDesde].filter(Boolean);
     return {
       persona: x.persona,
-      principal: jornada || x.ultima,
-      tono: jornada ? "aviso" : undefined,
-      secundaria: jornada ? x.ultima : undefined,
+      principal:
+        jornada.length > 0 ? (
+          <>
+            <span className={layout.junto}>{jornada.join(" · ")}</span>
+            <span className={layout.partes}>
+              {jornada.map((parte, i) => (
+                <Fragment key={`${x.persona.id}:${i}:${parte}`}>
+                  {i > 0 ? <span className={layout.sep}> · </span> : null}
+                  <span>{parte}</span>
+                </Fragment>
+              ))}
+            </span>
+          </>
+        ) : (
+          x.ultima
+        ),
+      tono: jornada.length > 0 ? "aviso" : undefined,
+      secundaria: jornada.length > 0 ? x.ultima : undefined,
       asignarHref: asignarHref?.(x.persona),
     };
   });

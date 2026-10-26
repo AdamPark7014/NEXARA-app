@@ -266,6 +266,39 @@
   overflow-wrap: anywhere;
 }
 
+/* En escritorio el texto junto (`.junto` o los `.sep`) sigue en un renglón.
+   A 390 px cada dato va en el suyo. «Para atender hoy» usa estas clases. */
+.partes {
+  display: none;
+}
+
+@media (max-width: 390px) {
+  .junto {
+    display: none;
+  }
+
+  .apilar,
+  .partes {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 0;
+  }
+
+  .apilar > .sep,
+  .partes > .sep {
+    display: none;
+  }
+
+  .folio.apilar,
+  .contexto.apilar {
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    -webkit-box-orient: unset;
+    overflow: visible;
+  }
+}
+
 .marcas {
   display: flex;
   flex-wrap: wrap;
