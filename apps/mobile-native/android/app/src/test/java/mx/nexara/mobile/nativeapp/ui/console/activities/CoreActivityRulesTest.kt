@@ -20,6 +20,7 @@ import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.Captur
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -254,11 +255,17 @@ class CoreActivityRulesTest {
         assertEquals(listOf("EXIT_PHOTO", "SERVICE_SHEET_DATA"), CoreActivityRules.pasosCorregidos(ev, revisiones))
         val zone = ZoneId.of("America/Mexico_City")
         val texto = CoreActivityRules.correccionTexto(ev.correctionSubmittedAt, revisiones, zone)
-        assertTrue(texto, texto.startsWith("Corrigió lo que se le devolvió (Foto de salida, Formulario) · "))
-        assertTrue(texto, texto.endsWith(". Revisa la corrección y apruébala o devuélvela de nuevo."))
+        val hora = CoreActivityRules.formatWhen(ev.correctionSubmittedAt, zone)
+        assertEquals(
+            "Corrigió lo que se le devolvió (Foto de salida, Formulario): revisa la corrección y apruébala o devuélvela de nuevo.\n$hora",
+            texto,
+        )
 
         val todo = listOf(TeamEvidenceReviewDto(id = 3L, decision = "DEVUELTA_TODO"))
-        assertTrue(CoreActivityRules.correccionTexto(null, todo, zone).contains("(rehízo toda la actividad)"))
+        assertEquals(
+            "Corrigió lo que se le devolvió (rehízo toda la actividad): revisa la corrección y apruébala o devuélvela de nuevo.",
+            CoreActivityRules.correccionTexto(null, todo, zone),
+        )
 
         // Sin corrección enviada, o ya aprobada: no es corrección.
         assertFalse(CoreActivityRules.esCorreccion(ev.copy(correctionSubmittedAt = null), revisiones))
@@ -269,13 +276,47 @@ class CoreActivityRulesTest {
     @Test
     fun correctingCopyTellsTheReviewerWhatComesNext() {
         assertEquals(
-            "Está corrigiendo: Foto de entrada · «Sin GPS». Cuando envíe la corrección podrás aprobarla o devolverla otra vez.",
+            "Está corrigiendo: Foto de entrada · «Sin GPS»: cuando envíe la corrección podrás aprobarla o devolverla otra vez.",
             CoreActivityRules.corrigiendoTexto(listOf("ENTRY_PHOTO"), "Sin GPS", avisarReenvio = true),
         )
         assertEquals(
             "Está corrigiendo: Fotos en sitio",
             CoreActivityRules.corrigiendoTexto(listOf("EVIDENCE_PHOTOS"), null, avisarReenvio = false),
         )
+    }
+
+    @Test
+    fun avisosDeCorreccionSonUnaFraseYLaHoraVaEnSuRenglon() {
+        val viejoEnviada =
+            "Corrigió lo que se le devolvió (Foto de salida, Formulario) · lun 5 oct 18:38. Revisa la corrección y apruébala o devuélvela de nuevo."
+        val viejoCorrigiendo =
+            "Está corrigiendo: Foto de entrada · «Sin GPS». Cuando envíe la corrección podrás aprobarla o devolverla otra vez."
+        val zone = ZoneId.of("America/Mexico_City")
+        val devolucion = TeamEvidenceReviewDto(
+            id = 2L,
+            decision = "DEVUELTA_PASOS",
+            pasos = listOf("EXIT_PHOTO", "SERVICE_SHEET_DATA"),
+        )
+        val texto = CoreActivityRules.correccionTexto("2026-10-06T00:38:00Z", listOf(devolucion), zone)
+        val frase = "Corrigió lo que se le devolvió (Foto de salida, Formulario): revisa la corrección y apruébala o devuélvela de nuevo."
+        val hora = CoreActivityRules.formatWhen("2026-10-06T00:38:00Z", zone)
+
+        assertNotEquals(viejoEnviada, texto)
+        assertFalse(texto.contains(". Revisa la corrección"))
+        assertEquals(listOf(frase, hora), texto.split("\n"))
+        assertEquals(1, frase.count { it == '.' })
+        assertFalse(frase.contains("18:38"))
+        assertTrue(hora!!.endsWith("18:38"))
+
+        val corrigiendo = CoreActivityRules.corrigiendoTexto(listOf("ENTRY_PHOTO"), "Sin GPS", avisarReenvio = true)
+        assertNotEquals(viejoCorrigiendo, corrigiendo)
+        assertFalse(corrigiendo.contains(". Cuando envíe"))
+        assertEquals(
+            "Está corrigiendo: Foto de entrada · «Sin GPS»: cuando envíe la corrección podrás aprobarla o devolverla otra vez.",
+            corrigiendo,
+        )
+        assertEquals(1, corrigiendo.count { it == '.' })
+        assertFalse(corrigiendo.contains("\n"))
     }
 
     @Test
