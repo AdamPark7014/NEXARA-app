@@ -449,7 +449,7 @@ struct GeoPhotoCaptureView: View {
     private func handleCaptured(_ image: UIImage?) async {
         guard let image, let jpeg = CorePhotoProcessing.jpeg(from: image) else {
             working = false
-            message = "No se pudo tomar la foto. Intenta de nuevo."
+            message = "No se pudo tomar la foto; intenta de nuevo"
             return
         }
         locating = true
