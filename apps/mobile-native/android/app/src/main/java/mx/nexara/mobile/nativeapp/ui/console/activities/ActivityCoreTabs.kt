@@ -97,8 +97,7 @@ fun ActivityEvidenciasTab(
                     color = NxColors.Slate,
                 )
                 Text(
-                    "En despacho tu parte es pasarla a quien la ejecuta; no subes evidencias. " +
-                        "El registro de a quién se la pasaste está en la pestaña Historial.",
+                    "En despacho tu parte es pasarla a quien la ejecuta; no subes evidencias.",
                     fontSize = 13.5.sp,
                     color = NxColors.Muted,
                 )

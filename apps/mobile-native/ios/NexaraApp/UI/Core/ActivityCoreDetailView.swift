@@ -714,8 +714,7 @@ struct ActivityCoreDetailView: View {
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundStyle(NxColors.fg)
                         }
-                        Text("En despacho tu parte es pasarla a quien la ejecuta; no subes evidencias. "
-                            + "El registro de a quién se la pasaste está en la pestaña Historial.")
+                        Text("En despacho tu parte es pasarla a quien la ejecuta; no subes evidencias.")
                             .font(.system(size: 13.5))
                             .foregroundStyle(NxColors.muted)
                             .fixedSize(horizontal: false, vertical: true)
