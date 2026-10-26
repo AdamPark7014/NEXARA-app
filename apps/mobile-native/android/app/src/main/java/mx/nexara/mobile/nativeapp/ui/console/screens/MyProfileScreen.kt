@@ -101,14 +101,25 @@ data class MyProfileUiState(
             ?: employeeNumber
             ?: "—"
 
-    /** Texto de «Estado Integra», igual que en el panel. */
+    /** Texto de «Estado Integra». Si está vinculado, el nombre va en [integraLinkedName]. */
     val integraStatusLabel: String
         get() = when (identity?.status) {
-            "linked" -> "Vinculado · " +
-                (identity.acsPerson?.personName ?: identity.acsPerson?.personId ?: "")
+            "linked" -> "Vinculado"
             "erp_only" -> "Tu número aún no está en control de acceso"
             "unlinked" -> "Sin número de empleado"
             else -> "—"
+        }
+
+    /**
+     * Persona del control de acceso: el mismo nombre o id que antes iba
+     * después de «Vinculado · ». Vacío si no está vinculada o no hay nombre.
+     * Un `personName` vacío no cae al id: así lo armaba el renglón anterior.
+     */
+    val integraLinkedName: String
+        get() {
+            val id = identity
+            if (id?.status != "linked") return ""
+            return id.acsPerson?.personName ?: id.acsPerson?.personId ?: ""
         }
 }
 
@@ -597,27 +608,30 @@ private fun ProfileCoreSummary(
             ProfileInfoRow("Rol", state.roleName ?: "—", brand, sub)
             ProfileInfoRow("Nº de empleado", state.acsEmployeeNumber, brand, sub)
             ProfileInfoRow("Control de acceso", state.integraStatusLabel, brand, sub)
+            if (state.identity?.status == "linked" && state.integraLinkedName.isNotEmpty()) {
+                ProfileInfoRow("Nombre", state.integraLinkedName, brand, sub)
+            }
 
             HorizontalDivider()
 
             Text("Acceso y asistencia (hoy)", fontWeight = FontWeight.SemiBold, color = slate)
             val erp = state.hybrid?.erp
             val acs = state.hybrid?.acs
-            val erpTexto = when {
-                erp?.checkIn != null -> buildString {
-                    append("Entrada ${hhmmMexico(erp.checkIn) ?: "—"}")
-                    hhmmMexico(erp.checkOut)?.let { append(" · Salida $it") }
-                }
-                else -> "Sin entrada"
+            if (erp?.checkIn != null) {
+                ProfileInfoRow("Entrada", hhmmMexico(erp.checkIn) ?: "—", brand, sub)
+                hhmmMexico(erp.checkOut)?.let { ProfileInfoRow("Salida", it, brand, sub) }
+            } else {
+                ProfileInfoRow("Checador de la app", "Sin entrada", brand, sub)
             }
-            val acsTexto = when {
-                acs?.firstAt != null ->
-                    "${acs.passes ?: 0} pases · ${acs.firstDoor ?: "puerta"} · desde ${hhmmMexico(acs.firstAt) ?: "—"}"
-                state.identity?.status == "linked" -> "Sin pases hoy"
-                else -> "Sin vincular"
+            if (acs?.firstAt != null) {
+                ProfileInfoRow("Pases en puertas", "${acs.passes ?: 0} pases", brand, sub)
+                ProfileInfoRow("Puerta", acs.firstDoor ?: "puerta", brand, sub)
+                ProfileInfoRow("Hora", hhmmMexico(acs.firstAt) ?: "—", brand, sub)
+            } else if (state.identity?.status == "linked") {
+                ProfileInfoRow("Pases en puertas", "Sin pases hoy", brand, sub)
+            } else {
+                ProfileInfoRow("Pases en puertas", "Sin vincular", brand, sub)
             }
-            ProfileInfoRow("Checador de la app", erpTexto, brand, sub)
-            ProfileInfoRow("Pases en puertas", acsTexto, brand, sub)
             Text(
                 "El checador de la app es el que cuenta para tu nómina.",
                 style = MaterialTheme.typography.bodySmall,
