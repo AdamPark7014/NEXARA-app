@@ -89,7 +89,9 @@
     `nexara-db` quedó reiniciándose («could not write lock file postmaster.pid»; se recuperó sola a las 18:47:19, redo
     normal) y Redis rechazó escrituras (MISCONF, ya sano). `docker builder prune -f` liberó ~5 GB: 97 % → 90 %.
     `/api/health` responde 503 mientras el disco esté ≥ 90 % (`thresholdPercent: 0.9`); `/api/health/live` da 200.
-    Quedan ~3 GB en imágenes `prev`/`rollback` de Ágora, ARTA y ZYNORATEK (no tocadas) y 33 GB en containerd.
+    Por orden de Adam (13:05) se borraron las 7 imágenes `prev`/`rollback` sin contenedor (Ágora ×4, ARTA ×2,
+    ZYNORATEK ×1): ya no hay punto de regreso por imagen para esos tres. Disco 92 % → 89 % (8 GB libres) y
+    `/api/health` volvió a 200. `nexara-transcriptor:small-20261026` se quedó: es la imagen de `transcriptor-dictado`.
 
 - **26-10 ~05:10 UTC (claude-code, R-1) — Transcriptor aparte para dictado (whisper `small`, 1 CPU).**
   - Decisión del coordinador (opción b): el turbo q8_0 tardaba en un dictado lo que dura el audio y el dictado
