@@ -45,6 +45,8 @@ describe("ArchivosDeActividad", () => {
     expect(await screen.findByText("Aún no hay archivos")).toBeTruthy();
     expect(screen.getByRole("button", { name: /Adjuntar archivo/ })).toBeTruthy();
     expect(screen.getByText("Excel, Word, PDF o imágenes de la propuesta, minutas y lo que mande el cliente")).toBeTruthy();
+    // El vacío dice cómo adjuntar y el límite: es cuando más se necesita.
+    expect(screen.getByText(/hasta 25 MB cada uno/)).toBeTruthy();
   });
 
   it("el Excel se abre embebido: vista previa en un iframe sin scripts", async () => {
@@ -57,7 +59,9 @@ describe("ArchivosDeActividad", () => {
       },
     ]);
     render(<ArchivosDeActividad activityId={7} />);
-    expect(await screen.findByText(/2\.3 MB · Luis Joel · hoy \d{2}:\d{2}/)).toBeTruthy();
+    expect(await screen.findByText("2.3 MB")).toBeTruthy();
+    expect(screen.getByText("Luis Joel")).toBeTruthy();
+    expect(screen.getByText(/hoy \d{2}:\d{2}/)).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Abrir Propuesta Toks.xlsx" }));
     const visor = await screen.findByRole("dialog");
