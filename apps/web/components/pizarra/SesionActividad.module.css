@@ -63,6 +63,23 @@
   gap: var(--ui-s2);
 }
 
+/* Conteo y nota, cada uno en su renglón (también a 390 px). */
+.pistaMotivo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  min-width: 0;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-3);
+}
+
+.conteo,
+.nota {
+  display: block;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .punto {
     animation: none;

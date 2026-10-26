@@ -30,7 +30,7 @@ object SesionActividadRules {
     const val TEXTO_PAUSA_PROPIA =
         "Tu reloj se detiene en esta actividad; sigue «En Proceso» y la reanudas cuando vuelvas a ella."
     const val AYUDA_REANUDAR =
-        "Tu reloj vuelve a correr. Se detiene al pausar, al checar salida, a las 12 h o al terminar el día."
+        "Tu reloj vuelve a correr y se detiene al pausar, al checar salida, a las 12 h o al terminar el día."
     const val PLACEHOLDER_MOTIVO_JEFE = "Ej. Salió una falla urgente en el cliente; que la atienda primero."
 
     private val CERRADA = Regex("finalizada|completada|cancelada|aprobada|no cumplida|incumplida", RegexOption.IGNORE_CASE)
@@ -94,6 +94,6 @@ object SesionActividadRules {
     /** Aviso tras pausar a alguien de su equipo. */
     fun avisoPausaDeEquipo(nombre: String?): String {
         val quien = primerNombre(nombre)
-        return if (quien.isEmpty()) "Pausada. Ya recibió el aviso." else "Pausada. $quien ya recibió el aviso."
+        return if (quien.isEmpty()) "Pausada y ya recibió el aviso." else "Pausada y $quien ya recibió el aviso."
     }
 }

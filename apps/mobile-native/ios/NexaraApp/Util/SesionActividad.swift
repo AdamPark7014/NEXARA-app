@@ -54,7 +54,7 @@ struct SesionActividad: Hashable {
     static let textoPausaPropia =
         "Tu reloj se detiene en esta actividad; sigue «En Proceso» y la reanudas cuando vuelvas a ella."
     static let ayudaReanudar =
-        "Tu reloj vuelve a correr. Se detiene al pausar, al checar salida, a las 12 h o al terminar el día."
+        "Tu reloj vuelve a correr y se detiene al pausar, al checar salida, a las 12 h o al terminar el día."
     static let placeholderMotivoJefe = "Ej. Salió una falla urgente en el cliente; que la atienda primero."
 
     static func cerrada(_ estatus: String?) -> Bool {
@@ -132,6 +132,6 @@ struct SesionActividad: Hashable {
     /// Aviso tras pausar a alguien de su equipo.
     static func avisoPausaDeEquipo(_ nombre: String?) -> String {
         let quien = primerNombre(nombre)
-        return quien.isEmpty ? "Pausada. Ya recibió el aviso." : "Pausada. \(quien) ya recibió el aviso."
+        return quien.isEmpty ? "Pausada y ya recibió el aviso." : "Pausada y \(quien) ya recibió el aviso."
     }
 }
