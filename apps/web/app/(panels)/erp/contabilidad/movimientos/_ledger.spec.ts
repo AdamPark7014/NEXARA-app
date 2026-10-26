@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  NATURALEZA_HINT,
   buildLedgerQuery,
   currentMonthRange,
   describeOrigen,
@@ -9,6 +10,10 @@ import {
   formatMetodo,
   hasActiveFilters,
 } from "./_ledger";
+
+/** Tres frases, el aviso de antes. La prueba lo cita para que no vuelva. */
+const AVISO_VIEJO =
+  "Efectivo = ya pasó por banco o caja. Devengado = registrado pero aún no cobrado o pagado. Se muestran por separado para no sumar dos veces el mismo peso.";
 
 describe("libro de movimientos · query a la API", () => {
   it("omite los filtros vacíos en vez de mandarlos en blanco", () => {
@@ -103,6 +108,19 @@ describe("libro de movimientos · formato", () => {
     expect(describeOrigen({ origen: { tabla: "bank_transactions", id: 8, href: null } })).toBe(
       "Línea bancaria #8",
     );
+  });
+});
+
+describe("libro de movimientos · aviso de efectivo y devengado", () => {
+  it("cabe en una frase y ya no usa el texto viejo de tres", () => {
+    expect(NATURALEZA_HINT).toBe(
+      "Efectivo (ya pasó por banco o caja) y devengado (registrado pero aún no cobrado o pagado) se muestran por separado para no sumar dos veces el mismo peso.",
+    );
+    expect(NATURALEZA_HINT).not.toBe(AVISO_VIEJO);
+    expect(AVISO_VIEJO.split(". ").length).toBe(3);
+    expect(NATURALEZA_HINT.match(/[.!?]/g)).toEqual(["."]);
+    expect(NATURALEZA_HINT).toContain("Efectivo");
+    expect(NATURALEZA_HINT).toContain("devengado");
   });
 });
 
