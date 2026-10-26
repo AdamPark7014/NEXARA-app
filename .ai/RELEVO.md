@@ -26,7 +26,18 @@
     imagen faltante, `--force-all`, `--no-auto-prune`, cambio sin commitear).
   - Ojo: el primer deploy después de cambiar `update.sh` corre la versión vieja (git reemplaza el archivo y bash sigue
     leyendo el anterior).
-  - Despliegue: pendiente.
+  - 1.er deploy con el script nuevo (~13:17, `/tmp/deploy-transcriptor-1917.log` en el servidor): el pull trajo también
+    el sitio 2026 (`4f0c0872`, `5b74776d`) y construyó el web. El aviso salió («disco al 91 % … Vaciando la caché de
+    build», 1.1 GB) y aun así el build del web llevó el disco de 7.7 GB libres a 669 MB (100 %). Al recrear
+    `nexara-web`, compose falló con `Conflict… name already in use` (EXIT=1) antes del bloque del transcriptor, aunque
+    el contenedor nuevo quedó arriba con la imagen nueva. Caché de build vaciada a mano (2.8 GB) → 90 %. DB y Redis
+    sin daño; web 200 y `/api/health` ok.
+  - El deploy de las 13:10 (`deploy-auditoria`, script viejo) rehízo whisper entero con el disco al 96 %; se vació la
+    caché sin usar (2.2 GB) en pleno build y tocó fondo en 2.7 GB libres.
+  - Lección: con ~7 GB libres un build del web apenas cabe; el umbral del 90 % ayuda, no basta. Lo que libera de
+    verdad es borrar las filas viejas de `audit_logs` (~10 GB, pendiente de Adam).
+  - Trampa en el servidor: `deploy/docker/Dockerfile.web` tiene un cambio local desde el 24-09 (`CACHEBUST` fijo). Por
+    él, todo deploy sin revisión nueva (`--no-pull` o sin commits) reconstruye api y web. No se tocó.
 
 - **26-10 ~13:10 (claude-code) — Causa del disco lleno: `audit_logs` pesa 14 GB (de 15 GB de la base).**
   - 5.5 millones de filas en un mes. 3.3 M (9.8 GB) son `integra POST_OK`: el interceptor de mutaciones auditaba
