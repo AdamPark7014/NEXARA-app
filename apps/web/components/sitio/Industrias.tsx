@@ -83,6 +83,9 @@ export default function Industrias({ industrias }: { industrias: Industria[] }) 
 
       <div id="industria-panel" role="tabpanel" aria-labelledby={`industria-${ind.slug}`} className={s.panel}>
         <div key={`t-${ind.slug}`} className={s.panelTexto}>
+          <span className={s.panelMarca} aria-hidden="true">
+            <PublicIcon name={ind.icono} size={260} />
+          </span>
           <span className={s.panelIcono}>
             <PublicIcon name={ind.icono} size={24} />
           </span>
