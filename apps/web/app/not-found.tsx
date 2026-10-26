@@ -13,7 +13,7 @@ export default function NotFound() {
         </span>
         <h1 className={styles.title}>Esta página no existe</h1>
         <p className={styles.text}>
-          Puede que el enlace esté incompleto o que la página se haya movido. Vuelve al inicio para seguir.
+          Puede que el enlace esté incompleto o que la página se haya movido, así que vuelve al inicio para seguir.
         </p>
         <div className={styles.actions}>
           <Link href="/" className={styles.btnPrimary}>
