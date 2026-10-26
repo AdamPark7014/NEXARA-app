@@ -185,8 +185,12 @@ export default function AsignadasPorMiView({
           </span>
           <span className={s.actividadTexto}>
             <span className={s.titulo}>{a.titulo}</span>
-            <span className={s.sub}>
-              <span className={c.folio}>{a.anNumber}</span> · {kindLabel(a)}
+            <span className={`${s.sub} ${s.meta}`}>
+              <span className={c.folio}>{a.anNumber}</span>
+              <span>
+                <span className={s.sep}> · </span>
+                {kindLabel(a)}
+              </span>
             </span>
           </span>
         </span>
@@ -353,7 +357,6 @@ export default function AsignadasPorMiView({
         tone="neutral"
         titleAs="h2"
         title="No asignaste actividades en este rango"
-        description="Cuando le asignes algo a tu equipo, aquí ves cómo va cada persona. Prueba con otro rango de fechas."
       />
     );
   } else {
@@ -376,8 +379,10 @@ export default function AsignadasPorMiView({
         )}
         rowActionsLabel="Acciones"
         flush
+        className={s.tabla}
         ariaLabel="Actividades que asignaste"
         emptyTitle="Ninguna asignación coincide con estos filtros"
+        emptyDescription=""
         emptyAction={
           hayFiltro ? (
             <Button size="sm" iconStart={<CloseIcon />} onClick={quitarFiltros}>
