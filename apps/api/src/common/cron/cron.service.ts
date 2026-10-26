@@ -8,8 +8,8 @@ import { VehiclesService } from '../../vehicles/vehicles.service.js';
 import { WebhooksService } from '../../webhooks/webhooks.service.js';
 import { DomainEventBusService } from '../../domain-events/domain-event-bus.service.js';
 import { OPEN_ACTIVITY_WHERE } from '../../activities/activity-status.js';
-import { normalizarPrioridad } from '../../activities/actividad-tiempos.js';
 import { finDelPeriodo, periodoDeActividad } from '../../activities/actividad-periodo.js';
+import { horasResolucionPorActividad, limiteResolucionMs } from '../../sla-tracker/sla-tracker.service.js';
 import { WORKDAY_TIMEZONE, workClock } from '../time/workday.js';
 
 @Injectable()
@@ -420,6 +420,18 @@ export class CronService {
     }
   }
 
+  private async horasResolucionContrato(ids: number[]): Promise<Map<number, number>> {
+    if (!ids.length) return new Map();
+    const visitas = await (this.prisma as any).maintenanceContractVisit.findMany({
+      where: { activityId: { in: ids } },
+      select: {
+        activityId: true,
+        contract: { select: { slaResolutionHours: true } },
+      },
+    });
+    return horasResolucionPorActividad(visitas);
+  }
+
   // ── SLA breach escalate — cada hora ────────────────────────────
   @Cron(CronExpression.EVERY_HOUR, { name: 'sla-breach-escalate' })
   async handleSlaBreachEscalate() {
@@ -432,6 +444,7 @@ export class CronService {
         titulo: true,
         prioridad: true,
         fechaAsignacion: true,
+        fechaEntregaEsperada: true,
         responsableId: true,
         companyId: true,
         periodoInicio: true,
@@ -439,15 +452,19 @@ export class CronService {
       },
       take: 200,
     });
-    // Claves en prioridad normalizada: los textos viejos se traducen antes de buscar.
-    const limits: Record<string, number> = { ALTA: 8, MEDIA: 24, BAJA: 72 };
+    const horasContrato = await this.horasResolucionContrato(open.map((t) => t.id));
     const breaches = open.filter((t) => {
       if (!t.fechaAsignacion) return false;
       // Actividad con periodo: su plazo es el fin del periodo, no «24 h desde que se asignó».
       const periodo = periodoDeActividad(t);
       if (periodo && finDelPeriodo(periodo.fin).getTime() >= now) return false;
-      const hrs = (now - t.fechaAsignacion.getTime()) / 3600000;
-      return hrs > (limits[normalizarPrioridad(t.prioridad)] ?? 24);
+      const limite = limiteResolucionMs({
+        prioridad: t.prioridad,
+        fechaAsignacion: t.fechaAsignacion,
+        fechaEntregaEsperada: t.fechaEntregaEsperada,
+        slaResolutionHours: horasContrato.get(t.id) ?? null,
+      });
+      return now > limite;
     });
     if (!breaches.length) return;
     this.logger.warn(`SLA breaches abiertos: ${breaches.length}`);
