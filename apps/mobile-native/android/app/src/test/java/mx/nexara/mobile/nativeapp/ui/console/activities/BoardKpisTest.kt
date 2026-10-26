@@ -2,6 +2,8 @@ package mx.nexara.mobile.nativeapp.ui.console.activities
 
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardKpisDto
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -60,9 +62,31 @@ class BoardKpisTest {
         assertEquals("75 %", tiles[0].valor)
         assertEquals("3/4 cerradas", tiles[0].pie)
         assertEquals("89 %", tiles[1].valor)
-        assertEquals("plan 8 h 00 min · real 9 h 00 min", tiles[1].pie)
+        assertEquals("plan 8 h 00 min\nreal 9 h 00 min", tiles[1].pie)
         assertEquals("77 %", tiles[2].valor)
+        assertEquals("6 h 40 min\nde 8 h 40 min", tiles[2].pie)
         assertEquals("4/6", tiles[3].valor)
         assertEquals("1 rechazada", tiles[3].pie)
+    }
+
+    @Test
+    fun `eficiencia y productividad van un dato por renglón`() {
+        val tiles = BoardKpis.tiles(
+            TeamBoardKpisDto(
+                minutosPlan = 480.0,
+                minutosReales = 540.0,
+                minutosEnActividad = 400.0,
+                minutosAsistidos = 520.0,
+            ),
+        )
+        // Texto viejo, a 390 px, en un solo renglón: «plan 8 h 00 min · real 9 h 00 min»
+        val eficienciaVieja = "plan 8 h 00 min · real 9 h 00 min"
+        assertEquals("plan 8 h 00 min\nreal 9 h 00 min", tiles[1].pie)
+        assertNotEquals(eficienciaVieja, tiles[1].pie)
+        assertFalse(tiles[1].pie.contains(" · "))
+        // Texto viejo: «6 h 40 min de 8 h 40 min»
+        val productividadVieja = "6 h 40 min de 8 h 40 min"
+        assertEquals("6 h 40 min\nde 8 h 40 min", tiles[2].pie)
+        assertNotEquals(productividadVieja, tiles[2].pie)
     }
 }
