@@ -3,8 +3,6 @@ package mx.nexara.mobile.nativeapp.ui.console.viaticos
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -68,7 +66,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
  * porque un multipart no lleva listas anidadas y porque a menudo se sabe qué
  * visitas cubrió el viaje solo al volver.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NuevoViaticoScreen(
     onCancelar: () -> Unit,
@@ -117,14 +115,14 @@ fun NuevoViaticoScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     NxSectionHeader(title = "¿En qué?")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         CATEGORIAS_VIATICO.forEach { (clave, etiqueta) ->
                             FilterChip(
                                 selected = categoria == clave,
                                 onClick = { categoria = clave },
                                 enabled = !state.enviando,
                                 label = { Text(etiqueta) },
-                                modifier = Modifier.heightIn(min = AlturaToque),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = AlturaToque),
                             )
                         }
                     }
