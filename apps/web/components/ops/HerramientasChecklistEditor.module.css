@@ -33,6 +33,18 @@
   color: var(--ui-fg-3);
 }
 
+/* En escritorio la persona y el conteo van en el mismo renglón. */
+.kitCabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.35em;
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  line-height: 1.45;
+  color: var(--ui-fg-3);
+}
+
 .etiqueta {
   font-size: var(--ui-fs-meta);
   font-weight: var(--ui-fw-semibold);
@@ -82,7 +94,15 @@
 }
 
 .filaM {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.35em;
   font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.separador {
   color: var(--ui-fg-3);
 }
 
@@ -116,4 +136,28 @@
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   background: var(--ui-surface);
+}
+
+/* Teléfono (~390 px): un dato por renglón. En escritorio siguen juntos. */
+@media (max-width: 480px) {
+  .filaArriba {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filaTexto {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .kitCabeza,
+  .filaM {
+    display: grid;
+    justify-items: start;
+    row-gap: 2px;
+  }
+
+  .separador {
+    display: none;
+  }
 }
