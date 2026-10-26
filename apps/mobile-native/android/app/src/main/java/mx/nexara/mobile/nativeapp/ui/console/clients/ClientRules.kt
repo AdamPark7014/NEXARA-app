@@ -26,15 +26,16 @@ object ClientRules {
         return if (inactivo) {
             "«$quien» volverá a estar activo en el padrón."
         } else {
-            "«$quien» quedará inactivo. Sus datos y su historial se conservan y podrás reactivarlo después."
+            "«$quien» quedará inactivo: sus datos y su historial se conservan y podrás reactivarlo después."
         }
     }
 
     const val DELETE_TITLE = "Eliminar cliente"
 
+    /** Que se borra para siempre y, aparte, la alternativa de desactivarlo. */
     fun deleteMessage(nombre: String?): String =
-        "¿Eliminar «${displayName(nombre)}» del padrón? Esta acción no se puede deshacer. " +
-            "Si solo ya no trabajan con él, mejor desactívalo."
+        "«${displayName(nombre)}» se eliminará del padrón para siempre; " +
+            "si solo ya no trabajan con él, mejor desactívalo."
 
     // ── Proyectos del cliente (operational-projects) ────────────────────────
     // Mismos permisos que el cliente: `puedeDesactivar` / `puedeEliminar`.
@@ -63,15 +64,16 @@ object ClientRules {
         return if (inactivo) {
             "«$cual» volverá a estar activo."
         } else {
-            "«$cual» quedará inactivo. Sus actividades y su historial se conservan y podrás reactivarlo después."
+            "«$cual» quedará inactivo: sus actividades y su historial se conservan y podrás reactivarlo después."
         }
     }
 
     const val PROJECT_DELETE_TITLE = "Eliminar proyecto"
 
+    /** Mismo texto que la web (`lib/avisos-proyecto.ts`). */
     fun projectDeleteMessage(titulo: String?): String =
-        "¿Eliminar «${projectName(titulo)}»? Dejará de aparecer en las listas y esta acción no se puede " +
-            "deshacer. Si solo está detenido, mejor desactívalo."
+        "El proyecto «${projectName(titulo)}» se eliminará para siempre y sus actividades conservarán " +
+            "su historial; si solo está detenido, mejor desactívalo."
 
     private fun projectName(titulo: String?): String = titulo?.trim().orEmpty().ifBlank { "Proyecto sin nombre" }
 

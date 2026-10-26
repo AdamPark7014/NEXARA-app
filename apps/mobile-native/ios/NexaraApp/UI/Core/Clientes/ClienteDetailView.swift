@@ -49,17 +49,17 @@ private enum ClienteAccion: Identifiable, Equatable {
     func mensaje(_ nombre: String) -> String {
         switch self {
         case .desactivar:
-            return "«\(nombre)» quedará inactivo. Sus datos y su historial se conservan y podrás reactivarlo después."
+            return "«\(nombre)» quedará inactivo: sus datos y su historial se conservan y podrás reactivarlo después."
         case .reactivar:
             return "«\(nombre)» volverá a estar activo en el padrón."
         case .eliminar:
-            return "¿Eliminar «\(nombre)» del padrón? Esta acción no se puede deshacer. Si solo ya no trabajan con él, mejor desactívalo."
+            return "«\(nombre)» se eliminará del padrón para siempre; si solo ya no trabajan con él, mejor desactívalo."
         case .desactivarProyecto(_, let titulo):
-            return "«\(titulo)» quedará inactivo. Sus actividades y su historial se conservan y podrás reactivarlo después."
+            return "«\(titulo)» quedará inactivo: sus actividades y su historial se conservan y podrás reactivarlo después."
         case .reactivarProyecto(_, let titulo):
             return "«\(titulo)» volverá a estar activo."
         case .eliminarProyecto(_, let titulo):
-            return "¿Eliminar «\(titulo)»? Dejará de aparecer en las listas y esta acción no se puede deshacer. Si solo está detenido, mejor desactívalo."
+            return "El proyecto «\(titulo)» se eliminará para siempre y sus actividades conservarán su historial; si solo está detenido, mejor desactívalo."
         }
     }
 }

@@ -333,7 +333,7 @@ export default function ClienteDetallePage() {
       title: activar ? "Reactivar cliente" : "Desactivar cliente",
       message: activar
         ? `«${client.name}» volverá a estar activo en el padrón.`
-        : `«${client.name}» quedará inactivo. Sus datos y su historial se conservan y podrás reactivarlo después.`,
+        : `«${client.name}» quedará inactivo: sus datos y su historial se conservan y podrás reactivarlo después.`,
       confirmLabel: activar ? "Reactivar" : "Desactivar",
       danger: !activar,
       fn: async () => {
@@ -353,7 +353,7 @@ export default function ClienteDetallePage() {
     if (!client) return;
     setConfirm({
       title: "Eliminar cliente",
-      message: `¿Eliminar «${client.name}» del padrón? Esta acción no se puede deshacer. Si solo ya no trabajan con él, mejor desactívalo.`,
+      message: `«${client.name}» se eliminará del padrón para siempre; si solo ya no trabajan con él, mejor desactívalo.`,
       confirmLabel: "Eliminar",
       danger: true,
       fn: async () => {
