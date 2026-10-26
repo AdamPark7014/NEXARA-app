@@ -1,5 +1,6 @@
 import Link from "next/link";
 import s from "@/components/sitio/sitio.module.css";
+import { ruta } from "@/components/sitio/rutas";
 import Aurora from "@/components/sitio/Aurora";
 import Tablero from "@/components/sitio/Tablero";
 import Marcas from "@/components/sitio/Marcas";
@@ -12,6 +13,7 @@ import MapaMexico from "@/components/sitio/MapaMexico";
 import Ecosistema from "@/components/sitio/Ecosistema";
 import { GlifoAnios, GlifoEstados, GlifoRespuesta, GlifoSitios } from "@/components/sitio/Glifos";
 import Preguntas, { type Pregunta } from "@/components/sitio/Preguntas";
+import { GraficaEntregas, TicketSoporte, TopologiaRed } from "@/components/sitio/MiniInterfaces";
 import PublicIcon from "@/app/components/PublicIcon";
 import {
   fetchPageSection,
@@ -178,7 +180,7 @@ export default async function PropuestaInicio() {
               responsable, del diagnóstico al soporte.
             </p>
             <div className={s.acciones}>
-              <Link href="/contacto" className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_hero_cta">
+              <Link href={ruta("/contacto")} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_hero_cta">
                 Cotiza tu proyecto
                 <Flecha />
               </Link>
@@ -252,7 +254,7 @@ export default async function PropuestaInicio() {
           </div>
 
           <div className={s.bento}>
-            <Link href="/servicios#cctv" className={`${s.tile} ${s.tileAncho}`} data-aparecer>
+            <Link href={ruta("/servicios#cctv")} className={`${s.tile} ${s.tileAncho}`} data-aparecer>
               <div className={s.tileTexto}>
                 <span className={s.tileIcono}>
                   <PublicIcon name="camera" size={20} />
@@ -276,7 +278,7 @@ export default async function PropuestaInicio() {
               </div>
             </Link>
 
-            <Link href="/servicios#redes" className={s.tile} data-aparecer>
+            <Link href={ruta("/servicios#redes")} className={s.tile} data-aparecer>
               <div className={s.tileTexto}>
                 <span className={s.tileIcono}>
                   <PublicIcon name="wifi" size={20} />
@@ -289,29 +291,11 @@ export default async function PropuestaInicio() {
                 </span>
               </div>
               <div className={s.tileArte} aria-hidden="true">
-                <svg className={s.red} viewBox="0 0 320 230" preserveAspectRatio="xMidYMid meet">
-                  <path className={s.redLinea} d="M160 40 V100 M160 100 L60 170 M160 100 L160 180 M160 100 L260 170" />
-                  <path className={s.redFlujo} d="M160 40 V100 L60 170" />
-                  <path className={s.redFlujo} d="M160 40 V100 L160 180" />
-                  <path className={s.redFlujo} d="M160 40 V100 L260 170" />
-                  <circle className={s.redNodo} cx="160" cy="32" r="16" />
-                  <path className={s.redIcono} d="M152 32a8 8 0 0 1 16 0M156 32a4 4 0 0 1 8 0" />
-                  <circle className={s.redNodoCentral} cx="160" cy="100" r="22" />
-                  <path className={`${s.redIcono} ${s.redIconoClaro}`} d="M150 96h20M150 104h20M154 96v8M166 96v8" />
-                  <circle className={s.redNodo} cx="60" cy="176" r="18" />
-                  <circle className={s.redNodo} cx="160" cy="186" r="18" />
-                  <circle className={s.redNodo} cx="260" cy="176" r="18" />
-                  <path className={s.redIcono} d="M52 176a8 8 0 0 1 16 0M56 176a4 4 0 0 1 8 0M152 186a8 8 0 0 1 16 0M156 186a4 4 0 0 1 8 0M252 176a8 8 0 0 1 16 0M256 176a4 4 0 0 1 8 0" />
-                  <text className={s.redTexto} x="184" y="36">Internet</text>
-                  <text className={s.redTexto} x="190" y="104">Switch central</text>
-                  <text className={s.redTexto} x="34" y="214">Oficinas</text>
-                  <text className={s.redTexto} x="140" y="224">Almacén</text>
-                  <text className={s.redTexto} x="236" y="214">Patio</text>
-                </svg>
+                <TopologiaRed />
               </div>
             </Link>
 
-            <Link href="/servicios#computo" className={s.tile} data-aparecer>
+            <Link href={ruta("/servicios#computo")} className={s.tile} data-aparecer>
               <div className={s.tileTexto}>
                 <span className={s.tileIcono}>
                   <PublicIcon name="server" size={20} />
@@ -332,7 +316,7 @@ export default async function PropuestaInicio() {
               </div>
             </Link>
 
-            <Link href="/servicios#soporte" className={s.tile} data-aparecer>
+            <Link href={ruta("/servicios#soporte")} className={s.tile} data-aparecer>
               <div className={s.tileTexto}>
                 <span className={s.tileIcono}>
                   <PublicIcon name="headset" size={20} />
@@ -345,36 +329,11 @@ export default async function PropuestaInicio() {
                 </span>
               </div>
               <div className={s.tileArte} aria-hidden="true">
-                <div className={s.ticket}>
-                  <div className={s.ticketCabeza}>
-                    Reporte de soporte
-                    <span className={s.ticketPrioridad}>Prioridad alta</span>
-                  </div>
-                  <ol className={s.ticketPasos}>
-                    <li className={`${s.ticketPaso} ${s.ticketPasoHecho}`}>
-                      Recibido <time>09:02</time>
-                    </li>
-                    <li className={`${s.ticketPaso} ${s.ticketPasoHecho}`}>
-                      Técnico asignado <time>09:10</time>
-                    </li>
-                    <li className={`${s.ticketPaso} ${s.ticketPasoHecho}`}>
-                      En sitio <time>10:15</time>
-                    </li>
-                    <li className={s.ticketPaso}>
-                      Cierre con evidencia <time>—</time>
-                    </li>
-                  </ol>
-                  <div className={s.ticketSla}>
-                    Tiempo del SLA usado
-                    <div className={s.ticketBarra}>
-                      <i />
-                    </div>
-                  </div>
-                </div>
+                <TicketSoporte />
               </div>
             </Link>
 
-            <Link href="/servicios#software" className={s.tile} data-aparecer>
+            <Link href={ruta("/servicios#software")} className={s.tile} data-aparecer>
               <div className={s.tileTexto}>
                 <span className={s.tileIcono}>
                   <PublicIcon name="code" size={20} />
@@ -387,15 +346,7 @@ export default async function PropuestaInicio() {
                 </span>
               </div>
               <div className={s.tileArte} aria-hidden="true">
-                <div className={s.grafica}>
-                  Entregas a tiempo, por semana
-                  <span className={s.graficaValor}>En aumento</span>
-                  <div className={s.barras}>
-                    {[38, 52, 46, 61, 58, 72, 80, 92].map((h, i) => (
-                      <i key={i} style={{ height: `${h}%`, animationDelay: `${i * 70}ms` }} />
-                    ))}
-                  </div>
-                </div>
+                <GraficaEntregas />
               </div>
             </Link>
           </div>
@@ -458,7 +409,7 @@ export default async function PropuestaInicio() {
             <p className={s.declaracion}>
               Las personas que diseñan tu proyecto <span className={s.tenue}>son las que lo instalan y las que te atienden después.</span>
             </p>
-            <Link href="/nosotros" className={s.enlace}>
+            <Link href={ruta("/nosotros")} className={s.enlace}>
               Conoce al equipo
               <Flecha />
             </Link>
@@ -570,7 +521,7 @@ export default async function PropuestaInicio() {
             </h2>
             <p className={s.lead}>{cta.text}</p>
             <div className={s.acciones}>
-              <Link href={cta.primaryHref} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_cta_primary">
+              <Link href={ruta(cta.primaryHref)} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_cta_primary">
                 {cta.primaryLabel}
                 <Flecha />
               </Link>

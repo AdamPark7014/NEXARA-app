@@ -54,8 +54,17 @@
       `tecnicos-mantenimiento-pc-colaboracion` (hacían ver a NEXARA como taller de PC), `campo-levantamiento-patio`
       (persona posando), `equipo-nexara-espalda`. Entran a la galería las de campo (punto de acceso en altura, video
       wall, torniquetes) y el equipo.
-  - Falta: visto bueno del dueño; después llevar el sistema a `(public)` (layout, Servicios, Proyectos, Nosotros,
-    Contacto, Blog, Soluciones, Cobertura) y restilar el banner de cookies y el contacto flotante.
+  - Tercera ronda: Servicios, Nosotros, Proyectos y Contacto ya existen en el sistema nuevo
+    (`app/propuesta/{servicios,nosotros,proyectos,contacto}`), con el contenido del sitio actual reescrito y sin sus
+    fotos de taller. Piezas nuevas: `SubNav` (sub-barra fija con la sección activa), `Cierre`, `Certificaciones`,
+    `MiniInterfaces` (red, ticket y gráfica, compartidas con la portada), `FormularioContacto` (mismo
+    `POST contact-messages` con `source: contacto-page` que el formulario actual; lee `?servicio=`) y `equipo.ts`
+    (`users/public-team`, solo iniciales). CSS de páginas interiores en `paginas.module.css`.
+  - Todas las ligas internas pasan por `ruta()` (`components/sitio/rutas.ts`): con `BASE_SITIO = "/propuesta"` la
+    propuesta navega entre sus páginas; blog, soluciones y cobertura siguen yendo al sitio actual. Al publicar en
+    `(public)`, `BASE_SITIO` pasa a "".
+  - Falta: visto bueno del dueño; después mover el sistema a `(public)` (layout y páginas), rehacer Blog, Soluciones
+    y Cobertura, y restilar el banner de cookies y el contacto flotante.
 
 - **26-10 ~10:30 (claude-code) — Asistencias: la insignia larga ya no se encima con la foto de la checada.**
   - Adam (captura de la ficha del día): en la tarjeta ENTRADA, «Revisar: Ubicación tomada 26 min después de
