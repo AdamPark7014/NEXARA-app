@@ -1,5 +1,19 @@
 # RELEVO
 
+- **26-10 ~15:20 (claude-code) — Blog con guías permanentes, Servicios más completo y limpieza de texto repetido.**
+  - `lib/guias.ts`: cuatro guías del equipo (videovigilancia, Wi‑Fi en horas pico, memoria técnica, soporte con SLA)
+    que `blog/[slug]` muestra cuando Studio no tiene una nota con ese slug; el índice del blog las presenta solas
+    mientras Studio no publique nada y debajo de las notas cuando haya. Van en el sitemap (sin `/cobertura`, que
+    redirige). Son texto escrito por Claude: Adam puede editarlas o quitarlas en ese archivo.
+  - Servicios: enlaces «Por industria» en cada servicio, «Lo que recibes en cada proyecto» (seis entregables),
+    «Un proyecto, o soporte que sigue» y las guías al final.
+  - Texto repetido fuera: «+10 años» del hero (queda en la cifra), la pregunta de tiempo de respuesta de la portada
+    (ahora «¿Cuánto cuesta un proyecto?»), datos de Nosotros que repetían el cierre y la fila de datos de Proyectos;
+    cada caso de Proyectos lleva a su solución.
+  - `PhoneField` en español con México, Estados Unidos y Canadá arriba (aplica también a los paneles).
+  - Con el servidor de desarrollo encendido, las pruebas del editor de cotizaciones y de viáticos se pasan de los
+    15 s; solas pasan (24/24). Apagar el servidor antes de `npm run test`.
+
 - **26-10 ~14:20 (claude-code) — Todas las subrutas públicas pasan al sitio 2026; `(public)` ya no existe.**
   - Se movieron a `app/(sitio)`: `soluciones/[industry]` y `[industry]/[service]`, `cobertura/[city]` y
     `[city]/[service]`, `blog` y `blog/[slug]`, `qa`, `Nexara-Ingenieros`, `cotizaciones/firmar/[token]`,

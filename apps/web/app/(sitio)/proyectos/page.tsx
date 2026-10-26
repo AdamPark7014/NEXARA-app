@@ -21,12 +21,15 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
-const DATOS: { icono: PublicIconName; etiqueta: string; valor: string }[] = [
-  { icono: "search", etiqueta: "En campo", valor: "Diagnóstico e instalación con evidencia en sitio" },
-  { icono: "building", etiqueta: "Multisede", valor: "Estándares repetibles para sucursales y campus" },
-  { icono: "headset", etiqueta: "Soporte", valor: "Continuidad después del arranque, no solo la entrega" },
-  { icono: "mapPin", etiqueta: "Nacional", valor: "Base en Puebla y CDMX, proyectos en todo el país" },
-];
+/** Página de solución de cada industria de los casos. */
+const SOLUCION_DE: Record<string, string> = {
+  Retail: "retail",
+  Manufactura: "manufactura",
+  Hospitalidad: "hospitalidad",
+  Salud: "salud",
+  Educación: "educacion",
+  Gobierno: "gobierno",
+};
 
 /** Referencias representativas por industria (sin nombrar al cliente), las mismas del sitio actual. */
 const CASOS: { sector: string; icono: PublicIconName; titulo: string; texto: string; metrica: string; servicios: string[] }[] = [
@@ -126,21 +129,9 @@ export default async function PropuestaProyectos() {
         </div>
       </section>
 
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Cómo trabajamos en campo" style={{ paddingTop: "clamp(56px, 7vw, 96px)" }}>
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Proyectos por industria">
         <div className={s.contenedor}>
-          <ul className={p.datos} style={{ marginTop: 0 }}>
-            {DATOS.map((d) => (
-              <li key={d.etiqueta} className={p.dato} data-aparecer>
-                <span className={p.datoIcono}>
-                  <PublicIcon name={d.icono} size={22} />
-                </span>
-                <p className={p.datoEtiqueta}>{d.etiqueta}</p>
-                <p className={p.datoValor}>{d.valor}</p>
-              </li>
-            ))}
-          </ul>
-
-          <div className={s.cabeza} style={{ marginTop: "clamp(88px, 10vw, 140px)" }} data-aparecer>
+          <div className={s.cabeza} data-aparecer>
             <div>
               <p className={s.antetitulo}>Por industria</p>
               <h2 className={s.titulo}>
@@ -165,6 +156,12 @@ export default async function PropuestaProyectos() {
                     <span key={sv}>{sv}</span>
                   ))}
                 </div>
+                {SOLUCION_DE[c.sector] ? (
+                  <Link href={`/soluciones/${SOLUCION_DE[c.sector]}`} className={s.enlace} style={{ marginTop: 20, fontSize: 15 }}>
+                    Ver la solución para {c.sector.toLowerCase()}
+                    <Flecha />
+                  </Link>
+                ) : null}
               </li>
             ))}
           </ul>

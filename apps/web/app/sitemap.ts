@@ -6,6 +6,7 @@ import {
 import { INDUSTRY_HUB_SLUGS } from "@/lib/seo/industry-hubs";
 import { sitemapPriorityForLanding } from "@/lib/seo/money-pages";
 import { fetchPublishedNews } from "@/lib/public-news";
+import { GUIAS } from "@/lib/guias";
 import { GEO_CITIES, getGeoServiceCombos } from "@/lib/seo/geo-cities";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -18,7 +19,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/servicios`, lastModified: now, changeFrequency: "daily", priority: 0.98 },
     { url: `${baseUrl}/contacto`, lastModified: now, changeFrequency: "daily", priority: 0.97 },
     { url: `${baseUrl}/proyectos`, lastModified: now, changeFrequency: "weekly", priority: 0.93 },
-    { url: `${baseUrl}/cobertura`, lastModified: now, changeFrequency: "weekly", priority: 0.88 },
     { url: `${baseUrl}/nosotros`, lastModified: now, changeFrequency: "weekly", priority: 0.86 },
     { url: `${baseUrl}/blog`, lastModified: now, changeFrequency: "daily", priority: 0.85 },
     { url: `${baseUrl}/qa`, lastModified: now, changeFrequency: "monthly", priority: 0.75 },
@@ -75,6 +75,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.72,
   }));
 
+  const guias: MetadataRoute.Sitemap = GUIAS.filter((g) => !posts.some((p) => p.slug === g.slug)).map((g) => ({
+    url: `${baseUrl}/blog/${g.slug}`,
+    lastModified: new Date(`${g.publicada}T12:00:00Z`),
+    changeFrequency: "monthly" as const,
+    priority: 0.74,
+  }));
+
   return [
     ...staticPages,
     ...geoServicePages.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0)),
@@ -82,5 +89,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...industryHubs,
     ...programmaticPages,
     ...blogPosts,
+    ...guias,
   ];
 }

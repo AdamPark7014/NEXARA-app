@@ -5,6 +5,9 @@ import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import { foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
+import ip from "@/components/sitio/interior.module.css";
+import TarjetasRuta from "@/components/sitio/TarjetasRuta";
+import { GUIAS } from "@/lib/guias";
 import Aurora from "@/components/sitio/Aurora";
 import Flecha from "@/components/sitio/Flecha";
 import SubNav from "@/components/sitio/SubNav";
@@ -54,7 +57,43 @@ type Servicio = {
   texto: string;
   puntos: string[];
   arte: React.ReactNode;
+  /** Servicio de las soluciones por industria (`/soluciones/<industria>/<servicio>`). */
+  solucion: string;
 };
+
+/** Industrias con página propia y soluciones por servicio. */
+const INDUSTRIAS_SOLUCION = [
+  { slug: "retail", nombre: "Retail" },
+  { slug: "manufactura", nombre: "Manufactura" },
+  { slug: "salud", nombre: "Salud" },
+  { slug: "gobierno", nombre: "Gobierno" },
+];
+
+/** Lo que se entrega al cerrar cualquier proyecto. */
+const ENTREGABLES: { icono: PublicIconName; titulo: string; texto: string }[] = [
+  { icono: "fileCheck", titulo: "Memoria técnica", texto: "Planos, diagramas de red y etiquetado que coincide con lo instalado." },
+  { icono: "camera", titulo: "Evidencia fotográfica", texto: "El antes y el después de cada punto, por si hace falta demostrarlo." },
+  { icono: "server", titulo: "Configuraciones respaldadas", texto: "Copia de switches, grabadores y equipos de red, lista para restaurar." },
+  { icono: "check", titulo: "Pruebas documentadas", texto: "Certificación del cableado y verificación de grabación y respaldos." },
+  { icono: "users", titulo: "Capacitación", texto: "Tu equipo aprende a operar lo básico sin depender de nadie." },
+  { icono: "shield", titulo: "Garantía y RMA", texto: "Garantía del fabricante con el trámite de reemplazo a nuestro cargo." },
+];
+
+/** Dos formas de trabajar con NEXARA. */
+const MODALIDADES: { icono: PublicIconName; titulo: string; texto: string; puntos: string[] }[] = [
+  {
+    icono: "clipboard",
+    titulo: "Proyecto llave en mano",
+    texto: "Para instalar o renovar: alcance cerrado y precio por fases antes de empezar.",
+    puntos: ["Diagnóstico en sitio", "Propuesta por fases", "Instalación con evidencia", "Entrega documentada"],
+  },
+  {
+    icono: "refresh",
+    titulo: "Soporte continuo",
+    texto: "Para lo que ya opera: mesa de ayuda con SLA y mantenimiento programado.",
+    puntos: ["Atención remota y en sitio", "Tiempos por prioridad", "Mantenimiento preventivo", "Reporte mensual"],
+  },
+];
 
 const SERVICIOS: Servicio[] = [
   {
@@ -80,6 +119,7 @@ const SERVICIOS: Servicio[] = [
         </span>
       </>
     ),
+    solucion: "camaras-cctv",
   },
   {
     id: "redes",
@@ -96,6 +136,7 @@ const SERVICIOS: Servicio[] = [
       "Documentación y optimización de la red",
     ],
     arte: <TopologiaRed />,
+    solucion: "redes-y-conectividad",
   },
   {
     id: "computo",
@@ -120,6 +161,7 @@ const SERVICIOS: Servicio[] = [
         </span>
       </>
     ),
+    solucion: "infraestructura-ti",
   },
   {
     id: "soporte",
@@ -136,6 +178,7 @@ const SERVICIOS: Servicio[] = [
       "Seguimiento y documentación de incidencias",
     ],
     arte: <TicketSoporte />,
+    solucion: "soporte-ti-pyme",
   },
   {
     id: "software",
@@ -152,6 +195,7 @@ const SERVICIOS: Servicio[] = [
       "Implementación por fases con objetivos definidos",
     ],
     arte: <GraficaEntregas />,
+    solucion: "automatizacion-de-procesos",
   },
 ];
 
@@ -293,6 +337,15 @@ export default function PropuestaServicios() {
                     <Flecha />
                   </Link>
                 </p>
+                <p className={ip.porIndustria}>
+                  Por industria:{" "}
+                  {INDUSTRIAS_SOLUCION.map((ind, n) => (
+                    <span key={ind.slug}>
+                      {n ? " · " : ""}
+                      <Link href={`/soluciones/${ind.slug}/${sv.solucion}`}>{ind.nombre}</Link>
+                    </span>
+                  ))}
+                </p>
               </div>
               <div className={p.servicioArte}>{sv.arte}</div>
             </article>
@@ -300,8 +353,40 @@ export default function PropuestaServicios() {
         </div>
       </section>
 
+      {/* Lo que se entrega */}
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="entregas-titulo">
+        <div className={s.contenedor}>
+          <div className={s.cabeza} data-aparecer>
+            <div>
+              <p className={s.antetitulo}>Al entregar</p>
+              <h2 id="entregas-titulo" className={s.titulo}>
+                Lo que recibes <span className={s.tenue}>en cada proyecto.</span>
+              </h2>
+            </div>
+            <p className={s.lead}>
+              Seis entregables, por escrito en la propuesta.{" "}
+              <Link href="/blog/que-debe-incluir-memoria-tecnica" className={s.enlace}>
+                Qué debe traer una memoria técnica
+                <Flecha />
+              </Link>
+            </p>
+          </div>
+          <ul className={ip.entregables}>
+            {ENTREGABLES.map((e) => (
+              <li key={e.titulo} className={ip.entregable} data-aparecer>
+                <span className={ip.rutaIcono}>
+                  <PublicIcon name={e.icono} size={20} />
+                </span>
+                <h3 className={ip.rutaTitulo}>{e.titulo}</h3>
+                <p className={ip.rutaTexto}>{e.texto}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
       {/* Método */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Método">
+      <section className={s.seccion} aria-label="Método">
         <div className={s.contenedor}>
           <Metodo
             antetitulo="Método"
@@ -313,6 +398,37 @@ export default function PropuestaServicios() {
             lead="Instalación documentada y operable: evidencia, no promesas."
             pasos={PASOS}
           />
+        </div>
+      </section>
+
+      {/* Cómo se contrata */}
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="modalidades-titulo">
+        <div className={s.contenedor}>
+          <div className={s.centro} data-aparecer>
+            <p className={s.antetitulo}>Cómo trabajamos contigo</p>
+            <h2 id="modalidades-titulo" className={s.titulo}>
+              Un proyecto, <span className={s.tenue}>o soporte que sigue.</span>
+            </h2>
+          </div>
+          <div className={ip.modalidades}>
+            {MODALIDADES.map((m) => (
+              <article key={m.titulo} className={ip.tarjeta} data-aparecer>
+                <span className={ip.rutaIcono}>
+                  <PublicIcon name={m.icono} size={20} />
+                </span>
+                <h3 className={ip.tarjetaTitulo}>{m.titulo}</h3>
+                <p className={ip.rutaTexto}>{m.texto}</p>
+                <ul className={p.lista}>
+                  {m.puntos.map((pt) => (
+                    <li key={pt}>
+                      <PublicIcon name="check" size={18} />
+                      {pt}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -338,6 +454,34 @@ export default function PropuestaServicios() {
               </Link>
             ))}
           </nav>
+        </div>
+      </section>
+
+      {/* Guías del blog */}
+      <section className={s.seccion} aria-labelledby="guias-servicios">
+        <div className={s.contenedor}>
+          <div className={s.cabeza} data-aparecer>
+            <div>
+              <p className={s.antetitulo}>Guías</p>
+              <h2 id="guias-servicios" className={s.titulo}>
+                Antes de cotizar, <span className={s.tenue}>lo que conviene saber.</span>
+              </h2>
+            </div>
+            <p className={s.lead}>
+              <Link href="/blog" className={s.enlace}>
+                Todas las guías
+                <Flecha />
+              </Link>
+            </p>
+          </div>
+          <TarjetasRuta
+            ir="Leer la guía"
+            rutas={GUIAS.filter((g) => g.slug !== "que-debe-incluir-memoria-tecnica").map((g) => ({
+              href: `/blog/${g.slug}`,
+              etiqueta: `${g.tema} · ${g.lectura} min`,
+              titulo: g.titulo,
+            }))}
+          />
         </div>
       </section>
 

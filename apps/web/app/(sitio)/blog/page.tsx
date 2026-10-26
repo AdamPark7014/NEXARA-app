@@ -2,12 +2,11 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import { fetchPublishedNews, normalizeNewsImageUrl, toPlainExcerpt, type PublicNewsPost } from "@/lib/public-news";
+import { GUIAS, type Guia } from "@/lib/guias";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
-import PublicIcon from "@/app/components/PublicIcon";
 import s from "@/components/sitio/sitio.module.css";
 import i from "@/components/sitio/interior.module.css";
 import HeroInterior from "@/components/sitio/HeroInterior";
-import Rutas from "@/components/sitio/TarjetasRuta";
 import Directorio from "@/components/sitio/Directorio";
 import Cierre from "@/components/sitio/Cierre";
 import Flecha from "@/components/sitio/Flecha";
@@ -28,27 +27,94 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const revalidate = 300;
 
-const fecha = (post: PublicNewsPost) =>
-  new Date(post.publishedAt || post.createdAt).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
+/** Nota de Studio o guía permanente, con lo que necesita una tarjeta. */
+type Entrada = {
+  clave: string;
+  href: string;
+  titulo: string;
+  resumen: string;
+  fecha: string;
+  etiqueta: string;
+  imagen: (sizes: string) => Foto;
+  tags?: string[];
+};
 
-/** Portada de Studio o, si la nota no trae, la foto del centro de monitoreo en webp. */
-const portada = (post: PublicNewsPost, sizes: string): Foto =>
-  post.coverImageUrl ? { src: normalizeNewsImageUrl(post.coverImageUrl) } : foto("monitoreo-pantallas-cctv", sizes);
+const fechaLarga = (iso: string) =>
+  new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
-function Etiquetas({ tags, max }: { tags?: string[]; max: number }) {
-  if (!tags?.length) return null;
+const deNota = (post: PublicNewsPost): Entrada => ({
+  clave: `nota-${post.id}`,
+  href: `/blog/${post.slug}`,
+  titulo: post.title,
+  resumen: toPlainExcerpt(post.summary, post.content, 200),
+  fecha: post.publishedAt || post.createdAt,
+  etiqueta: post.tags?.[0] ?? "Nota",
+  imagen: (sizes) => (post.coverImageUrl ? { src: normalizeNewsImageUrl(post.coverImageUrl) } : foto("monitoreo-pantallas-cctv", sizes)),
+  tags: post.tags,
+});
+
+const deGuia = (g: Guia): Entrada => ({
+  clave: `guia-${g.slug}`,
+  href: `/blog/${g.slug}`,
+  titulo: g.titulo,
+  resumen: g.resumen,
+  fecha: g.publicada,
+  etiqueta: `${g.tema} · ${g.lectura} min`,
+  imagen: (sizes) => foto(g.foto, sizes),
+});
+
+function Destacada({ e, antetitulo }: { e: Entrada; antetitulo: string }) {
   return (
-    <div className={i.etiquetas}>
-      {tags.slice(0, max).map((t) => (
-        <span key={t}>{t}</span>
+    <article className={i.destacada} data-aparecer>
+      <Link href={e.href} className={i.portada} tabIndex={-1} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img {...e.imagen("(max-width: 1068px) 100vw, 660px")} alt="" fetchPriority="high" decoding="async" />
+      </Link>
+      <div>
+        <p className={s.antetitulo}>{antetitulo}</p>
+        <p className={i.fecha}>
+          {e.etiqueta} · <time dateTime={e.fecha}>{fechaLarga(e.fecha)}</time>
+        </p>
+        <h2 className={i.destacadaTitulo}>
+          <Link href={e.href}>{e.titulo}</Link>
+        </h2>
+        <p className={i.resumen}>{e.resumen}</p>
+        <p style={{ marginTop: 28 }}>
+          <Link href={e.href} className={s.enlace}>
+            Leer
+            <Flecha />
+          </Link>
+        </p>
+      </div>
+    </article>
+  );
+}
+
+function Rejilla({ entradas }: { entradas: Entrada[] }) {
+  return (
+    <ul className={i.entradas}>
+      {entradas.map((e) => (
+        <li key={e.clave} className={i.entrada} data-aparecer>
+          <Link href={e.href} className={i.portada} tabIndex={-1} aria-hidden="true">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img {...e.imagen("(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 380px")} alt="" loading="lazy" decoding="async" />
+          </Link>
+          <p className={i.fecha}>{e.etiqueta}</p>
+          <h3 className={i.entradaTitulo}>
+            <Link href={e.href}>{e.titulo}</Link>
+          </h3>
+          <p className={i.resumen}>{e.resumen}</p>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
 export default async function BlogPage() {
   const posts = await fetchPublishedNews(24);
-  const [destacada, ...resto] = posts;
+  const notas = posts.map(deNota);
+  const guias = GUIAS.map(deGuia);
+  const hayNotas = notas.length > 0;
 
   return (
     <main aria-label="Blog de NEXARA">
@@ -58,12 +124,12 @@ export default async function BlogPage() {
           "@type": "Blog",
           name: "Blog NEXARA",
           url: `${siteBaseUrl()}/blog`,
-          description: "Noticias, guías y notas de campo sobre CCTV, redes y soporte TI.",
-          blogPost: posts.slice(0, 12).map((p) => ({
+          description: "Guías, noticias y notas de campo sobre CCTV, redes y soporte TI.",
+          blogPost: [...notas.slice(0, 12), ...guias].map((e) => ({
             "@type": "BlogPosting",
-            headline: p.title,
-            url: `${siteBaseUrl()}/blog/${p.slug}`,
-            datePublished: p.publishedAt || p.createdAt,
+            headline: e.titulo,
+            url: `${siteBaseUrl()}${e.href}`,
+            datePublished: e.fecha,
           })),
         }}
       />
@@ -76,112 +142,46 @@ export default async function BlogPage() {
             Notas de campo <span className={s.tenue}>y criterio técnico.</span>
           </>
         }
-        lead="Guías prácticas, aprendizajes de obra y resultados de operación, escritos por el equipo que instala."
+        lead="Guías prácticas y aprendizajes de obra, escritos por el equipo que instala, para decidir mejor antes de cotizar."
       />
 
-      {destacada ? (
-        <>
-          <section className={s.seccion} aria-labelledby="destacada-titulo" style={{ paddingTop: 0 }}>
-            <div className={s.contenedor}>
-              <article className={i.destacada} data-aparecer>
-                <Link href={`/blog/${destacada.slug}`} className={i.portada} tabIndex={-1} aria-hidden="true">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img {...portada(destacada, "(max-width: 1068px) 100vw, 660px")} alt="" fetchPriority="high" decoding="async" />
-                </Link>
-                <div>
-                  <p className={s.antetitulo}>Lo más reciente</p>
-                  <p className={i.fecha}>
-                    <time dateTime={destacada.publishedAt || destacada.createdAt}>{fecha(destacada)}</time>
-                  </p>
-                  <h2 id="destacada-titulo" className={i.destacadaTitulo}>
-                    <Link href={`/blog/${destacada.slug}`}>{destacada.title}</Link>
-                  </h2>
-                  <p className={i.resumen}>{toPlainExcerpt(destacada.summary, destacada.content, 220)}</p>
-                  <Etiquetas tags={destacada.tags} max={5} />
-                  <p style={{ marginTop: 28 }}>
-                    <Link href={`/blog/${destacada.slug}`} className={s.enlace}>
-                      Leer la nota
-                      <Flecha />
-                    </Link>
-                  </p>
-                </div>
-              </article>
-            </div>
-          </section>
+      {/* Lo más reciente: la última nota de Studio o, sin notas, la primera guía. */}
+      <section className={s.seccion} aria-label="Lo más reciente" style={{ paddingTop: 0 }}>
+        <div className={s.contenedor}>
+          {hayNotas ? <Destacada e={notas[0]} antetitulo="Lo más reciente" /> : <Destacada e={guias[0]} antetitulo="Guía destacada" />}
+        </div>
+      </section>
 
-          {resto.length > 0 ? (
-            <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="archivo-titulo">
-              <div className={s.contenedor}>
-                <p className={s.antetitulo}>Archivo</p>
-                <h2 id="archivo-titulo" className={s.titulo}>
-                  Más <span className={s.tenue}>notas.</span>
-                </h2>
-                <ul className={i.entradas}>
-                  {resto.map((post) => (
-                    <li key={post.id} className={i.entrada} data-aparecer>
-                      <Link href={`/blog/${post.slug}`} className={i.portada} tabIndex={-1} aria-hidden="true">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img {...portada(post, "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 380px")} alt="" loading="lazy" decoding="async" />
-                      </Link>
-                      <p className={i.fecha}>
-                        <time dateTime={post.publishedAt || post.createdAt}>{fecha(post)}</time>
-                      </p>
-                      <h3 className={i.entradaTitulo}>
-                        <Link href={`/blog/${post.slug}`}>{post.title}</Link>
-                      </h3>
-                      <p className={i.resumen}>{toPlainExcerpt(post.summary, post.content, 140)}</p>
-                      <Etiquetas tags={post.tags} max={3} />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </section>
-          ) : null}
-        </>
-      ) : (
-        <section className={s.seccion} aria-labelledby="pronto-titulo" style={{ paddingTop: 0 }}>
+      {hayNotas && notas.length > 1 ? (
+        <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="notas-titulo">
           <div className={s.contenedor}>
-            <div className={i.vacio} data-aparecer>
-              <span className={i.panelIcono}>
-                <PublicIcon name="clipboard" size={24} />
-              </span>
-              <h2 id="pronto-titulo" className={i.panelTitulo}>
-                Las primeras notas <span className={s.tenue}>vienen en camino.</span>
-              </h2>
-              <p className={i.panelTexto} style={{ marginInline: "auto", maxWidth: "46ch" }}>
-                Mientras tanto, estas páginas responden lo que más nos preguntan antes de cotizar.
-              </p>
-            </div>
-            <Rutas
-              ir="Abrir"
-              rutas={[
-                {
-                  href: "/qa",
-                  titulo: "Preguntas frecuentes",
-                  texto: "Tiempos, garantías, soporte y cómo se arma una cotización.",
-                  icono: "search",
-                },
-                {
-                  href: "/proyectos",
-                  titulo: "Proyectos",
-                  texto: "Instalaciones reales en operación, con lo que entregamos en cada una.",
-                  icono: "layers",
-                },
-                {
-                  href: "/servicios",
-                  titulo: "Servicios",
-                  texto: "Videovigilancia, redes, cómputo, soporte y plataformas bajo un contrato.",
-                  icono: "check",
-                },
-              ]}
-            />
+            <p className={s.antetitulo}>Notas</p>
+            <h2 id="notas-titulo" className={s.titulo}>
+              Lo que pasa <span className={s.tenue}>en campo.</span>
+            </h2>
+            <Rejilla entradas={notas.slice(1)} />
           </div>
         </section>
-      )}
+      ) : null}
+
+      <section className={`${s.seccion} ${hayNotas && notas.length > 1 ? "" : s.seccionAlt}`} aria-labelledby="guias-titulo">
+        <div className={s.contenedor}>
+          <div className={s.cabeza} data-aparecer>
+            <div>
+              <p className={s.antetitulo}>Guías</p>
+              <h2 id="guias-titulo" className={s.titulo}>
+                Antes de cotizar, <span className={s.tenue}>lo que conviene saber.</span>
+              </h2>
+            </div>
+            <p className={s.lead}>Criterios que usamos en cada proyecto, explicados sin tecnicismos de más.</p>
+          </div>
+          <Rejilla entradas={hayNotas ? guias : guias.slice(1)} />
+        </div>
+      </section>
 
       <Directorio
         actual="/blog"
-        titulo="De la nota a la cotización"
+        titulo="De la guía a la cotización"
         lead="Cuando una duda apunta a un problema real, estas soluciones cierran el ciclo."
         industrias={4}
         porIndustria={2}

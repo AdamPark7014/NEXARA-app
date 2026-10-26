@@ -135,8 +135,8 @@ const PREGUNTAS: Pregunta[] = [
     r: "Sí. Tenemos mesa de ayuda con SLA, atención remota y en sitio, monitoreo y mejoras para cuando el proyecto ya está operando.",
   },
   {
-    p: "¿Cuánto tardan en responder?",
-    r: "Nuestra primera respuesta suele llegar en menos de un día hábil. En una llamada breve te decimos qué instalar, qué posponer y un presupuesto realista.",
+    p: "¿Cuánto cuesta un proyecto?",
+    r: "Depende del sitio y del alcance. Después del diagnóstico te damos una propuesta por fases, con el precio de cada una por escrito: sin alcance abierto ni costos escondidos.",
   },
   {
     p: "¿Con qué marcas trabajan?",
@@ -206,7 +206,7 @@ export default async function PropuestaInicio() {
         <div className={`${s.contenedor} ${s.heroGrid}`}>
           <div>
             <p className={s.insignia}>
-              <span className={s.insigniaPunto}>+10 años</span>
+              <span className={s.insigniaPunto}>Llave en mano</span>
               Seguridad e infraestructura TI para empresas
             </p>
             <h1 id="hero-titulo" className={s.titular}>
