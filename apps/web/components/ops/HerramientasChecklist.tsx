@@ -52,6 +52,15 @@ function corto(nombre?: string | null): string {
   return (nombre || "").split(/\s+/).slice(0, 2).join(" ");
 }
 
+/** Quién palomeó, la hora y la nota. En escritorio van en un renglón; en el teléfono, uno por renglón. */
+function lineasDe(r: RequisitoHerramienta): string[] {
+  if (!r.check) return ["Sin revisar"];
+  const lineas = [corto(r.check.por?.nombre), fmt(r.check.at), (r.check.nota ?? "").trim()].filter(
+    (v): v is string => Boolean(v),
+  );
+  return lineas.length > 0 ? lineas : ["Sin revisar"];
+}
+
 /** El 403 de Nest llega ya desenvuelto como «Forbidden resource» desde el cliente. */
 function esSinPermiso(e: unknown): boolean {
   return e instanceof Error && /forbidden/i.test(e.message);
@@ -320,9 +329,6 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
             {lista.map((r) => {
               const estado = estadoDe(r);
               const Icono = estado.icon;
-              const meta = r.check
-                ? [corto(r.check.por?.nombre), fmt(r.check.at)].filter(Boolean).join(" · ")
-                : null;
               const nota = notaDe?.id === r.id ? notaDe : null;
               const ocupada = palomeando === r.id;
               return (
@@ -332,7 +338,14 @@ export default function HerramientasChecklist({ activityId, canManage, canCheck,
                       {r.descripcion}
                       {r.cantidad > 1 ? <span className={s.cantidad}> ×{r.cantidad}</span> : null}
                     </span>
-                    <span className={s.filaM}>{[meta, r.check?.nota].filter(Boolean).join(" · ") || "Sin revisar"}</span>
+                    <span className={s.filaM}>
+                      {lineasDe(r).map((linea, i) => (
+                        <span key={`${r.id}-${i}`}>
+                          {i > 0 ? <span className={s.sep}> · </span> : null}
+                          {linea}
+                        </span>
+                      ))}
+                    </span>
                   </div>
 
                   <div className={s.filaAcciones}>

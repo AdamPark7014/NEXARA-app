@@ -33,14 +33,14 @@ enum HerramientasChecklistReglas {
         return "\(listos(requisitos)) de \(total) \(total == 1 ? "lista" : "listas")"
     }
 
-    /// El mismo texto que devuelve el API en el 400 de `iniciar`.
+    /// El mismo texto, letra por letra, que devuelve el API en el 400 de `iniciar`.
     static func mensajePendiente(_ pendientes: [String]) -> String {
         guard !pendientes.isEmpty else { return "" }
         let muestra = pendientes.prefix(maxNombresEnMensaje).joined(separator: ", ")
         let resto = pendientes.count > maxNombresEnMensaje ? " y \(pendientes.count - maxNombresEnMensaje) más" : ""
         let falta = pendientes.count == 1 ? "Falta" : "Faltan"
-        return "\(falta) palomear el checklist de herramientas antes de iniciar: "
-            + "\(muestra)\(resto). Si algo no lo traes o está dañado, márcalo y avisa a tu supervisor."
+        return "\(falta) palomear el checklist de herramientas antes de iniciar: \(muestra)\(resto); "
+            + "si algo no lo traes o está dañado, márcalo y avisa a tu supervisor."
     }
 
     /// «2» en vez de «2.0»; los decimales solo aparecen si los hay (metros de cable).
@@ -49,15 +49,15 @@ enum HerramientasChecklistReglas {
         return String(cantidad)
     }
 
-    /// «x2 · Serie A-1140 · SKU-99»; vacío cuando no hay nada que añadir.
-    static func detalle(_ req: HerramientaRequisito) -> String {
+    /// Cantidad, serie y SKU, cada uno en su renglón. Vacío cuando no hay nada que añadir.
+    static func lineas(_ req: HerramientaRequisito) -> [String] {
         var partes: [String] = []
         if let cantidad = req.cantidad, cantidad > 0 { partes.append("x\(cantidadTexto(cantidad))") }
         if let serie = req.herramienta?.serie, !serie.trimmingCharacters(in: .whitespaces).isEmpty {
             partes.append("Serie \(serie)")
         }
         if let sku = req.producto?.sku, !sku.trimmingCharacters(in: .whitespaces).isEmpty { partes.append(sku) }
-        return partes.joined(separator: " · ")
+        return partes
     }
 }
 
@@ -196,7 +196,7 @@ private struct HerramientaRequisitoFila: View {
     }
 
     var body: some View {
-        let detalle = HerramientasChecklistReglas.detalle(req)
+        let datos = HerramientasChecklistReglas.lineas(req)
         VStack(alignment: .leading, spacing: 4) {
             Color.clear.frame(height: 4)
             HStack(alignment: .center, spacing: 8) {
@@ -206,11 +206,12 @@ private struct HerramientaRequisitoFila: View {
                         .foregroundStyle(NxColors.fg)
                         .lineSpacing(max(0, 24 - 13.5 * 1.2))
                         .fixedSize(horizontal: false, vertical: true)
-                    if !detalle.isEmpty {
-                        Text(detalle)
+                    ForEach(Array(datos.enumerated()), id: \.offset) { _, linea in
+                        Text(linea)
                             .font(.system(size: 11.5))
                             .foregroundStyle(NxColors.muted)
-                            .lineLimit(1)
+                            .lineSpacing(max(0, 24 - 11.5 * 1.2))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
