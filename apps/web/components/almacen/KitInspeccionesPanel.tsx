@@ -40,7 +40,7 @@ import InfoBreve from "./InfoBreve";
 import s from "./KitInspeccionesPanel.module.css";
 
 const INFO =
-  "Cada kit asignado puede tener un ritmo de revisión en días. Al registrar una revisión la próxima se recorre sola; si el kit queda observado o dañado, se adelanta. Los vencidos se avisan cada mañana.";
+  "Al registrar una revisión, la próxima se recorre sola, se adelanta si el kit queda observado o dañado, y los vencidos se avisan cada mañana.";
 
 const ESTADOS: ReadonlyArray<{ valor: EstadoInspeccion; etiqueta: string }> = [
   { valor: "OK", etiqueta: "En orden" },
@@ -262,7 +262,7 @@ export default function KitInspeccionesPanel() {
                 </Button>
               }
             >
-              {kits.length > 0 ? `${error}. Se muestra lo último que cargó.` : error}
+              {error}
             </Alert>
           </div>
         )}
@@ -293,8 +293,8 @@ export default function KitInspeccionesPanel() {
             emptyTitle={porVencer ? "Ningún kit pide revisión" : "Nada vencido"}
             emptyDescription={
               porVencer
-                ? "Ni hoy ni la próxima semana. Si un kit asignado nunca aparece aquí, ponle un ritmo de revisión en la columna «Cada cuánto»."
-                : "No hay revisiones vencidas. Marca «Incluir la próxima semana» para ver lo que viene."
+                ? "Si un kit asignado no aparece, ponle un ritmo de revisión en la columna «Cada cuánto»."
+                : "Marca «Incluir la próxima semana» para ver lo que viene."
             }
           />
         )}
