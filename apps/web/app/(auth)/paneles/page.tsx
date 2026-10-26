@@ -31,8 +31,8 @@ export default function PanelHubPage() {
   const isSuperAdmin = !!user?.isSuperAdmin;
   const headerKicker = isSuperAdmin ? "NEXARA OWNER" : "NEXARA APP";
   const headerSubtitle = isSuperAdmin
-    ? "Vista de dirección general. Selecciona el panel estratégico que deseas gestionar."
-    : "Tu jornada está lista. Selecciona el panel en el que deseas trabajar.";
+    ? "Selecciona el panel estratégico que deseas gestionar en la vista de dirección general."
+    : "Selecciona el panel en el que deseas trabajar ahora que tu jornada está lista.";
 
   const panels = useMemo(() => getUserAllowedPanels(user), [user]);
   const userJson = useMemo(() => (user ? JSON.stringify(user) : null), [user]);
@@ -103,7 +103,7 @@ export default function PanelHubPage() {
 
       {panels.length === 0 ? (
         <div className={styles.empty}>
-          Tu cuenta no tiene paneles habilitados por el momento. Contacta a superadministración para asignar permisos.
+          Tu cuenta no tiene paneles habilitados por el momento, así que contacta a superadministración para asignar permisos.
         </div>
       ) : (
         <section className={styles.panelsSection}>
