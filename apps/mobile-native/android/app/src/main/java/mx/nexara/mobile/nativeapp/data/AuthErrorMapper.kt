@@ -24,26 +24,26 @@ object AuthErrorMapper {
     fun loginMessage(throwable: Throwable): String = when (throwable) {
         is HttpException -> when (throwable.code()) {
             401 -> mensajeDelServidor(throwable)
-                ?: "Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo."
+                ?: "Correo o contraseña incorrectos, verifica tus datos e intenta de nuevo."
             // 404 no es «contraseña mal»: es que ese correo no existe en la
             // tabla que se consultó. Decirlo aparte evita que un endpoint
             // ausente se disfrace de credencial incorrecta.
             404 -> "No encontramos ninguna cuenta con ese correo."
             403 -> mensajeDelServidor(throwable)
                 ?: "Tu cuenta no tiene acceso a esta aplicación."
-            429 -> "Demasiados intentos. Espera ${esperaLegible(throwable)} e intenta de nuevo."
-            in 500..599 -> "El servidor no está disponible en este momento. Intenta más tarde."
-            else -> "No se pudo iniciar sesión. Intenta de nuevo."
+            429 -> "Demasiados intentos, espera ${esperaLegible(throwable)} e intenta de nuevo."
+            in 500..599 -> "El servidor no está disponible en este momento, intenta más tarde."
+            else -> "No se pudo iniciar sesión, intenta de nuevo."
         }
         is UnknownHostException, is SSLException ->
-            "Sin conexión a internet. Revisa tu red e intenta de nuevo."
+            "Sin conexión a internet, revisa tu red e intenta de nuevo."
         is SocketTimeoutException ->
-            "La conexión tardó demasiado. Comprueba tu internet e intenta de nuevo."
+            "La conexión tardó demasiado, comprueba tu internet e intenta de nuevo."
         is IOException ->
-            "Problema de conexión. Revisa tu internet e intenta de nuevo."
+            "Problema de conexión, revisa tu internet e intenta de nuevo."
         else -> throwable.message
             ?.takeIf { it.isNotBlank() && !it.contains("HTTP", ignoreCase = true) }
-            ?: "No se pudo iniciar sesión. Intenta de nuevo."
+            ?: "No se pudo iniciar sesión, intenta de nuevo."
     }
 
     // Moshi y no `org.json`: en los tests de JVM `org.json` es un stub de Android

@@ -22,11 +22,11 @@ enum AuthErrorMapper {
         "sin token",
     ]
 
-    static let credencialesIncorrectas = "Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo."
-    static let sinConexion = "Sin conexión a internet. Revisa tu red e intenta de nuevo."
-    static let tiempoAgotado = "La conexión tardó demasiado. Comprueba tu internet e intenta de nuevo."
-    static let problemaDeConexion = "Problema de conexión. Revisa tu internet e intenta de nuevo."
-    static let generico = "No se pudo iniciar sesión. Intenta de nuevo."
+    static let credencialesIncorrectas = "Correo o contraseña incorrectos, verifica tus datos e intenta de nuevo."
+    static let sinConexion = "Sin conexión a internet, revisa tu red e intenta de nuevo."
+    static let tiempoAgotado = "La conexión tardó demasiado, comprueba tu internet e intenta de nuevo."
+    static let problemaDeConexion = "Problema de conexión, revisa tu internet e intenta de nuevo."
+    static let generico = "No se pudo iniciar sesión, intenta de nuevo."
 
     static func loginMessage(_ error: Error) -> String {
         if let api = error as? ApiError {
@@ -50,7 +50,7 @@ enum AuthErrorMapper {
 
     private static func mensaje(status: Int, body: String?) -> String {
         if let body, body.localizedCaseInsensitiveContains("MFA_REQUIRED") {
-            return "Se requiere verificación MFA. Completa el segundo factor en la web o contacta a soporte."
+            return "Se requiere verificación MFA, completa el segundo factor en la web o contacta a soporte."
         }
         switch status {
         case 401:
@@ -67,11 +67,11 @@ enum AuthErrorMapper {
             // No es «contraseña mal»: ese correo no existe en la tabla que se consultó.
             return "No encontramos ninguna cuenta con ese correo."
         case 423:
-            return mensajeDelServidor(body) ?? "Tu cuenta está bloqueada temporalmente. Intenta de nuevo más tarde."
+            return mensajeDelServidor(body) ?? "Tu cuenta está bloqueada temporalmente, intenta de nuevo más tarde."
         case 429:
-            return "Demasiados intentos. Espera un momento e intenta de nuevo."
+            return "Demasiados intentos, espera un momento e intenta de nuevo."
         case 500...599:
-            return "El servidor no está disponible en este momento. Intenta más tarde."
+            return "El servidor no está disponible en este momento, intenta más tarde."
         default:
             return generico
         }

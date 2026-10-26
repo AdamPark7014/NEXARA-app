@@ -135,7 +135,7 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     it.copy(
                         isBiometricLoading = false,
-                        error = "No se pudo verificar tu identidad. Intenta de nuevo.",
+                        error = "No se pudo verificar tu identidad, intenta de nuevo.",
                     )
                 }
             }
