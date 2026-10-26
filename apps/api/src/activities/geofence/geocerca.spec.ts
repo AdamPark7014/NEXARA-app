@@ -25,5 +25,9 @@ describe('geocerca de actividades', () => {
   it('el mensaje dice la distancia y el máximo', () => {
     expect(mensajeSalidaFueraDeZona(745)).toContain('745 m');
     expect(mensajeSalidaFueraDeZona(745)).toContain('500 m');
+    // Web, Android e iOS repiten este texto tal cual.
+    expect(mensajeSalidaFueraDeZona(745)).toBe(
+      'La salida se registra donde iniciaste la actividad: estás a 745 m y el máximo es 500 m; regresa al punto de inicio para tomar la foto de salida.',
+    );
   });
 });

@@ -36,5 +36,11 @@ class ActivityGeofenceTest {
         assertTrue(m.contains("745 m"))
         assertTrue(m.contains("500 m"))
         assertEquals(500, ActivityGeofence.RADIO_M)
+        // Mismo texto con el que la API rechaza la foto de salida (geocerca.ts).
+        assertEquals(
+            "La salida se registra donde iniciaste la actividad: estás a 745 m y el máximo es 500 m; " +
+                "regresa al punto de inicio para tomar la foto de salida.",
+            m,
+        )
     }
 }

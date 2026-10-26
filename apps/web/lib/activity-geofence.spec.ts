@@ -27,8 +27,7 @@ describe("geocerca de actividades (web)", () => {
 
   it("bloquea la salida con el mismo mensaje que la API", () => {
     expect(mensajeSalidaFueraDeZona(745)).toBe(
-      "La salida se registra donde iniciaste la actividad: estás a 745 m y el máximo es 500 m. " +
-        "Regresa al punto de inicio para tomar la foto de salida.",
+      "La salida se registra donde iniciaste la actividad: estás a 745 m y el máximo es 500 m; regresa al punto de inicio para tomar la foto de salida.",
     );
   });
 
