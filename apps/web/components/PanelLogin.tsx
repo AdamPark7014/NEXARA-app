@@ -99,7 +99,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
     if (typeof window === "undefined" || mode !== "console") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("sso") === "error") {
-      setError("SSO falló. Revisa OIDC o que el usuario exista en NEXARA.");
+      setError("SSO falló: revisa OIDC o que el usuario exista en NEXARA.");
       return;
     }
     if (params.get("sso") !== "ok") return;
