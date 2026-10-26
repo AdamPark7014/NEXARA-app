@@ -48,8 +48,7 @@ export default function InteligenciaInventario({
       <Card>
         <EmptyState
           icon={<Inventory2Outlined />}
-          title="Aún no hay resumen del inventario"
-          description="Aparece en cuanto haya existencias y movimientos registrados."
+          title="Aún no hay resumen del inventario."
           action={
             <Button size="sm" variant="secondary" onClick={onRetry}>
               Reintentar
