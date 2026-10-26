@@ -56,7 +56,7 @@ export function resolveTemplateOrThrow(input: {
     const found = ORG_ROLE_BY_KEY[explicit as OrgRoleKey];
     if (!found) {
       throw new BadRequestException(
-        `La plantilla "${explicit}" no existe. Plantillas válidas: ${validTemplateKeys().join(', ')}`,
+        `La plantilla "${explicit}" no existe; plantillas válidas: ${validTemplateKeys().join(', ')}`,
       );
     }
     return found;
@@ -68,8 +68,7 @@ export function resolveTemplateOrThrow(input: {
   if (found) return found;
 
   throw new BadRequestException(
-    'Debes elegir una plantilla de permisos para el rol. ' +
-      `Plantillas válidas: ${validTemplateKeys().join(', ')}`,
+    `Debes elegir una plantilla de permisos para el rol; plantillas válidas: ${validTemplateKeys().join(', ')}`,
   );
 }
 
