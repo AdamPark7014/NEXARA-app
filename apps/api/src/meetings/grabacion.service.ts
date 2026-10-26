@@ -150,7 +150,7 @@ export class GrabacionService implements OnModuleInit {
     const inicioMs = msValidos(cuerpo?.inicioMs, MAX_DURACION_MS + 10 * 60_000);
     const duracionMs = msValidos(cuerpo?.duracionMs, 15 * 60_000);
     if (inicioMs != null && inicioMs >= MAX_DURACION_MS) {
-      throw new BadRequestException('La grabación llegó al máximo de 3 horas. Concluye la reunión.');
+      throw new BadRequestException('La grabación llegó al máximo de 3 horas: concluye la reunión.');
     }
     await this.reunion(meetingId, tenantId);
 
@@ -622,7 +622,7 @@ export class GrabacionService implements OnModuleInit {
     const existente = await this.grabacionDe(meetingId);
     if (existente) {
       const partes = await this.prisma.meetingRecordingPart.count({ where: { recordingId: existente.id } });
-      if (partes) throw new ConflictException('Esta reunión ya tiene grabación. Bórrala antes de pegar otro texto.');
+      if (partes) throw new ConflictException('Esta reunión ya tiene grabación: bórrala antes de pegar otro texto.');
       await this.prisma.meetingRecording.delete({ where: { id: existente.id } });
     }
     const trozos = partirTexto(texto);
@@ -782,7 +782,7 @@ export class GrabacionService implements OnModuleInit {
       select: { titulo: true, fecha: true, asistentes: { select: { user: { select: { email: true } } } } },
     });
     const correos = [...new Set((r?.asistentes ?? []).map((a) => a.user?.email?.trim()).filter((c): c is string => Boolean(c)))];
-    if (!correos.length) throw new BadRequestException('Ningún convocado tiene correo registrado. Agrega asistentes a la reunión.');
+    if (!correos.length) throw new BadRequestException('Ningún convocado tiene correo registrado: agrega asistentes a la reunión.');
     const titulo = escapar(r!.titulo);
     const ok = await this.email.send({
       to: correos,
@@ -790,7 +790,7 @@ export class GrabacionService implements OnModuleInit {
       html: `<p>Hola:</p><p>Adjuntamos la minuta de la reunión <strong>${titulo}</strong> del ${dia(r!.fecha)}, con el resumen, los temas tratados y los acuerdos.</p><p>NEXARA</p>`,
       attachments: [{ filename: archivo.nombre, content: archivo.pdf, contentType: 'application/pdf' }],
     });
-    if (!ok) throw new ServiceUnavailableException('No se pudo enviar el correo. Intenta de nuevo más tarde.');
+    if (!ok) throw new ServiceUnavailableException('No se pudo enviar el correo: intenta de nuevo más tarde.');
     return { enviados: correos.length };
   }
 }
