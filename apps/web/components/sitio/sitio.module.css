@@ -342,13 +342,15 @@
 
 .boton:hover .flechaLinea,
 .enlace:hover .flechaLinea,
-.tile:hover .flechaLinea {
+.tile:hover .flechaLinea,
+[data-flecha]:hover .flechaLinea {
   opacity: 1;
 }
 
 .boton:hover .flechaPunta,
 .enlace:hover .flechaPunta,
-.tile:hover .flechaPunta {
+.tile:hover .flechaPunta,
+[data-flecha]:hover .flechaPunta {
   transform: translateX(3px);
 }
 
@@ -2232,7 +2234,8 @@
   transition: opacity 0.2s var(--ease);
 }
 
-[data-hay-activa] .mapaMx g[data-ciudad]:not([data-activa]) {
+[data-hay-activa] .mapaMx g[data-ciudad]:not([data-activa]),
+.mapaMx[data-hay-activa] g[data-ciudad]:not([data-activa]) {
   opacity: 0.22;
 }
 

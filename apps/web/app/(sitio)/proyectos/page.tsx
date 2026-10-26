@@ -247,7 +247,7 @@ export default async function PropuestaProyectos() {
         </div>
       </section>
 
-      <section className={s.seccion} aria-labelledby="cobertura-proyectos">
+      <section id="cobertura" className={`${s.seccion} ${p.ancla}`} aria-labelledby="cobertura-proyectos">
         <Sincronia className={`${s.contenedor} ${s.cobertura}`}>
           <div data-aparecer>
             <p className={s.antetitulo}>Cobertura</p>

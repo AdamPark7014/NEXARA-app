@@ -1,0 +1,255 @@
+/*
+ * Documentos legales con el sistema del sitio: columna de lectura de ~70 caracteres, índice fijo a la izquierda en
+ * escritorio y los mismos tokens de color que el resto de `.sitio` (claro y oscuro).
+ */
+
+.marco {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: clamp(40px, 6vw, 96px);
+  max-width: calc(var(--wide) + 2 * var(--gutter));
+  margin-inline: auto;
+  padding: clamp(40px, 6vw, 88px) var(--gutter) clamp(72px, 9vw, 128px);
+}
+
+/* ── Índice ─────────────────────────────────────────────────────────────── */
+
+.indice {
+  position: sticky;
+  top: 96px;
+  align-self: start;
+  display: grid;
+  gap: 32px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.indice::-webkit-scrollbar {
+  display: none;
+}
+
+.indiceTitulo {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.indice ul {
+  display: grid;
+  gap: 2px;
+  margin-top: 10px;
+}
+
+.indice a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--fg-2);
+  transition: color 0.15s var(--ease), background-color 0.15s var(--ease);
+}
+
+.indice a:hover {
+  color: var(--fg);
+  background: var(--control);
+}
+
+.indice a[aria-current] {
+  color: var(--fg);
+  font-weight: 600;
+  background: var(--control);
+}
+
+.indiceSecciones a[aria-current] {
+  color: var(--accent);
+  background: transparent;
+  box-shadow: inset 2px 0 0 var(--accent);
+  border-radius: 0 8px 8px 0;
+}
+
+/* ── Documento ──────────────────────────────────────────────────────────── */
+
+.page {
+  max-width: 72ch;
+  color: var(--fg);
+}
+
+.eyebrow {
+  margin-bottom: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 4.6vw, 56px);
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.updated {
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--fg-3);
+}
+
+.lead {
+  margin-top: 28px;
+  font-size: clamp(18px, 1.5vw, 20px);
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  color: var(--fg-2);
+}
+
+.lead + .p,
+.lead + .lead {
+  margin-top: 16px;
+}
+
+.section {
+  margin-top: clamp(40px, 5vw, 56px);
+  padding-top: clamp(28px, 3.5vw, 36px);
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 96px;
+}
+
+.sectionTitle {
+  margin-bottom: 14px;
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2vw, 26px);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  scroll-margin-top: 96px;
+}
+
+.p {
+  font-size: 16.5px;
+  line-height: 1.7;
+  color: var(--fg-2);
+}
+
+.p + .p,
+.list + .p,
+.p + .list,
+.list + .list {
+  margin-top: 14px;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  padding-left: 1.2em;
+  font-size: 16.5px;
+  line-height: 1.6;
+  color: var(--fg-2);
+  list-style: disc;
+}
+
+.list li::marker {
+  color: var(--fg-3);
+}
+
+.page strong {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.contactBox {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding: clamp(20px, 2.6vw, 28px);
+  border-radius: var(--radius-lg);
+  background: var(--tile);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+}
+
+.contactBox p {
+  font-size: 15.5px;
+  line-height: 1.55;
+  color: var(--fg-2);
+}
+
+.link {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.15s var(--ease);
+}
+
+.link:hover {
+  text-decoration-color: currentColor;
+}
+
+.note {
+  margin-top: 18px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--fg-3);
+}
+
+/* Paleta de la guía de marca: muestra de color junto a cada código. */
+.paleta {
+  display: grid;
+  gap: 12px;
+  font-size: 16.5px;
+  line-height: 1.5;
+  color: var(--fg-2);
+}
+
+.paleta li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.muestra {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(10, 37, 64, 0.12);
+}
+
+.paleta + .p {
+  margin-top: 16px;
+}
+
+/* ── Responsivo ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 1068px) {
+  .marco {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .indice {
+    position: static;
+    max-height: none;
+  }
+  /* En pantallas angostas solo queda la lista de documentos, en una fila deslizable. */
+  .indiceSecciones {
+    display: none;
+  }
+  .indiceDocumentos ul {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .indiceDocumentos a {
+    white-space: nowrap;
+    box-shadow: inset 0 0 0 1px var(--line);
+    border-radius: 999px;
+    padding: 6px 14px;
+  }
+}

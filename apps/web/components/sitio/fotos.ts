@@ -22,10 +22,34 @@ const ORIGINAL: Record<string, number> = {
 
 const ANCHOS = [480, 960, 1440];
 
+/** Fotos del taller y del equipo que ya llegaron en webp, en dos anchos (`<nombre>-1200.webp` y `-1920.webp`). */
+const PARES = new Set([
+  "cableado-interno-pc-guantes-taller",
+  "descarga-equipo-camioneta-nexara",
+  "equipo-taller-ensamble-pc-nexara",
+  "equipo-tecnico-nexara-uniforme",
+  "sala-monitoreo-videowall-nexara",
+  "tecnico-ensamble-chasis-pc-taller",
+  "tecnico-nexara-entrega-equipo-sitio",
+  "tecnicos-mantenimiento-pc-colaboracion",
+]);
+
 export type Foto = { src: string; srcSet?: string; sizes?: string };
+
+/** Versión para Open Graph y datos estructurados: JPG original o, en las fotos que solo existen en webp, la de 1200. */
+export function fotoOg(nombre: string): string {
+  return PARES.has(nombre) ? `/fotos/${nombre}-1200.webp` : `/fotos/${nombre}.jpg`;
+}
 
 /** `src` + `srcSet` + `sizes` de una foto de public/fotos (por su nombre sin extensión). */
 export function foto(nombre: string, sizes = "(max-width: 734px) 100vw, 50vw"): Foto {
+  if (PARES.has(nombre)) {
+    return {
+      src: `/fotos/${nombre}-1200.webp`,
+      srcSet: `/fotos/${nombre}-1200.webp 1200w, /fotos/${nombre}-1920.webp 1920w`,
+      sizes,
+    };
+  }
   const original = ORIGINAL[nombre];
   if (!original) return { src: `/fotos/${nombre}.jpg`, sizes };
   const variantes = ANCHOS.map((w) => ({ archivo: w, real: Math.min(w, original) })).filter(

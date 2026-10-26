@@ -1,6 +1,6 @@
 /**
  * Industry hubs = páginas `/soluciones/[industry]` que existen en
- * `app/(public)/soluciones/[industry]/page.tsx` (INDUSTRY_HUBS).
+ * `app/(sitio)/soluciones/[industry]/page.tsx` (INDUSTRY_HUBS).
  *
  * Money landings (`INDUSTRY_LANDINGS` en programmatic-landings) pueden
  * incluir verticales sin hub propio (p.ej. seguridad-electronica).

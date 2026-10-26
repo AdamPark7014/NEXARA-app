@@ -1,6 +1,6 @@
 /**
  * Los 32 estados de México como trazos SVG simplificados (Douglas-Peucker, tolerancia 3.0) a partir de
- * `app/(public)/mxAdmin1Paths.ts`. Caja: 45 28 910 573. `c` es el centro aproximado de cada estado.
+ * `app/(public)/mxAdmin1Paths.ts` (borrado el 26-10-2026; está en el historial de git). Caja: 45 28 910 573. `c` es el centro aproximado de cada estado.
  * Generado; no editar a mano.
  */
 import type { Estado } from "./mexicoEstados";

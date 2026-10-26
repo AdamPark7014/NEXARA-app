@@ -319,7 +319,7 @@ export default function PropuestaServicios() {
       <Certificaciones />
 
       {/* Industrias */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="industrias-servicios">
+      <section id="industrias" className={`${s.seccion} ${s.seccionAlt} ${p.ancla}`} aria-labelledby="industrias-servicios">
         <div className={s.contenedor}>
           <header className={s.centro} data-aparecer>
             <p className={s.antetitulo}>Industrias</p>

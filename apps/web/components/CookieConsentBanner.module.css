@@ -1,36 +1,44 @@
+/*
+ * Aviso de cookies como tarjeta flotante con los tokens del sitio (`.sitio`): vidrio, esquinas de 18 px y botones
+ * en píldora. Los valores de respaldo sirven si se monta fuera del sitio.
+ */
 .banner {
-  --cc-bg: #07111f;
-  --cc-ink: #eef4ff;
-  --cc-muted: #9bb0cc;
-  --cc-line: rgba(140, 190, 255, 0.16);
-  --cc-cyan: #2dd8f2;
-  --cc-display: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  --cc-body: var(--nx-font-body, "Manrope", system-ui, sans-serif);
-  --cc-ui: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
-
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 16px;
+  bottom: 16px;
   z-index: 100050;
-  max-width: none;
+  display: grid;
+  gap: 14px;
+  width: min(440px, calc(100vw - 32px));
   margin: 0;
-  padding: 10px 14px;
-  border-radius: 0;
-  border-top: 1px solid var(--cc-line);
-  background: rgba(7, 17, 31, 0.92);
-  box-shadow: 0 -1px 0 rgba(255,255,255,0.04);
-  color: var(--cc-ink);
-  font-family: var(--cc-body);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  padding: 18px 18px 16px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--card, #ffffff) 90%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  box-shadow:
+    var(--sombra-xl, 0 30px 60px -12px rgba(50, 50, 93, 0.22)),
+    inset 0 0 0 1px var(--glass-line, rgba(10, 37, 64, 0.08));
+  color: var(--fg, #0a2540);
+  font-family: var(--font, "Inter", system-ui, sans-serif);
+  animation: entra 0.45s var(--ease-out, ease-out) both;
+}
+
+@keyframes entra {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner {
+    animation: none;
+  }
 }
 
 .title {
-  /* Oculto visualmente para hacer el banner más discreto,
-     conservando el rol y las etiquetas accesibles */
+  /* Oculto visualmente para hacer el aviso más discreto, conservando el rol y las etiquetas accesibles */
   position: absolute;
   width: 1px;
   height: 1px;
@@ -44,15 +52,15 @@
 
 .text {
   margin: 0;
-  font-size: 0.85rem;
-  line-height: 1.45;
-  color: var(--cc-muted);
-  flex: 1 1 320px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--fg-2, #425466);
 }
 
 .text a {
-  color: var(--cc-cyan);
+  color: var(--accent, #0060f0);
   text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent, #0060f0) 35%, transparent);
   text-underline-offset: 2px;
 }
 
@@ -60,59 +68,62 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-left: auto;
 }
 
 .btnPrimary,
 .btnSecondary,
 .btnGhost {
   appearance: none;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-family: var(--cc-ui);
-  font-size: 0.82rem;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  border: 1px solid transparent;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.btnPrimary:active,
+.btnSecondary:active,
+.btnGhost:active {
+  transform: scale(0.97);
 }
 
 .btnPrimary {
-  background: var(--cc-cyan);
-  color: #041018;
+  background: var(--btn, #0060f0);
+  color: var(--btn-fg, #ffffff);
 }
 
 .btnPrimary:hover {
-  filter: brightness(1.06);
+  background: var(--btn-hover, #0a52cc);
 }
 
 .btnSecondary {
-  background: transparent;
-  border-color: var(--cc-line);
-  color: var(--cc-ink);
+  background: var(--control, rgba(10, 37, 64, 0.06));
+  color: var(--fg, #0a2540);
 }
 
 .btnSecondary:hover {
-  border-color: rgba(45, 216, 242, 0.45);
+  background: var(--control-hover, rgba(10, 37, 64, 0.1));
 }
 
 .btnGhost {
+  margin-left: auto;
   background: transparent;
-  color: var(--cc-muted);
-  border-color: transparent;
+  color: var(--fg-2, #425466);
 }
 
 .btnGhost:hover {
-  color: var(--cc-ink);
+  color: var(--fg, #0a2540);
 }
 
 .prefs {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--cc-line);
   display: grid;
-  gap: 10px;
-  width: 100%;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, #e3e8ef);
 }
 
 .prefRow {
@@ -128,82 +139,66 @@
 
 .prefLabel {
   display: block;
-  font-family: var(--cc-ui);
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--cc-ink);
   margin-bottom: 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg, #0a2540);
 }
 
 .prefDesc {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 13px;
   line-height: 1.45;
-  color: var(--cc-muted);
+  color: var(--fg-2, #425466);
 }
 
 .toggle {
+  position: relative;
   flex-shrink: 0;
   width: 42px;
-  height: 24px;
-  border-radius: 999px;
-  border: 1px solid var(--cc-line);
-  background: rgba(255, 255, 255, 0.06);
-  position: relative;
-  cursor: pointer;
+  height: 26px;
   padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--control-hover, rgba(10, 37, 64, 0.12));
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
 .toggle[data-on="true"] {
-  background: rgba(45, 216, 242, 0.28);
-  border-color: rgba(45, 216, 242, 0.55);
+  background: var(--ok, #12a150);
 }
 
 .toggle[data-disabled="true"] {
-  opacity: 0.7;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
 .toggleKnob {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 18px;
-  height: 18px;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: #d7e6ff;
-  transition: transform 0.15s ease;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
 }
 
 .toggle[data-on="true"] .toggleKnob {
-  transform: translateX(18px);
-  background: var(--cc-cyan);
+  transform: translateX(16px);
 }
 
 @media (max-width: 560px) {
   .banner {
-    padding: 12px 10px;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
   }
-
-  .actions {
-    flex-direction: column;
-  }
-
   .btnPrimary,
-  .btnSecondary,
-  .btnGhost {
-    width: 100%;
-    text-align: center;
+  .btnSecondary {
+    flex: 1 1 auto;
   }
-}
-
-/* Tema claro: banner blanco con texto navy */
-:global(html[data-public-theme="light"]) .banner {
-  --cc-bg: #ffffff;
-  --cc-ink: #0b1a33;
-  --cc-muted: #4f607a;
-  --cc-line: rgba(11, 26, 51, 0.14);
-  --cc-cyan: #06708a;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 -1px 0 rgba(11, 26, 51, 0.06), 0 -12px 30px rgba(11, 26, 51, 0.08);
 }

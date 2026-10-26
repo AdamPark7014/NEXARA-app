@@ -13,11 +13,26 @@ type Props = {
   primario?: { href: string; label: string };
   /** Página de origen para el mensaje de WhatsApp y la medición. */
   origen: string;
+  /** Enlace de WhatsApp con el mensaje propio de la página (industria, servicio o ciudad). */
+  whatsapp?: string;
+  /**
+   * Nombres de medición que ya usa el tablero de landings. El rastreador cuenta como conversión el clic cuyo nombre
+   * lleva «primary», así que las landings conservan los suyos (`landing_primary_cta`…).
+   */
+  medicion?: { primario: string; whatsapp: string; ruta?: string };
 };
 
 /** Llamado final de cada página: tarjeta con el degradado de marca, dos acciones y tres garantías. */
-export default function Cierre({ titulo, texto, primario = { href: "/contacto", label: "Agendar diagnóstico" }, origen }: Props) {
-  const whatsapp = buildWhatsAppLeadUrl({ industryName: "mi empresa", serviceName: "CCTV, redes o soporte TI", path: origen });
+export default function Cierre({
+  titulo,
+  texto,
+  primario = { href: "/contacto", label: "Agendar diagnóstico" },
+  origen,
+  whatsapp,
+  medicion,
+}: Props) {
+  const enlaceWhatsapp =
+    whatsapp ?? buildWhatsAppLeadUrl({ industryName: "mi empresa", serviceName: "CCTV, redes o soporte TI", path: origen });
   const clave = origen.replace(/\W+/g, "_").replace(/^_|_$/g, "") || "inicio";
   return (
     <section className={s.final} aria-labelledby={`cierre-${clave}`}>
@@ -29,16 +44,22 @@ export default function Cierre({ titulo, texto, primario = { href: "/contacto", 
           </h2>
           <p className={s.lead}>{texto}</p>
           <div className={s.acciones}>
-            <Link href={ruta(primario.href)} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion={`${clave}_cierre_cta`}>
+            <Link
+              href={ruta(primario.href)}
+              className={`${s.boton} ${s.botonPrimario}`}
+              data-track-conversion={medicion?.primario ?? `${clave}_cierre_cta`}
+              data-landing-path={medicion?.ruta}
+            >
               {primario.label}
               <Flecha />
             </Link>
             <a
-              href={whatsapp}
+              href={enlaceWhatsapp}
               target="_blank"
               rel="noopener noreferrer"
               className={`${s.boton} ${s.botonSecundario}`}
-              data-track-conversion={`${clave}_cierre_whatsapp`}
+              data-track-conversion={medicion?.whatsapp ?? `${clave}_cierre_whatsapp`}
+              data-landing-path={medicion?.ruta}
             >
               Escríbenos por WhatsApp
               <Flecha />

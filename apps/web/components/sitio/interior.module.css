@@ -1,0 +1,665 @@
+/*
+ * Piezas de las páginas de detalle: soluciones por industria, cobertura por ciudad, blog, preguntas, legal y las
+ * páginas de servicio (firma de cotización, registro de equipo). Usan los tokens de `.sitio`.
+ */
+
+/* ── Migas ──────────────────────────────────────────────────────────────── */
+
+.migas {
+  margin-bottom: 28px;
+}
+
+.migas ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 10px;
+  font-size: 13.5px;
+  color: var(--fg-3);
+}
+
+.migasIzq ol {
+  justify-content: flex-start;
+}
+
+.migas li {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.migas li + li::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.7;
+}
+
+.migas a {
+  color: var(--fg-2);
+  transition: color 0.15s var(--ease);
+}
+
+.migas a:hover {
+  color: var(--fg);
+}
+
+.migas [aria-current="page"] {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+/* ── Hero de detalle ────────────────────────────────────────────────────── */
+
+.hero {
+  padding-top: clamp(40px, 6vw, 88px);
+}
+
+.tituloLargo {
+  max-width: 19ch;
+  font-size: clamp(38px, 5.2vw, 72px);
+}
+
+.heroVisual {
+  position: relative;
+  overflow: hidden;
+  margin-top: clamp(48px, 6vw, 80px);
+  aspect-ratio: 21 / 9;
+  border-radius: var(--radius-xl);
+  background: var(--tile);
+  box-shadow: var(--sombra-md), inset 0 0 0 1px var(--line-soft);
+  text-align: left;
+}
+
+.heroVisual > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* El mapa va centrado en el marco, con aire alrededor y sin la leyenda (el texto ya la dice). */
+.heroVisualMapa {
+  --mapa-halo: var(--bg-alt);
+  padding: clamp(20px, 3vw, 40px);
+  background: var(--bg-alt);
+}
+
+.heroVisualMapa > figure {
+  width: 100%;
+  height: 100%;
+}
+
+.heroVisualMapa figure svg {
+  width: 100%;
+  height: 100%;
+}
+
+.heroVisualMapa figure figcaption {
+  display: none;
+}
+
+/* ── Bloque de dos columnas: texto y tarjeta ────────────────────────────── */
+
+.dos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(40px, 6vw, 96px);
+  align-items: center;
+}
+
+.tarjeta {
+  padding: clamp(28px, 3.4vw, 44px);
+  border-radius: var(--radius-xl);
+  background: var(--tile);
+  box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line-soft);
+}
+
+.tarjetaEtiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.tarjetaTitulo {
+  margin-top: 10px;
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2vw, 28px);
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.024em;
+}
+
+.tarjeta > ul {
+  margin-top: 20px;
+}
+
+/* ── Tarjetas de ruta (enlaces a otras páginas) ─────────────────────────── */
+
+.rutas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: clamp(40px, 5vw, 64px);
+}
+
+.rutasCuatro {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.rutas > li {
+  display: flex;
+}
+
+.rutas .ruta {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 220px;
+  padding: 28px;
+  border-radius: var(--radius-xl);
+  background: var(--tile);
+  box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line-soft);
+  color: var(--fg);
+  transition: box-shadow 0.25s var(--ease), transform 0.25s var(--ease);
+}
+
+.rutas .ruta:hover {
+  box-shadow: var(--sombra-md), inset 0 0 0 1px var(--line);
+  transform: translateY(-2px);
+}
+
+.rutas .ruta:active {
+  transform: scale(0.985);
+}
+
+.rutaIcono {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+}
+
+.rutaEtiqueta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-3);
+}
+
+.rutaTitulo {
+  margin-top: 6px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.rutaTexto {
+  margin-top: 8px;
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--fg-2);
+}
+
+.rutaIr {
+  display: inline-flex;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 20px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* ── Fichas de ciudad o servicio ────────────────────────────────────────── */
+
+.fichas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.centroFichas {
+  justify-content: center;
+}
+
+.fichas .ficha {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--fg-2);
+  transition: color 0.2s var(--ease), box-shadow 0.2s var(--ease), background-color 0.2s var(--ease);
+}
+
+.fichas .ficha:hover {
+  color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--fg-3);
+}
+
+.fichas .fichaActual {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--card));
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+/* ── Directorio de enlaces (al pie de cada página de detalle) ───────────── */
+
+.directorio {
+  padding-block: clamp(56px, 7vw, 96px);
+  border-top: 1px solid var(--line-soft);
+}
+
+.directorioTitulo {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.directorioLead {
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--fg-2);
+}
+
+.directorioRejilla {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 32px 24px;
+  margin-top: 36px;
+}
+
+.directorioGrupo h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.directorioGrupo h3 a:hover {
+  color: var(--accent);
+}
+
+.directorioGrupo ul {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* «Por ciudad» ocupa dos columnas de la rejilla y reparte su lista en ambas. */
+.directorioDoble {
+  grid-column: span 2;
+}
+
+.directorioDoble ul {
+  display: block;
+  columns: 2;
+  column-gap: 24px;
+}
+
+.directorioDoble li {
+  margin-bottom: 8px;
+  break-inside: avoid;
+}
+
+.directorioGrupo li a {
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--fg-2);
+  transition: color 0.15s var(--ease);
+}
+
+.directorioGrupo li a:hover {
+  color: var(--fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── Blog ───────────────────────────────────────────────────────────────── */
+
+.destacada {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: center;
+  margin-top: clamp(40px, 5vw, 64px);
+}
+
+.portada {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-xl);
+  background: var(--tile);
+  box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line-soft);
+}
+
+.portada img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s var(--ease-out);
+}
+
+a.portada:hover img,
+.entrada:hover .portada img {
+  transform: scale(1.03);
+}
+
+.fecha {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.destacadaTitulo {
+  margin-top: 12px;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 3.2vw, 44px);
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.destacadaTitulo a:hover,
+.entradaTitulo a:hover {
+  color: var(--accent);
+}
+
+.resumen {
+  margin-top: 14px;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--fg-2);
+}
+
+.etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 18px;
+}
+
+.etiquetas span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--control);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+
+.entradas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(32px, 4vw, 48px) 24px;
+  margin-top: clamp(40px, 5vw, 64px);
+}
+
+.entrada {
+  display: flex;
+  flex-direction: column;
+}
+
+.entrada .fecha {
+  margin-top: 18px;
+}
+
+.entradaTitulo {
+  margin-top: 6px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.entrada .resumen {
+  margin-top: 8px;
+  font-size: 15.5px;
+}
+
+.vacio {
+  margin-top: clamp(40px, 5vw, 64px);
+  padding: clamp(32px, 5vw, 56px);
+  border-radius: var(--radius-xl);
+  background: var(--tile);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+  text-align: center;
+  color: var(--fg-2);
+}
+
+.vacio a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Artículo: columna de lectura de ~68 caracteres. */
+.articulo {
+  max-width: calc(720px + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+  padding-top: clamp(40px, 6vw, 88px);
+}
+
+.articuloTitulo {
+  margin-top: 14px;
+  font-family: var(--font-display);
+  font-size: clamp(36px, 4.8vw, 60px);
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.articuloLead {
+  margin-top: 20px;
+  font-size: clamp(19px, 1.7vw, 23px);
+  line-height: 1.45;
+  letter-spacing: -0.012em;
+  color: var(--fg-2);
+  text-wrap: pretty;
+}
+
+.articuloPortada {
+  position: relative;
+  overflow: hidden;
+  max-width: calc(1040px + 2 * var(--gutter));
+  margin: clamp(40px, 5vw, 64px) auto 0;
+  padding-inline: var(--gutter);
+}
+
+.articuloPortada img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-xl);
+  background: var(--tile);
+}
+
+.cuerpo {
+  margin-top: clamp(40px, 5vw, 56px);
+  white-space: pre-wrap;
+  font-size: 18.5px;
+  line-height: 1.7;
+  letter-spacing: -0.005em;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.articuloPie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: clamp(48px, 6vw, 72px);
+  padding-block: 28px clamp(64px, 8vw, 112px);
+  border-top: 1px solid var(--line);
+}
+
+.volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+
+.volver:hover {
+  color: var(--fg);
+}
+
+/* ── Preguntas por tema ─────────────────────────────────────────────────── */
+
+.temas {
+  display: grid;
+  gap: clamp(56px, 7vw, 88px);
+  margin-top: clamp(40px, 5vw, 64px);
+}
+
+.tema {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  gap: clamp(24px, 4vw, 64px);
+  align-items: start;
+}
+
+.temaTitulo {
+  position: sticky;
+  top: 96px;
+  font-family: var(--font-display);
+  font-size: clamp(24px, 2.2vw, 30px);
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+/* ── Páginas de servicio (firma, registro de equipo, errores) ───────────── */
+
+.servicioPagina {
+  display: grid;
+  place-items: start center;
+  min-height: 72vh;
+  padding: clamp(40px, 6vw, 88px) var(--gutter) clamp(64px, 8vw, 112px);
+}
+
+.panel {
+  width: min(760px, 100%);
+  padding: clamp(24px, 4vw, 44px);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  box-shadow: var(--sombra-xl), inset 0 0 0 1px var(--line-soft);
+}
+
+.panelAngosto {
+  width: min(560px, 100%);
+  text-align: center;
+}
+
+.panelIcono {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 20px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+}
+
+.panelTitulo {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3vw, 38px);
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.panelTexto {
+  margin-top: 12px;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--fg-2);
+}
+
+.panelAngosto .panelTexto {
+  margin-inline: auto;
+  max-width: 40ch;
+}
+
+.panelAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+/* ── Responsivo ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 1068px) {
+  .dos,
+  .destacada {
+    grid-template-columns: 1fr;
+  }
+  .rutas,
+  .rutasCuatro,
+  .entradas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .directorioRejilla {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tema {
+    grid-template-columns: 1fr;
+  }
+  .temaTitulo {
+    position: static;
+  }
+}
+
+@media (max-width: 734px) {
+  .heroVisual {
+    aspect-ratio: 4 / 3;
+  }
+  .heroVisualMapa {
+    aspect-ratio: 5 / 4;
+  }
+  .rutas,
+  .rutasCuatro,
+  .entradas {
+    grid-template-columns: 1fr;
+  }
+  .rutas .ruta {
+    min-height: 0;
+  }
+  .cuerpo {
+    font-size: 17.5px;
+  }
+}

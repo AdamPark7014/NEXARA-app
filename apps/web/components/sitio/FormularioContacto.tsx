@@ -7,10 +7,11 @@ import PhoneField from "@/components/PhoneField";
 import PublicIcon from "@/app/components/PublicIcon";
 import { buildApiUrl } from "@/lib/api-base";
 import { findGeoCity } from "@/lib/seo/geo-cities";
-import { findServiceLanding } from "@/lib/seo/programmatic-landings";
+import { findIndustryLanding, findServiceLanding } from "@/lib/seo/programmatic-landings";
 import s from "./sitio.module.css";
 import p from "./paginas.module.css";
 import Flecha from "./Flecha";
+import { MENU_INDUSTRIAS } from "./Encabezado";
 
 /** `?servicio=` llega desde los bloques de Servicios. */
 const SERVICIO_NOMBRE: Record<string, string> = {
@@ -36,9 +37,14 @@ export default function FormularioContacto() {
     const servicio = params.get("servicio");
     const ciudad = params.get("city") ? findGeoCity(params.get("city") || "") : undefined;
     const landing = params.get("service") ? findServiceLanding(params.get("service") || "") : undefined;
+    const slugIndustria = params.get("industry");
+    const industria = slugIndustria
+      ? (findIndustryLanding(slugIndustria)?.name ?? MENU_INDUSTRIAS.find((m) => m.href === `/soluciones/${slugIndustria}`)?.titulo)
+      : undefined;
     const que = (servicio && SERVICIO_NOMBRE[servicio]) || landing?.name;
-    if (!que && !ciudad) return "";
-    return `Hola, NEXARA:\nMe interesa cotizar${que ? ` ${que}` : ""}${ciudad ? ` en ${ciudad.name}` : ""}.\n\nSitio y contexto:\n`;
+    if (!que && !ciudad && !industria) return "";
+    const para = industria ? ` para ${que ? "" : "mi operación de "}${industria.toLowerCase()}` : "";
+    return `Hola, NEXARA:\nMe interesa cotizar${que ? ` ${que}` : " un proyecto"}${para}${ciudad ? ` en ${ciudad.name}` : ""}.\n\nSitio y contexto:\n`;
   }, [params]);
 
   const enviar: React.FormEventHandler<HTMLFormElement> = async (e) => {
