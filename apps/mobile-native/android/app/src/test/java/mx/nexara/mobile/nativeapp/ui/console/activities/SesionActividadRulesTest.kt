@@ -82,8 +82,8 @@ class SesionActividadRulesTest {
 
     @Test
     fun avisoYReloj() {
-        assertEquals("Pausada. Luis Mora ya recibió el aviso.", SesionActividadRules.avisoPausaDeEquipo("Luis Mora Díaz"))
-        assertEquals("Pausada. Ya recibió el aviso.", SesionActividadRules.avisoPausaDeEquipo(null))
+        assertEquals("Pausada y Luis Mora ya recibió el aviso.", SesionActividadRules.avisoPausaDeEquipo("Luis Mora Díaz"))
+        assertEquals("Pausada y ya recibió el aviso.", SesionActividadRules.avisoPausaDeEquipo(null))
         assertEquals("Reloj corriendo desde las 09:30.", SesionActividadRules.textoCorriendo("09:30"))
         assertEquals("Reloj corriendo.", SesionActividadRules.textoCorriendo(null))
     }

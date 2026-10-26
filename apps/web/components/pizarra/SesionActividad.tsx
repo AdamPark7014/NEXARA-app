@@ -88,7 +88,7 @@ export function SesionPropia({
         >
           <span className={s.texto}>{textoPausa(actividad, { miId, propia: true })}</span>
           <span className={s.ayuda}>
-            Tu reloj vuelve a correr. Se detiene al pausar, al checar salida, a las 12 h o al terminar el día.
+            Tu reloj vuelve a correr y se detiene al pausar, al checar salida, a las 12 h o al terminar el día.
           </span>
         </Alert>
         {error ? (
@@ -175,7 +175,7 @@ export function PausarDeEquipo({
     setError(null);
     try {
       await pausarActividadDeEquipo(token, userId, activityId, motivo);
-      setOk(nombre ? `Pausada. ${nombre} ya recibió el aviso.` : "Pausada. La persona ya recibió el aviso.");
+      setOk(nombre ? `Pausada y ${nombre} ya recibió el aviso.` : "Pausada y la persona ya recibió el aviso.");
       setOpen(false);
       setMotivo("");
       onDone?.();
@@ -232,9 +232,11 @@ export function PausarDeEquipo({
                 {error}
               </span>
             ) : (
-              <span id={ayudaId} className={c.pista}>
-                {Math.min(motivo.trim().length, MOTIVO_PAUSA_MIN)}/{MOTIVO_PAUSA_MIN} caracteres mínimo · la persona lo
-                ve en su aviso.
+              <span id={ayudaId} className={s.pistaMotivo}>
+                <span className={s.conteo}>
+                  {Math.min(motivo.trim().length, MOTIVO_PAUSA_MIN)}/{MOTIVO_PAUSA_MIN} caracteres mínimo
+                </span>
+                <span className={s.nota}>La persona lo ve en su aviso.</span>
               </span>
             )}
           </div>
