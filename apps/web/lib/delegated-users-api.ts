@@ -169,7 +169,7 @@ export async function crearUsuarioDelegado(token: string, alta: AltaUsuario): Pr
     credentials: "include",
     body: cuerpo,
   });
-  if (!res.ok) throw new Error(await mensajeDeError(res, "No se pudo dar de alta al usuario. Intenta de nuevo."));
+  if (!res.ok) throw new Error(await mensajeDeError(res, "No se pudo dar de alta al usuario: intenta de nuevo."));
   return (await res.json()) as UsuarioCreado;
 }
 
