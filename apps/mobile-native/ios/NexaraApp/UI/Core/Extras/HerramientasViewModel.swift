@@ -144,6 +144,13 @@ final class HerramientasViewModel: ObservableObject {
 
     // MARK: Prórroga
 
+    /// Aviso cuando la prórroga salió, en una frase.
+    ///
+    /// Sigue siendo lo mismo: ya se pidió y queda pendiente de que la autoricen.
+    static func avisoProrrogaSolicitada() -> String {
+        "Prórroga solicitada: queda pendiente de que la autoricen."
+    }
+
     /// Pide más plazo. Devuelve `true` si salió (o si quedó en cola): mientras falle,
     /// el diálogo se queda abierto con lo que la persona eligió.
     func renovar(_ prestamo: PrestamoHerramienta, fecha: HerramientasReglas.Dia, motivo: String?) async -> Bool {
@@ -159,7 +166,7 @@ final class HerramientasViewModel: ObservableObject {
             estado.enviando = false
             avisar(encolado
                 ? "Sin conexión: la prórroga quedó en la cola y sale sola al volver la señal."
-                : "Prórroga solicitada. Queda pendiente de que la autoricen.")
+                : Self.avisoProrrogaSolicitada())
             Task { await self.cargar(refresco: true) }
             return true
         } catch {
