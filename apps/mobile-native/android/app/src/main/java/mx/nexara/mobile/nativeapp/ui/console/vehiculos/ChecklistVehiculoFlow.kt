@@ -239,7 +239,7 @@ fun ChecklistVehiculoFlow(
             onDismissRequest = { confirmaSalir = false },
             title = { Text("¿Salir sin enviar?") },
             text = {
-                Text("Las fotos del checklist solo viven en esta pantalla hasta que las envías. Si sales ahora, hay que volver a tomarlas.")
+                Text("Las fotos del checklist solo viven en esta pantalla hasta que las envías, y si sales ahora hay que volver a tomarlas.")
             },
             confirmButton = {
                 TextButton(
@@ -277,18 +277,13 @@ private fun RejillaFotos(
     onTomar: (Slot) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        slots.chunked(2).forEach { fila ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                fila.forEach { slot ->
-                    CasillaFoto(
-                        slot = slot,
-                        foto = fotos[slot.id],
-                        onTomar = { onTomar(slot) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                repeat(2 - fila.size) { Spacer(Modifier.weight(1f)) }
-            }
+        slots.forEach { slot ->
+            CasillaFoto(
+                slot = slot,
+                foto = fotos[slot.id],
+                onTomar = { onTomar(slot) },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

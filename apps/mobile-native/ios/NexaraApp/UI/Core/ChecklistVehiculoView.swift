@@ -123,7 +123,7 @@ struct ChecklistVehiculoView: View {
             Button("Seguir aquí", role: .cancel) {}
             Button("Salir y perder fotos", role: .destructive) { dismiss() }
         } message: {
-            Text("Las fotos del checklist solo viven en esta pantalla hasta que las envías. Si sales ahora, hay que volver a tomarlas.")
+            Text("Las fotos del checklist solo viven en esta pantalla hasta que las envías, y si sales ahora hay que volver a tomarlas.")
         }
     }
 
@@ -221,7 +221,7 @@ struct ChecklistVehiculoView: View {
     // MARK: Casillas de foto
 
     private func cuadricula(_ slots: [SlotChecklist]) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+        LazyVGrid(columns: [GridItem(.flexible())], spacing: 10) {
             ForEach(slots) { slot in
                 casilla(slot, alto: 128)
             }
