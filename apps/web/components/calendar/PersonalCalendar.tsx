@@ -173,7 +173,8 @@ export default function PersonalCalendar({ embedded = false }: { embedded?: bool
       {error && (
         <InlineAlert
           variant={events ? "warning" : "danger"}
-          message={events ? `No pudimos actualizar tu agenda; mostramos la última versión. ${error}` : error}
+          title={events ? "No pudimos actualizar tu agenda" : undefined}
+          message={events ? `${error.trim().replace(/[.…]+$/u, "")}; mostramos la última versión.` : error}
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
         />
       )}
@@ -246,13 +247,18 @@ export default function PersonalCalendar({ embedded = false }: { embedded?: bool
               </h3>
               <ul className={styles.events}>
                 {day.items.map((ev) => {
-                  const sub = [ev.ownerName, ev.description?.slice(0, 90)].filter(Boolean).join(" · ");
+                  const desc = ev.description?.slice(0, 90);
                   const inner = (
                     <>
                       <Tag variant={SOURCE_VARIANT[ev.source] ?? "default"}>{SOURCE_LABEL[ev.source] ?? "Evento"}</Tag>
-                      <div style={{ minWidth: 0 }}>
+                      <div className={styles.eventBody}>
                         <div className={styles.eventTitle}>{ev.title}</div>
-                        {sub && <div className={styles.eventSub}>{sub}</div>}
+                        {(ev.ownerName || desc) && (
+                          <div className={styles.eventSub}>
+                            {ev.ownerName ? <span className={styles.eventOwner}>{ev.ownerName}</span> : null}
+                            {desc ? <span className={styles.eventDesc}>{desc}</span> : null}
+                          </div>
+                        )}
                       </div>
                       <time className={styles.time} dateTime={ev.start}>
                         {fmtTime(ev.start)}
