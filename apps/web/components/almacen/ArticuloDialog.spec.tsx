@@ -25,6 +25,13 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+/** Las dos frases de main (`8752494e`), citadas para que no vuelvan. */
+const AVISO_SIN_TIPO_VIEJO =
+  "El servidor todavía no guarda el tipo ni el empaque. Edítalo de nuevo cuando se actualice.";
+
+const AVISO_SIN_TIPO =
+  "El servidor todavía no guarda el tipo ni el empaque: edítalo de nuevo cuando se actualice.";
+
 describe("alta de artículo", () => {
   it("el tipo es obligatorio", async () => {
     const fetchMock = stubFetch(() => ({}));
@@ -87,15 +94,33 @@ describe("alta de artículo", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("si el servidor aún no guarda el tipo, lo avisa", async () => {
-    stubFetch(() => ({ id: 3, sku: "SKU-0003", name: "Monitor 24 in" }));
+  it("el aviso de que el servidor no guarda el tipo cabe en una frase", async () => {
+    const fetchMock = stubFetch(() => ({ id: 3, sku: "SKU-0003", name: "Monitor 24 in" }));
     const onGuardado = vi.fn();
     render(<ArticuloDialog open onClose={vi.fn()} onGuardado={onGuardado} />);
     await userEvent.click(screen.getByRole("radio", { name: "Equipo" }));
     await userEvent.type(screen.getByRole("textbox", { name: /Nombre/ }), "Monitor 24 in");
     await userEvent.click(screen.getByRole("button", { name: "Dar de alta" }));
     await waitFor(() => expect(onGuardado).toHaveBeenCalled());
-    expect(avisos.warning).toHaveBeenCalledWith(expect.objectContaining({ title: "Artículo dado de alta sin tipo" }));
+
+    expect(avisos.warning).toHaveBeenCalledWith({
+      title: "Artículo dado de alta sin tipo",
+      message: AVISO_SIN_TIPO,
+    });
+    const message = (avisos.warning.mock.calls[0]?.[0] as { message: string }).message;
+    expect(message).toBe(AVISO_SIN_TIPO);
+    expect(message).not.toBe(AVISO_SIN_TIPO_VIEJO);
+    expect(message.split(".").filter((parte) => parte.trim()).length).toBe(1);
+    expect(message).toContain("edítalo de nuevo");
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toMatch(/catalog\/products$/);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({
+      name: "Monitor 24 in",
+      tipoArticulo: "EQUIPO",
+      unitName: "pz",
+    });
   });
 });
 
