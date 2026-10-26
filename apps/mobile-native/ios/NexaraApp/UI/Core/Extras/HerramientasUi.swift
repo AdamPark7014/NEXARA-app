@@ -333,6 +333,8 @@ struct TarjetaKit: View {
     var body: some View {
         let titulo = HerramientasReglas.tituloPieza(asignacion)
         let identificacion = HerramientasReglas.identificacionPieza(asignacion)
+        let renglones = HerramientasReglas.renglonesPieza(asignacion)
+        let identificacionVisible = renglones.isEmpty ? identificacion : renglones.joined(separator: "\n")
         let abiertos = HerramientasReglas.eventosAbiertos(asignacion)
         let revisionVencida = HerramientasReglas.revisionVencida(asignacion, hoy: hoy)
         let estadoPieza = HerramientasReglas.etiquetaEstadoPieza(asignacion.inventoryItem?.status)
@@ -346,10 +348,11 @@ struct TarjetaKit: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(NxColors.fg)
                 .lineLimit(2)
-            Text(identificacion)
+            // Código, modelo y serie, uno por renglón. Con dos se cortaba la serie.
+            Text(identificacionVisible)
                 .font(NxType.labelMedium)
                 .foregroundStyle(NxColors.muted)
-                .lineLimit(2)
+                .lineLimit(3)
             if !desdeCuando.isEmpty {
                 Text("Asignada desde el \(desdeCuando)")
                     .font(NxType.labelSmall)
@@ -431,6 +434,8 @@ struct TarjetaPrestamo: View {
     var body: some View {
         let titulo = HerramientasReglas.tituloPrestamo(prestamo)
         let identificacion = HerramientasReglas.identificacionPrestamo(prestamo)
+        let renglones = HerramientasReglas.renglonesPrestamo(prestamo)
+        let identificacionVisible = renglones.isEmpty ? identificacion : renglones.joined(separator: "\n")
         let estado = HerramientasReglas.etiquetaEstado(prestamo.status)
         let abierto = HerramientasReglas.estaAbierto(prestamo)
         let plazo = abierto ? HerramientasReglas.textoPlazo(prestamo.expectedReturnDate, hoy: hoy) : nil
@@ -446,7 +451,8 @@ struct TarjetaPrestamo: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(NxColors.fg)
                     .lineLimit(2)
-                Text(identificacion)
+                // Modelo y serie, cada uno en su renglón. Dos líneas alcanzan: la serie es la segunda.
+                Text(identificacionVisible)
                     .font(NxType.labelMedium)
                     .foregroundStyle(NxColors.muted)
                     .lineLimit(2)
