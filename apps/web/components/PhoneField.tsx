@@ -7,6 +7,7 @@ import PhoneInput, {
 } from "react-phone-number-input";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import flags from "react-phone-number-input/flags";
+import es from "react-phone-number-input/locale/es.json";
 import "react-phone-number-input/style.css";
 import styles from "./PhoneField.module.css";
 
@@ -70,6 +71,9 @@ export default function PhoneField({
       international
       countryCallingCodeEditable={false}
       flags={flags}
+      // Países en español y los de uso diario arriba (México, Estados Unidos y Canadá) antes de la lista completa.
+      labels={es}
+      countryOptionsOrder={["MX", "US", "CA", "|", "..."]}
       defaultCountry={defaultCountry}
       value={(display || undefined) as Value | undefined}
       onChange={(next) => onChange((next as string | undefined) ?? "")}

@@ -22,12 +22,12 @@ export const dynamic = "force-dynamic";
 const DATOS: { icono: PublicIconName; etiqueta: string; valor: string }[] = [
   { icono: "mapPin", etiqueta: "Sedes", valor: "Puebla y Ciudad de México, con cobertura nacional" },
   { icono: "shield", etiqueta: "Modelo", valor: "Diseño, instalación y soporte con un solo responsable técnico" },
-  { icono: "clock", etiqueta: "Respuesta", valor: "La primera respuesta llega, por lo general, en un día hábil" },
-  { icono: "search", etiqueta: "Método", valor: "Diagnóstico en sitio antes de la propuesta y entrega documentada" },
+  { icono: "users", etiqueta: "Equipo propio", valor: "Ingenieros, instaladores y flotilla propios, sin subcontratar la obra" },
+  { icono: "layers", etiqueta: "Trayectoria", valor: "Más de 200 sitios implementados en 32 estados del país" },
 ];
 
 const COMPROMISOS = [
-  "Un solo responsable técnico del diagnóstico al soporte",
+  "Personal con DC-3 vigente y cableado con estándares certificados",
   "Propuesta con alcance cerrado y calendario visible",
   "Instalación documentada: diagramas, etiquetado y evidencia",
   "Soporte con SLA después del arranque",
