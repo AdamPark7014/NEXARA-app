@@ -92,9 +92,9 @@ enum RepartoViatico {
         case .sobra(let centavos):
             return "Sobran \(Dinero.pesos(centavos)): baja alguna parte."
         case .duplicada:
-            return "Esa actividad ya está en el reparto. Junta las dos partes en una sola."
+            return "Esa actividad ya está en el reparto, así que junta las dos partes en una sola."
         case .parteSinImporte:
-            return "Hay una actividad sin importe. Captura cuánto carga o quítala del reparto."
+            return "Hay una actividad sin importe, así que captura cuánto carga o quítala del reparto."
         }
     }
 

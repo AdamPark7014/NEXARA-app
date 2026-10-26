@@ -97,9 +97,9 @@ object RepartoViatico {
         is CuadreReparto.Sobra ->
             "Sobran ${Dinero.pesos(cuadre.centavos)}: baja alguna parte."
         is CuadreReparto.Duplicada ->
-            "Esa actividad ya está en el reparto. Junta las dos partes en una sola."
+            "Esa actividad ya está en el reparto, así que junta las dos partes en una sola."
         is CuadreReparto.ParteSinImporte ->
-            "Hay una actividad sin importe. Captura cuánto carga o quítala del reparto."
+            "Hay una actividad sin importe, así que captura cuánto carga o quítala del reparto."
     }
 
     /**
