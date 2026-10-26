@@ -326,15 +326,16 @@ private struct TarjetaDeCotizacion: View {
                         .font(.system(size: 14, weight: .bold, design: .monospaced))
                         .foregroundStyle(NxColors.fg)
                         .lineLimit(2)
+                    // Empresa y contacto van en renglones aparte: una empresa larga no tapa al contacto.
                     Text(CotizacionesRules.clienteTexto(cotizacion))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(NxColors.fg)
-                        .lineLimit(2)
+                        .lineLimit(3)
                     if let contexto = CotizacionesRules.contextoTexto(cotizacion) {
                         Text(contexto)
                             .font(NxType.bodySmall)
                             .foregroundStyle(NxColors.muted)
-                            .lineLimit(2)
+                            .lineLimit(3)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -368,15 +369,17 @@ private struct TarjetaDeCotizacion: View {
                 .foregroundStyle(vigenciaTono.fg)
             }
 
+            // Quién la elaboró, la revisión y las siglas, cada uno en su renglón: las siglas
+            // no se pegan a «revisión 2».
             if !siglas.isEmpty || autoria != nil {
                 Text(
                     [autoria, siglas.isEmpty ? nil : siglas.joined(separator: " · ")]
                         .compactMap { $0 }
-                        .joined(separator: " — ")
+                        .joined(separator: "\n")
                 )
                 .font(NxType.labelSmall)
                 .foregroundStyle(NxColors.muted)
-                .lineLimit(2)
+                .lineLimit(3)
             }
         }
         .accessibilityHint("Abre la cotización")
