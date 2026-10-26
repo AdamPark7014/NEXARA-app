@@ -97,7 +97,7 @@ export default function SeccionCronograma({ proyecto: p, token, hoy, ocupado, pe
 
   return (
     <div className={styles.pila}>
-      <RecordSection title="Cronograma" subtitle="Cada etapa va desde que termina la anterior hasta su fecha planeada.">
+      <RecordSection title="Cronograma" subtitle="Cada etapa va del fin de la anterior a su fecha planeada.">
         <LineaDeTiempo
           inicio={p.startDate}
           fin={p.endDate}
@@ -124,10 +124,7 @@ export default function SeccionCronograma({ proyecto: p, token, hoy, ocupado, pe
         subtitle={p.milestones.length ? `${cumplidas} de ${p.milestones.length} cumplidas` : undefined}
       >
         {p.milestones.length === 0 ? (
-          <p className={styles.vacio}>
-            Este proyecto todavía no tiene etapas. Agrega la primera abajo: con etapas, el avance se mide aunque aún no haya
-            actividades.
-          </p>
+          <p className={styles.vacio}>Todavía no hay etapas.</p>
         ) : (
           <ol className={styles.lista}>
             {p.milestones.map((h, i) => {
@@ -191,15 +188,15 @@ export default function SeccionCronograma({ proyecto: p, token, hoy, ocupado, pe
                 <li key={h.id} className={styles.fila}>
                   <div className={styles.principal}>
                     <span className={styles.tituloFila}>
-                      <span className={cumplida ? styles.hecho : undefined}>
+                      <span className={cumplida ? `${styles.nombreFila} ${styles.hecho}` : styles.nombreFila}>
                         {i + 1}. {h.name}
                       </span>
                       <StatusBadge size="sm" label={est.texto} tone={toneDe(est.tono)} />
                     </span>
-                    <span className={styles.meta}>
-                      Plan: {h.plannedDate ? formatoFecha(h.plannedDate) : "sin fecha"}
-                      {h.actualDate ? ` · Real: ${formatoFecha(h.actualDate)}` : ""}
-                      {h.responsable ? ` · ${h.responsable.nombre}` : " · Sin responsable"}
+                    <span className={`${styles.meta} ${styles.datosFila}`}>
+                      <span>Plan: {h.plannedDate ? formatoFecha(h.plannedDate) : "sin fecha"}</span>
+                      {h.actualDate ? <span>Real: {formatoFecha(h.actualDate)}</span> : null}
+                      <span>{h.responsable ? h.responsable.nombre : "Sin responsable"}</span>
                     </span>
                     {!cumplida && !cancelada && h.plannedDate ? (
                       <span className={`${styles.meta} ${est.tono === "peligro" ? styles.vencido : ""}`}>{textoPlazo(h.plannedDate, hoy)}</span>

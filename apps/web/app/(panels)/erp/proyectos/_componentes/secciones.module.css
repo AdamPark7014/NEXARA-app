@@ -373,3 +373,43 @@ a.tituloFila:hover {
   outline: var(--ui-focus-outline);
   outline-offset: 2px;
 }
+
+/* Datos de una fila (plan, real, responsable, tamaño…): en escritorio van en una
+   línea separados por «·», como siempre; en teléfono, cada uno en su renglón. */
+.datosFila {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 6px;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.datosFila > * + *::before {
+  content: "·";
+  margin-right: 6px;
+}
+
+/* El nombre de una etapa o un documento: junto a su insignia en escritorio; en
+   teléfono ocupa su renglón entero y la insignia baja, sin partir palabras. */
+.nombreFila {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+@media (max-width: 720px) {
+  .datosFila {
+    flex-direction: column;
+    row-gap: 2px;
+  }
+
+  .datosFila > * + *::before {
+    content: none;
+  }
+
+  .nombreFila {
+    flex: 1 0 100%;
+  }
+}
