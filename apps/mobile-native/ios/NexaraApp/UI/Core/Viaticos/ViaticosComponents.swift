@@ -112,7 +112,7 @@ struct ImporteLabel: View {
     }
 }
 
-/// Dos importes lado a lado (Android `ParDeImportes`), separados 14.
+/// Un importe por renglón (Android `ParDeImportes`), separados 14.
 struct ParDeImportes: View {
     let izquierda: String
     let izquierdaCentavos: Int
@@ -121,7 +121,7 @@ struct ParDeImportes: View {
     var derechaTono: NxTone = .neutral
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
             ImporteLabel(titulo: izquierda, centavos: izquierdaCentavos)
             ImporteLabel(titulo: derecha, centavos: derechaCentavos, tono: derechaTono)
         }

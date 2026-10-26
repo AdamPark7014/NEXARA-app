@@ -112,7 +112,7 @@ struct ViaticoLiquidacion: Decodable, Hashable {
         let saldo = abs(saldoCentavos ?? 0)
         switch estado {
         case .sinComprobar: return "Todavía no subes tickets contra este anticipo."
-        case .cuadrado: return "Los tickets cuadran con lo que se entregó. No hay nada pendiente."
+        case .cuadrado: return "Los tickets cuadran con lo entregado y no hay nada pendiente."
         case .porDevolver: return "Sobraron \(Dinero.pesos(saldo)): hay que devolverlos a la empresa."
         case .porReembolsar: return "Gastaste \(Dinero.pesos(saldo)) de más: la empresa te los debe."
         }
