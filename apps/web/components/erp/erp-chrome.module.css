@@ -44,6 +44,12 @@
   margin-bottom: 14px;
 }
 
+@media (max-width: 390px) {
+  .poMetaGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .poMetaItem {
   padding: 10px 12px;
   border-radius: 10px;
