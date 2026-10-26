@@ -14,7 +14,7 @@ object AttendanceCheckIn {
 
     /** Qué hacer después del 422: se dice completo, no como un error suelto. */
     const val MOCK_AYUDA =
-        "Tu checada no se registró y tus jefes recibieron el aviso. Desactiva la app de ubicación " +
+        "Tu checada no se registró y tus jefes recibieron el aviso: desactiva la app de ubicación " +
             "simulada (Opciones de desarrollador → «Seleccionar app de ubicación simulada» → Ninguna), " +
             "reinicia la app y vuelve a intentarlo."
 
@@ -29,16 +29,16 @@ object AttendanceCheckIn {
         val texto = mensaje?.lowercase().orEmpty()
         return when {
             texto.contains("ubicación vieja") || texto.contains("ubicacion vieja") ->
-                "Tu teléfono mandó la última posición que tenía guardada. Sal al aire libre o " +
-                    "asómate a una ventana unos segundos para que el GPS mida de nuevo, y vuelve a intentarlo."
+                "Tu teléfono mandó la última posición que tenía guardada, así que sal al aire libre o " +
+                    "asómate a una ventana unos segundos para que el GPS mida de nuevo y vuelve a intentarlo."
             texto.contains("distancia imposible") ->
-                "Tu ubicación no cuadra con tu checada anterior. Si de verdad te trasladaste, " +
-                    "avisa a tu jefe para que la registre él; tu checada no se guardó."
+                "Tu ubicación no cuadra con tu checada anterior, así que, si de verdad te trasladaste, " +
+                    "avisa a tu jefe para que la registre él, porque tu checada no se guardó."
             texto.contains("app nexara") ->
-                "Las checadas solo se registran desde esta app. Si no puedes usar tu teléfono, " +
+                "Las checadas solo se registran desde esta app, y si no puedes usar tu teléfono, " +
                     "tu jefe puede registrarla por ti."
             texto.contains("fin de semana") || texto.contains("guardia") ->
-                "Sábado y domingo solo checa quien tiene guardia ese día. Si hoy te toca trabajar, " +
+                "Sábado y domingo solo checa quien tiene guardia ese día, así que, si hoy te toca trabajar, " +
                     "pídele a tu encargado que te programe la guardia y vuelve a intentarlo."
             texto.isBlank() || texto.contains("simulada") || texto.contains("gps falso") -> MOCK_AYUDA
             // Un motivo nuevo del servidor: su texto ya dice qué pasó; aquí no se inventa otro.
@@ -48,7 +48,7 @@ object AttendanceCheckIn {
 
     /** Para rechazos que la app todavía no conoce: no se culpa al GPS sin saberlo. */
     const val AYUDA_GENERICA =
-        "Tu checada no se registró. Lee el motivo de arriba; si crees que es un error, " +
+        "Tu checada no se registró: lee el motivo de arriba y, si crees que es un error, " +
             "avisa a tu jefe para que la revise."
 
     /**
