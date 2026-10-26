@@ -1,6 +1,6 @@
 # RELEVO
 
-- **26-10 ~06:00 UTC (claude-code, R-1) — Transcriptor aparte para dictado (whisper `small`, 1 CPU).**
+- **26-10 ~05:10 UTC (claude-code, R-1) — Transcriptor aparte para dictado (whisper `small`, 1 CPU).**
   - Decisión del coordinador (opción b): el turbo q8_0 tardaba en un dictado lo que dura el audio y el dictado
     de 2 min podía pasar del límite de 100 s. Ahora `/api/ai/voz/transcribir` usa `TranscriptorService.dictar`:
     va a `TRANSCRIPTOR_DICTADO_URL` (servicio `transcriptor-dictado` del compose) y, si falla o tarda más del 70 %
@@ -10,6 +10,11 @@
     en 48 s; 1 CPU / 2 hilos peor (11.3 / 54.6 s); 1.5 CPU / 2 hilos 7.5 / 36 s; 2 CPU 5.8 / 27 s; RAM ~0.73 GB.
     Por omisión 1 CPU, 1 hilo, `cpu_shares` 256, 1 GB (variables `TRANSCRIPTOR_DICTADO_*` / `WHISPER_DICTADO_*`).
   - `update.sh` levanta `transcriptor-dictado` sin `--build` si `TRANSCRIPTOR_DICTADO_URL` está en el `.env`.
+  - Desplegado SOLO el contenedor nuevo (05:08 UTC): la imagen small que ya había, re-etiquetada como
+    `nexara-transcriptor-dictado` (sin build ni disco extra); `TRANSCRIPTOR_DICTADO_URL=http://transcriptor-dictado:8080`
+    en `deploy/.env.nexara` (respaldo `/root/respaldos/env.nexara.20261026-dictado`); el checkout del servidor no se
+    movió. Medido desde la red del API: dictado de 19 s → 10.3 s (el turbo, 19.8 s); 110 s → 48.1 s; 0.73 GB.
+    El API desplegado (40ee7054) todavía no lo usa: entra con el próximo despliegue de API/web.
 
 - **25-10 ~22:30 (claude-code) — GPS de jornada: un punto cada 30 min, entrada sin ubicación y mapa del recorrido.**
   - Adam (23-10, detalle de Iván Camargo, id 10): «aparece rota la del gps… no muestra ubicación desde la una… debe
