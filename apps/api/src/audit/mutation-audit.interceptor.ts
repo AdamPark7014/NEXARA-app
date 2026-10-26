@@ -17,7 +17,15 @@ const SKIP_PREFIXES = [
   '/health',
   '/auth/login',
   '/uploads',
+  // Webhook de los terminales Hikvision (INTEGRA): ~56 mil POST al día sin usuario. Cada evento ya queda en
+  // integra_push_events; auditarlos llenó 9.8 GB de audit_logs en un mes (y guardaba el token de la ruta).
+  '/api/integra/hik/',
 ];
+
+/** ¿Esta ruta queda fuera de la auditoría de mutaciones? */
+export function skipsMutationAudit(path: string): boolean {
+  return SKIP_PREFIXES.some((p) => path.startsWith(p) || path.includes(p));
+}
 
 /**
  * Audit de mutaciones tras AuthGuard (tiene req.user).
@@ -33,7 +41,7 @@ export class MutationAuditInterceptor implements NestInterceptor {
     if (!MUTATING.has(method)) return next.handle();
 
     const path = String(req?.originalUrl || req?.url || '').split('?')[0];
-    if (SKIP_PREFIXES.some((p) => path.startsWith(p) || path.includes(p))) {
+    if (skipsMutationAudit(path)) {
       return next.handle();
     }
 

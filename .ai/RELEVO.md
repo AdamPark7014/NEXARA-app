@@ -1,5 +1,15 @@
 # RELEVO
 
+- **26-10 ~13:10 (claude-code) — Causa del disco lleno: `audit_logs` pesa 14 GB (de 15 GB de la base).**
+  - 5.5 millones de filas en un mes. 3.3 M (9.8 GB) son `integra POST_OK`: el interceptor de mutaciones auditaba
+    cada POST del webhook de los terminales Hikvision (`/api/integra/hik/<empresa>/<token>`, ~56 mil al día, sin
+    usuario, y guardaba el token de la ruta). Otras 860 mil (592 MB) son `IntegraPushEvent CREATE`, copia de
+    `integra_push_events`.
+  - Corregido en código: `/api/integra/hik/` en `SKIP_PREFIXES` (`skipsMutationAudit`) e `IntegraPushEvent` en
+    `AUDIT_EXCLUDED`. Prueba en `audit/mutation-audit.interceptor.spec.ts`; jest API 3790/3790, tipos limpios.
+  - **Pendiente de Adam (borrado en producción, sin respaldos):** borrar esas filas viejas y `VACUUM FULL
+    audit_logs` devolvería ~10 GB al disco. Los eventos siguen en `integra_push_events`.
+
 - **26-10 ~12:30 (claude-code) — Mapas sin Google Static Maps: ubicación de sucursal, vistas previas y PDF.**
   - Coordinador (Adam: «continua»): `ClientLocationPicker` seguía con la imagen de Google Static Maps (403 «You must
     enable Billing»). Se cambió en todos los usos de la web y del API; las apps no usan mapas estáticos (Android
