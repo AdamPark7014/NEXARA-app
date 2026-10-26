@@ -445,7 +445,7 @@ object GastosRules {
 
     /** Qué no hace esta pantalla, al pie y sin botón que eche al navegador. */
     const val LIMITE =
-        "Registrar, autorizar y pagar. Corregir un gasto ya capturado, borrarlo y " +
+        "Aquí registras, autorizas y pagas; corregir un gasto ya capturado, borrarlo y " +
             "sacar el reporte por rango de fechas se hacen desde la computadora."
 
     // ── Utilidades ───────────────────────────────────────────────────────────

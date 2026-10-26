@@ -446,4 +446,13 @@ class GastosRulesTest {
         )
         assertTrue(GastosRules.CATEGORIA_POR_OMISION in GastosRules.CATEGORIAS)
     }
+
+    @Test
+    fun `el pie dice que se hace aqui y que en la computadora`() {
+        assertEquals(
+            "Aquí registras, autorizas y pagas; corregir un gasto ya capturado, borrarlo y " +
+                "sacar el reporte por rango de fechas se hacen desde la computadora.",
+            GastosRules.LIMITE,
+        )
+    }
 }
