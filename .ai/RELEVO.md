@@ -57,18 +57,29 @@
     editor de cotizaciones se pasó de tiempo con la máquina cargada (no usa nada de esto). Sin desplegar: lo
     despliega el coordinador al final. Cambio visual notable: que Adam vea las capturas antes del despliegue.
 
-- **26-10 ~04:00 UTC (claude-code, R-1) — Transcriptor: large-v3-turbo-q8_0 con tope de 3 CPU (medido otra vez).**
+- **26-10 ~05:00 UTC (claude-code, R-1) — Transcriptor en producción: large-v3-turbo-q8_0, tope de 3 CPU, sin audio_ctx.**
   - Condición del coordinador: límite de CPU que deje al menos un núcleo a los demás y, con ese límite, ≤ ~0.8 ×
-    tiempo real con voz de sala. Banco repetido con `--cpus 3` y 3 hilos (4 vCPU = 2 núcleos con SMT):
-    turbo-q8_0 + audio_ctx 1100: **13.9 / 54.0 % WER (0.78 / 0.58 × t. real)**, ~1.06 GB RAM ← elegido ·
-    turbo-q8_0 partes de 30 s: sala 53.1 % (0.71) · turbo-q5_0 + audio_ctx 1100: 21.3 / 53.8 % (1.18 / 0.85) ·
-    small: 22.3 / 65.5 % (0.30 / 0.23). q8_0 es más rápido que q5_0 en este CPU y no repitió oraciones (q5_0 metió
-    dos veces la del kundalini: de ahí los 7 puntos en limpio; en sala empatan). Sin fallback de temperatura
-    (`temperature_inc 0`) no ganó tiempo y metió 6 bucles en limpio → se queda el fallback. 2 hilos: 0.63 en sala.
-  - Carga durante la prueba de producción simulada (3–5 min por corrida, muestras cada 10 s): load 3.1–3.6 (máx 4.2),
-    CPU libre 19–25 % (mín 14 %), whisper ~2.65 CPU, API público 200 en ~50 ms (máx 120–154 ms).
-  - Compose: `WHISPER_MODEL` por omisión `large-v3-turbo-q8_0`, `cpus` 3, `WHISPER_THREADS` 3 (Dockerfile igual).
-    Banco: `carga.sh` nuevo (muestreo de carga) y `resultados.jsonl` con las 39 corridas.
+    tiempo real con voz de sala. Banco con `--cpus 3` y 3 hilos (4 vCPU = 2 núcleos con SMT), WER limpio / sala
+    (× tiempo real): **turbo-q8_0, contexto completo: 20.8 / 52.8 % (1.08 / 0.78), ~1.06 GB RAM ← en producción** ·
+    turbo-q8_0 + audio_ctx 1100: 13.9 / 54.0 % (0.78 / 0.58) · turbo-q8_0 partes de 30 s: sala 53.1 % (0.71) ·
+    turbo-q5_0 + audio_ctx 1100: 21.3 / 53.8 % (1.18 / 0.85) · small: 22.3 / 65.5 % (0.30 / 0.23). q8_0 es más rápido
+    que q5_0 en este CPU. Sin fallback de temperatura: mismo tiempo y 6 bucles en limpio → se queda. 2 hilos: 0.63.
+  - **audio_ctx fuera** (`grabacion.service.ts`, `grabacion.ts`, `transcriptor.service.ts`): medido en producción, tras
+    una petición SIN audio_ctx (un dictado), las partes con audio_ctx 1100 salen inventadas («En el caso de la
+    Iglesia… cállate cada vez más» en vez de «Tampoco estaba facultado para anular leyes fiscales…») y más lentas,
+    hasta reiniciar el contenedor. Sin audio_ctx nunca se mezcla. Cuesta ~27 % de tiempo (14 → 19 s por parte densa).
+  - Desplegado SOLO el transcriptor (04:10 UTC): `WHISPER_MODEL=large-v3-turbo-q8_0` en `deploy/.env.nexara` (respaldo
+    en `/root/respaldos/env.nexara.20261026-transcriptor`), construido desde los archivos de origin/main con
+    `git archive` en `/root/transcriptor-build` (el checkout del servidor NO se movió); imagen anterior guardada como
+    `nexara-transcriptor:small-20261026` para volver atrás. Contenedor: NanoCpus 3e9, CpuShares 512, 2 GiB, ~1.0 GB.
+  - Prueba de punta a punta con el API de producción (40ee7054, `POST /api/ai/voz/transcribir`, token firmado dentro
+    del contenedor): dictado de 20 s → 201 en 19.8 s, texto casi exacto; parte de junta de sala de 20 s → 201 en
+    19.3 s, «Tampoco estaba facilitado para mirar leyes fiscales o aranceles entre Estados.» (small decía «No estaba
+    facilitado para lograr lugares escales o garantías entre estados»). Carga mientras transcribe: load ~4, CPU libre
+    13–25 %, whisper ~2.8 CPU, API público 200 en ~50 ms (máx 154 ms).
+  - Pendiente / ojo: el dictado ahora tarda ~lo que dura el audio (antes ~¼). `MAX_DICTADO_MS` son 2 min y el API
+    corta el dictado a los 100 s: un dictado continuo de más de ~90 s puede no alcanzar. Propuesta: un segundo
+    transcriptor `small` solo para dictado (voz cercana), o bajar el dictado a 60 s. No hecho: decide el coordinador.
   - Corrección a lo de abajo: «dockerd ~1.3 CPU» era el promedio de `ps` desde el arranque (54 días), no el uso del
     momento; con el servidor en calma (load ~1) el resto de servicios usa ~0.5 CPU. Los 132 zombis son hijos de un
     solo proceso node (pid 3163642 al 23-10), no se tocaron.

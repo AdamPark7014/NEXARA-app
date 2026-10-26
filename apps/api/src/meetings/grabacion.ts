@@ -11,14 +11,6 @@
 /** Partes de 20 s: 3 horas son 540 partes. */
 export const MAX_PARTES = 9_999;
 
-/**
- * Contexto del codificador de whisper para cada parte (cuadros de 20 ms): 1100 = 22 s, lo que dura
- * una parte de 20 s con su holgura. Medido en el servidor (23-10, large-v3-turbo-q5_0): 1000 en vez
- * de los 1500 de siempre bajó el tiempo ~40 % con el mismo WER (21.3 vs 20.8 % limpio, 53.6 vs
- * 53.8 % de sala).
- */
-export const AUDIO_CTX_PARTE = 1_100;
-
 /** Texto pegado: se parte en tramos de este tamaño para que se anote igual que una grabación. */
 export const PALABRAS_POR_PARTE_PEGADA = 700;
 

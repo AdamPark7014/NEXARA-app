@@ -37,15 +37,16 @@ export class TranscriptorService {
   /**
    * Audio (cualquier formato que lea ffmpeg) → texto en español.
    * - `prompt` reemplaza al vocabulario fijo (ver `promptTranscriptor`: nombres de la empresa).
-   * - `audioCtx`: contexto del codificador en cuadros de 20 ms (1100 = 22 s). Para audio corto de
-   *   largo conocido (partes de una junta) acelera ~40 % sin perder calidad; 0 = los 30 s completos.
+   * - Sin `audio_ctx`, a propósito: whisper.cpp 1.9.5 no aguanta que en un mismo servidor se mezclen
+   *   peticiones con y sin él. Medido en producción (26-10): tras una petición sin `audio_ctx` (un
+   *   dictado), las partes de junta con 1100 salían inventadas y más lentas hasta reiniciar.
    */
   async transcribir(
     audio: Buffer,
     nombre: string,
     mime: string,
     timeoutMs = 600_000,
-    opciones: { prompt?: string; audioCtx?: number } = {},
+    opciones: { prompt?: string } = {},
   ): Promise<string> {
     const base = this.url();
     if (!base) {
@@ -59,7 +60,6 @@ export class TranscriptorService {
     form.append('language', 'es');
     form.append('temperature', '0');
     form.append('prompt', opciones.prompt?.trim() || promptTranscriptor());
-    if (opciones.audioCtx) form.append('audio_ctx', String(opciones.audioCtx));
 
     const t0 = Date.now();
     let respuesta: Response;
