@@ -65,6 +65,21 @@
       "fecha": "2026-10-23",
       "concepto": "prueba opcionales haiku",
       "usd": 0.000628
+    },
+    {
+      "fecha": "2026-10-26",
+      "concepto": "asistente haiku-low-np",
+      "usd": 0.004079
+    },
+    {
+      "fecha": "2026-10-26",
+      "concepto": "asistente haiku-low-np",
+      "usd": 0.009913
+    },
+    {
+      "fecha": "2026-10-26",
+      "concepto": "asistente haiku-low-np",
+      "usd": 0.007851
     }
   ]
 }
