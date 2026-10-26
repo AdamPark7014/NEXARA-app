@@ -153,7 +153,7 @@ export default function ArticuloDialog({
       if (!servidorGuardaTipo(guardado)) {
         toast.warning({
           title: modo === "alta" ? "Artículo dado de alta sin tipo" : "Cambios guardados sin el tipo",
-          message: "El servidor todavía no guarda el tipo ni el empaque. Edítalo de nuevo cuando se actualice.",
+          message: "El servidor todavía no guarda el tipo ni el empaque: edítalo de nuevo cuando se actualice.",
         });
       } else {
         toast.success(modo === "alta" ? `«${guardado.name}» dado de alta` : "Artículo actualizado");
