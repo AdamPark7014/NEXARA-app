@@ -12,6 +12,9 @@ import s from "./DictadoBoton.module.css";
 /** Un dictado son instrucciones o notas: a los 2 minutos se corta solo. */
 const MAX_DICTADO_MS = 2 * 60_000;
 
+/** El transcriptor devolvió vacío. */
+const MENSAJE_NO_ENTENDIO = "No se entendió nada; habla más cerca del micrófono.";
+
 /**
  * Botón de micrófono: dicta y entrega el texto con `onTexto`.
  *
@@ -50,17 +53,22 @@ function DictadoPropio({ token, onTexto, disabled }: { token: string; onTexto: (
       transcribirDictado(token, audio)
         .then((texto) => {
           if (texto.trim()) onTexto(texto);
-          else setFalla("No se entendió nada. Habla más cerca del micrófono.");
+          else setFalla(MENSAJE_NO_ENTENDIO);
         })
         .catch((e) => setFalla(e instanceof Error ? e.message : "No se pudo pasar a texto."))
         .finally(() => setPasando(false));
     },
   });
   if (!soportado) return null;
+  const visible = error ?? falla;
+  const reintentar = () => {
+    setFalla(null);
+    void iniciar();
+  };
   return (
     <Vista
       activo={grabando}
-      onClick={grabando ? detener : () => void iniciar()}
+      onClick={grabando ? detener : reintentar}
       disabled={(disabled && !grabando) || pasando}
       estado={
         grabando
@@ -69,7 +77,8 @@ function DictadoPropio({ token, onTexto, disabled }: { token: string; onTexto: (
             ? "Pasando a texto…"
             : null
       }
-      error={error ?? falla}
+      error={visible}
+      onReintentar={!grabando && !pasando && visible === MENSAJE_NO_ENTENDIO ? reintentar : undefined}
     />
   );
 }
@@ -94,12 +103,15 @@ function Vista({
   disabled,
   estado,
   error,
+  onReintentar,
 }: {
   activo: boolean;
   onClick: () => void;
   disabled?: boolean;
   estado: string | null;
   error: string | null;
+  /** Solo cuando el audio no se entendió: vuelve a abrir el micrófono. */
+  onReintentar?: () => void;
 }) {
   return (
     <span className={s.envoltura}>
@@ -125,6 +137,11 @@ function Vista({
         <span className={s.error} role="alert">
           {error}
         </span>
+      ) : null}
+      {onReintentar ? (
+        <button type="button" className={s.boton} onClick={onReintentar} disabled={disabled}>
+          Reintentar
+        </button>
       ) : null}
     </span>
   );
