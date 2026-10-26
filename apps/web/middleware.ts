@@ -452,6 +452,12 @@ export function middleware(request: NextRequest) {
       url.pathname = '/proyectos';
       return applySecurityHeaders(NextResponse.redirect(url, 308));
     }
+    // El rediseño 2026 vivió en /propuesta mientras se aprobaba; las ligas que se compartieron llevan a la página real.
+    if (normalized === '/propuesta' || normalized.startsWith('/propuesta/')) {
+      const url = request.nextUrl.clone();
+      url.pathname = normalized.slice('/propuesta'.length) || '/';
+      return applySecurityHeaders(NextResponse.redirect(url, 308));
+    }
   }
 
   // Si detectamos un subdominio conocido, reescribir a la ruta interna del

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { buildStudioPageMetadata } from "@/lib/page-seo";
+import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
 import Aurora from "@/components/sitio/Aurora";
@@ -11,10 +13,9 @@ import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import { GEO_CITIES } from "@/lib/seo/geo-cities";
 
-export const metadata: Metadata = {
-  title: "Proyectos · NEXARA (propuesta)",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("proyectos");
+}
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,24 @@ export default async function PropuestaProyectos() {
 
   return (
     <main aria-label="Proyectos">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: "Proyectos | NEXARA",
+          url: `${siteBaseUrl()}/proyectos`,
+          description: "Casos y proyectos de CCTV, redes y soporte ejecutados por NEXARA.",
+          mainEntity: {
+            "@type": "ItemList",
+            itemListElement: CASOS.map((c, i) => ({
+              "@type": "ListItem",
+              position: i + 1,
+              name: `${c.sector}: ${c.titulo}`,
+              description: c.texto,
+            })),
+          },
+        }}
+      />
       <section className={p.hero} aria-labelledby="proyectos-hero">
         <Aurora />
         <div className={`${s.contenedor} ${s.centro}`}>

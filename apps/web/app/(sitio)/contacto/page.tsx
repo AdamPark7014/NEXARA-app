@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { buildStudioPageMetadata } from "@/lib/page-seo";
+import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
 import Aurora from "@/components/sitio/Aurora";
@@ -11,10 +13,11 @@ import BrandMap from "@/app/components/BrandMap";
 import PublicIcon from "@/app/components/PublicIcon";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
-export const metadata: Metadata = {
-  title: "Contacto · NEXARA (propuesta)",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("contacto");
+}
+
+export const dynamic = "force-dynamic";
 
 const MAPA_URL = "https://maps.app.goo.gl/uJBZyNeAApgAri536";
 
@@ -42,6 +45,21 @@ export default function PropuestaContacto() {
 
   return (
     <main aria-label="Contacto">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "ContactPage",
+          name: "Contacto | NEXARA",
+          url: `${siteBaseUrl()}/contacto`,
+          description: "Agenda un diagnóstico con NEXARA: CCTV, redes, cómputo y soporte TI.",
+          mainEntity: {
+            "@type": "Organization",
+            name: "NEXARA",
+            url: siteBaseUrl(),
+            contactPoint: { "@type": "ContactPoint", contactType: "sales", areaServed: "MX", availableLanguage: "Spanish" },
+          },
+        }}
+      />
       <section className={p.hero} aria-labelledby="contacto-hero" style={{ paddingBottom: "clamp(40px, 5vw, 64px)" }}>
         <Aurora />
         <div className={`${s.contenedor} ${s.centro}`}>

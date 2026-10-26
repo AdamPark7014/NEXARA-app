@@ -1,5 +1,5 @@
-import { SERVICIOS_IMAGES } from "../servicios/serviciosImagery";
-import { PROYECTOS_SECTOR_COVERS } from "../proyectos/proyectosSectorCovers";
+import { SERVICIOS_IMAGES } from "./serviciosImagery";
+import { PROYECTOS_SECTOR_COVERS } from "./proyectosSectorCovers";
 
 /**
  * Fotografía principal por servicio (mismas fuentes que /servicios y /proyectos).

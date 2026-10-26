@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { buildStudioPageMetadata } from "@/lib/page-seo";
+import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
 import Aurora from "@/components/sitio/Aurora";
@@ -10,10 +12,9 @@ import { equipoPublico, iniciales } from "@/components/sitio/equipo";
 import { ruta } from "@/components/sitio/rutas";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
 
-export const metadata: Metadata = {
-  title: "Nosotros · NEXARA (propuesta)",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("nosotros");
+}
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,21 @@ export default async function PropuestaNosotros() {
 
   return (
     <main aria-label="Nosotros">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "AboutPage",
+          url: `${siteBaseUrl()}/nosotros`,
+          name: "Nosotros · NEXARA",
+          mainEntity: {
+            "@type": "Organization",
+            name: "NEXARA",
+            url: siteBaseUrl(),
+            logo: `${siteBaseUrl()}/logo-nexara-lockup.png`,
+            description: "Integrador tecnológico en México: CCTV, redes, cómputo y soporte con disciplina de campo.",
+          },
+        }}
+      />
       <section className={p.hero} aria-labelledby="nosotros-hero">
         <Aurora />
         <div className={`${s.contenedor} ${s.centro}`}>
