@@ -158,6 +158,23 @@ describe("legibilidad", () => {
     );
     expect(avisos.map((a) => a.herramientaId)).toEqual([1, 2]);
     expect(avisos[0].mensaje).toMatch(/no tiene código/);
-    expect(avisos[1].mensaje).toMatch(/Saldrá solo el texto/);
+    expect(avisos[1].mensaje).toMatch(/saldrá solo el texto/);
+  });
+
+  it("el código que no cabe en las barras cabe en una frase", () => {
+    const viejo =
+      "Cámara: el código «CÁM-01» trae caracteres que no caben en un código de barras. Saldrá solo el texto.";
+    const avisos = avisosDeEtiquetas([{ id: 2, toolName: "Cámara", barcode: "CÁM-01" }], rollo);
+    const mensaje = avisos[0]?.mensaje ?? "";
+    expect(mensaje).toBe(
+      "Cámara: el código «CÁM-01» trae caracteres que no caben en un código de barras: saldrá solo el texto.",
+    );
+    expect(mensaje).not.toBe(viejo);
+    expect(mensaje).toMatch(/saldrá solo el texto/);
+    expect(mensaje.split(".").filter((parte) => parte.trim()).length).toBe(1);
+    const html = htmlEtiquetas([{ id: 2, toolName: "Cámara", barcode: "CÁM-01" }]);
+    expect(html).toContain('<div class="codigo">CÁM-01</div>');
+    expect(html).not.toContain("<svg");
+    expect(avisosDeEtiquetas([MULTIMETRO], rollo)).toEqual([]);
   });
 });
