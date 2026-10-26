@@ -223,7 +223,7 @@ fun OfflineQueueScreen(
             item {
                 NxEmptyState(
                     title = "Todo sincronizado",
-                    subtitle = "No hay mutaciones pendientes en este dispositivo.",
+                    subtitle = "",
                 )
             }
         } else {
@@ -346,39 +346,38 @@ private fun SyncStatusCard(
             containerColor = if (pending == 0) NxColors.SuccessSoft else NxColors.WarningSoft,
         ),
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column {
-                    Text("$pending", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text("Pendientes", style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
-                }
-                Column {
-                    Text(
-                        "$withErrors",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = NxColors.Warning,
-                    )
-                    Text("Con reintentos", style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
-                }
-                Column {
-                    Text(
-                        if (isOnline) "Online" else "Offline",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isOnline) NxColors.Success else NxColors.Warning,
-                    )
-                    Text("Red", style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
-                }
-            }
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            DatoCola("Pendientes", "$pending")
+            DatoCola("Con reintentos", "$withErrors", NxColors.Warning)
+            DatoCola(
+                "Red",
+                if (isOnline) "Online" else "Offline",
+                if (isOnline) NxColors.Success else NxColors.Warning,
+            )
             if (lastSyncLabel != null) {
-                Text(
-                    "Última sync: $lastSyncLabel · ${syncStatus.lastReplayed} enviadas, ${syncStatus.lastPending} restantes",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = NxColors.Muted,
-                )
+                DatoCola("Última sync", lastSyncLabel)
+                DatoCola("Enviadas", "${syncStatus.lastReplayed}")
+                DatoCola("Restantes", "${syncStatus.lastPending}")
             }
         }
+    }
+}
+
+/** Un dato por renglón: etiqueta a la izquierda, valor a la derecha. */
+@Composable
+private fun DatoCola(etiqueta: String, valor: String, color: Color = NxColors.Slate) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(etiqueta, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+        Text(
+            valor,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = color,
+        )
     }
 }
 
