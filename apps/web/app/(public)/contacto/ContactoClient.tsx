@@ -32,6 +32,7 @@ export default function ContactoClient({ visuals }: Props) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const asideImg = visuals.slots[0];
 
   const leadContext = useMemo(() => {
@@ -90,12 +91,12 @@ export default function ContactoClient({ visuals }: Props) {
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
-        setSubmitError("No se pudo enviar el mensaje. Intenta de nuevo o escríbenos por WhatsApp.");
+        setSubmitError("No se pudo enviar el mensaje: intenta de nuevo o escríbenos por WhatsApp.");
         setLoading(false);
         return;
       }
     } catch {
-      setSubmitError("Error de conexión. Revisa tu internet e intenta de nuevo.");
+      setSubmitError("Error de conexión: revisa tu internet e intenta de nuevo.");
       setLoading(false);
       return;
     }
@@ -176,7 +177,7 @@ export default function ContactoClient({ visuals }: Props) {
                 </p>
               </div>
               {!submitted ? (
-                <form className={styles.form} onSubmit={onSubmit}>
+                <form className={styles.form} onSubmit={onSubmit} ref={formRef}>
                   <div className={styles.formRow}>
                     <label className={styles.field}>
                       <span>Nombre *</span>
@@ -215,9 +216,19 @@ export default function ContactoClient({ visuals }: Props) {
                     />
                   </label>
                   {submitError ? (
-                    <p className={styles.formError} role="alert">
-                      {submitError}
-                    </p>
+                    <>
+                      <p className={styles.formError} role="alert">
+                        {submitError}
+                      </p>
+                      <button
+                        type="button"
+                        className={`${shared.btn} ${shared.btnSecondary}`}
+                        disabled={loading}
+                        onClick={() => formRef.current?.requestSubmit()}
+                      >
+                        Reintentar
+                      </button>
+                    </>
                   ) : null}
                   <button
                     type="submit"
