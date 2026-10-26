@@ -276,8 +276,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
       <header className={styles.head}>
         <h2 id={ids.titulo} className={styles.title}>Solicitar herramienta</h2>
         <p className={styles.lead}>
-          Busca y elige una herramienta disponible. Las fotos salen del catálogo. Los campos con <RequiredMark /> son
-          obligatorios.
+          Busca y elige una herramienta disponible, las fotos salen del catálogo y los campos con <RequiredMark /> son obligatorios.
         </p>
       </header>
 
@@ -295,9 +294,17 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
               fullWidth
               error={errorDe('tool')}
               hint={
-                selectedInventoryItem
-                  ? `Seleccionada: ${selectedInventoryItem.toolName} · ${selectedInventoryItem.model} · ${selectedInventoryItem.serialNumber}`
-                  : 'Escribe al menos 2 letras: nombre, modelo o serie.'
+                selectedInventoryItem ? (
+                  <>
+                    Seleccionada: {selectedInventoryItem.toolName}
+                    <br />
+                    {selectedInventoryItem.model}
+                    <br />
+                    {selectedInventoryItem.serialNumber}
+                  </>
+                ) : (
+                  'Escribe al menos 2 letras: nombre, modelo o serie.'
+                )
               }
             >
               <Input
@@ -350,9 +357,8 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                         </span>
                         <span className={styles.optionText}>
                           <span className={styles.optionName}>{option.toolName}</span>
-                          <span className={styles.optionMeta}>
-                            {option.model} · {option.serialNumber}
-                          </span>
+                          <span className={styles.optionMeta}>{option.model}</span>
+                          <span className={styles.optionMeta}>{option.serialNumber}</span>
                         </span>
                         {!inventoryHasPhotos(option) && (
                           <Badge tone="danger" size="sm">Sin fotos en inventario</Badge>
@@ -370,9 +376,8 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
               <div className={styles.selectedHeader}>
                 <div className={styles.selectedText}>
                   <p className={styles.selectedTitle}>{selectedInventoryItem.toolName}</p>
-                  <p className={styles.selectedMeta}>
-                    {selectedInventoryItem.model} · Serie {selectedInventoryItem.serialNumber}
-                  </p>
+                  <p className={styles.selectedMeta}>{selectedInventoryItem.model}</p>
+                  <p className={styles.selectedMeta}>Serie {selectedInventoryItem.serialNumber}</p>
                 </div>
                 <Button variant="tertiary" size="sm" onClick={clearSelection}>
                   Cambiar
