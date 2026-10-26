@@ -862,7 +862,7 @@ private fun SiguientesCard(items: List<MyActivityItemDto>, onOpen: (MyActivityIt
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(InicioRules.titulo(a), fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, color = c.fg, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(InicioRules.detalleSiguiente(a), fontSize = 12.5.sp, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(InicioRules.detalleSiguiente(a), fontSize = 12.5.sp, color = c.muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = c.fg4)
             }

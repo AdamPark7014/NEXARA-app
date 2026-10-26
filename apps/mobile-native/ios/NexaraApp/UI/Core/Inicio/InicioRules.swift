@@ -151,7 +151,7 @@ enum InicioRules {
         }) {
             return Aviso(
                 titulo: "«\(titulo(a))» va atrasada",
-                detalle: "Pasó su fecha límite. Empiézala ya o avisa a tu jefe.",
+                detalle: "Pasó su fecha límite: empiézala ya o avisa a tu jefe.",
                 activityId: a.id,
                 tono: .danger
             )
@@ -208,7 +208,7 @@ enum InicioRules {
         return String(CoreStatusUI.priority(a.prioridad).label.prefix(12))
     }
 
-    /// Línea de detalle de «Después, hoy»: lugar · plan (o el tipo).
+    /// Detalle de «Después, hoy»: lugar y tiempo, cada uno en su renglón (o el tipo).
     static func detalleSiguiente(_ a: MyActivityItem) -> String {
         let plan: Double? = {
             if let p = a.minutosPlan?.value, p > 0 { return p }
@@ -216,7 +216,7 @@ enum InicioRules {
             return nil
         }()
         let partes = [lugar(a), plan.map { ActividadesTexto.minutos($0) }].compactMap { $0 }
-        let texto = partes.joined(separator: " · ")
+        let texto = partes.joined(separator: "\n")
         return texto.isEmpty ? CoreStatusUI.kind(a.coreKind, ticketTypeCustom: a.ticketTypeCustom) : texto
     }
 

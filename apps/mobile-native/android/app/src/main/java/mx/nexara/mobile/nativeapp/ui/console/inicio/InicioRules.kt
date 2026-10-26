@@ -170,7 +170,7 @@ object InicioRules {
         }?.let {
             return Aviso(
                 titulo = "«${titulo(it)}» va atrasada",
-                detalle = "Pasó su fecha límite. Empiézala ya o avisa a tu jefe.",
+                detalle = "Pasó su fecha límite: empiézala ya o avisa a tu jefe.",
                 activityId = it.id,
                 tono = Tono.DANGER,
             )
@@ -211,13 +211,13 @@ object InicioRules {
     /** Hora programada de una actividad («16:00»), o null si no trae. */
     fun horaDe(iso: String?): String? = CoreActivityRules.formatClock(iso).takeIf { it != "—" }
 
-    /** Línea de detalle de «Después, hoy»: lugar · plan. */
+    /** Detalle de «Después, hoy»: lugar y tiempo, cada uno en su renglón. */
     fun detalleSiguiente(a: MyActivityItemDto): String {
         val plan = a.minutosPlan?.takeIf { it > 0 } ?: a.tiempoEstimadoMin?.takeIf { it > 0 }
         return listOfNotNull(
             lugar(a),
             plan?.let { CoreActivityRules.formatMinutes(it) },
-        ).joinToString(" · ").ifBlank { CoreActivityRules.kindLabel(a.coreKind, a.ticketTypeCustom) }
+        ).joinToString("\n").ifBlank { CoreActivityRules.kindLabel(a.coreKind, a.ticketTypeCustom) }
     }
 
     /** Insignia de la pestaña Actividades: lo que falta por hacer. */

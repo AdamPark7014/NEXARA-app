@@ -774,7 +774,7 @@ private struct InicioSiguientesCard: View {
                     Text(InicioRules.detalleSiguiente(item))
                         .font(.system(size: 12.5))
                         .foregroundStyle(NxColors.muted)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .multilineTextAlignment(.leading)
