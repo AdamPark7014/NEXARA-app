@@ -284,7 +284,7 @@ export class ActivityEvidenceFieldsService {
     const url = (params.photoUrl || '').trim();
     if (!url || url.startsWith('data:') || url.includes(';base64,') || url.length > 500) {
       throw new BadRequestException(
-        `No se pudo guardar la foto de «${campo.nombre}»: la imagen no se subió correctamente. Vuelve a tomarla.`,
+        `No se pudo guardar la foto de «${campo.nombre}»: la imagen no se subió correctamente, vuelve a tomarla.`,
       );
     }
 
