@@ -47,10 +47,10 @@ enum CoreDispatch {
         return others.filter { pool.contains(CoreOrg.normalized($0.email)) }
     }
 
-    /// «Despacho» · «Despacho · se ocupan 3 personas».
-    static func resumen(_ indicaciones: String?) -> String {
-        guard let cupo = headcount(indicaciones) else { return "Despacho" }
-        return "Despacho · se ocupan \(cupo) persona\(cupo == 1 ? "" : "s")"
+    /// Cupo en su propio renglón: «Se ocupan 3 personas». Nil si no hay cupo.
+    static func resumen(_ indicaciones: String?) -> String? {
+        guard let cupo = headcount(indicaciones) else { return nil }
+        return "Se ocupan \(cupo) persona\(cupo == 1 ? "" : "s")"
     }
 }
 
@@ -158,13 +158,24 @@ struct DespachoPendingPanel: View {
 
     private func tarjeta(_ a: TeamBoardOpenActivity) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text([a.anNumber, a.titulo].compactMap { ActividadesTexto.limpio($0) }.joined(separator: " · "))
+            let titulo = ActividadesTexto.limpio(a.titulo)
+            let folio = ActividadesTexto.limpio(a.anNumber)
+            Text(titulo ?? folio ?? "Despacho")
                 .font(.system(size: 14, weight: .heavy))
                 .foregroundStyle(NxColors.fg)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(CoreDispatch.resumen(a.indicaciones))
-                .font(.system(size: 12))
-                .foregroundStyle(NxColors.muted)
+            if titulo != nil, let folio {
+                Text(folio)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(NxColors.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let cupo = CoreDispatch.resumen(a.indicaciones) {
+                Text(cupo)
+                    .font(.system(size: 12))
+                    .foregroundStyle(NxColors.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             ReprogramarDespachoInline(activityId: a.id, fechaActual: a.fechaInicio, onDone: onDone)
             if let indicaciones = ActividadesTexto.limpio(a.indicaciones) {
                 Text(indicaciones)
@@ -194,7 +205,7 @@ struct DespachoPendingPanel: View {
     @ViewBuilder
     private func eleccion(_ a: TeamBoardOpenActivity) -> some View {
         if candidatos.isEmpty {
-            Text("No hay gente de tu equipo en el tablero. Actualiza o revisa la jerarquía.")
+            Text("No hay gente de tu equipo en el tablero.")
                 .font(.system(size: 13))
                 .foregroundStyle(NxColors.muted)
         } else {
@@ -504,8 +515,8 @@ struct DespachoSheet: View {
             Form {
                 Section {
                     Text(target.title).font(.headline)
-                    if CoreDispatch.headcount(target.indicaciones) != nil {
-                        Text(CoreDispatch.resumen(target.indicaciones))
+                    if let cupo = CoreDispatch.resumen(target.indicaciones) {
+                        Text(cupo)
                             .font(.subheadline)
                             .foregroundStyle(NxColors.muted)
                     }
@@ -520,7 +531,7 @@ struct DespachoSheet: View {
                     if loading {
                         ProgressView()
                     } else if candidates.isEmpty {
-                        Text("No hay gente de tu equipo en el tablero. Actualiza o revisa la jerarquía.")
+                        Text("No hay gente de tu equipo en el tablero.")
                             .foregroundStyle(NxColors.muted)
                     } else {
                         ForEach(candidates) { user in

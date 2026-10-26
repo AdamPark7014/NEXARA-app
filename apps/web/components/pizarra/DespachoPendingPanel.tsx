@@ -188,12 +188,14 @@ export default function DespachoPendingPanel({
         return (
           <article key={a.id} className={s.despacho} data-activa={activa ? "true" : undefined}>
             <div className={c.pila}>
-              <div>
+              <div className={c.pila}>
                 <h3 className={c.tituloFila}>{a.titulo}</h3>
-                <span className={c.folio}>
-                  {a.anNumber}
-                  {cupo != null ? ` · se ocupan ${cupo} persona${cupo === 1 ? "" : "s"}` : ""}
-                </span>
+                {a.anNumber ? <span className={c.folio}>{a.anNumber}</span> : null}
+                {cupo != null ? (
+                  <span className={c.folio}>
+                    Se ocupan {cupo} persona{cupo === 1 ? "" : "s"}
+                  </span>
+                ) : null}
               </div>
               {a.indicaciones ? <p className={c.cita}>{a.indicaciones}</p> : null}
               <ReprogramarDespacho token={token} activityId={a.id} fechaActual={a.fechaInicio ?? null} onDone={onDone} />
@@ -202,7 +204,7 @@ export default function DespachoPendingPanel({
             {activa ? (
               <div className={c.pila}>
                 {candidates.length === 0 ? (
-                  <p className={c.tenue}>No hay gente de tu equipo disponible. Avísale a dirección.</p>
+                  <p className={c.tenue}>No hay gente de tu equipo disponible.</p>
                 ) : (
                   <fieldset className={s.grupo}>
                     <legend className={s.leyenda}>

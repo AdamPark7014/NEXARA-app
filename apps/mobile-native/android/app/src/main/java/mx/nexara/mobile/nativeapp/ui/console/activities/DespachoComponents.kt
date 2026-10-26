@@ -222,18 +222,30 @@ internal fun DespachoPendingPanel(
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                val titulo = a.titulo?.takeIf { it.isNotBlank() }
+                val folio = a.anNumber?.takeIf { it.isNotBlank() }
                 Text(
-                    listOfNotNull(a.anNumber, a.titulo).joinToString(" · "),
+                    titulo ?: folio ?: "Despacho",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = NxColors.Slate,
                 )
+                if (titulo != null && folio != null) {
+                    Text(
+                        folio,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = NxColors.Muted,
+                    )
+                }
                 val cupo = CoreActivityRules.parseDispatchHeadcount(a.indicaciones)
-                Text(
-                    "Despacho" + (cupo?.let { " · se ocupan $it persona${if (it == 1) "" else "s"}" } ?: ""),
-                    fontSize = 12.sp,
-                    color = NxColors.Muted,
-                )
+                if (cupo != null) {
+                    Text(
+                        "Se ocupan $cupo persona${if (cupo == 1) "" else "s"}",
+                        fontSize = 12.sp,
+                        color = NxColors.Muted,
+                    )
+                }
                 ReprogramarDespachoInline(activityId = a.id, fechaActual = a.fechaInicio, onDone = onDone)
                 a.indicaciones?.takeIf { it.isNotBlank() }?.let {
                     Text(it, fontSize = 12.sp, color = NxColors.Muted)
@@ -242,7 +254,7 @@ internal fun DespachoPendingPanel(
                 if (activeId == a.id) {
                     if (candidates.isEmpty()) {
                         Text(
-                            "No hay gente de tu equipo en el tablero. Actualiza o revisa la jerarquía.",
+                            "No hay gente de tu equipo en el tablero.",
                             fontSize = 13.sp,
                             color = NxColors.Muted,
                         )
