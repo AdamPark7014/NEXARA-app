@@ -642,16 +642,17 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
       ? 'salida'
       : null;
 
-  // Lo que se lee de un vistazo: «En jornada desde 8:02 · 6 h 41».
+  // Mismo cálculo de siempre. Cada dato va en su renglón: estado, fecha, hora y tiempo corrido.
   const elapsedOpen = elapsed || (openSession?.lastEntryAt ? Date.now() - new Date(openSession.lastEntryAt).getTime() : 0);
   const totalHoyMs = totalMinutes * 60_000 + (startTime ? elapsed : 0);
-  const estadoLinea = jornadaDone
-    ? `Completada · ${formatElapsed(totalHoyMs)}`
-    : openSession
-      ? openSessionFromPriorDay
-        ? `Abierta desde el ${formatDate(openSession.lastEntryAt)} · ${formatTime(openSession.lastEntryAt)}`
-        : `En jornada desde ${formatTime(openSession.lastEntryAt)} · ${formatElapsed(elapsedOpen)}`
-      : 'Sin checada';
+  const sesionVisible = Boolean(openSession) && !jornadaDone;
+  const horaJornada = sesionVisible && openSession ? formatTime(openSession.lastEntryAt) : '';
+  const fechaJornada = sesionVisible && openSessionFromPriorDay && openSession ? formatDate(openSession.lastEntryAt) : '';
+  const tiempoCorrido = jornadaDone
+    ? formatElapsed(totalHoyMs)
+    : sesionVisible && !openSessionFromPriorDay
+      ? formatElapsed(elapsedOpen)
+      : '';
   const mapaEntrada = attendanceMapUrl(history, 'entrada');
   const mapaSalida = attendanceMapUrl(history, 'salida');
   // La checada más reciente que el servidor marcó fuera de sitio (geocerca).
@@ -704,8 +705,13 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
         <div className={styles.statusBar} data-tone={statusTone}>
           <span className={styles.statusDot} aria-hidden="true" />
           <div className={styles.statusText}>
-            <div className={styles.statusEyebrow}>Estado hoy · {statusLabel}</div>
-            <div className={styles.statusValue}>{estadoLinea}</div>
+            <div className={styles.statusEyebrow}>Estado hoy</div>
+            <div className={styles.statusValue}>{statusLabel}</div>
+            {fechaJornada ? <div className={styles.statusValue}>Desde el {fechaJornada}</div> : null}
+            {horaJornada ? (
+              <div className={styles.statusValue}>{fechaJornada ? horaJornada : `Desde ${horaJornada}`}</div>
+            ) : null}
+            {tiempoCorrido ? <div className={styles.statusValue}>{tiempoCorrido}</div> : null}
             {(totalMinutes > 0 || startTime) && !jornadaDone && (
               <div className={styles.totalDay}>Total hoy: {formatElapsed(totalHoyMs)}</div>
             )}
@@ -841,7 +847,10 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
 
         <details className={styles.rangeDetails} open={!compact}>
           <summary className={styles.rangeSummary}>
-            Resumen semana / mes · {formatTotal(rangeTotalMinutes)}
+            <span className={styles.statusText}>
+              <span>Resumen semana / mes</span>
+              <span>{formatTotal(rangeTotalMinutes)}</span>
+            </span>
           </summary>
           <div className={styles.rangeSectionInner}>
             <div className={styles.quickRangeButtons}>
