@@ -243,11 +243,11 @@ export default function RootLayout({
       className={`${spaceGrotesk.variable} ${inter.variable} ${interTight.variable} ${manrope.variable} ${plusJakarta.variable}`}
     >
       <body suppressHydrationWarning>
-        {/* Tema del sitio público antes del primer pintado: preferencia guardada o la del sistema. */}
+        {/* Tema del sitio público antes del primer pintado: claro, salvo que la persona haya elegido oscuro. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var k='nexara:public-theme';var s=localStorage.getItem(k);var t=(s==='light'||s==='dark')?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-public-theme',t);}catch(e){document.documentElement.setAttribute('data-public-theme','dark');}})();",
+              "(function(){try{var s=localStorage.getItem('nexara:public-theme');document.documentElement.setAttribute('data-public-theme',s==='dark'?'dark':'light');}catch(e){document.documentElement.setAttribute('data-public-theme','light');}})();",
           }}
         />
         {/* Organization structured data */}

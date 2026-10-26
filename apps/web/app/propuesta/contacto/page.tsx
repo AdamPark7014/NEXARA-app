@@ -157,7 +157,8 @@ export default function PropuestaContacto() {
             </div>
           </div>
           <div className={p.mapaCalle} data-aparecer>
-            <BrandMap />
+            {/* Sin la tarjeta ni el botón propios del mapa: la dirección y «Cómo llegar» ya están a la izquierda. */}
+            <BrandMap overlay={false} />
           </div>
         </div>
       </section>
