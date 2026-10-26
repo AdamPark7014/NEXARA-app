@@ -2378,7 +2378,7 @@ select.celda {
   top: calc(100% + 6px);
   left: -8px;
   width: max-content;
-  max-width: min(24rem, 70vw);
+  max-width: min(24rem, calc(100vw - 32px));
   padding: 10px 12px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg, 12px);

@@ -64,7 +64,7 @@ export default function SeccionObjetivo({
       numero="01"
       titulo="Objetivo del proyecto"
       descripcion="Qué gana el cliente: introducción, beneficios y cierre."
-      ayuda="Qué gana el cliente. El PDF lo imprime como introducción, «Entre los principales beneficios se encuentran:» con la lista, y cierre. Lo que dejes vacío lo completa con la plantilla del segmento y las cifras de tus partidas."
+      ayuda="El PDF imprime introducción, «Entre los principales beneficios se encuentran:» con la lista y el cierre, y lo vacío lo completa la plantilla del segmento con las cifras de tus partidas."
       acciones={
         editable ? (
           <Button size="sm" iconStart={<AutoAwesomeOutlinedIcon />} onClick={pedirBorrador}>
