@@ -1,0 +1,10 @@
+/* Bancos: solo la frase de «cargando» y de «sin cuentas». El volver es el del encabezado base. */
+
+.frase {
+  margin: 28px 16px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
