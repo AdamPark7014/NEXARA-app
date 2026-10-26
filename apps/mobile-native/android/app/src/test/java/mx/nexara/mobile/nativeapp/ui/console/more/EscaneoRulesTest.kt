@@ -2,6 +2,8 @@ package mx.nexara.mobile.nativeapp.ui.console.more
 
 import mx.nexara.mobile.nativeapp.data.api.EmpaqueCodigoDto
 import mx.nexara.mobile.nativeapp.data.api.ExistenciaCodigoDto
+import mx.nexara.mobile.nativeapp.data.api.HerramientaActividadDto
+import mx.nexara.mobile.nativeapp.data.api.HerramientaEscaneadaDto
 import mx.nexara.mobile.nativeapp.data.api.HerramientaPersonaDto
 import mx.nexara.mobile.nativeapp.data.api.HerramientaPorCodigoDto
 import mx.nexara.mobile.nativeapp.data.api.KitEscaneadoDto
@@ -87,6 +89,37 @@ class EscaneoRulesTest {
         val enKit = HerramientaPorCodigoDto(kit = KitEscaneadoDto(user = HerramientaPersonaDto(nombre = "Ana")))
         assertEquals("En el kit de Ana", EscaneoRules.quienLaTiene(enKit))
         assertNull(EscaneoRules.quienLaTiene(HerramientaPorCodigoDto()))
+    }
+
+    @Test
+    fun unDatoPorRenglon() {
+        val r = HerramientaPorCodigoDto(
+            codigo = "MUL-12345",
+            item = HerramientaEscaneadaDto(toolName = "Multímetro", model = "Fluke 117", serialNumber = "4419B"),
+            prestamo = PrestamoEscaneadoDto(
+                status = "IN_USE",
+                usuario = HerramientaPersonaDto(nombre = "Juan Pérez"),
+                activity = HerramientaActividadDto(anNumber = "AN-0123"),
+            ),
+        )
+        assertEquals("MUL-12345\nSerie 4419B", EscaneoRules.codigoYSerie(r))
+        // La tarjeta pone el modelo debajo; el aviso de salida o entrada lo deja en una línea.
+        assertEquals("Multímetro\nFluke 117", EscaneoRules.nombreHerramientaRenglones(r))
+        assertEquals("Multímetro · Fluke 117", EscaneoRules.nombreHerramienta(r))
+        assertEquals("La tiene Juan Pérez\nAN-0123", EscaneoRules.quienLaTiene(r))
+        val pedida = r.copy(prestamo = r.prestamo?.copy(status = "APPROVED"))
+        assertEquals("La pidió Juan Pérez\nAN-0123", EscaneoRules.quienLaTiene(pedida))
+        // Sin el otro dato no queda un renglón vacío. El préstamo, entregar y recibir no cambian.
+        assertEquals("MUL-12345", EscaneoRules.codigoYSerie(HerramientaPorCodigoDto(codigo = "MUL-12345")))
+        assertEquals("Serie 4419B", EscaneoRules.codigoYSerie(HerramientaPorCodigoDto(item = HerramientaEscaneadaDto(serialNumber = "4419B"))))
+        assertEquals("", EscaneoRules.codigoYSerie(HerramientaPorCodigoDto()))
+        assertEquals("Multímetro", EscaneoRules.nombreHerramientaRenglones(HerramientaPorCodigoDto(item = HerramientaEscaneadaDto(toolName = "Multímetro"))))
+        assertEquals("Herramienta", EscaneoRules.nombreHerramientaRenglones(HerramientaPorCodigoDto()))
+        assertEquals("Herramienta", EscaneoRules.nombreHerramienta(HerramientaPorCodigoDto()))
+        assertEquals("Prestada", EscaneoRules.estadoPrestamo("IN_USE"))
+        assertEquals("Préstamo aprobado, falta entregarla", EscaneoRules.estadoPrestamo("APPROVED"))
+        assertEquals("Registrar salida", AccionHerramienta.ENTREGAR.etiqueta)
+        assertEquals("Registrar entrada", AccionHerramienta.RECIBIR.etiqueta)
     }
 
     // ── Un solo escáner para herramienta y artículo ───────────────────────────

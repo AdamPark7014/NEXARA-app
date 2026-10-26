@@ -219,27 +219,49 @@ object EscaneoRules {
         else -> "Sin préstamo abierto"
     }
 
-    /** «La tiene Juan Pérez · AN-0123» o «Kit de Ana López»; null si está libre. */
+    /**
+     * Quién la tiene y, si hay folio, el folio en el renglón de abajo.
+     * Antes iban juntos: «La tiene Juan Pérez · AN-0123». Null si está libre.
+     * El kit sigue en un renglón: «En el kit de Ana López».
+     */
     fun quienLaTiene(r: HerramientaPorCodigoDto): String? {
         val p = r.prestamo
         if (p != null) {
             val quien = p.usuario?.nombre?.trim().orEmpty().ifEmpty { "alguien" }
             val ot = p.activity?.anNumber?.trim()?.takeIf { it.isNotEmpty() }
             val verbo = if (p.status == "IN_USE") "La tiene" else "La pidió"
-            return listOfNotNull("$verbo $quien", ot).joinToString(" · ")
+            return listOfNotNull("$verbo $quien", ot).joinToString("\n")
         }
         val k = r.kit ?: return null
         val quien = k.user?.nombre?.trim().orEmpty().ifEmpty { "alguien" }
         return "En el kit de $quien"
     }
 
-    fun nombreHerramienta(r: HerramientaPorCodigoDto): String {
-        val item = r.item
-        return listOfNotNull(
-            item?.toolName?.trim()?.takeIf { it.isNotEmpty() },
-            item?.model?.trim()?.takeIf { it.isNotEmpty() },
-        ).joinToString(" · ").ifEmpty { "Herramienta" }
-    }
+    /**
+     * Nombre y modelo en una línea («Multímetro · Fluke 117»): para los avisos
+     * («Salida registrada: …»), donde un salto de renglón no cabe.
+     */
+    fun nombreHerramienta(r: HerramientaPorCodigoDto): String =
+        partesDelNombre(r).joinToString(" · ").ifEmpty { "Herramienta" }
+
+    /** El mismo nombre para el título de la tarjeta: el modelo en el renglón de abajo. */
+    fun nombreHerramientaRenglones(r: HerramientaPorCodigoDto): String =
+        partesDelNombre(r).joinToString("\n").ifEmpty { "Herramienta" }
+
+    private fun partesDelNombre(r: HerramientaPorCodigoDto): List<String> = listOfNotNull(
+        r.item?.toolName?.trim()?.takeIf { it.isNotEmpty() },
+        r.item?.model?.trim()?.takeIf { it.isNotEmpty() },
+    )
+
+    /**
+     * Código y serie, un dato por renglón. Antes iban juntos: «MUL-12345 · Serie …».
+     * Vacío si no hay ninguno de los dos.
+     */
+    fun codigoYSerie(r: HerramientaPorCodigoDto): String =
+        listOfNotNull(
+            r.codigo?.takeIf { it.isNotBlank() },
+            r.item?.serialNumber?.takeIf { it.isNotBlank() }?.let { "Serie $it" },
+        ).joinToString("\n")
 
     const val PERMISO_GENERICO = "No tienes permisos para esta acción"
 

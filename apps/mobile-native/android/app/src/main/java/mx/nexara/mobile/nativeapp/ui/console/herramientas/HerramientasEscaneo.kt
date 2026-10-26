@@ -62,15 +62,12 @@ fun EscanerDeHerramientas(onMovimiento: () -> Unit, modifier: Modifier = Modifie
 @Composable
 internal fun HerramientaEscaneada(r: HerramientaPorCodigoDto) {
     Text(
-        EscaneoRules.nombreHerramienta(r),
+        EscaneoRules.nombreHerramientaRenglones(r),
         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
         color = NxColors.Slate,
     )
     Text(
-        listOfNotNull(
-            r.codigo?.takeIf { it.isNotBlank() },
-            r.item?.serialNumber?.takeIf { it.isNotBlank() }?.let { "Serie $it" },
-        ).joinToString(" · "),
+        EscaneoRules.codigoYSerie(r),
         style = MaterialTheme.typography.labelMedium,
         color = NxColors.Muted,
     )

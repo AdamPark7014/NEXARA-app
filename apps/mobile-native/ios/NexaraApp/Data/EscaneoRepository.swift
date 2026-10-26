@@ -412,20 +412,41 @@ enum EscaneoReglas {
         }
     }
 
-    /// «La tiene Juan Pérez · AN-0123» o «En el kit de Ana López»; nil si está libre.
+    /// Quién la tiene y, si hay folio, el folio en el renglón de abajo.
+    /// Antes iban juntos: «La tiene Juan Pérez · AN-0123». Nil si está libre.
+    /// El kit sigue en un renglón: «En el kit de Ana López».
     static func quienLaTiene(_ r: HerramientaPorCodigo) -> String? {
         if let p = r.prestamo {
             let quien = p.usuario?.nombre?.nilSiVacio ?? "alguien"
             let verbo = p.status == "IN_USE" ? "La tiene" : "La pidió"
-            return ["\(verbo) \(quien)", p.activity?.anNumber?.nilSiVacio].compactMap { $0 }.joined(separator: " · ")
+            return ["\(verbo) \(quien)", p.activity?.anNumber?.nilSiVacio].compactMap { $0 }.joined(separator: "\n")
         }
         guard let kit = r.kit else { return nil }
         return "En el kit de \(kit.user?.nombre?.nilSiVacio ?? "alguien")"
     }
 
+    /// Nombre y modelo en una línea («Multímetro · Fluke 117»): para los avisos
+    /// («Salida registrada: …»), donde un salto de renglón no cabe.
     static func nombreHerramienta(_ r: HerramientaPorCodigo) -> String {
-        let partes = [r.item?.toolName?.nilSiVacio, r.item?.model?.nilSiVacio].compactMap { $0 }
+        let partes = partesDelNombre(r)
         return partes.isEmpty ? "Herramienta" : partes.joined(separator: " · ")
+    }
+
+    /// El mismo nombre para el título de la tarjeta: el modelo en el renglón de abajo.
+    static func nombreHerramientaRenglones(_ r: HerramientaPorCodigo) -> String {
+        let partes = partesDelNombre(r)
+        return partes.isEmpty ? "Herramienta" : partes.joined(separator: "\n")
+    }
+
+    private static func partesDelNombre(_ r: HerramientaPorCodigo) -> [String] {
+        [r.item?.toolName?.nilSiVacio, r.item?.model?.nilSiVacio].compactMap { $0 }
+    }
+
+    /// Código y serie, un dato por renglón. Antes iban juntos: «MUL-12345 · Serie …».
+    static func codigoYSerie(_ r: HerramientaPorCodigo) -> String {
+        [r.codigo?.nilSiVacio, r.item?.serialNumber?.nilSiVacio.map { "Serie \($0)" }]
+            .compactMap { $0 }
+            .joined(separator: "\n")
     }
 
     static let permisoGenerico = "No tienes permisos para esta acción"
