@@ -954,7 +954,7 @@ export class AuthService {
     }
     if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
       const mins = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000);
-      throw new UnauthorizedException(`Cuenta bloqueada temporalmente. Reintenta en ${mins} min.`);
+      throw new UnauthorizedException(`Cuenta bloqueada temporalmente: reintenta en ${mins} min.`);
     }
     const isPasswordMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordMatch) {
