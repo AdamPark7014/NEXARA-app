@@ -13,7 +13,7 @@ import { SkeletonList, Skeleton } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl, parseResponseJson } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
-import { getAttendanceSectionConfig } from "@/lib/user-access";
+import { canAccessHrManagement, getAttendanceSectionConfig } from "@/lib/user-access";
 import { attendanceMapUrl } from "@/lib/gps-map-links";
 import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
 import HybridAttendancePanel from "@/components/HybridAttendancePanel";
@@ -93,7 +93,7 @@ async function apiFetch<T = unknown>(path: string, token: string): Promise<T | n
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     const readable = text.trim().startsWith("<") ? "" : text;
-    throw new Error(readable || (res.status === 403 ? "No tienes permiso para ver esta asistencia." : "El servidor no respondió. Intenta de nuevo en unos minutos."));
+    throw new Error(readable || (res.status === 403 ? "No tienes permiso para ver esta asistencia." : "El servidor no respondió."));
   }
   return parseResponseJson<T>(res);
 }
@@ -161,6 +161,12 @@ function mapApiUser(raw: ApiAttendanceUser, dateFilter: string): TeamMember {
     exitMapUrl: getLatestMapUrl(raw.attendances, "salida"),
     estado: resolveEstado(checkIn, checkOut, dayInfo?.isOpen),
   };
+}
+
+/** Cierra con punto un mensaje (del servidor o propio) sin recortarlo: «S.A. de C.V.» queda entero. */
+function conPunto(text: string): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  return /[.!?…]$/.test(clean) ? clean : `${clean}.`;
 }
 
 function fmtElapsed(ms: number): string {
@@ -257,12 +263,13 @@ function EmployeeStatusHero({ token, gpsConsent }: { token: string; gpsConsent: 
       {loadErr && (
         <InlineAlert
           variant={day ? "warning" : "danger"}
-          message={day ? `${loadErr} Mostramos el último dato cargado.` : loadErr}
+          message={conPunto(loadErr)}
           action={<Button size="sm" variant="secondary" onClick={() => void loadDay()}>Reintentar</Button>}
           style={{ marginBottom: 12 }}
         />
       )}
       <section
+        className="nx-att-hero"
         aria-label="Tu jornada de hoy"
         aria-busy={!loaded}
         style={{
@@ -341,7 +348,7 @@ function WeeklyBar({ token }: { token: string }) {
       {weekErr && (
         <InlineAlert
           variant="warning"
-          message={weekErr}
+          message={conPunto(weekErr)}
           action={<Button size="sm" variant="secondary" onClick={() => setReloadKey((k) => k + 1)}>Reintentar</Button>}
           style={{ marginBottom: 10 }}
         />
@@ -403,7 +410,7 @@ function TeamCard({ member, token, dateFilter, highlighted }: { member: TeamMemb
       aria-label={`${name}: ${ESTADO_LABEL[estado]}`}
       style={{ background: "var(--surface)", border: `1.5px solid ${highlighted ? "var(--primary)" : CARD_BORDER[estado]}`, borderRadius: 12, padding: "14px 16px" }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 10 }}>
+      <div className="nx-att-card-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 10 }}>
         <div style={{ minWidth: 0 }}>
           <Link href={`/erp/hr/${member.userId}`} style={{ fontWeight: 700, fontSize: 14, color: "var(--foreground)", textDecoration: "none" }}>{name}</Link>
           {(role || dept) && (
@@ -414,7 +421,8 @@ function TeamCard({ member, token, dateFilter, highlighted }: { member: TeamMemb
         </div>
         <Tag size="sm" dot variant={ESTADO_VARIANT[estado]}>{ESTADO_LABEL[estado]}</Tag>
       </div>
-      <dl style={{ display: "flex", gap: 16, margin: 0, fontSize: 12.5, color: "var(--text-secondary)", flexWrap: "wrap" }}>
+      {/* En escritorio, como siempre; a 390 px, un dato por renglón (ATT_QUIET). */}
+      <dl className="nx-att-card-times" style={{ display: "flex", gap: 16, margin: 0, fontSize: 12.5, color: "var(--text-secondary)", flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 4 }}>
           <dt>Entrada</dt>
           <dd style={{ margin: 0, fontWeight: 600, color: "var(--foreground)", fontVariantNumeric: "tabular-nums" }}>{fmtTime(ci)}</dd>
@@ -424,8 +432,8 @@ function TeamCard({ member, token, dateFilter, highlighted }: { member: TeamMemb
           <dd style={{ margin: 0, fontWeight: 600, color: "var(--foreground)", fontVariantNumeric: "tabular-nums" }}>{fmtTime(co)}</dd>
         </div>
         {(member.totalMinutes ?? 0) > 0 && (
-          <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-            <dt style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>Horas</dt>
+          <div className="nx-att-card-horas" style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+            <dt className="nx-att-card-oculto" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>Horas</dt>
             <dd style={{ margin: 0, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{fmtMinutes(member.totalMinutes)}</dd>
           </div>
         )}
@@ -593,29 +601,21 @@ function TeamAttendanceView({
         <Button size="sm" variant="ghost" loading={loading && loaded} onClick={() => void load()}>Actualizar</Button>
       }
     >
-      {teamErr && loaded && (
+      {teamErr && (loaded || !loading) && (
         <InlineAlert
-          variant="warning"
-          title="No se pudo actualizar"
-          message={staleDate
-            ? `${teamErr} Mostramos la asistencia del ${fmtDayLong(loadedFor!)}.`
-            : `${teamErr} Mostramos la última información cargada.`}
-          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
-          style={{ marginBottom: 12 }}
-        />
-      )}
-      {teamErr && !loaded && !loading && (
-        <InlineAlert
-          variant="danger"
-          title="No se pudo cargar la asistencia"
-          message={teamErr}
+          variant={loaded ? "warning" : "danger"}
+          message={
+            staleDate && loadedFor
+              ? `${conPunto(teamErr)} Mostramos la asistencia del ${fmtDayLong(loadedFor)}.`
+              : conPunto(teamErr)
+          }
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
           style={{ marginBottom: 12 }}
         />
       )}
 
       {loaded && (
-        <div style={{ marginBottom: 14, opacity: staleDate ? 0.6 : 1 }}>
+        <div className="nx-att-metrics" style={{ marginBottom: 14, opacity: staleDate ? 0.6 : 1 }}>
           <MetricStrip
             ariaLabel="Resumen de asistencia"
             metrics={[
@@ -651,7 +651,7 @@ function TeamAttendanceView({
             <div style={{ height: "100%", width: `${Math.round((completos / members.length) * 100)}%`, background: "var(--success)", borderRadius: 4, position: "absolute", left: 0, transition: "width .4s" }} />
             <div style={{ height: "100%", width: `${presentePct}%`, background: "var(--primary)", borderRadius: 4, position: "absolute", left: 0, opacity: 0.5, transition: "width .4s" }} />
           </div>
-          <div style={{ display: "flex", gap: 16, marginTop: 6, fontSize: 12, color: "var(--text-tertiary)", flexWrap: "wrap" }}>
+          <div className="nx-att-legend" style={{ display: "flex", gap: 16, marginTop: 6, fontSize: 12, color: "var(--text-tertiary)", flexWrap: "wrap" }}>
             <span><span aria-hidden="true" style={{ color: "var(--success)", fontWeight: 700 }}>■</span> Completaron ({completos})</span>
             <span><span aria-hidden="true" style={{ color: "var(--primary)", fontWeight: 700 }}>■</span> En jornada ({presentes})</span>
             <span><span aria-hidden="true" style={{ color: "var(--danger)", fontWeight: 700 }}>■</span> Sin registro ({ausentes})</span>
@@ -710,8 +710,7 @@ function TeamAttendanceView({
       ) : !loaded ? null : visibleMembers.length === 0 ? (
         <EmptyState
           icon="🗓️"
-          title={hasFilters && members.length > 0 ? "Nadie coincide con la búsqueda" : "Sin registros para esta fecha"}
-          description={hasFilters && members.length > 0 ? "Prueba con otro nombre o quita los filtros." : "Nadie de tu equipo tiene asistencia registrada este día."}
+          title={hasFilters && members.length > 0 ? "Nadie coincide con la búsqueda." : "Nadie tiene asistencia este día."}
           action={hasFilters && members.length > 0
             ? <Button size="sm" variant="secondary" onClick={() => { setSearchMember(""); setFilterEstado(""); }}>Quitar filtros</Button>
             : undefined}
@@ -721,23 +720,98 @@ function TeamAttendanceView({
           {visibleMembers.map((m) => <TeamCard key={m.userId} member={m} token={token} dateFilter={dateFilter} highlighted={m.userId === highlightNum} />)}
         </div>
       ) : (
-        <div style={{ opacity: staleDate ? 0.6 : 1 }}>
+        <>
+        <div className="nx-att-table" style={{ opacity: staleDate ? 0.6 : 1 }}>
           <DataTable<TeamMember>
             columns={cols}
             rows={visibleMembers}
             rowKey={(m) => m.userId}
             density="compact"
             ariaLabel="Asistencia del equipo"
-            emptyTitle="Sin registros"
-            emptyDescription="No hay asistencia registrada para esta fecha."
+            emptyTitle="No hay asistencia para esta fecha."
+            emptyDescription=""
           />
         </div>
+        <div className="nx-att-stack" style={{ opacity: staleDate ? 0.6 : 1 }}>
+          {visibleMembers.map((m) => {
+            const estado = m.estado ?? "AUSENTE";
+            return (
+              <article key={m.userId} className="nx-att-line" aria-label={`${m.nombre}: ${ESTADO_LABEL[estado]}`}>
+                <Link href={`/erp/hr/${m.userId}`} style={{ fontWeight: 700, fontSize: 14, color: "var(--foreground)", textDecoration: "none" }}>{m.nombre}</Link>
+                <dl className="nx-att-times nx-att-times-col">
+                  <div><dt>Entrada</dt><dd>{fmtTime(m.checkIn)}</dd></div>
+                  <div><dt>Salida</dt><dd>{fmtTime(m.checkOut)}</dd></div>
+                  {(m.totalMinutes ?? 0) > 0 && (
+                    <div><dt>Horas</dt><dd>{fmtMinutes(m.totalMinutes)}</dd></div>
+                  )}
+                  <div><dt>Estado</dt><dd>{ESTADO_LABEL[estado]}</dd></div>
+                  <div>
+                    <dt>Ubicación</dt>
+                    <dd>{m.entryMapUrl || m.exitMapUrl ? "En mapa" : "Sin ubicación"}</dd>
+                  </div>
+                  {m.entryMapUrl ? (
+                    <div><dt>Mapa de entrada</dt><dd><a href={m.entryMapUrl} target="_blank" rel="noopener noreferrer">Abrir</a></dd></div>
+                  ) : null}
+                  {m.exitMapUrl ? (
+                    <div><dt>Mapa de salida</dt><dd><a href={m.exitMapUrl} target="_blank" rel="noopener noreferrer">Abrir</a></dd></div>
+                  ) : null}
+                </dl>
+              </article>
+            );
+          })}
+        </div>
+        </>
       )}
     </Section>
   );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
+
+const ATT_QUIET = `
+.nx-att-times {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+.nx-att-times > div { display: flex; gap: 6px; align-items: baseline; }
+.nx-att-times dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+.nx-att-times-col { flex-direction: column; align-items: stretch; gap: 8px; }
+.nx-att-times-col > div { justify-content: space-between; }
+.nx-att-stack { display: none; }
+.nx-att-line {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 8px;
+}
+.nx-att-line + .nx-att-line { margin-top: 12px; }
+@media (max-width: 390px) {
+  .nx-att-times { flex-direction: column; align-items: stretch; gap: 8px; }
+  .nx-att-times > div { justify-content: space-between; }
+  .nx-att-hero { flex-direction: column !important; align-items: stretch !important; }
+  .nx-att-hero > div { margin-left: 0 !important; }
+  .nx-att-metrics > * { grid-template-columns: 1fr !important; }
+  .nx-att-legend { flex-direction: column !important; align-items: flex-start !important; }
+  .nx-att-card-top { flex-direction: column !important; align-items: flex-start !important; }
+  .nx-att-card-times { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
+  .nx-att-card-times > div { justify-content: space-between !important; }
+  .nx-att-card-horas { margin-left: 0 !important; }
+  .nx-att-card-oculto { position: static !important; width: auto !important; height: auto !important; overflow: visible !important; clip: auto !important; }
+  .nx-att-table { display: none; }
+  .nx-att-stack { display: block; }
+}
+`;
 
 export default function AttendancePage() {
   const { user } = useUser();
@@ -773,13 +847,17 @@ export default function AttendancePage() {
 
   const isManager = attCfg.canManageTeam;
   const canRegister = attCfg.canRegisterSelf;
+  const puedeVolver = canAccessHrManagement(user);
 
   return (
     <>
+      <style>{ATT_QUIET}</style>
       <PageHeader
         eyebrow="Recursos Humanos"
         title={attCfg.title}
         subtitle={attCfg.subtitle}
+        backHref={puedeVolver ? "/erp/hr" : undefined}
+        backLabel="Plantilla"
         actions={isManager ? (
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-secondary)" }}>
             Fecha
@@ -826,11 +904,11 @@ export default function AttendancePage() {
       {canRegister && (
         <Section
           title="Registrar jornada"
-          subtitle="La entrada y la salida se registran desde la app NEXARA en tu teléfono."
+          subtitle="La jornada se registra en el teléfono y de esas checadas sale la nómina."
         >
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "var(--text-secondary)", maxWidth: "70ch" }}>
-            De estas checadas sale la nómina, así que solo se aceptan desde la app: ahí se comprueba que la ubicación
-            sea real. Si alguien no puede usar su teléfono, su jefe registra la checada desde <strong>Asistencias</strong> e indica el motivo.
+            Solo se aceptan desde la app, donde se comprueba que la ubicación sea real. Si alguien no puede usar su
+            teléfono, su jefe registra la checada desde <strong>Asistencias</strong> e indica el motivo.
           </p>
         </Section>
       )}
