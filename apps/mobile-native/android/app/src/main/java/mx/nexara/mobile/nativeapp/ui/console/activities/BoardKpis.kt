@@ -50,15 +50,15 @@ object BoardKpis {
             Tile(
                 etiqueta = "Eficiencia",
                 valor = pct(kpis.eficienciaPct),
-                pie = "plan ${CoreActivityRules.formatBoardMinutes(kpis.minutosPlan)} · " +
+                pie = "plan ${CoreActivityRules.formatBoardMinutes(kpis.minutosPlan)}\n" +
                     "real ${CoreActivityRules.formatBoardMinutes(kpis.minutosReales)}",
                 color = colorPct(kpis.eficienciaPct),
             ),
             Tile(
                 etiqueta = "Productividad",
                 valor = pct(kpis.productividadPct),
-                pie = "${CoreActivityRules.formatBoardMinutes(kpis.minutosEnActividad)} de " +
-                    CoreActivityRules.formatBoardMinutes(kpis.minutosAsistidos),
+                pie = "${CoreActivityRules.formatBoardMinutes(kpis.minutosEnActividad)}\n" +
+                    "de ${CoreActivityRules.formatBoardMinutes(kpis.minutosAsistidos)}",
                 color = colorPct(kpis.productividadPct),
             ),
             Tile(
