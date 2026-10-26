@@ -106,10 +106,10 @@ export default function Seguimiento({
               Seguimiento
             </h2>
             <Ayuda titulo="el seguimiento">
-              Cómo se lee el folio, quién intervino y qué versiones salieron. Esto no va en el PDF.
+              Cómo se lee el folio, quién intervino y qué versiones salieron; esto no va en el PDF.
             </Ayuda>
           </div>
-          <p className={styles.ayudaSeccion}>Historial, folio y decisiones. No va en el PDF.</p>
+          <p className={styles.ayudaSeccion}>Historial, folio y decisiones; no va en el PDF.</p>
         </div>
         <div className={styles.hojaAcciones}>
           {estado === "ENVIADA" || estado === "BORRADOR" ? (
@@ -213,7 +213,7 @@ export default function Seguimiento({
           </Timeline>
         ) : (
           <p className={styles.pista}>
-            Nadie registrado todavía. Quien la elabora, revisa, aprueba o envía queda aquí solo, y sus siglas entran al folio.
+            Nadie registrado todavía: quien elabora, revisa, aprueba o envía queda aquí y sus siglas entran al folio.
           </p>
         )}
 
@@ -284,7 +284,7 @@ export default function Seguimiento({
             htmlFor="destinatario-traspaso"
             pista={
               <>
-                Solo sale quien puede cotizar. La cotización sigue siendo de{" "}
+                Solo sale quien puede cotizar, y la cotización sigue siendo de{" "}
                 {detalle.elaboro?.nombre || "quien la elaboró"}: el folio no cambia.
               </>
             }

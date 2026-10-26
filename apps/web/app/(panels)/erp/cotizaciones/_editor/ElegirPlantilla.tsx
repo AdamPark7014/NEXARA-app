@@ -51,8 +51,8 @@ export default function ElegirPlantilla({
               Empezar desde una plantilla
             </h2>
             <Ayuda titulo="las plantillas">
-              Traen los textos, las secciones, las columnas y los términos guardados; el cliente y las fechas los pones
-              tú. Si la plantilla se guardó «con partidas», también llegan sus precios.
+              Traen textos, secciones, columnas y términos ya guardados, y también los precios si se guardó con
+              partidas; el cliente y las fechas los pones tú.
             </Ayuda>
           </div>
           <p className={styles.ayudaSeccion}>Textos, secciones y términos ya armados; tú pones el cliente.</p>
