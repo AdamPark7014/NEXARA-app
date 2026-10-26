@@ -224,7 +224,7 @@ private fun FilaDeExistencia(nivel: StockLevelDto) {
                     AlmacenRules.ubicacionTexto(nivel),
                     style = MaterialTheme.typography.labelMedium,
                     color = NxColors.Muted,
-                    maxLines = 2,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
             }

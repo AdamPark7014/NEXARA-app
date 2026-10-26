@@ -64,7 +64,7 @@ struct AlmacenView: View {
         }
     }
 
-    /// «3 sin existencia · 11 bajo mínimo»; `nil` si no hay nada que pedir.
+    /// «sin existencia» y «bajo mínimo», uno por renglón; `nil` si no hay nada que pedir.
     private var resumenAlertas: String? {
         guard let bajos = estado.datos?.bajoMinimo, !bajos.isEmpty else { return nil }
         let agotados = bajos.filter(\.agotado).count
@@ -72,7 +72,7 @@ struct AlmacenView: View {
         if agotados > 0 { partes.append("\(agotados) sin existencia") }
         let resto = bajos.count - agotados
         if resto > 0 { partes.append("\(resto) bajo mínimo") }
-        return partes.joined(separator: " · ")
+        return partes.joined(separator: "\n")
     }
 
     var body: some View {
