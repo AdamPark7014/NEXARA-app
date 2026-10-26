@@ -8,6 +8,7 @@ import p from "@/components/sitio/paginas.module.css";
 import Aurora from "@/components/sitio/Aurora";
 import Flecha from "@/components/sitio/Flecha";
 import FormularioContacto from "@/components/sitio/FormularioContacto";
+import Copiar from "@/components/sitio/Copiar";
 import Preguntas, { type Pregunta } from "@/components/sitio/Preguntas";
 import BrandMap from "@/app/components/BrandMap";
 import PublicIcon from "@/app/components/PublicIcon";
@@ -91,7 +92,7 @@ export default function PropuestaContacto() {
                   </span>
                 </a>
               </li>
-              <li>
+              <li className={p.canalFila}>
                 <a className={p.canal} href="tel:+522226960350">
                   <span className={p.canalIcono}>
                     <PublicIcon name="phone" size={20} />
@@ -101,8 +102,9 @@ export default function PropuestaContacto() {
                     <span className={p.canalValor}>Lunes a viernes, de 9:00 a 18:00</span>
                   </span>
                 </a>
+                <Copiar valor="+52 222 696 0350" etiqueta="teléfono" />
               </li>
-              <li>
+              <li className={p.canalFila}>
                 <a className={p.canal} href="mailto:gerencia@nexara.com.mx">
                   <span className={p.canalIcono}>
                     <PublicIcon name="fileCheck" size={20} />
@@ -112,6 +114,7 @@ export default function PropuestaContacto() {
                     <span className={p.canalValor}>Para propuestas y documentos</span>
                   </span>
                 </a>
+                <Copiar valor="gerencia@nexara.com.mx" etiqueta="correo" />
               </li>
             </ul>
             <div className={p.despues}>

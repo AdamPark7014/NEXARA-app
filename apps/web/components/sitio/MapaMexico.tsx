@@ -9,7 +9,7 @@ const ORIGEN = { x: 625, y: 470 };
 
 type Ciudad = { nombre: string; x: number; y: number; lado?: "izq" | "der" };
 
-const CIUDADES: Ciudad[] = [
+export const CIUDADES_MAPA: Ciudad[] = [
   { nombre: "Querétaro", x: 563, y: 418, lado: "izq" },
   { nombre: "Guadalajara", x: 476, y: 414, lado: "izq" },
   { nombre: "Monterrey", x: 592, y: 262 },
@@ -48,14 +48,14 @@ export default function MapaMexico() {
           ))}
         </g>
         <g aria-hidden="true">
-          {CIUDADES.map((c, i) => (
-            <g key={c.nombre}>
+          {CIUDADES_MAPA.map((c, i) => (
+            <g key={c.nombre} data-ciudad={c.nombre}>
               <path className={s.mapaRuta} d={ruta(c)} />
               <path className={s.mapaFlujo} d={ruta(c)} pathLength={100} style={{ animationDelay: `${-i * 0.37}s` }} />
             </g>
           ))}
-          {CIUDADES.map((c) => (
-            <g key={`p-${c.nombre}`} className={s.mapaCiudad}>
+          {CIUDADES_MAPA.map((c) => (
+            <g key={`p-${c.nombre}`} className={s.mapaCiudad} data-ciudad={c.nombre}>
               <circle cx={c.x} cy={c.y} r="4.5" />
               <text x={c.lado === "izq" ? c.x - 10 : c.x + 10} y={c.y + 4} textAnchor={c.lado === "izq" ? "end" : "start"}>
                 {c.nombre}
@@ -65,8 +65,8 @@ export default function MapaMexico() {
           <g className={s.mapaSede}>
             <circle className={s.mapaPulso} cx={ORIGEN.x} cy={ORIGEN.y} r="8" />
             <circle className={s.mapaPulso} cx="598" cy="458" r="8" style={{ animationDelay: "-1.2s" }} />
-            <circle cx="598" cy="458" r="6.5" />
-            <circle cx={ORIGEN.x} cy={ORIGEN.y} r="6.5" />
+            <circle cx="598" cy="458" r="6.5" data-ciudad="Ciudad de México" />
+            <circle cx={ORIGEN.x} cy={ORIGEN.y} r="6.5" data-ciudad="Puebla" />
             <text x="590" y="446" textAnchor="end">
               CDMX
             </text>

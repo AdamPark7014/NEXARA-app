@@ -38,6 +38,9 @@ const ENLACES = [
 
 type MenuId = "servicios" | "industrias";
 
+/** Evento con el que el botón «Buscar» abre la paleta de comandos (Paleta.tsx). */
+export const ABRIR_PALETA = "sitio:paleta";
+
 const Chevron = () => (
   <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M2 3.5l3 3 3-3" />
@@ -50,7 +53,12 @@ export default function Encabezado() {
   const [hoja, setHoja] = useState(false);
   const [hojaGrupo, setHojaGrupo] = useState<MenuId | null>(null);
   const [bajado, setBajado] = useState(false);
+  const [atajo, setAtajo] = useState("Ctrl K");
   const cierre = useRef<number>();
+
+  useEffect(() => {
+    if (/mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent)) setAtajo("⌘K");
+  }, []);
 
   useEffect(() => {
     const alBajar = () => setBajado(window.scrollY > 8);
@@ -175,6 +183,22 @@ export default function Encabezado() {
         </nav>
 
         <div className={s.lado}>
+          <button
+            type="button"
+            className={s.buscar}
+            onClick={() => window.dispatchEvent(new Event(ABRIR_PALETA))}
+            aria-label={`Buscar en el sitio (${atajo})`}
+            aria-keyshortcuts="Control+K Meta+K /"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="M20 20l-4.2-4.2" />
+            </svg>
+            <span className={s.buscarTexto}>Buscar</span>
+            <kbd className={s.buscarTecla} suppressHydrationWarning>
+              {atajo}
+            </kbd>
+          </button>
           <Link href={ruta("/contacto")} className={`${s.navEnlace} ${s.contacto}`} aria-current={actual("/contacto")}>
             Contacto
           </Link>

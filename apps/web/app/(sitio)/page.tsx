@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import Link from "next/link";
+import { foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import { ruta } from "@/components/sitio/rutas";
 import Aurora from "@/components/sitio/Aurora";
@@ -13,6 +14,8 @@ import Metodo, { type PasoMetodo } from "@/components/sitio/Metodo";
 import Industrias, { type Industria } from "@/components/sitio/Industrias";
 import Galeria, { type FotoGaleria } from "@/components/sitio/Galeria";
 import MapaMexico from "@/components/sitio/MapaMexico";
+import ListaCiudades from "@/components/sitio/ListaCiudades";
+import Sincronia from "@/components/sitio/Sincronia";
 import Ecosistema from "@/components/sitio/Ecosistema";
 import { GlifoAnios, GlifoEstados, GlifoRespuesta, GlifoSitios } from "@/components/sitio/Glifos";
 import Preguntas, { type Pregunta } from "@/components/sitio/Preguntas";
@@ -40,8 +43,8 @@ const w = (nombre: string) => ({
 });
 
 const FOTOS_METODO = [
-  { src: "/fotos/campo-enlace-antena-ciudad.jpg", alt: "Técnico de NEXARA revisando un enlace en azotea" },
-  { src: "/fotos/campo-instalacion-rack.jpg", alt: "Técnicos de NEXARA instalando un rack" },
+  { ...foto("campo-enlace-antena-ciudad", "(max-width: 734px) 100vw, 680px"), alt: "Técnico de NEXARA revisando un enlace en azotea" },
+  { ...foto("campo-instalacion-rack", "(max-width: 734px) 100vw, 680px"), alt: "Técnicos de NEXARA instalando un rack" },
   { ...w("sala-monitoreo-videowall-nexara"), alt: "Sala de monitoreo con video wall instalada por NEXARA" },
 ];
 
@@ -146,13 +149,13 @@ const PREGUNTAS: Pregunta[] = [
  * taller de cómputo) y la foto posando junto al patio de tráileres.
  */
 const DETRAS: FotoGaleria[] = [
-  { src: "/fotos/campo-instalacion-ap-altura.jpg", alt: "Técnico de NEXARA instalando un punto de acceso en altura", tema: "Instalación", pie: "Trabajo en altura con equipo de seguridad." },
-  { src: "/fotos/monitoreo-videowall.jpg", alt: "Video wall de videovigilancia instalado por NEXARA", tema: "Video wall", pie: "Muros de video listos para operar el primer día." },
-  { src: "/fotos/control-acceso-torniquetes.jpg", alt: "Torniquetes de control de acceso instalados por NEXARA", tema: "Control de acceso", pie: "Torniquetes con reconocimiento facial en operación." },
+  { ...foto("campo-instalacion-ap-altura", "(max-width: 734px) 100vw, 680px"), alt: "Técnico de NEXARA instalando un punto de acceso en altura", tema: "Instalación", pie: "Trabajo en altura con equipo de seguridad." },
+  { ...foto("monitoreo-videowall", "(max-width: 734px) 100vw, 680px"), alt: "Video wall de videovigilancia instalado por NEXARA", tema: "Video wall", pie: "Muros de video listos para operar el primer día." },
+  { ...foto("control-acceso-torniquetes", "(max-width: 734px) 100vw, 680px"), alt: "Torniquetes de control de acceso instalados por NEXARA", tema: "Control de acceso", pie: "Torniquetes con reconocimiento facial en operación." },
   { ...w("tecnico-nexara-entrega-equipo-sitio"), alt: "Técnico de NEXARA entregando equipo en sitio", tema: "Entrega", pie: "El equipo llega a sitio listo para instalar." },
   { ...w("descarga-equipo-camioneta-nexara"), alt: "Descarga de equipo de la camioneta de NEXARA", tema: "Logística", pie: "Flotilla propia, del almacén al sitio." },
   { ...w("equipo-taller-ensamble-pc-nexara"), alt: "Ensamble de equipo en el taller de NEXARA", tema: "Taller", pie: "Cada equipo se arma y se prueba antes de salir." },
-  { src: "/fotos/equipo-nexara-polos.jpg", alt: "Integrantes del equipo NEXARA", tema: "Equipo", pie: "Las mismas personas instalan y dan soporte." },
+  { ...foto("equipo-nexara-polos", "(max-width: 734px) 100vw, 680px"), alt: "Integrantes del equipo NEXARA", tema: "Equipo", pie: "Las mismas personas instalan y dan soporte." },
 ];
 
 function Guias() {
@@ -303,7 +306,7 @@ export default async function PropuestaInicio() {
               </div>
               <div className={s.tileArte}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/fotos/monitoreo-pantallas-cctv.jpg" alt="Operador revisando cámaras de videovigilancia" loading="lazy" decoding="async" />
+                <img {...foto("monitoreo-pantallas-cctv", "(max-width: 1068px) 100vw, 800px")} alt="Operador revisando cámaras de videovigilancia" loading="lazy" decoding="async" />
                 <span className={s.chip} style={{ top: 20, left: 20 }}>
                   <i /> CAM 12 · En vivo
                 </span>
@@ -344,7 +347,7 @@ export default async function PropuestaInicio() {
               </div>
               <div className={s.tileArte}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/fotos/rack-servidores-led.jpg" alt="Rack de servidores y switching instalado por NEXARA" loading="lazy" decoding="async" style={{ objectPosition: "center 30%" }} />
+                <img {...foto("rack-servidores-led", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px")} alt="Rack de servidores y switching instalado por NEXARA" loading="lazy" decoding="async" style={{ objectPosition: "center 30%" }} />
                 <span className={`${s.chip} ${s.chipOk}`} style={{ left: 20, bottom: 20 }}>
                   <i /> Respaldo nocturno completado
                 </span>
@@ -488,7 +491,7 @@ export default async function PropuestaInicio() {
 
       {/* ── Cobertura ── */}
       <section className={s.seccion} aria-labelledby="cobertura-titulo">
-        <div className={`${s.contenedor} ${s.cobertura}`}>
+        <Sincronia className={`${s.contenedor} ${s.cobertura}`}>
           <div data-aparecer>
             <p className={s.antetitulo}>Cobertura</p>
             <h2 id="cobertura-titulo" className={s.titulo}>
@@ -509,25 +512,12 @@ export default async function PropuestaInicio() {
                 <dd className={s.datoValor}>Toda la República</dd>
               </div>
             </dl>
-            <nav className={s.ciudades} aria-label="Ciudades">
-              <Link href="/cobertura/puebla/camaras-cctv" className={s.ciudad}>
-                Puebla
-              </Link>
-              <Link href="/cobertura/cdmx/camaras-cctv" className={s.ciudad}>
-                Ciudad de México
-              </Link>
-              <Link href="/cobertura/cholula/camaras-cctv" className={s.ciudad}>
-                San Andrés Cholula
-              </Link>
-              <Link href="/cobertura/queretaro/camaras-cctv" className={s.ciudad}>
-                Querétaro
-              </Link>
-            </nav>
+            <ListaCiudades />
           </div>
           <div data-aparecer>
             <MapaMexico />
           </div>
-        </div>
+        </Sincronia>
       </section>
 
       {/* ── Preguntas frecuentes ── */}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
+import { foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
 import Aurora from "@/components/sitio/Aurora";
@@ -73,7 +74,7 @@ const SERVICIOS: Servicio[] = [
     arte: (
       <>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/fotos/monitoreo-pantallas-cctv.jpg" alt="Monitores de videovigilancia en un centro de monitoreo de NEXARA" loading="lazy" decoding="async" />
+        <img {...foto("monitoreo-pantallas-cctv", "(max-width: 1068px) 100vw, 620px")} alt="Monitores de videovigilancia en un centro de monitoreo de NEXARA" loading="lazy" decoding="async" />
         <span className={s.chip} style={{ top: 20, left: 20 }}>
           <i /> CAM 12 · En vivo
         </span>
@@ -113,7 +114,7 @@ const SERVICIOS: Servicio[] = [
     arte: (
       <>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/fotos/rack-servidores-led.jpg" alt="Rack de servidores y switching instalado por NEXARA" loading="lazy" decoding="async" style={{ objectPosition: "center 35%" }} />
+        <img {...foto("rack-servidores-led", "(max-width: 1068px) 100vw, 620px")} alt="Rack de servidores y switching instalado por NEXARA" loading="lazy" decoding="async" style={{ objectPosition: "center 35%" }} />
         <span className={`${s.chip} ${s.chipOk}`} style={{ left: 20, bottom: 20 }}>
           <i /> Respaldo nocturno completado
         </span>
@@ -159,13 +160,13 @@ const PASOS: PasoMetodo[] = [
     num: "01",
     titulo: "Diagnóstico",
     texto: "Recorremos el sitio, levantamos riesgos y priorizamos lo que mueve la operación.",
-    foto: { src: "/fotos/campo-enlace-antena-ciudad.jpg", alt: "Técnico de NEXARA revisando un enlace en azotea" },
+    foto: { ...foto("campo-enlace-antena-ciudad", "(max-width: 1068px) 100vw, 680px"), alt: "Técnico de NEXARA revisando un enlace en azotea" },
   },
   {
     num: "02",
     titulo: "Implementación",
     texto: "Alcance cerrado, calendario visible e instalación con evidencia fotográfica.",
-    foto: { src: "/fotos/campo-instalacion-rack.jpg", alt: "Técnicos de NEXARA instalando un rack" },
+    foto: { ...foto("campo-instalacion-rack", "(max-width: 1068px) 100vw, 680px"), alt: "Técnicos de NEXARA instalando un rack" },
   },
   {
     num: "03",

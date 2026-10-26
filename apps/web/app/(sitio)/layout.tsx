@@ -5,6 +5,7 @@ import Encabezado from "@/components/sitio/Encabezado";
 import Pie from "@/components/sitio/Pie";
 import Aparecer from "@/components/sitio/Aparecer";
 import ExtrasSitio from "@/components/sitio/ExtrasSitio";
+import Paleta from "@/components/sitio/Paleta";
 
 /** Letra de exhibición para titulares y cifras; el texto corrido sigue en Inter. */
 const display = Inter_Tight({
@@ -25,6 +26,7 @@ export default function SitioLayout({ children }: Readonly<{ children: React.Rea
       {children}
       <Pie />
       <Aparecer />
+      <Paleta />
       <ExtrasSitio />
     </div>
   );

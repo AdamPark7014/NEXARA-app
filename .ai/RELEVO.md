@@ -1,5 +1,17 @@
 # RELEVO
 
+- **26-10 ~13:45 (claude-code) — Sitio 2026, ronda de mejoras tipo Apple/Stripe/Linear (aún sin desplegar al escribir esto).**
+  - Fotos en webp por tamaño: `scripts/fotos-sitio.py` genera `public/fotos/v/<nombre>-{480,960,1440}.webp` (39
+    archivos, 2.35 MB) y `components/sitio/fotos.ts` (`foto(nombre, sizes)`) arma `src`/`srcSet`/`sizes` sin pasar
+    del ancho real del JPG. Ninguna página del sitio baja ya los JPG originales.
+  - Tablero del hero con tres vistas (Cámaras, Red, Soporte) que avanzan solas cada 6.5 s mientras está a la vista,
+    se pausan con el cursor y se quedan quietas al elegir una pestaña; respeta `prefers-reduced-motion`.
+  - Paleta de búsqueda (`Paleta.tsx`): Ctrl/⌘+K, «/» o el botón Buscar del encabezado. Páginas, servicios,
+    industrias, ciudades y acciones (WhatsApp, llamar, copiar correo, cambiar tema).
+  - Mapa y lista de ciudades sincronizados (`Sincronia.tsx` + `data-ciudad`), `ListaCiudades.tsx` enlaza a
+    `/cobertura/<ciudad>`; `Copiar.tsx` en los canales de Contacto; `Aparecer.tsx` escalona las entradas.
+  - typecheck y tests completos en verde (API 314 suites / 3790 tests) con el servidor de desarrollo apagado.
+
 - **26-10 ~13:30 (claude-code) — Sitio público 2026 publicado: el dueño aprobó la propuesta.**
   - `app/propuesta` pasó a `app/(sitio)` (grupo de rutas con su propio layout): `/`, `/servicios`, `/nosotros`,
     `/proyectos` y `/contacto`. Se borraron las páginas anteriores de `(public)` (`page.tsx`, `nexara/`,

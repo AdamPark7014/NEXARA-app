@@ -2,16 +2,18 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
+import { foto, type Foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
 import Aurora from "@/components/sitio/Aurora";
 import Flecha from "@/components/sitio/Flecha";
 import Cierre from "@/components/sitio/Cierre";
 import MapaMexico from "@/components/sitio/MapaMexico";
+import ListaCiudades from "@/components/sitio/ListaCiudades";
+import Sincronia from "@/components/sitio/Sincronia";
 import { ruta } from "@/components/sitio/rutas";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
-import { GEO_CITIES } from "@/lib/seo/geo-cities";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("proyectos");
@@ -37,14 +39,14 @@ const CASOS: { sector: string; icono: PublicIconName; titulo: string; texto: str
 ];
 
 /** Galería de campo: instalaciones reales, sin tomas de taller repetidas. */
-const GALERIA = [
-  { src: "/fotos/campo-mastil-antenas.jpg", w: 1200, h: 1600, alt: "Mástil con antenas de enlace inalámbrico", tema: "Redes", pie: "Mástil con antenas de enlace." },
-  { src: "/fotos/monitoreo-pantallas-cctv.jpg", w: 1600, h: 1200, alt: "Pantallas de videovigilancia", tema: "CCTV", pie: "Monitores de videovigilancia multicámara." },
-  { src: "/fotos/control-acceso-terminal-facial.jpg", w: 1066, h: 1600, alt: "Terminal de reconocimiento facial", tema: "Control de acceso", pie: "Terminal facial en acceso de oficinas." },
-  { src: "/fotos/campo-instalacion-rack.jpg", w: 1280, h: 958, alt: "Técnicos instalando un rack", tema: "Instalación", pie: "Montaje de rack de telecomunicaciones." },
-  { src: "/fotos/rack-servidores-led.jpg", w: 1023, h: 1537, alt: "Rack de servidores y switching", tema: "Infraestructura", pie: "Rack de servidores, etiquetado y documentado." },
-  { src: "/fotos/campo-enlace-antena-ciudad.jpg", w: 1600, h: 1200, alt: "Radioenlace sobre la ciudad", tema: "Enlaces", pie: "Radioenlace punto a punto entre sedes." },
-  { src: "/fotos/control-acceso-torniquetes.jpg", w: 1600, h: 1066, alt: "Torniquetes de control de acceso", tema: "Control de acceso", pie: "Torniquetes con reconocimiento facial." },
+const GALERIA: (Foto & { w: number; h: number; alt: string; tema: string; pie: string })[] = [
+  { ...foto("campo-mastil-antenas", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1200, h: 1600, alt: "Mástil con antenas de enlace inalámbrico", tema: "Redes", pie: "Mástil con antenas de enlace." },
+  { ...foto("monitoreo-pantallas-cctv", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1600, h: 1200, alt: "Pantallas de videovigilancia", tema: "CCTV", pie: "Monitores de videovigilancia multicámara." },
+  { ...foto("control-acceso-terminal-facial", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1066, h: 1600, alt: "Terminal de reconocimiento facial", tema: "Control de acceso", pie: "Terminal facial en acceso de oficinas." },
+  { ...foto("campo-instalacion-rack", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1280, h: 958, alt: "Técnicos instalando un rack", tema: "Instalación", pie: "Montaje de rack de telecomunicaciones." },
+  { ...foto("rack-servidores-led", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1023, h: 1537, alt: "Rack de servidores y switching", tema: "Infraestructura", pie: "Rack de servidores, etiquetado y documentado." },
+  { ...foto("campo-enlace-antena-ciudad", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1600, h: 1200, alt: "Radioenlace sobre la ciudad", tema: "Enlaces", pie: "Radioenlace punto a punto entre sedes." },
+  { ...foto("control-acceso-torniquetes", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1600, h: 1066, alt: "Torniquetes de control de acceso", tema: "Control de acceso", pie: "Torniquetes con reconocimiento facial." },
   { src: "/fotos/sala-monitoreo-videowall-nexara-1200.webp", w: 1200, h: 800, alt: "Sala de monitoreo con video wall", tema: "Monitoreo", pie: "Sala de monitoreo lista para operar." },
   { src: "/fotos/tecnico-nexara-entrega-equipo-sitio-1200.webp", w: 1200, h: 800, alt: "Técnico de NEXARA entregando equipo en sitio", tema: "Logística", pie: "Entrega de equipo en sitio." },
 ];
@@ -214,7 +216,7 @@ export default async function PropuestaProyectos() {
             {GALERIA.map((g) => (
               <figure key={g.src} data-aparecer>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={g.src} width={g.w} height={g.h} alt={g.alt} loading="lazy" decoding="async" />
+                <img src={g.src} srcSet={g.srcSet} sizes={g.sizes} width={g.w} height={g.h} alt={g.alt} loading="lazy" decoding="async" />
                 <figcaption>
                   <b>{g.tema}</b>
                   {g.pie}
@@ -246,25 +248,19 @@ export default async function PropuestaProyectos() {
       </section>
 
       <section className={s.seccion} aria-labelledby="cobertura-proyectos">
-        <div className={`${s.contenedor} ${s.cobertura}`}>
+        <Sincronia className={`${s.contenedor} ${s.cobertura}`}>
           <div data-aparecer>
             <p className={s.antetitulo}>Cobertura</p>
             <h2 id="cobertura-proyectos" className={s.titulo}>
               Donde <span className={s.tenue}>trabajamos.</span>
             </h2>
             <p className={s.lead}>Base en Puebla y la Ciudad de México; proyectos multisede en toda la República.</p>
-            <nav className={s.ciudades} aria-label="Ciudades">
-              {GEO_CITIES.map((c) => (
-                <Link key={c.slug} href={`/cobertura/${c.slug}`} className={s.ciudad}>
-                  {c.name}
-                </Link>
-              ))}
-            </nav>
+            <ListaCiudades />
           </div>
           <div data-aparecer>
             <MapaMexico />
           </div>
-        </div>
+        </Sincronia>
       </section>
 
       <Cierre
