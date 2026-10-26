@@ -91,6 +91,19 @@ describe("validarCampos", () => {
     expect(errores.porFila.b).toMatch(/Ya hay otro punto llamado «Cámara 1»/);
   });
 
+  it("el aviso de un nombre repetido cabe en una frase", () => {
+    const textoViejo = "Ya hay otro punto llamado «Cámara 1». Usa otro nombre (p. ej. «Cámara 1 2»).";
+    const errores = validarCampos([
+      fila({ key: "a", nombre: "Cámara 1" }),
+      fila({ key: "b", nombre: "Cámara 1" }),
+    ]);
+    expect(errores.porFila.a).toBeUndefined();
+    expect(errores.porFila.b).toBe(
+      "Ya hay otro punto llamado «Cámara 1»: usa otro nombre (p. ej. «Cámara 1 2»).",
+    );
+    expect(errores.porFila.b).not.toBe(textoViejo);
+  });
+
   it("avisa cuando se pasa del máximo de la API", () => {
     const filas = Array.from({ length: MAX_CAMPOS + 1 }, (_, i) => fila({ key: `k${i}`, nombre: `Punto ${i}` }));
     expect(validarCampos(filas).general).toMatch(/hasta 40/);

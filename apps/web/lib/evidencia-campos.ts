@@ -147,7 +147,7 @@ export function validarCampos(filas: readonly CampoBorrador[]): ErroresCampos {
     }
     const clave = claveDeNombre(nombre);
     if (vistos.has(clave)) {
-      porFila[fila.key] = `Ya hay otro punto llamado «${vistos.get(clave)}». Usa otro nombre (p. ej. «${nombre} 2»).`;
+      porFila[fila.key] = `Ya hay otro punto llamado «${vistos.get(clave)}»: usa otro nombre (p. ej. «${nombre} 2»).`;
       continue;
     }
     vistos.set(clave, nombre);
