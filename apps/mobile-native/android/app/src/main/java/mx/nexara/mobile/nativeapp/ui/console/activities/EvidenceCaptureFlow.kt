@@ -1210,7 +1210,7 @@ private fun evidencePhotoFromUri(context: Context, uri: Uri): GeoPhoto {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-        throw IllegalArgumentException("No se pudo leer la imagen. Usa JPG o PNG.")
+        throw IllegalArgumentException("No se pudo leer la imagen: usa JPG o PNG.")
     }
     var sample = 1
     val edge = maxOf(bounds.outWidth, bounds.outHeight)
@@ -1220,7 +1220,7 @@ private fun evidencePhotoFromUri(context: Context, uri: Uri): GeoPhoto {
         0,
         bytes.size,
         BitmapFactory.Options().apply { inSampleSize = sample },
-    ) ?: throw IllegalArgumentException("No se pudo leer la imagen. Usa JPG o PNG.")
+    ) ?: throw IllegalArgumentException("No se pudo leer la imagen: usa JPG o PNG.")
     val normalized = LivePhotoEncoding.normalize(decoded, 0)
     var quality = LivePhotoEncoding.JPEG_QUALITY
     var dataUrl = LivePhotoEncoding.toJpegDataUrl(normalized, quality)

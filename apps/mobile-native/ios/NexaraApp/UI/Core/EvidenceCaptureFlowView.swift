@@ -1461,7 +1461,7 @@ struct EvidenceCaptureFlowView: View {
             return
         }
         guard let image = UIImage(data: data) else {
-            errorText = "No se pudo leer la imagen. Usa JPG o PNG."
+            errorText = "No se pudo leer la imagen: usa JPG o PNG."
             campoAdjunto = nil
             return
         }
