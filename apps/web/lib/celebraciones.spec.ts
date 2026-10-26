@@ -18,10 +18,10 @@ const base = (over: Partial<Celebracion>): Celebracion => ({
 });
 
 describe("texto del aviso de celebraciones", () => {
-  it("quien cumple años ve su felicitación con el primer nombre", () => {
+  it("quien cumple años ve su felicitación con el primer nombre, en una frase", () => {
     expect(textoCelebracion(base({ soyYo: true }))).toEqual({
-      titulo: "¡Feliz cumpleaños, Carolina! 🎂",
-      detalle: "Todo el equipo te desea un gran día",
+      titulo: "¡Feliz cumpleaños, Carolina: todo el equipo te desea un gran día! 🎂",
+      detalle: null,
     });
   });
 
@@ -46,9 +46,18 @@ describe("texto del aviso de celebraciones", () => {
     expect(textoCelebracion(base({ nombre: "Ana López", tipo: "aniversario", anios: 1 })).titulo).toBe(
       "Ana López cumple 1 año en NEXARA 🎉",
     );
+    expect(
+      textoCelebracion(base({ nombre: "Carolina Juárez Álvarez", tipo: "aniversario", anios: 3, soyYo: true })),
+    ).toEqual({
+      titulo: "¡Felicidades, Carolina: hoy cumples 3 años en NEXARA! 🎉",
+      detalle: null,
+    });
+    expect(textoCelebracion(base({ tipo: "aniversario", anios: null, soyYo: true })).titulo).toBe(
+      "¡Felicidades, Carolina: hoy es tu aniversario en NEXARA! 🎉",
+    );
     expect(textoCelebracion(base({ nombre: "Ana López", tipo: "aniversario", anios: 2, soyYo: true }))).toEqual({
-      titulo: "¡Felicidades, Ana! 🎉",
-      detalle: "Hoy cumples 2 años en NEXARA",
+      titulo: "¡Felicidades, Ana: hoy cumples 2 años en NEXARA! 🎉",
+      detalle: null,
     });
   });
 

@@ -43,26 +43,29 @@ struct CelebracionHoy: Decodable, Identifiable, Hashable {
         return String(primero.prefix(1)).uppercased() + String(primero.dropFirst())
     }
 
-    /// Renglón principal del aviso.
+    /// Una frase, la misma que Android (`Celebraciones.linea`) y la web (`textoCelebracion`).
+    /// El cumpleaños nunca lleva la edad; el aniversario, solo los años en NEXARA.
     var titulo: String {
-        if esCumpleanos {
-            if soyYo {
-                let quien = Self.primerNombre(nombre)
-                return quien.isEmpty ? "¡Feliz cumpleaños! 🎂" : "¡Feliz cumpleaños, \(quien)! 🎂"
+        let tiempo: String? = anios.flatMap { $0 > 0 ? ($0 == 1 ? "1 año" : "\($0) años") : nil }
+        if soyYo {
+            let quien = Self.primerNombre(nombre)
+            if esCumpleanos {
+                let saludo = quien.isEmpty ? "¡Feliz cumpleaños" : "¡Feliz cumpleaños, \(quien)"
+                return "\(saludo): todo el equipo te desea un gran día! 🎂"
             }
-            return "Hoy es cumpleaños de \(nombre.isEmpty ? "alguien del equipo" : nombre) 🎂"
+            let saludo = quien.isEmpty ? "¡Felicidades" : "¡Felicidades, \(quien)"
+            let hecho = tiempo.map { "hoy cumples \($0) en NEXARA" } ?? "hoy es tu aniversario en NEXARA"
+            return "\(saludo): \(hecho)! 🎉"
         }
-        let n = max(1, anios ?? 1)
-        let tiempo = n == 1 ? "1 año" : "\(n) años"
-        return "\(nombre.isEmpty ? "Alguien del equipo" : nombre) cumple \(tiempo) en NEXARA 🎉"
-    }
-
-    /// Renglón secundario, sin edad.
-    var detalle: String {
+        let quien = nombre.isEmpty ? "alguien del equipo" : nombre
         if esCumpleanos {
-            return soyYo ? "Todo el equipo de NEXARA te desea un gran día." : "Mándale una felicitación."
+            return "Hoy es cumpleaños de \(quien) 🎂"
         }
-        return soyYo ? "Gracias por todo lo que aportas al equipo." : "Felicítale por su aniversario."
+        if let tiempo {
+            let sujeto = nombre.isEmpty ? "Alguien del equipo" : nombre
+            return "\(sujeto) cumple \(tiempo) en NEXARA 🎉"
+        }
+        return "Hoy es aniversario de \(quien) en NEXARA 🎉"
     }
 }
 
