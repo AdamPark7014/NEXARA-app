@@ -5,6 +5,8 @@ import {
   expectedEndHm,
   expectedStartHm,
   findAcsMatchKey,
+  graciaMinGuardada,
+  horaEntradaGuardada,
   hybridTimeFlags,
   isLateVsSchedule,
   normalizeIdentityKey,
@@ -115,5 +117,92 @@ describe('attendance-hybrid.match', () => {
         scheduleKey: 'office_hours',
       }),
     ).toEqual(expect.arrayContaining(['retardo', 'acs_sin_checador']));
+  });
+
+  it('mide el retardo contra horaEntrada y, si no hay, contra las 10:00', () => {
+    const tz = 'America/Mexico_City';
+    // 15:00 UTC es las 09:00 en Ciudad de México (UTC-6, sin horario de verano).
+    expect(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(new Date('2026-10-20T15:00:00.000Z')),
+    ).toBe('09:00');
+
+    expect(horaEntradaGuardada('08:00')).toBe('08:00');
+    expect(horaEntradaGuardada(' 07:30 ')).toBe('07:30');
+    expect(horaEntradaGuardada(null)).toBeNull();
+    expect(horaEntradaGuardada('')).toBeNull();
+    expect(horaEntradaGuardada('8:00')).toBeNull();
+    expect(horaEntradaGuardada('a las ocho')).toBeNull();
+
+    expect(expectedStartHm('office_hours', '08:00')).toBe('08:00');
+    expect(expectedStartHm('contractor', null)).toBe('10:00');
+    expect(expectedStartHm('office_hours', 'ocho')).toBe('10:00');
+    expect(expectedStartHm('always_on')).toBeNull();
+    expect(expectedStartHm('visitor', null)).toBeNull();
+    expect(expectedStartHm('always_on', '09:30')).toBe('09:30');
+
+    // 09:00 MX. Tarde para quien entra a las 08:00; a tiempo contra las 10:00.
+    const nueve = '2026-10-20T15:00:00.000Z';
+    expect(isLateVsSchedule(nueve, 'office_hours', { horaEntrada: '08:00', tz })).toBe(true);
+    expect(isLateVsSchedule(nueve, 'office_hours', { tz })).toBe(false);
+    // 08:15 MX cabe en la gracia de 15 min; 08:16 ya es retardo.
+    expect(
+      isLateVsSchedule('2026-10-20T14:15:00.000Z', 'office_hours', { horaEntrada: '08:00', tz }),
+    ).toBe(false);
+    expect(
+      isLateVsSchedule('2026-10-20T14:16:00.000Z', 'office_hours', { horaEntrada: '08:00', tz }),
+    ).toBe(true);
+
+    expect(
+      hybridTimeFlags({
+        erpCheckIn: nueve,
+        scheduleKey: 'office_hours',
+        horaEntrada: '08:00',
+      }),
+    ).toContain('retardo');
+    expect(
+      hybridTimeFlags({
+        erpCheckIn: nueve,
+        scheduleKey: 'office_hours',
+      }),
+    ).not.toContain('retardo');
+
+    // 24/7 sin hora propia no marca. Con horaEntrada guardada, sí.
+    const nueveVeinte = '2026-10-20T15:20:00.000Z';
+    expect(
+      hybridTimeFlags({ erpCheckIn: nueveVeinte, scheduleKey: 'always_on' }),
+    ).not.toContain('retardo');
+    expect(
+      hybridTimeFlags({
+        erpCheckIn: nueveVeinte,
+        scheduleKey: 'always_on',
+        horaEntrada: '09:00',
+      }),
+    ).toContain('retardo');
+  });
+
+  it('usa graciaMin del horario y, si no viene, los 15 minutos', () => {
+    const tz = 'America/Mexico_City';
+    // 10:10 MX. Con 15 min de gracia no es retardo; con 5 sí. Contra las 10:00.
+    const diezDiez = '2026-10-20T16:10:00.000Z';
+    expect(graciaMinGuardada(null)).toBe(15);
+    expect(graciaMinGuardada(undefined)).toBe(15);
+    expect(graciaMinGuardada(-1)).toBe(15);
+    expect(graciaMinGuardada(5)).toBe(5);
+    expect(graciaMinGuardada(0)).toBe(0);
+
+    expect(isLateVsSchedule(diezDiez, 'office_hours', { tz })).toBe(false);
+    expect(isLateVsSchedule(diezDiez, 'office_hours', { tz, graceMinutes: 5 })).toBe(true);
+    expect(isLateVsSchedule(diezDiez, 'office_hours', { tz, graceMinutes: null })).toBe(false);
+    expect(
+      hybridTimeFlags({ erpCheckIn: diezDiez, scheduleKey: 'office_hours', graciaMin: 5 }),
+    ).toContain('retardo');
+    expect(
+      hybridTimeFlags({ erpCheckIn: diezDiez, scheduleKey: 'office_hours' }),
+    ).not.toContain('retardo');
   });
 });
