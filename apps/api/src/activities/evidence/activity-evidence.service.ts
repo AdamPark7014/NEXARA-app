@@ -76,7 +76,7 @@ export function urlDeFotoGuardable(photoUrl: unknown, paso: string): string {
   }
   if (url.startsWith('data:') || url.includes(';base64,') || url.length > LARGO_MAX_URL_FOTO) {
     throw new BadRequestException(
-      `No se pudo guardar la foto de ${paso}: la imagen no se subió correctamente. Vuelve a tomarla.`,
+      `No se pudo guardar la foto de ${paso}: la imagen no se subió correctamente, vuelve a tomarla.`,
     );
   }
   return url;
@@ -452,7 +452,7 @@ export class ActivityEvidenceService {
       });
       if (fila?.retiradoAt) {
         throw new ForbiddenException(
-          'Ya no estás en esta actividad: se la pasaron a otro compañero. Tu avance quedó guardado.',
+          'Ya no estás en esta actividad: se la pasaron a otro compañero y tu avance quedó guardado.',
         );
       }
     }
