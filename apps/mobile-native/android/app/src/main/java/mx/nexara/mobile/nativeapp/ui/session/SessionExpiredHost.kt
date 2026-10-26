@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import mx.nexara.mobile.nativeapp.data.session.SessionEvents
 
+private const val AVISO_SESION_TERMINADA =
+    "Tu sesión expiró o ya no es válida y hay que iniciar sesión de nuevo."
+
 @Composable
 fun SessionExpiredHost(
     onSessionExpired: () -> Unit,
@@ -37,7 +40,7 @@ fun SessionExpiredHost(
             if (showDialog) return@collect
             showDialog = true
             scope.launch {
-                snackbarHostState.showSnackbar("Tu sesión expiró. Inicia sesión de nuevo.")
+                snackbarHostState.showSnackbar(AVISO_SESION_TERMINADA)
             }
         }
     }
@@ -49,7 +52,7 @@ fun SessionExpiredHost(
                 onSessionExpired()
             },
             title = { Text("Sesión expirada") },
-            text = { Text("Tu sesión ya no es válida. Inicia sesión de nuevo para continuar.") },
+            text = { Text(AVISO_SESION_TERMINADA) },
             confirmButton = {
                 TextButton(onClick = {
                     showDialog = false
