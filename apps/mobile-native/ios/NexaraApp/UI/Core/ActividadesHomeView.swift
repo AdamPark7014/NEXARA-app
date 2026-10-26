@@ -514,13 +514,13 @@ private struct AtencionFila: View {
                 Text(renglon.principal)
                     .font(.system(size: 12.5, weight: renglon.principalColor != nil ? .semibold : .regular))
                     .foregroundStyle(renglon.principalColor ?? NxColors.fg)
-                    .lineLimit(2)
+                    .lineLimit(3)
                     .multilineTextAlignment(.leading)
                 if let secundaria = renglon.secundaria {
                     Text(secundaria)
                         .font(.system(size: 12, weight: renglon.secundariaColor != nil ? .semibold : .regular))
                         .foregroundStyle(renglon.secundariaColor ?? NxColors.muted)
-                        .lineLimit(2)
+                        .lineLimit(3)
                         .multilineTextAlignment(.leading)
                 }
             }
@@ -568,13 +568,14 @@ private struct PersonBoardCard: View {
             Text(ActividadesEquipo.contexto(user))
                 .font(.system(size: 11))
                 .foregroundStyle(aro == .retraso ? aro.color : NxColors.muted)
-                .lineLimit(2)
-            // Sin nada abierto: folio y cuándo terminó lo último («Última: AN-0091 · ayer 18:11»).
+                // Folio, encargo y atraso, o la entrada y el «sin nada hace»: uno por renglón.
+                .lineLimit(4)
+            // Sin nada abierto: folio y hora de lo último, cada uno en su renglón.
             if let ultima = ActividadesEquipo.ultimaEnTarjeta(user) {
                 Text(ultima)
                     .font(.system(size: 11))
                     .foregroundStyle(NxColors.muted)
-                    .lineLimit(1)
+                    .lineLimit(3)
             }
             // El avance de lo que trae entre manos: es dato, no adorno.
             if let pct = user.openActivities?.first?.progressPct {
