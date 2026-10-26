@@ -619,7 +619,7 @@ export class UsersService {
       });
       if (seatsUsed >= company.seatLimit) {
         throw new BadRequestException(
-          `Límite de asientos alcanzado (${seatsUsed}/${company.seatLimit}). Amplía el plan en Billing.`,
+          `Límite de asientos alcanzado (${seatsUsed}/${company.seatLimit}): amplía el plan en Billing.`,
         );
       }
     }
