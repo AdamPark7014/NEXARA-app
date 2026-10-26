@@ -87,7 +87,15 @@ export default function FlujoKpiStrip({
           label="A tiempo"
           value={formatPct(workflow.slaPct)}
           title={`${workflow.slaOnTime} a tiempo · ${workflow.slaLate} tarde — ver detalle para la lista`}
-          hint={`${workflow.slaOnTime} a tiempo · ${workflow.slaLate} tarde`}
+          hint={
+            <span className={s.pista}>
+              <span className={s.dato}>{workflow.slaOnTime} a tiempo</span>
+              <span className={s.sep} aria-hidden="true">
+                {" · "}
+              </span>
+              <span className={s.dato}>{workflow.slaLate} tarde</span>
+            </span>
+          }
           tone={workflow.slaLate > 0 ? "danger" : "default"}
           icon={<TimerOutlinedIcon />}
           iconTone={workflow.slaLate > 0 ? "danger" : "success"}
