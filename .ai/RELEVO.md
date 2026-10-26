@@ -41,8 +41,10 @@
     iOS no deja medir con la app cerrada; el recordatorio del servidor pide abrirla. Decisión de Adam.
   - Web: `RecorridoMapa` (MapLibre + OpenFreeMap) en vez de la imagen; línea de tiempo con «Entrada sin ubicación: …»,
     «Ubicación tomada a las …» y huecos de > 40 min (`lib/recorrido-huecos.ts`).
-  - Pendiente: desplegar API/web con `--with-migrate` (lo hace el coordinador); subir AAB a Play (Adam); probar en el
-    teléfono de Iván. `ClientLocationPicker` también usa `/api/static-map` (sigue roto sin facturación).
+  - Builds: iOS 1.0.1 (11) subido a TestFlight (run 40271208749, VALID en ASC); AAB 1.0.8 (18) firmado en
+    `Descargas/NEXARA-android-1.0.8-18.aab` (24.8 MB). CI de `main` en verde (tipos/tests, iOS simulador, Android).
+  - Pendiente: desplegar API/web con `--with-migrate` (lo hace el coordinador); subir el AAB a Play (Adam, arrastrar
+    en Play Console); probar en el teléfono de Iván. `ClientLocationPicker` también usa `/api/static-map` (sigue roto sin facturación).
 
 - **25-10 (claude-code) — «Asignar con IA» hasta arriba de Actividades, tarjeta completa y dictado en vivo.**
   - Adam: «que el asignador de IA esté hasta arriba en actividades… y ya esté completo» y «mucho más intuitivo el
