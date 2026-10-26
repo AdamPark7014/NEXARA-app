@@ -24,3 +24,16 @@
 {"etiqueta": "elegido-turbo5-20-ac1100", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 196.4, "rtf": 0.875, "wer": 0.5306, "bucles": 0}
 {"etiqueta": "elegido-con-nombres", "version": "limpia", "segundos": 20, "partes": 12, "audio_s": 224.2, "proceso_s": 280.8, "rtf": 1.252, "wer": 0.2225, "bucles": 1}
 {"etiqueta": "elegido-con-nombres", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 200.8, "rtf": 0.895, "wer": 0.533, "bucles": 0}
+{"etiqueta": "c3-t5-20-ac1100-t3", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 196.5, "rtf": 0.876, "wer": 0.5379, "bucles": 0}
+{"etiqueta": "c3-t5-20-ac1100-nf-t3", "version": "limpia", "segundos": 20, "partes": 12, "audio_s": 224.2, "proceso_s": 280.9, "rtf": 1.253, "wer": 0.3032, "bucles": 6}
+{"etiqueta": "c3-t5-20-ac1100-nf-t3", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 192.9, "rtf": 0.86, "wer": 0.5379, "bucles": 0}
+{"etiqueta": "c3-t5-30-t3", "version": "sala", "segundos": 30, "partes": 8, "audio_s": 224.4, "proceso_s": 232.5, "rtf": 1.036, "wer": 0.5403, "bucles": 0}
+{"etiqueta": "c3-t5-30-nf-t3", "version": "sala", "segundos": 30, "partes": 8, "audio_s": 224.4, "proceso_s": 230.6, "rtf": 1.028, "wer": 0.5379, "bucles": 0}
+{"etiqueta": "c3-t8-20-ac1100-t3", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 128.5, "rtf": 0.573, "wer": 0.5403, "bucles": 0}
+{"etiqueta": "c3-t5-20-ac1100-t2", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 191.3, "rtf": 0.853, "wer": 0.5306, "bucles": 0}
+{"etiqueta": "c3-small-20-t3", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 51.5, "rtf": 0.229, "wer": 0.6553, "bucles": 0}
+{"etiqueta": "c7-t8-20-ac1100-t3", "version": "limpia", "segundos": 20, "partes": 12, "audio_s": 224.2, "proceso_s": 175.4, "rtf": 0.782, "wer": 0.1394, "bucles": 0}
+{"etiqueta": "c7-t8-20-ac1100-t3", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 129.5, "rtf": 0.577, "wer": 0.5403, "bucles": 0}
+{"etiqueta": "c7-t8-30-t3", "version": "sala", "segundos": 30, "partes": 8, "audio_s": 224.4, "proceso_s": 160.0, "rtf": 0.713, "wer": 0.5306, "bucles": 0}
+{"etiqueta": "c7-t8-20-ac1100-t2", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 141.7, "rtf": 0.632, "wer": 0.5403, "bucles": 0}
+{"etiqueta": "c7-t5-20-ac1100-t3", "version": "sala", "segundos": 20, "partes": 12, "audio_s": 224.4, "proceso_s": 189.9, "rtf": 0.846, "wer": 0.5379, "bucles": 0}

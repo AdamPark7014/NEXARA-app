@@ -1,5 +1,21 @@
 # RELEVO
 
+- **26-10 ~04:00 UTC (claude-code, R-1) — Transcriptor: large-v3-turbo-q8_0 con tope de 3 CPU (medido otra vez).**
+  - Condición del coordinador: límite de CPU que deje al menos un núcleo a los demás y, con ese límite, ≤ ~0.8 ×
+    tiempo real con voz de sala. Banco repetido con `--cpus 3` y 3 hilos (4 vCPU = 2 núcleos con SMT):
+    turbo-q8_0 + audio_ctx 1100: **13.9 / 54.0 % WER (0.78 / 0.58 × t. real)**, ~1.06 GB RAM ← elegido ·
+    turbo-q8_0 partes de 30 s: sala 53.1 % (0.71) · turbo-q5_0 + audio_ctx 1100: 21.3 / 53.8 % (1.18 / 0.85) ·
+    small: 22.3 / 65.5 % (0.30 / 0.23). q8_0 es más rápido que q5_0 en este CPU y no repitió oraciones (q5_0 metió
+    dos veces la del kundalini: de ahí los 7 puntos en limpio; en sala empatan). Sin fallback de temperatura
+    (`temperature_inc 0`) no ganó tiempo y metió 6 bucles en limpio → se queda el fallback. 2 hilos: 0.63 en sala.
+  - Carga durante la prueba de producción simulada (3–5 min por corrida, muestras cada 10 s): load 3.1–3.6 (máx 4.2),
+    CPU libre 19–25 % (mín 14 %), whisper ~2.65 CPU, API público 200 en ~50 ms (máx 120–154 ms).
+  - Compose: `WHISPER_MODEL` por omisión `large-v3-turbo-q8_0`, `cpus` 3, `WHISPER_THREADS` 3 (Dockerfile igual).
+    Banco: `carga.sh` nuevo (muestreo de carga) y `resultados.jsonl` con las 39 corridas.
+  - Corrección a lo de abajo: «dockerd ~1.3 CPU» era el promedio de `ps` desde el arranque (54 días), no el uso del
+    momento; con el servidor en calma (load ~1) el resto de servicios usa ~0.5 CPU. Los 132 zombis son hijos de un
+    solo proceso node (pid 3163642 al 23-10), no se tocaron.
+
 - **23-10 ~19:00 UTC (claude-code, R-1) — Transcripción de juntas: modelo grande medido en el servidor y limpieza de whisper.**
   - Adam: «la transcripción es muy pobre, no tiene sentido» (junta real de 28 min, grabación 5: bucles, «nos vemos en
     el próximo vídeo», «[Noticias]», una línea en inglés). Sin Claude en este trabajo: WER por código.
@@ -11,7 +27,7 @@
     (1.18 / 0.88)** ← elegido. Partes de 30 s: al small le hizo perder frases (32 %) y al turbo no le mejoró la sala;
     se quedan las de 20 s. Contexto de la parte anterior como prompt: peor (20.5 / 56.7 %) → apagado. Lista de nombres
     de pila en el prompt: peor (22.3 %, un bucle) → solo clientes.
-  - Producción: `WHISPER_MODEL=large-v3-turbo-q5_0`, `audio_ctx` 1100 en cada parte, `cpu_shares` 512 y tope de 3.5
+  - Producción (superado el 26-10: q8_0 y tope de 3, ver arriba): `WHISPER_MODEL=large-v3-turbo-q5_0`, `audio_ctx` 1100 en cada parte, `cpu_shares` 512 y tope de 3.5
     CPU; `update.sh` reconstruye el transcriptor con `--build`. Con el servidor ocupado queda unos minutos detrás de la
     junta y se pone al día al concluir (partes pendientes ya no se dan por perdidas a los 20 min, sino a las 3 h).
   - `limpiarTextoWhisper`: quita marcas `[...]`, oraciones de cierre de video/subtítulos, «Gracias.» suelto, oraciones
