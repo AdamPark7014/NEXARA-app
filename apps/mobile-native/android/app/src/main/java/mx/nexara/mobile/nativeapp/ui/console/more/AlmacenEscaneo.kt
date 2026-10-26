@@ -54,6 +54,42 @@ fun EscanerDeAlmacen(onMovimiento: () -> Unit, modifier: Modifier = Modifier) {
     EscanerDeCodigos(enAlmacen = true, puedeAlmacen = true, onMovimiento = onMovimiento, modifier = modifier)
 }
 
+/**
+ * Textos del artículo escaneado. Un dato por renglón: la clave no comparte línea
+ * con el código, ni el almacén con la cantidad. El vacío y el aviso del catálogo
+ * son una frase, con el mismo hecho.
+ */
+internal object AlmacenEscaneoTexto {
+    /** «Clave ABC» y, en el renglón de abajo, «EAN-13 750…». Vacío si no hay ninguno. */
+    fun claveYCodigo(sku: String?, codigoBarras: String?, tipo: String): String =
+        listOfNotNull(
+            sku?.takeIf { it.isNotBlank() }?.let { "Clave $it" },
+            codigoBarras?.let { "$tipo $it" },
+        ).joinToString("\n")
+
+    /** El nombre del almacén y la cifra («14 (4 apartado)») van en renglones distintos. */
+    fun existencia(almacen: String?, cantidad: Double?, reservado: Double?): Existencia {
+        val apartado = reservado?.takeIf { it > 0 }?.let { " (${AlmacenRules.formato(it)} apartado)" }.orEmpty()
+        return Existencia(
+            almacen = almacen ?: "Almacén",
+            cantidad = "${AlmacenRules.formato(cantidad)}$apartado",
+        )
+    }
+
+    /**
+     * No hay producto con ese código y, si es nuevo, se puede dar de alta con él.
+     * Una frase: el alta sigue en el botón.
+     */
+    fun vacio(codigo: String): String =
+        "No hay producto con el código «$codigo»: si es un producto nuevo, puedes darlo de alta con este código."
+
+    /** Los datos vienen del catálogo y hay que revisarlos antes de guardar. Una frase. */
+    const val AVISO_CATALOGO =
+        "Datos sugeridos del catálogo internacional: revísalos antes de guardar."
+
+    data class Existencia(val almacen: String, val cantidad: String)
+}
+
 @Composable
 internal fun ProductoEscaneado(r: ProductoPorCodigoDto) {
     val p = r.product
@@ -63,14 +99,14 @@ internal fun ProductoEscaneado(r: ProductoPorCodigoDto) {
         color = NxColors.Slate,
     )
     val tipo = CodigoBarrasRules.etiquetaTipo(CodigoBarrasRules.clasificar(r.codigoBarras).tipo)
-    Text(
-        listOfNotNull(
-            p?.sku?.takeIf { it.isNotBlank() }?.let { "Clave $it" },
-            r.codigoBarras?.let { "$tipo $it" },
-        ).joinToString(" · "),
-        style = MaterialTheme.typography.labelMedium,
-        color = NxColors.Muted,
-    )
+    val claveYCodigo = AlmacenEscaneoTexto.claveYCodigo(p?.sku, r.codigoBarras, tipo)
+    if (claveYCodigo.isNotEmpty()) {
+        Text(
+            claveYCodigo,
+            style = MaterialTheme.typography.labelMedium,
+            color = NxColors.Muted,
+        )
+    }
     if (r.match == "empaque") {
         Text(
             "Leíste una caja: las cantidades cuentan ${EscaneoRules.unidad(r)}.",
@@ -88,15 +124,13 @@ internal fun ProductoEscaneado(r: ProductoPorCodigoDto) {
         Text("Sin existencia en ningún almacén.", style = MaterialTheme.typography.bodyMedium, color = NxColors.Muted)
     }
     existencias.forEach { e ->
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(e.almacen ?: "Almacén", style = MaterialTheme.typography.bodyMedium, color = NxColors.Slate)
-            val reservado = e.reservado?.takeIf { it > 0 }?.let { " (${AlmacenRules.formato(it)} apartado)" }.orEmpty()
-            Text(
-                "${AlmacenRules.formato(e.cantidad)}$reservado",
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = NxColors.Slate,
-            )
-        }
+        val lineas = AlmacenEscaneoTexto.existencia(e.almacen, e.cantidad, e.reservado)
+        Text(lineas.almacen, style = MaterialTheme.typography.bodyMedium, color = NxColors.Slate)
+        Text(
+            lineas.cantidad,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = NxColors.Slate,
+        )
     }
 }
 
@@ -250,16 +284,11 @@ internal fun AltaPorCodigo(
     var guardando by remember { mutableStateOf(false) }
     var error by remember(codigo) { mutableStateOf<String?>(null) }
 
-    Text(
-        "No hay producto con el código «$codigo».",
-        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-        color = NxColors.Slate,
-    )
     if (!abierto) {
         Text(
-            "Si es un producto nuevo, puedes darlo de alta con este código.",
-            style = MaterialTheme.typography.labelMedium,
-            color = NxColors.Muted,
+            AlmacenEscaneoTexto.vacio(codigo),
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = NxColors.Slate,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
@@ -278,7 +307,7 @@ internal fun AltaPorCodigo(
                                 if (descripcion.isBlank()) descripcion = p.descripcion.orEmpty()
                                 imagenUrl = p.imagenUrl
                                 categoria = p.categoria
-                                fuente = "Datos sugeridos del catálogo internacional. Revísalos antes de guardar."
+                                fuente = AlmacenEscaneoTexto.AVISO_CATALOGO
                             } else {
                                 fuente = r.mensaje?.takeIf { it.isNotBlank() }
                                     ?: "El catálogo internacional no conoce este código: escribe los datos."
@@ -303,6 +332,11 @@ internal fun AltaPorCodigo(
         return
     }
 
+    Text(
+        "No hay producto con el código «$codigo».",
+        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+        color = NxColors.Slate,
+    )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (consultando) {
             Text("Buscando datos del código…", style = MaterialTheme.typography.labelMedium, color = NxColors.Muted)
