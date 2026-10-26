@@ -251,7 +251,7 @@ private fun SinVistaPrevia(archivo: File, onAbrir: () -> Unit) {
         Text(archivo.name, style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center)
         Spacer(Modifier.height(4.dp))
         Text(
-            "Este tipo de archivo no se puede ver aquí. Guárdalo, compártelo o ábrelo con otra app.",
+            "Este tipo de archivo no se puede ver aquí y se puede guardar, compartir o abrir con otra app.",
             style = MaterialTheme.typography.bodySmall,
             color = Color(0xFF64748B),
             textAlign = TextAlign.Center,
