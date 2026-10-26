@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useUser } from "./UserContext";
-import { OFFLINE_QUEUE_STORAGE_KEY } from "@/lib/offline-queue";
+import { flushOfflineQueue, OFFLINE_QUEUE_STORAGE_KEY, portalSessionBearer } from "@/lib/offline-queue";
+import { isCapacitorNative } from "@/lib/capacitor-env";
+import s from "./OfflineNetworkBanner.module.css";
 
 const countQueued = () => {
   try {
@@ -31,6 +33,7 @@ export default function OfflineNetworkBanner() {
   const [online, setOnline] = useState(true);
   const [queued, setQueued] = useState(0);
   const [portal, setPortal] = useState(false);
+  const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     const sync = () => {
@@ -76,6 +79,35 @@ export default function OfflineNetworkBanner() {
   const fgVar = "var(--foreground)";
   const borderVar = "var(--border)";
 
+  const lineas: string[] = [];
+  if (!online) lineas.push("Sin conexión");
+  if (offlineDegraded && online) {
+    lineas.push("Sesión sin validar");
+    lineas.push("reconecta para sincronizar");
+  }
+  if (queued > 0) {
+    lineas.push(
+      queued === 1
+        ? `${queued} operación pendiente de envío`
+        : `${queued} operaciones pendientes de envío`,
+    );
+  }
+  if (queued === 0 && showOffline && !offlineDegraded) lineas.push("Modo sin conexión");
+
+  // Mismo filtro que OfflineQueueFlusher: la cola solo se reenvía en la app nativa. En el navegador
+  // se purga, porque lo encolado lleva el cuerpo de quien lo escribió y saldría con el token de
+  // quien esté dentro ahora. Sin señal tampoco: el envío no sale.
+  const puedeReintentar = queued > 0 && online && isCapacitorNative();
+
+  const reintentar = () => {
+    if (enviando) return;
+    setEnviando(true);
+    void flushOfflineQueue(() => (user?.token ? `Bearer ${user.token}` : portalSessionBearer())).finally(() => {
+      setEnviando(false);
+      setQueued(countQueued());
+    });
+  };
+
   return (
     <div
       role="status"
@@ -94,10 +126,23 @@ export default function OfflineNetworkBanner() {
         borderBottom: `1px solid ${borderVar}`,
       }}
     >
-      {!online && "Sin conexión · "}
-      {offlineDegraded && online && "Sesión sin validar · reconecta para sincronizar · "}
-      {queued > 0 && `${queued} operación${queued === 1 ? "" : "es"} pendiente(s) de envío`}
-      {queued === 0 && showOffline && !offlineDegraded && "Modo sin conexión"}
+      <span className={s.lineas}>
+        {lineas.map((linea, i) => (
+          <span key={linea}>
+            {i > 0 ? (
+              <span className={s.sep} aria-hidden="true">
+                {" · "}
+              </span>
+            ) : null}
+            {linea}
+          </span>
+        ))}
+      </span>
+      {puedeReintentar ? (
+        <button type="button" className={s.reintentar} onClick={reintentar} disabled={enviando}>
+          Reintentar
+        </button>
+      ) : null}
     </div>
   );
 }

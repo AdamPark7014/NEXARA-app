@@ -3,7 +3,8 @@ import SwiftUI
 /// Banda de conexión de arriba (Android `OfflineBanner`): ámbar #B45309 sin red,
 /// azul #0369A1 con cambios pendientes de subir; texto blanco 12 SemiBold. El
 /// color llega hasta la barra de estado, como `statusBarsPadding` en Android.
-/// Con red y pendientes, tocarla reintenta el envío.
+/// Un dato por renglón. Con red y pendientes, toda la banda es el botón «Reintentar»
+/// (el mismo `replay`); sin red no se ofrece, porque el envío no sale.
 struct OfflineBanner: View {
     @ObservedObject private var network = NetworkMonitor.shared
     @State private var pending = 0
@@ -17,19 +18,11 @@ struct OfflineBanner: View {
             if DemoMode.isActive {
                 // Modo demostración: nada sale del teléfono, no hay banda de conexión.
                 EmptyView()
-            } else if !network.isOnline {
+            } else if !network.isOnline || pending > 0 {
                 banda(
-                    pending > 0
-                        ? "Sin conexión · \(pending) en cola (incl. fotos)"
-                        : "Sin conexión · cambios y fotos se encolan localmente",
-                    color: Self.ambar,
-                    tocable: false
-                )
-            } else if pending > 0 {
-                banda(
-                    "Pendientes de sync: \(pending) · toca para reintentar",
-                    color: Self.azul,
-                    tocable: true
+                    lineas(online: network.isOnline, pending: pending),
+                    color: network.isOnline ? Self.azul : Self.ambar,
+                    reintentar: network.isOnline && pending > 0
                 )
             }
         }
@@ -41,16 +34,42 @@ struct OfflineBanner: View {
         }
     }
 
+    private func lineas(online: Bool, pending: Int) -> [String] {
+        if !online && pending > 0 {
+            return ["Sin conexión", "\(pending) en cola (incl. fotos)"]
+        }
+        if !online {
+            return ["Sin conexión", "cambios y fotos se encolan localmente"]
+        }
+        if pending > 0 {
+            return ["Pendientes de sync: \(pending)"]
+        }
+        return []
+    }
+
     @ViewBuilder
-    private func banda(_ texto: String, color: Color, tocable: Bool) -> some View {
-        let contenido = Text(texto)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(Color.white)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(color.ignoresSafeArea(edges: .top))
-        if tocable {
+    private func banda(_ lineas: [String], color: Color, reintentar: Bool) -> some View {
+        let contenido = VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(lineas.enumerated()), id: \.offset) { _, linea in
+                Text(linea)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if reintentar {
+                Text("Reintentar")
+                    .font(.system(size: 12, weight: .semibold))
+                    .underline()
+                    .foregroundStyle(Color.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(color.ignoresSafeArea(edges: .top))
+        if reintentar {
+            // Toda la banda es el botón, como antes: el área táctil no se encoge al renglón «Reintentar».
             Button {
                 guard !syncing else { return }
                 Task {
