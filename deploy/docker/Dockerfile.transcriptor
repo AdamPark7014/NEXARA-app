@@ -4,17 +4,19 @@
 # sale del servidor. Se compila aquí mismo con las instrucciones del CPU que lo corre
 # (GGML_NATIVE), por eso la imagen se construye en el servidor, como las demás.
 #
-# Modelo (WHISPER_MODEL). Medido en este servidor (23-10-2026, 4 vCPU compartidos, banco con FLEURS
-# es_419 de 22 voces; «sala» = voz lejana con eco y ruido; partes de 20 s como las sube la web):
-#   modelo (partes de 20 s)          WER limpio  WER sala  × tiempo real (limpio/sala)  RAM
-#   large-v3-turbo-q5_0, audio_ctx 1100   21.3 %     53.1 %    1.18 / 0.88               ~0.8 GB  ← por omisión
-#   large-v3-turbo-q5_0, contexto entero  20.8 %     53.8 %    1.89 / 1.17
-#   large-v3-turbo-q8_0                   20.8 %     52.8 %    1.61 / 0.77               ~1.0 GB
-#   medium-q5_0                           24.9 %     62.1 %    1.58 / 1.05               ~0.7 GB
-#   small (el de antes)                   22.3 %     65.5 %    0.30 / 0.23               ~0.6 GB
-#   (× tiempo real con el servidor ocupado, carga 5–8; la voz leída no tiene pausas, una junta sí)
-# El grande baja 12 puntos los errores con voz de sala; si el servidor va ocupado, queda unos
-# minutos detrás de la junta y se pone al día al concluir. Banco: apps/api/scripts/banco-transcriptor.
+# Modelo (WHISPER_MODEL). Medido en este servidor (23 y 26-10-2026, 4 vCPU = 2 núcleos con SMT, tope de
+# 3 CPU y 3 hilos como en el compose; banco con FLEURS es_419 de 22 voces; «sala» = voz lejana con eco y
+# ruido; partes de 20 s como las sube la web):
+#   modelo                                WER limpio  WER sala  × tiempo real (limpio/sala)  RAM
+#   large-v3-turbo-q8_0, audio_ctx 1100     13.9 %     54.0 %    0.78 / 0.58               ~1.1 GB  ← por omisión
+#   large-v3-turbo-q8_0, partes de 30 s        –       53.1 %       – / 0.71
+#   large-v3-turbo-q5_0, audio_ctx 1100     21.3 %     53.8 %    1.18 / 0.85               ~0.8 GB
+#   medium-q5_0 (sin tope)                  24.9 %     62.1 %    1.58 / 1.05               ~0.7 GB
+#   small (el de antes)                     22.3 %     65.5 %    0.30 / 0.23               ~0.6 GB
+# q8_0 corre más rápido que q5_0 en este CPU (menos trabajo para descomprimir pesos) y no repitió
+# oraciones como q5_0. Sin fallback de temperatura (temperature_inc 0) no ganó tiempo y metió bucles.
+# La voz leída no tiene pausas; una junta sí (el VAD se las salta), así que en una junta va más holgado.
+# Banco: apps/api/scripts/banco-transcriptor.
 FROM debian:bookworm-slim AS build
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git cmake build-essential ca-certificates curl \
@@ -26,7 +28,7 @@ WORKDIR /src
 RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_TESTS=OFF \
  && cmake --build build -j"$(nproc)" --target whisper-server
 
-ARG WHISPER_MODEL=large-v3-turbo-q5_0
+ARG WHISPER_MODEL=large-v3-turbo-q8_0
 RUN mkdir -p /models \
  && sh ./models/download-ggml-model.sh "${WHISPER_MODEL}" /models \
  && sh ./models/download-vad-model.sh silero-v6.2.0 /models \
@@ -44,7 +46,7 @@ COPY --from=build /src/build/bin/whisper-server /usr/local/bin/whisper-server
 COPY --from=build /models /models
 USER transcriptor
 WORKDIR /app/tmp
-ENV WHISPER_THREADS=4
+ENV WHISPER_THREADS=3
 EXPOSE 8080
 # --vad recorta los silencios: menos tiempo de CPU y sin frases inventadas en los huecos.
 ENV WHISPER_ARGS=""
