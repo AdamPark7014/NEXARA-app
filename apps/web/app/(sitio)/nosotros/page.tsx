@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
+import { foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
 import Aurora from "@/components/sitio/Aurora";
@@ -48,9 +49,9 @@ const PRINCIPIOS = [
 ];
 
 const EN_CAMPO = [
-  { src: "/fotos/campo-instalacion-ap-altura.jpg", alt: "Técnico de NEXARA instalando un punto de acceso en altura", tema: "Instalación", pie: "Punto de acceso exterior en un campus." },
-  { src: "/fotos/campo-enlace-antena-ciudad.jpg", alt: "Enlace inalámbrico instalado en azotea", tema: "Enlaces", pie: "Radioenlace punto a punto entre sedes." },
-  { src: "/fotos/monitoreo-videowall.jpg", alt: "Video wall de videovigilancia instalado por NEXARA", tema: "Monitoreo", pie: "Muro de video listo para operar." },
+  { ...foto("campo-instalacion-ap-altura", "(max-width: 734px) 100vw, 400px"), alt: "Técnico de NEXARA instalando un punto de acceso en altura", tema: "Instalación", pie: "Punto de acceso exterior en un campus." },
+  { ...foto("campo-enlace-antena-ciudad", "(max-width: 734px) 100vw, 400px"), alt: "Enlace inalámbrico instalado en azotea", tema: "Enlaces", pie: "Radioenlace punto a punto entre sedes." },
+  { ...foto("monitoreo-videowall", "(max-width: 734px) 100vw, 400px"), alt: "Video wall de videovigilancia instalado por NEXARA", tema: "Monitoreo", pie: "Muro de video listo para operar." },
 ];
 
 
@@ -121,7 +122,7 @@ export default async function PropuestaNosotros() {
         <div className={`${s.contenedor} ${p.dos}`}>
           <figure className={p.dosFoto} data-aparecer>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/fotos/equipo-nexara-polos.jpg" alt="Integrantes del equipo NEXARA" loading="lazy" decoding="async" />
+            <img {...foto("equipo-nexara-polos", "(max-width: 1068px) 100vw, 560px")} alt="Integrantes del equipo NEXARA" loading="lazy" decoding="async" />
           </figure>
           <div data-aparecer>
             <p className={s.antetitulo}>Quiénes somos</p>
@@ -188,7 +189,7 @@ export default async function PropuestaNosotros() {
             {EN_CAMPO.map((f) => (
               <figure key={f.src} className={p.foto} data-aparecer>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={f.src} alt={f.alt} loading="lazy" decoding="async" />
+                <img src={f.src} srcSet={f.srcSet} sizes={f.sizes} alt={f.alt} loading="lazy" decoding="async" />
                 <figcaption>
                   <span className={p.fotoTema}>{f.tema}</span>
                   {f.pie}

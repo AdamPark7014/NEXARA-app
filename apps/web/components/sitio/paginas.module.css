@@ -337,7 +337,11 @@
   box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line-soft);
   font-size: 16px;
   font-weight: 600;
-  transition: box-shadow 0.3s var(--ease), transform 0.3s var(--ease);
+  transition: box-shadow 0.2s var(--ease), transform 0.2s var(--ease);
+}
+
+.pildoras .pildora:active {
+  transform: scale(0.98);
 }
 
 .pildoras .pildora:hover {
@@ -765,11 +769,51 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: box-shadow 0.3s var(--ease);
+  transition: box-shadow 0.2s var(--ease), transform 0.2s var(--ease);
+}
+
+.canales .canal:active {
+  transform: scale(0.99);
 }
 
 .canales .canal:hover {
   box-shadow: var(--sombra-md), inset 0 0 0 1px var(--line);
+}
+
+.canalFila {
+  position: relative;
+}
+
+.canalFila .canal {
+  width: 100%;
+  padding-right: 96px;
+}
+
+.copiar {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--control);
+  color: var(--fg-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: background-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.copiar:hover {
+  background: var(--control-hover);
+  color: var(--fg);
+}
+
+.copiar[data-hecho] {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  color: var(--ok);
 }
 
 .canalIcono {
