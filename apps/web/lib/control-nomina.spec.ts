@@ -396,10 +396,31 @@ describe("cerrar la semana", () => {
   it("resultado del cierre con lo que respondió la API", () => {
     const previsto = resumenCierre(filas);
     expect(textoResultadoCierre({ creados: 2, existentes: 1 }, previsto)).toBe(
-      "Semana cerrada. Se crearon 2 pagos en Borrador. 1 ya existía y no se duplicó.",
+      "Semana cerrada: se crearon 2 pagos en Borrador. 1 ya existía y no se duplicó.",
     );
-    expect(textoResultadoCierre(null, previsto)).toBe("Semana cerrada. Se crearon 3 pagos en Borrador.");
-    expect(textoResultadoCierre({ creados: 0 }, previsto)).toBe("Semana cerrada. No se creó ningún pago nuevo.");
+    expect(textoResultadoCierre(null, previsto)).toBe("Semana cerrada: se crearon 3 pagos en Borrador.");
+    expect(textoResultadoCierre({ creados: 0 }, previsto)).toBe("Semana cerrada: no se creó ningún pago nuevo.");
+  });
+
+  it("el aviso del cierre cabe en una frase", () => {
+    const viejoNinguno = "Semana cerrada. No se creó ningún pago nuevo.";
+    const viejoTres = "Semana cerrada. Se crearon 3 pagos en Borrador.";
+    const previsto = resumenCierre(filas);
+    const ninguno = textoResultadoCierre({ creados: 0 }, previsto);
+    const tres = textoResultadoCierre(null, previsto);
+    const uno = textoResultadoCierre({ creados: 1 }, previsto);
+
+    expect(ninguno).toBe("Semana cerrada: no se creó ningún pago nuevo.");
+    expect(tres).toBe("Semana cerrada: se crearon 3 pagos en Borrador.");
+    expect(uno).toBe("Semana cerrada: se creó 1 pago en Borrador.");
+    expect(ninguno).not.toBe(viejoNinguno);
+    expect(tres).not.toBe(viejoTres);
+    expect(ninguno.split(".").filter((parte) => parte.trim()).length).toBe(1);
+    expect(tres.split(".").filter((parte) => parte.trim()).length).toBe(1);
+    expect(uno.split(".").filter((parte) => parte.trim()).length).toBe(1);
+    expect(ninguno).toMatch(/no se creó ningún pago nuevo/);
+    expect(tres).toMatch(/se crearon 3 pagos en Borrador/);
+    expect(uno).toMatch(/se creó 1 pago en Borrador/);
   });
 });
 

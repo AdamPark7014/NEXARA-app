@@ -696,8 +696,8 @@ export function textoResultadoCierre(res: ResultadoCierre | null | undefined, pr
   const omitidos = typeof res?.omitidos === "number" ? res.omitidos : 0;
   const partes = [
     creados === 0
-      ? "Semana cerrada. No se creó ningún pago nuevo."
-      : `Semana cerrada. Se ${creados === 1 ? "creó 1 pago" : `crearon ${creados} pagos`} en Borrador.`,
+      ? "Semana cerrada: no se creó ningún pago nuevo."
+      : `Semana cerrada: se ${creados === 1 ? "creó 1 pago" : `crearon ${creados} pagos`} en Borrador.`,
   ];
   if (existentes) partes.push(`${existentes === 1 ? "1 ya existía" : `${existentes} ya existían`} y no se duplicó.`);
   if (omitidos) partes.push(`${personas(omitidos)} sin monto no ${omitidos === 1 ? "generó" : "generaron"} pago.`);
