@@ -85,8 +85,8 @@ class HerramientasChecklistRulesTest {
     @Test
     fun singularMessage() {
         assertEquals(
-            "Falta palomear el checklist de herramientas antes de iniciar: Escalera. " +
-                "Si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.",
+            "Falta palomear el checklist de herramientas antes de iniciar: Escalera; " +
+                "si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.",
             HerramientasChecklistRules.mensajePendiente(listOf("Escalera")),
         )
     }
@@ -94,8 +94,8 @@ class HerramientasChecklistRulesTest {
     @Test
     fun pluralMessage() {
         assertEquals(
-            "Faltan palomear el checklist de herramientas antes de iniciar: Escalera, Taladro. " +
-                "Si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.",
+            "Faltan palomear el checklist de herramientas antes de iniciar: Escalera, Taladro; " +
+                "si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.",
             HerramientasChecklistRules.mensajePendiente(listOf("Escalera", "Taladro")),
         )
     }
@@ -104,8 +104,8 @@ class HerramientasChecklistRulesTest {
     fun longListIsTruncatedWithHowManyAreLeft() {
         val pendientes = listOf("A", "B", "C", "D", "E", "F")
         assertEquals(
-            "Faltan palomear el checklist de herramientas antes de iniciar: A, B, C, D y 2 más. " +
-                "Si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.",
+            "Faltan palomear el checklist de herramientas antes de iniciar: A, B, C, D y 2 más; " +
+                "si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.",
             HerramientasChecklistRules.mensajePendiente(pendientes),
         )
     }
@@ -114,7 +114,7 @@ class HerramientasChecklistRulesTest {
     fun exactlyFourNamesAreNotTruncated() {
         val mensaje = HerramientasChecklistRules.mensajePendiente(listOf("A", "B", "C", "D"))
         assertFalse(mensaje.contains("más"))
-        assertTrue(mensaje.contains("A, B, C, D."))
+        assertTrue(mensaje.contains("A, B, C, D;"))
     }
 
     @Test

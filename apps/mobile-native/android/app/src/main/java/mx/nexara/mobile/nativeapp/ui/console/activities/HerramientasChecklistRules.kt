@@ -44,8 +44,9 @@ object HerramientasChecklistRules {
     }
 
     /**
-     * El mismo texto que devuelve el API en el 400 de `iniciar`. Dice exactamente qué
-     * falta: «no puedes iniciar» a secas manda al técnico a llamar por teléfono.
+     * El mismo texto, letra por letra, que devuelve el API en el 400 de `iniciar`, en una
+     * frase. Dice exactamente qué falta: «no puedes iniciar» a secas manda al técnico a
+     * llamar por teléfono.
      */
     fun mensajePendiente(pendientes: List<String>): String {
         if (pendientes.isEmpty()) return ""
@@ -57,7 +58,7 @@ object HerramientasChecklistRules {
                 ""
             }
         val falta = if (pendientes.size == 1) "Falta" else "Faltan"
-        return "$falta palomear el checklist de herramientas antes de iniciar: " +
-            "$muestra$resto. Si algo no lo traes o está dañado, márcalo y avisa a tu supervisor."
+        return "$falta palomear el checklist de herramientas antes de iniciar: $muestra$resto; " +
+            "si algo no lo traes o está dañado, márcalo y avisa a tu supervisor."
     }
 }

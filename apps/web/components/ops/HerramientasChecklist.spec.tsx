@@ -84,7 +84,7 @@ const inicial = checklistDe([
     cantidad: 2,
     check: {
       ok: true,
-      nota: null,
+      nota: "En la camioneta",
       fotoUrl: null,
       at: "2026-09-18T16:00:00.000Z",
       por: { id: 7, nombre: "Carolina Pérez Ruiz" },
@@ -148,7 +148,10 @@ describe("HerramientasChecklist", () => {
     expect(screen.getByText("No se puede iniciar aún.")).toBeInTheDocument();
     expect(screen.getByText("Escalera")).toBeInTheDocument();
     expect(screen.getByText("×2")).toBeInTheDocument();
-    expect(screen.getByText(/Carolina Pérez ·/)).toBeInTheDocument();
+    const quien = screen.getByText("Carolina Pérez");
+    expect(quien.nextElementSibling).toHaveTextContent(/10:00/);
+    expect(quien.nextElementSibling?.nextElementSibling).toHaveTextContent("En la camioneta");
+    expect(screen.queryByText(/Carolina Pérez ·/)).not.toBeInTheDocument();
     expect(screen.getByText("Sin revisar")).toBeInTheDocument();
 
     const [url, init] = fetchMock.mock.calls.find(([u]) => /\/activities\/5\/herramientas$/.test(String(u))) as [string, RequestInit];
