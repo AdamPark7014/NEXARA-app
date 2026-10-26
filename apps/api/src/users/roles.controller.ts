@@ -76,7 +76,7 @@ export class RolesController {
     });
     if (existing) {
       throw new ConflictException(
-        `Ya existe un rol llamado "${existing.nombre}". Asigna ese rol o elige otro nombre.`,
+        `Ya existe un rol llamado "${existing.nombre}": asigna ese rol o elige otro nombre.`,
       );
     }
 
