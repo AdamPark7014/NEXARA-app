@@ -240,6 +240,59 @@ describe('ConsultaUpc', () => {
     });
   });
 
+  it('deja las cuatro notas en una frase y cita el texto viejo', async () => {
+    // El texto viejo eran dos frases. Capturar a mano se queda; no hay otra causa.
+    const viejo = {
+      NO_ENCONTRADO: 'El catálogo internacional no conoce este código. Captura los datos a mano.',
+      LIMITE: 'El catálogo internacional llegó a su límite por hoy. Captura los datos a mano.',
+      SIN_SERVICIO: 'No se pudo consultar el catálogo internacional. Captura los datos a mano.',
+      DESACTIVADO: 'La consulta internacional está apagada. Captura los datos a mano.',
+    };
+    const nuevo = {
+      NO_ENCONTRADO: 'El catálogo internacional no conoce este código: captura los datos a mano.',
+      LIMITE: 'El catálogo internacional llegó a su límite por hoy: captura los datos a mano.',
+      SIN_SERVICIO: 'No se pudo consultar el catálogo internacional: captura los datos a mano.',
+      DESACTIVADO: 'La consulta internacional está apagada: captura los datos a mano.',
+    };
+
+    const noEncontrado = await new ConsultaUpc({
+      proveedor: proveedorFalso(async () => null),
+    }).buscar(UPC);
+    const limite = await new ConsultaUpc({
+      proveedor: proveedorFalso(async () => {
+        throw new LimiteUpcError();
+      }),
+    }).buscar(UPC);
+    const sinServicio = await new ConsultaUpc({
+      proveedor: proveedorFalso(async () => {
+        throw new Error('ECONNRESET');
+      }),
+    }).buscar(UPC);
+    const apagada = await new ConsultaUpc({ proveedor: null }).buscar(UPC);
+
+    const casos = [
+      ['NO_ENCONTRADO', noEncontrado],
+      ['LIMITE', limite],
+      ['SIN_SERVICIO', sinServicio],
+      ['DESACTIVADO', apagada],
+    ] as const;
+
+    for (const [motivo, resultado] of casos) {
+      expect(viejo[motivo]).toMatch(/\. Captura los datos a mano\.$/);
+      expect(resultado).toMatchObject({ encontrado: false, codigo: UPC, motivo, mensaje: nuevo[motivo] });
+      expect(resultado).not.toMatchObject({ mensaje: viejo[motivo] });
+      const mensaje = (resultado as { mensaje: string }).mensaje;
+      expect(mensaje.split('. ')).toEqual([nuevo[motivo]]);
+      expect(mensaje.endsWith('captura los datos a mano.')).toBe(true);
+    }
+
+    const noUpc = await new ConsultaUpc({ proveedor: null }).buscar('MUL-12345');
+    expect(noUpc).toMatchObject({
+      motivo: 'CODIGO_NO_CONSULTABLE',
+      mensaje: 'Este código no es un UPC/EAN: captura los datos a mano.',
+    });
+  });
+
   it('la caché no crece sin tope', async () => {
     const proveedor = proveedorFalso(async (codigo) => ({ ...producto, codigo }));
     const consulta = new ConsultaUpc({ proveedor, maxEntradas: 2 });
