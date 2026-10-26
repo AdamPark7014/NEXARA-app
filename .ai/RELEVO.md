@@ -63,6 +63,11 @@
   - Todas las ligas internas pasan por `ruta()` (`components/sitio/rutas.ts`): con `BASE_SITIO = "/propuesta"` la
     propuesta navega entre sus páginas; blog, soluciones y cobertura siguen yendo al sitio actual. Al publicar en
     `(public)`, `BASE_SITIO` pasa a "".
+  - Tema claro por omisión en todo el sitio público (regla de Adam del 26-10): el script de `app/layout.tsx` ya no
+    sigue al sistema; pone `dark` solo si `nexara:public-theme` guardado es `dark`. Contacto usa `BrandMap
+    overlay={false}` (sin la tarjeta y el botón cian del estilo viejo).
+  - Ojo con las pruebas: con el servidor de desarrollo y Chrome headless corriendo, `banking/page.spec.tsx` y
+    `cotizaciones/[id]/page.spec.tsx` vencen por tiempo (15–25 s); solas pasan.
   - Falta: visto bueno del dueño; después mover el sistema a `(public)` (layout y páginas), rehacer Blog, Soluciones
     y Cobertura, y restilar el banner de cookies y el contacto flotante.
 
