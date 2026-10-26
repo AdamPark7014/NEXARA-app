@@ -127,7 +127,7 @@ export function convertirCaptura(
     const nombre = (captura.unidadCaptura || '').trim();
     throw new EmpaqueInvalidoError(
       nombre
-        ? `El producto no tiene registrada la presentación «${nombre}». Regístrala en el catálogo o captura en piezas.`
+        ? `El producto no tiene registrada la presentación «${nombre}»: regístrala en el catálogo o captura en piezas.`
         : 'La presentación seleccionada ya no existe en el producto.',
     );
   }
@@ -135,7 +135,7 @@ export function convertirCaptura(
   const factor = numero(empaque.piezasPorUnidad);
   if (factor == null || factor <= 0) {
     throw new EmpaqueInvalidoError(
-      `La presentación «${empaque.nombre}» no dice cuántas piezas trae. Corrígela en el catálogo.`,
+      `La presentación «${empaque.nombre}» no dice cuántas piezas trae: corrígela en el catálogo.`,
     );
   }
 
