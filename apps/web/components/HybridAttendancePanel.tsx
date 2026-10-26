@@ -6,8 +6,11 @@ import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
+import EmptyState from "@/components/ui/EmptyState";
+import InlineAlert from "@/components/ui/InlineAlert";
 import ListExportActions from "@/components/ui/ListExportActions";
 import { buildApiUrl, parseResponseJson } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 import { exportToExcel } from "@/lib/export-excel";
 
 type LinkStatus = "linked" | "erp_only" | "acs_only";
@@ -108,7 +111,7 @@ export default function HybridAttendancePanel({
       setData(json);
     } catch (e) {
       setData(null);
-      setError(e instanceof Error ? e.message : "No se pudo cargar el híbrido");
+      setError(formatApiError(e, "No se pudo cargar el contraste."));
     } finally {
       setLoading(false);
     }
@@ -233,9 +236,11 @@ export default function HybridAttendancePanel({
   });
 
   return (
+    <>
+    <style>{HYB_QUIET}</style>
     <Section
       title="Híbrido Integra ↔ ERP"
-      subtitle="Contraste del día: checador (nómina) vs accesos de puerta. No inventa fichajes."
+      subtitle="Checador de nómina frente a las puertas."
       actions={
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <ListExportActions
@@ -299,52 +304,45 @@ export default function HybridAttendancePanel({
         </div>
       }
     >
-      {error && (
+      {error ? (
+        <InlineAlert
+          variant="danger"
+          message={error}
+          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+        />
+      ) : (
+      <>
+      {data ? (
         <div
-          role="alert"
           style={{
-            padding: "8px 12px",
-            marginBottom: 12,
-            background: "var(--state-danger-bg,#fef2f2)",
-            border: "1px solid var(--danger)",
-            borderRadius: 8,
-            fontSize: 12,
-            color: "var(--danger)",
+            marginBottom: 14,
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            background: "var(--surface-2)",
+            fontSize: 12.5,
+            color: "var(--text-secondary)",
+            lineHeight: 1.45,
           }}
         >
-          {error}
+          <div>
+            <strong style={{ color: "var(--foreground)" }}>ERP:</strong> {data.sources.erp}
+          </div>
+          <div style={{ marginTop: 4 }}>
+            <strong style={{ color: "var(--foreground)" }}>ACS:</strong> {data.sources.acs}
+          </div>
+          <div style={{ marginTop: 8, color: "var(--text-tertiary)" }}>{data.howToLink}</div>
         </div>
-      )}
+      ) : null}
 
-      <div
-        style={{
-          marginBottom: 14,
-          padding: "12px 14px",
-          borderRadius: 10,
-          border: "1px solid var(--border)",
-          background: "var(--surface-2)",
-          fontSize: 12.5,
-          color: "var(--text-secondary)",
-          lineHeight: 1.45,
-        }}
-      >
-        <div>
-          <strong style={{ color: "var(--foreground)" }}>ERP:</strong> {data?.sources.erp}
-        </div>
-        <div style={{ marginTop: 4 }}>
-          <strong style={{ color: "var(--foreground)" }}>ACS:</strong> {data?.sources.acs}
-        </div>
-        <div style={{ marginTop: 8, color: "var(--text-tertiary)" }}>{data?.howToLink}</div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
+      <div className="nx-hyb-kpis">
         <KpiCard label="Vinculados" value={data?.summary.linked ?? 0} variant="positive" icon="🔗" />
         <KpiCard label="Solo ERP" value={data?.summary.erpOnly ?? 0} variant="accent" icon="⏰" />
         <KpiCard label="Solo ACS" value={data?.summary.acsOnly ?? 0} variant="warning" icon="🚪" />
         <KpiCard label="Con alertas" value={data?.summary.withFlags ?? 0} variant={data?.summary.withFlags ? "danger" : "default"} icon="⚠️" />
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+      <div className="nx-hyb-filters" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
         <button type="button" style={chip(filter === "")} onClick={() => setFilter("")}>
           Todos
         </button>
@@ -364,22 +362,100 @@ export default function HybridAttendancePanel({
 
       {loading ? (
         <div style={{ padding: 36, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
-          Cargando contraste híbrido…
+          Cargando el contraste…
         </div>
       ) : (
-        <DataTable<HybridItem>
-          columns={cols}
-          rows={rows}
-          rowKey={(r) =>
-            r.user
-              ? `u-${r.user.id}`
-              : `a-${r.acs?.personId ?? r.matchKey ?? "x"}`
-          }
-          density="compact"
-          emptyTitle="Sin señales ese día"
-          emptyDescription="No hay fichajes ERP ni accesos ACS para contrastar. Prueba otra fecha o verifica el vínculo de nº empleado."
-        />
+        <>
+          <div className="nx-hyb-table">
+            <DataTable<HybridItem>
+              columns={cols}
+              rows={rows}
+              rowKey={(r) =>
+                r.user
+                  ? `u-${r.user.id}`
+                  : `a-${r.acs?.personId ?? r.matchKey ?? "x"}`
+              }
+              density="compact"
+              emptyTitle="No hay fichajes ni accesos este día."
+              emptyDescription=""
+            />
+          </div>
+          <div className="nx-hyb-stack">
+            {rows.length === 0 ? (
+              <EmptyState title="No hay fichajes ni accesos este día." />
+            ) : (
+              rows.map((r) => <HybridStackCard key={r.user ? `u-${r.user.id}` : `a-${r.acs?.personId ?? r.matchKey ?? "x"}`} item={r} />)
+            )}
+          </div>
+        </>
+      )}
+      </>
       )}
     </Section>
+    </>
+  );
+}
+
+const HYB_QUIET = `
+.nx-hyb-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.nx-hyb-stack { display: none; }
+.nx-hyb-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 8px;
+}
+.nx-hyb-card + .nx-hyb-card { margin-top: 12px; }
+.nx-hyb-rows { display: flex; flex-direction: column; gap: 8px; margin: 0; font-size: 13px; }
+.nx-hyb-rows > div { display: flex; justify-content: space-between; gap: 12px; }
+.nx-hyb-rows dt { color: var(--text-tertiary); }
+.nx-hyb-rows dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 390px) {
+  .nx-hyb-kpis { grid-template-columns: 1fr; }
+  .nx-hyb-filters { flex-direction: column; align-items: stretch; }
+  .nx-hyb-table { display: none; }
+  .nx-hyb-stack { display: block; }
+}
+`;
+
+function HybridStackCard({ item }: { item: HybridItem }) {
+  const name = item.user?.nombre || item.acs?.personName || item.acs?.personId || "—";
+  return (
+    <article className="nx-hyb-card" aria-label={name}>
+      {item.user ? (
+        <Link href={`/erp/hr/${item.user.id}`} style={{ fontWeight: 700, fontSize: 14, color: "var(--foreground)", textDecoration: "none" }}>
+          {name}
+        </Link>
+      ) : (
+        <span style={{ fontWeight: 700, fontSize: 14 }}>{name}</span>
+      )}
+      <dl className="nx-hyb-rows">
+        <div><dt>Vínculo</dt><dd>{statusLabel(item.linkStatus)}</dd></div>
+        {item.erp ? (
+          <>
+            <div><dt>Entrada</dt><dd>{fmtTime(item.erp.checkIn)}</dd></div>
+            <div><dt>Salida</dt><dd>{fmtTime(item.erp.checkOut)}</dd></div>
+            <div><dt>Horas</dt><dd>{fmtMinutes(item.erp.totalMinutes)}{item.erp.isOpen ? " · abierta" : ""}</dd></div>
+          </>
+        ) : (
+          <div><dt>Checador</dt><dd>Sin fichaje</dd></div>
+        )}
+        {item.acs ? (
+          <>
+            <div><dt>Puerta entrada</dt><dd>{fmtTime(item.acs.firstAt)}</dd></div>
+            <div><dt>Puerta salida</dt><dd>{item.acs.passes > 1 ? fmtTime(item.acs.lastAt) : "—"}</dd></div>
+            <div><dt>Puerta horas</dt><dd>{item.acs.minutes == null ? "sin salida" : fmtMinutes(item.acs.minutes)}</dd></div>
+            {item.acs.firstDoor ? <div><dt>Puerta</dt><dd>{item.acs.firstDoor}</dd></div> : null}
+          </>
+        ) : (
+          <div><dt>Acceso</dt><dd>Sin acceso</dd></div>
+        )}
+        {item.flags.map((f) => (
+          <div key={f}><dt>Alerta</dt><dd>{FLAG_LABEL[f] || f}</dd></div>
+        ))}
+      </dl>
+    </article>
   );
 }
