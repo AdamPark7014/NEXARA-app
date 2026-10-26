@@ -122,7 +122,7 @@ final class CoreRepository {
         // Modo demostración: todo es local, siempre «hay señal».
         if DemoMode.isActive { return }
         guard await NetworkMonitor.shared.isOnline else {
-            throw CoreError.message("Sin conexión: esta acción necesita señal. Intenta de nuevo cuando regrese.")
+            throw CoreError.message("Sin conexión: esta acción necesita señal, intenta de nuevo cuando regrese.")
         }
     }
 

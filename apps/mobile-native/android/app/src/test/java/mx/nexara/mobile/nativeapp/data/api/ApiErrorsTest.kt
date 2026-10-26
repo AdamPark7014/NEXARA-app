@@ -1,8 +1,13 @@
 package mx.nexara.mobile.nativeapp.data.api
 
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import retrofit2.HttpException
+import retrofit2.Response
+import java.io.IOException
 
 /**
  * El 400 era el agujero.
@@ -124,4 +129,25 @@ class ApiErrorsTest {
     fun `los saltos de linea escapados se vuelven espacios`() {
         assertEquals("Primera linea segunda", parseServerErrorBody("""{"message":"Primera linea\nsegunda"}"""))
     }
+
+    // ── toUserMessage: una frase que dice qué pasó y qué hacer ───────────────
+
+    @Test
+    fun `cada aviso propio dice que hacer en la misma frase`() {
+        assertEquals("Sesión expirada, inicia sesión de nuevo.", http(401).toUserMessage())
+        assertEquals("Error del servidor, intenta más tarde.", http(503).toUserMessage())
+        assertEquals("Datos inválidos, revisa el formulario.", http(400).toUserMessage())
+        assertEquals("El registro cambió mientras lo editabas, vuelve a intentarlo.", http(409).toUserMessage())
+        assertEquals("Sin conexión, revisa tu red e intenta de nuevo.", IOException("reset").toUserMessage())
+    }
+
+    @Test
+    fun `el mensaje del servidor gana al texto propio`() {
+        val body = """{"statusCode":400,"message":"Solo puedes reabrir OT finalizadas"}"""
+        assertEquals("Solo puedes reabrir OT finalizadas", http(400, body).toUserMessage())
+        assertEquals("Solo puedes reabrir OT finalizadas", http(409, body).toUserMessage())
+    }
+
+    private fun http(code: Int, body: String = ""): HttpException =
+        HttpException(Response.error<Any>(code, body.toResponseBody("application/json".toMediaType())))
 }

@@ -9,7 +9,7 @@ extension ApiError {
             return "URL inválida"
         case .http(let code, let body):
             if let body, body.localizedCaseInsensitiveContains("MFA_REQUIRED") {
-                return "Se requiere verificación MFA. Completa el segundo factor en la web o contacta a soporte."
+                return "Se requiere verificación MFA, completa el segundo factor en la web o contacta a soporte."
             }
             let server = Self.parseServerErrorBody(body)
             switch code {
@@ -22,17 +22,17 @@ extension ApiError {
                 }
                 // «Sesión expirada» es solo para el 401 de una sesión ya abierta; los
                 // errores del login (sin sesión) los traduce `LoginView` por su cuenta.
-                return "Sesión expirada. Inicia sesión de nuevo."
+                return "Sesión expirada, inicia sesión de nuevo."
             case 403:
                 return server ?? "Sin permisos para esta acción."
             case 404:
                 return server ?? "Recurso no encontrado."
             case 500...599:
-                return "Error del servidor. Intenta más tarde."
+                return "Error del servidor, intenta más tarde."
             case 400:
-                return server ?? "Datos inválidos. Revisa el formulario."
+                return server ?? "Datos inválidos, revisa el formulario."
             case 409:
-                return server ?? "El registro cambió mientras lo editabas. Vuelve a intentarlo."
+                return server ?? "El registro cambió mientras lo editabas, vuelve a intentarlo."
             default:
                 return server ?? fallback
             }
@@ -45,7 +45,7 @@ extension ApiError {
     }
 
     /// Texto único para «no llegué al servidor» (sin red, timeout, DNS, TLS).
-    static let noConnectionMessage = "Sin conexión con el servidor. Revisa tu internet e inténtalo de nuevo."
+    static let noConnectionMessage = "Sin conexión con el servidor, revisa tu internet e inténtalo de nuevo."
 
     var isSessionExpired: Bool {
         if case .http(401, _) = self { return true }
