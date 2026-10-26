@@ -73,4 +73,39 @@
     min-width: 0;
     flex: 1 1 100%;
   }
+
+  /* Teléfono: un dato por renglón. La tabla se apila solo aquí; en escritorio
+     sigue siendo tabla, con sus cabeceras. */
+  .meta {
+    display: grid;
+    gap: 2px;
+  }
+  .sep {
+    display: none;
+  }
+  .tabla table,
+  .tabla tbody,
+  .tabla tr,
+  .tabla td {
+    display: block;
+    width: auto !important;
+  }
+  .tabla thead {
+    display: none;
+  }
+  .tabla tr {
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .tabla tr:last-child {
+    border-bottom: 0;
+  }
+  .tabla td {
+    border-bottom: 0;
+    text-align: left !important;
+  }
+  /* Acciones de la fila (última celda): visibles y alineadas a la izquierda. */
+  .tabla td:last-child > div {
+    opacity: 1;
+    justify-content: flex-start;
+  }
 }
