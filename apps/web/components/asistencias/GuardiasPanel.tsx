@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
-import { Alert, Avatar, Badge, Button, Card, CardHead, EmptyState, Field, Input, Select, SkeletonRows } from "@/components/base";
+import { Alert, Avatar, Badge, Button, Card, CardHead, Field, Input, Select, SkeletonRows } from "@/components/base";
 import { formatApiError } from "@/lib/erp-api";
 import {
   NOTA_GUARDIA_MAX,
@@ -18,12 +18,21 @@ import {
 } from "@/lib/guardias-api";
 import s from "./guardias.module.css";
 
+const ERROR_CARGA = "No se pudieron cargar las guardias.";
+const ERROR_PROGRAMAR = "No se pudo programar la guardia.";
+const ERROR_QUITAR = "No se pudo quitar la guardia.";
+const VACIO = "No tienes guardias programadas.";
+
+/** Una sola frase. Si el API manda un párrafo, se queda el respaldo. */
+function unaFrase(texto: string, respaldo: string): string {
+  const limpio = texto.replace(/\s+/g, " ").trim();
+  if (!limpio) return respaldo;
+  const partes = limpio.split(/(?<=[.!?])\s+/).filter(Boolean);
+  return partes.length > 1 ? respaldo : limpio;
+}
+
 /**
- * Guardias de fin de semana: quién trabaja cada sábado y domingo de las próximas semanas.
- *
- * Solo quien tiene guardia puede checar ese día; su entrada se registra sola al iniciar su
- * primer servicio o tarea, desde donde esté. Dirección programa a cualquiera y un encargado
- * a su gente; los demás solo ven sus propias guardias.
+ * Guardias de sábado y domingo. Quién puede programar lo decide el API (`puedeProgramar`).
  */
 export default function GuardiasPanel({ token }: { token: string }) {
   const [datos, setDatos] = useState<GuardiasRango | null>(null);
@@ -45,7 +54,7 @@ export default function GuardiasPanel({ token }: { token: string }) {
       setDatos(await fetchGuardias(token));
     } catch (e) {
       // Si ya había calendario, se queda a la vista; solo se avisa.
-      setError(formatApiError(e, "No se pudieron cargar las guardias"));
+      setError(unaFrase(formatApiError(e, ERROR_CARGA), ERROR_CARGA));
     } finally {
       setCargando(false);
     }
@@ -76,7 +85,7 @@ export default function GuardiasPanel({ token }: { token: string }) {
       setNota("");
       await cargar();
     } catch (e) {
-      setErrorForm(formatApiError(e, "No se pudo programar la guardia"));
+      setErrorForm(unaFrase(formatApiError(e, ERROR_PROGRAMAR), ERROR_PROGRAMAR));
     } finally {
       setGuardando(false);
     }
@@ -101,29 +110,34 @@ export default function GuardiasPanel({ token }: { token: string }) {
           await quitarGuardia(token, g.id);
           await cargar();
         } catch (e) {
-          setError(formatApiError(e, "No se pudo quitar la guardia"));
+          setError(unaFrase(formatApiError(e, ERROR_QUITAR), ERROR_QUITAR));
         }
       },
     });
   };
 
   if (cargando && !datos) {
-    return <SkeletonRows rows={4} label="Cargando guardias" />;
+    return (
+      <div className={s.panel}>
+        <h2 className={s.titulo}>Guardias</h2>
+        <SkeletonRows rows={4} label="Cargando guardias" />
+      </div>
+    );
   }
 
   if (error && !datos) {
     return (
-      <Alert
-        tone="danger"
-        role="alert"
-        action={
+      <div className={s.panel}>
+        <h2 className={s.titulo}>Guardias</h2>
+        <p className={s.frase} role="alert">
+          {error}
+        </p>
+        <div className={s.reintento}>
           <Button size="sm" onClick={() => void cargar()}>
             Reintentar
           </Button>
-        }
-      >
-        {error}
-      </Alert>
+        </div>
+      </div>
     );
   }
   if (!datos) return null;
@@ -132,20 +146,17 @@ export default function GuardiasPanel({ token }: { token: string }) {
 
   return (
     <div className={s.panel}>
-      <p className={s.nota}>
-        El sábado y el domingo solo checa quien tiene guardia. Su entrada se registra sola al iniciar su primer
-        servicio o tarea del día, con la ubicación de ese inicio.
-      </p>
+      <h2 className={s.titulo}>Guardias</h2>
 
       {error ? (
-        <Alert tone="danger" role="alert" onDismiss={() => setError(null)}>
+        <p className={s.aviso} role="alert">
           {error}
-        </Alert>
+        </p>
       ) : null}
 
       {datos.puedeProgramar ? (
         <Card aria-label="Programar guardia">
-          <CardHead title="Programar guardia" subtitle="Elige a la persona y el sábado o domingo que le toca." />
+          <CardHead title="Programar guardia" />
           <div className={s.form}>
             <div className={s.campos}>
               <Field label="Persona" required>
@@ -199,12 +210,9 @@ export default function GuardiasPanel({ token }: { token: string }) {
       ) : null}
 
       {sinNada ? (
-        <EmptyState
-          icon={<EventAvailableOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-          title="No tienes guardias programadas"
-          description="Si te toca trabajar un fin de semana, tu encargado te programa aquí."
-          tone="neutral"
-        />
+        <p className={s.frase} role="status">
+          {VACIO}
+        </p>
       ) : (
         <div className={s.fines}>
           {fines.map((f) => {
@@ -247,7 +255,7 @@ export default function GuardiasPanel({ token }: { token: string }) {
                           ) : null}
                         </div>
                         {lista.length === 0 ? (
-                          <span className={s.nadie}>Nadie de guardia</span>
+                          <span className={s.nadie}>Nadie de guardia.</span>
                         ) : (
                           <ul className={s.personas}>
                             {lista.map((g) => {

@@ -6,11 +6,35 @@
   min-width: 0;
 }
 
-.nota {
+.titulo {
   margin: 0;
-  font-size: var(--ui-text-sm);
-  line-height: 1.45;
-  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-page, 22px);
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--ui-fg);
+}
+
+.frase {
+  margin: 28px 16px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--ui-fg);
+}
+
+.reintento {
+  display: flex;
+  justify-content: center;
+}
+
+.aviso {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--ui-fg);
 }
 
 /* ─── Programar ───────────────────────────────────────────────────────── */
