@@ -192,6 +192,13 @@ object JornadaGps {
     internal const val NOTIFICATION_ID = 4711
 }
 
+/**
+ * Aviso expandido de la notificación fija. Una frase: se deja de compartir
+ * al registrar la salida, el mismo momento que la línea corta.
+ */
+internal const val AVISO_UBICACION_EXPANDIDO =
+    "Se comparte tu ubicación con NEXARA hasta que registres tu salida: regístrala para dejar de compartirla."
+
 class JornadaGpsService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -390,10 +397,7 @@ class JornadaGpsService : Service() {
             .setContentTitle("Jornada en curso · compartiendo ubicación")
             .setContentText("Se comparte tu ubicación con NEXARA hasta que registres tu salida.")
             .setStyle(
-                NotificationCompat.BigTextStyle().bigText(
-                    "Se comparte tu ubicación con NEXARA hasta que registres tu salida. " +
-                        "Registra la salida para dejar de compartirla.",
-                ),
+                NotificationCompat.BigTextStyle().bigText(AVISO_UBICACION_EXPANDIDO),
             )
             .setOngoing(true)
             .setSilent(true)
