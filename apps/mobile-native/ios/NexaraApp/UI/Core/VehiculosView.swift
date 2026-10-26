@@ -275,7 +275,7 @@ private struct DisponibleVehiculoRow: View {
     var body: some View {
         let estatus = vehiculo.estatus.trimmingCharacters(in: .whitespaces)
         NxListRow(
-            title: vehiculo.titulo,
+            title: vehiculo.tituloRenglones,
             subtitle: detalle,
             meta: estatus.isEmpty ? nil : estatus
         ) {
@@ -338,7 +338,7 @@ private struct SolicitarVehiculoSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Solicitar \(vehiculo.titulo)")
+                Text("Solicitar \(vehiculo.tituloRenglones)")
                     .font(NxType.headlineSmall)
                     .foregroundStyle(NxColors.fg)
                     .padding(.bottom, NxSpacing.s)
