@@ -134,7 +134,7 @@ export default function HerramientasPorEtiquetaPanel({ onCambio, activo = true }
     <Card aria-label="Entrada y salida con etiqueta">
       <CardHead
         title="Entrada y salida con etiqueta"
-        subtitle="Escanea la etiqueta de la herramienta. Aquí aparece quién la tiene y qué toca: entregarla o recibirla."
+        subtitle="Escanea la etiqueta de la herramienta para ver quién la tiene y si toca entregarla o recibirla."
       />
       <div className={s.cuerpo}>
         <CampoEscaneo
@@ -198,7 +198,7 @@ export default function HerramientasPorEtiquetaPanel({ onCambio, activo = true }
                 </p>
                 {prestamo.vencido ? (
                   <Alert tone="danger">
-                    El código de recolección de esta solicitud caducó. Hay que volver a aprobarla antes de entregar.
+                    El código de recolección de esta solicitud caducó y hay que volver a aprobarla antes de entregar.
                   </Alert>
                 ) : null}
               </>
@@ -218,8 +218,7 @@ export default function HerramientasPorEtiquetaPanel({ onCambio, activo = true }
 
             {prestamo?.status === "PENDING" && (
               <p className={s.linea}>
-                {prestamo.usuario?.nombre ?? "Alguien"} la pidió ({paraQue}) y la solicitud sigue sin
-                aprobar. Apruébala en la lista de abajo para poder entregarla.
+                {prestamo.usuario?.nombre ?? "Alguien"} la pidió ({paraQue}) y la solicitud sigue sin aprobar, así que apruébala en la lista de abajo para poder entregarla.
               </p>
             )}
 
@@ -233,7 +232,7 @@ export default function HerramientasPorEtiquetaPanel({ onCambio, activo = true }
             {!prestamo && !kit && (
               <p className={s.linea}>
                 {item.status === "AVAILABLE"
-                  ? "Está en almacén y nadie la tiene pedida. Para que salga, primero hay que solicitarla o asignarla a un kit."
+                  ? "Está en almacén, nadie la tiene pedida y para que salga hay que solicitarla o asignarla a un kit."
                   : item.status === "IN_REPAIR"
                     ? "Está en reparación. Cuando vuelva, márcala como disponible en el inventario."
                     : item.status === "RETIRED"
