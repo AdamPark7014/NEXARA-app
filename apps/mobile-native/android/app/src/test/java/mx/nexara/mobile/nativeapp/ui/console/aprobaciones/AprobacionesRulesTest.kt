@@ -429,18 +429,18 @@ class AprobacionesRulesTest {
     @Test
     fun `la confirmacion dice lo que el servidor hizo de verdad`() {
         assertEquals(
-            "Aprobada. Pasa al paso 3.",
+            "Aprobada: pasa al paso 3.",
             AprobacionesRules.mensajeDeDecision(
                 true,
                 DecisionRespuestaDto(decided = true, complete = false, nextStep = 3),
             ),
         )
         assertEquals(
-            "Aprobada. El flujo queda cerrado.",
+            "Aprobada: el flujo queda cerrado.",
             AprobacionesRules.mensajeDeDecision(true, DecisionRespuestaDto(decided = true, complete = true)),
         )
         assertEquals(
-            "Rechazada. La solicitud queda cancelada y el solicitante ya fue avisado.",
+            "Rechazada: la solicitud queda cancelada y el solicitante ya fue avisado.",
             AprobacionesRules.mensajeDeDecision(
                 false,
                 DecisionRespuestaDto(decided = true, complete = true, cancelled = true),
@@ -453,7 +453,7 @@ class AprobacionesRulesTest {
         // Si se pidió aprobar y el servidor contesta `cancelled`, mandó él: es
         // quien acaba de escribir en la base.
         assertEquals(
-            "Rechazada. La solicitud queda cancelada y el solicitante ya fue avisado.",
+            "Rechazada: la solicitud queda cancelada y el solicitante ya fue avisado.",
             AprobacionesRules.mensajeDeDecision(
                 aprobado = true,
                 respuesta = DecisionRespuestaDto(decided = true, complete = true, cancelled = true),

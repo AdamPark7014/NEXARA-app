@@ -491,9 +491,9 @@ object AprobacionesRules {
      */
     fun mensajeDeDecision(aprobado: Boolean, respuesta: DecisionRespuestaDto): String = when {
         !aprobado || respuesta.cancelled ->
-            "Rechazada. La solicitud queda cancelada y el solicitante ya fue avisado."
-        respuesta.nextStep != null -> "Aprobada. Pasa al paso ${respuesta.nextStep}."
-        respuesta.complete -> "Aprobada. El flujo queda cerrado."
+            "Rechazada: la solicitud queda cancelada y el solicitante ya fue avisado."
+        respuesta.nextStep != null -> "Aprobada: pasa al paso ${respuesta.nextStep}."
+        respuesta.complete -> "Aprobada: el flujo queda cerrado."
         else -> "Aprobada."
     }
 

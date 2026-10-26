@@ -430,10 +430,10 @@ enum AprobacionesRules {
     /// sobre la intención: es él quien acaba de escribir en la base.
     static func mensajeDeDecision(aprobado: Bool, respuesta: DecisionRespuesta) -> String {
         if !aprobado || respuesta.cancelled {
-            return "Rechazada. La solicitud queda cancelada y el solicitante ya fue avisado."
+            return "Rechazada: la solicitud queda cancelada y el solicitante ya fue avisado."
         }
-        if let siguiente = respuesta.nextStep { return "Aprobada. Pasa al paso \(siguiente)." }
-        if respuesta.complete { return "Aprobada. El flujo queda cerrado." }
+        if let siguiente = respuesta.nextStep { return "Aprobada: pasa al paso \(siguiente)." }
+        if respuesta.complete { return "Aprobada: el flujo queda cerrado." }
         return "Aprobada."
     }
 
