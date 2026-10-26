@@ -159,8 +159,14 @@ export default function HerramientasChecklistEditor({
           <div className={s.kitLista}>
             {Array.from(kitPorUsuario.entries()).map(([uid, items]) => (
               <div key={uid} className={s.kitLista}>
-                <div className={s.nota}>
-                  {kit.find((k) => k.user?.id === uid)?.user?.nombre ?? "Usuario"} · {items.length} herramienta{items.length === 1 ? "" : "s"}
+                <div className={s.kitCabeza}>
+                  <span>{kit.find((k) => k.user?.id === uid)?.user?.nombre ?? "Usuario"}</span>
+                  <span className={s.separador} aria-hidden="true">
+                    ·
+                  </span>
+                  <span>
+                    {items.length} herramienta{items.length === 1 ? "" : "s"}
+                  </span>
                 </div>
                 <div className={s.kitChips}>
                   {items.map((it) => (
@@ -190,8 +196,15 @@ export default function HerramientasChecklistEditor({
                     <div className={s.filaT}>{fila.descripcion}</div>
                     {fila.source ? (
                       <div className={s.filaM}>
-                        {fila.source === "KIT" ? "Del kit" : "De almacén"}
-                        {fila.toolId ? ` · #${fila.toolId}` : ""}
+                        <span>{fila.source === "KIT" ? "Del kit" : "De almacén"}</span>
+                        {fila.toolId ? (
+                          <>
+                            <span className={s.separador} aria-hidden="true">
+                              ·
+                            </span>
+                            <span>#{fila.toolId}</span>
+                          </>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
