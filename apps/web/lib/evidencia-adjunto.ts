@@ -127,7 +127,7 @@ export async function dataUrlDeImagen(file: Blob): Promise<string> {
     const imagen = await new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("No se pudo leer la imagen. Usa JPG o PNG."));
+      img.onerror = () => reject(new Error("No se pudo leer la imagen: usa JPG o PNG."));
       img.src = url;
     }).finally(() => {
       revoke?.();
@@ -139,7 +139,7 @@ export async function dataUrlDeImagen(file: Blob): Promise<string> {
 
   try {
     const size = bordeEscalado(bitmap.width, bitmap.height);
-    if (!size) throw new Error("No se pudo leer la imagen. Usa JPG o PNG.");
+    if (!size) throw new Error("No se pudo leer la imagen: usa JPG o PNG.");
     const canvas = document.createElement("canvas");
     canvas.width = size.ancho;
     canvas.height = size.alto;
