@@ -47,6 +47,29 @@ describe('resolveTemplateOrThrow', () => {
     expect(() => resolveTemplateOrThrow({})).toThrow(BadRequestException);
   });
 
+  it('cita el texto viejo «Debes elegir una plantilla de permisos para el rol. Plantillas válidas: ceo, …» y «La plantilla "inventado" no existe. Plantillas válidas: ceo, …» y los deja en una frase', () => {
+    const clave = 'inventado';
+    const lista = validTemplateKeys().join(', ');
+    const viejoSinElegir = `Debes elegir una plantilla de permisos para el rol. Plantillas válidas: ${lista}`;
+    const viejoInexistente = `La plantilla "${clave}" no existe. Plantillas válidas: ${lista}`;
+    const sinElegir = messageOf(() => resolveTemplateOrThrow({}));
+    const porNombre = messageOf(() => resolveTemplateOrThrow({ nombre: 'Rol improvisado' }));
+    const inexistente = messageOf(() => resolveTemplateOrThrow({ orgRoleKey: clave }));
+
+    expect(lista).toContain('ceo');
+    expect(sinElegir).not.toBe(viejoSinElegir);
+    expect(inexistente).not.toBe(viejoInexistente);
+    expect(sinElegir).toBe(
+      `Debes elegir una plantilla de permisos para el rol; plantillas válidas: ${lista}`,
+    );
+    expect(porNombre).toBe(sinElegir);
+    expect(inexistente).toBe(`La plantilla "${clave}" no existe; plantillas válidas: ${lista}`);
+    expect(sinElegir).toContain('ceo');
+    expect(inexistente).toContain('ceo');
+    expect(sinElegir.includes('. ')).toBe(false);
+    expect(inexistente.includes('. ')).toBe(false);
+  });
+
   it('todas las claves publicadas resuelven', () => {
     for (const key of validTemplateKeys()) {
       expect(resolveTemplateOrThrow({ orgRoleKey: key }).orgRoleKey).toBe(key);
@@ -104,3 +127,12 @@ describe('buildRoleData', () => {
     expect(buildRoleData(template, { nombre: 'Técnico Norte' }).nombre).toBe('Técnico Norte');
   });
 });
+
+function messageOf(run: () => unknown): string {
+  try {
+    run();
+  } catch (e) {
+    return (e as Error).message;
+  }
+  throw new Error('debio rechazar');
+}
