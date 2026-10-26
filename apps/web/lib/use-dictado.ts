@@ -37,7 +37,7 @@ const MENSAJE_ERROR: Record<string, string> = {
   "not-allowed": "El navegador no tiene permiso para usar el micrófono.",
   "service-not-allowed": "El navegador no tiene permiso para usar el micrófono.",
   "audio-capture": "No se encontró un micrófono.",
-  network: "Se perdió la conexión del dictado. Vuelve a intentarlo.",
+  network: "Se perdió la conexión del dictado: vuelve a intentarlo.",
 };
 
 /** Une lo dictado al texto que ya había, con un espacio de por medio. */
@@ -98,7 +98,7 @@ export function useDictado(alTerminarFrase: (texto: string) => void) {
     r.onerror = (e) => {
       if (e.error === "no-speech" || e.error === "aborted") return;
       quiereEscuchar.current = false;
-      setError(MENSAJE_ERROR[e.error] ?? "El dictado se detuvo. Vuelve a intentarlo.");
+      setError(MENSAJE_ERROR[e.error] ?? "El dictado se detuvo: vuelve a intentarlo.");
     };
     const arrancar = () => {
       if (pista && pista.readyState === "live") {
