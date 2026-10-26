@@ -68,6 +68,7 @@ import {
 } from "@/lib/ops-operational-api";
 import { etiquetaEstado, formatoFecha, listarProyectos, type ProyectoFila } from "@/lib/proyectos-api";
 import { canUserAccessPath } from "@/lib/user-access";
+import { avisoAlDesactivarProyecto, avisoAlEliminarProyecto } from "@/lib/avisos-proyecto";
 import { nombreSector } from "../sectores";
 import { TiposCliente } from "../_componentes/TiposCliente";
 import styles from "../clientes-core.module.css";
@@ -374,7 +375,7 @@ export default function ClienteDetallePage() {
       title: activar ? "Reactivar proyecto" : "Desactivar proyecto",
       message: activar
         ? `«${p.title}» volverá a estar activo.`
-        : `«${p.title}» quedará inactivo. Sus actividades y su historial se conservan y podrás reactivarlo después.`,
+        : avisoAlDesactivarProyecto(p.title),
       confirmLabel: activar ? "Reactivar" : "Desactivar",
       danger: !activar,
       fn: async () => {
@@ -393,7 +394,7 @@ export default function ClienteDetallePage() {
   const pedirEliminarProyecto = (p: ProyectoDelCliente) => {
     setConfirm({
       title: "Eliminar proyecto",
-      message: `¿Eliminar el proyecto «${p.title}»? Esta acción no se puede deshacer. Sus actividades conservan su historial. Si solo está detenido, mejor desactívalo.`,
+      message: avisoAlEliminarProyecto(p.title),
       confirmLabel: "Eliminar",
       danger: true,
       fn: async () => {
