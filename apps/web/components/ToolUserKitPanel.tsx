@@ -82,6 +82,23 @@ interface UserKitRow {
   }[];
 }
 
+/** Nombre, modelo y serie: en escritorio en un renglón («A · B · C»); en el teléfono, uno por renglón. */
+function LineasHerramienta({ nombre, modelo, serie }: { nombre: string; modelo: string; serie: string }) {
+  return (
+    <span className={styles.lineasHerramienta}>
+      <span>{nombre}</span>
+      <span>
+        <span className={styles.lineasSep}> · </span>
+        {modelo}
+      </span>
+      <span>
+        <span className={styles.lineasSep}> · </span>
+        {serie}
+      </span>
+    </span>
+  );
+}
+
 /** Cómo se resolvió un incidente del kit: los mismos textos de las opciones. */
 const RESOLUCION: Record<string, { etiqueta: string; tono: Tone }> = {
   PENDING: { etiqueta: 'Pendiente', tono: 'warning' },
@@ -101,6 +118,7 @@ const ToolUserKitPanel: React.FC = () => {
   const [filterUserId, setFilterUserId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorDeCarga, setErrorDeCarga] = useState(false);
   const [resolvingEventId, setResolvingEventId] = useState<number | null>(null);
   const [resolutionType, setResolutionType] = useState<'USER_MISUSE' | 'EQUIPMENT_FAILURE'>('EQUIPMENT_FAILURE');
   const [resolutionNotes, setResolutionNotes] = useState('');
@@ -122,8 +140,10 @@ const ToolUserKitPanel: React.FC = () => {
       const payload = await response.json();
       setRows(Array.isArray(payload) ? payload : []);
       setError(null);
+      setErrorDeCarga(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
+      setErrorDeCarga(true);
     } finally {
       setLoading(false);
     }
@@ -238,6 +258,7 @@ const ToolUserKitPanel: React.FC = () => {
     setResolutionNotes('');
     setResolutionFineAmount('500');
     setError(null);
+    setErrorDeCarga(false);
   };
 
   const cancelResolveForm = () => {
@@ -255,6 +276,7 @@ const ToolUserKitPanel: React.FC = () => {
       fineAmount = Number(resolutionFineAmount);
       if (!fineAmount || fineAmount <= 0 || Number.isNaN(fineAmount)) {
         setError('Debes indicar un monto válido para multa por mal uso');
+        setErrorDeCarga(false);
         return;
       }
     }
@@ -281,9 +303,11 @@ const ToolUserKitPanel: React.FC = () => {
 
       await fetchRows();
       setError(null);
+      setErrorDeCarga(false);
       cancelResolveForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
+      setErrorDeCarga(false);
     } finally {
       setResolvingSubmit(false);
     }
@@ -357,6 +381,7 @@ const ToolUserKitPanel: React.FC = () => {
       await fetchRows();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
+      setErrorDeCarga(false);
     }
   };
 
@@ -438,11 +463,21 @@ const ToolUserKitPanel: React.FC = () => {
                             setInventoryOptions([]);
                           }}
                         >
-                          {option.toolName} · {option.model} · {option.serialNumber}
+                          <LineasHerramienta nombre={option.toolName} modelo={option.model} serie={option.serialNumber} />
                         </Button>
                       </li>
                     ))}
                   </ul>
+                )}
+                {/* En el teléfono el campo corta «nombre · modelo · serie»: abajo va uno por renglón. */}
+                {selectedInventory && (
+                  <div className={`${styles.rowTitle} ${styles.elegida}`} role="group" aria-label="Herramienta elegida">
+                    <LineasHerramienta
+                      nombre={selectedInventory.toolName}
+                      modelo={selectedInventory.model}
+                      serie={selectedInventory.serialNumber}
+                    />
+                  </div>
                 )}
               </div>
             </Field>
@@ -504,7 +539,21 @@ const ToolUserKitPanel: React.FC = () => {
 
         {error && (
           <div className={styles.aviso}>
-            <Alert tone="danger" role="alert" onDismiss={() => setError(null)}>
+            <Alert
+              tone="danger"
+              role="alert"
+              onDismiss={() => {
+                setError(null);
+                setErrorDeCarga(false);
+              }}
+              action={
+                errorDeCarga ? (
+                  <Button size="sm" variant="secondary" onClick={() => void fetchRows()}>
+                    Reintentar
+                  </Button>
+                ) : undefined
+              }
+            >
               {error}
             </Alert>
           </div>
@@ -566,7 +615,11 @@ const ToolUserKitPanel: React.FC = () => {
                             />
                             <div className={styles.rowTexto}>
                               <div className={styles.rowTitle}>
-                                {row.inventoryItem.toolName} · {row.inventoryItem.model} · {row.inventoryItem.serialNumber}
+                                <LineasHerramienta
+                                  nombre={row.inventoryItem.toolName}
+                                  modelo={row.inventoryItem.model}
+                                  serie={row.inventoryItem.serialNumber}
+                                />
                               </div>
                               <div className={styles.rowMeta}>
                                 <Badge tone={row.assignmentType === 'KIT' ? 'brand' : 'warning'} size="sm">

@@ -130,6 +130,17 @@
   overflow-wrap: anywhere;
 }
 
+/* Nombre, modelo y serie de una herramienta: en escritorio en un renglón. */
+.lineasHerramienta {
+  min-width: 0;
+  text-align: left;
+}
+
+/* La herramienta elegida, uno por renglón: solo hace falta en el teléfono. */
+.elegida {
+  display: none;
+}
+
 .rowMeta {
   display: flex;
   align-items: center;
@@ -232,5 +243,26 @@
 
   .fotoSerie {
     display: none;
+  }
+
+  /* Un dato por renglón: nombre, modelo y serie. */
+  .lineasHerramienta {
+    display: grid;
+    line-height: 1.35;
+  }
+
+  .lineasSep {
+    display: none;
+  }
+
+  .suggestionBox .suggestionItem {
+    height: auto;
+    align-items: flex-start;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .elegida {
+    display: block;
   }
 }
