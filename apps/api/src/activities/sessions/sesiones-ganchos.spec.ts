@@ -125,6 +125,36 @@ describe('evidencia → sesiones de trabajo', () => {
 });
 
 describe('checada de salida → sesiones de trabajo', () => {
+  // Reloj fijo a media jornada (jueves 22-10-2026, 13:00 de Ciudad de México). Con el reloj real,
+  // entre las 00:00 y las 02:00 la sesión que empezó «hace 2 h» es del día laboral anterior y
+  // se cierra por corte de día (`CORTE_DIA`) en vez de `SALIDA`: la prueba fallaba según la hora.
+  // Solo se fija la fecha; los temporizadores y las promesas siguen siendo los reales.
+  beforeEach(() => {
+    jest.useFakeTimers({
+      now: new Date('2026-10-22T19:00:00.000Z'),
+      doNotFake: [
+        'hrtime',
+        'nextTick',
+        'performance',
+        'queueMicrotask',
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+        'requestIdleCallback',
+        'cancelIdleCallback',
+        'setImmediate',
+        'clearImmediate',
+        'setInterval',
+        'clearInterval',
+        'setTimeout',
+        'clearTimeout',
+      ],
+    });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   function asistencia() {
     const sesiones = [
       { id: 1, userId: 3, startedAt: new Date(Date.now() - 2 * 3_600_000), endedAt: null as Date | null, endReason: null as string | null },
