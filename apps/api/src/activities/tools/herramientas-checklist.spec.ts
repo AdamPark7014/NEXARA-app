@@ -127,4 +127,14 @@ describe('mensajeChecklistPendiente', () => {
   it('sin pendientes no hay mensaje', () => {
     expect(mensajeChecklistPendiente([])).toBe('');
   });
+
+  it('el aviso del checklist pendiente cabe en una frase', () => {
+    // La lista ya lleva dos puntos; el punto y coma es a propósito.
+    expect(mensajeChecklistPendiente(['Escalera'])).toBe(
+      'Falta palomear el checklist de herramientas antes de iniciar: Escalera; si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.',
+    );
+    expect(mensajeChecklistPendiente(['A', 'B', 'C', 'D', 'E', 'F'])).toBe(
+      'Faltan palomear el checklist de herramientas antes de iniciar: A, B, C, D y 2 más; si algo no lo traes o está dañado, márcalo y avisa a tu supervisor.',
+    );
+  });
 });
