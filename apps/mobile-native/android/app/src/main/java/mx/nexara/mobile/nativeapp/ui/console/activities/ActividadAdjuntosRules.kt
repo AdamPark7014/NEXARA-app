@@ -97,7 +97,7 @@ object ActividadAdjuntosRules {
         return adjunto.mimeType?.trim()?.ifEmpty { null } ?: MIME_GENERICO
     }
 
-    // ── El renglón: «2.3 MB · Luis Joel · hoy 13:39» ────────────────────────
+    // ── El renglón: tamaño, quién lo subió y la hora, cada uno en su línea ──
 
     /** «512 B», «48 KB», «2.3 MB», «25 MB». `null` si el API no lo manda. */
     fun tamanoLegible(bytes: Long?): String? {
@@ -119,11 +119,19 @@ object ActividadAdjuntosRules {
     /** Hora de México, 24 h: «hoy 13:39», «ayer 09:05», «lun 5 oct 18:11». */
     fun fechaTexto(iso: String?, ahora: Instant = Instant.now()): String = EquipoEstado.cuandoMx(iso, ahora)
 
-    fun pie(adjunto: AdjuntoDto, ahora: Instant = Instant.now()): String = listOfNotNull(
+    /**
+     * Tamaño, quién lo subió y la hora, en ese orden. Lo que no venga no se escribe.
+     * La fila pinta cada elemento en su propio renglón.
+     */
+    fun lineas(adjunto: AdjuntoDto, ahora: Instant = Instant.now()): List<String> = listOfNotNull(
         tamanoLegible(adjunto.sizeBytes),
         adjunto.subidoPor?.nombre?.trim()?.ifEmpty { null },
         fechaTexto(adjunto.createdAt, ahora).ifEmpty { null },
-    ).joinToString(" · ")
+    )
+
+    /** Los mismos datos en una frase. La pantalla no la usa: va un dato por renglón. */
+    fun pie(adjunto: AdjuntoDto, ahora: Instant = Instant.now()): String =
+        lineas(adjunto, ahora).joinToString(" · ")
 
     // ── Antes de subir ──────────────────────────────────────────────────────
 
