@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
 import s from "./encabezado.module.css";
 import base from "./sitio.module.css";
+import { ruta } from "./rutas";
 import TemaBoton from "./TemaBoton";
 import Flecha from "./Flecha";
 
@@ -43,8 +44,8 @@ const Chevron = () => (
   </svg>
 );
 
-export default function Encabezado({ inicio = "/" }: { inicio?: string }) {
-  const ruta = usePathname();
+export default function Encabezado() {
+  const camino = usePathname();
   const [menu, setMenu] = useState<MenuId | null>(null);
   const [hoja, setHoja] = useState(false);
   const [hojaGrupo, setHojaGrupo] = useState<MenuId | null>(null);
@@ -81,7 +82,7 @@ export default function Encabezado({ inicio = "/" }: { inicio?: string }) {
   useEffect(() => {
     setHoja(false);
     setMenu(null);
-  }, [ruta]);
+  }, [camino]);
 
   const abrir = (id: MenuId) => {
     window.clearTimeout(cierre.current);
@@ -92,7 +93,10 @@ export default function Encabezado({ inicio = "/" }: { inicio?: string }) {
     cierre.current = window.setTimeout(() => setMenu(null), 140);
   };
 
-  const actual = (href: string) => (ruta === href || ruta?.startsWith(`${href}/`) ? "page" : undefined);
+  const actual = (href: string) => {
+    const destino = ruta(href);
+    return camino === destino || camino?.startsWith(`${destino}/`) ? "page" : undefined;
+  };
 
   const grupo = (id: MenuId, etiqueta: string, opciones: Opcion[], pie: React.ReactNode) => (
     <div className={s.grupo} onPointerEnter={() => abrir(id)} onPointerLeave={cerrarLuego}>
@@ -111,7 +115,7 @@ export default function Encabezado({ inicio = "/" }: { inicio?: string }) {
           <div id={`menu-${id}`} className={`${s.panel} ${id === "industrias" ? s.panelAngosto : ""}`}>
             <div className={s.panelRejilla}>
               {opciones.map((o) => (
-                <Link key={o.href} href={o.href} className={s.opcion} onClick={() => setMenu(null)}>
+                <Link key={o.href} href={ruta(o.href)} className={s.opcion} onClick={() => setMenu(null)}>
                   <span className={s.opcionIcono}>
                     <PublicIcon name={o.icono} size={20} />
                   </span>
@@ -132,7 +136,7 @@ export default function Encabezado({ inicio = "/" }: { inicio?: string }) {
   return (
     <header className={s.barra} data-bajado={bajado || hoja ? "true" : "false"}>
       <div className={`${base.contenedor} ${s.fila}`}>
-        <Link href={inicio} className={s.marca} aria-label="NEXARA, inicio">
+        <Link href={ruta("/")} className={s.marca} aria-label="NEXARA, inicio">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/nexara-mark-v2.png" alt="" className={s.marcaIso} width={30} height={30} />
           <span className={s.marcaNombre}>NEXARA</span>
@@ -145,7 +149,7 @@ export default function Encabezado({ inicio = "/" }: { inicio?: string }) {
             MENU_SERVICIOS,
             <>
               <span>¿No sabes por dónde empezar?</span>
-              <Link href="/contacto" onClick={() => setMenu(null)}>
+              <Link href={ruta("/contacto")} onClick={() => setMenu(null)}>
                 Agenda un diagnóstico
                 <Flecha />
               </Link>
@@ -157,25 +161,25 @@ export default function Encabezado({ inicio = "/" }: { inicio?: string }) {
             MENU_INDUSTRIAS,
             <>
               <span>Cada industria tiene su riesgo típico.</span>
-              <Link href="/servicios" onClick={() => setMenu(null)}>
+              <Link href={ruta("/servicios")} onClick={() => setMenu(null)}>
                 Ver todos los servicios
                 <Flecha />
               </Link>
             </>,
           )}
           {ENLACES.map((l) => (
-            <Link key={l.href} href={l.href} className={s.navEnlace} aria-current={actual(l.href)}>
+            <Link key={l.href} href={ruta(l.href)} className={s.navEnlace} aria-current={actual(l.href)}>
               {l.label}
             </Link>
           ))}
         </nav>
 
         <div className={s.lado}>
-          <Link href="/contacto" className={`${s.navEnlace} ${s.contacto}`} aria-current={actual("/contacto")}>
+          <Link href={ruta("/contacto")} className={`${s.navEnlace} ${s.contacto}`} aria-current={actual("/contacto")}>
             Contacto
           </Link>
           <TemaBoton className={s.icono} />
-          <Link href="/contacto" className={s.cta} data-track-conversion="header_cta">
+          <Link href={ruta("/contacto")} className={s.cta} data-track-conversion="header_cta">
             Cotizar
             <Flecha />
           </Link>
@@ -213,7 +217,7 @@ export default function Encabezado({ inicio = "/" }: { inicio?: string }) {
               {hojaGrupo === id ? (
                 <div className={s.hojaSub}>
                   {opciones.map((o) => (
-                    <Link key={o.href} href={o.href}>
+                    <Link key={o.href} href={ruta(o.href)}>
                       <span className={s.opcionIcono}>
                         <PublicIcon name={o.icono} size={18} />
                       </span>
@@ -226,13 +230,13 @@ export default function Encabezado({ inicio = "/" }: { inicio?: string }) {
           ))}
           {[...ENLACES, { href: "/contacto", label: "Contacto" }].map((l) => (
             <div key={l.href} className={s.hojaGrupo}>
-              <Link href={l.href} className={s.hojaEnlace} aria-current={actual(l.href)}>
+              <Link href={ruta(l.href)} className={s.hojaEnlace} aria-current={actual(l.href)}>
                 {l.label}
               </Link>
             </div>
           ))}
           <div className={s.hojaAcciones}>
-            <Link href="/contacto" className={`${base.boton} ${base.botonPrimario}`}>
+            <Link href={ruta("/contacto")} className={`${base.boton} ${base.botonPrimario}`}>
               Cotiza tu proyecto
             </Link>
           </div>

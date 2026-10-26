@@ -1,0 +1,262 @@
+import Link from "next/link";
+import type { Metadata } from "next";
+import s from "@/components/sitio/sitio.module.css";
+import p from "@/components/sitio/paginas.module.css";
+import Aurora from "@/components/sitio/Aurora";
+import Flecha from "@/components/sitio/Flecha";
+import Cierre from "@/components/sitio/Cierre";
+import MapaMexico from "@/components/sitio/MapaMexico";
+import { ruta } from "@/components/sitio/rutas";
+import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
+import { GEO_CITIES } from "@/lib/seo/geo-cities";
+
+export const metadata: Metadata = {
+  title: "Proyectos · NEXARA (propuesta)",
+  robots: { index: false, follow: false },
+};
+
+export const dynamic = "force-dynamic";
+
+const DATOS: { icono: PublicIconName; etiqueta: string; valor: string }[] = [
+  { icono: "search", etiqueta: "En campo", valor: "Diagnóstico e instalación con evidencia en sitio" },
+  { icono: "building", etiqueta: "Multisede", valor: "Estándares repetibles para sucursales y campus" },
+  { icono: "headset", etiqueta: "Soporte", valor: "Continuidad después del arranque, no solo la entrega" },
+  { icono: "mapPin", etiqueta: "Nacional", valor: "Base en Puebla y CDMX, proyectos en todo el país" },
+];
+
+/** Referencias representativas por industria (sin nombrar al cliente), las mismas del sitio actual. */
+const CASOS: { sector: string; icono: PublicIconName; titulo: string; texto: string; metrica: string; servicios: string[] }[] = [
+  { sector: "Retail", icono: "store", titulo: "Modernización multisede", texto: "Videovigilancia, redes y soporte de punto de venta con un estándar repetible por sucursal.", metrica: "60 sedes", servicios: ["CCTV", "Redes", "Soporte"] },
+  { sector: "Manufactura", icono: "factory", titulo: "Continuidad de planta", texto: "Redes de piso, perímetro y monitoreo para reducir paros por fallas de infraestructura.", metrica: "Menos paros", servicios: ["Redes", "CCTV", "Infraestructura"] },
+  { sector: "Hospitalidad", icono: "hotel", titulo: "Wi‑Fi de alta densidad", texto: "Diseño de cobertura y cableado para habitaciones y áreas públicas sin saturar la experiencia.", metrica: "480 hab.", servicios: ["Wi‑Fi", "Cableado", "Soporte"] },
+  { sector: "Salud", icono: "hospital", titulo: "Infraestructura clínica", texto: "Segmentación, respaldos y soporte prioritario para la continuidad de la atención.", metrica: "12 sitios", servicios: ["Redes", "Infraestructura", "Soporte"] },
+  { sector: "Educación", icono: "school", titulo: "Campus conectado", texto: "Wi‑Fi, videovigilancia y mesa de ayuda para aulas, laboratorios y edificios administrativos.", metrica: "3 campus", servicios: ["Wi‑Fi", "CCTV", "Mesa de ayuda"] },
+  { sector: "Gobierno", icono: "landmark", titulo: "Modernización por fases", texto: "Infraestructura documentada, entregables auditables y continuidad operativa.", metrica: "Por fases", servicios: ["Infraestructura", "Redes", "Documentación"] },
+];
+
+/** Galería de campo: instalaciones reales, sin tomas de taller repetidas. */
+const GALERIA = [
+  { src: "/fotos/campo-mastil-antenas.jpg", w: 1200, h: 1600, alt: "Mástil con antenas de enlace inalámbrico", tema: "Redes", pie: "Mástil con antenas de enlace." },
+  { src: "/fotos/monitoreo-pantallas-cctv.jpg", w: 1600, h: 1200, alt: "Pantallas de videovigilancia", tema: "CCTV", pie: "Monitores de videovigilancia multicámara." },
+  { src: "/fotos/control-acceso-terminal-facial.jpg", w: 1066, h: 1600, alt: "Terminal de reconocimiento facial", tema: "Control de acceso", pie: "Terminal facial en acceso de oficinas." },
+  { src: "/fotos/campo-instalacion-rack.jpg", w: 1280, h: 958, alt: "Técnicos instalando un rack", tema: "Instalación", pie: "Montaje de rack de telecomunicaciones." },
+  { src: "/fotos/rack-servidores-led.jpg", w: 1023, h: 1537, alt: "Rack de servidores y switching", tema: "Infraestructura", pie: "Rack de servidores, etiquetado y documentado." },
+  { src: "/fotos/campo-enlace-antena-ciudad.jpg", w: 1600, h: 1200, alt: "Radioenlace sobre la ciudad", tema: "Enlaces", pie: "Radioenlace punto a punto entre sedes." },
+  { src: "/fotos/control-acceso-torniquetes.jpg", w: 1600, h: 1066, alt: "Torniquetes de control de acceso", tema: "Control de acceso", pie: "Torniquetes con reconocimiento facial." },
+  { src: "/fotos/sala-monitoreo-videowall-nexara-1200.webp", w: 1200, h: 800, alt: "Sala de monitoreo con video wall", tema: "Monitoreo", pie: "Sala de monitoreo lista para operar." },
+  { src: "/fotos/tecnico-nexara-entrega-equipo-sitio-1200.webp", w: 1200, h: 800, alt: "Técnico de NEXARA entregando equipo en sitio", tema: "Logística", pie: "Entrega de equipo en sitio." },
+];
+
+const DOCUMENTACION = [
+  { titulo: "Levantamiento en sitio", texto: "Recorrido, riesgos, planos y prioridades antes de cotizar. Sin propuestas a ciegas." },
+  { titulo: "Memoria técnica", texto: "Diagramas, direccionamiento, etiquetado y configuraciones entregadas al cliente." },
+  { titulo: "Entrega con evidencia", texto: "Pruebas, fotografías y capacitación. Después, soporte con SLA." },
+];
+
+type CasoStudio = { id: number; titulo: string; sector: string; resumen: string; imagen: string | null };
+
+/** Casos publicados en Studio; hoy la API devuelve una lista vacía y la sección no se pinta. */
+async function casosStudio(): Promise<CasoStudio[]> {
+  try {
+    const res = await fetch(buildApiUrl("case-studies/public?limit=12"), { cache: "no-store" });
+    if (!res.ok) return [];
+    const carga = (await res.json()) as unknown;
+    const filas = (Array.isArray(carga) ? carga : (carga as { data?: unknown[] })?.data) ?? [];
+    const origen = getApiAssetOrigin();
+    return (filas as Record<string, any>[]).map((c) => {
+      const img: string | null = c.imageUrl || c.cover || null;
+      return {
+        id: c.id,
+        titulo: c.titulo,
+        sector: c.vertical || "Proyecto",
+        resumen: c.descripcion || c.impacto || "",
+        imagen: !img ? null : /^https?:/.test(img) ? img : img.startsWith("/") ? `${origen}${img}` : `${origen}/case-studies/image/${img}`,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+export default async function PropuestaProyectos() {
+  const publicados = await casosStudio();
+
+  return (
+    <main aria-label="Proyectos">
+      <section className={p.hero} aria-labelledby="proyectos-hero">
+        <Aurora />
+        <div className={`${s.contenedor} ${s.centro}`}>
+          <p className={s.antetitulo}>Proyectos</p>
+          <h1 id="proyectos-hero" className={p.heroTitulo}>
+            Instalaciones <span className={s.degradado}>que operan hoy.</span>
+          </h1>
+          <p className={p.heroLead}>Videovigilancia, redes, cómputo y soporte en sitios reales, con evidencia de cada entrega.</p>
+          <div className={s.acciones}>
+            <Link href={ruta("/contacto")} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="proyectos_hero_cta">
+              Cotiza tu proyecto
+              <Flecha />
+            </Link>
+            <a href="#galeria" className={`${s.boton} ${s.botonSecundario}`}>
+              Ver la galería
+              <Flecha />
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Cómo trabajamos en campo" style={{ paddingTop: "clamp(56px, 7vw, 96px)" }}>
+        <div className={s.contenedor}>
+          <ul className={p.datos} style={{ marginTop: 0 }}>
+            {DATOS.map((d) => (
+              <li key={d.etiqueta} className={p.dato} data-aparecer>
+                <span className={p.datoIcono}>
+                  <PublicIcon name={d.icono} size={22} />
+                </span>
+                <p className={p.datoEtiqueta}>{d.etiqueta}</p>
+                <p className={p.datoValor}>{d.valor}</p>
+              </li>
+            ))}
+          </ul>
+
+          <div className={s.cabeza} style={{ marginTop: "clamp(88px, 10vw, 140px)" }} data-aparecer>
+            <div>
+              <p className={s.antetitulo}>Por industria</p>
+              <h2 className={s.titulo}>
+                Referencias <span className={s.tenue}>que se repiten.</span>
+              </h2>
+            </div>
+            <p className={s.lead}>Proyectos representativos por industria, sin nombrar a los clientes.</p>
+          </div>
+          <ul className={p.casos}>
+            {CASOS.map((c) => (
+              <li key={c.sector} className={p.caso} data-aparecer>
+                <div className={p.casoCabeza}>
+                  <span className={p.casoSector}>
+                    <PublicIcon name={c.icono} size={18} /> {c.sector}
+                  </span>
+                  <span className={p.casoMetrica}>{c.metrica}</span>
+                </div>
+                <h3 className={p.casoTitulo}>{c.titulo}</h3>
+                <p className={p.casoTexto}>{c.texto}</p>
+                <div className={p.chips}>
+                  {c.servicios.map((sv) => (
+                    <span key={sv}>{sv}</span>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {publicados.length ? (
+        <section className={s.seccion} aria-labelledby="publicados-titulo">
+          <div className={s.contenedor}>
+            <header data-aparecer>
+              <p className={s.antetitulo}>Casos publicados</p>
+              <h2 id="publicados-titulo" className={s.titulo}>
+                Casos <span className={s.tenue}>de campo.</span>
+              </h2>
+            </header>
+            <ul className={p.casos}>
+              {publicados.map((c) => (
+                <li key={c.id} className={p.caso} data-aparecer>
+                  {c.imagen ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.imagen} alt="" loading="lazy" decoding="async" style={{ width: "100%", aspectRatio: "16 / 10", objectFit: "cover", borderRadius: 14 }} />
+                  ) : null}
+                  <span className={p.casoSector} style={{ marginTop: 20 }}>
+                    {c.sector}
+                  </span>
+                  <h3 className={p.casoTitulo} style={{ marginTop: 8 }}>
+                    {c.titulo}
+                  </h3>
+                  <p className={p.casoTexto}>{c.resumen}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      ) : null}
+
+      <section id="galeria" className={`${s.seccion} ${p.ancla}`} aria-labelledby="galeria-titulo">
+        <div className={s.contenedor}>
+          <div className={s.cabeza} data-aparecer>
+            <div>
+              <p className={s.antetitulo}>Galería</p>
+              <h2 id="galeria-titulo" className={s.titulo}>
+                Trabajo real, <span className={s.tenue}>sin banco de imágenes.</span>
+              </h2>
+            </div>
+            <p className={s.lead}>Fotografía de instalaciones de NEXARA en operación.</p>
+          </div>
+          <div className={p.mosaico}>
+            {GALERIA.map((g) => (
+              <figure key={g.src} data-aparecer>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={g.src} width={g.w} height={g.h} alt={g.alt} loading="lazy" decoding="async" />
+                <figcaption>
+                  <b>{g.tema}</b>
+                  {g.pie}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="doc-titulo">
+        <div className={s.contenedor}>
+          <header className={s.centro} data-aparecer>
+            <p className={s.antetitulo}>Documentación</p>
+            <h2 id="doc-titulo" className={s.titulo}>
+              Cada proyecto <span className={s.tenue}>queda por escrito.</span>
+            </h2>
+          </header>
+          <ol className={p.tres}>
+            {DOCUMENTACION.map((d, i) => (
+              <li key={d.titulo} className={p.tresItem} data-aparecer>
+                <span className={p.tresNumero}>0{i + 1}</span>
+                <h3 className={p.tresTitulo}>{d.titulo}</h3>
+                <p className={p.tresTexto}>{d.texto}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section className={s.seccion} aria-labelledby="cobertura-proyectos">
+        <div className={`${s.contenedor} ${s.cobertura}`}>
+          <div data-aparecer>
+            <p className={s.antetitulo}>Cobertura</p>
+            <h2 id="cobertura-proyectos" className={s.titulo}>
+              Donde <span className={s.tenue}>trabajamos.</span>
+            </h2>
+            <p className={s.lead}>Base en Puebla y la Ciudad de México; proyectos multisede en toda la República.</p>
+            <nav className={s.ciudades} aria-label="Ciudades">
+              {GEO_CITIES.map((c) => (
+                <Link key={c.slug} href={`/cobertura/${c.slug}`} className={s.ciudad}>
+                  {c.name}
+                </Link>
+              ))}
+            </nav>
+          </div>
+          <div data-aparecer>
+            <MapaMexico />
+          </div>
+        </div>
+      </section>
+
+      <Cierre
+        titulo={
+          <>
+            ¿Tu sitio es el siguiente? <span className={s.tenue}>Cuéntanos qué necesitas.</span>
+          </>
+        }
+        texto="Diagnóstico en sitio en el centro del país y propuesta con alcance cerrado."
+        origen="/proyectos"
+      />
+    </main>
+  );
+}

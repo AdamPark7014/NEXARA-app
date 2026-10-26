@@ -26,9 +26,9 @@ export const metadata: Metadata = {
 export default function PropuestaLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className={`${s.sitio} ${display.variable}`} data-sitio>
-      <Encabezado inicio="/propuesta" />
+      <Encabezado />
       {children}
-      <Pie inicio="/propuesta" />
+      <Pie />
       <Aparecer />
     </div>
   );

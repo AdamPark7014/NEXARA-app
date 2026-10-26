@@ -1,6 +1,7 @@
 import Link from "next/link";
 import s from "./pie.module.css";
 import base from "./sitio.module.css";
+import { ruta } from "./rutas";
 import PieAcciones from "./PieAcciones";
 
 const WHATSAPP = "https://wa.me/522226960350?text=Hola%2C%20me%20interesa%20informaci%C3%B3n%20de%20Nexara";
@@ -81,13 +82,13 @@ const REDES = [
   },
 ];
 
-export default function Pie({ inicio = "/" }: { inicio?: string }) {
+export default function Pie() {
   return (
     <footer className={s.pie}>
       <div className={base.contenedor}>
         <div className={s.arriba}>
           <div>
-            <Link href={inicio} className={s.marca} aria-label="NEXARA, inicio">
+            <Link href={ruta("/")} className={s.marca} aria-label="NEXARA, inicio">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/brand/nexara-mark-v2.png" alt="" className={s.marcaIso} width={26} height={26} />
               <span className={s.marcaNombre}>NEXARA</span>
@@ -117,7 +118,7 @@ export default function Pie({ inicio = "/" }: { inicio?: string }) {
                         {e.label}
                       </a>
                     ) : e.href.startsWith("/") ? (
-                      <Link href={e.href}>{e.label}</Link>
+                      <Link href={ruta(e.href)}>{e.label}</Link>
                     ) : (
                       <a href={e.href}>{e.label}</a>
                     )}
