@@ -3349,6 +3349,24 @@
   text-overflow: ellipsis;
 }
 
+/* Canal y miembros: en escritorio en una línea con « · »; en teléfono, uno por renglón. */
+@media (max-width: 560px) {
+  .panelSubDatos {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .panelSubDato {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .panelSubSep {
+    display: none;
+  }
+}
+
 .panelActions {
   display: flex;
   align-items: center;

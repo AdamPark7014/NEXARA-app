@@ -24,7 +24,7 @@ function PanelHead({
   return (
     <div className={styles.panelHead}>
       <button type="button" className={styles.mobileBack} aria-label="Volver al canal" onClick={onClose}>
-        ← Chat
+        ‹ Chat
       </button>
       <div className={styles.panelTitleBlock}>
         <h3 className={styles.panelTitle}>{title}</h3>
@@ -69,10 +69,18 @@ export function MembersPanel({
         title="Miembros"
         subtitle={
           detail ? (
-            <>
-              {channelPrefixNode(detail.kind)}
-              {detail.name} · {detail.memberCount}
-            </>
+            <span className={styles.panelSubDatos}>
+              <span className={styles.panelSubDato}>
+                {channelPrefixNode(detail.kind)}
+                {detail.name}
+              </span>
+              <span className={styles.panelSubSep} aria-hidden="true">
+                {" · "}
+              </span>
+              <span className={styles.panelSubDato}>
+                {detail.memberCount} {detail.memberCount === 1 ? "miembro" : "miembros"}
+              </span>
+            </span>
           ) : null
         }
         onClose={onClose}
