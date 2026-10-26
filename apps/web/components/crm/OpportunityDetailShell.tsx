@@ -100,7 +100,7 @@ export default function OpportunityDetailShell({ id, children }: { id: string; c
       <div className={chrome.detailShell}>
         <header style={{ marginBottom: 14 }}>
           <Link href="/crm/opportunities" className={chrome.detailBack}>
-            ← Oportunidades
+            ‹ Oportunidades
           </Link>
           <h1 className={chrome.detailTitle}>
             {loading ? `Oportunidad #${id}` : opportunity?.title ?? `Oportunidad #${id}`}
