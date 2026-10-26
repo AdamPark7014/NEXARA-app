@@ -131,6 +131,66 @@ describe('reparto de un viático entre actividades — la regla del cuadre', () 
     expect(validarReparto(partes, 1200).ok).toBe(false);
   });
 
+  it('cada aviso del reparto cabe en una frase, con el número y el monto del dato', () => {
+    const duplicada = validarReparto(
+      normalizarPartes([
+        { actividadId: 12, monto: 600 },
+        { actividadId: 12, monto: 600 },
+      ]),
+      1200,
+    );
+    expect(duplicada).toEqual({
+      ok: false,
+      mensaje: 'La actividad #12 aparece dos veces en el reparto: junta las dos partes en una sola con el monto sumado.',
+    });
+
+    const enCero = validarReparto(
+      normalizarPartes([
+        { actividadId: 12, monto: 0 },
+        { actividadId: 13, monto: 1200 },
+      ]),
+      1200,
+    );
+    expect(enCero).toEqual({
+      ok: false,
+      mensaje:
+        'La parte de la actividad #12 es de $0.00: cada parte tiene que ser mayor que cero; si esa actividad no carga nada, quítala del reparto.',
+    });
+
+    expect(() => normalizarPartes([{ monto: 1200 }])).toThrow(
+      'La parte 1 del reparto no indica a qué actividad se carga: elige una actividad.',
+    );
+    expect(() => normalizarPartes([{ actividadId: 12 }])).toThrow(
+      'La parte 1 del reparto no trae un importe válido: captura cuánto carga esa actividad.',
+    );
+
+    const corto = validarReparto(
+      normalizarPartes([
+        { actividadId: 12, monto: 700 },
+        { actividadId: 13, monto: 300 },
+      ]),
+      1200,
+    );
+    expect(corto).toEqual({
+      ok: false,
+      mensaje:
+        'El reparto suma $1,000.00 y el viático es de $1,200.00, así que faltan $200.00: reparte lo que falta o corrige el monto del viático.',
+    });
+
+    const largo = validarReparto(
+      normalizarPartes([
+        { actividadId: 12, monto: 900 },
+        { actividadId: 13, monto: 500 },
+      ]),
+      1200,
+    );
+    expect(largo).toEqual({
+      ok: false,
+      mensaje:
+        'El reparto suma $1,400.00 y el viático es de $1,200.00, así que sobran $200.00: baja alguna parte o corrige el monto del viático.',
+    });
+  });
+
   it('sin partes no hay reparto: el viático sigue siendo de una sola actividad', () => {
     expect(validarReparto([], 1200)).toEqual({ ok: true });
   });
