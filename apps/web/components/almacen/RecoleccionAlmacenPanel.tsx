@@ -31,6 +31,13 @@ import s from "./RecoleccionAlmacenPanel.module.css";
 const INFO =
   "Código de 6 caracteres (48 h). Teclea aquí para entregar; queda quién y cuándo.";
 
+/** Si ya hay lista, el fallo y lo que se sigue viendo van en una sola frase. */
+function textoDelError(error: string, hayLista: boolean) {
+  if (!hayLista) return error;
+  const base = error.replace(/[.!\s]+$/u, "");
+  return `${base}; se muestra lo último que cargó.`;
+}
+
 /** Vigencia del código con su tono: rojo caducó, ámbar caduca pronto, verde vigente. */
 function vigencia(p: { vencido: boolean; horasRestantes: number | null }) {
   if (p.vencido) {
@@ -263,7 +270,7 @@ export default function RecoleccionAlmacenPanel() {
                 </Button>
               }
             >
-              {pendientes.length > 0 ? `${error}. Se muestra lo último que cargó.` : error}
+              {textoDelError(error, pendientes.length > 0)}
             </Alert>
           </div>
         )}
