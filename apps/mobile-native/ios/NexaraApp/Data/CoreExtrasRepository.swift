@@ -496,13 +496,13 @@ struct StockNivel: Decodable, Identifiable, Hashable {
         product?.name.nilSiVacio ?? product?.sku.nilSiVacio ?? "Producto sin nombre"
     }
 
-    /// «SKU-123 · Bodega central».
+    /// SKU y bodega, uno por renglón. El pasillo no viaja en este modelo.
     var ubicacionTexto: String {
         let partes = [
             product?.sku.nilSiVacio,
             warehouse?.name.nilSiVacio ?? warehouse?.code.nilSiVacio,
         ].compactMap { $0 }
-        return partes.isEmpty ? "Sin almacén asignado" : partes.joined(separator: " · ")
+        return partes.isEmpty ? "Sin almacén asignado" : partes.joined(separator: "\n")
     }
 
     /// Lo que de verdad se puede tomar: existencia menos lo apartado.
@@ -538,7 +538,7 @@ struct StockNivel: Decodable, Identifiable, Hashable {
             partes.append("\(CoreExtrasFormato.numero(apartado)) apartado")
             partes.append("\(CoreExtrasFormato.numero(disponible)) libre")
         }
-        return partes.joined(separator: " · ")
+        return partes.joined(separator: "\n")
     }
 }
 

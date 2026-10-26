@@ -3,6 +3,7 @@ package mx.nexara.mobile.nativeapp.ui.console.more
 import mx.nexara.mobile.nativeapp.data.api.StockAlmacenDto
 import mx.nexara.mobile.nativeapp.data.api.StockLevelDto
 import mx.nexara.mobile.nativeapp.data.api.StockProductoDto
+import mx.nexara.mobile.nativeapp.data.api.StockUbicacionDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -121,7 +122,13 @@ class AlmacenRulesTest {
 
     @Test
     fun theLocationLineJoinsWhatExists() {
-        assertEquals("CBL-1 · Bodega central", AlmacenRules.ubicacionTexto(nivel()))
+        assertEquals("CBL-1\nBodega central", AlmacenRules.ubicacionTexto(nivel()))
+        assertEquals(
+            "SKU-123\nBodega central\nPasillo 3",
+            AlmacenRules.ubicacionTexto(
+                nivel(sku = "SKU-123").copy(location = StockUbicacionDto(name = "Pasillo 3")),
+            ),
+        )
         assertEquals(
             "Sin almacén asignado",
             AlmacenRules.ubicacionTexto(nivel(sku = null, almacen = null).copy(warehouse = null)),
@@ -132,7 +139,7 @@ class AlmacenRulesTest {
     fun theDetailLineOnlySaysWhatItKnows() {
         assertEquals("mínimo 5", AlmacenRules.detalleTexto(nivel(cantidad = "10", reorden = "5")))
         assertEquals(
-            "mínimo 5 · 3 apartado · 7 libre",
+            "mínimo 5\n3 apartado\n7 libre",
             AlmacenRules.detalleTexto(nivel(cantidad = "10", reorden = "5", reservado = "3")),
         )
     }
@@ -186,6 +193,6 @@ class AlmacenRulesTest {
             nivel(id = 2, cantidad = "2", reorden = "5"),
             nivel(id = 3, cantidad = "1", reorden = "5"),
         )
-        assertEquals("1 sin existencia · 2 bajo mínimo", AlmacenRules.resumenAlertas(mezcla))
+        assertEquals("1 sin existencia\n2 bajo mínimo", AlmacenRules.resumenAlertas(mezcla))
     }
 }
