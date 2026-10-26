@@ -228,7 +228,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
     // Validar email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(branchDraft.portalEmail)) {
-      setError('El email de acceso no es válido. Ejemplo: usuario@empresa.com');
+      setError('El email de acceso no es válido, ejemplo: usuario@empresa.com');
       return;
     }
 
@@ -787,7 +787,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
 
       {branches.length === 0 && !editingBranchId && (
         <div className={styles.emptyBase}>
-          No tienes sucursales aún. Crea una para comenzar.
+          No tienes sucursales aún: crea una para comenzar.
         </div>
       )}
     </div>
