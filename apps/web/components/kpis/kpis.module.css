@@ -97,6 +97,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* En escritorio las cifras siguen en una línea, con « · ». En teléfono, una por renglón. */
+.detalleCifras {
+  min-width: 0;
+}
+
 .pct {
   text-align: right;
   font-size: 20px;
@@ -123,6 +128,22 @@
   .persona { grid-area: persona; }
   .medio { grid-area: medio; }
   .pct { grid-area: pct; }
+
+  .detalle {
+    align-items: flex-start;
+  }
+
+  .detalleCifras {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    flex-basis: 100%;
+    gap: 2px;
+  }
+
+  .detalleSep {
+    display: none;
+  }
 }
 
 .leyenda {
