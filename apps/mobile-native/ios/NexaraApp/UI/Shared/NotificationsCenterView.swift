@@ -166,12 +166,8 @@ struct NotificationsCenterView: View {
         let destino = NotificationDeepLinkResolver.resolve(notification: n)
         let titulo = ConsoleHelpers.mapStr(n, "title")
         let mensaje = ConsoleHelpers.mapStr(n, "message")
-        let meta = [
-            NotifCategoria.etiqueta(ConsoleHelpers.mapStr(n, "category")),
-            Self.haceCuanto(ConsoleHelpers.mapStr(n, "createdAt")),
-        ]
-        .filter { !$0.isEmpty }
-        .joined(separator: " · ")
+        let categoria = NotifCategoria.etiqueta(ConsoleHelpers.mapStr(n, "category"))
+        let hace = Self.haceCuanto(ConsoleHelpers.mapStr(n, "createdAt"))
 
         let contenido = HStack(alignment: .top, spacing: 10) {
             Circle()
@@ -195,10 +191,17 @@ struct NotificationsCenterView: View {
                         .foregroundStyle(NxColors.muted)
                         .lineLimit(3)
                 }
-                if !meta.isEmpty {
-                    Text(meta)
+                if !categoria.isEmpty {
+                    Text(categoria)
                         .font(NxType.labelMedium)
                         .foregroundStyle(NxColors.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if !hace.isEmpty {
+                    Text(hace)
+                        .font(NxType.labelMedium)
+                        .foregroundStyle(NxColors.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

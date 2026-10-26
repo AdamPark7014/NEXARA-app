@@ -590,17 +590,16 @@ private fun NotificationCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                val meta = buildList {
-                    n.category?.takeIf { it.isNotBlank() }?.let { raw ->
-                        add(NOTIFICATION_CATEGORY_LABEL[raw.lowercase()] ?: raw)
-                    }
-                    // «Hace 12 min» en vez de la fecha ISO cruda.
-                    CoreActivityRules.relativeTime(n.createdAt)
-                        .takeIf { it.isNotBlank() }
-                        ?.let { add(it) }
-                }.joinToString(" · ")
-                if (meta.isNotBlank()) {
-                    Text(meta, style = MaterialTheme.typography.labelMedium, color = NxColors.Muted)
+                val categoria = n.category?.takeIf { it.isNotBlank() }?.let { raw ->
+                    NOTIFICATION_CATEGORY_LABEL[raw.lowercase()] ?: raw
+                }.orEmpty()
+                // «Hace 12 min» en vez de la fecha ISO cruda.
+                val hace = CoreActivityRules.relativeTime(n.createdAt)
+                if (categoria.isNotBlank()) {
+                    Text(categoria, style = MaterialTheme.typography.labelMedium, color = NxColors.Muted)
+                }
+                if (hace.isNotBlank()) {
+                    Text(hace, style = MaterialTheme.typography.labelMedium, color = NxColors.Muted)
                 }
             }
             Box {
