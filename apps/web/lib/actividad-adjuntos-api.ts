@@ -151,14 +151,23 @@ export function cuandoMx(iso: string | null | undefined, ahora: Date = new Date(
   return `${semana} ${f.dia} ${MESES[f.mes - 1]}${anio} ${hora}`;
 }
 
-/** La línea gris del renglón: «2.3 MB · Luis Joel · hoy 13:39». */
+/**
+ * Tamaño, quién lo subió y cuándo, cada uno por separado. Se omite el que falte.
+ * En el renglón van juntos en pantalla ancha y, en el teléfono, uno por línea.
+ */
+export function datosDeAdjunto(
+  a: Pick<AdjuntoActividad, "sizeBytes" | "subidoPor" | "createdAt">,
+  ahora: Date = new Date(),
+): string[] {
+  return [tamanoLegible(a.sizeBytes), a.subidoPor?.nombre?.trim() ?? "", cuandoMx(a.createdAt, ahora)].filter(Boolean);
+}
+
+/** Los mismos datos en una línea: «2.3 MB · Luis Joel · hoy 13:39». */
 export function metaDeAdjunto(
   a: Pick<AdjuntoActividad, "sizeBytes" | "subidoPor" | "createdAt">,
   ahora: Date = new Date(),
 ): string {
-  return [tamanoLegible(a.sizeBytes), a.subidoPor?.nombre?.trim() ?? "", cuandoMx(a.createdAt, ahora)]
-    .filter(Boolean)
-    .join(" · ");
+  return datosDeAdjunto(a, ahora).join(" · ");
 }
 
 /**
