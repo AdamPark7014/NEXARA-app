@@ -11,6 +11,7 @@ import {
   hayFlujo,
   iniciales,
   motivoSinActividad,
+  partesContextoActividad,
   queHace,
   resumenEquipo,
   ultimaActividad,
@@ -228,6 +229,8 @@ describe("queHace y contextoActividad", () => {
       openActivities: [{ ...abierta, assignmentCharge: "Despacho a equipo" }],
     });
     expect(contextoActividad(u)).toBe("AN-1042 · Despacho a equipo · Atrasada · 2 h 15 min");
+    // «Atrasada · 2 h 15 min» es un solo dato: el punto medio no lo parte.
+    expect(partesContextoActividad(u)).toEqual(["AN-1042", "Despacho a equipo", "Atrasada · 2 h 15 min"]);
   });
 
   it("sin nada abierto pero con algo terminado: «Última: <título>»", () => {
@@ -248,6 +251,8 @@ describe("queHace y contextoActividad", () => {
       idleSinceAt: ENTRADA_1005,
     });
     expect(contextoActividad(u, AHORA)).toBe("Entró 10:05 · sin nada hace 2 h 15 min");
+    // En el teléfono cada parte va en su renglón: la entrada y el tiempo sin nada son dos datos.
+    expect(partesContextoActividad(u, AHORA)).toEqual(["Entró 10:05", "sin nada hace 2 h 15 min"]);
   });
 
   it("sin nada asignado: sin entrada hoy o ya salió", () => {

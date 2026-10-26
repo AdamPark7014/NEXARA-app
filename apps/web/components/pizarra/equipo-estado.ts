@@ -477,28 +477,31 @@ export function queHace(u: TeamBoardUser): string {
 }
 
 /**
- * Sin nada abierto, su jornada de hoy: «Entró 10:05 · sin nada hace 2 h 15 min»,
- * «Salió 18:02» o «Sin entrada hoy».
+ * Sin nada abierto, la jornada de hoy en datos sueltos. La entrada y el tiempo
+ * sin actividad son dos datos: «Entró 10:05» y «sin nada hace 2 h 15 min».
+ * También «Salió 18:02» o «Sin entrada hoy».
  */
-function jornadaSinNada(u: TeamBoardUser, ahora: number): string {
+function partesJornadaSinNada(u: TeamBoardUser, ahora: number): string[] {
   const entrada = fecha(u.entradaHoyAt);
-  if (!entrada) return "Sin entrada hoy";
+  if (!entrada) return ["Sin entrada hoy"];
   const salida = fecha(u.salidaHoyAt);
-  if (salida) return `Salió ${hora(salida)}`;
+  if (salida) return [`Salió ${hora(salida)}`];
   const min = minutosDesde(u.idleSinceAt, ahora);
   return min != null && min >= 1
-    ? `Entró ${hora(entrada)} · sin nada hace ${formatMinutes(min)}`
-    : `Entró ${hora(entrada)}`;
+    ? [`Entró ${hora(entrada)}`, `sin nada hace ${formatMinutes(min)}`]
+    : [`Entró ${hora(entrada)}`];
 }
 
 /**
- * Renglón 2: el contexto de esa actividad — folio, encargo y desde cuándo.
+ * Renglón 2, un dato por entrada: folio, encargo, el periodo si es de varios
+ * días, y el atraso. «Atrasada · 2 h 15 min» es un solo dato: el punto medio
+ * va dentro del atraso, no parte el renglón.
  *
  * El tablero (`me/board`) no manda sede ni cliente, así que el «dónde» del
  * boceto se resuelve con lo que sí existe: número de actividad, el encargo y la
  * hora real de arranque o el atraso acumulado.
  */
-export function contextoActividad(u: TeamBoardUser, ahora: number = Date.now()): string {
+export function partesContextoActividad(u: TeamBoardUser, ahora: number = Date.now()): string[] {
   const partes: string[] = [];
   const abierta = u.openActivities?.[0];
   const folio = abierta?.anNumber || u.currentActivity?.anNumber;
@@ -524,12 +527,20 @@ export function contextoActividad(u: TeamBoardUser, ahora: number = Date.now()):
     partes.push(`Desde las ${hora(u.activityStartedAt)}`);
   } else if ((u.status === "sin_actividad" || u.status === "inactivo") && u.entradaHoyAt !== undefined) {
     // API vieja (sin `entradaHoyAt`): se queda el rótulo del estado, como antes.
-    partes.push(jornadaSinNada(u, ahora));
+    partes.push(...partesJornadaSinNada(u, ahora));
   } else {
     partes.push(STATUS_LABELS[u.status] ?? "");
   }
 
-  return partes.filter(Boolean).join(" · ");
+  return partes.filter(Boolean);
+}
+
+/**
+ * Los mismos datos de `partesContextoActividad`, en un solo renglón.
+ * En escritorio la tarjeta los deja juntos; a 390 px los parte.
+ */
+export function contextoActividad(u: TeamBoardUser, ahora: number = Date.now()): string {
+  return partesContextoActividad(u, ahora).join(" · ");
 }
 
 /**
