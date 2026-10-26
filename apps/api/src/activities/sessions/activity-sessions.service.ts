@@ -574,7 +574,7 @@ export class ActivitySessionsService {
       throw new BadRequestException('Primero inicia la actividad');
     }
     const r = await this.abrir({ activityId: p.activityId, userId: p.userId, companyId: tenantId });
-    if (!r.abierta) throw new BadRequestException('No se pudo reanudar la actividad. Intenta de nuevo.');
+    if (!r.abierta) throw new BadRequestException('No se pudo reanudar la actividad: intenta de nuevo.');
     return this.estado(p.activityId, p.userId, tenantId);
   }
 
