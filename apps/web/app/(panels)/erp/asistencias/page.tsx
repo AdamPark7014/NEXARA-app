@@ -244,7 +244,7 @@ function InsigniasChecada({ checada }: { checada?: ChecadaValidable }) {
   return (
     <span className={styles.insignias}>
       {insignias.map((i) => (
-        <Badge key={i.clave} tone={TONO_INSIGNIA[i.clave]} size="sm" title={i.detalle}>
+        <Badge key={i.clave} tone={TONO_INSIGNIA[i.clave]} size="sm" title={i.detalle} className={styles.insignia}>
           {i.texto}
         </Badge>
       ))}
@@ -724,7 +724,7 @@ export default function ErpAsistenciasPage() {
             />
             {aviso ? (
               <span className={styles.insignias}>
-                <Badge tone={aviso.tono} size="sm" title={aviso.detalle}>
+                <Badge tone={aviso.tono} size="sm" title={aviso.detalle} className={styles.insignia}>
                   {aviso.texto}
                 </Badge>
               </span>

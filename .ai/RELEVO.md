@@ -1,5 +1,13 @@
 # RELEVO
 
+- **26-10 ~10:30 (claude-code) — Asistencias: la insignia larga ya no se encima con la foto de la checada.**
+  - Adam (captura de la ficha del día): en la tarjeta ENTRADA, «Revisar: Ubicación tomada 26 min después de
+    checar (al checar: …)» se salía por debajo de la foto y del borde. El `Badge` base (`piezas.module.css`) es
+    `nowrap` con alto fijo de 20 px; no se tocó (se usa en todo el panel).
+  - `asistencias.module.css`: `.insignias .insignia` (alto libre, `white-space: normal`, radio 10 px = píldora en un
+    renglón) y `max-width: 100%` en `.insignias`. `page.tsx`: la clase va en las insignias de `InsigniasChecada`
+    (ficha, columna Entrada/Salida de la tabla y tarjetas móviles) y en el aviso de ubicación de la columna Estado.
+
 - **26-10 ~05:10 UTC (claude-code, R-1) — Transcriptor aparte para dictado (whisper `small`, 1 CPU).**
   - Decisión del coordinador (opción b): el turbo q8_0 tardaba en un dictado lo que dura el audio y el dictado
     de 2 min podía pasar del límite de 100 s. Ahora `/api/ai/voz/transcribir` usa `TranscriptorService.dictar`:

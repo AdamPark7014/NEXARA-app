@@ -88,6 +88,20 @@
   flex-wrap: wrap;
   gap: var(--ui-s1);
   margin-top: var(--ui-s1);
+  max-width: 100%;
+}
+
+/* El motivo de revisión es largo («Ubicación tomada 26 min después de checar…»):
+   la insignia se parte en renglones en vez de salirse por debajo de la foto. */
+.insignias .insignia {
+  height: auto;
+  min-height: 20px;
+  max-width: 100%;
+  padding-block: 3px;
+  border-radius: 10px;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .tiempo {
