@@ -143,8 +143,8 @@ struct ActivityCancelSheet: View {
 
     var body: some View {
         ActivityDialogSheet(title: "Cancelar actividad", titleWeight: .bold) {
-            Text("La actividad quedará como «Cancelada» con tu motivo en el historial. Se avisa a quienes "
-                + "la ejecutan, al responsable, a sus jefes y a Christian.")
+            Text("La actividad quedará como «Cancelada» con tu motivo en el historial y se avisa a quienes la ejecutan, "
+                + "al responsable, a sus jefes y a dirección general.")
                 .font(.system(size: 13))
                 .foregroundStyle(NxColors.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -188,7 +188,7 @@ struct ActivityCancelSheet: View {
         defer { saving = false }
         do {
             try await CoreRepository.shared.cancelActivity(activityId: target.id, motivo: limpio)
-            onDone("La actividad quedó cancelada. Se avisó al equipo, a sus jefes y a Christian.")
+            onDone("La actividad quedó cancelada y se avisó al equipo, a sus jefes y a dirección general.")
             dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo cancelar la actividad")
@@ -219,9 +219,8 @@ struct ActivityNoCumplidaSheet: View {
 
     var body: some View {
         ActivityDialogSheet(title: "Registrar incumplimiento", titleWeight: .bold) {
-            Text("La actividad se cierra como «No cumplida»: ya no admite evidencia ni se puede iniciar. "
-                + "La causa y tus observaciones quedan en el historial y cuentan en los KPI. "
-                + "Después puedes reprogramarla.")
+            Text("La actividad se cierra como «No cumplida»: ya no admite evidencia ni se puede iniciar, "
+                + "y cuenta en los KPI de quienes no la entregaron.")
                 .font(.system(size: 13))
                 .foregroundStyle(NxColors.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -307,7 +306,7 @@ struct ActivityNoCumplidaSheet: View {
         defer { saving = false }
         do {
             try await CoreRepository.shared.registrarNoCumplida(activityId: target.id, causa: elegida, observaciones: limpio)
-            onDone("La actividad quedó como no cumplida. Puedes reprogramarla cuando haya fecha.")
+            onDone("La actividad quedó como no cumplida y se avisó a quienes la tenían, al responsable y a sus jefes.")
             dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo registrar el incumplimiento")
@@ -344,8 +343,8 @@ struct ActivityReprogramarSheet: View {
 
     var body: some View {
         ActivityDialogSheet(title: "Reprogramar", titleWeight: .bold) {
-            Text("La actividad se reabre con la nueva fecha. El incumplimiento no se borra: "
-                + "queda en el historial y en los KPI.")
+            Text("La actividad se reabre con la nueva fecha y el equipo recibe el aviso, pero el incumplimiento "
+                + "no se borra y sigue contando en los KPI.")
                 .font(.system(size: 13))
                 .foregroundStyle(NxColors.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -403,7 +402,7 @@ struct ActivityReprogramarSheet: View {
         do {
             try await CoreRepository.shared.reprogramarNoCumplida(activityId: target.id, fecha: fecha, motivo: limpio)
             let cuando = ActivityDetailFormat.when(ActivityDetailFormat.isoString(fecha)).map { " para \($0)" } ?? ""
-            onDone("Actividad reprogramada\(cuando). Vuelve a estar abierta; el incumplimiento queda en el historial.")
+            onDone("La actividad se reabrió\(cuando) y el incumplimiento queda en el historial.")
             dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo reprogramar la actividad")
@@ -441,8 +440,8 @@ struct ActivityReassignSheet: View {
 
     var body: some View {
         ActivityDialogSheet(title: "Pasar a otro compañero", titleWeight: .bold) {
-            Text("Quien la recibe continúa donde se quedó: ve el avance anterior y toma sus propias fotos "
-                + "de entrada y salida. El avance de quien sale queda guardado.")
+            Text("Quien la recibe continúa donde se quedó, ve el avance anterior y toma sus propias fotos "
+                + "de entrada y salida, y el avance de quien sale queda guardado.")
                 .font(.system(size: 13))
                 .foregroundStyle(NxColors.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -601,7 +600,7 @@ struct ActivityReassignSheet: View {
             )
             let corto = ActivityDetailRules.shortName(destino.nombre)
             let quien = corto.isEmpty ? "tu compañero" : corto
-            onDone("La actividad pasó a \(quien). Continuará donde se quedó con sus propias fotos de entrada y salida.")
+            onDone("La actividad pasó a \(quien) y continuará donde se quedó con sus propias fotos de entrada y salida.")
             dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo pasar la actividad")
