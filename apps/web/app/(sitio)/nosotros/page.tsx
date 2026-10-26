@@ -49,9 +49,9 @@ const PRINCIPIOS = [
 ];
 
 const EN_CAMPO = [
-  { ...foto("campo-instalacion-ap-altura", "(max-width: 734px) 100vw, 400px"), alt: "Técnico de NEXARA instalando un punto de acceso en altura", tema: "Instalación", pie: "Punto de acceso exterior en un campus." },
-  { ...foto("campo-enlace-antena-ciudad", "(max-width: 734px) 100vw, 400px"), alt: "Enlace inalámbrico instalado en azotea", tema: "Enlaces", pie: "Radioenlace punto a punto entre sedes." },
-  { ...foto("monitoreo-videowall", "(max-width: 734px) 100vw, 400px"), alt: "Video wall de videovigilancia instalado por NEXARA", tema: "Monitoreo", pie: "Muro de video listo para operar." },
+  { ...foto("campo-levantamiento-patio", "(max-width: 734px) 100vw, 400px"), alt: "Integrante de NEXARA en el levantamiento de un patio de maniobras", tema: "Levantamiento", pie: "Recorrido del sitio antes de cotizar." },
+  { ...foto("tecnico-ensamble-chasis-pc-taller", "(max-width: 734px) 100vw, 400px"), alt: "Técnico de NEXARA ensamblando un equipo en el taller", tema: "Taller", pie: "Cada equipo se arma y se prueba aquí." },
+  { ...foto("tecnicos-mantenimiento-pc-colaboracion", "(max-width: 734px) 100vw, 400px"), alt: "Dos técnicos de NEXARA revisando un equipo", tema: "Revisión", pie: "Dos personas revisan cada entrega." },
 ];
 
 

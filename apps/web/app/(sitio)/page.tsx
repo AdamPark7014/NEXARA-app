@@ -118,7 +118,7 @@ const INDUSTRIAS: Industria[] = [
 const PREGUNTAS: Pregunta[] = [
   {
     p: "¿Hacen el diagnóstico en sitio?",
-    r: "Sí. Recorremos el sitio, levantamos riesgos y priorizamos lo que realmente mueve tu operación. En Puebla, la Ciudad de México y el centro del país vamos en persona.",
+    r: "Sí, antes de cotizar. En Puebla, la Ciudad de México y el centro del país vamos en persona; en el resto del país lo programamos como primera fase del proyecto.",
   },
   {
     p: "¿Atienden fuera de Puebla y la Ciudad de México?",
@@ -428,7 +428,7 @@ export default async function PropuestaInicio() {
                 Del diagnóstico al soporte. <span className={s.tenue}>Sin sorpresas.</span>
               </>
             }
-            lead="Alcance cerrado, calendario visible y evidencia de cada entrega. Seguimos contigo cuando el proyecto ya está operando."
+            lead="Tres pasos y las mismas personas, de la primera visita al soporte."
             pasos={pasos}
           />
         </div>

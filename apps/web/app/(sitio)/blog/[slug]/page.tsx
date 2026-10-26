@@ -13,6 +13,7 @@ import Directorio from "@/components/sitio/Directorio";
 import Cierre from "@/components/sitio/Cierre";
 import Flecha from "@/components/sitio/Flecha";
 import SimuladorCobertura from "@/components/sitio/SimuladorCobertura";
+import BarraLectura from "@/components/sitio/BarraLectura";
 import { foto, fotoOg } from "@/components/sitio/fotos";
 
 type Params = { slug: string };
@@ -159,7 +160,8 @@ function GuiaPagina({ guia }: { guia: Guia }) {
         publicada={guia.publicada}
         modificada={guia.publicada}
       />
-      <article aria-labelledby="nota-titulo">
+      <BarraLectura articulo="nota" />
+      <article id="nota" aria-labelledby="nota-titulo">
         <header className={i.articulo}>
           <Migas alinear="izq" migas={[{ href: "/", label: "Inicio" }, { href: "/blog", label: "Blog" }, { label: guia.titulo }]} />
           <p className={i.fecha}>
@@ -262,7 +264,8 @@ export default async function BlogPostPage({ params }: { params: Params }) {
         modificada={post.updatedAt || publicada}
       />
 
-      <article aria-labelledby="nota-titulo">
+      <BarraLectura articulo="nota" />
+      <article id="nota" aria-labelledby="nota-titulo">
         <header className={i.articulo}>
           <Migas alinear="izq" migas={[{ href: "/", label: "Inicio" }, { href: "/blog", label: "Blog" }, { label: post.title }]} />
           <p className={i.fecha}>

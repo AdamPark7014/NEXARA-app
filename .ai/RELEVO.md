@@ -1,5 +1,20 @@
 # RELEVO
 
+- **26-10 ~17:00 (claude-code) — Ronda de detalles de UI en el sitio público.**
+  - El reseteo base del sitio (h1–h4, p, listas, img, a) pasó de `sitio.module.css` (`.sitio :where(…)`, peso de una
+    clase: empataba con las clases de los módulos y ganaba la hoja que cargara al último) a `sitio-documento.css`
+    con peso 0,0,3 (`html body :where([data-sitio]) :is(…)`). En Contacto el hero salía descentrado por eso.
+  - Portada: la tarjeta «Próximo mantenimiento» ya no tapa el «En vivo» del tablero; nombres de cámara cortos; el
+    lead de «Cómo trabajamos» y la primera pregunta ya no repiten el texto de los pasos.
+  - Fotos verticales fuera de los heros 21:9 (`monitoreo-videowall` es 0.86): ERP, automatización, hospitalidad y
+    Proyectos usan horizontales; Proyectos estrena foto en el hero y su galería toma la vertical. Nosotros «En campo»
+    con fotos de levantamiento y taller que no salen en la portada; equipo en una fila de cinco, iniciales arriba.
+  - Acordeón de preguntas con deslizamiento (`::details-content` + `interpolate-size` en `.sitio`) y barra de avance
+    de lectura en guías y notas (`components/sitio/BarraLectura.tsx`). «Cotizar redes y Wi‑Fi» / «soporte TI» con
+    sus mayúsculas.
+  - Ojo al verificar: el panel integrado oculto no pinta y no dispara `scroll`, así que el encabezado no toma su
+    vidrio ahí; en Chrome normal sí (`data-bajado="true"` al bajar).
+
 - **26-10 ~15:55 (claude-code) — Mapa interactivo de cobertura, simulador de cámaras y metadatos recortados.**
   - Rastreo de las 169 URL del sitemap en producción (script de la sesión): todo 200, un h1 por página, 157 enlaces
     internos y 82 imágenes sin rotos, JSON-LD válido, sin títulos repetidos. Faltaba: 147 descripciones de más de

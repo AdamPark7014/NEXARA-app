@@ -334,7 +334,8 @@ export default function PropuestaServicios() {
                 </ul>
                 <p className={p.servicioEnlace}>
                   <Link href={ruta(`/contacto?servicio=${sv.id}`)} className={s.enlace} data-track-conversion={`servicios_${sv.id}_cta`}>
-                    Cotizar {sv.nav.toLowerCase()}
+                    {/* Solo la inicial en minúscula: «Wi‑Fi» y «TI» conservan sus mayúsculas. */}
+                    Cotizar {sv.nav.charAt(0).toLowerCase() + sv.nav.slice(1)}
                     <Flecha />
                   </Link>
                 </p>
