@@ -156,10 +156,20 @@ describe("búsqueda rápida de inventario", () => {
     expect(await screen.findByText("Sin resultados para “xyz”")).toBeInTheDocument();
   });
 
+  it("si la búsqueda falla, el aviso es una frase y Reintentar vuelve a pedirla", async () => {
+    const fetchMock = responder(() => ({ status: 502, body: "<html>502</html>" }));
+    render(<BusquedaRapidaInventario />);
+    expect(await screen.findByText("No se pudo buscar en el inventario.")).toBeInTheDocument();
+    const antes = fetchMock.mock.calls.length;
+    await userEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(antes));
+  });
+
   it("si el servidor aún no tiene la búsqueda, avisa sin romper", async () => {
     responder(() => ({ status: 404, body: { message: "Cannot GET /api/tool-requests/busqueda-rapida", statusCode: 404 } }));
     render(<BusquedaRapidaInventario />);
-    expect(await screen.findByText(/todavía no está disponible/)).toBeInTheDocument();
+    expect(await screen.findByText("La búsqueda rápida todavía no está disponible.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
     expect(screen.getByRole("searchbox")).toBeInTheDocument();
   });
 

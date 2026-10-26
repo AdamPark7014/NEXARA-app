@@ -214,8 +214,8 @@ export function esErrorSinAcceso(err: unknown): boolean {
 export function mensajeErrorBusqueda(err: unknown): string {
   const crudo = err instanceof Error ? err.message : typeof err === "string" ? err : "";
   if (/\b404\b|Cannot GET|Not Found/i.test(crudo)) {
-    return "La búsqueda rápida todavía no está disponible. Usa las listas de abajo mientras tanto.";
+    return "La búsqueda rápida todavía no está disponible.";
   }
   if (/\b403\b|Forbidden/i.test(crudo)) return "No tienes acceso a la búsqueda de inventario.";
-  return formatApiError(err, "No se pudo buscar en el inventario. Intenta de nuevo.");
+  return formatApiError(err, "No se pudo buscar en el inventario.");
 }

@@ -143,7 +143,7 @@ describe("mensajeErrorBusqueda", () => {
 
   it("un 404 es que el servidor todavía no tiene la búsqueda", () => {
     const err = new Error(JSON.stringify({ message: "Cannot GET /api/tool-requests/busqueda-rapida", statusCode: 404 }));
-    expect(mensajeErrorBusqueda(err)).toMatch(/todavía no está disponible/);
+    expect(mensajeErrorBusqueda(err)).toBe("La búsqueda rápida todavía no está disponible.");
   });
 
   it("sin permiso lo dice", () => {
@@ -152,7 +152,7 @@ describe("mensajeErrorBusqueda", () => {
 
   it("lo demás usa el mensaje de la API o uno amable", () => {
     expect(mensajeErrorBusqueda(new Error('{"message":"q demasiado largo"}'))).toBe("q demasiado largo");
-    expect(mensajeErrorBusqueda(new Error("<html>502</html>"))).toBe("No se pudo buscar en el inventario. Intenta de nuevo.");
+    expect(mensajeErrorBusqueda(new Error("<html>502</html>"))).toBe("No se pudo buscar en el inventario.");
   });
 });
 
