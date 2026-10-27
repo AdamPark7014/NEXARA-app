@@ -9,12 +9,15 @@ import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import p from "./paleta.module.css";
 import { ABRIR_PALETA, MENU_INDUSTRIAS, MENU_SERVICIOS } from "./Encabezado";
 import { ruta } from "./rutas";
+import { GUIAS } from "@/lib/guias";
 
 type Item = {
   id: string;
-  grupo: "Páginas" | "Servicios" | "Industrias" | "Ciudades" | "Acciones";
+  grupo: "Páginas" | "Servicios" | "Industrias" | "Ciudades" | "Guías" | "Acciones";
   titulo: string;
   detalle?: string;
+  /** Palabras que la gente escribe y no salen en el título (CCTV, wifi, ERP…). */
+  claves?: string;
   icono: PublicIconName;
   href?: string;
   externo?: boolean;
@@ -22,6 +25,15 @@ type Item = {
 };
 
 const CORREO = "gerencia@nexara.com.mx";
+
+/** Sinónimos por sección de /servicios. */
+const CLAVES_SERVICIO: Record<string, string> = {
+  "#cctv": "cctv camaras seguridad videovigilancia nvr dvr grabacion monitoreo control de acceso",
+  "#redes": "wifi wi-fi internet red redes cableado switch fibra radioenlace enlace",
+  "#computo": "computadoras pc equipo de computo servidores rack respaldo backup laptops",
+  "#soporte": "soporte mesa de ayuda helpdesk sla mantenimiento tecnico ti",
+  "#software": "software erp automatizacion portal tablero dashboard indicadores app",
+};
 
 const normal = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -32,15 +44,26 @@ function armarItems(): Item[] {
     { id: "p-proyectos", grupo: "Páginas", titulo: "Proyectos", detalle: "Casos y galería de campo", icono: "clipboard", href: ruta("/proyectos") },
     { id: "p-nosotros", grupo: "Páginas", titulo: "Nosotros", detalle: "Equipo y principios", icono: "users", href: ruta("/nosotros") },
     { id: "p-contacto", grupo: "Páginas", titulo: "Contacto", detalle: "Cotiza tu proyecto", icono: "phone", href: ruta("/contacto") },
-    { id: "p-blog", grupo: "Páginas", titulo: "Blog", detalle: "Notas de campo", icono: "fileCheck", href: "/blog" },
+    { id: "p-blog", grupo: "Páginas", titulo: "Blog", detalle: "Guías y notas de campo", icono: "fileCheck", href: "/blog" },
+    { id: "p-qa", grupo: "Páginas", titulo: "Preguntas frecuentes", detalle: "Tiempos, garantías y cotización", claves: "faq dudas precio costo", icono: "search", href: "/qa" },
+    { id: "p-privacidad", grupo: "Páginas", titulo: "Aviso de privacidad", detalle: "Legal", claves: "datos personales terminos cookies", icono: "lock", href: "/legal/privacidad" },
   ];
   const servicios: Item[] = MENU_SERVICIOS.filter((o) => o.href.includes("#")).map((o) => ({
     id: `s-${o.href}`,
     grupo: "Servicios",
     titulo: o.titulo,
     detalle: o.texto,
+    claves: CLAVES_SERVICIO[o.href.slice(o.href.indexOf("#"))],
     icono: o.icono,
     href: ruta(o.href),
+  }));
+  const guias: Item[] = GUIAS.map((g) => ({
+    id: `g-${g.slug}`,
+    grupo: "Guías",
+    titulo: g.titulo,
+    detalle: `${g.tema} · ${g.lectura} min`,
+    icono: "fileCheck",
+    href: `/blog/${g.slug}`,
   }));
   const industrias: Item[] = MENU_INDUSTRIAS.map((o) => ({
     id: `i-${o.href}`,
@@ -72,7 +95,7 @@ function armarItems(): Item[] {
     { id: "a-correo", grupo: "Acciones", titulo: "Copiar correo", detalle: CORREO, icono: "fileCheck", accion: "copiar-correo" },
     { id: "a-tema", grupo: "Acciones", titulo: "Cambiar tema claro u oscuro", icono: "refresh", accion: "tema" },
   ];
-  return [...paginas, ...servicios, ...industrias, ...ciudades, ...acciones];
+  return [...paginas, ...servicios, ...industrias, ...ciudades, ...guias, ...acciones];
 }
 
 /**
@@ -92,9 +115,9 @@ export default function Paleta() {
 
   const resultados = useMemo(() => {
     const palabras = normal(consulta).split(/\s+/).filter(Boolean);
-    if (!palabras.length) return todos.filter((i) => i.grupo !== "Ciudades" && i.grupo !== "Industrias");
+    if (!palabras.length) return todos.filter((i) => i.grupo !== "Ciudades" && i.grupo !== "Industrias" && i.grupo !== "Guías");
     return todos.filter((i) => {
-      const texto = normal(`${i.titulo} ${i.detalle ?? ""} ${i.grupo}`);
+      const texto = normal(`${i.titulo} ${i.detalle ?? ""} ${i.claves ?? ""} ${i.grupo}`);
       return palabras.every((w) => texto.includes(w));
     });
   }, [consulta, todos]);
