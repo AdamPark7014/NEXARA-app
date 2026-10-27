@@ -11,7 +11,7 @@ vi.mock("next/link", () => ({
 }));
 
 const AVISO =
-  "Solo usamos cookies necesarias y, con tu permiso, activamos analítica para mejorar el sitio: consulta el Aviso de Privacidad y la Política de Cookies.";
+  "Usamos cookies necesarias y, con tu permiso, de analítica: consulta el Aviso de Privacidad y la Política de Cookies.";
 
 const NECESARIAS =
   "Autenticación, seguridad y funcionamiento básico, siempre activas.";
@@ -30,7 +30,7 @@ describe("CookieConsentBanner", () => {
     const aviso = await screen.findByText((_, node) => node?.id === "nexara-cookie-consent-desc");
     expect(aviso).toHaveTextContent(AVISO);
     expect(frases(AVISO)).toEqual([
-      "Solo usamos cookies necesarias y, con tu permiso, activamos analítica para mejorar el sitio: consulta el Aviso de Privacidad y la Política de Cookies",
+      "Usamos cookies necesarias y, con tu permiso, de analítica: consulta el Aviso de Privacidad y la Política de Cookies",
     ]);
     expect(screen.getByRole("link", { name: "Aviso de Privacidad" })).toHaveAttribute(
       "href",

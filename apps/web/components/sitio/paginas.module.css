@@ -329,48 +329,6 @@
   opacity: 0.78;
 }
 
-/* ── Industrias en píldoras ─────────────────────────────────────────────── */
-
-.pildoras {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: clamp(36px, 4vw, 52px);
-}
-
-.pildoras .pildora {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 22px;
-  border-radius: var(--radius-lg);
-  background: var(--tile);
-  box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line-soft);
-  font-size: 16px;
-  font-weight: 600;
-  transition: box-shadow 0.2s var(--ease), transform 0.2s var(--ease);
-}
-
-.pildoras .pildora:active {
-  transform: scale(0.98);
-}
-
-.pildoras .pildora:hover {
-  box-shadow: var(--sombra-md), inset 0 0 0 1px var(--line);
-  transform: translateY(-2px);
-}
-
-.pildoraIcono {
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--accent);
-}
-
 /* ── Rejilla de tres (principios, documentación) ────────────────────────── */
 
 .tres {
@@ -816,7 +774,8 @@
   position: absolute;
   top: 50%;
   right: 14px;
-  padding: 6px 12px;
+  min-height: 36px;
+  padding: 6px 14px;
   border: 0;
   border-radius: 999px;
   background: var(--control);
@@ -950,9 +909,6 @@
   .logos {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .pildoras {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   .casos {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -979,7 +935,6 @@
     grid-template-columns: 1fr;
   }
   .logos,
-  .pildoras,
   .equipo {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

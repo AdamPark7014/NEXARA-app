@@ -40,7 +40,8 @@ export default function Baldosa({ nombre, texto, acciones, foto, arte, pie, anch
           />
         </div>
       ) : null}
-      <h3 className={b.nombre}>{nombre}</h3>
+      {/* h2: cada baldosa abre su propia sección de la portada, justo debajo del h1. */}
+      <h2 className={b.nombre}>{nombre}</h2>
       <p className={b.texto}>{texto}</p>
       <div className={b.botones}>
         {acciones.map((a) => (

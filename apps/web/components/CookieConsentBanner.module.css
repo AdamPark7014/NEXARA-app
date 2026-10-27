@@ -190,15 +190,43 @@
   transform: translateX(16px);
 }
 
+/*
+ * En el teléfono el aviso tapaba un cuarto de la pantalla (texto en tres líneas y «Configurar» en su propio renglón):
+ * ahora va en dos bloques, con las tres acciones en una fila y botones de 40 px para el dedo.
+ */
 @media (max-width: 560px) {
   .banner {
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
+    left: 10px;
+    right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
     width: auto;
+    gap: 12px;
+    padding: 14px 14px 12px;
+    border-radius: 16px;
+  }
+  .text {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .actions {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .btnPrimary,
+  .btnSecondary,
+  .btnGhost {
+    min-height: 40px;
+    padding: 0 10px;
+    font-size: 13px;
+    white-space: nowrap;
   }
   .btnPrimary,
   .btnSecondary {
     flex: 1 1 auto;
+  }
+  .btnGhost {
+    flex: 0 0 auto;
+    margin-left: 0;
+    padding: 0 6px;
   }
 }

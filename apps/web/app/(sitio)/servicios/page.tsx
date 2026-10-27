@@ -226,13 +226,14 @@ const PASOS: PasoMetodo[] = [
 ];
 
 
-const INDUSTRIAS: { slug: string; nombre: string; icono: PublicIconName }[] = [
-  { slug: "retail", nombre: "Retail", icono: "store" },
-  { slug: "manufactura", nombre: "Manufactura", icono: "factory" },
-  { slug: "hospitalidad", nombre: "Hospitalidad", icono: "hotel" },
-  { slug: "salud", nombre: "Salud", icono: "hospital" },
-  { slug: "educacion", nombre: "Educación", icono: "school" },
-  { slug: "gobierno", nombre: "Gobierno", icono: "landmark" },
+/** Índice de industrias (el «Industrias» de las migas apunta aquí): cada una con su riesgo típico en una línea. */
+const INDUSTRIAS: { slug: string; nombre: string; icono: PublicIconName; riesgo: string }[] = [
+  { slug: "retail", nombre: "Retail", icono: "store", riesgo: "Muchas sucursales con un mismo estándar de cámaras, red y soporte." },
+  { slug: "manufactura", nombre: "Manufactura", icono: "factory", riesgo: "Redes de planta y perímetro para cuando una caída cuesta un turno." },
+  { slug: "hospitalidad", nombre: "Hospitalidad", icono: "hotel", riesgo: "Wi‑Fi para muchos huéspedes a la vez y vigilancia discreta." },
+  { slug: "salud", nombre: "Salud", icono: "hospital", riesgo: "Red segmentada y respaldos para que la atención no se detenga." },
+  { slug: "educacion", nombre: "Educación", icono: "school", riesgo: "Campus conectados y seguros, con mesa de ayuda para docentes." },
+  { slug: "gobierno", nombre: "Gobierno", icono: "landmark", riesgo: "Modernización por fases con entregables que se pueden auditar." },
 ];
 
 export default function PropuestaServicios() {
@@ -462,16 +463,15 @@ export default function PropuestaServicios() {
             </h2>
             <p className={s.lead}>Soluciones armadas por industria, con su riesgo típico resuelto.</p>
           </header>
-          <nav className={p.pildoras} aria-label="Industrias" data-aparecer>
-            {INDUSTRIAS.map((ind) => (
-              <Link key={ind.slug} href={`/soluciones/${ind.slug}`} className={p.pildora}>
-                <span className={p.pildoraIcono}>
-                  <PublicIcon name={ind.icono} size={20} />
-                </span>
-                {ind.nombre}
-              </Link>
-            ))}
-          </nav>
+          <TarjetasRuta
+            ir="Ver la industria"
+            rutas={INDUSTRIAS.map((ind) => ({
+              href: `/soluciones/${ind.slug}`,
+              titulo: ind.nombre,
+              texto: ind.riesgo,
+              icono: ind.icono,
+            }))}
+          />
         </div>
       </section>
 

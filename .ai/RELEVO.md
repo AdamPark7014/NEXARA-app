@@ -1,5 +1,17 @@
 # RELEVO
 
+- **27-10 ~14:15 (claude-code) — Auditoría de UX en 12 páginas × claro/oscuro/390 px y sus arreglos.**
+  - Sin problemas de contraste, desborde horizontal, imágenes rotas, texto < 12 px ni errores de consola. Lo que salió:
+    áreas de toque de 21–30 px en el teléfono (logo, migas, enlaces de texto, «Copiar») → `.enlace::before` y
+    `.migas a::before` agrandan el área sin mover el diseño, logo a 44 px, «Copiar» a 36 px; y la portada saltaba de
+    h1 a h3 (las baldosas ahora son h2).
+  - Aviso de cookies en el teléfono: una frase más corta (la prueba exige una sola frase) y las tres acciones en una
+    fila de 40 px; antes tapaba un cuarto de pantalla.
+  - Servicios › Industrias (destino de la miga «Industrias»): tarjetas con el riesgo típico de cada industria en vez
+    de píldoras vacías; fuera el CSS de `.pildoras`.
+  - Scripts de la auditoría en el scratchpad de la sesión (`auditoria.js`, `correr-auditoria.ps1`, sobre
+    `prueba-tema.mjs`); las corridas sin resultado eran tiempos de espera del servidor de desarrollo.
+
 - **27-10 ~13:30 (claude-code) — Ronda «premium» del sitio público: fotos, logos, cierre centrado y sin repeticiones.**
   - La foto granulosa `monitoreo-pantallas-cctv` sale de Servicios (videovigilancia), blog y guía de CCTV, retail,
     `camaras-cctv` y la galería de Proyectos: entra `muro-video-ancho` (recorte 16:9 del muro de video reescalado con

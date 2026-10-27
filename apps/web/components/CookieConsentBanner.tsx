@@ -65,7 +65,7 @@ export default function CookieConsentBanner() {
         Cookies y privacidad
       </h2>
       <p id="nexara-cookie-consent-desc" className={styles.text}>
-        Solo usamos cookies necesarias y, con tu permiso, activamos analítica para mejorar el sitio: consulta el{" "}
+        Usamos cookies necesarias y, con tu permiso, de analítica: consulta el{" "}
         <Link href="/legal/privacidad">Aviso de Privacidad</Link> y la{" "}
         <Link href="/legal/cookies">Política de Cookies</Link>.
       </p>
