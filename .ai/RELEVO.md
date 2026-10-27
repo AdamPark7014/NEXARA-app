@@ -1,5 +1,23 @@
 # RELEVO
 
+- **26-10 ~21:00 (claude-code) — La portada nueva es la oficial; el equipo con retratos en Nosotros y en la portada.**
+  - Adam aprobó el modelo nuevo: `app/(sitio)/page.tsx` ya solo pinta esa portada (con el JSON-LD de siempre); fuera
+    `?modelo=nuevo`, el `noindex`, la portada vieja, `Ecosistema.tsx`, `Glifos.tsx` y ~530 líneas de CSS que solo
+    usaba ella (hero dividido, virtudes, bento, integración, glifos y cuatro `@keyframes` sin uso). `Tablero` ya no
+    lleva la prop `grande`: siempre es el grande. La sección `home_proceso` de Studio sigue existiendo pero la
+    portada ya no la lee.
+  - Equipo (pedido de Adam): los 12 del organigrama menos el director general y Salvador y Erick (sin retrato con
+    uniforme). Lista fija en `components/sitio/equipo.ts` (nombre corto y puesto del organigrama); ya no se usa
+    `users/public-team`. Retratos en `public/fotos/equipo/<clave>.webp`, recortados a fondo transparente desde los
+    avatares de `/var/www/nexara-app/uploads/users` (el endpoint pide sesión: se copian por scp). Nosotros los muestra
+    en cuatro columnas con halo de color; la baldosa «Un solo equipo» de la portada es una foto de grupo armada con
+    los recortes (`EquipoGrupo.tsx`, dos filas escalonadas).
+  - Mosaico más «Apple»: Videovigilancia con el muro de video y Infraestructura en baldosa negra (`oscura`) con el
+    rack de LED, ambas reescaladas con Real-ESRGAN (`muro-video-nexara`, `rack-nexara-led` en `PARES` de `fotos.ts`);
+    Soporte y Plataformas en ventana blanca que sube del piso.
+  - Ojo al capturar: el script de capturas pausa las animaciones y las barras de Plataformas pueden salir aplastadas
+    en la captura; en el navegador crecen bien.
+
 - **26-10 ~19:15 (claude-code) — Portada «modelo nuevo» en vista previa: `/?modelo=nuevo` (noindex), sin tocar la actual.**
   - Adam: «ya se ve mejor pero sigue sin convencerme, mejora el modelo». Propuesta al estilo de la portada de Apple:
     hero centrado («Seguridad que ve. Y responde.») con el tablero grande debajo como producto (`<Tablero grande />`,
