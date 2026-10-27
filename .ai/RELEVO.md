@@ -5,8 +5,9 @@
     Zynoratek, Nexyx y Nexo. Zynora Tek tiene su propio Perfil de Google verificado en la misma dirección, así que
     eso podía hacer que Google leyera a las dos como un mismo negocio (el perfil de NEXARA está suspendido desde el
     26-10). Ahora `NOMBRES_ALTERNOS = ["Nexara"]` y la Organization trae `legalName` con la razón social.
-  - Pendiente con Adam: el correo del JSON-LD sale de `NEXT_PUBLIC_CONTACT_EMAIL` (en producción `ventas@`), mientras
-    el sitio muestra `gerencia@`; y el C.P. 72774 contra 72775 del aviso legal, a unificar con la constancia fiscal.
+  - El correo del JSON-LD ya es `gerencia@` fijo (`CORREO_PUBLICO`), igual que el sitio (Adam lo pidió); antes salía de
+    `NEXT_PUBLIC_CONTACT_EMAIL` (`ventas@` en producción), que el web ya no lee. Pendiente: C.P. 72774 contra 72775 del
+    aviso legal, a unificar con la constancia fiscal.
 
 - **27-10 ~14:15 (claude-code) — Auditoría de UX en 12 páginas × claro/oscuro/390 px y sus arreglos.**
   - Sin problemas de contraste, desborde horizontal, imágenes rotas, texto < 12 px ni errores de consola. Lo que salió:
