@@ -19,6 +19,8 @@ import { GlifoAnios, GlifoEstados, GlifoRespuesta, GlifoSitios } from "@/compone
 import Preguntas, { type Pregunta } from "@/components/sitio/Preguntas";
 import { GraficaEntregas, TicketSoporte, TopologiaRed } from "@/components/sitio/MiniInterfaces";
 import PublicIcon from "@/app/components/PublicIcon";
+import pn from "@/components/sitio/portada.module.css";
+import Baldosa from "@/components/sitio/Baldosa";
 import {
   fetchPageSection,
   DEFAULT_CTA,
@@ -28,8 +30,14 @@ import {
 } from "@/lib/page-content-api";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
-export async function generateMetadata(): Promise<Metadata> {
-  return buildStudioPageMetadata("home");
+type Busqueda = { searchParams?: { modelo?: string } };
+
+/** `?modelo=nuevo` muestra la portada propuesta (baldosas grandes) sin reemplazar la actual; no se indexa. */
+const esModeloNuevo = (p?: Busqueda["searchParams"]) => p?.modelo === "nuevo";
+
+export async function generateMetadata({ searchParams }: Busqueda): Promise<Metadata> {
+  const base = await buildStudioPageMetadata("home");
+  return esModeloNuevo(searchParams) ? { ...base, robots: { index: false, follow: false } } : base;
 }
 
 export const dynamic = "force-dynamic";
@@ -167,7 +175,186 @@ function Guias() {
   );
 }
 
-export default async function PropuestaInicio() {
+/** Servicios en baldosas grandes: foto a sangre o mini interfaz, dos acciones. */
+function Mosaico() {
+  const tam = "(max-width: 734px) 100vw, 50vw";
+  const ancho = "(max-width: 1720px) 100vw, 1720px";
+  return (
+    <section aria-label="Servicios" className={pn.mosaico}>
+      <Baldosa
+        ancha
+        nombre="Videovigilancia."
+        texto="Cobertura pensada por zona de riesgo y evidencia cuando se necesita."
+        foto={{ ...foto("monitoreo-pantallas-cctv", ancho), alt: "Sala con pantallas de videovigilancia instalada por NEXARA" }}
+        acciones={[
+          { href: ruta("/servicios#cctv"), label: "Ver más", principal: true },
+          { href: ruta("/contacto?servicio=cctv"), label: "Cotizar", medicion: "home_baldosa_cctv" },
+        ]}
+      />
+      <Baldosa
+        nombre="Redes y Wi‑Fi."
+        texto="Cableado certificado y Wi‑Fi que aguanta la hora pico."
+        foto={{ ...foto("campo-enlace-antena-ciudad", tam), alt: "Radioenlace de NEXARA sobre la ciudad", posicion: "center 70%" }}
+        acciones={[
+          { href: ruta("/servicios#redes"), label: "Ver más", principal: true },
+          { href: ruta("/contacto?servicio=redes"), label: "Cotizar", medicion: "home_baldosa_redes" },
+        ]}
+      />
+      <Baldosa
+        nombre="Infraestructura."
+        texto="Racks, servidores y respaldos listos para operar."
+        foto={{ ...foto("campo-instalacion-rack", tam), alt: "Técnicos de NEXARA instalando un rack", posicion: "center 60%" }}
+        acciones={[
+          { href: ruta("/servicios#computo"), label: "Ver más", principal: true },
+          { href: ruta("/contacto?servicio=computo"), label: "Cotizar", medicion: "home_baldosa_computo" },
+        ]}
+      />
+      <Baldosa
+        nombre="Soporte TI."
+        texto="Mesa de ayuda con SLA, remota y en sitio."
+        arte={<TicketSoporte />}
+        acciones={[
+          { href: ruta("/servicios#soporte"), label: "Ver más", principal: true },
+          { href: ruta("/contacto?servicio=soporte"), label: "Cotizar", medicion: "home_baldosa_soporte" },
+        ]}
+      />
+      <Baldosa
+        nombre="Plataformas."
+        texto="Portales, automatización e indicadores, por fases."
+        arte={<GraficaEntregas />}
+        acciones={[
+          { href: ruta("/servicios#software"), label: "Ver más", principal: true },
+          { href: ruta("/contacto?servicio=software"), label: "Cotizar", medicion: "home_baldosa_software" },
+        ]}
+      />
+      <Baldosa
+        ancha
+        nombre="Un solo equipo."
+        texto="Las mismas personas diseñan, instalan y te atienden después."
+        foto={{ ...foto("equipo-tecnico-nexara-uniforme", ancho), alt: "Equipo técnico de NEXARA", posicion: "center 35%" }}
+        acciones={[
+          { href: ruta("/nosotros"), label: "Conoce al equipo", principal: true },
+          { href: ruta("/proyectos"), label: "Ver proyectos" },
+        ]}
+      />
+    </section>
+  );
+}
+
+/** Portada propuesta: hero centrado con el tablero como producto, baldosas, cifras y el resto de la portada. */
+function PortadaNueva({ whatsapp, cierre }: { whatsapp: string; cierre: React.ReactNode }) {
+  return (
+    <main aria-label="NEXARA, inicio">
+      <section className={pn.hero} aria-labelledby="hero-titulo">
+        <Aurora />
+        <div className={s.contenedor}>
+          <h1 id="hero-titulo" className={pn.titulo}>
+            <span>Seguridad que ve.</span>
+            <span className={s.degradado}>Y responde.</span>
+          </h1>
+          <p className={pn.sub}>Videovigilancia, redes, cómputo y soporte TI para empresas, con un solo equipo responsable.</p>
+          <div className={pn.acciones}>
+            <Link href={ruta("/contacto")} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_hero_cta">
+              Agendar diagnóstico
+              <Flecha />
+            </Link>
+            <a
+              href={whatsapp}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${s.boton} ${s.botonSecundario}`}
+              data-track-conversion="home_hero_whatsapp"
+            >
+              Hablar con un especialista
+              <Flecha />
+            </a>
+          </div>
+          <Tablero grande />
+        </div>
+      </section>
+
+      <Marcas />
+
+      <Mosaico />
+
+      <section className={s.seccion} aria-label="NEXARA en cifras">
+        <div className={s.contenedor}>
+          <ul className={pn.cifras}>
+            {[
+              { valor: "10+", texto: "años instalando y sosteniendo tecnología" },
+              { valor: "200+", texto: "sitios implementados en el país" },
+              { valor: "32", texto: "estados con proyectos" },
+              { valor: "1", texto: "día hábil para la primera respuesta" },
+            ].map((c) => (
+              <li key={c.texto} data-aparecer>
+                <Cifra valor={c.valor} className={pn.cifra} />
+                <p className={pn.cifraTexto}>{c.texto}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="cobertura-titulo">
+        <div className={s.contenedor}>
+          <header className={s.centro} data-aparecer>
+            <h2 id="cobertura-titulo" className={s.titulo}>
+              Base en Puebla y CDMX. <span className={s.tenue}>Alcance nacional.</span>
+            </h2>
+            <p className={s.lead}>Toca tu estado y te decimos cómo lo atendemos.</p>
+          </header>
+          <div data-aparecer>
+            <MapaInteractivo />
+          </div>
+        </div>
+      </section>
+
+      <section className={s.seccion} aria-labelledby="industrias-titulo">
+        <div className={s.contenedor}>
+          <header className={s.centro} data-aparecer>
+            <h2 id="industrias-titulo" className={s.titulo}>
+              Hecho a la medida <span className={s.tenue}>de tu industria.</span>
+            </h2>
+          </header>
+          <div data-aparecer>
+            <Industrias industrias={INDUSTRIAS} />
+          </div>
+        </div>
+      </section>
+
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="detras-titulo">
+        <div className={s.contenedor}>
+          <header className={s.centro} data-aparecer>
+            <h2 id="detras-titulo" className={s.titulo}>
+              Trabajo real. <span className={s.tenue}>Ninguna foto es de banco.</span>
+            </h2>
+          </header>
+        </div>
+        <div data-aparecer>
+          <Galeria fotos={DETRAS} enlace={{ href: "/proyectos", label: "Ver proyectos" }} />
+        </div>
+      </section>
+
+      <section className={s.seccion} aria-labelledby="faq-titulo">
+        <div className={`${s.contenedor} ${s.faq}`}>
+          <div data-aparecer>
+            <h2 id="faq-titulo" className={s.titulo}>
+              Lo que todos <span className={s.tenue}>nos preguntan.</span>
+            </h2>
+            <p className={s.lead}>¿Tienes otra duda? Escríbenos y te contesta una persona del equipo.</p>
+          </div>
+          <div data-aparecer>
+            <Preguntas preguntas={PREGUNTAS} />
+          </div>
+        </div>
+      </section>
+
+      {cierre}
+    </main>
+  );
+}
+
+export default async function PropuestaInicio({ searchParams }: Busqueda) {
   const [procesoData, ctaData] = await Promise.all([
     fetchPageSection<{ items: ProcesoItem[] }>("home_proceso"),
     fetchPageSection<CtaContent>("home_cta"),
@@ -176,6 +363,49 @@ export default async function PropuestaInicio() {
   const pasos: PasoMetodo[] = proceso.map((p, i) => ({ num: p.num, titulo: p.title, texto: p.text, foto: FOTOS_METODO[i % 3] }));
   const cta = ctaData ?? DEFAULT_CTA;
   const whatsapp = buildWhatsAppLeadUrl({ industryName: "tu empresa", serviceName: "CCTV, redes o soporte TI", path: "/" });
+
+  const cierre = (
+    <section className={s.final} aria-labelledby="final-titulo">
+      <div className={s.contenedor}>
+        <div className={s.finalTarjeta} data-aparecer>
+          <Aurora />
+          <h2 id="final-titulo" className={s.titulo}>
+            {cta.title} {cta.titleAccent}.
+          </h2>
+          <p className={s.lead}>{cta.text}</p>
+          <div className={s.acciones}>
+            <Link href={ruta(cta.primaryHref)} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_cta_primary">
+              {cta.primaryLabel}
+              <Flecha />
+            </Link>
+            <a
+              href={whatsapp}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${s.boton} ${s.botonSecundario}`}
+              data-track-conversion="home_cta_whatsapp"
+            >
+              Escríbenos por WhatsApp
+              <Flecha />
+            </a>
+          </div>
+          <ul className={s.finalGarantias}>
+            <li>
+              <PublicIcon name="clock" size={18} /> Primera respuesta en un día hábil
+            </li>
+            <li>
+              <PublicIcon name="mapPin" size={18} /> Diagnóstico en sitio
+            </li>
+            <li>
+              <PublicIcon name="fileCheck" size={18} /> Memoria técnica al entregar
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+
+  if (esModeloNuevo(searchParams)) return <PortadaNueva whatsapp={whatsapp} cierre={cierre} />;
 
   return (
     <main aria-label="NEXARA, inicio">
@@ -521,45 +751,7 @@ export default async function PropuestaInicio() {
         </div>
       </section>
 
-      {/* ── Cierre ── */}
-      <section className={s.final} aria-labelledby="final-titulo">
-        <div className={s.contenedor}>
-          <div className={s.finalTarjeta} data-aparecer>
-            <Aurora />
-            <h2 id="final-titulo" className={s.titulo}>
-              {cta.title} {cta.titleAccent}.
-            </h2>
-            <p className={s.lead}>{cta.text}</p>
-            <div className={s.acciones}>
-              <Link href={ruta(cta.primaryHref)} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_cta_primary">
-                {cta.primaryLabel}
-                <Flecha />
-              </Link>
-              <a
-                href={whatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`${s.boton} ${s.botonSecundario}`}
-                data-track-conversion="home_cta_whatsapp"
-              >
-                Escríbenos por WhatsApp
-                <Flecha />
-              </a>
-            </div>
-            <ul className={s.finalGarantias}>
-              <li>
-                <PublicIcon name="clock" size={18} /> Primera respuesta en un día hábil
-              </li>
-              <li>
-                <PublicIcon name="mapPin" size={18} /> Diagnóstico en sitio
-              </li>
-              <li>
-                <PublicIcon name="fileCheck" size={18} /> Memoria técnica al entregar
-              </li>
-            </ul>
-          </div>
-        </div>
-      </section>
+      {cierre}
     </main>
   );
 }
