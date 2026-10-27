@@ -156,6 +156,9 @@ export const viewport: Viewport = {
  */
 const NOMBRES_ALTERNOS = ["Nexara"];
 
+/** El mismo correo que muestran Contacto, el pie y los avisos legales (antes salía de una variable con `ventas@`). */
+const CORREO_PUBLICO = "gerencia@nexara.com.mx";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -176,7 +179,7 @@ export default function RootLayout({
       "@type": "ContactPoint",
       contactType: "customer service",
       telephone: "+52 222 696 0350",
-      email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || undefined,
+      email: CORREO_PUBLICO,
       areaServed: "MX",
       availableLanguage: "Spanish",
     },
@@ -194,7 +197,7 @@ export default function RootLayout({
     image: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
     logo: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
     telephone: "+52 222 696 0350",
-    email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || "",
+    email: CORREO_PUBLICO,
     address: {
       "@type": "PostalAddress",
       streetAddress: "Calle Ignacio Allende 512",
