@@ -1,5 +1,12 @@
 # RELEVO
 
+- **26-10 ~18:35 (claude-code) — Menú móvil que no se desplegaba, y búsqueda Ctrl+K con sinónimos.**
+  - Causa: al abrir la hoja, el header se pone `data-bajado="true"` y su `backdrop-filter` lo volvía el bloque
+    contenedor de la hoja `position: fixed`; quedaba recortada a 64 px (solo se veía «Servicios»). El vidrio pasó a
+    `.barra::before` en `encabezado.module.css`. Probado a 390 px: hoja de 780 px, nueve enlaces y submenús.
+  - `Paleta.tsx`: campo `claves` (cctv, wifi, erp, mesa de ayuda…), guías del blog, Preguntas y Aviso de privacidad.
+    Antes «cctv» no encontraba nada.
+
 - **26-10 ~17:00 (claude-code) — Ronda de detalles de UI en el sitio público.**
   - El reseteo base del sitio (h1–h4, p, listas, img, a) pasó de `sitio.module.css` (`.sitio :where(…)`, peso de una
     clase: empataba con las clases de los módulos y ganaba la hoja que cargara al último) a `sitio-documento.css`

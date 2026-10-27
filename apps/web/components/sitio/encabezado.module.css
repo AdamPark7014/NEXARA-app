@@ -5,15 +5,31 @@
   top: 0;
   z-index: 50;
   border-bottom: 1px solid transparent;
-  transition: background-color 0.3s var(--ease), border-color 0.3s var(--ease), -webkit-backdrop-filter 0.3s var(--ease),
-    backdrop-filter 0.3s var(--ease);
+  transition: border-color 0.3s var(--ease);
+}
+
+/*
+ * El vidrio va en un pseudoelemento y no en el header: un `backdrop-filter` en el header lo vuelve el marco de sus
+ * hijos `position: fixed`, y la hoja del menú móvil quedaba recortada a los 64 px de la barra.
+ */
+.barra::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: transparent;
+  pointer-events: none;
+  transition: background-color 0.3s var(--ease), -webkit-backdrop-filter 0.3s var(--ease), backdrop-filter 0.3s var(--ease);
 }
 
 .barra[data-bajado="true"] {
+  border-bottom-color: var(--glass-line);
+}
+
+.barra[data-bajado="true"]::before {
   background: var(--glass);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
-  border-bottom-color: var(--glass-line);
 }
 
 .fila {
