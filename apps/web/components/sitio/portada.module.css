@@ -1,0 +1,238 @@
+/*
+ * Portada «modelo nuevo» (vista previa en /?modelo=nuevo): hero centrado con el tablero como producto, baldosas
+ * grandes con foto a sangre (como la portada de Apple) y una franja de cifras. Usa los tokens de `.sitio`.
+ */
+
+/* ── Hero centrado ──────────────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  padding-top: clamp(56px, 7vw, 104px);
+  padding-bottom: clamp(24px, 3vw, 40px);
+  text-align: center;
+}
+
+.titulo {
+  margin-inline: auto;
+  max-width: 14ch;
+  font-family: var(--font-display);
+  font-size: clamp(52px, 8.4vw, 116px);
+  line-height: 0.98;
+  font-weight: 600;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+}
+
+.titulo span {
+  display: block;
+}
+
+.sub {
+  margin: 26px auto 0;
+  max-width: 32ch;
+  font-size: clamp(19px, 1.8vw, 25px);
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+  color: var(--fg-2);
+  text-wrap: balance;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 34px;
+}
+
+/* ── Baldosas ───────────────────────────────────────────────────────────── */
+
+.mosaico {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 1720px;
+  margin-inline: auto;
+  padding: clamp(8px, 1vw, 12px);
+}
+
+.baldosa {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  min-height: clamp(520px, 46vw, 680px);
+  padding: clamp(44px, 5vw, 64px) 24px 0;
+  border-radius: 28px;
+  background: var(--tile);
+  text-align: center;
+}
+
+.ancha {
+  grid-column: 1 / -1;
+  min-height: clamp(560px, 44vw, 720px);
+}
+
+/* Foto a sangre con un velo del color de la baldosa arriba, para que el texto se lea sobre cualquier imagen. */
+.foto {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+.foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 1.2s var(--ease-out);
+}
+
+.baldosa:hover .foto img {
+  transform: scale(1.035);
+}
+
+.foto::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    var(--tile) 0%,
+    color-mix(in srgb, var(--tile) 88%, transparent) 20%,
+    color-mix(in srgb, var(--tile) 40%, transparent) 38%,
+    transparent 56%
+  );
+}
+
+.nombre {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 4.2vw, 58px);
+  line-height: 1.04;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.texto {
+  margin-top: 10px;
+  max-width: 30ch;
+  font-size: clamp(17px, 1.6vw, 22px);
+  line-height: 1.35;
+  letter-spacing: -0.012em;
+  color: var(--fg-2);
+  text-wrap: balance;
+}
+
+.botones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.mosaico .pildora,
+.mosaico .pildoraHueca {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: background-color 0.2s var(--ease), color 0.2s var(--ease), box-shadow 0.2s var(--ease),
+    transform 0.15s var(--ease);
+}
+
+.mosaico .pildora {
+  background: var(--btn);
+  color: var(--btn-fg);
+}
+
+.mosaico .pildora:hover {
+  background: var(--btn-hover);
+}
+
+.mosaico .pildoraHueca {
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.mosaico .pildoraHueca:hover {
+  background: var(--accent);
+  color: var(--btn-fg);
+}
+
+.mosaico .pildora:active,
+.mosaico .pildoraHueca:active {
+  transform: scale(0.97);
+}
+
+/* Mini interfaz al pie de la baldosa (plataformas, soporte). */
+.arte {
+  position: relative;
+  width: min(560px, 88%);
+  height: clamp(260px, 24vw, 340px);
+  margin-top: auto;
+  margin-bottom: clamp(28px, 3.4vw, 44px);
+}
+
+.arte > * {
+  inset: 0;
+}
+
+/* ── Cifras ─────────────────────────────────────────────────────────────── */
+
+.cifras {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(24px, 4vw, 56px);
+  text-align: center;
+}
+
+.cifra {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(52px, 6vw, 84px);
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  background: var(--degradado-texto);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+.cifraTexto {
+  margin: 14px auto 0;
+  max-width: 18ch;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--fg-2);
+}
+
+@media (max-width: 1068px) {
+  .cifras {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 48px;
+  }
+}
+
+@media (max-width: 734px) {
+  .mosaico {
+    grid-template-columns: 1fr;
+  }
+  .baldosa,
+  .ancha {
+    min-height: 520px;
+    border-radius: 22px;
+  }
+}

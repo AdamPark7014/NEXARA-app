@@ -828,6 +828,60 @@
   color: var(--fg-3);
 }
 
+/* Tablero como «producto» centrado bajo el titular (modelo nuevo de la portada): más ancho y con las cuatro cámaras en una fila. */
+.visualGrande {
+  max-width: 1080px;
+  margin: clamp(48px, 6vw, 80px) auto 0;
+  padding: 24px 0 64px;
+  text-align: left;
+}
+
+.visualGrande .ventanaCuerpo {
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 14px;
+  padding: 14px;
+}
+
+.visualGrande .camaras {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(210px, 1fr);
+}
+
+.visualGrande .demoLienzo {
+  min-height: 300px;
+}
+
+.visualGrande .flotanteTicket {
+  left: -36px;
+}
+
+.visualGrande .flotanteRed {
+  top: -26px;
+  right: -36px;
+}
+
+@media (max-width: 1068px) {
+  .visualGrande .camaras {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(140px, 1fr);
+  }
+  .visualGrande .flotanteTicket {
+    left: -8px;
+  }
+  .visualGrande .flotanteRed {
+    right: -8px;
+  }
+}
+
+@media (max-width: 734px) {
+  .visualGrande .ventanaCuerpo {
+    grid-template-columns: 1fr;
+  }
+  .visualGrande .camaras {
+    grid-auto-rows: minmax(120px, 1fr);
+  }
+}
+
 /* Flota sobre la esquina del tablero, sin tapar su barra (ahí va el indicador «En vivo»). */
 .flotanteRed {
   top: -46px;

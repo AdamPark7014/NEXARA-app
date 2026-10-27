@@ -1,5 +1,16 @@
 # RELEVO
 
+- **26-10 ~19:15 (claude-code) — Portada «modelo nuevo» en vista previa: `/?modelo=nuevo` (noindex), sin tocar la actual.**
+  - Adam: «ya se ve mejor pero sigue sin convencerme, mejora el modelo». Propuesta al estilo de la portada de Apple:
+    hero centrado («Seguridad que ve. Y responde.») con el tablero grande debajo como producto (`<Tablero grande />`,
+    `.visualGrande`), baldosas grandes con foto a sangre y dos acciones (`components/sitio/Baldosa.tsx`,
+    `portada.module.css`), franja de cifras, mapa interactivo, industrias, galería, preguntas y cierre. Fuera de la
+    portada nueva: «Por qué», Integración (órbita) y Método.
+  - Está en `app/(sitio)/page.tsx` como `PortadaNueva`, elegida por `searchParams.modelo === "nuevo"`; el
+    `generateMetadata` la marca `noindex`. Si el dueño la aprueba, basta con dejarla como la única y borrar la vieja.
+  - Perfil de Google (contexto de la tarde): deshabilitado el 26-10 por «El Perfil de Empresa no existe», apelable;
+    pruebas en `C:\dev\secrets\nexara-google-perfil` (OneDrive SECRETOS), apelación aún sin enviar.
+
 - **26-10 ~18:35 (claude-code) — Menú móvil que no se desplegaba, y búsqueda Ctrl+K con sinónimos.**
   - Causa: al abrir la hoja, el header se pone `data-bajado="true"` y su `backdrop-filter` lo volvía el bloque
     contenedor de la hoja `position: fixed`; quedaba recortada a 64 px (solo se veía «Servicios»). El vidrio pasó a
