@@ -150,6 +150,12 @@ export const viewport: Viewport = {
 };
 
 
+/**
+ * Solo variantes del nombre de NEXARA. Zynora Tek es otra empresa con su propio Perfil de Google en la misma dirección:
+ * mezclar sus nombres aquí hacía que Google las leyera como un mismo negocio.
+ */
+const NOMBRES_ALTERNOS = ["Nexara"];
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -159,7 +165,8 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "NEXARA",
-    alternateName: ["Nexara", "Zynora", "Zynora Tek", "Zynoratek", "Nexyx", "Nexo"],
+    legalName: "New Engineering Expertise and Resource Advancement S.A. de C.V.",
+    alternateName: NOMBRES_ALTERNOS,
     url: siteUrl,
     logo: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
     image: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
@@ -180,7 +187,7 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@type": "ProfessionalService",
     name: "NEXARA",
-    alternateName: ["Nexara", "Zynora", "Zynora Tek", "Zynoratek", "Nexyx", "Nexo"],
+    alternateName: NOMBRES_ALTERNOS,
     description:
       "CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en Puebla, CDMX y cobertura nacional.",
     url: siteUrl,
@@ -222,7 +229,7 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "NEXARA",
-    alternateName: ["Nexara", "Zynora", "Zynora Tek", "Zynoratek", "Nexyx", "Nexo"],
+    alternateName: NOMBRES_ALTERNOS,
     url: siteUrl,
     inLanguage: "es-MX",
     publisher: { "@type": "Organization", name: "NEXARA", url: siteUrl },

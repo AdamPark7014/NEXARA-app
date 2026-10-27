@@ -1,5 +1,13 @@
 # RELEVO
 
+- **27-10 ~14:25 (claude-code) — Datos estructurados de NEXARA sin las marcas de Zynora (Adam lo pidió).**
+  - `app/layout.tsx`: Organization, ProfessionalService y WebSite llevaban `alternateName` con Zynora, Zynora Tek,
+    Zynoratek, Nexyx y Nexo. Zynora Tek tiene su propio Perfil de Google verificado en la misma dirección, así que
+    eso podía hacer que Google leyera a las dos como un mismo negocio (el perfil de NEXARA está suspendido desde el
+    26-10). Ahora `NOMBRES_ALTERNOS = ["Nexara"]` y la Organization trae `legalName` con la razón social.
+  - Pendiente con Adam: el correo del JSON-LD sale de `NEXT_PUBLIC_CONTACT_EMAIL` (en producción `ventas@`), mientras
+    el sitio muestra `gerencia@`; y el C.P. 72774 contra 72775 del aviso legal, a unificar con la constancia fiscal.
+
 - **27-10 ~14:15 (claude-code) — Auditoría de UX en 12 páginas × claro/oscuro/390 px y sus arreglos.**
   - Sin problemas de contraste, desborde horizontal, imágenes rotas, texto < 12 px ni errores de consola. Lo que salió:
     áreas de toque de 21–30 px en el teléfono (logo, migas, enlaces de texto, «Copiar») → `.enlace::before` y
