@@ -21,7 +21,7 @@ type VisualServicio = {
 
 const SERVICIOS: Record<string, VisualServicio> = {
   "erp-industrial": { foto: "sala-monitoreo-videowall-nexara", icono: "layers", ancla: "software", arte: "grafica" },
-  "camaras-cctv": { foto: "monitoreo-pantallas-cctv", icono: "camera", ancla: "cctv", fotoBloque: "monitoreo-sala-videowall" },
+  "camaras-cctv": { foto: "muro-video-ancho", icono: "camera", ancla: "cctv", fotoBloque: "monitoreo-sala-videowall" },
   "equipo-de-computo": { foto: "cableado-interno-pc-guantes-taller", icono: "monitor", ancla: "computo", fotoBloque: "tecnico-ensamble-chasis-pc-taller" },
   "redes-y-conectividad": { foto: "campo-enlace-antena-ciudad", icono: "wifi", ancla: "redes", arte: "red" },
   "soporte-ti-pyme": { foto: "tecnico-nexara-entrega-equipo-sitio", icono: "headset", ancla: "soporte", arte: "soporte" },
@@ -29,7 +29,7 @@ const SERVICIOS: Record<string, VisualServicio> = {
   "infraestructura-ti": { foto: "campo-instalacion-rack", icono: "server", ancla: "computo", arte: "red" },
   "mesa-de-ayuda-ti": { foto: "equipo-tecnico-nexara-uniforme", icono: "headset", ancla: "soporte", arte: "soporte" },
   "automatizacion-de-procesos": { foto: "sala-monitoreo-videowall-nexara", icono: "code", ancla: "software", arte: "grafica" },
-  "servicios-gestionados-ti": { foto: "monitoreo-pantallas-cctv", icono: "refresh", ancla: "soporte", arte: "soporte" },
+  "servicios-gestionados-ti": { foto: "sala-monitoreo-videowall-nexara", icono: "refresh", ancla: "soporte", arte: "soporte" },
 };
 
 /** Cómo se nombra cada sección de /servicios en el enlace «Ver … en Servicios». */
@@ -48,7 +48,7 @@ export function visualServicio(slug: string): VisualServicio {
 type VisualIndustria = { icono: PublicIconName; foto?: string };
 
 const INDUSTRIAS: Record<string, VisualIndustria> = {
-  retail: { icono: "store", foto: "monitoreo-pantallas-cctv" },
+  retail: { icono: "store", foto: "muro-video-ancho" },
   manufactura: { icono: "factory", foto: "campo-enlace-antena-ciudad" },
   hospitalidad: { icono: "hotel", foto: "tecnico-nexara-entrega-equipo-sitio" },
   salud: { icono: "hospital", foto: "campo-instalacion-rack" },

@@ -2034,6 +2034,16 @@
   max-width: 18ch;
 }
 
+/* La tarjeta centra el título: el texto y los botones también, o quedaban cargados a la izquierda. */
+.finalTarjeta .lead {
+  margin-inline: auto;
+  max-width: 40ch;
+}
+
+.finalTarjeta .acciones {
+  justify-content: center;
+}
+
 .finalGarantias {
   display: flex;
   flex-wrap: wrap;

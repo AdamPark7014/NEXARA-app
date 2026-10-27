@@ -151,7 +151,7 @@ export default function QAPage() {
         </div>
       </section>
 
-      <Directorio actual="/qa" titulo="Soluciones recomendadas" industrias={4} porIndustria={2} />
+      <Directorio actual="/qa" titulo="Soluciones recomendadas" />
 
       <Cierre
         titulo={

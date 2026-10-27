@@ -1,18 +1,21 @@
 import s from "./sitio.module.css";
 import p from "./paginas.module.css";
 
-/** Certificaciones y alianzas reales (assets en /public/certificaciones). */
+/**
+ * Certificaciones y alianzas reales, a una tinta (`/public/certificaciones/mono`, sacadas de los originales de la
+ * misma carpeta). `alto` marca los logos más altos que anchos, que necesitan más altura para pesar lo mismo.
+ */
 const CERTIFICACIONES = [
-  { src: "/certificaciones/certificaciones-06.png", alt: "Hikvision" },
-  { src: "/certificaciones/certificaciones-09.png.jpeg", alt: "Dell Technologies Authorized Partner" },
-  { src: "/certificaciones/certificaciones-04.png", alt: "Lenovo SEG Silver Partner" },
-  { src: "/certificaciones/certificaciones-07.png", alt: "Sophos" },
-  { src: "/certificaciones/certificaciones-01.png", alt: "Linksys" },
-  { src: "/certificaciones/certificaciones-02.png", alt: "Belden" },
-  { src: "/certificaciones/certificaciones-03.png", alt: "Intellinet" },
-  { src: "/certificaciones/certificaciones-05.png.jpeg", alt: "Grandstream" },
-  { src: "/certificaciones/certificaciones-08.png", alt: "Mimosa" },
-  { src: "/certificaciones/certificaciones-04.1.png.webp", alt: "Lenovo SEG Authorized Solutions" },
+  { clave: "hikvision", alt: "Hikvision" },
+  { clave: "dell", alt: "Dell Technologies Authorized Partner" },
+  { clave: "lenovo-dispositivos", alt: "Lenovo 360 Intelligent Devices, 2025 Silver", alto: true },
+  { clave: "sophos", alt: "Sophos", alto: true },
+  { clave: "linksys", alt: "Linksys" },
+  { clave: "belden", alt: "Belden" },
+  { clave: "intellinet", alt: "Intellinet" },
+  { clave: "grandstream", alt: "Grandstream", alto: true },
+  { clave: "mimosa", alt: "Mimosa" },
+  { clave: "lenovo-infraestructura", alt: "Lenovo 360 Infrastructure Solutions, 2025 Authorized", alto: true },
 ];
 
 export default function Certificaciones({ gris = false }: { gris?: boolean }) {
@@ -27,9 +30,9 @@ export default function Certificaciones({ gris = false }: { gris?: boolean }) {
         </header>
         <ul className={p.logos} data-aparecer>
           {CERTIFICACIONES.map((c) => (
-            <li key={c.src} className={p.logo}>
+            <li key={c.clave} className={p.logo}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={c.src} alt={c.alt} loading="lazy" decoding="async" />
+              <img src={`/certificaciones/mono/${c.clave}.png`} alt={c.alt} loading="lazy" decoding="async" data-alto={c.alto ? "" : undefined} />
             </li>
           ))}
         </ul>

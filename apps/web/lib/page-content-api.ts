@@ -319,7 +319,7 @@ export const DEFAULT_PAGE_VISUALS: Record<PageVisualSection, PageVisualsContent>
     ],
   },
   page_soluciones: {
-    heroDesktopUrl: "/fotos/monitoreo-pantallas-cctv.jpg",
+    heroDesktopUrl: "/fotos/muro-video-ancho.jpg",
     heroMobileUrl: "",
     heroAlt: "Técnico Nexara en instalación",
     slots: [

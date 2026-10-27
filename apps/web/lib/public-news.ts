@@ -20,7 +20,7 @@ export type PublicNewsPost = {
 };
 
 export function normalizeNewsImageUrl(imageUrl?: string | null): string {
-  if (!imageUrl) return "/fotos/monitoreo-pantallas-cctv.jpg";
+  if (!imageUrl) return "/fotos/muro-video-ancho.jpg";
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) return imageUrl;
   const origin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {

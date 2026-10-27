@@ -49,7 +49,7 @@ const deNota = (post: PublicNewsPost): Entrada => ({
   resumen: toPlainExcerpt(post.summary, post.content, 200),
   fecha: post.publishedAt || post.createdAt,
   etiqueta: post.tags?.[0] ?? "Nota",
-  imagen: (sizes) => (post.coverImageUrl ? { src: normalizeNewsImageUrl(post.coverImageUrl) } : foto("monitoreo-pantallas-cctv", sizes)),
+  imagen: (sizes) => (post.coverImageUrl ? { src: normalizeNewsImageUrl(post.coverImageUrl) } : foto("muro-video-ancho", sizes)),
   tags: post.tags,
 });
 
@@ -183,8 +183,6 @@ export default async function BlogPage() {
         actual="/blog"
         titulo="De la guía a la cotización"
         lead="Cuando una duda apunta a un problema real, estas soluciones cierran el ciclo."
-        industrias={4}
-        porIndustria={2}
       />
 
       <Cierre

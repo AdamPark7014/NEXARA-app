@@ -283,7 +283,7 @@ export default function CoberturaCityPage({ params }: { params: Params }) {
             rutas={GEO_MONEY_LINKS.map((item) => ({
               href: `/soluciones/${item.industry}/${item.service}`,
               titulo: item.label,
-              texto: `Instalación y operación con evidencia en ${city.region}.`,
+              texto: item.texto,
               icono: visualIndustria(item.industry).icono,
             }))}
           />

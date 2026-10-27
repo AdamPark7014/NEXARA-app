@@ -251,7 +251,7 @@ export default async function BlogPostPage({ params }: { params: Params }) {
 
   const publicada = post.publishedAt || post.createdAt;
   const cover = normalizeNewsImageUrl(post.coverImageUrl);
-  const imagen = post.coverImageUrl ? { src: cover } : foto("monitoreo-pantallas-cctv", "(max-width: 1100px) 100vw, 1040px");
+  const imagen = post.coverImageUrl ? { src: cover } : foto("muro-video-ancho", "(max-width: 1100px) 100vw, 1040px");
 
   return (
     <main aria-label={post.title}>
@@ -297,7 +297,7 @@ export default async function BlogPostPage({ params }: { params: Params }) {
 
       <OtrasGuias />
 
-      <Directorio actual={`/blog/${post.slug}`} titulo="Soluciones relacionadas" industrias={4} porIndustria={2} />
+      <Directorio actual={`/blog/${post.slug}`} titulo="Soluciones relacionadas" />
 
       <Cierre
         titulo={

@@ -114,7 +114,7 @@ const SERVICIOS: Servicio[] = [
     arte: (
       <>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img {...foto("monitoreo-pantallas-cctv", "(max-width: 1068px) 100vw, 620px")} alt="Monitores de videovigilancia en un centro de monitoreo de NEXARA" loading="lazy" decoding="async" />
+        <img {...foto("muro-video-ancho", "(max-width: 1068px) 100vw, 620px")} alt="Muro de video de un centro de monitoreo instalado por NEXARA" loading="lazy" decoding="async" />
         <span className={s.chip} style={{ top: 20, left: 20 }}>
           <i /> CAM 12 · En vivo
         </span>

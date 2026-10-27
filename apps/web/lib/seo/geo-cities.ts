@@ -150,15 +150,16 @@ export function getGeoServiceCombos(): {
   return out;
 }
 
-export const GEO_MONEY_LINKS: { industry: string; service: string; label: string }[] = [
-  { industry: "retail", service: "camaras-cctv", label: "CCTV para retail" },
-  { industry: "manufactura", service: "camaras-cctv", label: "CCTV industrial" },
-  { industry: "seguridad-electronica", service: "camaras-cctv", label: "Videovigilancia IP" },
-  { industry: "retail", service: "redes-y-conectividad", label: "Redes y Wi‑Fi retail" },
-  { industry: "manufactura", service: "redes-y-conectividad", label: "Redes de planta" },
-  { industry: "pymes-y-startups", service: "soporte-ti-pyme", label: "Soporte TI PyME" },
-  { industry: "pymes-y-startups", service: "equipo-de-computo", label: "Equipo de cómputo" },
-  { industry: "retail", service: "mesa-de-ayuda-ti", label: "Mesa de ayuda" },
+/** Soluciones que se enlazan desde cada ciudad, con una línea propia (antes las ocho decían lo mismo). */
+export const GEO_MONEY_LINKS: { industry: string; service: string; label: string; texto: string }[] = [
+  { industry: "retail", service: "camaras-cctv", label: "CCTV para retail", texto: "Cámaras por sucursal, acceso remoto y el mismo estándar en cada apertura." },
+  { industry: "manufactura", service: "camaras-cctv", label: "CCTV industrial", texto: "Perímetro, naves y accesos con grabación que no se cae a mitad del turno." },
+  { industry: "seguridad-electronica", service: "camaras-cctv", label: "Videovigilancia IP", texto: "Cobertura por zona de riesgo y grabaciones a la mano cuando se necesitan." },
+  { industry: "retail", service: "redes-y-conectividad", label: "Redes y Wi‑Fi retail", texto: "Wi‑Fi de clientes aparte del de caja y enlace estable al punto de venta." },
+  { industry: "manufactura", service: "redes-y-conectividad", label: "Redes de planta", texto: "Cableado, switching y enlaces entre naves para equipos que no pueden parar." },
+  { industry: "pymes-y-startups", service: "soporte-ti-pyme", label: "Soporte TI PyME", texto: "Mesa de ayuda con SLA, remota y en sitio, a la medida de un equipo chico." },
+  { industry: "pymes-y-startups", service: "equipo-de-computo", label: "Equipo de cómputo", texto: "Equipos armados, probados y configurados antes de llegar a tu oficina." },
+  { industry: "retail", service: "mesa-de-ayuda-ti", label: "Mesa de ayuda", texto: "Atención por prioridad y un reporte mensual de cada incidencia." },
 ];
 
 /** Alias de búsqueda popular → URL canónica geo×servicio */
