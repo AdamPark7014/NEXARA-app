@@ -309,11 +309,19 @@
 }
 
 .sitio .enlace {
+  position: relative;
   display: inline-flex;
   align-items: center;
   color: var(--accent);
   font-weight: 600;
   font-size: 16px;
+}
+
+/* Área de toque de ~44 px alrededor del enlace de texto, sin mover el diseño (en el teléfono medía 23 px). */
+.sitio .enlace::before {
+  content: "";
+  position: absolute;
+  inset: -11px -6px;
 }
 
 /* ── Apariciones al bajar (las pone Aparecer.tsx solo bajo el pliegue) ─── */

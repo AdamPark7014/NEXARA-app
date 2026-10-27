@@ -40,8 +40,16 @@
 }
 
 .migas a {
+  position: relative;
   color: var(--fg-2);
   transition: color 0.15s var(--ease);
+}
+
+/* Las migas miden 21 px: el área de toque crece hasta ~44 px sin separar la línea. */
+.migas a::before {
+  content: "";
+  position: absolute;
+  inset: -12px -5px;
 }
 
 .migas a:hover {
