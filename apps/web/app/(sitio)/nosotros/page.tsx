@@ -9,7 +9,7 @@ import Aurora from "@/components/sitio/Aurora";
 import Flecha from "@/components/sitio/Flecha";
 import Cierre from "@/components/sitio/Cierre";
 import Certificaciones from "@/components/sitio/Certificaciones";
-import { equipoPublico, iniciales } from "@/components/sitio/equipo";
+import { EQUIPO, retrato } from "@/components/sitio/equipo";
 import { ruta } from "@/components/sitio/rutas";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
 
@@ -55,9 +55,7 @@ const EN_CAMPO = [
 ];
 
 
-export default async function PropuestaNosotros() {
-  const equipo = await equipoPublico();
-
+export default function Nosotros() {
   return (
     <main aria-label="Nosotros">
       <JsonLd
@@ -211,15 +209,14 @@ export default async function PropuestaNosotros() {
             <p className={s.lead}>Ingeniería, operación e instalación: las personas detrás de cada entrega.</p>
           </header>
           <ul className={p.equipo}>
-            {equipo.slice(0, 8).map((x) => (
+            {EQUIPO.map((x) => (
               <li key={x.clave} className={p.persona} data-aparecer>
-                <span className={p.iniciales} aria-hidden="true">
-                  {iniciales(x.nombre)}
-                </span>
-                <div>
-                  <p className={p.personaNombre}>{x.nombre}</p>
-                  <p className={p.personaRol}>{x.rol}</p>
+                <div className={p.retrato}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={retrato(x.clave)} alt={`${x.nombre}, ${x.rol.toLowerCase()} de NEXARA`} width={512} height={492} loading="lazy" decoding="async" />
                 </div>
+                <p className={p.personaNombre}>{x.nombre}</p>
+                <p className={p.personaRol}>{x.rol}</p>
               </li>
             ))}
           </ul>

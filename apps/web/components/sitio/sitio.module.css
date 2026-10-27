@@ -168,28 +168,6 @@
   text-align: center;
 }
 
-/* Líneas guía verticales (detalle de precisión, como en una retícula técnica). */
-.guias {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  max-width: var(--wide);
-  margin-inline: auto;
-  border-inline: 1px dashed var(--line-soft);
-  mask-image: linear-gradient(180deg, transparent, #000 20%, #000 80%, transparent);
-  -webkit-mask-image: linear-gradient(180deg, transparent, #000 20%, #000 80%, transparent);
-}
-
-.guias i {
-  border-right: 1px dashed var(--line-soft);
-}
-
-.guias i:last-child {
-  border-right: 0;
-}
-
 /* ── Tipografía ─────────────────────────────────────────────────────────── */
 
 .antetitulo {
@@ -320,14 +298,12 @@
 
 .boton:hover .flechaLinea,
 .enlace:hover .flechaLinea,
-.tile:hover .flechaLinea,
 [data-flecha]:hover .flechaLinea {
   opacity: 1;
 }
 
 .boton:hover .flechaPunta,
 .enlace:hover .flechaPunta,
-.tile:hover .flechaPunta,
 [data-flecha]:hover .flechaPunta {
   transform: translateX(3px);
 }
@@ -364,26 +340,7 @@
   }
 }
 
-/* ── Hero ───────────────────────────────────────────────────────────────── */
-
-.hero {
-  position: relative;
-  padding-top: clamp(56px, 8vw, 112px);
-  padding-bottom: clamp(56px, 7vw, 96px);
-  isolation: isolate;
-}
-
-.hero::after {
-  content: "";
-  position: absolute;
-  inset: -64px 0 0;
-  z-index: -1;
-  background-image: radial-gradient(color-mix(in srgb, var(--fg) 16%, transparent) 1px, transparent 1.5px);
-  background-size: 22px 22px;
-  mask-image: radial-gradient(ellipse 55% 60% at 75% 35%, #000 15%, transparent 70%);
-  -webkit-mask-image: radial-gradient(ellipse 55% 60% at 75% 35%, #000 15%, transparent 70%);
-  pointer-events: none;
-}
+/* ── Aurora del hero ────────────────────────────────────────────────────── */
 
 /* Degradado vivo con los colores del isotipo, en una franja inclinada que se desvanece. */
 .aurora {
@@ -468,81 +425,6 @@
   to {
     transform: translate3d(-8vw, 10vw, 0) scale(1.1);
   }
-}
-
-.heroGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
-  align-items: center;
-  gap: clamp(40px, 5vw, 72px);
-}
-
-.insignia {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 14px 6px 8px;
-  border-radius: 999px;
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  box-shadow: inset 0 0 0 1px var(--glass-line);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--fg-2);
-}
-
-.insigniaPunto {
-  display: inline-grid;
-  place-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--fg);
-  color: var(--bg);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.titular {
-  margin-top: 24px;
-  font-family: var(--font-display);
-  font-size: clamp(44px, 5vw, 74px);
-  line-height: 1.02;
-  font-weight: 600;
-  letter-spacing: -0.045em;
-}
-
-.titular span {
-  display: block;
-}
-
-.heroLead {
-  margin-top: 26px;
-  max-width: 34em;
-  font-size: clamp(18px, 1.5vw, 21px);
-  line-height: 1.5;
-  letter-spacing: -0.012em;
-  color: var(--fg-2);
-}
-
-.heroNota {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 22px;
-  margin-top: 28px;
-  font-size: 14px;
-  color: var(--fg-3);
-}
-
-.heroNota span {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.heroNota svg {
-  color: var(--ok);
 }
 
 /* ── Tablero ilustrativo del hero ───────────────────────────────────────── */
@@ -1090,7 +972,7 @@
   }
 }
 
-/* ── Declaración y virtudes ─────────────────────────────────────────────── */
+/* ── Declaración ────────────────────────────────────────────────────────── */
 
 .declaracion {
   font-family: var(--font-display);
@@ -1101,138 +983,12 @@
   text-wrap: balance;
 }
 
-.virtudes {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: clamp(48px, 5vw, 72px);
-}
-
-.virtud {
-  display: flex;
-  flex-direction: column;
-  min-height: 272px;
-  padding: 28px;
-  border-radius: var(--radius-xl);
-  background: var(--tile);
-  box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line-soft);
-}
-
-.virtudArte {
-  height: 72px;
-  margin-bottom: 40px;
-}
-
-.virtudValor {
-  display: block;
-  font-family: var(--font-display);
-  font-size: clamp(34px, 3.2vw, 46px);
-  line-height: 1;
-  font-weight: 600;
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-}
-
-.virtudTexto {
-  margin-top: 10px;
-  font-size: 15.5px;
-  line-height: 1.45;
-  color: var(--fg-2);
-}
-
-/* Glifos vectoriales de las virtudes */
-.glifo {
-  display: block;
-  width: auto;
-  height: 72px;
-  max-width: 100%;
-  overflow: visible;
-}
-
-.glifoBarra,
-.glifoBarraFuerte {
-  transform-box: fill-box;
-  transform-origin: bottom;
-  animation: crece 1.1s var(--ease-out) both;
-}
-
-.glifoBarra {
-  fill: color-mix(in srgb, var(--accent) 22%, transparent);
-}
-
-.glifoBarraFuerte {
-  fill: var(--accent);
-}
-
-.glifoPunto {
-  fill: var(--line);
-}
-
-.glifoPuntoOn {
-  fill: var(--accent);
-  animation: titila 2.6s ease-in-out infinite;
-}
-
-.glifoMapa path {
-  fill: color-mix(in srgb, var(--accent) 18%, transparent);
-  stroke: var(--tile);
-  stroke-width: 4;
-  stroke-linejoin: round;
-}
-
-.glifoPin {
-  fill: var(--accent);
-  animation: late 2.4s ease-in-out infinite;
-}
-
-.glifoBurbuja {
-  fill: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
-.glifoTecleo {
-  fill: var(--accent);
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: tecleo 1.3s ease-in-out infinite;
-}
-
-.glifoVisto {
-  fill: var(--ok);
-}
-
-.glifoPalomita {
-  fill: none;
-  stroke: #fff;
-  stroke-width: 3.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-@keyframes titila {
-  50% {
-    opacity: 0.3;
-  }
-}
-
-@keyframes tecleo {
-  0%,
-  60%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.45;
-  }
-  30% {
-    transform: translateY(-5px);
-    opacity: 1;
-  }
-}
-
 /* Las animaciones de entrada arrancan cuando el bloque aparece, no al cargar. */
-.sitio [data-oculto] :is(.glifoBarra, .glifoBarraFuerte, .barras i, .pasitos i, .linea path) {
+.sitio [data-oculto] :is(.barras i, .pasitos i, .linea path) {
   animation: none;
 }
 
-/* ── Servicios (bento con mini interfaces) ──────────────────────────────── */
+/* ── Cabeceras, etiquetas y mini interfaces ─────────────────────────────── */
 
 .cabeza {
   display: flex;
@@ -1245,101 +1001,6 @@
 .cabeza .lead {
   margin-top: 0;
   max-width: 34ch;
-}
-
-.bento {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: clamp(48px, 5vw, 72px);
-}
-
-.tile {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  grid-column: span 2;
-  min-height: 500px;
-  overflow: hidden;
-  isolation: isolate;
-  border-radius: var(--radius-xl);
-  background: var(--tile-alt);
-  box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line-soft);
-  transition: box-shadow 0.25s var(--ease), transform 0.25s var(--ease);
-}
-
-.tile:active {
-  transform: scale(0.99);
-}
-
-.tile:hover {
-  box-shadow: var(--sombra-md), inset 0 0 0 1px var(--line);
-  transform: translateY(-2px);
-}
-
-.tileAncho {
-  grid-column: span 4;
-}
-
-.tileTexto {
-  padding: 32px 32px 0;
-}
-
-.tileIcono {
-  display: inline-grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  margin-bottom: 18px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--accent);
-}
-
-.tileTitulo {
-  font-family: var(--font-display);
-  font-size: clamp(22px, 1.9vw, 26px);
-  line-height: 1.15;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-}
-
-.tileCopia {
-  margin-top: 8px;
-  max-width: 40ch;
-  font-size: 16px;
-  line-height: 1.5;
-  color: var(--fg-2);
-}
-
-.tileEnlace {
-  display: inline-flex;
-  align-items: center;
-  margin-top: 14px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.tileArte {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 250px;
-  margin-top: 28px;
-  overflow: hidden;
-}
-
-.tileArte > img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 1.2s var(--ease-out);
-}
-
-.tile:hover .tileArte > img {
-  transform: scale(1.035);
 }
 
 .chip {
@@ -1584,37 +1245,6 @@
   to {
     transform: scaleY(1);
   }
-}
-
-/* ── Foto del equipo ────────────────────────────────────────────────────── */
-
-.equipo {
-  position: relative;
-  overflow: hidden;
-  border-radius: var(--radius-xl);
-  aspect-ratio: 2.35 / 1;
-  background: var(--tile);
-}
-
-.equipo img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 36%;
-}
-
-.equipoPie {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px 48px;
-  margin-top: 28px;
-}
-
-.equipoPie .declaracion {
-  max-width: 24ch;
-  font-size: clamp(26px, 2.8vw, 38px);
 }
 
 /* ── Método (se cuenta al bajar) ────────────────────────────────────────── */
@@ -2374,142 +2004,6 @@
   }
 }
 
-/* ── Integración (diagrama del ecosistema) ──────────────────────────────── */
-
-.integra {
-  display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-  gap: clamp(40px, 6vw, 96px);
-  align-items: center;
-}
-
-.integraLista {
-  display: grid;
-  gap: 14px;
-  margin-top: 32px;
-}
-
-.integraLista li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.integraLista svg {
-  flex: none;
-  color: var(--accent);
-}
-
-.eco {
-  position: relative;
-  width: 100%;
-  max-width: 560px;
-  margin-inline: auto;
-  aspect-ratio: 1;
-}
-
-.eco > svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.ecoAnillo {
-  fill: none;
-  stroke: var(--line);
-  stroke-width: 1.2;
-}
-
-.ecoAnilloFuera {
-  fill: none;
-  stroke: var(--line);
-  stroke-width: 1.2;
-  stroke-dasharray: 2 8;
-}
-
-.ecoGira {
-  transform-origin: 280px 280px;
-  animation: gira 90s linear infinite;
-}
-
-.ecoSatelite {
-  fill: var(--accent);
-  opacity: 0.45;
-}
-
-.ecoLinea {
-  fill: none;
-  stroke: var(--line);
-  stroke-width: 1.4;
-}
-
-.ecoPulso {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  stroke-dasharray: 12 100;
-  animation: viaje 2.8s linear infinite;
-}
-
-.ecoOnda {
-  fill: color-mix(in srgb, var(--accent) 16%, transparent);
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: onda 3s var(--ease-out) infinite;
-}
-
-.ecoNucleo {
-  fill: var(--card);
-  filter: drop-shadow(0 10px 24px rgba(10, 37, 64, 0.16));
-}
-
-.ecoNodo {
-  position: absolute;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 16px 7px 7px;
-  border-radius: 999px;
-  background: var(--card);
-  box-shadow: var(--sombra-md), inset 0 0 0 1px var(--line-soft);
-  font-size: 14.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  transform: translate(-50%, -50%);
-}
-
-.ecoIcono {
-  display: inline-grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
-}
-
-@keyframes gira {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes onda {
-  from {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  to {
-    transform: scale(1.9);
-    opacity: 0;
-  }
-}
-
 /* ── Cierre ─────────────────────────────────────────────────────────────── */
 
 .final {
@@ -2564,9 +2058,6 @@
 /* ── Responsivo ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 1068px) {
-  .heroGrid {
-    grid-template-columns: 1fr;
-  }
   .visual {
     max-width: 680px;
     margin-inline: auto;
@@ -2577,15 +2068,6 @@
   }
   .flotanteRed {
     right: -12px;
-  }
-  .bento {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .tile {
-    grid-column: span 1;
-  }
-  .tileAncho {
-    grid-column: span 2;
   }
   .metodo,
   .cobertura {
@@ -2606,12 +2088,6 @@
   }
   .panelTexto {
     min-height: 0;
-  }
-  .virtudes {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .integra {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -2648,20 +2124,6 @@
   .visual {
     padding: 8px 0 0;
   }
-  .insignia {
-    font-size: 13px;
-  }
-  .bento {
-    grid-template-columns: 1fr;
-  }
-  .tile,
-  .tileAncho {
-    grid-column: auto;
-    min-height: 460px;
-  }
-  .equipo {
-    aspect-ratio: 4 / 3;
-  }
   .segmentoMarco {
     justify-content: flex-start;
     margin-inline: calc(-1 * var(--gutter));
@@ -2678,39 +2140,14 @@
     width: 84px;
     height: 48px;
   }
-  .guias {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .guias i:nth-child(n + 3) {
-    display: none;
-  }
 }
 
 @media (max-width: 734px) {
-  .virtudes {
-    grid-template-columns: 1fr;
-  }
-  .virtud {
-    min-height: 0;
-  }
   .mapaCiudad text {
     display: none;
   }
   .mapaSede text {
     font-size: 26px;
-  }
-  .ecoNodo {
-    gap: 6px;
-    padding: 4px 10px 4px 4px;
-    font-size: 11.5px;
-  }
-  .ecoIcono {
-    width: 22px;
-    height: 22px;
-  }
-  .ecoIcono svg {
-    width: 13px;
-    height: 13px;
   }
 }
 

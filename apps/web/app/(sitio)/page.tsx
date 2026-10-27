@@ -10,34 +10,20 @@ import Tablero from "@/components/sitio/Tablero";
 import Marcas from "@/components/sitio/Marcas";
 import Cifra from "@/components/sitio/Cifra";
 import Flecha from "@/components/sitio/Flecha";
-import Metodo, { type PasoMetodo } from "@/components/sitio/Metodo";
 import Industrias, { type Industria } from "@/components/sitio/Industrias";
 import Galeria, { type FotoGaleria } from "@/components/sitio/Galeria";
 import MapaInteractivo from "@/components/sitio/MapaInteractivo";
-import Ecosistema from "@/components/sitio/Ecosistema";
-import { GlifoAnios, GlifoEstados, GlifoRespuesta, GlifoSitios } from "@/components/sitio/Glifos";
 import Preguntas, { type Pregunta } from "@/components/sitio/Preguntas";
-import { GraficaEntregas, TicketSoporte, TopologiaRed } from "@/components/sitio/MiniInterfaces";
+import { GraficaEntregas, TicketSoporte } from "@/components/sitio/MiniInterfaces";
 import PublicIcon from "@/app/components/PublicIcon";
 import pn from "@/components/sitio/portada.module.css";
 import Baldosa from "@/components/sitio/Baldosa";
-import {
-  fetchPageSection,
-  DEFAULT_CTA,
-  DEFAULT_PROCESO,
-  type CtaContent,
-  type ProcesoItem,
-} from "@/lib/page-content-api";
+import EquipoGrupo from "@/components/sitio/EquipoGrupo";
+import { fetchPageSection, DEFAULT_CTA, type CtaContent } from "@/lib/page-content-api";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
-type Busqueda = { searchParams?: { modelo?: string } };
-
-/** `?modelo=nuevo` muestra la portada propuesta (baldosas grandes) sin reemplazar la actual; no se indexa. */
-const esModeloNuevo = (p?: Busqueda["searchParams"]) => p?.modelo === "nuevo";
-
-export async function generateMetadata({ searchParams }: Busqueda): Promise<Metadata> {
-  const base = await buildStudioPageMetadata("home");
-  return esModeloNuevo(searchParams) ? { ...base, robots: { index: false, follow: false } } : base;
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("home");
 }
 
 export const dynamic = "force-dynamic";
@@ -48,12 +34,6 @@ const w = (nombre: string) => ({
   srcSet: `/fotos/${nombre}-1200.webp 1200w, /fotos/${nombre}-1920.webp 1920w`,
 });
 
-const FOTOS_METODO = [
-  { ...foto("campo-enlace-antena-ciudad", "(max-width: 734px) 100vw, 680px"), alt: "Técnico de NEXARA revisando un enlace en azotea" },
-  { ...foto("campo-instalacion-rack", "(max-width: 734px) 100vw, 680px"), alt: "Técnicos de NEXARA instalando un rack" },
-  { ...w("sala-monitoreo-videowall-nexara"), alt: "Sala de monitoreo con video wall instalada por NEXARA" },
-];
-
 /** Servicios para los datos estructurados de la portada (anclas de /servicios). */
 const SERVICIOS_SEO: [string, string][] = [
   ["cctv", "Videovigilancia inteligente"],
@@ -63,12 +43,11 @@ const SERVICIOS_SEO: [string, string][] = [
   ["software", "Plataformas a la medida"],
 ];
 
-/** Lo que respalda a NEXARA, dicho en frases (sin tarjetas de una palabra). */
-const VIRTUDES = [
-  { valor: "10+", texto: "años instalando y sosteniendo tecnología en campo.", Glifo: GlifoAnios },
-  { valor: "200+", texto: "sitios implementados para empresas de todo el país.", Glifo: GlifoSitios },
-  { valor: "32", texto: "estados donde ya hemos trabajado, con base en Puebla y CDMX.", Glifo: GlifoEstados },
-  { valor: "Un día hábil", texto: "es lo que tarda, por lo general, nuestra primera respuesta.", Glifo: GlifoRespuesta },
+const CIFRAS = [
+  { valor: "10+", texto: "años instalando y sosteniendo tecnología" },
+  { valor: "200+", texto: "sitios implementados en el país" },
+  { valor: "32", texto: "estados con proyectos" },
+  { valor: "1", texto: "día hábil para la primera respuesta" },
 ];
 
 const INDUSTRIAS: Industria[] = [
@@ -164,17 +143,6 @@ const DETRAS: FotoGaleria[] = [
   { ...foto("equipo-nexara-polos", "(max-width: 734px) 100vw, 680px"), alt: "Integrantes del equipo NEXARA", tema: "Equipo", pie: "Las mismas personas instalan y dan soporte." },
 ];
 
-function Guias() {
-  return (
-    <div className={s.guias} aria-hidden="true">
-      <i />
-      <i />
-      <i />
-      <i />
-    </div>
-  );
-}
-
 /** Servicios en baldosas grandes: foto a sangre o mini interfaz, dos acciones. */
 function Mosaico() {
   const tam = "(max-width: 734px) 100vw, 50vw";
@@ -185,7 +153,7 @@ function Mosaico() {
         ancha
         nombre="Videovigilancia."
         texto="Cobertura pensada por zona de riesgo y evidencia cuando se necesita."
-        foto={{ ...foto("monitoreo-pantallas-cctv", ancho), alt: "Sala con pantallas de videovigilancia instalada por NEXARA" }}
+        foto={{ ...foto("muro-video-nexara", ancho), alt: "Centro de monitoreo con muro de video instalado por NEXARA", posicion: "center 2%" }}
         acciones={[
           { href: ruta("/servicios#cctv"), label: "Ver más", principal: true },
           { href: ruta("/contacto?servicio=cctv"), label: "Cotizar", medicion: "home_baldosa_cctv" },
@@ -201,9 +169,10 @@ function Mosaico() {
         ]}
       />
       <Baldosa
+        oscura
         nombre="Infraestructura."
         texto="Racks, servidores y respaldos listos para operar."
-        foto={{ ...foto("campo-instalacion-rack", tam), alt: "Técnicos de NEXARA instalando un rack", posicion: "center 60%" }}
+        foto={{ ...foto("rack-nexara-led", tam), alt: "Rack de servidores y switching instalado por NEXARA", posicion: "center 62%" }}
         acciones={[
           { href: ruta("/servicios#computo"), label: "Ver más", principal: true },
           { href: ruta("/contacto?servicio=computo"), label: "Cotizar", medicion: "home_baldosa_computo" },
@@ -231,9 +200,9 @@ function Mosaico() {
         ancha
         nombre="Un solo equipo."
         texto="Las mismas personas diseñan, instalan y te atienden después."
-        foto={{ ...foto("equipo-tecnico-nexara-uniforme", ancho), alt: "Equipo técnico de NEXARA", posicion: "center 35%" }}
+        pie={<EquipoGrupo />}
         acciones={[
-          { href: ruta("/nosotros"), label: "Conoce al equipo", principal: true },
+          { href: ruta("/nosotros#equipo"), label: "Conoce al equipo", principal: true },
           { href: ruta("/proyectos"), label: "Ver proyectos" },
         ]}
       />
@@ -241,10 +210,33 @@ function Mosaico() {
   );
 }
 
-/** Portada propuesta: hero centrado con el tablero como producto, baldosas, cifras y el resto de la portada. */
-function PortadaNueva({ whatsapp, cierre }: { whatsapp: string; cierre: React.ReactNode }) {
+/** Portada: hero centrado con el tablero como producto, baldosas de servicio, cifras, cobertura y cierre. */
+export default async function Inicio() {
+  const cta = (await fetchPageSection<CtaContent>("home_cta")) ?? DEFAULT_CTA;
+  const whatsapp = buildWhatsAppLeadUrl({ industryName: "tu empresa", serviceName: "CCTV, redes o soporte TI", path: "/" });
+
   return (
     <main aria-label="NEXARA, inicio">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          name: "NEXARA | CCTV, redes y soporte TI en México",
+          url: siteBaseUrl(),
+          description: "Integramos CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en Puebla, CDMX y cobertura nacional.",
+          isPartOf: { "@type": "WebSite", name: "NEXARA", url: siteBaseUrl() },
+          mainEntity: {
+            "@type": "ItemList",
+            itemListElement: SERVICIOS_SEO.map((nombre, i) => ({
+              "@type": "ListItem",
+              position: i + 1,
+              name: nombre[1],
+              url: `${siteBaseUrl()}/servicios#${nombre[0]}`,
+            })),
+          },
+        }}
+      />
+
       <section className={pn.hero} aria-labelledby="hero-titulo">
         <Aurora />
         <div className={s.contenedor}>
@@ -269,7 +261,7 @@ function PortadaNueva({ whatsapp, cierre }: { whatsapp: string; cierre: React.Re
               <Flecha />
             </a>
           </div>
-          <Tablero grande />
+          <Tablero />
         </div>
       </section>
 
@@ -280,12 +272,7 @@ function PortadaNueva({ whatsapp, cierre }: { whatsapp: string; cierre: React.Re
       <section className={s.seccion} aria-label="NEXARA en cifras">
         <div className={s.contenedor}>
           <ul className={pn.cifras}>
-            {[
-              { valor: "10+", texto: "años instalando y sosteniendo tecnología" },
-              { valor: "200+", texto: "sitios implementados en el país" },
-              { valor: "32", texto: "estados con proyectos" },
-              { valor: "1", texto: "día hábil para la primera respuesta" },
-            ].map((c) => (
+            {CIFRAS.map((c) => (
               <li key={c.texto} data-aparecer>
                 <Cifra valor={c.valor} className={pn.cifra} />
                 <p className={pn.cifraTexto}>{c.texto}</p>
@@ -349,105 +336,17 @@ function PortadaNueva({ whatsapp, cierre }: { whatsapp: string; cierre: React.Re
         </div>
       </section>
 
-      {cierre}
-    </main>
-  );
-}
-
-export default async function PropuestaInicio({ searchParams }: Busqueda) {
-  const [procesoData, ctaData] = await Promise.all([
-    fetchPageSection<{ items: ProcesoItem[] }>("home_proceso"),
-    fetchPageSection<CtaContent>("home_cta"),
-  ]);
-  const proceso = (procesoData?.items?.length ? procesoData.items : DEFAULT_PROCESO).slice(0, 3);
-  const pasos: PasoMetodo[] = proceso.map((p, i) => ({ num: p.num, titulo: p.title, texto: p.text, foto: FOTOS_METODO[i % 3] }));
-  const cta = ctaData ?? DEFAULT_CTA;
-  const whatsapp = buildWhatsAppLeadUrl({ industryName: "tu empresa", serviceName: "CCTV, redes o soporte TI", path: "/" });
-
-  const cierre = (
-    <section className={s.final} aria-labelledby="final-titulo">
-      <div className={s.contenedor}>
-        <div className={s.finalTarjeta} data-aparecer>
-          <Aurora />
-          <h2 id="final-titulo" className={s.titulo}>
-            {cta.title} {cta.titleAccent}.
-          </h2>
-          <p className={s.lead}>{cta.text}</p>
-          <div className={s.acciones}>
-            <Link href={ruta(cta.primaryHref)} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_cta_primary">
-              {cta.primaryLabel}
-              <Flecha />
-            </Link>
-            <a
-              href={whatsapp}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`${s.boton} ${s.botonSecundario}`}
-              data-track-conversion="home_cta_whatsapp"
-            >
-              Escríbenos por WhatsApp
-              <Flecha />
-            </a>
-          </div>
-          <ul className={s.finalGarantias}>
-            <li>
-              <PublicIcon name="clock" size={18} /> Primera respuesta en un día hábil
-            </li>
-            <li>
-              <PublicIcon name="mapPin" size={18} /> Diagnóstico en sitio
-            </li>
-            <li>
-              <PublicIcon name="fileCheck" size={18} /> Memoria técnica al entregar
-            </li>
-          </ul>
-        </div>
-      </div>
-    </section>
-  );
-
-  if (esModeloNuevo(searchParams)) return <PortadaNueva whatsapp={whatsapp} cierre={cierre} />;
-
-  return (
-    <main aria-label="NEXARA, inicio">
-      <JsonLd
-        data={{
-          "@context": "https://schema.org",
-          "@type": "WebPage",
-          name: "NEXARA | CCTV, redes y soporte TI en México",
-          url: siteBaseUrl(),
-          description: "Integramos CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en Puebla, CDMX y cobertura nacional.",
-          isPartOf: { "@type": "WebSite", name: "NEXARA", url: siteBaseUrl() },
-          mainEntity: {
-            "@type": "ItemList",
-            itemListElement: SERVICIOS_SEO.map((nombre, i) => ({
-              "@type": "ListItem",
-              position: i + 1,
-              name: nombre[1],
-              url: `${siteBaseUrl()}/servicios#${nombre[0]}`,
-            })),
-          },
-        }}
-      />
-      {/* ── Hero ── */}
-      <section className={s.hero} aria-labelledby="hero-titulo">
-        <Aurora />
-        <div className={`${s.contenedor} ${s.heroGrid}`}>
-          <div>
-            <p className={s.insignia}>
-              <span className={s.insigniaPunto}>Llave en mano</span>
-              Seguridad e infraestructura TI para empresas
-            </p>
-            <h1 id="hero-titulo" className={s.titular}>
-              <span>Seguridad que ve.</span>
-              <span className={s.degradado}>Entiende. Responde.</span>
-            </h1>
-            <p className={s.heroLead}>
-              Diseñamos, instalamos y operamos videovigilancia, redes, cómputo y soporte TI. Un solo equipo
-              responsable, del diagnóstico al soporte.
-            </p>
+      <section className={s.final} aria-labelledby="final-titulo">
+        <div className={s.contenedor}>
+          <div className={s.finalTarjeta} data-aparecer>
+            <Aurora />
+            <h2 id="final-titulo" className={s.titulo}>
+              {cta.title} {cta.titleAccent}.
+            </h2>
+            <p className={s.lead}>{cta.text}</p>
             <div className={s.acciones}>
-              <Link href={ruta("/contacto")} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_hero_cta">
-                Cotiza tu proyecto
+              <Link href={ruta(cta.primaryHref)} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_cta_primary">
+                {cta.primaryLabel}
                 <Flecha />
               </Link>
               <a
@@ -455,303 +354,26 @@ export default async function PropuestaInicio({ searchParams }: Busqueda) {
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`${s.boton} ${s.botonSecundario}`}
-                data-track-conversion="home_hero_whatsapp"
+                data-track-conversion="home_cta_whatsapp"
               >
-                Hablar con un especialista
+                Escríbenos por WhatsApp
                 <Flecha />
               </a>
             </div>
-            <p className={s.heroNota}>
-              <span>
-                <PublicIcon name="check" size={16} /> Diagnóstico en sitio
-              </span>
-              <span>
-                <PublicIcon name="check" size={16} /> Alcance cerrado
-              </span>
-              <span>
-                <PublicIcon name="check" size={16} /> Soporte con SLA
-              </span>
-            </p>
-          </div>
-          <Tablero />
-        </div>
-      </section>
-
-      <Marcas />
-
-      {/* ── Por qué NEXARA ── */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Por qué NEXARA">
-        <Guias />
-        <div className={s.contenedor}>
-          <p className={s.antetitulo} data-aparecer>
-            Por qué NEXARA
-          </p>
-          <p className={s.declaracion} data-aparecer>
-            Una sola firma responsable de la tecnología que protege y conecta tu operación.{" "}
-            <span className={s.tenue}>Del diagnóstico al soporte, con las mismas personas.</span>
-          </p>
-          <ul className={s.virtudes}>
-            {VIRTUDES.map(({ valor, texto, Glifo }) => (
-              <li key={valor} className={s.virtud} data-aparecer>
-                <div className={s.virtudArte}>
-                  <Glifo />
-                </div>
-                <Cifra valor={valor} className={s.virtudValor} />
-                <p className={s.virtudTexto}>{texto}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* ── Servicios ── */}
-      <section className={s.seccion} aria-labelledby="servicios-titulo">
-        <div className={s.contenedor}>
-          <div className={s.cabeza} data-aparecer>
-            <div>
-              <p className={s.antetitulo}>Servicios</p>
-              <h2 id="servicios-titulo" className={s.titulo}>
-                Cinco especialidades.
-                <br />
-                <span className={s.tenue}>Un solo responsable.</span>
-              </h2>
-            </div>
-            <p className={s.lead}>Todo lo que necesita tu operación, diseñado, instalado y sostenido por el mismo equipo.</p>
-          </div>
-
-          <div className={s.bento}>
-            <Link href={ruta("/servicios#cctv")} className={`${s.tile} ${s.tileAncho}`} data-aparecer>
-              <div className={s.tileTexto}>
-                <span className={s.tileIcono}>
-                  <PublicIcon name="camera" size={20} />
-                </span>
-                <h3 className={s.tileTitulo}>Videovigilancia inteligente</h3>
-                <p className={s.tileCopia}>Cobertura diseñada por riesgo, cámaras IP, grabación confiable y evidencia cuando se necesita.</p>
-                <span className={s.tileEnlace}>
-                  Ver servicio
-                  <Flecha />
-                </span>
-              </div>
-              <div className={s.tileArte}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img {...foto("monitoreo-pantallas-cctv", "(max-width: 1068px) 100vw, 800px")} alt="Operador revisando cámaras de videovigilancia" loading="lazy" decoding="async" />
-                <span className={s.chip} style={{ top: 20, left: 20 }}>
-                  <i /> CAM 12 · En vivo
-                </span>
-                <span className={`${s.chip} ${s.chipOk}`} style={{ right: 20, bottom: 20 }}>
-                  <i /> Grabación continua
-                </span>
-              </div>
-            </Link>
-
-            <Link href={ruta("/servicios#redes")} className={s.tile} data-aparecer>
-              <div className={s.tileTexto}>
-                <span className={s.tileIcono}>
-                  <PublicIcon name="wifi" size={20} />
-                </span>
-                <h3 className={s.tileTitulo}>Redes y Wi‑Fi</h3>
-                <p className={s.tileCopia}>Cableado certificado, switching administrable y Wi‑Fi estable.</p>
-                <span className={s.tileEnlace}>
-                  Ver servicio
-                  <Flecha />
-                </span>
-              </div>
-              <div className={s.tileArte} aria-hidden="true">
-                <TopologiaRed />
-              </div>
-            </Link>
-
-            <Link href={ruta("/servicios#computo")} className={s.tile} data-aparecer>
-              <div className={s.tileTexto}>
-                <span className={s.tileIcono}>
-                  <PublicIcon name="server" size={20} />
-                </span>
-                <h3 className={s.tileTitulo}>Infraestructura y cómputo</h3>
-                <p className={s.tileCopia}>Racks, servidores, respaldos y equipos listos para operar.</p>
-                <span className={s.tileEnlace}>
-                  Ver servicio
-                  <Flecha />
-                </span>
-              </div>
-              <div className={s.tileArte}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img {...foto("rack-servidores-led", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px")} alt="Rack de servidores y switching instalado por NEXARA" loading="lazy" decoding="async" style={{ objectPosition: "center 30%" }} />
-                <span className={`${s.chip} ${s.chipOk}`} style={{ left: 20, bottom: 20 }}>
-                  <i /> Respaldo nocturno completado
-                </span>
-              </div>
-            </Link>
-
-            <Link href={ruta("/servicios#soporte")} className={s.tile} data-aparecer>
-              <div className={s.tileTexto}>
-                <span className={s.tileIcono}>
-                  <PublicIcon name="headset" size={20} />
-                </span>
-                <h3 className={s.tileTitulo}>Soporte y gestión TI</h3>
-                <p className={s.tileCopia}>Mesa de ayuda con SLA, remota y en sitio.</p>
-                <span className={s.tileEnlace}>
-                  Ver servicio
-                  <Flecha />
-                </span>
-              </div>
-              <div className={s.tileArte} aria-hidden="true">
-                <TicketSoporte />
-              </div>
-            </Link>
-
-            <Link href={ruta("/servicios#software")} className={s.tile} data-aparecer>
-              <div className={s.tileTexto}>
-                <span className={s.tileIcono}>
-                  <PublicIcon name="code" size={20} />
-                </span>
-                <h3 className={s.tileTitulo}>Plataformas a la medida</h3>
-                <p className={s.tileCopia}>Portales, automatización e indicadores, por fases.</p>
-                <span className={s.tileEnlace}>
-                  Ver servicio
-                  <Flecha />
-                </span>
-              </div>
-              <div className={s.tileArte} aria-hidden="true">
-                <GraficaEntregas />
-              </div>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Integración ── */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="integra-titulo">
-        <div className={`${s.contenedor} ${s.integra}`}>
-          <div data-aparecer>
-            <p className={s.antetitulo}>Integración</p>
-            <h2 id="integra-titulo" className={s.titulo}>
-              Un solo sistema. <span className={s.tenue}>Todo conectado.</span>
-            </h2>
-            <p className={s.lead}>
-              Cámaras, red, cómputo y soporte se diseñan juntos, se documentan juntos y los atiende el mismo equipo.
-            </p>
-            <ul className={s.integraLista}>
+            <ul className={s.finalGarantias}>
               <li>
-                <PublicIcon name="fileCheck" size={20} /> Memoria técnica de cada entrega
+                <PublicIcon name="clock" size={18} /> Primera respuesta en un día hábil
               </li>
               <li>
-                <PublicIcon name="camera" size={20} /> Evidencia fotográfica de lo instalado
+                <PublicIcon name="mapPin" size={18} /> Diagnóstico en sitio
               </li>
               <li>
-                <PublicIcon name="headset" size={20} /> Un solo contacto para todo el soporte
+                <PublicIcon name="fileCheck" size={18} /> Memoria técnica al entregar
               </li>
             </ul>
           </div>
-          <div data-aparecer>
-            <Ecosistema />
-          </div>
         </div>
       </section>
-
-      {/* ── Método ── */}
-      <section className={s.seccion} aria-label="Cómo trabajamos">
-        <div className={s.contenedor}>
-          <Metodo
-            antetitulo="Cómo trabajamos"
-            titulo={
-              <>
-                Del diagnóstico al soporte. <span className={s.tenue}>Sin sorpresas.</span>
-              </>
-            }
-            lead="Tres pasos y las mismas personas, de la primera visita al soporte."
-            pasos={pasos}
-          />
-        </div>
-      </section>
-
-      {/* ── Equipo ── */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-label="Nuestro equipo">
-        <div className={s.contenedor}>
-          <figure className={s.equipo} data-aparecer>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img {...w("equipo-tecnico-nexara-uniforme")} sizes="(max-width: 1280px) 100vw, 1200px" alt="Equipo técnico de NEXARA" loading="lazy" decoding="async" />
-          </figure>
-          <div className={s.equipoPie} data-aparecer>
-            <p className={s.declaracion}>
-              Las personas que diseñan tu proyecto <span className={s.tenue}>son las que lo instalan y las que te atienden después.</span>
-            </p>
-            <Link href={ruta("/nosotros")} className={s.enlace}>
-              Conoce al equipo
-              <Flecha />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Industrias ── */}
-      <section className={s.seccion} aria-labelledby="industrias-titulo">
-        <div className={s.contenedor}>
-          <header className={s.centro} data-aparecer>
-            <p className={s.antetitulo}>Industrias</p>
-            <h2 id="industrias-titulo" className={s.titulo}>
-              Hecho a la medida <span className={s.tenue}>de tu industria.</span>
-            </h2>
-            <p className={s.lead}>Cada operación tiene su riesgo típico. Armamos la solución alrededor del tuyo.</p>
-          </header>
-          <div data-aparecer>
-            <Industrias industrias={INDUSTRIAS} />
-          </div>
-        </div>
-      </section>
-
-      {/* ── Trabajo real ── */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="detras-titulo">
-        <div className={s.contenedor}>
-          <div className={s.cabeza} data-aparecer>
-            <div>
-              <p className={s.antetitulo}>Trabajo real</p>
-              <h2 id="detras-titulo" className={s.titulo}>
-                Detrás de cada proyecto.
-              </h2>
-            </div>
-            <p className={s.lead}>Instalaciones, equipo y flotilla propios. Ninguna foto es de banco de imágenes.</p>
-          </div>
-        </div>
-        <div data-aparecer>
-          <Galeria fotos={DETRAS} enlace={{ href: "/proyectos", label: "Ver proyectos" }} />
-        </div>
-      </section>
-
-      {/* ── Cobertura ── */}
-      <section className={s.seccion} aria-labelledby="cobertura-titulo">
-        <div className={s.contenedor}>
-          <div className={s.cabeza} data-aparecer>
-            <div>
-              <p className={s.antetitulo}>Cobertura</p>
-              <h2 id="cobertura-titulo" className={s.titulo}>
-                Base en Puebla y CDMX. <span className={s.tenue}>Alcance nacional.</span>
-              </h2>
-            </div>
-            <p className={s.lead}>Toca tu estado en el mapa, o elígelo, y te decimos cómo lo atendemos.</p>
-          </div>
-          <div data-aparecer>
-            <MapaInteractivo />
-          </div>
-        </div>
-      </section>
-
-      {/* ── Preguntas frecuentes ── */}
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="faq-titulo">
-        <div className={`${s.contenedor} ${s.faq}`}>
-          <div data-aparecer>
-            <p className={s.antetitulo}>Preguntas frecuentes</p>
-            <h2 id="faq-titulo" className={s.titulo}>
-              Lo que todos <span className={s.tenue}>nos preguntan.</span>
-            </h2>
-            <p className={s.lead}>¿Tienes otra duda? Escríbenos y te contesta una persona del equipo.</p>
-          </div>
-          <div data-aparecer>
-            <Preguntas preguntas={PREGUNTAS} />
-          </div>
-        </div>
-      </section>
-
-      {cierre}
     </main>
   );
 }

@@ -50,7 +50,7 @@ const ESTADOS: Record<Vista, { etiqueta: string; valor: string }[]> = {
  * se pausa con el cursor encima y se queda quieta en cuanto la persona elige una pestaña. Es ilustrativa: el
  * texto del hero dice lo mismo en palabras.
  */
-export default function Tablero({ grande = false }: { grande?: boolean }) {
+export default function Tablero() {
   const [vista, setVista] = useState<Vista>("camaras");
   const [auto, setAuto] = useState(true);
   const [pausa, setPausa] = useState(false);
@@ -84,7 +84,7 @@ export default function Tablero({ grande = false }: { grande?: boolean }) {
   return (
     <div
       ref={raiz}
-      className={`${s.visual} ${grande ? s.visualGrande : ""}`}
+      className={`${s.visual} ${s.visualGrande}`}
       onPointerEnter={() => setPausa(true)}
       onPointerLeave={() => setPausa(false)}
       aria-label="Demo del centro de monitoreo de NEXARA"

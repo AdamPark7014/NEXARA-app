@@ -22,12 +22,17 @@ const ORIGINAL: Record<string, number> = {
 
 const ANCHOS = [480, 960, 1440];
 
-/** Fotos del taller y del equipo que ya llegaron en webp, en dos anchos (`<nombre>-1200.webp` y `-1920.webp`). */
+/**
+ * Fotos en webp en dos anchos (`<nombre>-1200.webp` y `-1920.webp`): las del taller y del equipo que ya llegaron
+ * así, y las reescaladas con Real-ESRGAN para baldosas anchas (`muro-video-nexara`, `rack-nexara-led`).
+ */
 const PARES = new Set([
   "cableado-interno-pc-guantes-taller",
   "descarga-equipo-camioneta-nexara",
   "equipo-taller-ensamble-pc-nexara",
   "equipo-tecnico-nexara-uniforme",
+  "muro-video-nexara",
+  "rack-nexara-led",
   "sala-monitoreo-videowall-nexara",
   "tecnico-ensamble-chasis-pc-taller",
   "tecnico-nexara-entrega-equipo-sitio",
