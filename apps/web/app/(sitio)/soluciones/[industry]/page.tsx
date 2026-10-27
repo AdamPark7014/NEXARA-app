@@ -428,7 +428,7 @@ export default function IndustryHubPage({ params }: { params: Params }) {
         </div>
       </section>
 
-      <Directorio actual={hubPath} excluirIndustria={params.industry} titulo="Otras industrias" industrias={4} porIndustria={3} />
+      <Directorio actual={hubPath} excluirIndustria={params.industry} titulo="Otras industrias" />
 
       <Cierre
         titulo={

@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { getProgrammaticLandings, INDUSTRY_LANDINGS, findServiceLanding } from "@/lib/seo/programmatic-landings";
-import { isIndustryHubSlug } from "@/lib/seo/industry-hubs";
-import { MONEY_SERVICE_SLUGS } from "@/lib/seo/money-pages";
+import { getProgrammaticLandings, findServiceLanding } from "@/lib/seo/programmatic-landings";
 import { findGeoCity } from "@/lib/seo/geo-cities";
 import s from "./sitio.module.css";
 import i from "./interior.module.css";
 
+/** Los tres servicios que más se cotizan: una columna por cada uno, con sus industrias. */
+const SERVICIOS = ["camaras-cctv", "redes-y-conectividad", "soporte-ti-pyme"] as const;
 const CIUDADES = ["puebla", "cdmx", "cholula", "queretaro", "monterrey"] as const;
-const SERVICIOS_LOCALES = ["camaras-cctv", "redes-y-conectividad", "soporte-ti-pyme"] as const;
+const POR_COLUMNA = 5;
 
 type Props = {
   titulo?: string;
@@ -16,45 +16,35 @@ type Props = {
   actual?: string;
   /** Industria cuyas soluciones ya muestra la página (su hub): no se repiten aquí. */
   excluirIndustria?: string;
-  industrias?: number;
-  porIndustria?: number;
 };
 
-const rango = (slug: string) => {
-  const n = (MONEY_SERVICE_SLUGS as readonly string[]).indexOf(slug);
-  return n === -1 ? 99 : n;
-};
+type Enlace = { href: string; label: string; contexto: string };
 
 /**
- * Directorio al pie de cada página de detalle (como el «Explora» de Apple): soluciones por industria y servicios
- * por ciudad. Son los enlaces internos que antes daba el bloque SEO, en columnas discretas.
+ * Directorio al pie de cada página de detalle (como el «Explora» de Apple): una columna por servicio con las
+ * industrias que tienen solución propia, y una de ciudades. Las etiquetas son cortas («Manufactura», «Puebla») y el
+ * texto oculto completa el ancla para buscadores y lectores de pantalla («Cámaras CCTV e IP para manufactura»).
  */
-export default function Directorio({ titulo = "Explora más", lead, actual, excluirIndustria, industrias = 4, porIndustria = 3 }: Props) {
-  const soluciones = getProgrammaticLandings()
-    .map(({ industry, service }) => ({ href: `/soluciones/${industry.slug}/${service.slug}`, industry, service }))
-    .filter((x) => x.href !== actual)
-    .sort((a, b) => rango(a.service.slug) - rango(b.service.slug));
-
-  const grupos = INDUSTRY_LANDINGS.filter((ind) => ind.slug !== excluirIndustria).map((ind) => {
-    const enlaces = soluciones.filter((x) => x.industry.slug === ind.slug).slice(0, porIndustria);
-    return {
-      titulo: ind.name,
-      href: isIndustryHubSlug(ind.slug) ? `/soluciones/${ind.slug}` : enlaces[0]?.href ?? "/servicios",
-      enlaces: enlaces.map((x) => ({ href: x.href, label: x.service.name })),
-    };
-  })
-    .filter((g) => g.enlaces.length > 0)
-    .slice(0, industrias);
-
-  const locales = CIUDADES.flatMap((c) => {
-    const ciudad = findGeoCity(c);
-    if (!ciudad) return [];
-    return SERVICIOS_LOCALES.map((sv) => {
-      const servicio = findServiceLanding(sv);
-      const href = `/cobertura/${ciudad.slug}/${sv}`;
-      return servicio && href !== actual ? { href, label: `${servicio.name} en ${ciudad.name}` } : null;
-    }).filter((x): x is { href: string; label: string } => x !== null);
+export default function Directorio({ titulo = "Explora más", lead, actual, excluirIndustria }: Props) {
+  const combinaciones = getProgrammaticLandings();
+  const columnas = SERVICIOS.flatMap((slug, k) => {
+    const servicio = findServiceLanding(slug);
+    if (!servicio) return [];
+    const todas: Enlace[] = combinaciones
+      .filter((x) => x.service.slug === slug && x.industry.slug !== excluirIndustria)
+      .map((x) => ({ href: `/soluciones/${x.industry.slug}/${slug}`, label: x.industry.name, contexto: `${servicio.name} para ` }))
+      .filter((x) => x.href !== actual);
+    // Cada columna arranca en otra industria: si no, las tres repetían la misma lista.
+    const inicio = todas.length ? (k * Math.ceil(todas.length / SERVICIOS.length)) % todas.length : 0;
+    const enlaces = [...todas.slice(inicio), ...todas.slice(0, inicio)].slice(0, POR_COLUMNA);
+    return enlaces.length ? [{ titulo: servicio.name, enlaces }] : [];
   });
+
+  const ciudades: Enlace[] = CIUDADES.flatMap((slug) => {
+    const ciudad = findGeoCity(slug);
+    return ciudad ? [{ href: `/cobertura/${ciudad.slug}`, label: ciudad.name, contexto: "Tecnología para empresas en " }] : [];
+  }).filter((x) => x.href !== actual);
+  if (ciudades.length) columnas.push({ titulo: "Por ciudad", enlaces: ciudades });
 
   return (
     <section className={i.directorio} aria-labelledby="directorio-titulo">
@@ -64,32 +54,21 @@ export default function Directorio({ titulo = "Explora más", lead, actual, excl
         </h2>
         {lead ? <p className={i.directorioLead}>{lead}</p> : null}
         <div className={i.directorioRejilla}>
-          {grupos.map((g) => (
-            <div key={g.titulo} className={i.directorioGrupo}>
-              <h3>
-                <Link href={g.href}>{g.titulo}</Link>
-              </h3>
+          {columnas.map((c) => (
+            <div key={c.titulo} className={i.directorioGrupo}>
+              <h3>{c.titulo}</h3>
               <ul>
-                {g.enlaces.map((e) => (
+                {c.enlaces.map((e) => (
                   <li key={e.href}>
-                    <Link href={e.href}>{e.label}</Link>
+                    <Link href={e.href}>
+                      <span className={i.oculto}>{e.contexto}</span>
+                      {e.label}
+                    </Link>
                   </li>
                 ))}
               </ul>
             </div>
           ))}
-          {locales.length > 0 ? (
-            <div className={`${i.directorioGrupo} ${i.directorioDoble}`}>
-              <h3>Por ciudad</h3>
-              <ul>
-                {locales.slice(0, 10).map((e) => (
-                  <li key={e.href}>
-                    <Link href={e.href}>{e.label}</Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
         </div>
       </div>
     </section>

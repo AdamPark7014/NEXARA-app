@@ -34,7 +34,7 @@ export const GUIAS: Guia[] = [
       "Antes de hablar de marcas o megapíxeles: qué debe ver cada cámara, cuántos días guardar y quién tiene acceso. Cinco decisiones que definen si el sistema sirve el día del incidente.",
     tema: "Videovigilancia",
     lectura: 6,
-    foto: "monitoreo-pantallas-cctv",
+    foto: "muro-video-ancho",
     publicada: "2026-10-26",
     solucion: { href: "/servicios#cctv", label: "Ver videovigilancia" },
     interactivo: "cctv",

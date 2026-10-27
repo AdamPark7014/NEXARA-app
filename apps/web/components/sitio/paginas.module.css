@@ -290,31 +290,43 @@
 
 /* ── Logos de certificaciones ───────────────────────────────────────────── */
 
+/*
+ * Muro de logos a una tinta (los PNG de /certificaciones/mono son grafito sobre transparente): sin cajas blancas,
+ * con la misma altura óptica, y en oscuro se invierten a gris claro.
+ */
 .logos {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: clamp(40px, 5vw, 56px);
+  gap: clamp(36px, 4vw, 56px) clamp(24px, 3vw, 48px);
+  margin-top: clamp(48px, 5vw, 72px);
 }
 
 .logo {
   display: grid;
   place-items: center;
-  height: 104px;
-  padding: 18px 22px;
-  border-radius: var(--radius-lg);
-  background: #ffffff;
-  box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line-soft);
+  height: 72px;
 }
 
 .logo img {
-  max-width: 100%;
-  max-height: 56px;
+  max-width: min(100%, 180px);
+  max-height: 44px;
   object-fit: contain;
+  opacity: 0.72;
+  transition: opacity 0.3s var(--ease);
 }
 
-:global(html[data-public-theme="dark"]) .logo {
-  background: #eef2f7;
+/* Las insignias de Lenovo y el emblema de Sophos son más altos que anchos: piden más alto para pesar lo mismo. */
+.logo img[data-alto] {
+  max-height: 64px;
+}
+
+.logo:hover img {
+  opacity: 1;
+}
+
+:global(html[data-public-theme="dark"]) .logo img {
+  filter: invert(1);
+  opacity: 0.78;
 }
 
 /* ── Industrias en píldoras ─────────────────────────────────────────────── */

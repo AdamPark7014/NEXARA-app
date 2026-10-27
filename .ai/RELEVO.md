@@ -1,5 +1,19 @@
 # RELEVO
 
+- **27-10 ~13:30 (claude-code) — Ronda «premium» del sitio público: fotos, logos, cierre centrado y sin repeticiones.**
+  - La foto granulosa `monitoreo-pantallas-cctv` sale de Servicios (videovigilancia), blog y guía de CCTV, retail,
+    `camaras-cctv` y la galería de Proyectos: entra `muro-video-ancho` (recorte 16:9 del muro de video reescalado con
+    Real-ESRGAN, con JPG de 1600 para Open Graph: `CON_JPG` en `fotos.ts`). `servicios-gestionados-ti` usa la sala de
+    monitoreo. El archivo viejo sigue en `public/fotos` por si Studio lo referencia.
+  - Certificaciones: los 10 logos a una tinta en `public/certificaciones/mono/` (sacados de los originales de la misma
+    carpeta), sin cajas blancas; en oscuro se invierten (`filter: invert(1)`). `data-alto` para los logos verticales.
+  - La tarjeta de cierre (`.finalTarjeta`) centraba solo el título: ahora también texto y botones (todas las páginas).
+  - `Directorio`: una columna por servicio con industrias cortas (rotadas para no repetir la lista) y una de ciudades
+    a los hubs `/cobertura/<ciudad>`; el ancla completa va en texto oculto (`.oculto`). Ya no lleva `industrias` ni
+    `porIndustria`. Soluciones servicio × industria: «Otras soluciones cercanas» mezcla 3 y 3 y titula con la
+    industria y su reto; las fichas de ciudad dicen solo la ciudad. Cobertura: cada solución trae su propio texto
+    (`texto` en `GEO_MONEY_LINKS`).
+
 - **26-10 ~21:00 (claude-code) — La portada nueva es la oficial; el equipo con retratos en Nosotros y en la portada.**
   - Adam aprobó el modelo nuevo: `app/(sitio)/page.tsx` ya solo pinta esa portada (con el JSON-LD de siempre); fuera
     `?modelo=nuevo`, el `noindex`, la portada vieja, `Ecosistema.tsx`, `Glifos.tsx` y ~530 líneas de CSS que solo

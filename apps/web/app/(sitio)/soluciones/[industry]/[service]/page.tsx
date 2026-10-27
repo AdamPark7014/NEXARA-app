@@ -20,7 +20,7 @@ import ArteServicio from "@/components/sitio/ArteServicio";
 import Cierre from "@/components/sitio/Cierre";
 import Flecha from "@/components/sitio/Flecha";
 import { foto, fotoOg } from "@/components/sitio/fotos";
-import { NOMBRE_LINEA, fotoSolucion, visualServicio } from "@/components/sitio/visuales";
+import { NOMBRE_LINEA, fotoSolucion, visualIndustria, visualServicio } from "@/components/sitio/visuales";
 
 type Params = {
   industry: string;
@@ -136,10 +136,14 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
   const industriaHref = isIndustryHubSlug(industry.slug) ? `/soluciones/${industry.slug}` : "/servicios#industrias";
   const industriaMin = industry.name.toLowerCase();
 
-  const related = getProgrammaticLandings()
-    .filter((item) => item.industry.slug === industry.slug || item.service.slug === service.slug)
-    .filter((item) => !(item.industry.slug === industry.slug && item.service.slug === service.slug))
-    .slice(0, 6);
+  // Tres de la misma industria con otro servicio y tres del mismo servicio en otra industria: con los seis primeros
+  // salían casi todas del mismo servicio, con el mismo título y el mismo texto.
+  const combinaciones = getProgrammaticLandings().filter(
+    (item) => !(item.industry.slug === industry.slug && item.service.slug === service.slug),
+  );
+  const mismaIndustria = combinaciones.filter((item) => item.industry.slug === industry.slug);
+  const mismoServicio = combinaciones.filter((item) => item.service.slug === service.slug);
+  const related = [...mismaIndustria.slice(0, 6 - Math.min(3, mismoServicio.length)), ...mismoServicio].slice(0, 6);
 
   const heroAbs = `${siteUrl}${fotoOg(heroFoto)}`;
 
@@ -372,19 +376,32 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
             </div>
             <Rutas
               ir="Ver solución"
-              rutas={related.map((item) => ({
-                href: `/soluciones/${item.industry.slug}/${item.service.slug}`,
-                etiqueta: item.industry.name,
-                titulo: item.service.name,
-                texto: item.service.summary,
-                icono: visualServicio(item.service.slug).icono,
-              }))}
+              rutas={related.map((item) =>
+                // El mismo servicio en otra industria se titula con la industria y su reto, no con el servicio repetido.
+                item.service.slug === service.slug
+                  ? {
+                      href: `/soluciones/${item.industry.slug}/${item.service.slug}`,
+                      etiqueta: item.service.name,
+                      titulo: item.industry.name,
+                      texto: item.industry.painPoint,
+                      icono: visualIndustria(item.industry.slug).icono,
+                    }
+                  : {
+                      href: `/soluciones/${item.industry.slug}/${item.service.slug}`,
+                      etiqueta: item.industry.name,
+                      titulo: item.service.name,
+                      texto: item.service.summary,
+                      icono: visualServicio(item.service.slug).icono,
+                    },
+              )}
             />
             {isGeoServiceSlug(service.slug) ? (
               <nav className={i.fichas} aria-label={`${service.name} por ciudad`} data-aparecer>
+                <span className={i.fichasTitulo}>{service.name} en</span>
                 {GEO_CITIES.map((c) => (
                   <Link key={c.slug} href={`/cobertura/${c.slug}/${service.slug}`} className={i.ficha}>
-                    {service.name} en {c.name}
+                    <span className={i.oculto}>{service.name} en </span>
+                    {c.name}
                   </Link>
                 ))}
               </nav>

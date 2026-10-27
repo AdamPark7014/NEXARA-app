@@ -44,13 +44,12 @@ const CASOS: { sector: string; icono: PublicIconName; titulo: string; texto: str
 /** Galería de campo: instalaciones reales, sin tomas de taller repetidas. */
 const GALERIA: (Foto & { w: number; h: number; alt: string; tema: string; pie: string })[] = [
   { ...foto("campo-mastil-antenas", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1200, h: 1600, alt: "Mástil con antenas de enlace inalámbrico", tema: "Redes", pie: "Mástil con antenas de enlace." },
-  { ...foto("monitoreo-pantallas-cctv", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1600, h: 1200, alt: "Pantallas de videovigilancia", tema: "CCTV", pie: "Monitores de videovigilancia multicámara." },
+  { ...foto("muro-video-ancho", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1920, h: 1080, alt: "Muro de video de un centro de monitoreo", tema: "CCTV", pie: "Centro de monitoreo con muro de video." },
   { ...foto("control-acceso-terminal-facial", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1066, h: 1600, alt: "Terminal de reconocimiento facial", tema: "Control de acceso", pie: "Terminal facial en acceso de oficinas." },
   { ...foto("campo-instalacion-rack", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1280, h: 958, alt: "Técnicos instalando un rack", tema: "Instalación", pie: "Montaje de rack de telecomunicaciones." },
   { ...foto("rack-servidores-led", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1023, h: 1537, alt: "Rack de servidores y switching", tema: "Infraestructura", pie: "Rack de servidores, etiquetado y documentado." },
   { ...foto("campo-enlace-antena-ciudad", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1600, h: 1200, alt: "Radioenlace sobre la ciudad", tema: "Enlaces", pie: "Radioenlace punto a punto entre sedes." },
   { ...foto("control-acceso-torniquetes", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1600, h: 1066, alt: "Torniquetes de control de acceso", tema: "Control de acceso", pie: "Torniquetes con reconocimiento facial." },
-  { ...foto("monitoreo-videowall", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1200, h: 1391, alt: "Muro de video con las cámaras de un cliente", tema: "Monitoreo", pie: "Muro de video listo para operar." },
   { src: "/fotos/tecnico-nexara-entrega-equipo-sitio-1200.webp", w: 1200, h: 800, alt: "Técnico de NEXARA entregando equipo en sitio", tema: "Logística", pie: "Entrega de equipo en sitio." },
 ];
 

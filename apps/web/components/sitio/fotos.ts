@@ -24,13 +24,15 @@ const ANCHOS = [480, 960, 1440];
 
 /**
  * Fotos en webp en dos anchos (`<nombre>-1200.webp` y `-1920.webp`): las del taller y del equipo que ya llegaron
- * así, y las reescaladas con Real-ESRGAN para baldosas anchas (`muro-video-nexara`, `rack-nexara-led`).
+ * así, y las reescaladas con Real-ESRGAN (`muro-video-nexara` vertical, `muro-video-ancho` su recorte 16:9 para
+ * heros y secciones, `rack-nexara-led`).
  */
 const PARES = new Set([
   "cableado-interno-pc-guantes-taller",
   "descarga-equipo-camioneta-nexara",
   "equipo-taller-ensamble-pc-nexara",
   "equipo-tecnico-nexara-uniforme",
+  "muro-video-ancho",
   "muro-video-nexara",
   "rack-nexara-led",
   "sala-monitoreo-videowall-nexara",
@@ -41,9 +43,12 @@ const PARES = new Set([
 
 export type Foto = { src: string; srcSet?: string; sizes?: string };
 
+/** De estas fotos en webp también hay un JPG de 1600 para las vistas previas que no leen webp. */
+const CON_JPG = new Set(["muro-video-ancho"]);
+
 /** Versión para Open Graph y datos estructurados: JPG original o, en las fotos que solo existen en webp, la de 1200. */
 export function fotoOg(nombre: string): string {
-  return PARES.has(nombre) ? `/fotos/${nombre}-1200.webp` : `/fotos/${nombre}.jpg`;
+  return PARES.has(nombre) && !CON_JPG.has(nombre) ? `/fotos/${nombre}-1200.webp` : `/fotos/${nombre}.jpg`;
 }
 
 /** `src` + `srcSet` + `sizes` de una foto de public/fotos (por su nombre sin extensión). */

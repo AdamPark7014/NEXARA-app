@@ -293,6 +293,15 @@
   justify-content: center;
 }
 
+/* Rótulo delante de las fichas de ciudad: así cada ficha dice solo la ciudad, sin repetir el servicio doce veces. */
+.fichasTitulo {
+  align-self: center;
+  margin-right: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
 .fichas .ficha {
   display: inline-flex;
   align-items: center;
@@ -322,13 +331,13 @@
 /* ── Directorio de enlaces (al pie de cada página de detalle) ───────────── */
 
 .directorio {
-  padding-block: clamp(56px, 7vw, 96px);
+  padding-block: clamp(48px, 6vw, 80px);
   border-top: 1px solid var(--line-soft);
 }
 
 .directorioTitulo {
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -342,45 +351,29 @@
 .directorioRejilla {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 32px 24px;
-  margin-top: 36px;
+  gap: 32px clamp(24px, 3vw, 48px);
+  margin-top: 32px;
 }
 
+/* Encabezado con su filete y lista corta debajo, como las columnas del pie de Apple. */
 .directorioGrupo h3 {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
   font-size: 13px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--fg);
-}
-
-.directorioGrupo h3 a:hover {
-  color: var(--accent);
 }
 
 .directorioGrupo ul {
   display: grid;
-  gap: 8px;
+  gap: 9px;
   margin-top: 12px;
 }
 
-/* «Por ciudad» ocupa dos columnas de la rejilla y reparte su lista en ambas. */
-.directorioDoble {
-  grid-column: span 2;
-}
-
-.directorioDoble ul {
-  display: block;
-  columns: 2;
-  column-gap: 24px;
-}
-
-.directorioDoble li {
-  margin-bottom: 8px;
-  break-inside: avoid;
-}
-
 .directorioGrupo li a {
-  font-size: 13.5px;
-  line-height: 1.4;
+  font-size: 14px;
+  line-height: 1.35;
   color: var(--fg-2);
   transition: color 0.15s var(--ease);
 }
@@ -389,6 +382,17 @@
   color: var(--fg);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* Contexto del ancla que leen buscadores y lectores de pantalla, sin ocupar lugar en pantalla. */
+.oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 /* ── Blog ───────────────────────────────────────────────────────────────── */
