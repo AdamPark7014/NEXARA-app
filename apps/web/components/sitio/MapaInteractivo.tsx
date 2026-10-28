@@ -49,6 +49,20 @@ const ciudadesDe = (estado: string) =>
 
 const ORDEN = [...ESTADOS_MX].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
+/** Rótulo en píldora centrado en (x, y), legible sobre cualquier estado. */
+function Etiqueta({ texto, x, y }: { texto: string; x: number; y: number }) {
+  const ancho = texto.length * 10.6 + 32;
+  const izq = Math.min(Math.max(x - ancho / 2, 40), 965 - ancho);
+  return (
+    <g className={m.rotulo}>
+      <rect x={izq} y={y - 17} width={ancho} height="34" rx="17" />
+      <text x={izq + ancho / 2} y={y + 6}>
+        {texto}
+      </text>
+    </g>
+  );
+}
+
 /**
  * Mapa de cobertura interactivo: al pasar el cursor o tocar un estado se dibuja la ruta desde Puebla y la ficha dice
  * cómo se atiende, qué ciudades tienen página y a dónde cotizar. Con teclado y en pantallas chicas se usa el selector
@@ -70,7 +84,16 @@ export default function MapaInteractivo({ inicial = "Puebla" }: { inicial?: stri
     <div className={m.marco}>
       <div className={m.lienzo} onPointerLeave={() => setEncima(null)}>
         <svg viewBox="35 18 935 595" aria-hidden="true">
-          <g>
+          <defs>
+            {/* El país «flota» sobre la página: sombra larga y suave, como una pieza física. */}
+            <filter id="mapa-relieve" x="-10%" y="-10%" width="120%" height="130%">
+              <feDropShadow dx="0" dy="14" stdDeviation="14" floodColor="#0a2540" floodOpacity="0.14" />
+            </filter>
+            <filter id="mapa-brillo" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0" stdDeviation="5" style={{ floodColor: "var(--accent)" }} floodOpacity="0.55" />
+            </filter>
+          </defs>
+          <g filter="url(#mapa-relieve)">
             {ESTADOS_MX.map((e) => (
               <path
                 key={e.nombre}
@@ -86,31 +109,25 @@ export default function MapaInteractivo({ inicial = "Puebla" }: { inicial?: stri
               />
             ))}
           </g>
-          <path d={estado.d} className={m.contorno} />
+          <path d={estado.d} className={m.contorno} filter={modo === "base" ? "url(#mapa-brillo)" : undefined} />
           {conRuta ? <path key={`r-${estado.nombre}`} d={curvaDesdeBase(destino)} className={m.ruta} pathLength={1} /> : null}
-          <circle className={m.sede} cx={BASE_MAPA.x} cy={BASE_MAPA.y} r="6.5" />
-          <circle className={m.sede} cx="598" cy="458" r="6.5" />
+          {/* Las dos sedes laten siempre: de ahí salen las cuadrillas. */}
+          {[BASE_MAPA, { x: 598, y: 458 }].map((b) => (
+            <g key={`${b.x}-${b.y}`}>
+              <circle className={m.pulso} cx={b.x} cy={b.y} r="7" />
+              <circle className={m.sede} cx={b.x} cy={b.y} r="6.5" />
+            </g>
+          ))}
           {conRuta ? (
             <g key={`d-${estado.nombre}`}>
               <circle className={m.halo} cx={destino.x} cy={destino.y} r="7" />
               <circle className={m.destino} cx={destino.x} cy={destino.y} r="6" />
-              <text
-                className={m.etiqueta}
-                x={destino.x > 700 ? destino.x - 12 : destino.x + 12}
-                y={destino.y - 10}
-                textAnchor={destino.x > 700 ? "end" : "start"}
-              >
-                {estado.nombre}
-              </text>
+              <Etiqueta texto={estado.nombre} x={destino.x} y={destino.y - 26} />
             </g>
           ) : estado.nombre === "Ciudad de México" ? (
-            <text className={m.etiqueta} x="586" y="446" textAnchor="end">
-              Ciudad de México
-            </text>
+            <Etiqueta texto="Ciudad de México" x={540} y={432} />
           ) : (
-            <text className={m.etiqueta} x={BASE_MAPA.x + 12} y={BASE_MAPA.y + 20}>
-              {estado.nombre}
-            </text>
+            <Etiqueta texto={estado.nombre} x={BASE_MAPA.x + 22} y={BASE_MAPA.y + 30} />
           )}
         </svg>
         <div className={m.leyenda} aria-hidden="true">

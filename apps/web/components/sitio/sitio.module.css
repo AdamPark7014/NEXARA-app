@@ -992,7 +992,7 @@
 }
 
 /* Las animaciones de entrada arrancan cuando el bloque aparece, no al cargar. */
-.sitio [data-oculto] :is(.barras i, .pasitos i, .linea path) {
+.sitio [data-oculto] :is(.graficaLinea, .pasitos i, .linea path) {
   animation: none;
 }
 
@@ -1041,12 +1041,13 @@
   animation: none;
 }
 
-/* Topología de red animada */
+/* Topología de red como consola de administración: tarjetas de equipo, enlaces curvos y tráfico animado */
 .red {
   position: absolute;
   inset: 0 16px 16px;
   width: calc(100% - 32px);
   height: calc(100% - 16px);
+  overflow: visible;
 }
 
 .redLinea {
@@ -1072,33 +1073,70 @@
   animation-delay: -1.9s;
 }
 
-.redNodo {
+.redTarjeta {
   fill: var(--card);
   stroke: var(--line);
-  stroke-width: 1.5;
+  stroke-width: 1;
+  filter: drop-shadow(0 2px 5px rgb(10 37 64 / 0.08));
 }
 
-.redNodoCentral {
+.redTarjetaCentral {
   fill: var(--accent);
-  stroke: none;
+  filter: drop-shadow(0 6px 12px color-mix(in srgb, var(--accent) 30%, transparent));
 }
 
-.redTexto {
-  fill: var(--fg-2);
-  font-size: 11px;
-  font-weight: 600;
+.redTitulo,
+.redTituloClaro,
+.redSub {
   font-family: var(--font);
+  letter-spacing: -0.01em;
+}
+
+.redTitulo {
+  fill: var(--fg);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.redTituloClaro {
+  fill: #ffffff;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.redSub {
+  fill: var(--fg-3);
+  font-size: 8.5px;
+  font-weight: 500;
+}
+
+.redIconoFondo {
+  fill: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .redIcono {
   fill: none;
-  stroke: var(--fg-2);
-  stroke-width: 1.5;
+  stroke: var(--accent);
+  stroke-width: 1.4;
   stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.redIconoClaro {
-  stroke: #fff;
+.redPunto {
+  fill: var(--accent);
+  stroke: none;
+}
+
+.redEstado {
+  fill: var(--ok);
+}
+
+.redPuerto {
+  fill: rgb(255 255 255 / 0.26);
+}
+
+.redPuertoOn {
+  fill: #7cf2b4;
 }
 
 @keyframes flujo {
@@ -1106,7 +1144,6 @@
     stroke-dashoffset: -126;
   }
 }
-
 /* Ticket de soporte */
 .ticket {
   position: absolute;
@@ -1206,7 +1243,7 @@
   background: var(--ok);
 }
 
-/* Mini tablero de indicadores */
+/* Mini tablero de indicadores: curva con degradado, rejilla tenue y semanas al pie */
 .grafica {
   position: absolute;
   inset: 0 24px 24px;
@@ -1217,44 +1254,92 @@
   background: var(--tile);
   font-size: 12px;
   color: var(--fg-3);
+  /* Las baldosas de la portada centran el texto: la gráfica se lee alineada a la izquierda. */
+  text-align: left;
+}
+
+.graficaCabeza {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .graficaValor {
-  font-size: 28px;
+  display: block;
+  margin-top: 2px;
+  font-size: 26px;
   font-weight: 600;
   letter-spacing: -0.03em;
   color: var(--fg);
 }
 
-.barras {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
+.graficaChip {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  color: var(--ok);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.graficaLienzo {
+  position: relative;
   flex: 1;
+  min-height: 80px;
   margin-top: 14px;
 }
 
-.barras i {
-  flex: 1;
-  border-radius: 4px 4px 2px 2px;
-  background: color-mix(in srgb, var(--accent) 25%, transparent);
-  transform-origin: bottom;
-  animation: crece 1.2s var(--ease-out) both;
+.graficaLienzo svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-.barras i:last-child {
-  background: var(--accent);
+.graficaRejilla {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  vector-effect: non-scaling-stroke;
 }
 
-@keyframes crece {
+.graficaLinea {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 1;
+  animation: traza 1.4s var(--ease-out) both;
+}
+
+@keyframes traza {
   from {
-    transform: scaleY(0.1);
-  }
-  to {
-    transform: scaleY(1);
+    stroke-dashoffset: 1;
   }
 }
 
+.graficaPunto {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--card), 0 0 0 7px color-mix(in srgb, var(--accent) 22%, transparent);
+  transform: translate(-50%, -50%);
+}
+
+.graficaEjes {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
 /* ── Método (se cuenta al bajar) ────────────────────────────────────────── */
 
 .metodo {
@@ -1447,18 +1532,61 @@
 }
 
 /* Ícono de la industria en línea fina, grande y tenue, como marca de agua. */
-.panelMarca {
-  position: absolute;
-  right: -36px;
-  bottom: -44px;
-  z-index: -1;
-  color: var(--accent);
-  opacity: 0.09;
-  pointer-events: none;
+/*
+ * Panel con foto de trabajo real: la imagen a sangre y un velo oscuro de abajo hacia arriba que deja leer el texto
+ * en blanco, igual en claro y en oscuro.
+ */
+.panelFoto {
+  justify-content: flex-end;
+  min-height: 480px;
+  background: #0b1220;
+  color: #ffffff;
 }
 
-.panelMarca svg {
-  stroke-width: 0.45;
+.panelImagen {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 1.2s var(--ease-out);
+}
+
+.panelFoto:hover .panelImagen {
+  transform: scale(1.03);
+}
+
+.panelFoto::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgb(5 12 24 / 0.12) 0%, rgb(5 12 24 / 0.5) 32%, rgb(5 12 24 / 0.82) 58%, rgb(5 12 24 / 0.92) 100%);
+}
+
+.panelFoto .panelIcono {
+  background: rgb(255 255 255 / 0.16);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22);
+  color: #ffffff;
+}
+
+.panelFoto .panelRiesgo {
+  color: #9fd0ff;
+}
+
+.panelFoto .panelTitulo {
+  color: #ffffff;
+}
+
+.panelFoto .panelCopia {
+  color: rgb(255 255 255 / 0.84);
+}
+
+.panelFoto .enlace {
+  color: #ffffff;
 }
 
 .panelIcono {

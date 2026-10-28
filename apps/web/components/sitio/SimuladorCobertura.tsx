@@ -29,10 +29,26 @@ const GONDOLAS = [
   { x: 422, y: 86, w: 16, h: 150 },
 ];
 
+/** Zonas de riesgo; `etiqueta` es el centro de su rótulo, fuera de puertas y muebles. */
 const ZONAS = [
-  { id: "acceso", nombre: "Acceso", x: 268, y: 320, w: 104, h: 56 },
-  { id: "caja", nombre: "Caja", x: 470, y: 250, w: 126, h: 64 },
-  { id: "almacen", nombre: "Almacén", x: 28, y: 28, w: 168, h: 118 },
+  { id: "acceso", nombre: "Acceso", x: 268, y: 320, w: 104, h: 56, etiqueta: { x: 320, y: 305 } },
+  { id: "caja", nombre: "Caja", x: 470, y: 250, w: 126, h: 64, etiqueta: { x: 533, y: 237 } },
+  { id: "almacen", nombre: "Almacén", x: 28, y: 28, w: 168, h: 118, etiqueta: { x: 140, y: 128 } },
+];
+
+/* Mobiliario que no tapa la vista (solo se dibuja): refrigeradores contra el muro, mostrador y tarimas. */
+const REFRIGERADORES = Array.from({ length: 6 }, (_, i) => ({ x: 246 + i * 58, y: 26, w: 52, h: 16 }));
+const TARIMAS = [
+  { x: 40, y: 40, w: 34, h: 28 },
+  { x: 80, y: 40, w: 34, h: 28 },
+  { x: 40, y: 74, w: 34, h: 28 },
+  { x: 152, y: 40, w: 34, h: 50 },
+];
+const DIVISIONES = [116, 146, 176, 206];
+/** Mesas de exhibición bajas: se ven por encima, así que no tapan. */
+const EXHIBIDORES = [
+  { x: 58, y: 206, w: 96, h: 40 },
+  { x: 58, y: 284, w: 96, h: 40 },
 ];
 
 const rect = (r: { x: number; y: number; w: number; h: number }): Seg[] => [
@@ -206,25 +222,108 @@ export default function SimuladorCobertura() {
           onPointerUp={() => (arrastre.current = null)}
           onPointerCancel={() => (arrastre.current = null)}
         >
-          <rect x="20" y="20" width="600" height="360" rx="6" className={c.piso} />
-          {MUESTRAS.map((p, i) => (vistos[i] ? null : <circle key={i} cx={p.x} cy={p.y} r="1.6" className={c.ciego} />))}
+          <defs>
+            <pattern id="sim-cuadricula" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M20 0 H0 V20" className={c.cuadricula} />
+            </pattern>
+            <pattern id="sim-rayado" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="6" className={c.rayado} />
+            </pattern>
+            <filter id="sim-sombra" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2.4" floodColor="#0a2540" floodOpacity="0.28" />
+            </filter>
+            <clipPath id="sim-zonas">
+              {ZONAS.map((z) => (
+                <rect key={z.id} x={z.x} y={z.y} width={z.w} height={z.h} rx="6" />
+              ))}
+            </clipPath>
+            {/* La luz de cada cámara se apaga con la distancia, como un cono real. */}
+            {camaras.map((cam) => (
+              <radialGradient key={cam.id} id={`sim-luz-${cam.id}`} gradientUnits="userSpaceOnUse" cx={cam.x} cy={cam.y} r={ALCANCE}>
+                <stop offset="0" style={{ stopColor: "var(--accent)", stopOpacity: cam.id === elegida ? 0.5 : 0.38 }} />
+                <stop offset="0.6" style={{ stopColor: "var(--accent)", stopOpacity: cam.id === elegida ? 0.2 : 0.14 }} />
+                <stop offset="1" style={{ stopColor: "var(--accent)", stopOpacity: 0.03 }} />
+              </radialGradient>
+            ))}
+          </defs>
+
+          {/* Piso con retícula de plano arquitectónico */}
+          <rect x="20" y="20" width="600" height="360" className={c.piso} />
+          <rect x="20" y="20" width="600" height="360" fill="url(#sim-cuadricula)" />
+
+          {/* Zonas de riesgo: verde cuando quedan cubiertas */}
           {zonas.map((z) => (
-            <g key={z.id}>
-              <rect x={z.x} y={z.y} width={z.w} height={z.h} rx="8" className={z.ok ? c.zonaOk : c.zona} />
-              <text x={z.x + z.w / 2} y={z.y + z.h / 2 + 5} className={c.zonaTexto}>
-                {z.nombre}
-              </text>
+            <rect key={z.id} x={z.x} y={z.y} width={z.w} height={z.h} rx="6" className={z.ok ? c.zonaOk : c.zona} />
+          ))}
+
+          {/* Mobiliario */}
+          {REFRIGERADORES.map((r, i) => (
+            <g key={`r${i}`}>
+              <rect x={r.x} y={r.y} width={r.w} height={r.h} rx="2.5" className={c.mueble} />
+              <line x1={r.x + r.w / 2} y1={r.y + 3} x2={r.x + r.w / 2} y2={r.y + r.h - 3} className={c.muebleLinea} />
             </g>
           ))}
+          {TARIMAS.map((t, i) => (
+            <g key={`t${i}`}>
+              <rect x={t.x} y={t.y} width={t.w} height={t.h} rx="3" className={c.caja} />
+              <path d={`M${t.x + 4} ${t.y + t.h / 2} H${t.x + t.w - 4}`} className={c.muebleLinea} />
+            </g>
+          ))}
+          {EXHIBIDORES.map((e, i) => (
+            <g key={`e${i}`}>
+              <rect x={e.x} y={e.y} width={e.w} height={e.h} rx="20" className={c.mueble} />
+              <rect x={e.x + 12} y={e.y + 12} width={e.w - 24} height={e.h - 24} rx="8" className={c.muebleLinea} />
+            </g>
+          ))}
+          <rect x="486" y="270" width="96" height="20" rx="5" className={c.mueble} />
+          <rect x="556" y="262" width="18" height="12" rx="2.5" className={c.registradora} />
+
+          {/* Conos de visión, recortados por muros y góndolas */}
           {conos.map((k) => (
-            <path key={k.id} d={k.d} className={k.id === elegida ? c.conoElegido : c.cono} />
+            <path key={k.id} d={k.d} fill={`url(#sim-luz-${k.id})`} className={k.id === elegida ? c.conoElegido : c.cono} />
           ))}
+
+          {/* Punto ciego dentro de las zonas de riesgo: rayado, celda por celda de la rejilla de medición */}
+          <g clipPath="url(#sim-zonas)">
+            {MUESTRAS.map((p, i) =>
+              !vistos[i] && ZONAS.some((z) => dentroDe(p, z)) ? (
+                <rect key={i} x={p.x - 7} y={p.y - 7} width="14" height="14" fill="url(#sim-rayado)" />
+              ) : null,
+            )}
+          </g>
+
+          {/* Góndolas vistas desde arriba: estructura, entrepaños y lomo central */}
           {GONDOLAS.map((g, i) => (
-            <rect key={i} x={g.x} y={g.y} width={g.w} height={g.h} rx="3" className={c.gondola} />
+            <g key={i}>
+              <rect x={g.x} y={g.y} width={g.w} height={g.h} rx="3" className={c.gondola} />
+              <line x1={g.x + g.w / 2} y1={g.y + 4} x2={g.x + g.w / 2} y2={g.y + g.h - 4} className={c.muebleLinea} />
+              {DIVISIONES.map((y) => (
+                <line key={y} x1={g.x + 2} y1={y} x2={g.x + g.w - 2} y2={y} className={c.muebleLinea} />
+              ))}
+            </g>
           ))}
+
+          {/* Muros con sus vanos y el abatimiento de cada puerta */}
           <path d="M268 380 H20 V20 H620 V380 H372 M200 20 V150 M20 150 H140" className={c.muro} />
+          <path d="M268 380 V330 M372 380 V330 M200 150 V206" className={c.puerta} />
+          <path d="M268 330 A50 50 0 0 1 318 380 M372 330 A50 50 0 0 0 322 380 M200 206 A56 56 0 0 1 144 150" className={c.abatimiento} />
+
+          {/* Rótulos de las zonas */}
+          {zonas.map((z) => {
+            const ancho = z.nombre.length * 7.4 + 30;
+            return (
+              <g key={`e${z.id}`} className={c.rotulo} data-ok={z.ok ? "" : undefined}>
+                <rect x={z.etiqueta.x - ancho / 2} y={z.etiqueta.y - 11} width={ancho} height="22" rx="11" />
+                <circle cx={z.etiqueta.x - ancho / 2 + 12} cy={z.etiqueta.y} r="3.5" className={c.rotuloPunto} />
+                <text x={z.etiqueta.x + 7} y={z.etiqueta.y + 4}>
+                  {z.nombre}
+                </text>
+              </g>
+            );
+          })}
+
           {camaras.map((cam, n) => {
-            const punta = { x: cam.x + Math.cos(rad(cam.ang)) * 54, y: cam.y + Math.sin(rad(cam.ang)) * 54 };
+            const punta = { x: cam.x + Math.cos(rad(cam.ang)) * 50, y: cam.y + Math.sin(rad(cam.ang)) * 50 };
             return (
               <g
                 key={cam.id}
@@ -241,15 +340,41 @@ export default function SimuladorCobertura() {
                 {/* Áreas de agarre invisibles, más grandes que el dibujo, para que el dedo atine en el teléfono. */}
                 <circle cx={punta.x} cy={punta.y} r="22" className={c.agarre} onPointerDown={(ev) => empezar(ev, cam.id, "girar")} />
                 <circle cx={cam.x} cy={cam.y} r="26" className={c.agarre} onPointerDown={(ev) => empezar(ev, cam.id, "mover")} />
-                <circle cx={punta.x} cy={punta.y} r="9" className={c.giro} />
-                <circle cx={cam.x} cy={cam.y} r="13" className={c.cuerpo} />
-                <text x={cam.x} y={cam.y + 4.5} className={c.numero}>
-                  {n + 1}
-                </text>
+                <g transform={`translate(${punta.x} ${punta.y})`} className={c.giro}>
+                  <circle r="8.5" />
+                  <path d="M-3.4 -1.6 A3.8 3.8 0 1 1 -1.6 3.4 M-3.4 -1.6 V-4.6 M-3.4 -1.6 H-0.6" />
+                </g>
+                <g transform={`translate(${cam.x} ${cam.y})`} filter="url(#sim-sombra)" pointerEvents="none">
+                  <circle r="20" className={c.halo} />
+                  <circle r="13.5" className={c.cuerpo} />
+                  {/* Cámara tipo bala vista desde arriba, apuntando a donde mira */}
+                  <g transform={`rotate(${cam.ang})`}>
+                    <rect x="-6" y="-4.6" width="15" height="9.2" rx="2.6" className={c.carcasa} />
+                    <rect x="8" y="-3.4" width="3" height="6.8" rx="1" className={c.lente} />
+                  </g>
+                  <circle cx="10.5" cy="-10.5" r="7" className={c.insignia} />
+                  <text x="10.5" y="-7.2" className={c.numero}>
+                    {n + 1}
+                  </text>
+                </g>
               </g>
             );
           })}
         </svg>
+        <ul className={c.leyenda} aria-hidden="true">
+          <li>
+            <i className={c.leyendaMuro} /> Muro
+          </li>
+          <li>
+            <i className={c.leyendaGondola} /> Góndola, tapa la vista
+          </li>
+          <li>
+            <i className={c.leyendaCiego} /> Punto ciego
+          </li>
+          <li>
+            <i className={c.leyendaLuz} /> Campo de la cámara
+          </li>
+        </ul>
         <p className={c.ayuda}>Arrastra una cámara para moverla y su punta para girarla.</p>
       </div>
 

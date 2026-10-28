@@ -1,5 +1,18 @@
 # RELEVO
 
+- **28-10 ~10:45 (claude-code) — Ilustraciones del sitio rehechas «de nivel profesional» (Adam: la del almacén no le gustó).**
+  - `SimuladorCobertura`: plano arquitectónico (retícula fina, muros de 7 con vanos y abatimiento de puertas, góndolas
+    con entrepaños, refrigeradores, mostrador con registradora, tarimas en el almacén, mesas de exhibición), cámaras
+    tipo bala que giran con su insignia, conos con luz que se apaga con la distancia (degradado radial por cámara),
+    punto ciego rayado por celda dentro de las zonas, rótulos en píldora con semáforo y leyenda bajo el plano. La lógica
+    de cobertura no cambió.
+  - `Industrias` (portada): fuera el ícono de contorno gigante; cada industria lleva foto real de NEXARA a sangre con
+    velo y texto en blanco (mapa `FOTOS` en el componente).
+  - `MiniInterfaces`: la topología es de tarjetas de equipo (internet, switch con puertos, oficinas/almacén/patio) y la
+    gráfica de entregas es una curva con degradado, rejilla y semanas (antes barras). `MapaInteractivo`: relieve con
+    sombra, latido en las dos sedes y rótulos en píldora.
+  - Ojo al capturar: la curva de la gráfica se dibuja con animación y las capturas la pausan a medias.
+
 - **27-10 ~14:25 (claude-code) — Datos estructurados de NEXARA sin las marcas de Zynora (Adam lo pidió).**
   - `app/layout.tsx`: Organization, ProfessionalService y WebSite llevaban `alternateName` con Zynora, Zynora Tek,
     Zynoratek, Nexyx y Nexo. Zynora Tek tiene su propio Perfil de Google verificado en la misma dirección, así que
