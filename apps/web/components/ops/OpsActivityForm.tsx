@@ -1423,7 +1423,9 @@ export default function OpsActivityForm({
                   />
                 </Field>
               )}
-              {tone === "core" && !form.periodoFin ? (
+            </FieldGrid>
+            {tone === "core" && !form.periodoFin ? (
+              <div className={s.compromiso}>
                 <Field
                   label="Entregar a más tardar"
                   optional
@@ -1441,8 +1443,8 @@ export default function OpsActivityForm({
                     onChange={(e) => setForm({ ...form, horaCompromiso: e.target.value })}
                   />
                 </Field>
-              ) : null}
-            </FieldGrid>
+              </div>
+            ) : null}
             {etapas && etapas.length > 0 ? (
               <Field label="Etapa del proyecto">
                 <Select value={form.projectMilestoneId} onChange={(e) => elegirEtapa(e.target.value)}>
