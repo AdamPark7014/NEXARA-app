@@ -1441,6 +1441,8 @@ function Breadcrumbs({
       {segments.map((seg, idx) => {
         accumulated.push(seg);
         const isLast = idx === segments.length - 1;
+        // Carpetas de la ruta que no son una página («/erp/finance/…»): no van en las migas.
+        if (!isLast && SEGMENTOS_SIN_MIGA.has(seg)) return null;
         const target = `/${panel}/${accumulated.join("/")}`;
         const moduleHit = MODULES_BY_URL.get(target);
         // Un id numérico (/indicadores/21, /cotizaciones/7) no dice nada: «Detalle».
@@ -1463,6 +1465,8 @@ function Breadcrumbs({
     </nav>
   );
 }
+
+const SEGMENTOS_SIN_MIGA: ReadonlySet<string> = new Set(["finance"]);
 
 const SLUG_DICTIONARY: Record<string, string> = {
   my: "Mis",

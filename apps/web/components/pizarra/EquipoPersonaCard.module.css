@@ -19,14 +19,24 @@
   text-decoration: none;
   color: inherit;
   background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  transition: border-color var(--ui-duration-fast) var(--ui-ease-standard);
+  border: 1px solid color-mix(in srgb, var(--ui-border) 55%, transparent);
+  border-radius: var(--ui-radius-xl);
+  box-shadow: var(--ui-elev-1);
+  transition:
+    box-shadow var(--ui-duration-base) var(--ui-ease-standard),
+    transform var(--ui-duration-base) var(--ui-ease-standard);
 }
 
 .tarjeta:hover {
-  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-elev-2);
+  transform: translateY(-2px);
   color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta:hover {
+    transform: none;
+  }
 }
 
 .tarjeta:focus-visible {

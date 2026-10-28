@@ -501,11 +501,12 @@
   border-radius: 6px;
   background: transparent;
   font-family: inherit;
-  font-size: 11px;
+  /* En minúsculas, como en el sitio público y en la propuesta aprobada (28-10). */
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.2;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: none;
+  letter-spacing: normal;
   text-align: left;
   color: var(--nav-label-ink);
   cursor: pointer;

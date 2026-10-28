@@ -1861,7 +1861,7 @@ const ERP_FINANCE_COPY: Record<ErpFinanceModule, { title: string; subtitle: stri
   accounting: { title: 'Pólizas y cuentas', subtitle: 'Libro diario, catálogo de cuentas y cierre mensual.' },
   banking: { title: 'Bancos', subtitle: 'Cuentas bancarias, movimientos y conciliación.' },
   invoicing: { title: 'Facturación', subtitle: 'Emisión, timbrado CFDI y cancelación de facturas.' },
-  'employee-payments': { title: 'Pagos a empleados', subtitle: 'Dispersiones, anticipos y complementos de nómina.' },
+  'employee-payments': { title: 'Nómina', subtitle: 'Control semanal, sugerencia de nómina y pagos al personal.' },
   exports: { title: 'Exportaciones contables', subtitle: 'Descarga de layouts para SAT y sistemas externos.' },
 };
 
