@@ -135,10 +135,13 @@
   color: var(--ui-fg-3);
 }
 
-/* Hora compromiso: el límite de entrega real, no el fin del día. */
-.compromisoNota {
-  font-size: var(--ui-text-xs);
-  color: var(--ui-fg-3);
+/* Hora compromiso: el límite de entrega real, no el fin del día. Renglón propio, con la nota a lo ancho. */
+.compromiso {
+  max-width: 30rem;
+}
+
+.compromiso input {
+  max-width: 11rem;
 }
 
 .chip:is(button)[aria-pressed="true"] {
