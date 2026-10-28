@@ -13,10 +13,20 @@
       cajón móvil el menú lleva fondo propio.
     - Menú: «Recursos» → «Equipo y recursos» con «Desempeño» (antes «KPIs del equipo», misma ruta);
       «Facturación CFDI» → «Facturación»; «Pagos a personal» → «Nómina» (etiquetas, migas, rieles y permisos).
-  - Fase 2 pendiente: rehacer el contenido de Hoy, Pizarra, Detalle, Asignar, Desempeño y Nómina como en el canvas,
-    y después las apps.
-  - Verificación: typecheck y 776 pruebas del web en verde. No se pudo ver en local porque Docker Desktop no
-    arrancó (el error del socket de siempre); se verifica en producción en el Chrome de Adam.
+  - Fase 2, primera parte (`cd229e31`), en `DashKit.module.css`:
+    - la banda de Hoy y del resumen general es oscura, con el brillo del sitio;
+    - los botones dentro de la banda se invierten (`:global(.nx-btn--*)`);
+    - las tarjetas del kit flotan con radio 22, las etiquetas pierden las mayúsculas forzadas y las cifras van en
+      Inter Tight.
+  - **Desplegado** el web (`063d0e0b` y `cd229e31`). En producción el CSS trae #168570, las sombras nuevas e Inter Tight.
+    Disco al 89 %.
+  - Pendiente del resto de la fase 2: contenido de Pizarra, Detalle, Asignar, Desempeño y Nómina como en el canvas;
+    después, las apps.
+  - Verificación: typecheck y 776 pruebas del web en verde.
+    - En local no se pudo ver: Docker Desktop no arrancó, por el error del socket de siempre.
+    - Dentro de Core tampoco: la extensión de Chrome estaba desconectada y el navegador integrado no tiene sesión.
+      Ahí hay una contraseña guardada de gerencia@ que **no se usó**.
+    - Falta que Adam mire Core por dentro.
 
 - **28-10 ~16:00 (claude-code) — Propuesta visual de la pasada UI/UX de Core y apps (nada construido).**
   - Canvas privado: https://claude.ai/artifact/WfLuBU8tk81cYoHVG8kAR7. Son 6 pantallas de escritorio (Hoy, Pizarra,
