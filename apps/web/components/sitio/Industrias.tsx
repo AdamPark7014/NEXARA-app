@@ -5,6 +5,17 @@ import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
 import s from "./sitio.module.css";
 import Flecha from "./Flecha";
+import { foto } from "./fotos";
+
+/** Foto de trabajo real de NEXARA detrás de cada industria (antes, un ícono de contorno gigante). */
+const FOTOS: Record<string, { nombre: string; alt: string; posicion: string }> = {
+  retail: { nombre: "muro-video-ancho", alt: "Muro de video de un centro de monitoreo", posicion: "center 40%" },
+  manufactura: { nombre: "campo-instalacion-rack", alt: "Técnicos de NEXARA con equipo de seguridad instalando un rack", posicion: "center 35%" },
+  hospitalidad: { nombre: "tecnico-nexara-entrega-equipo-sitio", alt: "Técnico de NEXARA entregando equipo en sitio", posicion: "center 30%" },
+  salud: { nombre: "rack-nexara-led", alt: "Rack de servidores y switching instalado por NEXARA", posicion: "center 45%" },
+  educacion: { nombre: "control-acceso-torniquetes", alt: "Torniquetes de control de acceso", posicion: "center 60%" },
+  gobierno: { nombre: "sala-monitoreo-videowall-nexara", alt: "Sala de monitoreo con muro de video", posicion: "center 25%" },
+};
 
 export type Industria = {
   slug: string;
@@ -48,6 +59,7 @@ export default function Industrias({ industrias }: { industrias: Industria[] }) 
   };
 
   const ind = industrias[activa];
+  const imagen = FOTOS[ind.slug];
 
   return (
     <>
@@ -82,10 +94,18 @@ export default function Industrias({ industrias }: { industrias: Industria[] }) 
       </div>
 
       <div id="industria-panel" role="tabpanel" aria-labelledby={`industria-${ind.slug}`} className={s.panel}>
-        <div key={`t-${ind.slug}`} className={s.panelTexto}>
-          <span className={s.panelMarca} aria-hidden="true">
-            <PublicIcon name={ind.icono} size={260} />
-          </span>
+        <div key={`t-${ind.slug}`} className={`${s.panelTexto} ${imagen ? s.panelFoto : ""}`}>
+          {imagen ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              {...foto(imagen.nombre, "(max-width: 1068px) 100vw, 600px")}
+              alt={imagen.alt}
+              loading="lazy"
+              decoding="async"
+              className={s.panelImagen}
+              style={{ objectPosition: imagen.posicion }}
+            />
+          ) : null}
           <span className={s.panelIcono}>
             <PublicIcon name={ind.icono} size={24} />
           </span>

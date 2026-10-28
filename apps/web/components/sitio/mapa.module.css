@@ -57,10 +57,40 @@
 /* El estado activo se redibuja encima con su contorno, para que el borde no quede bajo los vecinos. */
 .contorno {
   fill: none;
-  stroke: var(--fg);
+  stroke: color-mix(in srgb, var(--fg) 75%, transparent);
   stroke-width: 2;
   stroke-linejoin: round;
   pointer-events: none;
+}
+
+/* Latido continuo de las dos sedes */
+.pulso {
+  fill: var(--accent);
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: halo 2.6s var(--ease-out) infinite;
+}
+
+/* Rótulo en píldora (estado activo o sede) */
+.rotulo {
+  pointer-events: none;
+}
+
+.rotulo rect {
+  fill: var(--card);
+  stroke: var(--line);
+  stroke-width: 1;
+  filter: drop-shadow(0 3px 8px rgb(10 37 64 / 0.16));
+}
+
+.rotulo text {
+  font-family: var(--font);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-anchor: middle;
+  fill: var(--fg);
 }
 
 .ruta {
@@ -68,6 +98,7 @@
   stroke: var(--accent);
   stroke-width: 2.6;
   stroke-linecap: round;
+  filter: drop-shadow(0 2px 4px color-mix(in srgb, var(--accent) 45%, transparent));
   stroke-dasharray: 1;
   stroke-dashoffset: 0;
   pointer-events: none;
@@ -114,17 +145,6 @@
   pointer-events: none;
 }
 
-.etiqueta {
-  font-family: var(--font);
-  font-size: 15px;
-  font-weight: 700;
-  fill: var(--fg);
-  paint-order: stroke;
-  stroke: var(--mapa-halo);
-  stroke-width: 5px;
-  stroke-linejoin: round;
-  pointer-events: none;
-}
 
 /* ── Ficha del estado ───────────────────────────────────────────────────── */
 
@@ -274,7 +294,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ruta,
-  .halo {
+  .halo,
+  .pulso {
     animation: none;
+  }
+  .pulso {
+    opacity: 0;
   }
 }

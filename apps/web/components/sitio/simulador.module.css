@@ -1,6 +1,15 @@
-/* Simulador de cobertura de videovigilancia: plano, conos de visión y tablero de resultados. */
+/*
+ * Simulador de cobertura de videovigilancia: plano, conos de visión y tablero de resultados. El plano se dibuja como
+ * uno arquitectónico (retícula fina, muros gruesos con vanos y abatimientos, mobiliario visto desde arriba) con los
+ * tokens del sitio, así se lee igual en claro y en oscuro.
+ */
 
 .simulador {
+  --plano-piso: var(--card);
+  --plano-linea: color-mix(in srgb, var(--fg) 6%, transparent);
+  --plano-muro: color-mix(in srgb, var(--fg) 82%, transparent);
+  --plano-mueble: color-mix(in srgb, var(--fg) 7%, var(--card));
+  --plano-borde: color-mix(in srgb, var(--fg) 22%, transparent);
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr);
   gap: clamp(20px, 3vw, 40px);
@@ -23,72 +32,139 @@
 }
 
 .piso {
-  fill: var(--tile);
+  fill: var(--plano-piso);
 }
 
-.ciego {
-  fill: var(--rec);
-  opacity: 0.35;
+.cuadricula {
+  fill: none;
+  stroke: var(--plano-linea);
+  stroke-width: 1;
 }
 
+/* Zonas de riesgo: tinte suave y filete fino; pasan a verde cuando quedan cubiertas. */
 .zona,
 .zonaOk {
-  fill: color-mix(in srgb, var(--rec) 9%, transparent);
-  stroke: color-mix(in srgb, var(--rec) 55%, transparent);
-  stroke-width: 1.5;
-  stroke-dasharray: 5 4;
-  transition: fill 0.25s var(--ease), stroke 0.25s var(--ease);
+  fill: color-mix(in srgb, var(--rec) 8%, transparent);
+  stroke: color-mix(in srgb, var(--rec) 34%, transparent);
+  stroke-width: 1;
+  transition: fill 0.3s var(--ease), stroke 0.3s var(--ease);
 }
 
 .zonaOk {
-  fill: color-mix(in srgb, var(--ok) 12%, transparent);
-  stroke: color-mix(in srgb, var(--ok) 70%, transparent);
-  stroke-dasharray: none;
+  fill: color-mix(in srgb, var(--ok) 10%, transparent);
+  stroke: color-mix(in srgb, var(--ok) 42%, transparent);
 }
 
-.zonaTexto {
-  font-family: var(--font);
-  font-size: 13px;
-  font-weight: 700;
-  text-anchor: middle;
-  fill: var(--fg-2);
-  pointer-events: none;
+.rayado {
+  stroke: color-mix(in srgb, var(--rec) 55%, transparent);
+  stroke-width: 1.6;
+}
+
+/* Mobiliario visto desde arriba */
+.mueble,
+.gondola,
+.caja {
+  fill: var(--plano-mueble);
+  stroke: var(--plano-borde);
+  stroke-width: 1;
+}
+
+.gondola {
+  fill: color-mix(in srgb, var(--fg) 12%, var(--card));
+}
+
+.caja {
+  fill: color-mix(in srgb, #b8884d 16%, var(--card));
+  stroke: color-mix(in srgb, #8a6232 40%, transparent);
+}
+
+.muebleLinea {
+  fill: none;
+  stroke: var(--plano-borde);
+  stroke-width: 1;
+}
+
+.registradora {
+  fill: color-mix(in srgb, var(--fg) 30%, var(--card));
 }
 
 .cono,
 .conoElegido {
-  fill: color-mix(in srgb, var(--accent) 14%, transparent);
-  stroke: color-mix(in srgb, var(--accent) 40%, transparent);
+  stroke: color-mix(in srgb, var(--accent) 32%, transparent);
   stroke-width: 1;
+  stroke-linejoin: round;
   pointer-events: none;
 }
 
 .conoElegido {
-  fill: color-mix(in srgb, var(--accent) 22%, transparent);
-  stroke: color-mix(in srgb, var(--accent) 70%, transparent);
+  stroke: color-mix(in srgb, var(--accent) 65%, transparent);
 }
 
-.gondola {
-  fill: var(--fg-3);
-  opacity: 0.55;
-}
-
+/* Muros gruesos de plano, con vanos de puerta y su abatimiento en línea fina */
 .muro {
   fill: none;
-  stroke: var(--fg-2);
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  stroke: var(--plano-muro);
+  stroke-width: 7;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
 }
 
+.puerta {
+  fill: none;
+  stroke: var(--plano-muro);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.abatimiento {
+  fill: none;
+  stroke: var(--plano-borde);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+/* Rótulo de zona en píldora, con el semáforo a la izquierda */
+.rotulo {
+  pointer-events: none;
+}
+
+.rotulo rect {
+  fill: var(--card);
+  stroke: color-mix(in srgb, var(--rec) 30%, var(--line));
+  stroke-width: 1;
+  filter: drop-shadow(0 1px 2px rgba(10, 37, 64, 0.12));
+}
+
+.rotulo text {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-anchor: middle;
+  fill: var(--fg);
+}
+
+.rotuloPunto {
+  fill: var(--rec);
+  transition: fill 0.3s var(--ease);
+}
+
+.rotulo[data-ok] rect {
+  stroke: color-mix(in srgb, var(--ok) 35%, var(--line));
+}
+
+.rotulo[data-ok] .rotuloPunto {
+  fill: var(--ok);
+}
+
+/* Cámara: disco blanco con anillo de acento, carcasa tipo bala que gira y número en insignia */
 .camara {
   outline: none;
 }
 
 .brazo {
-  stroke: var(--accent);
-  stroke-width: 2;
-  stroke-dasharray: 3 3;
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke-width: 1.5;
 }
 
 .agarre {
@@ -101,42 +177,114 @@
 }
 
 .giro {
+  pointer-events: none;
+}
+
+.giro circle {
   fill: var(--card);
   stroke: var(--accent);
-  stroke-width: 2;
-  pointer-events: none;
+  stroke-width: 1.5;
+}
+
+.giro path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.halo {
+  fill: color-mix(in srgb, var(--accent) 16%, transparent);
+  opacity: 0;
+  transition: opacity 0.2s var(--ease);
+}
+
+.camara[data-elegida] .halo,
+.camara:hover .halo {
+  opacity: 1;
 }
 
 .cuerpo {
-  fill: var(--accent);
-  stroke: var(--card);
-  stroke-width: 3;
-  pointer-events: none;
-  filter: drop-shadow(0 4px 8px rgba(0, 40, 120, 0.25));
-  transition: r 0.15s var(--ease);
-}
-
-.camara:hover .cuerpo,
-.camara[data-elegida] .cuerpo {
-  r: 15;
+  fill: var(--card);
+  stroke: var(--accent);
+  stroke-width: 2.5;
 }
 
 .camara:focus-visible .cuerpo {
   stroke: var(--fg);
-  stroke-width: 3;
+}
+
+.carcasa {
+  fill: var(--accent);
+}
+
+.lente {
+  fill: #0a2540;
+}
+
+.insignia {
+  fill: var(--fg);
+  stroke: var(--card);
+  stroke-width: 1.5;
 }
 
 .numero {
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 9.5px;
   font-weight: 700;
   text-anchor: middle;
-  fill: #ffffff;
+  fill: var(--card);
   pointer-events: none;
 }
 
+/* Leyenda del plano, con las mismas muestras que el dibujo */
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-2);
+}
+
+.leyenda li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.leyenda i {
+  display: inline-block;
+  width: 18px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.leyenda .leyendaMuro {
+  height: 5px;
+  border-radius: 1px;
+  background: var(--plano-muro);
+}
+
+.leyendaGondola {
+  background: color-mix(in srgb, var(--fg) 12%, var(--card));
+  box-shadow: inset 0 0 0 1px var(--plano-borde);
+}
+
+.leyendaCiego {
+  background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--rec) 55%, transparent) 0 1.5px, transparent 1.5px 4.5px);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rec) 34%, transparent);
+}
+
+.leyendaLuz {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 45%, transparent), color-mix(in srgb, var(--accent) 6%, transparent));
+}
+
 .ayuda {
-  margin-top: 10px;
+  margin-top: 8px;
   font-size: 13.5px;
   color: var(--fg-3);
   text-align: center;
