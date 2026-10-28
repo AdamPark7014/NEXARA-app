@@ -169,7 +169,7 @@ histórico, P75 = tope, recalculado cada mes). Lo entregado y aprobado gana su T
 ### 7.3 Antes que los pesos: arreglar el instrumento
 
 1. Catálogo cerrado de 18 tipos y complejidad al asignar (IA sugiere por la puerta única, quien asigna confirma);
-   sin categoría libre ni opción por omisión.
+   sin «Otro» con texto libre, que hoy genera los 100 valores, y sin «Reporte / documentación» como comodín.
 2. Hora compromiso fijada por quien asigna; lo autoasignado lo valida el jefe.
 3. Una actividad por trabajo con su cuadrilla (sugerir sumarse a la del compañero en el mismo sitio ese día).
 4. Revisión con plazo de 24 h hábiles, visible en «Hoy» de cada jefe.
