@@ -514,7 +514,7 @@ export default function ActivityDetailShell({
               minutosPlan={miFila?.minutosPlan ?? activity.minutosPlan}
               minutosReales={miFila?.minutosReales ?? activity.minutosReales}
               tiempoMaximoMin={activity.tiempoMaximoMin}
-              enCurso={Boolean(miFila?.sesionAbiertaDesde)}
+              enCurso={(activity.assignees ?? []).some((m) => !m.retiradoAt && Boolean(m.sesionAbiertaDesde))}
             />
           }
           aside={core ? <CostoActividad activityId={activity.id} /> : undefined}
