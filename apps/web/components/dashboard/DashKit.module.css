@@ -1,5 +1,6 @@
-/* NEXARA · DashKit — dashboards ejecutivos limpios
-   Superficies planas, hairlines, tipografía tabular, acento del panel moderado. */
+/* NEXARA · DashKit — tableros de Core
+   28-10 (propuesta UI/UX aprobada): banda de entrada oscura con el brillo del sitio público,
+   tarjetas que flotan con sombra larga, etiquetas en minúsculas y cifras en Inter Tight. */
 
 .page {
   display: flex;
@@ -12,12 +13,49 @@
 
 /* ── Hero ──────────────────────────────────────────────────── */
 .hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px 24px;
   flex-wrap: wrap;
-  padding: 4px 2px 0;
+  padding: 30px 32px;
+  border-radius: 28px;
+  color: #ffffff;
+  background:
+    radial-gradient(520px 300px at 88% 0%, rgba(16, 161, 131, 0.45), transparent 65%),
+    radial-gradient(420px 260px at 62% 130%, rgba(0, 96, 240, 0.36), transparent 65%),
+    radial-gradient(360px 220px at 100% 100%, rgba(168, 82, 153, 0.3), transparent 65%),
+    radial-gradient(300px 200px at 35% -30%, rgba(240, 138, 30, 0.18), transparent 70%),
+    #0d0f12;
+  box-shadow: 0 24px 60px -32px rgba(13, 15, 18, 0.65);
+}
+
+/* Botones dentro de la banda oscura: el primario se invierte a blanco y los demás son de vidrio. */
+.hero :global(.nx-btn--primary) {
+  background: #ffffff;
+  color: #14171f;
+  border-color: #ffffff;
+}
+
+.hero :global(.nx-btn--primary:hover) {
+  background: #eef1f5;
+  color: #14171f;
+}
+
+.hero :global(.nx-btn--ghost),
+.hero :global(.nx-btn--secondary) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.hero :global(.nx-btn--ghost:hover),
+.hero :global(.nx-btn--secondary:hover) {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
 }
 
 .heroCopy {
@@ -29,12 +67,11 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  color: #c9ced8;
+  margin-bottom: 10px;
 }
 
 .heroEyebrow::before {
@@ -42,26 +79,26 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--panel-accent, var(--primary));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--panel-accent, var(--primary)) 18%, transparent);
+  background: #10a183;
+  box-shadow: 0 0 0 4px rgba(16, 161, 131, 0.25);
 }
 
 .heroTitle {
-  font-family: var(--nx-font-display);
-  font-size: clamp(1.55rem, 1.25rem + 1vw, 2.05rem);
+  font-family: var(--ui-font-display, var(--nx-font-display));
+  font-size: clamp(1.9rem, 1.35rem + 1.5vw, 2.75rem);
   font-weight: 700;
   letter-spacing: -0.03em;
-  line-height: 1.12;
-  color: var(--text-primary);
+  line-height: 1.06;
+  color: #ffffff;
   margin: 0;
 }
 
 .heroSub {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 6px 0 0;
+  font-size: 15px;
+  color: #d6dae2;
+  margin: 10px 0 0;
   max-width: 62ch;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .heroActions {
@@ -105,9 +142,9 @@
 /* ── Superficie base ───────────────────────────────────────── */
 .surface {
   background: var(--surface);
-  border: 1px solid var(--nx-panel-hairline, var(--border));
-  border-radius: 16px;
-  box-shadow: var(--nx-panel-elev-1);
+  border: 1px solid color-mix(in srgb, var(--ui-border, var(--border)) 55%, transparent);
+  border-radius: 22px;
+  box-shadow: var(--ui-elev-1, var(--nx-panel-elev-1));
   overflow: hidden;
 }
 
@@ -180,11 +217,10 @@
 }
 
 .statLabel {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-tertiary);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  color: var(--ui-fg-3, var(--text-tertiary));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -198,16 +234,16 @@
 }
 
 .statValue {
-  font-family: var(--nx-font-display);
+  font-family: var(--ui-font-display, var(--nx-font-display));
   font-weight: 700;
-  font-size: 28px;
+  font-size: 30px;
   letter-spacing: -0.025em;
   line-height: 1;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
-.statValueBig { font-size: 34px; }
+.statValueBig { font-size: 38px; }
 
 .statSub {
   font-size: 12px;
@@ -242,9 +278,9 @@
 /* ── Stat card individual ──────────────────────────────────── */
 .statCard {
   background: var(--surface);
-  border: 1px solid var(--nx-panel-hairline, var(--border));
-  border-radius: 16px;
-  box-shadow: var(--nx-panel-elev-1);
+  border: 1px solid color-mix(in srgb, var(--ui-border, var(--border)) 55%, transparent);
+  border-radius: 22px;
+  box-shadow: var(--ui-elev-1, var(--nx-panel-elev-1));
   overflow: hidden;
   padding: 18px 20px;
   display: flex;
@@ -264,9 +300,9 @@ a.statCard:hover {
 /* ── Panel ─────────────────────────────────────────────────── */
 .panel {
   background: var(--surface);
-  border: 1px solid var(--nx-panel-hairline, var(--border));
-  border-radius: 16px;
-  box-shadow: var(--nx-panel-elev-1);
+  border: 1px solid color-mix(in srgb, var(--ui-border, var(--border)) 55%, transparent);
+  border-radius: 22px;
+  box-shadow: var(--ui-elev-1, var(--nx-panel-elev-1));
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -283,9 +319,10 @@ a.statCard:hover {
 }
 
 .panelTitle {
-  font-size: 13.5px;
+  font-family: var(--ui-font-display, inherit);
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   color: var(--text-primary);
   margin: 0;
 }
