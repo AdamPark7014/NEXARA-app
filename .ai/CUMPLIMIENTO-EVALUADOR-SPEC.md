@@ -178,6 +178,22 @@ histórico, P75 = tope, recalculado cada mes). Lo entregado y aprobado gana su T
 7. Comida de campo en ventana 13–17 sin revisión; geocerca contra el sitio de la actividad y solo con sesión abierta.
 8. Ligar actividad a cliente/proyecto; uniforme por muestreo (2 entradas al azar por persona por semana).
 
+### 7.3 bis Contraste con el tabulador y la hoja de entradas (28-10)
+
+Adam mandó el tabulador vigente y la hoja «Control de entradas y salidas» del 19–23 oct. El detalle (montos
+por persona) está en el informe interno, fuera del repo. Lo que afecta al código:
+
+- La nómina se hace en Excel: `nomina_semanas` y `overtime_approvals` están vacías. El sueldo semanal de RH
+  (`UserProfile.sueldoSemanal`) coincide con el tabulador en 4 personas, difiere en 7 y falta en 8.
+- La hoja y el sistema dividen distinto: el día es ÷5 en la hoja y ÷7 en `sueldoDiario`, y la extra es sencilla en
+  la hoja y ×2 en `montoExtras`. `montoExtras` no aplica la triple pasando de 9 h a la semana (LFT art. 68).
+- En la hoja, el campo sale de las checadas y la oficina va fija 10:00–18:00, así que los retardos de oficina no
+  llegan a la nómina.
+- La cuadrilla entra a las 8:00 y hace 50–53 h por semana; todos tienen la plantilla de 10:00. Hay que capturar el
+  horario de campo antes de medir retardo o extra.
+- La fórmula toma del tabulador las familias de rol (administrativo, arquitecto, IDC, instalador, auxiliar,
+  team leader, externo) y divide el rendimiento entre las horas pagadas (ordinarias + extra).
+
 ### 7.4 Decisiones de Adam (v2)
 
 1. ¿«Horas estándar ganadas» en lugar de ritmo + ocupación + carga + tiempo adecuado? (recomendado: sí)
@@ -185,3 +201,7 @@ histórico, P75 = tope, recalculado cada mes). Lo entregado y aprobado gana su T
 3. ¿Lo autoasignado gana la mitad hasta validarse (recomendado) o nada?
 4. ¿Retardos graduados (recomendado)? ¿«3 retardos = 1 falta»? Es reglamento interno, no LFT: decidir con RH.
 5. ¿Coordinadores medidos por su equipo (recomendado)?
+6. ¿Una sola regla de pago para la hoja y el sistema? Semana = mensual × 12 ÷ 52, el mismo divisor del día en las
+   dos y extra doble/triple; revisarlo con el contador.
+7. ¿Horario de campo de 08:00 a 17:00 con comida?
+8. ¿La hoja de entradas sale del sistema, con ajustes con motivo, en vez de capturarse a mano?

@@ -1,5 +1,13 @@
 # RELEVO
 
+- **28-10 ~14:30 (claude-code) — Tabulador y hoja de entradas contra el sistema (solo lectura).**
+  - Adam mandó el tabulador vigente y la hoja «Control de entradas y salidas» del 19–23 oct. La nómina vive en Excel:
+    `nomina_semanas` y `overtime_approvals` vacías; `sueldoSemanal` coincide con el tabulador en 4 personas, difiere
+    en 7 y falta en 8. La hoja usa día ÷5 y extra sencilla; el sistema, ÷7 y ×2 (sin triple, LFT art. 68). La
+    oficina va fija 10:00–18:00 en la hoja aunque la checada diga otra cosa; el campo coincide al minuto.
+  - Resumen sin montos en `.ai/CUMPLIMIENTO-EVALUADOR-SPEC.md` §7.3 bis y decisiones 6–8; los montos por persona
+    van en el informe interno (`C:\dev\secrets\nexara\desempeno-2026-10-28\`). **Nada de código cambió.**
+
 - **28-10 ~13:30 (claude-code) — Análisis de la fórmula de desempeño desde producción (solo lectura); propuesta v2.**
   - Adam pidió analizar la base para llegar a «la fórmula general» de productividad, retardo e ineficiencia. Se
     consultó producción en transacción de solo lectura (28-09 → 28-10). Hallazgos: 87 % autoasignado, límite siempre
