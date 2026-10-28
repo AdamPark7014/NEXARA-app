@@ -194,6 +194,31 @@ por persona) está en el informe interno, fuera del repo. Lo que afecta al códi
 - La fórmula toma del tabulador las familias de rol (administrativo, arquitecto, IDC, instalador, auxiliar,
   team leader, externo) y divide el rendimiento entre las horas pagadas (ordinarias + extra).
 
+### 7.3 ter Pagos, costo y margen (28-10)
+
+Se revisó en producción toda la sección de Finanzas, más cotizaciones, almacén y vehículos. Casi no tiene datos:
+- Hay 0 semanas de nómina, pagos al personal, extras aprobadas, facturas, cobros, compras, salidas de almacén,
+  bitácoras de vehículo, encuestas e incidencias.
+- Hay 1 viático y 1 gasto, los dos pendientes.
+- Las 50 cotizaciones siguen en DRAFT: ninguna marcada como enviada ni ganada, y solo 2 ligadas a su actividad.
+
+El modelo ya prevé usar esos datos:
+- **Por actividad:** costo = mano de obra (horas reales × sueldo semanal ÷ 40, más la extra pagada) + viáticos
+  (`viatico_repartos`) + gastos + material + vehículo. Ingreso = factura (`invoices.activityId`) o, mientras no
+  exista, la cotización aprobada (`Activity.cotizacionId`). Margen = ingreso − costo, agrupado por cliente, tipo
+  de trabajo y coordinador.
+- **Por persona,** cada parámetro entra en las cuatro dimensiones que ya existen:
+  - Disciplina financiera dentro de Disciplina: viáticos comprobados en ≤ 3 días hábiles y con ticket.
+  - Comercial: rendimiento = 50 % horas estándar de cotizaciones enviadas + 50 % cierre en monto; confiabilidad =
+    tiempo de respuesta.
+  - Contabilidad: factura en ≤ 2 días hábiles, nómina cerrada el lunes, cobranza.
+  - Coordinación: margen de los servicios de su equipo.
+- Mientras no haya datos, cada parte se muestra como «sin datos» y no resta.
+
+Orden de adopción, de lo más barato a lo más laborioso: nómina semanal en control de nómina (en paralelo con el
+Excel) → cotización enviada y su resultado → viáticos y gastos por actividad con ticket → factura ligada al servicio
+y sus cobros → salidas de almacén por actividad.
+
 ### 7.4 Decisiones de Adam (v2)
 
 1. ¿«Horas estándar ganadas» en lugar de ritmo + ocupación + carga + tiempo adecuado? (recomendado: sí)
@@ -205,3 +230,5 @@ por persona) está en el informe interno, fuera del repo. Lo que afecta al códi
    dos y extra doble/triple; revisarlo con el contador.
 7. ¿Horario de campo de 08:00 a 17:00 con comida?
 8. ¿La hoja de entradas sale del sistema, con ajustes con motivo, en vez de capturarse a mano?
+9. ¿Se corre la nómina de la semana del 26-10 en el sistema en paralelo con el Excel?
+10. ¿Para el desempeño comercial solo cuenta la cotización marcada como enviada en el sistema?
