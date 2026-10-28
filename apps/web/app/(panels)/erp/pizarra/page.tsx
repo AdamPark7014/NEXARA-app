@@ -32,6 +32,7 @@ import SolicitudesEquipoView from "@/components/pizarra/SolicitudesEquipoView";
 import FlujoKpiStrip from "@/components/pizarra/FlujoKpiStrip";
 import CentroOperativo from "@/components/pizarra/CentroOperativo";
 import EquipoPersonaCard, { rejillaEquipo } from "@/components/pizarra/EquipoPersonaCard";
+import LineaDelDia, { ConmutadorModo, type ModoEquipo } from "@/components/pizarra/LineaDelDia";
 import ResumenEquipo, { type FiltroEquipo } from "@/components/pizarra/ResumenEquipo";
 import AtencionEquipo from "@/components/pizarra/AtencionEquipo";
 import AsistenteIA from "@/components/pizarra/AsistenteIA";
@@ -54,6 +55,8 @@ import p from "./pizarra.module.css";
 /** Actividades: lo mío, mi equipo, lo que repartí y solicitudes entre pares. */
 type Vista = "mias" | "equipo" | "asignadas" | "solicitudes";
 const VISTA_KEY = "nx-actividades-vista";
+/** «Mi equipo»: tarjetas o línea del día; se recuerda por navegador. */
+const MODO_KEY = "nx-equipo-modo";
 
 const DESCRIPCION: Record<Vista, string> = {
   mias: "Lo que te toca hoy, en el orden en que lo vas a hacer.",
@@ -109,6 +112,24 @@ export default function PizarraPage() {
   const [rango, setRango] = useState<BoardRange>({});
   /** Modo centro operativo: la pizarra a pantalla completa para la pared. */
   const [centro, setCentro] = useState(false);
+  const [modo, setModo] = useState<ModoEquipo>("tarjetas");
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(MODO_KEY) === "linea") setModo("linea");
+    } catch {
+      /* sin storage: tarjetas */
+    }
+  }, []);
+
+  const cambiarModo = (m: ModoEquipo) => {
+    setModo(m);
+    try {
+      window.localStorage.setItem(MODO_KEY, m);
+    } catch {
+      /* sin storage: vale para esta visita */
+    }
+  };
 
   // ?vista=mias|equipo|asignadas manda (enlaces viejos de Mis actividades); si no, la última elegida.
   useEffect(() => {
@@ -397,7 +418,13 @@ export default function PizarraPage() {
             </FilterChip>
           </FilterChips>
         }
-        end={rangoSelector}
+        end={
+          <>
+            {/* La línea es de un día: solo con el rango «Hoy». */}
+            {preset === "hoy" ? <ConmutadorModo modo={modo} onChange={cambiarModo} /> : null}
+            {rangoSelector}
+          </>
+        }
       />
     ) : null;
 
@@ -454,6 +481,8 @@ export default function PizarraPage() {
           }
         />
       );
+    } else if (modo === "linea" && preset === "hoy") {
+      contenidoEquipo = <LineaDelDia token={token} users={visibles} refresco={updatedAt} asignarHref={asignarA} />;
     } else {
       contenidoEquipo = (
         <div className={[rejillaEquipo, p.relleno].join(" ")}>

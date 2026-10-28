@@ -20,6 +20,7 @@ import {
   semaforoKpi,
   sumaEquipo,
   supuestosKpi,
+  type ActividadDelDia,
   type ActividadKpi,
   type AprobacionExtra,
   type ChecadaKpi,
@@ -31,6 +32,7 @@ import {
   type HorarioKpi,
   type SemaforoKpi,
   type TotalesKpi,
+  type TramoIso,
 } from './kpis-equipo.js';
 
 /** Rango máximo: un trimestre. Más que eso es un reporte, no un tablero. */
@@ -110,6 +112,40 @@ export type KpisEquipoResponse = {
   personas: KpiPersonaFila[];
   /** Entregas por día contra las que se mide el ritmo de cada quien (percentil 75 del equipo). */
   ritmoReferencia: number | null;
+};
+
+/**
+ * Un día del equipo para la «Línea del día» de la Pizarra: por persona, su jornada, su comida y
+ * los tramos en que corrió el reloj de cada actividad (los mismos del detalle por persona).
+ */
+export type LineaDelDiaPersona = {
+  persona: KpiPersona;
+  horario: KpiHorario;
+  /** null = ese día no hay nada que dibujar (no laborable y sin trabajo). */
+  dia: Pick<
+    DiaKpi,
+    | 'entrada'
+    | 'salida'
+    | 'abierta'
+    | 'retardo'
+    | 'minutosTarde'
+    | 'sinChecada'
+    | 'faltaJustificada'
+    | 'minutosLaborados'
+    | 'minutosOcupados'
+    | 'entregasDelDia'
+  > & {
+    jornada: TramoIso[];
+    comida: TramoIso[];
+    actividades: ActividadDelDia[];
+  } | null;
+};
+
+export type LineaDelDiaResponse = {
+  fecha: string;
+  scope: 'company' | 'subtree';
+  generadoAt: string;
+  personas: LineaDelDiaPersona[];
 };
 
 export type KpisPersonaResponse = KpiPersonaFila & {
@@ -279,6 +315,67 @@ export class KpisEquipoService {
       justificaciones: d.justificadas,
       entregas,
       ritmoReferencia,
+    };
+  }
+
+  /**
+   * Un solo día de todo el equipo, con los tramos de la línea de tiempo (28-10, Pizarra
+   * «Línea del día»). Mismo alcance y mismo cálculo que el detalle por persona: lo que se dibuja
+   * aquí es lo mismo que mide Desempeño.
+   */
+  async getLineaDelDia(viewer: Viewer, companyId: number | null, fecha?: string | null): Promise<LineaDelDiaResponse> {
+    const rango = this.resolveDias(fecha, fecha);
+    const { companyWide, scoped, now } = await this.teamBoard.resolveScope(viewer, companyId);
+    const datos = await this.cargar(
+      scoped.map((u) => u.id),
+      companyId,
+      rango,
+      null,
+    );
+    const personas = scoped.map((u): LineaDelDiaPersona => {
+      const d = datos.get(u.id) ?? vacio();
+      const { dias, totales } = calculaKpisPersona({
+        desde: rango.desde,
+        hasta: rango.hasta,
+        ahora: now,
+        horario: d.horario,
+        checadas: d.checadas,
+        comidas: d.comidas,
+        actividades: d.actividades,
+        justificadas: d.justificadas.map((j) => j.fecha),
+        entregas: d.entregas,
+        fechaIngreso: d.fechaIngreso,
+        detalle: true,
+      });
+      const { persona, horario } = fila(u, d.horario, totales);
+      const dia = dias.find((x) => x.fecha === rango.desde);
+      return {
+        persona,
+        horario,
+        dia: dia
+          ? {
+              entrada: dia.entrada,
+              salida: dia.salida,
+              abierta: dia.abierta,
+              retardo: dia.retardo,
+              minutosTarde: dia.minutosTarde,
+              sinChecada: dia.sinChecada,
+              faltaJustificada: dia.faltaJustificada,
+              minutosLaborados: dia.minutosLaborados,
+              minutosOcupados: dia.minutosOcupados,
+              entregasDelDia: dia.entregasDelDia,
+              jornada: dia.tramos?.jornada ?? [],
+              comida: dia.tramos?.comida ?? [],
+              actividades: dia.actividades ?? [],
+            }
+          : null,
+      };
+    });
+    return {
+      fecha: rango.desde,
+      scope: companyWide ? 'company' : 'subtree',
+      generadoAt: now.toISOString(),
+      personas,
     };
   }
 
