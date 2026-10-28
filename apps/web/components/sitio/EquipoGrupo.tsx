@@ -1,7 +1,7 @@
 import { EQUIPO, retrato } from "./equipo";
 import b from "./portada.module.css";
 
-/** Orden de la foto de grupo: atrás y adelante alternados, con las cuatro compañeras repartidas al frente. */
+/** Orden de la foto de grupo: atrás y adelante alternados (atrás en las dos orillas), con las compañeras al frente. */
 const ORDEN = [
   "alejandro-gonzalez",
   "carolina-juarez",
@@ -12,14 +12,13 @@ const ORDEN = [
   "jose-ramirez",
   "paulina-tlapaltotoli",
   "roberto-vivanco",
-  "monica-garcia",
-  "ivan-camargo",
   "israel-ramos",
+  "ivan-camargo",
 ];
 
 /**
- * Los doce retratos recortados en dos filas escalonadas, como una foto de grupo de estudio. Es decorativa: los
- * nombres y puestos están en Nosotros.
+ * Los retratos recortados en dos filas escalonadas, como una foto de grupo de estudio. Es decorativa: los nombres y
+ * puestos están en Nosotros. Las posiciones se reparten entre 6 % y 94 % del ancho según cuántos sean.
  */
 export default function EquipoGrupo({ prioridad = false }: { prioridad?: boolean }) {
   const personas = ORDEN.map((clave) => EQUIPO.find((x) => x.clave === clave)).filter((x) => x !== undefined);
@@ -36,7 +35,7 @@ export default function EquipoGrupo({ prioridad = false }: { prioridad?: boolean
           loading={prioridad ? "eager" : "lazy"}
           decoding="async"
           data-fila={i % 2 === 0 ? "atras" : "frente"}
-          style={{ "--x": `${6 + i * 8}%` } as React.CSSProperties}
+          style={{ "--x": `${6 + (i * 88) / Math.max(1, personas.length - 1)}%` } as React.CSSProperties}
         />
       ))}
     </div>

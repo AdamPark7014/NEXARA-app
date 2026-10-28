@@ -94,6 +94,34 @@
   transform: scale(1.035);
 }
 
+/*
+ * Paralaje sutil de la foto al bajar: la imagen va un 10 % más grande y se desliza ±5 % con su propia línea de tiempo
+ * de scroll, sin chocar con el acercamiento del hover (ese usa `transform`; esto, `translate` y `scale`).
+ */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* La línea de tiempo es de la baldosa: con `overflow: hidden` ella misma sería el contenedor de scroll de la foto
+       y la foto nunca avanzaría. */
+    .baldosa {
+      view-timeline: --baldosa block;
+    }
+    .foto img {
+      scale: 1.1;
+      animation: paralaje linear both;
+      animation-timeline: --baldosa;
+    }
+  }
+}
+
+@keyframes paralaje {
+  from {
+    translate: 0 -5%;
+  }
+  to {
+    translate: 0 5%;
+  }
+}
+
 .foto::after {
   content: "";
   position: absolute;
@@ -232,7 +260,7 @@
 }
 
 /*
- * Doce retratos recortados en dos filas, como foto de grupo: atrás más chicos y asentados en el piso de la
+ * Retratos recortados en dos filas, como foto de grupo: atrás más chicos y asentados en el piso de la
  * baldosa; adelante más grandes y hundidos bajo el piso (la baldosa los corta a la altura del pecho), así
  * ninguna orilla recortada queda a la vista. Las medidas van en % del ancho para que la composición escale entera.
  */

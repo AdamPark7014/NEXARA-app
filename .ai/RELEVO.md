@@ -1,5 +1,19 @@
 # RELEVO
 
+- **28-10 ~11:30 (claude-code) — Mónica fuera de lo público; revelado al bajar en la portada; API sin cuentas de baja.**
+  - Adam: Mónica García (soluciones@) existe pero no puede aparecer en público. Salió de `EQUIPO` (`equipo.ts`), de la
+    foto de grupo (`EquipoGrupo`, posiciones repartidas según cuántos son) y se borró su retrato. La rejilla de Nosotros
+    pasó a flex centrado (la última fila incompleta queda al centro). La API ya la excluía de `users/public-team`.
+  - `findPublicTeam` filtra `isActive: true`: devolvía a «Daniela Galindo Almazán» (redes@, cuenta de baja; Adam dice
+    que no existe). Adam pidió borrarla «definitivamente»: NO se borró. Tiene 1 actividad (creadora y responsable),
+    4 checadas, 2 días de asistencia, 1 comida, 13 puntos GPS, 10 sesiones, 78 avisos y 568 entradas de bitácora; el
+    DELETE del ERP falla por las llaves RESTRICT y no hay respaldos. Pendiente de Adam.
+  - OJO: `direccion.operaciones@` (Luis Joel Aguilar) también está en la lista de excluidos del equipo público de la
+    API, pero sale en Nosotros porque Adam lo incluyó en el organigrama del 26-10. Preguntado.
+  - Portada: el tablero entra inclinado y se asienta al bajar (`animation-timeline: view()`), y las fotos de las
+    baldosas tienen paralaje (línea de tiempo `--baldosa`: con `overflow: hidden` la baldosa era su propio scroller).
+    Solo con soporte y sin «reducir movimiento». La flecha de botones y enlaces también responde al foco de teclado.
+
 - **28-10 ~11:10 (claude-code) — Heroes de Nosotros y Proyectos sin recortes panorámicos flojos.**
   - Nosotros: el recorte 21:9 de la foto casual (cabezas cortadas, pared amarilla) se cambió por la foto de grupo de
     los 12 retratos (`EquipoGrupo prioridad`, carga inmediata) sobre una baldosa con luz de estudio (`.heroEstudio`).

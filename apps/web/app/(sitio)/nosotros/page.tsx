@@ -82,7 +82,7 @@ export default function Nosotros() {
             Las personas detrás <span className={s.degradado}>de cada solución.</span>
           </h1>
           <p className={p.heroLead}>Ingeniería, instalación y soporte que mantienen tu operación, desde Puebla y la Ciudad de México.</p>
-          <div className={p.heroEstudio} role="img" aria-label="Doce integrantes del equipo de NEXARA con su uniforme">
+          <div className={p.heroEstudio} role="img" aria-label="Integrantes del equipo de NEXARA con su uniforme">
             <EquipoGrupo prioridad />
           </div>
         </div>
