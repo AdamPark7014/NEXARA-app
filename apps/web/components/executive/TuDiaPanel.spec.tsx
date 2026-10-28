@@ -1,6 +1,5 @@
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TuDiaPanel, { type TuDia } from "./TuDiaPanel";
 
@@ -79,19 +78,11 @@ describe("TuDiaPanel", () => {
     expect(container.querySelector("section")).toBeNull();
   });
 
-  it("permite elegir «solo el resumen y lo urgente» y lo guarda", async () => {
-    const f = respuesta(RESUMEN);
-    vi.stubGlobal("fetch", f);
+  it("ya no trae la casilla de avisos: ese ajuste vive en Notificaciones", async () => {
+    vi.stubGlobal("fetch", respuesta(RESUMEN));
     render(<TuDiaPanel token="tok" />);
-    const casilla = (await screen.findByRole("checkbox")) as HTMLInputElement;
-    expect(casilla.checked).toBe(false);
-
-    await userEvent.click(casilla);
-    expect(casilla.checked).toBe(true);
-    await waitFor(() => {
-      const put = (f.mock.calls as unknown as Array<[string, RequestInit]>).find(([, i]) => i?.method === "PUT");
-      expect(put).toBeTruthy();
-      expect(JSON.parse(String(put![1].body))).toEqual({ key: "notificaciones.solo_resumen", value: "1" });
-    });
+    await screen.findByText(/3 solicitudes/);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
   });
 });

@@ -1,5 +1,13 @@
 # RELEVO
 
+- **28-10 ~12:00 (claude-code) — «Tu día» sin la casilla de avisos; el ajuste pasó a Notificaciones.**
+  - Adam no entendía la casilla «Solo el resumen y lo urgente» al pie de «Tu día» (`TuDiaPanel`): parecía palomear
+    algo de la lista. Ahora es un interruptor «Recibir solo lo urgente», con su explicación, en la sección «Avisos
+    que recibes» de `/erp/notifications-center` (`components/notifications/AvisosSoloUrgente.tsx` + spec). Misma
+    preferencia `notificaciones.solo_resumen`; la API no cambió.
+  - Pedido grande de Adam en cola: pasada de UI/UX a todo Core (menús, barra lateral, cada pantalla) y a las apps
+    móviles para homologarlas al sitio público, con propuesta visual aprobada antes de construir.
+
 - **28-10 ~11:30 (claude-code) — Mónica fuera de lo público; revelado al bajar en la portada; API sin cuentas de baja.**
   - Adam: Mónica García (soluciones@) existe pero no puede aparecer en público. Salió de `EQUIPO` (`equipo.ts`), de la
     foto de grupo (`EquipoGrupo`, posiciones repartidas según cuántos son) y se borró su retrato. La rejilla de Nosotros
