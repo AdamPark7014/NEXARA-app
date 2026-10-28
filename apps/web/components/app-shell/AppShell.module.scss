@@ -44,15 +44,18 @@
   --shell-sidebar-w: 264px;
   --shell-rail-w: 68px;
   --shell-topbar-h: 56px;
-  --sb-bg: #fbfcfd;
-  --sb-fg: #3d4a5c;
-  --sb-fg-2: #6b7889;
-  --sb-label: #8592a3;
-  --sb-hover: #f0f3f6;
-  --sb-active-bg: var(--ui-brand-soft, #e7f5f1);
-  --sb-active-fg: #0f5f4f;
-  --sb-border: #e6ebf0;
-  --sb-tip-bg: #0f1728;
+  /* 28-10: el menú ya no es una columna aparte. Vive sobre el mismo fondo que el contenido
+     y el módulo activo es una pastilla blanca que flota, como en la propuesta aprobada. */
+  --sb-bg: transparent;
+  --sb-fg: #2a2f3b;
+  --sb-fg-2: #5b6272;
+  --sb-label: #5b6272;
+  --sb-hover: rgba(255, 255, 255, 0.7);
+  --sb-active-bg: #ffffff;
+  --sb-active-fg: var(--ui-fg);
+  --sb-active-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 18px -10px rgba(16, 24, 40, 0.28);
+  --sb-border: transparent;
+  --sb-tip-bg: #14171f;
 
   position: relative;
   display: grid;
@@ -67,8 +70,12 @@
   max-width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-  /* «Minimalista»: fondo neutro sin brillos; el contenido vive en tarjetas blancas. */
-  background: var(--ui-bg);
+  /* Fondo con el brillo tenue del sitio público: verde de marca arriba a la derecha y azul
+     muy suave a la izquierda. Las tarjetas blancas flotan encima. */
+  background:
+    radial-gradient(1100px 520px at 85% -12%, color-mix(in srgb, var(--ui-brand) 11%, transparent), transparent 62%),
+    radial-gradient(900px 480px at 0% -6%, rgba(0, 96, 240, 0.06), transparent 60%),
+    var(--ui-bg);
   color: var(--ui-fg);
   font-family: var(--ui-font);
   isolation: isolate;
@@ -81,30 +88,16 @@
 }
 
 :global(body.dark) .shell {
-  --sb-bg: #0c1220;
+  --sb-bg: transparent;
   --sb-fg: #c3ccd8;
   --sb-fg-2: #8692a5;
-  --sb-label: #6f7c90;
-  --sb-hover: #152033;
-  --sb-active-bg: rgba(34, 169, 140, 0.16);
-  --sb-active-fg: #6ee0c3;
-  --sb-border: #182233;
+  --sb-label: #8692a5;
+  --sb-hover: rgba(255, 255, 255, 0.05);
+  --sb-active-bg: rgba(255, 255, 255, 0.08);
+  --sb-active-fg: #e6ebf2;
+  --sb-active-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sb-border: transparent;
   --sb-tip-bg: #1d2a3d;
-}
-
-/* La columna del menú conserva su tono aunque la página sea más alta que la ventana
-   (el menú es sticky de 100vh; esto solo se nota al imprimir o capturar la página completa). */
-@media (min-width: 901px) {
-  .shell:not([data-auth-state]):not([data-console="true"]) {
-    background:
-      linear-gradient(
-        90deg,
-        var(--sb-bg) 0 var(--shell-sidebar-w),
-        var(--sb-border) var(--shell-sidebar-w) calc(var(--shell-sidebar-w) + 1px),
-        transparent calc(var(--shell-sidebar-w) + 1px)
-      ),
-      var(--ui-bg);
-  }
 }
 
 .shell[data-collapsed="true"] {
@@ -198,6 +191,8 @@
     transform: translateX(-100%);
     /* Cerrado no es solo invisible: sale del orden de tabulación. */
     visibility: hidden;
+    /* En el cajón el menú sí necesita fondo propio: encima hay contenido. */
+    background: var(--ui-bg);
     box-shadow: var(--ui-shadow-lg);
     padding-bottom: env(safe-area-inset-bottom, 0px);
     will-change: transform;
@@ -381,12 +376,12 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  height: 36px;
-  padding: 0 8px 0 10px;
-  border: 1px solid var(--sb-border);
-  border-radius: 8px;
+  height: 40px;
+  padding: 0 8px 0 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
   background: var(--ui-surface);
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  box-shadow: var(--ui-elev-1);
   color: var(--sb-fg-2);
   font-family: inherit;
   font-size: 13px;
@@ -564,7 +559,7 @@
   gap: var(--nav-icon-gap);
   min-height: var(--nav-item-h);
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 13.5px;
   font-weight: 500;
   line-height: 1.25;
@@ -592,32 +587,21 @@
   }
 }
 
-/* Activo: fondo teal suave, texto teal oscuro en 600, icono de marca e indicador de 3 px
-   pegado al borde del panel. */
+/* Activo: pastilla blanca que flota sobre el fondo, texto en 600 e icono en el verde de marca. */
 .menuItem.active {
   background: var(--sb-active-bg);
+  box-shadow: var(--sb-active-shadow);
   color: var(--sb-active-fg);
   font-weight: 600;
 }
 
 .menuItem.active:hover {
-  background: color-mix(in srgb, var(--ui-brand) 16%, var(--sb-active-bg));
+  background: var(--sb-active-bg);
   color: var(--sb-active-fg);
 }
 
 .menuItem.active .menuItemIcon {
   color: var(--ui-brand);
-}
-
-.menuItem.active::before {
-  content: "";
-  position: absolute;
-  left: calc(-1 * var(--nav-gutter));
-  top: 7px;
-  bottom: 7px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--ui-brand);
 }
 
 /* Contador a la derecha del renglón: neutro, o rojo cuando espera una decisión. */
@@ -1097,15 +1081,15 @@
   gap: 12px;
   height: var(--shell-topbar-h);
   padding: 0 32px;
-  border-bottom: 1px solid var(--ui-border-subtle);
+  border-bottom: 1px solid transparent;
   position: sticky;
   top: 0;
   z-index: 20;
   min-width: 0;
   max-width: 100%;
-  background-color: color-mix(in srgb, var(--ui-bg) 88%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background-color: color-mix(in srgb, var(--ui-bg) 72%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
 }
 
 @media (max-width: 900px) {
@@ -1245,23 +1229,23 @@
   margin-left: auto;
 }
 
-/* Acción principal (un solo primario por pantalla): teal, 36 px, peso 600. */
+/* Acción principal (un solo primario por pantalla): verde de marca con su halo, 40 px, peso 600. */
 .primaryAction {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
-  padding: 0 14px 0 12px;
+  height: 40px;
+  padding: 0 16px 0 14px;
   margin-left: 6px;
   flex: 0 0 auto;
-  border-radius: var(--ui-radius, 8px);
+  border-radius: 12px;
   background: var(--ui-brand);
   color: var(--ui-brand-fg, #fff);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   white-space: nowrap;
   text-decoration: none;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+  box-shadow: var(--ui-brand-glow);
   transition: background var(--ui-duration-fast) ease;
   -webkit-tap-highlight-color: transparent;
 

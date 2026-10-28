@@ -2,7 +2,7 @@
  * Qué opción del menú está activa para una ruta.
  *
  * Una opción cuenta si la ruta es la suya o cuelga de ella; si varias cuentan gana la más específica.
- * Sin esto, en `/erp/asistencias/indicadores` se marcaban a la vez «Asistencias» y «KPIs del equipo».
+ * Sin esto, en `/erp/asistencias/indicadores` se marcaban a la vez «Asistencias» y «Desempeño».
  */
 export function rutaActivaDelMenu(pathname: string | null | undefined, targets: string[]): string | null {
   if (!pathname) return null;

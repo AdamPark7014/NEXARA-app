@@ -21,7 +21,7 @@ function nav(parcial: Partial<MeNavigation>): MeNavigation {
 }
 
 describe("filterModulesByNavigation · módulos ocultos por la empresa", () => {
-  it("un comodín de ruta abriría Pagos a personal; hiddenModuleIds lo gana", () => {
+  it("un comodín de ruta abriría Nómina; hiddenModuleIds lo gana", () => {
     // Contabilidad tiene `/erp/finance/**`: sin la política, la ruta abre el módulo.
     const sinPolitica = filterModulesByNavigation(
       modulos,

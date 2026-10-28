@@ -501,7 +501,7 @@ export default function InvoiceDetailPage() {
           href="/erp/invoicing"
           style={{ fontSize: 12, color: "var(--text-tertiary)", textDecoration: "none" }}
         >
-          ← Facturación CFDI
+          ← Facturación
         </Link>
       </div>
       <PageHeader

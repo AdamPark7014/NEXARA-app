@@ -446,7 +446,7 @@ describe("textos de apoyo", () => {
     ]);
   });
 
-  it("enlace a aprobar extras en KPIs del equipo con el rango de la semana", () => {
+  it("enlace a aprobar extras en Desempeño del equipo con el rango de la semana", () => {
     expect(enlaceAprobarExtras(12, "2026-09-28", "2026-10-04")).toBe(
       "/erp/asistencias/indicadores/12?desde=2026-09-28&hasta=2026-10-04",
     );

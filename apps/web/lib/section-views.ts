@@ -1860,7 +1860,7 @@ type ErpFinanceModule = 'accounting' | 'banking' | 'invoicing' | 'employee-payme
 const ERP_FINANCE_COPY: Record<ErpFinanceModule, { title: string; subtitle: string }> = {
   accounting: { title: 'Pólizas y cuentas', subtitle: 'Libro diario, catálogo de cuentas y cierre mensual.' },
   banking: { title: 'Bancos', subtitle: 'Cuentas bancarias, movimientos y conciliación.' },
-  invoicing: { title: 'Facturación CFDI', subtitle: 'Emisión, timbrado y cancelación de facturas.' },
+  invoicing: { title: 'Facturación', subtitle: 'Emisión, timbrado CFDI y cancelación de facturas.' },
   'employee-payments': { title: 'Pagos a empleados', subtitle: 'Dispersiones, anticipos y complementos de nómina.' },
   exports: { title: 'Exportaciones contables', subtitle: 'Descarga de layouts para SAT y sistemas externos.' },
 };

@@ -49,11 +49,11 @@ const FULL_ACCESS_TREE: AccessTreePanel[] = [
     label: 'Finanzas',
     modules: [
       toggle('accounting', 'Pólizas y cuentas'),
-      toggle('invoicing', 'Facturación CFDI'),
+      toggle('invoicing', 'Facturación'),
       toggle('banking', 'Bancos'),
       toggle('viatics-admin', 'Viáticos (admin)'),
       toggle('expenses-admin', 'Gastos (admin)'),
-      toggle('employee-payments', 'Pagos a personal'),
+      toggle('employee-payments', 'Nómina'),
     ],
   },
   {

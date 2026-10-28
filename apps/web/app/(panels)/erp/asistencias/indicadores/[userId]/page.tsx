@@ -86,7 +86,7 @@ export default function KpisPersonaPage() {
   return (
     <div className={st.pagina}>
       <PageHead
-        back={{ href: `${KPIS_PATH}${qs}`, label: "KPIs del equipo" }}
+        back={{ href: `${KPIS_PATH}${qs}`, label: "Desempeño del equipo" }}
         title={data?.persona.nombre ?? "Detalle"}
         description={data ? [data.persona.puesto, data.horario.etiqueta].filter(Boolean).join(" · ") : undefined}
         actions={

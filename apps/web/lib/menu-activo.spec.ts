@@ -4,7 +4,7 @@ import { rutaActivaDelMenu } from "./menu-activo";
 const MENU = ["/erp/pizarra", "/erp/asistencias", "/erp/asistencias/indicadores", "/erp/cotizaciones"];
 
 describe("rutaActivaDelMenu", () => {
-  it("en los KPIs solo se marca «KPIs del equipo», no también Asistencias", () => {
+  it("en los indicadores solo se marca «Desempeño», no también Asistencias", () => {
     expect(rutaActivaDelMenu("/erp/asistencias/indicadores", MENU)).toBe("/erp/asistencias/indicadores");
     expect(rutaActivaDelMenu("/erp/asistencias/indicadores/12", MENU)).toBe("/erp/asistencias/indicadores");
   });

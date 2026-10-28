@@ -3,7 +3,7 @@ import "./utilities.scss";
 import "./ecosystem.scss";
 import "./ui-tokens.scss";
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, Inter } from "next/font/google";
+import { Space_Grotesk, Inter, Inter_Tight } from "next/font/google";
 import ClientLayout from "./ClientLayout";
 import Providers from "./providers";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
@@ -37,6 +37,15 @@ const inter = Inter({
   display: "swap",
   weight: ["400", "500", "600"],
   variable: "--nx-font-app",
+  preload: false,
+});
+
+// Paneles: títulos y cifras en Inter Tight, la letra de exhibición del sitio público (28-10).
+const display = Inter_Tight({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["500", "600", "700"],
+  variable: "--ui-font-display-face",
   preload: false,
 });
 
@@ -250,7 +259,7 @@ export default function RootLayout({
     <html
       lang="es-MX"
       suppressHydrationWarning
-      className={`${spaceGrotesk.variable} ${inter.variable} ${interTight.variable} ${manrope.variable} ${plusJakarta.variable}`}
+      className={`${spaceGrotesk.variable} ${inter.variable} ${interTight.variable} ${manrope.variable} ${plusJakarta.variable} ${display.variable}`}
     >
       <body suppressHydrationWarning>
         {/* Tema del sitio público antes del primer pintado: claro, salvo que la persona haya elegido oscuro. */}
