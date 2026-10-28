@@ -509,12 +509,22 @@
 
 /* ── Equipo ─────────────────────────────────────────────────────────────── */
 
-/* Doce retratos: cuatro por fila en escritorio, tres en tableta y dos en el teléfono. */
+/*
+ * Retratos: cuatro por fila en escritorio, tres en tableta y dos en el teléfono. Va en flex y no en rejilla para que
+ * la última fila incompleta quede centrada en vez de dejar un hueco a la derecha.
+ */
 .equipo {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(28px, 3vw, 44px) clamp(14px, 1.6vw, 24px);
+  --columnas: 4;
+  --hueco: clamp(14px, 1.6vw, 24px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(28px, 3vw, 44px) var(--hueco);
   margin-top: clamp(40px, 5vw, 64px);
+}
+
+.equipo > li {
+  flex: 0 0 calc((100% - (var(--columnas) - 1) * var(--hueco)) / var(--columnas));
 }
 
 .persona {
@@ -953,7 +963,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .equipo {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    --columnas: 3;
   }
   .servicio,
   .dos,
@@ -1000,9 +1010,11 @@
   .fotos {
     grid-template-columns: 1fr;
   }
-  .logos,
-  .equipo {
+  .logos {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .equipo {
+    --columnas: 2;
   }
   .retrato {
     border-radius: 18px;

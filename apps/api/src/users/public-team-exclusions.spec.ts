@@ -58,6 +58,11 @@ describe('findPublicTeam · cuentas excluidas del equipo público', () => {
     );
   });
 
+  it('deja fuera las cuentas dadas de baja', async () => {
+    const where = await capturaWhere();
+    expect(where.isActive).toBe(true);
+  });
+
   it('sigue acotando el equipo a la empresa del sitio público', async () => {
     const where = await capturaWhere();
     expect(where.companyMemberships).toEqual({ some: { companyId: PUBLIC_COMPANY_ID } });

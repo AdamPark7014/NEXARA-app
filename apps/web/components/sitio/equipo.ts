@@ -1,9 +1,10 @@
 export type Integrante = { clave: string; nombre: string; rol: string };
 
 /**
- * Equipo que se muestra en Nosotros: el organigrama sin la dirección general ni a quien todavía no tiene retrato
- * con uniforme. Nombre corto (nombre y primer apellido) y puesto del organigrama. El retrato vive en
- * `/public/fotos/equipo/<clave>.webp`, recortado a fondo transparente para que sirva en claro y en oscuro.
+ * Equipo que se muestra en Nosotros: el organigrama sin la dirección general, sin quien todavía no tiene retrato
+ * con uniforme y sin Mónica García (Adam pidió quitarla el 28-10). Nombre corto (nombre y primer apellido) y puesto
+ * del organigrama. El retrato vive en `/public/fotos/equipo/<clave>.webp`, recortado a fondo transparente para que
+ * sirva en claro y en oscuro.
  */
 export const EQUIPO: Integrante[] = [
   { clave: "josue-cervantes", nombre: "Josué Cervantes", rol: "Encargado de obra" },
@@ -16,7 +17,6 @@ export const EQUIPO: Integrante[] = [
   { clave: "roberto-vivanco", nombre: "Roberto Vivanco", rol: "Ingeniero de campo" },
   { clave: "ivan-camargo", nombre: "Iván Camargo", rol: "Técnico instalador" },
   { clave: "israel-ramos", nombre: "Israel Ramos", rol: "Técnico instalador" },
-  { clave: "monica-garcia", nombre: "Mónica García", rol: "Administración" },
   { clave: "paulina-tlapaltotoli", nombre: "Paulina Tlapaltotoli", rol: "Contadora general" },
 ];
 

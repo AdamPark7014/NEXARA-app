@@ -296,15 +296,12 @@
   transition: transform 0.2s var(--ease);
 }
 
-.boton:hover .flechaLinea,
-.enlace:hover .flechaLinea,
-[data-flecha]:hover .flechaLinea {
+/* Con teclado la flecha responde igual que con el cursor. */
+:is(.boton, .enlace, [data-flecha]):is(:hover, :focus-visible) .flechaLinea {
   opacity: 1;
 }
 
-.boton:hover .flechaPunta,
-.enlace:hover .flechaPunta,
-[data-flecha]:hover .flechaPunta {
+:is(.boton, .enlace, [data-flecha]):is(:hover, :focus-visible) .flechaPunta {
   transform: translateX(3px);
 }
 
@@ -724,6 +721,31 @@
   margin: clamp(48px, 6vw, 80px) auto 0;
   padding: 24px 0 64px;
   text-align: left;
+}
+
+/*
+ * Revelado del tablero al bajar (como las presentaciones de producto de Apple): entra inclinado y se asienta plano
+ * conforme llega al centro de la pantalla. Solo donde el navegador tiene línea de tiempo de scroll y nadie pidió
+ * menos movimiento; en los demás se ve plano desde el principio.
+ */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .visualGrande {
+      transform-origin: 50% 100%;
+      animation: tableroAsienta linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 42%;
+    }
+  }
+}
+
+@keyframes tableroAsienta {
+  from {
+    transform: perspective(1600px) rotateX(18deg) scale(0.9) translateY(24px);
+  }
+  to {
+    transform: none;
+  }
 }
 
 .visualGrande .ventanaCuerpo {

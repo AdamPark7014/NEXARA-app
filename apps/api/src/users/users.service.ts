@@ -872,6 +872,8 @@ export class UsersService {
       where: {
         email: { notIn: this.excludedPublicTeamEmails },
         companyMemberships: { some: { companyId: tenantId } },
+        // Una cuenta dada de baja no se anuncia en público (salía, p. ej., una cuenta de diseño que ya no existe).
+        isActive: true,
       },
       select: {
         id: true,
