@@ -1,5 +1,18 @@
 # RELEVO
 
+- **28-10 ~13:30 (claude-code) — Análisis de la fórmula de desempeño desde producción (solo lectura); propuesta v2.**
+  - Adam pidió analizar la base para llegar a «la fórmula general» de productividad, retardo e ineficiencia. Se
+    consultó producción en transacción de solo lectura (28-09 → 28-10). Hallazgos: 87 % autoasignado, límite siempre
+    fin del día, 98 % aprobado a la primera, 112 entregas sin revisar, categoría libre con 100 valores, la cuadrilla
+    abre una actividad por persona para el mismo trabajo. El «ritmo» (20 pts) castiga al campo.
+  - Propuesta v2 en `.ai/CUMPLIMIENTO-EVALUADOR-SPEC.md` §7 (solo agregados): unidad «hora estándar ganada»,
+    `30·Confiabilidad + 25·Calidad + 30·Rendimiento + 15·Disciplina`, contracción por muestra, retardo graduado,
+    ineficiencia en cinco partes, modelo de coordinación. 5 decisiones de Adam en §7.4. **Nada construido.**
+  - Informe con detalle por persona: fuera del repo (es público), en `C:\dev\secrets\nexara\desempeno-2026-10-28\`.
+  - La fórmula actual real (`kpis-equipo.ts`, `PESOS_CUMPLIMIENTO`) es 20/10/15/20/15/15/5 + multiplicadores de carga
+    y días; la memoria «40/25/25/10» estaba vieja.
+  - Quedan 5 cuentas activas de la semana simulada (ids 42–46, sin actividad). No se tocaron.
+
 - **28-10 ~12:00 (claude-code) — «Tu día» sin la casilla de avisos; el ajuste pasó a Notificaciones.**
   - Adam no entendía la casilla «Solo el resumen y lo urgente» al pie de «Tu día» (`TuDiaPanel`): parecía palomear
     algo de la lista. Ahora es un interruptor «Recibir solo lo urgente», con su explicación, en la sección «Avisos

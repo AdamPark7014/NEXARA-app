@@ -1,6 +1,6 @@
 # Cumplimiento, eficiencia por complejidad y evaluador con IA — propuesta
 
-> Estado: **propuesta para aprobación de Adam** (22-10-2026). Nada de esto está construido salvo
+> Estado: **propuesta para aprobación de Adam** (22-10-2026; **v2 con la fórmula general el 28-10, §7**). Nada de esto está construido salvo
 > lo marcado como «ya existe». Pedido de Adam: «proteger la sistemática completa de actividades…
 > cumplimiento, horas, eficiencia, que se tarden menos o más dependiendo de la complejidad… y una
 > infraestructura de IA súper robusta que genere un evaluador completo».
@@ -105,8 +105,83 @@ Cada número lleva su muestra (n) y su confianza (alta/media/baja).
 
 ## 6. Decisiones de Adam
 
-1. **Pesos:** ¿se mete la eficiencia por complejidad al índice (35/25/15/15/10) o se queda 40/25/25/10
-   y la eficiencia se muestra aparte?
+1. **Pesos:** ~~¿se mete la eficiencia por complejidad al índice (35/25/15/15/10) o se queda 40/25/25/10
+   y la eficiencia se muestra aparte?~~ Lo reemplaza la propuesta v2 (§7, decisiones 7.4).
 2. **Complejidad:** ¿la confirma quien asigna con sugerencia de la IA (recomendado) o la pone la IA sola?
 3. **Visibilidad:** ¿la persona ve su evaluación una vez aprobada por su jefe (recomendado)?
 4. **Cadencia:** ¿semanal + mensual (recomendado) o solo mensual?
+
+## 7. Propuesta v2 — la fórmula general (28-10-2026, desde la base de producción)
+
+Adam (28-10): «analiza la base de datos, qué actividades han hecho, cuáles son los parámetros de medición… siento
+que no hemos llegado a la fórmula general». Se consultó producción en solo lectura (28-09 → 28-10: 319 actividades
+vivas, 322 asignaciones, 15 personas, 301 sesiones de reloj). El informe con el detalle por persona es interno y
+**no vive en el repo** (es público): `C:\dev\secrets\nexara\desempeno-2026-10-28\`.
+
+### 7.1 Lo que dice la base (agregado)
+
+| Dato | Valor | Consecuencia |
+|---|---|---|
+| Actividades creadas por quien las ejecuta | 280 de 322 (87 %) | La persona decide qué registra y cuándo; alta → inicio tiene mediana de 0 h |
+| Límite = fin del día del inicio | 290 de 290 | «A tiempo» = «la cerró hoy»; promedio del equipo 91 % |
+| Aprobadas a la primera | 171 de 174 (98 %); 83 % con 5 | Calidad sin señal; el CEO hace 140 de 182 revisiones |
+| Entregas sin ninguna revisión | 112, mediana 6.8 días | El cuello de botella es revisar |
+| Categoría (`ticketTypeCustom`) | 100 valores escritos a mano; «Reporte / documentación» en 82, 29 mal puestas | El tipo de trabajo no se puede usar |
+| Sin tiempo estimado | 180 de 319 (56 %); real ÷ estimado mediana 0.99 | El estimado lo pone la misma persona y se acomoda |
+| Cuadrilla | solo 8 asignaciones con equipo > 1 | Dos personas abren cada una su actividad para el mismo trabajo |
+| Ligadas a cliente / proyecto | 29 / 0 | No hay costo por servicio |
+| Cierres automáticos de salida | 37; 7 sesiones llegaron al tope de 12 h | Higiene de checada y reloj |
+| Geocerca | 150 alertas, 93 abiertas, a 12 km en promedio | El radio de 100 m sobre la foto de entrada es ruido en campo |
+| Comida fuera de 15–16 | 65 pendientes de revisar, casi todas de campo | La ventana no le queda a la cuadrilla |
+
+Duración real mediana por tipo (catálogo cerrado, clasificado con qwen3.5:9b local): cableado 7 h 29, instalación
+6 h 08, trámite 7 h 18, cotización 4 h 04, diseño 4 h 08, levantamiento 3 h 36, documentación 1 h 57, correctivo
+1 h 57, mantenimiento 1 h 55, logística 1 h 08, almacén 47 min. **Contar actividades (el «ritmo», 20 puntos) vale
+igual un día de cableado que un correo**: castiga al campo y premia fragmentar.
+
+### 7.2 La fórmula
+
+Unidad: **hora estándar ganada**. Cada tipo × complejidad tiene un tiempo estándar T<sub>e</sub> (mediana real del
+histórico, P75 = tope, recalculado cada mes). Lo entregado y aprobado gana su T<sub>e</sub>, no su reloj.
+
+`Índice = 30·Confiabilidad + 25·Calidad + 30·Rendimiento + 15·Disciplina`
+
+- **Rendimiento** = Σ T<sub>e</sub> aprobado ÷ horas disponibles, contra la meta de su familia (campo 60 %, oficina
+  70 %). Reemplaza ritmo, ocupación, carga y tiempo adecuado, que quedan como diagnóstico.
+- **Confiabilidad** = entregadas antes de su *hora compromiso* ÷ las que vencían (No cumplidas incluidas;
+  reprogramar con visto bueno antes de vencer no es falla).
+- **Calidad** = 60 % aprobadas a la primera + 40 % calificación calibrada por revisor (z contra su propio
+  promedio); restan incidencias y retrabajo.
+- **Disciplina** = puntualidad graduada × registro completo (salida checada, comida registrada). Uniforme solo con
+  ≥ 80 % de entradas revisadas.
+- Contracción: `(aciertos + 8·promedio del equipo) ÷ (n + 8)`; confianza alta ≥ 20 medidas, media 10–19, baja < 10
+  (no se publica).
+- Lo autoasignado gana la mitad de su T<sub>e</sub> hasta que un superior lo valida.
+- **Retardo** graduado contra el horario de la persona (o su primera actividad programada si es antes):
+  ≤ 15 min puntual 1.0 · 16–30 leve 0.6 · 31–60 retardo 0.3 · > 60 o sin checar 0.
+- **Ineficiencia** = jornada no ganada, en cinco partes: exceso sobre el P75 (persona), retrabajo (persona), sin
+  trabajo registrado (persona, salvo justificación), esperas por material/acceso/personal (planeación),
+  traslados (logística).
+- Por rol, misma fórmula: campo, oficina técnica/administración (T<sub>e</sub> por tamaño), comercial (cotización
+  por tamaño + embudo como diagnóstico) y **coordinación** (rendimiento y confiabilidad de su equipo, revisión en
+  ≤ 24 h hábiles, precisión de lo que planea).
+
+### 7.3 Antes que los pesos: arreglar el instrumento
+
+1. Catálogo cerrado de 18 tipos y complejidad al asignar (IA sugiere por la puerta única, quien asigna confirma);
+   sin categoría libre ni opción por omisión.
+2. Hora compromiso fijada por quien asigna; lo autoasignado lo valida el jefe.
+3. Una actividad por trabajo con su cuadrilla (sugerir sumarse a la del compañero en el mismo sitio ese día).
+4. Revisión con plazo de 24 h hábiles, visible en «Hoy» de cada jefe.
+5. Calibrar calificación (motivo para 5 y para < 3; promedio del revisor contra el equipo).
+6. Avisos de salida sin checar (18:15) y de reloj corriendo sin movimiento (3 h).
+7. Comida de campo en ventana 13–17 sin revisión; geocerca contra el sitio de la actividad y solo con sesión abierta.
+8. Ligar actividad a cliente/proyecto; uniforme por muestreo (2 entradas al azar por persona por semana).
+
+### 7.4 Decisiones de Adam (v2)
+
+1. ¿«Horas estándar ganadas» en lugar de ritmo + ocupación + carga + tiempo adecuado? (recomendado: sí)
+2. ¿Pesos 30/25/30/15?
+3. ¿Lo autoasignado gana la mitad hasta validarse (recomendado) o nada?
+4. ¿Retardos graduados (recomendado)? ¿«3 retardos = 1 falta»? Es reglamento interno, no LFT: decidir con RH.
+5. ¿Coordinadores medidos por su equipo (recomendado)?
