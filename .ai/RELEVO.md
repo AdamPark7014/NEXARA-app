@@ -14,6 +14,11 @@
     - En la Pizarra hay un conmutador «Tarjetas | Línea del día», que solo aparece con el rango Hoy; la elección
       se guarda en `nx-equipo-modo`. Las tarjetas siguen siendo la vista por omisión.
   - Verificación: web 1,286 pruebas y API `me/` 252, en verde; los tipos de las dos, limpios.
+  - **Desplegado** API + web (`5f298789`) y **verificado en el Chrome de Adam** con datos reales:
+    - las jornadas, lo que corre «ahora» y el «Libre · Asignar» de Iván;
+    - «Sin checar · entra 08:00» para los nuevos;
+    - los retardos contra el horario de campo nuevo.
+    - Detalle menor: la etiqueta «ahora» tapa la hora entera más cercana de la regla.
 
 - **28-10 ~17:00 (claude-code) — Pasada UI/UX de Core, fase 1: el lenguaje nuevo en todo Core desde los tokens.**
   - Adam eligió verde para Core (separado del azul del sitio) y lo demás como yo recomendara. Cambios:
