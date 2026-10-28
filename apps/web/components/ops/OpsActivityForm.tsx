@@ -42,6 +42,7 @@ import { getActivitiesSectionConfig } from "@/lib/section-views";
 import {
   activitySubmitLabel,
   buildActivityPayload,
+  compromisoValido,
   EMPTY_ACTIVITY_FORM,
   formFromActivityRecord,
   type ActivityFormState,
@@ -77,7 +78,7 @@ import {
   clientSectorsForUser,
   type ClientSector,
 } from "@/lib/client-sectors";
-import { TAREA_TIPOS, type ActivityKind } from "@/lib/activity-kinds";
+import { FAMILIAS_TAREA, TAREA_TIPOS, type ActivityKind } from "@/lib/activity-kinds";
 import { createMyActivity } from "@/lib/my-activities-api";
 import { quickCreateOperationalProject } from "@/lib/ops-operational-api";
 import { obtenerProgramacion, type EtapaPropuesta } from "@/lib/proyectos-api";
@@ -539,6 +540,10 @@ export default function OpsActivityForm({
     }
     if (isTareaCore && tareaTipo === "otro" && !form.ticketTypeCustom.trim()) {
       setError("Especifica el tipo de tarea");
+      return;
+    }
+    if (!form.periodoFin && !compromisoValido(form.hora, form.horaCompromiso)) {
+      setError("La hora de entrega tiene que ser después de la hora de inicio");
       return;
     }
     if (form.projectMode === "with_project" && !form.projectId) {
@@ -1027,37 +1032,33 @@ export default function OpsActivityForm({
                 <span className={s.etiqueta}>
                   Tipo de tarea <b className={s.req}>*</b>
                 </span>
-                <div className={s.chips} role="group" aria-label="Tipo de tarea">
-                  {TAREA_TIPOS.map((t, i) => {
-                    const on = tareaTipo === t.id;
-                    return (
-                      <Button
-                        key={t.id}
-                        id={i === 0 ? "oaf-tipo-tarea" : undefined}
-                        size="sm"
-                        className={s.chip}
-                        aria-pressed={on}
-                        iconStart={<ActivityKindIcon kind={t.icon} size={18} />}
-                        onClick={() => {
-                          const isOtro = t.id === "otro";
-                          setTareaOtroOpen(isOtro);
-                          setForm((prev) => ({
-                            ...prev,
-                            ticketType: "OTRO",
-                            ticketTypeCustom: isOtro
-                              ? tareaTipo === "otro"
-                                ? prev.ticketTypeCustom
-                                : ""
-                              : t.label,
-                            workType: "ISSUE",
-                          }));
-                        }}
-                      >
-                        {t.label}
-                      </Button>
-                    );
-                  })}
-                </div>
+                {/* Catálogo cerrado por familia (28-10): sin texto libre, cada tipo se puede medir. */}
+                {FAMILIAS_TAREA.map((familia, fi) => (
+                  <div key={familia.id} className={s.familiaTipos}>
+                    <span className={s.familiaEtiqueta}>{familia.label}</span>
+                    <div className={s.chips} role="group" aria-label={`Tipo de tarea · ${familia.label}`}>
+                      {TAREA_TIPOS.filter((t) => t.familia === familia.id).map((t, i) => {
+                        const on = tareaTipo === t.id;
+                        return (
+                          <Button
+                            key={t.id}
+                            id={fi === 0 && i === 0 ? "oaf-tipo-tarea" : undefined}
+                            size="sm"
+                            className={s.chip}
+                            aria-pressed={on}
+                            iconStart={<ActivityKindIcon kind={t.icon} size={18} />}
+                            onClick={() => {
+                              setTareaOtroOpen(false);
+                              setForm((prev) => ({ ...prev, ticketType: "OTRO", ticketTypeCustom: t.label, workType: "ISSUE" }));
+                            }}
+                          >
+                            {t.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
                 {intentado && isTareaCore && !tareaTipo ? (
                   <span className={s.errorCampo} role="alert">
                     Elige el tipo de tarea
@@ -1065,7 +1066,8 @@ export default function OpsActivityForm({
                 ) : null}
                 {tareaTipo === "otro" ? (
                   <Field
-                    label="¿Qué tipo de tarea es?"
+                    label="Tipo anterior (texto libre)"
+                    hint="Esta actividad se creó antes del catálogo. Si puedes, elige arriba el tipo que le corresponde."
                     required
                     error={intentado && !form.ticketTypeCustom.trim() ? "Especifica el tipo de tarea" : null}
                   >
@@ -1421,6 +1423,25 @@ export default function OpsActivityForm({
                   />
                 </Field>
               )}
+              {tone === "core" && !form.periodoFin ? (
+                <Field
+                  label="Entregar a más tardar"
+                  optional
+                  hint="Sin hora, el límite es el fin del día. Con hora, la entrega cuenta a tiempo solo si llega antes."
+                  error={
+                    form.horaCompromiso && !compromisoValido(form.hora, form.horaCompromiso)
+                      ? "Tiene que ser después de la hora de inicio."
+                      : null
+                  }
+                >
+                  <Input
+                    id="oaf-compromiso"
+                    type="time"
+                    value={form.horaCompromiso}
+                    onChange={(e) => setForm({ ...form, horaCompromiso: e.target.value })}
+                  />
+                </Field>
+              ) : null}
             </FieldGrid>
             {etapas && etapas.length > 0 ? (
               <Field label="Etapa del proyecto">

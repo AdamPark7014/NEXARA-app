@@ -1,5 +1,21 @@
 # RELEVO
 
+- **28-10 ~22:00 (claude-code) — Asignar actividad: tipos cerrados, hora compromiso y carga del equipo (pedido de Adam: «Sí, Asignar»).**
+  - `lib/activity-kinds.ts`: la tarea pasa a un catálogo cerrado de 17 tipos en 4 familias (`FAMILIAS_TAREA`: En
+    campo, Oficina técnica, Administración, Para todos). Ya no hay «Otro» en los chips; `'otro'` queda solo para leer
+    lo viejo. Los íconos nuevos están en `ActivityKindIcon.tsx`. El asistente de IA (`asistente-actividades.ts`,
+    `SUBTIPOS_TAREA`) usa la misma lista y «Otro» como respaldo.
+  - `OpsActivityForm.tsx`: los chips van agrupados por familia y el texto libre viejo se llama «Tipo anterior». Hay
+    campo nuevo «Entregar a más tardar» (`horaCompromiso`, solo en Core y sin periodo). Se guarda en `fechaMaxima` y
+    `fechaEntregaEsperada` (`horaLimite` en `lib/ops-activity-form.ts`) y se valida que sea después del inicio
+    (`compromisoValido`). Sin compromiso todo sigue igual: la API lo toma como fin del día. Pruebas en
+    `lib/ops-activity-compromiso.spec.ts`.
+  - Asignar (`pizarra/[userId]/asignar`): cada persona del equipo lleva su carga de hoy (`cargaDelDia` en
+    `lib/linea-del-dia.ts`): «Libre desde 12:10», «2 abiertas · 3 h planeadas · trabajando», «Sin checar hoy» o
+    «Ya salió». Se muestra con `OpcionPersona detalle`.
+  - Pendiente del canvas: la complejidad con sugerencia de la IA, que pide una migración y la puerta, y el tiempo
+    típico por tipo. Las apps móviles conservan su catálogo viejo (`CoreActivityKinds.kt`, `CoreActivityRules.swift`).
+
 - **28-10 ~21:15 (claude-code) — Detalle de actividad: tarjeta «Tiempo» y «Costo directo» (pedido de Adam).**
   - `components/ops/TiempoActividad.tsx` (+ css + spec) es una tarjeta oscura con un anillo: lo trabajado contra lo
     planeado y el tope (el máximo, o el plan + 25 %), con los estados en tiempo · cerca · excedida. Las cuentas

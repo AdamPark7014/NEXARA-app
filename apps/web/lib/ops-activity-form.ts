@@ -14,6 +14,12 @@ export const EMPTY_ACTIVITY_FORM = {
   fecha: "",
   hora: "09:00",
   /**
+   * «Entregar a más tardar» (`HH:MM`, mismo día). Vacío = como siempre: el límite es el fin del
+   * día. Con valor, la fecha máxima y la entrega esperada quedan a esa hora y el semáforo, los
+   * KPI y el cierre «No cumplida» la toman como el compromiso real (28-10).
+   */
+  horaCompromiso: "",
+  /**
    * Último día del periodo (`AAAA-MM-DD`). Vacío = actividad de un solo momento, como
    * siempre. Con valor, la actividad sigue en la pizarra cada día hasta ese día.
    */
@@ -62,6 +68,26 @@ export function toDateInputValue(iso?: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/**
+ * La hora compromiso de una actividad guardada: su fecha máxima, si cae el mismo día y después
+ * del inicio. Igual que antes, una fecha máxima igual al inicio significa «fin del día» y se
+ * deja vacía. Con periodo de varios días no aplica.
+ */
+export function horaCompromisoDe(record: Record<string, unknown>): string {
+  if (record.periodoFin) return "";
+  const inicio = record.fechaInicio ? new Date(record.fechaInicio as string) : null;
+  const maxima = record.fechaMaxima ? new Date(record.fechaMaxima as string) : null;
+  if (!inicio || !maxima || Number.isNaN(inicio.getTime()) || Number.isNaN(maxima.getTime())) return "";
+  if (maxima.getTime() <= inicio.getTime()) return "";
+  if (toDateInputValue(maxima.toISOString()) !== toDateInputValue(inicio.toISOString())) return "";
+  return maxima.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+/** El compromiso vale solo si es después de la hora de inicio. */
+export function compromisoValido(hora: string, compromiso: string): boolean {
+  return !compromiso || (/^\d{2}:\d{2}$/.test(compromiso) && compromiso > (hora || "09:00"));
+}
+
 export function formFromActivityRecord(record: Record<string, unknown>): ActivityFormState {
   const client = record.client as { id?: number; name?: string } | null | undefined;
   const projectId = record.projectId ? String(record.projectId) : "";
@@ -90,6 +116,7 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
       if (Number.isNaN(d.getTime())) return "09:00";
       return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
     })(),
+    horaCompromiso: horaCompromisoDe(record),
     clientId: record.clientId ? String(record.clientId) : client?.id ? String(client.id) : "",
     projectId,
     ticketType: String(record.ticketType ?? "PREVENTIVO"),
@@ -105,6 +132,11 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
     coreKind: String(record.coreKind ?? ""),
     assignmentCharge: String(record.assignmentCharge ?? ""),
   };
+}
+
+function horaLimite(form: ActivityFormState): string {
+  const hora = form.hora || "09:00";
+  return !form.periodoFin && form.horaCompromiso && compromisoValido(hora, form.horaCompromiso) ? form.horaCompromiso : hora;
 }
 
 export function buildActivityPayload(
@@ -133,11 +165,12 @@ export function buildActivityPayload(
     fechaInicio: form.fecha
       ? new Date(`${form.fecha}T${form.hora || "09:00"}:00`).toISOString()
       : undefined,
+    // Sin compromiso, la fecha máxima es la de inicio y la API la lee como «fin del día».
     fechaEntregaEsperada: form.fecha
-      ? new Date(`${form.fecha}T${form.hora || "09:00"}:00`).toISOString()
+      ? new Date(`${form.fecha}T${horaLimite(form)}:00`).toISOString()
       : undefined,
     fechaMaxima: form.fecha
-      ? new Date(`${form.fecha}T${form.hora || "09:00"}:00`).toISOString()
+      ? new Date(`${form.fecha}T${horaLimite(form)}:00`).toISOString()
       : undefined,
     evidencePhotoRequired: (() => {
       const n = Math.round(Number(form.evidencePhotoRequired || 4));

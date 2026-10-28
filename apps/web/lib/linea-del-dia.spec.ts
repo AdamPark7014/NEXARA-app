@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TeamBoardUser } from "@/lib/team-board-api";
-import { armaFila, diaMx, hhmmMx, horaMx, posicion, ventanaDelDia, type LineaDelDiaPersona } from "./linea-del-dia";
+import { armaFila, cargaDelDia, diaMx, hhmmMx, horaMx, posicion, ventanaDelDia, type LineaDelDiaPersona } from "./linea-del-dia";
 
 const FECHA = "2026-10-28";
 /** Hora de México (UTC−6). */
@@ -125,6 +125,28 @@ describe("armaFila", () => {
     expect(f.estado).toBe("sin_checar");
     expect(f.nota).toBe("Sin checar · entra 08:00");
     expect(f.jornada).toBeNull();
+  });
+});
+
+describe("cargaDelDia", () => {
+  it("libre desde que terminó lo último", () => {
+    expect(cargaDelDia(board({ status: "libre", idleSinceAt: M("12:10") }), ahora)).toEqual({ texto: "Libre desde 12:10", tono: "libre" });
+  });
+
+  it("cuenta lo abierto de hoy con sus horas planeadas y si está trabajando", () => {
+    const u = board({
+      openActivities: [
+        { id: 1, anNumber: "AN-1", titulo: "A", estatus: "En Proceso", evidenceStatus: "", progressPct: 0, coreKind: "obra", fechaFinalizacion: null, fechaInicio: M("08:00"), minutosPlan: 120, enCurso: true },
+        { id: 2, anNumber: "AN-2", titulo: "B", estatus: "Pendiente", evidenceStatus: "", progressPct: 0, coreKind: "tarea", fechaFinalizacion: null, fechaInicio: M("16:00"), minutosPlan: 60 },
+        { id: 3, anNumber: "AN-3", titulo: "Mañana", estatus: "Pendiente", evidenceStatus: "", progressPct: 0, coreKind: "tarea", fechaFinalizacion: null, fechaInicio: "2026-10-29T15:00:00Z", minutosPlan: 60 },
+      ],
+    });
+    expect(cargaDelDia(u, ahora)).toEqual({ texto: "2 abiertas · 3 h planeadas · trabajando", tono: "ocupado" });
+  });
+
+  it("sin checar o ya salió", () => {
+    expect(cargaDelDia(board({ entradaHoyAt: null }), ahora).texto).toBe("Sin checar hoy");
+    expect(cargaDelDia(board({ salidaHoyAt: M("13:00") }), ahora).texto).toBe("Ya salió");
   });
 });
 

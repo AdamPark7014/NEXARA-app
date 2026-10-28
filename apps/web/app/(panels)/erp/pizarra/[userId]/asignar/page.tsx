@@ -54,6 +54,7 @@ import {
   type TeamBoardUser,
 } from "@/lib/team-board-api";
 import { sumarPendientes, type PasoEquipo } from "@/lib/asignar-equipo";
+import { cargaDelDia } from "@/lib/linea-del-dia";
 import a from "./asignar.module.css";
 
 const OpsActivityForm = dynamic(() => import("@/components/ops/OpsActivityForm"), {
@@ -764,6 +765,7 @@ export default function AsignarActividadPage() {
                               nombre={u.nombre}
                               nombreCorto={shortName(u.nombre)}
                               avatarUrl={u.avatarUrl}
+                              detalle={cargaDelDia(boardUsers.find((b) => b.id === u.id) ?? u, Date.now())}
                             />
                           ))}
                         </div>

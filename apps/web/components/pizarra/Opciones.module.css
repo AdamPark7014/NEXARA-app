@@ -140,6 +140,36 @@
   white-space: nowrap;
 }
 
+/* Nombre y, debajo, su carga de hoy («Libre desde 12:10», «2 abiertas · 3 h planeadas»). */
+.personaTexto {
+  display: grid;
+  text-align: left;
+  line-height: 1.25;
+}
+
+.personaDetalle {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ui-fg-3);
+}
+
+.personaDetalle[data-tono="libre"] {
+  color: var(--ui-success-text);
+}
+
+.persona[data-selected="true"] .personaDetalle {
+  color: var(--ui-brand-text);
+}
+
+.persona:has(.personaDetalle) {
+  border-radius: var(--ui-radius-lg);
+  padding-block: 6px;
+}
+
 .personaMarca {
   display: none;
 }
