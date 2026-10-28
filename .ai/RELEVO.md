@@ -1,5 +1,13 @@
 # RELEVO
 
+- **28-10 ~11:10 (claude-code) — Heroes de Nosotros y Proyectos sin recortes panorámicos flojos.**
+  - Nosotros: el recorte 21:9 de la foto casual (cabezas cortadas, pared amarilla) se cambió por la foto de grupo de
+    los 12 retratos (`EquipoGrupo prioridad`, carga inmediata) sobre una baldosa con luz de estudio (`.heroEstudio`).
+  - Proyectos: mosaico de cuatro obras (rack, radioenlace, torniquetes, AP en altura) con rótulo de vidrio
+    (`.heroMosaico`); esas tres fotos salieron de la galería para no repetirse. Fuera `.heroFoto` (ya no se usaba).
+  - Probé poner en el tablero de la portada tomas reales recortadas del muro de video: en las miniaturas verticales
+    solo se veía una franja irreconocible, así que se quedó como estaba.
+
 - **28-10 ~10:45 (claude-code) — Ilustraciones del sitio rehechas «de nivel profesional» (Adam: la del almacén no le gustó).**
   - `SimuladorCobertura`: plano arquitectónico (retícula fina, muros de 7 con vanos y abatimiento de puertas, góndolas
     con entrepaños, refrigeradores, mostrador con registradora, tarimas en el almacén, mesas de exhibición), cámaras

@@ -21,7 +21,7 @@ const ORDEN = [
  * Los doce retratos recortados en dos filas escalonadas, como una foto de grupo de estudio. Es decorativa: los
  * nombres y puestos están en Nosotros.
  */
-export default function EquipoGrupo() {
+export default function EquipoGrupo({ prioridad = false }: { prioridad?: boolean }) {
   const personas = ORDEN.map((clave) => EQUIPO.find((x) => x.clave === clave)).filter((x) => x !== undefined);
   return (
     <div className={b.grupo} aria-hidden="true">
@@ -33,7 +33,7 @@ export default function EquipoGrupo() {
           alt=""
           width={512}
           height={492}
-          loading="lazy"
+          loading={prioridad ? "eager" : "lazy"}
           decoding="async"
           data-fila={i % 2 === 0 ? "atras" : "frente"}
           style={{ "--x": `${6 + i * 8}%` } as React.CSSProperties}
