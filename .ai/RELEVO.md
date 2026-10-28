@@ -1,5 +1,16 @@
 # RELEVO
 
+- **28-10 ~21:15 (claude-code) — Detalle de actividad: tarjeta «Tiempo» y «Costo directo» (pedido de Adam).**
+  - `components/ops/TiempoActividad.tsx` (+ css + spec) es una tarjeta oscura con un anillo: lo trabajado contra lo
+    planeado y el tope (el máximo, o el plan + 25 %), con los estados en tiempo · cerca · excedida. Las cuentas
+    están en `medidorDeTiempo` (`lib/actividad-tiempos.ts`, spec en `lib/actividad-medidor.spec.ts`). Reemplaza el
+    renglón «Tiempo» de «Datos clave».
+  - `components/ops/CostoActividad.tsx` suma los viáticos imputados (su parte del reparto) y el material del
+    almacén. Solo la ven CEO, dirección y coordinaciones, y no se pinta si no hay nada que sumar. La mano de obra y
+    el margen esperan a que la nómina y la factura pasen por el sistema.
+  - `RecordPage` gana la ranura `asideTop` (una tarjeta antes de los datos clave).
+  - Verificación: 1,293 pruebas del web y los tipos, en verde.
+
 - **28-10 ~20:45 (claude-code) — Pizarra · «Línea del día» en «Mi equipo» (pedido de Adam: «Pizarra primero»).**
   - API: `GET me/kpis/linea-del-dia?fecha=` (`KpisEquipoService.getLineaDelDia`). Devuelve un día de todo el
     equipo, con el mismo alcance y el mismo cálculo que el detalle por persona (`calculaKpisPersona`,

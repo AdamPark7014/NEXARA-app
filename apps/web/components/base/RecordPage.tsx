@@ -99,6 +99,8 @@ export type RecordPageProps = {
   asideActions?: ReactNode;
   /** Más tarjetas del panel derecho (`<AsideCard/>`). */
   aside?: ReactNode;
+  /** Tarjeta que va antes de los datos clave (p. ej. el tiempo de una actividad). */
+  asideTop?: ReactNode;
   /** Nombre del panel derecho para el lector de pantalla. */
   asideLabel?: string;
   className?: string;
@@ -150,13 +152,14 @@ export function RecordPage({
   factsActions,
   asideActions,
   aside,
+  asideTop,
   asideLabel = "Datos clave",
   className,
   style,
 }: RecordPageProps) {
   const hayAcciones = Boolean(tertiaryActions || secondaryActions || primaryAction);
   const restoDeAcciones = Boolean(secondaryActions || primaryAction);
-  const hayAside = Boolean((facts && facts.length) || asideActions || aside);
+  const hayAside = Boolean((facts && facts.length) || asideActions || aside || asideTop);
   const metaLista = Array.isArray(meta) && !isValidElement(meta) ? (meta as RecordMetaItem[]) : null;
 
   const cabecera =
@@ -236,6 +239,7 @@ export function RecordPage({
         </section>
         {hayAside ? (
           <aside className={s.aside} aria-label={asideLabel}>
+            {asideTop}
             {(facts && facts.length) || asideActions ? (
               <AsideCard title={factsTitle} actions={factsActions}>
                 {facts && facts.length ? <KeyFacts items={facts} /> : null}

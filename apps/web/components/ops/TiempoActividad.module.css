@@ -1,0 +1,121 @@
+/* Tarjeta oscura con el brillo del sitio: el número que el jefe viene a ver. */
+.tarjeta {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  gap: var(--ui-s3);
+  padding: 18px 20px;
+  border-radius: var(--ui-radius-xl);
+  color: #ffffff;
+  background:
+    radial-gradient(260px 160px at 100% 0%, rgba(16, 161, 131, 0.5), transparent 70%),
+    radial-gradient(240px 150px at 0% 130%, rgba(0, 96, 240, 0.42), transparent 70%),
+    #0d0f12;
+  box-shadow: 0 18px 44px -26px rgba(13, 15, 18, 0.7);
+}
+
+.titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #c9ced8;
+  letter-spacing: normal;
+}
+
+.vivo {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(16, 161, 131, 0.25);
+  color: #9be3d2;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.cuerpo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.anillo {
+  flex: 0 0 auto;
+}
+
+.pistaAnillo {
+  stroke: rgba(255, 255, 255, 0.16);
+}
+
+.avance {
+  stroke: #10a183;
+  transition: stroke-dasharray var(--ui-duration-slow) var(--ui-ease-out);
+}
+
+.tarjeta[data-estado="cerca"] .avance {
+  stroke: #f5b25c;
+}
+
+.tarjeta[data-estado="excedida"] .avance {
+  stroke: #f87171;
+}
+
+.cifras {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.real {
+  font-family: var(--ui-font-display);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.contra {
+  font-size: 13px;
+  color: #c9ced8;
+}
+
+.estado {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(16, 161, 131, 0.22);
+  color: #9be3d2;
+}
+
+.tarjeta[data-estado="cerca"] .estado {
+  background: rgba(245, 178, 92, 0.2);
+  color: #f8cd8f;
+}
+
+.tarjeta[data-estado="excedida"] .estado {
+  background: rgba(248, 113, 113, 0.2);
+  color: #fca5a5;
+}
+
+.tarjeta[data-estado="sin_plan"] .estado {
+  background: rgba(255, 255, 255, 0.1);
+  color: #d6dae2;
+}
+
+.pie {
+  margin: 0;
+  font-size: 12px;
+  color: #b9bfcc;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avance {
+    transition: none;
+  }
+}
