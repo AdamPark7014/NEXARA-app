@@ -10,6 +10,12 @@
     el margen esperan a que la nómina y la factura pasen por el sistema.
   - `RecordPage` gana la ranura `asideTop` (una tarjeta antes de los datos clave).
   - Verificación: 1,293 pruebas del web y los tipos, en verde.
+  - **Desplegado** (`2bf8a110` + `2aa63b9c`) y revisado en el Chrome de Adam:
+    - AN-0331 no tiene plan, y la tarjeta lo dice («sin tiempo planeado»).
+    - AN-0337 da «3 h 14 min de 1 h planeadas · le quedan 46 min para el tope», con el anillo en ámbar.
+    - `2aa63b9c`: «en curso» toma a cualquiera del equipo con sesión abierta, no solo a quien mira.
+    - Ojo: el plan es el de la persona (`horasPlan`, aquí 1 h) aunque el estimado general sea 3 h; es la misma
+      regla del semáforo.
 
 - **28-10 ~20:45 (claude-code) — Pizarra · «Línea del día» en «Mi equipo» (pedido de Adam: «Pizarra primero»).**
   - API: `GET me/kpis/linea-del-dia?fecha=` (`KpisEquipoService.getLineaDelDia`). Devuelve un día de todo el
