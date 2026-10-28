@@ -1,5 +1,20 @@
 # RELEVO
 
+- **28-10 ~20:45 (claude-code) — Pizarra · «Línea del día» en «Mi equipo» (pedido de Adam: «Pizarra primero»).**
+  - API: `GET me/kpis/linea-del-dia?fecha=` (`KpisEquipoService.getLineaDelDia`). Devuelve un día de todo el
+    equipo, con el mismo alcance y el mismo cálculo que el detalle por persona (`calculaKpisPersona`,
+    `detalle: true`): jornada, comida y los tramos con reloj de cada actividad. Tiene su prueba en
+    `kpis-equipo.service.spec.ts`.
+  - Web:
+    - `lib/linea-del-dia.ts` (puro, con su spec) junta esos tramos con lo abierto de `me/board`: lo programado de
+      hoy sin arrancar, lo atrasado y lo libre desde `idleSinceAt`; además arma la regla de horas.
+    - `components/pizarra/LineaDelDia.tsx` (+ css + spec) dibuja una fila por persona. Cada bloque enlaza a
+      `/erp/actividades/:id` y el hueco libre a «asignar»; lleva la línea de «ahora», una franja con el tipo
+      (obra, servicio, comercial, tarea) y una leyenda.
+    - En la Pizarra hay un conmutador «Tarjetas | Línea del día», que solo aparece con el rango Hoy; la elección
+      se guarda en `nx-equipo-modo`. Las tarjetas siguen siendo la vista por omisión.
+  - Verificación: web 1,286 pruebas y API `me/` 252, en verde; los tipos de las dos, limpios.
+
 - **28-10 ~17:00 (claude-code) — Pasada UI/UX de Core, fase 1: el lenguaje nuevo en todo Core desde los tokens.**
   - Adam eligió verde para Core (separado del azul del sitio) y lo demás como yo recomendara. Cambios:
     - `ui-tokens.scss`:

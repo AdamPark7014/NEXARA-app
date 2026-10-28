@@ -80,6 +80,23 @@ function build(over: Record<string, any> = {}) {
 
 const jefe = { id: 10, email: 'operaciones@nexara.com.mx', roleKey: 'coord_operaciones' };
 
+describe('KpisEquipoService.getLineaDelDia', () => {
+  it('da por persona la jornada, la comida y los tramos de cada actividad del día', async () => {
+    const { service } = build();
+    const res = await service.getLineaDelDia(jefe, 7, '2026-09-15');
+
+    expect(res.fecha).toBe('2026-09-15');
+    expect(res.scope).toBe('subtree');
+    const ana = res.personas.find((p) => p.persona.id === 20)!;
+    expect(ana.dia?.retardo).toBe(true);
+    expect(ana.dia?.jornada.length).toBeGreaterThan(0);
+    expect(ana.dia?.comida).toHaveLength(1);
+    expect(ana.dia?.actividades.map((a) => a.anNumber)).toEqual(['AN-100', 'AN-101']);
+    const beto = res.personas.find((p) => p.persona.id === 21)!;
+    expect(beto.dia?.actividades).toEqual([]);
+  });
+});
+
 describe('KpisEquipoService', () => {
   it('arma la fila de cada persona con su horario y el total del equipo', async () => {
     const { service } = build();

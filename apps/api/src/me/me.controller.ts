@@ -572,6 +572,19 @@ export class MeController {
     );
   }
 
+  /** Un día del equipo con los tramos de la línea de tiempo (Pizarra «Línea del día»). */
+  @Get('kpis/linea-del-dia')
+  lineaDelDia(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('fecha') fecha?: string,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.kpis.getLineaDelDia(this.viewer(user), companyId, fecha);
+  }
+
   /**
    * Excel de los KPI del equipo: una fila por persona con retardos, uniforme, horas
    * laboradas contra productivas, inactividad y tiempo extra, y totales con fórmulas.
