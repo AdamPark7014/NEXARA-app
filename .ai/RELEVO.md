@@ -15,6 +15,11 @@
     «Ya salió». Se muestra con `OpcionPersona detalle`.
   - Pendiente del canvas: la complejidad con sugerencia de la IA, que pide una migración y la puerta, y el tiempo
     típico por tipo. Las apps móviles conservan su catálogo viejo (`CoreActivityKinds.kt`, `CoreActivityRules.swift`).
+  - **Desplegado** API + web (`411cb0c0`) y revisado en el Chrome de Adam en `/erp/pizarra/10/asignar`:
+    - salen los chips por familia;
+    - cada persona muestra su carga («Sin checar hoy», «Ya salió», «1 abierta · 1 h planeadas · trabajando»).
+    - `974503d3` saca «Entregar a más tardar» a un renglón propio, porque caía en una cuarta columna angosta.
+    - La mayoría sale sin «h planeadas» porque su actividad abierta no tiene `minutosPlan`.
 
 - **28-10 ~21:15 (claude-code) — Detalle de actividad: tarjeta «Tiempo» y «Costo directo» (pedido de Adam).**
   - `components/ops/TiempoActividad.tsx` (+ css + spec) es una tarjeta oscura con un anillo: lo trabajado contra lo
