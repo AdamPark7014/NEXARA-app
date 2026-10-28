@@ -12,6 +12,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { IconLabel } from "@/components/ui/IconBadge";
 import NotificationKindIcon from "@/components/ui/NotificationKindIcon";
+import AvisosSoloUrgente from "@/components/notifications/AvisosSoloUrgente";
 import { stripLeadingEmoji } from "@/lib/notification-kind";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
@@ -481,6 +482,10 @@ export default function NotificationsCenterPage() {
           )}
         </Section>
       )}
+
+      <Section title="Avisos que recibes" subtitle="Ajusta cuánto te avisa el sistema.">
+        <AvisosSoloUrgente token={token} />
+      </Section>
     </>
   );
 }
