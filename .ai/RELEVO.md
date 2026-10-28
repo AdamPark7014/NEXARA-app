@@ -1,5 +1,16 @@
 # RELEVO
 
+- **28-10 ~15:00 (claude-code) — Datos de producción: horario de campo y sueldos del tabulador capturados.**
+  - Pedido de Adam. Se escribió con Prisma dentro de `nexara-api`, en una transacción, como lo hacen las pantallas, y
+    con bitácora (`audit_logs`: 9 `HORARIO_PROPIO`, 15 `SUELDO_SEMANAL`, actor Adam, id 2). **Sin cambios de código.**
+  - Horario propio 08:00–17:00 L–V (8 h netas, la comida dentro; el divisor de pago sigue en 40 h) para la cuadrilla:
+    Israel, Roberto (tenía 10:00–18:00), Salvador, Erick y los 5 nuevos (61–65). Alejandro, Carolina e Iván siguen con
+    10:00: en la hoja alternan días de oficina a las 10 con días de campo a las 8.
+  - `UserProfile.sueldoSemanal` = «precio por semana» del tabulador del 26-10 (mensual ÷ 4) para 19 personas:
+    15 cambiaron o se crearon y 4 ya coincidían. Las reglas de pago (÷4, ÷5 o ÷7, la extra) siguen pendientes de
+    Adam y del contador.
+  - Respaldo de lo anterior: `C:\dev\secrets\nexara\desempeno-2026-10-28\respaldo-horarios-sueldos-antes-2026-10-28.json`.
+
 - **28-10 ~14:30 (claude-code) — Tabulador y hoja de entradas contra el sistema (solo lectura).**
   - Adam mandó el tabulador vigente y la hoja «Control de entradas y salidas» del 19–23 oct. La nómina vive en Excel:
     `nomina_semanas` y `overtime_approvals` vacías; `sueldoSemanal` coincide con el tabulador en 4 personas, difiere
