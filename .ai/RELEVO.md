@@ -1,5 +1,16 @@
 # RELEVO
 
+- **28-10 ~16:00 (claude-code) — Propuesta visual de la pasada UI/UX de Core y apps (nada construido).**
+  - Canvas privado: https://claude.ai/artifact/WfLuBU8tk81cYoHVG8kAR7. Son 6 pantallas de escritorio (Hoy, Pizarra,
+    Detalle, Asignar, Desempeño, Nómina) y 2 de la app (Mi día, Entregar evidencia), con datos inventados.
+  - Adam la vio «muy plana» y se rehízo con el lenguaje del sitio: banda oscura con resplendor (aurora), tarjetas
+    flotantes con sombra en vez de bordes, la paleta de marca por tipo de trabajo (verde campo, naranja comercial,
+    magenta oficina técnica, cielo logística), anillos y gráficas pequeñas, y tipografía Inter Tight grande.
+  - Decisiones abiertas: acento azul del sitio (#0060f0) o verde de Core (#168570, el #1f9e84 no pasa contraste);
+    menú reagrupado (Hoy · Clientes y obra · Equipo y recursos · Dinero). Hoy Core mezcla tres juegos de letra
+    (Space Grotesk, Inter Tight, Manrope e Inter) y dos tokens (`--ui-*` teal y `--primary` azul viejo).
+  - Spec v2: la sección 7.3 ter (pagos, costo y margen) y las decisiones 9 y 10 están arriba.
+
 - **28-10 ~15:00 (claude-code) — Datos de producción: horario de campo y sueldos del tabulador capturados.**
   - Pedido de Adam. Se escribió con Prisma dentro de `nexara-api`, en una transacción, como lo hacen las pantallas, y
     con bitácora (`audit_logs`: 9 `HORARIO_PROPIO`, 15 `SUELDO_SEMANAL`, actor Adam, id 2). **Sin cambios de código.**
