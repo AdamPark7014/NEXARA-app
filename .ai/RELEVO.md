@@ -27,6 +27,13 @@
     - Dentro de Core tampoco: la extensión de Chrome estaba desconectada y el navegador integrado no tiene sesión.
       Ahí hay una contraseña guardada de gerencia@ que **no se usó**.
     - Falta que Adam mire Core por dentro.
+  - **Revisado en el Chrome de Adam** (sesión de Christian, solo lectura): Hoy, Actividades, Desempeño, Nómina,
+    Cotizaciones, Almacén, Contabilidad y el formulario nuevo. Correcciones en `2eac3f10`, desplegado y verificado:
+    - el menú decía «Pagos a empleados»: el título sale de `ERP_FINANCE_COPY` en `section-views.ts`;
+    - las migas ya no muestran la carpeta «Finance» (`SEGMENTOS_SIN_MIGA`);
+    - los títulos de grupo van en minúsculas;
+    - `PANEL_META.erp.accent` pasó de #2563EB al verde;
+    - las tarjetas de personas de la Pizarra flotan.
 
 - **28-10 ~16:00 (claude-code) — Propuesta visual de la pasada UI/UX de Core y apps (nada construido).**
   - Canvas privado: https://claude.ai/artifact/WfLuBU8tk81cYoHVG8kAR7. Son 6 pantallas de escritorio (Hoy, Pizarra,
