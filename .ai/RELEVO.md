@@ -1,5 +1,23 @@
 # RELEVO
 
+- **28-10 ~17:00 (claude-code) — Pasada UI/UX de Core, fase 1: el lenguaje nuevo en todo Core desde los tokens.**
+  - Adam eligió verde para Core (separado del azul del sitio) y lo demás como yo recomendara. Cambios:
+    - `ui-tokens.scss`:
+      - verde #168570 (4.5:1 con blanco) y fondo #eef1f5;
+      - sombras largas y suaves (`--ui-elev-*`) y radios 8/10/14/20;
+      - títulos h1/h2 en Inter Tight (`--ui-font-display`, cargada en `app/layout.tsx`);
+      - dentro de `.nx-app-shell` los semánticos viejos (`--primary` azul, `--surface`, `--text-*`, `--border`)
+        apuntan a `--ui-*`, así que todos los módulos toman el mismo verde y gris sin tocarlos uno por uno.
+    - `AppShell.module.scss`: el menú vive sobre el fondo (sin columna ni borde), el activo es una pastilla
+      blanca con sombra; búsqueda, barra superior translúcida y el botón «Nueva actividad» con halo verde; en el
+      cajón móvil el menú lleva fondo propio.
+    - Menú: «Recursos» → «Equipo y recursos» con «Desempeño» (antes «KPIs del equipo», misma ruta);
+      «Facturación CFDI» → «Facturación»; «Pagos a personal» → «Nómina» (etiquetas, migas, rieles y permisos).
+  - Fase 2 pendiente: rehacer el contenido de Hoy, Pizarra, Detalle, Asignar, Desempeño y Nómina como en el canvas,
+    y después las apps.
+  - Verificación: typecheck y 776 pruebas del web en verde. No se pudo ver en local porque Docker Desktop no
+    arrancó (el error del socket de siempre); se verifica en producción en el Chrome de Adam.
+
 - **28-10 ~16:00 (claude-code) — Propuesta visual de la pasada UI/UX de Core y apps (nada construido).**
   - Canvas privado: https://claude.ai/artifact/WfLuBU8tk81cYoHVG8kAR7. Son 6 pantallas de escritorio (Hoy, Pizarra,
     Detalle, Asignar, Desempeño, Nómina) y 2 de la app (Mi día, Entregar evidencia), con datos inventados.

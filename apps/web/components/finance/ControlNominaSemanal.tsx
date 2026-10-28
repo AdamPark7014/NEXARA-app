@@ -1530,7 +1530,7 @@ function CeldaExtras({ fila, verMontos, inicio, fin }: { fila: FilaControl; verM
         <Link
           href={enlaceAprobarExtras(fila.userId, inicio, fin)}
           className={s.pendLink}
-          aria-label={`${formatoMinutos(pend)} extra pendientes de ${fila.nombre}: aprobar en KPIs del equipo`}
+          aria-label={`${formatoMinutos(pend)} extra pendientes de ${fila.nombre}: aprobar en Desempeño del equipo`}
         >
           {formatoMinutos(pend)} pendiente
           <span className={s.pendAction}>Aprobar ›</span>

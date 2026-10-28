@@ -12,11 +12,11 @@ import { useHiddenModuleIds } from "@/lib/use-hidden-modules";
 const FINANCE_LINKS = [
   { id: "hub", label: "Escritorio Contadora", href: "/erp/contabilidad" },
   { id: "polizas", label: "Pólizas y cuentas", href: "/erp/contabilidad/polizas" },
-  { id: "invoicing", label: "Facturación CFDI", href: "/erp/invoicing" },
+  { id: "invoicing", label: "Facturación", href: "/erp/invoicing" },
   { id: "banking", label: "Bancos", href: "/erp/banking" },
   { id: "viatics", label: "Viáticos", href: "/erp/finance/viatics" },
   { id: "expenses", label: "Gastos", href: "/erp/finance/expenses" },
-  { id: "payments", label: "Pagos a personal", href: "/erp/finance/employee-payments", moduleId: "employee-payments" },
+  { id: "payments", label: "Nómina", href: "/erp/finance/employee-payments", moduleId: "employee-payments" },
   { id: "prenomina", label: "Pre-nómina", href: "/erp/finance/prenomina" },
 ] as const;
 

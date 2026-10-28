@@ -414,14 +414,15 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   // quien ve al equipo en Asistencias (`shouldShowModuleInSidebar`).
   "kpis-equipo": {
     id: "kpis-equipo", panel: PANELS.ERP, path: "/asistencias/indicadores",
-    label: "KPIs del equipo", description: "Retardos, uniforme, horas laboradas vs productivas",
+    // 28-10: «Desempeño» en «Equipo y recursos» (propuesta UI/UX aprobada); la ruta no cambia.
+    label: "Desempeño", description: "Cumplimiento, retardos, uniforme y horas del equipo",
     icon: "📈",
     allowedRoles: [
       R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.ARQUITECTO, R.COORD_OPERACIONES,
       R.PROJECT_MANAGER, R.MAINTENANCE_COORDINATOR, R.SENIOR_ENGINEER, R.SUPPORT_AGENT,
       R.NOC_LEAD, R.ADMIN_STAFF, R.HR_SPECIALIST, R.WAREHOUSE_MANAGER, R.PROCUREMENT_OFFICER,
     ],
-    group: "Hoy", visible: true,
+    group: "Equipo y recursos", visible: true,
   },
   "erp-clients": {
     id: "erp-clients", panel: PANELS.ERP, path: "/clientes",
@@ -469,7 +470,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     label: "Almacén", description: "Inventario, entradas y salidas, y reabastecimiento",
     icon: "📦",
     allowedRoles: [...WAREHOUSE_TEAM, R.PROJECT_MANAGER, R.ARQUITECTO, R.COORD_OPERACIONES],
-    group: "Recursos", visible: true,
+    group: "Equipo y recursos", visible: true,
   },
   // Herramientas y vehículos: cualquiera pide y ve lo suyo; aprueba quien ya aprobaba
   // (`TOOLS_MANAGE` / `VEHICLES_REVIEW` en la API).
@@ -477,20 +478,20 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "erp-herramientas", panel: PANELS.ERP, path: "/almacen/herramientas",
     label: "Herramientas", description: "Pide herramienta, revisa tu kit y tus préstamos",
     icon: "🛠️", allowedRoles: ANY_INTERNAL,
-    group: "Recursos", visible: true,
+    group: "Equipo y recursos", visible: true,
   },
   "erp-vehiculos": {
     id: "erp-vehiculos", panel: PANELS.ERP, path: "/vehiculos",
     label: "Vehículos", description: "Pide un vehículo; entrega y recepción con fotos",
     icon: "🚐", allowedRoles: ANY_INTERNAL,
-    group: "Recursos", visible: true,
+    group: "Equipo y recursos", visible: true,
   },
   // Lectura para todo el personal; mover a alguien de jefe sigue siendo de RH y dirección.
   "erp-organigrama": {
     id: "erp-organigrama", panel: PANELS.ERP, path: "/organigrama",
     label: "Organigrama", description: "Quién reporta a quién",
     icon: "🌳", allowedRoles: ANY_INTERNAL,
-    group: "Recursos", visible: true,
+    group: "Equipo y recursos", visible: true,
   },
   "erp-contabilidad": {
     id: "erp-contabilidad", panel: PANELS.ERP, path: "/contabilidad",
@@ -578,7 +579,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   invoicing: {
     id: "invoicing", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/invoicing",
-    label: "Facturación CFDI", description: "Timbrado, cancelaciones y cobranza",
+    label: "Facturación", description: "Facturas CFDI, cancelaciones y cobranza",
     icon: "🧾", allowedRoles: FINANCE_TEAM,
     group: "Finanzas", visible: true,
   },
@@ -602,7 +603,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "employee-payments": {
     id: "employee-payments", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/finance/employee-payments",
-    label: "Pagos a personal", description: "Dispersiones internas (no CFDI nómina)",
+    label: "Nómina", description: "Control semanal, sugerencia de nómina y pagos al personal (no CFDI)",
     icon: "💼", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.ACCOUNTANT, R.HR_SPECIALIST],
     group: "Finanzas", visible: true,
   },
@@ -650,13 +651,13 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "warehouse", panel: PANELS.ERP, path: "/warehouse",
     label: "Inventario", description: "Entradas, salidas, stock y mínimos",
     icon: "📦", allowedRoles: WAREHOUSE_TEAM,
-    group: "Recursos", visible: true,
+    group: "Equipo y recursos", visible: true,
   },
   procurement: {
     id: "procurement", panel: PANELS.ERP, path: "/procurement",
     label: "Compras", description: "Requisiciones, OC y proveedores",
     icon: "🛒", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.PROCUREMENT_OFFICER, R.WAREHOUSE_MANAGER, R.ADMIN_STAFF],
-    group: "Recursos", visible: true,
+    group: "Equipo y recursos", visible: true,
   },
   documents: {
     id: "documents", panel: PANELS.ERP, path: "/documents",

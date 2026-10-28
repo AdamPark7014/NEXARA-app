@@ -8,7 +8,7 @@ import type { PanelId } from "@/lib/access-matrix";
 export const CORE_GROUP_ORDER: readonly string[] = [
   "Hoy",
   "Clientes y obra",
-  "Recursos",
+  "Equipo y recursos",
   "Finanzas",
   "Personas",
   "Gobierno",

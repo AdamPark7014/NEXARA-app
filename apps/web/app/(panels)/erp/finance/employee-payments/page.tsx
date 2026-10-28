@@ -313,7 +313,7 @@ function BreakdownTable({
 }
 
 /**
- * «Pagos a personal» puede estar reservado a la dirección en esta empresa (política del API). Si es
+ * «Nómina» puede estar reservada a la dirección en esta empresa (política del API). Si es
  * así se avisa con claridad en vez de dejar abrir una pantalla cuyas consultas responderían 403.
  */
 export default function EmployeePaymentsPage() {
@@ -323,7 +323,7 @@ export default function EmployeePaymentsPage() {
       <div style={{ padding: 24, maxWidth: 640 }}>
         <InlineAlert
           variant="warning"
-          title="Pagos a personal está reservado a la dirección"
+          title="La nómina está reservada a la dirección"
           message="En esta empresa solo la dirección general consulta y captura estos pagos. Si necesitas verlos, pídele acceso."
         />
         <div style={{ marginTop: 16 }}>

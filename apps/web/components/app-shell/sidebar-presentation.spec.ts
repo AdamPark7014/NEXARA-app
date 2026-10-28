@@ -6,12 +6,12 @@ import { CORE_GROUP_ORDER, formatNavCount, presentSidebarGroups } from "./sideba
 const g = (title: string, ids: string[]) => ({ title, items: ids.map((id) => ({ id })) });
 
 describe("presentSidebarGroups", () => {
-  it("ordena Core en Hoy · Clientes y obra · Recursos · Finanzas · Mi cuenta", () => {
+  it("ordena Core en Hoy · Clientes y obra · Equipo y recursos · Finanzas · Mi cuenta", () => {
     const out = presentSidebarGroups(
-      [g("Mi cuenta", ["my-profile"]), g("Finanzas", ["erp-contabilidad"]), g("Recursos", ["erp-almacen"]), g("Clientes y obra", ["erp-clients"]), g("Hoy", ["pizarra"])],
+      [g("Mi cuenta", ["my-profile"]), g("Finanzas", ["erp-contabilidad"]), g("Equipo y recursos", ["erp-almacen"]), g("Clientes y obra", ["erp-clients"]), g("Hoy", ["pizarra"])],
       "erp",
     );
-    expect(out.map((x) => x.title)).toEqual(["Hoy", "Clientes y obra", "Recursos", "Finanzas", "Mi cuenta"]);
+    expect(out.map((x) => x.title)).toEqual(["Hoy", "Clientes y obra", "Equipo y recursos", "Finanzas", "Mi cuenta"]);
   });
 
   it("acomoda «Hoy»: actividades antes que chat", () => {

@@ -552,7 +552,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
     return !canUserAccessPath(user, path);
   }, [user, pathname]);
 
-  // Solo la opción más específica: en «KPIs del equipo» no se marca también «Asistencias».
+  // Solo la opción más específica: en «Desempeño» no se marca también «Asistencias».
   const activeMenuTarget = useMemo(
     () =>
       rutaActivaDelMenu(
@@ -1506,7 +1506,7 @@ const SLUG_DICTIONARY: Record<string, string> = {
   orgchart: "Organigrama",
   viatics: "Viáticos",
   expenses: "Gastos",
-  "employee-payments": "Pagos a personal",
+  "employee-payments": "Nómina",
 };
 
 function humanize(slug: string) {

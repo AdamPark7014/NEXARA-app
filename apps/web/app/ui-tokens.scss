@@ -32,6 +32,9 @@
 
   --ui-font: var(--nx-font-app, "Inter"), "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --ui-font-mono: var(--ds-font-mono, "JetBrains Mono"), ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  /* Títulos y cifras: Inter Tight, la misma letra de exhibición del sitio público (28-10).
+     El texto corrido sigue en Inter. */
+  --ui-font-display: var(--ui-font-display-face, "Inter Tight"), var(--ui-font);
 
   /* ----------------------------------------------------------
      Tipografía · tamaños crudos (escala heredada, se conserva)
@@ -50,10 +53,10 @@
      ---------------------------------------------------------- */
 
   /* Título de página — el H1 de cada pantalla, uno por vista */
-  --ui-fs-page: var(--ui-text-title); /* 22px */
-  --ui-lh-page: 1.2;
-  --ui-fw-page: 650;
-  --ui-tracking-page: -0.02em;
+  --ui-fs-page: 28px;
+  --ui-lh-page: 1.15;
+  --ui-fw-page: 700;
+  --ui-tracking-page: -0.025em;
 
   /* Título de sección — encabezado de tarjeta, bloque o grupo */
   --ui-fs-section: var(--ui-text-lg); /* 16px */
@@ -86,9 +89,9 @@
   --ui-tracking-caption: 0.02em;
 
   /* Cifra — KPI / métrica destacada (no es un papel de texto, es un dato) */
-  --ui-fs-stat: var(--ui-text-stat); /* 28px */
+  --ui-fs-stat: 30px;
   --ui-lh-stat: 1.05;
-  --ui-fw-stat: 650;
+  --ui-fw-stat: 700;
   --ui-tracking-stat: -0.025em;
 
   /* Números tabulares para columnas de importes */
@@ -99,7 +102,7 @@
      surface-0 (fondo de página) < surface (tarjeta) < surface-3 (elevada)
      `--ui-surface-2` es la superficie *hundida* (zebra, thead, wells).
      ---------------------------------------------------------- */
-  --ui-bg: #f5f7f9; /* fondo de página */
+  --ui-bg: #eef1f5; /* fondo de página: un tono más hondo para que las tarjetas floten */
   --ui-surface: #ffffff; /* superficie 1 — tarjeta, panel, modal */
   --ui-surface-2: #f8fafb; /* superficie hundida — thead, zebra, well */
   --ui-surface-3: #ffffff; /* superficie elevada — popover, dropdown, tooltip */
@@ -117,9 +120,9 @@
   /* ----------------------------------------------------------
      Texto · cuatro niveles
      ---------------------------------------------------------- */
-  --ui-fg: #0f1728; /* primario */
-  --ui-fg-2: #4a5768; /* secundario */
-  --ui-fg-3: #6b7889; /* terciario / apagado (≈4.6:1 sobre blanco: sirve para texto) */
+  --ui-fg: #14171f; /* primario */
+  --ui-fg-2: #4a5060; /* secundario */
+  --ui-fg-3: #5b6272; /* terciario / apagado (≈4.9:1 sobre el fondo y 6:1 sobre blanco) */
   --ui-fg-4: #a3adba; /* deshabilitado y placeholder; nunca texto que hay que leer */
   --ui-fg-disabled: var(--ui-fg-4);
   --ui-fg-muted: var(--ui-fg-3);
@@ -133,23 +136,26 @@
   /* ----------------------------------------------------------
      Bordes · tres pesos
      ---------------------------------------------------------- */
-  --ui-border-subtle: #eef1f4; /* separadores internos, filas de tabla */
-  --ui-border: #e3e8ee; /* borde por defecto de tarjeta */
+  --ui-border-subtle: #eef0f4; /* separadores internos, filas de tabla */
+  --ui-border: #e6e9ef; /* borde por defecto de tarjeta: apenas se ve, la sombra da la forma */
   --ui-border-strong: #cdd5de; /* borde de control, hover, divisor mayor */
 
   /* ----------------------------------------------------------
      Marca
      ---------------------------------------------------------- */
-  --ui-brand: #1f9e84;
-  --ui-brand-hover: #188a73;
-  --ui-brand-press: #147a65;
+  /* Verde de Core (Adam, 28-10: verde para separar Core del sitio, que es azul). El #1f9e84 de
+     antes daba 3.2:1 con texto blanco; #168570 da 4.5:1 y sigue siendo el verde del logo. */
+  --ui-brand: #168570;
+  --ui-brand-hover: #127562;
+  --ui-brand-press: #0f6352;
   --ui-brand-fg: #ffffff;
-  --ui-brand-text: #12715e;
-  --ui-brand-soft: #e7f5f1;
-  --ui-brand-soft-2: #cfece4;
+  --ui-brand-text: #0f6b59;
+  --ui-brand-soft: #e3f3ef;
+  --ui-brand-soft-2: #c7e8df;
   --ui-brand-bg: var(--ui-brand-soft);
-  --ui-brand-border: color-mix(in srgb, #1f9e84 30%, transparent);
-  --ui-ring: 0 0 0 3px rgba(31, 158, 132, 0.25);
+  --ui-brand-border: color-mix(in srgb, #168570 30%, transparent);
+  --ui-brand-glow: 0 10px 24px -12px rgba(22, 133, 112, 0.75);
+  --ui-ring: 0 0 0 3px rgba(22, 133, 112, 0.25);
   --ui-ring-danger: 0 0 0 3px rgba(220, 38, 38, 0.2);
   --ui-focus-ring: var(--ui-ring);
 
@@ -211,21 +217,21 @@
   /* ----------------------------------------------------------
      Forma
      ---------------------------------------------------------- */
-  --ui-radius-sm: 6px;
-  --ui-radius: 8px;
-  --ui-radius-lg: 12px;
-  --ui-radius-xl: 16px;
+  --ui-radius-sm: 8px;
+  --ui-radius: 10px;
+  --ui-radius-lg: 14px;
+  --ui-radius-xl: 20px;
   --ui-radius-pill: 999px;
 
   /* ----------------------------------------------------------
-     Elevación · muy contenida. Nada por encima de `pop`.
-     Sin degradados y sin desenfoque: la profundidad es
-     superficie + borde, y la sombra solo la remata.
+     Elevación · profundidad del sitio público (28-10: «aún está muy plana»).
+     La tarjeta flota sobre el fondo con una sombra larga y suave; el borde
+     casi desaparece. Nada por encima de `pop` salvo diálogos (`elev-3`).
      ---------------------------------------------------------- */
   --ui-elev-0: none;
-  --ui-elev-1: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --ui-elev-2: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 12px rgba(16, 24, 40, 0.06);
-  --ui-elev-pop: 0 1px 2px rgba(16, 24, 40, 0.06), 0 12px 32px rgba(16, 24, 40, 0.1);
+  --ui-elev-1: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px -18px rgba(16, 24, 40, 0.2);
+  --ui-elev-2: 0 1px 2px rgba(16, 24, 40, 0.05), 0 16px 40px -20px rgba(16, 24, 40, 0.24);
+  --ui-elev-pop: 0 2px 6px rgba(16, 24, 40, 0.06), 0 24px 56px -20px rgba(16, 24, 40, 0.3);
   --ui-shadow-sm: var(--ui-elev-1);
   --ui-shadow-pop: var(--ui-elev-pop);
 
@@ -341,7 +347,7 @@
   --ui-page-pad-x: 32px;
   --ui-page-gap: 24px;
 
-  /* Tarjeta · radio 16, borde de 1 px y elevación mínima */
+  /* Tarjeta · radio 20, borde casi invisible y sombra larga */
   --ui-card-radius: var(--ui-radius-xl);
   --ui-card-shadow: var(--ui-elev-1);
   --ui-card-pad: 20px;
@@ -399,11 +405,12 @@ body.dark {
   --ui-border: #1f2b3d;
   --ui-border-strong: #2e3c52;
 
-  /* Marca — el relleno se queda en #1f9e84 para que el texto blanco del
-     primario no pierda contraste; lo que aclara es el texto y el hover. */
+  /* Marca — en oscuro el relleno sube a #1f9e84 (sobre el ink se ve mejor y el texto blanco
+     del primario sigue legible); lo que aclara es el texto y el hover. */
   --ui-brand: #1f9e84;
   --ui-brand-hover: #22a98c;
   --ui-brand-press: #188a73;
+  --ui-brand-glow: 0 10px 24px -12px rgba(31, 158, 132, 0.6);
   --ui-brand-fg: #ffffff;
   --ui-brand-text: #4fd1b2;
   --ui-brand-soft: rgba(34, 169, 140, 0.14);
@@ -495,15 +502,40 @@ body.dark {
    ------------------------------------------------------------ */
 .nx-app-shell {
   --font-base: var(--ui-font);
-  --font-heading: var(--ui-font);
+  --font-heading: var(--ui-font-display);
   --nx-font-body: var(--ui-font);
-  --nx-font-display: var(--ui-font);
+  --nx-font-display: var(--ui-font-display);
   --nx-font-ui: var(--ui-font);
   font-family: var(--ui-font);
   font-size: var(--ui-text-base);
   line-height: 1.5;
   letter-spacing: normal;
   font-feature-settings: "cv11", "ss01";
+
+  /* Homologación (28-10): los módulos que todavía leen los semánticos viejos de
+     `globals.scss` (`--primary` azul #2563EB, `--surface`, `--text-primary`…) toman
+     dentro de Core los valores del sistema `--ui-*`. Un solo verde, un solo gris y
+     una sola sombra en todas las pantallas, sin tocar cada módulo. Fuera del shell
+     (sitio público, login) no cambia nada. */
+  --primary: var(--ui-brand);
+  --primary-hover: var(--ui-brand-hover);
+  --primary-soft: var(--ui-brand-soft);
+  --background: var(--ui-bg);
+  --background-elevated: var(--ui-surface);
+  --surface: var(--ui-surface);
+  --surface-2: var(--ui-surface-2);
+  --text-primary: var(--ui-fg);
+  --text-secondary: var(--ui-fg-2);
+  --text-tertiary: var(--ui-fg-3);
+  --border: var(--ui-border);
+  --border-strong: var(--ui-border-strong);
+  --shadow: var(--ui-elev-2);
+}
+
+/* Títulos de página y de sección en la letra de exhibición. */
+.nx-app-shell :is(h1, h2) {
+  font-family: var(--ui-font-display);
+  letter-spacing: -0.015em;
 }
 
 .nx-app-shell ::selection {

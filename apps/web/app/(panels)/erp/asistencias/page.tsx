@@ -1309,7 +1309,7 @@ export default function ErpAsistenciasPage() {
         secondaryActions={
           isManager ? (
             <ButtonLink href={KPIS_PATH} iconStart={<InsightsOutlinedIcon fontSize="inherit" aria-hidden="true" />}>
-              KPIs del equipo
+              Desempeño del equipo
             </ButtonLink>
           ) : undefined
         }
