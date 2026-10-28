@@ -10,6 +10,7 @@ import Flecha from "@/components/sitio/Flecha";
 import Cierre from "@/components/sitio/Cierre";
 import Certificaciones from "@/components/sitio/Certificaciones";
 import { EQUIPO, retrato } from "@/components/sitio/equipo";
+import EquipoGrupo from "@/components/sitio/EquipoGrupo";
 import { ruta } from "@/components/sitio/rutas";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
 
@@ -81,17 +82,9 @@ export default function Nosotros() {
             Las personas detrás <span className={s.degradado}>de cada solución.</span>
           </h1>
           <p className={p.heroLead}>Ingeniería, instalación y soporte que mantienen tu operación, desde Puebla y la Ciudad de México.</p>
-          <figure className={p.heroFoto}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/fotos/equipo-tecnico-nexara-uniforme-1920.webp"
-              srcSet="/fotos/equipo-tecnico-nexara-uniforme-1200.webp 1200w, /fotos/equipo-tecnico-nexara-uniforme-1920.webp 1920w"
-              sizes="(max-width: 1280px) 100vw, 1200px"
-              alt="Equipo técnico de NEXARA"
-              style={{ objectPosition: "center 34%" }}
-              fetchPriority="high"
-            />
-          </figure>
+          <div className={p.heroEstudio} role="img" aria-label="Doce integrantes del equipo de NEXARA con su uniforme">
+            <EquipoGrupo prioridad />
+          </div>
         </div>
       </section>
 

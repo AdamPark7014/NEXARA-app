@@ -33,18 +33,75 @@
   text-wrap: balance;
 }
 
-.heroFoto {
+/*
+ * Mosaico del hero de Proyectos: una pieza alta a la izquierda y tres en rejilla, cada una con su rótulo de vidrio.
+ * Muestra la amplitud del trabajo en lugar de un solo recorte panorámico.
+ */
+.heroMosaico {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr 1fr;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  height: clamp(380px, 38vw, 520px);
   margin-top: clamp(48px, 6vw, 80px);
+  text-align: left;
+}
+
+.heroPieza {
+  position: relative;
   overflow: hidden;
-  border-radius: var(--radius-xl);
-  aspect-ratio: 21 / 9;
+  border-radius: var(--radius-lg);
   background: var(--tile);
 }
 
-.heroFoto img {
+.heroPieza:first-child {
+  grid-row: 1 / -1;
+}
+
+.heroPieza:nth-child(2) {
+  grid-column: 2 / -1;
+}
+
+.heroPieza img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 1.2s var(--ease-out);
+}
+
+.heroPieza:hover img {
+  transform: scale(1.04);
+}
+
+.heroPieza figcaption {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgb(10 18 32 / 0.55);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Hero de Nosotros: la foto de grupo de los retratos sobre una baldosa con luz de estudio. */
+.heroEstudio {
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  margin-top: clamp(48px, 6vw, 80px);
+  padding-top: clamp(8px, 2vw, 24px);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(60% 90% at 50% 100%, color-mix(in srgb, var(--aurora-1) 24%, transparent), transparent 70%),
+    radial-gradient(40% 60% at 85% 20%, color-mix(in srgb, var(--aurora-3) 14%, transparent), transparent 70%),
+    var(--tile);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
 }
 
 /* ── Sub-barra de la página ─────────────────────────────────────────────── */
@@ -924,8 +981,17 @@
 }
 
 @media (max-width: 734px) {
-  .heroFoto {
-    aspect-ratio: 4 / 3;
+  .heroMosaico {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: 220px 150px 150px;
+    height: auto;
+  }
+  .heroPieza:first-child {
+    grid-row: auto;
+    grid-column: 1 / -1;
+  }
+  .heroPieza:nth-child(2) {
+    grid-column: 1 / -1;
   }
   .problemas,
   .datos,

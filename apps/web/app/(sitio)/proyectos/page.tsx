@@ -41,15 +41,20 @@ const CASOS: { sector: string; icono: PublicIconName; titulo: string; texto: str
   { sector: "Gobierno", icono: "landmark", titulo: "Modernización por fases", texto: "Infraestructura documentada, entregables auditables y continuidad operativa.", metrica: "Por fases", servicios: ["Infraestructura", "Redes", "Documentación"] },
 ];
 
-/** Galería de campo: instalaciones reales, sin tomas de taller repetidas. */
+/** Mosaico del hero: cuatro obras distintas (la primera, alta; las demás, en rejilla). No se repiten en la galería. */
+const MOSAICO: (Foto & { alt: string; tema: string; posicion: string })[] = [
+  { ...foto("rack-nexara-led", "(max-width: 734px) 100vw, 420px"), alt: "Rack de servidores y switching con iluminación instalado por NEXARA", tema: "Infraestructura", posicion: "center 45%" },
+  { ...foto("campo-enlace-antena-ciudad", "(max-width: 734px) 100vw, 780px"), alt: "Radioenlace de NEXARA sobre la ciudad", tema: "Enlaces entre sedes", posicion: "center 62%" },
+  { ...foto("control-acceso-torniquetes", "(max-width: 734px) 50vw, 380px"), alt: "Torniquetes de control de acceso instalados por NEXARA", tema: "Control de acceso", posicion: "center 55%" },
+  { ...foto("campo-instalacion-ap-altura", "(max-width: 734px) 50vw, 380px"), alt: "Técnico de NEXARA instalando un punto de acceso en altura", tema: "Wi‑Fi", posicion: "center 30%" },
+];
+
+/** Galería de campo: instalaciones reales, sin tomas de taller repetidas ni las del mosaico del hero. */
 const GALERIA: (Foto & { w: number; h: number; alt: string; tema: string; pie: string })[] = [
   { ...foto("campo-mastil-antenas", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1200, h: 1600, alt: "Mástil con antenas de enlace inalámbrico", tema: "Redes", pie: "Mástil con antenas de enlace." },
   { ...foto("muro-video-ancho", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1920, h: 1080, alt: "Muro de video de un centro de monitoreo", tema: "CCTV", pie: "Centro de monitoreo con muro de video." },
   { ...foto("control-acceso-terminal-facial", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1066, h: 1600, alt: "Terminal de reconocimiento facial", tema: "Control de acceso", pie: "Terminal facial en acceso de oficinas." },
   { ...foto("campo-instalacion-rack", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1280, h: 958, alt: "Técnicos instalando un rack", tema: "Instalación", pie: "Montaje de rack de telecomunicaciones." },
-  { ...foto("rack-servidores-led", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1023, h: 1537, alt: "Rack de servidores y switching", tema: "Infraestructura", pie: "Rack de servidores, etiquetado y documentado." },
-  { ...foto("campo-enlace-antena-ciudad", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1600, h: 1200, alt: "Radioenlace sobre la ciudad", tema: "Enlaces", pie: "Radioenlace punto a punto entre sedes." },
-  { ...foto("control-acceso-torniquetes", "(max-width: 734px) 100vw, (max-width: 1068px) 50vw, 400px"), w: 1600, h: 1066, alt: "Torniquetes de control de acceso", tema: "Control de acceso", pie: "Torniquetes con reconocimiento facial." },
   { src: "/fotos/tecnico-nexara-entrega-equipo-sitio-1200.webp", w: 1200, h: 800, alt: "Técnico de NEXARA entregando equipo en sitio", tema: "Logística", pie: "Entrega de equipo en sitio." },
 ];
 
@@ -125,15 +130,16 @@ export default async function PropuestaProyectos() {
               <Flecha />
             </a>
           </div>
-          <figure className={p.heroFoto}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              {...foto("sala-monitoreo-videowall-nexara", "(max-width: 1260px) 100vw, 1200px")}
-              alt="Sala de monitoreo con muro de video y estaciones de trabajo instalada por NEXARA, en operación"
-              fetchPriority="high"
-              decoding="async"
-            />
-          </figure>
+          {/* Cuatro obras en vez de un solo recorte: la amplitud del trabajo se ve antes de bajar. */}
+          <div className={p.heroMosaico}>
+            {MOSAICO.map((m, i) => (
+              <figure key={m.tema} className={p.heroPieza}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img {...m} alt={m.alt} fetchPriority={i === 0 ? "high" : undefined} decoding="async" style={{ objectPosition: m.posicion }} />
+                <figcaption>{m.tema}</figcaption>
+              </figure>
+            ))}
+          </div>
         </div>
       </section>
 
