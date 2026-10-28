@@ -177,6 +177,53 @@ export function textoPlanVsReal(minutosPlan?: number | null, minutosReales?: num
   return `Real ${real}`;
 }
 
+/** Sin tiempo máximo, el tope es el plan más este margen (el mismo de los KPI, `TOLERANCIA_PLAN`). */
+export const TOLERANCIA_DEL_PLAN = 1.25;
+
+export type MedidorTiempo = {
+  real: number;
+  plan: number | null;
+  tope: number | null;
+  /** real ÷ plan, de 0 a 1.5 (el anillo da una vuelta en el plan). null sin plan. */
+  avance: number | null;
+  estado: "sin_plan" | "en_tiempo" | "cerca" | "excedida";
+  /** «va en tiempo», «le quedan 40 min para el tope», «se pasó 25 min del tope». */
+  texto: string;
+};
+
+/**
+ * Lo que muestra la tarjeta «Tiempo» del detalle (28-10): lo trabajado contra lo planeado y el
+ * tope (su tiempo máximo, o el plan + 25 %). «Cerca» = ya pasó el plan sin llegar al tope.
+ */
+export function medidorDeTiempo(e: {
+  minutosPlan?: number | null;
+  minutosReales?: number | null;
+  tiempoMaximoMin?: number | null;
+}): MedidorTiempo {
+  const real = Math.max(0, Math.round(e.minutosReales ?? 0));
+  const plan = e.minutosPlan && e.minutosPlan > 0 ? Math.round(e.minutosPlan) : null;
+  const maximo = e.tiempoMaximoMin && e.tiempoMaximoMin > 0 ? Math.round(e.tiempoMaximoMin) : null;
+  const tope = maximo ?? (plan != null ? Math.round(plan * TOLERANCIA_DEL_PLAN) : null);
+  if (plan == null) {
+    return { real, plan: null, tope, avance: null, estado: "sin_plan", texto: real ? "sin tiempo planeado" : "aún sin tiempo" };
+  }
+  const avance = Math.min(1.5, real / plan);
+  if (tope != null && real > tope) {
+    return { real, plan, tope, avance, estado: "excedida", texto: `se pasó ${formatoMinutos(real - tope)} del tope` };
+  }
+  if (real > plan) {
+    return {
+      real,
+      plan,
+      tope,
+      avance,
+      estado: "cerca",
+      texto: tope != null ? `le quedan ${formatoMinutos(tope - real)} para el tope` : "ya pasó lo planeado",
+    };
+  }
+  return { real, plan, tope, avance, estado: "en_tiempo", texto: "va en tiempo" };
+}
+
 /** La única acción de quien recibe una actividad (regla del dueño, 18-09). */
 export const ACCION_INICIAR = "Iniciar actividad";
 

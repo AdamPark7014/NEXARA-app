@@ -18,7 +18,6 @@ import {
   PRIORIDAD_UI,
   puedeIniciar,
   textoChipSemaforo,
-  textoPlanVsReal,
 } from "@/lib/actividad-tiempos";
 import { formatDate, formatDateTime } from "@/components/detail/DetailFrame";
 import CrossPanelLink from "@/components/CrossPanelLink";
@@ -37,6 +36,8 @@ import {
   type Tone,
 } from "@/components/base";
 import ActivityKindIcon from "./ActivityKindIcon";
+import CostoActividad from "./CostoActividad";
+import TiempoActividad from "./TiempoActividad";
 import { IcoCalendario, IcoCamara, IcoCliente, IcoSitio, RouteTabs, type RouteTab } from "./_piezas";
 import s from "./ActivityDetailShell.module.css";
 
@@ -397,8 +398,6 @@ export default function ActivityDetailShell({
     rows.filter((m) => !m.retiradoAt).map((m) => m.user?.nombre).filter((n): n is string => Boolean(n));
   const coordinan = nombres((activity.assignees ?? []).filter((m) => m.rol === "LEAD"));
   const ejecutores = nombres((activity.assignees ?? []).filter((m) => m.rol !== "LEAD"));
-  const planVsReal = textoPlanVsReal(miFila?.minutosPlan ?? activity.minutosPlan, miFila?.minutosReales ?? activity.minutosReales);
-  const excedida = Boolean(miFila?.excedida ?? activity.excedida);
   const llegada = llegadaAlSitio(activity);
 
   const facts: RecordFact[] = [];
@@ -464,11 +463,7 @@ export default function ActivityDetailShell({
   push("Llegada al sitio", llegada ? <span className={s.factOk}>{llegada}</span> : null);
   push("Entrega esperada", activity.fechaEntregaEsperada ? formatDate(activity.fechaEntregaEsperada) : null);
   push("Finalización", activity.fechaFinalizacion ? formatDateTime(activity.fechaFinalizacion) : null);
-  push(
-    "Tiempo",
-    planVsReal ? <span className={excedida ? s.factBad : undefined}>{planVsReal}</span> : null,
-    planVsReal ? (excedida ? "Excedió el tiempo estimado" : chipSemaforo ?? "Estimado vs real") : undefined,
-  );
+  // El tiempo (plan contra real y el tope) vive en su tarjeta, arriba de estos datos.
 
   const kind = String(activity.coreKind ?? "").toLowerCase() === "obra" ? "obra" : undefined;
 
@@ -514,6 +509,15 @@ export default function ActivityDetailShell({
           tabs={<RouteTabs items={tabs} ariaLabel="Secciones de la actividad" />}
           facts={facts}
           factsTitle="Datos clave"
+          asideTop={
+            <TiempoActividad
+              minutosPlan={miFila?.minutosPlan ?? activity.minutosPlan}
+              minutosReales={miFila?.minutosReales ?? activity.minutosReales}
+              tiempoMaximoMin={activity.tiempoMaximoMin}
+              enCurso={Boolean(miFila?.sesionAbiertaDesde)}
+            />
+          }
+          aside={core ? <CostoActividad activityId={activity.id} /> : undefined}
         >
           {errorInicio ? (
             <Alert tone="danger" role="alert" onDismiss={() => setErrorInicio(null)}>

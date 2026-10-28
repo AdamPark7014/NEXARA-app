@@ -1,0 +1,39 @@
+.lista {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.fila {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--ui-text-base);
+}
+
+.fila dt {
+  color: var(--ui-fg-2);
+}
+
+.fila dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg);
+}
+
+.total {
+  padding-top: 8px;
+  border-top: 1px solid var(--ui-border-subtle);
+  font-weight: 600;
+}
+
+.total dt {
+  color: var(--ui-fg);
+}
+
+.nota {
+  margin: 10px 0 0;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  line-height: 1.45;
+}
