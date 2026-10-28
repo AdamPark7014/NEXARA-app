@@ -119,6 +119,28 @@
   border-radius: var(--ui-radius-pill);
 }
 
+/* Catálogo de tipos de tarea por familia. */
+.familiaTipos {
+  display: grid;
+  gap: 6px;
+}
+
+.familiaTipos + .familiaTipos {
+  margin-top: var(--ui-s2);
+}
+
+.familiaEtiqueta {
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  color: var(--ui-fg-3);
+}
+
+/* Hora compromiso: el límite de entrega real, no el fin del día. */
+.compromisoNota {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
 .chip:is(button)[aria-pressed="true"] {
   border-color: var(--ui-brand);
   background: var(--ui-brand-soft);

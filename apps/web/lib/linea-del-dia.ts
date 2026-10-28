@@ -262,6 +262,37 @@ export function armaFila(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Carga del día (al asignar)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type CargaDelDia = { texto: string; tono: "libre" | "ocupado" | "neutro" };
+
+/**
+ * Una línea para elegir a quién asignarle (28-10): «Libre desde 12:10», «2 abiertas · 3 h
+ * planeadas · trabajando», «Sin checar hoy» o «Ya salió». Cuenta lo abierto de hoy o de antes
+ * (lo programado para otro día no carga hoy).
+ */
+export function cargaDelDia(u: TeamBoardUser, ahora: number): CargaDelDia {
+  if (u.salidaHoyAt) return { texto: "Ya salió", tono: "neutro" };
+  const hoy = diaMx(ahora);
+  if (!u.entradaHoyAt || diaMx(Date.parse(u.entradaHoyAt)) !== hoy) return { texto: "Sin checar hoy", tono: "neutro" };
+  const abiertas = (u.openActivities ?? []).filter((a) => {
+    const inicio = ms(a.fechaInicio);
+    return inicio == null || diaMx(inicio) <= hoy;
+  });
+  if (abiertas.length === 0 || u.status === "libre") {
+    const desde = ms(u.idleSinceAt);
+    return { texto: desde != null && diaMx(desde) === hoy ? `Libre desde ${hhmmMx(desde)}` : "Libre", tono: "libre" };
+  }
+  const minutos = abiertas.reduce((s, a) => s + (a.minutosPlan && a.minutosPlan > 0 ? a.minutosPlan : 0), 0);
+  const trabajando = abiertas.some((a) => a.enCurso);
+  return {
+    texto: `${abiertas.length} ${abiertas.length === 1 ? "abierta" : "abiertas"}${minutos ? ` · ${duracion(minutos)} planeadas` : ""}${trabajando ? " · trabajando" : ""}`,
+    tono: "ocupado",
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Regla de horas
 // ─────────────────────────────────────────────────────────────────────────────
 

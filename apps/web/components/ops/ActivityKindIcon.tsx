@@ -17,6 +17,14 @@ import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
 import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
+import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
+import CableOutlinedIcon from "@mui/icons-material/CableOutlined";
+import CleaningServicesOutlinedIcon from "@mui/icons-material/CleaningServicesOutlined";
+import BugReportOutlinedIcon from "@mui/icons-material/BugReportOutlined";
+import ArchitectureOutlinedIcon from "@mui/icons-material/ArchitectureOutlined";
+import SettingsRemoteOutlinedIcon from "@mui/icons-material/SettingsRemoteOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
 import type { ActivityIconKey } from "@/lib/activity-kinds";
 import { IconBadge } from "@/components/ui/IconBadge";
 
@@ -37,6 +45,14 @@ export const ACTIVITY_KIND_ICONS: Record<ActivityIconKey, SvgIconComponent> = {
   capacitacion: SchoolOutlinedIcon,
   documentacion: EditNoteOutlinedIcon,
   otro: EditOutlinedIcon,
+  instalacion: VideocamOutlinedIcon,
+  cableado: CableOutlinedIcon,
+  mantenimiento: CleaningServicesOutlinedIcon,
+  correctivo: BugReportOutlinedIcon,
+  diseno: ArchitectureOutlinedIcon,
+  configuracion: SettingsRemoteOutlinedIcon,
+  facturacion: ReceiptLongOutlinedIcon,
+  evento: EventOutlinedIcon,
 };
 
 export function activityKindIconComponent(key?: string | null): SvgIconComponent {

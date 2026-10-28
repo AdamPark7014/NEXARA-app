@@ -100,33 +100,62 @@ export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
 };
 
 /**
- * Subtipos de Tarea. Se guardan como ticketType OTRO + ticketTypeCustom = label
- * (o el texto libre de «Otro»). Servicio, proyecto, obra y comercial no van aquí:
- * ya tienen su propio tipo.
+ * Subtipos de Tarea. Se guardan como ticketType OTRO + ticketTypeCustom = label.
+ * Servicio, proyecto, obra y comercial no van aquí: ya tienen su propio tipo.
+ *
+ * 28-10: catálogo cerrado en cuatro familias. El análisis de producción encontró 100 valores
+ * distintos escritos a mano en «Otro» y «Reporte / documentación» usado de comodín; sin un
+ * tipo confiable no se puede medir cuánto tarda cada trabajo
+ * (`.ai/CUMPLIMIENTO-EVALUADOR-SPEC.md` §7). Los nombres que ya existían se conservan para que
+ * el historial siga cuadrando. `otro` queda solo para leer actividades viejas.
  */
 export type TareaTipoId =
+  | 'instalacion'
+  | 'cableado'
+  | 'mantenimiento'
+  | 'correctivo'
   | 'levantamiento'
   | 'recoleccion'
   | 'entrega'
-  | 'junta'
-  | 'compra'
   | 'preparacion'
+  | 'diseno'
+  | 'configuracion'
   | 'tramite'
-  | 'capacitacion'
+  | 'compra'
+  | 'facturacion'
   | 'documentacion'
+  | 'capacitacion'
+  | 'junta'
+  | 'evento'
   | 'otro';
 
-export const TAREA_TIPOS: ReadonlyArray<{ id: TareaTipoId; label: string; icon: ActivityIconKey }> = [
-  { id: 'levantamiento', label: 'Levantamiento', icon: 'levantamiento' },
-  { id: 'recoleccion', label: 'Recolección', icon: 'recoleccion' },
-  { id: 'entrega', label: 'Entrega', icon: 'entrega' },
-  { id: 'junta', label: 'Junta', icon: 'junta' },
-  { id: 'compra', label: 'Compra de material', icon: 'compra' },
-  { id: 'preparacion', label: 'Preparación de equipo', icon: 'preparacion' },
-  { id: 'tramite', label: 'Trámite', icon: 'tramite' },
-  { id: 'capacitacion', label: 'Capacitación', icon: 'capacitacion' },
-  { id: 'documentacion', label: 'Reporte / documentación', icon: 'documentacion' },
-  { id: 'otro', label: 'Otro', icon: 'otro' },
+export type FamiliaTarea = 'campo' | 'oficina' | 'administracion' | 'transversal';
+
+export const FAMILIAS_TAREA: ReadonlyArray<{ id: FamiliaTarea; label: string }> = [
+  { id: 'campo', label: 'En campo' },
+  { id: 'oficina', label: 'Oficina técnica' },
+  { id: 'administracion', label: 'Administración' },
+  { id: 'transversal', label: 'Para todos' },
+];
+
+export const TAREA_TIPOS: ReadonlyArray<{ id: TareaTipoId; label: string; icon: ActivityIconKey; familia: FamiliaTarea }> = [
+  { id: 'instalacion', label: 'Instalación', icon: 'instalacion', familia: 'campo' },
+  { id: 'cableado', label: 'Cableado y canalización', icon: 'cableado', familia: 'campo' },
+  { id: 'mantenimiento', label: 'Mantenimiento preventivo', icon: 'mantenimiento', familia: 'campo' },
+  { id: 'correctivo', label: 'Correctivo y diagnóstico', icon: 'correctivo', familia: 'campo' },
+  { id: 'levantamiento', label: 'Levantamiento', icon: 'levantamiento', familia: 'campo' },
+  { id: 'recoleccion', label: 'Recolección', icon: 'recoleccion', familia: 'campo' },
+  { id: 'entrega', label: 'Entrega', icon: 'entrega', familia: 'campo' },
+  { id: 'preparacion', label: 'Preparación de equipo', icon: 'preparacion', familia: 'campo' },
+  { id: 'diseno', label: 'Diseño, CAD y memoria técnica', icon: 'diseno', familia: 'oficina' },
+  { id: 'configuracion', label: 'Configuración y soporte remoto', icon: 'configuracion', familia: 'oficina' },
+  { id: 'tramite', label: 'Trámite', icon: 'tramite', familia: 'administracion' },
+  { id: 'compra', label: 'Compra de material', icon: 'compra', familia: 'administracion' },
+  { id: 'facturacion', label: 'Facturación y contabilidad', icon: 'facturacion', familia: 'administracion' },
+  { id: 'documentacion', label: 'Reporte / documentación', icon: 'documentacion', familia: 'transversal' },
+  { id: 'capacitacion', label: 'Capacitación', icon: 'capacitacion', familia: 'transversal' },
+  { id: 'junta', label: 'Junta', icon: 'junta', familia: 'transversal' },
+  { id: 'evento', label: 'Evento o guardia', icon: 'evento', familia: 'transversal' },
 ];
 
 const ALL: ActivityKind[] = ['tarea', 'proyecto', 'obra', 'servicio', 'comercial'];

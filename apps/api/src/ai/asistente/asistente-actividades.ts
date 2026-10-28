@@ -23,19 +23,32 @@ export const ETIQUETA_TIPO: Record<TipoActividad, string> = {
   comercial: 'Comercial',
 };
 
-/** Subtipos de Tarea (mismos textos que `TAREA_TIPOS` en la web: viajan en ticketTypeCustom). */
+/**
+ * Subtipos de Tarea: el catálogo cerrado del 28-10 (mismos textos que `TAREA_TIPOS` en la web;
+ * viajan en ticketTypeCustom). «Otro» ya no se ofrece al modelo: queda solo de respaldo si no
+ * elige ninguno (`SUBTIPO_RESPALDO`).
+ */
 export const SUBTIPOS_TAREA = [
+  'Instalación',
+  'Cableado y canalización',
+  'Mantenimiento preventivo',
+  'Correctivo y diagnóstico',
   'Levantamiento',
   'Recolección',
   'Entrega',
-  'Junta',
-  'Compra de material',
   'Preparación de equipo',
+  'Diseño, CAD y memoria técnica',
+  'Configuración y soporte remoto',
   'Trámite',
-  'Capacitación',
+  'Compra de material',
+  'Facturación y contabilidad',
   'Reporte / documentación',
-  'Otro',
+  'Capacitación',
+  'Junta',
+  'Evento o guardia',
 ] as const;
+
+const SUBTIPO_RESPALDO = 'Otro';
 
 export const TIPOS_SERVICIO = ['PREVENTIVO', 'CORRECTIVO', 'EMERGENCIA', 'INSTALACION'] as const;
 
@@ -177,7 +190,7 @@ export function planDeSalida(salida: unknown): PlanAsistente {
 export const PROMPT_SISTEMA = `Asistente de asignación de actividades de NEXARA (seguridad electrónica e integración en México: CCTV, control de acceso, redes, alarmas, servicio de campo). Conviertes la instrucción de dirección (escrita o dictada por voz, con errores, muletillas y correcciones: «que Paty… no, que Carolina» es Carolina) en actividades. Una persona las revisa antes de crearlas.
 
 Tipos:
-- tarea: sin proyecto. sub: Levantamiento (revisar o medir un sitio antes de cotizar), Recolección, Entrega, Junta (reunión o llamada para revisar o acordar algo, también con un cliente), Compra de material, Preparación de equipo, Trámite (facturas, fianzas, permisos, pagos), Capacitación, Reporte / documentación (hacer o mandar un reporte, aunque sea de una falla), Otro.
+- tarea: sin proyecto. sub (elige siempre uno): Instalación (equipo nuevo: cámaras, control de acceso, biométrico, red, audio), Cableado y canalización (cable, tubería, charola, nodos), Mantenimiento preventivo, Correctivo y diagnóstico (falla, revisar por qué no funciona), Levantamiento (revisar o medir un sitio antes de cotizar), Recolección, Entrega (llevar material, traslados), Preparación de equipo (almacén, armar y probar antes de ir), Diseño, CAD y memoria técnica, Configuración y soporte remoto (software, NVR, Hik-Connect, Fortinet, módem), Trámite (fianzas, permisos, pagos, cheques), Compra de material, Facturación y contabilidad, Reporte / documentación (hacer o mandar un reporte o documento), Capacitación, Junta (reunión o llamada para revisar o acordar algo, también con un cliente), Evento o guardia.
 - servicio: trabajo técnico en el sitio de un cliente. sub: PREVENTIVO (mantenimiento), CORRECTIVO (falla o cambio de una pieza), EMERGENCIA (sistema caído o urgente), INSTALACION (equipo nuevo de pocas horas).
 - obra: instalación grande de un proyecto. proyecto: ingeniería, planos, pruebas o puesta en marcha de un proyecto. Solo si mencionan el proyecto, la obra o la puesta en marcha.
 - comercial: solo para vender: cotizar, propuesta, seguimiento de venta, visita de venta. Una junta con un cliente para revisar algo es tarea Junta.
@@ -868,7 +881,7 @@ export function construirPropuesta(
         ? 'OTRO'
         : tipoServicio || 'PREVENTIVO';
   const ticketTypeCustom =
-    tipo === 'comercial' ? 'COMERCIAL' : tipo === 'tarea' ? subtipoTarea || 'Otro' : undefined;
+    tipo === 'comercial' ? 'COMERCIAL' : tipo === 'tarea' ? subtipoTarea || SUBTIPO_RESPALDO : undefined;
 
   const payload: Record<string, unknown> = {
     titulo: tituloFinal,
@@ -905,7 +918,7 @@ export function construirPropuesta(
   for (const k of Object.keys(payload)) if (payload[k] === undefined) delete payload[k];
 
   const partes = [
-    ETIQUETA_TIPO[tipo] + (tipo === 'tarea' && ticketTypeCustom && ticketTypeCustom !== 'Otro' ? ` · ${ticketTypeCustom}` : ''),
+    ETIQUETA_TIPO[tipo] + (tipo === 'tarea' && ticketTypeCustom && ticketTypeCustom !== SUBTIPO_RESPALDO ? ` · ${ticketTypeCustom}` : ''),
     `para ${responsable?.nombre ?? accion.responsable ?? '(sin responsable)'}`,
     cliente ? `en ${cliente.nombre}${sucursal ? ` · ${sucursal.name}` : ''}` : textoCliente ? `en ${textoCliente}` : null,
     horaLegible(fechaInicio, contexto.ahora) + (agenda.hasta ? ` · vence ${diaCorto(agenda.hasta)}` : ''),

@@ -73,12 +73,15 @@ export function OpcionPersona({
   nombre,
   nombreCorto,
   avatarUrl,
+  detalle,
 }: {
   selected: boolean;
   onClick: () => void;
   nombre: string;
   nombreCorto: string;
   avatarUrl?: string | null;
+  /** Su carga de hoy, para decidir a quién sumar (`cargaDelDia`). */
+  detalle?: { texto: string; tono: "libre" | "ocupado" | "neutro" } | null;
 }) {
   return (
     <button
@@ -87,10 +90,19 @@ export function OpcionPersona({
       aria-pressed={selected}
       data-selected={selected ? "true" : undefined}
       onClick={onClick}
-      title={nombre}
+      title={detalle ? `${nombre} · ${detalle.texto}` : nombre}
     >
       <Avatar name={nombre} avatarUrl={avatarUrl} size={28} />
-      <span className={o.personaNombre}>{nombreCorto}</span>
+      {detalle ? (
+        <span className={o.personaTexto}>
+          <span className={o.personaNombre}>{nombreCorto}</span>
+          <span className={o.personaDetalle} data-tono={detalle.tono}>
+            {detalle.texto}
+          </span>
+        </span>
+      ) : (
+        <span className={o.personaNombre}>{nombreCorto}</span>
+      )}
       <span className={o.personaMarca} aria-hidden="true">
         <CheckIcon />
       </span>
