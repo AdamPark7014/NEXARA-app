@@ -114,6 +114,11 @@
   gap: 2px;
 }
 
+/* En 3D no se dibuja: el atributo hidden debe ganarle al display: flex. */
+.herramientas[hidden] {
+  display: none;
+}
+
 .herramientaHueco {
   display: inline-flex;
   align-items: center;
