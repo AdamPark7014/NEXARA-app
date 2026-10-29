@@ -15,6 +15,11 @@
     `gradlew :app:testDebugUnitTest -Pcapturas=true --tests "*CapturasMiDiaTest*"` → `app/build/capturas/mi-dia.png`.
   - iOS: la misma tabla de color en `NxBrand.swift`, `AccentColor` #168570, radios 10/14/20/24 y sombra flotante en
     `nxCardSurface`. Falta «Mi día», la barra superior clara y la fuente (`ios/Resources/Fonts`, aún sin cablear).
+  - Android «Entregar evidencia» (`EvidenceCaptureFlow.kt`), solo lo visual del artboard sin tocar los pasos ni el GPS:
+    tarjeta blanca flotante por paso, «Paso 2 de 4 · Fotos en sitio» con barra de avance, fotos en rejilla de dos
+    (4:3, «Lista», nombre debajo) y botón principal de 52 con radio 14.
+  - Canvas: cuatro artboards nuevos de app para el visto bueno de Adam (Mis actividades, Detalle, Asignar, Mi equipo
+    con «En espera de revisión»). No se construyen hasta que los apruebe.
 
 - **29-10 ~11:35 (claude-code) — Tiempo estándar por especificidad, parte API (§8 de la especificación, tarifas
   aprobadas por Adam el 28-10).**

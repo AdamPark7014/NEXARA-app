@@ -11,21 +11,20 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -61,8 +60,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -72,11 +73,10 @@ import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePdfStepRequest
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoDto
 import mx.nexara.mobile.nativeapp.data.api.EvidenceFlowDto
-import mx.nexara.mobile.nativeapp.data.api.GeocercaDto
-import mx.nexara.mobile.nativeapp.util.JornadaGps
 import mx.nexara.mobile.nativeapp.data.api.EvidenceFormDataWrapper
 import mx.nexara.mobile.nativeapp.data.api.EvidencePhotoGeoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidencePhotosWithGeoRequest
+import mx.nexara.mobile.nativeapp.data.api.GeocercaDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
 import mx.nexara.mobile.nativeapp.ui.common.GPS_REQUIRED_MESSAGE
@@ -84,8 +84,6 @@ import mx.nexara.mobile.nativeapp.ui.common.GeoPhoto
 import mx.nexara.mobile.nativeapp.ui.common.GeoPhotoPreviewDialog
 import mx.nexara.mobile.nativeapp.ui.common.LiveCameraCaptureDialog
 import mx.nexara.mobile.nativeapp.ui.common.LivePhotoEncoding
-import mx.nexara.mobile.nativeapp.util.DeviceLocation
-import java.time.Instant
 import mx.nexara.mobile.nativeapp.ui.common.ProtectedImage
 import mx.nexara.mobile.nativeapp.ui.common.ProtectedPdfButton
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.STEP_COMPLETED
@@ -95,11 +93,15 @@ import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.STEP_E
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.STEP_PDF
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.STEP_PHOTOS
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.icon
+import mx.nexara.mobile.nativeapp.ui.enterprise.nxFlotante
+import mx.nexara.mobile.nativeapp.util.DeviceLocation
+import mx.nexara.mobile.nativeapp.util.JornadaGps
 
 private const val KIND_ENTRY = "entry"
 private const val KIND_EVIDENCE = "evidence"
@@ -1262,17 +1264,19 @@ private fun StepCard(
     icon: ImageVector? = null,
     content: @Composable () -> Unit,
 ) {
+    // Tarjeta blanca que flota (canvas «App · Entregar evidencia»): sin borde, con sombra larga.
+    val shape = RoundedCornerShape(NxDimens.PanelRadius)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFFF8FAFC))
-            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(14.dp))
-            .padding(14.dp),
+            .nxFlotante(shape)
+            .clip(shape)
+            .background(NxColors.Card)
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        NxIconText(text = title, icon = icon, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
-        Text(description, fontSize = 13.sp, color = NxColors.Muted)
+        NxIconText(text = title, icon = icon, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
+        Text(description, fontSize = 13.sp, lineHeight = 18.sp, color = NxColors.Muted)
         content()
     }
 }
@@ -1282,80 +1286,75 @@ private fun PrimaryAction(label: String, enabled: Boolean, icon: ImageVector? = 
     Button(
         onClick = onClick,
         enabled = enabled,
-        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = NxColors.Brand,
+            disabledContainerColor = Color(0xFFC9CED8),
+            disabledContentColor = Color(0xFF3D4352),
+        ),
         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
     ) {
         if (icon != null) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
         }
-        Text(label, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        Text(label, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
     }
 }
 
+/**
+ * «Paso 2 de 4 · Fotos en sitio» con la barra de avance del canvas: lo que ya quedó listo
+ * contra el total de pasos. El paso de ahora va en negritas.
+ */
 @Composable
 private fun StepProgress(steps: List<String>, flow: EvidenceFlowDto?, current: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        steps.forEachIndexed { index, s ->
-            val done = when (s) {
-                STEP_ENTRY -> !flow?.entryPhotoUrl.isNullOrBlank()
-                STEP_PHOTOS -> !flow?.evidencePhotos.isNullOrEmpty()
-                STEP_PDF -> !flow?.serviceSheetPdfUrl.isNullOrBlank()
-                STEP_DATA -> flow?.serviceSheetData != null
-                else -> !flow?.exitPhotoUrl.isNullOrBlank()
-            }
-            val active = s == current
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(
-                            when {
-                                done -> Color(CoreActivityRules.VERDE)
-                                active -> NxColors.Brand
-                                else -> Color(0xFFE2E8F0)
-                            },
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (done) {
-                        Icon(
-                            NxGlyph.DONE.icon,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    } else {
-                        Text(
-                            "${index + 1}",
-                            color = if (active) Color.White else NxColors.Muted,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-                Text(
-                    CoreActivityRules.stepLabel(s, flow?.activity?.coreKind),
-                    fontSize = 12.sp,
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                    color = if (active) NxColors.Slate else NxColors.Muted,
-                )
-            }
-            if (index < steps.lastIndex) {
-                Box(Modifier.width(14.dp).heightIn(min = 1.dp).background(Color(0xFFCBD5E1)))
-            }
+    val hechos = steps.count { s ->
+        when (s) {
+            STEP_ENTRY -> !flow?.entryPhotoUrl.isNullOrBlank()
+            STEP_PHOTOS -> !flow?.evidencePhotos.isNullOrEmpty()
+            STEP_PDF -> !flow?.serviceSheetPdfUrl.isNullOrBlank()
+            STEP_DATA -> flow?.serviceSheetData != null
+            else -> !flow?.exitPhotoUrl.isNullOrBlank()
+        }
+    }
+    val indice = steps.indexOf(current).coerceAtLeast(0)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Paso ${indice + 1} de ${steps.size} · ${CoreActivityRules.stepLabel(current, flow?.activity?.coreKind)}",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = NxColors.Slate,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "$hechos de ${steps.size} listos",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (hechos == steps.size) NxColors.BrandDark else NxColors.Muted,
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color(0xFFEEF0F4)),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(if (steps.isEmpty()) 0f else hechos.toFloat() / steps.size)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(NxColors.Brand),
+            )
         }
     }
 }
 
+/** Fotos ya tomadas en rejilla de dos (canvas): miniatura 4:3, «Lista» y su nombre debajo. */
 @Composable
 private fun DraftGrid(
     drafts: List<DraftPhoto>,
@@ -1363,53 +1362,71 @@ private fun DraftGrid(
     onRemove: (Int) -> Unit,
 ) {
     if (drafts.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        drafts.forEachIndexed { index, draft ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(96.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFF0F172A)),
-            ) {
-                val thumb = draft.thumb
-                if (thumb != null) {
-                    Image(
-                        bitmap = thumb.asImageBitmap(),
-                        contentDescription = "Evidencia ${index + 1}",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    ProtectedImage(
-                        url = draft.url,
-                        contentDescription = "Evidencia ${index + 1}",
-                        modifier = Modifier.fillMaxSize(),
-                    )
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        drafts.withIndex().chunked(2).forEach { par ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                par.forEach { (index, draft) ->
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        val shape = RoundedCornerShape(16.dp)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(4f / 3f)
+                                .nxFlotante(shape, 8.dp)
+                                .clip(shape)
+                                .background(Color(0xFFE8EDF3)),
+                        ) {
+                            val thumb = draft.thumb
+                            if (thumb != null) {
+                                Image(
+                                    bitmap = thumb.asImageBitmap(),
+                                    contentDescription = CoreActivityRules.fotoEvidenciaLabel(index + 1),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            } else {
+                                ProtectedImage(
+                                    url = draft.url,
+                                    contentDescription = CoreActivityRules.fotoEvidenciaLabel(index + 1),
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                            Text(
+                                "Lista",
+                                color = Color(0xFF0B7A4B),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(8.dp)
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(Color(0xFFE8F5EE))
+                                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(6.dp)
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xCC0D0F12))
+                                    .clickable(enabled = enabled) { onRemove(index) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Outlined.Close, contentDescription = "Quitar", tint = Color.White, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                        Text(
+                            CoreActivityRules.fotoEvidenciaLabel(index + 1),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = NxColors.Slate,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp)
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(Color(0x99000000))
-                        .clickable(enabled = enabled) { onRemove(index) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Outlined.Close, contentDescription = "Quitar", tint = Color.White, modifier = Modifier.size(16.dp))
-                }
-                Text(
-                    CoreActivityRules.fotoEvidenciaLabel(index + 1),
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(4.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0x99000000))
-                        .padding(horizontal = 5.dp, vertical = 1.dp),
-                )
+                if (par.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
