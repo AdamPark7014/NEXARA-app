@@ -33,8 +33,12 @@ const llaveDeTarjeta = (userId: number) => `nx_entrada_u${userId}`;
 type Candidato = { id: number; nombre: string; companyId: number | null; horario: HorarioKpi };
 
 /**
- * Cada minuto: «buenos días» a su hora de entrada y, a quien no ha checado, un push cada 2 min
- * desde su entrada más la tolerancia hasta su salida. Reglas en `recordatorio-entrada.ts`.
+ * Cada minuto, solo a quien no ha checado: «buenos días» a su hora de entrada y un push cada 2 min
+ * desde su entrada más la tolerancia hasta su salida. Reglas en `recordatorio-entrada.ts`. En cuanto
+ * checa lo toma `activities/recordatorios-jornada.service.ts` («sin actividad», «por vencer»).
+ *
+ * La insistencia va directo por `PushDispatchService`, no por `createNotification` como aquel: cada
+ * aviso de 2 min sería una fila nueva en `notifications` (más de cien por persona en un día sin checar).
  *
  * Varias instancias de la API corren este cron a la vez: cada aviso se reclama antes de mandarlo
  * con una escritura condicional sobre la fila de la persona en `user_preferences` (solo una gana
@@ -107,12 +111,14 @@ export class RecordatorioEntradaService {
     const ids = candidatos.map((c) => c.id);
     const hoy = workDateColumn(ahora);
     const { start, end } = workDayBounds(ahora);
-    const [entradas, justificadas, permisos, guardias, saludos, prefs] = await Promise.all([
+    const [entradas, jornadas, justificadas, permisos, guardias, saludos, prefs] = await Promise.all([
       this.prisma.attendance.findMany({
         where: { userId: { in: ids }, type: 'entrada', timestamp: { gte: start, lte: end } },
-        select: { userId: true, timestamp: true },
-        orderBy: { timestamp: 'asc' },
+        select: { userId: true },
       }),
+      // La señal con la que `recordatorios-jornada` decide que alguien ya está en jornada: con ella
+      // aquí se calla, y nadie recibe los dos recordatorios a la vez.
+      this.prisma.attendanceDay.findMany({ where: { userId: { in: ids }, date: hoy }, select: { userId: true } }),
       this.prisma.attendanceJustification.findMany({
         where: { userId: { in: ids }, date: hoy },
         select: { userId: true },
@@ -134,8 +140,7 @@ export class RecordatorioEntradaService {
       }),
     ]);
 
-    const primeraEntrada = new Map<number, Date>();
-    for (const e of entradas) if (!primeraEntrada.has(e.userId)) primeraEntrada.set(e.userId, e.timestamp);
+    const yaEntraron = new Set([...entradas, ...jornadas].map((e) => e.userId));
     const conJustificacion = new Set(justificadas.map((j) => j.userId));
     const conPermiso = new Set(permisos.map((p) => p.userId));
     const conGuardia = new Set(guardias.map((g) => g.userId));
@@ -143,7 +148,6 @@ export class RecordatorioEntradaService {
     const turnoPrevio = new Map(prefs.map((p) => [p.userId, p.value]));
 
     for (const c of candidatos) {
-      const entrada = primeraEntrada.get(c.id) ?? null;
       const toca = avisoQueToca(
         ahora,
         {
@@ -154,7 +158,7 @@ export class RecordatorioEntradaService {
           conPermiso: conPermiso.has(c.id),
           descansos,
         },
-        { yaEntro: entrada != null, yaSaludado: saludados.has(c.id) },
+        { yaEntro: yaEntraron.has(c.id), yaSaludado: saludados.has(c.id) },
       );
       if (!toca) continue;
       if (!(await this.reclamar(c.id, toca.turno, turnoPrevio.get(c.id)))) continue;
@@ -162,12 +166,7 @@ export class RecordatorioEntradaService {
       const horario = horaDeEntrada(ahora, c.horario.entrada as string);
       try {
         if (toca.aviso === 'buenos-dias') {
-          const { title, message } = avisoBuenosDias({
-            nombre: c.nombre,
-            horario,
-            entradaRegistrada: entrada ? horaAviso(entrada) : null,
-            minutosTarde: toca.minutosTarde,
-          });
+          const { title, message } = avisoBuenosDias({ nombre: c.nombre, horario, minutosTarde: toca.minutosTarde });
           const fila = await this.notifications.createNotification({
             userId: c.id,
             type: TIPO,
@@ -178,7 +177,7 @@ export class RecordatorioEntradaService {
             relatedEntityId: c.id,
             entityType: ENTIDAD,
             relatedUrl: URL_ASISTENCIA,
-            priority: entrada ? 'normal' : 'high',
+            priority: 'high',
             channel: 'attendance',
             collapseKey: llaveDeTarjeta(c.id),
             dedupeSeconds: 0,

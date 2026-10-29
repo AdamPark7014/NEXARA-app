@@ -8,6 +8,8 @@
  *   registrado tu entrada». Solo push: no deja filas.
  * - Para al checar, al llegar su hora de salida, con falta justificada, permiso o vacaciones, y en su
  *   descanso (sábado, domingo o festivo), salvo que ese día tenga guardia.
+ * - Al checar pasa al recordatorio de la jornada (`activities/recordatorios-jornada`): uno u otro,
+ *   nunca los dos.
  *
  * El horario es el de cada quien (`horarioDePersona`, el mismo que mide retardos): oficina entra a
  * las 10:00 y la cuadrilla de campo a las 08:00, cada uno con su gracia. Módulo puro: sin Nest ni Prisma.
@@ -121,17 +123,19 @@ export type AvisoDeEntrada = {
 /**
  * Qué aviso le toca en este minuto, o null.
  *
+ * - Quien ya checó no recibe nada de aquí: desde su entrada lo atiende el recordatorio de la
+ *   jornada (`activities/recordatorios-jornada`, «sin actividad» y «por vencer»). Así nadie recibe
+ *   los dos a la vez.
  * - Entre su entrada y su salida, quien aún no recibió el «buenos días» lo recibe primero, aunque
- *   el servidor haya arrancado tarde. A quien ya checó solo se le saluda dentro de su tolerancia:
- *   pasada esa hora, ya no le hace falta nada.
- * - Desde la entrada más la tolerancia, a quien no ha checado, un «sin entrada» por turno de 2 min.
+ *   el servidor haya arrancado tarde.
+ * - Desde la entrada más la tolerancia, un «sin entrada» por turno de 2 min.
  */
 export function avisoQueToca(
   ahora: Date,
   d: DiaDeLaPersona,
   estado: { yaEntro: boolean; yaSaludado: boolean },
 ): AvisoDeEntrada | null {
-  if (!seLeEsperaHoy(d)) return null;
+  if (estado.yaEntro || !seLeEsperaHoy(d)) return null;
   const entrada = minutos(d.horario.entrada);
   if (entrada == null) return null;
   const salidaEscrita = minutos(d.horario.salida);
@@ -143,11 +147,10 @@ export function avisoQueToca(
   const minutosTarde = ahoraMin - entrada;
 
   if (!estado.yaSaludado) {
-    if (estado.yaEntro && ahoraMin >= inicio) return null;
     // Turno del minuto en curso: si el aviso no llegó a guardarse, el siguiente minuto lo reintenta.
     return { aviso: 'buenos-dias', turno: `${d.fecha} ${hhmm(ahoraMin)}`, minutosTarde };
   }
-  if (estado.yaEntro || ahoraMin < inicio) return null;
+  if (ahoraMin < inicio) return null;
   const turno = inicio + Math.floor((ahoraMin - inicio) / CADA_MIN_SIN_ENTRADA) * CADA_MIN_SIN_ENTRADA;
   return { aviso: 'sin-entrada', turno: `${d.fecha} ${hhmm(turno)}`, minutosTarde };
 }
@@ -169,16 +172,11 @@ export function avisoBuenosDias(p: {
   nombre: string | null | undefined;
   /** Hora de entrada de su horario, ya escrita («10:00 a. m.»). */
   horario: string;
-  /** Hora en que checó, si ya lo hizo. */
-  entradaRegistrada: string | null;
   minutosTarde: number;
 }): { title: string; message: string } {
   const nombre = primerNombre(p.nombre);
   const title = nombre ? `Buenos días, ${nombre} ☀️` : 'Buenos días ☀️';
   // Las horas terminan en «a. m.»/«p. m.»: los textos no les ponen otro punto detrás.
-  if (p.entradaRegistrada) {
-    return { title, message: `Registraste tu entrada a las ${p.entradaRegistrada}: ¡que tengas buen día!` };
-  }
   if (p.minutosTarde > 0) {
     return {
       title,

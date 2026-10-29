@@ -63,10 +63,10 @@ describe('recordatorio de entrada: la regla', () => {
     expect(avisoQueToca(mx(JUEVES, '18:00'), dia(), NADA)).toBeNull();
   });
 
-  it('a quien ya checó solo se le saluda dentro de su tolerancia', () => {
-    expect(avisoQueToca(mx(JUEVES, '10:00'), dia(), { yaEntro: true, yaSaludado: false })?.aviso).toBe('buenos-dias');
-    // El servidor arrancó a las 11: quien ya entró no necesita nada; quien no, recibe el buenos días primero.
+  it('a quien ya checó no le manda nada: lo atiende el recordatorio de la jornada', () => {
+    expect(avisoQueToca(mx(JUEVES, '10:00'), dia(), { yaEntro: true, yaSaludado: false })).toBeNull();
     expect(avisoQueToca(mx(JUEVES, '11:00'), dia(), { yaEntro: true, yaSaludado: false })).toBeNull();
+    // El servidor arrancó a las 11: quien no ha entrado recibe el buenos días primero.
     expect(avisoQueToca(mx(JUEVES, '11:00'), dia(), NADA)).toEqual({
       aviso: 'buenos-dias',
       turno: '2026-10-29 11:00',
@@ -130,14 +130,11 @@ describe('recordatorio de entrada: la regla', () => {
   });
 
   it('textos', () => {
-    expect(avisoBuenosDias({ nombre: 'óscar Pérez', horario: '10:00 a. m.', entradaRegistrada: null, minutosTarde: 0 })).toEqual({
+    expect(avisoBuenosDias({ nombre: 'óscar Pérez', horario: '10:00 a. m.', minutosTarde: 0 })).toEqual({
       title: 'Buenos días, Óscar ☀️',
       message: '¿Ya registraste tu entrada? Tu horario empieza a las 10:00 a. m.',
     });
-    expect(
-      avisoBuenosDias({ nombre: 'Óscar', horario: '10:00 a. m.', entradaRegistrada: '9:52 a. m.', minutosTarde: 0 }).message,
-    ).toBe('Registraste tu entrada a las 9:52 a. m.: ¡que tengas buen día!');
-    expect(avisoBuenosDias({ nombre: '', horario: '10:00 a. m.', entradaRegistrada: null, minutosTarde: 40 })).toEqual({
+    expect(avisoBuenosDias({ nombre: '', horario: '10:00 a. m.', minutosTarde: 40 })).toEqual({
       title: 'Buenos días ☀️',
       message: 'Aún no registras tu entrada (tu horario empezó a las 10:00 a. m.): regístrala en la app.',
     });
@@ -157,6 +154,7 @@ function baseFalsa() {
   const db = {
     users: [] as Fila[],
     attendance: [] as Fila[],
+    jornadas: [] as Fila[],
     justificaciones: [] as Fila[],
     permisos: [] as Fila[],
     guardias: [] as Fila[],
@@ -178,8 +176,13 @@ function baseFalsa() {
         db.consultas += 1;
         return db.attendance
           .filter((a) => enIds(where, a) && a.type === where.type)
-          .filter((a) => a.timestamp >= where.timestamp.gte && a.timestamp <= where.timestamp.lte)
-          .sort((a, b) => a.timestamp - b.timestamp);
+          .filter((a) => a.timestamp >= where.timestamp.gte && a.timestamp <= where.timestamp.lte);
+      },
+    },
+    attendanceDay: {
+      findMany: async ({ where }: any) => {
+        db.consultas += 1;
+        return db.jornadas.filter((j) => enIds(where, j) && mismaFecha(j.date, where.date));
       },
     },
     attendanceJustification: {
@@ -315,6 +318,15 @@ describe('recordatorio de entrada: el servicio', () => {
     await minuto(b, JUEVES, '10:17');
     await minuto(b, JUEVES, '10:19');
     expect(b.pushes.filter((p) => p.userId === 1)).toHaveLength(1);
+  });
+
+  it('con la jornada de hoy abierta se calla aunque la checada no se vea: no se enciman los dos recordatorios', async () => {
+    const b = equipo();
+    // La señal de `recordatorios-jornada` (AttendanceDay de hoy), sin fila de entrada a la vista.
+    b.db.jornadas.push({ userId: 1, date: new Date(Date.UTC(2026, 9, 29)), isOpen: true });
+    for (const hm of ['10:00', '10:15', '10:17']) await minuto(b, JUEVES, hm);
+    expect(b.avisos.filter((a) => a.userId === 1)).toHaveLength(0);
+    expect(b.pushes.filter((p) => p.userId === 1)).toHaveLength(0);
   });
 
   it('con falta justificada o permiso aprobado no recibe nada', async () => {
