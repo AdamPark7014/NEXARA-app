@@ -1,5 +1,22 @@
 # RELEVO
 
+- **29-10 ~16:00 (claude-code) — Diseñador de videovigilancia: modelo 3D y editor pulidos (pedidos de Adam).**
+  - En `main` y en producción:
+    - `4e29d06c`: muros sólidos con corte «casa de muñecas» (Adam lo aprobó).
+    - `57ebb0ff`: la vista de cámara solo sale al elegir una.
+    - `f8faf1af`: en 3D se ocultan de verdad las herramientas de dibujo; el `hidden` perdía contra `display: flex`.
+    - `b6c669a4`: rayos del campo de visión de la cámara elegida, tooltip por cámara, brújula, transiciones de
+      300 ms y editor usable a 375 px.
+  - Medido: girar con dos niveles pasó de 20–105 ms por cuadro a 10–12 ms. A 375 px, la barra bajó de 277 a 165 px.
+  - Verificación a 1536 y 375 px exactos con un arnés local temporal con el editor real.
+    - Chrome está al 90 % y Core manda `X-Frame-Options: DENY`.
+    - El arnés ya se quitó. Antes/después en la carpeta de notas compartidas.
+  - Ojo, git: el checkout compartido quedó desfasado de `origin/main` por cambios ajenos sin commitear que chocan
+    con commits remotos.
+    - Subí con un índice temporal (`read-tree origin/main` + `commit-tree`), sin tocar el árbol de trabajo.
+    - Mi commit local `d53e8e40` es el mismo parche que `57ebb0ff`: el `pull --rebase` lo descarta.
+    - En Git Bash, `git show origin/main:ruta` necesita `MSYS_NO_PATHCONV=1`: sin eso sale vacío.
+
 - **29-10 ~16:30 (claude-code) — Tiempo estándar: el modelo medido contra el reloj real (Adam: «ve como mejorar el
   modelo»).**
   - Prueba hacia atrás con 233 actividades terminadas desde el 21-09 (reloj de quien la ejecutó, sin cortes del
