@@ -9,11 +9,18 @@ import { minutosTrabajados } from '../activities/sessions/sesiones-trabajo.js';
 import { TeamBoardService } from './team-board.service.js';
 import { cerrarSesionesVencidas, leerSesiones } from '../activities/sessions/activity-sessions.service.js';
 import { limiteDeEntrega } from '../activities/semaforo-actividad.js';
+import { claveDeTipo, mediana, MUESTRAS_MINIMAS } from '../ai/complejidad/tiempos-tipicos.js';
 import {
   calculaKpisPersona,
+  calificacionCalibrada,
   conReferencia,
   diasDelRango,
-  referenciaDeRitmo,
+  equipoCoordinadoDe,
+  estandarDeRespaldo,
+  familiaDePuesto,
+  mediasDeRevisores,
+  referenciasDelEquipo,
+  revisionesEnPlazo,
   topeDeTiempo,
   horarioDePersona,
   horarioDePlantilla,
@@ -23,6 +30,7 @@ import {
   type ActividadDelDia,
   type ActividadKpi,
   type AprobacionExtra,
+  type CalificacionRevision,
   type ChecadaKpi,
   type ComidaKpi,
   type DiaKpi,
@@ -179,7 +187,12 @@ type DatosPersona = {
   justificadas: Array<{ fecha: string; motivo: string }>;
   aprobacionesExtra: AprobacionExtra[];
   entregas: EntregaKpi[];
+  /** Sus calificaciones del rango, calibradas por revisor (Calidad v2). */
+  calificacion: { n: number; pct: number | null };
 };
+
+type Calculada = { u: ScopedPersona; d: DatosPersona; dias: DiaKpi[]; totales: TotalesKpi };
+type ScopedPersona = KpiPersona & { managerId?: number | null };
 
 /**
  * KPI del equipo (dashboard del dueño): retardos, uniforme, horas laboradas contra productivas,
@@ -219,25 +232,9 @@ export class KpisEquipoService {
     if (soloUserId && !gente.length) throw new NotFoundException('Usuario fuera de tu alcance');
 
     const datos = await this.cargar(gente.map((u) => u.id), companyId, rango, null);
-    const calculadas = gente.map((u) => {
-      const d = datos.get(u.id) ?? vacio();
-      const { dias, totales } = calculaKpisPersona({
-        desde: rango.desde,
-        hasta: rango.hasta,
-        ahora: now,
-        horario: d.horario,
-        checadas: d.checadas,
-        comidas: d.comidas,
-        actividades: d.actividades,
-        justificadas: d.justificadas.map((j) => j.fecha),
-        aprobacionesExtra: d.aprobacionesExtra,
-        entregas: d.entregas,
-        fechaIngreso: d.fechaIngreso,
-      });
-      return { u, d, dias, totales };
-    });
-    // El ritmo de cada quien se mide contra el del equipo: hace falta ver a todos primero.
-    const referencia = referenciaDeRitmo(calculadas.map((c) => c.totales));
+    const calculadas = await this.calcularTodos(gente, datos, rango, now, companyId);
+    // Cada quien se mide contra el equipo (ritmo y contracción): hace falta ver a todos primero.
+    const referencia = referenciasDelEquipo(calculadas.map((c) => c.totales));
     const personas = calculadas.map(({ u, d, dias, totales }): KpiPersonaFila => {
       const t = conReferencia(totales, referencia);
       const base = { ...fila(u, d.horario, t), actividadPorDia: actividadPorDiaDe(dias) };
@@ -253,8 +250,124 @@ export class KpisEquipoService {
       supuestos: supuestosKpi(),
       equipo: { totales: totalesEquipo, ...semaforoKpi(totalesEquipo) },
       personas,
-      ritmoReferencia: referencia,
+      ritmoReferencia: referencia.ritmo,
     };
+  }
+
+  /**
+   * Los totales de cada persona con lo que la v2 necesita de fuera del cálculo puro: su familia (meta de
+   * Rendimiento), su calificación calibrada y, si tiene gente a cargo, su equipo y sus revisiones.
+   */
+  private async calcularTodos(
+    gente: ScopedPersona[],
+    datos: Map<number, DatosPersona>,
+    rango: { desde: string; hasta: string },
+    now: Date,
+    companyId: number | null,
+  ): Promise<Calculada[]> {
+    const calculadas: Calculada[] = gente.map((u) => {
+      const d = datos.get(u.id) ?? vacio();
+      const { dias, totales } = calculaKpisPersona({
+        desde: rango.desde,
+        hasta: rango.hasta,
+        ahora: now,
+        horario: d.horario,
+        checadas: d.checadas,
+        comidas: d.comidas,
+        actividades: d.actividades,
+        justificadas: d.justificadas.map((j) => j.fecha),
+        aprobacionesExtra: d.aprobacionesExtra,
+        entregas: d.entregas,
+        fechaIngreso: d.fechaIngreso,
+      });
+      return { u, d, dias, totales: { ...totales, familia: familiaDePuesto(u.puesto), calificacion: d.calificacion } };
+    });
+    const coordinacion = await this.coordinacion(calculadas, rango, companyId);
+    return calculadas.map((c) => {
+      const x = coordinacion.get(c.u.id);
+      return x ? { ...c, totales: { ...c.totales, equipo: x.equipo, metaRendimiento: x.metaRendimiento } } : c;
+    });
+  }
+
+  /**
+   * Coordinación (§7.4.5): quien tiene gente a cargo (por organigrama, dentro de lo que se ve) se mide
+   * por su equipo —él incluido— y por revisar dentro de 24 h hábiles. Sin gente a cargo, nada.
+   */
+  private async coordinacion(
+    calculadas: Calculada[],
+    rango: { desde: string; hasta: string },
+    companyId: number | null,
+  ): Promise<Map<number, ReturnType<typeof equipoCoordinadoDe>>> {
+    const out = new Map<number, ReturnType<typeof equipoCoordinadoDe>>();
+    const hijos = new Map<number, number[]>();
+    for (const c of calculadas) {
+      const jefe = c.u.managerId;
+      if (jefe == null || jefe === c.u.id) continue;
+      hijos.set(jefe, [...(hijos.get(jefe) ?? []), c.u.id]);
+    }
+    const equipos = new Map<number, number[]>();
+    for (const c of calculadas) {
+      if (!hijos.has(c.u.id)) continue;
+      const vistos = new Set<number>([c.u.id]);
+      const cola = [...(hijos.get(c.u.id) ?? [])];
+      while (cola.length) {
+        const id = cola.shift()!;
+        if (vistos.has(id)) continue;
+        vistos.add(id);
+        cola.push(...(hijos.get(id) ?? []));
+      }
+      equipos.set(c.u.id, [...vistos]);
+    }
+    if (!equipos.size) return out;
+
+    const pares = await this.leerRevisionesDe([...equipos.keys()], rango, companyId);
+    const porId = new Map(calculadas.map((c) => [c.u.id, c.totales]));
+    for (const [id, miembros] of equipos) {
+      out.set(
+        id,
+        equipoCoordinadoDe(
+          miembros.map((m) => porId.get(m)).filter((t): t is TotalesKpi => t != null),
+          revisionesEnPlazo(pares.get(id) ?? []),
+        ),
+      );
+    }
+    return out;
+  }
+
+  /** Revisiones que hizo cada quien en el rango, con la hora en que se le envió la evidencia. */
+  private async leerRevisionesDe(
+    revisores: number[],
+    rango: { desde: string; hasta: string },
+    companyId: number | null,
+  ): Promise<Map<number, Array<{ envio: Date | null; revision: Date }>>> {
+    const out = new Map<number, Array<{ envio: Date | null; revision: Date }>>();
+    const prisma = this.prisma as any;
+    if (typeof prisma?.activityEvidenceReview?.findMany !== 'function') return out;
+    const revisiones: Array<{ reviewerId: number | null; activityId: number; evidenceUserId: number; createdAt: Date }> =
+      (await prisma.activityEvidenceReview.findMany({
+        where: {
+          reviewerId: { in: revisores },
+          createdAt: { gte: workDayStart(parseWorkDate(rango.desde)), lte: workDayEnd(parseWorkDate(rango.hasta)) },
+          ...(companyId != null ? { companyId } : {}),
+        },
+        select: { reviewerId: true, activityId: true, evidenceUserId: true, createdAt: true },
+      })) ?? [];
+    if (!revisiones.length) return out;
+    const evidencias: Array<{ activityId: number; userId: number; completedAt: Date | null }> =
+      typeof prisma?.activityEvidence?.findMany === 'function'
+        ? ((await prisma.activityEvidence.findMany({
+            where: { OR: revisiones.map((r) => ({ activityId: r.activityId, userId: r.evidenceUserId })) },
+            select: { activityId: true, userId: true, completedAt: true },
+          })) ?? [])
+        : [];
+    const envioPor = new Map(evidencias.map((e) => [`${e.userId}:${e.activityId}`, e.completedAt ?? null]));
+    for (const r of revisiones) {
+      if (r.reviewerId == null) continue;
+      const lista = out.get(r.reviewerId) ?? [];
+      lista.push({ envio: envioPor.get(`${r.evidenceUserId}:${r.activityId}`) ?? null, revision: r.createdAt });
+      out.set(r.reviewerId, lista);
+    }
+    return out;
   }
 
   /** Detalle de una persona, día por día, con los tramos para la línea de tiempo. */
@@ -269,25 +382,11 @@ export class KpisEquipoService {
     if (!persona) throw new NotFoundException('Usuario fuera de tu alcance');
     // El detalle propio no esconde lo que le asignaron por ser de otro tipo.
     const tipos = userId === viewer.id ? null : tiposVisibles(viewer);
-    // Se lee a todo su equipo: su ritmo se mide contra el mismo que en la lista, y así el % coincide.
+    // Se lee a todo su equipo: se mide contra el mismo equipo que en la lista, y así el % coincide.
     const datos = await this.cargar(scoped.map((u) => u.id), companyId, rango, tipos);
-    const ritmoReferencia = referenciaDeRitmo(
-      scoped.map((u) => {
-        const x = datos.get(u.id) ?? vacio();
-        return calculaKpisPersona({
-          desde: rango.desde,
-          hasta: rango.hasta,
-          ahora: now,
-          horario: x.horario,
-          checadas: x.checadas,
-          comidas: x.comidas,
-          actividades: x.actividades,
-          justificadas: x.justificadas.map((j) => j.fecha),
-          entregas: x.entregas,
-          fechaIngreso: x.fechaIngreso,
-        }).totales;
-      }),
-    );
+    const calculadas = await this.calcularTodos(scoped, datos, rango, now, companyId);
+    const referencia = referenciasDelEquipo(calculadas.map((c) => c.totales));
+    const suyo = calculadas.find((c) => c.u.id === userId);
     const d = datos.get(userId) ?? vacio();
     const { dias, totales: crudos, entregas } = calculaKpisPersona({
       desde: rango.desde,
@@ -303,7 +402,16 @@ export class KpisEquipoService {
       fechaIngreso: d.fechaIngreso,
       detalle: true,
     });
-    const totales = conReferencia(crudos, ritmoReferencia);
+    const totales = conReferencia(
+      {
+        ...crudos,
+        familia: suyo?.totales.familia,
+        calificacion: suyo?.totales.calificacion,
+        equipo: suyo?.totales.equipo,
+        metaRendimiento: suyo?.totales.metaRendimiento,
+      },
+      referencia,
+    );
     return {
       ...fila(persona, d.horario, totales),
       desde: rango.desde,
@@ -314,7 +422,7 @@ export class KpisEquipoService {
       dias: [...dias].reverse(),
       justificaciones: d.justificadas,
       entregas,
-      ritmoReferencia,
+      ritmoReferencia: referencia.ritmo,
     };
   }
 
@@ -560,6 +668,7 @@ export class KpisEquipoService {
         justificadas: [],
         aprobacionesExtra: aprobaciones.get(u.id) ?? [],
         entregas: [],
+        calificacion: { n: 0, pct: null },
       });
     }
 
@@ -616,10 +725,14 @@ export class KpisEquipoService {
     }
 
     // Entregas: lo último que se lee, aparte, para no cambiar el orden de lo de arriba.
-    const entregas = await this.leerEntregas(userIds, companyId, ini, fin, tipos);
+    const { entregas, calificaciones } = await this.leerEntregas(userIds, companyId, ini, fin, tipos);
     for (const [userId, lista] of entregas) {
       const d = out.get(userId);
       if (d) d.entregas = lista;
+    }
+    for (const [userId, c] of calificaciones) {
+      const d = out.get(userId);
+      if (d) d.calificacion = c;
     }
 
     return out;
@@ -641,8 +754,9 @@ export class KpisEquipoService {
     ini: Date,
     fin: Date,
     tipos: string[] | null,
-  ): Promise<Map<number, EntregaKpi[]>> {
+  ): Promise<{ entregas: Map<number, EntregaKpi[]>; calificaciones: Map<number, { n: number; pct: number | null }> }> {
     const out = new Map<number, EntregaKpi[]>();
+    const calificaciones = new Map<number, { n: number; pct: number | null }>();
     const desde = new Date(ini.getTime() - ENTREGAS_ANTES_DIAS * DIA_MS);
     const filas = ((await this.prisma.activityAssignee.findMany({
       where: {
@@ -664,6 +778,10 @@ export class KpisEquipoService {
             titulo: true,
             estatus: true,
             coreKind: true,
+            ticketType: true,
+            ticketTypeCustom: true,
+            creadoPorId: true,
+            cotizacion: { select: { status: true } },
             assignmentCharge: true,
             fechaInicio: true,
             fechaMaxima: true,
@@ -679,6 +797,7 @@ export class KpisEquipoService {
               select: {
                 userId: true,
                 status: true,
+                reviewStatus: true,
                 completedAt: true,
                 entryPhotoUploadedAt: true,
                 exitPhotoUploadedAt: true,
@@ -694,23 +813,52 @@ export class KpisEquipoService {
         !/cancel/i.test(f.activity.estatus ?? '') &&
         !(f.activity.assignmentCharge === 'despacho' && String(f.rol) === 'LEAD'),
     );
-    if (!propias.length) return out;
+    if (!propias.length) return { entregas: out, calificaciones };
 
     // Revisiones de su evidencia, en orden: la primera decide «a la primera».
     // (Un cliente Prisma sin la tabla —pruebas con mock— se queda sin revisiones, no sin tablero.)
     const prisma = this.prisma as any;
-    const revisiones: Array<{ activityId: number; evidenceUserId: number; decision: string }> =
-      typeof prisma?.activityEvidenceReview?.findMany === 'function'
-        ? ((await prisma.activityEvidenceReview.findMany({
-            where: {
-              evidenceUserId: { in: userIds },
-              activityId: { in: [...new Set(propias.map((f) => f.activityId))] },
-              ...(companyId != null ? { companyId } : {}),
-            },
-            select: { activityId: true, evidenceUserId: true, decision: true, createdAt: true },
-            orderBy: { createdAt: 'asc' },
-          })) ?? [])
-        : [];
+    const conRevisiones = typeof prisma?.activityEvidenceReview?.findMany === 'function';
+    const revisiones: Array<{
+      activityId: number;
+      evidenceUserId: number;
+      decision: string;
+      createdAt?: Date | null;
+      score?: number | null;
+      reviewerId?: number | null;
+    }> = conRevisiones
+      ? ((await prisma.activityEvidenceReview.findMany({
+          where: {
+            evidenceUserId: { in: userIds },
+            activityId: { in: [...new Set(propias.map((f) => f.activityId))] },
+            ...(companyId != null ? { companyId } : {}),
+          },
+          select: { activityId: true, evidenceUserId: true, decision: true, createdAt: true, score: true, reviewerId: true },
+          orderBy: { createdAt: 'asc' },
+        })) ?? [])
+      : [];
+    // El promedio de cada revisor sale de todo lo que calificó en la empresa, no solo de esta gente.
+    const todasLasCalificaciones: CalificacionRevision[] = conRevisiones
+      ? (((await prisma.activityEvidenceReview.findMany({
+          where: {
+            score: { not: null },
+            createdAt: { gte: desde, lte: fin },
+            ...(companyId != null ? { companyId } : {}),
+          },
+          select: { reviewerId: true, score: true },
+        })) ?? []) as Array<{ reviewerId: number | null; score: number | null }>)
+          .filter((r) => r.score != null)
+          .map((r) => ({ reviewerId: r.reviewerId, score: Number(r.score) }))
+      : [];
+    const medias = mediasDeRevisores(todasLasCalificaciones);
+    const calificadasPor = new Map<number, CalificacionRevision[]>();
+    for (const r of revisiones) {
+      if (r.score == null || !r.createdAt || r.createdAt < ini || r.createdAt > fin) continue;
+      const lista = calificadasPor.get(r.evidenceUserId) ?? [];
+      lista.push({ reviewerId: r.reviewerId ?? null, score: Number(r.score) });
+      calificadasPor.set(r.evidenceUserId, lista);
+    }
+    for (const [userId, lista] of calificadasPor) calificaciones.set(userId, calificacionCalibrada(lista, medias));
     // Sus sesiones de reloj: de ahí sale cuánto trabajó de verdad en cada una.
     const sesiones = await leerSesiones(this.prisma, {
       userIds,
@@ -727,6 +875,9 @@ export class KpisEquipoService {
       revisionesPor.set(k, lista);
     }
 
+    // Lo de antes del 29-10 no trae tiempo estándar: se usa la mediana real de su tipo (ver `estandarDeRespaldo`).
+    const sinEstandar: Array<{ entrega: EntregaKpi; tipo: string }> = [];
+    const realesPorTipo = new Map<string, number[]>();
     for (const f of propias) {
       const a = f.activity;
       const ev = (a.activityEvidences ?? []).find((e) => e.userId === f.userId) ?? null;
@@ -752,7 +903,7 @@ export class KpisEquipoService {
       const visible = !tipos || (a.coreKind != null && tipos.includes(a.coreKind));
       const periodo = periodoDeActividad(a);
       const lista = out.get(f.userId) ?? [];
-      lista.push({
+      const entrega: EntregaKpi = {
         activityId: f.activityId,
         anNumber: visible ? a.anNumber : null,
         titulo: visible ? a.titulo : 'Actividad de otra área',
@@ -770,10 +921,30 @@ export class KpisEquipoService {
         }),
         diasPeriodo: periodo ? diasDelRango(periodo.inicio, periodo.fin).length : 1,
         minutosEstandar: a.tiempoEstandarMin ?? null,
-      });
+        // §7.4.3: la creó quien la hace; gana la mitad hasta que un superior la aprueba.
+        autoasignada: a.creadoPorId != null && a.creadoPorId === f.userId,
+        aprobada:
+          ev?.reviewStatus === 'APPROVED' || decisiones.some((x) => /^APROBADA/i.test(x)) || /finalizad/i.test(a.estatus ?? ''),
+        // §7.4.10: la cotización solo cuenta marcada como enviada (o ya aprobada, rechazada o vencida).
+        sinCotizacionEnviada: a.coreKind === 'comercial' && (a.cotizacion?.status ?? 'DRAFT') === 'DRAFT',
+      };
+      lista.push(entrega);
       out.set(f.userId, lista);
+      const tipo = claveDeTipo(a) ?? 'otro';
+      if (a.tiempoEstandarMin == null) sinEstandar.push({ entrega, tipo });
+      if (entregadaAt && (entrega.minutosReales ?? 0) > 0) {
+        realesPorTipo.set(tipo, [...(realesPorTipo.get(tipo) ?? []), entrega.minutosReales!]);
+      }
     }
-    return out;
+    for (const { entrega, tipo } of sinEstandar) {
+      const reales = realesPorTipo.get(tipo) ?? [];
+      entrega.minutosEstandar = estandarDeRespaldo(
+        reales.length >= MUESTRAS_MINIMAS ? mediana(reales) : null,
+        entrega.minutosReales ?? null,
+        entrega.minutosPlan ?? null,
+      );
+    }
+    return { entregas: out, calificaciones };
   }
 
   /**
@@ -926,6 +1097,7 @@ function vacio(): DatosPersona {
     justificadas: [],
     aprobacionesExtra: [],
     entregas: [],
+    calificacion: { n: 0, pct: null },
   };
 }
 

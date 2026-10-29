@@ -219,19 +219,51 @@ Orden de adopción, de lo más barato a lo más laborioso: nómina semanal en co
 Excel) → cotización enviada y su resultado → viáticos y gastos por actividad con ticket → factura ligada al servicio
 y sus cobros → salidas de almacén por actividad.
 
-### 7.4 Decisiones de Adam (v2)
+### 7.4 Decisiones de Adam (v2) — aprobado 29-10
 
-1. ¿«Horas estándar ganadas» en lugar de ritmo + ocupación + carga + tiempo adecuado? (recomendado: sí)
-2. ¿Pesos 30/25/30/15?
-3. ¿Lo autoasignado gana la mitad hasta validarse (recomendado) o nada?
-4. ¿Retardos graduados (recomendado)? ¿«3 retardos = 1 falta»? Es reglamento interno, no LFT: decidir con RH.
-5. ¿Coordinadores medidos por su equipo (recomendado)?
-6. ¿Una sola regla de pago para la hoja y el sistema? Semana = mensual × 12 ÷ 52, el mismo divisor del día en las
-   dos y extra doble/triple; revisarlo con el contador.
-7. ¿Horario de campo de 08:00 a 17:00 con comida?
-8. ¿La hoja de entradas sale del sistema, con ajustes con motivo, en vez de capturarse a mano?
-9. ¿Se corre la nómina de la semana del 26-10 en el sistema en paralelo con el Excel?
-10. ¿Para el desempeño comercial solo cuenta la cotización marcada como enviada en el sistema?
+Adam aprobó las diez el 29-10 («aprueba todo»), con la opción recomendada donde había una:
+
+1. Sí: «horas estándar ganadas» reemplaza ritmo + ocupación + carga + tiempo adecuado (quedan de diagnóstico).
+2. Sí: pesos 30/25/30/15.
+3. Lo autoasignado gana la mitad hasta que un superior lo valida.
+4. Retardos graduados, y «3 retardos = 1 falta» cuenta en el índice. El descuento en dinero espera al reglamento
+   interno firmado (no es LFT): el sistema lo marca, no lo descuenta solo.
+5. Sí: coordinadores medidos por su equipo.
+6. Sí: una sola regla de pago para la hoja y el sistema (semana = mensual × 12 ÷ 52, el mismo divisor del día en las
+   dos, extra doble/triple). **Pendiente: la revisa la contadora.** La mesa contable no tiene dónde dejar notas; la
+   nota va por la sesión de la mesa contable o por Adam.
+7. Sí: horario de campo de 08:00 a 17:00 con comida (capturado el 28-10 a la cuadrilla).
+8. Sí: la hoja de entradas sale del sistema, con ajustes con motivo (trabajo aparte).
+9. Sí: la nómina de la semana del 26-10 se corre en el sistema en paralelo con el Excel. Sueldos y datos por persona
+   fuera del repo (OneDrive/SECRETOS); en el repo, solo el comparativo sin nombres ni montos (trabajo aparte).
+10. Sí: en comercial solo cuenta la cotización marcada como enviada en el sistema.
+
+### 7.5 Cómo quedó construido (29-10)
+
+Código: `apps/api/src/me/kpis-equipo.ts` (`cumplimientoDe`, puro) y `kpis-equipo.service.ts` (datos). Web:
+`apps/web/lib/desempeno.ts` y `components/kpis/DesempenoTablero.tsx` (mismo tablero; el pilar Rendimiento es
+horas estándar). Sin migración.
+
+- **Confiabilidad (30):** entregadas antes de su límite ÷ las que vencían, contraídas hacia la tasa del equipo con
+  `(aciertos + 8·equipo) ÷ (n + 8)`. Aún no existe la «hora compromiso» de §7.3.2: el límite es el del semáforo.
+- **Calidad (25):** 60 % aprobadas a la primera (contraídas) + 40 % calificación calibrada. Calibrar = mover cada
+  número por la diferencia entre el promedio de su revisor y el de todos los de la empresa en los últimos 120 días
+  (revisor con menos de 3 calificaciones: su número tal cual), y llevarlo a 0–100 (1 = 0, 5 = 100).
+- **Rendimiento (30):** Σ T<sub>e</sub> ganado ÷ horas en jornada contra la meta (campo 60 %, oficina 70 %).
+  T<sub>e</sub> = el capturado al asignar (§8); lo de antes no lo trae y usa la **mediana real de su tipo** (≥ 3
+  casos del equipo en los últimos 120 días), sin pasar lo que esa actividad duró o se estimó. Lo autoasignado gana la
+  mitad hasta que su evidencia se aprueba; la comercial gana solo con la cotización ligada fuera de borrador.
+  Familia por puesto: instalador, técnico, campo, soporte u obra = campo; lo demás, oficina.
+- **Disciplina (15):** por día que debía checar, ≤ 15 min 1 · 16–30 0.6 · 31–60 0.3 · más o sin checar 0; cada 3
+  retardos se quita el que más daba. Se multiplica por el registro completo: jornada terminada con salida propia
+  (no automática) y comida registrada. El uniforme pesa 3 de los 15 solo con ≥ 80 % de entradas revisadas.
+- **Coordinación:** quien tiene gente a cargo por organigrama (dentro de lo que ve quien consulta) se mide en
+  Confiabilidad y Rendimiento con lo de su equipo, él incluido; su Confiabilidad es mitad la del equipo y mitad
+  revisar dentro de 24 h hábiles (lunes a viernes, sin festivos) desde el envío de la evidencia.
+- **Confianza:** alta ≥ 20 entregas medidas, media 10–19, baja < 10. Con confianza baja el jefe ve el número
+  atenuado como provisional; no se publica a la persona (la vista de la persona no existe todavía).
+- Quien no trabajó ninguno de los días que debía queda en 0. Ritmo, ocupación, carga, tiempo adecuado y días
+  trabajados se devuelven con peso 0 y salen en la lectura como «no pesa, para leer».
 
 ## 8. Tiempo estándar por especificidad (propuesta, 28-10-2026)
 

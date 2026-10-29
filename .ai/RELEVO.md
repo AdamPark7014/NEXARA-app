@@ -1,5 +1,22 @@
 # RELEVO
 
+- **29-10 ~15:30 (claude-code) — Desempeño: índice v2 (Adam aprobó las 10 decisiones de §7.4, «aprueba todo»).**
+  - Fórmula en `.ai/CUMPLIMIENTO-EVALUADOR-SPEC.md` §7.2; decisiones marcadas «aprobado 29-10» en §7.4 y lo construido
+    en §7.5. `30·Confiabilidad + 25·Calidad + 30·Rendimiento + 15·Disciplina`.
+  - API (`me/kpis-equipo.ts`, puro): `cumplimientoDe` v2 con contracción hacia el equipo (`referenciasDelEquipo`),
+    `disciplinaDe` (retardos graduados y 3 = 1 falta, sin descuento en dinero), calificación calibrada por revisor,
+    `minutosHabilesEntre`/`revisionesEnPlazo` (24 h hábiles), `equipoCoordinadoDe`, `metaPonderada`,
+    `estandarDeRespaldo`. Ritmo, ocupación, carga, tiempo y días quedan con peso 0 (diagnóstico).
+  - Servicio: autoasignada (`creadoPorId`), aprobada (evidencia APPROVED o «Finalizada»), comercial sin cotización
+    enviada (no gana), T<sub>e</sub> de respaldo = mediana real de su tipo para lo de antes del 29-10, familia por
+    puesto, coordinación por organigrama con revisiones en plazo. Sin migración.
+  - Web: mismo `DesempenoTablero`; pilar Rendimiento = horas estándar, confianza 20/10, lectura con calificación,
+    puntualidad y registro, «Su equipo» para coordinadores y el diagnóstico como «no pesa, para leer».
+  - Ojo con el registro completo: en los últimos 14 días José e Iván no registraron ninguna comida y David y
+    Roberto 1 de 9; su Disciplina cae casi a 0 hasta que la registren.
+  - Fuera de la fórmula (aprobado, trabajo aparte): nota de la regla de pago para la contadora (la mesa contable no
+    tiene dónde dejar notas), hoja de entradas desde el sistema y nómina del 26-10 en paralelo con el Excel.
+
 - **29-10 ~13:40 (claude-code) — Apps: inicio de dirección general (CEO) en el teléfono (pedido de Adam).**
   - Adam: «Christian tiene ir a pizarra del equipo, el módulo principal es un módulo vacío… que tenga algo que ver el
     superadmin CEO en su main sección móvil». Artboard nuevo en el canvas: «App · Inicio CEO» (`MovilCeo.dc.html`).

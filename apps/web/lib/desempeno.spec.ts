@@ -1,25 +1,26 @@
 import { describe, expect, it } from "vitest";
 import type { ParteCumplimiento, TotalesKpi } from "@/lib/kpis-equipo";
-import { confianzaDe, estandarGanado, multiplicadoresDe, pilaresDe, resumenDesempeno } from "./desempeno";
+import { confianzaDe, diagnosticoDe, disciplinaTexto, estandarGanado, pilaresDe, resumenDesempeno } from "./desempeno";
 
 const parte = (clave: string, pct: number, peso: number): ParteCumplimiento => ({ clave, etiqueta: clave, pct, peso, detalle: "" });
 
-describe("pilares", () => {
-  it("promedia cada pilar con los pesos de sus partes", () => {
+describe("pilares (índice v2)", () => {
+  it("cada pilar sale de sus partes con peso; el diagnóstico no entra", () => {
     const p = pilaresDe([
-      parte("entregas", 90, 20),
-      parte("tiempo", 60, 15),
-      parte("forma", 80, 10),
-      parte("ritmo", 100, 20),
-      parte("asistencia", 100, 15),
-      parte("uniforme", 50, 5),
+      parte("entregas", 90, 30),
+      parte("forma", 80, 25),
+      parte("estandar", 64, 30),
+      parte("asistencia", 100, 12),
+      parte("uniforme", 50, 3),
+      parte("tiempo", 10, 0),
+      parte("ritmo", 10, 0),
       parte("carga", 70, 0),
     ]);
     expect(p.map((x) => [x.id, x.pct])).toEqual([
-      ["confiabilidad", 77],
+      ["confiabilidad", 90],
       ["calidad", 80],
-      ["rendimiento", 100],
-      ["disciplina", 88],
+      ["rendimiento", 64],
+      ["disciplina", 90],
     ]);
   });
 
@@ -27,17 +28,18 @@ describe("pilares", () => {
     expect(pilaresDe(undefined).every((x) => x.pct === null)).toBe(true);
   });
 
-  it("los multiplicadores solo salen si restan", () => {
-    expect(multiplicadoresDe([parte("carga", 70, 0), parte("dias", 100, 0), parte("forma", 50, 10)]).map((x) => x.clave)).toEqual(["carga"]);
+  it("el diagnóstico que se lee es el que va bajo su referencia", () => {
+    expect(diagnosticoDe([parte("carga", 70, 0), parte("dias", 100, 0), parte("forma", 50, 25)]).map((x) => x.clave)).toEqual(["carga"]);
   });
 });
 
 describe("lectura", () => {
   const base = { minutosLaborados: 600, minutosProductivos: 420 } as TotalesKpi;
 
-  it("confianza por entregas medidas", () => {
+  it("confianza: alta con 20 entregas medidas, media de 10 a 19, baja con menos", () => {
     expect(confianzaDe({ entregas: { medidas: 20 } as TotalesKpi["entregas"] })).toBe("alta");
-    expect(confianzaDe({ entregas: { medidas: 6 } as TotalesKpi["entregas"] })).toBe("media");
+    expect(confianzaDe({ entregas: { medidas: 10 } as TotalesKpi["entregas"] })).toBe("media");
+    expect(confianzaDe({ entregas: { medidas: 9 } as TotalesKpi["entregas"] })).toBe("baja");
     expect(confianzaDe({})).toBe("baja");
   });
 
@@ -46,9 +48,17 @@ describe("lectura", () => {
     expect(resumenDesempeno(t)).toBe("Entregó 8 de 10 a tiempo y 1 quedó sin entregar. Tuvo una actividad corriendo 7 h de 10 h en jornada.");
     expect(resumenDesempeno(base)).toBe("No tuvo entregas que medir en estas fechas. Tuvo una actividad corriendo 7 h de 10 h en jornada.");
   });
+
+  it("disciplina en una línea, con la falta por retardos que no se descuenta sola", () => {
+    const disciplina = { esperados: 5, puntos: 1.3, retardos: 3, faltasPorRetardos: 1, jornadasRevisables: 4, registroCompleto: 4, pct: 26 };
+    expect(disciplinaTexto({ disciplina })).toBe(
+      "1.3 de 5 días en puntos · 3 retardos = 1 falta (no se descuenta sola) · registro completo 4 de 4",
+    );
+    expect(disciplinaTexto({})).toBeNull();
+  });
 });
 
-describe("horas estándar ganadas (§8, aparte del índice)", () => {
+describe("horas estándar ganadas (pilar Rendimiento)", () => {
   it("lo que vale lo entregado contra su jornada, con la eficiencia", () => {
     const t = {
       minutosLaborados: 960,

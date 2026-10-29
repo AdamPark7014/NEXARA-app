@@ -1,8 +1,7 @@
 /**
- * Lectura de «Desempeño» como en el canvas (28-10): el índice de siempre (`cumplimientoPct`)
- * contado en cuatro pilares. Cada pilar agrupa partes que el sistema ya mide, con sus mismos
- * pesos, así que el índice no cambia; solo se lee mejor. La fórmula v2 (horas estándar ganadas)
- * sigue esperando las decisiones de §7.4 de `.ai/CUMPLIMIENTO-EVALUADOR-SPEC.md`.
+ * Lectura de «Desempeño»: el índice v2 (§7.2 de `.ai/CUMPLIMIENTO-EVALUADOR-SPEC.md`, aprobado el 29-10)
+ * contado en sus cuatro pilares. Cada pilar agrupa las partes que manda la API con su peso; ritmo,
+ * ocupación, carga, tiempo adecuado y días trabajados llegan con peso 0, como diagnóstico.
  */
 import type { ParteCumplimiento, TotalesKpi } from "@/lib/kpis-equipo";
 import { horasEnPalabras } from "@/lib/kpis-lectura";
@@ -10,10 +9,10 @@ import { horasEnPalabras } from "@/lib/kpis-lectura";
 export type PilarId = "confiabilidad" | "calidad" | "rendimiento" | "disciplina";
 
 export const PILARES: ReadonlyArray<{ id: PilarId; label: string; claves: readonly string[]; ayuda: string }> = [
-  { id: "confiabilidad", label: "Confiabilidad", claves: ["entregas", "tiempo"], ayuda: "Entrega a tiempo y sin pasarse de su tiempo máximo" },
-  { id: "calidad", label: "Calidad", claves: ["forma"], ayuda: "Entregas aprobadas a la primera" },
-  { id: "rendimiento", label: "Rendimiento", claves: ["ritmo", "ocupacion"], ayuda: "Ritmo de entregas y tiempo con una actividad" },
-  { id: "disciplina", label: "Disciplina", claves: ["asistencia", "uniforme"], ayuda: "Asistencia puntual y uniforme" },
+  { id: "confiabilidad", label: "Confiabilidad", claves: ["entregas"], ayuda: "Entrega antes de su límite (en coordinación, su equipo y revisar a tiempo)" },
+  { id: "calidad", label: "Calidad", claves: ["forma"], ayuda: "Aprobadas a la primera y su calificación calibrada" },
+  { id: "rendimiento", label: "Rendimiento", claves: ["estandar"], ayuda: "Horas estándar ganadas contra sus horas en jornada" },
+  { id: "disciplina", label: "Disciplina", claves: ["asistencia", "uniforme"], ayuda: "Puntualidad graduada, registro completo y uniforme" },
 ];
 
 export type Pilar = { id: PilarId; label: string; ayuda: string; pct: number | null; partes: ParteCumplimiento[] };
@@ -29,17 +28,17 @@ export function pilaresDe(partes: ParteCumplimiento[] | undefined): Pilar[] {
   });
 }
 
-/** Lo que multiplica el índice (carga de trabajo y días trabajados) cuando resta algo. */
-export function multiplicadoresDe(partes: ParteCumplimiento[] | undefined): ParteCumplimiento[] {
+/** El diagnóstico (partes de peso 0) que vale la pena leer: lo que va por debajo de su referencia. */
+export function diagnosticoDe(partes: ParteCumplimiento[] | undefined): ParteCumplimiento[] {
   return (partes ?? []).filter((x) => x.peso === 0 && x.pct < 100);
 }
 
 export type Confianza = "alta" | "media" | "baja";
 
-/** Qué tanto pesa el número: con pocas entregas medidas, un error mueve mucho el índice. */
+/** §7.2: con 20 entregas medidas o más es alta; de 10 a 19, media; con menos, baja y no se publica. */
 export function confianzaDe(t: Pick<TotalesKpi, "entregas">): Confianza {
   const n = t.entregas?.medidas ?? 0;
-  return n >= 15 ? "alta" : n >= 5 ? "media" : "baja";
+  return n >= 20 ? "alta" : n >= 10 ? "media" : "baja";
 }
 
 export const CONFIANZA_UI: Record<Confianza, string> = {
@@ -49,9 +48,9 @@ export const CONFIANZA_UI: Record<Confianza, string> = {
 };
 
 /**
- * Horas estándar ganadas (§8): lo que vale lo entregado según la tabla de tarifas, contra sus horas en
- * jornada, y qué tan cerca del estándar lo hizo. Medición aparte: el índice no la usa todavía (§7.4).
- * null si en el rango no entregó nada asignado con tiempo estándar.
+ * Horas estándar ganadas: lo que vale lo entregado (tiempo estándar; lo autoasignado sin validar, la
+ * mitad) contra sus horas en jornada, y qué tan cerca del estándar lo hizo. Es el pilar Rendimiento.
+ * null si en el rango no entregó nada con tiempo estándar.
  */
 export function estandarGanado(t: Pick<TotalesKpi, "entregas" | "minutosLaborados">): { valor: string; detalle: string } | null {
   const e = t.entregas;
@@ -65,6 +64,18 @@ export function estandarGanado(t: Pick<TotalesKpi, "entregas" | "minutosLaborado
     valor: rendimiento != null ? `${horasEnPalabras(ganados)} · ${rendimiento} % de su jornada` : horasEnPalabras(ganados),
     detalle: partes.join(" · "),
   };
+}
+
+/** Puntualidad graduada y registro completo, en una línea. null sin días que medir. */
+export function disciplinaTexto(t: Pick<TotalesKpi, "disciplina">): string | null {
+  const d = t.disciplina;
+  if (!d || !d.esperados) return null;
+  const partes = [`${d.puntos} de ${d.esperados} días en puntos`];
+  if (d.faltasPorRetardos) {
+    partes.push(`${d.retardos} retardos = ${d.faltasPorRetardos} ${d.faltasPorRetardos === 1 ? "falta" : "faltas"} (no se descuenta sola)`);
+  }
+  if (d.jornadasRevisables) partes.push(`registro completo ${d.registroCompleto} de ${d.jornadasRevisables}`);
+  return partes.join(" · ");
 }
 
 /** «Entregó 31 de 33 a tiempo. Tuvo una actividad corriendo 128 h de 212 h en jornada.» */

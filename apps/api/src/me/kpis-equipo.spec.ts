@@ -2,11 +2,24 @@ import { isLateVsSchedule } from '../attendance/attendance-hybrid.match';
 import {
   armaJornadas,
   calculaKpisPersona,
+  calificacionCalibrada,
   conReferencia,
+  contraida,
   cumplimientoDe,
   diasDelRango,
+  disciplinaDe,
   entregasDelRango,
+  equipoCoordinadoDe,
+  estandarDeRespaldo,
+  estandarGanadoDe,
+  familiaDePuesto,
   horarioDePlantilla,
+  mediasDeRevisores,
+  metaPonderada,
+  minutosHabilesEntre,
+  puntosDeLlegada,
+  referenciasDelEquipo,
+  revisionesEnPlazo,
   intersectaTramos,
   minutosDeTramos,
   normalizaTramos,
@@ -695,22 +708,19 @@ describe('entregas: en tiempo y forma', () => {
     expect(referenciaDeRitmo([r(0, 8)])).toBeNull();
   });
 
-  it('cumplimiento: ocho partes que suman 100 y lo que no tiene dato no pesa', () => {
+  it('índice v2: cuatro pilares que suman 100, lo que no tiene dato no pesa y lo de antes queda de diagnóstico', () => {
     const base = {
       entregas: {
+        ...resumenEntregas([]),
         medidas: 2,
         aTiempo: 1,
         tarde: 1,
-        sinEntregar: 0,
         revisadas: 2,
         aprobadasALaPrimera: 2,
-        devueltas: 0,
         conTiempo: 2,
         enTiempoAdecuado: 1,
         minutosCarga: 240,
-        pctATiempo: 50,
-        pctALaPrimera: 100,
-        pctTiempoAdecuado: 50,
+        minutosEstandarGanados: 168,
       },
       asistenciaPuntual: { esperados: 1, puntuales: 1, pct: 100 },
       uniforme: { revisadas: 0, ok: 0, noOk: 0, sinRevisar: 1, pct: null },
@@ -719,31 +729,52 @@ describe('entregas: en tiempo y forma', () => {
       carga: { minutos: 240, pct: 50 },
       ocupacion: { minutos: 168, pct: 35 },
     };
+    expect(PESOS_CUMPLIMIENTO).toEqual({ entregas: 30, forma: 25, estandar: 30, asistencia: 15 });
     expect(Object.values(PESOS_CUMPLIMIENTO).reduce((a, b) => a + b, 0)).toBe(100);
-    // entregas ½·20 + forma 1·10 + tiempo ½·15 + ritmo (2 de 4)·20 + ocupación (35 % de 70)·15 +
-    // asistencia 1·15 = 60 de 95 → 63 %; carga 50 % (la meta) no resta.
+    // Confiabilidad ½·30 + Calidad 1·25 + Rendimiento (2.8 h de 8 = 35 %, la mitad de la meta de oficina)·30 +
+    // Disciplina 1·15 = 70.
     const c = cumplimientoDe(base, 4);
-    expect(c.pct).toBe(63);
+    expect(c.pct).toBe(70);
     expect(c.partes.map((p) => [p.clave, p.pct, p.peso])).toEqual([
-      ['entregas', 50, 20],
-      ['forma', 100, 10],
-      ['tiempo', 50, 15],
-      ['ritmo', 50, 20],
-      ['ocupacion', 50, 15],
+      ['entregas', 50, 30],
+      ['forma', 100, 25],
+      ['estandar', 50, 30],
       ['asistencia', 100, 15],
+      ['tiempo', 50, 0],
+      ['ritmo', 50, 0],
+      ['ocupacion', 50, 0],
       ['carga', 100, 0],
     ]);
-    expect(c.partes.find((p) => p.clave === 'ritmo')!.detalle).toBe('2 por día · el equipo va a 4');
-    // Sin ritmo del equipo, el ritmo no se califica.
-    expect(cumplimientoDe(base, null).pct).toBe(67);
-    // Poca carga multiplica: 12.5 % de las horas con trabajo entregado = ¼ de la meta → ×0.25.
-    expect(cumplimientoDe({ ...base, carga: { minutos: 60, pct: 13 } }, 4).pct).toBe(16);
-    // Sin entregas no hay cumplimiento, aunque haya llegado temprano.
+    expect(c.partes.find((p) => p.clave === 'ritmo')!.detalle).toBe('2 por día · el equipo va a 4 · diagnóstico');
+    // El ritmo ya no mueve el índice.
+    expect(cumplimientoDe(base, null).pct).toBe(70);
+    // Poca carga ya no multiplica: la falta de trabajo se ve en Rendimiento.
+    expect(cumplimientoDe({ ...base, carga: { minutos: 60, pct: 13 } }, 4).pct).toBe(70);
+    // Campo tiene meta de 60 %: 2.4 h de 8 (30 %) es la mitad de su meta.
+    expect(cumplimientoDe({ ...base, entregas: { ...base.entregas, minutosEstandarGanados: 144 }, familia: 'campo' }, 4).pct).toBe(70);
+    // La calificación calibrada pesa 40 % de Calidad: 0.6·1 + 0.4·0.5 = 80.
+    const conCalif = cumplimientoDe({ ...base, calificacion: { n: 3, pct: 50 } }, 4);
+    expect(conCalif.partes.find((p) => p.clave === 'forma')!.pct).toBe(80);
+    expect(conCalif.pct).toBe(65);
+    // Con pocas medidas se acerca al equipo: (1 + 8·0.9) ÷ 10 = 82 y (2 + 8·0.98) ÷ 10 = 98.
+    const contraido = cumplimientoDe(base, { ritmo: 4, aTiempo: 0.9, aLaPrimera: 0.98 });
+    expect(contraido.partes.slice(0, 2).map((p) => p.pct)).toEqual([82, 98]);
+    expect(contraido.pct).toBe(79);
+    // Uniforme: pesa 3 de los 15 solo con ≥ 80 % de entradas revisadas.
+    const malUniforme = { revisadas: 1, ok: 0, noOk: 1, sinRevisar: 0, pct: 0 };
+    expect(cumplimientoDe({ ...base, uniforme: malUniforme, diasConJornada: 1 }, 4).pct).toBe(67);
+    expect(cumplimientoDe({ ...base, uniforme: malUniforme, diasConJornada: 2 }, 4).pct).toBe(70);
+    // Sin entregas ni días que debía trabajar no hay índice, aunque haya llegado temprano.
     expect(cumplimientoDe({ ...base, entregas: resumenEntregas([]) }, 4).pct).toBeNull();
   });
 
-  it('una sola entrega en el día no pesa lo mismo que cinco (Adam: Alejandro contra Daniela)', () => {
-    const dia = { desde: '2026-09-15', hasta: '2026-09-15', checadas: [entrada('15', '10:00'), salida('15', '18:00')] };
+  it('una sola entrega en el día no pesa lo mismo que cinco: lo separan las horas estándar (Alejandro contra Daniela)', () => {
+    const dia = {
+      desde: '2026-09-15',
+      hasta: '2026-09-15',
+      checadas: [entrada('15', '10:00'), salida('15', '18:00')],
+      comidas: [{ inicio: M('15', '15:00'), fin: M('15', '16:00') }],
+    };
     const entrega = (id: number, hora: string) => ({
       activityId: id,
       limite: finDelDia('15'),
@@ -751,6 +782,7 @@ describe('entregas: en tiempo y forma', () => {
       minutosPlan: 60,
       minutosMaximo: 90,
       minutosReales: 60,
+      minutosEstandar: 60,
     });
     const daniela = calcula({
       ...dia,
@@ -762,35 +794,36 @@ describe('entregas: en tiempo y forma', () => {
       actividades: [actividad(9, M('15', '10:00'), M('15', '11:00'))],
       entregas: [entrega(9, '11:00')],
     }).totales;
-    // Los dos entregaron todo a tiempo y dentro de su tiempo…
+    // Los dos entregaron todo a tiempo, llegaron puntuales y registraron su comida…
     expect(daniela.entregas.pctATiempo).toBe(100);
     expect(alejandro.entregas.pctATiempo).toBe(100);
-    // …pero el ritmo, la carga y la ocupación los separan.
-    const ref = referenciaDeRitmo([daniela, alejandro]);
-    expect(ref).toBe(5);
-    // Daniela: 5 h de trabajo entregado en 8 h (62 %, sobre la meta). Alejandro: 1 h en 8 h
-    // (12.5 % = ¼ de la meta) y su cumplimiento se multiplica por 0.25.
-    expect(conReferencia(daniela, ref).cumplimientoPct).toBe(98);
-    expect(conReferencia(alejandro, ref).cumplimientoPct).toBe(17);
+    expect(daniela.disciplina).toMatchObject({ esperados: 1, puntos: 1, registroCompleto: 1, pct: 100 });
+    // …pero Daniela ganó 5 h estándar en 7 h de jornada (sobre la meta de 70 %) y Alejandro 1 h (20 % de la meta).
+    const ref = referenciasDelEquipo([daniela, alejandro]);
+    expect(ref).toEqual({ ritmo: 5, aTiempo: 1, aLaPrimera: null });
+    expect(conReferencia(daniela, ref).cumplimientoPct).toBe(100);
+    expect(conReferencia(alejandro, ref).cumplimientoPct).toBe(68);
     expect(alejandro.ritmo).toMatchObject({ entregadas: 1, dias: 1, porDia: 1 });
   });
 
-  it('un día laborable perdido sin justificar multiplica todo; sin trabajar ninguno, 0', () => {
+  it('un día laborable perdido sin justificar vale 0 en Disciplina; sin trabajar ninguno, 0', () => {
     const dosDias = { desde: '2026-09-14', hasta: '2026-09-15' };
     const conUnDia = calcula({
       ...dosDias,
       checadas: [entrada('14', '10:00'), salida('14', '18:00')],
+      comidas: [{ inicio: M('14', '15:00'), fin: M('14', '16:00') }],
       actividades: [actividad(1, M('14', '10:00'), M('14', '17:00'))],
-      entregas: [{ activityId: 1, limite: finDelDia('14'), entregadaAt: M('14', '17:00'), minutosPlan: 300 }],
+      entregas: [{ activityId: 1, limite: finDelDia('14'), entregadaAt: M('14', '17:00'), minutosPlan: 300, minutosEstandar: 300 }],
     }).totales;
     // El 15 no checó y no está justificado: 1 de 2 días.
     expect(conUnDia.diasDeTrabajo).toMatchObject({ esperados: 2, trabajados: 1, sinChecar: 1, sinTrabajo: 0, pct: 50 });
-    // entregas 1·20 + ocupación (4 h de 8 = 50 % de 70)·15 + asistencia (1 de 2)·15 = 38.2 de 50 → 76 %, × ½ = 38 %.
-    expect(conUnDia.cumplimientoPct).toBe(38);
+    // Confiabilidad 1·30 + Rendimiento (5 h de 7, sobre la meta) 1·30 + Disciplina (1 de 2 días)·15 = 67.5 de 75 → 90.
+    expect(conUnDia.disciplina).toMatchObject({ esperados: 2, puntos: 1, pct: 50 });
+    expect(conUnDia.cumplimientoPct).toBe(90);
     expect(conUnDia.cumplimientoPartes.find((p) => p.clave === 'dias')).toMatchObject({
       pct: 50,
       peso: 0,
-      detalle: '1 de 2 días (1 sin checar) · multiplica el total',
+      detalle: '1 de 2 · diagnóstico',
     });
     // Justificado, ese día no cuenta.
     expect(calcula({ ...dosDias, checadas: [entrada('14', '10:00'), salida('14', '18:00')], actividades: [actividad(1, M('14', '10:00'), M('14', '17:00'))], justificadas: ['2026-09-15'] }).totales.diasDeTrabajo).toMatchObject({ esperados: 1, trabajados: 1 });
@@ -898,5 +931,171 @@ describe('horas estándar ganadas', () => {
       entregasDelRango([{ activityId: 5, ...base, minutosEstandar: 120, minutosReales: 30 }], '2026-10-29', '2026-10-29', ahora),
     );
     expect(r.pctEficienciaEstandar).toBe(100);
+  });
+});
+
+// Índice v2 (§7.2, aprobado el 29-10): las piezas que no son el promedio.
+describe('índice de desempeño v2', () => {
+  const dia = (over: Partial<Parameters<typeof disciplinaDe>[0][number]> = {}) => ({
+    laborable: true,
+    conJornada: true,
+    sinChecada: false,
+    minutosTarde: 0,
+    abierta: false,
+    salida: '2026-10-29T18:00:00.000Z',
+    cierreAutomatico: false,
+    sinSalida: false,
+    minutosComida: 60,
+    ...over,
+  });
+
+  it('puntualidad graduada y cada 3 retardos una falta (en el índice, no en dinero)', () => {
+    expect([0, 15, 16, 30, 31, 60, 61].map(puntosDeLlegada)).toEqual([1, 1, 0.6, 0.6, 0.3, 0.3, 0]);
+    const d = disciplinaDe([
+      dia(),
+      dia({ minutosTarde: 20 }),
+      dia({ minutosTarde: 45 }),
+      dia({ minutosTarde: 90 }),
+      dia({ conJornada: false, sinChecada: true, salida: null, minutosComida: 0 }),
+    ]);
+    // 1 + 0.6 + 0.3 + 0 = 1.9; tres retardos = una falta: se quita el que más daba (0.6) → 1.3 de 5.
+    expect(d).toEqual({
+      esperados: 5,
+      puntos: 1.3,
+      retardos: 3,
+      faltasPorRetardos: 1,
+      jornadasRevisables: 4,
+      registroCompleto: 4,
+      pct: 26,
+    });
+  });
+
+  it('el registro completo multiplica: salida propia y comida registrada', () => {
+    const d = disciplinaDe([dia(), dia({ cierreAutomatico: true }), dia({ minutosComida: 0 }), dia({ abierta: true })]);
+    expect(d).toMatchObject({ esperados: 4, puntos: 4, jornadasRevisables: 3, registroCompleto: 1, pct: 33 });
+  });
+
+  it('contracción hacia el equipo con pocas medidas', () => {
+    // Una sola entrega a tiempo no da 100: (1 + 8·0.9) ÷ 9.
+    expect(contraida(1, 1, 0.9)).toBeCloseTo(0.9111, 3);
+    expect(contraida(0, 1, 0.9)).toBeCloseTo(0.8, 3);
+    expect(contraida(40, 40, 0.5)).toBeCloseTo(0.9167, 3);
+    expect(contraida(1, 2, null)).toBe(0.5);
+  });
+
+  it('lo autoasignado gana la mitad hasta validarse; la cotización sin enviar no gana', () => {
+    const e = { entregada: true, minutosEstandar: 120 };
+    expect(estandarGanadoDe(e)).toBe(120);
+    expect(estandarGanadoDe({ ...e, autoasignada: true })).toBe(60);
+    expect(estandarGanadoDe({ ...e, autoasignada: true, aprobada: true })).toBe(120);
+    expect(estandarGanadoDe({ ...e, sinCotizacionEnviada: true })).toBe(0);
+    expect(estandarGanadoDe({ ...e, entregada: false })).toBe(0);
+    const lista = entregasDelRango(
+      [
+        {
+          activityId: 1,
+          limite: null,
+          entregadaAt: new Date('2026-10-29T20:00:00Z'),
+          minutosEstandar: 90,
+          autoasignada: true,
+        },
+      ],
+      '2026-10-29',
+      '2026-10-29',
+      new Date('2026-10-29T23:00:00Z'),
+    );
+    expect(resumenEntregas(lista)).toMatchObject({ conEstandar: 1, minutosEstandarGanados: 45 });
+  });
+
+  it('tiempo estándar de respaldo: la mediana de su tipo sin pasar lo que esa actividad duró', () => {
+    expect(estandarDeRespaldo(300, 45, 60)).toBe(60);
+    expect(estandarDeRespaldo(300, 400, null)).toBe(300);
+    expect(estandarDeRespaldo(300, null, null)).toBe(0);
+    expect(estandarDeRespaldo(null, 400, 60)).toBeNull();
+  });
+
+  it('calificación calibrada: un 3 de quien califica duro vale más que un 4 de quien regala cincos', () => {
+    const r = (reviewerId: number | null, score: number) => ({ reviewerId, score });
+    const todas = [r(1, 5), r(1, 5), r(1, 5), r(1, 4), r(2, 3), r(2, 3), r(2, 3), r(3, 5)];
+    const medias = mediasDeRevisores(todas);
+    expect(medias.global).toBe(4.125);
+    // 4 − 4.75 + 4.125 = 3.375 → 59; 3 − 3 + 4.125 → 78; el revisor 3 tiene un solo número: cuenta tal cual.
+    expect(calificacionCalibrada([r(1, 4)], medias)).toEqual({ n: 1, pct: 59 });
+    expect(calificacionCalibrada([r(2, 3)], medias)).toEqual({ n: 1, pct: 78 });
+    expect(calificacionCalibrada([r(3, 5)], medias)).toEqual({ n: 1, pct: 100 });
+    expect(calificacionCalibrada([], medias)).toEqual({ n: 0, pct: null });
+  });
+
+  it('24 h hábiles no cuentan el fin de semana', () => {
+    const cdmx = (iso: string) => new Date(`${iso}-06:00`);
+    // Viernes 17:00 → lunes 12:00: 7 h + 12 h = 19 h hábiles.
+    expect(minutosHabilesEntre(cdmx('2026-10-30T17:00:00'), cdmx('2026-11-02T12:00:00'))).toBe(19 * 60);
+    expect(
+      revisionesEnPlazo([
+        { envio: cdmx('2026-10-30T17:00:00'), revision: cdmx('2026-11-02T12:00:00') },
+        { envio: cdmx('2026-10-29T10:00:00'), revision: cdmx('2026-10-30T11:00:00') },
+        // Reenviada después de esta revisión: no se mide.
+        { envio: cdmx('2026-10-30T12:00:00'), revision: cdmx('2026-10-30T11:00:00') },
+        { envio: null, revision: cdmx('2026-10-30T11:00:00') },
+      ]),
+    ).toEqual({ total: 2, enPlazo: 1 });
+  });
+
+  it('familia por puesto y meta ponderada por horas', () => {
+    expect(['Técnico Instalador', 'Ingeniero de Soporte', 'Encargado de Obra', 'Encargada comercial', 'Contador(a) General', null].map(familiaDePuesto)).toEqual([
+      'campo',
+      'campo',
+      'campo',
+      'oficina',
+      'oficina',
+      'oficina',
+    ]);
+    expect(metaPonderada([{ minutosLaborados: 480, familia: 'campo' }, { minutosLaborados: 480, familia: 'oficina' }])).toBe(0.65);
+    expect(metaPonderada([{ minutosLaborados: 0, familia: 'campo' }])).toBeUndefined();
+  });
+
+  it('coordinación: confiabilidad y rendimiento de su equipo, mitad y mitad con revisar a tiempo', () => {
+    const t = {
+      entregas: { ...resumenEntregas([]), medidas: 1, aTiempo: 1, revisadas: 1, aprobadasALaPrimera: 1 },
+      asistenciaPuntual: { esperados: 1, puntuales: 1, pct: 100 },
+      uniforme: { revisadas: 0, ok: 0, noOk: 0, sinRevisar: 0, pct: null },
+      minutosLaborados: 480,
+      ritmo: { entregadas: 1, dias: 1, porDia: 1, referencia: null },
+      carga: { minutos: 0, pct: 0 },
+      ocupacion: { minutos: 0, pct: 0 },
+      equipo: {
+        personas: 3,
+        aTiempo: 9,
+        medidas: 10,
+        minutosEstandarGanados: 1200,
+        minutosLaborados: 2400,
+        revisiones: { total: 4, enPlazo: 2 },
+      },
+      metaRendimiento: 0.6,
+    };
+    const c = cumplimientoDe(t, null);
+    // ½·90 % + ½·50 % = 70; 50 % de las horas del equipo contra su meta de 60 % = 83.
+    expect(c.partes.slice(0, 3).map((p) => [p.clave, p.pct])).toEqual([
+      ['entregas', 70],
+      ['forma', 100],
+      ['estandar', 83],
+    ]);
+    expect(c.partes[0].detalle).toBe('Su equipo entregó 9 de 10 a tiempo · revisó 2 de 4 en 24 h hábiles');
+    expect(c.pct).toBe(86);
+    const miembro = { ...t, equipo: undefined, metaRendimiento: undefined } as unknown as TotalesKpi;
+    expect(equipoCoordinadoDe([miembro, miembro], { total: 0, enPlazo: 0 }).equipo).toMatchObject({ personas: 2, medidas: 2, minutosLaborados: 960 });
+  });
+
+  it('la fila del equipo suma la disciplina de todos', () => {
+    const comida = [{ inicio: M('14', '15:00'), fin: M('14', '16:00') }];
+    const puntual = calcula({ checadas: [entrada('14', '10:00'), salida('14', '18:00')], comidas: comida }).totales;
+    const tarde = calcula({ checadas: [entrada('14', '10:20'), salida('14', '18:00')], comidas: comida }).totales;
+    expect(tarde.disciplina).toMatchObject({ puntos: 0.6, retardos: 1, pct: 60 });
+    expect(sumaEquipo([puntual, tarde]).disciplina).toMatchObject({ esperados: 2, puntos: 1.6, retardos: 1, pct: 80 });
+  });
+
+  it('las reglas en palabras ya hablan de la v2', () => {
+    expect(supuestosKpi()[0]).toContain('Confiabilidad 30 %');
+    expect(supuestosKpi().join(' ')).not.toContain('MULTIPLICA');
   });
 });
