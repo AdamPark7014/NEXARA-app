@@ -33,6 +33,7 @@ import { distancia, type Abertura, type CamaraPlano, type Nivel, type Plano, typ
 import { ETIQUETA_ESTADO_PERSONA, camaraEnMetros, leerPersona } from "@/lib/cctv/visibilidad";
 import { ETIQUETA_ESTADO_DISENO, type EstadoDiseno } from "@/lib/cctv/api";
 import { COLOR_NIVEL } from "./colores";
+import type { Herramienta } from "./Lienzo";
 import styles from "./editor.module.css";
 
 export type Pestana = "seleccion" | "camaras" | "plano";
@@ -108,6 +109,7 @@ export default function Inspector({
   resumen,
   onRecalibrar,
   onCambiarCroquis,
+  onHerramienta,
   fichaDe,
   numeroNuevo,
   nivel,
@@ -124,6 +126,8 @@ export default function Inspector({
   resumen: ResumenDiseno | null;
   onRecalibrar: () => void;
   onCambiarCroquis: () => void;
+  /** Activa una herramienta del lienzo (la guía de pasos la usa). */
+  onHerramienta?: (h: Herramienta) => void;
   /** Ruta de la ficha de una cámara. */
   fichaDe: (camaraId: string) => string;
   /** Número de la siguiente cámara (sigue entre niveles). */
@@ -150,10 +154,7 @@ export default function Inspector({
           seleccion ? (
             <PanelSeleccion plano={plano} seleccion={seleccion} tapas={tapas} onAplicar={onAplicar} onSeleccionar={onSeleccionar} fichaDe={fichaDe} numeroNuevo={numeroNuevo} />
           ) : (
-            <p className={styles.ayuda}>
-              Haz clic en una cámara, un muro o un hueco para editarlo. Con <b>+ Cámara</b> pones una nueva; con <b>Persona</b>, un humanoide
-              para ver cómo lo capta cada cámara.
-            </p>
+            <Guia plano={plano} resumen={resumen} onHerramienta={onHerramienta} onCambiarCroquis={onCambiarCroquis} onRecalibrar={onRecalibrar} />
           )
         ) : pestana === "camaras" ? (
           <ListaCamaras plano={plano} onSeleccionar={(s) => (onSeleccionar(s), onPestana("seleccion"))} />
@@ -636,6 +637,114 @@ function PanelPersona({
         <p className={styles.ayuda}>Ninguna cámara la tiene en su cuadro. Arrástrala a otra zona.</p>
       )}
       <div className={styles.acciones}>{quitar}</div>
+    </div>
+  );
+}
+
+/**
+ * Sin nada elegido: los pasos para armar el diseño, cada uno con su estado y el botón que lo empieza.
+ * Con todo listo, la cobertura del interior y la grabación.
+ */
+function Guia({
+  plano,
+  resumen,
+  onHerramienta,
+  onCambiarCroquis,
+  onRecalibrar,
+}: {
+  plano: Plano;
+  resumen: ResumenDiseno | null;
+  onHerramienta?: (h: Herramienta) => void;
+  onCambiarCroquis: () => void;
+  onRecalibrar: () => void;
+}) {
+  const pasos: Array<{ hecho: boolean; titulo: string; detalle: string; boton: string; accion: () => void }> = [
+    {
+      hecho: Boolean(plano.croquis),
+      titulo: "Croquis del sitio",
+      detalle: "PDF, imagen o captura del plano. Es opcional si trazas los muros a mano.",
+      boton: plano.croquis ? "Cambiar" : "Subir",
+      accion: onCambiarCroquis,
+    },
+    {
+      hecho: Boolean(plano.escala.calibracion),
+      titulo: "Escala",
+      detalle: "Marca los dos extremos de una medida conocida.",
+      boton: plano.escala.calibracion ? "Recalibrar" : "Calibrar",
+      accion: onRecalibrar,
+    },
+    {
+      hecho: plano.muros.length > 0,
+      titulo: "Muros, puertas y accesos",
+      detalle: "Tapan la vista de las cámaras; sin ellos la cobertura no se recorta.",
+      boton: "Trazar",
+      accion: () => onHerramienta?.("muro"),
+    },
+    {
+      hecho: plano.camaras.length > 0,
+      titulo: "Cámaras",
+      detalle: "Clic en el plano y luego arrastra la manija del cono para apuntarla.",
+      boton: "Poner",
+      accion: () => onHerramienta?.("camara"),
+    },
+    {
+      hecho: plano.personas.length > 0,
+      titulo: "Persona de prueba",
+      detalle: "Dice cuántos PPM le llegan y si alguna cámara la reconoce.",
+      boton: "Poner",
+      accion: () => onHerramienta?.("persona"),
+    },
+  ];
+  const faltan = pasos.filter((p) => !p.hecho).length;
+  const cob = resumen?.cobertura;
+  return (
+    <div className={styles.panel}>
+      <div>
+        <p className={styles.seccion}>{faltan ? `Para armar el diseño · faltan ${faltan}` : "Diseño completo"}</p>
+        <ol className={styles.guia}>
+          {pasos.map((p, i) => (
+            <li key={p.titulo} className={p.hecho ? styles.guiaHecho : undefined}>
+              <span className={styles.guiaNumero} aria-hidden="true">
+                {p.hecho ? "✓" : i + 1}
+              </span>
+              <span className={styles.guiaTexto}>
+                <b>{p.titulo}</b>
+                <span>{p.detalle}</span>
+              </span>
+              <Button size="sm" variant={p.hecho ? "ghost" : "secondary"} onClick={p.accion} aria-label={`${p.boton}: ${p.titulo}`}>
+                {p.boton}
+              </Button>
+            </li>
+          ))}
+        </ol>
+      </div>
+      {cob ? (
+        <div>
+          <p className={styles.seccion}>Cobertura del interior</p>
+          {(
+            [
+              ["Cubierto por alguna cámara", cob.cubierto, "var(--ui-brand)"],
+              ["Identificación", cob.identificacion, COLOR_NIVEL.identificacion],
+              ["Reconocimiento", cob.reconocimiento, COLOR_NIVEL.reconocimiento],
+              ["Observación", cob.observacion, COLOR_NIVEL.observacion],
+            ] as const
+          ).map(([etiqueta, pct, color]) => (
+            <div key={etiqueta} className={styles.alcance}>
+              <span>{etiqueta}</span>
+              <b>{Math.round(pct)} %</b>
+              <span className={styles.barra2} style={{ gridColumn: "1 / -1" }}>
+                <i style={{ width: `${Math.min(pct, 100)}%`, background: color }} />
+              </span>
+            </div>
+          ))}
+          {resumen ? (
+            <p className={styles.ayuda} style={{ marginTop: 8 }}>
+              {resumen.camaras} {resumen.camaras === 1 ? "cámara" : "cámaras"} · {Math.round(resumen.mbps)} Mbps · {resumen.tb.toFixed(1)} TB de grabación
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      <p className={styles.ayuda}>Clic en una cámara, un muro o un hueco para editarlo. Supr borra y Ctrl+Z deshace.</p>
     </div>
   );
 }
