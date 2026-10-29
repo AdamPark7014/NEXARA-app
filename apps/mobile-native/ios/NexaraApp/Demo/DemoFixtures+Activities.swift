@@ -470,6 +470,11 @@ extension DemoStore {
             json["inicioRealAt"] = DemoClock.iso(started)
         } else if let entry = evidence[a.id]?.entryAt {
             json["inicioRealAt"] = DemoClock.iso(entry)
+        } else if a.estatus == "En Proceso" {
+            // Sembrada ya en curso (5156, la «de ahora» de Inicio): ya la inició y la aceptó.
+            // Sin esto el API de mentira le ofrecería «Iniciar» con el reloj corriendo.
+            json["inicioRealAt"] = iso(a.startMin)
+            json["aceptacion"] = "ACEPTADA"
         }
         if let state = effectiveEvidence(a), evidence[a.id] != nil { json["evidenceStatus"] = state.status }
         if let note = reorderNote[a.id] {

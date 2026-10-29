@@ -48,7 +48,7 @@ private enum CoreShellTab: String, Hashable, CaseIterable {
         }
     }
 
-    /// Título de la barra teal (Android `currentTitle` de `ConsoleNavHost`).
+    /// Título de la barra superior (Android `currentTitle` de `ConsoleNavHost`).
     var barTitle: String {
         switch self {
         case .inicio: return "Inicio"
@@ -85,7 +85,7 @@ private enum CoreShellTab: String, Hashable, CaseIterable {
 }
 
 /// Shell de NEXARA Core (rediseño v2), con el cromo de Android
-/// (`ConsoleNavHost`): barra superior teal con la campana en todas las pestañas
+/// (`ConsoleNavHost`): barra superior clara con la campana en todas las pestañas
 /// menos Inicio (que pinta su cabecera) y barra inferior propia de 5 destinos con
 /// insignias. Después del login el personal cae en Inicio. Menú = módulos de
 /// Core de `GET me/navigation` filtrados por rol (ver `CoreNavigation`).
@@ -123,7 +123,7 @@ struct CoreShellView: View {
         !chrome.barraInferiorOculta && !tecladoVisible
     }
 
-    /// La campana de la barra teal (en cualquier pantalla del shell) abre la bandeja.
+    /// La campana de la barra superior (en cualquier pantalla del shell) abre la bandeja.
     private var abrirNotificaciones: () -> Void {
         { present(.notifications) }
     }
@@ -174,9 +174,9 @@ struct CoreShellView: View {
         }
     }
 
-    /// Barra inferior y, en modo demostración, su aviso justo encima. El aviso ya
-    /// no va arriba: ahí la barra teal tiene que llegar hasta la hora sin nada
-    /// en medio (si no, la hora blanca queda sobre fondo claro).
+    /// Barra inferior (blanca, `NxBottomBar`) y, en modo demostración, su aviso justo
+    /// encima. El aviso no va arriba: ahí la barra superior llega hasta la hora sin nada
+    /// en medio.
     private var barraInferior: some View {
         VStack(spacing: 0) {
             if DemoMode.isActive {
@@ -203,10 +203,12 @@ struct CoreShellView: View {
         .background(NxColors.surface.ignoresSafeArea(edges: .bottom))
     }
 
-    /// Inicio pinta su propia cabecera clara (hora en negro); todo lo demás del shell
-    /// lleva la barra teal hasta arriba (hora en blanco). Ver `NxStatusBar`.
+    /// Todo Core es claro arriba: Inicio pinta su cabecera sobre el fondo y las demás
+    /// pantallas llevan la barra superior clara (canvas del 28-10), así que la hora y la
+    /// batería van siempre en oscuro. Se reafirma al cambiar de pestaña o de cubierta por si
+    /// algo de fuera (el portal, una hoja del sistema) la dejó en blanco. Ver `NxStatusBar`.
     private func actualizarBarraDeEstado() {
-        NxStatusBar.textoBlanco(!(selected == .inicio && overlay == nil))
+        NxStatusBar.textoBlanco(false)
     }
 
     private func badgeCount(_ tab: CoreShellTab) -> Int {
@@ -223,7 +225,7 @@ struct CoreShellView: View {
     private func tabRoot(_ tab: CoreShellTab) -> some View {
         switch tab {
         case .inicio:
-            // Inicio pinta su propia cabecera (saludo, fecha y campana): sin barra teal.
+            // Inicio pinta su propia cabecera («Mi día», fecha y campana): sin barra superior.
             NavigationStack {
                 InicioView(
                     store: inicio,
@@ -237,7 +239,7 @@ struct CoreShellView: View {
                 )
             }
         case .chat:
-            // `ChatView` trae su propio NavigationStack y pone su barra teal dentro.
+            // `ChatView` trae su propio NavigationStack y pone su barra superior dentro.
             ChatView(initialChannelId: chatChannelId, initialMessageId: chatMessageId)
                 .id(chatNonce)
         case .actividades:
@@ -336,16 +338,16 @@ struct CoreShellView: View {
         }
     }
 
-    /// Cerrar una cubierta: flecha blanca de volver, como el `ArrowBack` de
-    /// Android. Se llama «Cerrar» para VoiceOver y para las pruebas de UI.
+    /// Cerrar una cubierta: flecha de volver #14171F sobre la barra clara, como el
+    /// `ArrowBack` de Android. Se llama «Cerrar» para VoiceOver y para las pruebas de UI.
     private var closeItem: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
             Button { overlay = nil } label: {
                 Image(systemName: "chevron.backward")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(NxColors.fg)
             }
-            .tint(Color.white)
+            .tint(NxColors.fg)
             .accessibilityLabel("Cerrar")
         }
     }

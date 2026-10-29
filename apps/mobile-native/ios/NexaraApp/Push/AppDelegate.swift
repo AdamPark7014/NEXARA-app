@@ -4,6 +4,8 @@ import UIKit
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ app: UIApplication,
                      didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        // Color de la flecha de volver antes de que exista la primera barra (ver `NxBarraSuperior`).
+        NxBarraSuperior.configurar()
         // Firebase se configura aquí, antes de pedir el token, y solo si el
         // binario trae GoogleService-Info.plist. `configure` también fija el
         // delegado de UNUserNotificationCenter, que debe quedar puesto antes de

@@ -6,6 +6,9 @@ import Foundation
 @MainActor
 final class InicioStore: ObservableObject {
     @Published private(set) var data: MyActivitiesResponse?
+    /// Cuándo llegó `data`. `minutosReales` viene calculado a esa hora: el reloj de la banda
+    /// de «Mi día» le suma lo que pasó desde entonces (Android `remember(a)` en `ActualCard`).
+    @Published private(set) var cargadoEn = Date()
     @Published private(set) var loading = true
     @Published private(set) var error: String?
     /// Actividad sobre la que corre «Iniciar» o «Reanudar».
@@ -26,7 +29,9 @@ final class InicioStore: ObservableObject {
             return
         }
         do {
-            data = try await CoreRepository.shared.myActivities()
+            let respuesta = try await CoreRepository.shared.myActivities()
+            cargadoEn = Date()
+            data = respuesta
             error = nil
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudieron cargar tus actividades")

@@ -62,6 +62,15 @@ targets:
       # tras archivar (debe quedar en la raíz del .app).
       - path: Resources/PrivacyInfo.xcprivacy
         buildPhase: resources
+      # Inter Tight, la letra de los títulos de Core («Mi día», la banda de la actividad,
+      # el reloj). Se copian a la raíz del .app y se registran en `UIAppFonts` de
+      # Resources/Info.plist (la plist es a mano: ver `INFOPLIST_FILE` abajo). La licencia
+      # OFL va en Resources/Fonts/OFL-InterTight.txt y también dentro de cada TTF (tabla
+      # `name`, ids 13 y 14), así que el .txt no hace falta en el paquete.
+      - path: Resources/Fonts/InterTight-Bold.ttf
+        buildPhase: resources
+      - path: Resources/Fonts/InterTight-SemiBold.ttf
+        buildPhase: resources
     dependencies:
       - package: SocketIO
         product: SocketIO

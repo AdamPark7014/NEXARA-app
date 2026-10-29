@@ -230,6 +230,15 @@ enum DemoData {
                      avance: 0, evidencia: "",
                      indicaciones: "Validar con Administración las partidas de obra del trimestre.",
                      estimadoMin: 75, descripcion: "Cierre presupuestal del trimestre."),
+        // La de «ahora» en Inicio: en curso con plan (4 h), fecha máxima el mismo día (la hora
+        // compromiso) y semáforo en verde, para que la banda oscura de «Mi día» salga completa
+        // en las capturas (`01-inicio`), como el artboard del canvas.
+        DemoActivity(id: 5156, folio: "AN-0156", titulo: "Cableado de nodos, planta baja",
+                     kind: "servicio", clientServiceId: 4106, projectId: nil, ownerId: 1, creatorId: 1,
+                     prioridad: "alta", estatus: "En Proceso", startMin: -150, maxMin: 105, finMin: nil,
+                     avance: 40, evidencia: "EVIDENCE_PHOTOS",
+                     indicaciones: "Tender y etiquetar los 12 nodos de la planta baja y probar cada salida.",
+                     estimadoMin: 240, descripcion: "Cableado de red del área de consultorios."),
         DemoActivity(id: 5153, folio: "AN-0153", titulo: "Reporte semanal de indicadores",
                      kind: "tarea", clientServiceId: 0, projectId: nil, ownerId: 1, creatorId: 1,
                      prioridad: "media", estatus: "Finalizada", startMin: -300, maxMin: -150, finMin: -120,
@@ -249,7 +258,8 @@ enum DemoData {
     }
 
     /// Actividades mías que aparecen abiertas en «Mis actividades», en el orden de la cola.
-    static let myOpenIds: [Int] = [5150, 5151, 5152]
+    /// 5156 va primero: es la que tiene el reloj corriendo (la «de ahora» de Inicio).
+    static let myOpenIds: [Int] = [5156, 5150, 5151, 5152]
 
     /// Actividades más viejas (ya finalizadas) para el historial de cada persona.
     static let olderWork: [DemoOlderWork] = [

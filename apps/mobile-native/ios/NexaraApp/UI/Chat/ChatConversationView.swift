@@ -425,7 +425,7 @@ struct ChatConversationView: View {
                     .truncationMode(.tail)
             }
         }
-        .foregroundStyle(Color.white)
+        .foregroundStyle(NxColors.fg)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
@@ -437,7 +437,7 @@ struct ChatConversationView: View {
                 scrollToTop += 1
             } label: {
                 Image(systemName: "pin.fill")
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(NxColors.fg)
                     .overlay(alignment: .topTrailing) {
                         NxCountBadge(count: store.pinnedMessages.count)
                             .fixedSize()
@@ -450,14 +450,14 @@ struct ChatConversationView: View {
             store.toggleSearch()
         } label: {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(Color.white)
+                .foregroundStyle(NxColors.fg)
         }
         .accessibilityLabel("Buscar mensajes")
         Button {
             Task { await store.refreshMessages() }
         } label: {
             Image(systemName: "arrow.clockwise")
-                .foregroundStyle(Color.white)
+                .foregroundStyle(NxColors.fg)
         }
         .accessibilityLabel("Actualizar")
         Menu {
@@ -465,7 +465,7 @@ struct ChatConversationView: View {
         } label: {
             Image(systemName: "ellipsis")
                 .rotationEffect(.degrees(90))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(NxColors.fg)
         }
         .accessibilityLabel("Opciones del canal")
     }

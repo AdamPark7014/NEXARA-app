@@ -39,6 +39,11 @@
     <dict/>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
+    <key>UIAppFonts</key>
+    <array>
+        <string>InterTight-Bold.ttf</string>
+        <string>InterTight-SemiBold.ttf</string>
+    </array>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>

@@ -39,6 +39,30 @@ enum NxType {
     static let labelSmall = Font.system(size: 11, weight: .medium)
 }
 
+/// Letra de los títulos de Core (canvas «App · Mi día», 28-10; Android `InterTight` de
+/// `ui/theme/Type.kt`): Inter Tight Bold y SemiBold. Los TTF van en `Resources/Fonts/` y se
+/// registran con `UIAppFonts` (Info.plist). Tamaño fijo, como `NxType`.
+///
+/// Si la fuente no llegó al paquete (proyecto generado sin los TTF), cae a la del sistema con
+/// el mismo tamaño y peso en vez de a la regular que daría `Font.custom` por su cuenta.
+enum NxFont {
+    /// Nombres PostScript de los TTF.
+    static let interTightBold = "InterTight-Bold"
+    static let interTightSemiBold = "InterTight-SemiBold"
+
+    private static let hayBold = UIFont(name: interTightBold, size: 12) != nil
+    private static let haySemiBold = UIFont(name: interTightSemiBold, size: 12) != nil
+
+    /// Título de Core en Inter Tight: `.bold` (o más) usa Bold; lo demás, SemiBold.
+    static func display(size: CGFloat, weight: Font.Weight = .bold) -> Font {
+        let negrita = weight == .bold || weight == .heavy || weight == .black
+        let nombre = negrita ? interTightBold : interTightSemiBold
+        let disponible = negrita ? hayBold : haySemiBold
+        guard disponible else { return Font.system(size: size, weight: negrita ? weight : .semibold) }
+        return Font.custom(nombre, fixedSize: size)
+    }
+}
+
 /// Estilo de texto con interlineado de Android (`lineHeight`), para párrafos.
 /// `Text("…").nxTextStyle(.bodyMedium)` = 14 normal con alto de línea 20.
 enum NxTextStyle {

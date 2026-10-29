@@ -103,10 +103,12 @@ enum NxColors {
 
 /// Paleta de marca. Única fuente de los tonos de marca de la app: nada de
 /// `Color(red:…)` sueltos ni `.teal` en las pantallas. El color de acento global
-/// (`Color.accentColor`) sale de `Assets.xcassets/AccentColor` con el mismo teal;
+/// (`Color.accentColor`) sale de `Assets.xcassets/AccentColor` con el mismo verde;
 /// su variante oscura es BLANCA a propósito: el único sitio de la app que se pinta
-/// con rasgo oscuro es la barra superior teal (`nxBrandNavBar`), y ahí los botones
-/// y la flecha de volver tienen que salir en blanco, como en Android.
+/// con rasgo oscuro es la barra superior verde del portal (`nxBrandNavBar(estilo:
+/// .portal)`), y ahí los botones y la flecha de volver tienen que salir en blanco, como
+/// en Android. La barra de Core es clara (28-10): su flecha va en #14171F
+/// (`NxBarraSuperior`).
 ///
 /// Los valores salen de `NxColors` (paridad exacta con Android). Los colores
 /// semánticos NO son marca y siguen en `NxTone` / `CorePalette`.
