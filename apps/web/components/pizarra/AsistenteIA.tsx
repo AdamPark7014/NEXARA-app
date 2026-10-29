@@ -22,6 +22,7 @@ import { ROLES, type RoleKey } from "@/lib/rbac";
 import {
   DURACIONES_MIN,
   ETIQUETA_TIPO,
+  altaRapidaCliente,
   SUBTIPOS_TAREA,
   TIPOS,
   TIPOS_SERVICIO,
@@ -35,6 +36,8 @@ import {
   estadoAsistente,
   interpretar,
   lugarEfectivo,
+  nombreComparable,
+  nombreParaAlta,
   pasoEquipo,
   payloadFinal,
   personasAsignables,
@@ -49,6 +52,7 @@ import {
   type PersonaAsignable,
   type Prioridad,
   type PropuestaActividad,
+  type Referencia,
   type RespuestaAsistente,
 } from "@/lib/asistente-ia-api";
 import type { ActivityKind } from "@/lib/activity-kinds";
@@ -63,6 +67,9 @@ type Estado = {
   error?: string;
   descartada?: boolean;
 };
+
+/** Valor de la opción «+ Agregar cliente "…"» del selector de cliente. */
+const ALTA_CLIENTE = "__alta__";
 
 /** Etapa del proyecto que se propuso para una tarjeta (como «Asignar»). */
 type EtapaPropuesta = { nombre: string | null };
@@ -137,6 +144,9 @@ function Contenido({
   const [estados, setEstados] = useState<Record<number, Estado>>({});
   const [etapas, setEtapas] = useState<Record<number, EtapaPropuesta>>({});
   const [creandoTodas, setCreandoTodas] = useState(false);
+  /** Clientes dados de alta desde las tarjetas (alta rápida) y el estado de cada alta. */
+  const [clientesNuevos, setClientesNuevos] = useState<Referencia[]>([]);
+  const [altas, setAltas] = useState<Record<number, { creando?: boolean; error?: string }>>({});
   const personasOrdenadas = useMemo(() => [...personas].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")), [personas]);
   /** Lo que ya estaba escrito cuando empezó el dictado: lo dicho se agrega después. */
   const base = useRef("");
@@ -161,6 +171,7 @@ function Contenido({
         setRespuesta(r);
         setListoEnMs(Math.round(performance.now() - inicio));
         setAjustes({});
+        setAltas({});
         setEstados({});
         setEtapas({});
       } catch (e) {
@@ -202,6 +213,39 @@ function Contenido({
 
   const propuestas = useMemo(() => respuesta?.propuestas ?? [], [respuesta]);
   const opciones = respuesta?.opciones;
+  const todosLosClientes = useMemo(
+    () => [...(opciones?.clientes ?? []), ...clientesNuevos.filter((n) => !(opciones?.clientes ?? []).some((c) => c.id === n.id))],
+    [opciones, clientesNuevos],
+  );
+
+  /**
+   * «+ Agregar cliente "Toks"»: alta rápida (solo el nombre) y queda elegido en la tarjeta; las
+   * demás tarjetas que dijeron el mismo nombre y no tienen cliente también lo toman.
+   */
+  const agregarCliente = async (i: number, nombre: string) => {
+    if (altas[i]?.creando) return;
+    setAltas((prev) => ({ ...prev, [i]: { creando: true } }));
+    try {
+      const nuevo = await altaRapidaCliente(token, nombre);
+      setClientesNuevos((prev) => [...prev.filter((c) => c.id !== nuevo.id), nuevo]);
+      const clave = nombreComparable(nombre);
+      setAjustes((prev) => {
+        const sig = { ...prev };
+        propuestas.forEach((p, j) => {
+          const aj = prev[j] || {};
+          const mismo = j === i || (!p.cliente && aj.clientId === undefined && nombreComparable(nombreParaAlta(p, aj, []) ?? "") === clave);
+          if (!mismo) return;
+          // El nombre ya es el cliente: no se repite como lugar.
+          const lugarIgual = !p.sucursal && nombreComparable(lugarEfectivo(p, aj)) === clave;
+          sig[j] = { ...aj, clientId: nuevo.id, ...(lugarIgual ? { lugar: "" } : {}) };
+        });
+        return sig;
+      });
+      setAltas((prev) => ({ ...prev, [i]: {} }));
+    } catch (e) {
+      setAltas((prev) => ({ ...prev, [i]: { error: formatApiError(e, "No se pudo dar de alta el cliente.") } }));
+    }
+  };
 
   /** Todo lo que la tarjeta necesita para mostrarse y crearse con lo que se eligió. */
   const armar = (p: PropuestaActividad, i: number) => {
@@ -434,7 +478,10 @@ function Contenido({
           const tiposVisibles: ActivityKind[] = TIPOS.filter((t) => permitidos.includes(t) || t === tipo);
           const clienteId = payload.clientId ? Number(payload.clientId) : null;
           const clientesSugeridos = p.cliente ? [p.cliente] : p.clienteCandidatos;
-          const otrosClientes = (opciones?.clientes ?? []).filter((x) => !clientesSugeridos.some((o) => o.id === x.id));
+          const otrosClientes = todosLosClientes.filter((x) => !clientesSugeridos.some((o) => o.id === x.id));
+          const altaNombre = clienteId ? null : nombreParaAlta(p, aj, todosLosClientes);
+          const alta = altas[i] || {};
+          const clienteNuevo = clienteId ? clientesNuevos.find((x) => x.id === clienteId) : undefined;
           const proyectoId = proyectoEfectivo(p, aj);
           const proyectosLista = [
             ...(p.proyecto ? [p.proyecto] : []),
@@ -542,27 +589,38 @@ function Contenido({
                       </optgroup>
                     </Select>
                   </Field>
-                  {!conProyecto(tipo) && (clientesSugeridos.length || otrosClientes.length) ? (
+                  {!conProyecto(tipo) && (clientesSugeridos.length || otrosClientes.length || altaNombre) ? (
                     <Field
                       label="Cliente"
                       required={tipo === "servicio"}
+                      error={alta.error ?? null}
                       hint={
-                        aj.clientId === undefined && corrCliente
-                          ? textoCorreccion(corrCliente)
-                          : !p.cliente && p.textoCliente
-                            ? `«${p.textoCliente}» no está registrado`
-                            : undefined
+                        alta.creando
+                          ? `Dando de alta «${altaNombre ?? ""}»…`
+                          : clienteNuevo
+                            ? "Cliente nuevo: completa su ficha en Clientes."
+                            : aj.clientId === undefined && corrCliente
+                              ? textoCorreccion(corrCliente)
+                              : !p.cliente && p.textoCliente
+                                ? `«${p.textoCliente}» no está registrado`
+                                : undefined
                       }
                     >
                       <Select
                         value={clienteId ? String(clienteId) : ""}
+                        disabled={alta.creando}
                         onChange={(e) => {
+                          if (e.target.value === ALTA_CLIENTE) {
+                            if (altaNombre) void agregarCliente(i, altaNombre);
+                            return;
+                          }
                           const nuevo = Number(e.target.value) || null;
                           // Otro cliente: la sucursal de la IA ya no aplica (el lugar escrito se queda).
                           ajustar(i, { clientId: nuevo, ...(p.sucursal && aj.lugar === undefined && nuevo !== (p.cliente?.id ?? null) ? { lugar: "" } : {}) });
                         }}
                       >
                         <option value="">{tipo === "servicio" ? "Elige el cliente" : "Sin cliente"}</option>
+                        {altaNombre ? <option value={ALTA_CLIENTE}>{`+ Agregar cliente «${altaNombre}»`}</option> : null}
                         {clientesSugeridos.length ? (
                           <optgroup label={p.cliente ? "El que dijiste" : "Coinciden con lo que dijiste"}>
                             {clientesSugeridos.map((o) => (

@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   interpretar: vi.fn(),
   crearActividad: vi.fn(),
   sumarAlEquipo: vi.fn(),
+  altaRapidaCliente: vi.fn(),
 }));
 
 vi.mock("@/components/UserContext", () => ({
@@ -214,6 +215,66 @@ describe("AsistenteIA", () => {
       fechaMaxima: "2026-10-24T19:30:00.000Z",
       fechaEntregaEsperada: "2026-10-24T19:30:00.000Z",
     });
+  });
+
+  it("sin cliente registrado ofrece «+ Agregar cliente» con el nombre entendido y lo liga a las propuestas", async () => {
+    const enToks: PropuestaActividad = {
+      ...servicio,
+      titulo: "Revisar cámaras en Toks",
+      textoCliente: "Toks",
+      cliente: null,
+      payload: { ...servicio.payload, titulo: "Revisar cámaras en Toks", clientId: undefined, branchName: "Toks" },
+    };
+    const otraEnToks: PropuestaActividad = { ...enToks, titulo: "Llevar DVR a Toks", payload: { ...enToks.payload, titulo: "Llevar DVR a Toks" } };
+    // Encontrado por la IA (aunque sea por parecido): no se ofrece el alta, no se duplica.
+    const conCliente: PropuestaActividad = { ...servicio, textoCliente: "Talks" };
+    api.interpretar.mockResolvedValue({
+      propuestas: [enToks, otraEnToks, conCliente],
+      aclaracion: null,
+      uso: null,
+      opciones: { clientes: [{ id: 1, nombre: "Grupo Tox" }], proyectos: [], sucursales: [] },
+    });
+    api.altaRapidaCliente.mockResolvedValue({ id: 77, nombre: "Toks" });
+    const usuario = userEvent.setup();
+    render(<AsistenteIA />);
+    await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Carolina revise las cámaras en talks");
+    await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
+
+    expect(await screen.findAllByRole("option", { name: "+ Agregar cliente «Toks»" })).toHaveLength(2);
+    expect(screen.getAllByText(/Un servicio necesita un cliente registrado/)).toHaveLength(2);
+    await usuario.selectOptions(screen.getAllByLabelText(/^Cliente/)[0], "+ Agregar cliente «Toks»");
+
+    await waitFor(() => expect(api.altaRapidaCliente).toHaveBeenCalledWith("tok", "Toks"));
+    expect(api.altaRapidaCliente).toHaveBeenCalledTimes(1);
+    // Queda elegido en las dos tarjetas que dijeron «Toks», y ya no se ofrece de nuevo.
+    await waitFor(() => expect(screen.getAllByText("Cliente nuevo: completa su ficha en Clientes.")).toHaveLength(2));
+    expect(screen.queryByRole("option", { name: "+ Agregar cliente «Toks»" })).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText(/^Lugar/)[0]).toHaveValue("");
+
+    await usuario.click(screen.getAllByRole("button", { name: "Confirmar y asignar" })[0]);
+    await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
+    const cuerpo = api.crearActividad.mock.calls[0][1];
+    expect(cuerpo).toMatchObject({ clientId: 77, titulo: "Revisar cámaras en Toks" });
+    expect(cuerpo.branchName).toBeUndefined();
+  });
+
+  it("si el alta del cliente falla, lo dice en el campo y no elige nada", async () => {
+    const enToks: PropuestaActividad = {
+      ...servicio,
+      textoCliente: "Toks",
+      cliente: null,
+      payload: { ...servicio.payload, clientId: undefined, branchName: "Toks" },
+    };
+    api.interpretar.mockResolvedValue({ propuestas: [enToks], aclaracion: null, uso: null, opciones: { clientes: [], proyectos: [] } });
+    api.altaRapidaCliente.mockRejectedValue(new Error("No tienes permiso para dar de alta clientes."));
+    const usuario = userEvent.setup();
+    render(<AsistenteIA />);
+    await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Carolina vaya a toks");
+    await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
+    await usuario.selectOptions(await screen.findByLabelText(/^Cliente/), "+ Agregar cliente «Toks»");
+    expect(await screen.findByText(/No tienes permiso para dar de alta clientes/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Cliente/)).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Confirmar y asignar" })).toBeDisabled();
   });
 
   it("una hora límite antes del inicio no deja crear", async () => {
