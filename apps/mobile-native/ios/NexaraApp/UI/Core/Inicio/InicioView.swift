@@ -17,6 +17,12 @@ struct InicioView: View {
     let onOpenActividades: () -> Void
     let onOpenAsistencia: () -> Void
     let onOpenComidas: () -> Void
+    /// Dirección general: a dónde lleva cada renglón de su tablero. nil = el rol no abre ese
+    /// módulo y el renglón cae a la pizarra (`onOpenActividades`).
+    var onOpenAprobaciones: (() -> Void)? = nil
+    var onOpenPagos: (() -> Void)? = nil
+    var onOpenDesempeno: (() -> Void)? = nil
+    var onOpenPersona: (Int) -> Void = { _ in }
 
     @ObservedObject private var session = SessionStore.shared
     @ObservedObject private var badge = NotificationsBadgeStore.shared
@@ -31,14 +37,19 @@ struct InicioView: View {
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
     private var muestraJornada: Bool { tieneAsistencia && attendance.canRegisterSelf }
     /// Dirección general (Christian y su equivalente): el API no le da «Mis actividades»
-    /// (403 «no aplica a dirección general»), así que Inicio le lleva a la pizarra del equipo.
+    /// (403 «no aplica a dirección general»), así que Inicio le enseña el tablero del equipo
+    /// (`InicioCeoContenido`, canvas «App · Inicio CEO»).
     /// En modo demo `CoreOrg.isCeo` es verdadero para la persona ficticia: ahí sí hay cola propia.
-    private var esDireccion: Bool { !DemoMode.isActive && CoreOrg.isCeo(session.currentUser?.email) }
+    /// En demo, solo con `NEXARA_DEMO_CEO=1` (captura de paridad del tablero de dirección).
+    private var esDireccion: Bool {
+        DemoMode.isActive ? DemoMode.inicioDireccion : CoreOrg.isCeo(session.currentUser?.email)
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 InicioHeader(
+                    titulo: esDireccion ? "Tu equipo hoy" : "Mi día",
                     unread: badge.unreadCount,
                     onOpenNotifications: onOpenNotifications
                 )
@@ -69,7 +80,12 @@ struct InicioView: View {
             if phase == .active { Task { await reload() } }
         }
         .refreshOnModels(["Activity", "ActivityEvidence", "ServiceSheet"]) {
-            await store.load(enabled: tieneActividades && !esDireccion)
+            if esDireccion {
+                // El tablero de dirección son cinco consultas: los avisos en vivo lo espacian 30 s.
+                await store.cargarCeo(enVivo: true)
+            } else {
+                await store.load(enabled: tieneActividades)
+            }
         }
         .fullScreenCover(isPresented: Binding(
             get: { photoType != nil },
@@ -131,8 +147,22 @@ struct InicioView: View {
     @ViewBuilder
     private var actividades: some View {
         if esDireccion {
-            VStack(alignment: .leading, spacing: NxSpacing.s) {
-                InicioSectionTitle(title: "Tu equipo hoy")
+            // Canvas «App · Inicio CEO» (29-10): lo que ve en la web, con los mismos endpoints.
+            if let ceo = store.ceo, store.ceoError == nil, InicioCeoRules.hayAlgo(ceo) {
+                InicioCeoContenido(
+                    ceo: ceo,
+                    onPizarra: onOpenActividades,
+                    onPendiente: { abrirPendiente($0) },
+                    onDesempeno: onOpenDesempeno ?? onOpenActividades,
+                    onPersona: onOpenPersona
+                )
+            } else if store.ceo == nil && store.ceoCargando {
+                NxSkeletonList(itemCount: 3, itemHeight: 120)
+            } else {
+                // Todo falló (o no hay nada que contar): el aviso y la tarjeta de la pizarra.
+                if let error = store.ceoError {
+                    NxRefreshErrorBanner(message: error, onRetry: { Task { await store.cargarCeo() } })
+                }
                 InicioEquipoCard(onVerEquipo: tieneActividades ? Optional(onOpenActividades) : nil)
             }
         } else if tieneActividades {
@@ -181,9 +211,22 @@ struct InicioView: View {
     @MainActor
     private func reload() async {
         await store.load(enabled: tieneActividades && !esDireccion)
+        if esDireccion {
+            await store.cargarCeo()
+        }
         if tieneAsistencia {
             await attendance.loadMine()
             await ShiftGpsTracker.shared.resumeIfNeeded()
+        }
+    }
+
+    /// Un renglón de «Requiere tu atención» de dirección: aprobaciones y pagos abren su pantalla
+    /// si el rol la tiene; lo demás (y lo que el rol no abre), la pizarra.
+    private func abrirPendiente(_ clave: String) {
+        switch clave {
+        case InicioCeoRules.claveAprobaciones: (onOpenAprobaciones ?? onOpenActividades)()
+        case InicioCeoRules.clavePagos: (onOpenPagos ?? onOpenActividades)()
+        default: onOpenActividades()
         }
     }
 
@@ -235,7 +278,9 @@ private extension InicioRules.Tono {
 
 /// Cabecera de «Mi día» (Android `InicioHeader`): fecha 13 gris, «Mi día» en Inter Tight 28
 /// negrita y la campana blanca de 44 que flota, con un punto de marca si hay avisos sin leer.
+/// Dirección general lee «Tu equipo hoy».
 private struct InicioHeader: View {
+    var titulo: String = "Mi día"
     let unread: Int
     let onOpenNotifications: () -> Void
 
@@ -246,7 +291,7 @@ private struct InicioHeader: View {
                     .font(.system(size: 13))
                     .foregroundStyle(NxColors.muted)
                     .lineLimit(1)
-                Text("Mi día")
+                Text(titulo)
                     .font(NxFont.display(size: 28))
                     .tracking(-0.5)
                     .foregroundStyle(NxColors.fg)

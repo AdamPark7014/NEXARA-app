@@ -57,6 +57,25 @@ final class ParityScreenshotsUITests: XCTestCase {
         app.launch()
     }
 
+    /// Inicio de dirección general (CEO) en demo: canvas «App · Inicio CEO». Va con número 91+ para
+    /// no pisar las capturas del recorrido.
+    func testInicioDireccion() throws {
+        app.terminate()
+        app.launchEnvironment["NEXARA_DEMO_CEO"] = "1"
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "La app no llegó a primer plano")
+        despejarAlertas()
+        guard buscar(pestana("tab-inicio", "Inicio"), timeout: 30) != nil else {
+            adjuntarJerarquia("dbg-direccion-sin-shell")
+            XCTFail("No aparece la barra de pestañas en el demo de dirección")
+            return
+        }
+        Thread.sleep(forTimeInterval: 2)
+        numero = 90
+        capturar("inicio-direccion")
+        deslizarYCapturar("inicio-direccion-abajo")
+    }
+
     func testRecorridoDeParidad() throws {
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "La app no llegó a primer plano")
         despejarAlertas()
