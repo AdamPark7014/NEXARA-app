@@ -9,6 +9,8 @@ import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCom
 import { FolioService } from '../common/folio/folio.service.js';
 import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 import { cents } from '../pac/cfdi-xml.builder.js';
+import { validarCfdiParaTimbrar, validarComplementoPago } from '../pac/validacion-cfdi.js';
+import type { PacPaymentComplementInput, PacStampInput } from '../pac/pac.types.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { BASE_CHART_OF_ACCOUNTS } from './base-chart-of-accounts.js';
 import { polizaFacturaEmitida, polizaPagoFactura, type RenglonPoliza } from './mesa-contable/polizas-mesa.js';
@@ -2000,7 +2002,7 @@ export class AccountingService {
     if (!invoice.emisorRegime) cfdiErrors.push('régimen fiscal del emisor');
     if (!invoice.cfdiUsage) cfdiErrors.push('uso de CFDI');
     if (!invoice.items?.length) cfdiErrors.push('al menos un concepto');
-    const issuerProfile = await this.getInvoiceIssuerProfile();
+    const issuerProfile = await this.getInvoiceIssuerProfile(companyId ?? undefined);
     if (!issuerProfile.emisorZipCode) {
       cfdiErrors.push('CP fiscal del emisor (LugarExpedicion — configurar en perfil de empresa o ajustes fiscales)');
     }
@@ -2019,6 +2021,55 @@ export class AccountingService {
     const emisorRfc = invoice.emisorRfc as string;
     const receptorRfc = invoice.receptorRfc as string;
 
+    const entrada: PacStampInput = {
+      invoiceNumber: invoice.invoiceNumber,
+      serie: invoice.cfdiSerie,
+      folio: invoice.cfdiFolio,
+      total: Number(invoice.totalAmount),
+      subtotal: Number(invoice.subtotal),
+      taxTotal: Number(invoice.taxAmount),
+      currency: invoice.currency || 'MXN',
+      exchangeRate: invoice.exchangeRate ? Number(invoice.exchangeRate) : null,
+      paymentForm: invoice.satPaymentForm || 'FP99',
+      paymentMethod: invoice.satPaymentMethod || 'PUE',
+      cfdiUsage: invoice.cfdiUsage || 'G03',
+      tipoComprobante: invoice.cfdiRelatedUuids && invoice.cfdiRelationType === '01' ? 'E' : 'I',
+      relatedUuids: invoice.cfdiRelatedUuids?.split(',').map((u) => u.trim()).filter(Boolean),
+      relationType: invoice.cfdiRelationType || undefined,
+      emisor: {
+        rfc: emisorRfc,
+        name: invoice.emisorName || 'Emisor',
+        regime: invoice.emisorRegime || 'R601',
+        zipCode: issuerProfile.emisorZipCode,
+      },
+      receptor: {
+        rfc: receptorRfc,
+        name: invoice.receptorName || 'Receptor',
+        zipCode: invoice.receptorZipCode,
+        regime: invoice.receptorRegime,
+      },
+      items: invoice.items.map((item) => ({
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+        discount: Number(item.discount),
+        taxRate: Number(item.taxRate),
+        satProductKey: item.satProductKey,
+        satUnitKey: item.satUnitKey,
+        unitName: item.unitName,
+        ivaRetAmount: item.ivaRetAmount ? Number(item.ivaRetAmount) : undefined,
+        isrRetAmount: item.isrRetAmount ? Number(item.isrRetAmount) : undefined,
+        iepsAmount: item.iepsAmount ? Number(item.iepsAmount) : undefined,
+        iepsRate: item.iepsRate ? Number(item.iepsRate) : undefined,
+      })),
+    };
+    // Reglas del SAT que el sandbox no revisa (régimen contra RFC, uso contra régimen, cuadre…): se frenan aquí,
+    // antes de reservar la factura, con un mensaje que quien factura puede corregir.
+    const problemas = validarCfdiParaTimbrar(entrada, issuerProfile.emisorRfc);
+    if (problemas.length) {
+      throw new BadRequestException(`No se puede timbrar la factura ${invoice.invoiceNumber}: ${problemas.join(' ')}`);
+    }
+
     // Claim atómico DRAFT → STAMPING para evitar doble timbrado concurrente.
     const claim = await this.prisma.invoice.updateMany({
       where: { id, status: 'DRAFT', cfdiUuid: null, isCancelled: false },
@@ -2032,48 +2083,7 @@ export class AccountingService {
 
     let stamp: Awaited<ReturnType<PacService['stamp']>>;
     try {
-      stamp = await this.pacService.stamp({
-        invoiceNumber: invoice.invoiceNumber,
-        serie: invoice.cfdiSerie,
-        folio: invoice.cfdiFolio,
-        total: Number(invoice.totalAmount),
-        subtotal: Number(invoice.subtotal),
-        taxTotal: Number(invoice.taxAmount),
-        currency: invoice.currency || 'MXN',
-        exchangeRate: invoice.exchangeRate ? Number(invoice.exchangeRate) : null,
-        paymentForm: invoice.satPaymentForm || 'FP99',
-        paymentMethod: invoice.satPaymentMethod || 'PUE',
-        cfdiUsage: invoice.cfdiUsage || 'G03',
-        tipoComprobante: invoice.cfdiRelatedUuids && invoice.cfdiRelationType === '01' ? 'E' : 'I',
-        relatedUuids: invoice.cfdiRelatedUuids?.split(',').map((u) => u.trim()).filter(Boolean),
-        relationType: invoice.cfdiRelationType || undefined,
-        emisor: {
-          rfc: emisorRfc,
-          name: invoice.emisorName || 'Emisor',
-          regime: invoice.emisorRegime || 'R601',
-          zipCode: issuerProfile.emisorZipCode,
-        },
-        receptor: {
-          rfc: receptorRfc,
-          name: invoice.receptorName || 'Receptor',
-          zipCode: invoice.receptorZipCode,
-          regime: invoice.receptorRegime,
-        },
-        items: invoice.items.map((item) => ({
-          description: item.description,
-          quantity: Number(item.quantity),
-          unitPrice: Number(item.unitPrice),
-          discount: Number(item.discount),
-          taxRate: Number(item.taxRate),
-          satProductKey: item.satProductKey,
-          satUnitKey: item.satUnitKey,
-          unitName: item.unitName,
-          ivaRetAmount: item.ivaRetAmount ? Number(item.ivaRetAmount) : undefined,
-          isrRetAmount: item.isrRetAmount ? Number(item.isrRetAmount) : undefined,
-          iepsAmount: item.iepsAmount ? Number(item.iepsAmount) : undefined,
-          iepsRate: item.iepsRate ? Number(item.iepsRate) : undefined,
-        })),
-      });
+      stamp = await this.pacService.stamp(entrada);
     } catch (err) {
       await this.prisma.invoice.updateMany({
         where: { id, status: 'STAMPING', cfdiUuid: null },
@@ -2964,6 +2974,15 @@ export class AccountingService {
     if (reasonNorm === '01' && !dto.substitutionUuid) {
       throw new BadRequestException('Motivo 01 requiere UUID sustituto');
     }
+    if (reasonNorm === '01') {
+      const sustituto = String(dto.substitutionUuid).trim();
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sustituto)) {
+        throw new BadRequestException(`El UUID sustituto (${sustituto}) no tiene el formato de un folio fiscal.`);
+      }
+      if (sustituto.toLowerCase() === invoice.cfdiUuid.toLowerCase()) {
+        throw new BadRequestException('El UUID sustituto no puede ser el de la misma factura que se cancela.');
+      }
+    }
 
     const cancelResult = await this.pacService.cancel({
       uuid: invoice.cfdiUuid,
@@ -3218,7 +3237,7 @@ export class AccountingService {
       );
     }
 
-    const stamp = await this.pacService.stampPayment({
+    const entradaPago: PacPaymentComplementInput = {
       invoiceNumber: `PAGO-${invoice.invoiceNumber}-${payment.id}`,
       serie: 'P',
       folio: String(payment.id),
@@ -3254,7 +3273,12 @@ export class AccountingService {
         remainingBalance,
         ivaRate: tasasIva[0] ?? 16,
       }],
-    });
+    };
+    const problemasPago = validarComplementoPago(entradaPago, issuerProfile.emisorRfc);
+    if (problemasPago.length) {
+      throw new BadRequestException(`No se puede timbrar el complemento de pago: ${problemasPago.join(' ')}`);
+    }
+    const stamp = await this.pacService.stampPayment(entradaPago);
 
     const claim = await this.prisma.payment.updateMany({
       where: { id: paymentId, cfdiPaymentUuid: null },

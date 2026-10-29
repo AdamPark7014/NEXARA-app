@@ -45,9 +45,18 @@
   - Sandbox (29-10, 12:30, mismas credenciales que la cuenta real): pasaron timbrar, reutilizar el mismo folio, el PDF
     y el REP 2.0. La cancelación no se puede probar ahí (solo con el RFC de prueba EKU9003173C9). Se corrigieron
     `NoIdentificacion` vacío y `ExchangeRate` en pagos MXN. En sandbox se crearon las series A y P.
+  - Pruebas de facturas (pedido de Adam, 29-10, sandbox):
+    - `pac/validacion-cfdi.ts` (+ spec) frena en `stampInvoice` y en el REP, antes de STAMPING, lo que el SAT rechaza:
+      RFC/dígito, régimen vs. persona, uso vs. régimen, P01, 616, «S.A. de C.V.», XAXX con «PUBLICO EN GENERAL»
+      (global no soportada), claves con formato, cuadre del total, moneda, forma/método e IEPS.
+    - Adaptador: razón social en mayúsculas y pistas de qué corregir en los rechazos del SAT.
+    - Cancelación con motivo 01: el UUID sustituto se valida.
+    - El emisor se lee por empresa (riesgo 11).
+    - Resultados de la batería en `docs/CFDI-GO-LIVE.md` §8.
   - **Falta:**
     - Adam: comprar la anualidad y crear las series **A** y **P** en la cuenta real; o pedírmelo y las creo por
       `POST /serie/{idSucursal}` en cuanto la API responda.
+    - Mesa contable: validar claves SAT contra el catálogo al capturar.
     - La contadora: preparar los borradores con RFC, régimen, CP, uso y claves SAT.
     - Cada CFDI real lo confirma Adam antes de timbrar.
   - Runbook actualizado: `docs/CFDI-GO-LIVE.md` §1 y §8.

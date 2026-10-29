@@ -179,10 +179,11 @@ async function timbrar(opts: { provider: string; folio: string }) {
         cfdiUsage: 'G03',
         cfdiRelatedUuids: null,
         cfdiRelationType: null,
-        emisorRfc: 'AAA010101AAA',
+        // RFC de prueba del SAT: desde el 29-10 el timbrado revisa el dígito verificador antes de llamar al PAC.
+        emisorRfc: 'EKU9003173C9',
         emisorName: 'Nexara',
         emisorRegime: 'R601',
-        receptorRfc: 'BBB010101BBB',
+        receptorRfc: 'URE180429TM6',
         receptorName: 'Cliente',
         receptorZipCode: '44100',
         receptorRegime: 'R601',

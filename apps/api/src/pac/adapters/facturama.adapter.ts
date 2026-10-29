@@ -113,6 +113,21 @@ function detalleError(texto: string): string {
   return texto.slice(0, 400) || 'sin detalle';
 }
 
+/** Qué corregir según el rechazo del SAT o de Facturama (mensajes vistos en el sandbox, 29-10-2026). */
+const PISTAS: Array<[RegExp, string]> = [
+  [/Nombre del receptor, debe pertenecer/i, 'Escribe la razón social del cliente tal como en su constancia de situación fiscal (con Ñ y acentos, sin «S.A. de C.V.»).'],
+  [/DomicilioFiscalReceptor/i, 'El código postal debe ser el de la constancia de situación fiscal del cliente.'],
+  [/RFC inscritos no cancelados/i, 'Revisa el RFC del cliente contra su constancia de situación fiscal.'],
+  [/'Serie' debe existir/i, 'Esa serie no está dada de alta en Facturama: créala en Perfil → Lugar de expedición.'],
+  [/no se encuentra en los catalogos/i, 'Revisa la clave en el catálogo del SAT (c_ClaveProdServ o c_ClaveUnidad).'],
+];
+
+function pista(detalle: string): string {
+  const encontradas = PISTAS.filter(([patron]) => patron.test(detalle)).map(([, texto]) => texto);
+  if (!encontradas.length) return '';
+  return `${/[.!?]$/.test(detalle.trim()) ? '' : '.'} ${encontradas.join(' ')}`;
+}
+
 /** Atributos del nodo TimbreFiscalDigital (no de otros nodos con `UUID`, como CfdiRelacionado). */
 function atributoTimbre(xml: string, nombre: string): string | null {
   const nodo = /<[^>]*TimbreFiscalDigital\b[^>]*>/.exec(xml)?.[0];
@@ -321,9 +336,12 @@ export class FacturamaAdapter implements IPacAdapter {
     lugar: string,
   ): Record<string, unknown> {
     const rfc = (r.rfc || '').trim().toUpperCase();
+    // El SAT compara la razón social con la de su padrón, que está en mayúsculas: en minúsculas la rechaza
+    // aunque esté bien escrita (sandbox, 29-10-2026).
+    const nombre = r.name.trim().replace(/\s+/g, ' ').toLocaleUpperCase('es-MX');
     if (rfc === RFC_PUBLICO_EN_GENERAL) {
       // Público en general: el SAT exige régimen 616, uso S01 y el CP del lugar de expedición.
-      return { Rfc: rfc, Name: r.name.trim(), CfdiUse: 'S01', FiscalRegime: '616', TaxZipCode: lugar };
+      return { Rfc: rfc, Name: nombre, CfdiUse: 'S01', FiscalRegime: '616', TaxZipCode: lugar };
     }
     const regimen = (r.regime || '').trim().toUpperCase().replace(/^R/, '');
     if (!/^\d{3}$/.test(regimen)) {
@@ -333,7 +351,7 @@ export class FacturamaAdapter implements IPacAdapter {
     if (!/^\d{5}$/.test(cp)) {
       throw new BadRequestException(`Falta el código postal fiscal del cliente ${r.name} (${rfc}).`);
     }
-    return { Rfc: rfc, Name: r.name.trim(), CfdiUse: usoCfdi, FiscalRegime: regimen, TaxZipCode: cp };
+    return { Rfc: rfc, Name: nombre, CfdiUse: usoCfdi, FiscalRegime: regimen, TaxZipCode: cp };
   }
 
   private lugarExpedicion(cp?: string | null): string {
@@ -539,7 +557,8 @@ export class FacturamaAdapter implements IPacAdapter {
       );
     }
     if (estado < 200 || estado >= 300) {
-      throw new BadRequestException(`Facturama rechazó la solicitud de ${etiqueta}: ${detalleError(texto)}`);
+      const detalle = detalleError(texto);
+      throw new BadRequestException(`Facturama rechazó la solicitud de ${etiqueta}: ${detalle}${pista(detalle)}`);
     }
     if (!texto) return null;
     try {
