@@ -1224,6 +1224,7 @@ export default function OpsActivityForm({
                   onTiempoTipico?.(m);
                 }}
                 onSugerencia={setSugerenciaIA}
+                estandarActivo={estandarManda}
               />
             ) : null}
             {complejidadVisible ? (

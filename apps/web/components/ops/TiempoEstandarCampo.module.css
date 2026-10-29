@@ -1,17 +1,12 @@
 /* Tiempo estándar al asignar (canvas «Tiempo estándar» y «Traslado»). Tokens --ui-*. */
 
+/* Dos columnas solo si la columna del formulario da para las dos (en Asignar suele ser angosta). */
 .campo {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: var(--ui-s4);
   align-items: start;
   margin-top: var(--ui-s4);
-}
-
-@media (max-width: 760px) {
-  .campo {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .entradas {
