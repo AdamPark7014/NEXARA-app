@@ -211,6 +211,8 @@ extension DemoStore {
             }
             return reply(fxMyActivities())
         }
+        // me/activities/tiempo-calculado: vista previa de la autoasignación (`DemoFixtures+Activities`).
+        if parts[2] == "tiempo-calculado" { return reply(fxTiempoCalculado(json)) }
         guard let id = Int(parts[2]) else { return empty() }
         let action = parts.count > 3 ? parts[3] : ""
         switch action {
@@ -290,7 +292,13 @@ extension DemoStore {
         let owner = selfAssign ? DemoMode.meId : (json["responsableId"] as? Int ?? DemoMode.meId)
         let title = (json["titulo"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let start = minutesFromEpoch(json["fechaInicio"] as? String) ?? 30
-        let limit = minutesFromEpoch(json["fechaMaxima"] as? String) ?? (start + 240)
+        // Como la API desde el 29-10: a sí mismo, el tiempo y la entrega los fija el sistema con el
+        // título y el tipo (lo que mande el cliente se ignora), igual que la vista previa.
+        let fijo: DemoJSON? = owner == DemoMode.meId ? fxTiempoCalculado(json) : nil
+        let limit = minutesFromEpoch(fijo?["fechaEntregaEsperada"] as? String)
+            ?? minutesFromEpoch(json["fechaMaxima"] as? String)
+            ?? (start + 240)
+        let estimado = (fijo?["tiempoEstandarMin"] as? Int) ?? (json["tiempoEstimadoMin"] as? Int) ?? 60
         let activity = DemoActivity(
             id: id,
             folio: "AN-0\(160 + extraActivities.count)",
@@ -308,13 +316,13 @@ extension DemoStore {
             avance: 0,
             evidencia: "",
             indicaciones: json["indicaciones"] as? String ?? "",
-            estimadoMin: json["tiempoEstimadoMin"] as? Int ?? 60,
+            estimadoMin: estimado,
             descripcion: ""
         )
         extraActivities.append(activity)
         let complejidad = DemoComplejidad(
-            elegida: json["complejidad"] as? String,
-            sugerida: json["complejidadSugerida"] as? String
+            elegida: (fijo?["complejidad"] as? String) ?? (json["complejidad"] as? String),
+            sugerida: fijo == nil ? json["complejidadSugerida"] as? String : nil
         )
         if complejidad.elegida != nil || complejidad.sugerida != nil { complejidadCreada[id] = complejidad }
         if owner == DemoMode.meId { openOrder.append(id) }

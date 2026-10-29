@@ -338,6 +338,82 @@ struct CoreSugerenciaComplejidad: Hashable {
     let motivo: String
 }
 
+// MARK: - Tiempo y entrega que fija el sistema (autoasignación)
+
+/// Autoasignación (regla de Adam, 29-10): el tiempo, la complejidad y la entrega los fija el
+/// sistema desde el título y el tipo; solo un superior los ajusta al asignar a alguien de su
+/// equipo. En el alta propia se enseñan en solo lectura con su desglose
+/// (`POST me/activities/tiempo-calculado`). Espejo de `TiempoCalculado.kt` de Android.
+struct CoreTiempoCalculado: Hashable {
+    struct Concepto: Hashable {
+        let concepto: String
+        /// 0 en las líneas «Supuesto: …»: se enseñan sin minutos.
+        let minutos: Double?
+    }
+
+    /// Renglón del desglose ya listo para pintarse.
+    struct Linea: Hashable {
+        let texto: String
+        let minutos: String?
+    }
+
+    let tiempoEstandarMin: Double?
+    let desglose: [Concepto]
+    let supuestos: [String]
+    let complejidad: String?
+    let fechaEntregaEsperada: String?
+
+    /// El desglose: «Supuesto: …» va sin minutos (llega con 0); los conceptos vacíos no se pintan.
+    var lineas: [Linea] {
+        desglose.compactMap { d in
+            let concepto = d.concepto.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !concepto.isEmpty else { return nil }
+            let esSupuesto = concepto.lowercased().hasPrefix("supuesto")
+            let minutos = d.minutos.flatMap { $0.isFinite && $0 > 0 && !esSupuesto ? Int($0.rounded()) : nil }
+            return Linea(texto: concepto, minutos: minutos.flatMap { CoreFormat.minutes($0) })
+        }
+    }
+
+    /// «Supuesto: una sola visita» por cada supuesto que no venga ya como línea del desglose.
+    var supuestosTexto: [String] {
+        let yaEnDesglose = Set(lineas.map(\.texto))
+        return supuestos.compactMap { s in
+            var limpio = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            if limpio.lowercased().hasPrefix("supuesto:") {
+                limpio = String(limpio.dropFirst("supuesto:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            guard !limpio.isEmpty else { return nil }
+            let texto = "Supuesto: \(limpio)"
+            return yaEnDesglose.contains(texto) ? nil : texto
+        }
+    }
+
+    /// «Estándar 2 h 20 min · Compleja»; nil si no trae ni tiempo ni complejidad.
+    var resumen: String? {
+        let tiempo = tiempoEstandarMin
+            .flatMap { $0.isFinite && $0 > 0 ? Int($0.rounded()) : nil }
+            .flatMap { CoreFormat.minutes($0) }
+            .map { "Estándar \($0)" }
+        let nivel = CoreComplejidad.de(complejidad)?.label
+        let partes = [tiempo, nivel].compactMap { $0 }
+        return partes.isEmpty ? nil : partes.joined(separator: " · ")
+    }
+
+    /// «Entrega a más tardar 17:20» o, si no cae el día del inicio (en México),
+    /// «Entrega a más tardar el 30/10 a las 09:20». nil sin entrega.
+    func entrega(inicio: Date?) -> String? {
+        guard let fin = NxFormat.parseISO(fechaEntregaEsperada) else { return nil }
+        let hora = CoreSchedule.hhmm(fin)
+        if let inicio, NxHoraMexico.dia(inicio) != NxHoraMexico.dia(fin) {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = CoreSchedule.mexico
+            let p = calendar.dateComponents([.day, .month], from: fin)
+            return "Entrega a más tardar el \(p.day ?? 1)/\(p.month ?? 1) a las \(hora)"
+        }
+        return "Entrega a más tardar \(hora)"
+    }
+}
+
 /// Lo típico que se enseña: del nivel elegido o, si aún no hay suficientes, del tipo completo.
 struct CoreTipicoElegido: Hashable {
     let minutos: Int
@@ -579,6 +655,23 @@ enum CoreActivityRules {
         let hora = NxHoraMexico.hhmm(fechaMaxima)
         // 23:59 es el fin del día escrito a mano, no un compromiso (`limiteEsFinDeDia` de la API).
         return hora == "23:59" ? nil : hora
+    }
+
+    /// La entrega al editar el detalle (`CoreActivityKinds.entregaEditada` de Android): nil si el
+    /// día (en México) no cambió, y entonces no se manda: desde el 29-10 la API cuenta como cambio
+    /// cualquier valor distinto y solo un superior de quien la ejecuta puede hacerlo (403). Si
+    /// cambió, el día nuevo a la misma hora de México que tenía (18:00 si no tenía).
+    ///
+    /// Antes iba siempre «día T12:00Z»: aun sin tocarla, la entrega se movía a las 6:00 de México.
+    /// El campo se llena con `ActivityDetailFormat.parse` y se pinta en hora de México, así que se
+    /// compara el día de México (no los 10 primeros caracteres del ISO, que son el día UTC).
+    static func entregaEditada(original: String?, nuevoDia: Date?) -> String? {
+        guard let nuevoDia else { return nil }
+        let antes = ActivityDetailFormat.parse(original)
+        if let antes, NxHoraMexico.dia(antes) == NxHoraMexico.dia(nuevoDia) { return nil }
+        let hora = antes.map { CoreSchedule.hhmm($0) } ?? "18:00"
+        guard let fecha = CoreSchedule.at(day: nuevoDia, hhmm: hora) else { return nil }
+        return CoreFormat.isoString(fecha)
     }
 
     // MARK: Complejidad: cuándo se pide y cómo se nombra el tipo de trabajo

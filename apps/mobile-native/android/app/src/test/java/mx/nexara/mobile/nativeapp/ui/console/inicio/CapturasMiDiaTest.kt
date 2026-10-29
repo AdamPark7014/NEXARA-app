@@ -143,6 +143,42 @@ class CapturasMiDiaTest {
         guardar(bitmap, "mi-dia.png")
     }
 
+    /** Base vacía: sin entrada checada y sin nada asignado. */
+    @Test
+    fun miDiaVacio() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            NexaraTheme {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(NxTheme.colors.surface)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    InicioHeader(fecha = "Jueves 29 de octubre", unreadCount = 0, onOpenNotifications = {})
+                    JornadaTarjeta(
+                        jornada = InicioRules.Jornada.SIN_ENTRADA,
+                        titulo = "Sin entrada registrada",
+                        detalle = "Se toma una foto y tu ubicación al checar",
+                        loading = false,
+                        entradaHabilitada = true,
+                        onEntrada = {},
+                        onSalida = {},
+                        onComida = {},
+                        onVerJornada = {},
+                    )
+                    TodoAlDiaCard(hechasHoy = 0, onVerTodas = {})
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(300)
+        val raiz = compose.activity.window.decorView.rootView
+        val bitmap = Bitmap.createBitmap(raiz.width, raiz.height, Bitmap.Config.ARGB_8888)
+        raiz.draw(Canvas(bitmap))
+        guardar(bitmap, "mi-dia-vacio.png")
+    }
+
     /** Inicio de dirección general con datos como los del artboard «App · Inicio CEO». */
     @Test
     fun inicioCeo() {

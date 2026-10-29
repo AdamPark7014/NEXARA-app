@@ -72,6 +72,13 @@ struct InicioView: View {
             .padding(.bottom, NxSpacing.xl)
         }
         .background(NxColors.surface.ignoresSafeArea())
+        // Franja del color del fondo detrás de la barra de estado: al desplazar, la banda oscura
+        // pasaba por debajo de la hora (en negro) y no se leía.
+        .overlay(alignment: .top) {
+            NxColors.surface
+                .ignoresSafeArea(edges: .top)
+                .frame(height: 0)
+        }
         .toolbar(.hidden, for: .navigationBar)
         .refreshable { await reload() }
         .task { await reload() }

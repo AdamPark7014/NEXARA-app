@@ -1033,7 +1033,7 @@ private fun EquipoCard(onVerEquipo: (() -> Unit)?) {
 }
 
 @Composable
-private fun TodoAlDiaCard(hechasHoy: Int, onVerTodas: (() -> Unit)?) {
+internal fun TodoAlDiaCard(hechasHoy: Int, onVerTodas: (() -> Unit)?) {
     val c = NxTheme.colors
     val shape = RoundedCornerShape(22.dp)
     Column(
