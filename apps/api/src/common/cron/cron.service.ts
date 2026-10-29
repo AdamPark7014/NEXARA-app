@@ -156,7 +156,7 @@ export class CronService {
   }
 
   // ── Limpieza de logs de auditoría > 90 días — domingo 3AM ──────
-  @Cron('0 3 * * 0', { name: 'audit-cleanup' })
+  @Cron('0 3 * * 0', { name: 'audit-cleanup', timeZone: WORKDAY_TIMEZONE })
   async handleAuditCleanup() {
     this.logger.log('Limpiando logs de auditoría antiguos...');
     const cutoff = new Date(Date.now() - 90 * 86400000);
@@ -287,7 +287,7 @@ export class CronService {
   }
 
   // ── IAM: usuarios inactivos 30d — diario 9AM ───────────────────
-  @Cron('0 9 * * *', { name: 'inactive-users-warn' })
+  @Cron('0 9 * * *', { name: 'inactive-users-warn', timeZone: WORKDAY_TIMEZONE })
   async handleInactiveUsers() {
     const cutoff = new Date(Date.now() - 30 * 86_400_000);
     const stale = await this.prisma.user.findMany({
@@ -342,7 +342,7 @@ export class CronService {
   }
 
   // ── Inventario: dead stock + low stock — diario 7AM ────────────
-  @Cron('0 7 * * *', { name: 'inventory-health-alerts' })
+  @Cron('0 7 * * *', { name: 'inventory-health-alerts', timeZone: WORKDAY_TIMEZONE })
   async handleInventoryHealth() {
     const levels = await this.prisma.stockLevel.findMany({
       include: {
