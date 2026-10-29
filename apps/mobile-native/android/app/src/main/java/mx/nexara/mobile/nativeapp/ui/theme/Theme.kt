@@ -19,8 +19,8 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxDarkPalette
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLightPalette
 
 /**
- * Esquema claro = tokens v2 (`.ai/ui-maquetas/PLAN.md` §2): teal de marca
- * #1F9E84, texto #0F172A. Sin color dinámico: la marca manda.
+ * Esquema claro = tokens de Core (`apps/web/app/ui-tokens.scss`, 28-10): verde #168570,
+ * fondo #EEF1F5 y texto #14171F. Sin color dinámico: la marca manda.
  */
 private val LightColors = lightColorScheme(
     primary = NxColors.Brand,
@@ -46,18 +46,18 @@ private val LightColors = lightColorScheme(
     onSurfaceVariant = NxColors.Muted,
     // Material 3 trae contenedores lila por defecto (barra inferior, tarjetas, campos):
     // se fijan a neutros pizarra para que toda la app se lea con la marca.
-    surfaceVariant = Color(0xFFEEF2F7),
+    surfaceVariant = Color(0xFFEEF1F5),
     surfaceBright = Color.White,
-    surfaceDim = Color(0xFFE2E8F0),
+    surfaceDim = Color(0xFFE6E9EF),
     surfaceContainerLowest = Color.White,
-    surfaceContainerLow = Color(0xFFF8FAFC),
-    surfaceContainer = Color(0xFFF1F5F9),
-    surfaceContainerHigh = Color(0xFFEEF2F7),
-    surfaceContainerHighest = Color(0xFFE8EDF4),
+    surfaceContainerLow = Color(0xFFF8FAFB),
+    surfaceContainer = Color(0xFFF2F4F7),
+    surfaceContainerHigh = Color(0xFFEEF1F5),
+    surfaceContainerHighest = Color(0xFFE6E9EF),
     inverseSurface = NxColors.Slate,
-    inverseOnSurface = Color(0xFFF1F5F9),
-    outline = Color(0xFFCBD5E1),
-    outlineVariant = Color(0xFFE2E8F0),
+    inverseOnSurface = Color(0xFFF2F4F7),
+    outline = Color(0xFFCDD5DE),
+    outlineVariant = Color(0xFFE6E9EF),
     error = NxColors.Danger,
     onError = Color.White,
     errorContainer = NxColors.DangerSoft,
@@ -105,13 +105,13 @@ private val DarkColors = darkColorScheme(
     scrim = Color.Black,
 )
 
-/** Radios v2: 8 controles chicos · 12 controles · 16 tarjetas · 20 hojas. */
+/** Radios de Core: 8 controles chicos · 10 · 14 controles · 20 tarjetas · 24 hojas. */
 val NexaraShapes = Shapes(
-    extraSmall = RoundedCornerShape(6.dp),
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(12.dp),
-    large = RoundedCornerShape(16.dp),
-    extraLarge = RoundedCornerShape(20.dp),
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(14.dp),
+    large = RoundedCornerShape(20.dp),
+    extraLarge = RoundedCornerShape(24.dp),
 )
 
 /**

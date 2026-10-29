@@ -67,8 +67,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -78,6 +80,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import java.time.LocalDate
 import kotlinx.coroutines.delay
 import mx.nexara.mobile.nativeapp.access.CoreKeys
 import mx.nexara.mobile.nativeapp.data.AuthRepository
@@ -87,8 +90,8 @@ import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl
 import mx.nexara.mobile.nativeapp.ui.common.NotificationHealthBanner
-import mx.nexara.mobile.nativeapp.ui.common.rememberProblemaDeAvisos
 import mx.nexara.mobile.nativeapp.ui.common.rememberCameraCapture
+import mx.nexara.mobile.nativeapp.ui.common.rememberProblemaDeAvisos
 import mx.nexara.mobile.nativeapp.ui.console.CoreMenu
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules
 import mx.nexara.mobile.nativeapp.ui.console.activities.NxChip
@@ -107,7 +110,8 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxRefreshErrorBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTheme
 import mx.nexara.mobile.nativeapp.ui.enterprise.icon
-import java.time.LocalDate
+import mx.nexara.mobile.nativeapp.ui.enterprise.nxFlotante
+import mx.nexara.mobile.nativeapp.ui.theme.InterTight
 
 /**
  * Inicio (rediseño v2, `.ai/ui-maquetas/movil-inicio.html`): la primera pestaña.
@@ -173,7 +177,6 @@ fun InicioScreen(
         ) {
             item(key = "header") {
                 InicioHeader(
-                    user = user,
                     fecha = InicioRules.fechaLarga(hoy),
                     unreadCount = unreadCount,
                     onOpenNotifications = onOpenNotifications,
@@ -223,7 +226,6 @@ fun InicioScreen(
                         TodoAlDiaCard(hechasHoy = state.hechasHoy, onVerTodas = onOpenActividades)
                     }
                     else -> {
-                        item(key = "ahora-titulo") { SectionTitle("Ahora") }
                         item(key = "ahora-${actual.id}") {
                             ActualCard(
                                 a = actual,
@@ -252,7 +254,7 @@ fun InicioScreen(
                         }
                         if (siguientes.isNotEmpty()) {
                             item(key = "despues-titulo") {
-                                SectionTitle("Después, hoy", action = "Ver todas", onAction = onOpenActividades)
+                                SectionTitle("Lo que sigue hoy", action = "Ver todas", onAction = onOpenActividades)
                             }
                             item(key = "despues") {
                                 SiguientesCard(items = siguientes, onOpen = { onOpenActivity(it.id, null) })
@@ -290,8 +292,7 @@ fun InicioScreen(
 // ── Cabecera ────────────────────────────────────────────────────────────────
 
 @Composable
-private fun InicioHeader(
-    user: SessionUser?,
+internal fun InicioHeader(
     fecha: String,
     unreadCount: Int,
     onOpenNotifications: () -> Unit,
@@ -301,75 +302,50 @@ private fun InicioHeader(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(top = 12.dp, bottom = 2.dp),
+            .padding(top = 16.dp, bottom = 4.dp, start = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Avatar(user = user, size = 48.dp)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(fecha, fontSize = 13.sp, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                InicioRules.saludo(user?.nombre),
-                fontSize = 22.sp,
-                lineHeight = 26.sp,
+                "Mi día",
+                fontFamily = InterTight,
+                fontSize = 28.sp,
+                lineHeight = 32.sp,
                 fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.5).sp,
                 color = c.fg,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.semantics { heading() },
             )
         }
+        // Campana blanca que flota, con un punto de marca cuando hay avisos sin leer.
         Box(
             modifier = Modifier
                 .size(44.dp)
+                .nxFlotante(CircleShape, 8.dp)
                 .clip(CircleShape)
                 .background(c.card)
-                .border(1.dp, c.border, CircleShape)
                 .clickable(onClick = onOpenNotifications),
             contentAlignment = Alignment.Center,
         ) {
-            BadgedBox(
-                badge = {
-                    if (unreadCount > 0) {
-                        Badge(containerColor = c.danger, contentColor = Color.White) {
-                            Text(if (unreadCount > 99) "99+" else unreadCount.toString())
-                        }
-                    }
-                },
-            ) {
-                Icon(
-                    Icons.Outlined.Notifications,
-                    contentDescription = if (unreadCount > 0) "Notificaciones, $unreadCount sin leer" else "Notificaciones",
-                    tint = c.fg2,
-                    modifier = Modifier.size(22.dp),
+            Icon(
+                Icons.Outlined.Notifications,
+                contentDescription = if (unreadCount > 0) "Avisos, $unreadCount sin leer" else "Avisos",
+                tint = c.fg,
+                modifier = Modifier.size(21.dp),
+            )
+            if (unreadCount > 0) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 9.dp, end = 10.dp)
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(c.brand),
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun Avatar(user: SessionUser?, size: androidx.compose.ui.unit.Dp) {
-    val c = NxTheme.colors
-    val avatarUrl = user?.avatarUrl
-    if (!avatarUrl.isNullOrBlank()) {
-        AsyncImage(
-            model = toAbsoluteAssetUrl(avatarUrl),
-            contentDescription = user.nombre,
-            modifier = Modifier.size(size).clip(CircleShape).border(2.dp, c.brandSoft2, CircleShape),
-            contentScale = ContentScale.Crop,
-        )
-    } else {
-        Box(
-            modifier = Modifier.size(size).clip(CircleShape).background(c.brandSoft),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                CoreActivityRules.initials(user?.nombre).ifBlank { "?" },
-                color = c.brandText,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = (size.value * 0.36f).sp,
-            )
         }
     }
 }
@@ -383,8 +359,8 @@ private fun SectionTitle(title: String, action: String? = null, onAction: (() ->
     ) {
         Text(
             title,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
             color = c.fg,
             modifier = Modifier.weight(1f).semantics { heading() },
         )
@@ -458,8 +434,8 @@ private fun JornadaHero(
         InicioRules.Jornada.SIN_ENTRADA -> "Sin entrada registrada"
     }
     val subTexto = when {
-        jornada == InicioRules.Jornada.EN_JORNADA && state.gpsActivo -> "Compartiendo tu ubicación de jornada"
-        jornada == InicioRules.Jornada.EN_JORNADA -> "Tu ubicación de jornada está apagada"
+        jornada == InicioRules.Jornada.EN_JORNADA && state.gpsActivo -> "GPS activo"
+        jornada == InicioRules.Jornada.EN_JORNADA -> "GPS apagado"
         jornada == InicioRules.Jornada.COMPLETADA -> "Entrada y salida registradas hoy"
         else -> "Se toma una foto y tu ubicación al checar"
     }
@@ -469,93 +445,34 @@ private fun JornadaHero(
         abierta -> "salida"
         else -> null
     }
-    val shape = RoundedCornerShape(NxDimens.SheetRadius)
+    val titulo = when (jornada) {
+        InicioRules.Jornada.EN_JORNADA -> "Entraste a las ${fmtHoraCorta(inicioIso)}"
+        InicioRules.Jornada.COMPLETADA -> "Jornada completada · ${fmtHoraCorta(inicioIso)} – ${fmtHoraCorta(salidaIso)}"
+        InicioRules.Jornada.SIN_ENTRADA -> estadoTexto
+    }
+    val detalle = when (jornada) {
+        InicioRules.Jornada.SIN_ENTRADA -> subTexto
+        else -> "${InicioRules.horasMinutos(trabajadoMs)} h trabajadas · $subTexto"
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(Color(0xFF2BBD9D), Color(0xFF1A8A73), Color(0xFF0F5F4F)),
-                        start = Offset(Float.POSITIVE_INFINITY, 0f),
-                        end = Offset(0f, Float.POSITIVE_INFINITY),
-                    ),
-                )
-                .drawBehind {
-                    drawCircle(
-                        color = Color.White.copy(alpha = 0.06f),
-                        radius = 110.dp.toPx(),
-                        center = Offset(size.width - 20.dp.toPx(), size.height + 30.dp.toPx()),
-                        style = Stroke(width = 28.dp.toPx()),
-                    )
-                }
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(if (abierta) Color(0xFF7DFFD8) else Color.White.copy(alpha = 0.55f)),
-                )
-                Text(estadoTexto, fontSize = 13.5.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.92f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-                Text(
-                    InicioRules.horasMinutos(trabajadoMs),
-                    fontSize = 40.sp,
-                    lineHeight = 42.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                )
-                Text("h trabajadas", fontSize = 16.sp, color = Color.White.copy(alpha = 0.78f), modifier = Modifier.padding(bottom = 6.dp))
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(Icons.Outlined.Place, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(15.dp))
-                Text(subTexto, fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                when (jornada) {
-                    InicioRules.Jornada.EN_JORNADA -> {
-                        HeroButton(text = "Comida", icon = Icons.Outlined.Restaurant, light = true, onClick = onComida, modifier = Modifier.weight(1f))
-                        HeroButton(
-                            text = "Checar salida",
-                            icon = Icons.AutoMirrored.Outlined.Logout,
-                            light = false,
-                            loading = state.checkInLoading,
-                            onClick = {
-                                pendiente = "salida"
-                                tomarFoto()
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    InicioRules.Jornada.SIN_ENTRADA -> {
-                        HeroButton(
-                            text = "Checar entrada",
-                            icon = Icons.AutoMirrored.Outlined.Login,
-                            light = false,
-                            loading = state.checkInLoading,
-                            enabled = siguiente == "entrada",
-                            onClick = {
-                                pendiente = "entrada"
-                                tomarFoto()
-                            },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    InicioRules.Jornada.COMPLETADA -> {
-                        HeroButton(text = "Ver mi jornada", icon = Icons.Outlined.Schedule, light = true, onClick = onVerJornada, modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-        }
+        JornadaTarjeta(
+            jornada = jornada,
+            titulo = titulo,
+            detalle = detalle,
+            loading = state.checkInLoading,
+            entradaHabilitada = siguiente == "entrada",
+            onEntrada = {
+                pendiente = "entrada"
+                tomarFoto()
+            },
+            onSalida = {
+                pendiente = "salida"
+                tomarFoto()
+            },
+            onComida = onComida,
+            onVerJornada = onVerJornada,
+        )
         state.checkInMessage?.takeIf { it.isNotBlank() }?.let { msg ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
@@ -574,53 +491,139 @@ private fun JornadaHero(
     }
 }
 
+/**
+ * Tarjeta blanca compacta de la jornada (canvas «Mi día»): el estado y su único botón, y la
+ * fila de comida mientras la jornada está abierta. Sin estado propio, para la pantalla y para
+ * las capturas en la JVM (`CapturasMiDiaTest`).
+ */
 @Composable
-private fun HeroButton(
+internal fun JornadaTarjeta(
+    jornada: InicioRules.Jornada,
+    titulo: String,
+    detalle: String,
+    loading: Boolean,
+    entradaHabilitada: Boolean,
+    onEntrada: () -> Unit,
+    onSalida: () -> Unit,
+    onComida: () -> Unit,
+    onVerJornada: () -> Unit,
+) {
+    val c = NxTheme.colors
+    val shape = RoundedCornerShape(NxDimens.PanelRadius)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .nxFlotante(shape)
+            .clip(shape)
+            .background(c.card),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(if (jornada == InicioRules.Jornada.SIN_ENTRADA) c.sunken else c.successSoft),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (jornada == InicioRules.Jornada.SIN_ENTRADA) Icons.Outlined.Schedule else Icons.Outlined.TaskAlt,
+                    contentDescription = null,
+                    tint = if (jornada == InicioRules.Jornada.SIN_ENTRADA) c.fg2 else c.success,
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(titulo, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = c.fg, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(detalle, fontSize = 13.sp, color = c.muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            when (jornada) {
+                InicioRules.Jornada.SIN_ENTRADA -> JornadaBoton(
+                    text = "Entrada",
+                    icon = Icons.AutoMirrored.Outlined.Login,
+                    primario = true,
+                    loading = loading,
+                    enabled = entradaHabilitada,
+                    onClick = onEntrada,
+                )
+                InicioRules.Jornada.EN_JORNADA -> JornadaBoton(
+                    text = "Salida",
+                    icon = Icons.AutoMirrored.Outlined.Logout,
+                    primario = false,
+                    loading = loading,
+                    onClick = onSalida,
+                )
+                InicioRules.Jornada.COMPLETADA -> JornadaBoton(
+                    text = "Ver",
+                    icon = Icons.Outlined.Schedule,
+                    primario = false,
+                    onClick = onVerJornada,
+                )
+            }
+        }
+        if (jornada == InicioRules.Jornada.EN_JORNADA) {
+            HorizontalDivider(color = c.borderSubtle)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onComida)
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(Icons.Outlined.Restaurant, contentDescription = null, tint = c.fg2, modifier = Modifier.size(18.dp))
+                Text("Comida", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.fg, modifier = Modifier.weight(1f))
+                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = c.fg4)
+            }
+        }
+    }
+}
+
+@Composable
+private fun JornadaBoton(
     text: String,
     icon: ImageVector,
-    light: Boolean,
+    primario: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
     loading: Boolean = false,
     enabled: Boolean = true,
 ) {
+    val c = NxTheme.colors
     Button(
         onClick = onClick,
         enabled = enabled && !loading,
-        shape = RoundedCornerShape(16.dp),
-        colors = if (light) {
-            ButtonDefaults.buttonColors(
-                containerColor = Color.White.copy(alpha = 0.16f),
-                contentColor = Color.White,
-                disabledContainerColor = Color.White.copy(alpha = 0.10f),
-                disabledContentColor = Color.White.copy(alpha = 0.6f),
-            )
+        shape = RoundedCornerShape(12.dp),
+        colors = if (primario) {
+            ButtonDefaults.buttonColors(containerColor = c.brand, contentColor = Color.White)
         } else {
-            ButtonDefaults.buttonColors(
-                containerColor = Color.White,
-                contentColor = Color(0xFF0F5F4F),
-                disabledContainerColor = Color.White.copy(alpha = 0.6f),
-                disabledContentColor = Color(0xFF0F5F4F).copy(alpha = 0.6f),
-            )
+            ButtonDefaults.buttonColors(containerColor = c.card, contentColor = c.fg)
         },
-        border = if (light) androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)) else null,
-        modifier = modifier.heightIn(min = NxDimens.PrimaryButtonHeight),
-        contentPadding = PaddingValues(horizontal = 12.dp),
+        border = if (primario) null else androidx.compose.foundation.BorderStroke(1.dp, c.border),
+        modifier = Modifier.heightIn(min = 44.dp),
+        contentPadding = PaddingValues(horizontal = 14.dp),
     ) {
         if (loading) {
-            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color(0xFF0F5F4F))
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = if (primario) Color.White else c.brand,
+            )
         } else {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
         }
-        Spacer(Modifier.width(8.dp))
-        Text(if (loading) "Registrando…" else text, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(6.dp))
+        Text(if (loading) "…" else text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
 // ── Aviso ───────────────────────────────────────────────────────────────────
 
 @Composable
-private fun AvisoCard(aviso: InicioRules.Aviso, onClick: () -> Unit) {
+internal fun AvisoCard(aviso: InicioRules.Aviso, onClick: () -> Unit) {
     val c = NxTheme.colors
     val tinta = when (aviso.tono) {
         InicioRules.Tono.DANGER -> c.danger
@@ -641,7 +644,7 @@ private fun AvisoCard(aviso: InicioRules.Aviso, onClick: () -> Unit) {
         InicioRules.Tono.WARNING -> c.warningText
         else -> c.fg
     }
-    val shape = RoundedCornerShape(NxDimens.PanelRadius)
+    val shape = RoundedCornerShape(16.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -675,8 +678,13 @@ private fun AvisoCard(aviso: InicioRules.Aviso, onClick: () -> Unit) {
 
 // ── Ahora ───────────────────────────────────────────────────────────────────
 
+/**
+ * La actividad de ahora en la banda oscura con resplandor (canvas «App · Mi día»): estado y
+ * folio, título, el reloj grande, plan y hora compromiso, el avance contra el plan, y dos
+ * botones: pausar (o ver el detalle) y la acción principal.
+ */
 @Composable
-private fun ActualCard(
+internal fun ActualCard(
     a: MyActivityItemDto,
     accionEnCurso: Boolean,
     accionError: String?,
@@ -684,185 +692,253 @@ private fun ActualCard(
     onDetalle: () -> Unit,
     onPausar: () -> Unit,
 ) {
-    val c = NxTheme.colors
     val accion = InicioRules.accion(a)
-    val estado = InicioRules.estado(a)
-    val avance = InicioRules.avance(a)
     val lugar = InicioRules.lugar(a)
-    val kindColor = categoryColor(a.coreKind, c)
     val pausable = a.despachador != true && SesionActividadRules.puedePausar(a.sesion(), a.estatus)
-    val estadoColor = when (estado.tono) {
-        InicioRules.Tono.INFO -> c.info
-        InicioRules.Tono.WARNING -> c.warning
-        InicioRules.Tono.DANGER -> c.danger
-        InicioRules.Tono.SUCCESS -> c.success
-        InicioRules.Tono.NEUTRAL -> c.fg2
+    // `minutosReales` viene calculado al consultar; desde ahí el reloj corre en el teléfono.
+    val cargadoMs = remember(a) { System.currentTimeMillis() }
+    var ahoraMs by remember(a) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(a, a.enCurso) {
+        while (a.enCurso == true) {
+            delay(1_000)
+            ahoraMs = System.currentTimeMillis()
+        }
     }
-    val shape = RoundedCornerShape(NxDimens.SheetRadius)
+    val segundos = InicioRules.segundosTrabajados(a, cargadoMs, ahoraMs)
+    val avancePlan = InicioRules.avancePlan(a, segundos)
+    val pie = InicioRules.pieBanda(a)
+    val shape = RoundedCornerShape(26.dp)
+    val tenue = Color(0xFFC9CED8)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .nxFlotante(shape, 14.dp)
             .clip(shape)
-            .background(c.card)
-            .border(1.dp, c.border, shape)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .background(BandaFondo)
+            .drawBehind { dibujarResplandor() }
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier.size(28.dp).background(kindColor.copy(alpha = 0.14f), RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(CoreActivityRules.kindGlyph(a.coreKind).icon, contentDescription = null, tint = kindColor, modifier = Modifier.size(16.dp))
-            }
             Text(
-                listOfNotNull(
-                    CoreActivityRules.kindLabel(a.coreKind, a.ticketTypeCustom),
-                    a.anNumber?.takeIf { it.isNotBlank() },
-                ).joinToString("  "),
-                fontSize = 13.sp,
+                InicioRules.etiquetaBanda(a).uppercase(),
+                fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = c.muted,
+                letterSpacing = 0.5.sp,
+                color = Color(0xFFB9BFCC),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            NxChip(text = estado.label, color = estadoColor, dot = true)
-        }
-        Text(
-            InicioRules.titulo(a),
-            fontSize = 18.sp,
-            lineHeight = 23.sp,
-            fontWeight = FontWeight.Bold,
-            color = c.fg,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (lugar != null) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(Icons.Outlined.Place, contentDescription = null, tint = c.muted, modifier = Modifier.size(15.dp))
-                Text(lugar, fontSize = 13.5.sp, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // El estado ya va en la etiqueta: la pastilla dice cómo va contra el límite.
+            InicioRules.pastillaBanda(a)?.let { pastilla ->
+                Text(
+                    pastilla,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color.White.copy(alpha = 0.12f))
+                        .padding(horizontal = 9.dp, vertical = 3.dp),
+                )
             }
         }
-        a.periodo?.etiqueta?.takeIf { it.isNotBlank() }?.let {
-            Text(it, fontSize = 12.5.sp, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(
+            modifier = Modifier.clickable(onClick = onDetalle),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                InicioRules.titulo(a),
+                fontFamily = InterTight,
+                fontSize = 21.sp,
+                lineHeight = 25.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            listOfNotNull(lugar, a.periodo?.etiqueta?.takeIf { it.isNotBlank() }).joinToString(" · ").takeIf { it.isNotEmpty() }?.let {
+                Text(it, fontSize = 14.sp, color = tenue, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
         }
-        if (avance != null) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 2.dp)) {
-                LinearProgressIndicator(
-                    progress = { if (avance.second == 0) 0f else avance.first.toFloat() / avance.second },
-                    modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(999.dp)),
-                    color = c.brand,
-                    trackColor = c.sunken,
-                    drawStopIndicator = {},
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                segundos?.let { InicioRules.reloj(it) } ?: (InicioRules.horaDe(a.fechaInicio) ?: "—"),
+                fontFamily = InterTight,
+                fontSize = 40.sp,
+                lineHeight = 44.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.8).sp,
+                color = Color.White,
+                style = TextStyle(fontFeatureSettings = "tnum"),
+                modifier = Modifier.semantics {
+                    contentDescription = segundos?.let { "Tiempo trabajado ${InicioRules.reloj(it)}" } ?: "Programada"
+                },
+            )
+            (pie ?: if (segundos == null) "Programada para hoy" else null)?.let {
+                Text(it, fontSize = 13.sp, color = tenue, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (avancePlan != null) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.White.copy(alpha = 0.14f)),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(avancePlan)
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                if (a.excedida == true) listOf(Color(0xFFF5B14C), Color(0xFFF08A1E)) else listOf(Color(0xFF6EC5D8), Color(0xFF10A183)),
+                            ),
+                        ),
                 )
-                Text("${avance.first}/${avance.second}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = c.fg2)
             }
         }
         accionError?.let {
-            Text(it, fontSize = 12.5.sp, color = c.danger)
+            Text(it, fontSize = 12.5.sp, color = Color(0xFFFFB4B4))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button(
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            BandaBoton(
+                text = if (pausable) "Pausar" else "Detalle",
+                icon = if (pausable) Icons.Outlined.Pause else Icons.Outlined.Info,
+                claro = false,
+                onClick = if (pausable) onPausar else onDetalle,
+                modifier = Modifier.weight(1f),
+            )
+            BandaBoton(
+                text = InicioRules.etiquetaCorta(accion),
+                icon = when (accion.kind) {
+                    InicioRules.AccionKind.INICIAR, InicioRules.AccionKind.REANUDAR -> Icons.Outlined.PlayArrow
+                    InicioRules.AccionKind.CONTINUAR, InicioRules.AccionKind.CORREGIR -> NxGlyph.PHOTO.icon
+                    InicioRules.AccionKind.REPARTIR -> NxGlyph.DISPATCH.icon
+                    else -> Icons.Outlined.Info
+                },
+                claro = true,
+                loading = accionEnCurso,
                 onClick = { onPrimary(accion) },
-                enabled = !accionEnCurso,
-                colors = ButtonDefaults.buttonColors(containerColor = c.brand, contentColor = Color.White),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.weight(1f).heightIn(min = NxDimens.PrimaryButtonHeight),
-                contentPadding = PaddingValues(horizontal = 12.dp),
-            ) {
-                if (accionEnCurso) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                } else {
-                    Icon(
-                        when (accion.kind) {
-                            InicioRules.AccionKind.INICIAR, InicioRules.AccionKind.REANUDAR -> Icons.Outlined.PlayArrow
-                            InicioRules.AccionKind.CONTINUAR, InicioRules.AccionKind.CORREGIR -> NxGlyph.PHOTO.icon
-                            InicioRules.AccionKind.REPARTIR -> NxGlyph.DISPATCH.icon
-                            else -> Icons.Outlined.Info
-                        },
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(accion.label, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            if (pausable) {
-                SquareButton(icon = Icons.Outlined.Pause, contentDescription = "Pausar actividad", onClick = onPausar)
-            }
-            SquareButton(icon = Icons.Outlined.Info, contentDescription = "Ver detalle", onClick = onDetalle)
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
 
+/** Fondo casi negro de la banda; el resplandor se dibuja encima. */
+private val BandaFondo = Color(0xFF0D0F12)
+
+/** Aurora de la banda: verde arriba a la derecha, azul abajo a la izquierda, magenta abajo. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.dibujarResplandor() {
+    val w = size.width
+    val h = size.height
+    drawRect(
+        Brush.radialGradient(
+            listOf(Color(0xFF10A183).copy(alpha = 0.55f), Color.Transparent),
+            center = Offset(w, 0f),
+            radius = w * 0.85f,
+        ),
+    )
+    drawRect(
+        Brush.radialGradient(
+            listOf(Color(0xFF0060F0).copy(alpha = 0.45f), Color.Transparent),
+            center = Offset(0f, h * 1.2f),
+            radius = w * 0.75f,
+        ),
+    )
+    drawRect(
+        Brush.radialGradient(
+            listOf(Color(0xFFA85299).copy(alpha = 0.32f), Color.Transparent),
+            center = Offset(w * 0.6f, h * 1.3f),
+            radius = w * 0.55f,
+        ),
+    )
+}
+
 @Composable
-private fun SquareButton(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
-    val c = NxTheme.colors
-    val shape = RoundedCornerShape(16.dp)
-    Box(
-        modifier = Modifier
-            .size(NxDimens.PrimaryButtonHeight)
-            .clip(shape)
-            .background(c.card)
-            .border(1.dp, c.borderStrong, shape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+private fun BandaBoton(
+    text: String,
+    icon: ImageVector,
+    claro: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    loading: Boolean = false,
+) {
+    Button(
+        onClick = onClick,
+        enabled = !loading,
+        shape = RoundedCornerShape(14.dp),
+        colors = if (claro) {
+            ButtonDefaults.buttonColors(
+                containerColor = Color.White,
+                contentColor = Color(0xFF14171F),
+                disabledContainerColor = Color.White.copy(alpha = 0.7f),
+                disabledContentColor = Color(0xFF14171F).copy(alpha = 0.6f),
+            )
+        } else {
+            ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White)
+        },
+        border = if (claro) null else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.28f)),
+        modifier = modifier.heightIn(min = 48.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp),
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = c.fg, modifier = Modifier.size(22.dp))
+        if (loading) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color(0xFF14171F))
+        } else {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(19.dp))
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 // ── Después, hoy ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun SiguientesCard(items: List<MyActivityItemDto>, onOpen: (MyActivityItemDto) -> Unit) {
+internal fun SiguientesCard(items: List<MyActivityItemDto>, onOpen: (MyActivityItemDto) -> Unit) {
     val c = NxTheme.colors
-    val shape = RoundedCornerShape(NxDimens.SheetRadius)
+    val shape = RoundedCornerShape(22.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .nxFlotante(shape)
             .clip(shape)
-            .background(c.card)
-            .border(1.dp, c.border, shape),
+            .background(c.card),
     ) {
         items.forEachIndexed { i, a ->
             if (i > 0) HorizontalDivider(color = c.borderSubtle)
-            val kindColor = categoryColor(a.coreKind, c)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onOpen(a) }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // 58: con 48 «Esta semana» y «Puede esperar» salían cortadas («Esta sem…»).
-                Column(Modifier.width(58.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    InicioRules.horaDe(a.fechaInicio) ?: a.periodo?.dia?.let { "Día $it" } ?: "—",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = c.muted,
+                    maxLines = 1,
+                    style = TextStyle(fontFeatureSettings = "tnum"),
+                    modifier = Modifier.width(48.dp),
+                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(InicioRules.titulo(a), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = c.fg, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(
-                        InicioRules.horaDe(a.fechaInicio) ?: "—",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = c.fg,
-                        maxLines = 1,
-                    )
-                    Text(
-                        a.periodo?.dia?.let { "Día $it" } ?: CoreActivityRules.priorityUi(a.prioridad).label.take(12),
-                        fontSize = 11.sp,
+                        InicioRules.detalleSiguiente(a).replace("\n", " · "),
+                        fontSize = 13.sp,
                         color = c.muted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                }
-                Box(
-                    modifier = Modifier.size(36.dp).background(kindColor.copy(alpha = 0.14f), RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(CoreActivityRules.kindGlyph(a.coreKind).icon, contentDescription = null, tint = kindColor, modifier = Modifier.size(18.dp))
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    Text(InicioRules.titulo(a), fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, color = c.fg, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(InicioRules.detalleSiguiente(a), fontSize = 12.5.sp, color = c.muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = c.fg4)
             }
@@ -889,13 +965,13 @@ private fun VerTodasRow(onClick: () -> Unit) {
 @Composable
 private fun EquipoCard(onVerEquipo: (() -> Unit)?) {
     val c = NxTheme.colors
-    val shape = RoundedCornerShape(NxDimens.SheetRadius)
+    val shape = RoundedCornerShape(22.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .nxFlotante(shape)
             .clip(shape)
             .background(c.card)
-            .border(1.dp, c.border, shape)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -930,13 +1006,13 @@ private fun EquipoCard(onVerEquipo: (() -> Unit)?) {
 @Composable
 private fun TodoAlDiaCard(hechasHoy: Int, onVerTodas: (() -> Unit)?) {
     val c = NxTheme.colors
-    val shape = RoundedCornerShape(NxDimens.SheetRadius)
+    val shape = RoundedCornerShape(22.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .nxFlotante(shape)
             .clip(shape)
             .background(c.card)
-            .border(1.dp, c.border, shape)
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),

@@ -3,6 +3,7 @@ package mx.nexara.mobile.nativeapp.ui.console.inicio
 import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
 import mx.nexara.mobile.nativeapp.ui.console.activities.ActividadesUx
 import mx.nexara.mobile.nativeapp.ui.console.activities.ActivitySemaforo
+import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityKinds
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules
 import mx.nexara.mobile.nativeapp.ui.console.activities.SesionActividad
 import mx.nexara.mobile.nativeapp.ui.console.activities.SesionActividadRules
@@ -222,4 +223,63 @@ object InicioRules {
 
     /** Insignia de la pestaña Actividades: lo que falta por hacer. */
     fun pendientes(open: List<MyActivityItemDto>): Int = open.size
+
+    // ── Banda oscura de la actividad de ahora (canvas «App · Mi día», 28-10) ──
+
+    /** «En curso · AN-0418», «En pausa · AN-0418», «Por iniciar · AN-0418» o «Sigue · …». */
+    fun etiquetaBanda(a: MyActivityItemDto): String {
+        val estado = when {
+            a.enPausa == true -> "En pausa"
+            a.enCurso == true -> "En curso"
+            a.inicioRealAt.isNullOrBlank() && (a.minutosReales ?: 0.0) <= 0.0 -> "Por iniciar"
+            else -> "Sigue"
+        }
+        return listOfNotNull(estado, a.anNumber?.trim()?.takeIf { it.isNotEmpty() }).joinToString(" · ")
+    }
+
+    /**
+     * Segundos trabajados para el reloj grande. `minutosReales` llega calculado al momento de
+     * la consulta ([cargadoMs]); con el reloj corriendo se le suma lo que pasó desde entonces.
+     * Null si todavía no hay nada trabajado.
+     */
+    fun segundosTrabajados(a: MyActivityItemDto, cargadoMs: Long, ahoraMs: Long): Long? {
+        val base = a.minutosReales?.takeIf { it > 0 }?.let { (it * 60).toLong() }
+        if (a.enCurso != true) return base
+        return (base ?: 0L) + ((ahoraMs - cargadoMs) / 1000L).coerceAtLeast(0L)
+    }
+
+    /** «5:40:12». */
+    fun reloj(segundos: Long): String {
+        val s = segundos.coerceAtLeast(0L)
+        return "%d:%02d:%02d".format(s / 3600, (s % 3600) / 60, s % 60)
+    }
+
+    /** «Plan 7 h 30 min · entrega antes de las 17:00» (lo que haya de los dos). */
+    fun pieBanda(a: MyActivityItemDto): String? {
+        val plan = (a.minutosPlan?.takeIf { it > 0 } ?: a.tiempoEstimadoMin?.takeIf { it > 0 })
+            ?.let { "Plan ${CoreActivityRules.formatMinutes(it)}" }
+        val compromiso = CoreActivityKinds.horaCompromisoDe(a.fechaInicio, a.fechaMaxima, a.periodo != null)
+            ?.let { "entrega antes de las $it" }
+        return listOfNotNull(plan, compromiso).joinToString(" · ").ifEmpty { null }
+            ?.replaceFirstChar { it.uppercaseChar() }
+    }
+
+    /** El botón principal de la banda, corto para que quepa a la mitad del ancho. */
+    fun etiquetaCorta(accion: Accion): String = when (accion.kind) {
+        AccionKind.INICIAR -> "Iniciar"
+        AccionKind.CONTINUAR -> "Entregar"
+        AccionKind.CORREGIR -> "Corregir"
+        AccionKind.VER -> "Evidencias"
+        else -> accion.label
+    }
+
+    /** Pastilla de la banda: el semáforo («En tiempo», «Por vencer», «Atrasada») o nada. */
+    fun pastillaBanda(a: MyActivityItemDto): String? = ActivitySemaforo.luz(a.semaforo)?.etiqueta
+
+    /** Avance del reloj contra el plan (0–1); null sin plan. */
+    fun avancePlan(a: MyActivityItemDto, segundos: Long?): Float? {
+        val plan = a.minutosPlan?.takeIf { it > 0 } ?: a.tiempoEstimadoMin?.takeIf { it > 0 } ?: return null
+        val s = segundos ?: return 0f
+        return (s / (plan * 60)).toFloat().coerceIn(0f, 1f)
+    }
 }

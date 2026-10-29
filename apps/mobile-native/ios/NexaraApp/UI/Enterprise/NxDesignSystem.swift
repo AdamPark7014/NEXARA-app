@@ -38,9 +38,9 @@ extension NxBrand {
 enum NxSpacing {
     static let xxs: CGFloat = 2
     static let xs: CGFloat = 4
-    static let s: CGFloat = 8
-    static let m: CGFloat = 12
-    static let l: CGFloat = 16
+    static let s: CGFloat = 10
+    static let m: CGFloat = 14
+    static let l: CGFloat = 20
     static let xl: CGFloat = 24
     static let xxl: CGFloat = 32
     /// Margen lateral de todas las pantallas (Android `NxSpacing.ScreenH`).
@@ -49,12 +49,12 @@ enum NxSpacing {
     static let listGap: CGFloat = 10
 }
 
-/// Radios v2: 8 controles chicos · 12 controles · 16 tarjetas · 20 hojas y tarjetas hero.
+/// Radios de Core (28-10): 10 controles chicos · 14 controles · 20 tarjetas · 24 hojas y tarjetas hero.
 enum NxRadius {
-    static let s: CGFloat = 8
-    static let m: CGFloat = 12
-    static let l: CGFloat = 16
-    static let xl: CGFloat = 20
+    static let s: CGFloat = 10
+    static let m: CGFloat = 14
+    static let l: CGFloat = 20
+    static let xl: CGFloat = 24
 }
 
 /// Medidas mínimas de toque (HIG: 44 pt).

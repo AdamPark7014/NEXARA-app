@@ -53,23 +53,23 @@ import androidx.compose.ui.unit.sp
  */
 object NxUi {
     /** `--ui-border`: borde por defecto de tarjeta, campo y botón secundario. */
-    val Border = Color(0xFFE2E8F0)
+    val Border = Color(0xFFE6E9EF)
 
     /** `--ui-border-subtle`: separadores internos (entre filas, entre celdas). */
-    val BorderSubtle = Color(0xFFEEF2F6)
+    val BorderSubtle = Color(0xFFEEF0F4)
 
     /** `--ui-border-strong`: divisor de sección, borde exterior. */
-    val BorderStrong = Color(0xFFCBD5E1)
+    val BorderStrong = Color(0xFFCDD5DE)
 
     /** `--ui-surface-2`: superficie hundida (encabezado de tabla, campo de solo lectura). */
-    val Sunken = Color(0xFFF8FAFC)
+    val Sunken = Color(0xFFF8FAFB)
 
     /** `--ui-fg-2`: texto secundario que SÍ hay que leer (no es `--ui-fg-3`). */
-    val Fg2 = Color(0xFF475569)
+    val Fg2 = Color(0xFF4A5060)
 
     /** `--ui-radius` / `--ui-radius-lg`. */
-    val Radius = 8.dp
-    val RadiusLg = 12.dp
+    val Radius = 10.dp
+    val RadiusLg = 14.dp
 
     /** `--ui-control-h`: 32 px de alto de control. En el teléfono, 44 de zona táctil. */
     val ControlH = 32.dp

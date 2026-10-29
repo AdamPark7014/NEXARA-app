@@ -54,21 +54,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import mx.nexara.mobile.nativeapp.ui.NexaraAppMeta
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mx.nexara.mobile.nativeapp.ui.NexaraAppMeta
 
 /**
  * Design system Enterprise compartido — KPIs, alertas, tendencias, estados vacíos.
@@ -81,23 +83,27 @@ import androidx.compose.ui.unit.sp
  * fija en claro para lo que todavía no se ha migrado.
  */
 object NxColors {
-    /** Teal de marca: botones, pestañas activas, chips, enlaces, progreso, FAB. */
-    val Brand = Color(0xFF1F9E84)
-    /** Teal de texto (`#12715E`): texto de marca sobre fondo claro y suave. */
-    val BrandDark = Color(0xFF12715E)
-    /** Teal profundo para superficies fuertes con letras blancas (tarjeta de jornada). */
-    val BrandDeep = Color(0xFF0F5F4F)
-    /** Suave `#E7F5F1`: fondo de chips, iconos y pastilla de la barra inferior. */
-    val BrandSoft = Color(0xFFE7F5F1)
-    /** Suave 2 `#CFECE4`: pastilla activa, bordes de marca. */
-    val BrandSoft2 = Color(0xFFCFECE4)
+    /**
+     * Verde de Core (`--ui-brand` de la web, 28-10): botones, pestañas activas, chips, enlaces,
+     * progreso. El #1F9E84 de antes daba 3.2:1 con letra blanca; #168570 da 4.5:1.
+     */
+    val Brand = Color(0xFF168570)
+    /** `--ui-brand-text` #0F6B59: texto de marca sobre fondo claro y suave. */
+    val BrandDark = Color(0xFF0F6B59)
+    /** `--ui-brand-press` #0F6352: superficies fuertes con letras blancas. */
+    val BrandDeep = Color(0xFF0F6352)
+    /** `--ui-brand-soft` #E3F3EF: fondo de chips, iconos y pastilla de la barra inferior. */
+    val BrandSoft = Color(0xFFE3F3EF)
+    /** `--ui-brand-soft-2` #C7E8DF: pastilla activa, bordes de marca. */
+    val BrandSoft2 = Color(0xFFC7E8DF)
     /** Tinte de superficie (degradados suaves, tarjetas destacadas). */
-    val BrandTint = Color(0xFFF2FAF8)
-    /** Acento claro de la marca para gráficas, insignias y el modo oscuro. */
-    val Accent = Color(0xFF2BBD9D)
-    val Slate = Color(0xFF0F172A)
-    /** `--ui-fg-3` v2: #6B7889 (≈4.6:1 sobre blanco; el #94a3b8 de antes no llegaba). */
-    val Muted = Color(0xFF6B7889)
+    val BrandTint = Color(0xFFF0F8F5)
+    /** Verde del resplandor de la banda oscura (#10A183) para gráficas e insignias. */
+    val Accent = Color(0xFF10A183)
+    /** `--ui-fg` #14171F. */
+    val Slate = Color(0xFF14171F)
+    /** `--ui-fg-3` #5B6272: ≈4.9:1 sobre el fondo y 6:1 sobre blanco. */
+    val Muted = Color(0xFF5B6272)
     val Success = Color(0xFF10B981)
     val SuccessSoft = Color(0xFFD1FAE5)
     val Warning = Color(0xFFF59E0B)
@@ -106,7 +112,8 @@ object NxColors {
     val DangerSoft = Color(0xFFFEE2E2)
     val Info = Color(0xFF3B82F6)
     val InfoSoft = Color(0xFFDBEAFE)
-    val Surface = Color(0xFFF8FAFC)
+    /** `--ui-bg` #EEF1F5: un tono más hondo para que las tarjetas blancas floten. */
+    val Surface = Color(0xFFEEF1F5)
     val Card = Color.White
 
     // ── Acentos de categoría (del logotipo). Son color de TIPO, nunca de estado. ──
@@ -122,18 +129,31 @@ object NxColors {
 
 /** Radios 12 / 16 / 20 (controles · tarjetas · hojas) y la altura del botón principal. */
 object NxDimens {
-    /** Tarjetas y paneles. */
-    val PanelRadius = 16.dp
-    /** Controles: botones, campos, chips grandes. */
-    val ControlRadius = 12.dp
-    /** Hojas, tarjetas hero y diálogos. */
-    val SheetRadius = 20.dp
+    /** Tarjetas y paneles (`--ui-radius-xl` 20 de Core). */
+    val PanelRadius = 20.dp
+    /** Controles: botones, campos, chips grandes (14 del canvas). */
+    val ControlRadius = 14.dp
+    /** Hojas, tarjetas hero (banda oscura) y diálogos. */
+    val SheetRadius = 24.dp
     val PanelElevation = 2.dp
     /** Acción principal en el teléfono: se toca con el pulgar y con guantes. */
     val PrimaryButtonHeight = 52.dp
     /** Acción principal del dock de detalle (al alcance del pulgar). */
     val DockButtonHeight = 56.dp
 }
+
+/**
+ * Sombra larga y suave de las tarjetas de Core (`--ui-card-shadow` de la web): la tarjeta blanca
+ * flota sobre el fondo #EEF1F5 sin borde.
+ */
+fun Modifier.nxFlotante(shape: Shape, elevation: Dp = 10.dp): Modifier =
+    shadow(
+        elevation = elevation,
+        shape = shape,
+        clip = false,
+        ambientColor = Color(0xFF101828).copy(alpha = 0.10f),
+        spotColor = Color(0xFF101828).copy(alpha = 0.24f),
+    )
 
 enum class NxTone { Neutral, Success, Warning, Danger, Info, Brand }
 
@@ -144,6 +164,20 @@ fun NxBrandTopAppBarColors() = TopAppBarDefaults.topAppBarColors(
     titleContentColor = Color.White,
     navigationIconContentColor = Color.White,
     actionIconContentColor = Color.White,
+)
+
+/**
+ * Barra superior de Core (canvas de las apps, 28-10): sobre el mismo fondo #EEF1F5 de la
+ * pantalla, con título e íconos oscuros. La verde con letras blancas queda para el portal.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NxCoreTopAppBarColors() = TopAppBarDefaults.topAppBarColors(
+    containerColor = NxColors.Surface,
+    scrolledContainerColor = NxColors.Card,
+    titleContentColor = NxColors.Slate,
+    navigationIconContentColor = NxColors.Slate,
+    actionIconContentColor = NxColors.Slate,
 )
 
 fun NxTone.fg(): Color = when (this) {
@@ -217,11 +251,12 @@ fun NxPanelShell(
 ) {
     val shape = RoundedCornerShape(NxDimens.PanelRadius)
     val colors = CardDefaults.cardColors(containerColor = NxColors.Card)
-    val elevation = CardDefaults.cardElevation(NxDimens.PanelElevation)
+    // La sombra la pone `nxFlotante`: la de Material es corta y dura.
+    val elevation = CardDefaults.cardElevation(0.dp)
     if (onClick != null) {
         Card(
             onClick = onClick,
-            modifier = modifier.fillMaxWidth(),
+            modifier = modifier.fillMaxWidth().nxFlotante(shape),
             shape = shape,
             colors = colors,
             elevation = elevation,
@@ -230,7 +265,7 @@ fun NxPanelShell(
         }
     } else {
         Card(
-            modifier = modifier.fillMaxWidth(),
+            modifier = modifier.fillMaxWidth().nxFlotante(shape),
             shape = shape,
             colors = colors,
             elevation = elevation,

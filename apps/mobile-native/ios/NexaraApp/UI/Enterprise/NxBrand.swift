@@ -13,44 +13,46 @@ import UIKit
 /// siempre en claro (`UIUserInterfaceStyle = Light`), igual que Android.
 enum NxColors {
     // ── Marca ───────────────────────────────────────────────────────────────
-    /// #1F9E84 — botones, pestaña activa, chips, enlaces, progreso, FAB, barra superior.
-    static let brand = rgb(0x1F9E84)
-    /// #12715E — texto de marca sobre fondo claro y suave.
-    static let brandText = rgb(0x12715E)
-    /// #0F5F4F — superficies fuertes con letra blanca; icono activo de la barra inferior.
-    static let brandDeep = rgb(0x0F5F4F)
-    /// #E7F5F1 — fondo de chips, iconos y baldosas.
-    static let brandSoft = rgb(0xE7F5F1)
-    /// #CFECE4 — pastilla activa de la barra inferior, bordes de marca.
-    static let brandSoft2 = rgb(0xCFECE4)
-    /// #F2FAF8 — tinte de superficie (círculo del estado vacío, tarjetas destacadas).
-    static let brandTint = rgb(0xF2FAF8)
-    /// #2BBD9D — acento claro para gráficas e insignias.
-    static let accent = rgb(0x2BBD9D)
+    /// #168570 — verde de Core (`--ui-brand` web, 28-10): botones, pestaña activa, chips,
+    /// enlaces, progreso. El #1F9E84 de antes daba 3.2:1 con letra blanca; este da 4.5:1.
+    static let brand = rgb(0x168570)
+    /// #0F6B59 — texto de marca sobre fondo claro y suave.
+    static let brandText = rgb(0x0F6B59)
+    /// #0F6352 — superficies fuertes con letra blanca.
+    static let brandDeep = rgb(0x0F6352)
+    /// #E3F3EF — fondo de chips, iconos y baldosas.
+    static let brandSoft = rgb(0xE3F3EF)
+    /// #C7E8DF — pastilla activa, bordes de marca.
+    static let brandSoft2 = rgb(0xC7E8DF)
+    /// #F0F8F5 — tinte de superficie (círculo del estado vacío, tarjetas destacadas).
+    static let brandTint = rgb(0xF0F8F5)
+    /// #10A183 — verde del resplandor de la banda oscura, para gráficas e insignias.
+    static let accent = rgb(0x10A183)
 
     // ── Texto ───────────────────────────────────────────────────────────────
-    /// #0F172A — texto principal.
-    static let fg = rgb(0x0F172A)
-    /// #475569 — texto secundario que SÍ hay que leer.
-    static let fg2 = rgb(0x475569)
-    /// #6B7889 — texto terciario (metadatos, iconos inactivos).
-    static let muted = rgb(0x6B7889)
-    /// #94A3B8 — solo deshabilitado.
-    static let fg4 = rgb(0x94A3B8)
+    /// #14171F — texto principal.
+    static let fg = rgb(0x14171F)
+    /// #4A5060 — texto secundario que SÍ hay que leer.
+    static let fg2 = rgb(0x4A5060)
+    /// #5B6272 — texto terciario (metadatos, iconos inactivos): 4.9:1 sobre el fondo.
+    static let muted = rgb(0x5B6272)
+    /// #A3ADBA — solo deshabilitado.
+    static let fg4 = rgb(0xA3ADBA)
 
     // ── Superficies y bordes ────────────────────────────────────────────────
-    /// #F8FAFC — fondo de TODAS las pantallas y de la barra inferior.
-    static let surface = rgb(0xF8FAFC)
+    /// #EEF1F5 — fondo de TODAS las pantallas (`--ui-bg` de Core): un tono más hondo para
+    /// que las tarjetas blancas floten.
+    static let surface = rgb(0xEEF1F5)
     /// #FFFFFF — tarjetas.
     static let card = rgb(0xFFFFFF)
-    /// #F1F5F9 — superficie hundida (pista de progreso, campo de solo lectura).
-    static let sunken = rgb(0xF1F5F9)
-    /// #E2E8F0 — borde por omisión de tarjeta, campo y botón secundario.
-    static let border = rgb(0xE2E8F0)
-    /// #EEF2F6 — separadores internos (entre filas, entre celdas).
-    static let borderSubtle = rgb(0xEEF2F6)
-    /// #CBD5E1 — divisor de sección, contorno de campos y botones de contorno.
-    static let borderStrong = rgb(0xCBD5E1)
+    /// #F8FAFB — superficie hundida (pista de progreso, campo de solo lectura).
+    static let sunken = rgb(0xF8FAFB)
+    /// #E6E9EF — borde por omisión de tarjeta, campo y botón secundario.
+    static let border = rgb(0xE6E9EF)
+    /// #EEF0F4 — separadores internos (entre filas, entre celdas).
+    static let borderSubtle = rgb(0xEEF0F4)
+    /// #CDD5DE — divisor de sección, contorno de campos y botones de contorno.
+    static let borderStrong = rgb(0xCDD5DE)
 
     // ── Semánticos ──────────────────────────────────────────────────────────
     static let success = rgb(0x10B981)
@@ -109,7 +111,7 @@ enum NxColors {
 /// Los valores salen de `NxColors` (paridad exacta con Android). Los colores
 /// semánticos NO son marca y siguen en `NxTone` / `CorePalette`.
 enum NxBrand {
-    /// #1F9E84 — botones, iconos, acentos.
+    /// #168570 — botones, iconos, acentos.
     static let primary = NxColors.brand
     /// #0F5F4F — superficies con texto blanco encima (baldosa del logo, tarjeta de jornada).
     static let dark = NxColors.brandDeep
@@ -121,7 +123,7 @@ enum NxBrand {
     /// modo oscuro; se conserva para quien lo use en gráficas.
     static let light = NxColors.rgb(0x4FC4A8)
 
-    /// Antes cambiaba con el modo oscuro; hoy es el teal de marca fijo (#1F9E84).
+    /// Antes cambiaba con el modo oscuro; hoy es el verde de marca fijo (#168570).
     static let adaptive = NxColors.brand
 
     /// Fondo suave de baldosa: #E7F5F1.

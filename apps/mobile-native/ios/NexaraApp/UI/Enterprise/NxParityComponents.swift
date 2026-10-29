@@ -102,8 +102,15 @@ extension View {
             )
     }
 
-    /// Fondo de tarjeta de Android: forma redondeada blanca con su sombra detrás
-    /// del contenido. No recorta ni rellena: solo pinta el fondo.
+    /// Sombra larga y suave de las tarjetas de Core (`--ui-card-shadow` de la web, Android
+    /// `nxFlotante`): la tarjeta blanca flota sobre el fondo #EEF1F5 sin borde.
+    func nxFlotante(_ fuerza: CGFloat = 1) -> some View {
+        shadow(color: NxColors.rgb(0x101828, alpha: 0.05 * fuerza), radius: 1, x: 0, y: 1)
+            .shadow(color: NxColors.rgb(0x101828, alpha: 0.12 * fuerza), radius: 14, x: 0, y: 10)
+    }
+
+    /// Fondo de tarjeta: forma redondeada blanca con la sombra flotante detrás del
+    /// contenido. No recorta ni rellena: solo pinta el fondo. `elevation` 0 la deja plana.
     func nxCardSurface(
         radius: CGFloat = NxRadius.l,
         elevation: CGFloat = 2,
@@ -112,11 +119,11 @@ extension View {
         background {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .fill(fill)
-                .nxElevation(elevation)
+                .nxFlotante(elevation > 0 ? 1 : 0)
         }
     }
 
-    /// Fondo de pantalla de Android (#F8FAFC) hasta los bordes. Para pantallas
+    /// Fondo de pantalla de Core (#EEF1F5) hasta los bordes. Para pantallas
     /// con `ScrollView` / `VStack`.
     func nxScreenBackground() -> some View {
         frame(maxWidth: .infinity, maxHeight: .infinity)

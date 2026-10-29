@@ -38,13 +38,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
+import mx.nexara.mobile.nativeapp.access.ClientSector
 import mx.nexara.mobile.nativeapp.access.CoreKeys
 import mx.nexara.mobile.nativeapp.access.DeepLinkDestination
 import mx.nexara.mobile.nativeapp.access.DeepLinkNavigation
@@ -61,7 +63,6 @@ import mx.nexara.mobile.nativeapp.ui.console.activities.BoardPersonScreen
 import mx.nexara.mobile.nativeapp.ui.console.activities.ConsoleActivityDetailByIdScreen
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityFormScreen
 import mx.nexara.mobile.nativeapp.ui.console.aprobaciones.AprobacionesScreen
-import mx.nexara.mobile.nativeapp.access.ClientSector
 import mx.nexara.mobile.nativeapp.ui.console.clients.ClientDetailScreen
 import mx.nexara.mobile.nativeapp.ui.console.clients.ClientsListScreen
 import mx.nexara.mobile.nativeapp.ui.console.clients.NewClientScreen
@@ -71,12 +72,12 @@ import mx.nexara.mobile.nativeapp.ui.console.gastos.GastosScreen
 import mx.nexara.mobile.nativeapp.ui.console.herramientas.HerramientasScreen
 import mx.nexara.mobile.nativeapp.ui.console.inicio.InicioScreen
 import mx.nexara.mobile.nativeapp.ui.console.inicio.InicioViewModel
-import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.AlmacenScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.KpisEquipoScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreHubScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.ProyectosScreen
 import mx.nexara.mobile.nativeapp.ui.console.pagos.PagosEmpleadosScreen
+import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.vehiculos.VehiculosScreen
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.NuevoViaticoScreen
@@ -85,9 +86,9 @@ import mx.nexara.mobile.nativeapp.ui.console.viaticos.ViaticoDetalleScreen
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.ViaticosScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTab
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTabBar
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxCoreTopAppBarColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxBrandTopAppBarColors
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLightStatusBarIcons
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
 import mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen
 import mx.nexara.mobile.nativeapp.ui.shared.OfflineQueueScreen
@@ -491,29 +492,28 @@ fun ConsoleNavHost(
     /** El detalle de actividad lleva su dock con la acción grande: ahí la barra inferior estorba. */
     val conBarraInferior = currentRoute != ConsoleRoutes.ActivityDetail
 
-    // La barra superior es teal con letras blancas: iconos claros en la barra de
-    // estado mientras se ve. En Inicio el fondo es claro y vuelven los oscuros.
-    if (!enInicio) NxLightStatusBarIcons()
+    // La barra superior va clara, sobre el fondo de la pantalla: los iconos de la barra de
+    // estado se quedan oscuros en todas las pestañas.
     Scaffold(
         topBar = {
             if (!enInicio) TopAppBar(
                 title = {
                     Text(
                         currentTitle,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 17.sp),
+                        color = NxColors.Slate,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
                 },
-                colors = NxBrandTopAppBarColors(),
+                colors = NxCoreTopAppBarColors(),
                 navigationIcon = {
                     if (showBack) {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Volver",
-                                tint = Color.White,
+                                tint = NxColors.Slate,
                             )
                         }
                     }
@@ -536,7 +536,7 @@ fun ConsoleNavHost(
                                 Icon(
                                     Icons.Default.Notifications,
                                     contentDescription = if (unreadCount > 0) "Notificaciones, $unreadCount sin leer" else "Notificaciones",
-                                    tint = Color.White,
+                                    tint = NxColors.Slate,
                                 )
                             }
                         }

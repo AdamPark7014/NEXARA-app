@@ -1,5 +1,21 @@
 # RELEVO
 
+- **29-10 ~11:45 (claude-code) — Apps: pasada visual de Core, primera parte (Android «Mi día» + tokens; iOS tokens).**
+  - Android, tokens como la web (`ui-tokens.scss`): verde #168570 y sus suaves, fondo #EEF1F5, texto #14171F/#5B6272,
+    bordes #E6E9EF, radios 10/14/20/24, Inter Tight (OFL, `res/font`, licencia en `android/OFL-InterTight.txt`) en
+    títulos. `NxPanelShell` sin borde con sombra larga (`Modifier.nxFlotante`). Barra inferior blanca sin pastilla, la
+    activa en verde. Barra superior de Core clara con título oscuro (`NxCoreTopAppBarColors`); el portal de clientes
+    sigue con la verde.
+  - Android «Mi día» (`InicioScreen.kt`) como el artboard «App · Mi día»: cabecera con fecha y «Mi día», tarjeta
+    blanca de jornada (`JornadaTarjeta`, Entrada/Salida y fila de Comida), banda oscura con resplandor para la
+    actividad de ahora (reloj que corre, plan y «entrega antes de las 17:00», avance contra el plan, Pausar/Entregar),
+    y «Lo que sigue hoy». Reglas nuevas en `InicioRules` (`etiquetaBanda`, `segundosTrabajados`, `reloj`, `pieBanda`,
+    `avancePlan`, `etiquetaCorta`, `pastillaBanda`) con pruebas.
+  - Capturas sin teléfono ni sesión: `CapturasMiDiaTest` (Robolectric, fuera de las pruebas normales):
+    `gradlew :app:testDebugUnitTest -Pcapturas=true --tests "*CapturasMiDiaTest*"` → `app/build/capturas/mi-dia.png`.
+  - iOS: la misma tabla de color en `NxBrand.swift`, `AccentColor` #168570, radios 10/14/20/24 y sombra flotante en
+    `nxCardSurface`. Falta «Mi día», la barra superior clara y la fuente (`ios/Resources/Fonts`, aún sin cablear).
+
 - **29-10 ~11:35 (claude-code) — Tiempo estándar por especificidad, parte API (§8 de la especificación, tarifas
   aprobadas por Adam el 28-10).**
   - Migración `20261029030000_actividad_tiempo_estandar` en Activity: `unidades`, `destino` (JSON), `trasladoMin`,
