@@ -84,12 +84,22 @@
     {
       "fecha": "2026-10-29",
       "concepto": "complejidad haiku-low-np",
-      "usd": 0.001204
+      "usd": 0.002977
     },
     {
       "fecha": "2026-10-29",
       "concepto": "asistente haiku-low-np",
       "usd": 0.009495
+    },
+    {
+      "fecha": "2026-10-29",
+      "concepto": "eval asistente-chat (haiku)",
+      "usd": 0.006864
+    },
+    {
+      "fecha": "2026-10-29",
+      "concepto": "juez asistente-chat (haiku)",
+      "usd": 0.004129
     }
   ]
 }

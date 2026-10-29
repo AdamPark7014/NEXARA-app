@@ -4,10 +4,13 @@ import {
   IsString,
   IsInt,
   IsDateString,
+  IsArray,
   IsEnum,
   IsIn,
+  IsObject,
   Matches,
   Max,
+  Min,
   MaxLength,
 } from 'class-validator';
 import { ActivityType, ActivityWorkType, TicketType } from '@prisma/client';
@@ -111,6 +114,41 @@ export class CreateActivityDto {
   @IsOptional()
   @IsIn([...COMPLEJIDADES], { message: 'La complejidad sugerida es BASICA, ESTANDAR, COMPLEJA o CRITICA' })
   complejidadSugerida?: Complejidad | null;
+
+  /** Tiempo estándar (§8). Lo calcula la web con `GET ai/estandar/tabla`; aquí solo se guarda. */
+  @IsOptional()
+  @IsObject()
+  unidades?: { clave: string; cantidad: number } | null;
+
+  @IsOptional()
+  @IsObject()
+  destino?: { direccion?: string; lat: number; lng: number } | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1440)
+  trasladoMin?: number | null;
+
+  @IsOptional()
+  @IsIn(['AUTO', 'TRANSPORTE'])
+  trasladoModo?: 'AUTO' | 'TRANSPORTE' | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(TOPE_SESION_MIN, { message: MENSAJE_TOPE_12H })
+  tiempoEstandarMin?: number | null;
+
+  @IsOptional()
+  @IsArray()
+  estandarDesglose?: Array<{ concepto: string; minutos: number }> | null;
+
+  /** Por qué el tiempo de la actividad no es el estándar (obligatorio si se cambió). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(300, { message: 'El motivo del cambio de tiempo no puede pasar de 300 caracteres' })
+  estandarCambiadoMotivo?: string | null;
 
   @IsNotEmpty()
   @IsInt()
