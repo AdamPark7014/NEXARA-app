@@ -7,7 +7,7 @@ export class CreateLunchBreakDto {
   @IsString()
   checkinPhotoUrl!: string;
 
-  /** Obligatoria si sales a comer fuera de 15:00–16:00. */
+  /** Obligatoria si sales a comer fuera de tu ventana (oficina 15:00–16:00; cuadrilla, ver `ventana-comida.ts`). */
   @IsOptional()
   @IsString()
   @MaxLength(1000)

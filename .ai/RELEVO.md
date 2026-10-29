@@ -1,5 +1,23 @@
 # RELEVO
 
+- **29-10 ~17:10 (claude-code) — Comida: ventana por horario y avisos a la hora de cada quien.**
+  - El aviso de las 14:50 no le llegaba a nadie: el cron filtraba por roles con acceso a consola y ningún rol activo
+    lo tenía. Ahora `avisosDeComida` (`lunch-breaks.cron.service.ts`, cada minuto de 12 a 18 h, hora de México) le
+    avisa a quien tiene la jornada abierta y horario, una vez al día cada aviso (lo decide `notifications` con
+    `entityType AvisoComida`): «empieza en 10 minutos» y «tu hora de comida terminó» si no registró que volvió.
+    Fuera: dirección (24/7), cuentas `.invalid`, no empleados y bajas. Push con `reemplazar` (no se apila en iOS).
+  - Ventana según el horario (`attendance/lunch/ventana-comida.ts`, `ventanaDeComida(horario)`): quien entra a las
+    10:00 o después, de 15:00 a 16:00 (regreso hasta 16:05). Quien entra antes (cuadrilla 08:00–17:00): una hora libre
+    entre su entrada + 5 h y su salida (13:00–17:00); sale hasta las 16:00 y regresa a más tardar 65 min después,
+    sin pasar de las 17:05. La usan la checada de salida y regreso, `miDia` (`ventana.texto`, `tipo`,
+    `regresoLimite`) y los avisos: la cuadrilla recibe el suyo a las 12:50.
+  - `NotificationsService.createNotification` acepta `reemplazar` y lo pasa al push. Los dos avisos de
+    `recordatorios-jornada.service.ts` lo usan (pedido de la sesión de apps: en iOS se apilaban).
+  - Web: el subtítulo de «Comidas de tu equipo» ya no dice solo 3 a 4.
+  - Pruebas: `ventana-comida.spec.ts`, `lunch-breaks.cron.service.spec.ts`. Pendiente: ver el aviso real el 30-10
+    (12:50 cuadrilla, 14:50 oficina). Android tiene «4:00 p.m.» escrito a mano: debe usar `ventana.texto` y
+    `regresoLimite` de `miDia` (avisado a la sesión de apps).
+
 - **29-10 ~16:30 (claude-code) — Entrega y hora de inicio con el horario de quien ejecuta (auditoría de parámetros
   de Adam: «dale una pasada a todos los parámetros de todo»).**
   - La entrega calculada usaba siempre la oficina: comida de 15 a 16 y salida a las 18:00. Ahora usa la jornada de

@@ -33,6 +33,11 @@ export interface INotificationPayload {
   dedupeSeconds?: number;
   /** Ícono vectorial del aviso en las apps; si falta se deriva de type+category (`iconForNotification`). */
   icon?: string;
+  /**
+   * Aviso que se repite (recordatorios cada pocos minutos): en iOS reemplaza a la tarjeta anterior
+   * con el mismo `collapseKey` en vez de apilarse. Android ya lo reemplaza por `tag`.
+   */
+  reemplazar?: boolean;
 }
 
 @Injectable()
@@ -442,6 +447,7 @@ export class NotificationsService {
         senderAvatar: notification.triggerUser?.avatarUrl ?? null,
         threadId: collapseKey,
         icon: payload.icon ?? iconForNotification(String(payload.type), payload.category),
+        reemplazar: payload.reemplazar,
       };
       this.emitPushToSocket(payload.userId, push);
       void this.pushDispatch
