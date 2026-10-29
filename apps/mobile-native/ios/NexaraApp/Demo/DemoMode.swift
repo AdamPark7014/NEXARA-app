@@ -44,6 +44,12 @@ enum DemoMode {
         }
     }
 
+    /// Demo con el inicio de dirección general (`NEXARA_DEMO_CEO=1`): solo para la captura de paridad
+    /// del tablero del CEO. Sin la variable, el demo conserva «Mi día» con su cola (capturas de tienda).
+    static var inicioDireccion: Bool {
+        ProcessInfo.processInfo.environment["NEXARA_DEMO_CEO"] == "1"
+    }
+
     /// El proceso se lanzó pidiendo el demo (`-NEXARA_DEMO 1` o `NEXARA_DEMO=1`).
     static var launchRequested: Bool {
         let args = ProcessInfo.processInfo.arguments

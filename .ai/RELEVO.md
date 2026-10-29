@@ -40,7 +40,9 @@
     por autorizar (borradores de `employee-payments`), «Desempeño · 7 días» con anillo (`me/kpis/equipo`) y «Para
     atender» (los grupos de la pizarra). Cada sección cae sola si su endpoint falla; las recargas en vivo se espacian
     30 s. Captura en la JVM: `CapturasMiDiaTest.inicioCeo` → `app/build/capturas/inicio-ceo.png`, igual al artboard.
-  - iOS: en curso. Versión de tiendas: 1.1.0 (19) en Android y 1.1 (12) en iOS, sin subir todavía (Adam aprobó
+  - iOS: lo mismo (`Inicio/InicioCeoRules.swift`, `InicioCeoSection.swift`, `InicioStore.cargarCeo`, `CoreShellView.
+    abrirExtra`). El demo conserva «Mi día»; con `NEXARA_DEMO_CEO=1` muestra el de dirección y la prueba de paridad
+    `testInicioDireccion` lo captura como `91-inicio-direccion.png`. Versión de tiendas: 1.1.0 (19) en Android y 1.1 (12) en iOS, sin subir todavía (Adam aprobó
     subirlas; esperan el inicio CEO en iOS y la autoasignación de la sesión «Asignar»).
 
 - **29-10 ~13:00 (claude-code) — Apps: botones de trayecto (API `7e7934d5` de la sesión «En espera de revisión»).**

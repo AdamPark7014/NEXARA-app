@@ -235,7 +235,11 @@ struct CoreShellView: View {
                     onOpenActivity: { id, detailTab in present(.activity(id: id, tab: detailTab)) },
                     onOpenActividades: { if modules.contains(.actividades) { selected = .actividades } },
                     onOpenAsistencia: { if modules.contains(.asistencias) { selected = .asistencias } },
-                    onOpenComidas: { present(.comidas) }
+                    onOpenComidas: { present(.comidas) },
+                    onOpenAprobaciones: abrirExtra(.aprobaciones),
+                    onOpenPagos: abrirExtra(.pagosEmpleados),
+                    onOpenDesempeno: abrirExtra(.kpisEquipo),
+                    onOpenPersona: { present(.person(userId: $0)) }
                 )
             }
         case .chat:
@@ -371,6 +375,13 @@ struct CoreShellView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             overlay = next
         }
+    }
+
+    /// Inicio de dirección: abre un módulo de «Más» encima si el rol lo ve y ya tiene pantalla
+    /// (la misma regla que los enlaces); si no, nil y el renglón cae a la pizarra.
+    private func abrirExtra(_ module: CoreExtraModule) -> (() -> Void)? {
+        guard extraModules.contains(module), CoreExtraDestination.tienePantallaNativa(module) else { return nil }
+        return { present(.extra(module)) }
     }
 
     @MainActor
