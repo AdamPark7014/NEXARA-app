@@ -873,6 +873,44 @@ data class PalomearHerramientaRequest(
     val fotoUrl: String? = null,
 )
 
+/**
+ * Un tramo del trayecto (`me/activities/:id/trayectos`): ida al sitio o regreso a la oficina,
+ * medido aparte del reloj de la actividad. `estado`: en_tiempo | excedido (ruta + 25 %).
+ */
+data class TrayectoDto(
+    val id: Long,
+    val activityId: Long? = null,
+    val userId: Long? = null,
+    /** IDA | REGRESO */
+    val tipo: String? = null,
+    /** AUTO | TRANSPORTE */
+    val modo: String? = null,
+    val startedAt: String? = null,
+    /** null = sigue en camino. */
+    val endedAt: String? = null,
+    /** LLEGADA | INICIO | SALIDA | NUEVO */
+    val finMotivo: String? = null,
+    val minutos: Double? = null,
+    val estimadoMin: Double? = null,
+    /** google | osrm | aproximado */
+    val estimadoFuente: String? = null,
+    val estado: String? = null,
+)
+
+/** «Iniciar trayecto» (IDA) o «Regreso a la oficina» (REGRESO), con el punto de salida si se tiene. */
+data class IniciarTrayectoRequest(
+    val tipo: String,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val modo: String? = null,
+)
+
+/** «Llegué». */
+data class TerminarTrayectoRequest(
+    val lat: Double? = null,
+    val lng: Double? = null,
+)
+
 /** Dueño de una evidencia por revisar (`me/revisiones`). */
 data class PersonaRevisionDto(
     val id: Long? = null,
@@ -945,6 +983,18 @@ interface CoreActivitiesApi {
     /** Sugerencia de complejidad al asignar (Haiku por la puerta). No guarda nada. */
     @POST("ai/complejidad/sugerir")
     suspend fun sugerirComplejidad(@Body body: SugerirComplejidadRequest): SugerirComplejidadResponse
+
+    /** Mis tramos del trayecto (quien la lleva y quien la creó ven los de todos). */
+    @GET("me/activities/{id}/trayectos")
+    suspend fun trayectos(@Path("id") activityId: Long): List<TrayectoDto>
+
+    /** Empieza un tramo con la hora del servidor; cierra cualquier otro que estuviera abierto. */
+    @POST("me/activities/{id}/trayectos")
+    suspend fun iniciarTrayecto(@Path("id") activityId: Long, @Body body: IniciarTrayectoRequest): TrayectoDto
+
+    /** «Llegué»: cierra el tramo abierto. */
+    @POST("me/activities/{id}/trayectos/terminar")
+    suspend fun terminarTrayecto(@Path("id") activityId: Long, @Body body: TerminarTrayectoRequest): TrayectoDto
 
     /** «En espera de revisión»: la misma regla de quién revisa a quién que `me/activities/:id/evidencias`. */
     @GET("me/revisiones")

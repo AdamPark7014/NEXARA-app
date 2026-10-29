@@ -12,7 +12,10 @@ import mx.nexara.mobile.nativeapp.data.api.PalomearHerramientaRequest
 import mx.nexara.mobile.nativeapp.data.api.JustificarZonaRequest
 import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.SalesClientDto
+import mx.nexara.mobile.nativeapp.data.api.IniciarTrayectoRequest
 import mx.nexara.mobile.nativeapp.data.api.RevisionPendienteDto
+import mx.nexara.mobile.nativeapp.data.api.TerminarTrayectoRequest
+import mx.nexara.mobile.nativeapp.data.api.TrayectoDto
 import mx.nexara.mobile.nativeapp.data.api.SugerenciaComplejidadDto
 import mx.nexara.mobile.nativeapp.data.api.SugerirComplejidadRequest
 import mx.nexara.mobile.nativeapp.data.api.TiemposTipicosDto
@@ -106,6 +109,16 @@ class CoreActivitiesRepository(context: Context) {
     suspend fun salesClients(sector: String): List<SalesClientDto> = api.salesClients(sector)
 
     suspend fun operationalProjects(): List<OperationalProjectDto> = api.operationalProjects()
+
+    /** Mis tramos del trayecto de esta actividad (la API también manda los de otros a quien la lleva). */
+    suspend fun trayectos(activityId: Long, miId: Long?): List<TrayectoDto> =
+        api.trayectos(activityId).filter { miId == null || it.userId == null || it.userId == miId }
+
+    suspend fun iniciarTrayecto(activityId: Long, tipo: String, lat: Double?, lng: Double?): TrayectoDto =
+        api.iniciarTrayecto(activityId, IniciarTrayectoRequest(tipo = tipo, lat = lat, lng = lng))
+
+    suspend fun terminarTrayecto(activityId: Long, lat: Double?, lng: Double?): TrayectoDto =
+        api.terminarTrayecto(activityId, TerminarTrayectoRequest(lat = lat, lng = lng))
 
     /** Lo que espera mi revisión; la que más lleva esperando, primero. */
     suspend fun revisionesPendientes(): List<RevisionPendienteDto> =
