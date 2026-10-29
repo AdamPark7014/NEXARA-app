@@ -643,15 +643,16 @@
   outline-offset: 2px;
 }
 
+/* Texto en el verde de texto y el número sin opacidad: el activo y las cifras quedaban bajo 4.5:1. */
 .chipActivo {
   border-color: var(--primary);
   background: color-mix(in srgb, var(--primary) 12%, var(--surface));
-  color: var(--primary);
+  color: var(--ui-brand-text, var(--primary));
 }
 
 .chipCuenta {
   font-variant-numeric: tabular-nums;
-  opacity: 0.75;
+  font-weight: 700;
 }
 
 .cuerpoLista {

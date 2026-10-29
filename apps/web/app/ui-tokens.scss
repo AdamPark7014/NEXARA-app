@@ -530,6 +530,11 @@ body.dark {
   --border: var(--ui-border);
   --border-strong: var(--ui-border-strong);
   --shadow: var(--ui-elev-2);
+  /* Texto de estado sobre fondos claros (auditoría 29-10): la mezcla de `globals.scss` dejaba el
+     naranja en 2.6–2.9:1 en pastillas, avisos y cifras. Los `--ui-*-text` pasan 4.5:1. */
+  --state-warning-text: var(--ui-warning-text);
+  --state-success-text: var(--ui-success-text);
+  --state-danger-text: var(--ui-danger-text);
 }
 
 /* Títulos de página y de sección en la letra de exhibición. */

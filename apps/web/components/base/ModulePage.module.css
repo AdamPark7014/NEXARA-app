@@ -161,9 +161,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Sin opacidad: el número del filtro activo, blanco sobre el verde, quedaba en 3.5:1. */
 .chip[aria-pressed="true"] .chipN {
   color: inherit;
-  opacity: 0.8;
+  font-weight: 700;
 }
 
 .chipDashed {
