@@ -46,12 +46,15 @@ export default function VistaCamara({
   tapas,
   coberturas,
   esHoja,
+  compacta = false,
 }: {
   plano: Plano;
   camara: CamaraPlano;
   tapas: readonly Tapa[];
   coberturas: ReadonlyMap<string, PoligonoCobertura[]>;
   esHoja: (t: Tapa) => boolean;
+  /** Para la propuesta: sin zoom ni «Ampliar». */
+  compacta?: boolean;
 }) {
   const [zoom, setZoom] = useState(1);
   const [grande, setGrande] = useState(false);
@@ -128,13 +131,17 @@ export default function VistaCamara({
         <b>
           {camara.numero} · {camara.nombre}
         </b>
-        <label className={styles.pipZoom}>
-          Zoom
-          <input type="range" min={1} max={8} step={1} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom digital" />
-        </label>
-        <button type="button" className={styles.pipBoton} onClick={() => setGrande((g) => !g)} aria-pressed={grande}>
-          {grande ? "Reducir" : "Ampliar"}
-        </button>
+        {compacta ? null : (
+          <>
+            <label className={styles.pipZoom}>
+              Zoom
+              <input type="range" min={1} max={8} step={1} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom digital" />
+            </label>
+            <button type="button" className={styles.pipBoton} onClick={() => setGrande((g) => !g)} aria-pressed={grande}>
+              {grande ? "Reducir" : "Ampliar"}
+            </button>
+          </>
+        )}
       </figcaption>
     </figure>
   );

@@ -7,11 +7,13 @@
  * guardó antes, avisa en lugar de pisarlo. Mockup aprobado por Adam el 29-10-2026.
  */
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from "react";
 import UndoRoundedIcon from "@mui/icons-material/UndoRounded";
 import RedoRoundedIcon from "@mui/icons-material/RedoRounded";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import { Alert, Badge, Button, Input, Segmented } from "@/components/base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { MODELOS_CAMARA, etiquetaModelo, modeloPorId, type ModeloCamara } from "@/lib/cctv/catalogo";
@@ -72,8 +74,24 @@ function planoDe(d: Diseno): Plano {
   return p.croquis ? { ...p, croquis: { ...p.croquis, url: resolveAssetUrl(p.croquis.url) || p.croquis.url } } : p;
 }
 
-export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Diseno; token: string; onRecargar: () => void }) {
-  const [estado, despachar] = useReducer(reducirEditor, diseno, (d) => estadoInicial(planoDe(d)));
+export default function EditorCctv({
+  diseno,
+  token,
+  onRecargar,
+  camaraInicial,
+}: {
+  diseno: Diseno;
+  token: string;
+  onRecargar: () => void;
+  /** Cámara a elegir al abrir (al volver de su ficha). */
+  camaraInicial?: string | null;
+}) {
+  const router = useRouter();
+  const [estado, despachar] = useReducer(reducirEditor, diseno, (d) => {
+    const inicial = estadoInicial(planoDe(d));
+    const cam = camaraInicial ? inicial.plano.camaras.find((c) => c.id === camaraInicial) : null;
+    return cam ? { ...inicial, seleccion: { tipo: "camara" as const, id: cam.id } } : inicial;
+  });
   const { plano, seleccion } = estado;
   const [meta, setMeta] = useState<Meta>({ nombre: diseno.nombre, estado: diseno.estado, grabacion: diseno.grabacion ?? GRABACION_POR_OMISION });
   const [metaSucia, setMetaSucia] = useState(false);
@@ -294,6 +312,17 @@ export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Dise
           <Button variant="ghost" icon aria-label="Rehacer (Ctrl+Y)" title="Rehacer (Ctrl+Y)" disabled={!estado.futuro.length} onClick={() => despachar({ tipo: "rehacer" })}>
             <RedoRoundedIcon fontSize="small" />
           </Button>
+          <Button
+            iconStart={<DescriptionOutlinedIcon fontSize="small" />}
+            onClick={async () => {
+              if (estado.sucio || metaSucia) await guardar();
+              router.push(`/erp/videovigilancia/${diseno.id}/propuesta`);
+            }}
+            disabled={!plano.camaras.length}
+            title={plano.camaras.length ? undefined : "Coloca al menos una cámara"}
+          >
+            Propuesta PDF
+          </Button>
           <Button iconStart={<UploadFileOutlinedIcon fontSize="small" />} loading={subiendo} onClick={() => archivo.current?.click()}>
             {plano.croquis ? "Cambiar croquis" : "Subir croquis"}
           </Button>
@@ -488,6 +517,7 @@ export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Dise
               setAviso("Marca los dos extremos de una cota conocida.");
             }}
             onCambiarCroquis={() => archivo.current?.click()}
+            fichaDe={(camId) => `/erp/videovigilancia/${diseno.id}/camara/${encodeURIComponent(camId)}`}
           />
         </div>
 

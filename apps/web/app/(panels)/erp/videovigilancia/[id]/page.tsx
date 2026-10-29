@@ -15,6 +15,8 @@ export default function DisenoCctvPage() {
   const id = Number(params?.id);
   const [diseno, setDiseno] = useState<Diseno | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // `?camara=` (al volver de la ficha) se lee de la URL al montar, sin useSearchParams.
+  const [camaraInicial] = useState(() => (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("camara") : null));
 
   const cargar = useCallback(async () => {
     if (!token || !Number.isFinite(id)) return;
@@ -53,5 +55,5 @@ export default function DisenoCctvPage() {
       </div>
     );
   }
-  return <EditorCctv key={diseno.id} diseno={diseno} token={token} onRecargar={cargar} />;
+  return <EditorCctv key={diseno.id} diseno={diseno} token={token} onRecargar={cargar} camaraInicial={camaraInicial} />;
 }

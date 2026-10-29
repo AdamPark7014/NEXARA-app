@@ -6,7 +6,7 @@
  * grabación).
  */
 import { useMemo, type ReactNode } from "react";
-import { Button, Field, Input, Segmented, Select, Switch } from "@/components/base";
+import { Button, ButtonLink, Field, Input, Segmented, Select, Switch } from "@/components/base";
 import { MODELOS_CAMARA, MODELO_GENERICO, etiquetaModelo, modeloPorId } from "@/lib/cctv/catalogo";
 import {
   borrar,
@@ -98,6 +98,7 @@ export default function Inspector({
   resumen,
   onRecalibrar,
   onCambiarCroquis,
+  fichaDe,
 }: {
   plano: Plano;
   seleccion: Seleccion | null;
@@ -111,6 +112,8 @@ export default function Inspector({
   resumen: ResumenDiseno | null;
   onRecalibrar: () => void;
   onCambiarCroquis: () => void;
+  /** Ruta de la ficha de una cámara. */
+  fichaDe: (camaraId: string) => string;
 }) {
   return (
     <aside className={styles.inspector} aria-label="Panel del plano">
@@ -130,7 +133,7 @@ export default function Inspector({
       <div className={styles.inspectorCuerpo}>
         {pestana === "seleccion" ? (
           seleccion ? (
-            <PanelSeleccion plano={plano} seleccion={seleccion} tapas={tapas} onAplicar={onAplicar} onSeleccionar={onSeleccionar} />
+            <PanelSeleccion plano={plano} seleccion={seleccion} tapas={tapas} onAplicar={onAplicar} onSeleccionar={onSeleccionar} fichaDe={fichaDe} />
           ) : (
             <p className={styles.ayuda}>
               Haz clic en una cámara, un muro o un hueco para editarlo. Con <b>+ Cámara</b> pones una nueva; con <b>Persona</b>, un humanoide
@@ -170,12 +173,14 @@ function PanelSeleccion({
   tapas,
   onAplicar,
   onSeleccionar,
+  fichaDe,
 }: {
   plano: Plano;
   seleccion: Seleccion;
   tapas: readonly Tapa[];
   onAplicar: Aplicar;
   onSeleccionar: (s: Seleccion | null) => void;
+  fichaDe: (camaraId: string) => string;
 }) {
   const quitar = (texto: string) => (
     <Button variant="danger-ghost" size="sm" onClick={() => onAplicar(borrar(plano, seleccion), { seleccion: null })}>
@@ -185,7 +190,7 @@ function PanelSeleccion({
   switch (seleccion.tipo) {
     case "camara": {
       const c = plano.camaras.find((x) => x.id === seleccion.id);
-      return c ? <PanelCamara plano={plano} camara={c} tapas={tapas} onAplicar={onAplicar} quitar={quitar("Quitar cámara")} /> : null;
+      return c ? <PanelCamara plano={plano} camara={c} tapas={tapas} onAplicar={onAplicar} quitar={quitar("Quitar cámara")} fichaHref={fichaDe(c.id)} /> : null;
     }
     case "muro": {
       const m = plano.muros.find((x) => x.id === seleccion.id);
@@ -299,12 +304,14 @@ function PanelCamara({
   tapas,
   onAplicar,
   quitar,
+  fichaHref,
 }: {
   plano: Plano;
   camara: CamaraPlano;
   tapas: readonly Tapa[];
   onAplicar: Aplicar;
   quitar: ReactNode;
+  fichaHref: string;
 }) {
   const fusion = `cam-${c.id}`;
   const cambiar = (cambios: Partial<CamaraPlano>) => onAplicar(actualizarCamara(plano, c.id, cambios), { fusion });
@@ -451,6 +458,9 @@ function PanelCamara({
       <LecturaCamara plano={plano} camara={c} tapas={tapas} />
 
       <div className={styles.acciones}>
+        <ButtonLink href={fichaHref} size="sm" variant="primary">
+          Abrir ficha
+        </ButtonLink>
         <Button
           size="sm"
           onClick={() => {

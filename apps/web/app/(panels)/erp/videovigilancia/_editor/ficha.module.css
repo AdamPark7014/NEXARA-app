@@ -1,0 +1,296 @@
+/* Videovigilancia · ficha de cámara (artboard 3 del mockup aprobado). Solo tokens --ui-*. */
+
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s4);
+  padding: var(--ui-s5) var(--ui-s6) var(--ui-s6);
+  min-width: 0;
+}
+
+.migas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+  font-size: var(--ui-fs-label);
+  color: var(--ui-fg-3);
+}
+
+.migas b {
+  color: var(--ui-fg);
+  font-weight: 600;
+}
+
+.volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ui-fg-3);
+  text-decoration: none;
+}
+
+.paginador {
+  margin-left: auto;
+  display: inline-flex;
+  gap: var(--ui-s3);
+  align-items: center;
+}
+
+.paginador a {
+  color: var(--ui-brand-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tarjeta {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-elev-1);
+  padding: var(--ui-s4) var(--ui-s5);
+}
+
+.cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s4);
+  align-items: center;
+}
+
+.numero {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--ui-brand);
+  color: var(--ui-fg-on-brand);
+  font-family: var(--ui-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.cabezaTexto {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+
+.insignias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+  margin-bottom: var(--ui-s1);
+}
+
+.titulo {
+  margin: 0;
+  font-family: var(--ui-font-display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2) var(--ui-s4);
+  margin-top: var(--ui-s1);
+  font-size: var(--ui-fs-label);
+  color: var(--ui-fg-2);
+}
+
+.columnas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--ui-s4);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .columnas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.principal,
+.lateral {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.h2 {
+  margin: 0 0 var(--ui-s1);
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-section);
+}
+
+.sub2 {
+  margin: 0 0 var(--ui-s3);
+  font-size: var(--ui-fs-label);
+  color: var(--ui-fg-3);
+}
+
+.nivelCabeza,
+.nivel {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 92px 92px;
+  gap: var(--ui-s3);
+  align-items: center;
+  padding: var(--ui-s2) 0;
+  border-bottom: 1px solid var(--ui-border-subtle);
+  font-size: var(--ui-fs-label);
+}
+
+.nivelCabeza {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+  padding-top: 0;
+}
+
+.punto {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 8px;
+}
+
+.pista {
+  position: relative;
+  height: 10px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-track);
+}
+
+.pista i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--ui-radius-pill);
+}
+
+.num {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+  font-weight: 500;
+}
+
+.datosLinea {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2) var(--ui-s5);
+  margin-top: var(--ui-s3);
+  font-size: var(--ui-fs-label);
+  color: var(--ui-fg-2);
+}
+
+.datosLinea b {
+  color: var(--ui-fg);
+}
+
+.vistaGrande > figure {
+  width: 100%;
+  box-shadow: none;
+}
+
+.laminas {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ui-s4);
+}
+
+@media (max-width: 720px) {
+  .laminas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.lamina {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s2);
+}
+
+.lamina figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--ui-fs-meta);
+}
+
+.lamina figcaption b {
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.lamina figcaption span {
+  color: var(--ui-fg-3);
+}
+
+.seccion {
+  margin: 0 0 var(--ui-s3);
+  font-size: var(--ui-fs-caption);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-fg-label);
+}
+
+.mini {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  overflow: hidden;
+}
+
+.datos {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0;
+  margin: 0;
+  font-size: var(--ui-fs-label);
+}
+
+.datos dt,
+.datos dd {
+  padding: var(--ui-s2) 0;
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+
+.datos dt {
+  color: var(--ui-fg-3);
+}
+
+.datos dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.lista {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--ui-fs-label);
+  line-height: 1.6;
+  color: var(--ui-fg-2);
+}
+
+.aviso {
+  margin: var(--ui-s3) 0 0;
+  padding: var(--ui-s2) var(--ui-s3);
+  border-radius: var(--ui-radius);
+  background: var(--ui-warning-bg);
+  border: 1px solid var(--ui-warning-border);
+  color: var(--ui-warning-text);
+  font-size: var(--ui-fs-meta);
+}

@@ -6,6 +6,8 @@ import { planoVacio, type Plano } from "@/lib/cctv/plano";
 import type { Diseno } from "@/lib/cctv/api";
 import EditorCctv from "./EditorCctv";
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
+
 vi.mock("@/lib/cctv/api", async (original) => ({
   ...(await original<typeof import("@/lib/cctv/api")>()),
   guardarDiseno: vi.fn(),
