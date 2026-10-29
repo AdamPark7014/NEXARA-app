@@ -281,8 +281,45 @@ pruebas en `pac/adapters/facturama.adapter.spec.ts`; **falta confirmarlo en sand
   IVA proporcional con la tasa de los conceptos de la factura; si la factura mezcla tasas, el servicio se detiene con
   un aviso. La fecha `@db.Date` conserva el día.
 - **15 · resuelto:** los impuestos se redondean con `cents`, igual que el ERP.
-- **Sin cambio:** 8, 10, 11, 12, 14, 16, 17, 18. El 19 solo aplica a SW o Finkok. Además, los errores de Facturama ya
-  le llegan al usuario con su motivo, en vez de «error interno».
+- **Sin cambio:** 8, 10, 12, 16, 17, 18. El 19 solo aplica a SW o Finkok. Además, los errores de Facturama ya le
+  llegan al usuario con su motivo, en vez de «error interno».
+- **11 · resuelto:** `stampInvoice` toma el emisor del perfil de la empresa de la factura.
+- **14 · parcial:** el IEPS y la factura global al público en general se frenan con un aviso claro, en vez de timbrar
+  un total distinto.
+
+**Revisión antes de timbrar (29-oct-2026, `pac/validacion-cfdi.ts`).** `stampInvoice` y `stampPaymentComplement` la
+corren antes de reservar la factura; si algo falla, explican qué corregir. Revisa:
+
+- RFC: formato y dígito verificador del emisor y del cliente; además, que el emisor del borrador sea el de la empresa.
+- Régimen contra tipo de persona y uso del CFDI contra régimen (c_UsoCFDI). P01 se rechaza y el 616 solo admite S01.
+- Razón social sin «S.A. de C.V.» y CP de 5 dígitos.
+- RFC genérico: a un cliente sin RFC se le factura con XAXX y su nombre; «PUBLICO EN GENERAL» pide factura global, que
+  no está soportada.
+- Claves SAT con formato (8 dígitos; unidad de 1 a 3), cantidad y precio mayores a cero, descuento no mayor al importe,
+  IVA de 16, 8 o 0 %.
+- Total guardado igual al de los conceptos, al centavo. En sandbox, Facturama recalcula y timbra su propio total aunque
+  Core diga otro.
+- Serie y folio, moneda con su tipo de cambio, forma y método de pago (PUE con 99 no; nota de crédito con PUE).
+- Complemento de pago: forma real, pago no mayor al saldo y saldo insoluto que cuadra.
+- Al cancelar con motivo 01, el UUID sustituto tiene que ser un folio fiscal válido y distinto del de la misma factura.
+
+Batería en sandbox del 29-oct:
+
+- **Timbraron y el XML cuadró al centavo con Core:**
+  - PUE y PPD;
+  - 3 partidas con descuento;
+  - persona física sin IVA;
+  - IVA 16 % y 0 % mezclados;
+  - complemento de pago en dos parcialidades;
+  - razón social escrita en minúsculas (el adaptador la pasa a mayúsculas: el SAT la rechaza en minúsculas).
+- **Cancelación** (motivos 02 y 01 con sustituta, probada con el RFC de prueba por Multiemisor): Facturama responde
+  `canceled` con su acuse.
+- **Lo que solo detecta Facturama/SAT, con su mensaje y la pista que agrega el adaptador:**
+  - clave de producto o unidad que no existe en el catálogo;
+  - nombre o CP que no coinciden con el padrón del SAT (por ejemplo, sin «Ñ»);
+  - serie no dada de alta.
+
+  Validar los catálogos al capturar el concepto queda pendiente en la Mesa contable.
 
 | # | Sev. | Dónde | Riesgo |
 |---|---|---|---|

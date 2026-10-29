@@ -175,6 +175,19 @@ describe('FacturamaAdapter', () => {
       expect(error.message).toContain('El RFC del receptor no está en la lista del SAT');
     });
 
+    it('manda la razón social en mayúsculas y explica qué corregir cuando el SAT no la reconoce', async () => {
+      const llamadas = servidor([
+        [/^GET \/cfdi\?/, () => ({ body: [] })],
+        [
+          /^POST \/3\/cfdis$/,
+          () => ({ status: 400, body: { Message: 'El campo Nombre del receptor, debe pertenecer al nombre asociado al RFC registrado en el campo Rfc del Receptor.' } }),
+        ],
+      ]);
+      const error = await pac.stamp({ ...FACTURA, receptor: { ...FACTURA.receptor, name: '  Universidad  Robotica Española ' } } as any).catch((e) => e);
+      expect(llamadas.find((l) => l.metodo === 'POST')!.cuerpo.Receiver.Name).toBe('UNIVERSIDAD ROBOTICA ESPAÑOLA');
+      expect(error.message).toMatch(/tal como en su constancia de situación fiscal/);
+    });
+
     it('no timbra sin código postal del emisor', async () => {
       const llamadas = servidor([]);
       await expect(pac.stamp({ ...FACTURA, emisor: { ...FACTURA.emisor, zipCode: null } } as any)).rejects.toThrow(
