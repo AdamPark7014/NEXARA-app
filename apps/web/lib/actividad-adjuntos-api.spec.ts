@@ -97,12 +97,14 @@ describe("revisarAntesDeSubir", () => {
       { name: "Propuesta Toks.xlsx", size: 1200 },
       { name: "Minuta.DOCX", size: 5000 },
       { name: "video.mp4", size: 5000 },
+      { name: "Foto.jpg", size: 5000 },
       { name: "Planos.pdf", size: ADJUNTO_MAX_BYTES + 1 },
       { name: "vacío.csv", size: 0 },
     ]);
     expect(listos.map((a) => a.name)).toEqual(["Propuesta Toks.xlsx", "Minuta.DOCX"]);
     expect(avisos).toEqual([
-      "No se puede adjuntar «video.mp4». Se aceptan PDF, Excel, Word, PowerPoint, imágenes y texto.",
+      "No se puede adjuntar «video.mp4». Se aceptan PDF, Excel, Word, PowerPoint y texto; las fotos van en Evidencias.",
+      "No se puede adjuntar «Foto.jpg». Se aceptan PDF, Excel, Word, PowerPoint y texto; las fotos van en Evidencias.",
       "«Planos.pdf» pesa 25 MB: el límite es 25 MB por archivo.",
       "«vacío.csv» está vacío.",
     ]);
@@ -114,7 +116,8 @@ describe("revisarAntesDeSubir", () => {
 
   it("el selector ofrece las mismas extensiones", () => {
     expect(ACEPTA_ADJUNTOS.split(",")).toContain(".xlsx");
-    expect(ACEPTA_ADJUNTOS.split(",")).toContain(".heic");
+    expect(ACEPTA_ADJUNTOS.split(",")).toContain(".pptx");
+    expect(ACEPTA_ADJUNTOS.split(",")).not.toContain(".jpg");
     expect(extensionDe("Propuesta Toks.XLSX")).toBe("xlsx");
     expect(extensionDe("sin-extension")).toBe("");
   });

@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * «Archivos de evidencia» de una actividad comercial: Excel, Word, PDF o imágenes de la propuesta,
- * minutas y lo que mande el cliente.
+ * «Documentos» de cualquier actividad (opcional): PowerPoint, Excel, Word o PDF de la propuesta,
+ * minutas, planos y lo que mande el cliente. Las fotos no van aquí, van en evidencias.
  *
  * Se suben con el botón o arrastrando (varios a la vez; lo que pase de 25 MB o no sea de un tipo
  * aceptado se avisa antes de mandarlo). Tocar uno lo abre aquí mismo: el PDF con el visor pdf.js de
- * la web, la imagen desde un blob y Excel/CSV/Word con la vista previa HTML de la API dentro de un
+ * la web, una imagen vieja desde un blob y Excel/CSV/Word/PowerPoint con la vista previa HTML de la API dentro de un
  * `<iframe sandbox="">` (sin scripts). Todo se baja con la sesión; nada de `/uploads` directo.
  */
 import dynamic from "next/dynamic";
@@ -209,8 +209,8 @@ export default function ArchivosDeActividad({ activityId }: { activityId: number
 
   return (
     <RecordSection
-      title="Archivos de evidencia"
-      subtitle="Excel, Word, PDF o imágenes de la propuesta, minutas y lo que mande el cliente"
+      title="Documentos"
+      subtitle="Opcional: PowerPoint, Excel, Word o PDF (propuestas, minutas, planos, lo que mande el cliente)"
       end={
         <Button
           variant="secondary"
@@ -279,7 +279,10 @@ export default function ArchivosDeActividad({ activityId }: { activityId: number
         ) : lista.length === 0 ? (
           <div className={s.vacio}>
             <strong>Aún no hay archivos</strong>
-            <span>Arrastra aquí Excel, Word, PDF o imágenes o usa «Adjuntar archivo», hasta 25 MB cada uno.</span>
+            <span>
+              Arrastra aquí un PowerPoint, Excel, Word o PDF o usa «Adjuntar archivo», hasta 25 MB cada uno. Las fotos van en
+              Evidencias.
+            </span>
           </div>
         ) : (
           <>
