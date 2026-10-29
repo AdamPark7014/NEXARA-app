@@ -1,0 +1,435 @@
+/* Desempeño (canvas 28-10): banda oscura con el índice, tabla por pilares y lectura de la persona. */
+
+.banda {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(240px, 1.3fr) repeat(3, minmax(0, 1fr));
+  gap: var(--ui-s4) var(--ui-s5, 24px);
+  align-items: center;
+  margin: var(--ui-s4) 0;
+  padding: 24px 28px;
+  border-radius: 24px;
+  color: #ffffff;
+  background:
+    radial-gradient(520px 300px at 88% 0%, rgba(16, 161, 131, 0.45), transparent 65%),
+    radial-gradient(420px 260px at 62% 130%, rgba(0, 96, 240, 0.36), transparent 65%),
+    radial-gradient(360px 220px at 100% 100%, rgba(168, 82, 153, 0.3), transparent 65%),
+    #0d0f12;
+  box-shadow: 0 24px 60px -32px rgba(13, 15, 18, 0.65);
+}
+
+@media (max-width: 900px) {
+  .banda {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .banda {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px;
+  }
+}
+
+.indice {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.indiceTexto,
+.dato {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bandaEtiqueta {
+  font-size: 13px;
+  font-weight: 500;
+  color: #c9ced8;
+}
+
+.bandaSub {
+  font-size: 13px;
+  color: #b9c0cc;
+}
+
+.indiceValor,
+.datoValor {
+  font-family: var(--ui-font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.indiceValor {
+  font-size: 40px;
+}
+
+.datoValor {
+  font-size: 28px;
+}
+
+/* ─── Cuerpo: tabla + lectura ─────────────────────────────────────────── */
+
+.cuerpo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s4);
+  align-items: flex-start;
+  margin-bottom: var(--ui-s4);
+}
+
+.tablaCaja {
+  flex: 999 1 640px;
+  min-width: 0;
+  border-radius: var(--ui-radius-xl, 20px);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-elev-1);
+  overflow: hidden;
+}
+
+.tablaCabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2) var(--ui-s3);
+  padding: 14px 16px 10px;
+}
+
+.tablaTitulo {
+  margin: 0;
+  font-size: var(--ui-fs-body);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.desliza {
+  overflow-x: auto;
+}
+
+.tabla {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: var(--ui-fs-meta);
+}
+
+.tabla thead th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: var(--ui-fs-caption);
+  font-weight: 600;
+  color: var(--ui-fg-3);
+  border-bottom: 1px solid var(--ui-border);
+  white-space: nowrap;
+}
+
+.tabla tbody th,
+.tabla tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ui-border);
+  vertical-align: middle;
+  text-align: left;
+  font-weight: 400;
+}
+
+.tabla tbody tr:last-child th,
+.tabla tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tabla tbody tr[data-on="true"] {
+  background: var(--ui-brand-soft);
+}
+
+.tabla .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.persona {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  min-height: 44px;
+  max-width: 240px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.persona:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+  border-radius: var(--ui-radius-md);
+}
+
+.personaTexto {
+  display: grid;
+  min-width: 0;
+}
+
+.nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.punto {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.indiceFila {
+  display: inline-grid;
+  place-items: center;
+  min-width: 40px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font-family: var(--ui-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.indiceFila[data-baja="true"] {
+  opacity: 0.6;
+}
+
+.indiceFila.ok {
+  background: var(--ui-success-bg);
+  color: var(--ui-success-text);
+}
+
+.indiceFila.atencion {
+  background: var(--ui-warning-bg);
+  color: var(--ui-warning-text);
+}
+
+.indiceFila.critico {
+  background: var(--ui-danger-bg);
+  color: var(--ui-danger-text);
+}
+
+.indiceFila.sinDatos {
+  background: var(--ui-surface-2);
+  color: var(--ui-fg-3);
+}
+
+.pilar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 96px;
+}
+
+.pilarPista {
+  position: relative;
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ui-surface-2);
+  overflow: hidden;
+}
+
+.pilarLleno {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+}
+
+.pilarLleno.ok {
+  background: var(--ui-brand);
+}
+
+.pilarLleno.atencion {
+  background: var(--ui-warning);
+}
+
+.pilarLleno.critico {
+  background: var(--ui-danger);
+}
+
+.pilarLleno.sinDatos {
+  background: transparent;
+}
+
+.pilarValor {
+  min-width: 26px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.horas {
+  display: block;
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.horasDe {
+  display: block;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Lectura de la persona ───────────────────────────────────────────── */
+
+.lectura {
+  flex: 1 1 300px;
+  max-width: 380px;
+  display: grid;
+  gap: var(--ui-s3);
+  position: sticky;
+  top: 84px;
+}
+
+@media (max-width: 1100px) {
+  .lectura {
+    position: static;
+    max-width: none;
+  }
+}
+
+.tarjeta {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: 18px;
+  border-radius: var(--ui-radius-xl, 20px);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-elev-1);
+}
+
+.lecturaCabeza {
+  display: grid;
+  gap: 2px;
+}
+
+.lecturaTitulo {
+  margin: 0;
+  font-family: var(--ui-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ui-fg);
+}
+
+.lecturaSub {
+  margin: 0;
+  font-size: var(--ui-fs-body);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.resumen {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+}
+
+.datos {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.datoFila {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  font-size: var(--ui-fs-meta);
+}
+
+.datoFila dt {
+  color: var(--ui-fg-2);
+}
+
+.datoFila dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--ui-fg);
+  text-align: right;
+}
+
+.partes {
+  display: grid;
+  gap: var(--ui-s3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.parteCabeza {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--ui-fs-meta);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.parteLista {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-2);
+}
+
+.parteVacia {
+  margin: 4px 0 0;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.peso {
+  color: var(--ui-fg-3);
+}
+
+.multiplica {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-warning-bg);
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-warning-text);
+}
+
+.verDetalle {
+  font-size: var(--ui-fs-meta);
+  font-weight: 600;
+  color: var(--ui-brand-text);
+  text-decoration: none;
+}
+
+.verDetalle:hover {
+  text-decoration: underline;
+}
+
+.nota {
+  margin: 0;
+  padding: 0 4px;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-3);
+}

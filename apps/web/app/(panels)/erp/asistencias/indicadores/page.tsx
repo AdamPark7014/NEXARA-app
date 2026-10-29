@@ -3,23 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
-import { Alert, Button, Card, CardHead, EmptyState, InfoPopover, PageHead, Segmented, SkeletonRows, Stat, StatRow } from "@/components/base";
+import { Alert, Button, Card, EmptyState, InfoPopover, PageHead, Segmented, SkeletonRows } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { PRESETS_NOMINA, RangoSelector } from "@/components/pizarra/PizarraKpi";
-import RankingPersonas, { LeyendaJornada } from "@/components/kpis/RankingPersonas";
+import DesempenoTablero from "@/components/kpis/DesempenoTablero";
 import ActividadPorDia from "@/components/kpis/ActividadPorDia";
 import { formatApiError } from "@/lib/erp-api";
 import { rangoDePreset, type BoardRange, type RangoPreset } from "@/lib/team-board-api";
-import { KPIS_PATH, fetchKpisEquipo, formatPctKpi, rangoDesdeUrl, type KpiPersonaFila, type KpisEquipoResponse } from "@/lib/kpis-equipo";
-import {
-  PESOS_CUMPLIMIENTO,
-  entregasDelEquipo,
-  horasEnPalabras,
-  ordenaRanking,
-  tonoCumplimiento,
-  tonoProductividad,
-  type OrdenRanking,
-} from "@/lib/kpis-lectura";
+import { KPIS_PATH, fetchKpisEquipo, rangoDesdeUrl, type KpiPersonaFila, type KpisEquipoResponse } from "@/lib/kpis-equipo";
+import { horasEnPalabras, ordenaRanking, type OrdenRanking } from "@/lib/kpis-lectura";
 import { descargarPreNominaExcel } from "@/lib/asistencia-confiable-api";
 
 // `productividad` conserva su id; en pantalla es lo que mide: tiempo con una actividad corriendo.
@@ -29,8 +21,6 @@ const ORDENES: ReadonlyArray<{ id: OrdenRanking; label: string }> = [
   { id: "retardos", label: "Retardos" },
   { id: "nombre", label: "Nombre" },
 ];
-
-const TONO_STAT = { ok: "brand", atencion: "warning", critico: "danger", sin_datos: "default" } as const;
 
 /** «28 sep – 4 oct», o un solo día: lo que va a traer el Excel. */
 function etiquetaPeriodo(r: BoardRange): string {
@@ -129,7 +119,7 @@ export default function KpisEquipoPage() {
   const t = data?.equipo.totales;
 
   return (
-    <div style={{ maxWidth: 1120, margin: "0 auto" }}>
+    <div style={{ maxWidth: 1280, margin: "0 auto" }}>
       <PageHead
         back={{ href: "/erp/asistencias", label: "Asistencias" }}
         title="Desempeño del equipo"
@@ -195,73 +185,27 @@ export default function KpisEquipoPage() {
         </Alert>
       ) : null}
 
-      {t ? (
-        <StatRow>
-          {hayCumplimiento ? (
-            <Stat
-              label="Cumplimiento"
-              value={formatPctKpi(t.cumplimientoPct)}
-              hint={entregasDelEquipo(t.entregas)}
-              title={PESOS_CUMPLIMIENTO}
-              tone={TONO_STAT[tonoCumplimiento(t.cumplimientoPct)]}
-            />
-          ) : null}
-          {/* Ya no es el semáforo: mide reloj corriendo, no si entregó a tiempo. */}
-          <Stat
-            label="Tiempo en actividades"
-            value={formatPctKpi(t.productividadPct)}
-            hint={`${Math.round(t.minutosProductivos / 60)} h de ${Math.round(t.minutosLaborados / 60)} h en jornada`}
-            title="Minutos con el reloj de una actividad corriendo ÷ minutos en jornada"
-            tone={hayCumplimiento ? "default" : TONO_STAT[tonoProductividad(t.productividadPct)]}
+      {cargando && !data ? (
+        <Card>
+          <SkeletonRows rows={5} label="Calculando indicadores" />
+        </Card>
+      ) : t && personas.length ? (
+        <div style={{ opacity: cargando ? 0.6 : 1, transition: "opacity 120ms" }}>
+          <DesempenoTablero
+            equipo={t}
+            personas={personas}
+            hrefDe={hrefDe}
+            titulo={soloYo ? "Tus números" : "Por persona"}
+            herramientas={<Segmented items={ordenes} value={ordenVisto} onChange={setOrden} ariaLabel="Ordenar por" />}
           />
-          <Stat
-            label="Retardos"
-            value={t.retardos}
-            hint={t.retardos ? `${horasEnPalabras(t.minutosTarde)} tarde` : "Todos a tiempo"}
-            tone={t.retardos >= 3 ? "warning" : "default"}
-          />
-          <Stat
-            label="Extra aprobado"
-            value={horasEnPalabras(t.minutosExtraAprobados)}
-            hint={
-              t.minutosExtraPendientes
-                ? `${horasEnPalabras(t.minutosExtraPendientes)} sin aprobar`
-                : "Todo decidido"
-            }
-            title="Lo único que la pre-nómina puede pagar como tiempo extra"
-            tone={t.minutosExtraPendientes ? "warning" : "default"}
-          />
-          <Stat
-            label="Uniforme"
-            value={formatPctKpi(t.uniforme.pct)}
-            hint={t.uniforme.revisadas ? `${t.uniforme.ok} de ${t.uniforme.revisadas} revisadas` : "Sin revisar"}
-            tone={t.uniforme.pct != null && t.uniforme.pct < 80 ? "warning" : "default"}
-          />
-        </StatRow>
+        </div>
+      ) : data ? (
+        <Card>
+          <EmptyState icon={<GroupsOutlinedIcon />} title="Nadie en tu alcance" />
+        </Card>
       ) : null}
 
       {data && !soloYo ? <ActividadPorDia personas={data.personas} hrefDe={hrefDe} /> : null}
-
-      <Card>
-        <CardHead
-          title={soloYo ? "Tus horas" : "Por persona"}
-          actions={
-            <>
-              <LeyendaJornada modo={ordenVisto === "productividad" ? "jornada" : "entregas"} />
-              <Segmented items={ordenes} value={ordenVisto} onChange={setOrden} ariaLabel="Ordenar por" />
-            </>
-          }
-        />
-        {cargando && !data ? (
-          <SkeletonRows rows={5} label="Calculando indicadores" />
-        ) : personas.length ? (
-          <div style={{ opacity: cargando ? 0.6 : 1, transition: "opacity 120ms" }}>
-            <RankingPersonas personas={personas} hrefDe={hrefDe} orden={ordenVisto} />
-          </div>
-        ) : data ? (
-          <EmptyState icon={<GroupsOutlinedIcon />} title="Nadie en tu alcance" />
-        ) : null}
-      </Card>
     </div>
   );
 }

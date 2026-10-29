@@ -69,16 +69,29 @@ function tonoPct(valor: number | null | undefined): Tone {
   return "danger";
 }
 
-function Medidor({ label, valor, hint }: { label: string; valor: number | null | undefined; hint: string }) {
+function Medidor({
+  label,
+  valor,
+  hint,
+  sinDato,
+}: {
+  label: string;
+  valor: number | null | undefined;
+  hint: string;
+  /** Lo que se lee cuando no hay con qué medir (en vez de una barra en 0 %). */
+  sinDato?: string;
+}) {
   const pct = valor == null || !Number.isFinite(valor) ? null : Math.max(0, Math.min(100, Math.round(valor)));
   return (
-    <div className={k.medidor} title={hint}>
+    <div className={k.medidor} title={pct == null && sinDato ? sinDato : hint}>
       <div className={k.medidorCabeza}>
         <span className={k.medidorEtiqueta}>{label}</span>
-        <span className={k.medidorCifra}>{formatPct(valor)}</span>
+        <span className={k.medidorCifra}>{pct == null ? "Sin dato" : formatPct(valor)}</span>
       </div>
-      <Progress value={pct ?? 0} max={100} tone={tonoPct(valor)} ariaLabel={`${label}: ${formatPct(valor)}`} />
-      <span className={k.medidorPista}>{hint}</span>
+      {pct == null ? null : (
+        <Progress value={pct} max={100} tone={tonoPct(valor)} ariaLabel={`${label}: ${formatPct(valor)}`} />
+      )}
+      <span className={k.medidorPista}>{pct == null && sinDato ? sinDato : hint}</span>
     </div>
   );
 }
@@ -95,16 +108,19 @@ export function KpiStrip({ kpis, compacta = false }: { kpis?: BoardKpis; compact
         label="A tiempo"
         valor={kpis.aTiempoPct}
         hint={`${kpis.aTiempo} de ${kpis.cerradas} cerradas dentro de su fecha máxima`}
+        sinDato="Aún no cierra ninguna en estas fechas"
       />
       <Medidor
         label="Eficiencia"
         valor={kpis.eficienciaPct}
-        hint={`Plan ${formatMinutes(kpis.minutosPlan)} contra real ${formatMinutes(kpis.minutosReales)}`}
+        hint={`Tiempo planeado ${formatMinutes(kpis.minutosPlan)} contra real ${formatMinutes(kpis.minutosReales)}`}
+        sinDato="Ninguna cerrada tiene tiempo planeado: se mide al asignar con tiempo estimado"
       />
       <Medidor
         label="Productividad"
         valor={kpis.productividadPct}
         hint={`${formatMinutes(kpis.minutosEnActividad)} productivas de ${formatMinutes(kpis.minutosAsistidos)} trabajadas`}
+        sinDato="Sin jornada checada en estas fechas"
       />
       <div className={k.conteos}>
         <Badge tone="brand" title="Cerradas de las asignadas en el rango">

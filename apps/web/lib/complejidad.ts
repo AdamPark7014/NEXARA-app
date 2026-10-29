@@ -9,10 +9,10 @@ export const COMPLEJIDADES = ["BASICA", "ESTANDAR", "COMPLEJA", "CRITICA"] as co
 export type Complejidad = (typeof COMPLEJIDADES)[number];
 
 export const COMPLEJIDAD_UI: Record<Complejidad, { label: string; ayuda: string }> = {
-  BASICA: { label: "Básica", ayuda: "Rutina corta, un solo punto" },
-  ESTANDAR: { label: "Estándar", ayuda: "Lo normal de este tipo" },
-  COMPLEJA: { label: "Compleja", ayuda: "Más volumen, altura o coordinación" },
-  CRITICA: { label: "Crítica", ayuda: "Cliente detenido o con riesgo" },
+  BASICA: { label: "Básica", ayuda: "Rutina corta" },
+  ESTANDAR: { label: "Estándar", ayuda: "Lo normal" },
+  COMPLEJA: { label: "Compleja", ayuda: "Más volumen" },
+  CRITICA: { label: "Crítica", ayuda: "Cliente detenido" },
 };
 
 export function esComplejidad(v: unknown): v is Complejidad {

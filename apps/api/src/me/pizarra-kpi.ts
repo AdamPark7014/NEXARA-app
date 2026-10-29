@@ -125,6 +125,18 @@ export function minutosPlanDeHoras(horasPlan?: number | null): number | null {
   return Math.round(horasPlan * 60);
 }
 
+/**
+ * Plan de una persona en una actividad: sus horas (`horasPlan`) o, sin ellas, el tiempo estimado
+ * de la actividad. Es el mismo plan que usa Desempeño (`kpis-equipo.service.ts`). Con solo las
+ * horas por persona, 9 de cada 10 cerradas quedaban sin plan y la eficiencia salía vacía (28-10).
+ */
+export function minutosPlanDe(horasPlan?: number | null, tiempoEstimadoMin?: number | null): number | null {
+  return (
+    minutosPlanDeHoras(horasPlan) ??
+    (tiempoEstimadoMin != null && Number.isFinite(tiempoEstimadoMin) && tiempoEstimadoMin > 0 ? tiempoEstimadoMin : null)
+  );
+}
+
 /** Minutos entre dos instantes; si sigue abierta, hasta `ahora`. Sin inicio, null. */
 export function minutosEntre(inicio: Date | null, fin: Date | null, ahora: Date): number | null {
   if (!inicio) return null;

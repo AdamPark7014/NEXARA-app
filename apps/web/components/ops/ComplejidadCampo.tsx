@@ -17,6 +17,14 @@ import {
 } from "@/lib/complejidad";
 import s from "./ComplejidadCampo.module.css";
 
+/** Qué cuenta en cada nivel (al pasar el cursor): lo mismo que lee la IA. */
+const COMPLEJIDAD_NIVEL_TITULO: Record<Complejidad, string> = {
+  BASICA: "Rutina corta y conocida, un solo punto o equipo",
+  ESTANDAR: "Lo normal de este tipo de trabajo",
+  COMPLEJA: "Más volumen o más difícil: varios puntos, altura, falla sin causa clara o coordinar con otros",
+  CRITICA: "El cliente está detenido o hay riesgo: sistema caído, incidente o plazo de horas",
+};
+
 /** Espera tras la última tecla antes de pedir la sugerencia (una llamada por título, no por letra). */
 const ESPERA_SUGERENCIA_MS = 900;
 
@@ -123,6 +131,7 @@ export default function ComplejidadCampo({
               className={s.nivel}
               aria-pressed={on}
               data-on={on ? "true" : undefined}
+              title={COMPLEJIDAD_NIVEL_TITULO[c]}
               onClick={() => {
                 elegidaAMano.current = true;
                 onChange({ complejidad: c });

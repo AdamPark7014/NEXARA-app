@@ -1,5 +1,24 @@
 # RELEVO
 
+- **28-10 ~19:30 (claude-code) — Desempeño como en el canvas y eficiencia de la pizarra sin plan.**
+  - Desempeño (`/erp/asistencias/indicadores`): `components/kpis/DesempenoTablero.tsx` (+ css) reemplaza la franja de
+    cifras y el ranking.
+    - Arriba, banda oscura con el índice del equipo en anillo, entregas a tiempo, tiempo en actividades y extra por decidir.
+    - Tabla por persona con cuatro pilares (`lib/desempeno.ts`): Confiabilidad = entregas + tiempo, Calidad = forma,
+      Rendimiento = ritmo + ocupación, Disciplina = asistencia + uniforme. Se promedian con los mismos pesos de la API.
+      El índice no cambia; la fórmula v2 sigue esperando §7.4.
+    - Al lado, la lectura de la persona elegida: resumen, datos y de qué sale su número. La confianza depende de las
+      entregas medidas (≥15 alta, ≥5 media).
+    - «Actividad por día» queda abajo.
+  - Eficiencia en 0 % (pedido de Adam): la pizarra solo tomaba `horasPlan` de la persona. De las 136 cerradas de 4
+    semanas, solo 14 lo tenían y otras 48 tenían el estimado de la actividad. Ahora usa `minutosPlanDe(horasPlan,
+    tiempoEstimadoMin)` (`me/pizarra-kpi.ts`), el mismo plan de Desempeño. Sin ningún plan, la tarjeta dice «Sin dato»
+    con el motivo, en vez de una barra en 0 %.
+  - Complejidad: los niveles caben de dos en dos en columnas angostas, con ayudas cortas; la definición completa va en
+    el `title`.
+  - AN-0324, AN-0340 y AN-0341: los reabrió la sesión del cierre (19:00) y siguen «En Proceso», sin incumplimiento.
+    Adam decide si se dejan así para que suban su foto de salida o si se finalizan.
+
 - **28-10 ~19:00 (claude-code) — Cierre «No cumplida» solo al checar salida; salida de zona justificada libera la foto de salida (urgente de Adam).**
   - Causa: el cron `actividades-cierre-jornada` (cada 5 min, desde el 22-10) cerraba a la hora de salida del horario
     (18:00, o 17:00 con `work_schedules` propio) antes de que la gente checara. El 28-10 cerró 10 actividades
