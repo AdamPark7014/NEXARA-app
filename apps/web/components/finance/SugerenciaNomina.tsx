@@ -182,7 +182,7 @@ function partesPeriodo(datos: SugerenciaNominaRespuesta): string[] {
     partes.push(`en curso: lo esperado se cuenta hasta el ${p.calculadoHasta}`);
     partes.push(`«a la fecha» corta el ${fechaCorta(p.calculadoHasta)} y «periodo completo» el ${fechaCorta(p.hasta)}`);
   }
-  if (p.origen === "por_omision") partes.push("la empresa no tiene calendario de nómina: se asume quincenal");
+  if (p.origen === "por_omision") partes.push("la empresa no tiene calendario de nómina: se asume semanal, de lunes a domingo");
   if (datos.scope === "subtree") partes.push("solo tu organigrama");
   return partes;
 }

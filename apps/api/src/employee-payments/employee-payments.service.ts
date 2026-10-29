@@ -13,10 +13,12 @@ import { diasDelRango } from '../me/kpis-equipo.js';
 import { WORKDAY_TIMEZONE, workDateKey } from '../common/time/workday.js';
 import { NOMINA_SETTING_KEY, parsearConfigNomina } from './nomina-calendario.js';
 import {
+  divisorDeHorario,
   esClavePeriodo,
   filaSugerencia,
   formulaSugerencia,
   ordenaSugerencias,
+  minutosEsperados,
   periodoDeClave,
   periodoManual,
   periodosCalculados,
@@ -119,12 +121,16 @@ export class EmployeePaymentsService {
     const approvedOvertimeMinutes = t.minutosExtraAprobados;
 
     const sueldoSemanal = profile?.sueldoSemanal != null ? Number(profile.sueldoSemanal) : null;
-    // `minutosLaborados` es el tiempo neto de comida y ya lleva dentro el extra: la
-    // función separa la parte ordinaria de la extra, que se paga con multiplicador.
+    // `minutosLaborados` es el tiempo neto de comida y ya lleva dentro el extra. Lo ordinario se topa
+    // a lo que su horario esperaba (lo de más sin aprobar no se paga) y la extra aprobada va al doble
+    // hasta 9 h por semana y al triple después.
+    const esperados = minutosEsperados(divisorDeHorario(fila.horario), rango.desde, rango.hasta);
     const suggested = calculatePrenominaAmount({
       sueldoSemanal,
       minutosLaborados: t.minutosLaborados,
       minutosExtraAprobados: approvedOvertimeMinutes,
+      minutosEsperados: esperados,
+      semanas: semanasDe(rango.desde, rango.hasta),
     });
 
     return {
@@ -132,9 +138,10 @@ export class EmployeePaymentsService {
       from: rango.desde,
       to: rango.hasta,
       daysWithAttendance: t.diasConJornada,
-      /** Lo pagable: laborado neto + extra aprobado (que se paga aparte). */
-      totalMinutes: minutosPagables(t),
-      totalHours: horas(minutosPagables(t)),
+      /** Lo pagable: lo ordinario hasta lo esperado + la extra aprobada (lo laborado ya la trae dentro). */
+      totalMinutes: minutosPagables(t, esperados),
+      totalHours: horas(minutosPagables(t, esperados)),
+      minutosEsperados: esperados,
       /** El desglose, para que la pantalla no tenga que adivinar. */
       minutosLaborados: t.minutosLaborados,
       minutosProductivos: t.minutosProductivos,
@@ -381,10 +388,19 @@ export class EmployeePaymentsService {
     const approvedOvertimeMinutes = overtime.reduce((s, r) => s + (r.minutos || 0), 0);
 
     const sueldoSemanal = profile?.sueldoSemanal != null ? Number(profile.sueldoSemanal) : null;
+    // Sin el horario de la persona: lo esperado es la jornada de oficina (L–V, 8 h).
+    const desde = fromDate.toISOString().slice(0, 10);
+    const hasta = toDate.toISOString().slice(0, 10);
     const suggested = calculatePrenominaAmount({
       sueldoSemanal,
       minutosLaborados: totalMinutes,
       minutosExtraAprobados: approvedOvertimeMinutes,
+      minutosEsperados: minutosEsperados(
+        divisorDeHorario({ jornadaOrdinariaMin: 480, dias: [1, 2, 3, 4, 5], personalizado: false }),
+        desde,
+        hasta,
+      ),
+      semanas: semanasDe(desde, hasta),
     });
 
     return {
@@ -831,4 +847,9 @@ function minutosDelDiaEnMexico(instante: Date): number {
   }).formatToParts(instante);
   const n = (t: string) => Number(partes.find((p) => p.type === t)?.value ?? 0);
   return n('hour') * 60 + n('minute');
+}
+
+/** Semanas del periodo (al menos una), para el tope de 9 h de extra al doble por semana. */
+function semanasDe(desde: string, hasta: string): number {
+  return Math.max(1, Math.ceil(diasDelRango(desde, hasta).length / 7));
 }

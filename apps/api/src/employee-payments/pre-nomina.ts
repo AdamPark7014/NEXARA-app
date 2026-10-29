@@ -158,13 +158,17 @@ export function resumenPreNomina(filas: FilaPreNomina[]): ResumenPreNomina {
 /**
  * Lo que se le sugiere al módulo de pagos como «minutos del periodo».
  *
- * Es la suma de lo laborado neto más el extra **aprobado**. El extra pendiente queda
- * fuera a propósito: mientras nadie lo autorice, no es una hora pagable, y meterlo en la
- * sugerencia haría que se pagara solo con que alguien le diera a «calcular».
+ * Lo laborado neto ya trae dentro el tiempo extra, así que el extra aprobado no se suma otra vez:
+ * es lo ordinario (lo laborado sin el extra aprobado, hasta lo que su horario esperaba) más el
+ * extra **aprobado**. El extra pendiente queda fuera a propósito: mientras nadie lo autorice, no es
+ * una hora pagable. Sin `minutosEsperados` no se puede topar y se devuelve lo laborado.
  */
-export function minutosPagables(t: {
-  minutosLaborados: number;
-  minutosExtraAprobados: number;
-}): number {
-  return Math.max(0, Math.round(t.minutosLaborados + t.minutosExtraAprobados));
+export function minutosPagables(
+  t: { minutosLaborados: number; minutosExtraAprobados: number },
+  minutosEsperados?: number | null,
+): number {
+  const laborados = Math.max(0, t.minutosLaborados);
+  const aprobados = Math.min(Math.max(0, t.minutosExtraAprobados), laborados);
+  if (minutosEsperados == null) return Math.round(laborados);
+  return Math.max(0, Math.round(Math.min(laborados - aprobados, Math.max(0, minutosEsperados)) + aprobados));
 }

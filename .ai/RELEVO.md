@@ -1,5 +1,23 @@
 # RELEVO
 
+- **29-10 ~16:10 (claude-code) — Nómina: extra doble/triple, nada de extra sin aprobar, solo jefes aprueban, pago
+  semanal; la cotización vuelve a 40 + 4.** (Auditoría de parámetros pedida por Adam; todo aprobado en la decisión 6.)
+  - Pre-nómina (`prenomina-amount.ts`, `pre-nomina.ts`, `employee-payments.service.ts`): lo ordinario se topa a lo que su
+    horario esperaba y como extra solo cuenta la aprobada. Con 50 h y nada aprobado se pagan 40. `minutosPagables` ya
+    no suma dos veces la extra aprobada (lo laborado ya la trae dentro).
+  - Extra según la LFT: las primeras 9 h aprobadas de la semana al doble y el resto al triple (`pagoExtraLft`; también
+    `montoExtras` y la nota del pago en el control de nómina).
+  - Aprobar o rechazar extra (`overtime-approvals`): solo un jefe de la persona en el organigrama, o dirección. RH o
+    contabilidad sin ser su jefe ya no pueden, y nadie aprueba la suya.
+  - `payroll.schedule` de la empresa 1 en producción: de `{"frecuencia":"quincenal"}` a
+    `{"frecuencia":"semanal","diaSemanaCorte":0,"diaPago":1}`. Valores por omisión y textos en semanal; el resumen del
+    CEO ya avisa el corte de la semana.
+  - Cotización: vuelve a 40 + 4 por partida. El «hasta 10 en 40 min» rompía el «5 productos → 1 h» de Adam (§8).
+  - Actividad para la contadora (Adam, 15:18 en la sesión madre): **AN-0356** (id 390), «Generar la nómina semanal
+    (semana del 26-10 al 1-nov)». La asignó Christian a Paulina; entrega el viernes 30-10 a las 18:00 (la hoja no trae
+    el día de pago y el lunes 2-nov es Día de Muertos) y tiempo estándar de 260 min. La notificación quedó en Core y
+    Paulina tiene push registrado. Core no tiene actividades recurrentes: la de cada semana se arma aparte.
+
 - **29-10 ~16:00 (claude-code) — Diseñador de videovigilancia: modelo 3D y editor pulidos (pedidos de Adam).**
   - En `main` y en producción:
     - `4e29d06c`: muros sólidos con corte «casa de muñecas» (Adam lo aprobó).
