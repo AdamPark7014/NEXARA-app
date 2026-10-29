@@ -263,6 +263,8 @@ class CoreActivityKindsTest {
         assertNull(k.horaCompromisoDe("2026-10-29T15:00:00.000Z", "2026-10-30T23:00:00.000Z", false))
         assertNull(k.horaCompromisoDe("2026-10-29T15:00:00.000Z", "2026-10-29T23:00:00.000Z", true))
         assertNull(k.horaCompromisoDe(null, "2026-10-29T23:00:00.000Z", false))
+        // 23:59 de México = fin del día escrito a mano.
+        assertNull(k.horaCompromisoDe("2026-10-29T15:00:00.000Z", "2026-10-30T05:59:00.000Z", false))
     }
 
     @Test

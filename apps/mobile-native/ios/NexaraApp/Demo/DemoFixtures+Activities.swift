@@ -4,6 +4,12 @@ import Foundation
 // Las formas de cada respuesta salen de los modelos `Decodable` de `Data/CoreModels.swift`
 // y de las fixtures de capturas de tienda (`scripts/store-demo/generar-fixtures.py`).
 
+/// Complejidad de una actividad de la demostración (`BASICA`…`CRITICA`, como la API).
+struct DemoComplejidad {
+    let elegida: String?
+    let sugerida: String?
+}
+
 extension DemoStore {
     /// Despachos que se reparten a otra persona: no cuentan como «abiertas» de nadie en la pizarra.
     static let dispatchedIds: Set<Int> = [5154]
@@ -558,6 +564,10 @@ extension DemoStore {
             "assignees": assignees,
         ])
         if let custom = ticketCustom(a) { json["ticketTypeCustom"] = custom }
+        if let comp = complejidadDemo(a) {
+            if let elegida = comp.elegida { json["complejidad"] = elegida }
+            if let sugerida = comp.sugerida { json["complejidadSugerida"] = sugerida }
+        }
         if let name = clientName(a), let client = DemoData.client(serviceId: a.clientServiceId) {
             json["client"] = dj(["id": client.serviceId, "name": name])
         }
@@ -566,6 +576,102 @@ extension DemoStore {
         }
         if let fin = a.finMin { json["fechaFinalizacion"] = iso(fin) }
         return json
+    }
+
+    // MARK: Complejidad (`ai/complejidad/tiempos` y `ai/complejidad/sugerir`)
+
+    /// Complejidad elegida al asignar y la que sugirió la IA. Varias mías difieren de la
+    /// sugerencia para que el detalle enseñe «La IA sugirió …».
+    func complejidadDemo(_ a: DemoActivity) -> DemoComplejidad? {
+        if let creada = complejidadCreada[a.id] { return creada }
+        switch a.id {
+        case 5142: return DemoComplejidad(elegida: "COMPLEJA", sugerida: "COMPLEJA")
+        case 5143: return DemoComplejidad(elegida: "ESTANDAR", sugerida: "ESTANDAR")
+        case 5144: return DemoComplejidad(elegida: "CRITICA", sugerida: "COMPLEJA")
+        case 5145: return DemoComplejidad(elegida: "COMPLEJA", sugerida: "ESTANDAR")
+        case 5146: return DemoComplejidad(elegida: "ESTANDAR", sugerida: "ESTANDAR")
+        case 5150: return DemoComplejidad(elegida: "ESTANDAR", sugerida: "COMPLEJA")
+        case 5151: return DemoComplejidad(elegida: "BASICA", sugerida: "BASICA")
+        case 5152: return DemoComplejidad(elegida: "ESTANDAR", sugerida: nil)
+        case 5154: return DemoComplejidad(elegida: "COMPLEJA", sugerida: "COMPLEJA")
+        default: return nil
+        }
+    }
+
+    /// Mediana en minutos (nivel Estándar) por subtipo de tarea o tipo de servicio.
+    private static let medianaPorTipo: [String: Int] = [
+        "Instalación": 220, "Cableado y canalización": 260, "Mantenimiento preventivo": 150,
+        "Correctivo y diagnóstico": 120, "Levantamiento": 95, "Recolección": 60, "Entrega": 50,
+        "Preparación de equipo": 70, "Diseño, CAD y memoria técnica": 180,
+        "Configuración y soporte remoto": 90, "Trámite": 75, "Compra de material": 60,
+        "Facturación y contabilidad": 80, "Reporte / documentación": 45, "Capacitación": 120,
+        "Junta": 60, "Evento o guardia": 240,
+        "PREVENTIVO": 150, "CORRECTIVO": 120, "EMERGENCIA": 90, "INSTALACION": 240,
+    ]
+
+    /// Mediana de los tipos que no se dividen por subtipo.
+    private static let medianaPorKind: [String: Int] = ["proyecto": 180, "obra": 300, "comercial": 75]
+
+    /// Lo típico de un tipo de trabajo. Crítica junta solo 2 anteriores: sin mediana, para que
+    /// el formulario enseñe «Aún no hay suficientes de este nivel».
+    func fxTiemposTipicos(coreKind: String, tipo: String?) -> DemoJSON {
+        let kind = coreKind.lowercased()
+        let tipoLimpio = (tipo ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let base: Int? = {
+            switch kind {
+            case "tarea": return tipoLimpio.isEmpty ? nil : (DemoStore.medianaPorTipo[tipoLimpio] ?? 90)
+            case "servicio": return DemoStore.medianaPorTipo[tipoLimpio.isEmpty ? "PREVENTIVO" : tipoLimpio] ?? 150
+            default: return DemoStore.medianaPorKind[kind]
+            }
+        }()
+        let tipico: (Int, Double?) -> DemoJSON = { muestras, factor in
+            guard let base, let factor, muestras >= 3 else { return dj(["muestras": muestras, "medianaMin": NSNull()]) }
+            return dj(["muestras": muestras, "medianaMin": max(5, Int((Double(base) * factor / 5).rounded()) * 5)])
+        }
+        guard base != nil else {
+            return dj([
+                "clave": NSNull(),
+                "total": tipico(0, nil),
+                "porComplejidad": dj([
+                    "BASICA": tipico(0, nil), "ESTANDAR": tipico(0, nil),
+                    "COMPLEJA": tipico(0, nil), "CRITICA": tipico(0, nil),
+                ]),
+            ])
+        }
+        return dj([
+            "clave": tipoLimpio.isEmpty ? kind : "\(kind):\(tipoLimpio)",
+            "total": tipico(20, 1),
+            "porComplejidad": dj([
+                "BASICA": tipico(5, 0.6),
+                "ESTANDAR": tipico(9, 1),
+                "COMPLEJA": tipico(4, 1.6),
+                "CRITICA": tipico(2, nil),
+            ]),
+        ])
+    }
+
+    /// Sugerencia «de la IA» por palabras del título y las indicaciones (6 letras o más).
+    func fxSugerirComplejidad(_ json: DemoJSON) -> DemoJSON {
+        let titulo = (json["titulo"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard titulo.count >= 6 else { return dj(["sugerencia": NSNull()]) }
+        let texto = "\(titulo) \(json["indicaciones"] as? String ?? "")"
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "es_MX"))
+            .lowercased()
+        let reglas: [(palabras: [String], nivel: String, motivo: String)] = [
+            (["caido", "detenid", "urgente", "emergencia", "sin servicio", "no funciona"],
+             "CRITICA", "El cliente está detenido o la falla es urgente"),
+            (["varios", "todas", "todos", "edificio", "piso", "planta", "puntos", "ampliacion", "completo"],
+             "COMPLEJA", "Son varios puntos o más volumen que lo normal"),
+            (["revisar", "revision", "junta", "reporte", "recoger", "un solo"],
+             "BASICA", "Parece una rutina corta y conocida"),
+        ]
+        let regla = reglas.first { regla in regla.palabras.contains { texto.contains($0) } }
+        return dj([
+            "sugerencia": dj([
+                "complejidad": regla?.nivel ?? "ESTANDAR",
+                "motivo": regla?.motivo ?? "Parece un trabajo normal de este tipo",
+            ]),
+        ])
     }
 
     /// Actividades viejas del historial: detalle genérico, ya finalizadas.

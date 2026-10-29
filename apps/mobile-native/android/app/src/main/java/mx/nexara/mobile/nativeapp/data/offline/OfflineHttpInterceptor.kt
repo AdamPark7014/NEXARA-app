@@ -141,6 +141,9 @@ class OfflineHttpInterceptor(
             "/pausar", "/reanudar",
             // Alta y movimientos por código de barras: el API decide si el código existe.
             "/por-codigo",
+            // La sugerencia de complejidad solo sirve mientras se llena el formulario: reenviada
+            // después nadie la lee y gasta una llamada a la IA.
+            "/ai/complejidad/sugerir",
         )
 
         /**

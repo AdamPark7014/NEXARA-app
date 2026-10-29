@@ -13,6 +13,32 @@ enum CoreSchedule {
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) ?? now
         return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrow) ?? tomorrow
     }
+
+    private static var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = mexico
+        return calendar
+    }
+
+    /// «HH:mm» de un instante, en hora de México.
+    static func hhmm(_ date: Date) -> String {
+        let parts = calendar.dateComponents([.hour, .minute], from: date)
+        return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+    }
+
+    /// El mismo día (en México) a la hora «HH:mm»; nil si la hora no se entiende.
+    static func at(day: Date, hhmm: String) -> Date? {
+        let parts = hhmm.split(separator: ":").compactMap { Int($0) }
+        guard parts.count == 2, (0...23).contains(parts[0]), (0...59).contains(parts[1]) else { return nil }
+        return calendar.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: day)
+    }
+
+    /// Hora límite que se propone al prender «Entregar a más tardar»: las 18:00 de ese día o,
+    /// si ya empieza después, una hora tras el inicio.
+    static func compromisoPorOmision(inicio: Date) -> Date {
+        if let cierre = at(day: inicio, hhmm: "18:00"), cierre > inicio { return cierre }
+        return inicio.addingTimeInterval(3600)
+    }
 }
 
 private let coreTicketTypes: [(value: String, label: String)] = [
@@ -29,8 +55,10 @@ private func coreClean(_ text: String) -> String {
 }
 
 /// Datos de la actividad — espejo de `OpsActivityForm` en tono Core: proyecto o
-/// cliente por sector según el tipo, subtipo de tarea, agenda, prioridad,
-/// tiempos y fotos de evidencia (2–8). Se pinta como secciones dentro de un `Form`.
+/// cliente por sector según el tipo, subtipo de tarea (catálogo por familia), complejidad
+/// con la sugerencia de la IA, agenda con «Entregar a más tardar», prioridad, tiempos y
+/// fotos de evidencia (2–8). Se pinta como secciones dentro de un `Form`. Solo da de alta:
+/// en iOS no se edita una actividad desde aquí.
 struct CoreActivityFormView: View {
     let kind: CoreActivityKind
     let charge: CoreAssignmentCharge?
@@ -50,9 +78,28 @@ struct CoreActivityFormView: View {
     @State private var ticketType = "PREVENTIVO"
     @State private var ticketTypeCustom = ""
     @State private var tareaTipoId: String?
-    @State private var tareaOtro = ""
     @State private var withSchedule = true
     @State private var fecha = CoreSchedule.defaultStart()
+    /// «Entregar a más tardar»: apagado = el límite es el fin del día, como siempre.
+    @State private var conCompromiso = false
+    @State private var compromiso = CoreSchedule.compromisoPorOmision(inicio: CoreSchedule.defaultStart())
+    @State private var complejidad: CoreComplejidad?
+    @State private var complejidadSugerida: CoreComplejidad?
+    /// Quien asigna ya eligió a mano: la sugerencia ya no cambia su elección.
+    @State private var complejidadAMano = false
+    @State private var tiempos: CoreTiemposTipicos?
+    /// Tipo de trabajo (`tiemposKey`) del que ya se pidió lo típico.
+    @State private var tiemposDe = ""
+    @State private var tiemposTarea: Task<Void, Never>?
+    @State private var sugerencia: CoreSugerenciaComplejidad?
+    @State private var pensandoSugerencia = false
+    @State private var sugerenciaTarea: Task<Void, Never>?
+    /// Combinación tipo + título + indicaciones para la que se programó la última espera.
+    @State private var sugerenciaPara = ""
+    /// Última combinación que ya se le preguntó a la IA (una sola vez por combinación).
+    @State private var ultimaPregunta = ""
+    /// Ya intentó guardar: desde ahí lo que falta se dice junto al campo.
+    @State private var intentado = false
     @State private var estimadoHoras = 1
     @State private var estimadoMinutos = 0
     @State private var maximoHoras = 0
@@ -84,11 +131,37 @@ struct CoreActivityFormView: View {
         return activeProjects.first(where: { $0.id == projectId })
     }
 
+    private var tareaTipo: CoreTareaTipo? {
+        guard let tareaTipoId else { return nil }
+        return CoreTareaTipo.all.first(where: { $0.id == tareaTipoId })
+    }
+
+    // Entregar a más tardar: solo con día; las horas se comparan como «HH:mm» de México.
+    private var horaInicio: String { CoreSchedule.hhmm(fecha) }
+    private var horaCompromiso: String { scheduled && conCompromiso ? CoreSchedule.hhmm(compromiso) : "" }
+    private var compromisoOk: Bool { CoreActivityRules.compromisoValido(hora: horaInicio, compromiso: horaCompromiso) }
+
+    // Complejidad: en tarea, después de elegir su tipo; en las demás, siempre.
+    private var tipoComplejidad: String? {
+        CoreActivityRules.tipoParaComplejidad(kind: kind, tareaTipo: tareaTipo, ticketType: ticketType)
+    }
+    private var complejidadVisible: Bool { CoreActivityRules.complejidadVisible(kind: kind, tipo: tipoComplejidad) }
+    private var tiemposKey: String { complejidadVisible ? "\(kind.rawValue)|\(tipoComplejidad ?? "")" : "" }
+    private var preguntaSugerencia: String {
+        guard complejidadVisible else { return "" }
+        return "\(kind.rawValue)|\(tipoComplejidad ?? "")|\(coreClean(titulo))|\(coreClean(indicaciones))"
+    }
+    private var estimadoTotal: Int { estimadoHoras * 60 + estimadoMinutos }
+
     var body: some View {
         Group {
             Section {
                 LabeledContent("AN sugerido", value: nextAn.isEmpty ? (loaded ? "Se asigna al guardar" : "Calculando…") : nextAn)
+                // La complejidad se dispara desde vistas sueltas, no desde el `Group`: un
+                // modificador en el `Group` se repite en cada sección.
                 TextField("Título de la actividad", text: $titulo)
+                    .onAppear { refrescarComplejidad() }
+                    .onChange(of: titulo) { _, _ in refrescarComplejidad() }
             } header: {
                 Text("Datos de la actividad")
             } footer: {
@@ -115,27 +188,25 @@ struct CoreActivityFormView: View {
             }
 
             if kind == .tarea {
+                // Catálogo cerrado por familia (28-10): sin texto libre, cada tipo se puede medir.
                 Section {
-                    CoreFlowLayout(spacing: 8) {
-                        ForEach(CoreTareaTipo.all) { tipo in
-                            let on = tareaTipoId == tipo.id
-                            Button {
-                                tareaTipoId = tipo.id
-                            } label: {
-                                Label(tipo.label, systemImage: tipo.symbol)
-                                    .symbolRenderingMode(.hierarchical)
-                                    .font(.subheadline.weight(on ? .bold : .regular))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .foregroundStyle(on ? Color.accentColor : Color.primary)
-                                    .background(on ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.08), in: Capsule())
+                    ForEach(CoreFamiliaTarea.allCases) { familia in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(familia.label)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            CoreFlowLayout(spacing: 8) {
+                                ForEach(CoreTareaTipo.deFamilia(familia)) { tipo in
+                                    tareaChip(tipo)
+                                }
                             }
-                            .buttonStyle(.borderless)
                         }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
-                    if tareaTipoId == "otro" {
-                        TextField("Especifica el tipo (ej. Visita a proveedor)", text: $tareaOtro)
+                    if intentado && tareaTipo == nil {
+                        Text("Elige el tipo de tarea")
+                            .font(.footnote)
+                            .foregroundStyle(CorePalette.red)
                     }
                 } header: {
                     Text("Tipo de tarea *")
@@ -158,16 +229,23 @@ struct CoreActivityFormView: View {
                 }
             }
 
-            if kind.ticketType == nil {
-                Section("Tipo de trabajo") {
-                    Picker("Tipo", selection: $ticketType) {
-                        ForEach(coreTicketTypes, id: \.value) { option in
-                            Text(option.label).tag(option.value)
+            // El tipo de trabajo y la complejidad (que pregunta por ese tipo) van juntos.
+            Group {
+                if kind.ticketType == nil {
+                    Section("Tipo de trabajo") {
+                        Picker("Tipo", selection: $ticketType) {
+                            ForEach(coreTicketTypes, id: \.value) { option in
+                                Text(option.label).tag(option.value)
+                            }
+                        }
+                        .onChange(of: ticketType) { _, _ in refrescarComplejidad() }
+                        if ticketType == "OTRO" {
+                            TextField("Tipo personalizado (ej. Auditoría de red)", text: $ticketTypeCustom)
                         }
                     }
-                    if ticketType == "OTRO" {
-                        TextField("Tipo personalizado (ej. Auditoría de red)", text: $ticketTypeCustom)
-                    }
+                }
+                if complejidadVisible {
+                    complejidadSection
                 }
             }
 
@@ -197,6 +275,23 @@ struct CoreActivityFormView: View {
                 if scheduled {
                     DatePicker("Día", selection: $fecha, displayedComponents: .date)
                     DatePicker("Hora", selection: $fecha, displayedComponents: .hourAndMinute)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("Entregar a más tardar (opcional)", isOn: $conCompromiso)
+                            .onChange(of: conCompromiso) { _, prendido in
+                                if prendido { compromiso = CoreSchedule.compromisoPorOmision(inicio: fecha) }
+                            }
+                        Text("Sin hora, el límite es el fin del día. Con hora, la entrega cuenta a tiempo solo si llega antes.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    if conCompromiso {
+                        DatePicker("Hora límite", selection: $compromiso, displayedComponents: .hourAndMinute)
+                        if !compromisoOk {
+                            Text("Tiene que ser después de la hora de inicio.")
+                                .font(.footnote)
+                                .foregroundStyle(CorePalette.red)
+                        }
+                    }
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("¿Cuánto tiempo toma?")
@@ -254,6 +349,7 @@ struct CoreActivityFormView: View {
             Section {
                 TextField("Indicaciones generales (para todo el equipo)", text: $indicaciones, axis: .vertical)
                     .lineLimit(2...6)
+                    .onChange(of: indicaciones) { _, _ in refrescarComplejidad() }
                 Stepper("Fotos de evidencia por persona: \(fotos)", value: $fotos, in: 2...8)
             } footer: {
                 Text("Cada persona que la ejecute sube entre 2 y 8 fotos.")
@@ -282,6 +378,185 @@ struct CoreActivityFormView: View {
         .task(id: kind) { await loadMeta() }
     }
 
+    // MARK: Tipo de tarea
+
+    private func tareaChip(_ tipo: CoreTareaTipo) -> some View {
+        let on = tareaTipoId == tipo.id
+        return Button {
+            tareaTipoId = tipo.id
+            refrescarComplejidad()
+        } label: {
+            Label(tipo.label, systemImage: tipo.symbol)
+                .symbolRenderingMode(.hierarchical)
+                .font(.subheadline.weight(on ? .bold : .regular))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .foregroundStyle(on ? Color.accentColor : Color.primary)
+                .background(on ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.08), in: Capsule())
+        }
+        .buttonStyle(.borderless)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    // MARK: Complejidad
+
+    /// «Complejidad» (canvas de Asignar, 28-10): cuatro niveles con el tiempo típico de cada uno,
+    /// la sugerencia de la IA y lo típico de ese tipo de trabajo para usarlo como tiempo estimado.
+    /// La IA solo sugiere: si nadie elige, se toma su nivel; si quien asigna cambia, se guardan las dos.
+    @ViewBuilder
+    private var complejidadSection: some View {
+        let tipico = CoreComplejidad.tipicoPara(tiempos, complejidad)
+        let texto = CoreComplejidad.textoTipico(
+            tipoLabel: CoreActivityRules.etiquetaTipoTrabajo(kind: kind, tipo: tipoComplejidad),
+            nivel: complejidad,
+            tipico: tipico
+        )
+        Section {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                ForEach(CoreComplejidad.allCases) { nivel in
+                    complejidadBoton(nivel)
+                }
+            }
+            .padding(.vertical, 4)
+
+            if sugerencia != nil || pensandoSugerencia {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(Color.accentColor)
+                        .accessibilityHidden(true)
+                    if let sugerencia {
+                        (Text("Sugerencia: \(sugerencia.complejidad.label).").bold()
+                            + Text(" " + CoreComplejidad.textoSugerencia(sugerencia, elegida: complejidad)))
+                            .font(.footnote)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("Revisando el título para sugerir la complejidad…")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+            }
+
+            if let texto, let tipico {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(texto + (!tipico.delNivel && complejidad != nil ? " Aún no hay suficientes de este nivel." : ""))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    let minutos = CoreComplejidad.minutosParaEstimado(tipico.minutos)
+                    if minutos != estimadoTotal {
+                        Button("Usar \(CoreComplejidad.formatoMinutos(minutos)) como tiempo estimado") {
+                            estimadoHoras = minutos / 60
+                            estimadoMinutos = minutos % 60
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.footnote.weight(.semibold))
+                    } else {
+                        Text("Es el tiempo estimado.")
+                            .font(.footnote)
+                            .foregroundStyle(CorePalette.green)
+                    }
+                }
+            }
+        } header: {
+            Text("Complejidad · opcional")
+        } footer: {
+            if let complejidad {
+                Text("\(complejidad.label): \(complejidad.definicion).")
+            }
+        }
+    }
+
+    private func complejidadBoton(_ nivel: CoreComplejidad) -> some View {
+        let on = complejidad == nivel
+        let mediana = tiempos?.porComplejidad[nivel]?.medianaMin
+        return Button {
+            complejidadAMano = true
+            complejidad = nivel
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(nivel.label)
+                    .font(.subheadline.weight(.bold))
+                Text(mediana.map { CoreComplejidad.formatoMinutos($0) } ?? nivel.ayuda)
+                    .font(.caption)
+                    .foregroundStyle(on ? Color.accentColor : Color.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .foregroundStyle(on ? Color.accentColor : Color.primary)
+            .background(
+                on ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.08),
+                in: RoundedRectangle(cornerRadius: NxRadius.s, style: .continuous)
+            )
+        }
+        .buttonStyle(.borderless)
+        .accessibilityHint(nivel.definicion)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    /// Se llama cada vez que cambia el título, las indicaciones o el tipo de trabajo.
+    ///
+    /// - Lo típico se vuelve a pedir solo si cambió el tipo de trabajo.
+    /// - La sugerencia se pide con un título de 6 letras o más, ~900 ms después del último
+    ///   cambio y una sola vez por combinación (una llamada por título, no por letra).
+    ///
+    /// Si la API falla, ni pista ni sugerencia, y ningún error visible.
+    private func refrescarComplejidad() {
+        let claveTiempos = tiemposKey
+        if claveTiempos != tiemposDe {
+            tiemposDe = claveTiempos
+            tiempos = nil
+            tiemposTarea?.cancel()
+            tiemposTarea = nil
+            if complejidadVisible {
+                let coreKind = kind.rawValue
+                let tipo = tipoComplejidad
+                tiemposTarea = Task { @MainActor in
+                    let resultado = try? await CoreRepository.shared.tiemposTipicos(coreKind: coreKind, tipo: tipo)
+                    guard !Task.isCancelled, tiemposDe == claveTiempos else { return }
+                    tiempos = resultado
+                }
+            }
+        }
+
+        // Misma combinación que la ya programada (p. ej. la fila del título volvió a aparecer al
+        // desplazarse): no se toca la que va en camino.
+        let pregunta = preguntaSugerencia
+        guard pregunta != sugerenciaPara else { return }
+        sugerenciaTarea?.cancel()
+        sugerenciaTarea = nil
+        pensandoSugerencia = false
+        sugerenciaPara = pregunta
+        let tituloLimpio = coreClean(titulo)
+        guard complejidadVisible, tituloLimpio.count >= 6, pregunta != ultimaPregunta else { return }
+        let coreKind = kind.rawValue
+        let tipo = tipoComplejidad
+        let notas = coreClean(indicaciones)
+        sugerenciaTarea = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            guard !Task.isCancelled else { return }
+            ultimaPregunta = pregunta
+            pensandoSugerencia = true
+            let resultado = try? await CoreRepository.shared.sugerirComplejidad(
+                coreKind: coreKind,
+                tipo: tipo,
+                titulo: tituloLimpio,
+                indicaciones: notas.isEmpty ? nil : notas
+            )
+            guard !Task.isCancelled else { return }
+            pensandoSugerencia = false
+            // `try?` aplana el opcional: nil = falló o no hubo sugerencia (las dos se callan).
+            sugerencia = resultado
+            guard let nivel = resultado?.complejidad else { return }
+            complejidadSugerida = nivel
+            if !complejidadAMano { complejidad = nivel }
+        }
+    }
+
     @MainActor
     private func loadMeta() async {
         let sectors = ClientSector.forActivityKind(kind, email: session.currentUser?.email)
@@ -306,6 +581,7 @@ struct CoreActivityFormView: View {
     private func submit() async {
         guard !saving else { return }
         error = nil
+        intentado = true
 
         let title = coreClean(titulo)
         guard !title.isEmpty else {
@@ -320,20 +596,11 @@ struct CoreActivityFormView: View {
         var type = kind.ticketType ?? ticketType
         var custom = kind.ticketTypeCustom
         if kind == .tarea {
-            guard let tipo = tareaTipoId else {
+            guard let tipo = tareaTipo else {
                 error = "Elige el tipo de tarea"
                 return
             }
-            if tipo == "otro" {
-                let text = coreClean(tareaOtro)
-                guard !text.isEmpty else {
-                    error = "Especifica el tipo de tarea"
-                    return
-                }
-                custom = String(text.prefix(120))
-            } else {
-                custom = CoreTareaTipo.all.first(where: { $0.id == tipo })?.label
-            }
+            custom = tipo.label
             type = "OTRO"
         } else if kind.ticketType == nil && ticketType == "OTRO" {
             let text = coreClean(ticketTypeCustom)
@@ -342,6 +609,11 @@ struct CoreActivityFormView: View {
                 return
             }
             custom = text
+        }
+
+        if !compromisoOk {
+            error = "La hora de entrega tiene que ser después de la hora de inicio"
+            return
         }
 
         let project = selectedProject
@@ -355,6 +627,15 @@ struct CoreActivityFormView: View {
         }
 
         let when = scheduled ? CoreFormat.isoString(fecha) : nil
+        // Sin compromiso, la fecha máxima es la de inicio y la API la lee como «fin del día».
+        let limite: String? = scheduled
+            ? CoreFormat.isoString(
+                CoreSchedule.at(
+                    day: fecha,
+                    hhmm: CoreActivityRules.horaLimite(hora: horaInicio, compromiso: horaCompromiso)
+                ) ?? fecha
+            )
+            : nil
         let notes = coreClean(indicaciones)
         let body = CoreActivityCreateBody(
             titulo: title,
@@ -376,11 +657,14 @@ struct CoreActivityFormView: View {
                 return total > 0 ? total : nil
             }(),
             fechaInicio: when,
-            fechaEntregaEsperada: when,
-            fechaMaxima: when,
+            fechaEntregaEsperada: limite,
+            fechaMaxima: limite,
             evidencePhotoRequired: min(8, max(2, fotos)),
             coreKind: kind.rawValue,
             assignmentCharge: charge?.rawValue,
+            // Solo si se ve el campo: una tarea sin tipo no lleva complejidad.
+            complejidad: complejidadVisible ? complejidad?.rawValue : nil,
+            complejidadSugerida: complejidadVisible ? complejidadSugerida?.rawValue : nil,
             estatus: "Pendiente",
             creadoPorId: me
         )

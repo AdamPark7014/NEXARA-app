@@ -558,20 +558,32 @@ struct ActivitySoftNote: View {
 struct ActivityDetailRow: View {
     let label: String
     let value: String
+    /// Segunda línea, más tenue, bajo el valor («La IA sugirió compleja»); nil = sin nota.
+    var nota: String? = nil
 
     var body: some View {
         let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let n = (nota ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if !v.isEmpty && v != "—" {
             HStack(alignment: .top, spacing: 8) {
                 Text(label)
                     .font(.system(size: 13))
                     .foregroundStyle(NxColors.muted)
                 Spacer(minLength: 8)
-                Text(v)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(NxColors.fg)
-                    .multilineTextAlignment(.trailing)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(v)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(NxColors.fg)
+                        .multilineTextAlignment(.trailing)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !n.isEmpty {
+                        Text(n)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(NxColors.muted)
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
             .accessibilityElement(children: .combine)
         }

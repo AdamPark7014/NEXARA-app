@@ -1,6 +1,6 @@
 # RELEVO
 
-- **29-10 ~10:45 (claude-code) — Apps: paridad con lo de Core del 28-10 (Android hecho; iOS en curso).**
+- **29-10 ~11:30 (claude-code) — Apps: paridad con lo de Core del 28-10 (Android e iOS).**
   - Android (`apps/mobile-native/android`), alta/asignar y detalle:
     - Catálogo cerrado de 17 tipos en 4 familias (`CoreActivityKinds.FAMILIAS_TAREA`, `tiposDeFamilia`), íconos como
       la web (`NxGlyph` nuevos). Sin «Otro»: un texto libre viejo se lee como «otro» y al guardar pide el tipo.
@@ -10,6 +10,13 @@
       tiempos` y `sugerir`), y «Complejidad» en los datos del detalle.
     - Pizarra del equipo: sección «En espera de revisión» (`GET me/revisiones`, `EnEsperaRevision.kt`), «Revisar»
       abre Evidencias. Muestra 30; el resto remite a la web.
+  - iOS (`apps/mobile-native/ios`), lo mismo: `CoreActivityRules.swift` (`CoreFamiliaTarea`, `CoreComplejidad`,
+    `compromisoValido`, `horaCompromisoDe`), `CoreActivityFormView.swift` (chips por familia, interruptor «Entregar a
+    más tardar», sección «Complejidad · opcional»), detalle con «Complejidad» y la hora compromiso, y la pizarra con
+    «En espera de revisión» (`EnEsperaRevision.swift`, `revisionesPendientes()`). El demo responde `ai/complejidad/*`
+    y `me/revisiones` para las capturas de paridad. Sin Mac: lo compila `ios-screenshots.yml` al subir.
+  - Las dos apps: `ai/complejidad/sugerir` no entra a la cola sin conexión, y una fecha máxima a las 23:59 se lee
+    como fin del día (no como «Antes de 23:59»).
   - Ya estaban: cierre «No cumplida» al checar salida (textos espejo de 613ee251) y los avisos push (genéricos por
     `tag`/`collapse_key`, sirven para los recordatorios de 9761d2d9 y bfc18fec).
   - Sin portar (piden artboard o no aplican al teléfono): línea del día, Desempeño de cuatro pilares, tarjeta de
