@@ -7,7 +7,7 @@ import { MaintenanceContractsService } from '../../maintenance-contracts/mainten
 import { VehiclesService } from '../../vehicles/vehicles.service.js';
 import { WebhooksService } from '../../webhooks/webhooks.service.js';
 import { DomainEventBusService } from '../../domain-events/domain-event-bus.service.js';
-import { OPEN_ACTIVITY_WHERE } from '../../activities/activity-status.js';
+import { sinPlazoStatusVariants } from '../../activities/activity-status.js';
 import { finDelPeriodo, periodoDeActividad } from '../../activities/actividad-periodo.js';
 import { horasResolucionPorActividad, limiteResolucionMs } from '../../sla-tracker/sla-tracker.service.js';
 import { WORKDAY_TIMEZONE, workClock } from '../time/workday.js';
@@ -437,7 +437,8 @@ export class CronService {
   async handleSlaBreachEscalate() {
     const now = Date.now();
     const open = await this.prisma.activity.findMany({
-      where: { ticketType: { not: null }, ...OPEN_ACTIVITY_WHERE },
+      // «Por Validar» ya se entregó: calificarla tarde no la vuelve vencida (Adam, 29-10).
+      where: { ticketType: { not: null }, estatus: { notIn: sinPlazoStatusVariants() }, deletedAt: null },
       select: {
         id: true,
         anNumber: true,

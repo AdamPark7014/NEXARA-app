@@ -3,7 +3,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
-import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
 import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import CelebrationOutlinedIcon from "@mui/icons-material/CelebrationOutlined";
 import {
@@ -37,7 +36,6 @@ import {
   minutosEsperando,
   pieRevisadas,
   textoEspera,
-  tonoEspera,
   type RevisionHecha,
   type RevisionPendiente,
   type RevisionesResponse,
@@ -115,7 +113,6 @@ export default function EnEsperaRevisionView({
     () => revisadas.filter((r) => coincideBusqueda(r, busqueda)),
     [revisadas, busqueda],
   );
-  const tarde = pendientes.filter((p) => (minutosEsperando(p.enviadaAt, ahora) ?? 0) >= 24 * 60).length;
   const correcciones = pendientes.filter((p) => p.correccion).length;
 
   const columnasPendientes: Column<RevisionPendiente>[] = [
@@ -129,19 +126,17 @@ export default function EnEsperaRevisionView({
       ),
     },
     {
-      key: "espera",
-      label: "Espera desde",
+      // Solo informa desde cuándo está: lo enviado ya cuenta como cumplido y revisarlo tarde no
+      // es un atraso (Adam, 29-10), así que sin semáforo.
+      key: "enviada",
+      label: "Enviada",
       width: 170,
-      render: (p) => {
-        const min = minutosEsperando(p.enviadaAt, ahora);
-        return (
-          <WhenCell
-            time={textoEspera(min)}
-            hint={p.enviadaAt ? cuandoMx(p.enviadaAt, ahora) : undefined}
-            tone={tonoEspera(min)}
-          />
-        );
-      },
+      render: (p) => (
+        <WhenCell
+          time={textoEspera(minutosEsperando(p.enviadaAt, ahora))}
+          hint={p.enviadaAt ? cuandoMx(p.enviadaAt, ahora) : undefined}
+        />
+      ),
     },
     {
       key: "estado",
@@ -320,23 +315,15 @@ export default function EnEsperaRevisionView({
   return (
     <div className={s.vista}>
       {data && pendientes.length > 0 ? (
-        <StatRow cols={3} ariaLabel="Resumen de lo que espera revisión">
+        <StatRow cols={2} ariaLabel="Resumen de lo que espera revisión">
           <Stat
             label="Por revisar"
             value={pendientes.length}
             tone="brand"
-            hint="evidencias enviadas sin aprobar"
+            hint="entregadas: ya cuentan como cumplidas"
             icon={<RateReviewOutlinedIcon />}
             onClick={() => onVer("pendientes")}
             pressed={ver === "pendientes"}
-          />
-          <Stat
-            label="Esperan más de un día"
-            value={tarde}
-            tone={tarde > 0 ? "danger" : "default"}
-            hint={tarde > 0 ? "atiéndelas primero" : "todas recientes"}
-            icon={<HourglassBottomIcon />}
-            iconTone={tarde > 0 ? "danger" : "neutral"}
           />
           <Stat
             label="Correcciones"
@@ -370,7 +357,7 @@ export default function EnEsperaRevisionView({
             {busqueda.trim()
               ? `${visibles} de ${total}`
               : ver === "pendientes"
-                ? `${total} por revisar · la que más lleva esperando va primero`
+                ? `${total} por revisar · las más antiguas primero`
                 : pieRevisadas(total)}
           </ListFooter>
         ) : null}

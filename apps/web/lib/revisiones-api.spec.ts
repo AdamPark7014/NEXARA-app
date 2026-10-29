@@ -5,7 +5,6 @@ import {
   minutosEsperando,
   pieRevisadas,
   textoEspera,
-  tonoEspera,
 } from "./revisiones-api";
 
 describe("pie de «Revisadas por ti»", () => {
@@ -37,13 +36,6 @@ describe("cuánto lleva esperando", () => {
     expect(textoEspera(26 * 60)).toBe("hace 1 día");
     expect(textoEspera(3 * 24 * 60)).toBe("hace 3 días");
     expect(textoEspera(null)).toBe("Sin fecha de envío");
-  });
-
-  it("más de 4 h es ámbar y más de un día, rojo", () => {
-    expect(tonoEspera(30)).toBe("success");
-    expect(tonoEspera(4 * 60)).toBe("warning");
-    expect(tonoEspera(24 * 60)).toBe("danger");
-    expect(tonoEspera(null)).toBe("neutral");
   });
 });
 

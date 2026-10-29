@@ -83,6 +83,15 @@ describe('SLA breach escalate', () => {
     );
   });
 
+  it('no busca lo ya enviado a revisión: «Por Validar» no es «vencida» (Adam, 29-10)', async () => {
+    const { service, prisma } = build();
+    await service.handleSlaBreachEscalate();
+
+    const where = prisma.activity.findMany.mock.calls[0][0].where;
+    expect(where.estatus.notIn).toEqual(expect.arrayContaining(['Por Validar', 'Finalizada', 'No cumplida']));
+    expect(where.deletedAt).toBeNull();
+  });
+
   it('no escala si la entrega esperada del caso todavía no vence', async () => {
     const { service, notificationHierarchy, domainEvents } = build(NOW, [
       {

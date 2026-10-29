@@ -3,7 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
-import { closedStatusSqlList } from './activity-status.js';
+import { sinPlazoStatusSqlList } from './activity-status.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { fechaAviso, horaAviso } from '../notifications/notification-push-meta.js';
 import { appUrls } from '../common/app-urls.js';
@@ -61,7 +61,7 @@ export class TicketAlertsService {
       FROM "Activity" a
       LEFT JOIN service_clients c ON c.id = a."clientId"
       WHERE a."clientId" IS NOT NULL
-        AND a.estatus NOT IN (${Prisma.raw(closedStatusSqlList())})
+        AND a.estatus NOT IN (${Prisma.raw(sinPlazoStatusSqlList())})
         AND a."fechaEntregaEsperada" >= ${now}
         AND a."fechaEntregaEsperada" <= ${alertAt}
         AND a."slaAlertedAt" IS NULL
@@ -129,7 +129,7 @@ export class TicketAlertsService {
       FROM "Activity" a
       LEFT JOIN service_clients c ON c.id = a."clientId"
       WHERE a."clientId" IS NOT NULL
-        AND a.estatus NOT IN (${Prisma.raw(closedStatusSqlList())})
+        AND a.estatus NOT IN (${Prisma.raw(sinPlazoStatusSqlList())})
         AND a."fechaEntregaEsperada" < ${now}
         AND a."deletedAt" IS NULL
         AND (

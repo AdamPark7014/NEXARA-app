@@ -67,7 +67,10 @@ export function minutosEsperando(iso: string | null | undefined, ahora: number =
   return Math.max(0, Math.floor((ahora - t) / 60_000));
 }
 
-/** «hace 25 min», «hace 3 h», «hace 2 días»: lo justo para saber qué atender primero. */
+/**
+ * «hace 25 min», «hace 3 h», «hace 2 días»: desde cuándo está enviada. Solo informa: lo enviado ya
+ * cuenta como cumplido y revisarlo tarde no es un atraso (Adam, 29-10), así que no lleva semáforo.
+ */
 export function textoEspera(minutos: number | null): string {
   if (minutos == null) return "Sin fecha de envío";
   if (minutos < 1) return "hace un momento";
@@ -76,14 +79,6 @@ export function textoEspera(minutos: number | null): string {
   if (horas < 24) return `hace ${horas} h`;
   const dias = Math.floor(horas / 24);
   return dias === 1 ? "hace 1 día" : `hace ${dias} días`;
-}
-
-/** Más de un día esperando es tarde; más de 4 h, ya hay que verla. */
-export function tonoEspera(minutos: number | null): Tone {
-  if (minutos == null) return "neutral";
-  if (minutos >= 24 * 60) return "danger";
-  if (minutos >= 4 * 60) return "warning";
-  return "success";
 }
 
 export const DECISION_UI: Record<string, { label: string; tone: Tone }> = {

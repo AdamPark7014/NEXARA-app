@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { appUrls } from '../common/app-urls.js';
-import { closedStatusVariants } from './activity-status.js';
+import { sinPlazoStatusVariants } from './activity-status.js';
 import {
   CLAVE_RECORDATORIO_ATRASO,
   decisionAvisoAtraso,
@@ -76,7 +76,8 @@ export class ActivityOverdueAlertsService {
         OR: [
           { overdueAlertedAt: { not: null } },
           {
-            estatus: { notIn: closedStatusVariants() },
+            // Lo enviado a revisión ya está cumplido: no se avisa como atrasado.
+            estatus: { notIn: sinPlazoStatusVariants() },
             OR: [
               { fechaInicio: { lt: ahora } },
               { fechaMaxima: { lt: ahora } },

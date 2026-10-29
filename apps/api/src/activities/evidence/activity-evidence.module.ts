@@ -10,7 +10,6 @@ import { ActivitiesModule } from '../activities.module.js';
 import { NotificationsModule } from '../../notifications/notifications.module.js';
 import { ActivityGeofenceModule } from '../geofence/activity-geofence.module.js';
 import { ActivitySessionsModule } from '../sessions/activity-sessions.module.js';
-import { ActivityEvidenceReminderCronService } from './activity-evidence-reminder.cron.js';
 
 @Module({
   imports: [
@@ -22,7 +21,9 @@ import { ActivityEvidenceReminderCronService } from './activity-evidence-reminde
     ActivitySessionsModule,
   ],
   controllers: [ActivityEvidenceController, ActivityEvidenceFieldsController],
-  providers: [ActivityEvidenceService, ActivityEvidenceFieldsService, ActivityEvidenceZipService, ActivityEvidenceReminderCronService],
+  // Sin recordatorio diario de «evidencia por revisar» (Adam, 29-10): lo enviado ya está cumplido y
+  // calificarlo tarde no es un atraso. El resumen «Tu día» ya dice cuántas esperan revisión.
+  providers: [ActivityEvidenceService, ActivityEvidenceFieldsService, ActivityEvidenceZipService],
   exports: [ActivityEvidenceService, ActivityEvidenceFieldsService],
 })
 export class ActivityEvidenceModule {}
