@@ -1,5 +1,19 @@
 # RELEVO
 
+- **29-10 ~10:45 (claude-code) — Recordatorios insistentes en la jornada (pedido de Adam).**
+  - `src/activities/recordatorios-jornada.ts` (reglas puras + spec) y `recordatorios-jornada.service.ts` (cron
+    `recordatorios-jornada`, cada 5 min; lunes a sábado, de 7:00 a 20:00 de México). Solo se avisa con la jornada
+    abierta (`AttendanceDay.isOpen` de hoy), sin las cuentas que no son empleados.
+    - Sin reloj de actividad corriendo, fuera de la comida: push «No tienes ninguna actividad abierta/en curso» cada
+      5 min (`SLA_ALERT`, prioridad alta, `collapseKey nx_sin_actividad_u<id>`, dedupe 4 min, lleva a «Mis actividades»).
+    - Actividad sin entregar a ≤ 30 min de su límite o ya pasada, con el límite de hoy: push cada 10 min a quien la
+      ejecuta (`ACTIVITY_OVERDUE`, `nx_vence_<act>_u<id>`, dedupe 9 min) hasta que la entregue o cheque salida. Lo
+      de días anteriores (p. ej. AN-0009) no se persigue.
+  - El cierre no cambia y ya hace lo que pidió Adam: al checar su **salida propia**, lo del día no entregado queda
+    «No cumplida»; sin checar salida las sigue teniendo. La salida automática no cierra (Adam: «si todavía no marcan su
+    salida, pueden seguirlas teniendo»).
+  - Sin migración (tipos de aviso que ya existen).
+
 - **29-10 ~10:20 (claude-code) — Lo enviado a revisión ya no se avisa como «vencida» (regla de Adam).**
   - Adam: «una cosa son las actividades que se mandan a revisión… no importa si lo califico ahorita o en un año. Y
     la otra, el cumplimiento… en tiempo y forma, en un mismo día»; al checar salida se botan como vencidas las del

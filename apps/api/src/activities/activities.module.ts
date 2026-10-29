@@ -8,6 +8,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
 import { TicketAlertsService } from './ticket-alerts.service.js';
 import { ActivityTimeAlertsService } from './activity-time-alerts.service.js';
 import { ActivityOverdueAlertsService } from './activity-overdue-alerts.service.js';
+import { RecordatoriosJornadaService } from './recordatorios-jornada.service.js';
 import { ActivityNonComplianceService } from './activity-non-compliance.service.js';
 import { ActivityLifecycleService } from './activity-lifecycle.service.js';
 import { ActivityTeamService } from './activity-team.service.js';
@@ -47,6 +48,7 @@ import {
     TicketAlertsService,
     ActivityTimeAlertsService,
     ActivityOverdueAlertsService,
+    RecordatoriosJornadaService,
     ActivityNonComplianceService,
     ActivityLifecycleService,
   ],
