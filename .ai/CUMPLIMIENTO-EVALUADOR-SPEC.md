@@ -232,3 +232,72 @@ y sus cobros → salidas de almacén por actividad.
 8. ¿La hoja de entradas sale del sistema, con ajustes con motivo, en vez de capturarse a mano?
 9. ¿Se corre la nómina de la semana del 26-10 en el sistema en paralelo con el Excel?
 10. ¿Para el desempeño comercial solo cuenta la cotización marcada como enviada en el sistema?
+
+## 8. Tiempo estándar por especificidad (propuesta, 28-10-2026)
+
+Pedido de Adam: «con base al título que le pongan es cuánto se pueden tardar… cargar taladros unos 5 minutos,
+cotización IPADE 5 productos 1 hora, 50 productos 4 horas… por el número de partidas, una instalación por el número de
+dispositivos, recoger algo que seleccionen la ubicación… ida y vuelta… en auto o transporte».
+
+**Lo que dice la base** (terminadas o por validar desde el 21-09, reloj por persona sin los cortes automáticos):
+
+| Tipo | Casos | Mediana real | p25 – p75 | Estimado promedio que se puso |
+|---|---|---|---|---|
+| Reporte / documentación | 53 | 5 h 19 min | 1 h 42 – 7 h 42 | 4 h 24 |
+| Preparación de equipo | 11 | 7 h 12 min | 6 h 16 – 7 h 43 | — |
+| Instalación | 10 | 7 h 55 min | 7 h 33 – 8 h 20 | 7 h 30 |
+| Trámite | 6 | 8 h | 7 h 44 – 8 h 07 | 7 h 40 |
+| Recolección | 5 | 1 h 21 min | 42 min – 2 h | 51 min |
+| Entrega | 4 | 1 h 11 min | 1 h 06 – 1 h 16 | — |
+
+El reloj corre casi toda la jornada aunque el trabajo sea corto, y el estimado lo escribe quien asigna copiando lo que
+ya se tarda. Por eso «eficiencia = plan ÷ real» no mide nada: el plan ya trae el tiempo muerto. Casi ningún título
+trae la cantidad («montaje», «peinado de cables»), y solo 2 comerciales están ligadas a su cotización.
+
+**Modelo.** Tiempo estándar = trabajo por unidades + traslado. Lo calcula el código con una tabla fija y se ve
+desglosado. La IA no inventa minutos: lee el título y las indicaciones, propone el tipo y la cantidad («50 productos»
+→ 50 partidas; «cargar taladros» → Preparación, sin unidades), y quien asigna confirma o corrige. La complejidad (§ ya
+desplegada) mueve el estándar cuando el tipo no tiene unidades.
+
+| Tipo | Se pide | Estándar inicial (a calibrar) |
+|---|---|---|
+| Cotización (comercial) | partidas; se leen solas si está ligada a la cotización | 40 min + 4 min por partida (5 → 1 h, 50 → 4 h) |
+| Instalación | dispositivos (cámaras, lectores, equipos) | 30 min + 45 min por dispositivo |
+| Cableado y canalización | nodos, o metros de tubería | 45 min por nodo · 4 min por metro |
+| Mantenimiento preventivo | equipos | 20 min + 15 min por equipo |
+| Correctivo y diagnóstico | — | por complejidad: 1 h · 2 h · 3 h 30 · 5 h |
+| Recolección · Entrega · Compra de material · Trámite | destino en el mapa | ida y vuelta + 15 min en el lugar (trámite: + 30 min) |
+| Preparación de equipo | — | 15 min (cargar herramienta); 45 min si hay que armar equipo |
+| Reporte / documentación | reportes | 20 min por reporte |
+| Diseño, CAD y memoria técnica | niveles o planos | 2 h por nivel |
+| Configuración y soporte remoto | equipos | 15 min + 10 min por equipo |
+| Facturación y contabilidad | facturas | 10 min por factura |
+| Levantamiento | áreas, + destino | traslado + 30 min por área |
+| Junta · Capacitación · Evento o guardia | horario agendado | lo que dure la agenda |
+
+**Traslado.** El destino se marca en el mapa al asignar y se pide la ruta de ida y vuelta en auto o en transporte.
+- Opción A (recomendada): Google Routes API. Pide activar la facturación de la llave de Maps (hoy sin facturación,
+  ver memoria de claves). Con ~20 rutas al día cabe en el crédito mensual de Google.
+- Opción B, gratis y solo en auto: OSRM propio en el Hetzner. Hoy no cabe, porque el disco está al 90 %.
+- Respaldo sin API: distancia en línea recta × 1.4 a 25 km/h urbanos, marcado como aproximado.
+
+**Cómo cambia la medición.**
+- Eficiencia = estándar ÷ real, con tope en 100.
+- Rendimiento = horas estándar ganadas ÷ horas en jornada.
+- Tiempo muerto = jornada − horas estándar ganadas.
+- El estándar sustituye al «¿cuánto tiempo toma?» escrito a mano. Quien asigna puede cambiarlo, pero con motivo, y
+  queda registrado.
+- Calibración cada mes con la mitad rápida de lo real (mediana de lo que quedó debajo de la mediana) por tipo y
+  unidad. Adam aprueba los cambios de tarifa.
+
+**Datos nuevos en la actividad.**
+- `unidades` (JSON: clave y cantidad), `destino` (dirección, lat, lng), `trasladoMin` y `trasladoModo`.
+- `tiempoEstandarMin` y `estandarDesglose` (JSON).
+- `estandarCambiadoMotivo`.
+- Una migración. La pista del tiempo típico que ya está desplegada queda como referencia.
+
+**Decisiones de Adam.**
+1. Tarifas iniciales de la tabla.
+2. Traslado: A, B o el respaldo.
+3. ¿El estándar sustituye al tiempo escrito a mano, o solo lo sugiere?
+4. Mockup en el canvas antes de construir (regla de NEXARA).
