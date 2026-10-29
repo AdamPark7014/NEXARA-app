@@ -72,9 +72,6 @@ services:
       TRANSCRIPTOR_URL: ${TRANSCRIPTOR_URL:-}
       # Whisper `small` solo para dictado; vacío = el dictado usa TRANSCRIPTOR_URL.
       TRANSCRIPTOR_DICTADO_URL: ${TRANSCRIPTOR_DICTADO_URL:-}
-      # Días extra en que no se insiste con «No has registrado tu entrada» (AAAA-MM-DD,…). Los ya
-      # acordados viven en el código: attendance/recordatorio-entrada.ts (DESCANSOS_ACORDADOS).
-      ASISTENCIA_DIAS_DE_DESCANSO: ${ASISTENCIA_DIAS_DE_DESCANSO:-}
       # SaaS hard multi-tenant: set to 0 when all clients send X-Company-Id
       TENANT_ALLOW_PRIMARY_FALLBACK: ${TENANT_ALLOW_PRIMARY_FALLBACK:-1}
       CORS_ORIGIN: ${CORS_ORIGIN:-}
@@ -207,8 +204,6 @@ services:
       JOBS_RUN_WORKERS: "1"
       TRANSCRIPTOR_URL: ${TRANSCRIPTOR_URL:-}
       TRANSCRIPTOR_DICTADO_URL: ${TRANSCRIPTOR_DICTADO_URL:-}
-      # Arranca AppModule completo: corre los mismos cron que la API y debe ver los mismos descansos.
-      ASISTENCIA_DIAS_DE_DESCANSO: ${ASISTENCIA_DIAS_DE_DESCANSO:-}
       JWT_SECRET: ${JWT_SECRET}
       UPLOADS_ROOT: /app/uploads
     command: ["node", "/app/apps/api/dist/worker.js"]

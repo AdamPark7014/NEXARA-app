@@ -120,6 +120,26 @@
     - Lo marcado no cuenta como plan: `estimadoParaKpi` (pizarra-kpi) en Desempeño (`kpis-equipo.service`, tope
       diario y plan de cada entrega) y en la pizarra (`team-board.service`), y `tiemposDto` en el detalle y en
       «Mis actividades» (no sale «excedida»). Spec `me/relleno-kpi.spec.ts`.
+    - **REVERTIDO (29-10 ~21:40 UTC), a petición de Adam: «es para actividades de ahora en adelante, no pasadas».**
+      Las 100 filas (267 campos) volvieron a su valor anterior, cada campo solo si seguía igual a lo escrito (ninguno
+      había cambiado): vacíos otra vez, y los tipos de AN-0344/0345/0346/0349/0350 los de antes. Abiertas: asignadas
+      1 sin tiempo; autoasignadas 18 sin entrega, 94 sin tiempo, 127 sin estándar; 0 marcadas. La regla (tiempo y
+      entrega obligatorios, autoasignación fija) aplica solo a lo que se crea desde el 29-10. Se quitó del repo
+      `scripts/rellenar-tiempos-abiertas.cjs` para que no se vuelva a correr; `rellenar-tiempos.ts` y
+      `estimadoParaKpi` se quedan (sin filas marcadas no cambian nada). Lo de abajo es el historial del relleno.
+    - **Escrito en producción (29-10 ~21:20 UTC, f0278eb4 desplegado):** 100 filas, 0 cambios de «a tiempo»; un
+      segundo simulacro da 0 filas (idempotente). Abiertas antes → después: asignadas 7 (0 sin entrega, 1 sin
+      tiempo → 0); autoasignadas 128 (18 sin entrega → 0, 94 sin tiempo → 0). Sin estándar quedan 7 + 116, todas
+      ya entregadas (a propósito). 87 marcadas «relleno 29-10 tras entrega» (mediana de su tipo: 60–480 min).
+    - En proceso (11; AN-0355 ya nació con estándar): tipo corregido por el título en AN-0344/0345/0346/0349
+      (→ Cableado y canalización, 45 min = 1 nodo supuesto) y AN-0350 (comercial → Facturación, 10 min = 1
+      factura). Dudosas para su superior: AN-0351 «Apoyo Biblioteca Tlaxcala» (tipo Reporte, estándar 20 contra
+      420 que puso él) y AN-0350 (varias facturas en un título).
+    - KPIs por persona (semana 26–30, `GET me/kpis/equipo`, antes y después): de 19 personas, 4 solo con el
+      minuto que corrió entre fotos; 7 con cambio real (ocupación / «con una actividad» bajan 2–3 h) y son
+      exactamente quienes tienen una de las en proceso con tiempo nuevo (Alejandro, Carlos, Carolina, Erick,
+      Paulina, Roberto, Salvador): su sesión de hoy ya se topa con el plan de 45 min. Las 87 marcadas no mueven
+      ningún KPI. Si el equipo de obra trabaja todo el día en esas, su superior debe ajustar el tiempo (con motivo).
 
 - **29-10 ~16:30 (claude-code) — Sugerencia de nómina con periodos calculados (pedido de Adam: «múltiples cálculos
   de fechas dinámicas»).**
@@ -332,6 +352,10 @@
     detalle de la cotización (`/erp/cotizaciones/*`, sin sumarle el módulo al menú) y la ficha del cliente
     (`/erp/clientes/**` + `GET /api/ventas/clientes/**`) para completar RFC, régimen y CP; editar el cliente ya lo daba
     `CLIENT_ADMIN_WRITE_URL_RULES`.
+  - Verificado en producción con la sesión de Christian (Chrome, 29-10 tarde): las tres pantallas cuadran con el
+    mockup (vacías donde no hay datos), «Por facturar» muestra los 12 servicios y «Completar cliente» lleva a la ficha.
+    La miga y la pestaña decían «Pagos Y Gastos» (`humanize` en `AppShell.tsx`): ahora con `SLUG_FRASES`. Sin
+    revisar visualmente: preparar/timbrar un CFDI (no hay borradores y crear uno gasta folio en producción).
   - Pedido de Adam: «por facturar», pagos y gastos ligados a su CFDI y banco, estado de resultados y balance. Mockup
     aprobado por Adam el 29-10: https://claude.ai/artifact/MENR9dXWC7PGocKEoSTmpD
   - API en `src/accounting/mesa-contable/` bajo `GET|POST /api/accounting/workspace/mesa/*` (contrato en el

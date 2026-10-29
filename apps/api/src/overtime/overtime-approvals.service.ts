@@ -10,6 +10,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { resolveAccessScheduleKey } from '../integra/access-schedule-defaults.js';
+import { leerFestivos } from '../festivos/festivos-datos.js';
+import { comoLeToca } from '../festivos/festivos-reglas.js';
 import {
   companyWhere,
   requireCompanyId,
@@ -135,7 +137,7 @@ export class OvertimeApprovalsService {
     const fin = new Date(workDayEnd(parseWorkDate(hasta)).getTime() + DIA_MS);
     const ventana = { gte: ini, lte: fin };
 
-    const [checadas, comidas] = await Promise.all([
+    const [checadas, comidas, festivos] = await Promise.all([
       this.prisma.attendance.findMany({
         where: { userId: { in: userIds }, timestamp: ventana, companyId: tenantId },
         select: {
@@ -156,6 +158,8 @@ export class OvertimeApprovalsService {
         },
         select: { userId: true, checkinTime: true, checkoutTime: true },
       }),
+      // Un festivo con horario propio mide el extra contra ese horario, como el desempeño.
+      leerFestivos(this.prisma, tenantId, desde, hasta).then((l) => l.filter((f) => !f.finDeSemana)),
     ]);
 
     const checadasPor = new Map<number, typeof checadas>();
@@ -199,6 +203,15 @@ export class OvertimeApprovalsService {
           fin: c.checkoutTime ?? null,
         })),
         actividades: [],
+        festivos: Object.fromEntries(
+          festivos.map((f) => {
+            const como = comoLeToca(f, { userId: u.id });
+            return [
+              f.fecha,
+              { nombre: f.nombre, trabaja: como.trabaja, entrada: como.horario?.entrada ?? null, salida: como.horario?.salida ?? null },
+            ];
+          }),
+        ),
         fechaIngreso: u.fechaIngreso ?? null,
       });
 

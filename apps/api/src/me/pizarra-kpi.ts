@@ -8,6 +8,7 @@
  * Contrato del viernes, sección C (y la prioridad/semáforo de la B).
  */
 import { esMultiDia, type Periodo } from '../activities/actividad-periodo.js';
+import { MOTIVO_RELLENO } from '../activities/rellenar-tiempos.js';
 import { evaluarSemaforo, limiteDeEntrega, type MotivoSemaforo } from '../activities/semaforo-actividad.js';
 import {
   cruzarTramos,
@@ -130,6 +131,15 @@ export function minutosPlanDeHoras(horasPlan?: number | null): number | null {
  * de la actividad. Es el mismo plan que usa Desempeño (`kpis-equipo.service.ts`). Con solo las
  * horas por persona, 9 de cada 10 cerradas quedaban sin plan y la eficiencia salía vacía (28-10).
  */
+/**
+ * Tiempo estimado que el desempeño puede usar como plan. El que se rellenó el 29-10 en lo ya
+ * entregado (mediana del tipo, `MOTIVO_RELLENO`) no lo es: esas actividades se miden como antes,
+ * sin plan.
+ */
+export function estimadoParaKpi(a: { tiempoEstimadoMin?: number | null; estandarCambiadoMotivo?: string | null }): number | null {
+  return a.estandarCambiadoMotivo === MOTIVO_RELLENO ? null : (a.tiempoEstimadoMin ?? null);
+}
+
 export function minutosPlanDe(horasPlan?: number | null, tiempoEstimadoMin?: number | null): number | null {
   return (
     minutosPlanDeHoras(horasPlan) ??

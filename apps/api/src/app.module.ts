@@ -31,6 +31,7 @@ import { DevicesModule } from './devices/devices.module.js';
 import { ViaticosModule } from './viaticos/viaticos.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { GuardiasModule } from './guardias/guardias.module.js';
+import { FestivosModule } from './festivos/festivos.module.js';
 import { ProjectsModule } from './projects/projects.module';
 import { ContactMessagesModule } from './contact-messages/contact-messages.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
@@ -136,6 +137,7 @@ import { CctvDisenosModule } from './cctv-disenos/cctv-disenos.module.js';
     ViaticosModule,
     AttendanceModule,
     GuardiasModule,
+    FestivosModule,
     ProjectsModule,
     ContactMessagesModule,
     NewsletterModule,
