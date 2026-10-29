@@ -301,6 +301,13 @@ describe('FacturamaAdapter', () => {
       expect(llamadas.some((l) => l.metodo === 'DELETE')).toBe(false);
     });
 
+    it('baja el PDF por el Id del CFDI', async () => {
+      servidor([
+        [/^GET \/cfdi\/pdf\/issued\/DznlumtVtkA3ya4JXAeGWw2$/, () => ({ body: { ContentType: 'pdf', Content: Buffer.from('%PDF-1.4').toString('base64') } })],
+      ]);
+      expect((await pac.downloadPdf(CFDI_CREADO.Id)).toString()).toBe('%PDF-1.4');
+    });
+
     it('avisa si no encuentra el CFDI en Facturama', async () => {
       servidor([[/^GET \/cfdi\?/, () => ({ body: [] })]]);
       await expect(pac.cancel(CANCELAR)).rejects.toThrow(/No encontré en Facturama el CFDI/);

@@ -105,6 +105,14 @@ export class PacService {
     }
   }
 
+  /** PDF que generó el PAC para un CFDI ya timbrado (Facturama no da una URL pública). */
+  async downloadPdf(pacDocumentId: string): Promise<Buffer> {
+    if (!this.adapter.downloadPdf) {
+      throw new Error(`El PAC ${this.adapter.provider} no entrega el PDF del CFDI`);
+    }
+    return this.adapter.downloadPdf(pacDocumentId);
+  }
+
   /** Diagnóstico del CSD cargado (sin exponer llaves). */
   csdInfo() {
     return this.csd.info();

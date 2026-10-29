@@ -150,6 +150,12 @@ export class InvoicesController {
     @CurrentCompanyId() companyId: number | null,
   ) {
     const pdf = await this.service.getInvoicePdf(+id, companyId);
+    if ('body' in pdf) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${pdf.filename}"`);
+      res.send(pdf.body);
+      return;
+    }
     res.redirect(pdf.url);
   }
 

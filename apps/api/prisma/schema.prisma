@@ -3997,6 +3997,8 @@ model Invoice {
   cancelledAt         DateTime?
   cancelReason        String?            @db.VarChar(5)
   substitutionUuid    String?            @db.VarChar(80)
+  /// Id del CFDI en el PAC: Facturama lo pide para cancelar y para bajar el PDF.
+  pacDocumentId       String?            @db.VarChar(80)
   // ── end CFDI ──
   createdById         Int?
   companyId           Int
@@ -4100,6 +4102,7 @@ model Payment {
   exchangeRate    Decimal?        @db.Decimal(10, 4)
   operationNumber String?         @db.VarChar(50)
   cfdiPaymentUuid String?         @db.VarChar(80) // UUID del complemento de pago
+  pacDocumentId   String?         @db.VarChar(80) // Id del complemento en el PAC (para bajar su XML/PDF)
   // ── end MX ──
   createdById     Int?
   companyId       Int

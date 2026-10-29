@@ -132,4 +132,6 @@ export interface IPacAdapter {
   cancel(input: PacCancelInput): Promise<PacCancelResult>;
   /** Timbra un Complemento de Pago (CFDI tipo P). Opcional por adapter. */
   stampPayment?(input: PacPaymentComplementInput): Promise<PacStampResult>;
+  /** PDF del CFDI que generó el PAC, por su `pacDocumentId`. Opcional por adapter. */
+  downloadPdf?(pacDocumentId: string): Promise<Buffer>;
 }
