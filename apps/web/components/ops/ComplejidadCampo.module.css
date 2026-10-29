@@ -18,16 +18,11 @@
   color: var(--ui-fg-3);
 }
 
+/* Cuatro en fila si caben (~100 px cada uno); si la columna es angosta, dos y dos. */
 .niveles {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 100px), 1fr));
   gap: var(--ui-s2);
-}
-
-@media (max-width: 560px) {
-  .niveles {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 .nivel {
