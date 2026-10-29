@@ -26,6 +26,23 @@ describe('tiempo y entrega de toda actividad', () => {
     expect(cantidadDelTitulo('Mantenimientos 2026 Sephora')).toBeNull();
     expect(cantidadDelTitulo('Revisar 2 horas el NVR')).toBeNull();
     expect(cantidadDelTitulo('Apoyo Biblioteca Tlaxcala')).toBeNull();
+    // El número de un lugar no es una cantidad.
+    expect(cantidadDelTitulo('Tubería y canalización en nave 2')).toBeNull();
+    expect(cantidadDelTitulo('Instalar cámaras en planta 1, piso 3')).toBeNull();
+    expect(cantidadDelTitulo('Revisar sucursal #12 y local No. 4')).toBeNull();
+    expect(cantidadDelTitulo('Cableado de 4 nodos en nave 2')).toBe(4);
+  });
+
+  it('la unidad es la que nombra el título: «120 m» son metros, no nodos', () => {
+    const canal = estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Cableado y canalización', titulo: 'Canalización de 120 m entre naves' }, { cantidad: 120 });
+    expect(canal.totalMin).toBe(480);
+    expect(canal.unidades).toEqual({ clave: 'metros', cantidad: 120 });
+    // Obra: metros, nodos o dispositivos según el título; sin nombrar, la primera (dispositivos).
+    expect(estandarDeLectura({ coreKind: 'obra', titulo: 'Tubería de 40 metros en nave 2' }, { cantidad: 40 }).totalMin).toBe(190);
+    expect(estandarDeLectura({ coreKind: 'obra', titulo: 'Cableado de 6 nodos' }, { cantidad: 6 }).totalMin).toBe(300);
+    expect(estandarDeLectura({ coreKind: 'obra', titulo: 'Instalar 3 cámaras' }, { cantidad: 3 }).unidades).toEqual({ clave: 'dispositivos', cantidad: 3 });
+    // «2 jornadas»: días en sitio (topado a 12 h; más de un día va con periodo).
+    expect(estandarDeLectura({ coreKind: 'obra', titulo: '2 jornadas de tubería' }, { cantidad: 2 }).totalMin).toBe(720);
   });
 
   it('el estándar sale de la tabla con lo leído; lo que falta se supone y se dice', () => {

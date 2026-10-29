@@ -1,5 +1,14 @@
 # RELEVO
 
+- **29-10 ~17:30 (claude-code) — El título: números de lugar y la unidad que nombra (hallado al verificar la jornada
+  en obra en producción).**
+  - `cantidadDelTitulo` leía «nave 2», «piso 3», «sucursal #12» como cantidades: «Tubería y canalización en nave 2»
+    salía como 2 dispositivos (120 min) en vez de una jornada en obra. Ahora ignora el número que sigue a un lugar.
+  - `estandarDeLectura` usaba siempre la primera unidad del tipo: «Canalización de 120 m» eran 120 nodos (topado a
+    12 h). Ahora `unidadDelTitulo` elige la que nombra el título (metros, nodos, jornadas, dispositivos); si no nombra
+    ninguna, la primera.
+  - Si la IA lee una cantidad, sigue mandando la suya; esto es el respaldo y la unidad.
+
 - **29-10 ~17:15 (claude-code) — Jornada en obra: infraestructura sin cantidad es un día en sitio (Adam: «sí,
   agrégalo… obra se refiere a temas de tubería o cosas con temas de CCTV… infraestructura»).**
   - Medido el 29-10: el 44 % de lo terminado desde el 21-09 eran días completos en sitio («cableado biblioteca»,
