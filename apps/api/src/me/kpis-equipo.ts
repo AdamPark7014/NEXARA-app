@@ -826,7 +826,13 @@ export function conReferencia(t: TotalesKpi, referencia: number | null | Referen
       : { ritmo: referencia ?? null, aTiempo: null, aLaPrimera: null };
   const ritmo = t.ritmo ? { ...t.ritmo, referencia: ref.ritmo } : t.ritmo;
   const c = cumplimientoDe({ ...t, ritmo }, ref);
-  return { ...t, ritmo, cumplimientoPct: c.pct, cumplimientoPartes: c.partes };
+  return {
+    ...t,
+    ritmo,
+    cumplimientoPct: c.pct,
+    cumplimientoPartes: c.partes,
+    ...lecturaDelIndice(c.pct, c.partes, t.entregas?.medidas),
+  };
 }
 
 /** «7 h 20 min», «45 min». */
@@ -880,7 +886,57 @@ export type ParteCumplimiento = {
   pct: number;
   peso: number;
   detalle: string;
+  /** Ya calculado con `UMBRALES_INDICE`, para que web y apps no usen cortes propios. */
+  semaforo?: SemaforoKpi;
 };
+
+/** Cortes únicos del índice, sus pilares y sus partes (los mismos de la web): ≥ 90 verde, ≥ 75 amarillo. */
+export const UMBRALES_INDICE = { verde: 90, amarillo: 75 } as const;
+
+export function semaforoDePct(pct: number | null | undefined): SemaforoKpi {
+  if (pct == null || !Number.isFinite(pct)) return 'sin_datos';
+  if (pct >= UMBRALES_INDICE.verde) return 'verde';
+  if (pct >= UMBRALES_INDICE.amarillo) return 'amarillo';
+  return 'rojo';
+}
+
+export type ConfianzaKpi = 'alta' | 'media' | 'baja';
+
+/** §7.2: con 20 entregas medidas o más es alta; de 10 a 19, media; con menos, baja (no se publica). */
+export function confianzaDeMedidas(medidas: number | null | undefined): ConfianzaKpi {
+  const n = medidas ?? 0;
+  return n >= 20 ? 'alta' : n >= 10 ? 'media' : 'baja';
+}
+
+export type PilarId = 'confiabilidad' | 'calidad' | 'rendimiento' | 'disciplina';
+export type PilarKpi = { id: PilarId; label: string; pct: number | null; semaforo: SemaforoKpi };
+
+/** Qué partes (con peso) forman cada pilar del índice v2. */
+export const PILARES_INDICE: ReadonlyArray<{ id: PilarId; label: string; claves: ReadonlyArray<ParteCumplimiento['clave']> }> = [
+  { id: 'confiabilidad', label: 'Confiabilidad', claves: ['entregas'] },
+  { id: 'calidad', label: 'Calidad', claves: ['forma'] },
+  { id: 'rendimiento', label: 'Rendimiento', claves: ['estandar'] },
+  { id: 'disciplina', label: 'Disciplina', claves: ['asistencia', 'uniforme'] },
+];
+
+/** Los cuatro pilares ya calculados (promedio ponderado de sus partes con peso), con su semáforo. */
+export function pilaresDe(partes: ParteCumplimiento[]): PilarKpi[] {
+  return PILARES_INDICE.map((p) => {
+    const suyas = partes.filter((x) => p.claves.includes(x.clave) && x.peso > 0);
+    const peso = suyas.reduce((a, x) => a + x.peso, 0);
+    const pct = peso > 0 ? Math.round(suyas.reduce((a, x) => a + x.pct * x.peso, 0) / peso) : null;
+    return { id: p.id, label: p.label, pct, semaforo: semaforoDePct(pct) };
+  });
+}
+
+/** Lo que acompaña al índice en la respuesta: su semáforo, su confianza y sus pilares. */
+export function lecturaDelIndice(
+  pct: number | null,
+  partes: ParteCumplimiento[],
+  medidas: number | null | undefined,
+): { semaforoIndice: SemaforoKpi; confianza: ConfianzaKpi; pilares: PilarKpi[] } {
+  return { semaforoIndice: semaforoDePct(pct), confianza: confianzaDeMedidas(medidas), pilares: pilaresDe(partes) };
+}
 
 /**
  * Disciplina (§7.2): puntualidad graduada × registro completo. Por día que debía checar: hasta 15 min
@@ -987,7 +1043,13 @@ export function metaPonderada(
 export const PLAZO_REVISION_HABIL_MIN = 24 * 60;
 
 /** Minutos entre dos instantes sin contar sábados ni domingos (hora de CDMX, UTC−6 sin horario de verano). */
-export function minutosHabilesEntre(desde: Date, hasta: Date, offsetMin = -360): number {
+export function minutosHabilesEntre(
+  desde: Date,
+  hasta: Date,
+  offsetMin = -360,
+  /** Días `AAAA-MM-DD` que no se laboran (festivos): no cuentan, igual que el fin de semana. */
+  noHabiles?: ReadonlySet<string>,
+): number {
   const fin = hasta.getTime();
   let t = desde.getTime();
   if (!(fin > t)) return 0;
@@ -998,7 +1060,8 @@ export function minutosHabilesEntre(desde: Date, hasta: Date, offsetMin = -360):
     const finDelDia = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1) - off;
     const hastaAqui = Math.min(fin, finDelDia);
     const dow = local.getUTCDay();
-    if (dow !== 0 && dow !== 6) total += hastaAqui - t;
+    const festivo = noHabiles?.has(local.toISOString().slice(0, 10)) ?? false;
+    if (dow !== 0 && dow !== 6 && !festivo) total += hastaAqui - t;
     t = hastaAqui;
   }
   return Math.round(total / 60_000);
@@ -1060,11 +1123,15 @@ export function estandarDeRespaldo(mediana: number | null, minutosReales: number
 }
 
 /** Revisiones de un coordinador: cuántas llegaron dentro de 24 h hábiles del envío (sin envío anterior no se mide). */
-export function revisionesEnPlazo(pares: Array<{ envio: Date | null; revision: Date }>): { total: number; enPlazo: number } {
+export function revisionesEnPlazo(
+  pares: Array<{ envio: Date | null; revision: Date }>,
+  /** Festivos que no se laboran: no cuentan en las 24 h hábiles. */
+  noHabiles?: ReadonlySet<string>,
+): { total: number; enPlazo: number } {
   const medibles = pares.filter((p): p is { envio: Date; revision: Date } => p.envio != null && p.envio.getTime() <= p.revision.getTime());
   return {
     total: medibles.length,
-    enPlazo: medibles.filter((p) => minutosHabilesEntre(p.envio, p.revision) <= PLAZO_REVISION_HABIL_MIN).length,
+    enPlazo: medibles.filter((p) => minutosHabilesEntre(p.envio, p.revision, -360, noHabiles) <= PLAZO_REVISION_HABIL_MIN).length,
   };
 }
 
@@ -1258,7 +1325,7 @@ export function cumplimientoDe(
   if (dias && esperados > 0 && dias.trabajados === 0) valor = 0;
   else if (base != null && (entregas.medidas > 0 || esperados > 0)) valor = Math.round(base * 100);
   else valor = null;
-  return { pct: valor, partes: partes.map(({ razon: _razon, ...p }) => p) };
+  return { pct: valor, partes: partes.map(({ razon: _razon, ...p }) => ({ ...p, semaforo: semaforoDePct(p.pct) })) };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1395,6 +1462,12 @@ export type TotalesKpi = {
   /** Índice de desempeño v2, 0–100; null sin nada que medir. */
   cumplimientoPct: number | null;
   cumplimientoPartes: ParteCumplimiento[];
+  /** Semáforo del índice con `UMBRALES_INDICE` (el mismo que pinta la web). */
+  semaforoIndice?: SemaforoKpi;
+  /** Por entregas medidas: alta ≥ 20, media 10–19, baja < 10 (no se publica). */
+  confianza?: ConfianzaKpi;
+  /** Confiabilidad, Calidad, Rendimiento y Disciplina ya calculados, con su semáforo. */
+  pilares?: PilarKpi[];
 };
 
 /** Qué decidió el jefe sobre el tiempo extra de un día. */
@@ -1819,6 +1892,7 @@ function sumaTotales(
     disciplina,
     cumplimientoPct: cumplimiento.pct,
     cumplimientoPartes: cumplimiento.partes,
+    ...lecturaDelIndice(cumplimiento.pct, cumplimiento.partes, entregas.medidas),
   };
 }
 
@@ -1950,6 +2024,7 @@ export function sumaEquipo(lista: TotalesKpi[]): TotalesKpi {
     metaRendimiento: metaPonderada(lista),
     cumplimientoPct: cumplimiento.pct,
     cumplimientoPartes: cumplimiento.partes,
+    ...lecturaDelIndice(cumplimiento.pct, cumplimiento.partes, entregas.medidas),
   };
 }
 

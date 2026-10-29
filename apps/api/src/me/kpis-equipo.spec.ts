@@ -4,6 +4,7 @@ import {
   calculaKpisPersona,
   calificacionCalibrada,
   conReferencia,
+  confianzaDeMedidas,
   contraida,
   cumplimientoDe,
   diasDelRango,
@@ -20,6 +21,7 @@ import {
   puntosDeLlegada,
   referenciasDelEquipo,
   revisionesEnPlazo,
+  semaforoDePct,
   intersectaTramos,
   minutosDeTramos,
   normalizaTramos,
@@ -1061,6 +1063,17 @@ describe('índice de desempeño v2', () => {
     ).toEqual({ total: 2, enPlazo: 1 });
   });
 
+  it('los festivos que no se laboran tampoco cuentan en las 24 h hábiles', () => {
+    const cdmx = (iso: string) => new Date(`${iso}-06:00`);
+    // Viernes 30-10 17:00 → martes 3-11 12:00 con el lunes 2-11 festivo: 7 h + 12 h = 19 h, en plazo.
+    const festivo = new Set(['2026-11-02']);
+    expect(minutosHabilesEntre(cdmx('2026-10-30T17:00:00'), cdmx('2026-11-03T12:00:00'), -360, festivo)).toBe(19 * 60);
+    expect(minutosHabilesEntre(cdmx('2026-10-30T17:00:00'), cdmx('2026-11-03T12:00:00'))).toBe(43 * 60);
+    const par = [{ envio: cdmx('2026-10-30T17:00:00'), revision: cdmx('2026-11-03T12:00:00') }];
+    expect(revisionesEnPlazo(par)).toEqual({ total: 1, enPlazo: 0 });
+    expect(revisionesEnPlazo(par, festivo)).toEqual({ total: 1, enPlazo: 1 });
+  });
+
   it('familia por puesto y meta ponderada por horas', () => {
     expect(['Técnico Instalador', 'Ingeniero de Soporte', 'Encargado de Obra', 'Encargada comercial', 'Contador(a) General', null].map(familiaDePuesto)).toEqual([
       'campo',
@@ -1117,5 +1130,35 @@ describe('índice de desempeño v2', () => {
   it('las reglas en palabras ya hablan de la v2', () => {
     expect(supuestosKpi()[0]).toContain('Confiabilidad 30 %');
     expect(supuestosKpi().join(' ')).not.toContain('MULTIPLICA');
+  });
+});
+
+describe('semáforo y confianza los calcula la API (para web y apps)', () => {
+  it('cortes únicos: ≥ 90 verde, ≥ 75 amarillo', () => {
+    expect([95, 90, 89, 75, 74, null].map(semaforoDePct)).toEqual(['verde', 'verde', 'amarillo', 'amarillo', 'rojo', 'sin_datos']);
+    expect([25, 20, 19, 10, 9, null].map(confianzaDeMedidas)).toEqual(['alta', 'alta', 'media', 'media', 'baja', 'baja']);
+  });
+
+  it('cada parte trae su semáforo y el índice sus pilares', () => {
+    const t = {
+      entregas: { ...resumenEntregas([]), medidas: 12, aTiempo: 12, revisadas: 4, aprobadasALaPrimera: 3, conEstandar: 12, minutosEstandarGanados: 240 },
+      asistenciaPuntual: { esperados: 1, puntuales: 1, pct: 100 },
+      uniforme: { revisadas: 0, ok: 0, noOk: 0, sinRevisar: 0, pct: null },
+      minutosLaborados: 480,
+      ritmo: { entregadas: 12, dias: 1, porDia: 12, referencia: null },
+      carga: { minutos: 0, pct: 0 },
+      ocupacion: { minutos: 0, pct: 0 },
+    } as unknown as TotalesKpi;
+    const r = conReferencia({ ...t, cumplimientoPct: null, cumplimientoPartes: [] }, null);
+    expect(r.cumplimientoPartes.find((p) => p.clave === 'entregas')?.semaforo).toBe('verde');
+    expect(r.cumplimientoPartes.find((p) => p.clave === 'forma')?.semaforo).toBe('amarillo');
+    expect(r.confianza).toBe('media');
+    expect(r.semaforoIndice).toBe(semaforoDePct(r.cumplimientoPct));
+    expect(r.pilares?.map((p) => [p.id, p.pct, p.semaforo])).toEqual([
+      ['confiabilidad', 100, 'verde'],
+      ['calidad', 75, 'amarillo'],
+      ['rendimiento', 71, 'rojo'],
+      ['disciplina', 100, 'verde'],
+    ]);
   });
 });

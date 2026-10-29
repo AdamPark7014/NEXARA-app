@@ -36,7 +36,9 @@ export function diagnosticoDe(partes: ParteCumplimiento[] | undefined): ParteCum
 export type Confianza = "alta" | "media" | "baja";
 
 /** §7.2: con 20 entregas medidas o más es alta; de 10 a 19, media; con menos, baja y no se publica. */
-export function confianzaDe(t: Pick<TotalesKpi, "entregas">): Confianza {
+export function confianzaDe(t: Pick<TotalesKpi, "entregas" | "confianza">): Confianza {
+  // La API ya la manda (la misma para web y apps); si no viene, la misma regla aquí.
+  if (t.confianza) return t.confianza;
   const n = t.entregas?.medidas ?? 0;
   return n >= 20 ? "alta" : n >= 10 ? "media" : "baja";
 }
