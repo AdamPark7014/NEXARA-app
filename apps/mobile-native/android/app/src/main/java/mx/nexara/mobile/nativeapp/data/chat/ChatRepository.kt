@@ -20,10 +20,19 @@ import mx.nexara.mobile.nativeapp.data.api.PatchChatMessageBody
 import mx.nexara.mobile.nativeapp.data.api.PostChatMessageBody
 import mx.nexara.mobile.nativeapp.data.api.PostChatReactionBody
 import mx.nexara.mobile.nativeapp.data.api.UpdateChatTopicBody
+import mx.nexara.mobile.nativeapp.data.api.ChatActividadCreadaDto
+import mx.nexara.mobile.nativeapp.data.api.ChatAsistenteBody
+import mx.nexara.mobile.nativeapp.data.api.ChatEstadoAsistenteDto
+import mx.nexara.mobile.nativeapp.data.api.ChatLigasBody
+import mx.nexara.mobile.nativeapp.data.api.ChatRespuestaAsistenteDto
+import mx.nexara.mobile.nativeapp.data.api.ChatTarjetaLigaDto
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
+
+/** Refs por llamada a `chat/ligas` (`MAX_REFS` del API). */
+private const val CHAT_LIGAS_MAX = 40
 
 class ChatRepository(context: Context) {
     private val appContext = context.applicationContext
@@ -151,6 +160,33 @@ class ChatRepository(context: Context) {
         if (q.length < 2) return emptyList()
         return api.searchMessages(q, channelId).messages
     }
+
+    // ── Ligas y asistente ────────────────────────────────────────────────────
+
+    /**
+     * Tarjetas de varias ligas en una sola llamada (`POST chat/ligas`), en tandas de
+     * [CHAT_LIGAS_MAX] para no pasar el tope del API. Devuelve `ref → tarjeta`; las que el
+     * API no reconoce simplemente no vienen.
+     */
+    suspend fun ligas(refs: List<String>): Map<String, ChatTarjetaLigaDto> {
+        val unicas = refs.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        if (unicas.isEmpty()) return emptyMap()
+        val out = LinkedHashMap<String, ChatTarjetaLigaDto>()
+        unicas.chunked(CHAT_LIGAS_MAX).forEach { tanda ->
+            out.putAll(api.resolveLigas(ChatLigasBody(tanda)))
+        }
+        return out
+    }
+
+    /** `POST chat/asistente`: la respuesta es solo para quien pregunta; nada se publica. */
+    suspend fun askAsistente(texto: String, channelId: Long): ChatRespuestaAsistenteDto =
+        api.askAsistente(ChatAsistenteBody(texto = texto.trim().take(2000), channelId = channelId))
+
+    suspend fun asistenteEstado(): ChatEstadoAsistenteDto = api.asistenteEstado()
+
+    /** Crea la actividad de una propuesta del asistente (la persona tocó «Crear»). */
+    suspend fun createProposedActivity(payload: Map<String, Any?>): ChatActividadCreadaDto =
+        api.createProposedActivity(payload)
 
     private fun filePart(uri: Uri): MultipartBody.Part? {
         val resolver = appContext.contentResolver

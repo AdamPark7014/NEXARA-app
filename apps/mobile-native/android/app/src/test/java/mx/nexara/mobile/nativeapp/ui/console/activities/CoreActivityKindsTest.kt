@@ -346,9 +346,9 @@ class CoreActivityKindsTest {
 
     @Test
     fun hourParsesAndFormats() {
-        assertEquals(9 to 0, k.parseHora(""))
+        assertEquals(10 to 0, k.parseHora(""))
         assertEquals(18 to 5, k.parseHora("18:05"))
-        assertEquals(9 to 0, k.parseHora("25:99"))
+        assertEquals(10 to 0, k.parseHora("25:99"))
         assertEquals("07:05", k.formatHora(7, 5))
     }
 
@@ -399,5 +399,15 @@ class CoreActivityKindsTest {
         assertEquals(2, body.evidencePhotoRequired)
         assertNull(body.assignmentCharge)
         assertEquals("COMERCIAL", k.buildRequest(k.initialForm("comercial", 7L, null).copy(titulo = "x"), null, 2L).ticketTypeCustom)
+    }
+
+    @Test
+    fun horaDeInicioEsLaEntradaDeQuienEjecuta() {
+        assertEquals("08:00", k.horaDeEntrada("08:00"))
+        assertEquals("08:00", k.horaDeEntrada("08:00:00"))
+        // Dirección no tiene horario: la entrada de la oficina.
+        assertEquals("10:00", k.horaDeEntrada(null))
+        assertEquals("10:00", k.horaDeEntrada("mañana"))
+        assertEquals("10:00", k.initialForm("tarea", 7L, null).hora)
     }
 }

@@ -50,12 +50,14 @@ object ActividadAdjuntosRules {
 
     enum class Icono { PDF, HOJA, DOCUMENTO, IMAGEN, PRESENTACION, ARCHIVO }
 
-    /** PDF rojo, Excel verde, Word azul, imagen morada, lo demás gris. */
+    /** PDF rojo, Excel verde, Word azul, PowerPoint naranja, imagen morada, lo demás gris. */
     enum class Tipo(val icono: Icono, val color: Long) {
         PDF(Icono.PDF, 0xFFDC2626L),
         EXCEL(Icono.HOJA, 0xFF16A34AL),
         CSV(Icono.HOJA, 0xFF16A34AL),
         WORD(Icono.DOCUMENTO, 0xFF2563EBL),
+        /** `.pptx` (el API lo manda como `powerpoint` desde el 29-10, con vista previa). */
+        POWERPOINT(Icono.PRESENTACION, 0xFFC4501FL),
         IMAGEN(Icono.IMAGEN, 0xFF7C3AEDL),
         OTRO(Icono.ARCHIVO, 0xFF64748BL),
     }
@@ -68,6 +70,7 @@ object ActividadAdjuntosRules {
             "excel" -> return Tipo.EXCEL
             "csv" -> return Tipo.CSV
             "word" -> return Tipo.WORD
+            "powerpoint" -> return Tipo.POWERPOINT
             "otro" -> return Tipo.OTRO
         }
         return when (extension(nombre)) {
@@ -76,11 +79,13 @@ object ActividadAdjuntosRules {
             "xlsx", "xlsm", "xls" -> Tipo.EXCEL
             "csv" -> Tipo.CSV
             "docx", "doc" -> Tipo.WORD
+            // Como el API (`tipoDeDocumento`): solo el .pptx; el .ppt viejo sigue como «otro».
+            "pptx" -> Tipo.POWERPOINT
             else -> Tipo.OTRO
         }
     }
 
-    /** Icono del renglón: una presentación sigue siendo «otro» (gris), pero se reconoce. */
+    /** Icono del renglón: un .ppt viejo sigue siendo «otro» (gris), pero se reconoce. */
     fun icono(tipo: Tipo, nombre: String?): Icono =
         if (tipo == Tipo.OTRO && extension(nombre) in setOf("ppt", "pptx")) Icono.PRESENTACION else tipo.icono
 

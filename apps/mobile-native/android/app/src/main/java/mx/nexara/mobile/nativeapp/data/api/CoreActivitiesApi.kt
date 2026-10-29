@@ -945,6 +945,47 @@ data class TiempoCalculadoDto(
     val fechaEntregaEsperada: String? = null,
 )
 
+/** `GET users/assignable`: solo lo que usa el alta; `horaEntrada` "HH:MM" o null (sin horario). */
+data class AsignableDto(
+    val id: Long,
+    val horaEntrada: String? = null,
+)
+
+/**
+ * `GET festivos/mio` (29-10): el festivo de hoy y los próximos 90 días, ya resueltos para quien
+ * pregunta (si le toca, con qué horario y si se paga doble). La regla vive en el servidor.
+ */
+data class FestivosMioDto(
+    /** AAAA-MM-DD en México. */
+    val hoy: String? = null,
+    val festivoHoy: FestivoDto? = null,
+    /** Hasta 5, en orden. */
+    val proximos: List<FestivoDto>? = null,
+)
+
+data class FestivoDto(
+    val fecha: String? = null,
+    val nombre: String? = null,
+    /** LEY | EMPRESA */
+    val origen: String? = null,
+    val finDeSemana: Boolean? = null,
+    val nota: String? = null,
+    val como: FestivoComoDto? = null,
+)
+
+data class FestivoComoDto(
+    val trabaja: Boolean? = null,
+    /** null = jornada completa. */
+    val horario: FestivoHorarioDto? = null,
+    val pagoDoble: Boolean? = null,
+)
+
+/** «HH:MM» de México. */
+data class FestivoHorarioDto(
+    val entrada: String? = null,
+    val salida: String? = null,
+)
+
 /** Dueño de una evidencia por revisar (`me/revisiones`). */
 data class PersonaRevisionDto(
     val id: Long? = null,
@@ -997,10 +1038,49 @@ data class SugerirComplejidadRequest(
 data class SugerenciaComplejidadDto(
     val complejidad: String? = null,
     val motivo: String? = null,
+    /** Para el tiempo estándar: cuántas unidades del tipo dice el título (null si no lo dice). */
+    val cantidad: Int? = null,
+    /** A dónde hay que ir, si el título lo nombra (texto; no trae coordenadas). */
+    val destino: String? = null,
 )
 
 data class SugerirComplejidadResponse(
     val sugerencia: SugerenciaComplejidadDto? = null,
+)
+
+/** `GET ai/estandar/tabla`: la tabla del tiempo estándar (§8); la cuenta la hace `TiempoEstandar`. */
+data class TablaEstandarDto(
+    val reglas: List<ReglaEstandarDto>? = null,
+    val topeMin: Double? = null,
+    val origen: OrigenEstandarDto? = null,
+)
+
+data class ReglaEstandarDto(
+    /** `comercial`, `tarea:Instalación`, `servicio:CORRECTIVO`… */
+    val clave: String? = null,
+    val nombre: String? = null,
+    val baseMin: Double? = null,
+    /** Lo que se cuenta; la primera es la de omisión. Vacío = el tipo no tiene cantidad. */
+    val unidades: List<UnidadEstandarDto>? = null,
+    /** `BASICA`…`CRITICA` → minutos, en los tipos sin cantidad. */
+    val porComplejidad: Map<String, Double>? = null,
+    val destino: Boolean? = null,
+    val enLugarMin: Double? = null,
+    val agenda: Boolean? = null,
+)
+
+data class UnidadEstandarDto(
+    val clave: String? = null,
+    val singular: String? = null,
+    val plural: String? = null,
+    /** «¿Cuántas partidas?» */
+    val pregunta: String? = null,
+    val porUnidadMin: Double? = null,
+    val incluidas: Double? = null,
+)
+
+data class OrigenEstandarDto(
+    val nombre: String? = null,
 )
 
 interface CoreActivitiesApi {
@@ -1022,6 +1102,10 @@ interface CoreActivitiesApi {
     @POST("me/activities/tiempo-calculado")
     suspend fun tiempoCalculado(@Body body: TiempoCalculadoRequest): TiempoCalculadoDto
 
+    /** Tabla del tiempo estándar (tarifas por tipo de trabajo). */
+    @GET("ai/estandar/tabla")
+    suspend fun tablaEstandar(): TablaEstandarDto
+
     /** Mis tramos del trayecto (quien la lleva y quien la creó ven los de todos). */
     @GET("me/activities/{id}/trayectos")
     suspend fun trayectos(@Path("id") activityId: Long): List<TrayectoDto>
@@ -1034,6 +1118,14 @@ interface CoreActivitiesApi {
     @POST("me/activities/{id}/trayectos/terminar")
     suspend fun terminarTrayecto(@Path("id") activityId: Long, @Body body: TerminarTrayectoRequest): TrayectoDto
 
+    /** Quien se puede asignar, con su hora de entrada (`AsignableDto`). */
+    @GET("users/assignable")
+    suspend fun asignables(): List<AsignableDto>
+
+    /** Mi festivo de hoy y los próximos (`FestivosMioDto`). */
+    @GET("festivos/mio")
+    suspend fun festivosMio(): FestivosMioDto
+
     /** «En espera de revisión»: la misma regla de quién revisa a quién que `me/activities/:id/evidencias`. */
     @GET("me/revisiones")
     suspend fun revisiones(): RevisionesResponseDto
@@ -1044,6 +1136,13 @@ interface CoreActivitiesApi {
     /** Asignar a otra persona (mismo cuerpo que `me/activities`). */
     @POST("activities")
     suspend fun createActivity(@Body body: CreateActivityRequest): ResponseBody
+
+    /**
+     * El mismo alta con el tiempo estándar (`unidades`, `tiempoEstandarMin`, `estandarDesglose`,
+     * `estandarCambiadoMotivo`): `CreateActivityRequest` más esos campos, armado por `TiempoEstandar.cuerpo`.
+     */
+    @POST("activities")
+    suspend fun createActivityConEstandar(@Body body: Map<String, @JvmSuppressWildcards Any?>): ResponseBody
 
     @POST("activities/{id}/team")
     suspend fun addTeamMember(

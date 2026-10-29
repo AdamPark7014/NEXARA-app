@@ -269,12 +269,19 @@ enum ChatMarkup {
         return (collapsed, false)
     }
 
-    /// `[AN-0142 · Título](/erp/actividades/5142)`: el token que se pega en el
-    /// mensaje al «Mencionar actividad» o «Mencionar evidencia».
+    /// Token que deja el selector «Ligar»: `[@Nombre](user:3)` para una persona
+    /// (el API avisa a quien se menciona) y `[AN-0142 · Título](/erp/actividades/5142)`
+    /// para todo lo demás, con la ruta que trae `chat/mentions`.
     static func entityToken(_ entity: ChatMentionRow) -> String {
         let cleanLabel = entity.label
             .filter { !"[]()".contains($0) }
-            .trimmingCharacters(in: .whitespaces)
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        if entity.kind == "USER" {
+            let nombre = cleanLabel.hasPrefix("@") ? String(cleanLabel.dropFirst()) : cleanLabel
+            return "[@\(nombre.isEmpty ? "alguien" : nombre)](user:\(entity.entityId))"
+        }
         var href = entity.href.trimmingCharacters(in: .whitespacesAndNewlines)
         if href.isEmpty {
             switch entity.kind {
@@ -283,7 +290,7 @@ enum ChatMarkup {
             default: href = "/"
             }
         }
-        return "[\(cleanLabel)](\(href))"
+        return "[\(cleanLabel.isEmpty ? "enlace" : cleanLabel)](\(href))"
     }
 
     /// Agrega el token al borrador con un espacio antes (si hace falta) y otro después.

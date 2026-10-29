@@ -86,6 +86,7 @@ import mx.nexara.mobile.nativeapp.access.CoreKeys
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.SessionRevision
 import mx.nexara.mobile.nativeapp.data.SessionUser
+import mx.nexara.mobile.nativeapp.data.api.FestivoDto
 import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl
@@ -93,6 +94,7 @@ import mx.nexara.mobile.nativeapp.ui.common.NotificationHealthBanner
 import mx.nexara.mobile.nativeapp.ui.common.rememberCameraCapture
 import mx.nexara.mobile.nativeapp.ui.common.rememberProblemaDeAvisos
 import mx.nexara.mobile.nativeapp.ui.console.CoreMenu
+import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityKinds
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules
 import mx.nexara.mobile.nativeapp.ui.console.activities.NxChip
 import mx.nexara.mobile.nativeapp.ui.console.activities.PausarPropiaDialog
@@ -195,15 +197,25 @@ fun InicioScreen(
                 }
             }
 
-            if (attendanceVm != null && attendance != null && attendanceVm.viewMode.canRegisterSelf) {
+            // Festivo (mockup aprobado el 29-10): si descansa, la banda sustituye a la jornada (ese
+            // día no se checa); si le toca, la tarjeta del horario lleva el botón de entrada.
+            val festivo = FestivoRules.estado(state.festivos, CoreActivityKinds.todayInMexico())
+            val festivos = state.festivos
+            val puedeChecar = attendanceVm != null && attendance != null && attendanceVm.viewMode.canRegisterSelf
+            if (festivo == FestivoRules.Estado.DESCANSA && festivos != null) {
+                item(key = "festivo") { FestivoDescansaContenido(festivos) }
+            } else if (puedeChecar && attendanceVm != null && attendance != null) {
                 item(key = "jornada") {
                     JornadaHero(
                         vm = attendanceVm,
                         state = attendance,
                         onComida = onOpenComidas,
                         onVerJornada = onOpenAsistencia,
+                        festivo = festivos?.festivoHoy?.takeIf { festivo == FestivoRules.Estado.LABORA },
                     )
                 }
+            } else if (festivo == FestivoRules.Estado.LABORA) {
+                festivos?.festivoHoy?.let { f -> item(key = "festivo") { FestivoLaboraTarjeta(f, onEntrada = null) } }
             }
 
             aviso?.let { a ->
@@ -421,6 +433,8 @@ private fun JornadaHero(
     state: AttendanceUiState,
     onComida: () -> Unit,
     onVerJornada: () -> Unit,
+    /** Festivo que le toca laborar: su horario arriba y, sin entrada, su botón la sustituye. */
+    festivo: FestivoDto? = null,
 ) {
     val context = LocalContext.current
     val c = NxTheme.colors
@@ -485,7 +499,21 @@ private fun JornadaHero(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        JornadaTarjeta(
+        if (festivo != null) {
+            FestivoLaboraTarjeta(
+                f = festivo,
+                onEntrada = if (siguiente == "entrada") {
+                    {
+                        pendiente = "entrada"
+                        tomarFoto()
+                    }
+                } else {
+                    null
+                },
+                loading = state.checkInLoading,
+            )
+        }
+        if (festivo == null || jornada != InicioRules.Jornada.SIN_ENTRADA) JornadaTarjeta(
             jornada = jornada,
             titulo = titulo,
             detalle = detalle,

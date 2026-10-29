@@ -209,6 +209,9 @@ final class ApiClient {
         if path.hasSuffix("/trayectos") || path.hasSuffix("/trayectos/terminar") { return true }
         // Vista previa del tiempo de una autoasignación: solo sirve mientras se llena el alta.
         if path.hasSuffix("/tiempo-calculado") { return true }
+        // Chat: el asistente de #general y las tarjetas de las ligas son consultas del momento
+        // (Android `SOLO_EN_LINEA`). Encoladas, la respuesta llegaría a nadie.
+        if path == "chat/asistente" || path == "chat/ligas" { return true }
         if path.hasPrefix("tool-requests/") {
             return path.hasSuffix("/deliver") || path.hasSuffix("/return")
         }

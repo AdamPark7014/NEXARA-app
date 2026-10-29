@@ -106,6 +106,24 @@ final class InicioStore: ObservableObject {
         ceoCargando = false
     }
 
+    // MARK: Festivos (Android `cargarFestivos`)
+
+    /// `GET festivos/mio` (`FestivoRules`); nil si falló o la API aún no lo tiene.
+    @Published private(set) var festivos: FestivosMio?
+    /// Los festivos cambian poco: un aviso en vivo no los vuelve a pedir antes de 10 min.
+    private var festivosCargadoEn: Date?
+
+    /// Al cargar Inicio y, con `enVivo` (lo pidió un aviso en vivo), a lo más cada 10 min.
+    func cargarFestivos(enVivo: Bool = false) async {
+        let ahora = Date()
+        if enVivo, let previa = festivosCargadoEn, ahora.timeIntervalSince(previa) < 10 * 60 { return }
+        festivosCargadoEn = ahora
+        // Si falla se queda lo último; la pantalla lo ignora si ya no es de hoy.
+        if let respuesta = try? await CoreRepository.shared.festivosMio() {
+            festivos = respuesta
+        }
+    }
+
     private func accion(_ activityId: Int, fallback: String, call: () async throws -> Void) async -> Bool {
         guard accionEnCurso == nil else { return false }
         accionEnCurso = activityId

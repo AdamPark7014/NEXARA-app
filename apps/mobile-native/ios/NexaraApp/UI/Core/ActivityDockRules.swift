@@ -140,8 +140,8 @@ enum ActivityDockRules {
             label = comercial ? "Tomar foto de inicio" : "Tomar foto de entrada"
         case CoreEvidence.evidencePhotos:
             if porCampos { label = "Fotos por campo" }
-            else if faltan > 0 { label = "Tomar fotos · \(fotos) de \(fotosRequeridas)" }
-            else { label = "Enviar fotos · \(fotos) de \(fotosRequeridas)" }
+            else if faltan > 0 { label = "Tomar fotos\n\(fotos) de \(fotosRequeridas)" }
+            else { label = "Enviar fotos\n\(fotos) de \(fotosRequeridas)" }
         case CoreEvidence.serviceSheetPdf:
             label = "Cargar hoja de servicio"
         case CoreEvidence.serviceSheetData:

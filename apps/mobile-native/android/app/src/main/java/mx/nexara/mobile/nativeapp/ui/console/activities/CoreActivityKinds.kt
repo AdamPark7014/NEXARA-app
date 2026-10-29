@@ -39,7 +39,8 @@ object CoreActivityKinds {
     const val ROL_TECNICO = "TECNICO"
 
     const val TAREA_OTRO = "otro"
-    const val DEFAULT_HORA = "09:00"
+    /** Sin la entrada de quien ejecuta (dirección no tiene horario): la de la oficina. */
+    const val DEFAULT_HORA = "10:00"
     const val DEFAULT_PRIORIDAD = "Media"
     const val DEFAULT_EVIDENCE_PHOTOS = 4
 
@@ -517,10 +518,17 @@ object CoreActivityKinds {
 
     fun todayInMexico(now: Instant = Instant.now()): String = now.atZone(MEXICO).toLocalDate().toString()
 
-    /** "HH:mm" → (hora, minuto); 09:00 si viene vacío o mal. */
+    /**
+     * Hora de inicio por omisión al asignar (29-10): la entrada de quien ejecuta, como la web
+     * (`users/assignable` → `horaEntrada`; oficina 10:00, cuadrilla 08:00); sin dato, 10:00.
+     */
+    fun horaDeEntrada(horaEntrada: String?): String =
+        horaEntrada?.trim()?.take(5)?.takeIf { Regex("^\\d{2}:\\d{2}$").matches(it) } ?: DEFAULT_HORA
+
+    /** "HH:mm" → (hora, minuto); [DEFAULT_HORA] si viene vacío o mal. */
     fun parseHora(hora: String?): Pair<Int, Int> {
         val t = hora?.trim()?.takeIf { it.isNotEmpty() }?.let { runCatching { LocalTime.parse(it) }.getOrNull() }
-            ?: LocalTime.of(9, 0)
+            ?: LocalTime.parse(DEFAULT_HORA)
         return t.hour to t.minute
     }
 

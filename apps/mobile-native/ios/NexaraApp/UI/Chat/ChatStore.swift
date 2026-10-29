@@ -126,10 +126,10 @@ final class ChatStore: ObservableObject {
 
     // MARK: Conversación
     @Published private(set) var selectedChannel: ChatChannelRow?
-    @Published private(set) var messages: [ChatMessageRow] = []
+    @Published private(set) var messages: [ChatMessageRow] = [] { didSet { scheduleLigas() } }
     @Published private(set) var hasMore = false
     @Published private(set) var loadingOlder = false
-    @Published private(set) var pinnedMessages: [ChatMessageRow] = []
+    @Published private(set) var pinnedMessages: [ChatMessageRow] = [] { didSet { scheduleLigas() } }
     @Published private(set) var unreadBoundaryAt: String?
     @Published private(set) var refreshingMessages = false
     @Published var messagesError: String?
@@ -139,8 +139,8 @@ final class ChatStore: ObservableObject {
     @Published private(set) var typingUsers: [Int64: ChatTypingUser] = [:]
 
     // MARK: Hilo y respuesta
-    @Published private(set) var threadRoot: ChatMessageRow?
-    @Published private(set) var threadReplies: [ChatMessageRow] = []
+    @Published private(set) var threadRoot: ChatMessageRow? = nil { didSet { scheduleLigas() } }
+    @Published private(set) var threadReplies: [ChatMessageRow] = [] { didSet { scheduleLigas() } }
     @Published private(set) var threadLoading = false
     @Published private(set) var threadError: String?
     @Published var replyTo: ChatMessageRow?
@@ -169,6 +169,16 @@ final class ChatStore: ObservableObject {
     /// `true` = la búsqueda se limita al canal abierto.
     @Published private(set) var searchInChannel = false
 
+    // MARK: Ligas y asistente (paridad web, 29-10-2026)
+    /// Tarjetas de las ligas ya pedidas (`POST chat/ligas`), por ref; se piden en lote.
+    @Published private(set) var ligaTarjetas: [String: ChatTarjetaLiga] = [:]
+    /// Conversación con el asistente de #general: solo en este teléfono, nunca en el canal.
+    @Published private(set) var asistenteTurnos: [ChatTurnoAsistente] = [] { didSet { scheduleLigas() } }
+    /// Propuestas de «asígnale a…» creadas, descartadas o en curso (clave `turno-índice`).
+    @Published private(set) var asistentePropuestas: [String: ChatCreacionPropuesta] = [:]
+    /// Texto que vuelve al redactor porque el asistente no pudo contestar.
+    @Published var draftRestore: String?
+
     // MARK: Acciones de canal
     @Published var showCreateChannel = false
     @Published var showDmPicker = false
@@ -192,6 +202,12 @@ final class ChatStore: ObservableObject {
     private var colleaguesRequest = 0
     private var entityRequest = 0
     private var mentionsRequest = 0
+    /// Junta en una sola petición las tarjetas que piden la carga, el sondeo y el socket.
+    private var ligasTask: Task<Void, Never>?
+    /// Refs pedidas y sin respuesta todavía.
+    private var ligasEnVuelo = Set<String>()
+    /// Refs que fallaron y cuándo: se reintentan pasados 30 s, no en cada sondeo.
+    private var ligasFallidas: [String: Date] = [:]
 
     init() {
         let user = SessionStore.shared.currentUser
@@ -218,6 +234,23 @@ final class ChatStore: ObservableObject {
         guard let detail = channelDetail else { return false }
         return !detail.supervised && !detail.readOnly
     }
+
+    /// Slug del canal abierto. La ficha manda; sin ella, el listado. Si ninguno lo
+    /// trae, un canal público llamado «general» se toma por #general (el API lo
+    /// vuelve a comprobar).
+    var channelSlug: String? {
+        guard let channel = selectedChannel else { return nil }
+        if let slug = (channelDetail?.slug.nilIfEmpty ?? channel.slug.nilIfEmpty)?
+            .trimmingCharacters(in: .whitespaces).nilIfEmpty {
+            return slug
+        }
+        let nombre = channel.name.trimmingCharacters(in: .whitespaces).lowercased()
+        let limpio = nombre.hasPrefix("#") ? String(nombre.dropFirst()) : nombre
+        return (limpio == ChatAsistente.slugGeneral && channel.kind.uppercased() == "PUBLIC") ? limpio : nil
+    }
+
+    /// El asistente solo vive en #general.
+    var isGeneral: Bool { channelSlug?.lowercased() == ChatAsistente.slugGeneral }
 
     var conversationItems: [ChatConversationItem] {
         ChatConversationItem.build(messages, currentUserId: currentUserId, unreadBoundaryAt: unreadBoundaryAt)
@@ -619,6 +652,12 @@ final class ChatStore: ObservableObject {
         let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty else { return false }
         let effectiveParent = parentId ?? threadRoot?.id ?? replyTo?.id
+        // `@asistente` en #general no se publica: va al asistente y solo lo ve
+        // quien pregunta. Si falla, el texto vuelve al redactor (`draftRestore`).
+        if ChatAsistente.debePreguntar(clean, slug: channelSlug, parentId: effectiveParent, conAdjunto: false) {
+            preguntarAsistente(clean, channelId: channel.id)
+            return true
+        }
         sending = true
         do {
             let msg = try await ChatRepository.shared.postMessage(channelId: channel.id, body: clean, parentId: effectiveParent)
@@ -676,6 +715,127 @@ final class ChatStore: ObservableObject {
             messages = merge(messages, [msg])
         }
         replyTo = nil
+    }
+
+    // MARK: Tarjetas de las ligas
+
+    /// Pide las tarjetas de todo lo que hay en pantalla (mensajes, hilo, fijados y
+    /// respuestas del asistente) en una sola llamada cada vez que cambia, como la
+    /// web junta las de una página.
+    private func scheduleLigas() {
+        ligasTask?.cancel()
+        ligasTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(60))
+            guard !Task.isCancelled else { return }
+            await self?.ensureLigas()
+        }
+    }
+
+    private func ensureLigas() async {
+        var bodies = messages.map(\.body)
+        if let root = threadRoot { bodies.append(root.body) }
+        bodies += threadReplies.map(\.body)
+        bodies += pinnedMessages.map(\.body)
+        bodies += asistenteTurnos.compactMap { $0.respuesta?.texto }
+        let ahora = Date()
+        let faltan = ChatLigas.refsDeMensajes(bodies).filter { ref in
+            if ligasEnVuelo.contains(ref) { return false }
+            if let fallo = ligasFallidas[ref] { return ahora.timeIntervalSince(fallo) >= 30 }
+            return ligaTarjetas[ref] == nil
+        }
+        guard !faltan.isEmpty else { return }
+        ligasEnVuelo.formUnion(faltan)
+        // Petición aparte: si llega otro cambio mientras viaja, no se cancela a medias.
+        let mapa = await Task { (try? await ChatRepository.shared.ligas(refs: faltan)) ?? [:] }.value
+        ligasEnVuelo.subtract(faltan)
+        var nuevas = ligaTarjetas
+        for ref in faltan {
+            if let tarjeta = mapa[ref] {
+                nuevas[ref] = tarjeta
+                ligasFallidas[ref] = nil
+            } else {
+                ligasFallidas[ref] = Date()
+                // Lo que falló por red no pisa una tarjeta buena que ya hubiera.
+                if nuevas[ref]?.acceso != true { nuevas[ref] = ChatLigas.tarjetaSinCargar(ref) }
+            }
+        }
+        ligaTarjetas = nuevas
+    }
+
+    // MARK: Asistente de #general
+
+    /// Manda la pregunta al asistente (`POST chat/asistente`). Nada se publica en
+    /// el canal; la respuesta solo se ve en el panel de este teléfono. Si el API
+    /// falla, el aviso queda en el panel y el texto vuelve al redactor.
+    func preguntarAsistente(_ texto: String, channelId: Int64) {
+        let id = "a-\(Int(Date().timeIntervalSince1970 * 1000))-\(Int.random(in: 1000...9999))"
+        var turnos = asistenteTurnos + [ChatTurnoAsistente(id: id, pregunta: texto, estado: .esperando)]
+        if turnos.count > ChatAsistente.maxTurnos { turnos.removeFirst(turnos.count - ChatAsistente.maxTurnos) }
+        asistenteTurnos = turnos
+        Task {
+            do {
+                let respuesta = try await ChatRepository.shared.preguntarAsistente(texto: texto, channelId: channelId)
+                actualizarTurno(id) { turno in
+                    turno.estado = .listo
+                    turno.respuesta = respuesta
+                }
+            } catch {
+                let mensaje = error.toUserMessage(fallback: "El asistente no respondió.")
+                actualizarTurno(id) { turno in
+                    turno.estado = .error
+                    turno.error = "\(mensaje) Tu pregunta volvió al cuadro de texto; intenta de nuevo."
+                }
+                draftRestore = texto
+            }
+        }
+    }
+
+    private func actualizarTurno(_ id: String, _ cambio: (inout ChatTurnoAsistente) -> Void) {
+        asistenteTurnos = asistenteTurnos.map { turno in
+            guard turno.id == id else { return turno }
+            var copia = turno
+            cambio(&copia)
+            return copia
+        }
+    }
+
+    /// Sugerencia tocada en el panel: se pregunta igual que si se hubiera escrito.
+    func preguntarSugerencia(_ sugerencia: String) {
+        guard let channel = selectedChannel, isGeneral,
+              !sugerencia.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        preguntarAsistente(ChatAsistente.textoDeSugerencia(sugerencia), channelId: channel.id)
+    }
+
+    func cerrarAsistente() {
+        asistenteTurnos = []
+        asistentePropuestas = [:]
+    }
+
+    static func clavePropuesta(_ turnoId: String, _ indice: Int) -> String { "\(turnoId)-\(indice)" }
+
+    /// «Crear» en una propuesta de «asígnale a…»: `POST activities` con su cuerpo.
+    func crearPropuesta(turnoId: String, indice: Int, propuesta: ChatPropuestaAsistente) {
+        let clave = Self.clavePropuesta(turnoId, indice)
+        if asistentePropuestas[clave] == .creando { return }
+        asistentePropuestas[clave] = .creando
+        Task {
+            do {
+                let creada = try await ChatRepository.shared.crearActividadPropuesta(propuesta.payload)
+                if creada.id > 0 {
+                    asistentePropuestas[clave] = .creada(id: creada.id, anNumber: creada.anNumber)
+                } else if creada.enCola {
+                    asistentePropuestas[clave] = .enCola
+                } else {
+                    asistentePropuestas[clave] = .fallo("No se pudo crear la actividad.")
+                }
+            } catch {
+                asistentePropuestas[clave] = .fallo(error.toUserMessage(fallback: "No se pudo crear la actividad."))
+            }
+        }
+    }
+
+    func descartarPropuesta(turnoId: String, indice: Int) {
+        asistentePropuestas[Self.clavePropuesta(turnoId, indice)] = .descartada
     }
 
     // MARK: Reacciones, edición y fijados

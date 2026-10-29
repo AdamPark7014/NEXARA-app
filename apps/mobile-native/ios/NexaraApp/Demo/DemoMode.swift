@@ -50,6 +50,16 @@ enum DemoMode {
         ProcessInfo.processInfo.environment["NEXARA_DEMO_CEO"] == "1"
     }
 
+    /// Festivo de hoy en el demo (`NEXARA_DEMO_FESTIVO=descansa|labora`): solo para las capturas de
+    /// paridad de los festivos de «Mi día». Sin la variable (o con otro valor), `festivos/mio`
+    /// contesta `null` y «Mi día» se ve normal.
+    static var festivoHoy: String? {
+        let valor = ProcessInfo.processInfo.environment["NEXARA_DEMO_FESTIVO"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return valor == "descansa" || valor == "labora" ? valor : nil
+    }
+
     /// El proceso se lanzó pidiendo el demo (`-NEXARA_DEMO 1` o `NEXARA_DEMO=1`).
     static var launchRequested: Bool {
         let args = ProcessInfo.processInfo.arguments

@@ -1,5 +1,29 @@
 # RELEVO
 
+- **29-10 ~16:15 (claude-code, sesión de apps) — Paridad total de las apps con la web (pedido de Adam: «que cada uno ya traiga todo de todo»).**
+  - **Festivos en «Mi día»** (mockup aprobado, `GET festivos/mio`): «Hoy descansas» sustituye a la jornada, con el
+    siguiente día de trabajo y los próximos; «Hoy te toca de X a Y» lleva el botón de entrada (misma checada con
+    foto). Android `inicio/Festivo*.kt`; iOS `Inicio/Festivo*.swift`, demo con `NEXARA_DEMO_FESTIVO=descansa|labora`
+    y capturas 93/94. El rechazo FESTIVO_SIN_LABORAR va al aviso de checada (b004e833 + 428ad57c).
+  - **Desempeño v2** como `DesempenoTablero`: «Índice» (ya no «Cumplimiento»), cuatro pilares y diagnóstico aparte;
+    pinta `pilares[]`, `semaforoIndice` y `confianza` de la API (f2dc7130) y solo agrupa si faltan; provisional con
+    menos de 10 entregas; inicio de dirección con los pilares (sin la «ocupación» mal nombrada).
+  - **Chat**: `@asistente` en #general no se publica (va a `POST chat/asistente`, panel privado); tarjetas de liga
+    (`POST chat/ligas`, devuelve mapa ref → tarjeta); «Ligar» con los 9 tipos; ligas a la ficha o a la web, nunca a
+    Inicio; pie del hilo en dos renglones (24bda734).
+  - **Detalle de actividad**: tarjeta «Tiempo» (medidor de la web; «en curso» por cualquiera del equipo), renglón
+    «Tiempo estándar», «Costo directo» (mismos roles que la web) y cotización ligada con su PDF; PowerPoint en
+    adjuntos de Android. `ConsoleRepository` leía `materiales` como arreglo y es objeto.
+  - **Asignar a otro**: tiempo estándar con la tabla (`ai/estandar/tabla`), cantidad con su pregunta, el total fija
+    el estimado y cambiarlo pide motivo; no se manda destino ni traslado (sin mapa en el teléfono; la API completa).
+  - **Hora de inicio por omisión** = entrada de quien ejecuta (`users/assignable` → `horaEntrada`, 675da9db); 10:00
+    sin dato; si quien asigna la movió, no se toca.
+  - De ramas `cursor/*` (25-10): b48d8bdb, f0fd987d, 7acab966, e45ae755 traídos; 817e2f42 descartado (quitaba las
+    pastillas de la cabecera del detalle que dibuja el artboard «App · Detalle»).
+  - Android: 947 pruebas JVM en verde (con capturas). iOS: sin compilador local; lo compila el CI de capturas.
+  - Pendiente: sugerencia de nómina (`employee-payments/sugerencia-nomina`) no tiene pantalla en las apps;
+    `BoardKpis.kt` sigue con 85/60; demo iOS con partes del índice viejo.
+
 - **29-10 ~17:10 (claude-code) — Comida: ventana por horario y avisos a la hora de cada quien.**
   - El aviso de las 14:50 no le llegaba a nadie: el cron filtraba por roles con acceso a consola y ningún rol activo
     lo tenía. Ahora `avisosDeComida` (`lunch-breaks.cron.service.ts`, cada minuto de 12 a 18 h, hora de México) le

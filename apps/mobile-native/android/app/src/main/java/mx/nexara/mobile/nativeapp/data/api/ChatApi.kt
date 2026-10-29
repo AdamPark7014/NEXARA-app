@@ -197,6 +197,83 @@ data class ChatSearchResponse(
     val messages: List<ChatSearchHitDto> = emptyList(),
 )
 
+// ── Ligas y asistente (paridad con la web, 29-10-2026) ──────────────────────
+// `POST chat/ligas` arma las tarjetas de las ligas de los mensajes con los
+// permisos de quien las ve; `POST chat/asistente` contesta solo a quien pregunta
+// en #general (nada se publica en el canal).
+
+data class ChatLigasBody(
+    /** Rutas `/erp/…` de las ligas o `folio:AN-0031`; el API atiende 40 por llamada. */
+    val refs: List<String>,
+)
+
+data class ChatLigaMontoDto(
+    val total: Double = 0.0,
+    val moneda: String? = null,
+)
+
+/** `TarjetaLiga` del API (`apps/api/src/chat/ligas/ligas.ts`), ya filtrada por permisos. */
+data class ChatTarjetaLigaDto(
+    val ref: String = "",
+    val tipo: String = "",
+    /** `false`: sin permiso o ya no existe; solo trae el título genérico y [motivo]. */
+    val acceso: Boolean = false,
+    val folio: String? = null,
+    val titulo: String = "",
+    val estado: String? = null,
+    val detalle: List<String> = emptyList(),
+    val monto: ChatLigaMontoDto? = null,
+    val href: String = "",
+    /** «Sin acceso», «No se encontró». */
+    val motivo: String? = null,
+)
+
+data class ChatAsistenteBody(
+    /** El mensaje tal cual, con la mención al asistente. */
+    val texto: String,
+    /** #general: el API rechaza cualquier otro canal. */
+    val channelId: Long,
+)
+
+/** «Asígnale a…» (solo CEO): se crea solo al tocar «Crear», con `POST activities`. */
+data class ChatPropuestaAsistenteDto(
+    val resumen: String = "",
+    val titulo: String = "",
+    val responsable: String? = null,
+    val cuando: String? = null,
+    val faltantes: List<String> = emptyList(),
+    val avisos: List<String> = emptyList(),
+    /** Cuerpo listo para `POST activities`; se reenvía tal cual. */
+    val payload: Map<String, Any?> = emptyMap(),
+)
+
+data class ChatAccionAsistenteDto(
+    val tipo: String = "",
+    val propuestas: List<ChatPropuestaAsistenteDto> = emptyList(),
+)
+
+data class ChatRespuestaAsistenteDto(
+    val intencion: String = "",
+    /** `codigo`: reglas y base de datos; `ia`: Claude por la puerta. */
+    val fuente: String = "codigo",
+    /** Markdown del chat: sus ligas `[…](/erp/…)` se pintan como tarjetas. */
+    val texto: String = "",
+    val sugerencias: List<String> = emptyList(),
+    val accion: ChatAccionAsistenteDto? = null,
+)
+
+data class ChatEstadoAsistenteDto(
+    val disponible: Boolean = false,
+    val ia: Boolean = false,
+)
+
+data class ChatActividadCreadaDto(
+    val id: Long = 0L,
+    val anNumber: String? = null,
+    /** La cola sin conexión contesta `{queued:true}`: se creará al volver la señal. */
+    val queued: Boolean = false,
+)
+
 interface ChatApi {
     @GET("chat/channels")
     suspend fun listChannels(): List<ChatChannelDto>
@@ -297,4 +374,21 @@ interface ChatApi {
         @Query("q") query: String,
         @Query("channelId") channelId: Long? = null,
     ): ChatSearchResponse
+
+    /** Tarjetas de las ligas: un mapa `ref → tarjeta` (las que no reconoce no vienen). */
+    @POST("chat/ligas")
+    suspend fun resolveLigas(@Body body: ChatLigasBody): Map<String, ChatTarjetaLigaDto>
+
+    /** Pregunta al asistente de #general. No publica nada en el canal. */
+    @POST("chat/asistente")
+    suspend fun askAsistente(@Body body: ChatAsistenteBody): ChatRespuestaAsistenteDto
+
+    @GET("chat/asistente/estado")
+    suspend fun asistenteEstado(): ChatEstadoAsistenteDto
+
+    /** Crea la actividad de una propuesta del asistente con el cuerpo que trajo (`POST activities`). */
+    @POST("activities")
+    suspend fun createProposedActivity(
+        @Body payload: Map<String, @JvmSuppressWildcards Any?>,
+    ): ChatActividadCreadaDto
 }

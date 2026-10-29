@@ -12,6 +12,7 @@ import mx.nexara.mobile.nativeapp.data.api.PalomearHerramientaRequest
 import mx.nexara.mobile.nativeapp.data.api.JustificarZonaRequest
 import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.SalesClientDto
+import mx.nexara.mobile.nativeapp.data.api.FestivosMioDto
 import mx.nexara.mobile.nativeapp.data.api.IniciarTrayectoRequest
 import mx.nexara.mobile.nativeapp.data.api.RevisionPendienteDto
 import mx.nexara.mobile.nativeapp.data.api.TerminarTrayectoRequest
@@ -23,6 +24,7 @@ import mx.nexara.mobile.nativeapp.data.api.SugerirComplejidadRequest
 import mx.nexara.mobile.nativeapp.data.api.TiemposTipicosDto
 import mx.nexara.mobile.nativeapp.ui.console.activities.Complejidad
 import mx.nexara.mobile.nativeapp.ui.console.activities.EnEsperaRevision
+import mx.nexara.mobile.nativeapp.ui.console.activities.TiempoEstandar
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.BoardAsignadaPorMiDto
@@ -124,6 +126,12 @@ class CoreActivitiesRepository(context: Context) {
     suspend fun terminarTrayecto(activityId: Long, lat: Double?, lng: Double?): TrayectoDto =
         api.terminarTrayecto(activityId, TerminarTrayectoRequest(lat = lat, lng = lng))
 
+    /** La hora de entrada de quien va a ejecutar (null si no tiene horario o no se pudo leer). */
+    suspend fun horaEntrada(userId: Long): String? = api.asignables().firstOrNull { it.id == userId }?.horaEntrada
+
+    /** Mi festivo de hoy y los próximos; la API resuelve si me toca y con qué horario. */
+    suspend fun festivosMio(): FestivosMioDto = api.festivosMio()
+
     /** Lo que espera mi revisión; la que más lleva esperando, primero. */
     suspend fun revisionesPendientes(): List<RevisionPendienteDto> =
         EnEsperaRevision.ordenar(api.revisiones().pendientes.orEmpty())
@@ -134,6 +142,28 @@ class CoreActivitiesRepository(context: Context) {
     /** Null si la IA no respondió (6 s sin reintento en la API) o el nivel no es uno de los cuatro. */
     suspend fun sugerirComplejidad(body: SugerirComplejidadRequest): SugerenciaComplejidadDto? =
         api.sugerirComplejidad(body).sugerencia?.takeIf { Complejidad.esComplejidad(it.complejidad) }
+
+    /**
+     * Tabla del tiempo estándar. Cambia solo cuando Adam mueve tarifas: se pide una vez por
+     * arranque de la app; si falla, se vuelve a pedir la siguiente vez.
+     */
+    suspend fun tablaEstandar(): TiempoEstandar.Tabla? {
+        tablaEstandarEnMemoria?.let { return it }
+        return TiempoEstandar.desde(api.tablaEstandar())?.also { tablaEstandarEnMemoria = it }
+    }
+
+    /** Asignar a otra persona con el tiempo estándar que se calculó en el alta. */
+    suspend fun createActivity(body: CreateActivityRequest, estandar: TiempoEstandar.Envio?): Long? =
+        if (estandar == null) {
+            createActivity(body)
+        } else {
+            createdId(api.createActivityConEstandar(TiempoEstandar.cuerpo(body, estandar)).string())
+        }
+
+    private companion object {
+        @Volatile
+        var tablaEstandarEnMemoria: TiempoEstandar.Tabla? = null
+    }
 
     /** «AN sugerido» del formulario web; vacío si el API no lo da. */
     suspend fun nextAnNumber(): String {

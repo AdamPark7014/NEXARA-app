@@ -225,7 +225,8 @@ private struct InicioCeoPendientesCard: View {
     }
 }
 
-/// «Desempeño · 7 días»: el anillo del cumplimiento y dos renglones; abre los KPI del equipo.
+/// «Desempeño · 7 días»: el anillo del índice v2 y sus pilares en dos renglones; abre los
+/// KPI del equipo.
 private struct InicioCeoDesempenoCard: View {
     let desempeno: InicioCeoRules.Desempeno
     let onTap: () -> Void
@@ -233,7 +234,11 @@ private struct InicioCeoDesempenoCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(alignment: .center, spacing: 16) {
-                InicioCeoAnillo(pct: desempeno.cumplimientoPct)
+                InicioCeoAnillo(
+                    pct: desempeno.indicePct,
+                    descripcion: InicioCeoRules.descripcionAnillo(desempeno),
+                    color: desempeno.tono.color
+                )
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Desempeño · 7 días")
                         .font(.system(size: 15, weight: .semibold))
@@ -262,10 +267,13 @@ private struct InicioCeoDesempenoCard: View {
     }
 }
 
-/// Anillo de 76 con trazo de 8 (Android `Anillo`): pista #EEF0F4 y el avance en el verde de
-/// marca desde las 12; el porcentaje al centro, o «—» sin entregas que medir.
+/// Anillo de 76 con trazo de 8 (Android `Anillo`): pista #EEF0F4 y el avance desde las 12 en
+/// el color del semáforo del índice (`semaforoIndice` del API; sin él, el corte 90/75); el
+/// índice al centro (0–100, sin «%», como la web), o «—» sin nada que medir.
 private struct InicioCeoAnillo: View {
     let pct: Int?
+    let descripcion: String
+    let color: Color
 
     var body: some View {
         ZStack {
@@ -275,12 +283,12 @@ private struct InicioCeoAnillo: View {
             if let pct, pct > 0 {
                 Circle()
                     .trim(from: 0, to: CGFloat(min(pct, 100)) / 100)
-                    .stroke(NxColors.brand, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .padding(4)
             }
-            Text(pct.map { "\($0) %" } ?? "—")
-                .font(NxFont.display(size: 16))
+            Text(pct.map { "\($0)" } ?? "—")
+                .font(NxFont.display(size: 18))
                 .monospacedDigit()
                 .foregroundStyle(NxColors.fg)
                 .lineLimit(1)
@@ -288,7 +296,7 @@ private struct InicioCeoAnillo: View {
         }
         .frame(width: 76, height: 76)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(pct.map { "Cumplimiento \($0) %" } ?? "Cumplimiento sin entregas que medir")
+        .accessibilityLabel(descripcion)
     }
 }
 

@@ -429,8 +429,8 @@ final class AttendanceVM: ObservableObject {
             let mensaje = error.toUserMessage(fallback: "Error al registrar")
             var codigo: Int?
             if let api = error as? ApiError, case .http(let code, _) = api { codigo = code }
-            // Ubicación simulada, posición vieja, viaje imposible, fuera de la app o fin de
-            // semana sin guardia: para quien está en la puerta todos significan «no se
+            // Ubicación simulada, posición vieja, viaje imposible, fuera de la app, fin de
+            // semana sin guardia o festivo que no se labora: para quien está en la puerta todos significan «no se
             // registró». Van al mismo aviso; volver a disparar la foto no lo arregla.
             if ChecadaRechazo.esRechazo(codigo: codigo, mensaje: mensaje) {
                 checkInBloqueo = mensaje.isEmpty ? ChecadaRechazo.mockMensaje : mensaje

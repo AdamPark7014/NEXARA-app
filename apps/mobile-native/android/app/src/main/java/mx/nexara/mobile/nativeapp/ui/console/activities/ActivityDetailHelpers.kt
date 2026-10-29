@@ -332,10 +332,22 @@ fun ActivityPlaceholderTab(message: String) {
 }
 
 @Composable
-fun ADetailRow(label: String, value: String) {
+fun ADetailRow(label: String, value: String, nota: String? = null) {
     if (value == "—" || value.isBlank()) return
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    val segunda = nota?.trim()?.takeIf { it.isNotEmpty() }
+    if (segunda == null) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        }
+        return
+    }
+    // Con nota (el desglose del tiempo estándar): segunda línea tenue y a todo lo ancho.
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        }
+        Text(segunda, fontSize = 11.5.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

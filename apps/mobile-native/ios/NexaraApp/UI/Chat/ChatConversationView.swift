@@ -283,6 +283,8 @@ struct ChatReplyPreviewBar: View {
 
 struct ChatConversationView: View {
     @ObservedObject var store: ChatStore
+    /// Cotización abierta desde una liga (se presenta aquí si no hay hilo abierto).
+    @ObservedObject private var ligaSheets = ChatLigaSheets.shared
 
     @StateObject private var viewer = ChatAttachmentViewer()
     @State private var draft = ""
@@ -308,8 +310,15 @@ struct ChatConversationView: View {
 
     var body: some View {
         withSheets(screen)
+            .environment(\.chatLigaTarjetas, store.ligaTarjetas)
             .onChange(of: draft) { _, value in
                 if !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { store.notifyDraftChanged() }
+            }
+            // El asistente no pudo contestar: la pregunta vuelve al redactor.
+            .onChange(of: store.draftRestore) { _, texto in
+                guard let texto else { return }
+                if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { draft = texto }
+                store.draftRestore = nil
             }
     }
 
@@ -391,6 +400,9 @@ struct ChatConversationView: View {
                     },
                     onDismiss: { store.showEntityPicker = false }
                 )
+            }
+            .sheet(item: cotizacionBinding) { item in
+                ChatCotizacionSheet(item: item) { ligaSheets.cotizacion = nil }
             }
             .alert("Salir de \(channel?.name ?? "")", isPresented: $confirmLeave) {
                 Button("Salir", role: .destructive) {
@@ -518,6 +530,9 @@ struct ChatConversationView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 4)
             }
+            if store.isGeneral {
+                ChatAsistentePanel(store: store)
+            }
             if let reply = store.replyTo {
                 ChatReplyPreviewBar(
                     author: reply.authorName.nilIfEmpty ?? "Usuario",
@@ -527,7 +542,9 @@ struct ChatConversationView: View {
             }
             ChatComposeBar(
                 draft: $draft,
-                placeholder: store.replyTo != nil ? "Responder en el hilo…" : "Escribe un mensaje…",
+                placeholder: store.replyTo != nil
+                    ? "Responder en el hilo…"
+                    : (store.isGeneral ? ChatAsistente.placeholderGeneral : "Escribe un mensaje…"),
                 sending: store.sending,
                 uploading: store.uploading,
                 onSend: send,
@@ -601,6 +618,14 @@ struct ChatConversationView: View {
         Binding(
             get: { store.showEntityPicker && store.threadRoot == nil },
             set: { if !$0 { store.showEntityPicker = false } }
+        )
+    }
+
+    /// Con el hilo abierto, la cotización de una liga la presenta la hoja del hilo.
+    private var cotizacionBinding: Binding<ChatCotizacionLiga?> {
+        Binding(
+            get: { store.threadRoot == nil ? ligaSheets.cotizacion : nil },
+            set: { if $0 == nil { ligaSheets.cotizacion = nil } }
         )
     }
 }
@@ -701,6 +726,7 @@ private struct ChatMessageList: View {
 /// Android `ThreadSheetContent`: raíz, respuestas y el campo para responder.
 struct ChatThreadSheet: View {
     @ObservedObject var store: ChatStore
+    @ObservedObject private var ligaSheets = ChatLigaSheets.shared
 
     @StateObject private var viewer = ChatAttachmentViewer()
     @State private var draft = ""
@@ -732,6 +758,10 @@ struct ChatThreadSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .environment(\.openURL, OpenURLAction { ChatLinks.handle($0) })
+        .environment(\.chatLigaTarjetas, store.ligaTarjetas)
+        .sheet(item: cotizacionBinding) { item in
+            ChatCotizacionSheet(item: item) { ligaSheets.cotizacion = nil }
+        }
         .modifier(ChatAttachmentPresenter(viewer: viewer, uploading: store.uploading))
         .modifier(ChatAttachmentPickers(
             showPhotos: $showPhotos,
@@ -904,13 +934,22 @@ struct ChatThreadSheet: View {
             set: { if !$0 { store.showEntityPicker = false } }
         )
     }
+
+    private var cotizacionBinding: Binding<ChatCotizacionLiga?> {
+        Binding(
+            get: { store.threadRoot != nil ? ligaSheets.cotizacion : nil },
+            set: { if $0 == nil { ligaSheets.cotizacion = nil } }
+        )
+    }
 }
 
 // MARK: - Enlaces del texto
 
-/// Enlaces a actividades y evidencias dentro de los mensajes (Android
-/// `openChatEntityLink`): se abren en la app; las menciones de persona y las
-/// URL web no hacen nada.
+/// Ligas dentro de los mensajes y en sus tarjetas (Android `openChatEntityLink`).
+/// Cada una va a lo más cercano que tenga la app (`ChatLigas.destino`): su ficha,
+/// su sección o, si la app no tiene esa pantalla (facturas, la asistencia de otra
+/// persona), la misma ruta en la web del panel. Las menciones de persona y las URL
+/// externas no hacen nada, como antes.
 enum ChatLinks {
     static func handle(_ url: URL) -> OpenURLAction.Result {
         guard let href = ChatMarkup.href(from: url) else { return .discarded }
@@ -923,15 +962,24 @@ enum ChatLinks {
         let lower = clean.lowercased()
         if clean.isEmpty || lower.hasPrefix("user:") { return }
         if lower.hasPrefix("http://") || lower.hasPrefix("https://") { return }
-        let destination: DeepLinkDestination?
         if lower.hasPrefix("nexara://") {
-            destination = URL(string: clean).flatMap { DeepLinkParser.parse($0) }
-        } else {
-            destination = DeepLinkParser.parseWebPath(clean)
+            guard let destination = URL(string: clean).flatMap({ DeepLinkParser.parse($0) }) else { return }
+            Task { @MainActor in
+                DeepLinkCoordinator.shared.ingest(destination: destination)
+            }
+            return
         }
-        guard let destination else { return }
+        let yo = Int64(SessionStore.shared.currentUser?.id ?? "") ?? 0
+        guard let destino = ChatLigas.destino(clean, usuarioActualId: yo) else { return }
         Task { @MainActor in
-            DeepLinkCoordinator.shared.ingest(destination: destination)
+            switch destino {
+            case .app(let destination):
+                DeepLinkCoordinator.shared.ingest(destination: destination)
+            case .cotizacion(let id):
+                ChatLigaSheets.shared.cotizacion = ChatCotizacionLiga(id: id)
+            case .web(let url):
+                UIApplication.shared.open(url)
+            }
         }
     }
 }
