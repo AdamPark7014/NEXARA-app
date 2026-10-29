@@ -40,6 +40,10 @@
     lógica en `activities/rellenar-tiempos.ts`, con spec). No escribe si cambiaría algún «a tiempo».
   - Pruebas: API tiempo-entrega 9, parámetros 7, relleno 5; web TiempoFijoCampo 2; suites completas en el commit.
   - Contrato para las apps: mandado a la sesión de apps (`local_e8744ccc…`).
+  - Relleno: el simulacro en producción llena las 134 sin cambiar ningún «a tiempo», pero 122 ya están entregadas y
+    su tiempo real es en mediana 5× el estándar del título (75 de 123 pasan de 3×; p. ej. tareas de tubería con
+    tipo «Preparación de equipo» = 15 min). Opción B lista (`--entregadas-sin-estandar`: a lo entregado, tiempo =
+    lo trabajado y sin estándar). Pendiente de la decisión de la sesión principal antes de `--escribir`.
 
 - **29-10 ~16:30 (claude-code) — Sugerencia de nómina con periodos calculados (pedido de Adam: «múltiples cálculos
   de fechas dinámicas»).**
@@ -66,6 +70,13 @@
     por nivel y el 3D con todos los pisos. API sin cambios (el JSON va en el mismo `plano`).
   - Ojo: el `.prettierrc` de la raíz (comillas simples, 100) no es el estilo de `apps/web` (comillas dobles en todo);
     no correr prettier sobre la web sin `--no-config`.
+  - Pulido por pedido de Adam («ineficiencias, no es intuitivo»), commits `27820248`, `24d3b151`, `016556b7`:
+    el piso de abajo en gris ya no usa `filter: grayscale` (girar costaba 20–105 ms por cuadro con dos niveles);
+    giro y paneo a un cuadro por `requestAnimationFrame`; botones de acercar/alejar/encuadrar (y girar 45° en 3D);
+    lienzo al alto de la ventana; encuadre 2D con el alcance de los conos; etiquetas de conos sin encimarse;
+    muros 3D sin juntas de tramo; guía de pasos en el panel derecho cuando no hay nada elegido.
+  - Proyecto de prueba en producción: diseño 2 «Bodegas VDM con mezzanine · prueba por niveles (se archiva)»
+    (16 cámaras en dos niveles) y diseño 1 de antes. Archivarlos cuando ya no se ocupen.
 
 - **29-10 ~15:30 (claude-code) — Desempeño: índice v2 (Adam aprobó las 10 decisiones de §7.4, «aprueba todo»).**
   - Fórmula en `.ai/CUMPLIMIENTO-EVALUADOR-SPEC.md` §7.2; decisiones marcadas «aprobado 29-10» en §7.4 y lo construido

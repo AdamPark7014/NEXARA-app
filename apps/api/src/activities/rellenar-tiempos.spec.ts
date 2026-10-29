@@ -63,6 +63,20 @@ describe('relleno de las abiertas sin tiempo ni entrega', () => {
     expect((sinInicio.fechaEntregaEsperada as Date).toISOString()).toBe('2026-10-29T05:59:59.999Z');
   });
 
+  it('entregada sin estándar: tiempo = lo que trabajó, y su estándar se queda vacío', () => {
+    const entregada = fila({ entregadaAt: new Date('2026-10-28T23:00:00Z') });
+    const { cambios, nota } = planDeRelleno(entregada, est, { entregadaSinEstandar: true, minutosReales: 502 });
+    expect(cambios.tiempoEstimadoMin).toBe(500);
+    expect(cambios.tiempoEstandarMin).toBeUndefined();
+    expect(cambios.estandarDesglose).toBeUndefined();
+    expect(cambios.fechaEntregaEsperada).toBeDefined();
+    expect(nota).toMatch(/lo que trabajó/);
+    // Sin sesiones: el del título, igual sin estándar.
+    const sinSesiones = planDeRelleno(entregada, est, { entregadaSinEstandar: true, minutosReales: 0 }).cambios;
+    expect(sinSesiones).toMatchObject({ tiempoEstimadoMin: 40 });
+    expect(sinSesiones.tiempoEstandarMin).toBeUndefined();
+  });
+
   it('«a tiempo»: sin límite cuenta a tiempo; sin entregar no se mide', () => {
     expect(aTiempo(new Date(), null)).toBe(true);
     expect(aTiempo(null, new Date())).toBeNull();

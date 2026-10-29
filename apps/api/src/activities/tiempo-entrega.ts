@@ -84,7 +84,8 @@ export function estandarDeLectura(
   let cantidad = lectura.cantidad && lectura.cantidad > 0 ? Math.round(lectura.cantidad) : null;
   if (unidad && !cantidad) {
     cantidad = 1;
-    supuestos.push(`el título no dice cuántos ${unidad.plural}: se cuenta 1`);
+    // «¿Cuántas partidas?» de la tabla: así concuerda («cuántas partidas», «cuántos equipos»).
+    supuestos.push(`el título no dice ${unidad.pregunta.replace(/[¿?]/g, '').toLowerCase()}: se cuenta 1`);
   }
   let complejidad: Complejidad | null = esComplejidad(lectura.complejidad) ? lectura.complejidad : null;
   if (regla.porComplejidad && !complejidad) {
