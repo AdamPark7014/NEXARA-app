@@ -81,6 +81,8 @@ export interface PacPaymentComplementInput {
     previousBalance: number; // ImpSaldoAnt
     amountPaid: number; // ImpPagado
     remainingBalance: number; // ImpSaldoInsoluto
+    /** Tasa de IVA de la factura pagada, en porcentaje (16, 8, 0). Si falta se asume 16. */
+    ivaRate?: number | null;
   }>;
 }
 
@@ -99,6 +101,8 @@ export interface PacStampResult {
   pdfUrl?: string | null;
   /** Provider que efectuó el timbrado. */
   provider: PacProvider;
+  /** Identificador interno del CFDI en el PAC (Facturama lo pide para cancelar y descargar). */
+  pacDocumentId?: string | null;
 }
 
 export interface PacCancelInput {
@@ -108,6 +112,11 @@ export interface PacCancelInput {
   cancelReason: '01' | '02' | '03' | '04';
   /** UUID sustituto cuando cancelReason = 01. */
   substitutionUuid?: string | null;
+  /** Identificador interno del CFDI en el PAC, si se guardó al timbrar. */
+  pacDocumentId?: string | null;
+  /** Serie y folio del CFDI: ayudan a encontrarlo en el PAC cuando no hay `pacDocumentId`. */
+  serie?: string | null;
+  folio?: string | null;
 }
 
 export interface PacCancelResult {
