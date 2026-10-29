@@ -212,13 +212,35 @@ describe('tiempo y entrega de toda actividad', () => {
     });
 
     it('sin cantidad en el título, la mediana real del tipo en vez de «1 unidad»', () => {
-      const r = estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Instalación' }, {}, { tipicoMin: 182 });
+      const r = estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Reporte / documentación' }, {}, { tipicoMin: 182 });
       expect(r.totalMin).toBe(180);
-      expect(r.desglose).toEqual([{ concepto: 'Instalación: tiempo típico', minutos: 180 }]);
-      expect(r.supuestos).toEqual(['el título no dice cuántos dispositivos: tiempo típico del tipo']);
+      expect(r.desglose).toEqual([{ concepto: 'Reporte / documentación: tiempo típico', minutos: 180 }]);
+      expect(r.supuestos).toEqual(['el título no dice cuántos reportes: tiempo típico del tipo']);
       // Con cantidad manda la tabla; sin mediana del tipo, 1 unidad como antes.
-      expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Instalación' }, { cantidad: 2 }, { tipicoMin: 182 }).totalMin).toBe(120);
-      expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Instalación' }, {}).totalMin).toBe(75);
+      expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Reporte / documentación' }, { cantidad: 2 }, { tipicoMin: 182 }).totalMin).toBe(40);
+      expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Reporte / documentación' }, {}).totalMin).toBe(20);
+    });
+
+    it('infraestructura sin cantidad (obra, instalación, cableado): una jornada en obra de 8 h', () => {
+      const obra = estandarDeLectura({ coreKind: 'obra' }, {}, { tipicoMin: 182 });
+      expect(obra.totalMin).toBe(480);
+      // La jornada no lleva la base de 30 min de la obra.
+      expect(obra.desglose).toEqual([{ concepto: '1 jornada en sitio × 480 min', minutos: 480 }]);
+      expect(obra.unidades).toEqual({ clave: 'jornadas', cantidad: 1 });
+      expect(obra.supuestos).toEqual(['el título no dice cuántos dispositivos: una jornada en obra']);
+      expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Instalación' }, {}).totalMin).toBe(480);
+      expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Cableado y canalización' }, {}).totalMin).toBe(480);
+      // Con cantidad, por pieza como siempre.
+      expect(estandarDeLectura({ coreKind: 'obra' }, { cantidad: 3 }).totalMin).toBe(165);
+      expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Instalación' }, { cantidad: 2 }).totalMin).toBe(120);
+      // Lo que ya tomó el mismo título manda sobre la jornada.
+      expect(estandarDeLectura({ coreKind: 'obra', titulo: 'Tubería nave 2' }, {}, { historial: { minutos: 300, veces: 3, propio: false } }).totalMin).toBe(300);
+      // La cuadrilla entra a las 8: la jornada en obra entrega a las 17:00.
+      const cuadrilla = jornadaDeHorario({ entrada: '08:00', salida: '17:00' });
+      expect(hora(entregaCalculada(cdmx('08:00'), 480, cuadrilla))).toBe('17:00');
+      // Lo administrativo no cambia, ni lo comercial con palabras de obra.
+      expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Trámite' }, {}).totalMin).toBe(90);
+      expect(tipoDelTitulo({ coreKind: 'comercial', ticketTypeCustom: 'COMERCIAL', titulo: 'Cotizar tubería y charola' })).toBeNull();
     });
 
     it('si el título dice otro trabajo se calcula como ese tipo (sin cambiar el elegido)', () => {

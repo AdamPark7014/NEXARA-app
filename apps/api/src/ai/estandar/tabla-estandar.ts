@@ -21,6 +21,8 @@ export type UnidadEstandar = {
   porUnidadMin: number;
   /** Unidades que ya cubre la base: se cobran solo las de más (cotización: hasta 10 partidas en 40 min). */
   incluidas?: number;
+  /** La unidad ya es un día completo en sitio: no lleva la base del tipo. */
+  sinBase?: boolean;
 };
 
 export type ReglaEstandar = {
@@ -59,16 +61,35 @@ const u = (
 
 const POR_COMPLEJIDAD_CORRECTIVO: Record<Complejidad, number> = { BASICA: 60, ESTANDAR: 120, COMPLEJA: 210, CRITICA: 300 };
 
+/**
+ * Jornada en obra (Adam, 29-10-2026: «obra se refiere a temas de tubería o cosas con temas de CCTV…
+ * infraestructura»): un día completo en sitio, 8 h netas. El 44 % de lo terminado del 21-09 al 29-10
+ * eran días así («cableado biblioteca», «instalación de tubería»), no piezas sueltas. La entrega se
+ * topa a la salida de quien ejecuta (la cuadrilla, 08:00 + 8 h + comida = 17:00).
+ */
+export const JORNADA_EN_OBRA_MIN = 8 * 60;
+const jornadaEnSitio = (): UnidadEstandar => ({
+  ...u('jornadas', 'jornada en sitio', 'jornadas en sitio', JORNADA_EN_OBRA_MIN, true),
+  sinBase: true,
+});
+
 export const TABLA_ESTANDAR: ReglaEstandar[] = [
   // 40 min + 4 por partida: cumple los dos ejemplos de Adam (5 productos → 1 h, 50 → 4 h). El ajuste de
   // «hasta 10 en 40 min» del 29-10 se revirtió el mismo día porque rompía el de 5 → 1 h.
   { clave: 'comercial', nombre: 'Cotización', baseMin: 40, unidades: [u('partidas', 'partida', 'partidas', 4, true)], destino: false, enLugarMin: 0 },
-  { clave: 'tarea:Instalación', nombre: 'Instalación', baseMin: 30, unidades: [u('dispositivos', 'dispositivo', 'dispositivos', 45)], destino: false, enLugarMin: 0 },
+  {
+    clave: 'tarea:Instalación',
+    nombre: 'Instalación',
+    baseMin: 30,
+    unidades: [u('dispositivos', 'dispositivo', 'dispositivos', 45), jornadaEnSitio()],
+    destino: false,
+    enLugarMin: 0,
+  },
   {
     clave: 'tarea:Cableado y canalización',
     nombre: 'Cableado y canalización',
     baseMin: 0,
-    unidades: [u('nodos', 'nodo', 'nodos', 45), u('metros', 'metro de tubería', 'metros de tubería', 4)],
+    unidades: [u('nodos', 'nodo', 'nodos', 45), u('metros', 'metro de tubería', 'metros de tubería', 4), jornadaEnSitio()],
     destino: false,
     enLugarMin: 0,
   },
@@ -100,9 +121,10 @@ export const TABLA_ESTANDAR: ReglaEstandar[] = [
   { clave: 'servicio:CORRECTIVO', nombre: 'Servicio correctivo', baseMin: 0, unidades: [], porComplejidad: POR_COMPLEJIDAD_CORRECTIVO, destino: true, enLugarMin: 0 },
   { clave: 'servicio:EMERGENCIA', nombre: 'Servicio de emergencia', baseMin: 0, unidades: [], porComplejidad: POR_COMPLEJIDAD_CORRECTIVO, destino: true, enLugarMin: 0 },
   { clave: 'servicio:INSTALACION', nombre: 'Servicio de instalación', baseMin: 30, unidades: [u('dispositivos', 'dispositivo', 'dispositivos', 45)], destino: true, enLugarMin: 0 },
-  // Obra (instalación en sitio ligada a proyecto, Adam 29-10: «que las obras tengan una
-  // parametrización de resultados»): las mismas tarifas de instalación y de cableado, según lo
-  // que se cuente ese día. Sin traslado: la cuadrilla va al sitio del proyecto en su jornada.
+  // Obra (infraestructura en sitio ligada a proyecto: tubería, cableado, CCTV; Adam 29-10: «que las
+  // obras tengan una parametrización de resultados»): las mismas tarifas de instalación y de
+  // cableado, según lo que se cuente ese día, o la jornada en sitio. Sin traslado: la cuadrilla va al
+  // sitio del proyecto en su jornada.
   {
     clave: 'obra',
     nombre: 'Obra',
@@ -111,6 +133,7 @@ export const TABLA_ESTANDAR: ReglaEstandar[] = [
       u('dispositivos', 'dispositivo', 'dispositivos', 45),
       u('nodos', 'nodo', 'nodos', 45),
       u('metros', 'metro de tubería', 'metros de tubería', 4),
+      jornadaEnSitio(),
     ],
     destino: false,
     enLugarMin: 0,
@@ -149,7 +172,7 @@ export function calcularEstandar(
     const unidad = regla.unidades.find((x) => x.clave === datos.unidad) ?? regla.unidades[0];
     const n = Math.max(0, Math.round(Number(datos.cantidad) || 0));
     const incluidas = Math.max(0, unidad.incluidas ?? 0);
-    if (regla.baseMin) {
+    if (regla.baseMin && !unidad.sinBase) {
       const hasta = incluidas ? ` (hasta ${incluidas} ${unidad.plural})` : '';
       desglose.push({ concepto: `Base de ${regla.nombre.toLowerCase()}${hasta}`, minutos: regla.baseMin });
     }

@@ -77,6 +77,17 @@ describe("la misma cuenta que la API (§8)", () => {
     expect(calcularEstandar(conIncluidas, { cantidad: 11 }).desglose[1]).toEqual({ concepto: "1 partida más × 5 min", minutos: 5 });
   });
 
+  it("jornada en obra: un día en sitio de 8 h, sin la base del tipo", () => {
+    const jornada = { ...u("jornadas", "jornada en sitio", "jornadas en sitio", 480), sinBase: true };
+    const instalacion = { ...regla("tarea:Instalación"), unidades: [...regla("tarea:Instalación").unidades, jornada] };
+    expect(calcularEstandar(instalacion, { cantidad: 1, unidad: "jornadas" })).toMatchObject({
+      totalMin: 480,
+      desglose: [{ concepto: "1 jornada en sitio × 480 min", minutos: 480 }],
+    });
+    // Por pieza sigue con su base.
+    expect(calcularEstandar(instalacion, { cantidad: 2, unidad: "dispositivos" }).totalMin).toBe(120);
+  });
+
   it("instalación por dispositivo, con tope de 12 h", () => {
     expect(calcularEstandar(regla("tarea:Instalación"), { cantidad: 8 }).totalMin).toBe(390);
     expect(calcularEstandar(regla("tarea:Instalación"), { cantidad: 20 })).toMatchObject({ totalMin: 720, topado: true });
