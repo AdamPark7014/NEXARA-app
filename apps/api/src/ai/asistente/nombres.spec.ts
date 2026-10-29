@@ -114,6 +114,11 @@ describe('nombres mal oídos o mal escritos', () => {
     expect(corregidoDe('Benemérita Universidad Autónoma de Puebla', 'que vaya a la BUAP')).toBeNull();
     // Una palabra dicha igual: lo que solo se parece en otra palabra no cuenta.
     expect(corregidoDe('José Antonio Ramírez', 'que José Antonio vaya a Ramos Arizpe')).toBeNull();
+    // …pero junto a la palabra dicha igual sí es el mismo nombre mal oído.
+    expect(corregidoDe('Creppes and Waffles', 'la cotización de crepas en waffles')).toMatchObject({
+      de: 'crepas',
+      pares: [{ mal: ['crepas'], bien: 'Creppes' }],
+    });
   });
 
   it('corrige el título y las indicaciones sin tocar el verbo ni otras palabras', () => {

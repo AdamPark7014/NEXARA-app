@@ -406,7 +406,8 @@ export type Corregido = {
 /**
  * Si `texto` nombra a `nombre` de otra forma (mal oído, mal escrito, apodo o siglas), qué
  * se dijo. null si lo nombra igual o no lo nombra. Si alguna palabra del nombre se dijo
- * igual, lo que solo «se parece» no cuenta como corrección (era otra palabra).
+ * igual, lo que solo «se parece» cuenta solo si va junto a ella («crepas en waffles» →
+ * Creppes and Waffles); lejos era otra palabra («José Antonio vaya a Ramos» no es Ramírez).
  */
 export function corregidoDe(nombre: string, texto: string | null | undefined): Corregido | null {
   const dichas = palabrasDe(texto);
@@ -425,8 +426,11 @@ export function corregidoDe(nombre: string, texto: string | null | undefined): C
         !x.mejor.dicha.sigla &&
         (x.mejor.c === 3 || (x.mejor.dicha.norm.length >= 3 && x.palabra.startsWith(x.mejor.dicha.norm))),
     );
-  const literal = porPalabra.some(esLiteral);
-  const corregidas = porPalabra.filter((x) => x.mejor && !esLiteral(x) && (x.mejor.c >= 2 || !literal));
+  const posLiterales = porPalabra.filter(esLiteral).map((x) => x.mejor!.dicha.pos);
+  const junto = (pos: number) => posLiterales.some((p) => Math.abs(p - pos) <= 2);
+  const corregidas = porPalabra.filter(
+    (x) => x.mejor && !esLiteral(x) && (x.mejor.c >= 2 || !posLiterales.length || junto(x.mejor.dicha.pos)),
+  );
   if (!corregidas.length) return null;
   const vistas = new Set<string>();
   const partes: string[] = [];

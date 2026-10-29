@@ -173,12 +173,12 @@ describe("asistente IA en la pizarra", () => {
       fechaEntregaEsperada: "2026-10-24T19:30:00.000Z",
     });
     // La que propuso la IA se respeta; borrarla vuelve al fin del día.
-    const conIA = { ...lista, agenda: { ...lista.agenda, compromiso: "18:00" } };
+    const conIA = { ...lista, agenda: { ...lista.agenda!, compromiso: "18:00" } };
     expect(payloadFinal(conIA, { compromiso: "" }).fechaMaxima).toBe("2026-10-24T15:00:00.000Z");
     // Con varios días no aplica: vence el último.
     expect(agendaFinal(conIA, { hasta: "2026-10-26" }).compromiso).toBeNull();
     // Antes de la hora de inicio, no se crea.
-    const mal = { ...lista.agenda, compromiso: "08:00" };
+    const mal = { ...lista.agenda!, compromiso: "08:00" };
     expect(bloqueos(lista, payloadFinal(lista, { compromiso: "08:00" }), { agenda: mal })).toContain(
       "«Entregar a más tardar» tiene que ser después de la hora de inicio.",
     );

@@ -424,6 +424,14 @@ describe('nombres mal oídos: el código los empata con el catálogo y lo dice',
     expect(p.payload.branchName).toBe('Toks');
     expect(p.titulo).toBe('Inventario de Toks');
     expect(p.correcciones).toContainEqual({ campo: 'lugar', de: 'talks', a: 'Toks', como: 'parecido' });
+    // Si la IA ya escribió «Toks», no cambia nada, pero se dice que se dijo «talks».
+    const yaBien = construirPropuesta(
+      { ...base, cliente: null, sitio: 'Toks', titulo: 'Revisar cámaras en Toks' },
+      { ...sinTox, nombresUsados: ['Toks'] },
+      { ...ctx, instruccion: 'que revise las cámaras en talks' },
+    );
+    expect(yaBien.payload.branchName).toBe('Toks');
+    expect(yaBien.correcciones).toContainEqual({ campo: 'lugar', de: 'talks', a: 'Toks', como: 'parecido' });
     // Y a la IA le llega como nombre ya usado (no como cliente).
     const bloque = bloqueCoincidencias(catalogoRelevante('que haga el inventario de talks', { ...sinTox, nombresUsados: ['Toks', 'Sephora'] }));
     expect(bloque).toContain('Otros nombres ya usados (no son clientes): Toks («talks»)');
