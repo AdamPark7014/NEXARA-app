@@ -77,7 +77,17 @@ export function proyector(v: Vista3D): Proyector {
 export type Figura3D =
   | { tipo: "piso"; puntos: P2[] }
   | { tipo: "cobertura"; nivel: NivelCobertura; propia: boolean; puntos: P2[] }
-  | { tipo: "cara"; puntos: P2[]; tono: number; superior: boolean; origen: string; material: "muro" | "hoja" | "obstaculo" | "vidrio"; d: number }
+  | {
+      tipo: "cara";
+      puntos: P2[];
+      tono: number;
+      superior: boolean;
+      /** Cara de afuera que mira a quien ve: es la que tapa el interior (corte tipo «casa de muñecas»). */
+      exterior: boolean;
+      origen: string;
+      material: "muro" | "hoja" | "obstaculo" | "vidrio";
+      d: number;
+    }
   | { tipo: "persona"; id: string; anillo: P2[]; pie: P2; cadera: P2; cuello: P2; cabeza: P2; radio: number; d: number }
   | { tipo: "camara"; id: string; numero: number; montaje: P2; insignia: P2; d: number }
   | { tipo: "etiqueta"; id: string; texto: string; pos: P2; d: number };
@@ -165,13 +175,18 @@ export function escena3D(params: {
       const t1 = { x: p1.x - normal.x * g, y: p1.y - normal.y * g };
       const medio = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2, z: (base + tope) / 2 };
       const d = pr.profundidad(medio);
-      const tono = 0.78 + 0.18 * Math.max(0, normal.x * LUZ.x + normal.y * LUZ.y);
+      const tono = 0.7 + 0.26 * Math.max(0, normal.x * LUZ.x + normal.y * LUZ.y);
+      // Un paso afuera de la cara que se ve: si cae fuera del edificio, esa cara es la de afuera.
+      const asoma = { x: (p0.x + p1.x) / 2 + normal.x * (g + 0.3), y: (p0.y + p1.y) / 2 + normal.y * (g + 0.3) };
+      const lim = params.limites;
+      const exterior = Boolean(lim && (asoma.x < lim.min.x || asoma.x > lim.max.x || asoma.y < lim.min.y || asoma.y > lim.max.y));
       if (vista.elevacionDeg < 89.5) {
         ordenables.push({
           tipo: "cara",
           material,
           origen,
           superior: false,
+          exterior,
           tono,
           d,
           puntos: [
@@ -187,6 +202,7 @@ export function escena3D(params: {
         material,
         origen,
         superior: true,
+        exterior: false,
         tono: 1,
         d: d + 1e-3,
         puntos: [

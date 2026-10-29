@@ -266,7 +266,7 @@ export default function Propuesta({
               <svg viewBox="0 0 720 380" width="100%" role="img" aria-label={varios ? "Vista isométrica del edificio con sus niveles apilados" : "Vista isométrica del sitio"}>
                 <rect width={720} height={380} fill="var(--ui-surface-2)" />
                 {iso.map((n) => (
-                  <Figuras3D key={n.id} figuras={n.figuras} plano={n.plano} matriz={n.matriz} capas={{ croquis: true, etiquetas: true, translucidos: true }} />
+                  <Figuras3D key={n.id} figuras={n.figuras} plano={n.plano} matriz={n.matriz} capas={{ croquis: true, etiquetas: true, translucidos: false }} />
                 ))}
               </svg>
             </div>
