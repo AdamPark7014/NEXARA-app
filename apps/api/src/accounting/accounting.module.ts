@@ -23,6 +23,11 @@ import { WorkspaceArApController } from './workspace-ar-ap.controller.js';
 import { WorkspaceArApService } from './workspace-ar-ap.service.js';
 import { VendorProjectFinanceService } from './vendor-project-finance.service.js';
 import { VendorProjectFinanceController } from './vendor-project-finance.controller.js';
+import { MesaContableController } from './mesa-contable/mesa-contable.controller.js';
+import { PorFacturarService } from './mesa-contable/por-facturar.service.js';
+import { PagosGastosService } from './mesa-contable/pagos-gastos.service.js';
+import { EstadosFinancierosService } from './mesa-contable/estados-financieros.service.js';
+import { RevisionFacturaService } from './mesa-contable/revision-factura.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, NotificationsModule, WebhooksModule, AuditModule],
@@ -39,6 +44,7 @@ import { VendorProjectFinanceController } from './vendor-project-finance.control
     AccountingWorkspaceReportsController,
     WorkspaceArApController,
     VendorProjectFinanceController,
+    MesaContableController,
   ],
   providers: [
     AccountingService,
@@ -48,6 +54,10 @@ import { VendorProjectFinanceController } from './vendor-project-finance.control
     AccountingWorkspaceReportsService,
     WorkspaceArApService,
     VendorProjectFinanceService,
+    PorFacturarService,
+    PagosGastosService,
+    EstadosFinancierosService,
+    RevisionFacturaService,
   ],
   exports: [AccountingService, VendorProjectFinanceService],
 })
