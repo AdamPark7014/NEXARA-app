@@ -110,6 +110,7 @@ export default function Figuras3D({
             const sel = selId === f.id;
             return (
               <g key={i} data-sel={`persona:${f.id}`}>
+                <title>Persona de prueba: arrástrala en el 2D para medir cuántos PPM le llegan</title>
                 <polygon points={pts(f.anillo)} fill="none" stroke={sel ? "var(--ui-brand)" : apagado ? GRIS_APAGADO : "var(--ui-info)"} strokeWidth={2} strokeOpacity={apagado ? 0.5 : 1} />
                 <line x1={f.pie.x} y1={f.pie.y} x2={f.cadera.x} y2={f.cadera.y} stroke={apagado ? "#c3cad3" : "#7d8796"} strokeWidth={Math.max(f.radio * 1.6, 2)} strokeLinecap="round" />
                 <line x1={f.cadera.x} y1={f.cadera.y} x2={f.cuello.x} y2={f.cuello.y} stroke={apagado ? "#d3d9e0" : "#aab3bf"} strokeWidth={Math.max(f.radio * 2.1, 2.5)} strokeLinecap="round" />
@@ -121,6 +122,7 @@ export default function Figuras3D({
             const sel = selId === f.id;
             return (
               <g key={i} data-sel={`camara:${f.id}`} style={{ cursor: "pointer" }}>
+                <title>{`Cámara ${f.numero} · ${f.nombre}${apagado ? "" : " — clic para editarla"}`}</title>
                 <line x1={f.montaje.x} y1={f.montaje.y} x2={f.insignia.x} y2={f.insignia.y} stroke={apagado ? GRIS_APAGADO : "#14171f"} strokeWidth={1} />
                 <circle cx={f.montaje.x} cy={f.montaje.y} r={3} fill={apagado ? GRIS_APAGADO : "#14171f"} />
                 {sel ? <circle cx={f.insignia.x} cy={f.insignia.y} r={15} fill="var(--ui-brand)" opacity={0.22} /> : null}
@@ -128,6 +130,18 @@ export default function Figuras3D({
                 <text x={f.insignia.x} y={f.insignia.y + 3.8} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="#fff" style={{ userSelect: "none" }}>
                   {f.numero}
                 </text>
+              </g>
+            );
+          }
+          case "rayos": {
+            const linea = (a: { x: number; y: number }, b: { x: number; y: number }) => `M${a.x.toFixed(1)},${a.y.toFixed(1)}L${b.x.toFixed(1)},${b.y.toFixed(1)}`;
+            const [c0, c1] = f.cerca;
+            const [l0, l1] = f.lejos;
+            return (
+              <g key={i} style={{ pointerEvents: "none" }}>
+                <path d={`${linea(f.lente, l0)}${linea(f.lente, l1)}`} stroke="var(--ui-brand)" strokeWidth={1.4} strokeDasharray="6 4" fill="none" opacity={0.9} />
+                <path d={`${linea(f.lente, c0)}${linea(f.lente, c1)}${linea(c0, c1)}`} stroke="var(--ui-brand)" strokeWidth={1} strokeDasharray="2 3" fill="none" opacity={0.7} />
+                <circle cx={f.lente.x} cy={f.lente.y} r={3.5} fill="var(--ui-brand)" stroke="#fff" strokeWidth={1.2} />
               </g>
             );
           }

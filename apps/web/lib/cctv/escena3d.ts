@@ -11,7 +11,7 @@
  */
 import type { NivelCobertura } from "./optica";
 import { dirRumbo, type Plano, type Punto, type Tapa } from "./plano";
-import type { PoligonoCobertura } from "./visibilidad";
+import { camaraEnMetros, type PoligonoCobertura } from "./visibilidad";
 
 export type Vista3D = {
   azimutDeg: number;
@@ -89,7 +89,9 @@ export type Figura3D =
       d: number;
     }
   | { tipo: "persona"; id: string; anillo: P2[]; pie: P2; cadera: P2; cuello: P2; cabeza: P2; radio: number; d: number }
-  | { tipo: "camara"; id: string; numero: number; montaje: P2; insignia: P2; d: number }
+  | { tipo: "camara"; id: string; numero: number; nombre: string; montaje: P2; insignia: P2; d: number }
+  /** Campo de visión de la cámara elegida: de la lente a las esquinas de lo que ve en el piso. */
+  | { tipo: "rayos"; id: string; lente: P2; cerca: P2[]; lejos: P2[] }
   | { tipo: "etiqueta"; id: string; texto: string; pos: P2; d: number };
 
 type Ordenable = Extract<Figura3D, { d: number }>;
@@ -253,6 +255,7 @@ export function escena3D(params: {
       tipo: "camara",
       id: c.id,
       numero: c.numero,
+      nombre: c.nombre,
       montaje: pr.pantalla({ ...p, z: c.alturaM }),
       insignia: pr.pantalla({ x: p.x + dir.x * 0.9, y: p.y + dir.y * 0.9, z: c.alturaM + 1.4 }),
       d: pr.profundidad({ ...p, z: c.alturaM }) + 0.3,
@@ -265,7 +268,28 @@ export function escena3D(params: {
   }
 
   ordenables.sort((a, b) => a.d - b.d);
-  return [...fondo, ...conos, ...ordenables];
+
+  // La cámara elegida enseña su campo de visión: rayos de la lente al pie de la zona ciega y al
+  // final del cono, en los dos bordes del ángulo horizontal. Va encima de todo, como una guía.
+  const rayos: Figura3D[] = [];
+  const sel = params.seleccionada ? plano.camaras.find((c) => c.id === params.seleccionada) : null;
+  const cm = sel ? camaraEnMetros(sel, plano.escala) : null;
+  if (sel && cm) {
+    const bajo = cm.inclinacionDeg + cm.vfovDeg / 2;
+    const ciega = bajo < 89.5 ? Math.min(cm.alturaM / Math.tan(rad(bajo)), cm.distanciaM) : 0;
+    const punto = (dist: number, lado: number) => {
+      const d = dirRumbo(cm.rumboDeg + (lado * Math.min(cm.hfovDeg, 179)) / 2);
+      return pr.pantalla({ x: cm.pos.x + d.x * dist, y: cm.pos.y + d.y * dist, z: 0 });
+    };
+    rayos.push({
+      tipo: "rayos",
+      id: sel.id,
+      lente: pr.pantalla({ ...cm.pos, z: cm.alturaM }),
+      cerca: [punto(ciega, -1), punto(ciega, 1)],
+      lejos: [punto(cm.distanciaM, -1), punto(cm.distanciaM, 1)],
+    });
+  }
+  return [...fondo, ...conos, ...ordenables, ...rayos];
 }
 
 /** Une los límites de varios pisos (los que no tienen muros no cuentan). */

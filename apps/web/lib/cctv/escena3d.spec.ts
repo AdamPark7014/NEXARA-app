@@ -67,6 +67,18 @@ describe("escena", () => {
     expect(verticales(atras.id).some((f) => f.tipo === "cara" && f.exterior)).toBe(false);
   });
 
+  it("la cámara elegida enseña su campo de visión y las demás no", () => {
+    const plano = sitio();
+    const cam = plano.camaras[0];
+    const args = { plano, tapas: tapasDelPlano(plano), coberturas: new Map(), vista: { ...base, ...VISTA_ISOMETRICA, centro: { x: 5, y: 2.5 } }, limites: null };
+    expect(escena3D(args).some((f) => f.tipo === "rayos")).toBe(false);
+    const rayos = escena3D({ ...args, seleccionada: cam.id }).filter((f) => f.tipo === "rayos");
+    expect(rayos).toHaveLength(1);
+    const r = rayos[0];
+    expect(r.tipo === "rayos" && r.cerca.length === 2 && r.lejos.length === 2).toBe(true);
+    expect(escena3D({ ...args, seleccionada: cam.id }).find((f) => f.tipo === "camara")).toMatchObject({ nombre: cam.nombre });
+  });
+
   it("desde arriba solo se pintan las tapas de los muros", () => {
     const plano = sitio();
     const figuras = escena3D({ plano, tapas: tapasDelPlano(plano), coberturas: new Map(), vista: { ...base, ...VISTA_SUPERIOR }, limites: null });
