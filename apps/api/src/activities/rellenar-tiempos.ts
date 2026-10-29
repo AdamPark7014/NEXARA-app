@@ -39,18 +39,38 @@ export type PlanRelleno = {
   nota: string | null;
 };
 
-/** Qué se le pone a una fila (solo lo que le falta). `est` = estándar leído de su título. */
-export function planDeRelleno(fila: FilaAbierta, est: EstandarCalculado | null): PlanRelleno {
+/**
+ * Qué se le pone a una fila (solo lo que le falta). `est` = estándar leído de su título.
+ * `entregadaSinEstandar`: ya entregada, no se le pone estándar (el desempeño sigue con la mediana real
+ * de su tipo) y su tiempo estimado es lo que de verdad trabajó (`minutosReales`; sin sesiones, el
+ * calculado del título).
+ */
+export function planDeRelleno(
+  fila: FilaAbierta,
+  est: EstandarCalculado | null,
+  opciones: { entregadaSinEstandar?: boolean; minutosReales?: number | null } = {},
+): PlanRelleno {
   const cambios: Record<string, unknown> = {};
   let nota: string | null = null;
-  if (fila.tiempoEstandarMin == null && est) {
+  if (opciones.entregadaSinEstandar) {
+    const real = Number(opciones.minutosReales) || 0;
+    if (fila.tiempoEstimadoMin == null) {
+      if (real > 0) {
+        cambios.tiempoEstimadoMin = Math.min(720, Math.max(5, Math.round(real / 5) * 5));
+        nota = 'entregada: tiempo estimado = lo que trabajó, sin estándar';
+      } else if (est) {
+        cambios.tiempoEstimadoMin = est.totalMin;
+        nota = 'entregada sin sesiones: tiempo estimado del título, sin estándar';
+      }
+    }
+  } else if (fila.tiempoEstandarMin == null && est) {
     cambios.tiempoEstandarMin = est.totalMin;
     cambios.estandarDesglose = [...est.desglose, ...est.supuestos.map((s) => ({ concepto: `Supuesto: ${s}`, minutos: 0 }))];
     if (!fila.complejidad && est.complejidad) cambios.complejidad = est.complejidad;
     if (!fila.unidades && est.unidades) cambios.unidades = est.unidades;
   }
   const estandar = fila.tiempoEstandarMin ?? (cambios.tiempoEstandarMin as number | undefined) ?? null;
-  if (fila.tiempoEstimadoMin == null && estandar) cambios.tiempoEstimadoMin = estandar;
+  if (fila.tiempoEstimadoMin == null && cambios.tiempoEstimadoMin == null && estandar) cambios.tiempoEstimadoMin = estandar;
 
   if (!fila.periodoFin) {
     if (!fila.fechaEntregaEsperada && !fila.fechaMaxima) {
@@ -59,7 +79,9 @@ export function planDeRelleno(fila: FilaAbierta, est: EstandarCalculado | null):
         let limite = workDayEnd(base);
         if (fila.entregadaAt && fila.entregadaAt > limite) {
           limite = workDayEnd(fila.entregadaAt);
-          nota = 'se entregó después del día de su inicio: entrega al fin del día en que se entregó (no cambia su «a tiempo»)';
+          nota = [nota, 'se entregó después del día de su inicio: entrega al fin del día en que se entregó (no cambia su «a tiempo»)']
+            .filter(Boolean)
+            .join('; ');
         }
         cambios.fechaEntregaEsperada = limite;
         cambios.fechaMaxima = limite;
