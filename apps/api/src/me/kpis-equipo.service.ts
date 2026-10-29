@@ -925,8 +925,9 @@ export class KpisEquipoService {
         autoasignada: a.creadoPorId != null && a.creadoPorId === f.userId,
         aprobada:
           ev?.reviewStatus === 'APPROVED' || decisiones.some((x) => /^APROBADA/i.test(x)) || /finalizad/i.test(a.estatus ?? ''),
-        // §7.4.10: la cotización solo cuenta marcada como enviada (o ya aprobada, rechazada o vencida).
-        sinCotizacionEnviada: a.coreKind === 'comercial' && (a.cotizacion?.status ?? 'DRAFT') === 'DRAFT',
+        // §7.4.10: la cotización solo cuenta marcada como enviada (o ya aprobada, rechazada o vencida). «Comercial»
+        // se usa también para contabilidad o seguimiento: la regla es solo para lo que es una cotización.
+        sinCotizacionEnviada: esCotizacion(a) && (a.cotizacion?.status ?? 'DRAFT') === 'DRAFT',
       };
       lista.push(entrega);
       out.set(f.userId, lista);
@@ -1088,6 +1089,11 @@ export class KpisEquipoService {
 function planDe(horasPlan: unknown, tiempoEstimadoMin?: number | null): number | null {
   const n = horasPlan == null ? null : Number(horasPlan);
   return minutosPlanDeHoras(n != null && Number.isFinite(n) ? n : null) ?? tiempoEstimadoMin ?? null;
+}
+
+/** Una actividad comercial que es una cotización: ligada a una, o con «cotiza…» en el título. */
+export function esCotizacion(a: { coreKind?: string | null; titulo?: string | null; cotizacion?: unknown }): boolean {
+  return a.coreKind === 'comercial' && (a.cotizacion != null || /cotiza/i.test(a.titulo ?? ''));
 }
 
 function vacio(): DatosPersona {

@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { KpisEquipoService } from './kpis-equipo.service.js';
+import { KpisEquipoService, esCotizacion } from './kpis-equipo.service.js';
 
 /** Hora de México (UTC−6). */
 const M = (dia: string, hhmm: string) => new Date(`2026-09-${dia}T${hhmm}:00-06:00`);
@@ -164,5 +164,14 @@ describe('KpisEquipoService', () => {
     const { service } = build();
     expect(() => service.resolveDias('2026-01-01', '2026-09-15')).toThrow(BadRequestException);
     expect(service.resolveDias('2026-09-01', '2026-09-15')).toEqual({ desde: '2026-09-01', hasta: '2026-09-15' });
+  });
+});
+
+describe('qué comercial es una cotización (§7.4.10)', () => {
+  it('ligada a una cotización o con «cotiza» en el título; la contabilidad anotada como comercial no', () => {
+    expect(esCotizacion({ coreKind: 'comercial', titulo: 'Cotización de equipos' })).toBe(true);
+    expect(esCotizacion({ coreKind: 'comercial', titulo: 'Formato a propuesta técnica', cotizacion: { status: 'DRAFT' } })).toBe(true);
+    expect(esCotizacion({ coreKind: 'comercial', titulo: 'Elaboración de complementos de pago' })).toBe(false);
+    expect(esCotizacion({ coreKind: 'tarea', titulo: 'Cotización' })).toBe(false);
   });
 });
