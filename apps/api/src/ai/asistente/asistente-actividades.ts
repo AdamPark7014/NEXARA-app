@@ -789,7 +789,9 @@ export function construirPropuesta(
       const c = corregido(usado, contexto.instruccion, lugarLibre);
       if (!c || !c.pares.length) continue;
       const nuevo = corregirEnTexto(lugarLibre, c.pares, { primera: true });
-      if (nuevo === lugarLibre) continue;
+      // La IA ya lo escribió bien («Toks» por «talks»): no cambia, pero se dice de dónde salió.
+      const yaBien = palabrasUtiles(lugarLibre).includes(normalizar(usado));
+      if (nuevo === lugarLibre && !yaBien) continue;
       correcciones.push({ campo: 'lugar', de: c.de, a: usado, como: 'parecido' });
       pares.push(...c.pares);
       lugarLibre = nuevo;

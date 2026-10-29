@@ -72,6 +72,13 @@
     cambios sin commitear de la sesión del tiempo estándar.
   - Sugerencia para Adam: dar de alta como clientes los que se usan seguido (Toks, Sephora, MAJA, ARTA): así el
     código los empata como cliente y no solo como lugar.
+  - Desplegado (API + web, `deploy-api-web.sh` con ed12e3d4) y revisado en Chrome con la sesión del CEO, sin crear
+    nada: «que ivan vaya mañana a las 11 a talks a revisar las cámaras, le toma 2 horas, a más tardar a la 1; y que
+    caro mande la cotización de crepas en waffles para el viernes» → 2 tarjetas en 3.2 s: «Revisar cámaras en
+    Toks» (lugar Toks, Iván Camargo, mañana 11:00, a más tardar 13:00, sin cliente con aviso) y «Mandar cotización
+    de Creppes and Waffles» (cliente resuelto, Carolina por «caro», plazo viernes). Ajuste posterior: se marca
+    «talks» → Toks aunque la IA ya lo escriba bien, «crepas» → Creppes (lo parecido junto a una palabra dicha
+    igual) y el aviso dice «"Toks" no está registrado» en vez de «Dijiste».
 
 - **29-10 ~11:30 (claude-code) — Apps: paridad con lo de Core del 28-10 (Android e iOS).**
   - Android (`apps/mobile-native/android`), alta/asignar y detalle:

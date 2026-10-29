@@ -550,7 +550,7 @@ function Contenido({
                         aj.clientId === undefined && corrCliente
                           ? textoCorreccion(corrCliente)
                           : !p.cliente && p.textoCliente
-                            ? `Dijiste «${p.textoCliente}»: no está registrado`
+                            ? `«${p.textoCliente}» no está registrado`
                             : undefined
                       }
                     >
