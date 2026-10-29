@@ -69,8 +69,14 @@
     con la cámara a 5 m; en realidad son 4.3 m. La ficha guarda las dos lecturas.
   - Pruebas: `npx vitest run lib/cctv` 4 archivos / 36 en verde; `tsc` de la web limpio. Nada desplegado: no
     hay pantallas.
-  - Sigue: mockup del editor 2D/3D, ficha y propuesta para el visto bueno de Adam; luego la fase 2 (módulo
-    `erp-videovigilancia`, permisos, proyectos, editor 2D).
+  - Mockup publicado (lienzo privado de Adam): https://claude.ai/artifact/9SmTSdB2wuyDFYr1eEHghZ
+    - Cinco pantallas: lista y alta, editor 2D, vista 3D con vistas de cámara, ficha de cámara y dos hojas de la
+      propuesta.
+    - El plano, la isométrica y las vistas de cámara salen del motor real con la bodega VDM. El interior queda
+      79 % cubierto: 14 % identificación, 50 % reconocimiento, 16 % observación.
+    - **Espera el visto bueno de Adam: no construir pantallas antes.**
+  - Sigue la fase 2: módulo `erp-videovigilancia`, permisos, proyectos y editor 2D. `schema.prisma` tenía cambios
+    ajenos sin commitear el 29-10: el modelo `CctvProyecto` va en su propio commit cuando esos entren.
   - Para el acceso hay que decidir algo: José Antonio comparte `ing_soporte` con Carolina y Alejandro. La
     propuesta es entrar por «tener reportes directos»; la otra opción es pasarlo a `enc_soporte`.
 
