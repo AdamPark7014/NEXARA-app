@@ -196,6 +196,8 @@ export type EntradaLugar = {
   actividadForanea?: boolean;
   /** Viático de hospedaje que cubre el día. */
   hospedaje?: boolean;
+  /** Festivo (`festivos/festivos-reglas.ts`): si le toca trabajar y si se le paga doble. */
+  festivo?: { nombre: string; trabaja: boolean; pagoDoble: boolean } | null;
 };
 
 export type LugarAutomatico = { lugar: Lugar | null; motivo: string };
@@ -211,8 +213,18 @@ export type LugarAutomatico = { lugar: Lugar | null; motivo: string };
  *    permiso aprobado → «Vacaciones»/«Permiso»; falta justificada → «Falta justificada»; con
  *    actividad foránea u hospedaje → «Foráneo» (sin checada sigue en amarillo, pero no se
  *    sugiere descontarlo); si no, «Falta». Hoy y los días por venir quedan vacíos.
+ * 4. Un festivo que no le toca trabajar no es laborable: «Descanso» (pagado). Si lo trabajó, el
+ *    lugar sale de sus checadas como cualquier día y el motivo dice que fue festivo.
  */
 export function lugarAutomatico(e: EntradaLugar): LugarAutomatico {
+  const r = lugarDelDia(e);
+  if (e.festivo && e.checadas.length && r.lugar) {
+    return { ...r, motivo: `Festivo trabajado (${e.festivo.nombre}) · ${r.motivo}` };
+  }
+  return r;
+}
+
+function lugarDelDia(e: EntradaLugar): LugarAutomatico {
   if (e.guardia) return { lugar: 'Guardia', motivo: 'Guardia programada' };
 
   const oficina = normalizaTexto(e.oficina || 'Oficina');
@@ -230,7 +242,9 @@ export function lugarAutomatico(e: EntradaLugar): LugarAutomatico {
     return { lugar: 'Oficina', motivo: 'Checada sin ubicación: se supone oficina' };
   }
 
-  if (!e.laborable) return { lugar: 'Descanso', motivo: 'Día de descanso sin checada ni guardia' };
+  if (!e.laborable) {
+    return { lugar: 'Descanso', motivo: e.festivo ? `Festivo: ${e.festivo.nombre}` : 'Día de descanso sin checada ni guardia' };
+  }
   if (e.permiso) return { lugar: e.permiso, motivo: `${e.permiso} aprobado` };
   if (e.justificada) return { lugar: 'Falta justificada', motivo: 'Falta justificada por dirección' };
   if (e.antesDeIngreso) return { lugar: null, motivo: 'Antes de su ingreso' };
@@ -519,8 +533,11 @@ export function sueldoDiario(sueldoSemanal: number | null): number | null {
   return s == null ? null : s / 7;
 }
 
-/** `minutos`: de la entrada a la salida (en bruto), las mismas de la columna HORAS. */
-export type DiaParaSueldo = { fecha: string; lugar: Lugar | null; minutos: number };
+/**
+ * `minutos`: de la entrada a la salida (en bruto), las mismas de la columna HORAS. Un festivo no
+ * se espera ni suma horas: se paga como descanso, y si se trabajó, aparte y doble.
+ */
+export type DiaParaSueldo = { fecha: string; lugar: Lugar | null; minutos: number; festivo?: boolean };
 
 export type SueldoPeriodo = {
   sueldoPeriodo: number | null;
@@ -559,12 +576,17 @@ export function sueldoDelPeriodo(e: {
   const ventana = ventanaDeCalculo(e.semana, e.hoy, e.fechaIngreso);
   const enVentana = (f: string) => ventana.dias > 0 && f >= ventana.desde && f <= ventana.hasta;
   const porFecha = new Map(e.dias.map((d) => [d.fecha, d]));
-  const laborados = e.dias.filter((d) => enVentana(d.fecha)).reduce((s, d) => s + Math.max(0, d.minutos || 0), 0);
+  const laborados = e.dias
+    .filter((d) => enVentana(d.fecha) && !d.festivo)
+    .reduce((s, d) => s + Math.max(0, d.minutos || 0), 0);
   const faltas = e.dias.filter((d) => enVentana(d.fecha) && d.lugar === 'Falta').length;
   const esperadosDias =
     ventana.dias > 0
       ? diasDelRango(ventana.desde, ventana.hasta).filter(
-          (f) => e.divisor.dias.includes(diaDeLaSemana(f)) && !LUGARES_SIN_HORAS_ESPERADAS.has(porFecha.get(f)?.lugar ?? null),
+          (f) =>
+            e.divisor.dias.includes(diaDeLaSemana(f)) &&
+            !porFecha.get(f)?.festivo &&
+            !LUGARES_SIN_HORAS_ESPERADAS.has(porFecha.get(f)?.lugar ?? null),
         ).length
       : 0;
   const jornada = e.jornadaMin && e.jornadaMin > 0 ? e.jornadaMin : e.divisor.jornadaMin;
@@ -656,14 +678,25 @@ export function descuentosSugeridos(e: {
     .map((d) => ({ fecha: d.fecha, concepto: conceptoFalta(d.fecha), monto: roundMoney(diario) }));
 }
 
-/** SUBTOTAL = sueldo del periodo + viáticos + extras; TOTAL = SUBTOTAL − DESCUENTOS. */
+/**
+ * FESTIVO TRABAJADO (LFT art. 75): salario doble por el servicio, además del sueldo del día que ya
+ * va en el sueldo semanal. Un día = semanal ÷ 7.
+ */
+export function montoFestivos(diasTrabajados: number, sueldoSemanal: number | null): number | null {
+  const diario = sueldoDiario(sueldoSemanal);
+  if (diario == null) return null;
+  return roundMoney(Math.max(0, diasTrabajados) * diario * 2);
+}
+
+/** SUBTOTAL = sueldo del periodo + viáticos + extras + festivos trabajados; TOTAL = SUBTOTAL − DESCUENTOS. */
 export function totalesDeFila(e: {
   sueldoPeriodo: number | null;
   viaticos: number;
   extrasMonto: number | null;
+  festivosMonto?: number | null;
   descuentosTotal: number;
 }): { subtotal: number; total: number } {
-  const subtotal = roundMoney((e.sueldoPeriodo ?? 0) + (e.viaticos || 0) + (e.extrasMonto ?? 0));
+  const subtotal = roundMoney((e.sueldoPeriodo ?? 0) + (e.viaticos || 0) + (e.extrasMonto ?? 0) + (e.festivosMonto ?? 0));
   return { subtotal, total: roundMoney(subtotal - (e.descuentosTotal || 0)) };
 }
 
@@ -710,11 +743,19 @@ export type DiaControl = {
   laborable: boolean;
   nota: string | null;
   ajuste: { porId: number | null; por: string | null; at: string | null } | null;
+  /** Festivo de ley o de la empresa; `trabajado` = le tocaba y checó. */
+  festivo: { nombre: string; trabajado: boolean } | null;
 };
 
-export function diaControl(
-  e: EntradaDia,
-): DiaControl & { evaluable: boolean; destinos: string[]; minutosLaborados: number; minutosBrutos: number; sinSalida: boolean } {
+export function diaControl(e: EntradaDia): DiaControl & {
+  evaluable: boolean;
+  destinos: string[];
+  minutosLaborados: number;
+  minutosBrutos: number;
+  sinSalida: boolean;
+  /** Festivo trabajado que se paga doble. */
+  festivoPagado: boolean;
+} {
   const auto = lugarAutomatico(e);
   const lugar = e.manual?.lugar ?? auto.lugar;
   const conChecada = e.checadas.length > 0 || Boolean(e.entrada);
@@ -736,6 +777,8 @@ export function diaControl(
     laborable: e.laborable,
     nota: e.manual?.nota?.trim() || notaAuto,
     ajuste: e.manual ? { porId: e.manual.porId ?? null, por: e.manual.por ?? null, at } : null,
+    festivo: e.festivo ? { nombre: e.festivo.nombre, trabajado: e.festivo.trabaja && conChecada } : null,
+    festivoPagado: Boolean(e.festivo?.trabaja && e.festivo.pagoDoble && conChecada),
     evaluable: e.pasado || conChecada,
     destinos: e.destinos ?? [],
     minutosLaborados: Math.max(0, e.minutosLaborados || 0),
@@ -820,6 +863,10 @@ export type FilaControl = {
   extrasMinutosAprobados: number;
   extrasMinutosPendientes: number;
   extrasDiasPendientes: number;
+  /** Festivos que trabajó y se le pagan doble (LFT art. 75). */
+  festivosTrabajados: Array<{ fecha: string; nombre: string }>;
+  /** Su pago (sueldo diario × 2 cada uno); null sin sueldo capturado. */
+  festivosMonto: number | null;
   sueldoPeriodo: number | null;
   sueldoPeriodoExplicacion: string;
   cumplimientoPct: number | null;
@@ -848,10 +895,14 @@ export function filaControl(e: EntradaFila): FilaControl {
     semana: { desde: e.semana.inicio, hasta: e.semana.fin },
     hoy: e.hoy,
     fechaIngreso: e.fechaIngreso,
-    dias: dias.map((d) => ({ fecha: d.fecha, lugar: d.lugar, minutos: d.minutosBrutos })),
+    dias: dias.map((d) => ({ fecha: d.fecha, lugar: d.lugar, minutos: d.minutosBrutos, festivo: d.festivo != null })),
   });
   const viaticos = roundMoney(e.viaticos.reduce((s, v) => s + (Number(v.monto) || 0), 0));
   const extrasMonto = montoExtras(e.extrasMinutosAprobados, ph.pagoPorHora);
+  const festivosTrabajados = dias
+    .filter((d) => d.festivoPagado && d.festivo)
+    .map((d) => ({ fecha: d.fecha, nombre: d.festivo!.nombre }));
+  const festivosMonto = festivosTrabajados.length ? montoFestivos(festivosTrabajados.length, sueldo) : 0;
   const guardados: DescuentoFila[] = e.descuentos.map((d) => ({
     id: d.id,
     concepto: d.concepto,
@@ -878,6 +929,7 @@ export function filaControl(e: EntradaFila): FilaControl {
     sueldoPeriodo: periodo.sueldoPeriodo,
     viaticos,
     extrasMonto,
+    festivosMonto,
     descuentosTotal,
   });
 
@@ -898,6 +950,14 @@ export function filaControl(e: EntradaFila): FilaControl {
   }
   const sinSalida = dias.filter((d) => d.sinSalida).length;
   if (sinSalida) avisos.push(`${sinSalida} día(s) sin salida registrada: sus horas quedan en 0.00.`);
+  for (const f of festivosTrabajados) {
+    const dia = `${NOMBRES_DIA[diaDeLaSemana(f.fecha)]} ${ddmm(f.fecha)}`;
+    avisos.push(
+      sueldo == null
+        ? `Festivo trabajado el ${dia} (${f.nombre}): sin sueldo no se calcula el pago doble.`
+        : `Festivo trabajado el ${dia} (${f.nombre}): salario doble, ${dinero(roundMoney((sueldo / 7) * 2))} (LFT art. 75).`,
+    );
+  }
 
   return {
     userId: e.userId,
@@ -906,7 +966,9 @@ export function filaControl(e: EntradaFila): FilaControl {
     numeroEmpleado: e.numeroEmpleado ?? null,
     area: e.area,
     horario: e.horario.etiqueta ?? '',
-    dias: dias.map(({ evaluable: _e, destinos: _d, minutosLaborados: _m, minutosBrutos: _b, sinSalida: _s, ...d }) => d),
+    dias: dias.map(
+      ({ evaluable: _e, destinos: _d, minutosLaborados: _m, minutosBrutos: _b, sinSalida: _s, festivoPagado: _f, ...d }) => d,
+    ),
     horasTotales: roundMoney(dias.reduce((s, d) => s + d.horas, 0)),
     horasNetasTotales: horas(dias.reduce((s, d) => s + d.minutosLaborados, 0)),
     faltas,
@@ -922,6 +984,8 @@ export function filaControl(e: EntradaFila): FilaControl {
     extrasMinutosAprobados: Math.max(0, e.extrasMinutosAprobados || 0),
     extrasMinutosPendientes: Math.max(0, e.extrasMinutosPendientes || 0),
     extrasDiasPendientes: Math.max(0, e.extrasDiasPendientes || 0),
+    festivosTrabajados,
+    festivosMonto,
     sueldoPeriodo: periodo.sueldoPeriodo,
     sueldoPeriodoExplicacion: periodo.explicacion,
     cumplimientoPct: periodo.cumplimientoPct,
@@ -997,6 +1061,7 @@ export function ocultarMontos(f: FilaControl): FilaControl {
     viaticos: null,
     viaticosDetalle: [],
     extrasMonto: null,
+    festivosMonto: null,
     sueldoPeriodo: null,
     sueldoPeriodoExplicacion: 'Montos reservados.',
     descuentos: [],
@@ -1005,7 +1070,7 @@ export function ocultarMontos(f: FilaControl): FilaControl {
     descuentosSugeridosTotal: null,
     subtotal: null,
     total: null,
-    avisos: f.avisos.filter((a) => !/sueldo|descuento/i.test(a)),
+    avisos: f.avisos.filter((a) => !/sueldo|descuento|salario/i.test(a)),
   };
 }
 
@@ -1051,7 +1116,9 @@ export function formulaControl(): {
       'EXTRAS = horas extra APROBADAS por un jefe × pago por hora × 2. Las pendientes se muestran aparte y no se pagan hasta aprobarlas.',
     descuentos:
       'DESCUENTOS = renglones capturados por nómina más los sugeridos que alguien aceptó. Cada falta injustificada sugiere descontar un día de sueldo (semanal ÷ 7); nunca se aplica solo.',
-    subtotal: 'SUBTOTAL = sueldo del periodo + viáticos + extras.',
+    subtotal:
+      'SUBTOTAL = sueldo del periodo + viáticos + extras + festivos trabajados (sueldo diario × 2 por cada uno, LFT art. 75). ' +
+      'Un festivo no se espera ni suma horas al sueldo del periodo: se paga como descanso.',
     total: 'TOTAL = SUBTOTAL − DESCUENTOS.',
     cierre:
       'Cerrar la semana congela las cifras y genera un pago en Borrador por persona en «Pagos a empleados» (sin duplicar si ya existe uno para ese periodo). Una semana cerrada no se edita: se reabre con motivo.',

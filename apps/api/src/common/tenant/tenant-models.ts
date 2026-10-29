@@ -123,6 +123,8 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'ActivityTrayecto',
   // Guardias de fin de semana (migración 20261003010000_guardias).
   'Guardia',
+  // Días festivos y cómo se trabajan (migración 20261029223000_dias_festivos).
+  'DiaFestivo',
   // Control de nómina semanal (migración 20261005120000_control_nomina_semanal).
   'NominaSemana',
   'NominaSemanaDia',

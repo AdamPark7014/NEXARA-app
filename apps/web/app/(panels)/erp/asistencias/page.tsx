@@ -91,8 +91,9 @@ const ChecadasRechazadas = dynamic(() => import("@/components/asistencias/Checad
 const HorariosEquipo = dynamic(() => import("@/components/asistencias/HorariosEquipo"), { ssr: false });
 const RegistroAsistido = dynamic(() => import("@/components/asistencias/RegistroAsistido"), { ssr: false });
 const GuardiasPanel = dynamic(() => import("@/components/asistencias/GuardiasPanel"), { ssr: false });
+const FestivosPanel = dynamic(() => import("@/components/asistencias/FestivosPanel"), { ssr: false });
 
-type TabId = "equipo" | "comidas" | "trayectoria" | "rechazos" | "horarios" | "guardias";
+type TabId = "equipo" | "comidas" | "trayectoria" | "rechazos" | "horarios" | "guardias" | "festivos";
 type Estado = "PRESENTE" | "COMPLETO" | "JUSTIFICADA" | "AUSENTE";
 type FilterEstado = "TODOS" | Estado;
 
@@ -282,7 +283,7 @@ export default function ErpAsistenciasPage() {
   // Los avisos de comida abren /erp/asistencias?tab=comidas.
   useEffect(() => {
     const inicial = new URLSearchParams(window.location.search).get("tab");
-    if (inicial === "comidas" || inicial === "equipo" || inicial === "guardias") setTab(inicial);
+    if (inicial === "comidas" || inicial === "equipo" || inicial === "guardias" || inicial === "festivos") setTab(inicial);
     else if ((inicial === "rechazos" || inicial === "horarios") && isManager) setTab(inicial);
     else if (inicial === "trayectoria" && canLiveGps) setTab(inicial);
   }, [canLiveGps, isManager]);
@@ -1041,6 +1042,8 @@ export default function ErpAsistenciasPage() {
     );
   } else if (tab === "guardias") {
     contenido = <GuardiasPanel token={token} />;
+  } else if (tab === "festivos") {
+    contenido = <FestivosPanel token={token} />;
   } else if (tab === "trayectoria" && canLiveGps) {
     before = (
       <div className={styles.pila}>
@@ -1144,6 +1147,7 @@ export default function ErpAsistenciasPage() {
     // Mapa del equipo y recorridos: solo dirección.
     ...(canLiveGps ? [{ id: "trayectoria" as const, label: "Recorrido del día" }] : []),
     { id: "guardias", label: "Guardias" },
+    { id: "festivos", label: "Días festivos" },
   ];
 
   const descripcion =
@@ -1161,7 +1165,9 @@ export default function ErpAsistenciasPage() {
             ? "El horario de cada persona de tu equipo."
             : tab === "guardias"
               ? "Quién trabaja cada sábado y domingo de las próximas semanas."
-              : "Dónde está tu equipo ahora y tu propio recorrido del día.";
+              : tab === "festivos"
+                ? "Qué días no se labora y, en los que sí, con qué horario y quién trabaja."
+                : "Dónde está tu equipo ahora y tu propio recorrido del día.";
 
   /* ─── Ficha del día de una persona ────────────────────────────────────── */
 

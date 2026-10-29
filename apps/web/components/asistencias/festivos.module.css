@@ -1,0 +1,454 @@
+/* NEXARA · Días festivos (v2). Solo tokens --ui-*. */
+
+.panel {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.cabeza {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  flex-wrap: wrap;
+}
+
+.cabeza > .titulo {
+  margin-right: auto;
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--ui-fs-page, 22px);
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--ui-fg);
+  text-transform: none;
+}
+
+.botones {
+  display: flex;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+}
+
+.frase {
+  margin: 28px 16px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--ui-fg);
+}
+
+.reintento {
+  display: flex;
+  justify-content: center;
+}
+
+.aviso {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ui-fg);
+}
+
+.oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.sub {
+  display: block;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  line-height: 1.45;
+}
+
+.nombre {
+  display: block;
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.texto {
+  margin: 0;
+  padding: 0 20px 18px;
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+}
+
+/* ─── Ficha de calendario ─────────────────────────────────────────────── */
+
+.ficha {
+  width: 52px;
+  height: 56px;
+  border-radius: var(--ui-radius-lg);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.05;
+  flex: none;
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+.ficha[data-tono="labora"] {
+  background: var(--ui-warning-bg);
+  color: var(--ui-warning-text);
+}
+
+.ficha[data-tono="finde"] {
+  background: var(--ui-bg-2);
+  color: var(--ui-fg-2);
+}
+
+.fichaMes,
+.fichaSemana {
+  font-size: 11px;
+}
+
+.fichaMes {
+  font-weight: 700;
+}
+
+.fichaDia {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--ui-font-display, inherit);
+}
+
+/* ─── Tabla ───────────────────────────────────────────────────────────── */
+
+.tablaCaja {
+  overflow-x: auto;
+}
+
+.tabla {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  font-size: var(--ui-text-sm);
+}
+
+.tabla th,
+.tabla td {
+  padding: 12px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.tabla th:first-child,
+.tabla td:first-child {
+  padding-left: 18px;
+}
+
+.tabla th:last-child,
+.tabla td:last-child {
+  padding-right: 18px;
+}
+
+.tabla thead th {
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  color: var(--ui-fg-3);
+}
+
+.tabla tbody tr {
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.tabla tbody tr[data-tono="labora"] {
+  background: var(--ui-warning-bg);
+}
+
+.tabla tbody tr[data-pasado="true"] {
+  opacity: 0.6;
+}
+
+.grupo th {
+  padding: 10px 18px;
+  background: var(--ui-bg-2);
+  font-size: var(--ui-text-xs);
+  font-weight: 700;
+  color: var(--ui-fg-2);
+  letter-spacing: 0.02em;
+}
+
+.quien {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  color: var(--ui-fg-2);
+}
+
+.avatares {
+  display: inline-flex;
+}
+
+.avatares > * + * {
+  margin-left: -8px;
+}
+
+.accion {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pie {
+  margin: 0;
+  padding: 14px 18px;
+  border-top: 1px solid var(--ui-border-subtle);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+}
+
+/* ─── Qué pasa ese día ────────────────────────────────────────────────── */
+
+.explica {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--ui-s3);
+}
+
+.explicaCuerpo {
+  display: grid;
+  gap: var(--ui-s2);
+  justify-items: start;
+  padding: 18px;
+}
+
+.explicaCuerpo ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--ui-text-sm);
+  line-height: 1.6;
+  color: var(--ui-fg-2);
+}
+
+/* ─── Editor ──────────────────────────────────────────────────────────── */
+
+.editor {
+  display: flex;
+  gap: var(--ui-s4);
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.forma {
+  flex: 3 1 520px;
+  min-width: 0;
+}
+
+.formaCuerpo {
+  display: grid;
+  gap: 22px;
+  padding: 22px 24px;
+}
+
+.campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: var(--ui-s3);
+}
+
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.nombreGrande {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ui-fg);
+}
+
+.grupoCampos {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.leyenda {
+  padding: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ui-fg);
+}
+
+.opcion {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: var(--ui-radius-lg);
+  border: 1px solid var(--ui-border);
+  cursor: pointer;
+}
+
+.opcion[data-elegida="true"] {
+  border: 2px solid var(--ui-brand);
+  background: var(--ui-brand-soft);
+}
+
+.opcion input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--ui-brand);
+}
+
+.opcionTexto {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.opcionTitulo {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.horas {
+  display: flex;
+  gap: var(--ui-s3);
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-top: 6px;
+}
+
+.duracion {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+  gap: 4px;
+}
+
+.quienOpciones {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 11px;
+  background: var(--ui-bg-2);
+  justify-self: start;
+  flex-wrap: wrap;
+}
+
+.quienOpcion {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+  cursor: pointer;
+}
+
+.quienOpcion[data-elegida="true"] {
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font-weight: 600;
+}
+
+.quienOpcion input {
+  accent-color: var(--ui-brand);
+}
+
+.chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  min-height: 40px;
+  padding: 0 4px 0 4px;
+  border-radius: 999px;
+  background: var(--ui-bg-2);
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  color: var(--ui-fg);
+}
+
+.extras {
+  display: grid;
+  gap: var(--ui-s3);
+  padding-top: var(--ui-s4);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.lado {
+  flex: 2 1 340px;
+  min-width: 0;
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.resumenOscuro {
+  display: grid;
+  gap: 6px;
+  padding: 20px 22px;
+  border-radius: var(--ui-radius-xl);
+  background:
+    radial-gradient(260px 140px at 100% 0%, rgba(22, 133, 112, 0.55), transparent 70%),
+    radial-gradient(240px 140px at 0% 120%, rgba(0, 96, 240, 0.4), transparent 70%),
+    #0d0f12;
+  color: #ffffff;
+}
+
+.resumenEtiqueta {
+  font-size: var(--ui-text-sm);
+  color: #c9ced8;
+}
+
+.resumenCifra {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--ui-font-display, inherit);
+}
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0 20px 18px;
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.persona {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.personaTexto {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+}
