@@ -1,5 +1,24 @@
 # RELEVO
 
+- **29-10 ~08:45 (claude-code) — Las 7 actividades del 28-10 que seguían abiertas, cerradas a mano (orden de Adam).**
+  - Por qué no se cerraron solas: AN-0324/0325/0332/0334/0340 eran de gente que checó su salida propia entre 17:11 y
+    18:26, antes de que entrara el cierre por checada (613ee251, ~19:00) y antes de que la sesión del cierre las
+    reabriera (~19:00). Ninguna salida posterior las volvió a evaluar: hueco de una sola vez por la transición.
+    AN-0336 (David, salida 17:27) y AN-0342 (Josué, 19:30) tenían solo **salida automática**, y la regla vigente
+    no cierra con la automática (`salidasPropias`: `cierreAutomatico = false`). Eso sí se repetirá con quien no
+    cheque su salida: falta que Adam diga si la salida automática también cierra lo pendiente.
+  - Hecho en la base (`/root/cierre-2910.sql`, una transacción con guarda; respaldo `/root/respaldo-cierre-2910/` y
+    copia en `C:\dev\_scratch\respaldos-hetzner\respaldo-cierre-2910\`):
+    - «Finalizada» (cumplidas): AN-0324 Erick, AN-0325 Salvador, AN-0340 Carlos (peinado de cable) y AN-0332 Roberto.
+      `fechaFinalizacion` = su salida del 28-10, revisión APROBADA de Adam (id 2, sin calificación, sin tocar el
+      `status` de la evidencia), como las terminadas del 28-10.
+    - «No cumplida»: AN-0334 José Antonio (Adam dijo «José Luis»; es el único José de la lista además de Josué),
+      AN-0336 David y AN-0342 Josué. `activity_non_compliances` MANUAL, causa SIN_ENTREGA, registrada por Adam (id 2)
+      a la hora de su salida del 28-10. Sin notificación (se escribió por SQL).
+    - Las 7 llevan su fila en `audit_logs` (source `correccion-manual`). Los relojes ya estaban cerrados.
+  - Siguen abiertas y vencidas, sin tocar: **AN-0328** (Josué, «Dibujo Planta Arquitectónica», vencía 28-10 10:30; es
+    la «Atrasada» que queda en la pizarra) y **AN-0009** (Daniela Galindo, del 30-09). Esperan a Adam.
+
 - **28-10 ~20:30 (claude-code) — Actividades › «En espera de revisión» y la flecha de regresar al origen (pedido de Adam).**
   - Pestaña nueva en `/erp/pizarra` (`?vista=revision`), entre «Asignadas por mí» y «Solicitudes»: la ven Christian,
     quien tiene gente a cargo y quien, sin equipo, tiene algo por revisar o ya revisó algo. Lleva el número de pendientes.
