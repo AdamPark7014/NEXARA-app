@@ -34,7 +34,12 @@
   - Datos 28-10: respaldo en el servidor `/root/respaldo-reapertura-2810/*.jsonl` (y copia en `C:\dev\_scratch\respaldos-hetzner\`).
     Reabiertas 9 (todas menos AN-0343: Daniela checó a las 15:05, antes del cierre); se borraron sus 9 registros de
     `activity_non_compliances` y los relojes cortados con `CORTE_DIA` pasaron a la hora de su salida (`SALIDA`) o siguen corriendo.
-    Las del 22–27 siguen cerradas: falta que Adam diga si también se reabren.
+    Las del 22–27: Adam dijo «déjalas como terminadas». 13 pasaron de «No cumplida» a «Finalizada» (`fechaFinalizacion` =
+    hora del cierre original): AN-0258/0259/0260/0266/0268/0271/0280/0287/0303/0311/0314/0316/0317. Cada una lleva una
+    revisión APROBADA de Adam (reviewer 2, sin calificación, sin tocar el `status` de la evidencia), una fila en
+    `audit_logs` (source `correccion-manual`, previousData completo) y sin su `activity_non_compliances`. Respaldo:
+    `/root/respaldo-terminadas-2810/`. AN-0286 (Alejandro) se dejó a la sesión principal; AN-0284 (Erick) y AN-0343
+    (Daniela) no entran: checaron antes del cierre.
   - Despliegue: **solo la API** (613ee251, sana). Se detuvo `update.sh` antes del build del web: el disco llegó a 96 %
     (3.3 GB libres) y el web pide ~7 GB. La imagen web sigue en 5e8d8e57; mis dos textos web (`AvisoIncumplimiento`
     «Al cerrar su jornada» y el mensaje de geocerca) salen con el próximo deploy del web (mirar `df -h /` antes).
