@@ -22,7 +22,7 @@ export default function AvisoIncumplimiento({ estatus, inc }: { estatus?: string
 
   const quien =
     inc.origen === "CIERRE_JORNADA"
-      ? `Cierre automático de la jornada${inc.limite ? ` (${horaMx(inc.limite)})` : ""}`
+      ? `Al cerrar su jornada${inc.limite ? ` (${horaMx(inc.limite)})` : ""}`
       : `Registrada por ${inc.registradoPor?.nombre ?? "un superior"}`;
   const pendientes = inc.pendientes.map((p) => p.nombre).join(", ");
 

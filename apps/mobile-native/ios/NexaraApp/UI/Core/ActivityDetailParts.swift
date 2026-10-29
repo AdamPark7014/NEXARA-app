@@ -248,7 +248,7 @@ enum ActivityDetailRules {
         let causa = registro.causaEtiqueta
         let origen: String
         if registro.automatica {
-            origen = "Cierre automático de la jornada"
+            origen = "Al cerrar su jornada"
         } else {
             origen = "Registrada por \(registro.registradoPor)"
         }

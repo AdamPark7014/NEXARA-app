@@ -762,7 +762,7 @@ export class ActivityTeamService {
         kind: 'no_cumplida',
         title:
           inc.origen === 'CIERRE_JORNADA'
-            ? `No cumplida: sin entrega al cierre de la jornada${inc.limite ? ` (${horaDeCierre(new Date(inc.limite))})` : ''}`
+            ? `No cumplida: sin entrega al cerrar su jornada${inc.limite ? ` (${horaDeCierre(new Date(inc.limite))})` : ''}`
             : `Registrada como no cumplida por ${inc.registradoPor?.nombre ?? 'un superior'}`,
         subtitle:
           [

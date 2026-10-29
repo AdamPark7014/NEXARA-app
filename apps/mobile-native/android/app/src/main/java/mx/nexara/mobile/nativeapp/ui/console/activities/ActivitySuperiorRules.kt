@@ -170,7 +170,7 @@ object ActivitySuperiorRules {
             titulo = if (causa == null) "No cumplida" else "No cumplida · $causa",
             origen = when {
                 inc == null -> "Se cerró sin entregarse"
-                automatica -> "Cierre automático de la jornada"
+                automatica -> "Al cerrar su jornada"
                 quien.isNotEmpty() -> "Registrada por $quien"
                 else -> "Registrada por un superior"
             },
