@@ -126,7 +126,7 @@ android {
         unitTests.all { test ->
             test.systemProperty("robolectric.graphicsMode", "NATIVE")
             if (project.findProperty("capturas") != "true") {
-                test.exclude("**/CapturasMiDiaTest*")
+                test.exclude("**/Capturas*Test*")
             }
         }
     }
@@ -219,7 +219,7 @@ dependencies {
     // El módulo android.graphics.pdf.PdfRenderer viene en el SDK, no requiere dep extra.
 
     testImplementation("junit:junit:4.13.2")
-    // Capturas en la JVM: `./gradlew :app:testDebugUnitTest -Pcapturas=true --tests "*CapturasMiDiaTest*"`.
+    // Capturas en la JVM: `./gradlew :app:testDebugUnitTest -Pcapturas=true --tests "*Capturas*"`.
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation(composeBom)
     testImplementation("androidx.compose.ui:ui-test-junit4")

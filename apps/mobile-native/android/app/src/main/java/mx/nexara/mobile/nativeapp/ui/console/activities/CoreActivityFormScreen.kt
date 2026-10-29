@@ -567,7 +567,7 @@ private fun AssignFlow(
 /** OpsActivityForm (tone core): título, proyecto/cliente, subtipo, prioridad, agenda, tiempos, fotos. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ActivityFormPanel(
+internal fun ActivityFormPanel(
     stepTitle: String,
     stepIcon: ImageVector? = null,
     meta: CoreActivityKinds.KindMeta,
