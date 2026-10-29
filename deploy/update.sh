@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# Un despliegue a la vez. El 28-10-2026 dos sesiones corrieron este script juntas: dos builds subieron el disco del
+# 88 % al 99 % y compose chocó con «container name … is already in use». El segundo espera hasta 15 min y si no, sale.
+exec 9>/tmp/nexara-update.lock
+if ! flock -w 900 9; then
+  echo "Ya hay otro despliegue corriendo (/tmp/nexara-update.lock); intenta más tarde." >&2
+  exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.nexara.yml"
