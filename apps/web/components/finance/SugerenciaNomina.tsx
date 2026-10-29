@@ -78,11 +78,13 @@ export type SugerenciaNominaRespuesta = {
     etiqueta: string;
     origen: "calendario" | "por_omision" | "manual" | "calculado";
     clave?: ClavePeriodo;
+    /** Día en que se paga (semana: el lunes siguiente al corte del domingo). */
+    pagoEl?: string;
     enCurso: boolean;
     calculadoHasta: string;
   };
   /** Los periodos del selector con sus fechas (API nueva). */
-  periodos?: Array<{ clave: ClavePeriodo; desde: string; hasta: string; etiqueta: string }>;
+  periodos?: Array<{ clave: ClavePeriodo; desde: string; hasta: string; etiqueta: string; pagoEl?: string }>;
   generadoAt: string;
   scope: "company" | "subtree";
   formula: string[];
@@ -100,6 +102,22 @@ export function fechaCorta(iso: string, conAnio = false): string {
   const [y, m, d] = iso.split("-").map(Number);
   if (!y || !m || !d) return iso;
   return `${d} ${MESES_CORTOS[m - 1]}${conAnio ? ` ${y}` : ""}`;
+}
+
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+
+/** «lunes 2 nov». */
+export function diaYFecha(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return `${DIAS_SEMANA[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${fechaCorta(iso)}`;
+}
+
+/** Encabezado de la semana de pago: «Semana del 26 oct al 1 nov · se paga el lunes 2 nov». */
+export function encabezadoSemana(desde: string, hasta: string, pagoEl?: string | null): string {
+  const mismoMes = desde.slice(0, 7) === hasta.slice(0, 7);
+  const inicio = mismoMes ? String(Number(desde.slice(8, 10))) : fechaCorta(desde);
+  return `Semana del ${inicio} al ${fechaCorta(hasta)}${pagoEl ? ` · se paga el ${diaYFecha(pagoEl)}` : ""}`;
 }
 
 /** «26 oct – 1 nov»; con el año en las dos si cruza de año. */
@@ -156,10 +174,10 @@ const NOTA_SUGERENCIA =
 /** Etiqueta, fechas y avisos del periodo, en una sola frase. */
 function partesPeriodo(datos: SugerenciaNominaRespuesta): string[] {
   const p = datos.periodo;
-  const partes = [
-    `${p.origen === "manual" ? "Rango" : "Periodo"} ${p.etiqueta}`,
-    `del ${p.desde} al ${p.hasta}`,
-  ];
+  // La nómina se paga por semana: su encabezado dice las fechas y el día de pago, sin quincenas.
+  const partes = p.clave?.startsWith("semana")
+    ? [encabezadoSemana(p.desde, p.hasta, p.pagoEl)]
+    : [`${p.origen === "manual" ? "Rango" : "Periodo"} ${p.etiqueta}`, `del ${p.desde} al ${p.hasta}`];
   if (p.enCurso) {
     partes.push(`en curso: lo esperado se cuenta hasta el ${p.calculadoHasta}`);
     partes.push(`«a la fecha» corta el ${fechaCorta(p.calculadoHasta)} y «periodo completo» el ${fechaCorta(p.hasta)}`);
@@ -194,8 +212,8 @@ const BAJA_PRODUCTIVIDAD = 60;
  * hora y monto sugerido por persona. Solo lectura: no crea pagos.
  */
 export default function SugerenciaNomina({ token }: { token: string }) {
-  // Christian paga quincenal: se abre en la quincena actual.
-  const [modo, setModo] = useState<ModoPeriodo>("quincena");
+  // La nómina se paga cada semana (Adam, 29-10): se abre en la semana en curso.
+  const [modo, setModo] = useState<ModoPeriodo>("semana");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [datos, setDatos] = useState<SugerenciaNominaRespuesta | null>(null);

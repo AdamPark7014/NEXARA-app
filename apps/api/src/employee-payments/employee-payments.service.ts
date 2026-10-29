@@ -10,7 +10,7 @@ import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { KPI_MAX_DIAS, KpisEquipoService } from '../me/kpis-equipo.service.js';
 import { diasDelRango } from '../me/kpis-equipo.js';
-import { workDateKey } from '../common/time/workday.js';
+import { WORKDAY_TIMEZONE, workDateKey } from '../common/time/workday.js';
 import { NOMINA_SETTING_KEY, parsearConfigNomina } from './nomina-calendario.js';
 import {
   esClavePeriodo,
@@ -257,7 +257,17 @@ export class EmployeePaymentsService {
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
-    const hoy = workDateKey(new Date());
+    const ahora = new Date();
+    const hoy = workDateKey(ahora);
+    // «A la fecha» incluye hoy cuando la jornada ya terminó (18:00 en Ciudad de México).
+    const incluyeHoy = minutosDelDiaEnMexico(ahora) >= FIN_DE_JORNADA_MIN;
+
+    const ajustes = await this.prisma.systemSetting.findMany({
+      where: { key: NOMINA_SETTING_KEY, OR: [{ companyId: null }, { companyId: tenantId }] },
+      select: { companyId: true, value: true },
+    });
+    const propio = ajustes.find((a) => a.companyId === tenantId) ?? ajustes.find((a) => a.companyId == null);
+    const calendario = parsearConfigNomina(propio?.value);
 
     let periodo;
     if (opciones.desde && opciones.hasta) {
@@ -266,14 +276,9 @@ export class EmployeePaymentsService {
       }
       periodo = periodoManual(opciones.desde, opciones.hasta);
     } else if (esClavePeriodo(opciones.periodo)) {
-      periodo = periodoDeClave(hoy, opciones.periodo);
+      periodo = periodoDeClave(hoy, opciones.periodo, calendario);
     } else {
-      const ajustes = await this.prisma.systemSetting.findMany({
-        where: { key: NOMINA_SETTING_KEY, OR: [{ companyId: null }, { companyId: tenantId }] },
-        select: { companyId: true, value: true },
-      });
-      const propio = ajustes.find((a) => a.companyId === tenantId) ?? ajustes.find((a) => a.companyId == null);
-      periodo = periodoSugerencia(hoy, parsearConfigNomina(propio?.value), opciones.periodo ?? 'vigente');
+      periodo = periodoSugerencia(hoy, calendario, opciones.periodo ?? 'vigente');
     }
 
     const rango = { desde: periodo.desde, hasta: periodo.hasta };
@@ -309,17 +314,24 @@ export class EmployeePaymentsService {
           sueldoSemanal: sueldoPor.get(p.persona.id) ?? null,
           periodo: rango,
           hoy,
+          incluyeHoy,
           fechaIngreso: u?.fechaIngreso ? workDateKey(u.fechaIngreso) : null,
         });
       }),
     );
-    const ventana = ventanaDeCalculo(rango, hoy);
+    const ventana = ventanaDeCalculo(rango, hoy, null, incluyeHoy);
 
     return {
-      // «A la fecha» corta en `calculadoHasta` (ayer, si está en curso); «periodo completo», en `hasta`.
+      // «A la fecha» corta en `calculadoHasta` (hoy después de las 18:00; si no, ayer); «periodo completo», en `hasta`.
       periodo: { ...periodo, enCurso: ventana.enCurso, calculadoHasta: ventana.hasta },
-      // Lo que ofrece el selector, ya con sus fechas.
-      periodos: periodosCalculados(hoy).map(({ clave, desde, hasta, etiqueta }) => ({ clave, desde, hasta, etiqueta })),
+      // Lo que ofrece el selector, ya con sus fechas y su día de pago.
+      periodos: periodosCalculados(hoy, calendario).map(({ clave, desde, hasta, etiqueta, pagoEl }) => ({
+        clave,
+        desde,
+        hasta,
+        etiqueta,
+        pagoEl,
+      })),
       generadoAt: datos.generadoAt,
       scope: datos.scope,
       formula: formulaSugerencia(),
@@ -804,4 +816,19 @@ export class EmployeePaymentsService {
       rows: analytics.rows,
     });
   }
+}
+
+/** Fin de la jornada de oficina (18:00): desde ahí el día de hoy ya se puede juzgar. */
+const FIN_DE_JORNADA_MIN = 18 * 60;
+
+/** Minutos transcurridos del día en Ciudad de México (la zona de `workDateKey`). */
+function minutosDelDiaEnMexico(instante: Date): number {
+  const partes = new Intl.DateTimeFormat('en-GB', {
+    timeZone: WORKDAY_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(instante);
+  const n = (t: string) => Number(partes.find((p) => p.type === t)?.value ?? 0);
+  return n('hour') * 60 + n('minute');
 }

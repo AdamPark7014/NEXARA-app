@@ -1,5 +1,42 @@
 # RELEVO
 
+- **29-10 ~15:40 (claude-code) — Sugerencia de nómina: la semana de pago primero (Adam: «es semanalmente los pagos…
+  y hoy es jueves»).**
+  - Abre en la semana en curso (lunes a domingo). El encabezado dice «Semana del 26 oct al 1 nov · se paga el lunes
+    2 nov», sin quincenas. Semana anterior, quincena y mes quedan como opciones.
+  - Corte leído de la hoja «Control de entradas y salidas» de Christian: la del 19-10 va de lunes 19 a domingo 25.
+    La hoja no trae el día de pago y no hay pagos registrados en el sistema. Se tomó el lunes siguiente al corte,
+    porque la hoja de esa semana se mandó el lunes 26. Es configurable: `payroll.schedule` con `diaPago`
+    (`fechaDePago` en `nomina-calendario.ts`), y un calendario semanal propio de la empresa manda sobre esto.
+  - «A la fecha» incluye hoy desde las 18:00 (jornada terminada); antes, llega hasta ayer.
+  - Pendiente: `payroll.schedule` de la empresa 1 sigue en quincenal, y con eso el resumen matutino del CEO avisa
+    cortes de quincena. Pasarlo a `{"frecuencia":"semanal","diaSemanaCorte":0,"diaPago":1}` lo decide Adam.
+
+- **29-10 ~15:30 (claude-code) — Días festivos: dirección marca si se labora y cuánto (mockup aprobado por Adam).**
+  - Pedido de Adam: «que el sistema en días festivos pueda marcar Christian días festivos y cuánto se labora ese
+    día o si no se labora». Mockup aprobado: https://claude.ai/artifact/RkLMLVobd7xFiJbL2MDLue
+  - Tabla `dias_festivos` (migración `20261029223000_dias_festivos`, una fila por empresa y fecha). Los de ley (LFT
+    art. 74) **no necesitan fila**: salen solos como «no se labora» (`festivos/festivos-reglas.ts`). La fila existe
+    cuando dirección cambia uno o para días de la empresa (el 2-nov, Día de Muertos, se da de alta tras desplegar).
+  - Por día: `modo` NO_SE_LABORA | HORARIO (entrada/salida propias) | COMPLETA; `personas` (vacío = todos; con ids,
+    el resto descansa); `pagoDoble` (LFT art. 75); `avisar` (push 3 días antes, a las 10:00 y 13:00, «ya avisé» se ve
+    en `notifications` con `entityType DiaFestivo`); `nota`. En fin de semana solo trabaja quien tiene guardia.
+  - API `GET/PUT/DELETE /api/festivos[/:fecha]` y `GET /api/festivos/mio` (para las apps: el festivo de hoy y los
+    próximos ya resueltos para quien consulta); editar solo dirección (CEO equivalente o superadmin). Web:
+    pestaña «Días festivos» en Asistencias (`components/asistencias/FestivosPanel.tsx`), con editor y vista previa.
+  - Quién lo usa:
+    - **Nómina** (`control-nomina.ts`): festivo que no le toca → «Descanso» con motivo «Festivo: …», nunca «Falta»;
+      sus horas no se esperan ni suman al sueldo del periodo; trabajado → `festivosTrabajados`, `festivosMonto`
+      (sueldo diario × 2 cada uno) al SUBTOTAL y un aviso en la fila.
+    - **Desempeño** (`kpis-equipo.ts`, `esLaborable`/`horarioDelDia`) y **horas extra**: no le exige el día; con
+      horario propio mide retardo y extra contra ese horario.
+    - **Checada**: entrada rechazada (`FESTIVO_SIN_LABORAR`) entre semana si no le toca; registro asistido igual.
+    - **Recordatorio de entrada**: lee la tabla; ya no hay lista fija ni `ASISTENCIA_DIAS_DE_DESCANSO` (quitada del
+      compose).
+  - Pendiente: las dos pantallas de las apps (quien descansa / a quien le toca); contrato enviado a la sesión de apps.
+  - Pruebas: API 344 suites / 4197 en verde (+ festivos-reglas, nómina y desempeño con festivos); web `tsc` limpio
+    y `lib/festivos-api.spec.ts`.
+
 - **29-10 ~15:00 (claude-code) — Sueldo semanal recapturado con la regla × 12 ÷ 52 (Adam: «Sí, recaptúralo»).**
   - `UserProfile.sueldoSemanal` de las 19 personas activas pasó del tabulador (mensual ÷ 4) a mensual × 12 ÷ 52
     (capturado × 12 ÷ 13), en una transacción que exigía 19 filas. Las 3 inactivas no se tocaron.

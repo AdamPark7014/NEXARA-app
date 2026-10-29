@@ -1,5 +1,6 @@
 import {
   diasEntre,
+  fechaDePago,
   parsearConfigNomina,
   periodoQueCierra,
   periodoRecienCerrado,
@@ -85,5 +86,32 @@ describe('diasEntre', () => {
     expect(diasEntre('2026-03-01', '2026-04-01')).toBe(31);
     expect(diasEntre('2026-09-15', '2026-09-15')).toBe(0);
     expect(() => diasEntre('15/09/2026', '2026-09-15')).toThrow(RangeError);
+  });
+});
+
+describe('día de pago', () => {
+  it('lee diaPago y lo ignora si no es un día de la semana', () => {
+    expect(parsearConfigNomina('{"frecuencia":"semanal","diaSemanaCorte":0,"diaPago":1}')).toEqual({
+      frecuencia: 'semanal',
+      diaSemanaCorte: 0,
+      diaPago: 1,
+    });
+    expect(parsearConfigNomina('{"frecuencia":"semanal","diaPago":9}')).toEqual({ frecuencia: 'semanal', diaSemanaCorte: 5 });
+  });
+
+  it('semanal: el primer día de pago desde el corte; por omisión, el día siguiente al corte', () => {
+    // Semana del 26-10 (lunes) al 1-11 (domingo): se paga el lunes 2-11.
+    expect(fechaDePago({ corte: '2026-11-01' }, { frecuencia: 'semanal', diaSemanaCorte: 0 })).toBe('2026-11-02');
+    expect(fechaDePago({ corte: '2026-11-01' }, { frecuencia: 'semanal', diaSemanaCorte: 0, diaPago: 1 })).toBe('2026-11-02');
+    // Corte en viernes y pago el sábado; pago el mismo día del corte.
+    expect(fechaDePago({ corte: '2026-10-30' }, { frecuencia: 'semanal', diaSemanaCorte: 5, diaPago: 6 })).toBe('2026-10-31');
+    expect(fechaDePago({ corte: '2026-10-30' }, { frecuencia: 'semanal', diaSemanaCorte: 5, diaPago: 5 })).toBe('2026-10-30');
+    // Cruzando de año.
+    expect(fechaDePago({ corte: '2027-01-03' }, { frecuencia: 'semanal', diaSemanaCorte: 0 })).toBe('2027-01-04');
+  });
+
+  it('quincenal y mensual: el día del corte', () => {
+    expect(fechaDePago({ corte: '2026-10-31' }, QUINCENAL)).toBe('2026-10-31');
+    expect(fechaDePago({ corte: '2027-02-28' }, { frecuencia: 'mensual', diaSemanaCorte: 5 })).toBe('2027-02-28');
   });
 });

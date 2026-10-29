@@ -401,3 +401,34 @@ describe('dos lecturas: a la fecha y periodo completo', () => {
     expect(t.proyectado).toBe(4000);
   });
 });
+
+describe('semana de pago (corrección de Adam, jueves 29-10: «es semanalmente los pagos»)', () => {
+  it('lunes a domingo como la hoja, y se paga el lunes siguiente', () => {
+    expect(periodoDeClave('2026-10-29', 'semana')).toMatchObject({ desde: '2026-10-26', hasta: '2026-11-01', pagoEl: '2026-11-02' });
+    expect(periodoDeClave('2026-10-29', 'semana_anterior')).toMatchObject({ desde: '2026-10-19', hasta: '2026-10-25', pagoEl: '2026-10-26' });
+    // Quincena y mes se pagan el día del corte.
+    expect(periodoDeClave('2026-10-29', 'quincena').pagoEl).toBe('2026-10-31');
+  });
+
+  it('una empresa con su propio calendario semanal manda sobre lunes a domingo', () => {
+    const viernes = { frecuencia: 'semanal' as const, diaSemanaCorte: 5, diaPago: 6 };
+    expect(periodoDeClave('2026-10-29', 'semana', viernes)).toMatchObject({ desde: '2026-10-24', hasta: '2026-10-30', pagoEl: '2026-10-31' });
+    // Un calendario quincenal no cambia la semana.
+    expect(periodoDeClave('2026-10-29', 'semana', { frecuencia: 'quincenal', diaSemanaCorte: 5 })).toMatchObject({ desde: '2026-10-26' });
+    expect(periodosCalculados('2026-10-29').every((p) => p.pagoEl)).toBe(true);
+  });
+
+  it('«a la fecha» incluye hoy cuando la jornada ya terminó', () => {
+    const SEMANA = { desde: '2026-10-26', hasta: '2026-11-01' };
+    expect(ventanaDeCalculo(SEMANA, '2026-10-29')).toMatchObject({ hasta: '2026-10-28', dias: 3, enCurso: true });
+    expect(ventanaDeCalculo(SEMANA, '2026-10-29', null, true)).toMatchObject({ hasta: '2026-10-29', dias: 4, enCurso: true });
+    // El domingo después de las 18:00 la semana ya no está en curso.
+    expect(ventanaDeCalculo(SEMANA, '2026-11-01', null, true)).toMatchObject({ hasta: '2026-11-01', dias: 7, enCurso: false });
+    const f = filaSugerencia(
+      entrada({ periodo: SEMANA, hoy: '2026-10-29', incluyeHoy: true, totales: tot({ minutosLaborados: 4 * 480, minutosProductivos: 4 * 400 }) }),
+    );
+    expect([f.diasALaFecha, f.diasRestantes]).toEqual([4, 3]);
+    expect(f.montoSugerido).toBe(2285.71);
+    expect(f.proyectado).toBe(4000);
+  });
+});

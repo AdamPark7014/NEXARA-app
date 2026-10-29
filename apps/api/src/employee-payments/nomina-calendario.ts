@@ -14,7 +14,15 @@
  */
 export type FrecuenciaNomina = 'quincenal' | 'semanal' | 'mensual';
 
-export type ConfigNomina = { frecuencia: FrecuenciaNomina; diaSemanaCorte: number };
+export type ConfigNomina = {
+  frecuencia: FrecuenciaNomina;
+  diaSemanaCorte: number;
+  /**
+   * Semanal: día de la semana en que se paga (0=domingo…6=sábado), el primero desde el corte. Por omisión,
+   * el día siguiente al corte (corte en domingo → se paga el lunes, como la hoja de la semana del 19-10).
+   */
+  diaPago?: number;
+};
 
 export type PeriodoNomina = {
   desde: string;
@@ -44,7 +52,12 @@ export function parsearConfigNomina(raw: string | null | undefined): ConfigNomin
   const frecuencia = String(o['frecuencia'] ?? '').trim().toLowerCase() as FrecuenciaNomina;
   if (!FRECUENCIAS.includes(frecuencia)) return null;
   const dia = Number(o['diaSemanaCorte']);
-  return { frecuencia, diaSemanaCorte: Number.isInteger(dia) && dia >= 0 && dia <= 6 ? dia : 5 };
+  const pago = o['diaPago'] == null ? Number.NaN : Number(o['diaPago']);
+  return {
+    frecuencia,
+    diaSemanaCorte: Number.isInteger(dia) && dia >= 0 && dia <= 6 ? dia : 5,
+    ...(Number.isInteger(pago) && pago >= 0 && pago <= 6 ? { diaPago: pago } : {}),
+  };
 }
 
 type Ymd = { y: number; m: number; d: number };
@@ -124,6 +137,18 @@ export function proximoCorte(hoy: string, cfg: ConfigNomina): { periodo: Periodo
     periodo = periodoSemanal(iso(dia({ y, m, d }) + faltan * DIA_MS));
   }
   return { periodo, dias: diasEntre(hoy, periodo.corte) };
+}
+
+/**
+ * Cuándo se paga un periodo. Semanal: el primer `diaPago` desde el corte (por omisión, el día siguiente
+ * al corte). Quincenal y mensual: el día del corte.
+ */
+export function fechaDePago(periodo: Pick<PeriodoNomina, 'corte'>, cfg: ConfigNomina): string {
+  if (cfg.frecuencia !== 'semanal') return periodo.corte;
+  const diaPago = cfg.diaPago ?? (cfg.diaSemanaCorte + 1) % 7;
+  const t = dia(leer(periodo.corte));
+  const dow = new Date(t).getUTCDay();
+  return iso(t + ((diaPago - dow + 7) % 7) * DIA_MS);
 }
 
 /**
