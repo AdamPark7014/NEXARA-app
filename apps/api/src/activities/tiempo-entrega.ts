@@ -106,15 +106,45 @@ export type EstandarCalculado = {
   supuestos: string[];
 };
 
-/** «Instalar 4 cámaras» → 4. El primer número entero razonable del texto (no horas ni años). */
+/** El número de un lugar no es una cantidad: «nave 2», «piso 3», «sucursal #12», «etapa 1». */
+const NUMERO_DE_LUGAR =
+  /\b(nave|planta|piso|nivel|edificio|torre|bodega|sucursal|local|[áa]rea|zona|sala|sal[óo]n|aula|m[óo]dulo|etapa|fase|lote|manzana|calle|avenida|av|no|n[úu]m|n[úu]mero|oficina|puerta|acceso|caseta|cuarto|site|rack|l[íi]nea|tienda|cedis|almac[ée]n|secci[óo]n|ala|bloque)\.?\s*(#|n[°º]\.?)?\s*\d+\b/gi;
+
+/** «Instalar 4 cámaras» → 4. El primer número entero razonable del texto (no horas, años ni lugares). */
 export function cantidadDelTitulo(texto: string | null | undefined): number | null {
-  const limpio = String(texto ?? '').replace(/\b\d{1,2}[:.]\d{2}\b/g, ' ').replace(/\b(19|20)\d{2}\b/g, ' ');
+  const limpio = String(texto ?? '')
+    .replace(/\b\d{1,2}[:.]\d{2}\b/g, ' ')
+    .replace(/\b(19|20)\d{2}\b/g, ' ')
+    .replace(NUMERO_DE_LUGAR, ' ')
+    .replace(/#\s*\d+/g, ' ');
   const m = /\b(\d{1,3})\b(?!\s*(h|hr|hrs|horas?|min|minutos?|am|pm|%))/i.exec(limpio);
   const n = m ? Number(m[1]) : NaN;
   return Number.isInteger(n) && n > 0 && n <= 500 ? n : null;
 }
 
 const redondeo5 = (min: number) => Math.max(5, Math.round(min / 5) * 5);
+
+/** Palabras que dicen qué se cuenta, por clave de unidad de la tabla. */
+const UNIDAD_POR_PALABRA: Array<[string, RegExp]> = [
+  ['metros', /\b\d+\s*(m|mts?|metros?)\b|\bmetros?\b/],
+  ['nodos', /\bnodos?\b/],
+  ['jornadas', /\bjornadas?\b|\bdias? complet|\btodo el dia\b/],
+  ['dispositivos', /\b(dispositivos?|camaras?|lectoras?|sensores?|controladores?|paneles?|bocinas?)\b/],
+];
+
+/**
+ * La unidad que nombra el título entre las del tipo («Canalización de 120 m» son metros, no nodos);
+ * si no nombra ninguna, la primera de la tabla.
+ */
+export function unidadDelTitulo(regla: ReglaEstandar, texto: string | null | undefined): ReglaEstandar['unidades'][number] | null {
+  if (!regla.unidades.length) return null;
+  const t = normalizar(texto);
+  for (const [clave, patron] of UNIDAD_POR_PALABRA) {
+    const unidad = regla.unidades.find((x) => x.clave === clave);
+    if (unidad && patron.test(t)) return unidad;
+  }
+  return regla.unidades[0];
+}
 
 /**
  * Estándar con lo leído del título; lo que falta se supone y queda en el desglose. Siempre da
@@ -166,7 +196,7 @@ export function estandarDeLectura(
   if (regla.agenda) return respaldo(opciones.tipicoMin ? `${regla.nombre}: tiempo típico` : `${regla.nombre}: tiempo por omisión`);
 
   const supuestos: string[] = [...avisoTipo];
-  const unidad = regla.unidades[0] ?? null;
+  const unidad = unidadDelTitulo(regla, `${tipoGuardado.titulo ?? ''} ${tipoGuardado.indicaciones ?? ''}`);
   let cantidad = lectura.cantidad && lectura.cantidad > 0 ? Math.round(lectura.cantidad) : null;
   // «¿Cuántas partidas?» de la tabla: así concuerda («cuántas partidas», «cuántos equipos»).
   const cuantos = unidad ? unidad.pregunta.replace(/[¿?]/g, '').toLowerCase() : '';
