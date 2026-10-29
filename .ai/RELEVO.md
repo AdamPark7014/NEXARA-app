@@ -26,6 +26,11 @@
     - La ida se cierra sola al «Iniciar actividad» (`MyActivitiesService.iniciar`, motivo INICIO). Todo lo abierto se
       cierra al checar salida (bus `attendance.checkout`, motivo SALIDA).
   - Las apps (`nexara-apps-uiux`) esperan estos endpoints para los botones; la web todavía no los pinta.
+  - **Desplegado** con `deploy-api-migrar-web.sh` (`7e7934d5`; `MIGRADO`, `API_LISTO`, `WEB_LISTO`, `FIN`). La migración
+    `20261029210000_actividad_trayectos` está aplicada y las tres rutas aparecen en el arranque de la API. Con este
+    despliegue también salió la regla `obra` del tiempo estándar. Endpoints enviados a `nexara-apps-uiux`.
+  - Pendiente de Adam: su WhatsApp del 29-10 dice que una cotización de 5 a 10 productos tarda 40 min o menos. La tarifa
+    (40 + 4 por partida) da 80 min con 10. Si lo decide, el ajuste es en `TABLA_ESTANDAR` (`comercial`).
 
 - **29-10 ~12:20 (claude-code) — Comerciales: PowerPoint y la cotización ligada se ven abiertos en la actividad (pedido de Adam: «que puedan adjuntar Excel, PDF, PowerPoint… o ligar una cotización, y se vea embebida»).**
   - Adjuntar y ligar ya existían: «Archivos de evidencia» (`components/erp/ArchivosDeActividad.tsx`) y «Ligar
