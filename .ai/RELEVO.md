@@ -66,6 +66,11 @@
     12 ÷ 52. El sueldo semanal capturado el 28-10 es el del tabulador (mensual ÷ 4): no se convirtió, espera la
     revisión de la contadora (nota en la carpeta compartida de las sesiones).
   - Pruebas: cambio de mes y de año, quincena de 15/16 días, febrero (13 y 14 días), zona de Ciudad de México.
+  - Verificado en producción con la sesión de Christian: el selector trae las fechas, cambiar de periodo recalcula sin
+    recargar y la semana del 26-10 sale como «Semana actual». Desempeño v2 también verificado; con datos reales salieron
+    dos arreglos (`9ec8fac6` sin T<sub>e</sub> no hay dato, `00047622` la regla de cotización solo para cotizaciones,
+    porque la contadora anota su trabajo como «comercial»).
+  - El build web de las 20:02 falló al bajar la fuente de Google (`next/font`, red), no por código; se relanzó.
 
 - **29-10 ~16:00 (claude-code) — Diseñador de videovigilancia: plano por niveles (artboard 5, aprobado por Adam 29-10).**
   - Motor `apps/web/lib/cctv/niveles.ts` (+ `ids.ts`): el plano raíz es la planta baja y los pisos van en
