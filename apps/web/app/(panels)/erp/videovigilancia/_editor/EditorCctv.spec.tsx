@@ -66,6 +66,15 @@ describe("editor del diseñador de videovigilancia", () => {
     expect(screen.getByText("Escala sin calibrar")).toBeInTheDocument();
   });
 
+  it("en 3D pinta el sitio, sus vistas desde las cámaras y deja elegir la cámara", () => {
+    render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "3D" }));
+    expect(screen.getByRole("img", { name: /Vista 3D del sitio/ })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Vistas desde las cámaras" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Vista superior" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Muro/ })).toBeNull();
+  });
+
   it("la lista de cámaras abre la ficha de la cámara en el panel", () => {
     render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
     fireEvent.click(screen.getByRole("tab", { name: "Cámaras · 1" }));

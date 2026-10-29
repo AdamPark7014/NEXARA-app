@@ -12,7 +12,7 @@ import UndoRoundedIcon from "@mui/icons-material/UndoRounded";
 import RedoRoundedIcon from "@mui/icons-material/RedoRounded";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
-import { Alert, Badge, Button, Input } from "@/components/base";
+import { Alert, Badge, Button, Input, Segmented } from "@/components/base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { MODELOS_CAMARA, etiquetaModelo, modeloPorId, type ModeloCamara } from "@/lib/cctv/catalogo";
 import {
@@ -34,6 +34,7 @@ import { LEYENDA_NIVELES, COLOR_NIVEL } from "./colores";
 import { TIPOS_CROQUIS, esOscuro, prepararCroquis } from "./croquis";
 import Inspector, { type Pestana } from "./Inspector";
 import Lienzo, { type Herramienta } from "./Lienzo";
+import Lienzo3D from "./Lienzo3D";
 import VistaCamara from "./VistaCamara";
 import styles from "./editor.module.css";
 
@@ -84,7 +85,9 @@ export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Dise
   const [aviso, setAviso] = useState<string | null>(null);
   const [resumen, setResumen] = useState<ResumenDiseno | null>(diseno.resumen);
   const [herramienta, setHerramienta] = useState<Herramienta>("seleccionar");
-  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false });
+  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: true, humanoides: true });
+  const [modo, setModo] = useState<"2d" | "3d">("2d");
+  const [todasLasVistas, setTodasLasVistas] = useState(false);
   const [modeloNuevo, setModeloNuevo] = useState<ModeloCamara>(MODELOS_CAMARA[0]);
   const [pestana, setPestana] = useState<Pestana>("seleccion");
   const [medida, setMedida] = useState<{ a: Punto; b: Punto } | null>(null);
@@ -310,7 +313,7 @@ export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Dise
 
       <section className={styles.editor}>
         <div className={styles.barra} role="toolbar" aria-label="Herramientas del plano">
-          <div className={styles.herramientas}>
+          <div className={styles.herramientas} hidden={modo === "3d"}>
             {HERRAMIENTAS.map((h, i) => (
               <span key={h.id} className={styles.herramientaHueco}>
                 {h.grupo === "camara" && HERRAMIENTAS[i - 1]?.grupo !== "camara" ? <span className={styles.separador} aria-hidden="true" /> : null}
@@ -330,7 +333,19 @@ export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Dise
             ))}
           </div>
           <div className={styles.barraFin}>
-            {herramienta === "camara" ? (
+            <Segmented
+              ariaLabel="Vista"
+              value={modo}
+              onChange={(m) => {
+                setModo(m);
+                if (m === "3d") setHerramienta("seleccionar");
+              }}
+              items={[
+                { id: "2d", label: "2D" },
+                { id: "3d", label: "3D" },
+              ]}
+            />
+            {herramienta === "camara" && modo === "2d" ? (
               <label className={styles.modeloNuevo}>
                 Modelo
                 <select value={modeloNuevo.id} onChange={(e) => setModeloNuevo(modeloPorId(e.target.value) ?? MODELOS_CAMARA[0])}>
@@ -342,12 +357,18 @@ export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Dise
                 </select>
               </label>
             ) : null}
-            {(
-              [
-                ["croquis", "Croquis"],
-                ["etiquetas", "Etiquetas"],
-                ["calor", "Mapa de calor"],
-              ] as const
+            {(modo === "2d"
+              ? ([
+                  ["croquis", "Croquis"],
+                  ["etiquetas", "Etiquetas"],
+                  ["calor", "Mapa de calor"],
+                ] as const)
+              : ([
+                  ["croquis", "Croquis"],
+                  ["etiquetas", "Etiquetas"],
+                  ["translucidos", "Muros translúcidos"],
+                  ["humanoides", "Humanoides"],
+                ] as const)
             ).map(([k, t]) => (
               <label key={k} className={styles.capa}>
                 <input type="checkbox" checked={capas[k]} onChange={(e) => setCapas((c) => ({ ...c, [k]: e.target.checked }))} />
@@ -357,10 +378,17 @@ export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Dise
           </div>
         </div>
         {/* Siempre presente: si apareciera y desapareciera con la herramienta, el plano saltaría bajo el cursor. */}
-        <p className={styles.ayudaHerramienta}>{AYUDA_HERRAMIENTA[herramienta]}</p>
+        <p className={styles.ayudaHerramienta}>
+          {modo === "3d"
+            ? "Muros a su altura real y cámaras a su altura de montaje. Clic en un muro, una cámara o una persona para editarla en el panel."
+            : AYUDA_HERRAMIENTA[herramienta]}
+        </p>
 
         <div className={styles.cuerpo}>
           <div className={styles.lienzoCaja}>
+            {modo === "3d" ? (
+              <Lienzo3D plano={plano} seleccion={seleccion} tapas={tapas} coberturas={coberturas} capas={capas} onSeleccionar={seleccionar} />
+            ) : (
             <Lienzo
               plano={plano}
               seleccion={seleccion}
@@ -376,7 +404,8 @@ export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Dise
               onPedirTexto={setTextoEn}
               onHerramienta={setHerramienta}
             />
-            {!plano.croquis && !plano.muros.length ? (
+            )}
+            {!plano.croquis && !plano.muros.length && modo === "2d" ? (
               <div className={styles.vacio}>
                 <b>Empieza por el croquis del sitio</b>
                 <span>JPG, PNG o el PDF que exporta AutoCAD. Después lo calibras con una cota y dibujas o corriges los muros.</span>
@@ -398,7 +427,7 @@ export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Dise
                 </span>
               ))}
             </div>
-            {camaraVista ? (
+            {camaraVista && modo === "2d" ? (
               <div className={styles.pipCaja}>
                 <VistaCamara plano={plano} camara={camaraVista} tapas={tapas} coberturas={coberturas} esHoja={esHoja} />
               </div>
@@ -461,6 +490,28 @@ export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Dise
             onCambiarCroquis={() => archivo.current?.click()}
           />
         </div>
+
+        {modo === "3d" && plano.camaras.length ? (
+          <section className={styles.tiraVistas} aria-label="Vistas desde las cámaras">
+            <div className={styles.tiraVistasCabeza}>
+              <h2>Vistas desde las cámaras</h2>
+              <span className={styles.tenue}>Óptica real de cada lente; la etiqueta va pegada a la persona más cercana en su ángulo</span>
+              {plano.camaras.length > 4 ? (
+                <button type="button" className={styles.enlace} onClick={() => setTodasLasVistas((t) => !t)} style={{ marginLeft: "auto" }}>
+                  {todasLasVistas ? "Ver menos" : `Ver las ${plano.camaras.length}`}
+                </button>
+              ) : null}
+            </div>
+            <div className={styles.tiraVistasGrid}>
+              {[...plano.camaras]
+                .sort((a, b) => Number(b.id === camaraSel?.id) - Number(a.id === camaraSel?.id) || a.numero - b.numero)
+                .slice(0, todasLasVistas ? undefined : 4)
+                .map((c) => (
+                  <VistaCamara key={c.id} plano={plano} camara={c} tapas={tapas} coberturas={coberturas} esHoja={esHoja} />
+                ))}
+            </div>
+          </section>
+        ) : null}
 
         <footer className={styles.estado}>
           <span>

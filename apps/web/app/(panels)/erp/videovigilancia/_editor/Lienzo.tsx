@@ -386,7 +386,25 @@ export default function Lienzo({
   const cursorCss =
     arrastrando === "pan" ? "grabbing" : herramienta === "seleccionar" ? "default" : herramienta === "camara" || herramienta === "persona" || herramienta === "etiqueta" ? "copy" : "crosshair";
 
+  // Barra de escala: el largo «redondo» (1, 2, 5, 10, 20, 50 m…) que ocupa entre 70 y 170 px de pantalla.
+  const metrosPorPantalla = u * k;
+  const largoBarra = [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500].find((m) => m / metrosPorPantalla >= 70) ?? 1000;
+  const anchoBarra = largoBarra / metrosPorPantalla;
+
   return (
+    <>
+    <div className={styles.escalaNorte} aria-hidden="true">
+      <span className={styles.norte} style={{ transform: `rotate(${plano.norteDeg}deg)` }} title="Norte">
+        <svg viewBox="0 0 24 24" width="22" height="22">
+          <path d="M12 2l5 14-5-3-5 3z" fill="var(--ui-fg)" />
+          <text x="12" y="23" textAnchor="middle" fontSize="7" fontWeight="700" fill="var(--ui-fg)">N</text>
+        </svg>
+      </span>
+      <span className={styles.barraEscala}>
+        <span style={{ width: anchoBarra }} />
+        <b>{largoBarra < 1 ? `${largoBarra * 100} cm` : `${largoBarra} m`}</b>
+      </span>
+    </div>
     <svg
       ref={svgRef}
       className={styles.lienzo}
@@ -590,6 +608,28 @@ export default function Lienzo({
         );
       })}
 
+      {/* «14 m · 109 PPM · Observación» al final de cada cono (la seleccionada lleva la suya, más grande). */}
+      {capas.etiquetas
+        ? plano.camaras
+            .filter((c) => c.id !== selId)
+            .map((c) => {
+              const cm = camarasM.get(c.id);
+              const h = c.lentes[0] ? hfovDeg(c.lentes[0].optica) : null;
+              if (!cm || h == null) return null;
+              const d = dirRumbo(c.rumboDeg + (c.lentes[0]?.desfaseRumboDeg ?? 0));
+              const largo = (c.distanciaM * 0.82) / k;
+              const texto = etiquetaCono(c.distanciaM, ppm(cm.pxHoriz, distanciaInclinadaM(c.distanciaM, c.alturaM), h));
+              return (
+                <g key={`et-${c.id}`} transform={`translate(${c.pos.x + d.x * largo} ${c.pos.y + d.y * largo}) scale(${u})`} style={{ pointerEvents: "none" }}>
+                  <rect x={-74} y={-9} width={148} height={18} rx={9} fill="var(--ui-surface)" fillOpacity={0.92} stroke="var(--ui-border-strong)" strokeWidth={0.8} />
+                  <text y={3.5} textAnchor="middle" fontSize={10} fontWeight={600} fill="var(--ui-fg-2)">
+                    {texto}
+                  </text>
+                </g>
+              );
+            })
+        : null}
+
       {/* Cámara seleccionada: eje, manija para apuntar y etiqueta del final del cono. */}
       {camaraSel ? (() => {
         const d = dirRumbo(camaraSel.rumboDeg + (camaraSel.lentes[0]?.desfaseRumboDeg ?? 0));
@@ -674,5 +714,6 @@ export default function Lienzo({
         />
       ) : null}
     </svg>
+    </>
   );
 }
