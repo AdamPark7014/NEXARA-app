@@ -141,8 +141,9 @@ export class RecordatoriosJornadaService {
         relatedUrl: '/erp/pizarra?vista=mias',
         priority: 'high',
         channel: 'ops',
-        // La tarjeta del teléfono se reemplaza, no se apila; uno por corrida del cron.
+        // La tarjeta del teléfono se reemplaza, no se apila; uno por corrida del cron (en iOS con `reemplazar`).
         collapseKey: `nx_sin_actividad_u${userId}`,
+        reemplazar: true,
         dedupeSeconds: (CADA_SIN_ACTIVIDAD_MIN - 1) * 60,
         companyId,
       });
@@ -165,6 +166,7 @@ export class RecordatoriosJornadaService {
         priority: 'high',
         channel: 'ops',
         collapseKey: `nx_vence_${v.a.id}_u${v.userId}`,
+        reemplazar: true,
         dedupeSeconds: (CADA_POR_VENCER_MIN - 1) * 60,
         companyId: v.companyId,
       });

@@ -6,6 +6,19 @@ import { CreateLunchBreakDto, RevisarComidaDto, UpdateLunchBreakDto } from './dt
 import { companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import { parseWorkDate, workDateColumn, workDayAtClock } from '../../common/time/workday.js';
 import { NON_EMPLOYEE_EMAILS } from '../../common/platform-accounts.js';
+import { horaAviso } from '../../notifications/notification-push-meta.js';
+import { resolveAccessScheduleKey } from '../../integra/access-schedule-defaults.js';
+import { horarioDePersona } from '../../me/kpis-equipo.js';
+import { minutoDelDia } from '../recordatorio-entrada.js';
+import {
+  TOLERANCIA_REGRESO_MIN,
+  aMinutos,
+  regresoLimite,
+  salidaATiempo,
+  ultimaSalida,
+  ventanaDeComida,
+  type VentanaComida,
+} from './ventana-comida.js';
 
 /** Christian supervisa y developer es cuenta de plataforma: no registran comida. */
 /** No registran comida ni salen como pendientes: quien no es empleado (ver platform-accounts). */
@@ -57,6 +70,45 @@ export class LunchBreaksService {
     return workDateColumn(valor);
   }
 
+  /**
+   * La ventana de comida de una persona, según su horario (`ventana-comida.ts`). Si no se puede
+   * leer su horario queda la de oficina, la de siempre: no saber no tumba la checada de comida.
+   */
+  private async ventanaDe(userId: number): Promise<VentanaComida> {
+    let u: {
+      roleKey: string | null;
+      tipoContrato: string | null;
+      role: { orgRoleKey: string | null } | null;
+      horario: { horaEntrada: string | null; horaSalida: string | null; dias: number[]; graciaMin: number | null; jornadaOrdinariaMin: number | null } | null;
+    } | null = null;
+    try {
+      u = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          roleKey: true,
+          tipoContrato: true,
+          role: { select: { orgRoleKey: true } },
+          horario: { select: { horaEntrada: true, horaSalida: true, dias: true, graciaMin: true, jornadaOrdinariaMin: true } },
+        },
+      });
+    } catch {
+      u = null;
+    }
+    if (!u) return ventanaDeComida(null);
+    const plantilla = resolveAccessScheduleKey({
+      isActive: true,
+      roleKey: u.roleKey,
+      orgRoleKey: u.role?.orgRoleKey ?? null,
+      tipoContrato: u.tipoContrato,
+    });
+    return ventanaDeComida(horarioDePersona(plantilla, u.horario ?? null));
+  }
+
+  /** Instante del día de `ref` a un minuto del día. */
+  private aInstante(ref: Date, minutoDia: number): Date {
+    return workDayAtClock(ref, Math.floor(minutoDia / 60), minutoDia % 60);
+  }
+
   async createCheckin(usuarioId: number, data: CreateLunchBreakDto, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     const now = new Date();
@@ -76,15 +128,17 @@ export class LunchBreaksService {
     }
 
     const checkinTime = this.horaRegistro(data.checkinTime, now);
-    const lunchStartHour = workDayAtClock(now, 15, 0);
-    const lunchEndHour = workDayAtClock(now, 16, 0);
+    // Oficina de 3 a 4 p.m.; la cuadrilla, una hora libre por la tarde (`ventana-comida.ts`).
+    const ventana = await this.ventanaDe(usuarioId);
+    const lunchStartHour = this.aInstante(now, aMinutos(ventana.desde));
+    const lunchEndHour = this.aInstante(now, ultimaSalida(ventana));
 
-    const isLate = checkinTime < lunchStartHour || checkinTime > lunchEndHour;
-    // Fuera de 3–4 p.m. hay que decir por qué; queda pendiente de que un superior lo apruebe.
+    const isLate = !salidaATiempo(ventana, minutoDelDia(checkinTime));
+    // Fuera de su ventana hay que decir por qué; queda pendiente de que un superior lo apruebe.
     const justificacion = (data.justificacion ?? '').trim();
     if (isLate && justificacion.length < JUSTIFICACION_MIN) {
       throw new BadRequestException(
-        'Estás fuera del horario de comida (3:00 a 4:00 p.m.): escribe por qué sales a comer a esta hora.',
+        `Estás fuera del horario de comida (${ventana.texto}): escribe por qué sales a comer a esta hora.`,
       );
     }
     const revision = isLate
@@ -94,10 +148,10 @@ export class LunchBreaksService {
     if (checkinTime < lunchStartHour) {
       notes = `Entraste a comida ${this.getMinutesDiff(checkinTime, lunchStartHour)} minutos antes`;
     } else if (checkinTime > lunchEndHour) {
-      // Se mide contra el FIN de la ventana (16:00), que es lo que se rebasó.
+      // Se mide contra la última hora para salir (16:00 en oficina), que es lo que se rebasó.
       // Antes se medía contra las 15:00 y se guardaba en `notes` un retraso
       // inflado en 60 minutos: un dato falso en la base.
-      notes = `Entraste a comida ${this.getMinutesDiff(lunchEndHour, checkinTime)} minutos después del horario permitido (4 PM)`;
+      notes = `Entraste a comida ${this.getMinutesDiff(lunchEndHour, checkinTime)} minutos después del horario permitido (${horaAviso(lunchEndHour)})`;
     }
 
     let lunchBreak;
@@ -179,13 +233,16 @@ export class LunchBreaksService {
     }
 
     const checkoutTime = this.horaRegistro(data.checkoutTime, now);
-    const lunchEndHour = workDayAtClock(now, 16, 5);
+    // Oficina: 16:05. Cuadrilla: una hora después de salir (más la tolerancia), sin pasar de su salida.
+    const ventana = await this.ventanaDe(usuarioId);
+    const limite = regresoLimite(ventana, lunch.checkinTime ? minutoDelDia(lunch.checkinTime) : null);
+    const lunchEndHour = this.aInstante(now, limite);
 
     const isLate = checkoutTime > lunchEndHour;
     const justificacion = (data.justificacion ?? '').trim();
     if (isLate && justificacion.length < JUSTIFICACION_MIN) {
       throw new BadRequestException(
-        'Ya pasó la hora de regreso de comida (4:00 p.m.): escribe por qué regresas a esta hora.',
+        `Ya pasó la hora de regreso de comida (${horaAviso(this.aInstante(now, limite - TOLERANCIA_REGRESO_MIN))}): escribe por qué regresas a esta hora.`,
       );
     }
     // `lunch.notes` es nullable: sin el `?? ''`, concatenar dejaba en la base
@@ -244,9 +301,11 @@ export class LunchBreaksService {
           where: { userId: viewer.id, date: this.dayColumn(now), ...companyWhere(tenantId) },
         })
       : null;
-    const inicio = workDayAtClock(now, 15, 0);
-    const fin = workDayAtClock(now, 16, 0);
-    const regresoLimite = workDayAtClock(now, 16, 5);
+    // Su ventana: `fin` es la última hora para salir y el regreso depende de a qué hora salió.
+    const ventana = await this.ventanaDe(viewer.id);
+    const inicio = this.aInstante(now, aMinutos(ventana.desde));
+    const fin = this.aInstante(now, ultimaSalida(ventana));
+    const limiteRegreso = this.aInstante(now, regresoLimite(ventana, registro ? minutoDelDia(registro.checkinTime) : null));
     const siguiente = !debeRegistrar
       ? 'no_aplica'
       : !registro
@@ -258,9 +317,9 @@ export class LunchBreaksService {
     return {
       debeRegistrar,
       ahora: now,
-      ventana: { inicio, fin, regresoLimite, texto: '3:00 a 4:00 p.m.' },
+      ventana: { inicio, fin, regresoLimite: limiteRegreso, texto: ventana.texto, tipo: ventana.tipo },
       salidaADestiempo: now < inicio || now > fin,
-      regresoADestiempo: now > regresoLimite,
+      regresoADestiempo: now > limiteRegreso,
       siguiente,
       registro: mapped,
     };

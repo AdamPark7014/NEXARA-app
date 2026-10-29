@@ -834,7 +834,7 @@ export default function ComidasPanel({ fecha }: { fecha: string }) {
         <Card aria-label="Comidas de tu equipo">
           <CardHead
             title="Comidas de tu equipo"
-            subtitle={`${equipo.alcance === "todo" ? "Toda la empresa." : "Tu gente por organigrama."} Horario 3:00 a 4:00 p.m.; lo que sea fuera de esa hora trae justificación y lo apruebas o rechazas.`}
+            subtitle={`${equipo.alcance === "todo" ? "Toda la empresa." : "Tu gente por organigrama."} Oficina de 3:00 a 4:00 p.m.; cuadrilla, una hora libre entre 1:00 y 5:00 p.m. Lo que sea fuera de su ventana trae justificación y lo apruebas o rechazas.`}
             actions={
               <Button
                 size="sm"
