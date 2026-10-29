@@ -57,9 +57,13 @@ describe("editor del diseñador de videovigilancia", () => {
     render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
     expect(screen.getByRole("heading", { name: "Proyecto CCTV Bodegas VDM" })).toBeInTheDocument();
     expect(screen.getByText(/Escala calibrada · cota 43.00 m/)).toBeInTheDocument();
-    expect(screen.getByLabelText("Vista desde la cámara 1")).toBeInTheDocument();
-    expect(screen.getByText(/PPM ·/, { selector: "span" })).toBeInTheDocument();
     expect(screen.getByRole("toolbar", { name: "Herramientas del plano" })).toBeInTheDocument();
+    // sin cámara elegida el plano queda libre; al elegirla sale su vista
+    expect(screen.queryByLabelText("Vista desde la cámara 1")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Cámaras · 1" }));
+    fireEvent.click(screen.getByRole("button", { name: /Domo 2 Z ALM/ }));
+    expect(screen.getByLabelText("Vista desde la cámara 1")).toBeInTheDocument();
+    expect(screen.getAllByText(/PPM ·/, { selector: "span" }).length).toBeGreaterThan(0);
   });
 
   it("sin croquis ni muros invita a subir el croquis", () => {

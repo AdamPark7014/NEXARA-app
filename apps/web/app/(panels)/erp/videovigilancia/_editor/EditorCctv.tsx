@@ -313,7 +313,8 @@ export default function EditorCctv({
   };
 
   const camaraSel = seleccion?.tipo === "camara" ? plano.camaras.find((c) => c.id === seleccion.id) : null;
-  const camaraVista = camaraSel ?? plano.camaras[0] ?? null;
+  // La vista de la cámara sale al elegir una (como en el artboard); sin selección el plano queda libre.
+  const camaraVista = camaraSel ?? null;
   const cal = plano.escala.calibracion;
   const cob = resumen?.cobertura;
 
