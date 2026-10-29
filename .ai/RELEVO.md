@@ -158,10 +158,16 @@
     de Creppes and Waffles» (cliente resuelto, Carolina por «caro», plazo viernes). Ajuste posterior: se marca
     «talks» → Toks aunque la IA ya lo escriba bien, «crepas» → Creppes (lo parecido junto a una palabra dicha
     igual) y el aviso dice «"Toks" no está registrado» en vez de «Dijiste».
-  - **Ese ajuste (604eb457) NO está desplegado:** `main` ya trae fab4f3ab (tiempo estándar) con la migración
-    `20261029030000_actividad_tiempo_estandar`, que no está aplicada en producción, y `deploy-api-web.sh` no migra.
-    Se va con el próximo despliegue con migración (`deploy/update.sh --with-migrate`). Lo desplegado (ed12e3d4) ya
-    tiene todo lo demás de «Asignar con IA».
+  - Ese ajuste (604eb457) salió con el despliegue con migración de otra sesión (servidor en 38a2778a, migración
+    `20261029030000_actividad_tiempo_estandar` aplicada).
+  - **Alta rápida de cliente en cada propuesta** (Adam: «aquí quitaron lo de agregar clientes rápidamente y luego
+    llenar su detalle»). El selector de cliente ofrece «+ Agregar cliente "Toks"» con el nombre que entendió (el
+    lugar ya corregido, o lo escrito en «Lugar»): misma alta rápida corporativa del formulario «Asignar»
+    (`createSalesClient` con `altaRapida`, el padrón reutiliza al cliente si el nombre ya existe y decide permisos;
+    luego `provisionSalesServiceClient`). Queda elegido en esa tarjeta y en las demás que dijeron el mismo nombre sin
+    cliente; el lugar igual al cliente se vacía; la ficha se completa después en Clientes. No se ofrece si la IA
+    encontró al cliente (aunque sea por parecido) ni si ya hay uno igual en la lista. Error del alta: en el campo.
+    El formulario «Asignar» (`OpsActivityForm`, `ClienteTipoPicker`) no se tocó y sigue con su alta.
 
 - **29-10 ~11:30 (claude-code) — Apps: paridad con lo de Core del 28-10 (Android e iOS).**
   - Android (`apps/mobile-native/android`), alta/asignar y detalle:

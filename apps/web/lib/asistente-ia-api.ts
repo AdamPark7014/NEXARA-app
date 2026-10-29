@@ -18,6 +18,7 @@ import {
   type ActivityKind,
 } from "@/lib/activity-kinds";
 import type { RoleKey } from "@/lib/rbac/roles";
+import { createSalesClient, provisionSalesServiceClient } from "@/lib/sales-api";
 
 export type Referencia = { id: number; nombre: string };
 export type Encargo = "ejecucion" | "despacho";
@@ -255,6 +256,41 @@ export function textoCorreccion(c: Correccion | null): string | undefined {
 }
 
 const CAMPOS_SUCURSAL = ["branchName", "branchNumber", "branchCity", "branchState", "branchAddress"] as const;
+
+/** Nombre sin acentos, mayúsculas ni signos, para no duplicar clientes («Toks» = «TOKS.»). */
+export function nombreComparable(s: string | null | undefined): string {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9ñ]+/g, " ")
+    .trim();
+}
+
+/**
+ * Nombre para el alta rápida de cliente desde la tarjeta: el lugar que entendió (ya corregido,
+ * «Toks» por «talks») o lo que la IA dijo del cliente. null si la IA encontró al cliente (no se
+ * duplica), si ese nombre ya está en la lista o si es demasiado corto.
+ */
+export function nombreParaAlta(p: PropuestaActividad, aj: Ajustes, clientes: Referencia[]): string | null {
+  if (p.cliente) return null;
+  const lugar = p.sucursal ? "" : lugarEfectivo(p, aj).trim();
+  const nombre = (lugar || p.textoCliente || "").trim().slice(0, 200);
+  const clave = nombreComparable(nombre);
+  if (clave.length < 2) return null;
+  return clientes.some((c) => nombreComparable(c.nombre) === clave) ? null : nombre;
+}
+
+/**
+ * Alta rápida del cliente, la misma del formulario «Asignar» (cliente corporativo solo con el
+ * nombre; la ficha se llena después en Clientes): el padrón reutiliza al cliente si el nombre ya
+ * existe y decide los permisos. Devuelve el cliente de operación para la actividad.
+ */
+export async function altaRapidaCliente(token: string, nombre: string): Promise<Referencia> {
+  const creado = await createSalesClient(token, { name: nombre.trim(), status: "Activo", tipo: "CORPORATIVO", altaRapida: true });
+  const id = creado.serviceClientId ?? (await provisionSalesServiceClient(token, creado.id)).serviceClient.id;
+  return { id, nombre: creado.name };
+}
 
 /** Lugar vigente (lo escrito en la tarjeta o el de la IA). */
 export function lugarEfectivo(p: PropuestaActividad, aj: Ajustes): string {

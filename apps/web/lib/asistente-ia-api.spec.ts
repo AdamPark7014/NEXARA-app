@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const ventas = vi.hoisted(() => ({ createSalesClient: vi.fn(), provisionSalesServiceClient: vi.fn() }));
+vi.mock("@/lib/sales-api", () => ventas);
 import {
   agendaFinal,
+  altaRapidaCliente,
   bloqueos,
   correccionDe,
   lugarEfectivo,
+  nombreParaAlta,
   pasoEquipo,
   payloadFinal,
   reglaEncargo,
@@ -234,5 +239,29 @@ describe("asistente IA en la pizarra", () => {
     expect(correccionDe(p, "lugar")).toBeNull();
     // Un API anterior no manda correcciones.
     expect(correccionDe(lista, "cliente")).toBeNull();
+  });
+
+  it("alta rápida de cliente: con el nombre entendido y nunca si ya hay uno igual o la IA lo encontró", () => {
+    const sinCliente: PropuestaActividad = { ...base, textoCliente: "Talk", payload: { ...base.payload, branchName: "Toks" } };
+    // El lugar ya corregido manda sobre lo que escribió la IA; lo escrito en la tarjeta, sobre ambos.
+    expect(nombreParaAlta(sinCliente, {}, [])).toBe("Toks");
+    expect(nombreParaAlta(sinCliente, { lugar: "Toks Angelópolis" }, [])).toBe("Toks Angelópolis");
+    expect(nombreParaAlta({ ...sinCliente, payload: base.payload }, {}, [])).toBe("Talk");
+    // Igual a uno de la lista (sin acentos ni mayúsculas): no se duplica.
+    expect(nombreParaAlta(sinCliente, {}, [{ id: 3, nombre: "TOKS." }])).toBeNull();
+    // La IA lo encontró (aunque sea por parecido): tampoco.
+    expect(nombreParaAlta(lista, {}, [])).toBeNull();
+    expect(nombreParaAlta({ ...base, textoCliente: null }, {}, [])).toBeNull();
+  });
+
+  it("el alta rápida es la del formulario: corporativo solo con el nombre y activado para operación", async () => {
+    ventas.createSalesClient.mockResolvedValueOnce({ id: 40, name: "Toks", serviceClientId: null });
+    ventas.provisionSalesServiceClient.mockResolvedValueOnce({ serviceClient: { id: 77 } });
+    await expect(altaRapidaCliente("tok", " Toks ")).resolves.toEqual({ id: 77, nombre: "Toks" });
+    expect(ventas.createSalesClient).toHaveBeenCalledWith("tok", { name: "Toks", status: "Activo", tipo: "CORPORATIVO", altaRapida: true });
+    // Si el padrón ya lo tenía activado, no se vuelve a activar.
+    ventas.createSalesClient.mockResolvedValueOnce({ id: 41, name: "Sephora", serviceClientId: 12 });
+    await expect(altaRapidaCliente("tok", "Sephora")).resolves.toEqual({ id: 12, nombre: "Sephora" });
+    expect(ventas.provisionSalesServiceClient).toHaveBeenCalledTimes(1);
   });
 });
