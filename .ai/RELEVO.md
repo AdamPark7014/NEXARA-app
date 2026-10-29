@@ -1,5 +1,29 @@
 # RELEVO
 
+- **28-10 ~19:00 (claude-code) — Cierre «No cumplida» solo al checar salida; salida de zona justificada libera la foto de salida (urgente de Adam).**
+  - Causa: el cron `actividades-cierre-jornada` (cada 5 min, desde el 22-10) cerraba a la hora de salida del horario
+    (18:00, o 17:00 con `work_schedules` propio) antes de que la gente checara. El 28-10 cerró 10 actividades
+    (AN-0324/0325/0332/0340 a las 17:00; AN-0328/0334/0336/0341/0342/0343 a las 18:00) y ya no podían subir la foto de salida.
+  - Regla nueva (Adam): **el cierre es la checada de salida propia** (ni la automática de las 23:30 ni la de un jefe).
+    `AttendanceService.register` publica `attendance.checkout` en el bus de dominio; `ActivityNonComplianceService.alChecarSalida`
+    cierra lo que vencía ese día o antes y no entregó (en equipo, cuando ya salieron todos los que no entregaron).
+    Pasarse de la hora no cierra (semáforo rojo con minutos de atraso). Se quitaron el cron y el aviso previo de 1 h
+    (`notifyActivityClosingSoon` quedó sin uso). Reglas puras: `decidirCierrePorSalida`/`salidaCuentaDesde` en `incumplimiento.ts`.
+  - Geocerca: si la alerta de zona más reciente está `JUSTIFICADA`, `validarSalida` acepta fuera de 500 m y `estado()`
+    manda `exigeMismaUbicacion=false` + `salidaJustificada` (web/Android/iOS ya publicados solo pre-bloquean con esa bandera).
+    Al rechazar una salida lejos se abre la alerta para poder justificarla. Textos espejo actualizados en Android/iOS (salen con la próxima build).
+  - Datos 28-10: respaldo en el servidor `/root/respaldo-reapertura-2810/*.jsonl` (y copia en `C:\dev\_scratch\respaldos-hetzner\`).
+    Reabiertas 9 (todas menos AN-0343: Daniela checó a las 15:05, antes del cierre); se borraron sus 9 registros de
+    `activity_non_compliances` y los relojes cortados con `CORTE_DIA` pasaron a la hora de su salida (`SALIDA`) o siguen corriendo.
+    Las del 22–27 siguen cerradas: falta que Adam diga si también se reabren.
+  - Despliegue: **solo la API** (613ee251, sana). Se detuvo `update.sh` antes del build del web: el disco llegó a 96 %
+    (3.3 GB libres) y el web pide ~7 GB. La imagen web sigue en 5e8d8e57; mis dos textos web (`AvisoIncumplimiento`
+    «Al cerrar su jornada» y el mensaje de geocerca) salen con el próximo deploy del web (mirar `df -h /` antes).
+  - Verificado en producción: `estado(375,15)` da `exigeMismaUbicacion=false, salidaJustificada=true` y `validarSalida` a
+    ~8.5 km pasa. El cierre por salida aún no se ha visto en vivo: Josué (3) y David (8) seguían en jornada a las 19:00;
+    al checar debe salir en `docker logs nexara-api` «Salida de N: … no cumplida(s)».
+  - Pendiente aparte (Adam): margen de 5–10 min en la ubicación por mala señal y obligar a tener la ubicación encendida.
+
 - **28-10 ~23:30 (claude-code) — Asignar: complejidad con sugerencia de IA y tiempo típico (pedido de Adam: «ambos»).**
   - BD: `Activity.complejidad` y `complejidadSugerida` (`BASICA|ESTANDAR|COMPLEJA|CRITICA`), migración
     `20261028220000_actividad_complejidad`. **Va con `prisma migrate deploy`**: el script `deploy-api-web.sh` no migra.
