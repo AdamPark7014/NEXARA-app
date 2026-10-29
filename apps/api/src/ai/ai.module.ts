@@ -14,6 +14,6 @@ import { EstandarService } from './estandar/estandar.service.js';
   imports: [PrismaModule, AuthModule, UsersModule],
   providers: [AiTriageService, ClaudeService, AsistenteActividadesService, TranscriptorService, ComplejidadService, EstandarService],
   controllers: [AiController],
-  exports: [AiTriageService, ClaudeService, TranscriptorService],
+  exports: [AiTriageService, ClaudeService, TranscriptorService, ComplejidadService, EstandarService],
 })
 export class AiModule {}

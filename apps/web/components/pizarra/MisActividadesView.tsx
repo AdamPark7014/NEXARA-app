@@ -432,6 +432,7 @@ export default function MisActividadesPage() {
                         <TimerOutlinedIcon aria-hidden="true" />
                         {plan}
                         {a.excedida ? " · excedida" : ""}
+                        {a.tiempoEstandarMin && a.tiempoEstandarMin !== a.minutosPlan ? ` · estándar ${formatMinutes(a.tiempoEstandarMin)}` : ""}
                       </span>
                     ) : estimado ? (
                       <span className={c.dato}>

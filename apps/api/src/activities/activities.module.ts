@@ -5,6 +5,8 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
+import { AiModule } from '../ai/ai.module.js';
+import { TiemposActividadService } from './tiempos-actividad.service.js';
 import { TicketAlertsService } from './ticket-alerts.service.js';
 import { ActivityTimeAlertsService } from './activity-time-alerts.service.js';
 import { ActivityOverdueAlertsService } from './activity-overdue-alerts.service.js';
@@ -28,6 +30,7 @@ import {
     AuthModule,
     UsersModule,
     NotificationsModule,
+    AiModule,
   ],
   // El orden importa: los controladores con rutas literales van primero para
   // que `activities/reportes/...` no caiga en `activities/:id`.
@@ -51,7 +54,8 @@ import {
     RecordatoriosJornadaService,
     ActivityNonComplianceService,
     ActivityLifecycleService,
+    TiemposActividadService,
   ],
-  exports: [ActivitiesService, ActivityLifecycleService, ActivityTeamService],
+  exports: [ActivitiesService, ActivityLifecycleService, ActivityTeamService, TiemposActividadService],
 })
 export class ActivitiesModule {}

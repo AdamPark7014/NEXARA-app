@@ -15,11 +15,14 @@ export default function TiempoActividad({
   minutosPlan,
   minutosReales,
   tiempoMaximoMin,
+  minutosEstandar,
   enCurso = false,
 }: {
   minutosPlan?: number | null;
   minutosReales?: number | null;
   tiempoMaximoMin?: number | null;
+  /** Tiempo estándar (tabla + título): la analítica de cuánto debía tardar contra lo real. */
+  minutosEstandar?: number | null;
   enCurso?: boolean;
 }) {
   const m = medidorDeTiempo({ minutosPlan, minutosReales, tiempoMaximoMin });
@@ -52,6 +55,12 @@ export default function TiempoActividad({
           <span className={s.estado}>{m.texto}</span>
         </div>
       </div>
+      {minutosEstandar && minutosEstandar > 0 ? (
+        <p className={s.pie}>
+          Estándar: {formatoMinutos(minutosEstandar)}
+          {m.real > 0 ? ` · lleva el ${Math.round((m.real / minutosEstandar) * 100)} % del estándar` : ""}
+        </p>
+      ) : null}
       {m.tope != null ? <p className={s.pie}>Tope: {formatoMinutos(m.tope)}{tiempoMaximoMin ? "" : " (plan + 25 %)"}</p> : null}
     </section>
   );

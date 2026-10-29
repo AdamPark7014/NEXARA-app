@@ -191,7 +191,11 @@ export default function ActivityDetailPage() {
         indicaciones: form.indicaciones || null,
       };
       if (form.fechaInicio) payload.fechaInicio = new Date(form.fechaInicio).toISOString();
-      if (form.fechaEntregaEsperada) payload.fechaEntregaEsperada = new Date(form.fechaEntregaEsperada).toISOString();
+      // La entrega solo se manda si se cambió: es un parámetro que solo ajusta un superior (y en la
+      // autoasignación la fija el sistema), y reenviarla igual la daría por cambiada.
+      if (form.fechaEntregaEsperada && form.fechaEntregaEsperada !== toDateOnly(activity?.fechaEntregaEsperada)) {
+        payload.fechaEntregaEsperada = new Date(form.fechaEntregaEsperada).toISOString();
+      }
       if (form.fechaFinalizacion) payload.fechaFinalizacion = new Date(form.fechaFinalizacion).toISOString();
       await apiFetch(`activities/${id}`, token, { method: "PATCH", body: JSON.stringify(payload) });
       setEditing(false);
@@ -207,7 +211,7 @@ export default function ActivityDetailPage() {
     } finally {
       setSaving(false);
     }
-  }, [token, id, form, reload]);
+  }, [token, id, form, reload, activity?.fechaEntregaEsperada]);
 
   // La ficha (shell) ya pinta la carga y el error cuando la actividad no llegó.
   if (!activity) return null;

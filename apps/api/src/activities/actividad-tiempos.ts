@@ -198,6 +198,9 @@ export function tiemposDto(
     estatus?: string | null;
     periodoInicio?: Date | string | null;
     periodoFin?: Date | string | null;
+    /** Sin `horasPlan` (lo autoasignado nunca lo tiene), el plan es el tiempo de la actividad. */
+    tiempoEstimadoMin?: number | null;
+    tiempoEstandarMin?: number | null;
   },
   ahora: Date = new Date(),
   /**
@@ -206,7 +209,8 @@ export function tiemposDto(
    */
   sesiones?: SesionTrabajo[] | null,
 ) {
-  const plan = minutosPlan(fila.horasPlan);
+  const estimado = Number(actividad.tiempoEstimadoMin);
+  const plan = minutosPlan(fila.horasPlan) ?? (estimado > 0 ? Math.round(estimado) : null);
   const cerrada = esCerrada(actividad.estatus);
   const fuente = {
     inicio: fila.inicioRealAt ?? null,
@@ -247,6 +251,8 @@ export function tiemposDto(
     motivoSemaforo: luz.motivo,
     minutosPlan: plan,
     minutosReales: reales,
+    /** Tiempo estándar de la actividad (tabla + título), para «estándar contra real». */
+    minutosEstandar: Number(actividad.tiempoEstandarMin) > 0 ? Number(actividad.tiempoEstandarMin) : null,
     excedida: variosDias ? false : estaExcedida(plan, reales),
     inicioRealAt: fila.inicioRealAt ?? null,
     finRealAt: fila.finRealAt ?? null,

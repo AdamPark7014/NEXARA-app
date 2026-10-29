@@ -15,6 +15,8 @@ import {
 import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
+import { TiemposActividadService } from '../activities/tiempos-actividad.service.js';
+import { requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { MeService } from './me.service.js';
@@ -62,6 +64,7 @@ export class MeController {
     private readonly peerRequests: PeerRequestsService,
     private readonly horasExtra: HorasExtraService,
     private readonly trayectos: TrayectosService,
+    private readonly tiempos: TiemposActividadService,
   ) {}
 
   /** Mis actividades: cola personal (todos menos el CEO). */
@@ -158,6 +161,46 @@ export class MeController {
       companyId,
       body,
     );
+  }
+
+  /**
+   * Lo que se guardará al autoasignarse (tiempo estándar con su desglose y entrega a más tardar),
+   * leído del título: el formulario lo enseña en solo lectura porque en la autoasignación es fijo.
+   */
+  @Post('activities/tiempo-calculado')
+  tiempoCalculado(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body()
+    body: {
+      titulo?: string;
+      indicaciones?: string | null;
+      coreKind?: string | null;
+      ticketType?: string | null;
+      ticketTypeCustom?: string | null;
+      fechaInicio?: string | null;
+      periodoInicio?: string | null;
+      periodoFin?: string | null;
+      tiempoEstimadoMin?: number | null;
+    },
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    const n = Number(body?.tiempoEstimadoMin);
+    return this.tiempos.calcular(requireCompanyId(companyId), {
+      titulo: String(body?.titulo ?? '').slice(0, 200),
+      indicaciones: body?.indicaciones ? String(body.indicaciones).slice(0, 1200) : null,
+      coreKind: body?.coreKind ?? null,
+      ticketType: body?.ticketType ?? null,
+      ticketTypeCustom: body?.ticketTypeCustom ?? null,
+      fechaInicio: body?.fechaInicio ?? null,
+      periodoInicio: body?.periodoInicio ?? null,
+      periodoFin: body?.periodoFin ?? null,
+      tiempoEstimadoMin: Number.isFinite(n) && n > 0 ? Math.min(720, Math.round(n)) : null,
+      creadoPorId: Number(user.id),
+      responsableId: Number(user.id),
+    });
   }
 
   /** Cualquier persona del equipo: auto-asignarse una actividad (responsable = uno mismo). */

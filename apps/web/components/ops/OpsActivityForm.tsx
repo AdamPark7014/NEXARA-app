@@ -87,6 +87,7 @@ import { fechaCorta, periodoPorOmision, resumenDelRango } from "@/lib/actividad-
 import coreCss from "./OpsActivityFormCore.module.css";
 import ComplejidadCampo from "./ComplejidadCampo";
 import TiempoEstandarCampo from "./TiempoEstandarCampo";
+import TiempoFijoCampo from "./TiempoFijoCampo";
 import type { SugerenciaComplejidad } from "@/lib/complejidad";
 import s from "./OpsActivityForm.module.css";
 import { formatoMinutos } from "@/lib/actividad-tiempos";
@@ -935,7 +936,10 @@ export default function OpsActivityForm({
       : kindActual === "servicio"
         ? form.ticketType
         : null;
-  const complejidadVisible = isCore && Boolean(kindActual) && (kindActual !== "tarea" || Boolean(tipoParaComplejidad));
+  // En la autoasignación no se eligen: tiempo, complejidad y entrega salen del título (`TiempoFijoCampo`).
+  const complejidadVisible =
+    isCore && !selfAssign && Boolean(kindActual) && (kindActual !== "tarea" || Boolean(tipoParaComplejidad));
+  const tiempoFijo = isCore && selfAssign && Boolean(kindActual);
 
   /** El estándar fija el tiempo mientras nadie lo cambie con motivo. */
   const estandarManda =
@@ -1247,6 +1251,19 @@ export default function OpsActivityForm({
                 }}
               />
             ) : null}
+            {tiempoFijo ? (
+              <TiempoFijoCampo
+                token={token}
+                titulo={form.titulo}
+                indicaciones={form.indicaciones}
+                coreKind={kindActual}
+                ticketType={kindActual === "servicio" ? form.ticketType : null}
+                ticketTypeCustom={kindActual === "tarea" ? form.ticketTypeCustom : null}
+                fechaInicio={form.fecha ? new Date(`${form.fecha}T${form.hora || "09:00"}:00`).toISOString() : null}
+                periodoFin={form.periodoFin || null}
+                onMinutos={(m) => setForm((prev) => ({ ...prev, tiempoEstimadoMin: String(Math.min(720, m)) }))}
+              />
+            ) : null}
           </div>
         </FormSection>
 
@@ -1519,7 +1536,7 @@ export default function OpsActivityForm({
                 </Field>
               )}
             </FieldGrid>
-            {tone === "core" && !form.periodoFin ? (
+            {tone === "core" && !form.periodoFin && !tiempoFijo ? (
               <div className={s.compromiso}>
                 <Field
                   label="Entregar a más tardar"
@@ -1579,7 +1596,12 @@ export default function OpsActivityForm({
             <div className={s.duraciones}>
               <div className={s.grupo}>
                 <span className={s.etiqueta}>{isCore ? "¿Cuánto tiempo toma?" : "Tiempo esperado"}</span>
-                {estandarManda ? (
+                {tiempoFijo ? (
+                  <p className={s.estandarFijo} role="status">
+                    <strong>{formatoMinutos(Number(form.tiempoEstimadoMin)) ?? "—"}</strong>
+                    <span>Fijo en la autoasignación: sale del título. Solo tu superior lo puede ajustar.</span>
+                  </p>
+                ) : estandarManda ? (
                   // Lo da el tiempo estándar: para otro tiempo, «Cambiar el tiempo» pide el motivo.
                   <p className={s.estandarFijo} role="status">
                     <strong>{formatoMinutos(Number(form.tiempoEstimadoMin)) ?? "—"}</strong>
@@ -1596,10 +1618,12 @@ export default function OpsActivityForm({
                   />
                 )}
               </div>
-              <div className={s.grupo}>
-                <span className={s.etiqueta}>{isCore ? "Máximo permitido" : "Tiempo máximo"}</span>
-                <DurationWheelPicker {...duracion("tiempoMaximoMin")} maxHoras={24} minuteStep={5} />
-              </div>
+              {tiempoFijo ? null : (
+                <div className={s.grupo}>
+                  <span className={s.etiqueta}>{isCore ? "Máximo permitido" : "Tiempo máximo"}</span>
+                  <DurationWheelPicker {...duracion("tiempoMaximoMin")} maxHoras={24} minuteStep={5} />
+                </div>
+              )}
             </div>
           </div>
         </FormSection>

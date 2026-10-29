@@ -1,5 +1,35 @@
 # RELEVO
 
+- **29-10 ~14:30 (claude-code) — Ninguna actividad sin tiempo ni entrega; autoasignación fija; ajuste solo de superiores.**
+  - Adam: «ya no debe haber ninguna actividad que tenga tiempo indefinido de entrega, y la edición de parámetros de
+    una asignación debe ser a subordinados, pero la autoasignación es fija basándose en el título».
+  - API `activities/tiempo-entrega.ts` (puro, con spec) + `tiempos-actividad.service.ts`:
+    - `ActivitiesService.create` (todas las altas: web, apps, asistente, juntas, proyectos, solicitudes) completa
+      el alta. El estándar sale de la tabla con lo que la IA de complejidad lee del título (cantidad, complejidad;
+      caché de 30 min por título); lo que falta se supone y queda en el desglose como «Supuesto: …» (1 unidad,
+      complejidad estándar, traslado aproximado 30+30). Sin regla o en juntas, la mediana real del tipo o 1 h.
+      La entrega es el inicio + el tiempo, sumando la comida (15–16), sin pasar de las 18:00 si empieza en jornada.
+    - **Autoasignación** (`creadoPorId = responsableId`, por `/me/activities` o `/activities`): tiempo, estándar,
+      complejidad, unidades y entrega fijos; lo que mande el cliente se ignora.
+    - **Asignada a otro:** se respeta lo que puso quien asigna; solo se llena lo que falta. Si manda estándar y
+      otro tiempo sin `estandarCambiadoMotivo` → 400.
+    - `PATCH /activities/:id`: tiempo, estándar, desglose, motivo, complejidad, unidades, destino, traslado,
+      entrega y máxima solo los cambia un superior de quien la ejecuta (`isSuperiorInChain`); reenviar lo mismo
+      no cuenta, y con periodo la entrega/máxima tampoco (las pone el periodo).
+    - Altas directas: gastos administrativos (5 min) y mantenimiento por contrato (estándar del preventivo,
+      entrega = SLA). `app.service.importAll` (restaurar un respaldo) se deja tal cual.
+    - `POST me/activities/tiempo-calculado`: vista previa de lo que fijará la autoasignación.
+    - El plan del detalle y de «Mis actividades» usa `tiempoEstimadoMin` si no hay `horasPlan` (lo autoasignado nunca
+      lo tenía); `me/activities` trae `tiempoEstandarMin`/`estandarDesglose`; «asignadas por mí», `minutosEstandar`.
+  - Web: autoasignación con la tarjeta del estándar en solo lectura (`TiempoFijoCampo`), sin complejidad, sin
+    «Entregar a más tardar», sin ruedas de tiempo ni máximo. Detalle: «Estándar X · lleva el N % del estándar» en
+    la tarjeta Tiempo y la entrega con hora; el formulario de edición ya no reenvía la entrega si no cambió.
+    Listas: «estándar X» junto al plan contra real.
+  - Relleno: `apps/api/scripts/rellenar-tiempos-abiertas.cjs` (dentro del contenedor, simulacro y `--escribir`;
+    lógica en `activities/rellenar-tiempos.ts`, con spec). No escribe si cambiaría algún «a tiempo».
+  - Pruebas: API tiempo-entrega 9, parámetros 7, relleno 5; web TiempoFijoCampo 2; suites completas en el commit.
+  - Contrato para las apps: mandado a la sesión de apps (`local_e8744ccc…`).
+
 - **29-10 ~16:30 (claude-code) — Sugerencia de nómina con periodos calculados (pedido de Adam: «múltiples cálculos
   de fechas dinámicas»).**
   - `/erp/finance/employee-payments` → «Sugerencia de nómina»: el selector ofrece semana actual y anterior (lunes a

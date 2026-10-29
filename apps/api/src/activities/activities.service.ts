@@ -42,9 +42,12 @@ import {
   assertCanCancel,
   cleanMotivo,
   isCancelledStatus,
+  isSuperiorInChain,
   loadActivityChain,
   MOTIVO_MINIMO,
 } from './activity-superiors.js';
+import { esAutoasignacion, parametrosCambiados } from './tiempo-entrega.js';
+import { TiemposActividadService } from './tiempos-actividad.service.js';
 import { normalizarMomento, normalizarMomentos, progresoDeCampos, type Momento } from './evidence/evidence-fields.helpers.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -59,6 +62,7 @@ export class ActivitiesService {
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly domainEvents: DomainEventBusService,
     @Optional() private readonly realtime?: RealtimeGateway,
+    @Optional() private readonly tiempos?: TiemposActividadService,
   ) {}
 
   // Dummy implementation to avoid controller errors
@@ -124,9 +128,14 @@ export class ActivitiesService {
     }
   }
 
-  async create(createActivityDto: CreateActivityDto, companyId?: number | null) {
-    await this.assertResponsableActivo(createActivityDto.responsableId);
+  async create(dtoRecibido: CreateActivityDto, companyId?: number | null) {
+    await this.assertResponsableActivo(dtoRecibido.responsableId);
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
+    // Ninguna sin tiempo ni entrega; en la autoasignación salen del título y no se editan
+    // (`tiempo-entrega.ts`). Todas las altas pasan por aquí: web, apps, asistente y servicios.
+    const createActivityDto = this.tiempos
+      ? ((await this.tiempos.completar(dtoRecibido, resolvedCompanyId)) as CreateActivityDto)
+      : dtoRecibido;
     const trimmed = createActivityDto.anNumber?.trim();
     const anNumber = trimmed ? trimmed : await this.generateNextAnNumber(resolvedCompanyId);
 
@@ -1082,16 +1091,54 @@ export class ActivitiesService {
       select: {
         estatus: true,
         responsableId: true,
+        creadoPorId: true,
         anNumber: true,
         titulo: true,
         companyId: true,
         fechaInicio: true,
         fechaMaxima: true,
+        fechaEntregaEsperada: true,
         periodoInicio: true,
         periodoFin: true,
+        tiempoEstimadoMin: true,
+        tiempoEstandarMin: true,
+        estandarDesglose: true,
+        estandarCambiadoMotivo: true,
+        complejidad: true,
+        unidades: true,
+        destino: true,
+        trasladoMin: true,
+        trasladoModo: true,
       },
     });
     assertCompanyAccess(prev, companyId, 'Actividad');
+    // Tiempo, complejidad y entrega: en la autoasignación los fija el sistema; en lo asignado solo
+    // los ajusta un superior de quien la ejecuta (la cadena de «quién revisa a quién»).
+    // Con periodo, la entrega y la máxima las pone el periodo (el formulario viejo las reenvía
+    // iguales al inicio): no cuentan como cambio de entrega.
+    const conPeriodo = Boolean(updateActivityDto.periodoFin !== undefined ? updateActivityDto.periodoFin : prev?.periodoFin);
+    const cambiados = parametrosCambiados(prev as Record<string, unknown>, updateActivityDto as Record<string, unknown>).filter(
+      (k) => !(conPeriodo && (k === 'fechaMaxima' || k === 'fechaEntregaEsperada')),
+    );
+    if (cambiados.length) {
+      const cadena = await loadActivityChain(this.prisma, id, companyId);
+      if (!isSuperiorInChain(actor, cadena, prev!.responsableId)) {
+        throw new ForbiddenException(
+          esAutoasignacion(prev!)
+            ? 'En una autoasignación el tiempo y la entrega los fija el sistema desde el título; solo un superior los puede ajustar.'
+            : 'Solo un superior de quien la ejecuta puede cambiar el tiempo, la complejidad o la entrega.',
+        );
+      }
+      const estandar = updateActivityDto.tiempoEstandarMin ?? prev!.tiempoEstandarMin;
+      const estimado = updateActivityDto.tiempoEstimadoMin ?? prev!.tiempoEstimadoMin;
+      const motivo = updateActivityDto.estandarCambiadoMotivo !== undefined ? updateActivityDto.estandarCambiadoMotivo : prev!.estandarCambiadoMotivo;
+      if (cambiados.includes('tiempoEstimadoMin') && estandar && estimado && estandar !== estimado && !String(motivo ?? '').trim()) {
+        throw new BadRequestException('El tiempo no es el estándar: escribe por qué lo cambiaste.');
+      }
+      if (updateActivityDto.tiempoEstimadoMin === null) {
+        throw new BadRequestException('Toda actividad lleva tiempo estimado.');
+      }
+    }
     if (
       updateActivityDto.responsableId != null &&
       Number(updateActivityDto.responsableId) !== Number(prev.responsableId)
