@@ -13,13 +13,17 @@ import { diasDelRango } from '../me/kpis-equipo.js';
 import { workDateKey } from '../common/time/workday.js';
 import { NOMINA_SETTING_KEY, parsearConfigNomina } from './nomina-calendario.js';
 import {
+  esClavePeriodo,
   filaSugerencia,
   formulaSugerencia,
   ordenaSugerencias,
+  periodoDeClave,
   periodoManual,
+  periodosCalculados,
   periodoSugerencia,
   totalesSugerencia,
   ventanaDeCalculo,
+  type ClavePeriodo,
 } from './sugerencia-nomina.js';
 import {
   avisosDeFila,
@@ -249,7 +253,7 @@ export class EmployeePaymentsService {
    */
   async sugerenciaNomina(
     viewer: { id: number; roleKey?: string | null; email?: string | null; isSuperAdmin?: boolean },
-    opciones: { desde?: string; hasta?: string; periodo?: 'vigente' | 'anterior' },
+    opciones: { desde?: string; hasta?: string; periodo?: 'vigente' | 'anterior' | ClavePeriodo },
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
@@ -261,6 +265,8 @@ export class EmployeePaymentsService {
         throw new BadRequestException(`El rango máximo es de ${KPI_MAX_DIAS} días`);
       }
       periodo = periodoManual(opciones.desde, opciones.hasta);
+    } else if (esClavePeriodo(opciones.periodo)) {
+      periodo = periodoDeClave(hoy, opciones.periodo);
     } else {
       const ajustes = await this.prisma.systemSetting.findMany({
         where: { key: NOMINA_SETTING_KEY, OR: [{ companyId: null }, { companyId: tenantId }] },
@@ -310,7 +316,10 @@ export class EmployeePaymentsService {
     const ventana = ventanaDeCalculo(rango, hoy);
 
     return {
+      // «A la fecha» corta en `calculadoHasta` (ayer, si está en curso); «periodo completo», en `hasta`.
       periodo: { ...periodo, enCurso: ventana.enCurso, calculadoHasta: ventana.hasta },
+      // Lo que ofrece el selector, ya con sus fechas.
+      periodos: periodosCalculados(hoy).map(({ clave, desde, hasta, etiqueta }) => ({ clave, desde, hasta, etiqueta })),
       generadoAt: datos.generadoAt,
       scope: datos.scope,
       formula: formulaSugerencia(),

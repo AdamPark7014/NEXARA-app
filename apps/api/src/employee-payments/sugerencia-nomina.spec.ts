@@ -1,8 +1,15 @@
 import { calculaKpisPersona, horarioDePersona } from '../me/kpis-equipo.js';
 import type { EntradaPreNomina } from './pre-nomina.js';
+import { workDateKey } from '../common/time/workday.js';
 import {
+  CLAVES_PERIODO,
   HORAS_SEMANALES_LFT,
   divisorDeHorario,
+  esClavePeriodo,
+  periodoDeClave,
+  periodosCalculados,
+  semanalDeMensual,
+  sueldoDeDias,
   filaSugerencia,
   formulaSugerencia,
   minutosEsperados,
@@ -11,6 +18,7 @@ import {
   periodoSugerencia,
   totalesSugerencia,
   ventanaDeCalculo,
+  type ClavePeriodo,
   type EntradaSugerencia,
 } from './sugerencia-nomina.js';
 
@@ -276,5 +284,120 @@ describe('totales y orden', () => {
     expect(texto).toContain('sueldo semanal ÷ horas semanales');
     expect(texto).toContain('48 h');
     expect(texto).toContain('no crea ni modifica pagos');
+  });
+});
+
+describe('periodos calculados con la fecha de hoy (29-10)', () => {
+  const rango = (hoy: string, clave: ClavePeriodo) => {
+    const p = periodoDeClave(hoy, clave);
+    return [p.desde, p.hasta];
+  };
+
+  it('semana de lunes a domingo, aunque cruce el mes', () => {
+    // Jueves 29-10: la semana del 26-10 (la de la corrida en paralelo con el Excel) termina el 1-11.
+    expect(rango('2026-10-29', 'semana')).toEqual(['2026-10-26', '2026-11-01']);
+    expect(rango('2026-10-29', 'semana_anterior')).toEqual(['2026-10-19', '2026-10-25']);
+    // El lunes y el domingo son de su propia semana.
+    expect(rango('2026-10-26', 'semana')).toEqual(['2026-10-26', '2026-11-01']);
+    expect(rango('2026-11-01', 'semana')).toEqual(['2026-10-26', '2026-11-01']);
+    expect(rango('2026-11-02', 'semana_anterior')).toEqual(['2026-10-26', '2026-11-01']);
+    // Y cruzando el año.
+    expect(rango('2027-01-03', 'semana')).toEqual(['2026-12-28', '2027-01-03']);
+  });
+
+  it('quincena de 15 o de 16 días y cambio de mes', () => {
+    expect(rango('2026-10-29', 'quincena')).toEqual(['2026-10-16', '2026-10-31']);
+    expect(rango('2026-10-29', 'quincena_anterior')).toEqual(['2026-10-01', '2026-10-15']);
+    expect(rango('2026-11-03', 'quincena')).toEqual(['2026-11-01', '2026-11-15']);
+    expect(rango('2026-11-03', 'quincena_anterior')).toEqual(['2026-10-16', '2026-10-31']);
+    expect(rango('2026-11-20', 'quincena')).toEqual(['2026-11-16', '2026-11-30']);
+    expect(rango('2027-01-10', 'quincena_anterior')).toEqual(['2026-12-16', '2026-12-31']);
+  });
+
+  it('febrero: la 2.ª quincena tiene 13 días (14 en bisiesto)', () => {
+    expect(rango('2027-02-20', 'quincena')).toEqual(['2027-02-16', '2027-02-28']);
+    expect(rango('2027-02-20', 'mes')).toEqual(['2027-02-01', '2027-02-28']);
+    expect(rango('2028-02-29', 'quincena')).toEqual(['2028-02-16', '2028-02-29']);
+    expect(rango('2027-03-05', 'mes_anterior')).toEqual(['2027-02-01', '2027-02-28']);
+  });
+
+  it('mes actual y anterior, también de diciembre a enero', () => {
+    expect(rango('2026-10-29', 'mes')).toEqual(['2026-10-01', '2026-10-31']);
+    expect(rango('2026-10-29', 'mes_anterior')).toEqual(['2026-09-01', '2026-09-30']);
+    expect(rango('2027-01-10', 'mes_anterior')).toEqual(['2026-12-01', '2026-12-31']);
+  });
+
+  it('«hoy» es el día de Ciudad de México, no el de UTC', () => {
+    // 31-10 a las 23:30 en México ya es 1-11 en UTC: sigue siendo la 2.ª quincena de octubre.
+    const hoy = workDateKey(new Date('2026-11-01T05:30:00Z'), 'America/Mexico_City');
+    expect(hoy).toBe('2026-10-31');
+    expect(rango(hoy, 'quincena')).toEqual(['2026-10-16', '2026-10-31']);
+  });
+
+  it('la lista trae los seis periodos, en el orden del selector', () => {
+    expect(periodosCalculados('2026-10-29').map((p) => [p.clave, p.origen])).toEqual(
+      CLAVES_PERIODO.map((c) => [c, 'calculado']),
+    );
+    expect(esClavePeriodo('quincena_anterior')).toBe(true);
+    expect(esClavePeriodo('vigente')).toBe(false);
+  });
+});
+
+describe('regla de pago (decisión 6, 29-10)', () => {
+  it('el día es la semana ÷ 7 en todo periodo: 7 días son la semana exacta', () => {
+    expect(sueldoDeDias(4000, 7)).toBe(4000);
+    expect(sueldoDeDias(4000, 15)).toBe(8571.43);
+    expect(sueldoDeDias(4000, 16)).toBe(9142.86);
+  });
+
+  it('las dos quincenas suman el mes (al centavo)', () => {
+    const octubre = sueldoDeDias(4000, 31);
+    expect(Math.abs(sueldoDeDias(4000, 15) + sueldoDeDias(4000, 16) - octubre)).toBeLessThanOrEqual(0.01);
+    // Febrero de 28 días: cuatro semanas exactas.
+    expect(sueldoDeDias(4000, 15) + sueldoDeDias(4000, 13)).toBeCloseTo(16000, 2);
+  });
+
+  it('semana = mensual × 12 ÷ 52', () => {
+    expect(semanalDeMensual(16000)).toBe(3692.31);
+    expect(semanalDeMensual(5200)).toBe(1200);
+  });
+});
+
+describe('dos lecturas: a la fecha y periodo completo', () => {
+  const SEMANA = { desde: '2026-10-26', hasta: '2026-11-01' };
+  const HOY_JUEVES = '2026-10-29';
+
+  it('en curso: lo de a la fecha llega a ayer y el completo suma los días que faltan', () => {
+    const f = filaSugerencia(
+      entrada({ periodo: SEMANA, hoy: HOY_JUEVES, totales: tot({ minutosLaborados: 3 * 480, minutosProductivos: 3 * 400 }) }),
+    );
+    expect(f.diasALaFecha).toBe(3);
+    expect(f.diasRestantes).toBe(4);
+    expect(f.montoSugerido).toBe(1714.29);
+    expect(f.devengadoALaFecha).toBe(1714.29);
+    expect(f.proyectado).toBe(4000);
+    expect(f.sueldoPeriodo).toBe(4000);
+  });
+
+  it('cerrado: las dos lecturas coinciden', () => {
+    const f = filaSugerencia(entrada());
+    expect(f.diasRestantes).toBe(0);
+    expect(f.proyectado).toBe(f.montoSugerido);
+  });
+
+  it('el primer día del periodo: nada que juzgar todavía, el completo es el sueldo del periodo', () => {
+    const f = filaSugerencia(entrada({ periodo: SEMANA, hoy: '2026-10-26', totales: tot() }));
+    expect(f.diasALaFecha).toBe(0);
+    expect(f.montoSugerido).toBeNull();
+    expect(f.proyectado).toBe(4000);
+  });
+
+  it('los totales suman las dos lecturas', () => {
+    const t = totalesSugerencia([
+      filaSugerencia(entrada({ periodo: SEMANA, hoy: HOY_JUEVES, totales: tot({ minutosLaborados: 3 * 480, minutosProductivos: 1000 }) })),
+      filaSugerencia(entrada({ userId: 8, periodo: SEMANA, hoy: HOY_JUEVES, sueldoSemanal: null })),
+    ]);
+    expect(t.devengadoALaFecha).toBe(1714.29);
+    expect(t.proyectado).toBe(4000);
   });
 });

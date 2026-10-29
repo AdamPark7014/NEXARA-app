@@ -32,7 +32,13 @@ export type FilaSugerencia = {
   pagoPorLaboradas: number | null;
   pagoPorProductivas: number | null;
   sueldoPeriodo: number | null;
+  /** «A la fecha»: lo esperado contado hasta ayer. */
   montoSugerido: number | null;
+  devengadoALaFecha?: number | null;
+  /** «Periodo completo»: lo de a la fecha más el sueldo de los días que faltan. */
+  proyectado?: number | null;
+  diasALaFecha?: number;
+  diasRestantes?: number;
   estado: EstadoSugerencia;
   sugerencia: string;
   avisos: string[];
@@ -50,17 +56,33 @@ export type TotalesSugerencia = {
   pagoPorProductivas: number;
   sueldoPeriodo: number;
   montoSugerido: number;
+  devengadoALaFecha?: number;
+  proyectado?: number;
 };
+
+/** Periodos que el selector ofrece sin escribir fechas (la API los calcula con la fecha de hoy). */
+export const PERIODOS_CALCULADOS = [
+  { clave: "semana", label: "Semana actual" },
+  { clave: "semana_anterior", label: "Semana anterior" },
+  { clave: "quincena", label: "Quincena actual" },
+  { clave: "quincena_anterior", label: "Quincena anterior" },
+  { clave: "mes", label: "Mes actual" },
+  { clave: "mes_anterior", label: "Mes anterior" },
+] as const;
+export type ClavePeriodo = (typeof PERIODOS_CALCULADOS)[number]["clave"];
 
 export type SugerenciaNominaRespuesta = {
   periodo: {
     desde: string;
     hasta: string;
     etiqueta: string;
-    origen: "calendario" | "por_omision" | "manual";
+    origen: "calendario" | "por_omision" | "manual" | "calculado";
+    clave?: ClavePeriodo;
     enCurso: boolean;
     calculadoHasta: string;
   };
+  /** Los periodos del selector con sus fechas (API nueva). */
+  periodos?: Array<{ clave: ClavePeriodo; desde: string; hasta: string; etiqueta: string }>;
   generadoAt: string;
   scope: "company" | "subtree";
   formula: string[];
@@ -68,7 +90,23 @@ export type SugerenciaNominaRespuesta = {
   totales: TotalesSugerencia;
 };
 
-export type ModoPeriodo = "vigente" | "anterior" | "rango";
+/** `vigente`/`anterior` = calendario de la empresa (rutas viejas); el selector usa los calculados. */
+export type ModoPeriodo = ClavePeriodo | "vigente" | "anterior" | "rango";
+
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** «26 oct», «1 nov» (y el año si no es el de la otra fecha). */
+export function fechaCorta(iso: string, conAnio = false): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return `${d} ${MESES_CORTOS[m - 1]}${conAnio ? ` ${y}` : ""}`;
+}
+
+/** «26 oct – 1 nov»; con el año en las dos si cruza de año. */
+export function rangoCorto(desde: string, hasta: string): string {
+  const cruza = desde.slice(0, 4) !== hasta.slice(0, 4);
+  return `${fechaCorta(desde, cruza)} – ${fechaCorta(hasta, cruza)}`;
+}
 
 /** Misma fórmula que la API; aquí solo se enseña. */
 export const NOTA_FORMULA =
@@ -122,7 +160,10 @@ function partesPeriodo(datos: SugerenciaNominaRespuesta): string[] {
     `${p.origen === "manual" ? "Rango" : "Periodo"} ${p.etiqueta}`,
     `del ${p.desde} al ${p.hasta}`,
   ];
-  if (p.enCurso) partes.push(`en curso: lo esperado se cuenta hasta el ${p.calculadoHasta}`);
+  if (p.enCurso) {
+    partes.push(`en curso: lo esperado se cuenta hasta el ${p.calculadoHasta}`);
+    partes.push(`«a la fecha» corta el ${fechaCorta(p.calculadoHasta)} y «periodo completo» el ${fechaCorta(p.hasta)}`);
+  }
   if (p.origen === "por_omision") partes.push("la empresa no tiene calendario de nómina: se asume quincenal");
   if (datos.scope === "subtree") partes.push("solo tu organigrama");
   return partes;
@@ -153,7 +194,8 @@ const BAJA_PRODUCTIVIDAD = 60;
  * hora y monto sugerido por persona. Solo lectura: no crea pagos.
  */
 export default function SugerenciaNomina({ token }: { token: string }) {
-  const [modo, setModo] = useState<ModoPeriodo>("vigente");
+  // Christian paga quincenal: se abre en la quincena actual.
+  const [modo, setModo] = useState<ModoPeriodo>("quincena");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [datos, setDatos] = useState<SugerenciaNominaRespuesta | null>(null);
@@ -188,6 +230,7 @@ export default function SugerenciaNomina({ token }: { token: string }) {
     if (modo !== "rango") void cargar(modo, "", "");
   }, [modo, cargar]);
 
+  const enCurso = Boolean(datos?.periodo.enCurso);
   const columnas: Column<Renglon>[] = [
     {
       key: "persona",
@@ -295,6 +338,11 @@ export default function SugerenciaNomina({ token }: { token: string }) {
             <div style={{ marginTop: 2, display: "flex", justifyContent: "flex-end" }}>
               <StatusDot label={estado.label} tone={estado.tone} />
             </div>
+            {enCurso && f.proyectado != null ? (
+              <div style={metaStyle}>
+                Periodo completo al {fechaCorta(datos!.periodo.hasta)} <Money value={f.proyectado} bold={false} />
+              </div>
+            ) : null}
             {f.sueldoPeriodo != null ? (
               <div style={metaStyle}>
                 Sueldo del periodo <Money value={f.sueldoPeriodo} bold={false} />
@@ -313,6 +361,8 @@ export default function SugerenciaNomina({ token }: { token: string }) {
       ]
     : [];
   const t = datos?.totales;
+  const fechasDe = new Map((datos?.periodos ?? []).map((p) => [p.clave, rangoCorto(p.desde, p.hasta)]));
+  const MXN = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -323,9 +373,11 @@ export default function SugerenciaNomina({ token }: { token: string }) {
             value: modo,
             onChange: (v) => setModo(v as ModoPeriodo),
             options: [
-              { value: "vigente", label: "Periodo vigente" },
-              { value: "anterior", label: "Periodo anterior" },
-              { value: "rango", label: "Rango de fechas" },
+              ...PERIODOS_CALCULADOS.map((p) => ({
+                value: p.clave,
+                label: fechasDe.has(p.clave) ? `${p.label} · ${fechasDe.get(p.clave)}` : p.label,
+              })),
+              { value: "rango", label: "Rango personalizado" },
             ],
           },
         ]}
@@ -390,7 +442,14 @@ export default function SugerenciaNomina({ token }: { token: string }) {
         <MetricStrip
           ariaLabel="Totales de la sugerencia de nómina"
           metrics={[
-            { label: "Sugerido", value: <Money value={t.montoSugerido} />, hint: `sueldo del periodo ${new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(t.sueldoPeriodo)}` },
+            {
+              label: enCurso ? `Sugerido al ${fechaCorta(datos!.periodo.calculadoHasta)}` : "Sugerido",
+              value: <Money value={t.montoSugerido} />,
+              hint:
+                enCurso && t.proyectado != null
+                  ? `periodo completo al ${fechaCorta(datos!.periodo.hasta)}: ${MXN.format(t.proyectado)}`
+                  : `sueldo del periodo ${MXN.format(t.sueldoPeriodo)}`,
+            },
             { label: "Horas laboradas", value: formatoHoras(t.horasLaboradas), hint: `${formatoHoras(t.horasProductivas)} productivas` },
             {
               label: "Productividad",

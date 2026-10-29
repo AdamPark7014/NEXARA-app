@@ -38,9 +38,42 @@ const CONFIG_POR_OMISION: ConfigNomina = { frecuencia: 'quincenal', diaSemanaCor
 
 export type PeriodoSugerencia = PeriodoNomina & {
   frecuencia: FrecuenciaNomina | null;
-  /** `calendario` = el de la empresa; `por_omision` = quincenal supuesto; `manual` = desde/hasta. */
-  origen: 'calendario' | 'por_omision' | 'manual';
+  /**
+   * `calendario` = el de la empresa; `por_omision` = quincenal supuesto; `manual` = desde/hasta;
+   * `calculado` = semana, quincena o mes calculados con la fecha de hoy (`clave`).
+   */
+  origen: 'calendario' | 'por_omision' | 'manual' | 'calculado';
+  clave?: ClavePeriodo;
 };
+
+/** Los periodos que la pantalla ofrece sin escribir fechas, calculados con la fecha de hoy. */
+export const CLAVES_PERIODO = ['semana', 'semana_anterior', 'quincena', 'quincena_anterior', 'mes', 'mes_anterior'] as const;
+export type ClavePeriodo = (typeof CLAVES_PERIODO)[number];
+
+export function esClavePeriodo(v: unknown): v is ClavePeriodo {
+  return typeof v === 'string' && (CLAVES_PERIODO as readonly string[]).includes(v);
+}
+
+/**
+ * La semana de nómina va de lunes a domingo, como el control de nómina (`nomina_semanas`) y la hoja de
+ * entradas de Excel (que llena de lunes a viernes). Corte en domingo.
+ */
+const SEMANA_LUNES_A_DOMINGO: ConfigNomina = { frecuencia: 'semanal', diaSemanaCorte: 0 };
+const QUINCENAL: ConfigNomina = { frecuencia: 'quincenal', diaSemanaCorte: 5 };
+const MENSUAL: ConfigNomina = { frecuencia: 'mensual', diaSemanaCorte: 5 };
+
+/** Semana, quincena o mes que contiene `hoy` (día de México), o el anterior a ese. */
+export function periodoDeClave(hoy: string, clave: ClavePeriodo): PeriodoSugerencia {
+  const cfg = clave.startsWith('semana') ? SEMANA_LUNES_A_DOMINGO : clave.startsWith('quincena') ? QUINCENAL : MENSUAL;
+  const actual = proximoCorte(hoy, cfg).periodo;
+  const periodo = clave.endsWith('_anterior') ? periodoQueCierra(sumaDias(actual.desde, -1), cfg) : actual;
+  return { ...periodo, frecuencia: cfg.frecuencia, origen: 'calculado', clave };
+}
+
+/** Todos los periodos calculados, en el orden del selector. */
+export function periodosCalculados(hoy: string): PeriodoSugerencia[] {
+  return CLAVES_PERIODO.map((c) => periodoDeClave(hoy, c));
+}
 
 /** El periodo de nómina vigente (el que contiene hoy) o el anterior a ese. */
 export function periodoSugerencia(
@@ -73,6 +106,26 @@ export function ventanaDeCalculo(
   const desde = fechaIngreso && fechaIngreso > periodo.desde ? fechaIngreso : periodo.desde;
   const dias = desde <= hasta ? diasDelRango(desde, hasta).length : 0;
   return { desde, hasta, dias, enCurso };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regla de pago (§7.4.6, aprobada el 29-10; la revisa la contadora)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Semanas por mes de la regla aprobada: un año tiene 52 semanas, no 48 (el tabulador usa ÷ 4). */
+export const SEMANAS_POR_MES = 52 / 12;
+
+/** Semana = mensual × 12 ÷ 52. */
+export function semanalDeMensual(mensual: number): number {
+  return roundMoney(mensual / SEMANAS_POR_MES);
+}
+
+/**
+ * Sueldo de `dias` días naturales: semana ÷ 7 × días. El mismo divisor en todo periodo, así que 7 días
+ * son la semana exacta, y una quincena o un mes son la suma de sus días (incluye el séptimo día).
+ */
+export function sueldoDeDias(semanal: number, dias: number): number {
+  return roundMoney((semanal / 7) * Math.max(0, dias));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -182,7 +235,14 @@ export type FilaSugerencia = {
   pagoPorProductivas: number | null;
   /** Sueldo de todo el periodo: sueldo semanal ÷ 7 × días del periodo. */
   sueldoPeriodo: number | null;
+  /** «A la fecha»: el sugerido, con lo esperado contado hasta ayer. */
   montoSugerido: number | null;
+  /** Sueldo de los días ya transcurridos (desde su ingreso): semanal ÷ 7 × días. */
+  devengadoALaFecha: number | null;
+  /** «Periodo completo»: lo sugerido a la fecha más el sueldo de los días que faltan, si los cumple. */
+  proyectado: number | null;
+  diasALaFecha: number;
+  diasRestantes: number;
   estado: EstadoSugerencia;
   sugerencia: string;
   avisos: string[];
@@ -215,8 +275,11 @@ export function filaSugerencia(e: EntradaSugerencia): FilaSugerencia {
   const pagoHora = sueldo != null ? sueldo / divisor.horasSemanales : null;
   const pagoPorLaboradas = pagoHora != null ? roundMoney((laborados / 60) * pagoHora) : null;
   const pagoPorProductivas = pagoHora != null ? roundMoney((productivos / 60) * pagoHora) : null;
-  const sueldoPeriodo = sueldo != null ? roundMoney((sueldo / 7) * diasPeriodo) : null;
+  const sueldoPeriodo = sueldo != null ? sueldoDeDias(sueldo, diasPeriodo) : null;
   const productividadPct = pct(productivos, laborados);
+  // Los días que faltan del periodo (hoy incluido), desde su ingreso si entró después de hoy.
+  const desdeRestantes = [sumaDias(ventana.hasta, 1), e.fechaIngreso ?? ''].reduce((a, b) => (b > a ? b : a));
+  const diasRestantes = ventana.enCurso && desdeRestantes <= e.periodo.hasta ? diasDelRango(desdeRestantes, e.periodo.hasta).length : 0;
 
   let estado: EstadoSugerencia;
   let montoSugerido: number | null = null;
@@ -290,6 +353,14 @@ export function filaSugerencia(e: EntradaSugerencia): FilaSugerencia {
     pagoPorProductivas,
     sueldoPeriodo,
     montoSugerido,
+    devengadoALaFecha: sueldo != null ? sueldoDeDias(sueldo, ventana.dias) : null,
+    // Sin sugerido a la fecha solo se proyecta si el periodo apenas empieza (no hay días que juzgar).
+    proyectado:
+      sueldo != null && (montoSugerido != null || ventana.dias === 0)
+        ? roundMoney((montoSugerido ?? 0) + sueldoDeDias(sueldo, diasRestantes))
+        : null,
+    diasALaFecha: ventana.dias,
+    diasRestantes,
     estado,
     sugerencia,
     avisos,
@@ -310,6 +381,8 @@ export type TotalesSugerencia = {
   pagoPorProductivas: number;
   sueldoPeriodo: number;
   montoSugerido: number;
+  devengadoALaFecha: number;
+  proyectado: number;
 };
 
 /** El pie de la tabla. Los montos nulos (sin sueldo) no suman; el % sale de los totales. */
@@ -331,6 +404,8 @@ export function totalesSugerencia(filas: FilaSugerencia[]): TotalesSugerencia {
     pagoPorProductivas: roundMoney(s((f) => f.pagoPorProductivas)),
     sueldoPeriodo: roundMoney(s((f) => f.sueldoPeriodo)),
     montoSugerido: roundMoney(s((f) => f.montoSugerido)),
+    devengadoALaFecha: roundMoney(s((f) => f.devengadoALaFecha)),
+    proyectado: roundMoney(s((f) => f.proyectado)),
   };
 }
 
@@ -347,7 +422,10 @@ export function formulaSugerencia(): string[] {
     'Horas productivas: tiempo con una actividad en curso (sesiones de trabajo, máximo 12 h cada una) que cae dentro de las horas laboradas. Lo hecho antes de la entrada o después de la salida no cuenta, y dos actividades a la vez no cuentan doble.',
     `Pago por hora = sueldo semanal ÷ horas semanales de su horario (jornada × días laborables; oficina L–V 8 h = 40 h). Sin horario fijo: ÷ ${HORAS_SEMANALES_LFT} h, la jornada diurna legal.`,
     'Pago por laboradas = horas laboradas × pago por hora. Pago por productivas = horas productivas × pago por hora.',
+    'Regla de pago aprobada el 29-10 (la revisa la contadora): semana = mensual × 12 ÷ 52, y el día es la semana ÷ 7 en todo periodo. Así 7 días son la semana exacta y una quincena o un mes son la suma de sus días.',
     'Sueldo del periodo = sueldo semanal ÷ 7 × días del periodo (incluye el séptimo día, como la quincena).',
+    'Periodos: semana de lunes a domingo (como el control de nómina), quincena del 1 al 15 y del 16 a fin de mes, y mes natural. Se calculan con la fecha de hoy en Ciudad de México.',
+    'A la fecha = sugerido con lo esperado contado hasta ayer (hoy todavía no termina). Periodo completo = lo de a la fecha más el sueldo de los días que faltan, si los cumple.',
     'Sugerido = sueldo devengado a la fecha × (horas laboradas ÷ horas esperadas), sin pasar de su sueldo. El tiempo extra no entra: solo se paga si un jefe lo aprueba (pre-nómina).',
     `Si las productivas son menos del ${UMBRAL_PRODUCTIVIDAD_REVISAR} % de las laboradas, se sugiere revisar antes de pagar.`,
     'Es una sugerencia: no crea ni modifica pagos.',
