@@ -132,6 +132,11 @@ fun InicioScreen(
     onOpenActividades: () -> Unit,
     onOpenAsistencia: () -> Unit,
     onOpenComidas: () -> Unit,
+    /** Dirección general: a dónde lleva cada renglón de su tablero (null = el rol no lo abre). */
+    onOpenAprobaciones: (() -> Unit)? = null,
+    onOpenPagos: (() -> Unit)? = null,
+    onOpenDesempeno: (() -> Unit)? = null,
+    onOpenPersona: (Long) -> Unit = {},
 ) {
     val context = LocalContext.current
     val c = NxTheme.colors
@@ -177,6 +182,7 @@ fun InicioScreen(
         ) {
             item(key = "header") {
                 InicioHeader(
+                    titulo = if (state.esDireccion) "Tu equipo hoy" else "Mi día",
                     fecha = InicioRules.fechaLarga(hoy),
                     unreadCount = unreadCount,
                     onOpenNotifications = onOpenNotifications,
@@ -207,10 +213,32 @@ fun InicioScreen(
             }
 
             if (state.esDireccion) {
-                item(key = "equipo") {
-                    SectionTitle("Tu equipo hoy")
-                    Spacer(Modifier.height(8.dp))
-                    EquipoCard(onVerEquipo = if (state.tieneActividades) onOpenActividades else null)
+                val ceo = state.ceo
+                when {
+                    ceo == null && state.isLoading -> item(key = "ceo-cargando") {
+                        NxSkeletonList(itemCount = 3, itemHeight = 120.dp)
+                    }
+                    ceo == null || state.error != null -> item(key = "equipo") {
+                        state.error?.let { NxRefreshErrorBanner(message = it, onRetry = { vm.load(initial = false) }) }
+                        Spacer(Modifier.height(8.dp))
+                        EquipoCard(onVerEquipo = if (state.tieneActividades) onOpenActividades else null)
+                    }
+                    else -> item(key = "ceo") {
+                        // Canvas «App · Inicio CEO» (29-10): lo que ve en la web, con los mismos endpoints.
+                        InicioCeoContenido(
+                            ceo = ceo,
+                            onPizarra = onOpenActividades,
+                            onPendiente = { clave ->
+                                when (clave) {
+                                    InicioCeoRules.CLAVE_APROBACIONES -> (onOpenAprobaciones ?: onOpenActividades)()
+                                    InicioCeoRules.CLAVE_PAGOS -> (onOpenPagos ?: onOpenActividades)()
+                                    else -> onOpenActividades()
+                                }
+                            },
+                            onDesempeno = onOpenDesempeno,
+                            onPersona = onOpenPersona,
+                        )
+                    }
                 }
             } else if (state.tieneActividades) {
                 when {
@@ -294,6 +322,7 @@ fun InicioScreen(
 @Composable
 internal fun InicioHeader(
     fecha: String,
+    titulo: String = "Mi día",
     unreadCount: Int,
     onOpenNotifications: () -> Unit,
 ) {
@@ -309,7 +338,7 @@ internal fun InicioHeader(
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(fecha, fontSize = 13.sp, color = c.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "Mi día",
+                titulo,
                 fontFamily = InterTight,
                 fontSize = 28.sp,
                 lineHeight = 32.sp,

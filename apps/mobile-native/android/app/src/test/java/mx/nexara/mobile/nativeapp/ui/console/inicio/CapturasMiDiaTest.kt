@@ -15,7 +15,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.io.File
+import mx.nexara.mobile.nativeapp.data.api.AprobacionPendienteDto
+import mx.nexara.mobile.nativeapp.data.api.KpiAsistenciaPuntualDto
+import mx.nexara.mobile.nativeapp.data.api.KpiBloqueDto
+import mx.nexara.mobile.nativeapp.data.api.KpiEntregasDto
+import mx.nexara.mobile.nativeapp.data.api.KpiTotalesDto
+import mx.nexara.mobile.nativeapp.data.api.KpisEquipoDto
 import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
+import mx.nexara.mobile.nativeapp.data.api.PagoEmpleadoDto
+import mx.nexara.mobile.nativeapp.data.api.RevisionPendienteDto
+import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTheme
 import mx.nexara.mobile.nativeapp.ui.theme.NexaraTheme
 import org.junit.Rule
@@ -132,6 +141,65 @@ class CapturasMiDiaTest {
         val bitmap = Bitmap.createBitmap(raiz.width, raiz.height, Bitmap.Config.ARGB_8888)
         raiz.draw(Canvas(bitmap))
         guardar(bitmap, "mi-dia.png")
+    }
+
+    /** Inicio de dirección general con datos como los del artboard «App · Inicio CEO». */
+    @Test
+    fun inicioCeo() {
+        val entrada = "2026-10-29T14:00:00Z"
+        val equipo = buildList {
+            repeat(7) { add(TeamBoardUserDto(id = 10L + it, nombre = "Técnico $it", status = "activo", entradaHoyAtJson = entrada)) }
+            repeat(3) { add(TeamBoardUserDto(id = 20L + it, nombre = "Ingeniera $it", status = "sin_actividad", entradaHoyAtJson = entrada)) }
+            add(
+                TeamBoardUserDto(
+                    id = 30,
+                    nombre = "Marco Silva",
+                    status = "atrasado",
+                    entradaHoyAtJson = entrada,
+                    currentActivity = mx.nexara.mobile.nativeapp.data.api.TeamBoardActivityDto(id = 411, titulo = "Memoria técnica"),
+                ),
+            )
+            repeat(3) { add(TeamBoardUserDto(id = 40L + it, nombre = "Ana López $it", status = "sin_actividad", entradaHoyAtJson = null)) }
+        }
+        val ceo = CeoInicio(
+            equipo = equipo,
+            revisiones = List(12) { RevisionPendienteDto(activityId = it.toLong(), enviadaAt = "2026-10-27T18:00:00Z") },
+            aprobaciones = List(3) { AprobacionPendienteDto(id = it.toLong()) },
+            pagos = listOf(
+                PagoEmpleadoDto(id = 1, status = "Borrador", amount = "9200.00"),
+                PagoEmpleadoDto(id = 2, status = "Borrador", amount = "9200.00"),
+            ),
+            kpis = KpisEquipoDto(
+                equipo = KpiBloqueDto(
+                    totales = KpiTotalesDto(
+                        entregas = KpiEntregasDto(medidas = 47, aTiempo = 41),
+                        asistenciaPuntual = KpiAsistenciaPuntualDto(pct = 92.0),
+                        productividadPct = 78.0,
+                        cumplimientoPct = 86.0,
+                    ),
+                ),
+            ),
+        )
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            NexaraTheme {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(NxTheme.colors.surface)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    InicioHeader(fecha = "Jueves 29 de octubre", titulo = "Tu equipo hoy", unreadCount = 3, onOpenNotifications = {})
+                    InicioCeoContenido(ceo = ceo, onPizarra = {}, onPendiente = {}, onDesempeno = {}, onPersona = {})
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(500)
+        val raiz = compose.activity.window.decorView.rootView
+        val bitmap = Bitmap.createBitmap(raiz.width, raiz.height, Bitmap.Config.ARGB_8888)
+        raiz.draw(Canvas(bitmap))
+        guardar(bitmap, "inicio-ceo.png")
     }
 
     private fun guardar(bitmap: Bitmap, nombre: String) {
