@@ -1049,12 +1049,14 @@ export function calificacionCalibrada(
 
 /**
  * Tiempo estándar de lo que no lo trae capturado (lo asignado antes del 29-10): la mediana real de su
- * tipo, sin pasar lo que esa actividad duró de verdad o se estimó (así cerrar muchas cortas no gana
- * la mediana de cada una). Sin mediana del tipo no hay respaldo.
+ * tipo (o la de todo lo entregado, si su tipo tiene pocos casos), sin pasar lo que esa actividad duró
+ * de verdad o se estimó (así cerrar muchas cortas no gana la mediana de cada una). Sin mediana, o si
+ * la actividad no dice cuánto duró (sin reloj ni estimado), no hay dato: null, no 0.
  */
-export function estandarDeRespaldo(medianaTipo: number | null, minutosReales: number | null, minutosPlan: number | null): number | null {
-  if (medianaTipo == null) return null;
-  return Math.round(Math.min(medianaTipo, Math.max(minutosReales ?? 0, minutosPlan ?? 0)));
+export function estandarDeRespaldo(mediana: number | null, minutosReales: number | null, minutosPlan: number | null): number | null {
+  const tope = Math.max(minutosReales ?? 0, minutosPlan ?? 0);
+  if (mediana == null || !(tope > 0)) return null;
+  return Math.round(Math.min(mediana, tope));
 }
 
 /** Revisiones de un coordinador: cuántas llegaron dentro de 24 h hábiles del envío (sin envío anterior no se mide). */
@@ -1168,7 +1170,9 @@ export function cumplimientoDe(
   const meta = t.metaRendimiento ?? META_RENDIMIENTO[familia];
   const ganados = eq ? eq.minutosEstandarGanados : (entregas.minutosEstandarGanados ?? 0);
   const disponibles = eq ? eq.minutosLaborados : (t.minutosLaborados ?? 0);
-  if (disponibles > 0) {
+  // Entregó pero nada trae tiempo estándar (ni de respaldo): no hay dato, no pesa. Sin entregas, sí es 0.
+  const sinDatoDeEstandar = !eq && entregas.aTiempo + entregas.tarde > 0 && (entregas.conEstandar ?? 0) === 0;
+  if (disponibles > 0 && !sinDatoDeEstandar) {
     agrega(
       'estandar',
       eq ? 'Rendimiento de su equipo' : 'Horas estándar ganadas',
