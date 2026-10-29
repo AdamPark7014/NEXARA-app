@@ -27,6 +27,7 @@ import { dirRumbo, hojasPuerta, type Plano, type Punto, type Tapa } from "@/lib/
 import { reescalar } from "@/lib/cctv/niveles";
 import { camaraEnMetros, mejorNivelEn, type CamaraM, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import { COLOR_NIVEL, OPACIDAD_NIVEL } from "./colores";
+import Navegacion, { ICONO } from "./Navegacion";
 import styles from "./editor.module.css";
 
 export type Herramienta =
@@ -57,17 +58,33 @@ const pts = (ps: readonly Punto[]) => ps.map((p) => `${f1(p.x)},${f1(p.y)}`).joi
 
 function vistaInicial(plano: Plano): Vista {
   if (plano.croquis) return { x: 0, y: 0, w: plano.croquis.anchoPx, h: plano.croquis.altoPx };
-  const ps = [...plano.muros.flatMap((m) => [m.a, m.b]), ...plano.camaras.map((c) => c.pos)];
+  // Los muros, las cámaras y hasta dónde llegan sus conos (las de fuera del edificio miran hacia afuera).
+  const k = plano.escala.metrosPorPx;
+  const conos = plano.camaras.flatMap((c) => {
+    const h = Math.min((c.lentes[0] ? hfovDeg(c.lentes[0].optica) : null) ?? 90, 179);
+    const r = c.rumboDeg + (c.lentes[0]?.desfaseRumboDeg ?? 0);
+    return [r - h / 2, r, r + h / 2].map((a) => {
+      const d = dirRumbo(a);
+      return { x: c.pos.x + (d.x * c.distanciaM) / k, y: c.pos.y + (d.y * c.distanciaM) / k };
+    });
+  });
+  const ps = [...plano.muros.flatMap((m) => [m.a, m.b]), ...plano.camaras.map((c) => c.pos), ...conos];
   if (ps.length) {
     const minX = Math.min(...ps.map((p) => p.x));
     const minY = Math.min(...ps.map((p) => p.y));
     const maxX = Math.max(...ps.map((p) => p.x));
     const maxY = Math.max(...ps.map((p) => p.y));
-    const margen = Math.max(maxX - minX, maxY - minY) * 0.08 + 10;
+    const margen = Math.max(maxX - minX, maxY - minY) * 0.04 + 10;
     return { x: minX - margen, y: minY - margen, w: maxX - minX + 2 * margen, h: maxY - minY + 2 * margen };
   }
-  const k = plano.escala.metrosPorPx;
   return { x: 0, y: 0, w: 60 / k, h: 30 / k };
+}
+
+/** Acerca (f > 1) o aleja sin mover el centro de la vista. */
+function acercarAlCentro(v: Vista, f: number): Vista {
+  const w = Math.min(Math.max(v.w / f, 20), 200_000);
+  const h = (v.h * w) / v.w;
+  return { x: v.x + (v.w - w) / 2, y: v.y + (v.h - h) / 2, w, h };
 }
 
 export default function Lienzo({
@@ -412,6 +429,14 @@ export default function Lienzo({
         <b>{largoBarra < 1 ? `${largoBarra * 100} cm` : `${largoBarra} m`}</b>
       </span>
     </div>
+    <Navegacion
+      lugar="arriba"
+      botones={[
+        { etiqueta: "Alejar", icono: ICONO.menos, accion: () => setVista((v) => acercarAlCentro(v, 0.8)) },
+        { etiqueta: "Acercar", icono: ICONO.mas, accion: () => setVista((v) => acercarAlCentro(v, 1.25)) },
+        { etiqueta: "Encuadrar todo", icono: ICONO.encuadrar, accion: () => setVista(vistaInicial(plano)) },
+      ]}
+    />
     <svg
       ref={svgRef}
       className={styles.lienzo}
@@ -637,26 +662,50 @@ export default function Lienzo({
         );
       })}
 
-      {/* «14 m · 109 PPM · Observación» al final de cada cono (la seleccionada lleva la suya, más grande). */}
+      {/* «14 m · 109 PPM · Observación» al final de cada cono (la seleccionada lleva la suya, más grande).
+          Como en un mapa, cada etiqueta busca lugar libre a lo largo de su cono; si no cabe, cede (al
+          alejar quedan menos y al acercar vuelven). */}
       {capas.etiquetas
-        ? plano.camaras
-            .filter((c) => c.id !== selId)
-            .map((c) => {
-              const cm = camarasM.get(c.id);
-              const h = c.lentes[0] ? hfovDeg(c.lentes[0].optica) : null;
-              if (!cm || h == null) return null;
-              const d = dirRumbo(c.rumboDeg + (c.lentes[0]?.desfaseRumboDeg ?? 0));
-              const largo = (c.distanciaM * 0.82) / k;
-              const texto = etiquetaCono(c.distanciaM, ppm(cm.pxHoriz, distanciaInclinadaM(c.distanciaM, c.alturaM), h));
-              return (
-                <g key={`et-${c.id}`} transform={`translate(${c.pos.x + d.x * largo} ${c.pos.y + d.y * largo}) scale(${u})`} style={{ pointerEvents: "none" }}>
-                  <rect x={-74} y={-9} width={148} height={18} rx={9} fill="var(--ui-surface)" fillOpacity={0.92} stroke="var(--ui-border-strong)" strokeWidth={0.8} />
-                  <text y={3.5} textAnchor="middle" fontSize={10} fontWeight={600} fill="var(--ui-fg-2)">
-                    {texto}
-                  </text>
-                </g>
-              );
-            })
+        ? (() => {
+            type Caja = { x: number; y: number; w: number; h: number };
+            const puestas: Caja[] = [];
+            const choca = (r: Caja) => puestas.some((p) => Math.abs(p.x - r.x) * 2 < p.w + r.w && Math.abs(p.y - r.y) * 2 < p.h + r.h);
+            if (camaraSel) {
+              const d = dirRumbo(camaraSel.rumboDeg + (camaraSel.lentes[0]?.desfaseRumboDeg ?? 0));
+              const largo = camaraSel.distanciaM / k + 18 * u;
+              puestas.push({ x: camaraSel.pos.x + d.x * largo, y: camaraSel.pos.y + d.y * largo, w: 182 * u, h: 26 * u });
+            }
+            return [...plano.camaras]
+              .filter((c) => c.id !== selId)
+              .sort((a, b) => a.numero - b.numero)
+              .map((c) => {
+                const cm = camarasM.get(c.id);
+                const h = c.lentes[0] ? hfovDeg(c.lentes[0].optica) : null;
+                if (!cm || h == null) return null;
+                const d = dirRumbo(c.rumboDeg + (c.lentes[0]?.desfaseRumboDeg ?? 0));
+                const texto = etiquetaCono(c.distanciaM, ppm(cm.pxHoriz, distanciaInclinadaM(c.distanciaM, c.alturaM), h));
+                const ancho = Math.round(texto.length * 5.2 + 18);
+                let lugar: Caja | null = null;
+                for (const f of [0.82, 0.66, 0.95, 0.52]) {
+                  const largo = (c.distanciaM * f) / k;
+                  const r = { x: c.pos.x + d.x * largo, y: c.pos.y + d.y * largo, w: (ancho + 8) * u, h: 22 * u };
+                  if (!choca(r)) {
+                    lugar = r;
+                    break;
+                  }
+                }
+                if (!lugar) return null;
+                puestas.push(lugar);
+                return (
+                  <g key={`et-${c.id}`} transform={`translate(${lugar.x} ${lugar.y}) scale(${u})`} style={{ pointerEvents: "none" }}>
+                    <rect x={-ancho / 2} y={-9} width={ancho} height={18} rx={9} fill="var(--ui-surface)" fillOpacity={0.94} stroke="var(--ui-border-strong)" strokeWidth={0.8} />
+                    <text y={3.5} textAnchor="middle" fontSize={10} fontWeight={600} fill="var(--ui-fg-2)">
+                      {texto}
+                    </text>
+                  </g>
+                );
+              });
+          })()
         : null}
 
       {/* Cámara seleccionada: eje, manija para apuntar y etiqueta del final del cono. */}

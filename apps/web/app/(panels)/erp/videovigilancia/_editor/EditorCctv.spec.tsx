@@ -75,6 +75,11 @@ describe("editor del diseñador de videovigilancia", () => {
     expect(screen.getByRole("region", { name: "Vistas desde las cámaras" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Vista superior" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Muro/ })).toBeNull();
+    // controles a la vista: girar, acercar y encuadrar
+    fireEvent.click(screen.getByRole("button", { name: "Girar a la derecha" }));
+    fireEvent.click(screen.getByRole("button", { name: "Acercar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Encuadrar todo" }));
+    expect(screen.getByRole("img", { name: /Vista 3D del sitio/ })).toBeInTheDocument();
   });
 
   it("la lista de cámaras abre la ficha de la cámara en el panel", () => {
