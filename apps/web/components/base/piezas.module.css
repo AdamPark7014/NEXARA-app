@@ -505,6 +505,14 @@
   }
 }
 
+/* 390 px: una cifra por renglón. Por encima sigue el corte de 720 (dos columnas). */
+@media (max-width: 390px) {
+  .stats,
+  .statsStrip:not([data-cols]) {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}
+
 /* ─── Control segmentado ───────────────────────────────────────────────── */
 
 .segmented {
