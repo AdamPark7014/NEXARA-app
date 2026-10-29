@@ -73,6 +73,19 @@
     - Lo marcado no cuenta como plan: `estimadoParaKpi` (pizarra-kpi) en Desempeño (`kpis-equipo.service`, tope
       diario y plan de cada entrega) y en la pizarra (`team-board.service`), y `tiemposDto` en el detalle y en
       «Mis actividades» (no sale «excedida»). Spec `me/relleno-kpi.spec.ts`.
+    - **Escrito en producción (29-10 ~21:20 UTC, f0278eb4 desplegado):** 100 filas, 0 cambios de «a tiempo»; un
+      segundo simulacro da 0 filas (idempotente). Abiertas antes → después: asignadas 7 (0 sin entrega, 1 sin
+      tiempo → 0); autoasignadas 128 (18 sin entrega → 0, 94 sin tiempo → 0). Sin estándar quedan 7 + 116, todas
+      ya entregadas (a propósito). 87 marcadas «relleno 29-10 tras entrega» (mediana de su tipo: 60–480 min).
+    - En proceso (11; AN-0355 ya nació con estándar): tipo corregido por el título en AN-0344/0345/0346/0349
+      (→ Cableado y canalización, 45 min = 1 nodo supuesto) y AN-0350 (comercial → Facturación, 10 min = 1
+      factura). Dudosas para su superior: AN-0351 «Apoyo Biblioteca Tlaxcala» (tipo Reporte, estándar 20 contra
+      420 que puso él) y AN-0350 (varias facturas en un título).
+    - KPIs por persona (semana 26–30, `GET me/kpis/equipo`, antes y después): de 19 personas, 4 solo con el
+      minuto que corrió entre fotos; 7 con cambio real (ocupación / «con una actividad» bajan 2–3 h) y son
+      exactamente quienes tienen una de las en proceso con tiempo nuevo (Alejandro, Carlos, Carolina, Erick,
+      Paulina, Roberto, Salvador): su sesión de hoy ya se topa con el plan de 45 min. Las 87 marcadas no mueven
+      ningún KPI. Si el equipo de obra trabaja todo el día en esas, su superior debe ajustar el tiempo (con motivo).
 
 - **29-10 ~16:30 (claude-code) — Sugerencia de nómina con periodos calculados (pedido de Adam: «múltiples cálculos
   de fechas dinámicas»).**
