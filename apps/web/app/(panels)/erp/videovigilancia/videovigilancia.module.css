@@ -1,0 +1,77 @@
+/* Videovigilancia · lista de diseños y alta. Solo tokens --ui-*. */
+
+.pagina {
+  min-width: 0;
+}
+
+.sinAcceso {
+  padding: var(--ui-s6) var(--ui-s5);
+}
+
+.nombre {
+  font-weight: var(--ui-fw-semibold, 600);
+  color: var(--ui-fg);
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-meta);
+}
+
+.cobertura {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  font-variant-numeric: tabular-nums;
+}
+
+.barra {
+  width: 80px;
+  height: 8px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-track);
+  overflow: hidden;
+  display: inline-block;
+}
+
+.barra span {
+  display: block;
+  height: 100%;
+  background: var(--ui-brand);
+}
+
+.alta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s4);
+  padding: var(--ui-s4) var(--ui-s5);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-elev-1);
+}
+
+.altaCabeza h2 {
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-section);
+}
+
+.altaCabeza p {
+  margin: var(--ui-s1) 0 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.altaCampos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--ui-s3) var(--ui-s4);
+}
+
+.altaPie {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+}

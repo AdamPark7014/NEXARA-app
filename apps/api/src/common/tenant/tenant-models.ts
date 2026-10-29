@@ -128,6 +128,8 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'NominaSemanaFila',
   'NominaDescuento',
   'ActivityAttachment',
+  // Diseñador de videovigilancia (migración 20261029130000_cctv_disenos).
+  'CctvDiseno',
 ]);
 
 /** Models where missing companyId on create is a hard error (not soft-injected). */

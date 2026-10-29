@@ -1,5 +1,38 @@
 # RELEVO
 
+- **29-10 ~12:00 (claude-code) — Diseñador de videovigilancia, fase 2: módulo `/erp/videovigilancia` (mockup aprobado).**
+  - Adam aprobó el mockup («Aprobado, construye»). Especificación en `docs/DISENADOR-CCTV.md`.
+  - Web:
+    - `app/(panels)/erp/videovigilancia/`: lista y alta; `[id]` es el editor.
+    - Editor 2D:
+      - croquis JPG/PNG/PDF (el PDF se pasa a PNG con pdf.js); calibrar con una cota;
+      - muros con imán (extremos y 0/45/90°); puertas, ventanas y accesos sobre el muro; obstáculos con altura;
+        cotas y textos;
+      - cámaras del catálogo semilla, con manija para apuntar y largo del cono; humanoides;
+      - conos DORI recortados por muros (con caché por cámara); mapa de calor;
+      - recuadro con la vista desde la cámara («134 PPM · Reconocimiento · persona a 10 m»);
+      - deshacer y rehacer;
+      - autoguardado con control de versión: un 409 avisa que otra persona guardó.
+    - Piezas puras en `lib/cctv/editor.ts`, `vista.ts`, `catalogo.ts`, `api.ts` y `acceso.ts`.
+  - API `src/cctv-disenos/`, tabla `cctv_disenos` (migración `20261029130000_cctv_disenos`, aditiva):
+    - `acceso`, lista, alta, detalle, `PATCH` con versión (409 con `versionActual` por su propio filtro), archivar y
+      croquis (sharp, en `/uploads/cctv-croquis/`, con sesión).
+  - Acceso (`acceso-cctv.ts`):
+    - siempre: dirección, coordinadores, arquitecto, administrativo y `enc_soporte`;
+    - con gente a cargo: `ing_soporte`/RH/contabilidad/líder de diseño (José Antonio sí, Carolina y Alejandro no);
+    - instaladores nunca.
+    - `/me/navigation` lo esconde a quien no puede. En la web, el menú usa `lib/cctv/acceso.ts` (soporte por la lista
+      de encargados) y la página pregunta a `GET cctv-disenos/acceso`.
+  - Pruebas:
+    - web: `lib/cctv` 7 archivos / 55, el editor 3, `role-modules` 65, suite completa 1,465/1,466 (la que falló,
+      `OpsProjectDetailShell`, pasa sola: es intermitente por carga);
+    - API: 61 suites / 593 en cctv, me, rbac y tenant;
+    - `tsc`: API 0 errores; web solo con los 3 de `lib/asistente-ia-api.spec.ts`, que ya estaban y no son de aquí.
+  - Producción: la migración no corre con `deploy-api-web.sh`. Va aparte: `docker compose … run --rm -T api sh -c
+    "cd apps/api && npx prisma migrate deploy"` (como `update.sh --with-migrate`).
+  - No hecho todavía (fases 3 a 6): 3D con three.js, propuesta en PDF, «Pasar a cotización», detección automática del
+    croquis, «Leer ficha» e infraestructura en el plano.
+
 - **29-10 ~11:45 (claude-code) — Apps: pasada visual de Core, primera parte (Android «Mi día» + tokens; iOS tokens).**
   - Android, tokens como la web (`ui-tokens.scss`): verde #168570 y sus suaves, fondo #EEF1F5, texto #14171F/#5B6272,
     bordes #E6E9EF, radios 10/14/20/24, Inter Tight (OFL, `res/font`, licencia en `android/OFL-InterTight.txt`) en

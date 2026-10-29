@@ -140,6 +140,22 @@ export const PROYECTOS_CORE_URL_RULES: UrlRule[] = [
 ];
 
 /**
+ * Diseñador de videovigilancia (`/erp/videovigilancia`, `docs/DISENADOR-CCTV.md` §8).
+ *
+ * Va a los encargados de área, al arquitecto y a dirección, y también a soporte, RH, contabilidad
+ * y diseño: de esos solo entra quien tiene gente a cargo (José Antonio sí; Carolina y Alejandro
+ * no), y eso lo decide el servicio con `puedeDisenarCctv` (403 con el motivo) y `/me/navigation`
+ * esconde el módulo a quien no. Instaladores, vendedores y el cliente no lo tienen.
+ * `GET /api/cctv-disenos/acceso` está en `SHARED_SESSION_URL_RULES`: todo el personal pregunta.
+ */
+export const CCTV_DISENOS_URL_RULES: UrlRule[] = [
+  { path: '/erp/videovigilancia', scope: 'write' },
+  { path: '/erp/videovigilancia/**', scope: 'write' },
+  // `/**` también cubre `/api/cctv-disenos` (la lista y el alta).
+  { path: '/api/cctv-disenos/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+];
+
+/**
  * Revisar el uniforme en la foto de entrada (KPI del equipo). Se abre a quien revisa checadas
  * ajenas; quién puede de verdad (sus jefes, dirección y RH, nunca él mismo) lo decide el servicio.
  */
@@ -339,6 +355,8 @@ export const SHARED_SESSION_URL_RULES: UrlRule[] = [
   { path: '/api/me/**', methods: ['GET'], scope: 'read' },
   { path: '/api/devices/**', methods: ['GET', 'POST', 'PATCH', 'DELETE'], scope: 'write' },
   { path: '/api/company/mine', methods: ['GET'], scope: 'read' },
+  // ¿Entra al diseñador de videovigilancia? Solo la bandera: responde `{ puede }`, nunca 403.
+  { path: '/api/cctv-disenos/acceso', methods: ['GET'], scope: 'read' },
   // Los comunicados internos son PARA el personal: todos leen, solo
   // Administracion y Direccion publican.
   { path: '/api/internal-comunicados/**', methods: ['GET'], scope: 'read' },
@@ -366,6 +384,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     // «Acceso a cuentas»: el API solo deja pasar al dueño de la plataforma; aquí solo se permite el camino.
     { path: '/api/account-access/**', methods: ['GET', 'POST'], scope: 'write' },
     ...COTIZACIONES_CORE_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
@@ -408,6 +427,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...CORE_OLA1_URL_RULES,
@@ -458,6 +478,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
@@ -512,6 +533,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   [ROLES.DIR_ADMIN]: [
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
@@ -556,6 +578,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
@@ -634,6 +657,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   [ROLES.ADMINISTRATIVO]: [
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...CORE_OLA1_URL_RULES,
@@ -695,6 +719,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...CORE_OLA1_URL_RULES,
@@ -799,6 +824,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     // Sistemas es un área y su encargado cotiza (Adam, 20-09): sin esto, el permiso
     // `cotizaciones.access` le abría el módulo y la matriz le devolvía 403 al guardar.
     ...COTIZACIONES_CORE_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     { path: '/ops', scope: 'read' },
     { path: '/ops/dashboard', scope: 'read' },
     { path: '/ops/chat', scope: 'write' },
@@ -859,6 +885,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...CORE_OLA1_URL_RULES,
     ...SELF_ATTENDANCE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     { path: '/ops', scope: 'read' },
     { path: '/ops/dashboard', scope: 'read' },
     { path: '/ops/chat', scope: 'write' },
@@ -918,6 +945,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...CORE_RECURSOS_URL_RULES,
     ...CLIENTES_CORE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
@@ -989,6 +1017,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.LIDER_DISENO]: [
     ...CORE_RECURSOS_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     // Daniela (diseño) también es personal Core: actividades, asistencia, comida y chat.
     ...CORE_OLA1_URL_RULES,
@@ -1061,6 +1090,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   [ROLES.RH]: [
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp', scope: 'read' },
@@ -1101,6 +1131,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   [ROLES.CONTABILIDAD]: [
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
+    ...CCTV_DISENOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp', scope: 'read' },

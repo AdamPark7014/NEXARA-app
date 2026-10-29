@@ -132,6 +132,7 @@ const MODULE_ICONS: Record<string, ShellIconName> = {
   "erp-clients": "users",
   "erp-cotizaciones": "quote",
   "erp-proyectos": "folder",
+  "erp-videovigilancia": "cctv",
   "activities-daily": "task",
   "activities-projects": "folder",
   "activities-services": "tool",

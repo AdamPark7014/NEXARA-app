@@ -77,6 +77,13 @@ export const COTIZACIONES_CORE_PATHS: PageRule[] = ['/erp/cotizaciones', '/erp/c
 export const PROYECTOS_CORE_PATHS: PageRule[] = ['/erp/proyectos', '/erp/proyectos/**'];
 
 /**
+ * Diseñador de videovigilancia (`/erp/videovigilancia`): encargados de área y el arquitecto.
+ * Soporte entra a la página; la API deja pasar solo a quien tiene gente a cargo (José Antonio) y
+ * la página muestra «sin acceso» a los demás. Instaladores, no (`docs/DISENADOR-CCTV.md` §8).
+ */
+export const VIDEOVIGILANCIA_CORE_PATHS: PageRule[] = ['/erp/videovigilancia', '/erp/videovigilancia/**'];
+
+/**
  * Clientes en Core (`/erp/clientes`): coordinación, gerencia y comercial.
  * Ingenieros y operativos no tienen estas páginas; el alta la confirma el API.
  */
@@ -136,6 +143,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     ...CLIENTES_CORE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
+    ...VIDEOVIGILANCIA_CORE_PATHS,
     ...CORE_OLA1_PAGE_PATHS,
     '/erp/dashboard',
     '/erp/chat',
@@ -166,6 +174,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     ...CLIENTES_CORE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
+    ...VIDEOVIGILANCIA_CORE_PATHS,
     '/erp/dashboard',
     '/erp/chat',
     '/erp/reuniones',
@@ -235,6 +244,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     ...CLIENTES_CORE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
+    ...VIDEOVIGILANCIA_CORE_PATHS,
     '/erp/dashboard',
     '/erp/chat',
     '/erp/reuniones',
@@ -294,6 +304,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     ...CLIENTES_CORE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
+    ...VIDEOVIGILANCIA_CORE_PATHS,
     '/erp/dashboard',
     ...CORE_OLA1_PAGE_PATHS,
     '/erp/chat',
@@ -334,6 +345,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     ...CLIENTES_CORE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
+    ...VIDEOVIGILANCIA_CORE_PATHS,
     '/ops/chat',
     ...CORE_OLA1_PAGE_PATHS,
     '/erp/chat',
@@ -375,6 +387,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── ING. SOPORTE — campo + cuenta ERP operativa ───────────────────────
   [ROLES.ING_SOPORTE]: [
     ...CORE_RECURSOS_PATHS,
+    ...VIDEOVIGILANCIA_CORE_PATHS,
     '/ops/my-activities',
     '/ops/my-activities/**',
     '/ops/activities/**',
@@ -412,6 +425,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── ENC. SOPORTE — coordina soporte; mismas páginas base que soporte ──
   [ROLES.ENC_SOPORTE]: [
     ...CORE_RECURSOS_PATHS,
+    ...VIDEOVIGILANCIA_CORE_PATHS,
     '/ops/my-activities',
     '/ops/my-activities/**',
     '/ops/activities/**',
@@ -453,6 +467,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     ...CLIENTES_CORE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
+    ...VIDEOVIGILANCIA_CORE_PATHS,
     '/crm/chat',
     '/erp/dashboard',
     '/erp/chat',

@@ -16,6 +16,8 @@ export const CORE_OLA1_MODULE_IDS: readonly string[] = [
   'erp-cotizaciones',
   // Proyectos (plan, cronograma, alcance, equipo y documentos), mismo motivo.
   'erp-proyectos',
+  // Diseñador de videovigilancia: encargados de área y el arquitecto (`lib/cctv/acceso.ts`).
+  'erp-videovigilancia',
   // KPIs del equipo (retardos, uniforme, horas laboradas vs productivas): vive en /erp/asistencias.
   'kpis-equipo',
   // Recursos: almacén (inventario), herramientas y vehículos para todo el personal, y el

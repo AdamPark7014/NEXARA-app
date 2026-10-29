@@ -8031,3 +8031,35 @@ model ActivityAttachment {
   @@index([companyId])
   @@map("activity_attachments")
 }
+
+/// Diseño de videovigilancia (`docs/DISENADOR-CCTV.md` §9): el plano del lugar con sus cámaras,
+/// conos y personas de prueba. Lo arma un encargado de área en Core (`/erp/videovigilancia`) y lo
+/// guarda la API de `cctv-disenos`. Las referencias son columnas sueltas, como en
+/// `CotizacionPlantilla`; el aislamiento por empresa lo pone el middleware (`tenant-models.ts`).
+model CctvDiseno {
+  id               Int       @id @default(autoincrement())
+  companyId        Int
+  nombre           String    @db.VarChar(160)
+  /// Cliente comercial: `SalesClient.id`, el mismo que `Cotizacion.salesClientId`.
+  clienteId        Int?
+  cotizacionId     Int?
+  /// borrador | enviada | aprobada
+  estado           String    @default("borrador") @db.VarChar(20)
+  /// El `Plano` de `apps/web/lib/cctv/plano.ts` (versión 1).
+  plano            Json
+  /// Grabación: NVR, discos y días que se guardan (`apps/web/lib/cctv/infraestructura.ts`).
+  grabacion        Json?
+  /// Lo que la lista muestra sin abrir el plano (cámaras, % de cobertura); lo calcula la web.
+  resumen          Json?
+  /// Concurrencia optimista: cada guardado manda la versión que abrió y la sube en 1.
+  version          Int       @default(1)
+  creadoPorId      Int
+  actualizadoPorId Int?
+  /// Archivado (no se borra): sale de la lista y deja de abrirse.
+  archivadoAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([companyId, updatedAt])
+  @@map("cctv_disenos")
+}
