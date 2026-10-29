@@ -1,5 +1,5 @@
 /**
- * Archivos adjuntos de una actividad (evidencia comercial: Excel, Word, PDF, imágenes…).
+ * Documentos adjuntos de una actividad, de cualquier tipo de actividad (Excel, Word, PowerPoint, PDF…).
  *
  * API (`apps/api/src/activities/attachments`), con la sesión de siempre:
  * - `GET    activities/:id/adjuntos`                          lista (lo más reciente primero)
@@ -35,15 +35,9 @@ export const ADJUNTO_MAX_BYTES = 25 * 1024 * 1024;
 /** Archivos por envío que acepta la API; si eligen más, se mandan en tandas. */
 export const ADJUNTOS_MAX_POR_ENVIO = 10;
 
+/** Solo documentos, como la API: las fotos van en evidencias. */
 const EXTENSIONES = [
   "pdf",
-  "png",
-  "jpg",
-  "jpeg",
-  "webp",
-  "gif",
-  "heic",
-  "heif",
   "xlsx",
   "xlsm",
   "xls",
@@ -183,7 +177,7 @@ export function revisarAntesDeSubir<T extends { name: string; size: number }>(
   const avisos: string[] = [];
   for (const archivo of archivos) {
     if (!EXTENSIONES_ACEPTADAS.has(extensionDe(archivo.name))) {
-      avisos.push(`No se puede adjuntar «${archivo.name}». Se aceptan PDF, Excel, Word, PowerPoint, imágenes y texto.`);
+      avisos.push(`No se puede adjuntar «${archivo.name}». Se aceptan PDF, Excel, Word, PowerPoint y texto; las fotos van en Evidencias.`);
     } else if (archivo.size > ADJUNTO_MAX_BYTES) {
       avisos.push(`«${archivo.name}» pesa ${tamanoLegible(archivo.size)}: el límite es 25 MB por archivo.`);
     } else if (archivo.size === 0) {

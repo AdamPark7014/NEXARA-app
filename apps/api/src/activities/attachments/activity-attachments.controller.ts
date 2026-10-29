@@ -91,7 +91,7 @@ export class ActivityAttachmentsController {
         else
           cb(
             new BadRequestException(
-              `No se puede adjuntar «${nombreOriginal(file.originalname)}». Se aceptan PDF, Excel, Word, PowerPoint, imágenes y texto.`,
+              `No se puede adjuntar «${nombreOriginal(file.originalname)}». Se aceptan PDF, Excel, Word, PowerPoint y texto; las fotos van en Evidencias.`,
             ),
             false,
           );

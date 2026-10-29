@@ -37,10 +37,12 @@ describe('adjuntos de actividades', () => {
     expect(nombreEnDisco('sin-extension')).toMatch(/^\d+-[a-z0-9]+$/);
   });
 
-  it('acepta oficina, PDF e imágenes; no ejecutables', () => {
-    for (const ext of ['pdf', 'xlsx', 'xls', 'csv', 'docx', 'doc', 'pptx', 'jpg', 'png']) expect(EXTENSIONES_ADJUNTO.has(ext)).toBe(true);
-    for (const ext of ['exe', 'js', 'html', 'svg', 'apk', 'sh']) expect(EXTENSIONES_ADJUNTO.has(ext)).toBe(false);
+  it('acepta oficina y PDF; ni fotos (van en evidencias) ni ejecutables', () => {
+    for (const ext of ['pdf', 'xlsx', 'xls', 'csv', 'docx', 'doc', 'pptx', 'ppt', 'txt']) expect(EXTENSIONES_ADJUNTO.has(ext)).toBe(true);
+    for (const ext of ['jpg', 'png', 'heic', 'exe', 'js', 'html', 'svg', 'apk', 'sh']) expect(EXTENSIONES_ADJUNTO.has(ext)).toBe(false);
     expect(mimeDeExtension('a.docx')).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    // Las fotos que ya se adjuntaron se siguen sirviendo con su tipo.
+    expect(mimeDeExtension('vieja.jpg')).toBe('image/jpeg');
   });
 
   it('adjunta quien es del equipo; el tipo sale de la extensión, no del navegador', async () => {

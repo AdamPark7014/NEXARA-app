@@ -3310,3 +3310,13 @@ Puente NAS · keystore Play · sitio público (canónica de producción) · `NO 
 - El script ya no trae datos: lee `personal.json`, genera contraseñas aleatorias y escribe fuera del repo; `.gitignore`
   bloquea Excel/JSON de credenciales. El historial de git sigue teniendo lo filtrado (ya inservible): limpiarlo o hacer
   privado el repo es decisión de Adam.
+
+## 29-10-2026 17:10 — Documentos en cualquier actividad (claude-code, sesión madre)
+
+- Pedido de Adam: «que cualquier actividad puedas adjuntar un archivo opcionalmente… no debe ser archivo de fotos,
+  es tipo PowerPoint, Excel o PDF».
+- Web: la sección «Documentos» (antes «Archivos de evidencia», solo comercial) sale en el detalle de toda actividad.
+  La «Cotización» sigue solo en comerciales.
+- API y web aceptan PDF, Excel, Word, PowerPoint, CSV y texto; ya no fotos (van en Evidencias). Las imágenes ya
+  subidas se siguen sirviendo.
+- Apps: la sesión de apps iguala título, tipos y que salga en toda actividad.

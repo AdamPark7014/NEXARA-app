@@ -523,19 +523,18 @@ export default function ActivityDetailPage() {
       ) : null}
 
       {String(activity.coreKind ?? "").toLowerCase() === "comercial" ? (
-        <>
-          <RecordSection title="Cotización">
-            <CotizacionDeActividad
-              activityId={activity.id}
-              coreKind={activity.coreKind}
-              cotizacion={(activity as { cotizacion?: CotizacionLigada | null }).cotizacion ?? null}
-              onLigada={() => void reload()}
-            />
-          </RecordSection>
-          {/* Excel, Word, PDF o imágenes de la propuesta: se suben aquí y se ven sin salir de la ficha. */}
-          <ArchivosDeActividad activityId={activity.id} />
-        </>
+        <RecordSection title="Cotización">
+          <CotizacionDeActividad
+            activityId={activity.id}
+            coreKind={activity.coreKind}
+            cotizacion={(activity as { cotizacion?: CotizacionLigada | null }).cotizacion ?? null}
+            onLigada={() => void reload()}
+          />
+        </RecordSection>
       ) : null}
+
+      {/* Documentos opcionales en cualquier actividad (PowerPoint, Excel, Word, PDF): se ven sin salir de la ficha. */}
+      <ArchivosDeActividad activityId={activity.id} />
 
       {/* El checklist va antes de la evidencia: se revisa lo que se lleva y luego se trabaja. */}
       <HerramientasChecklist activityId={activity.id} />

@@ -11,16 +11,13 @@ export const ADJUNTOS_SUBDIR = 'actividades-adjuntos';
 export const ADJUNTO_MAX_BYTES = 25 * 1024 * 1024;
 export const ADJUNTOS_MAX_POR_ENVIO = 10;
 
-/** Lo que se puede adjuntar: documentos de oficina, PDF, imágenes y texto. Nada ejecutable. */
+/**
+ * Lo que se puede adjuntar: documentos de oficina, PDF y texto, en cualquier actividad. Las fotos van
+ * en evidencias, no aquí; las imágenes que ya se subieron se siguen sirviendo (`MIME_POR_EXTENSION`).
+ * Nada ejecutable.
+ */
 export const EXTENSIONES_ADJUNTO = new Set([
   'pdf',
-  'png',
-  'jpg',
-  'jpeg',
-  'webp',
-  'gif',
-  'heic',
-  'heif',
   'xlsx',
   'xlsm',
   'xls',

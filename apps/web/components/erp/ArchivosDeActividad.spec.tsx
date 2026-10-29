@@ -44,7 +44,8 @@ describe("ArchivosDeActividad", () => {
     render(<ArchivosDeActividad activityId={7} />);
     expect(await screen.findByText("Aún no hay archivos")).toBeTruthy();
     expect(screen.getByRole("button", { name: /Adjuntar archivo/ })).toBeTruthy();
-    expect(screen.getByText("Excel, Word, PDF o imágenes de la propuesta, minutas y lo que mande el cliente")).toBeTruthy();
+    expect(screen.getByText("Documentos")).toBeTruthy();
+    expect(screen.getByText("Opcional: PowerPoint, Excel, Word o PDF (propuestas, minutas, planos, lo que mande el cliente)")).toBeTruthy();
     // El vacío dice cómo adjuntar y el límite: es cuando más se necesita.
     expect(screen.getByText(/hasta 25 MB cada uno/)).toBeTruthy();
   });
@@ -85,6 +86,15 @@ describe("ArchivosDeActividad", () => {
     expect(f).toHaveBeenCalledTimes(1);
   });
 
+  it("una foto se rechaza antes de subir: van en evidencias", async () => {
+    const f = api([{ metodo: "GET", patron: /\/adjuntos$/, responde: json([]) }]);
+    const { container } = render(<ArchivosDeActividad activityId={7} />);
+    await screen.findByText("Aún no hay archivos");
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(["x"], "Fachada.jpg")] } });
+    expect(await screen.findByText(/«Fachada\.jpg».*las fotos van en Evidencias/)).toBeTruthy();
+    expect(f.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "POST")).toBe(false);
+  });
+
   it("más de 25 MB se avisa antes de subir y no se manda", async () => {
     const f = api([{ metodo: "GET", patron: /\/adjuntos$/, responde: json([]) }]);
     const { container } = render(<ArchivosDeActividad activityId={7} />);
@@ -104,18 +114,18 @@ describe("ArchivosDeActividad", () => {
         patron: /\/adjuntos$/,
         responde: json([
           adjunto({ id: 2, nombre: "Minuta.docx", tipo: "word" }),
-          adjunto({ id: 3, nombre: "Foto.jpg", tipo: "imagen", vistaPrevia: false }),
+          adjunto({ id: 3, nombre: "Pitch.pptx", tipo: "powerpoint", vistaPrevia: true }),
         ]),
       },
     ]);
     const { container } = render(<ArchivosDeActividad activityId={7} />);
     await screen.findByText("Viejo.xlsx");
     fireEvent.change(container.querySelector('input[type="file"]')!, {
-      target: { files: [new File(["a"], "Minuta.docx"), new File(["b"], "Foto.jpg")] },
+      target: { files: [new File(["a"], "Minuta.docx"), new File(["b"], "Pitch.pptx")] },
     });
     await screen.findByText("Minuta.docx");
     const nombres = screen.getAllByRole("button", { name: /^Abrir / }).map((b) => b.getAttribute("aria-label"));
-    expect(nombres).toEqual(["Abrir Minuta.docx", "Abrir Foto.jpg", "Abrir Viejo.xlsx"]);
+    expect(nombres).toEqual(["Abrir Minuta.docx", "Abrir Pitch.pptx", "Abrir Viejo.xlsx"]);
     const post = f.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "POST")!;
     expect(((post[1] as RequestInit).body as FormData).getAll("files")).toHaveLength(2);
   });
