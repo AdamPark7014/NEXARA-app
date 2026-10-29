@@ -1,5 +1,16 @@
 # RELEVO
 
+- **29-10 ~16:10 (claude-code) — Dos arreglos web rescatados de las ramas viejas de Cursor (pedido de Adam: «no traspapelar trabajos»).**
+  - `0396b2b6` (de `24bda734`): en el chat, la cuenta de respuestas y «Ver hilo» van en dos renglones en el pie del
+    hilo; el botón sigue abriendo el hilo. Prueba nueva `components/chat/MessageList.spec.tsx`. La parte iOS de ese
+    commit no se trajo: la lleva la sesión de apps.
+  - `6e0cb911` (de `7019b29e`): a ≤390 px la franja de cifras (`StatRow`, `piezas.module.css`) va a una columna;
+    de 391 a 720 px siguen dos y en escritorio no cambia.
+  - Ninguno toca pantallas del canvas aprobado (el canvas no trae chat y a 390 px solo define las apps nativas).
+  - Desplegados con `/root/desplegar-cuando-libre.sh` (API + web de f2dc7130); verificación por DOM con el CSS desplegado (la ventana de Chrome no baja de ancho): franja a 1 columna en 390 px, 2 en 391 y 4 desde 722 hasta 1536 (escritorio igual); pie del hilo en dos renglones sin recorte. En producción ningún canal visible tenía hilos.
+  - El `main` local de la carpeta compartida quedó con copias sin subir de estos commits (`bf80bf64` y la del
+    `piezas.module.css`) porque el merge de `origin/main` lo bloquean archivos sin commitear de otras sesiones; los
+    de arriba se armaron sobre `origin/main` con índice temporal. Un `pull --rebase` los descarta solos (mismo parche).
 - **29-10 ~16:15 (claude-code, sesión de apps) — Paridad total de las apps con la web (pedido de Adam: «que cada uno ya traiga todo de todo»).**
   - **Festivos en «Mi día»** (mockup aprobado, `GET festivos/mio`): «Hoy descansas» sustituye a la jornada, con el
     siguiente día de trabajo y los próximos; «Hoy te toca de X a Y» lleva el botón de entrada (misma checada con
