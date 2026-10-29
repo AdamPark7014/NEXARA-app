@@ -5,6 +5,7 @@ import {
   entregaCalculada,
   estandarDeLectura,
   parametrosCambiados,
+  tipoDelTitulo,
   TRASLADO_APROX,
 } from './tiempo-entrega.js';
 
@@ -168,5 +169,51 @@ describe('tiempo y entrega de toda actividad', () => {
       'tiempoEstimadoMin',
       'fechaEntregaEsperada',
     ]);
+  });
+
+  describe('modelo medido contra el tiempo real (29-10)', () => {
+    it('lo que ya tomó el mismo título manda (2+ veces), salvo la duración de una junta', () => {
+      const historial = { minutos: 432, veces: 6, propio: true };
+      const apoyo = estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Reporte / documentación', titulo: 'Apoyo Biblioteca Tlaxcala' }, {}, { historial });
+      expect(apoyo.totalMin).toBe(430);
+      expect(apoyo.desglose[0].concepto).toBe('Lo que ha tomado este mismo título (mediana de 6 veces, tuyas)');
+      // Una sola vez no basta.
+      expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Reporte / documentación' }, { cantidad: 2 }, { historial: { ...historial, veces: 1 } }).totalMin).toBe(40);
+      // La junta dura lo que dice la agenda.
+      expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Junta' }, {}, { duracionAgendaMin: 60, historial }).totalMin).toBe(60);
+    });
+
+    it('sin cantidad en el título, la mediana real del tipo en vez de «1 unidad»', () => {
+      const r = estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Instalación' }, {}, { tipicoMin: 182 });
+      expect(r.totalMin).toBe(180);
+      expect(r.desglose).toEqual([{ concepto: 'Instalación: tiempo típico', minutos: 180 }]);
+      expect(r.supuestos).toEqual(['el título no dice cuántos dispositivos: tiempo típico del tipo']);
+      // Con cantidad manda la tabla; sin mediana del tipo, 1 unidad como antes.
+      expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Instalación' }, { cantidad: 2 }, { tipicoMin: 182 }).totalMin).toBe(120);
+      expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Instalación' }, {}).totalMin).toBe(75);
+    });
+
+    it('si el título dice otro trabajo se calcula como ese tipo (sin cambiar el elegido)', () => {
+      expect(tipoDelTitulo({ coreKind: 'tarea', ticketTypeCustom: 'Preparación de equipo', titulo: 'Montado de tubería y charola' })).toEqual({
+        coreKind: 'tarea',
+        ticketTypeCustom: 'Cableado y canalización',
+      });
+      const r = estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Preparación de equipo', titulo: 'Montado de tubería y charola' }, { cantidad: 4 });
+      // 4 nodos × 45, no los 15 min de «Preparación de equipo».
+      expect(r.totalMin).toBe(180);
+      expect(r.supuestos[0]).toBe('el título es de cableado y canalización: se calcula como tal');
+      expect(tipoDelTitulo({ coreKind: 'servicio', ticketType: 'CORRECTIVO', titulo: 'Revisar cableado del DVR' })).toBeNull();
+      expect(tipoDelTitulo({ coreKind: 'tarea', ticketTypeCustom: 'Cableado y canalización', titulo: 'Cableado de 4 nodos' })).toBeNull();
+    });
+
+    it('la autoasignación usa el historial del título cuando lo hay', () => {
+      const { cambios } = completarTiempos(
+        { coreKind: 'tarea', ticketTypeCustom: 'Reporte / documentación', titulo: 'Apoyo Biblioteca Tlaxcala', creadoPorId: 7, responsableId: 7, fechaInicio: cdmx('10:00').toISOString() },
+        { lectura: {}, historial: { minutos: 420, veces: 5, propio: true }, ahora: cdmx('09:00') },
+      );
+      expect(cambios).toMatchObject({ tiempoEstimadoMin: 420, tiempoEstandarMin: 420 });
+      // 10:00 + 7 h con la comida: pasa de las 18:00, se topa en la salida.
+      expect(hora(cambios.fechaEntregaEsperada!)).toBe('18:00');
+    });
   });
 });

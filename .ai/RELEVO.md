@@ -1,5 +1,25 @@
 # RELEVO
 
+- **29-10 ~16:30 (claude-code) — Tiempo estándar: el modelo medido contra el reloj real (Adam: «ve como mejorar el
+  modelo»).**
+  - Prueba hacia atrás con 233 actividades terminadas desde el 21-09 (reloj de quien la ejecutó, sin cortes del
+    sistema): el modelo de antes daba 0.22 × lo real en la mediana, 22 % dentro de ×2, error típico ×5.4. Con este
+    cambio: 0.89 ×, 52 % dentro de ×2, error típico ×1.94. La estimación de la propia persona da 0.98 × y 75 %.
+  - Tres cambios, en este orden, en `estandarDeLectura` (`tiempo-entrega.ts`):
+    1. Si el título dice otro trabajo que el tipo elegido (tubería, charola, cableado, nodos → Cableado y
+       canalización; factura → Facturación) se calcula como ese tipo, con el supuesto escrito. No cambia el tipo
+       guardado. `tipoDelTitulo` se mudó aquí desde `rellenar-tiempos.ts`.
+    2. Lo que ya tomó el mismo título (sin acentos ni mayúsculas) manda si hay 2+ veces: primero las de la persona,
+       si no las de cualquiera. Mediana. `TiemposActividadService.historial`: una consulta por empresa cada 10 min.
+       La duración de agenda de una junta sigue mandando sobre esto.
+    3. Tipo por unidades sin cantidad en el título: la mediana real del tipo en vez de «1 unidad».
+  - Las tarifas de la tabla NO se tocaron (son decisión de Adam). Siguen bajas contra lo real: Cotización 40 min
+    contra mediana 179; Reporte/documentación 20 contra 333; Instalación 75 contra ~450; Preparación de equipo 15
+    contra 424. Propuesta de recalibración pendiente de su visto bueno.
+  - Aplica solo a lo que se crea desde hoy; nada pasado se recalculó. `rellenar-tiempos.ts` queda sin script (el
+    relleno del 29-10 se revirtió); su encabezado ya lo dice.
+  - Commit armado con índice temporal sobre `origin/main` (checkout compartido con trabajo ajeno sin commitear).
+
 - **29-10 ~15:40 (claude-code) — Ubicación obligatoria para checar y margen de 10 min (pedido de Adam del 28-10).**
   - Adam: «dales un margen de error de 5–10 minutos por temas de internet… y fuerza a que se deba comenzar a tomar la
     ubicación; si no la tienen prendida, que les marque errores: enciende tu ubicación».
