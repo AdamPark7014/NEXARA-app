@@ -20,6 +20,7 @@
 import { calcularEstandar, reglaDe, TOPE_ESTANDAR_MIN, type Desglose, type ReglaEstandar, type Traslado } from '../ai/estandar/tabla-estandar.js';
 import { esComplejidad, normalizar, type Complejidad } from '../ai/complejidad/tiempos-tipicos.js';
 import { workDayAtClock } from '../common/time/workday.js';
+import { aHoraMinuto, aMinutos, MINUTOS_DE_COMIDA, ventanaDeComida } from '../attendance/lunch/ventana-comida.js';
 
 /** Sin ruta: ida y vuelta aproximadas dentro de Puebla. */
 export const TRASLADO_APROX: Traslado = { idaMin: 30, vueltaMin: 30 };
@@ -29,14 +30,6 @@ export const MINUTOS_POR_OMISION = 60;
 export type JornadaEntrega = { entrada: string; salida: string; comidaDesde: string; comidaHasta: string };
 /** La oficina (Adam, 05-10-2026): de 10 a 18, comida de 15 a 16. Es la de quien no tiene horario. */
 export const JORNADA_OFICINA: JornadaEntrega = { entrada: '10:00', salida: '18:00', comidaDesde: '15:00', comidaHasta: '16:00' };
-/**
- * La comida, con la regla de la ventana de comida de asistencia (`ventanaDeComida`): quien entra a
- * las 10:00 o después come de 15 a 16; quien entra antes (la cuadrilla, 08:00–17:00) tiene una hora
- * libre desde las 5 h de entrar, y para la entrega se supone la primera (13–14).
- */
-export const COMIDA_TRAS_ENTRADA_MIN = 5 * 60;
-export const COMIDA_MIN = 60;
-const ENTRADA_OFICINA_MIN = 10 * 60;
 
 function minutosHm(valor?: string | null): number | null {
   const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec((valor ?? '').trim());
@@ -51,13 +44,22 @@ function aHm(min: number): string {
 /**
  * La jornada de un horario (`horarioDePersona`): su entrada y su salida, con su comida. Sin entrada
  * (dirección 24/7) o sin horario, la de la oficina; sin salida, 9 h después de entrar.
+ *
+ * La comida es la ventana de asistencia (`ventanaDeComida`, una sola regla): quien entra a las 10:00
+ * o después come de 15 a 16; quien entra antes (la cuadrilla, 08:00–17:00) tiene una hora libre desde
+ * las 5 h de entrar, y para la entrega se supone la primera (13–14).
  */
 export function jornadaDeHorario(h?: { entrada?: string | null; salida?: string | null } | null): JornadaEntrega {
   const entrada = minutosHm(h?.entrada);
   if (entrada == null) return JORNADA_OFICINA;
-  const salida = minutosHm(h?.salida) ?? entrada + 8 * 60 + COMIDA_MIN;
-  const comida = entrada >= ENTRADA_OFICINA_MIN ? (minutosHm(JORNADA_OFICINA.comidaDesde) as number) : entrada + COMIDA_TRAS_ENTRADA_MIN;
-  return { entrada: aHm(entrada), salida: aHm(salida), comidaDesde: aHm(comida), comidaHasta: aHm(comida + COMIDA_MIN) };
+  const salida = minutosHm(h?.salida) ?? entrada + 8 * 60 + MINUTOS_DE_COMIDA;
+  const comida = ventanaDeComida(h);
+  return {
+    entrada: aHm(entrada),
+    salida: aHm(salida),
+    comidaDesde: comida.desde,
+    comidaHasta: aHoraMinuto(aMinutos(comida.desde) + comida.minutos),
+  };
 }
 
 export type TipoActividad = { coreKind?: string | null; ticketType?: string | null; ticketTypeCustom?: string | null };
