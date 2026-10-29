@@ -272,9 +272,11 @@ export default function Lienzo3D({
         </button>
       </div>
       <span className={styles.brujula} role="img" aria-label="Norte" title="Norte" style={{ transform: `rotate(${norte}deg)` }}>
-        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
-          <path d="M12 2l5 14-5-3-5 3z" fill="var(--ui-fg)" />
-          <text x="12" y="23" textAnchor="middle" fontSize="7" fontWeight="700" fill="var(--ui-fg)">N</text>
+        <svg viewBox="0 0 32 32" width="34" height="34" aria-hidden="true">
+          <text x="16" y="8.5" textAnchor="middle" fontSize="8" fontWeight="800" fill="var(--ui-brand-text)">N</text>
+          <path d="M16 10l3.6 7H12.4z" fill="var(--ui-brand)" />
+          <path d="M16 27l-3.6-10h7.2z" fill="var(--ui-fg-4)" />
+          <circle cx="16" cy="17" r="1.6" fill="var(--ui-surface)" stroke="var(--ui-fg-3)" strokeWidth="0.8" />
         </svg>
       </span>
       <p className={styles.pista3d}>Arrastrar: girar · Mayús + arrastrar: mover · rueda: acercar · F: enfocar la selección</p>
