@@ -12,6 +12,10 @@ import {
   type PropuestaActividad,
   type SalidaIA,
 } from './asistente-actividades.js';
+import { nombresPropiosDe } from './nombres.js';
+
+/** Actividades recientes de las que se toman los nombres ya usados («Toks»). */
+const ACTIVIDADES_PARA_NOMBRES = 400;
 
 export type RespuestaAsistente = {
   propuestas: PropuestaActividad[];
@@ -24,6 +28,16 @@ export type RespuestaAsistente = {
   opciones: {
     clientes: Array<{ id: number; nombre: string }>;
     proyectos: Array<{ id: number; nombre: string; clientId: number }>;
+    /** Sucursales activas: el lugar de la tarjeta se elige de aquí o se escribe. */
+    sucursales: Array<{
+      id: number;
+      nombre: string;
+      clientId: number;
+      branchNumber: string | null;
+      city: string | null;
+      state: string | null;
+      address: string | null;
+    }>;
   };
 };
 
@@ -69,13 +83,22 @@ export class AsistenteActividadesService {
           .map((c) => ({ id: c.id, nombre: c.name }))
           .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
         proyectos: catalogos.proyectos.map((p) => ({ id: p.id, nombre: p.title, clientId: p.clientId })),
+        sucursales: catalogos.sucursales.map((s) => ({
+          id: s.id,
+          nombre: s.name,
+          clientId: s.clientId,
+          branchNumber: s.branchNumber ?? null,
+          city: s.city ?? null,
+          state: s.state ?? null,
+          address: s.address ?? null,
+        })),
       },
     };
   }
 
   private async catalogos(user: any, companyId: number): Promise<CatalogosNexara> {
     const conRol = await this.users.findOne(user.id, companyId);
-    const [personas, clientes, sucursales, proyectos] = await Promise.all([
+    const [personas, clientes, sucursales, proyectos, recientes] = await Promise.all([
       this.users.findAssignableUsers({ ...user, role: conRol?.role }, companyId),
       this.prisma.serviceClient.findMany({
         where: { companyId, isActive: true },
@@ -98,12 +121,19 @@ export class AsistenteActividadesService {
         where: { companyId, deletedAt: null, status: { in: ['ACTIVE', 'PLANNED', 'ON_HOLD'] } },
         select: { id: true, title: true, clientId: true, client: { select: { name: true } } },
       }),
+      this.prisma.activity.findMany({
+        where: { companyId, deletedAt: null },
+        orderBy: { id: 'desc' },
+        take: ACTIVIDADES_PARA_NOMBRES,
+        select: { titulo: true, branchName: true },
+      }),
     ]);
     return {
       personas: (personas as any[]).map((p) => ({ id: p.id, nombre: p.nombre, puesto: p.puesto ?? null, email: p.email })),
       clientes,
       sucursales: sucursales.map(({ client, ...s }) => ({ ...s, clientName: client?.name ?? '' })),
       proyectos: proyectos.map(({ client, ...p }) => ({ ...p, clientName: client?.name ?? '' })),
+      nombresUsados: nombresPropiosDe(recientes.map((a) => ({ titulo: a.titulo, lugar: a.branchName }))),
     };
   }
 }

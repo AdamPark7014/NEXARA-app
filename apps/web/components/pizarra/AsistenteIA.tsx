@@ -27,11 +27,14 @@ import {
   TIPOS_SERVICIO,
   agendaFinal,
   bloqueos,
+  compromisoValido,
   conProyecto,
+  correccionDe,
   crearActividad,
   encargoElegido,
   estadoAsistente,
   interpretar,
+  lugarEfectivo,
   pasoEquipo,
   payloadFinal,
   personasAsignables,
@@ -39,6 +42,7 @@ import {
   reglaEncargo,
   subtipoEfectivo,
   sumarAlEquipo,
+  textoCorreccion,
   tipoEfectivo,
   type Ajustes,
   type Encargo,
@@ -66,8 +70,10 @@ type EtapaPropuesta = { nombre: string | null };
 /**
  * «Asignar con IA», hasta arriba de Actividades para el CEO. Se dicta con un toque (el texto
  * aparece en vivo y al callar se prepara solo) o se escribe y «Preparar actividades». La IA
- * propone tipo, persona, cliente, día, plazo y duración; el CEO corrige lo que haga falta y
- * confirma una por una o todas. Solo se muestra al CEO y si el servidor tiene la IA activa.
+ * propone tipo, persona, cliente, día, plazo y duración; los nombres mal oídos los corrige el
+ * API contra el catálogo y lo dice («Corregido de "talks"»). Cada campo se corrige a mano en
+ * la tarjeta, sin volver a escribir la instrucción, y se confirma una por una o todas. Solo se
+ * muestra al CEO y si el servidor tiene la IA activa.
  */
 export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
   const { user, token } = useUser();
@@ -130,7 +136,6 @@ function Contenido({
   const [ajustes, setAjustes] = useState<Record<number, Ajustes>>({});
   const [estados, setEstados] = useState<Record<number, Estado>>({});
   const [etapas, setEtapas] = useState<Record<number, EtapaPropuesta>>({});
-  const [editandoTexto, setEditandoTexto] = useState<Record<number, boolean>>({});
   const [creandoTodas, setCreandoTodas] = useState(false);
   const personasOrdenadas = useMemo(() => [...personas].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")), [personas]);
   /** Lo que ya estaba escrito cuando empezó el dictado: lo dicho se agrega después. */
@@ -158,7 +163,6 @@ function Contenido({
         setAjustes({});
         setEstados({});
         setEtapas({});
-        setEditandoTexto({});
       } catch (e) {
         // Lo escrito o dictado no se borra: basta volver a intentar.
         setError(`${formatApiError(e, "La IA no respondió.")} Tu instrucción sigue aquí: vuelve a tocar «Preparar actividades».`);
@@ -206,7 +210,7 @@ function Contenido({
     const destino = personas.find((x) => x.id === responsableId);
     // Sin la lista de personas no se sabe a quién va: no se aplican las reglas por persona.
     const destinoEmail = destino ? destino.email ?? null : undefined;
-    const payload = payloadFinal(p, aj, { destinoEmail, proyectos: opciones?.proyectos });
+    const payload = payloadFinal(p, aj, { destinoEmail, proyectos: opciones?.proyectos, sucursales: opciones?.sucursales });
     const agenda = agendaFinal(p, aj);
     const motivos = bloqueos(p, payload, { creadorEmail, destinoEmail, v2Role: v2, isSuperAdmin, agenda });
     return { aj, payload, agenda, destinoEmail, motivos };
@@ -414,9 +418,11 @@ function Contenido({
           const subtipo = subtipoEfectivo(p, aj);
           const falta = (campo: string) => p.faltantes.includes(campo);
           const regla = reglaEncargo(tipo, destinoEmail, encargoElegido(p, aj));
-          const editando = Boolean(editandoTexto[i]);
           const titulo = String(payload.titulo ?? p.titulo);
           const indicaciones = typeof payload.indicaciones === "string" ? payload.indicaciones : "";
+          const lugar = lugarEfectivo(p, aj);
+          const sucursalesLista = (opciones?.sucursales ?? []).filter((x) => !payload.clientId || x.clientId === Number(payload.clientId));
+          const corregidos = (p.correcciones ?? []).filter((x) => x.campo !== "sucursal");
           const duracion = Number(payload.tiempoEstimadoMin) || 0;
           const opcionesDuracion = duracion && !DURACIONES_MIN.includes(duracion) ? [...DURACIONES_MIN, duracion].sort((a, b) => a - b) : DURACIONES_MIN;
           const responsableId = aj.responsableId ?? p.responsable?.id;
@@ -436,6 +442,9 @@ function Contenido({
             ...(opciones?.proyectos ?? []),
           ].filter((x, k, arr) => arr.findIndex((y) => y.id === x.id) === k);
           const etapa = etapas[i]?.nombre;
+          const corrResponsable = correccionDe(p, "responsable");
+          const corrCliente = correccionDe(p, "cliente");
+          const corrLugar = correccionDe(p, "lugar") ?? correccionDe(p, "sucursal");
 
           return (
             <div key={i} className={s.propuesta}>
@@ -448,39 +457,31 @@ function Contenido({
                   </Badge>
                 </div>
                 {!est.creada ? (
-                  <div className={c.fila}>
-                    <Button variant="ghost" size="sm" onClick={() => setEditandoTexto((prev) => ({ ...prev, [i]: !editando }))} aria-expanded={editando}>
-                      {editando ? "Listo" : "Editar texto"}
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEstados((prev) => ({ ...prev, [i]: { descartada: true } }))}>
-                      Descartar
-                    </Button>
-                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setEstados((prev) => ({ ...prev, [i]: { descartada: true } }))}>
+                    Descartar
+                  </Button>
                 ) : null}
               </div>
-              {editando && !est.creada ? (
-                <div className={s.texto}>
-                  <Field label="Título" required>
-                    <Input value={aj.titulo ?? titulo} maxLength={200} onChange={(e) => ajustar(i, { titulo: e.target.value })} />
-                  </Field>
-                  <Field label="Indicaciones" optional>
-                    <Textarea
-                      rows={3}
-                      value={aj.indicaciones ?? indicaciones}
-                      maxLength={4000}
-                      placeholder="Detalle para quien la hará: síntoma, cantidades, con quién coordinarse…"
-                      onChange={(e) => ajustar(i, { indicaciones: e.target.value })}
-                    />
-                  </Field>
-                </div>
-              ) : indicaciones ? (
-                <p className={s.indicaciones}>{indicaciones}</p>
-              ) : null}
+              {est.creada && indicaciones ? <p className={s.indicaciones}>{indicaciones}</p> : null}
               {/* El resumen es el de la IA: si se cambió el tipo, ya no aplica (los campos lo dicen). */}
               {tipo === p.tipo ? <p className={s.resumen}>{p.resumen}</p> : null}
+              {corregidos.length && !est.creada ? (
+                <p className={s.corregidos}>
+                  Nombres corregidos:{" "}
+                  {corregidos.map((x) => (x.como === "apodo" ? `«${x.de}» es ${x.a}` : `«${x.de}» → ${x.a}`)).join(" · ")}
+                </p>
+              ) : null}
 
               {!est.creada ? (
                 <div className={s.ajustes}>
+                  <Field label="Título" required fullWidth>
+                    <Input
+                      value={aj.titulo ?? titulo}
+                      maxLength={200}
+                      invalid={aj.titulo !== undefined && !aj.titulo.trim()}
+                      onChange={(e) => ajustar(i, { titulo: e.target.value })}
+                    />
+                  </Field>
                   <Field label="Tipo" required>
                     <Select value={tipo} onChange={(e) => ajustar(i, { tipo: e.target.value as ActivityKind, subtipo: undefined })}>
                       {tiposVisibles.map((t) => (
@@ -507,7 +508,17 @@ function Contenido({
                       </Select>
                     </Field>
                   ) : null}
-                  <Field label="Responsable" required hint={!p.responsable && p.textoResponsable ? `Dijiste «${p.textoResponsable}»` : undefined}>
+                  <Field
+                    label="Responsable"
+                    required
+                    hint={
+                      aj.responsableId === undefined && corrResponsable
+                        ? textoCorreccion(corrResponsable)
+                        : !p.responsable && p.textoResponsable
+                          ? `Dijiste «${p.textoResponsable}»`
+                          : undefined
+                    }
+                  >
                     <Select
                       value={responsableId ? String(responsableId) : ""}
                       onChange={(e) => ajustar(i, { responsableId: Number(e.target.value) || undefined })}
@@ -535,11 +546,21 @@ function Contenido({
                     <Field
                       label="Cliente"
                       required={tipo === "servicio"}
-                      hint={!p.cliente && p.textoCliente ? `Dijiste «${p.textoCliente}»` : undefined}
+                      hint={
+                        aj.clientId === undefined && corrCliente
+                          ? textoCorreccion(corrCliente)
+                          : !p.cliente && p.textoCliente
+                            ? `Dijiste «${p.textoCliente}»: no está registrado`
+                            : undefined
+                      }
                     >
                       <Select
                         value={clienteId ? String(clienteId) : ""}
-                        onChange={(e) => ajustar(i, { clientId: Number(e.target.value) || null })}
+                        onChange={(e) => {
+                          const nuevo = Number(e.target.value) || null;
+                          // Otro cliente: la sucursal de la IA ya no aplica (el lugar escrito se queda).
+                          ajustar(i, { clientId: nuevo, ...(p.sucursal && aj.lugar === undefined && nuevo !== (p.cliente?.id ?? null) ? { lugar: "" } : {}) });
+                        }}
                       >
                         <option value="">{tipo === "servicio" ? "Elige el cliente" : "Sin cliente"}</option>
                         {clientesSugeridos.length ? (
@@ -562,6 +583,28 @@ function Contenido({
                         ) : null}
                       </Select>
                     </Field>
+                  ) : null}
+                  {!conProyecto(tipo) ? (
+                    <Field
+                      label="Lugar"
+                      optional
+                      hint={aj.lugar === undefined && corrLugar ? textoCorreccion(corrLugar) : sucursalesLista.length ? "Sucursal o lugar" : undefined}
+                    >
+                      <Input
+                        value={lugar}
+                        maxLength={160}
+                        list={sucursalesLista.length ? `asistente-lugares-${i}` : undefined}
+                        placeholder="Sucursal, planta o dirección"
+                        onChange={(e) => ajustar(i, { lugar: e.target.value })}
+                      />
+                    </Field>
+                  ) : null}
+                  {!conProyecto(tipo) && sucursalesLista.length ? (
+                    <datalist id={`asistente-lugares-${i}`}>
+                      {sucursalesLista.map((x) => (
+                        <option key={x.id} value={x.nombre} />
+                      ))}
+                    </datalist>
                   ) : null}
                   {conProyecto(tipo) ? (
                     <Field label="Proyecto" required>
@@ -596,6 +639,21 @@ function Contenido({
                   <Field label="Hora" hint={agenda.dia && !agenda.horaDicha ? "No la dijiste: revísala" : undefined}>
                     <Input type="time" value={agenda.hora ?? ""} disabled={!agenda.dia} onChange={(e) => ajustar(i, { hora: e.target.value })} />
                   </Field>
+                  {!agenda.hasta ? (
+                    <Field
+                      label="Entregar a más tardar"
+                      optional
+                      hint={agenda.compromiso ? undefined : "Sin hora, el límite es el fin del día."}
+                      error={compromisoValido(agenda) ? null : "Tiene que ser después de la hora de inicio."}
+                    >
+                      <Input
+                        type="time"
+                        value={agenda.compromiso ?? ""}
+                        disabled={!agenda.dia}
+                        onChange={(e) => ajustar(i, { compromiso: e.target.value })}
+                      />
+                    </Field>
+                  ) : null}
                   <Field label="Último día" optional>
                     <DateInput
                       value={agenda.hasta ?? ""}
@@ -644,6 +702,15 @@ function Contenido({
                       <Input value={regla.valor === "despacho" ? "La reparte a su equipo" : "La hace en persona"} readOnly />
                     </Field>
                   ) : null}
+                  <Field label="Indicaciones" optional fullWidth>
+                    <Textarea
+                      rows={2}
+                      value={aj.indicaciones ?? indicaciones}
+                      maxLength={4000}
+                      placeholder="Detalle para quien la hará: síntoma, cantidades, con quién coordinarse…"
+                      onChange={(e) => ajustar(i, { indicaciones: e.target.value })}
+                    />
+                  </Field>
                 </div>
               ) : null}
 

@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { agendaFinal, bloqueos, pasoEquipo, payloadFinal, reglaEncargo, subtipoEfectivo, type PropuestaActividad } from "./asistente-ia-api";
+import {
+  agendaFinal,
+  bloqueos,
+  correccionDe,
+  lugarEfectivo,
+  pasoEquipo,
+  payloadFinal,
+  reglaEncargo,
+  subtipoEfectivo,
+  textoCorreccion,
+  type PropuestaActividad,
+  type SucursalOpcion,
+} from "./asistente-ia-api";
 
 const base: PropuestaActividad = {
   tipo: "servicio",
@@ -83,7 +95,7 @@ describe("asistente IA en la pizarra", () => {
     expect(sinDia.fechaMaxima).toBeUndefined();
     // Un último día antes del primero no se manda (y la tarjeta lo bloquea).
     expect(payloadFinal(lista, { hasta: "2026-10-20" }).periodoFin).toBeUndefined();
-    expect(agendaFinal(base, { dia: "2026-10-24" })).toEqual({ dia: "2026-10-24", hora: "09:00", hasta: null, horaDicha: false });
+    expect(agendaFinal(base, { dia: "2026-10-24" })).toEqual({ dia: "2026-10-24", hora: "09:00", hasta: null, horaDicha: false, compromiso: null });
   });
 
   it("no deja crear sin responsable, cliente, día del servicio ni tiempo estimado", () => {
@@ -151,5 +163,76 @@ describe("asistente IA en la pizarra", () => {
     expect(payloadFinal(lista, { tipo: "comercial" })).toMatchObject({ ticketType: "OTRO", ticketTypeCustom: "COMERCIAL" });
     expect(subtipoEfectivo({ ...lista, tipo: "tarea", payload: { ...lista.payload, ticketTypeCustom: "Entrega" } }, { tipo: "servicio" })).toBe("PREVENTIVO");
     expect(subtipoEfectivo(lista, { tipo: "tarea" })).toBe("Otro");
+  });
+
+  it("«Entregar a más tardar» deja la fecha máxima y la entrega a esa hora (sin periodo)", () => {
+    const p = payloadFinal(lista, { compromiso: "13:30" });
+    expect(p).toMatchObject({
+      fechaInicio: "2026-10-24T15:00:00.000Z",
+      fechaMaxima: "2026-10-24T19:30:00.000Z",
+      fechaEntregaEsperada: "2026-10-24T19:30:00.000Z",
+    });
+    // La que propuso la IA se respeta; borrarla vuelve al fin del día.
+    const conIA = { ...lista, agenda: { ...lista.agenda, compromiso: "18:00" } };
+    expect(payloadFinal(conIA, { compromiso: "" }).fechaMaxima).toBe("2026-10-24T15:00:00.000Z");
+    // Con varios días no aplica: vence el último.
+    expect(agendaFinal(conIA, { hasta: "2026-10-26" }).compromiso).toBeNull();
+    // Antes de la hora de inicio, no se crea.
+    const mal = { ...lista.agenda, compromiso: "08:00" };
+    expect(bloqueos(lista, payloadFinal(lista, { compromiso: "08:00" }), { agenda: mal })).toContain(
+      "«Entregar a más tardar» tiene que ser después de la hora de inicio.",
+    );
+  });
+
+  it("el lugar se escribe libre o se toma de una sucursal del cliente con sus datos", () => {
+    const sucursales: SucursalOpcion[] = [
+      { id: 60, nombre: "CEDIS Puebla", clientId: 1, branchNumber: "7", city: "Puebla", state: "Puebla", address: "Av. 1" },
+      { id: 61, nombre: "CEDIS Puebla", clientId: 2, branchNumber: "9", city: "Cholula", state: "Puebla", address: null },
+    ];
+    expect(payloadFinal(lista, { lugar: "cedis puebla" }, { sucursales })).toMatchObject({
+      branchName: "CEDIS Puebla",
+      branchNumber: "7",
+      branchCity: "Puebla",
+      branchAddress: "Av. 1",
+    });
+    const libre = payloadFinal(lista, { lugar: " Tienda Maja " }, { sucursales });
+    expect(libre.branchName).toBe("Tienda Maja");
+    expect(libre.branchNumber).toBeUndefined();
+    expect(payloadFinal({ ...lista, payload: { ...lista.payload, branchName: "Talks" } }, { lugar: "" }).branchName).toBeUndefined();
+    expect(lugarEfectivo({ ...lista, payload: { ...lista.payload, branchName: "Nave 2" } }, {})).toBe("Nave 2");
+  });
+
+  it("si se cambia el cliente, la sucursal de la IA (de otro cliente) no se arrastra", () => {
+    const conSucursal: PropuestaActividad = {
+      ...lista,
+      sucursal: { id: 60, nombre: "CEDIS Puebla" },
+      payload: { ...lista.payload, branchName: "CEDIS Puebla", branchNumber: "7", branchCity: "Puebla" },
+    };
+    const otro = payloadFinal(conSucursal, { clientId: 2 });
+    expect(otro.clientId).toBe(2);
+    expect(otro.branchName).toBeUndefined();
+    expect(otro.branchNumber).toBeUndefined();
+    expect(payloadFinal(conSucursal, {}).branchNumber).toBe("7");
+  });
+
+  it("un título vacío no se crea (no vuelve en silencio al de la IA)", () => {
+    const p = payloadFinal(lista, { titulo: "   " });
+    expect(p.titulo).toBe("");
+    expect(bloqueos(lista, p, {})).toContain("Escribe el título.");
+  });
+
+  it("las correcciones de nombres se dicen en su campo", () => {
+    const p: PropuestaActividad = {
+      ...lista,
+      correcciones: [
+        { campo: "cliente", de: "talks", a: "TOX Logística", como: "parecido" },
+        { campo: "responsable", de: "Caro", a: "Carolina Pérez", como: "apodo" },
+      ],
+    };
+    expect(textoCorreccion(correccionDe(p, "cliente"))).toBe("Corregido de «talks»");
+    expect(textoCorreccion(correccionDe(p, "responsable"))).toBe("Dijiste «Caro»");
+    expect(correccionDe(p, "lugar")).toBeNull();
+    // Un API anterior no manda correcciones.
+    expect(correccionDe(lista, "cliente")).toBeNull();
   });
 });

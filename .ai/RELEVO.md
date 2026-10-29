@@ -1,5 +1,42 @@
 # RELEVO
 
+- **29-10 ~11:00 (claude-code) — «Asignar con IA»: nombres mal oídos resueltos en código y propuestas editables (pedido de Adam).**
+  - Adam: «le digo talks y escribe talk… que una vez que se genera la parametrización… puedas corregir cualquier
+    parámetro manualmente». En producción «Toks» no es cliente (sale en títulos: «Inventario Toks»): el dictado
+    escribe «talks» y la IA lo copiaba como «Talk».
+  - API `ai/asistente/nombres.ts` (puro, con spec): `sonido` con lo que el dictado mete del inglés (alk→ok, ph, th,
+    sh, ck, ee, oo) además de k/c/qu, s/z/c, x/ks, h muda, ll/y, b/v, g/j; distancia de edición; apodos (+chava,
+    isra, clau, efra…); dos palabras juntas («han lob»); siglas deletreadas («te pe eme» = TPM) e iniciales del
+    nombre. `buscar(..., { aproximado })`: 3 igual > 1.8 suena igual > 1.5 se parece; lo aproximado solo se elige si
+    es la única opción parecida. Las actas siguen con `buscar` exacto (sin la opción).
+    - `catalogoRelevante` manda a la IA lo mencionado así, ordenado, con cómo se oyó: «Grupo Tox («talks»)», y
+      «Otros nombres ya usados (no son clientes): Toks («talks»)» (palabras propias de los títulos y lugares de las
+      últimas 400 actividades, `nombresPropiosDe`).
+    - `construirPropuesta`: persona, cliente, sucursal y proyecto con coincidencia aproximada; si la IA copió lo mal
+      oído («Talk») y la instrucción lo corrobora, se empata con una letra de diferencia; `correcciones` («talks» →
+      Grupo Tox, campo, apodo o parecido) y el título, las indicaciones y el lugar se corrigen («Revisar NVR en
+      Talk» → «… en Tox»). Varios parecidos: candidatos + aviso. Ninguno: sin cliente + aviso; nunca se inventa.
+    - «A más tardar a las 6» el mismo día ya no va escrito en las indicaciones: es la hora compromiso
+      (`agenda.compromiso`, `fechaMaxima`/`fechaEntregaEsperada` a esa hora, como el formulario). Con varios días
+      sigue escrita.
+    - `opciones.sucursales` en la respuesta (no pasan por la IA).
+  - Web `AsistenteIA.tsx` + `lib/asistente-ia-api.ts`: título e indicaciones siempre como campos (se quitó «Editar
+    texto»); campo «Lugar» (libre o sucursal del cliente, con sus datos); «Entregar a más tardar»; «Corregido de
+    "talks"» / «Dijiste "Chava"» en responsable, cliente y lugar, y una línea «Nombres corregidos: …». Cambiar de
+    cliente suelta la sucursal de la IA; título vacío bloquea. Lo corregido es lo que va a `POST /activities`.
+  - Eval (`--funcion asistente`, por la puerta `pruebas`, Haiku `low`): casos a24–a30 nuevos (datos inventados:
+    Erik/«eric», Salvador/«chava», Azael/«asael», Yahir/«jair», Brooks Coffee/«bruks cofi», Super Kwik/«súper
+    quick», Transportes Coatzacoalcos/«cuatzacualcos», TPM/«te pe eme», «talks», Maja sin cliente). Antes: 0.88, 2/7
+    perfectos. Ahora: **30/30 perfectos**, p50 1.9 s, p95 2.6 s, US$0.00023 por llamada (~3.4K de entrada). Sin
+    cambio de modelo. Gasto del eval: US$0.0095. a22 ya no exige la hora en el texto. Contrato §8 de
+    `C:\dev\scripts\ai-os\IA-CLAUDE.md` actualizado.
+  - Pruebas: jest del asistente 42 (nombres 10 + armado 32), toda la API 322 suites en verde salvo
+    `ai/asistente-chat/intenciones.spec.ts` (trabajo en curso de la sesión del chat, sin commitear); vitest de
+    pizarra y lib 94. Tipos web limpios; los de la API solo fallan en `activities/activities.service.ts`, que tiene
+    cambios sin commitear de la sesión del tiempo estándar.
+  - Sugerencia para Adam: dar de alta como clientes los que se usan seguido (Toks, Sephora, MAJA, ARTA): así el
+    código los empata como cliente y no solo como lugar.
+
 - **29-10 ~11:30 (claude-code) — Apps: paridad con lo de Core del 28-10 (Android e iOS).**
   - Android (`apps/mobile-native/android`), alta/asignar y detalle:
     - Catálogo cerrado de 17 tipos en 4 familias (`CoreActivityKinds.FAMILIAS_TAREA`, `tiposDeFamilia`), íconos como

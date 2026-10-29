@@ -80,7 +80,8 @@ describe('asistente de actividades', () => {
       estatus: 'Pendiente',
     });
     expect(p.payload.periodoFin).toBeUndefined();
-    expect(p.agenda).toEqual({ dia: '2026-10-12', hora: '15:00', hasta: null, horaDicha: true });
+    expect(p.agenda).toEqual({ dia: '2026-10-12', hora: '15:00', hasta: null, horaDicha: true, compromiso: null });
+    expect(p.correcciones).toEqual([]);
     expect(p.resumen).toBe('Tarea · Junta para José Antonio Ramírez en TOX Logística hoy 15:00');
   });
 
@@ -183,7 +184,7 @@ describe('asistente de actividades', () => {
   describe('agenda: inicio contra plazo', () => {
     it('«para el viernes» empieza hoy y vence el viernes (periodo, como «Al» del formulario)', () => {
       const p = construirPropuesta({ ...base, fecha: null, hora: null, fechaLimite: '2026-10-16' }, catalogos, ctx);
-      expect(p.agenda).toEqual({ dia: '2026-10-12', hora: '10:00', hasta: '2026-10-16', horaDicha: false });
+      expect(p.agenda).toEqual({ dia: '2026-10-12', hora: '10:00', hasta: '2026-10-16', horaDicha: false, compromiso: null });
       expect(p.payload).toMatchObject({
         periodoInicio: '2026-10-12',
         periodoFin: '2026-10-16',
@@ -206,18 +207,38 @@ describe('asistente de actividades', () => {
         hora: '09:00',
         hasta: null,
         horaDicha: false,
+        compromiso: null,
       });
       // Inicio después del plazo: se hace el día del plazo.
       expect(agendaDe({ fecha: '2026-10-20', hora: '11:00', fechaLimite: '2026-10-16' }, ahora).dia).toBe('2026-10-16');
     });
 
-    it('la hora límite queda escrita en las indicaciones', () => {
+    it('«a más tardar a las 6» el mismo día es la hora compromiso (fecha máxima a esa hora)', () => {
       const p = construirPropuesta(
         { ...base, fecha: null, hora: null, fechaLimite: '2026-10-12', horaLimite: '18:00', indicaciones: 'Mandarlo por correo al gerente.' },
         catalogos,
         ctx,
       );
-      expect(p.payload.indicaciones).toBe('Mandarlo por correo al gerente. Entregar a más tardar el lunes 12 de octubre a las 18:00.');
+      expect(p.agenda.compromiso).toBe('18:00');
+      expect(p.payload.fechaInicio).toBe('2026-10-12T16:00:00.000Z');
+      expect(p.payload.fechaMaxima).toBe('2026-10-13T00:00:00.000Z');
+      expect(p.payload.fechaEntregaEsperada).toBe('2026-10-13T00:00:00.000Z');
+      expect(p.payload.indicaciones).toBe('Mandarlo por correo al gerente.');
+      expect(p.resumen).toContain('a más tardar 18:00');
+    });
+
+    it('con varios días la hora límite no tiene columna: queda escrita en las indicaciones', () => {
+      const p = construirPropuesta(
+        { ...base, fecha: null, hora: null, fechaLimite: '2026-10-14', horaLimite: '18:00', indicaciones: 'Mandarlo por correo al gerente.' },
+        catalogos,
+        ctx,
+      );
+      expect(p.agenda.compromiso).toBeNull();
+      expect(p.payload.indicaciones).toBe('Mandarlo por correo al gerente. Entregar a más tardar el miércoles 14 de octubre a las 18:00.');
+    });
+
+    it('una hora límite antes del inicio no es compromiso', () => {
+      expect(agendaDe({ fecha: '2026-10-13', hora: '11:00', fechaLimite: null, horaLimite: '10:00' }, ahora).compromiso).toBeNull();
     });
 
     it('sin fecha ni duración: quedan vacías y como faltantes', () => {
@@ -334,5 +355,86 @@ describe('asistente de actividades', () => {
       expect(mencionaDia('el lunes 2 de noviembre')).toBe(true);
       expect(mencionaDia('que vaya a las 8')).toBe(false);
     });
+  });
+});
+
+describe('nombres mal oídos: el código los empata con el catálogo y lo dice', () => {
+  const conTox: CatalogosNexara = {
+    ...catalogos,
+    personas: [...catalogos.personas, { id: 20, nombre: 'Yahir Benítez Rosas' }],
+    // Sin «TOX Logística»: aquí «talks» solo puede ser Grupo Tox.
+    clientes: [{ id: 2, name: 'Banorte' }, { id: 3, name: 'Grupo Tox' }],
+    sucursales: [
+      ...catalogos.sucursales,
+      { id: 60, clientId: 3, name: 'Nave 2 Cuautlancingo', branchNumber: null, city: 'Cuautlancingo', clientName: 'Grupo Tox' },
+    ],
+    proyectos: [],
+  };
+  const sinTox = { ...conTox, clientes: [{ id: 2, name: 'Banorte' }], sucursales: catalogos.sucursales };
+
+  it('«talks» es Grupo Tox: cliente, sucursal y título corregidos, y se dice de qué', () => {
+    const instruccion = 'que yahir vaya mañana a las 11 a talks nave 2 no prende el nvr';
+    const p = construirPropuesta(
+      { ...base, tipo: 'servicio', responsable: 'Yahir', cliente: 'Talks', sitio: 'Talks nave 2', titulo: 'Revisar NVR que no prende en Talk', fecha: '2026-10-13', hora: '11:00' },
+      conTox,
+      { ...ctx, instruccion },
+    );
+    expect(p.cliente).toEqual({ id: 3, nombre: 'Grupo Tox' });
+    expect(p.sucursal).toEqual({ id: 60, nombre: 'Nave 2 Cuautlancingo' });
+    expect(p.titulo).toBe('Revisar NVR que no prende en Tox');
+    expect(p.correcciones).toContainEqual({ campo: 'cliente', de: 'talks', a: 'Grupo Tox', como: 'parecido' });
+    expect(p.avisos).toEqual([]);
+    // A la IA le llegó Grupo Tox con cómo se oyó.
+    expect(bloqueCoincidencias(catalogoRelevante(instruccion, conTox))).toContain('Grupo Tox («talks»)');
+  });
+
+  it('si la IA copió lo mal oído en singular («Talk»), la instrucción lo corrobora', () => {
+    const p = construirPropuesta({ ...base, cliente: 'Talk', titulo: 'Junta en Talk' }, conTox, {
+      ...ctx,
+      instruccion: 'junta con talks a las 3',
+    });
+    expect(p.cliente).toEqual({ id: 3, nombre: 'Grupo Tox' });
+    expect(p.titulo).toBe('Junta en Tox');
+  });
+
+  it('«Jair» es Yahir (la única parecida) y se marca como corregido', () => {
+    const p = construirPropuesta({ ...base, responsable: 'Jair' }, conTox, { ...ctx, instruccion: 'que jair vaya a tox a las 3' });
+    expect(p.responsable).toEqual({ id: 20, nombre: 'Yahir Benítez Rosas' });
+    expect(p.correcciones).toContainEqual({ campo: 'responsable', de: 'jair', a: 'Yahir Benítez Rosas', como: 'parecido' });
+  });
+
+  it('sin ningún cliente parecido queda sin cliente, con aviso; nunca se inventa', () => {
+    const p = construirPropuesta({ ...base, cliente: 'Talks', titulo: 'Junta en Talks' }, sinTox, {
+      ...ctx,
+      instruccion: 'junta con talks a las 3',
+    });
+    expect(p.cliente).toBeNull();
+    expect(p.payload.clientId).toBeUndefined();
+    expect(p.payload.branchName).toBe('Talks');
+    expect(p.avisos.join(' ')).toContain('«Talks» no es un cliente registrado: queda sin cliente');
+  });
+
+  it('un nombre ya usado en actividades («Toks») corrige el lugar y el título aunque no sea cliente', () => {
+    const p = construirPropuesta(
+      { ...base, cliente: null, sitio: 'Talk', titulo: 'Inventario de Talks' },
+      { ...sinTox, nombresUsados: ['Toks', 'Sephora'] },
+      { ...ctx, instruccion: 'que haga el inventario de talks' },
+    );
+    expect(p.cliente).toBeNull();
+    expect(p.payload.branchName).toBe('Toks');
+    expect(p.titulo).toBe('Inventario de Toks');
+    expect(p.correcciones).toContainEqual({ campo: 'lugar', de: 'talks', a: 'Toks', como: 'parecido' });
+    // Y a la IA le llega como nombre ya usado (no como cliente).
+    const bloque = bloqueCoincidencias(catalogoRelevante('que haga el inventario de talks', { ...sinTox, nombresUsados: ['Toks', 'Sephora'] }));
+    expect(bloque).toContain('Otros nombres ya usados (no son clientes): Toks («talks»)');
+    expect(bloque).not.toContain('Sephora');
+  });
+
+  it('con dos clientes parecidos no elige: los propone y avisa', () => {
+    const dos = { ...sinTox, clientes: [{ id: 2, name: 'Banorte' }, { id: 4, name: 'Tocs Logística' }, { id: 5, name: 'Toks Restaurantes' }] };
+    const p = construirPropuesta({ ...base, cliente: 'Talks' }, dos, { ...ctx, instruccion: 'junta en talks a las 3' });
+    expect(p.cliente).toBeNull();
+    expect(p.clienteCandidatos.map((c) => c.id).sort()).toEqual([4, 5]);
+    expect(p.avisos.join(' ')).toMatch(/puede ser .* elige el cliente/);
   });
 });

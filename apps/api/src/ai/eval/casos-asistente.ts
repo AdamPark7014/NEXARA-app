@@ -424,10 +424,10 @@ export const CASOS_ASISTENTE: CasoAsistente[] = [
         inicio: [HOY],
         limite: [HOY],
         horaLimite: ['18:00'],
-        detalleCon: ['18:00'],
+        detalleCon: ['dvr'],
       },
     ],
-    nota: 'Plazo hoy a las 18:00: la hora límite debe quedar escrita en las indicaciones («Entregar a más tardar…»).',
+    nota: 'Plazo hoy a las 18:00: queda como «Entregar a más tardar» (fecha máxima a las 18:00), no en el texto.',
   },
   {
     id: 'a23',
@@ -452,5 +452,115 @@ export const CASOS_ASISTENTE: CasoAsistente[] = [
       },
     ],
     nota: 'Alejandra tiene plazo hasta el lunes; el seguimiento de Patricia es el martes a las 10 por media hora.',
+  },
+  // 29-10: nombres que el dictado escribe mal («no detecta cosas»: le dicen Tox y escribe «talk»).
+  // El código los empata con el catálogo; la IA solo ve las coincidencias.
+  {
+    id: 'a24',
+    instruccion: 'que antonio vázquez vaya mañana a las 11 a talks nave 2 no prende el nvr',
+    acciones: [
+      {
+        responsableId: 9,
+        tipos: ['servicio'],
+        tipoServicio: ['CORRECTIVO', 'EMERGENCIA'],
+        clienteId: [101],
+        sucursalId: [202],
+        inicio: ['2026-10-22'],
+        hora: ['11:00'],
+        detalleCon: ['nvr', 'tox'],
+      },
+    ],
+    nota: '«talks» es Grupo Tox mal oído por el dictado: el título y el cliente deben decir Tox, nunca «Talk».',
+  },
+  {
+    id: 'a25',
+    instruccion: 'que eric revise hoy el switch de bruks cofi sonata se reinicia solo',
+    acciones: [
+      {
+        responsableId: 13,
+        tipos: ['servicio', 'tarea'],
+        clienteId: [106],
+        sucursalId: [207],
+        inicio: [HOY],
+        detalleCon: ['switch'],
+      },
+    ],
+    nota: '«eric» es Erik y «bruks cofi» es Brooks Coffee (sucursal Sonata).',
+  },
+  {
+    id: 'a26',
+    instruccion: 'que chava configure mañana el hik connect de súper quick le toma media hora',
+    acciones: [
+      {
+        responsableId: 14,
+        tipos: ['tarea', 'servicio'],
+        subtipo: ['Configuración y soporte remoto', ''],
+        clienteId: [107],
+        inicio: ['2026-10-22'],
+        duracionMin: [30],
+      },
+    ],
+    nota: '«Chava» es Salvador; «súper quick» es el cliente Super Kwik.',
+  },
+  {
+    id: 'a27',
+    instruccion: 'que asael vaya el viernes a las 10 a cuatzacualcos a instalar 4 cámaras',
+    acciones: [
+      {
+        responsableId: 15,
+        tipos: ['servicio', 'tarea'],
+        clienteId: [108],
+        inicio: ['2026-10-23'],
+        hora: ['10:00'],
+        detalleCon: ['4'],
+      },
+    ],
+    nota: '«asael» es Azael; «cuatzacualcos» es Transportes Coatzacoalcos.',
+  },
+  {
+    id: 'a28',
+    instruccion: 'que jair haga el levantamiento de te pe eme industrial el lunes',
+    acciones: [
+      {
+        responsableId: 16,
+        tipos: ['tarea', 'comercial'],
+        clienteId: [109],
+        inicio: ['2026-10-26'],
+      },
+    ],
+    nota: '«jair» es Yahir; «te pe eme» son las siglas TPM (TPM Industrial).',
+  },
+  {
+    id: 'a29',
+    instruccion: 'que carolina le mande hoy la factura a talks antes de las 5',
+    acciones: [
+      {
+        responsableId: 2,
+        tipos: ['tarea'],
+        subtipo: ['Facturación y contabilidad', 'Entrega', 'Reporte / documentación'],
+        clienteId: [101],
+        inicio: [HOY],
+        limite: [HOY],
+        horaLimite: ['17:00'],
+        detalleCon: ['factura', 'tox'],
+      },
+    ],
+    nota: '«talks» es Grupo Tox; la hora límite (17:00) queda como «Entregar a más tardar».',
+  },
+  {
+    id: 'a30',
+    instruccion: 'que Jorge lleve hoy 3 cámaras a la tienda Maja del centro',
+    acciones: [
+      {
+        responsableId: 7,
+        tipos: ['tarea'],
+        subtipo: ['Entrega'],
+        clienteId: [null],
+        inicio: [HOY],
+        lugarCon: 'maja',
+        detalleCon: ['3'],
+      },
+    ],
+    nota: 'Maja no es cliente: sin cliente y «Maja» como lugar. Nunca se inventa ni se empata con otro cliente.',
   },
 ];

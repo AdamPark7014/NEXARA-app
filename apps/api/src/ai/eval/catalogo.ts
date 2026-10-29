@@ -21,6 +21,11 @@ export const PERSONAS = [
   { id: 10, nombre: 'Patricia Lozano Ibarra', puesto: 'Recepción' },
   { id: 11, nombre: 'Roberto Castillo Núñez', puesto: 'Jefe de soporte' },
   { id: 12, nombre: 'Adriana Morales Paz', puesto: 'Directora de operaciones' },
+  // Nombres que el dictado escribe mal («Eric», «Chava», «Asael», «Jair»).
+  { id: 13, nombre: 'Erik Solís Prado', puesto: 'Técnico de campo' },
+  { id: 14, nombre: 'Salvador Ortiz Bravo', puesto: 'Técnico de redes' },
+  { id: 15, nombre: 'Azael Moreno Cruz', puesto: 'Técnico de campo' },
+  { id: 16, nombre: 'Yahir Benítez Rosas', puesto: 'Técnico de campo' },
 ];
 
 export const CATALOGO: CatalogosNexara = {
@@ -31,6 +36,12 @@ export const CATALOGO: CatalogosNexara = {
     { id: 103, name: 'Bodegas Luna' },
     { id: 104, name: 'Colegio Andes' },
     { id: 105, name: 'Hotel Real de Cholula' },
+    // Nombres en inglés, siglas y topónimos que el dictado cambia («bruks cofi», «súper quick»,
+    // «cuatzacualcos», «te pe eme»).
+    { id: 106, name: 'Brooks Coffee' },
+    { id: 107, name: 'Super Kwik' },
+    { id: 108, name: 'Transportes Coatzacoalcos' },
+    { id: 109, name: 'TPM Industrial' },
   ],
   sucursales: [
     { id: 201, clientId: 101, clientName: 'Grupo Tox', name: 'CEDIS Puebla', branchNumber: null, address: null, city: 'Puebla', state: 'Puebla' },
@@ -39,6 +50,7 @@ export const CATALOGO: CatalogosNexara = {
     { id: 204, clientId: 103, clientName: 'Bodegas Luna', name: 'Sucursal 14 Angelópolis', branchNumber: '14', address: null, city: 'Puebla', state: 'Puebla' },
     { id: 205, clientId: 103, clientName: 'Bodegas Luna', name: 'Sucursal 22 Atlixco', branchNumber: '22', address: null, city: 'Atlixco', state: 'Puebla' },
     { id: 206, clientId: 104, clientName: 'Colegio Andes', name: 'Campus Zavaleta', branchNumber: null, address: null, city: 'Puebla', state: 'Puebla' },
+    { id: 207, clientId: 106, clientName: 'Brooks Coffee', name: 'Sucursal Sonata', branchNumber: null, address: null, city: 'San Andrés Cholula', state: 'Puebla' },
   ],
   proyectos: [
     { id: 301, title: 'Videovigilancia CEDIS Tox', clientId: 101, clientName: 'Grupo Tox' },

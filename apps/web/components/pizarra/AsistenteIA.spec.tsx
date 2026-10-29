@@ -124,7 +124,7 @@ describe("AsistenteIA", () => {
     await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
 
     // Lo que leerá quien la hace y la agenda que se guardará, editables antes de crear.
-    expect(await screen.findByText("El DVR de la caja no graba desde ayer.")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("El DVR de la caja no graba desde ayer.")).toBeInTheDocument();
     expect(screen.getAllByLabelText(/^Día|^Del/)[0]).toHaveValue("2026-10-24");
     expect(screen.getAllByLabelText(/^Último día/)[1]).toHaveValue("2026-10-23");
     // A la compra le falta la duración: no se puede crear hasta elegirla.
@@ -150,8 +150,8 @@ describe("AsistenteIA", () => {
     render(<AsistenteIA />);
     await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Carolina revise el DVR");
     await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
-    await usuario.click(await screen.findByRole("button", { name: "Editar texto" }));
-    const titulo = screen.getByLabelText(/^Título/);
+    // Título e indicaciones están a la vista como campos, sin abrir nada.
+    const titulo = await screen.findByLabelText(/^Título/);
     await usuario.clear(titulo);
     await usuario.type(titulo, "Cambiar DVR del CEDIS");
     await usuario.clear(screen.getByLabelText(/^Indicaciones/));
@@ -164,6 +164,67 @@ describe("AsistenteIA", () => {
     const cuerpo = api.crearActividad.mock.calls[0][1];
     expect(cuerpo).toMatchObject({ titulo: "Cambiar DVR del CEDIS", prioridad: "Alta", fechaInicio: "2026-10-27T15:00:00.000Z" });
     expect(cuerpo.indicaciones).toBeUndefined();
+  });
+
+  it("dice qué nombre corrigió («talks» → Grupo Tox) y deja corregir lugar y hora límite", async () => {
+    const corregida: PropuestaActividad = {
+      ...servicio,
+      titulo: "Revisar NVR en Tox",
+      textoCliente: "Talks",
+      correcciones: [
+        { campo: "cliente", de: "talks", a: "Grupo Tox", como: "parecido" },
+        { campo: "responsable", de: "Caro", a: "Carolina Pérez", como: "apodo" },
+      ],
+      payload: { ...servicio.payload, titulo: "Revisar NVR en Tox", branchName: "Nave 2" },
+    };
+    api.interpretar.mockResolvedValue({
+      propuestas: [corregida],
+      aclaracion: null,
+      uso: null,
+      opciones: {
+        clientes: [{ id: 1, nombre: "Grupo Tox" }],
+        proyectos: [],
+        sucursales: [{ id: 60, nombre: "CEDIS Puebla", clientId: 1, branchNumber: "7", city: "Puebla", state: "Puebla", address: null }],
+      },
+    });
+    const usuario = userEvent.setup();
+    render(<AsistenteIA />);
+    await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que caro vaya a talks");
+    await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
+
+    expect(await screen.findByText("Corregido de «talks»")).toBeInTheDocument();
+    expect(screen.getByText("Dijiste «Caro»")).toBeInTheDocument();
+    expect(screen.getByText(/Nombres corregidos: «talks» → Grupo Tox · «Caro» es Carolina Pérez/)).toBeInTheDocument();
+
+    // El lugar se escribe o se elige de las sucursales del cliente (con sus datos).
+    const lugar = screen.getByLabelText(/^Lugar/);
+    expect(lugar).toHaveValue("Nave 2");
+    await usuario.clear(lugar);
+    await usuario.type(lugar, "CEDIS Puebla");
+    fireEvent.change(screen.getByLabelText(/^Entregar a más tardar/), { target: { value: "13:30" } });
+    await usuario.click(screen.getByRole("button", { name: "Confirmar y asignar" }));
+
+    await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
+    expect(api.crearActividad.mock.calls[0][1]).toMatchObject({
+      clientId: 1,
+      branchName: "CEDIS Puebla",
+      branchNumber: "7",
+      branchCity: "Puebla",
+      fechaInicio: "2026-10-24T15:00:00.000Z",
+      fechaMaxima: "2026-10-24T19:30:00.000Z",
+      fechaEntregaEsperada: "2026-10-24T19:30:00.000Z",
+    });
+  });
+
+  it("una hora límite antes del inicio no deja crear", async () => {
+    api.interpretar.mockResolvedValue({ propuestas: [servicio], aclaracion: null, uso: null });
+    const usuario = userEvent.setup();
+    render(<AsistenteIA />);
+    await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Carolina revise el DVR");
+    await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
+    fireEvent.change(await screen.findByLabelText(/^Entregar a más tardar/), { target: { value: "08:00" } });
+    expect(screen.getByText("Tiene que ser después de la hora de inicio.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirmar y asignar" })).toBeDisabled();
   });
 
   it("si la IA no contesta, avisa claro y deja el texto para reintentar", async () => {
