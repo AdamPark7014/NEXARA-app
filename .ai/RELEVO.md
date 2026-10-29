@@ -7,6 +7,12 @@
     repo). Las 22 filas cuadran contra el respaldo.
   - Afecta la sugerencia de nómina, la pre-nómina y el control de nómina: sale 7.7 % abajo del tabulador semanal.
     La regla la sigue revisando la contadora.
+  - Cambiaron 19 de 19 personas activas; el total semanal bajó 7.69 %. La recaptura no es idempotente (× 12 ÷ 13):
+    no repetirla; se deshace desde el respaldo.
+  - Pendiente: (1) la Mesa contable no tiene dónde dejar notas, así que falta elegir por dónde le llega la nota a la
+    contadora; el texto está listo en la carpeta compartida de las sesiones. (2) La revisión en pantalla de la
+    sugerencia de la semana del 26-10 *después* de la recaptura: Chrome se desconectó. Antes de la recaptura sí se
+    revisó (carga y recalcula sin recargar).
 
 - **29-10 ~14:00 (claude-code) — Apps: autoasignación fija (contrato de la API e920ddbb, sesión «Asignar con IA»).**
   - Android: en el alta propia (`autoasignacion = selfAssign || destino = yo`) ya no se capturan complejidad,
