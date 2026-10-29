@@ -16,6 +16,7 @@ import {
   setHttpNotificationHost,
 } from '../hikvision-isapi';
 import { resolveUploadsDir } from '../common/uploads-path';
+import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { isAcsDenied, isAcsGranted, minorsDe } from './integra-acs-codes';
 import { IntegraSiteService } from './integra-site.service';
@@ -252,7 +253,7 @@ export class IntegraPushService {
    * Las fotos huérfanas se van con su fila: una foto de una cara sin el evento
    * que la explica no es un dato, es un archivo de gente suelto.
    */
-  @Cron('27 4 * * *')
+  @Cron('27 4 * * *', { timeZone: WORKDAY_TIMEZONE })
   async purgeOldEvents() {
     return this.purgeEvents({ wipeAllNoise: true, includeBusiness: true });
   }
