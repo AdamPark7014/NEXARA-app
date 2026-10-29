@@ -1,8 +1,9 @@
 /**
- * Relleno de una sola vez (29-10-2026) de las actividades abiertas que quedaron sin tiempo estándar,
- * sin tiempo estimado o sin entrega, con las reglas de `tiempo-entrega.ts`. Idempotente: solo llena
- * lo que está vacío y nunca borra. Lo corre `scripts/rellenar-tiempos-abiertas.cjs` dentro del
- * contenedor de la API (simulacro por omisión; `--escribir` para guardar).
+ * Relleno de las actividades abiertas que quedaron sin tiempo estándar, sin tiempo estimado o sin
+ * entrega, con las reglas de `tiempo-entrega.ts`. Idempotente: solo llena lo que está vacío y nunca
+ * borra. Se corrió el 29-10-2026 y se revirtió ese mismo día: Adam decidió que la regla vale de
+ * aquí en adelante, no para lo pasado. No hay script que lo corra; la lógica queda probada por si
+ * se vuelve a decidir, y `MOTIVO_RELLENO` sigue fuera del desempeño.
  *
  * Decisión del 29-10 (opción B): ponerle estándar de golpe a trabajo ya entregado castigaría a la
  * gente por un error de tipo (tubería como «Preparación de equipo» = 15 min). Por eso:
@@ -13,9 +14,7 @@
  *   entregó después de ese día, el fin del día en que se entregó (no cambia su «a tiempo»).
  */
 import { workDayEnd } from '../common/time/workday.js';
-import { reglaDe } from '../ai/estandar/tabla-estandar.js';
-import { normalizar } from '../ai/complejidad/tiempos-tipicos.js';
-import type { EstandarCalculado } from './tiempo-entrega.js';
+import { tipoDelTitulo, type EstandarCalculado } from './tiempo-entrega.js';
 
 export const ESTATUS_CERRADOS = ['Finalizada', 'Cancelada', 'No cumplida', 'Completada', 'Cerrada'];
 
@@ -58,28 +57,8 @@ export function yaEntregada(fila: Pick<FilaAbierta, 'estatus' | 'entregadaAt'>):
   return fila.estatus === 'Por Validar' || Boolean(fila.entregadaAt);
 }
 
-/**
- * Trabajos que el título nombra sin lugar a duda, aunque el tipo guardado diga otro: tubería,
- * charola, registros y cable son cableado y canalización; las facturas, facturación.
- */
-const TIPO_POR_TITULO: Array<[RegExp, { coreKind: string; ticketTypeCustom: string }]> = [
-  [/\b(tuberia|charola|canalizacion|registros?|cableado|cable|nodos?)\b/, { coreKind: 'tarea', ticketTypeCustom: 'Cableado y canalización' }],
-  [/\bfacturas?\b/, { coreKind: 'tarea', ticketTypeCustom: 'Facturación y contabilidad' }],
-];
-
-/** El tipo correcto si el título (o sus indicaciones) dice otro trabajo; null si cuadra o no se sabe. */
-export function tipoPorTitulo(fila: Pick<FilaAbierta, 'titulo' | 'indicaciones' | 'coreKind' | 'ticketType' | 'ticketTypeCustom'>) {
-  const texto = normalizar(`${fila.titulo ?? ''} ${fila.indicaciones ?? ''}`);
-  const actual = reglaDe(fila)?.clave ?? null;
-  for (const [patron, tipo] of TIPO_POR_TITULO) {
-    if (!patron.test(texto)) continue;
-    const clave = reglaDe(tipo)?.clave ?? null;
-    // Servicio y obra ya miden instalación y cableado en sitio: no se cambian.
-    if (['servicio', 'obra', 'proyecto'].includes(String(fila.coreKind ?? '').toLowerCase())) return null;
-    return clave && clave !== actual ? tipo : null;
-  }
-  return null;
-}
+/** El tipo que dice el título si el guardado no cuadra (la regla vive en `tiempo-entrega.ts`). */
+export const tipoPorTitulo = tipoDelTitulo;
 
 /**
  * Qué se le pone a una fila (solo lo que le falta). `est` = estándar leído del título (con el tipo

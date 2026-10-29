@@ -2,10 +2,15 @@
  * Ninguna actividad sin tiempo ni entrega (Adam, 29-10-2026: «ya no debe haber ninguna actividad que
  * tenga tiempo indefinido de entrega… la autoasignación es fija basándose en el título»).
  *
- * - El tiempo estándar lo calcula la tabla (`ai/estandar/tabla-estandar.ts`) con lo que se lee del
- *   título (la IA propone complejidad, cantidad y destino; aquí no hay IA). Lo que el título no dice
- *   se supone y se escribe en el desglose: 1 unidad, complejidad estándar, traslado aproximado. Sin
- *   regla en la tabla (o en juntas y guardias), la mediana real del tipo, y si no hay, 1 h.
+ * - El tiempo estándar, en este orden (medido contra el tiempo real de 233 actividades terminadas el
+ *   29-10: con solo la tabla y «1 unidad» salía 0.22× lo real y 22 % dentro de ×2; así, 0.89× y 52 %):
+ *   1. Lo que ha tomado este mismo título (mediana de 2+ veces; primero las de la persona).
+ *   2. La tabla (`ai/estandar/tabla-estandar.ts`) con lo que se lee del título (la IA propone
+ *      complejidad, cantidad y destino; aquí no hay IA), con el tipo que dice el título si el elegido
+ *      no cuadra («tubería» guardada como «Preparación de equipo»).
+ *   3. Si el título no dice cuántos, la mediana real del tipo (y si no hay, 1 unidad).
+ *   Lo que se supone se escribe en el desglose. Sin regla en la tabla (o en juntas y guardias), la
+ *   mediana real del tipo, y si no hay, 1 h.
  * - La entrega a más tardar es el inicio más ese tiempo, contando la comida, sin pasar del fin de la
  *   jornada.
  * - En la autoasignación esos valores son fijos; en lo asignado a otro solo se llenan si faltan.
@@ -13,7 +18,7 @@
  * Puro, con pruebas.
  */
 import { calcularEstandar, reglaDe, TOPE_ESTANDAR_MIN, type Desglose, type ReglaEstandar, type Traslado } from '../ai/estandar/tabla-estandar.js';
-import { esComplejidad, type Complejidad } from '../ai/complejidad/tiempos-tipicos.js';
+import { esComplejidad, normalizar, type Complejidad } from '../ai/complejidad/tiempos-tipicos.js';
 import { workDayAtClock } from '../common/time/workday.js';
 
 /** Sin ruta: ida y vuelta aproximadas dentro de Puebla. */
@@ -26,6 +31,32 @@ export const COMIDA_HASTA_H = 16;
 export const SALIDA_H = 18;
 
 export type TipoActividad = { coreKind?: string | null; ticketType?: string | null; ticketTypeCustom?: string | null };
+
+/** Lo que tomó antes el mismo título: mediana, cuántas veces y si son de la misma persona. */
+export type HistorialTitulo = { minutos: number; veces: number; propio: boolean };
+
+/**
+ * Trabajos que el título nombra sin lugar a duda, aunque el tipo elegido diga otro: tubería,
+ * charola, registros y cable son cableado y canalización; las facturas, facturación.
+ */
+const TIPO_POR_TITULO: Array<[RegExp, { coreKind: string; ticketTypeCustom: string }]> = [
+  [/\b(tuberia|charola|canalizacion|registros?|cableado|cable|nodos?)\b/, { coreKind: 'tarea', ticketTypeCustom: 'Cableado y canalización' }],
+  [/\bfacturas?\b/, { coreKind: 'tarea', ticketTypeCustom: 'Facturación y contabilidad' }],
+];
+
+/** El tipo que dice el título si el elegido no cuadra; null si cuadra o no se sabe. Servicio y obra no se tocan. */
+export function tipoDelTitulo(a: TipoActividad & { titulo?: string | null; indicaciones?: string | null }) {
+  if (!a.titulo) return null;
+  if (['servicio', 'obra', 'proyecto'].includes(String(a.coreKind ?? '').toLowerCase())) return null;
+  const texto = normalizar(`${a.titulo ?? ''} ${a.indicaciones ?? ''}`);
+  const actual = reglaDe(a)?.clave ?? null;
+  for (const [patron, tipo] of TIPO_POR_TITULO) {
+    if (!patron.test(texto)) continue;
+    const clave = reglaDe(tipo)?.clave ?? null;
+    return clave && clave !== actual ? tipo : null;
+  }
+  return null;
+}
 
 /** Lo que se leyó del título (la IA o, sin ella, el número que trae el texto). */
 export type LecturaTitulo = { complejidad?: Complejidad | null; cantidad?: number | null; destino?: string | null };
@@ -54,10 +85,19 @@ const redondeo5 = (min: number) => Math.max(5, Math.round(min / 5) * 5);
  * minutos (nunca null). `tipicoMin`: mediana real del tipo, para lo que la tabla no mide.
  */
 export function estandarDeLectura(
-  tipo: TipoActividad,
+  tipoGuardado: TipoActividad & { titulo?: string | null; indicaciones?: string | null },
   lectura: LecturaTitulo,
-  opciones: { traslado?: Traslado | null; tipicoMin?: number | null; duracionAgendaMin?: number | null } = {},
+  opciones: {
+    traslado?: Traslado | null;
+    tipicoMin?: number | null;
+    duracionAgendaMin?: number | null;
+    historial?: HistorialTitulo | null;
+  } = {},
 ): EstandarCalculado {
+  // El tipo que dice el título manda sobre uno elegido que no cuadra (solo para calcular).
+  const delTitulo = tipoDelTitulo(tipoGuardado);
+  const tipo = delTitulo ? { ...tipoGuardado, ...delTitulo } : tipoGuardado;
+  const avisoTipo = delTitulo ? [`el título es de ${delTitulo.ticketTypeCustom.toLowerCase()}: se calcula como tal`] : [];
   const regla: ReglaEstandar | null = reglaDe(tipo);
   const respaldo = (concepto: string): EstandarCalculado => {
     const minutos = redondeo5(Math.min(TOPE_ESTANDAR_MIN, opciones.tipicoMin ?? MINUTOS_POR_OMISION));
@@ -66,26 +106,48 @@ export function estandarDeLectura(
       desglose: [{ concepto, minutos }],
       complejidad: esComplejidad(lectura.complejidad) ? lectura.complejidad : null,
       unidades: null,
-      supuestos: opciones.tipicoMin ? [] : ['sin historial del tipo: 1 h'],
+      supuestos: [...avisoTipo, ...(opciones.tipicoMin ? [] : ['sin historial del tipo: 1 h'])],
     };
   };
-  if (!regla) return respaldo(opciones.tipicoMin ? 'Tiempo típico del tipo' : 'Tiempo por omisión');
-  if (regla.agenda) {
-    const agenda = opciones.duracionAgendaMin && opciones.duracionAgendaMin > 0 ? opciones.duracionAgendaMin : null;
-    if (agenda) {
-      const minutos = redondeo5(Math.min(TOPE_ESTANDAR_MIN, agenda));
-      return { totalMin: minutos, desglose: [{ concepto: `${regla.nombre}: lo que dura en la agenda`, minutos }], complejidad: null, unidades: null, supuestos: [] };
-    }
-    return respaldo(opciones.tipicoMin ? `${regla.nombre}: tiempo típico` : `${regla.nombre}: tiempo por omisión`);
+  const agenda = regla?.agenda && opciones.duracionAgendaMin && opciones.duracionAgendaMin > 0 ? opciones.duracionAgendaMin : null;
+  if (regla && agenda) {
+    const minutos = redondeo5(Math.min(TOPE_ESTANDAR_MIN, agenda));
+    return { totalMin: minutos, desglose: [{ concepto: `${regla.nombre}: lo que dura en la agenda`, minutos }], complejidad: null, unidades: null, supuestos: [] };
   }
+  // Lo que ya ha tomado este mismo título es lo que mejor predice (el «Apoyo Biblioteca» de cada día).
+  const h = opciones.historial;
+  if (h && h.veces >= 2 && h.minutos > 0) {
+    const minutos = redondeo5(Math.min(TOPE_ESTANDAR_MIN, h.minutos));
+    return {
+      totalMin: minutos,
+      desglose: [{ concepto: `Lo que ha tomado este mismo título (mediana de ${h.veces} veces${h.propio ? ', tuyas' : ''})`, minutos }],
+      complejidad: esComplejidad(lectura.complejidad) ? lectura.complejidad : null,
+      unidades: null,
+      supuestos: [],
+    };
+  }
+  if (!regla) return respaldo(opciones.tipicoMin ? 'Tiempo típico del tipo' : 'Tiempo por omisión');
+  if (regla.agenda) return respaldo(opciones.tipicoMin ? `${regla.nombre}: tiempo típico` : `${regla.nombre}: tiempo por omisión`);
 
-  const supuestos: string[] = [];
+  const supuestos: string[] = [...avisoTipo];
   const unidad = regla.unidades[0] ?? null;
   let cantidad = lectura.cantidad && lectura.cantidad > 0 ? Math.round(lectura.cantidad) : null;
+  // «¿Cuántas partidas?» de la tabla: así concuerda («cuántas partidas», «cuántos equipos»).
+  const cuantos = unidad ? unidad.pregunta.replace(/[¿?]/g, '').toLowerCase() : '';
+  if (unidad && !cantidad && opciones.tipicoMin && opciones.tipicoMin > 0) {
+    // Sin cantidad, «1 unidad» se quedaba en una fracción de lo real: la mediana del tipo se acerca más.
+    const minutos = redondeo5(Math.min(TOPE_ESTANDAR_MIN, opciones.tipicoMin));
+    return {
+      totalMin: minutos,
+      desglose: [{ concepto: `${regla.nombre}: tiempo típico`, minutos }],
+      complejidad: esComplejidad(lectura.complejidad) ? lectura.complejidad : null,
+      unidades: null,
+      supuestos: [...supuestos, `el título no dice ${cuantos}: tiempo típico del tipo`],
+    };
+  }
   if (unidad && !cantidad) {
     cantidad = 1;
-    // «¿Cuántas partidas?» de la tabla: así concuerda («cuántas partidas», «cuántos equipos»).
-    supuestos.push(`el título no dice ${unidad.pregunta.replace(/[¿?]/g, '').toLowerCase()}: se cuenta 1`);
+    supuestos.push(`el título no dice ${cuantos}: se cuenta 1`);
   }
   let complejidad: Complejidad | null = esComplejidad(lectura.complejidad) ? lectura.complejidad : null;
   if (regla.porComplejidad && !complejidad) {
@@ -172,7 +234,7 @@ const aFecha = (v: string | Date | null | undefined): Date | null => {
  */
 export function completarTiempos(
   dto: DatosTiempo,
-  ctx: { lectura: LecturaTitulo; tipicoMin?: number | null; traslado?: Traslado | null; ahora: Date },
+  ctx: { lectura: LecturaTitulo; tipicoMin?: number | null; traslado?: Traslado | null; ahora: Date; historial?: HistorialTitulo | null },
 ): { cambios: TiempoCompletado; error?: string } {
   const auto = esAutoasignacion(dto);
   const conPeriodo = Boolean(dto.periodoInicio && dto.periodoFin);
@@ -180,6 +242,7 @@ export function completarTiempos(
     traslado: auto ? null : ctx.traslado,
     tipicoMin: ctx.tipicoMin,
     duracionAgendaMin: dto.tiempoEstimadoMin ?? null,
+    historial: ctx.historial ?? null,
   });
   const sugerida = esComplejidad(ctx.lectura.complejidad) ? ctx.lectura.complejidad : null;
   const desglose = [...est.desglose, ...est.supuestos.map((s) => ({ concepto: `Supuesto: ${s}`, minutos: 0 }))];

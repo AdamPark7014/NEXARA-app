@@ -143,4 +143,22 @@ describe('tiempo y entrega en el alta y en la edición', () => {
     );
     expect(update).toHaveBeenCalledTimes(1);
   });
+
+  it('el historial del título: primero el de la persona (2+), si no el de cualquiera (2+)', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([
+        { titulo: 'Apoyo Biblioteca Tlaxcala', userId: ANA, minutos: 400 },
+        { titulo: 'Apoyó biblioteca tlaxcala', userId: ANA, minutos: 440 },
+        { titulo: 'Apoyo Biblioteca Tlaxcala', userId: OTRO, minutos: 100 },
+        { titulo: 'Inventario de almacén', userId: OTRO, minutos: 90 },
+        { titulo: 'Inventario de almacén', userId: JEFE, minutos: 110 },
+      ]),
+    };
+    const tiempos = new TiemposActividadService(undefined, prisma as never);
+    expect(await tiempos.historial(1, 'apoyo biblioteca tlaxcala', ANA)).toEqual({ minutos: 420, veces: 2, propio: true });
+    expect(await tiempos.historial(1, 'Inventario de almacén', ANA)).toEqual({ minutos: 100, veces: 2, propio: false });
+    expect(await tiempos.historial(1, 'Algo nuevo', ANA)).toBeNull();
+    // Una sola consulta por empresa (caché de 10 min).
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
 });
