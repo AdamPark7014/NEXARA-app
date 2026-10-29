@@ -33,6 +33,16 @@
     quedaba debajo de la hora en negro). En Android no pasa: el Scaffold ya mete ese margen y la lista se recorta.
   - Versión 1.1: Android `VERSION_CODE=19`, `VERSION_NAME=1.1.0` (AAB firmado con `build-play-aab.ps1`, mapping en
     `play-releases/mapping-v19-1.1.0.txt`). Captura nueva `miDiaVacio` (Mi día sin actividades).
+  - Tiendas (~15:20): **iOS 1.1 (12) en «Esperando revisión»** desde el 29-10 15:19, lanzamiento MANUAL, enviada por
+    la API de ASC (la llave de ARTA `H7VXTV487C` ve NEXARA: mismo equipo). Novedades en es-MX, cuenta de revisión
+    igual a la de secrets (activa, sin MFA ni candado; el login en vivo no se probó: es de Adam con
+    `verificar-cuenta-revision.ps1`). Capturas de la ficha: siguen las 10 de 1.0 en iPhone 6,7"; sin iPad ni videos.
+    **Android 1.1.0 (19)**: AAB firmado; el R8 se probó con el APK release en el emulador (abre hasta el login sin
+    cierres; los DTO nuevos conservan nombre en el mapping). En Play solo hay hasta la 17 (la 18 nunca se subió). El
+    borrador de producción quedó abierto en Play Console; el AAB (26 MB) lo arrastra Adam: el clasificador de auto
+    mode bloqueó subirlo por partes («Production Deploy»).
+  - Captura nueva `autoasignacion.png` (alta propia + tarjeta con datos de muestra); `TiempoCalculadoContenido` se
+    separó de la tarjeta para poder pintarla sin servidor.
 
 - **29-10 ~14:30 (claude-code) — Ninguna actividad sin tiempo ni entrega; autoasignación fija; ajuste solo de superiores.**
   - Adam: «ya no debe haber ninguna actividad que tenga tiempo indefinido de entrega, y la edición de parámetros de
