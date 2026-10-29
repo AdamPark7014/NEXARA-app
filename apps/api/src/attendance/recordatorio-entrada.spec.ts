@@ -4,12 +4,11 @@ import {
   avisoBuenosDias,
   avisoQueToca,
   avisoSinEntrada,
-  descansosDeEmpresa,
-  esFestivoDeLey,
   seLeEsperaHoy,
   type DiaDeLaPersona,
 } from './recordatorio-entrada';
 import { RecordatorioEntradaService } from './recordatorio-entrada.service';
+import { comoLeToca, festivosDelRango, type FilaFestivo } from '../festivos/festivos-reglas';
 
 // Datos ficticios: ninguna persona real. México está en UTC−6 todo el año.
 const mx = (fecha: string, hm: string) => new Date(`${fecha}T${hm}:00-06:00`);
@@ -38,6 +37,7 @@ describe('recordatorio de entrada: la regla', () => {
       aviso: 'buenos-dias',
       turno: '2026-10-29 10:00',
       minutosTarde: 0,
+      entrada: '10:00',
     });
     // Ya saludado, dentro de la gracia: nada.
     expect(avisoQueToca(mx(JUEVES, '10:14'), dia(), SALUDADO)).toBeNull();
@@ -45,6 +45,7 @@ describe('recordatorio de entrada: la regla', () => {
       aviso: 'sin-entrada',
       turno: '2026-10-29 10:15',
       minutosTarde: 15,
+      entrada: '10:00',
     });
   });
 
@@ -71,6 +72,7 @@ describe('recordatorio de entrada: la regla', () => {
       aviso: 'buenos-dias',
       turno: '2026-10-29 11:00',
       minutosTarde: 60,
+      entrada: '10:00',
     });
   });
 
@@ -101,42 +103,39 @@ describe('recordatorio de entrada: la regla', () => {
     expect(avisoQueToca(mx(SABADO, '10:20'), dia({ fecha: SABADO, conGuardia: true }), SALUDADO)?.aviso).toBe(
       'sin-entrada',
     );
-    // Tercer lunes de noviembre de 2026.
-    expect(seLeEsperaHoy(dia({ fecha: '2026-11-16' }))).toBe(false);
-    expect(seLeEsperaHoy(dia({ fecha: '2026-11-16', conGuardia: true }))).toBe(true);
-    // Días que la empresa da además de la ley: el 2 de noviembre ya viene acordado.
-    expect(seLeEsperaHoy(dia({ fecha: '2026-11-02' }))).toBe(true);
-    expect(seLeEsperaHoy(dia({ fecha: '2026-11-02', descansos: descansosDeEmpresa('') }))).toBe(false);
-    expect(seLeEsperaHoy(dia({ fecha: '2026-11-03', descansos: descansosDeEmpresa('') }))).toBe(true);
+    // Tercer lunes de noviembre de 2026, de ley y sin tocar: no se labora.
+    const [revolucion] = festivosDelRango('2026-11-16', '2026-11-16', []);
+    expect(seLeEsperaHoy(dia({ fecha: '2026-11-16', festivo: comoLeToca(revolucion, { userId: 1 }) }))).toBe(false);
+    expect(seLeEsperaHoy(dia({ fecha: '2026-11-16' }))).toBe(true);
   });
 
-  it('descansos de la empresa: los acordados más los del entorno', () => {
-    expect([...descansosDeEmpresa(undefined)]).toEqual(['2026-11-02']);
-    expect([...descansosDeEmpresa('2026-12-24, 2026-12-31;x 2026-13')].sort()).toEqual([
-      '2026-11-02',
-      '2026-12-24',
-      '2026-12-31',
-    ]);
+  it('un festivo con horario propio: se le espera con ese horario, aunque no sea su día', () => {
+    const fila: FilaFestivo = {
+      fecha: '2026-11-16',
+      nombre: '',
+      origen: 'LEY',
+      modo: 'HORARIO',
+      horaEntrada: '08:00',
+      horaSalida: '12:00',
+      personas: [],
+      pagoDoble: true,
+      avisar: true,
+      nota: null,
+    };
+    const [f] = festivosDelRango('2026-11-16', '2026-11-16', [fila]);
+    const d = dia({ fecha: '2026-11-16', festivo: comoLeToca(f, { userId: 1 }) });
+    expect(avisoQueToca(mx('2026-11-16', '07:59'), d, NADA)).toBeNull();
+    expect(avisoQueToca(mx('2026-11-16', '08:00'), d, NADA)).toMatchObject({ aviso: 'buenos-dias', entrada: '08:00' });
+    expect(avisoQueToca(mx('2026-11-16', '08:15'), d, SALUDADO)?.aviso).toBe('sin-entrada');
+    expect(avisoQueToca(mx('2026-11-16', '12:00'), d, SALUDADO)).toBeNull();
+    const soloLunesAMiercoles = dia({ fecha: '2026-11-16', horario: horarioDePersona('office_hours', { dias: [2, 3] }) });
+    expect(seLeEsperaHoy({ ...soloLunesAMiercoles, festivo: comoLeToca(f, { userId: 1 }) })).toBe(true);
   });
 
   it('respeta los días laborables de su horario', () => {
     const lunesAJueves = dia({ horario: horarioDePersona('office_hours', { dias: [1, 2, 3, 4] }) });
     expect(seLeEsperaHoy(lunesAJueves)).toBe(true);
     expect(seLeEsperaHoy({ ...lunesAJueves, fecha: '2026-10-30' })).toBe(false);
-  });
-
-  it('festivos de la LFT (art. 74)', () => {
-    for (const f of ['2026-01-01', '2026-02-02', '2026-03-16', '2026-05-01', '2026-09-16', '2026-11-16', '2026-12-25']) {
-      expect(esFestivoDeLey(f)).toBe(true);
-    }
-    expect(esFestivoDeLey('2027-02-01')).toBe(true);
-    expect(esFestivoDeLey('2027-03-15')).toBe(true);
-    expect(esFestivoDeLey('2027-11-15')).toBe(true);
-    expect(esFestivoDeLey('2030-10-01')).toBe(true);
-    expect(esFestivoDeLey('2026-10-01')).toBe(false);
-    expect(esFestivoDeLey('2026-11-02')).toBe(false);
-    expect(esFestivoDeLey('2026-02-09')).toBe(false);
-    expect(esFestivoDeLey('no-es-fecha')).toBe(false);
   });
 
   it('textos', () => {
@@ -170,6 +169,7 @@ function baseFalsa() {
     guardias: [] as Fila[],
     notificaciones: [] as Fila[],
     prefs: [] as Fila[],
+    festivos: [] as Fila[],
     consultas: 0,
   };
   const enIds = (where: any, fila: Fila) => !where?.userId?.in || where.userId.in.includes(fila.userId);
@@ -214,6 +214,11 @@ function baseFalsa() {
         db.consultas += 1;
         return db.guardias.filter((g) => enIds(where, g) && mismaFecha(g.fecha, where.fecha));
       },
+    },
+    // No cuenta en `consultas`: se lee siempre, una vez por empresa.
+    diaFestivo: {
+      findMany: async ({ where }: any) =>
+        db.festivos.filter((f) => f.companyId === where.companyId && f.fecha >= where.fecha.gte && f.fecha <= where.fecha.lte),
     },
     notification: {
       findMany: async ({ where }: any) => {
@@ -349,14 +354,48 @@ describe('recordatorio de entrada: el servicio', () => {
     expect(b.pushes).toHaveLength(0);
   });
 
-  it('el lunes 2 de noviembre no insiste: es descanso acordado', async () => {
+  it('el lunes 2 de noviembre no insiste: dirección lo marcó como descanso', async () => {
     const b = equipo();
+    b.db.festivos.push({
+      companyId: 7,
+      fecha: new Date(Date.UTC(2026, 10, 2)),
+      nombre: 'Día de Muertos',
+      origen: 'EMPRESA',
+      modo: 'NO_SE_LABORA',
+      personas: [],
+      pagoDoble: true,
+      avisar: true,
+    });
     for (const hm of ['08:00', '08:15', '10:00', '10:15', '10:17']) await minuto(b, '2026-11-02', hm);
     expect(b.avisos).toHaveLength(0);
     expect(b.pushes).toHaveLength(0);
     // El martes 3 todo vuelve a la normalidad.
     await minuto(b, '2026-11-03', '10:00');
     expect(b.avisos.map((a) => a.userId)).toEqual([1, 2]);
+  });
+
+  it('el 16 de noviembre (de ley) no insiste; si dirección lo hace laborable para alguien, solo a esa persona y con su horario', async () => {
+    const b = equipo();
+    for (const hm of ['08:00', '08:15', '10:00', '10:15']) await minuto(b, '2026-11-16', hm);
+    expect(b.avisos).toHaveLength(0);
+
+    const otra = equipo();
+    otra.db.festivos.push({
+      companyId: 7,
+      fecha: new Date(Date.UTC(2026, 10, 16)),
+      nombre: 'Día de la Revolución',
+      origen: 'LEY',
+      modo: 'HORARIO',
+      horaEntrada: '09:00',
+      horaSalida: '13:00',
+      personas: [1],
+      pagoDoble: true,
+      avisar: true,
+    });
+    for (const hm of ['08:00', '09:00', '09:15', '10:15']) await minuto(otra, '2026-11-16', hm);
+    expect(otra.avisos.map((a) => a.userId)).toEqual([1]);
+    expect(otra.avisos[0].message).toBe('¿Ya registraste tu entrada? Tu horario empieza a las 9:00 a. m.');
+    expect(otra.pushes.map((p) => p.userId)).toEqual([1, 1]);
   });
 
   it('el sábado solo a quien tiene guardia', async () => {

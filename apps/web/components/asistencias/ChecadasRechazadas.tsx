@@ -31,6 +31,7 @@ const MOTIVOS = [
   { id: "UBICACION_VIEJA", label: "Ubicación vieja" },
   { id: "ORIGEN_WEB", label: "Navegador" },
   { id: "FIN_DE_SEMANA_SIN_GUARDIA", label: "Sin guardia" },
+  { id: "FESTIVO_SIN_LABORAR", label: "Festivo" },
   { id: "SIN_CONEXION_FUERA_DE_VENTANA", label: "Fuera de ventana" },
 ] as const;
 
@@ -42,6 +43,7 @@ const TONO: Record<string, "danger" | "warning" | "outline"> = {
   SIN_CONEXION_FUERA_DE_VENTANA: "warning",
   ORIGEN_WEB: "outline",
   FIN_DE_SEMANA_SIN_GUARDIA: "outline",
+  FESTIVO_SIN_LABORAR: "outline",
 };
 
 const fechaHora = (iso: string) =>

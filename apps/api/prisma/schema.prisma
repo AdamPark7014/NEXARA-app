@@ -6241,6 +6241,7 @@ model CompanyProfile {
   activityGeofenceAlerts  ActivityGeofenceAlert[]
   activityWorkSessions    ActivityWorkSession[]
   guardias                Guardia[]
+  diasFestivos            DiaFestivo[]
   nominaSemanas           NominaSemana[]
   nominaSemanaDias        NominaSemanaDia[]
   nominaSemanaFilas       NominaSemanaFila[]
@@ -6839,6 +6840,39 @@ model Guardia {
   @@unique([companyId, userId, fecha])
   @@index([companyId, fecha])
   @@map("guardias")
+}
+
+/// Día festivo y cómo se trabaja (29-10-2026, dirección lo decide). Los de ley (LFT art. 74) no
+/// necesitan fila: salen solos como «no se labora» (`festivos/festivos-reglas.ts`). La fila existe
+/// cuando dirección cambia uno de ellos o para los días que da la empresa.
+model DiaFestivo {
+  id               Int       @id @default(autoincrement())
+  companyId        Int
+  /// Día calendario en la zona de la jornada (America/Mexico_City).
+  fecha            DateTime  @db.Date
+  nombre           String    @db.VarChar(120)
+  /// LEY | EMPRESA
+  origen           String    @db.VarChar(10)
+  /// NO_SE_LABORA | HORARIO (entrada y salida propias) | COMPLETA (el horario de cada quien)
+  modo             String    @default("NO_SE_LABORA") @db.VarChar(20)
+  horaEntrada      String?   @db.VarChar(5)
+  horaSalida       String?   @db.VarChar(5)
+  /// Si se labora: vacío = todo el equipo; con ids, solo esas personas y el resto descansa.
+  personas         Int[]     @default([])
+  /// Festivo trabajado: salario doble además del sueldo del día (LFT art. 75).
+  pagoDoble        Boolean   @default(true)
+  /// Aviso por la app 3 días antes (quién ya lo recibió se ve en `notifications`).
+  avisar           Boolean   @default(true)
+  nota             String?   @db.VarChar(300)
+  /// Quién lo cambió por última vez. Sin relación: el día se conserva aunque se borre el usuario.
+  actualizadoPorId Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([companyId, fecha])
+  @@map("dias_festivos")
 }
 
 /// Control de nómina semanal (lunes → domingo): lo que antes se llenaba a mano en dos Excel

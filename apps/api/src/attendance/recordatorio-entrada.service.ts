@@ -17,10 +17,11 @@ import {
   avisoBuenosDias,
   avisoQueToca,
   avisoSinEntrada,
-  descansosDeEmpresa,
   horaDeEntrada,
   type DiaDeLaPersona,
 } from './recordatorio-entrada.js';
+import { leerFestivos } from '../festivos/festivos-datos.js';
+import { comoLeToca, type Festivo } from '../festivos/festivos-reglas.js';
 
 /** El «buenos días» es la única fila del día: así se sabe a quién ya se saludó. */
 const TIPO = 'ATTENDANCE_ABSENCE';
@@ -30,7 +31,7 @@ const URL_ASISTENCIA = '/erp/asistencias';
 /** Una sola tarjeta por persona en el teléfono: cada aviso reemplaza al anterior y vuelve a sonar. */
 const llaveDeTarjeta = (userId: number) => `nx_entrada_u${userId}`;
 
-type Candidato = { id: number; nombre: string; companyId: number | null; horario: HorarioKpi };
+type Candidato = { id: number; nombre: string; companyId: number | null; horario: HorarioKpi; festivo: Festivo | null };
 
 /**
  * Cada minuto, solo a quien no ha checado: «buenos días» a su hora de entrada y un push cada 2 min
@@ -64,7 +65,6 @@ export class RecordatorioEntradaService {
     const enviados = { buenosDias: [] as number[], sinEntrada: [] as number[] };
     const fecha = workDateKey(ahora);
     const finDeSemana = esSabadoODomingo(fecha);
-    const descansos = descansosDeEmpresa();
 
     const usuarios = await this.prisma.user.findMany({
       where: { isActive: true },
@@ -80,6 +80,16 @@ export class RecordatorioEntradaService {
       },
     });
 
+    // El festivo de hoy de cada empresa (los de ley salen solos; dirección pudo cambiarlos).
+    const empresaDe = (u: (typeof usuarios)[number]) =>
+      [...u.companyMemberships].sort((a, b) => Number(b.isDefault) - Number(a.isDefault))[0]?.companyId ?? null;
+    const empresas = [...new Set(usuarios.map(empresaDe).filter((id): id is number => id != null))];
+    const festivoDe = new Map<number, Festivo | null>(
+      await Promise.all(
+        empresas.map(async (id) => [id, (await leerFestivos(this.prisma, id, fecha, fecha))[0] ?? null] as const),
+      ),
+    );
+
     // Primero, sin consultar nada más, quién podría estar en su ventana (en fin de semana, como si
     // tuviera guardia): de noche y fuera de horario la corrida termina aquí.
     const candidatos: Candidato[] = [];
@@ -93,18 +103,18 @@ export class RecordatorioEntradaService {
         tipoContrato: u.tipoContrato,
       });
       const horario = horarioDePersona(plantilla, u.horario ?? null);
+      const empresa = empresaDe(u);
+      const festivo = empresa != null ? (festivoDe.get(empresa) ?? null) : null;
       const posible: DiaDeLaPersona = {
         fecha,
         horario,
         conGuardia: finDeSemana,
         justificada: false,
         conPermiso: false,
-        descansos,
+        festivo: festivo ? comoLeToca(festivo, { userId: u.id, conGuardia: finDeSemana }) : null,
       };
       if (!avisoQueToca(ahora, posible, { yaEntro: false, yaSaludado: false })) continue;
-      const empresa =
-        [...u.companyMemberships].sort((a, b) => Number(b.isDefault) - Number(a.isDefault))[0]?.companyId ?? null;
-      candidatos.push({ id: u.id, nombre: u.nombre, companyId: empresa, horario });
+      candidatos.push({ id: u.id, nombre: u.nombre, companyId: empresa, horario, festivo });
     }
     if (!candidatos.length) return enviados;
 
@@ -156,14 +166,14 @@ export class RecordatorioEntradaService {
           conGuardia: conGuardia.has(c.id),
           justificada: conJustificacion.has(c.id),
           conPermiso: conPermiso.has(c.id),
-          descansos,
+          festivo: c.festivo ? comoLeToca(c.festivo, { userId: c.id, conGuardia: conGuardia.has(c.id) }) : null,
         },
         { yaEntro: yaEntraron.has(c.id), yaSaludado: saludados.has(c.id) },
       );
       if (!toca) continue;
       if (!(await this.reclamar(c.id, toca.turno, turnoPrevio.get(c.id)))) continue;
 
-      const horario = horaDeEntrada(ahora, c.horario.entrada as string);
+      const horario = horaDeEntrada(ahora, toca.entrada);
       try {
         if (toca.aviso === 'buenos-dias') {
           const { title, message } = avisoBuenosDias({ nombre: c.nombre, horario, minutosTarde: toca.minutosTarde });

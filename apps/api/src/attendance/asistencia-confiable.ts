@@ -393,6 +393,7 @@ export const MOTIVO_RECHAZO = {
   ubicacionVieja: 'UBICACION_VIEJA',
   finDeSemanaSinGuardia: 'FIN_DE_SEMANA_SIN_GUARDIA',
   sinConexionFueraDeVentana: 'SIN_CONEXION_FUERA_DE_VENTANA',
+  festivoSinLaborar: 'FESTIVO_SIN_LABORAR',
 } as const;
 
 export type MotivoRechazo = (typeof MOTIVO_RECHAZO)[keyof typeof MOTIVO_RECHAZO];
@@ -405,6 +406,7 @@ export const ETIQUETA_MOTIVO_RECHAZO: Record<string, string> = {
   UBICACION_VIEJA: 'Ubicación guardada, no del momento',
   FIN_DE_SEMANA_SIN_GUARDIA: 'Fin de semana sin guardia',
   SIN_CONEXION_FUERA_DE_VENTANA: 'Sin conexión fuera de ventana',
+  FESTIVO_SIN_LABORAR: 'Festivo que no se labora',
 };
 
 /**

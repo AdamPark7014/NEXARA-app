@@ -1409,6 +1409,32 @@ export type AprobacionExtra = {
   nota?: string | null;
 };
 
+/**
+ * Un festivo para el desempeño: si no le toca trabajar, el día no se le exige; si trabaja con
+ * horario propio, retardo y tiempo extra se miden contra ese horario.
+ */
+export type FestivoKpi = { nombre: string; trabaja: boolean; entrada: string | null; salida: string | null };
+
+/** El horario contra el que se mide un día: el suyo, o el propio del festivo. */
+export function horarioDelDia(horario: HorarioKpi, festivo: FestivoKpi | null | undefined): HorarioKpi {
+  if (!festivo?.trabaja || !festivo.entrada || !festivo.salida) return horario;
+  const [he, me] = festivo.entrada.split(':').map(Number);
+  const [hs, ms] = festivo.salida.split(':').map(Number);
+  const jornada = hs * 60 + ms - (he * 60 + me);
+  return { ...horario, entrada: festivo.entrada, salida: festivo.salida, jornadaOrdinariaMin: jornada > 0 ? jornada : horario.jornadaOrdinariaMin };
+}
+
+/**
+ * ¿Se le exige ese día? Un festivo que no le toca no; uno con horario propio sí aunque no sea su
+ * día de siempre; uno con la jornada completa, si lo era. Sin horario (24/7) nunca.
+ */
+export function esLaborable(horario: HorarioKpi, fecha: string, festivo: FestivoKpi | null | undefined): boolean {
+  const deSiempre = horario.diasLaborables.includes(diaDeLaSemana(fecha));
+  if (!festivo) return deSiempre;
+  if (!festivo.trabaja || !horario.entrada) return false;
+  return festivo.entrada != null || deSiempre;
+}
+
 export type EntradaKpiPersona = {
   /** Rango en `AAAA-MM-DD`, ambos incluidos. */
   desde: string;
@@ -1420,6 +1446,8 @@ export type EntradaKpiPersona = {
   actividades: ActividadKpi[];
   /** Días (`AAAA-MM-DD`) con falta justificada. */
   justificadas?: string[];
+  /** Festivos del rango y cómo le tocan (`festivos/festivos-reglas.ts`), por día. */
+  festivos?: Record<string, FestivoKpi>;
   /** Lo que el jefe ya decidió sobre el tiempo extra, por día. */
   aprobacionesExtra?: AprobacionExtra[];
   /** Sus actividades vistas como entregas (límite, cuándo entregó, revisión). */
@@ -1509,7 +1537,9 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
   const hastaEfectivo = e.hasta < hoy ? e.hasta : hoy;
   for (const fecha of diasDelRango(e.desde, hastaEfectivo)) {
     const delDia = (porDia.get(fecha) ?? []).sort((a, b) => a.entrada.getTime() - b.entrada.getTime());
-    const laborable = e.horario.diasLaborables.includes(diaDeLaSemana(fecha));
+    const festivo = e.festivos?.[fecha] ?? null;
+    const laborable = esLaborable(e.horario, fecha, festivo);
+    const horarioHoy = horarioDelDia(e.horario, festivo);
 
     // Actividades que empezaron este día y no tocan ninguna jornada: se trabajó sin checar.
     const fuera = actividades.filter(
@@ -1581,12 +1611,12 @@ export function calculaKpisPersona(e: EntradaKpiPersona): {
     const minutosOcupados = Math.min(minutosDeTramos(intersectaTramos(tramosOcupados, laborables)), minutosLaborados);
     const trabajado = minutosProductivos >= MIN_TRABAJO_DIA_MIN || diasConEntrega.has(fecha);
     const sinTrabajo = laborable && !trabajado && terminado(fecha) && !justificadas.has(fecha);
-    const r = laborable ? retardoDeEntrada(primera.entrada, e.horario, tz) : { retardo: false, minutosTarde: 0 };
+    const r = laborable ? retardoDeEntrada(primera.entrada, horarioHoy, tz) : { retardo: false, minutosTarde: 0 };
     const minutosExtra =
-      e.horario.jornadaOrdinariaMin == null
+      horarioHoy.jornadaOrdinariaMin == null
         ? null
         : laborable
-          ? Math.max(0, minutosLaborados - e.horario.jornadaOrdinariaMin)
+          ? Math.max(0, minutosLaborados - horarioHoy.jornadaOrdinariaMin)
           : minutosLaborados;
 
     // Solo se paga lo que un jefe aprobó. Sin fila, el extra está pendiente de mirar.
