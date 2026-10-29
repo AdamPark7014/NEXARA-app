@@ -27,6 +27,8 @@ object TiempoEstandar {
         val porUnidadMin: Int,
         /** Unidades que ya cubre la base; se cobran solo las de más (cotización: hasta 10 partidas). */
         val incluidas: Int = 0,
+        /** «Jornadas en sitio»: cada una ya es el día completo; no se suma la base del tipo. */
+        val sinBase: Boolean = false,
     )
 
     data class Regla(
@@ -76,6 +78,7 @@ object TiempoEstandar {
                         pregunta = u.pregunta?.trim()?.takeIf { it.isNotEmpty() } ?: "¿Cuántos $plural?",
                         porUnidadMin = entero(u.porUnidadMin),
                         incluidas = entero(u.incluidas),
+                        sinBase = u.sinBase == true,
                     )
                 },
                 porComplejidad = r.porComplejidad?.mapValues { entero(it.value) }?.takeIf { it.isNotEmpty() },
@@ -141,7 +144,7 @@ object TiempoEstandar {
             val u = unidad(regla, unidad)!!
             val n = (cantidad ?: 0).coerceAtLeast(0)
             val incluidas = u.incluidas.coerceAtLeast(0)
-            if (regla.baseMin > 0) {
+            if (regla.baseMin > 0 && !u.sinBase) {
                 val hasta = if (incluidas > 0) " (hasta $incluidas ${u.plural})" else ""
                 desglose += Concepto("Base de ${regla.nombre.lowercase()}$hasta", regla.baseMin)
             }

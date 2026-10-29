@@ -19,6 +19,8 @@ enum CoreTiempoEstandar {
         let porUnidadMin: Int
         /// Unidades que ya cubre la base; se cobran solo las de más (cotización: hasta 10 partidas).
         let incluidas: Int
+        /// «Jornadas en sitio» (a8085bb3): cada una ya es el día completo; no se suma la base del tipo.
+        var sinBase: Bool = false
     }
 
     struct Regla: Hashable {
@@ -112,7 +114,8 @@ enum CoreTiempoEstandar {
                     plural: plural,
                     pregunta: pregunta.isEmpty ? "¿Cuántos \(plural)?" : pregunta,
                     porUnidadMin: entero(u["porUnidadMin"]),
-                    incluidas: entero(u["incluidas"])
+                    incluidas: entero(u["incluidas"]),
+                    sinBase: (u["sinBase"] as? Bool) == true
                 )
             }
             var porComplejidad: [CoreComplejidad: Int]?
@@ -197,7 +200,7 @@ enum CoreTiempoEstandar {
         if let u = unidad(regla, clave: claveUnidad) {
             let n = max(0, cantidad ?? 0)
             let incluidas = max(0, u.incluidas)
-            if regla.baseMin > 0 {
+            if regla.baseMin > 0 && !u.sinBase {
                 let hasta = incluidas > 0 ? " (hasta \(incluidas) \(u.plural))" : ""
                 desglose.append(Concepto(concepto: "Base de \(regla.nombre.lowercased())\(hasta)", minutos: regla.baseMin))
             }
