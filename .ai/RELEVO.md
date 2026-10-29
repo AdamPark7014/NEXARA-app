@@ -159,6 +159,27 @@
   - Pendiente: selector «Ligar», tarjetas y asistente en Android/iOS; `lib/asistente-ia-api.spec.ts` (web) falla
     en tipos y en una prueba por el trabajo sin subir de otra sesión, no por el chat.
 
+- **29-10 ~12:45 (claude-code) — Diseñador de videovigilancia, fases 3 y 4: 3D, ficha por cámara y propuesta en PDF.**
+  - Pedido de Adam por la sesión principal: «que hiperprofesionalice el generador de planos, modelos 3D…». Todo sale de
+    los artboards 2, 3 y 4 del mockup que ya aprobó.
+  - Revisado en producción con la sesión de Christian. Se creó el diseño «Prueba de verificación (se archiva)», id 1, con
+    el croquis de VDM: subir el croquis, calibrar con la cota de 43 m, poner una cámara, ver su cono, el panel y la vista
+    desde la cámara. Salieron dos arreglos (`a327a96d`):
+    - el plano saltaba ~30 px al cambiar de herramienta;
+    - el croquis negro de AutoCAD se veía gris: ahora se detecta y se pinta en negativo.
+  - Plano 2D: etiqueta «14 m · 109 PPM · Observación» en cada cono, barra de escala y norte (`02042b29`).
+  - 3D (`lib/cctv/escena3d.ts` + `Lienzo3D`/`Figuras3D`):
+    - proyección axonométrica en SVG, sin WebGL ni dependencias nuevas (no toca el lock compartido ni la CSP);
+    - muros extruidos con huecos y hojas, croquis en el piso con matriz afín, conos, humanoides y cámaras a su altura;
+    - isométrica, vista superior, girar, mover y F para enfocar; abajo las vistas desde las cámaras.
+  - Ficha `/erp/videovigilancia/:id/camara/:camara` y propuesta `/erp/videovigilancia/:id/propuesta` (`d269cdbb`):
+    - la ficha lleva una lámina propia (`public/cctv/lamina-referencia.svg`) pixelada a cada PPM en canvas;
+    - la propuesta va en hojas carta con marca NEXARA y se descarga con la impresión del navegador.
+  - Pruebas: `lib/cctv` + editor + ficha/propuesta = 67 en verde; `tsc` de la web limpio.
+  - Mockup: se agregó el artboard 5, «Plano por niveles», **por aprobar** (no está construido).
+  - Pendiente: archivar el diseño de prueba id 1 cuando Adam lo vea; «Pasar a cotización»; detección automática del
+    croquis; «Leer ficha»; infraestructura en el plano.
+
 - **29-10 ~12:00 (claude-code) — Diseñador de videovigilancia, fase 2: módulo `/erp/videovigilancia` (mockup aprobado).**
   - Adam aprobó el mockup («Aprobado, construye»). Especificación en `docs/DISENADOR-CCTV.md`.
   - Web:

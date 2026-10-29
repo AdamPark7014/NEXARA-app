@@ -386,8 +386,9 @@ lugares a tocar para dar de alta un módulo:
 |---|---|---|
 | 1 | Motor: óptica, DORI, zona ciega, plano, oclusión, cobertura, humanoides, mapa de calor, infraestructura. 36 pruebas | **Hecha** (29-10) |
 | 2 | Módulo y permisos, proyectos (guardar/abrir), editor 2D (croquis, calibrar, muros, aberturas, obstáculos, etiquetas, cotas, cámaras con conos recortados, humanoides), catálogo semilla, vista desde la cámara en 2D | **Hecha** (29-10) |
-| 3 | 3D y vista desde cada cámara (three.js), recuadro de PPM, referencia de detalle | — |
-| 4 | Propuesta PDF y «Pasar a cotización» | — |
+| 3 | 3D y vista desde cada cámara, recuadro de PPM, referencia de detalle. Se hizo en SVG axonométrico en lugar de three.js: sin dependencias nuevas ni WebGL | **Hecha** (29-10) |
+| 4 | Propuesta PDF (hojas carta, impresión del navegador) y ficha por cámara. Falta «Pasar a cotización» | **Hecha**, salvo cotización (29-10) |
+| 5b | Plano por niveles (varios pisos): artboard 5 del lienzo | Espera el visto bueno de Adam |
 | 5 | Detección automática (PDF vectorial y luego IA con eval) y «Leer ficha» | — |
 | 6 | Infraestructura en el plano (gabinetes, rutas de cable, NVR/discos/switch) y mapa de calor en la propuesta | — |
 
