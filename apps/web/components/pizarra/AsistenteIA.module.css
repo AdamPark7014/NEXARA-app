@@ -28,9 +28,12 @@
   color: var(--ui-fg-2);
 }
 
-.texto {
-  display: grid;
-  gap: var(--ui-s3);
+/* Nombres que el API corrigió contra el catálogo («talks» → Grupo Tox). */
+.corregidos {
+  margin: 0;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-2);
+  overflow-wrap: anywhere;
 }
 
 .ajustes {

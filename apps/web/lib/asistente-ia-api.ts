@@ -23,8 +23,19 @@ export type Referencia = { id: number; nombre: string };
 export type Encargo = "ejecucion" | "despacho";
 export type Prioridad = "Alta" | "Media" | "Baja";
 
-/** Día (AAAA-MM-DD), hora (HH:MM) y último día, en hora de Ciudad de México. */
-export type Agenda = { dia: string | null; hora: string | null; hasta: string | null; horaDicha: boolean };
+/**
+ * Día (AAAA-MM-DD), hora (HH:MM) y último día, en hora de Ciudad de México. `compromiso` es
+ * «Entregar a más tardar» (HH:MM del mismo día; sin periodo).
+ */
+export type Agenda = { dia: string | null; hora: string | null; hasta: string | null; horaDicha: boolean; compromiso?: string | null };
+
+/** Un nombre que el API corrigió («talks» → Grupo Tox), para decirlo en su campo. */
+export type Correccion = {
+  campo: "responsable" | "cliente" | "sucursal" | "proyecto" | "lugar";
+  de: string;
+  a: string;
+  como: "apodo" | "parecido";
+};
 
 export type PropuestaActividad = {
   tipo: ActivityKind;
@@ -51,17 +62,28 @@ export type PropuestaActividad = {
   /** Lo que no se dijo: responsable, cliente, proyecto, fecha, duración. */
   faltantes: string[];
   avisos: string[];
+  /** Opcional mientras conviven una web nueva y un API anterior. */
+  correcciones?: Correccion[];
   payload: Record<string, unknown>;
 };
 
 export type ProyectoOpcion = Referencia & { clientId: number };
+
+/** Sucursal registrada: el lugar de la tarjeta se elige de aquí o se escribe libre. */
+export type SucursalOpcion = Referencia & {
+  clientId: number;
+  branchNumber: string | null;
+  city: string | null;
+  state: string | null;
+  address: string | null;
+};
 
 export type RespuestaAsistente = {
   propuestas: PropuestaActividad[];
   aclaracion: string | null;
   uso: { modelo: string; tokensEntrada: number; tokensSalida: number; usdAprox: number | null } | null;
   /** Clientes y proyectos activos, para cambiar el tipo en la tarjeta (no pasan por la IA). */
-  opciones?: { clientes: Referencia[]; proyectos: ProyectoOpcion[] };
+  opciones?: { clientes: Referencia[]; proyectos: ProyectoOpcion[]; sucursales?: SucursalOpcion[] };
 };
 
 export type PersonaAsignable = { id: number; nombre: string; email?: string | null };
@@ -128,9 +150,13 @@ export type Ajustes = {
   projectId?: number | null;
   titulo?: string;
   indicaciones?: string;
+  /** Lugar: el nombre de una sucursal del cliente o texto libre. `""` = sin lugar. */
+  lugar?: string;
   dia?: string;
   hora?: string;
   hasta?: string;
+  /** «Entregar a más tardar» (HH:MM). `""` = sin hora límite (fin del día). */
+  compromiso?: string;
   duracionMin?: number | null;
   prioridad?: Prioridad;
   encargo?: Encargo | null;
@@ -201,7 +227,38 @@ export function agendaFinal(p: PropuestaActividad, aj: Ajustes): Agenda {
   const dia = aj.dia !== undefined ? aj.dia || null : base.dia;
   const hora = aj.hora !== undefined ? aj.hora || null : base.hora;
   const hasta = aj.hasta !== undefined ? aj.hasta || null : base.hasta;
-  return { dia, hora: dia ? hora ?? "09:00" : null, hasta: dia ? hasta : null, horaDicha: aj.hora !== undefined || base.horaDicha };
+  // Como el formulario: con varios días no hay hora compromiso (vence al fin del último).
+  const compromiso = aj.compromiso !== undefined ? aj.compromiso || null : base.compromiso ?? null;
+  return {
+    dia,
+    hora: dia ? hora ?? "09:00" : null,
+    hasta: dia ? hasta : null,
+    horaDicha: aj.hora !== undefined || base.horaDicha,
+    compromiso: dia && !(hasta && hasta > dia) ? compromiso : null,
+  };
+}
+
+/** «Entregar a más tardar» vale solo después de la hora de inicio (como en el formulario). */
+export function compromisoValido(ag: Agenda): boolean {
+  return !ag.compromiso || (/^\d{2}:\d{2}$/.test(ag.compromiso) && ag.compromiso > (ag.hora || "09:00"));
+}
+
+/** La corrección de nombre de un campo («talks» → Grupo Tox), si la hubo. */
+export function correccionDe(p: PropuestaActividad, campo: Correccion["campo"]): Correccion | null {
+  return p.correcciones?.find((c) => c.campo === campo) ?? null;
+}
+
+/** Cómo se dice en la tarjeta: «Corregido de "talks"» o, con apodo, «Dijiste "Chava"». */
+export function textoCorreccion(c: Correccion | null): string | undefined {
+  if (!c) return undefined;
+  return c.como === "apodo" ? `Dijiste «${c.de}»` : `Corregido de «${c.de}»`;
+}
+
+const CAMPOS_SUCURSAL = ["branchName", "branchNumber", "branchCity", "branchState", "branchAddress"] as const;
+
+/** Lugar vigente (lo escrito en la tarjeta o el de la IA). */
+export function lugarEfectivo(p: PropuestaActividad, aj: Ajustes): string {
+  return aj.lugar !== undefined ? aj.lugar : typeof p.payload.branchName === "string" ? p.payload.branchName : "";
 }
 
 /**
@@ -234,7 +291,7 @@ const CAMPOS_FECHA = ["fechaInicio", "fechaEntregaEsperada", "fechaMaxima", "per
 export function payloadFinal(
   p: PropuestaActividad,
   aj: Ajustes,
-  ctx: { destinoEmail?: string | null; proyectos?: ProyectoOpcion[] } = {},
+  ctx: { destinoEmail?: string | null; proyectos?: ProyectoOpcion[]; sucursales?: SucursalOpcion[] } = {},
 ): Record<string, unknown> {
   const out: Record<string, unknown> = { ...p.payload };
   if (aj.responsableId) out.responsableId = aj.responsableId;
@@ -250,6 +307,29 @@ export function payloadFinal(
   if (aj.clientId !== undefined) {
     if (aj.clientId) out.clientId = aj.clientId;
     else delete out.clientId;
+    // La sucursal de la IA era de otro cliente: no se arrastra.
+    if (p.sucursal && aj.clientId !== (p.cliente?.id ?? null) && aj.lugar === undefined) {
+      for (const k of CAMPOS_SUCURSAL) delete out[k];
+    }
+  }
+  if (aj.lugar !== undefined) {
+    for (const k of CAMPOS_SUCURSAL) delete out[k];
+    const lugar = aj.lugar.trim();
+    const clienteId = Number(out.clientId) || null;
+    // Si es una sucursal registrada (del cliente elegido), se llenan sus datos como en el formulario.
+    const suc = lugar
+      ? ctx.sucursales?.find((x) => (!clienteId || x.clientId === clienteId) && x.nombre.trim().toLowerCase() === lugar.toLowerCase())
+      : undefined;
+    if (suc) {
+      out.branchName = suc.nombre.slice(0, 160);
+      if (!out.clientId) out.clientId = suc.clientId;
+      if (suc.branchNumber) out.branchNumber = suc.branchNumber.slice(0, 60);
+      if (suc.city) out.branchCity = suc.city.slice(0, 120);
+      if (suc.state) out.branchState = suc.state.slice(0, 120);
+      if (suc.address) out.branchAddress = suc.address.slice(0, 220);
+    } else if (lugar) {
+      out.branchName = lugar.slice(0, 160);
+    }
   }
   const proyecto = proyectoEfectivo(p, aj);
   if (proyecto) {
@@ -263,7 +343,8 @@ export function payloadFinal(
     delete out.projectId;
     delete out.projectMilestoneId;
   }
-  if (aj.titulo !== undefined && aj.titulo.trim()) out.titulo = aj.titulo.trim().slice(0, 200);
+  // Lo escrito en la tarjeta manda; vacío no se crea («Escribe el título»).
+  if (aj.titulo !== undefined) out.titulo = aj.titulo.trim().slice(0, 200);
   if (aj.indicaciones !== undefined) {
     const t = aj.indicaciones.trim();
     if (t) out.indicaciones = t.slice(0, 4000);
@@ -274,16 +355,17 @@ export function payloadFinal(
     if (aj.duracionMin && aj.duracionMin > 0) out.tiempoEstimadoMin = Math.min(720, Math.round(aj.duracionMin));
     else delete out.tiempoEstimadoMin;
   }
-  // Fechas como el formulario: inicio = entrega = máxima; con último día, el periodo (la API
-  // pone la máxima y la entrega al fin de ese día).
-  if (aj.dia !== undefined || aj.hora !== undefined || aj.hasta !== undefined) {
+  // Fechas como el formulario: inicio = entrega = máxima (a la hora compromiso si la hay); con
+  // último día, el periodo (la API pone la máxima y la entrega al fin de ese día).
+  if (aj.dia !== undefined || aj.hora !== undefined || aj.hasta !== undefined || aj.compromiso !== undefined) {
     const ag = agendaFinal(p, aj);
     for (const k of CAMPOS_FECHA) delete out[k];
     const iso = ag.dia ? aIso(ag.dia, ag.hora) : null;
     if (ag.dia && iso) {
+      const limite = ag.compromiso && compromisoValido(ag) ? aIso(ag.dia, ag.compromiso) ?? iso : iso;
       out.fechaInicio = iso;
-      out.fechaEntregaEsperada = iso;
-      out.fechaMaxima = iso;
+      out.fechaEntregaEsperada = limite;
+      out.fechaMaxima = limite;
       if (ag.hasta && ag.hasta > ag.dia) {
         out.periodoInicio = ag.dia;
         out.periodoFin = ag.hasta;
@@ -324,6 +406,10 @@ export function bloqueos(
   if (ctx.agenda?.dia && ctx.agenda.hasta && ctx.agenda.hasta < ctx.agenda.dia) {
     out.push("El último día no puede ser antes del primero.");
   }
+  if (ctx.agenda && !compromisoValido(ctx.agenda)) {
+    out.push("«Entregar a más tardar» tiene que ser después de la hora de inicio.");
+  }
+  if (!String(payload.titulo ?? "").trim()) out.push("Escribe el título.");
   if (payload.responsableId && ctx.destinoEmail !== undefined) {
     if (reglaEncargo(tipo, ctx.destinoEmail, null).ofrecer && !payload.assignmentCharge) {
       out.push("Elige si la hace en persona o la reparte a su equipo.");

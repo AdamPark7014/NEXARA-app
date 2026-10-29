@@ -10,7 +10,22 @@
  *   y `lib/activity-kinds.ts`) y dice qué falta.
  * - Nada se crea hasta que la persona confirma: la web manda cada propuesta al alta normal,
  *   que vuelve a revisar permisos, organigrama y responsable activo.
+ * - Los nombres mal oídos o mal escritos («talks» por Tox) los empata `nombres.ts` con el
+ *   catálogo real; la IA nunca decide un cliente que no existe.
  */
+import {
+  PALABRAS_GIRO,
+  PALABRAS_RELLENO,
+  buscar,
+  corregidoDe,
+  corregirEnTexto,
+  mencion,
+  normalizar,
+  palabrasDe,
+  palabrasUtiles,
+  parecido,
+  type Corregido,
+} from './nombres.js';
 
 export const TIPOS_ACTIVIDAD = ['tarea', 'proyecto', 'obra', 'servicio', 'comercial'] as const;
 export type TipoActividad = (typeof TIPOS_ACTIVIDAD)[number];
@@ -210,6 +225,8 @@ Campos:
 - No inventes personas, clientes, sucursales, proyectos, fechas ni cantidades.
 - Si piden algún trabajo, devuelve la actividad aunque falten datos. Solo si no piden ningún trabajo: acciones vacío y en aclaracion una pregunta breve. Con actividades, aclaracion null.`;
 
+export { normalizar, sonido, puntaje, buscar, type Coincidencia } from './nombres.js';
+
 export type PersonaAsignable = { id: number; nombre: string; puesto?: string | null; email?: string | null };
 export type ClienteNexara = { id: number; name: string };
 export type SucursalNexara = {
@@ -224,135 +241,75 @@ export type SucursalNexara = {
 };
 export type ProyectoNexara = { id: number; title: string; clientId: number; clientName: string };
 
-/**
- * Apodos frecuentes → nombres de pila, para encontrar a la persona en código antes de llamar
- * a la IA («Beto» → Roberto, «Paty» → Patricia, «Toño» → Antonio).
- */
-const APODOS: Record<string, string[]> = {
-  beto: ['roberto', 'alberto', 'norberto', 'heriberto', 'humberto'],
-  paty: ['patricia'],
-  pati: ['patricia'],
-  tono: ['antonio'],
-  tony: ['antonio'],
-  pepe: ['jose'],
-  chema: ['jose'],
-  lupe: ['guadalupe'],
-  lupita: ['guadalupe'],
-  memo: ['guillermo'],
-  paco: ['francisco'],
-  pancho: ['francisco'],
-  nacho: ['ignacio'],
-  chuy: ['jesus'],
-  chucho: ['jesus'],
-  lalo: ['eduardo'],
-  quique: ['enrique'],
-  rafa: ['rafael'],
-  fer: ['fernando', 'fernanda'],
-  mafer: ['fernanda'],
-  gaby: ['gabriela'],
-  gabi: ['gabriela'],
-  ale: ['alejandra', 'alejandro'],
-  alex: ['alejandro', 'alejandra'],
-  dani: ['daniela', 'daniel'],
-  caro: ['carolina'],
-  charly: ['carlos'],
-  pau: ['paulina'],
-  moni: ['monica'],
-  vero: ['veronica'],
-  lety: ['leticia'],
-  isa: ['isabel'],
-  santi: ['santiago'],
-  tere: ['teresa'],
-  mau: ['mauricio'],
-  richi: ['ricardo'],
-  poncho: ['alfonso'],
-  cris: ['cristian', 'cristina'],
-  mari: ['maria'],
-  maru: ['maria'],
-};
-
-/**
- * Cómo suena una palabra (ya normalizada), para que el dictado no impida encontrarla:
- * «Toks» = «Tox», «Cristian» = «Christian», «Vanesa» = «Banessa».
- */
-export function sonido(palabra: string): string {
-  return palabra
-    .replace(/chr/g, 'cr')
-    .replace(/ch/g, '§')
-    .replace(/h/g, '')
-    .replace(/qu/g, 'k')
-    .replace(/c([ei])/g, 's$1')
-    .replace(/c/g, 'k')
-    .replace(/z/g, 's')
-    .replace(/v/g, 'b')
-    .replace(/ll/g, 'y')
-    .replace(/ks/g, 'x')
-    .replace(/w/g, 'u')
-    .replace(/y$/, 'i')
-    .replace(/(.)\1+/g, '$1')
-    .replace(/§/g, 'ch');
-}
-
-/** Palabras con las que se puede nombrar algo (sin artículos, giros ni relleno). */
-function palabrasNombre(texto: string): string[] {
-  return normalizar(texto)
-    .split(' ')
-    .filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !PALABRAS_RELLENO.has(w) && !PALABRAS_GIRO.has(w))
-    .map(sonido);
-}
-
-/** Lo dicho, como suena, con los apodos ya traducidos a nombres. */
-function palabrasDichas(instruccion: string): string[] {
-  const salida = new Set<string>();
-  for (const w of normalizar(instruccion).split(' ')) {
-    for (const nombre of APODOS[w] ?? []) salida.add(sonido(nombre));
-    if (w.length >= 3 && !/^\d+$/.test(w) && !PALABRAS_RELLENO.has(w)) salida.add(sonido(w));
-  }
-  return [...salida];
-}
-
-function parecidas(a: string, b: string): boolean {
-  return a === b || (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a)));
-}
-
 /** Tope de cada lista de coincidencias que se manda a la IA. */
 const MAX_COINCIDENCIAS = 8;
 
+/** Lo que el catálogo relevante sabe además: cómo se dijo lo que no se dijo igual. */
+export type CatalogoRelevante = CatalogosNexara & {
+  /** «cliente:101» → «talks»: lo que se oyó cuando no fue el nombre tal cual. */
+  comoSeDijo: Record<string, string>;
+};
+
 /**
- * Lo del catálogo que se mencionó (por nombre, apodo o como suena), resuelto en código antes
- * de llamar a la IA: se le manda solo esto en vez de toda la empresa. Lo que no aparece aquí
- * lo copia la IA tal cual y el código lo vuelve a buscar en el catálogo completo.
+ * Lo del catálogo que se mencionó (por nombre, apodo, como suena, siglas o casi igual),
+ * resuelto en código antes de llamar a la IA: se le manda solo esto en vez de toda la
+ * empresa, primero lo que coincide mejor. Lo que no aparece aquí lo copia la IA tal cual y
+ * el código lo vuelve a buscar en el catálogo completo.
  */
-export function catalogoRelevante(instruccion: string, catalogos: CatalogosNexara): CatalogosNexara {
-  const dichas = palabrasDichas(instruccion);
-  const coincide = (nombre: string) => palabrasNombre(nombre).some((w) => dichas.some((d) => parecidas(d, w)));
-  const personas = catalogos.personas.filter((p) => coincide(p.nombre)).slice(0, MAX_COINCIDENCIAS);
-  const sucursales = catalogos.sucursales.filter((s) => coincide(s.name)).slice(0, MAX_COINCIDENCIAS);
-  const proyectos = catalogos.proyectos.filter((p) => coincide(p.title)).slice(0, MAX_COINCIDENCIAS);
+export function catalogoRelevante(instruccion: string, catalogos: CatalogosNexara): CatalogoRelevante {
+  const dichas = palabrasDe(instruccion);
+  const comoSeDijo: Record<string, string> = {};
+  const elegir = <T>(items: T[], tipo: string, idDe: (t: T) => number, nombreDe: (t: T) => string, extra?: (t: T) => boolean) =>
+    items
+      .map((item, orden) => ({ item, orden, m: mencion(dichas, nombreDe(item)) }))
+      .filter((x) => x.m.nivel >= 1 || extra?.(x.item))
+      .sort((a, b) => b.m.nivel - a.m.nivel || a.orden - b.orden)
+      .slice(0, MAX_COINCIDENCIAS)
+      .map((x) => {
+        if (x.m.comoSeDijo) comoSeDijo[`${tipo}:${idDe(x.item)}`] = x.m.comoSeDijo;
+        return x.item;
+      });
+  const personas = elegir(catalogos.personas, 'persona', (p) => p.id, (p) => p.nombre);
+  const sucursales = elegir(catalogos.sucursales, 'sucursal', (s) => s.id, (s) => s.name);
+  const proyectos = elegir(catalogos.proyectos, 'proyecto', (p) => p.id, (p) => p.title);
   const deOtros = new Set([...sucursales.map((s) => s.clientId), ...proyectos.map((p) => p.clientId)]);
-  const clientes = catalogos.clientes.filter((c) => coincide(c.name) || deOtros.has(c.id)).slice(0, MAX_COINCIDENCIAS);
+  const clientes = elegir(catalogos.clientes, 'cliente', (c) => c.id, (c) => c.name, (c) => deOtros.has(c.id));
+  // Nombres ya usados en actividades que no son clientes («Toks»): solo si suenan igual.
+  const nombresUsados = (catalogos.nombresUsados ?? []).filter((n) => {
+    const m = mencion(dichas, n);
+    if (m.nivel < 2 || m.nivel >= 3 || !m.comoSeDijo) return false;
+    comoSeDijo[`nombre:${n}`] = m.comoSeDijo;
+    return true;
+  });
   return {
     personas,
     clientes,
     // Solo sucursales de clientes que quedaron (o de los que se nombró la sucursal).
     sucursales: sucursales.filter((s) => clientes.some((c) => c.id === s.clientId)),
     proyectos,
+    nombresUsados: nombresUsados.slice(0, MAX_COINCIDENCIAS),
+    comoSeDijo,
   };
 }
 
 /** Las coincidencias como texto para el mensaje (lo variable va fuera de la caché). */
-export function bloqueCoincidencias(rel: CatalogosNexara): string {
+export function bloqueCoincidencias(rel: CatalogosNexara & { comoSeDijo?: Record<string, string> }): string {
   const lista = (xs: string[], vacio = 'ninguno') => (xs.length ? xs.join('; ') : vacio);
+  const dicho = (clave: string) => (rel.comoSeDijo?.[clave] ? ` («${rel.comoSeDijo[clave]}»)` : '');
   const cliente = (c: ClienteNexara) => {
-    const suc = rel.sucursales.filter((s) => s.clientId === c.id).map((s) => s.name);
-    return suc.length ? `${c.name} (sucursales: ${suc.join(', ')})` : c.name;
+    const suc = rel.sucursales.filter((s) => s.clientId === c.id).map((s) => s.name + dicho(`sucursal:${s.id}`));
+    return `${c.name}${dicho(`cliente:${c.id}`)}${suc.length ? ` (sucursales: ${suc.join(', ')})` : ''}`;
   };
+  const usados = rel.nombresUsados?.length ? rel.nombresUsados.map((n) => n + dicho(`nombre:${n}`)) : null;
   return [
-    'Coincidencias en el catálogo (escribe estos nombres tal cual):',
-    `Personas: ${lista(rel.personas.map((p) => p.nombre), 'ninguna')}`,
+    'Coincidencias en el catálogo (escribe estos nombres tal cual; entre « » cómo se oyó):',
+    `Personas: ${lista(rel.personas.map((p) => p.nombre + dicho(`persona:${p.id}`)), 'ninguna')}`,
     `Clientes: ${lista(rel.clientes.map(cliente))}`,
-    `Proyectos: ${lista(rel.proyectos.map((p) => `${p.title} (${p.clientName})`))}`,
-  ].join('\n');
+    `Proyectos: ${lista(rel.proyectos.map((p) => `${p.title} (${p.clientName})${dicho(`proyecto:${p.id}`)}`))}`,
+    usados ? `Otros nombres ya usados (no son clientes): ${usados.join('; ')}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /** «sáb 2026-10-24, dom 2026-10-25, …»: los próximos días ya calculados en código. */
@@ -444,68 +401,6 @@ export function fechaLocalISO(d: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_HORARIA }).format(d);
 }
 
-export function normalizar(s: string | null | undefined): string {
-  return (s || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9ñ ]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/** Palabras que no distinguen un nombre de otro («CEDIS de Tox», «la Torre Médica»). */
-const PALABRAS_VACIAS = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'en', 'y', 'a', 'al', 'con', 'para', 'por']);
-
-/**
- * Palabras de giro: «Grupo», «Hotel», «Bodegas»… no distinguen a un cliente de otro, así
- * que «Tox nave 2» encuentra a «Grupo Tox» por su palabra propia («tox»).
- */
-const PALABRAS_GIRO = new Set([
-  'grupo', 'corporativo', 'corporacion', 'hotel', 'hospital', 'clinica', 'colegio', 'escuela', 'instituto',
-  'universidad', 'bodega', 'bodegas', 'plaza', 'tienda', 'tiendas', 'sucursal', 'empresa', 'servicios',
-  'centro', 'oficinas', 'farmacia', 'farmacias', 'restaurante', 'constructora', 'inmobiliaria',
-  'sa', 'cv', 'sapi', 'rl', 'sc',
-]);
-
-function palabrasUtiles(s: string): string[] {
-  return normalizar(s)
-    .split(' ')
-    .filter((w) => w.length >= 2 && !PALABRAS_VACIAS.has(w));
-}
-
-/**
- * Qué tan bien coincide `consulta` con `nombre` (0 = nada, 3 = igual).
- * 2: cada palabra de la consulta es (o empieza) una palabra del nombre («antonio» → «José
- *    Antonio Ramírez», «banor» → «Banorte»), o el nombre completo viene dentro de la consulta
- *    («Bodegas Luna Atlixco» → «Bodegas Luna», «Torre Médica del San Rafael» → «Torre Médica»).
- * 1: solo algunas palabras coinciden así: se propone, no se elige.
- */
-export function puntaje(consulta: string, nombre: string): number {
-  const c = normalizar(consulta);
-  const n = normalizar(nombre);
-  if (!c || !n) return 0;
-  if (c === n) return 3;
-  const palabrasN = n.split(' ');
-  const palabrasC = palabrasUtiles(consulta);
-  const esInicio = (w: string) => palabrasN.some((p) => p.startsWith(w));
-  if (palabrasC.length && palabrasC.every((w) => palabrasN.includes(w) || (w.length >= 3 && esInicio(w)))) return 2;
-  const utilesN = palabrasUtiles(nombre);
-  if (utilesN.length && utilesN.every((w) => palabrasC.includes(w))) return 2;
-  // «Tox nave 2» → «Grupo Tox»: basta con las palabras propias del nombre (sin el giro).
-  const propiasN = utilesN.filter((w) => w.length >= 3 && !PALABRAS_GIRO.has(w));
-  if (propiasN.length && propiasN.every((w) => palabrasC.includes(w))) return 2;
-  if (palabrasC.some((w) => w.length >= 3 && esInicio(w))) return 1;
-  return 0;
-}
-
-/** Palabras que no aportan al comparar indicaciones con el título. */
-const PALABRAS_RELLENO = new Set([
-  ...PALABRAS_VACIAS,
-  'que', 'se', 'un', 'una', 'unos', 'unas', 'su', 'sus', 'es', 'son', 'esta', 'este', 'esto', 'estos', 'lo', 'le',
-  'les', 'hay', 'muy', 'sobre', 'realizar', 'hacer', 'llevar', 'cabo', 'favor', 'cliente', 'sitio', 'actividad',
-]);
-
 /** Raíz corta para que «graba» y «grabando» o «cablear» y «cableado» cuenten igual. */
 function raicesDe(texto: string): string[] {
   return normalizar(texto)
@@ -549,33 +444,18 @@ export function lugarDicho(lugar: string | null | undefined, instruccion?: strin
     .split(' ')
     .filter((w) => /^\d+$/.test(w) || (w.length >= 3 && !PALABRAS_GIRO.has(w) && !PALABRAS_RELLENO.has(w)));
   if (!propias.length) return true;
-  return propias.some((w) => (/^\d+$/.test(w) ? numeros.has(w) : dichas.has(w.slice(0, 5))));
+  const dicha = (w: string) => dichas.has(w.slice(0, 5)) || (w.length >= 4 && [...dichas].some((d) => d.startsWith(w)));
+  if (propias.some((w) => (/^\d+$/.test(w) ? numeros.has(w) : dicha(w)))) return true;
+  // Dicho como suena («Toks» en el lugar y «talks» en la instrucción).
+  return mencion(palabrasDe(instruccion), lugar).nivel >= 2;
 }
 
-/** Quita de `texto` las palabras de `nombre` («CEDIS de Tox» sin «Grupo Tox» → «CEDIS»). */
+/** Quita de `texto` las palabras de `nombre`, también como suenan («talks nave 2» sin «Grupo Tox» → «nave 2»). */
 function sinPalabrasDe(texto: string | null, nombre: string): string | null {
   if (!texto) return null;
-  const quitar = new Set(palabrasUtiles(nombre));
-  const resto = palabrasUtiles(texto).filter((w) => !quitar.has(w));
+  const quitar = palabrasUtiles(nombre);
+  const resto = palabrasUtiles(texto).filter((w) => !quitar.some((q) => q === w || parecido(w, q) >= 2));
   return resto.length ? resto.join(' ') : null;
-}
-
-export type Coincidencia<T> = { elegido: T | null; candidatos: T[] };
-
-/** Elige solo cuando hay un único mejor resultado; si empatan, deja que la persona escoja. */
-export function buscar<T>(consulta: string | null, items: T[], nombreDe: (t: T) => string, max = 5): Coincidencia<T> {
-  if (!consulta || !normalizar(consulta)) return { elegido: null, candidatos: [] };
-  const puntuados = items
-    .map((item) => ({ item, p: puntaje(consulta, nombreDe(item)) }))
-    .filter((x) => x.p > 0)
-    .sort((a, b) => b.p - a.p);
-  if (!puntuados.length) return { elegido: null, candidatos: [] };
-  const mejor = puntuados[0].p;
-  const empatados = puntuados.filter((x) => x.p === mejor);
-  return {
-    elegido: empatados.length === 1 && mejor >= 2 ? empatados[0].item : null,
-    candidatos: puntuados.slice(0, max).map((x) => x.item),
-  };
 }
 
 /** `AAAA-MM-DD` + `HH:MM` de CDMX → ISO UTC. null si falta la fecha o no es válida. */
@@ -621,6 +501,11 @@ export type Agenda = {
   hasta: string | null;
   /** false = la hora no se dijo y se puso la de omisión. */
   horaDicha: boolean;
+  /**
+   * «Entregar a más tardar» (`HH:MM`, el mismo día y después de la hora): la fecha máxima y
+   * la entrega quedan a esa hora, como en el formulario. null si no la dijeron o dura varios días.
+   */
+  compromiso: string | null;
 };
 
 /** ¿La instrucción dice algún día («hoy», «mañana», «el viernes», «3 de noviembre», «24/10»)? */
@@ -640,7 +525,10 @@ export function corregirHoraPasada<T extends Pick<AccionPlan, 'fecha' | 'hora'>>
   return { ...accion, fecha: fechaLocalISO(new Date(ahora.getTime() + 86_400_000)) };
 }
 
-export function agendaDe(accion: Pick<AccionPlan, 'fecha' | 'hora' | 'fechaLimite'>, ahora: Date): Agenda {
+export function agendaDe(
+  accion: Pick<AccionPlan, 'fecha' | 'hora' | 'fechaLimite'> & Partial<Pick<AccionPlan, 'horaLimite'>>,
+  ahora: Date,
+): Agenda {
   const hoy = fechaLocalISO(ahora);
   const limite = esDia(accion.fechaLimite) ? accion.fechaLimite : null;
   let dia = esDia(accion.fecha) ? accion.fecha : limite ? (limite < hoy ? limite : hoy) : null;
@@ -648,7 +536,10 @@ export function agendaDe(accion: Pick<AccionPlan, 'fecha' | 'hora' | 'fechaLimit
   if (dia && limite && dia > limite) dia = limite;
   const dicha = aHora(accion.hora);
   const hora = dicha ?? (dia === hoy ? horaActualRedondeada(ahora) : dia ? '09:00' : null);
-  return { dia, hora, hasta: dia && limite && limite > dia ? limite : null, horaDicha: Boolean(dicha) };
+  const hasta = dia && limite && limite > dia ? limite : null;
+  const horaLimite = aHora(accion.horaLimite);
+  const compromiso = dia && !hasta && horaLimite && hora && horaLimite > hora ? horaLimite : null;
+  return { dia, hora, hasta, horaDicha: Boolean(dicha), compromiso };
 }
 
 const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -696,6 +587,8 @@ export type PropuestaActividad = {
    */
   faltantes: string[];
   avisos: string[];
+  /** Nombres que el código corrigió («talks» → Grupo Tox), para decirlo en cada campo. */
+  correcciones: Correccion[];
   /** Cuerpo para `POST /activities` (sin `responsableId` si aún no se eligió). */
   payload: Record<string, unknown>;
 };
@@ -705,6 +598,11 @@ export type CatalogosNexara = {
   clientes: ClienteNexara[];
   sucursales: SucursalNexara[];
   proyectos: ProyectoNexara[];
+  /**
+   * Nombres propios ya escritos en actividades que no son clientes («Toks», «Sephora»), para
+   * escribir igual lo que el dictado oyó distinto. Opcional: el eval y las pruebas no lo usan.
+   */
+  nombresUsados?: string[];
 };
 
 const ref = (id: number, nombre: string): Referencia => ({ id, nombre });
@@ -740,12 +638,32 @@ export function mencionAmbigua(
   instruccion: string,
 ): PersonaAsignable[] | null {
   const dichas = new Set(palabrasUtiles(instruccion));
-  const mencion = palabrasUtiles(elegida.nombre).filter((w) => dichas.has(w));
-  if (!mencion.length) return null;
+  const dichasDeElla = palabrasUtiles(elegida.nombre).filter((w) => dichas.has(w));
+  if (!dichasDeElla.length) return null;
   const otras = personas.filter(
-    (p) => p.id !== elegida.id && mencion.every((w) => palabrasUtiles(p.nombre).includes(w)),
+    (p) => p.id !== elegida.id && dichasDeElla.every((w) => palabrasUtiles(p.nombre).includes(w)),
   );
   return otras.length ? [elegida, ...otras] : null;
+}
+
+/** De quién es cada corrección de nombre que se muestra en la tarjeta. */
+export type Correccion = {
+  campo: 'responsable' | 'cliente' | 'sucursal' | 'proyecto' | 'lugar';
+  /** Lo que se dijo o escribió («talks», «Chava»). */
+  de: string;
+  /** El nombre que quedó («Grupo Tox», «Salvador Ortiz Bravo»). */
+  a: string;
+  /** apodo («Chava» = Salvador) o parecido (mal oído o mal escrito). */
+  como: 'apodo' | 'parecido';
+};
+
+/** Lo dicho de otra forma: primero cómo quedó en la instrucción y si no, lo que escribió la IA. */
+function corregido(nombre: string, ...textos: Array<string | null | undefined>): Corregido | null {
+  for (const t of textos) {
+    const c = corregidoDe(nombre, t);
+    if (c) return c;
+  }
+  return null;
 }
 
 /** Convierte una acción del plan en una propuesta lista para confirmar. */
@@ -757,10 +675,20 @@ export function construirPropuesta(
   const tipo: TipoActividad = (TIPOS_ACTIVIDAD as readonly string[]).includes(accion.tipo) ? accion.tipo : 'tarea';
   const avisos: string[] = [];
   const faltantes: string[] = [];
+  const correcciones: Correccion[] = [];
+  /** Palabras mal oídas → bien, para el título, las indicaciones y el lugar. */
+  const pares: Corregido['pares'] = [];
+  const anotar = (campo: Correccion['campo'], nombre: string, c: Corregido | null) => {
+    if (!c) return;
+    correcciones.push({ campo, de: c.de, a: nombre, como: c.como });
+    pares.push(...c.pares);
+  };
+  const aproximado = { aproximado: true } as const;
 
   // Persona. Si la IA eligió a alguien que en la instrucción solo se nombró con palabras que
-  // comparte con otra persona («Antonio» con dos Antonio en la lista), no se elige.
-  const persona = buscar(accion.responsable, catalogos.personas, (p) => p.nombre);
+  // comparte con otra persona («Antonio» con dos Antonio en la lista), no se elige. Lo mal
+  // oído («Jair» por Yahir) se empata en código y se dice.
+  const persona = buscar(accion.responsable, catalogos.personas, (p) => p.nombre, 5, aproximado);
   let responsable = persona.elegido ? ref(persona.elegido.id, persona.elegido.nombre) : null;
   let candidatosPersona = persona.candidatos;
   if (persona.elegido && contexto.instruccion) {
@@ -771,10 +699,16 @@ export function construirPropuesta(
       avisos.push(`El nombre que dijeron puede ser ${empatadas.map((p) => p.nombre).join(' o ')}: elige a la persona.`);
     }
   }
-  if (!responsable) {
+  if (responsable) {
+    const c = corregido(responsable.nombre, contexto.instruccion, accion.responsable);
+    // Los apodos no se cambian en el texto («Chava» puede quedarse en las indicaciones).
+    if (c) anotar('responsable', responsable.nombre, c.como === 'apodo' ? { ...c, pares: [] } : c);
+  } else {
     faltantes.push('responsable');
     if (accion.responsable && !candidatosPersona.length) {
       avisos.push(`No encontré a «${accion.responsable}» entre las personas que puedes asignar.`);
+    } else if (accion.responsable && candidatosPersona.length > 1 && !avisos.length) {
+      avisos.push(`«${accion.responsable}» puede ser ${candidatosPersona.slice(0, 3).map((p) => p.nombre).join(' o ')}: elige a la persona.`);
     }
   }
 
@@ -785,12 +719,19 @@ export function construirPropuesta(
   let cliente: Referencia | null = null;
   let sucursal: SucursalNexara | null = null;
   let clienteCandidatos: Referencia[] = [];
-  const porCliente = buscar(accion.cliente, catalogos.clientes, (c) => c.name);
+  const porCliente = buscar(accion.cliente, catalogos.clientes, (c) => c.name, 5, aproximado);
   if (porCliente.elegido) cliente = ref(porCliente.elegido.id, porCliente.elegido.name);
   // «Bodegas Luna Atlixco» puede llegar solo como sitio: el cliente también se busca ahí.
   if (!cliente && sitio) {
-    const porSitio = buscar(sitio, catalogos.clientes, (c) => c.name);
+    const porSitio = buscar(sitio, catalogos.clientes, (c) => c.name, 5, aproximado);
     if (porSitio.elegido) cliente = ref(porSitio.elegido.id, porSitio.elegido.name);
+  }
+  // La IA copió lo mal oído («Talk») y la instrucción sí nombra a un cliente («talks» =
+  // Grupo Tox): con eso basta una letra de diferencia.
+  if (!cliente && textoCliente && contexto.instruccion) {
+    const mencionados = catalogoRelevante(contexto.instruccion, catalogos).clientes;
+    const porMencion = buscar(textoCliente, mencionados, (c) => c.name, 5, { aproximado: true, modo: 'holgada' });
+    if (porMencion.elegido) cliente = ref(porMencion.elegido.id, porMencion.elegido.name);
   }
   const sucursalesDelCliente = cliente
     ? catalogos.sucursales.filter((s) => s.clientId === cliente!.id)
@@ -800,12 +741,16 @@ export function construirPropuesta(
     cliente ? sinPalabrasDe(consultaSucursal, cliente.nombre) : consultaSucursal,
     sucursalesDelCliente,
     (s) => s.name,
+    5,
+    aproximado,
   );
   if (porSucursal.elegido) {
     sucursal = porSucursal.elegido;
     if (!cliente) cliente = ref(sucursal.clientId, sucursal.clientName);
   }
-  if (!cliente) {
+  if (cliente) {
+    anotar('cliente', cliente.nombre, corregido(cliente.nombre, contexto.instruccion, accion.cliente, sitio));
+  } else {
     const vistos = new Set<number>();
     for (const c of porCliente.candidatos) {
       if (!vistos.has(c.id)) clienteCandidatos.push(ref(c.id, c.name));
@@ -817,13 +762,14 @@ export function construirPropuesta(
     }
     clienteCandidatos = clienteCandidatos.slice(0, 5);
   }
+  if (sucursal) anotar('sucursal', sucursal.name, corregido(sucursal.name, sitio));
 
   // Proyecto (obra / proyecto): el del cliente si es uno solo, o por nombre.
   let proyecto: Referencia | null = null;
   let proyectoCandidatos: Referencia[] = [];
   if (tipo === 'obra' || tipo === 'proyecto') {
     const delCliente = cliente ? catalogos.proyectos.filter((p) => p.clientId === cliente!.id) : [];
-    const porNombre = buscar(accion.cliente || sitio || accion.titulo, catalogos.proyectos, (p) => `${p.title} ${p.clientName}`);
+    const porNombre = buscar(accion.cliente || sitio || accion.titulo, catalogos.proyectos, (p) => `${p.title} ${p.clientName}`, 5, aproximado);
     if (delCliente.length === 1) proyecto = ref(delCliente[0].id, delCliente[0].title);
     else if (!cliente && porNombre.elegido) {
       proyecto = ref(porNombre.elegido.id, porNombre.elegido.title);
@@ -835,9 +781,30 @@ export function construirPropuesta(
     }
   }
 
+  // Lugar libre (no es una sucursal registrada): si suena igual a un nombre ya usado en
+  // actividades («talks» = «Toks»), se escribe como siempre se ha escrito.
+  let lugarLibre: string | null = !sucursal ? sitio || (textoCliente && !cliente ? textoCliente : null) : null;
+  if (lugarLibre && contexto.instruccion) {
+    for (const usado of catalogos.nombresUsados ?? []) {
+      const c = corregido(usado, contexto.instruccion, lugarLibre);
+      if (!c || !c.pares.length) continue;
+      const nuevo = corregirEnTexto(lugarLibre, c.pares, { primera: true });
+      if (nuevo === lugarLibre) continue;
+      correcciones.push({ campo: 'lugar', de: c.de, a: usado, como: 'parecido' });
+      pares.push(...c.pares);
+      lugarLibre = nuevo;
+      break;
+    }
+  }
+  if (lugarLibre) lugarLibre = corregirEnTexto(lugarLibre, pares, { primera: true });
+
   if (tipo === 'servicio' && !cliente) faltantes.push('cliente');
-  if (textoCliente && !cliente && tipo !== 'servicio') {
-    avisos.push(`«${textoCliente}» no es un cliente registrado; quedará como lugar en la actividad.`);
+  if (textoCliente && !cliente) {
+    avisos.push(
+      clienteCandidatos.length > 1
+        ? `«${textoCliente}» puede ser ${clienteCandidatos.slice(0, 3).map((c) => c.nombre).join(' o ')}: elige el cliente.`
+        : `«${lugarLibre ?? textoCliente}» no es un cliente registrado: queda sin cliente${lugarLibre ? ' y como lugar de la actividad' : ''}.`,
+    );
   }
 
   // Fechas como el formulario «Asignar»: inicio = entrega = máxima; con plazo de varios días,
@@ -853,18 +820,22 @@ export function construirPropuesta(
     accion.duracionMin && accion.duracionMin > 0 ? Math.min(TOPE_MINUTOS, Math.round(accion.duracionMin)) : undefined;
   if (!duracion) faltantes.push('duración');
 
-  // La hora límite no tiene columna (el plazo vence al fin del día): se escribe en las indicaciones.
+  // «A más tardar a las 6» el mismo día es la hora compromiso del formulario (fecha máxima y
+  // entrega a esa hora). Con varios días no tiene columna: se escribe en las indicaciones.
+  const fechaLimite = agenda.compromiso ? aFechaISO(agenda.dia, agenda.compromiso) : fechaInicio;
   const horaLimite = aHora(accion.horaLimite);
   const diaLimite = esDia(accion.fechaLimite) ? accion.fechaLimite : agenda.dia;
-  const notaLimite = horaLimite && diaLimite ? `Entregar a más tardar el ${diaLargo(diaLimite)} a las ${horaLimite}.` : null;
-  const tituloFinal = recortar(accion.titulo, 200) || 'Actividad';
-  const propias = indicacionesSinEco(accion.indicaciones, tituloFinal, [
+  const notaLimite =
+    horaLimite && diaLimite && !agenda.compromiso ? `Entregar a más tardar el ${diaLargo(diaLimite)} a las ${horaLimite}.` : null;
+  const tituloFinal = corregirEnTexto(recortar(accion.titulo, 200) || 'Actividad', pares);
+  const propias = indicacionesSinEco(accion.indicaciones ? corregirEnTexto(accion.indicaciones, pares) : null, tituloFinal, [
     responsable?.nombre,
     accion.responsable,
     cliente?.nombre,
     accion.cliente,
     accion.sitio,
     sucursal?.name,
+    lugarLibre,
   ]);
   const indicaciones = [propias, notaLimite].filter(Boolean).join(' ') || null;
   const prioridad = (['Alta', 'Media', 'Baja'] as const).includes(accion.prioridad) ? accion.prioridad : 'Media';
@@ -897,8 +868,8 @@ export function construirPropuesta(
     evidencePhotoRequired: 4,
     tiempoEstimadoMin: duracion,
     fechaInicio: fechaInicio ?? undefined,
-    fechaEntregaEsperada: fechaInicio ?? undefined,
-    fechaMaxima: fechaInicio ?? undefined,
+    fechaEntregaEsperada: fechaLimite ?? undefined,
+    fechaMaxima: fechaLimite ?? undefined,
     periodoInicio: agenda.hasta ? agenda.dia : undefined,
     periodoFin: agenda.hasta ?? undefined,
     assignmentCharge: encargo ?? undefined,
@@ -912,16 +883,19 @@ export function construirPropuesta(
     payload.branchCity = recortar(sucursal.city, 120);
     payload.branchState = recortar(sucursal.state, 120);
     payload.branchAddress = recortar(sucursal.address, 220);
-  } else if (sitio || (textoCliente && !cliente)) {
-    payload.branchName = recortar(sitio || textoCliente, 160);
+  } else if (lugarLibre) {
+    payload.branchName = recortar(lugarLibre, 160);
   }
   for (const k of Object.keys(payload)) if (payload[k] === undefined) delete payload[k];
 
+  const lugarResumen = lugarLibre ?? textoCliente;
   const partes = [
     ETIQUETA_TIPO[tipo] + (tipo === 'tarea' && ticketTypeCustom && ticketTypeCustom !== SUBTIPO_RESPALDO ? ` · ${ticketTypeCustom}` : ''),
     `para ${responsable?.nombre ?? accion.responsable ?? '(sin responsable)'}`,
-    cliente ? `en ${cliente.nombre}${sucursal ? ` · ${sucursal.name}` : ''}` : textoCliente ? `en ${textoCliente}` : null,
-    horaLegible(fechaInicio, contexto.ahora) + (agenda.hasta ? ` · vence ${diaCorto(agenda.hasta)}` : ''),
+    cliente ? `en ${cliente.nombre}${sucursal ? ` · ${sucursal.name}` : ''}` : lugarResumen ? `en ${lugarResumen}` : null,
+    horaLegible(fechaInicio, contexto.ahora) +
+      (agenda.compromiso ? ` · a más tardar ${agenda.compromiso}` : '') +
+      (agenda.hasta ? ` · vence ${diaCorto(agenda.hasta)}` : ''),
   ].filter(Boolean);
 
   return {
@@ -947,6 +921,7 @@ export function construirPropuesta(
     indicaciones: (payload.indicaciones as string | undefined) ?? null,
     faltantes,
     avisos,
+    correcciones,
     payload,
   };
 }

@@ -20,6 +20,7 @@ describe('AsistenteActividadesService', () => {
       serviceClient: { findMany: jest.fn().mockResolvedValue([]) },
       serviceClientBranch: { findMany: jest.fn().mockResolvedValue([]) },
       operationalProject: { findMany: jest.fn().mockResolvedValue([]) },
+      activity: { findMany: jest.fn().mockResolvedValue([{ titulo: 'Inventario Toks', branchName: null }]) },
     };
     const users = {
       findOne: jest.fn().mockResolvedValue({ role: 'coordinador' }),
