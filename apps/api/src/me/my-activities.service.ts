@@ -46,6 +46,7 @@ import {
   sesionesDe,
 } from '../activities/sessions/activity-sessions.service.js';
 import { errorDeHorasPlan, type MotivoFinSesion } from '../activities/sessions/sesiones-trabajo.js';
+import { TrayectosService } from '../activities/trayectos/trayectos.service.js';
 
 const CEO_EMAIL = 'gerencia@nexara.com.mx';
 
@@ -277,6 +278,7 @@ export class MyActivitiesService {
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly activityTools: ActivityToolsService,
     @Optional() private readonly sesiones?: ActivitySessionsService,
+    @Optional() private readonly trayectos?: TrayectosService,
   ) {}
 
   /**
@@ -322,6 +324,8 @@ export class MyActivitiesService {
     if (!despachador) {
       await this.sesiones?.abrir({ activityId, userId: viewer.id, at: ahora, companyId });
     }
+    // Llegó: si venía en camino a esta actividad, la ida termina aquí (el trayecto no es su reloj).
+    await this.trayectos?.cerrarAbiertos({ userId: viewer.id, companyId, at: ahora, motivo: 'INICIO', activityId, tipo: 'IDA' });
     return {
       ok: true,
       aceptacion: 'ACEPTADA' as const,

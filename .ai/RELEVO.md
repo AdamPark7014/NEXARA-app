@@ -1,5 +1,22 @@
 # RELEVO
 
+- **29-10 ~14:30 (claude-code) — API del trayecto: ida y regreso medidos aparte del reloj (pedido de Adam).**
+  - Flujo de Adam: «Iniciar trayecto» → llegar e «Iniciar actividad» → «Concluir» en el sitio → regreso a la oficina,
+    cada tramo medido y con tráfico.
+  - Tabla `activity_trayectos` (migración `20261029210000_actividad_trayectos`, aditiva, **va con
+    `deploy-api-migrar-web.sh`**). Columnas: `tipo` IDA|REGRESO, `modo`, `startedAt`/`endedAt`, `finMotivo`
+    (LLEGADA|INICIO|SALIDA|NUEVO), puntos de inicio y fin, `estimadoMin` y `estimadoFuente`. Va en `tenant-models.ts`.
+  - `src/activities/trayectos/trayectos.ts` (reglas puras + spec) y `trayectos.service.ts`:
+    - `POST me/activities/:id/trayectos` `{tipo, lat?, lng?, modo?}` empieza el tramo. Solo puede quien la hace. Cierra
+      lo que tuviera abierto, rechaza una ida repetida y calcula el estimado con `calcularRuta` (oficina → destino de
+      la actividad; en el regreso, la vuelta).
+    - `POST me/activities/:id/trayectos/terminar` `{lat?, lng?}` es «Llegué».
+    - `GET me/activities/:id/trayectos` devuelve los propios; el responsable y el creador ven los de todos. Cada tramo
+      trae `minutos`, `estimadoMin` y `estado` (en tiempo hasta ruta + 25 %).
+    - La ida se cierra sola al «Iniciar actividad» (`MyActivitiesService.iniciar`, motivo INICIO). Todo lo abierto se
+      cierra al checar salida (bus `attendance.checkout`, motivo SALIDA).
+  - Las apps (`nexara-apps-uiux`) esperan estos endpoints para los botones; la web todavía no los pinta.
+
 - **29-10 ~12:20 (claude-code) — Comerciales: PowerPoint y la cotización ligada se ven abiertos en la actividad (pedido de Adam: «que puedan adjuntar Excel, PDF, PowerPoint… o ligar una cotización, y se vea embebida»).**
   - Adjuntar y ligar ya existían: «Archivos de evidencia» (`components/erp/ArchivosDeActividad.tsx`) y «Ligar
     cotización» (`CotizacionDeActividad.tsx`). PDF, imagen, Excel, CSV y Word ya se abrían dentro; faltaban dos cosas.
