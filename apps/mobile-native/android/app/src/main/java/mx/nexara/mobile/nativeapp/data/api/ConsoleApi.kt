@@ -86,6 +86,9 @@ data class ActivityDto(
     val asignadoPor: ActivityPersonRefDto? = null,
     /** Actividad de varios días (la frase la arma la API). */
     val periodo: ActivityPeriodoDto? = null,
+    /** BASICA | ESTANDAR | COMPLEJA | CRITICA al asignar, y la que sugirió la IA. */
+    val complejidad: String? = null,
+    val complejidadSugerida: String? = null,
 )
 
 /** `{ id, nombre }` con nombre opcional: una persona borrada no debe tumbar el detalle. */
@@ -237,6 +240,9 @@ data class CreateActivityRequest(
     val coreKind: String? = null,
     /** ejecucion | despacho. */
     val assignmentCharge: String? = null,
+    /** BASICA | ESTANDAR | COMPLEJA | CRITICA (al asignar) y la que sugirió la IA (`ai/complejidad`). */
+    val complejidad: String? = null,
+    val complejidadSugerida: String? = null,
 )
 
 data class ExecuteActivityRequest(

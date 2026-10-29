@@ -1,5 +1,22 @@
 # RELEVO
 
+- **29-10 ~10:45 (claude-code) — Apps: paridad con lo de Core del 28-10 (Android hecho; iOS en curso).**
+  - Android (`apps/mobile-native/android`), alta/asignar y detalle:
+    - Catálogo cerrado de 17 tipos en 4 familias (`CoreActivityKinds.FAMILIAS_TAREA`, `tiposDeFamilia`), íconos como
+      la web (`NxGlyph` nuevos). Sin «Otro»: un texto libre viejo se lee como «otro» y al guardar pide el tipo.
+    - «Entregar a más tardar» (`horaCompromiso` → `fechaMaxima` y `fechaEntregaEsperada`, validado contra el inicio).
+      El detalle muestra «Antes de 17:00» en la tira y «· a más tardar 17:00» en «Entrega esperada».
+    - Complejidad con sugerencia de la IA y tiempo típico (`Complejidad.kt` + `ComplejidadCampo.kt`; `ai/complejidad/
+      tiempos` y `sugerir`), y «Complejidad» en los datos del detalle.
+    - Pizarra del equipo: sección «En espera de revisión» (`GET me/revisiones`, `EnEsperaRevision.kt`), «Revisar»
+      abre Evidencias. Muestra 30; el resto remite a la web.
+  - Ya estaban: cierre «No cumplida» al checar salida (textos espejo de 613ee251) y los avisos push (genéricos por
+    `tag`/`collapse_key`, sirven para los recordatorios de 9761d2d9 y bfc18fec).
+  - Sin portar (piden artboard o no aplican al teléfono): línea del día, Desempeño de cuatro pilares, tarjeta de
+    tiempo/costo del detalle.
+  - Pruebas: Android 844 unitarias en verde (`ComplejidadTest`, `EnEsperaRevisionTest`, `CoreActivityKindsTest`).
+    Nada subido a tiendas.
+
 - **29-10 ~10:40 (claude-code) — Recordatorio de entrada: «buenos días» y push cada 2 min hasta que cheque (pedido de Adam).**
   - Adam: «que la misma plataforma les vaya comentando a todos como de buenos días, ¿ya registraste tu entrada?…
     notificación push cada dos minutos… y los estén muele y muele y muele».

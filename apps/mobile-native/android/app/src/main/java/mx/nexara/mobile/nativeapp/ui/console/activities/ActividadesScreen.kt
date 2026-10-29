@@ -74,6 +74,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.SessionUser
 import mx.nexara.mobile.nativeapp.data.api.BoardAsignadaPorMiDto
+import mx.nexara.mobile.nativeapp.data.api.RevisionPendienteDto
 import mx.nexara.mobile.nativeapp.data.api.MyActivitiesResponseDto
 import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardResponseDto
@@ -161,6 +162,7 @@ fun ActividadesScreen(
     /** Contrato C: Hoy · Semana · Mes para la pizarra y para «Asignadas por mí». */
     var rango by rememberSaveable { mutableStateOf(BoardRange.HOY) }
     var asignadasPorMi by remember { mutableStateOf<List<BoardAsignadaPorMiDto>>(emptyList()) }
+    var porRevisar by remember { mutableStateOf<List<RevisionPendienteDto>>(emptyList()) }
 
     LaunchedEffect(boardReload, rango) {
         boardLoading = true
@@ -177,6 +179,8 @@ fun ActividadesScreen(
         asignadasPorMi = runCatching {
             withContext(Dispatchers.IO) { repo.boardAsignadasPorMi(desde = desde, hasta = hasta) }
         }.getOrDefault(emptyList())
+        // «En espera de revisión» no depende del rango: es todo lo enviado sin aprobar ni devolver.
+        porRevisar = runCatching { withContext(Dispatchers.IO) { repo.revisionesPendientes() } }.getOrDefault(emptyList())
     }
 
     val users = board?.users.orEmpty().let { list ->
@@ -244,6 +248,7 @@ fun ActividadesScreen(
                 rango = rango,
                 onRango = { rango = it },
                 asignadasPorMi = asignadasPorMi,
+                porRevisar = porRevisar,
                 onOpenActivity = onOpenActivity,
             )
         }
@@ -310,6 +315,7 @@ private fun TeamBoardContent(
     rango: BoardRange = BoardRange.HOY,
     onRango: (BoardRange) -> Unit = {},
     asignadasPorMi: List<BoardAsignadaPorMiDto> = emptyList(),
+    porRevisar: List<RevisionPendienteDto> = emptyList(),
     onOpenActivity: (Long, String?) -> Unit = { _, _ -> },
 ) {
     /** Aro elegido en la barra; null = todos. */
@@ -399,6 +405,41 @@ private fun TeamBoardContent(
                         }
                         gridItems(visibles, key = { it.id }) { u ->
                             PersonBoardCard(user = u, meId = meId, ahora = ahora, onClick = { onOpenPerson(u.id) })
+                        }
+                    }
+                }
+
+                // «En espera de revisión» (web, 28-10): «Revisar» abre Evidencias, donde se aprueba o devuelve.
+                if (porRevisar.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        NxDenseSectionHeader(
+                            title = "En espera de revisión (${porRevisar.size})",
+                            hint = "Lo enviado ya cuenta como cumplido: revisarlo no tiene plazo.",
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        val ahoraRevision = remember(porRevisar) { Instant.now() }
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(NxUi.RadiusLg))
+                                .background(NxColors.Card)
+                                .border(1.dp, NxUi.Border, RoundedCornerShape(NxUi.RadiusLg)),
+                        ) {
+                            porRevisar.take(MAX_POR_REVISAR).forEachIndexed { i, r ->
+                                if (i > 0) HorizontalDivider(color = NxUi.BorderSubtle)
+                                PorRevisarRow(r = r, ahora = ahoraRevision, onClick = { onOpenActivity(r.activityId, "evidencias") })
+                            }
+                            if (porRevisar.size > MAX_POR_REVISAR) {
+                                HorizontalDivider(color = NxUi.BorderSubtle)
+                                Text(
+                                    "Y ${porRevisar.size - MAX_POR_REVISAR} más en la web (Actividades › En espera de revisión).",
+                                    fontSize = 12.5.sp,
+                                    color = NxColors.Muted,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -553,6 +594,34 @@ private fun RenglonParaAtender(r: EquipoEstado.RenglonAtencion, onClick: () -> U
                 )
             }
         }
+    }
+}
+
+/** En el teléfono se enseñan las que más llevan esperando; el resto, en la web. */
+private const val MAX_POR_REVISAR = 30
+
+@Composable
+private fun PorRevisarRow(r: RevisionPendienteDto, ahora: Instant, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                EnEsperaRevision.titulo(r),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = NxColors.Slate,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(EnEsperaRevision.detalle(r, ahora), fontSize = 12.5.sp, color = NxColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Text("Revisar", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = NxColors.Brand)
     }
 }
 

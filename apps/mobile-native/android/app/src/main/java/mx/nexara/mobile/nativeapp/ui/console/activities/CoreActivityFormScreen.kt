@@ -581,7 +581,6 @@ private fun ActivityFormPanel(
     val k = CoreActivityKinds
     val scope = rememberCoroutineScope()
     var form by remember { mutableStateOf(initial) }
-    var tareaOtroOpen by remember { mutableStateOf(false) }
     var projects by remember { mutableStateOf<List<OperationalProjectDto>>(emptyList()) }
     var sectorClients by remember { mutableStateOf<List<SectorClient>>(emptyList()) }
     var nextAn by remember { mutableStateOf("") }
@@ -627,7 +626,7 @@ private fun ActivityFormPanel(
     val isTarea = meta.id == k.TAREA
     val needsClientPicker = meta.id == k.SERVICIO || meta.id == k.COMERCIAL
     val filtersProjectsBySector = meta.id == k.PROYECTO || meta.id == k.OBRA
-    val tareaTipo = k.tareaTipo(form, tareaOtroOpen)
+    val tareaTipo = k.tareaTipo(form)
     val activeProjects = projects.filter { it.status == "ACTIVE" }.let { active ->
         if (!filtersProjectsBySector || sectorClients.isEmpty()) {
             active
@@ -642,7 +641,7 @@ private fun ActivityFormPanel(
         error = null
         success = null
         val current = form
-        k.validationError(current, tareaOtroOpen, meta.requiresSchedule)?.let {
+        k.validationError(current, meta.requiresSchedule)?.let {
             error = it
             return
         }
@@ -714,32 +713,24 @@ private fun ActivityFormPanel(
             if (isTarea) {
                 Spacer(Modifier.height(8.dp))
                 Text("Tipo de tarea *", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
-                Spacer(Modifier.height(6.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    k.TAREA_TIPOS.forEach { t ->
-                        Pill(
-                            text = t.label,
-                            icon = t.glyph.icon,
-                            selected = tareaTipo == t.id,
-                            onClick = {
-                                form = k.pickTareaTipo(form, tareaTipo, t.id)
-                                tareaOtroOpen = t.id == k.TAREA_OTRO
-                            },
-                        )
+                // Catálogo cerrado por familia (28-10): sin texto libre, cada tipo se puede medir.
+                k.FAMILIAS_TAREA.forEach { familia ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(familia.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted)
+                    Spacer(Modifier.height(6.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        k.tiposDeFamilia(familia.id).forEach { t ->
+                            Pill(
+                                text = t.label,
+                                icon = t.glyph.icon,
+                                selected = tareaTipo == t.id,
+                                onClick = { form = k.pickTareaTipo(form, t.id) },
+                            )
+                        }
                     }
-                }
-                if (tareaTipo == k.TAREA_OTRO) {
-                    Gap()
-                    OutlinedTextField(
-                        value = form.ticketTypeCustom,
-                        onValueChange = { form = form.copy(ticketType = "OTRO", ticketTypeCustom = it.take(120)) },
-                        label = { Text("Especifica el tipo (ej. Visita a proveedor)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
                 }
             }
             if (needsClientPicker) {
@@ -781,6 +772,16 @@ private fun ActivityFormPanel(
             )
         }
 
+        if (Complejidad.visible(meta.id, form)) {
+            Gap()
+            ComplejidadCampo(
+                repo = repo,
+                kind = meta.id,
+                form = form,
+                onForm = { form = it(form) },
+            )
+        }
+
         Gap()
         Text("Prioridad", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted)
         Spacer(Modifier.height(6.dp))
@@ -814,6 +815,13 @@ private fun ActivityFormPanel(
                 modifier = Modifier.weight(1f),
             )
         }
+        Gap()
+        CompromisoField(
+            value = form.horaCompromiso,
+            inicio = form.hora,
+            onChange = { form = form.copy(horaCompromiso = it) },
+            modifier = Modifier.fillMaxWidth(),
+        )
         Gap()
         DurationField(
             label = "¿Cuánto tiempo toma?",
@@ -1184,6 +1192,75 @@ private fun HourField(label: String, value: String, onChange: (String) -> Unit, 
             },
             dismissButton = {
                 TextButton(onClick = { open = false }) { Text("Cancelar") }
+            },
+        )
+    }
+}
+
+/**
+ * «Entregar a más tardar» (OpsActivityForm, 28-10): opcional, mismo día. Sin hora el límite es el
+ * fin del día; con hora, la entrega cuenta a tiempo solo si llega antes.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompromisoField(value: String, inicio: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    var open by remember { mutableStateOf(false) }
+    val invalido = value.isNotEmpty() && !CoreActivityKinds.compromisoValido(inicio, value)
+    Box(modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Entregar a más tardar (opcional)") },
+            placeholder = { Text("Fin del día") },
+            trailingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+            singleLine = true,
+            isError = invalido,
+            supportingText = {
+                Text(
+                    if (invalido) {
+                        "Tiene que ser después de la hora de inicio."
+                    } else {
+                        "Sin hora, el límite es el fin del día. Con hora, la entrega cuenta a tiempo solo si llega antes."
+                    },
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box(Modifier.matchParentSize().clickable { open = true })
+    }
+    if (open) {
+        // Sin valor, la rueda abre una hora después del inicio.
+        val (h0, m0) = CoreActivityKinds.parseHora(value.ifEmpty { inicio })
+        val state = rememberTimePickerState(
+            initialHour = if (value.isEmpty()) (h0 + 1).coerceAtMost(23) else h0,
+            initialMinute = m0,
+            is24Hour = true,
+        )
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("Entregar a más tardar") },
+            text = { TimePicker(state = state) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onChange(CoreActivityKinds.formatHora(state.hour, state.minute))
+                        open = false
+                    },
+                ) { Text("Aceptar") }
+            },
+            dismissButton = {
+                Row {
+                    if (value.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                onChange("")
+                                open = false
+                            },
+                        ) { Text("Quitar") }
+                    }
+                    TextButton(onClick = { open = false }) { Text("Cancelar") }
+                }
             },
         )
     }

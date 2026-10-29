@@ -198,39 +198,93 @@ class CoreActivityKindsTest {
     @Test
     fun tareaSubtypeTravelsAsOtroPlusLabel() {
         val base = k.initialForm("tarea", 3L, null).copy(titulo = "Ver cámaras")
-        assertEquals("", k.tareaTipo(base, otroOpen = false))
-        assertEquals("Elige el tipo de tarea", k.validationError(base, false, false))
+        assertEquals("", k.tareaTipo(base))
+        assertEquals("Elige el tipo de tarea", k.validationError(base, false))
 
-        val junta = k.pickTareaTipo(base, "", "junta")
+        val junta = k.pickTareaTipo(base, "junta")
         assertEquals("Junta", junta.ticketTypeCustom)
-        assertEquals("junta", k.tareaTipo(junta, false))
-        assertNull(k.validationError(junta, false, false))
+        assertEquals("junta", k.tareaTipo(junta))
+        assertNull(k.validationError(junta, false))
         assertEquals("Junta", k.buildRequest(junta, null, 1L).ticketTypeCustom)
     }
 
     @Test
-    fun tareaOtroRequiresFreeText() {
-        val base = k.initialForm("tarea", 3L, null).copy(titulo = "Algo")
-        val otro = k.pickTareaTipo(k.pickTareaTipo(base, "", "junta"), "junta", "otro")
-        assertEquals("", otro.ticketTypeCustom)
-        assertEquals("Especifica el tipo de tarea", k.validationError(otro, tareaOtroOpen = true, requireSchedule = false))
+    fun catalogIsClosedInFourFamiliesLikeTheWeb() {
+        assertEquals(17, k.TAREA_TIPOS.size)
+        assertEquals(listOf("En campo", "Oficina técnica", "Administración", "Para todos"), k.FAMILIAS_TAREA.map { it.label })
+        assertEquals(17, k.FAMILIAS_TAREA.sumOf { k.tiposDeFamilia(it.id).size })
+        assertFalse(k.TAREA_TIPOS.any { it.id == k.TAREA_OTRO })
+        assertEquals(
+            listOf("Diseño, CAD y memoria técnica", "Configuración y soporte remoto"),
+            k.tiposDeFamilia("oficina").map { it.label },
+        )
+        // Un id que no está en el catálogo no cambia el formulario.
+        val base = k.initialForm("tarea", 3L, null)
+        assertEquals(base, k.pickTareaTipo(base, "otro"))
+    }
 
-        val typed = otro.copy(ticketTypeCustom = "Visita a proveedor")
-        assertEquals("otro", k.tareaTipo(typed, otroOpen = false))
-        assertNull(k.validationError(typed, true, false))
-        // Volver a tocar «Otro» conserva el texto.
-        assertEquals("Visita a proveedor", k.pickTareaTipo(typed, "otro", "otro").ticketTypeCustom)
+    @Test
+    fun oldFreeTextReadsAsOtroButCannotBeSaved() {
+        val vieja = k.initialForm("tarea", 3L, null).copy(titulo = "Algo", ticketType = "OTRO", ticketTypeCustom = "Visita a proveedor")
+        assertEquals(k.TAREA_OTRO, k.tareaTipo(vieja))
+        assertEquals("Elige el tipo de tarea", k.validationError(vieja, false))
+        assertNull(k.validationError(k.pickTareaTipo(vieja, "compra"), false))
+    }
+
+    @Test
+    fun compromisoMustBeAfterStartAndMovesTheDeadline() {
+        assertTrue(k.compromisoValido("09:00", ""))
+        assertTrue(k.compromisoValido("09:00", "17:00"))
+        assertFalse(k.compromisoValido("09:00", "09:00"))
+        assertFalse(k.compromisoValido("10:30", "08:00"))
+        assertFalse(k.compromisoValido("09:00", "5pm"))
+
+        val base = k.initialForm("tarea", 7L, null).copy(titulo = "Ir por cable", fecha = "2026-10-29", hora = "09:00")
+            .let { k.pickTareaTipo(it, "recoleccion") }
+        val sin = k.buildRequest(base, null, 2L)
+        assertEquals("2026-10-29T15:00:00.000Z", sin.fechaInicio)
+        assertEquals(sin.fechaInicio, sin.fechaMaxima)
+
+        val con = k.buildRequest(base.copy(horaCompromiso = "17:00"), null, 2L)
+        assertEquals("2026-10-29T15:00:00.000Z", con.fechaInicio)
+        assertEquals("2026-10-29T23:00:00.000Z", con.fechaMaxima)
+        assertEquals(con.fechaMaxima, con.fechaEntregaEsperada)
+
+        val antes = base.copy(horaCompromiso = "08:00")
+        assertEquals("La hora de entrega tiene que ser después de la hora de inicio", k.validationError(antes, false))
+        // Uno inválido nunca llega al cuerpo: queda como fin del día.
+        assertEquals("2026-10-29T15:00:00.000Z", k.buildRequest(antes, null, 2L).fechaMaxima)
+    }
+
+    @Test
+    fun horaCompromisoIsReadBackOnlySameDayAndAfterStart() {
+        assertEquals("17:00", k.horaCompromisoDe("2026-10-29T15:00:00.000Z", "2026-10-29T23:00:00.000Z", false))
+        assertNull(k.horaCompromisoDe("2026-10-29T15:00:00.000Z", "2026-10-29T15:00:00.000Z", false))
+        assertNull(k.horaCompromisoDe("2026-10-29T15:00:00.000Z", "2026-10-30T23:00:00.000Z", false))
+        assertNull(k.horaCompromisoDe("2026-10-29T15:00:00.000Z", "2026-10-29T23:00:00.000Z", true))
+        assertNull(k.horaCompromisoDe(null, "2026-10-29T23:00:00.000Z", false))
+    }
+
+    @Test
+    fun complejidadTravelsInTheBodyOnlyWhenChosen() {
+        val base = k.pickTareaTipo(k.initialForm("tarea", 7L, null).copy(titulo = "Instalar 4 cámaras"), "instalacion")
+        val sin = k.buildRequest(base, null, 2L)
+        assertNull(sin.complejidad)
+        assertNull(sin.complejidadSugerida)
+        val con = k.buildRequest(base.copy(complejidad = "COMPLEJA", complejidadSugerida = "ESTANDAR"), null, 2L)
+        assertEquals("COMPLEJA", con.complejidad)
+        assertEquals("ESTANDAR", con.complejidadSugerida)
     }
 
     @Test
     fun validationOrderMatchesWeb() {
-        assertEquals("Título y responsable son obligatorios", k.validationError(FormState(responsableId = 1L), false, false))
-        assertEquals("Título y responsable son obligatorios", k.validationError(FormState(titulo = "x"), false, false))
+        assertEquals("Título y responsable son obligatorios", k.validationError(FormState(responsableId = 1L), false))
+        assertEquals("Título y responsable son obligatorios", k.validationError(FormState(titulo = "x"), false))
         val proyecto = k.initialForm("proyecto", 1L, null).copy(titulo = "Instalar")
-        assertEquals("Selecciona un proyecto", k.validationError(proyecto, false, false))
+        assertEquals("Selecciona un proyecto", k.validationError(proyecto, false))
         val obra = k.initialForm("obra", 1L, null).copy(titulo = "Instalar", projectId = 8L)
-        assertEquals("Indica día y hora de la agenda", k.validationError(obra, false, requireSchedule = true))
-        assertNull(k.validationError(obra.copy(fecha = "2026-09-20"), false, true))
+        assertEquals("Indica día y hora de la agenda", k.validationError(obra, requireSchedule = true))
+        assertNull(k.validationError(obra.copy(fecha = "2026-09-20"), true))
     }
 
     @Test

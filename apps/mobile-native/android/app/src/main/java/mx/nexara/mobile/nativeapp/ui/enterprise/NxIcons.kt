@@ -11,19 +11,24 @@ import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.automirrored.outlined.Login
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material.icons.outlined.Architecture
 import androidx.compose.material.icons.outlined.AssignmentInd
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Cable
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.Construction
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Engineering
+import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Groups
@@ -41,8 +46,11 @@ import androidx.compose.material.icons.outlined.RateReview
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.SettingsRemote
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Work
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -78,6 +86,7 @@ enum class NxGlyph {
 
     // Subtipos de tarea
     SURVEY, PICKUP, DELIVERY, MEETING, PURCHASE, EQUIPMENT_PREP, PROCEDURE, TRAINING, DOCUMENTATION, OTHER,
+    INSTALLATION, CABLING, MAINTENANCE, CORRECTIVE, DESIGN, REMOTE_CONFIG, BILLING, EVENT,
 
     // Estados y flujo de evidencias
     APPROVED, DONE, IN_PROGRESS, WAITING, TO_REVIEW, RETURNED, CORRECTION, REJECTED,
@@ -95,7 +104,7 @@ val NxGlyph.icon: ImageVector
         NxGlyph.SERVICE -> Icons.Outlined.Handyman
         NxGlyph.COMMERCIAL -> Icons.Outlined.Work
         NxGlyph.ACTIVITY -> Icons.Outlined.PushPin
-        NxGlyph.SURVEY -> Icons.Outlined.Architecture
+        NxGlyph.SURVEY -> Icons.Outlined.Straighten
         NxGlyph.PICKUP -> Icons.Outlined.Inventory2
         NxGlyph.DELIVERY -> Icons.Outlined.LocalShipping
         NxGlyph.MEETING -> Icons.Outlined.Groups
@@ -105,6 +114,15 @@ val NxGlyph.icon: ImageVector
         NxGlyph.TRAINING -> Icons.Outlined.School
         NxGlyph.DOCUMENTATION -> Icons.Outlined.EditNote
         NxGlyph.OTHER -> Icons.Outlined.Edit
+        // Mismos íconos que ActivityKindIcon.tsx de la web.
+        NxGlyph.INSTALLATION -> Icons.Outlined.Videocam
+        NxGlyph.CABLING -> Icons.Outlined.Cable
+        NxGlyph.MAINTENANCE -> Icons.Outlined.CleaningServices
+        NxGlyph.CORRECTIVE -> Icons.Outlined.BugReport
+        NxGlyph.DESIGN -> Icons.Outlined.Architecture
+        NxGlyph.REMOTE_CONFIG -> Icons.Outlined.SettingsRemote
+        NxGlyph.BILLING -> Icons.AutoMirrored.Outlined.ReceiptLong
+        NxGlyph.EVENT -> Icons.Outlined.Event
         NxGlyph.APPROVED -> Icons.Outlined.TaskAlt
         NxGlyph.DONE -> Icons.Outlined.Check
         NxGlyph.IN_PROGRESS -> Icons.Outlined.HourglassTop

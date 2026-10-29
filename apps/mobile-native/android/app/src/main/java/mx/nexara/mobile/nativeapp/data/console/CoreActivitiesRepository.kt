@@ -12,6 +12,12 @@ import mx.nexara.mobile.nativeapp.data.api.PalomearHerramientaRequest
 import mx.nexara.mobile.nativeapp.data.api.JustificarZonaRequest
 import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.SalesClientDto
+import mx.nexara.mobile.nativeapp.data.api.RevisionPendienteDto
+import mx.nexara.mobile.nativeapp.data.api.SugerenciaComplejidadDto
+import mx.nexara.mobile.nativeapp.data.api.SugerirComplejidadRequest
+import mx.nexara.mobile.nativeapp.data.api.TiemposTipicosDto
+import mx.nexara.mobile.nativeapp.ui.console.activities.Complejidad
+import mx.nexara.mobile.nativeapp.ui.console.activities.EnEsperaRevision
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.BoardAsignadaPorMiDto
@@ -100,6 +106,17 @@ class CoreActivitiesRepository(context: Context) {
     suspend fun salesClients(sector: String): List<SalesClientDto> = api.salesClients(sector)
 
     suspend fun operationalProjects(): List<OperationalProjectDto> = api.operationalProjects()
+
+    /** Lo que espera mi revisión; la que más lleva esperando, primero. */
+    suspend fun revisionesPendientes(): List<RevisionPendienteDto> =
+        EnEsperaRevision.ordenar(api.revisiones().pendientes.orEmpty())
+
+    suspend fun tiemposTipicos(coreKind: String, tipo: String?): TiemposTipicosDto =
+        api.tiemposTipicos(coreKind, tipo?.takeIf { it.isNotBlank() })
+
+    /** Null si la IA no respondió (6 s sin reintento en la API) o el nivel no es uno de los cuatro. */
+    suspend fun sugerirComplejidad(body: SugerirComplejidadRequest): SugerenciaComplejidadDto? =
+        api.sugerirComplejidad(body).sugerencia?.takeIf { Complejidad.esComplejidad(it.complejidad) }
 
     /** «AN sugerido» del formulario web; vacío si el API no lo da. */
     suspend fun nextAnNumber(): String {
