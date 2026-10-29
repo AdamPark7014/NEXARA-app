@@ -50,6 +50,8 @@ describe('las horas que llegan a nómina son netas', () => {
     expect(totales.minutosExtraAprobados).toBe(0);
     expect(totales.minutosExtraPendientes).toBe(60);
     expect(totales.diasExtraPendientes).toBe(1);
+    // Con su jornada de 8 h, la hora de más sin aprobar no se paga.
+    expect(minutosPagables(totales, 8 * 60)).toBe(8 * 60);
     expect(minutosPagables(totales)).toBe(9 * 60);
   });
 
@@ -61,7 +63,9 @@ describe('las horas que llegan a nómina son netas', () => {
     expect(totales.minutosExtraAprobados).toBe(60);
     expect(totales.minutosExtraPendientes).toBe(0);
     expect(totales.diasExtraPendientes).toBe(0);
-    expect(minutosPagables(totales)).toBe(10 * 60);
+    // La hora aprobada ya va dentro de las 9 laboradas: no se suma dos veces.
+    expect(minutosPagables(totales, 8 * 60)).toBe(9 * 60);
+    expect(minutosPagables(totales)).toBe(9 * 60);
   });
 
   it('rechazado no se paga, y tampoco queda pendiente: ya se miró', () => {
@@ -72,7 +76,7 @@ describe('las horas que llegan a nómina son netas', () => {
     expect(totales.minutosExtraAprobados).toBe(0);
     expect(totales.minutosExtraPendientes).toBe(0);
     expect(totales.diasExtraPendientes).toBe(0);
-    expect(minutosPagables(totales)).toBe(9 * 60);
+    expect(minutosPagables(totales, 8 * 60)).toBe(8 * 60);
   });
 
   it('el jefe puede autorizar menos de lo que salió', () => {
@@ -84,7 +88,7 @@ describe('las horas que llegan a nómina son netas', () => {
     });
     expect(totales.minutosExtra).toBe(60);
     expect(totales.minutosExtraAprobados).toBe(30);
-    expect(minutosPagables(totales)).toBe(9 * 60 + 30);
+    expect(minutosPagables(totales, 8 * 60)).toBe(8 * 60 + 30);
     expect(dias[0]).toMatchObject({ extraEstado: 'APROBADO', minutosExtraAprobados: 30 });
   });
 
@@ -94,7 +98,7 @@ describe('las horas que llegan a nómina son netas', () => {
       aprobacionesExtra: [{ fecha: DIA, minutos: 60, estado: 'PENDIENTE' }],
     });
     expect(totales.minutosExtraAprobados).toBe(0);
-    expect(minutosPagables(totales)).toBe(9 * 60);
+    expect(minutosPagables(totales, 8 * 60)).toBe(8 * 60);
   });
 });
 

@@ -94,10 +94,10 @@ describe('el pago por hora sale de su horario', () => {
 });
 
 describe('periodo de nómina', () => {
-  it('sin calendario capturado se asume quincenal y se dice', () => {
+  it('sin calendario capturado se asume la semana de pago (lunes a domingo, pago el lunes) y se dice', () => {
     const p = periodoSugerencia(HOY, null);
-    expect(p).toMatchObject({ desde: '2026-10-01', hasta: '2026-10-15', origen: 'por_omision', frecuencia: 'quincenal' });
-    expect(periodoSugerencia(HOY, null, 'anterior')).toMatchObject({ desde: '2026-09-16', hasta: '2026-09-30' });
+    expect(p).toMatchObject({ desde: '2026-09-28', hasta: '2026-10-04', origen: 'por_omision', frecuencia: 'semanal', pagoEl: '2026-10-05' });
+    expect(periodoSugerencia(HOY, null, 'anterior')).toMatchObject({ desde: '2026-09-21', hasta: '2026-09-27' });
   });
 
   it('semanal con corte en viernes: el vigente cierra hoy y el anterior es la semana previa', () => {

@@ -410,11 +410,13 @@ describe('sueldo del periodo', () => {
 });
 
 describe('extras, descuentos y totales', () => {
-  it('extras aprobados × pago por hora × 2; sin pago por hora, null', () => {
+  it('extras aprobados: hasta 9 h al doble y el resto al triple; sin pago por hora, null', () => {
     expect(montoExtras(120, 70)).toBe(280);
     expect(montoExtras(90, 70)).toBe(210);
     expect(montoExtras(0, 70)).toBe(0);
     expect(montoExtras(120, null)).toBeNull();
+    // 12 h en la semana: 9 × 70 × 2 + 3 × 70 × 3.
+    expect(montoExtras(12 * 60, 70)).toBe(9 * 70 * 2 + 3 * 70 * 3);
   });
 
   it('cada falta injustificada sugiere descontar un día de sueldo (semanal ÷ 7)', () => {

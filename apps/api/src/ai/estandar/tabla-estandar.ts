@@ -60,8 +60,9 @@ const u = (
 const POR_COMPLEJIDAD_CORRECTIVO: Record<Complejidad, number> = { BASICA: 60, ESTANDAR: 120, COMPLEJA: 210, CRITICA: 300 };
 
 export const TABLA_ESTANDAR: ReglaEstandar[] = [
-  // Adam (29-10): de 5 a 10 productos no pasa de 40 min; 50 productos siguen siendo 4 h (40 + 40 × 5).
-  { clave: 'comercial', nombre: 'Cotización', baseMin: 40, unidades: [u('partidas', 'partida', 'partidas', 5, true, 10)], destino: false, enLugarMin: 0 },
+  // 40 min + 4 por partida: cumple los dos ejemplos de Adam (5 productos → 1 h, 50 → 4 h). El ajuste de
+  // «hasta 10 en 40 min» del 29-10 se revirtió el mismo día porque rompía el de 5 → 1 h.
+  { clave: 'comercial', nombre: 'Cotización', baseMin: 40, unidades: [u('partidas', 'partida', 'partidas', 4, true)], destino: false, enLugarMin: 0 },
   { clave: 'tarea:Instalación', nombre: 'Instalación', baseMin: 30, unidades: [u('dispositivos', 'dispositivo', 'dispositivos', 45)], destino: false, enLugarMin: 0 },
   {
     clave: 'tarea:Cableado y canalización',

@@ -1,9 +1,9 @@
 /**
  * Calendario de nómina de una empresa: cuándo cierra cada periodo.
  *
- * El sistema guardaba periodos como fechas libres y no conocía la quincena; Christian paga quincenal
- * («1QNA/2QNA»). La cadencia vive en la configuración de cada empresa (`SystemSetting`
- * `payroll.schedule`, JSON `{"frecuencia":"quincenal"}`); sin ella no se avisa nada.
+ * La cadencia vive en la configuración de cada empresa (`SystemSetting` `payroll.schedule`); sin ella no se
+ * avisa nada. NEXARA paga por semana (Adam, 29-10): de lunes a domingo, como la hoja «Control de entradas y
+ * salidas», y se paga el lunes siguiente: `{"frecuencia":"semanal","diaSemanaCorte":0,"diaPago":1}`.
  *
  * Todo trabaja con días calendario `AAAA-MM-DD` (los de México que ya calcula `common/time/workday`),
  * sin horas ni zonas: por eso es puro y fácil de probar.

@@ -5,9 +5,11 @@
  */
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { esDeTodaLaEmpresa } from '../me/equipo-alcance.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { resolveAccessScheduleKey } from '../integra/access-schedule-defaults.js';
 import { leerFestivos } from '../festivos/festivos-datos.js';
@@ -251,10 +253,33 @@ export class OvertimeApprovalsService {
     return { from: desde, to: hasta, upserted, candidates };
   }
 
+  /**
+   * El tiempo extra solo lo decide un jefe de la persona (Adam, 29-10): alguien arriba de ella en el
+   * organigrama, o dirección. RH o contabilidad sin ser su jefe no lo aprueban, y nadie el suyo.
+   */
+  async exigirSuperior(actor: ActorExtra, userId: number): Promise<void> {
+    if (actor.id === userId) throw new ForbiddenException('Nadie aprueba sus propias horas extra');
+    if (esDeTodaLaEmpresa(actor)) return;
+    const vistos = new Set<number>([userId]);
+    let actual: number | null = userId;
+    for (let i = 0; i < 15 && actual != null; i++) {
+      const fila: { managerId: number | null } | null = await this.prisma.user.findUnique({
+        where: { id: actual },
+        select: { managerId: true },
+      });
+      const jefe: number | null = fila?.managerId ?? null;
+      if (jefe == null || vistos.has(jefe)) break;
+      if (jefe === actor.id) return;
+      vistos.add(jefe);
+      actual = jefe;
+    }
+    throw new ForbiddenException('Solo un jefe de esta persona puede decidir su tiempo extra');
+  }
+
   async decide(
     id: number,
     estado: 'APROBADO' | 'RECHAZADO',
-    actorId: number,
+    actor: ActorExtra,
     nota?: string | null,
     companyId?: number | null,
   ) {
@@ -266,11 +291,12 @@ export class OvertimeApprovalsService {
     if (existing.estado !== 'PENDIENTE') {
       throw new BadRequestException('Solo se pueden decidir filas PENDIENTE');
     }
+    await this.exigirSuperior(actor, existing.userId);
     return this.ot().update({
       where: { id },
       data: {
         estado,
-        aprobadoPorId: actorId,
+        aprobadoPorId: actor.id,
         nota: nota?.trim() || null,
       },
       include: {
@@ -309,3 +335,6 @@ export class OvertimeApprovalsService {
     });
   }
 }
+
+/** Quien decide el tiempo extra: su id y lo que dice si es de dirección. */
+export type ActorExtra = { id: number; roleKey?: string | null; email?: string | null; isSuperAdmin?: boolean };

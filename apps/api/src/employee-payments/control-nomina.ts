@@ -16,7 +16,7 @@
 import { WORKDAY_TIMEZONE, workDateKey } from '../common/time/workday.js';
 import { diaDeLaSemana, diasDelRango, horaValida, pct, sumaDias } from '../me/kpis-equipo.js';
 import { horas } from './pre-nomina.js';
-import { OT_MULTIPLIER, roundMoney } from './prenomina-amount.js';
+import { EXTRA_DOBLE_MAX_MIN_SEMANA, pagoExtraLft, roundMoney } from './prenomina-amount.js';
 import { divisorDeHorario, ventanaDeCalculo, type Divisor } from './sugerencia-nomina.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -646,11 +646,13 @@ export function sueldoDelPeriodo(e: {
   };
 }
 
-/** EXTRAS: minutos APROBADOS × pago por hora × 2 (`OT_MULTIPLIER` de la pre-nómina). */
+/**
+ * EXTRAS de la semana (LFT arts. 67–68): las primeras 9 h APROBADAS al doble del pago por hora y las
+ * que pasen, al triple.
+ */
 export function montoExtras(minutosAprobados: number, pagoHora: number | null): number | null {
   if (pagoHora == null || !Number.isFinite(pagoHora)) return null;
-  const min = Math.max(0, Number(minutosAprobados) || 0);
-  return roundMoney((min / 60) * pagoHora * OT_MULTIPLIER);
+  return roundMoney(pagoExtraLft(minutosAprobados, pagoHora / 60, 1));
 }
 
 export type DescuentoSugerido = { fecha: string; concepto: string; monto: number };
@@ -1133,7 +1135,7 @@ export function notaDePago(f: FilaControl, lunes: string): string {
     `Horas: ${f.horasTotales.toFixed(2)} en bruto, ${f.horasNetasTotales.toFixed(2)} netas.`,
     `Sueldo del periodo: ${dinero(f.sueldoPeriodo ?? 0)} (${f.sueldoPeriodoExplicacion})`,
     `Viáticos: ${dinero(f.viaticos ?? 0)}.`,
-    `Extras: ${dinero(f.extrasMonto ?? 0)} (${horas(f.extrasMinutosAprobados)} h aprobadas × pago por hora × ${OT_MULTIPLIER}).`,
+    `Extras: ${dinero(f.extrasMonto ?? 0)} (${horas(f.extrasMinutosAprobados)} h aprobadas: hasta ${EXTRA_DOBLE_MAX_MIN_SEMANA / 60} h al doble del pago por hora y el resto al triple).`,
     `Descuentos: ${dinero(f.descuentosTotal ?? 0)}${aceptados.length ? ` (${aceptados.map((d) => `${d.concepto} ${dinero(d.monto)}`).join('; ')})` : ''}.`,
     `Subtotal: ${dinero(f.subtotal ?? 0)} · Total: ${dinero(f.total ?? 0)}.`,
   ];

@@ -4,17 +4,13 @@ import { calcularRuta, deAutoATransporte, kmEnLineaRecta, rutaAproximada } from 
 const regla = (coreKind: string, tipo?: string) => reglaDe({ coreKind, ticketType: tipo, ticketTypeCustom: tipo })!;
 
 describe('tabla del tiempo estándar (tarifas aprobadas 28-10)', () => {
-  it('cotización: hasta 10 partidas en 40 min y 5 por cada una de más (50 → 4 h)', () => {
-    expect(calcularEstandar(regla('comercial'), { cantidad: 5 }).totalMin).toBe(40);
-    const diez = calcularEstandar(regla('comercial'), { cantidad: 10 });
-    expect(diez.totalMin).toBe(40);
-    expect(diez.desglose).toEqual([{ concepto: 'Base de cotización (hasta 10 partidas)', minutos: 40 }]);
-    expect(calcularEstandar(regla('comercial'), { cantidad: 11 }).totalMin).toBe(45);
+  it('cotización: 40 min + 4 por partida (5 → 1 h, 50 → 4 h)', () => {
+    expect(calcularEstandar(regla('comercial'), { cantidad: 5 }).totalMin).toBe(60);
     const r = calcularEstandar(regla('comercial'), { cantidad: 50 });
     expect(r.totalMin).toBe(240);
     expect(r.desglose).toEqual([
-      { concepto: 'Base de cotización (hasta 10 partidas)', minutos: 40 },
-      { concepto: '40 partidas más × 5 min', minutos: 200 },
+      { concepto: 'Base de cotización', minutos: 40 },
+      { concepto: '50 partidas × 4 min', minutos: 200 },
     ]);
     expect(calcularEstandar(regla('comercial'), {})).toMatchObject({ totalMin: null, faltan: ['cantidad'] });
   });

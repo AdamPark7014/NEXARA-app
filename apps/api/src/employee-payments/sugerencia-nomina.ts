@@ -30,8 +30,8 @@ const JORNADA_LFT_MIN = 8 * 60;
 const DIAS_LFT: readonly number[] = [1, 2, 3, 4, 5, 6];
 /** Productivas por debajo de este % de las laboradas: se sugiere revisar antes de pagar. */
 export const UMBRAL_PRODUCTIVIDAD_REVISAR = 60;
-/** Christian paga quincenal; sin `payroll.schedule` en la empresa se asume eso. */
-const CONFIG_POR_OMISION: ConfigNomina = { frecuencia: 'quincenal', diaSemanaCorte: 5 };
+/** NEXARA paga por semana (lunes a domingo, pago el lunes); sin `payroll.schedule` en la empresa se asume eso. */
+const CONFIG_POR_OMISION: ConfigNomina = { frecuencia: 'semanal', diaSemanaCorte: 0, diaPago: 1 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Periodo
@@ -40,7 +40,7 @@ const CONFIG_POR_OMISION: ConfigNomina = { frecuencia: 'quincenal', diaSemanaCor
 export type PeriodoSugerencia = PeriodoNomina & {
   frecuencia: FrecuenciaNomina | null;
   /**
-   * `calendario` = el de la empresa; `por_omision` = quincenal supuesto; `manual` = desde/hasta;
+   * `calendario` = el de la empresa; `por_omision` = semanal supuesto; `manual` = desde/hasta;
    * `calculado` = semana, quincena o mes calculados con la fecha de hoy (`clave`).
    */
   origen: 'calendario' | 'por_omision' | 'manual' | 'calculado';

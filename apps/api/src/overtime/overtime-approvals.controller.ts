@@ -14,7 +14,12 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
-import { OvertimeApprovalsService } from './overtime-approvals.service.js';
+import { OvertimeApprovalsService, type ActorExtra } from './overtime-approvals.service.js';
+
+/** Solo un jefe de la persona decide su extra: el servicio lo revisa con esto. */
+function actorDe(user: ActorExtra): ActorExtra {
+  return { id: Number(user?.id), roleKey: user?.roleKey ?? null, email: user?.email ?? null, isSuperAdmin: Boolean(user?.isSuperAdmin) };
+}
 
 @Controller()
 @UseGuards(AuthGuard('jwt'), RbacGuard)
@@ -56,22 +61,22 @@ export class OvertimeApprovalsController {
   @RBAC({ anyPermissions: [PERMISSIONS.HR_MANAGE, PERMISSIONS.CONTABILIDAD_MANAGE] })
   approve(
     @Param('id') id: string,
-    @CurrentUser() user: { id: number },
+    @CurrentUser() user: ActorExtra,
     @CurrentCompanyId() companyId: number | null,
     @Body() body?: { nota?: string },
   ) {
-    return this.service.decide(+id, 'APROBADO', user.id, body?.nota, companyId);
+    return this.service.decide(+id, 'APROBADO', actorDe(user), body?.nota, companyId);
   }
 
   @Patch('overtime-approvals/:id/reject')
   @RBAC({ anyPermissions: [PERMISSIONS.HR_MANAGE, PERMISSIONS.CONTABILIDAD_MANAGE] })
   reject(
     @Param('id') id: string,
-    @CurrentUser() user: { id: number },
+    @CurrentUser() user: ActorExtra,
     @CurrentCompanyId() companyId: number | null,
     @Body() body?: { nota?: string },
   ) {
-    return this.service.decide(+id, 'RECHAZADO', user.id, body?.nota, companyId);
+    return this.service.decide(+id, 'RECHAZADO', actorDe(user), body?.nota, companyId);
   }
 
   @Get('attendance-rejections')
