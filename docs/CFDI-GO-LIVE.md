@@ -27,6 +27,16 @@ Leyenda:
 | Facturas reales timbradas | 0 |
 | Cómo factura Nexara | a mano en el portal del SAT |
 
+**Actualización 29-oct-2026:**
+
+| Cosa | Estado |
+|---|---|
+| Cuenta de Facturama (producción) | Alta completa: RFC `NEE240925V73`, régimen 601, CP 72775. CSD cargado (certificado `00001000000718329029`, vence el 25-08-2029). Está en la prueba gratis: 15 folios de API hasta el 29-nov-2026 |
+| Anualidad de API | **Sin comprar**: $1,650 con IVA al año, incluye API Web + Multiemisor y 100 folios. Los folios de API se compran aparte y vencen al año |
+| Credenciales de API | No hay llaves aparte: son el usuario y la contraseña del portal. La cuenta de **sandbox** se crea por separado en dev.facturama.mx. Ninguna está aún en el servidor |
+| Perfil fiscal en Core (`company_profile` id 1) | Corregido con los datos reales (antes RFC genérico y sin CP). El respaldo del registro anterior está en `/root/company_profile_1_antes_20261029.csv`. La revisión previa da el emisor completo y válido |
+| Adaptador Facturama | Reescrito el 29-oct (ver §8): baja el XML, cancela por `Id`, no duplica en reintentos, Pagos 2.0 con IVA por documento |
+
 Cómo comprobarlo en cualquier momento, sin riesgo (solo lee):
 
 ```bash
@@ -244,6 +254,29 @@ Lo que hay que saber:
 ## 8. Riesgos conocidos antes de encender (para el desarrollador)
 
 Encontrados al preparar la revisión previa. **No se corrigieron aquí**; se listan con archivo y línea. Los marcados **(alto)** conviene resolverlos o verificarlos en sandbox **antes de la etapa 4**. Todas las rutas son de `apps/api/src/`.
+
+**Estado al 29-oct-2026** (adaptador reescrito contra la documentación oficial: https://facturama.mx/docs/es/bienvenidos;
+pruebas en `pac/adapters/facturama.adapter.spec.ts`; **falta confirmarlo en sandbox**):
+
+- **1 · resuelto en el XML:** tras timbrar se baja con `GET /cfdi/xml/issued/{Id}`. El PDF sigue sin guardarse:
+  Facturama solo lo da con credenciales. El adaptador devuelve `pacDocumentId` para que el ERP lo pida después.
+- **2 · resuelto:** se cancela con `DELETE /cfdi/{Id}`. El `Id` se busca por UUID (o serie y folio) si el ERP no lo
+  tiene guardado, y `uuidReplacement` solo va con motivo 01.
+- **4 · mitigado:** cada llamada tiene tiempo límite (`FACTURAMA_TIMEOUT_MS`, 45 s). Antes de timbrar se busca un CFDI
+  vigente con la misma serie y folio: si es el mismo se reutiliza y, si es de otro cliente o importe, se detiene. Sigue
+  pendiente en el servicio la factura que se queda en `STAMPING` si falla el guardado.
+- **3 y 5 · resueltos en el servicio:** el CP del emisor ya bloquea, y una respuesta sin UUID deja la factura en
+  «timbrando».
+- **6 · mitigado en el adaptador:** si la cancelación queda pendiente de aceptación, el adaptador lanza un aviso y el ERP
+  no la marca cancelada. Si Facturama ya la tiene cancelada, no la vuelve a pedir (cada cancelación gasta un folio).
+- **7 · resuelto en el adaptador:** PUE con forma 99 se rechaza con un mensaje claro, y PPD siempre va con 99.
+- **9 · parcial:** el adaptador ya no inventa régimen ni CP del cliente (exige los dos, salvo público en general:
+  616, S01 y CP de expedición). Los rellenos del servicio siguen.
+- **13 · resuelto en el adaptador:** cada documento relacionado lleva `TaxObject`, `Taxes` (IVA proporcional, 16 % si
+  el ERP no manda `ivaRate`) y `EquivalenceDocRel`. La fecha `@db.Date` conserva el día.
+- **15 · resuelto:** los impuestos se redondean con `cents`, igual que el ERP.
+- **Sin cambio:** 8, 10, 11, 12, 14, 16, 17, 18. El 19 solo aplica a SW o Finkok. Además, los errores de Facturama ya
+  le llegan al usuario con su motivo, en vez de «error interno».
 
 | # | Sev. | Dónde | Riesgo |
 |---|---|---|---|

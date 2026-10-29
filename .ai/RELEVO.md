@@ -1,5 +1,40 @@
 # RELEVO
 
+- **29-10 ~12:20 (claude-code) — Comerciales: PowerPoint y la cotización ligada se ven abiertos en la actividad (pedido de Adam: «que puedan adjuntar Excel, PDF, PowerPoint… o ligar una cotización, y se vea embebida»).**
+  - Adjuntar y ligar ya existían: «Archivos de evidencia» (`components/erp/ArchivosDeActividad.tsx`) y «Ligar
+    cotización» (`CotizacionDeActividad.tsx`). PDF, imagen, Excel, CSV y Word ya se abrían dentro; faltaban dos cosas.
+  - **PowerPoint:** el `.pptx` se aceptaba pero solo se descargaba. Ahora `vista-previa-documento.ts`
+    (`powerpointAHtml`, con `jszip`, que ya viene con exceljs y mammoth) arma una tarjeta por diapositiva, en el
+    orden real de la presentación, con su texto y sus fotos incrustadas como `data:`. Topes: 60 diapositivas,
+    1.5 MB por foto y 8 MB en total. Las gráficas y formas no se dibujan. Va en el mismo iframe aislado sin scripts
+    que Excel y Word. El `.ppt` viejo sigue solo de descarga. Prueba en `vista-previa-powerpoint.spec.ts`.
+  - **Cotización ligada:** era solo un enlace. Ahora `PropuestaEmbebida.tsx` baja `GET cotizaciones/:id/pdf` con la
+    sesión y la muestra abierta con el visor pdf.js. Sin permiso de cotizaciones, lo dice y deja el enlace.
+
+- **29-10 ~12:10 (claude-code) — Timbrado con Facturama: adaptador listo, perfil fiscal corregido (sin desplegar, sigue en mock).**
+  - PAC elegido: Facturama API Web. El adaptador ya existía y timbra desde JSON con el CSD de la cuenta. Finkok no aparece
+    en la lista vigente del SAT y SW certifica vía Digital Factura/SIFEI. Comparativa y costos en las notas de la sesión
+    del PAC (`pac-cfdi-recomendacion.md`).
+  - Cuenta Facturama de producción (Adam, 29-10): alta completa, CSD `00001000000718329029` vigente al 25-08-2029, prueba
+    con 15 folios de API hasta el 29-nov. **Anualidad API sin comprar** ($1,650; compra de Adam).
+  - `apps/api/src/pac/adapters/facturama.adapter.ts` reescrito (+ spec con 17 casos):
+    - baja el XML por `Id` y cancela por `Id`, buscándolo por UUID si no viene;
+    - busca serie y folio antes de timbrar para no duplicar, con tiempo límite;
+    - Pagos 2.0 con IVA por documento; PUE/99 rechazado y PPD con 99;
+    - errores de Facturama legibles (BadRequest/ServiceUnavailable);
+    - cancelación pendiente de aceptación = aviso, no «cancelada».
+  - `pac.types.ts`: opcionales `pacDocumentId` (resultado y cancelación), `serie`/`folio` en cancelación e `ivaRate` por
+    documento del REP. No toqué `accounting.service.ts` ni `schema.prisma`: tienen cambios sin commitear de la Mesa contable.
+  - BD del servidor: `company_profile` id 1 con RFC `NEE240925V73`, razón social sin régimen societario, régimen `601`,
+    domicilio y CP 72775. El registro anterior quedó en `/root/company_profile_1_antes_20261029.csv`. Preflight: emisor
+    completo y válido; único bloqueo `proveedor_mock`.
+  - **Falta:**
+    - Adam: dejar `FACTURAMA_USER`/`FACTURAMA_PASSWORD` y las de sandbox (cuenta nueva en dev.facturama.mx) en
+      `C:\dev\secrets\nexara\facturama-alta\facturama-api.env`;
+    - luego, prueba en sandbox (RFC de prueba EKU9003173C9) y credenciales al `.env.nexara` del servidor;
+    - en el servicio: guardar `pacDocumentId` (campo nuevo en `invoices`), servir el PDF con él y pasar `ivaRate` al REP.
+  - Runbook actualizado: `docs/CFDI-GO-LIVE.md` §1 y §8.
+
 - **29-10 ~14:00 (claude-code) — Tiempo estándar en Asignar (web) y obra con tarifas (lo retomé de la sesión principal).**
   - Adam: «Sí, retómala aquí». La API (`fab4f3ab`) y la migración `20261029030000` son de la principal y ya se desplegaron.
   - `components/ops/TiempoEstandarCampo.tsx` (+ css + spec) va en «¿Qué se va a hacer?», debajo de la complejidad,
