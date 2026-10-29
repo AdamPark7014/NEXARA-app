@@ -1,5 +1,19 @@
 # RELEVO
 
+- **29-10 ~16:30 (claude-code) — Sugerencia de nómina con periodos calculados (pedido de Adam: «múltiples cálculos
+  de fechas dinámicas»).**
+  - `/erp/finance/employee-payments` → «Sugerencia de nómina»: el selector ofrece semana actual y anterior (lunes a
+    domingo, como `nomina_semanas`), quincena actual y anterior, mes actual y anterior, y rango personalizado. Cada
+    opción trae sus fechas (`periodos` en la respuesta). Abre en la quincena actual y la semana del 26-10 es
+    «Semana actual» hasta el domingo 1-11.
+  - API: `periodoDeClave`/`periodosCalculados` en `sugerencia-nomina.ts`; `GET sugerencia-nomina?periodo=semana|
+    semana_anterior|quincena|…` (vigente/anterior siguen). Cada fila trae «a la fecha» (`montoSugerido`,
+    `devengadoALaFecha`, corte = `calculadoHasta`) y «periodo completo» (`proyectado`, corte = `hasta`).
+  - Regla de pago (decisión 6): `sueldoDeDias` = semana ÷ 7 × días en todo periodo; `semanalDeMensual` = mensual ×
+    12 ÷ 52. El sueldo semanal capturado el 28-10 es el del tabulador (mensual ÷ 4): no se convirtió, espera la
+    revisión de la contadora (nota en la carpeta compartida de las sesiones).
+  - Pruebas: cambio de mes y de año, quincena de 15/16 días, febrero (13 y 14 días), zona de Ciudad de México.
+
 - **29-10 ~16:00 (claude-code) — Diseñador de videovigilancia: plano por niveles (artboard 5, aprobado por Adam 29-10).**
   - Motor `apps/web/lib/cctv/niveles.ts` (+ `ids.ts`): el plano raíz es la planta baja y los pisos van en
     `plano.niveles` (`{ nivel, plano }`); agregar/quitar/renombrar, `copiarMurosDeAbajo` (ids nuevos, altura libre),
