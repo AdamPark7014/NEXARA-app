@@ -49,6 +49,7 @@ class TiempoEstandarTest {
                     u("dispositivos", "dispositivo", "dispositivos", 45.0),
                     u("nodos", "nodo", "nodos", 45.0),
                     u("metros", "metro de tubería", "metros de tubería", 4.0),
+                    UnidadEstandarDto("jornadas", "jornada en sitio", "jornadas en sitio", "¿Cuántas jornadas en sitio?", 480.0, sinBase = true),
                 ),
             ),
         ),
@@ -78,6 +79,19 @@ class TiempoEstandarTest {
         val topado = TiempoEstandar.calcular(regla("tarea:Instalación"), cantidad = 20)
         assertEquals(720, topado.totalMin)
         assertTrue(topado.topado)
+    }
+
+    @Test
+    fun jornadasEnSitioNoSumanLaBaseDelTipo() {
+        // a8085bb3: 1 jornada = 480 (sin los 30 de base de Obra); 2 = 960, topadas a 720.
+        val una = TiempoEstandar.calcular(regla("obra"), cantidad = 1, unidad = "jornadas")
+        assertEquals(480, una.totalMin)
+        assertTrue(una.desglose.none { it.concepto.startsWith("Base") })
+        val dos = TiempoEstandar.calcular(regla("obra"), cantidad = 2, unidad = "jornadas")
+        assertEquals(720, dos.totalMin)
+        assertTrue(dos.topado)
+        // La unidad por omisión sigue siendo la primera (dispositivos), con su base.
+        assertEquals(30 + 45, TiempoEstandar.calcular(regla("obra"), cantidad = 1).totalMin)
     }
 
     @Test

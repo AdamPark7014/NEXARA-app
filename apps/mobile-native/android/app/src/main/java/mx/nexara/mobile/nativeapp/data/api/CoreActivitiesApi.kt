@@ -1077,6 +1077,8 @@ data class UnidadEstandarDto(
     val pregunta: String? = null,
     val porUnidadMin: Double? = null,
     val incluidas: Double? = null,
+    /** «Jornadas en sitio» (a8085bb3): con esta unidad no se suma la base del tipo. */
+    val sinBase: Boolean? = null,
 )
 
 data class OrigenEstandarDto(
