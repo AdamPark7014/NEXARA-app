@@ -12,11 +12,13 @@ import { elevacionTexto, type NivelConPlano } from "@/lib/cctv/niveles";
 import { tapasDelPlano, type Plano, type Tapa } from "@/lib/cctv/plano";
 import { camaraEnMetros, coberturaCamara, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import Figuras3D from "./Figuras3D";
+import Navegacion, { ICONO } from "./Navegacion";
 import styles from "./editor.module.css";
 
 type Arrastre = { modo: "girar" | "mover"; x: number; y: number; vista: Vista3D };
 
 const ALTO = 640;
+const acercar = (v: Vista3D, f: number): Vista3D => ({ ...v, pxPorMetro: Math.min(Math.max(v.pxPorMetro * f, 1), 400) });
 const SIN_NIVELES: readonly NivelConPlano[] = [];
 
 export default function Lienzo3D({
@@ -56,6 +58,19 @@ export default function Lienzo3D({
   const [vista, setVista] = useState<Vista3D>(() => encuadreInicial(VISTA_ISOMETRICA));
   const arrastre = useRef<Arrastre | null>(null);
   const [arrastrando, setArrastrando] = useState(false);
+  // El puntero manda más eventos que cuadros pinta la pantalla: se junta todo en uno por cuadro.
+  const pendiente = useRef<Vista3D | null>(null);
+  const cuadro = useRef(0);
+  const programar = (v: Vista3D) => {
+    pendiente.current = v;
+    if (cuadro.current) return;
+    cuadro.current = requestAnimationFrame(() => {
+      cuadro.current = 0;
+      if (pendiente.current) setVista(pendiente.current);
+      pendiente.current = null;
+    });
+  };
+  useEffect(() => () => cancelAnimationFrame(cuadro.current), []);
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -79,7 +94,7 @@ export default function Lienzo3D({
     const rueda = (e: WheelEvent) => {
       e.preventDefault();
       const f = Math.exp(-e.deltaY * 0.0015);
-      setVista((v) => ({ ...v, pxPorMetro: Math.min(Math.max(v.pxPorMetro * f, 1), 400) }));
+      setVista((v) => acercar(v, f));
     };
     svg.addEventListener("wheel", rueda, { passive: false });
     return () => svg.removeEventListener("wheel", rueda);
@@ -171,13 +186,13 @@ export default function Lienzo3D({
     const dx = e.clientX - a.x;
     const dy = e.clientY - a.y;
     if (a.modo === "girar") {
-      setVista({ ...a.vista, azimutDeg: a.vista.azimutDeg + dx * 0.35, elevacionDeg: Math.min(90, Math.max(8, a.vista.elevacionDeg + dy * 0.25)) });
+      programar({ ...a.vista, azimutDeg: a.vista.azimutDeg + dx * 0.35, elevacionDeg: Math.min(90, Math.max(8, a.vista.elevacionDeg + dy * 0.25)) });
     } else {
       const ang = (a.vista.azimutDeg * Math.PI) / 180;
       const se = Math.max(Math.sin((a.vista.elevacionDeg * Math.PI) / 180), 0.2);
       const mx = -dx / a.vista.pxPorMetro;
       const my = -dy / (a.vista.pxPorMetro * se);
-      setVista({
+      programar({
         ...a.vista,
         centro: { x: a.vista.centro.x + mx * Math.cos(ang) + my * Math.sin(ang), y: a.vista.centro.y - mx * Math.sin(ang) + my * Math.cos(ang) },
       });
@@ -186,6 +201,12 @@ export default function Lienzo3D({
   const alSoltar = () => {
     arrastre.current = null;
     setArrastrando(false);
+    if (pendiente.current) {
+      cancelAnimationFrame(cuadro.current);
+      cuadro.current = 0;
+      setVista(pendiente.current);
+      pendiente.current = null;
+    }
   };
 
   const selId = seleccion?.id;
@@ -201,6 +222,16 @@ export default function Lienzo3D({
         </button>
       </div>
       <p className={styles.pista3d}>Arrastrar: girar · Mayús + arrastrar: mover · rueda: acercar · F: enfocar la selección</p>
+      <Navegacion
+        lugar="abajo"
+        botones={[
+          { etiqueta: "Girar a la izquierda", icono: ICONO.girarIzq, accion: () => setVista((v) => ({ ...v, azimutDeg: v.azimutDeg - 45 })) },
+          { etiqueta: "Girar a la derecha", icono: ICONO.girarDer, accion: () => setVista((v) => ({ ...v, azimutDeg: v.azimutDeg + 45 })) },
+          { etiqueta: "Alejar", icono: ICONO.menos, accion: () => setVista((v) => acercar(v, 0.8)) },
+          { etiqueta: "Acercar", icono: ICONO.mas, accion: () => setVista((v) => acercar(v, 1.25)) },
+          { etiqueta: "Encuadrar todo", icono: ICONO.encuadrar, accion: () => setVista((v) => encuadreInicial({ azimutDeg: v.azimutDeg, elevacionDeg: v.elevacionDeg })) },
+        ]}
+      />
       <svg
         ref={svgRef}
         className={styles.lienzo}
@@ -222,8 +253,8 @@ export default function Lienzo3D({
         </defs>
         <rect width={ancho} height={ALTO} fill="url(#cctv-cielo)" />
         {pisosDeAbajo.map((n) => (
-          <g key={n.nivel.id} style={{ opacity: 0.45, filter: "grayscale(1)", pointerEvents: "none" }}>
-            <Figuras3D figuras={n.figuras} plano={n.plano} matriz={n.matriz} capas={{ ...capas, translucidos: true }} />
+          <g key={n.nivel.id} style={{ pointerEvents: "none" }}>
+            <Figuras3D figuras={n.figuras} plano={n.plano} matriz={n.matriz} capas={{ ...capas, translucidos: true }} apagado />
           </g>
         ))}
         {rotulos ? (

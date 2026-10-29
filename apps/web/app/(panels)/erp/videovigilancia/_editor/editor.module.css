@@ -953,3 +953,52 @@
   line-height: 1.45;
   margin: 0;
 }
+
+/* Botones de navegación sobre el lienzo (acercar, alejar, encuadrar, girar). */
+.navegacion {
+  position: absolute;
+  right: var(--ui-s4);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-elev-1);
+  z-index: 1;
+}
+
+.navegacionArriba {
+  top: var(--ui-s3);
+}
+
+.navegacionAbajo {
+  bottom: var(--ui-s4);
+}
+
+.botonNav {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-fg-2);
+  cursor: pointer;
+}
+
+.botonNav svg {
+  width: 18px;
+  height: 18px;
+}
+
+.botonNav:hover {
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+}
+
+.botonNav:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 1px;
+}
