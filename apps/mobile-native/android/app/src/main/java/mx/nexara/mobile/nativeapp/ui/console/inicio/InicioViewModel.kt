@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -13,9 +15,17 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.access.CoreKeys
 import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.api.AprobacionPendienteDto
+import mx.nexara.mobile.nativeapp.data.api.KpisEquipoDto
 import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
+import mx.nexara.mobile.nativeapp.data.api.PagoEmpleadoDto
+import mx.nexara.mobile.nativeapp.data.api.RevisionPendienteDto
+import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
+import mx.nexara.mobile.nativeapp.data.console.AprobacionesRepository
 import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
+import mx.nexara.mobile.nativeapp.data.console.CoreExtrasRepository
+import mx.nexara.mobile.nativeapp.data.console.PagosEmpleadosRepository
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.ui.console.CoreMenu
 
@@ -35,11 +45,25 @@ data class InicioUiState(
     /** Actividad sobre la que corre «Iniciar» o «Reanudar». */
     val accionEnCurso: Long? = null,
     val accionError: String? = null,
+    /** Dirección general: su tablero (`InicioCeoRules`); null mientras carga la primera vez. */
+    val ceo: CeoInicio? = null,
 ) {
     val actual: MyActivityItemDto? get() = InicioRules.actividadActual(open)
     val siguientes: List<MyActivityItemDto> get() = InicioRules.siguientes(open, actual)
     val pendientes: Int get() = InicioRules.pendientes(open)
 }
+
+/**
+ * Lo que ve dirección general en su inicio. Cada lista es null si su endpoint falló o el rol no
+ * la ve: esa sección no se pinta y las demás siguen.
+ */
+data class CeoInicio(
+    val equipo: List<TeamBoardUserDto>? = null,
+    val revisiones: List<RevisionPendienteDto>? = null,
+    val aprobaciones: List<AprobacionPendienteDto>? = null,
+    val pagos: List<PagoEmpleadoDto>? = null,
+    val kpis: KpisEquipoDto? = null,
+)
 
 /**
  * Inicio: lo de actividades. La jornada la lleva `ConsoleAttendanceViewModel`
@@ -49,6 +73,9 @@ data class InicioUiState(
 class InicioViewModel(app: Application) : AndroidViewModel(app) {
     private val authRepo = AuthRepository(app.applicationContext)
     private val repo = CoreActivitiesRepository(app.applicationContext)
+    private val aprobacionesRepo = AprobacionesRepository(app.applicationContext)
+    private val pagosRepo = PagosEmpleadosRepository(app.applicationContext)
+    private val extrasRepo = CoreExtrasRepository(app.applicationContext)
     private val _state = MutableStateFlow(
         authRepo.loadSession().let { session ->
             InicioUiState(
@@ -62,13 +89,18 @@ class InicioViewModel(app: Application) : AndroidViewModel(app) {
     init {
         refreshOnModels(
             models = setOf("Activity", "ActivityEvidence", "ServiceSheet"),
-            refresh = { load(initial = false) },
+            refresh = { load(initial = false, enVivo = true) },
         )
         load(initial = true)
     }
 
-    fun load(initial: Boolean = true) {
-        if (!_state.value.tieneActividades || _state.value.esDireccion) {
+    /** [enVivo]: lo pidió un aviso en vivo (no la persona); el tablero de dirección lo espacia. */
+    fun load(initial: Boolean = true, enVivo: Boolean = false) {
+        if (_state.value.esDireccion) {
+            cargarCeo(initial, enVivo)
+            return
+        }
+        if (!_state.value.tieneActividades) {
             _state.update { it.copy(isLoading = false, isRefreshing = false) }
             return
         }
@@ -100,6 +132,39 @@ class InicioViewModel(app: Application) : AndroidViewModel(app) {
                         error = e.toUserMessage("No se pudieron cargar tus actividades"),
                     )
                 }
+            }
+        }
+    }
+
+    /** Última carga del tablero de dirección: los avisos en vivo no lo vuelven a pedir antes de 30 s. */
+    private var ceoCargadoMs = 0L
+
+    /** El tablero de dirección: cinco consultas a la vez, cada una por su lado. */
+    private fun cargarCeo(initial: Boolean, enVivo: Boolean) {
+        val ahora = System.currentTimeMillis()
+        if (enVivo && _state.value.ceo != null && ahora - ceoCargadoMs < 30_000) return
+        ceoCargadoMs = ahora
+        _state.update { it.copy(isLoading = initial && it.ceo == null, isRefreshing = !initial) }
+        viewModelScope.launch {
+            val (desde, hasta) = InicioCeoRules.rangoSieteDias()
+            val ceo = withContext(Dispatchers.IO) {
+                coroutineScope {
+                    val equipo = async { runCatching { repo.board().users.orEmpty() }.getOrNull() }
+                    val revisiones = async { runCatching { repo.revisionesPendientes() }.getOrNull() }
+                    val aprobaciones = async { runCatching { aprobacionesRepo.pendientes() }.getOrNull() }
+                    val pagos = async { runCatching { pagosRepo.lista() }.getOrNull() }
+                    val kpis = async { runCatching { extrasRepo.kpisEquipo(desde, hasta) }.getOrNull() }
+                    CeoInicio(equipo.await(), revisiones.await(), aprobaciones.await(), pagos.await(), kpis.await())
+                }
+            }
+            val nada = ceo.equipo == null && ceo.revisiones == null && ceo.aprobaciones == null && ceo.kpis == null
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    ceo = ceo,
+                    error = if (nada) "No se pudo cargar el tablero de hoy" else null,
+                )
             }
         }
     }

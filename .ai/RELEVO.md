@@ -1,5 +1,17 @@
 # RELEVO
 
+- **29-10 ~13:40 (claude-code) — Apps: inicio de dirección general (CEO) en el teléfono (pedido de Adam).**
+  - Adam: «Christian tiene ir a pizarra del equipo, el módulo principal es un módulo vacío… que tenga algo que ver el
+    superadmin CEO en su main sección móvil». Artboard nuevo en el canvas: «App · Inicio CEO» (`MovilCeo.dc.html`).
+  - Android (`inicio/InicioCeoRules.kt` + `InicioCeoSection.kt`, `InicioViewModel.cargarCeo`): cabecera «Tu equipo
+    hoy», banda oscura con «N de M checaron entrada» y Trabajando / Sin actividad / Atrasadas (`me/board`),
+    «Requiere tu atención» con Evidencias por validar (`me/revisiones`), Aprobaciones (`workflow/my-pending`) y Pagos
+    por autorizar (borradores de `employee-payments`), «Desempeño · 7 días» con anillo (`me/kpis/equipo`) y «Para
+    atender» (los grupos de la pizarra). Cada sección cae sola si su endpoint falla; las recargas en vivo se espacian
+    30 s. Captura en la JVM: `CapturasMiDiaTest.inicioCeo` → `app/build/capturas/inicio-ceo.png`, igual al artboard.
+  - iOS: en curso. Versión de tiendas: 1.1.0 (19) en Android y 1.1 (12) en iOS, sin subir todavía (Adam aprobó
+    subirlas; esperan el inicio CEO en iOS y la autoasignación de la sesión «Asignar»).
+
 - **29-10 ~13:00 (claude-code) — Apps: botones de trayecto (API `7e7934d5` de la sesión «En espera de revisión»).**
   - Android: tarjeta «Trayecto» en el detalle (`TrayectoSection.kt`, reglas en `TrayectoRules.kt` + prueba), solo
     para quien hace la actividad (`captura && !despachador`): «Iniciar trayecto» (IDA) antes de iniciar, «Llegué»

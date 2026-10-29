@@ -591,6 +591,22 @@ fun ConsoleNavHost(
                             selectTab(ConsoleRoutes.Attendance)
                         }
                     },
+                    onOpenAprobaciones = if (CoreExtraModule.APROBACIONES in extras) {
+                        { navController.navigate(ConsoleRoutes.Aprobaciones) { launchSingleTop = true } }
+                    } else {
+                        null
+                    },
+                    onOpenPagos = if (CoreExtraModule.PAGOS_EMPLEADOS in extras) {
+                        { navController.navigate(ConsoleRoutes.PagosEmpleados) { launchSingleTop = true } }
+                    } else {
+                        null
+                    },
+                    onOpenDesempeno = if (CoreExtraModule.KPIS_EQUIPO in extras) {
+                        { navController.navigate(ConsoleRoutes.KpisEquipo) { launchSingleTop = true } }
+                    } else {
+                        null
+                    },
+                    onOpenPersona = openPerson,
                 )
             }
             nxComposable(ConsoleRoutes.Activities) {
