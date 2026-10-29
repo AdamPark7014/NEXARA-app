@@ -67,6 +67,11 @@ describe('formFromActivityRecord · cargar una OT existente en el formulario', (
   it('nunca deja campos undefined en un registro vacío', () => {
     const form = formFromActivityRecord({});
     for (const [key, value] of Object.entries(form)) {
+      // `estandar` no es un input: es el tiempo estándar ya armado, o null si no hay.
+      if (key === 'estandar') {
+        expect(value, `campo ${key}`).toBeNull();
+        continue;
+      }
       expect(typeof value, `campo ${key}`).toBe('string');
     }
     expect(form.prioridad).toBe('Media');
@@ -87,6 +92,27 @@ describe('buildActivityPayload · lo que se manda al API', () => {
     );
     expect(payload.ticketType).toBe('PREVENTIVO');
     expect(payload.workType).toBe('PREVENTIVE_INVENTORY');
+  });
+
+  it('el tiempo estándar viaja con la actividad; sin estándar no manda esos campos', () => {
+    const estandar = {
+      unidades: { clave: 'dispositivos', cantidad: 8 },
+      destino: null,
+      trasladoMin: null,
+      trasladoModo: null,
+      tiempoEstandarMin: 390,
+      estandarDesglose: [
+        { concepto: 'Base de instalación', minutos: 30 },
+        { concepto: '8 dispositivos × 45 min', minutos: 360 },
+      ],
+      estandarCambiadoMotivo: null,
+    };
+    const base = { ...EMPTY_ACTIVITY_FORM, responsableId: '8', projectMode: 'without_project' as const };
+    const con = buildActivityPayload({ ...base, estandar, tiempoEstimadoMin: '390' }, undefined, {});
+    expect(con).toMatchObject({ unidades: { clave: 'dispositivos', cantidad: 8 }, tiempoEstandarMin: 390, tiempoEstimadoMin: 390 });
+    const sin = buildActivityPayload(base, undefined, {});
+    expect('tiempoEstandarMin' in sin).toBe(false);
+    expect('unidades' in sin).toBe(false);
   });
 
   it('el texto libre del tipo solo viaja cuando el tipo es OTRO', () => {

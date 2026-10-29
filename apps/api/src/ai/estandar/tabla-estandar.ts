@@ -88,6 +88,21 @@ export const TABLA_ESTANDAR: ReglaEstandar[] = [
   { clave: 'servicio:CORRECTIVO', nombre: 'Servicio correctivo', baseMin: 0, unidades: [], porComplejidad: POR_COMPLEJIDAD_CORRECTIVO, destino: true, enLugarMin: 0 },
   { clave: 'servicio:EMERGENCIA', nombre: 'Servicio de emergencia', baseMin: 0, unidades: [], porComplejidad: POR_COMPLEJIDAD_CORRECTIVO, destino: true, enLugarMin: 0 },
   { clave: 'servicio:INSTALACION', nombre: 'Servicio de instalación', baseMin: 30, unidades: [u('dispositivos', 'dispositivo', 'dispositivos', 45)], destino: true, enLugarMin: 0 },
+  // Obra (instalación en sitio ligada a proyecto, Adam 29-10: «que las obras tengan una
+  // parametrización de resultados»): las mismas tarifas de instalación y de cableado, según lo
+  // que se cuente ese día. Sin traslado: la cuadrilla va al sitio del proyecto en su jornada.
+  {
+    clave: 'obra',
+    nombre: 'Obra',
+    baseMin: 30,
+    unidades: [
+      u('dispositivos', 'dispositivo', 'dispositivos', 45),
+      u('nodos', 'nodo', 'nodos', 45),
+      u('metros', 'metro de tubería', 'metros de tubería', 4),
+    ],
+    destino: false,
+    enLugarMin: 0,
+  },
 ];
 
 const POR_CLAVE = new Map(TABLA_ESTANDAR.map((r) => [r.clave, r]));

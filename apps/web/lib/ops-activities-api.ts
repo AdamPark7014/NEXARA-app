@@ -23,6 +23,14 @@ export type ActivityDetail = {
   /** BASICA | ESTANDAR | COMPLEJA | CRITICA (al asignar) y la que sugirió la IA. */
   complejidad?: string | null;
   complejidadSugerida?: string | null;
+  /** Tiempo estándar (§8): lo que se contó, el destino, el traslado, el total y su desglose. */
+  unidades?: { clave: string; cantidad: number } | null;
+  destino?: { direccion: string; lat: number; lng: number } | null;
+  trasladoMin?: number | null;
+  trasladoModo?: string | null;
+  tiempoEstandarMin?: number | null;
+  estandarDesglose?: Array<{ concepto: string; minutos: number }> | null;
+  estandarCambiadoMotivo?: string | null;
   projectId?: number | null;
   project?: { id: number; title: string } | null;
   branchName?: string | null;

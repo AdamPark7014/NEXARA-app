@@ -1,5 +1,6 @@
 /** Formulario moderno de OT — extraído del legacy `ActivitiesTable`. */
 import { aInputFecha } from "@/lib/proyecto-plan";
+import { estandarDeRegistro, payloadEstandar, type EstandarGuardado } from "@/lib/tiempo-estandar";
 
 export type ActivityProjectMode = 'with_project' | 'without_project';
 
@@ -43,6 +44,11 @@ export const EMPTY_ACTIVITY_FORM = {
   /** Complejidad elegida (`BASICA`…`CRITICA`, o vacío) y la que sugirió la IA. */
   complejidad: "",
   complejidadSugerida: "",
+  /**
+   * Tiempo estándar (§8): lo que se cuenta, el destino, el traslado y el total con su desglose.
+   * null = el tipo no tiene estándar o todavía no se calcula. Lo llena `TiempoEstandarCampo`.
+   */
+  estandar: null as EstandarGuardado | null,
 };
 
 export type ActivityFormState = typeof EMPTY_ACTIVITY_FORM;
@@ -136,6 +142,7 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
     assignmentCharge: String(record.assignmentCharge ?? ""),
     complejidad: String(record.complejidad ?? ""),
     complejidadSugerida: String(record.complejidadSugerida ?? ""),
+    estandar: estandarDeRegistro(record),
   };
 }
 
@@ -187,6 +194,8 @@ export function buildActivityPayload(
     // Al editar, vacío la quita; al crear, solo va si se eligió.
     complejidad: form.complejidad || (options.isEdit ? null : undefined),
     complejidadSugerida: form.complejidadSugerida || undefined,
+    // Tiempo estándar: solo va si el tipo lo tiene (cantidad, destino, total y motivo si se cambió).
+    ...payloadEstandar(form.estandar),
   };
 
   // Periodo: del día elegido al día de fin. La API fija la fecha máxima y la entrega al fin

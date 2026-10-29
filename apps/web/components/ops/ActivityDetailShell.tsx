@@ -14,9 +14,11 @@ import { isCeoEmail } from "@/lib/activity-kinds";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { chargeLabel, estatusUi, kindIcon, kindLabel } from "@/lib/activity-labels";
 import { COMPLEJIDAD_UI, esComplejidad } from "@/lib/complejidad";
+import { estandarDeRegistro, resumenEstandar } from "@/lib/tiempo-estandar";
 import { countEvidenceFiles } from "@/lib/evidence-display";
 import {
   ACCION_INICIAR,
+  formatoMinutos,
   normalizarPrioridad,
   PRIORIDAD_UI,
   puedeIniciar,
@@ -469,6 +471,8 @@ export default function ActivityDetailShell({
       ? `La IA sugirió ${COMPLEJIDAD_UI[activity.complejidadSugerida].label.toLowerCase()}`
       : undefined,
   );
+  const estandar = resumenEstandar(estandarDeRegistro(activity as unknown as Record<string, unknown>), (m) => formatoMinutos(m) ?? `${m} min`);
+  push("Tiempo estándar", estandar?.valor, estandar?.detalle ?? undefined);
   push(
     "Proyecto",
     activity.project?.id && core ? (

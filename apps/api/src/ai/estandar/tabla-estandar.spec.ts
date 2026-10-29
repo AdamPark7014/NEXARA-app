@@ -24,6 +24,13 @@ describe('tabla del tiempo estándar (tarifas aprobadas 28-10)', () => {
     expect(calcularEstandar(regla('tarea', 'Instalación'), {})).toMatchObject({ totalMin: null, faltan: ['cantidad'] });
   });
 
+  it('obra: tarifas de instalación y de cableado según lo que se cuente', () => {
+    expect(calcularEstandar(regla('obra'), { cantidad: 4 }).totalMin).toBe(210); // 30 + 4 × 45
+    expect(calcularEstandar(regla('obra'), { cantidad: 60, unidad: 'metros' }).totalMin).toBe(270); // 30 + 60 × 4
+    expect(calcularEstandar(regla('obra'), { cantidad: 3, unidad: 'nodos' }).totalMin).toBe(165);
+    expect(calcularEstandar(regla('obra'), {})).toMatchObject({ faltan: ['cantidad'] });
+  });
+
   it('cableado por metros cuando se elige esa unidad', () => {
     expect(calcularEstandar(regla('tarea', 'Cableado y canalización'), { cantidad: 120, unidad: 'metros' }).totalMin).toBe(480);
     expect(calcularEstandar(regla('tarea', 'Cableado y canalización'), { cantidad: 2 }).totalMin).toBe(90);
@@ -45,7 +52,9 @@ describe('tabla del tiempo estándar (tarifas aprobadas 28-10)', () => {
   it('juntas y cursos van por agenda y los textos viejos encuentran su regla', () => {
     expect(calcularEstandar(regla('tarea', 'Junta'), {})).toMatchObject({ totalMin: null, faltan: [] });
     expect(reglaDe({ coreKind: 'tarea', ticketTypeCustom: 'instalacion.' })?.clave).toBe('tarea:Instalación');
-    expect(reglaDe({ coreKind: 'obra' })).toBeNull();
+    // Desde el 29-10 la obra se mide por cantidad; el proyecto (actividad suelta de proyecto) no.
+    expect(reglaDe({ coreKind: 'obra' })?.clave).toBe('obra');
+    expect(reglaDe({ coreKind: 'proyecto' })).toBeNull();
   });
 
   it('cada clave aparece una vez', () => {

@@ -86,7 +86,10 @@ import { aInputFecha, hoyISO } from "@/lib/proyecto-plan";
 import { fechaCorta, periodoPorOmision, resumenDelRango } from "@/lib/actividad-periodo";
 import coreCss from "./OpsActivityFormCore.module.css";
 import ComplejidadCampo from "./ComplejidadCampo";
+import TiempoEstandarCampo from "./TiempoEstandarCampo";
+import type { SugerenciaComplejidad } from "@/lib/complejidad";
 import s from "./OpsActivityForm.module.css";
+import { formatoMinutos } from "@/lib/actividad-tiempos";
 
 const SERVICIO_LABEL: Record<string, string> = {
   PREVENTIVO: "Servicio preventivo",
@@ -134,6 +137,11 @@ type Props = {
   selfAssign?: boolean;
   /** «Usar como tiempo estimado» desde la complejidad: la página de asignar ajusta también su rueda. */
   onTiempoTipico?: (minutos: number) => void;
+  /**
+   * El tiempo estándar manda (minutos) o ya no (null: el tipo no tiene, falta un dato o se cambió
+   * con motivo). La página de asignar deja su rueda en solo lectura mientras mande.
+   */
+  onEstandar?: (minutos: number | null) => void;
   onSuccess?: (id: number) => void;
   onCancel?: () => void;
 };
@@ -157,6 +165,7 @@ export default function OpsActivityForm({
   evidencePhotoRequired = 4,
   selfAssign = false,
   onTiempoTipico,
+  onEstandar,
   onSuccess,
   onCancel,
 }: Props) {
@@ -168,6 +177,10 @@ export default function OpsActivityForm({
     (hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canCreate && actCfg.canAssign);
   const isEdit = activityId != null && activityId > 0;
 
+  /** Lo que la IA leyó del título (cantidad y destino) para el tiempo estándar. */
+  const [sugerenciaIA, setSugerenciaIA] = useState<SugerenciaComplejidad | null>(null);
+  const onEstandarRef = useRef(onEstandar);
+  onEstandarRef.current = onEstandar;
   const [form, setForm] = useState<ActivityFormState>({
     ...EMPTY_ACTIVITY_FORM,
     projectMode: forcedProjectMode ?? EMPTY_ACTIVITY_FORM.projectMode,
@@ -924,6 +937,10 @@ export default function OpsActivityForm({
         : null;
   const complejidadVisible = isCore && Boolean(kindActual) && (kindActual !== "tarea" || Boolean(tipoParaComplejidad));
 
+  /** El estándar fija el tiempo mientras nadie lo cambie con motivo. */
+  const estandarManda =
+    complejidadVisible && form.estandar?.tiempoEstandarMin != null && !form.estandar.estandarCambiadoMotivo;
+
   const duracion = (cual: "tiempoEstimadoMin" | "tiempoMaximoMin") => ({
     horas: splitMinutes(Number(form[cual]) || 0).horas,
     minutos: splitMinutes(Number(form[cual]) || 0).minutos,
@@ -1205,6 +1222,27 @@ export default function OpsActivityForm({
                   const m = Math.min(720, minutos);
                   setForm((prev) => ({ ...prev, tiempoEstimadoMin: String(m) }));
                   onTiempoTipico?.(m);
+                }}
+                onSugerencia={setSugerenciaIA}
+              />
+            ) : null}
+            {complejidadVisible ? (
+              <TiempoEstandarCampo
+                token={token}
+                coreKind={kindActual}
+                ticketType={kindActual === "servicio" ? form.ticketType : null}
+                tipoTarea={kindActual === "tarea" ? tipoParaComplejidad : null}
+                complejidad={form.complejidad}
+                sugerencia={sugerenciaIA}
+                salida={form.fecha ? new Date(`${form.fecha}T${form.hora || "09:00"}:00`).toISOString() : null}
+                value={form.estandar}
+                onChange={(estandar, minutos) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    estandar,
+                    ...(minutos != null ? { tiempoEstimadoMin: String(minutos) } : {}),
+                  }));
+                  onEstandarRef.current?.(minutos);
                 }}
               />
             ) : null}
@@ -1540,14 +1578,22 @@ export default function OpsActivityForm({
             <div className={s.duraciones}>
               <div className={s.grupo}>
                 <span className={s.etiqueta}>{isCore ? "¿Cuánto tiempo toma?" : "Tiempo esperado"}</span>
-                <DurationWheelPicker
-                  {...duracion("tiempoEstimadoMin")}
-                  // Ninguna actividad dura más de 12 horas; si lleva más días, se reanuda cada día.
-                  maxHoras={12}
-                  topeMinutos={720}
-                  minuteStep={5}
-                  hint={isCore ? "Gira las ruedas. Máximo 12 h: si lleva más días, se reanuda cada día." : undefined}
-                />
+                {estandarManda ? (
+                  // Lo da el tiempo estándar: para otro tiempo, «Cambiar el tiempo» pide el motivo.
+                  <p className={s.estandarFijo} role="status">
+                    <strong>{formatoMinutos(Number(form.tiempoEstimadoMin)) ?? "—"}</strong>
+                    <span>Lo da el tiempo estándar. Para poner otro, usa «Cambiar el tiempo» arriba (pide motivo).</span>
+                  </p>
+                ) : (
+                  <DurationWheelPicker
+                    {...duracion("tiempoEstimadoMin")}
+                    // Ninguna actividad dura más de 12 horas; si lleva más días, se reanuda cada día.
+                    maxHoras={12}
+                    topeMinutos={720}
+                    minuteStep={5}
+                    hint={isCore ? "Gira las ruedas. Máximo 12 h: si lleva más días, se reanuda cada día." : undefined}
+                  />
+                )}
               </div>
               <div className={s.grupo}>
                 <span className={s.etiqueta}>{isCore ? "Máximo permitido" : "Tiempo máximo"}</span>

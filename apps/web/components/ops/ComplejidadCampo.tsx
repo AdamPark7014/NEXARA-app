@@ -46,6 +46,7 @@ export default function ComplejidadCampo({
   tiempoActualMin,
   onChange,
   onUsarTiempo,
+  onSugerencia,
 }: {
   token: string;
   coreKind: string;
@@ -61,6 +62,8 @@ export default function ComplejidadCampo({
   tiempoActualMin: number;
   onChange: (next: { complejidad?: Complejidad; sugerida?: Complejidad }) => void;
   onUsarTiempo: (minutos: number) => void;
+  /** La sugerencia completa (trae la cantidad y el destino que leyó la IA, para el tiempo estándar). */
+  onSugerencia?: (sugerencia: SugerenciaComplejidad | null) => void;
 }) {
   const [tiempos, setTiempos] = useState<TiemposTipicos | null>(null);
   const [sugerencia, setSugerencia] = useState<SugerenciaComplejidad | null>(null);
@@ -70,6 +73,8 @@ export default function ComplejidadCampo({
   const ultimaPregunta = useRef("");
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onSugerenciaRef = useRef(onSugerencia);
+  onSugerenciaRef.current = onSugerencia;
 
   useEffect(() => {
     let vivo = true;
@@ -96,6 +101,7 @@ export default function ComplejidadCampo({
         .then(({ sugerencia: sug }) => {
           if (!vivo) return;
           setSugerencia(sug);
+          onSugerenciaRef.current?.(sug);
           if (sug) {
             onChangeRef.current(
               elegidaAMano.current ? { sugerida: sug.complejidad } : { complejidad: sug.complejidad, sugerida: sug.complejidad },
