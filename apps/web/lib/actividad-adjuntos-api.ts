@@ -12,7 +12,7 @@
  */
 import { apiRequest, buildApiUrl } from "@/lib/api-base";
 
-export type TipoAdjunto = "pdf" | "imagen" | "excel" | "csv" | "word" | "otro";
+export type TipoAdjunto = "pdf" | "imagen" | "excel" | "csv" | "word" | "powerpoint" | "otro";
 
 export type AdjuntoActividad = {
   id: number;
@@ -66,7 +66,7 @@ export function extensionDe(nombre: string): string {
   return m ? m[1].toLowerCase() : "";
 }
 
-export type IconoAdjunto = "pdf" | "hoja" | "documento" | "imagen" | "archivo";
+export type IconoAdjunto = "pdf" | "hoja" | "documento" | "presentacion" | "imagen" | "archivo";
 
 /** Icono y color por tipo: PDF rojo, Excel/CSV verde, Word azul, imagen morado, el resto gris. */
 export function iconoYColor(tipo: TipoAdjunto | string | null | undefined): {
@@ -83,6 +83,8 @@ export function iconoYColor(tipo: TipoAdjunto | string | null | undefined): {
       return { icono: "hoja", color: "#1E7B45", etiqueta: "CSV" };
     case "word":
       return { icono: "documento", color: "#2B5FD9", etiqueta: "Word" };
+    case "powerpoint":
+      return { icono: "presentacion", color: "#C4501F", etiqueta: "PowerPoint" };
     case "imagen":
       return { icono: "imagen", color: "#7C3AED", etiqueta: "Imagen" };
     default:

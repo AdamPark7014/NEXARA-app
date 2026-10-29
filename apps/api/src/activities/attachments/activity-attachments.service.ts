@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { PERMISSIONS } from '../../common/permissions.js';
 import { getUploadSubdir } from '../../common/upload-paths.js';
 import { esDeTodaLaEmpresa } from '../../me/equipo-alcance.js';
-import { tipoDeDocumento, vistaPreviaHtml } from '../../common/files/vista-previa-documento.js';
+import { tieneVistaPreviaHtml, tipoDeDocumento, vistaPreviaHtml } from '../../common/files/vista-previa-documento.js';
 
 export const ADJUNTOS_SUBDIR = 'actividades-adjuntos';
 export const ADJUNTO_MAX_BYTES = 25 * 1024 * 1024;
@@ -163,7 +163,7 @@ export class ActivityAttachmentsService {
       mimeType: f.mimeType,
       sizeBytes: f.sizeBytes,
       tipo,
-      vistaPrevia: tipo === 'excel' || tipo === 'csv' || tipo === 'word',
+      vistaPrevia: tieneVistaPreviaHtml(tipo),
       createdAt: f.createdAt,
       subidoPor: f.user ? { id: f.user.id, nombre: f.user.nombre } : null,
       puedeQuitar:

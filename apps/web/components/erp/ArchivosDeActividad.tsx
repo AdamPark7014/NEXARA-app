@@ -15,6 +15,7 @@ import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
 import TableChartOutlinedIcon from "@mui/icons-material/TableChartOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
+import SlideshowOutlinedIcon from "@mui/icons-material/SlideshowOutlined";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
@@ -50,6 +51,7 @@ const ICONOS: Record<IconoAdjunto, typeof PictureAsPdfOutlinedIcon> = {
   pdf: PictureAsPdfOutlinedIcon,
   hoja: TableChartOutlinedIcon,
   documento: DescriptionOutlinedIcon,
+  presentacion: SlideshowOutlinedIcon,
   imagen: ImageOutlinedIcon,
   archivo: InsertDriveFileOutlinedIcon,
 };
