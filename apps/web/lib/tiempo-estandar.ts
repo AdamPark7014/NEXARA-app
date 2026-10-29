@@ -9,7 +9,15 @@
 import { erpFetch } from "@/lib/erp-api";
 import type { Complejidad } from "@/lib/complejidad";
 
-export type UnidadEstandar = { clave: string; singular: string; plural: string; pregunta: string; porUnidadMin: number };
+export type UnidadEstandar = {
+  clave: string;
+  singular: string;
+  plural: string;
+  pregunta: string;
+  porUnidadMin: number;
+  /** Unidades que ya cubre la base; se cobran solo las de más (cotización: hasta 10 partidas). */
+  incluidas?: number;
+};
 
 export type ReglaEstandar = {
   clave: string;
@@ -96,7 +104,7 @@ export function reglaPara(tabla: TablaEstandar | null | undefined, clave: string
   return tabla.reglas.find((r) => normalizar(r.clave) === buscada) ?? null;
 }
 
-/** La misma cuenta que la API: base + cantidad × tarifa (o por complejidad) + ida y vuelta + en el lugar. */
+/** La misma cuenta que la API: base + (cantidad − incluidas) × tarifa (o por complejidad) + ida y vuelta + en el lugar. */
 export function calcularEstandar(
   regla: ReglaEstandar,
   datos: { cantidad?: number | null; unidad?: string | null; complejidad?: Complejidad | "" | null; traslado?: { idaMin: number; vueltaMin: number } | null },
@@ -108,12 +116,20 @@ export function calcularEstandar(
   if (regla.unidades.length) {
     const unidad = regla.unidades.find((x) => x.clave === datos.unidad) ?? regla.unidades[0];
     const n = Math.max(0, Math.round(Number(datos.cantidad) || 0));
-    if (regla.baseMin) desglose.push({ concepto: `Base de ${regla.nombre.toLowerCase()}`, minutos: regla.baseMin });
-    if (n > 0) {
-      desglose.push({ concepto: `${n} ${n === 1 ? unidad.singular : unidad.plural} × ${unidad.porUnidadMin} min`, minutos: n * unidad.porUnidadMin });
-    } else {
-      faltan.push("cantidad");
+    const incluidas = Math.max(0, unidad.incluidas ?? 0);
+    if (regla.baseMin) {
+      const hasta = incluidas ? ` (hasta ${incluidas} ${unidad.plural})` : "";
+      desglose.push({ concepto: `Base de ${regla.nombre.toLowerCase()}${hasta}`, minutos: regla.baseMin });
     }
+    // Lo que la base ya cubre no se cobra otra vez: solo las unidades de más.
+    const extra = n - incluidas;
+    if (n > 0 && extra > 0) {
+      desglose.push({
+        concepto: `${extra} ${extra === 1 ? unidad.singular : unidad.plural}${incluidas ? " más" : ""} × ${unidad.porUnidadMin} min`,
+        minutos: extra * unidad.porUnidadMin,
+      });
+    }
+    if (n <= 0) faltan.push("cantidad");
   } else if (regla.porComplejidad) {
     if (datos.complejidad) desglose.push({ concepto: `${regla.nombre} · complejidad`, minutos: regla.porComplejidad[datos.complejidad] });
     else faltan.push("complejidad");

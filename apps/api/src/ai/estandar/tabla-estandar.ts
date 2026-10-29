@@ -19,6 +19,8 @@ export type UnidadEstandar = {
   /** «¿Cuántas partidas?» */
   pregunta: string;
   porUnidadMin: number;
+  /** Unidades que ya cubre la base: se cobran solo las de más (cotización: hasta 10 partidas en 40 min). */
+  incluidas?: number;
 };
 
 export type ReglaEstandar = {
@@ -39,18 +41,27 @@ export type ReglaEstandar = {
   agenda?: boolean;
 };
 
-const u = (clave: string, singular: string, plural: string, porUnidadMin: number, femenino = false): UnidadEstandar => ({
+const u = (
+  clave: string,
+  singular: string,
+  plural: string,
+  porUnidadMin: number,
+  femenino = false,
+  incluidas?: number,
+): UnidadEstandar => ({
   clave,
   singular,
   plural,
   pregunta: `¿${femenino ? 'Cuántas' : 'Cuántos'} ${plural}?`,
   porUnidadMin,
+  ...(incluidas ? { incluidas } : {}),
 });
 
 const POR_COMPLEJIDAD_CORRECTIVO: Record<Complejidad, number> = { BASICA: 60, ESTANDAR: 120, COMPLEJA: 210, CRITICA: 300 };
 
 export const TABLA_ESTANDAR: ReglaEstandar[] = [
-  { clave: 'comercial', nombre: 'Cotización', baseMin: 40, unidades: [u('partidas', 'partida', 'partidas', 4, true)], destino: false, enLugarMin: 0 },
+  // Adam (29-10): de 5 a 10 productos no pasa de 40 min; 50 productos siguen siendo 4 h (40 + 40 × 5).
+  { clave: 'comercial', nombre: 'Cotización', baseMin: 40, unidades: [u('partidas', 'partida', 'partidas', 5, true, 10)], destino: false, enLugarMin: 0 },
   { clave: 'tarea:Instalación', nombre: 'Instalación', baseMin: 30, unidades: [u('dispositivos', 'dispositivo', 'dispositivos', 45)], destino: false, enLugarMin: 0 },
   {
     clave: 'tarea:Cableado y canalización',
@@ -136,9 +147,20 @@ export function calcularEstandar(
   if (regla.unidades.length) {
     const unidad = regla.unidades.find((x) => x.clave === datos.unidad) ?? regla.unidades[0];
     const n = Math.max(0, Math.round(Number(datos.cantidad) || 0));
-    if (regla.baseMin) desglose.push({ concepto: `Base de ${regla.nombre.toLowerCase()}`, minutos: regla.baseMin });
-    if (n > 0) desglose.push({ concepto: `${n} ${n === 1 ? unidad.singular : unidad.plural} × ${unidad.porUnidadMin} min`, minutos: n * unidad.porUnidadMin });
-    else faltan.push('cantidad');
+    const incluidas = Math.max(0, unidad.incluidas ?? 0);
+    if (regla.baseMin) {
+      const hasta = incluidas ? ` (hasta ${incluidas} ${unidad.plural})` : '';
+      desglose.push({ concepto: `Base de ${regla.nombre.toLowerCase()}${hasta}`, minutos: regla.baseMin });
+    }
+    // Lo que la base ya cubre no se cobra otra vez: solo las unidades de más.
+    const extra = n - incluidas;
+    if (n > 0 && extra > 0) {
+      desglose.push({
+        concepto: `${extra} ${extra === 1 ? unidad.singular : unidad.plural}${incluidas ? ' más' : ''} × ${unidad.porUnidadMin} min`,
+        minutos: extra * unidad.porUnidadMin,
+      });
+    }
+    if (n <= 0) faltan.push('cantidad');
   } else if (regla.porComplejidad) {
     if (datos.complejidad) desglose.push({ concepto: `${regla.nombre} · complejidad`, minutos: regla.porComplejidad[datos.complejidad] });
     else faltan.push('complejidad');

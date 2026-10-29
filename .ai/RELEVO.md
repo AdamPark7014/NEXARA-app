@@ -28,6 +28,8 @@
     Roberto 1 de 9; su Disciplina cae casi a 0 hasta que la registren.
   - Fuera de la fórmula (aprobado, trabajo aparte): nota de la regla de pago para la contadora (la mesa contable no
     tiene dónde dejar notas), hoja de entradas desde el sistema y nómina del 26-10 en paralelo con el Excel.
+  - Tarifa de cotización ajustada (aprobada): 40 min hasta 10 partidas + 5 por cada una de más (50 → 4 h).
+    `UnidadEstandar.incluidas` en API y web; anotado en §8.
 
 - **29-10 ~13:40 (claude-code) — Apps: inicio de dirección general (CEO) en el teléfono (pedido de Adam).**
   - Adam: «Christian tiene ir a pizarra del equipo, el módulo principal es un módulo vacío… que tenga algo que ver el

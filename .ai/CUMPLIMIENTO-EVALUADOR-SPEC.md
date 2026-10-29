@@ -293,7 +293,7 @@ desplegada) mueve el estándar cuando el tipo no tiene unidades.
 
 | Tipo | Se pide | Estándar inicial (a calibrar) |
 |---|---|---|
-| Cotización (comercial) | partidas; se leen solas si está ligada a la cotización | 40 min + 4 min por partida (5 → 1 h, 50 → 4 h) |
+| Cotización (comercial) | partidas; se leen solas si está ligada a la cotización | 40 min hasta 10 partidas + 5 min por cada una de más (10 → 40 min, 50 → 4 h). Ajustado el 29-10 (antes 40 + 4 por partida) |
 | Instalación | dispositivos (cámaras, lectores, equipos) | 30 min + 45 min por dispositivo |
 | Cableado y canalización | nodos, o metros de tubería | 45 min por nodo · 4 min por metro |
 | Mantenimiento preventivo | equipos | 20 min + 15 min por equipo |
@@ -306,6 +306,11 @@ desplegada) mueve el estándar cuando el tipo no tiene unidades.
 | Facturación y contabilidad | facturas | 10 min por factura |
 | Levantamiento | áreas, + destino | traslado + 30 min por área |
 | Junta · Capacitación · Evento o guardia | horario agendado | lo que dure la agenda |
+
+Ajuste del 29-10 (aprobado con «aprueba todo»): Adam dijo por WhatsApp que una cotización de 5 a 10 productos no pasa
+de 40 minutos. Con la tarifa del 28-10, 10 partidas daban 80 min. Ahora la base de 40 min cubre hasta 10 partidas
+(`incluidas` en `TABLA_ESTANDAR`) y cada partida de más suma 5 min, así que 50 productos siguen siendo 4 h. Lo ya
+asignado conserva el estándar que se guardó.
 
 **Traslado.** El destino se marca en el mapa al asignar y se pide la ruta de ida y vuelta en auto o en transporte.
 - Opción A (recomendada): Google Routes API. Pide activar la facturación de la llave de Maps (hoy sin facturación,
