@@ -6,6 +6,7 @@ import CelebrationOutlinedIcon from "@mui/icons-material/CelebrationOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import OutboxOutlinedIcon from "@mui/icons-material/OutboxOutlined";
 import HandshakeOutlinedIcon from "@mui/icons-material/HandshakeOutlined";
+import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
 import MonitorOutlinedIcon from "@mui/icons-material/MonitorOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import CloseIcon from "@mui/icons-material/Close";
@@ -29,6 +30,8 @@ import { createRealtimeSocket } from "@/lib/realtime-socket";
 import MisActividadesView from "@/components/pizarra/MisActividadesView";
 import AsignadasPorMiView from "@/components/pizarra/AsignadasPorMiView";
 import SolicitudesEquipoView from "@/components/pizarra/SolicitudesEquipoView";
+import EnEsperaRevisionView, { type VerRevisiones } from "@/components/pizarra/EnEsperaRevisionView";
+import { fetchRevisiones, type RevisionesResponse } from "@/lib/revisiones-api";
 import FlujoKpiStrip from "@/components/pizarra/FlujoKpiStrip";
 import CentroOperativo from "@/components/pizarra/CentroOperativo";
 import EquipoPersonaCard, { rejillaEquipo } from "@/components/pizarra/EquipoPersonaCard";
@@ -52,8 +55,9 @@ import {
 import c from "@/components/pizarra/comun.module.css";
 import p from "./pizarra.module.css";
 
-/** Actividades: lo mío, mi equipo, lo que repartí y solicitudes entre pares. */
-type Vista = "mias" | "equipo" | "asignadas" | "solicitudes";
+/** Actividades: lo mío, mi equipo, lo que repartí, lo que espera mi revisión y solicitudes entre pares. */
+type Vista = "mias" | "equipo" | "asignadas" | "revision" | "solicitudes";
+const VISTAS: readonly Vista[] = ["mias", "equipo", "asignadas", "revision", "solicitudes"];
 const VISTA_KEY = "nx-actividades-vista";
 /** «Mi equipo»: tarjetas o línea del día; se recuerda por navegador. */
 const MODO_KEY = "nx-equipo-modo";
@@ -62,8 +66,23 @@ const DESCRIPCION: Record<Vista, string> = {
   mias: "Lo que te toca hoy, en el orden en que lo vas a hacer.",
   equipo: "Quién trabaja, quién va con retraso y qué espera tu revisión.",
   asignadas: "Lo que repartiste y cómo va cada persona.",
+  revision: "Evidencias que tu equipo ya envió y esperan tu visto bueno: revísalas y califícalas.",
   solicitudes: "Actividades que les pides a tus compañeros y las que te piden a ti.",
 };
+
+/** La URL dice en qué pestaña estás: «‹ regresar» desde una actividad vuelve a la misma. */
+function reflejarEnUrl(cambios: Record<string, string | null>) {
+  try {
+    const url = new URL(window.location.href);
+    for (const [k, v] of Object.entries(cambios)) {
+      if (v == null) url.searchParams.delete(k);
+      else url.searchParams.set(k, v);
+    }
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  } catch {
+    /* sin History API: la pestaña vale para esta visita */
+  }
+}
 
 function TarjetasCargando() {
   return (
@@ -93,6 +112,7 @@ const PESTANAS: ReadonlyArray<TabItem<Vista>> = [
   { id: "mias", label: "Mis actividades", icon: TaskAltIcon },
   { id: "equipo", label: "Mi equipo", icon: GroupsOutlinedIcon },
   { id: "asignadas", label: "Asignadas por mí", icon: OutboxOutlinedIcon },
+  { id: "revision", label: "En espera de revisión", icon: RateReviewOutlinedIcon },
   { id: "solicitudes", label: "Solicitudes de equipo", icon: HandshakeOutlinedIcon },
 ];
 
@@ -113,6 +133,11 @@ export default function PizarraPage() {
   /** Modo centro operativo: la pizarra a pantalla completa para la pared. */
   const [centro, setCentro] = useState(false);
   const [modo, setModo] = useState<ModoEquipo>("tarjetas");
+  // «En espera de revisión»: se carga con la pizarra para que la pestaña lleve su número.
+  const [revisiones, setRevisiones] = useState<RevisionesResponse | null>(null);
+  const [cargandoRevisiones, setCargandoRevisiones] = useState(false);
+  const [errorRevisiones, setErrorRevisiones] = useState<string | null>(null);
+  const [verRevisiones, setVerRevisiones] = useState<VerRevisiones>("pendientes");
 
   useEffect(() => {
     try {
@@ -131,14 +156,20 @@ export default function PizarraPage() {
     }
   };
 
-  // ?vista=mias|equipo|asignadas manda (enlaces viejos de Mis actividades); si no, la última elegida.
+  // ?vista=mias|equipo|asignadas|revision manda (enlaces viejos y «‹ regresar» desde una
+  // actividad); si no, la última elegida. `&ver=revisadas` abre lo que ya revisaste.
   useEffect(() => {
     try {
-      const q = new URLSearchParams(window.location.search).get("vista");
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get("vista");
+      const valida = (v: string | null): v is Vista => v != null && (VISTAS as readonly string[]).includes(v);
+      if (params.get("ver") === "revisadas") setVerRevisiones("revisadas");
+      if (valida(q)) {
+        setVista(q);
+        return;
+      }
       const guardada = window.localStorage.getItem(VISTA_KEY);
-      const valida = (v: string | null): v is Vista =>
-        v === "mias" || v === "equipo" || v === "asignadas" || v === "solicitudes";
-      setVista(valida(q) ? q : valida(guardada) ? guardada : "mias");
+      setVista(valida(guardada) ? guardada : "mias");
     } catch {
       /* sin storage: queda «mias» */
     }
@@ -173,11 +204,34 @@ export default function PizarraPage() {
     void load();
   }, [load]);
 
+  const cargarRevisiones = useCallback(async () => {
+    if (!token) return;
+    setCargandoRevisiones(true);
+    try {
+      setRevisiones(await fetchRevisiones(token));
+      setErrorRevisiones(null);
+    } catch (e) {
+      // Con lista ya en pantalla se conserva y solo se avisa (la vista decide cómo).
+      setErrorRevisiones(formatApiError(e, "No se pudo cargar lo que espera revisión"));
+    } finally {
+      setCargandoRevisiones(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void cargarRevisiones();
+  }, [cargarRevisiones]);
+
+  const recargar = useCallback(() => {
+    void load();
+    void cargarRevisiones();
+  }, [load, cargarRevisiones]);
+
   // Cada 30 s mientras la pestaña está a la vista; al volver a ella, refresca de inmediato.
   useEffect(() => {
     if (!token) return;
     const tick = () => {
-      if (document.visibilityState === "visible") void load();
+      if (document.visibilityState === "visible") recargar();
     };
     const id = window.setInterval(tick, 30_000);
     document.addEventListener("visibilitychange", tick);
@@ -185,23 +239,24 @@ export default function PizarraPage() {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", tick);
     };
-  }, [token, load]);
+  }, [token, recargar]);
 
   // La pizarra también escucha el socket: al borrar (o mover) una actividad
-  // sale de Mi equipo sin esperar los 30 s del refresco.
+  // sale de Mi equipo sin esperar los 30 s del refresco; al enviar o revisar
+  // evidencia, «En espera de revisión» también se pone al día.
   useEffect(() => {
     if (!token) return;
     const socket = createRealtimeSocket(getSocketBaseUrl(), { auth: { token } });
     const onEntity = (payload?: { model?: string }) => {
       if (payload?.model && payload.model !== "Activity") return;
-      void load();
+      recargar();
     };
     socket.on("entity:updated", onEntity);
-    socket.on("activity:updated", () => void load());
+    socket.on("activity:updated", () => recargar());
     return () => {
       socket.disconnect();
     };
-  }, [token, load]);
+  }, [token, recargar]);
 
   const users = useMemo(() => {
     const list = data?.users ?? [];
@@ -237,23 +292,31 @@ export default function PizarraPage() {
   const tieneEquipo = otros > 0;
   const cargandoEquipo = !isCeo && data == null && !error;
   const sinEquipo = !isCeo && !tieneEquipo && (data != null || Boolean(error));
-  // Christian solo asigna: ve el tablero y lo que repartió. Encargados con subordinados,
-  // además lo suyo.
+  const porRevisar = revisiones?.pendientes.length ?? 0;
+  // Sin gente a cargo también revisa quien es responsable de lo que hace otro: la pestaña
+  // sale si tiene algo pendiente o ya revisó algo.
+  const revisaAlgo = porRevisar > 0 || (revisiones?.revisadas.length ?? 0) > 0;
+  // Christian solo asigna y revisa: ve el tablero, lo que repartió y lo que espera su
+  // revisión. Encargados con subordinados, además lo suyo.
   const pestanas: Vista[] = isCeo
-    ? ["equipo", "asignadas", "solicitudes"]
+    ? ["equipo", "asignadas", "revision", "solicitudes"]
     : tieneEquipo
-      ? ["mias", "equipo", "asignadas", "solicitudes"]
-      : ["mias", "solicitudes"];
+      ? ["mias", "equipo", "asignadas", "revision", "solicitudes"]
+      : revisaAlgo
+        ? ["mias", "revision", "solicitudes"]
+        : ["mias", "solicitudes"];
   const conPestanas = pestanas.length > 0;
   const vistaActiva: Vista = conPestanas && pestanas.includes(vista) ? vista : pestanas[0] ?? "equipo";
   const verMias = vistaActiva === "mias";
   const verEquipo = vistaActiva === "equipo";
   const verAsignadas = vistaActiva === "asignadas";
+  const verRevision = vistaActiva === "revision";
   const verSolicitudes = vistaActiva === "solicitudes";
 
   const cambiarVista = (v: Vista) => {
     setVista(v);
     if (v !== "equipo") setCentro(false);
+    reflejarEnUrl({ vista: v, ver: v === "revision" && verRevisiones === "revisadas" ? "revisadas" : null });
     try {
       window.localStorage.setItem(VISTA_KEY, v);
     } catch {
@@ -261,13 +324,37 @@ export default function PizarraPage() {
     }
   };
 
-  // Contadores reales de las pestañas: lo abierto de quien mira y la gente a su cargo.
+  const cambiarVerRevisiones = (v: VerRevisiones) => {
+    setVerRevisiones(v);
+    reflejarEnUrl({ vista: "revision", ver: v === "revisadas" ? "revisadas" : null });
+  };
+
+  // Contadores reales de las pestañas: lo abierto de quien mira, la gente a su cargo y lo
+  // que espera su revisión.
   const misAbiertas = users.find((u) => u.id === user?.id)?.openActivities?.length;
   const pestanasVisibles = (ids: readonly Vista[]): TabItem<Vista>[] =>
     PESTANAS.filter((t) => ids.includes(t.id)).map((t) => ({
       ...t,
-      count: t.id === "equipo" ? otros : t.id === "mias" ? misAbiertas : undefined,
+      count:
+        t.id === "equipo"
+          ? otros
+          : t.id === "mias"
+            ? misAbiertas
+            : t.id === "revision"
+              ? porRevisar || undefined
+              : undefined,
     }));
+
+  const vistaRevision = (
+    <EnEsperaRevisionView
+      data={revisiones}
+      loading={cargandoRevisiones}
+      error={errorRevisiones}
+      onRecargar={() => void cargarRevisiones()}
+      ver={verRevisiones}
+      onVer={cambiarVerRevisiones}
+    />
+  );
 
   const pestanasNodo = (ids: readonly Vista[]) => (
     <Tabs ariaLabel="Vista de actividades" items={pestanasVisibles(ids)} value={vistaActiva} onChange={cambiarVista} />
@@ -287,17 +374,23 @@ export default function PizarraPage() {
     );
   }
 
-  if (sinEquipo && (vistaActiva === "solicitudes" || vistaActiva === "mias")) {
+  if (sinEquipo && (vistaActiva === "solicitudes" || vistaActiva === "mias" || vistaActiva === "revision")) {
     return (
       <div className={p.pagina}>
         <ModulePage
           title="Actividades"
           description={DESCRIPCION[vistaActiva]}
-          tabs={pestanasNodo(["mias", "solicitudes"])}
+          tabs={pestanasNodo(pestanas)}
           lead={asistente}
           card={false}
         >
-          {vistaActiva === "solicitudes" ? <SolicitudesEquipoView token={token} /> : <MisActividadesView />}
+          {vistaActiva === "solicitudes" ? (
+            <SolicitudesEquipoView token={token} />
+          ) : vistaActiva === "revision" ? (
+            vistaRevision
+          ) : (
+            <MisActividadesView />
+          )}
         </ModulePage>
       </div>
     );
@@ -333,12 +426,12 @@ export default function PizarraPage() {
       <Button
         variant="ghost"
         className={c.tap}
-        iconStart={<RefreshIcon className={loading ? p.girando : undefined} />}
-        onClick={() => void load()}
-        disabled={loading || !token}
-        aria-busy={loading}
+        iconStart={<RefreshIcon className={loading || cargandoRevisiones ? p.girando : undefined} />}
+        onClick={recargar}
+        disabled={loading || cargandoRevisiones || !token}
+        aria-busy={loading || cargandoRevisiones}
       >
-        {loading ? "Actualizando…" : "Actualizar"}
+        {loading || cargandoRevisiones ? "Actualizando…" : "Actualizar"}
       </Button>
     </>
   );
@@ -531,6 +624,8 @@ export default function PizarraPage() {
           <MisActividadesView />
         ) : verSolicitudes ? (
           <SolicitudesEquipoView token={token} />
+        ) : verRevision ? (
+          vistaRevision
         ) : verAsignadas ? (
           <AsignadasPorMiView token={token} rango={preset === "hoy" ? {} : rango} toolbarEnd={rangoSelector} />
         ) : (

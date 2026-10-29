@@ -1,0 +1,116 @@
+/* «En espera de revisión»: resumen + tarjeta de lista con tabla (tokens --ui-*). */
+
+.vista {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.vista.vista > * {
+  margin-bottom: 0;
+}
+
+.lista {
+  overflow: clip;
+  min-width: 0;
+}
+
+.relleno {
+  padding: var(--ui-s4);
+}
+
+.actividad {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.tipo {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--ui-radius-md, 10px);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+.actividadTexto {
+  display: grid;
+  min-width: 0;
+}
+
+.titulo {
+  font-weight: 600;
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.sub {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-3);
+}
+
+.estado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+
+.estrellas {
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--ui-warning, #b7791f);
+  white-space: nowrap;
+}
+
+.estrellasVacias {
+  color: var(--ui-border-strong, var(--ui-border));
+}
+
+/* En escritorio el botón «Revisar» se ve siempre: es la acción de esta lista. */
+.tabla td:last-child > div {
+  opacity: 1;
+}
+
+@media (max-width: 480px) {
+  .relleno {
+    padding: var(--ui-s3);
+  }
+
+  /* Teléfono: un dato por renglón; en escritorio sigue siendo tabla. */
+  .meta {
+    display: grid;
+    gap: 2px;
+  }
+  .sep {
+    display: none;
+  }
+  .tabla table,
+  .tabla tbody,
+  .tabla tr,
+  .tabla td {
+    display: block;
+    width: auto !important;
+  }
+  .tabla thead {
+    display: none;
+  }
+  .tabla tr {
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .tabla tr:last-child {
+    border-bottom: 0;
+  }
+  .tabla td {
+    border-bottom: 0;
+    text-align: left !important;
+  }
+  .tabla td:last-child > div {
+    justify-content: flex-start;
+  }
+}

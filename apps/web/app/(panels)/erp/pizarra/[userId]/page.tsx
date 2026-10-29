@@ -55,6 +55,7 @@ import { ESTADO_EQUIPO_TONE } from "@/components/pizarra/tonos";
 import { digitalFormLabels } from "@/lib/evidence-flow-helpers";
 import { chargeLabel, estatusUi, formatHourMinute, kindLabel } from "@/lib/activity-labels";
 import DespachoPendingPanel from "@/components/pizarra/DespachoPendingPanel";
+import { conOrigen } from "@/lib/actividad-origen";
 import { PausarDeEquipo } from "@/components/pizarra/SesionActividad";
 import { textoPausa } from "@/lib/sesion-actividad";
 import { FotoProtegida, VisorPdf } from "@/components/ops/EquipoEvidencias";
@@ -112,10 +113,26 @@ export default function PizarraPersonaPage() {
   const desde = rango.desde ?? null;
   const hasta = rango.hasta ?? null;
 
-  // Al volver de asignar (`?asignada=<id>`). Sin useSearchParams: evita el error de Suspense en build.
+  // Al volver de asignar (`?asignada=<id>`) o de una actividad abierta desde el historial
+  // (`?pestana=historial`). Sin useSearchParams: evita el error de Suspense en build.
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("asignada")) setAsignada(true);
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("asignada")) setAsignada(true);
+    if (q.get("pestana") === "historial") setPestana("historial");
   }, []);
+
+  // La URL lleva la pestaña: así «‹ regresar» (y el botón atrás del navegador) vuelve a ella.
+  const cambiarPestana = (p: Pestana) => {
+    setPestana(p);
+    try {
+      const url = new URL(window.location.href);
+      if (p === "historial") url.searchParams.set("pestana", "historial");
+      else url.searchParams.delete("pestana");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    } catch {
+      /* sin History API: vale para esta visita */
+    }
+  };
 
   const cerrarAviso = () => {
     setAsignada(false);
@@ -273,7 +290,7 @@ export default function PizarraPersonaPage() {
           { id: "historial" as const, label: "Historial", icon: HistoryIcon, count: history.length },
         ]}
         value={pestana}
-        onChange={setPestana}
+        onChange={cambiarPestana}
       />
       <div className={f.rango}>
         <RangoSelector
@@ -333,7 +350,7 @@ export default function PizarraPersonaPage() {
                 <span className={c.folio}>{act.anNumber}</span>
               </div>
               <ButtonLink
-                href={`/erp/actividades/${act.id}`}
+                href={conOrigen(`/erp/actividades/${act.id}`, { tipo: "persona", persona: user.id })}
                 size="sm"
                 className={c.tap}
                 iconEnd={<ArrowForwardIcon />}
@@ -550,8 +567,22 @@ export default function PizarraPersonaPage() {
                           </Button>
                         </>
                       ) : null}
+                      {/* Entregada y sin visto bueno: directo a revisarla; al terminar, «‹ Historial» vuelve aquí. */}
+                      {!isSelf && ev.status === "COMPLETED" && /validar|validaci/i.test(h.estatus) ? (
+                        <ButtonLink
+                          href={conOrigen(`/erp/actividades/${h.id}/evidencias#revision`, {
+                            tipo: "historial",
+                            persona: user.id,
+                          })}
+                          size="sm"
+                          variant="primary"
+                          className={c.tap}
+                        >
+                          Revisar evidencia
+                        </ButtonLink>
+                      ) : null}
                       <ButtonLink
-                        href={`/erp/actividades/${h.id}`}
+                        href={conOrigen(`/erp/actividades/${h.id}`, { tipo: "historial", persona: user.id })}
                         size="sm"
                         variant="ghost"
                         className={c.tap}

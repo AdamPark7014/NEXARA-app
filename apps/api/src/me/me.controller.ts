@@ -388,6 +388,24 @@ export class MeController {
     );
   }
 
+  /** «En espera de revisión»: lo que quien consulta puede aprobar o devolver, y lo que ya revisó. */
+  @Get('revisiones')
+  pendingReviews(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.myActivities.pendingReviews(
+      {
+        id: Number(user.id),
+        email: user.email ?? null,
+        roleKey: user.roleKey ?? null,
+        isSuperAdmin: Boolean(user.isSuperAdmin),
+        permissions: Array.isArray(user.permissions) ? user.permissions : [],
+      },
+      companyId,
+    );
+  }
+
   /** Aprobar o devolver (pasos o todo) la evidencia de alguien de la cadena, con observaciones y calificación. */
   @Post('activities/:id/evidencias/:userId/revision')
   reviewTeamEvidence(

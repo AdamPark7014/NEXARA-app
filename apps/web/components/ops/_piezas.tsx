@@ -48,10 +48,13 @@ export function RouteTabs({ items, ariaLabel = "Secciones" }: { items: ReadonlyA
   );
 
   const activa = useMemo(() => {
-    let mejor: RouteTab | null = null;
+    // El href puede llevar `?origen=…` (de dónde se llegó): la pestaña activa se decide por la ruta.
+    const ruta = (href: string) => href.split(/[?#]/)[0] ?? href;
+    let mejor: { id: string; ruta: string } | null = null;
     for (const t of visibles) {
-      if (pathname === t.href || pathname.startsWith(`${t.href}/`)) {
-        if (!mejor || t.href.length > mejor.href.length) mejor = t;
+      const r = ruta(t.href);
+      if (pathname === r || pathname.startsWith(`${r}/`)) {
+        if (!mejor || r.length > mejor.ruta.length) mejor = { id: t.id, ruta: r };
       }
     }
     return mejor?.id ?? null;

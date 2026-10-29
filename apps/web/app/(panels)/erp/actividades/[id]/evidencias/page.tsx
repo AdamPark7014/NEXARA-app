@@ -41,6 +41,16 @@ export default function ActivityEvidencesPage() {
     })),
   });
 
+  // «Revisar» (En espera de revisión, la ficha) llega con `#revision` antes de que la actividad
+  // cargue: el ancla aún no existe y el navegador no baja. Se baja una vez, ya con la actividad.
+  const listaParaAncla = Boolean(activity?.id);
+  useEffect(() => {
+    if (!listaParaAncla) return;
+    const ancla = window.location.hash.slice(1);
+    if (ancla !== "revision" && ancla !== "captura") return;
+    document.getElementById(ancla)?.scrollIntoView?.({ block: "start" });
+  }, [listaParaAncla]);
+
   useEffect(() => {
     if (typeof window === "undefined" || !activity?.id) return;
     const url = new URL(window.location.href);
