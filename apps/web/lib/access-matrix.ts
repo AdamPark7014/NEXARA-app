@@ -509,7 +509,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "erp-contabilidad": {
     id: "erp-contabilidad", panel: PANELS.ERP, path: "/contabilidad",
-    label: "Contabilidad", description: "Hub financiero: CxC, CxP, facturas, conciliación y cierres",
+    label: "Mesa contable", description: "Hub financiero: CxC, CxP, facturas, conciliación y cierres",
     icon: "📒", allowedRoles: FINANCE_TEAM,
     group: "Finanzas", visible: true,
   },

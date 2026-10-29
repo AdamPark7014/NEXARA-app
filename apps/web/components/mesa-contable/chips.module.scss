@@ -1,0 +1,115 @@
+/* Fila de chips de la Mesa contable (maqueta 29-10-2026): pastillas de 36 px, la activa en
+   verde de Core con texto blanco y el contador en una pastilla translúcida. */
+
+.nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 6px 0 4px;
+}
+
+.chip {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--ui-fg-2) 70%, var(--ui-fg));
+  text-decoration: none;
+  font: 500 14px var(--ui-font);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--ui-duration-fast) var(--ui-ease-standard);
+
+  &:hover {
+    background: var(--ui-hover);
+    color: var(--ui-fg);
+  }
+
+  &:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: var(--ui-focus-offset);
+  }
+
+  &[aria-current="page"],
+  &[data-activo="true"] {
+    background: var(--ui-brand);
+    color: var(--ui-brand-fg);
+    font-weight: 600;
+  }
+
+  &[aria-current="page"]:hover,
+  &[data-activo="true"]:hover {
+    background: var(--ui-brand-hover);
+    color: var(--ui-brand-fg);
+  }
+}
+
+.count {
+  font-size: 12px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--ui-track);
+  color: color-mix(in srgb, var(--ui-fg-2) 70%, var(--ui-fg));
+  font-variant-numeric: tabular-nums;
+
+  .chip[aria-current="page"] &,
+  .chip[data-activo="true"] & {
+    background: rgba(255, 255, 255, 0.22);
+    color: var(--ui-brand-fg);
+  }
+}
+
+.more {
+  position: relative;
+  display: inline-flex;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: var(--ui-z-dropdown);
+  min-width: 220px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--ui-surface-3);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-elev-pop);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: var(--ui-fg);
+  text-decoration: none;
+  font: 500 14px var(--ui-font);
+  white-space: nowrap;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--ui-hover);
+    color: var(--ui-fg);
+  }
+
+  &:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: -2px;
+  }
+
+  &[aria-current="page"] {
+    background: var(--ui-brand-soft);
+    color: var(--ui-brand-text);
+    font-weight: 600;
+  }
+}
