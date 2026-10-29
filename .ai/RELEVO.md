@@ -1,5 +1,25 @@
 # RELEVO
 
+- **29-10 ~10:20 (claude-code) — Lo enviado a revisión ya no se avisa como «vencida» (regla de Adam).**
+  - Adam: «una cosa son las actividades que se mandan a revisión… no importa si lo califico ahorita o en un año. Y
+    la otra, el cumplimiento… en tiempo y forma, en un mismo día»; al checar salida se botan como vencidas las del
+    día no cerradas, **nunca las ya enviadas a revisión: esas son cumplidas**.
+  - Lo que le llegó (no era el cierre de las 7): desde al menos el 20-10, cada día. El 29-10 a las 9:00 fueron
+    403 «… está vencida» sobre 120 actividades (116 «Por Validar») y 110 «Recordatorio: evidencia por revisar».
+    - `cron.service.ts` (`sla-breach-escalate`, cada hora, dedupe 20 h) filtraba con `OPEN_ACTIVITY_WHERE`, que
+      trata «Por Validar» como abierta.
+    - `ticket-alerts` («por vencer» / «vencida» de clientes) y `actividades-atrasadas` usaban `closedStatus*`.
+    - El recordatorio de evidencias iba al **responsable**: en lo autoasignado, la misma persona que la envió.
+  - Cambio: `SIN_PLAZO_STATUSES` (cerradas + «Por Validar») en `activity-status.ts` (`sinPlazoStatusVariants`,
+    `sinPlazoStatusSqlList`, `isSinPlazoStatus`; con spec). Los tres avisos de plazo filtran con eso. `closedStatus*`
+    no cambia: las listas y la revisión siguen viendo «Por Validar» como abierta. Se borró
+    `activity-evidence-reminder.cron.ts` (+ spec); el resumen «Tu día» de las 8:00 ya dice cuántas esperan revisión.
+  - «En espera de revisión» sin semáforo: columna «Enviada» neutra, fuera la cifra «Esperan más de un día»; el
+    resumen dice «entregadas: ya cuentan como cumplidas».
+  - Datos: AN-0328 (Josué, del 28-10) también «No cumplida», con el mismo script (`/root/cierre-an0328.sql`; respaldo
+    `an0328-*.jsonl` en `/root/respaldo-cierre-2910/`). Adam confirmó que «José Luis» era José Antonio (AN-0334).
+    AN-0009 (Daniela Galindo, 30-09) sigue abierta, sin indicación.
+
 - **29-10 ~08:45 (claude-code) — Las 7 actividades del 28-10 que seguían abiertas, cerradas a mano (orden de Adam).**
   - Por qué no se cerraron solas: AN-0324/0325/0332/0334/0340 eran de gente que checó su salida propia entre 17:11 y
     18:26, antes de que entrara el cierre por checada (613ee251, ~19:00) y antes de que la sesión del cierre las

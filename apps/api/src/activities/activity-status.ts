@@ -143,6 +143,24 @@ export const FINISHED_ACTIVITY_WHERE = {
   deletedAt: null,
 };
 
+/**
+ * Sin plazo que vigilar: ya cerrada o ya entregada («Por Validar»). Regla de Adam (29-10-2026):
+ * lo enviado a revisión está cumplido; calificarlo hoy o en un año no lo vuelve vencido. Los
+ * avisos de «vencida» / «atrasada» / «por vencer» filtran con esto, no con `closedStatusVariants`
+ * (que sigue tratando «Por Validar» como abierta para las listas y la revisión).
+ */
+export const SIN_PLAZO_STATUSES: ActivityStatus[] = [...CLOSED_STATUSES, ACTIVITY_STATUS.POR_VALIDAR];
+
+export function sinPlazoStatusVariants(): string[] {
+  return [...new Set(SIN_PLAZO_STATUSES.flatMap((status) => statusVariants(status)))];
+}
+
+/** True si ya no corre plazo: cerrada o entregada a revisión. */
+export function isSinPlazoStatus(raw: unknown): boolean {
+  const status = normalizeActivityStatus(raw);
+  return status != null && SIN_PLAZO_STATUSES.includes(status);
+}
+
 /** True si el valor almacenado corresponde a una actividad cerrada. */
 export function isClosedStatus(raw: unknown): boolean {
   const status = normalizeActivityStatus(raw);
@@ -161,6 +179,11 @@ function toSqlList(values: string[]): string {
 /** Lista SQL entrecomillada para los `$queryRaw` que aún filtran por texto. */
 export function closedStatusSqlList(): string {
   return toSqlList(closedStatusVariants());
+}
+
+/** Lista SQL de `sinPlazoStatusVariants` (cerradas + «Por Validar»), para los avisos de plazo. */
+export function sinPlazoStatusSqlList(): string {
+  return toSqlList(sinPlazoStatusVariants());
 }
 
 /** Igual que la anterior, pero solo para finalizadas con éxito. */

@@ -5,6 +5,9 @@ import {
   closedStatusVariants,
   isClosedStatus,
   isFinishedStatus,
+  isSinPlazoStatus,
+  sinPlazoStatusSqlList,
+  sinPlazoStatusVariants,
   normalizeActivityStatus,
   OPEN_ACTIVITY_WHERE,
   statusVariants,
@@ -104,5 +107,29 @@ describe('closedStatusSqlList', () => {
     for (const token of tokens) {
       expect(token).toMatch(/^'(?:[^']|'')*'$/);
     }
+  });
+});
+
+// Regla de Adam (29-10-2026): lo enviado a revisión ya está cumplido. Los avisos de «vencida»,
+// «atrasada» y «por vencer» no deben tocar «Por Validar», aunque se califique semanas después.
+describe('sin plazo que vigilar (cerradas y entregadas)', () => {
+  it('«Por Validar» (y sus grafías) ya no corre plazo', () => {
+    expect(isSinPlazoStatus('Por Validar')).toBe(true);
+    expect(isSinPlazoStatus('POR_VALIDAR')).toBe(true);
+    expect(sinPlazoStatusVariants()).toEqual(expect.arrayContaining(['Por Validar', 'En Validacion']));
+    expect(sinPlazoStatusSqlList()).toContain("'Por Validar'");
+  });
+
+  it('las cerradas tampoco; lo abierto sí', () => {
+    expect(isSinPlazoStatus('Finalizada')).toBe(true);
+    expect(isSinPlazoStatus('No cumplida')).toBe(true);
+    expect(isSinPlazoStatus('Cancelada')).toBe(true);
+    expect(isSinPlazoStatus('En Proceso')).toBe(false);
+    expect(isSinPlazoStatus('Asignada')).toBe(false);
+  });
+
+  it('«Por Validar» sigue siendo abierta para las listas y la revisión', () => {
+    expect(isClosedStatus('Por Validar')).toBe(false);
+    expect(closedStatusVariants()).not.toContain('Por Validar');
   });
 });

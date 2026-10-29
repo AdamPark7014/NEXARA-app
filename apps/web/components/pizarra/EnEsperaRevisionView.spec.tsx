@@ -92,12 +92,13 @@ describe("En espera de revisión", () => {
     expect(revisar.getAttribute("href")).toBe("/erp/actividades/331/evidencias?origen=revision#revision");
   });
 
-  it("el resumen avisa cuando alguna lleva más de un día esperando", () => {
+  it("lo enviado no se pinta como atrasado: sin cifra de «más de un día» ni semáforo", () => {
     pintar();
-    expect(screen.getByText("Esperan más de un día")).toBeTruthy();
-    expect(screen.getByText("atiéndelas primero")).toBeTruthy();
-    pintar({ data: { ...data, pendientes: data.pendientes.slice(1) } });
-    expect(screen.getByText("todas recientes")).toBeTruthy();
+    expect(screen.getByText("entregadas: ya cuentan como cumplidas")).toBeTruthy();
+    expect(screen.queryByText(/más de un día/)).toBeNull();
+    expect(screen.queryByText(/atiéndelas/)).toBeNull();
+    const tabla = screen.getByRole("region", { name: "Evidencias en espera de revisión" });
+    expect(within(tabla).getByText("Enviada")).toBeTruthy();
   });
 
   it("tocar la fila abre la actividad con el origen", () => {
