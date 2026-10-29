@@ -1,5 +1,16 @@
 # RELEVO
 
+- **28-10 ~20:15 (claude-code) — audit_logs: fuera el latido de sesión y las masivas que no tocan filas.**
+  - Medido en producción: disco del Hetzner al 88 % (no al 98 % del 27-10); `audit_logs` pesa 14 GB con 5.7 M de
+    filas. El webhook de INTEGRA ya no entra, pero en 6 h se escribieron ≈24 mil `UPDATE UserSession` (solo
+    `lastSeenAt`, el latido de `auth.service.ts`) y ≈10 mil BULK de chat (`ChatService.ensureDefaults` corre
+    `updateMany`/`createMany`/`deleteMany` en cada consulta y casi siempre afectan 0 filas): ≈8 mil filas por hora en
+    horario laboral, ≈250 MB al día.
+  - `isAuditNoise` en `prisma.service.ts` (con pruebas en `prisma-tenant-audit.spec.ts`): no se audita una masiva con
+    `count` 0 ni un `UserSession.update` que solo cambia `lastSeenAt`. Crear, renovar o revocar sesión sí.
+  - Pendiente de Adam: borrar las filas viejas de ruido (latidos, masivas en 0, POST_OK de INTEGRA) y `VACUUM FULL`
+    para recuperar espacio. Es borrar en producción sin respaldo: no se hace sin su OK.
+
 - **28-10 ~19:30 (claude-code) — Desempeño como en el canvas y eficiencia de la pizarra sin plan.**
   - Desempeño (`/erp/asistencias/indicadores`): `components/kpis/DesempenoTablero.tsx` (+ css) reemplaza la franja de
     cifras y el ranking.

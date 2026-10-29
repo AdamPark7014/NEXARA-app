@@ -84,6 +84,33 @@ export function buildAuditChanges(
   };
 }
 
+/**
+ * Escrituras de modelos auditados que aun así no van a audit_logs, porque no dicen nada:
+ * - las masivas que no tocaron ninguna fila: `ChatService.ensureDefaults` corre un `updateMany`, un `createMany` con
+ *   `skipDuplicates` y un `deleteMany` en cada consulta del chat y casi siempre afectan 0 filas (≈10 mil por 6 h);
+ * - el latido de sesión que solo mueve `lastSeenAt` (≈4 mil por hora en horario laboral). Crear, renovar o revocar
+ *   la sesión sí se audita.
+ * Sin esto audit_logs crecía ≈250 MB al día con el disco del servidor al 88 % (28-10-2026).
+ */
+export function isAuditNoise(
+  model: string,
+  action: string,
+  args: { data?: unknown } | undefined,
+  result: unknown,
+): boolean {
+  if (BULK_ACTIONS.has(action)) {
+    return (result as { count?: unknown } | null | undefined)?.count === 0;
+  }
+  if (model === 'UserSession' && action === 'update') {
+    const data = args?.data;
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      const keys = Object.keys(data);
+      return keys.length > 0 && keys.every((k) => k === 'lastSeenAt');
+    }
+  }
+  return false;
+}
+
 const READ_ACTIONS = new Set([
   'findFirst', 'findMany', 'count', 'aggregate', 'groupBy',
   'findUnique', 'findUniqueOrThrow', 'findFirstOrThrow',
@@ -661,7 +688,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         }
 
         // Audit log (best-effort, async, non-blocking)
-        if (!AUDIT_EXCLUDED.has(params.model)) {
+        if (
+          !AUDIT_EXCLUDED.has(params.model) &&
+          !isAuditNoise(params.model, params.action, params.args, result)
+        ) {
           const entityId = result?.id ?? 0;
           const actionMap: Record<string, string> = {
             create: 'CREATE', update: 'UPDATE', delete: 'DELETE',

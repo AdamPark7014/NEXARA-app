@@ -1,5 +1,6 @@
 import {
   buildAuditChanges,
+  isAuditNoise,
   planTenantQuery,
   readCompoundUniqueSelector,
   redactAuditPayload,
@@ -141,6 +142,30 @@ describe('buildAuditChanges', () => {
       where: null,
       affected: null,
     });
+  });
+});
+
+describe('isAuditNoise', () => {
+  it('una escritura masiva que no tocó filas no se audita; si tocó alguna, sí', () => {
+    expect(isAuditNoise('ChatChannel', 'updateMany', { data: { isArchived: true } }, { count: 0 })).toBe(true);
+    expect(isAuditNoise('ChatChannelMember', 'createMany', { data: [] }, { count: 0 })).toBe(true);
+    expect(isAuditNoise('ChatChannelMember', 'deleteMany', {}, { count: 2 })).toBe(false);
+    // Sin conteo no se sabe: se audita.
+    expect(isAuditNoise('ChatChannelMember', 'createMany', {}, undefined)).toBe(false);
+  });
+
+  it('el latido de sesión no se audita; renovarla, revocarla o crearla sí', () => {
+    expect(isAuditNoise('UserSession', 'update', { data: { lastSeenAt: new Date() } }, { id: 9 })).toBe(true);
+    expect(
+      isAuditNoise('UserSession', 'update', { data: { expiresAt: new Date(), lastSeenAt: new Date() } }, { id: 9 }),
+    ).toBe(false);
+    expect(isAuditNoise('UserSession', 'update', { data: { revokedAt: new Date() } }, { id: 9 })).toBe(false);
+    expect(isAuditNoise('UserSession', 'create', { data: { lastSeenAt: new Date() } }, { id: 9 })).toBe(false);
+  });
+
+  it('los demás modelos se auditan como siempre', () => {
+    expect(isAuditNoise('Activity', 'update', { data: { lastSeenAt: new Date() } }, { id: 1 })).toBe(false);
+    expect(isAuditNoise('Activity', 'update', { data: { status: 'DONE' } }, { id: 1 })).toBe(false);
   });
 });
 
