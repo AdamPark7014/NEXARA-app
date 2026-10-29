@@ -24,16 +24,17 @@ extension EnvironmentValues {
     }
 }
 
-/// Barra teal de Android `TicketsNavHost`: título 16 SemiBold blanco, flecha de
+/// Barra verde de Android `TicketsNavHost`: título 16 SemiBold blanco, flecha de
 /// volver (la pone la pila) y, a la derecha, el icono de cerrar sesión en TODAS
-/// las pantallas del portal. Sin campana: el portal no tiene notificaciones.
+/// las pantallas del portal. Sin campana: el portal no tiene notificaciones. El
+/// portal conserva la verde (Core pasó a la barra clara el 28-10, como Android).
 private struct PortalChromeModifier: ViewModifier {
     let title: String
     @Environment(\.portalLogout) private var logout
 
     func body(content: Content) -> some View {
         content
-            .nxBrandNavBar(title: title, showsBell: false)
+            .nxBrandNavBar(title: title, showsBell: false, estilo: .portal)
             .toolbar {
                 if let logout {
                     ToolbarItem(placement: .topBarTrailing) {

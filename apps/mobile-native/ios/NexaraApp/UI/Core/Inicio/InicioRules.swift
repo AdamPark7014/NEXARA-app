@@ -208,18 +208,96 @@ enum InicioRules {
         return String(CoreStatusUI.priority(a.prioridad).label.prefix(12))
     }
 
-    /// Detalle de «Después, hoy»: lugar y tiempo, cada uno en su renglón (o el tipo).
+    /// Detalle de «Lo que sigue hoy»: lugar y tiempo, cada uno en su renglón (o el tipo).
+    /// La fila los junta en uno con « · » («Biblioteca Central · 45 min»).
     static func detalleSiguiente(_ a: MyActivityItem) -> String {
-        let plan: Double? = {
-            if let p = a.minutosPlan?.value, p > 0 { return p }
-            if let e = a.tiempoEstimadoMin, e > 0 { return Double(e) }
-            return nil
-        }()
-        let partes = [lugar(a), plan.map { ActividadesTexto.minutos($0) }].compactMap { $0 }
+        let partes = [lugar(a), planMinutos(a).map { ActividadesTexto.minutos($0) }].compactMap { $0 }
         let texto = partes.joined(separator: "\n")
         return texto.isEmpty ? CoreStatusUI.kind(a.coreKind, ticketTypeCustom: a.ticketTypeCustom) : texto
     }
 
+    /// Columna de la hora en «Lo que sigue hoy»: «16:00», «Día 3» o «—».
+    static func horaFila(_ a: MyActivityItem) -> String {
+        if let hora = horaDe(a.fechaInicio) { return hora }
+        if let dia = a.periodo?.dia { return "Día \(dia)" }
+        return "—"
+    }
+
     /// Insignia de la pestaña Actividades: lo que falta por hacer.
     static func pendientes(_ open: [MyActivityItem]) -> Int { open.count }
+
+    /// Tiempo planeado en minutos: `minutosPlan` del contrato B o, si no llega, el estimado.
+    static func planMinutos(_ a: MyActivityItem) -> Double? {
+        if let p = a.minutosPlan?.value, p > 0, p.isFinite { return p }
+        if let e = a.tiempoEstimadoMin, e > 0 { return Double(e) }
+        return nil
+    }
+
+    // MARK: Banda oscura de la actividad de ahora (canvas «App · Mi día», 28-10)
+
+    /// «En curso · AN-0418», «En pausa · AN-0418», «Por iniciar · AN-0418» o «Sigue · …».
+    static func etiquetaBanda(_ a: MyActivityItem) -> String {
+        let estado: String
+        if a.enPausa == true {
+            estado = "En pausa"
+        } else if a.enCurso == true {
+            estado = "En curso"
+        } else if ActividadesTexto.limpio(a.inicioRealAt) == nil && (a.minutosReales?.value ?? 0) <= 0 {
+            estado = "Por iniciar"
+        } else {
+            estado = "Sigue"
+        }
+        return [estado, ActividadesTexto.limpio(a.anNumber)].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// Segundos trabajados para el reloj grande. `minutosReales` llega calculado al momento de
+    /// la consulta (`cargado`); con el reloj corriendo se le suma lo que pasó desde entonces.
+    /// nil si todavía no hay nada trabajado.
+    static func segundosTrabajados(_ a: MyActivityItem, cargado: Date, ahora: Date) -> Int? {
+        let base: Int? = a.minutosReales?.value.flatMap { $0 > 0 && $0.isFinite ? Int($0 * 60) : nil }
+        guard a.enCurso == true else { return base }
+        return (base ?? 0) + max(0, Int(ahora.timeIntervalSince(cargado)))
+    }
+
+    /// «5:40:12».
+    static func reloj(_ segundos: Int) -> String {
+        let s = max(0, segundos)
+        return "\(s / 3600):" + String(format: "%02d:%02d", (s % 3600) / 60, s % 60)
+    }
+
+    /// «Plan 7 h 30 min · entrega antes de las 17:00» (lo que haya de los dos).
+    static func pieBanda(_ a: MyActivityItem) -> String? {
+        let plan = planMinutos(a).map { "Plan \(ActividadesTexto.minutos($0))" }
+        let compromiso = CoreActivityRules.horaCompromisoDe(
+            fechaInicio: a.fechaInicio,
+            fechaMaxima: a.fechaMaxima,
+            conPeriodo: a.periodo != nil
+        ).map { "entrega antes de las \($0)" }
+        let texto = [plan, compromiso].compactMap { $0 }.joined(separator: " · ")
+        guard !texto.isEmpty else { return nil }
+        return texto.prefix(1).uppercased() + texto.dropFirst()
+    }
+
+    /// El botón principal de la banda, corto para que quepa a la mitad del ancho.
+    static func etiquetaCorta(_ accion: Accion) -> String {
+        switch accion.kind {
+        case .iniciar: return "Iniciar"
+        case .continuar: return "Entregar"
+        case .corregir: return "Corregir"
+        case .ver: return "Evidencias"
+        case .reanudar, .repartir, .abrir: return accion.label
+        }
+    }
+
+    /// Pastilla de la banda: el semáforo («En tiempo», «Por vencer», «Atrasada») o nada.
+    static func pastillaBanda(_ a: MyActivityItem) -> String? {
+        ActividadesSemaforo.luz(a.semaforo)?.etiqueta
+    }
+
+    /// Avance del reloj contra el plan (0–1); nil sin plan.
+    static func avancePlan(_ a: MyActivityItem, segundos: Int?) -> Double? {
+        guard let plan = planMinutos(a) else { return nil }
+        guard let s = segundos else { return 0 }
+        return min(1, max(0, Double(s) / (plan * 60)))
+    }
 }

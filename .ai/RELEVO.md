@@ -121,7 +121,11 @@
   - Capturas sin teléfono ni sesión: `CapturasMiDiaTest` (Robolectric, fuera de las pruebas normales):
     `gradlew :app:testDebugUnitTest -Pcapturas=true --tests "*CapturasMiDiaTest*"` → `app/build/capturas/mi-dia.png`.
   - iOS: la misma tabla de color en `NxBrand.swift`, `AccentColor` #168570, radios 10/14/20/24 y sombra flotante en
-    `nxCardSurface`. Falta «Mi día», la barra superior clara y la fuente (`ios/Resources/Fonts`, aún sin cablear).
+    `nxCardSurface`. Después (~12:05): Inter Tight cableada (`project.yml` + `UIAppFonts`, `NxFont.display`), «Mi día»
+    espejo de Android (`InicioView.swift`/`InicioRules.swift`), barra superior clara en Core (`NxNavBarEstilo.core`;
+    el portal conserva la verde), barra inferior blanca sin pastilla y demo con la actividad 5156 en curso. El chat
+    (`ChatConversationView`) pasó sus íconos de blanco a #14171F para verse en la barra clara. Sin Mac: lo compila
+    `ios-screenshots.yml`; dudas abiertas: el tono de la flecha de volver y la línea bajo la barra (mirar capturas).
   - Android «Entregar evidencia» (`EvidenceCaptureFlow.kt`), solo lo visual del artboard sin tocar los pasos ni el GPS:
     tarjeta blanca flotante por paso, «Paso 2 de 4 · Fotos en sitio» con barra de avance, fotos en rejilla de dos
     (4:3, «Lista», nombre debajo) y botón principal de 52 con radio 14.

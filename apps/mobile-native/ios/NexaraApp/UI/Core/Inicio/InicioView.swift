@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// Inicio (rediseño v2, `.ai/ui-maquetas/movil-inicio.html`): la primera pestaña.
-/// Espejo de `InicioScreen.kt` de Android.
+/// Inicio, «Mi día» (canvas «App · Mi día», 28-10): la primera pestaña.
+/// Espejo de `InicioScreen.kt` de Android (commit ace68045).
 ///
-/// De arriba abajo: saludo con la fecha y la campana; la tarjeta de jornada con
-/// el botón grande de checar; el único aviso que importa hoy; la actividad de
-/// «ahora» con su acción principal; y las siguientes del día. Todo sale de lo
-/// que la app ya consulta: `me/activities`, `attendance/current` y las checadas
-/// de hoy. Inicio no tiene barra superior: trae su propia cabecera.
+/// De arriba abajo: la fecha, «Mi día» y la campana; la tarjeta blanca de la jornada con su
+/// único botón; el único aviso que importa hoy; la actividad de ahora en la banda oscura con
+/// el reloj, el plan y la hora compromiso; y «Lo que sigue hoy». Todo sale de lo que la app ya
+/// consulta: `me/activities`, `attendance/current` y las checadas de hoy. Inicio no tiene
+/// barra superior: trae su propia cabecera.
 struct InicioView: View {
     @ObservedObject var store: InicioStore
     let tieneActividades: Bool
@@ -39,12 +39,11 @@ struct InicioView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 InicioHeader(
-                    user: session.currentUser,
                     unread: badge.unreadCount,
                     onOpenNotifications: onOpenNotifications
                 )
                 if muestraJornada {
-                    InicioJornadaHero(
+                    InicioJornadaCard(
                         vm: attendance,
                         onMark: { marcar($0) },
                         onComida: onOpenComidas,
@@ -58,7 +57,7 @@ struct InicioView: View {
                 }
                 actividades
             }
-            .padding(.horizontal, NxSpacing.l)
+            .padding(.horizontal, NxSpacing.screenH)
             .padding(.bottom, NxSpacing.xl)
         }
         .background(NxColors.surface.ignoresSafeArea())
@@ -142,9 +141,10 @@ struct InicioView: View {
             } else if let error = store.error, store.open.isEmpty {
                 NxRefreshErrorBanner(message: error, onRetry: { Task { await store.load(enabled: true) } })
             } else if let actual = store.actual {
-                InicioSectionTitle(title: "Ahora")
+                // Sin rótulo «Ahora»: la banda oscura ya dice qué es.
                 InicioActualCard(
                     item: actual,
+                    cargado: store.cargadoEn,
                     enCurso: store.accionEnCurso == actual.id,
                     error: store.accionError,
                     onPrimary: { accion in Task { await primaria(accion, actual) } },
@@ -159,7 +159,7 @@ struct InicioView: View {
                 }
                 let siguientes = store.siguientes
                 if !siguientes.isEmpty {
-                    InicioSectionTitle(title: "Después, hoy", action: "Ver todas", onAction: onOpenActividades)
+                    InicioSectionTitle(title: "Lo que sigue hoy", action: "Ver todas", onAction: onOpenActividades)
                     InicioSiguientesCard(items: siguientes) { onOpenActivity($0.id, nil) }
                 } else if store.open.count <= 1 {
                     InicioVerTodasRow(onClick: onOpenActividades)
@@ -233,23 +233,22 @@ private extension InicioRules.Tono {
     }
 }
 
-/// Cabecera de Inicio (Android `InicioHeader`): foto 48, fecha 13 gris, «Hola, …»
-/// 22 Bold y la campana en un círculo blanco de 44 con su insignia.
+/// Cabecera de «Mi día» (Android `InicioHeader`): fecha 13 gris, «Mi día» en Inter Tight 28
+/// negrita y la campana blanca de 44 que flota, con un punto de marca si hay avisos sin leer.
 private struct InicioHeader: View {
-    let user: SessionUser?
     let unread: Int
     let onOpenNotifications: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            InicioAvatar(nombre: user?.nombre, url: user?.avatarUrl, size: 48)
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(InicioRules.fechaLarga(Date()))
                     .font(.system(size: 13))
                     .foregroundStyle(NxColors.muted)
                     .lineLimit(1)
-                Text(InicioRules.saludo(user?.nombre))
-                    .font(.system(size: 22, weight: .bold))
+                Text("Mi día")
+                    .font(NxFont.display(size: 28))
+                    .tracking(-0.5)
                     .foregroundStyle(NxColors.fg)
                     .lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
@@ -258,59 +257,35 @@ private struct InicioHeader: View {
             Button(action: onOpenNotifications) {
                 Image(systemName: "bell")
                     .font(.system(size: 19, weight: .regular))
-                    .foregroundStyle(NxColors.fg2)
-                    .frame(width: 22, height: 22)
+                    .foregroundStyle(NxColors.fg)
+                    .frame(width: 44, height: 44)
+                    .background {
+                        Circle()
+                            .fill(NxColors.card)
+                            .nxFlotante()
+                    }
                     .overlay(alignment: .topTrailing) {
                         if unread > 0 {
-                            NxCountBadge(count: unread)
-                                .fixedSize()
-                                .offset(x: 9, y: -7)
+                            Circle()
+                                .fill(NxColors.brand)
+                                .frame(width: 8, height: 8)
+                                .padding(.top, 9)
+                                .padding(.trailing, 10)
                         }
                     }
-                    .frame(width: 44, height: 44)
-                    .background(NxColors.card, in: Circle())
-                    .overlay(Circle().strokeBorder(NxColors.border, lineWidth: 1))
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(unread > 0 ? "Notificaciones, \(unread) sin leer" : "Notificaciones")
             .accessibilityIdentifier("bell-button")
         }
-        .padding(.top, 12)
-        .padding(.bottom, 2)
+        .padding(.top, 16)
+        .padding(.bottom, 4)
+        .padding(.leading, 4)
     }
 }
 
-/// Foto con aro de 2 en `brandSoft2` o iniciales de marca en ExtraBold (36 % del lado).
-private struct InicioAvatar: View {
-    let nombre: String?
-    let url: String?
-    let size: CGFloat
-
-    var body: some View {
-        Group {
-            if let url, !url.isEmpty {
-                AuthenticatedImage(url: url, contentMode: .fill, background: NxColors.brandSoft)
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-                    .overlay(Circle().strokeBorder(NxColors.brandSoft2, lineWidth: 2))
-            } else {
-                ZStack {
-                    Circle().fill(NxColors.brandSoft)
-                    Text(ActividadesTexto.iniciales(nombre))
-                        .font(.system(size: size * 0.36, weight: .heavy))
-                        .foregroundStyle(NxColors.brandText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                }
-                .frame(width: size, height: size)
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-/// Título de sección (Android `SectionTitle`): 17 Bold y una acción 13,5 SemiBold de marca.
+/// Título de sección (Android `SectionTitle`): 15 SemiBold y una acción 13,5 SemiBold de marca.
 private struct InicioSectionTitle: View {
     let title: String
     var action: String? = nil
@@ -319,7 +294,7 @@ private struct InicioSectionTitle: View {
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
             Text(title)
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(NxColors.fg)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityAddTraits(.isHeader)
@@ -339,10 +314,10 @@ private struct InicioSectionTitle: View {
     }
 }
 
-/// Tarjeta teal de la jornada (Android `JornadaHero`): la misma checada que
-/// Asistencias (foto + GPS + aviso de rechazo) a través de `AttendanceVM`; aquí
-/// solo cambia la presentación.
-private struct InicioJornadaHero: View {
+/// Tarjeta blanca compacta de la jornada (Android `JornadaHero` + `JornadaTarjeta`): el estado
+/// y su único botón, y la fila de comida mientras la jornada está abierta. La checada es la
+/// misma de Asistencias (foto + GPS + aviso de rechazo) a través de `AttendanceVM`.
+private struct InicioJornadaCard: View {
     @ObservedObject var vm: AttendanceVM
     @ObservedObject private var tracker = ShiftGpsTracker.shared
     let onMark: (String) -> Void
@@ -350,7 +325,7 @@ private struct InicioJornadaHero: View {
     let onVerJornada: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: NxSpacing.s) {
+        VStack(alignment: .leading, spacing: 8) {
             // La cifra se refresca cada 30 s mientras la jornada está abierta.
             TimelineView(.periodic(from: .now, by: 30)) { context in
                 tarjeta(now: context.date)
@@ -387,158 +362,155 @@ private struct InicioJornadaHero: View {
         let jornada = InicioRules.jornada(abierta: abierta, hayEntrada: hayEntrada, haySalida: !salidas.isEmpty)
         let inicioIso = vm.lastEntryAt ?? ultima(entradas)
         let salidaIso = ultima(salidas)
-        let trabajado: TimeInterval
-        let estadoTexto: String
-        let subTexto: String
+        let titulo: String
+        let detalle: String
         switch jornada {
         case .enJornada:
-            trabajado = AttendanceClock.elapsed(from: inicioIso, to: nil, now: now)
-            estadoTexto = "En jornada · entrada \(ActividadesTexto.hora(inicioIso))"
-            subTexto = tracker.isTracking ? "Compartiendo tu ubicación de jornada" : "Tu ubicación de jornada está apagada"
+            let trabajado = AttendanceClock.elapsed(from: inicioIso, to: nil, now: now)
+            titulo = "Entraste a las \(ActividadesTexto.hora(inicioIso))"
+            detalle = "\(InicioRules.horasMinutos(trabajado)) h trabajadas · " + (tracker.isTracking ? "GPS activo" : "GPS apagado")
         case .completada:
-            trabajado = AttendanceClock.elapsed(from: inicioIso, to: salidaIso, now: now)
-            estadoTexto = "Jornada completada · \(ActividadesTexto.hora(inicioIso)) – \(ActividadesTexto.hora(salidaIso))"
-            subTexto = "Entrada y salida registradas hoy"
+            let trabajado = AttendanceClock.elapsed(from: inicioIso, to: salidaIso, now: now)
+            titulo = "Jornada completada · \(ActividadesTexto.hora(inicioIso)) – \(ActividadesTexto.hora(salidaIso))"
+            detalle = "\(InicioRules.horasMinutos(trabajado)) h trabajadas · Entrada y salida registradas hoy"
         case .sinEntrada:
-            trabajado = 0
-            estadoTexto = "Sin entrada registrada"
-            subTexto = "Se toma una foto y tu ubicación al checar"
+            titulo = "Sin entrada registrada"
+            detalle = "Se toma una foto y tu ubicación al checar"
         }
         // El API contesta 400 a la segunda entrada del día: aquí se apaga antes.
         let puedeEntrar = !hayEntrada && !abierta
+        let sinEntrada = jornada == .sinEntrada
 
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .center, spacing: 8) {
-                Circle()
-                    .fill(abierta ? NxColors.rgb(0x7DFFD8) : Color.white.opacity(0.55))
-                    .frame(width: 8, height: 8)
-                Text(estadoTexto)
-                    .font(.system(size: 13.5, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.92))
-                    .lineLimit(1)
-            }
-            HStack(alignment: .lastTextBaseline, spacing: 8) {
-                Text(InicioRules.horasMinutos(trabajado))
-                    .font(.system(size: 40, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.white)
-                    .lineLimit(1)
-                Text("h trabajadas")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.white.opacity(0.78))
-                    .lineLimit(1)
-            }
-            .padding(.top, 6)
-            HStack(alignment: .center, spacing: 6) {
-                Image(systemName: "mappin")
-                    .font(.system(size: 13, weight: .regular))
-                    .frame(width: 15, height: 15)
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: sinEntrada ? "clock" : "checkmark")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(sinEntrada ? NxColors.fg2 : NxColors.success)
+                    .frame(width: 36, height: 36)
+                    .background(sinEntrada ? NxColors.sunken : NxColors.successSoft, in: Circle())
                     .accessibilityHidden(true)
-                Text(subTexto)
-                    .font(.system(size: 13))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(Color.white.opacity(0.85))
-            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(titulo)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(NxColors.fg)
+                        .lineLimit(2)
+                    Text(detalle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(NxColors.muted)
+                        .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 switch jornada {
-                case .enJornada:
-                    InicioHeroButton(title: "Comida", systemImage: "fork.knife", light: true, action: onComida)
-                    InicioHeroButton(
-                        title: "Checar salida",
-                        systemImage: "rectangle.portrait.and.arrow.right",
-                        light: false,
-                        loading: vm.checkInLoading
-                    ) { onMark("salida") }
                 case .sinEntrada:
-                    InicioHeroButton(
-                        title: "Checar entrada",
+                    InicioJornadaBoton(
+                        title: "Entrada",
                         systemImage: "rectangle.portrait.and.arrow.forward",
-                        light: false,
+                        primario: true,
                         loading: vm.checkInLoading,
                         enabled: puedeEntrar
                     ) { onMark("entrada") }
+                case .enJornada:
+                    InicioJornadaBoton(
+                        title: "Salida",
+                        systemImage: "rectangle.portrait.and.arrow.right",
+                        primario: false,
+                        loading: vm.checkInLoading
+                    ) { onMark("salida") }
                 case .completada:
-                    InicioHeroButton(title: "Ver mi jornada", systemImage: "clock", light: true, action: onVerJornada)
+                    InicioJornadaBoton(title: "Ver", systemImage: "clock", primario: false, action: onVerJornada)
                 }
             }
-            .padding(.top, 12)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            if jornada == .enJornada {
+                NxRowDivider()
+                Button(action: onComida) {
+                    HStack(alignment: .center, spacing: 12) {
+                        Image(systemName: "fork.knife")
+                            .font(.system(size: 15, weight: .regular))
+                            .foregroundStyle(NxColors.fg2)
+                            .frame(width: 18, height: 18)
+                            .accessibilityHidden(true)
+                        Text("Comida")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(NxColors.fg)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(NxColors.fg4)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(NxPressableStyle())
+            }
         }
-        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Aro decorativo detrás del contenido (Android `drawBehind`: radio 110, trazo 28).
-        .background(alignment: .bottomTrailing) {
-            Circle()
-                .stroke(Color.white.opacity(0.06), lineWidth: 28)
-                .frame(width: 220, height: 220)
-                .offset(x: 90, y: 140)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
-        .background(NxBrand.heroGradient)
-        .clipShape(RoundedRectangle(cornerRadius: NxRadius.xl, style: .continuous))
+        // Radio 20, sin borde, con la sombra flotante.
+        .nxCardSurface(radius: NxRadius.l)
     }
 }
 
-/// Botón de la tarjeta de jornada (Android `HeroButton`): 52 de alto, radio 16,
-/// blanco lleno (letra teal profundo) o blanco translúcido con filo.
-private struct InicioHeroButton: View {
+/// Botón de la tarjeta de jornada (Android `JornadaBoton`): 44 de alto, radio 12; «Entrada»
+/// verde lleno, «Salida» y «Ver» de contorno.
+private struct InicioJornadaBoton: View {
     let title: String
     let systemImage: String
-    let light: Bool
+    let primario: Bool
     var loading: Bool = false
     var enabled: Bool = true
     let action: () -> Void
 
     private var activo: Bool { enabled && !loading }
 
-    private var tinta: Color {
-        if light { return activo ? Color.white : Color.white.opacity(0.6) }
-        return activo ? NxColors.brandDeep : NxColors.brandDeep.opacity(0.6)
-    }
-
-    private var fondo: Color {
-        if light { return activo ? Color.white.opacity(0.16) : Color.white.opacity(0.10) }
-        return activo ? Color.white : Color.white.opacity(0.6)
-    }
-
     var body: some View {
         Button(action: action) {
-            HStack(alignment: .center, spacing: 8) {
+            HStack(alignment: .center, spacing: 6) {
                 if loading {
                     ProgressView()
                         .controlSize(.small)
-                        .tint(NxColors.brandDeep)
-                        .frame(width: 18, height: 18)
+                        .tint(primario ? Color.white : NxColors.brand)
+                        .frame(width: 16, height: 16)
                 } else {
                     Image(systemName: systemImage)
-                        .font(.system(size: 17, weight: .medium))
-                        .frame(width: 20, height: 20)
+                        .font(.system(size: 15, weight: .medium))
+                        .frame(width: 18, height: 18)
                         .accessibilityHidden(true)
                 }
-                Text(loading ? "Registrando…" : title)
-                    .font(.system(size: 15, weight: .bold))
+                Text(loading ? "…" : title)
+                    .font(.system(size: 14, weight: .semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
             }
-            .foregroundStyle(tinta)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: NxMetrics.primaryButtonHeight)
-            .background(fondo, in: RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
-            .overlay {
-                if light {
-                    RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
+            .foregroundStyle(primario ? Color.white : NxColors.fg)
+            .padding(.horizontal, 14)
+            .frame(minHeight: NxMetrics.minTap)
+            .background {
+                if primario {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(NxColors.brand)
+                } else {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(NxColors.card)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(NxColors.border, lineWidth: 1)
+                        )
                 }
             }
-            .contentShape(RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
+            .opacity(activo ? 1 : 0.6)
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(NxPressableStyle())
         .disabled(!activo)
+        .fixedSize()
+        .accessibilityLabel(loading ? "Registrando" : title)
     }
 }
 
-/// El único aviso de hoy (Android `AvisoCard`): fondo suave del tono, icono en una
-/// baldosa de 36 y flecha si abre la actividad.
+/// El único aviso de hoy (Android `AvisoCard`): fondo suave del tono, radio 16, icono en
+/// una baldosa de 36 y flecha si abre la actividad.
 private struct InicioAvisoCard: View {
     let aviso: InicioRules.Aviso
     let onTap: () -> Void
@@ -575,8 +547,8 @@ private struct InicioAvisoCard: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(tono.fondo, in: RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
+            .background(tono.fondo, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(NxPressableStyle())
         .disabled(aviso.activityId == nil)
@@ -584,163 +556,248 @@ private struct InicioAvisoCard: View {
     }
 }
 
-/// La actividad de ahora (Android `ActualCard`): tipo, folio, estado, avance, la
-/// acción principal grande y los botones cuadrados Pausar / Ver detalle.
+/// La actividad de ahora en la banda oscura con resplandor (Android `ActualCard`, canvas «App ·
+/// Mi día»): estado y folio, el semáforo, título, lugar, el reloj grande, plan y hora
+/// compromiso, el avance contra el plan, y dos botones: pausar (o ver el detalle) y la acción
+/// principal.
 private struct InicioActualCard: View {
     let item: MyActivityItem
+    /// Cuándo llegó `item` (`InicioStore.cargadoEn`): base del reloj que corre en el teléfono.
+    let cargado: Date
     let enCurso: Bool
     let error: String?
     let onPrimary: (InicioRules.Accion) -> Void
     let onPausar: () -> Void
     let onDetalle: () -> Void
 
-    var body: some View {
-        let accion = InicioRules.accion(item)
-        let estado = InicioRules.estado(item)
-        let kindColor = NxBrand.category(item.coreKind)
-        let pausable = item.despachador != true && item.sesion.puedePausar(estatus: item.estatus)
-        let encabezado = [
-            CoreStatusUI.kind(item.coreKind, ticketTypeCustom: item.ticketTypeCustom),
-            ActividadesTexto.limpio(item.anNumber),
-        ].compactMap { $0 }.joined(separator: "  ")
+    private static let radio: CGFloat = 26
+    private static let fondo = NxColors.rgb(0x0D0F12)
+    /// Texto secundario sobre la banda (#C9CED8).
+    private static let tenue = NxColors.rgb(0xC9CED8)
 
-        VStack(alignment: .leading, spacing: 10) {
+    var body: some View {
+        if item.enCurso == true {
+            // El reloj corre cada segundo mientras la actividad está en curso.
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                banda(ahora: context.date)
+            }
+        } else {
+            banda(ahora: cargado)
+        }
+    }
+
+    private func banda(ahora: Date) -> some View {
+        let accion = InicioRules.accion(item)
+        let pausable = item.despachador != true && item.sesion.puedePausar(estatus: item.estatus)
+        let segundos = InicioRules.segundosTrabajados(item, cargado: cargado, ahora: ahora)
+        let avance = InicioRules.avancePlan(item, segundos: segundos)
+        let pie = InicioRules.pieBanda(item) ?? (segundos == nil ? "Programada para hoy" : nil)
+        let lugar = [InicioRules.lugar(item), item.periodo?.texto].compactMap { $0 }.joined(separator: " · ")
+        let forma = RoundedRectangle(cornerRadius: Self.radio, style: .continuous)
+
+        return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 8) {
-                Image(systemName: CoreStatusUI.kindSymbol(item.coreKind))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(kindColor)
-                    .frame(width: 28, height: 28)
-                    .background(kindColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .accessibilityHidden(true)
-                Text(encabezado)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(NxColors.muted)
+                Text(InicioRules.etiquetaBanda(item).uppercased())
+                    .font(.system(size: 12, weight: .semibold))
+                    .tracking(0.5)
+                    .foregroundStyle(NxColors.rgb(0xB9BFCC))
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                NxChip(text: estado.label, color: estado.tono.tinta, dot: true)
-            }
-            Text(InicioRules.titulo(item))
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(NxColors.fg)
-                .lineSpacing(1.4)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-            if let lugar = InicioRules.lugar(item) {
-                HStack(alignment: .center, spacing: 6) {
-                    Image(systemName: "mappin")
-                        .font(.system(size: 13))
-                        .frame(width: 15, height: 15)
-                        .accessibilityHidden(true)
-                    Text(lugar)
-                        .font(.system(size: 13.5))
+                // El estado ya va en la etiqueta: la pastilla dice cómo va contra el límite.
+                if let pastilla = InicioRules.pastillaBanda(item) {
+                    Text(pastilla)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.white)
                         .lineLimit(1)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 3)
+                        .background(Color.white.opacity(0.12), in: Capsule())
                 }
-                .foregroundStyle(NxColors.muted)
             }
-            if let periodo = item.periodo?.texto {
-                Text(periodo)
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(NxColors.muted)
-                    .lineLimit(1)
-            }
-            if let avance = InicioRules.avance(item) {
-                HStack(alignment: .center, spacing: 10) {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(NxColors.sunken)
-                            Capsule()
-                                .fill(NxColors.brand)
-                                .frame(width: geo.size.width * CGFloat(avance.total == 0 ? 0 : Double(avance.hechos) / Double(avance.total)))
-                        }
+            Button(action: onDetalle) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(InicioRules.titulo(item))
+                        .font(NxFont.display(size: 21))
+                        .foregroundStyle(Color.white)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !lugar.isEmpty {
+                        Text(lugar)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Self.tenue)
+                            .lineLimit(2)
                     }
-                    .frame(height: 8)
-                    .accessibilityHidden(true)
-                    Text("\(avance.hechos)/\(avance.total)")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(NxColors.fg2)
-                        .monospacedDigit()
                 }
-                .padding(.top, 2)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(NxPressableStyle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(segundos.map { InicioRules.reloj($0) } ?? (InicioRules.horaDe(item.fechaInicio) ?? "—"))
+                    .font(NxFont.display(size: 40))
+                    .monospacedDigit()
+                    .tracking(-0.8)
+                    .foregroundStyle(Color.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityLabel(segundos.map { "Tiempo trabajado \(InicioRules.reloj($0))" } ?? "Programada")
+                if let pie {
+                    Text(pie)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Self.tenue)
+                        .lineLimit(2)
+                }
+            }
+            if let avance {
+                InicioBandaAvance(avance: avance, excedida: item.excedida == true)
             }
             if let error {
                 Text(error)
                     .font(.system(size: 12.5))
-                    .foregroundStyle(NxColors.danger)
+                    .foregroundStyle(NxColors.rgb(0xFFB4B4))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            HStack(alignment: .center, spacing: 8) {
-                Button {
-                    onPrimary(accion)
-                } label: {
-                    HStack(alignment: .center, spacing: 8) {
-                        if enCurso {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(Color.white)
-                                .frame(width: 18, height: 18)
-                        } else {
-                            Image(systemName: accion.systemImage)
-                                .font(.system(size: 17, weight: .medium))
-                                .frame(width: 20, height: 20)
-                                .accessibilityHidden(true)
-                        }
-                        Text(accion.label)
-                            .font(.system(size: 15, weight: .bold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-                    }
-                    .foregroundStyle(Color.white)
-                    .padding(.horizontal, 12)
-                    .frame(maxWidth: .infinity, minHeight: NxMetrics.primaryButtonHeight)
-                    .background(
-                        enCurso ? NxColors.fg.opacity(0.12) : NxColors.brand,
-                        in: RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous)
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
-                }
-                .buttonStyle(NxPressableStyle())
-                .disabled(enCurso)
-                if pausable {
-                    InicioSquareButton(systemImage: "pause", label: "Pausar actividad", action: onPausar)
-                }
-                InicioSquareButton(systemImage: "info.circle", label: "Ver detalle", action: onDetalle)
+            HStack(alignment: .center, spacing: 10) {
+                InicioBandaBoton(
+                    title: pausable ? "Pausar" : "Detalle",
+                    systemImage: pausable ? "pause.fill" : "info.circle",
+                    claro: false,
+                    action: pausable ? onPausar : onDetalle
+                )
+                InicioBandaBoton(
+                    title: InicioRules.etiquetaCorta(accion),
+                    systemImage: accion.systemImage,
+                    claro: true,
+                    loading: enCurso
+                ) { onPrimary(accion) }
             }
         }
-        .padding(16)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(NxColors.card, in: RoundedRectangle(cornerRadius: NxRadius.xl, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: NxRadius.xl, style: .continuous)
-                .strokeBorder(NxColors.border, lineWidth: 1)
-        )
+        .background { InicioBandaResplandor(fondo: Self.fondo) }
+        .clipShape(forma)
+        // La sombra va fuera del recorte (si no, la corta la forma).
+        .background {
+            forma
+                .fill(Self.fondo)
+                .shadow(color: NxColors.rgb(0x0D0F12, alpha: 0.35), radius: 18, x: 0, y: 12)
+        }
     }
 }
 
-/// Botón cuadrado de 52, radio 16, filo #CBD5E1 e icono de 22.
-private struct InicioSquareButton: View {
+/// Fondo casi negro de la banda con su aurora (Android `dibujarResplandor`): verde arriba a la
+/// derecha, azul abajo a la izquierda y magenta abajo, al centro.
+private struct InicioBandaResplandor: View {
+    let fondo: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            let ancho = geo.size.width
+            ZStack {
+                fondo
+                RadialGradient(
+                    colors: [NxColors.rgb(0x10A183, alpha: 0.55), NxColors.rgb(0x10A183, alpha: 0)],
+                    center: .topTrailing,
+                    startRadius: 0,
+                    endRadius: ancho * 0.85
+                )
+                RadialGradient(
+                    colors: [NxColors.rgb(0x0060F0, alpha: 0.45), NxColors.rgb(0x0060F0, alpha: 0)],
+                    center: UnitPoint(x: 0, y: 1.2),
+                    startRadius: 0,
+                    endRadius: ancho * 0.75
+                )
+                RadialGradient(
+                    colors: [NxColors.rgb(0xA85299, alpha: 0.32), NxColors.rgb(0xA85299, alpha: 0)],
+                    center: UnitPoint(x: 0.6, y: 1.3),
+                    startRadius: 0,
+                    endRadius: ancho * 0.55
+                )
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Barra de 6 del reloj contra el plan: degradado #6EC5D8 → #10A183, o naranja si ya se pasó.
+private struct InicioBandaAvance: View {
+    let avance: Double
+    let excedida: Bool
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.14))
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: excedida
+                                ? [NxColors.rgb(0xF5B14C), NxColors.rgb(0xF08A1E)]
+                                : [NxColors.rgb(0x6EC5D8), NxColors.rgb(0x10A183)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: geo.size.width * CGFloat(min(max(avance, 0), 1)))
+            }
+        }
+        .frame(height: 6)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Botón de 48 de la banda (Android `BandaBoton`): contorno blanco translúcido, o blanco lleno
+/// con letra oscura para la acción principal.
+private struct InicioBandaBoton: View {
+    let title: String
     let systemImage: String
-    let label: String
+    let claro: Bool
+    var loading: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 19, weight: .regular))
-                .foregroundStyle(NxColors.fg)
-                .frame(width: NxMetrics.primaryButtonHeight, height: NxMetrics.primaryButtonHeight)
-                .background(NxColors.card, in: RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous)
-                        .strokeBorder(NxColors.borderStrong, lineWidth: 1)
-                )
-                .contentShape(RoundedRectangle(cornerRadius: NxRadius.l, style: .continuous))
+            HStack(alignment: .center, spacing: 8) {
+                if loading {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(NxColors.fg)
+                        .frame(width: 18, height: 18)
+                } else {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 19, height: 19)
+                        .accessibilityHidden(true)
+                }
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            .foregroundStyle(claro ? NxColors.fg : Color.white)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background {
+                if claro {
+                    RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+                        .fill(Color.white.opacity(loading ? 0.7 : 1))
+                } else {
+                    RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.28), lineWidth: 1)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
         }
         .buttonStyle(NxPressableStyle())
-        .accessibilityLabel(label)
+        .disabled(loading)
     }
 }
 
-/// «Después, hoy» (Android `SiguientesCard`): las siguientes de la cola, una por renglón.
+/// «Lo que sigue hoy» (Android `SiguientesCard`): tarjeta blanca de radio 22 con la sombra
+/// flotante; cada fila con la hora (13 SemiBold gris, tabular), el título y el detalle en un
+/// renglón («Biblioteca Central · 45 min»).
 private struct InicioSiguientesCard: View {
     let items: [MyActivityItem]
     let onOpen: (MyActivityItem) -> Void
@@ -752,49 +809,30 @@ private struct InicioSiguientesCard: View {
                 fila(item)
             }
         }
-        .background(NxColors.card, in: RoundedRectangle(cornerRadius: NxRadius.xl, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: NxRadius.xl, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: NxRadius.xl, style: .continuous)
-                .strokeBorder(NxColors.border, lineWidth: 1)
-        )
+        .nxCardSurface(radius: 22)
     }
 
     private func fila(_ item: MyActivityItem) -> some View {
-        let kindColor = NxBrand.category(item.coreKind)
-        return Button {
+        Button {
             onOpen(item)
         } label: {
             HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .center, spacing: 0) {
-                    Text(InicioRules.horaDe(item.fechaInicio) ?? "—")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(NxColors.fg)
-                        .monospacedDigit()
-                        .lineLimit(1)
-                    Text(InicioRules.subHora(item))
-                        .font(.system(size: 11))
-                        .foregroundStyle(NxColors.muted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-                // 58 como Android: con 48 «Esta semana» salía «Esta sem…».
-                .frame(width: 58)
-                Image(systemName: CoreStatusUI.kindSymbol(item.coreKind))
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(kindColor)
-                    .frame(width: 36, height: 36)
-                    .background(kindColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 1) {
+                Text(InicioRules.horaFila(item))
+                    .font(.system(size: 13, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(NxColors.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(width: 48, alignment: .leading)
+                VStack(alignment: .leading, spacing: 2) {
                     Text(InicioRules.titulo(item))
-                        .font(.system(size: 14.5, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(NxColors.fg)
                         .lineLimit(2)
-                    Text(InicioRules.detalleSiguiente(item))
-                        .font(.system(size: 12.5))
+                    Text(InicioRules.detalleSiguiente(item).replacingOccurrences(of: "\n", with: " · "))
+                        .font(.system(size: 13))
                         .foregroundStyle(NxColors.muted)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .multilineTextAlignment(.leading)
@@ -803,8 +841,8 @@ private struct InicioSiguientesCard: View {
                     .foregroundStyle(NxColors.fg4)
                     .accessibilityHidden(true)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(NxPressableStyle())
@@ -857,11 +895,8 @@ private struct InicioEquipoCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(NxColors.card, in: RoundedRectangle(cornerRadius: NxRadius.xl, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: NxRadius.xl, style: .continuous)
-                .strokeBorder(NxColors.border, lineWidth: 1)
-        )
+        // Sin borde: la sombra flotante la separa del fondo.
+        .nxCardSurface(radius: 22)
     }
 }
 
@@ -901,11 +936,8 @@ private struct InicioTodoAlDiaCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(20)
-        .background(NxColors.card, in: RoundedRectangle(cornerRadius: NxRadius.xl, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: NxRadius.xl, style: .continuous)
-                .strokeBorder(NxColors.border, lineWidth: 1)
-        )
+        // Sin borde: la sombra flotante la separa del fondo.
+        .nxCardSurface(radius: 22)
     }
 }
 
