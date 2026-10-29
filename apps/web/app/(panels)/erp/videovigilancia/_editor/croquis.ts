@@ -57,6 +57,25 @@ async function desdeImagen(archivo: File): Promise<Blob> {
   return aPng(canvas);
 }
 
+/**
+ * ¿El croquis es de fondo oscuro? Los PDF de AutoCAD salen en negro con trazos claros y en el tema
+ * claro de Core el plano se vería gris; esos se pintan invertidos (trazos oscuros sobre blanco).
+ */
+export async function esOscuro(imagen: Blob): Promise<boolean> {
+  const bitmap = await createImageBitmap(imagen);
+  const lado = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = lado;
+  canvas.height = lado;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return false;
+  ctx.drawImage(bitmap, 0, 0, lado, lado);
+  const { data } = ctx.getImageData(0, 0, lado, lado);
+  let suma = 0;
+  for (let i = 0; i < data.length; i += 4) suma += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+  return suma / (data.length / 4) < 0.4 * 255;
+}
+
 export function esPdf(archivo: File): boolean {
   return archivo.type === "application/pdf" || /\.pdf$/i.test(archivo.name);
 }

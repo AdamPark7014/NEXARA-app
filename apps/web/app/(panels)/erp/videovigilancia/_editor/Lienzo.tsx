@@ -419,7 +419,7 @@ export default function Lienzo({
           height={plano.croquis.altoPx}
           opacity={plano.croquis.opacidad}
           preserveAspectRatio="none"
-          style={{ pointerEvents: "none" }}
+          style={{ pointerEvents: "none", filter: plano.croquis.invertido ? "invert(1) hue-rotate(180deg)" : undefined }}
         />
       ) : null}
 
