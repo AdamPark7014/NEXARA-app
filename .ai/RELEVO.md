@@ -1,5 +1,25 @@
 # RELEVO
 
+- **29-10 ~13:30 (claude-code) — Mesa contable de la contadora: API (web en curso, sin desplegar).**
+  - Pedido de Adam: «por facturar», pagos y gastos ligados a su CFDI y banco, estado de resultados y balance. Mockup
+    aprobado por Adam el 29-10: https://claude.ai/artifact/MENR9dXWC7PGocKEoSTmpD
+  - API en `src/accounting/mesa-contable/` bajo `GET|POST /api/accounting/workspace/mesa/*` (contrato en el
+    controlador): `por-facturar` (servicios terminados con cliente, cotizaciones aprobadas, anticipos pactados,
+    pedidos con partidas sin facturar y cobros PPD sin complemento; `preparar` crea el borrador ligado y `descartar`
+    guarda «no se factura» con motivo), `facturas/:id/revision` («antes de timbrar» y póliza), `pagos-gastos`
+    (viáticos, gastos, nómina, cobros/pagos y recepciones con su CFDI, banco y póliza; ligar XML recibido, ligar
+    banco, registrar póliza) y `estados` (resultados/balance por periodo con agrupador SAT, Excel de 3 hojas).
+  - Migración `20261029180000_mesa_contable`: `invoices.cotizacionId` y `esAnticipo`, tablas
+    `por_facturar_descartes` y `movimiento_vinculos` (pago o gasto ↔ CFDI ↔ movimiento de banco).
+  - Cambios contables: la póliza de factura timbrada usa la base (descuentos) y retenciones y ya no truena con IVA 0;
+    con PPD el IVA va a 208.02 y el cobro lo pasa a 208.01; el viático entregado va a 107.01 «por comprobar» y la
+    comprobación se registra desde la Mesa (deducible + IVA acreditable 110.02 + no deducible 605.01). Cuenta nueva
+    113.01 sin agrupador. `registerPayment` liga el pago a su movimiento de banco.
+  - Rol `contabilidad`: + `accounting.post`, `accounting.close_period`, `banking.reconcile` (antes solo con el flag
+    viejo). Sigue sin `audit.view` a propósito (spec de RBAC).
+  - Timbrado: no se duplica; lo conecta la sesión del PAC (Facturama recomendado; producción en mock).
+  - Pendiente conocido: la recepción de compra sigue cargando IVA a 209.01 (mal definida en el catálogo base).
+
 - **29-10 ~12:00 (claude-code) — Web Core: auditoría por DOM del resto del menú y arreglos de contraste (sin desplegar).**
   - Auditadas 21 pantallas a 1707 px (el ancho real de Adam: Chrome maximizado con zoom al 90 %). 375 px no se pudo
     medir sin cambiar su ventana; el navegador integrado no tiene sesión de Core. Sin solapes ni desborde horizontal.
