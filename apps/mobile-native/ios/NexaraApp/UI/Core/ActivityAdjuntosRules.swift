@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// Reglas puras de «Archivos de evidencia» (adjuntos de una actividad comercial): qué
+// Reglas puras de «Documentos» (adjuntos de cualquier actividad, desde el 29-10; sin fotos): qué
 // se puede adjuntar, icono y color por tipo, tamaño legible y fecha en hora de México.
 // Los textos son los del contrato de las tres plataformas (web, Android, iOS).
 
@@ -48,8 +48,8 @@ enum ActivityAdjuntoTipo: Equatable {
 enum ActivityAdjuntosRules {
     // MARK: Textos
 
-    static let titulo = "Archivos de evidencia"
-    static let subtitulo = "Excel, Word, PDF o imágenes de la propuesta, minutas y lo que mande el cliente"
+    static let titulo = "Documentos"
+    static let subtitulo = "Opcional: PowerPoint, Excel, Word o PDF"
     static let vacio = "Aún no hay archivos"
     static let adjuntar = "Adjuntar archivo"
     static let subiendo = "Subiendo…"
@@ -61,10 +61,9 @@ enum ActivityAdjuntosRules {
     /// Hasta 10 archivos por envío.
     static let maximoPorEnvio = 10
 
-    /// `EXTENSIONES_ADJUNTO` del API: oficina, PDF, imágenes y texto. Nada ejecutable.
+    /// `EXTENSIONES_ADJUNTO` del API (7562fa8a): oficina, PDF y texto; sin fotos (van en Evidencias).
     static let extensionesPermitidas: Set<String> = [
-        "pdf", "png", "jpg", "jpeg", "webp", "gif", "heic", "heif",
-        "xlsx", "xlsm", "xls", "csv", "docx", "doc", "pptx", "ppt", "txt",
+        "pdf", "xlsx", "xlsm", "xls", "csv", "docx", "doc", "pptx", "ppt", "txt",
     ]
 
     /// `MIME_POR_EXTENSION` del API (el servidor vuelve a decidirlo por la extensión).
@@ -90,7 +89,7 @@ enum ActivityAdjuntosRules {
 
     /// Lo que ofrece el selector de Archivos (varios a la vez).
     static var tiposImportables: [UTType] {
-        var tipos: [UTType] = [.pdf, .image, .spreadsheet, .presentation, .plainText, .commaSeparatedText]
+        var tipos: [UTType] = [.pdf, .spreadsheet, .presentation, .plainText, .commaSeparatedText]
         let identificadores = [
             "org.openxmlformats.wordprocessingml.document",
             "com.microsoft.word.doc",
@@ -184,7 +183,7 @@ enum ActivityAdjuntosRules {
     // MARK: Validación antes de subir
 
     static func mensajeTipoNoPermitido(_ nombre: String) -> String {
-        "No se puede adjuntar «\(nombre)». Se aceptan PDF, Excel, Word, PowerPoint, imágenes y texto."
+        "No se puede adjuntar «\(nombre)». Se aceptan PDF, Excel, Word, PowerPoint y texto; las fotos van en Evidencias."
     }
 
     static func mensajeDemasiadoGrande(_ nombre: String) -> String {

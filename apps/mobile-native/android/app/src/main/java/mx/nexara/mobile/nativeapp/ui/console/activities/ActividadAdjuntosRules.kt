@@ -7,13 +7,13 @@ import mx.nexara.mobile.nativeapp.ui.common.MIME_GENERICO
 import mx.nexara.mobile.nativeapp.ui.common.mimeDeArchivo
 
 /**
- * «Archivos de evidencia» de una actividad comercial: Excel, Word, PDF o imágenes de la
- * propuesta, minutas y lo que mande el cliente (Adam, 07-10). Reglas puras de la sección;
- * los textos son los mismos que en la web y en iOS.
+ * «Documentos» de cualquier actividad (Adam, 29-10: «que cualquier actividad puedas adjuntar un
+ * archivo opcionalmente… tipo PowerPoint, Excel o PDF»; antes solo comerciales). Las fotos van en
+ * Evidencias; las imágenes ya subidas se siguen viendo. Mismos textos que la web (7562fa8a) e iOS.
  */
 object ActividadAdjuntosRules {
-    const val TITULO = "Archivos de evidencia"
-    const val SUBTITULO = "Excel, Word, PDF o imágenes de la propuesta, minutas y lo que mande el cliente"
+    const val TITULO = "Documentos"
+    const val SUBTITULO = "Opcional: PowerPoint, Excel, Word o PDF"
     const val VACIO = "Aún no hay archivos"
     const val BOTON = "Adjuntar archivo"
 
@@ -21,16 +21,17 @@ object ActividadAdjuntosRules {
     const val MAX_BYTES: Long = 25L * 1024 * 1024
     const val MAX_POR_ENVIO = 10
 
-    /** Lo que acepta el API (`EXTENSIONES_ADJUNTO`): documentos de oficina, PDF, imágenes y texto. */
+    /** Lo que acepta el API (`EXTENSIONES_ADJUNTO`, 7562fa8a): documentos de oficina, PDF y texto; sin fotos. */
     val EXTENSIONES: Set<String> = setOf(
-        "pdf", "png", "jpg", "jpeg", "webp", "gif", "heic", "heif",
-        "xlsx", "xlsm", "xls", "csv", "docx", "doc", "pptx", "ppt", "txt",
+        "pdf", "xlsx", "xlsm", "xls", "csv", "docx", "doc", "pptx", "ppt", "txt",
     )
+
+    /** El mismo aviso que da el API cuando le llega algo que no es documento. */
+    const val SOLO_DOCUMENTOS = "Se aceptan PDF, Excel, Word, PowerPoint y texto; las fotos van en Evidencias."
 
     /** Tipos que ofrece el selector de Android (`OpenMultipleDocuments`). */
     val MIMES_SELECTOR: Array<String> = arrayOf(
         "application/pdf",
-        "image/*",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/vnd.ms-excel.sheet.macroEnabled.12",
         "application/vnd.ms-excel",
@@ -43,8 +44,9 @@ object ActividadAdjuntosRules {
         "text/plain",
     )
 
-    /** Solo las actividades comerciales llevan la sección. */
-    fun aplica(coreKind: String?): Boolean = CoreActivityRules.esComercial(coreKind)
+    /** Toda actividad lleva la sección (desde el 29-10; la «Cotización» sigue solo en comerciales). */
+    @Suppress("UNUSED_PARAMETER")
+    fun aplica(coreKind: String?): Boolean = true
 
     // ── Cómo se ve cada archivo ─────────────────────────────────────────────
 
@@ -146,7 +148,7 @@ object ActividadAdjuntosRules {
      */
     fun motivoRechazo(nombre: String, bytes: Long?): String? {
         if (extension(nombre) !in EXTENSIONES) {
-            return "No se puede adjuntar «$nombre». Se aceptan PDF, Excel, Word, PowerPoint, imágenes y texto."
+            return "No se puede adjuntar «$nombre». $SOLO_DOCUMENTOS"
         }
         if (bytes != null && bytes > MAX_BYTES) {
             return "«$nombre» pesa más de 25 MB, el máximo por archivo."

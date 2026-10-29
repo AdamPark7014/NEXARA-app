@@ -64,6 +64,8 @@
     (oficina 3 a 4 p.m.; cuadrilla, una hora entre 1 y 5 p.m.). «3:00 a 4:00» queda solo de respaldo.
   - Jornadas en sitio (a8085bb3): con `sinBase` no se suma la base del tipo (1 jornada = 480, tope 720).
     Versión de tiendas: Android 1.1.0 (20), iOS 1.1 (13).
+  - «Documentos» en toda actividad (7562fa8a): PowerPoint, Excel, Word o PDF; sin cámara ni Fotos; el mismo aviso
+    que la API para lo que no es documento. La «Cotización» sigue solo en comerciales.
 
 - **29-10 ~17:10 (claude-code) — Comida: ventana por horario y avisos a la hora de cada quien.**
   - El aviso de las 14:50 no le llegaba a nadie: el cron filtraba por roles con acceso a consola y ningún rol activo

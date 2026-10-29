@@ -42,8 +42,8 @@ class ActividadAdjuntosRulesTest {
     fun soloLasComercialesLlevanLaSeccion() {
         assertTrue(ActividadAdjuntosRules.aplica("comercial"))
         assertTrue(ActividadAdjuntosRules.aplica(" Comercial "))
-        assertFalse(ActividadAdjuntosRules.aplica("instalacion"))
-        assertFalse(ActividadAdjuntosRules.aplica(null))
+        assertTrue(ActividadAdjuntosRules.aplica("instalacion"))
+        assertTrue(ActividadAdjuntosRules.aplica(null))
     }
 
     // ── Tamaño legible ──────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ class ActividadAdjuntosRulesTest {
     @Test
     fun tipoNoAceptadoConElTextoDelApi() {
         assertEquals(
-            "No se puede adjuntar «instalador.exe». Se aceptan PDF, Excel, Word, PowerPoint, imágenes y texto.",
+            "No se puede adjuntar «instalador.exe». Se aceptan PDF, Excel, Word, PowerPoint y texto; las fotos van en Evidencias.",
             ActividadAdjuntosRules.motivoRechazo("instalador.exe", 10L),
         )
         assertNotNull(ActividadAdjuntosRules.motivoRechazo("sin-extension", 10L))
