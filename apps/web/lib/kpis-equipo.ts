@@ -45,6 +45,12 @@ export type EntregasKpi = {
   pctTiempoAdecuado?: number | null;
   /** Minutos de trabajo entregado: el estimado de lo entregado (sin estimado, su tiempo real hasta 2 h). */
   minutosCarga?: number;
+  /** Horas estándar ganadas (§8): entregadas con tiempo estándar, la suma de sus estándares y lo que tardaron. */
+  conEstandar?: number;
+  minutosEstandarGanados?: number;
+  minutosRealesConEstandar?: number;
+  /** Estándar ÷ real con tope de 100. null sin dato. */
+  pctEficienciaEstandar?: number | null;
 };
 
 /** Entregas por día trabajado; `referencia` = el ritmo del equipo contra el que se mide. */

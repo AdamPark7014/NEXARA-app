@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/base";
 import { formatPctKpi, type KpiPersonaFila, type TotalesKpi } from "@/lib/kpis-equipo";
 import { horasEnPalabras, tonoCumplimiento, type TonoKpi } from "@/lib/kpis-lectura";
-import { CONFIANZA_UI, confianzaDe, multiplicadoresDe, pilaresDe, resumenDesempeno, type Pilar } from "@/lib/desempeno";
+import { CONFIANZA_UI, confianzaDe, estandarGanado, multiplicadoresDe, pilaresDe, resumenDesempeno, type Pilar } from "@/lib/desempeno";
 import s from "./DesempenoTablero.module.css";
 
 const TONO: Record<TonoKpi, string> = { ok: s.ok, atencion: s.atencion, critico: s.critico, sin_datos: s.sinDatos };
@@ -209,6 +209,9 @@ function Lectura({ persona: p, href }: { persona: KpiPersonaFila; href: string }
     ["Asistencia puntual", a && a.esperados ? `${a.puntuales} de ${a.esperados} días` : "—"],
     ["Uniforme", t.uniforme.revisadas ? `${t.uniforme.ok} de ${t.uniforme.revisadas}` : "Sin revisar"],
   ];
+  // Horas estándar ganadas (§8): aparte del índice, solo de lo asignado con tiempo estándar.
+  const estandar = estandarGanado(t);
+  datos.push(["Horas estándar ganadas", estandar ? `${estandar.valor} (${estandar.detalle})` : "Aún sin entregas con tiempo estándar"]);
   return (
     <aside className={s.lectura} aria-label={`Lectura de ${p.persona.nombre}`}>
       <section className={s.tarjeta}>

@@ -510,6 +510,8 @@ export type EntregaKpi = {
   minutosReales?: number | null;
   /** Días de su periodo (1 si es de un día). El plan es de una jornada. */
   diasPeriodo?: number | null;
+  /** Tiempo estándar de la actividad (§8), si se asignó con él. */
+  minutosEstandar?: number | null;
 };
 
 export type EstadoEntrega = 'a_tiempo' | 'tarde' | 'sin_entregar';
@@ -569,6 +571,8 @@ export type EntregaDelRango = {
   tiempo: 'adecuado' | 'excedido' | null;
   /** Lo que aporta a la carga: su plan (por día del periodo) o, sin plan, su tiempo real hasta 2 h. */
   minutosCarga: number;
+  /** Tiempo estándar (§8). Entregada, son las «horas estándar ganadas»: cuenta el estándar, no lo que tardó. */
+  minutosEstandar: number | null;
 };
 
 /**
@@ -630,6 +634,7 @@ export function entregasDelRango(
       minutosReales: reales,
       tiempo,
       minutosCarga: !entregada ? 0 : plan != null ? plan * diasPeriodo : Math.min(reales ?? 0, CARGA_SIN_PLAN_MAX_MIN),
+      minutosEstandar: minutosValidos(e.minutosEstandar),
       orden: (entregada ?? limite ?? ahora).getTime(),
     });
   }
@@ -657,7 +662,19 @@ export type EntregasKpi = {
   pctATiempo: number | null;
   pctALaPrimera: number | null;
   pctTiempoAdecuado: number | null;
+  /**
+   * Horas estándar ganadas (§8, medición aparte: el índice no cambia hasta las decisiones de §7.4).
+   * Entregadas que traían tiempo estándar, la suma de sus estándares y lo que de verdad tardaron.
+   */
+  conEstandar: number;
+  minutosEstandarGanados: number;
+  minutosRealesConEstandar: number;
+  /** Estándar ÷ real con tope de 100: 100 = lo hizo en el estándar o antes. null sin dato. */
+  pctEficienciaEstandar: number | null;
 };
+
+/** Lo que se suma del tiempo estándar; los que no lo traen cuentan como cero. */
+type SumasEstandar = Pick<EntregasKpi, 'conEstandar' | 'minutosEstandarGanados' | 'minutosRealesConEstandar'>;
 
 export function resumenEntregas(lista: EntregaDelRango[]): EntregasKpi {
   const revisadas = lista.filter((e) => e.primeraRevision != null);
@@ -672,15 +689,36 @@ export function resumenEntregas(lista: EntregaDelRango[]): EntregasKpi {
     conTiempo: lista.filter((e) => e.tiempo != null).length,
     enTiempoAdecuado: lista.filter((e) => e.tiempo === 'adecuado').length,
     minutosCarga: lista.reduce((acc, e) => acc + e.minutosCarga, 0),
+    ...sumasEstandar(lista),
   });
 }
 
-function armaEntregas(c: Omit<EntregasKpi, 'pctATiempo' | 'pctALaPrimera' | 'pctTiempoAdecuado'>): EntregasKpi {
+/** Horas estándar ganadas: solo lo entregado que traía estándar. */
+export function sumasEstandar(lista: EntregaDelRango[]): SumasEstandar {
+  const con = lista.filter((e) => e.entregadaAt != null && e.minutosEstandar != null);
+  return {
+    conEstandar: con.length,
+    minutosEstandarGanados: con.reduce((acc, e) => acc + (e.minutosEstandar ?? 0), 0),
+    minutosRealesConEstandar: con.reduce((acc, e) => acc + (e.minutosReales ?? e.minutosEstandar ?? 0), 0),
+  };
+}
+
+function armaEntregas(
+  c: Omit<EntregasKpi, 'pctATiempo' | 'pctALaPrimera' | 'pctTiempoAdecuado' | 'pctEficienciaEstandar' | keyof SumasEstandar> &
+    Partial<SumasEstandar>,
+): EntregasKpi {
+  const conEstandar = c.conEstandar ?? 0;
+  const ganados = c.minutosEstandarGanados ?? 0;
+  const reales = c.minutosRealesConEstandar ?? 0;
   return {
     ...c,
+    conEstandar,
+    minutosEstandarGanados: ganados,
+    minutosRealesConEstandar: reales,
     pctATiempo: pct(c.aTiempo, c.medidas),
     pctALaPrimera: pct(c.aprobadasALaPrimera, c.revisadas),
     pctTiempoAdecuado: pct(c.enTiempoAdecuado, c.conTiempo),
+    pctEficienciaEstandar: conEstandar > 0 && reales > 0 ? Math.min(100, Math.round((ganados / reales) * 100)) : null,
   };
 }
 
@@ -1427,6 +1465,9 @@ export function sumaEquipo(lista: TotalesKpi[]): TotalesKpi {
     conTiempo: ent((x) => x.conTiempo ?? 0),
     enTiempoAdecuado: ent((x) => x.enTiempoAdecuado ?? 0),
     minutosCarga: ent((x) => x.minutosCarga ?? 0),
+    conEstandar: ent((x) => x.conEstandar ?? 0),
+    minutosEstandarGanados: ent((x) => x.minutosEstandarGanados ?? 0),
+    minutosRealesConEstandar: ent((x) => x.minutosRealesConEstandar ?? 0),
   });
   const esperados = s((t) => t.asistenciaPuntual?.esperados ?? 0);
   const puntuales = s((t) => t.asistenciaPuntual?.puntuales ?? 0);
