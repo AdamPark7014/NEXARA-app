@@ -62,6 +62,7 @@ internal fun TrayectoCard(
     iniciada: Boolean,
     entregada: Boolean,
     cancelada: Boolean,
+    deOficina: Boolean,
     refreshKey: Any?,
     onAviso: (String) -> Unit,
 ) {
@@ -76,7 +77,7 @@ internal fun TrayectoCard(
         tramos = runCatching { withContext(Dispatchers.IO) { repo.trayectos(activityId, miId) } }.getOrNull()
     }
     val lista = tramos ?: return
-    val estado = TrayectoRules.estado(lista, iniciada = iniciada, entregada = entregada, cancelada = cancelada)
+    val estado = TrayectoRules.estado(lista, iniciada = iniciada, entregada = entregada, cancelada = cancelada, deOficina = deOficina)
     if (estado.vacio) return
 
     /** El punto de salida o de llegada, si hay permiso; sin él el tramo se mide igual. */

@@ -75,6 +75,9 @@ final class DemoStore: @unchecked Sendable {
     /// Reloj por sesiones: pausas abiertas y desde cuándo corre cada reloj reanudado.
     var pausas: [Int: DemoPausa] = [:]
     var sesionDesde: [Int: Date] = [:]
+    /// Trayecto (ida al sitio y regreso a la oficina) de mis actividades, en orden de salida.
+    var trayectos: [DemoTrayecto] = []
+    var nextTrayectoId = 7700
 
     // Escáner de almacén y herramientas
     var stockAjustes: [Int: Double] = [:]
@@ -145,6 +148,8 @@ final class DemoStore: @unchecked Sendable {
         complejidadCreada = [:]
         pausas = [:]
         sesionDesde = [:]
+        trayectos = []
+        nextTrayectoId = 7700
         stockAjustes = [:]
         stockAltas = [:]
         prestamosHerramienta = [:]
