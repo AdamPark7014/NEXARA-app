@@ -107,6 +107,7 @@ import { AsistenteChatModule } from './ai/asistente-chat/asistente-chat.module.j
 import { ActivityFeedModule } from './activity-feed/activity-feed.module.js';
 import { DomainEventsModule } from './domain-events/domain-events.module.js';
 import { CelebrationsModule } from './celebrations/celebrations.module.js';
+import { CctvDisenosModule } from './cctv-disenos/cctv-disenos.module.js';
 
 @Module({
   imports: [
@@ -211,6 +212,7 @@ import { CelebrationsModule } from './celebrations/celebrations.module.js';
     AiModule,
     AsistenteChatModule,
     CelebrationsModule,
+    CctvDisenosModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [

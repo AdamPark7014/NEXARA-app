@@ -525,6 +525,18 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `erp-clients, erp-cotizaciones, pizarra`,
   },
+  'erp-videovigilancia': {
+    id: 'erp-videovigilancia',
+    summary: `Diseño de sistemas de CCTV sobre el plano del sitio: muros y puertas a escala, cámaras del catálogo con su óptica, cobertura DORI recortada por muros, lo que ve cada cámara y la propuesta para el cliente.`,
+    audience: `Encargados de área y el arquitecto. Soporte e instaladores no.`,
+    how: `La cobertura sale de la óptica de cada cámara (focal, sensor, resolución), su altura e inclinación y los muros del plano, con la norma IEC 62676-4. Las distancias se miden en el piso desde el pie de la cámara.`,
+    steps: [
+      `Sube el croquis y calíbralo con una cota conocida`,
+      `Dibuja o corrige muros, puertas y obstáculos con su altura`,
+      `Coloca las cámaras y ajusta altura, inclinación y rumbo hasta cubrir cada área`,
+    ],
+    connects: `erp-clients, erp-cotizaciones, erp-proyectos`,
+  },
   'erp-almacen': {
     id: 'erp-almacen',
     summary: `Almacén de Core: existencias por almacén, entradas y salidas, lotes, valuación y conteos.`,

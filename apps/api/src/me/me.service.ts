@@ -7,6 +7,11 @@ import { deriveModuleKeysFromPaths } from './navigation-module-map.js';
 import { applyModuleAccessOverrides, parseModuleAccess } from './module-access-merge.js';
 import { ModulePolicyService } from '../common/tenant/module-policy.service.js';
 import { aplicarPoliticaANavegacion } from '../common/tenant/module-policy.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { puedeDisenarCctvSegunGente } from '../cctv-disenos/acceso-cctv.js';
+
+/** Diseñador de videovigilancia: la matriz se lo abre a soporte, RH, contabilidad y diseño, pero solo entra quien lleva gente. */
+const MODULO_CCTV = 'erp-videovigilancia';
 
 /** Prefijo de panel web → PanelId móvil / hub. */
 const PANEL_PREFIXES: Array<{ prefix: string; panel: string }> = [
@@ -24,6 +29,7 @@ export class MeService {
   constructor(
     private readonly auth: AuthService,
     private readonly policy: ModulePolicyService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async navigation(userId: number, companyId?: number | null) {
@@ -55,6 +61,20 @@ export class MeService {
       },
       ocultos,
     );
+    // Sin gente a cargo, soporte (Carolina, Alejandro) no ve el diseñador aunque su rol lo abra.
+    if (
+      (recortada.webModuleIds.includes(MODULO_CCTV) || recortada.moduleKeys.includes(MODULO_CCTV)) &&
+      !(await puedeDisenarCctvSegunGente(this.prisma, {
+        id: userId,
+        roleKey: roleKeyRaw ?? null,
+        isSuperAdmin: roleKey === 'super_admin',
+        email: profile?.email ?? null,
+      }))
+    ) {
+      recortada.webModuleIds = recortada.webModuleIds.filter((m) => m !== MODULO_CCTV);
+      recortada.moduleKeys = recortada.moduleKeys.filter((m) => m !== MODULO_CCTV);
+      recortada.hiddenModuleIds = [...new Set([...recortada.hiddenModuleIds, MODULO_CCTV])].sort();
+    }
     const webModuleIds = recortada.webModuleIds;
     const moduleKeys = recortada.moduleKeys;
 

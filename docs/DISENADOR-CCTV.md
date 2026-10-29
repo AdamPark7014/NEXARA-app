@@ -10,8 +10,16 @@ diseñador de SYSCOM: «parametrice un sistema que me genere todo esto y lo pued
 área… incluyendo el arquitecto. Los únicos que no son los de soporte y los instaladores». Los encargados de
 instalación y de soporte sí entran.
 
-Estado: **fase 1 hecha** (motor de cálculo con pruebas, `apps/web/lib/cctv/`). Las pantallas esperan el visto
-bueno de Adam sobre el mockup (§10).
+Estado (29-10): **fases 1 y 2 hechas**. Fase 1 es el motor en `apps/web/lib/cctv/`. Fase 2, con el mockup aprobado
+por Adam, es el módulo `/erp/videovigilancia`: lista y alta, editor 2D, panel de cámara, vista desde la cámara y API
+`/api/cctv-disenos`. Lo que sigue está en §10.
+
+Dónde vive la fase 2:
+- Web:
+  - páginas en `app/(panels)/erp/videovigilancia/` (`page.tsx` lista y alta; `[id]/page.tsx` carga el diseño);
+  - editor en `_editor/` (`EditorCctv`, `Lienzo`, `Inspector`, `VistaCamara`, `croquis.ts`);
+  - en `lib/cctv/`: `editor.ts` (operaciones puras y deshacer), `vista.ts`, `catalogo.ts`, `api.ts` y `acceso.ts`.
+- API: `src/cctv-disenos/` y la migración `20261029130000_cctv_disenos`.
 
 ---
 
@@ -377,7 +385,7 @@ lugares a tocar para dar de alta un módulo:
 | Fase | Contenido | Estado |
 |---|---|---|
 | 1 | Motor: óptica, DORI, zona ciega, plano, oclusión, cobertura, humanoides, mapa de calor, infraestructura. 36 pruebas | **Hecha** (29-10) |
-| 2 | Módulo y permisos, proyectos (guardar/abrir), editor 2D (croquis, calibrar, muros, aberturas, obstáculos, etiquetas, cotas, cámaras con conos recortados, humanoides), catálogo semilla | Espera el visto bueno del mockup |
+| 2 | Módulo y permisos, proyectos (guardar/abrir), editor 2D (croquis, calibrar, muros, aberturas, obstáculos, etiquetas, cotas, cámaras con conos recortados, humanoides), catálogo semilla, vista desde la cámara en 2D | **Hecha** (29-10) |
 | 3 | 3D y vista desde cada cámara (three.js), recuadro de PPM, referencia de detalle | — |
 | 4 | Propuesta PDF y «Pasar a cotización» | — |
 | 5 | Detección automática (PDF vectorial y luego IA con eval) y «Leer ficha» | — |

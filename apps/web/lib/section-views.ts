@@ -13,6 +13,7 @@ import { puedeVerModuloClientes } from '@/lib/client-sectors';
 import { PERMISSIONS } from '@/lib/permissions';
 import { canCreateToolLoan, canManageTools } from '@/lib/tools-access';
 import { canManageAlmacen } from '@/lib/almacen-access';
+import { veDisenadorCctv } from '@/lib/cctv/acceso';
 
 export type SectionViewMode = 'manage' | 'execute' | 'manage_execute';
 
@@ -250,6 +251,9 @@ export function shouldShowModuleInSidebar(
       // datos de sus clientes recurrentes, incluidos los que se dieron de alta rápido en
       // una actividad, una cotización o un proyecto. Quién es lo decide `activity-kinds.ts`.
       return puedeVerModuloClientes(user);
+    case 'erp-videovigilancia':
+      // Encargados de área y el arquitecto; soporte solo su encargado (`lib/cctv/acceso.ts`).
+      return veDisenadorCctv(user);
     case 'ops-activities': {
       const ov = user?.moduleAccess?.['ops-activities'];
       if (ov === 'both') return true;

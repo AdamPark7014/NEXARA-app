@@ -208,6 +208,7 @@ export type ModuleId =
   | "erp-clients"
   | "erp-cotizaciones"
   | "erp-proyectos"
+  | "erp-videovigilancia"
   | "erp-almacen"
   | "erp-herramientas"
   | "erp-vehiculos"
@@ -460,6 +461,18 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
       R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL,
       R.SALES_MANAGER, R.PROJECT_MANAGER, R.SENIOR_ENGINEER,
       R.ADMIN_STAFF, R.MAINTENANCE_COORDINATOR,
+    ],
+    group: "Clientes y obra", visible: true,
+  },
+  "erp-videovigilancia": {
+    id: "erp-videovigilancia", panel: PANELS.ERP, path: "/videovigilancia",
+    label: "Videovigilancia", description: "Diseño de CCTV sobre el plano: cobertura DORI, vista por cámara y propuesta",
+    icon: "📹",
+    // Encargados de área y el arquitecto (`lib/cctv/acceso.ts`); la API es la autoridad.
+    allowedRoles: [
+      R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL,
+      R.SALES_MANAGER, R.PROJECT_MANAGER, R.ARQUITECTO, R.COORD_OPERACIONES,
+      R.ADMIN_STAFF, R.MAINTENANCE_COORDINATOR, R.SUPPORT_AGENT,
     ],
     group: "Clientes y obra", visible: true,
   },

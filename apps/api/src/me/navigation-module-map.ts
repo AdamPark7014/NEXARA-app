@@ -32,6 +32,9 @@ export const CORE_EXTRA_MODULES: ReadonlyArray<{ key: string; url: string }> = [
   { key: 'erp-aprobaciones', url: '/erp/approvals' },
   { key: 'erp-pagos-empleados', url: '/erp/finance/employee-payments' },
   { key: 'erp-documentos', url: '/erp/documents' },
+  // Diseñador de videovigilancia («Clientes y obra»). Quien no puede diseñar (soporte sin gente a
+  // cargo) lo recibe en `hiddenModuleIds` (`me.service.ts` con `puedeDisenarCctv`).
+  { key: 'erp-videovigilancia', url: '/erp/videovigilancia' },
 ];
 
 /** Comodines que abren un panel entero: devuelve su base (`''` = todo). */
@@ -61,6 +64,7 @@ export const PATH_MODULE_HINTS: PathModuleHint[] = [
     web: ['erp-pagos-empleados'],
   },
   { match: /^\/erp\/documents(\/|$)/, android: ['erp-documentos'], web: ['erp-documentos'] },
+  { match: /^\/erp\/videovigilancia(\/|$)/, android: ['erp-videovigilancia'], web: ['erp-videovigilancia'] },
   { match: /\/my-profile|\/users\/profile/, android: ['my-profile'], web: ['my-profile'] },
   { match: /user-preferences|my-preferences/, android: ['my-preferences'], web: ['my-preferences'] },
   { match: /\/calendar/, android: ['calendar'], web: ['calendar'] },
