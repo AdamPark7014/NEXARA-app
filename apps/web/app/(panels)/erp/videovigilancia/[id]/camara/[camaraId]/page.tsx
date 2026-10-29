@@ -8,6 +8,7 @@ import { ButtonLink, EmptyState, Skeleton } from "@/components/base";
 import { planoDeDiseno, useCalculoDiseno } from "../../../_editor/calculo";
 import FichaCamara from "../../../_editor/FichaCamara";
 import { useDiseno } from "../../../_editor/useDiseno";
+import { todasLasCamaras } from "@/lib/cctv/niveles";
 import { planoVacio } from "@/lib/cctv/plano";
 
 export default function FichaCamaraPage() {
@@ -17,6 +18,9 @@ export default function FichaCamaraPage() {
   const { diseno, error } = useDiseno(id);
   const plano = useMemo(() => (diseno ? planoDeDiseno(diseno) : planoVacio()), [diseno]);
   const calculo = useCalculoDiseno(plano, diseno?.grabacion);
+  const todas = useMemo(() => todasLasCamaras(plano), [plano]);
+  // La cámara puede estar en cualquier nivel del edificio.
+  const nivel = calculo.niveles.find((n) => n.plano.camaras.some((c) => c.id === camaraId)) ?? calculo.niveles[0];
 
   if (error) {
     return (
@@ -37,11 +41,13 @@ export default function FichaCamaraPage() {
     <FichaCamara
       disenoId={diseno.id}
       disenoNombre={diseno.nombre}
-      plano={plano}
+      plano={nivel.plano}
       camaraId={camaraId}
-      tapas={calculo.tapas}
-      coberturas={calculo.coberturas}
-      esHoja={calculo.esHoja}
+      tapas={nivel.tapas}
+      coberturas={nivel.coberturas}
+      esHoja={nivel.esHoja}
+      todas={todas}
+      nivel={calculo.niveles.length > 1 ? nivel.nivel : null}
     />
   );
 }

@@ -24,6 +24,7 @@ import {
 } from "@/lib/cctv/editor";
 import { etiquetaCono, hfovDeg, distanciaInclinadaM, ppm } from "@/lib/cctv/optica";
 import { dirRumbo, hojasPuerta, type Plano, type Punto, type Tapa } from "@/lib/cctv/plano";
+import { reescalar } from "@/lib/cctv/niveles";
 import { camaraEnMetros, mejorNivelEn, type CamaraM, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import { COLOR_NIVEL, OPACIDAD_NIVEL } from "./colores";
 import styles from "./editor.module.css";
@@ -83,6 +84,8 @@ export default function Lienzo({
   onPedirMedida,
   onPedirTexto,
   onHerramienta,
+  numeroNuevo,
+  planoAbajo,
 }: {
   plano: Plano;
   seleccion: Seleccion | null;
@@ -97,6 +100,10 @@ export default function Lienzo({
   onPedirMedida: (a: Punto, b: Punto) => void;
   onPedirTexto: (pos: Punto) => void;
   onHerramienta: (h: Herramienta) => void;
+  /** Número de la siguiente cámara (sigue entre niveles). */
+  numeroNuevo: number;
+  /** Nivel de abajo para dibujarlo en gris (artboard 5). */
+  planoAbajo?: Plano | null;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const planoRef = useRef(plano);
@@ -278,7 +285,7 @@ export default function Lienzo({
         onPedirTexto(p);
         return;
       case "camara": {
-        const r = agregarCamara(actual, p, modeloNuevo);
+        const r = agregarCamara(actual, p, modeloNuevo, { numero: numeroNuevo, nombre: `Cámara ${numeroNuevo}` });
         onAplicar(r.plano, { seleccion: { tipo: "camara", id: r.camara.id } });
         onHerramienta("seleccionar");
         return;
@@ -440,6 +447,28 @@ export default function Lienzo({
           style={{ pointerEvents: "none", filter: plano.croquis.invertido ? "invert(1) hue-rotate(180deg)" : undefined }}
         />
       ) : null}
+
+      {/* El nivel de abajo, en gris, para calcar encima (los croquis comparten origen y se pasa por metros). */}
+      {planoAbajo
+        ? planoAbajo.muros.map((m) => {
+            const a = reescalar(m.a, planoAbajo, plano);
+            const b = reescalar(m.b, planoAbajo, plano);
+            return (
+              <line
+                key={`abajo-${m.id}`}
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke="var(--ui-fg-4)"
+                strokeOpacity={0.55}
+                strokeWidth={Math.max(m.grosorM / k, 2 * u)}
+                strokeDasharray={`${6 * u} ${4 * u}`}
+                style={{ pointerEvents: "none" }}
+              />
+            );
+          })
+        : null}
 
       {calor
         ? calor.celdas.map((c, i) => (

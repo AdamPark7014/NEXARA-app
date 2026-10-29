@@ -20,6 +20,10 @@ Dónde vive la fase 2:
   - editor en `_editor/` (`EditorCctv`, `Lienzo`, `Inspector`, `VistaCamara`, `croquis.ts`);
   - en `lib/cctv/`: `editor.ts` (operaciones puras y deshacer), `vista.ts`, `catalogo.ts`, `api.ts` y `acceso.ts`.
 - API: `src/cctv-disenos/` y la migración `20261029130000_cctv_disenos`.
+- Niveles (fase 5b): el plano raíz es la planta baja y los demás pisos van en `plano.niveles`, cada uno con
+  `{ nivel: { id, nombre, elevacionM, alturaLibreM }, plano }`. La geometría de cada nivel está en px de su
+  croquis; para pasar algo de un piso a otro se va por metros. La API no cambió: el JSON viaja en el mismo campo
+  `plano` (tope de 2 MB). El resumen suma la cobertura de todos los pisos, ponderada por área.
 
 ---
 
@@ -388,7 +392,7 @@ lugares a tocar para dar de alta un módulo:
 | 2 | Módulo y permisos, proyectos (guardar/abrir), editor 2D (croquis, calibrar, muros, aberturas, obstáculos, etiquetas, cotas, cámaras con conos recortados, humanoides), catálogo semilla, vista desde la cámara en 2D | **Hecha** (29-10) |
 | 3 | 3D y vista desde cada cámara, recuadro de PPM, referencia de detalle. Se hizo en SVG axonométrico en lugar de three.js: sin dependencias nuevas ni WebGL | **Hecha** (29-10) |
 | 4 | Propuesta PDF (hojas carta, impresión del navegador) y ficha por cámara. Falta «Pasar a cotización» | **Hecha**, salvo cotización (29-10) |
-| 5b | Plano por niveles (varios pisos): artboard 5 del lienzo | Espera el visto bueno de Adam |
+| 5b | Plano por niveles (varios pisos), artboard 5 aprobado por Adam el 29-10: barra de niveles, cada nivel con su croquis, escala, muros y cámaras; «Copiar muros» del nivel de abajo; numeración que sigue entre niveles; 3D apilado a la elevación real con los de abajo en gris; propuesta con una hoja de distribución por nivel. Motor en `lib/cctv/niveles.ts` | **Hecha** (29-10) |
 | 5 | Detección automática (PDF vectorial y luego IA con eval) y «Leer ficha» | — |
 | 6 | Infraestructura en el plano (gabinetes, rutas de cable, NVR/discos/switch) y mapa de calor en la propuesta | — |
 

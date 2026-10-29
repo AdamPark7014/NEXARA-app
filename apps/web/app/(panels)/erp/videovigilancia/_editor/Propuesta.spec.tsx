@@ -2,8 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { MODELOS_CAMARA } from "@/lib/cctv/catalogo";
 import { agregarCamara, agregarMuro, agregarPersona, resumenDelPlano } from "@/lib/cctv/editor";
-import { planoVacio, tapasDelPlano, type Plano } from "@/lib/cctv/plano";
-import { camaraEnMetros, coberturaCamara, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
+import { agregarNivel, copiarMurosDeAbajo, listaNiveles, planoDeNivel, reemplazarNivel, siguienteNumeroGlobal, todasLasCamaras } from "@/lib/cctv/niveles";
+import { planoVacio, type Plano } from "@/lib/cctv/plano";
+import { calcularNivel } from "./calculo";
 import FichaCamara from "./FichaCamara";
 import Propuesta from "./Propuesta";
 
@@ -20,20 +21,19 @@ function bodega(): Plano {
   return agregarPersona(p, { x: 160, y: 145 });
 }
 
-function calculo(plano: Plano) {
-  const tapas = tapasDelPlano(plano);
-  const coberturas = new Map<string, PoligonoCobertura[]>();
-  for (const c of plano.camaras) {
-    const cm = camaraEnMetros(c, plano.escala);
-    coberturas.set(c.id, cm ? coberturaCamara(cm, tapas) : []);
-  }
-  return { tapas, coberturas, esHoja: () => false };
+/** La bodega con un mezzanine de oficinas encima y una cámara (la 3). */
+function conMezzanine(): { raiz: Plano; mezz: string } {
+  const { raiz, id } = agregarNivel(bodega(), { nombre: "Mezzanine oficinas" });
+  const conMuros = copiarMurosDeAbajo(raiz, id);
+  const n = siguienteNumeroGlobal(conMuros);
+  const arriba = agregarCamara(planoDeNivel(conMuros, id), { x: 400, y: 200 }, MODELOS_CAMARA[0], { numero: n, nombre: "Domo Mezzanine norte", alturaM: 2.7, distanciaM: 8 });
+  return { raiz: reemplazarNivel(conMuros, id, arriba.plano), mezz: id };
 }
 
 describe("ficha y propuesta del diseñador", () => {
   it("la ficha muestra alcance en el piso, la vista y la referencia de detalle", () => {
     const plano = bodega();
-    const { tapas, coberturas, esHoja } = calculo(plano);
+    const { tapas, coberturas, esHoja } = calcularNivel(listaNiveles(plano)[0]);
     render(<FichaCamara disenoId={7} disenoNombre="Bodegas VDM" plano={plano} camaraId={plano.camaras[0].id} tapas={tapas} coberturas={coberturas} esHoja={esHoja} />);
     expect(screen.getByRole("heading", { name: "Domo 2 Z ALM" })).toBeInTheDocument();
     expect(screen.getByText("Alcance por nivel de detalle")).toBeInTheDocument();
@@ -45,25 +45,47 @@ describe("ficha y propuesta del diseñador", () => {
 
   it("la propuesta arma una hoja por cámara más portada, 3D e infraestructura", () => {
     const plano = bodega();
-    const { tapas, coberturas, esHoja } = calculo(plano);
-    render(
-      <Propuesta
-        disenoId={7}
-        nombre="Proyecto CCTV Bodegas VDM"
-        cliente="Concretos Pronto"
-        plano={plano}
-        tapas={tapas}
-        coberturas={coberturas}
-        esHoja={esHoja}
-        resumen={resumenDelPlano(plano)}
-        grabacion={null}
-      />,
-    );
+    render(<Propuesta disenoId={7} nombre="Proyecto CCTV Bodegas VDM" cliente="Concretos Pronto" niveles={listaNiveles(plano).map(calcularNivel)} resumen={resumenDelPlano(plano)} grabacion={null} />);
     expect(screen.getAllByRole("article")).toHaveLength(5);
     expect(screen.getByText("Hoja 1 de 5")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Vista isométrica del sitio" })).toBeInTheDocument();
     expect(screen.getByText("NVR de 4 canales")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Descargar PDF/ })).toBeInTheDocument();
     expect(screen.getByText("Concretos Pronto")).toBeInTheDocument();
+  });
+
+  it("con varios niveles saca una hoja de distribución por nivel y la lista de equipo junta todo", () => {
+    const { raiz } = conMezzanine();
+    render(<Propuesta disenoId={7} nombre="Proyecto CCTV Bodegas VDM" cliente="Concretos Pronto" niveles={listaNiveles(raiz).map(calcularNivel)} resumen={resumenDelPlano(raiz)} grabacion={null} />);
+    // 2 distribuciones + 3D + 3 cámaras + infraestructura
+    expect(screen.getAllByRole("article")).toHaveLength(7);
+    expect(screen.getByRole("article", { name: "Hoja 2: distribución de Mezzanine oficinas" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Distribución · Mezzanine oficinas +3.50 m" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Vista isométrica del edificio con sus niveles apilados" })).toBeInTheDocument();
+    expect(screen.getByRole("article", { name: "Hoja 6: cámara 3" })).toHaveTextContent("Mezzanine oficinas +3.50 m");
+    expect(screen.getByText("canales de NVR (3 en uso)")).toBeInTheDocument();
+  });
+
+  it("la ficha de una cámara del mezzanine pasa a las de la planta baja", () => {
+    const { raiz, mezz } = conMezzanine();
+    const nivel = calcularNivel(listaNiveles(raiz).find((n) => n.nivel.id === mezz)!);
+    const cam = nivel.plano.camaras[0];
+    render(
+      <FichaCamara
+        disenoId={7}
+        disenoNombre="Bodegas VDM"
+        plano={nivel.plano}
+        camaraId={cam.id}
+        tapas={nivel.tapas}
+        coberturas={nivel.coberturas}
+        esHoja={nivel.esHoja}
+        todas={todasLasCamaras(raiz)}
+        nivel={nivel.nivel}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Domo Mezzanine norte" })).toBeInTheDocument();
+    expect(screen.getByText("Mezzanine oficinas · +3.50 m")).toBeInTheDocument();
+    expect(screen.getByText("3 de 3")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Cámara 2/ })).toHaveAttribute("href", expect.stringContaining("/camara/"));
   });
 });

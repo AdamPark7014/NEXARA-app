@@ -19,7 +19,8 @@ import {
   tramoVisible,
   type NivelCobertura,
 } from "@/lib/cctv/optica";
-import type { Plano, Tapa } from "@/lib/cctv/plano";
+import { elevacionTexto } from "@/lib/cctv/niveles";
+import type { CamaraPlano, Nivel, Plano, Tapa } from "@/lib/cctv/plano";
 import { camaraEnMetros, leerPersona, personaDeCamara, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import { COLOR_NIVEL } from "./colores";
 import LaminaDetalle from "./LaminaDetalle";
@@ -46,6 +47,8 @@ export default function FichaCamara({
   tapas,
   coberturas,
   esHoja,
+  todas,
+  nivel,
 }: {
   disenoId: number;
   disenoNombre: string;
@@ -54,8 +57,12 @@ export default function FichaCamara({
   tapas: readonly Tapa[];
   coberturas: ReadonlyMap<string, PoligonoCobertura[]>;
   esHoja: (t: Tapa) => boolean;
+  /** Todas las cámaras del edificio, para pasar de una a otra entre niveles. */
+  todas?: ReadonlyArray<{ camara: CamaraPlano }>;
+  /** El nivel de la cámara, cuando el diseño tiene varios. */
+  nivel?: Nivel | null;
 }) {
-  const ordenadas = useMemo(() => [...plano.camaras].sort((a, b) => a.numero - b.numero), [plano.camaras]);
+  const ordenadas = useMemo(() => (todas ? todas.map((t) => t.camara) : [...plano.camaras].sort((a, b) => a.numero - b.numero)), [todas, plano.camaras]);
   const i = ordenadas.findIndex((c) => c.id === camaraId);
   const c = ordenadas[i];
   const k = plano.escala.metrosPorPx;
@@ -112,6 +119,11 @@ export default function FichaCamara({
           </div>
           <h1 className={styles.titulo}>{c.nombre}</h1>
           <div className={styles.sub}>
+            {nivel ? (
+              <span>
+                {nivel.nombre} · {elevacionTexto(nivel.elevacionM)}
+              </span>
+            ) : null}
             <span>{c.modelo}</span>
             {modelo ? <span>{ETIQUETA_TIPO_CAMARA[modelo.tipo]} · {modelo.descripcion}</span> : null}
             <span>Montaje en {c.montaje ?? "muro"} a {metros(c.alturaM)}</span>

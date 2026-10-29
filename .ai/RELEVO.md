@@ -1,5 +1,17 @@
 # RELEVO
 
+- **29-10 ~16:00 (claude-code) — Diseñador de videovigilancia: plano por niveles (artboard 5, aprobado por Adam 29-10).**
+  - Motor `apps/web/lib/cctv/niveles.ts` (+ `ids.ts`): el plano raíz es la planta baja y los pisos van en
+    `plano.niveles` (`{ nivel, plano }`); agregar/quitar/renombrar, `copiarMurosDeAbajo` (ids nuevos, altura libre),
+    numeración global (15, 16…), paso entre pisos por metros. `resumenDelPlano` suma todos los pisos. 6 pruebas.
+  - Editor: barra de niveles arriba del lienzo, «+ Nivel», sección Nivel en la pestaña Plano, fantasma gris del piso
+    de abajo en 2D y 3D apilado a la elevación real (los de abajo en gris, rótulos y aristas punteadas). `encuadrar`
+    centra el edificio cuando hay pisos encima.
+  - Ficha por cámara y propuesta encuentran la cámara en cualquier nivel; la propuesta saca una hoja de distribución
+    por nivel y el 3D con todos los pisos. API sin cambios (el JSON va en el mismo `plano`).
+  - Ojo: el `.prettierrc` de la raíz (comillas simples, 100) no es el estilo de `apps/web` (comillas dobles en todo);
+    no correr prettier sobre la web sin `--no-config`.
+
 - **29-10 ~15:30 (claude-code) — Desempeño: índice v2 (Adam aprobó las 10 decisiones de §7.4, «aprueba todo»).**
   - Fórmula en `.ai/CUMPLIMIENTO-EVALUADOR-SPEC.md` §7.2; decisiones marcadas «aprobado 29-10» en §7.4 y lo construido
     en §7.5. `30·Confiabilidad + 25·Calidad + 30·Rendimiento + 15·Disciplina`.
