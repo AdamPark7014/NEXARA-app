@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import { ClaudeService } from '../claude/claude.service.js';
 import { limpiarComplejidad, peticionComplejidad, type SugerenciaComplejidad } from './complejidad-ia.js';
+import { reglaDe } from '../estandar/tabla-estandar.js';
 import {
   SIN_TIEMPOS,
   agruparTiempos,
@@ -57,8 +58,10 @@ export class ComplejidadService {
     const titulo = String(body.titulo ?? '').trim();
     if (titulo.length < 6 || !this.claude.disponible()) return { sugerencia: null };
     try {
+      const regla = reglaDe({ coreKind: body.coreKind, ticketType: body.tipo, ticketTypeCustom: body.tipo });
+      const seCuenta = regla?.unidades.map((x) => x.plural).join(' o ') || null;
       const { datos } = await this.claude.json<SugerenciaComplejidad>({
-        ...peticionComplejidad({ tipo: tipoLegible(body.coreKind, body.tipo), titulo, indicaciones: body.indicaciones }),
+        ...peticionComplejidad({ tipo: tipoLegible(body.coreKind, body.tipo), seCuenta, titulo, indicaciones: body.indicaciones }),
         proceso: 'complejidad',
         companyId: tenantId,
       });

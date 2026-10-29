@@ -1,5 +1,20 @@
 import { Injectable, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+
+/** Columnas JSON del tiempo estándar: Prisma no acepta `null` en ellas, pide `DbNull` para vaciarlas. */
+const CAMPOS_JSON_ESTANDAR = ['unidades', 'destino', 'estandarDesglose'] as const;
+type JsonEstandar = Prisma.InputJsonValue | Prisma.NullTypes.DbNull;
+type ConJsonNulo<T> = Omit<T, (typeof CAMPOS_JSON_ESTANDAR)[number]> & {
+  unidades?: JsonEstandar;
+  destino?: JsonEstandar;
+  estandarDesglose?: JsonEstandar;
+};
+function conJsonNulo<T extends object>(datos: T): ConJsonNulo<T> {
+  const salida = { ...datos } as Record<string, unknown>;
+  for (const k of CAMPOS_JSON_ESTANDAR) if (k in salida && salida[k] === null) salida[k] = Prisma.DbNull;
+  return salida as ConJsonNulo<T>;
+}
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { esCeoChristian } from '../common/ceo-user.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
@@ -136,7 +151,7 @@ export class ActivitiesService {
 
     const activity = await this.prisma['activity'].create({
       data: {
-        ...rest,
+        ...conJsonNulo(rest),
         ...conPeriodo,
         anNumber,
         companyId: resolvedCompanyId,
@@ -1243,7 +1258,7 @@ export class ActivitiesService {
 
     const updatedActivity = await this.prisma['activity'].update({
       where: { id },
-      data: { ...updateActivityDto, ...periodoData },
+      data: { ...conJsonNulo(updateActivityDto), ...periodoData },
       include: { responsable: { select: { nombre: true, id: true } } },
     });
 

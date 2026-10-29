@@ -1,5 +1,25 @@
 # RELEVO
 
+- **29-10 ~11:35 (claude-code) — Tiempo estándar por especificidad, parte API (§8 de la especificación, tarifas
+  aprobadas por Adam el 28-10).**
+  - Migración `20261029030000_actividad_tiempo_estandar` en Activity: `unidades`, `destino` (JSON), `trasladoMin`,
+    `trasladoModo`, `tiempoEstandarMin`, `estandarDesglose` (JSON) y `estandarCambiadoMotivo`. **Se aplica con
+    `prisma migrate deploy`**, porque `deploy-api-web.sh` no migra; usa `/root/deploy-api-migrar-web.sh`. El `null` de
+    las columnas JSON pasa por `conJsonNulo` (`Prisma.DbNull`) al crear y al editar.
+  - `src/ai/estandar/`:
+    - `tabla-estandar.ts` es la única tabla de tarifas, por tipo. Por ejemplo: cotización 40 min + 4 por partida,
+      instalación 30 + 45 por dispositivo, cableado 45 por nodo o 4 por metro, correctivo por complejidad, y salidas
+      con ida + vuelta + tiempo en el lugar. `calcularEstandar` arma el desglose, redondea a 5 min y topa en 12 h.
+    - `rutas.ts`: ida y vuelta desde la oficina (`sitioOficina`). Intenta primero Google Routes con tráfico (la llave
+      hoy da 403: falta habilitar Routes API y facturación, eso es de Adam), luego OSRM (auto) y al final línea recta
+      × 1.4 a 25 km/h. Transporte sin Google = auto × 2.2 + 10 min, marcado como estimado.
+    - Endpoints `GET ai/estandar/tabla` y `POST ai/estandar/ruta`. La ruta se guarda en caché 1 h.
+  - La sugerencia de complejidad (`complejidad-ia.ts`) ahora también lee del título la `cantidad` de lo que se cuenta
+    en ese tipo y el `destino`, en la misma llamada. Eval `--funcion complejidad`: 28 casos, 26 perfectos, todas las
+    cantidades y destinos bien, 0.00006 USD por llamada.
+  - Falta: el campo en el formulario web (cantidad, mapa del destino y la tarjeta con el desglose) y el flujo de
+    trayecto en las apps (iniciar trayecto → actividad → regreso), que se le pasa a la sesión `nexara-apps-uiux`.
+
 - **29-10 ~11:00 (claude-code) — «Asignar con IA»: nombres mal oídos resueltos en código y propuestas editables (pedido de Adam).**
   - Adam: «le digo talks y escribe talk… que una vez que se genera la parametrización… puedas corregir cualquier
     parámetro manualmente». En producción «Toks» no es cliente (sale en títulos: «Inventario Toks»): el dictado

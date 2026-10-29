@@ -1195,6 +1195,17 @@ model Activity {
   complejidad             String?                  @db.VarChar(12)
   /// La que sugirió la IA al asignar; queda aunque se elija otra.
   complejidadSugerida     String?                  @db.VarChar(12)
+  /// Tiempo estándar (§8): lo que se cuenta `{clave, cantidad}`, p. ej. `{partidas: 50}`.
+  unidades                Json?
+  /// A dónde va `{direccion, lat, lng}` (salidas y servicio en sitio).
+  destino                 Json?
+  /// Ida + vuelta en minutos, cómo se va (AUTO | TRANSPORTE) y de dónde salió la ruta.
+  trasladoMin             Int?
+  trasladoModo            String?                  @db.VarChar(12)
+  /// El estándar calculado y su desglose `[{concepto, minutos}]`; `tiempoEstimadoMin` lo toma salvo cambio con motivo.
+  tiempoEstandarMin       Int?
+  estandarDesglose        Json?
+  estandarCambiadoMotivo  String?                  @db.VarChar(300)
   creadoPorId             Int
   responsableId           Int
   eficienciaScore         Int?

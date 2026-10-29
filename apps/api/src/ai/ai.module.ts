@@ -8,10 +8,11 @@ import { ClaudeService } from './claude/claude.service.js';
 import { AsistenteActividadesService } from './asistente/asistente-actividades.service.js';
 import { TranscriptorService } from './voz/transcriptor.service.js';
 import { ComplejidadService } from './complejidad/complejidad.service.js';
+import { EstandarService } from './estandar/estandar.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, UsersModule],
-  providers: [AiTriageService, ClaudeService, AsistenteActividadesService, TranscriptorService, ComplejidadService],
+  providers: [AiTriageService, ClaudeService, AsistenteActividadesService, TranscriptorService, ComplejidadService, EstandarService],
   controllers: [AiController],
   exports: [AiTriageService, ClaudeService, TranscriptorService],
 })

@@ -1,41 +1,54 @@
 /**
- * Sugerencia de complejidad con Claude al asignar una actividad. La web la enseña como
- * «Sugerencia: Compleja · <motivo>»; quien asigna decide y las dos quedan guardadas
- * (`complejidad` y `complejidadSugerida`). Modelo y parámetros medidos con el eval
+ * Lectura del título con Claude al asignar una actividad: la complejidad sugerida y, para el
+ * tiempo estándar (§8), la cantidad de lo que se cuenta en ese tipo («50 productos» → 50 partidas)
+ * y el destino si el texto lo dice. La web lo enseña como sugerencia; quien asigna decide y lo que
+ * sugirió la IA queda guardado (`complejidadSugerida`). Los minutos nunca salen de aquí: los
+ * calcula la tabla (`estandar/tabla-estandar.ts`). Modelo y parámetros medidos con el eval
  * (`src/ai/eval/`, `--funcion complejidad`).
  */
 import { COMPLEJIDADES, esComplejidad, type Complejidad } from './tiempos-tipicos.js';
 
-export type SugerenciaComplejidad = { complejidad: Complejidad; motivo: string };
+export type SugerenciaComplejidad = {
+  complejidad: Complejidad;
+  motivo: string;
+  /** Cuántas unidades del tipo trae el texto; null si no lo dice. */
+  cantidad: number | null;
+  /** A dónde hay que ir, si el texto lo dice. */
+  destino: string | null;
+};
 
 export const ESQUEMA_COMPLEJIDAD: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
-  required: ['complejidad', 'motivo'],
+  required: ['complejidad', 'motivo', 'cantidad', 'destino'],
   properties: {
     complejidad: { type: 'string', enum: [...COMPLEJIDADES] },
     motivo: { type: 'string' },
+    cantidad: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
+    destino: { anyOf: [{ type: 'string' }, { type: 'null' }] },
   },
 };
 
-export const PROMPT_COMPLEJIDAD = `Calificas la complejidad de actividades de NEXARA, empresa mexicana de seguridad electrónica e infraestructura TI (CCTV, control de acceso, redes, cableado, alarmas, soporte y servicio de campo). Recibes el tipo de trabajo, el título y, si hay, las indicaciones de una actividad que alguien va a asignar.
+export const PROMPT_COMPLEJIDAD = `Lees actividades de NEXARA, empresa mexicana de seguridad electrónica e infraestructura TI (CCTV, control de acceso, redes, cableado, alarmas, soporte y servicio de campo). Recibes el tipo de trabajo, lo que se cuenta en ese tipo (si aplica), el título y, si hay, las indicaciones de una actividad que alguien va a asignar.
 
-Niveles, comparados con lo normal de ese mismo tipo de trabajo:
-- BASICA: rutina corta y conocida, un solo punto o equipo, sin coordinar a nadie. Ej.: entregar documentos, recoger material, cambiar la contraseña de un DVR, revisar una cámara.
+Niveles de complejidad, comparados con lo normal de ese mismo tipo de trabajo:
+- BASICA: rutina corta y conocida, un solo punto o equipo, sin coordinar a nadie. Ej.: entregar documentos, recoger material, cambiar la contraseña de un DVR, revisar una cámara, cargar herramienta.
 - ESTANDAR: lo normal del tipo. Ej.: preventivo de un sitio, instalar 2 o 3 cámaras, configurar un equipo, un reporte de servicio, una junta.
-- COMPLEJA: más volumen o más difícil de lo normal: varios equipos o puntos, altura, canalización larga, varios sitios o áreas, falla sin causa clara, integrar sistemas, coordinar con el cliente u otras áreas. Ej.: instalar 8 cámaras con tubería, diagnosticar cámaras que fallan intermitentes, memoria técnica de un proyecto.
+- COMPLEJA: más volumen o más difícil de lo normal: varios equipos o puntos, altura, canalización larga, varios sitios o áreas, falla sin causa clara, integrar sistemas, coordinar con el cliente u otras áreas, armar equipo. Ej.: instalar 8 cámaras con tubería, diagnosticar cámaras que fallan intermitentes, memoria técnica de un proyecto.
 - CRITICA: el cliente está detenido o hay riesgo: sistema caído, sin acceso o sin grabación en operación, robo o incidente, plazo de horas con penalización, trabajo nocturno o en sitio de alto riesgo.
 
 Reglas:
 - Califica solo con lo escrito. Si no hay señales de más o menos, es ESTANDAR.
 - La urgencia sola no es complejidad: «urgente» sube a CRITICA solo si el cliente está detenido o hay riesgo.
-- motivo: una frase de máximo 120 caracteres, en español, que diga qué del texto te hizo elegir el nivel. Sin inventar datos ni repetir el título.`;
+- motivo: una frase de máximo 120 caracteres, en español, que diga qué del texto te hizo elegir el nivel. Sin inventar datos ni repetir el título.
+- cantidad: el número de lo que se cuenta en ese tipo (partidas o productos de una cotización, cámaras o dispositivos, nodos, metros, equipos, reportes, facturas, niveles o planos, áreas), solo si el texto lo dice con número o con palabra («cinco cámaras» = 5, «un nodo» = 1). Si no lo dice o no se cuenta nada, null. Nunca lo adivines.
+- destino: el lugar al que hay que ir si el texto lo nombra (proveedor, sucursal, cliente, dirección), en pocas palabras. Si no nombra ninguno, null.`;
 
 export const CONFIG_COMPLEJIDAD = {
   modelo: 'claude-haiku-5-5',
   esfuerzo: 'low' as const,
   pensar: false,
-  maxTokens: 200,
+  maxTokens: 260,
   timeoutMs: 6_000,
   reintentos: 0,
 };
@@ -43,6 +56,8 @@ export const CONFIG_COMPLEJIDAD = {
 export type ActividadAClasificar = {
   /** «Tarea · Instalación», «Servicio · CORRECTIVO», «Obra»… */
   tipo: string;
+  /** Lo que se cuenta en ese tipo («partidas», «dispositivos»); null si no se cuenta nada. */
+  seCuenta?: string | null;
   titulo: string;
   indicaciones?: string | null;
 };
@@ -51,6 +66,7 @@ export type ActividadAClasificar = {
 export function peticionComplejidad(a: ActividadAClasificar) {
   const usuario = [
     `Tipo de trabajo: ${String(a.tipo ?? '').trim() || '(sin tipo)'}`,
+    `Se cuenta: ${a.seCuenta?.trim() || 'nada'}`,
     `Título: ${String(a.titulo ?? '').trim()}`,
     a.indicaciones?.trim() ? `Indicaciones: ${a.indicaciones.trim().slice(0, 1200)}` : null,
   ]
@@ -73,5 +89,8 @@ export function peticionComplejidad(a: ActividadAClasificar) {
 export function limpiarComplejidad(datos: Partial<SugerenciaComplejidad> | null | undefined): SugerenciaComplejidad | null {
   if (!esComplejidad(datos?.complejidad)) return null;
   const motivo = String(datos?.motivo ?? '').trim().replace(/\s+/g, ' ');
-  return { complejidad: datos.complejidad, motivo: motivo.slice(0, 140) };
+  const n = Number(datos?.cantidad);
+  const cantidad = Number.isInteger(n) && n > 0 && n <= 9999 ? n : null;
+  const destino = String(datos?.destino ?? '').trim().replace(/\s+/g, ' ');
+  return { complejidad: datos.complejidad, motivo: motivo.slice(0, 140), cantidad, destino: destino ? destino.slice(0, 120) : null };
 }

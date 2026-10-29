@@ -58,13 +58,20 @@ describe('agruparTiempos', () => {
 
 describe('sugerencia de complejidad', () => {
   it('manda tipo, título e indicaciones', () => {
-    const p = peticionComplejidad({ tipo: 'Tarea · Instalación', titulo: 'Instalar 8 cámaras', indicaciones: 'Con tubería' });
-    expect(p.usuario).toBe('Tipo de trabajo: Tarea · Instalación\nTítulo: Instalar 8 cámaras\nIndicaciones: Con tubería');
+    const p = peticionComplejidad({ tipo: 'Tarea · Instalación', seCuenta: 'dispositivos', titulo: 'Instalar 8 cámaras', indicaciones: 'Con tubería' });
+    expect(p.usuario).toBe('Tipo de trabajo: Tarea · Instalación\nSe cuenta: dispositivos\nTítulo: Instalar 8 cámaras\nIndicaciones: Con tubería');
+    expect(peticionComplejidad({ tipo: 'Obra', titulo: 'Montaje' }).usuario).toContain('Se cuenta: nada');
     expect(p).toMatchObject({ modelo: 'claude-haiku-5-5', esfuerzo: 'low', pensar: false, reintentos: 0 });
   });
 
   it('solo acepta niveles válidos', () => {
-    expect(limpiarComplejidad({ complejidad: 'COMPLEJA', motivo: '  varios  puntos ' })).toEqual({ complejidad: 'COMPLEJA', motivo: 'varios puntos' });
+    expect(limpiarComplejidad({ complejidad: 'COMPLEJA', motivo: '  varios  puntos ', cantidad: 8, destino: ' Bodega norte ' })).toEqual({
+      complejidad: 'COMPLEJA',
+      motivo: 'varios puntos',
+      cantidad: 8,
+      destino: 'Bodega norte',
+    });
+    expect(limpiarComplejidad({ complejidad: 'BASICA', motivo: 'x', cantidad: 2.5 as never, destino: '' })).toMatchObject({ cantidad: null, destino: null });
     expect(limpiarComplejidad({ complejidad: 'ALTA' as never, motivo: 'x' })).toBeNull();
     expect(limpiarComplejidad(null)).toBeNull();
   });

@@ -23,6 +23,8 @@ import { extensionAudio } from './voz/transcriptor.js';
 import { isChainTopAuthority } from '../activities/activity-superiors.js';
 import { ComplejidadService } from './complejidad/complejidad.service.js';
 import { SugerirComplejidadDto } from './complejidad/sugerir-complejidad.dto.js';
+import { EstandarService } from './estandar/estandar.service.js';
+import { RutaEstandarDto } from './estandar/ruta.dto.js';
 
 /** Un dictado son segundos o un par de minutos: 10 MB sobran en opus. */
 const MAX_DICTADO_BYTES = 10 * 1024 * 1024;
@@ -35,6 +37,7 @@ export class AiController {
     private readonly asistente: AsistenteActividadesService,
     private readonly transcriptor: TranscriptorService,
     private readonly complejidad: ComplejidadService,
+    private readonly estandar: EstandarService,
   ) {}
 
   @Post('triage')
@@ -95,6 +98,20 @@ export class AiController {
   @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS] })
   sugerirComplejidad(@Body() body: SugerirComplejidadDto, @CurrentCompanyId() companyId: number | null) {
     return this.complejidad.sugerir(companyId, body);
+  }
+
+  /** Tabla del tiempo estándar por tipo de trabajo (tarifas aprobadas, §8 de la especificación). */
+  @Get('estandar/tabla')
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS] })
+  tablaEstandar() {
+    return this.estandar.tabla();
+  }
+
+  /** Ida y vuelta de la oficina a un destino (Google con tráfico, OSRM o aproximado). */
+  @Post('estandar/ruta')
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS] })
+  rutaEstandar(@Body() body: RutaEstandarDto) {
+    return this.estandar.ruta(body);
   }
 
   /** ¿Hay transcriptor propio? Si no, la web dicta con el reconocimiento del navegador. */

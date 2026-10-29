@@ -595,6 +595,12 @@ async function correrComplejidad(caso: CasoComplejidad, v: Variante): Promise<Re
       { nombre: 'nivel', ok: Boolean(c && caso.aceptables.includes(c.complejidad)), detalle: c?.complejidad },
       { nombre: 'motivo', ok: Boolean(c?.motivo && c.motivo.length <= 140), detalle: c?.motivo },
     ];
+    if (caso.cantidad !== undefined) {
+      revisiones.push({ nombre: 'cantidad', ok: (c?.cantidad ?? null) === caso.cantidad, detalle: String(c?.cantidad ?? null) });
+    }
+    if (caso.destino !== undefined) {
+      revisiones.push({ nombre: 'destino', ok: Boolean(c?.destino) === caso.destino, detalle: c?.destino ?? 'null' });
+    }
     return { ...base, revisiones, puntaje: revisiones.filter((r) => r.ok).length / revisiones.length, inventos: 0, notaJuez: null, comentarioJuez: null, uso, ms: Date.now() - t0, salida: c };
   } catch (error) {
     if (error instanceof PresupuestoAgotado) throw error;

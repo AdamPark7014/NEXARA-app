@@ -23,5 +23,31 @@
       "c19 nivel (BASICA)"
     ],
     "etiqueta": "prompt-28-10"
+  },
+  {
+    "funcion": "complejidad",
+    "variante": "haiku-low-np",
+    "modelo": "claude-haiku-5-5",
+    "esfuerzo": "low",
+    "pensar": false,
+    "fecha": "2026-10-29T17:28:37.154Z",
+    "casos": 28,
+    "errores": 0,
+    "puntaje": 0.9702,
+    "casosPerfectos": 26,
+    "inventos": 0,
+    "notaJuez": null,
+    "tokensEntradaMedios": 1378,
+    "tokensSalidaMedios": 75,
+    "tokensPensamientoMedios": 0,
+    "usdPorLlamada": 0.000063,
+    "msMedios": 1578,
+    "msP50": 1347,
+    "msP95": 2794,
+    "fallos": [
+      "c10 nivel (ESTANDAR)",
+      "c19 nivel (BASICA)"
+    ],
+    "etiqueta": "cantidad-destino-29-10"
   }
 ]
