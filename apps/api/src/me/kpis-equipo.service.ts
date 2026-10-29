@@ -4,7 +4,7 @@ import { resolveAccessScheduleKey } from '../integra/access-schedule-defaults.js
 import { workDateColumn, workDateKey, workDayEnd, workDayStart, parseWorkDate } from '../common/time/workday.js';
 import { esMultiDia, periodoDeActividad } from '../activities/actividad-periodo.js';
 import { tiposVisibles } from './equipo-alcance.js';
-import { estatusCerrado, estatusNoCumplida, minutosPlanDeHoras, tiemposReales } from './pizarra-kpi.js';
+import { estatusCerrado, estatusNoCumplida, estimadoParaKpi, minutosPlanDeHoras, tiemposReales } from './pizarra-kpi.js';
 import { minutosTrabajados } from '../activities/sessions/sesiones-trabajo.js';
 import { TeamBoardService } from './team-board.service.js';
 import { cerrarSesionesVencidas, leerSesiones } from '../activities/sessions/activity-sessions.service.js';
@@ -620,6 +620,7 @@ export class KpisEquipoService {
               periodoInicio: true,
               periodoFin: true,
               tiempoEstimadoMin: true,
+              estandarCambiadoMotivo: true,
               tiempoMaximoMin: true,
               deletedAt: true,
             },
@@ -720,7 +721,7 @@ export class KpisEquipoService {
         terminada: cerrada || ev?.status === 'COMPLETED',
         periodoFin: esMultiDia(periodo) ? periodo!.fin : null,
         sesiones: sesiones.get(k) ?? null,
-        topeDiarioMin: topeDeTiempo(planDe(asig?.horasPlan, act.tiempoEstimadoMin), act.tiempoMaximoMin),
+        topeDiarioMin: topeDeTiempo(planDe(asig?.horasPlan, estimadoParaKpi(act)), act.tiempoMaximoMin),
       });
     }
 
@@ -790,6 +791,7 @@ export class KpisEquipoService {
             periodoInicio: true,
             periodoFin: true,
             tiempoEstimadoMin: true,
+              estandarCambiadoMotivo: true,
             tiempoMaximoMin: true,
             tiempoEstandarMin: true,
             activityEvidences: {
@@ -911,7 +913,7 @@ export class KpisEquipoService {
         entregadaAt,
         primeraRevision: decisiones.length ? (devuelta(decisiones[0]) ? 'DEVUELTA' : 'APROBADA') : null,
         devoluciones: decisiones.filter(devuelta).length,
-        minutosPlan: planDe(f.horasPlan, a.tiempoEstimadoMin),
+        minutosPlan: planDe(f.horasPlan, estimadoParaKpi(a)),
         minutosMaximo: a.tiempoMaximoMin ?? null,
         minutosReales: minutosTrabajados({
           inicio: tiempos.inicio,
