@@ -1063,6 +1063,12 @@ export class ClientPortalController {
   async invoicePdf(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     await this.findOwnInvoiceOrFail(user, id);
     const pdf = await this.accountingService.getInvoicePdf(id);
+    if ('body' in pdf) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${pdf.filename}"`);
+      res.send(pdf.body);
+      return;
+    }
     res.redirect(pdf.url);
   }
 

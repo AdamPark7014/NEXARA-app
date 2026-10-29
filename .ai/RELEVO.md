@@ -28,11 +28,18 @@
   - BD del servidor: `company_profile` id 1 con RFC `NEE240925V73`, razón social sin régimen societario, régimen `601`,
     domicilio y CP 72775. El registro anterior quedó en `/root/company_profile_1_antes_20261029.csv`. Preflight: emisor
     completo y válido; único bloqueo `proveedor_mock`.
+  - Segundo commit (la Mesa contable soltó `accounting.service.ts` y `schema.prisma`):
+    - `invoices.pacDocumentId` y `payments.pacDocumentId` (migración `20261029200000_pac_document_id`);
+    - `stampInvoice` y el REP los guardan, y `cancelInvoice` pasa Id, serie y folio;
+    - `GET :id/pdf` (ERP y portal de clientes) entrega el PDF de Facturama;
+    - el REP manda la tasa de IVA de los conceptos y se detiene si la factura mezcla tasas.
+  - Suite de la API: solo falla `app-urls-core-surface` por dos rutas `/crm/projects` de la Mesa contable (de esa
+    sesión, ya avisada). Los PDF de reuniones/cotización pasan con `--runInBand`.
   - **Falta:**
-    - Adam: dejar `FACTURAMA_USER`/`FACTURAMA_PASSWORD` y las de sandbox (cuenta nueva en dev.facturama.mx) en
-      `C:\dev\secrets\nexara\facturama-alta\facturama-api.env`;
-    - luego, prueba en sandbox (RFC de prueba EKU9003173C9) y credenciales al `.env.nexara` del servidor;
-    - en el servicio: guardar `pacDocumentId` (campo nuevo en `invoices`), servir el PDF con él y pasar `ivaRate` al REP.
+    - Adam: correr `C:\dev\secrets\nexara\facturama-alta\guardar-credenciales-facturama.ps1`, que escribe
+      `facturama-api.env` con las de producción y las de sandbox (cuenta nueva en dev.facturama.mx);
+    - luego, prueba en sandbox con `sandbox-facturama.ts` (scratchpad de la sesión del PAC) y credenciales al
+      `.env.nexara` del servidor.
   - Runbook actualizado: `docs/CFDI-GO-LIVE.md` §1 y §8.
 
 - **29-10 ~14:00 (claude-code) — Tiempo estándar en Asignar (web) y obra con tarifas (lo retomé de la sesión principal).**

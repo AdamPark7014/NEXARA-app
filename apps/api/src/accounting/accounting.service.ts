@@ -2105,6 +2105,7 @@ export class AccountingService {
           String(invoice.id),
         cfdiXml: stamp.xml || invoice.cfdiXml,
         pdfUrl: stamp.pdfUrl || invoice.pdfUrl,
+        pacDocumentId: stamp.pacDocumentId ?? null,
         createdById: invoice.createdById ?? userId,
       },
     });
@@ -2654,10 +2655,15 @@ export class AccountingService {
 
   async getInvoicePdf(id: number, companyId?: number | null) {
     const invoice = await this.getInvoice(id, companyId);
+    const filename = `${invoice.invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+    // Facturama no publica una URL del PDF: se baja con las credenciales de la cuenta por el Id del CFDI.
+    if (invoice.pacDocumentId && this.pacService.provider === 'facturama') {
+      return { body: await this.pacService.downloadPdf(invoice.pacDocumentId), filename };
+    }
     if (!invoice.pdfUrl) {
       throw new BadRequestException('PDF no disponible para esta factura (el PAC no generó representación impresa)');
     }
-    return { url: invoice.pdfUrl, filename: `${invoice.invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf` };
+    return { url: invoice.pdfUrl, filename };
   }
 
   // ── Banking ───────────────────────────────────────────────────────
@@ -2964,6 +2970,9 @@ export class AccountingService {
       emisorRfc: invoice.emisorRfc,
       cancelReason: reasonNorm as '01' | '02' | '03' | '04',
       substitutionUuid: dto.substitutionUuid || null,
+      pacDocumentId: invoice.pacDocumentId,
+      serie: invoice.cfdiSerie,
+      folio: invoice.cfdiFolio,
     });
 
     return this.prisma.invoice.update({
@@ -3200,6 +3209,14 @@ export class AccountingService {
     const previousBalance = Number(invoice.totalAmount) - previousPaid;
     const amountPaid = Number(payment.amount);
     const remainingBalance = Math.max(0, previousBalance - amountPaid);
+    // Pagos 2.0 lleva el IVA de lo pagado. Con una sola tasa en la factura se reparte en proporción;
+    // mezclar tasas pediría un traslado por tasa, que todavía no se arma.
+    const tasasIva = [...new Set(invoice.items.map((it) => Number(it.taxRate ?? 16)))];
+    if (tasasIva.length > 1) {
+      throw new BadRequestException(
+        `La factura ${invoice.invoiceNumber} mezcla tasas de IVA (${tasasIva.join(' %, ')} %): el complemento de pago con varias tasas aún no está soportado.`,
+      );
+    }
 
     const stamp = await this.pacService.stampPayment({
       invoiceNumber: `PAGO-${invoice.invoiceNumber}-${payment.id}`,
@@ -3235,12 +3252,13 @@ export class AccountingService {
         previousBalance,
         amountPaid,
         remainingBalance,
+        ivaRate: tasasIva[0] ?? 16,
       }],
     });
 
     const claim = await this.prisma.payment.updateMany({
       where: { id: paymentId, cfdiPaymentUuid: null },
-      data: { cfdiPaymentUuid: stamp.uuid },
+      data: { cfdiPaymentUuid: stamp.uuid, pacDocumentId: stamp.pacDocumentId ?? null },
     });
     if (claim.count === 0) {
       const existing = await this.prisma.payment.findUnique({ where: { id: paymentId } });

@@ -175,6 +175,16 @@ export class FacturamaAdapter implements IPacAdapter {
     }
   }
 
+  async downloadPdf(pacDocumentId: string): Promise<Buffer> {
+    try {
+      const archivo = await this.llamar('GET', `/cfdi/pdf/issued/${encodeURIComponent(pacDocumentId)}`, undefined, 'descarga del PDF');
+      if (!archivo?.Content) throw new BadRequestException(`Facturama no devolvió el PDF del CFDI ${pacDocumentId}.`);
+      return Buffer.from(String(archivo.Content), 'base64');
+    } catch (err) {
+      throw this.comoHttp(err, 'descarga del PDF');
+    }
+  }
+
   // ── Payloads ──────────────────────────────────────────────────────
 
   private payloadFactura(input: PacStampInput): Record<string, unknown> {

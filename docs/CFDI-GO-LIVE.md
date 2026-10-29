@@ -258,10 +258,12 @@ Encontrados al preparar la revisión previa. **No se corrigieron aquí**; se lis
 **Estado al 29-oct-2026** (adaptador reescrito contra la documentación oficial: https://facturama.mx/docs/es/bienvenidos;
 pruebas en `pac/adapters/facturama.adapter.spec.ts`; **falta confirmarlo en sandbox**):
 
-- **1 · resuelto en el XML:** tras timbrar se baja con `GET /cfdi/xml/issued/{Id}`. El PDF sigue sin guardarse:
-  Facturama solo lo da con credenciales. El adaptador devuelve `pacDocumentId` para que el ERP lo pida después.
-- **2 · resuelto:** se cancela con `DELETE /cfdi/{Id}`. El `Id` se busca por UUID (o serie y folio) si el ERP no lo
-  tiene guardado, y `uuidReplacement` solo va con motivo 01.
+- **1 · resuelto:** tras timbrar el XML se baja con `GET /cfdi/xml/issued/{Id}` y queda en `cfdiXml`. El `Id`
+  del CFDI se guarda en `invoices.pacDocumentId` (y en `payments.pacDocumentId` para el complemento; migración
+  `20261029200000_pac_document_id`). `GET :id/pdf` (ERP y portal de clientes) entrega el PDF de Facturama con ese
+  `Id`, porque Facturama no tiene URL pública.
+- **2 · resuelto:** se cancela con `DELETE /cfdi/{Id}` usando el `Id` guardado. En facturas anteriores se busca por
+  UUID, o por serie y folio. `uuidReplacement` solo va con el motivo 01.
 - **4 · mitigado:** cada llamada tiene tiempo límite (`FACTURAMA_TIMEOUT_MS`, 45 s). Antes de timbrar se busca un CFDI
   vigente con la misma serie y folio: si es el mismo se reutiliza y, si es de otro cliente o importe, se detiene. Sigue
   pendiente en el servicio la factura que se queda en `STAMPING` si falla el guardado.
@@ -272,8 +274,9 @@ pruebas en `pac/adapters/facturama.adapter.spec.ts`; **falta confirmarlo en sand
 - **7 · resuelto en el adaptador:** PUE con forma 99 se rechaza con un mensaje claro, y PPD siempre va con 99.
 - **9 · parcial:** el adaptador ya no inventa régimen ni CP del cliente (exige los dos, salvo público en general:
   616, S01 y CP de expedición). Los rellenos del servicio siguen.
-- **13 · resuelto en el adaptador:** cada documento relacionado lleva `TaxObject`, `Taxes` (IVA proporcional, 16 % si
-  el ERP no manda `ivaRate`) y `EquivalenceDocRel`. La fecha `@db.Date` conserva el día.
+- **13 · resuelto:** cada documento relacionado lleva `TaxObject`, `Taxes` y `EquivalenceDocRel`. Los `Taxes` son el
+  IVA proporcional con la tasa de los conceptos de la factura; si la factura mezcla tasas, el servicio se detiene con
+  un aviso. La fecha `@db.Date` conserva el día.
 - **15 · resuelto:** los impuestos se redondean con `cents`, igual que el ERP.
 - **Sin cambio:** 8, 10, 11, 12, 14, 16, 17, 18. El 19 solo aplica a SW o Finkok. Además, los errores de Facturama ya
   le llegan al usuario con su motivo, en vez de «error interno».
