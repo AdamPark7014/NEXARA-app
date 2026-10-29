@@ -128,6 +128,9 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'NominaSemanaFila',
   'NominaDescuento',
   'ActivityAttachment',
+  // Mesa contable (migración 20261029180000_mesa_contable).
+  'PorFacturarDescarte',
+  'MovimientoVinculo',
   // Diseñador de videovigilancia (migración 20261029130000_cctv_disenos).
   'CctvDiseno',
 ]);

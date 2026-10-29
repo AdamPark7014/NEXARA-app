@@ -201,6 +201,16 @@ export class UpdateInvoiceDraftDto {
   @IsString()
   cfdiUsage?: string;
 
+  /** PUE | PPD (Mesa contable: se elige al preparar el CFDI). */
+  @IsOptional()
+  @IsString()
+  satPaymentMethod?: string;
+
+  /** Clave de forma de pago del SAT («03», «99»…). */
+  @IsOptional()
+  @IsString()
+  satPaymentForm?: string;
+
   @IsOptional()
   @IsString()
   notes?: string;

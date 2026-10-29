@@ -521,6 +521,11 @@ export class AuthService {
       // Catálogo de proyectos al ligar viáticos (GET ventas/proyectos).
       set.add(PERMISSIONS.VIATICS_VIEW);
       set.add(PERMISSIONS.SALES_VIEW);
+      // Mesa contable (29-10): la contadora registra pólizas, concilia el banco y cierra el mes.
+      // Antes solo los daba el flag viejo `accesoBanca`, así que con el rol v2 no podía hacerlo.
+      set.add(PERMISSIONS.ACCOUNTING_POST);
+      set.add(PERMISSIONS.ACCOUNTING_CLOSE_PERIOD);
+      set.add(PERMISSIONS.BANKING_RECONCILE);
     }
 
     /**

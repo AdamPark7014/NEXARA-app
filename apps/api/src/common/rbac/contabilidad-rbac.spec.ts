@@ -93,6 +93,23 @@ describe('CONTADORA · lo que SÍ le toca (200)', () => {
     }
   });
 
+  it('Mesa contable: registra pólizas, concilia el banco y cierra el mes', () => {
+    for (const permiso of [PERMISSIONS.ACCOUNTING_POST, PERMISSIONS.ACCOUNTING_CLOSE_PERIOD, PERMISSIONS.BANKING_RECONCILE]) {
+      expect(permisosContadora).toContain(permiso);
+    }
+    for (const [url, metodo] of [
+      ['/api/accounting/workspace/mesa/por-facturar', 'GET'],
+      ['/api/accounting/workspace/mesa/por-facturar/preparar', 'POST'],
+      ['/api/accounting/workspace/mesa/pagos-gastos/VIATICO/5/cfdi', 'POST'],
+      ['/api/accounting/workspace/mesa/estados/excel', 'GET'],
+      ['/erp/contabilidad/por-facturar', 'GET'],
+      ['/erp/contabilidad/pagos-y-gastos', 'GET'],
+      ['/erp/contabilidad/estados', 'GET'],
+    ] as const) {
+      expect(puede(ROLES.CONTABILIDAD, url, metodo)).toBe(true);
+    }
+  });
+
   it('el dashboard del workspace acepta su permiso contable', () => {
     const exigidos = [
       PERMISSIONS.CONTABILIDAD_VIEW,
