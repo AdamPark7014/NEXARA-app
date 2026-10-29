@@ -179,8 +179,15 @@ object DeepLinkParser {
             first in EVIDENCE_LIST_SEGMENTS && activityId != null ->
                 module(CoreKeys.ACTIVITIES, entityId = activityId, params = extra + ("tab" to "evidencias"))
             // KPIs del equipo antes que Asistencias: viven dentro de la misma ruta.
+            // `/erp/asistencias/indicadores/:userId?desde&hasta` (la liga de asistencia del
+            // chat) conserva a la persona y el día: antes se perdían y se abría el tablero
+            // del equipo sin saber de quién se hablaba.
             first in ATTENDANCE_SEGMENTS && second == "indicadores" ->
-                module(CoreKeys.KPIS_EQUIPO, params = extra)
+                module(
+                    CoreKeys.KPIS_EQUIPO,
+                    entityId = parts.getOrNull(2)?.toLongOrNull()?.takeIf { it > 0L },
+                    params = extra,
+                )
             first in ATTENDANCE_SEGMENTS -> module(CoreKeys.ATTENDANCE, params = extra)
             first == "cotizaciones" ->
                 module(CoreKeys.COTIZACIONES, entityId = second?.toLongOrNull()?.takeIf { it > 0L }, params = extra)
@@ -191,15 +198,21 @@ object DeepLinkParser {
             first in TOOL_SEGMENTS -> module(CoreKeys.HERRAMIENTAS, params = extra)
             first in VEHICLE_SEGMENTS ->
                 module(CoreKeys.VEHICULOS, entityId = second?.toLongOrNull()?.takeIf { it > 0L }, params = extra)
-            // `/erp/finance/viatics[/:id]` — donde la web tiene viáticos.
+            // `/erp/finance/viatics[/:id]` — donde la web tiene viáticos. La web resalta uno con
+            // `?highlight=:id` (así liga el chat un viático): es el mismo id.
             first == "finance" && second in VIATIC_SEGMENTS ->
                 module(
                     CoreKeys.VIATICOS,
-                    entityId = parts.getOrNull(2)?.toLongOrNull()?.takeIf { it > 0L },
+                    entityId = parts.getOrNull(2)?.toLongOrNull()?.takeIf { it > 0L }
+                        ?: params.longParam("highlight"),
                     params = extra,
                 )
             first in VIATIC_SEGMENTS ->
-                module(CoreKeys.VIATICOS, entityId = second?.toLongOrNull()?.takeIf { it > 0L }, params = extra)
+                module(
+                    CoreKeys.VIATICOS,
+                    entityId = second?.toLongOrNull()?.takeIf { it > 0L } ?: params.longParam("highlight"),
+                    params = extra,
+                )
             // El organigrama no está en la app (es de escritorio): `/erp/organigrama` y
             // `/erp/hr/orgchart` caen en la casa de Core, como todo lo que no existe aquí.
             // `/erp/hr/attendance` y `/erp/hr/lunch-breaks` (appUrls viejos) → Asistencias.

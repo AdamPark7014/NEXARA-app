@@ -1056,7 +1056,7 @@ private struct TeamMemberCard: View {
     private var reviewBox: some View {
         let texto = esCorreccion
             ? TeamEvidenceUI.correccionTexto(member.evidence, revisiones: revisiones, coreKind: coreKind)
-            : "Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela."
+            : "Ya envió su evidencia: revísala, califícala y apruébala o devuélvela."
         return VStack(alignment: .leading, spacing: 8) {
             TeIconText(text: texto, icon: TeGlyph.toReview, size: 13.5, weight: .semibold, color: NxColors.fg)
             HStack(spacing: 8) {
@@ -1230,19 +1230,9 @@ private struct TeamEvidenceContent: View {
 
     private var stepGrid: some View {
         let pasos = CoreEvidence.steps(for: coreKind)
-        let filas: [[String]] = stride(from: 0, to: pasos.count, by: 2).map {
-            Array(pasos[$0..<min($0 + 2, pasos.count)])
-        }
         return VStack(alignment: .leading, spacing: 12) {
-            ForEach(Array(filas.enumerated()), id: \.offset) { _, fila in
-                HStack(alignment: .top, spacing: 8) {
-                    ForEach(fila, id: \.self) { step in
-                        stepCell(step)
-                    }
-                    if fila.count == 1 {
-                        Color.clear.frame(maxWidth: .infinity, maxHeight: 0)
-                    }
-                }
+            ForEach(pasos, id: \.self) { step in
+                stepCell(step)
             }
         }
     }
@@ -1296,7 +1286,7 @@ private struct TeamEvidenceContent: View {
     // MARK: Fotos
 
     private func entryExitRow(_ fotoSet: TeamEvidenceUI.PhotoSet) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             if let index = fotoSet.entrada {
                 VStack(alignment: .leading, spacing: 6) {
                     TeamSectionTitle(
@@ -1325,35 +1315,22 @@ private struct TeamEvidenceContent: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if fotoSet.entrada == nil || fotoSet.salida == nil {
-                Color.clear.frame(maxWidth: .infinity, maxHeight: 0)
-            }
         }
     }
 
     private func siteSection(_ fotoSet: TeamEvidenceUI.PhotoSet) -> some View {
-        let filas: [[Int]] = stride(from: 0, to: fotoSet.sitio.count, by: 3).map {
-            Array(fotoSet.sitio[$0..<min($0 + 3, fotoSet.sitio.count)])
-        }
-        return VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
             TeamSectionTitle(
                 title: "Fotos en sitio (\(fotoSet.sitio.count))",
                 time: evidence.evidencePhotosUploadedAt,
                 step: CoreEvidence.evidencePhotos,
                 onDevolverPaso: onDevolverPaso
             )
-            ForEach(Array(filas.enumerated()), id: \.offset) { _, fila in
-                HStack(alignment: .top, spacing: 8) {
-                    ForEach(fila, id: \.self) { index in
-                        TeamPhotoThumb(item: fotoSet.items[index], label: fotoSet.labels[index], height: 110) {
-                            onOpenVisor(fotoSet.items, index)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    ForEach(0..<(3 - fila.count), id: \.self) { _ in
-                        Color.clear.frame(maxWidth: .infinity, maxHeight: 0)
-                    }
+            ForEach(fotoSet.sitio, id: \.self) { index in
+                TeamPhotoThumb(item: fotoSet.items[index], label: fotoSet.labels[index], height: 110) {
+                    onOpenVisor(fotoSet.items, index)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }

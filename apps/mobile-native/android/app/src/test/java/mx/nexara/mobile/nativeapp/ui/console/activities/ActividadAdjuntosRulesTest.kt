@@ -95,6 +95,18 @@ class ActividadAdjuntosRulesTest {
     }
 
     @Test
+    fun powerPointNaranjaConSuIcono() {
+        assertEquals(Tipo.POWERPOINT, ActividadAdjuntosRules.tipo("powerpoint", "Junta.pptx"))
+        assertEquals(Tipo.POWERPOINT, ActividadAdjuntosRules.tipo(" PowerPoint ", null))
+        assertEquals(0xFFC4501FL, Tipo.POWERPOINT.color)
+        assertEquals(Icono.PRESENTACION, ActividadAdjuntosRules.icono(Tipo.POWERPOINT, "Junta.pptx"))
+        // Sin tipo del API: el .pptx es PowerPoint; el .ppt viejo sigue gris (como el API).
+        assertEquals(Tipo.POWERPOINT, ActividadAdjuntosRules.tipo(null, "Propuesta.PPTX"))
+        assertEquals(Tipo.OTRO, ActividadAdjuntosRules.tipo(null, "Vieja.ppt"))
+        assertEquals(Icono.PRESENTACION, ActividadAdjuntosRules.icono(Tipo.OTRO, "Vieja.ppt"))
+    }
+
+    @Test
     fun sinTipoDelApiSeDeducePorLaExtension() {
         assertEquals(Tipo.EXCEL, ActividadAdjuntosRules.tipo(null, "Cotización.XLSM"))
         assertEquals(Tipo.IMAGEN, ActividadAdjuntosRules.tipo("", "foto.heic"))

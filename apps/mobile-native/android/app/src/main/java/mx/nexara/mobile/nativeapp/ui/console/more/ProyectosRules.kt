@@ -6,9 +6,8 @@ import mx.nexara.mobile.nativeapp.data.api.ProyectoResumenDto
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 
 /**
- * Proyectos en el teléfono: una tarjeta por proyecto en vez de la tabla de la
- * web. Lo primero que se lee es la salud (el semáforo que pidió dirección), y
- * debajo qué toca —el próximo hito— y cuánto va.
+ * Proyectos en el teléfono: una tarjeta por proyecto, un dato por renglón.
+ * La lista sigue poniendo arriba lo retrasado; la pantalla no explica ese orden.
  *
  * Sin Android: se prueba en la JVM (`ProyectosRulesTest`).
  */

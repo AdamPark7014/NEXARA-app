@@ -45,6 +45,19 @@ struct CoreActivityCreateBody: Encodable {
     let complejidadSugerida: String?
     let estatus: String
     let creadoPorId: Int
+    /// Tiempo estándar al asignar a otro (`CoreTiempoEstandar.Envio`). Cada uno viaja solo si se
+    /// calculó (los nil no se codifican); sin total, la API completa el estándar.
+    var unidades: CoreTiempoEstandar.Unidades? = nil
+    var tiempoEstandarMin: Int? = nil
+    var estandarDesglose: [CoreTiempoEstandar.Concepto]? = nil
+    /// Solo si quien asigna puso otro tiempo con un motivo válido.
+    var estandarCambiadoMotivo: String? = nil
+}
+
+/// La tabla del tiempo estándar ya leída (una vez por arranque de la app).
+@MainActor
+enum CoreTablaEstandarCache {
+    static var tabla: CoreTiempoEstandar.Tabla?
 }
 
 /// `POST me/activities/tiempo-calculado` (29-10): lo que lee el sistema para fijar el tiempo y la
@@ -191,7 +204,25 @@ extension CoreRepository {
         if CoreRepository.isQueuedOffline(data) { return nil }
         guard let row = ConsoleHelpers.decodeMap(data)["sugerencia"] as? [String: Any],
               let nivel = CoreComplejidad.de(ActivityParse.str(row["complejidad"])) else { return nil }
-        return CoreSugerenciaComplejidad(complejidad: nivel, motivo: ActivityParse.str(row["motivo"]))
+        let cantidad = ActivityParse.int(row["cantidad"]).flatMap { $0 > 0 ? $0 : nil }
+        let destino = ActivityParse.str(row["destino"]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return CoreSugerenciaComplejidad(
+            complejidad: nivel,
+            motivo: ActivityParse.str(row["motivo"]),
+            cantidad: cantidad,
+            destino: destino.isEmpty ? nil : destino
+        )
+    }
+
+    /// `GET ai/estandar/tabla`: la tabla del tiempo estándar. Cambia solo cuando Adam mueve
+    /// tarifas: se pide una vez por arranque de la app (si falla, se vuelve a pedir la siguiente vez).
+    @MainActor
+    func tablaEstandar() async throws -> CoreTiempoEstandar.Tabla? {
+        if let guardada = CoreTablaEstandarCache.tabla { return guardada }
+        let data = try await ApiClient.shared.get("ai/estandar/tabla")
+        let tabla = CoreTiempoEstandar.tabla(map: ConsoleHelpers.decodeMap(data))
+        CoreTablaEstandarCache.tabla = tabla
+        return tabla
     }
 
     /// `POST me/activities/tiempo-calculado`: vista previa de lo que el sistema fija al
@@ -202,6 +233,15 @@ extension CoreRepository {
         let data = try await ApiClient.shared.postJSON("me/activities/tiempo-calculado", body: body)
         if CoreRepository.isQueuedOffline(data) { return nil }
         return CoreTiempoCalculado(map: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// `GET users/assignable`: la hora de entrada («HH:MM») de quien va a ejecutar; nil si no tiene
+    /// horario o no se pudo leer (entonces se queda la de la oficina).
+    func horaEntrada(userId: Int) async -> String? {
+        guard userId > 0, let data = try? await ApiClient.shared.get("users/assignable") else { return nil }
+        let fila = ApiClient.decodeMapList(data).first { ActivityParse.int($0["id"]) == userId }
+        let hora = ActivityParse.str(fila?["horaEntrada"])
+        return hora.isEmpty ? nil : hora
     }
 
     /// `POST activities/:id/team` — suma a alguien al equipo con su rol e indicaciones.

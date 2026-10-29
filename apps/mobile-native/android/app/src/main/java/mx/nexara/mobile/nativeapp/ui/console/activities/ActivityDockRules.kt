@@ -97,8 +97,8 @@ object ActivityDockRules {
             CoreActivityRules.STEP_ENTRY -> if (comercial) "Tomar foto de inicio" else "Tomar foto de entrada"
             CoreActivityRules.STEP_PHOTOS -> when {
                 porCampos -> "Fotos por campo"
-                faltan > 0 -> "Tomar fotos · $fotos de $fotosRequeridas"
-                else -> "Enviar fotos · $fotos de $fotosRequeridas"
+                faltan > 0 -> "Tomar fotos\n$fotos de $fotosRequeridas"
+                else -> "Enviar fotos\n$fotos de $fotosRequeridas"
             }
             CoreActivityRules.STEP_PDF -> "Cargar hoja de servicio"
             CoreActivityRules.STEP_DATA -> "Llenar formulario"

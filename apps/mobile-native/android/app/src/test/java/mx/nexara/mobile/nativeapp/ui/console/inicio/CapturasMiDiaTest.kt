@@ -16,6 +16,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.io.File
 import mx.nexara.mobile.nativeapp.data.api.AprobacionPendienteDto
+import mx.nexara.mobile.nativeapp.data.api.FestivoComoDto
+import mx.nexara.mobile.nativeapp.data.api.FestivoDto
+import mx.nexara.mobile.nativeapp.data.api.FestivoHorarioDto
+import mx.nexara.mobile.nativeapp.data.api.FestivosMioDto
 import mx.nexara.mobile.nativeapp.data.api.KpiAsistenciaPuntualDto
 import mx.nexara.mobile.nativeapp.data.api.KpiBloqueDto
 import mx.nexara.mobile.nativeapp.data.api.KpiEntregasDto
@@ -177,6 +181,56 @@ class CapturasMiDiaTest {
         val bitmap = Bitmap.createBitmap(raiz.width, raiz.height, Bitmap.Config.ARGB_8888)
         raiz.draw(Canvas(bitmap))
         guardar(bitmap, "mi-dia-vacio.png")
+    }
+
+    /** Festivo de ley que no le toca: tablero «App · quien descansa» del mockup de festivos. */
+    @Test
+    fun festivoDescansa() {
+        val f = FestivosMioDto(
+            hoy = "2026-11-16",
+            festivoHoy = FestivoDto(fecha = "2026-11-16", nombre = "Día de la Revolución", origen = "LEY", como = FestivoComoDto(trabaja = false)),
+            proximos = listOf(
+                FestivoDto(fecha = "2026-12-25", nombre = "Navidad", origen = "LEY", como = FestivoComoDto(trabaja = false)),
+                FestivoDto(fecha = "2027-01-01", nombre = "Año Nuevo", origen = "LEY", como = FestivoComoDto(trabaja = false)),
+            ),
+        )
+        capturarFestivo("festivo-descansa.png") { FestivoDescansaContenido(f) }
+    }
+
+    /** Festivo trabajado con horario propio: tablero «App · a quien le toca laborar». */
+    @Test
+    fun festivoLabora() {
+        val f = FestivoDto(
+            fecha = "2026-11-16",
+            nombre = "Día de la Revolución",
+            origen = "LEY",
+            nota = "Cerramos la entrega del corporativo; Iván abre la bodega a las 9:45.",
+            como = FestivoComoDto(trabaja = true, horario = FestivoHorarioDto("10:00", "14:00"), pagoDoble = true),
+        )
+        capturarFestivo("festivo-labora.png") { FestivoLaboraTarjeta(f, onEntrada = {}) }
+    }
+
+    private fun capturarFestivo(nombre: String, contenido: @androidx.compose.runtime.Composable () -> Unit) {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            NexaraTheme {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(NxTheme.colors.surface)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    InicioHeader(fecha = "Lunes 16 de noviembre", unreadCount = 0, onOpenNotifications = {})
+                    contenido()
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(300)
+        val raiz = compose.activity.window.decorView.rootView
+        val bitmap = Bitmap.createBitmap(raiz.width, raiz.height, Bitmap.Config.ARGB_8888)
+        raiz.draw(Canvas(bitmap))
+        guardar(bitmap, nombre)
     }
 
     /** Inicio de dirección general con datos como los del artboard «App · Inicio CEO». */

@@ -236,6 +236,61 @@ final class ChatRepository {
         return raw.map(ChatSearchHit.init).filter { $0.id > 0 }
     }
 
+    // MARK: Ligas y asistente (paridad web, 29-10-2026)
+
+    /// POST `chat/ligas`: tarjetas de varias ligas en una sola llamada (tandas de
+    /// 40, el tope del API). Devuelve `ref → tarjeta`; las que el API no reconoce
+    /// simplemente no vienen.
+    func ligas(refs: [String]) async throws -> [String: ChatTarjetaLiga] {
+        struct Body: Encodable { let refs: [String] }
+        var unicas: [String] = []
+        for ref in refs.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }) where !ref.isEmpty && !unicas.contains(ref) {
+            unicas.append(ref)
+        }
+        guard !unicas.isEmpty else { return [:] }
+        var out: [String: ChatTarjetaLiga] = [:]
+        var inicio = 0
+        while inicio < unicas.count {
+            let tanda = Array(unicas[inicio..<min(inicio + 40, unicas.count)])
+            inicio += 40
+            let data = try await api.postJSON("chat/ligas", body: Body(refs: tanda))
+            for (ref, value) in ConsoleHelpers.decodeMap(data) {
+                guard let raw = value as? [String: Any] else { continue }
+                out[ref] = ChatTarjetaLiga(raw: raw)
+            }
+        }
+        return out
+    }
+
+    /// POST `chat/asistente`: la respuesta es solo para quien pregunta; nada se
+    /// publica en el canal. El API rechaza cualquier canal que no sea #general.
+    func preguntarAsistente(texto: String, channelId: Int64) async throws -> ChatRespuestaAsistente {
+        struct Body: Encodable {
+            let texto: String
+            let channelId: Int64
+        }
+        let limpio = String(texto.trimmingCharacters(in: .whitespacesAndNewlines).prefix(2000))
+        let data = try await api.postJSON("chat/asistente", body: Body(texto: limpio, channelId: channelId))
+        return ChatRespuestaAsistente(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// GET `chat/asistente/estado`: si el asistente está disponible y si hay IA.
+    func estadoAsistente() async throws -> (disponible: Bool, ia: Bool) {
+        let map = ConsoleHelpers.decodeMap(try await api.get("chat/asistente/estado"))
+        return (ChatJSON.bool(map["disponible"]), ChatJSON.bool(map["ia"]))
+    }
+
+    /// POST `activities` con el cuerpo de una propuesta del asistente (la persona
+    /// tocó «Crear»).
+    func crearActividadPropuesta(_ payload: ChatJSONValue) async throws -> ChatActividadCreada {
+        let map = ConsoleHelpers.decodeMap(try await api.postJSON("activities", body: payload))
+        return ChatActividadCreada(
+            id: StockParse.int64(map["id"]) ?? 0,
+            anNumber: StockParse.str(map["anNumber"]).nilIfEmpty,
+            enCola: ChatJSON.bool(map["queued"])
+        )
+    }
+
     private struct EmptyBody: Encodable {}
 }
 

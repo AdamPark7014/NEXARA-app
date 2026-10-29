@@ -210,8 +210,10 @@ enum DeepLinkParser {
             return .core(link)
         case "asistencias", "asistencia", "attendance":
             // KPIs del equipo cuelga de Asistencias en la web, pero es otro módulo.
+            // `/erp/asistencias/indicadores/:userId?desde&hasta` (la liga de asistencia
+            // del chat) conserva a la persona en `entityId`.
             if second == "indicadores" {
-                return .core(extraLink(.kpisEquipo))
+                return .core(extraLink(.kpisEquipo, entityId: positiveInt64(parts.count >= 3 ? parts[2] : nil)))
             }
             return .core(CoreLink(module: .asistencias, tab: params["tab"]))
         case "almacen", "warehouse":
@@ -220,19 +222,22 @@ enum DeepLinkParser {
             // Incluye `mis-vehiculos`, `:id` y `gps`.
             return .core(extraLink(.vehiculos))
         case "finance":
-            // Donde la web tiene los viáticos: `/erp/finance/viatics[/:id]`.
+            // Donde la web tiene los viáticos: `/erp/finance/viatics[/:id]`. La web resalta
+            // uno con `?highlight=:id` (así liga el chat un viático): es el mismo id.
             guard let second, viaticHeads.contains(second) else { return .core(CoreLink.home) }
-            return .core(extraLink(.viaticos, entityId: positiveInt64(parts.count >= 3 ? parts[2] : nil)))
+            let idRuta = positiveInt64(parts.count >= 3 ? parts[2] : nil)
+            return .core(extraLink(.viaticos, entityId: idRuta ?? positiveInt64(params["highlight"])))
         case "viatics", "viaticos", "my-viatics", "mis-viaticos":
-            return .core(extraLink(.viaticos, entityId: positiveInt64(second)))
+            return .core(extraLink(.viaticos, entityId: positiveInt64(second) ?? positiveInt64(params["highlight"])))
         case "hr":
             // Nada de RH existe en Core; el organigrama (`/erp/hr/orgchart`,
             // `/erp/organigrama`) es de escritorio y la app ya no lo tiene.
             return .core(CoreLink.home)
         case "cotizaciones":
-            return .core(extraLink(.cotizaciones))
+            // `/erp/cotizaciones/:id` conserva el id (el chat abre esa cotización).
+            return .core(extraLink(.cotizaciones, entityId: positiveInt64(second)))
         case "proyectos":
-            return .core(extraLink(.proyectos))
+            return .core(extraLink(.proyectos, entityId: positiveInt64(second)))
         case "chat":
             let channel = parts.count >= 2 ? positiveInt64(parts[1]) : nil
             return .core(CoreLink(

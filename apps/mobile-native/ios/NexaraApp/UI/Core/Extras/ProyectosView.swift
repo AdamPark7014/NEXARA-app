@@ -2,10 +2,8 @@ import SwiftUI
 
 /// Proyectos (`/erp/proyectos`) en iPhone — Android `ProyectosScreen`.
 ///
-/// La web trae una tabla con nueve columnas. Aquí cada proyecto es una tarjeta
-/// con la jerarquía invertida respecto de la tabla: primero **la salud** —el
-/// semáforo que pidió dirección—, luego cuánto va, qué toca (el próximo hito) y
-/// al final cliente y responsable. El orden pone arriba lo que va tarde.
+/// Cada dato de la tarjeta va en su renglón. El vacío y el error caben en una
+/// frase. La lista sigue poniendo arriba lo que va tarde, y no lo explica.
 struct ProyectosView: View {
     @State private var estado = CoreExtrasEstado<[ProyectoResumenFila]>()
     @State private var filtro: ProyectosRules.Filtro = .activos
@@ -36,7 +34,12 @@ struct ProyectosView: View {
                 }
 
                 if let error = estado.error, !estado.hayDatos {
-                    NxErrorBlock(message: error, onRetry: { Task { await cargar() } })
+                    NxEmptyState(
+                        title: unaFrase(NxFriendlyError.text(error)),
+                        subtitle: "",
+                        actionLabel: "Reintentar",
+                        onAction: { Task { await cargar() } }
+                    )
                 }
 
                 if estado.hayDatos {
@@ -48,7 +51,6 @@ struct ProyectosView: View {
                     } else {
                         MoreCabecera(
                             titulo: filtro.etiqueta,
-                            subtitulo: "Primero lo que va tarde",
                             trailing: "\(visibles.count)"
                         )
                         ForEach(visibles) { TarjetaDeProyecto(proyecto: $0) }
@@ -67,23 +69,18 @@ struct ProyectosView: View {
     @ViewBuilder
     private var vacio: some View {
         if todos.isEmpty {
-            NxEmptyState(
-                title: "Sin proyectos",
-                subtitle: "Todavía no hay proyectos dados de alta en esta empresa."
-            )
+            NxEmptyState(title: "Sin proyectos", subtitle: "")
         } else if !consulta.trimmingCharacters(in: .whitespaces).isEmpty {
             NxEmptyState(
                 title: "Sin coincidencias",
-                subtitle: "Ningún proyecto coincide con «\(consulta)».",
+                subtitle: "",
                 actionLabel: "Limpiar búsqueda",
                 onAction: { consulta = "" }
             )
         } else {
             NxEmptyState(
                 title: "Nada en «\(filtro.etiqueta.lowercased())»",
-                subtitle: filtro == .atencion
-                    ? "Ningún proyecto está retrasado ni en riesgo. Buena señal."
-                    : "No hay proyectos en este filtro.",
+                subtitle: "",
                 actionLabel: "Ver todos",
                 onAction: { filtro = .todos }
             )
@@ -100,7 +97,7 @@ struct ProyectosView: View {
     }
 }
 
-/// Un proyecto: salud arriba, qué toca en medio, contexto abajo.
+/// Un proyecto: un dato por renglón. El porcentaje desconocido no se pinta como cero.
 private struct TarjetaDeProyecto: View {
     let proyecto: ProyectoResumenFila
 
@@ -108,38 +105,41 @@ private struct TarjetaDeProyecto: View {
         let tono = ProyectosRules.tono(ProyectosRules.salud(proyecto.resumen?.salud))
         let avance = proyecto.resumen?.avance?.porcentaje
         MoreTarjeta {
-            HStack(alignment: .top, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(proyecto.title)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(NxColors.fg)
-                        .lineLimit(3)
-                    Text(proyecto.contextoTexto)
-                        .font(NxType.bodySmall)
-                        .foregroundStyle(NxColors.muted)
-                        .lineLimit(2)
-                }
+            Text(proyecto.title)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(NxColors.fg)
+                .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                NxStatusChip(text: ProyectosRules.etiquetaSalud(proyecto), tone: tono)
-            }
-
-            MoreBarra(
-                progreso: avance.map { Double($0) / 100 },
-                etiqueta: (avance.map { "\($0) % · " } ?? "Avance desconocido · ")
-                    + (proyecto.resumen?.avance?.texto ?? "Sin avance que calcular"),
-                tono: tono
-            )
-
-            HStack(alignment: .center, spacing: NxSpacing.s) {
-                Text(ProyectosRules.plazoTexto(proyecto))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(tono == .danger || tono == .warning ? tono.fg : NxColors.muted)
+            Text(proyecto.contextoTexto)
+                .font(NxType.bodySmall)
+                .foregroundStyle(NxColors.muted)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            NxStatusChip(text: ProyectosRules.etiquetaSalud(proyecto), tone: tono)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let avance {
+                Text("\(avance) %")
+                    .font(NxType.labelMedium)
+                    .foregroundStyle(NxColors.muted)
+                    .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if proyecto.equipoCount > 0 {
-                    Text("\(proyecto.equipoCount) en el equipo")
-                        .font(NxType.labelSmall)
-                        .foregroundStyle(NxColors.muted)
-                }
+            }
+            Text(proyecto.resumen?.avance?.texto ?? "Sin avance que calcular")
+                .font(NxType.labelSmall)
+                .foregroundStyle(NxColors.muted)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(ProyectosRules.plazoTexto(proyecto))
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tono == .danger || tono == .warning ? tono.fg : NxColors.muted)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if proyecto.equipoCount > 0 {
+                Text("\(proyecto.equipoCount) en el equipo")
+                    .font(NxType.labelSmall)
+                    .foregroundStyle(NxColors.muted)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if let hito = ProyectosRules.proximoHitoTexto(proyecto) {
@@ -152,7 +152,8 @@ private struct TarjetaDeProyecto: View {
                     Text(hito)
                         .font(NxType.labelMedium)
                         .foregroundStyle(NxColors.fg)
-                        .lineLimit(2)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
@@ -160,10 +161,20 @@ private struct TarjetaDeProyecto: View {
                 Text("Requerimientos: \(req.cumplidos) de \(req.total) cumplidos")
                     .font(NxType.labelSmall)
                     .foregroundStyle(NxColors.muted)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .accessibilityElement(children: .combine)
     }
+}
+
+/// La primera oración. El vacío y el error de esta pantalla no siguen con otra.
+private func unaFrase(_ texto: String) -> String {
+    let limpio = texto.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let corte = limpio.firstIndex(where: { ".!?".contains($0) }) else { return limpio }
+    let resto = limpio[limpio.index(after: corte)...].trimmingCharacters(in: .whitespacesAndNewlines)
+    return resto.isEmpty ? limpio : String(limpio[...corte])
 }
 
 /// Filtros, orden y textos de la tarjeta (Android `ProyectosRules`).

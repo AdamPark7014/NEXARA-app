@@ -26,6 +26,15 @@ class OfflineQueueRulesTest {
     }
 
     @Test
+    fun `el asistente y las tarjetas del chat solo en linea`() {
+        // Encolada, la pregunta gastaría IA horas después y la respuesta no le llegaría a nadie.
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/chat/asistente", "POST"))
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/chat/ligas", "POST"))
+        // Un mensaje del chat sí se encola, como siempre.
+        assertTrue(OfflineHttpInterceptor.isQueueable("$base/chat/channels/3/messages", "POST"))
+    }
+
+    @Test
     fun `iniciar una actividad solo en linea`() {
         // Guarda la hora real de inicio: encolada quedaría la hora de cuando regrese la señal.
         assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/activities/9/iniciar", "POST"))

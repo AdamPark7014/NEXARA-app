@@ -89,28 +89,48 @@ enum InicioCeoRules {
     // MARK: Desempeño · 7 días
 
     struct Desempeno: Equatable {
-        /// 0–100 para el anillo; nil si el rango no tuvo entregas que medir.
-        let cumplimientoPct: Int?
-        /// «Entregas a tiempo 41 de 47» · «Asistencia puntual 92 % · ocupación 78 %».
+        /// Índice v2 del equipo (0–100) para el anillo; nil si el rango no tuvo nada que medir.
+        let indicePct: Int?
+        /// Menos de 10 entregas medidas: confianza baja, el índice es provisional.
+        let provisional: Bool
+        /// «Confiabilidad 94 · Calidad 88» · «Rendimiento 62 · Disciplina 91».
         let renglones: [String]
+        /// Color del anillo: `semaforoIndice` del API; sin él, el corte 90/75.
+        var tono: CoreExtrasSemaforo = .sinDatos
     }
 
-    /// nil sin totales del equipo, o si no hay ni cumplimiento ni renglones que decir.
+    /// La tarjeta «Desempeño · 7 días»: el anillo es el índice v2 del equipo y los renglones,
+    /// sus cuatro pilares como la tabla de la web (`KpisEquipoRules.pilares`). Sin partes del
+    /// índice (API anterior), las entregas a tiempo. Con confianza baja, provisional. nil sin
+    /// totales del equipo, o si no hay ni índice ni renglones que decir.
     static func desempeno(_ k: KpisEquipoResumen?) -> Desempeno? {
         guard let t = k?.equipo?.totales else { return nil }
+        let pct = entero(t.cumplimientoPct).map { min(100, max(0, $0)) }
+        let provisional = pct != nil && KpisEquipoRules.confianza(t) == .baja
+        let pilares = KpisEquipoRules.pilares(t)
         var renglones: [String] = []
-        if let e = t.entregas, e.medidas > 0 {
+        if pilares.contains(where: { $0.pct != nil }) {
+            for inicio in stride(from: 0, to: pilares.count, by: 2) {
+                let par = pilares[inicio..<min(inicio + 2, pilares.count)]
+                renglones.append(par.map { "\($0.etiqueta) \($0.pct.map { "\($0)" } ?? "—")" }.joined(separator: " · "))
+            }
+        } else if let e = t.entregas, e.medidas > 0 {
             renglones.append("Entregas a tiempo \(e.aTiempo) de \(e.medidas)")
         }
-        let puntual = entero(t.asistenciaPuntual?.pct).map { "Asistencia puntual \($0) %" }
-        let ocupacion = entero(t.productividadPct).map { "ocupación \($0) %" }
-        let linea = [puntual, ocupacion].compactMap { $0 }.joined(separator: " · ")
-        if !linea.isEmpty {
-            renglones.append(linea.prefix(1).uppercased() + linea.dropFirst())
+        if provisional {
+            let medidas = t.entregas?.medidas ?? 0
+            renglones.append(medidas > 0
+                ? "Índice provisional: \(medidas) \(medidas == 1 ? "entrega medida" : "entregas medidas")"
+                : "Índice provisional: sin entregas medidas")
         }
-        let pct = entero(t.cumplimientoPct).map { min(100, max(0, $0)) }
         if pct == nil && renglones.isEmpty { return nil }
-        return Desempeno(cumplimientoPct: pct, renglones: renglones)
+        return Desempeno(indicePct: pct, provisional: provisional, renglones: renglones, tono: KpisEquipoRules.tonoIndice(t))
+    }
+
+    /// Lo que lee VoiceOver del anillo: «Índice 86 de 100», «Índice sin datos».
+    static func descripcionAnillo(_ d: Desempeno) -> String {
+        guard let pct = d.indicePct else { return "Índice sin datos" }
+        return d.provisional ? "Índice \(pct) de 100, provisional" : "Índice \(pct) de 100"
     }
 
     /// Redondeo al entero (Kotlin `roundToInt`); nil si no hay número legible.

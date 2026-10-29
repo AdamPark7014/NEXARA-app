@@ -196,6 +196,10 @@ fun ActivityInfoTab(
                         Complejidad.detalle(a.complejidad, a.complejidadSugerida)?.let { (nivel, ia) ->
                             ADetailRow("Complejidad", if (ia != null) "$nivel · $ia" else nivel)
                         }
+                        // Tiempo estándar (29-10): el total y, abajo, su desglose, el destino y si se cambió.
+                        ActividadTiempoRules.resumenEstandar(a)?.let { estandar ->
+                            ADetailRow("Tiempo estándar", estandar.valor, nota = estandar.detalle)
+                        }
                         ADetailRow("Asignación", NxFormat.dateTime(a.fechaAsignacion))
                         ADetailRow("Inicio", NxFormat.dateTime(a.fechaInicio))
                         ActivityPeriodo.cuandoTexto(a.periodo, null)?.let { ADetailRow("Periodo", it) }

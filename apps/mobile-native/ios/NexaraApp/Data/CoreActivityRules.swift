@@ -336,6 +336,10 @@ struct CoreTiemposTipicos: Hashable {
 struct CoreSugerenciaComplejidad: Hashable {
     let complejidad: CoreComplejidad
     let motivo: String
+    /// Para el tiempo estándar: cuántas unidades del tipo dice el título (nil si no lo dice).
+    var cantidad: Int? = nil
+    /// A dónde hay que ir, si el título lo nombra (texto, sin coordenadas).
+    var destino: String? = nil
 }
 
 // MARK: - Tiempo y entrega que fija el sistema (autoasignación)
@@ -625,8 +629,16 @@ enum CoreActivityRules {
 
     // MARK: Entregar a más tardar (`apps/web/lib/ops-activity-form.ts`)
 
-    /// Hora de inicio cuando no hay una.
-    static let horaPorOmision = "09:00"
+    /// Hora de inicio cuando no se conoce la entrada de quien ejecuta (dirección no tiene
+    /// horario): la de la oficina.
+    static let horaPorOmision = "10:00"
+
+    /// Hora de inicio por omisión al asignar (29-10): la entrada de quien ejecuta, como la web
+    /// (`users/assignable` → `horaEntrada`; oficina 10:00, cuadrilla 08:00); sin dato, 10:00.
+    static func horaDeEntrada(_ horaEntrada: String?) -> String {
+        let v = String((horaEntrada ?? "").trimmingCharacters(in: .whitespacesAndNewlines).prefix(5))
+        return v.range(of: #"^\d{2}:\d{2}$"#, options: .regularExpression) != nil ? v : horaPorOmision
+    }
 
     /// El compromiso vale vacío o, si es `HH:MM`, solo después de la hora de inicio.
     static func compromisoValido(hora: String, compromiso: String) -> Bool {

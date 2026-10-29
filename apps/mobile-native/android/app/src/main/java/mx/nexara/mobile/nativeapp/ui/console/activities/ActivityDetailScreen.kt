@@ -108,6 +108,14 @@ fun ActivityDetailScreen(
     val isAssigned = user?.id != null &&
         (detail.responsableId == user.id || detail.responsable?.id == user.id)
     val canExecute = isAssigned && !canManage
+    // «Costo directo»: la misma regla de roles que la web (`CostoActividad.tsx`).
+    val puedeVerCosto = user != null && ActividadCostoRules.puedeVer(
+        isSuperAdmin = user.isSuperAdmin,
+        email = user.email,
+        roleKey = user.roleKey,
+        orgRoleKey = user.orgRoleKey,
+        rolVisible = user.role,
+    )
     val statusColor = activStatusColor(detail.estatus)
     val scope = rememberCoroutineScope()
     val snackbarHostState = rememberNxSnackbarHostState()
@@ -502,6 +510,8 @@ fun ActivityDetailScreen(
                             topContent = {
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     ActivityPlaceCard(detail = detail, onOpenMap = { url -> openExternalUrl(context, url) })
+                                    // «Tiempo» (28-10): lo trabajado contra el plan y el tope, antes de la tira.
+                                    ActividadTiempoCard(detail = detail, miFila = miFila)
                                     ActivityFactsStrip(detail = detail, sesion = sesion)
                                     // Trayecto (29-10): ida al sitio y regreso a la oficina, medidos aparte del reloj.
                                     if (captura && !despachador) {
@@ -541,6 +551,17 @@ fun ActivityDetailScreen(
                             },
                             extraContent = {
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    // Costo directo (28-10): solo dirección y coordinación de Admin y Operaciones.
+                                    ActividadCostoCard(
+                                        activityId = detail.id,
+                                        puedeVer = puedeVerCosto,
+                                        refreshKey = recarga,
+                                    )
+                                    // Comercial: la cotización ligada, con su propuesta en PDF (29-10).
+                                    val cotizacion = detail.cotizacion
+                                    if (cotizacion != null && ActividadCotizacionRules.aplica(detail.coreKind, cotizacion)) {
+                                        ActividadCotizacionCard(cotizacion = cotizacion)
+                                    }
                                     // Comercial: la propuesta, la minuta y lo que manda el cliente (Adam, 07-10).
                                     if (ActividadAdjuntosRules.aplica(detail.coreKind)) {
                                         ActividadAdjuntosSection(

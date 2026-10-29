@@ -439,7 +439,7 @@ private fun TeamMemberCard(
                         text = if (esCorreccion) {
                             CoreActivityRules.correccionTexto(ev?.correctionSubmittedAt, revisiones)
                         } else {
-                            "Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela."
+                            "Ya envió su evidencia: revísala, califícala y apruébala o devuélvela."
                         },
                         icon = NxGlyph.TO_REVIEW.icon,
                         fontSize = 13.5.sp,
@@ -567,103 +567,86 @@ private fun EvidenceContent(
     val pasos = CoreActivityRules.evidenceStepsForKind(coreKind)
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        pasos.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { step ->
-                    val hora = CoreActivityRules.horaPaso(ev, step)
-                    val hecho = hora != null
-                    val corregir = step in porCorregir
-                    val corregido = !corregir && hecho && step in corregidos
-                    val color = when {
+        pasos.forEach { step ->
+            val hora = CoreActivityRules.horaPaso(ev, step)
+            val hecho = hora != null
+            val corregir = step in porCorregir
+            val corregido = !corregir && hecho && step in corregidos
+            val color = when {
+                corregir -> Color(NARANJA)
+                corregido -> Color(AZUL)
+                hecho -> Color(VERDE)
+                else -> null
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(color?.copy(alpha = 0.08f) ?: Color.White)
+                    .border(1.dp, color?.copy(alpha = 0.35f) ?: Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                NxIconText(
+                    text = CoreActivityRules.stepLabel(step, coreKind),
+                    icon = when {
+                        corregir -> NxGlyph.RETURNED.icon
+                        corregido -> NxGlyph.CORRECTION.icon
+                        hecho -> NxGlyph.DONE.icon
+                        else -> Icons.Outlined.RadioButtonUnchecked
+                    },
+                    iconTint = color ?: NxColors.Muted,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = NxColors.Slate,
+                )
+                Text(
+                    when {
+                        corregir -> "Por corregir"
+                        corregido -> "Corregido · ${CoreActivityRules.formatWhen(hora).orEmpty()}"
+                        hecho -> CoreActivityRules.formatWhen(hora) ?: "Hecho"
+                        else -> "Pendiente"
+                    },
+                    fontSize = 11.5.sp,
+                    fontWeight = if (corregido) FontWeight.SemiBold else FontWeight.Normal,
+                    color = when {
                         corregir -> Color(NARANJA)
                         corregido -> Color(AZUL)
-                        hecho -> Color(VERDE)
-                        else -> null
-                    }
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(color?.copy(alpha = 0.08f) ?: Color.White)
-                            .border(1.dp, color?.copy(alpha = 0.35f) ?: Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                    ) {
-                        NxIconText(
-                            text = CoreActivityRules.stepLabel(step, coreKind),
-                            icon = when {
-                                corregir -> NxGlyph.RETURNED.icon
-                                corregido -> NxGlyph.CORRECTION.icon
-                                hecho -> NxGlyph.DONE.icon
-                                else -> Icons.Outlined.RadioButtonUnchecked
-                            },
-                            iconTint = color ?: NxColors.Muted,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = NxColors.Slate,
-                        )
-                        Text(
-                            when {
-                                corregir -> "Por corregir"
-                                corregido -> "Corregido · ${CoreActivityRules.formatWhen(hora).orEmpty()}"
-                                hecho -> CoreActivityRules.formatWhen(hora) ?: "Hecho"
-                                else -> "Pendiente"
-                            },
-                            fontSize = 11.5.sp,
-                            fontWeight = if (corregido) FontWeight.SemiBold else FontWeight.Normal,
-                            color = when {
-                                corregir -> Color(NARANJA)
-                                corregido -> Color(AZUL)
-                                else -> NxColors.Muted
-                            },
-                        )
-                    }
-                }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+                        else -> NxColors.Muted
+                    },
+                )
             }
         }
 
         val entrada = set.entrada
+        if (entrada != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                SectionTitle(
+                    if (CoreActivityRules.esComercial(coreKind)) "Inicio" else "Entrada",
+                    ev.entryPhotoUploadedAt,
+                    STEP_ENTRY,
+                    onDevolverPaso,
+                )
+                PhotoThumb(set.fotos[entrada], 160.dp) { onOpenVisor(set.fotos, entrada) }
+            }
+        }
         val salida = set.salida
-        if (entrada != null || salida != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (entrada != null) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionTitle(
-                            if (CoreActivityRules.esComercial(coreKind)) "Inicio" else "Entrada",
-                            ev.entryPhotoUploadedAt,
-                            STEP_ENTRY,
-                            onDevolverPaso,
-                        )
-                        PhotoThumb(set.fotos[entrada], 160.dp) { onOpenVisor(set.fotos, entrada) }
-                    }
-                }
-                if (salida != null) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionTitle(
-                            if (CoreActivityRules.esComercial(coreKind)) "Conclusión" else "Salida",
-                            ev.exitPhotoUploadedAt,
-                            STEP_EXIT,
-                            onDevolverPaso,
-                        )
-                        PhotoThumb(set.fotos[salida], 160.dp) { onOpenVisor(set.fotos, salida) }
-                    }
-                }
-                if (entrada == null || salida == null) Spacer(Modifier.weight(1f))
+        if (salida != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                SectionTitle(
+                    if (CoreActivityRules.esComercial(coreKind)) "Conclusión" else "Salida",
+                    ev.exitPhotoUploadedAt,
+                    STEP_EXIT,
+                    onDevolverPaso,
+                )
+                PhotoThumb(set.fotos[salida], 160.dp) { onOpenVisor(set.fotos, salida) }
             }
         }
 
         if (set.sitio.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 SectionTitle("Fotos en sitio (${set.sitio.size})", ev.evidencePhotosUploadedAt, STEP_PHOTOS, onDevolverPaso)
-                set.sitio.chunked(3).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.forEach { idx ->
-                            Box(Modifier.weight(1f)) {
-                                PhotoThumb(set.fotos[idx], 110.dp) { onOpenVisor(set.fotos, idx) }
-                            }
-                        }
-                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-                    }
+                set.sitio.forEach { idx ->
+                    PhotoThumb(set.fotos[idx], 110.dp) { onOpenVisor(set.fotos, idx) }
                 }
             }
         }

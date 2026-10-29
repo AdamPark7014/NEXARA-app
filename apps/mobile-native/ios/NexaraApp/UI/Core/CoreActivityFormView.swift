@@ -4,14 +4,15 @@ import SwiftUI
 enum CoreSchedule {
     static let mexico = TimeZone(identifier: "America/Mexico_City") ?? .current
 
-    /// Hoy a las 9:00 (México) o, si ya pasó, mañana a las 9:00.
-    static func defaultStart(now: Date = Date()) -> Date {
+    /// Hoy a la hora de inicio por omisión (México) o, si ya pasó, mañana a esa hora. La hora es la
+    /// entrada de quien ejecuta cuando se conoce (`CoreActivityRules.horaDeEntrada`); si no, 10:00.
+    static func defaultStart(now: Date = Date(), hhmm: String = CoreActivityRules.horaPorOmision) -> Date {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = mexico
-        let today = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: now) ?? now
+        let today = at(day: now, hhmm: hhmm) ?? now
         if today > now { return today }
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) ?? now
-        return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrow) ?? tomorrow
+        return at(day: tomorrow, hhmm: hhmm) ?? tomorrow
     }
 
     private static var calendar: Calendar {
@@ -80,6 +81,9 @@ struct CoreActivityFormView: View {
     @State private var tareaTipoId: String?
     @State private var withSchedule = true
     @State private var fecha = CoreSchedule.defaultStart()
+    /// La hora que se puso sola (la de la oficina o la entrada de quien ejecuta): si la de `fecha`
+    /// ya es otra, quien asigna la movió a mano.
+    @State private var horaAutomatica = CoreActivityRules.horaPorOmision
     /// «Entregar a más tardar»: apagado = el límite es el fin del día, como siempre.
     @State private var conCompromiso = false
     @State private var compromiso = CoreSchedule.compromisoPorOmision(inicio: CoreSchedule.defaultStart())
@@ -111,6 +115,16 @@ struct CoreActivityFormView: View {
     @State private var loaded = false
     @State private var saving = false
     @State private var error: String?
+    /// Tiempo estándar al asignar a otro: la tabla (`GET ai/estandar/tabla`), lo que se cuenta y,
+    /// si quien asigna pone otro tiempo, el motivo.
+    @State private var tablaEstandar: CoreTiempoEstandar.Tabla?
+    @State private var unidadEstandar = ""
+    @State private var cantidadEstandar = ""
+    /// La cantidad la puso la IA (se dice) hasta que alguien la toca.
+    @State private var cantidadDeIA = false
+    @State private var cantidadAMano = false
+    @State private var cambiandoEstandar = false
+    @State private var motivoEstandar = ""
 
     /// Autoasignación (regla de Adam, 29-10): a sí mismo, desde «Auto-asignarme» o desde su propia
     /// ficha. El tiempo, el tope, la complejidad y la entrega los calcula la API del título y el
@@ -189,6 +203,45 @@ struct CoreActivityFormView: View {
         return "\(kind.rawValue)|\(tipoComplejidad ?? "")|\(coreClean(titulo))|\(coreClean(indicaciones))"
     }
     private var estimadoTotal: Int { estimadoHoras * 60 + estimadoMinutos }
+
+    // Tiempo estándar: solo al asignar a otro y con la complejidad a la vista (en tarea, con su tipo).
+    private var reglaEstandar: CoreTiempoEstandar.Regla? {
+        guard complejidadVisible else { return nil }
+        let clave = CoreTiempoEstandar.clave(
+            coreKind: kind.rawValue,
+            ticketType: kind.ticketType ?? ticketType,
+            tipoTarea: tareaTipo?.label
+        )
+        return CoreTiempoEstandar.reglaPara(tablaEstandar, clave: clave)
+    }
+    private var unidadEstandarActual: CoreTiempoEstandar.Unidad? {
+        CoreTiempoEstandar.unidad(reglaEstandar, clave: unidadEstandar)
+    }
+    private var cantidadEstandarN: Int { Int(cantidadEstandar) ?? 0 }
+    private var resultadoEstandar: CoreTiempoEstandar.Resultado? {
+        guard let regla = reglaEstandar else { return nil }
+        // Sin mapa en el teléfono no hay traslado: si el tipo va a otro lugar, la API completa el estándar.
+        return CoreTiempoEstandar.calcular(
+            regla,
+            cantidad: cantidadEstandarN,
+            unidad: unidadEstandarActual?.clave,
+            complejidad: complejidad,
+            traslado: nil,
+            tope: tablaEstandar?.topeMin ?? CoreTiempoEstandar.topeMin
+        )
+    }
+    private var envioEstandar: CoreTiempoEstandar.Envio? {
+        CoreTiempoEstandar.envio(
+            regla: reglaEstandar,
+            resultado: resultadoEstandar,
+            cantidad: cantidadEstandarN,
+            unidad: unidadEstandarActual,
+            cambiando: cambiandoEstandar,
+            motivo: motivoEstandar
+        )
+    }
+    /// Lo fija el estándar mientras nadie lo cambie con motivo; nil = la rueda es libre.
+    private var estandarFijo: Int? { CoreTiempoEstandar.minutosFijos(envioEstandar) }
 
     var body: some View {
         Group {
@@ -284,6 +337,9 @@ struct CoreActivityFormView: View {
                 if complejidadVisible {
                     complejidadSection
                 }
+                if complejidadVisible {
+                    estandarSection
+                }
             }
 
             Section("Prioridad") {
@@ -337,29 +393,44 @@ struct CoreActivityFormView: View {
                         }
                     }
                     if !autoasignacion {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("¿Cuánto tiempo toma?")
-                                .font(.subheadline.weight(.semibold))
-                            Text(Self.durationLabel(horas: estimadoHoras, minutos: estimadoMinutos))
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                            HStack {
-                                Picker("Horas", selection: $estimadoHoras) {
-                                    ForEach(0...24, id: \.self) { Text("\($0) h").tag($0) }
-                                }
-                                .pickerStyle(.wheel)
-                                .frame(maxWidth: .infinity)
-                                .clipped()
-                                Picker("Minutos", selection: $estimadoMinutos) {
-                                    ForEach(Array(stride(from: 0, through: 55, by: 5)), id: \.self) {
-                                        Text("\($0) min").tag($0)
-                                    }
-                                }
-                                .pickerStyle(.wheel)
-                                .frame(maxWidth: .infinity)
-                                .clipped()
+                        if let fijo = estandarFijo {
+                            // Lo da el tiempo estándar: para otro tiempo, «Cambiar el tiempo» pide el motivo.
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("¿Cuánto tiempo toma?")
+                                    .font(.subheadline.weight(.semibold))
+                                Text(CoreComplejidad.formatoMinutos(fijo))
+                                    .font(.title3.weight(.bold))
+                                Text("Lo da el tiempo estándar. Para poner otro, usa «Cambiar el tiempo» arriba (pide motivo).")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                            .frame(height: 120)
+                            .accessibilityElement(children: .combine)
+                        } else {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("¿Cuánto tiempo toma?")
+                                    .font(.subheadline.weight(.semibold))
+                                Text(Self.durationLabel(horas: estimadoHoras, minutos: estimadoMinutos))
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                HStack {
+                                    Picker("Horas", selection: $estimadoHoras) {
+                                        ForEach(0...24, id: \.self) { Text("\($0) h").tag($0) }
+                                    }
+                                    .pickerStyle(.wheel)
+                                    .frame(maxWidth: .infinity)
+                                    .clipped()
+                                    Picker("Minutos", selection: $estimadoMinutos) {
+                                        ForEach(Array(stride(from: 0, through: 55, by: 5)), id: \.self) {
+                                            Text("\($0) min").tag($0)
+                                        }
+                                    }
+                                    .pickerStyle(.wheel)
+                                    .frame(maxWidth: .infinity)
+                                    .clipped()
+                                }
+                                .frame(height: 120)
+                            }
                         }
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Tope máximo (opcional)")
@@ -426,6 +497,19 @@ struct CoreActivityFormView: View {
             }
         }
         .task(id: kind) { await loadMeta() }
+        .task(id: responsableId) { await aplicarHoraEntrada() }
+    }
+
+    /// La hora de inicio por omisión es la entrada de quien ejecuta (oficina 10:00, cuadrilla
+    /// 08:00), como la web; si quien asigna ya movió la hora, no se toca.
+    @MainActor
+    private func aplicarHoraEntrada() async {
+        let entrada = CoreActivityRules.horaDeEntrada(await CoreRepository.shared.horaEntrada(userId: responsableId))
+        guard CoreSchedule.hhmm(fecha) == horaAutomatica, entrada != horaAutomatica,
+              let nueva = CoreSchedule.at(day: fecha, hhmm: entrada) else { return }
+        fecha = nueva
+        horaAutomatica = entrada
+        if !conCompromiso { compromiso = CoreSchedule.compromisoPorOmision(inicio: nueva) }
     }
 
     // MARK: Tipo de tarea
@@ -495,7 +579,12 @@ struct CoreActivityFormView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     let minutos = CoreComplejidad.minutosParaEstimado(tipico.minutos)
-                    if minutos != estimadoTotal {
+                    if estandarFijo != nil {
+                        // El tiempo estándar ya fija el tiempo: lo típico queda solo como referencia.
+                        Text("Referencia: el tiempo lo da el estándar.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else if minutos != estimadoTotal {
                         Button("Usar \(CoreComplejidad.formatoMinutos(minutos)) como tiempo estimado") {
                             estimadoHoras = minutos / 60
                             estimadoMinutos = minutos % 60
@@ -516,6 +605,203 @@ struct CoreActivityFormView: View {
                 Text("\(complejidad.label): \(complejidad.definicion).")
             }
         }
+    }
+
+    // MARK: Tiempo estándar
+
+    /// «Tiempo estándar» al asignar a otro (`TiempoEstandarCampo` de la web y de Android): lo que se
+    /// cuenta en ese tipo de trabajo, con la cantidad que propone la IA, y el total con su desglose.
+    /// El total fija «¿Cuánto tiempo toma?»; cambiarlo pide motivo y queda registrado. Sin mapa en
+    /// el teléfono: si el tipo va a otro lugar, la API completa el estándar con la ida y la vuelta.
+    /// Sin tabla o sin regla para el tipo no se pinta y el tiempo se captura como antes.
+    @ViewBuilder
+    private var estandarSection: some View {
+        if let regla = reglaEstandar {
+            Section {
+                if regla.agenda {
+                    Text("\(regla.nombre): dura lo que dure la agenda, así que no hay tiempo estándar. Pon su duración en «¿Cuánto tiempo toma?».")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    estandarEntradas(regla)
+                    estandarTarjeta(regla)
+                }
+            } header: {
+                Text("Tiempo estándar · \(regla.nombre)")
+            }
+            .onChange(of: estandarFijo) { _, nuevo in fijarEstimado(nuevo) }
+        }
+    }
+
+    @ViewBuilder
+    private func estandarEntradas(_ regla: CoreTiempoEstandar.Regla) -> some View {
+        let unidad = unidadEstandarActual
+        let n = cantidadEstandarN
+        if cantidadDeIA, n > 0, let unidad {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityHidden(true)
+                (Text("La IA leyó el título:").bold()
+                    + Text(" \(n) \(n == 1 ? unidad.singular : unidad.plural). Confírmalo o corrige la cantidad; el tiempo lo calcula la tabla, no la IA."))
+                    .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+        }
+        if regla.unidades.count > 1 {
+            Picker("Qué se cuenta", selection: unidadEstandarSeleccion) {
+                ForEach(regla.unidades, id: \.clave) { u in
+                    Text(String(u.plural.prefix(1)).uppercased() + String(u.plural.dropFirst())).tag(u.clave)
+                }
+            }
+            .pickerStyle(.menu)
+        }
+        if let unidad {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(unidad.pregunta)
+                    .font(.subheadline.weight(.semibold))
+                HStack(spacing: 12) {
+                    TextField("0", text: cantidadEstandarTexto)
+                        .keyboardType(.numberPad)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 96)
+                    Stepper("Cantidad", value: cantidadEstandarPaso, in: 0...9999)
+                        .labelsHidden()
+                }
+                Text("\(unidad.porUnidadMin) min por \(unidad.singular)\(regla.baseMin > 0 ? " + \(regla.baseMin) min de base" : "").")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 2)
+        }
+        if let texto = CoreTiempoEstandar.textoPorComplejidad(regla) {
+            Text(texto)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        if regla.destino {
+            let destinoIA = (sugerencia?.destino ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let leido: String = destinoIA.isEmpty ? "" : "La IA leyó el destino: «\(destinoIA)». "
+            let nota: String = leido + "En el teléfono no se marca en el mapa: al guardar, el sistema completa el estándar con la ida y la vuelta."
+            Text(nota)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private func estandarTarjeta(_ regla: CoreTiempoEstandar.Regla) -> some View {
+        let resultado = resultadoEstandar
+        let total = resultado?.totalMin
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Tiempo estándar")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+            Text(total.map { CoreComplejidad.formatoMinutos($0) } ?? "—")
+                .font(.title2.weight(.bold))
+            ForEach(Array((resultado?.desglose ?? []).enumerated()), id: \.offset) { _, renglon in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(renglon.concepto)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Text(CoreComplejidad.formatoMinutos(renglon.minutos)).monospacedDigit()
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            if let faltan = CoreTiempoEstandar.textoFaltan(resultado?.faltan ?? [], regla: regla) {
+                Text(faltan)
+                    .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if resultado?.topado == true {
+                Text("Pasa de 12 h: queda en el tope de 12 h.")
+                    .font(.footnote)
+            }
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        if let total {
+            if cambiandoEstandar {
+                let valido = CoreTiempoEstandar.motivoValido(motivoEstandar)
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("¿Por qué otro tiempo? Ej.: hay que abrir muro", text: $motivoEstandar, axis: .vertical)
+                        .lineLimit(2...4)
+                    Text(valido
+                         ? "Ahora el tiempo lo pones tú en «¿Cuánto tiempo toma?»; el estándar queda guardado con este motivo."
+                         : "Escribe el motivo (mínimo \(CoreTiempoEstandar.motivoMinimo) letras) y luego ajusta «¿Cuánto tiempo toma?».")
+                        .font(.caption)
+                        .foregroundStyle(!motivoEstandar.isEmpty && !valido ? CorePalette.red : Color.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button("Usar el estándar") {
+                    cambiandoEstandar = false
+                    motivoEstandar = ""
+                    fijarEstimado(total)
+                }
+                .buttonStyle(.borderless)
+                .font(.footnote.weight(.semibold))
+            } else {
+                Button("Cambiar el tiempo (pide motivo)") {
+                    // Las ruedas arrancan en el estándar para ajustarlo desde ahí.
+                    fijarEstimado(total)
+                    cambiandoEstandar = true
+                }
+                .buttonStyle(.borderless)
+                .font(.footnote.weight(.semibold))
+            }
+        }
+    }
+
+    /// La unidad que se ve elegida (la primera si nadie eligió).
+    private var unidadEstandarSeleccion: Binding<String> {
+        Binding(
+            get: { unidadEstandarActual?.clave ?? "" },
+            set: { unidadEstandar = $0 }
+        )
+    }
+
+    /// Escribir la cantidad: solo dígitos (hasta 4) y desde ahí ya no la cambia la IA.
+    private var cantidadEstandarTexto: Binding<String> {
+        Binding(
+            get: { cantidadEstandar },
+            set: { nuevo in
+                cantidadAMano = true
+                cantidadDeIA = false
+                cantidadEstandar = String(nuevo.filter { $0.isASCII && $0.isNumber }.prefix(4))
+            }
+        )
+    }
+
+    private var cantidadEstandarPaso: Binding<Int> {
+        Binding(
+            get: { cantidadEstandarN },
+            set: { nuevo in
+                cantidadAMano = true
+                cantidadDeIA = false
+                cantidadEstandar = nuevo > 0 ? String(min(9999, nuevo)) : ""
+            }
+        )
+    }
+
+    /// Las ruedas de «¿Cuánto tiempo toma?» en los minutos del estándar (múltiplos de 5).
+    private func fijarEstimado(_ minutos: Int?) {
+        guard let minutos, minutos > 0 else { return }
+        let tope = min(CoreComplejidad.topeEstimadoMin, minutos)
+        estimadoHoras = tope / 60
+        estimadoMinutos = (tope % 60) / 5 * 5
+    }
+
+    /// La IA leyó una cantidad del título: se pone mientras nadie la haya escrito a mano.
+    private func aplicarCantidadIA() {
+        guard let n = sugerencia?.cantidad, n > 0, !cantidadAMano,
+              let regla = reglaEstandar, !regla.unidades.isEmpty else { return }
+        cantidadEstandar = String(n)
+        cantidadDeIA = true
     }
 
     private func complejidadBoton(_ nivel: CoreComplejidad) -> some View {
@@ -601,6 +887,8 @@ struct CoreActivityFormView: View {
             pensandoSugerencia = false
             // `try?` aplana el opcional: nil = falló o no hubo sugerencia (las dos se callan).
             sugerencia = resultado
+            // La cantidad que leyó la IA va al tiempo estándar (si nadie la escribió a mano).
+            aplicarCantidadIA()
             guard let nivel = resultado?.complejidad else { return }
             complejidadSugerida = nivel
             if !complejidadAMano { complejidad = nivel }
@@ -618,6 +906,11 @@ struct CoreActivityFormView: View {
         sectorClients = await clients
         nextAn = await an
         loaded = true
+        // Tabla del tiempo estándar (solo al asignar a otro). Si falla, el tiempo se captura a mano.
+        if !autoasignacion && tablaEstandar == nil {
+            tablaEstandar = try? await CoreRepository.shared.tablaEstandar()
+            aplicarCantidadIA()
+        }
     }
 
     @MainActor
@@ -690,6 +983,9 @@ struct CoreActivityFormView: View {
             )
             : nil
         let notes = coreClean(indicaciones)
+        // Tiempo estándar al asignar a otro: cada campo solo si se calculó. Sin motivo, el estimado
+        // es el estándar (la API responde 400 si difieren sin decir por qué).
+        let estandar = complejidadVisible ? envioEstandar : nil
         let body = CoreActivityCreateBody(
             titulo: title,
             indicaciones: notes.isEmpty ? nil : notes,
@@ -703,7 +999,8 @@ struct CoreActivityFormView: View {
             responsableId: responsableId,
             tiempoEstimadoMin: {
                 let total = estimadoHoras * 60 + estimadoMinutos
-                return !propia && total > 0 ? total : nil
+                guard !propia else { return nil }
+                return CoreTiempoEstandar.estimadoAMandar(capturado: total > 0 ? total : nil, envio: estandar)
             }(),
             tiempoMaximoMin: {
                 let total = maximoHoras * 60 + maximoMinutos
@@ -720,7 +1017,11 @@ struct CoreActivityFormView: View {
             complejidad: complejidadVisible ? complejidad?.rawValue : nil,
             complejidadSugerida: complejidadVisible ? complejidadSugerida?.rawValue : nil,
             estatus: "Pendiente",
-            creadoPorId: me
+            creadoPorId: me,
+            unidades: estandar?.unidades,
+            tiempoEstandarMin: estandar?.tiempoEstandarMin,
+            estandarDesglose: estandar?.desglose,
+            estandarCambiadoMotivo: estandar?.motivo
         )
 
         saving = true

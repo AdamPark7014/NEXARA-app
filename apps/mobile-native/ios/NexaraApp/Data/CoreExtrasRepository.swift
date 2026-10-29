@@ -17,6 +17,59 @@ import Foundation
 
 // MARK: - KPIs del equipo
 
+/// Entero que el API puede mandar como `12` o como `12.0`; lo que no se lee, 0.
+private func kpiEntero<K: CodingKey>(_ c: KeyedDecodingContainer<K>, _ key: K) -> Int {
+    if let n = try? c.decode(Int.self, forKey: key) { return n }
+    if let d = try? c.decode(Double.self, forKey: key), d.isFinite, abs(d) < 1e12 { return Int(d.rounded()) }
+    return 0
+}
+
+/// Un texto que el API puede mandar tal cual («alta», «verde») o dentro de un objeto
+/// (`{ "nivel": "alta" }`, `{ "semaforo": "verde" }`). Es para la confianza y el semáforo
+/// que el API va a empezar a mandar: se aceptan las dos formas y lo que no se entiende
+/// queda vacío (las reglas calculan entonces lo suyo, como la web).
+struct KpiTextoFlexible: Decodable, Hashable {
+    /// Cuando llega como texto.
+    var texto: String?
+    /// Cuando llega como objeto: sus campos de texto.
+    var campos: [String: String] = [:]
+
+    private struct Clave: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { return nil }
+    }
+
+    init(from decoder: Decoder) throws {
+        if let c = try? decoder.singleValueContainer(), let s = try? c.decode(String.self) {
+            texto = KpiTextoFlexible.limpio(s)
+            return
+        }
+        if let c = try? decoder.container(keyedBy: Clave.self) {
+            for k in c.allKeys {
+                if let s = try? c.decode(String.self, forKey: k), let t = KpiTextoFlexible.limpio(s) {
+                    campos[k.stringValue] = t
+                }
+            }
+        }
+    }
+
+    /// El texto, o el primero de `claves` que traiga el objeto.
+    func valor(_ claves: [String]) -> String? {
+        if let texto { return texto }
+        for k in claves {
+            if let v = campos[k] { return v }
+        }
+        return nil
+    }
+
+    private static func limpio(_ s: String) -> String? {
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? nil : t
+    }
+}
+
 struct KpiUniforme: Decodable, Hashable {
     var revisadas: Int = 0
     var ok: Int = 0
@@ -55,15 +108,23 @@ struct KpiEntregas: Decodable, Hashable {
     var pctATiempo: Double?
     /// aprobadasALaPrimera ÷ revisadas; `nil` sin revisadas.
     var pctALaPrimera: Double?
+    /// Horas estándar ganadas (pilar Rendimiento, 29-10): entregadas con tiempo estándar,
+    /// la suma de sus estándares (lo autoasignado sin validar, la mitad) y lo que tardaron.
+    var conEstandar: Int = 0
+    var minutosEstandarGanados: Int = 0
+    var minutosRealesConEstandar: Int = 0
+    /// Estándar ÷ real con tope de 100; `nil` sin dato.
+    var pctEficienciaEstandar: Double?
 
     private enum CodingKeys: String, CodingKey {
         case medidas, aTiempo, tarde, sinEntregar, revisadas, aprobadasALaPrimera, devueltas
         case pctATiempo, pctALaPrimera
+        case conEstandar, minutosEstandarGanados, minutosRealesConEstandar, pctEficienciaEstandar
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        func entero(_ key: CodingKeys) -> Int { (try? c.decode(Int.self, forKey: key)) ?? 0 }
+        func entero(_ key: CodingKeys) -> Int { kpiEntero(c, key) }
         medidas = entero(.medidas)
         aTiempo = entero(.aTiempo)
         tarde = entero(.tarde)
@@ -73,6 +134,92 @@ struct KpiEntregas: Decodable, Hashable {
         devueltas = entero(.devueltas)
         pctATiempo = try? c.decode(Double.self, forKey: .pctATiempo)
         pctALaPrimera = try? c.decode(Double.self, forKey: .pctALaPrimera)
+        conEstandar = entero(.conEstandar)
+        minutosEstandarGanados = entero(.minutosEstandarGanados)
+        minutosRealesConEstandar = entero(.minutosRealesConEstandar)
+        pctEficienciaEstandar = try? c.decode(Double.self, forKey: .pctEficienciaEstandar)
+    }
+}
+
+/// Disciplina v2 (pilar del índice): por día que debía checar, hasta 15 min tarde 1 punto,
+/// 16–30 0.6, 31–60 0.3, más o sin checar 0; cada 3 retardos, una falta en el índice; todo
+/// por el registro completo (salida propia y comida).
+struct KpiDisciplina: Decodable, Hashable {
+    var esperados: Int = 0
+    /// Con decimales («4.6»).
+    var puntos: Double = 0
+    /// Días que llegó más de 15 min tarde.
+    var retardos: Int = 0
+    var faltasPorRetardos: Int = 0
+    var jornadasRevisables: Int = 0
+    var registroCompleto: Int = 0
+    var pct: Double?
+
+    private enum CodingKeys: String, CodingKey {
+        case esperados, puntos, retardos, faltasPorRetardos, jornadasRevisables, registroCompleto, pct
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        esperados = kpiEntero(c, .esperados)
+        puntos = (try? c.decode(Double.self, forKey: .puntos)) ?? 0
+        retardos = kpiEntero(c, .retardos)
+        faltasPorRetardos = kpiEntero(c, .faltasPorRetardos)
+        jornadasRevisables = kpiEntero(c, .jornadasRevisables)
+        registroCompleto = kpiEntero(c, .registroCompleto)
+        pct = try? c.decode(Double.self, forKey: .pct)
+    }
+}
+
+/// Calificación de sus revisiones, calibrada por revisor (0–100).
+struct KpiCalificacion: Decodable, Hashable {
+    var n: Int = 0
+    var pct: Double?
+
+    private enum CodingKeys: String, CodingKey { case n, pct }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        n = kpiEntero(c, .n)
+        pct = try? c.decode(Double.self, forKey: .pct)
+    }
+}
+
+/// Revisiones que hizo un coordinador en el rango y cuántas dentro de 24 h hábiles.
+struct KpiRevisiones: Decodable, Hashable {
+    var total: Int = 0
+    var enPlazo: Int = 0
+
+    private enum CodingKeys: String, CodingKey { case total, enPlazo }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        total = kpiEntero(c, .total)
+        enPlazo = kpiEntero(c, .enPlazo)
+    }
+}
+
+/// Solo coordinadores: lo de su equipo (él incluido) y sus revisiones.
+struct KpiEquipoCoordinado: Decodable, Hashable {
+    var personas: Int = 0
+    var aTiempo: Int = 0
+    var medidas: Int = 0
+    var minutosEstandarGanados: Int = 0
+    var minutosLaborados: Int = 0
+    var revisiones: KpiRevisiones?
+
+    private enum CodingKeys: String, CodingKey {
+        case personas, aTiempo, medidas, minutosEstandarGanados, minutosLaborados, revisiones
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        personas = kpiEntero(c, .personas)
+        aTiempo = kpiEntero(c, .aTiempo)
+        medidas = kpiEntero(c, .medidas)
+        minutosEstandarGanados = kpiEntero(c, .minutosEstandarGanados)
+        minutosLaborados = kpiEntero(c, .minutosLaborados)
+        revisiones = try? c.decode(KpiRevisiones.self, forKey: .revisiones)
     }
 }
 
@@ -92,20 +239,23 @@ struct KpiAsistenciaPuntual: Decodable, Hashable {
     }
 }
 
-/// Una parte del cumplimiento («Entregas a tiempo», «Asistencia puntual»…). El API
-/// puede sumar partes nuevas con otras claves y otros pesos: aquí no se fija
-/// ninguna; se pinta lo que llegue, en el orden en que llega.
+/// Una parte del índice v2. Con peso: `entregas` (Confiabilidad), `forma` (Calidad),
+/// `estandar` (Rendimiento), `asistencia` y `uniforme` (Disciplina); las reglas las agrupan
+/// en los cuatro pilares. Con peso 0, diagnóstico (`tiempo`, `ritmo`, `ocupacion`, `carga`,
+/// `dias`): se leen aparte y no cuentan.
 struct KpiParteCumplimiento: Decodable, Hashable {
     var clave: String = ""
     var etiqueta: String = ""
     /// 0–100.
     var pct: Double?
-    /// Lo que pesa en el promedio (el API manda el número tal cual: 40 = «pesa 40 %»).
+    /// Lo que pesa en el índice (suman 100); 0 = diagnóstico.
     var peso: Double?
     /// «17 de 18», «7 de 8 días».
     var detalle: String = ""
+    /// Semáforo de la parte si el API ya lo manda (texto u objeto); `nil` mientras no.
+    var semaforo: KpiTextoFlexible?
 
-    private enum CodingKeys: String, CodingKey { case clave, etiqueta, pct, peso, detalle }
+    private enum CodingKeys: String, CodingKey { case clave, etiqueta, pct, peso, detalle, semaforo }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -114,6 +264,7 @@ struct KpiParteCumplimiento: Decodable, Hashable {
         pct = try? c.decode(Double.self, forKey: .pct)
         peso = try? c.decode(Double.self, forKey: .peso)
         detalle = (try? c.decode(String.self, forKey: .detalle)) ?? ""
+        semaforo = try? c.decode(KpiTextoFlexible.self, forKey: .semaforo)
     }
 }
 
@@ -138,14 +289,33 @@ struct KpiTotales: Decodable, Hashable {
     var cierresAutomaticos: Int = 0
     /// Entregas del rango (07-10); `nil` con la API vieja.
     var entregas: KpiEntregas?
+    /// Días que entró sin retardo de los que debía checar (binario).
     var asistenciaPuntual: KpiAsistenciaPuntual?
-    /// Cumplimiento en tiempo y forma, 0–100. `nil` sin entregas que medir (no es un cero).
+    /// Índice de desempeño v2, 0–100 (29-10): 30 Confiabilidad + 25 Calidad + 30
+    /// Rendimiento + 15 Disciplina. El campo conserva su nombre. `nil` = nada que medir.
     var cumplimientoPct: Double?
     var cumplimientoPartes: [KpiParteCumplimiento] = []
-    /// El API ya manda el cumplimiento: viene `cumplimientoPct` (aunque sea nulo, que es
-    /// «sin entregas que medir»), `entregas` o las partes. Con la API vieja no viene nada
-    /// de eso y la pantalla se queda como antes: por productividad y semáforo.
+    /// El API ya manda el índice: viene `cumplimientoPct` (aunque sea nulo, que es «nada
+    /// que medir»), `entregas` o las partes. Con la API vieja no viene nada de eso y la
+    /// pantalla se queda como antes: por productividad y semáforo.
     var traeCumplimiento = false
+    /// Puntualidad graduada y registro completo (pilar Disciplina, v2).
+    var disciplina: KpiDisciplina?
+    /// Calificación calibrada de sus revisiones (v2).
+    var calificacion: KpiCalificacion?
+    /// `campo` u `oficina`: decide la meta de Rendimiento.
+    var familia: String?
+    /// Meta de Rendimiento ya ponderada (0.6 = 60 %).
+    var metaRendimiento: Double?
+    /// Solo coordinadores: su equipo y sus revisiones.
+    var equipo: KpiEquipoCoordinado?
+    /// Confianza del índice (`alta` · `media` · `baja`); el API la manda como texto desde
+    /// f2dc7130, aquí se acepta también un objeto.
+    var confianza: KpiTextoFlexible?
+    /// Semáforo del índice ya calculado por el API (≥ 90 verde, ≥ 75 amarillo).
+    var semaforoIndice: KpiTextoFlexible?
+    /// Los cuatro pilares ya agrupados por el API con los pesos v2; vacío con un API anterior.
+    var pilares: [KpiPilar] = []
 
     private enum CodingKeys: String, CodingKey {
         case diasConJornada, diasSinChecada, faltasJustificadas, retardos, minutosTarde
@@ -153,6 +323,8 @@ struct KpiTotales: Decodable, Hashable {
         case minutosExtra, minutosExtraAprobados, minutosExtraPendientes, diasExtraPendientes
         case jornadasAbiertas, jornadasSinSalida, cierresAutomaticos
         case entregas, asistenciaPuntual, cumplimientoPct, cumplimientoPartes
+        case disciplina, calificacion, familia, metaRendimiento, equipo, confianza
+        case semaforoIndice, pilares
     }
 
     init(from decoder: Decoder) throws {
@@ -180,6 +352,34 @@ struct KpiTotales: Decodable, Hashable {
         cumplimientoPct = try? c.decode(Double.self, forKey: .cumplimientoPct)
         cumplimientoPartes = (try? c.decode([KpiParteCumplimiento].self, forKey: .cumplimientoPartes)) ?? []
         traeCumplimiento = c.contains(.cumplimientoPct) || c.contains(.entregas) || c.contains(.cumplimientoPartes)
+        disciplina = try? c.decode(KpiDisciplina.self, forKey: .disciplina)
+        calificacion = try? c.decode(KpiCalificacion.self, forKey: .calificacion)
+        familia = try? c.decode(String.self, forKey: .familia)
+        metaRendimiento = try? c.decode(Double.self, forKey: .metaRendimiento)
+        equipo = try? c.decode(KpiEquipoCoordinado.self, forKey: .equipo)
+        confianza = try? c.decode(KpiTextoFlexible.self, forKey: .confianza)
+        semaforoIndice = try? c.decode(KpiTextoFlexible.self, forKey: .semaforoIndice)
+        pilares = (try? c.decode([KpiPilar].self, forKey: .pilares)) ?? []
+    }
+}
+
+/// Un pilar del índice v2 como lo manda el API: `{ id, label, pct, semaforo }`.
+struct KpiPilar: Decodable, Hashable {
+    /// `confiabilidad` · `calidad` · `rendimiento` · `disciplina`.
+    var id: String = ""
+    var label: String = ""
+    /// 0–100; `nil` = sin dato en el rango (no pesa).
+    var pct: Double?
+    var semaforo: KpiTextoFlexible?
+
+    private enum CodingKeys: String, CodingKey { case id, label, pct, semaforo }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(String.self, forKey: .id)) ?? ""
+        label = (try? c.decode(String.self, forKey: .label)) ?? ""
+        pct = try? c.decode(Double.self, forKey: .pct)
+        semaforo = try? c.decode(KpiTextoFlexible.self, forKey: .semaforo)
     }
 }
 
@@ -223,10 +423,13 @@ struct KpiPersonaFila: Decodable, Identifiable, Hashable {
     var totales: KpiTotales?
     var semaforo: String = "sin_datos"
     var motivos: [String] = []
+    /// Confianza del índice si el API ya la manda por persona (`alta` · `media` · `baja`, o
+    /// un objeto con `nivel`). Mientras no, las reglas la calculan como la web.
+    var confianza: KpiTextoFlexible?
 
     var id: Int { persona?.id ?? 0 }
 
-    private enum CodingKeys: String, CodingKey { case persona, horario, totales, semaforo, motivos }
+    private enum CodingKeys: String, CodingKey { case persona, horario, totales, semaforo, motivos, confianza }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -235,6 +438,7 @@ struct KpiPersonaFila: Decodable, Identifiable, Hashable {
         totales = try? c.decode(KpiTotales.self, forKey: .totales)
         semaforo = (try? c.decode(String.self, forKey: .semaforo)) ?? "sin_datos"
         motivos = (try? c.decode([String].self, forKey: .motivos)) ?? []
+        confianza = try? c.decode(KpiTextoFlexible.self, forKey: .confianza)
     }
 }
 

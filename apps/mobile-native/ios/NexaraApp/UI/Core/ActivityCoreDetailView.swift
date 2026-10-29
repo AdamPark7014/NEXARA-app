@@ -75,6 +75,8 @@ struct ActivityCoreDetailView: View {
     @State private var events: [ActivityTimelineEvent] = []
     @State private var eventsLoading = false
     @State private var eventsError: String?
+    /// «Costo directo» (viáticos + material); nil hasta cargar o sin permiso para verlo.
+    @State private var costo: ActividadCostoRules.Costo?
 
     // MARK: Datos derivados
 
@@ -142,6 +144,28 @@ struct ActivityCoreDetailView: View {
     private var sesion: SesionActividad? {
         guard let mine = miFila else { return nil }
         return SesionActividad(fila: mine)
+    }
+
+    /// Tarjeta «Tiempo» (web `TiempoActividad.tsx`): mi plan y mi real si soy del equipo; si no
+    /// (un jefe que revisa), el resumen de la actividad.
+    private var medidorTiempo: ActividadTiempoRules.Medidor {
+        ActividadTiempoRules.medidor(
+            minutosPlan: ActivityParse.double(miFila?["minutosPlan"]) ?? ActivityParse.double(raw["minutosPlan"]),
+            minutosReales: ActivityParse.double(miFila?["minutosReales"]) ?? ActivityParse.double(raw["minutosReales"]),
+            tiempoMaximoMin: ActivityParse.double(raw["tiempoMaximoMin"])
+        )
+    }
+
+    /// «En curso» sale del reloj de CUALQUIERA del equipo, no solo de mi fila.
+    private var tiempoEnCurso: Bool { ActividadTiempoRules.enCurso(assignees) }
+
+    /// «Costo directo»: la misma regla de roles que la web (`CostoActividad.tsx`).
+    private var puedeVerCosto: Bool { ActividadCostoRules.puedeVer(session.currentUser) }
+
+    /// Comercial: la cotización ligada (`GET activities/:id` → `cotizacion`).
+    private var cotizacionLigada: ActividadCotizacionLigada? {
+        let ligada = ActividadCotizacionLigada(raw["cotizacion"])
+        return ActividadCotizacionRules.aplica(coreKind: coreKind, cotizacion: ligada) ? ligada : nil
     }
 
     /// Regla del 18-09: quien la recibe no la acepta ni la rechaza, únicamente la inicia.
@@ -360,6 +384,8 @@ struct ActivityCoreDetailView: View {
         .task(id: tab) {
             if tab == .historial { await loadTimeline() }
         }
+        // «Costo directo»: viáticos imputados + material, solo para dirección y coordinación.
+        .task(id: "\(recarga)-\(puedeVerCosto)") { await cargarCosto() }
         .task(id: snack) {
             guard snack != nil else { return }
             try? await Task.sleep(nanoseconds: 4_000_000_000)
@@ -557,6 +583,15 @@ struct ActivityCoreDetailView: View {
                     if !lugarTitulo.isEmpty {
                         ActivityPlaceCard(titulo: lugarTitulo, detalle: lugarDetalle, mapsURL: lugarMapa)
                     }
+                    // «Tiempo» (28-10): lo trabajado contra el plan y el tope, antes de la tira.
+                    if ActividadTiempoRules.visible(medidorTiempo) {
+                        ActivityTiempoCard(
+                            medidor: medidorTiempo,
+                            enCurso: tiempoEnCurso,
+                            tiempoMaximoMin: ActivityParse.double(raw["tiempoMaximoMin"]),
+                            minutosEstandar: ActivityParse.double(raw["tiempoEstandarMin"])
+                        )
+                    }
                     // Trayecto (29-10): ida al sitio y regreso a la oficina, medidos aparte del reloj.
                     // Solo quien la hace. Va en una columna sin espaciado junto a la tira: sin
                     // tarjeta no deja hueco.
@@ -635,6 +670,10 @@ struct ActivityCoreDetailView: View {
                     if !text("indicaciones").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         textoCard("Indicaciones", text("indicaciones"))
                     }
+                    // Costo directo (28-10): solo dirección y coordinación de Admin y Operaciones.
+                    if puedeVerCosto, let costo, ActividadCostoRules.visible(costo) {
+                        ActivityCostoCard(costo: costo)
+                    }
                     NxPanelShell {
                         Text("Evidencias del equipo")
                             .font(.system(size: 14, weight: .bold))
@@ -642,6 +681,10 @@ struct ActivityCoreDetailView: View {
                         TeamEvidenceCompactView(activityId: activityId, refreshToken: teamRefresh) {
                             tab = .evidencias
                         }
+                    }
+                    // Comercial: la cotización ligada, con su propuesta en PDF (29-10).
+                    if let cotizacion = cotizacionLigada {
+                        ActivityCotizacionCard(cotizacion: cotizacion)
                     }
                     // Comercial: la propuesta en Excel, la minuta en Word, el PDF del cliente.
                     if CoreEvidence.isComercial(coreKind) {
@@ -689,6 +732,10 @@ struct ActivityCoreDetailView: View {
             // La que se eligió al asignar y, si la IA sugirió otra, cuál (como la web).
             if let comp = CoreComplejidad.detalle(complejidad: text("complejidad"), sugerida: text("complejidadSugerida")) {
                 ActivityDetailRow(label: "Complejidad", value: comp.valor, nota: comp.nota)
+            }
+            // Tiempo estándar (29-10): el total y, abajo, su desglose, el destino y si se cambió.
+            if let estandar = ActividadTiempoRules.resumenEstandar(raw) {
+                ActivityDetailRow(label: "Tiempo estándar", value: estandar.valor, nota: estandar.detalle)
             }
             if !ticketType.isEmpty {
                 ActivityDetailRow(label: "Tipo de servicio", value: ActivityDetailRules.humanize(ticketType))
@@ -980,6 +1027,21 @@ struct ActivityCoreDetailView: View {
     }
 
     // MARK: Carga
+
+    /// «Costo directo» (web `CostoActividad.tsx`): viáticos de `GET viatics` imputados a esta
+    /// actividad y material de `GET activities/:id/materiales`. Si una consulta falla cuenta como
+    /// vacía (la web usa `allSettled`); sin nada que sumar, la tarjeta no se pinta.
+    @MainActor
+    private func cargarCosto() async {
+        guard puedeVerCosto else {
+            costo = nil
+            return
+        }
+        let viaticos: [Viatico]? = try? await ViaticosRepository.shared.lista()
+        let materiales: ActivityMateriales? = try? await ActivityCostoRepository.shared.materiales(activityId: activityId)
+        if Task.isCancelled { return }
+        costo = ActividadCostoRules.costo(viaticos: viaticos, activityId: activityId, materiales: materiales)
+    }
 
     @MainActor
     private func load() async {

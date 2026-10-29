@@ -53,13 +53,21 @@ struct InicioView: View {
                     unread: badge.unreadCount,
                     onOpenNotifications: onOpenNotifications
                 )
-                if muestraJornada {
+                // Festivo (mockup aprobado el 29-10): si descansa, la banda sustituye a la jornada (ese
+                // día no se checa); si le toca, la tarjeta del horario lleva el botón de entrada.
+                let festivo = FestivoRules.estado(store.festivos, hoyMexico: AttendanceClock.today())
+                if festivo == .descansa, let festivos = store.festivos {
+                    FestivoDescansaContenido(festivos: festivos)
+                } else if muestraJornada {
                     InicioJornadaCard(
                         vm: attendance,
+                        festivo: festivo == .labora ? store.festivos?.festivoHoy : nil,
                         onMark: { marcar($0) },
                         onComida: onOpenComidas,
                         onVerJornada: onOpenAsistencia
                     )
+                } else if festivo == .labora, let hoy = store.festivos?.festivoHoy {
+                    FestivoLaboraTarjeta(festivo: hoy, onEntrada: nil)
                 }
                 if let aviso = InicioRules.aviso(store.open, miId: myId) {
                     InicioAvisoCard(aviso: aviso) {
@@ -87,6 +95,8 @@ struct InicioView: View {
             if phase == .active { Task { await reload() } }
         }
         .refreshOnModels(["Activity", "ActivityEvidence", "ServiceSheet"]) {
+            // Los festivos cambian poco: un aviso en vivo los vuelve a pedir a lo más cada 10 min.
+            await store.cargarFestivos(enVivo: true)
             if esDireccion {
                 // El tablero de dirección son cinco consultas: los avisos en vivo lo espacian 30 s.
                 await store.cargarCeo(enVivo: true)
@@ -217,6 +227,9 @@ struct InicioView: View {
 
     @MainActor
     private func reload() async {
+        // Los festivos van aparte, a la par de lo demás: si la API aún no los tiene, no retrasan nada.
+        let tienda = store
+        let festivos = Task { await tienda.cargarFestivos() }
         await store.load(enabled: tieneActividades && !esDireccion)
         if esDireccion {
             await store.cargarCeo()
@@ -225,6 +238,7 @@ struct InicioView: View {
             await attendance.loadMine()
             await ShiftGpsTracker.shared.resumeIfNeeded()
         }
+        await festivos.value
     }
 
     /// Un renglón de «Requiere tu atención» de dirección: aprobaciones y pagos abren su pantalla
@@ -372,15 +386,40 @@ private struct InicioSectionTitle: View {
 private struct InicioJornadaCard: View {
     @ObservedObject var vm: AttendanceVM
     @ObservedObject private var tracker = ShiftGpsTracker.shared
+    /// Festivo que le toca laborar (Android `JornadaHero(festivo=…)`): su horario arriba y, sin
+    /// entrada, su botón «Checar entrada» sustituye a esta tarjeta hasta que la hay.
+    var festivo: Festivo? = nil
     let onMark: (String) -> Void
     let onComida: () -> Void
     let onVerJornada: () -> Void
 
+    /// El API contesta 400 a la segunda entrada del día: aquí se apaga antes.
+    private var puedeEntrar: Bool { !vm.hasEntryToday && !vm.isOpen }
+    private var jornada: InicioRules.Jornada {
+        InicioRules.jornada(abierta: vm.isOpen, hayEntrada: vm.hasEntryToday, haySalida: vm.hasExitToday)
+    }
+
+    /// «Checar entrada» del festivo: la misma checada que el botón «Entrada» de abajo (aviso de
+    /// ubicación, foto y GPS). nil = ya hay entrada o jornada abierta: sin botón.
+    private var entradaFestivo: (() -> Void)? {
+        guard puedeEntrar else { return nil }
+        return { onMark("entrada") }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // La cifra se refresca cada 30 s mientras la jornada está abierta.
-            TimelineView(.periodic(from: .now, by: 30)) { context in
-                tarjeta(now: context.date)
+            if let festivo {
+                FestivoLaboraTarjeta(
+                    festivo: festivo,
+                    onEntrada: entradaFestivo,
+                    loading: vm.checkInLoading
+                )
+            }
+            if festivo == nil || jornada != .sinEntrada {
+                // La cifra se refresca cada 30 s mientras la jornada está abierta.
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    tarjeta(now: context.date)
+                }
             }
             if let notice = vm.checkInNotice, !notice.isEmpty {
                 let esError = vm.checkInNoticeIsError

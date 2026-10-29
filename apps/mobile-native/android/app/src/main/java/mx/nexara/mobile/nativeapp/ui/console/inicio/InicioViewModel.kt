@@ -16,6 +16,7 @@ import mx.nexara.mobile.nativeapp.access.CoreKeys
 import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.AprobacionPendienteDto
+import mx.nexara.mobile.nativeapp.data.api.FestivosMioDto
 import mx.nexara.mobile.nativeapp.data.api.KpisEquipoDto
 import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
 import mx.nexara.mobile.nativeapp.data.api.PagoEmpleadoDto
@@ -47,6 +48,8 @@ data class InicioUiState(
     val accionError: String? = null,
     /** Dirección general: su tablero (`InicioCeoRules`); null mientras carga la primera vez. */
     val ceo: CeoInicio? = null,
+    /** `GET festivos/mio` (`FestivoRules`); null si falló o la API aún no lo tiene. */
+    val festivos: FestivosMioDto? = null,
 ) {
     val actual: MyActivityItemDto? get() = InicioRules.actividadActual(open)
     val siguientes: List<MyActivityItemDto> get() = InicioRules.siguientes(open, actual)
@@ -96,6 +99,7 @@ class InicioViewModel(app: Application) : AndroidViewModel(app) {
 
     /** [enVivo]: lo pidió un aviso en vivo (no la persona); el tablero de dirección lo espacia. */
     fun load(initial: Boolean = true, enVivo: Boolean = false) {
+        cargarFestivos(enVivo)
         if (_state.value.esDireccion) {
             cargarCeo(initial, enVivo)
             return
@@ -133,6 +137,20 @@ class InicioViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
             }
+        }
+    }
+
+    /** Los festivos cambian poco: un aviso en vivo no los vuelve a pedir antes de 10 min. */
+    private var festivosCargadoMs = 0L
+
+    private fun cargarFestivos(enVivo: Boolean) {
+        val ahora = System.currentTimeMillis()
+        if (enVivo && ahora - festivosCargadoMs < 10 * 60_000) return
+        festivosCargadoMs = ahora
+        viewModelScope.launch {
+            val f = withContext(Dispatchers.IO) { runCatching { repo.festivosMio() }.getOrNull() }
+            // Si falla se queda lo último; la pantalla lo ignora si ya no es de hoy.
+            if (f != null) _state.update { it.copy(festivos = f) }
         }
     }
 

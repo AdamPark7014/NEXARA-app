@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import java.time.Instant
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.ui.console.activities.EquipoEstado
+import mx.nexara.mobile.nativeapp.ui.console.more.KpisEquipoRules
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTheme
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxFlotante
 import mx.nexara.mobile.nativeapp.ui.theme.InterTight
@@ -88,7 +90,7 @@ internal fun InicioCeoContenido(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Anillo(d.cumplimientoPct)
+                    Anillo(d.indicePct, InicioCeoRules.descripcionAnillo(d), d.tono)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Desempeño · 7 días", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = c.fg)
                         d.renglones.forEach { Text(it, fontSize = 13.sp, color = c.fg2) }
@@ -215,19 +217,34 @@ private fun Cifra(n: Int, etiqueta: String, modifier: Modifier, color: Color = C
     }
 }
 
+/**
+ * El índice v2 del equipo (0–100, sin «%», como la web); «—» sin nada que medir. El avance
+ * va en el color de su semáforo (`semaforoIndice` del API; sin él, el corte 90/75).
+ */
 @Composable
-private fun Anillo(pct: Int?) {
+private fun Anillo(pct: Int?, descripcion: String, tono: KpisEquipoRules.Semaforo) {
     val c = NxTheme.colors
-    Box(Modifier.size(76.dp), contentAlignment = Alignment.Center) {
+    val avance = when (tono) {
+        KpisEquipoRules.Semaforo.VERDE -> c.success
+        KpisEquipoRules.Semaforo.AMARILLO -> c.warning
+        KpisEquipoRules.Semaforo.ROJO -> c.danger
+        KpisEquipoRules.Semaforo.SIN_DATOS -> c.fg4
+    }
+    Box(
+        Modifier
+            .size(76.dp)
+            .clearAndSetSemantics { contentDescription = descripcion },
+        contentAlignment = Alignment.Center,
+    ) {
         Canvas(Modifier.size(76.dp)) {
             val grosor = 8.dp.toPx()
             val st = Stroke(width = grosor, cap = StrokeCap.Round)
             drawArc(Color(0xFFEEF0F4), 0f, 360f, false, topLeft = Offset(grosor / 2, grosor / 2), size = androidx.compose.ui.geometry.Size(size.width - grosor, size.height - grosor), style = st)
             if (pct != null && pct > 0) {
-                drawArc(c.brand, -90f, 360f * pct / 100f, false, topLeft = Offset(grosor / 2, grosor / 2), size = androidx.compose.ui.geometry.Size(size.width - grosor, size.height - grosor), style = st)
+                drawArc(avance, -90f, 360f * pct / 100f, false, topLeft = Offset(grosor / 2, grosor / 2), size = androidx.compose.ui.geometry.Size(size.width - grosor, size.height - grosor), style = st)
             }
         }
-        Text(pct?.let { "$it %" } ?: "—", fontFamily = InterTight, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = c.fg)
+        Text(pct?.toString() ?: "—", fontFamily = InterTight, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = c.fg)
     }
 }
 

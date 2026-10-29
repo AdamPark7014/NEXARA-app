@@ -7,6 +7,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityAccionesDto
+import mx.nexara.mobile.nativeapp.data.api.ActivityMaterialesDto
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.AttendanceJustificacionDto
 import mx.nexara.mobile.nativeapp.data.api.CancelActivityRequest
@@ -50,8 +51,11 @@ class ConsoleRepository(context: Context) {
         }
     }
 
-    suspend fun activityMaterials(activityId: Long): List<Map<String, Any?>> =
-        parseJsonArray(api.getActivityMaterials(activityId).string())
+    /**
+     * Material del almacén que consumió la actividad y su costo. El API responde
+     * `{ movimientos, costoTotal }`: leerlo como arreglo daba siempre vacío.
+     */
+    suspend fun activityMaterials(activityId: Long): ActivityMaterialesDto = api.getActivityMaterials(activityId)
 
     suspend fun activityTeam(activityId: Long): List<Map<String, Any?>> =
         parseJsonArray(api.getActivityTeam(activityId).string())

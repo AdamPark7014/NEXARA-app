@@ -63,6 +63,12 @@ data class KpiPersonaFilaDto(
     val totales: KpiTotalesDto? = null,
     val semaforo: String? = null,
     val motivos: List<String>? = null,
+    /**
+     * Confianza del índice si el API ya la manda por persona: `alta` · `media` · `baja`, o un
+     * objeto con `nivel` (o `valor`/`clave`). Mientras no venga, la app la calcula como la web
+     * (`KpisEquipoRules.confianza`). `Any?` para aceptar las dos formas sin tumbar la respuesta.
+     */
+    val confianza: Any? = null,
 )
 
 data class KpiPersonaDto(
@@ -116,15 +122,91 @@ data class KpiTotalesDto(
     // ── «En tiempo y forma» (07-10). La API vieja no manda nada de esto: todo `null`.
     /** Entregas de actividades del rango. La API nueva lo manda SIEMPRE, aunque sea en ceros. */
     val entregas: KpiEntregasDto? = null,
-    /** Días laborables en que checó a tiempo, de los que debía checar. */
+    /** Días laborables en que checó a tiempo, de los que debía checar (binario: con o sin retardo). */
     val asistenciaPuntual: KpiAsistenciaPuntualDto? = null,
-    /** Cumplimiento 0–100; `null` = en el rango no tuvo ninguna entrega que medir. */
+    /**
+     * Índice de desempeño v2, 0–100 (29-10): 30 Confiabilidad + 25 Calidad + 30 Rendimiento +
+     * 15 Disciplina. El nombre del campo es el de siempre. `null` = nada que medir en el rango.
+     */
     val cumplimientoPct: Double? = null,
     /**
-     * De qué está hecho el cumplimiento. Se pinta la lista que llegue, sin suponer
-     * cuántas partes son ni cuánto pesa cada una: el API puede sumar más.
+     * De qué está hecho el índice. Las de peso > 0 se agrupan en los cuatro pilares
+     * (`KpisEquipoRules.pilares`); las de peso 0 (tiempo, ritmo, ocupación, carga, días) son
+     * solo diagnóstico: se leen, no cuentan.
      */
     val cumplimientoPartes: List<KpiParteCumplimientoDto>? = null,
+    // ── Índice v2 (29-10). Un API anterior no los manda: `null`.
+    /** Puntualidad graduada y registro completo (pilar Disciplina). */
+    val disciplina: KpiDisciplinaDto? = null,
+    /** Calificación de sus revisiones, calibrada por revisor (0–100). */
+    val calificacion: KpiCalificacionDto? = null,
+    /** `campo` u `oficina`: decide la meta de Rendimiento. */
+    val familia: String? = null,
+    /** Meta de Rendimiento ya ponderada (0.6 = 60 %). */
+    val metaRendimiento: Double? = null,
+    /** Solo coordinadores: su equipo y sus revisiones. */
+    val equipo: KpiEquipoCoordinadoDto? = null,
+    /**
+     * Confianza del índice (`alta` · `media` · `baja`, por entregas medidas: ≥ 20, 10–19, < 10).
+     * El API la manda como texto desde f2dc7130; `Any?` para aceptar también un objeto.
+     */
+    val confianza: Any? = null,
+    /**
+     * Semáforo del índice (`cumplimientoPct`) ya calculado por el API con sus cortes únicos
+     * (≥ 90 verde, ≥ 75 amarillo): `verde` · `amarillo` · `rojo` · `sin_datos`.
+     */
+    val semaforoIndice: Any? = null,
+    /** Los cuatro pilares ya agrupados por el API con los pesos v2, con su semáforo. */
+    val pilares: List<KpiPilarDto>? = null,
+)
+
+/** Un pilar del índice v2 como lo manda el API: `{ id, label, pct, semaforo }`. */
+data class KpiPilarDto(
+    /** `confiabilidad` · `calidad` · `rendimiento` · `disciplina`. */
+    val id: String? = null,
+    val label: String? = null,
+    /** 0–100; `null` = sin dato en el rango (no pesa). */
+    val pct: Double? = null,
+    /** `verde` · `amarillo` · `rojo` · `sin_datos` (`Any?`: también un objeto). */
+    val semaforo: Any? = null,
+)
+
+/**
+ * Disciplina v2: por día que debía checar, hasta 15 min tarde 1 punto · 16–30 0.6 · 31–60 0.3 ·
+ * más o sin checar 0; cada 3 retardos, una falta en el índice; × registro completo.
+ */
+data class KpiDisciplinaDto(
+    val esperados: Int? = null,
+    /** Con decimales («4.6»): por eso `Double`. */
+    val puntos: Double? = null,
+    /** Días que llegó más de 15 min tarde. */
+    val retardos: Int? = null,
+    val faltasPorRetardos: Int? = null,
+    /** Jornadas terminadas y, de ellas, con salida propia y comida registrada. */
+    val jornadasRevisables: Int? = null,
+    val registroCompleto: Int? = null,
+    val pct: Double? = null,
+)
+
+data class KpiCalificacionDto(
+    val n: Int? = null,
+    val pct: Double? = null,
+)
+
+/** Coordinación: lo de su equipo (él incluido) y sus revisiones. */
+data class KpiEquipoCoordinadoDto(
+    val personas: Int? = null,
+    val aTiempo: Int? = null,
+    val medidas: Int? = null,
+    val minutosEstandarGanados: Int? = null,
+    val minutosLaborados: Int? = null,
+    val revisiones: KpiRevisionesDto? = null,
+)
+
+/** Revisiones que hizo en el rango y cuántas dentro de 24 h hábiles del envío. */
+data class KpiRevisionesDto(
+    val total: Int? = null,
+    val enPlazo: Int? = null,
 )
 
 /** Las entregas del rango: el «tiempo y forma». */
@@ -144,6 +226,14 @@ data class KpiEntregasDto(
     val pctATiempo: Double? = null,
     /** 0–100; `null` sin revisadas. */
     val pctALaPrimera: Double? = null,
+    // ── Horas estándar ganadas (pilar Rendimiento, 29-10).
+    /** Entregadas que traían tiempo estándar. */
+    val conEstandar: Int? = null,
+    /** Suma de sus estándares (lo autoasignado sin validar, la mitad). */
+    val minutosEstandarGanados: Int? = null,
+    val minutosRealesConEstandar: Int? = null,
+    /** Estándar ÷ real con tope de 100; `null` sin dato. */
+    val pctEficienciaEstandar: Double? = null,
 )
 
 data class KpiAsistenciaPuntualDto(
@@ -152,16 +242,26 @@ data class KpiAsistenciaPuntualDto(
     val pct: Double? = null,
 )
 
-/** Una parte del cumplimiento: «Entregas a tiempo · 17 de 18 · 94 % · pesa 40 %». */
+/** Una parte del índice: «Entregas a tiempo · 17 de 18 · 94 % · pesa 30». */
 data class KpiParteCumplimientoDto(
-    /** `entregas`, `forma`, `asistencia`, `uniforme`… y las que el API sume después. */
+    /**
+     * Con peso: `entregas` (Confiabilidad), `forma` (Calidad), `estandar` (Rendimiento),
+     * `asistencia` y `uniforme` (Disciplina). Con peso 0, diagnóstico: `tiempo`, `ritmo`,
+     * `ocupacion`, `carga`, `dias`.
+     */
     val clave: String? = null,
     val etiqueta: String? = null,
     /** 0–100. */
     val pct: Double? = null,
+    /** Lo que pesa en el índice (suman 100); 0 = diagnóstico, no cuenta. */
     val peso: Double? = null,
     /** «17 de 18», «7 de 8 días». */
     val detalle: String? = null,
+    /**
+     * Semáforo de la parte si el API ya lo manda: `verde` · `amarillo` · `rojo` · `sin_datos`, o
+     * un objeto con `semaforo`/`nivel`/`color`. Mientras no venga, se usan los cortes del API.
+     */
+    val semaforo: Any? = null,
 )
 
 // ── Proyectos ────────────────────────────────────────────────────────────────

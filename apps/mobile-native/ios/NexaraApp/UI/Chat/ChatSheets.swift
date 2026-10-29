@@ -381,45 +381,45 @@ struct ChatEntityPickerSheet: View {
 
     @State private var query = ""
 
-    private struct Kind {
-        let value: String
-        let label: String
-        let icon: String
+    /// Pestaña activa (las nueve de la web, en su mismo orden).
+    private var pestana: ChatPestanaLigar {
+        ChatLigas.pestanas.first { $0.kind == kind } ?? ChatLigas.pestanas[0]
     }
 
-    private static let kinds = [
-        Kind(value: "ACTIVITY", label: "Actividades", icon: "doc.text"),
-        Kind(value: "EVIDENCE", label: "Evidencias", icon: "photo"),
-    ]
-
     var body: some View {
-        ChatDialog(title: "Mencionar en el mensaje", dismissLabel: "Cerrar", onDismiss: onDismiss) {
-            HStack(spacing: 8) {
-                ForEach(Self.kinds, id: \.value) { item in
-                    Button {
-                        query = ""
-                        onKindChange(item.value)
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: item.icon)
-                                .font(.system(size: 15))
-                            Text(item.label)
-                                .font(NxType.labelLarge.weight(kind == item.value ? .bold : .regular))
+        ChatDialog(title: "Ligar en el mensaje", dismissLabel: "Cerrar", onDismiss: onDismiss) {
+            // Cada búsqueda la filtra el API con los permisos de quien busca (sin permiso, vacía).
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(ChatLigas.pestanas, id: \.kind) { item in
+                        let selected = kind == item.kind
+                        Button {
+                            guard !selected else { return }
+                            query = ""
+                            onKindChange(item.kind)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: item.systemImage)
+                                    .font(.system(size: 13))
+                                Text(item.etiqueta)
+                                    .font(NxType.labelLarge.weight(selected ? .bold : .regular))
+                            }
+                            .foregroundStyle(selected ? NxColors.brandText : NxColors.fg2)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 36)
+                            .background(selected ? NxColors.brandSoft : NxColors.sunken, in: Capsule())
+                            .overlay(Capsule().strokeBorder(selected ? NxColors.brand.opacity(0.5) : NxColors.border, lineWidth: 1))
+                            .contentShape(Capsule())
                         }
-                        .foregroundStyle(kind == item.value ? NxColors.fg2 : NxColors.brand)
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 40)
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(selected ? AccessibilityTraits.isSelected : [])
                     }
-                    .buttonStyle(.plain)
-                    .disabled(kind == item.value)
-                    .accessibilityAddTraits(kind == item.value ? AccessibilityTraits.isSelected : [])
                 }
             }
             ChatOutlinedField(
                 label: "Buscar",
                 text: $query,
-                placeholder: kind == "ACTIVITY" ? "AN, título o estado…" : "Evidencia, actividad o comentario…",
+                placeholder: pestana.buscar,
                 submitLabel: .search
             )
             .onChange(of: query) { _, value in onSearch(value) }
@@ -449,7 +449,7 @@ struct ChatEntityPickerSheet: View {
             onPick(mention)
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: mention.kind == "ACTIVITY" ? "doc.text" : "photo")
+                Image(systemName: ChatLigas.tipoDeKind(mention.kind.isEmpty ? kind : mention.kind)?.systemImage ?? "person")
                     .foregroundStyle(NxColors.muted)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {

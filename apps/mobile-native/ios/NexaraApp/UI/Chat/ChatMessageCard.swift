@@ -71,6 +71,9 @@ struct ChatMessageCard: View {
                     .tint(accent)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                // Tarjeta de cada liga bajo el texto, como la web (hasta tres por mensaje).
+                ChatLigaCards(body: msg.body)
+                    .padding(.top, 2)
             }
             attachment
             if !msg.reactions.isEmpty {
@@ -287,23 +290,29 @@ struct ChatMessageCard: View {
     // MARK: Pie
 
     private var meta: some View {
-        HStack(spacing: 8) {
-            Text(ChatTime.messageTime(msg.createdAt))
-                .font(NxType.labelSmall)
-                .foregroundStyle(metaText)
-            if msg.isEdited {
-                Text("(editado)")
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                Text(ChatTime.messageTime(msg.createdAt))
                     .font(NxType.labelSmall)
-                    .italic()
                     .foregroundStyle(metaText)
+                if msg.isEdited {
+                    Text("(editado)")
+                        .font(NxType.labelSmall)
+                        .italic()
+                        .foregroundStyle(metaText)
+                }
             }
             if showThreadHint && canThread && msg.replyCount > 0 {
                 Button {
                     actions.onOpenThread(msg)
                 } label: {
-                    Text("\(msg.replyCount) \(msg.replyCount == 1 ? "respuesta" : "respuestas") · Ver hilo")
-                        .font(NxType.labelSmall)
-                        .foregroundStyle(accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(msg.replyCount) \(msg.replyCount == 1 ? "respuesta" : "respuestas")")
+                        Text("Ver hilo")
+                    }
+                    .font(NxType.labelSmall)
+                    .foregroundStyle(accent)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 .buttonStyle(.plain)
             }

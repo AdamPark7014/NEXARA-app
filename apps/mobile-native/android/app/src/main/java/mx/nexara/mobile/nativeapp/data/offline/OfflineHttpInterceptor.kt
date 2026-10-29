@@ -148,6 +148,10 @@ class OfflineHttpInterceptor(
             "/trayectos",
             // Vista previa del tiempo de una autoasignación: solo sirve mientras se llena el alta.
             "/tiempo-calculado",
+            // Chat: el asistente de #general y las tarjetas de las ligas son consultas del momento.
+            // Encoladas, la respuesta llegaría a nadie (y la pregunta gastaría IA horas después).
+            "/chat/asistente",
+            "/chat/ligas",
         )
 
         /**

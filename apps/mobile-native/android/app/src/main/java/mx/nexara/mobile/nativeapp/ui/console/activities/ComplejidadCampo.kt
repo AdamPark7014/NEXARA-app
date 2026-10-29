@@ -58,8 +58,13 @@ internal fun ComplejidadCampo(
     kind: String,
     form: CoreActivityKinds.FormState,
     onForm: ((CoreActivityKinds.FormState) -> CoreActivityKinds.FormState) -> Unit,
+    /** Lo que la IA leyó del título (cantidad y destino) para el tiempo estándar. */
+    onSugerencia: (SugerenciaComplejidadDto?) -> Unit = {},
+    /** El tiempo estándar ya fija el tiempo: lo típico queda solo como referencia, sin «Usar…». */
+    estandarActivo: Boolean = false,
 ) {
     val tipo = Complejidad.tipoParaComplejidad(kind, form)
+    val alSugerir by rememberUpdatedState(onSugerencia)
     var tiempos by remember { mutableStateOf<TiemposTipicosDto?>(null) }
     var sugerencia by remember { mutableStateOf<SugerenciaComplejidadDto?>(null) }
     var pensando by remember { mutableStateOf(false) }
@@ -102,6 +107,7 @@ internal fun ComplejidadCampo(
         }
         ultimaPregunta = pregunta
         sugerencia = sug
+        alSugerir(sug)
         val nivel = sug?.complejidad ?: return@LaunchedEffect
         alCambiar { Complejidad.aplicarSugerencia(it, nivel, elegidaAMano) }
     }
@@ -167,7 +173,9 @@ internal fun ComplejidadCampo(
                     color = NxColors.Muted,
                 )
                 val usar = minOf(Complejidad.TOPE_MIN, tipico.minutos)
-                if (usar != estimadoActual) {
+                if (estandarActivo) {
+                    Text("Referencia: el tiempo lo da el estándar.", fontSize = 12.sp, color = NxColors.Muted)
+                } else if (usar != estimadoActual) {
                     TextButton(onClick = { onForm { it.copy(tiempoEstimadoMin = usar.toString()) } }) {
                         Text(
                             "Usar ${Complejidad.formatoMinutos(usar)} como tiempo estimado",

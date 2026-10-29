@@ -76,6 +76,40 @@ final class ParityScreenshotsUITests: XCTestCase {
         deslizarYCapturar("inicio-direccion-abajo")
     }
 
+    /// Festivo de ley que no le toca (mockup de festivos, tablero «App · quien descansa»):
+    /// `NEXARA_DEMO_FESTIVO=descansa`. Captura 93.
+    func testFestivoDescansa() throws {
+        capturarFestivo("descansa", titulo: "Hoy descansas", numeroPrevio: 92)
+    }
+
+    /// Festivo trabajado con horario propio (tablero «App · a quien le toca laborar»):
+    /// `NEXARA_DEMO_FESTIVO=labora`, sin entrada todavía (el botón «Checar entrada»). Captura 94.
+    func testFestivoLabora() throws {
+        capturarFestivo("labora", titulo: "Hoy te toca de 10:00 a 14:00", numeroPrevio: 93)
+    }
+
+    /// Relanza el demo con el festivo pedido, espera su título en «Mi día» y captura
+    /// `NN-festivo-<modo>`. Si el título no aparece, adjunta el árbol y captura igual.
+    private func capturarFestivo(_ modo: String, titulo: String, numeroPrevio: Int) {
+        app.terminate()
+        app.launchEnvironment["NEXARA_DEMO_FESTIVO"] = modo
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "La app no llegó a primer plano")
+        despejarAlertas()
+        guard buscar(pestana("tab-inicio", "Inicio"), timeout: 30) != nil else {
+            adjuntarJerarquia("dbg-festivo-\(modo)-sin-shell")
+            XCTFail("No aparece la barra de pestañas en el demo del festivo (\(modo))")
+            return
+        }
+        let encabezado = app.staticTexts.matching(NSPredicate(format: "label == %@", titulo)).firstMatch
+        if buscar([encabezado], timeout: 15) == nil {
+            adjuntarJerarquia("dbg-festivo-\(modo)-sin-titulo")
+        }
+        Thread.sleep(forTimeInterval: 1)
+        numero = numeroPrevio
+        capturar("festivo-\(modo)")
+    }
+
     func testRecorridoDeParidad() throws {
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "La app no llegó a primer plano")
         despejarAlertas()

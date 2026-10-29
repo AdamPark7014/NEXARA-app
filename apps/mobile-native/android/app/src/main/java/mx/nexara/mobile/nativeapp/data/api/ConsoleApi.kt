@@ -89,6 +89,50 @@ data class ActivityDto(
     /** BASICA | ESTANDAR | COMPLEJA | CRITICA al asignar, y la que sugirió la IA. */
     val complejidad: String? = null,
     val complejidadSugerida: String? = null,
+    // ── Tiempo estándar (29-10): lo guardado al asignar. Opcionales (la API vieja no los manda).
+    val tiempoEstandarMin: Double? = null,
+    /** Base, unidades, ida, vuelta…; las líneas «Supuesto: …» llegan con 0 minutos. */
+    val estandarDesglose: List<DesgloseTiempoDto>? = null,
+    val unidades: UnidadesDto? = null,
+    val destino: ActivityDestinoDto? = null,
+    val trasladoMin: Double? = null,
+    /** AUTO | TRANSPORTE */
+    val trasladoModo: String? = null,
+    /** Quien asignó puso otro tiempo: por qué. */
+    val estandarCambiadoMotivo: String? = null,
+    /** Actividad comercial: su cotización ligada. */
+    val cotizacion: ActivityCotizacionDto? = null,
+)
+
+/** A dónde va la actividad (tiempo estándar con traslado). */
+data class ActivityDestinoDto(
+    val direccion: String? = null,
+    val lat: Double? = null,
+    val lng: Double? = null,
+)
+
+/** Cotización ligada a una actividad comercial (`GET activities/:id`). `total` llega como Decimal. */
+data class ActivityCotizacionDto(
+    val id: Long? = null,
+    val quoteNumber: String? = null,
+    /** DRAFT | SENT | APPROVED | REJECTED | EXPIRED */
+    val status: String? = null,
+    val total: String? = null,
+    val segmento: String? = null,
+)
+
+/** `GET activities/:id/materiales`: el material del almacén que consumió la actividad. */
+data class ActivityMaterialesDto(
+    val movimientos: List<ActivityMaterialMovDto>? = null,
+    val costoTotal: Double? = null,
+)
+
+data class ActivityMaterialMovDto(
+    val id: Long? = null,
+    val quantity: String? = null,
+    val movementType: String? = null,
+    val totalCost: String? = null,
+    val createdAt: String? = null,
 )
 
 /** `{ id, nombre }` con nombre opcional: una persona borrada no debe tumbar el detalle. */
@@ -193,6 +237,9 @@ data class ActivityAssigneeRefDto(
     val pausadaPor: MyActivityRefDto? = null,
     val motivoPausa: String? = null,
     val sesionAbiertaDesde: String? = null,
+    /** Plan y real de esta persona (la tarjeta «Tiempo» usa los de quien consulta). */
+    val minutosPlan: Double? = null,
+    val minutosReales: Double? = null,
 )
 
 data class ActivityAssigneeUserDto(
@@ -609,8 +656,9 @@ interface ConsoleApi {
     @GET("activities/{id}/timeline")
     suspend fun getActivityTimeline(@retrofit2.http.Path("id") id: Long): okhttp3.ResponseBody
 
+    /** Objeto `{ movimientos, costoTotal }`, no arreglo. */
     @GET("activities/{id}/materiales")
-    suspend fun getActivityMaterials(@retrofit2.http.Path("id") id: Long): okhttp3.ResponseBody
+    suspend fun getActivityMaterials(@retrofit2.http.Path("id") id: Long): ActivityMaterialesDto
 
     @GET("activities/{id}/team")
     suspend fun getActivityTeam(@retrofit2.http.Path("id") id: Long): okhttp3.ResponseBody

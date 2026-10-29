@@ -150,6 +150,13 @@ extension DemoStore {
                 if method == "POST", parts[2] == "sugerir" { return reply(fxSugerirComplejidad(json)) }
             }
             return empty()
+        case "festivos":
+            // `festivos/mio` (`DemoFixtures+Festivos`): `null` salvo con `NEXARA_DEMO_FESTIVO`.
+            if isGet, parts.count >= 2, parts[1] == "mio" {
+                if let festivos = fxFestivosMio() { return reply(festivos) }
+                return DemoReply(status: 200, data: Data("null".utf8))
+            }
+            return empty()
         case "cotizaciones", "employee-payments", "expenses", "workflow":
             // Cotizaciones, Pagos a empleados, Gastos y Aprobaciones (`DemoFixtures+Finanzas`).
             return routeFinanzas(method: method, parts: parts, json: json, body: body) ?? empty()

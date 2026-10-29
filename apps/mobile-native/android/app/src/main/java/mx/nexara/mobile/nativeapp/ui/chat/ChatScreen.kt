@@ -125,11 +125,17 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import mx.nexara.mobile.nativeapp.access.DeepLinkParser
+import mx.nexara.mobile.nativeapp.data.api.ChatPropuestaAsistenteDto
+import mx.nexara.mobile.nativeapp.data.api.ChatTarjetaLigaDto
 import mx.nexara.mobile.nativeapp.data.SessionStore
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
@@ -181,6 +187,15 @@ private val chatDayFmt: DateTimeFormatter =
 private val chatChannelTimeFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM HH:mm")
 private val chatEntityLinkRegex = Regex("""\[([^\]\n]+)\]\(([^)]+)\)""")
 
+/** Espera para juntar en una sola petición las tarjetas que piden la carga, el sondeo y el socket. */
+private const val LIGAS_LOTE_MS = 60L
+
+/** Una ref que falló se vuelve a pedir pasado este tiempo (no en cada sondeo de 3 s). */
+private const val LIGAS_REINTENTO_MS = 30_000L
+
+/** Lo que se espera al asistente: el API corta la IA a los ~16 s (la web espera 25 s). */
+private const val ASISTENTE_ESPERA_MS = 25_000L
+
 private enum class EntityMentionTarget { Main, Thread }
 
 private fun appendChatMentionToken(current: String, token: String): String {
@@ -188,15 +203,23 @@ private fun appendChatMentionToken(current: String, token: String): String {
     return "$current$spacer$token "
 }
 
-private fun formatEntityMentionToken(entity: ChatMentionDto): String {
-    val cleanLabel = entity.label.replace(Regex("""[\[\]\(\)]"""), "").trim()
+/**
+ * Token que deja el selector «Ligar»: `[@Nombre](user:3)` para una persona (el API avisa a quien se
+ * menciona) y `[etiqueta](/erp/…)` para todo lo demás, con la ruta que trae `chat/mentions`.
+ */
+internal fun formatEntityMentionToken(entity: ChatMentionDto): String {
+    val cleanLabel = entity.label.replace(Regex("""[\[\]\(\)]"""), "").replace(Regex("""\s+"""), " ").trim()
+    if (entity.kind.uppercase() == "USER") {
+        val nombre = cleanLabel.removePrefix("@").ifBlank { "alguien" }
+        return "[@$nombre](user:${entity.id})"
+    }
     val href = entity.href?.takeIf { it.isNotBlank() }
         ?: when (entity.kind.uppercase()) {
             "ACTIVITY" -> "/ops/activities/${entity.id}"
             "EVIDENCE" -> "/ops/activities/${entity.id}/evidences"
             else -> "/"
         }
-    return "[$cleanLabel]($href)"
+    return "[${cleanLabel.ifBlank { "enlace" }}]($href)"
 }
 
 private fun buildChatMessageAnnotatedString(
@@ -241,14 +264,24 @@ private fun buildChatMessageAnnotatedString(
     }
 }
 
-private fun openChatEntityLink(href: String) {
-    val dest = when {
-        href.startsWith("user:") -> null
-        href.startsWith("nexara://") -> DeepLinkParser.parse(Uri.parse(href))
-        href.startsWith("http://") || href.startsWith("https://") -> null
-        else -> DeepLinkParser.parseWebPath(href)
+/**
+ * Abre una liga del chat (texto o tarjeta). Cada una va a lo más cercano que tenga la app
+ * ([ChatLigas.destino]): su ficha, su sección o, si la app no tiene esa pantalla (facturas, la
+ * asistencia de otra persona), la misma ruta en la web del panel. Personas y URL externas no hacen
+ * nada, como antes.
+ */
+private fun openChatEntityLink(context: Context, href: String, currentUserId: Long) {
+    val clean = href.trim()
+    when {
+        clean.isEmpty() || clean.startsWith("user:") -> return
+        clean.startsWith("http://") || clean.startsWith("https://") -> return
+        clean.startsWith("nexara://") -> DeepLinkParser.parse(Uri.parse(clean))?.let(PendingDeepLink::publish)
+        else -> when (val destino = ChatLigas.destino(clean, currentUserId)) {
+            is DestinoLiga.EnApp -> PendingDeepLink.publish(destino.destino)
+            is DestinoLiga.EnWeb -> openExternalUrl(context, destino.url)
+            null -> Unit
+        }
     }
-    if (dest != null) PendingDeepLink.publish(dest)
 }
 
 private sealed class ChatListItem {
@@ -412,9 +445,34 @@ data class ChatUiState(
      * él una vez cargado. Se limpia al cambiar de canal.
      */
     val jumpTargetId: Long? = null,
+    // ── Ligas y asistente (paridad web, 29-10-2026) ─────────────────────────
+    /** Tarjetas de las ligas ya pedidas (`POST chat/ligas`), por ref; se piden en lote. */
+    val ligaTarjetas: Map<String, ChatTarjetaLigaDto> = emptyMap(),
+    /** Conversación con el asistente de #general: solo en este teléfono, nunca en el canal. */
+    val asistenteTurnos: List<TurnoAsistente> = emptyList(),
+    /** Propuestas de «asígnale a…» creadas, descartadas o en curso (clave [clavePropuesta]). */
+    val asistentePropuestas: Map<String, CreacionPropuesta> = emptyMap(),
+    /** Texto que vuelve al redactor porque el asistente no pudo contestar. */
+    val draftRestore: String? = null,
 ) {
     /** Silenciado según la ficha; si aún no llegó, se asume que no. */
     val isMuted: Boolean get() = channelDetail?.muted == true
+
+    /**
+     * Slug del canal abierto. La ficha manda; sin ella, el listado. Si ninguno lo trae, un canal
+     * público llamado «general» se toma por #general (el API vuelve a comprobarlo).
+     */
+    val channelSlug: String?
+        get() {
+            val ch = selectedChannel ?: return null
+            val slug = (channelDetail?.slug ?: ch.slug)?.trim()?.takeIf { it.isNotEmpty() }
+            if (slug != null) return slug
+            return ch.name.trim().removePrefix("#").lowercase()
+                .takeIf { it == ChatAsistente.SLUG_GENERAL && ch.kind.uppercase() == "PUBLIC" }
+        }
+
+    /** El asistente solo vive en #general. */
+    val isGeneral: Boolean get() = channelSlug?.lowercase() == ChatAsistente.SLUG_GENERAL
 
     /**
      * Salir sólo tiene sentido en canales de equipo. El servidor rechaza los DM
@@ -445,9 +503,16 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(ChatUiState(currentUserId = currentUserId))
     val state: StateFlow<ChatUiState> = _state
 
+    /** Refs pedidas y sin respuesta todavía: no se vuelven a pedir mientras viajan. */
+    private val ligasEnVuelo = mutableSetOf<String>()
+
+    /** Refs que fallaron (red o el API no las devolvió) y cuándo: se reintentan pasado un rato. */
+    private val ligasFallidas = mutableMapOf<String, Long>()
+
     init {
         loadChannels()
         observeRealtime()
+        observeLigas()
         viewModelScope.launch {
             favoritesStore.favorites.collect { favs ->
                 _state.update { s ->
@@ -1102,16 +1167,190 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         loadEntityMentions(kind = kind)
     }
 
+    /** Con nueve pestañas, la respuesta de una pestaña vieja no debe pisar la de la actual. */
+    private var entityRequest = 0
+
     fun loadEntityMentions(query: String? = null, kind: String? = null) {
         val effectiveKind = kind ?: _state.value.entityKind
+        val request = ++entityRequest
         viewModelScope.launch {
             _state.update { it.copy(entityMentionsLoading = true) }
             runCatching { withContext(Dispatchers.IO) { repo.mentions(query, effectiveKind) } }
                 .onSuccess { list ->
+                    if (request != entityRequest) return@onSuccess
                     _state.update { it.copy(entityMentionsLoading = false, entityMentions = list) }
                 }
-                .onFailure { _state.update { it.copy(entityMentionsLoading = false) } }
+                .onFailure {
+                    if (request != entityRequest) return@onFailure
+                    _state.update { it.copy(entityMentionsLoading = false) }
+                }
         }
+    }
+
+    // ── Tarjetas de las ligas ────────────────────────────────────────────────
+
+    /**
+     * Pide las tarjetas de todo lo que hay en pantalla (mensajes, hilo, fijados y respuestas del
+     * asistente) en una sola llamada cada vez que cambia, como la web junta las de una página. Lo
+     * que ya está en caché no se vuelve a pedir; lo que falló se reintenta pasado un rato.
+     */
+    private fun observeLigas() {
+        viewModelScope.launch {
+            _state
+                .map { s ->
+                    buildList {
+                        s.messages.forEach { add(it.body) }
+                        s.threadRoot?.let { add(it.body) }
+                        s.threadReplies.forEach { add(it.body) }
+                        s.pinnedMessages.forEach { add(it.body) }
+                        s.asistenteTurnos.forEach { t -> t.respuesta?.let { add(it.texto) } }
+                    }
+                }
+                .distinctUntilChanged()
+                .collectLatest { bodies ->
+                    // Junta las ráfagas (carga + sondeo + socket) en una sola petición.
+                    delay(LIGAS_LOTE_MS)
+                    ensureLigas(ChatLigas.refsDeMensajes(bodies))
+                }
+        }
+    }
+
+    private fun ensureLigas(refs: List<String>) {
+        if (refs.isEmpty()) return
+        val ahora = System.currentTimeMillis()
+        val cache = _state.value.ligaTarjetas
+        val faltan = refs.filter { ref ->
+            if (ref in ligasEnVuelo) return@filter false
+            val fallo = ligasFallidas[ref]
+            when {
+                fallo != null -> ahora - fallo >= LIGAS_REINTENTO_MS
+                else -> ref !in cache
+            }
+        }
+        if (faltan.isEmpty()) return
+        ligasEnVuelo += faltan
+        viewModelScope.launch {
+            val resultado = runCatching { withContext(Dispatchers.IO) { repo.ligas(faltan) } }
+            ligasEnVuelo -= faltan.toSet()
+            val mapa = resultado.getOrNull().orEmpty()
+            val momento = System.currentTimeMillis()
+            faltan.forEach { ref -> if (ref in mapa) ligasFallidas.remove(ref) else ligasFallidas[ref] = momento }
+            _state.update { s ->
+                val nuevas = s.ligaTarjetas.toMutableMap()
+                faltan.forEach { ref ->
+                    val tarjeta = mapa[ref]
+                    when {
+                        tarjeta != null -> nuevas[ref] = tarjeta
+                        // Lo que falló por red no pisa una tarjeta buena que ya hubiera.
+                        nuevas[ref]?.acceso == true -> Unit
+                        else -> nuevas[ref] = tarjetaSinCargar(ref)
+                    }
+                }
+                s.copy(ligaTarjetas = nuevas)
+            }
+        }
+    }
+
+    /** Tarjeta compacta para una ref que no se pudo pedir (la web: «No se pudo cargar»). */
+    private fun tarjetaSinCargar(ref: String): ChatTarjetaLigaDto {
+        val liga = ChatLigas.refsDelMensaje(
+            if (ref.startsWith("folio:")) ref.removePrefix("folio:") else "[liga]($ref)",
+        ).firstOrNull()
+        val tipo = liga?.tipo ?: TipoLiga.ACTIVIDAD
+        val folio = ref.removePrefix("folio:").takeIf { ref.startsWith("folio:") }
+        return ChatTarjetaLigaDto(
+            ref = ref,
+            tipo = tipo.clave,
+            acceso = false,
+            folio = folio,
+            titulo = ChatLigas.tituloGenerico(tipo, folio),
+            href = if (ref.startsWith("/")) ref else "",
+            motivo = ChatLigas.NO_SE_PUDO_CARGAR,
+        )
+    }
+
+    // ── Asistente de #general ────────────────────────────────────────────────
+
+    /**
+     * Manda la pregunta al asistente (`POST chat/asistente`). Nada se publica en el canal: la
+     * respuesta solo se ve en el panel de este teléfono. Si el API falla, el aviso queda en el panel
+     * y el texto vuelve al redactor para no perderlo.
+     */
+    private fun preguntarAsistente(texto: String, channelId: Long) {
+        val id = "a-${System.currentTimeMillis()}-${(1000..9999).random()}"
+        _state.update { s ->
+            s.copy(
+                asistenteTurnos = (s.asistenteTurnos + TurnoAsistente(id, texto, EstadoTurno.ESPERANDO))
+                    .takeLast(ChatAsistente.MAX_TURNOS),
+            )
+        }
+        viewModelScope.launch {
+            val resultado = runCatching {
+                withTimeoutOrNull(ASISTENTE_ESPERA_MS) {
+                    withContext(Dispatchers.IO) { repo.askAsistente(texto, channelId) }
+                }
+            }
+            val respuesta = resultado.getOrNull()
+            val error = when {
+                respuesta != null -> null
+                resultado.isSuccess -> "El asistente tardó demasiado en contestar."
+                else -> resultado.exceptionOrNull()?.toUserMessage("El asistente no respondió.")
+                    ?: "El asistente no respondió."
+            }
+            _state.update { s ->
+                s.copy(
+                    asistenteTurnos = s.asistenteTurnos.map { t ->
+                        when {
+                            t.id != id -> t
+                            respuesta != null -> t.copy(estado = EstadoTurno.LISTO, respuesta = respuesta)
+                            else -> t.copy(
+                                estado = EstadoTurno.ERROR,
+                                error = "$error Tu pregunta volvió al cuadro de texto; intenta de nuevo.",
+                            )
+                        }
+                    },
+                    draftRestore = if (respuesta == null) texto else s.draftRestore,
+                )
+            }
+        }
+    }
+
+    /** Sugerencia tocada en el panel: se pregunta igual que si se hubiera escrito. */
+    fun askSuggestion(sugerencia: String) {
+        val ch = _state.value.selectedChannel ?: return
+        if (!_state.value.isGeneral || sugerencia.isBlank()) return
+        preguntarAsistente(ChatAsistente.textoDeSugerencia(sugerencia), ch.id)
+    }
+
+    fun closeAssistant() = _state.update { it.copy(asistenteTurnos = emptyList(), asistentePropuestas = emptyMap()) }
+
+    fun consumeDraftRestore() = _state.update { it.copy(draftRestore = null) }
+
+    /** «Crear» en una propuesta de «asígnale a…»: `POST activities` con el cuerpo que trajo. */
+    fun createProposal(turnoId: String, indice: Int, propuesta: ChatPropuestaAsistenteDto) {
+        val clave = clavePropuesta(turnoId, indice)
+        if (_state.value.asistentePropuestas[clave] is CreacionPropuesta.Creando) return
+        _state.update { it.copy(asistentePropuestas = it.asistentePropuestas + (clave to CreacionPropuesta.Creando)) }
+        viewModelScope.launch {
+            val estado = runCatching {
+                withContext(Dispatchers.IO) { repo.createProposedActivity(propuesta.payload) }
+            }.fold(
+                onSuccess = { r ->
+                    when {
+                        r.id > 0L -> CreacionPropuesta.Creada(r.id, r.anNumber)
+                        r.queued -> CreacionPropuesta.EnCola
+                        else -> CreacionPropuesta.Fallo("No se pudo crear la actividad.")
+                    }
+                },
+                onFailure = { e -> CreacionPropuesta.Fallo(e.toUserMessage("No se pudo crear la actividad.")) },
+            )
+            _state.update { it.copy(asistentePropuestas = it.asistentePropuestas + (clave to estado)) }
+        }
+    }
+
+    fun discardProposal(turnoId: String, indice: Int) {
+        val clave = clavePropuesta(turnoId, indice)
+        _state.update { it.copy(asistentePropuestas = it.asistentePropuestas + (clave to CreacionPropuesta.Descartada)) }
     }
 
     fun send(
@@ -1125,6 +1364,11 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         val effectiveParentId = parentId
             ?: _state.value.threadRoot?.id
             ?: _state.value.replyTo?.id
+        // `@asistente` en #general no se publica: va al asistente y solo lo ve quien pregunta.
+        if (ChatAsistente.debePreguntar(text, _state.value.channelSlug, effectiveParentId, !attachmentUrl.isNullOrBlank())) {
+            preguntarAsistente(text.trim(), ch.id)
+            return
+        }
         viewModelScope.launch {
             _state.update { it.copy(sending = true) }
             runCatching {
@@ -1525,8 +1769,16 @@ fun ChatScreen(
         )
     }
 
-    val openEntityLink: (String) -> Unit = remember {
-        { href -> openChatEntityLink(href) }
+    val linkUserId = state.currentUserId
+    val openEntityLink: (String) -> Unit = remember(ctx, linkUserId) {
+        { href -> openChatEntityLink(ctx, href, linkUserId) }
+    }
+
+    // El asistente no pudo contestar: la pregunta vuelve al redactor (si no se escribió otra cosa).
+    LaunchedEffect(state.draftRestore) {
+        val texto = state.draftRestore ?: return@LaunchedEffect
+        if (draft.isBlank()) draft = texto
+        vm.consumeDraftRestore()
     }
 
     if (pdfFile != null) {
@@ -1753,6 +2005,18 @@ fun ChatScreen(
             bottomBar = {
                 Column(Modifier.fillMaxWidth()) {
                     ChatTypingIndicator(state.typingUsers.values.map { it.nombre })
+                    if (state.isGeneral) {
+                        ChatAsistentePanel(
+                            turnos = state.asistenteTurnos,
+                            tarjetas = state.ligaTarjetas,
+                            propuestas = state.asistentePropuestas,
+                            onSugerencia = { vm.askSuggestion(it) },
+                            onCrear = { turnoId, indice, propuesta -> vm.createProposal(turnoId, indice, propuesta) },
+                            onDescartar = { turnoId, indice -> vm.discardProposal(turnoId, indice) },
+                            onOpenLink = openEntityLink,
+                            onCerrar = { vm.closeAssistant() },
+                        )
+                    }
                     state.replyTo?.let { reply ->
                         ReplyPreviewBar(
                             author = reply.author?.nombre ?: "Usuario",
@@ -1790,7 +2054,11 @@ fun ChatScreen(
                             attachMenuExpanded = false
                             pdfPicker.launch("application/pdf")
                         },
-                        placeholder = if (state.replyTo != null) "Responder en el hilo…" else "Escribe un mensaje…",
+                        placeholder = when {
+                            state.replyTo != null -> "Responder en el hilo…"
+                            state.isGeneral -> ChatAsistente.PLACEHOLDER_GENERAL
+                            else -> "Escribe un mensaje…"
+                        },
                         sending = state.sending,
                         uploading = state.uploading,
                     )
@@ -1840,6 +2108,7 @@ fun ChatScreen(
                                 onPin = { vm.pinMessage(it.id) },
                                 onOpenAttachment = openAttachment,
                                 onOpenEntityLink = openEntityLink,
+                                tarjetas = state.ligaTarjetas,
                             )
                         }
                     }
@@ -1866,6 +2135,7 @@ fun ChatScreen(
                                 onPin = { vm.pinMessage(it.id) },
                                 onOpenAttachment = openAttachment,
                                 onOpenEntityLink = openEntityLink,
+                                tarjetas = state.ligaTarjetas,
                             )
                         }
                     }
@@ -1922,6 +2192,7 @@ fun ChatScreen(
                         currentUserId = state.currentUserId,
                         onOpenAttachment = openAttachment,
                         onOpenEntityLink = openEntityLink,
+                        tarjetas = state.ligaTarjetas,
                     )
                 }
             }
@@ -2683,6 +2954,7 @@ private fun ThreadSheetContent(
     currentUserId: Long,
     onOpenAttachment: (String, String?) -> Unit,
     onOpenEntityLink: (String) -> Unit,
+    tarjetas: Map<String, ChatTarjetaLigaDto> = emptyMap(),
 ) {
     Column(
         Modifier
@@ -2703,6 +2975,7 @@ private fun ThreadSheetContent(
             onOpenAttachment = onOpenAttachment,
             onOpenEntityLink = onOpenEntityLink,
             showThreadHint = false,
+            tarjetas = tarjetas,
         )
         when {
             loading -> NxLoadingBlock("Cargando respuestas…")
@@ -2725,6 +2998,7 @@ private fun ThreadSheetContent(
                         onOpenAttachment = onOpenAttachment,
                         onOpenEntityLink = onOpenEntityLink,
                         showThreadHint = false,
+                        tarjetas = tarjetas,
                     )
                 }
             }
@@ -2789,6 +3063,7 @@ private fun PinnedMessagesSection(
     onPin: (ChatMessageDto) -> Unit,
     onOpenAttachment: (String, String?) -> Unit,
     onOpenEntityLink: (String) -> Unit,
+    tarjetas: Map<String, ChatTarjetaLigaDto> = emptyMap(),
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -2834,6 +3109,7 @@ private fun PinnedMessagesSection(
                     onPin = onPin,
                     onOpenAttachment = onOpenAttachment,
                     onOpenEntityLink = onOpenEntityLink,
+                    tarjetas = tarjetas,
                 )
             }
         }
@@ -2894,6 +3170,8 @@ private fun ChatMessageCard(
     onPin: (ChatMessageDto) -> Unit,
     onOpenAttachment: (String, String?) -> Unit,
     onOpenEntityLink: (String) -> Unit,
+    /** Caché de tarjetas de ligas del chat (`POST chat/ligas`). */
+    tarjetas: Map<String, ChatTarjetaLigaDto> = emptyMap(),
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var showReactionPicker by remember { mutableStateOf(false) }
@@ -3014,6 +3292,13 @@ private fun ChatMessageCard(
                     mentionColor = if (isOwn) Color.White else NxColors.Brand,
                     onOpenEntityLink = onOpenEntityLink,
                 )
+                // Tarjeta de cada liga bajo el texto, como la web (hasta tres por mensaje).
+                ChatLigaCards(
+                    body = msg.body,
+                    tarjetas = tarjetas,
+                    onOpen = onOpenEntityLink,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
             }
             msg.attachmentUrl?.takeIf { it.isNotBlank() }?.let { url ->
                 val name = msg.attachmentName?.takeIf { it.isNotBlank() } ?: "Adjunto"
@@ -3084,14 +3369,21 @@ private fun ChatMessageCard(
                         fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                     )
                 }
-                if (showThreadHint && canThread && msg.replyCount > 0) {
+            }
+            // Un dato por renglón (como la web y iOS, 24bda734): la cuenta y «Ver hilo» aparte.
+            if (showThreadHint && canThread && msg.replyCount > 0) {
+                Column(
+                    modifier = Modifier.clickable { onOpenThread(msg) },
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    val tono = if (isOwn) Color.White else NxColors.Brand
                     Text(
-                        "${msg.replyCount} ${if (msg.replyCount == 1) "respuesta" else "respuestas"} · Ver hilo",
+                        "${msg.replyCount} ${if (msg.replyCount == 1) "respuesta" else "respuestas"}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isOwn) Color.White else NxColors.Brand,
+                        color = tono,
                         fontWeight = FontWeight.Medium,
-                        modifier = Modifier.clickable { onOpenThread(msg) },
                     )
+                    Text("Ver hilo", style = MaterialTheme.typography.labelSmall, color = tono, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -3410,7 +3702,7 @@ private fun QuickReactionPicker(
 }
 
 @Composable
-private fun ChatMessageBodyText(
+internal fun ChatMessageBodyText(
     body: String,
     primaryColor: Color,
     linkColor: Color,
@@ -3443,30 +3735,41 @@ private fun EntityMentionPickerDialog(
     onPick: (ChatMentionDto) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
+    val pestana = ChatLigas.PESTANAS_LIGAR.firstOrNull { it.kind == kind } ?: ChatLigas.PESTANAS_LIGAR.first()
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Mencionar en el mensaje") },
+        title = { Text("Ligar en el mensaje") },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(
-                        Triple("ACTIVITY", "Actividades", NxIcons.Assignment),
-                        Triple("EVIDENCE", "Evidencias", NxGlyph.PHOTO.icon),
-                    ).forEach { (value, label, icon) ->
-                        TextButton(
+                // Las nueve pestañas del selector «Ligar» de la web, en su mismo orden. Cada
+                // búsqueda la filtra el API con los permisos de quien busca (sin permiso, vacía).
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    ChatLigas.PESTANAS_LIGAR.forEach { p ->
+                        val selected = p.kind == kind
+                        FilterChip(
+                            selected = selected,
                             onClick = {
-                                query = ""
-                                onKindChange(value)
+                                if (!selected) {
+                                    query = ""
+                                    onKindChange(p.kind)
+                                }
                             },
-                            enabled = kind != value,
-                        ) {
-                            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(label, fontWeight = if (kind == value) FontWeight.Bold else FontWeight.Normal)
-                        }
+                            label = { Text(p.etiqueta) },
+                            leadingIcon = {
+                                Icon(iconoDeKind(p.kind), contentDescription = null, modifier = Modifier.size(16.dp))
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = NxColors.BrandSoft,
+                                selectedLabelColor = NxColors.BrandDark,
+                                selectedLeadingIconColor = NxColors.Brand,
+                            ),
+                        )
                     }
                 }
                 OutlinedTextField(
@@ -3476,15 +3779,7 @@ private fun EntityMentionPickerDialog(
                         onSearch(it)
                     },
                     label = { Text("Buscar") },
-                    placeholder = {
-                        Text(
-                            if (kind == "ACTIVITY") {
-                                "AN, título o estado…"
-                            } else {
-                                "Evidencia, actividad o comentario…"
-                            },
-                        )
-                    },
+                    placeholder = { Text(pestana.buscar) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
@@ -3515,7 +3810,7 @@ private fun EntityMentionPickerDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Icon(
-                                        if (mention.kind == "ACTIVITY") NxIcons.Assignment else NxGlyph.PHOTO.icon,
+                                        iconoDeKind(mention.kind.ifBlank { kind }),
                                         contentDescription = null,
                                         tint = NxColors.Muted,
                                     )

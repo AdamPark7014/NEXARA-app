@@ -70,6 +70,7 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.SessionUser
 import mx.nexara.mobile.nativeapp.data.api.CreateActivityRequest
 import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
+import mx.nexara.mobile.nativeapp.data.api.SugerenciaComplejidadDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
@@ -151,6 +152,12 @@ private fun AssignFlow(
     var boardUsers by remember(targetUserId) { mutableStateOf<List<TeamBoardUserDto>>(emptyList()) }
     var loadingPerson by remember(targetUserId) { mutableStateOf(!selfAssign) }
     var loadError by remember(targetUserId) { mutableStateOf<String?>(null) }
+
+    // La hora de inicio por omisión es la entrada de quien ejecuta (también al asignarse a sí mismo).
+    var horaEntrada by remember(targetUserId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(targetUserId) {
+        horaEntrada = withContext(Dispatchers.IO) { runCatching { repo.horaEntrada(targetUserId) }.getOrNull() }
+    }
 
     LaunchedEffect(targetUserId, selfAssign) {
         if (selfAssign) return@LaunchedEffect
@@ -484,9 +491,10 @@ private fun AssignFlow(
                 if (despachoOnly) append(" · $headcount persona${if (headcount == 1) "" else "s"}")
             }
         }
-        val submit: suspend (CreateActivityRequest) -> Unit = { body ->
+        val submit: suspend (AltaCore) -> Unit = { alta ->
+            val body: CreateActivityRequest = alta.body
             val id = withContext(Dispatchers.IO) {
-                if (selfAssign) repo.selfAssign(body) else repo.createActivity(body)
+                if (selfAssign) repo.selfAssign(body) else repo.createActivity(body, alta.estandar)
             }
             if (selfAssign) {
                 onCreated(id)
@@ -552,6 +560,7 @@ private fun AssignFlow(
                 onSubmit = submit,
                 // A sí mismo (desde «Auto-asignarme» o desde su propia ficha): lo fija el sistema.
                 autoasignacion = selfAssign || targetUserId == user.id,
+                horaEntrada = horaEntrada,
             )
         }
     } else if (meta != null && !bridgeNeeded && offerCharge && charge == null) {
@@ -578,16 +587,23 @@ internal fun ActivityFormPanel(
     creadoPorId: Long,
     repo: CoreActivitiesRepository,
     onCancel: () -> Unit,
-    onSubmit: suspend (CreateActivityRequest) -> Unit,
+    /** El cuerpo del alta y, al asignar a otro, el tiempo estándar que se calculó (`AltaCore`). */
+    onSubmit: suspend (AltaCore) -> Unit,
     /**
      * Autoasignación (regla de Adam, 29-10): tiempo, tope, complejidad y entrega los calcula la API
      * del título y el tipo; aquí no se capturan y se enseñan en solo lectura.
      */
     autoasignacion: Boolean = false,
+    /** Entrada de quien ejecuta: la hora de inicio por omisión mientras nadie la mueva a mano. */
+    horaEntrada: String? = null,
 ) {
     val k = CoreActivityKinds
     val scope = rememberCoroutineScope()
     var form by remember { mutableStateOf(initial) }
+    var horaTocada by remember { mutableStateOf(false) }
+    LaunchedEffect(horaEntrada) {
+        if (!horaTocada && horaEntrada != null) form = form.copy(hora = k.horaDeEntrada(horaEntrada))
+    }
     var projects by remember { mutableStateOf<List<OperationalProjectDto>>(emptyList()) }
     var sectorClients by remember { mutableStateOf<List<SectorClient>>(emptyList()) }
     var nextAn by remember { mutableStateOf("") }
@@ -598,6 +614,12 @@ internal fun ActivityFormPanel(
     var success by remember { mutableStateOf<String?>(null) }
     var showOtroDialog by remember { mutableStateOf(false) }
     var otroInput by remember { mutableStateOf("") }
+    /** Lo que la IA leyó del título (cantidad y destino) para el tiempo estándar. */
+    var sugerenciaIA by remember { mutableStateOf<SugerenciaComplejidadDto?>(null) }
+    /** El tiempo estándar que se manda al asignar a otro; null = nada que mandar. */
+    var estandar by remember { mutableStateOf<TiempoEstandar.Envio?>(null) }
+    /** Lo fija el estándar mientras nadie lo cambie con motivo; null = «¿Cuánto tiempo toma?» libre. */
+    val estandarFijo = if (autoasignacion) null else TiempoEstandar.minutosFijos(estandar)
 
     LaunchedEffect(meta.id) {
         val (projs, an) = withContext(Dispatchers.IO) {
@@ -653,11 +675,14 @@ internal fun ActivityFormPanel(
             return
         }
         val project = activeProjects.firstOrNull { it.id == current.projectId }
-        val body = k.buildRequest(current, project?.client?.id, creadoPorId, autoasignacion = autoasignacion)
+        val base: CreateActivityRequest = k.buildRequest(current, project?.client?.id, creadoPorId, autoasignacion = autoasignacion)
+        // Al asignar a otro, el tiempo estándar viaja aparte; sin motivo, el estimado es el estándar.
+        val envio = if (autoasignacion || !Complejidad.visible(meta.id, current)) null else estandar
+        val alta = AltaCore(TiempoEstandar.ajustar(base, envio), envio)
         saving = true
         scope.launch {
             try {
-                onSubmit(body)
+                onSubmit(alta)
                 success = "Actividad asignada"
                 done = true
             } catch (e: Exception) {
@@ -786,6 +811,20 @@ internal fun ActivityFormPanel(
                 kind = meta.id,
                 form = form,
                 onForm = { form = it(form) },
+                onSugerencia = { sugerenciaIA = it },
+                estandarActivo = estandarFijo != null,
+            )
+            Gap()
+            TiempoEstandarCampo(
+                repo = repo,
+                kind = meta.id,
+                form = form,
+                sugerencia = sugerenciaIA,
+                onCambio = { envio ->
+                    estandar = envio
+                    // El total llena «¿Cuánto tiempo toma?» mientras nadie lo cambie con motivo.
+                    TiempoEstandar.minutosFijos(envio)?.let { form = form.copy(tiempoEstimadoMin = it.toString()) }
+                },
             )
         }
 
@@ -818,7 +857,10 @@ internal fun ActivityFormPanel(
             HourField(
                 label = if (meta.requiresSchedule) "Hora *" else "Hora",
                 value = form.hora,
-                onChange = { form = form.copy(hora = it) },
+                onChange = {
+                    horaTocada = true
+                    form = form.copy(hora = it)
+                },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -834,12 +876,17 @@ internal fun ActivityFormPanel(
                 modifier = Modifier.fillMaxWidth(),
             )
             Gap()
-            DurationField(
-                label = "¿Cuánto tiempo toma?",
-                minutesText = form.tiempoEstimadoMin,
-                onMinutesText = { form = form.copy(tiempoEstimadoMin = it) },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (estandarFijo != null) {
+                // Lo da el tiempo estándar: para otro tiempo, «Cambiar el tiempo» pide el motivo.
+                EstandarFijoField(minutos = estandarFijo, modifier = Modifier.fillMaxWidth())
+            } else {
+                DurationField(
+                    label = "¿Cuánto tiempo toma?",
+                    minutesText = form.tiempoEstimadoMin,
+                    onMinutesText = { form = form.copy(tiempoEstimadoMin = it) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             Gap()
             DurationField(
                 label = "Tope máximo",
@@ -1276,6 +1323,24 @@ private fun CompromisoField(value: String, inicio: String, onChange: (String) ->
             },
         )
     }
+}
+
+/** «¿Cuánto tiempo toma?» cuando lo da el tiempo estándar: solo lectura (cambiarlo pide motivo). */
+@Composable
+private fun EstandarFijoField(minutos: Int, modifier: Modifier = Modifier) {
+    val parts = DurationParts.fromMinutes(minutos)
+    OutlinedTextField(
+        value = DurationParts.label(parts.horas, parts.minutos),
+        onValueChange = {},
+        readOnly = true,
+        label = { Text("¿Cuánto tiempo toma?") },
+        trailingIcon = { Icon(Icons.Default.Schedule, contentDescription = null) },
+        singleLine = true,
+        supportingText = {
+            Text("Lo da el tiempo estándar. Para poner otro, usa «Cambiar el tiempo» arriba (pide motivo).")
+        },
+        modifier = modifier,
+    )
 }
 
 /**

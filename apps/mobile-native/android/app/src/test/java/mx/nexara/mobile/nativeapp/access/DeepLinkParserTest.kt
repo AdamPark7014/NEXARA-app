@@ -200,6 +200,27 @@ class DeepLinkParserTest {
         assertEquals(12L, module("/erp/viaticos/12").entityId)
     }
 
+    /**
+     * Ligas del chat (29-10): el viático se liga con `?highlight=:id` y la asistencia con la persona
+     * y el día. Antes el viático abría la lista y la asistencia el tablero sin saber de quién.
+     */
+    @Test
+    fun lasLigasDelChatConservanElRegistro() {
+        val viatico = module("/erp/finance/viatics?highlight=44")
+        assertEquals(CoreKeys.VIATICOS, viatico.key)
+        assertEquals(44L, viatico.entityId)
+        assertEquals(45L, module("/erp/viaticos?highlight=45").entityId)
+        // El id de la ruta gana al resaltado.
+        assertEquals(31L, module("/erp/finance/viatics/31?highlight=44").entityId)
+
+        val asistencia = module("/erp/asistencias/indicadores/7?desde=2026-10-29&hasta=2026-10-29")
+        assertEquals(CoreKeys.KPIS_EQUIPO, asistencia.key)
+        assertEquals(7L, asistencia.entityId)
+        assertEquals("2026-10-29", asistencia.params["desde"])
+        assertEquals("2026-10-29", asistencia.params["hasta"])
+        assertNull(module("/erp/asistencias/indicadores").entityId)
+    }
+
     /** Las rutas viejas de viáticos (`/ops` y `/finance`) abren la misma pantalla. */
     @Test
     fun lasRutasViejasDeViaticosAbrenElModulo() {

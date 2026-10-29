@@ -770,7 +770,7 @@ struct ActivityDockBar: View {
                     }
                     Text(label)
                         .font(.system(size: 16, weight: .bold))
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .truncationMode(.tail)
                 }
                 .foregroundStyle(on ? Color.white : NxColors.fg4)
