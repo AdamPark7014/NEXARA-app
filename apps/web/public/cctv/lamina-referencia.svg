@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="2000" viewBox="0 0 1000 2000">
+  <rect width="1000" height="2000" fill="#cfd4d8"/>
+  <rect y="1700" width="1000" height="300" fill="#9aa1a8"/>
+  <!-- Lámina de referencia de NEXARA: persona de 1.70 m con placa de prueba y barras de 4, 2 y 1 cm, a 1000 px por metro. -->
+  <!-- persona -->
+  <ellipse cx="500" cy="300" rx="105" ry="130" fill="#c99a78"/>
+  <path d="M395 250 Q500 120 605 250 L605 215 Q500 110 395 215 Z" fill="#2b2523"/>
+  <ellipse cx="460" cy="295" rx="14" ry="9" fill="#2b2523"/><ellipse cx="540" cy="295" rx="14" ry="9" fill="#2b2523"/>
+  <path d="M445 268 L478 262 M522 262 L555 268" stroke="#2b2523" stroke-width="8"/>
+  <path d="M492 300 L482 345 L505 348" fill="none" stroke="#9b6d50" stroke-width="6"/>
+  <path d="M462 378 Q500 398 538 378" fill="none" stroke="#7a3b32" stroke-width="9" stroke-linecap="round"/>
+  <rect x="470" y="420" width="60" height="50" fill="#c99a78"/>
+  <path d="M300 470 Q500 430 700 470 L740 1000 L260 1000 Z" fill="#f4f6f8"/>
+  <path d="M430 470 L500 560 L570 470" fill="none" stroke="#d5dae0" stroke-width="10"/>
+  <rect x="285" y="560" width="70" height="380" rx="30" fill="#f4f6f8"/><rect x="645" y="560" width="70" height="380" rx="30" fill="#f4f6f8"/>
+  <path d="M290 1000 L710 1000 L690 1680 L540 1680 L510 1150 L490 1150 L460 1680 L310 1680 Z" fill="#2f3b52"/>
+  <rect x="300" y="1660" width="170" height="50" rx="20" fill="#1c1c1c"/><rect x="530" y="1660" width="170" height="50" rx="20" fill="#1c1c1c"/>
+  <!-- placa -->
+  <rect x="310" y="700" width="380" height="160" rx="12" fill="#ffffff" stroke="#1f3f8a" stroke-width="10"/>
+  <rect x="310" y="700" width="380" height="34" rx="10" fill="#1f3f8a"/>
+  <text x="500" y="726" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#ffffff">PUEBLA</text>
+  <text x="500" y="820" text-anchor="middle" font-family="Arial, sans-serif" font-size="66" font-weight="700" fill="#141414">NXR-123-A</text>
+  <!-- carta de resolución: barras de 4, 2 y 1 cm -->
+  <g transform="translate(60 1760)">
+    <rect x="0" width="40" height="160" fill="#111"/><rect x="80" width="40" height="160" fill="#111"/><rect x="160" width="40" height="160" fill="#111"/>
+    <rect x="300" width="20" height="160" fill="#111"/><rect x="340" width="20" height="160" fill="#111"/><rect x="380" width="20" height="160" fill="#111"/><rect x="420" width="20" height="160" fill="#111"/>
+    <rect x="540" width="10" height="160" fill="#111"/><rect x="560" width="10" height="160" fill="#111"/><rect x="580" width="10" height="160" fill="#111"/><rect x="600" width="10" height="160" fill="#111"/><rect x="620" width="10" height="160" fill="#111"/><rect x="640" width="10" height="160" fill="#111"/>
+    <text x="720" y="110" font-family="Arial, sans-serif" font-size="70" font-weight="700" fill="#111">1 m</text>
+  </g>
+</svg>

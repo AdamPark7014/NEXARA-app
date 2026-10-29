@@ -1,0 +1,349 @@
+/* Videovigilancia · propuesta en hojas carta (artboard 4 del mockup aprobado). */
+
+.fondo {
+  padding: var(--ui-s4) var(--ui-s5) var(--ui-s7);
+  background: var(--ui-track);
+  min-height: 100%;
+}
+
+.barra {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s3);
+  max-width: 8.5in;
+  margin: 0 auto var(--ui-s4);
+  padding: var(--ui-s2) var(--ui-s3);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-elev-1);
+}
+
+.barra > :last-child {
+  margin-left: auto;
+}
+
+.volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--ui-fs-label);
+  font-weight: 600;
+  color: var(--ui-brand-text);
+  text-decoration: none;
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-meta);
+}
+
+.hoja {
+  width: 8.5in;
+  min-height: 11in;
+  margin: 0 auto var(--ui-s5);
+  padding: 0.5in 0.55in 0.45in;
+  box-sizing: border-box;
+  background: #fff;
+  color: #14171f;
+  box-shadow: 0 2px 6px rgba(16, 24, 40, 0.08), 0 24px 56px -20px rgba(16, 24, 40, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: var(--ui-font);
+}
+
+.portada {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.eyebrow {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #168570;
+}
+
+.eyebrowGris {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #5b6b80;
+  margin-bottom: 4px;
+}
+
+.titulo {
+  margin: 6px 0 4px;
+  font-family: var(--ui-font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.para {
+  font-size: 12.5px;
+  color: #4a5060;
+}
+
+.marca {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.marca b {
+  font-family: var(--ui-font-display);
+  font-size: 22px;
+  letter-spacing: 0.06em;
+}
+
+.marca span {
+  font-size: 10px;
+  color: #5b6272;
+}
+
+.regla {
+  height: 1px;
+  background: #e6e9ef;
+}
+
+.seccionCabeza {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.h2 {
+  margin: 4px 0 0;
+  font-family: var(--ui-font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.nota {
+  margin: 0;
+  font-size: 10.5px;
+  color: #5b6272;
+  line-height: 1.45;
+}
+
+.marco {
+  border: 1px solid #e6e9ef;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.listaCamaras {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 24px;
+  font-size: 11px;
+}
+
+.cifras {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cifra {
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cifra b {
+  font-family: var(--ui-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.cifra span {
+  font-size: 10.5px;
+  color: #5b6272;
+}
+
+.leyenda {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 20px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f8fafb;
+  border: 1px solid #eef0f4;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.leyendaTitulo {
+  grid-column: 1 / -1;
+  font-size: 11.5px;
+}
+
+.punto {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: baseline;
+}
+
+.vistas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.vistas > figure,
+.fichaAbajo figure {
+  width: auto;
+  box-shadow: none;
+}
+
+.fichaCabeza {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.numero {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #14171f;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.fichaTitulo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.fichaTitulo b {
+  font-family: var(--ui-font-display);
+  font-size: 17px;
+}
+
+.fichaTitulo span {
+  font-size: 11.5px;
+  color: #5b6272;
+}
+
+.insignia {
+  background: #fff6e6;
+  color: #9a5b06;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fichaArriba {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.fichaAbajo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px;
+  gap: 18px;
+  align-items: start;
+}
+
+.kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  padding: 5px 0;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.kv span {
+  color: #5b6272;
+}
+
+.kv b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.dosCol {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+  margin-top: 8px;
+}
+
+.caracteristicas {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #4a5060;
+  columns: 2;
+}
+
+.tabla {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11.5px;
+}
+
+.tabla th {
+  text-align: left;
+  font-weight: 600;
+  color: #5b6272;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e6e9ef;
+}
+
+.tabla td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.derecha {
+  text-align: right;
+}
+
+.pie {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 10px;
+  color: #5b6272;
+  border-top: 1px solid #e6e9ef;
+  padding-top: 10px;
+}
