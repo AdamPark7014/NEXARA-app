@@ -112,6 +112,12 @@ internal fun TiempoCalculadoCard(repo: CoreActivitiesRepository, form: CoreActiv
         }
     }
 
+    TiempoCalculadoContenido(listo, pensando, dato, TiempoCalculado.request(form).fechaInicio)
+}
+
+/** Lo que se pinta de la tarjeta, sin pedir nada (así también se captura con datos de muestra). */
+@Composable
+internal fun TiempoCalculadoContenido(listo: Boolean, pensando: Boolean, dato: TiempoCalculadoDto?, inicioIso: String?) {
     val shape = RoundedCornerShape(14.dp)
     Column(
         modifier = Modifier
@@ -137,7 +143,7 @@ internal fun TiempoCalculadoCard(repo: CoreActivitiesRepository, form: CoreActiv
             )
             else -> {
                 TiempoCalculado.resumen(t)?.let { Text(it, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Slate) }
-                TiempoCalculado.entrega(t, TiempoCalculado.request(form).fechaInicio)?.let {
+                TiempoCalculado.entrega(t, inicioIso)?.let {
                     Text(it, fontSize = 13.sp, color = NxColors.Slate)
                 }
                 TiempoCalculado.lineas(t).forEach { l ->
