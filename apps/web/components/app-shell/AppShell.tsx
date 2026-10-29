@@ -1524,7 +1524,16 @@ const SLUG_DICTIONARY: Record<string, string> = {
   "employee-payments": "Nómina",
 };
 
+/** Rutas cuyo nombre es una frase y no se lee palabra por palabra («Pagos y gastos», no «Pagos Y Gastos»). */
+const SLUG_FRASES: Record<string, string> = {
+  "por-facturar": "Por facturar",
+  "pagos-y-gastos": "Pagos y gastos",
+  estados: "Estados financieros",
+};
+
 function humanize(slug: string) {
+  const frase = SLUG_FRASES[slug.toLowerCase()];
+  if (frase) return frase;
   const words = slug.split("-").map((w) => {
     const lower = w.toLowerCase();
     if (SLUG_DICTIONARY[lower]) return SLUG_DICTIONARY[lower];
