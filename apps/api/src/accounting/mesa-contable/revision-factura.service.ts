@@ -100,7 +100,7 @@ export class RevisionFacturaService {
     }
 
     let origen: { tipo: OrigenPorFacturar; folio: string; href: string | null; extra: string | null } | null = null;
-    if (f.activity) origen = { tipo: 'SERVICIO', folio: f.activity.anNumber, href: `/erp/actividades/${f.activity.id}`, extra: null };
+    if (f.activity) origen = { tipo: 'SERVICIO', folio: f.activity.anNumber, href: null, extra: null };
     if (f.cotizacion) {
       const folioCot = f.cotizacion.folioEnviado || f.cotizacion.quoteNumber;
       origen = origen
@@ -108,7 +108,8 @@ export class RevisionFacturaService {
         : { tipo: f.esAnticipo ? 'ANTICIPO' : 'COTIZACION', folio: folioCot, href: `/erp/cotizaciones/${f.cotizacion.id}`, extra: null };
     }
     if (!origen && f.salesProjectOrder) {
-      origen = { tipo: 'PEDIDO', folio: f.salesProjectOrder.orderId, href: `/crm/projects/${f.salesProjectOrder.projectId}`, extra: null };
+      // Proyecto de ventas: sin pantalla en Core, así que sin enlace.
+      origen = { tipo: 'PEDIDO', folio: f.salesProjectOrder.orderId, href: null, extra: null };
     }
 
     const regimen = claveSat(f.receptorRegime);

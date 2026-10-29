@@ -383,7 +383,7 @@ export class PagosGastosService {
         tipoEtiqueta: comprobado ? 'Viático comprobado' : 'Viático entregado',
         titulo: [v.User?.nombre, v.motivo].filter(Boolean).join(' · ') || `Viático #${v.id}`,
         subtitulo: v.categoria ?? null,
-        folio: v.Activity ? { texto: v.Activity.anNumber, href: `/erp/actividades/${v.Activity.id}` } : null,
+        folio: v.Activity ? { texto: v.Activity.anNumber, href: null } : null,
         importe: -cents(entregado),
         cfdi: comprobado
           ? { estado: 'falta', texto: 'Sin CFDI', accion: 'LIGAR_XML' }
@@ -409,7 +409,7 @@ export class PagosGastosService {
         tipoEtiqueta: 'Gasto',
         titulo: g.concepto || g.categoria || g.razonGasto || `Gasto #${g.id}`,
         subtitulo: g.usuario?.nombre ?? null,
-        folio: g.actividad ? { texto: g.actividad.anNumber, href: `/erp/actividades/${g.actividad.id}` } : null,
+        folio: g.actividad ? { texto: g.actividad.anNumber, href: null } : null,
         importe: -cents(Number(g.montoSolicitado)),
         cfdi: { estado: 'falta', texto: 'Sin CFDI', accion: 'LIGAR_XML' },
         poliza: { ...estadoPoliza(g.journalEntry?.entryNumber ?? null), journalEntryId: g.journalEntryId },

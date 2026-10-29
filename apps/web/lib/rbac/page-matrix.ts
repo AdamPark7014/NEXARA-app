@@ -575,6 +575,10 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.CONTABILIDAD]: [
     ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS,
+    // Mesa contable: abrir la cotización que se factura (solo el detalle, sin sumarle el módulo al
+    // menú; la API se la deja en lectura) y la ficha del cliente para completar sus datos fiscales.
+    '/erp/cotizaciones/*',
+    ...CLIENTES_CORE_PATHS,
     '/erp',
     '/erp/dashboard',
     '/erp/chat',
