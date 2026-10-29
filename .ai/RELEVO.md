@@ -83,6 +83,13 @@
     - Lo marcado no cuenta como plan: `estimadoParaKpi` (pizarra-kpi) en Desempeño (`kpis-equipo.service`, tope
       diario y plan de cada entrega) y en la pizarra (`team-board.service`), y `tiemposDto` en el detalle y en
       «Mis actividades» (no sale «excedida»). Spec `me/relleno-kpi.spec.ts`.
+    - **REVERTIDO (29-10 ~21:40 UTC), a petición de Adam: «es para actividades de ahora en adelante, no pasadas».**
+      Las 100 filas (267 campos) volvieron a su valor anterior, cada campo solo si seguía igual a lo escrito (ninguno
+      había cambiado): vacíos otra vez, y los tipos de AN-0344/0345/0346/0349/0350 los de antes. Abiertas: asignadas
+      1 sin tiempo; autoasignadas 18 sin entrega, 94 sin tiempo, 127 sin estándar; 0 marcadas. La regla (tiempo y
+      entrega obligatorios, autoasignación fija) aplica solo a lo que se crea desde el 29-10. Se quitó del repo
+      `scripts/rellenar-tiempos-abiertas.cjs` para que no se vuelva a correr; `rellenar-tiempos.ts` y
+      `estimadoParaKpi` se quedan (sin filas marcadas no cambian nada). Lo de abajo es el historial del relleno.
     - **Escrito en producción (29-10 ~21:20 UTC, f0278eb4 desplegado):** 100 filas, 0 cambios de «a tiempo»; un
       segundo simulacro da 0 filas (idempotente). Abiertas antes → después: asignadas 7 (0 sin entrega, 1 sin
       tiempo → 0); autoasignadas 128 (18 sin entrega → 0, 94 sin tiempo → 0). Sin estándar quedan 7 + 116, todas
