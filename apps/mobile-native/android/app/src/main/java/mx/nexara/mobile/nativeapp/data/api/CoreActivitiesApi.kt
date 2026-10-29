@@ -873,9 +873,82 @@ data class PalomearHerramientaRequest(
     val fotoUrl: String? = null,
 )
 
+/** Dueño de una evidencia por revisar (`me/revisiones`). */
+data class PersonaRevisionDto(
+    val id: Long? = null,
+    val nombre: String? = null,
+    val avatarUrl: String? = null,
+    val puesto: String? = null,
+)
+
+/** Evidencia enviada que quien mira puede aprobar o devolver. */
+data class RevisionPendienteDto(
+    val activityId: Long,
+    val anNumber: String? = null,
+    val titulo: String? = null,
+    val estatus: String? = null,
+    val coreKind: String? = null,
+    val ticketTypeCustom: String? = null,
+    val persona: PersonaRevisionDto? = null,
+    /** Desde cuándo espera: la corrección reenviada o, si no la hubo, el envío. */
+    val enviadaAt: String? = null,
+    /** Es una corrección de algo que se le devolvió. */
+    val correccion: Boolean? = null,
+)
+
+/** `GET me/revisiones`: lo pendiente (y lo revisado en 30 días, que el teléfono no usa). */
+data class RevisionesResponseDto(
+    val pendientes: List<RevisionPendienteDto>? = null,
+)
+
+/** Un tiempo típico: mediana del reloj de las anteriores (null si aún no junta 3). */
+data class TipicoDto(
+    val muestras: Int? = null,
+    val medianaMin: Int? = null,
+)
+
+/** `GET ai/complejidad/tiempos`: en total y por complejidad (`BASICA`…`CRITICA`). */
+data class TiemposTipicosDto(
+    val clave: String? = null,
+    val total: TipicoDto? = null,
+    val porComplejidad: Map<String, TipicoDto>? = null,
+)
+
+/** `POST ai/complejidad/sugerir`. */
+data class SugerirComplejidadRequest(
+    val coreKind: String,
+    val tipo: String? = null,
+    val titulo: String,
+    val indicaciones: String? = null,
+)
+
+data class SugerenciaComplejidadDto(
+    val complejidad: String? = null,
+    val motivo: String? = null,
+)
+
+data class SugerirComplejidadResponse(
+    val sugerencia: SugerenciaComplejidadDto? = null,
+)
+
 interface CoreActivitiesApi {
     @GET("me/activities")
     suspend fun myActivities(): MyActivitiesResponseDto
+
+    /** Tiempo típico de un tipo de trabajo, en total y por complejidad. */
+    @GET("ai/complejidad/tiempos")
+    suspend fun tiemposTipicos(
+        @retrofit2.http.Query("coreKind") coreKind: String,
+        @retrofit2.http.Query("tipo") tipo: String?,
+    ): TiemposTipicosDto
+
+    /** Sugerencia de complejidad al asignar (Haiku por la puerta). No guarda nada. */
+    @POST("ai/complejidad/sugerir")
+    suspend fun sugerirComplejidad(@Body body: SugerirComplejidadRequest): SugerirComplejidadResponse
+
+    /** «En espera de revisión»: la misma regla de quién revisa a quién que `me/activities/:id/evidencias`. */
+    @GET("me/revisiones")
+    suspend fun revisiones(): RevisionesResponseDto
 
     @GET("me/celebraciones/hoy")
     suspend fun celebracionesHoy(): CelebracionesHoyDto

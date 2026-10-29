@@ -193,10 +193,18 @@ fun ActivityInfoTab(
                         if (!a.branchAddress.isNullOrBlank()) ADetailRow("Dirección", a.branchAddress!!)
                         NxStatusLabels.priority(a.prioridad)?.let { ADetailRow("Prioridad", it) }
                         if (!a.ticketType.isNullOrBlank()) ADetailRow("Tipo de servicio", NxStatusLabels.label(a.ticketType))
+                        Complejidad.detalle(a.complejidad, a.complejidadSugerida)?.let { (nivel, ia) ->
+                            ADetailRow("Complejidad", if (ia != null) "$nivel · $ia" else nivel)
+                        }
                         ADetailRow("Asignación", NxFormat.dateTime(a.fechaAsignacion))
                         ADetailRow("Inicio", NxFormat.dateTime(a.fechaInicio))
                         ActivityPeriodo.cuandoTexto(a.periodo, null)?.let { ADetailRow("Periodo", it) }
-                        ADetailRow("Entrega esperada", NxFormat.date(a.fechaEntregaEsperada))
+                        ADetailRow(
+                            "Entrega esperada",
+                            CoreActivityKinds.horaCompromisoDe(a.fechaInicio, a.fechaMaxima, a.periodo != null)
+                                ?.let { "${NxFormat.date(a.fechaEntregaEsperada)} · a más tardar $it" }
+                                ?: NxFormat.date(a.fechaEntregaEsperada),
+                        )
                         ADetailRow("Finalización", NxFormat.dateTime(a.fechaFinalizacion))
                     }
                 }

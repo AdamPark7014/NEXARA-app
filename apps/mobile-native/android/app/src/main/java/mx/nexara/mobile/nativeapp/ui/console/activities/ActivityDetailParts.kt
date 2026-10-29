@@ -214,7 +214,10 @@ fun ActivityFactsStrip(
     val c = NxTheme.colors
     val plan = CoreActivityRules.formatMinutes(detail.minutosPlan)
     val real = CoreActivityRules.formatMinutes(detail.minutosReales)
-    val entrega = detail.fechaEntregaEsperada?.takeIf { it.isNotBlank() }?.let { NxFormat.date(it) }
+    // Con hora compromiso («Entregar a más tardar»), la hora es lo que importa en el día.
+    val entrega = CoreActivityKinds.horaCompromisoDe(detail.fechaInicio, detail.fechaMaxima, detail.periodo != null)
+        ?.let { "Antes de $it" }
+        ?: detail.fechaEntregaEsperada?.takeIf { it.isNotBlank() }?.let { NxFormat.date(it) }
         ?: detail.fechaMaxima?.takeIf { it.isNotBlank() }?.let { CoreActivityRules.formatWhen(it) }
     val desde = sesion?.sesionAbiertaDesde?.let { CoreActivityRules.formatClock(it) }?.takeIf { it != "—" }
     val celdas = listOf(

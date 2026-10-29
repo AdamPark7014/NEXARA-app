@@ -84,21 +84,44 @@ object CoreActivityKinds {
 
     fun meta(kind: String?): KindMeta? = KINDS[kind]
 
-    data class TareaTipo(val id: String, val label: String, val glyph: NxGlyph)
+    data class Familia(val id: String, val label: String)
 
-    /** Subtipos de Tarea: viajan como ticketType OTRO + ticketTypeCustom = label (o el texto de «Otro»). */
-    val TAREA_TIPOS: List<TareaTipo> = listOf(
-        TareaTipo("levantamiento", "Levantamiento", NxGlyph.SURVEY),
-        TareaTipo("recoleccion", "Recolección", NxGlyph.PICKUP),
-        TareaTipo("entrega", "Entrega", NxGlyph.DELIVERY),
-        TareaTipo("junta", "Junta", NxGlyph.MEETING),
-        TareaTipo("compra", "Compra de material", NxGlyph.PURCHASE),
-        TareaTipo("preparacion", "Preparación de equipo", NxGlyph.EQUIPMENT_PREP),
-        TareaTipo("tramite", "Trámite", NxGlyph.PROCEDURE),
-        TareaTipo("capacitacion", "Capacitación", NxGlyph.TRAINING),
-        TareaTipo("documentacion", "Reporte / documentación", NxGlyph.DOCUMENTATION),
-        TareaTipo(TAREA_OTRO, "Otro", NxGlyph.OTHER),
+    /** FAMILIAS_TAREA de la web, en el orden en que se muestran. */
+    val FAMILIAS_TAREA: List<Familia> = listOf(
+        Familia("campo", "En campo"),
+        Familia("oficina", "Oficina técnica"),
+        Familia("administracion", "Administración"),
+        Familia("transversal", "Para todos"),
     )
+
+    data class TareaTipo(val id: String, val label: String, val glyph: NxGlyph, val familia: String)
+
+    /**
+     * Subtipos de Tarea: viajan como ticketType OTRO + ticketTypeCustom = label.
+     * Catálogo cerrado de 17 tipos en 4 familias (web, 28-10): sin «Otro», cada tipo se puede
+     * medir. [TAREA_OTRO] queda solo para leer actividades viejas con texto libre.
+     */
+    val TAREA_TIPOS: List<TareaTipo> = listOf(
+        TareaTipo("instalacion", "Instalación", NxGlyph.INSTALLATION, "campo"),
+        TareaTipo("cableado", "Cableado y canalización", NxGlyph.CABLING, "campo"),
+        TareaTipo("mantenimiento", "Mantenimiento preventivo", NxGlyph.MAINTENANCE, "campo"),
+        TareaTipo("correctivo", "Correctivo y diagnóstico", NxGlyph.CORRECTIVE, "campo"),
+        TareaTipo("levantamiento", "Levantamiento", NxGlyph.SURVEY, "campo"),
+        TareaTipo("recoleccion", "Recolección", NxGlyph.PICKUP, "campo"),
+        TareaTipo("entrega", "Entrega", NxGlyph.DELIVERY, "campo"),
+        TareaTipo("preparacion", "Preparación de equipo", NxGlyph.EQUIPMENT_PREP, "campo"),
+        TareaTipo("diseno", "Diseño, CAD y memoria técnica", NxGlyph.DESIGN, "oficina"),
+        TareaTipo("configuracion", "Configuración y soporte remoto", NxGlyph.REMOTE_CONFIG, "oficina"),
+        TareaTipo("tramite", "Trámite", NxGlyph.PROCEDURE, "administracion"),
+        TareaTipo("compra", "Compra de material", NxGlyph.PURCHASE, "administracion"),
+        TareaTipo("facturacion", "Facturación y contabilidad", NxGlyph.BILLING, "administracion"),
+        TareaTipo("documentacion", "Reporte / documentación", NxGlyph.DOCUMENTATION, "transversal"),
+        TareaTipo("capacitacion", "Capacitación", NxGlyph.TRAINING, "transversal"),
+        TareaTipo("junta", "Junta", NxGlyph.MEETING, "transversal"),
+        TareaTipo("evento", "Evento o guardia", NxGlyph.EVENT, "transversal"),
+    )
+
+    fun tiposDeFamilia(familia: String): List<TareaTipo> = TAREA_TIPOS.filter { it.familia == familia }
 
     data class ChargeMeta(val id: String, val title: String, val help: String, val badge: String)
 
@@ -362,6 +385,14 @@ object CoreActivityKinds {
         val fecha: String = "",
         /** HH:mm, hora de México */
         val hora: String = DEFAULT_HORA,
+        /**
+         * «Entregar a más tardar» (HH:mm, mismo día). Vacío = el límite es el fin del día; con valor,
+         * la fecha máxima y la entrega esperada quedan a esa hora (semáforo, KPI y cierre).
+         */
+        val horaCompromiso: String = "",
+        /** BASICA | ESTANDAR | COMPLEJA | CRITICA, o vacío; y la que sugirió la IA. */
+        val complejidad: String = "",
+        val complejidadSugerida: String = "",
         val clientId: Long? = null,
         val projectId: Long? = null,
         val ticketType: String = "PREVENTIVO",
@@ -390,22 +421,43 @@ object CoreActivityKinds {
         )
     }
 
-    /** Subtipo de tarea seleccionado ("" = ninguno). */
-    fun tareaTipo(form: FormState, otroOpen: Boolean): String {
-        if (otroOpen) return TAREA_OTRO
-        val preset = TAREA_TIPOS.firstOrNull { it.id != TAREA_OTRO && it.label == form.ticketTypeCustom }
+    /** Subtipo de tarea seleccionado ("" = ninguno; [TAREA_OTRO] = texto libre de antes del catálogo). */
+    fun tareaTipo(form: FormState): String {
+        val preset = TAREA_TIPOS.firstOrNull { it.label == form.ticketTypeCustom }
         if (preset != null) return preset.id
         return if (form.ticketType == "OTRO" && form.ticketTypeCustom.isNotBlank()) TAREA_OTRO else ""
     }
 
-    /** Tocar un chip de tipo de tarea. «Otro» conserva el texto si ya estaba en «Otro». */
-    fun pickTareaTipo(form: FormState, currentTipo: String, id: String): FormState {
-        val custom = if (id == TAREA_OTRO) {
-            if (currentTipo == TAREA_OTRO) form.ticketTypeCustom else ""
-        } else {
-            TAREA_TIPOS.firstOrNull { it.id == id }?.label.orEmpty()
-        }
-        return form.copy(ticketType = "OTRO", ticketTypeCustom = custom, workType = "ISSUE")
+    /** Tocar un chip de tipo de tarea (solo los del catálogo). */
+    fun pickTareaTipo(form: FormState, id: String): FormState {
+        val label = TAREA_TIPOS.firstOrNull { it.id == id }?.label ?: return form
+        return form.copy(ticketType = "OTRO", ticketTypeCustom = label, workType = "ISSUE")
+    }
+
+    /** El compromiso vale solo si es después de la hora de inicio (`compromisoValido` de la web). */
+    fun compromisoValido(hora: String, compromiso: String): Boolean =
+        compromiso.isEmpty() || (Regex("^\\d{2}:\\d{2}$").matches(compromiso) && compromiso > hora.ifEmpty { DEFAULT_HORA })
+
+    /**
+     * La hora compromiso de una actividad guardada (`horaCompromisoDe` de la web): su fecha máxima,
+     * si cae el mismo día (en México) y después del inicio. Una fecha máxima igual al inicio
+     * significa «fin del día». Con periodo de varios días no aplica.
+     */
+    fun horaCompromisoDe(fechaInicio: String?, fechaMaxima: String?, conPeriodo: Boolean, zone: ZoneId = MEXICO): String? {
+        if (conPeriodo) return null
+        val inicio = fechaInicio?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return null
+        val maxima = fechaMaxima?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return null
+        if (!maxima.isAfter(inicio)) return null
+        val i = inicio.atZone(zone)
+        val m = maxima.atZone(zone)
+        if (i.toLocalDate() != m.toLocalDate()) return null
+        return formatHora(m.hour, m.minute)
+    }
+
+    /** Hora de la fecha máxima y la entrega esperada: el compromiso si vale; si no, la de inicio (= fin del día). */
+    fun horaLimite(form: FormState): String {
+        val hora = form.hora.ifEmpty { DEFAULT_HORA }
+        return if (form.horaCompromiso.isNotEmpty() && compromisoValido(hora, form.horaCompromiso)) form.horaCompromiso else hora
     }
 
     /** Select «Tipo» (proyecto / servicio). OTRO pide el texto aparte. */
@@ -423,12 +475,14 @@ object CoreActivityKinds {
     fun clampEvidencePhotos(n: Int): Int = n.coerceIn(2, 8)
 
     /** Mismo orden y textos que handleSubmit de OpsActivityForm; null = se puede guardar. */
-    fun validationError(form: FormState, tareaOtroOpen: Boolean, requireSchedule: Boolean): String? {
+    fun validationError(form: FormState, requireSchedule: Boolean): String? {
         if (form.titulo.isBlank() || form.responsableId == null) return "Título y responsable son obligatorios"
-        if (form.coreKind == TAREA) {
-            val tipo = tareaTipo(form, tareaOtroOpen)
-            if (tipo.isEmpty()) return "Elige el tipo de tarea"
-            if (tipo == TAREA_OTRO && form.ticketTypeCustom.isBlank()) return "Especifica el tipo de tarea"
+        // El alta solo ofrece el catálogo cerrado: un texto libre viejo no basta.
+        if (form.coreKind == TAREA && tareaTipo(form).let { it.isEmpty() || it == TAREA_OTRO }) {
+            return "Elige el tipo de tarea"
+        }
+        if (!compromisoValido(form.hora, form.horaCompromiso)) {
+            return "La hora de entrega tiene que ser después de la hora de inicio"
         }
         if (form.projectMode == WITH_PROJECT && form.projectId == null) return "Selecciona un proyecto"
         if (requireSchedule && (form.fecha.isBlank() || form.hora.isBlank())) return "Indica día y hora de la agenda"
@@ -477,6 +531,8 @@ object CoreActivityKinds {
     fun buildRequest(form: FormState, projectClientId: Long?, creadoPorId: Long, zone: ZoneId = MEXICO): CreateActivityRequest {
         val withProject = form.projectMode == WITH_PROJECT
         val iso = scheduleIso(form.fecha, form.hora, zone)
+        // Sin compromiso, la fecha máxima es la de inicio y la API la lee como «fin del día».
+        val limite = scheduleIso(form.fecha, horaLimite(form), zone)
         val inventario = form.ticketType == "INVENTARIO"
         return CreateActivityRequest(
             titulo = form.titulo.trim(),
@@ -494,11 +550,13 @@ object CoreActivityKinds {
             responsableId = requireNotNull(form.responsableId) { "responsableId" },
             estatus = "Pendiente",
             fechaInicio = iso,
-            fechaEntregaEsperada = iso,
-            fechaMaxima = iso,
+            fechaEntregaEsperada = limite,
+            fechaMaxima = limite,
             evidencePhotoRequired = clampEvidencePhotos(form.evidencePhotoRequired),
             coreKind = form.coreKind.ifEmpty { null },
             assignmentCharge = form.assignmentCharge.ifEmpty { null },
+            complejidad = form.complejidad.ifEmpty { null },
+            complejidadSugerida = form.complejidadSugerida.ifEmpty { null },
         )
     }
 
