@@ -42,6 +42,11 @@
     API 320/3877 en verde. `tsc` limpio sobre `HEAD` + estos archivos; en el checkout compartido falla en
     `activities.service.ts` por trabajo sin commitear de otra sesión (tiempo estándar), no por esto.
   - Sin migración.
+  - Desplegado `bfc18fec` con `deploy-api-web.sh` (API y web; FIN a las 10:45, disco 71 %). Primera corrida 10:41:
+    buenos días a 6 sin entrada (u13 Carolina, u16 Israel, u61 Antonio, u62 Jesús, u63 Ricardo, u64 Genaro); push
+    «sin entrada» a las 10:43 y 10:45, nada en los minutos pares, 0 filas nuevas en `audit_logs`. Antonio, Jesús,
+    Ricardo y Genaro no tienen teléfono registrado (`UserPushEndpoint`): solo les llega la fila de la campana. El log
+    cuenta a quien se le intentó, no a quien le llegó.
 
 - **29-10 ~11:00 (claude-code) — Diseñador de videovigilancia, fase 1: ingeniería inversa de SYSCOM y motor de cálculo.**
   - Pedido de Adam: un módulo de Core que haga lo que David sacó con el diseñador de SYSCOM («Proyecto CCTV Bodegas
