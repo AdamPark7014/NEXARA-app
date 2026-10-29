@@ -911,6 +911,40 @@ data class TerminarTrayectoRequest(
     val lng: Double? = null,
 )
 
+/**
+ * `POST me/activities/tiempo-calculado` (29-10): lo que el sistema fija en una autoasignación —
+ * tiempo estándar con su desglose, complejidad y entrega—, leído del título y el tipo. La API
+ * ignora esos campos al autoasignarse y los calcula igual; esto solo los enseña antes de guardar.
+ */
+data class TiempoCalculadoRequest(
+    val titulo: String,
+    val indicaciones: String? = null,
+    val coreKind: String,
+    val ticketType: String? = null,
+    val ticketTypeCustom: String? = null,
+    val fechaInicio: String? = null,
+)
+
+data class DesgloseTiempoDto(
+    val concepto: String? = null,
+    /** 0 en las líneas «Supuesto: …»: se enseñan sin minutos. */
+    val minutos: Double? = null,
+)
+
+data class UnidadesDto(
+    val clave: String? = null,
+    val cantidad: Double? = null,
+)
+
+data class TiempoCalculadoDto(
+    val tiempoEstandarMin: Double? = null,
+    val desglose: List<DesgloseTiempoDto>? = null,
+    val supuestos: List<String>? = null,
+    val complejidad: String? = null,
+    val unidades: UnidadesDto? = null,
+    val fechaEntregaEsperada: String? = null,
+)
+
 /** Dueño de una evidencia por revisar (`me/revisiones`). */
 data class PersonaRevisionDto(
     val id: Long? = null,
@@ -983,6 +1017,10 @@ interface CoreActivitiesApi {
     /** Sugerencia de complejidad al asignar (Haiku por la puerta). No guarda nada. */
     @POST("ai/complejidad/sugerir")
     suspend fun sugerirComplejidad(@Body body: SugerirComplejidadRequest): SugerirComplejidadResponse
+
+    /** Vista previa de lo que el sistema fija al autoasignarse (tiempo, desglose, complejidad, entrega). */
+    @POST("me/activities/tiempo-calculado")
+    suspend fun tiempoCalculado(@Body body: TiempoCalculadoRequest): TiempoCalculadoDto
 
     /** Mis tramos del trayecto (quien la lleva y quien la creó ven los de todos). */
     @GET("me/activities/{id}/trayectos")

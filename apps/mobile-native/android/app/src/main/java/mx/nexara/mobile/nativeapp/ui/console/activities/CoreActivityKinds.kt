@@ -491,6 +491,21 @@ object CoreActivityKinds {
         return null
     }
 
+    /**
+     * La entrega al editar el detalle: null si el día no cambió (no se manda; la API cuenta como
+     * cambio cualquier valor distinto), y si cambió, el día nuevo a la misma hora de México que
+     * tenía (18:00 si no tenía hora).
+     */
+    fun entregaEditada(original: String?, nuevoDia: String, zone: ZoneId = MEXICO): String? {
+        val dia = nuevoDia.trim().take(10).takeIf { it.isNotEmpty() } ?: return null
+        // El campo se llena con los 10 primeros caracteres (día UTC): sin tocarlo, tampoco cambió.
+        if (original?.take(10) == dia) return null
+        val antes = original?.let { runCatching { Instant.parse(it) }.getOrNull() }?.atZone(zone)
+        if (antes != null && antes.toLocalDate().toString() == dia) return null
+        val hora = antes?.let { formatHora(it.hour, it.minute) } ?: "18:00"
+        return scheduleIso(dia, hora, zone)
+    }
+
     /** El DatePicker de Material entrega medianoche UTC: se lee en UTC para no perder un día en México. */
     fun pickerMillisToDate(millis: Long): String =
         Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString()
@@ -529,13 +544,24 @@ object CoreActivityKinds {
         return ISO_UTC_MILLIS.format(day.atTime(time).atZone(zone).toInstant())
     }
 
-    /** buildActivityPayload de la web para un alta (estatus Pendiente, creadoPorId). */
-    fun buildRequest(form: FormState, projectClientId: Long?, creadoPorId: Long, zone: ZoneId = MEXICO): CreateActivityRequest {
+    /**
+     * buildActivityPayload de la web para un alta (estatus Pendiente, creadoPorId).
+     * [autoasignacion]: no se mandan tiempo, tope, complejidad ni entrega; la API los calcula del
+     * título y el tipo (y los ignoraría de todos modos).
+     */
+    fun buildRequest(
+        form: FormState,
+        projectClientId: Long?,
+        creadoPorId: Long,
+        zone: ZoneId = MEXICO,
+        autoasignacion: Boolean = false,
+    ): CreateActivityRequest {
         val withProject = form.projectMode == WITH_PROJECT
         val iso = scheduleIso(form.fecha, form.hora, zone)
         // Sin compromiso, la fecha máxima es la de inicio y la API la lee como «fin del día».
         val limite = scheduleIso(form.fecha, horaLimite(form), zone)
         val inventario = form.ticketType == "INVENTARIO"
+        val propia = autoasignacion
         return CreateActivityRequest(
             titulo = form.titulo.trim(),
             indicaciones = form.indicaciones.trim().takeIf { it.isNotEmpty() },
@@ -546,19 +572,19 @@ object CoreActivityKinds {
             workType = if (inventario) "PREVENTIVE_INVENTORY" else form.workType.ifEmpty { "ISSUE" },
             clientId = if (withProject) projectClientId ?: form.clientId else form.clientId,
             projectId = if (withProject) form.projectId else null,
-            tiempoEstimadoMin = form.tiempoEstimadoMin.trim().toIntOrNull(),
-            tiempoMaximoMin = form.tiempoMaximoMin.trim().toIntOrNull(),
+            tiempoEstimadoMin = if (propia) null else form.tiempoEstimadoMin.trim().toIntOrNull(),
+            tiempoMaximoMin = if (propia) null else form.tiempoMaximoMin.trim().toIntOrNull(),
             creadoPorId = creadoPorId,
             responsableId = requireNotNull(form.responsableId) { "responsableId" },
             estatus = "Pendiente",
             fechaInicio = iso,
-            fechaEntregaEsperada = limite,
-            fechaMaxima = limite,
+            fechaEntregaEsperada = if (propia) null else limite,
+            fechaMaxima = if (propia) null else limite,
             evidencePhotoRequired = clampEvidencePhotos(form.evidencePhotoRequired),
             coreKind = form.coreKind.ifEmpty { null },
             assignmentCharge = form.assignmentCharge.ifEmpty { null },
-            complejidad = form.complejidad.ifEmpty { null },
-            complejidadSugerida = form.complejidadSugerida.ifEmpty { null },
+            complejidad = if (propia) null else form.complejidad.ifEmpty { null },
+            complejidadSugerida = if (propia) null else form.complejidadSugerida.ifEmpty { null },
         )
     }
 

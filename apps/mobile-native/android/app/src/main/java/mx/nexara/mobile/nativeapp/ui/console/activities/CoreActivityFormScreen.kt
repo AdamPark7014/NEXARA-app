@@ -550,6 +550,8 @@ private fun AssignFlow(
                 repo = repo,
                 onCancel = onCancel,
                 onSubmit = submit,
+                // A sí mismo (desde «Auto-asignarme» o desde su propia ficha): lo fija el sistema.
+                autoasignacion = selfAssign || targetUserId == user.id,
             )
         }
     } else if (meta != null && !bridgeNeeded && offerCharge && charge == null) {
@@ -577,6 +579,11 @@ internal fun ActivityFormPanel(
     repo: CoreActivitiesRepository,
     onCancel: () -> Unit,
     onSubmit: suspend (CreateActivityRequest) -> Unit,
+    /**
+     * Autoasignación (regla de Adam, 29-10): tiempo, tope, complejidad y entrega los calcula la API
+     * del título y el tipo; aquí no se capturan y se enseñan en solo lectura.
+     */
+    autoasignacion: Boolean = false,
 ) {
     val k = CoreActivityKinds
     val scope = rememberCoroutineScope()
@@ -646,7 +653,7 @@ internal fun ActivityFormPanel(
             return
         }
         val project = activeProjects.firstOrNull { it.id == current.projectId }
-        val body = k.buildRequest(current, project?.client?.id, creadoPorId)
+        val body = k.buildRequest(current, project?.client?.id, creadoPorId, autoasignacion = autoasignacion)
         saving = true
         scope.launch {
             try {
@@ -772,7 +779,7 @@ internal fun ActivityFormPanel(
             )
         }
 
-        if (Complejidad.visible(meta.id, form)) {
+        if (!autoasignacion && Complejidad.visible(meta.id, form)) {
             Gap()
             ComplejidadCampo(
                 repo = repo,
@@ -815,28 +822,33 @@ internal fun ActivityFormPanel(
                 modifier = Modifier.weight(1f),
             )
         }
-        Gap()
-        CompromisoField(
-            value = form.horaCompromiso,
-            inicio = form.hora,
-            onChange = { form = form.copy(horaCompromiso = it) },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Gap()
-        DurationField(
-            label = "¿Cuánto tiempo toma?",
-            minutesText = form.tiempoEstimadoMin,
-            onMinutesText = { form = form.copy(tiempoEstimadoMin = it) },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Gap()
-        DurationField(
-            label = "Tope máximo",
-            minutesText = form.tiempoMaximoMin,
-            onMinutesText = { form = form.copy(tiempoMaximoMin = it) },
-            modifier = Modifier.fillMaxWidth(),
-            optional = true,
-        )
+        if (autoasignacion) {
+            Gap()
+            TiempoCalculadoCard(repo = repo, form = form)
+        } else {
+            Gap()
+            CompromisoField(
+                value = form.horaCompromiso,
+                inicio = form.hora,
+                onChange = { form = form.copy(horaCompromiso = it) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Gap()
+            DurationField(
+                label = "¿Cuánto tiempo toma?",
+                minutesText = form.tiempoEstimadoMin,
+                onMinutesText = { form = form.copy(tiempoEstimadoMin = it) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Gap()
+            DurationField(
+                label = "Tope máximo",
+                minutesText = form.tiempoMaximoMin,
+                onMinutesText = { form = form.copy(tiempoMaximoMin = it) },
+                modifier = Modifier.fillMaxWidth(),
+                optional = true,
+            )
+        }
         Gap()
         OutlinedTextField(
             value = form.indicaciones,

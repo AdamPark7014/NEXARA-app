@@ -268,6 +268,31 @@ class CoreActivityKindsTest {
     }
 
     @Test
+    fun autoasignacionNoMandaTiempoNiEntrega() {
+        val base = k.pickTareaTipo(k.initialForm("tarea", 7L, null).copy(titulo = "Reporte semanal", fecha = "2026-10-29", hora = "09:00", tiempoEstimadoMin = "90", horaCompromiso = "17:00", complejidad = "BASICA"), "documentacion")
+        val propia = k.buildRequest(base, null, 7L, autoasignacion = true)
+        assertNull(propia.tiempoEstimadoMin)
+        assertNull(propia.tiempoMaximoMin)
+        assertNull(propia.fechaEntregaEsperada)
+        assertNull(propia.fechaMaxima)
+        assertNull(propia.complejidad)
+        assertEquals("2026-10-29T15:00:00.000Z", propia.fechaInicio)
+        val ajena = k.buildRequest(base, null, 2L)
+        assertEquals(90, ajena.tiempoEstimadoMin)
+        assertEquals("2026-10-29T23:00:00.000Z", ajena.fechaMaxima)
+    }
+
+    @Test
+    fun entregaEditadaSoloSiCambiaElDiaYConservaLaHora() {
+        assertNull(k.entregaEditada("2026-10-29T23:00:00.000Z", "2026-10-29"))
+        assertEquals("2026-10-30T23:00:00.000Z", k.entregaEditada("2026-10-29T23:00:00.000Z", "2026-10-30"))
+        assertEquals("2026-10-30T00:00:00.000Z", k.entregaEditada(null, "2026-10-29"))
+        assertNull(k.entregaEditada("2026-10-29T23:00:00.000Z", ""))
+        // 20:00 de México del 29 es el 30 en UTC: el campo dice 30 y no se tocó.
+        assertNull(k.entregaEditada("2026-10-30T02:00:00.000Z", "2026-10-30"))
+    }
+
+    @Test
     fun complejidadTravelsInTheBodyOnlyWhenChosen() {
         val base = k.pickTareaTipo(k.initialForm("tarea", 7L, null).copy(titulo = "Instalar 4 cámaras"), "instalacion")
         val sin = k.buildRequest(base, null, 2L)

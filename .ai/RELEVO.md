@@ -1,5 +1,16 @@
 # RELEVO
 
+- **29-10 ~14:00 (claude-code) — Apps: autoasignación fija (contrato de la API e920ddbb, sesión «Asignar con IA»).**
+  - Android: en el alta propia (`autoasignacion = selfAssign || destino = yo`) ya no se capturan complejidad,
+    «Entregar a más tardar», tiempo estimado ni tope; la tarjeta «Tiempo y entrega · los fija el sistema»
+    (`TiempoCalculado.kt`) enseña en solo lectura lo que da `POST me/activities/tiempo-calculado` (estándar,
+    complejidad, entrega y desglose con sus supuestos). `buildRequest(autoasignacion = true)` no manda esos campos.
+    Asignar a otro sigue igual.
+  - Arreglo de paso en el detalle (`CoreActivityKinds.entregaEditada`): guardar la edición mandaba siempre la entrega
+    como `día T12:00Z` (06:00 de México) y pisaba la hora compromiso; con la regla nueva daba 403 a quien no es
+    superior. Ahora solo va si cambió el día, y a la misma hora de México que tenía.
+  - iOS: en curso (mismo diseño).
+
 - **29-10 ~14:30 (claude-code) — Ninguna actividad sin tiempo ni entrega; autoasignación fija; ajuste solo de superiores.**
   - Adam: «ya no debe haber ninguna actividad que tenga tiempo indefinido de entrega, y la edición de parámetros de
     una asignación debe ser a subordinados, pero la autoasignación es fija basándose en el título».

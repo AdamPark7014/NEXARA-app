@@ -146,6 +146,8 @@ class OfflineHttpInterceptor(
             "/ai/complejidad/sugerir",
             // El trayecto toma la hora del servidor: encolado, la ida empezaría cuando vuelva la señal.
             "/trayectos",
+            // Vista previa del tiempo de una autoasignación: solo sirve mientras se llena el alta.
+            "/tiempo-calculado",
         )
 
         /**
