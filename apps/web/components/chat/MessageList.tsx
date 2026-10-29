@@ -405,10 +405,13 @@ function MessageRow({
             className={`${styles.threadHint} ${ctx.openThreadId === m.id ? styles.threadHintOpen : ""}`}
             onClick={() => ctx.onOpenThread(m)}
           >
-            <strong>
-              {m.replyCount} {m.replyCount === 1 ? "respuesta" : "respuestas"}
-            </strong>
-            <span>Ver hilo</span>
+            <span>
+              <strong>
+                {m.replyCount} {m.replyCount === 1 ? "respuesta" : "respuestas"}
+              </strong>
+              <br />
+              <span>Ver hilo</span>
+            </span>
           </button>
         )}
       </div>
