@@ -1,5 +1,31 @@
 # RELEVO
 
+- **29-10 ~11:00 (claude-code) — Diseñador de videovigilancia, fase 1: ingeniería inversa de SYSCOM y motor de cálculo.**
+  - Pedido de Adam: un módulo de Core que haga lo que David sacó con el diseñador de SYSCOM («Proyecto CCTV Bodegas
+    VDM», 14 cámaras, PDF en `Downloads`). Lo usan los encargados de área y el arquitecto. No entran los ingenieros
+    de soporte ni los instaladores; sí el encargado de instalación (David) y el de soporte (José Antonio).
+  - Especificación completa en `docs/DISENADOR-CCTV.md`:
+    - flujo de SYSCOM y su modelo de datos (sacado de la vista pública de solo lectura del proyecto, sin sesión);
+    - fórmulas comprobadas contra el PDF y diseño de croquis → plano, 3D, vista por cámara, catálogo, PDF;
+    - acceso por rol y fases.
+  - Motor en `apps/web/lib/cctv/`, puro TypeScript y sin pantallas:
+    - `optica.ts`: HFOV/VFOV por focal y sensor, PPM, DORI IEC 62676-4, zona ciega, bandas. Reproduce el PDF:
+      109 PPM a 13.8 m, identificación 6 m y reconocimiento 11.9 m por la visual, zona ciega 2.4 m, persona a
+      10.3 m con 134 PPM.
+    - `plano.ts`: geometría en px del croquis más escala calibrada; muros partidos por puertas, ventanas y
+      accesos; obstáculos.
+    - `visibilidad.ts`: cuadro de la lente, oclusión 3D por muros, polígonos DORI recortados, estado del
+      humanoide, mapa de calor.
+    - `infraestructura.ts`: Mbps, TB, discos, PoE y cable UTP.
+  - Decisión: los anillos se miden en el piso con la altura descontada. SYSCOM promete identificación «hasta 6 m»
+    con la cámara a 5 m; en realidad son 4.3 m. La ficha guarda las dos lecturas.
+  - Pruebas: `npx vitest run lib/cctv` 4 archivos / 36 en verde; `tsc` de la web limpio. Nada desplegado: no
+    hay pantallas.
+  - Sigue: mockup del editor 2D/3D, ficha y propuesta para el visto bueno de Adam; luego la fase 2 (módulo
+    `erp-videovigilancia`, permisos, proyectos, editor 2D).
+  - Para el acceso hay que decidir algo: José Antonio comparte `ing_soporte` con Carolina y Alejandro. La
+    propuesta es entrar por «tener reportes directos»; la otra opción es pasarlo a `enc_soporte`.
+
 - **29-10 ~10:45 (claude-code) — Recordatorios insistentes en la jornada (pedido de Adam).**
   - `src/activities/recordatorios-jornada.ts` (reglas puras + spec) y `recordatorios-jornada.service.ts` (cron
     `recordatorios-jornada`, cada 5 min; lunes a sábado, de 7:00 a 20:00 de México). Solo se avisa con la jornada
