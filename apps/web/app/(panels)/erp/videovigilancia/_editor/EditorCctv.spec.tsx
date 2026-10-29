@@ -85,4 +85,24 @@ describe("editor del diseñador de videovigilancia", () => {
     expect(screen.getByText("Alcance en el piso")).toBeInTheDocument();
     expect(screen.getByText("hasta 4.3 m")).toBeInTheDocument();
   });
+
+  it("agrega un nivel encima, le copia los muros y lo apila en 3D", () => {
+    render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
+    const barra = screen.getByRole("region", { name: "Niveles del edificio" });
+    expect(screen.getByRole("button", { name: /Planta baja.*±0.00 m · 1 cámara/ })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "+ Nivel" }));
+    expect(barra).toHaveTextContent("Nivel 2+3.50 m · sin cámaras");
+    expect(screen.getByRole("button", { name: /Nivel 2/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Ver el nivel de abajo en gris")).toBeChecked();
+    // la pestaña Plano trae los datos del nivel
+    expect(screen.getByRole("textbox", { name: "Nombre" })).toHaveValue("Nivel 2");
+    fireEvent.click(screen.getByRole("button", { name: "Copiar muros de Planta baja" }));
+    expect(screen.getByText(/Muros copiados de Planta baja/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "3D" }));
+    expect(screen.getByText("Nivel 2 +3.50 m")).toBeInTheDocument();
+    expect(screen.getByText("Planta baja ±0.00 m")).toBeInTheDocument();
+    // volver a la planta baja la deja como estaba
+    fireEvent.click(screen.getByRole("button", { name: /^Planta baja/ }));
+    expect(screen.getByRole("tab", { name: "Cámaras · 1" })).toBeInTheDocument();
+  });
 });

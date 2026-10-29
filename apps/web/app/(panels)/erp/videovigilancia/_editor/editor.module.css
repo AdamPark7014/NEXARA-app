@@ -824,3 +824,132 @@
   flex: 1;
   accent-color: var(--ui-brand);
 }
+
+/* Barra de niveles del edificio (artboard 5). */
+.niveles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--ui-s2);
+  padding: var(--ui-s3) var(--ui-s4);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-elev-1);
+}
+
+.niveles > button:not(.nivel) {
+  align-self: center;
+}
+
+.nivel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 150px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nivel b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.nivel span {
+  font-size: 12px;
+  color: var(--ui-fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.nivel:hover {
+  background: var(--ui-hover);
+}
+
+.nivel:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 1px;
+}
+
+.nivel[aria-pressed="true"] {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+  box-shadow: inset 0 -3px 0 var(--ui-brand);
+}
+
+.nivel[aria-pressed="true"] b {
+  color: var(--ui-brand-text);
+}
+
+.nivelesFin {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s3);
+}
+
+@media (max-width: 640px) {
+  .niveles {
+    padding: var(--ui-s2) var(--ui-s3);
+  }
+  .nivel {
+    min-width: 0;
+    flex: 1 1 140px;
+  }
+  .nivelesFin {
+    margin-left: 0;
+  }
+}
+
+.camaraNivel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--ui-fs-label);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+
+.camaraNivel:last-child {
+  border-bottom: 0;
+}
+
+.camaraNivel > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.numeroNivel {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ui-fg);
+  color: var(--ui-surface);
+  display: inline-grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex: none;
+}
+
+.notaInfo {
+  background: var(--ui-info-bg);
+  border: 1px solid var(--ui-info-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: var(--ui-info-text);
+  line-height: 1.45;
+  margin: 0;
+}

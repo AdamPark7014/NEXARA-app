@@ -92,8 +92,19 @@ export type Escala = {
   calibracion?: { a: Punto; b: Punto; metros: number } | null;
 };
 
+/** Piso del edificio: planta baja, mezzanine, azotea… */
+export type Nivel = { id: string; nombre: string; elevacionM: number; alturaLibreM?: number | null };
+
 export type Plano = {
   version: 1;
+  /**
+   * Niveles (artboard 5, aprobado 29-10-2026). El plano raíz es la planta baja (`nivel`, si no
+   * viene, «Planta baja» a ±0.00 m); los demás pisos van en `niveles`, cada uno con su plano
+   * completo (croquis, escala, muros, cámaras). Los diseños de un solo nivel no traen ninguno de
+   * los dos campos. Ver `niveles.ts`.
+   */
+  nivel?: Nivel | null;
+  niveles?: Array<{ nivel: Nivel; plano: Plano }> | null;
   /** `invertido`: croquis de fondo oscuro (AutoCAD) pintado en negativo para que se lea en el tema claro. */
   croquis?: { url: string; anchoPx: number; altoPx: number; opacidad: number; invertido?: boolean } | null;
   escala: Escala;

@@ -36,10 +36,7 @@ export default function PropuestaPage() {
       disenoId={diseno.id}
       nombre={diseno.nombre}
       cliente={diseno.clienteNombre}
-      plano={plano}
-      tapas={calculo.tapas}
-      coberturas={calculo.coberturas}
-      esHoja={calculo.esHoja}
+      niveles={calculo.niveles}
       resumen={calculo.resumen}
       grabacion={diseno.grabacion}
     />

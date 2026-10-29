@@ -30,6 +30,23 @@ import {
 } from "@/lib/cctv/editor";
 import { GRABACION_POR_OMISION, type Grabacion } from "@/lib/cctv/infraestructura";
 import { problemasDelPlano, tapasDelPlano, type Plano, type Punto } from "@/lib/cctv/plano";
+import {
+  actualizarNivel,
+  agregarNivel,
+  copiarMurosDeAbajo,
+  elevacionTexto,
+  esPlantaBaja,
+  listaNiveles,
+  nivelBase,
+  nivelDeAbajo,
+  nivelDeCamara,
+  quitarNivel,
+  reemplazarNivel,
+  siguienteNumeroGlobal,
+  todasLasCamaras,
+  transformarCroquis,
+  type NivelConPlano,
+} from "@/lib/cctv/niveles";
 import { camaraEnMetros, coberturaCamara, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import { ConflictoDeVersion, ETIQUETA_ESTADO_DISENO, guardarDiseno, subirCroquis, type Diseno, type EstadoDiseno } from "@/lib/cctv/api";
 import { LEYENDA_NIVELES, COLOR_NIVEL } from "./colores";
@@ -68,10 +85,9 @@ const AYUDA_HERRAMIENTA: Record<Herramienta, string> = {
 
 type Meta = { nombre: string; estado: EstadoDiseno; grabacion: Grabacion };
 
-/** Diseño recién guardado: la API manda el plano tal cual, con el croquis en ruta relativa. */
+/** Diseño recién guardado: la API manda el plano tal cual, con los croquis en ruta relativa. */
 function planoDe(d: Diseno): Plano {
-  const p = d.plano;
-  return p.croquis ? { ...p, croquis: { ...p.croquis, url: resolveAssetUrl(p.croquis.url) || p.croquis.url } } : p;
+  return transformarCroquis(d.plano, (url) => resolveAssetUrl(url) || url);
 }
 
 export default function EditorCctv({
@@ -89,10 +105,25 @@ export default function EditorCctv({
   const router = useRouter();
   const [estado, despachar] = useReducer(reducirEditor, diseno, (d) => {
     const inicial = estadoInicial(planoDe(d));
-    const cam = camaraInicial ? inicial.plano.camaras.find((c) => c.id === camaraInicial) : null;
-    return cam ? { ...inicial, seleccion: { tipo: "camara" as const, id: cam.id } } : inicial;
+    const enNivel = camaraInicial ? nivelDeCamara(inicial.plano, camaraInicial) : null;
+    return enNivel ? { ...inicial, seleccion: { tipo: "camara" as const, id: camaraInicial! } } : inicial;
   });
-  const { plano, seleccion } = estado;
+  // La raíz guarda todos los pisos; se edita el nivel activo (`plano`).
+  const { plano: raiz, seleccion } = estado;
+  const [nivelId, setNivelId] = useState(() => {
+    const p = planoDe(diseno);
+    return (camaraInicial ? nivelDeCamara(p, camaraInicial)?.nivel.id : null) ?? nivelBase(p).id;
+  });
+  const niveles = useMemo(() => listaNiveles(raiz), [raiz]);
+  const nivelActivo = niveles.find((n) => n.nivel.id === nivelId) ?? niveles[0];
+  const plano = nivelActivo.plano;
+  const abajo = useMemo(() => nivelDeAbajo(raiz, nivelActivo.nivel.id), [raiz, nivelActivo.nivel.id]);
+  const totalCamaras = useMemo(() => todasLasCamaras(raiz).length, [raiz]);
+  const numeroNuevo = useMemo(() => siguienteNumeroGlobal(raiz), [raiz]);
+  const raizRef = useRef(raiz);
+  raizRef.current = raiz;
+  const nivelRef = useRef(nivelActivo.nivel.id);
+  nivelRef.current = nivelActivo.nivel.id;
   const [meta, setMeta] = useState<Meta>({ nombre: diseno.nombre, estado: diseno.estado, grabacion: diseno.grabacion ?? GRABACION_POR_OMISION });
   const [metaSucia, setMetaSucia] = useState(false);
   const version = useRef(diseno.version);
@@ -103,7 +134,16 @@ export default function EditorCctv({
   const [aviso, setAviso] = useState<string | null>(null);
   const [resumen, setResumen] = useState<ResumenDiseno | null>(diseno.resumen);
   const [herramienta, setHerramienta] = useState<Herramienta>("seleccionar");
-  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: true, humanoides: true });
+  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: true, humanoides: true, abajo: true });
+  // Pisos de abajo para la vista apilada (en gris). La raíz cambia con cada edición de cualquier
+  // piso; si los de abajo no cambiaron se reutiliza la lista para no recalcular su cobertura.
+  const debajoRef = useRef<{ clave: string; valor: NivelConPlano[] }>({ clave: "[]", valor: [] });
+  const debajo = useMemo(() => {
+    const lista = capas.abajo ? niveles.filter((n) => n.nivel.elevacionM < nivelActivo.nivel.elevacionM) : [];
+    const clave = JSON.stringify(lista.map(({ nivel, plano: p }) => [nivel, p.escala, p.croquis, p.muros, p.aberturas, p.obstaculos, p.etiquetas, p.camaras, p.personas]));
+    if (clave !== debajoRef.current.clave) debajoRef.current = { clave, valor: lista };
+    return debajoRef.current.valor;
+  }, [capas.abajo, niveles, nivelActivo.nivel.elevacionM]);
   const [modo, setModo] = useState<"2d" | "3d">("2d");
   const [todasLasVistas, setTodasLasVistas] = useState(false);
   const [modeloNuevo, setModeloNuevo] = useState<ModeloCamara>(MODELOS_CAMARA[0]);
@@ -113,13 +153,21 @@ export default function EditorCctv({
   const [subiendo, setSubiendo] = useState(false);
   const archivo = useRef<HTMLInputElement>(null);
 
+  /** Aplica un cambio al nivel activo (todo lo del editor trabaja sobre un solo piso). */
   const aplicar = useCallback(
     (p: Plano, opciones?: { seleccion?: Seleccion | null; fusion?: string }) => {
-      despachar({ tipo: "aplicar", plano: p, seleccion: opciones?.seleccion, fusion: opciones?.fusion });
+      despachar({ tipo: "aplicar", plano: reemplazarNivel(raizRef.current, nivelRef.current, p), seleccion: opciones?.seleccion, fusion: opciones?.fusion });
       if (opciones?.seleccion) setPestana("seleccion");
     },
     [],
   );
+  /** Cambios del edificio (agregar, quitar o renombrar niveles). */
+  const aplicarRaiz = useCallback((nueva: Plano) => despachar({ tipo: "aplicar", plano: nueva }), []);
+  const cambiarNivel = (id: string) => {
+    setNivelId(id);
+    despachar({ tipo: "seleccionar", seleccion: null });
+    setHerramienta("seleccionar");
+  };
   const seleccionar = useCallback((s: Seleccion | null) => {
     despachar({ tipo: "seleccionar", seleccion: s });
     if (s) setPestana("seleccion");
@@ -153,8 +201,8 @@ export default function EditorCctv({
   /* ── Guardado automático ── */
   const guardar = useCallback(async () => {
     if (conflicto) return;
-    const mandado = plano;
-    const planoParaApi: Plano = mandado.croquis ? { ...mandado, croquis: { ...mandado.croquis, url: rutaRelativa(mandado.croquis.url) } } : mandado;
+    const mandado = raiz;
+    const planoParaApi = transformarCroquis(mandado, rutaRelativa);
     const nuevoResumen = resumenDelPlano(mandado, meta.grabacion);
     setGuardando(true);
     try {
@@ -178,7 +226,7 @@ export default function EditorCctv({
     } finally {
       setGuardando(false);
     }
-  }, [conflicto, plano, meta, token, diseno.id, diseno.nombre]);
+  }, [conflicto, raiz, meta, token, diseno.id, diseno.nombre]);
 
   useEffect(() => {
     if ((!estado.sucio && !metaSucia) || guardando || conflicto) return;
@@ -293,7 +341,7 @@ export default function EditorCctv({
         <div className={styles.cabezaTexto}>
           <div className={styles.insignias}>
             <Badge tone={meta.estado === "aprobada" ? "success" : meta.estado === "enviada" ? "info" : "neutral"}>{ETIQUETA_ESTADO_DISENO[meta.estado]}</Badge>
-            <Badge tone="brand">CCTV · {plano.camaras.length} {plano.camaras.length === 1 ? "cámara" : "cámaras"}</Badge>
+            <Badge tone="brand">CCTV · {totalCamaras} {totalCamaras === 1 ? "cámara" : "cámaras"}</Badge>
             {cal ? <Badge tone="success">Escala calibrada · cota {cal.metros.toFixed(2)} m</Badge> : <Badge tone="warning">Escala sin calibrar</Badge>}
           </div>
           <h1 className={styles.titulo}>{meta.nombre || diseno.nombre}</h1>
@@ -318,8 +366,8 @@ export default function EditorCctv({
               if (estado.sucio || metaSucia) await guardar();
               router.push(`/erp/videovigilancia/${diseno.id}/propuesta`);
             }}
-            disabled={!plano.camaras.length}
-            title={plano.camaras.length ? undefined : "Coloca al menos una cámara"}
+            disabled={!totalCamaras}
+            title={totalCamaras ? undefined : "Coloca al menos una cámara"}
           >
             Propuesta PDF
           </Button>
@@ -339,6 +387,42 @@ export default function EditorCctv({
           {errorGuardar}
         </Alert>
       ) : null}
+
+      <section className={styles.niveles} aria-label="Niveles del edificio">
+        {niveles.map(({ nivel, plano: p }) => (
+          <button
+            key={nivel.id}
+            type="button"
+            className={styles.nivel}
+            aria-pressed={nivel.id === nivelActivo.nivel.id}
+            onClick={() => cambiarNivel(nivel.id)}
+          >
+            <b>{nivel.nombre}</b>
+            <span>
+              {elevacionTexto(nivel.elevacionM)} · {p.camaras.length ? `${p.camaras.length} ${p.camaras.length === 1 ? "cámara" : "cámaras"}` : "sin cámaras"}
+            </span>
+          </button>
+        ))}
+        <Button
+          onClick={() => {
+            const r = agregarNivel(raiz);
+            aplicarRaiz(r.raiz);
+            cambiarNivel(r.id);
+            setPestana("plano");
+            setAviso("Nivel nuevo: sube su croquis o copia los muros del nivel de abajo (pestaña Plano).");
+          }}
+        >
+          + Nivel
+        </Button>
+        {abajo ? (
+          <div className={styles.nivelesFin}>
+            <label className={styles.capa}>
+              <input type="checkbox" checked={capas.abajo} onChange={(e) => setCapas((c) => ({ ...c, abajo: e.target.checked }))} />
+              Ver el nivel de abajo en gris
+            </label>
+          </div>
+        ) : null}
+      </section>
 
       <section className={styles.editor}>
         <div className={styles.barra} role="toolbar" aria-label="Herramientas del plano">
@@ -416,9 +500,21 @@ export default function EditorCctv({
         <div className={styles.cuerpo}>
           <div className={styles.lienzoCaja}>
             {modo === "3d" ? (
-              <Lienzo3D plano={plano} seleccion={seleccion} tapas={tapas} coberturas={coberturas} capas={capas} onSeleccionar={seleccionar} />
+              <Lienzo3D
+                plano={plano}
+                key={nivelActivo.nivel.id}
+                nombreNivel={nivelActivo.nivel.nombre}
+                elevacionM={nivelActivo.nivel.elevacionM}
+                debajo={debajo}
+                seleccion={seleccion}
+                tapas={tapas}
+                coberturas={coberturas}
+                capas={capas}
+                onSeleccionar={seleccionar}
+              />
             ) : (
             <Lienzo
+              key={nivelActivo.nivel.id}
               plano={plano}
               seleccion={seleccion}
               herramienta={herramienta}
@@ -432,6 +528,8 @@ export default function EditorCctv({
               onPedirMedida={(a, b) => setMedida({ a, b })}
               onPedirTexto={setTextoEn}
               onHerramienta={setHerramienta}
+              numeroNuevo={numeroNuevo}
+              planoAbajo={capas.abajo ? abajo?.plano ?? null : null}
             />
             )}
             {!plano.croquis && !plano.muros.length && modo === "2d" ? (
@@ -518,6 +616,23 @@ export default function EditorCctv({
             }}
             onCambiarCroquis={() => archivo.current?.click()}
             fichaDe={(camId) => `/erp/videovigilancia/${diseno.id}/camara/${encodeURIComponent(camId)}`}
+            numeroNuevo={numeroNuevo}
+            nivel={{
+              nivel: nivelActivo.nivel,
+              esPlantaBaja: esPlantaBaja(raiz, nivelActivo.nivel.id),
+              nombreDeAbajo: abajo?.nivel.nombre ?? null,
+              onCambiar: (cambios) => aplicarRaiz(actualizarNivel(raiz, nivelActivo.nivel.id, cambios)),
+              onCopiarMuros: () => {
+                aplicarRaiz(copiarMurosDeAbajo(raiz, nivelActivo.nivel.id));
+                setAviso(`Muros copiados de ${abajo?.nivel.nombre ?? "abajo"}. Ctrl+Z los quita.`);
+              },
+              onQuitar: () => {
+                const nombre = nivelActivo.nivel.nombre;
+                aplicarRaiz(quitarNivel(raiz, nivelActivo.nivel.id));
+                cambiarNivel(nivelBase(raiz).id);
+                setAviso(`Se quitó ${nombre}. Ctrl+Z lo regresa.`);
+              },
+            }}
           />
         </div>
 

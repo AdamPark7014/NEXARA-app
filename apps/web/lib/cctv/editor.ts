@@ -21,16 +21,13 @@ import {
   type Punto,
 } from "./plano";
 import { camaraEnMetros, repartoDeArea } from "./visibilidad";
+import { nuevoId } from "./ids";
+import { listaNiveles } from "./niveles";
 
 export type TipoElemento = "muro" | "abertura" | "obstaculo" | "etiqueta" | "cota" | "camara" | "persona";
 export type Seleccion = { tipo: TipoElemento; id: string };
 
-let contador = 0;
-/** Id corto y único en la sesión: `m-lq3k2-7`. */
-export function nuevoId(prefijo: string): string {
-  contador = (contador + 1) % 1_000_000;
-  return `${prefijo}-${Date.now().toString(36)}-${contador.toString(36)}`;
-}
+export { nuevoId };
 
 const pxDe = (plano: Plano, metros: number) => metros / plano.escala.metrosPorPx;
 const mDe = (plano: Plano, px: number) => px * plano.escala.metrosPorPx;
@@ -265,10 +262,10 @@ export function apuntarCamara(plano: Plano, id: string, hacia: Punto): Plano {
   return actualizarCamara(plano, id, { rumboDeg: Math.round(rumboEntre(c.pos, hacia) * 10) / 10, distanciaM });
 }
 
-export function duplicarCamara(plano: Plano, id: string): { plano: Plano; camara: CamaraPlano | null } {
+/** `numero`: el que sigue en todo el edificio cuando hay varios niveles. */
+export function duplicarCamara(plano: Plano, id: string, numero = siguienteNumero(plano.camaras)): { plano: Plano; camara: CamaraPlano | null } {
   const c = plano.camaras.find((x) => x.id === id);
   if (!c) return { plano, camara: null };
-  const numero = siguienteNumero(plano.camaras);
   const desplazo = pxDe(plano, 1);
   const camara: CamaraPlano = {
     ...c,
@@ -349,7 +346,7 @@ export function borrar(plano: Plano, sel: Seleccion): Plano {
   }
 }
 
-/** ¿Sigue existiendo lo seleccionado? */
+/** ¿Sigue existiendo lo seleccionado? (en cualquier nivel) */
 export function existe(plano: Plano, sel: Seleccion | null): boolean {
   if (!sel) return false;
   const listas: Record<TipoElemento, Array<{ id: string }>> = {
@@ -361,7 +358,7 @@ export function existe(plano: Plano, sel: Seleccion | null): boolean {
     camara: plano.camaras,
     persona: plano.personas,
   };
-  return listas[sel.tipo].some((x) => x.id === sel.id);
+  return listas[sel.tipo].some((x) => x.id === sel.id) || (plano.niveles ?? []).some((n) => existe(n.plano, sel));
 }
 
 /* ── Historial ──────────────────────────────────────────────────────────────────── */
@@ -477,25 +474,39 @@ function mpDe(c: CamaraPlano): number {
   return conocida ? conocida.mp : (o.pxHoriz * o.pxVert) / 1_000_000;
 }
 
-export function resumenDelPlano(plano: Plano, grabacion: Grabacion = GRABACION_POR_OMISION, celdaM = 0.5): ResumenDiseno {
-  const mp = plano.camaras.map(mpDe);
-  const base = { camaras: plano.camaras.length, mbps: anchoBandaMbps(mp, grabacion), tb: almacenamientoTB(mp, grabacion) };
-  const lim = limitesEnMetros(plano);
-  if (!lim) return { ...base, cobertura: null };
-  const camaras = plano.camaras.map((c) => camaraEnMetros(c, plano.escala)).filter((c): c is NonNullable<typeof c> => c != null);
-  // Planos enormes: la celda crece para no pasar de ~20 mil celdas.
-  const area = (lim.max.x - lim.min.x) * (lim.max.y - lim.min.y);
-  const celda = Math.max(celdaM, Math.sqrt(area / 20_000));
-  const r = repartoDeArea({ camaras, tapas: tapasDelPlano(plano), min: lim.min, max: lim.max, celdaM: celda });
-  const pct = (n: number) => (r.celdas ? Math.round((n / r.celdas) * 1000) / 10 : 0);
+/**
+ * Resumen del edificio: cámaras y grabación de todos los niveles, y la cobertura sumando el
+ * área de cada piso (cada nivel contra sus propios muros y cámaras).
+ */
+export function resumenDelPlano(raiz: Plano, grabacion: Grabacion = GRABACION_POR_OMISION, celdaM = 0.5): ResumenDiseno {
+  const niveles = listaNiveles(raiz);
+  const todas = niveles.flatMap((n) => n.plano.camaras);
+  const mp = todas.map(mpDe);
+  const base = { camaras: todas.length, mbps: anchoBandaMbps(mp, grabacion), tb: almacenamientoTB(mp, grabacion) };
+  const suma = { celdas: 0, sinCobertura: 0, identificacion: 0, reconocimiento: 0, observacion: 0, deteccion: 0, general: 0 };
+  for (const { plano } of niveles) {
+    const lim = limitesEnMetros(plano);
+    if (!lim) continue;
+    const camaras = plano.camaras.map((c) => camaraEnMetros(c, plano.escala)).filter((c): c is NonNullable<typeof c> => c != null);
+    // Planos enormes: la celda crece para no pasar de ~20 mil celdas por nivel.
+    const area = (lim.max.x - lim.min.x) * (lim.max.y - lim.min.y);
+    const celda = Math.max(celdaM, Math.sqrt(area / 20_000));
+    const r = repartoDeArea({ camaras, tapas: tapasDelPlano(plano), min: lim.min, max: lim.max, celdaM: celda });
+    const peso = celda * celda;
+    suma.celdas += r.celdas * peso;
+    suma.sinCobertura += r.sinCobertura * peso;
+    for (const k of ["identificacion", "reconocimiento", "observacion", "deteccion", "general"] as const) suma[k] += r.porNivel[k] * peso;
+  }
+  if (!suma.celdas) return { ...base, cobertura: null };
+  const pct = (n: number) => Math.round((n / suma.celdas) * 1000) / 10;
   return {
     ...base,
     cobertura: {
-      cubierto: pct(r.celdas - r.sinCobertura),
-      identificacion: pct(r.porNivel.identificacion),
-      reconocimiento: pct(r.porNivel.reconocimiento),
-      observacion: pct(r.porNivel.observacion),
-      deteccion: pct(r.porNivel.deteccion + r.porNivel.general),
+      cubierto: pct(suma.celdas - suma.sinCobertura),
+      identificacion: pct(suma.identificacion),
+      reconocimiento: pct(suma.reconocimiento),
+      observacion: pct(suma.observacion),
+      deteccion: pct(suma.deteccion + suma.general),
     },
   };
 }

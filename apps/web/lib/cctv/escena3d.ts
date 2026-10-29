@@ -35,8 +35,8 @@ export type Proyector = {
   profundidad: (p: P3) => number;
   /** ¿Una cara vertical con esta normal (en planta) mira hacia quien ve? */
   miraAlFrente: (normal: Punto) => boolean;
-  /** Matriz SVG que lleva px del croquis (con `metrosPorPx`) al piso de la vista. */
-  matrizPiso: (metrosPorPx: number) => [number, number, number, number, number, number];
+  /** Matriz SVG que lleva px del croquis (con `metrosPorPx`) al piso de la vista, a la altura `z`. */
+  matrizPiso: (metrosPorPx: number, z?: number) => [number, number, number, number, number, number];
 };
 
 const rad = (g: number) => (g * Math.PI) / 180;
@@ -64,12 +64,12 @@ export function proyector(v: Vista3D): Proyector {
       return yr * ce + p.z * se;
     },
     miraAlFrente: (n) => ce > 1e-3 && n.x * sa + n.y * ca > 1e-6,
-    matrizPiso: (k) => {
+    matrizPiso: (k, z = 0) => {
       // pantalla = A·(px·k − centro) + desplazamiento
       const m = [s * k * ca, s * k * se * sa, -s * k * sa, s * k * se * ca] as const;
       const cx = -(v.centro.x * ca - v.centro.y * sa) * s + v.ancho / 2;
       const cy = -(v.centro.x * sa + v.centro.y * ca) * se * s + v.alto / 2;
-      return [m[0], m[1], m[2], m[3], cx, cy];
+      return [m[0], m[1], m[2], m[3], cx, cy - z * ce * s];
     },
   };
 }
@@ -102,9 +102,17 @@ export function escena3D(params: {
   vista: Vista3D;
   seleccionada?: string | null;
   limites: { min: Punto; max: Punto } | null;
+  /** Elevación del piso de este nivel (m): todo el nivel se dibuja encima de ella. */
+  elevacionM?: number;
 }): Figura3D[] {
   const { plano, vista } = params;
-  const pr = proyector(vista);
+  const z0 = params.elevacionM ?? 0;
+  const base = proyector(vista);
+  const pr: Proyector = {
+    ...base,
+    pantalla: (p) => base.pantalla({ ...p, z: p.z + z0 }),
+    profundidad: (p) => base.profundidad({ ...p, z: p.z + z0 }),
+  };
   const k = plano.escala.metrosPorPx;
   const fondo: Figura3D[] = [];
 
@@ -244,15 +252,39 @@ export function escena3D(params: {
   return [...fondo, ...conos, ...ordenables];
 }
 
+/** Une los límites de varios pisos (los que no tienen muros no cuentan). */
+export function unirLimites(ls: ReadonlyArray<{ min: Punto; max: Punto } | null>): { min: Punto; max: Punto } | null {
+  const v = ls.filter((l): l is { min: Punto; max: Punto } => l != null);
+  if (!v.length) return null;
+  return {
+    min: { x: Math.min(...v.map((l) => l.min.x)), y: Math.min(...v.map((l) => l.min.y)) },
+    max: { x: Math.max(...v.map((l) => l.max.x)), y: Math.max(...v.map((l) => l.max.y)) },
+  };
+}
+
 /** Escala que hace caber los límites del sitio en la pantalla con la vista dada. */
-export function encuadrar(limites: { min: Punto; max: Punto }, vista: Omit<Vista3D, "pxPorMetro" | "centro">): Pick<Vista3D, "pxPorMetro" | "centro"> {
-  const centro = { x: (limites.min.x + limites.max.x) / 2, y: (limites.min.y + limites.max.y) / 2 };
-  const base = proyector({ ...vista, pxPorMetro: 1, centro });
+export function encuadrar(
+  limites: { min: Punto; max: Punto },
+  vista: Omit<Vista3D, "pxPorMetro" | "centro">,
+  /** Elevación del nivel más alto que se ve (m). */
+  elevacionMaxM = 0,
+): Pick<Vista3D, "pxPorMetro" | "centro"> {
+  let centro = { x: (limites.min.x + limites.max.x) / 2, y: (limites.min.y + limites.max.y) / 2 };
   const esquinas: P3[] = [];
   for (const x of [limites.min.x, limites.max.x])
     for (const y of [limites.min.y, limites.max.y])
-      for (const z of [0, 5]) esquinas.push({ x, y, z });
-  const ps = esquinas.map(base.pantalla);
+      for (const z of [0, elevacionMaxM + 5]) esquinas.push({ x, y, z });
+  let ps = esquinas.map(proyector({ ...vista, pxPorMetro: 1, centro }).pantalla);
+  if (elevacionMaxM > 0) {
+    // Con pisos encima, se centra en pantalla lo que se ve: el corrimiento de pantalla se lleva al
+    // piso con la rotación inversa del azimut.
+    const a = rad(vista.azimutDeg);
+    const e = rad(Math.min(Math.max(vista.elevacionDeg, 5), 90));
+    const u = (Math.min(...ps.map((p) => p.x)) + Math.max(...ps.map((p) => p.x))) / 2 - vista.ancho / 2;
+    const yr = ((Math.min(...ps.map((p) => p.y)) + Math.max(...ps.map((p) => p.y))) / 2 - vista.alto / 2) / Math.sin(e);
+    centro = { x: centro.x + u * Math.cos(a) + yr * Math.sin(a), y: centro.y - u * Math.sin(a) + yr * Math.cos(a) };
+    ps = esquinas.map(proyector({ ...vista, pxPorMetro: 1, centro }).pantalla);
+  }
   const w = Math.max(...ps.map((p) => p.x)) - Math.min(...ps.map((p) => p.x));
   const h = Math.max(...ps.map((p) => p.y)) - Math.min(...ps.map((p) => p.y));
   const pxPorMetro = Math.max(1, Math.min((vista.ancho * 0.88) / Math.max(w, 1e-6), (vista.alto * 0.82) / Math.max(h, 1e-6)));

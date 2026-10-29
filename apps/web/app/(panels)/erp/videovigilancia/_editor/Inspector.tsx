@@ -29,13 +29,23 @@ import {
   resumenOptico,
   type Optica,
 } from "@/lib/cctv/optica";
-import { distancia, type Abertura, type CamaraPlano, type Plano, type Tapa } from "@/lib/cctv/plano";
+import { distancia, type Abertura, type CamaraPlano, type Nivel, type Plano, type Tapa } from "@/lib/cctv/plano";
 import { ETIQUETA_ESTADO_PERSONA, camaraEnMetros, leerPersona } from "@/lib/cctv/visibilidad";
 import { ETIQUETA_ESTADO_DISENO, type EstadoDiseno } from "@/lib/cctv/api";
 import { COLOR_NIVEL } from "./colores";
 import styles from "./editor.module.css";
 
 export type Pestana = "seleccion" | "camaras" | "plano";
+
+/** El nivel que se está editando y lo que se puede hacer con él (artboard 5). */
+export type DatosNivel = {
+  nivel: Nivel;
+  esPlantaBaja: boolean;
+  nombreDeAbajo: string | null;
+  onCambiar: (cambios: Partial<Omit<Nivel, "id">>) => void;
+  onCopiarMuros: () => void;
+  onQuitar: () => void;
+};
 
 type Aplicar = (plano: Plano, opciones?: { seleccion?: Seleccion | null; fusion?: string }) => void;
 
@@ -99,6 +109,8 @@ export default function Inspector({
   onRecalibrar,
   onCambiarCroquis,
   fichaDe,
+  numeroNuevo,
+  nivel,
 }: {
   plano: Plano;
   seleccion: Seleccion | null;
@@ -114,6 +126,9 @@ export default function Inspector({
   onCambiarCroquis: () => void;
   /** Ruta de la ficha de una cámara. */
   fichaDe: (camaraId: string) => string;
+  /** Número de la siguiente cámara (sigue entre niveles). */
+  numeroNuevo: number;
+  nivel: DatosNivel;
 }) {
   return (
     <aside className={styles.inspector} aria-label="Panel del plano">
@@ -133,7 +148,7 @@ export default function Inspector({
       <div className={styles.inspectorCuerpo}>
         {pestana === "seleccion" ? (
           seleccion ? (
-            <PanelSeleccion plano={plano} seleccion={seleccion} tapas={tapas} onAplicar={onAplicar} onSeleccionar={onSeleccionar} fichaDe={fichaDe} />
+            <PanelSeleccion plano={plano} seleccion={seleccion} tapas={tapas} onAplicar={onAplicar} onSeleccionar={onSeleccionar} fichaDe={fichaDe} numeroNuevo={numeroNuevo} />
           ) : (
             <p className={styles.ayuda}>
               Haz clic en una cámara, un muro o un hueco para editarlo. Con <b>+ Cámara</b> pones una nueva; con <b>Persona</b>, un humanoide
@@ -143,7 +158,7 @@ export default function Inspector({
         ) : pestana === "camaras" ? (
           <ListaCamaras plano={plano} onSeleccionar={(s) => (onSeleccionar(s), onPestana("seleccion"))} />
         ) : (
-          <PanelPlano plano={plano} onAplicar={onAplicar} meta={meta} onMeta={onMeta} resumen={resumen} onRecalibrar={onRecalibrar} onCambiarCroquis={onCambiarCroquis} />
+          <PanelPlano plano={plano} onAplicar={onAplicar} meta={meta} onMeta={onMeta} resumen={resumen} onRecalibrar={onRecalibrar} onCambiarCroquis={onCambiarCroquis} nivel={nivel} />
         )}
       </div>
     </aside>
@@ -174,6 +189,7 @@ function PanelSeleccion({
   onAplicar,
   onSeleccionar,
   fichaDe,
+  numeroNuevo,
 }: {
   plano: Plano;
   seleccion: Seleccion;
@@ -181,6 +197,7 @@ function PanelSeleccion({
   onAplicar: Aplicar;
   onSeleccionar: (s: Seleccion | null) => void;
   fichaDe: (camaraId: string) => string;
+  numeroNuevo: number;
 }) {
   const quitar = (texto: string) => (
     <Button variant="danger-ghost" size="sm" onClick={() => onAplicar(borrar(plano, seleccion), { seleccion: null })}>
@@ -190,7 +207,7 @@ function PanelSeleccion({
   switch (seleccion.tipo) {
     case "camara": {
       const c = plano.camaras.find((x) => x.id === seleccion.id);
-      return c ? <PanelCamara plano={plano} camara={c} tapas={tapas} onAplicar={onAplicar} quitar={quitar("Quitar cámara")} fichaHref={fichaDe(c.id)} /> : null;
+      return c ? <PanelCamara plano={plano} camara={c} tapas={tapas} onAplicar={onAplicar} quitar={quitar("Quitar cámara")} fichaHref={fichaDe(c.id)} numeroNuevo={numeroNuevo} /> : null;
     }
     case "muro": {
       const m = plano.muros.find((x) => x.id === seleccion.id);
@@ -305,6 +322,7 @@ function PanelCamara({
   onAplicar,
   quitar,
   fichaHref,
+  numeroNuevo,
 }: {
   plano: Plano;
   camara: CamaraPlano;
@@ -312,6 +330,7 @@ function PanelCamara({
   onAplicar: Aplicar;
   quitar: ReactNode;
   fichaHref: string;
+  numeroNuevo: number;
 }) {
   const fusion = `cam-${c.id}`;
   const cambiar = (cambios: Partial<CamaraPlano>) => onAplicar(actualizarCamara(plano, c.id, cambios), { fusion });
@@ -464,7 +483,7 @@ function PanelCamara({
         <Button
           size="sm"
           onClick={() => {
-            const r = duplicarCamara(plano, c.id);
+            const r = duplicarCamara(plano, c.id, numeroNuevo);
             if (r.camara) onAplicar(r.plano, { seleccion: { tipo: "camara", id: r.camara.id } });
           }}
         >
@@ -654,8 +673,10 @@ function PanelPlano({
   resumen,
   onRecalibrar,
   onCambiarCroquis,
+  nivel,
 }: {
   plano: Plano;
+  nivel: DatosNivel;
   onAplicar: Aplicar;
   meta: { nombre: string; estado: EstadoDiseno; grabacion: Grabacion };
   onMeta: (m: Partial<{ nombre: string; estado: EstadoDiseno; grabacion: Grabacion }>) => void;
@@ -679,6 +700,54 @@ function PanelPlano({
           ))}
         </Select>
       </Field>
+
+      <div className={styles.panel}>
+        <p className={styles.seccion} style={{ margin: 0 }}>
+          Nivel
+        </p>
+        <Field label="Nombre">
+          <Input value={nivel.nivel.nombre} onChange={(e) => nivel.onCambiar({ nombre: e.target.value })} maxLength={60} controlSize="sm" />
+        </Field>
+        <div className={styles.dosColumnas}>
+          <Numero etiqueta="Elevación del piso" valor={nivel.nivel.elevacionM} unidad="m" paso={0.05} min={-20} max={300} onCambio={(elevacionM) => nivel.onCambiar({ elevacionM })} />
+          <Numero etiqueta="Altura libre" valor={nivel.nivel.alturaLibreM ?? 2.8} unidad="m" paso={0.05} min={1} max={40} onCambio={(alturaLibreM) => nivel.onCambiar({ alturaLibreM })} />
+        </div>
+        {!nivel.esPlantaBaja ? (
+          <div className={styles.acciones}>
+            {nivel.nombreDeAbajo ? (
+              <Button size="sm" onClick={nivel.onCopiarMuros}>
+                Copiar muros de {nivel.nombreDeAbajo}
+              </Button>
+            ) : null}
+            <Button size="sm" variant="danger-ghost" onClick={nivel.onQuitar}>
+              Quitar nivel
+            </Button>
+          </div>
+        ) : null}
+        {!nivel.esPlantaBaja ? <p className={styles.ayuda}>La escala se hereda de la planta baja si los croquis vienen del mismo juego de planos; se puede recalibrar.</p> : null}
+      </div>
+
+      {plano.camaras.length ? (
+        <div>
+          <p className={styles.seccion}>Cámaras en este nivel</p>
+          {[...plano.camaras]
+            .sort((a, b) => a.numero - b.numero)
+            .map((c) => {
+              const o = c.lentes[0]?.optica;
+              const f = o ? resumenOptico({ optica: o, distanciaM: c.distanciaM, alturaCamM: c.alturaM, inclinacionDeg: c.inclinacionDeg }) : null;
+              return (
+                <div key={c.id} className={styles.camaraNivel}>
+                  <span className={styles.numeroNivel}>{c.numero}</span>
+                  <span>{c.nombre}</span>
+                  <span className={styles.tenue}>{f ? ETIQUETA_NIVEL[f.nivelFinal] : "Sin óptica"}</span>
+                </div>
+              );
+            })}
+        </div>
+      ) : null}
+      {!nivel.esPlantaBaja ? (
+        <p className={styles.notaInfo}>La numeración de cámaras sigue entre niveles. La propuesta lleva una hoja de distribución por nivel y la lista de equipo junta todo.</p>
+      ) : null}
 
       <div>
         <p className={styles.seccion}>Escala</p>

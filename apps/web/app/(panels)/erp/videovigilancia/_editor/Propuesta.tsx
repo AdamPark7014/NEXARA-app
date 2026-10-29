@@ -3,8 +3,9 @@
 /**
  * Propuesta de videovigilancia en hojas carta (artboard 4 del mockup aprobado), lista para
  * «Descargar PDF» con la impresión del navegador:
- * 1. portada y distribución de cámaras, cobertura del interior y leyenda DORI;
- * 2. vista 3D del sitio y vistas desde las cámaras;
+ * 1. portada y distribución de cámaras, cobertura del interior y leyenda DORI; con varios niveles,
+ *    una hoja de distribución por nivel (artboard 5);
+ * 2. vista 3D del sitio (los niveles apilados a su elevación) y vistas desde las cámaras;
  * 3. una ficha por cámara;
  * 4. infraestructura de grabación y lista de equipo.
  * Marca NEXARA (CCTV es de NEXARA; ver `.claude/rules/marcas-mailing.md`).
@@ -15,7 +16,7 @@ import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import { Button } from "@/components/base";
 import { etiquetaModelo, modeloPorId, type TipoCamara } from "@/lib/cctv/catalogo";
-import { VISTA_ISOMETRICA, encuadrar, escena3D, proyector } from "@/lib/cctv/escena3d";
+import { VISTA_ISOMETRICA, encuadrar, escena3D, proyector, unirLimites } from "@/lib/cctv/escena3d";
 import { limitesEnMetros, type ResumenDiseno } from "@/lib/cctv/editor";
 import {
   GRABACION_POR_OMISION,
@@ -28,8 +29,9 @@ import {
   type Grabacion,
 } from "@/lib/cctv/infraestructura";
 import { DESCRIPCION_NIVEL, ETIQUETA_NIVEL, NIVELES_DORI, RESOLUCIONES, UMBRAL_DORI, metros, resumenOptico } from "@/lib/cctv/optica";
-import type { CamaraPlano, Plano, Tapa } from "@/lib/cctv/plano";
-import type { PoligonoCobertura } from "@/lib/cctv/visibilidad";
+import { elevacionTexto } from "@/lib/cctv/niveles";
+import type { CamaraPlano } from "@/lib/cctv/plano";
+import type { CalculoNivel } from "./calculo";
 import { COLOR_NIVEL } from "./colores";
 import Figuras3D from "./Figuras3D";
 import LaminaDetalle from "./LaminaDetalle";
@@ -79,38 +81,43 @@ export default function Propuesta({
   disenoId,
   nombre,
   cliente,
-  plano,
-  tapas,
-  coberturas,
-  esHoja,
+  niveles,
   resumen,
   grabacion,
 }: {
   disenoId: number;
   nombre: string;
   cliente: string | null;
-  plano: Plano;
-  tapas: readonly Tapa[];
-  coberturas: ReadonlyMap<string, PoligonoCobertura[]>;
-  esHoja: (t: Tapa) => boolean;
+  /** Los niveles del edificio con su cálculo, de abajo hacia arriba (la planta baja primero). */
+  niveles: readonly CalculoNivel[];
   resumen: ResumenDiseno;
   grabacion: Grabacion | null;
 }) {
-  const camaras = useMemo(() => [...plano.camaras].sort((a, b) => a.numero - b.numero), [plano.camaras]);
+  // Cada cámara con el nivel donde está; la numeración sigue entre niveles.
+  const conNivel = useMemo(
+    () => niveles.flatMap((n) => n.plano.camaras.map((c) => ({ c, n }))).sort((a, b) => a.c.numero - b.c.numero),
+    [niveles],
+  );
+  const camaras = useMemo(() => conNivel.map((x) => x.c), [conNivel]);
+  const varios = niveles.length > 1;
   const g = grabacion ?? GRABACION_POR_OMISION;
-  const totalHojas = 2 + camaras.length + 1;
-  const cal = plano.escala.calibracion;
+  const hojasDistribucion = niveles.length;
+  const totalHojas = hojasDistribucion + 1 + camaras.length + 1;
 
   const iso = useMemo(() => {
-    const lim = limitesEnMetros(plano);
+    const lim = unirLimites(niveles.map((n) => limitesEnMetros(n.plano)));
     if (!lim) return null;
     const vistaBase = { ...VISTA_ISOMETRICA, ancho: 720, alto: 380 };
-    const vista = { ...vistaBase, ...encuadrar(lim, vistaBase) };
-    return {
-      figuras: escena3D({ plano, tapas, coberturas, vista, limites: lim }),
-      matriz: proyector(vista).matrizPiso(plano.escala.metrosPorPx),
-    };
-  }, [plano, tapas, coberturas]);
+    const tope = Math.max(...niveles.map((n) => n.nivel.elevacionM));
+    const vista = { ...vistaBase, ...encuadrar(lim, vistaBase, tope) };
+    const pr = proyector(vista);
+    return niveles.map((n) => ({
+      id: n.nivel.id,
+      plano: n.plano,
+      figuras: escena3D({ plano: n.plano, tapas: n.tapas, coberturas: n.coberturas, vista, limites: limitesEnMetros(n.plano), elevacionM: n.nivel.elevacionM }),
+      matriz: pr.matrizPiso(n.plano.escala.metrosPorPx, n.nivel.elevacionM),
+    }));
+  }, [niveles]);
 
   const infra = useMemo(() => {
     const mp = camaras.map(mpDe);
@@ -153,8 +160,45 @@ export default function Propuesta({
       </div>
 
       <div className="cctv-propuesta">
-        {/* Hoja 1 · portada y distribución */}
-        <article className={`${styles.hoja} cctv-hoja`} aria-label="Hoja 1: distribución de cámaras">
+        {niveles.map((nv, hn) => {
+          const delNivel = conNivel.filter((x) => x.n.nivel.id === nv.nivel.id).map((x) => x.c);
+          const cal = nv.plano.escala.calibracion;
+          const distribucion = (
+            <>
+              <div className={styles.seccionCabeza}>
+                <h2 className={styles.h2}>{varios ? `Distribución · ${nv.nivel.nombre} ${elevacionTexto(nv.nivel.elevacionM)}` : "Distribución de cámaras"}</h2>
+                <span className={styles.tenue}>
+                  {delNivel.length ? `${delNivel.length} ${delNivel.length === 1 ? "cámara" : "cámaras"}` : "sin cámaras"}
+                  {cal ? ` · sobre croquis calibrado (cota ${cal.metros.toFixed(2)} m)` : ""}
+                </span>
+              </div>
+              <div className={styles.marco}>
+                <PlanoEstatico
+                  plano={nv.plano}
+                  tapas={nv.tapas}
+                  coberturas={nv.coberturas}
+                  conCroquis
+                  titulo={varios ? `Plano de ${nv.nivel.nombre} con la cobertura de sus cámaras` : "Plano con la cobertura de todas las cámaras"}
+                />
+              </div>
+              <ol className={styles.listaCamaras}>
+                {delNivel.map((c) => (
+                  <li key={c.id}>
+                    <b>{c.numero}.</b> {c.nombre} — {c.modelo.replace(/^HIKVISION\s+/i, "")}
+                  </li>
+                ))}
+              </ol>
+            </>
+          );
+          if (hn > 0)
+            return (
+              <article key={nv.nivel.id} className={`${styles.hoja} cctv-hoja`} aria-label={`Hoja ${hn + 1}: distribución de ${nv.nivel.nombre}`}>
+                {distribucion}
+                <Pie hoja={hn + 1} total={totalHojas} />
+              </article>
+            );
+          return (
+        <article key={nv.nivel.id} className={`${styles.hoja} cctv-hoja`} aria-label="Hoja 1: distribución de cámaras">
           <header className={styles.portada}>
             <div>
               <div className={styles.eyebrow}>Propuesta de videovigilancia</div>
@@ -169,23 +213,7 @@ export default function Propuesta({
             </div>
           </header>
           <div className={styles.regla} />
-          <div className={styles.seccionCabeza}>
-            <h2 className={styles.h2}>Distribución de cámaras</h2>
-            <span className={styles.tenue}>
-              {camaras.length} {camaras.length === 1 ? "cámara" : "cámaras"}
-              {cal ? ` · sobre croquis calibrado (cota ${cal.metros.toFixed(2)} m)` : ""}
-            </span>
-          </div>
-          <div className={styles.marco}>
-            <PlanoEstatico plano={plano} tapas={tapas} coberturas={coberturas} conCroquis titulo="Plano con la cobertura de todas las cámaras" />
-          </div>
-          <ol className={styles.listaCamaras}>
-            {camaras.map((c) => (
-              <li key={c.id}>
-                <b>{c.numero}.</b> {c.nombre} — {c.modelo.replace(/^HIKVISION\s+/i, "")}
-              </li>
-            ))}
-          </ol>
+          {distribucion}
           {cob ? (
             <>
               <h2 className={styles.h2}>Cobertura del interior</h2>
@@ -223,42 +251,54 @@ export default function Propuesta({
           </div>
           <Pie hoja={1} total={totalHojas} />
         </article>
+          );
+        })}
 
-        {/* Hoja 2 · 3D y vistas */}
-        <article className={`${styles.hoja} cctv-hoja`} aria-label="Hoja 2: vista 3D y vistas desde las cámaras">
+        {/* 3D y vistas */}
+        <article className={`${styles.hoja} cctv-hoja`} aria-label={`Hoja ${hojasDistribucion + 1}: vista 3D y vistas desde las cámaras`}>
           <h2 className={styles.h2}>Vista 3D del sitio</h2>
-          <p className={styles.nota}>Cámaras a su altura real de montaje con su cobertura proyectada al piso; los humanoides marcan dónde se midió la densidad de píxeles.</p>
+          <p className={styles.nota}>
+            Cámaras a su altura real de montaje con su cobertura proyectada al piso{varios ? ", con cada nivel a su elevación" : ""}; los humanoides marcan dónde se midió la densidad de
+            píxeles.
+          </p>
           {iso ? (
             <div className={styles.marco}>
-              <svg viewBox="0 0 720 380" width="100%" role="img" aria-label="Vista isométrica del sitio">
+              <svg viewBox="0 0 720 380" width="100%" role="img" aria-label={varios ? "Vista isométrica del edificio con sus niveles apilados" : "Vista isométrica del sitio"}>
                 <rect width={720} height={380} fill="var(--ui-surface-2)" />
-                <Figuras3D figuras={iso.figuras} plano={plano} matriz={iso.matriz} capas={{ croquis: true, etiquetas: true, translucidos: true }} />
+                {iso.map((n) => (
+                  <Figuras3D key={n.id} figuras={n.figuras} plano={n.plano} matriz={n.matriz} capas={{ croquis: true, etiquetas: true, translucidos: true }} />
+                ))}
               </svg>
             </div>
           ) : null}
           <h2 className={styles.h2}>Vistas desde las cámaras</h2>
           <p className={styles.nota}>Simulación con la óptica real de cada cámara y los humanoides en su posición actual.</p>
           <div className={styles.vistas}>
-            {camaras.slice(0, 6).map((c) => (
-              <VistaCamara key={c.id} plano={plano} camara={c} tapas={tapas} coberturas={coberturas} esHoja={esHoja} compacta />
+            {conNivel.slice(0, 6).map(({ c, n }) => (
+              <VistaCamara key={c.id} plano={n.plano} camara={c} tapas={n.tapas} coberturas={n.coberturas} esHoja={n.esHoja} compacta />
             ))}
           </div>
           {camaras.length > 6 ? <p className={styles.nota}>Las vistas de las demás cámaras van en su ficha.</p> : null}
-          <Pie hoja={2} total={totalHojas} />
+          <Pie hoja={hojasDistribucion + 1} total={totalHojas} />
         </article>
 
         {/* Una hoja por cámara */}
-        {camaras.map((c, i) => {
+        {conNivel.map(({ c, n: nv }, i) => {
+          const { plano, tapas, coberturas, esHoja } = nv;
+          const hoja = hojasDistribucion + 2 + i;
           const o = c.lentes[0]?.optica;
           const f = o ? resumenOptico({ optica: o, distanciaM: c.distanciaM, alturaCamM: c.alturaM, inclinacionDeg: c.inclinacionDeg }) : null;
           const m = modeloPorId(c.productoId);
           return (
-            <article key={c.id} className={`${styles.hoja} cctv-hoja`} aria-label={`Hoja ${3 + i}: cámara ${c.numero}`}>
+            <article key={c.id} className={`${styles.hoja} cctv-hoja`} aria-label={`Hoja ${hoja}: cámara ${c.numero}`}>
               <div className={styles.fichaCabeza}>
                 <span className={styles.numero}>{c.numero}</span>
                 <div className={styles.fichaTitulo}>
                   <b>{c.nombre}</b>
-                  <span>{c.modelo}</span>
+                  <span>
+                    {c.modelo}
+                    {varios ? ` · ${nv.nivel.nombre} ${elevacionTexto(nv.nivel.elevacionM)}` : ""}
+                  </span>
                 </div>
                 {f ? (
                   <span className={styles.insignia}>
@@ -347,7 +387,7 @@ export default function Propuesta({
                   </ul>
                 </div>
               ) : null}
-              <Pie hoja={3 + i} total={totalHojas} />
+              <Pie hoja={hoja} total={totalHojas} />
             </article>
           );
         })}

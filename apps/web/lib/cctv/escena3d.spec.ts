@@ -74,4 +74,17 @@ describe("escena", () => {
     expect(r.pxPorMetro).toBeGreaterThan(8);
     expect(r.pxPorMetro).toBeLessThan(20);
   });
+
+  it("con pisos encima encuadra el edificio completo, centrado en pantalla", () => {
+    const vista = { ...VISTA_ISOMETRICA, ancho: 900, alto: 560 };
+    const lim = { min: { x: 0, y: 0 }, max: { x: 30, y: 20 } };
+    const r = encuadrar(lim, vista, 7);
+    const pr = proyector({ ...vista, ...r });
+    const ys: number[] = [];
+    for (const x of [0, 30]) for (const y of [0, 20]) for (const z of [0, 12]) ys.push(pr.pantalla({ x, y, z }).y);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(560);
+    // el centro de lo que se ve queda a media pantalla (±5 %)
+    expect(Math.abs((Math.min(...ys) + Math.max(...ys)) / 2 - 280)).toBeLessThan(28);
+  });
 });
