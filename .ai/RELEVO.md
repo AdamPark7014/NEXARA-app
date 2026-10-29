@@ -298,6 +298,10 @@
     detalle de la cotización (`/erp/cotizaciones/*`, sin sumarle el módulo al menú) y la ficha del cliente
     (`/erp/clientes/**` + `GET /api/ventas/clientes/**`) para completar RFC, régimen y CP; editar el cliente ya lo daba
     `CLIENT_ADMIN_WRITE_URL_RULES`.
+  - Verificado en producción con la sesión de Christian (Chrome, 29-10 tarde): las tres pantallas cuadran con el
+    mockup (vacías donde no hay datos), «Por facturar» muestra los 12 servicios y «Completar cliente» lleva a la ficha.
+    La miga y la pestaña decían «Pagos Y Gastos» (`humanize` en `AppShell.tsx`): ahora con `SLUG_FRASES`. Sin
+    revisar visualmente: preparar/timbrar un CFDI (no hay borradores y crear uno gasta folio en producción).
   - Pedido de Adam: «por facturar», pagos y gastos ligados a su CFDI y banco, estado de resultados y balance. Mockup
     aprobado por Adam el 29-10: https://claude.ai/artifact/MENR9dXWC7PGocKEoSTmpD
   - API en `src/accounting/mesa-contable/` bajo `GET|POST /api/accounting/workspace/mesa/*` (contrato en el
