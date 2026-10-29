@@ -3,9 +3,9 @@ import PhotosUI
 import UIKit
 import UniformTypeIdentifiers
 
-/// «Archivos de evidencia» del detalle de una actividad comercial: la propuesta en
+/// «Documentos» del detalle de cualquier actividad (desde el 29-10; antes solo comercial): la propuesta en
 /// Excel, la minuta en Word, el PDF del cliente. Lista con icono por tipo, «Adjuntar
-/// archivo» (varios a la vez, desde Archivos o desde Fotos) y, al tocar uno, el
+/// archivo» (varios a la vez, solo desde Archivos) y, al tocar uno, el
 /// documento embebido con Vista Rápida + «Guardar en Archivos» y «Compartir»
 /// (`DocumentoScreen`). Quitar, solo si el API dice `puedeQuitar`.
 struct ActivityAdjuntosSection: View {
@@ -64,16 +64,6 @@ struct ActivityAdjuntosSection: View {
             case .failure:
                 errorAccion = "No se pudo abrir el archivo."
             }
-        }
-        .photosPicker(
-            isPresented: $eligiendoFotos,
-            selection: $fotos,
-            maxSelectionCount: ActivityAdjuntosRules.maximoPorEnvio,
-            matching: .images
-        )
-        .onChange(of: fotos) { _, elegidas in
-            guard !elegidas.isEmpty else { return }
-            Task { await subirFotos(elegidas) }
         }
         .fullScreenCover(item: $abierto) { documento in
             NavigationStack {
@@ -157,21 +147,12 @@ struct ActivityAdjuntosSection: View {
         }
     }
 
-    /// «Adjuntar archivo» con el contorno de `NxSecondaryButton`; ofrece Archivos y Fotos.
+    /// «Adjuntar archivo» con el contorno de `NxSecondaryButton`. Solo documentos desde Archivos
+    /// (Adam, 29-10): sin cámara ni Fotos; las fotos van en Evidencias.
     private var botonAdjuntar: some View {
-        Menu {
-            Button {
-                errorAccion = nil
-                eligiendoArchivos = true
-            } label: {
-                Label("Desde Archivos", systemImage: "folder")
-            }
-            Button {
-                errorAccion = nil
-                eligiendoFotos = true
-            } label: {
-                Label("Desde Fotos", systemImage: "photo.on.rectangle")
-            }
+        Button {
+            errorAccion = nil
+            eligiendoArchivos = true
         } label: {
             HStack(spacing: 8) {
                 if subiendo {

@@ -562,7 +562,7 @@ fun ActivityDetailScreen(
                                     if (cotizacion != null && ActividadCotizacionRules.aplica(detail.coreKind, cotizacion)) {
                                         ActividadCotizacionCard(cotizacion = cotizacion)
                                     }
-                                    // Comercial: la propuesta, la minuta y lo que manda el cliente (Adam, 07-10).
+                                    // Documentos en toda actividad (Adam, 29-10): PowerPoint, Excel, Word o PDF; las fotos van en Evidencias.
                                     if (ActividadAdjuntosRules.aplica(detail.coreKind)) {
                                         ActividadAdjuntosSection(
                                             activityId = detail.id,

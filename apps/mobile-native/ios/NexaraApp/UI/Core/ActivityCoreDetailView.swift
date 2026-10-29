@@ -686,15 +686,13 @@ struct ActivityCoreDetailView: View {
                     if let cotizacion = cotizacionLigada {
                         ActivityCotizacionCard(cotizacion: cotizacion)
                     }
-                    // Comercial: la propuesta en Excel, la minuta en Word, el PDF del cliente.
-                    if CoreEvidence.isComercial(coreKind) {
-                        ActivityAdjuntosSection(
-                            activityId: activityId,
-                            puedeAdjuntar: puedeAdjuntar,
-                            refreshToken: recarga,
-                            onAviso: { snack = $0 }
-                        )
-                    }
+                    // Documentos en toda actividad (Adam, 29-10): PowerPoint, Excel, Word o PDF.
+                    ActivityAdjuntosSection(
+                        activityId: activityId,
+                        puedeAdjuntar: puedeAdjuntar,
+                        refreshToken: recarga,
+                        onAviso: { snack = $0 }
+                    )
                 }
             }
             .padding(16)
