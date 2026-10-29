@@ -48,6 +48,25 @@ export const CONFIANZA_UI: Record<Confianza, string> = {
   baja: "confianza baja",
 };
 
+/**
+ * Horas estándar ganadas (§8): lo que vale lo entregado según la tabla de tarifas, contra sus horas en
+ * jornada, y qué tan cerca del estándar lo hizo. Medición aparte: el índice no la usa todavía (§7.4).
+ * null si en el rango no entregó nada asignado con tiempo estándar.
+ */
+export function estandarGanado(t: Pick<TotalesKpi, "entregas" | "minutosLaborados">): { valor: string; detalle: string } | null {
+  const e = t.entregas;
+  const n = e?.conEstandar ?? 0;
+  const ganados = e?.minutosEstandarGanados ?? 0;
+  if (!e || n <= 0 || ganados <= 0) return null;
+  const rendimiento = t.minutosLaborados > 0 ? Math.round((ganados / t.minutosLaborados) * 100) : null;
+  const partes = [`${n} ${n === 1 ? "entrega" : "entregas"} con estándar`];
+  if (e.pctEficienciaEstandar != null) partes.push(`eficiencia ${e.pctEficienciaEstandar} %`);
+  return {
+    valor: rendimiento != null ? `${horasEnPalabras(ganados)} · ${rendimiento} % de su jornada` : horasEnPalabras(ganados),
+    detalle: partes.join(" · "),
+  };
+}
+
 /** «Entregó 31 de 33 a tiempo. Tuvo una actividad corriendo 128 h de 212 h en jornada.» */
 export function resumenDesempeno(t: TotalesKpi): string {
   const frases: string[] = [];

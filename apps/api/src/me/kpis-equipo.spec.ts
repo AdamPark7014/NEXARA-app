@@ -860,3 +860,43 @@ describe('sumaEquipo', () => {
     expect(supuestosKpi().length).toBeGreaterThan(5);
   });
 });
+
+// Horas estándar ganadas (§8): medición aparte del índice. Cuenta el estándar de lo entregado.
+describe('horas estándar ganadas', () => {
+  const ahora = new Date('2026-10-29T23:00:00Z');
+  const base = {
+    limite: new Date('2026-10-29T23:59:00Z'),
+    entregadaAt: new Date('2026-10-29T20:00:00Z'),
+  };
+
+  it('suma el estándar de lo entregado y compara con lo que tardó (tope 100)', () => {
+    const lista = entregasDelRango(
+      [
+        { activityId: 1, ...base, minutosEstandar: 240, minutosReales: 300 },
+        { activityId: 2, ...base, minutosEstandar: 60, minutosReales: 45 },
+        { activityId: 3, ...base, minutosReales: 120 },
+        { activityId: 4, limite: new Date('2026-10-29T18:00:00Z'), entregadaAt: null, minutosEstandar: 90 },
+      ],
+      '2026-10-29',
+      '2026-10-29',
+      ahora,
+    );
+    const r = resumenEntregas(lista);
+    expect(r.conEstandar).toBe(2);
+    expect(r.minutosEstandarGanados).toBe(300);
+    expect(r.minutosRealesConEstandar).toBe(345);
+    expect(r.pctEficienciaEstandar).toBe(87);
+  });
+
+  it('sin estándar no hay eficiencia estándar', () => {
+    const r = resumenEntregas(entregasDelRango([{ activityId: 9, ...base, minutosReales: 50 }], '2026-10-29', '2026-10-29', ahora));
+    expect(r).toMatchObject({ conEstandar: 0, minutosEstandarGanados: 0, pctEficienciaEstandar: null });
+  });
+
+  it('nunca pasa de 100 aunque lo haga en menos tiempo', () => {
+    const r = resumenEntregas(
+      entregasDelRango([{ activityId: 5, ...base, minutosEstandar: 120, minutosReales: 30 }], '2026-10-29', '2026-10-29', ahora),
+    );
+    expect(r.pctEficienciaEstandar).toBe(100);
+  });
+});

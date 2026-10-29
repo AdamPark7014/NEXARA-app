@@ -673,6 +673,7 @@ export class KpisEquipoService {
             periodoFin: true,
             tiempoEstimadoMin: true,
             tiempoMaximoMin: true,
+            tiempoEstandarMin: true,
             activityEvidences: {
               where: { userId: { in: userIds } },
               select: {
@@ -768,6 +769,7 @@ export class KpisEquipoService {
           ahora,
         }),
         diasPeriodo: periodo ? diasDelRango(periodo.inicio, periodo.fin).length : 1,
+        minutosEstandar: a.tiempoEstandarMin ?? null,
       });
       out.set(f.userId, lista);
     }

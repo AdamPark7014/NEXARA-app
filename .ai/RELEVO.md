@@ -62,6 +62,17 @@
   - API: regla nueva `obra` en `tabla-estandar.ts`, con las mismas tarifas de instalación y cableado (dispositivos,
     nodos o metros, base de 30 min). Adam pidió parametrizar las obras.
   - Falta: horas estándar ganadas en Desempeño y la API de tramos de trayecto (la espera `nexara-apps-uiux`).
+  - **Desplegado el web** (`c6cc2ef3` + `8899e14b`) y revisado en el Chrome de Adam, en Asignar de Iván · Instalación:
+    con 8 dispositivos da 6 h 30 min (30 + 8 × 45). «Tiempo estimado» del panel quedó igual, y lo típico (7 h 30 min,
+    24 anteriores) queda como referencia. La regla `obra` sale con el próximo despliegue de API.
+  - **Horas estándar ganadas en Desempeño** (medición aparte; el índice no cambia hasta §7.4):
+    - API `kpis-equipo.ts`: `EntregaKpi.minutosEstandar` (de `Activity.tiempoEstandarMin`) y, en `EntregasKpi`,
+      `conEstandar`, `minutosEstandarGanados`, `minutosRealesConEstandar` y `pctEficienciaEstandar` (estándar ÷ real,
+      tope 100), con `sumasEstandar` y `sumaEquipo`.
+    - Web: renglón «Horas estándar ganadas» en la lectura de cada persona (`estandarGanado` en `lib/desempeno.ts`), con
+      «8 h · 50 % de su jornada (3 entregas con estándar · eficiencia 87 %)». Sin entregas con estándar lo dice.
+    - Solo cuenta lo asignado desde hoy con tiempo estándar; la medición de lo de antes está en las notas compartidas
+      (`medicion-actividades-2026-10-29.md`: ningún título traía la cantidad).
 
 - **29-10 ~13:30 (claude-code) — Mesa contable de la contadora: API y web, desplegadas el 29-10 ~12:10.**
   - Desplegado `c6cc2ef3` con `prisma migrate deploy` antes de levantar la API (232 migraciones, la nueva aplicada).
