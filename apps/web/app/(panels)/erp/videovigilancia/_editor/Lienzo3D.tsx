@@ -208,7 +208,26 @@ export default function Lienzo3D({
     };
   }, [debajo, elevacionM, vista, limites, nombreNivel, pisosDeAbajo]);
 
+  // Dos dedos (celular): pellizcar acerca o aleja y arrastrar mueve la vista; no gira.
+  const dedos = useRef(new Map<number, { x: number; y: number }>());
+  const pellizco = useRef<{ dist: number; medio: { x: number; y: number }; vista: Vista3D } | null>(null);
+  const medioYDistancia = () => {
+    const [a, b] = [...dedos.current.values()];
+    return { medio: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, dist: Math.max(Math.hypot(a.x - b.x, a.y - b.y), 1) };
+  };
+
   const alPresionar = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === "touch") {
+      dedos.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (dedos.current.size >= 2) {
+        if (dedos.current.size === 2) {
+          arrastre.current = null;
+          setArrastrando(false);
+          pellizco.current = { ...medioYDistancia(), vista: vistaRef.current };
+        }
+        return;
+      }
+    }
     const el = (e.target as Element).closest?.("[data-sel]");
     const raw = el?.getAttribute("data-sel");
     if (raw && e.button === 0 && !e.shiftKey) {
@@ -221,6 +240,21 @@ export default function Lienzo3D({
     svgRef.current?.setPointerCapture(e.pointerId);
   };
   const alMover = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === "touch" && dedos.current.has(e.pointerId)) {
+      dedos.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const p = pellizco.current;
+      if (p) {
+        const { medio, dist } = medioYDistancia();
+        const v = acercar(p.vista, dist / p.dist);
+        // El punto medio arrastra la vista (mismo cálculo que Mayús + arrastrar).
+        const ang = (v.azimutDeg * Math.PI) / 180;
+        const se = Math.max(Math.sin((v.elevacionDeg * Math.PI) / 180), 0.2);
+        const mx = -(medio.x - p.medio.x) / v.pxPorMetro;
+        const my = -(medio.y - p.medio.y) / (v.pxPorMetro * se);
+        programar({ ...v, centro: { x: v.centro.x + mx * Math.cos(ang) + my * Math.sin(ang), y: v.centro.y - mx * Math.sin(ang) + my * Math.cos(ang) } });
+        return;
+      }
+    }
     const a = arrastre.current;
     if (!a) return;
     const dx = e.clientX - a.x;
@@ -238,7 +272,11 @@ export default function Lienzo3D({
       });
     }
   };
-  const alSoltar = () => {
+  const alSoltar = (e?: ReactPointerEvent<SVGSVGElement>) => {
+    if (e?.pointerType === "touch") {
+      dedos.current.delete(e.pointerId);
+      if (pellizco.current && dedos.current.size < 2) pellizco.current = null;
+    }
     arrastre.current = null;
     setArrastrando(false);
     if (pendiente.current) {
