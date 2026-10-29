@@ -577,11 +577,12 @@
   border: 1px solid var(--ui-border);
 }
 
+/* Pista oscurecida y letra blanca: sobre un velo claro daba 3.1:1. */
 .btnPrimary .kbd,
 .btnDanger .kbd {
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.16);
+  border-color: rgba(255, 255, 255, 0.32);
 }
 
 .btnTonal .kbd {

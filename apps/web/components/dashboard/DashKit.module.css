@@ -271,7 +271,7 @@
 .tonePositive .statValue,
 .tonePositive .miniValue { color: var(--success); }
 .toneWarning .statValue,
-.toneWarning .miniValue { color: var(--warning); }
+.toneWarning .miniValue { color: var(--state-warning-text, var(--warning)); }
 .toneDanger .statValue,
 .toneDanger .miniValue { color: var(--danger); }
 

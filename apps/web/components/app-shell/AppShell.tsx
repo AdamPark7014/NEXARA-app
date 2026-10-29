@@ -1418,6 +1418,17 @@ function Breadcrumbs({
     .filter(Boolean)
     .slice(1); // saltamos el slug del panel
 
+  // Título de la pestaña del navegador con la miga actual («Pizarra · NEXARA Core»): todas las
+  // pantallas decían el título del sitio público (auditoría 29-10).
+  const ultimoSegmento = segments[segments.length - 1];
+  const tituloPestana = ultimoSegmento
+    ? MODULES_BY_URL.get(`/${panel}/${segments.join("/")}`)?.label ||
+      (/^\d+$/.test(ultimoSegmento) ? "Detalle" : humanize(ultimoSegmento))
+    : PANEL_META[panel].name;
+  useEffect(() => {
+    document.title = `${tituloPestana} · NEXARA Core`;
+  }, [tituloPestana]);
+
   if (segments.length === 0) {
     return (
       <nav className={styles.breadcrumbs} aria-label="Estás en">

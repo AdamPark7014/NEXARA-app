@@ -1,5 +1,18 @@
 # RELEVO
 
+- **29-10 ~12:00 (claude-code) — Web Core: auditoría por DOM del resto del menú y arreglos de contraste (sin desplegar).**
+  - Auditadas 21 pantallas a 1707 px (el ancho real de Adam: Chrome maximizado con zoom al 90 %). 375 px no se pudo
+    medir sin cambiar su ventana; el navegador integrado no tiene sesión de Core. Sin solapes ni desborde horizontal.
+    JSON por pantalla en el scratchpad de la sesión «apps paridad» (`auditoria-web/`).
+  - Arreglado: dentro de `.nx-app-shell`, `--state-warning-text/-success-text/-danger-text` toman los `--ui-*-text`
+    (pastillas «Pendiente», aviso del riel de Hoy y cifras de advertencia en 2.6–2.9:1); número del filtro activo de
+    `ModulePage` sin opacidad (3.5:1); pista de teclado del botón verde (`base_btnPrimary .kbd`, 3.1:1); chips de
+    Vehículos; cifras de advertencia de `DashKit`. Título de la pestaña por sección («Pizarra · NEXARA Core»).
+  - Sin tocar (de otras sesiones): Contabilidad (enlace activo 3.55:1) y Chat (blanco sobre degradado, composer recorta
+    4 px). Notificaciones «· Abrir →» 4.26 y «Prioridad alta» 4.34 a 10.5 px quedan pendientes.
+  - **No desplegado:** sale con el próximo despliegue del web. Ojo: la auditoría abrió `/erp/chat` como Christian y
+    pudo marcar como leído el canal 333; puede quedar abierta en su Chrome una pestaña en `core.nexara.com.mx/robots.txt`.
+
 - **29-10 ~12:10 (claude-code) — Chat de Core: ligas de todo, editor sin texto encimado y asistente en #general (pedido de Adam).**
   - Código: `bbc3b4a9` (API + web) y el arreglo del menú de `@` (este commit). Desplegado y probado en producción con
     la sesión de Christian, solo con borradores y el panel del asistente (nada se publicó en #general).
