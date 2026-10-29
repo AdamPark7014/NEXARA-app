@@ -33,7 +33,7 @@ describe('tiempo y entrega de toda actividad', () => {
 
     const sinCantidad = estandarDeLectura({ coreKind: 'comercial' }, {});
     expect(sinCantidad.totalMin).toBe(COTIZACION_1);
-    expect(sinCantidad.supuestos[0]).toMatch(/no dice cuántos partidas: se cuenta 1/);
+    expect(sinCantidad.supuestos[0]).toBe('el título no dice cuántas partidas: se cuenta 1');
 
     const correctivo = estandarDeLectura({ coreKind: 'servicio', ticketType: 'CORRECTIVO' }, {});
     // Complejidad estándar (120) + traslado aproximado (30 + 30).
