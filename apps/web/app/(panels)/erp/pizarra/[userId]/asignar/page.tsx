@@ -839,6 +839,11 @@ export default function AsignarActividadPage() {
                     forcedTicketType={kindMeta.ticketType}
                     forcedTicketTypeCustom={kindMeta.ticketTypeCustom}
                     requireSchedule={Boolean(kindMeta.requiresSchedule)}
+                    onTiempoTipico={(min) => {
+                      const tope = Math.min(720, min);
+                      setPlanHoras(Math.floor(tope / 60));
+                      setPlanMinutos(tope % 60);
+                    }}
                     onCancel={() => router.push(`/erp/pizarra/${userId}`)}
                     onSuccess={handleSuccess}
                   />

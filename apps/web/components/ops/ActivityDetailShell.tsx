@@ -11,6 +11,7 @@ import { formatApiError } from "@/lib/erp-api";
 import { isCeoEmail } from "@/lib/activity-kinds";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { chargeLabel, estatusUi, kindIcon, kindLabel } from "@/lib/activity-labels";
+import { COMPLEJIDAD_UI, esComplejidad } from "@/lib/complejidad";
 import { countEvidenceFiles } from "@/lib/evidence-display";
 import {
   ACCION_INICIAR,
@@ -431,6 +432,13 @@ export default function ActivityDetailShell({
     if (ejecutores.length > 1) push("Equipo", ejecutores.join(", "));
   }
   push("Encargo", chargeLabel(activity.assignmentCharge));
+  push(
+    "Complejidad",
+    esComplejidad(activity.complejidad) ? COMPLEJIDAD_UI[activity.complejidad].label : null,
+    esComplejidad(activity.complejidadSugerida) && activity.complejidadSugerida !== activity.complejidad
+      ? `La IA sugirió ${COMPLEJIDAD_UI[activity.complejidadSugerida].label.toLowerCase()}`
+      : undefined,
+  );
   push(
     "Proyecto",
     activity.project?.id && core ? (

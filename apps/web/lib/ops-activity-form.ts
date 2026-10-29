@@ -40,6 +40,9 @@ export const EMPTY_ACTIVITY_FORM = {
   evidencePhotoRequired: "4",
   coreKind: "",
   assignmentCharge: "",
+  /** Complejidad elegida (`BASICA`…`CRITICA`, o vacío) y la que sugirió la IA. */
+  complejidad: "",
+  complejidadSugerida: "",
 };
 
 export type ActivityFormState = typeof EMPTY_ACTIVITY_FORM;
@@ -131,6 +134,8 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
     evidencePhotoRequired: record.evidencePhotoRequired != null ? String(record.evidencePhotoRequired) : "4",
     coreKind: String(record.coreKind ?? ""),
     assignmentCharge: String(record.assignmentCharge ?? ""),
+    complejidad: String(record.complejidad ?? ""),
+    complejidadSugerida: String(record.complejidadSugerida ?? ""),
   };
 }
 
@@ -179,6 +184,9 @@ export function buildActivityPayload(
     })(),
     coreKind: form.coreKind || undefined,
     assignmentCharge: form.assignmentCharge || undefined,
+    // Al editar, vacío la quita; al crear, solo va si se eligió.
+    complejidad: form.complejidad || (options.isEdit ? null : undefined),
+    complejidadSugerida: form.complejidadSugerida || undefined,
   };
 
   // Periodo: del día elegido al día de fin. La API fija la fecha máxima y la entrega al fin

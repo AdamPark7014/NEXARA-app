@@ -1,0 +1,27 @@
+[
+  {
+    "funcion": "complejidad",
+    "variante": "haiku-low-np",
+    "modelo": "claude-haiku-5-5",
+    "esfuerzo": "low",
+    "pensar": false,
+    "fecha": "2026-10-29T00:14:25.789Z",
+    "casos": 22,
+    "errores": 0,
+    "puntaje": 0.9773,
+    "casosPerfectos": 21,
+    "inventos": 0,
+    "notaJuez": null,
+    "tokensEntradaMedios": 1008,
+    "tokensSalidaMedios": 68,
+    "tokensPensamientoMedios": 0,
+    "usdPorLlamada": 0.000055,
+    "msMedios": 1606,
+    "msP50": 1418,
+    "msP95": 2417,
+    "fallos": [
+      "c19 nivel (BASICA)"
+    ],
+    "etiqueta": "prompt-28-10"
+  }
+]
