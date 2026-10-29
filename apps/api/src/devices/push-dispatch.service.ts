@@ -38,6 +38,11 @@ export type PushPayload = {
    * `NOTIFICATION_ICONS` (notifications/notification-push-meta.ts); vacío = ícono genérico.
    */
   icon?: string | null;
+  /**
+   * Aviso que se repite (p. ej. «No has registrado tu entrada» cada 2 min): en iOS reemplaza al
+   * anterior con su `collapseKey` en vez de apilarse. Android ya lo reemplaza por `tag`.
+   */
+  reemplazar?: boolean;
 };
 
 /** Errores de FCM que significan que el token ya no sirve (app desinstalada o reinstalada). */
@@ -233,7 +238,12 @@ export class PushDispatchService {
               ...(kind === 'chat' ? {} : { collapseKey }),
             },
             apns: {
-              headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
+              headers: {
+                'apns-priority': '10',
+                'apns-push-type': 'alert',
+                // APNs acepta hasta 64 bytes en el collapse-id.
+                ...(payload.reemplazar && kind !== 'chat' ? { 'apns-collapse-id': collapseKey.slice(0, 64) } : {}),
+              },
               payload: {
                 // iOS Notification Service Extension requiere `mutable-content: 1` para ejecutar
                 // y poder fijar `threadIdentifier`, categoría e imagen desde los campos `data`.
