@@ -503,7 +503,8 @@ export default function ActivityDetailShell({
     );
   }
   push("Llegada al sitio", llegada ? <span className={s.factOk}>{llegada}</span> : null);
-  push("Entrega esperada", activity.fechaEntregaEsperada ? formatDate(activity.fechaEntregaEsperada) : null);
+  // Con hora: desde el 29-10 la entrega puede ser a una hora («a más tardar»), no solo el día.
+  push("Entrega esperada", activity.fechaEntregaEsperada ? formatDateTime(activity.fechaEntregaEsperada) : null);
   push("Finalización", activity.fechaFinalizacion ? formatDateTime(activity.fechaFinalizacion) : null);
   // El tiempo (plan contra real y el tope) vive en su tarjeta, arriba de estos datos.
 
@@ -556,6 +557,7 @@ export default function ActivityDetailShell({
               minutosPlan={miFila?.minutosPlan ?? activity.minutosPlan}
               minutosReales={miFila?.minutosReales ?? activity.minutosReales}
               tiempoMaximoMin={activity.tiempoMaximoMin}
+              minutosEstandar={(activity as { tiempoEstandarMin?: number | null }).tiempoEstandarMin ?? null}
               enCurso={(activity.assignees ?? []).some((m) => !m.retiradoAt && Boolean(m.sesionAbiertaDesde))}
             />
           }

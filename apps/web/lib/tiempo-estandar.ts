@@ -186,7 +186,8 @@ export function payloadEstandar(e: EstandarGuardado | null | undefined): Record<
  */
 export function resumenEstandar(e: EstandarGuardado | null | undefined, formato: (min: number) => string): { valor: string; detalle: string | null } | null {
   if (!e || e.tiempoEstandarMin == null) return null;
-  const partes = (e.estandarDesglose ?? []).map((d) => `${d.concepto} ${formato(d.minutos)}`);
+  // «Supuesto: …» va sin minutos (lo que el título no decía y se supuso).
+  const partes = (e.estandarDesglose ?? []).map((d) => (d.minutos > 0 ? `${d.concepto} ${formato(d.minutos)}` : d.concepto));
   if (e.destino?.direccion) partes.push(`Destino: ${e.destino.direccion}${e.trasladoModo === "TRANSPORTE" ? " (en transporte)" : ""}`);
   if (e.estandarCambiadoMotivo) partes.push(`Se cambió el tiempo: ${e.estandarCambiadoMotivo}`);
   return { valor: formato(e.tiempoEstandarMin), detalle: partes.length ? partes.join(" · ") : null };

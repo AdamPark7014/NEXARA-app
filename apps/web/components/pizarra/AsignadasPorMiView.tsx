@@ -230,7 +230,9 @@ export default function AsignadasPorMiView({
             value={Math.min(a.minutosReales ?? 0, a.minutosPlan)}
             max={a.minutosPlan}
             tone={a.excedida ? "danger" : a.terminada ? "success" : "brand"}
-            label={`${formatMinutes(a.minutosReales ?? 0)} / ${formatMinutes(a.minutosPlan)}`}
+            label={`${formatMinutes(a.minutosReales ?? 0)} / ${formatMinutes(a.minutosPlan)}${
+              a.minutosEstandar && a.minutosEstandar !== a.minutosPlan ? ` · est. ${formatMinutes(a.minutosEstandar)}` : ""
+            }`}
             ariaLabel={`Real ${formatMinutes(a.minutosReales)} de ${formatMinutes(a.minutosPlan)} planeados`}
             width={150}
           />

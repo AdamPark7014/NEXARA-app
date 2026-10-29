@@ -168,6 +168,9 @@ export type MyActivityItem = {
   fechaAsignacion: Date;
   fechaFinalizacion: Date | null;
   tiempoEstimadoMin: number | null;
+  /** Tiempo estándar (tabla + título) y su desglose: la analítica de «estándar contra real». */
+  tiempoEstandarMin: number | null;
+  estandarDesglose: Array<{ concepto: string; minutos: number }> | null;
   tiempoMaximoMin: number | null;
   rol: string;
   /** Indicaciones personales de esta persona en la actividad. */
@@ -1079,6 +1082,8 @@ export class MyActivitiesService {
             periodoInicio: true,
             periodoFin: true,
             tiempoEstimadoMin: true,
+            tiempoEstandarMin: true,
+            estandarDesglose: true,
             tiempoMaximoMin: true,
             creadoPorId: true,
             creador: { select: { id: true, nombre: true } },
@@ -1143,6 +1148,8 @@ export class MyActivitiesService {
         periodoInicio: true,
         periodoFin: true,
         tiempoEstimadoMin: true,
+        tiempoEstandarMin: true,
+        estandarDesglose: true,
         tiempoMaximoMin: true,
         creadoPorId: true,
         creador: { select: { id: true, nombre: true } },
@@ -1232,6 +1239,8 @@ export class MyActivitiesService {
         fechaAsignacion: a.fechaAsignacion,
         fechaFinalizacion: a.fechaFinalizacion,
         tiempoEstimadoMin: a.tiempoEstimadoMin,
+        tiempoEstandarMin: a.tiempoEstandarMin ?? null,
+        estandarDesglose: Array.isArray(a.estandarDesglose) ? (a.estandarDesglose as Array<{ concepto: string; minutos: number }>) : null,
         tiempoMaximoMin: a.tiempoMaximoMin,
         rol: String(row.rol),
         indicaciones: row.indicaciones,

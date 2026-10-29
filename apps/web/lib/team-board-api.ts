@@ -251,6 +251,8 @@ export type AsignadaPorMiItem = {
   semaforo: Semaforo;
   minutosPlan: number | null;
   minutosReales: number | null;
+  /** Tiempo estándar (tabla + título); opcional con un API anterior. */
+  minutosEstandar?: number | null;
   excedida: boolean;
   terminada: boolean;
   retirado: boolean;

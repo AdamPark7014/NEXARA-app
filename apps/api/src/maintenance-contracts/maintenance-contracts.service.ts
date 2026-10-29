@@ -5,6 +5,7 @@ import { NotificationHierarchyService } from '../notifications/notification-hier
 import { resolveRequiredCompanyId, companyWhere, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
 import { FolioService } from '../common/folio/folio.service.js';
 import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
+import { estandarDeLectura } from '../activities/tiempo-entrega.js';
 
 const FREQUENCY_DAYS: Record<string, number> = {
   WEEKLY: 7,
@@ -303,6 +304,9 @@ export class MaintenanceContractsService {
     fechaMaxima.setHours(fechaMaxima.getHours() + contract.slaResolutionHours);
 
     const anNumber = await this.generateNextAnNumber(tenantId);
+    // Ninguna actividad sin tiempo ni entrega: el estándar del servicio preventivo (sin IA aquí) y
+    // la entrega al vencer el SLA.
+    const estandar = estandarDeLectura({ coreKind: 'servicio', ticketType: 'PREVENTIVO' }, {});
     const activity = await this.prisma.activity.create({
       data: {
         anNumber,
@@ -320,10 +324,14 @@ export class MaintenanceContractsService {
         branchState: contract.branch?.state || null,
         branchAddress: contract.branch?.address || null,
         tiempoMaximoMin: slaMin,
+        tiempoEstimadoMin: estandar.totalMin,
+        tiempoEstandarMin: estandar.totalMin,
+        estandarDesglose: [...estandar.desglose, ...estandar.supuestos.map((s) => ({ concepto: `Supuesto: ${s}`, minutos: 0 }))],
         creadoPorId: contract.ownerId || 1,
         responsableId: responsibleId,
         fechaAsignacion,
         fechaMaxima,
+        fechaEntregaEsperada: fechaMaxima,
         companyId: tenantId,
       },
     });

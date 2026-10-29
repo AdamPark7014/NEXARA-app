@@ -77,6 +77,11 @@ export class ExpensesService {
         descripcion: 'Contenedor interno para gastos de oficina, renta y servicios (no operación de campo).',
         estatus: ACTIVITY_STATUS.FINALIZADA,
         activityType: 'INTERNAL',
+        // Contenedor ya cerrado: igual lleva tiempo y entrega (ninguna actividad sin ellos).
+        tiempoEstimadoMin: 5,
+        tiempoEstandarMin: 5,
+        fechaEntregaEsperada: new Date(),
+        fechaMaxima: new Date(),
         creadoPorId: usuarioId,
         responsableId: usuarioId,
         companyId,

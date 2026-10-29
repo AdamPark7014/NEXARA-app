@@ -20,6 +20,8 @@ export type MyActivityItem = {
   fechaAsignacion: string;
   fechaFinalizacion: string | null;
   tiempoEstimadoMin: number | null;
+  /** Tiempo estándar (tabla + título); opcional con un API anterior. */
+  tiempoEstandarMin?: number | null;
   tiempoMaximoMin: number | null;
   rol: string;
   /** Indicaciones personales de esta persona en la actividad. */
@@ -109,6 +111,38 @@ export function createMyActivity(token: string, payload: object): Promise<{ id: 
   return erpFetch<{ id: number }>("me/activities", token, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+/** Lo que fija la autoasignación (sale del título; la API lo vuelve a calcular al crear). */
+export type TiempoCalculado = {
+  tiempoEstandarMin: number;
+  desglose: Array<{ concepto: string; minutos: number }>;
+  supuestos: string[];
+  complejidad: string | null;
+  unidades: { clave: string; cantidad: number } | null;
+  /** Entrega a más tardar (ISO); null sin inicio o con periodo. */
+  fechaEntregaEsperada: string | null;
+};
+
+export function tiempoCalculado(
+  token: string,
+  body: {
+    titulo: string;
+    indicaciones?: string | null;
+    coreKind?: string | null;
+    ticketType?: string | null;
+    ticketTypeCustom?: string | null;
+    fechaInicio?: string | null;
+    periodoInicio?: string | null;
+    periodoFin?: string | null;
+  },
+  signal?: AbortSignal,
+): Promise<TiempoCalculado> {
+  return erpFetch<TiempoCalculado>("me/activities/tiempo-calculado", token, {
+    method: "POST",
+    body: JSON.stringify(body),
+    signal,
   });
 }
 

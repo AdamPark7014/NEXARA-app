@@ -235,6 +235,8 @@ export type AsignadaPorMiItem = {
   semaforo: Semaforo;
   minutosPlan: number | null;
   minutosReales: number | null;
+  /** Tiempo estándar de la actividad (tabla + título): cuánto debía tardar. */
+  minutosEstandar: number | null;
   excedida: boolean;
   terminada: boolean;
   retirado: boolean;
@@ -847,6 +849,7 @@ export class TeamBoardService {
             periodoInicio: true,
             periodoFin: true,
             tiempoEstimadoMin: true,
+            tiempoEstandarMin: true,
             activityEvidences: {
               select: {
                 userId: true,
@@ -930,6 +933,7 @@ export class TeamBoardService {
         semaforo: calc.semaforo,
         minutosPlan: calc.minutosPlan,
         minutosReales: calc.minutosReales,
+        minutosEstandar: act.tiempoEstandarMin ?? null,
         excedida: calc.excedida,
         terminada: calc.terminada,
         retirado: calc.retirado,
