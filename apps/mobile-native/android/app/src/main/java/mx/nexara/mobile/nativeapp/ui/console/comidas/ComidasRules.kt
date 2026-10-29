@@ -14,6 +14,29 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
  * apps/web/components/asistencias/ComidasPanel.tsx (ComidasRulesTest).
  */
 object ComidasRules {
+    /**
+     * La ventana depende del horario (29-10): oficina de 3 a 4 p.m.; cuadrilla, una hora libre entre
+     * 1 y 5 p.m. y regreso según a qué hora salió. Para el jefe, que ve a los dos.
+     */
+    const val VENTANAS_DEL_EQUIPO =
+        "Oficina de 3:00 a 4:00 p.m.; cuadrilla, una hora libre entre 1:00 y 5:00 p.m. Lo que sea fuera de su ventana trae justificación y lo apruebas o rechazas."
+
+    /** «Ya pasó la hora de regreso (4:05 p.m.)…» con el límite que manda la API (`ventana.regresoLimite`). */
+    fun avisoRegresoTarde(regresoLimite: String?): String {
+        val hora = horaDoce(regresoLimite)
+        val cuando = if (hora != null) " ($hora)" else ""
+        return "Ya pasó la hora de regreso$cuando: al registrar tendrás que escribir por qué."
+    }
+
+    /** ISO → «4:05 p.m.» en hora de México; null si no se entiende. */
+    fun horaDoce(iso: String?): String? {
+        val t = iso?.let { runCatching { Instant.parse(it) }.getOrNull() }
+            ?.atZone(java.time.ZoneId.of("America/Mexico_City")) ?: return null
+        val h12 = if (t.hour % 12 == 0) 12 else t.hour % 12
+        val sufijo = if (t.hour < 12) "a.m." else "p.m."
+        return "%d:%02d %s".format(h12, t.minute, sufijo)
+    }
+
     const val MIN_JUSTIFICACION = 5
     const val SALIDA = "salida"
     const val REGRESO = "regreso"

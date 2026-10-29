@@ -194,7 +194,11 @@ struct ComidasView: View {
             )
         }
         .sheet(item: $reasonRequest) { pending in
-            LunchReasonSheet(pending: pending, windowText: myDay?.windowText ?? "3:00 a 4:00 p.m.") { reason in
+            LunchReasonSheet(
+                pending: pending,
+                windowText: myDay?.windowText ?? "3:00 a 4:00 p.m.",
+                lateReturnText: myDay?.lateReturnText ?? "Ya pasó la hora de regreso"
+            ) { reason in
                 await register(checkIn: pending.checkIn, photo: pending.photo, reason: reason)
             }
         }
@@ -293,7 +297,7 @@ struct ComidasView: View {
                 }
             }
             if late {
-                NxIconText(systemName: "clock.badge.exclamationmark", text: "Ya pasó la hora de regreso (4:00 p.m.): al registrar tendrás que escribir por qué.")
+                NxIconText(systemName: "clock.badge.exclamationmark", text: "\(day.lateReturnText): al registrar tendrás que escribir por qué.")
                     .font(.footnote)
                     .foregroundStyle(CorePalette.orange)
             }
@@ -422,7 +426,7 @@ struct ComidasView: View {
         let rows = filteredRows(team)
         return VStack(alignment: .leading, spacing: 12) {
             Text("Comidas de tu equipo").font(.headline)
-            Text("Aprueba o rechaza las que fueron fuera de 3:00 a 4:00 p.m.")
+            Text("\(LunchVentanas.delEquipo) Aprueba o rechaza las que fueron fuera de su ventana.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             if let pendientes = team.resumen?.pendientes, pendientes > 0 {
@@ -634,6 +638,8 @@ private struct LunchTeamRowCard: View {
 private struct LunchReasonSheet: View {
     let pending: LunchPendingPhoto
     let windowText: String
+    /// «Ya pasó la hora de regreso (4:05 p.m.)», con el límite de la API.
+    var lateReturnText: String = "Ya pasó la hora de regreso"
     let onSubmit: (String) async -> LunchRegisterOutcome
 
     @Environment(\.dismiss) private var dismiss
@@ -653,7 +659,7 @@ private struct LunchReasonSheet: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         Text(pending.serverMessage ?? (pending.checkIn
                             ? "Estás fuera de tu horario de comida (\(windowText)). Escribe por qué; tu jefe lo aprobará o rechazará."
-                            : "Ya pasó la hora de regreso (4:00 p.m.). Escribe por qué; tu jefe lo aprobará o rechazará."))
+                            : "\(lateReturnText). Escribe por qué; tu jefe lo aprobará o rechazará."))
                             .font(.footnote)
                     }
                 } footer: {
@@ -729,7 +735,7 @@ private struct LunchReviewSheet: View {
                     }
                     .pickerStyle(.segmented)
                 } footer: {
-                    Text("Solo se revisan las comidas fuera de 3:00 a 4:00 p.m.")
+                    Text("Solo se revisan las comidas fuera de su ventana (\(LunchVentanas.delEquipo))")
                 }
                 Section("Lo que escribió") {
                     if let text = request.record.checkinJustificacion, !text.isEmpty {

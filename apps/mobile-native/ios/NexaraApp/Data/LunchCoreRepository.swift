@@ -103,6 +103,29 @@ struct LunchMyDay: Decodable {
     }
 
     var windowText: String { ventana?.texto ?? "3:00 a 4:00 p.m." }
+
+    /// «Ya pasó la hora de regreso (4:05 p.m.)…» con el límite que manda la API: depende del
+    /// horario (oficina 3 a 4 p.m.; cuadrilla, una hora libre entre 1 y 5 p.m.) y de a qué hora salió.
+    var lateReturnText: String {
+        let hora = LunchMyDay.horaDoce(ventana?.regresoLimite).map { " (\($0))" } ?? ""
+        return "Ya pasó la hora de regreso\(hora)"
+    }
+
+    /// ISO → «4:05 p.m.» en hora de México; nil si no se entiende.
+    static func horaDoce(_ iso: String?) -> String? {
+        guard let fecha = NxFormat.parseISO(iso) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Mexico_City") ?? .current
+        let p = calendar.dateComponents([.hour, .minute], from: fecha)
+        let h = p.hour ?? 0
+        let h12 = h % 12 == 0 ? 12 : h % 12
+        return "\(h12):\(String(format: "%02d", p.minute ?? 0)) \(h < 12 ? "a.m." : "p.m.")"
+    }
+}
+
+/// Las ventanas que ve un jefe en su equipo (oficina y cuadrilla), como la web.
+enum LunchVentanas {
+    static let delEquipo = "Oficina de 3:00 a 4:00 p.m.; cuadrilla, una hora libre entre 1:00 y 5:00 p.m."
 }
 
 struct LunchTeamRow: Decodable, Identifiable, Hashable {
