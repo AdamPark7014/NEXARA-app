@@ -39,8 +39,13 @@
     horario laboral, ≈250 MB al día.
   - `isAuditNoise` en `prisma.service.ts` (con pruebas en `prisma-tenant-audit.spec.ts`): no se audita una masiva con
     `count` 0 ni un `UserSession.update` que solo cambia `lastSeenAt`. Crear, renovar o revocar sesión sí.
-  - Pendiente de Adam: borrar las filas viejas de ruido (latidos, masivas en 0, POST_OK de INTEGRA) y `VACUUM FULL`
-    para recuperar espacio. Es borrar en producción sin respaldo: no se hace sin su OK.
+  - **Limpieza hecha con el OK de Adam (28-10 ~20:48):** en una sola transacción se copiaron aparte las filas que se
+    quedan, `TRUNCATE public.audit_logs` y se reinsertaron (con tope de seguridad: abortaba si no quedaban entre 250 y
+    450 mil). Se fueron 5.37 M de filas de ruido: 3.30 M `integra POST_OK` del webhook (`/api/integra/hik/…`, sin
+    usuario, guardaban el cuerpo entero: ≈12 GB en TOAST), 0.87 M de `IntegraPushEvent`, 0.81 M de latidos de sesión,
+    0.28 M de masivas con `affected` 0 y 0.10 M de reescrituras de #general/#anuncios. Quedan 326,797 filas; la tabla
+    pasó de 14 GB a 126 MB y el disco de 89 % a 69 % (23 GB libres). La salud de la API quedó en 200.
+    `backup_20260828b.audit_logs` (40 kB) no se tocó.
   - Medido tras el despliegue: 100 filas en 14 min de noche, sin latidos ni masivas en 0. Quedaba el chat reescribiendo
     #general y #anuncios en cada consulta (`fc78f21f`: ahora solo si cambiaron).
   - **Incidente 20:35:** dos sesiones corrieron `update.sh` a la vez; el disco llegó a 99 % (1.4 GB libres) y compose
