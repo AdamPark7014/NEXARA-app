@@ -41,6 +41,12 @@
     `count` 0 ni un `UserSession.update` que solo cambia `lastSeenAt`. Crear, renovar o revocar sesión sí.
   - Pendiente de Adam: borrar las filas viejas de ruido (latidos, masivas en 0, POST_OK de INTEGRA) y `VACUUM FULL`
     para recuperar espacio. Es borrar en producción sin respaldo: no se hace sin su OK.
+  - Medido tras el despliegue: 100 filas en 14 min de noche, sin latidos ni masivas en 0. Quedaba el chat reescribiendo
+    #general y #anuncios en cada consulta (`fc78f21f`: ahora solo si cambiaron).
+  - **Incidente 20:35:** dos sesiones corrieron `update.sh` a la vez; el disco llegó a 99 % (1.4 GB libres) y compose
+    chocó con un nombre de contenedor en uso. Se vació la caché de build (3.9 GB, vuelve a 88 %), la base y Redis no
+    se cayeron y la API quedó sana con `fc78f21f`. `update.sh` ahora toma `flock /tmp/nexara-update.lock` (`4f87882e`,
+    ya en el servidor). Con el disco base en 88 % un build de web+api deja poco margen: liberar espacio (arriba) urge.
 
 - **28-10 ~19:30 (claude-code) — Desempeño como en el canvas y eficiencia de la pizarra sin plan.**
   - Desempeño (`/erp/asistencias/indicadores`): `components/kpis/DesempenoTablero.tsx` (+ css) reemplaza la franja de
