@@ -7,8 +7,9 @@
  *   docker exec -w /app/apps/api nexara-api node rellenar-tiempos-abiertas.cjs            # simulacro
  *   docker exec -w /app/apps/api nexara-api node rellenar-tiempos-abiertas.cjs --escribir # guarda
  *
- * `--entregadas-sin-estandar`: a las ya entregadas («Por Validar» o con evidencia completa) no se les
- * pone estándar y su tiempo estimado es lo que trabajaron (opción B del 29-10).
+ * Opción B del 29-10: en proceso, completas desde el título (con el tipo corregido si el título dice
+ * otro trabajo); ya entregadas, sin estándar y con la mediana real de su tipo como tiempo, marcadas
+ * como relleno para que el desempeño no las use como plan.
  *
  * Idempotente (solo llena lo vacío; `rellenar-tiempos.ts`). Lee cada título con la misma IA del alta
  * (Haiku por la puerta, proceso `complejidad`) y comprueba que ninguna entrega cambie de «a tiempo».
@@ -20,12 +21,11 @@ const dist = (rel) => require(path.join(__dirname, 'dist', rel));
 const { ClaudeService } = dist('ai/claude/claude.service.js');
 const { ComplejidadService } = dist('ai/complejidad/complejidad.service.js');
 const { TiemposActividadService } = dist('activities/tiempos-actividad.service.js');
-const { estandarDeLectura } = dist('activities/tiempo-entrega.js');
-const { planDeRelleno, aTiempo, ESTATUS_CERRADOS } = dist('activities/rellenar-tiempos.js');
+const { estandarDeLectura, cantidadDelTitulo } = dist('activities/tiempo-entrega.js');
+const { planDeRelleno, aTiempo, ESTATUS_CERRADOS, tipoPorTitulo, yaEntregada } = dist('activities/rellenar-tiempos.js');
 const { limiteDeEntrega } = dist('activities/semaforo-actividad.js');
 
 const ESCRIBIR = process.argv.includes('--escribir');
-const ENTREGADAS_SIN_ESTANDAR = process.argv.includes('--entregadas-sin-estandar');
 
 async function contar(prisma) {
   const filas = await prisma.$queryRawUnsafe(`
@@ -78,32 +78,30 @@ async function main() {
     },
   });
 
-  // Minutos que de verdad trabajó el responsable (sus sesiones cerradas).
-  const reales = new Map(
-    (
-      await prisma.$queryRawUnsafe(`
-        SELECT s."activityId" AS id, ROUND(SUM(EXTRACT(EPOCH FROM (s."endedAt" - s."startedAt")) / 60))::int AS minutos
-        FROM activity_work_sessions s JOIN "Activity" a ON a.id = s."activityId" AND s."userId" = a."responsableId"
-        WHERE s."endedAt" IS NOT NULL GROUP BY 1`)
-    ).map((r) => [Number(r.id), Number(r.minutos)]),
-  );
+  const tipoDe = (x) => (x.coreKind === 'servicio' ? x.ticketType : x.ticketTypeCustom);
+  const tipicoDe = async (x) =>
+    (await complejidad.tiempos(x.companyId, { coreKind: x.coreKind, tipo: tipoDe(x) }).catch(() => null))?.total?.medianaMin ?? null;
   const reporte = [];
   const cambiosATiempo = [];
   for (const a of filas) {
     const ev = a.activityEvidences.find((e) => e.userId === a.responsableId && e.status === 'COMPLETED');
     const fin = a.assignees.find((x) => x.userId === a.responsableId)?.finRealAt ?? null;
     const entregadaAt = ev?.completedAt ?? fin ?? null;
+    const entregada = yaEntregada({ estatus: a.estatus, entregadaAt });
     let est = null;
-    if (a.tiempoEstandarMin == null) {
-      const lectura = await tiempos.lectura(a.companyId, a);
-      const t = await complejidad.tiempos(a.companyId, { coreKind: a.coreKind, tipo: a.coreKind === 'servicio' ? a.ticketType : a.ticketTypeCustom }).catch(() => null);
-      est = estandarDeLectura(a, lectura, { tipicoMin: t?.total?.medianaMin ?? null, duracionAgendaMin: a.tiempoEstimadoMin });
+    let tipoCorregido = null;
+    let tipicoMin = null;
+    if (entregada) {
+      // Sin IA: solo hace falta de respaldo si su tipo no tiene mediana.
+      tipicoMin = a.tiempoEstimadoMin == null ? await tipicoDe(a) : null;
+      if (a.tiempoEstimadoMin == null && !tipicoMin) est = estandarDeLectura(a, { cantidad: cantidadDelTitulo(a.titulo) });
+    } else if (a.tiempoEstandarMin == null) {
+      tipoCorregido = tipoPorTitulo(a);
+      const conTipo = { ...a, ...(tipoCorregido ?? {}) };
+      const lectura = await tiempos.lectura(a.companyId, conTipo);
+      est = estandarDeLectura(conTipo, lectura, { tipicoMin: await tipicoDe(conTipo), duracionAgendaMin: a.tiempoEstimadoMin });
     }
-    const entregada = a.estatus === 'Por Validar' || Boolean(entregadaAt);
-    const plan = planDeRelleno({ ...a, entregadaAt }, est, {
-      entregadaSinEstandar: ENTREGADAS_SIN_ESTANDAR && entregada,
-      minutosReales: reales.get(a.id) ?? 0,
-    });
+    const plan = planDeRelleno({ ...a, entregadaAt }, est, { tipoCorregido, tipicoMin });
     if (!Object.keys(plan.cambios).length) continue;
     const limiteAntes = limiteDeEntrega(a);
     const limiteDespues = limiteDeEntrega({ ...a, ...plan.cambios });
@@ -115,6 +113,7 @@ async function main() {
       anNumber: a.anNumber,
       titulo: a.titulo,
       estatus: a.estatus,
+      entregada,
       auto: a.creadoPorId === a.responsableId,
       cambios: Object.fromEntries(
         Object.entries(plan.cambios).map(([k, v]) => [k, v instanceof Date ? v.toISOString() : v]),
@@ -135,13 +134,13 @@ async function main() {
     }
   }
   const despues = ESCRIBIR && !cambiosATiempo.length ? await contar(prisma) : null;
-  console.log(
-    JSON.stringify(
-      { escribir: ESCRIBIR, entregadasSinEstandar: ENTREGADAS_SIN_ESTANDAR, antes, despues, aCambiar: reporte.length, cambiosATiempo, reporte },
-      null,
-      1,
-    ),
+  // El reporte va a un archivo: la consola lleva los registros de cada lectura con la IA.
+  const salida = process.env.SALIDA || '/tmp/relleno-tiempos.json';
+  require('node:fs').writeFileSync(
+    salida,
+    JSON.stringify({ escribir: ESCRIBIR, antes, despues, aCambiar: reporte.length, cambiosATiempo, reporte }, null, 1),
   );
+  console.log(`RELLENO ${ESCRIBIR ? 'escrito' : 'simulacro'}: ${reporte.length} filas, ${cambiosATiempo.length} cambios de «a tiempo» → ${salida}`);
   await prisma.$disconnect();
 }
 
