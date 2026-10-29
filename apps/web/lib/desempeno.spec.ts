@@ -41,6 +41,8 @@ describe("lectura", () => {
     expect(confianzaDe({ entregas: { medidas: 10 } as TotalesKpi["entregas"] })).toBe("media");
     expect(confianzaDe({ entregas: { medidas: 9 } as TotalesKpi["entregas"] })).toBe("baja");
     expect(confianzaDe({})).toBe("baja");
+    // Si la API ya la manda, manda la API.
+    expect(confianzaDe({ confianza: "alta", entregas: { medidas: 3 } as TotalesKpi["entregas"] })).toBe("alta");
   });
 
   it("resume entregas y horas", () => {

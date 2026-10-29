@@ -1,5 +1,19 @@
 # RELEVO
 
+- **29-10 ~16:20 (claude-code) — Desempeño: la revisión en 24 h hábiles no cuenta festivos; semáforo y confianza los
+  manda la API.**
+  - `minutosHabilesEntre` y `revisionesEnPlazo` reciben los días que no se laboran. La coordinación lee
+    `leerFestivos` (modo NO_SE_LABORA, entre semana, 30 días antes del rango).
+  - La respuesta de KPIs trae lo que antes calculaba cada pantalla. Cortes únicos `UMBRALES_INDICE` (≥ 90 verde, ≥ 75
+    amarillo), los mismos de la web:
+    - `cumplimientoPartes[].semaforo`.
+    - `semaforoIndice`.
+    - `confianza` (alta ≥ 20 medidas, media 10–19, baja < 10).
+    - `pilares[]` (`id`, `label`, `pct`, `semaforo`).
+    La web usa `confianza` de la API; el contrato va a la sesión de apps (Android usaba 85/60).
+  - Nota: el `node_modules` compartido perdió todos los paquetes `@…` hacia las 15:55. Se repuso con `npm install` y
+    `prisma generate`; el `package-lock.json` que reescribió se dejó como el de git.
+
 - **29-10 ~16:10 (claude-code) — Nómina: extra doble/triple, nada de extra sin aprobar, solo jefes aprueban, pago
   semanal; la cotización vuelve a 40 + 4.** (Auditoría de parámetros pedida por Adam; todo aprobado en la decisión 6.)
   - Pre-nómina (`prenomina-amount.ts`, `pre-nomina.ts`, `employee-payments.service.ts`): lo ordinario se topa a lo que su

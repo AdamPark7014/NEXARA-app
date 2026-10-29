@@ -73,6 +73,8 @@ export type ParteCumplimiento = {
   peso: number;
   /** «17 de 18», «2.3 por día · el equipo va a 1.8». */
   detalle: string;
+  /** Ya calculado por la API (≥ 90 verde, ≥ 75 amarillo). */
+  semaforo?: "verde" | "amarillo" | "rojo" | "sin_datos";
 };
 
 export type TotalesKpi = {
@@ -127,6 +129,15 @@ export type TotalesKpi = {
    * con su peso; lo que no tiene dato no pesa). null si no hubo nada que medir en el rango.
    */
   cumplimientoPct?: number | null;
+  /** Lo que la API ya calcula para web y apps: semáforo del índice, confianza y los cuatro pilares. */
+  semaforoIndice?: "verde" | "amarillo" | "rojo" | "sin_datos";
+  confianza?: "alta" | "media" | "baja";
+  pilares?: Array<{
+    id: "confiabilidad" | "calidad" | "rendimiento" | "disciplina";
+    label: string;
+    pct: number | null;
+    semaforo: "verde" | "amarillo" | "rojo" | "sin_datos";
+  }>;
   cumplimientoPartes?: ParteCumplimiento[];
   diasConJornada: number;
   diasSinChecada: number;

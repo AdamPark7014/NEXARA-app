@@ -17,6 +17,7 @@ import {
   calificacionCalibrada,
   conReferencia,
   diasDelRango,
+  sumaDias,
   equipoCoordinadoDe,
   estandarDeRespaldo,
   familiaDePuesto,
@@ -327,13 +328,20 @@ export class KpisEquipoService {
     if (!equipos.size) return out;
 
     const pares = await this.leerRevisionesDe([...equipos.keys()], rango, companyId);
+    // Los festivos que no se laboran no cuentan en las 24 h hábiles (una evidencia enviada antes puede
+    // revisarse dentro del rango: se miran 30 días antes).
+    const noHabiles = new Set(
+      (await leerFestivos(this.prisma, companyId, sumaDias(rango.desde, -30), rango.hasta))
+        .filter((f) => f.modo === 'NO_SE_LABORA' && !f.finDeSemana)
+        .map((f) => f.fecha),
+    );
     const porId = new Map(calculadas.map((c) => [c.u.id, c.totales]));
     for (const [id, miembros] of equipos) {
       out.set(
         id,
         equipoCoordinadoDe(
           miembros.map((m) => porId.get(m)).filter((t): t is TotalesKpi => t != null),
-          revisionesEnPlazo(pares.get(id) ?? []),
+          revisionesEnPlazo(pares.get(id) ?? [], noHabiles),
         ),
       );
     }
