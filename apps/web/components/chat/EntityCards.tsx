@@ -1,182 +1,125 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
+import HowToRegOutlinedIcon from "@mui/icons-material/HowToRegOutlined";
+import FlightTakeoffOutlinedIcon from "@mui/icons-material/FlightTakeoffOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import styles from "../WorkspaceChat.module.css";
 import { apiFetch } from "./chat-utils";
-import { detectarFolios, tonoDeEstado, type FolioDetectado, type FolioTipo } from "./folios";
+import { tonoDeEstado } from "./folios";
+import {
+  ETIQUETA_TIPO,
+  LISTA_DE_TIPO,
+  refsDelMensaje,
+  type RefLiga,
+  type TarjetaLiga,
+  type TipoLiga,
+} from "@/lib/ligas";
 
 /*
- * Tarjetas de folio dentro del mensaje (dirección B).
+ * Tarjetas de las ligas de un mensaje: actividad, evidencia, cotización, cliente, proyecto,
+ * asistencia de una persona en un día, viático y factura. Un solo endpoint (`POST chat/ligas`) las
+ * arma con los permisos de quien las ve; sin acceso queda compacta con el título genérico.
  *
- * Solo usa endpoints que ya existen:
- *   Actividad   `GET chat/mentions?kind=ACTIVITY&q=<folio>` (id, título y estatus, con el alcance
- *               del chat) y `GET activities/:id` para responsable, prioridad y fecha.
- *   Cotización  `GET cotizaciones/core?search=<folio>` (folio, cliente, estado, total, quién la hizo).
- * Si la persona no tiene permiso o el folio no aparece, la tarjeta queda compacta: folio y enlace.
+ * Las peticiones de todas las tarjetas que se pintan a la vez (una página de mensajes) se juntan en
+ * una sola llamada, y cada liga se pide una vez por sesión.
  */
 
-export type TarjetaActividad = {
-  tipo: "actividad";
-  folio: string;
-  id: number;
-  titulo: string;
-  estatus: string | null;
-  prioridad: string | null;
-  responsable: string | null;
-  fecha: string | null;
-  href: string;
+type IconoMui = ComponentType<{ "aria-hidden"?: boolean | "true"; sx?: Record<string, unknown> }>;
+
+export const ICONO_TIPO: Record<TipoLiga, IconoMui> = {
+  actividad: AssignmentOutlinedIcon,
+  evidencia: PhotoCameraOutlinedIcon,
+  cotizacion: DescriptionOutlinedIcon,
+  cliente: BusinessOutlinedIcon,
+  proyecto: AccountTreeOutlinedIcon,
+  asistencia: HowToRegOutlinedIcon,
+  viatico: FlightTakeoffOutlinedIcon,
+  factura: ReceiptLongOutlinedIcon,
 };
 
-export type TarjetaCotizacion = {
-  tipo: "cotizacion";
-  folio: string;
-  id: number;
-  titulo: string;
-  estado: string | null;
-  cliente: string | null;
-  total: number | null;
-  moneda: string | null;
-  elaboro: string | null;
-  href: string;
-};
+/** Comercial y dinero en verde de marca; operación en azul. */
+const TIPOS_DE_MARCA = new Set<TipoLiga>(["cotizacion", "cliente", "viatico", "factura"]);
 
-export type TarjetaCompacta = {
-  tipo: "compacta";
-  de: FolioTipo;
-  folio: string;
-  href: string;
-  motivo: string;
-};
-
-export type DatosTarjeta = TarjetaActividad | TarjetaCotizacion | TarjetaCompacta;
-
-const pendientes = new Map<string, Promise<DatosTarjeta>>();
-const resueltas = new Map<string, DatosTarjeta>();
+const resueltas = new Map<string, TarjetaLiga>();
+const enVuelo = new Map<string, Promise<TarjetaLiga>>();
+let cola: Array<{ clave: string; ref: RefLiga; token: string; listo: (t: TarjetaLiga) => void }> = [];
+let temporizador: ReturnType<typeof setTimeout> | null = null;
 
 /** Solo para pruebas: vacía la caché entre casos. */
 export function limpiarCacheTarjetas() {
-  pendientes.clear();
   resueltas.clear();
+  enVuelo.clear();
+  cola = [];
+  if (temporizador) clearTimeout(temporizador);
+  temporizador = null;
 }
 
-function claveDe(f: FolioDetectado, token: string) {
-  return `${token.slice(-16)}|${f.tipo}|${f.folio}|${f.id ?? ""}`;
+function claveDe(ref: string, token: string) {
+  return `${token.slice(-16)}|${ref}`;
 }
 
-type MencionActividad = { kind: string; id: number; label: string; subtitle?: string | null };
-
-function folioDeEtiqueta(label: string) {
-  return label.split(" · ")[0]!.trim().toUpperCase();
+function sinCargar(ref: RefLiga): TarjetaLiga {
+  return {
+    ref: ref.ref,
+    tipo: ref.tipo,
+    acceso: false,
+    folio: ref.folio,
+    titulo: ref.folio ? `${ETIQUETA_TIPO[ref.tipo]} ${ref.folio}` : ETIQUETA_TIPO[ref.tipo],
+    estado: null,
+    detalle: [],
+    monto: null,
+    href: ref.ref.startsWith("/") ? ref.ref : LISTA_DE_TIPO[ref.tipo],
+    motivo: "No se pudo cargar",
+  };
 }
 
-function tituloDeEtiqueta(label: string) {
-  const i = label.indexOf(" · ");
-  return i >= 0 ? label.slice(i + 3).trim() : label.trim();
-}
-
-async function buscarMencion(folio: string, token: string, id?: number): Promise<MencionActividad | null> {
-  const lista = await apiFetch(`chat/mentions?kind=ACTIVITY&q=${encodeURIComponent(folio)}`, token).catch(() => null);
-  if (!Array.isArray(lista)) return null;
-  const actividades = (lista as MencionActividad[]).filter((e) => e?.kind === "ACTIVITY");
-  return (
-    actividades.find((e) => (id ? e.id === id : false)) ??
-    actividades.find((e) => folioDeEtiqueta(e.label ?? "") === folio) ??
-    null
+async function vaciarCola() {
+  temporizador = null;
+  const tanda = cola;
+  cola = [];
+  const porToken = new Map<string, typeof tanda>();
+  for (const p of tanda) porToken.set(p.token, [...(porToken.get(p.token) ?? []), p]);
+  await Promise.all(
+    [...porToken.entries()].map(async ([token, pedidos]) => {
+      let mapa: Record<string, TarjetaLiga> = {};
+      try {
+        const data = await apiFetch("chat/ligas", token, {
+          method: "POST",
+          body: JSON.stringify({ refs: [...new Set(pedidos.map((p) => p.ref.ref))] }),
+        });
+        if (data && typeof data === "object") mapa = data as Record<string, TarjetaLiga>;
+      } catch {
+        mapa = {};
+      }
+      for (const p of pedidos) {
+        const t = mapa[p.ref.ref] ?? sinCargar(p.ref);
+        // Lo que falló por red se vuelve a pedir la próxima vez; lo demás queda en caché.
+        if (mapa[p.ref.ref]) resueltas.set(p.clave, t);
+        enVuelo.delete(p.clave);
+        p.listo(t);
+      }
+    }),
   );
 }
 
-type DetalleActividad = {
-  id: number;
-  anNumber?: string | null;
-  titulo?: string | null;
-  estatus?: string | null;
-  prioridad?: string | null;
-  fechaMaxima?: string | null;
-  fechaEntregaEsperada?: string | null;
-  responsable?: { nombre?: string | null } | null;
-};
-
-async function resolverActividad(f: FolioDetectado, token: string): Promise<DatosTarjeta> {
-  const mencion = f.id ? null : await buscarMencion(f.folio, token);
-  const id = f.id ?? mencion?.id;
-  if (!id) {
-    return { tipo: "compacta", de: "actividad", folio: f.folio, href: "/erp/actividades", motivo: "No aparece en tus actividades" };
-  }
-  const detalle = (await apiFetch(`activities/${id}`, token).catch(() => null)) as DetalleActividad | null;
-  const respaldo = detalle ? null : mencion ?? (await buscarMencion(f.folio, token, id));
-  if (!detalle && !respaldo) {
-    return { tipo: "compacta", de: "actividad", folio: f.folio, href: `/erp/actividades/${id}`, motivo: "Sin acceso al detalle" };
-  }
-  return {
-    tipo: "actividad",
-    folio: (detalle?.anNumber || f.folio).toUpperCase(),
-    id,
-    titulo: detalle?.titulo || (respaldo ? tituloDeEtiqueta(respaldo.label) : f.folio),
-    estatus: detalle?.estatus ?? respaldo?.subtitle ?? null,
-    prioridad: detalle?.prioridad ?? null,
-    responsable: detalle?.responsable?.nombre ?? null,
-    fecha: detalle?.fechaMaxima ?? detalle?.fechaEntregaEsperada ?? null,
-    href: `/erp/actividades/${id}`,
-  };
-}
-
-type FilaCotizacion = {
-  id: number;
-  folio: string;
-  projectName?: string | null;
-  clienteNombre?: string | null;
-  clienteEmpresa?: string | null;
-  estadoEtiqueta?: string | null;
-  estado?: string | null;
-  total?: number | null;
-  currency?: string | null;
-  elaboro?: { nombre?: string | null } | null;
-};
-
-async function resolverCotizacion(f: FolioDetectado, token: string): Promise<DatosTarjeta> {
-  let filas: FilaCotizacion[] | null = null;
-  try {
-    const data = await apiFetch(`cotizaciones/core?search=${encodeURIComponent(f.folio)}&limit=5`, token);
-    filas = Array.isArray(data) ? (data as FilaCotizacion[]) : [];
-  } catch {
-    return { tipo: "compacta", de: "cotizacion", folio: f.folio, href: "/erp/cotizaciones", motivo: "Sin acceso a cotizaciones" };
-  }
-  const igual = (r: FilaCotizacion) => String(r.folio ?? "").toUpperCase();
-  const fila =
-    filas.find((r) => igual(r) === f.folio) ??
-    filas.find((r) => igual(r).startsWith(`${f.folio}-`) || f.folio.startsWith(`${igual(r)}-`));
-  if (!fila) {
-    return { tipo: "compacta", de: "cotizacion", folio: f.folio, href: "/erp/cotizaciones", motivo: "No se encontró la cotización" };
-  }
-  const cliente = fila.clienteEmpresa || fila.clienteNombre || null;
-  return {
-    tipo: "cotizacion",
-    folio: fila.folio,
-    id: fila.id,
-    titulo: fila.projectName || cliente || fila.folio,
-    estado: fila.estadoEtiqueta ?? fila.estado ?? null,
-    cliente,
-    total: typeof fila.total === "number" ? fila.total : null,
-    moneda: fila.currency ?? null,
-    elaboro: fila.elaboro?.nombre ?? null,
-    href: `/erp/cotizaciones/${fila.id}`,
-  };
-}
-
-export function resolverTarjeta(f: FolioDetectado, token: string): Promise<DatosTarjeta> {
-  const clave = claveDe(f, token);
-  const enCurso = pendientes.get(clave);
-  if (enCurso) return enCurso;
-  const promesa = (f.tipo === "actividad" ? resolverActividad(f, token) : resolverCotizacion(f, token)).then((d) => {
-    resueltas.set(clave, d);
-    return d;
+export function pedirTarjeta(ref: RefLiga, token: string): Promise<TarjetaLiga> {
+  const clave = claveDe(ref.ref, token);
+  const ya = resueltas.get(clave);
+  if (ya) return Promise.resolve(ya);
+  const curso = enVuelo.get(clave);
+  if (curso) return curso;
+  const promesa = new Promise<TarjetaLiga>((listo) => {
+    cola.push({ clave, ref, token, listo });
+    if (!temporizador) temporizador = setTimeout(() => void vaciarCola(), 25);
   });
-  pendientes.set(clave, promesa);
+  enVuelo.set(clave, promesa);
   return promesa;
 }
 
@@ -188,56 +131,42 @@ function formatoMoneda(total: number, moneda: string | null) {
   }
 }
 
-function formatoFecha(iso: string) {
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return "";
-  return d.toLocaleString("es-MX", {
-    timeZone: "America/Mexico_City",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-const ETIQUETA: Record<FolioTipo, string> = { actividad: "Actividad", cotizacion: "Cotización" };
-
-function Encabezado({ de, folio }: { de: FolioTipo; folio: string }) {
-  const Icon = de === "actividad" ? AssignmentOutlinedIcon : DescriptionOutlinedIcon;
-  return (
-    <>
-      <span className={styles.ecardKind}>
-        <Icon aria-hidden="true" sx={{ fontSize: 14 }} />
-        {ETIQUETA[de]}
-      </span>
-      <span className={styles.ecardFolio}>{folio}</span>
-    </>
-  );
-}
-
-function Abrir({ href, de, folio }: { href: string; de: FolioTipo; folio: string }) {
-  return (
-    <a className={styles.ecardOpen} href={href} aria-label={`Abrir ${ETIQUETA[de].toLowerCase()} ${folio}`}>
-      Abrir
-      <OpenInNewIcon aria-hidden="true" sx={{ fontSize: 13 }} />
-    </a>
-  );
-}
-
-function Chip({ texto, tono }: { texto: string; tono: ReturnType<typeof tonoDeEstado> }) {
+function Chip({ texto }: { texto: string }) {
   const cls = {
     proc: styles.chipProc,
     val: styles.chipVal,
     fin: styles.chipFin,
     alta: styles.chipAlta,
     neu: styles.chipNeu,
-  }[tono];
+  }[tonoDeEstado(texto)];
   return <span className={`${styles.chip} ${cls}`}>{texto}</span>;
 }
 
-export function EntityCard({ folio, token }: { folio: FolioDetectado; token: string }) {
-  const clave = claveDe(folio, token);
-  const [datos, setDatos] = useState<DatosTarjeta | null>(() => resueltas.get(clave) ?? null);
+function Encabezado({ tipo, folio }: { tipo: TipoLiga; folio: string | null }) {
+  const Icon = ICONO_TIPO[tipo];
+  return (
+    <>
+      <span className={styles.ecardKind}>
+        <Icon aria-hidden="true" sx={{ fontSize: 14 }} />
+        {ETIQUETA_TIPO[tipo]}
+      </span>
+      {folio ? <span className={styles.ecardFolio}>{folio}</span> : null}
+    </>
+  );
+}
+
+function Abrir({ href, tipo, nombre }: { href: string; tipo: TipoLiga; nombre: string }) {
+  return (
+    <a className={styles.ecardOpen} href={href} aria-label={`Abrir ${ETIQUETA_TIPO[tipo].toLowerCase()} ${nombre}`}>
+      Abrir
+      <OpenInNewIcon aria-hidden="true" sx={{ fontSize: 13 }} />
+    </a>
+  );
+}
+
+export function LigaCard({ liga, token }: { liga: RefLiga; token: string }) {
+  const clave = claveDe(liga.ref, token);
+  const [datos, setDatos] = useState<TarjetaLiga | null>(() => resueltas.get(clave) ?? null);
 
   useEffect(() => {
     let vivo = true;
@@ -246,27 +175,27 @@ export function EntityCard({ folio, token }: { folio: FolioDetectado; token: str
       setDatos(ya);
       return;
     }
-    void resolverTarjeta(folio, token).then((d) => {
+    void pedirTarjeta(liga, token).then((d) => {
       if (vivo) setDatos(d);
     });
     return () => {
       vivo = false;
     };
-    // `clave` resume folio, id y token.
+    // `clave` resume la ruta y el token.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clave]);
 
-  const de: FolioTipo = datos?.tipo === "compacta" ? datos.de : folio.tipo;
-  const quote = de === "cotizacion";
-  const cls = `${styles.ecard} ${quote ? styles.ecardQuote : ""}`;
+  const tipo = datos?.tipo ?? liga.tipo;
+  const cls = `${styles.ecard} ${TIPOS_DE_MARCA.has(tipo) ? styles.ecardQuote : ""}`;
+  const nombre = datos?.folio || datos?.titulo || liga.folio || "";
 
   if (!datos) {
     return (
-      <div className={cls} role="group" aria-busy="true" aria-label={`${ETIQUETA[de]} ${folio.folio}`}>
+      <div className={cls} role="group" aria-busy="true" aria-label={`${ETIQUETA_TIPO[tipo]} ${liga.folio ?? ""}`.trim()}>
         <div className={styles.ecardStrip} />
         <div className={styles.ecardIn}>
           <div className={styles.ecardTop}>
-            <Encabezado de={de} folio={folio.folio} />
+            <Encabezado tipo={tipo} folio={liga.folio} />
           </div>
           <div className={styles.ecardLoading}>Cargando…</div>
         </div>
@@ -274,51 +203,15 @@ export function EntityCard({ folio, token }: { folio: FolioDetectado; token: str
     );
   }
 
-  if (datos.tipo === "compacta") {
+  if (!datos.acceso) {
     return (
-      <div className={`${cls} ${styles.ecardCompact}`} role="group" aria-label={`${ETIQUETA[de]} ${datos.folio}`}>
+      <div className={`${cls} ${styles.ecardCompact}`} role="group" aria-label={datos.titulo}>
         <div className={styles.ecardStrip} />
         <div className={styles.ecardIn}>
           <div className={styles.ecardTop}>
-            <Encabezado de={de} folio={datos.folio} />
-            <span className={styles.ecardHint}>{datos.motivo}</span>
-            <Abrir href={datos.href} de={de} folio={datos.folio} />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (datos.tipo === "actividad") {
-    const alta = datos.prioridad && /(alta|urgent|crit)/i.test(datos.prioridad);
-    return (
-      <div className={cls} role="group" aria-label={`Actividad ${datos.folio}`}>
-        <div className={styles.ecardStrip} />
-        <div className={styles.ecardIn}>
-          <div className={styles.ecardTop}>
-            <Encabezado de="actividad" folio={datos.folio} />
-            <span className={styles.ecardChips}>
-              {datos.prioridad ? (
-                <Chip texto={`Prioridad ${datos.prioridad.toLowerCase()}`} tono={alta ? "alta" : "neu"} />
-              ) : null}
-              {datos.estatus ? <Chip texto={datos.estatus} tono={tonoDeEstado(datos.estatus)} /> : null}
-            </span>
-          </div>
-          <div className={styles.ecardTitle}>{datos.titulo}</div>
-          <div className={styles.ecardMeta}>
-            {datos.responsable ? (
-              <span>
-                <PersonOutlineIcon aria-hidden="true" sx={{ fontSize: 14 }} />
-                <b>{datos.responsable}</b>
-              </span>
-            ) : null}
-            {datos.fecha ? (
-              <span>
-                <ScheduleOutlinedIcon aria-hidden="true" sx={{ fontSize: 14 }} />
-                {formatoFecha(datos.fecha)}
-              </span>
-            ) : null}
-            <Abrir href={datos.href} de="actividad" folio={datos.folio} />
+            <Encabezado tipo={tipo} folio={datos.folio} />
+            {datos.motivo ? <span className={styles.ecardHint}>{datos.motivo}</span> : null}
+            <Abrir href={datos.href} tipo={tipo} nombre={nombre} />
           </div>
         </div>
       </div>
@@ -326,45 +219,39 @@ export function EntityCard({ folio, token }: { folio: FolioDetectado; token: str
   }
 
   return (
-    <div className={cls} role="group" aria-label={`Cotización ${datos.folio}`}>
+    <div className={cls} role="group" aria-label={`${ETIQUETA_TIPO[tipo]} ${nombre}`}>
       <div className={styles.ecardStrip} />
       <div className={styles.ecardIn}>
         <div className={styles.ecardTop}>
-          <Encabezado de="cotizacion" folio={datos.folio} />
-          <span className={styles.ecardChips}>
-            {datos.estado ? <Chip texto={datos.estado} tono={tonoDeEstado(datos.estado)} /> : null}
-          </span>
+          <Encabezado tipo={tipo} folio={datos.folio} />
+          <span className={styles.ecardChips}>{datos.estado ? <Chip texto={datos.estado} /> : null}</span>
         </div>
         <div className={styles.ecardTitle}>{datos.titulo}</div>
         <div className={styles.ecardMeta}>
-          {datos.cliente && datos.cliente !== datos.titulo ? (
+          {datos.detalle.map((d) => (
+            <span key={d}>{d}</span>
+          ))}
+          {datos.monto ? (
             <span>
-              <PersonOutlineIcon aria-hidden="true" sx={{ fontSize: 14 }} />
-              {datos.cliente}
+              <b className={styles.ecardNum}>{formatoMoneda(datos.monto.total, datos.monto.moneda)}</b>
+              <small>{datos.monto.moneda}</small>
             </span>
           ) : null}
-          {datos.elaboro ? <span>Elaboró {datos.elaboro}</span> : null}
-          {datos.total != null ? (
-            <span>
-              <b className={styles.ecardNum}>{formatoMoneda(datos.total, datos.moneda)}</b>
-              {datos.moneda ? <small>{datos.moneda}</small> : null}
-            </span>
-          ) : null}
-          <Abrir href={datos.href} de="cotizacion" folio={datos.folio} />
+          <Abrir href={datos.href} tipo={tipo} nombre={nombre} />
         </div>
       </div>
     </div>
   );
 }
 
-/** Tarjetas de los folios que trae el cuerpo del mensaje (hasta tres). */
+/** Tarjetas de las ligas que trae el cuerpo del mensaje (hasta tres). */
 export default function EntityCards({ body, token }: { body: string; token: string }) {
-  const folios = useMemo(() => detectarFolios(body), [body]);
-  if (!folios.length || !token) return null;
+  const ligas = useMemo(() => refsDelMensaje(body), [body]);
+  if (!ligas.length || !token) return null;
   return (
     <div className={styles.ecards}>
-      {folios.map((f) => (
-        <EntityCard key={`${f.tipo}-${f.folio}`} folio={f} token={token} />
+      {ligas.map((l) => (
+        <LigaCard key={l.ref} liga={l} token={token} />
       ))}
     </div>
   );

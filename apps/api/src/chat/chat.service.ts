@@ -246,7 +246,8 @@ export class ChatService {
     return out;
   }
 
-  private async resolveChatScope(userId: number, companyId?: number | null): Promise<{
+  /** Alcance del chat: todo (dirección) o el árbol de quien pregunta. También lo usan las ligas y el asistente. */
+  async resolveChatScope(userId: number, companyId?: number | null): Promise<{
     isOmniscient: boolean;
     reportIds: number[];
   }> {
@@ -1224,7 +1225,8 @@ export class ChatService {
         id: e.id,
         label: `Evidencia #${e.id} · ${e.tipoEvidencia}`,
         subtitle: `${e.actividad.anNumber} · ${e.actividad.titulo} · ${e.estatus}`,
-        href: appUrls.erpActividadEvidencias(e.actividadId),
+        // `?evidencia=` deja que la tarjeta de la liga muestre esa evidencia y no toda la actividad.
+        href: `${appUrls.erpActividadEvidencias(e.actividadId)}?evidencia=${e.id}`,
       })),
     ];
   }

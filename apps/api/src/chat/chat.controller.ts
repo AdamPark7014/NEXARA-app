@@ -20,6 +20,8 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
 import { RbacGuard } from '../common/rbac.guard.js';
+import { LigasService, type ActorLiga } from './ligas/ligas.service.js';
+import { TIPO_DE_KIND } from './ligas/ligas.js';
 
 type MulterFile = {
   originalname: string;
@@ -31,7 +33,10 @@ type MulterFile = {
 @Controller('chat')
 @UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
 export class ChatController {
-  constructor(private readonly chat: ChatService) {}
+  constructor(
+    private readonly chat: ChatService,
+    private readonly ligas: LigasService,
+  ) {}
 
   @Get('channels')
   listChannels(@CurrentUser() user: { id: number }, @CurrentCompanyId() companyId: number | null) {
@@ -258,14 +263,35 @@ export class ChatController {
     return this.chat.listColleagues(user.id, q, companyId);
   }
 
+  /**
+   * Selector «Ligar»: personas, actividades y evidencias (las de siempre) y, con `kind`, cotizaciones,
+   * clientes, proyectos, asistencia, viáticos y facturas, cada uno con los permisos de quien busca.
+   */
   @Get('mentions')
   mentions(
-    @CurrentUser() user: { id: number },
+    @CurrentUser() user: ActorLiga,
     @CurrentCompanyId() companyId: number | null,
     @Query('q') q?: string,
-    @Query('kind') kind?: 'USER' | 'ACTIVITY' | 'EVIDENCE',
+    @Query('kind') kind?: string,
   ) {
-    return this.chat.searchMentionables(user.id, q ?? '', kind, companyId);
+    if (kind && TIPO_DE_KIND[kind] && !['ACTIVITY', 'EVIDENCE'].includes(kind)) {
+      return this.ligas.buscar(user, companyId, kind, q ?? '');
+    }
+    const clasica = kind === 'USER' || kind === 'ACTIVITY' || kind === 'EVIDENCE' ? kind : undefined;
+    return this.chat.searchMentionables(user.id, q ?? '', clasica, companyId);
+  }
+
+  /**
+   * Tarjetas de las ligas de uno o varios mensajes (`refs`: rutas `/erp/…` o `folio:AN-0031`), con los
+   * permisos de quien las ve: sin acceso, solo el título genérico.
+   */
+  @Post('ligas')
+  resolverLigas(
+    @CurrentUser() user: ActorLiga,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: { refs?: unknown },
+  ) {
+    return this.ligas.resolver(user, companyId, body?.refs);
   }
 
   @Post('upload')

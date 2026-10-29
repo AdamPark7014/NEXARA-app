@@ -103,6 +103,7 @@ import { ScimModule } from './scim/scim.module.js';
 import { ObservabilityModule } from './observability/observability.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
 import { AiModule } from './ai/ai.module.js';
+import { AsistenteChatModule } from './ai/asistente-chat/asistente-chat.module.js';
 import { ActivityFeedModule } from './activity-feed/activity-feed.module.js';
 import { DomainEventsModule } from './domain-events/domain-events.module.js';
 import { CelebrationsModule } from './celebrations/celebrations.module.js';
@@ -208,6 +209,7 @@ import { CelebrationsModule } from './celebrations/celebrations.module.js';
     WebhooksModule,
     ScimModule,
     AiModule,
+    AsistenteChatModule,
     CelebrationsModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],

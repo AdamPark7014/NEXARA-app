@@ -1,3 +1,5 @@
+import type { KindLiga } from "@/lib/ligas";
+
 export type Attachment = { url: string; name: string; mime: string; size: number };
 
 export type ChannelKind = "PUBLIC" | "PRIVATE" | "DIRECT";
@@ -33,7 +35,8 @@ export type ReactionUser = { id: number; nombre: string; avatarUrl?: string | nu
 export type Reaction = { emoji: string; count: number; userIds: number[]; users?: ReactionUser[] };
 
 export type MentionEntity = {
-  kind: "USER" | "ACTIVITY" | "EVIDENCE";
+  /** `USER` menciona a una persona; los demás ligan un registro (ver `lib/ligas.ts`). */
+  kind: KindLiga;
   id: number;
   label: string;
   subtitle: string;
