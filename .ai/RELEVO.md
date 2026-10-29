@@ -1,5 +1,24 @@
 # RELEVO
 
+- **28-10 ~23:30 (claude-code) — Asignar: complejidad con sugerencia de IA y tiempo típico (pedido de Adam: «ambos»).**
+  - BD: `Activity.complejidad` y `complejidadSugerida` (`BASICA|ESTANDAR|COMPLEJA|CRITICA`), migración
+    `20261028220000_actividad_complejidad`. **Va con `prisma migrate deploy`**: el script `deploy-api-web.sh` no migra.
+  - API `src/ai/complejidad/`:
+    - `GET ai/complejidad/tiempos?coreKind&tipo`: mediana del reloj por persona de las terminadas o por validar de
+      ese tipo, en total y por nivel. Cuenta desde 3 anteriores, en los últimos 120 días, sin la semana demo y sin los
+      tramos que cortó el sistema (`TOPE_12H`, `CORTE_DIA`). Caché de 10 min.
+    - Los textos libres viejos se leen con `subtipoDeTarea` («instalacion.» → Instalación).
+    - `POST ai/complejidad/sugerir`: Haiku 5.5 por la puerta (`x-proceso: complejidad`), 6 s sin reintento; si falla
+      no hay sugerencia.
+    - Eval `--funcion complejidad`: 22 casos, 21/22, p50 1.4 s, 0.000055 USD. Contrato en §8 de `IA-CLAUDE.md`.
+  - Web:
+    - `components/ops/ComplejidadCampo.tsx` va en «¿Qué se va a hacer?» (solo Core; en tarea, después del tipo). Lleva
+      los cuatro niveles con el tiempo de cada uno, la sugerencia (se toma si nadie eligió; si eligen otra se guardan
+      las dos) y «Usar X como tiempo estimado». En asignar ese botón ajusta también la rueda de la página
+      (`onTiempoTipico`).
+    - El detalle muestra «Complejidad» en los datos clave, con lo que sugirió la IA si fue otra.
+  - Pruebas: web 1,305 y API `activities` + `ai` 500, en verde.
+
 - **28-10 ~22:00 (claude-code) — Asignar actividad: tipos cerrados, hora compromiso y carga del equipo (pedido de Adam: «Sí, Asignar»).**
   - `lib/activity-kinds.ts`: la tarea pasa a un catálogo cerrado de 17 tipos en 4 familias (`FAMILIAS_TAREA`: En
     campo, Oficina técnica, Administración, Para todos). Ya no hay «Otro» en los chips; `'otro'` queda solo para leer

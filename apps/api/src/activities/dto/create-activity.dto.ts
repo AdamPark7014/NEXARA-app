@@ -5,12 +5,14 @@ import {
   IsInt,
   IsDateString,
   IsEnum,
+  IsIn,
   Matches,
   Max,
   MaxLength,
 } from 'class-validator';
 import { ActivityType, ActivityWorkType, TicketType } from '@prisma/client';
 import { MENSAJE_TOPE_12H, TOPE_SESION_MIN } from '../sessions/sesiones-trabajo.js';
+import { COMPLEJIDADES, type Complejidad } from '../../ai/complejidad/tiempos-tipicos.js';
 
 /** Los topes de largo son los de cada columna (`@db.VarChar` en schema.prisma). */
 export class CreateActivityDto {
@@ -100,6 +102,15 @@ export class CreateActivityDto {
   @IsOptional()
   @IsInt()
   tiempoMaximoMin?: number;
+
+  /** Complejidad elegida y la que sugirió la IA (`ai/complejidad`). */
+  @IsOptional()
+  @IsIn([...COMPLEJIDADES], { message: 'La complejidad es BASICA, ESTANDAR, COMPLEJA o CRITICA' })
+  complejidad?: Complejidad | null;
+
+  @IsOptional()
+  @IsIn([...COMPLEJIDADES], { message: 'La complejidad sugerida es BASICA, ESTANDAR, COMPLEJA o CRITICA' })
+  complejidadSugerida?: Complejidad | null;
 
   @IsNotEmpty()
   @IsInt()

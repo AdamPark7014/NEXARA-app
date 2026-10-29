@@ -1191,6 +1191,10 @@ model Activity {
   overdueAlertedAt        DateTime?
   tiempoEstimadoMin       Int?
   tiempoMaximoMin         Int?
+  /// Complejidad elegida al asignar: BASICA | ESTANDAR | COMPLEJA | CRITICA. Con el tipo da el tiempo típico.
+  complejidad             String?                  @db.VarChar(12)
+  /// La que sugirió la IA al asignar; queda aunque se elija otra.
+  complejidadSugerida     String?                  @db.VarChar(12)
   creadoPorId             Int
   responsableId           Int
   eficienciaScore         Int?

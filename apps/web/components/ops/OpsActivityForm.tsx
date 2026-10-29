@@ -85,7 +85,22 @@ import { obtenerProgramacion, type EtapaPropuesta } from "@/lib/proyectos-api";
 import { aInputFecha, hoyISO } from "@/lib/proyecto-plan";
 import { fechaCorta, periodoPorOmision, resumenDelRango } from "@/lib/actividad-periodo";
 import coreCss from "./OpsActivityFormCore.module.css";
+import ComplejidadCampo from "./ComplejidadCampo";
 import s from "./OpsActivityForm.module.css";
+
+const SERVICIO_LABEL: Record<string, string> = {
+  PREVENTIVO: "Servicio preventivo",
+  CORRECTIVO: "Servicio correctivo",
+  EMERGENCIA: "Servicio de emergencia",
+  INSTALACION: "Servicio de instalación",
+};
+
+/** «Instalación», «Servicio correctivo», «Obra»: el tipo de trabajo como se lee en la pista. */
+function etiquetaTipoTrabajo(kind: string, tipo: string | null): string {
+  if (kind === "tarea" && tipo) return tipo;
+  if (kind === "servicio") return SERVICIO_LABEL[tipo || "PREVENTIVO"] ?? "Servicio";
+  return kind ? kind[0].toUpperCase() + kind.slice(1) : "este tipo";
+}
 
 type Props = {
   activityId?: number;
@@ -117,6 +132,8 @@ type Props = {
   evidencePhotoRequired?: number;
   /** Auto-asignación de encargado: crea vía POST /me/activities (responsable = uno mismo). */
   selfAssign?: boolean;
+  /** «Usar como tiempo estimado» desde la complejidad: la página de asignar ajusta también su rueda. */
+  onTiempoTipico?: (minutos: number) => void;
   onSuccess?: (id: number) => void;
   onCancel?: () => void;
 };
@@ -139,6 +156,7 @@ export default function OpsActivityForm({
   assignmentCharge,
   evidencePhotoRequired = 4,
   selfAssign = false,
+  onTiempoTipico,
   onSuccess,
   onCancel,
 }: Props) {
@@ -894,6 +912,18 @@ export default function OpsActivityForm({
       ? "OT con proyecto operativo: el cliente sale del proyecto."
       : "OT sin proyecto: trabajo interno o ad-hoc; no pide proyecto.";
 
+  // Complejidad (solo Core): en tarea, después de elegir su tipo; en las demás, siempre.
+  const kindActual = form.coreKind || coreKind || "";
+  const tipoParaComplejidad =
+    kindActual === "tarea"
+      ? tareaTipo && tareaTipo !== "otro"
+        ? form.ticketTypeCustom
+        : null
+      : kindActual === "servicio"
+        ? form.ticketType
+        : null;
+  const complejidadVisible = isCore && Boolean(kindActual) && (kindActual !== "tarea" || Boolean(tipoParaComplejidad));
+
   const duracion = (cual: "tiempoEstimadoMin" | "tiempoMaximoMin") => ({
     horas: splitMinutes(Number(form[cual]) || 0).horas,
     minutos: splitMinutes(Number(form[cual]) || 0).minutos,
@@ -1152,6 +1182,32 @@ export default function OpsActivityForm({
                 )}
               </Field>
             </FieldGrid>
+            {complejidadVisible ? (
+              <ComplejidadCampo
+                token={token}
+                coreKind={kindActual}
+                tipo={tipoParaComplejidad}
+                tipoLabel={etiquetaTipoTrabajo(kindActual, tipoParaComplejidad)}
+                titulo={form.titulo}
+                indicaciones={form.indicaciones}
+                value={form.complejidad}
+                pedirSugerencia={!(isEdit && form.complejidad)}
+                tiempoActualMin={Number(form.tiempoEstimadoMin) || 0}
+                onChange={({ complejidad, sugerida }) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    ...(complejidad ? { complejidad } : {}),
+                    ...(sugerida ? { complejidadSugerida: sugerida } : {}),
+                  }))
+                }
+                onUsarTiempo={(minutos) => {
+                  // Tope de 12 h por actividad, como la rueda.
+                  const m = Math.min(720, minutos);
+                  setForm((prev) => ({ ...prev, tiempoEstimadoMin: String(m) }));
+                  onTiempoTipico?.(m);
+                }}
+              />
+            ) : null}
           </div>
         </FormSection>
 

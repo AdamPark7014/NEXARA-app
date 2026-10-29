@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   Post,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -20,6 +21,8 @@ import { InterpretarInstruccionDto } from './asistente/dto/interpretar.dto.js';
 import { TranscriptorService } from './voz/transcriptor.service.js';
 import { extensionAudio } from './voz/transcriptor.js';
 import { isChainTopAuthority } from '../activities/activity-superiors.js';
+import { ComplejidadService } from './complejidad/complejidad.service.js';
+import { SugerirComplejidadDto } from './complejidad/sugerir-complejidad.dto.js';
 
 /** Un dictado son segundos o un par de minutos: 10 MB sobran en opus. */
 const MAX_DICTADO_BYTES = 10 * 1024 * 1024;
@@ -31,6 +34,7 @@ export class AiController {
     private readonly triage: AiTriageService,
     private readonly asistente: AsistenteActividadesService,
     private readonly transcriptor: TranscriptorService,
+    private readonly complejidad: ComplejidadService,
   ) {}
 
   @Post('triage')
@@ -73,6 +77,24 @@ export class AiController {
   ) {
     if (!isChainTopAuthority(user)) throw new ForbiddenException('«Asignar con IA» es solo del CEO.');
     return this.asistente.interpretar(body.texto, user, companyId);
+  }
+
+  /** Tiempo típico de un tipo de trabajo (mediana del reloj de las anteriores), en total y por complejidad. */
+  @Get('complejidad/tiempos')
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS] })
+  tiemposTipicos(
+    @Query('coreKind') coreKind: string | undefined,
+    @Query('tipo') tipo: string | undefined,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.complejidad.tiempos(companyId, { coreKind, tipo });
+  }
+
+  /** Sugerencia de complejidad al asignar. No guarda nada: la web la manda con la actividad. */
+  @Post('complejidad/sugerir')
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS] })
+  sugerirComplejidad(@Body() body: SugerirComplejidadDto, @CurrentCompanyId() companyId: number | null) {
+    return this.complejidad.sugerir(companyId, body);
   }
 
   /** ¿Hay transcriptor propio? Si no, la web dicta con el reconocimiento del navegador. */

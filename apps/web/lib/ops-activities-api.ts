@@ -20,6 +20,9 @@ export type ActivityDetail = {
   coreKind?: string | null;
   /** Encargo: ejecucion | despacho (en despacho el LEAD solo reparte). */
   assignmentCharge?: string | null;
+  /** BASICA | ESTANDAR | COMPLEJA | CRITICA (al asignar) y la que sugirió la IA. */
+  complejidad?: string | null;
+  complejidadSugerida?: string | null;
   projectId?: number | null;
   project?: { id: number; title: string } | null;
   branchName?: string | null;
