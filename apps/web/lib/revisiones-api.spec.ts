@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { coincideBusqueda, decisionUi, minutosEsperando, textoEspera, tonoEspera } from "./revisiones-api";
+import {
+  coincideBusqueda,
+  decisionUi,
+  minutosEsperando,
+  pieRevisadas,
+  textoEspera,
+  tonoEspera,
+} from "./revisiones-api";
+
+describe("pie de «Revisadas por ti»", () => {
+  it("con el tope de la API lleno no afirma un total", () => {
+    expect(pieRevisadas(100)).toBe("Las 100 más recientes de los últimos 30 días");
+    expect(pieRevisadas(1)).toBe("1 revisión en los últimos 30 días");
+    expect(pieRevisadas(42)).toBe("42 revisiones en los últimos 30 días");
+  });
+});
 
 const ahora = new Date("2026-10-28T20:00:00Z").getTime();
 const antes = (min: number) => new Date(ahora - min * 60_000).toISOString();
