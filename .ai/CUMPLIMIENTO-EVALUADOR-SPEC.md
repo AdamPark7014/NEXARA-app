@@ -254,7 +254,9 @@ horas estándar). Sin migración.
   casos del equipo en los últimos 120 días; si no, la de todo lo entregado), sin pasar lo que esa actividad duró o se
   estimó. Sin reloj ni estimado no hay dato, y quien entregó pero sin ningún T<sub>e</sub> no lleva el pilar (no pesa);
   quien no entregó nada en jornada sí queda en 0. Lo autoasignado gana la
-  mitad hasta que su evidencia se aprueba; la comercial gana solo con la cotización ligada fuera de borrador.
+  mitad hasta que su evidencia se aprueba; una cotización (comercial ligada a una cotización o con «cotiza» en el
+  título) gana solo con la cotización ligada fuera de borrador. «Comercial» también se usa para contabilidad o
+  seguimiento: eso gana como cualquier otra actividad.
   Familia por puesto: instalador, técnico, campo, soporte u obra = campo; lo demás, oficina.
 - **Disciplina (15):** por día que debía checar, ≤ 15 min 1 · 16–30 0.6 · 31–60 0.3 · más o sin checar 0; cada 3
   retardos se quita el que más daba. Se multiplica por el registro completo: jornada terminada con salida propia
