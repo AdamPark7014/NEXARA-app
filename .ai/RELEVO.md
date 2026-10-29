@@ -19,6 +19,12 @@
     viejo). Sigue sin `audit.view` a propósito (spec de RBAC).
   - Timbrado: no se duplica; lo conecta la sesión del PAC (Facturama recomendado; producción en mock).
   - Pendiente conocido: la recepción de compra sigue cargando IVA a 209.01 (mal definida en el catálogo base).
+  - Web: `/erp/contabilidad/por-facturar` (+ `/[id]` para preparar y timbrar), `/pagos-y-gastos` y `/estados`
+    (`?vista=balance`), en el sistema visual nuevo (`components/mesa-contable/`, datos en `lib/mesa-contable.ts`).
+    Los chips de `ContabilidadSidebar` quedan en el orden del mockup (Hoy · Por facturar · Pagos y gastos ·
+    Estados financieros · Cuadrar banco · Me deben · Debo pagar · Cerrar el mes · Más) con contadores de
+    `GET mesa/resumen`; en las tres pantallas nuevas van debajo del encabezado. En el menú, «Contabilidad» se llama
+    «Mesa contable».
 
 - **29-10 ~12:00 (claude-code) — Web Core: auditoría por DOM del resto del menú y arreglos de contraste (sin desplegar).**
   - Auditadas 21 pantallas a 1707 px (el ancho real de Adam: Chrome maximizado con zoom al 90 %). 375 px no se pudo
