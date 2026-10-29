@@ -66,9 +66,9 @@
     de `C:\dev\scripts\ai-os\IA-CLAUDE.md` (copiado a `/opt/IA-CLAUDE.md`) y objetivo en la puerta
     (PUERTA-IA-app `2690965`, p95 4 s, 0.0006).
   - **Despliegue:** `bbc3b4a9` salió con `deploy-api-web.sh` (API + web, ed12e3d4) y está probado. El arreglo del
-    menú de `@` (`e4d24f38`) **NO está desplegado**: `main` ya trae dos migraciones sin aplicar de otras sesiones
-    (`20261029030000_actividad_tiempo_estandar` y `20261029130000_cctv_disenos`) y el módulo de videovigilancia en
-    el menú; un despliegue solo de web lo habría publicado sin su API. Sale con el próximo despliegue con migración.
+    menú de `@` (`e4d24f38`) salió con el `update.sh --with-migrate` de 38952929 (sesión de «Asignar con IA») y está
+    verificado en producción: el menú de `@` se ve (Asistente primero), la mención entra con el cursor detrás y el de
+    emojis sale completo.
     - `/root/deploy-api-web.sh` no tiene permiso de ejecución: correrlo con `bash /root/deploy-api-web.sh` (con
       `nohup … &` por SSH muere sin dejar log).
   - Pendiente: selector «Ligar», tarjetas y asistente en Android/iOS; `lib/asistente-ia-api.spec.ts` (web) falla
