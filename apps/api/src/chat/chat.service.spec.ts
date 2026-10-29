@@ -360,3 +360,47 @@ describe('ChatService.deleteMessage', () => {
     expect(prisma.chatMessage.findFirst).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('ChatService.ensureDefaults', () => {
+  const realtime = { emitToRoom: jest.fn() } as any;
+  const general = {
+    id: 333,
+    slug: 'general',
+    topic: 'Conversación del equipo',
+    description: 'Canal abierto para toda la organización',
+    isArchived: false,
+  };
+  const anuncios = {
+    id: 334,
+    slug: 'anuncios',
+    topic: 'Avisos importantes del equipo',
+    description: 'Comunicados y novedades',
+    isArchived: false,
+  };
+
+  function prismaCon(canales: Record<string, any>) {
+    return {
+      userCompany: { findFirst: jest.fn().mockResolvedValue({ companyId: 1 }) },
+      chatChannel: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        findFirst: jest.fn(({ where }: any) => Promise.resolve(canales[where.slug] ?? null)),
+        create: jest.fn(),
+        update: jest.fn(({ where }: any) => Promise.resolve({ id: where.id })),
+      },
+      user: { findMany: jest.fn().mockResolvedValue([]) },
+      chatChannelMember: { createMany: jest.fn(), deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    } as any;
+  }
+
+  it('no reescribe #general ni #anuncios si ya están como deben (corre en cada consulta)', async () => {
+    const prisma = prismaCon({ general, anuncios });
+    await new ChatService(prisma, realtime, {} as any).ensureDefaults(7, 1);
+    expect(prisma.chatChannel.update).not.toHaveBeenCalled();
+  });
+
+  it('sí los corrige si alguien los archivó o cambió su texto', async () => {
+    const prisma = prismaCon({ general: { ...general, isArchived: true }, anuncios: { ...anuncios, topic: 'otro' } });
+    await new ChatService(prisma, realtime, {} as any).ensureDefaults(7, 1);
+    expect(prisma.chatChannel.update).toHaveBeenCalledTimes(2);
+  });
+});

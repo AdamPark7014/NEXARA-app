@@ -120,7 +120,13 @@ export class ChatService {
             companyId: cid,
           },
         });
-      } else {
+      } else if (
+        channel.topic !== d.topic ||
+        channel.description !== d.description ||
+        channel.isArchived
+      ) {
+        // Solo si algo cambió: esto corre en cada consulta del chat y reescribir los mismos textos dejaba dos filas de
+        // auditoría por llamada (28-10-2026).
         channel = await this.prisma.chatChannel.update({
           where: { id: channel.id },
           data: {
