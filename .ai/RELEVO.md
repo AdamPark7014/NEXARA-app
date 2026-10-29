@@ -1,5 +1,31 @@
 # RELEVO
 
+- **29-10 ~10:40 (claude-code) — Recordatorio de entrada: «buenos días» y push cada 2 min hasta que cheque (pedido de Adam).**
+  - Adam: «que la misma plataforma les vaya comentando a todos como de buenos días, ¿ya registraste tu entrada?…
+    notificación push cada dos minutos… y los estén muele y muele y muele».
+  - Reglas puras en `src/attendance/recordatorio-entrada.ts` y servicio `recordatorio-entrada.service.ts` (cron
+    `asistencia-recordatorio-entrada`, cada minuto). Horario de cada quien con `horarioDePersona`, el mismo que mide
+    retardos: oficina 10:00–18:00, cuadrilla de campo 08:00–17:00 (`work_schedules`), gracia de 15 min si no tiene
+    otra.
+    - A su hora de entrada: un «Buenos días, <nombre> ☀️ · ¿Ya registraste tu entrada?» (`ATTENDANCE_ABSENCE`,
+      `entityType RecordatorioEntrada`). Es la **única fila del día por persona**; con ella se decide «ya saludé».
+      A quien ya checó solo se le saluda dentro de su tolerancia.
+    - Desde la entrada más la gracia (10:15 / 08:15), sin checar: push «No has registrado tu entrada» cada 2 min,
+      **solo push, sin fila**. Una sola tarjeta que se reemplaza y vuelve a sonar (`tag nx_entrada_u<id>`; en iOS
+      `apns-collapse-id` con el nuevo `PushPayload.reemplazar`).
+    - Para al checar, al llegar su salida, con falta justificada, permiso/vacaciones aprobados (`leave_requests`)
+      o en descanso: sábado, domingo y festivos de la LFT art. 74, salvo guardia. Días que da la empresa además de
+      la ley: `ASISTENCIA_DIAS_DE_DESCANSO=AAAA-MM-DD,…` en el entorno de la API (hoy vacío: **el lunes 2-nov no es
+      festivo de ley**, si se descansa hay que ponerlo ahí o registrarlo).
+    - Fuera: dirección 24/7 (ceo, arquitecto…), cuentas de plataforma y el equipo ficticio `@demo.invalid`.
+  - Varias instancias: cada aviso se reclama con una escritura condicional en `user_preferences`
+    (`asistencia.recordatorio_entrada` = último turno `AAAA-MM-DD HH:MM`, una fila por persona). Ni esa tabla ni
+    `notifications` pasan por `audit_logs`. Disco al 70 % el 29-10.
+  - Pruebas: `recordatorio-entrada.spec.ts` 16 en verde (regla y servicio con dos instancias simuladas); suite de la
+    API 320/3877 en verde. `tsc` limpio sobre `HEAD` + estos archivos; en el checkout compartido falla en
+    `activities.service.ts` por trabajo sin commitear de otra sesión (tiempo estándar), no por esto.
+  - Sin migración.
+
 - **29-10 ~11:00 (claude-code) — Diseñador de videovigilancia, fase 1: ingeniería inversa de SYSCOM y motor de cálculo.**
   - Pedido de Adam: un módulo de Core que haga lo que David sacó con el diseñador de SYSCOM («Proyecto CCTV Bodegas
     VDM», 14 cámaras, PDF en `Downloads`). Lo usan los encargados de área y el arquitecto. No entran los ingenieros
