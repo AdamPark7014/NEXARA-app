@@ -35,11 +35,15 @@
     - el REP manda la tasa de IVA de los conceptos y se detiene si la factura mezcla tasas.
   - Suite de la API: solo falla `app-urls-core-surface` por dos rutas `/crm/projects` de la Mesa contable (de esa
     sesión, ya avisada). Los PDF de reuniones/cotización pasan con `--runInBand`.
-  - **Falta:**
-    - Adam: correr `C:\dev\secrets\nexara\facturama-alta\guardar-credenciales-facturama.ps1`, que escribe
-      `facturama-api.env` con las de producción y las de sandbox (cuenta nueva en dev.facturama.mx);
-    - luego, prueba en sandbox con `sandbox-facturama.ts` (scratchpad de la sesión del PAC) y credenciales al
-      `.env.nexara` del servidor.
+  - Desplegado (migración aplicada, api sana).
+  - Adam pidió «no uses pruebas, ya directo conecta»: el servidor quedó con `PAC_PROVIDER=facturama` y las credenciales
+    reales (respaldo `/root/env.nexara.antes-facturama-20261029-181852`). Preflight `listo_para_produccion`.
+  - **Facturama da 401:** la API de producción exige la anualidad ($1,650), que sigue sin comprar. No reintentar contra su
+    API hasta que la compre: ya van ~9 intentos fallidos y conviene no arriesgar un bloqueo.
+  - No hay ninguna factura en la base. Lo único facturable a la vista son actividades reales terminadas (AN-0038 Nivel
+    Diez, AN-0039 TEKSERVE, AN-0239 «SE»), sin importe ni datos fiscales; AN-0007 es de la semana demo.
+  - **Falta:** compra de la anualidad (Adam) y que la contadora prepare los borradores con RFC, régimen, CP, uso y
+    claves SAT. Cada CFDI real lo confirma Adam antes de timbrar.
   - Runbook actualizado: `docs/CFDI-GO-LIVE.md` §1 y §8.
 
 - **29-10 ~14:00 (claude-code) — Tiempo estándar en Asignar (web) y obra con tarifas (lo retomé de la sesión principal).**

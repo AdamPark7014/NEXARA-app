@@ -33,7 +33,8 @@ Leyenda:
 |---|---|
 | Cuenta de Facturama (producción) | Alta completa: RFC `NEE240925V73`, régimen 601, CP 72775. CSD cargado (certificado `00001000000718329029`, vence el 25-08-2029). Está en la prueba gratis: 15 folios de API hasta el 29-nov-2026 |
 | Anualidad de API | **Sin comprar**: $1,650 con IVA al año, incluye API Web + Multiemisor y 100 folios. Los folios de API se compran aparte y vencen al año |
-| Credenciales de API | No hay llaves aparte: son el usuario y la contraseña del portal. La cuenta de **sandbox** se crea por separado en dev.facturama.mx. Ninguna está aún en el servidor |
+| Credenciales de API | No hay llaves aparte: son el usuario y la contraseña del portal. La cuenta de **sandbox** se crea por separado en dev.facturama.mx (Adam pidió no usarla). Desde el 29-oct, 18:19 UTC, el servidor tiene `PAC_PROVIDER=facturama`, `PAC_FALLBACK_TO_MOCK=0`, `FACTURAMA_BASE_URL=https://api.facturama.mx` y las credenciales reales. Respaldo del `.env` anterior: `/root/env.nexara.antes-facturama-20261029-181852` |
+| Conexión | La revisión previa da `listo_para_produccion` sin bloqueos, pero **Facturama responde 401** porque la API de producción solo se habilita con la anualidad. Hasta comprarla, «Timbrar» muestra «Facturama rechazó las credenciales…» y no se emite nada |
 | Perfil fiscal en Core (`company_profile` id 1) | Corregido con los datos reales (antes RFC genérico y sin CP). El respaldo del registro anterior está en `/root/company_profile_1_antes_20261029.csv`. La revisión previa da el emisor completo y válido |
 | Adaptador Facturama | Reescrito el 29-oct (ver §8): baja el XML, cancela por `Id`, no duplica en reintentos, Pagos 2.0 con IVA por documento |
 
