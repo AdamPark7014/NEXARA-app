@@ -80,6 +80,23 @@ function vistaInicial(plano: Plano): Vista {
   return { x: 0, y: 0, w: 60 / k, h: 30 / k };
 }
 
+/**
+ * Vista tras pellizcar: la escala sigue a la distancia entre los dedos y el punto del plano que
+ * estaba bajo el punto medio se queda bajo el punto medio (que también puede moverse).
+ */
+export function vistaPellizcada(
+  inicio: { dist: number; enPlano: Punto; centro: Punto; u: number; vista: Vista },
+  medio: Punto,
+  dist: number,
+): Vista {
+  const w = Math.min(Math.max((inicio.vista.w * inicio.dist) / dist, 20), 200_000);
+  const f = inicio.vista.w / w;
+  const h = inicio.vista.h / f;
+  const u1 = inicio.u / f;
+  const vc = { x: inicio.enPlano.x - (medio.x - inicio.centro.x) * u1, y: inicio.enPlano.y - (medio.y - inicio.centro.y) * u1 };
+  return { x: vc.x - w / 2, y: vc.y - h / 2, w, h };
+}
+
 /** Acerca (f > 1) o aleja sin mover el centro de la vista. */
 function acercarAlCentro(v: Vista, f: number): Vista {
   const w = Math.min(Math.max(v.w / f, 20), 200_000);
@@ -216,7 +233,40 @@ export default function Lienzo({
     return { sel: { tipo: tipo as TipoElemento, id: resto.join(":") }, manija };
   };
 
+  // Dos dedos (celular): pellizcar acerca o aleja alrededor del punto medio y arrastrar mueve la vista.
+  // Con «meet», el punto del plano bajo un punto de pantalla c es centro + (c − centro de pantalla) · u.
+  const dedos = useRef(new Map<number, Punto>());
+  const pellizco = useRef<{ dist: number; enPlano: Punto; centro: Punto; u: number; vista: Vista } | null>(null);
+  const medioYDistancia = () => {
+    const [a, b] = [...dedos.current.values()];
+    return { medio: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, dist: Math.max(Math.hypot(a.x - b.x, a.y - b.y), 1) };
+  };
+  const empezarPellizco = () => {
+    const r = svgRef.current?.getBoundingClientRect();
+    if (!r || r.width <= 0 || r.height <= 0) return;
+    arrastre.current = null;
+    setArrastrando(null);
+    const { medio, dist } = medioYDistancia();
+    const centro = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    const u0 = Math.max(vista.w / r.width, vista.h / r.height);
+    const vc = { x: vista.x + vista.w / 2, y: vista.y + vista.h / 2 };
+    pellizco.current = { dist, centro, u: u0, vista, enPlano: { x: vc.x + (medio.x - centro.x) * u0, y: vc.y + (medio.y - centro.y) * u0 } };
+  };
+  const moverPellizco = () => {
+    const p = pellizco.current;
+    if (!p) return;
+    const { medio, dist } = medioYDistancia();
+    setVista(vistaPellizcada(p, medio, dist));
+  };
+
   const alPresionar = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === "touch") {
+      dedos.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (dedos.current.size >= 2) {
+        if (dedos.current.size === 2) empezarPellizco();
+        return;
+      }
+    }
     if (e.button === 2) return;
     const p = aPlano(e.clientX, e.clientY);
     const actual = planoRef.current;
@@ -317,6 +367,10 @@ export default function Lienzo({
   };
 
   const alMover = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === "touch" && dedos.current.has(e.pointerId)) {
+      dedos.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pellizco.current) return moverPellizco();
+    }
     const a = arrastre.current;
     if (a?.modo === "pan") {
       const dx = (e.clientX - a.inicio.x) * u;
@@ -343,6 +397,14 @@ export default function Lienzo({
   };
 
   const alSoltar = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === "touch") {
+      dedos.current.delete(e.pointerId);
+      if (pellizco.current) {
+        // Al levantar un dedo termina el pellizco; el que queda no arrastra nada.
+        if (dedos.current.size < 2) pellizco.current = null;
+        return;
+      }
+    }
     const a = arrastre.current;
     arrastre.current = null;
     setArrastrando(null);
