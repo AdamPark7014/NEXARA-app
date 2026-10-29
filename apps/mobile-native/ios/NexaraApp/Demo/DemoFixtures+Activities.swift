@@ -679,6 +679,99 @@ extension DemoStore {
         ])
     }
 
+    /// `POST me/activities/tiempo-calculado` (y el alta propia, que fija lo mismo): la mediana
+    /// del tipo por la complejidad que «lee» `fxSugerirComplejidad`, lo que el título dice de la
+    /// cantidad y el traslado si es trabajo de campo. Lo que el título no dice se supone y se
+    /// escribe en `supuestos`, como la API.
+    func fxTiempoCalculado(_ json: DemoJSON) -> DemoJSON {
+        let kind = (json["coreKind"] as? String ?? "tarea").lowercased()
+        let ticketType = (json["ticketType"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let custom = (json["ticketTypeCustom"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        // Como `tipoDe` de la API: en servicio cuenta el tipo de servicio; en lo demás, el subtipo.
+        let tipo = kind == "servicio" ? (ticketType.isEmpty ? "PREVENTIVO" : ticketType) : custom
+        let etiqueta: String = {
+            switch kind {
+            case "servicio": return CoreActivityRules.servicioLabel[tipo] ?? "Servicio"
+            case "tarea": return tipo.isEmpty ? "Tarea" : tipo
+            default: return CoreActivityKind(rawValue: kind)?.title ?? "Actividad"
+            }
+        }()
+        let base = DemoStore.medianaPorTipo[tipo] ?? DemoStore.medianaPorKind[kind] ?? 60
+        let leida = (fxSugerirComplejidad(json)["sugerencia"] as? DemoJSON)?["complejidad"] as? String
+        let nivel = leida ?? "ESTANDAR"
+        let factores: [String: Double] = ["BASICA": 0.6, "ESTANDAR": 1, "COMPLEJA": 1.6, "CRITICA": 1.3]
+        let factor = factores[nivel] ?? 1
+        let titulo = json["titulo"] as? String ?? ""
+        let cantidad = titulo
+            .split(whereSeparator: { !$0.isNumber })
+            .compactMap { Int($0) }
+            .first(where: { (1...50).contains($0) })
+        let campo: Bool = {
+            switch kind {
+            case "servicio", "obra", "proyecto": return true
+            case "tarea": return CoreTareaTipo.all.first(where: { $0.label == tipo })?.familia == .campo
+            default: return false
+            }
+        }()
+        let redondeo5: (Double) -> Int = { max(5, Int(($0 / 5).rounded()) * 5) }
+
+        let porUnidad = redondeo5(Double(base) * factor)
+        var desglose: [DemoJSON] = [dj(["concepto": "Base de \(etiqueta)", "minutos": porUnidad])]
+        var supuestos: [String] = []
+        if let cantidad, cantidad > 1 {
+            desglose.append(dj([
+                "concepto": "\(cantidad - 1) más del mismo trabajo",
+                "minutos": redondeo5(Double(porUnidad * (cantidad - 1)) * 0.5),
+            ]))
+        } else if cantidad == nil {
+            supuestos.append("el título no dice cuántos: se cuenta 1")
+        }
+        if leida == nil { supuestos.append("complejidad estándar") }
+        if campo {
+            desglose.append(dj(["concepto": "Traslado ida y vuelta", "minutos": 60]))
+            supuestos.append("traslado aproximado (30 min de ida y 30 de vuelta)")
+        }
+        let total = min(720, desglose.compactMap { $0["minutos"] as? Int }.reduce(0, +))
+
+        let entrega: Any
+        if let raw = json["fechaInicio"] as? String, let inicio = ActivityParse.isoDate(raw) {
+            entrega = DemoClock.iso(DemoStore.entregaCalculada(inicio: inicio, minutos: total))
+        } else {
+            entrega = NSNull()
+        }
+        let unidades: Any
+        if let cantidad {
+            unidades = dj(["clave": "unidades", "cantidad": cantidad])
+        } else {
+            unidades = NSNull()
+        }
+        return dj([
+            "tiempoEstandarMin": total,
+            "desglose": desglose,
+            "supuestos": supuestos,
+            "complejidad": nivel,
+            "unidades": unidades,
+            "fechaEntregaEsperada": entrega,
+        ])
+    }
+
+    /// `entregaCalculada` de la API: inicio + tiempo, sumando la comida (15–16) si la cruza y sin
+    /// pasar de las 18:00 cuando empieza dentro de la jornada; al menos 5 min después del inicio.
+    private static func entregaCalculada(inicio: Date, minutos: Int) -> Date {
+        let duracion = TimeInterval(max(5, minutos) * 60)
+        let comidaDesde = CoreSchedule.at(day: inicio, hhmm: "15:00") ?? inicio
+        let comidaHasta = CoreSchedule.at(day: inicio, hhmm: "16:00") ?? inicio
+        let salida = CoreSchedule.at(day: inicio, hhmm: "18:00") ?? inicio
+        var fin = inicio.addingTimeInterval(duracion)
+        if inicio < comidaDesde && fin > comidaDesde {
+            fin = fin.addingTimeInterval(comidaHasta.timeIntervalSince(comidaDesde))
+        } else if inicio >= comidaDesde && inicio < comidaHasta {
+            fin = comidaHasta.addingTimeInterval(duracion)
+        }
+        if inicio < salida && fin > salida { fin = salida }
+        return max(fin, inicio.addingTimeInterval(300))
+    }
+
     /// Actividades viejas del historial: detalle genérico, ya finalizadas.
     func fxOlderDetail(_ id: Int) -> DemoJSON {
         guard let work = DemoData.olderWork.first(where: { $0.id == id }) else { return [:] }

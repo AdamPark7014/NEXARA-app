@@ -750,6 +750,7 @@ struct ActivityCoreDetailView: View {
                 descripcion: editDescripcion,
                 indicaciones: editIndicaciones,
                 fechaInicio: editFechaInicio,
+                entregaOriginal: text("fechaEntregaEsperada"),
                 fechaEntrega: editFechaEntrega,
                 fechaFin: editFechaFin
             )
@@ -1294,19 +1295,11 @@ private enum ActivityEditRepository {
         return t.isEmpty ? nil : t
     }
 
-    /// Entrega esperada: el día de México a mediodía UTC (como Android `T12:00:00.000Z`).
-    private static func entregaISO(_ date: Date?) -> String? {
-        guard let date else { return nil }
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = ActivityDetailFormat.mexico
-        let p = calendar.dateComponents([.year, .month, .day], from: date)
-        let y = p.year ?? 2026
-        let m = p.month ?? 1
-        let d = p.day ?? 1
-        return String(format: "%04d-%02d-%02dT12:00:00.000Z", y, m, d)
-    }
-
     /// Devuelve `true` si quedó en la cola sin conexión.
+    ///
+    /// La entrega solo viaja si cambió el día, y a la misma hora de México que tenía
+    /// (`CoreActivityRules.entregaEditada`): desde el 29-10 cambiarla es solo de un superior y la
+    /// API contesta 403 a cualquier otro valor, aunque sea el mismo día a otra hora.
     static func guardar(
         activityId: Int,
         comoResponsable: Bool,
@@ -1315,6 +1308,7 @@ private enum ActivityEditRepository {
         descripcion: String,
         indicaciones: String,
         fechaInicio: Date?,
+        entregaOriginal: String?,
         fechaEntrega: Date?,
         fechaFin: Date?
     ) async throws -> Bool {
@@ -1330,7 +1324,7 @@ private enum ActivityEditRepository {
                     descripcion: limpio(descripcion),
                     indicaciones: limpio(indicaciones),
                     fechaInicio: inicio,
-                    fechaEntregaEsperada: entregaISO(fechaEntrega),
+                    fechaEntregaEsperada: CoreActivityRules.entregaEditada(original: entregaOriginal, nuevoDia: fechaEntrega),
                     fechaFinalizacion: fin
                 )
             )

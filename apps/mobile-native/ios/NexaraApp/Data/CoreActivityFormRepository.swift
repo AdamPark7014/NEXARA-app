@@ -47,6 +47,37 @@ struct CoreActivityCreateBody: Encodable {
     let creadoPorId: Int
 }
 
+/// `POST me/activities/tiempo-calculado` (29-10): lo que lee el sistema para fijar el tiempo y la
+/// entrega de una autoasignación. Es también la «pregunta» de la vista previa: el mismo cuerpo da
+/// lo mismo (la API guarda la lectura 30 min), así que no se vuelve a pedir.
+struct CoreTiempoCalculadoBody: Encodable, Hashable {
+    let titulo: String
+    let indicaciones: String?
+    let coreKind: String
+    let ticketType: String?
+    let ticketTypeCustom: String?
+    /// ISO del inicio; sin agenda no se manda y la API no calcula la entrega.
+    let fechaInicio: String?
+}
+
+extension CoreTiempoCalculado {
+    /// Respuesta de `POST me/activities/tiempo-calculado`; lo que falte queda vacío.
+    init(map: [String: Any]) {
+        let filas = map["desglose"] as? [[String: Any]] ?? []
+        let complejidad = ActivityParse.str(map["complejidad"])
+        let entrega = ActivityParse.str(map["fechaEntregaEsperada"])
+        self.init(
+            tiempoEstandarMin: ActivityParse.double(map["tiempoEstandarMin"]),
+            desglose: filas.map { fila in
+                Concepto(concepto: ActivityParse.str(fila["concepto"]), minutos: ActivityParse.double(fila["minutos"]))
+            },
+            supuestos: (map["supuestos"] as? [Any] ?? []).compactMap { $0 as? String },
+            complejidad: complejidad.isEmpty ? nil : complejidad,
+            fechaEntregaEsperada: entrega.isEmpty ? nil : entrega
+        )
+    }
+}
+
 extension CoreTiemposTipicos {
     /// Respuesta de `GET ai/complejidad/tiempos`; lo que falte cuenta como «sin anteriores».
     init(map: [String: Any]) {
@@ -161,6 +192,16 @@ extension CoreRepository {
         guard let row = ConsoleHelpers.decodeMap(data)["sugerencia"] as? [String: Any],
               let nivel = CoreComplejidad.de(ActivityParse.str(row["complejidad"])) else { return nil }
         return CoreSugerenciaComplejidad(complejidad: nivel, motivo: ActivityParse.str(row["motivo"]))
+    }
+
+    /// `POST me/activities/tiempo-calculado`: vista previa de lo que el sistema fija al
+    /// autoasignarse (tiempo estándar con su desglose, complejidad y entrega). Nunca entra a la
+    /// cola sin conexión (`ApiClient.isNeverQueued`): sin red falla y el alta dice que se
+    /// calculan al guardar.
+    func tiempoCalculado(_ body: CoreTiempoCalculadoBody) async throws -> CoreTiempoCalculado? {
+        let data = try await ApiClient.shared.postJSON("me/activities/tiempo-calculado", body: body)
+        if CoreRepository.isQueuedOffline(data) { return nil }
+        return CoreTiempoCalculado(map: ConsoleHelpers.decodeMap(data))
     }
 
     /// `POST activities/:id/team` — suma a alguien al equipo con su rol e indicaciones.

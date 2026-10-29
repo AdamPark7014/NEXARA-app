@@ -9,7 +9,15 @@
   - Arreglo de paso en el detalle (`CoreActivityKinds.entregaEditada`): guardar la edición mandaba siempre la entrega
     como `día T12:00Z` (06:00 de México) y pisaba la hora compromiso; con la regla nueva daba 403 a quien no es
     superior. Ahora solo va si cambió el día, y a la misma hora de México que tenía.
-  - iOS: en curso (mismo diseño).
+  - iOS (~15:00): mismo diseño. `CoreTiempoCalculado` (reglas) + `CoreTiempoCalculadoSection` (sección «Tiempo y
+    entrega · los fija el sistema»), `CoreRepository.tiempoCalculado`, la ruta nunca se encola sin red, el demo
+    responde `me/activities/tiempo-calculado`. El detalle tenía el mismo fallo de la entrega (`entregaISO` → día
+    T12:00Z): ahora `CoreActivityRules.entregaEditada`, que compara el día de México. Sin compilar en local: lo
+    compila el CI de capturas.
+  - iOS Inicio: franja del color del fondo detrás de la barra de estado (al desplazar, la banda oscura del CEO
+    quedaba debajo de la hora en negro). En Android no pasa: el Scaffold ya mete ese margen y la lista se recorta.
+  - Versión 1.1: Android `VERSION_CODE=19`, `VERSION_NAME=1.1.0` (AAB firmado con `build-play-aab.ps1`, mapping en
+    `play-releases/mapping-v19-1.1.0.txt`). Captura nueva `miDiaVacio` (Mi día sin actividades).
 
 - **29-10 ~14:30 (claude-code) — Ninguna actividad sin tiempo ni entrega; autoasignación fija; ajuste solo de superiores.**
   - Adam: «ya no debe haber ninguna actividad que tenga tiempo indefinido de entrega, y la edición de parámetros de

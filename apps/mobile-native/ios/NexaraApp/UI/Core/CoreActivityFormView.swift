@@ -112,6 +112,13 @@ struct CoreActivityFormView: View {
     @State private var saving = false
     @State private var error: String?
 
+    /// Autoasignación (regla de Adam, 29-10): a sí mismo, desde «Auto-asignarme» o desde su propia
+    /// ficha. El tiempo, el tope, la complejidad y la entrega los calcula la API del título y el
+    /// tipo (los ignoraría de todos modos): no se capturan y se enseñan en solo lectura.
+    private var autoasignacion: Bool {
+        selfAssign || (responsableId > 0 && responsableId == session.currentUser.flatMap { Int($0.id) })
+    }
+
     private var needsClientPicker: Bool { kind == .servicio || kind == .comercial }
     private var filtersProjectsBySector: Bool { kind == .proyecto || kind == .obra }
     private var scheduled: Bool { kind.requiresSchedule || withSchedule }
@@ -141,11 +148,41 @@ struct CoreActivityFormView: View {
     private var horaCompromiso: String { scheduled && conCompromiso ? CoreSchedule.hhmm(compromiso) : "" }
     private var compromisoOk: Bool { CoreActivityRules.compromisoValido(hora: horaInicio, compromiso: horaCompromiso) }
 
-    // Complejidad: en tarea, después de elegir su tipo; en las demás, siempre.
+    // Complejidad: en tarea, después de elegir su tipo; en las demás, siempre. En la autoasignación
+    // nunca: la fija el sistema, y así tampoco se piden lo típico ni la sugerencia de la IA.
     private var tipoComplejidad: String? {
         CoreActivityRules.tipoParaComplejidad(kind: kind, tareaTipo: tareaTipo, ticketType: ticketType)
     }
-    private var complejidadVisible: Bool { CoreActivityRules.complejidadVisible(kind: kind, tipo: tipoComplejidad) }
+    private var complejidadVisible: Bool {
+        !autoasignacion && CoreActivityRules.complejidadVisible(kind: kind, tipo: tipoComplejidad)
+    }
+
+    /// La pregunta de la vista previa del tiempo (solo en la autoasignación): el mismo tipo que se
+    /// mandará al guardar. nil mientras falte el título (6 letras o más) o, en tarea, su tipo.
+    private var pedidoTiempo: CoreTiempoCalculadoBody? {
+        guard autoasignacion else { return nil }
+        let title = coreClean(titulo)
+        guard title.count >= 6 else { return nil }
+        var type = kind.ticketType ?? ticketType
+        var custom = kind.ticketTypeCustom
+        if kind == .tarea {
+            guard let tipo = tareaTipo else { return nil }
+            custom = tipo.label
+            type = "OTRO"
+        } else if kind.ticketType == nil && ticketType == "OTRO" {
+            let text = coreClean(ticketTypeCustom)
+            custom = text.isEmpty ? nil : text
+        }
+        let notes = coreClean(indicaciones)
+        return CoreTiempoCalculadoBody(
+            titulo: title,
+            indicaciones: notes.isEmpty ? nil : notes,
+            coreKind: kind.rawValue,
+            ticketType: type == "INVENTARIO" ? "PREVENTIVO" : type,
+            ticketTypeCustom: type == "OTRO" ? custom : nil,
+            fechaInicio: scheduled ? CoreFormat.isoString(fecha) : nil
+        )
+    }
     private var tiemposKey: String { complejidadVisible ? "\(kind.rawValue)|\(tipoComplejidad ?? "")" : "" }
     private var preguntaSugerencia: String {
         guard complejidadVisible else { return "" }
@@ -268,83 +305,96 @@ struct CoreActivityFormView: View {
                 .labelsHidden()
             }
 
-            Section {
-                if !kind.requiresSchedule {
-                    Toggle("Poner día y hora", isOn: $withSchedule)
-                }
-                if scheduled {
-                    DatePicker("Día", selection: $fecha, displayedComponents: .date)
-                    DatePicker("Hora", selection: $fecha, displayedComponents: .hourAndMinute)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Toggle("Entregar a más tardar (opcional)", isOn: $conCompromiso)
-                            .onChange(of: conCompromiso) { _, prendido in
-                                if prendido { compromiso = CoreSchedule.compromisoPorOmision(inicio: fecha) }
-                            }
-                        Text("Sin hora, el límite es el fin del día. Con hora, la entrega cuenta a tiempo solo si llega antes.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+            // La agenda y, en la autoasignación, lo que el sistema fija con ella (en un `Group`: el
+            // bloque de arriba ya junta diez piezas, el tope de `ViewBuilder` antes de iOS 17).
+            Group {
+                Section {
+                    if !kind.requiresSchedule {
+                        Toggle("Poner día y hora", isOn: $withSchedule)
                     }
-                    if conCompromiso {
-                        DatePicker("Hora límite", selection: $compromiso, displayedComponents: .hourAndMinute)
-                        if !compromisoOk {
-                            Text("Tiene que ser después de la hora de inicio.")
+                    if scheduled {
+                        DatePicker("Día", selection: $fecha, displayedComponents: .date)
+                        DatePicker("Hora", selection: $fecha, displayedComponents: .hourAndMinute)
+                    }
+                    // Autoasignación: la entrega y los tiempos los fija el sistema (tarjeta de abajo).
+                    if scheduled && !autoasignacion {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle("Entregar a más tardar (opcional)", isOn: $conCompromiso)
+                                .onChange(of: conCompromiso) { _, prendido in
+                                    if prendido { compromiso = CoreSchedule.compromisoPorOmision(inicio: fecha) }
+                                }
+                            Text("Sin hora, el límite es el fin del día. Con hora, la entrega cuenta a tiempo solo si llega antes.")
                                 .font(.footnote)
-                                .foregroundStyle(CorePalette.red)
+                                .foregroundStyle(.secondary)
                         }
-                    }
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("¿Cuánto tiempo toma?")
-                        .font(.subheadline.weight(.semibold))
-                    Text(Self.durationLabel(horas: estimadoHoras, minutos: estimadoMinutos))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    HStack {
-                        Picker("Horas", selection: $estimadoHoras) {
-                            ForEach(0...24, id: \.self) { Text("\($0) h").tag($0) }
-                        }
-                        .pickerStyle(.wheel)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
-                        Picker("Minutos", selection: $estimadoMinutos) {
-                            ForEach(Array(stride(from: 0, through: 55, by: 5)), id: \.self) {
-                                Text("\($0) min").tag($0)
+                        if conCompromiso {
+                            DatePicker("Hora límite", selection: $compromiso, displayedComponents: .hourAndMinute)
+                            if !compromisoOk {
+                                Text("Tiene que ser después de la hora de inicio.")
+                                    .font(.footnote)
+                                    .foregroundStyle(CorePalette.red)
                             }
                         }
-                        .pickerStyle(.wheel)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
                     }
-                    .frame(height: 120)
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Tope máximo (opcional)")
-                        .font(.subheadline.weight(.semibold))
-                    Text(Self.durationLabel(horas: maximoHoras, minutos: maximoMinutos))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    HStack {
-                        Picker("Horas máx.", selection: $maximoHoras) {
-                            ForEach(0...24, id: \.self) { Text("\($0) h").tag($0) }
-                        }
-                        .pickerStyle(.wheel)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
-                        Picker("Minutos máx.", selection: $maximoMinutos) {
-                            ForEach(Array(stride(from: 0, through: 55, by: 5)), id: \.self) {
-                                Text("\($0) min").tag($0)
+                    if !autoasignacion {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("¿Cuánto tiempo toma?")
+                                .font(.subheadline.weight(.semibold))
+                            Text(Self.durationLabel(horas: estimadoHoras, minutos: estimadoMinutos))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            HStack {
+                                Picker("Horas", selection: $estimadoHoras) {
+                                    ForEach(0...24, id: \.self) { Text("\($0) h").tag($0) }
+                                }
+                                .pickerStyle(.wheel)
+                                .frame(maxWidth: .infinity)
+                                .clipped()
+                                Picker("Minutos", selection: $estimadoMinutos) {
+                                    ForEach(Array(stride(from: 0, through: 55, by: 5)), id: \.self) {
+                                        Text("\($0) min").tag($0)
+                                    }
+                                }
+                                .pickerStyle(.wheel)
+                                .frame(maxWidth: .infinity)
+                                .clipped()
                             }
+                            .frame(height: 120)
                         }
-                        .pickerStyle(.wheel)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Tope máximo (opcional)")
+                                .font(.subheadline.weight(.semibold))
+                            Text(Self.durationLabel(horas: maximoHoras, minutos: maximoMinutos))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            HStack {
+                                Picker("Horas máx.", selection: $maximoHoras) {
+                                    ForEach(0...24, id: \.self) { Text("\($0) h").tag($0) }
+                                }
+                                .pickerStyle(.wheel)
+                                .frame(maxWidth: .infinity)
+                                .clipped()
+                                Picker("Minutos máx.", selection: $maximoMinutos) {
+                                    ForEach(Array(stride(from: 0, through: 55, by: 5)), id: \.self) {
+                                        Text("\($0) min").tag($0)
+                                    }
+                                }
+                                .pickerStyle(.wheel)
+                                .frame(maxWidth: .infinity)
+                                .clipped()
+                            }
+                            .frame(height: 120)
+                        }
                     }
-                    .frame(height: 120)
+                } header: {
+                    Text(kind.requiresSchedule ? "Agenda * (hora de México)" : "Agenda (hora de México)")
                 }
-            } header: {
-                Text(kind.requiresSchedule ? "Agenda * (hora de México)" : "Agenda (hora de México)")
+                .environment(\.timeZone, CoreSchedule.mexico)
+
+                if autoasignacion {
+                    CoreTiempoCalculadoSection(pedido: pedidoTiempo, inicio: scheduled ? fecha : nil)
+                }
             }
-            .environment(\.timeZone, CoreSchedule.mexico)
 
             Section {
                 TextField("Indicaciones generales (para todo el equipo)", text: $indicaciones, axis: .vertical)
@@ -611,7 +661,7 @@ struct CoreActivityFormView: View {
             custom = text
         }
 
-        if !compromisoOk {
+        if !autoasignacion && !compromisoOk {
             error = "La hora de entrega tiene que ser después de la hora de inicio"
             return
         }
@@ -627,8 +677,11 @@ struct CoreActivityFormView: View {
         }
 
         let when = scheduled ? CoreFormat.isoString(fecha) : nil
-        // Sin compromiso, la fecha máxima es la de inicio y la API la lee como «fin del día».
-        let limite: String? = scheduled
+        // Autoasignación: sin tiempo, tope, complejidad ni entrega (sí el inicio); la API los calcula
+        // del título y el tipo. Sin compromiso, la fecha máxima es la de inicio y la API la lee como
+        // «fin del día».
+        let propia = autoasignacion
+        let limite: String? = scheduled && !propia
             ? CoreFormat.isoString(
                 CoreSchedule.at(
                     day: fecha,
@@ -650,11 +703,11 @@ struct CoreActivityFormView: View {
             responsableId: responsableId,
             tiempoEstimadoMin: {
                 let total = estimadoHoras * 60 + estimadoMinutos
-                return total > 0 ? total : nil
+                return !propia && total > 0 ? total : nil
             }(),
             tiempoMaximoMin: {
                 let total = maximoHoras * 60 + maximoMinutos
-                return total > 0 ? total : nil
+                return !propia && total > 0 ? total : nil
             }(),
             fechaInicio: when,
             fechaEntregaEsperada: limite,
@@ -662,7 +715,8 @@ struct CoreActivityFormView: View {
             evidencePhotoRequired: min(8, max(2, fotos)),
             coreKind: kind.rawValue,
             assignmentCharge: charge?.rawValue,
-            // Solo si se ve el campo: una tarea sin tipo no lleva complejidad.
+            // Solo si se ve el campo: una tarea sin tipo no lleva complejidad, y la autoasignación
+            // tampoco (`complejidadVisible` ya es falso en ella).
             complejidad: complejidadVisible ? complejidad?.rawValue : nil,
             complejidadSugerida: complejidadVisible ? complejidadSugerida?.rawValue : nil,
             estatus: "Pendiente",
@@ -677,6 +731,98 @@ struct CoreActivityFormView: View {
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo guardar la actividad")
         }
+    }
+}
+
+/// «Tiempo y entrega · los fija el sistema» del alta propia (`TiempoCalculadoCard` de Android):
+/// tiempo estándar con su complejidad, la entrega a más tardar, el desglose y los supuestos, en
+/// solo lectura. Pide la vista previa ~0.9 s después del último cambio (`.task(id:)` cancela la
+/// anterior); sin respuesta, dice que se calculan al guardar. Todo va en una sola fila para que
+/// la tarea no se repita por cada renglón de la sección.
+struct CoreTiempoCalculadoSection: View {
+    /// nil mientras falte el título o, en tarea, el tipo.
+    let pedido: CoreTiempoCalculadoBody?
+    /// Inicio elegido (para decir si la entrega cae otro día); nil sin agenda.
+    let inicio: Date?
+
+    @State private var dato: CoreTiempoCalculado?
+    @State private var calculadoPara: CoreTiempoCalculadoBody?
+    @State private var pensando = false
+
+    var body: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 6) {
+                if pedido == nil {
+                    Text("Escribe el título y elige el tipo: con eso se calculan el tiempo, la complejidad y la entrega.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if let dato {
+                    if let resumen = dato.resumen {
+                        Text(resumen)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    if let entrega = dato.entrega(inicio: inicio) {
+                        Text(entrega)
+                            .font(.footnote)
+                    }
+                    ForEach(Array(dato.lineas.enumerated()), id: \.offset) { _, linea in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(linea.texto)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                            if let minutos = linea.minutos {
+                                Text(minutos).monospacedDigit()
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    ForEach(Array(dato.supuestosTexto.enumerated()), id: \.offset) { _, supuesto in
+                        Text(supuesto)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Text("Solo tu jefe puede ajustarlo al asignarte una actividad.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
+                } else {
+                    Text(pensando ? "Calculando con el título…" : "Se calculan al guardar con el título y el tipo.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 4)
+            .accessibilityElement(children: .combine)
+            .task(id: pedido) { await calcular() }
+        } header: {
+            Text("Tiempo y entrega · los fija el sistema")
+        }
+    }
+
+    /// Si la API falla o no hay red (esta ruta nunca se encola), ningún error visible: la
+    /// tarjeta dice que se calculan al guardar.
+    @MainActor
+    private func calcular() async {
+        guard let pedido else {
+            dato = nil
+            calculadoPara = nil
+            pensando = false
+            return
+        }
+        // La fila volvió a aparecer al desplazarse: ya está calculado para esta pregunta.
+        if pedido == calculadoPara, dato != nil { return }
+        try? await Task.sleep(nanoseconds: 900_000_000)
+        guard !Task.isCancelled else { return }
+        pensando = true
+        // `try?` aplana el opcional: nil = falló o la respuesta no sirvió.
+        let resultado = try? await CoreRepository.shared.tiempoCalculado(pedido)
+        pensando = false
+        guard !Task.isCancelled else { return }
+        dato = resultado
+        calculadoPara = resultado == nil ? nil : pedido
     }
 }
 

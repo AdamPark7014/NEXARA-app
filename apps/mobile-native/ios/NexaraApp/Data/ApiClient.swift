@@ -207,6 +207,8 @@ final class ApiClient {
         if path == "ai/complejidad/sugerir" { return true }
         // El trayecto toma la hora del servidor: encolado, la ida empezaría cuando vuelva la señal.
         if path.hasSuffix("/trayectos") || path.hasSuffix("/trayectos/terminar") { return true }
+        // Vista previa del tiempo de una autoasignación: solo sirve mientras se llena el alta.
+        if path.hasSuffix("/tiempo-calculado") { return true }
         if path.hasPrefix("tool-requests/") {
             return path.hasSuffix("/deliver") || path.hasSuffix("/return")
         }
