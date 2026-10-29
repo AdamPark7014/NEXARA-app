@@ -13,13 +13,18 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { applyDisplayEdit, mentionAtCaret, toDisplay } from "@/lib/chat-mentions";
+import { applyDisplayEdit, insertTokenAt, mentionAtCaret, toDisplay } from "@/lib/chat-mentions";
 import styles from "./MentionTextarea.module.css";
 
 export type MentionTextareaHandle = {
   focus: () => void;
   /** Inserta texto plano (un emoji, por ejemplo) donde está el cursor. */
   insertText: (text: string) => void;
+  /**
+   * Inserta una liga o mención (`[…](…)`) donde está el cursor, devuelve el foco y deja el cursor
+   * justo detrás, para seguir escribiendo. `quitarDisparador` borra el `@parcial` del autocompletado.
+   */
+  insertarToken: (token: string, opts?: { quitarDisparador?: boolean }) => void;
   /** Markdown guardado, por si el padre lo necesita fuera del estado. */
   getMarkup: () => string;
   /** Selección actual en coordenadas del texto visible. */
@@ -39,6 +44,8 @@ type Props = {
   disabled?: boolean;
   /** Clase del `textarea` — la hereda del compositor que lo usa. */
   className?: string;
+  /** Crece con el texto hasta el `max-height` de su clase (el compositor), como WhatsApp. */
+  autoGrow?: boolean;
   "aria-label"?: string;
   id?: string;
 };
@@ -93,6 +100,7 @@ const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function Mentio
     rows = 2,
     disabled,
     className,
+    autoGrow,
     id,
     "aria-label": ariaLabel,
   },
@@ -118,7 +126,29 @@ const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function Mentio
       const valor = cs[prop];
       if (typeof valor === "string" && valor) destino[prop] = valor;
     }
+    // Con texto largo el textarea saca barra de desplazamiento y su renglón se angosta; el espejo no
+    // la tiene. Sin este relleno extra cortan las líneas en otro punto y el texto se encima.
+    const px = (v: string) => Number.parseFloat(v) || 0;
+    const barra = Math.max(
+      0,
+      area.offsetWidth - area.clientWidth - px(cs.borderLeftWidth) - px(cs.borderRightWidth),
+    );
+    if (barra > 0) espejo.style.paddingRight = `${px(cs.paddingRight) + barra}px`;
+    espejo.scrollTop = area.scrollTop;
   }, []);
+
+  /** Alto según el contenido, con el tope del `max-height` de la clase. */
+  const ajustarAlto = useCallback(() => {
+    const area = areaRef.current;
+    if (!autoGrow || !area || typeof window.getComputedStyle !== "function") return;
+    const cs = window.getComputedStyle(area);
+    const px = (v: string) => Number.parseFloat(v) || 0;
+    area.style.height = "auto";
+    const borde = px(cs.borderTopWidth) + px(cs.borderBottomWidth);
+    const relleno = px(cs.paddingTop) + px(cs.paddingBottom);
+    const alto = cs.boxSizing === "border-box" ? area.scrollHeight + borde : area.scrollHeight - relleno;
+    area.style.height = `${Math.max(alto, 0)}px`;
+  }, [autoGrow]);
 
   useLayoutEffect(() => {
     sincronizarMetricas();
@@ -126,6 +156,12 @@ const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function Mentio
     window.addEventListener("resize", sincronizarMetricas);
     return () => window.removeEventListener("resize", sincronizarMetricas);
   }, [sincronizarMetricas]);
+
+  // Cada cambio de texto puede sacar o quitar la barra y mover el renglón: alto, métricas y scroll.
+  useLayoutEffect(() => {
+    ajustarAlto();
+    sincronizarMetricas();
+  }, [display.text, ajustarAlto, sincronizarMetricas]);
 
   // Reponer el cursor: React reescribe el valor entero del textarea y sin esto
   // el cursor salta al final en cuanto se escribe en medio de una frase.
@@ -182,6 +218,29 @@ const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function Mentio
         });
         caretPendiente.current = res.caret;
         onChange(res.markup);
+      },
+      insertarToken: (token: string, opts?: { quitarDisparador?: boolean }) => {
+        const area = areaRef.current;
+        // El textarea guarda su selección aunque el selector se haya llevado el foco.
+        const inicio = area?.selectionStart ?? display.text.length;
+        const fin = area?.selectionEnd ?? inicio;
+        const res = insertTokenAt(value, inicio, fin, token, opts);
+        caretPendiente.current = res.caret;
+        onChange(res.markup);
+        // El selector se cierra en este mismo clic: el foco vuelve aquí en el siguiente cuadro, con el
+        // cursor detrás de la liga (antes se quedaba en el <body> y lo tecleado no llegaba a ningún lado).
+        const devolverFoco = () => {
+          const el = areaRef.current;
+          if (!el) return;
+          el.focus();
+          const pos = Math.min(res.caret, el.value.length);
+          el.setSelectionRange(pos, pos);
+        };
+        if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+          window.requestAnimationFrame(devolverFoco);
+        } else {
+          devolverFoco();
+        }
       },
     }),
     [value, display.text, onChange],

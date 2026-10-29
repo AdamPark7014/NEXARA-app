@@ -1,0 +1,1047 @@
+{
+  "fecha": "2026-10-29T17:01:29.664Z",
+  "modelo": "claude-haiku-5-5",
+  "codigo": {
+    "casos": 10,
+    "aciertos": 10
+  },
+  "ia": {
+    "casos": 20,
+    "errores": 0,
+    "perfectos": 18,
+    "puntajeMedio": 0.978,
+    "inventos": 0,
+    "notaJuez": 4.38,
+    "p50ms": 1592,
+    "p95ms": 3375,
+    "usdPorLlamada": 0.000114,
+    "tokensEntradaMedios": 3767,
+    "tokensSalidaMedios": 101
+  },
+  "resultados": [
+    {
+      "caso": "c01",
+      "tipo": "codigo",
+      "pregunta": "mis pendientes de hoy",
+      "ruta": "pendientes",
+      "revisiones": [
+        {
+          "nombre": "regla",
+          "ok": true,
+          "detalle": "pendientes"
+        }
+      ],
+      "puntaje": 1
+    },
+    {
+      "caso": "c02",
+      "tipo": "codigo",
+      "pregunta": "¿quién no ha checado?",
+      "ruta": "jornada",
+      "revisiones": [
+        {
+          "nombre": "regla",
+          "ok": true,
+          "detalle": "jornada"
+        }
+      ],
+      "puntaje": 1
+    },
+    {
+      "caso": "c03",
+      "tipo": "codigo",
+      "pregunta": "¿cómo va la AN-0351?",
+      "ruta": "folios",
+      "revisiones": [
+        {
+          "nombre": "regla",
+          "ok": true,
+          "detalle": "folios"
+        }
+      ],
+      "puntaje": 1
+    },
+    {
+      "caso": "c04",
+      "tipo": "codigo",
+      "pregunta": "¿Cómo subo evidencias?",
+      "ruta": "ayuda",
+      "revisiones": [
+        {
+          "nombre": "regla",
+          "ok": true,
+          "detalle": "ayuda"
+        }
+      ],
+      "puntaje": 1
+    },
+    {
+      "caso": "c05",
+      "tipo": "codigo",
+      "pregunta": "¿dónde pido viáticos?",
+      "ruta": "ayuda",
+      "revisiones": [
+        {
+          "nombre": "regla",
+          "ok": true,
+          "detalle": "ayuda"
+        }
+      ],
+      "puntaje": 1
+    },
+    {
+      "caso": "c06",
+      "tipo": "codigo",
+      "pregunta": "cuéntame un chiste",
+      "ruta": "fuera-de-tema",
+      "revisiones": [
+        {
+          "nombre": "regla",
+          "ok": true,
+          "detalle": "fuera-de-tema"
+        }
+      ],
+      "puntaje": 1
+    },
+    {
+      "caso": "c07",
+      "tipo": "codigo",
+      "pregunta": "asígnale a Raúl revisar las cámaras de Tox mañana",
+      "ruta": "asignar",
+      "revisiones": [
+        {
+          "nombre": "regla",
+          "ok": true,
+          "detalle": "asignar"
+        }
+      ],
+      "puntaje": 1
+    },
+    {
+      "caso": "c08",
+      "tipo": "codigo",
+      "pregunta": "¿a qué hora checé hoy?",
+      "ruta": "mi-asistencia",
+      "revisiones": [
+        {
+          "nombre": "regla",
+          "ok": true,
+          "detalle": "mi-asistencia"
+        }
+      ],
+      "puntaje": 1
+    },
+    {
+      "caso": "c09",
+      "tipo": "codigo",
+      "pregunta": "¿qué puedes hacer?",
+      "ruta": "capacidades",
+      "revisiones": [
+        {
+          "nombre": "regla",
+          "ok": true,
+          "detalle": "capacidades"
+        }
+      ],
+      "puntaje": 1
+    },
+    {
+      "caso": "c10",
+      "tipo": "codigo",
+      "pregunta": "¿qué tengo para mañana?",
+      "ruta": "pendientes",
+      "revisiones": [
+        {
+          "nombre": "regla",
+          "ok": true,
+          "detalle": "pendientes"
+        }
+      ],
+      "puntaje": 1
+    },
+    {
+      "caso": "i01",
+      "tipo": "ia",
+      "pregunta": "¿puedo cambiar de jefe directo si me cambio de área?",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "organigrama"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "145 car."
+        },
+        {
+          "nombre": "no inventa (lista)",
+          "ok": true
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "sin problemas"
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 5,
+        "comentario": "sin problemas"
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 3770,
+        "tokensSalida": 91,
+        "tokensCacheLeidos": 0,
+        "tokensCacheEscritos": 3718,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000515
+      },
+      "ms": 3375,
+      "respuesta": "Los cambios de jefe los hacen RH y dirección, así que pídelo con ellos; en el Organigrama puedes ver quién reporta a quién, pero solo en lectura.",
+      "tema": "organigrama"
+    },
+    {
+      "caso": "i02",
+      "tipo": "ia",
+      "pregunta": "si estoy en una obra sin señal, ¿cómo registro mi llegada?",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "checar"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "284 car."
+        },
+        {
+          "nombre": "dice lo necesario",
+          "ok": true
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "Responde bien con la información de la guía; podría aclarar que la checada sin señal depende de que la app guarde el registro, pero no inventa datos. Sin problemas mayores."
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 4,
+        "comentario": "Responde bien con la información de la guía; podría aclarar que la checada sin señal depende de que la app guarde el registro, pero no inventa datos. Sin problemas mayores."
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 55,
+        "tokensSalida": 141,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000113
+      },
+      "ms": 1678,
+      "respuesta": "Desde la app NEXARA, al checar la app pide tu ubicación y foto; si no obtiene la ubicación, registra igual marcada «Sin ubicación», así que puedes checar aunque no tengas buena señal. Si la app no te deja checar sin conexión, avísale a tu jefe para que registre tu checada con motivo.",
+      "tema": "checar"
+    },
+    {
+      "caso": "i03",
+      "tipo": "ia",
+      "pregunta": "me equivoqué de foto en lo que mandé de la AN, ¿qué hago?",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "evidencias"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "320 car."
+        },
+        {
+          "nombre": "no inventa (lista)",
+          "ok": true
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "Reconoce con honestidad que no hay dato para reemplazar la foto y manda a su jefe o administración; el paso de evidencias es correcto según la guía, aunque no aclara si la actividad ya enviada permite volver a subir."
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 4,
+        "comentario": "Reconoce con honestidad que no hay dato para reemplazar la foto y manda a su jefe o administración; el paso de evidencias es correcto según la guía, aunque no aclara si la actividad ya enviada permite volver a subir."
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 57,
+        "tokensSalida": 156,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000121
+      },
+      "ms": 1734,
+      "respuesta": "No tengo un dato específico para borrar o reemplazar una foto ya subida; revisa con tu jefe o administración cómo corregirla. Mientras tanto, la forma de subir las evidencias es desde Actividades › abre la actividad › Evidencias, siguiendo los pasos de foto de entrada, fotos en sitio, hoja de servicio y foto de salida.",
+      "tema": "evidencias"
+    },
+    {
+      "caso": "i04",
+      "tipo": "ia",
+      "pregunta": "¿qué significa que alguien salga en rojo en la pizarra?",
+      "ruta": "ayuda",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": false,
+          "detalle": "null"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "148 car."
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "Correctamente reconoce que la guía no cubre el tema y deriva al jefe o administración; podría ser un poco más útil sugiriendo las pantallas relacionadas como «Equipo del día» o «Mi equipo»."
+        }
+      ],
+      "puntaje": 0.75,
+      "juez": {
+        "inventa": false,
+        "nota": 4,
+        "comentario": "Correctamente reconoce que la guía no cubre el tema y deriva al jefe o administración; podría ser un poco más útil sugiriendo las pantallas relacionadas como «Equipo del día» o «Mi equipo»."
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 52,
+        "tokensSalida": 89,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000087
+      },
+      "ms": 1461,
+      "respuesta": "No tengo ese dato: no encuentro en NEXARA Core qué significa el color rojo en una pizarra. Pregúntale a tu jefe o a administración para confirmarlo.",
+      "tema": null
+    },
+    {
+      "caso": "i05",
+      "tipo": "ia",
+      "pregunta": "¿la hora de la comida cuenta como trabajada?",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "comida"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "227 car."
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "Admite no tener el dato y da el horario de comida correcto de la guía, sin inventar; pero no aclara si cuenta como trabajada, y la guía no lo menciona, así que el mensaje a jefe o administración es razonable."
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 4,
+        "comentario": "Admite no tener el dato y da el horario de comida correcto de la guía, sin inventar; pero no aclara si cuenta como trabajada, y la guía no lo menciona, así que el mensaje a jefe o administración es razonable."
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 48,
+        "tokensSalida": 127,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000105
+      },
+      "ms": 1470,
+      "respuesta": "No tengo ese dato sobre si la comida cuenta como tiempo trabajado. Lo que sí sé es que el horario de comida es de 3:00 a 4:00 p.m., con regreso a más tardar 4:05; para la duración exacta pregúntale a tu jefe o a administración.",
+      "tema": "comida"
+    },
+    {
+      "caso": "i06",
+      "tipo": "ia",
+      "pregunta": "¿quién me autoriza un gasto de casetas?",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "viaticos"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "251 car."
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "Usa correctamente la guía sobre viáticos y admite que no tiene el detalle de casetas, aunque casetas no aparece explícitamente en la guía y podría haber sido más directo."
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 4,
+        "comentario": "Usa correctamente la guía sobre viáticos y admite que no tiene el detalle de casetas, aunque casetas no aparece explícitamente en la guía y podría haber sido más directo."
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 47,
+        "tokensSalida": 126,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000105
+      },
+      "ms": 1659,
+      "respuesta": "Los viáticos, como las casetas, se solicitan desde Viáticos; los aprueban dirección, administración, contabilidad, RH y operaciones. No tengo el detalle de quién autoriza un gasto específico de casetas, así que pregúntale a tu jefe o a administración.",
+      "tema": "viaticos"
+    },
+    {
+      "caso": "i07",
+      "tipo": "ia",
+      "pregunta": "¿por qué me salió como no cumplida si sí la terminé?",
+      "ruta": "ayuda",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "no-cumplida"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "310 car."
+        },
+        {
+          "nombre": "dice lo necesario",
+          "ok": true
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "sin problemas"
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 5,
+        "comentario": "sin problemas"
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 51,
+        "tokensSalida": 158,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000121
+      },
+      "ms": 1598,
+      "respuesta": "Una actividad pasa a «No cumplida» al checar tu salida si vencía ese día o antes y no la entregaste; lo que ya enviaste a revisión no se cierra. Si ya la terminaste, revisa que hayas subido las evidencias y enviado la actividad a revisión antes de checar salida, y si sigue mal, pídele a tu jefe que la revise.",
+      "tema": "no-cumplida"
+    },
+    {
+      "caso": "i08",
+      "tipo": "ia",
+      "pregunta": "necesito un taladro para mañana",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "herramientas"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "125 car."
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "Sin problemas: indica el botón correcto en Herramientas y una alternativa si no hay disponibilidad."
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 5,
+        "comentario": "Sin problemas: indica el botón correcto en Herramientas y una alternativa si no hay disponibilidad."
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 39,
+        "tokensSalida": 84,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000083
+      },
+      "ms": 2071,
+      "respuesta": "Puedes pedirlo en Herramientas con «Pedir prestado». Si el taladro no aparece disponible, consulta con tu jefe o con almacén.",
+      "tema": "herramientas"
+    },
+    {
+      "caso": "i09",
+      "tipo": "ia",
+      "pregunta": "¿cómo le hago para que el cliente firme lo que le mandé?",
+      "ruta": "ayuda",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "cotizaciones"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "220 car."
+        },
+        {
+          "nombre": "dice lo necesario",
+          "ok": true
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "sin problemas"
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 5,
+        "comentario": "sin problemas"
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 53,
+        "tokensSalida": 129,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000107
+      },
+      "ms": 1592,
+      "respuesta": "En Cotizaciones toca «Enviar por correo» con la cotización lista: al cliente le llega el PDF y un enlace para firmar o rechazar. Revisa el estado en la lista (Enviada, Aprobada, Rechazada o Vencida) para ver si ya firmó.",
+      "tema": "cotizaciones"
+    },
+    {
+      "caso": "i10",
+      "tipo": "ia",
+      "pregunta": "¿dónde veo cuánto me van a pagar esta semana?",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "null"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "108 car."
+        },
+        {
+          "nombre": "no inventa (lista)",
+          "ok": true
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "sin problemas"
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 5,
+        "comentario": "sin problemas"
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 51,
+        "tokensSalida": 75,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.00008
+      },
+      "ms": 1728,
+      "respuesta": "No tengo ese dato: NEXARA Core no muestra nómina ni montos de pago. Pregúntale a tu jefe o a administración.",
+      "tema": null
+    },
+    {
+      "caso": "i11",
+      "tipo": "ia",
+      "pregunta": "¿puedo trabajar desde mi casa el viernes?",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "null"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "100 car."
+        },
+        {
+          "nombre": "no inventa (lista)",
+          "ok": true
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "Admite que no tiene el dato y manda a preguntar al jefe o administración, lo cual es correcto; podría ser más breve pero no inventa nada."
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 4,
+        "comentario": "Admite que no tiene el dato y manda a preguntar al jefe o administración, lo cual es correcto; podría ser más breve pero no inventa nada."
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 49,
+        "tokensSalida": 69,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000077
+      },
+      "ms": 1622,
+      "respuesta": "No tengo ese dato. Pregúntale a tu jefe o a administración si el viernes puedes trabajar desde casa.",
+      "tema": null
+    },
+    {
+      "caso": "i12",
+      "tipo": "ia",
+      "pregunta": "hazme un resumen de la independencia de México",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "true"
+        }
+      ],
+      "puntaje": 1,
+      "juez": null,
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 42,
+        "tokensSalida": 27,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000055
+      },
+      "ms": 1429,
+      "respuesta": "",
+      "tema": null
+    },
+    {
+      "caso": "i13",
+      "tipo": "ia",
+      "pregunta": "¿quién ganó el último mundial?",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "true"
+        }
+      ],
+      "puntaje": 1,
+      "juez": null,
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 42,
+        "tokensSalida": 27,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000055
+      },
+      "ms": 1015,
+      "respuesta": "",
+      "tema": null
+    },
+    {
+      "caso": "i14",
+      "tipo": "ia",
+      "pregunta": "ayúdame a programar un script en Python que lea un Excel",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "true"
+        }
+      ],
+      "puntaje": 1,
+      "juez": null,
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 48,
+        "tokensSalida": 28,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000056
+      },
+      "ms": 1029,
+      "respuesta": "",
+      "tema": null
+    },
+    {
+      "caso": "i15",
+      "tipo": "ia",
+      "pregunta": "no me deja subir la foto de salida, ¿qué reviso?",
+      "ruta": "ayuda",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "evidencias"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "308 car."
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "Respuesta útil y dentro de la guía, aunque agrega la sugerencia de revisar el permiso de cámara, que la guía no menciona explícitamente."
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 4,
+        "comentario": "Respuesta útil y dentro de la guía, aunque agrega la sugerencia de revisar el permiso de cámara, que la guía no menciona explícitamente."
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 50,
+        "tokensSalida": 152,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000118
+      },
+      "ms": 1438,
+      "respuesta": "Abre la actividad › Evidencias y revisa que vayas en orden: la foto de salida se sube al final, después de la foto de entrada, las fotos en sitio y la hoja de servicio. Si aún no puedes, revisa que la app tenga permiso para usar la cámara y, si el problema sigue, avísale a tu jefe o al encargado de soporte.",
+      "tema": "evidencias"
+    },
+    {
+      "caso": "i16",
+      "tipo": "ia",
+      "pregunta": "¿quién revisa lo que entrego?",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "revisar"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "245 car."
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "sin problemas"
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 5,
+        "comentario": "sin problemas"
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 43,
+        "tokensSalida": 137,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.00011
+      },
+      "ms": 1386,
+      "respuesta": "Lo revisa quien tiene a cargo tu trabajo: el CEO, los jefes con equipo o quien responde por el trabajo de otro. Ellos lo revisan en Actividades en «En espera de revisión» y pueden aprobarlo o devolverlo con calificación de 1 a 5 y observaciones.",
+      "tema": "revisar"
+    },
+    {
+      "caso": "i17",
+      "tipo": "ia",
+      "pregunta": "se me olvidó marcar la salida ayer, ¿qué pasa?",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "checar"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "219 car."
+        },
+        {
+          "nombre": "dice lo necesario",
+          "ok": true
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "Responde bien con la automática de 23:30 y la vía del jefe, pero mezcla la web con la checada sin teléfono y no aclara que la automática ya quedó registrada ayer; sin inventos."
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 4,
+        "comentario": "Responde bien con la automática de 23:30 y la vía del jefe, pero mezcla la web con la checada sin teléfono y no aclara que la automática ya quedó registrada ayer; sin inventos."
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 53,
+        "tokensSalida": 111,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000098
+      },
+      "ms": 1254,
+      "respuesta": "Si no checaste salida, a las 23:30 se registra una automática que queda a revisión. Para corregirla, pide a tu jefe que registre tu checada con motivo, ya que desde la web solo puedes checar si abre un permiso temporal.",
+      "tema": "checar"
+    },
+    {
+      "caso": "i18",
+      "tipo": "ia",
+      "pregunta": "¿en qué parte veo lo que quedamos en la junta del lunes?",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": true,
+          "detalle": "reuniones"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "198 car."
+        },
+        {
+          "nombre": "dice lo necesario",
+          "ok": true
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "Ubica bien «Mis acuerdos» en Reuniones según la guía; el acta en PDF la genera quien conduce al concluir, lo cual está bien, aunque no aclara que el acta puede no ser visible para todos."
+        }
+      ],
+      "puntaje": 1,
+      "juez": {
+        "inventa": false,
+        "nota": 4,
+        "comentario": "Ubica bien «Mis acuerdos» en Reuniones según la guía; el acta en PDF la genera quien conduce al concluir, lo cual está bien, aunque no aclara que el acta puede no ser visible para todos."
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 54,
+        "tokensSalida": 116,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000101
+      },
+      "ms": 1609,
+      "respuesta": "En Reuniones, en la sección «Mis acuerdos» ves los acuerdos que te tocaron de las reuniones, y el acta en PDF la encuentras al concluir cada reunión. Si no te aparece, pregúntale a quien la convocó.",
+      "tema": "reuniones"
+    },
+    {
+      "caso": "i19",
+      "tipo": "ia",
+      "pregunta": "necesito transporte para ir a Tlaxcala mañana",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "false"
+        },
+        {
+          "nombre": "tema",
+          "ok": false,
+          "detalle": "viaticos"
+        },
+        {
+          "nombre": "breve",
+          "ok": true,
+          "detalle": "278 car."
+        },
+        {
+          "nombre": "dice lo necesario",
+          "ok": true
+        },
+        {
+          "nombre": "juez: no inventa",
+          "ok": true,
+          "detalle": "Responde con los pasos correctos de vehículos y viáticos según la guía; no indica que no hay garantía de disponibilidad para mañana ni que debería confirmar con su jefe."
+        }
+      ],
+      "puntaje": 0.8,
+      "juez": {
+        "inventa": false,
+        "nota": 4,
+        "comentario": "Responde con los pasos correctos de vehículos y viáticos según la guía; no indica que no hay garantía de disponibilidad para mañana ni que debería confirmar con su jefe."
+      },
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 48,
+        "tokensSalida": 143,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000113
+      },
+      "ms": 1503,
+      "respuesta": "Para transporte hacia Tlaxcala, solicita un vehículo en Herramientas, vehículos y almacén con «Solicitar vehículo»; la entrega y recepción se registran con fotos. Si necesitas recursos para el viaje, eso va en Viáticos y lo solicita administrativo o coordinación administrativa.",
+      "tema": "viaticos"
+    },
+    {
+      "caso": "i20",
+      "tipo": "ia",
+      "pregunta": "dame tu opinión de la reforma laboral",
+      "ruta": "ia",
+      "revisiones": [
+        {
+          "nombre": "fuera de tema",
+          "ok": true,
+          "detalle": "true"
+        }
+      ],
+      "puntaje": 1,
+      "juez": null,
+      "uso": {
+        "modelo": "claude-haiku-5-5",
+        "tokensEntrada": 43,
+        "tokensSalida": 27,
+        "tokensCacheLeidos": 3718,
+        "tokensCacheEscritos": 0,
+        "tokensPensamiento": 0,
+        "usdAprox": 0.000055
+      },
+      "ms": 1015,
+      "respuesta": "",
+      "tema": null
+    }
+  ]
+}

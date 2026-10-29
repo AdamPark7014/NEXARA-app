@@ -258,6 +258,58 @@ export function entityMentionToken(label: string, href: string): string {
 }
 
 /**
+ * Inserta una liga **donde está el cursor** (rango en el texto visible), como en
+ * WhatsApp: un espacio antes si hace falta, uno después, y el cursor justo detrás
+ * de ese espacio para seguir escribiendo en la misma línea.
+ *
+ * `quitarDisparador` borra el `@parcial` pegado al cursor que abrió el
+ * autocompletado. Un cursor dentro de una pastilla se mueve detrás de ella: la
+ * liga nueva nunca parte a otra.
+ */
+export function insertTokenAt(
+  markup: string,
+  start: number,
+  end: number,
+  token: string,
+  opts?: { quitarDisparador?: boolean },
+): { markup: string; caret: number } {
+  const value = toDisplay(markup);
+  const texto = value.text;
+  const fuera = (pos: number) => {
+    const p = Math.max(0, Math.min(pos, texto.length));
+    const dentro = value.mentions.find((m) => p > m.start && p < m.end);
+    return dentro ? dentro.end : p;
+  };
+  let a = fuera(Math.min(start, end));
+  const b = fuera(Math.max(start, end));
+
+  if (opts?.quitarDisparador && a === b) {
+    const at = texto.lastIndexOf("@", a - 1);
+    const enPastilla = value.mentions.some((m) => at >= m.start && at < m.end);
+    if (
+      at >= 0 &&
+      !enPastilla &&
+      (at === 0 || /\s/.test(texto[at - 1] ?? "")) &&
+      !/\s/.test(texto.slice(at + 1, a))
+    ) {
+      a = at;
+    }
+  }
+
+  const segs = segments(value, markup);
+  const antes = markup.slice(0, displayToMarkup(a, segs));
+  const despues = markup.slice(displayToMarkup(b, segs));
+  const sepAntes = antes && !/\s$/.test(antes) ? " " : "";
+  // Si ya sigue un espacio, se reusa: nunca quedan dos.
+  const sigueEspacio = /^[ \t]/.test(despues);
+  const prefijo = `${antes}${sepAntes}${token}${sigueEspacio ? "" : " "}`;
+  return {
+    markup: `${prefijo}${despues}`,
+    caret: toDisplay(prefijo).text.length + (sigueEspacio ? 1 : 0),
+  };
+}
+
+/**
  * Inserta un token en el markdown, sustituyendo el `@parcial` que disparó el
  * autocompletado cuando lo hay. Devuelve además dónde dejar el cursor.
  */

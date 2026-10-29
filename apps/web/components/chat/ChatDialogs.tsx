@@ -5,16 +5,29 @@ import type { SvgIconComponent } from "@mui/icons-material";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
+import HowToRegOutlinedIcon from "@mui/icons-material/HowToRegOutlined";
+import FlightTakeoffOutlinedIcon from "@mui/icons-material/FlightTakeoffOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import InlineAlert from "@/components/ui/InlineAlert";
 import styles from "../WorkspaceChat.module.css";
 import { Avatar, ReactorAvatar, channelPrefixNode } from "./ChatAtoms";
 import { formatMexicoDateTime, formatRelativeTime } from "./chat-utils";
 import type { Channel, ChatUser, MentionEntity, Message, ReactionUser, ReadPerson } from "./types";
+import { PESTANAS_LIGAR } from "@/lib/ligas";
 
 export const MENTION_KIND_ICON: Record<MentionEntity["kind"], SvgIconComponent> = {
   USER: PersonOutlineIcon,
   ACTIVITY: AssignmentOutlinedIcon,
   EVIDENCE: PhotoCameraOutlinedIcon,
+  QUOTE: DescriptionOutlinedIcon,
+  CLIENT: BusinessOutlinedIcon,
+  PROJECT: AccountTreeOutlinedIcon,
+  ATTENDANCE: HowToRegOutlinedIcon,
+  VIATIC: FlightTakeoffOutlinedIcon,
+  INVOICE: ReceiptLongOutlinedIcon,
 };
 
 function Modal({
@@ -240,16 +253,10 @@ export function EntityPickerDialog({
   return (
     <Modal labelledBy="chat-modal-entity" onClose={onClose} className={styles.entityPickerModal}>
       <div className={styles.modalTitle} id="chat-modal-entity">
-        Mencionar en el mensaje
+        Ligar al mensaje
       </div>
-      <div className={styles.entityTabs}>
-        {(
-          [
-            ["USER", "Personas"],
-            ["ACTIVITY", "Actividades"],
-            ["EVIDENCE", "Evidencias"],
-          ] as Array<[MentionEntity["kind"], string]>
-        ).map(([k, label]) => {
+      <div className={styles.entityTabs} role="group" aria-label="Qué ligar">
+        {PESTANAS_LIGAR.map(({ kind: k, etiqueta }) => {
           const TabIcon = MENTION_KIND_ICON[k];
           return (
             <button
@@ -260,7 +267,7 @@ export function EntityPickerDialog({
               onClick={() => onKind(k)}
             >
               <TabIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-              {label}
+              {etiqueta}
             </button>
           );
         })}
@@ -268,13 +275,7 @@ export function EntityPickerDialog({
       <input
         className={styles.modalInput}
         aria-label="Buscar"
-        placeholder={
-          kind === "USER"
-            ? "Buscar por nombre o correo…"
-            : kind === "ACTIVITY"
-              ? "Buscar por AN, título o estado…"
-              : "Buscar evidencia, actividad o comentario…"
-        }
+        placeholder={PESTANAS_LIGAR.find((p) => p.kind === kind)?.buscar ?? "Buscar…"}
         value={query}
         onChange={(e) => onQuery(e.target.value)}
         autoFocus
@@ -298,11 +299,13 @@ export function EntityPickerDialog({
                   <strong>{entity.label}</strong>
                   <small>{entity.subtitle}</small>
                 </span>
-                <span className={styles.entityResultAdd}>Mencionar</span>
+                <span className={styles.entityResultAdd}>{entity.kind === "USER" ? "Mencionar" : "Ligar"}</span>
               </button>
             );
           })}
-        {!loading && results.length === 0 && <div className={styles.entityEmpty}>No hay resultados disponibles.</div>}
+        {!loading && results.length === 0 && (
+          <div className={styles.entityEmpty}>Nada que ligar aquí: no hay resultados o tu rol no tiene acceso a este módulo.</div>
+        )}
       </div>
       <div className={styles.modalActions}>
         <button type="button" className={styles.actionBtn} onClick={onClose}>

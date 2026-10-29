@@ -45,6 +45,8 @@ import ChannelHeader, { TAB_IDS } from "./chat/ChannelHeader";
 import MessageList, { type MessageListCtx } from "./chat/MessageList";
 import Composer from "./chat/Composer";
 import { MembersPanel, ThreadPanel } from "./chat/ChatSidePanel";
+import AsistentePanel, { type ItemAsistente } from "./chat/AsistentePanel";
+import { ID_ASISTENTE, MENCION_ASISTENTE, preguntarAsistente } from "@/lib/asistente-chat-api";
 import {
   ColleaguesDialog,
   EntityPickerDialog,
@@ -68,6 +70,8 @@ export default function WorkspaceChat({
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [detail, setDetail] = useState<Channel | null>(null);
+  /** El asistente de NEXARA solo vive en #general. */
+  const esGeneral = detail?.slug === "general";
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [draft, setDraft] = useState("");
@@ -139,6 +143,8 @@ export default function WorkspaceChat({
   const [entityPickerOpen, setEntityPickerOpen] = useState(false);
   const [entityKind, setEntityKind] = useState<MentionEntity["kind"]>("ACTIVITY");
   const [entityTarget, setEntityTarget] = useState<"main" | "thread">("main");
+  /** Conversación con el asistente en #general: solo en esta pestaña, nunca en el canal. */
+  const [asistente, setAsistente] = useState<ItemAsistente[]>([]);
   const [entityQ, setEntityQ] = useState("");
   const [entityResults, setEntityResults] = useState<MentionEntity[]>([]);
   const [entityLoading, setEntityLoading] = useState(false);
@@ -982,12 +988,38 @@ export default function WorkspaceChat({
    * borrador, así que tampoco lo vacía ni se lleva el adjunto que estuviera
    * esperando.
    */
+  /**
+   * `@asistente` en #general: la pregunta va al asistente y no se publica. La respuesta se pinta en el
+   * panel de arriba del redactor, solo para quien pregunta.
+   */
+  const preguntar = async (texto: string) => {
+    if (!activeId) return;
+    const id = `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setAsistente((prev) => [...prev.slice(-19), { id, pregunta: texto, estado: "esperando" }]);
+    try {
+      const respuesta = await preguntarAsistente(token, texto, activeId);
+      setAsistente((prev) => prev.map((it) => (it.id === id ? { ...it, estado: "listo", respuesta } : it)));
+    } catch (e) {
+      const error = e instanceof Error && e.message ? e.message : "El asistente no respondió: intenta de nuevo.";
+      setAsistente((prev) => prev.map((it) => (it.id === id ? { ...it, estado: "error", error } : it)));
+    }
+  };
+
   const send = async (parentId?: number | null, bodyOverride?: string) => {
     if (!activeId || sending) return;
     const suelto = bodyOverride != null;
     const text = (suelto ? bodyOverride : parentId ? threadDraft : draft).trim();
     const att = suelto ? null : parentId ? threadAttachment : attachment;
     if (!text && !att) return;
+    if (!parentId && !suelto && !att && esGeneral && MENCION_ASISTENTE.test(text)) {
+      setDraft("");
+      if (activeId != null) {
+        draftsRef.current[activeId] = "";
+        persistDrafts();
+      }
+      void preguntar(text);
+      return;
+    }
     const clientMsgId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const optimistic: Message = {
       id: -Math.floor(Math.random() * 1e9),
@@ -1249,7 +1281,11 @@ export default function WorkspaceChat({
         ? userMentionToken(entity.label, entity.id)
         : entityMentionToken(entity.label, entity.href ?? "/");
 
-    if (entityTarget === "thread") {
+    // Con el compositor montado, la liga entra donde estaba el cursor y el foco vuelve ahí mismo.
+    const handle = entityTarget === "thread" ? threadComposerRef.current : composerRef.current;
+    if (handle) {
+      handle.insertarToken(token);
+    } else if (entityTarget === "thread") {
       setThreadDraft((prev) => insertMentionToken(prev, token).markup);
     } else {
       setDraft((prev) => {
@@ -1387,11 +1423,16 @@ export default function WorkspaceChat({
         ? colleagues
         : [];
     const q = mentionQ.toLowerCase();
-    return pool
+    const personas = pool
       .filter((u) => u.id !== currentUserId)
       .filter((u) => !q || u.nombre.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
       .slice(0, 6);
-  }, [detail?.members, colleagues, mentionQ, currentUserId]);
+    // En #general el asistente va primero: `@asis…` lo deja como pastilla `[@Asistente](user:0)`.
+    const asistenteCoincide = !q || "asistente".startsWith(q) || "nexara".startsWith(q);
+    return detail?.slug === "general" && asistenteCoincide
+      ? [{ id: ID_ASISTENTE, nombre: "Asistente", email: "Pregúntale de NEXARA · solo tú ves la respuesta" }, ...personas.slice(0, 5)]
+      : personas;
+  }, [detail?.members, detail?.slug, colleagues, mentionQ, currentUserId]);
 
   /**
    * El borrador guarda markdown; el disparador `@` se busca sobre el texto
@@ -1428,7 +1469,14 @@ export default function WorkspaceChat({
    * token `](user:ID)`: la mención se veía pero no notificaba a nadie.
    */
   const insertMention = (user: ChatUser) => {
-    const next = insertMentionToken(draft, userMentionToken(user.nombre, user.id), {
+    const token = userMentionToken(user.nombre, user.id);
+    if (composerRef.current) {
+      // Pasa por `onDraftChange` (borrador por canal) y deja el cursor detrás de la pastilla.
+      composerRef.current.insertarToken(token, { quitarDisparador: true });
+      setMentionOpen(false);
+      return;
+    }
+    const next = insertMentionToken(draft, token, {
       replaceTrigger: true,
     }).markup;
     setDraft(next);
@@ -1591,7 +1639,8 @@ export default function WorkspaceChat({
     setShowNewChannel(true);
   };
 
-  const channelPlaceholder = `Mensaje a ${channelPrefix(detail?.kind ?? "PUBLIC")}${detail?.name ?? "canal"}`;
+  const channelLabel = `Mensaje a ${channelPrefix(detail?.kind ?? "PUBLIC")}${detail?.name ?? "canal"}`;
+  const channelPlaceholder = esGeneral ? `${channelLabel} · escribe @asistente para preguntarle a NEXARA` : channelLabel;
 
   return (
     <>
@@ -1792,13 +1841,21 @@ export default function WorkspaceChat({
                     <InlineAlert variant="danger" dense message={error} onDismiss={() => setError(null)} />
                   </div>
                 )}
+                {esGeneral ? (
+                  <AsistentePanel
+                    items={asistente}
+                    token={token}
+                    onSugerencia={(t) => void preguntar(`[@Asistente](user:${ID_ASISTENTE}) ${t}`)}
+                    onCerrar={() => setAsistente([])}
+                  />
+                ) : null}
                 <Composer
                   variant="main"
                   textareaRef={composerRef}
                   value={draft}
                   onChange={onDraftChange}
                   placeholder={channelPlaceholder}
-                  ariaLabel={channelPlaceholder}
+                  ariaLabel={channelLabel}
                   attachment={attachment}
                   uploading={uploading}
                   onRemoveAttachment={() => setAttachment(null)}

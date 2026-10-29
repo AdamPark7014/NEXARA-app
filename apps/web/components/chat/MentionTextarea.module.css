@@ -3,9 +3,11 @@
  * (las copia el componente con getComputedStyle), así que cada carácter del
  * espejo cae exactamente bajo el mismo carácter del textarea.
  *
- * La pastilla NO lleva relleno ni margen: un relleno horizontal ensancharía la
- * caja en línea y desalinearía todo lo que venga detrás. El aire alrededor se
- * dibuja con `box-shadow` de extensión, que no ocupa sitio.
+ * La pastilla NO lleva relleno, margen ni otro grosor de letra: cualquiera de
+ * los tres ensancha la caja en línea y todo lo que viene detrás se corre contra
+ * el cursor del textarea (con `font-weight: 550` eran ~4 px por liga y el texto
+ * nuevo se encimaba, 29-10-2026). El aire alrededor se dibuja con `box-shadow`
+ * de extensión, que no ocupa sitio; el color y el fondo bastan para distinguirla.
  */
 
 .wrap {
@@ -50,7 +52,7 @@
 
 .pill {
   border-radius: var(--ui-radius-sm);
-  font-weight: var(--ui-fw-label);
+  font-weight: inherit;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }

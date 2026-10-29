@@ -2,8 +2,7 @@
 
 import { useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from "react";
 import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
-import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
-import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
+import AddLinkOutlinedIcon from "@mui/icons-material/AddLinkOutlined";
 import SentimentSatisfiedAltOutlinedIcon from "@mui/icons-material/SentimentSatisfiedAltOutlined";
 import AlternateEmailIcon from "@mui/icons-material/AlternateEmail";
 import SendIcon from "@mui/icons-material/Send";
@@ -43,7 +42,8 @@ type Props = {
 
 /**
  * Redactor del canal y del hilo: barra de formato, `textarea` con pastillas, adjunto y barra de
- * acciones. Enter envía, Shift+Enter hace salto de línea.
+ * acciones. Enter envía, Shift+Enter hace salto de línea. «Ligar» abre el selector de todo lo que
+ * se puede ligar (actividades, cotizaciones, asistencia, clientes, proyectos, viáticos, facturas).
  */
 export default function Composer({
   variant,
@@ -120,6 +120,7 @@ export default function Composer({
         placeholder={placeholder}
         value={value}
         rows={2}
+        autoGrow
         onChange={onChange}
         onPaste={(e) => {
           const file = Array.from(e.clipboardData?.files ?? [])[0];
@@ -200,20 +201,12 @@ export default function Composer({
           <button
             type="button"
             className={styles.entityBtn}
-            aria-label="Mencionar actividad"
+            aria-label="Ligar actividad, cotización, asistencia y más"
+            data-tip="Ligar actividad, cotización, asistencia…"
             onClick={() => onOpenEntityPicker("ACTIVITY")}
           >
-            <AssignmentOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-            <span>Actividad</span>
-          </button>
-          <button
-            type="button"
-            className={styles.entityBtn}
-            aria-label="Mencionar evidencia"
-            onClick={() => onOpenEntityPicker("EVIDENCE")}
-          >
-            <PhotoCameraOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
-            <span>Evidencia</span>
+            <AddLinkOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
+            <span>Ligar</span>
           </button>
         </div>
         <span className={styles.composerHint}>{hint}</span>
