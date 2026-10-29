@@ -56,6 +56,7 @@ import {
 import { sumarPendientes, type PasoEquipo } from "@/lib/asignar-equipo";
 import { cargaDelDia } from "@/lib/linea-del-dia";
 import a from "./asignar.module.css";
+import { formatoMinutos } from "@/lib/actividad-tiempos";
 
 const OpsActivityForm = dynamic(() => import("@/components/ops/OpsActivityForm"), {
   ssr: false,
@@ -174,6 +175,8 @@ export default function AsignarActividadPage() {
   /** Tiempo estimado de la actividad (obligatorio): se guarda como horasPlan. */
   const [planHoras, setPlanHoras] = useState(1);
   const [planMinutos, setPlanMinutos] = useState(0);
+  /** Minutos del tiempo estándar mientras manda (la rueda se lee, no se gira); null = rueda libre. */
+  const [estandarMin, setEstandarMin] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   /** La actividad ya existe: quién falta sumar al equipo. Mientras exista, no se vuelve a crear. */
   const [pendiente, setPendiente] = useState<{ activityId: number; pasos: PasoEquipo[] } | null>(null);
@@ -685,6 +688,12 @@ export default function AsignarActividadPage() {
               description="Cuánto debería tomarle. Gira las ruedas de horas y minutos — no hace falta hacer la cuenta mental."
               className={planValido ? undefined : a.seccionAviso}
             >
+              {estandarMin != null ? (
+                <p className={a.estandarFijo} role="status">
+                  <strong>{formatoMinutos(estandarMin)}</strong>
+                  <span>Lo da el tiempo estándar (en «Datos»). Para poner otro, usa «Cambiar el tiempo»: pide motivo.</span>
+                </p>
+              ) : (
               <DurationWheelPicker
                 horas={planHoras}
                 minutos={planMinutos}
@@ -702,6 +711,7 @@ export default function AsignarActividadPage() {
                     : "Máximo 12 h. Si lleva más días, se reanuda cada día."
                 }
               />
+              )}
               {!planValido ? (
                 <p className={a.faltaTiempo} role="status">
                   Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede.
@@ -840,6 +850,13 @@ export default function AsignarActividadPage() {
                     forcedTicketTypeCustom={kindMeta.ticketTypeCustom}
                     requireSchedule={Boolean(kindMeta.requiresSchedule)}
                     onTiempoTipico={(min) => {
+                      const tope = Math.min(720, min);
+                      setPlanHoras(Math.floor(tope / 60));
+                      setPlanMinutos(tope % 60);
+                    }}
+                    onEstandar={(min) => {
+                      setEstandarMin(min);
+                      if (min == null) return;
                       const tope = Math.min(720, min);
                       setPlanHoras(Math.floor(tope / 60));
                       setPlanMinutos(tope % 60);

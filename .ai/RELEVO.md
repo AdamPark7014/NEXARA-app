@@ -1,5 +1,26 @@
 # RELEVO
 
+- **29-10 ~14:00 (claude-code) — Tiempo estándar en Asignar (web) y obra con tarifas (lo retomé de la sesión principal).**
+  - Adam: «Sí, retómala aquí». La API (`fab4f3ab`) y la migración `20261029030000` son de la principal y ya se desplegaron.
+  - `components/ops/TiempoEstandarCampo.tsx` (+ css + spec) va en «¿Qué se va a hacer?», debajo de la complejidad,
+    como los artboards `TiempoEstandar` y `TiempoTraslado` del canvas:
+    - cantidad con − y +, la pregunta de la regla, y el selector de unidad si hay varias (cableado y obra);
+    - destino con `ClientLocationPicker`, «En auto» o «En transporte» y `POST ai/estandar/ruta`, con chips de ida,
+      vuelta y en el lugar, y la fuente de la ruta (Google, OSRM o aproximado);
+    - tarjeta oscura con el total y el desglose; «Cambiar el tiempo (pide motivo)», de 5 letras mínimo.
+  - La cantidad y el destino que lee la IA llegan por `ComplejidadCampo` → `onSugerencia`. Si alguien la escribe a
+    mano, ya no la pisa.
+  - La suma está en `lib/tiempo-estandar.ts` (+ spec), con la misma fórmula que `calcularEstandar` de la API. La
+    tabla se pide una vez a `GET ai/estandar/tabla`.
+  - Mientras el estándar mande, «¿Cuánto tiempo toma?» del formulario y la rueda de la página de asignar quedan de
+    solo lectura (`onEstandar`). Con motivo, la rueda vuelve a quedar libre y el motivo se guarda.
+  - El payload manda `unidades`, `destino`, `traslado*`, `tiempoEstandarMin`, `estandarDesglose` y
+    `estandarCambiadoMotivo` (`payloadEstandar`). Al editar, se leen con `estandarDeRegistro`.
+  - En el detalle, «Datos clave» muestra «Tiempo estándar» con su desglose, el destino y el motivo si se cambió.
+  - API: regla nueva `obra` en `tabla-estandar.ts`, con las mismas tarifas de instalación y cableado (dispositivos,
+    nodos o metros, base de 30 min). Adam pidió parametrizar las obras.
+  - Falta: horas estándar ganadas en Desempeño y la API de tramos de trayecto (la espera `nexara-apps-uiux`).
+
 - **29-10 ~13:30 (claude-code) — Mesa contable de la contadora: API (web en curso, sin desplegar).**
   - Pedido de Adam: «por facturar», pagos y gastos ligados a su CFDI y banco, estado de resultados y balance. Mockup
     aprobado por Adam el 29-10: https://claude.ai/artifact/MENR9dXWC7PGocKEoSTmpD

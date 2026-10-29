@@ -55,6 +55,25 @@
   border-color: var(--ui-warning-border);
 }
 
+/* La rueda cuando la fija el tiempo estándar: se lee, no se gira. */
+.estandarFijo {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+  font-size: var(--ui-fs-caption);
+  line-height: 1.45;
+}
+
+.estandarFijo strong {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ui-fg);
+}
+
 .faltaTiempo {
   margin: var(--ui-s3) 0 0;
   font-size: var(--ui-fs-meta);

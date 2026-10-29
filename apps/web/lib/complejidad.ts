@@ -21,7 +21,14 @@ export function esComplejidad(v: unknown): v is Complejidad {
 
 export type Tipico = { muestras: number; medianaMin: number | null };
 export type TiemposTipicos = { clave: string | null; total: Tipico; porComplejidad: Record<Complejidad, Tipico> };
-export type SugerenciaComplejidad = { complejidad: Complejidad; motivo: string };
+export type SugerenciaComplejidad = {
+  complejidad: Complejidad;
+  motivo: string;
+  /** Lo que se cuenta en ese tipo, si el título lo dice («50 productos» → 50). Para el tiempo estándar. */
+  cantidad?: number | null;
+  /** El lugar al que hay que ir, si el texto lo nombra. */
+  destino?: string | null;
+};
 
 export function fetchTiemposTipicos(token: string, q: { coreKind: string; tipo?: string | null }): Promise<TiemposTipicos> {
   const p = new URLSearchParams({ coreKind: q.coreKind });
