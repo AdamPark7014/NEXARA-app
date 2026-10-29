@@ -231,7 +231,9 @@ Adam aprobó las diez el 29-10 («aprueba todo»), con la opción recomendada do
 5. Sí: coordinadores medidos por su equipo.
 6. Sí: una sola regla de pago para la hoja y el sistema (semana = mensual × 12 ÷ 52, el mismo divisor del día en las
    dos, extra doble/triple). **Pendiente: la revisa la contadora.** La mesa contable no tiene dónde dejar notas; la
-   nota va por la sesión de la mesa contable o por Adam.
+   nota va por la sesión de la mesa contable o por Adam. El 29-10, a pedido de Adam, el sueldo semanal de RH de las
+   19 personas activas se recapturó con esta regla (antes era el del tabulador, mensual ÷ 4). Respaldo y bitácora,
+   fuera del repo, en `C:\dev\secrets\nexara\sueldos-2026-10-29\`.
 7. Sí: horario de campo de 08:00 a 17:00 con comida (capturado el 28-10 a la cuadrilla).
 8. Sí: la hoja de entradas sale del sistema, con ajustes con motivo (trabajo aparte).
 9. Sí: la nómina de la semana del 26-10 se corre en el sistema en paralelo con el Excel. Sueldos y datos por persona

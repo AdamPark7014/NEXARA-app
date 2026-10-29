@@ -1,5 +1,13 @@
 # RELEVO
 
+- **29-10 ~15:00 (claude-code) — Sueldo semanal recapturado con la regla × 12 ÷ 52 (Adam: «Sí, recaptúralo»).**
+  - `UserProfile.sueldoSemanal` de las 19 personas activas pasó del tabulador (mensual ÷ 4) a mensual × 12 ÷ 52
+    (capturado × 12 ÷ 13), en una transacción que exigía 19 filas. Las 3 inactivas no se tocaron.
+  - Respaldo, valores de después y bitácora en `C:\dev\secrets\nexara\sueldos-2026-10-29\` (OneDrive, fuera del
+    repo). Las 22 filas cuadran contra el respaldo.
+  - Afecta la sugerencia de nómina, la pre-nómina y el control de nómina: sale 7.7 % abajo del tabulador semanal.
+    La regla la sigue revisando la contadora.
+
 - **29-10 ~14:00 (claude-code) — Apps: autoasignación fija (contrato de la API e920ddbb, sesión «Asignar con IA»).**
   - Android: en el alta propia (`autoasignacion = selfAssign || destino = yo`) ya no se capturan complejidad,
     «Entregar a más tardar», tiempo estimado ni tope; la tarjeta «Tiempo y entrega · los fija el sistema»
