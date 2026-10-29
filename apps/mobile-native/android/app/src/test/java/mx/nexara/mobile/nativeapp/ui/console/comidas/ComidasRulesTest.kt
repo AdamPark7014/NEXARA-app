@@ -126,4 +126,19 @@ class ComidasRulesTest {
             ComidasRules.mensajeRegistro(ComidasRules.REGRESO, conMotivo = false),
         )
     }
+
+    @Test
+    fun regresoTardeUsaElLimiteDeLaApi() {
+        // Cuadrilla que salió a la 1:40: regresa a más tardar 2:45 p.m. (no las 4:00 de la oficina).
+        assertEquals(
+            "Ya pasó la hora de regreso (2:45 p.m.): al registrar tendrás que escribir por qué.",
+            ComidasRules.avisoRegresoTarde("2026-10-29T20:45:00.000Z"),
+        )
+        assertEquals("4:05 p.m.", ComidasRules.horaDoce("2026-10-29T22:05:00Z"))
+        assertEquals("12:00 p.m.", ComidasRules.horaDoce("2026-10-29T18:00:00Z"))
+        assertEquals(
+            "Ya pasó la hora de regreso: al registrar tendrás que escribir por qué.",
+            ComidasRules.avisoRegresoTarde(null),
+        )
+    }
 }

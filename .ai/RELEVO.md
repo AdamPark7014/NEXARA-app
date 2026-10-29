@@ -34,6 +34,9 @@
   - Android: 947 pruebas JVM en verde (con capturas). iOS: sin compilador local; lo compila el CI de capturas.
   - Pendiente: sugerencia de nómina (`employee-payments/sugerencia-nomina`) no tiene pantalla en las apps;
     `BoardKpis.kt` sigue con 85/60; demo iOS con partes del índice viejo.
+  - Comidas (~16:25): la ventana depende del horario (da1d180c). Las apps usan `ventana.texto` y
+    `ventana.regresoLimite` de la API («Ya pasó la hora de regreso (2:45 p.m.)»); el jefe lee las dos ventanas
+    (oficina 3 a 4 p.m.; cuadrilla, una hora entre 1 y 5 p.m.). «3:00 a 4:00» queda solo de respaldo.
 
 - **29-10 ~17:10 (claude-code) — Comida: ventana por horario y avisos a la hora de cada quien.**
   - El aviso de las 14:50 no le llegaba a nadie: el cron filtraba por roles con acceso a consola y ningún rol activo

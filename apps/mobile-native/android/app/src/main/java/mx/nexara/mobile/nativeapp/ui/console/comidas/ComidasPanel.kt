@@ -268,7 +268,7 @@ fun ComidasPanel(
                         Text("Comidas de tu equipo", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
                         Text(
                             (if (eq.alcance == "todo") "Toda la empresa." else "Tu gente por organigrama.") +
-                                " Horario 3:00 a 4:00 p.m.; lo que sea fuera de esa hora trae justificación y lo apruebas o rechazas.",
+                                " " + ComidasRules.VENTANAS_DEL_EQUIPO,
                             fontSize = 13.sp,
                             color = NxColors.Muted,
                         )
@@ -528,7 +528,7 @@ private fun MiComidaCard(
                 revision?.let { ToneChip(it) }
                 if (destiempo) {
                     NxIconText(
-                        text = "Ya pasó la hora de regreso (4:00 p.m.): al registrar tendrás que escribir por qué.",
+                        text = ComidasRules.avisoRegresoTarde(mi.ventana?.regresoLimite),
                         icon = Icons.Outlined.AccessTime,
                         fontSize = 13.sp,
                         color = NxColors.Muted,
