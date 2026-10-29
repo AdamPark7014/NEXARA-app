@@ -17,6 +17,7 @@ import {
   minutosTrabajados,
   type SesionTrabajo,
 } from './sessions/sesiones-trabajo.js';
+import { MOTIVO_RELLENO } from './rellenar-tiempos.js';
 
 export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
 export type Aceptacion = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
@@ -201,6 +202,8 @@ export function tiemposDto(
     /** Sin `horasPlan` (lo autoasignado nunca lo tiene), el plan es el tiempo de la actividad. */
     tiempoEstimadoMin?: number | null;
     tiempoEstandarMin?: number | null;
+    /** `MOTIVO_RELLENO`: el estimado se rellenó tras entregarla y no es un plan. */
+    estandarCambiadoMotivo?: string | null;
   },
   ahora: Date = new Date(),
   /**
@@ -209,7 +212,7 @@ export function tiemposDto(
    */
   sesiones?: SesionTrabajo[] | null,
 ) {
-  const estimado = Number(actividad.tiempoEstimadoMin);
+  const estimado = actividad.estandarCambiadoMotivo === MOTIVO_RELLENO ? 0 : Number(actividad.tiempoEstimadoMin);
   const plan = minutosPlan(fila.horasPlan) ?? (estimado > 0 ? Math.round(estimado) : null);
   const cerrada = esCerrada(actividad.estatus);
   const fuente = {

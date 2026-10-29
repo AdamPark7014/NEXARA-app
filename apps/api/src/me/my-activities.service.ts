@@ -1084,6 +1084,7 @@ export class MyActivitiesService {
             tiempoEstimadoMin: true,
             tiempoEstandarMin: true,
             estandarDesglose: true,
+            estandarCambiadoMotivo: true,
             tiempoMaximoMin: true,
             creadoPorId: true,
             creador: { select: { id: true, nombre: true } },
