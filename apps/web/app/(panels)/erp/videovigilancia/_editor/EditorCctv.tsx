@@ -615,6 +615,10 @@ export default function EditorCctv({
               setAviso("Marca los dos extremos de una cota conocida.");
             }}
             onCambiarCroquis={() => archivo.current?.click()}
+            onHerramienta={(h) => {
+              setModo("2d");
+              setHerramienta(h);
+            }}
             fichaDe={(camId) => `/erp/videovigilancia/${diseno.id}/camara/${encodeURIComponent(camId)}`}
             numeroNuevo={numeroNuevo}
             nivel={{

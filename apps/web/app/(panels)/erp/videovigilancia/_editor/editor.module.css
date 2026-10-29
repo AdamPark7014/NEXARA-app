@@ -1003,3 +1003,81 @@
   outline: 2px solid var(--ui-brand);
   outline-offset: 1px;
 }
+
+/* Guía de pasos del panel derecho cuando no hay nada elegido. */
+.guia {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.guia li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: var(--ui-s2) var(--ui-s3);
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+
+.guia li:last-child {
+  border-bottom: 0;
+}
+
+.guiaNumero {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ui-fg-2);
+  background: var(--ui-surface-2);
+  border: 1px solid var(--ui-border);
+}
+
+.guiaHecho .guiaNumero {
+  color: var(--ui-fg-on-brand);
+  background: var(--ui-brand);
+  border-color: var(--ui-brand);
+}
+
+.guiaTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.guiaTexto b {
+  font-size: var(--ui-fs-label);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.guiaTexto span {
+  font-size: 12px;
+  color: var(--ui-fg-3);
+  line-height: 1.35;
+}
+
+.guiaHecho .guiaTexto b {
+  color: var(--ui-fg-2);
+}
+
+.barra2 {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ui-track);
+  overflow: hidden;
+}
+
+.barra2 i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}

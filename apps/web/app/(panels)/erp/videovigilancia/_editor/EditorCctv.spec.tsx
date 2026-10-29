@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { MODELOS_CAMARA } from "@/lib/cctv/catalogo";
-import { agregarCamara, agregarMuro, agregarPersona } from "@/lib/cctv/editor";
+import { agregarCamara, agregarMuro, agregarPersona, resumenDelPlano } from "@/lib/cctv/editor";
 import { planoVacio, type Plano } from "@/lib/cctv/plano";
 import type { Diseno } from "@/lib/cctv/api";
 import EditorCctv from "./EditorCctv";
@@ -74,7 +74,7 @@ describe("editor del diseñador de videovigilancia", () => {
     expect(screen.getByRole("img", { name: /Vista 3D del sitio/ })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Vistas desde las cámaras" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Vista superior" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Muro/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Muro" })).toBeNull();
     // controles a la vista: girar, acercar y encuadrar
     fireEvent.click(screen.getByRole("button", { name: "Girar a la derecha" }));
     fireEvent.click(screen.getByRole("button", { name: "Acercar" }));
@@ -89,6 +89,16 @@ describe("editor del diseñador de videovigilancia", () => {
     expect(screen.getByRole("tab", { name: "Cámara 1" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Alcance en el piso")).toBeInTheDocument();
     expect(screen.getByText("hasta 4.3 m")).toBeInTheDocument();
+  });
+
+  it("sin nada elegido guía los pasos y cada botón activa su herramienta", () => {
+    render(<EditorCctv diseno={{ ...diseno(bodega()), resumen: resumenDelPlano(bodega()) }} token="t" onRecargar={() => {}} />);
+    expect(screen.getByText("Para armar el diseño · faltan 1")).toBeInTheDocument();
+    expect(screen.getByText("Cobertura del interior")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "3D" }));
+    fireEvent.click(screen.getByRole("button", { name: "Poner: Cámaras" }));
+    // vuelve al 2D con la herramienta de cámara lista
+    expect(screen.getByRole("button", { name: "+ Cámara" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("agrega un nivel encima, le copia los muros y lo apila en 3D", () => {
