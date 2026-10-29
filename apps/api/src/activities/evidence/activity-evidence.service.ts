@@ -1886,6 +1886,8 @@ export class ActivityEvidenceService {
     companyId?: number | null,
     /** Eficiencia de quien la realizó (1–5). */
     score?: number | null,
+    /** Por lote: sin el aviso por actividad (quien llama manda uno agrupado por persona). */
+    opciones: { silencioso?: boolean } = {},
   ) {
     // `isSuperAdmin` NO es columna de `User` —se calcula en el JWT
     // (`rbac.guard.ts`) o desde el correo (`platform-accounts.ts`)—, así que
@@ -1932,6 +1934,7 @@ export class ActivityEvidenceService {
 
     // 100 % finalizada solo cuando la evidencia de todo el equipo está aprobada.
     const finalizada = await this.finalizeIfAllApproved(activityId);
+    if (opciones.silencioso) return updated;
 
     try {
       const activity = await this.prisma.activity.findUnique({
@@ -2195,10 +2198,14 @@ export class ActivityEvidenceService {
     observaciones: string;
     calificacion: number;
     companyId?: number | null;
+    /** Aprobación por lote: sin el aviso por actividad. */
+    silencioso?: boolean;
   }) {
     const { activityId, evidenceUserId, reviewerId, observaciones, calificacion, companyId } = params;
     if (params.decision === 'aprobar') {
-      return this.approveEvidence(activityId, evidenceUserId, reviewerId, observaciones, companyId, calificacion);
+      return this.approveEvidence(activityId, evidenceUserId, reviewerId, observaciones, companyId, calificacion, {
+        silencioso: params.silencioso,
+      });
     }
     return this.rejectEvidence(
       activityId,

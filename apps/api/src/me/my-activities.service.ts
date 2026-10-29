@@ -88,6 +88,16 @@ export type DispatchMyActivityDto = {
 export type ReprogramarDespachoDto = { fecha: string; motivo?: string };
 
 /** Revisión de evidencia desde la cadena de mando. */
+/** Aprobar varias evidencias a la vez con la misma regla del botón «Aprobar». */
+export type AprobarLoteDto = {
+  items: Array<{ activityId: number; userId: number }>;
+  observaciones: string;
+  calificacion: number;
+};
+
+/** Hasta cuántas evidencias por llamada. */
+export const APROBAR_LOTE_MAX = 100;
+
 export type RevisarEvidenciaDto = {
   decision: 'aprobar' | 'devolver';
   /** Pasos a corregir (devolución parcial). */
@@ -816,6 +826,87 @@ export class MyActivitiesService {
     evidenceUserId: number,
     dto: RevisarEvidenciaDto,
   ) {
+    await this.revisarUnaEvidencia(viewer, companyId, activityId, evidenceUserId, dto);
+    return this.teamEvidence(viewer, companyId, activityId);
+  }
+
+  /**
+   * Aprobar varias a la vez (Adam, 29-10: «guarda en la db las 90 actividades más viejas que falten de
+   * revisión»). Cada una pasa por la misma regla del botón «Aprobar» (evidencia enviada, solo sus superiores,
+   * historial y calificación); lo que no pasa se devuelve con su motivo. El aviso va agrupado: uno por persona.
+   */
+  async approveTeamEvidenceBatch(
+    viewer: TeamEvidenceViewer,
+    companyId: number | null,
+    dto: AprobarLoteDto,
+  ): Promise<{ aprobadas: Array<{ activityId: number; userId: number }>; fallidas: Array<{ activityId: number; userId: number; motivo: string }> }> {
+    const items = Array.isArray(dto?.items) ? dto.items : [];
+    if (!items.length || items.length > APROBAR_LOTE_MAX) {
+      throw new BadRequestException(`Manda de 1 a ${APROBAR_LOTE_MAX} evidencias`);
+    }
+    const revision: RevisarEvidenciaDto = {
+      decision: 'aprobar',
+      observaciones: String(dto.observaciones ?? ''),
+      calificacion: Number(dto.calificacion),
+    };
+    if (revision.observaciones.trim().length < 5) throw new BadRequestException('Escribe por qué las apruebas');
+    if (!Number.isInteger(revision.calificacion) || revision.calificacion < 1 || revision.calificacion > 5) {
+      throw new BadRequestException('Califica su eficiencia de 1 a 5 estrellas');
+    }
+
+    const aprobadas: Array<{ activityId: number; userId: number }> = [];
+    const fallidas: Array<{ activityId: number; userId: number; motivo: string }> = [];
+    for (const it of items) {
+      const activityId = Number(it?.activityId);
+      const userId = Number(it?.userId);
+      try {
+        await this.revisarUnaEvidencia(viewer, companyId, activityId, userId, revision, { silencioso: true });
+        aprobadas.push({ activityId, userId });
+      } catch (e) {
+        fallidas.push({ activityId, userId, motivo: e instanceof Error ? e.message : String(e) });
+      }
+    }
+
+    // Un aviso por persona con todas sus actividades aprobadas.
+    if (aprobadas.length) {
+      const [actividades, revisor] = await Promise.all([
+        this.prisma.activity.findMany({
+          where: { id: { in: [...new Set(aprobadas.map((a) => a.activityId))] } },
+          select: { id: true, anNumber: true, titulo: true },
+        }),
+        this.prisma.user.findUnique({ where: { id: viewer.id }, select: { nombre: true } }),
+      ]);
+      const porId = new Map(actividades.map((a) => [a.id, a]));
+      const porPersona = new Map<number, Array<{ activityId: number; an: string | null; titulo: string | null }>>();
+      for (const a of aprobadas) {
+        const act = porId.get(a.activityId);
+        const lista = porPersona.get(a.userId) ?? [];
+        lista.push({ activityId: a.activityId, an: act?.anNumber ?? null, titulo: act?.titulo ?? null });
+        porPersona.set(a.userId, lista);
+      }
+      for (const [userId, suyas] of porPersona) {
+        await this.notificationHierarchy.notifyEvidenceBatchApproved({
+          userId,
+          reviewerId: viewer.id,
+          reviewerName: revisor?.nombre ?? '',
+          actividades: suyas,
+          score: revision.calificacion,
+          notes: revision.observaciones,
+        });
+      }
+    }
+    return { aprobadas, fallidas };
+  }
+
+  /** Lo que hace el botón «Aprobar»/«Devolver»: validación, permisos y la revisión (sin armar la vista). */
+  private async revisarUnaEvidencia(
+    viewer: TeamEvidenceViewer,
+    companyId: number | null,
+    activityId: number,
+    evidenceUserId: number,
+    dto: RevisarEvidenciaDto,
+    opciones: { silencioso?: boolean } = {},
+  ): Promise<void> {
     const decision = dto?.decision;
     if (decision !== 'aprobar' && decision !== 'devolver') {
       throw new BadRequestException('Indica si apruebas o devuelves la evidencia');
@@ -856,8 +947,8 @@ export class MyActivitiesService {
       observaciones,
       calificacion,
       companyId,
+      silencioso: opciones.silencioso,
     });
-    return this.teamEvidence(viewer, companyId, activityId);
   }
 
   /**

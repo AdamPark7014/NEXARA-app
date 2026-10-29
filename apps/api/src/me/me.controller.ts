@@ -25,6 +25,7 @@ import {
   type DispatchMyActivityDto,
   type ReorderMyActivitiesDto,
   type ReprogramarDespachoDto,
+  type AprobarLoteDto,
   type RevisarEvidenciaDto,
 } from './my-activities.service.js';
 import { TeamBoardService } from './team-board.service.js';
@@ -497,6 +498,32 @@ export class MeController {
         permissions: Array.isArray(user.permissions) ? user.permissions : [],
       },
       companyId,
+    );
+  }
+
+  /**
+   * Aprobar varias evidencias a la vez, con la misma regla del botón «Aprobar» y un aviso por persona.
+   * Devuelve las aprobadas y las que no pasaron, con su motivo.
+   */
+  @Post('revisiones/aprobar-lote')
+  approveTeamEvidenceBatch(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: AprobarLoteDto,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.myActivities.approveTeamEvidenceBatch(
+      {
+        id: Number(user.id),
+        email: user.email ?? null,
+        roleKey: user.roleKey ?? null,
+        isSuperAdmin: Boolean(user.isSuperAdmin),
+        permissions: Array.isArray(user.permissions) ? user.permissions : [],
+      },
+      companyId,
+      body,
     );
   }
 

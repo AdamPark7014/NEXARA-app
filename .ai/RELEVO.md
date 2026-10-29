@@ -1,5 +1,15 @@
 # RELEVO
 
+- **29-10 ~17:40 (claude-code) — Aprobar por lote las evidencias en espera de revisión (Adam, 17:17: «guarda en la db
+  las 90 actividades más viejas que falten de revisión»).**
+  - `POST me/revisiones/aprobar-lote` `{ items: [{ activityId, userId }], observaciones, calificacion }` (máximo 100).
+    Cada evidencia pasa por la misma regla del botón «Aprobar» (`revisarUnaEvidencia`: enviada, solo sus superiores,
+    historial y calificación, Finalizada cuando todo el equipo está aprobado). Lo que no pasa vuelve con su motivo.
+  - Avisos: `approveEvidence` tiene un modo silencioso y el lote manda uno por persona
+    (`notifyEvidenceBatchApproved`, «Christian aprobó N de tus actividades» con sus AN).
+  - Simulacro, lista de IDs y resultado de la corrida: `C:\dev\secrets\nexara\revisiones-2026-10-29\` (fuera del
+    repo). Para deshacerlo, la lista de IDs dice qué evidencias regresar a PENDING y qué actividades a «Por Validar».
+
 - **29-10 ~17:30 (claude-code) — El título: números de lugar y la unidad que nombra (hallado al verificar la jornada
   en obra en producción).**
   - `cantidadDelTitulo` leía «nave 2», «piso 3», «sucursal #12» como cantidades: «Tubería y canalización en nave 2»

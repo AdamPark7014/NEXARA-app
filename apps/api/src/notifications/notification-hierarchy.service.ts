@@ -968,6 +968,49 @@ export class NotificationHierarchyService {
   }
 
   /**
+   * Aprobación por lote (Adam, 29-10): un solo aviso por persona, «Christian aprobó N de tus actividades».
+   * El registro por actividad queda en la revisión de cada evidencia (historial y calificación).
+   */
+  async notifyEvidenceBatchApproved(params: {
+    userId: number;
+    reviewerId: number;
+    reviewerName: string;
+    actividades: Array<{ activityId: number; an: string | null; titulo: string | null }>;
+    score?: number | null;
+    notes?: string | null;
+  }) {
+    try {
+      const { userId, reviewerId, actividades } = params;
+      if (!actividades.length || userId === reviewerId) return;
+      const quien = persona(params.reviewerName, 'Tu supervisor');
+      const n = actividades.length;
+      const una = n === 1 ? actividades[0] : null;
+      const lista =
+        actividades
+          .slice(0, 8)
+          .map((a) => a.an || `#${a.activityId}`)
+          .join(', ') + (n > 8 ? ` y ${n - 8} más` : '');
+      const calif = params.score ? `Calificación ${params.score} de 5` : null;
+      const obs = params.notes?.trim() ? `Observaciones: ${params.notes.trim()}` : null;
+      await this.notificationsService.createNotification({
+        userId,
+        type: 'EVIDENCE_APPROVED',
+        category: 'evidences',
+        title: una ? `Evidencia aprobada: ${nombreActividad(una.titulo || '')}` : `${quien} aprobó ${n} de tus actividades`,
+        message: unir(una ? `${quien} aprobó la evidencia` : `${quien} aprobó: ${lista}`, calif, obs),
+        icon: 'aprobada',
+        ...(una ? { relatedEntityId: una.activityId, entityType: 'Activity' } : {}),
+        relatedUrl: una ? `/erp/actividades/${una.activityId}/evidencias` : '/erp/actividades',
+        priority: 'normal',
+        dedupeSeconds: 0,
+        triggerUserId: reviewerId,
+      });
+    } catch (error) {
+      this.logger.error(`Error notifying batch evidence approval:`, error);
+    }
+  }
+
+  /**
    * Despacho / asignación a equipo: avisa a quien recibe, al responsable (Luis) y a Christian.
    */
   async notifyActivityDispatched(params: {
