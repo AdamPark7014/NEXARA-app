@@ -409,18 +409,20 @@
       **Quien ya checó no recibe nada de aquí** (entrada de hoy o `AttendanceDay` de hoy, la misma señal de
       `recordatorios-jornada`): desde su entrada lo toma ese job («sin actividad», «por vencer»), nunca los dos.
       La insistencia no usa `createNotification` como aquel porque cada push de 2 min sería una fila.
-    - Desde la entrada más la gracia (10:15 / 08:15), sin checar: push «No has registrado tu entrada» cada 2 min,
-      **solo push, sin fila**. Una sola tarjeta que se reemplaza y vuelve a sonar (`tag nx_entrada_u<id>`; en iOS
+    - Desde la entrada más la gracia (10:15 / 08:15, igual que el retardo; **decidido 29-10, Adam lo aprobó**), sin
+      checar: push «No has registrado tu entrada» cada 2 min, **solo push, sin fila**. Una sola tarjeta que se reemplaza y vuelve a sonar (`tag nx_entrada_u<id>`; en iOS
       `apns-collapse-id` con el nuevo `PushPayload.reemplazar`).
     - Para al checar, al llegar su salida, con falta justificada, permiso/vacaciones aprobados (`leave_requests`)
       o en descanso: sábado, domingo y festivos de la LFT art. 74, salvo guardia. Días que da la empresa además de
-      la ley: `ASISTENCIA_DIAS_DE_DESCANSO=AAAA-MM-DD,…` en el entorno de la API (hoy vacío: **el lunes 2-nov no es
-      festivo de ley**, si se descansa hay que ponerlo ahí o registrarlo).
+      la ley: `DESCANSOS_ACORDADOS` en `recordatorio-entrada.ts` (**el lunes 2-nov, decidido 29-10 y aprobado por
+      Adam**: no es festivo de ley, pero insistir cada 2 min en un día de descanso molesta a todos y saltarlo solo
+      quita el recordatorio; retardos, KPI y nómina no leen esa lista) más `ASISTENCIA_DIAS_DE_DESCANSO=AAAA-MM-DD,…`,
+      que desde ese día sí llega al contenedor (antes faltaba en el `environment` de `docker-compose.nexara.yml`).
     - Fuera: dirección 24/7 (ceo, arquitecto…), cuentas de plataforma y el equipo ficticio `@demo.invalid`.
   - Varias instancias: cada aviso se reclama con una escritura condicional en `user_preferences`
     (`asistencia.recordatorio_entrada` = último turno `AAAA-MM-DD HH:MM`, una fila por persona). Ni esa tabla ni
     `notifications` pasan por `audit_logs`. Disco al 70 % el 29-10.
-  - Pruebas: `recordatorio-entrada.spec.ts` 16 en verde (regla y servicio con dos instancias simuladas); suite de la
+  - Pruebas: `recordatorio-entrada.spec.ts` 19 en verde (regla y servicio con dos instancias simuladas); suite de la
     API 320/3877 en verde. `tsc` limpio sobre `HEAD` + estos archivos; en el checkout compartido falla en
     `activities.service.ts` por trabajo sin commitear de otra sesión (tiempo estándar), no por esto.
   - Sin migración.
