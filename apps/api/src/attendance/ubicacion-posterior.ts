@@ -7,9 +7,17 @@
  * se le asigna el primer punto que llegue en los {@link VENTANA_UBICACION_POSTERIOR_MS} siguientes,
  * marcado como tomado después (`Attendance.ubicacionPosteriorAt`), en lugar de «Sin ubicación».
  *
- * La checada sigue a revisión: el punto es de minutos después, no del momento de checar. El motivo
- * lo dice con los minutos y conserva la causa original.
+ * El motivo lo dice con los minutos y conserva la causa original. Pasa a revisión solo si el punto
+ * llegó después de {@link MARGEN_UBICACION_MIN}: Adam (28-10-2026) pidió «un margen de error de
+ * 5–10 minutos por temas de internet» antes de marcar nada.
  */
+import { combinarValidacion, type ValidacionChecada } from './asistencia-confiable.js';
+
+/**
+ * Margen de la ubicación: un punto que llegó a lo más estos minutos después de checar cuenta como
+ * del momento, y un tramo con la ubicación apagada más corto no se marca (`estado-ubicacion.ts`).
+ */
+export const MARGEN_UBICACION_MIN = 10;
 
 /** Cuánto después de checar todavía vale un punto como ubicación de la entrada. */
 export const VENTANA_UBICACION_POSTERIOR_MS = 30 * 60_000;
@@ -50,4 +58,22 @@ export function motivoUbicacionPosterior(minutos: number, motivoValidacion?: str
   });
   if (!reemplazado) salida.unshift(base);
   return [...new Set(salida)].join(' · ');
+}
+
+/**
+ * Validación de la entrada al ponerle su ubicación posterior. Dentro del margen, si la falta de
+ * ubicación era lo único a revisar, queda OK; lo demás (sin conexión, hora del teléfono…) se queda.
+ */
+export function validacionTrasUbicacionPosterior(p: {
+  minutos: number;
+  validacion?: string | null;
+  motivoValidacion?: string | null;
+}): ValidacionChecada {
+  const previa = (p.validacion as ValidacionChecada) || 'OK';
+  if (p.minutos > MARGEN_UBICACION_MIN) return combinarValidacion(previa, 'REVISAR');
+  const otros = String(p.motivoValidacion ?? '')
+    .split(' · ')
+    .map((parte) => parte.trim())
+    .filter((parte) => parte && !/^(Sin ubicación|Ubicación tomada)\b/i.test(parte));
+  return otros.length ? previa : 'OK';
 }

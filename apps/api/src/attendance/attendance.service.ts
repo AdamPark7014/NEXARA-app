@@ -71,7 +71,13 @@ import {
   type ValidacionChecada,
 } from './asistencia-confiable.js';
 import { estadoPorFalla, registrarEstadoUbicacion, tramosSinUbicacionDe } from './estado-ubicacion.js';
-import { minutosDespues, motivoUbicacionPosterior, puntoSirveParaEntrada } from './ubicacion-posterior.js';
+import {
+  minutosDespues,
+  motivoUbicacionPosterior,
+  puntoSirveParaEntrada,
+  validacionTrasUbicacionPosterior,
+} from './ubicacion-posterior.js';
+import { rechazoPorUbicacion } from './ubicacion-obligatoria.js';
 
 @Injectable()
 export class AttendanceService {
@@ -914,10 +920,8 @@ export class AttendanceService {
         accuracyM: null,
         sitios: await this.sitiosPermitidos(params.userId, entrada.timestamp, params.companyId),
       });
-      const motivo = motivoUbicacionPosterior(
-        minutosDespues(entrada.timestamp, params.at),
-        entrada.motivoValidacion,
-      );
+      const minutos = minutosDespues(entrada.timestamp, params.at);
+      const motivo = motivoUbicacionPosterior(minutos, entrada.motivoValidacion);
       // updateMany con las mismas condiciones: si dos puntos llegan juntos, solo uno la llena.
       const { count } = await this.prisma.attendance.updateMany({
         where: { id: entrada.id, entryLatitude: null, ubicacionPosteriorAt: null },
@@ -925,8 +929,12 @@ export class AttendanceService {
           entryLatitude: coords.latitude,
           entryLongitude: coords.longitude,
           ubicacionPosteriorAt: params.at,
-          // Sigue a revisión: el punto es de después, no del momento de checar.
-          validacion: combinarValidacion((entrada.validacion as ValidacionChecada) || 'OK', 'REVISAR'),
+          // A revisión solo si el punto llegó pasado el margen (`MARGEN_UBICACION_MIN`).
+          validacion: validacionTrasUbicacionPosterior({
+            minutos,
+            validacion: entrada.validacion,
+            motivoValidacion: entrada.motivoValidacion,
+          }),
           motivoValidacion: motivo,
           fueraDeSitio: ubicacion.fueraDeSitio,
           distanciaSitioM: ubicacion.distanciaSitioM,
@@ -1161,7 +1169,14 @@ export class AttendanceService {
     // El intento desde el navegador no es un fraude: es alguien que abrió la web
     // en vez de la app. Tampoco quien quiso checar en fin de semana sin guardia.
     // No se despierta a sus jefes por eso.
-    if (motivo !== MOTIVO_RECHAZO.desdeNavegador && motivo !== MOTIVO_RECHAZO.finDeSemanaSinGuardia) {
+    // Ni quien la intentó con la ubicación apagada: la enciende y checa al momento.
+    const sinAviso: string[] = [
+      MOTIVO_RECHAZO.desdeNavegador,
+      MOTIVO_RECHAZO.finDeSemanaSinGuardia,
+      MOTIVO_RECHAZO.ubicacionApagada,
+      MOTIVO_RECHAZO.sinPermisoUbicacion,
+    ];
+    if (!sinAviso.includes(motivo)) {
       await this.avisarChecadaMarcada({
         userId: ctx.userId,
         titulo:
@@ -1577,6 +1592,12 @@ export class AttendanceService {
         MENSAJE_UBICACION_VIEJA,
         `Medición de hace ${Math.round((edad.edadMs ?? 0) / 60000)} min`,
       );
+    }
+
+    // Ubicación apagada o sin permiso: no se checa hasta encenderla (Adam, 28-10).
+    const sinUbicacion = rechazoPorUbicacion({ coords: coordsIntento, falla: dto.ubicacionFalla, offline: dto.offline });
+    if (sinUbicacion) {
+      await this.rechazar(contexto, sinUbicacion.motivo, sinUbicacion.mensaje);
     }
 
     // La hora la pone el servidor. `timestamp` (campo viejo de la app 1.0.2) se

@@ -70,6 +70,14 @@ enum ChecadaRechazo {
             return "Sábado y domingo solo checa quien tiene guardia ese día, así que, si hoy te toca trabajar, "
                 + "pídele a tu encargado que te programe la guardia y vuelve a intentarlo."
         }
+        // Ubicación obligatoria para checar (28-10): el servidor rechaza apagada o sin permiso.
+        if t.contains("enciende la ubicación") || t.contains("enciende la ubicacion") {
+            return "Abre Ajustes › Privacidad y seguridad › Localización y actívala, espera unos segundos "
+                + "a que el GPS mida y vuelve a checar."
+        }
+        if t.contains("permiso de ubicación a nexara") || t.contains("permiso de ubicacion a nexara") {
+            return "Abre Ajustes › NEXARA › Ubicación, elige «Mientras se usa la app» y vuelve a checar."
+        }
         if t.isEmpty || t.contains("simulada") || t.contains("gps falso") {
             return mockAyuda
         }

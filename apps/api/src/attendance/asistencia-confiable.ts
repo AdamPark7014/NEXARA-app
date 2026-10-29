@@ -387,6 +387,8 @@ export function deviceInfoNativo(origen: 'ANDROID' | 'IOS'): string {
 
 /** Claves de `AttendanceRejection.motivo`. Cortas y estables: la UI las traduce. */
 export const MOTIVO_RECHAZO = {
+  ubicacionApagada: 'UBICACION_APAGADA',
+  sinPermisoUbicacion: 'SIN_PERMISO_UBICACION',
   ubicacionSimulada: 'MOCK_LOCATION',
   desdeNavegador: 'ORIGEN_WEB',
   viajeImposible: 'VIAJE_IMPOSIBLE',
@@ -400,6 +402,8 @@ export type MotivoRechazo = (typeof MOTIVO_RECHAZO)[keyof typeof MOTIVO_RECHAZO]
 
 /** Cómo se lee cada motivo en la web y en las apps. */
 export const ETIQUETA_MOTIVO_RECHAZO: Record<string, string> = {
+  UBICACION_APAGADA: 'Ubicación del teléfono apagada',
+  SIN_PERMISO_UBICACION: 'NEXARA sin permiso de ubicación',
   MOCK_LOCATION: 'Ubicación simulada',
   ORIGEN_WEB: 'Intento desde el navegador',
   VIAJE_IMPOSIBLE: 'Viaje imposible entre checadas',

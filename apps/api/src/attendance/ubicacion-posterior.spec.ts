@@ -1,4 +1,5 @@
 import { AttendanceService } from './attendance.service.js';
+import { MARGEN_UBICACION_MIN, validacionTrasUbicacionPosterior } from './ubicacion-posterior.js';
 
 /**
  * Entrada sin ubicación + primer punto del GPS de jornada (Adam, 23-10-2026).
@@ -49,7 +50,8 @@ describe('asignarUbicacionPosterior', () => {
         entryLatitude: 19.07402,
         entryLongitude: -98.27774,
         ubicacionPosteriorAt: at('08:01'),
-        validacion: 'REVISAR',
+        // 3 min: dentro del margen de 10 min ya no va a revisión (Adam, 28-10).
+        validacion: 'OK',
         motivoValidacion: 'Ubicación tomada 3 min después de checar (al checar: ubicación del teléfono apagada)',
       }),
     );
@@ -93,5 +95,34 @@ describe('asignarUbicacionPosterior', () => {
     await expect(
       service.asignarUbicacionPosterior({ userId: 10, companyId: 1, latitude: 19.07, longitude: -98.27, at: at('08:01') }),
     ).resolves.toBe(false);
+  });
+});
+
+describe('margen de 10 min para la ubicación (Adam, 28-10)', () => {
+  it('pasado el margen la entrada sí va a revisión', async () => {
+    const { service, prisma } = build(entradaSinUbicacion);
+    await service.asignarUbicacionPosterior({ userId: 10, companyId: 1, latitude: 19.07402, longitude: -98.27774, at: at('08:12') });
+    expect(prisma.attendance.updateMany.mock.calls[0][0].data).toEqual(
+      expect.objectContaining({
+        validacion: 'REVISAR',
+        motivoValidacion: 'Ubicación tomada 14 min después de checar (al checar: ubicación del teléfono apagada)',
+      }),
+    );
+  });
+
+  it('dentro del margen solo se quita lo de la ubicación; lo demás sigue a revisión', () => {
+    expect(MARGEN_UBICACION_MIN).toBe(10);
+    expect(
+      validacionTrasUbicacionPosterior({ minutos: 10, validacion: 'REVISAR', motivoValidacion: 'Sin ubicación: permiso de ubicación negado' }),
+    ).toBe('OK');
+    expect(
+      validacionTrasUbicacionPosterior({
+        minutos: 2,
+        validacion: 'REVISAR',
+        motivoValidacion: 'Sin ubicación: sin señal · La hora del teléfono no coincidía',
+      }),
+    ).toBe('REVISAR');
+    expect(validacionTrasUbicacionPosterior({ minutos: 11, validacion: 'OK', motivoValidacion: null })).toBe('REVISAR');
+    expect(validacionTrasUbicacionPosterior({ minutos: 0, validacion: null, motivoValidacion: null })).toBe('OK');
   });
 });
