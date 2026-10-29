@@ -21,6 +21,15 @@
   - Evidencias: con `#revision`/`#captura` la página baja al bloque una vez que la actividad carga (antes el ancla
     aún no existía y se quedaba arriba).
   - Pruebas: web 173 archivos / 1,342 y API `src/me` 18 suites / 195, en verde; `tsc` limpio en los dos.
+  - **Desplegado API + web** (`dcd2f802`, con `deploy-api-web.sh`: la API cambió, así que no bastaba el web) y revisado
+    en el Chrome de Adam como Christian, solo lectura:
+    - La pestaña sale con **121 por revisar, 110 de más de un día** (las más viejas, del 8 oct). Es dato real, no
+      error: hay mucho «Por Validar» que nadie aprobó. Adam decide si se revisan o se cierran en lote.
+    - «Revisar» en AN-0130 abre Evidencias con Aprobar/Devolver a la vista; la miga «‹ En espera de revisión» regresa a
+      la pestaña, y Detalle/Evidencias/Historial conservan el origen.
+    - Ficha de Iván (`/erp/pizarra/10?pestana=historial`): abre en Historial; «Revisar evidencia» → miga «Historial de
+      Iván» → regresa a su Historial.
+    - «Revisadas por ti» de Christian llega al tope de 100: el pie ya dice «Las 100 más recientes» (ajuste aparte).
 
 - **28-10 ~20:15 (claude-code) — audit_logs: fuera el latido de sesión y las masivas que no tocan filas.**
   - Medido en producción: disco del Hetzner al 88 % (no al 98 % del 27-10); `audit_logs` pesa 14 GB con 5.7 M de

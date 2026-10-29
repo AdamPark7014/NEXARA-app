@@ -35,6 +35,7 @@ import {
   coincideBusqueda,
   decisionUi,
   minutosEsperando,
+  pieRevisadas,
   textoEspera,
   tonoEspera,
   type RevisionHecha,
@@ -370,7 +371,7 @@ export default function EnEsperaRevisionView({
               ? `${visibles} de ${total}`
               : ver === "pendientes"
                 ? `${total} por revisar · la que más lleva esperando va primero`
-                : `${total} revisi${total === 1 ? "ón" : "ones"} en los últimos 30 días`}
+                : pieRevisadas(total)}
           </ListFooter>
         ) : null}
       </Card>

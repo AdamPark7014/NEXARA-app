@@ -46,6 +46,15 @@ export type RevisionesResponse = {
   revisadas: RevisionHecha[];
 };
 
+/** La API trae a lo más las 100 revisiones más recientes de 30 días (`take: 100`). */
+export const TOPE_REVISADAS = 100;
+
+/** Pie de «Revisadas por ti»: con el tope lleno no se sabe el total, y no se inventa. */
+export function pieRevisadas(total: number): string {
+  if (total >= TOPE_REVISADAS) return `Las ${TOPE_REVISADAS} más recientes de los últimos 30 días`;
+  return `${total} revisi${total === 1 ? "ón" : "ones"} en los últimos 30 días`;
+}
+
 export function fetchRevisiones(token: string): Promise<RevisionesResponse> {
   return erpFetch<RevisionesResponse>("me/revisiones", token);
 }
