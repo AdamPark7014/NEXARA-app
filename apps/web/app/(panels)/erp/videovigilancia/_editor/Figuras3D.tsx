@@ -92,7 +92,8 @@ export default function Figuras3D({
                   fill={sel ? "var(--ui-brand-soft-2)" : relleno}
                   fillOpacity={opacidad}
                   stroke={sel ? "var(--ui-brand)" : aristas && opacidad === 1 ? relleno : f.material === "hoja" ? "#a8844f" : "none"}
-                  strokeWidth={sel ? 1.4 : 0.6}
+                  // En caras opacas el trazo del mismo color (y un poco grueso) tapa las juntas entre tramos.
+                  strokeWidth={sel ? 1.4 : aristas && opacidad === 1 ? 1.2 : 0.6}
                 />
                 {aristas ? (
                   <path
