@@ -79,6 +79,10 @@
     de Creppes and Waffles» (cliente resuelto, Carolina por «caro», plazo viernes). Ajuste posterior: se marca
     «talks» → Toks aunque la IA ya lo escriba bien, «crepas» → Creppes (lo parecido junto a una palabra dicha
     igual) y el aviso dice «"Toks" no está registrado» en vez de «Dijiste».
+  - **Ese ajuste (604eb457) NO está desplegado:** `main` ya trae fab4f3ab (tiempo estándar) con la migración
+    `20261029030000_actividad_tiempo_estandar`, que no está aplicada en producción, y `deploy-api-web.sh` no migra.
+    Se va con el próximo despliegue con migración (`deploy/update.sh --with-migrate`). Lo desplegado (ed12e3d4) ya
+    tiene todo lo demás de «Asignar con IA».
 
 - **29-10 ~11:30 (claude-code) — Apps: paridad con lo de Core del 28-10 (Android e iOS).**
   - Android (`apps/mobile-native/android`), alta/asignar y detalle:
