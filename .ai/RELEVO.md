@@ -126,6 +126,12 @@
     - Subí con un índice temporal (`read-tree origin/main` + `commit-tree`), sin tocar el árbol de trabajo.
     - Mi commit local `d53e8e40` es el mismo parche que `57ebb0ff`: el `pull --rebase` lo descarta.
     - En Git Bash, `git show origin/main:ruta` necesita `MSYS_NO_PATHCONV=1`: sin eso sale vacío.
+  - Verificado en producción con Chrome de Adam (1707 px por el zoom de 90 %) y a 375 px con el mismo código.
+    - Plano por nivel, 3D con muros nuevos y conos DORI con rayos.
+    - Lámina `cctv-verificacion-produccion-2910.png` en las notas compartidas.
+  - `8ff12e4e`: la brújula ya no parece el puntero y los muros opacos no muestran juntas de tramo.
+  - `2d8a0552`: zoom con dos dedos en 2D y 3D en el celular, con pruebas de `vistaPellizcada`.
+  - Diseños de prueba 1 y 2 archivados (Adam, 29-10). Archivar solo pone `archivadoAt`.
 
 - **29-10 ~16:30 (claude-code) — Tiempo estándar: el modelo medido contra el reloj real (Adam: «ve como mejorar el
   modelo»).**
