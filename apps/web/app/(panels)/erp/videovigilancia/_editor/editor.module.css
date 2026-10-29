@@ -235,16 +235,17 @@
 
 .lienzoCaja {
   position: relative;
-  min-height: 640px;
+  min-height: clamp(460px, calc(100dvh - 250px), 900px);
   background: var(--ui-surface-2);
   border-right: 1px solid var(--ui-border-subtle);
   overflow: hidden;
 }
 
+/* Alto de la ventana menos barra, ayuda y estado: con la cabecera fuera de vista, todo el plano cabe. */
 .lienzo {
   display: block;
   width: 100%;
-  height: 640px;
+  height: clamp(460px, calc(100dvh - 250px), 900px);
   touch-action: none;
   user-select: none;
 }

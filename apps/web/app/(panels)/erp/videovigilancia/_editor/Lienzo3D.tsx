@@ -17,7 +17,6 @@ import styles from "./editor.module.css";
 
 type Arrastre = { modo: "girar" | "mover"; x: number; y: number; vista: Vista3D };
 
-const ALTO = 640;
 const acercar = (v: Vista3D, f: number): Vista3D => ({ ...v, pxPorMetro: Math.min(Math.max(v.pxPorMetro * f, 1), 400) });
 const SIN_NIVELES: readonly NivelConPlano[] = [];
 
@@ -46,15 +45,19 @@ export default function Lienzo3D({
   onSeleccionar: (s: Seleccion | null) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  // El lienzo se ajusta al alto de la ventana (CSS); aquí se mide para que el dibujo no se deforme.
   const [ancho, setAncho] = useState(900);
+  const [alto, setAlto] = useState(640);
   const limites = useMemo(() => limitesEnMetros(plano), [plano]);
   // El encuadre abarca todos los pisos que se ven.
   const limitesTodos = useMemo(() => unirLimites([limites, ...debajo.map((n) => limitesEnMetros(n.plano))]), [limites, debajo]);
   const k = plano.escala.metrosPorPx;
-  const encuadreInicial = (orientacion: { azimutDeg: number; elevacionDeg: number }, w = ancho): Vista3D => {
+  const encuadreInicial = (orientacion: { azimutDeg: number; elevacionDeg: number }, w = ancho, h = alto): Vista3D => {
     const lim = limitesTodos ?? { min: { x: 0, y: 0 }, max: { x: 20, y: 12 } };
-    return { ...orientacion, ancho: w, alto: ALTO, ...encuadrar(lim, { ...orientacion, ancho: w, alto: ALTO }, elevacionM) };
+    return { ...orientacion, ancho: w, alto: h, ...encuadrar(lim, { ...orientacion, ancho: w, alto: h }, elevacionM) };
   };
+  const encuadreRef = useRef(encuadreInicial);
+  encuadreRef.current = encuadreInicial;
   const [vista, setVista] = useState<Vista3D>(() => encuadreInicial(VISTA_ISOMETRICA));
   const arrastre = useRef<Arrastre | null>(null);
   const [arrastrando, setArrastrando] = useState(false);
@@ -75,11 +78,16 @@ export default function Lienzo3D({
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
+    let primera = true;
     const medir = () => {
-      const w = svg.getBoundingClientRect().width;
-      if (w > 0) {
-        setAncho(w);
-        setVista((v) => ({ ...v, ancho: w }));
+      const r = svg.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        setAncho(r.width);
+        setAlto(r.height);
+        // La primera medida reencuadra (el encuadre inicial supuso 900 × 640); después solo se ajusta el tamaño.
+        if (primera) setVista((v) => encuadreRef.current({ azimutDeg: v.azimutDeg, elevacionDeg: v.elevacionDeg }, r.width, r.height));
+        else setVista((v) => ({ ...v, ancho: r.width, alto: r.height }));
+        primera = false;
       }
     };
     medir();
@@ -158,8 +166,14 @@ export default function Lienzo3D({
     const pr = proyector(vista);
     type Lim = NonNullable<typeof limites>;
     const esquinas = (lim: Lim) => [lim.min.x, lim.max.x].flatMap((x) => [lim.min.y, lim.max.y].map((y) => ({ x, y })));
-    // La esquina más cercana a quien ve (la más baja en pantalla).
-    const frente = (lim: Lim, z: number) => esquinas(lim).map((e) => pr.pantalla({ ...e, z })).reduce((a, b) => (b.y > a.y ? b : a));
+    // Centro del borde de enfrente (las dos esquinas más bajas en pantalla): así el rótulo no cae en las
+    // esquinas, donde van la leyenda y los controles.
+    const frente = (lim: Lim, z: number) => {
+      const [a, b] = esquinas(lim)
+        .map((e) => pr.pantalla({ ...e, z }))
+        .sort((p, q) => q.y - p.y);
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    };
     const pisoMasBajo = Math.min(elevacionM, ...debajo.map((n) => n.nivel.elevacionM));
     return {
       activo: limites ? { p: frente(limites, elevacionM), texto: `${nombreNivel ?? "Nivel"} ${elevacionTexto(elevacionM)}` } : null,
@@ -235,7 +249,7 @@ export default function Lienzo3D({
       <svg
         ref={svgRef}
         className={styles.lienzo}
-        viewBox={`0 0 ${ancho} ${ALTO}`}
+        viewBox={`0 0 ${ancho} ${alto}`}
         style={{ cursor: arrastrando ? "grabbing" : "grab" }}
         onPointerDown={alPresionar}
         onPointerMove={alMover}
@@ -251,7 +265,7 @@ export default function Lienzo3D({
             <stop offset="1" stopColor="var(--ui-surface-2)" />
           </linearGradient>
         </defs>
-        <rect width={ancho} height={ALTO} fill="url(#cctv-cielo)" />
+        <rect width={ancho} height={alto} fill="url(#cctv-cielo)" />
         {pisosDeAbajo.map((n) => (
           <g key={n.nivel.id} style={{ pointerEvents: "none" }}>
             <Figuras3D figuras={n.figuras} plano={n.plano} matriz={n.matriz} capas={{ ...capas, translucidos: true }} apagado />
