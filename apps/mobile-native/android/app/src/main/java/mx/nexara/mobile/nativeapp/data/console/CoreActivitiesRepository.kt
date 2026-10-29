@@ -15,6 +15,8 @@ import mx.nexara.mobile.nativeapp.data.api.SalesClientDto
 import mx.nexara.mobile.nativeapp.data.api.IniciarTrayectoRequest
 import mx.nexara.mobile.nativeapp.data.api.RevisionPendienteDto
 import mx.nexara.mobile.nativeapp.data.api.TerminarTrayectoRequest
+import mx.nexara.mobile.nativeapp.data.api.TiempoCalculadoDto
+import mx.nexara.mobile.nativeapp.data.api.TiempoCalculadoRequest
 import mx.nexara.mobile.nativeapp.data.api.TrayectoDto
 import mx.nexara.mobile.nativeapp.data.api.SugerenciaComplejidadDto
 import mx.nexara.mobile.nativeapp.data.api.SugerirComplejidadRequest
@@ -109,6 +111,8 @@ class CoreActivitiesRepository(context: Context) {
     suspend fun salesClients(sector: String): List<SalesClientDto> = api.salesClients(sector)
 
     suspend fun operationalProjects(): List<OperationalProjectDto> = api.operationalProjects()
+
+    suspend fun tiempoCalculado(body: TiempoCalculadoRequest): TiempoCalculadoDto = api.tiempoCalculado(body)
 
     /** Mis tramos del trayecto de esta actividad (la API también manda los de otros a quien la lleva). */
     suspend fun trayectos(activityId: Long, miId: Long?): List<TrayectoDto> =

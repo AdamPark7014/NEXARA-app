@@ -118,7 +118,9 @@ fun ActivityDetailScreen(
             saveError = null
             try {
                 val isoInicio = editFechaInicio.takeIf { it.isNotBlank() }?.let { toIsoDateTime(it) }
-                val isoEntrega = editFechaEntrega.takeIf { it.isNotBlank() }?.let { "${it}T12:00:00.000Z" }
+                // Solo si cambió el día, y a la misma hora de México que tenía: reenviarla igual
+                // la movía a las 6:00 y, desde el 29-10, la API rechaza el cambio si no es un superior.
+                val isoEntrega = CoreActivityKinds.entregaEditada(detail.fechaEntregaEsperada, editFechaEntrega)
                 val isoFin = editFechaFin.takeIf { it.isNotBlank() }?.let { toIsoDateTime(it) }
                 val updated = withContext(Dispatchers.IO) {
                     if (canManage) {
