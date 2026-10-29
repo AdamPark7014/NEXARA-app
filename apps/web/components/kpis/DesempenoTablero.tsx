@@ -5,7 +5,16 @@ import Link from "next/link";
 import { Avatar } from "@/components/base";
 import { formatPctKpi, type KpiPersonaFila, type TotalesKpi } from "@/lib/kpis-equipo";
 import { horasEnPalabras, tonoCumplimiento, type TonoKpi } from "@/lib/kpis-lectura";
-import { CONFIANZA_UI, confianzaDe, estandarGanado, multiplicadoresDe, pilaresDe, resumenDesempeno, type Pilar } from "@/lib/desempeno";
+import {
+  CONFIANZA_UI,
+  confianzaDe,
+  diagnosticoDe,
+  disciplinaTexto,
+  estandarGanado,
+  pilaresDe,
+  resumenDesempeno,
+  type Pilar,
+} from "@/lib/desempeno";
 import s from "./DesempenoTablero.module.css";
 
 const TONO: Record<TonoKpi, string> = { ok: s.ok, atencion: s.atencion, critico: s.critico, sin_datos: s.sinDatos };
@@ -168,7 +177,7 @@ export default function DesempenoTablero({
                         <span
                           className={`${s.indiceFila} ${TONO[tonoCumplimiento(pct)]}`}
                           data-baja={baja ? "true" : undefined}
-                          title={baja ? "Con pocas entregas medidas, el índice todavía se mueve mucho" : undefined}
+                          title={baja ? "Menos de 10 entregas medidas: confianza baja, el índice es provisional y no se publica" : undefined}
                         >
                           {pct ?? "—"}
                         </span>
@@ -199,19 +208,32 @@ export default function DesempenoTablero({
 function Lectura({ persona: p, href }: { persona: KpiPersonaFila; href: string }) {
   const t = p.totales;
   const pilares = pilaresDe(t.cumplimientoPartes);
-  const multiplicadores = multiplicadoresDe(t.cumplimientoPartes);
+  const diagnostico = diagnosticoDe(t.cumplimientoPartes);
   const e = t.entregas;
   const a = t.asistenciaPuntual;
   const nombreCorto = p.persona.nombre.split(/\s+/).slice(0, 2).join(" ");
+  // Horas estándar ganadas: el pilar Rendimiento.
+  const estandar = estandarGanado(t);
   const datos: Array<[string, string]> = [
+    ["Horas estándar ganadas", estandar ? `${estandar.valor} (${estandar.detalle})` : "Sin entregas con tiempo estándar"],
     ["Aprobadas a la primera", e && e.revisadas ? `${e.aprobadasALaPrimera} de ${e.revisadas}` : "Sin revisar"],
+    [
+      "Calificación calibrada",
+      t.calificacion?.n && t.calificacion.pct != null ? `${t.calificacion.pct} de 100 (${t.calificacion.n})` : "Sin calificar",
+    ],
     ["Retardos", t.retardos ? `${t.retardos} · ${horasEnPalabras(t.minutosTarde)}` : "Ninguno"],
-    ["Asistencia puntual", a && a.esperados ? `${a.puntuales} de ${a.esperados} días` : "—"],
+    ["Puntualidad y registro", disciplinaTexto(t) ?? (a && a.esperados ? `${a.puntuales} de ${a.esperados} días` : "—")],
     ["Uniforme", t.uniforme.revisadas ? `${t.uniforme.ok} de ${t.uniforme.revisadas}` : "Sin revisar"],
   ];
-  // Horas estándar ganadas (§8): aparte del índice, solo de lo asignado con tiempo estándar.
-  const estandar = estandarGanado(t);
-  datos.push(["Horas estándar ganadas", estandar ? `${estandar.valor} (${estandar.detalle})` : "Aún sin entregas con tiempo estándar"]);
+  if (t.equipo) {
+    const q = t.equipo;
+    datos.unshift([
+      "Su equipo",
+      `${q.personas} ${q.personas === 1 ? "persona" : "personas"} · ${q.aTiempo} de ${q.medidas} a tiempo${
+        q.revisiones.total ? ` · revisó ${q.revisiones.enPlazo} de ${q.revisiones.total} en 24 h hábiles` : ""
+      }`,
+    ]);
+  }
   return (
     <aside className={s.lectura} aria-label={`Lectura de ${p.persona.nombre}`}>
       <section className={s.tarjeta}>
@@ -255,9 +277,9 @@ function Lectura({ persona: p, href }: { persona: KpiPersonaFila; href: string }
             </li>
           ))}
         </ul>
-        {multiplicadores.length ? (
+        {diagnostico.length ? (
           <p className={s.multiplica}>
-            {multiplicadores.map((m) => `${m.etiqueta}: ${m.detalle}`).join(". ")}.
+            No pesa, para leer: {diagnostico.map((m) => `${m.etiqueta}: ${m.detalle.replace(/ · diagnóstico$/, "")}`).join(". ")}.
           </p>
         ) : null}
         <Link href={href} className={s.verDetalle}>

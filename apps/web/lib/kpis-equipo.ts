@@ -63,7 +63,7 @@ export type AsistenciaPuntualKpi = { esperados: number; puntuales: number; pct: 
 
 /** Una de las partes del cumplimiento, con su peso en el promedio. */
 export type ParteCumplimiento = {
-  /** entregas · forma · tiempo · ritmo · carga · ocupacion · asistencia · uniforme (puede haber más). */
+  /** Pesan: entregas · forma · estandar · asistencia · uniforme. Diagnóstico (peso 0): tiempo · ritmo · ocupacion · carga · dias. */
   clave: string;
   /** «Entregas a tiempo», «Ritmo de entregas», «Siempre con algo»… */
   etiqueta: string;
@@ -99,10 +99,32 @@ export type TotalesKpi = {
     sinTrabajar: number;
     pct: number | null;
   };
+  /** Puntualidad graduada y registro completo (Disciplina v2). */
+  disciplina?: {
+    esperados: number;
+    puntos: number;
+    retardos: number;
+    faltasPorRetardos: number;
+    jornadasRevisables: number;
+    registroCompleto: number;
+    pct: number | null;
+  };
+  /** Su calificación, calibrada por revisor (0–100). */
+  calificacion?: { n: number; pct: number | null };
+  familia?: "campo" | "oficina";
+  metaRendimiento?: number;
+  /** Solo coordinadores: lo de su equipo (él incluido) y sus revisiones. */
+  equipo?: {
+    personas: number;
+    aTiempo: number;
+    medidas: number;
+    minutosEstandarGanados: number;
+    minutosLaborados: number;
+    revisiones: { total: number; enPlazo: number };
+  };
   /**
-   * Cumplimiento en tiempo y forma (0–100): promedio ponderado de sus partes
-   * (`cumplimientoPartes`, cada una con su peso; lo que no tiene dato no pesa).
-   * null si no tuvo ninguna entrega que medir en el rango.
+   * Índice de desempeño v2 (0–100): promedio ponderado de sus partes (`cumplimientoPartes`, cada una
+   * con su peso; lo que no tiene dato no pesa). null si no hubo nada que medir en el rango.
    */
   cumplimientoPct?: number | null;
   cumplimientoPartes?: ParteCumplimiento[];

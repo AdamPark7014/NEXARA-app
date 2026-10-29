@@ -41,9 +41,9 @@ export function tonoCumplimiento(pct: number | null | undefined): TonoKpi {
   return "critico";
 }
 
-/** Para el `title` de la cifra: de qué está hecho el cumplimiento (los pesos vigentes de la API). */
+/** Para el `title` de la cifra: de qué está hecho el índice (los pesos vigentes de la API, v2 del 29-10). */
 export const PESOS_CUMPLIMIENTO =
-  "Entregas a tiempo 20 %, ritmo de entregas 20 %, tiempo adecuado 15 %, siempre con algo 15 %, asistencia puntual 15 %, aprobadas a la primera 10 %, uniforme 5 %; el resultado se multiplica por la carga de trabajo (trabajo entregado ÷ horas en la oficina, meta 50 %) y por los días trabajados de los que debía trabajar";
+  "Confiabilidad 30 % (entregas antes de su límite), Calidad 25 % (aprobadas a la primera y calificación calibrada), Rendimiento 30 % (horas estándar ganadas contra sus horas en jornada; meta campo 60 %, oficina 70 %) y Disciplina 15 % (puntualidad graduada × registro completo; uniforme 3 si se revisó lo suficiente). Ritmo, ocupación y carga quedan como diagnóstico";
 
 /** «2.3», «1»: entregas por día con un decimal. */
 export function porDiaTexto(n: number | null | undefined): string {
@@ -239,7 +239,7 @@ export type AvisoKpi = { clave: string; texto: string; tono: "warning" | "danger
 export function avisosDePersona(t: TotalesKpi): AvisoKpi[] {
   const out: AvisoKpi[] = [];
   const e = t.entregas;
-  // Lo que más baja el cumplimiento va primero: días perdidos y poca carga multiplican el total.
+  // Lo que más baja el índice va primero: días perdidos (Disciplina en 0) y poco rendimiento.
   const dd = t.diasDeTrabajo;
   if (dd?.sinTrabajar) {
     out.push({
@@ -254,12 +254,14 @@ export function avisosDePersona(t: TotalesKpi): AvisoKpi[] {
         .join(" · ") + " — sin justificar",
     });
   }
-  if (t.carga && t.minutosLaborados > 0 && (t.carga.pct ?? 0) < 50) {
+  // Rendimiento v2: horas estándar ganadas contra su meta (la carga ya no multiplica).
+  const rendimiento = t.cumplimientoPartes?.find((p) => p.clave === "estandar" && p.peso > 0);
+  if (rendimiento && t.minutosLaborados > 0 && rendimiento.pct < 50) {
     out.push({
-      clave: "carga",
-      texto: `Carga ${t.carga.pct ?? 0} %`,
-      tono: (t.carga.pct ?? 0) < 25 ? "danger" : "warning",
-      titulo: "Trabajo entregado (su tiempo estimado) de sus horas en la oficina; debajo de 50 % baja su cumplimiento",
+      clave: "rendimiento",
+      texto: `Rendimiento ${rendimiento.pct} %`,
+      tono: rendimiento.pct < 25 ? "danger" : "warning",
+      titulo: `Horas estándar ganadas contra su meta: ${rendimiento.detalle}`,
     });
   }
   if (e?.tarde) {
