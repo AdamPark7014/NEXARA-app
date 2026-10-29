@@ -138,4 +138,39 @@ class InicioRulesTest {
         assertEquals("Tarea", InicioRules.detalleSiguiente(act(1)))
         assertEquals("Obra Norte", InicioRules.lugar(act(1, proyecto = "Obra Norte")))
     }
+
+    @Test
+    fun bandaOscuraDeLaActividadDeAhora() {
+        val enCurso = act(1, enCurso = true, inicioRealAt = "2026-10-29T15:00:00Z").copy(anNumber = "AN-0418", minutosReales = 90.0)
+        assertEquals("En curso · AN-0418", InicioRules.etiquetaBanda(enCurso))
+        assertEquals("En pausa", InicioRules.etiquetaBanda(act(2, enPausa = true, inicioRealAt = "x")))
+        assertEquals("Por iniciar", InicioRules.etiquetaBanda(act(3)))
+        assertEquals("Sigue", InicioRules.etiquetaBanda(act(4, inicioRealAt = "2026-10-29T15:00:00Z")))
+
+        // 90 min al consultar + 75 s desde entonces, con el reloj corriendo.
+        assertEquals(5475L, InicioRules.segundosTrabajados(enCurso, cargadoMs = 1_000L, ahoraMs = 76_000L))
+        assertEquals(5400L, InicioRules.segundosTrabajados(enCurso.copy(enCurso = false), 1_000L, 76_000L))
+        assertNull(InicioRules.segundosTrabajados(act(3), 0L, 10_000L))
+        assertEquals("1:31:15", InicioRules.reloj(5475L))
+        assertEquals("0:00:09", InicioRules.reloj(9L))
+
+        assertEquals(0.75f, InicioRules.avancePlan(act(5, minutosPlan = 120.0), 5400L))
+        assertEquals(1f, InicioRules.avancePlan(act(5, minutosPlan = 60.0), 5400L))
+        assertNull(InicioRules.avancePlan(act(5), 5400L))
+    }
+
+    @Test
+    fun pieDeLaBandaConPlanYCompromiso() {
+        val base = act(1, minutosPlan = 450.0).copy(
+            fechaInicio = "2026-10-29T14:00:00.000Z",
+            fechaMaxima = "2026-10-29T23:00:00.000Z",
+        )
+        assertEquals("Plan 7 h 30 min · entrega antes de las 17:00", InicioRules.pieBanda(base))
+        assertEquals("Plan 7 h 30 min", InicioRules.pieBanda(base.copy(fechaMaxima = base.fechaInicio)))
+        assertEquals(
+            "Entrega antes de las 17:00",
+            InicioRules.pieBanda(base.copy(minutosPlan = null)),
+        )
+        assertNull(InicioRules.pieBanda(act(2)))
+    }
 }

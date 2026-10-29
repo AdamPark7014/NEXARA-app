@@ -119,6 +119,18 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        // Capturas de pantallas en la JVM (Robolectric, `CapturasMiDiaTest`): necesitan los
+        // recursos de la app (fuentes, colores) y no corren en el flujo normal de pruebas.
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all { test ->
+            test.systemProperty("robolectric.graphicsMode", "NATIVE")
+            if (project.findProperty("capturas") != "true") {
+                test.exclude("**/CapturasMiDiaTest*")
+            }
+        }
+    }
+
     lint {
         // Un fallo de lint no debe detener un build de release urgente, pero
         // el informe tiene que generarse siempre para poder revisarlo.
@@ -207,6 +219,11 @@ dependencies {
     // El módulo android.graphics.pdf.PdfRenderer viene en el SDK, no requiere dep extra.
 
     testImplementation("junit:junit:4.13.2")
+    // Capturas en la JVM: `./gradlew :app:testDebugUnitTest -Pcapturas=true --tests "*CapturasMiDiaTest*"`.
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 

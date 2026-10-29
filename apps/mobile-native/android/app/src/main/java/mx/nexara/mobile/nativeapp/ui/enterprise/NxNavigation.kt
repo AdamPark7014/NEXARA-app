@@ -25,7 +25,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -105,9 +107,9 @@ fun NavGraphBuilder.nxComposable(
 }
 
 /**
- * Barra inferior Material 3 del rediseño v2: pastilla teal suave en la activa,
- * icono relleno al seleccionar y una insignia roja con el conteo cuando hay
- * algo pendiente. Lee el tema (no [NxColors]) para que el modo oscuro funcione.
+ * Barra inferior de Core (canvas «App · Mi día», 28-10): blanca, con una sombra suave hacia
+ * arriba; la pestaña activa va en el verde de marca (ícono relleno y texto), sin pastilla, y
+ * una insignia roja con el conteo cuando hay algo pendiente. Lee el tema (no [NxColors]).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,9 +121,10 @@ fun NxBottomTabBar(
     val haptic = LocalHapticFeedback.current
     val scheme = MaterialTheme.colorScheme
     NavigationBar(
-        containerColor = scheme.surface,
+        containerColor = scheme.surfaceContainerLowest,
         contentColor = scheme.onSurface,
         tonalElevation = 0.dp,
+        modifier = Modifier.nxFlotante(RectangleShape, 12.dp),
     ) {
         tabs.forEach { tab ->
             val selected = isSelected(tab.route)
@@ -161,9 +164,9 @@ fun NxBottomTabBar(
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = scheme.onSecondaryContainer,
-                    selectedTextColor = scheme.onSurface,
-                    indicatorColor = scheme.secondaryContainer,
+                    selectedIconColor = scheme.primary,
+                    selectedTextColor = scheme.primary,
+                    indicatorColor = Color.Transparent,
                     unselectedIconColor = scheme.onSurfaceVariant,
                     unselectedTextColor = scheme.onSurfaceVariant,
                 ),
