@@ -33,7 +33,9 @@
     otra.
     - A su hora de entrada: un «Buenos días, <nombre> ☀️ · ¿Ya registraste tu entrada?» (`ATTENDANCE_ABSENCE`,
       `entityType RecordatorioEntrada`). Es la **única fila del día por persona**; con ella se decide «ya saludé».
-      A quien ya checó solo se le saluda dentro de su tolerancia.
+      **Quien ya checó no recibe nada de aquí** (entrada de hoy o `AttendanceDay` de hoy, la misma señal de
+      `recordatorios-jornada`): desde su entrada lo toma ese job («sin actividad», «por vencer»), nunca los dos.
+      La insistencia no usa `createNotification` como aquel porque cada push de 2 min sería una fila.
     - Desde la entrada más la gracia (10:15 / 08:15), sin checar: push «No has registrado tu entrada» cada 2 min,
       **solo push, sin fila**. Una sola tarjeta que se reemplaza y vuelve a sonar (`tag nx_entrada_u<id>`; en iOS
       `apns-collapse-id` con el nuevo `PushPayload.reemplazar`).
