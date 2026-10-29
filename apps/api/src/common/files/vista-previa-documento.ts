@@ -11,8 +11,10 @@
  * se quitan y quien la sirve manda una CSP que solo permite estilos en línea e imágenes `data:`.
  */
 import ExcelJS from 'exceljs';
+// jszip ya viene con exceljs y mammoth; se usa para leer el pptx (un zip de XML).
+import JSZip from 'jszip';
 
-export type TipoDocumento = 'pdf' | 'imagen' | 'excel' | 'csv' | 'word' | 'otro';
+export type TipoDocumento = 'pdf' | 'imagen' | 'excel' | 'csv' | 'word' | 'powerpoint' | 'otro';
 
 /** Topes para que un Excel de 50 mil filas no tumbe al teléfono: es una vista previa, no el archivo. */
 export const VISTA_PREVIA_MAX_HOJAS = 10;
@@ -30,12 +32,13 @@ export function tipoDeDocumento(nombre?: string | null, mime?: string | null): T
   if (ext === 'xlsx' || ext === 'xlsm' || m.includes('spreadsheetml')) return 'excel';
   if (ext === 'csv' || m === 'text/csv') return 'csv';
   if (ext === 'docx' || m.includes('wordprocessingml')) return 'word';
+  if (ext === 'pptx' || m.includes('presentationml')) return 'powerpoint';
   return 'otro';
 }
 
-/** ¿Se puede ver como HTML (Excel, CSV, Word)? */
+/** ¿Se puede ver como HTML (Excel, CSV, Word, PowerPoint)? El .ppt viejo (binario) no. */
 export function tieneVistaPreviaHtml(tipo: TipoDocumento): boolean {
-  return tipo === 'excel' || tipo === 'csv' || tipo === 'word';
+  return tipo === 'excel' || tipo === 'csv' || tipo === 'word' || tipo === 'powerpoint';
 }
 
 export function escapaHtml(texto: string): string {
@@ -64,6 +67,13 @@ const ESTILOS = `
   .aviso { margin: 8px 0 0; color: #64748b; font-size: 12px; }
   .doc img { max-width: 100%; height: auto; }
   .doc table td, .doc table th { white-space: normal; }
+  .presentacion { display: grid; gap: 12px; }
+  .lamina { border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+  .lamina .num { margin: 0 0 4px; font-size: 11px; color: #64748b; text-transform: none; }
+  .lamina h3 { margin: 0 0 6px; font-size: 16px; color: #0f172a; }
+  .lamina p { margin: 4px 0; }
+  .lamina .fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-top: 8px; }
+  .lamina .fotos img { width: 100%; height: auto; border-radius: 8px; border: 1px solid #e2e8f0; }
 `;
 
 function pagina(titulo: string, cuerpo: string): string {
@@ -223,7 +233,107 @@ export async function wordAHtml(buffer: Buffer, titulo: string): Promise<string>
   return pagina(titulo, cuerpo ? `<div class="doc">${cuerpo}</div>` : '<p class="aviso">Documento vacío.</p>');
 }
 
-/** HTML de vista previa para Excel, CSV o Word; null si ese tipo no la tiene (PDF, imagen, otro). */
+/** Topes de la vista previa de PowerPoint: es para ver la propuesta, no para reemplazar el archivo. */
+export const VISTA_PREVIA_MAX_DIAPOSITIVAS = 60;
+const MAX_IMAGEN_BYTES = 1_500_000;
+const MAX_IMAGENES_BYTES = 8_000_000;
+const MIME_IMAGEN: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' };
+
+/** Texto de un XML de OOXML: `&amp;` → `&` y compañía (luego se vuelve a escapar al pintarlo). */
+function textoXml(t: string): string {
+  return t
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&amp;/g, '&');
+}
+
+/** Párrafos de una diapositiva: cada `<a:p>` con el texto de sus `<a:t>`. */
+export function parrafosDeDiapositiva(xml: string): string[] {
+  const parrafos: string[] = [];
+  for (const p of xml.match(/<a:p\b[\s\S]*?<\/a:p>/g) ?? []) {
+    const texto = (p.match(/<a:t>([\s\S]*?)<\/a:t>/g) ?? []).map((t) => textoXml(t.replace(/<\/?a:t>/g, ''))).join('');
+    if (texto.trim()) parrafos.push(texto.trim());
+  }
+  return parrafos;
+}
+
+/**
+ * PowerPoint (pptx) como HTML: una tarjeta por diapositiva, con su texto y sus imágenes
+ * incrustadas (`data:`), en el orden de la presentación. Las gráficas y formas no se dibujan:
+ * se ve el texto y las fotos, que es lo que se revisa de una propuesta.
+ */
+export async function powerpointAHtml(buffer: Buffer, titulo: string): Promise<string> {
+  const zip = await JSZip.loadAsync(buffer);
+  const leer = async (ruta: string): Promise<string | null> => {
+    const f = zip.file(ruta);
+    return f ? ((await f.async('string')) as string) : null;
+  };
+
+  // Orden real: presentation.xml (sldId → r:id) + sus relaciones (r:id → slides/slideN.xml).
+  const pres = (await leer('ppt/presentation.xml')) ?? '';
+  const relsPres = (await leer('ppt/_rels/presentation.xml.rels')) ?? '';
+  const destino = new Map<string, string>();
+  for (const r of relsPres.match(/<Relationship\b[^>]*>/g) ?? []) {
+    const id = r.match(/\bId="([^"]+)"/)?.[1];
+    const target = r.match(/\bTarget="([^"]+)"/)?.[1];
+    if (id && target) destino.set(id, target.replace(/^\/?ppt\//, ''));
+  }
+  let rutas = (pres.match(/<p:sldId\b[^>]*>/g) ?? [])
+    .map((s) => destino.get(s.match(/\br:id="([^"]+)"/)?.[1] ?? ''))
+    .filter((t): t is string => Boolean(t))
+    .map((t) => `ppt/${t}`);
+  if (!rutas.length) {
+    rutas = Object.keys(zip.files)
+      .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+      .sort((a, b) => Number(a.match(/(\d+)\.xml$/)![1]) - Number(b.match(/(\d+)\.xml$/)![1]));
+  }
+
+  let bytesImagenes = 0;
+  const tarjetas: string[] = [];
+  for (const [i, ruta] of rutas.slice(0, VISTA_PREVIA_MAX_DIAPOSITIVAS).entries()) {
+    const xml = (await leer(ruta)) ?? '';
+    const parrafos = parrafosDeDiapositiva(xml);
+    // Imágenes: <a:blip r:embed="rIdN"> → slides/_rels/slideN.xml.rels → ../media/imageX.png
+    const relsRuta = ruta.replace(/slides\/(slide\d+\.xml)$/, 'slides/_rels/$1.rels');
+    const rels = (await leer(relsRuta)) ?? '';
+    const media = new Map<string, string>();
+    for (const r of rels.match(/<Relationship\b[^>]*>/g) ?? []) {
+      const id = r.match(/\bId="([^"]+)"/)?.[1];
+      const target = r.match(/\bTarget="([^"]+)"/)?.[1];
+      if (id && target) media.set(id, `ppt/${target.replace(/^\.\.\//, '')}`);
+    }
+    const imagenes: string[] = [];
+    for (const id of new Set((xml.match(/r:embed="([^"]+)"/g) ?? []).map((m) => m.slice(9, -1)))) {
+      const archivo = media.get(id);
+      const ext = archivo?.split('.').pop()?.toLowerCase() ?? '';
+      const f = archivo ? zip.file(archivo) : null;
+      if (!f || !MIME_IMAGEN[ext]) continue;
+      const datos = (await f.async('nodebuffer')) as Buffer;
+      if (datos.length > MAX_IMAGEN_BYTES || bytesImagenes + datos.length > MAX_IMAGENES_BYTES) continue;
+      bytesImagenes += datos.length;
+      imagenes.push(`<img alt="" src="data:${MIME_IMAGEN[ext]};base64,${datos.toString('base64')}">`);
+    }
+    const [primero, ...resto] = parrafos;
+    tarjetas.push(
+      `<section class="lamina"><p class="num">Diapositiva ${i + 1}</p>${primero ? `<h3>${escapaHtml(primero)}</h3>` : ''}${resto
+        .map((p) => `<p>${escapaHtml(p)}</p>`)
+        .join('')}${imagenes.length ? `<div class="fotos">${imagenes.join('')}</div>` : ''}${
+        !primero && !imagenes.length ? '<p class="aviso">Sin texto ni fotos (solo formas o gráficas).</p>' : ''
+      }</section>`,
+    );
+  }
+  if (!tarjetas.length) return pagina(titulo, '<p class="aviso">Presentación vacía.</p>');
+  const extra =
+    rutas.length > VISTA_PREVIA_MAX_DIAPOSITIVAS
+      ? `<p class="aviso">Se muestran ${VISTA_PREVIA_MAX_DIAPOSITIVAS} de ${rutas.length} diapositivas: descarga el archivo para verlo completo.</p>`
+      : '';
+  return pagina(titulo, `<div class="presentacion">${tarjetas.join('')}</div>${extra}`);
+}
+
+/** HTML de vista previa para Excel, CSV, Word o PowerPoint; null si ese tipo no la tiene (PDF, imagen, otro). */
 export async function vistaPreviaHtml(
   buffer: Buffer,
   nombre: string,
@@ -233,5 +343,6 @@ export async function vistaPreviaHtml(
   if (tipo === 'excel') return excelAHtml(buffer, nombre);
   if (tipo === 'csv') return csvAHtml(buffer, nombre);
   if (tipo === 'word') return wordAHtml(buffer, nombre);
+  if (tipo === 'powerpoint') return powerpointAHtml(buffer, nombre);
   return null;
 }

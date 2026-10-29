@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import PropuestaEmbebida from "./PropuestaEmbebida";
 import {
   ESTADO_LABEL,
   formatoMoneda,
@@ -79,18 +80,21 @@ export default function CotizacionDeActividad({
 
   if (cotizacion?.id) {
     return (
-      <p style={{ margin: 0, fontSize: 13 }}>
-        Cotización{" "}
-        <Link href={`/erp/cotizaciones/${cotizacion.id}`} style={{ fontWeight: 700 }}>
-          {cotizacion.quoteNumber}
-        </Link>{" "}
-        · {estadoEnEspanol(cotizacion.status)}
-        {cotizacion.total != null ? ` · ${formatoMoneda(Number(cotizacion.total))}` : ""}
-        <br />
-        <span style={{ color: "var(--text-secondary)" }}>
-          Las fotos del levantamiento de esta actividad salen como anexos (03 Planos) de la propuesta.
-        </span>
-      </p>
+      <div>
+        <p style={{ margin: 0, fontSize: 13 }}>
+          Cotización{" "}
+          <Link href={`/erp/cotizaciones/${cotizacion.id}`} style={{ fontWeight: 700 }}>
+            {cotizacion.quoteNumber}
+          </Link>{" "}
+          · {estadoEnEspanol(cotizacion.status)}
+          {cotizacion.total != null ? ` · ${formatoMoneda(Number(cotizacion.total))}` : ""}
+          <br />
+          <span style={{ color: "var(--text-secondary)" }}>
+            Las fotos del levantamiento de esta actividad salen como anexos (03 Planos) de la propuesta.
+          </span>
+        </p>
+        <PropuestaEmbebida cotizacionId={cotizacion.id} quoteNumber={cotizacion.quoteNumber} token={token} />
+      </div>
     );
   }
 
