@@ -1086,3 +1086,74 @@
   height: 100%;
   border-radius: inherit;
 }
+
+/* Brújula del 3D: gira con el modelo. */
+.brujula {
+  position: absolute;
+  left: var(--ui-s4);
+  top: 56px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-elev-1);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Celular: menos margen, herramientas en una tira que se desliza, lienzo más alto y sin la leyenda encima. */
+@media (max-width: 640px) {
+  .pagina {
+    padding: var(--ui-s3) var(--ui-s2) var(--ui-s5);
+    gap: var(--ui-s3);
+  }
+  .titulo {
+    font-size: 20px;
+  }
+  .barra {
+    padding: var(--ui-s2);
+    gap: var(--ui-s2);
+  }
+  .herramientas {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
+  }
+  .herramienta {
+    min-width: 54px;
+    height: 48px;
+    flex: none;
+  }
+  .ayudaHerramienta {
+    font-size: 12px;
+  }
+  .lienzoCaja,
+  .lienzo {
+    min-height: 0;
+    height: clamp(360px, 62dvh, 620px);
+  }
+  .leyenda {
+    display: none;
+  }
+  .pista3d {
+    display: none;
+  }
+  .escalaNorte {
+    top: auto;
+    bottom: var(--ui-s3);
+  }
+  .pipCaja {
+    left: var(--ui-s2);
+    right: var(--ui-s2);
+    bottom: var(--ui-s2);
+  }
+  .pip,
+  .pipGrande {
+    width: 100%;
+    max-width: none;
+  }
+}

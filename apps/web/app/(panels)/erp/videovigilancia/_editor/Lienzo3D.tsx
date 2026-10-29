@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { limitesEnMetros, type Seleccion, type TipoElemento } from "@/lib/cctv/editor";
 import { VISTA_ISOMETRICA, VISTA_SUPERIOR, encuadrar, escena3D, proyector, unirLimites, type Vista3D } from "@/lib/cctv/escena3d";
 import { elevacionTexto, type NivelConPlano } from "@/lib/cctv/niveles";
-import { tapasDelPlano, type Plano, type Tapa } from "@/lib/cctv/plano";
+import { dirRumbo, tapasDelPlano, type Plano, type Tapa } from "@/lib/cctv/plano";
 import { camaraEnMetros, coberturaCamara, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import Figuras3D from "./Figuras3D";
 import Navegacion, { ICONO } from "./Navegacion";
@@ -59,6 +59,32 @@ export default function Lienzo3D({
   const encuadreRef = useRef(encuadreInicial);
   encuadreRef.current = encuadreInicial;
   const [vista, setVista] = useState<Vista3D>(() => encuadreInicial(VISTA_ISOMETRICA));
+  const vistaRef = useRef(vista);
+  vistaRef.current = vista;
+  // Cambios de vista con botón (preset, girar, acercar, encuadrar): transición de ~300 ms.
+  const animacion = useRef(0);
+  const animarA = (destino: (v: Vista3D) => Vista3D) => {
+    cancelAnimationFrame(animacion.current);
+    const desde = vistaRef.current;
+    const hasta = destino(desde);
+    if (typeof document !== "undefined" && document.hidden) return setVista(hasta);
+    const giro = ((((hasta.azimutDeg - desde.azimutDeg) % 360) + 540) % 360) - 180;
+    const t0 = performance.now();
+    const paso = (t: number) => {
+      const u = Math.min(1, (t - t0) / 300);
+      const e = 1 - Math.pow(1 - u, 3);
+      setVista({
+        ...hasta,
+        azimutDeg: desde.azimutDeg + giro * e,
+        elevacionDeg: desde.elevacionDeg + (hasta.elevacionDeg - desde.elevacionDeg) * e,
+        pxPorMetro: desde.pxPorMetro * Math.pow(hasta.pxPorMetro / desde.pxPorMetro, e),
+        centro: { x: desde.centro.x + (hasta.centro.x - desde.centro.x) * e, y: desde.centro.y + (hasta.centro.y - desde.centro.y) * e },
+      });
+      if (u < 1) animacion.current = requestAnimationFrame(paso);
+    };
+    animacion.current = requestAnimationFrame(paso);
+  };
+  useEffect(() => () => cancelAnimationFrame(animacion.current), []);
   const arrastre = useRef<Arrastre | null>(null);
   const [arrastrando, setArrastrando] = useState(false);
   // El puntero manda más eventos que cuadros pinta la pantalla: se junta todo en uno por cuadro.
@@ -225,25 +251,41 @@ export default function Lienzo3D({
 
   const selId = seleccion?.id;
 
+  // Brújula: hacia dónde queda el norte en pantalla con la vista actual (gira con el modelo).
+  const norte = (() => {
+    const pr = proyector(vista);
+    const c = vista.centro;
+    const n = dirRumbo(plano.norteDeg);
+    const a = pr.pantalla({ x: c.x, y: c.y, z: 0 });
+    const b = pr.pantalla({ x: c.x + n.x, y: c.y + n.y, z: 0 });
+    return (Math.atan2(b.x - a.x, -(b.y - a.y)) * 180) / Math.PI;
+  })();
+
   return (
     <>
       <div className={styles.controles3d}>
-        <button type="button" className={styles.boton3d} onClick={() => setVista(encuadreInicial(VISTA_ISOMETRICA))}>
+        <button type="button" className={styles.boton3d} onClick={() => animarA(() => encuadreInicial(VISTA_ISOMETRICA))}>
           Isométrica
         </button>
-        <button type="button" className={styles.boton3d} onClick={() => setVista(encuadreInicial(VISTA_SUPERIOR))}>
+        <button type="button" className={styles.boton3d} onClick={() => animarA(() => encuadreInicial(VISTA_SUPERIOR))}>
           Vista superior
         </button>
       </div>
+      <span className={styles.brujula} role="img" aria-label="Norte" title="Norte" style={{ transform: `rotate(${norte}deg)` }}>
+        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+          <path d="M12 2l5 14-5-3-5 3z" fill="var(--ui-fg)" />
+          <text x="12" y="23" textAnchor="middle" fontSize="7" fontWeight="700" fill="var(--ui-fg)">N</text>
+        </svg>
+      </span>
       <p className={styles.pista3d}>Arrastrar: girar · Mayús + arrastrar: mover · rueda: acercar · F: enfocar la selección</p>
       <Navegacion
         lugar="abajo"
         botones={[
-          { etiqueta: "Girar a la izquierda", icono: ICONO.girarIzq, accion: () => setVista((v) => ({ ...v, azimutDeg: v.azimutDeg - 45 })) },
-          { etiqueta: "Girar a la derecha", icono: ICONO.girarDer, accion: () => setVista((v) => ({ ...v, azimutDeg: v.azimutDeg + 45 })) },
-          { etiqueta: "Alejar", icono: ICONO.menos, accion: () => setVista((v) => acercar(v, 0.8)) },
-          { etiqueta: "Acercar", icono: ICONO.mas, accion: () => setVista((v) => acercar(v, 1.25)) },
-          { etiqueta: "Encuadrar todo", icono: ICONO.encuadrar, accion: () => setVista((v) => encuadreInicial({ azimutDeg: v.azimutDeg, elevacionDeg: v.elevacionDeg })) },
+          { etiqueta: "Girar a la izquierda", icono: ICONO.girarIzq, accion: () => animarA((v) => ({ ...v, azimutDeg: v.azimutDeg - 45 })) },
+          { etiqueta: "Girar a la derecha", icono: ICONO.girarDer, accion: () => animarA((v) => ({ ...v, azimutDeg: v.azimutDeg + 45 })) },
+          { etiqueta: "Alejar", icono: ICONO.menos, accion: () => animarA((v) => acercar(v, 0.8)) },
+          { etiqueta: "Acercar", icono: ICONO.mas, accion: () => animarA((v) => acercar(v, 1.25)) },
+          { etiqueta: "Encuadrar todo", icono: ICONO.encuadrar, accion: () => animarA((v) => encuadreInicial({ azimutDeg: v.azimutDeg, elevacionDeg: v.elevacionDeg })) },
         ]}
       />
       <svg
