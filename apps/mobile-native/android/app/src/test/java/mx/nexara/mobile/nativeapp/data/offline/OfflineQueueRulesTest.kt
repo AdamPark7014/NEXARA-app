@@ -45,6 +45,8 @@ class OfflineQueueRulesTest {
         assertFalse(OfflineHttpInterceptor.isQueueable("$base/stock/movements/por-codigo", "POST"))
         assertFalse(OfflineHttpInterceptor.isQueueable("$base/stock/products/por-codigo", "POST"))
         assertFalse(OfflineHttpInterceptor.isQueueable("$base/ai/complejidad/sugerir", "POST"))
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/activities/7/trayectos", "POST"))
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/activities/7/trayectos/terminar", "POST"))
         assertFalse(OfflineHttpInterceptor.isQueueable("$base/tool-requests/7/deliver", "POST"))
         assertFalse(OfflineHttpInterceptor.isQueueable("$base/tool-requests/7/return", "POST"))
         // La prórroga del propio préstamo sí se encola.

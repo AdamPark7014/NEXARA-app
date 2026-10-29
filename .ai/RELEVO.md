@@ -1,5 +1,15 @@
 # RELEVO
 
+- **29-10 ~13:00 (claude-code) — Apps: botones de trayecto (API `7e7934d5` de la sesión «En espera de revisión»).**
+  - Android: tarjeta «Trayecto» en el detalle (`TrayectoSection.kt`, reglas en `TrayectoRules.kt` + prueba), solo
+    para quien hace la actividad (`captura && !despachador`): «Iniciar trayecto» (IDA) antes de iniciar, «Llegué»
+    mientras va en camino, «Regreso a la oficina» (REGRESO) ya entregada, y el resumen de cada tramo («Ida · 18 min
+    · en tiempo»). Manda la ubicación si hay permiso (5 s máx.). `me/activities/:id/trayectos*` no entra a la cola
+    sin conexión (la hora es la del servidor). Si la API falla o no está desplegada, la tarjeta no se pinta.
+  - iOS: en curso (mismo diseño y textos).
+  - Verificación iOS «Mi día»: capturas de paridad del commit `329ac6ba` (`258c4df9`) iguales al artboard; la barra
+    superior clara sale con flecha y título oscuros y una línea fina debajo.
+
 - **29-10 ~14:30 (claude-code) — API del trayecto: ida y regreso medidos aparte del reloj (pedido de Adam).**
   - Flujo de Adam: «Iniciar trayecto» → llegar e «Iniciar actividad» → «Concluir» en el sitio → regreso a la oficina,
     cada tramo medido y con tráfico.

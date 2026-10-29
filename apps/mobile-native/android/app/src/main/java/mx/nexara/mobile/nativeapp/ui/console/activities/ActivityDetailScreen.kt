@@ -501,6 +501,19 @@ fun ActivityDetailScreen(
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     ActivityPlaceCard(detail = detail, onOpenMap = { url -> openExternalUrl(context, url) })
                                     ActivityFactsStrip(detail = detail, sesion = sesion)
+                                    // Trayecto (29-10): ida al sitio y regreso a la oficina, medidos aparte del reloj.
+                                    if (captura && !despachador) {
+                                        TrayectoCard(
+                                            activityId = detail.id,
+                                            miId = user?.id,
+                                            iniciada = !miFila?.inicioRealAt.isNullOrBlank() ||
+                                                detail.estatus.contains("proceso", ignoreCase = true),
+                                            entregada = TrayectoRules.entregada(detail.estatus, !flow?.exitPhotoUrl.isNullOrBlank()),
+                                            cancelada = TrayectoRules.cancelada(detail.estatus),
+                                            refreshKey = listOf(recarga, detail.estatus, miFila?.inicioRealAt, flowTick),
+                                            onAviso = { mensaje -> scope.launch { snackbarHostState.showSnackbar(mensaje) } },
+                                        )
+                                    }
                                     // «Iniciar actividad» vive en el dock; aquí solo se explica (regla del 18-09).
                                     if (puedeIniciar) {
                                         SoftNote(

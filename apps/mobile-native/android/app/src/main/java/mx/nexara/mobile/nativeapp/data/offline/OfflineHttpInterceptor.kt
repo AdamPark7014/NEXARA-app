@@ -144,6 +144,8 @@ class OfflineHttpInterceptor(
             // La sugerencia de complejidad solo sirve mientras se llena el formulario: reenviada
             // después nadie la lee y gasta una llamada a la IA.
             "/ai/complejidad/sugerir",
+            // El trayecto toma la hora del servidor: encolado, la ida empezaría cuando vuelva la señal.
+            "/trayectos",
         )
 
         /**
