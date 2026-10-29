@@ -10,6 +10,8 @@ import { TeamBoardService } from './team-board.service.js';
 import { cerrarSesionesVencidas, leerSesiones } from '../activities/sessions/activity-sessions.service.js';
 import { limiteDeEntrega } from '../activities/semaforo-actividad.js';
 import { claveDeTipo, mediana, MUESTRAS_MINIMAS } from '../ai/complejidad/tiempos-tipicos.js';
+import { leerFestivos } from '../festivos/festivos-datos.js';
+import { comoLeToca } from '../festivos/festivos-reglas.js';
 import {
   calculaKpisPersona,
   calificacionCalibrada,
@@ -37,6 +39,7 @@ import {
   type EntregaDelRango,
   type EntregaKpi,
   type EstadoExtra,
+  type FestivoKpi,
   type HorarioKpi,
   type SemaforoKpi,
   type TotalesKpi,
@@ -185,6 +188,8 @@ type DatosPersona = {
   comidas: ComidaKpi[];
   actividades: ActividadKpi[];
   justificadas: Array<{ fecha: string; motivo: string }>;
+  /** Festivos entre semana del rango y cómo le tocan. */
+  festivos: Record<string, FestivoKpi>;
   aprobacionesExtra: AprobacionExtra[];
   entregas: EntregaKpi[];
   /** Sus calificaciones del rango, calibradas por revisor (Calidad v2). */
@@ -276,6 +281,7 @@ export class KpisEquipoService {
         comidas: d.comidas,
         actividades: d.actividades,
         justificadas: d.justificadas.map((j) => j.fecha),
+        festivos: d.festivos,
         aprobacionesExtra: d.aprobacionesExtra,
         entregas: d.entregas,
         fechaIngreso: d.fechaIngreso,
@@ -397,6 +403,7 @@ export class KpisEquipoService {
       comidas: d.comidas,
       actividades: d.actividades,
       justificadas: d.justificadas.map((j) => j.fecha),
+      festivos: d.festivos,
       aprobacionesExtra: d.aprobacionesExtra,
       entregas: d.entregas,
       fechaIngreso: d.fechaIngreso,
@@ -451,6 +458,7 @@ export class KpisEquipoService {
         comidas: d.comidas,
         actividades: d.actividades,
         justificadas: d.justificadas.map((j) => j.fecha),
+        festivos: d.festivos,
         entregas: d.entregas,
         fechaIngreso: d.fechaIngreso,
         detalle: true,
@@ -582,9 +590,11 @@ export class KpisEquipoService {
     // Horario propio y decisiones de horas extra. Van aparte del `Promise.all` de arriba
     // porque son tablas nuevas: un cliente Prisma sin ellas (pruebas con mock) no debe
     // tumbar el tablero entero, solo quedarse sin ese dato.
-    const [horarios, aprobaciones] = await Promise.all([
+    const [horarios, aprobaciones, festivos] = await Promise.all([
       this.leerHorarios(userIds, companyId),
       this.leerAprobacionesExtra(userIds, rango, companyId),
+      // En fin de semana el festivo no cambia nada aquí: ya no es laborable.
+      leerFestivos(this.prisma, companyId, rango.desde, rango.hasta).then((l) => l.filter((f) => !f.finDeSemana)),
     ]);
 
     // Sesiones de trabajo que tocan la ventana. Una actividad iniciada hace semanas no aparece
@@ -668,6 +678,15 @@ export class KpisEquipoService {
         actividades: [],
         justificadas: [],
         aprobacionesExtra: aprobaciones.get(u.id) ?? [],
+        festivos: Object.fromEntries(
+          festivos.map((f) => {
+            const como = comoLeToca(f, { userId: u.id });
+            return [
+              f.fecha,
+              { nombre: f.nombre, trabaja: como.trabaja, entrada: como.horario?.entrada ?? null, salida: como.horario?.salida ?? null },
+            ];
+          }),
+        ),
         entregas: [],
         calificacion: { n: 0, pct: null },
       });
@@ -1108,6 +1127,7 @@ function vacio(): DatosPersona {
     justificadas: [],
     aprobacionesExtra: [],
     entregas: [],
+    festivos: {},
     calificacion: { n: 0, pct: null },
   };
 }

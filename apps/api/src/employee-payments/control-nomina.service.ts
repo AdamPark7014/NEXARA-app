@@ -11,6 +11,8 @@ import { AuditService } from '../audit/audit.service.js';
 import { KpisEquipoService } from '../me/kpis-equipo.service.js';
 import { sitioOficina } from '../attendance/asistencia-confiable.js';
 import { fechaClave, fechaColumna } from '../guardias/guardias-reglas.js';
+import { leerFestivos } from '../festivos/festivos-datos.js';
+import { comoLeToca } from '../festivos/festivos-reglas.js';
 import { parseWorkDate, workDateKey, workDayEnd, workDayStart } from '../common/time/workday.js';
 import { requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { ETIQUETA_CATEGORIA_VIATICO } from '../common/excel/etiquetas.js';
@@ -931,6 +933,7 @@ export class ControlNominaService {
     const clave = (userId: number, fecha: string) => `${userId}:${fecha}`;
     const oficina = sitioOficina().nombre;
     const usuarioPor = new Map(usuarios.map((u) => [u.id, u]));
+    const festivoPor = new Map((await leerFestivos(this.prisma, tenantId, lunes, fin)).map((f) => [f.fecha, f]));
 
     const checadasPor = new Map<string, EntradaDia['checadas']>();
     for (const c of checadas) {
@@ -1031,9 +1034,14 @@ export class ControlNominaService {
         const kpi = diasKpi.get(fecha);
         const ajuste = ajustePor.get(k);
         const lugarManual = ajuste ? lugarValido(ajuste.lugar) : null;
+        const festivo = festivoPor.get(fecha) ?? null;
+        const como = festivo ? comoLeToca(festivo, { userId: id, conGuardia: guardiaEn.has(k) }) : null;
+        const deSiempre = p.horario.dias.includes(diaDeLaSemana(fecha));
         return {
           fecha,
-          laborable: p.horario.dias.includes(diaDeLaSemana(fecha)),
+          // Un festivo que no le toca no se le exige; uno con horario propio sí, aunque no sea su día.
+          laborable: festivo && como && !festivo.finDeSemana ? como.trabaja && (como.horario != null || deSiempre) : deSiempre,
+          festivo: festivo && como ? { nombre: festivo.nombre, trabaja: como.trabaja, pagoDoble: como.pagoDoble } : null,
           pasado: fecha < hoy,
           antesDeIngreso: ingreso != null && fecha < ingreso,
           checadas: checadasPor.get(k) ?? [],

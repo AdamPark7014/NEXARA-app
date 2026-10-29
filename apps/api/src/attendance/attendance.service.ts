@@ -32,6 +32,8 @@ import { cerrarSesionesDeUsuario } from '../activities/sessions/activity-session
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { DOMAIN_EVENTS, type SalidaDeJornada } from '../domain-events/domain-event.types.js';
 import { MENSAJE_FIN_DE_SEMANA_SIN_GUARDIA, diaDeGuardia } from '../guardias/guardias-reglas.js';
+import { festivoSinLaborar } from '../festivos/festivos-datos.js';
+import { mensajeFestivoSinLaborar } from '../festivos/festivos-reglas.js';
 import {
   AttendanceJustificationsService,
   type AttendanceJustificationDto,
@@ -726,6 +728,12 @@ export class AttendanceService {
     if (type === 'entrada' && (await diaDeGuardia(this.prisma, { userId: targetId, companyId: tenantId, at })) === 'SIN_GUARDIA') {
       throw new BadRequestException(
         'Ese día es fin de semana y esa persona no tiene guardia. Prográmala primero en Guardias.',
+      );
+    }
+    const festivo = type === 'entrada' ? await festivoSinLaborar(this.prisma, { userId: targetId, companyId: tenantId, at }) : null;
+    if (festivo) {
+      throw new BadRequestException(
+        `Ese día es ${festivo.nombre} y no se labora. Si esa persona trabajó, agrégala primero en Días festivos.`,
       );
     }
 
@@ -1598,6 +1606,13 @@ export class AttendanceService {
     const guardia = await diaDeGuardia(this.prisma, { userId, companyId: tenantId, at: now });
     if (dto.type === 'entrada' && guardia === 'SIN_GUARDIA') {
       await this.rechazar(contexto, MOTIVO_RECHAZO.finDeSemanaSinGuardia, MENSAJE_FIN_DE_SEMANA_SIN_GUARDIA);
+    }
+    // Entre semana, un festivo que dirección no marcó como laborable para esta persona.
+    if (dto.type === 'entrada') {
+      const festivo = await festivoSinLaborar(this.prisma, { userId, companyId: tenantId, at: now });
+      if (festivo) {
+        await this.rechazar(contexto, MOTIVO_RECHAZO.festivoSinLaborar, mensajeFestivoSinLaborar(festivo.nombre));
+      }
     }
 
     // Una sola lectura de las coordenadas para todo el registro: lo que se
