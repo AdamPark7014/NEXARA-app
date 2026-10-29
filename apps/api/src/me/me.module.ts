@@ -13,6 +13,7 @@ import { TeamBoardService } from './team-board.service.js';
 import { KpisEquipoService } from './kpis-equipo.service.js';
 import { PeerRequestsService } from './peer-requests.service.js';
 import { HorasExtraService } from './horas-extra.service.js';
+import { TrayectosService } from '../activities/trayectos/trayectos.service.js';
 import { ModulePolicyModule } from '../common/tenant/module-policy.module.js';
 
 @Module({
@@ -34,6 +35,7 @@ import { ModulePolicyModule } from '../common/tenant/module-policy.module.js';
     KpisEquipoService,
     PeerRequestsService,
     HorasExtraService,
+    TrayectosService,
   ],
   // Nómina calcula las horas del periodo con el mismo módulo que ve el jefe en los
   // indicadores. Si fueran dos cálculos distintos, tarde o temprano darían distinto.

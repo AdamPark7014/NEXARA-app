@@ -1296,6 +1296,8 @@ model Activity {
   geofenceAlerts          ActivityGeofenceAlert[]
   /// Tramos en que corrió el reloj de cada persona (de aquí sale el tiempo real).
   workSessions            ActivityWorkSession[]
+  /// Traslados de ida y de regreso, medidos aparte del reloj de la actividad.
+  trayectos               ActivityTrayecto[]
   /// Archivos adjuntos (evidencia en Excel, Word, PDF…; sobre todo en las comerciales).
   attachments             ActivityAttachment[]
   /// Qué hay que documentar en esta actividad («Cámara 1», «Rack») y en qué momentos.
@@ -8121,4 +8123,41 @@ model CctvDiseno {
 
   @@index([companyId, updatedAt])
   @@map("cctv_disenos")
+}
+
+/// Trayecto de una actividad (Adam, 29-10): «Iniciar trayecto» → llega e «Iniciar actividad» →
+/// «Concluir» en el sitio → regreso a la oficina. Cada tramo se mide aparte del reloj de la
+/// actividad (`ActivityWorkSession`), con lo que daba la ruta con tráfico al salir. Las
+/// referencias a persona y empresa son columnas sueltas, como en `CctvDiseno`; el aislamiento por
+/// empresa lo pone el middleware (`tenant-models.ts`).
+model ActivityTrayecto {
+  id          Int       @id @default(autoincrement())
+  activityId  Int
+  userId      Int
+  companyId   Int
+  /// IDA | REGRESO
+  tipo        String    @db.VarChar(10)
+  /// AUTO | TRANSPORTE
+  modo        String    @default("AUTO") @db.VarChar(12)
+  startedAt   DateTime
+  /// null = va en camino.
+  endedAt     DateTime?
+  /// LLEGADA (lo marcó) | INICIO (inició la actividad) | SALIDA (checó salida) | NUEVO (empezó otro tramo)
+  finMotivo   String?   @db.VarChar(12)
+  startLat    Decimal?  @db.Decimal(10, 8)
+  startLng    Decimal?  @db.Decimal(11, 8)
+  endLat      Decimal?  @db.Decimal(10, 8)
+  endLng      Decimal?  @db.Decimal(11, 8)
+  /// Lo que daba la ruta (con tráfico, si hay Google) al salir; null sin destino en la actividad.
+  estimadoMin Int?
+  /// google | osrm | aproximado
+  estimadoFuente String?  @db.VarChar(12)
+  createdAt   DateTime  @default(now())
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([activityId])
+  @@index([userId, endedAt])
+  @@index([companyId])
+  @@map("activity_trayectos")
 }

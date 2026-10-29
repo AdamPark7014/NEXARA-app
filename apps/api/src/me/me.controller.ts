@@ -30,6 +30,11 @@ import { isWorkflowBucket } from './workflow-kpis.js';
 import { KpisEquipoService } from './kpis-equipo.service.js';
 import { PeerRequestsService } from './peer-requests.service.js';
 import { HorasExtraService } from './horas-extra.service.js';
+import {
+  TrayectosService,
+  type IniciarTrayectoBody,
+  type TerminarTrayectoBody,
+} from '../activities/trayectos/trayectos.service.js';
 import { ActivityToolsService } from '../activities/tools/activity-tools.service.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { COLUMNAS_KPIS_DIAS, COLUMNAS_KPIS_PERSONAS } from '../common/excel/reportes.js';
@@ -56,6 +61,7 @@ export class MeController {
     private readonly activityTools: ActivityToolsService,
     private readonly peerRequests: PeerRequestsService,
     private readonly horasExtra: HorasExtraService,
+    private readonly trayectos: TrayectosService,
   ) {}
 
   /** Mis actividades: cola personal (todos menos el CEO). */
@@ -189,6 +195,51 @@ export class MeController {
       companyId,
       activityId,
     );
+  }
+
+  /** Trayecto de la actividad: mis tramos de ida y regreso (quien la lleva ve los de todos). */
+  @Get('activities/:id/trayectos')
+  trayectosDeActividad(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.trayectos.lista({ id: Number(user.id) }, companyId, activityId);
+  }
+
+  /**
+   * «Iniciar trayecto» (`tipo: IDA`) o «Regreso a la oficina» (`tipo: REGRESO`), con su punto y
+   * modo opcionales. Mide el tramo contra la ruta con tráfico al salir. La ida termina sola al
+   * iniciar la actividad; todo lo abierto, al checar salida.
+   */
+  @Post('activities/:id/trayectos')
+  iniciarTrayecto(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+    @Body() body: IniciarTrayectoBody,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.trayectos.iniciar({ id: Number(user.id) }, companyId, activityId, body);
+  }
+
+  /** «Llegué»: termina el tramo en curso de esta actividad. */
+  @Post('activities/:id/trayectos/terminar')
+  terminarTrayecto(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+    @Body() body: TerminarTrayectoBody,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.trayectos.terminar({ id: Number(user.id) }, companyId, activityId, body);
   }
 
   /**
