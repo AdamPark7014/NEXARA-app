@@ -42,8 +42,14 @@
     API hasta que la compre: ya van ~9 intentos fallidos y conviene no arriesgar un bloqueo.
   - No hay ninguna factura en la base. Lo único facturable a la vista son actividades reales terminadas (AN-0038 Nivel
     Diez, AN-0039 TEKSERVE, AN-0239 «SE»), sin importe ni datos fiscales; AN-0007 es de la semana demo.
-  - **Falta:** compra de la anualidad (Adam) y que la contadora prepare los borradores con RFC, régimen, CP, uso y
-    claves SAT. Cada CFDI real lo confirma Adam antes de timbrar.
+  - Sandbox (29-10, 12:30, mismas credenciales que la cuenta real): pasaron timbrar, reutilizar el mismo folio, el PDF
+    y el REP 2.0. La cancelación no se puede probar ahí (solo con el RFC de prueba EKU9003173C9). Se corrigieron
+    `NoIdentificacion` vacío y `ExchangeRate` en pagos MXN. En sandbox se crearon las series A y P.
+  - **Falta:**
+    - Adam: comprar la anualidad y crear las series **A** y **P** en la cuenta real; o pedírmelo y las creo por
+      `POST /serie/{idSucursal}` en cuanto la API responda.
+    - La contadora: preparar los borradores con RFC, régimen, CP, uso y claves SAT.
+    - Cada CFDI real lo confirma Adam antes de timbrar.
   - Runbook actualizado: `docs/CFDI-GO-LIVE.md` §1 y §8.
 
 - **29-10 ~14:00 (claude-code) — Tiempo estándar en Asignar (web) y obra con tarifas (lo retomé de la sesión principal).**

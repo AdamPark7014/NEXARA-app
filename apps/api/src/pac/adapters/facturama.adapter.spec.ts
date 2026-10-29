@@ -96,6 +96,7 @@ describe('FacturamaAdapter', () => {
         Receiver: { Rfc: 'URE180429TM6', FiscalRegime: '601', TaxZipCode: '86991', CfdiUse: 'G03' },
       });
       expect(post.cuerpo.ExchangeRate).toBeUndefined();
+      expect(post.cuerpo.Items[0]).not.toHaveProperty('IdentificationNumber'); // vacío lo rechaza el SAT
       expect(post.cuerpo.Items[0]).toMatchObject({ Subtotal: 100, Total: 116, Taxes: [{ Name: 'IVA', Base: 100, Total: 16 }] });
 
       expect(r.uuid).toBe('5e09160f-a206-44d7-b389-4f243585e76a');
@@ -242,7 +243,8 @@ describe('FacturamaAdapter', () => {
       expect(cuerpo).toMatchObject({ CfdiType: 'P', NameId: '14', Serie: 'P', Folio: '7', Receiver: { CfdiUse: 'CP01' } });
       const pago = cuerpo.Complemento.Payments[0];
       expect(pago.Date).toBe('2026-10-29T12:00:00');
-      expect(pago).toMatchObject({ PaymentForm: '03', Currency: 'MXN', ExchangeRate: 1, Amount: 1160, OperationNumber: 'SPEI-123' });
+      expect(pago).toMatchObject({ PaymentForm: '03', Currency: 'MXN', Amount: 1160, OperationNumber: 'SPEI-123' });
+      expect(pago).not.toHaveProperty('ExchangeRate'); // Facturama lo rechaza con pesos (probado en sandbox)
       const doc = pago.RelatedDocuments[0];
       expect(doc.PaymentMethod).toBeUndefined();
       expect(doc).toMatchObject({ TaxObject: '02', EquivalenceDocRel: 1, AmountPaid: 1160, ImpSaldoInsoluto: 0 });
