@@ -277,7 +277,8 @@ export class PorFacturarService {
           ...this.base('SERVICIO', a.id, listo, hoy),
           cliente: this.clienteDe(cliente, a.client?.name ?? ''),
           folio: a.anNumber,
-          folioHref: `/erp/actividades/${a.id}`,
+          // El detalle de una actividad ajena no lo abre la contadora: el folio va sin enlace.
+          folioHref: null,
           concepto: a.titulo,
           detalle: cot
             ? `Cotización ${folioCot}${cot.status === 'APPROVED' ? ' · aprobada' : ''}`
@@ -428,7 +429,8 @@ export class PorFacturarService {
         ...this.base('PEDIDO', p.projectId, listo, hoy),
         cliente: this.clienteDe(clienteFact, ''),
         folio: p.orderId,
-        folioHref: bloqueado ? revision.href : `/crm/projects/${p.projectId}`,
+        // El pedido es de un proyecto de ventas, que no tiene pantalla en Core: el folio va sin enlace.
+        folioHref: bloqueado ? revision.href : null,
         concepto: p.project?.name ?? 'Pedido de venta',
         detalle: `${sinFactura.length} de ${p.lines.length} partidas sin facturar`,
         importe: sinFactura.length ? importe : null,

@@ -1159,6 +1159,14 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/crm/projects/**', methods: ['GET'], scope: 'read' },
     { path: '/api/cotizaciones/**', methods: ['GET'], scope: 'read' },
     VISTA_PREVIA_COTIZACION_URL_RULE,
+    // Mesa contable (29-10): abrir la cotización que se factura (en Core `/crm/quotes` lleva a
+    // `/erp/cotizaciones`) y la ficha del cliente para completar RFC, régimen y CP. Editar el
+    // cliente ya lo da `CLIENT_ADMIN_WRITE_URL_RULES`; la cotización sigue siendo solo lectura.
+    { path: '/erp/cotizaciones/*', methods: ['GET'], scope: 'read' },
+    { path: '/erp/clientes', methods: ['GET'], scope: 'read' },
+    { path: '/erp/clientes/**', methods: ['GET'], scope: 'read' },
+    { path: '/api/ventas/clientes', methods: ['GET'], scope: 'read' },
+    { path: '/api/ventas/clientes/**', methods: ['GET'], scope: 'read' },
     { path: '/api/accounting/**', scope: 'write' },
     // Preparación del timbrado (solo lectura; el controlador además restringe por rol).
     { path: '/api/pac/readiness', methods: ['GET'], scope: 'read' },

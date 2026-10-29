@@ -105,6 +105,10 @@ describe('CONTADORA · lo que SÍ le toca (200)', () => {
       ['/erp/contabilidad/por-facturar', 'GET'],
       ['/erp/contabilidad/pagos-y-gastos', 'GET'],
       ['/erp/contabilidad/estados', 'GET'],
+      // Enlaces que arma la Mesa (folio de cada renglón): la contadora tiene que poder abrirlos.
+      ['/erp/cotizaciones/79', 'GET'],
+      ['/erp/clientes/3', 'GET'],
+      ['/erp/invoicing/231', 'GET'],
     ] as const) {
       expect(puede(ROLES.CONTABILIDAD, url, metodo)).toBe(true);
     }

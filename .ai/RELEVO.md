@@ -126,6 +126,11 @@
     cliente y sin factura (14–22 días hábiles; casi todos sin cotización y varios de «A QUIEN CORRESPONDA» sin RFC);
     pagos y gastos vacío (no hay viáticos ni gastos pagados en octubre); estados en cero (0 pólizas), cuadran y el
     Excel sale. Falta revisar las pantallas contra el mockup con sesión de Core (el navegador integrado no la tiene).
+  - Arreglo (29-10 tarde): los folios de pedido y de actividad iban a `/crm/projects` y `/erp/actividades/:id`, que la
+    contadora no abre (y rompían `app-urls-core-surface.spec`): ahora van sin enlace. Se le abrió en lectura el
+    detalle de la cotización (`/erp/cotizaciones/*`, sin sumarle el módulo al menú) y la ficha del cliente
+    (`/erp/clientes/**` + `GET /api/ventas/clientes/**`) para completar RFC, régimen y CP; editar el cliente ya lo daba
+    `CLIENT_ADMIN_WRITE_URL_RULES`.
   - Pedido de Adam: «por facturar», pagos y gastos ligados a su CFDI y banco, estado de resultados y balance. Mockup
     aprobado por Adam el 29-10: https://claude.ai/artifact/MENR9dXWC7PGocKEoSTmpD
   - API en `src/accounting/mesa-contable/` bajo `GET|POST /api/accounting/workspace/mesa/*` (contrato en el
