@@ -174,6 +174,26 @@ struct ActivityCoreDetailView: View {
         ActivityDockRules.pausable(sesion: sesion, despachador: despachador, estatus: estatus)
     }
 
+    /// Mi hora real de inicio (vacía si no la he iniciado).
+    private var inicioRealPropio: String {
+        ActivityParse.str(miFila?["inicioRealAt"]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Trayecto: ya la inicié (hora real) o va «En Proceso» (Android `iniciada`).
+    private var trayectoIniciada: Bool {
+        !inicioRealPropio.isEmpty || estatus.range(of: "proceso", options: .caseInsensitive) != nil
+    }
+
+    /// Ya subí la foto de salida (entregué en el sitio).
+    private var tieneFotoSalida: Bool {
+        !(flow?.exitPhotoUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Hueco entre la tira de datos y la tarjeta de trayecto; sin tira (las tres celdas vacías), ninguno.
+    private var separacionTrayecto: CGFloat {
+        facts.allSatisfy({ $0.valor == "—" }) ? 0 : 10
+    }
+
     // Permisos de «Editar» (Android: `activities.manage`/`console.admin` o la tengo asignada).
     private var canManage: Bool {
         guard let user = session.currentUser else { return false }
@@ -537,7 +557,27 @@ struct ActivityCoreDetailView: View {
                     if !lugarTitulo.isEmpty {
                         ActivityPlaceCard(titulo: lugarTitulo, detalle: lugarDetalle, mapsURL: lugarMapa)
                     }
-                    ActivityFactsStrip(celdas: facts)
+                    // Trayecto (29-10): ida al sitio y regreso a la oficina, medidos aparte del reloj.
+                    // Solo quien la hace. Va en una columna sin espaciado junto a la tira: sin
+                    // tarjeta no deja hueco.
+                    if captura && !despachador {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ActivityFactsStrip(celdas: facts)
+                            ActivityTrayectoCard(
+                                activityId: activityId,
+                                miId: myId,
+                                iniciada: trayectoIniciada,
+                                entregada: TrayectoRules.entregada(estatus, fotoSalida: tieneFotoSalida),
+                                cancelada: TrayectoRules.cancelada(estatus),
+                                deOficina: TrayectoRules.deOficina(coreKind: text("coreKind"), ticketTypeCustom: text("ticketTypeCustom")),
+                                refreshToken: "\(recarga)-\(estatus)-\(inicioRealPropio)-\(flowTick)",
+                                separacionArriba: separacionTrayecto,
+                                onAviso: { snack = $0 }
+                            )
+                        }
+                    } else {
+                        ActivityFactsStrip(celdas: facts)
+                    }
                     // «Iniciar actividad» vive en el dock; aquí solo se explica (regla del 18-09).
                     if puedeIniciar {
                         ActivitySoftNote(

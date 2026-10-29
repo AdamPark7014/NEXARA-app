@@ -233,6 +233,42 @@ final class CoreRepository {
         return try decode(HerramientasChecklist.self, from: data)
     }
 
+    // MARK: Trayecto (ida al sitio y regreso a la oficina)
+
+    /// `GET me/activities/:id/trayectos`, solo con mis tramos: a quien la lleva (responsable o
+    /// creador) el API también le manda los de los demás.
+    func trayectos(activityId: Int, miId: Int?) async throws -> [ActivityTrayecto] {
+        let data = try await api.get("me/activities/\(activityId)/trayectos")
+        let todos = try decode([ActivityTrayecto].self, from: data)
+        return todos.filter { miId == nil || $0.userId == nil || $0.userId == miId }
+    }
+
+    /// `POST me/activities/:id/trayectos` `{tipo, lat?, lng?}`: «Iniciar trayecto» (IDA) o
+    /// «Regreso a la oficina» (REGRESO). Solo en línea: la hora la pone el servidor y, encolado,
+    /// el tramo empezaría cuando regrese la señal. Los 400 («Ya vas en camino…») llegan tal cual.
+    @discardableResult
+    func iniciarTrayecto(activityId: Int, tipo: String, lat: Double?, lng: Double?) async throws -> ActivityTrayecto? {
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON(
+            "me/activities/\(activityId)/trayectos",
+            body: IniciarTrayectoPayload(tipo: tipo, lat: lat, lng: lng)
+        )
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+        return try? JSONDecoder().decode(ActivityTrayecto.self, from: data)
+    }
+
+    /// `POST me/activities/:id/trayectos/terminar` `{lat?, lng?}`: «Llegué». Solo en línea.
+    @discardableResult
+    func terminarTrayecto(activityId: Int, lat: Double?, lng: Double?) async throws -> ActivityTrayecto? {
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON(
+            "me/activities/\(activityId)/trayectos/terminar",
+            body: TerminarTrayectoPayload(lat: lat, lng: lng)
+        )
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+        return try? JSONDecoder().decode(ActivityTrayecto.self, from: data)
+    }
+
     /// Quien reparte un despacho lo pasa a su equipo. Devuelve cuántos quedaron asignados.
     /// `horasPlan` (contrato B): tiempo estimado de cada persona; sin valor no se manda.
     func dispatchActivity(activityId: Int, userIds: [Int], indicaciones: String?, horasPlan: Double? = nil) async throws -> Int {

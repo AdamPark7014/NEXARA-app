@@ -510,6 +510,7 @@ fun ActivityDetailScreen(
                                                 detail.estatus.contains("proceso", ignoreCase = true),
                                             entregada = TrayectoRules.entregada(detail.estatus, !flow?.exitPhotoUrl.isNullOrBlank()),
                                             cancelada = TrayectoRules.cancelada(detail.estatus),
+                                            deOficina = TrayectoRules.deOficina(detail.coreKind, detail.ticketTypeCustom),
                                             refreshKey = listOf(recarga, detail.estatus, miFila?.inicioRealAt, flowTick),
                                             onAviso = { mensaje -> scope.launch { snackbarHostState.showSnackbar(mensaje) } },
                                         )

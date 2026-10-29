@@ -78,6 +78,17 @@ class TrayectoRulesTest {
     }
 
     @Test
+    fun sinIdaNoHayRegresoYLaOficinaNoSale() {
+        // Entregada sin haber registrado la ida: no hay de dónde regresar.
+        assertTrue(r.estado(emptyList(), iniciada = true, entregada = true, cancelada = false).vacio)
+        val reporte = r.estado(emptyList(), iniciada = false, entregada = false, cancelada = false, deOficina = true)
+        assertTrue(reporte.vacio)
+        assertTrue(r.deOficina("tarea", "Reporte / documentación"))
+        assertFalse(r.deOficina("tarea", "Instalación"))
+        assertFalse(r.deOficina("servicio", "Reporte / documentación"))
+    }
+
+    @Test
     fun estatusQueCuentan() {
         assertTrue(r.cancelada("Cancelada"))
         assertTrue(r.cancelada("No cumplida"))

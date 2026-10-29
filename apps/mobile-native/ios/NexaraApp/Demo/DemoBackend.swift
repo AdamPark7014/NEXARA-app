@@ -216,7 +216,13 @@ extension DemoStore {
         switch action {
         case "iniciar":
             startedAt[id] = now
+            // Como el API: al iniciar, la ida al sitio se cierra sola.
+            cerrarTrayectos(motivo: "INICIO", now: now, activityId: id, tipo: "IDA")
             return reply(dj(["ok": true, "inicioRealAt": DemoClock.iso(now)]))
+        case "trayectos":
+            // me/activities/:id/trayectos y …/trayectos/terminar (`DemoFixtures+Trayectos`).
+            let respuesta = routeTrayectos(method: method, parts: parts, activityId: id, json: json, now: now)
+            return reply(respuesta.payload, status: respuesta.status)
         case "pausar", "reanudar":
             let respuesta = routeSesionPropia(action: action, activityId: id, json: json, now: now)
             return reply(respuesta.payload, status: respuesta.status)
@@ -445,6 +451,8 @@ extension DemoStore {
         }
         myExit = now
         myExitPhoto = photo.isEmpty ? DemoImages.dataURL(.exit) : photo
+        // Al checar salida se cierra todo lo que siguiera en camino (como el API).
+        cerrarTrayectos(motivo: "SALIDA", now: now)
         return reply(dj(["id": 1, "type": "salida", "timestamp": DemoClock.iso(now), "message": "Salida registrada"]))
     }
 

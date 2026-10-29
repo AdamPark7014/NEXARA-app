@@ -32,12 +32,15 @@ object TrayectoRules {
      * - [iniciada]: ya tiene hora real de inicio (o va «En Proceso»).
      * - [entregada]: ya mandó su evidencia (Por Validar o cerrada con éxito): ahí se ofrece el regreso.
      * - [cancelada]: cancelada o «No cumplida»: ya no se ofrece ningún tramo nuevo.
+     * - [deOficina]: trabajo de escritorio ([deOficina]): no se ofrece salir al sitio.
+     * El regreso solo se ofrece a quien registró la ida: si no salió, no hay de dónde regresar.
      */
     fun estado(
         tramos: List<TrayectoDto>,
         iniciada: Boolean,
         entregada: Boolean,
         cancelada: Boolean,
+        deOficina: Boolean = false,
     ): Estado {
         val resumen = tramos.filter { !it.endedAt.isNullOrBlank() }.map(::resumenDe)
         val abierto = abierto(tramos)
@@ -58,7 +61,7 @@ object TrayectoRules {
         if (cancelada) return Estado(Accion.NINGUNA, null, null, resumen)
         val yaFue = tramos.any { it.tipo == IDA }
         val yaRegreso = tramos.any { it.tipo == REGRESO }
-        if (!iniciada && !yaFue) {
+        if (!iniciada && !yaFue && !deOficina) {
             return Estado(
                 Accion.INICIAR_IDA,
                 "¿Vas al sitio?",
@@ -66,7 +69,7 @@ object TrayectoRules {
                 resumen,
             )
         }
-        if (entregada && !yaRegreso) {
+        if (entregada && yaFue && !yaRegreso) {
             return Estado(
                 Accion.REGRESO,
                 "¿Regresas a la oficina?",
@@ -89,6 +92,17 @@ object TrayectoRules {
         }
         return listOfNotNull(nombre, dur, calif).joinToString(" · ")
     }
+
+    /** Tipos de tarea de escritorio (catálogo del 28-10): ahí no se sale al sitio. */
+    private val TAREAS_DE_OFICINA = setOf(
+        "Diseño, CAD y memoria técnica",
+        "Configuración y soporte remoto",
+        "Facturación y contabilidad",
+        "Reporte / documentación",
+    )
+
+    fun deOficina(coreKind: String?, ticketTypeCustom: String?): Boolean =
+        coreKind == CoreActivityKinds.TAREA && ticketTypeCustom?.trim() in TAREAS_DE_OFICINA
 
     /** Estatus que ya no admiten tramos nuevos. */
     fun cancelada(estatus: String?): Boolean =

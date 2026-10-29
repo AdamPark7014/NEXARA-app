@@ -6,7 +6,11 @@
     mientras va en camino, «Regreso a la oficina» (REGRESO) ya entregada, y el resumen de cada tramo («Ida · 18 min
     · en tiempo»). Manda la ubicación si hay permiso (5 s máx.). `me/activities/:id/trayectos*` no entra a la cola
     sin conexión (la hora es la del servidor). Si la API falla o no está desplegada, la tarjeta no se pinta.
-  - iOS: en curso (mismo diseño y textos).
+  - iOS: lo mismo (`TrayectoRules.swift`, `TrayectoSection.swift` → `ActivityTrayectoCard`, `TrayectoModels.swift`,
+    `CoreRepository.trayectos/iniciarTrayecto/terminarTrayecto`; `ApiClient` no encola `…/trayectos`). El demo responde
+    los tres endpoints (`DemoFixtures+Trayectos.swift`) y cierra la ida al iniciar y todo al checar salida, como la API.
+  - Las dos apps: el regreso solo se ofrece a quien registró la ida, y las tareas de escritorio (Diseño, Configuración
+    remota, Facturación, Reporte) no ofrecen «Iniciar trayecto» (`TrayectoRules.deOficina`).
   - Verificación iOS «Mi día»: capturas de paridad del commit `329ac6ba` (`258c4df9`) iguales al artboard; la barra
     superior clara sale con flecha y título oscuros y una línea fina debajo.
 
