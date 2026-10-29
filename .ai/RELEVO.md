@@ -32,9 +32,10 @@
     juez 4.38/5, p50 1.6 s, p95 3.4 s, US$0.00011 por llamada leyendo caché (0.0005 escribiéndola). Contrato en §8
     de `C:\dev\scripts\ai-os\IA-CLAUDE.md` (copiado a `/opt/IA-CLAUDE.md`) y objetivo en la puerta
     (PUERTA-IA-app `2690965`, p95 4 s, 0.0006).
-  - **Despliegue:** `bbc3b4a9` salió con `deploy-api-web.sh` (API + web, ed12e3d4). El arreglo del menú de `@` salió
-    **solo web** (sin reconstruir la API): `main` ya trae la migración `20261029030000_actividad_tiempo_estandar`
-    sin aplicar (ver la entrada de «Asignar con IA»); no la corrí porque es de otra sesión.
+  - **Despliegue:** `bbc3b4a9` salió con `deploy-api-web.sh` (API + web, ed12e3d4) y está probado. El arreglo del
+    menú de `@` (`e4d24f38`) **NO está desplegado**: `main` ya trae dos migraciones sin aplicar de otras sesiones
+    (`20261029030000_actividad_tiempo_estandar` y `20261029130000_cctv_disenos`) y el módulo de videovigilancia en
+    el menú; un despliegue solo de web lo habría publicado sin su API. Sale con el próximo despliegue con migración.
     - `/root/deploy-api-web.sh` no tiene permiso de ejecución: correrlo con `bash /root/deploy-api-web.sh` (con
       `nohup … &` por SSH muere sin dejar log).
   - Pendiente: selector «Ligar», tarjetas y asistente en Android/iOS; `lib/asistente-ia-api.spec.ts` (web) falla
