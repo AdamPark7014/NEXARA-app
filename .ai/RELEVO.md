@@ -9,10 +9,11 @@
     La regla la sigue revisando la contadora.
   - Cambiaron 19 de 19 personas activas; el total semanal bajó 7.69 %. La recaptura no es idempotente (× 12 ÷ 13):
     no repetirla; se deshace desde el respaldo.
-  - Pendiente: (1) la Mesa contable no tiene dónde dejar notas, así que falta elegir por dónde le llega la nota a la
-    contadora; el texto está listo en la carpeta compartida de las sesiones. (2) La revisión en pantalla de la
-    sugerencia de la semana del 26-10 *después* de la recaptura: Chrome se desconectó. Antes de la recaptura sí se
-    revisó (carga y recalcula sin recargar).
+  - La nota a la contadora se la da Adam en persona («No, yo le aviso»); no se creó actividad en Core. El texto
+    está en la carpeta compartida de las sesiones.
+  - Revisado en pantalla después de la recaptura, con la sesión de Christian: la semana del 26-10 recalcula sin
+    recargar; 19 personas (9 sugerido, 6 por revisar, 4 sin jornadas, ninguna sin sueldo) y las dos lecturas (al
+    28 oct y completo al 1 nov).
 
 - **29-10 ~14:00 (claude-code) — Apps: autoasignación fija (contrato de la API e920ddbb, sesión «Asignar con IA»).**
   - Android: en el alta propia (`autoasignacion = selfAssign || destino = yo`) ya no se capturan complejidad,
@@ -62,10 +63,16 @@
     lógica en `activities/rellenar-tiempos.ts`, con spec). No escribe si cambiaría algún «a tiempo».
   - Pruebas: API tiempo-entrega 9, parámetros 7, relleno 5; web TiempoFijoCampo 2; suites completas en el commit.
   - Contrato para las apps: mandado a la sesión de apps (`local_e8744ccc…`).
-  - Relleno: el simulacro en producción llena las 134 sin cambiar ningún «a tiempo», pero 122 ya están entregadas y
-    su tiempo real es en mediana 5× el estándar del título (75 de 123 pasan de 3×; p. ej. tareas de tubería con
-    tipo «Preparación de equipo» = 15 min). Opción B lista (`--entregadas-sin-estandar`: a lo entregado, tiempo =
-    lo trabajado y sin estándar). Pendiente de la decisión de la sesión principal antes de `--escribir`.
+  - Relleno (opción B, decisión de la sesión principal): el simulacro llenaba las 134 sin cambiar ningún «a tiempo»,
+    pero 122 ya estaban entregadas y su tiempo real era en mediana 5× el estándar del título (75 de 123 pasaban de
+    3×; tubería guardada como «Preparación de equipo» = 15 min). Ponerles estándar castigaba un error de tipo.
+    - En proceso: completas desde el título; si el título dice otro trabajo, tipo corregido (`tipoPorTitulo`:
+      tubería, charola, registros y cable → «Cableado y canalización»; facturas → «Facturación y contabilidad»).
+    - Entregadas: sin estándar; `tiempoEstimadoMin` = mediana real de su tipo (o la del título si el tipo no tiene)
+      y `estandarCambiadoMotivo = «relleno 29-10 tras entrega»` (`MOTIVO_RELLENO`).
+    - Lo marcado no cuenta como plan: `estimadoParaKpi` (pizarra-kpi) en Desempeño (`kpis-equipo.service`, tope
+      diario y plan de cada entrega) y en la pizarra (`team-board.service`), y `tiemposDto` en el detalle y en
+      «Mis actividades» (no sale «excedida»). Spec `me/relleno-kpi.spec.ts`.
 
 - **29-10 ~16:30 (claude-code) — Sugerencia de nómina con periodos calculados (pedido de Adam: «múltiples cálculos
   de fechas dinámicas»).**
