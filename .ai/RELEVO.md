@@ -201,6 +201,11 @@
     cliente; el lugar igual al cliente se vacía; la ficha se completa después en Clientes. No se ofrece si la IA
     encontró al cliente (aunque sea por parecido) ni si ya hay uno igual en la lista. Error del alta: en el campo.
     El formulario «Asignar» (`OpsActivityForm`, `ClienteTipoPicker`) no se tocó y sigue con su alta.
+  - Desplegado con `deploy/update.sh --with-migrate` (38952929; aplicó también `20261029130000_cctv_disenos`, de la
+    sesión del diseñador CCTV; log `/tmp/update-asistente-2910.log`). Se solapó ~70 s con el final de
+    `/root/deploy-api-migrar-web.sh` de otra sesión, que no usa el candado de `update.sh`: buscar los dos nombres
+    antes de lanzar. Revisado en Chrome como CEO sin crear nada: «talks» → tarjeta con «+ Agregar cliente «Toks»»,
+    «Corregido de "talks"» en Lugar; en «Nueva actividad» → Servicio sigue «+ Nuevo cliente corporativo».
 
 - **29-10 ~11:30 (claude-code) — Apps: paridad con lo de Core del 28-10 (Android e iOS).**
   - Android (`apps/mobile-native/android`), alta/asignar y detalle:
