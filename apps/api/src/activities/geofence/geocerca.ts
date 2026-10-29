@@ -38,5 +38,15 @@ export function fueraDeZona(origen: Punto, punto: Punto, radioM = RADIO_ACTIVIDA
 
 /** Mensaje al bloquear la foto de salida. */
 export function mensajeSalidaFueraDeZona(distancia: number, radioM = RADIO_ACTIVIDAD_M): string {
-  return `La salida se registra donde iniciaste la actividad: estás a ${distancia} m y el máximo es ${radioM} m; regresa al punto de inicio para tomar la foto de salida.`;
+  return `La salida se registra donde iniciaste la actividad: estás a ${distancia} m y el máximo es ${radioM} m; regresa al punto de inicio o justifica tu salida de zona para tomar la foto de salida.`;
+}
+
+/**
+ * ¿Su salida de zona está justificada? Regla de Adam (28-10-2026): si justificó el movimiento, la
+ * foto de salida ya no tiene que tomarse en el punto de inicio. Cuenta la alerta más reciente:
+ * si volvió y salió otra vez sin justificar, vuelve a exigirse.
+ */
+export function salidaDeZonaJustificada(alertas: Array<{ detectedAt: Date | string; status: string | null }>): boolean {
+  const ultima = [...alertas].sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime())[0];
+  return ultima?.status === 'JUSTIFICADA';
 }

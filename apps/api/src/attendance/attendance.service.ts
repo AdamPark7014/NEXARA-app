@@ -29,6 +29,8 @@ import { horaAviso } from '../notifications/notification-push-meta.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 import { alcanzaA, esDeTodaLaEmpresa } from '../me/equipo-alcance.js';
 import { cerrarSesionesDeUsuario } from '../activities/sessions/activity-sessions.service.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
+import { DOMAIN_EVENTS, type SalidaDeJornada } from '../domain-events/domain-event.types.js';
 import { MENSAJE_FIN_DE_SEMANA_SIN_GUARDIA, diaDeGuardia } from '../guardias/guardias-reglas.js';
 import {
   AttendanceJustificationsService,
@@ -78,6 +80,7 @@ export class AttendanceService {
     private readonly realtimeGateway: RealtimeGateway,
     private readonly notificationHierarchy: NotificationHierarchyService,
     @Optional() private readonly notifications?: NotificationsService,
+    @Optional() private readonly domainEvents?: DomainEventBusService,
   ) {}
 
   /** Aviso con push (NotificationsService); sin él (pruebas) queda solo en la campana como antes. */
@@ -1853,6 +1856,14 @@ export class AttendanceService {
     // Su salida detiene el reloj de las actividades que tenga en curso. No las termina:
     // siguen «En Proceso» y mañana las reanuda (si no, los KPI cuentan la noche como trabajo).
     await cerrarSesionesDeUsuario(this.prisma, { userId, at: now, companyId: tenantId });
+
+    // Su salida es el cierre de su jornada: lo que vencía hoy y no entregó pasa a «No cumplida»
+    // (`ActivityNonComplianceService.alChecarSalida`). Nada se cierra antes por la hora.
+    this.domainEvents?.publish<SalidaDeJornada>(DOMAIN_EVENTS.ATTENDANCE_CHECKOUT, {
+      userId,
+      companyId: tenantId,
+      at: now,
+    });
 
     // El `false` de la salida sí se queda. Revocar no es fabricar: apagar el
     // rastreo al cerrar la jornada es el comportamiento conservador, y deja al

@@ -1,11 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, Optional } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { BadRequestException, ForbiddenException, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
-import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
+import { DOMAIN_EVENTS, type SalidaDeJornada } from '../domain-events/domain-event.types.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
-import { workDateKey } from '../common/time/workday.js';
+import { workDateColumn, workDateKey, workDayEnd } from '../common/time/workday.js';
+import { limiteDeEntrega } from './semaforo-actividad.js';
 import { ACTIVITY_STATUS, isFinishedStatus, statusVariants } from './activity-status.js';
 import {
   canCancelActivity,
@@ -22,12 +22,13 @@ import {
   CAUSA_CIERRE_JORNADA,
   CAUSAS_INCUMPLIMIENTO,
   cierreDeJornada,
-  decidirCierreDeJornada,
+  decidirCierrePorSalida,
   esCausaValida,
   esNoCumplida,
   estatusAlReprogramar,
   etiquetaCausa,
   horaDeCierre,
+  salidaCuentaDesde,
   type EjecutorEntrega,
   type OrigenIncumplimiento,
 } from './incumplimiento.js';
@@ -85,15 +86,16 @@ type FilaCierre = {
 };
 
 /**
- * Actividades no cumplidas: cierre de jornada automático, registro de un superior y reprogramación.
- * Las reglas viven en `incumplimiento.ts`; aquí solo se lee la base, se escribe y se avisa.
+ * Actividades no cumplidas: cierre al checar la salida de jornada, registro de un superior y
+ * reprogramación. Las reglas viven en `incumplimiento.ts`; aquí solo se lee la base, se escribe y
+ * se avisa.
  *
- * El cron no trae empresa en el request: cada escritura filtra por `companyId` y por el estatus
- * que se leyó, así una actividad que alguien entregó o canceló entre la lectura y la escritura
- * no se toca.
+ * La salida llega por el bus de eventos, sin request: cada escritura filtra por `companyId` y por
+ * el estatus que se leyó, así una actividad que alguien entregó o canceló entre la lectura y la
+ * escritura no se toca.
  */
 @Injectable()
-export class ActivityNonComplianceService {
+export class ActivityNonComplianceService implements OnModuleInit {
   private readonly logger = new Logger(ActivityNonComplianceService.name);
 
   constructor(
@@ -103,17 +105,24 @@ export class ActivityNonComplianceService {
     @Optional() private readonly domainEvents?: DomainEventBusService,
   ) {}
 
-  @Cron('*/5 * * * *', { name: 'actividades-cierre-jornada' })
-  async cierreDeJornada() {
-    await runScheduledJob('actividades:cierre-jornada', this.logger, () => this.revisarCierres());
+  /** El cierre de jornada sale de la checada de salida, no de un reloj: ver `incumplimiento.ts`. */
+  onModuleInit() {
+    this.domainEvents?.subscribe<SalidaDeJornada>(DOMAIN_EVENTS.ATTENDANCE_CHECKOUT, async (salida) => {
+      await this.alChecarSalida(salida);
+    });
   }
 
-  /** Expuesto para las pruebas. */
-  async revisarCierres(ahora = new Date()): Promise<{ cerradas: number; avisadas: number }> {
-    // Lo que puede vencer de aquí a mañana; lo demás todavía no tiene nada que decidir.
-    const horizonte = new Date(ahora.getTime() + 36 * 3_600_000);
+  /**
+   * Quien checó su salida deja como no cumplido lo que vencía ese día (o antes) y no entregó. En
+   * equipo se cierra cuando ya salieron todos los que no la entregaron. Expuesto para las pruebas.
+   */
+  async alChecarSalida(salida: SalidaDeJornada): Promise<{ cerradas: number }> {
+    const at = new Date(salida.at);
+    const dia = workDateKey(at);
+    const finDelDia = workDayEnd(at);
     const filas = (await this.prisma.activity.findMany({
       where: {
+        companyId: salida.companyId,
         deletedAt: null,
         estatus: {
           in: [
@@ -123,61 +132,83 @@ export class ActivityNonComplianceService {
             ACTIVITY_STATUS.RECHAZADA,
           ].flatMap((s) => statusVariants(s)),
         },
-        OR: [
-          { periodoFin: { lte: horizonte } },
-          { periodoFin: null, fechaMaxima: { lte: horizonte } },
-          { periodoFin: null, fechaEntregaEsperada: { lte: horizonte } },
+        AND: [
+          { OR: [{ responsableId: salida.userId }, { assignees: { some: { userId: salida.userId, retiradoAt: null } } }] },
+          {
+            OR: [
+              { periodoFin: { lte: finDelDia } },
+              { periodoFin: null, fechaMaxima: { lte: finDelDia } },
+              { periodoFin: null, fechaEntregaEsperada: { lte: finDelDia } },
+            ],
+          },
         ],
       },
       select: SELECT_CIERRE,
       orderBy: { id: 'asc' },
       take: LOTE,
     })) as FilaCierre[];
-    if (!filas.length) return { cerradas: 0, avisadas: 0 };
+    if (!filas.length) return { cerradas: 0 };
 
-    const salidas = await this.horasDeSalida(filas.flatMap((f) => this.ejecutoresDe(f)));
+    const salidas = await this.salidasPropias(
+      filas.flatMap((f) => this.ejecutoresDe(f)).filter((id) => id !== salida.userId),
+      at,
+    );
+    salidas.set(salida.userId, at);
     let cerradas = 0;
-    let avisadas = 0;
     for (const fila of filas) {
       const ejecutores = this.ejecutoresDe(fila);
-      const cierre = cierreDeJornada({ ...fila, horasSalida: ejecutores.map((id) => salidas.get(id) ?? null) });
-      const decision = decidirCierreDeJornada({
+      if (!ejecutores.includes(salida.userId)) continue;
+      const limite = limiteDeEntrega(fila);
+      const decision = decidirCierrePorSalida({
         estatus: fila.estatus,
-        cierre,
-        ahora,
-        avisadoAt: fila.cierreAvisadoAt,
-        ejecutores: this.entregas(fila, ejecutores),
+        limite,
+        dia,
+        ejecutores: this.entregas(fila, ejecutores).map((e) => {
+          const asig = fila.assignees.find((a) => a.userId === e.userId);
+          return {
+            ...e,
+            salidaAt: salidas.get(e.userId) ?? null,
+            desde: salidaCuentaDesde({ fechaInicio: fila.fechaInicio, asignadaAt: asig?.asignadoAt ?? fila.fechaAsignacion }),
+          };
+        }),
       });
+      if (!decision.cerrar) continue;
       try {
-        if (decision.accion === 'cerrar' && cierre) {
-          const ok = await this.cerrar(fila, {
-            origen: 'CIERRE_JORNADA',
-            causa: CAUSA_CIERRE_JORNADA,
-            observaciones: null,
-            limite: cierre,
-            pendientesIds: decision.pendientes.length ? decision.pendientes : ejecutores,
-            actorId: null,
-            ahora,
-          });
-          if (ok) cerradas += 1;
-        } else if (decision.accion === 'avisar' && cierre) {
-          const marcada = await this.prisma.activity.updateMany({
-            where: { id: fila.id, companyId: fila.companyId, cierreAvisadoAt: null },
-            data: { cierreAvisadoAt: ahora },
-          });
-          if (marcada.count) {
-            avisadas += 1;
-            void this.notificationHierarchy
-              .notifyActivityClosingSoon({ activityId: fila.id, pendientesIds: decision.pendientes, cierre })
-              .catch(() => undefined);
-          }
-        }
+        const ok = await this.cerrar(fila, {
+          origen: 'CIERRE_JORNADA',
+          causa: CAUSA_CIERRE_JORNADA,
+          observaciones: null,
+          // El cierre fue la salida (la de quien salió al último).
+          limite: at,
+          pendientesIds: decision.pendientes,
+          actorId: null,
+          ahora: at,
+        });
+        if (ok) cerradas += 1;
       } catch (error) {
-        this.logger.warn(`Cierre de jornada ${fila.id}: ${error instanceof Error ? error.message : error}`);
+        this.logger.warn(`Cierre al checar salida ${fila.id}: ${error instanceof Error ? error.message : error}`);
       }
     }
-    if (cerradas || avisadas) this.logger.log(`Cierre de jornada: ${cerradas} no cumplida(s), ${avisadas} aviso(s)`);
-    return { cerradas, avisadas };
+    if (cerradas) this.logger.log(`Salida de ${salida.userId}: ${cerradas} actividad(es) no cumplida(s)`);
+    return { cerradas };
+  }
+
+  /** Salida propia de cada quien ese día: ni la automática de las 23:30 ni la que registra un jefe. */
+  private async salidasPropias(userIds: number[], at: Date): Promise<Map<number, Date>> {
+    const ids = [...new Set(userIds)].filter((id) => id > 0);
+    if (!ids.length) return new Map();
+    const filas = await this.prisma.attendance.findMany({
+      where: {
+        userId: { in: ids },
+        type: 'salida',
+        workDate: workDateColumn(at),
+        cierreAutomatico: false,
+        registradaPorId: null,
+        timestamp: { lte: at },
+      },
+      select: { userId: true, timestamp: true },
+    });
+    return new Map(filas.map((f) => [f.userId, f.timestamp]));
   }
 
   /**

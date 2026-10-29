@@ -227,7 +227,7 @@ class ActivitySuperiorRulesTest {
         )
         val aviso = ActivitySuperiorRules.avisoNoCumplida(a)!!
         assertEquals("No cumplida · Sin entrega al cierre de la jornada", aviso.titulo)
-        assertEquals("Cierre automático de la jornada", aviso.origen)
+        assertEquals("Al cerrar su jornada", aviso.origen)
         assertEquals("2026-10-23T00:00:00.000Z", aviso.registradoAt)
         assertNull(aviso.observaciones)
         assertEquals("Pendientes de entrega: Ana López, Beto Ruiz", aviso.pendientes)

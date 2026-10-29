@@ -2,7 +2,14 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { saveBase64Photo } from '../../common/file-upload.util';
-import { RADIO_ACTIVIDAD_M, distanciaM, mensajeSalidaFueraDeZona, puntoReal, type Punto } from './geocerca';
+import {
+  RADIO_ACTIVIDAD_M,
+  distanciaM,
+  mensajeSalidaFueraDeZona,
+  puntoReal,
+  salidaDeZonaJustificada,
+  type Punto,
+} from './geocerca';
 import { exigeMismaUbicacionPorTipo } from './misma-ubicacion.js';
 import { puedeVerGpsDireccion } from '../../attendance/asistencia-confiable.js';
 
@@ -95,7 +102,19 @@ export class ActivityGeofenceService {
     return exigeMismaUbicacionPorTipo(act?.coreKind, act?.ticketTypeCustom);
   }
 
-  /** La foto de salida solo se acepta dentro del radio del punto de inicio, en los tipos que lo exigen. */
+  /** Si justificó su salida de zona, la foto de salida ya no se exige en el punto de inicio. */
+  private async justificoSalida(activityId: number, userId: number): Promise<boolean> {
+    const alertas = await this.prisma.activityGeofenceAlert.findMany({
+      where: { activityId, userId },
+      select: { detectedAt: true, status: true },
+    });
+    return salidaDeZonaJustificada(alertas);
+  }
+
+  /**
+   * La foto de salida solo se acepta dentro del radio del punto de inicio, en los tipos que lo
+   * exigen y mientras no haya justificado su salida de zona.
+   */
   async validarSalida(activityId: number, userId: number, latitude: number, longitude: number) {
     if (!(await this.exigeMismaUbicacion(activityId))) return;
     const o = await this.origen(activityId, userId);
@@ -103,6 +122,9 @@ export class ActivityGeofenceService {
     if (!o || !punto) return; // sin punto de inicio (evidencias viejas) no hay contra qué medir
     const d = distanciaM(o.punto, punto);
     if (d > RADIO_ACTIVIDAD_M) {
+      if (await this.justificoSalida(activityId, userId)) return;
+      // Deja la alerta abierta para que la pueda justificar desde la actividad.
+      await this.evaluarActividad(activityId, userId, o.companyId, o.punto, punto).catch(() => undefined);
       throw new BadRequestException(mensajeSalidaFueraDeZona(d));
     }
   }
@@ -208,11 +230,14 @@ export class ActivityGeofenceService {
         .filter((p): p is NonNullable<typeof p> => p != null);
     }
     const ultimo = puntos[0] ?? null;
-    const exigeMismaUbicacion = await this.exigeMismaUbicacion(activityId);
+    const salidaJustificada = salidaDeZonaJustificada(alertas);
+    // Las apps (web, Android, iOS) solo pre-bloquean la foto de salida con esta bandera en true.
+    const exigeMismaUbicacion = !salidaJustificada && (await this.exigeMismaUbicacion(activityId));
     return {
       activityId,
-      /** Según el tipo de actividad: la foto de salida tiene que coincidir con el inicio. */
+      /** Según el tipo de actividad: la foto de salida tiene que coincidir con el inicio, salvo salida justificada. */
       exigeMismaUbicacion,
+      salidaJustificada,
       radioM: RADIO_ACTIVIDAD_M,
       origen: o ? { latitude: o.punto.lat, longitude: o.punto.lng, at: o.at } : null,
       seguimientoActivo: Boolean(o && !o.salidaAt && o.status !== 'COMPLETED'),

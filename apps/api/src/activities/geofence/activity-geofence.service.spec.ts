@@ -27,11 +27,16 @@ function armar(actividad: { coreKind: string | null; ticketTypeCustom?: string |
     },
     activityGeofenceAlert: {
       findFirst: jest.fn(async ({ where }: any) =>
-        alertas.filter((a) => a.activityId === where.activityId && a.userId === where.userId && a.returnedAt == null).at(-1) ?? null,
+        where.id != null
+          ? (alertas.find((a) => a.id === where.id && a.activityId === where.activityId) ?? null)
+          : (alertas.filter((a) => a.activityId === where.activityId && a.userId === where.userId && a.returnedAt == null).at(-1) ??
+            null),
       ),
-      findMany: jest.fn().mockResolvedValue([]),
+      findMany: jest.fn(async ({ where }: any) =>
+        alertas.filter((a) => a.activityId === where.activityId && a.userId === where.userId),
+      ),
       create: jest.fn(async ({ data }: any) => {
-        const fila = { id: alertas.length + 1, returnedAt: null, ...data };
+        const fila = { id: alertas.length + 1, returnedAt: null, status: 'ABIERTA', detectedAt: new Date(), ...data };
         alertas.push(fila);
         return fila;
       }),
@@ -133,5 +138,27 @@ describe('ActivityGeofenceService', () => {
 
     const recoleccion = armar({ coreKind: 'tarea', ticketTypeCustom: 'Recolección' });
     await expect(recoleccion.service.estado(7, 3)).resolves.toMatchObject({ exigeMismaUbicacion: false });
+  });
+
+  it('salida de zona justificada (regla de Adam, 28-10): ya no bloquea la foto de salida', async () => {
+    const { service, alertas } = armar({ coreKind: 'servicio' });
+    // Intentar la salida lejos deja la alerta abierta para poder justificarla.
+    await expect(service.validarSalida(7, 3, LEJOS.lat, LEJOS.lng)).rejects.toBeInstanceOf(BadRequestException);
+    expect(alertas).toHaveLength(1);
+    await expect(service.estado(7, 3)).resolves.toMatchObject({ exigeMismaUbicacion: true, salidaJustificada: false });
+
+    await service.justificar({ activityId: 7, alertId: alertas[0].id, userId: 3, motivo: 'montaje en otro sitio' });
+    await expect(service.validarSalida(7, 3, LEJOS.lat, LEJOS.lng)).resolves.toBeUndefined();
+    // Las apps solo pre-bloquean con la bandera en true.
+    await expect(service.estado(7, 3)).resolves.toMatchObject({ exigeMismaUbicacion: false, salidaJustificada: true });
+  });
+
+  it('si volvió y salió otra vez sin justificar, se exige de nuevo', async () => {
+    const { service, alertas } = armar({ coreKind: 'servicio' });
+    alertas.push(
+      { id: 1, activityId: 7, userId: 3, status: 'JUSTIFICADA', detectedAt: new Date('2026-10-28T22:16:00Z'), returnedAt: new Date('2026-10-28T23:00:00Z') },
+      { id: 2, activityId: 7, userId: 3, status: 'ABIERTA', detectedAt: new Date('2026-10-28T23:30:00Z'), returnedAt: null },
+    );
+    await expect(service.validarSalida(7, 3, LEJOS.lat, LEJOS.lng)).rejects.toBeInstanceOf(BadRequestException);
   });
 });

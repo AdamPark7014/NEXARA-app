@@ -1,4 +1,11 @@
-import { RADIO_ACTIVIDAD_M, distanciaM, fueraDeZona, mensajeSalidaFueraDeZona, puntoReal } from './geocerca';
+import {
+  RADIO_ACTIVIDAD_M,
+  distanciaM,
+  fueraDeZona,
+  mensajeSalidaFueraDeZona,
+  puntoReal,
+  salidaDeZonaJustificada,
+} from './geocerca';
 
 describe('geocerca de actividades', () => {
   const zocaloPuebla = { lat: 19.0414, lng: -98.2063 };
@@ -27,7 +34,18 @@ describe('geocerca de actividades', () => {
     expect(mensajeSalidaFueraDeZona(745)).toContain('500 m');
     // Web, Android e iOS repiten este texto tal cual.
     expect(mensajeSalidaFueraDeZona(745)).toBe(
-      'La salida se registra donde iniciaste la actividad: estás a 745 m y el máximo es 500 m; regresa al punto de inicio para tomar la foto de salida.',
+      'La salida se registra donde iniciaste la actividad: estás a 745 m y el máximo es 500 m; regresa al punto de inicio o justifica tu salida de zona para tomar la foto de salida.',
     );
+  });
+
+  it('cuenta la salida de zona más reciente: justificada libera la foto de salida', () => {
+    expect(salidaDeZonaJustificada([])).toBe(false);
+    expect(salidaDeZonaJustificada([{ detectedAt: '2026-10-28T22:16:00Z', status: 'JUSTIFICADA' }])).toBe(true);
+    expect(
+      salidaDeZonaJustificada([
+        { detectedAt: '2026-10-28T23:30:00Z', status: 'ABIERTA' },
+        { detectedAt: '2026-10-28T22:16:00Z', status: 'JUSTIFICADA' },
+      ]),
+    ).toBe(false);
   });
 });

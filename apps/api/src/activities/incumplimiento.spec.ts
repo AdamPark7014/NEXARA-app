@@ -1,8 +1,7 @@
 import {
   admiteRegistroManual,
-  AVISO_PREVIO_MIN,
   cierreDeJornada,
-  decidirCierreDeJornada,
+  decidirCierrePorSalida,
   esCandidataAlCierre,
   esCausaValida,
   esNoCumplida,
@@ -10,6 +9,7 @@ import {
   etiquetaCausa,
   horaDeCierre,
   NO_CUMPLIDA_VIGENTE_DESDE,
+  salidaCuentaDesde,
   salidaMasTarde,
 } from './incumplimiento';
 import {
@@ -86,65 +86,109 @@ describe('cierre de jornada de una actividad', () => {
   });
 });
 
-describe('decisión al cierre de jornada', () => {
-  const base = {
-    cierre: CIERRE_22,
-    ahora: MX('2026-10-22T18:05:00'),
-    ejecutores: [{ userId: 7, entregadaAt: null }],
-  };
-
-  it('lo que nadie entregó se cierra como no cumplida, con quién quedó pendiente', () => {
-    for (const estatus of ['Pendiente', 'Asignada', 'En Proceso', 'Rechazada']) {
-      expect(decidirCierreDeJornada({ ...base, estatus })).toEqual({ accion: 'cerrar', pendientes: [7] });
-    }
+describe('cierre al checar la salida de jornada (regla de Adam, 28-10)', () => {
+  const LIMITE = MX('2026-10-28T23:59:59');
+  const DIA = '2026-10-28';
+  const sinEntregar = (userId: number, salidaAt: Date | null, desde: Date | null = MX('2026-10-28T09:00:00')) => ({
+    userId,
+    entregadaAt: null,
+    salidaAt,
+    desde,
   });
 
-  it('«Por Validar» ya se entregó: no se toca; lo cerrado tampoco', () => {
+  it('a las 18:00 sin checar salida no se cierra nada; al checarla, sí', () => {
+    expect(
+      decidirCierrePorSalida({ estatus: 'En Proceso', limite: LIMITE, dia: DIA, ejecutores: [sinEntregar(15, null)] }),
+    ).toEqual({ cerrar: false, pendientes: [] });
+    expect(
+      decidirCierrePorSalida({
+        estatus: 'En Proceso',
+        limite: LIMITE,
+        dia: DIA,
+        ejecutores: [sinEntregar(15, MX('2026-10-28T18:02:00'))],
+      }),
+    ).toEqual({ cerrar: true, pendientes: [15] });
+  });
+
+  it('en equipo espera a que salgan todos los que no la entregaron', () => {
+    const base = { estatus: 'En Proceso', limite: LIMITE, dia: DIA };
+    const uno = decidirCierrePorSalida({
+      ...base,
+      ejecutores: [sinEntregar(15, MX('2026-10-28T18:02:00')), sinEntregar(58, null)],
+    });
+    expect(uno.cerrar).toBe(false);
+    const todos = decidirCierrePorSalida({
+      ...base,
+      ejecutores: [
+        sinEntregar(15, MX('2026-10-28T18:02:00')),
+        sinEntregar(58, MX('2026-10-28T18:05:00')),
+        { userId: 57, entregadaAt: MX('2026-10-28T17:30:00'), salidaAt: null, desde: null },
+      ],
+    });
+    expect(todos).toEqual({ cerrar: true, pendientes: [15, 58] });
+  });
+
+  it('pasarse de la hora no cierra: quien entregó tarde no queda pendiente', () => {
+    const d = decidirCierrePorSalida({
+      estatus: 'En Proceso',
+      limite: MX('2026-10-28T17:00:00'),
+      dia: DIA,
+      ejecutores: [{ userId: 58, entregadaAt: MX('2026-10-28T17:45:00'), salidaAt: MX('2026-10-28T18:05:00'), desde: null }],
+    });
+    expect(d.cerrar).toBe(false);
+  });
+
+  it('lo que vence otro día no se cierra con la salida de hoy; lo vencido de ayer, sí', () => {
+    const base = { estatus: 'En Proceso', dia: DIA, ejecutores: [sinEntregar(15, MX('2026-10-28T18:02:00'))] };
+    expect(decidirCierrePorSalida({ ...base, limite: MX('2026-10-29T18:00:00') }).cerrar).toBe(false);
+    expect(decidirCierrePorSalida({ ...base, limite: MX('2026-10-27T18:00:00') }).cerrar).toBe(true);
+  });
+
+  it('una salida antes de empezar o recién asignada no cuenta', () => {
+    const desde = salidaCuentaDesde({ fechaInicio: MX('2026-10-28T19:00:00'), asignadaAt: MX('2026-10-28T10:00:00') });
+    expect(desde?.toISOString()).toBe(MX('2026-10-28T19:00:00').toISOString());
+    const reciente = salidaCuentaDesde({ fechaInicio: MX('2026-10-28T09:00:00'), asignadaAt: MX('2026-10-28T17:30:00') });
+    expect(reciente?.toISOString()).toBe(MX('2026-10-28T18:30:00').toISOString());
+    expect(
+      decidirCierrePorSalida({
+        estatus: 'Asignada',
+        limite: LIMITE,
+        dia: DIA,
+        ejecutores: [sinEntregar(15, MX('2026-10-28T18:02:00'), reciente)],
+      }).cerrar,
+    ).toBe(false);
+  });
+
+  it('una salida de otro día no cierra lo de hoy', () => {
+    expect(
+      decidirCierrePorSalida({
+        estatus: 'En Proceso',
+        limite: LIMITE,
+        dia: DIA,
+        ejecutores: [sinEntregar(15, MX('2026-10-27T18:02:00'))],
+      }).cerrar,
+    ).toBe(false);
+  });
+
+  it('«Por Validar», lo cerrado, lo sin fecha y lo de antes de la regla no se tocan', () => {
+    const ejecutores = [sinEntregar(15, MX('2026-10-28T18:02:00'))];
     for (const estatus of ['Por Validar', 'Finalizada', 'Cancelada', 'No cumplida', null]) {
-      expect(decidirCierreDeJornada({ ...base, estatus }).accion).toBeNull();
+      expect(decidirCierrePorSalida({ estatus, limite: LIMITE, dia: DIA, ejecutores }).cerrar).toBe(false);
     }
-  });
-
-  it('si todos entregaron antes del cierre y se la devolvieron después, no es incumplimiento', () => {
-    const d = decidirCierreDeJornada({
-      ...base,
-      estatus: 'En Proceso',
-      ejecutores: [
-        { userId: 7, entregadaAt: MX('2026-10-22T16:00:00') },
-        { userId: 8, entregadaAt: MX('2026-10-22T17:59:00') },
-      ],
-    });
-    expect(d.accion).toBeNull();
-  });
-
-  it('en equipo, solo quedan pendientes quienes no entregaron a tiempo', () => {
-    const d = decidirCierreDeJornada({
-      ...base,
-      estatus: 'En Proceso',
-      ejecutores: [
-        { userId: 7, entregadaAt: MX('2026-10-22T16:00:00') },
-        { userId: 8, entregadaAt: null },
-        { userId: 9, entregadaAt: MX('2026-10-22T18:01:00') },
-      ],
-    });
-    expect(d).toEqual({ accion: 'cerrar', pendientes: [8, 9] });
-  });
-
-  it('avisa una sola vez dentro de la hora previa', () => {
-    const antes = new Date(CIERRE_22.getTime() - (AVISO_PREVIO_MIN - 10) * 60_000);
-    expect(decidirCierreDeJornada({ ...base, estatus: 'Pendiente', ahora: antes }).accion).toBe('avisar');
-    expect(
-      decidirCierreDeJornada({ ...base, estatus: 'Pendiente', ahora: antes, avisadoAt: antes }).accion,
-    ).toBeNull();
-    const lejos = new Date(CIERRE_22.getTime() - (AVISO_PREVIO_MIN + 10) * 60_000);
-    expect(decidirCierreDeJornada({ ...base, estatus: 'Pendiente', ahora: lejos }).accion).toBeNull();
-  });
-
-  it('lo que venció antes de que entrara la regla se queda como estaba', () => {
+    expect(decidirCierrePorSalida({ estatus: 'En Proceso', limite: null, dia: DIA, ejecutores }).cerrar).toBe(false);
     const viejo = new Date(NO_CUMPLIDA_VIGENTE_DESDE.getTime() - 6 * 3_600_000);
+    expect(decidirCierrePorSalida({ estatus: 'En Proceso', limite: viejo, dia: DIA, ejecutores }).cerrar).toBe(false);
+  });
+
+  it('si todos entregaron y se la devolvieron después, no es incumplimiento', () => {
     expect(
-      decidirCierreDeJornada({ ...base, estatus: 'En Proceso', cierre: viejo, ahora: CIERRE_22 }).accion,
-    ).toBeNull();
+      decidirCierrePorSalida({
+        estatus: 'En Proceso',
+        limite: LIMITE,
+        dia: DIA,
+        ejecutores: [{ userId: 7, entregadaAt: MX('2026-10-28T16:00:00'), salidaAt: MX('2026-10-28T18:00:00'), desde: null }],
+      }).cerrar,
+    ).toBe(false);
   });
 });
 

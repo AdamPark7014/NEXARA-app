@@ -4,15 +4,15 @@
  * Regla de Adam (22-10-2026): «cualquier actividad que no se acabe después de la jornada laboral
  * se toma como incumplida», y un superior debe poder registrar que una actividad no se cumplió.
  *
- * - **Cierre de jornada.** Al término de la jornada del día en que vencía su entrega (el mismo
- *   límite del semáforo, `limiteDeEntrega`), lo que siga sin entregarse pasa a «No cumplida» y
- *   queda un registro formal (`activity_non_compliances`). Entregada = todos los que la ejecutan
- *   mandaron su evidencia antes del cierre; por eso «Por Validar» nunca se cierra: ya se entregó y
- *   lo que falta es el visto bueno del jefe.
- * - **La jornada** termina a la hora de salida más tarde de quienes la ejecutan (su horario en
- *   `work_schedules`, 18:00 si no tienen). Un límite explícito más tarde que eso manda; una
- *   actividad citada después de la salida tiene hasta que acabe el día.
- * - **Aviso previo** una hora antes del cierre a quien la tiene, una sola vez.
+ * - **Cierre de jornada = la checada de salida.** Regla de Adam (28-10-2026): nada se cierra a una
+ *   hora fija ni por un cron. Cuando la persona checa su salida de asistencia ella misma (no la
+ *   salida automática de las 23:30 ni la que registra un jefe), lo que vencía ese día o antes
+ *   (`limiteDeEntrega`, el mismo límite del semáforo) y no entregó pasa a «No cumplida», con
+ *   registro formal (`activity_non_compliances`). En equipo, cuando ya salieron todos los que no la
+ *   entregaron. Entregada = mandó su evidencia; por eso «Por Validar» nunca se cierra: ya se
+ *   entregó y lo que falta es el visto bueno del jefe.
+ * - **Pasarse de la hora** el mismo día no la cierra: la actividad sigue abierta y el semáforo la
+ *   marca atrasada con cuánto se pasó.
  * - **Registro manual**: los mismos superiores que pueden cancelarla, con causa y observaciones.
  * - **Reprogramar** la reabre con fecha nueva; el incumplimiento no se borra (es lo que miden
  *   los KPI de «en tiempo y forma»).
@@ -32,9 +32,6 @@ export const NO_CUMPLIDA_VIGENTE_DESDE = new Date('2026-10-22T06:00:00.000Z');
 
 /** Salida de la jornada normal (la misma de `JORNADA_SALIDA_HM` en asistencia). */
 export const SALIDA_POR_OMISION = '18:00';
-
-/** Minutos antes del cierre en que se le avisa a quien la tiene. */
-export const AVISO_PREVIO_MIN = 60;
 
 /** Lo que se asigna sobre la hora tiene al menos esto para entregarse. */
 export const MARGEN_TRAS_ASIGNAR_MIN = 60;
@@ -154,40 +151,53 @@ export function cierreDeJornada(p: {
 
 export type EjecutorEntrega = { userId: number; entregadaAt: Date | null };
 
-export type DecisionCierre =
-  | { accion: 'cerrar'; pendientes: number[] }
-  | { accion: 'avisar'; pendientes: number[] }
-  | { accion: null; pendientes: number[] };
+export type EjecutorAlSalir = EjecutorEntrega & {
+  /** Su salida propia del día que se evalúa (null = no ha checado). */
+  salidaAt: Date | null;
+  /** Una salida antes de esto no cuenta: ver `salidaCuentaDesde`. */
+  desde: Date | null;
+};
 
 /**
- * Qué toca hacer con una actividad en este momento: cerrarla como no cumplida, avisar que se
- * acerca el cierre, o nada. `pendientes` = quienes no la entregaron a tiempo.
+ * Desde cuándo su salida cierra la actividad: no antes de que empiece (una citada después de la
+ * salida se queda para el día siguiente) ni antes de una hora de habérsela asignado (nadie queda
+ * incumplido por algo que le dieron sin tiempo para hacerlo).
  */
-export function decidirCierreDeJornada(p: {
+export function salidaCuentaDesde(p: {
+  fechaInicio?: Date | string | null;
+  asignadaAt?: Date | string | null;
+}): Date | null {
+  const inicio = aFecha(p.fechaInicio);
+  const asignada = aFecha(p.asignadaAt);
+  const conMargen = asignada ? new Date(asignada.getTime() + MARGEN_TRAS_ASIGNAR_MIN * 60_000) : null;
+  if (inicio && conMargen) return masTarde(inicio, conMargen);
+  return inicio ?? conMargen;
+}
+
+/**
+ * ¿La actividad se cierra como no cumplida con las salidas del día `dia` (`AAAA-MM-DD`)? Solo si
+ * ya vencía ese día (o antes) y todos los que no la entregaron checaron su salida ese día después
+ * de `desde`. `pendientes` = quienes salieron sin entregarla.
+ */
+export function decidirCierrePorSalida(p: {
   estatus: string | null | undefined;
-  cierre: Date | null;
-  ahora: Date;
-  avisadoAt?: Date | null;
-  ejecutores: EjecutorEntrega[];
+  limite: Date | null;
+  dia: string;
+  ejecutores: EjecutorAlSalir[];
   vigenteDesde?: Date;
-}): DecisionCierre {
-  const nada = (pendientes: number[] = []): DecisionCierre => ({ accion: null, pendientes });
-  if (!esCandidataAlCierre(p.estatus) || !p.cierre) return nada();
-  const desde = p.vigenteDesde ?? NO_CUMPLIDA_VIGENTE_DESDE;
-  if (p.cierre.getTime() < desde.getTime()) return nada();
+}): { cerrar: boolean; pendientes: number[] } {
+  const no = { cerrar: false, pendientes: [] as number[] };
+  if (!esCandidataAlCierre(p.estatus) || !p.limite) return no;
+  if (p.limite.getTime() < (p.vigenteDesde ?? NO_CUMPLIDA_VIGENTE_DESDE).getTime()) return no;
+  if (workDateKey(p.limite) > p.dia) return no;
 
-  const cierre = p.cierre;
-  const pendientes = p.ejecutores
-    .filter((e) => !e.entregadaAt || e.entregadaAt.getTime() > cierre.getTime())
-    .map((e) => e.userId);
-  // Todos entregaron a tiempo: si se la devolvieron después, es tema de revisión, no de plazo.
-  if (p.ejecutores.length && !pendientes.length) return nada();
-
-  if (p.ahora.getTime() >= cierre.getTime()) return { accion: 'cerrar', pendientes };
-  if (!p.avisadoAt && p.ahora.getTime() >= cierre.getTime() - AVISO_PREVIO_MIN * 60_000) {
-    return { accion: 'avisar', pendientes };
-  }
-  return nada(pendientes);
+  const sinEntregar = p.ejecutores.filter((e) => !e.entregadaAt);
+  // Todos entregaron: si se la devolvieron después, es tema de revisión, no de plazo.
+  if (!sinEntregar.length) return no;
+  const salieron = sinEntregar.every(
+    (e) => e.salidaAt && workDateKey(e.salidaAt) === p.dia && (!e.desde || e.salidaAt.getTime() >= e.desde.getTime()),
+  );
+  return salieron ? { cerrar: true, pendientes: sinEntregar.map((e) => e.userId) } : no;
 }
 
 /** Estatus con que se reabre al reprogramar: en proceso si alguien ya la había empezado. */
