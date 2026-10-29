@@ -47,6 +47,7 @@ export default function ComplejidadCampo({
   onChange,
   onUsarTiempo,
   onSugerencia,
+  estandarActivo = false,
 }: {
   token: string;
   coreKind: string;
@@ -64,6 +65,8 @@ export default function ComplejidadCampo({
   onUsarTiempo: (minutos: number) => void;
   /** La sugerencia completa (trae la cantidad y el destino que leyó la IA, para el tiempo estándar). */
   onSugerencia?: (sugerencia: SugerenciaComplejidad | null) => void;
+  /** El tiempo estándar ya fija el tiempo: lo típico queda solo como referencia, sin «Usar…». */
+  estandarActivo?: boolean;
 }) {
   const [tiempos, setTiempos] = useState<TiemposTipicos | null>(null);
   const [sugerencia, setSugerencia] = useState<SugerenciaComplejidad | null>(null);
@@ -175,7 +178,9 @@ export default function ComplejidadCampo({
             {textoDelTipico}
             {!tipico.delNivel && elegida ? " Aún no hay suficientes de este nivel." : ""}
           </span>
-          {tipico.minutos !== tiempoActualMin ? (
+          {estandarActivo ? (
+            <span className={s.usado}>Referencia: el tiempo lo da el estándar.</span>
+          ) : tipico.minutos !== tiempoActualMin ? (
             <button type="button" className={s.usar} onClick={() => onUsarTiempo(tipico.minutos)}>
               Usar {formatoMinutos(tipico.minutos)} como tiempo estimado
             </button>
