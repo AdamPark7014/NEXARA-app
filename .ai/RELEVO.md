@@ -63,7 +63,12 @@
     nodos o metros, base de 30 min). Adam pidió parametrizar las obras.
   - Falta: horas estándar ganadas en Desempeño y la API de tramos de trayecto (la espera `nexara-apps-uiux`).
 
-- **29-10 ~13:30 (claude-code) — Mesa contable de la contadora: API (web en curso, sin desplegar).**
+- **29-10 ~13:30 (claude-code) — Mesa contable de la contadora: API y web, desplegadas el 29-10 ~12:10.**
+  - Desplegado `c6cc2ef3` con `prisma migrate deploy` antes de levantar la API (232 migraciones, la nueva aplicada).
+    Prueba de humo contra la base real (empresa 1, solo lectura): «Por facturar» trae 12 servicios terminados con
+    cliente y sin factura (14–22 días hábiles; casi todos sin cotización y varios de «A QUIEN CORRESPONDA» sin RFC);
+    pagos y gastos vacío (no hay viáticos ni gastos pagados en octubre); estados en cero (0 pólizas), cuadran y el
+    Excel sale. Falta revisar las pantallas contra el mockup con sesión de Core (el navegador integrado no la tiene).
   - Pedido de Adam: «por facturar», pagos y gastos ligados a su CFDI y banco, estado de resultados y balance. Mockup
     aprobado por Adam el 29-10: https://claude.ai/artifact/MENR9dXWC7PGocKEoSTmpD
   - API en `src/accounting/mesa-contable/` bajo `GET|POST /api/accounting/workspace/mesa/*` (contrato en el
