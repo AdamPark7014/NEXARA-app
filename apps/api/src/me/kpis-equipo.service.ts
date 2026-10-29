@@ -936,10 +936,13 @@ export class KpisEquipoService {
         realesPorTipo.set(tipo, [...(realesPorTipo.get(tipo) ?? []), entrega.minutosReales!]);
       }
     }
+    // Un tipo con pocos casos usa la mediana de todo lo entregado (con el mismo tope de lo que duró).
+    const todos = [...realesPorTipo.values()].flat();
+    const general = todos.length >= MUESTRAS_MINIMAS ? mediana(todos) : null;
     for (const { entrega, tipo } of sinEstandar) {
       const reales = realesPorTipo.get(tipo) ?? [];
       entrega.minutosEstandar = estandarDeRespaldo(
-        reales.length >= MUESTRAS_MINIMAS ? mediana(reales) : null,
+        reales.length >= MUESTRAS_MINIMAS ? mediana(reales) : general,
         entrega.minutosReales ?? null,
         entrega.minutosPlan ?? null,
       );

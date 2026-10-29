@@ -251,7 +251,9 @@ horas estándar). Sin migración.
   (revisor con menos de 3 calificaciones: su número tal cual), y llevarlo a 0–100 (1 = 0, 5 = 100).
 - **Rendimiento (30):** Σ T<sub>e</sub> ganado ÷ horas en jornada contra la meta (campo 60 %, oficina 70 %).
   T<sub>e</sub> = el capturado al asignar (§8); lo de antes no lo trae y usa la **mediana real de su tipo** (≥ 3
-  casos del equipo en los últimos 120 días), sin pasar lo que esa actividad duró o se estimó. Lo autoasignado gana la
+  casos del equipo en los últimos 120 días; si no, la de todo lo entregado), sin pasar lo que esa actividad duró o se
+  estimó. Sin reloj ni estimado no hay dato, y quien entregó pero sin ningún T<sub>e</sub> no lleva el pilar (no pesa);
+  quien no entregó nada en jornada sí queda en 0. Lo autoasignado gana la
   mitad hasta que su evidencia se aprueba; la comercial gana solo con la cotización ligada fuera de borrador.
   Familia por puesto: instalador, técnico, campo, soporte u obra = campo; lo demás, oficina.
 - **Disciplina (15):** por día que debía checar, ≤ 15 min 1 · 16–30 0.6 · 31–60 0.3 · más o sin checar 0; cada 3

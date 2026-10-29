@@ -720,6 +720,7 @@ describe('entregas: en tiempo y forma', () => {
         conTiempo: 2,
         enTiempoAdecuado: 1,
         minutosCarga: 240,
+        conEstandar: 2,
         minutosEstandarGanados: 168,
       },
       asistenciaPuntual: { esperados: 1, puntuales: 1, pct: 100 },
@@ -1010,8 +1011,27 @@ describe('índice de desempeño v2', () => {
   it('tiempo estándar de respaldo: la mediana de su tipo sin pasar lo que esa actividad duró', () => {
     expect(estandarDeRespaldo(300, 45, 60)).toBe(60);
     expect(estandarDeRespaldo(300, 400, null)).toBe(300);
-    expect(estandarDeRespaldo(300, null, null)).toBe(0);
+    // Sin reloj ni estimado no se sabe cuánto duró: no hay dato (no 0).
+    expect(estandarDeRespaldo(300, null, null)).toBeNull();
+    expect(estandarDeRespaldo(300, 0, 0)).toBeNull();
     expect(estandarDeRespaldo(null, 400, 60)).toBeNull();
+  });
+
+  it('entregó, pero nada trae tiempo estándar: Rendimiento no pesa; sin entregas, sí es 0', () => {
+    const t = {
+      entregas: { ...resumenEntregas([]), medidas: 3, aTiempo: 3 },
+      asistenciaPuntual: { esperados: 1, puntuales: 1, pct: 100 },
+      uniforme: { revisadas: 0, ok: 0, noOk: 0, sinRevisar: 0, pct: null },
+      minutosLaborados: 480,
+      ritmo: { entregadas: 3, dias: 1, porDia: 3, referencia: null },
+      carga: { minutos: 0, pct: 0 },
+      ocupacion: { minutos: 0, pct: 0 },
+    };
+    const sinDato = cumplimientoDe(t, null);
+    expect(sinDato.partes.find((p) => p.clave === 'estandar')).toBeUndefined();
+    expect(sinDato.pct).toBe(100);
+    const sinEntregas = cumplimientoDe({ ...t, entregas: { ...t.entregas, aTiempo: 0, sinEntregar: 3 } }, null);
+    expect(sinEntregas.partes.find((p) => p.clave === 'estandar')).toMatchObject({ pct: 0, peso: 30 });
   });
 
   it('calificación calibrada: un 3 de quien califica duro vale más que un 4 de quien regala cincos', () => {
