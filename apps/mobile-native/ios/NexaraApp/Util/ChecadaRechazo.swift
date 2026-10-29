@@ -31,6 +31,8 @@ enum ChecadaRechazo {
             || t.contains("distancia imposible")
             || t.contains("app nexara")
             || esFinDeSemanaSinGuardia(t)
+            // Festivo que no le toca (FESTIVO_SIN_LABORAR): el mensaje del servidor, tal cual.
+            || t.contains("no se labora")
     }
 
     /// Igual que `esRechazoDelServidor` de Android: un 422 a secas ya es rechazo de la
