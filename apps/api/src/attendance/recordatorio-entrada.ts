@@ -5,7 +5,8 @@
  *
  * - A su hora de entrada, un «buenos días» por persona y por día (la única fila de la campana).
  * - Desde su entrada más la tolerancia, mientras no cheque, un push cada 2 minutos con «No has
- *   registrado tu entrada». Solo push: no deja filas.
+ *   registrado tu entrada». Solo push: no deja filas. Con la tolerancia, igual que el retardo: oficina
+ *   desde las 10:15, cuadrilla desde las 08:15 (29-10-2026, aprobado por Adam).
  * - Para al checar, al llegar su hora de salida, con falta justificada, permiso o vacaciones, y en su
  *   descanso (sábado, domingo o festivo), salvo que ese día tenga guardia.
  * - Al checar pasa al recordatorio de la jornada (`activities/recordatorios-jornada`): uno u otro,
@@ -61,16 +62,23 @@ export function esFestivoDeLey(fecha: string): boolean {
 }
 
 /**
- * Descansos que da la empresa además de la ley (p. ej. el 2 de noviembre), en
- * `ASISTENCIA_DIAS_DE_DESCANSO=2026-11-02,2026-12-24`. Lo que no es fecha se ignora.
+ * Descansos que da la empresa además de la ley, en los que no se insiste (29-10-2026, aprobado por
+ * Adam). El 2 de noviembre no es festivo de la LFT, pero si se descansa y el aviso insiste cada 2 min
+ * todo el día, molesta a todo el equipo; si se trabaja, solo se pierde el recordatorio de ese día
+ * (retardos, KPI y nómina no leen esta lista).
+ */
+export const DESCANSOS_ACORDADOS: readonly string[] = ['2026-11-02'];
+
+/**
+ * Los acordados más los de `ASISTENCIA_DIAS_DE_DESCANSO=2026-12-24,2026-12-31` (entorno de la API y
+ * del worker en `deploy/docker-compose.nexara.yml`). Lo que no es fecha se ignora.
  */
 export function descansosDeEmpresa(raw = process.env.ASISTENCIA_DIAS_DE_DESCANSO): Set<string> {
-  return new Set(
-    String(raw ?? '')
-      .split(/[\s,;]+/)
-      .map((f) => f.trim())
-      .filter((f) => FECHA_RE.test(f)),
-  );
+  const extra = String(raw ?? '')
+    .split(/[\s,;]+/)
+    .map((f) => f.trim())
+    .filter((f) => FECHA_RE.test(f));
+  return new Set([...DESCANSOS_ACORDADOS, ...extra]);
 }
 
 export type DiaDeLaPersona = {

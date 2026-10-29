@@ -104,9 +104,19 @@ describe('recordatorio de entrada: la regla', () => {
     // Tercer lunes de noviembre de 2026.
     expect(seLeEsperaHoy(dia({ fecha: '2026-11-16' }))).toBe(false);
     expect(seLeEsperaHoy(dia({ fecha: '2026-11-16', conGuardia: true }))).toBe(true);
-    // Días que la empresa da además de la ley.
+    // Días que la empresa da además de la ley: el 2 de noviembre ya viene acordado.
     expect(seLeEsperaHoy(dia({ fecha: '2026-11-02' }))).toBe(true);
-    expect(seLeEsperaHoy(dia({ fecha: '2026-11-02', descansos: descansosDeEmpresa('2026-11-02, x') }))).toBe(false);
+    expect(seLeEsperaHoy(dia({ fecha: '2026-11-02', descansos: descansosDeEmpresa('') }))).toBe(false);
+    expect(seLeEsperaHoy(dia({ fecha: '2026-11-03', descansos: descansosDeEmpresa('') }))).toBe(true);
+  });
+
+  it('descansos de la empresa: los acordados más los del entorno', () => {
+    expect([...descansosDeEmpresa(undefined)]).toEqual(['2026-11-02']);
+    expect([...descansosDeEmpresa('2026-12-24, 2026-12-31;x 2026-13')].sort()).toEqual([
+      '2026-11-02',
+      '2026-12-24',
+      '2026-12-31',
+    ]);
   });
 
   it('respeta los días laborables de su horario', () => {
@@ -337,6 +347,16 @@ describe('recordatorio de entrada: el servicio', () => {
     for (const hm of ['08:00', '08:15', '10:00', '10:15', '10:17']) await minuto(b, JUEVES, hm);
     expect(b.avisos).toHaveLength(0);
     expect(b.pushes).toHaveLength(0);
+  });
+
+  it('el lunes 2 de noviembre no insiste: es descanso acordado', async () => {
+    const b = equipo();
+    for (const hm of ['08:00', '08:15', '10:00', '10:15', '10:17']) await minuto(b, '2026-11-02', hm);
+    expect(b.avisos).toHaveLength(0);
+    expect(b.pushes).toHaveLength(0);
+    // El martes 3 todo vuelve a la normalidad.
+    await minuto(b, '2026-11-03', '10:00');
+    expect(b.avisos.map((a) => a.userId)).toEqual([1, 2]);
   });
 
   it('el sábado solo a quien tiene guardia', async () => {
