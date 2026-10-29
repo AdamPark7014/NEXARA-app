@@ -94,7 +94,8 @@ export type Escala = {
 
 export type Plano = {
   version: 1;
-  croquis?: { url: string; anchoPx: number; altoPx: number; opacidad: number } | null;
+  /** `invertido`: croquis de fondo oscuro (AutoCAD) pintado en negativo para que se lea en el tema claro. */
+  croquis?: { url: string; anchoPx: number; altoPx: number; opacidad: number; invertido?: boolean } | null;
   escala: Escala;
   norteDeg: number;
   muros: Muro[];

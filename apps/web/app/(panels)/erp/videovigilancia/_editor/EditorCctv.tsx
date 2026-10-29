@@ -31,7 +31,7 @@ import { problemasDelPlano, tapasDelPlano, type Plano, type Punto } from "@/lib/
 import { camaraEnMetros, coberturaCamara, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import { ConflictoDeVersion, ETIQUETA_ESTADO_DISENO, guardarDiseno, subirCroquis, type Diseno, type EstadoDiseno } from "@/lib/cctv/api";
 import { LEYENDA_NIVELES, COLOR_NIVEL } from "./colores";
-import { TIPOS_CROQUIS, prepararCroquis } from "./croquis";
+import { TIPOS_CROQUIS, esOscuro, prepararCroquis } from "./croquis";
 import Inspector, { type Pestana } from "./Inspector";
 import Lienzo, { type Herramienta } from "./Lienzo";
 import VistaCamara from "./VistaCamara";
@@ -50,7 +50,8 @@ const HERRAMIENTAS: ReadonlyArray<{ id: Herramienta; etiqueta: string; tecla?: s
   { id: "persona", etiqueta: "Persona", tecla: "H", icono: "M12 3a2 2 0 110 4 2 2 0 010-4zM12 8v7M8 11h8M12 15l-3 6M12 15l3 6", grupo: "camara" },
 ];
 
-const AYUDA_HERRAMIENTA: Partial<Record<Herramienta, string>> = {
+const AYUDA_HERRAMIENTA: Record<Herramienta, string> = {
+  seleccionar: "Clic para elegir y arrastrar para mover. Arrastra el fondo para mover la vista; la rueda acerca. Supr borra y Ctrl+Z deshace.",
   muro: "Clic para empezar y clic para terminar; sigue encadenando. Doble clic o Esc corta. Alt suelta el imán.",
   puerta: "Clic sobre un muro para poner una puerta de 0.9 m.",
   ventana: "Clic sobre un muro para poner una ventana de 1.2 m.",
@@ -221,10 +222,15 @@ export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Dise
     setSubiendo(true);
     try {
       const png = await prepararCroquis(f);
+      const invertido = await esOscuro(png).catch(() => false);
       const r = await subirCroquis(token, diseno.id, png, f.name.replace(/\.[^.]+$/, "") + ".png");
       const vacio = !plano.muros.length && !plano.camaras.length;
       const escala = plano.escala.calibracion || !vacio ? plano.escala : { metrosPorPx: 60 / r.anchoPx, calibracion: null };
-      aplicar({ ...plano, escala, croquis: { url: resolveAssetUrl(r.url) || r.url, anchoPx: r.anchoPx, altoPx: r.altoPx, opacidad: plano.croquis?.opacidad ?? 0.6 } });
+      aplicar({
+        ...plano,
+        escala,
+        croquis: { url: resolveAssetUrl(r.url) || r.url, anchoPx: r.anchoPx, altoPx: r.altoPx, opacidad: plano.croquis?.opacidad ?? 0.6, invertido },
+      });
       if (!escala.calibracion) {
         setHerramienta("cota");
         setAviso("Croquis cargado. Marca los extremos de una cota conocida para calibrar la escala.");
@@ -350,7 +356,8 @@ export default function EditorCctv({ diseno, token, onRecargar }: { diseno: Dise
             ))}
           </div>
         </div>
-        {AYUDA_HERRAMIENTA[herramienta] ? <p className={styles.ayudaHerramienta}>{AYUDA_HERRAMIENTA[herramienta]}</p> : null}
+        {/* Siempre presente: si apareciera y desapareciera con la herramienta, el plano saltaría bajo el cursor. */}
+        <p className={styles.ayudaHerramienta}>{AYUDA_HERRAMIENTA[herramienta]}</p>
 
         <div className={styles.cuerpo}>
           <div className={styles.lienzoCaja}>

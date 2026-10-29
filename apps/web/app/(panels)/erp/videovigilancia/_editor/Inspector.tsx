@@ -701,6 +701,14 @@ function PanelPlano({
             />
           </label>
         ) : null}
+        {plano.croquis ? (
+          <Switch
+            checked={Boolean(plano.croquis.invertido)}
+            onChange={(e) => plano.croquis && onAplicar({ ...plano, croquis: { ...plano.croquis, invertido: e.target.checked } })}
+            label="En negativo"
+            description="Para croquis de fondo negro (AutoCAD): trazos oscuros sobre blanco."
+          />
+        ) : null}
         <Button size="sm" onClick={onCambiarCroquis}>
           {plano.croquis ? "Cambiar croquis" : "Subir croquis"}
         </Button>
