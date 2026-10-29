@@ -51,6 +51,28 @@ private struct BoardAsignadasPorMiSobre: Decodable {
     let items: [BoardAsignadaPorMi]?
 }
 
+/// `GET me/revisiones` → `pendientes`: evidencia enviada que quien mira puede aprobar o
+/// devolver (web `RevisionPendiente`, Android `RevisionPendienteDto`).
+struct RevisionPendiente: Decodable, Identifiable, Hashable {
+    let activityId: Int
+    let anNumber: String?
+    let titulo: String?
+    let estatus: String?
+    /// Dueño de la evidencia.
+    let persona: MyActivityAssigner?
+    /// Desde cuándo espera: la corrección reenviada o, si no la hubo, el envío.
+    let enviadaAt: String?
+    /// Es una corrección de algo que se le devolvió.
+    let correccion: Bool?
+
+    var id: Int { activityId }
+}
+
+/// `{ pendientes, revisadas }`; el teléfono solo usa lo pendiente.
+private struct RevisionesSobre: Decodable {
+    let pendientes: [RevisionPendiente]?
+}
+
 extension CoreRepository {
     /// `desde`/`hasta` como parámetros de consulta; vacío = el API usa hoy.
     static func rangoQuery(_ desde: String?, _ hasta: String?) -> [String: String] {
@@ -58,6 +80,14 @@ extension CoreRepository {
         if let desde, !desde.isEmpty { query["desde"] = desde }
         if let hasta, !hasta.isEmpty { query["hasta"] = hasta }
         return query
+    }
+
+    /// «En espera de revisión»: la misma regla de quién revisa a quién que
+    /// `me/activities/:id/evidencias`. La que más lleva esperando, primero.
+    func revisionesPendientes() async throws -> [RevisionPendiente] {
+        let data = try await ApiClient.shared.get("me/revisiones")
+        let sobre = try JSONDecoder().decode(RevisionesSobre.self, from: data)
+        return EnEsperaRevision.ordenar(sobre.pendientes ?? [])
     }
 
     /// «Asignadas por mí» en el rango. Se aceptan las dos formas que puede tomar la

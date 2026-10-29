@@ -96,4 +96,26 @@ extension DemoStore {
             "items": items,
         ])
     }
+
+    /// `me/revisiones`: dos de lo que repartí esperan mi visto bueno (una es corrección
+    /// reenviada), para que la pizarra enseñe «En espera de revisión».
+    func fxRevisiones(now: Date) -> DemoJSON {
+        let mias = allActivities.filter {
+            $0.creatorId == DemoMode.meId && $0.ownerId != DemoMode.meId
+        }
+        var pendientes: [DemoJSON] = []
+        for (i, a) in mias.prefix(2).enumerated() {
+            let persona = DemoData.person(a.ownerId)
+            pendientes.append(dj([
+                "activityId": a.id,
+                "anNumber": a.folio,
+                "titulo": a.titulo,
+                "estatus": "Por Validar",
+                "persona": dj(["id": persona.id, "nombre": persona.nombre]),
+                "enviadaAt": DemoClock.iso(now.addingTimeInterval(i == 0 ? -26 * 3600 : -95 * 60)),
+                "correccion": i == 1,
+            ]))
+        }
+        return dj(["pendientes": pendientes, "revisadas": [DemoJSON]()])
+    }
 }

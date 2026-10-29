@@ -70,6 +70,8 @@ final class DemoStore: @unchecked Sendable {
     var reviews: [String: DemoReview] = [:]
     var extraActivities: [DemoActivity] = []
     var nextActivityId = 5200
+    /// Complejidad elegida y sugerida de las actividades creadas en esta sesión.
+    var complejidadCreada: [Int: DemoComplejidad] = [:]
     /// Reloj por sesiones: pausas abiertas y desde cuándo corre cada reloj reanudado.
     var pausas: [Int: DemoPausa] = [:]
     var sesionDesde: [Int: Date] = [:]
@@ -140,6 +142,7 @@ final class DemoStore: @unchecked Sendable {
         reviews = [:]
         extraActivities = []
         nextActivityId = 5200
+        complejidadCreada = [:]
         pausas = [:]
         sesionDesde = [:]
         stockAjustes = [:]

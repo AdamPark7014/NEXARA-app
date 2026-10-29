@@ -34,13 +34,35 @@ struct CoreActivityCreateBody: Encodable {
     let tiempoEstimadoMin: Int?
     let tiempoMaximoMin: Int?
     let fechaInicio: String?
+    /// Día + «Entregar a más tardar» si es válida; si no, día + hora de inicio (fin del día).
     let fechaEntregaEsperada: String?
     let fechaMaxima: String?
     let evidencePhotoRequired: Int
     let coreKind: String
     let assignmentCharge: String?
+    /// `BASICA`…`CRITICA`. Al crear solo viajan si hay valor (los nil no se codifican).
+    let complejidad: String?
+    let complejidadSugerida: String?
     let estatus: String
     let creadoPorId: Int
+}
+
+extension CoreTiemposTipicos {
+    /// Respuesta de `GET ai/complejidad/tiempos`; lo que falte cuenta como «sin anteriores».
+    init(map: [String: Any]) {
+        func tipico(_ value: Any?) -> CoreTipico {
+            let row = value as? [String: Any] ?? [:]
+            let mediana: Int? = ActivityParse.double(row["medianaMin"]).flatMap { $0.isFinite && $0 >= 0 ? Int($0.rounded()) : nil }
+            return CoreTipico(muestras: ActivityParse.int(row["muestras"]) ?? 0, medianaMin: mediana)
+        }
+        let niveles = map["porComplejidad"] as? [String: Any] ?? [:]
+        var porComplejidad: [CoreComplejidad: CoreTipico] = [:]
+        for nivel in CoreComplejidad.allCases {
+            porComplejidad[nivel] = tipico(niveles[nivel.rawValue])
+        }
+        let clave = ActivityParse.str(map["clave"])
+        self.init(clave: clave.isEmpty ? nil : clave, total: tipico(map["total"]), porComplejidad: porComplejidad)
+    }
 }
 
 extension CoreRepository {
@@ -101,6 +123,44 @@ extension CoreRepository {
         let id = ConsoleHelpers.mapInt(ConsoleHelpers.decodeMap(data), "id")
         guard id > 0 else { throw CoreError.message("El servidor no devolvió la actividad creada") }
         return id
+    }
+
+    /// `GET ai/complejidad/tiempos?coreKind=&tipo=`: lo típico de ese tipo de trabajo.
+    func tiemposTipicos(coreKind: String, tipo: String?) async throws -> CoreTiemposTipicos {
+        var query = ["coreKind": coreKind]
+        if let tipo, !tipo.isEmpty { query["tipo"] = tipo }
+        let data = try await ApiClient.shared.get("ai/complejidad/tiempos", query: query)
+        return CoreTiemposTipicos(map: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// `POST ai/complejidad/sugerir`: la complejidad que sugiere la IA, o nil si no hay
+    /// sugerencia (sin IA, título corto o sin conexión: elegir nunca depende de que responda).
+    func sugerirComplejidad(
+        coreKind: String,
+        tipo: String?,
+        titulo: String,
+        indicaciones: String?
+    ) async throws -> CoreSugerenciaComplejidad? {
+        struct Body: Encodable {
+            let coreKind: String
+            let tipo: String?
+            let titulo: String
+            let indicaciones: String?
+        }
+        let notas = (indicaciones ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let data = try await ApiClient.shared.postJSON(
+            "ai/complejidad/sugerir",
+            body: Body(
+                coreKind: coreKind,
+                tipo: (tipo ?? "").isEmpty ? nil : tipo,
+                titulo: titulo,
+                indicaciones: notas.isEmpty ? nil : notas
+            )
+        )
+        if CoreRepository.isQueuedOffline(data) { return nil }
+        guard let row = ConsoleHelpers.decodeMap(data)["sugerencia"] as? [String: Any],
+              let nivel = CoreComplejidad.de(ActivityParse.str(row["complejidad"])) else { return nil }
+        return CoreSugerenciaComplejidad(complejidad: nivel, motivo: ActivityParse.str(row["motivo"]))
     }
 
     /// `POST activities/:id/team` — suma a alguien al equipo con su rol e indicaciones.

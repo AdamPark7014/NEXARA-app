@@ -451,6 +451,8 @@ object CoreActivityKinds {
         val i = inicio.atZone(zone)
         val m = maxima.atZone(zone)
         if (i.toLocalDate() != m.toLocalDate()) return null
+        // 23:59 es el fin del día escrito a mano, no un compromiso (`limiteEsFinDeDia` de la API).
+        if (m.hour == 23 && m.minute == 59) return null
         return formatHora(m.hour, m.minute)
     }
 

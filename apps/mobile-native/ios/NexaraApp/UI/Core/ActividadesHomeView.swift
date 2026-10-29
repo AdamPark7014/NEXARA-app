@@ -39,6 +39,8 @@ struct ActividadesHomeView: View {
     /// Contrato C: Hoy · Semana · Mes para la pizarra y para «Asignadas por mí».
     @State private var rango: ActividadesRango = .hoy
     @State private var asignadasPorMi: [BoardAsignadaPorMi] = []
+    /// «En espera de revisión»: no depende del rango, es todo lo enviado sin aprobar ni devolver.
+    @State private var porRevisar: [RevisionPendiente] = []
     @State private var ruta: ActividadesRuta?
 
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
@@ -117,9 +119,12 @@ struct ActividadesHomeView: View {
                 error: boardError,
                 rango: $rango,
                 asignadasPorMi: asignadasPorMi,
+                porRevisar: porRevisar,
                 onRefresh: { await cargarPizarra() },
                 onOpenPerson: { user in ruta = .persona(id: user.id, nombre: user.nombre) },
-                onOpenActivity: { id in ruta = .actividad(id: id, tab: nil) }
+                onOpenActivity: { id in ruta = .actividad(id: id, tab: nil) },
+                // «Revisar» abre Evidencias, donde se aprueba o devuelve.
+                onReview: { id in ruta = .actividad(id: id, tab: ActividadesUx.tabEvidencias) }
             )
         }
     }
@@ -142,6 +147,7 @@ struct ActividadesHomeView: View {
         boardLoading = false
         // El endpoint puede no existir todavía: sin lista, la sección no aparece.
         asignadasPorMi = (try? await CoreRepository.shared.boardAsignadasPorMi(desde: desde, hasta: hasta)) ?? []
+        porRevisar = (try? await CoreRepository.shared.revisionesPendientes()) ?? []
     }
 
     /// Refresco silencioso: sin red se queda la última pizarra.
@@ -166,9 +172,11 @@ struct TeamBoardView: View {
     let error: String?
     @Binding var rango: ActividadesRango
     let asignadasPorMi: [BoardAsignadaPorMi]
+    var porRevisar: [RevisionPendiente] = []
     let onRefresh: () async -> Void
     let onOpenPerson: (TeamBoardUser) -> Void
     let onOpenActivity: (Int) -> Void
+    var onReview: (Int) -> Void = { _ in }
 
     /// Aro elegido en la barra; nil = todos.
     @State private var filtro: ActividadesAro?
@@ -201,6 +209,7 @@ struct TeamBoardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     contenido
+                    enEsperaDeRevision
                     asignadas
                 }
                 .padding(.horizontal, 16)
@@ -261,6 +270,44 @@ struct TeamBoardView: View {
         }
     }
 
+    /// «En espera de revisión» (web, 28-10): lo que espera mi visto bueno.
+    @ViewBuilder
+    private var enEsperaDeRevision: some View {
+        if !porRevisar.isEmpty {
+            NxDenseSectionHeader(
+                title: "En espera de revisión (\(porRevisar.count))",
+                hint: "Lo enviado ya cuenta como cumplido: revisarlo no tiene plazo."
+            )
+            .padding(.top, 6)
+            VStack(spacing: 0) {
+                ForEach(Array(porRevisar.prefix(EnEsperaRevision.maximo).enumerated()), id: \.element.id) { i, r in
+                    if i > 0 {
+                        Rectangle().fill(NxColors.borderSubtle).frame(height: 1)
+                    }
+                    Button { onReview(r.activityId) } label: {
+                        PorRevisarRow(r: r)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if porRevisar.count > EnEsperaRevision.maximo {
+                    Rectangle().fill(NxColors.borderSubtle).frame(height: 1)
+                    Text("Y \(porRevisar.count - EnEsperaRevision.maximo) más en la web (Actividades › En espera de revisión).")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(NxColors.muted)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .background(NxColors.card)
+            .clipShape(RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+                    .strokeBorder(NxColors.border, lineWidth: 1)
+            )
+        }
+    }
+
     /// Contrato C: lo que yo asigné en el rango, con persona, estado y semáforo.
     @ViewBuilder
     private var asignadas: some View {
@@ -293,6 +340,34 @@ struct TeamBoardView: View {
 
     private static func primeraMinuscula(_ texto: String) -> String {
         texto.prefix(1).lowercased() + texto.dropFirst()
+    }
+}
+
+/// Una evidencia por revisar: actividad, quién la envió y desde cuándo espera.
+private struct PorRevisarRow: View {
+    let r: RevisionPendiente
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(EnEsperaRevision.titulo(r))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(NxColors.fg)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Text(EnEsperaRevision.detalle(r))
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(NxColors.muted)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Revisar")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(NxColors.brand)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
     }
 }
 

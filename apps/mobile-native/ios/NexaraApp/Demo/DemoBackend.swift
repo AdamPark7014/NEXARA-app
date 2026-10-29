@@ -141,6 +141,15 @@ extension DemoStore {
             return empty()
         case "company":
             return reply(fxCompanyMine())
+        case "ai":
+            // Complejidad al asignar (`DemoFixtures+Activities`): tiempo típico y sugerencia.
+            if parts.count >= 3, parts[1] == "complejidad" {
+                if isGet, parts[2] == "tiempos" {
+                    return reply(fxTiemposTipicos(coreKind: query["coreKind"] ?? "", tipo: query["tipo"]))
+                }
+                if method == "POST", parts[2] == "sugerir" { return reply(fxSugerirComplejidad(json)) }
+            }
+            return empty()
         case "cotizaciones", "employee-payments", "expenses", "workflow":
             // Cotizaciones, Pagos a empleados, Gastos y Aprobaciones (`DemoFixtures+Finanzas`).
             return routeFinanzas(method: method, parts: parts, json: json, body: body) ?? empty()
@@ -172,6 +181,8 @@ extension DemoStore {
             return reply(fxBoard(now: now))
         case "celebraciones":
             return reply(fxCelebraciones(now: now))
+        case "revisiones":
+            return reply(fxRevisiones(now: now))
         case "kpis":
             let range = ConsoleHelpersFallback.range(query)
             return reply(fxKpis(desde: range.desde, hasta: range.hasta))
@@ -295,6 +306,11 @@ extension DemoStore {
             descripcion: ""
         )
         extraActivities.append(activity)
+        let complejidad = DemoComplejidad(
+            elegida: json["complejidad"] as? String,
+            sugerida: json["complejidadSugerida"] as? String
+        )
+        if complejidad.elegida != nil || complejidad.sugerida != nil { complejidadCreada[id] = complejidad }
         if owner == DemoMode.meId { openOrder.append(id) }
         return reply(dj(["id": id, "anNumber": activity.folio]))
     }

@@ -202,6 +202,9 @@ final class ApiClient {
         if path.hasSuffix("/pausar") || path.hasSuffix("/reanudar") || path.hasSuffix("/por-codigo") {
             return true
         }
+        // La sugerencia de complejidad solo sirve mientras se llena el formulario: reenviada
+        // después nadie la lee y gasta una llamada a la IA.
+        if path == "ai/complejidad/sugerir" { return true }
         if path.hasPrefix("tool-requests/") {
             return path.hasSuffix("/deliver") || path.hasSuffix("/return")
         }

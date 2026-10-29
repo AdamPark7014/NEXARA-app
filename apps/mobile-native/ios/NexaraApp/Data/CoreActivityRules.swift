@@ -160,26 +160,189 @@ enum CoreActivityKind: String, CaseIterable, Identifiable, Hashable {
     var requiresSchedule: Bool { self == .obra || self == .servicio }
 }
 
-/// Subtipos de Tarea: viajan como `ticketType OTRO` + `ticketTypeCustom = label`
-/// (o el texto libre de «Otro»).
+/// Familias del catálogo cerrado de tareas (`FAMILIAS_TAREA` web, 28-10), en el orden en que
+/// se pintan.
+enum CoreFamiliaTarea: String, CaseIterable, Identifiable, Hashable {
+    case campo, oficina, administracion, transversal
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .campo: return "En campo"
+        case .oficina: return "Oficina técnica"
+        case .administracion: return "Administración"
+        case .transversal: return "Para todos"
+        }
+    }
+}
+
+/// Subtipos de Tarea (`TAREA_TIPOS` web): viajan como `ticketType OTRO` + `ticketTypeCustom = label`.
+///
+/// 28-10: catálogo cerrado en cuatro familias, sin «Otro». En producción había 100 valores
+/// escritos a mano y sin un tipo confiable no se puede medir cuánto tarda cada trabajo. Las
+/// actividades viejas con texto libre se siguen leyendo tal cual (`CoreStatusUI.kind`).
 struct CoreTareaTipo: Identifiable, Hashable {
     let id: String
     let label: String
-    /// SF Symbol (antes emoji).
+    /// SF Symbol equivalente al ícono de `ActivityKindIcon` web.
     let symbol: String
+    let familia: CoreFamiliaTarea
 
     static let all: [CoreTareaTipo] = [
-        CoreTareaTipo(id: "levantamiento", label: "Levantamiento", symbol: "ruler"),
-        CoreTareaTipo(id: "recoleccion", label: "Recolección", symbol: "shippingbox"),
-        CoreTareaTipo(id: "entrega", label: "Entrega", symbol: "truck.box"),
-        CoreTareaTipo(id: "junta", label: "Junta", symbol: "person.2"),
-        CoreTareaTipo(id: "compra", label: "Compra de material", symbol: "cart"),
-        CoreTareaTipo(id: "preparacion", label: "Preparación de equipo", symbol: "wrench.adjustable"),
-        CoreTareaTipo(id: "tramite", label: "Trámite", symbol: "doc.text"),
-        CoreTareaTipo(id: "capacitacion", label: "Capacitación", symbol: "graduationcap"),
-        CoreTareaTipo(id: "documentacion", label: "Reporte / documentación", symbol: "doc.richtext"),
-        CoreTareaTipo(id: "otro", label: "Otro", symbol: "pencil"),
+        CoreTareaTipo(id: "instalacion", label: "Instalación", symbol: "video", familia: .campo),
+        CoreTareaTipo(id: "cableado", label: "Cableado y canalización", symbol: "cable.connector", familia: .campo),
+        CoreTareaTipo(id: "mantenimiento", label: "Mantenimiento preventivo", symbol: "bubbles.and.sparkles", familia: .campo),
+        CoreTareaTipo(id: "correctivo", label: "Correctivo y diagnóstico", symbol: "ladybug", familia: .campo),
+        CoreTareaTipo(id: "levantamiento", label: "Levantamiento", symbol: "ruler", familia: .campo),
+        CoreTareaTipo(id: "recoleccion", label: "Recolección", symbol: "shippingbox", familia: .campo),
+        CoreTareaTipo(id: "entrega", label: "Entrega", symbol: "truck.box", familia: .campo),
+        CoreTareaTipo(id: "preparacion", label: "Preparación de equipo", symbol: "wrench.adjustable", familia: .campo),
+        CoreTareaTipo(id: "diseno", label: "Diseño, CAD y memoria técnica", symbol: "pencil.and.ruler", familia: .oficina),
+        CoreTareaTipo(
+            id: "configuracion", label: "Configuración y soporte remoto",
+            symbol: "antenna.radiowaves.left.and.right", familia: .oficina
+        ),
+        CoreTareaTipo(id: "tramite", label: "Trámite", symbol: "doc.text", familia: .administracion),
+        CoreTareaTipo(id: "compra", label: "Compra de material", symbol: "cart", familia: .administracion),
+        CoreTareaTipo(id: "facturacion", label: "Facturación y contabilidad", symbol: "receipt", familia: .administracion),
+        CoreTareaTipo(id: "documentacion", label: "Reporte / documentación", symbol: "doc.richtext", familia: .transversal),
+        CoreTareaTipo(id: "capacitacion", label: "Capacitación", symbol: "graduationcap", familia: .transversal),
+        CoreTareaTipo(id: "junta", label: "Junta", symbol: "person.2", familia: .transversal),
+        CoreTareaTipo(id: "evento", label: "Evento o guardia", symbol: "calendar", familia: .transversal),
     ]
+
+    /// Los tipos de una familia, en el orden del catálogo.
+    static func deFamilia(_ familia: CoreFamiliaTarea) -> [CoreTareaTipo] {
+        all.filter { $0.familia == familia }
+    }
+}
+
+// MARK: - Complejidad al asignar
+
+/// Complejidad de la actividad (`apps/web/lib/complejidad.ts`). La IA sugiere un nivel; quien
+/// asigna decide y las dos quedan guardadas (`complejidad` y `complejidadSugerida`).
+enum CoreComplejidad: String, CaseIterable, Identifiable, Hashable {
+    case basica = "BASICA"
+    case estandar = "ESTANDAR"
+    case compleja = "COMPLEJA"
+    case critica = "CRITICA"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .basica: return "Básica"
+        case .estandar: return "Estándar"
+        case .compleja: return "Compleja"
+        case .critica: return "Crítica"
+        }
+    }
+
+    /// Lo que se lee bajo el nivel cuando aún no hay tiempo típico.
+    var ayuda: String {
+        switch self {
+        case .basica: return "Rutina corta"
+        case .estandar: return "Lo normal"
+        case .compleja: return "Más volumen"
+        case .critica: return "Cliente detenido"
+        }
+    }
+
+    /// Qué cuenta en cada nivel (`COMPLEJIDAD_NIVEL_TITULO` web): lo mismo que lee la IA.
+    var definicion: String {
+        switch self {
+        case .basica: return "Rutina corta y conocida, un solo punto o equipo"
+        case .estandar: return "Lo normal de este tipo de trabajo"
+        case .compleja: return "Más volumen o más difícil: varios puntos, altura, falla sin causa clara o coordinar con otros"
+        case .critica: return "El cliente está detenido o hay riesgo: sistema caído, incidente o plazo de horas"
+        }
+    }
+
+    /// El nivel que guarda la API (`BASICA`…`CRITICA`); nil si viene vacío o es otro texto.
+    static func de(_ valor: String?) -> CoreComplejidad? {
+        CoreComplejidad(rawValue: (valor ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// Tope de la rueda de tiempo estimado (12 h por actividad, como la web).
+    static let topeEstimadoMin = 720
+
+    /// Lo típico para el nivel elegido; si ese nivel aún no junta anteriores suficientes, el
+    /// del tipo completo (y se dice). `tipicoPara` web.
+    static func tipicoPara(_ tiempos: CoreTiemposTipicos?, _ nivel: CoreComplejidad?) -> CoreTipicoElegido? {
+        guard let tiempos else { return nil }
+        if let nivel, let delNivel = tiempos.porComplejidad[nivel], let mediana = delNivel.medianaMin {
+            return CoreTipicoElegido(minutos: mediana, muestras: delNivel.muestras, delNivel: true)
+        }
+        if let mediana = tiempos.total.medianaMin {
+            return CoreTipicoElegido(minutos: mediana, muestras: tiempos.total.muestras, delNivel: false)
+        }
+        return nil
+    }
+
+    /// «Lo típico en Instalación · Compleja: 3 h 40 min (9 anteriores).» (`textoTipico` web).
+    static func textoTipico(tipoLabel: String, nivel: CoreComplejidad?, tipico: CoreTipicoElegido?) -> String? {
+        guard let tipico else { return nil }
+        let delNivel = tipico.delNivel ? (nivel.map { " · \($0.label)" } ?? "") : ""
+        let cuantas = "\(tipico.muestras) anterior\(tipico.muestras == 1 ? "" : "es")"
+        return "Lo típico en \(tipoLabel)\(delNivel): \(formatoMinutos(tipico.minutos)) (\(cuantas))."
+    }
+
+    /// «45 min», «2 h», «3 h 40 min» (`formatoMinutos` web, con el formateador de `CoreFormat`).
+    static func formatoMinutos(_ minutos: Int) -> String {
+        CoreFormat.minutes(minutos) ?? "0 min"
+    }
+
+    /// Minutos que deja «Usar … como tiempo estimado»: tope de 12 h y redondeados a 5 min,
+    /// porque la rueda de minutos va de 5 en 5.
+    static func minutosParaEstimado(_ minutos: Int) -> Int {
+        let tope = min(topeEstimadoMin, max(0, minutos))
+        return min(topeEstimadoMin, Int((Double(tope) / 5).rounded()) * 5)
+    }
+
+    /// Texto de la sugerencia después de «Sugerencia: X.»: el motivo y quién decide.
+    static func textoSugerencia(_ sugerencia: CoreSugerenciaComplejidad, elegida: CoreComplejidad?) -> String {
+        var motivo = sugerencia.motivo.trimmingCharacters(in: .whitespacesAndNewlines)
+        if motivo.hasSuffix(".") { motivo.removeLast() }
+        let cierre = elegida != nil && elegida != sugerencia.complejidad
+            ? "Elegiste otra: quedan las dos registradas."
+            : "Tú decides; si la cambias, queda registrado."
+        return motivo.isEmpty ? cierre : "\(motivo). \(cierre)"
+    }
+
+    /// Renglón «Complejidad» del detalle: la etiqueta y, si la IA sugirió otra, «La IA sugirió
+    /// compleja». nil cuando la actividad no trae una complejidad válida.
+    static func detalle(complejidad: String?, sugerida: String?) -> (valor: String, nota: String?)? {
+        guard let elegida = de(complejidad) else { return nil }
+        let nota: String? = de(sugerida).flatMap { $0 == elegida ? nil : "La IA sugirió \($0.label.lowercased())" }
+        return (elegida.label, nota)
+    }
+}
+
+/// Anteriores de un nivel y su mediana en minutos (nil = menos de las mínimas para enseñarla).
+struct CoreTipico: Hashable {
+    let muestras: Int
+    let medianaMin: Int?
+}
+
+/// `GET ai/complejidad/tiempos`: lo típico del tipo de trabajo, en total y por nivel.
+struct CoreTiemposTipicos: Hashable {
+    let clave: String?
+    let total: CoreTipico
+    let porComplejidad: [CoreComplejidad: CoreTipico]
+}
+
+/// `POST ai/complejidad/sugerir` → `sugerencia`.
+struct CoreSugerenciaComplejidad: Hashable {
+    let complejidad: CoreComplejidad
+    let motivo: String
+}
+
+/// Lo típico que se enseña: del nivel elegido o, si aún no hay suficientes, del tipo completo.
+struct CoreTipicoElegido: Hashable {
+    let minutos: Int
+    let muestras: Int
+    let delNivel: Bool
 }
 
 /// Encargo al responsable: la ejecuta él o la reparte a su equipo.
@@ -382,5 +545,74 @@ enum CoreActivityRules {
         if creatorEmail == CoreOrg.developerEmail || creatorEmail == CoreOrg.antonioEmail { return false }
         if target == CoreOrg.antonioEmail { return false }
         return creatorEmail == CoreOrg.luisEmail
+    }
+
+    // MARK: Entregar a más tardar (`apps/web/lib/ops-activity-form.ts`)
+
+    /// Hora de inicio cuando no hay una.
+    static let horaPorOmision = "09:00"
+
+    /// El compromiso vale vacío o, si es `HH:MM`, solo después de la hora de inicio.
+    static func compromisoValido(hora: String, compromiso: String) -> Bool {
+        if compromiso.isEmpty { return true }
+        guard compromiso.range(of: #"^\d{2}:\d{2}$"#, options: .regularExpression) != nil else { return false }
+        return compromiso > (hora.isEmpty ? horaPorOmision : hora)
+    }
+
+    /// La hora de la fecha máxima y de la entrega esperada: la del compromiso si es válida; si
+    /// no, la de inicio (la API la lee como «fin del día»). Con periodo de varios días no aplica.
+    static func horaLimite(hora: String, compromiso: String, conPeriodo: Bool = false) -> String {
+        let inicio = hora.isEmpty ? horaPorOmision : hora
+        guard !conPeriodo, !compromiso.isEmpty, compromisoValido(hora: inicio, compromiso: compromiso) else { return inicio }
+        return compromiso
+    }
+
+    /// La hora compromiso («HH:mm») de una actividad guardada: su fecha máxima, si cae el mismo
+    /// día (en México) y después del inicio. Una fecha máxima igual al inicio es «fin del día» y
+    /// da nil; con periodo de varios días tampoco aplica (igual que Android).
+    static func horaCompromisoDe(fechaInicio: String?, fechaMaxima: String?, conPeriodo: Bool) -> String? {
+        guard !conPeriodo,
+              let inicio = NxFormat.parseISO(fechaInicio),
+              let maxima = NxFormat.parseISO(fechaMaxima),
+              maxima > inicio,
+              NxHoraMexico.dia(maxima) == NxHoraMexico.dia(inicio) else { return nil }
+        let hora = NxHoraMexico.hhmm(fechaMaxima)
+        // 23:59 es el fin del día escrito a mano, no un compromiso (`limiteEsFinDeDia` de la API).
+        return hora == "23:59" ? nil : hora
+    }
+
+    // MARK: Complejidad: cuándo se pide y cómo se nombra el tipo de trabajo
+
+    /// `SERVICIO_LABEL` web: el tipo de servicio como se lee en la pista de lo típico.
+    static let servicioLabel: [String: String] = [
+        "PREVENTIVO": "Servicio preventivo",
+        "CORRECTIVO": "Servicio correctivo",
+        "EMERGENCIA": "Servicio de emergencia",
+        "INSTALACION": "Servicio de instalación",
+    ]
+
+    /// El tipo que se manda a `ai/complejidad/tiempos` y `sugerir`: en tarea, la etiqueta del chip (nil sin
+    /// elegir); en servicio, su `ticketType`; en los demás, ninguno.
+    static func tipoParaComplejidad(kind: CoreActivityKind, tareaTipo: CoreTareaTipo?, ticketType: String) -> String? {
+        switch kind {
+        case .tarea: return tareaTipo?.label
+        case .servicio: return ticketType
+        case .proyecto, .obra, .comercial: return nil
+        }
+    }
+
+    /// La complejidad se ve en todos los tipos; en tarea, después de elegir su tipo.
+    static func complejidadVisible(kind: CoreActivityKind, tipo: String?) -> Bool {
+        kind != .tarea || !(tipo ?? "").isEmpty
+    }
+
+    /// «Instalación», «Servicio correctivo», «Obra»: el tipo de trabajo como se lee en la pista.
+    static func etiquetaTipoTrabajo(kind: CoreActivityKind, tipo: String?) -> String {
+        let limpio = (tipo ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        switch kind {
+        case .tarea: return limpio.isEmpty ? kind.title : limpio
+        case .servicio: return servicioLabel[limpio.isEmpty ? "PREVENTIVO" : limpio] ?? "Servicio"
+        case .proyecto, .obra, .comercial: return kind.title
+        }
     }
 }

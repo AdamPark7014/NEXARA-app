@@ -238,14 +238,34 @@ struct ActivityCoreDetailView: View {
         )
     }
 
+    /// «Entregar a más tardar» de la actividad («17:00»), o nil si su límite es el fin del día.
+    private var horaCompromiso: String? {
+        CoreActivityRules.horaCompromisoDe(
+            fechaInicio: text("fechaInicio"),
+            fechaMaxima: text("fechaMaxima"),
+            conPeriodo: raw["periodo"] is [String: Any]
+        )
+    }
+
+    /// «26 sept 2026 · a más tardar 17:00» con hora compromiso (como Android); si no, solo el día.
+    private var entregaEsperadaTexto: String {
+        let entrega = ActivityDetailFormat.date(text("fechaEntregaEsperada"))
+        guard let hora = horaCompromiso else { return entrega }
+        // El compromiso cae el mismo día que la fecha máxima: sirve si la entrega no viene.
+        let dia = entrega == "—" ? ActivityDetailFormat.date(text("fechaMaxima")) : entrega
+        return "\(dia) · a más tardar \(hora)"
+    }
+
     private var facts: [ActivityFact] {
         let plan = ActivityDetailFormat.minutes(ActivityParse.double(raw["minutosPlan"]))
         let real = ActivityDetailFormat.minutes(ActivityParse.double(raw["minutosReales"]))
         let entregaRaw = text("fechaEntregaEsperada").trimmingCharacters(in: .whitespaces)
         let maximaRaw = text("fechaMaxima").trimmingCharacters(in: .whitespaces)
-        let entrega: String? = !entregaRaw.isEmpty
-            ? ActivityDetailFormat.date(entregaRaw)
-            : (!maximaRaw.isEmpty ? ActivityDetailFormat.when(maximaRaw) : nil)
+        // Con hora compromiso («Entregar a más tardar»), la hora es lo que importa en el día.
+        let entrega: String? = horaCompromiso.map { "Antes de \($0)" }
+            ?? (!entregaRaw.isEmpty
+                ? ActivityDetailFormat.date(entregaRaw)
+                : (!maximaRaw.isEmpty ? ActivityDetailFormat.when(maximaRaw) : nil))
         let desdeRaw = ActivityDetailFormat.clock(sesion?.sesionAbiertaDesde)
         let desde: String? = desdeRaw == "—" ? nil : desdeRaw
         let corriendo = sesion?.enCurso == true && desde != nil
@@ -626,6 +646,10 @@ struct ActivityCoreDetailView: View {
             ActivityDetailRow(label: "Sucursal", value: sucursal)
             ActivityDetailRow(label: "Dirección", value: text("branchAddress"))
             ActivityDetailRow(label: "Prioridad", value: ActivityDetailRules.priorityLabel(text("prioridad")) ?? "")
+            // La que se eligió al asignar y, si la IA sugirió otra, cuál (como la web).
+            if let comp = CoreComplejidad.detalle(complejidad: text("complejidad"), sugerida: text("complejidadSugerida")) {
+                ActivityDetailRow(label: "Complejidad", value: comp.valor, nota: comp.nota)
+            }
             if !ticketType.isEmpty {
                 ActivityDetailRow(label: "Tipo de servicio", value: ActivityDetailRules.humanize(ticketType))
             }
@@ -633,7 +657,7 @@ struct ActivityCoreDetailView: View {
             ActivityDetailRow(label: "Inicio", value: ActivityDetailFormat.dateTime(text("fechaInicio")))
             // Varios días: la frase la manda la API («Día 3 de 10 · termina vie 25 sep»).
             ActivityDetailRow(label: "Periodo", value: nested("periodo", "etiqueta"))
-            ActivityDetailRow(label: "Entrega esperada", value: ActivityDetailFormat.date(text("fechaEntregaEsperada")))
+            ActivityDetailRow(label: "Entrega esperada", value: entregaEsperadaTexto)
             ActivityDetailRow(label: "Finalización", value: ActivityDetailFormat.dateTime(text("fechaFinalizacion")))
         }
         .padding(16)
