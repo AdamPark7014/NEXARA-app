@@ -12,12 +12,13 @@ import {
   type TablaEstandar,
 } from "./tiempo-estandar";
 
-const u = (clave: string, singular: string, plural: string, porUnidadMin: number) => ({
+const u = (clave: string, singular: string, plural: string, porUnidadMin: number, incluidas?: number) => ({
   clave,
   singular,
   plural,
   pregunta: `¿Cuántos ${plural}?`,
   porUnidadMin,
+  ...(incluidas ? { incluidas } : {}),
 });
 
 // Copia de las reglas de la API que se prueban (apps/api/src/ai/estandar/tabla-estandar.ts).
@@ -25,7 +26,7 @@ const TABLA: TablaEstandar = {
   topeMin: 720,
   origen: { nombre: "Oficina NEXARA" },
   reglas: [
-    { clave: "comercial", nombre: "Cotización", baseMin: 40, unidades: [u("partidas", "partida", "partidas", 4)], destino: false, enLugarMin: 0 },
+    { clave: "comercial", nombre: "Cotización", baseMin: 40, unidades: [u("partidas", "partida", "partidas", 5, 10)], destino: false, enLugarMin: 0 },
     { clave: "tarea:Instalación", nombre: "Instalación", baseMin: 30, unidades: [u("dispositivos", "dispositivo", "dispositivos", 45)], destino: false, enLugarMin: 0 },
     {
       clave: "tarea:Cableado y canalización",
@@ -60,13 +61,17 @@ const TABLA: TablaEstandar = {
 const regla = (clave: string) => TABLA.reglas.find((r) => r.clave === clave) as ReglaEstandar;
 
 describe("la misma cuenta que la API (§8)", () => {
-  it("cotización: 40 min + 4 por partida (5 → 1 h, 50 → 4 h)", () => {
-    expect(calcularEstandar(regla("comercial"), { cantidad: 5 }).totalMin).toBe(60);
+  it("cotización: hasta 10 partidas en 40 min y 5 por cada una de más (50 → 4 h)", () => {
+    expect(calcularEstandar(regla("comercial"), { cantidad: 5 }).totalMin).toBe(40);
+    expect(calcularEstandar(regla("comercial"), { cantidad: 10 }).desglose).toEqual([
+      { concepto: "Base de cotización (hasta 10 partidas)", minutos: 40 },
+    ]);
+    expect(calcularEstandar(regla("comercial"), { cantidad: 11 }).totalMin).toBe(45);
     const r = calcularEstandar(regla("comercial"), { cantidad: 50 });
     expect(r.totalMin).toBe(240);
     expect(r.desglose).toEqual([
-      { concepto: "Base de cotización", minutos: 40 },
-      { concepto: "50 partidas × 4 min", minutos: 200 },
+      { concepto: "Base de cotización (hasta 10 partidas)", minutos: 40 },
+      { concepto: "40 partidas más × 5 min", minutos: 200 },
     ]);
   });
 
