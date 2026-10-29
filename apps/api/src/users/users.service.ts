@@ -14,6 +14,8 @@ import { IntegraAcsFanoutService } from '../integra/integra-acs-fanout.service.j
 import { CredentialVaultService } from '../credential-vault/credential-vault.service.js';
 import { NON_EMPLOYEE_EMAILS, PLATFORM_DEVELOPER_EMAIL, STORE_REVIEWER_EMAIL, TESTER_CEO_EMAIL } from '../common/platform-accounts.js';
 import { asignablesDe, esJefe } from '../me/equipo-alcance.js';
+import { horarioDePersona } from '../me/kpis-equipo.js';
+import { resolveAccessScheduleKey } from '../integra/access-schedule-defaults.js';
 import { motivoLateralInvalida } from './organigrama-lateral.js';
 import {
   buildAccessScheduleAssignment,
@@ -796,7 +798,18 @@ export class UsersService {
 
       const activos = await this.prisma['user'].findMany({
         where: { AND: [membership, { isActive: true }] },
-        select: { id: true, nombre: true, email: true, managerId: true, puesto: true, avatarUrl: true, role: true },
+        select: {
+          id: true,
+          nombre: true,
+          email: true,
+          managerId: true,
+          puesto: true,
+          avatarUrl: true,
+          role: true,
+          roleKey: true,
+          tipoContrato: true,
+          horario: { select: { horaEntrada: true, horaSalida: true, dias: true, graciaMin: true, jornadaOrdinariaMin: true } },
+        },
         orderBy: { nombre: 'asc' },
       });
       // Christian, Adam, Claudia y la cuenta demo nunca reciben trabajo.
@@ -824,6 +837,14 @@ export class UsersService {
             puesto: u.puesto ?? null,
             /** Tiene gente a su cargo: al asignarle, él reparte. */
             esJefe: p.esJefe || esJefe(u.id, activos as any),
+            /**
+             * `HH:MM` de entrada de su horario (el de retardos): la hora de inicio por omisión al
+             * asignarle. 10:00 la oficina, 08:00 la cuadrilla; null = sin horario (10:00).
+             */
+            horaEntrada: horarioDePersona(
+              resolveAccessScheduleKey({ isActive: true, roleKey: u.roleKey, orgRoleKey: u.role?.orgRoleKey ?? null, tipoContrato: u.tipoContrato }),
+              u.horario ?? null,
+            ).entrada,
           };
         });
     } catch (error) {

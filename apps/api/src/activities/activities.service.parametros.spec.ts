@@ -161,4 +161,21 @@ describe('tiempo y entrega en el alta y en la edición', () => {
     // Una sola consulta por empresa (caché de 10 min).
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
+
+  it('la jornada de quien ejecuta sale de su horario: la cuadrilla, de 8 a 17 con comida de 13 a 14', async () => {
+    const findUnique = jest.fn((args: { where: { id: number } }) =>
+      Promise.resolve(
+        args.where.id === ANA
+          ? { roleKey: 'tecnico', tipoContrato: null, role: null, horario: { horaEntrada: '08:00', horaSalida: '17:00', dias: [1, 2, 3, 4, 5] } }
+          : { roleKey: 'administrativo', tipoContrato: null, role: null, horario: null },
+      ),
+    );
+    const tiempos = new TiemposActividadService(undefined, { user: { findUnique } } as never);
+    expect(await tiempos.jornada(ANA)).toEqual({ entrada: '08:00', salida: '17:00', comidaDesde: '13:00', comidaHasta: '14:00' });
+    expect(await tiempos.jornada(OTRO)).toEqual({ entrada: '10:00', salida: '18:00', comidaDesde: '15:00', comidaHasta: '16:00' });
+    expect(await tiempos.jornada(null)).toEqual({ entrada: '10:00', salida: '18:00', comidaDesde: '15:00', comidaHasta: '16:00' });
+    await tiempos.jornada(ANA);
+    // Una lectura por persona (caché de 10 min).
+    expect(findUnique).toHaveBeenCalledTimes(2);
+  });
 });

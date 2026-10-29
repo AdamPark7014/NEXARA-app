@@ -3,15 +3,20 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ComplejidadService } from '../ai/complejidad/complejidad.service.js';
 import { mediana, normalizar } from '../ai/complejidad/tiempos-tipicos.js';
+import { resolveAccessScheduleKey } from '../integra/access-schedule-defaults.js';
+import { horarioDePersona } from '../me/kpis-equipo.js';
 import {
   cantidadDelTitulo,
   completarTiempos,
   entregaCalculada,
   estandarDeLectura,
   esAutoasignacion,
+  jornadaDeHorario,
+  JORNADA_OFICINA,
   tipoDelTitulo,
   type DatosTiempo,
   type HistorialTitulo,
+  type JornadaEntrega,
   type LecturaTitulo,
 } from './tiempo-entrega.js';
 
@@ -19,6 +24,8 @@ import {
 const CACHE_LECTURA_MS = 30 * 60_000;
 /** El historial de títulos cambia despacio: una consulta por empresa cada 10 minutos. */
 const CACHE_HISTORIAL_MS = 10 * 60_000;
+/** El horario de una persona cambia poco: se lee una vez cada 10 minutos. */
+const CACHE_JORNADA_MS = 10 * 60_000;
 /** La semana del 14-09 es la demo sembrada: el historial cuenta desde la siguiente. */
 const DESDE_OPERACION_REAL = new Date('2026-09-21T06:00:00Z');
 
@@ -32,6 +39,7 @@ export class TiemposActividadService {
   private readonly logger = new Logger('TiemposActividad');
   private readonly lecturas = new Map<string, { hasta: number; lectura: LecturaTitulo }>();
   private readonly historiales = new Map<number, { hasta: number; porTitulo: Map<string, Array<{ userId: number; minutos: number }>> }>();
+  private readonly jornadas = new Map<number, { hasta: number; jornada: JornadaEntrega }>();
 
   constructor(
     @Optional() private readonly complejidad?: ComplejidadService,
@@ -78,6 +86,39 @@ export class TiemposActividadService {
     const usar = propias.length >= 2 ? propias : todas.length >= 2 ? todas : null;
     if (!usar) return null;
     return { minutos: mediana(usar.map((x) => x.minutos)) ?? 0, veces: usar.length, propio: usar === propias };
+  }
+
+  /**
+   * La jornada de quien ejecuta: su horario (`horarioDePersona`, el mismo de retardos y avisos),
+   * con la comida a las 5 h de entrar. La cuadrilla (08:00–17:00) entrega antes de las 17:00; sin
+   * horario, la oficina.
+   */
+  async jornada(userId?: number | null): Promise<JornadaEntrega> {
+    if (!this.prisma || !userId) return JORNADA_OFICINA;
+    const guardada = this.jornadas.get(userId);
+    if (guardada && guardada.hasta > Date.now()) return guardada.jornada;
+    let jornada = JORNADA_OFICINA;
+    try {
+      const u = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          roleKey: true,
+          tipoContrato: true,
+          role: { select: { orgRoleKey: true } },
+          horario: { select: { horaEntrada: true, horaSalida: true, dias: true, graciaMin: true, jornadaOrdinariaMin: true } },
+        },
+      });
+      if (u) {
+        const plantilla = resolveAccessScheduleKey({ isActive: true, roleKey: u.roleKey, orgRoleKey: u.role?.orgRoleKey ?? null, tipoContrato: u.tipoContrato });
+        jornada = jornadaDeHorario(horarioDePersona(plantilla, u.horario ?? null));
+      }
+    } catch (error) {
+      this.logger.warn(`sin horario de ${userId}: ${(error as Error).message}`);
+      return JORNADA_OFICINA;
+    }
+    this.jornadas.set(userId, { hasta: Date.now() + CACHE_JORNADA_MS, jornada });
+    if (this.jornadas.size > 500) this.jornadas.delete(this.jornadas.keys().next().value as number);
+    return jornada;
   }
 
   /** El tipo con el que se calcula: el que dice el título si el elegido no cuadra. */
@@ -137,7 +178,8 @@ export class TiemposActividadService {
     const lectura = leer ? await this.lectura(companyId, conTipo) : {};
     const tipicoMin = leer ? await this.tipicoMin(companyId, conTipo) : null;
     const historial = leer ? await this.historial(companyId, dto.titulo, dto.responsableId) : null;
-    const { cambios, error } = completarTiempos(dto, { lectura, tipicoMin, historial, ahora: new Date() });
+    const jornada = await this.jornada(dto.responsableId);
+    const { cambios, error } = completarTiempos(dto, { lectura, tipicoMin, historial, jornada, ahora: new Date() });
     if (error) throw new BadRequestException(error);
     return { ...dto, ...cambios };
   }
@@ -148,6 +190,7 @@ export class TiemposActividadService {
     const lectura = await this.lectura(companyId, conTipo);
     const tipicoMin = await this.tipicoMin(companyId, conTipo);
     const historial = await this.historial(companyId, a.titulo, a.responsableId);
+    const jornada = await this.jornada(a.responsableId);
     const est = estandarDeLectura(a, lectura, { tipicoMin, duracionAgendaMin: a.tiempoEstimadoMin ?? null, historial });
     const inicio = a.fechaInicio ? new Date(a.fechaInicio) : null;
     const conPeriodo = Boolean(a.periodoInicio && a.periodoFin);
@@ -158,7 +201,7 @@ export class TiemposActividadService {
       complejidad: est.complejidad,
       unidades: est.unidades,
       fechaEntregaEsperada:
-        !conPeriodo && inicio && !Number.isNaN(inicio.getTime()) ? entregaCalculada(inicio, est.totalMin).toISOString() : null,
+        !conPeriodo && inicio && !Number.isNaN(inicio.getTime()) ? entregaCalculada(inicio, est.totalMin, jornada).toISOString() : null,
     };
   }
 }

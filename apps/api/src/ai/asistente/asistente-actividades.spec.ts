@@ -176,7 +176,8 @@ describe('asistente de actividades', () => {
 
   it('fechas en hora de CDMX', () => {
     expect(aFechaISO('2026-10-13', '9:30')).toBe('2026-10-13T15:30:00.000Z');
-    expect(aFechaISO('2026-10-13', null)).toBe('2026-10-13T15:00:00.000Z');
+    // Sin hora, la entrada de la oficina (10:00).
+    expect(aFechaISO('2026-10-13', null)).toBe('2026-10-13T16:00:00.000Z');
     expect(aFechaISO(null, '15:00')).toBeNull();
     expect(mensajeUsuario('  hola ', ahora, 'Christian')).toContain('(2026-10-12), 10:00 hora de Ciudad de México.');
   });
@@ -201,14 +202,19 @@ describe('asistente de actividades', () => {
       expect(p.payload.fechaMaxima).toBe(p.payload.fechaInicio);
     });
 
-    it('una cita sin hora va a las 9 (la del formulario) y se marca como no dicha', () => {
+    it('una cita sin hora va a la entrada de quien ejecuta (la del formulario) y se marca como no dicha', () => {
       expect(agendaDe({ fecha: '2026-10-13', hora: null, fechaLimite: null }, ahora)).toEqual({
         dia: '2026-10-13',
-        hora: '09:00',
+        hora: '10:00',
         hasta: null,
         horaDicha: false,
+        horaPorEntrada: true,
         compromiso: null,
       });
+      // La cuadrilla entra a las 8.
+      expect(agendaDe({ fecha: '2026-10-13', hora: null, fechaLimite: null }, ahora, '08:00').hora).toBe('08:00');
+      // Lo dicho manda sobre su entrada.
+      expect(agendaDe({ fecha: '2026-10-13', hora: '11:00', fechaLimite: null }, ahora, '08:00').hora).toBe('11:00');
       // Inicio después del plazo: se hace el día del plazo.
       expect(agendaDe({ fecha: '2026-10-20', hora: '11:00', fechaLimite: '2026-10-16' }, ahora).dia).toBe('2026-10-16');
     });

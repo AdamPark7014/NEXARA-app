@@ -3,6 +3,7 @@ import {
   EMPTY_ACTIVITY_FORM,
   buildActivityPayload,
   formFromActivityRecord,
+  horaDeEntrada,
   periodoDelFormulario,
   toDateInputValue,
   type OperationalProjectOption,
@@ -153,17 +154,23 @@ describe('buildActivityPayload · lo que se manda al API', () => {
     expect(editado).not.toHaveProperty('creadoPorId');
   });
 
-  it('sin hora elegida, la fecha se ancla a las 09:00 locales, no a medianoche UTC', () => {
-    // El formulario tiene campo de hora desde 6994dbbf y arranca en 09:00.
+  it('sin hora elegida, la fecha se ancla a la entrada de la oficina (10:00 locales), no a medianoche UTC', () => {
+    // El formulario arranca en la entrada de quien ejecuta; sin saberla, la de la oficina.
     const payload = buildActivityPayload(
       { ...EMPTY_ACTIVITY_FORM, projectId: '11', responsableId: '8', fecha: '2026-04-15' },
       project,
       {},
     );
-    // 09:00 en CDMX (UTC-6) = 15:00Z.
-    expect(payload.fechaInicio).toBe('2026-04-15T15:00:00.000Z');
-    expect(payload.fechaEntregaEsperada).toBe('2026-04-15T15:00:00.000Z');
-    expect(payload.fechaMaxima).toBe('2026-04-15T15:00:00.000Z');
+    // 10:00 en CDMX (UTC-6) = 16:00Z.
+    expect(payload.fechaInicio).toBe('2026-04-15T16:00:00.000Z');
+    expect(payload.fechaEntregaEsperada).toBe('2026-04-15T16:00:00.000Z');
+    expect(payload.fechaMaxima).toBe('2026-04-15T16:00:00.000Z');
+  });
+
+  it('la hora por omisión es la entrada de quien ejecuta', () => {
+    expect(horaDeEntrada('08:00')).toBe('08:00');
+    expect(horaDeEntrada(null)).toBe('10:00');
+    expect(horaDeEntrada('8:00')).toBe('10:00');
   });
 
   it('la hora elegida viaja tal cual, en hora local', () => {

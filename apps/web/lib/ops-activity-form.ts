@@ -4,6 +4,16 @@ import { estandarDeRegistro, payloadEstandar, type EstandarGuardado } from "@/li
 
 export type ActivityProjectMode = 'with_project' | 'without_project';
 
+/**
+ * Hora de inicio por omisión: la entrada de quien ejecuta (`users/assignable` trae `horaEntrada`):
+ * 10:00 la oficina, 08:00 la cuadrilla. Sin horario, la de la oficina.
+ */
+export const HORA_INICIO_POR_OMISION = "10:00";
+
+export function horaDeEntrada(valor?: string | null): string {
+  return valor && /^([01]\d|2[0-3]):[0-5]\d$/.test(valor) ? valor : HORA_INICIO_POR_OMISION;
+}
+
 export const EMPTY_ACTIVITY_FORM = {
   titulo: "",
   indicaciones: "",
@@ -13,7 +23,7 @@ export const EMPTY_ACTIVITY_FORM = {
   tiempoMaximoMin: "",
   /** Día (y primer día del periodo, si lo hay). */
   fecha: "",
-  hora: "09:00",
+  hora: HORA_INICIO_POR_OMISION,
   /**
    * «Entregar a más tardar» (`HH:MM`, mismo día). Vacío = como siempre: el límite es el fin del
    * día. Con valor, la fecha máxima y la entrega esperada quedan a esa hora y el semáforo, los
@@ -94,7 +104,7 @@ export function horaCompromisoDe(record: Record<string, unknown>): string {
 
 /** El compromiso vale solo si es después de la hora de inicio. */
 export function compromisoValido(hora: string, compromiso: string): boolean {
-  return !compromiso || (/^\d{2}:\d{2}$/.test(compromiso) && compromiso > (hora || "09:00"));
+  return !compromiso || (/^\d{2}:\d{2}$/.test(compromiso) && compromiso > (hora || HORA_INICIO_POR_OMISION));
 }
 
 export function formFromActivityRecord(record: Record<string, unknown>): ActivityFormState {
@@ -120,9 +130,9 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
         (record.fechaInicio as string) ??
         (record.fechaEntregaEsperada as string) ??
         (record.fechaMaxima as string);
-      if (!raw) return "09:00";
+      if (!raw) return HORA_INICIO_POR_OMISION;
       const d = new Date(raw);
-      if (Number.isNaN(d.getTime())) return "09:00";
+      if (Number.isNaN(d.getTime())) return HORA_INICIO_POR_OMISION;
       return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
     })(),
     horaCompromiso: horaCompromisoDe(record),
@@ -147,7 +157,7 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
 }
 
 function horaLimite(form: ActivityFormState): string {
-  const hora = form.hora || "09:00";
+  const hora = form.hora || HORA_INICIO_POR_OMISION;
   return !form.periodoFin && form.horaCompromiso && compromisoValido(hora, form.horaCompromiso) ? form.horaCompromiso : hora;
 }
 
@@ -175,7 +185,7 @@ export function buildActivityPayload(
     tiempoEstimadoMin: form.tiempoEstimadoMin ? Number(form.tiempoEstimadoMin) : undefined,
     tiempoMaximoMin: form.tiempoMaximoMin ? Number(form.tiempoMaximoMin) : undefined,
     fechaInicio: form.fecha
-      ? new Date(`${form.fecha}T${form.hora || "09:00"}:00`).toISOString()
+      ? new Date(`${form.fecha}T${form.hora || HORA_INICIO_POR_OMISION}:00`).toISOString()
       : undefined,
     // Sin compromiso, la fecha máxima es la de inicio y la API la lee como «fin del día».
     fechaEntregaEsperada: form.fecha

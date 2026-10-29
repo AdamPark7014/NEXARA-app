@@ -254,8 +254,10 @@ function Contenido({
     const destino = personas.find((x) => x.id === responsableId);
     // Sin la lista de personas no se sabe a quién va: no se aplican las reglas por persona.
     const destinoEmail = destino ? destino.email ?? null : undefined;
-    const payload = payloadFinal(p, aj, { destinoEmail, proyectos: opciones?.proyectos, sucursales: opciones?.sucursales });
-    const agenda = agendaFinal(p, aj);
+    // Sin hora dicha, empieza a la entrada de quien ejecuta (10:00 la oficina, 08:00 la cuadrilla).
+    const entrada = destino?.horaEntrada ?? null;
+    const payload = payloadFinal(p, aj, { destinoEmail, proyectos: opciones?.proyectos, sucursales: opciones?.sucursales, entrada });
+    const agenda = agendaFinal(p, aj, entrada);
     const motivos = bloqueos(p, payload, { creadorEmail, destinoEmail, v2Role: v2, isSuperAdmin, agenda });
     return { aj, payload, agenda, destinoEmail, motivos };
   };

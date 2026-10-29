@@ -416,7 +416,14 @@ export async function listAssignableUsers(token: string) {
   return users.filter((u) => !isNonEmployeeEmail(u.email));
 }
 
-export type AssignableUserOption = { id: number; nombre: string; email?: string; role?: { nombre: string } };
+export type AssignableUserOption = {
+  id: number;
+  nombre: string;
+  email?: string;
+  role?: { nombre: string };
+  /** `HH:MM` de su entrada (10:00 la oficina, 08:00 la cuadrilla); null = sin horario. */
+  horaEntrada?: string | null;
+};
 
 export function fetchNextAnNumber(token: string) {
   return apiFetch<{ next?: string }>("activities/next-an", token);

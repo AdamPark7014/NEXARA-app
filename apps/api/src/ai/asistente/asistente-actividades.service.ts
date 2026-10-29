@@ -129,7 +129,13 @@ export class AsistenteActividadesService {
       }),
     ]);
     return {
-      personas: (personas as any[]).map((p) => ({ id: p.id, nombre: p.nombre, puesto: p.puesto ?? null, email: p.email })),
+      personas: (personas as any[]).map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+        puesto: p.puesto ?? null,
+        email: p.email,
+        horaEntrada: p.horaEntrada ?? null,
+      })),
       clientes,
       sucursales: sucursales.map(({ client, ...s }) => ({ ...s, clientName: client?.name ?? '' })),
       proyectos: proyectos.map(({ client, ...p }) => ({ ...p, clientName: client?.name ?? '' })),

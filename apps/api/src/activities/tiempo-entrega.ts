@@ -12,7 +12,7 @@
  *   Lo que se supone se escribe en el desglose. Sin regla en la tabla (o en juntas y guardias), la
  *   mediana real del tipo, y si no hay, 1 h.
  * - La entrega a más tardar es el inicio más ese tiempo, contando la comida, sin pasar del fin de la
- *   jornada.
+ *   jornada de quien la ejecuta (la cuadrilla sale a las 17:00, la oficina a las 18:00).
  * - En la autoasignación esos valores son fijos; en lo asignado a otro solo se llenan si faltan.
  *
  * Puro, con pruebas.
@@ -25,10 +25,40 @@ import { workDayAtClock } from '../common/time/workday.js';
 export const TRASLADO_APROX: Traslado = { idaMin: 30, vueltaMin: 30 };
 /** Sin regla ni historial del tipo. */
 export const MINUTOS_POR_OMISION = 60;
-/** Jornada de NEXARA (Adam, 05-10-2026): comida de 15 a 16, salida a las 18. */
-export const COMIDA_DESDE_H = 15;
-export const COMIDA_HASTA_H = 16;
-export const SALIDA_H = 18;
+/** Entrada, salida y comida de quien ejecuta (`HH:MM`, hora de México). */
+export type JornadaEntrega = { entrada: string; salida: string; comidaDesde: string; comidaHasta: string };
+/** La oficina (Adam, 05-10-2026): de 10 a 18, comida de 15 a 16. Es la de quien no tiene horario. */
+export const JORNADA_OFICINA: JornadaEntrega = { entrada: '10:00', salida: '18:00', comidaDesde: '15:00', comidaHasta: '16:00' };
+/**
+ * La comida, con la regla de la ventana de comida de asistencia (`ventanaDeComida`): quien entra a
+ * las 10:00 o después come de 15 a 16; quien entra antes (la cuadrilla, 08:00–17:00) tiene una hora
+ * libre desde las 5 h de entrar, y para la entrega se supone la primera (13–14).
+ */
+export const COMIDA_TRAS_ENTRADA_MIN = 5 * 60;
+export const COMIDA_MIN = 60;
+const ENTRADA_OFICINA_MIN = 10 * 60;
+
+function minutosHm(valor?: string | null): number | null {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec((valor ?? '').trim());
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+function aHm(min: number): string {
+  const m = Math.max(0, Math.min(23 * 60 + 59, min));
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
+
+/**
+ * La jornada de un horario (`horarioDePersona`): su entrada y su salida, con su comida. Sin entrada
+ * (dirección 24/7) o sin horario, la de la oficina; sin salida, 9 h después de entrar.
+ */
+export function jornadaDeHorario(h?: { entrada?: string | null; salida?: string | null } | null): JornadaEntrega {
+  const entrada = minutosHm(h?.entrada);
+  if (entrada == null) return JORNADA_OFICINA;
+  const salida = minutosHm(h?.salida) ?? entrada + 8 * 60 + COMIDA_MIN;
+  const comida = entrada >= ENTRADA_OFICINA_MIN ? (minutosHm(JORNADA_OFICINA.comidaDesde) as number) : entrada + COMIDA_TRAS_ENTRADA_MIN;
+  return { entrada: aHm(entrada), salida: aHm(salida), comidaDesde: aHm(comida), comidaHasta: aHm(comida + COMIDA_MIN) };
+}
 
 export type TipoActividad = { coreKind?: string | null; ticketType?: string | null; ticketTypeCustom?: string | null };
 
@@ -171,13 +201,18 @@ export function estandarDeLectura(
 }
 
 /**
- * Entrega a más tardar: el inicio más el tiempo, sumando la comida (15–16) si la cruza, sin pasar
- * de la salida (18:00) cuando empieza dentro de la jornada. Al menos 5 min después del inicio.
+ * Entrega a más tardar: el inicio más el tiempo, sumando la comida si la cruza, sin pasar de la
+ * salida cuando empieza dentro de la jornada (la de quien ejecuta; por omisión, la de la oficina).
+ * Al menos 5 min después del inicio.
  */
-export function entregaCalculada(inicio: Date, minutos: number): Date {
-  const comidaDesde = workDayAtClock(inicio, COMIDA_DESDE_H);
-  const comidaHasta = workDayAtClock(inicio, COMIDA_HASTA_H);
-  const salida = workDayAtClock(inicio, SALIDA_H);
+export function entregaCalculada(inicio: Date, minutos: number, jornada: JornadaEntrega = JORNADA_OFICINA): Date {
+  const a = (hm: string, respaldo: string) => {
+    const min = minutosHm(hm) ?? (minutosHm(respaldo) as number);
+    return workDayAtClock(inicio, Math.floor(min / 60), min % 60);
+  };
+  const comidaDesde = a(jornada.comidaDesde, JORNADA_OFICINA.comidaDesde);
+  const comidaHasta = a(jornada.comidaHasta, JORNADA_OFICINA.comidaHasta);
+  const salida = a(jornada.salida, JORNADA_OFICINA.salida);
   let fin = new Date(inicio.getTime() + Math.max(5, minutos) * 60_000);
   // Empieza antes de la comida y termina después de que empieza: la hora de comida no cuenta.
   if (inicio < comidaDesde && fin > comidaDesde) fin = new Date(fin.getTime() + (comidaHasta.getTime() - comidaDesde.getTime()));
@@ -234,7 +269,15 @@ const aFecha = (v: string | Date | null | undefined): Date | null => {
  */
 export function completarTiempos(
   dto: DatosTiempo,
-  ctx: { lectura: LecturaTitulo; tipicoMin?: number | null; traslado?: Traslado | null; ahora: Date; historial?: HistorialTitulo | null },
+  ctx: {
+    lectura: LecturaTitulo;
+    tipicoMin?: number | null;
+    traslado?: Traslado | null;
+    ahora: Date;
+    historial?: HistorialTitulo | null;
+    /** La jornada de quien la ejecuta; sin ella, la de la oficina. */
+    jornada?: JornadaEntrega | null;
+  },
 ): { cambios: TiempoCompletado; error?: string } {
   const auto = esAutoasignacion(dto);
   const conPeriodo = Boolean(dto.periodoInicio && dto.periodoFin);
@@ -249,7 +292,7 @@ export function completarTiempos(
   const entrega = (minutos: number) => {
     if (conPeriodo) return {};
     const inicio = aFecha(dto.fechaInicio) ?? ctx.ahora;
-    const iso = entregaCalculada(inicio, minutos).toISOString();
+    const iso = entregaCalculada(inicio, minutos, ctx.jornada ?? JORNADA_OFICINA).toISOString();
     return { fechaEntregaEsperada: iso, fechaMaxima: iso };
   };
 

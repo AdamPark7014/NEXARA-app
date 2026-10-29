@@ -18,6 +18,7 @@ import {
   type ActivityKind,
 } from "@/lib/activity-kinds";
 import type { RoleKey } from "@/lib/rbac/roles";
+import { HORA_INICIO_POR_OMISION, horaDeEntrada } from "@/lib/ops-activity-form";
 import { createSalesClient, provisionSalesServiceClient } from "@/lib/sales-api";
 
 export type Referencia = { id: number; nombre: string };
@@ -28,7 +29,15 @@ export type Prioridad = "Alta" | "Media" | "Baja";
  * Día (AAAA-MM-DD), hora (HH:MM) y último día, en hora de Ciudad de México. `compromiso` es
  * «Entregar a más tardar» (HH:MM del mismo día; sin periodo).
  */
-export type Agenda = { dia: string | null; hora: string | null; hasta: string | null; horaDicha: boolean; compromiso?: string | null };
+export type Agenda = {
+  dia: string | null;
+  hora: string | null;
+  hasta: string | null;
+  horaDicha: boolean;
+  /** La hora es la entrada de quien ejecuta (no se dijo): cambia si se elige a otra persona. */
+  horaPorEntrada?: boolean;
+  compromiso?: string | null;
+};
 
 /** Un nombre que el API corrigió («talks» → Grupo Tox), para decirlo en su campo. */
 export type Correccion = {
@@ -87,7 +96,13 @@ export type RespuestaAsistente = {
   opciones?: { clientes: Referencia[]; proyectos: ProyectoOpcion[]; sucursales?: SucursalOpcion[] };
 };
 
-export type PersonaAsignable = { id: number; nombre: string; email?: string | null };
+export type PersonaAsignable = {
+  id: number;
+  nombre: string;
+  email?: string | null;
+  /** `HH:MM` de su entrada (10:00 la oficina, 08:00 la cuadrilla); null = sin horario. */
+  horaEntrada?: string | null;
+};
 
 async function pedir<T>(token: string, path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(buildApiUrl(path), {
@@ -217,22 +232,26 @@ export const DURACIONES_MIN = [15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 480,
 const DESFASE_CDMX = "-06:00";
 
 function aIso(dia: string, hora: string | null): string | null {
-  const h = hora && /^\d{2}:\d{2}$/.test(hora) ? hora : "09:00";
+  const h = hora && /^\d{2}:\d{2}$/.test(hora) ? hora : HORA_INICIO_POR_OMISION;
   const d = new Date(`${dia}T${h}:00${DESFASE_CDMX}`);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-/** La agenda vigente: lo que entendió la IA con lo que se cambió en la tarjeta. */
-export function agendaFinal(p: PropuestaActividad, aj: Ajustes): Agenda {
+/**
+ * La agenda vigente: lo que entendió la IA con lo que se cambió en la tarjeta. Sin hora dicha ni
+ * elegida, la entrada de quien ejecuta (`entrada`, la de la persona elegida en la tarjeta).
+ */
+export function agendaFinal(p: PropuestaActividad, aj: Ajustes, entrada?: string | null): Agenda {
   const base = p.agenda ?? { dia: null, hora: null, hasta: null, horaDicha: false };
   const dia = aj.dia !== undefined ? aj.dia || null : base.dia;
-  const hora = aj.hora !== undefined ? aj.hora || null : base.hora;
+  const porEntrada = aj.hora === undefined && !base.horaDicha && (base.horaPorEntrada === true || !base.hora);
+  const hora = aj.hora !== undefined ? aj.hora || null : porEntrada ? horaDeEntrada(entrada) : base.hora;
   const hasta = aj.hasta !== undefined ? aj.hasta || null : base.hasta;
   // Como el formulario: con varios días no hay hora compromiso (vence al fin del último).
   const compromiso = aj.compromiso !== undefined ? aj.compromiso || null : base.compromiso ?? null;
   return {
     dia,
-    hora: dia ? hora ?? "09:00" : null,
+    hora: dia ? hora ?? horaDeEntrada(entrada) : null,
     hasta: dia ? hasta : null,
     horaDicha: aj.hora !== undefined || base.horaDicha,
     compromiso: dia && !(hasta && hasta > dia) ? compromiso : null,
@@ -241,7 +260,7 @@ export function agendaFinal(p: PropuestaActividad, aj: Ajustes): Agenda {
 
 /** «Entregar a más tardar» vale solo después de la hora de inicio (como en el formulario). */
 export function compromisoValido(ag: Agenda): boolean {
-  return !ag.compromiso || (/^\d{2}:\d{2}$/.test(ag.compromiso) && ag.compromiso > (ag.hora || "09:00"));
+  return !ag.compromiso || (/^\d{2}:\d{2}$/.test(ag.compromiso) && ag.compromiso > (ag.hora || HORA_INICIO_POR_OMISION));
 }
 
 /** La corrección de nombre de un campo («talks» → Grupo Tox), si la hubo. */
@@ -327,7 +346,7 @@ const CAMPOS_FECHA = ["fechaInicio", "fechaEntregaEsperada", "fechaMaxima", "per
 export function payloadFinal(
   p: PropuestaActividad,
   aj: Ajustes,
-  ctx: { destinoEmail?: string | null; proyectos?: ProyectoOpcion[]; sucursales?: SucursalOpcion[] } = {},
+  ctx: { destinoEmail?: string | null; proyectos?: ProyectoOpcion[]; sucursales?: SucursalOpcion[]; entrada?: string | null } = {},
 ): Record<string, unknown> {
   const out: Record<string, unknown> = { ...p.payload };
   if (aj.responsableId) out.responsableId = aj.responsableId;
@@ -393,8 +412,11 @@ export function payloadFinal(
   }
   // Fechas como el formulario: inicio = entrega = máxima (a la hora compromiso si la hay); con
   // último día, el periodo (la API pone la máxima y la entrega al fin de ese día).
-  if (aj.dia !== undefined || aj.hora !== undefined || aj.hasta !== undefined || aj.compromiso !== undefined) {
-    const ag = agendaFinal(p, aj);
+  // La hora por omisión es la entrada de quien ejecuta: si se eligió a otra persona, también cambia.
+  const agendaVigente = agendaFinal(p, aj, ctx.entrada);
+  const otraEntrada = Boolean(p.agenda?.dia && agendaVigente.hora !== p.agenda.hora);
+  if (aj.dia !== undefined || aj.hora !== undefined || aj.hasta !== undefined || aj.compromiso !== undefined || otraEntrada) {
+    const ag = agendaVigente;
     for (const k of CAMPOS_FECHA) delete out[k];
     const iso = ag.dia ? aIso(ag.dia, ag.hora) : null;
     if (ag.dia && iso) {

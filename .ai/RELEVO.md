@@ -1,5 +1,27 @@
 # RELEVO
 
+- **29-10 ~16:30 (claude-code) — Entrega y hora de inicio con el horario de quien ejecuta (auditoría de parámetros
+  de Adam: «dale una pasada a todos los parámetros de todo»).**
+  - La entrega calculada usaba siempre la oficina: comida de 15 a 16 y salida a las 18:00. Ahora usa la jornada de
+    quien ejecuta (`jornadaDeHorario` en `tiempo-entrega.ts`, leída con `horarioDePersona` en
+    `TiemposActividadService.jornada`, caché de 10 min). Con la regla de comida de asistencia (`ventanaDeComida`,
+    sesión de comidas): quien entra a las 10:00 o después come de 15 a 16; la cuadrilla (08:00–17:00 en
+    `work_schedules`, 9 personas) come de 13 a 14 y entrega a más tardar a las 17:00. Sin horario, la oficina.
+    Cuando `attendance/lunch/ventana-comida.ts` llegue a main, `jornadaDeHorario` puede llamarla en vez de repetir la
+    regla.
+  - Hora de inicio por omisión: era 09:00 en el formulario y en «Asignar con IA» (web y API). Ahora es la entrada de
+    quien ejecuta: `users/assignable` trae `horaEntrada`; el formulario la pone al elegir responsable mientras nadie
+    haya movido la hora a mano; el asistente la usa cuando no se dijo la hora de otro día (`horaPorEntrada` en la
+    agenda, para que cambie si en la tarjeta se elige a otra persona). Sin horario, 10:00.
+  - Rutas (`EstandarService.ruta`): acepta `origenLat/origenLng/origenNombre`; sin eso, la oficina. Caché con tope de
+    500 (sale la que lleva más sin usarse) y clave por origen y destino.
+  - `schema.prisma`: la documentación de `WorkSchedule` decía «oficina 09:00»; el código usa 10:00.
+  - Solo de aquí en adelante: no se tocó ninguna actividad existente (hay 4 abiertas de la cuadrilla con entrega
+    después de las 17:00 que se quedan como están).
+  - Android (`CoreActivityKinds.kt`) e iOS (`CoreActivityRules.swift`) siguen con 09:00: contrato enviado a la sesión
+    de apps.
+  - Commit armado con índice temporal sobre `origin/main` (checkout compartido con trabajo ajeno sin commitear).
+
 - **29-10 ~16:20 (claude-code) — Desempeño: la revisión en 24 h hábiles no cuenta festivos; semáforo y confianza los
   manda la API.**
   - `minutosHabilesEntre` y `revisionesEnPlazo` reciben los días que no se laboran. La coordinación lee

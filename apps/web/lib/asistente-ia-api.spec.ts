@@ -100,7 +100,14 @@ describe("asistente IA en la pizarra", () => {
     expect(sinDia.fechaMaxima).toBeUndefined();
     // Un último día antes del primero no se manda (y la tarjeta lo bloquea).
     expect(payloadFinal(lista, { hasta: "2026-10-20" }).periodoFin).toBeUndefined();
-    expect(agendaFinal(base, { dia: "2026-10-24" })).toEqual({ dia: "2026-10-24", hora: "09:00", hasta: null, horaDicha: false, compromiso: null });
+    expect(agendaFinal(base, { dia: "2026-10-24" })).toEqual({ dia: "2026-10-24", hora: "10:00", hasta: null, horaDicha: false, compromiso: null });
+    // Sin hora dicha empieza a la entrada de quien ejecuta: la cuadrilla, a las 8.
+    expect(agendaFinal(base, { dia: "2026-10-24" }, "08:00").hora).toBe("08:00");
+    const porEntrada = { ...lista, agenda: { dia: "2026-10-24", hora: "10:00", hasta: null, horaDicha: false, horaPorEntrada: true } };
+    expect(agendaFinal(porEntrada, { responsableId: 3 }, "08:00").hora).toBe("08:00");
+    expect(payloadFinal(porEntrada, { responsableId: 3 }, { entrada: "08:00" }).fechaInicio).toBe("2026-10-24T14:00:00.000Z");
+    // Lo que se dijo no se mueve.
+    expect(agendaFinal(lista, { responsableId: 3 }, "08:00").hora).toBe("09:00");
   });
 
   it("no deja crear sin responsable, cliente, día del servicio ni tiempo estimado", () => {
