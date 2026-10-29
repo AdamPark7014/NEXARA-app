@@ -1143,12 +1143,21 @@
   border: 1px solid var(--nx-line);
   border-radius: 14px;
   background: var(--surface, #fff);
-  overflow: hidden;
+  /*
+   * Sin `overflow: hidden`: el menú de `@` y el de emojis salen hacia arriba del redactor y quedaban
+   * recortados (el de `@` no se veía nada, 29-10-2026). Ningún hijo pinta fondo en las esquinas.
+   */
+  overflow: visible;
   position: relative;
   box-shadow:
     0 1px 2px rgba(15, 23, 42, 0.04),
     0 8px 24px rgba(15, 23, 42, 0.05);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Dentro del redactor la barra no se estira hacia fuera: su línea inferior se saldría del borde. */
+.composer > .fmtBar {
+  margin: 0 0 4px;
 }
 
 .composer:focus-within {
