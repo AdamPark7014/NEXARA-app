@@ -17,6 +17,8 @@ export type UnidadEstandar = {
   porUnidadMin: number;
   /** Unidades que ya cubre la base; se cobran solo las de más (cotización: hasta 10 partidas). */
   incluidas?: number;
+  /** La unidad ya es un día completo en sitio (jornada en obra): no lleva la base del tipo. */
+  sinBase?: boolean;
 };
 
 export type ReglaEstandar = {
@@ -127,7 +129,7 @@ export function calcularEstandar(
     const unidad = regla.unidades.find((x) => x.clave === datos.unidad) ?? regla.unidades[0];
     const n = Math.max(0, Math.round(Number(datos.cantidad) || 0));
     const incluidas = Math.max(0, unidad.incluidas ?? 0);
-    if (regla.baseMin) {
+    if (regla.baseMin && !unidad.sinBase) {
       const hasta = incluidas ? ` (hasta ${incluidas} ${unidad.plural})` : "";
       desglose.push({ concepto: `Base de ${regla.nombre.toLowerCase()}${hasta}`, minutos: regla.baseMin });
     }

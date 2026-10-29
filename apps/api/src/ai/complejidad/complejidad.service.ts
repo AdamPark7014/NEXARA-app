@@ -59,7 +59,8 @@ export class ComplejidadService {
     if (titulo.length < 6 || !this.claude.disponible()) return { sugerencia: null };
     try {
       const regla = reglaDe({ coreKind: body.coreKind, ticketType: body.tipo, ticketTypeCustom: body.tipo });
-      const seCuenta = regla?.unidades.map((x) => x.plural).join(' o ') || null;
+      // La jornada en sitio no se lee del título: es lo que se supone cuando no dice cuántas piezas.
+      const seCuenta = regla?.unidades.filter((x) => !x.sinBase).map((x) => x.plural).join(' o ') || null;
       const { datos } = await this.claude.json<SugerenciaComplejidad>({
         ...peticionComplejidad({ tipo: tipoLegible(body.coreKind, body.tipo), seCuenta, titulo, indicaciones: body.indicaciones }),
         proceso: 'complejidad',

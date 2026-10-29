@@ -1,5 +1,21 @@
 # RELEVO
 
+- **29-10 ~17:15 (claude-code) — Jornada en obra: infraestructura sin cantidad es un día en sitio (Adam: «sí,
+  agrégalo… obra se refiere a temas de tubería o cosas con temas de CCTV… infraestructura»).**
+  - Medido el 29-10: el 44 % de lo terminado desde el 21-09 eran días completos en sitio («cableado biblioteca»,
+    «instalación de tubería»). Con «1 pieza» la tabla daba 75 min.
+  - Tabla (`tabla-estandar.ts`): unidad nueva «jornadas en sitio» de 480 min (`JORNADA_EN_OBRA_MIN`, 8 h netas,
+    `sinBase`: no lleva la base de 30 min) en Obra, Instalación y Cableado y canalización. Quien asigna la puede
+    elegir; la web la recibe de `GET ai/estandar/tabla` y su `calcularEstandar` ya respeta `sinBase`.
+  - Desde el título (`estandarDeLectura`): esos tres tipos sin cantidad = 1 jornada en obra (antes: mediana del tipo
+    o 1 pieza). El historial del mismo título sigue mandando. La entrega se topa a la salida de quien ejecuta (la
+    cuadrilla que entra a las 8: 17:00). Lo administrativo (trámites, reportes) no cambia.
+  - `tipoDelTitulo`: la regla de tubería/cableado ya no convierte lo comercial («Cotizar tubería» sigue siendo
+    cotización); la de facturas sí (las de la contadora guardadas como comercial).
+  - El prompt de la IA de complejidad no lista la jornada como algo que se cuenta.
+  - Solo de aquí en adelante. Android/iOS: si repiten la cuenta de la tabla, deben respetar `sinBase` (contrato a la
+    sesión de apps).
+
 - **29-10 ~16:10 (claude-code) — Dos arreglos web rescatados de las ramas viejas de Cursor (pedido de Adam: «no traspapelar trabajos»).**
   - `0396b2b6` (de `24bda734`): en el chat, la cuenta de respuestas y «Ver hilo» van en dos renglones en el pie del
     hilo; el botón sigue abriendo el hilo. Prueba nueva `components/chat/MessageList.spec.tsx`. La parte iOS de ese

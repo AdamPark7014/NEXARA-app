@@ -43,7 +43,8 @@ describe('relleno de las abiertas sin tiempo ni entrega (opción B del 29-10)', 
     expect(tipo).toEqual({ coreKind: 'tarea', ticketTypeCustom: 'Cableado y canalización' });
     const estCorregido = estandarDeLectura({ ...tuberia, ...tipo }, {});
     const { cambios, nota } = planDeRelleno(tuberia, estCorregido, { tipoCorregido: tipo });
-    expect(cambios).toMatchObject({ ticketTypeCustom: 'Cableado y canalización', tiempoEstandarMin: 45, tiempoEstimadoMin: 45 });
+    // Sin cantidad, el cableado es una jornada en obra (8 h), no un nodo.
+    expect(cambios).toMatchObject({ ticketTypeCustom: 'Cableado y canalización', tiempoEstandarMin: 480, tiempoEstimadoMin: 480 });
     expect(nota).toMatch(/tipo corregido por el título: Cableado y canalización \(era Preparación de equipo\)/);
     // Facturas guardadas como comercial: son facturación.
     expect(tipoPorTitulo({ titulo: 'Elaboración de facturas del mes', coreKind: 'comercial', ticketTypeCustom: 'COMERCIAL' })).toEqual({

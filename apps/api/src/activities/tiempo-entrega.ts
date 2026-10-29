@@ -8,7 +8,8 @@
  *   2. La tabla (`ai/estandar/tabla-estandar.ts`) con lo que se lee del título (la IA propone
  *      complejidad, cantidad y destino; aquí no hay IA), con el tipo que dice el título si el elegido
  *      no cuadra («tubería» guardada como «Preparación de equipo»).
- *   3. Si el título no dice cuántos, la mediana real del tipo (y si no hay, 1 unidad).
+ *   3. Si el título no dice cuántos: en infraestructura (obra, instalación, cableado) una jornada en
+ *      sitio; en lo demás, la mediana real del tipo (y si no hay, 1 unidad).
  *   Lo que se supone se escribe en el desglose. Sin regla en la tabla (o en juntas y guardias), la
  *   mediana real del tipo, y si no hay, 1 h.
  * - La entrega a más tardar es el inicio más ese tiempo, contando la comida, sin pasar del fin de la
@@ -71,19 +72,22 @@ export type HistorialTitulo = { minutos: number; veces: number; propio: boolean 
  * Trabajos que el título nombra sin lugar a duda, aunque el tipo elegido diga otro: tubería,
  * charola, registros y cable son cableado y canalización; las facturas, facturación.
  */
-const TIPO_POR_TITULO: Array<[RegExp, { coreKind: string; ticketTypeCustom: string }]> = [
-  [/\b(tuberia|charola|canalizacion|registros?|cableado|cable|nodos?)\b/, { coreKind: 'tarea', ticketTypeCustom: 'Cableado y canalización' }],
-  [/\bfacturas?\b/, { coreKind: 'tarea', ticketTypeCustom: 'Facturación y contabilidad' }],
+const TIPO_POR_TITULO: Array<[RegExp, { coreKind: string; ticketTypeCustom: string }, readonly string[]]> = [
+  // «Cotizar tubería» es una cotización: lo comercial no pasa a cableado.
+  [/\b(tuberia|charola|canalizacion|registros?|cableado|cable|nodos?)\b/, { coreKind: 'tarea', ticketTypeCustom: 'Cableado y canalización' }, ['tarea', '']],
+  // Las facturas que la contadora guarda como comercial sí son facturación.
+  [/\bfacturas?\b/, { coreKind: 'tarea', ticketTypeCustom: 'Facturación y contabilidad' }, ['tarea', 'comercial', '']],
 ];
 
 /** El tipo que dice el título si el elegido no cuadra; null si cuadra o no se sabe. Servicio y obra no se tocan. */
 export function tipoDelTitulo(a: TipoActividad & { titulo?: string | null; indicaciones?: string | null }) {
   if (!a.titulo) return null;
-  if (['servicio', 'obra', 'proyecto'].includes(String(a.coreKind ?? '').toLowerCase())) return null;
+  const kind = String(a.coreKind ?? '').trim().toLowerCase();
+  if (['servicio', 'obra', 'proyecto'].includes(kind)) return null;
   const texto = normalizar(`${a.titulo ?? ''} ${a.indicaciones ?? ''}`);
   const actual = reglaDe(a)?.clave ?? null;
-  for (const [patron, tipo] of TIPO_POR_TITULO) {
-    if (!patron.test(texto)) continue;
+  for (const [patron, tipo, deTipos] of TIPO_POR_TITULO) {
+    if (!deTipos.includes(kind) || !patron.test(texto)) continue;
     const clave = reglaDe(tipo)?.clave ?? null;
     return clave && clave !== actual ? tipo : null;
   }
@@ -166,6 +170,18 @@ export function estandarDeLectura(
   let cantidad = lectura.cantidad && lectura.cantidad > 0 ? Math.round(lectura.cantidad) : null;
   // «¿Cuántas partidas?» de la tabla: así concuerda («cuántas partidas», «cuántos equipos»).
   const cuantos = unidad ? unidad.pregunta.replace(/[¿?]/g, '').toLowerCase() : '';
+  // Infraestructura sin cantidad (tubería, cableado, CCTV): es un día en sitio, no una pieza.
+  const enSitio = regla.unidades.find((x) => x.sinBase) ?? null;
+  if (enSitio && !cantidad) {
+    const r = calcularEstandar(regla, { cantidad: 1, unidad: enSitio.clave });
+    return {
+      totalMin: r.totalMin ?? enSitio.porUnidadMin,
+      desglose: r.desglose,
+      complejidad: esComplejidad(lectura.complejidad) ? lectura.complejidad : null,
+      unidades: { clave: enSitio.clave, cantidad: 1 },
+      supuestos: [...supuestos, `el título no dice ${cuantos}: una jornada en obra`],
+    };
+  }
   if (unidad && !cantidad && opciones.tipicoMin && opciones.tipicoMin > 0) {
     // Sin cantidad, «1 unidad» se quedaba en una fracción de lo real: la mediana del tipo se acerca más.
     const minutos = redondeo5(Math.min(TOPE_ESTANDAR_MIN, opciones.tipicoMin));
