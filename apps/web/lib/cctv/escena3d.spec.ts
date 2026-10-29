@@ -60,6 +60,11 @@ describe("escena", () => {
     expect(figuras.some((f) => f.tipo === "camara")).toBe(true);
     const ds = figuras.filter((f): f is Extract<typeof f, { d: number }> => "d" in f).map((f) => f.d);
     expect([...ds].sort((a, b) => a - b)).toEqual(ds);
+    // Corte «casa de muñecas»: el muro de enfrente enseña su cara de afuera (tapa el interior); el del fondo, la de adentro.
+    const [atras, enfrente] = plano.muros;
+    const verticales = (id: string) => caras.filter((f) => f.tipo === "cara" && f.origen === id && !f.superior);
+    expect(verticales(enfrente.id).every((f) => f.tipo === "cara" && f.exterior)).toBe(true);
+    expect(verticales(atras.id).some((f) => f.tipo === "cara" && f.exterior)).toBe(false);
   });
 
   it("desde arriba solo se pintan las tapas de los muros", () => {

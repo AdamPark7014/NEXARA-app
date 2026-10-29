@@ -134,7 +134,7 @@ export default function EditorCctv({
   const [aviso, setAviso] = useState<string | null>(null);
   const [resumen, setResumen] = useState<ResumenDiseno | null>(diseno.resumen);
   const [herramienta, setHerramienta] = useState<Herramienta>("seleccionar");
-  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: true, humanoides: true, abajo: true });
+  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: false, humanoides: true, abajo: true });
   // Pisos de abajo para la vista apilada (en gris). La raíz cambia con cada edición de cualquier
   // piso; si los de abajo no cambiaron se reutiliza la lista para no recalcular su cobertura.
   const debajoRef = useRef<{ clave: string; valor: NivelConPlano[] }>({ clave: "[]", valor: [] });

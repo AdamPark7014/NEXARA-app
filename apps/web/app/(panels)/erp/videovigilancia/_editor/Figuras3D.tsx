@@ -69,7 +69,18 @@ export default function Figuras3D({
             const sel = selId === f.origen;
             const relleno =
               f.material === "hoja" ? "#c9a46b" : f.material === "vidrio" ? "var(--ui-info)" : f.material === "obstaculo" ? "#b9c2cc" : f.superior ? "var(--ui-surface)" : grisMuro(f.tono);
-            const opacidad = apagado ? 0.32 : f.material === "vidrio" ? 0.22 : !f.superior && capas.translucidos && f.material === "muro" ? 0.45 : 1;
+            // Muros sólidos con su sombra; la cara de afuera que queda entre quien ve y el interior va
+            // tenue para que se vea la cobertura («casa de muñecas»). Con «Muros translúcidos», todos.
+            const muroVertical = !f.superior && f.material === "muro";
+            const opacidad = apagado
+              ? 0.32
+              : f.material === "vidrio"
+                ? 0.22
+                : muroVertical && capas.translucidos
+                  ? 0.45
+                  : muroVertical && f.exterior
+                    ? 0.24
+                    : 1;
             const tipoSel = f.material === "obstaculo" ? "obstaculo" : f.material === "hoja" ? null : "muro";
             // Los muros se parten en tramos de 1 m para el orden de pintado; para que no se vean las
             // juntas, cada tramo solo traza sus aristas largas (base y corona) y no los cortes.
