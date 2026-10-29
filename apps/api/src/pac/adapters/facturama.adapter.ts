@@ -100,8 +100,11 @@ function detalleError(texto: string): string {
     const cuerpo = JSON.parse(texto);
     const partes: string[] = [];
     if (cuerpo?.Message) partes.push(String(cuerpo.Message));
-    for (const mensajes of Object.values(cuerpo?.ModelState ?? {})) {
-      for (const m of Array.isArray(mensajes) ? mensajes : [mensajes]) partes.push(String(m));
+    for (const [campo, mensajes] of Object.entries(cuerpo?.ModelState ?? {})) {
+      // El campo dice cuál atributo falló (p. ej. «Complemento.Payments[0].ExchangeRate»); sin él, «No debe incluir
+      // este atributo» no se puede corregir.
+      const donde = campo.replace(/^(cfdiToCreate|model|cfdi)\./i, '');
+      for (const m of Array.isArray(mensajes) ? mensajes : [mensajes]) partes.push(donde ? `${donde}: ${m}` : String(m));
     }
     if (partes.length) return [...new Set(partes)].join(' · ');
   } catch {
@@ -231,7 +234,8 @@ export class FacturamaAdapter implements IPacAdapter {
       Date: fechaPagoCfdi(pago.date),
       PaymentForm: forma,
       Currency: moneda,
-      ExchangeRate: moneda === 'MXN' ? 1 : pago.exchangeRate,
+      // Con pesos Facturama rechaza el atributo («No debe incluir este atributo»): solo va en otra moneda.
+      ...(moneda === 'MXN' ? {} : { ExchangeRate: pago.exchangeRate }),
       Amount: cents(pago.amount),
       RelatedDocuments: input.relatedDocs.map((d) => this.documentoRelacionado(d, moneda)),
     };
@@ -267,9 +271,9 @@ export class FacturamaAdapter implements IPacAdapter {
       retenido += total;
       taxes.push({ Name: nombre, Rate: base > 0 ? seisDecimales(total / base) : 0, Base: base, Total: total, IsRetention: true });
     }
+    // Sin `IdentificationNumber`: el SAT rechaza el NoIdentificacion vacío y el ERP no manda uno por concepto.
     return {
       ProductCode: item.satProductKey || '01010101',
-      IdentificationNumber: '',
       Description: item.description,
       Unit: item.unitName || 'Servicio',
       UnitCode: item.satUnitKey || 'E48',
