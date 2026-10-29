@@ -30,6 +30,16 @@ import { periodoDto, type PeriodoDto } from '../activities/actividad-periodo.js'
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { extrasDeAsignacion, reportesDirectos, type Alcanzador } from './equipo-alcance.js';
 import {
+  actividadCerradaParaRevision,
+  cadenaConResponsable,
+  cadenasDeMando,
+  esperaRevision,
+  MISMO_MOMENTO_MS,
+  ordenarPorEspera,
+  reglaDeRevision,
+  revisaTodo,
+} from './revision-evidencias.js';
+import {
   ActivitySessionsService,
   cerrarSesionesVencidas,
   leerSesiones,
@@ -38,9 +48,6 @@ import {
 import { errorDeHorasPlan, type MotivoFinSesion } from '../activities/sessions/sesiones-trabajo.js';
 
 const CEO_EMAIL = 'gerencia@nexara.com.mx';
-
-/** Dos personas sumadas con menos de 5 s de diferencia están en el mismo nivel de la cadena. */
-const MISMO_MOMENTO_MS = 5_000;
 
 /** Encargados de área: ordenan su cola (con justificación). Autoasignarse lo puede cualquiera. */
 export const AREA_MANAGER_EMAILS = new Set<string>([
@@ -101,6 +108,48 @@ export type TeamEvidenceViewer = {
 };
 
 export type MyActivitiesViewer = { id: number; email?: string | null };
+
+type PersonaRevision = { id: number; nombre: string; avatarUrl: string | null; puesto: string | null };
+
+/** Una evidencia enviada que quien mira puede aprobar o devolver. */
+export type RevisionPendienteItem = {
+  activityId: number;
+  anNumber: string;
+  titulo: string;
+  estatus: string;
+  coreKind: string | null;
+  ticketTypeCustom: string | null;
+  assignmentCharge: string | null;
+  prioridad: string | null;
+  /** Dueño de la evidencia. */
+  persona: PersonaRevision;
+  /** Desde cuándo espera: la corrección reenviada o, si no la hubo, el envío. */
+  enviadaAt: Date | null;
+  /** Es una corrección de algo que se le devolvió. */
+  correccion: boolean;
+};
+
+/** Una revisión que hizo quien mira (aprobó o devolvió). */
+export type RevisionHechaItem = {
+  id: number;
+  activityId: number;
+  anNumber: string;
+  titulo: string;
+  estatus: string;
+  coreKind: string | null;
+  ticketTypeCustom: string | null;
+  persona: PersonaRevision;
+  /** APROBADA | DEVUELTA_PASOS | DEVUELTA_TODO */
+  decision: string;
+  calificacion: number | null;
+  observaciones: string;
+  at: Date;
+};
+
+export type RevisionesResponse = {
+  pendientes: RevisionPendienteItem[];
+  revisadas: RevisionHechaItem[];
+};
 
 export type MyActivityItem = {
   id: number;
@@ -565,53 +614,31 @@ export class MyActivitiesService {
 
     const despacho = activity.assignmentCharge === 'despacho';
     type Eslabon = (typeof activity.assignees)[number];
-    // El responsable es parte de la cadena aunque no tenga fila de equipo (reparte o ejecuta).
-    const cadena: Eslabon[] = activity.assignees.some((m) => m.userId === activity.responsableId)
-      ? activity.assignees
-      : [
-          {
-            userId: activity.responsableId,
-            rol: 'LEAD' as Eslabon['rol'],
-            asignadoAt: activity.fechaAsignacion,
-            asignadoPorId: activity.creadoPorId,
-            retiradoAt: null,
-            indicaciones: null,
-            user: activity.responsable,
-            asignadoPor: activity.creador ? { nombre: activity.creador.nombre } : null,
-          },
-          ...activity.assignees,
-        ];
+    const cadena: Eslabon[] = cadenaConResponsable(activity.assignees, activity.responsableId, () => ({
+      userId: activity.responsableId,
+      rol: 'LEAD' as Eslabon['rol'],
+      asignadoAt: activity.fechaAsignacion,
+      asignadoPorId: activity.creadoPorId,
+      retiradoAt: null,
+      indicaciones: null,
+      user: activity.responsable,
+      asignadoPor: activity.creador ? { nombre: activity.creador.nombre } : null,
+    }));
 
-    const email = norm(viewer.email);
-    const perms = new Set((viewer.permissions ?? []).map(String));
-    const todo =
-      Boolean(viewer.isSuperAdmin) ||
-      viewer.roleKey === 'ceo' ||
-      isCeoEquivalentEmail(email) ||
-      email === 'developer@nexara.com.mx' ||
-      perms.has('console.admin') ||
-      perms.has('evidences.review');
+    const todo = revisaTodo(viewer);
     const esResponsable = activity.responsableId === viewer.id;
     // Quien la creó ve todo, pero solo lectura (salvo que además sea superior de alguien).
     const esCreador = activity.creadoPorId === viewer.id;
-    const mine =
-      cadena.find((m) => m.userId === viewer.id && !m.retiradoAt) ??
-      cadena.find((m) => m.userId === viewer.id);
-    const soyEncargado = Boolean(mine && !mine.retiradoAt && String(mine.rol) === 'LEAD');
     // Jefes por organigrama (managerId hacia arriba): el jefe de alguien también lo revisa.
     const jefesDe = await this.managerChains(cadena.map((m) => m.userId));
-
-    /** Soy encargado por encima de `m`: la recibió después que yo (o a la vez, si `m` no es encargado). */
-    const encimaDe = (m: Eslabon) => {
-      if (!soyEncargado || !mine) return false;
-      const diff = m.asignadoAt.getTime() - mine.asignadoAt.getTime();
-      return diff > MISMO_MOMENTO_MS || (Math.abs(diff) <= MISMO_MOMENTO_MS && String(m.rol) !== 'LEAD');
-    };
-    const reparteM = (m: Eslabon) => despacho && String(m.rol) === 'LEAD';
-    const puedeRevisar = (m: Eslabon) =>
-      m.userId !== viewer.id &&
-      !reparteM(m) &&
-      (todo || esResponsable || Boolean(jefesDe.get(m.userId)?.has(viewer.id)) || encimaDe(m));
+    const { mine, soyEncargado, puedeRevisar } = reglaDeRevision({
+      viewerId: viewer.id,
+      todo,
+      esResponsable,
+      despacho,
+      cadena,
+      jefesDe,
+    });
     // A quién reemplazó quien consulta (y a quién reemplazaron esos): ve su avance para continuarlo.
     const reemplazados = new Set<number>();
     {
@@ -826,22 +853,149 @@ export class MyActivitiesService {
     return this.teamEvidence(viewer, companyId, activityId);
   }
 
+  /**
+   * «En espera de revisión»: la evidencia enviada que quien mira puede aprobar o devolver
+   * (misma regla que `teamEvidence`), lo que más lleva esperando primero. Con lo que revisó
+   * él mismo en los últimos 30 días, para volver a abrirlo.
+   */
+  async pendingReviews(viewer: TeamEvidenceViewer, companyId: number | null): Promise<RevisionesResponse> {
+    const todo = revisaTodo(viewer);
+    const usuarios = await this.prisma.user.findMany({ select: { id: true, managerId: true } });
+    const jefesDe = cadenasDeMando(
+      usuarios,
+      usuarios.map((u) => u.id),
+    );
+    // Recorte barato antes de la regla fina: su gente por organigrama, lo que tiene como
+    // responsable y donde es encargado. Quien revisa todo no se recorta.
+    const debajo = usuarios.filter((u) => jefesDe.get(u.id)?.has(viewer.id)).map((u) => u.id);
+    const deEmpresa = companyId != null ? { companyId } : {};
+
+    const evidencias = await this.prisma.activityEvidence.findMany({
+      where: {
+        ...deEmpresa,
+        status: 'COMPLETED',
+        reviewStatus: { notIn: ['APPROVED', 'REJECTED'] },
+        userId: { not: viewer.id },
+        activity: { deletedAt: null, ...deEmpresa },
+        ...(todo
+          ? {}
+          : {
+              OR: [
+                { userId: { in: debajo } },
+                { activity: { responsableId: viewer.id } },
+                { activity: { assignees: { some: { userId: viewer.id, rol: 'LEAD', retiradoAt: null } } } },
+              ],
+            }),
+      },
+      select: {
+        userId: true,
+        status: true,
+        reviewStatus: true,
+        completedAt: true,
+        correctionSubmittedAt: true,
+        user: { select: { id: true, nombre: true, avatarUrl: true, puesto: true } },
+        activity: {
+          select: {
+            id: true,
+            anNumber: true,
+            titulo: true,
+            estatus: true,
+            coreKind: true,
+            ticketTypeCustom: true,
+            assignmentCharge: true,
+            prioridad: true,
+            responsableId: true,
+            fechaAsignacion: true,
+            assignees: { select: { userId: true, rol: true, asignadoAt: true, retiradoAt: true } },
+            reassignments: { select: { deUsuarioId: true } },
+          },
+        },
+      },
+      take: 500,
+    });
+
+    const pendientes: RevisionPendienteItem[] = [];
+    for (const ev of evidencias) {
+      const a = ev.activity;
+      if (!esperaRevision(ev) || actividadCerradaParaRevision(a.estatus)) continue;
+      const cadena = cadenaConResponsable(
+        a.assignees.map((m) => ({ ...m, rol: String(m.rol) })),
+        a.responsableId,
+        () => ({ userId: a.responsableId, rol: 'LEAD', asignadoAt: a.fechaAsignacion, retiradoAt: null }),
+      );
+      const m = cadena.find((x) => x.userId === ev.userId);
+      if (!m) continue;
+      // Se la pasaron a otro compañero: su avance ya no se revisa (igual que en `teamEvidence`).
+      if (m.retiradoAt && a.reassignments.some((r) => r.deUsuarioId === ev.userId)) continue;
+      const { puedeRevisar } = reglaDeRevision({
+        viewerId: viewer.id,
+        todo,
+        esResponsable: a.responsableId === viewer.id,
+        despacho: a.assignmentCharge === 'despacho',
+        cadena,
+        jefesDe,
+      });
+      if (!puedeRevisar(m)) continue;
+      pendientes.push({
+        activityId: a.id,
+        anNumber: a.anNumber,
+        titulo: a.titulo,
+        estatus: a.estatus,
+        coreKind: a.coreKind,
+        ticketTypeCustom: a.ticketTypeCustom,
+        assignmentCharge: a.assignmentCharge,
+        prioridad: a.prioridad,
+        persona: ev.user,
+        enviadaAt: ev.correctionSubmittedAt ?? ev.completedAt,
+        correccion: ev.correctionSubmittedAt != null,
+      });
+    }
+
+    const hace30Dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const hechas = await this.prisma.activityEvidenceReview.findMany({
+      where: {
+        ...deEmpresa,
+        reviewerId: viewer.id,
+        createdAt: { gte: hace30Dias },
+        activity: { deletedAt: null },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        decision: true,
+        score: true,
+        notes: true,
+        createdAt: true,
+        evidenceUser: { select: { id: true, nombre: true, avatarUrl: true, puesto: true } },
+        activity: { select: { id: true, anNumber: true, titulo: true, estatus: true, coreKind: true, ticketTypeCustom: true } },
+      },
+    });
+
+    return {
+      pendientes: ordenarPorEspera(pendientes),
+      revisadas: hechas.map((r) => ({
+        id: r.id,
+        activityId: r.activity.id,
+        anNumber: r.activity.anNumber,
+        titulo: r.activity.titulo,
+        estatus: r.activity.estatus,
+        coreKind: r.activity.coreKind,
+        ticketTypeCustom: r.activity.ticketTypeCustom,
+        persona: r.evidenceUser,
+        decision: r.decision,
+        calificacion: r.score,
+        observaciones: r.notes,
+        at: r.createdAt,
+      })),
+    };
+  }
+
   /** Jefes (managerId hacia arriba) de cada usuario. */
   private async managerChains(userIds: number[]): Promise<Map<number, Set<number>>> {
-    const out = new Map<number, Set<number>>();
-    if (!userIds.length) return out;
+    if (!userIds.length) return new Map();
     const users = await this.prisma.user.findMany({ select: { id: true, managerId: true } });
-    const jefeDe = new Map(users.map((u) => [u.id, u.managerId]));
-    for (const id of userIds) {
-      const jefes = new Set<number>();
-      let cur = jefeDe.get(id) ?? null;
-      while (cur != null && cur !== id && !jefes.has(cur)) {
-        jefes.add(cur);
-        cur = jefeDe.get(cur) ?? null;
-      }
-      out.set(id, jefes);
-    }
-    return out;
+    return cadenasDeMando(users, userIds);
   }
 
   isAreaManager(email?: string | null): boolean {

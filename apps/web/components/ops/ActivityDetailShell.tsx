@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ROLES } from "@/lib/rbac/roles";
 import { useUser } from "@/components/UserContext";
 import { getActivity, type ActivityDetail } from "@/lib/ops-activities-api";
 import { getActivitiesCanonicalPath } from "@/lib/section-views";
+import { conOrigen, leerOrigen, regresoDeOrigen, type OrigenActividad } from "@/lib/actividad-origen";
 import { iniciarMiActividad } from "@/lib/my-activities-api";
 import { formatApiError } from "@/lib/erp-api";
 import { isCeoEmail } from "@/lib/activity-kinds";
@@ -240,6 +242,21 @@ export default function ActivityDetailShell({
     void load();
   }, [load]);
 
+  // De dónde se llegó (`?origen=`, ver `lib/actividad-origen.ts`): «‹ regresar» vuelve ahí y no
+  // a la pizarra general. Se relee al cambiar de pestaña; si la URL nueva no lo trae, se queda
+  // el de esta misma actividad. Sin useSearchParams: evita el error de Suspense en build.
+  const pathname = usePathname();
+  const [origenDe, setOrigenDe] = useState<{ id: number; origen: OrigenActividad | null }>({
+    id: numericId,
+    origen: null,
+  });
+  useEffect(() => {
+    if (!core) return;
+    const leido = leerOrigen(window.location.search);
+    setOrigenDe((prev) => ({ id: numericId, origen: leido ?? (prev.id === numericId ? prev.origen : null) }));
+  }, [core, numericId, pathname]);
+  const origen = core && origenDe.id === numericId ? origenDe.origen : null;
+
   const base = core ? `/erp/actividades/${id}` : `/ops/activities/${id}`;
   const evidencesHref = core ? `${base}/evidencias` : `${base}/evidences`;
   // Sin archivos no se pinta el contador (un «0» en la pestaña no dice nada).
@@ -249,9 +266,9 @@ export default function ActivityDetailShell({
     () =>
       core
         ? [
-            { id: "detalle", label: "Detalle", href: base },
-            { id: "evidences", label: "Evidencias", href: evidencesHref, count: evidenceCount },
-            { id: "historial", label: "Historial", href: `${base}/historial` },
+            { id: "detalle", label: "Detalle", href: conOrigen(base, origen) },
+            { id: "evidences", label: "Evidencias", href: conOrigen(evidencesHref, origen), count: evidenceCount },
+            { id: "historial", label: "Historial", href: conOrigen(`${base}/historial`, origen) },
           ]
         : [
             { id: "detalle", label: "Detalle", href: base },
@@ -273,10 +290,27 @@ export default function ActivityDetailShell({
             },
             { id: "historial", label: "Historial", href: `${base}/historial` },
           ],
-    [base, core, evidencesHref, evidenceCount],
+    [base, core, evidencesHref, evidenceCount, origen],
   );
 
-  const backHref = useMemo(() => (core ? "/erp/pizarra" : getActivitiesCanonicalPath(user)), [core, user]);
+  // Nombre de la persona de la ficha de donde se vino («‹ Historial de Iván»), si está en la actividad.
+  let personaOrigen: string | null = null;
+  if (origen && "persona" in origen && activity) {
+    personaOrigen =
+      activity.responsable?.id === origen.persona
+        ? activity.responsable?.nombre ?? null
+        : (activity.assignees ?? []).find((m) => (m.userId ?? m.user?.id) === origen.persona)?.user?.nombre ?? null;
+  }
+  // El enlace decía «Actividades» también en Core, donde vuelve a la pizarra:
+  // una etiqueta que no nombra su destino hace dudar antes de pulsarla.
+  const regreso = core ? regresoDeOrigen(origen, personaOrigen) : null;
+  const backHref = useMemo(
+    () => regreso?.href ?? getActivitiesCanonicalPath(user),
+    [regreso?.href, user],
+  );
+  const backLabel = regreso?.label ?? "Actividades";
+  const detailHref = conOrigen(base, origen);
+  const evidencesConOrigen = conOrigen(evidencesHref, origen);
 
   const ctx = useMemo(
     () => ({
@@ -286,15 +320,11 @@ export default function ActivityDetailShell({
       error,
       reload: load,
       core,
-      hrefs: { detail: base, evidences: evidencesHref, back: backHref },
+      hrefs: { detail: detailHref, evidences: evidencesConOrigen, back: backHref },
       actionsSlot,
     }),
-    [numericId, activity, loading, error, load, core, base, evidencesHref, backHref, actionsSlot],
+    [numericId, activity, loading, error, load, core, detailHref, evidencesConOrigen, backHref, actionsSlot],
   );
-
-  // El enlace decía «Actividades» también en Core, donde vuelve a la pizarra:
-  // una etiqueta que no nombra su destino hace dudar antes de pulsarla.
-  const backLabel = core ? "Pizarra" : "Actividades";
 
   if (!activity) {
     return (
@@ -356,11 +386,11 @@ export default function ActivityDetailShell({
       {iniciando ? "Iniciando…" : ACCION_INICIAR}
     </Button>
   ) : ejecuta && !cerrada ? (
-    <ButtonLink variant="primary" href={`${evidencesHref}#captura`} iconStart={<IcoCamara />}>
+    <ButtonLink variant="primary" href={conOrigen(`${evidencesHref}#captura`, origen)} iconStart={<IcoCamara />}>
       Continuar evidencias
     </ButtonLink>
   ) : porRevisar && !ejecuta ? (
-    <ButtonLink variant="primary" href={`${evidencesHref}#revision`} iconStart={<IcoCamara />}>
+    <ButtonLink variant="primary" href={conOrigen(`${evidencesHref}#revision`, origen)} iconStart={<IcoCamara />}>
       Revisar evidencias
     </ButtonLink>
   ) : null;

@@ -1,5 +1,27 @@
 # RELEVO
 
+- **28-10 ~20:30 (claude-code) — Actividades › «En espera de revisión» y la flecha de regresar al origen (pedido de Adam).**
+  - Pestaña nueva en `/erp/pizarra` (`?vista=revision`), entre «Asignadas por mí» y «Solicitudes»: la ven Christian,
+    quien tiene gente a cargo y quien, sin equipo, tiene algo por revisar o ya revisó algo. Lleva el número de pendientes.
+    `components/pizarra/EnEsperaRevisionView.tsx` (+ css + spec):
+    - «Por revisar»: actividad, quién la envió, desde cuándo espera (verde < 4 h, ámbar, rojo > 1 día) y botón «Revisar».
+      Ese botón abre `/erp/actividades/:id/evidencias?origen=revision#revision`, con el aprobar/devolver y las estrellas
+      de siempre (`EquipoEvidencias`). La que más lleva esperando va primero. Las correcciones reenviadas se marcan.
+    - «Revisadas por ti» (`&ver=revisadas`): lo que revisó en 30 días, con la decisión y la calificación.
+  - API `GET me/revisiones` (`MyActivitiesService.pendingReviews`): evidencias `COMPLETED` y sin aprobar ni devolver, de
+    actividades no cerradas, que quien mira puede revisar. La regla de quién revisa a quién salió de `teamEvidence` a
+    `src/me/revision-evidencias.ts` (+ spec): la usan las dos, así la lista no ofrece nada que luego dé 403. Incluye
+    evidencia enviada de una actividad que sigue «En Proceso» (falta otro del equipo), igual que el «En espera» de la ficha.
+  - Regreso (`lib/actividad-origen.ts` + spec): `?origen=revision|revisadas|historial|persona` (`&persona=<id>`).
+    `ActivityDetailShell` lo lee, lo pasa a sus pestañas y al «Revisar evidencias», y la miga vuelve a «En espera de
+    revisión», a «Revisadas», a `/erp/pizarra/:id?pestana=historial` («Historial de Iván») o a la ficha. Sin origen
+    sigue volviendo a la pizarra, como antes. `RouteTabs` marca la pestaña activa por la ruta, sin el `?`.
+  - Ficha de la persona: la pestaña Historial queda en la URL (`?pestana=historial`) y sus «Abrir actividad» llevan el
+    origen. En una actividad entregada sin visto bueno sale «Revisar evidencia». La pizarra también refleja la pestaña en la URL.
+  - Evidencias: con `#revision`/`#captura` la página baja al bloque una vez que la actividad carga (antes el ancla
+    aún no existía y se quedaba arriba).
+  - Pruebas: web 173 archivos / 1,342 y API `src/me` 18 suites / 195, en verde; `tsc` limpio en los dos.
+
 - **28-10 ~20:15 (claude-code) — audit_logs: fuera el latido de sesión y las masivas que no tocan filas.**
   - Medido en producción: disco del Hetzner al 88 % (no al 98 % del 27-10); `audit_logs` pesa 14 GB con 5.7 M de
     filas. El webhook de INTEGRA ya no entra, pero en 6 h se escribieron ≈24 mil `UPDATE UserSession` (solo
