@@ -20,6 +20,8 @@ export const BASE_CHART_OF_ACCOUNTS: readonly BaseChartAccount[] = [
   { code: '107.01', name: 'Deudores diversos', type: 'ASSET', satAgrupador: '107.01' },
   { code: '110.01', name: 'IVA acreditable pendiente de pago', type: 'ASSET', satAgrupador: '110.01' },
   { code: '110.02', name: 'IVA acreditable pagado', type: 'ASSET', satAgrupador: '110.02' },
+  // Sin agrupador a propósito: la contadora lo asigna (ISR o IVA que nos retuvo el cliente).
+  { code: '113.01', name: 'Impuestos retenidos a favor', type: 'ASSET' },
   { code: '115.01', name: 'Inventario de mercancías', type: 'ASSET', satAgrupador: '115.01' },
   { code: '118.01', name: 'Anticipo a proveedores', type: 'ASSET', satAgrupador: '118.01' },
   { code: '120.01', name: 'Terrenos', type: 'ASSET', satAgrupador: '151.01' },

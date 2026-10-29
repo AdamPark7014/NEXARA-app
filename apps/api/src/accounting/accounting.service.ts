@@ -11,6 +11,7 @@ import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 import { cents } from '../pac/cfdi-xml.builder.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { BASE_CHART_OF_ACCOUNTS } from './base-chart-of-accounts.js';
+import { polizaFacturaEmitida, polizaPagoFactura, type RenglonPoliza } from './mesa-contable/polizas-mesa.js';
 
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -137,7 +138,7 @@ export class AccountingService {
   }
 
   /** Claves SAT para líneas de orden de cierre → factura CFDI. */
-  private resolveSatKeysForOrderLine(line: {
+  resolveSatKeysForOrderLine(line: {
     product?: {
       specifications?: unknown;
       itemType?: string;
@@ -797,9 +798,11 @@ export class AccountingService {
     // El catálogo completo (~80) se carga a demanda vía POST …/seed-base.
     const cid = await this.resolveCompanyId(companyId);
     const defaults = BASE_CHART_OF_ACCOUNTS.filter((a) =>
-      ['102.01', '105.01', '115.01', '201.01', '208.01', '209.01', '401.01', '501.01', '601.01', '601.02', '602.01'].includes(
-        a.code,
-      ),
+      [
+        '102.01', '105.01', '115.01', '201.01', '208.01', '209.01', '401.01', '501.01', '601.01', '601.02', '602.01',
+        // Mesa contable: viáticos por comprobar, IVA acreditable, retenciones, anticipos, IVA no cobrado.
+        '107.01', '110.02', '113.01', '205.01', '206.01', '208.02', '605.01',
+      ].includes(a.code),
     );
     for (const account of defaults) {
       await this.prisma.account.upsert({
@@ -881,7 +884,8 @@ export class AccountingService {
 
   /**
    * Póliza automática de egreso operativo (gasto / viático / pago a empleado).
-   * Debe gasto  ·  Haber bancos.
+   * Debe gasto  ·  Haber bancos. El viático va a «por comprobar» (107.01): es gasto hasta que se
+   * comprueba, y esa segunda póliza la registra la Mesa contable con su IVA acreditable.
    */
   async postOperationalDisbursement(input: {
     kind: 'expense' | 'viatic' | 'payroll';
@@ -898,7 +902,7 @@ export class AccountingService {
     }
 
     const expenseAccountCode =
-      input.kind === 'viatic' ? '601.02' : input.kind === 'payroll' ? '602.01' : '601.01';
+      input.kind === 'viatic' ? '107.01' : input.kind === 'payroll' ? '602.01' : '601.01';
     const prefix =
       input.kind === 'viatic' ? 'VIAT-PAY' : input.kind === 'payroll' ? 'PAYR-PAY' : 'EXP-PAY';
     const reference = `${prefix}-${input.entityId}`;
@@ -923,7 +927,7 @@ export class AccountingService {
           creditAccountId: bank.id,
           debit: amount,
           credit: 0,
-          label: `Gasto ${input.kind} #${input.entityId}`,
+          label: input.kind === 'viatic' ? `Viático por comprobar #${input.entityId}` : `Gasto ${input.kind} #${input.entityId}`,
         },
         {
           debitAccountId: bank.id,
@@ -1370,35 +1374,42 @@ export class AccountingService {
       taxAmount: Prisma.Decimal | number;
       totalAmount: Prisma.Decimal | number;
       issueDate: Date;
+      satPaymentMethod?: string | null;
+      esAnticipo?: boolean;
+      items?: Array<{
+        taxBase: Prisma.Decimal | null;
+        ivaAmount: Prisma.Decimal | null;
+        iepsAmount: Prisma.Decimal | null;
+        isrRetAmount: Prisma.Decimal | null;
+        ivaRetAmount: Prisma.Decimal | null;
+      }>;
     },
     userId: number,
     companyId?: number | null,
   ) {
     if (invoice.type !== 'ACCOUNTS_RECEIVABLE') return null;
+    if (Number(invoice.totalAmount) <= 0) return null;
 
-    const total = Number(invoice.totalAmount);
-    const subtotal = Number(invoice.subtotal);
-    const tax = Number(invoice.taxAmount);
-    if (total <= 0) return null;
+    const renglones = polizaFacturaEmitida({
+      total: Number(invoice.totalAmount),
+      subtotal: Number(invoice.subtotal),
+      taxAmount: Number(invoice.taxAmount),
+      metodoPago: invoice.satPaymentMethod,
+      esAnticipo: invoice.esAnticipo,
+      conceptos: (invoice.items ?? []).map((i) => ({
+        taxBase: i.taxBase == null ? null : Number(i.taxBase),
+        ivaAmount: Number(i.ivaAmount ?? 0),
+        iepsAmount: Number(i.iepsAmount ?? 0),
+        isrRetAmount: Number(i.isrRetAmount ?? 0),
+        ivaRetAmount: Number(i.ivaRetAmount ?? 0),
+      })),
+    });
 
-    const [cxc, revenue, iva] = await Promise.all([
-      this.getAccountByCode('105.01', companyId),
-      this.getAccountByCode('401.01', companyId),
-      this.getAccountByCode('208.01', companyId),
-    ]);
-
-    const date = new Date(invoice.issueDate).toISOString().slice(0, 10);
-    const ref = `INV-STAMP-${invoice.id}`;
-
-    return this.createAndPostAutoJournal(
-      ref,
+    return this.registrarPolizaMesa(
+      `INV-STAMP-${invoice.id}`,
       `Factura timbrada ${invoice.invoiceNumber}`,
-      date,
-      [
-        { debitAccountId: cxc.id, creditAccountId: revenue.id, debit: total, credit: 0, label: 'CXC clientes' },
-        { debitAccountId: revenue.id, creditAccountId: cxc.id, debit: 0, credit: subtotal, label: 'Ingresos' },
-        { debitAccountId: iva.id, creditAccountId: cxc.id, debit: 0, credit: tax, label: 'IVA trasladado' },
-      ],
+      new Date(invoice.issueDate).toISOString().slice(0, 10),
+      renglones,
       userId,
       companyId,
     );
@@ -1406,55 +1417,96 @@ export class AccountingService {
 
   private async autoJournalForPayment(
     payment: { id: number; amount: Prisma.Decimal | number; paymentDate: Date },
-    invoice: { id: number; invoiceNumber: string; type: string },
+    invoice: {
+      id: number;
+      invoiceNumber: string;
+      type: string;
+      totalAmount?: Prisma.Decimal | number;
+      taxAmount?: Prisma.Decimal | number;
+      satPaymentMethod?: string | null;
+    },
     userId: number,
     companyId?: number | null,
   ) {
     const amount = Number(payment.amount);
     if (amount <= 0) return null;
+    if (invoice.type !== 'ACCOUNTS_RECEIVABLE' && invoice.type !== 'ACCOUNTS_PAYABLE') return null;
 
-    const date = new Date(payment.paymentDate).toISOString().slice(0, 10);
-    const ref = `PAY-${payment.id}`;
+    // Cobro: Debe bancos · Haber clientes, y en PPD el IVA de lo cobrado pasa a «cobrado».
+    // Pago a proveedor: Debe proveedores · Haber bancos.
+    const renglones = polizaPagoFactura({
+      tipo: invoice.type,
+      importe: amount,
+      facturaTotal: Number(invoice.totalAmount ?? 0),
+      facturaIva: Number(invoice.taxAmount ?? 0),
+      metodoPago: invoice.satPaymentMethod,
+    });
+    return this.registrarPolizaMesa(
+      `PAY-${payment.id}`,
+      `${invoice.type === 'ACCOUNTS_RECEIVABLE' ? 'Cobro' : 'Pago proveedor'} factura ${invoice.invoiceNumber}`,
+      new Date(payment.paymentDate).toISOString().slice(0, 10),
+      renglones,
+      userId,
+      companyId,
+    );
+  }
 
-    // Cobro cliente: Debe bancos · Haber CXC
-    if (invoice.type === 'ACCOUNTS_RECEIVABLE') {
-      const [bank, cxc] = await Promise.all([
-        this.getAccountByCode('102.01', companyId),
-        this.getAccountByCode('105.01', companyId),
-      ]);
-      return this.createAndPostAutoJournal(
-        ref,
-        `Cobro factura ${invoice.invoiceNumber}`,
-        date,
-        [
-          { debitAccountId: bank.id, creditAccountId: cxc.id, debit: amount, credit: 0, label: 'Entrada bancaria' },
-          { debitAccountId: cxc.id, creditAccountId: bank.id, debit: 0, credit: amount, label: 'Aplicación CXC' },
-        ],
-        userId,
-        companyId,
-      );
+  /**
+   * Da de alta, del catálogo base, las cuentas que una póliza va a pisar y la empresa aún no tiene
+   * (p. ej. 601.10 combustibles la primera vez que se registra un gasto de gasolina). No toca las
+   * que ya existen.
+   */
+  async asegurarCuentasBase(codigos: string[], companyId?: number | null) {
+    const cid = await this.resolveCompanyId(companyId);
+    for (const codigo of codigos) {
+      const base = BASE_CHART_OF_ACCOUNTS.find((a) => a.code === codigo);
+      if (!base) continue;
+      await this.prisma.account.upsert({
+        where: { companyId_code: { companyId: cid, code: base.code } },
+        create: { code: base.code, name: base.name, type: base.type, satAgrupador: base.satAgrupador ?? null, companyId: cid },
+        update: {},
+      });
     }
+  }
 
-    // Pago proveedor: Debe CXP · Haber bancos
-    if (invoice.type === 'ACCOUNTS_PAYABLE') {
-      const [bank, cxp] = await Promise.all([
-        this.getAccountByCode('102.01', companyId),
-        this.getAccountByCode('201.01', companyId),
-      ]);
-      return this.createAndPostAutoJournal(
-        ref,
-        `Pago proveedor factura ${invoice.invoiceNumber}`,
-        date,
-        [
-          { debitAccountId: cxp.id, creditAccountId: bank.id, debit: amount, credit: 0, label: 'Liquidación CXP' },
-          { debitAccountId: bank.id, creditAccountId: cxp.id, debit: 0, credit: amount, label: 'Salida bancaria' },
-        ],
-        userId,
-        companyId,
-      );
+  /**
+   * Registra (ya contabilizada) una póliza armada con códigos del catálogo base. La contrapartida
+   * de cada renglón es el primer renglón del lado contrario: solo es informativa, los saldos se
+   * suman por la cuenta del renglón.
+   */
+  async registrarPolizaMesa(
+    reference: string,
+    description: string,
+    date: string,
+    renglones: RenglonPoliza[],
+    userId: number,
+    companyId?: number | null,
+  ) {
+    const codigos = [...new Set(renglones.map((r) => r.codigo))];
+    await this.asegurarCuentasBase(codigos, companyId);
+    const cuentas = new Map<string, number>();
+    for (const codigo of codigos) {
+      cuentas.set(codigo, (await this.getAccountByCode(codigo, companyId)).id);
     }
-
-    return null;
+    const primerDebe = renglones.find((r) => r.debe > 0);
+    const primerHaber = renglones.find((r) => r.haber > 0);
+    return this.createAndPostAutoJournal(
+      reference,
+      description,
+      date,
+      renglones.map((r) => {
+        const contra = r.debe > 0 ? primerHaber : primerDebe;
+        return {
+          debitAccountId: cuentas.get(r.codigo)!,
+          creditAccountId: cuentas.get(contra?.codigo ?? r.codigo)!,
+          debit: r.debe,
+          credit: r.haber,
+          label: r.etiqueta,
+        };
+      }),
+      userId,
+      companyId,
+    );
   }
 
   async reverseJournalEntry(id: number, userId: number, companyId?: number | null) {
@@ -1674,6 +1726,10 @@ export class AccountingService {
     cfdiRelationType?: string;
     cfdiRelatedUuids?: string[];
     companyId?: number | null;
+    /** Mesa contable: de qué servicio o cotización sale, y si es un anticipo. */
+    activityId?: number;
+    cotizacionId?: number;
+    esAnticipo?: boolean;
     items: Array<{
       description: string;
       quantity: number;
@@ -1700,6 +1756,8 @@ export class AccountingService {
     await assertRefsBelongToCompany(companyId, [
       { modelo: this.prisma.salesClient, ids: [dto.clientId], etiqueta: 'Cliente' },
       { modelo: this.prisma.supplier, ids: [dto.supplierId], etiqueta: 'Proveedor' },
+      { modelo: this.prisma.activity, ids: [dto.activityId], etiqueta: 'Actividad' },
+      { modelo: this.prisma.cotizacion, ids: [dto.cotizacionId], etiqueta: 'Cotización' },
       {
         modelo: this.prisma.product,
         ids: dto.items.map((i) => i.productId),
@@ -1761,6 +1819,9 @@ export class AccountingService {
         cfdiSerie: dto.cfdiSerie?.trim() || null,
         cfdiRelationType: dto.cfdiRelationType?.trim() || null,
         cfdiRelatedUuids: (dto.cfdiRelatedUuids || []).join(',') || null,
+        activityId: dto.activityId ?? null,
+        cotizacionId: dto.cotizacionId ?? null,
+        esAnticipo: dto.esAnticipo ?? false,
         items: {
           create: items.map((i) => ({
             description: i.description.trim(),
@@ -2125,6 +2186,8 @@ export class AccountingService {
       receptorRegime?: string;
       receptorZipCode?: string;
       cfdiUsage?: string;
+      satPaymentMethod?: string;
+      satPaymentForm?: string;
       notes?: string;
       items?: Array<{
         description: string;
@@ -2188,6 +2251,10 @@ export class AccountingService {
             receptorRegime: dto.receptorRegime ? (this.normalizeFiscalRegime(dto.receptorRegime) as any) : undefined,
             receptorZipCode: dto.receptorZipCode?.trim() ?? undefined,
             cfdiUsage: dto.cfdiUsage ? (this.normalizeCfdiUsage(dto.cfdiUsage) as any) : undefined,
+            satPaymentMethod: dto.satPaymentMethod
+              ? (this.normalizeSatPaymentMethod(dto.satPaymentMethod) as any)
+              : undefined,
+            satPaymentForm: dto.satPaymentForm ? (this.normalizeSatPaymentForm(dto.satPaymentForm) as any) : undefined,
             notes: dto.notes !== undefined ? (dto.notes?.trim() || null) : undefined,
             subtotal: new Prisma.Decimal(subtotal),
             taxAmount: new Prisma.Decimal(taxAmount),
@@ -2224,6 +2291,10 @@ export class AccountingService {
           receptorRegime: dto.receptorRegime ? (this.normalizeFiscalRegime(dto.receptorRegime) as any) : undefined,
           receptorZipCode: dto.receptorZipCode?.trim() ?? undefined,
           cfdiUsage: dto.cfdiUsage ? (this.normalizeCfdiUsage(dto.cfdiUsage) as any) : undefined,
+          satPaymentMethod: dto.satPaymentMethod
+            ? (this.normalizeSatPaymentMethod(dto.satPaymentMethod) as any)
+            : undefined,
+          satPaymentForm: dto.satPaymentForm ? (this.normalizeSatPaymentForm(dto.satPaymentForm) as any) : undefined,
           notes: dto.notes !== undefined ? (dto.notes?.trim() || null) : undefined,
         },
       });
@@ -2448,7 +2519,7 @@ export class AccountingService {
       }
 
       if (paymentBankAccount) {
-        await tx.bankTransaction.create({
+        const movimientoBanco = await tx.bankTransaction.create({
           data: {
             bankAccountId: paymentBankAccount.id,
             transactionDate: new Date(dto.paymentDate),
@@ -2460,6 +2531,17 @@ export class AccountingService {
             concept: dto.notes?.trim() || `Pago ${locked.invoiceNumber}`,
             counterpartyName: locked.receptorName?.trim() || null,
             counterpartyRfc: locked.receptorRfc?.trim() || null,
+            companyId: requireCompanyId(paymentBankAccount.companyId),
+          },
+        });
+
+        // Mesa contable: el cobro o pago queda ligado al movimiento de banco que lo respalda.
+        await tx.movimientoVinculo.create({
+          data: {
+            origen: 'PAGO',
+            origenId: createdPayment.id,
+            bankTransactionId: movimientoBanco.id,
+            createdById: userId,
             companyId: requireCompanyId(paymentBankAccount.companyId),
           },
         });

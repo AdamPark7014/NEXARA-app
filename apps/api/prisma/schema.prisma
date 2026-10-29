@@ -2565,6 +2565,7 @@ model Cotizacion {
   actividades     Activity[]                @relation("ActividadCotizacion")
   /// Proyectos operativos que nacieron de esta cotización: su alcance es el mismo.
   proyectos       OperationalProject[]      @relation("CotizacionProyecto")
+  facturas        Invoice[]                 @relation("FacturaCotizacion")
 
   @@unique([companyId, quoteNumber])
   @@index([salesClientId])
@@ -4023,6 +4024,15 @@ model Invoice {
   matchedById         Int?
   matchNotes          String?            @db.VarChar(500)
   matchedBy           User?              @relation("InvoiceMatcher", fields: [matchedById], references: [id])
+  /// Cotización que se factura, completa o su anticipo. Sin esto la bandeja «Por facturar» no
+  /// podía saber qué cotización aprobada seguía sin factura.
+  cotizacionId        Int?
+  cotizacion          Cotizacion?        @relation("FacturaCotizacion", fields: [cotizacionId], references: [id], onDelete: SetNull)
+  /// CFDI de anticipo (SAT: «Anticipo del bien o servicio», 84111506). La factura final lo
+  /// relaciona con tipo 07 y descuenta lo ya cobrado.
+  esAnticipo          Boolean            @default(false)
+  /// Pagos y gastos que este CFDI (recibido) respalda.
+  vinculos            MovimientoVinculo[]
 
   @@unique([cfdiUuid])
   @@unique([companyId, invoiceNumber])
@@ -4032,6 +4042,8 @@ model Invoice {
   @@index([receptorRfc])
   @@index([companyId])
   @@index([matchStatus])
+  @@index([activityId])
+  @@index([cotizacionId])
   @@map("invoices")
 }
 
@@ -4157,6 +4169,8 @@ model BankTransaction {
   bankAccount       BankAccount         @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
   reconciliation    BankReconciliation?
   company           CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  /// Pago o gasto al que corresponde este movimiento (Mesa contable).
+  vinculos          MovimientoVinculo[]
 
   @@unique([bankAccountId, speiTrackingKey])
   @@index([bankAccountId, transactionDate])
@@ -4183,6 +4197,48 @@ model BankReconciliation {
   @@index([bankAccountId, status])
   @@index([companyId])
   @@map("bank_reconciliations")
+}
+
+/// Mesa contable: lo que la contadora decidió no facturar (garantía, cortesía, póliza ya cobrada).
+/// Sin esto la bandeja «Por facturar» se llena de servicios que nunca se cobran.
+model PorFacturarDescarte {
+  id          Int      @id @default(autoincrement())
+  /// ACTIVIDAD | COTIZACION | ANTICIPO | PEDIDO
+  origen      String   @db.VarChar(20)
+  origenId    Int
+  motivo      String   @db.VarChar(300)
+  createdById Int?
+  companyId   Int
+  createdAt   DateTime @default(now())
+
+  @@unique([companyId, origen, origenId])
+  @@index([companyId])
+  @@map("por_facturar_descartes")
+}
+
+/// Mesa contable: liga un pago o gasto con su CFDI (recibido o emitido) y con su movimiento de
+/// banco. Antes ese cruce no existía: la conciliación lo dejaba como texto en `notes`. Un renglón
+/// lleva el CFDI o el banco; un viático puede tener varios CFDI, uno por ticket.
+model MovimientoVinculo {
+  id                Int              @id @default(autoincrement())
+  /// VIATICO | GASTO | NOMINA | PAGO | RECEPCION
+  origen            String           @db.VarChar(20)
+  origenId          Int
+  invoiceId         Int?
+  bankTransactionId Int?
+  /// Lo que cubre este CFDI del movimiento, con IVA.
+  importe           Decimal?         @db.Decimal(14, 2)
+  createdById       Int?
+  companyId         Int
+  createdAt         DateTime         @default(now())
+  invoice           Invoice?         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  bankTransaction   BankTransaction? @relation(fields: [bankTransactionId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, origen, origenId, invoiceId])
+  @@index([companyId, origen, origenId])
+  @@index([invoiceId])
+  @@index([bankTransactionId])
+  @@map("movimiento_vinculos")
 }
 
 model Budget {
