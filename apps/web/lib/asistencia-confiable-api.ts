@@ -12,6 +12,8 @@ import { erpFetch } from "./erp-api";
 
 /** Por qué el servidor no aceptó una checada. Las claves las fija el API. */
 export const MOTIVO_RECHAZO_ETIQUETA: Record<string, string> = {
+  UBICACION_APAGADA: "Ubicación apagada",
+  SIN_PERMISO_UBICACION: "Sin permiso de ubicación",
   MOCK_LOCATION: "Ubicación simulada",
   ORIGEN_WEB: "Desde el navegador",
   VIAJE_IMPOSIBLE: "Viaje imposible",

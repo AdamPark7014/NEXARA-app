@@ -9,6 +9,7 @@
  */
 import type { PrismaService } from '../prisma/prisma.service.js';
 import { workDateKey } from '../common/time/workday.js';
+import { MARGEN_UBICACION_MIN } from './ubicacion-posterior.js';
 
 export const ESTADOS_UBICACION = ['APAGADA', 'SIN_PERMISO', 'ENCENDIDA'] as const;
 export type EstadoUbicacion = (typeof ESTADOS_UBICACION)[number];
@@ -98,6 +99,15 @@ export function tramosSinUbicacion(
 }
 
 /**
+ * Los tramos que se marcan en Asistencias: de {@link MARGEN_UBICACION_MIN} minutos o más. Uno más
+ * corto suele ser la red o el GPS reconectando (el 28-10 salía «Ubicación apagada 0 min»), y uno
+ * abierto se marca cuando ya pasó el margen.
+ */
+export function tramosQueCuentan(tramos: TramoSinUbicacion[]): TramoSinUbicacion[] {
+  return tramos.filter((t) => t.minutos >= MARGEN_UBICACION_MIN);
+}
+
+/**
  * Guarda el estado si cambia algo (ver `debeRegistrarse`). Nunca lanza: avisar de la ubicación
  * no puede tumbar una checada ni un punto de GPS.
  */
@@ -160,7 +170,7 @@ export async function tramosSinUbicacionDe(
       porUsuario.set(e.userId, lista);
     }
     for (const [userId, lista] of porUsuario) {
-      const tramos = tramosSinUbicacion(lista, params.desde, params.hasta, params.ahora);
+      const tramos = tramosQueCuentan(tramosSinUbicacion(lista, params.desde, params.hasta, params.ahora));
       if (tramos.length) out.set(userId, tramos);
     }
   } catch {

@@ -151,6 +151,8 @@ describe('las claves de rechazo son estables', () => {
       'MOCK_LOCATION',
       'ORIGEN_WEB',
       'SIN_CONEXION_FUERA_DE_VENTANA',
+      'SIN_PERMISO_UBICACION',
+      'UBICACION_APAGADA',
       'UBICACION_VIEJA',
       'VIAJE_IMPOSIBLE',
     ]);

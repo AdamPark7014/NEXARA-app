@@ -194,9 +194,11 @@ describe('lo que no se puede comprobar se marca, no se rechaza', () => {
   it('sin ubicación con el diagnóstico de la app: el jefe lee la causa', async () => {
     const { service, prisma } = build();
 
-    await service.register(entrada({ ubicacionFalla: 'UBICACION_APAGADA' }) as any, 3, PETICION_APP, 7);
+    // Sin señal sí se registra; apagada o sin permiso ya no (`ubicacion-obligatoria.spec.ts`).
+    await service.register(entrada({ ubicacionFalla: 'SIN_SENAL' }) as any, 3, PETICION_APP, 7);
 
-    expect(fila(prisma).motivoValidacion).toBe('Sin ubicación: ubicación del teléfono apagada');
+    expect(fila(prisma).motivoValidacion).toMatch(/^Sin ubicación: /);
+    expect(fila(prisma).validacion).toBe('REVISAR');
   });
 
   it('la cola sin conexión de una app vieja (okhttp) no se toma por una PC ni se rechaza', async () => {

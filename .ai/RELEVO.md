@@ -1,5 +1,24 @@
 # RELEVO
 
+- **29-10 ~15:40 (claude-code) — Ubicación obligatoria para checar y margen de 10 min (pedido de Adam del 28-10).**
+  - Adam: «dales un margen de error de 5–10 minutos por temas de internet… y fuerza a que se deba comenzar a tomar la
+    ubicación; si no la tienen prendida, que les marque errores: enciende tu ubicación».
+  - API `attendance/ubicacion-obligatoria.ts`: con `ubicacionFalla` UBICACION_APAGADA o PERMISO_NEGADO y sin
+    coordenadas, `register` rechaza con 422 («Enciende la ubicación de tu teléfono para checar…» / «Dale permiso de
+    ubicación a NEXARA…»), entrada y salida. Sin señal, error del GPS, app vieja sin motivo o captura sin conexión se
+    siguen registrando a revisión. Motivos nuevos `UBICACION_APAGADA`/`SIN_PERMISO_UBICACION` en `MOTIVO_RECHAZO`
+    (quedan en «Checadas rechazadas»; no se avisa a los jefes). Las apps publicadas ya muestran el 422 en su diálogo
+    «No se pudo checar» con la ayuda genérica; Android (`AttendanceCheckIn.ayudaDelRechazo`) e iOS
+    (`ChecadaRechazo.ayuda`) traen la ayuda exacta para la próxima build.
+  - Margen `MARGEN_UBICACION_MIN = 10` (`ubicacion-posterior.ts`): la ubicación posterior que llega a ≤ 10 min deja la
+    entrada OK si eso era lo único a revisar (`validacionTrasUbicacionPosterior`), y los tramos sin ubicación de menos
+    de 10 min ya no salen en Asistencias (`tramosQueCuentan`). Dato: la entrada 580 (Carlos, 28-10, 2 min) pasó a OK
+    con fila en `audit_logs` (source `correccion-manual`); respaldo `/root/respaldo-attendance-580-2910.jsonl`. La de
+    Iván del 26-10 (26 min) sigue a revisión.
+  - El commit se armó con un índice temporal sobre `origin/main` porque los mismos archivos de asistencia tienen
+    preparado (sin commit) el trabajo de días festivos de otra sesión: en el checkout compartido mis líneas siguen como
+    cambios sin preparar encima del suyo, con el mismo contenido que ya está en origin.
+
 - **29-10 ~15:40 (claude-code) — Sugerencia de nómina: la semana de pago primero (Adam: «es semanalmente los pagos…
   y hoy es jueves»).**
   - Abre en la semana en curso (lunes a domingo). El encabezado dice «Semana del 26 oct al 1 nov · se paga el lunes

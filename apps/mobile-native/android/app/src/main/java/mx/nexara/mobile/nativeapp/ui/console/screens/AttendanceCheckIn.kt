@@ -40,6 +40,13 @@ object AttendanceCheckIn {
             texto.contains("fin de semana") || texto.contains("guardia") ->
                 "Sábado y domingo solo checa quien tiene guardia ese día, así que, si hoy te toca trabajar, " +
                     "pídele a tu encargado que te programe la guardia y vuelve a intentarlo."
+            // Ubicación obligatoria para checar (28-10): el servidor rechaza apagada o sin permiso.
+            texto.contains("enciende la ubicación") || texto.contains("enciende la ubicacion") ->
+                "Desliza desde arriba de la pantalla y toca «Ubicación» para encenderla, espera unos " +
+                    "segundos a que el GPS mida y vuelve a checar."
+            texto.contains("permiso de ubicación a nexara") || texto.contains("permiso de ubicacion a nexara") ->
+                "Abre Ajustes › Aplicaciones › NEXARA › Permisos › Ubicación, elige «Permitir solo con la " +
+                    "app en uso» y vuelve a checar."
             texto.isBlank() || texto.contains("simulada") || texto.contains("gps falso") -> MOCK_AYUDA
             // Un motivo nuevo del servidor: su texto ya dice qué pasó; aquí no se inventa otro.
             else -> AYUDA_GENERICA
@@ -61,7 +68,9 @@ object AttendanceCheckIn {
         esUbicacionSimulada(code, mensaje) ||
             mensaje?.lowercase()?.let { t ->
                 t.contains("ubicación vieja") || t.contains("ubicacion vieja") ||
-                    t.contains("distancia imposible") || t.contains("app nexara")
+                    t.contains("distancia imposible") || t.contains("app nexara") ||
+                    // Festivo que no le toca (FESTIVO_SIN_LABORAR): el mensaje del servidor, tal cual.
+                    t.contains("no se labora")
             } == true
 
     /** Arriba de 200 m el servidor la acepta pero la deja «Revisar: Ubicación imprecisa». */

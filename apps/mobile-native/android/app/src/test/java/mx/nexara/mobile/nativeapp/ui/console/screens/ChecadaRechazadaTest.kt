@@ -71,4 +71,16 @@ class ChecadaRechazadaTest {
         assertTrue(AttendanceCheckIn.ayudaDelRechazo(null).isNotBlank())
         assertTrue(AttendanceCheckIn.ayudaDelRechazo("").isNotBlank())
     }
+
+    @Test
+    fun `ubicacion apagada o sin permiso dice como encenderla (servidor, 28-10)`() {
+        // Mismos textos que `ubicacion-obligatoria.ts` del API.
+        val apagada = "Enciende la ubicación de tu teléfono para checar: NEXARA registra dónde estás al checar tu entrada y tu salida."
+        val sinPermiso = "Dale permiso de ubicación a NEXARA para checar: en los ajustes del teléfono, Ubicación › Permitir mientras se usa la app, y vuelve a intentarlo."
+        assertTrue(AttendanceCheckIn.esRechazoDelServidor(422, apagada))
+        assertTrue(AttendanceCheckIn.ayudaDelRechazo(apagada).contains("encenderla"))
+        assertTrue(AttendanceCheckIn.ayudaDelRechazo(sinPermiso).contains("Permisos › Ubicación"))
+        // No es el rechazo de «solo desde la app».
+        assertFalse(AttendanceCheckIn.ayudaDelRechazo(apagada).contains("solo se registran desde esta app"))
+    }
 }
