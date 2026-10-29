@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SugerenciaNomina, {
   NOTA_FORMULA,
+  diaYFecha,
+  encabezadoSemana,
   fechaCorta,
   formatoHoras,
   rangoCorto,
@@ -123,6 +125,13 @@ describe("rutaSugerencia", () => {
     expect(rutaSugerencia("rango", "2026-09-15", "2026-09-01")).toBeNull();
   });
 
+  it("encabezado de la semana de pago, sin quincenas", () => {
+    expect(diaYFecha("2026-11-02")).toBe("lunes 2 nov");
+    expect(encabezadoSemana("2026-10-26", "2026-11-01", "2026-11-02")).toBe("Semana del 26 oct al 1 nov · se paga el lunes 2 nov");
+    expect(encabezadoSemana("2026-10-19", "2026-10-25", "2026-10-26")).toBe("Semana del 19 al 25 oct · se paga el lunes 26 oct");
+    expect(encabezadoSemana("2026-10-19", "2026-10-25")).toBe("Semana del 19 al 25 oct");
+  });
+
   it("fechas cortas para el selector, con el año si el rango cruza de año", () => {
     expect(fechaCorta("2026-11-01")).toBe("1 nov");
     expect(rangoCorto("2026-10-26", "2026-11-01")).toBe("26 oct – 1 nov");
@@ -136,14 +145,14 @@ describe("rutaSugerencia", () => {
 });
 
 describe("SugerenciaNomina", () => {
-  it("abre en la quincena actual con la sesión y enseña la fórmula y los dos cortes", async () => {
+  it("abre en la semana en curso con la sesión y enseña la fórmula y los dos cortes", async () => {
     const f = respuesta(RESPUESTA);
     vi.stubGlobal("fetch", f);
     render(<SugerenciaNomina token="tok-9" />);
 
     expect(await screen.findByText("Ana López")).toBeTruthy();
     const [url, init] = (f.mock.calls as unknown as Array<[string, RequestInit]>)[0];
-    expect(String(url)).toContain("employee-payments/sugerencia-nomina?periodo=quincena");
+    expect(String(url)).toContain("employee-payments/sugerencia-nomina?periodo=semana");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok-9");
 
     expect(screen.getByText(NOTA_FORMULA)).toBeTruthy();
@@ -179,7 +188,7 @@ describe("SugerenciaNomina", () => {
     render(<SugerenciaNomina token="tok" />);
     await screen.findByText("Ana López");
 
-    for (const clave of ["semana", "semana_anterior", "quincena_anterior", "mes", "mes_anterior"]) {
+    for (const clave of ["semana_anterior", "quincena", "quincena_anterior", "mes", "mes_anterior"]) {
       await userEvent.selectOptions(screen.getByLabelText("Periodo"), clave);
       await waitFor(() =>
         expect((f.mock.calls as unknown as Array<[string]>).some(([u]) => String(u).endsWith(`periodo=${clave}`))).toBe(true),
@@ -192,5 +201,28 @@ describe("SugerenciaNomina", () => {
     render(<SugerenciaNomina token="tok" />);
     expect(await screen.findByText(/Sin permiso/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeTruthy();
+  });
+});
+
+describe("la semana de pago", () => {
+  it("el encabezado dice las fechas de la semana y su día de pago", async () => {
+    const semana: SugerenciaNominaRespuesta = {
+      ...RESPUESTA,
+      periodo: {
+        desde: "2026-10-26",
+        hasta: "2026-11-01",
+        etiqueta: "semana del 26 de octubre de 2026 al 1 de noviembre de 2026",
+        origen: "calculado",
+        clave: "semana",
+        pagoEl: "2026-11-02",
+        enCurso: true,
+        calculadoHasta: "2026-10-28",
+      },
+    };
+    vi.stubGlobal("fetch", respuesta(semana));
+    render(<SugerenciaNomina token="tok" />);
+    const encabezado = await screen.findByText(/Semana del 26 oct al 1 nov · se paga el lunes 2 nov/);
+    // La frase del periodo no nombra quincenas (el selector sí las ofrece como opción).
+    expect(encabezado.parentElement?.textContent ?? "").not.toMatch(/quincena/i);
   });
 });

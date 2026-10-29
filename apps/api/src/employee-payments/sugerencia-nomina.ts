@@ -16,6 +16,7 @@ import { diaDeLaSemana, diasDelRango, pct, sumaDias } from '../me/kpis-equipo.js
 import { avisosDeFila, horas, type EntradaPreNomina } from './pre-nomina.js';
 import { roundMoney } from './prenomina-amount.js';
 import {
+  fechaDePago,
   periodoQueCierra,
   proximoCorte,
   type ConfigNomina,
@@ -44,6 +45,8 @@ export type PeriodoSugerencia = PeriodoNomina & {
    */
   origen: 'calendario' | 'por_omision' | 'manual' | 'calculado';
   clave?: ClavePeriodo;
+  /** Día en que se paga (semanal: el lunes siguiente al corte del domingo, salvo otro `diaPago`). */
+  pagoEl?: string;
 };
 
 /** Los periodos que la pantalla ofrece sin escribir fechas, calculados con la fecha de hoy. */
@@ -55,24 +58,30 @@ export function esClavePeriodo(v: unknown): v is ClavePeriodo {
 }
 
 /**
- * La semana de nómina va de lunes a domingo, como el control de nómina (`nomina_semanas`) y la hoja de
- * entradas de Excel (que llena de lunes a viernes). Corte en domingo.
+ * La semana de nómina va de lunes a domingo, como la hoja «Control de entradas y salidas» de Christian
+ * (la del 19-10 trae de lunes 19 a domingo 25 y su total) y el control de nómina (`nomina_semanas`).
+ * Corte en domingo y pago el lunes siguiente: la hoja de esa semana se mandó el lunes 26. Una empresa
+ * con calendario semanal propio (`payroll.schedule`) manda sobre esto.
  */
-const SEMANA_LUNES_A_DOMINGO: ConfigNomina = { frecuencia: 'semanal', diaSemanaCorte: 0 };
+const SEMANA_LUNES_A_DOMINGO: ConfigNomina = { frecuencia: 'semanal', diaSemanaCorte: 0, diaPago: 1 };
 const QUINCENAL: ConfigNomina = { frecuencia: 'quincenal', diaSemanaCorte: 5 };
 const MENSUAL: ConfigNomina = { frecuencia: 'mensual', diaSemanaCorte: 5 };
 
-/** Semana, quincena o mes que contiene `hoy` (día de México), o el anterior a ese. */
-export function periodoDeClave(hoy: string, clave: ClavePeriodo): PeriodoSugerencia {
-  const cfg = clave.startsWith('semana') ? SEMANA_LUNES_A_DOMINGO : clave.startsWith('quincena') ? QUINCENAL : MENSUAL;
+/**
+ * Semana, quincena o mes que contiene `hoy` (día de México), o el anterior a ese. La semana usa el
+ * calendario de la empresa si es semanal; si no, lunes a domingo con pago el lunes.
+ */
+export function periodoDeClave(hoy: string, clave: ClavePeriodo, empresa?: ConfigNomina | null): PeriodoSugerencia {
+  const semanal = empresa?.frecuencia === 'semanal' ? empresa : SEMANA_LUNES_A_DOMINGO;
+  const cfg = clave.startsWith('semana') ? semanal : clave.startsWith('quincena') ? QUINCENAL : MENSUAL;
   const actual = proximoCorte(hoy, cfg).periodo;
   const periodo = clave.endsWith('_anterior') ? periodoQueCierra(sumaDias(actual.desde, -1), cfg) : actual;
-  return { ...periodo, frecuencia: cfg.frecuencia, origen: 'calculado', clave };
+  return { ...periodo, frecuencia: cfg.frecuencia, origen: 'calculado', clave, pagoEl: fechaDePago(periodo, cfg) };
 }
 
 /** Todos los periodos calculados, en el orden del selector. */
-export function periodosCalculados(hoy: string): PeriodoSugerencia[] {
-  return CLAVES_PERIODO.map((c) => periodoDeClave(hoy, c));
+export function periodosCalculados(hoy: string, empresa?: ConfigNomina | null): PeriodoSugerencia[] {
+  return CLAVES_PERIODO.map((c) => periodoDeClave(hoy, c, empresa));
 }
 
 /** El periodo de nómina vigente (el que contiene hoy) o el anterior a ese. */
@@ -84,7 +93,12 @@ export function periodoSugerencia(
   const config = cfg ?? CONFIG_POR_OMISION;
   const vigente = proximoCorte(hoy, config).periodo;
   const periodo = cual === 'anterior' ? periodoQueCierra(sumaDias(vigente.desde, -1), config) : vigente;
-  return { ...periodo, frecuencia: config.frecuencia, origen: cfg ? 'calendario' : 'por_omision' };
+  return {
+    ...periodo,
+    frecuencia: config.frecuencia,
+    origen: cfg ? 'calendario' : 'por_omision',
+    pagoEl: fechaDePago(periodo, config),
+  };
 }
 
 /** Un rango escrito a mano. */
@@ -93,16 +107,17 @@ export function periodoManual(desde: string, hasta: string): PeriodoSugerencia {
 }
 
 /**
- * Los días que ya se pueden juzgar. Hoy no cuenta (la jornada no ha terminado) y antes del
- * ingreso no se esperaba que trabajara.
+ * Los días que ya se pueden juzgar. Hoy cuenta solo con la jornada terminada (`incluyeHoy`, desde las
+ * 18:00) y antes del ingreso no se esperaba que trabajara.
  */
 export function ventanaDeCalculo(
   periodo: { desde: string; hasta: string },
   hoy: string,
   fechaIngreso?: string | null,
+  incluyeHoy = false,
 ): { desde: string; hasta: string; dias: number; enCurso: boolean } {
-  const enCurso = periodo.hasta >= hoy;
-  const hasta = enCurso ? sumaDias(hoy, -1) : periodo.hasta;
+  const enCurso = incluyeHoy ? periodo.hasta > hoy : periodo.hasta >= hoy;
+  const hasta = periodo.hasta >= hoy ? (incluyeHoy ? hoy : sumaDias(hoy, -1)) : periodo.hasta;
   const desde = fechaIngreso && fechaIngreso > periodo.desde ? fechaIngreso : periodo.desde;
   const dias = desde <= hasta ? diasDelRango(desde, hasta).length : 0;
   return { desde, hasta, dias, enCurso };
@@ -208,6 +223,8 @@ export type EntradaSugerencia = {
   periodo: { desde: string; hasta: string };
   /** Hoy en `AAAA-MM-DD` (día de México). */
   hoy: string;
+  /** La jornada de hoy ya terminó (18:00): hoy entra en «a la fecha». */
+  incluyeHoy?: boolean;
   fechaIngreso?: string | null;
 };
 
@@ -268,7 +285,7 @@ export function filaSugerencia(e: EntradaSugerencia): FilaSugerencia {
   const laborados = Math.max(0, t.minutosLaborados);
   const productivos = Math.max(0, Math.min(t.minutosProductivos, laborados));
 
-  const ventana = ventanaDeCalculo(e.periodo, e.hoy, e.fechaIngreso);
+  const ventana = ventanaDeCalculo(e.periodo, e.hoy, e.fechaIngreso, e.incluyeHoy);
   const esperados = ventana.dias > 0 ? minutosEsperados(divisor, ventana.desde, ventana.hasta) : 0;
   const diasPeriodo = diasDelRango(e.periodo.desde, e.periodo.hasta).length;
 
@@ -424,8 +441,8 @@ export function formulaSugerencia(): string[] {
     'Pago por laboradas = horas laboradas × pago por hora. Pago por productivas = horas productivas × pago por hora.',
     'Regla de pago aprobada el 29-10 (la revisa la contadora): semana = mensual × 12 ÷ 52, y el día es la semana ÷ 7 en todo periodo. Así 7 días son la semana exacta y una quincena o un mes son la suma de sus días.',
     'Sueldo del periodo = sueldo semanal ÷ 7 × días del periodo (incluye el séptimo día, como la quincena).',
-    'Periodos: semana de lunes a domingo (como el control de nómina), quincena del 1 al 15 y del 16 a fin de mes, y mes natural. Se calculan con la fecha de hoy en Ciudad de México.',
-    'A la fecha = sugerido con lo esperado contado hasta ayer (hoy todavía no termina). Periodo completo = lo de a la fecha más el sueldo de los días que faltan, si los cumple.',
+    'La nómina se paga por semana: de lunes a domingo, como la hoja «Control de entradas y salidas», y se paga el lunes siguiente. Quincena (1–15 y 16–fin de mes) y mes natural quedan como opciones. Todo se calcula con la fecha de hoy en Ciudad de México.',
+    'A la fecha = sugerido con lo esperado contado hasta hoy si la jornada ya terminó (18:00), o hasta ayer si no. Periodo completo = lo de a la fecha más el sueldo de los días que faltan, si los cumple.',
     'Sugerido = sueldo devengado a la fecha × (horas laboradas ÷ horas esperadas), sin pasar de su sueldo. El tiempo extra no entra: solo se paga si un jefe lo aprueba (pre-nómina).',
     `Si las productivas son menos del ${UMBRAL_PRODUCTIVIDAD_REVISAR} % de las laboradas, se sugiere revisar antes de pagar.`,
     'Es una sugerencia: no crea ni modifica pagos.',
