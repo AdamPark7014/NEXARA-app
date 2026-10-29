@@ -249,6 +249,121 @@
   user-select: none;
 }
 
+.controles3d {
+  position: absolute;
+  left: var(--ui-s4);
+  top: var(--ui-s3);
+  display: flex;
+  gap: var(--ui-s2);
+  z-index: 1;
+}
+
+.boton3d {
+  height: 32px;
+  padding: 0 var(--ui-s3);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: var(--ui-fs-label);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--ui-elev-1);
+}
+
+.boton3d:hover {
+  background: var(--ui-hover);
+}
+
+.pista3d {
+  position: absolute;
+  right: var(--ui-s4);
+  top: var(--ui-s3);
+  margin: 0;
+  padding: 6px var(--ui-s3);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.tiraVistas {
+  padding: var(--ui-s4);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.tiraVistasCabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--ui-s2) var(--ui-s3);
+  margin-bottom: var(--ui-s3);
+}
+
+.tiraVistasCabeza h2 {
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-section);
+}
+
+.tiraVistasGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--ui-s3);
+}
+
+.tiraVistasGrid .pip {
+  width: auto;
+  box-shadow: var(--ui-elev-1);
+}
+
+.escalaNorte {
+  position: absolute;
+  left: var(--ui-s4);
+  top: var(--ui-s3);
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  padding: 6px var(--ui-s3);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-elev-1);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.norte {
+  display: inline-grid;
+  place-items: center;
+}
+
+.barraEscala {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+}
+
+.barraEscala span {
+  display: inline-block;
+  height: 6px;
+  border: 1.5px solid var(--ui-fg);
+  border-top: 0;
+  background: repeating-linear-gradient(90deg, var(--ui-fg) 0 25%, transparent 25% 50%);
+}
+
+.barraEscala b {
+  font-weight: 600;
+  color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
+}
+
 .vacio {
   position: absolute;
   left: 50%;
