@@ -2117,10 +2117,12 @@ model OvertimeApproval {
 
 /// Horario propio de una persona: a qué hora entra, a qué hora sale y qué días trabaja.
 ///
-/// Mientras nadie edite nada, esta tabla está vacía y todo sigue igual: manda la plantilla de
-/// acceso de siempre (oficina 09:00, campo 08:00, 15 min de gracia, L–V, 8 h netas). Cada campo
-/// en null hereda ese mismo valor, así que se puede cambiar solo la hora de entrada de una
-/// persona sin decidir de paso su jornada ni sus días.
+/// Sin fila manda la plantilla de acceso (`expectedStartHm`): oficina y contratistas de 10:00 a
+/// 18:00, 15 min de gracia, L–V, 8 h netas; dirección (24/7) sin horario. La cuadrilla de campo
+/// tiene aquí su horario propio, de 08:00 a 17:00. Cada campo en null hereda el de la plantilla,
+/// así que se puede cambiar solo la hora de entrada de una persona sin decidir de paso su jornada
+/// ni sus días. De aquí salen también la hora de inicio por omisión al asignarle y su entrega
+/// calculada (`activities/tiempo-entrega.ts`: comida 5 h después de entrar).
 ///
 /// De aquí salen el retardo y el tiempo extra que se calculan en `kpis-equipo.ts`, y de ahí la
 /// pre-nómina: por eso queda registrado quién lo editó y cuándo.

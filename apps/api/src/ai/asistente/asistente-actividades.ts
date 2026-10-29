@@ -227,7 +227,17 @@ Campos:
 
 export { normalizar, sonido, puntaje, buscar, type Coincidencia } from './nombres.js';
 
-export type PersonaAsignable = { id: number; nombre: string; puesto?: string | null; email?: string | null };
+export type PersonaAsignable = {
+  id: number;
+  nombre: string;
+  puesto?: string | null;
+  email?: string | null;
+  /** `HH:MM` de su entrada (10:00 la oficina, 08:00 la cuadrilla); null = sin horario. */
+  horaEntrada?: string | null;
+};
+
+/** La entrada de la oficina: la hora de inicio de quien no tiene horario. */
+export const HORA_ENTRADA_OFICINA = '10:00';
 export type ClienteNexara = { id: number; name: string };
 export type SucursalNexara = {
   id: number;
@@ -461,7 +471,7 @@ function sinPalabrasDe(texto: string | null, nombre: string): string | null {
 /** `AAAA-MM-DD` + `HH:MM` de CDMX → ISO UTC. null si falta la fecha o no es válida. */
 export function aFechaISO(fecha: string | null, hora: string | null): string | null {
   if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return null;
-  const h = hora && /^\d{1,2}:\d{2}$/.test(hora) ? hora.padStart(5, '0') : '09:00';
+  const h = hora && /^\d{1,2}:\d{2}$/.test(hora) ? hora.padStart(5, '0') : HORA_ENTRADA_OFICINA;
   const d = new Date(`${fecha}T${h}:00${DESFASE_CDMX}`);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
@@ -492,7 +502,8 @@ export function horaActualRedondeada(ahora: Date): string {
  * - Plazo («para el viernes»): empieza hoy (o el día que dijeron) y vence el día del plazo; si
  *   son días distintos va como periodo, así se queda en la pizarra cada día y no cuenta como
  *   atrasada antes del último.
- * - Sin hora: hoy, la hora actual; otro día, 09:00 (la del formulario).
+ * - Sin hora: hoy, la hora actual; otro día, la entrada de quien ejecuta (10:00 la oficina, 08:00 la
+ *   cuadrilla), como el formulario.
  */
 export type Agenda = {
   dia: string | null;
@@ -501,6 +512,8 @@ export type Agenda = {
   hasta: string | null;
   /** false = la hora no se dijo y se puso la de omisión. */
   horaDicha: boolean;
+  /** La hora es la entrada de quien ejecuta (no se dijo y es otro día): cambia si cambia la persona. */
+  horaPorEntrada?: boolean;
   /**
    * «Entregar a más tardar» (`HH:MM`, el mismo día y después de la hora): la fecha máxima y
    * la entrega quedan a esa hora, como en el formulario. null si no la dijeron o dura varios días.
@@ -528,6 +541,7 @@ export function corregirHoraPasada<T extends Pick<AccionPlan, 'fecha' | 'hora'>>
 export function agendaDe(
   accion: Pick<AccionPlan, 'fecha' | 'hora' | 'fechaLimite'> & Partial<Pick<AccionPlan, 'horaLimite'>>,
   ahora: Date,
+  entrada?: string | null,
 ): Agenda {
   const hoy = fechaLocalISO(ahora);
   const limite = esDia(accion.fechaLimite) ? accion.fechaLimite : null;
@@ -535,11 +549,13 @@ export function agendaDe(
   // Un inicio después del plazo no tiene sentido: se hace el día del plazo.
   if (dia && limite && dia > limite) dia = limite;
   const dicha = aHora(accion.hora);
-  const hora = dicha ?? (dia === hoy ? horaActualRedondeada(ahora) : dia ? '09:00' : null);
+  const hora = dicha ?? (dia === hoy ? horaActualRedondeada(ahora) : dia ? aHora(entrada) ?? HORA_ENTRADA_OFICINA : null);
   const hasta = dia && limite && limite > dia ? limite : null;
   const horaLimite = aHora(accion.horaLimite);
   const compromiso = dia && !hasta && horaLimite && hora && horaLimite > hora ? horaLimite : null;
-  return { dia, hora, hasta, horaDicha: Boolean(dicha), compromiso };
+  // Solo cuando aplica: la hora puesta por la entrada cambia si en la tarjeta se elige a otra persona.
+  const porEntrada = !dicha && Boolean(dia) && dia !== hoy;
+  return { dia, hora, hasta, horaDicha: Boolean(dicha), ...(porEntrada ? { horaPorEntrada: true } : {}), compromiso };
 }
 
 const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -811,7 +827,8 @@ export function construirPropuesta(
 
   // Fechas como el formulario «Asignar»: inicio = entrega = máxima; con plazo de varios días,
   // además el periodo (la API pone la máxima y la entrega al fin de su último día).
-  const agenda = agendaDe(corregirHoraPasada(accion, contexto.ahora, contexto.instruccion), contexto.ahora);
+  const entrada = responsable ? (catalogos.personas.find((p) => p.id === responsable!.id)?.horaEntrada ?? null) : null;
+  const agenda = agendaDe(corregirHoraPasada(accion, contexto.ahora, contexto.instruccion), contexto.ahora, entrada);
   const fechaInicio = aFechaISO(agenda.dia, agenda.hora);
   const hoy = fechaLocalISO(contexto.ahora);
   if (agenda.hasta ? agenda.hasta < hoy : fechaInicio && new Date(fechaInicio).getTime() < contexto.ahora.getTime() - 15 * 60_000) {

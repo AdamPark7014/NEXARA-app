@@ -67,13 +67,23 @@ export function fetchTablaEstandar(token: string): Promise<TablaEstandar> {
   return erpFetch<TablaEstandar>("ai/estandar/tabla", token);
 }
 
+/** Sin `origen`, la ruta sale de la oficina. */
 export function fetchRutaEstandar(
   token: string,
-  body: { lat: number; lng: number; modo: ModoTraslado; salida?: string | null },
+  body: {
+    lat: number;
+    lng: number;
+    modo: ModoTraslado;
+    salida?: string | null;
+    origen?: { lat: number; lng: number; nombre?: string | null } | null;
+  },
 ): Promise<Ruta> {
+  const origen = body.origen
+    ? { origenLat: body.origen.lat, origenLng: body.origen.lng, ...(body.origen.nombre ? { origenNombre: body.origen.nombre } : {}) }
+    : {};
   return erpFetch<Ruta>("ai/estandar/ruta", token, {
     method: "POST",
-    body: JSON.stringify({ lat: body.lat, lng: body.lng, modo: body.modo, ...(body.salida ? { salida: body.salida } : {}) }),
+    body: JSON.stringify({ lat: body.lat, lng: body.lng, modo: body.modo, ...(body.salida ? { salida: body.salida } : {}), ...origen }),
   });
 }
 

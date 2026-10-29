@@ -1,4 +1,4 @@
-import { IsDateString, IsIn, IsNumber, IsOptional, Max, Min } from 'class-validator';
+import { IsDateString, IsIn, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class RutaEstandarDto {
   @IsNumber()
@@ -19,4 +19,22 @@ export class RutaEstandarDto {
   @IsOptional()
   @IsDateString()
   salida?: string;
+
+  /** De dónde sale, si no es la oficina (el sitio de la actividad anterior, la casa del técnico). */
+  @IsOptional()
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  origenLat?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  origenLng?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  origenNombre?: string;
 }

@@ -4,6 +4,8 @@ import {
   completarTiempos,
   entregaCalculada,
   estandarDeLectura,
+  jornadaDeHorario,
+  JORNADA_OFICINA,
   parametrosCambiados,
   tipoDelTitulo,
   TRASLADO_APROX,
@@ -60,6 +62,32 @@ describe('tiempo y entrega de toda actividad', () => {
     expect(hora(entregaCalculada(cdmx('16:00'), 300))).toBe('18:00');
     // Fuera de la jornada: el tiempo completo.
     expect(hora(entregaCalculada(cdmx('19:00'), 60))).toBe('20:00');
+  });
+
+  it('la jornada es la de quien ejecuta: la cuadrilla come de 13 a 14 y sale a las 17', () => {
+    const cuadrilla = jornadaDeHorario({ entrada: '08:00', salida: '17:00' });
+    expect(cuadrilla).toEqual({ entrada: '08:00', salida: '17:00', comidaDesde: '13:00', comidaHasta: '14:00' });
+    // La oficina sale igual con la regla (10:00 + 5 h = 15:00) y sin horario manda la oficina.
+    expect(jornadaDeHorario({ entrada: '10:00', salida: '18:00' })).toEqual(JORNADA_OFICINA);
+    expect(jornadaDeHorario({ entrada: null, salida: null })).toEqual(JORNADA_OFICINA);
+    expect(jornadaDeHorario(null)).toEqual(JORNADA_OFICINA);
+    // Sin salida escrita: 8 h más la comida.
+    expect(jornadaDeHorario({ entrada: '07:30', salida: null }).salida).toBe('16:30');
+    // Quien entra a las 10:00 o después come de 15 a 16 (la ventana fija de asistencia).
+    expect(jornadaDeHorario({ entrada: '11:00', salida: '19:00' })).toMatchObject({ comidaDesde: '15:00', comidaHasta: '16:00' });
+    expect(jornadaDeHorario({ entrada: '09:00', salida: '18:00' })).toMatchObject({ comidaDesde: '14:00', comidaHasta: '15:00' });
+
+    // No pasa de las 17:00 (antes daba 18:00).
+    expect(hora(entregaCalculada(cdmx('15:00'), 180, cuadrilla))).toBe('17:00');
+    // Cruza su comida (13–14), no la de la oficina.
+    expect(hora(entregaCalculada(cdmx('12:30'), 60, cuadrilla))).toBe('14:30');
+    expect(hora(entregaCalculada(cdmx('14:30'), 60, cuadrilla))).toBe('15:30');
+
+    const { cambios } = completarTiempos(
+      { coreKind: 'tarea', ticketTypeCustom: 'Apoyo', titulo: 'Peinado de rack', creadoPorId: 1, responsableId: 7, fechaInicio: cdmx('15:30').toISOString() },
+      { lectura: {}, tipicoMin: 240, jornada: cuadrilla, ahora: cdmx('09:00') },
+    );
+    expect(hora(cambios.fechaEntregaEsperada!)).toBe('17:00');
   });
 
   it('autoasignación: tiempo, estándar, complejidad, unidades y entrega fijos desde el título', () => {

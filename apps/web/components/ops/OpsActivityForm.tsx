@@ -45,6 +45,8 @@ import {
   compromisoValido,
   EMPTY_ACTIVITY_FORM,
   formFromActivityRecord,
+  HORA_INICIO_POR_OMISION,
+  horaDeEntrada,
   type ActivityFormState,
   type ActivityProjectMode,
 } from "@/lib/ops-activity-form";
@@ -202,6 +204,8 @@ export default function OpsActivityForm({
   const [saving, setSaving] = useState(false);
   /** Doble clic: el segundo llega antes de que `saving` deshabilite el botón. */
   const enviandoRef = useRef(false);
+  /** Quien llena eligió la hora: ya no se mueve sola al cambiar de responsable. */
+  const horaElegidaRef = useRef(false);
   /**
    * La actividad ya existe pero un paso posterior falló (p. ej. ligar el ticket): volver a
    * enviar solo repite esos pasos, nunca crea otra.
@@ -353,6 +357,14 @@ export default function OpsActivityForm({
     if (!initialResponsableId || isEdit) return;
     setForm((prev) => ({ ...prev, responsableId: String(initialResponsableId) }));
   }, [initialResponsableId, isEdit]);
+
+  // La hora de inicio por omisión es la entrada de quien ejecuta (10:00 la oficina, 08:00 la
+  // cuadrilla), mientras nadie la haya elegido a mano.
+  useEffect(() => {
+    if (isEdit || horaElegidaRef.current) return;
+    const entrada = horaDeEntrada(users.find((u) => String(u.id) === form.responsableId)?.horaEntrada);
+    setForm((prev) => (prev.hora === entrada ? prev : { ...prev, hora: entrada }));
+  }, [isEdit, users, form.responsableId]);
 
   useEffect(() => {
     if (isEdit || !assignmentCharge) return;
@@ -1239,7 +1251,7 @@ export default function OpsActivityForm({
                 tipoTarea={kindActual === "tarea" ? tipoParaComplejidad : null}
                 complejidad={form.complejidad}
                 sugerencia={sugerenciaIA}
-                salida={form.fecha ? new Date(`${form.fecha}T${form.hora || "09:00"}:00`).toISOString() : null}
+                salida={form.fecha ? new Date(`${form.fecha}T${form.hora || HORA_INICIO_POR_OMISION}:00`).toISOString() : null}
                 value={form.estandar}
                 onChange={(estandar, minutos) => {
                   setForm((prev) => ({
@@ -1259,7 +1271,7 @@ export default function OpsActivityForm({
                 coreKind={kindActual}
                 ticketType={kindActual === "servicio" ? form.ticketType : null}
                 ticketTypeCustom={kindActual === "tarea" ? form.ticketTypeCustom : null}
-                fechaInicio={form.fecha ? new Date(`${form.fecha}T${form.hora || "09:00"}:00`).toISOString() : null}
+                fechaInicio={form.fecha ? new Date(`${form.fecha}T${form.hora || HORA_INICIO_POR_OMISION}:00`).toISOString() : null}
                 periodoFin={form.periodoFin || null}
                 onMinutos={(m) => setForm((prev) => ({ ...prev, tiempoEstimadoMin: String(Math.min(720, m)) }))}
               />
@@ -1529,8 +1541,11 @@ export default function OpsActivityForm({
                   <Input
                     id="oaf-hora"
                     type="time"
-                    value={form.hora || "09:00"}
-                    onChange={(e) => setForm({ ...form, hora: e.target.value })}
+                    value={form.hora || HORA_INICIO_POR_OMISION}
+                    onChange={(e) => {
+                      horaElegidaRef.current = true;
+                      setForm({ ...form, hora: e.target.value });
+                    }}
                     required={requireSchedule}
                   />
                 </Field>
