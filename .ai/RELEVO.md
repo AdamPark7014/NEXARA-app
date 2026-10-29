@@ -1,5 +1,45 @@
 # RELEVO
 
+- **29-10 ~12:10 (claude-code) — Chat de Core: ligas de todo, editor sin texto encimado y asistente en #general (pedido de Adam).**
+  - Código: `bbc3b4a9` (API + web) y el arreglo del menú de `@` (este commit). Desplegado y probado en producción con
+    la sesión de Christian, solo con borradores y el panel del asistente (nada se publicó en #general).
+  - **Bug del texto encimado:** la pastilla del espejo (`MentionTextarea`) se pintaba con `font-weight 550` y el
+    textarea con 400: cada liga corría ~4 px el texto contra el cursor y, al saltar de línea o salir la barra, se
+    encimaba. Ahora mismo grosor, el espejo compensa la barra de desplazamiento, el redactor crece hasta 160 px y la
+    liga/mención entra donde está el cursor con el foco de vuelta (`insertTokenAt` en `lib/chat-mentions.ts`;
+    antes el foco se quedaba en el `<body>` y lo tecleado se perdía). Medido en producción: anchos y scroll del
+    espejo = textarea con 1, 2 y 9 líneas.
+    - Además `.composer` tenía `overflow: hidden`: **el menú de `@` nunca se veía** y el de emojis salía recortado.
+  - **Ligas** (`apps/api/src/chat/ligas/`, `POST chat/ligas`, `GET chat/mentions?kind=QUOTE|CLIENT|PROJECT|
+    ATTENDANCE|VIATIC|INVOICE`): token de siempre `[etiqueta](/erp/…)`; actividad, evidencia (`?evidencia=`),
+    cotización, cliente, proyecto, asistencia (`/erp/asistencias/indicadores/<user>?desde=d&hasta=d`), viático
+    (`/erp/finance/viatics?highlight=`) y factura (`/erp/invoicing/<id>`). Cada tarjeta con los permisos de quien
+    la ve (regla de URL del rol + permiso del detalle + alcance de su pantalla); sin acceso, solo «Cotización
+    NEX-…». Web: botón «Ligar» con 9 pestañas, `lib/ligas.ts` (misma tabla de rutas que el API) y `EntityCards`
+    junta las tarjetas de la pantalla en una llamada. Las apps ya pintan estas ligas como enlaces; sin selector
+    nuevo ni tarjetas (pendiente).
+  - **Asistente** (`apps/api/src/ai/asistente-chat/`, módulo propio, `POST chat/asistente`): `@asistente` en #general
+    (pastilla `[@Asistente](user:0)` desde el `@` o escrito a mano). No publica nada: el panel «Solo tú lo ves» va
+    arriba del redactor y se borra al recargar. Reglas sin IA: saludo, qué puedes hacer, mis pendientes (hoy,
+    mañana, vencidas), quién está en jornada / no ha checado (CEO y jefes con equipo), mi asistencia, folios
+    AN/NEX y «cómo hago / dónde está» con 23 temas verificados contra el código (`ayuda-core.ts`). Lo demás va a
+    Claude: proceso `chat-asistente`, Haiku 5.5 low sin razonamiento, JSON, `max_tokens` 350, guía fija con caché y
+    solo rol + pregunta (ningún dato de la empresa). Tope 20 por persona y 150 por empresa al día
+    (`CHAT_ASISTENTE_TOPE_DIARIO`). «Asígnale a…» reusa `AsistenteActividadesService.interpretar` (solo CEO) y la
+    web crea cada propuesta solo con «Crear». `GET chat/asistente/estado` da al CEO cuántas respondió el código y
+    cuántas la IA hoy.
+  - Eval `npm run eval:asistente-chat -w apps/api` (30 casos): 10/10 por reglas; IA 18/20 perfectos, 0 inventos,
+    juez 4.38/5, p50 1.6 s, p95 3.4 s, US$0.00011 por llamada leyendo caché (0.0005 escribiéndola). Contrato en §8
+    de `C:\dev\scripts\ai-os\IA-CLAUDE.md` (copiado a `/opt/IA-CLAUDE.md`) y objetivo en la puerta
+    (PUERTA-IA-app `2690965`, p95 4 s, 0.0006).
+  - **Despliegue:** `bbc3b4a9` salió con `deploy-api-web.sh` (API + web, ed12e3d4). El arreglo del menú de `@` salió
+    **solo web** (sin reconstruir la API): `main` ya trae la migración `20261029030000_actividad_tiempo_estandar`
+    sin aplicar (ver la entrada de «Asignar con IA»); no la corrí porque es de otra sesión.
+    - `/root/deploy-api-web.sh` no tiene permiso de ejecución: correrlo con `bash /root/deploy-api-web.sh` (con
+      `nohup … &` por SSH muere sin dejar log).
+  - Pendiente: selector «Ligar», tarjetas y asistente en Android/iOS; `lib/asistente-ia-api.spec.ts` (web) falla
+    en tipos y en una prueba por el trabajo sin subir de otra sesión, no por el chat.
+
 - **29-10 ~12:00 (claude-code) — Diseñador de videovigilancia, fase 2: módulo `/erp/videovigilancia` (mockup aprobado).**
   - Adam aprobó el mockup («Aprobado, construye»). Especificación en `docs/DISENADOR-CCTV.md`.
   - Web:
