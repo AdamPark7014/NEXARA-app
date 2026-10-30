@@ -9,6 +9,11 @@
     (`notifyEvidenceBatchApproved`, «Christian aprobó N de tus actividades» con sus AN).
   - Simulacro, lista de IDs y resultado de la corrida: `C:\dev\secrets\nexara\revisiones-2026-10-29\` (fuera del
     repo). Para deshacerlo, la lista de IDs dice qué evidencias regresar a PENDING y qué actividades a «Por Validar».
+  - **Corrido el 30-10 ~10:40** con `apps/api/scripts/aprobar-revisiones-lote.cjs` dentro del contenedor (token de
+    10 min para Christian firmado con el `JWT_SECRET`, sin contraseña). Resultado: 90 de 90 aprobadas, en «Finalizada»,
+    con calificación 5 y «informacion completa gracias»; 12 avisos, uno por persona. Finalizadas 215 → 305 y «Por
+    Validar» 110 → 22. Desempeño del mes: equipo 72 → 75, David 46 → 51, José Antonio 57 → 58; sus revisiones en
+    plazo no cambian porque las revisó Christian. Bitácora y forma de deshacerlo: misma carpeta.
 
 - **29-10 ~17:30 (claude-code) — El título: números de lugar y la unidad que nombra (hallado al verificar la jornada
   en obra en producción).**
