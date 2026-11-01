@@ -25,11 +25,15 @@
     línea base de Next 14 (200/404/308/400, metadatos en `<head>`, feed con ISR, OG); sitio a 375 y 1536 px sin desborde
     ni errores en consola; formulario de login; `/erp` sin sesión manda a `/login?next=%2Ferp` y sus 28 archivos estáticos
     dan 200; la web sin 5xx desde que arrancó (207 MiB).
-  - **Sin verificar:** `/erp` con sesión en un navegador real; hace falta que Adam inicie sesión. Lo cubren las pruebas
-    con React 19 en jsdom, no una pantalla real.
+  - Con sesión: la pizarra se vio funcionando en el Chrome de Adam a las 09:27, 5 min después del despliegue (menú,
+    tarjetas de «Asignar con IA»). Desde que arrancó la web (15:22 UTC) Traefik registra pizarra, asistencias, cotizaciones
+    y más pantallas del ERP en 200, `asistente/interpretar` en 201 y ni un 5xx en web o API.
+  - **Sin verificar:** consola del navegador y el resto de pantallas con sesión. Una pestaña nueva de Claude en Chrome cae
+    al login porque cada pestaña guarda su JWT si no se marcó «Recordarme» (igual que en Next 14, no es regresión). El
+    servidor no recibe los errores del navegador: un fallo solo de cliente no sale en los logs.
   - **Respaldo:** imagen `nexara-web:next14-respaldo` (2.17 GB) en el Hetzner. Para volver:
-    `docker tag nexara-web:next14-respaldo nexara-web:latest` y `up -d --no-build web`. Borrarla cuando la pizarra esté
-    revisada con sesión (`docker rmi nexara-web:next14-respaldo`).
+    `docker tag nexara-web:next14-respaldo nexara-web:latest` y `up -d --no-build web`. Se deja hasta que pase un día de uso
+    normal, porque el despliegue fue en domingo; después, `docker rmi nexara-web:next14-respaldo`.
   - **CI en rojo, ajeno a esto:** «Tipos y tests» falla en `npm ci` desde `b1a6880f` (`lock file's multer@2.4.0 does not
     satisfy multer@2.5.0`, por el override `$multer`). Mientras siga así, CI no corre tipos ni pruebas en ningún commit.
     Docker no se afecta (`npm install`); la imagen de la API sigue con multer 2.4.0.
