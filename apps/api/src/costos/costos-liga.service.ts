@@ -158,6 +158,7 @@ export class CostosLigaService {
         titulo: a.titulo,
         coreKind: a.coreKind,
         clientId: a.clientId,
+        cliente: a.client?.name ?? null,
         lugar: [a.client?.name, a.branchName, a.branchCity].filter(Boolean).join(' · ') || null,
       };
       let sugerencia = sugerirPorReglas(suelta, candidatos);
