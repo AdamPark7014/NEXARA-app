@@ -88,6 +88,12 @@ const BANDEJA = {
 };
 
 describe("Horas sin proyecto", () => {
+  it("dice cuando la lista no trae todas las actividades", async () => {
+    servir(ACCESO_LIGA, { incluye: "/costos/por-ligar?", body: { ...BANDEJA, resumen: { ...BANDEJA.resumen, actividades: 295 } } });
+    render(<HorasSinProyecto />);
+    expect(await screen.findByText(/Se ven las 2 actividades con más horas de 295/)).toBeInTheDocument();
+  });
+
   it("pinta las horas y aceptar liga con lo sugerido", async () => {
     servir(ACCESO_LIGA, { incluye: "/costos/por-ligar?", body: BANDEJA });
     const user = userEvent.setup();

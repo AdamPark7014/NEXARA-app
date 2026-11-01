@@ -216,6 +216,12 @@ export default function HorasSinProyecto() {
         )}
       </section>
 
+      {datos && datos.resumen.actividades > datos.filas.length ? (
+        <p className={c.hint}>
+          Se ven las {datos.filas.length} actividades con más horas de {datos.resumen.actividades}. Al ligarlas aparecen las demás.
+        </p>
+      ) : null}
+
       <ElegirLiga
         fila={eligiendo}
         candidatos={datos?.candidatos ?? []}
