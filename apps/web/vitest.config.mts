@@ -17,7 +17,7 @@ process.env.TZ = 'America/Mexico_City';
  *
  * Hasta ahora los 69 `*.spec.ts` del repo vivían todos en `apps/api/src/**` y a
  * la web el CI solo le pasaba `tsc --noEmit`: cero cobertura de comportamiento
- * en el frontend. Vitest + Testing Library es lo que encaja con Next 14 sin
+ * en el frontend. Vitest + Testing Library es lo que encaja con Next sin
  * arrastrar el toolchain de Jest/Babel que la API ya usa por su lado.
  *
  * Los alias replican los `paths` de `tsconfig.json` a mano: `vite-tsconfig-paths`

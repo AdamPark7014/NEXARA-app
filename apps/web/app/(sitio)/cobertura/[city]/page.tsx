@@ -30,7 +30,8 @@ export function generateStaticParams() {
   return GEO_CITIES.map((c) => ({ city: c.slug }));
 }
 
-export function generateMetadata({ params }: { params: Params }): Metadata {
+export async function generateMetadata(props: { params: Promise<Params> }): Promise<Metadata> {
+  const params = await props.params;
   const city = findGeoCity(params.city);
   if (!city) {
     return { title: "Cobertura | NEXARA", robots: { index: false, follow: false } };
@@ -66,7 +67,8 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   };
 }
 
-export default function CoberturaCityPage({ params }: { params: Params }) {
+export default async function CoberturaCityPage(props: { params: Promise<Params> }) {
+  const params = await props.params;
   const city = findGeoCity(params.city);
   if (!city) notFound();
 

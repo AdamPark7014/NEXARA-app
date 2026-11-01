@@ -13,8 +13,8 @@ const display = Inter_Tight({ subsets: ["latin"], weight: ["500", "600", "700"],
 /** El dominio público (y el servidor local) ven el 404 del sitio; los paneles, el suyo. */
 const esSitioPublico = (host: string) => /^(www\.)?nexara\.com\.mx$/.test(host) || /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host);
 
-export default function NotFound() {
-  const h = headers();
+export default async function NotFound() {
+  const h = await headers();
   const host = (h.get("x-forwarded-host") || h.get("host") || "").split(",")[0].trim().toLowerCase();
 
   if (esSitioPublico(host)) {

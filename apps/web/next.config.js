@@ -12,9 +12,6 @@ const nextConfig = {
     tsconfigPath: 'tsconfig.build.json',
   },
   
-  // Habilitar SWC para compilación más rápida
-  swcMinify: true,
-  
   // Permitir subdominios en desarrollo
   allowedDevOrigins: [
     'localhost',
@@ -43,7 +40,13 @@ const nextConfig = {
   // Configuración experimental para mejor performance
   experimental: {
     optimizePackageImports: ['@mui/material', '@mui/icons-material'],
+    // Next 15 dejó de reusar las páginas ya visitadas al navegar; se conservan los 30 s de Next 14.
+    staleTimes: { dynamic: 30 },
   },
+
+  // Next 15 manda los metadatos (title, canonical, OG) después del <head> a quien considera capaz de
+  // ejecutar JS, Googlebot incluido. Para el SEO del sitio siguen yendo en el <head> para todos.
+  htmlLimitedBots: /.*/,
   
   // Optimización de imports de MUI
   modularizeImports: {

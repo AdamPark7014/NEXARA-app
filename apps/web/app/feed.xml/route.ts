@@ -1,5 +1,10 @@
 import { fetchPublishedNews } from "@/lib/public-news";
 
+// Desde Next 15 los GET ya no se cachean por omisión: esto conserva el XML estático que se renueva
+// cada 5 min (lo mismo que dura la lista de noticias en fetchPublishedNews).
+export const dynamic = "force-static";
+export const revalidate = 300;
+
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
 function escapeXml(value: string): string {

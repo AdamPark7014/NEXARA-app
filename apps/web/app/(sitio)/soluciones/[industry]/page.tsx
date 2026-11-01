@@ -169,7 +169,8 @@ export function generateStaticParams() {
   return INDUSTRY_HUB_SLUGS.map((industry) => ({ industry }));
 }
 
-export function generateMetadata({ params }: { params: Params }): Metadata {
+export async function generateMetadata(props: { params: Promise<Params> }): Promise<Metadata> {
+  const params = await props.params;
   const hub = INDUSTRY_HUBS[params.industry];
   if (!hub) {
     return { title: "Soluciones | Nexara", robots: { index: false, follow: false } };
@@ -210,7 +211,8 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   };
 }
 
-export default function IndustryHubPage({ params }: { params: Params }) {
+export default async function IndustryHubPage(props: { params: Promise<Params> }) {
+  const params = await props.params;
   const hub = INDUSTRY_HUBS[params.industry];
   if (!hub) notFound();
 

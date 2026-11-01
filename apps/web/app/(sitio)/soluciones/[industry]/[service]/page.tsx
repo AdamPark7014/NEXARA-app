@@ -39,7 +39,8 @@ export function generateStaticParams() {
   }));
 }
 
-export function generateMetadata({ params }: { params: Params }): Metadata {
+export async function generateMetadata(props: { params: Promise<Params> }): Promise<Metadata> {
+  const params = await props.params;
   const industry = findIndustryLanding(params.industry);
   const service = findServiceLanding(params.service);
 
@@ -116,7 +117,8 @@ function buildFaqs(industryName: string, serviceName: string) {
   ];
 }
 
-export default function ProgrammaticLandingPage({ params }: { params: Params }) {
+export default async function ProgrammaticLandingPage(props: { params: Promise<Params> }) {
+  const params = await props.params;
   const industry = findIndustryLanding(params.industry);
   const service = findServiceLanding(params.service);
 
