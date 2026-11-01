@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
         'User-Agent': 'NEXARA-SmartQuote/1.0',
         // Sin Referer: CT Cloudflare responde 200
       },
-      // Next/undici: no enviar referrer del sitio
-      redirect: 'follow',
+      // Sin seguir redirecciones: un 30x de CT podía llevar el proxy a otro host (o a la red interna).
+      redirect: 'error',
       cache: 'force-cache',
       next: { revalidate: 60 * 60 * 24 * 7 },
     } as RequestInit);
@@ -44,31 +44,26 @@ export async function GET(request: NextRequest) {
     }
 
     const contentType = upstream.headers.get('content-type') || 'image/jpeg';
-    if (!contentType.startsWith('image/')) {
+    // Solo mapas de bits: un SVG servido desde nuestro dominio puede llevar <script>.
+    if (!/^image\/(jpeg|png|webp|gif|avif)\b/i.test(contentType)) {
       return NextResponse.json({ message: 'Not an image' }, { status: 502 });
     }
+
+    const headers = {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
+      'Referrer-Policy': 'no-referrer',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+    };
 
     const body = upstream.body;
     if (!body) {
       const buf = await upstream.arrayBuffer();
-      return new NextResponse(buf, {
-        status: 200,
-        headers: {
-          'Content-Type': contentType,
-          'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
-          'Referrer-Policy': 'no-referrer',
-        },
-      });
+      return new NextResponse(buf, { status: 200, headers });
     }
 
-    return new NextResponse(body, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
-        'Referrer-Policy': 'no-referrer',
-      },
-    });
+    return new NextResponse(body, { status: 200, headers });
   } catch {
     return NextResponse.json({ message: 'Proxy failed' }, { status: 502 });
   }

@@ -213,7 +213,7 @@ export class ContactMessagesService {
               <div style="margin-top:16px;background:#f1f5fb;border:1px solid #d7e1f2;border-radius:14px;padding:14px;color:#24324a;line-height:1.6;">
                 ${this.escapeHtml(message.message).replace(/\n/g, '<br />')}
               </div>
-              <p style="margin:16px 0 0;font-size:13px;opacity:0.5;">Origen: ${message.source || 'formulario'}</p>
+              <p style="margin:16px 0 0;font-size:13px;opacity:0.5;">Origen: ${this.escapeHtml(message.source || 'formulario')}</p>
             </td>
           </tr>
         </table>

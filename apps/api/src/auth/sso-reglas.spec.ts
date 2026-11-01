@@ -149,6 +149,12 @@ describe('sso-reglas · a dónde se regresa', () => {
     expect(nextSeguro('https://evil.com')).toBeNull();
     expect(nextSeguro('/login?next=/x')).toBeNull();
     expect(nextSeguro(undefined)).toBeNull();
+    // El navegador borra tabuladores y saltos: `/\t/evil.com` acababa en `//evil.com`.
+    expect(nextSeguro('/\t/evil.com')).toBeNull();
+    expect(nextSeguro('/\n/evil.com')).toBeNull();
+    expect(nextSeguro('/erp\\..\\//evil.com')).toBeNull();
+    expect(nextSeguro('/LOGIN')).toBeNull();
+    expect(nextSeguro('/erp/x?tab=2#nota')).toBe('/erp/x?tab=2#nota');
   });
 
   it('lee una cookie de la cabecera', () => {

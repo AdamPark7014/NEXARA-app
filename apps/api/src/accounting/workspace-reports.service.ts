@@ -1579,7 +1579,9 @@ export class AccountingWorkspaceReportsService {
 function csvCampo(valor: unknown): string {
   if (valor === null || valor === undefined) return '';
   const txt = typeof valor === 'number' ? String(valor) : String(valor);
-  // Prefijo defensivo: Excel interpreta =, +, -, @ iniciales como fórmula.
-  const seguro = /^[=+@]/.test(txt) ? `'${txt}` : txt;
+  // Prefijo defensivo: Excel interpreta =, +, -, @, tabulador y retorno iniciales como fórmula.
+  // Los números negativos (`-12.50`) no son fórmula y quedan igual.
+  const formula = typeof valor !== 'number' && /^[=+\-@\t\r]/.test(txt) && !/^-?\d+(\.\d+)?$/.test(txt);
+  const seguro = formula ? `'${txt}` : txt;
   return `"${seguro.replace(/"/g, '""')}"`;
 }

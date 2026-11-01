@@ -15,6 +15,7 @@ import {
 } from "@/lib/cotizaciones-api";
 import { mover } from "@/lib/cotizacion-documento";
 import { formatApiError } from "@/lib/erp-api";
+import { enlaceSeguro } from "@/lib/enlace-seguro";
 import { Hoja } from "./campos";
 import styles from "./editor.module.css";
 
@@ -109,7 +110,7 @@ export default function SeccionPlanos({
 
   const tarjeta = (p: PlanoCotizacion, i: number, propio: boolean) => (
     <li key={p.url} className={styles.plano}>
-      <a href={p.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${p.nombre ?? "plano"}`}>
+      <a href={enlaceSeguro(p.url)} target="_blank" rel="noreferrer" aria-label={`Abrir ${p.nombre ?? "plano"}`}>
         {p.tipo === "pdf" ? (
           <span className={styles.planoMiniatura}>PDF</span>
         ) : (

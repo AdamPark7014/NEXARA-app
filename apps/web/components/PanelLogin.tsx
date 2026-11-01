@@ -48,9 +48,18 @@ function resolveLandingPath(redirectTo: string): string {
 function destinoNext(): string | null {
   if (typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("next") ?? "";
-  if (!v.startsWith("/") || v.startsWith("//") || v.startsWith("/\\")) return null;
-  if (/^\/(auth\/)?login(\/|\?|$)/.test(v)) return null;
-  return v;
+  // El navegador borra tabuladores y saltos de una URL: `/\t/evil.com` acababa en `//evil.com`.
+  if (!v.startsWith("/") || v.length > 500 || /[\u0000-\u001f\u007f\\]/.test(v)) return null;
+  let url: URL;
+  try {
+    url = new URL(v, window.location.origin);
+  } catch {
+    return null;
+  }
+  if (url.origin !== window.location.origin) return null;
+  const ruta = `${url.pathname}${url.search}${url.hash}`;
+  if (ruta.startsWith("//") || /^\/(auth\/)?login(\/|\?|$)/i.test(ruta)) return null;
+  return ruta;
 }
 
 type ProveedorSso = "google" | "microsoft" | "oidc";
