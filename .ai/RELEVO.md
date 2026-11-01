@@ -58,21 +58,19 @@
     una ruta real con sesión.
   - **Disco del servidor:** los despliegues de hoy llevaron `/` de 75 % a 93 % sin nada corriendo (pico de 95 % al compilar).
     La caché de compilación llegó a 16 GB: la limpieza de los scripts, sin `-a`, liberaba 1.2 GB de esos 16; con `-a`, 13.7 GB.
-    - Corregido: los 6 `/root/deploy-*.sh` (no están en el repo; respaldo en `/root/respaldo-scripts-deploy-20261101`) y
-      `deploy/update.sh` usan `docker builder prune -af --max-used-space 5GB --min-free-space 15GB`, y el resultado sale en
-      el log; antes iba a `/dev/null`.
-    - Medido con dos ciclos de compilar API y web, sin reiniciar nada: caché en 5.2 GB; de 14 a 13 GB libres entre ciclos
-      (antes bajaba de 3 a 5 GB por despliegue); mínimo al compilar 9.7 GB (antes 3.7 GB); tiempos iguales (API 175 y 174 s,
-      web 193 y 187 s). Los scripts corregidos aún no han corrido en un despliegue real; se probó el mismo comando.
+    - Corregido: los 6 `/root/deploy-*.sh` (no están en el repo; originales en `/root/respaldo-scripts-deploy-20261101`) y
+      `deploy/update.sh` usan `docker builder prune -af --max-used-space 3GB --min-free-space 15GB`, y el resultado sale en el
+      log; antes iba a `/dev/null`.
     - ARTA y los demás no limpian (una compilación de ARTA sumó 3.5 GB justo después de medir), así que hay **limpieza diaria a
       las 03:30 de México (09:30 UTC)**: `/etc/cron.d/limpiar-cache-build` corre `/root/limpiar-cache-build.sh`, con el mismo
-      comando. Si hay una compilación espera hasta una hora. Registro en `/var/log/limpiar-cache-build.log`. Probada bajo cron:
-      de 11 a 13 GB libres.
-    - Quedó en 13 GB libres (83 %). `nexara-api:latest` y `nexara-web:latest` apuntan a las imágenes de la medición (mismo código
-      que corre); el siguiente despliegue suelta unos 3 GB. Docker no encuentra por ID la imagen de los contenedores que corren:
-      es lo normal al mover `:latest` y es inofensivo (probado con uno desechable: reinicia bien).
-    - El vigilante de Ágora (`vigilar-disco.sh`, por ntfy) avisa desde 80 %: seguirá sonando hasta ese despliegue y en los picos
-      al compilar.
+      comando. Si hay una compilación espera hasta una hora. Registro en `/var/log/limpiar-cache-build.log`.
+    - Medido: el despliegue de `93e420a3`, primero real con los scripts corregidos (aún con tope de 5 GB), empezó y terminó en
+      13 GB libres; antes costaba de 3 a 5 GB. Esa caché casi no ahorra tiempo (API 175 s sin caché y 174 s con ella).
+    - **Por qué 3 GB y no 5:** con 5 GB el disco se quedó en 83 % y el vigilante de Ágora (`vigilar-disco.sh`, por ntfy), que avisa
+      desde 80 %, mandaba 4 alertas de prioridad alta por hora. Con 3 GB quedó en **79 %, 16 GB libres**. Hay poco margen y aún no
+      corre un despliegue con 3 GB; el vigilante sonará en los picos al compilar. Borrar `nexara-web:next14-respaldo`, cuando
+      toque, debería dar hasta 2 GB más.
+    - En `docker builder du` mira `Private`, no `Total`: `Total` cuenta dos veces las capas compartidas con las imágenes en uso.
     - No se tocaron imágenes ni volúmenes: `nexara-web:next14-respaldo` y `arta-*:prev` siguen, y `docker image prune -a` las borraría.
 
 - **01-11 ~11:30 (claude-code) — Reuniones: la grabación sigue hasta que la concluyas, en cualquier módulo, pestaña o app.**
