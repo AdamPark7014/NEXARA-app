@@ -223,42 +223,12 @@ function NoticeRow({ notice }: { notice: Notice }) {
  * piezas abren la distancia sin tocar el componente compartido.
  */
 export function MetricValue({ children }: { children: ReactNode }) {
-  return <span style={{ fontSize: 25, letterSpacing: "-0.015em" }}>{children}</span>;
+  return <span>{children}</span>;
 }
-
-/**
- * Corrige la tira de cifras cuando una celda se puede pulsar.
- *
- * `MetricStrip` pinta con `<button>` las celdas que llevan `onClick`, y su
- * `border: "none"` se pierde: React aplica la propiedad `border` después de
- * `borderRight`, el atajo borra el divisor y la celda se queda con el borde y
- * el radio que el navegador da a cualquier botón. En pantalla, las cifras que
- * filtran aparecen como pastillas y las que no, planas — lo contrario de una
- * tira agrupada con divisores sutiles.
- *
- * El componente es compartido y hay más agentes trabajando sobre él, así que
- * la corrección vive aquí, acotada a esta pantalla: se quita el borde del
- * navegador y se devuelve el divisor a TODAS las celdas por igual.
- */
-const METRIC_FRAME_CSS = `
-.nx-metric-frame > * > button,
-.nx-metric-frame > * > a {
-  border: 0 !important;
-  border-radius: 0 !important;
-  -webkit-appearance: none;
-  appearance: none;
-}
-.nx-metric-frame > * > *:not(:last-child) {
-  border-right: 1px solid var(--nx-panel-hairline, var(--border)) !important;
-}
-`;
 
 export function MetricFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="nx-metric-frame" style={{ marginBottom: 16 }}>
-      <style dangerouslySetInnerHTML={{ __html: METRIC_FRAME_CSS }} />
-      {children}
-    </div>
+    <div style={{ marginBottom: 16 }}>{children}</div>
   );
 }
 

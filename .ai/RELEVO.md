@@ -1,5 +1,11 @@
 # RELEVO
 
+- **01-11 ~17:05 (claude-code) — Base común: lo que salió al verla en producción.**
+  - Facturación: `MetricFrame` traía un `<style>` con `!important` que forzaba la tira vieja y dejaba cuadrada la tarjeta que se puede pulsar. Se quitó; `MetricValue` ya no fija 25 px.
+  - Pestañas de finanzas y de operación: `:where(button)` les daba radio y la raya salía curva. `border-radius: 0`.
+  - «Asignar con IA»: las iniciales nuevas hacían que un nombre completo bien dicho saliera como «Corregido de» sí mismo. `empates` ya no las cuenta como siglas (prueba en `nombres.spec.ts`).
+  - Trampa para la pasada por módulo: hay reglas sueltas con `!important` y `<style>` dentro de los componentes viejos. Revisar cada pantalla con ojos, no solo por pruebas.
+
 - **01-11 ~16:40 (claude-code) — Verificado en producción (`58ac22bb`): cotizaciones y pasada premium.** Con el código desplegado y datos reales: 56 de 56
   PDF válidos con portada, 303 ms el más lento; 53 con los siete puntos y 3 con menos porque ya traen bloques escritos; ninguna sin puntos. Se encendieron
   objetivo y alcance en 8 borradores (4, 6, 9, 10, 20, 21, 25, 35) y en 2 plantillas, conservando su fecha. Los tokens unificados ya están en el CSS de producción.
