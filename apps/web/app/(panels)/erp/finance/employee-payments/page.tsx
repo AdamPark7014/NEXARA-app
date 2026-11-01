@@ -3,6 +3,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { SkeletonTable } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
@@ -1113,8 +1114,8 @@ function EmployeePaymentsContent() {
               />
             )}
             {firstLoad ? (
-              <div style={{ ...statusPanelStyle, padding: 32 }} role="status" aria-live="polite">
-                Cargando pagos…
+              <div role="status" aria-label="Cargando pagos">
+                <SkeletonTable rows={6} columns={5} />
               </div>
             ) : error && items.length === 0 ? null : (
               <DataTable

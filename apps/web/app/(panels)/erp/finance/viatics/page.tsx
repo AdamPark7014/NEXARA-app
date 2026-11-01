@@ -1277,7 +1277,7 @@ export default function ViaticosPage() {
       tabs={[
         { id: "contabilidad", label: "Contabilidad" },
         { id: "todos", label: "Todos" },
-        { id: "analytics", label: "Analytics" },
+        { id: "analytics", label: "Análisis" },
       ]}
       activeTab={tab}
       onTabChange={(id) => setTab(id as typeof tab)}

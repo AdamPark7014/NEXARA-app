@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useId, useRef, useState, type CSSProperties, type InputHTMLAttributes, type ReactNode } from "react";
 import SearchIcon from "@mui/icons-material/Search";
+import Simbolo from "@/components/ui/Simbolo";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { Kbd } from "./Button";
@@ -71,7 +72,7 @@ export function EmptyState({
     <div className={[s.empty, className].filter(Boolean).join(" ")} data-size={size} data-tone={tone} role="status" style={style}>
       {icon ? (
         <span className={s.emptyIcon} aria-hidden="true">
-          {icon}
+          <Simbolo valor={icon} />
         </span>
       ) : null}
       <TitleTag className={s.emptyTitle}>{title}</TitleTag>
@@ -185,7 +186,7 @@ export function Alert({
     >
       {icon !== null ? (
         <span className={s.alertIco} aria-hidden="true">
-          {icon ?? <AlertIcon tone={tone} />}
+          {icon ? <Simbolo valor={icon} /> : <AlertIcon tone={tone} />}
         </span>
       ) : null}
       <span className={s.alertText}>

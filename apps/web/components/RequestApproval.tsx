@@ -152,7 +152,7 @@ export default function RequestApproval({
     setError(null);
   };
 
-  const buttonLabel = label || "🛡️ Solicitar aprobación";
+  const buttonLabel = label || "Solicitar aprobación";
   const buttonStyle: React.CSSProperties =
     variant === "primary"
       ? {
@@ -223,7 +223,7 @@ export default function RequestApproval({
               overflow: "auto",
             }}
           >
-            <h2 style={{ margin: 0, fontSize: 18 }}>🛡️ Solicitar aprobación</h2>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Solicitar aprobación</h2>
             <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>
               {reasonHint || `Iniciar el flujo de aprobación para ${entityType} #${entityId}.`}
             </p>
@@ -256,7 +256,7 @@ export default function RequestApproval({
                     marginBottom: 12,
                   }}
                 >
-                  ✅ Solicitud creada. Instancia #{instance.id} — paso actual: {instance.currentStep}.
+                  Solicitud creada. Instancia #{instance.id} — paso actual: {instance.currentStep}.
                   El aprobador recibirá una notificación y aparecerá en su bandeja.
                 </div>
                 <button

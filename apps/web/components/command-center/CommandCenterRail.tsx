@@ -1,5 +1,6 @@
 "use client";
 
+import Simbolo from "@/components/ui/Simbolo";
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import CrossPanelLink from "@/components/CrossPanelLink";
@@ -20,7 +21,7 @@ export type CommandWidget = {
 
 const WIDGETS: Record<string, CommandWidget[]> = {
   ceo: [
-    { id: "executive", label: "Vista ejecutiva", href: "/erp/executive", icon: "📊", hint: "Indicadores clave" },
+    { id: "executive", label: "Hoy", href: "/erp/executive", icon: "📊", hint: "Indicadores clave" },
     { id: "approvals", label: "Aprobaciones", href: "/erp/approvals", icon: "✅", hint: "Pendientes" },
     { id: "dispatch", label: "Despacho", href: "/ops/dispatch", icon: "🗺️", hint: "OT en campo" },
     { id: "crm-dash", label: "Pipeline", href: "/crm/dashboard", icon: "💼", hint: "Comercial" },
@@ -118,7 +119,7 @@ export function CommandCenterRail({
           href={w.href}
           className={`${styles.chip} ${w.alert ? styles.alert : ""}`}
         >
-          <span aria-hidden="true">{w.icon}</span>
+          <span aria-hidden="true"><Simbolo valor={w.icon} /></span>
           <span>{w.label}</span>
           {w.hint && <span className={styles.hint}>{w.hint}</span>}
         </CrossPanelLink>

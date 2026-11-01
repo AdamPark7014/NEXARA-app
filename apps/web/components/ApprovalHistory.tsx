@@ -141,7 +141,7 @@ export default function ApprovalHistory({ entityType, entityId, title, compact }
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>
-          🛡️ {title || "Historial de aprobaciones"}
+          {title || "Historial de aprobaciones"}
         </h3>
         <button
           type="button"
@@ -179,8 +179,7 @@ export default function ApprovalHistory({ entityType, entityId, title, compact }
             color: "var(--text-secondary, #6b7280)",
           }}
         >
-          <div style={{ fontSize: 26, marginBottom: 6 }}>🕊️</div>
-          <div style={{ fontSize: 12, fontWeight: 600 }}>Sin aprobaciones registradas</div>
+                    <div style={{ fontSize: 12, fontWeight: 600 }}>Sin aprobaciones registradas</div>
           <div style={{ fontSize: 11, marginTop: 4 }}>
             Esta {entityType.toLowerCase()} no ha pasado por un flujo todavía.
           </div>
@@ -300,7 +299,7 @@ export default function ApprovalHistory({ entityType, entityId, title, compact }
                                 color: "var(--text-primary, #111)",
                               }}
                             >
-                              💬 {approval.comments}
+                              {approval.comments}
                             </div>
                           )}
                         </div>

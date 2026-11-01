@@ -26,6 +26,12 @@ import InlineAlert from "@/components/ui/InlineAlert";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
+import Simbolo from "@/components/ui/Simbolo";
+import { IconLabel } from "@/components/ui/IconBadge";
+import BuildOutlined from "@mui/icons-material/BuildOutlined";
+import CalendarMonthOutlined from "@mui/icons-material/CalendarMonthOutlined";
+import EventOutlined from "@mui/icons-material/EventOutlined";
+import PersonOutlineOutlined from "@mui/icons-material/PersonOutlineOutlined";
 import { formatApiError } from "@/lib/erp-api";
 import { listUsers, type ApiUserRow } from "@/lib/users-api";
 import { resolveV2RoleKey } from "@/lib/rbac";
@@ -687,7 +693,7 @@ export default function ReunionesPage() {
         <Section
           title="Reuniones"
           subtitle="De la más reciente a la más antigua. Cada una baja su acta en PDF."
-          actions={<Button size="sm" variant="ghost" onClick={() => setVerLecciones(true)}>💡 Lecciones aprendidas</Button>}
+          actions={<Button size="sm" variant="ghost" onClick={() => setVerLecciones(true)}>Lecciones aprendidas</Button>}
         >
           {primeraCarga ? (
             <SkeletonList />
@@ -713,7 +719,7 @@ export default function ReunionesPage() {
               {reuniones.map((r) => (
                 <li key={r.id} className={s.meetingRow}>
                   <button type="button" className={s.meeting} onClick={() => void abrirDetalle(r.id)}>
-                    <span className={s.meetingIcon} aria-hidden="true">📅</span>
+                    <span className={s.meetingIcon} aria-hidden="true"><CalendarMonthOutlined fontSize="inherit" /></span>
                     <span style={{ minWidth: 0 }}>
                       <span className={s.meetingTitle}>{r.titulo}</span>
                       <span className={s.meetingMeta}>
@@ -985,7 +991,7 @@ export default function ReunionesPage() {
                 >
                   {(Object.keys(AGREEMENT_KIND_LABEL) as AgreementKind[]).map((k) => (
                     <option key={k} value={k}>
-                      {KIND_ICON[k]} {AGREEMENT_KIND_LABEL[k]}
+                      <Simbolo valor={KIND_ICON[k]} /> {AGREEMENT_KIND_LABEL[k]}
                     </option>
                   ))}
                 </select>
@@ -1103,15 +1109,15 @@ function ListaAcuerdos({
     <ul className={s.list}>
       {acuerdos.map((a) => (
         <li key={a.id} className={`${s.item} ${a.vencido ? s.itemLate : ""}`}>
-          <span className={s.itemIcon} aria-label={AGREEMENT_KIND_LABEL[a.tipo]} role="img">{KIND_ICON[a.tipo]}</span>
+          <span className={s.itemIcon} aria-label={AGREEMENT_KIND_LABEL[a.tipo]} role="img"><Simbolo valor={KIND_ICON[a.tipo]} /></span>
 
           <div style={{ minWidth: 0 }}>
             <p className={s.itemText}>{a.descripcion}</p>
             <div className={s.itemMeta}>
-              {mostrarResponsable && a.responsable && <span>👤 {a.responsable.nombre}</span>}
-              {a.fechaCompromiso && <span>📆 Para el {formatMeetingDate(a.fechaCompromiso)}</span>}
-              {a.activity && <span>🔧 {a.activity.anNumber} · {a.activity.titulo}</span>}
-              {mostrarReunion && a.meeting && <span>📅 {a.meeting.titulo} · {formatMeetingDate(a.meeting.fecha)}</span>}
+              {mostrarResponsable && a.responsable && <IconLabel icon={PersonOutlineOutlined} size={14} gap={4}>{a.responsable.nombre}</IconLabel>}
+              {a.fechaCompromiso && <IconLabel icon={EventOutlined} size={14} gap={4}>Para el {formatMeetingDate(a.fechaCompromiso)}</IconLabel>}
+              {a.activity && <IconLabel icon={BuildOutlined} size={14} gap={4}>{a.activity.anNumber} · {a.activity.titulo}</IconLabel>}
+              {mostrarReunion && a.meeting && <IconLabel icon={CalendarMonthOutlined} size={14} gap={4}>{a.meeting.titulo} · {formatMeetingDate(a.meeting.fecha)}</IconLabel>}
             </div>
           </div>
 

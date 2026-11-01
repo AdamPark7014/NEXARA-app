@@ -39,7 +39,7 @@ import {
   readableChatPreview,
   saveJson,
 } from "./chat/chat-utils";
-import { Avatar } from "./chat/ChatAtoms";
+import { Avatar, MensajesCargando } from "./chat/ChatAtoms";
 import ChatSidebar from "./chat/ChatSidebar";
 import ChannelHeader, { TAB_IDS } from "./chat/ChannelHeader";
 import MessageList, { type MessageListCtx } from "./chat/MessageList";
@@ -1765,7 +1765,8 @@ export default function WorkspaceChat({
                     Cargar anteriores
                   </button>
                 )}
-                {loadingMessages && <div className={styles.loadingLine}>Cargando…</div>}
+                {loadingMessages &&
+                  (messages.length ? <div className={styles.loadingLine}>Cargando…</div> : <MensajesCargando />)}
                 {!loadingMessages && messages.length === 0 && (
                   <div className={styles.emptyMain}>
                     <div>

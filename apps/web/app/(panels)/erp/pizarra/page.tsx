@@ -559,7 +559,7 @@ export default function PizarraPage() {
           titleAs="h2"
           title={
             soloRetraso
-              ? "Nadie con retraso 🎉"
+              ? "Nadie con retraso"
               : busqueda.trim()
                 ? `Nadie coincide con «${busqueda.trim()}»`
                 : `Nadie en «${filtro === "todos" ? "Todos" : ARO_LABEL[filtro]}» ahora`

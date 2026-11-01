@@ -1,5 +1,6 @@
 "use client";
 
+import Simbolo from "@/components/ui/Simbolo";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { MODULES } from "@/lib/access-matrix";
@@ -65,7 +66,7 @@ export default function ModuleGuideBanner() {
               fontFamily: "var(--nx-font-display)",
             }}
           >
-            <span style={{ marginRight: 8 }}>{entry.icon}</span>
+            <span style={{ marginRight: 8 }}><Simbolo valor={entry.icon} /></span>
             {entry.label}
           </div>
           <p

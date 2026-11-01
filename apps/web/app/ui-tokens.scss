@@ -500,7 +500,8 @@ body.dark {
    Los módulos que piden Space Grotesk / Manrope por variable heredan
    Inter sin tocar su código; su color y su forma no cambian aquí.
    ------------------------------------------------------------ */
-.nx-app-shell {
+.nx-app-shell,
+body:has(.nx-app-shell) {
   --font-base: var(--ui-font);
   --font-heading: var(--ui-font-display);
   --nx-font-body: var(--ui-font);
@@ -517,6 +518,19 @@ body.dark {
      dentro de Core los valores del sistema `--ui-*`. Un solo verde, un solo gris y
      una sola sombra en todas las pantallas, sin tocar cada módulo. Fuera del shell
      (sitio público, login) no cambia nada. */
+  --success: var(--ui-success);
+  --warning: var(--ui-warning);
+  --danger: var(--ui-danger);
+  --error: var(--ui-danger);
+  --state-success-bg: var(--ui-success-bg);
+  --state-success-border: var(--ui-success-border);
+  --state-success-text: var(--ui-success-text);
+  --state-warning-bg: var(--ui-warning-bg);
+  --state-warning-border: var(--ui-warning-border);
+  --state-warning-text: var(--ui-warning-text);
+  --state-danger-bg: var(--ui-danger-bg);
+  --state-danger-border: var(--ui-danger-border);
+  --state-danger-text: var(--ui-danger-text);
   --primary: var(--ui-brand);
   --primary-hover: var(--ui-brand-hover);
   --primary-soft: var(--ui-brand-soft);

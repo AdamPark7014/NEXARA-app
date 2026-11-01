@@ -1,5 +1,6 @@
 "use client";
 
+import Skeleton from "@/components/ui/Skeleton";
 import { useState, type ReactNode } from "react";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import styles from "../WorkspaceChat.module.css";
@@ -126,4 +127,35 @@ export function channelPrefixNode(kind: ChannelKind): ReactNode {
     );
   }
   return "#";
+}
+
+/** Mensajes mientras llegan: la silueta de la conversación, no un «Cargando…» suelto. */
+export function MensajesCargando() {
+  return (
+    <div className={styles.esqueletoLista} role="status" aria-label="Cargando mensajes">
+      {[72, 46, 88, 58].map((ancho) => (
+        <div key={ancho} className={styles.esqueletoMensaje}>
+          <Skeleton width={36} height={36} radius={10} />
+          <div className={styles.esqueletoTexto}>
+            <Skeleton width={130} height={11} />
+            <Skeleton width={`${ancho}%`} height={11} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Lista de canales mientras llega. */
+export function CanalesCargando() {
+  return (
+    <div className={styles.esqueletoCanales} role="status" aria-label="Cargando conversaciones">
+      {[64, 82, 54, 72].map((ancho) => (
+        <div key={ancho} className={styles.esqueletoCanal}>
+          <Skeleton width={22} height={22} radius={7} />
+          <Skeleton width={`${ancho}%`} height={11} />
+        </div>
+      ))}
+    </div>
+  );
 }
