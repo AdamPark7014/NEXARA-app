@@ -1,5 +1,24 @@
 # RELEVO
 
+- **01-11 ~13:00 (claude-code) — Libro de costos: investigación de OPUS 27, esquema y propuesta. No hay código; espera el visto bueno de Adam.**
+  - Pedido: ingeniería inversa de OPUS y construir algo de ese calibre, ligando costos a cotizaciones, nómina, autos,
+    herramienta y almacén. Se hizo solo **funcional**: su licencia prohíbe descompilar. No se instaló REA ni se bajó el programa.
+  - Entregables: `docs/COSTOS-PRECIOS-UNITARIOS.md` (público, sin cifras de producción) y el artifact privado
+    <https://claude.ai/artifact/VJpUHdLxGPRRXSJGK7a7Fe> con mockup, medición, dimensionamiento y fases.
+  - Hallazgo: ya se puede calcular la mano de obra (reloj por actividad y sueldos), pero casi ninguna hora está ligada a un
+    proyecto, ninguna cotización se marca enviada en el sistema, y vehículos, herramientas, almacén, viáticos, nómina y
+    pólizas están prácticamente vacíos en producción. El bloqueo es de liga y captura, no de cálculo.
+  - **Hecho:** investigación, medición de solo lectura, esquema y propuesta. **A medias:** nada. **No tocar:** nada nuevo.
+  - **Siguiente, solo si Adam aprueba:** Fase 0 en `apps/api/src/costos/`, con los casos hechos a mano del documento, y que la
+    contadora dé el `Ps` real del SUA. Las Fases 1 y 2 se cruzan con las sesiones de asistente, editor de cotización y catálogo.
+  - Regla de diseño: el libro **solo lee**. Ninguna fase cambia nómina, facturas ni pólizas sin que Adam lo apruebe.
+  - Trampas:
+    - LFT reformada el 01-05-2026: máximo 46 h desde el 01-01-2027 y 40 h en 2030; extra doble sube a 10 h en 2028.
+      `control-nomina.ts` usa 48 h sin horario y `prenomina-amount.ts` fija 9 h. No se tocaron.
+    - El manual M1 de OPUS cita el art. 189 (hoy 220) y propone ISR 54 %: manda el Reglamento y la LISR, no el manual.
+    - `kmPerLiter` en `vehicles.service.ts` da km por tanque. Hay tres márgenes distintos (Contabilidad, Ventas, BI).
+    - Sin confirmar: tabla de cesantía 2026, clase de riesgo de NEXARA y si ya salió el Reglamento adecuado a la reforma de 2025.
+
 - **01-11 ~10:50 (claude-code) — Tope al índice y la profundidad de los campos en toda subida (`23e20f54`, desplegado).**
   - Por qué: multer no limita por omisión `a[99999999]`, que crea un arreglo de 100 millones de lugares y cuesta cuando algo
     recorre `req.body` (el filtro global, al registrar un error). Adam pidió ponerlo.
