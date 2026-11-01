@@ -1,5 +1,22 @@
 # RELEVO
 
+- **01-11 ~17:35 (claude-code) — Libro de costos: revisión en producción con la sesión del CEO; salieron tres defectos que la prueba local no vio (`cbfacd4e`, `5236fab2`).**
+  - **«Por proyecto» daba 404:** `SEGMENT_ALIASES` de `legacy-path-remap.ts` traduce cualquier tramo bajo `/erp` (`proyectos`→`projects`), con un 308 que el navegador
+    guarda. La pantalla pasó a `/erp/costos/por-proyecto` y las dos direcciones viejas llegan ahí, sin ciclo con el 308 guardado. Una prueba revisa que ninguna pestaña de
+    Costos se desvíe. **Quien agregue una ruta en español bajo `/erp` (`/erp/costos/vehiculos`) cae igual: probar con `normalizeLegacyPath`.**
+  - **Pestaña Costos cortada:** «Datos clave» le quita ancho y la tabla sacaba barra y cortaba «%». Ahora va a todo el ancho y debajo mano de obra y avisos. Difiere del
+    mockup, que no tenía esa columna. También: plurales en los avisos («1 reloj lo cerró») y campos alineados en Tarifas.
+  - **Tope sin aviso:** la bandeja enseña 200 de 295 actividades por horas; la banda cuenta 49 con sugerencia y se ven 34. Ahora lo dice una línea. El tope sigue.
+  - Causa común de los dos primeros: se compararon en `app/costos-demo`, sin middleware ni marco del proyecto. Mirar dentro del marco real.
+  - **Verificado con sesión de CEO a 1707 px:** bandeja, selector de destino (sin guardar), Tarifas, Por proyecto con sus cifras cuadradas y pestaña Costos sin barra. «Sugerir
+    con IA» corrió una vez: 25 actividades en 25 s, 3 sugerencias correctas, por la puerta. Una petición inválida a ligar dio 400, no 403: el permiso deja pasar `Aceptar`.
+  - **Sin verificar:** nadie ha aceptado una liga real en producción; el aviso de los 200 se comprobó en el código publicado y en prueba, no a la vista, porque la PC se quedó
+    sin RAM y Chrome se congelaba; cuenta de la contadora y de un coordinador; ancho de celular dentro del marco. El proceso nocturno corre por primera vez el 02-11 a las 03:20
+    (no el 01-11, como dije antes). Cosmético: la miga dice «Por Proyecto» porque `humanize` capitaliza cada palabra.
+  - **Fases 2 a 8 siguen sin aprobar.** La sesión del programa general relayó pedidos de Adam: manual y ficha robusta de vehículos (amplía la Fase 3) y margen por partida con
+    indirectos complejos (Fase 2). Préstamo de herramienta y consumo parcial en almacén son de esa sesión. Siguiente paso: mockup de lo que Adam elija.
+  - No se delegó a Ollama: eran correcciones de una sola sesión, revisadas contra producción.
+
 - **01-11 ~17:40 (claude-code) — Fuera el generador de cotización que nadie llamaba; el PDF del cliente no cambió.**
   - **El único PDF de cotización para el cliente es `generarCotizacionNexaraPdf`** (`cotizacion-formato-nexara.ts`). El interno, con costo y margen, es `cotizacion-pdf.ts`, y también sigue vivo.
   - Quitados: `propuesta-tecnica-pdf.ts` (1,781 líneas), `propuesta-payload.ts`, sus dos specs, `buildPropuesta`, `opcionesDePropuesta` y `OpcionesPropuesta` (solo lo alimentaban) y `scripts/bench-propuesta-pdf.ts` (medía el generador muerto).
