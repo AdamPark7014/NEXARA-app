@@ -1,5 +1,63 @@
 # RELEVO
 
+- **01-11 ~13:00 (claude-code) — Clientes: Comercial primero, alta de último momento en todos lados y aviso de repetidos.**
+  - Pedido de Adam: Comercial primero; crear un cliente de último momento al asignar con IA o sin ella y en cotizaciones;
+    que detecte «BUAP» contra «Benemérita Universidad Autónoma de Puebla». Aprobó la muestra real del selector.
+  - **Causa real del alta perdida (no era una sola):**
+    - Actividad comercial: siempre fue un `<select>` sin alta. `5d1738f5` (28-09) solo la puso en servicio, y la API
+      rechazaba `altaRapida` con `tipo: COMERCIAL` (había una prueba que lo exigía).
+    - Servicio: existía, pero escondida: había que escribir en «Buscar» para que se activara un botón aparte.
+    - «Asignar con IA»: «+ Agregar» solo salía si la frase ya traía el nombre; no había dónde escribir uno.
+    - Cotización: `47b798c6` y `5d1738f5` quitaron el «Cliente nuevo» para quien no administra el padrón.
+    - **Basura del padrón:** el editor autoguarda 1.2 s después de la última tecla y cada pausa daba de alta el nombre a
+      medias. De ahí salieron «Benemer», «ANFO», «GAMINF» y «Bodega de», y por eso el botón de crear desaparecía solo.
+  - Qué cambió:
+    - `ClienteRapido` (`components/erp/`): un solo campo para buscar o escribir; «Crear «X» con solo el nombre» fijo abajo.
+      `useAltaCliente` y `AvisoParecidos` los comparten actividad, cotización, Asignar con IA, «Nuevo cliente» y proyecto.
+    - `altaRapida` ahora crea CORPORATIVO o COMERCIAL. Marca de «por completar» = el «Sin RFC» que ya existe en Clientes.
+    - Cotización: `clienteSinAlta` guarda el nombre como texto. No se da de alta hasta que alguien lo crea o lo elige, y
+      no se puede enviar sin cliente del padrón (web `faltaParaEnviar` y API `send`).
+    - `POST ventas/clientes/parecidos`: código primero, IA solo si el código no afirma nada. `createClient` responde 409
+      si es casi seguro repetido y no trae `confirmarNuevo`; `reutilizarId` es «usar este», con la misma puerta de acceso.
+    - La vía antigua `clientePorNombreOAlta` manda `confirmarNuevo` porque no tiene dónde preguntar.
+  - **Medido (eval `npm run eval:duplicados -w apps/api`, proceso `clientes-duplicados`, Haiku 5.5 low):**
+    - Pares reales (45 repetidos y 25 limpios, en el scratchpad; repo público): código 42/45 con 24/25 limpios;
+      código + IA **45/45** con 24/25 limpios. El aviso falso es «Sertec Ingeniería» → SERTE.
+    - Repo (37 y 21): código 32/37 con 21/21; código + IA 37/37 con 18/21.
+    - La primera versión del prompt daba 100 % pero 11 avisos falsos. Bajó con dos cosas: pedir `nombreOficial` primero y
+      creer solo `seguridad: alta`. p50 ~1 s, US$0.0001 por llamada; 5 s de tope y sin reintento.
+    - Lo no resuelto en repo: Cinemex→Cinépolis, Bodega Aurrerá→Walmart, Suburbia→Liverpool. Basta «Crear otro».
+  - **Para que Adam decida, nada se fusionó ni se borró:** ANFO/ANFORA, GAMINF/GAMING, Benemer/BUAP; basura probable:
+    «Bodega de», «SE», «Licencia»; «A QUIEN CORRESPONDA» con 22 cotizaciones. Service client «CUATZACUALCOS» ligado al comercial
+    COATZACOALCOS.
+  - **Permisos y empresa:** todo con `companyId`; un cliente de otra empresa ni cuenta ni se reutiliza. Quien no puede abrir
+    al parecido ve el nombre, sin razón social ni botón; nunca viaja RFC ni correo. La matriz sigue dejando fuera a
+    `ing_campo`, `ing_soporte` y `disenador` (solo crean tareas). **Decisión abierta:** `ing_soporte` puede escribir cotizaciones
+    y no llega al padrón; en producción ninguno ha cotizado, así que no se abrió.
+  - Trampa: `puedeAltaRapidaCorporativa` dice sí a operativos, pero la matriz les da 403 en la ruta. `puedeAltaRapida` es el
+    que dice la verdad; el viejo ya no lo lee ninguna pantalla de la web y se puede quitar.
+  - **Inventario de IA (uso real desde 23-10):**
+    | Función | Modelo | Uso | Eval | Estado |
+    |---|---|---|---|---|
+    | `complejidad` | Haiku | 260 | 26/28; en producción 23 de 25 aceptadas sin cambio | Bien, no se tocó |
+    | `asistente-actividades` | Haiku | 13 | 48 casos, 0.955 | Mejorada hoy por otra sesión |
+    | `clientes-duplicados` | Haiku | nueva | 45/45 real | Nueva |
+    | `chat-asistente` | Haiku | 2 | 18/20, 0 inventos | Bien, casi sin uso |
+    | `reunion-minuta` | Sonnet medium | 1 | 0.97 | Bien, la más cara (~US$0.03–0.05) |
+    | `reunion-notas` | Haiku | 0 | `scripts/eval-minutas` | Sin tráfico atribuido |
+    | `acta-reunion` | Sonnet low | 0 | 0.966 | Sin tráfico atribuido |
+    | `triage` | Haiku | 0 | 0.97 | Bandera apagada |
+    | `lab` | a elegir | 0 | ninguno | Herramienta interna |
+    | dictado (whisper propio) | local | sí | ninguno | **Sin eval: lo siguiente a medir** |
+    Lo siguiente, en orden: eval del dictado; usar `clientesParecidos` dentro de `asistente-actividades` para que la tarjeta
+    proponga BUAP directo (hoy lo detecta el aviso; esperar a que acabe la otra sesión); decidir si se enciende `triage`.
+  - Puerta: objetivos de `complejidad` y `clientes-duplicados` subidos (`37663d4` en PUERTA-IA-app) y fila en `IA-CLAUDE.md`.
+    Pendiente ajeno: `pruebas` sigue en 4 USD y su RELEVO dice que el 1-11 baja a 2.
+  - Verificado: API 4,411 y web 1,595 en verde sobre la base anterior, y lo afectado otra vez tras integrar; `tsc` limpio en los
+    dos; la API resuelve la inyección (solo cae al llegar a la base falsa). Muestra real en 1280 y 390 px, claro y oscuro.
+  - Trampas de pruebas: `excel-export.console` y `acta-pdf`, y dos del editor de cotización, se pasan de tiempo si corren junto
+    con todo y pasan solas. En una prueba de página, `useUser` debe devolver el mismo objeto o el formulario se cicla sin fin.
+
 - **01-11 ~13:15 (claude-code) — Pasada «premium» de Core, aprobada por Adam con antes y después.** Auditoría de las 44 rutas de `/erp`.
   - `components/ui/Simbolo.tsx`: convierte a ícono de línea el emoji que un módulo le pasa al kit. Lo usan `EmptyState`, `Alert`, `Badge`,
     `KpiCard`/stat, `Button`, `PageState`, `FilterToolbar`, `Breadcrumbs`, `RecordPage`, tarjetas de módulo y los accesos de Hoy. **Código nuevo:

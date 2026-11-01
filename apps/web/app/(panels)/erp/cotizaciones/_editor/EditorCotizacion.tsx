@@ -263,8 +263,14 @@ export default function EditorCotizacion({
   const guardar = useCallback(
     async (cambios: Partial<GuardarCotizacion>, completo: GuardarCotizacion) => {
       if (!token) throw new Error("Tu sesión expiró: vuelve a entrar.");
+      // Sin cliente elegido, el nombre va como texto: el autoguardado no da de alta a nadie.
+      const sinCliente = !completo.salesClientId;
       if (!idRef.current) {
-        const creada = await crearCotizacion(token, { ...completo, activityId: activityId ?? undefined });
+        const creada = await crearCotizacion(token, {
+          ...completo,
+          ...(sinCliente ? { clienteSinAlta: true } : {}),
+          activityId: activityId ?? undefined,
+        });
         idRef.current = creada.id;
         setId(creada.id);
         if (creada.salesClientId) {
@@ -273,7 +279,11 @@ export default function EditorCotizacion({
         // Sin recargar: el documento sigue en pantalla con lo que se esté escribiendo.
         window.history.replaceState(null, "", `/erp/cotizaciones/${creada.id}`);
       } else {
-        const actualizada = await actualizarCotizacion(token, idRef.current, cambios);
+        const tocaCliente = "clientName" in cambios || "salesClientId" in cambios;
+        const actualizada = await actualizarCotizacion(token, idRef.current, {
+          ...cambios,
+          ...(sinCliente && tocaCliente ? { salesClientId: null, clienteSinAlta: true } : {}),
+        });
         if (actualizada.salesClientId) {
           setDoc((d) => (d.salesClientId ? d : { ...d, salesClientId: actualizada.salesClientId ?? null }));
         }

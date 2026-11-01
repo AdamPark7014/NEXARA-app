@@ -219,6 +219,7 @@ export default function OpsActivityForm({
     Array<{ serviceClientId: number; name: string; salesClientId: number }>
   >([]);
   const [clientesCorporativos, setClientesCorporativos] = useState<SalesClient[]>([]);
+  const [clientesComerciales, setClientesComerciales] = useState<SalesClient[]>([]);
   const [salesServicioId, setSalesServicioId] = useState<number | null>(null);
   const [permisosCliente, setPermisosCliente] = useState(NO_CLIENT_PERMISSIONS);
   const [clientesProyecto, setClientesProyecto] = useState<SalesClient[]>([]);
@@ -316,6 +317,10 @@ export default function OpsActivityForm({
           const batches = await Promise.all(
             sectors.map((s: ClientSector) => listSalesClients(token, { sector: s })),
           );
+          if (coreKind === "comercial") {
+            const unicos = new Map(batches.flat().map((c) => [c.id, c]));
+            setClientesComerciales([...unicos.values()].sort((a, b) => a.name.localeCompare(b.name, "es")));
+          }
           const byId = new Map<number, { serviceClientId: number; name: string; salesClientId: number }>();
           for (const row of batches.flat()) {
             if (!row.serviceClientId) continue;
@@ -340,10 +345,30 @@ export default function OpsActivityForm({
   }, [loadMeta]);
 
   useEffect(() => {
-    if (coreKind !== "servicio" || !form.clientId) return;
-    const hit = clientesCorporativos.find((c) => String(c.serviceClientId) === form.clientId);
+    if (!form.clientId) return;
+    const lista = coreKind === "servicio" ? clientesCorporativos : coreKind === "comercial" ? clientesComerciales : [];
+    const hit = lista.find((c) => String(c.serviceClientId) === form.clientId);
     if (hit) setSalesServicioId(hit.id);
-  }, [coreKind, form.clientId, clientesCorporativos]);
+  }, [coreKind, form.clientId, clientesCorporativos, clientesComerciales]);
+
+  /** El cliente del padrón ya sirve para la actividad: se activa en operación si hacía falta. */
+  const usarClienteEnActividad = async (c: SalesClient) => {
+    setSalesServicioId(c.id);
+    if (!token) return;
+    try {
+      let serviceId = c.serviceClientId ?? null;
+      if (!serviceId) {
+        serviceId = (await provisionSalesServiceClient(token, c.id)).serviceClient.id;
+        const conOperacion = (prev: SalesClient[]) =>
+          prev.map((row) => (row.id === c.id ? { ...row, serviceClientId: serviceId } : row));
+        setClientesCorporativos(conOperacion);
+        setClientesComerciales(conOperacion);
+      }
+      setForm((prev) => ({ ...prev, clientId: String(serviceId) }));
+    } catch (e) {
+      setError(apiErrorMessage(e, "No se pudo usar ese cliente en la actividad"));
+    }
+  };
 
   useEffect(() => {
     if (!initialClientId || isEdit || requestId) return;
@@ -596,6 +621,10 @@ export default function OpsActivityForm({
     }
     if (coreKind === "servicio" && form.projectMode !== "with_project" && !form.clientId) {
       setError("Elige o crea el cliente corporativo");
+      return;
+    }
+    if (coreKind === "comercial" && form.projectMode !== "with_project" && !form.clientId) {
+      setError("Elige o crea el cliente");
       return;
     }
     if (requireSchedule && (!form.fecha || !form.hora)) {
@@ -858,7 +887,7 @@ export default function OpsActivityForm({
   const tipoTareaOk =
     !isTareaCore || (Boolean(tareaTipo) && (tareaTipo !== "otro" || Boolean(form.ticketTypeCustom.trim())));
   const proyectoOk = form.projectMode !== "with_project" || Boolean(form.projectId);
-  const pideClienteServicio = coreKind === "servicio" && form.projectMode !== "with_project";
+  const pideClienteServicio = (coreKind === "servicio" || coreKind === "comercial") && form.projectMode !== "with_project";
   const clienteServicioOk = !pideClienteServicio || Boolean(form.clientId);
   const agendaOk = !requireSchedule || (Boolean(form.fecha) && Boolean(form.hora));
   const periodoMal = Boolean(form.periodoFin && form.fecha && form.periodoFin < form.fecha);
@@ -878,7 +907,7 @@ export default function OpsActivityForm({
     pendientes.push({ id: "proyecto", label: "Proyecto", done: proyectoOk, error: intentado && !proyectoOk, fieldId: "oaf-proyecto" });
   }
   if (pideClienteServicio) {
-    pendientes.push({ id: "cliente", label: "Cliente corporativo", done: clienteServicioOk, error: intentado && !clienteServicioOk, fieldId: "oaf-donde" });
+    pendientes.push({ id: "cliente", label: coreKind === "comercial" ? "Cliente" : "Cliente corporativo", done: clienteServicioOk, error: intentado && !clienteServicioOk, fieldId: "oaf-donde" });
   }
   if (!hideResponsableSelect || !responsableOk) {
     pendientes.push({
@@ -1389,45 +1418,14 @@ export default function OpsActivityForm({
                     editable
                     puedeCrear
                     puedeEditar={permisosCliente.puedeEditar}
-                    altaCorporativa
                     clientes={clientesCorporativos}
                     onCreado={(creado) => {
                       setClientesCorporativos((prev) =>
                         [...prev.filter((c) => c.id !== creado.id), creado].sort((a, b) => a.name.localeCompare(b.name, "es")),
                       );
-                      setSalesServicioId(creado.id);
-                      void (async () => {
-                        if (!token) return;
-                        let serviceId = creado.serviceClientId ?? null;
-                        if (!serviceId) {
-                          try {
-                            const activado = await provisionSalesServiceClient(token, creado.id);
-                            serviceId = activado.serviceClient.id;
-                          } catch (e) {
-                            setError(apiErrorMessage(e, "El cliente se creó, pero no quedó listo para la actividad"));
-                            return;
-                          }
-                        }
-                        setForm((prev) => ({ ...prev, clientId: String(serviceId) }));
-                      })();
+                      void usarClienteEnActividad(creado);
                     }}
-                    onSelect={async (c) => {
-                      setSalesServicioId(c.id);
-                      if (!token) return;
-                      try {
-                        let serviceId = c.serviceClientId ?? null;
-                        if (!serviceId) {
-                          const activado = await provisionSalesServiceClient(token, c.id);
-                          serviceId = activado.serviceClient.id;
-                          setClientesCorporativos((prev) =>
-                            prev.map((row) => (row.id === c.id ? { ...row, serviceClientId: serviceId } : row)),
-                          );
-                        }
-                        setForm((prev) => ({ ...prev, clientId: String(serviceId) }));
-                      } catch (e) {
-                        setError(apiErrorMessage(e, "No se pudo usar ese cliente en la actividad"));
-                      }
-                    }}
+                    onSelect={usarClienteEnActividad}
                   />
                   {intentado && !clienteServicioOk ? (
                     <span className={s.errorCampo} role="alert">
@@ -1436,16 +1434,32 @@ export default function OpsActivityForm({
                   ) : null}
                 </div>
               ) : needsClientPicker ? (
-                <Field label="Cliente" required>
-                  <Select value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })} required>
-                    <option value="">Seleccionar cliente…</option>
-                    {sectorClients.map((c) => (
-                      <option key={c.salesClientId} value={c.serviceClientId}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
+                <div className={s.grupo}>
+                  <span className={s.etiqueta}>
+                    Cliente <b className={s.req}>*</b>
+                  </span>
+                  <ClienteTipoPicker
+                    token={token}
+                    tipo="COMERCIAL"
+                    salesClientId={salesServicioId}
+                    editable
+                    puedeCrear={Boolean(permisosCliente.puedeAltaRapida)}
+                    puedeEditar={permisosCliente.puedeEditar}
+                    clientes={clientesComerciales}
+                    onCreado={(creado) => {
+                      setClientesComerciales((prev) =>
+                        [...prev.filter((c) => c.id !== creado.id), creado].sort((a, b) => a.name.localeCompare(b.name, "es")),
+                      );
+                      void usarClienteEnActividad(creado);
+                    }}
+                    onSelect={usarClienteEnActividad}
+                  />
+                  {intentado && !clienteServicioOk ? (
+                    <span className={s.errorCampo} role="alert">
+                      Elige o crea el cliente
+                    </span>
+                  ) : null}
+                </div>
               ) : null}
 
               {pendingRequestId ? (

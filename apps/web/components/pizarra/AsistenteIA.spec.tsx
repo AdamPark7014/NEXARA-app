@@ -20,6 +20,11 @@ vi.mock("@/components/UserContext", () => ({
 vi.mock("@/components/DictadoBoton", () => ({ default: () => null }));
 // La onda dibuja en un canvas, que jsdom no tiene.
 vi.mock("@/app/(panels)/erp/reuniones/OndaVoz", () => ({ default: () => null }));
+const buscarClientesParecidos = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/sales-api", async (original) => ({
+  ...(await original<typeof import("@/lib/sales-api")>()),
+  buscarClientesParecidos,
+}));
 vi.mock("@/lib/asistente-ia-api", async (original) => ({ ...(await original<typeof import("@/lib/asistente-ia-api")>()), ...api }));
 
 import AsistenteIA from "./AsistenteIA";
@@ -100,6 +105,7 @@ async function abrir(usuario: ReturnType<typeof userEvent.setup>, etiqueta: stri
 describe("AsistenteIA", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    buscarClientesParecidos.mockResolvedValue([]);
     api.estadoAsistente.mockResolvedValue({ disponible: true, modelo: "claude-haiku-5-5" });
     api.personasAsignables.mockResolvedValue([
       { id: 8, nombre: "Carolina Pérez", email: "soporte@nexara.com.mx" },
@@ -268,7 +274,7 @@ describe("AsistenteIA", () => {
 
     await usuario.click(screen.getAllByRole("button", { name: "Confirmar y asignar" })[0]);
     await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
-    expect(api.altaRapidaCliente).toHaveBeenCalledWith("tok", "Toks");
+    expect(api.altaRapidaCliente).toHaveBeenCalledWith("tok", "Toks", { tipo: "servicio", confirmarNuevo: false });
     const cuerpo = api.crearActividad.mock.calls[0][1];
     expect(cuerpo).toMatchObject({ clientId: 77, titulo: "Revisar cámaras en Toks" });
     expect(cuerpo.branchName).toBeUndefined();
@@ -355,7 +361,7 @@ describe("AsistenteIA", () => {
 
     await usuario.click(confirmar);
     await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
-    expect(api.altaRapidaCliente).toHaveBeenCalledWith("tok", "Toks");
+    expect(api.altaRapidaCliente).toHaveBeenCalledWith("tok", "Toks", { tipo: "servicio", confirmarNuevo: false });
     expect(api.crearActividad.mock.calls[0][1]).toMatchObject({ responsableId: 39, clientId: 77, coreKind: "servicio", tiempoEstimadoMin: 180, assignmentCharge: "despacho" });
   });
 
@@ -385,6 +391,84 @@ describe("AsistenteIA", () => {
     await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
     expect(api.altaRapidaCliente).not.toHaveBeenCalled();
     expect(api.crearActividad.mock.calls[0][1]).toMatchObject({ clientId: 41 });
+  });
+
+  describe("cliente de último momento", () => {
+    const enBenemerita: PropuestaActividad = {
+      ...servicio,
+      textoCliente: "Benemérita Universidad Autónoma de Puebla",
+      clienteNuevo: "Benemérita Universidad Autónoma de Puebla",
+      cliente: null,
+      payload: { ...servicio.payload, clientId: undefined },
+    };
+    const BUAP = {
+      id: 17,
+      nombre: "BUAP",
+      razonSocial: null,
+      tipos: ["COMERCIAL"],
+      porque: "Son las siglas de ese nombre",
+      confianza: "alta",
+      origen: "codigo",
+      puedeUsar: true,
+      serviceClientId: 34,
+    };
+    const preparar = async (propuesta: PropuestaActividad) => {
+      api.interpretar.mockResolvedValue({ propuestas: [propuesta], aclaracion: null, uso: null, opciones: { clientes: [{ id: 1, nombre: "Grupo Tox" }], proyectos: [], sucursales: [] } });
+      const usuario = userEvent.setup();
+      render(<AsistenteIA />);
+      await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "algo");
+      await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
+      return usuario;
+    };
+
+    it("si el cliente propuesto se parece a otro, avisa y no deja confirmar hasta decidir", async () => {
+      buscarClientesParecidos.mockResolvedValue([BUAP]);
+      await preparar(enBenemerita);
+      expect(await screen.findByText("¿Ya existe este cliente?")).toBeInTheDocument();
+      expect(screen.getByText("«Benemérita Universidad Autónoma de Puebla» se parece a:")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Confirmar y asignar" })).toBeDisabled();
+      expect(api.altaRapidaCliente).not.toHaveBeenCalled();
+    });
+
+    it("«Usar BUAP» pone ese cliente en la tarjeta y no crea otro", async () => {
+      buscarClientesParecidos.mockResolvedValue([BUAP]);
+      api.altaRapidaCliente.mockResolvedValue({ id: 34, nombre: "BUAP" });
+      const usuario = await preparar(enBenemerita);
+      await usuario.click(await screen.findByRole("button", { name: "Usar BUAP" }));
+      await waitFor(() => expect(api.altaRapidaCliente).toHaveBeenCalledWith("tok", "BUAP", { tipo: "servicio", reutilizarId: 17 }));
+      const confirmar = await screen.findByRole("button", { name: "Confirmar y asignar" });
+      await waitFor(() => expect(confirmar).toBeEnabled());
+      await usuario.click(confirmar);
+      await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
+      expect(api.crearActividad.mock.calls[0][1]).toMatchObject({ clientId: 34 });
+      expect(api.altaRapidaCliente).toHaveBeenCalledTimes(1);
+    });
+
+    it("«Crear otro de todos modos» lo da de alta al confirmar", async () => {
+      buscarClientesParecidos.mockResolvedValue([BUAP]);
+      api.altaRapidaCliente.mockResolvedValue({ id: 90, nombre: "Benemérita Universidad Autónoma de Puebla" });
+      const usuario = await preparar(enBenemerita);
+      await usuario.click(await screen.findByRole("button", { name: "Crear otro de todos modos" }));
+      const confirmar = await screen.findByRole("button", { name: "Confirmar y asignar" });
+      await waitFor(() => expect(confirmar).toBeEnabled());
+      await usuario.click(confirmar);
+      await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
+      expect(api.altaRapidaCliente).toHaveBeenCalledWith("tok", "Benemérita Universidad Autónoma de Puebla", { tipo: "servicio", confirmarNuevo: true });
+    });
+
+    it("un cliente que la frase no dijo se puede escribir", async () => {
+      api.altaRapidaCliente.mockResolvedValue({ id: 91, nombre: "Toks" });
+      const usuario = await preparar({ ...servicio, cliente: null, textoCliente: null, payload: { ...servicio.payload, clientId: undefined } });
+      await usuario.selectOptions(await screen.findByLabelText(/^Cliente/), "+ Escribir otro cliente…");
+      await usuario.type(await screen.findByPlaceholderText("Nombre del cliente"), "Toks");
+      await usuario.click(screen.getByRole("button", { name: "Usar" }));
+      expect(await screen.findByText("Nuevo: alta al confirmar")).toBeInTheDocument();
+      await waitFor(() => expect(buscarClientesParecidos).toHaveBeenCalledWith("tok", { nombre: "Toks" }));
+      expect(api.altaRapidaCliente).not.toHaveBeenCalled();
+      await usuario.click(screen.getByRole("button", { name: "Confirmar y asignar" }));
+      await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
+      expect(api.altaRapidaCliente).toHaveBeenCalledWith("tok", "Toks", { tipo: "servicio", confirmarNuevo: false });
+    });
   });
 
   it("si el alta del cliente falla al confirmar, lo dice, no crea la actividad y deja reintentar", async () => {

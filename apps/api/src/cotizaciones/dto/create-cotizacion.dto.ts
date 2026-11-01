@@ -83,6 +83,14 @@ export class CreateCotizacionDto {
   @IsInt()
   salesClientId?: number;
 
+  /**
+   * El nombre todavía no es un cliente del padrón: se guarda como texto y no se da de alta. El editor
+   * autoguarda mientras se escribe, y así nacieron clientes como «Benemer» o «Bodega de».
+   */
+  @IsOptional()
+  @IsBoolean()
+  clienteSinAlta?: boolean;
+
   @IsOptional()
   @IsInt()
   opportunityId?: number;

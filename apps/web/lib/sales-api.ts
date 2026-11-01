@@ -621,6 +621,8 @@ export type ClientPermissions = {
   puedeEliminar: boolean;
   /** Operativo: alta rápida corporativa (nombre y contacto) desde una actividad de servicio. */
   puedeAltaRapidaCorporativa?: boolean;
+  /** Dar de alta de último momento con solo el nombre, al asignar o al cotizar. */
+  puedeAltaRapida?: boolean;
 };
 
 export const NO_CLIENT_PERMISSIONS: ClientPermissions = {
@@ -629,6 +631,47 @@ export const NO_CLIENT_PERMISSIONS: ClientPermissions = {
   puedeDesactivar: false,
   puedeEliminar: false,
   puedeAltaRapidaCorporativa: false,
+  puedeAltaRapida: false,
+};
+
+/** Un cliente del padrón que se parece al que se quiere dar de alta. */
+export type ClienteParecido = {
+  id: number;
+  nombre: string;
+  razonSocial: string | null;
+  tipos: Array<"PROYECTO" | "CORPORATIVO" | "COMERCIAL">;
+  porque: string;
+  confianza: "alta" | "media";
+  origen: "codigo" | "ia";
+  puedeUsar: boolean;
+  serviceClientId: number | null;
+};
+
+/**
+ * «¿Ya existe este cliente?». Con `soloCodigo` no gasta IA (para revisar mientras se escribe);
+ * sin él, lo que el código no resuelve lo revisa Claude antes de crear.
+ */
+export const buscarClientesParecidos = async (
+  token: string,
+  consulta: { nombre: string; razonSocial?: string; rfc?: string; excluirId?: number; soloCodigo?: boolean },
+): Promise<ClienteParecido[]> => {
+  const r = await apiRequest<{ parecidos: ClienteParecido[] }>(
+    "ventas/clientes/parecidos",
+    {
+      token,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nombre: consulta.nombre,
+        ...(consulta.razonSocial?.trim() ? { razonSocial: consulta.razonSocial.trim() } : {}),
+        ...(consulta.rfc?.trim() ? { rfc: consulta.rfc.trim() } : {}),
+        ...(consulta.excluirId ? { excluirId: consulta.excluirId } : {}),
+        ...(consulta.soloCodigo ? { soloCodigo: true } : {}),
+      }),
+    },
+    "No se pudo revisar si el cliente ya existe",
+  );
+  return r?.parecidos ?? [];
 };
 
 export const getClientPermissions = async (token: string) => {
@@ -1004,6 +1047,10 @@ export const createSalesClient = async (
     tipo?: "PROYECTO" | "CORPORATIVO" | "COMERCIAL";
     altaRapida?: boolean;
     altaProyecto?: boolean;
+    /** Ya se vio el aviso de parecidos y es otro cliente. */
+    confirmarNuevo?: boolean;
+    /** «Usar este»: trae a ese cliente en vez de crear uno. */
+    reutilizarId?: number;
   },
 ) => {
   return apiRequest<SalesClient>(

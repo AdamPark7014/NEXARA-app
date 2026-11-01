@@ -41,6 +41,7 @@ const DETALLE = {
   issueDate: "2026-09-18T00:00:00.000Z",
   validUntil: "2026-10-03T00:00:00.000Z",
   clientName: "Plaza Norte",
+  salesClientId: 7,
   clientEmail: "compras@plazanorte.mx",
   clientPhone: "222 123 4567",
   projectName: "Renovación del CCTV",
@@ -162,6 +163,22 @@ describe("editor de cotización", () => {
       { timeout: 4000 },
     );
     expect(await screen.findByText(/^Guardado ·/, {}, { timeout: 4000 })).toBeInTheDocument();
+  });
+
+  it("cambiar el cliente a mano guarda el texto y no da de alta a nadie", async () => {
+    const llamadas = servidor();
+    const user = userEvent.setup();
+    render(<CotizacionDetallePage />);
+    const campo = await screen.findByPlaceholderText("Buscar o escribir cliente");
+    await user.clear(campo);
+    await user.type(campo, "Benemer");
+    await waitFor(
+      () => {
+        const cuerpo = llamadas.filter((l) => l.metodo === "PUT").at(-1)?.cuerpo as Record<string, unknown> | undefined;
+        expect(cuerpo).toMatchObject({ clientName: "Benemer", salesClientId: null, clienteSinAlta: true });
+      },
+      { timeout: 4000 },
+    );
   });
 
   it("captura rápida: Enter agrega la partida y el total se recalcula con IVA", async () => {

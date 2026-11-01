@@ -29,11 +29,12 @@ import {
   sectorFromSlug,
   type ClientSector,
 } from "@/lib/client-sectors";
-import { createSalesClient, getClientPermissions } from "@/lib/sales-api";
+import { buscarClientesParecidos, createSalesClient, getClientPermissions, type ClienteParecido } from "@/lib/sales-api";
+import { AvisoParecidos } from "@/components/erp/ClienteRapido";
 import { CLIENT_SECTOR_ICONS } from "@/components/erp/ClientSectorIcon";
 import PhoneField, { isValidNexaraPhone } from "@/components/PhoneField";
 import FiscalRfcLookup from "@/components/FiscalRfcLookup";
-import { nombreSector } from "../sectores";
+import { nombreSector, ordenarSectores } from "../sectores";
 import styles from "../clientes-core.module.css";
 
 const empty = {
@@ -69,6 +70,9 @@ export default function NuevoClientePage() {
   const [intento, setIntento] = useState(false);
   /** null = consultando; la API decide quién agrega (coordinación, gerencia, encargada comercial). */
   const [puedeAgregar, setPuedeAgregar] = useState<boolean | null>(null);
+  /** Los que se parecen a lo escrito; `nombre` dice para qué nombre se revisó. */
+  const [parecidos, setParecidos] = useState<{ nombre: string; lista: ClienteParecido[] } | null>(null);
+  const turnoRevision = useRef(0);
 
   // El sector llega por la URL (?sector=comercial); se aplica cuando ya se sabe qué sectores ve la persona.
   useEffect(() => {
@@ -127,6 +131,42 @@ export default function NuevoClientePage() {
     });
   };
 
+  /** ¿Ya existe? Al salir del campo solo con código; al guardar, también lo revisa la IA. */
+  const revisarParecidos = async (conIa: boolean): Promise<ClienteParecido[]> => {
+    const nombre = form.name.trim();
+    if (!token || nombre.length < 2) return [];
+    const mio = ++turnoRevision.current;
+    const lista = await buscarClientesParecidos(token, {
+      nombre,
+      razonSocial: form.legalName,
+      rfc: form.taxId,
+      soloCodigo: !conIa,
+    }).catch(() => [] as ClienteParecido[]);
+    if (mio === turnoRevision.current) setParecidos(lista.length ? { nombre, lista } : null);
+    return lista;
+  };
+
+  const crearCliente = async (confirmarNuevo: boolean) => {
+    if (!token) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const created = await createSalesClient(token, {
+        ...form,
+        taxId: form.taxId.toUpperCase(),
+        tipo: sectors[0],
+        sectors,
+        status: "Activo",
+        ...(confirmarNuevo ? { confirmarNuevo: true } : {}),
+      });
+      router.push(`/erp/clientes/${created.id}`);
+    } catch (err) {
+      setError(formatApiError(err, "No se pudo crear el cliente"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) return;
@@ -147,26 +187,18 @@ export default function NuevoClientePage() {
       setSaving(false);
       return;
     }
-    try {
-      const created = await createSalesClient(token, {
-        ...form,
-        taxId: form.taxId.toUpperCase(),
-        tipo: sectors[0],
-        sectors,
-        status: "Activo",
-      });
-      router.push(`/erp/clientes/${created.id}`);
-    } catch (err) {
-      setError(formatApiError(err, "No se pudo crear el cliente"));
-    } finally {
+    const repetidos = await revisarParecidos(true);
+    if (repetidos.length) {
       setSaving(false);
+      return;
     }
+    await crearCliente(false);
   };
 
   const set = (campo: keyof typeof empty) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [campo]: e.target.value }));
 
-  const visibles = ALL_CLIENT_SECTORS.filter((s) => allowedSectors.includes(s));
+  const visibles = ordenarSectores(ALL_CLIENT_SECTORS.filter((s) => allowedSectors.includes(s)));
   const errorNombre = intento && !form.name.trim() ? "Escribe el nombre comercial" : null;
   const pendientes: PendingItem[] = [
     { id: "nombre", label: "Nombre comercial", done: Boolean(form.name.trim()), error: Boolean(errorNombre), fieldId: "name" },
@@ -214,8 +246,18 @@ export default function NuevoClientePage() {
     >
       <FormSection step={1} done={Boolean(form.name.trim())} title="Identidad" description="Cómo lo ubica tu equipo en listas y buscadores." columns={1}>
         <Field label="Nombre comercial" required error={errorNombre} hint="Como lo conoce tu equipo, por ejemplo «Plaza Norte».">
-          <Input id="name" autoComplete="organization" value={form.name} onChange={set("name")} />
+          <Input id="name" autoComplete="organization" value={form.name} onChange={set("name")} onBlur={() => void revisarParecidos(false)} />
         </Field>
+        {parecidos && parecidos.nombre === form.name.trim() ? (
+          <AvisoParecidos
+            nombre={parecidos.nombre}
+            parecidos={parecidos.lista}
+            ocupado={saving}
+            onUsar={(p) => router.push(`/erp/clientes/${p.id}`)}
+            onCrearOtro={() => void crearCliente(true)}
+            onCancelar={() => setParecidos(null)}
+          />
+        ) : null}
       </FormSection>
 
       <FormSection step={2} title="Datos fiscales" description="Con el RFC se consulta el SAT y se llenan razón social, régimen y CP.">

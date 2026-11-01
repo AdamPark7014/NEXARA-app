@@ -73,7 +73,7 @@ describe("lista de clientes", () => {
     render(<ClientesHubPage />);
 
     const fila = (await screen.findByText("Plaza Norte")).closest("tr")!;
-    expect(listSalesClients).toHaveBeenCalledWith("jwt", { sector: "PROYECTO" });
+    expect(listSalesClients).toHaveBeenCalledWith("jwt", { sector: "COMERCIAL" });
     expect(within(fila).getByRole("link", { name: "Plaza Norte" })).toHaveAttribute("href", "/erp/clientes/1");
     expect(within(fila).getByText("PNO010101AB1")).toBeInTheDocument();
     expect(within(fila).getByText("Activo")).toBeInTheDocument();
@@ -107,10 +107,20 @@ describe("lista de clientes", () => {
     await screen.findByText("Plaza Norte");
 
     listSalesClients.mockResolvedValue([]);
-    await user.click(screen.getByRole("tab", { name: /Comercial/ }));
-    expect(replace).toHaveBeenCalledWith("/erp/clientes?sector=comercial", { scroll: false });
-    expect(await screen.findByText("Aún no hay clientes comerciales")).toBeInTheDocument();
-    expect(listSalesClients).toHaveBeenLastCalledWith("jwt", { sector: "COMERCIAL" });
+    await user.click(screen.getByRole("tab", { name: /Proyecto/ }));
+    expect(replace).toHaveBeenCalledWith("/erp/clientes?sector=proyecto", { scroll: false });
+    expect(await screen.findByText(/Aún no hay clientes de proyecto/)).toBeInTheDocument();
+    expect(listSalesClients).toHaveBeenLastCalledWith("jwt", { sector: "PROYECTO" });
+  });
+
+  it("Comercial va primero y es la que abre", async () => {
+    listSalesClients.mockResolvedValue(FILAS);
+    render(<ClientesHubPage />);
+    await screen.findByText("Plaza Norte");
+    const pestanas = screen.getAllByRole("tab").map((t) => t.textContent);
+    expect(pestanas[0]).toMatch(/Comercial/);
+    expect(screen.getByRole("tab", { name: /Comercial/ })).toHaveAttribute("aria-selected", "true");
+    expect(listSalesClients).toHaveBeenCalledWith("jwt", { sector: "COMERCIAL" });
   });
 
   it("si falla al cargar lo dice y deja reintentar", async () => {

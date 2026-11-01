@@ -382,3 +382,14 @@
     width: 100%;
   }
 }
+
+.clienteEscrito {
+  display: flex;
+  gap: var(--ui-s2, 8px);
+  align-items: center;
+}
+
+.clienteEscrito > :first-child {
+  flex: 1;
+  min-width: 0;
+}

@@ -14,6 +14,8 @@ import { unirDictado } from "@/lib/use-dictado";
 import { useDictadoVivo } from "@/lib/use-dictado-vivo";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
+import { AvisoParecidos } from "@/components/erp/ClienteRapido";
+import { buscarClientesParecidos, type ClienteParecido } from "@/lib/sales-api";
 import { formatMinutes } from "@/lib/activity-labels";
 import { kindsForAssignment, puedeAsignarConIa } from "@/lib/activity-kinds";
 import { periodoPorOmision } from "@/lib/actividad-periodo";
@@ -76,6 +78,8 @@ type Estado = {
 
 /** Valor de la opción «+ Agregar cliente "…"» del selector de cliente. */
 const ALTA_CLIENTE = "__alta__";
+/** «+ Escribir otro cliente…»: abre un campo para dar de alta uno que la frase no dijo. */
+const OTRO_CLIENTE = "__otro__";
 
 /** Etapa del proyecto que se propuso para una tarjeta (como «Asignar»). */
 type EtapaPropuesta = { nombre: string | null };
@@ -219,6 +223,12 @@ function Contenido({
   const [creandoTodas, setCreandoTodas] = useState(false);
   /** Clientes dados de alta al confirmar una tarjeta (alta rápida). */
   const [clientesNuevos, setClientesNuevos] = useState<Referencia[]>([]);
+  /** Los que se trajeron del aviso de parecidos: ya existían, no son nuevos. */
+  const [clientesTraidos, setClientesTraidos] = useState<Referencia[]>([]);
+  const [parecidos, setParecidos] = useState<Record<string, ClienteParecido[]>>({});
+  const revisados = useRef(new Set<string>());
+  /** Lo que se está escribiendo en «+ Escribir otro cliente…», por tarjeta. */
+  const [escribiendo, setEscribiendo] = useState<Record<number, string | undefined>>({});
   const personasOrdenadas = useMemo(() => [...personas].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")), [personas]);
   /** Lo que ya estaba escrito cuando empezó el dictado: lo dicho se agrega después. */
   const base = useRef("");
@@ -245,6 +255,7 @@ function Contenido({
         setRespuesta(r);
         setListoEnMs(Math.round(performance.now() - inicio));
         setAjustes({});
+        setEscribiendo({});
         setAbiertos({});
         setEstados({});
         setEtapas({});
@@ -287,10 +298,49 @@ function Contenido({
 
   const propuestas = useMemo(() => respuesta?.propuestas ?? [], [respuesta]);
   const opciones = respuesta?.opciones;
-  const todosLosClientes = useMemo(
-    () => [...(opciones?.clientes ?? []), ...clientesNuevos.filter((n) => !(opciones?.clientes ?? []).some((c) => c.id === n.id))],
-    [opciones, clientesNuevos],
-  );
+  const todosLosClientes = useMemo(() => {
+    const base = opciones?.clientes ?? [];
+    const extra = [...clientesNuevos, ...clientesTraidos].filter((n, k, arr) => !base.some((c) => c.id === n.id) && arr.findIndex((x) => x.id === n.id) === k);
+    return [...base, ...extra];
+  }, [opciones, clientesNuevos, clientesTraidos]);
+
+  // ¿El cliente que se va a dar de alta ya existe con otro nombre? Se revisa en cuanto se propone.
+  const nombresPorRevisar = propuestas
+    .map((p, i) => clientePendiente(p, ajustes[i] || {}))
+    .filter((n): n is string => Boolean(n))
+    .join("\n");
+  useEffect(() => {
+    if (!nombresPorRevisar) return;
+    for (const nombre of nombresPorRevisar.split("\n")) {
+      const clave = nombreComparable(nombre);
+      if (revisados.current.has(clave)) continue;
+      revisados.current.add(clave);
+      buscarClientesParecidos(token, { nombre })
+        .then((lista) => setParecidos((prev) => ({ ...prev, [clave]: lista })))
+        .catch(() => undefined);
+    }
+  }, [nombresPorRevisar, token]);
+
+  /** «+ Escribir otro cliente…»: lo escrito queda como cliente a dar de alta al confirmar. */
+  const usarEscrito = (i: number) => {
+    const nombre = escribiendo[i]?.trim();
+    if (!nombre) return;
+    agregarCliente(i, nombre);
+    setEscribiendo((prev) => ({ ...prev, [i]: undefined }));
+  };
+
+  /** «Usar este» del aviso: ese cliente en la tarjeta, sin crear otro. */
+  const usarParecido = async (i: number, p: PropuestaActividad, parecido: ClienteParecido) => {
+    setEstados((prev) => ({ ...prev, [i]: { creando: true } }));
+    try {
+      const usado = await altaRapidaCliente(token, parecido.nombre, { tipo: tipoEfectivo(p, ajustes[i] || {}), reutilizarId: parecido.id });
+      setClientesTraidos((prev) => [...prev.filter((x) => x.id !== usado.id), usado]);
+      ajustar(i, { clientId: usado.id, clienteNuevo: null, clienteNuevoConfirmado: false });
+      setEstados((prev) => ({ ...prev, [i]: {} }));
+    } catch (e) {
+      setEstados((prev) => ({ ...prev, [i]: { error: formatApiError(e, "No se pudo usar ese cliente.") } }));
+    }
+  };
 
   /**
    * «+ Agregar cliente "Toks"»: queda elegido para darse de alta al confirmar (solo el nombre); las
@@ -313,11 +363,11 @@ function Contenido({
   };
 
   /** El alta del cliente al confirmar: si otra tarjeta ya lo dio de alta, se reutiliza. */
-  const clienteParaCrear = async (nombre: string): Promise<Referencia> => {
+  const clienteParaCrear = async (nombre: string, opciones: { tipo: ActivityKind; confirmarNuevo: boolean }): Promise<Referencia> => {
     const clave = nombreComparable(nombre);
     const ya = todosLosClientes.find((x) => nombreComparable(x.nombre) === clave) ?? altasHechas.current.get(clave);
     if (ya) return ya;
-    const nuevo = await altaRapidaCliente(token, nombre);
+    const nuevo = await altaRapidaCliente(token, nombre, opciones);
     altasHechas.current.set(clave, nuevo);
     setClientesNuevos((prev) => [...prev.filter((x) => x.id !== nuevo.id), nuevo]);
     return nuevo;
@@ -336,7 +386,9 @@ function Contenido({
     const agenda = agendaFinal(p, aj, entrada);
     const pendiente = clientePendiente(p, aj);
     const motivos = bloqueos(p, payload, { creadorEmail, destinoEmail, v2Role: v2, isSuperAdmin, agenda, clienteNuevo: pendiente });
-    return { aj, payload, agenda, destinoEmail, motivos, pendiente };
+    const parecidosCliente = pendiente && !aj.clienteNuevoConfirmado ? parecidos[nombreComparable(pendiente)] ?? [] : [];
+    if (parecidosCliente.length) motivos.push(`«${pendiente}» se parece a un cliente que ya existe: elige si es el mismo.`);
+    return { aj, payload, agenda, destinoEmail, motivos, pendiente, parecidosCliente };
   };
 
   // Obra o proyecto sin fechas dichas: el periodo de la etapa vigente, como propone «Asignar».
@@ -373,14 +425,14 @@ function Contenido({
   }, [proyectosPorTarjeta, token]);
 
   const crear = async (i: number, p: PropuestaActividad) => {
-    const { payload, destinoEmail, motivos, pendiente } = armar(p, i);
+    const { aj, payload, destinoEmail, motivos, pendiente } = armar(p, i);
     if (motivos.length || estados[i]?.creando || estados[i]?.creada) return false;
     setEstados((prev) => ({ ...prev, [i]: { creando: true } }));
     let creada: { id: number; anNumber?: string };
     try {
       if (pendiente && !payload.clientId) {
         try {
-          payload.clientId = (await clienteParaCrear(pendiente)).id;
+          payload.clientId = (await clienteParaCrear(pendiente, { tipo: tipoEfectivo(p, aj), confirmarNuevo: Boolean(aj.clienteNuevoConfirmado) })).id;
         } catch (e) {
           setEstados((prev) => ({ ...prev, [i]: { error: `No se pudo dar de alta «${pendiente}»: ${formatApiError(e, "error de conexión")}. Elige otro cliente o vuelve a intentar.` } }));
           return false;
@@ -545,7 +597,7 @@ function Contenido({
         {propuestas.map((p, i) => {
           const est = estados[i] || {};
           if (est.descartada) return null;
-          const { aj, payload, agenda, destinoEmail, motivos, pendiente } = armar(p, i);
+          const { aj, payload, agenda, destinoEmail, motivos, pendiente, parecidosCliente } = armar(p, i);
           const tipo = tipoEfectivo(p, aj);
           const subtipo = subtipoEfectivo(p, aj);
           const regla = reglaEncargo(tipo, destinoEmail, encargoElegido(p, aj));
@@ -806,8 +858,8 @@ function Contenido({
                     }
                     supuesto={Boolean(pendiente)}
                     explicacion={p.notaCliente ?? undefined}
-                    abierto={abierto("cliente") || sinClienteDeServicio}
-                    obligado={sinClienteDeServicio}
+                    abierto={abierto("cliente") || sinClienteDeServicio || parecidosCliente.length > 0}
+                    obligado={sinClienteDeServicio || parecidosCliente.length > 0}
                     onAlternar={() => alternar("cliente")}
                   >
                     <div className={s.ajustes}>
@@ -819,6 +871,10 @@ function Contenido({
                               if (altaNombre) agregarCliente(i, altaNombre);
                               return;
                             }
+                            if (e.target.value === OTRO_CLIENTE) {
+                              setEscribiendo((prev) => ({ ...prev, [i]: "" }));
+                              return;
+                            }
                             const nuevo = Number(e.target.value) || null;
                             // Otro cliente: la sucursal de la IA ya no aplica (el lugar escrito se queda).
                             ajustar(i, { clientId: nuevo, clienteNuevo: null, ...(p.sucursal && aj.lugar === undefined && nuevo !== (p.cliente?.id ?? null) ? { lugar: "" } : {}) });
@@ -827,6 +883,7 @@ function Contenido({
                           <option value="">{tipo === "servicio" ? "Elige el cliente" : "Sin cliente"}</option>
                           {pendiente ? <option value={ALTA_CLIENTE}>{`${pendiente} (cliente nuevo)`}</option> : null}
                           {altaNombre ? <option value={ALTA_CLIENTE}>{`+ Agregar cliente «${altaNombre}»`}</option> : null}
+                          <option value={OTRO_CLIENTE}>+ Escribir otro cliente…</option>
                           {clientesSugeridos.length ? (
                             <optgroup label={p.cliente ? "El que dijiste" : "Coinciden con lo que dijiste"}>
                               {clientesSugeridos.map((o) => (
@@ -847,6 +904,41 @@ function Contenido({
                           ) : null}
                         </Select>
                       </Field>
+                      {escribiendo[i] !== undefined ? (
+                        <Field label="Cliente nuevo" hint="Solo el nombre; sus datos se completan después en Clientes.">
+                          <div className={s.clienteEscrito}>
+                            <Input
+                              value={escribiendo[i] ?? ""}
+                              maxLength={200}
+                              autoFocus
+                              placeholder="Nombre del cliente"
+                              onChange={(e) => setEscribiendo((prev) => ({ ...prev, [i]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key !== "Enter") return;
+                                e.preventDefault();
+                                if ((escribiendo[i]?.trim().length ?? 0) >= 2) usarEscrito(i);
+                              }}
+                            />
+                            <Button
+                              variant="tonal"
+                              size="sm"
+                              disabled={(escribiendo[i]?.trim().length ?? 0) < 2}
+                              onClick={() => usarEscrito(i)}
+                            >
+                              Usar
+                            </Button>
+                          </div>
+                        </Field>
+                      ) : null}
+                      {parecidosCliente.length && pendiente ? (
+                        <AvisoParecidos
+                          nombre={pendiente}
+                          parecidos={parecidosCliente}
+                          ocupado={est.creando}
+                          onUsar={(parecido) => void usarParecido(i, p, parecido)}
+                          onCrearOtro={() => ajustar(i, { clienteNuevoConfirmado: true })}
+                        />
+                      ) : null}
                       <Field label="Lugar" optional hint={sucursalesLista.length ? "Sucursal o lugar" : undefined}>
                         <Input
                           value={lugar}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AvisoParecidos, useAltaCliente } from "@/components/erp/ClienteRapido";
 import { useRouter } from "next/navigation";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
@@ -31,7 +32,6 @@ import { formatApiError } from "@/lib/erp-api";
 import { DatosClienteOpcionales } from "@/components/erp/DatosCliente";
 import { clientSectorsForUser } from "@/lib/client-sectors";
 import {
-  createSalesClient,
   getClientPermissions,
   getSalesClient,
   listSalesClients,
@@ -135,8 +135,6 @@ export default function NuevoProyectoPage() {
   const [puedeEditarCliente, setPuedeEditarCliente] = useState(false);
   const [altaNombre, setAltaNombre] = useState("");
   const [altaAbierta, setAltaAbierta] = useState(false);
-  const [altaGuardando, setAltaGuardando] = useState(false);
-  const [errorAlta, setErrorAlta] = useState<string | null>(null);
   const [buscarCliente, setBuscarCliente] = useState("");
   const [cotizaciones, setCotizaciones] = useState<CotizacionRow[]>([]);
   const [errorCotizaciones, setErrorCotizaciones] = useState<string | null>(null);
@@ -216,6 +214,27 @@ export default function NuevoProyectoPage() {
       titulo.focus();
     }
   }, [paso]);
+
+  /** Alta rápida del cliente desde el asistente: avisa si se parece a otro; el 403 del padrón se enseña tal cual. */
+  const armarAltaCliente = useCallback(
+    (nombre: string) =>
+      puedeAgregarCliente && clientSectorsForUser(user).includes("PROYECTO")
+        ? { name: nombre, status: "Activo", tipo: "PROYECTO" as const, sectors: ["PROYECTO" as const] }
+        : { name: nombre, status: "Activo", tipo: "PROYECTO" as const, altaProyecto: true },
+    [puedeAgregarCliente, user],
+  );
+  const altaCliente = useAltaCliente({
+    token,
+    armar: armarAltaCliente,
+    onListo: (creado) => {
+      setClientes((prev) =>
+        [...prev.filter((c) => c.id !== creado.id), creado].sort((x, y) => x.name.localeCompare(y.name, "es")),
+      );
+      cambiar("clienteId", String(creado.id));
+      setAltaNombre("");
+      setAltaAbierta(false);
+    },
+  });
 
   const cambiar = <K extends keyof BorradorProyecto>(campo: K, valor: BorradorProyecto[K]) =>
     setB((prev) => ({ ...prev, [campo]: valor }));
@@ -302,28 +321,6 @@ export default function NuevoProyectoPage() {
     }
   }
 
-  /** Alta rápida del cliente desde el asistente: el 403 del padrón se enseña tal cual. */
-  function crearClienteRapido() {
-    if (!token) return;
-    setAltaGuardando(true);
-    setErrorAlta(null);
-    createSalesClient(
-      token,
-      puedeAgregarCliente && clientSectorsForUser(user).includes("PROYECTO")
-        ? { name: altaNombre.trim(), status: "Activo", tipo: "PROYECTO", sectors: ["PROYECTO"] }
-        : { name: altaNombre.trim(), status: "Activo", tipo: "PROYECTO", altaProyecto: true },
-    )
-      .then((creado) => {
-        setClientes((prev) =>
-          [...prev.filter((c) => c.id !== creado.id), creado].sort((x, y) => x.name.localeCompare(y.name, "es")),
-        );
-        cambiar("clienteId", String(creado.id));
-        setAltaNombre("");
-        setAltaAbierta(false);
-      })
-      .catch((e) => setErrorAlta(formatApiError(e, "No se pudo dar de alta el cliente")))
-      .finally(() => setAltaGuardando(false));
-  }
 
   // --- Renglones -----------------------------------------------------------
 
@@ -428,7 +425,7 @@ export default function NuevoProyectoPage() {
                     value={altaNombre}
                     onChange={(e) => {
                       setAltaNombre(e.target.value);
-                      if (errorAlta) setErrorAlta(null);
+                      if (altaCliente.error || altaCliente.aviso) altaCliente.descartar();
                     }}
                     onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
                     placeholder="Nombre del cliente nuevo"
@@ -436,22 +433,32 @@ export default function NuevoProyectoPage() {
                     maxLength={160}
                     autoFocus
                   />
-                  <Button variant="tertiary" disabled={altaGuardando} onClick={() => setAltaAbierta(false)}>
+                  <Button variant="tertiary" disabled={altaCliente.ocupado} onClick={() => setAltaAbierta(false)}>
                     Cerrar
                   </Button>
                   <Button
                     variant="tonal"
-                    loading={altaGuardando}
+                    loading={altaCliente.ocupado}
                     disabled={altaNombre.trim().length < 2}
-                    onClick={crearClienteRapido}
+                    onClick={() => void altaCliente.pedir(altaNombre)}
                   >
                     Crear y usar
                   </Button>
                 </div>
                 <p className={styles.ayuda}>Solo con el nombre: sus datos fiscales se completan después en Clientes.</p>
-                {errorAlta ? (
+                {altaCliente.aviso ? (
+                  <AvisoParecidos
+                    nombre={altaCliente.aviso.nombre}
+                    parecidos={altaCliente.aviso.parecidos}
+                    ocupado={altaCliente.ocupado}
+                    onUsar={(p) => void altaCliente.usar(p)}
+                    onCrearOtro={altaCliente.crearOtro}
+                    onCancelar={altaCliente.descartar}
+                  />
+                ) : null}
+                {altaCliente.error ? (
                   <Alert tone="danger" role="alert" srLabel="Error">
-                    {errorAlta}
+                    {altaCliente.error}
                   </Alert>
                 ) : null}
               </div>

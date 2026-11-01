@@ -5,10 +5,10 @@
  * modifica. Agregar y editar: coordinación y gerencia (y la encargada comercial, rol
  * `administrativo`), más quien tiene gente a su cargo salvo que su rol sea operativo.
  * Un ingeniero o un operativo no da de alta clientes aunque tenga personal reportándole,
- * con dos excepciones: al asignar una actividad de servicio, quien ya puede crear
- * esa actividad da de alta un CORPORATIVO (`altaRapida`: nombre obligatorio; correo,
- * teléfono y RFC opcionales; no depende del sector del padrón); al crear un proyecto
- * desde una actividad, da de alta un PROYECTO con solo el nombre (`altaProyecto`).
+ * con dos excepciones: al asignar una actividad o cotizar, quien ya puede hacerlo da de
+ * alta un CORPORATIVO o un COMERCIAL (`altaRapida`: nombre obligatorio; correo, teléfono y
+ * RFC opcionales; no depende del sector del padrón); al crear un proyecto desde una
+ * actividad, da de alta un PROYECTO con solo el nombre (`altaProyecto`).
  * El operativo no edita el padrón. El encargado sí.
  * Desactivar y eliminar: solo Christian (y su equivalente de pruebas); la cuenta de
  * desarrollo conserva el acceso técnico total.
@@ -71,6 +71,8 @@ export type ClientPermissions = {
    * rápida. El API acepta esa alta a cualquiera que ya puede crear la actividad.
    */
   puedeAltaRapidaCorporativa: boolean;
+  /** Dar de alta de último momento con solo el nombre, al asignar o al cotizar (`getClientPermissions`). */
+  puedeAltaRapida?: boolean;
 };
 
 /** Christian, su equivalente de pruebas o la cuenta de desarrollo (acceso técnico total). */

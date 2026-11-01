@@ -47,7 +47,7 @@ import {
   type SalesClient,
 } from "@/lib/sales-api";
 import { CLIENT_SECTOR_ICONS } from "@/components/erp/ClientSectorIcon";
-import { nombreSector } from "./sectores";
+import { nombreSector, ordenarSectores } from "./sectores";
 import { TiposCliente } from "./_componentes/TiposCliente";
 import styles from "./clientes-core.module.css";
 
@@ -66,7 +66,7 @@ function sectoresDe(c: SalesClient): ClientSector[] {
 export default function ClientesHubPage() {
   const router = useRouter();
   const { user, token } = useUser();
-  const allowedSectors = useMemo(() => clientSectorsForUser(user), [user]);
+  const allowedSectors = useMemo(() => ordenarSectores(clientSectorsForUser(user)), [user]);
   const showOwner = isCeoEquivalentEmail(user?.email) || Boolean(user?.isSuperAdmin);
 
   const [pedido, setPedido] = useState<ClientSector | null>(null);
