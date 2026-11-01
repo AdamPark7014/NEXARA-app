@@ -1,5 +1,25 @@
 # RELEVO
 
+- **01-11 ~15:45 (claude-code) — Libro de costos: Fases 0 y 1 verificadas en producción (`126d2540` y `8f4d81d8`, desplegados y migrados).**
+  - Primera carga: 345 renglones de mano de obra y 1,396 h efectivas (de 1,473 h de reloj en bruto, ya con el tope a los cierres
+    automáticos y los relojes encimados repartidos). Repetirla da 0 nuevos, 0 cambiados y 0 quitados.
+  - En paralelo y sin tocar nómina: con el factor de salario real la mano de obra sale 43 % arriba de sueldo ÷ 40 h. Es provisional:
+    las cuotas son el supuesto de 25 % hasta que la contadora las capture. Montos en el chat con Adam, no aquí: el repo es público.
+  - Bandeja en producción: 98.7 % de las horas sin ligar, 295 actividades, 46 con sugerencia de reglas. Nadie ha corrido aún
+    «Sugerir con IA» en producción; el eval sí pasó por la puerta.
+  - Lo que no vieron las pruebas y sí vio mirar: título oscuro sobre la banda, casilla gigante y columnas desalineadas (se comparó en
+    local con datos inventados contra el mockup, a 1440 y 375 px). Con datos reales salieron dos falsos positivos: el vocabulario del
+    giro ligaba trabajos ajenos, y «A QUIEN CORRESPONDA» contaba como mismo cliente. Corregidos con prueba.
+  - **Falta verificar:** las pantallas en producción con la sesión de Adam (`core.nexara.com.mx/erp/costos`), con su cuenta y la de la
+    contadora. El proceso nocturno corre por primera vez hoy a las 03:20; se probó el mismo código a mano, no el cron.
+  - **Decisiones pendientes de Adam:** quién coordina la bandeja, y si sigue la Fase 2 u otra. La contadora debe capturar las cuotas.
+  - No se delegó a Ollama: el trabajo era diseño y fórmulas verificadas a mano, y el reconocimiento lo hizo un subagente.
+  - Trampas para quien siga con una copia exportada:
+    - Si armas otro commit desde una copia vieja, compara contra la base de la copia: con `126d2540` como base casi se revierte
+      `deploy/update.sh`, que otra sesión acababa de cambiar. Revisa `git show --stat` antes de subir.
+    - Las pruebas dejan fotos en `uploads/attendance/` de la raíz: no se suben.
+    - `next dev` en `%TEMP%` no ve cambios de SCSS: hay que reiniciarlo, y tarda unos 20 s por pantalla.
+
 - **01-11 ~14:00 (claude-code) — Libro de costos, Fases 0 y 1 en producción: costo real por hora, bandeja de horas sin proyecto y pestaña Costos.**
   - Adam aprobó las Fases 0 y 1 («Sí, Fases 0 y 1»). Las Fases 2 a 8 siguen en propuesta. Estado y decisiones en
     `docs/COSTOS-PRECIOS-UNITARIOS.md`, sección «Estado». Mockup: <https://claude.ai/artifact/VJpUHdLxGPRRXSJGK7a7Fe>.
