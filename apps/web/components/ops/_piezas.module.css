@@ -22,6 +22,7 @@
   height: 46px;
   padding: 0 2px;
   border-bottom: 2px solid transparent;
+  border-radius: 0;
   color: var(--ui-fg-2);
   font-size: var(--ui-text-sm);
   font-weight: var(--ui-fw-medium);

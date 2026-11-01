@@ -128,12 +128,13 @@
   appearance: none;
   border: none;
   border-bottom: 2px solid transparent;
+  border-radius: 0;
   background: none;
   margin-bottom: -1px;
   padding: 0 0 8px;
   font-family: inherit;
-  font-size: 13px;
-  font-weight: 550;
+  font-size: var(--ui-text-base);
+  font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
   transition: color 0.12s ease, border-color 0.12s ease;
@@ -151,6 +152,7 @@
 
 .tabFlatActive {
   color: var(--foreground, var(--text-primary));
+  font-weight: 600;
   border-bottom-color: var(--primary);
 }
 

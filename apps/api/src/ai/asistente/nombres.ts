@@ -328,7 +328,8 @@ function empates(dichas: Dicha[], nombre: string, modo: 'normal' | 'estricta' | 
     return { palabra: w, mejor };
   });
   const siglas = siglasDe(nombre);
-  const porSiglas = siglas ? dichas.find((d) => d.norm === siglas && !d.apodo) ?? null : null;
+  // Las iniciales de lo dicho no cuentan aquí: un nombre completo no es la corrección de sí mismo.
+  const porSiglas = siglas ? dichas.find((d) => d.norm === siglas && !d.apodo && !d.iniciales) ?? null : null;
   return { propias, porPalabra, porSiglas };
 }
 

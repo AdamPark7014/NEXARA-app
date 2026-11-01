@@ -181,6 +181,11 @@ describe('iniciales de un nombre completo', () => {
     expect(mencion(palabrasDe('Técnicos Proveedores Mexicanos'), 'TPM').nivel).toBeGreaterThanOrEqual(2);
   });
 
+  it('un nombre completo bien dicho no es la corrección de sí mismo', () => {
+    expect(corregidoDe('José Antonio Ramírez Salazar', 'que José Antonio Ramírez Salazar revise las cámaras')).toBeNull();
+    expect(puntajeAproximado('José Antonio Ramírez Salazar', 'José Antonio Ramírez Salazar')).toBe(3);
+  });
+
   it('dice de dónde salió la corrección y la cambia en el texto', () => {
     const c = corregidoDe('BUAP', 'Revisar cámaras en la Benemérita Universidad Autónoma de Puebla');
     expect(c?.de).toBe('Benemérita Universidad Autónoma de Puebla');
