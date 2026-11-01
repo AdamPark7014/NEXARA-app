@@ -100,6 +100,21 @@
       "fecha": "2026-10-29",
       "concepto": "juez asistente-chat (haiku)",
       "usd": 0.004129
+    },
+    {
+      "fecha": "2026-11-01",
+      "concepto": "asistente real claude-haiku-5-5",
+      "usd": 0.067018
+    },
+    {
+      "fecha": "2026-11-01",
+      "concepto": "asistente haiku-low-np",
+      "usd": 0.037869
+    },
+    {
+      "fecha": "2026-11-01",
+      "concepto": "juez asistente (haiku-5-5)",
+      "usd": 0.035113
     }
   ]
 }

@@ -1,5 +1,40 @@
 # RELEVO
 
+- **01-11 ~11:00 (claude-code) — «Asignar con IA»: todo lleno y editable, tarjeta nueva y acceso para David.**
+  - Pedido de Adam: entender lo informal, tiempos vagos y hoy si no dicen; responsable cuando se menciona; todo lleno.
+    Eligió la tarjeta «B» (renglones que se editan con un lápiz; lo supuesto lleva un punto ámbar). Y dárselo a David Morales.
+  - Medido con la empresa real (41 frases, en el scratchpad, no en git; repo público): de **2/41** listas para confirmar
+    (71.5 % de las revisiones) a **39–41/41** (99 %+). 20 frases que no se usaron para ajustar: 17–19/20 (98 %+).
+    Eval del repo (`casos-asistente.ts`, 48 casos ficticios, a31–a48 nuevos): 0.955, juez 4.29/5, p50 1.3 s, p95 1.9 s,
+    US$0.00019 por llamada. **Se quedó Haiku 5.5 low sin razonamiento:** ya pasa, el salto salió de reglas en código y prompt.
+    Lo que varía entre corridas es poco y editable (un subtipo, a quién se pone de principal en «ayude a…»).
+  - Decisiones con evidencia de producción (01-11):
+    - **Dos Antonio:** `elegir-persona.ts` ordena por: que pueda recibir ese tipo (`tiposQueRecibe`, espejo de
+      `RECEIVE_BY_EMAIL`), puesto, actividades parecidas, mismo cliente, total, y el nombre de pila desempata. La comandera va a
+      José Antonio (Encargado de soporte, 25 actividades, recibe servicios); Antonio Hernández entró el 28-10, tiene 0 y solo
+      recibe tareas. «Instalar 4 cámaras» va a Antonio Hernández por su puesto. La otra persona queda a la mano y se dice el
+      porqué. En una misma instrucción el mismo nombre es la misma persona.
+    - **Cliente sin registrar (Toks):** en un servicio (5 de 5 con cliente) o algo comercial se propone darlo de alta **al
+      confirmar**; nada se crea antes (el alta rápida la hacía al elegir; ahora también espera). En una tarea (302 de 302 sin
+      cliente) queda como lugar. Si sus actividades ya van con otro cliente, se propone ese: «Sephora» → TEKSERVE.
+    - **Duración:** la de `estandarDeLectura`, la misma cuenta del alta (tabla de tarifas y mediana real). La IA solo lee
+      complejidad y cantidad; los minutos nunca salen de ella, y un `min` sin unidad de tiempo en la frase se ignora.
+    - **«Entregar a más tardar» NO se autollena:** los KPI y «No cumplida» lo toman como compromiso real; vacío es fin del día.
+      «Al final del día» es la salida de quien lo hace (17:00 la cuadrilla).
+    - **Único hueco a propósito:** si nombran a alguien que no existe («Pedro») no se le da a otra persona.
+    - Sin decir quién: la más probable, con aviso. Sin decir cuándo: hoy; con su jornada ya terminada, el siguiente día.
+    - Lo que esa persona (o quien asigna) no puede recibir pasa a la tarea equivalente en vez de bloquear la tarjeta; en la
+      tarjeta, cambiar de persona hace lo mismo (`tareaEquivalente`).
+  - **David** (`operaciones@`): concesión por correo, `asistentePorCorreo` en `tipos-actividad.ts`, `RbacGuard` y controlador;
+    espejo `puedeAsignarConIa` en la web. No se le abre a toda la coordinación. No crea servicios: pasan a tarea. No ve el costo.
+  - Trampas: `tipos-actividad.ts` es hoja a propósito (si `tiempos-tipicos` importa `asistente-actividades` hay ciclo y
+    truena al cargar). `soloGiro` evita que «la bodega» sea el cliente mal capturado «Bodega de» o Bodegas Luna.
+  - **Sin verificar con sesión de David:** se probó su concesión por pruebas y por código, no entrando con su cuenta.
+  - Para Adam: el padrón trae clientes basura del alta rápida vieja («Bodega de», «SE», «Benemer», «Licencia», «ANFO» y «ANFORA»,
+    «GAMINF» y «GAMING»), y 21 comerciales van a «A QUIEN CORRESPONDA». Conviene depurarlo; no se tocó.
+  - Prueba inestable ajena: `components/mesa-contable/pantallas.spec.tsx` («Pagos y gastos») falla a veces en la corrida
+    completa y pasa sola.
+
 - **01-11 ~10:10 (claude-code) — CI vivo otra vez y multer 2.5.0 en producción (`8c9e031f`, desplegado).**
   - Síntoma: «Tipos y tests» caía en `npm ci` desde `490068a9` con `lock file's multer@2.4.0 does not satisfy multer@2.5.0`.
     El aviso engaña: la 2.4.0 no era el problema.

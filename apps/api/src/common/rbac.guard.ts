@@ -2,7 +2,8 @@ import { Injectable, ExecutionContext, ForbiddenException, Logger } from '@nestj
 import { PERMISSIONS } from './permissions';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { checkUrlAccess } from './rbac/url-matrix.js';
+import { ASISTENTE_IA_URL_RULES, checkUrlAccess, checkUrlRules } from './rbac/url-matrix.js';
+import { asistentePorCorreo } from '../ai/asistente/tipos-actividad.js';
 import { LEGACY_TO_V2, ROLES, type RoleKey } from './rbac/roles.v2.js';
 
 export interface RbacOptions {
@@ -51,7 +52,11 @@ export class RbacGuard extends AuthGuard('jwt') {
     if (v2Role) {
       const method = (request.method as HttpMethod) ?? 'GET';
       const url = request.originalUrl || request.url || '';
-      const result = checkUrlAccess(v2Role, url, method);
+      let result = checkUrlAccess(v2Role, url, method);
+      // «Asignar con IA» concedido por persona (David): sin cambiarle el rol.
+      if (!result.allowed && asistentePorCorreo(user.email)) {
+        result = checkUrlRules(ASISTENTE_IA_URL_RULES, url, method);
+      }
       if (!result.allowed) {
         this.logger.warn(`[v2 DENY] role=${v2Role} ${method} ${url}`);
         throw new ForbiddenException(`Tu rol (${v2Role}) no puede acceder a ${method} ${url}`);

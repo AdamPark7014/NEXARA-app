@@ -89,10 +89,17 @@ describe('nombres mal oídos o mal escritos', () => {
     const dos = buscar('Jair', [...personas, { id: 6, nombre: 'Yair Mendoza' }], (p) => p.nombre, 5, { aproximado: true });
     expect(dos.elegido).toBeNull();
     expect(dos.candidatos.map((p) => p.id)).toEqual(expect.arrayContaining([1, 6]));
+    // Las dos con parecido claro quedan como empatadas: quien llama decide cuál proponer.
+    expect(dos.empatados.map((p) => p.id)).toEqual(expect.arrayContaining([1, 6]));
     // Sin `aproximado`, como siempre (lo usan las actas).
     expect(buscar('talks', clientes, (c) => c.name).elegido).toBeNull();
     // Nunca inventa: nada parecido, nada elegido.
-    expect(buscar('tienda Maja', clientes, (c) => c.name, 5, { aproximado: true })).toEqual({ elegido: null, candidatos: [] });
+    expect(buscar('tienda Maja', clientes, (c) => c.name, 5, { aproximado: true })).toEqual({ elegido: null, candidatos: [], empatados: [] });
+  });
+
+  it('una palabra de tres letras no se corrige por parecido («Hik» no es «Kwik»)', () => {
+    const pares = [{ mal: ['quick'], bien: 'Kwik' }];
+    expect(corregirEnTexto('Configurar Hik-Connect en Super Quick', pares)).toBe('Configurar Hik-Connect en Super Kwik');
   });
 
   it('dice qué se corrigió y con qué palabra cambiarlo', () => {

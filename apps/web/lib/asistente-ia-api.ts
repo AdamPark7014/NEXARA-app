@@ -36,6 +36,8 @@ export type Agenda = {
   horaDicha: boolean;
   /** La hora es la entrada de quien ejecuta (no se dijo): cambia si se elige a otra persona. */
   horaPorEntrada?: boolean;
+  /** false = no dijeron cuándo y el API propuso hoy (o el siguiente día si ya acabó la jornada). */
+  diaDicho?: boolean;
   compromiso?: string | null;
 };
 
@@ -69,7 +71,17 @@ export type PropuestaActividad = {
   prioridad?: Prioridad;
   encargo?: Encargo | null;
   indicaciones?: string | null;
-  /** Lo que no se dijo: responsable, cliente, proyecto, fecha, duración. */
+  /** De dónde salió el responsable: dicho, el más probable entre varios o sugerido porque nadie dijo quién. */
+  responsableOrigen?: "dicho" | "probable" | "sugerido" | null;
+  /** Cliente que no está registrado: se da de alta al confirmar («Toks»). */
+  clienteNuevo?: string | null;
+  /** dicha = la dijeron; estimada = la tabla de tiempos. */
+  duracionOrigen?: "dicha" | "estimada";
+  duracionDetalle?: string | null;
+  /** Por qué se propuso a esa persona o ese cliente: se lee al abrir su renglón (también va en `avisos`). */
+  notaResponsable?: string | null;
+  notaCliente?: string | null;
+  /** Lo que no se pudo proponer: el responsable si nombraron a alguien que no existe, o el proyecto. */
   faltantes: string[];
   avisos: string[];
   /** Opcional mientras conviven una web nueva y un API anterior. */
@@ -163,6 +175,8 @@ export type Ajustes = {
   etapaId?: number | null;
   responsableId?: number;
   clientId?: number | null;
+  /** Nombre del cliente a dar de alta al confirmar (la opción «+ Agregar cliente»). */
+  clienteNuevo?: string | null;
   projectId?: number | null;
   titulo?: string;
   indicaciones?: string;
@@ -218,6 +232,19 @@ export function subtipoEfectivo(p: PropuestaActividad, aj: Ajustes): string | nu
   return null;
 }
 
+const TAREA_DE_SERVICIO: Record<string, string> = {
+  CORRECTIVO: "Correctivo y diagnóstico",
+  EMERGENCIA: "Correctivo y diagnóstico",
+  PREVENTIVO: "Mantenimiento preventivo",
+  INSTALACION: "Instalación",
+};
+
+/** La tarea que equivale a un trabajo que esa persona no puede recibir (mismo mapeo que el API). */
+export function tareaEquivalente(tipo: ActivityKind, subtipo: string | null): { tipo: ActivityKind; subtipo: string } {
+  if (tipo === "servicio") return { tipo: "tarea", subtipo: TAREA_DE_SERVICIO[subtipo ?? ""] ?? "Correctivo y diagnóstico" };
+  return { tipo: "tarea", subtipo: tipo === "obra" ? "Instalación" : "Reporte / documentación" };
+}
+
 /** Proyecto vigente (solo obra y proyecto): el elegido o el que encontró la IA. */
 export function proyectoEfectivo(p: PropuestaActividad, aj: Ajustes): number | null {
   if (!conProyecto(tipoEfectivo(p, aj))) return null;
@@ -263,6 +290,42 @@ export function compromisoValido(ag: Agenda): boolean {
   return !ag.compromiso || (/^\d{2}:\d{2}$/.test(ag.compromiso) && ag.compromiso > (ag.hora || HORA_INICIO_POR_OMISION));
 }
 
+const DIAS_CORTOS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+function etiquetaDia(dia: string, hoy: string): string {
+  const d = new Date(`${dia}T12:00:00Z`);
+  const manana = new Date(`${hoy}T12:00:00Z`);
+  manana.setUTCDate(manana.getUTCDate() + 1);
+  if (dia === hoy) return "Hoy";
+  if (dia === manana.toISOString().slice(0, 10)) return "Mañana";
+  return `${DIAS_CORTOS[d.getUTCDay()]} ${d.getUTCDate()} ${MESES_CORTOS[d.getUTCMonth()]}`;
+}
+
+/** «09:30» → «9:30 a. m.», como los campos de hora del navegador. */
+export function hora12(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "a. m." : "p. m."}`;
+}
+
+/** La agenda en una línea: «Hoy, 9:30 a. m. · a más tardar 5:00 p. m.» o «Del Hoy al vie 6 nov». */
+export function textoCuando(ag: Agenda, hoy: string): string {
+  if (!ag.dia) return "";
+  if (ag.hasta && ag.hasta > ag.dia) {
+    const inicio = etiquetaDia(ag.dia, hoy);
+    return `${inicio === "Hoy" ? "Desde hoy" : inicio === "Mañana" ? "Desde mañana" : `Del ${inicio}`} al ${etiquetaDia(ag.hasta, hoy).toLowerCase()}`;
+  }
+  const hora = ag.hora ? `, ${hora12(ag.hora)}` : "";
+  const limite = ag.compromiso ? ` · a más tardar ${hora12(ag.compromiso)}` : "";
+  return `${etiquetaDia(ag.dia, hoy)}${hora}${limite}`;
+}
+
+/** «Servicio · Correctivo», «Tarea · Instalación», «Comercial». */
+export function textoTipo(tipo: ActivityKind, subtipo: string | null): string {
+  const sub = tipo === "servicio" ? TIPOS_SERVICIO.find((t) => t.id === subtipo)?.label : tipo === "tarea" ? subtipo : null;
+  return sub ? `${ETIQUETA_TIPO[tipo]} · ${sub}` : ETIQUETA_TIPO[tipo];
+}
+
 /** La corrección de nombre de un campo («talks» → Grupo Tox), si la hubo. */
 export function correccionDe(p: PropuestaActividad, campo: Correccion["campo"]): Correccion | null {
   return p.correcciones?.find((c) => c.campo === campo) ?? null;
@@ -294,10 +357,22 @@ export function nombreComparable(s: string | null | undefined): string {
 export function nombreParaAlta(p: PropuestaActividad, aj: Ajustes, clientes: Referencia[]): string | null {
   if (p.cliente) return null;
   const lugar = p.sucursal ? "" : lugarEfectivo(p, aj).trim();
-  const nombre = (lugar || p.textoCliente || "").trim().slice(0, 200);
+  const nombre = (p.clienteNuevo || lugar || p.textoCliente || "").trim().slice(0, 200);
   const clave = nombreComparable(nombre);
   if (clave.length < 2) return null;
   return clientes.some((c) => nombreComparable(c.nombre) === clave) ? null : nombre;
+}
+
+/**
+ * El cliente que se dará de alta al confirmar: el que propuso el API («Toks») o el que se eligió con
+ * «+ Agregar cliente», mientras no se elija otro. Nada se crea antes de confirmar. Una obra o un
+ * proyecto llevan el cliente de su proyecto.
+ */
+export function clientePendiente(p: PropuestaActividad, aj: Ajustes): string | null {
+  if (conProyecto(tipoEfectivo(p, aj))) return null;
+  if (aj.clienteNuevo !== undefined) return aj.clienteNuevo || null;
+  if (aj.clientId !== undefined) return null;
+  return p.clienteNuevo?.trim() || null;
 }
 
 /**
@@ -450,12 +525,14 @@ export function bloqueos(
     v2Role?: RoleKey | null;
     isSuperAdmin?: boolean;
     agenda?: Agenda;
+    /** Cliente que se da de alta al confirmar: cuenta como cliente del servicio. */
+    clienteNuevo?: string | null;
   },
 ): string[] {
   const out: string[] = [];
   const tipo = (payload.coreKind as ActivityKind | undefined) ?? p.tipo;
   if (!payload.responsableId) out.push("Elige a quién se le asigna.");
-  if (tipo === "servicio" && !payload.clientId) out.push("Un servicio necesita un cliente registrado.");
+  if (tipo === "servicio" && !payload.clientId && !ctx.clienteNuevo) out.push("Un servicio necesita un cliente registrado.");
   if (conProyecto(tipo) && !payload.projectId) out.push("Elige el proyecto.");
   if ((tipo === "servicio" || tipo === "obra") && !payload.fechaInicio) {
     out.push(tipo === "servicio" ? "Indica el día del servicio." : "Indica el día de la obra.");

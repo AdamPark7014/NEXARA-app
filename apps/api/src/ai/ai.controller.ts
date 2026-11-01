@@ -17,6 +17,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { AsistenteActividadesService } from './asistente/asistente-actividades.service.js';
+import { asistentePorCorreo } from './asistente/tipos-actividad.js';
 import { InterpretarInstruccionDto } from './asistente/dto/interpretar.dto.js';
 import { TranscriptorService } from './voz/transcriptor.service.js';
 import { extensionAudio } from './voz/transcriptor.js';
@@ -57,12 +58,12 @@ export class AiController {
 
   /**
    * ¿Hay IA configurada en el servidor? (la web oculta el asistente si no). «Asignar con IA»
-   * es solo del CEO: la matriz no basta porque los directores tienen `/api/**`.
+   * es del CEO y de David (`asistentePorCorreo`): la matriz no basta porque los directores tienen `/api/**`.
    */
   @Get('asistente/estado')
   @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS] })
   estadoAsistente(@CurrentUser() user: any) {
-    if (!isChainTopAuthority(user)) return { disponible: false };
+    if (!isChainTopAuthority(user) && !asistentePorCorreo(user?.email)) return { disponible: false };
     return this.asistente.estado();
   }
 
@@ -78,7 +79,7 @@ export class AiController {
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    if (!isChainTopAuthority(user)) throw new ForbiddenException('«Asignar con IA» es solo del CEO.');
+    if (!isChainTopAuthority(user) && !asistentePorCorreo(user?.email)) throw new ForbiddenException('«Asignar con IA» no está disponible para tu cuenta.');
     return this.asistente.interpretar(body.texto, user, companyId);
   }
 

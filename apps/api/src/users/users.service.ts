@@ -828,6 +828,10 @@ export class UsersService {
         .filter((p) => porId.has(p.id))
         .map((p) => {
           const u: any = porId.get(p.id);
+          const horario = horarioDePersona(
+            resolveAccessScheduleKey({ isActive: true, roleKey: u.roleKey, orgRoleKey: u.role?.orgRoleKey ?? null, tipoContrato: u.tipoContrato }),
+            u.horario ?? null,
+          );
           return {
             id: u.id,
             nombre: u.nombre,
@@ -841,10 +845,9 @@ export class UsersService {
              * `HH:MM` de entrada de su horario (el de retardos): la hora de inicio por omisión al
              * asignarle. 10:00 la oficina, 08:00 la cuadrilla; null = sin horario (10:00).
              */
-            horaEntrada: horarioDePersona(
-              resolveAccessScheduleKey({ isActive: true, roleKey: u.roleKey, orgRoleKey: u.role?.orgRoleKey ?? null, tipoContrato: u.tipoContrato }),
-              u.horario ?? null,
-            ).entrada,
+            horaEntrada: horario.entrada,
+            /** `HH:MM` de salida: el «final del día» de esa persona (17:00 la cuadrilla). */
+            horaSalida: horario.salida,
           };
         });
     } catch (error) {

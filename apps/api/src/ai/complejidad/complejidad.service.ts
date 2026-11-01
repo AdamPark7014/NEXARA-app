@@ -46,6 +46,14 @@ export class ComplejidadService {
     return { clave, ...(porTipo.get(clave) ?? SIN_TIEMPOS) };
   }
 
+  /** La mediana real de cada tipo («tarea:Instalación» → minutos), con la misma caché. */
+  async medianas(companyId: number | null): Promise<Map<string, number>> {
+    const porTipo = await this.porTipo(requireCompanyId(companyId));
+    const salida = new Map<string, number>();
+    for (const [clave, t] of porTipo) if (t.total.medianaMin) salida.set(clave, t.total.medianaMin);
+    return salida;
+  }
+
   /**
    * Sugerencia de la IA. Si no hay IA o falla, no hay sugerencia (la web lo calla): elegir la
    * complejidad nunca depende de que responda.

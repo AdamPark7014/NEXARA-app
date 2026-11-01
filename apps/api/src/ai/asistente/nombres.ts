@@ -346,7 +346,21 @@ export function puntajeAproximado(consulta: string, nombre: string, modo: 'norma
   return base;
 }
 
-export type Coincidencia<T> = { elegido: T | null; candidatos: T[] };
+/**
+ * «Bodega», «Plaza», «Bodega de»: hechos solo de palabras de giro no identifican a nadie (un cliente
+ * mal capturado se llama «Bodega de»; «recoge en la bodega» no es ese cliente ni Bodegas Luna).
+ */
+export function soloGiro(s: string | null | undefined): boolean {
+  const utiles = palabrasUtiles(s ?? '');
+  return utiles.length > 0 && utiles.every((w) => PALABRAS_GIRO.has(w));
+}
+
+export type Coincidencia<T> = {
+  elegido: T | null;
+  candidatos: T[];
+  /** Las que empatan en lo mejor con un parecido claro («Antonio» con dos Antonio): se decide después. */
+  empatados: T[];
+};
 
 /**
  * Elige solo cuando hay un único mejor resultado; si empatan, deja que la persona escoja.
@@ -360,19 +374,20 @@ export function buscar<T>(
   max = 5,
   opciones: { aproximado?: boolean; modo?: 'normal' | 'holgada' } = {},
 ): Coincidencia<T> {
-  if (!consulta || !normalizar(consulta)) return { elegido: null, candidatos: [] };
+  if (!consulta || !normalizar(consulta)) return { elegido: null, candidatos: [], empatados: [] };
   const medir = opciones.aproximado ? (n: string) => puntajeAproximado(consulta, n, opciones.modo) : (n: string) => puntaje(consulta, n);
   const puntuados = items
     .map((item) => ({ item, p: medir(nombreDe(item)) }))
     .filter((x) => x.p > 0)
     .sort((a, b) => b.p - a.p);
-  if (!puntuados.length) return { elegido: null, candidatos: [] };
+  if (!puntuados.length) return { elegido: null, candidatos: [], empatados: [] };
   const mejor = puntuados[0].p;
   const empatados = puntuados.filter((x) => x.p === mejor);
   const unica = empatados.length === 1 && (mejor >= 2 || (opciones.aproximado && mejor >= 1.5 && puntuados.filter((x) => x.p >= 1.5).length === 1));
   return {
     elegido: unica ? empatados[0].item : null,
     candidatos: puntuados.slice(0, max).map((x) => x.item),
+    empatados: !unica && mejor >= 1.5 ? empatados.map((x) => x.item) : [],
   };
 }
 
@@ -507,6 +522,8 @@ export function corregirEnTexto(texto: string, pares: Corregido['pares'], opcion
         n === 1 &&
         (k > 0 || opciones.primera) &&
         /^\p{Lu}/u.test(palabra) &&
+        // Tres letras se parecen a todo: «Hik» no es «Kwik».
+        normalizar(palabra).length >= 4 &&
         normalizar(palabra) !== normalizar(par.bien) &&
         (parecido(normalizar(palabra), par.mal[0], 'holgada') > 0 || parecido(normalizar(palabra), normalizar(par.bien), 'holgada') > 0);
       if (!iguales && !parecida) continue;
