@@ -23,8 +23,9 @@
       `import/all` solo plataforma; tope global de 256 MB (`MAX_REQUEST_BODY_BYTES`).
   - Servidor: Traefik v2.11.61 sin dashboard, HSTS global; SSH solo llave (`00-endurecer.conf`), fail2ban en 2222;
     `.env` en 600. Ninguna cuenta usa los hashes de demo publicados en el repo (revisado en la BD).
-  - **Decisiones de Adam pendientes:** `play.review@` (cuenta de revisión de tiendas) tiene rol **ceo** en
-    producción y su contraseña la conocen Apple/Google; reboot por kernel/docker; limpiar `authorized_keys`;
+  - **Decidido por Adam:** `play.review@` (revisión de tiendas, contraseña conocida por Apple/Google) se queda con rol
+    **ceo**. Su único vínculo en `user_companies` es la empresa 2 `nexara-demo`, no la real. No volver a proponerlo.
+  - **Decisiones de Adam pendientes:** reboot por kernel/docker; limpiar `authorized_keys`;
     ACROBAT publica `:8010` directo a internet (nadie lo usa: todo entra por Traefik) y go2rtc 1.9.7 (tras su propio
     forwardAuth); Redis sin contraseña (solo red interna).
   - **Siguiente trabajo grande:** Next 14 → 15.5.28 + React 19. Hoy no son alcanzables las fallas más graves (sin
