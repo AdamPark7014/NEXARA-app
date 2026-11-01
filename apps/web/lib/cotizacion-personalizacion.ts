@@ -31,12 +31,23 @@ export function textoVigenciaPorOmision(dias: number | null, vence: string): str
 export type Firmante = { nombre: string; cargo?: string };
 export type Moneda = "MXN" | "USD";
 
+/** Título propio de cada apartado fijo del PDF y la portada; vacío = el del diseño. */
+export type TitulosApartados = { objetivo: string; garantias: string; cotizacion: string };
+
+/** Igual que `TITULOS_POR_OMISION` en `apps/api/src/cotizaciones/alcance-por-omision.ts`. */
+export const TITULOS_POR_OMISION: TitulosApartados = {
+  objetivo: "Alcance ejecutivo",
+  garantias: "Póliza de garantías, exclusiones y vigencia comercial",
+  cotizacion: "Propuesta económica detallada",
+};
+
 export type OpcionesCotizacion = {
   secciones: SeccionesOpcionales;
   columnas: ColumnasOpcionales;
   carta: CartaPresentacion | null;
   tipoCambioNota: string;
   condiciones: CondicionesComerciales;
+  titulos: TitulosApartados;
   /** `null` = el autor de la cotización. */
   elaboro: Firmante | null;
   autorizo: (Firmante & { userId?: number | null }) | null;
@@ -64,6 +75,7 @@ export function opcionesPorOmision(): OpcionesCotizacion {
     carta: null,
     tipoCambioNota: "",
     condiciones: { formaPago: "", tiempoEntrega: "", garantia: "", vigencia: "" },
+    titulos: { objetivo: "", garantias: "", cotizacion: "" },
     elaboro: null,
     autorizo: null,
   };
@@ -88,6 +100,7 @@ export function opcionesDesdeApi(crudo: unknown): OpcionesCotizacion {
   const s = objeto(o["secciones"]);
   const c = objeto(o["columnas"]);
   const k = objeto(o["condiciones"]);
+  const t = objeto(o["titulos"]);
   const carta = objeto(o["carta"]);
   const autorizo = firmante(o["autorizo"]);
   const userId = Number(objeto(o["autorizo"])["userId"]);
@@ -119,6 +132,11 @@ export function opcionesDesdeApi(crudo: unknown): OpcionesCotizacion {
       tiempoEntrega: cadena(k["tiempoEntrega"]),
       garantia: cadena(k["garantia"]),
       vigencia: cadena(k["vigencia"]),
+    },
+    titulos: {
+      objetivo: cadena(t["objetivo"]),
+      garantias: cadena(t["garantias"]),
+      cotizacion: cadena(t["cotizacion"]),
     },
     elaboro: firmante(o["elaboro"]),
     autorizo: autorizo ? { ...autorizo, ...(Number.isInteger(userId) && userId > 0 ? { userId } : {}) } : null,
@@ -157,6 +175,11 @@ export function opcionesParaApi(o: OpcionesCotizacion): OpcionesCotizacion {
       tiempoEntrega: limpio(o.condiciones.tiempoEntrega),
       garantia: limpio(o.condiciones.garantia),
       vigencia: limpio(o.condiciones.vigencia),
+    },
+    titulos: {
+      objetivo: limpio(o.titulos.objetivo),
+      garantias: limpio(o.titulos.garantias),
+      cotizacion: limpio(o.titulos.cotizacion),
     },
     elaboro: firma(o.elaboro),
     autorizo: firma(o.autorizo),

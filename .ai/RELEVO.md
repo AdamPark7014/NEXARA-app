@@ -1,5 +1,16 @@
 # RELEVO
 
+- **01-11 ~14:00 (claude-code) — Portada de cotización: siete puntos por omisión y editables (corrección de Adam: «faltan todos los puntos»).**
+  - Causa: el índice solo listaba lo escrito en cada cotización, y las plantillas Suministro y Licenciamiento apagaban objetivo o alcance. Esos
+    interruptores no hacían nada en el PDF desde el 28-09, así que nadie los había elegido viendo su efecto.
+  - `cotizaciones/alcance-por-omision.ts`: `puntosPorOmision(partidas)` da los cuatro puntos del Canva cuando no hay bloques escritos. **Siempre son
+    cuatro, pero el título y el texto siguen a lo cotizado**: sin conducto dice «Beneficios de la solución», sin cámaras «los equipos», sin NVR/DVR
+    «Operación y continuidad». La especificación lista los 5 equipos de más peso con su modelo real. Cada punto es un apartado del PDF.
+  - Edición: en «Portada» del editor (`_editor/PuntosPortada.tsx`) se renombran, quitan o agregan; al tocar uno, los cuatro pasan a `alcanceBloques`
+    con su texto. El contenido se edita en «02». Títulos fijos en `opciones.titulos`. Quitar el último apaga el alcance para que no regresen solos.
+  - Póliza: título del Canva y recuadro «Vigencia comercial» con vigencia y moneda, que ya no salen en condiciones (sin póliza, sí).
+  - Datos: se encendieron objetivo y alcance en 8 borradores viejos y en las plantillas Suministro y Licenciamiento.
+
 - **01-11 ~13:00 (claude-code) — Clientes: Comercial primero, alta de último momento en todos lados y aviso de repetidos.**
   - Pedido de Adam: Comercial primero; crear un cliente de último momento al asignar con IA o sin ella y en cotizaciones;
     que detecte «BUAP» contra «Benemérita Universidad Autónoma de Puebla». Aprobó la muestra real del selector.

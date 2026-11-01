@@ -292,8 +292,9 @@ describe('plantillas base', () => {
 
   it('las secciones y columnas siguen el esquema de cada tipo de cotización', () => {
     const sec = (clave: string) => buscarPlantillaBase(clave)!.contenido.opciones.secciones;
-    expect(sec('suministro-equipo')).toMatchObject({ objetivo: true, alcance: false, planos: false });
-    expect(sec('licenciamiento')).toMatchObject({ objetivo: false, alcance: true, planos: false });
+    // Todas traen los puntos de la portada; los planos dependen de que el trabajo los tenga.
+    expect(sec('suministro-equipo')).toMatchObject({ objetivo: true, alcance: true, planos: false });
+    expect(sec('licenciamiento')).toMatchObject({ objetivo: true, alcance: true, planos: false });
     expect(sec('red-estructurada')).toMatchObject({ objetivo: true, alcance: true, planos: true });
     expect(sec('cctv')).toMatchObject({ objetivo: true, alcance: true, planos: true });
     expect(sec('control-acceso')).toMatchObject({ objetivo: true, alcance: true, planos: false });

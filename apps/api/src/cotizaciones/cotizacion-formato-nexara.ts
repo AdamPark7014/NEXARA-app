@@ -11,6 +11,7 @@ import { importeConLetra } from './importe-letra.js';
 import { factorMargen } from './cotizacion-totals.js';
 import { normalizarOpciones } from './personalizacion.js';
 import { normalizarBloques } from './alcance-bloques.js';
+import { puntosPorOmision, TITULOS_POR_OMISION } from './alcance-por-omision.js';
 import { objetivoDePropuesta, type Objetivo } from './objetivo-plantilla.js';
 import { ESTADO, estadoDesdeDb } from './estado-cotizacion.js';
 import { grupoDePartida, GRUPOS, incluyeInstalacion, type GrupoPartida } from './partidas-grupos.js';
@@ -135,8 +136,10 @@ export type FormatoNexara = {
   objetivo: Objetivo | null;
   /** Párrafo de entrada del alcance (`scope`) y bloques sin título. */
   alcanceIntro: string[];
-  /** Bloques con título del alcance. */
+  /** Bloques con título del alcance; sin ninguno escrito, los puntos por omisión. */
   alcance: Array<{ titulo: string; texto: string; vinetas: string[] }>;
+  /** Título de cada apartado fijo: el que escribió quien cotiza o el del diseño. */
+  titulos: { objetivo: string; garantias: string; cotizacion: string };
   /** false = «Planos» apagado en «Personalizar». */
   conPlanos: boolean;
   /** Renglones de la póliza; vacío = no se imprime (términos apagados o licitación: mandan las bases). */
@@ -245,6 +248,7 @@ function agrupable(item: Record<string, unknown>) {
     unitPrice: Number(item['unitPrice'] ?? 0) || 0,
     laborHours: Number(item['laborHours'] ?? 0) || 0,
     laborRate: Number(item['laborRate'] ?? 0) || 0,
+    model: texto(item['model']),
   };
 }
 
@@ -374,6 +378,12 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
         previo.vinetas = [...previo.vinetas, ...b.vinetas];
       } else alcanceIntro.push(...parrafosDe(textoBloque), ...b.vinetas);
     }
+    // Sin puntos escritos van los del diseño: la portada nunca sale sin ellos.
+    if (!alcance.length) {
+      for (const b of puntosPorOmision(agrupables(quote))) {
+        alcance.push({ titulo: b.titulo, texto: b.texto ?? '', vinetas: b.vinetas });
+      }
+    }
   }
   return {
     numero: String(quote.quoteNumber ?? '').trim() || 'COTIZACIÓN',
@@ -401,6 +411,11 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
       : null,
     alcanceIntro,
     alcance,
+    titulos: {
+      objetivo: opciones.titulos.objetivo || TITULOS_POR_OMISION.objetivo,
+      garantias: opciones.titulos.garantias || TITULOS_POR_OMISION.garantias,
+      cotizacion: opciones.titulos.cotizacion || TITULOS_POR_OMISION.cotizacion,
+    },
     conPlanos: opciones.secciones.planos,
     garantias: garantiasDe(garantia, terminos.modalidad, incluyeInstalacion(agrupables(quote)), opciones.secciones.terminos),
     partidas,
@@ -660,7 +675,7 @@ function recuadro(p: Lapiz, titulo: string, cuerpo: string) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Por encima de esto los bloques del alcance dejan de ser apartados y van juntos en uno solo. */
-const MAX_APARTADOS_DE_ALCANCE = 5;
+const MAX_APARTADOS_DE_ALCANCE = 8;
 
 type Apartado = {
   clave: 'objetivo' | 'alcance' | 'planos' | 'garantias' | 'cotizacion';
@@ -672,12 +687,12 @@ type Apartado = {
 /** Lo que trae esta cotización: lo vacío o apagado no se numera ni sale en el índice de la portada. */
 function apartadosDe(q: FormatoNexara, hayPlanos: boolean): Apartado[] {
   const lista: Array<Omit<Apartado, 'numero'>> = [];
-  if (q.objetivo || q.alcanceIntro.length) lista.push({ clave: 'objetivo', titulo: 'Alcance ejecutivo' });
+  if (q.objetivo || q.alcanceIntro.length) lista.push({ clave: 'objetivo', titulo: q.titulos.objetivo });
   if (q.alcance.length > MAX_APARTADOS_DE_ALCANCE) lista.push({ clave: 'alcance', titulo: 'Alcance técnico' });
   else q.alcance.forEach((bloque) => lista.push({ clave: 'alcance', titulo: bloque.titulo, bloque }));
   if (hayPlanos) lista.push({ clave: 'planos', titulo: 'Planos' });
-  if (q.garantias.length) lista.push({ clave: 'garantias', titulo: 'Póliza de garantías y exclusiones' });
-  lista.push({ clave: 'cotizacion', titulo: 'Propuesta económica detallada' });
+  if (q.garantias.length) lista.push({ clave: 'garantias', titulo: q.titulos.garantias });
+  lista.push({ clave: 'cotizacion', titulo: q.titulos.cotizacion });
   return lista.map((a, i) => ({ ...a, numero: i + 1 }));
 }
 
@@ -836,7 +851,7 @@ function apartadoDeGarantias(p: Lapiz, q: FormatoNexara, a: Apartado) {
   // La etiqueta en negritas es más ancha que al medirla con texto normal: se mide un poco más angosto.
   const altoDeVinetas = (lista: readonly string[]) =>
     lista.reduce((acc, v) => acc + partirTexto(p, v, AW - 24, CUERPO.size, F.texto).length * CUERPO.lh + 3, 0);
-  asegurar(p, 52 + 15 + altoDeVinetas(q.garantias) + 6 + 15 + 17 + altoDeVinetas(EXCLUSIONES_DE_GARANTIA));
+  asegurar(p, 70 + 15 + altoDeVinetas(q.garantias) + 6 + 15 + 17 + altoDeVinetas(EXCLUSIONES_DE_GARANTIA) + 66);
   tituloDeApartado(p, a);
   subtitulo(p, 'Alcance de la garantía');
   q.garantias.forEach((g) => vineta(p, g));
@@ -844,6 +859,8 @@ function apartadoDeGarantias(p: Lapiz, q: FormatoNexara, a: Apartado) {
   subtitulo(p, 'Exclusiones');
   parrafo(p, 'La garantía no aplica cuando la falla derive de:', { despues: 3 });
   EXCLUSIONES_DE_GARANTIA.forEach((e) => vineta(p, e));
+  p.y += 6;
+  recuadro(p, 'Vigencia comercial', `Vigencia: ${q.vigencia}\n${lineaDeMoneda(q)}`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1115,17 +1132,21 @@ const FIRMA_ANCHO = 96;
 const FIRMA_ALTO = FIRMA_ANCHO * (232 / 288);
 const ALTO_DE_FIRMA = 18 + FIRMA_ALTO - 8 + 6 + 12 + 12 + 12;
 
+function lineaDeMoneda(q: FormatoNexara): string {
+  return `Moneda: Precios en ${q.moneda === 'USD' ? 'dólares americanos (USD)' : 'pesos mexicanos (MXN)'}, ${
+    q.conIva ? `más IVA ${q.ivaPorciento}% desglosado.` : 'sin IVA (no incluye factura).'
+  }${q.tipoCambioNota ? ` ${q.tipoCambioNota}` : ''}`;
+}
+
 function condicionesDe(q: FormatoNexara): string[] {
   const lineas = [`Tiempo de entrega: ${q.entrega}`];
   if (q.condicionesPago) lineas.push(`Condiciones de pago: ${q.condicionesPago}`);
-  lineas.push(`Vigencia: ${q.vigencia}`);
-  // Con la póliza impresa la garantía ya está dicha ahí: aquí sería repetirla.
-  if (q.garantia && !q.garantias.length) lineas.push(`Garantía: ${q.garantia}`);
-  lineas.push(
-    `Moneda: Precios en ${q.moneda === 'USD' ? 'dólares americanos (USD)' : 'pesos mexicanos (MXN)'}, ${
-      q.conIva ? `más IVA ${q.ivaPorciento}% desglosado.` : 'sin IVA (no incluye factura).'
-    }${q.tipoCambioNota ? ` ${q.tipoCambioNota}` : ''}`,
-  );
+  // Con la póliza impresa, garantía, vigencia y moneda ya están dichas ahí: aquí sería repetirlas.
+  if (!q.garantias.length) {
+    lineas.push(`Vigencia: ${q.vigencia}`);
+    if (q.garantia) lineas.push(`Garantía: ${q.garantia}`);
+    lineas.push(lineaDeMoneda(q));
+  }
   return lineas;
 }
 

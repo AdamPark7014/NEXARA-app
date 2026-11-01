@@ -73,6 +73,7 @@ import {
   normalizarOpciones,
 } from './personalizacion.js';
 import { leerObjetivo, objetivoDePropuesta } from './objetivo-plantilla.js';
+import { puntosPorOmision } from './alcance-por-omision.js';
 import { normalizarBloques, plantillasDeCotizacion } from './alcance-bloques.js';
 import { ordenarPlanos } from './planos-cotizacion.js';
 import {
@@ -609,6 +610,8 @@ export class CotizacionesService {
         vigenciaDias,
       }),
       alcanceBloques: normalizarBloques(quote.alcanceBloques),
+      // Los puntos que el PDF y la portada llevan si no se escriben otros.
+      alcanceSugerido: puntosPorOmision(partidas),
       estado,
       estadoEtiqueta: ETIQUETA_ESTADO[estado],
       bloqueada: estaBloqueada(quote.status),
