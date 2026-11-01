@@ -32,6 +32,15 @@ describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
     expect(normalizeLegacyPath('/erp/quotes')).toBe('/erp/cotizaciones');
   });
 
+  it('Costos › Por proyecto no cae en el alias proyectos→projects', () => {
+    expect(normalizeLegacyPath('/erp/costos')).toBe('/erp/costos');
+    expect(normalizeLegacyPath('/erp/costos/tarifas')).toBe('/erp/costos/tarifas');
+    expect(normalizeLegacyPath('/erp/costos/por-proyecto')).toBe('/erp/costos/por-proyecto');
+    expect(normalizeLegacyPath('/erp/costos/proyectos')).toBe('/erp/costos/por-proyecto');
+    // Quien abrió el enlace roto tiene guardado el 308 a esta dirección: debe llegar sin ciclo.
+    expect(normalizeLegacyPath('/erp/costos/projects')).toBe('/erp/costos/por-proyecto');
+  });
+
   it('los proyectos de Core se quedan en /erp/proyectos', () => {
     // Sin el atajo, el alias `proyectos`→`projects` mandaba la página a `/erp/projects`
     // (308 del middleware a una ruta que no existe).

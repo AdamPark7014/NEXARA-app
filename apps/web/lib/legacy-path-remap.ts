@@ -155,6 +155,10 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/erp\/quotes(\/.*)?$/, '/erp/cotizaciones'],
   // Inglés → Proyectos Core (misma idea que quotes → cotizaciones).
   [/^\/erp\/projects(\/.*)?$/, '/erp/proyectos'],
+  // Costos › Por proyecto: el alias `proyectos`→`projects` la mandaba a una ruta que no existe, y ese
+  // 308 se queda guardado en el navegador. Por eso la página vive en `por-proyecto` y las dos
+  // direcciones viejas llegan ahí, sin riesgo de ciclo con el 308 guardado.
+  [/^\/erp\/costos\/(?:proyectos|projects)(\/.*)?$/, '/erp/costos/por-proyecto'],
   [/^\/erp\/multas(\/?.*)$/, '/erp/hr/fines'],
   [/^\/erp\/fines(\/?.*)$/, '/erp/hr/fines'],
   [/^\/erp\/sanciones(\/?.*)$/, '/erp/hr/fines'],

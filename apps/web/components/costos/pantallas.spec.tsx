@@ -8,9 +8,10 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import HorasSinProyecto from "@/app/(panels)/erp/costos/page";
-import CostosPorProyecto from "@/app/(panels)/erp/costos/proyectos/page";
+import CostosPorProyecto from "@/app/(panels)/erp/costos/por-proyecto/page";
 import TarifasDeCosto from "@/app/(panels)/erp/costos/tarifas/page";
 import SeccionCostos from "@/app/(panels)/erp/proyectos/_componentes/SeccionCostos";
+import { normalizeLegacyPath } from "@/lib/legacy-path-remap";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -292,6 +293,16 @@ describe("Por proyecto", () => {
     );
   });
 
+  it("ninguna pestaña de Costos la desvía el mapa de rutas heredadas", async () => {
+    servir(ACCESO_TODO, { incluye: "/costos/proyectos", body: LISTA });
+    render(<CostosPorProyecto />);
+    await screen.findByText("CCTV Bodega Norte");
+    for (const nombre of ["Horas sin proyecto", "Por proyecto", "Tarifas de costo"]) {
+      const href = screen.getByRole("link", { name: nombre }).getAttribute("href")!;
+      expect(normalizeLegacyPath(href)).toBe(href);
+    }
+  });
+
   it("solo CEO y contadora", async () => {
     servir(ACCESO_LIGA);
     render(<CostosPorProyecto />);
@@ -337,8 +348,17 @@ describe("Pestaña Costos del proyecto", () => {
     expect(screen.getByText("92 %")).toBeInTheDocument();
     expect(screen.getByText(/Instalador · 312 h/)).toBeInTheDocument();
     expect(screen.getByText(/2 de 10 partidas no traen costo/)).toBeInTheDocument();
-    expect(screen.getByText(/1 sesiones valen cero/)).toBeInTheDocument();
-    expect(screen.getByText(/3 relojes los cerró el sistema/)).toBeInTheDocument();
+    expect(screen.getByText(/1 sesión vale cero/)).toBeInTheDocument();
+    expect(screen.getByText(/3 relojes los cerró el sistema: cuentan a lo mucho una jornada/)).toBeInTheDocument();
+  });
+
+  it("los avisos concuerdan cuando es uno solo", async () => {
+    const avisos = { ...DETALLE.avisos, partidasSinCosto: 1, sesionesRecortadas: 1, salidasSinCosto: 1 };
+    servir({ incluye: "/costos/proyectos/9", body: { ...DETALLE, avisos } });
+    render(<SeccionCostos proyecto={PROYECTO} token="jwt" />);
+    expect(await screen.findByText(/1 de 10 partidas no trae costo/)).toBeInTheDocument();
+    expect(screen.getByText(/1 reloj lo cerró el sistema: cuenta a lo mucho una jornada/)).toBeInTheDocument();
+    expect(screen.getByText(/1 salida de almacén no trae costo: vale cero/)).toBeInTheDocument();
   });
 
   it("sin detalle no enseña el importe por categoría", async () => {

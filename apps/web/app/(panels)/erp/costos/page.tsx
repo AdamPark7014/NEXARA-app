@@ -99,7 +99,7 @@ export default function HorasSinProyecto() {
       const r = await sugerirConIa(token, periodo);
       setAviso(
         r.consultadas
-          ? `La IA revisó ${r.consultadas} actividades y sugirió ${r.sugeridas}. Tú decides en cada una.`
+          ? `La IA revisó ${r.consultadas === 1 ? "1 actividad" : `${r.consultadas} actividades`} y sugirió ${r.sugeridas}. Tú decides en cada una.`
           : "Ya no quedan actividades por revisar con IA en este periodo.",
       );
       await cargar();
