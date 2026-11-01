@@ -16,7 +16,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '../common/files/interceptores-subida.js';
 import type { Response } from 'express';
 import * as path from 'path';
 import * as fs from 'fs/promises';

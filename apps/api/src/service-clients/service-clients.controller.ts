@@ -14,7 +14,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '../common/files/interceptores-subida.js';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';

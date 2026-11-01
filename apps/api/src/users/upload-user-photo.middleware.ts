@@ -1,6 +1,7 @@
 
 import multer from 'multer';
 import path from 'path';
+import { LIMITES_CAMPOS_SUBIDA } from '../common/files/interceptores-subida.js';
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
 
@@ -39,7 +40,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: Number(process.env['MAX_FILE_SIZE'] || 5_242_880) },
+  limits: { ...LIMITES_CAMPOS_SUBIDA, fileSize: Number(process.env['MAX_FILE_SIZE'] || 5_242_880) },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED_MIME.has(String(file.mimetype || '').toLowerCase())) {
       cb(new Error('Solo se permiten imágenes JPG, PNG o WEBP'));

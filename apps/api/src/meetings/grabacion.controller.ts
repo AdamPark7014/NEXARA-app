@@ -14,7 +14,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '../common/files/interceptores-subida.js';
 import type { Response } from 'express';
 import { RbacGuard } from '../common/rbac.guard.js';
 import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';

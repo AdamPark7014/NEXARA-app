@@ -13,7 +13,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '../common/files/interceptores-subida.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';

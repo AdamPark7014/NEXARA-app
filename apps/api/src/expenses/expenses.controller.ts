@@ -15,7 +15,7 @@ import {
   UseInterceptors,
   BadRequestException,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '../common/files/interceptores-subida.js';
 import { ExpensesService } from './expenses.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateExpenseDto } from './dto/create-expense.dto.js';

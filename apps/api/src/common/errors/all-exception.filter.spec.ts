@@ -9,7 +9,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { APP_FILTER, NestFactory } from '@nestjs/core';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '../files/interceptores-subida.js';
 import { MulterError } from 'multer';
 import { AllExceptionsFilter, mapMulterError, mapPrismaError } from './all-exception.filter.js';
 

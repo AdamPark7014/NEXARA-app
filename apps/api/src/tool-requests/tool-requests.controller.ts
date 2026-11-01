@@ -15,7 +15,7 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { FileFieldsInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FilesInterceptor } from '../common/files/interceptores-subida.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CurrentUser } from '../common/current-user.decorator.js';

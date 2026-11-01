@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Patch, Post, Put, UseGuards, UploadedFiles, UseInterceptors, BadRequestException, Query } from '@nestjs/common';
 import { Param, ParseIntPipe, Res } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '../common/files/interceptores-subida.js';
 import { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { BranchPortalGuard } from './branch-portal.guard.js';

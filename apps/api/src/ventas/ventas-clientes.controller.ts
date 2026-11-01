@@ -13,7 +13,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '../common/files/interceptores-subida.js';
 import { AuthGuard } from '@nestjs/passport';
 import { VentasService } from './ventas.service.js';
 import { CreateSalesClientDto } from './dto/create-sales-client.dto.js';

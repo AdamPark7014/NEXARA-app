@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Q
 import { ClientTicketStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { Response } from 'express';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '../common/files/interceptores-subida.js';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';

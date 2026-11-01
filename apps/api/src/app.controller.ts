@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { AppService } from './app.service.js';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from './common/files/interceptores-subida.js';
 import { RBAC, RbacGuard } from './common/rbac.guard.js';
 import { PERMISSIONS } from './common/permissions.js';
 

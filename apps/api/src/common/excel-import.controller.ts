@@ -1,7 +1,7 @@
 import {
   Controller, Post, UploadedFile, UseInterceptors, BadRequestException, Param, UseGuards,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from './files/interceptores-subida.js';
 import { ExcelImportService } from './excel-import.service.js';
 import { RBAC, RbacGuard } from './rbac.guard.js';
 import { PERMISSIONS } from './permissions.js';

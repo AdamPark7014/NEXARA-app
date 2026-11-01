@@ -13,7 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '../../common/files/interceptores-subida.js';
 import type { Response } from 'express';
 import { diskStorage } from 'multer';
 import { RBAC, RbacGuard } from '../../common/rbac.guard.js';
