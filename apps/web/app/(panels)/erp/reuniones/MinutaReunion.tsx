@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
@@ -119,8 +120,19 @@ export default function MinutaReunion({
     }
   };
 
-  const enviar = async () => {
-    if (!window.confirm("¿Enviar el PDF de la minuta por correo a todos los convocados?")) return;
+  const [confirmar, setConfirmar] = useState<ConfirmState | null>(null);
+  const dialogoConfirmar = <ConfirmDialog state={confirmar} onClose={() => setConfirmar(null)} />;
+
+  const enviar = () =>
+    setConfirmar({
+      title: "Enviar la minuta",
+      message: "¿Enviar el PDF de la minuta por correo a todos los convocados?",
+      confirmLabel: "Enviar",
+      danger: false,
+      fn: enviarYa,
+    });
+
+  const enviarYa = async () => {
     setEnviando(true);
     try {
       const r = await enviarMinuta(token, meetingId);
@@ -141,8 +153,15 @@ export default function MinutaReunion({
     }
   };
 
-  const borrar = async () => {
-    if (!window.confirm("¿Borrar la grabación, su transcripción, las notas y la minuta? Los acuerdos ya guardados se quedan.")) return;
+  const borrar = () =>
+    setConfirmar({
+      title: "Borrar la grabación",
+      message: "¿Borrar la grabación, su transcripción, las notas y la minuta? Los acuerdos ya guardados se quedan.",
+      confirmLabel: "Borrar",
+      fn: borrarYa,
+    });
+
+  const borrarYa = async () => {
     try {
       await borrarGrabacion(token, meetingId);
       await onCambio();
@@ -212,6 +231,7 @@ export default function MinutaReunion({
   if (g.estado === "ERROR" || !g.minuta) {
     return (
       <div className={s.minuta}>
+        {dialogoConfirmar}
         <InlineAlert variant="danger" message={g.error || "No se pudo escribir la minuta."} />
         <div className={s.minutaActions}>
           <Button variant="primary" onClick={() => void regenerar()}>
@@ -231,6 +251,7 @@ export default function MinutaReunion({
 
   return (
     <div className={s.minuta}>
+      {dialogoConfirmar}
       <div className={s.minutaHead}>
         <div>
           <p className={s.minutaTitle}>Minuta con IA</p>

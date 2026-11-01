@@ -1,5 +1,6 @@
 "use client";
 
+import Simbolo from "./Simbolo";
 import { ButtonHTMLAttributes, forwardRef, ReactNode } from "react";
 import { Button as BaseButton, type ButtonSize, type ButtonVariant } from "@/components/base/Button";
 
@@ -80,8 +81,8 @@ const Button = forwardRef<HTMLButtonElement, Props>(function Button(
       size={TAMANO[size] ?? "md"}
       icon={iconOnly && !(iconLeft && iconRight)}
       loading={Boolean(loading)}
-      iconStart={iconLeft}
-      iconEnd={iconRight}
+      iconStart={iconLeft ? <Simbolo valor={iconLeft} /> : undefined}
+      iconEnd={iconRight ? <Simbolo valor={iconRight} /> : undefined}
       fullWidth={fullWidth}
       aria-label={resolvedLabel}
       title={resolvedTitle}

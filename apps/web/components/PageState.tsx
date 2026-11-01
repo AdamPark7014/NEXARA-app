@@ -20,6 +20,7 @@
  *   if (items.length === 0) return <EmptyState icon="📋" title="Sin datos" />;
  */
 
+import Simbolo from "@/components/ui/Simbolo";
 import { type CSSProperties, type ReactNode } from "react";
 
 // ─── LOADING ────────────────────────────────────────────────────────────────
@@ -108,7 +109,7 @@ export function EmptyState({ icon = "📭", title, description, actionLabel, onA
         color: "var(--text-secondary, #6b7280)",
       }}
     >
-      <div style={{ fontSize: 38, marginBottom: 8, opacity: 0.85 }}>{icon}</div>
+      <div style={{ fontSize: 38, marginBottom: 8, color: "var(--ui-fg-3)" }}><Simbolo valor={icon} size={36} /></div>
       <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--text-primary, #111)" }}>{title}</h3>
       {description && (
         <p style={{ margin: "6px 0 0", fontSize: 13, maxWidth: 420, lineHeight: 1.5 }}>{description}</p>
@@ -161,7 +162,7 @@ export function ErrorState({ error, title = "Algo salió mal", onRetry }: ErrorS
         color: "var(--text-primary, #111)",
       }}
     >
-      <div style={{ fontSize: 32, marginBottom: 6 }}>⚠️</div>
+      <div style={{ marginBottom: 6, color: "var(--ui-danger)" }}><Simbolo valor="⚠" size={32} /></div>
       <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{title}</h3>
       <p style={{ margin: "6px 0 0", fontSize: 13, maxWidth: 480, color: "var(--text-secondary, #6b7280)" }}>{message}</p>
       {onRetry && (

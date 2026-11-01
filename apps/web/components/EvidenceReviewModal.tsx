@@ -1,4 +1,5 @@
 "use client";
+import Simbolo from "@/components/ui/Simbolo";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import { EVIDENCE_STEP_ORDER, evidenceStepLabel } from "@/lib/evidence-lock";
 import React, { useEffect, useState } from 'react';
@@ -147,7 +148,7 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
         <div className={styles.body}>
           {error && (
             <div className={styles.errorAlert}>
-              ❌ {error}
+              {error}
             </div>
           )}
 
@@ -160,14 +161,14 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
                 className={`${styles.actionButton} ${styles.approveAction}`}
                 onClick={() => setAction('approve')}
               >
-                <span className={styles.emoji}>✅</span>
+                <span className={styles.emoji}><Simbolo valor="✅" /></span>
                 Aprobar Evidencias
               </button>
               <button
                 className={`${styles.actionButton} ${styles.rejectAction}`}
                 onClick={() => setAction('reject')}
               >
-                <span className={styles.emoji}>❌</span>
+                <span className={styles.emoji}><Simbolo valor="❌" /></span>
                 Rechazar Evidencias
               </button>
             </div>
@@ -176,7 +177,7 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
           {action === 'approve' && (
             <div className={styles.contentGrid}>
               <div className={`${styles.actionPanel} ${styles.approvePanel}`}>
-                <h3 className={`${styles.panelTitle} ${styles.approveTitle}`}>✅ Aprobar Evidencias</h3>
+                <h3 className={`${styles.panelTitle} ${styles.approveTitle}`}>Aprobar evidencias</h3>
                 <p className={styles.panelDescription}>
                   Las evidencias se marcarán como aprobadas y la actividad cambiará a estado &quot;Aprobada&quot;.
                 </p>
@@ -201,7 +202,7 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
                   onClick={handleSubmit}
                   disabled={loading}
                 >
-                  {loading ? '⏳ Aprobando...' : 'Confirmar Aprobación'}
+                  {loading ? 'Aprobando…' : 'Confirmar Aprobación'}
                 </button>
                 <button
                   className="button-secondary"
@@ -217,7 +218,7 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
           {action === 'reject' && (
             <div className={styles.contentGrid}>
               <div className={`${styles.actionPanel} ${styles.rejectPanel}`}>
-                <h3 className={`${styles.panelTitle} ${styles.rejectTitle}`}>❌ Rechazar Evidencias</h3>
+                <h3 className={`${styles.panelTitle} ${styles.rejectTitle}`}>Rechazar evidencias</h3>
                 <p className={styles.panelDescription}>
                   Selecciona uno o varios pasos a corregir, o indica que el técnico debe rehacer todo el flujo desde cero.
                 </p>
@@ -277,7 +278,7 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
                   onClick={handleSubmit}
                   disabled={loading || !notes.trim() || (!resetFullFlow && rejectedSteps.length === 0)}
                 >
-                  {loading ? '⏳ Rechazando...' : 'Confirmar Rechazo'}
+                  {loading ? 'Rechazando…' : 'Confirmar Rechazo'}
                 </button>
                 <button
                   className="button-secondary"

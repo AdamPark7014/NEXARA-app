@@ -1,5 +1,6 @@
 "use client";
 
+import PedirTexto, { type PedirTextoEstado } from "@/components/ui/PedirTexto";
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import KeyboardReturnRoundedIcon from "@mui/icons-material/KeyboardReturnRounded";
@@ -58,12 +59,19 @@ function CeldaImagen({
   etiqueta: string;
   onUrl: (u: string | null) => void;
 }) {
-  const pedir = () => {
-    const nueva = window.prompt("URL de la imagen del producto (vacío para quitarla)", url ?? "");
-    if (nueva === null) return;
-    onUrl(nueva.trim() || null);
-  };
+  const [pidiendo, setPidiendo] = useState<PedirTextoEstado | null>(null);
+  const pedir = () =>
+    setPidiendo({
+      titulo: "Imagen del producto",
+      etiqueta: "URL de la imagen",
+      descripcion: "Déjala vacía para quitarla.",
+      confirmar: "Guardar",
+      inicial: url ?? "",
+      fn: (nueva) => onUrl(nueva || null),
+    });
   return (
+    <>
+    <PedirTexto estado={pidiendo} onCerrar={() => setPidiendo(null)} />
     <button
       type="button"
       className={styles.celdaImagen}
@@ -79,6 +87,7 @@ function CeldaImagen({
         <span aria-hidden>+</span>
       )}
     </button>
+    </>
   );
 }
 

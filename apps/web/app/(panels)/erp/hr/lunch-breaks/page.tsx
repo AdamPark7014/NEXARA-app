@@ -5,6 +5,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import dynamic from "next/dynamic";
 import PageHeader from "@/components/ui/PageHeader";
+import Simbolo from "@/components/ui/Simbolo";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import MetricStrip from "@/components/ui/MetricStrip";
@@ -150,7 +151,7 @@ function BreakStatusHero({ todayBreak }: { todayBreak: LunchBreak | null }) {
         flexWrap: "wrap",
       }}
     >
-      <span aria-hidden="true" style={{ fontSize: 40 }}>{icon}</span>
+      <span aria-hidden="true" style={{ fontSize: 40, lineHeight: 1 }}><Simbolo valor={icon} size={38} /></span>
 
       <div style={{ flex: 1, minWidth: 180 }}>
         <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 2 }}>Hoy</div>
@@ -232,7 +233,7 @@ function MyHistoryList({ items }: { items: LunchBreak[] }) {
                 }}
               >
                 <span aria-hidden="true" style={{ fontSize: 20 }}>
-                  {b.status === "COMPLETED" ? (isLate ? "⚠️" : "✅") : "⏳"}
+                  <Simbolo valor={b.status === "COMPLETED" ? (isLate ? "⚠" : "✅") : "⏳"} />
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600 }}>{fmtDate(b.date)}</div>

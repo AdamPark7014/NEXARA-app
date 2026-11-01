@@ -12,6 +12,7 @@
  * El último item se renderiza sin link (página actual).
  */
 
+import Simbolo from "@/components/ui/Simbolo";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -44,7 +45,7 @@ export default function Breadcrumbs({ items }: BreadcrumbsProps) {
           const isLast = i === items.length - 1;
           const content = (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              {item.icon}
+              <Simbolo valor={item.icon} />
               {item.label}
             </span>
           );

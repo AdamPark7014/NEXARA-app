@@ -810,9 +810,13 @@ export default function OrgChartView({ canEditOrg, showHrRail = false }: OrgChar
                   const desde = porId.get(enlace.de);
                   const rotulo =
                     enlace.tipo === "lateral"
-                      ? `${hasta?.nombre} va al lado de ${desde?.nombre}`
+                      ? hasta && desde
+                        ? `${hasta.nombre} va al lado de ${desde.nombre}`
+                        : null
                       : enlace.tipo === "sinJefe"
-                        ? `${hasta?.nombre} no tiene jefe asignado`
+                        ? hasta
+                          ? `${hasta.nombre} no tiene jefe asignado`
+                          : null
                         : null;
                   return (
                     <path

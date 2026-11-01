@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import ConfirmDialog from "./ConfirmDialog";
+import { useEffect, useId, useRef, type ReactNode, useState } from "react";
 import styles from "./overlay.module.scss";
 import { useScrollLock } from "./useScrollLock";
 
@@ -54,10 +55,21 @@ export default function Modal({
 
   useScrollLock(open);
 
+  const [avisoCierre, setAvisoCierre] = useState(false);
+  const avisoCierreRef = useRef(false);
+  avisoCierreRef.current = avisoCierre;
+  // Al abrirse otra vez no arrastra el aviso de la vez anterior.
+  useEffect(() => {
+    if (!open) setAvisoCierre(false);
+  }, [open]);
+
   const requestClose = () => {
     if (dirty) {
-      const ok = onDirtyClose ? onDirtyClose() : window.confirm("Hay cambios sin guardar, ¿cerrar de todos modos?");
-      if (!ok) return;
+      if (!onDirtyClose) {
+        setAvisoCierre(true);
+        return;
+      }
+      if (!onDirtyClose()) return;
     }
     onClose();
   };
@@ -73,6 +85,8 @@ export default function Modal({
     (firstInBody ?? panel?.querySelector<HTMLElement>(FOCUSABLE) ?? panel)?.focus();
 
     const onKey = (e: KeyboardEvent) => {
+      // Con el aviso de cierre abierto, el teclado es suyo.
+      if (avisoCierreRef.current) return;
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
@@ -145,6 +159,19 @@ export default function Modal({
         </div>
         {footer ? <div className={styles.footer}>{footer}</div> : null}
       </div>
+      <ConfirmDialog
+        state={
+          avisoCierre
+            ? {
+                title: "Cambios sin guardar",
+                message: "Hay cambios sin guardar, ¿cerrar de todos modos?",
+                confirmLabel: "Cerrar sin guardar",
+                fn: () => onClose(),
+              }
+            : null
+        }
+        onClose={() => setAvisoCierre(false)}
+      />
     </div>
   );
 }

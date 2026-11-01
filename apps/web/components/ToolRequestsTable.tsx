@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import PedirTexto, { type PedirTextoEstado } from "@/components/ui/PedirTexto";
 import HandymanOutlined from "@mui/icons-material/HandymanOutlined";
 import HourglassBottomOutlined from "@mui/icons-material/HourglassBottomOutlined";
 import PersonOutlineOutlined from "@mui/icons-material/PersonOutlineOutlined";
@@ -123,17 +124,26 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
     }
   };
 
-  const rechazar = (r: ToolRequestRow) => {
-    const adminNotes = window.prompt("Motivo del rechazo (obligatorio):");
-    if (!adminNotes?.trim()) return;
-    void runAction(r.id, () => rejectToolRequest(token, r.id, adminNotes.trim()));
-  };
+  const [pedir, setPedir] = useState<PedirTextoEstado | null>(null);
 
-  const recibir = (r: ToolRequestRow) => {
-    const damageDescription =
-      window.prompt("Descripción de daño (opcional, vacío si está en buen estado):") ?? "";
-    void runAction(r.id, () => returnToolRequest(token, r.id, damageDescription));
-  };
+  const rechazar = (r: ToolRequestRow) =>
+    setPedir({
+      titulo: `Rechazar ${r.toolName}`,
+      etiqueta: "Motivo del rechazo",
+      confirmar: "Rechazar",
+      minimo: 1,
+      peligro: true,
+      fn: (adminNotes) => void runAction(r.id, () => rejectToolRequest(token, r.id, adminNotes)),
+    });
+
+  const recibir = (r: ToolRequestRow) =>
+    setPedir({
+      titulo: `Recibir ${r.toolName}`,
+      descripcion: "Déjalo vacío si llegó en buen estado.",
+      etiqueta: "Descripción del daño",
+      confirmar: "Recibir",
+      fn: (damageDescription) => void runAction(r.id, () => returnToolRequest(token, r.id, damageDescription)),
+    });
 
   /** Lo que queda tras la búsqueda: sobre esto cuentan los chips de estado. */
   const buscadas = useMemo(() => {
@@ -454,6 +464,7 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
       </Card>
 
       <FinesTable tipo="herramienta" showUser={true} />
+      <PedirTexto estado={pedir} onCerrar={() => setPedir(null)} />
     </div>
   );
 };

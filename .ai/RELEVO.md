@@ -1,5 +1,20 @@
 # RELEVO
 
+- **01-11 ~13:15 (claude-code) — Pasada «premium» de Core, aprobada por Adam con antes y después.** Auditoría de las 44 rutas de `/erp`.
+  - `components/ui/Simbolo.tsx`: convierte a ícono de línea el emoji que un módulo le pasa al kit. Lo usan `EmptyState`, `Alert`, `Badge`,
+    `KpiCard`/stat, `Button`, `PageState`, `FilterToolbar`, `Breadcrumbs`, `RecordPage`, tarjetas de módulo y los accesos de Hoy. **Código nuevo:
+    pasa el ícono directo.** Quedan emojis a propósito en reacciones del chat y en el banner de cumpleaños.
+  - `components/ui/PedirTexto.tsx` sustituye a `window.prompt`: dice qué falta y conserva el texto si la acción falla. Antes, un daño de menos de
+    5 letras se descartaba sin aviso. `Modal` y la minuta usan `ConfirmDialog`. Ya no queda ningún `window.confirm` ni `window.prompt` en el panel.
+  - Tokens (`app/ui-tokens.scss`): `--success/--warning/--danger` y `--state-*` toman los `--ui-*`, y la homologación aplica también a
+    `body:has(.nx-app-shell)`: los modales con `createPortal` a `body` salían con Manrope/Segoe y el azul viejo.
+  - Chat: avatares planos en vez de degradados de arcoíris, fuente corregida (la variable se referenciaba a sí misma) y esqueletos.
+  - Hallazgos que NO se tocaron: 38 archivos de más de 800 líneas (`ActivityEvidenceFlow` 3,364); `propuesta-tecnica-pdf.ts` es código muerto;
+    `/erp/hr`, `/erp/procurement`, `/erp/settings` y `/erp/users` siguen con los alias viejos, pero están fuera del menú de Core.
+  - IA medida el 01-11 (puerta, 20-10 a 01-11): sin errores y dentro de objetivo en `asistente-actividades`, `chat-asistente`, `complejidad` (260
+    llamadas) y `reunion-minuta`. No hizo falta cambiar ningún modelo.
+  - Solo probado con pruebas y en código: no se vio con sesión en el navegador. Falta que Adam pase por chat, reuniones y herramientas.
+
 - **01-11 ~15:45 (claude-code) — Libro de costos: Fases 0 y 1 verificadas en producción (`126d2540` y `8f4d81d8`, desplegados y migrados).**
   - Primera carga: 345 renglones de mano de obra y 1,396 h efectivas (de 1,473 h de reloj en bruto, ya con el tope a los cierres
     automáticos y los relojes encimados repartidos). Repetirla da 0 nuevos, 0 cambiados y 0 quitados.

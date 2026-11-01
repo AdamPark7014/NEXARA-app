@@ -19,6 +19,7 @@
  * acción principal a la derecha.
  */
 
+import Simbolo from "@/components/ui/Simbolo";
 import type { CSSProperties, ReactNode } from "react";
 
 export type FilterSelectOption = { value: string; label: string };
@@ -213,7 +214,7 @@ export default function FilterToolbar({
             onChange={(e) => t.onChange(e.target.checked)}
             style={{ accentColor: "var(--primary)", width: 13, height: 13, margin: 0 }}
           />
-          {t.icon && <span aria-hidden="true">{t.icon}</span>}
+          {t.icon && <span aria-hidden="true"><Simbolo valor={t.icon} /></span>}
           <span>{t.label}</span>
         </label>
       ))}

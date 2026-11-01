@@ -1,5 +1,6 @@
 "use client";
 
+import Simbolo from "@/components/ui/Simbolo";
 import Link from "next/link";
 import { isValidElement, type CSSProperties, type ReactNode } from "react";
 import type { PageHeadCrumb } from "./PageHead";
@@ -201,12 +202,12 @@ export function RecordPage({
                   ? metaLista.map((m, i) =>
                       m.href ? (
                         <Link key={i} href={m.href}>
-                          {m.icon}
+                          <Simbolo valor={m.icon} />
                           {m.label}
                         </Link>
                       ) : (
                         <span key={i}>
-                          {m.icon}
+                          <Simbolo valor={m.icon} />
                           {m.label}
                         </span>
                       ),

@@ -374,10 +374,10 @@ const ActivityEvidenceFlow = () => {
 
   const correctionSuccessMessage = (saved: Record<string, unknown>, fallback: string) => {
     if (saved.status === 'COMPLETED') {
-      return '🎉 ¡Corrección enviada! Tu evidencia será revisada nuevamente.';
+      return '¡Corrección enviada! Tu evidencia será revisada nuevamente.';
     }
     if (typeof saved.status === 'string') {
-      return `✅ Paso corregido. Siguiente: ${evidenceStepLabel(saved.status, flowData?.coreKind)}`;
+      return `Paso corregido. Siguiente: ${evidenceStepLabel(saved.status, flowData?.coreKind)}`;
     }
     return fallback;
   };
@@ -946,8 +946,8 @@ const ActivityEvidenceFlow = () => {
         });
         setSuccessMsg(
           isCorrection
-            ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
-            : `✅ ${textos.inicio.guardado} Siguiente: Tomar evidencias (${photoRequired} fotos)`,
+            ? correctionSuccessMessage(updated, 'Corrección enviada.')
+            : `${textos.inicio.guardado} Siguiente: Tomar evidencias (${photoRequired} fotos)`,
         );
         setCameraActive(false);
         return true;
@@ -1133,7 +1133,7 @@ const ActivityEvidenceFlow = () => {
         while (alineadas.length < previas) alineadas.push(null);
         return [...alineadas, punto ? { ...punto, capturedAt: photo.capturedAt } : null];
       });
-      setSuccessMsg(`📷 Foto agregada (${updatedPhotos.length} de ${photoRequired})`);
+      setSuccessMsg(`Foto agregada (${updatedPhotos.length} de ${photoRequired})`);
       return true;
     } catch (err) {
       setError(mensajeFotoNoGuardada(err, 'No se pudo guardar la foto. Intenta de nuevo.'));
@@ -1158,7 +1158,7 @@ const ActivityEvidenceFlow = () => {
         capturedAt: photo.capturedAt,
       });
       setCamposEvidencia(lista);
-      setSuccessMsg(`📷 ${MOMENTO_LABEL[campoTarget.momento]} guardada`);
+      setSuccessMsg(`${MOMENTO_LABEL[campoTarget.momento]} guardada`);
       setCampoTarget(null);
       return true;
     } catch (err) {
@@ -1348,10 +1348,10 @@ const ActivityEvidenceFlow = () => {
         syncFlowFromSaved(updated);
         setSuccessMsg(
           isCorrection
-            ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
+            ? correctionSuccessMessage(updated, 'Corrección enviada.')
             : needsServiceSheetPdf
-              ? '✅ Evidencias guardadas. Siguiente: Carga hoja de servicio PDF'
-              : '✅ Evidencias guardadas. Siguiente: Completa el formulario',
+              ? 'Evidencias guardadas. Siguiente: Carga hoja de servicio PDF'
+              : 'Evidencias guardadas. Siguiente: Completa el formulario',
         );
       } else {
         const errorData = await res.json();
@@ -1411,8 +1411,8 @@ const ActivityEvidenceFlow = () => {
           syncFlowFromSaved(updated, { serviceSheetPdfUrl: pdfUrl });
           setSuccessMsg(
             isCorrection
-              ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
-              : '✅ PDF guardado. Siguiente: Completa la plantilla interna',
+              ? correctionSuccessMessage(updated, 'Corrección enviada.')
+              : 'PDF guardado. Siguiente: Completa la plantilla interna',
           );
         } else {
           const errorData = await res.json();
@@ -1454,8 +1454,8 @@ const ActivityEvidenceFlow = () => {
         syncFlowFromSaved(updated, { serviceSheetData: data });
         setSuccessMsg(
           isCorrection
-            ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
-            : `✅ Plantilla completada. Siguiente: ${textos.cierre.siguiente}`,
+            ? correctionSuccessMessage(updated, 'Corrección enviada.')
+            : `Plantilla completada. Siguiente: ${textos.cierre.siguiente}`,
         );
       } else {
         const errorData = await res.json();
@@ -1593,11 +1593,11 @@ const ActivityEvidenceFlow = () => {
         if (saved.status === 'COMPLETED') {
           setSuccessMsg(
             isCorrection
-              ? '🎉 ¡Corrección enviada exitosamente! Tu evidencia será revisada nuevamente.'
-              : '🎉 ¡Asignación completada! Queda en revisión administrativa.',
+              ? '¡Corrección enviada exitosamente! Tu evidencia será revisada nuevamente.'
+              : '¡Asignación completada! Queda en revisión administrativa.',
           );
         } else if (isCorrection) {
-          setSuccessMsg(correctionSuccessMessage(saved, '✅ Paso corregido.'));
+          setSuccessMsg(correctionSuccessMessage(saved, 'Paso corregido.'));
         }
         setCameraActive(false);
         void geocerca.recargar();

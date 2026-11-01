@@ -7,6 +7,7 @@ import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import { useUser } from './UserContext';
+import PedirTexto, { type PedirTextoEstado } from '@/components/ui/PedirTexto';
 import styles from './ToolMyKitPanel.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
@@ -125,11 +126,20 @@ const ToolMyKitPanel: React.FC = () => {
     };
   }, [user?.token, fetchKit]);
 
-  const reportIncident = async (assignmentId: number) => {
-    if (!user?.token) return;
+  const [pedir, setPedir] = useState<PedirTextoEstado | null>(null);
 
-    const description = window.prompt('Describe el daño o incidente de esta herramienta');
-    if (!description || description.trim().length < 5) return;
+  const reportIncident = (assignmentId: number) =>
+    setPedir({
+      titulo: 'Reportar daño o incidente',
+      etiqueta: 'Qué le pasó a la herramienta',
+      placeholder: 'Se rompió el mango al usarla en sitio.',
+      confirmar: 'Reportar',
+      minimo: 5,
+      fn: (description) => enviarIncidente(assignmentId, description),
+    });
+
+  const enviarIncidente = async (assignmentId: number, description: string) => {
+    if (!user?.token) return;
 
     try {
       const response = await fetch(buildApiUrl(`tool-requests/kits/${assignmentId}/report`), {
@@ -311,6 +321,7 @@ const ToolMyKitPanel: React.FC = () => {
           </ul>
         )}
       </div>
+      <PedirTexto estado={pedir} onCerrar={() => setPedir(null)} />
     </Card>
   );
 };

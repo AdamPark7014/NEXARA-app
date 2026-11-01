@@ -10,7 +10,7 @@ import NotificationsOffOutlinedIcon from "@mui/icons-material/NotificationsOffOu
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import styles from "../WorkspaceChat.module.css";
-import { Avatar, channelPrefixNode } from "./ChatAtoms";
+import { Avatar, channelPrefixNode, CanalesCargando } from "./ChatAtoms";
 import { SECTIONS_KEY, loadJson, readableChatPreview, saveJson } from "./chat-utils";
 import type { Channel } from "./types";
 
@@ -285,7 +285,7 @@ export default function ChatSidebar({
           renderRow={row}
           footer={
             <>
-              {loading && <div className={styles.loadingLine}>Cargando…</div>}
+              {loading && <CanalesCargando />}
               <button type="button" className={styles.rowAdd} onClick={onNewChannel}>
                 <span className={styles.plusBox} aria-hidden="true">
                   <AddIcon sx={{ fontSize: 14 }} />

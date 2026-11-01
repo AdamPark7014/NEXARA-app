@@ -1,5 +1,6 @@
 "use client";
 
+import Simbolo from "@/components/ui/Simbolo";
 import Link from "next/link";
 import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { statusTone } from "./estado-tono";
@@ -56,7 +57,7 @@ export function Badge({
     >
       {icon ? (
         <span className={s.badgeIco} aria-hidden="true">
-          {icon}
+          <Simbolo valor={icon} />
         </span>
       ) : null}
       {children}
@@ -321,7 +322,7 @@ export function Stat({
       <span className={s.statTop}>
         {icon ? (
           <span className={[s.statIco, TONO[tonoIcono]].filter(Boolean).join(" ")} aria-hidden="true">
-            {icon}
+            <Simbolo valor={icon} />
           </span>
         ) : null}
         <span className={s.statLabel}>

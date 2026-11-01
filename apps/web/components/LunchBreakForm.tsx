@@ -208,7 +208,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   }, []);
 
   const lunchStatus = isCheckin ? 'De Entrada a Comida' : 'De Regreso al Trabajo';
-  const lunchEmoji = isCheckin ? '🍽️ Entrada' : '✅ Regreso';
+  const lunchEmoji = isCheckin ? 'Entrada' : 'Regreso';
 
   return (
     <div className={`card ${styles.cardWrap} ${isMobile ? styles.cardWrapMobile : ''}`}>
@@ -250,14 +250,14 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
                 type="button"
                 onClick={capturePhoto}
               >
-                📷 Capturar Foto
+                Capturar foto
               </button>
               <button
                 className={`button-secondary ${styles.captureBtn} ${isMobile ? styles.captureBtnMobile : ''} ${isSmallMobile ? styles.captureBtnSmall : ''}`}
                 type="button"
                 onClick={flipCamera}
               >
-                🔄 Voltear
+                Voltear
               </button>
             </div>
           </div>

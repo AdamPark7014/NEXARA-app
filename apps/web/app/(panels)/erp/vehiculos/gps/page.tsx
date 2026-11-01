@@ -15,6 +15,8 @@ import {
   VEHICULOS_PATH,
   puedeVerGpsDireccion,
 } from "@/lib/recursos-core";
+import { formatApiError } from "@/lib/erp-api";
+import InlineAlert from "@/components/ui/InlineAlert";
 import { estadoGps, type EstadoGps } from "@/lib/vehiculos-api";
 import styles from "../vehiculos-core.module.css";
 
@@ -29,6 +31,7 @@ export default function VehiculosGpsPage() {
   const permitido = puedeVerGpsDireccion(user);
   const token = user?.token ?? "";
   const [estado, setEstado] = useState<EstadoGps | null>(null);
+  const [errorEstado, setErrorEstado] = useState<string | null>(null);
 
   useEffect(() => {
     if (!permitido || !token) return;
@@ -36,9 +39,15 @@ export default function VehiculosGpsPage() {
     void (async () => {
       try {
         const data = await estadoGps(token);
-        if (vivo) setEstado(data);
-      } catch {
-        if (vivo) setEstado(null);
+        if (vivo) {
+          setEstado(data);
+          setErrorEstado(null);
+        }
+      } catch (e) {
+        if (vivo) {
+          setEstado(null);
+          setErrorEstado(formatApiError(e, "No se pudo leer el estado del GPS."));
+        }
       }
     })();
     return () => {
@@ -48,6 +57,7 @@ export default function VehiculosGpsPage() {
 
   return (
     <>
+      {errorEstado ? <InlineAlert variant="danger" message={errorEstado} /> : null}
       <PageHeader
         eyebrow="Core · Vehículos"
         title="GPS de la flotilla"

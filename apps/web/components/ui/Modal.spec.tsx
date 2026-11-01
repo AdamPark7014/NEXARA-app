@@ -9,7 +9,7 @@ describe("Modal · cambios sin guardar", () => {
     vi.unstubAllGlobals();
   });
 
-  it("el confirm al cerrar con cambios cabe en una frase", async () => {
+  it("con cambios sin guardar pregunta en un diálogo del sistema, no en la caja del navegador", async () => {
     const aviso = "Hay cambios sin guardar, ¿cerrar de todos modos?";
 
     const confirm = vi.fn((_mensaje?: string) => false);
@@ -27,25 +27,32 @@ describe("Modal · cambios sin guardar", () => {
     expect(screen.getByRole("button", { name: "Cerrar" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Cerrar" }));
-    expect(confirm).toHaveBeenCalledTimes(1);
-    expect(confirm).toHaveBeenCalledWith(aviso);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(screen.getByText(aviso)).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
-    confirm.mockReturnValueOnce(true);
+    // Seguir editando: el aviso se va y el modal sigue.
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByText(aviso)).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Esc también pregunta, y con el aviso abierto Esc solo cierra el aviso.
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByText(aviso)).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByText(aviso)).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
     await userEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Cerrar sin guardar" }));
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    confirm.mockReset();
-    confirm.mockReturnValue(false);
+    // Clic afuera: pregunta igual.
     onClose.mockClear();
-    await userEvent.keyboard("{Escape}");
-    expect(confirm).toHaveBeenCalledWith(aviso);
-    expect(onClose).not.toHaveBeenCalled();
-
-    confirm.mockClear();
     fireEvent.click(document.querySelector('[role="presentation"]')!);
-    expect(confirm).toHaveBeenCalledWith(aviso);
+    expect(screen.getByText(aviso)).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+    expect(confirm).not.toHaveBeenCalled();
 
     unmount();
 

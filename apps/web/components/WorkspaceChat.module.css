@@ -25,8 +25,8 @@
   --nx-msg-hover: color-mix(in srgb, var(--foreground, #0f1c2e) 3%, transparent);
   --nx-mention-bg: color-mix(in srgb, var(--panel-accent, var(--primary)) 12%, transparent);
   --nx-radius: var(--nx-panel-radius-sm, 12px);
-  --nx-font: var(--nx-font-ui, "Inter Tight", "Manrope", ui-sans-serif, system-ui, sans-serif);
-  --nx-font-body: var(--nx-font-body, "Manrope", ui-sans-serif, system-ui, sans-serif);
+  --nx-font: var(--ui-font);
+  --nx-font-body: var(--ui-font);
 }
 
 .shell {
@@ -771,12 +771,47 @@
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
 }
 
-.avatarHue0 { background: linear-gradient(145deg, #38BDF8, #1D4ED8); }
-.avatarHue1 { background: linear-gradient(145deg, #60A5FA, #2563EB); }
-.avatarHue2 { background: linear-gradient(145deg, #f07178, #e11d48); }
-.avatarHue3 { background: linear-gradient(145deg, #e2a336, #d97706); }
-.avatarHue4 { background: linear-gradient(145deg, #8b9cf6, #6366f1); }
-.avatarHue5 { background: linear-gradient(145deg, #a78bfa, #7c3aed); }
+/* Tonos planos y sobrios: distinguen a cada persona sin competir con el verde de la marca. */
+.avatarHue0 { background: #168570; }
+.avatarHue1 { background: #3b6e8f; }
+.avatarHue2 { background: #7a5a8c; }
+.avatarHue3 { background: #a06a2c; }
+.avatarHue4 { background: #4f6470; }
+.avatarHue5 { background: #2f7f86; }
+
+.esqueletoLista {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 20px;
+}
+
+.esqueletoMensaje {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.esqueletoTexto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.esqueletoCanales {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.esqueletoCanal {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
 
 .avatarSm {
   width: 22px;
