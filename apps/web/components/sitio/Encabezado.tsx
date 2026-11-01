@@ -54,7 +54,7 @@ export default function Encabezado() {
   const [hojaGrupo, setHojaGrupo] = useState<MenuId | null>(null);
   const [bajado, setBajado] = useState(false);
   const [atajo, setAtajo] = useState("Ctrl K");
-  const cierre = useRef<number>();
+  const cierre = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (/mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent)) setAtajo("⌘K");

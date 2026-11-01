@@ -39,7 +39,8 @@ export function generateStaticParams() {
   return params;
 }
 
-export function generateMetadata({ params }: { params: Params }): Metadata {
+export async function generateMetadata(props: { params: Promise<Params> }): Promise<Metadata> {
+  const params = await props.params;
   const city = findGeoCity(params.city);
   const service = isGeoServiceSlug(params.service) ? findServiceLanding(params.service) : undefined;
   if (!city || !service) {
@@ -83,7 +84,8 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   };
 }
 
-export default function CoberturaCityServicePage({ params }: { params: Params }) {
+export default async function CoberturaCityServicePage(props: { params: Promise<Params> }) {
+  const params = await props.params;
   const city = findGeoCity(params.city);
   const service = isGeoServiceSlug(params.service) ? findServiceLanding(params.service) : undefined;
   if (!city || !service) notFound();

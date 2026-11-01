@@ -1,9 +1,9 @@
 /**
  * `href` para una URL que escribió una persona (comprobantes, planos, documentos de cartera).
  *
- * React 18 todavía pinta `href="javascript:…"` y la CSP permite scripts en línea: un comprobante
- * guardado como `javascript:fetch(...)` corría con la sesión de quien le diera clic. Solo pasan
- * http(s), rutas del mismo sitio y `blob:`/`mailto:`/`tel:`; lo demás no se vuelve enlace.
+ * La CSP permite scripts en línea: un comprobante guardado como `javascript:fetch(...)` corría con
+ * la sesión de quien le diera clic (React 19 ya bloquea ese `href`, pero el enlace quedaba muerto).
+ * Solo pasan http(s), rutas del mismo sitio y `blob:`/`mailto:`/`tel:`; lo demás no se vuelve enlace.
  */
 export function enlaceSeguro(url?: string | null): string | undefined {
   const v = String(url ?? "").trim();

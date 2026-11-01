@@ -718,7 +718,7 @@ function Detalle({
   uuid: string;
   uuidError: string | null;
   idUuid: string;
-  inputUuid: RefObject<HTMLInputElement>;
+  inputUuid: RefObject<HTMLInputElement | null>;
   encima: boolean;
   onUuid: (v: string) => void;
   onLigarUuid: () => void;

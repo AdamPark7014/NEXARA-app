@@ -16,8 +16,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
  */
 export function useVisibleOnce<T extends HTMLElement = HTMLDivElement>(
   options?: { rootMargin?: string; enabled?: boolean },
-): [RefObject<T>, boolean] {
-  // `useRef<T>(null)` da `RefObject<T>`, que es lo que acepta `ref=` en los tipos de React 18.
+): [RefObject<T | null>, boolean] {
   const ref = useRef<T>(null);
   const enabled = options?.enabled ?? true;
   const [visible, setVisible] = useState(false);

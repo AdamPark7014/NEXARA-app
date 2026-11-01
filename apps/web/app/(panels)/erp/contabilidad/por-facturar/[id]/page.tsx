@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { Alert, SkeletonRows } from "@/components/base";
 import { saveBlob } from "@/components/finance/download";
@@ -66,7 +66,8 @@ function formDe(r: RevisionFactura): Form {
   };
 }
 
-export default function PrepararCfdiPage({ params }: { params: { id: string } }) {
+export default function PrepararCfdiPage() {
+  const params = useParams<{ id: string }>();
   const invoiceId = Number(params.id);
   const router = useRouter();
   const { user, isContextReady } = useUser();

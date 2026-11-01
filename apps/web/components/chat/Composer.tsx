@@ -16,7 +16,7 @@ import type { Attachment, MentionEntity } from "./types";
 
 type Props = {
   variant: "main" | "thread";
-  textareaRef: RefObject<MentionTextareaHandle>;
+  textareaRef: RefObject<MentionTextareaHandle | null>;
   value: string;
   onChange: (markup: string) => void;
   placeholder: string;

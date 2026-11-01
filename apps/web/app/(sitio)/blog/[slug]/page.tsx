@@ -27,7 +27,8 @@ const absoluta = (url: string) => (url.startsWith("http") ? url : `${siteUrl()}$
 const fechaLarga = (iso: string) =>
   new Date(iso).toLocaleDateString("es-MX", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 
-export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<Params> }): Promise<Metadata> {
+  const params = await props.params;
   const post = await fetchNewsBySlug(params.slug);
   const guia = post ? undefined : findGuia(params.slug);
   if (!post && !guia) {
@@ -241,7 +242,8 @@ function GuiaPagina({ guia }: { guia: Guia }) {
   );
 }
 
-export default async function BlogPostPage({ params }: { params: Params }) {
+export default async function BlogPostPage(props: { params: Promise<Params> }) {
+  const params = await props.params;
   const post = await fetchNewsBySlug(params.slug);
   if (!post) {
     const guia = findGuia(params.slug);

@@ -1,4 +1,4 @@
-import type { SVGProps } from "react";
+import type { ReactElement, SVGProps } from "react";
 
 /**
  * Set de iconos de línea del sitio público (24×24, trazo 1.75, esquinas
@@ -36,7 +36,7 @@ export type PublicIconName =
   | "phone"
   | "target";
 
-const PATHS: Record<PublicIconName, JSX.Element> = {
+const PATHS: Record<PublicIconName, ReactElement> = {
   camera: (
     <>
       <rect x="3" y="7" width="13" height="10" rx="2" />

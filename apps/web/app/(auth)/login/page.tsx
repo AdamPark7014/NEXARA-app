@@ -26,11 +26,11 @@ function resolveLoginSkin(host: string | null): "default" | "integra" {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams?: { denied?: string };
+  searchParams?: Promise<{ denied?: string }>;
 }) {
   const h = await headers();
   const skin = resolveLoginSkin(h.get("x-forwarded-host") || h.get("host"));
-  const accessNotice = deniedPanelMessage(searchParams?.denied);
+  const accessNotice = deniedPanelMessage((await searchParams)?.denied);
 
   return (
     <Suspense

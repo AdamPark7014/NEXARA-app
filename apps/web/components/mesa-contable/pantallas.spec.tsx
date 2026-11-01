@@ -19,6 +19,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: nav.push, replace: vi.fn() }),
   usePathname: () => nav.pathname,
   useSearchParams: () => new URLSearchParams(""),
+  useParams: () => ({ id: "232" }),
 }));
 
 vi.mock("@/components/UserContext", () => ({
@@ -231,7 +232,7 @@ describe("Preparar y timbrar", () => {
       { incluye: "mesa/facturas/232/revision", body: REVISION },
       { incluye: "accounting/invoices/232", metodo: "PATCH", body: { ok: true } },
     );
-    render(<PrepararCfdiPage params={{ id: "232" }} />);
+    render(<PrepararCfdiPage />);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Factura para COLEGIO MONTEBELLO" })).toBeInTheDocument();
     expect(screen.getByText("Borrador · A-232")).toBeInTheDocument();

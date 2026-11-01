@@ -488,7 +488,7 @@ const ToolInventoryPanel: React.FC<ToolInventoryPanelProps> = ({ busquedaInicial
   const zonaFoto = (opciones: {
     etiqueta: string;
     activa: boolean;
-    inputRef: React.RefObject<HTMLInputElement>;
+    inputRef: React.RefObject<HTMLInputElement | null>;
     archivo: File | null;
     preview: string | null;
     onDragOver: () => void;

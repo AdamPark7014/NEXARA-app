@@ -76,7 +76,7 @@ export default function PhoneField({
       countryOptionsOrder={["MX", "US", "CA", "|", "..."]}
       defaultCountry={defaultCountry}
       value={(display || undefined) as Value | undefined}
-      onChange={(next) => onChange((next as string | undefined) ?? "")}
+      onChange={(next?: Value) => onChange(next ?? "")}
       disabled={disabled}
       className={`${styles.wrap}${invalid ? ` ${styles.invalid}` : ""}${className ? ` ${className}` : ""}`}
       style={style}
