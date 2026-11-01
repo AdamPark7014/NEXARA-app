@@ -75,7 +75,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         details = res;
       }
     } else if (exception instanceof Error) {
-      const mapped = mapPrismaError(exception);
+      const mapped = mapPrismaError(exception) ?? mapMulterError(exception);
       if (mapped) {
         status = mapped.status;
         message = mapped.message;
@@ -186,6 +186,46 @@ export function mapPrismaError(
   }
 
   return null;
+}
+
+/**
+ * Traduce a HTTP los errores de subida que Nest deja pasar.
+ *
+ * Nest 10 distingue los errores de multer por el texto del mensaje, no por el
+ * código, y multer 2 ya cambió ese texto («Unexpected field» pasó a «Unexpected
+ * file field») y agregó códigos que Nest no conoce. Sin esto, mandar más archivos
+ * de los permitidos o en un campo equivocado respondía 500 en lugar de 400.
+ */
+export function mapMulterError(
+  error: Error,
+): { status: number; message: string; errorCode: string } | null {
+  if ((error.constructor?.name ?? error.name) !== 'MulterError') {
+    return null;
+  }
+
+  switch ((error as unknown as { code?: string }).code) {
+    case 'LIMIT_FILE_SIZE':
+      return {
+        status: HttpStatus.PAYLOAD_TOO_LARGE,
+        message: 'El archivo es demasiado grande.',
+        errorCode: 'FILE_TOO_LARGE',
+      };
+    case 'LIMIT_UNEXPECTED_FILE':
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Se enviaron más archivos de los permitidos o en un campo no esperado.',
+        errorCode: 'UNEXPECTED_FILE',
+      };
+    // El flujo del archivo se rompió de nuestro lado: no es culpa de quien sube.
+    case 'STREAM_DESTROYED':
+      return null;
+    default:
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        message: 'La subida no es válida: revisa los archivos e intenta de nuevo.',
+        errorCode: 'INVALID_UPLOAD',
+      };
+  }
 }
 
 function suggestErrorSolutions(status: number, _errorCode: string, message: string, details: any): string[] {
