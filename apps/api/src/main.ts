@@ -66,6 +66,19 @@ async function bootstrap() {
   httpServer.disable('x-powered-by');
   httpServer.set('trust proxy', 1);
 
+  // Tope global del cuerpo declarado: casi ninguna subida fija `limits` en multer y un solo POST con
+  // sesión podía llenar el disco. 256 MB cubre el video del hero (80 MB) y lotes de 30 fotos.
+  const maxCuerpoBytes = readPositiveIntEnv('MAX_REQUEST_BODY_BYTES', 256 * 1024 * 1024);
+  app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
+    const declarado = Number(request.headers['content-length'] ?? 0);
+    if (Number.isFinite(declarado) && declarado > maxCuerpoBytes) {
+      response.setHeader('Connection', 'close');
+      response.status(413).json({ statusCode: 413, message: 'El archivo es demasiado grande.' });
+      return;
+    }
+    next();
+  });
+
   // Los equipos Hikvision empujan XML, JSON o multipart con el JPEG dentro. Va
   // primero para que nada lo interprete antes: en esta ruta se decide por la
   // forma del cuerpo, no por la cabecera.
