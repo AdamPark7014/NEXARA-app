@@ -6,9 +6,8 @@ import { Stat, StatRow } from "@/components/base/piezas";
 /**
  * NEXARA · Tira de cifras (envoltorio de `components/base/piezas` StatRow + Stat).
  *
- * Para las pantallas financieras: una sola tarjeta con divisiones finas y cifras
- * compactas (20 px). El dato manda, el adorno desaparece, y la tira entera ocupa
- * lo que antes una sola tarjeta de KPI.
+ * Para las pantallas financieras: tarjetas sueltas con la cifra en grande, las mismas
+ * de Clientes y del resto de Core. El dato manda y el adorno desaparece.
  *
  * El color solo entra cuando pide acción (`tone`), nunca como decoración: si
  * todo va bien, la tira es neutra y la vista se lee sin ruido.

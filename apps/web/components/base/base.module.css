@@ -151,10 +151,6 @@
   font-size: 26px;
 }
 
-.head[data-density="ops"] .headTitle {
-  font-size: 20px;
-}
-
 .headDesc {
   margin: 0;
   font-size: var(--ui-text-base);
