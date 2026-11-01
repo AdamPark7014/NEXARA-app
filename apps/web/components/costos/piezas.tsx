@@ -15,7 +15,7 @@ export { c };
 
 const PESTANAS = [
   { href: "/erp/costos", texto: "Horas sin proyecto", requiere: "puedeLigar" },
-  { href: "/erp/costos/proyectos", texto: "Por proyecto", requiere: "veTodo" },
+  { href: "/erp/costos/por-proyecto", texto: "Por proyecto", requiere: "veTodo" },
   { href: "/erp/costos/tarifas", texto: "Tarifas de costo", requiere: "veTodo" },
 ] as const;
 

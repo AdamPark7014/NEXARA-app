@@ -12,7 +12,7 @@ mockups y la investigación con diagramas están en el artifact privado que se l
 ## Estado
 
 **Fase 0, motor y tarifas:** `apps/api/src/costos/calculos/` y `/erp/costos/tarifas`. **Fase 1, horas a proyecto:** libro de
-costos, proceso nocturno, `/erp/costos`, `/erp/costos/proyectos` y la pestaña Costos de cada proyecto.
+costos, proceso nocturno, `/erp/costos`, `/erp/costos/por-proyecto` y la pestaña Costos de cada proyecto.
 
 Cómo quedó, y en qué cambió respecto a la propuesta:
 

@@ -66,7 +66,7 @@ export default function SeccionCostos({ proyecto, token }: Pick<SeccionProps, "p
         </div>
       </div>
 
-      <div className={c.cols2}>
+      <div className={c.page}>
         <section className={`${c.card} ${c.scroll}`} aria-label="Cotizado contra real">
           <div className={c.rubros}>
             <div className={c.rubro}>
@@ -86,7 +86,7 @@ export default function SeccionCostos({ proyecto, token }: Pick<SeccionProps, "p
           </div>
         </section>
 
-        <div className={c.page}>
+        <div className={c.cols3}>
           <section className={c.card} aria-label="Mano de obra">
             <h3 className={c.cardTitle}>Mano de obra: de dónde sale</h3>
             {datos.manoDeObra.categorias ? (
@@ -124,7 +124,7 @@ export default function SeccionCostos({ proyecto, token }: Pick<SeccionProps, "p
               </Aviso>
             ) : a.partidasSinCosto ? (
               <Aviso tono="warning" titulo="Cotizado incompleto.">
-                {a.partidasSinCosto} de {a.partidas} partidas no traen costo interno.
+                {a.partidasSinCosto} de {a.partidas} partidas {a.partidasSinCosto === 1 ? "no trae" : "no traen"} costo interno.
               </Aviso>
             ) : null}
             {a.sinVenta ? (
@@ -138,13 +138,25 @@ export default function SeccionCostos({ proyecto, token }: Pick<SeccionProps, "p
               </Aviso>
             ) : null}
             {a.sesionesSinSueldo ? (
-              <Aviso tono="warning">{a.sesionesSinSueldo} sesiones valen cero porque esa persona no tiene sueldo capturado.</Aviso>
+              <Aviso tono="warning">
+                {a.sesionesSinSueldo === 1 ? "1 sesión vale" : `${a.sesionesSinSueldo} sesiones valen`} cero porque esa persona no
+                tiene sueldo capturado.
+              </Aviso>
             ) : null}
             {a.salidasSinCosto ? (
-              <Aviso tono="warning">{a.salidasSinCosto} salidas de almacén no traen costo: valen cero.</Aviso>
+              <Aviso tono="warning">
+                {a.salidasSinCosto === 1
+                  ? "1 salida de almacén no trae costo: vale cero."
+                  : `${a.salidasSinCosto} salidas de almacén no traen costo: valen cero.`}
+              </Aviso>
             ) : null}
             {a.sesionesRecortadas ? (
-              <Aviso tono="info">{a.sesionesRecortadas} relojes los cerró el sistema: cuentan a lo mucho una jornada.</Aviso>
+              <Aviso tono="info">
+                {a.sesionesRecortadas === 1
+                  ? "1 reloj lo cerró el sistema: cuenta"
+                  : `${a.sesionesRecortadas} relojes los cerró el sistema: cuentan`}{" "}
+                a lo mucho una jornada.
+              </Aviso>
             ) : null}
           </div>
         </div>

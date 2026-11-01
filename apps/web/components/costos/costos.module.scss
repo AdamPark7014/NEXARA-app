@@ -151,24 +151,11 @@
   font-weight: 600;
 }
 
-.cols2 {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
-}
-
 .cols3 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 14px;
   align-items: start;
-}
-
-@media (max-width: 860px) {
-  .cols2 {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .hint {
@@ -292,6 +279,10 @@
   display: grid;
   gap: 8px;
   margin-top: 12px;
+}
+
+.cols3 > .notas {
+  margin-top: 0;
 }
 
 /* ── Bandeja ────────────────────────────────────────────────────────────── */
@@ -429,6 +420,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
   gap: 10px 12px;
+  align-items: end;
 }
 
 .campo {
