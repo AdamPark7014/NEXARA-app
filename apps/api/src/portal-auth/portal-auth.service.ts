@@ -18,6 +18,38 @@ export type PortalCompanyHint = {
 };
 
 /**
+ * Intentos fallidos por cuenta del portal. El límite por IP no frena a quien prueba contraseñas
+ * desde muchas IPs: 5 fallos en 15 min bloquean ese correo 15 min (en memoria; una sola API).
+ */
+export class FallosPortal {
+  static readonly MAX = 5;
+  static readonly VENTANA_MS = 15 * 60_000;
+  private readonly fallos = new Map<string, { n: number; desde: number; hasta?: number }>();
+
+  bloqueado(clave: string, ahora = Date.now()): boolean {
+    const f = this.fallos.get(clave);
+    return Boolean(f?.hasta && f.hasta > ahora);
+  }
+
+  registrar(clave: string, ahora = Date.now()): void {
+    if (this.fallos.size > 10_000) {
+      for (const [k, v] of this.fallos) if (ahora - v.desde > FallosPortal.VENTANA_MS && !(v.hasta && v.hasta > ahora)) this.fallos.delete(k);
+    }
+    const f = this.fallos.get(clave);
+    const vigente = f && ahora - f.desde <= FallosPortal.VENTANA_MS ? f : { n: 0, desde: ahora };
+    vigente.n += 1;
+    if (vigente.n >= FallosPortal.MAX) vigente.hasta = ahora + FallosPortal.VENTANA_MS;
+    this.fallos.set(clave, vigente);
+  }
+
+  limpiar(clave: string): void {
+    this.fallos.delete(clave);
+  }
+}
+
+const MENSAJE_BLOQUEO = 'Demasiados intentos con este correo. Espera 15 minutos e intenta de nuevo.';
+
+/**
  * Login unificado del portal NEXARA (tickets).
  * portalEmail is unique per companyId. Without a company hint, login is allowed
  * only when the email matches a single company; otherwise companySlug/companyId is required.
@@ -29,6 +61,8 @@ export class PortalAuthService {
     private readonly jwtService: JwtService,
     private readonly audit: AuditService,
   ) {}
+
+  private readonly fallos = new FallosPortal();
 
   private async auditLogin(dto: {
     success: boolean;
@@ -129,6 +163,8 @@ export class PortalAuthService {
     companyHint?: PortalCompanyHint,
   ) {
     const normalized = email.trim().toLowerCase();
+    const claveFallos = `client:${normalized}`;
+    if (this.fallos.bloqueado(claveFallos)) throw new UnauthorizedException(MENSAJE_BLOQUEO);
     const scopedCompanyId = await this.resolveScopedCompanyId(companyHint);
     if (scopedCompanyId == null) {
       await this.assertEmailNotAmbiguousAcrossTenants(normalized, meta);
@@ -149,6 +185,7 @@ export class PortalAuthService {
         reason: 'client_not_found',
         meta,
       });
+      this.fallos.registrar(claveFallos);
       throw new UnauthorizedException('Credenciales invalidas');
     }
     const isValid = await bcrypt.compare(password, client.portalPasswordHash);
@@ -161,8 +198,10 @@ export class PortalAuthService {
         reason: 'bad_password',
         meta,
       });
+      this.fallos.registrar(claveFallos);
       throw new UnauthorizedException('Credenciales invalidas');
     }
+    this.fallos.limpiar(claveFallos);
 
     let resolvedLogoUrl = client.logoUrl || null;
     if (!resolvedLogoUrl) {
@@ -211,6 +250,8 @@ export class PortalAuthService {
     companyHint?: PortalCompanyHint,
   ) {
     const normalized = email.trim().toLowerCase();
+    const claveFallos = `branch:${normalized}`;
+    if (this.fallos.bloqueado(claveFallos)) throw new UnauthorizedException(MENSAJE_BLOQUEO);
     const scopedCompanyId = await this.resolveScopedCompanyId(companyHint);
     if (scopedCompanyId == null) {
       await this.assertEmailNotAmbiguousAcrossTenants(normalized, meta);
@@ -232,6 +273,7 @@ export class PortalAuthService {
         reason: 'branch_not_found',
         meta,
       });
+      this.fallos.registrar(claveFallos);
       throw new UnauthorizedException('Credenciales invalidas');
     }
     const isValid = await bcrypt.compare(password, branch.portalPasswordHash);
@@ -244,8 +286,10 @@ export class PortalAuthService {
         reason: 'bad_password',
         meta,
       });
+      this.fallos.registrar(claveFallos);
       throw new UnauthorizedException('Credenciales invalidas');
     }
+    this.fallos.limpiar(claveFallos);
 
     const companyId = branch.companyId ?? branch.client?.companyId ?? null;
     const payload = {
@@ -300,7 +344,9 @@ export class PortalAuthService {
       }
       try {
         return await this.loginAsBranch(email, password, meta, companyHint);
-      } catch {
+      } catch (secondErr) {
+        // Si la sucursal quedó bloqueada por intentos, que lo diga en vez de «Credenciales invalidas».
+        if (secondErr instanceof UnauthorizedException && secondErr.message === MENSAJE_BLOQUEO) throw secondErr;
         throw firstErr;
       }
     }

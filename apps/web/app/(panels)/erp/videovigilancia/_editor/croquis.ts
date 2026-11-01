@@ -30,7 +30,8 @@ function aPng(canvas: HTMLCanvasElement): Promise<Blob> {
 
 async function desdePdf(archivo: File): Promise<Blob> {
   const pdfjs = await cargarPdfJs();
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(await archivo.arrayBuffer()) }).promise;
+  // `isEvalSupported: false`: pdf.js 3.x ejecutaba JavaScript de un PDF armado (CVE-2024-4367).
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(await archivo.arrayBuffer()), isEvalSupported: false }).promise;
   const hoja = await doc.getPage(1);
   const base = hoja.getViewport({ scale: 1 });
   const vista = hoja.getViewport({ scale: ANCHO_CROQUIS_PX / base.width });
