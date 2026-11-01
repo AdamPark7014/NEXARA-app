@@ -68,10 +68,11 @@ export class CreateSalesClientDto {
   tipo?: (typeof SECTORS)[number];
 
   /**
-   * Alta rápida al asignar una actividad de servicio.
+   * Alta rápida de último momento: al asignar una actividad o al cotizar.
    * La puede quien ya puede crear la actividad (encargado, operativo o el resto del personal).
    * Solo el nombre es obligatorio; correo, teléfono y RFC son opcionales.
-   * Siempre CORPORATIVO, sin mirar el sector del padrón.
+   * CORPORATIVO (servicio) o COMERCIAL (actividad comercial y cotización), sin mirar el sector
+   * del padrón. Queda bajo «Sin RFC» hasta que alguien complete sus datos.
    */
   @IsOptional()
   @IsBoolean()
@@ -84,6 +85,19 @@ export class CreateSalesClientDto {
   @IsOptional()
   @IsBoolean()
   altaProyecto?: boolean;
+
+  /**
+   * Ya se avisó que se parece a otro cliente y la persona decidió que es uno distinto.
+   * Sin esto, un nombre casi seguro repetido se rechaza con 409.
+   */
+  @IsOptional()
+  @IsBoolean()
+  confirmarNuevo?: boolean;
+
+  /** «Usar este»: en vez de crear, se reutiliza ese cliente con las mismas reglas de acceso. */
+  @IsOptional()
+  @IsInt()
+  reutilizarId?: number;
 
   /**
    * Tipos del cliente: puede ser de proyecto, corporativo y comercial a la vez. Se guardan

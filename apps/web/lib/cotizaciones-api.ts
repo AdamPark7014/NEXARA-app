@@ -312,6 +312,8 @@ export function obtenerCotizacion(token: string, id: number) {
 }
 
 export type GuardarCotizacion = {
+  /** El nombre aún no es un cliente del padrón: se guarda como texto, sin darlo de alta. */
+  clienteSinAlta?: boolean;
   segmento?: Segmento;
   salesClientId?: number | null;
   clientName?: string | null;

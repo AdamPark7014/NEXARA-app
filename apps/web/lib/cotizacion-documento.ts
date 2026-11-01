@@ -663,6 +663,7 @@ export function faltaParaEnviar(doc: DocumentoCotizacion): string[] {
   const faltas: string[] = [];
   if (!doc.partidas.some((p) => p.name.trim())) faltas.push("al menos una partida en 04 Cotización");
   if (!doc.clientName.trim()) faltas.push("el cliente");
+  else if (!doc.salesClientId) faltas.push("elegir o crear el cliente");
   return faltas;
 }
 

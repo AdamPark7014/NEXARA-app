@@ -177,6 +177,8 @@ export type Ajustes = {
   clientId?: number | null;
   /** Nombre del cliente a dar de alta al confirmar (la opción «+ Agregar cliente»). */
   clienteNuevo?: string | null;
+  /** Se vio el aviso de parecidos y es otro: se crea de todos modos. */
+  clienteNuevoConfirmado?: boolean;
   projectId?: number | null;
   titulo?: string;
   indicaciones?: string;
@@ -376,12 +378,24 @@ export function clientePendiente(p: PropuestaActividad, aj: Ajustes): string | n
 }
 
 /**
- * Alta rápida del cliente, la misma del formulario «Asignar» (cliente corporativo solo con el
- * nombre; la ficha se llena después en Clientes): el padrón reutiliza al cliente si el nombre ya
- * existe y decide los permisos. Devuelve el cliente de operación para la actividad.
+ * Alta rápida del cliente, la misma del formulario «Asignar» (solo con el nombre; la ficha se llena
+ * después en Clientes): el padrón reutiliza al cliente si el nombre ya existe y decide los
+ * permisos. Comercial si la actividad es comercial; si no, corporativo. Devuelve el cliente de
+ * operación para la actividad.
  */
-export async function altaRapidaCliente(token: string, nombre: string): Promise<Referencia> {
-  const creado = await createSalesClient(token, { name: nombre.trim(), status: "Activo", tipo: "CORPORATIVO", altaRapida: true });
+export async function altaRapidaCliente(
+  token: string,
+  nombre: string,
+  opciones: { tipo?: ActivityKind; confirmarNuevo?: boolean; reutilizarId?: number } = {},
+): Promise<Referencia> {
+  const creado = await createSalesClient(token, {
+    name: nombre.trim(),
+    status: "Activo",
+    tipo: opciones.tipo === "comercial" ? "COMERCIAL" : "CORPORATIVO",
+    altaRapida: true,
+    ...(opciones.confirmarNuevo ? { confirmarNuevo: true } : {}),
+    ...(opciones.reutilizarId ? { reutilizarId: opciones.reutilizarId } : {}),
+  });
   const id = creado.serviceClientId ?? (await provisionSalesServiceClient(token, creado.id)).serviceClient.id;
   return { id, nombre: creado.name };
 }

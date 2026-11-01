@@ -1,0 +1,252 @@
+.bloque {
+  display: grid;
+  gap: var(--ui-s2, 8px);
+  min-width: 0;
+}
+
+.combo {
+  position: relative;
+  min-width: 0;
+}
+
+/* Lista flotante: misma tarjeta del resto de Core, con la acción de crear fija abajo. */
+.opciones {
+  position: absolute;
+  z-index: var(--ui-z-dropdown, 40);
+  left: 0;
+  right: 0;
+  top: calc(var(--ui-control-h, 40px) + 6px);
+  display: flex;
+  flex-direction: column;
+  max-height: 20rem;
+  overflow: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg, 14px);
+  box-shadow: var(--ui-elev-3);
+  animation: aparece 140ms ease-out;
+}
+
+.grupo {
+  padding: 8px 10px 4px;
+  font-size: var(--ui-fs-meta, 12px);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ui-fg-3);
+}
+
+.opcion {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--ui-radius);
+  font-size: var(--ui-text-sm);
+  cursor: pointer;
+  transition: background-color 90ms ease;
+}
+
+.opcionTexto {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.opcionTexto > span {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.opcionTexto small {
+  font-size: var(--ui-fs-meta, 12px);
+  color: var(--ui-fg-3);
+  overflow-wrap: anywhere;
+}
+
+.opcionActiva {
+  background: var(--ui-brand-soft);
+}
+
+.opcionCrear {
+  position: sticky;
+  bottom: -6px;
+  margin: 6px -6px -6px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0 0 var(--ui-radius-lg, 14px) var(--ui-radius-lg, 14px);
+  background: var(--ui-surface);
+}
+
+.opcionCrear.opcionActiva {
+  background: var(--ui-brand-soft);
+}
+
+.opcionCrear .opcionTexto > span {
+  color: var(--ui-brand-text);
+  font-weight: 600;
+}
+
+.inicial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--ui-radius-pill, 999px);
+  background: var(--ui-surface-2, var(--ui-bg));
+  color: var(--ui-fg-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.inicialCrear {
+  background: var(--ui-brand);
+  color: var(--ui-brand-fg);
+}
+
+.nota {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--ui-fs-meta, 12px);
+  color: var(--ui-fg-3);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--ui-fs-meta, 12px);
+  color: var(--ui-danger);
+}
+
+.marca {
+  justify-self: start;
+}
+
+/* Aviso «¿Ya existe?»: una tarjeta que se lee de un vistazo, no un error. */
+.aviso {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--ui-radius-lg, 14px);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-elev-2), inset 0 0 0 1px var(--ui-warning-border, var(--ui-border));
+  animation: aparece 160ms ease-out;
+}
+
+.avisoCabeza {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.avisoIcono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--ui-radius, 10px);
+  background: var(--ui-warning-bg);
+  color: var(--ui-warning-text);
+}
+
+.avisoTitulo {
+  margin: 0;
+  font-family: var(--ui-font-display, inherit);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--ui-fg);
+}
+
+.avisoSub {
+  margin: 1px 0 0;
+  font-size: var(--ui-fs-meta, 12px);
+  color: var(--ui-fg-2);
+  overflow-wrap: anywhere;
+}
+
+.avisoLista {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.avisoFila {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--ui-radius, 10px);
+  background: var(--ui-surface-2, var(--ui-bg));
+}
+
+.avisoFila .inicial {
+  background: var(--ui-surface);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+}
+
+.avisoCliente {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  font-size: var(--ui-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.avisoCliente strong {
+  font-weight: 600;
+}
+
+.avisoCliente small,
+.sinAcceso {
+  font-size: var(--ui-fs-meta, 12px);
+  color: var(--ui-fg-3);
+}
+
+.avisoPie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 520px) {
+  .avisoFila {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .avisoFila > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@keyframes aparece {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opciones,
+  .aviso {
+    animation: none;
+  }
+}

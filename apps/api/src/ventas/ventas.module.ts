@@ -16,6 +16,8 @@ import { WorkflowModule } from '../workflow/workflow.module.js';
 import { WebhooksModule } from '../webhooks/webhooks.module.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { ServiceClientsModule } from '../service-clients/service-clients.module.js';
+import { AiModule } from '../ai/ai.module.js';
+import { ClientesParecidosService } from './clientes-parecidos.service.js';
 
 @Module({
   imports: [
@@ -27,8 +29,9 @@ import { ServiceClientsModule } from '../service-clients/service-clients.module.
     WebhooksModule,
     AuditModule,
     ServiceClientsModule,
+    forwardRef(() => AiModule),
   ],
-  providers: [VentasService, PdfGeneratorService],
+  providers: [VentasService, PdfGeneratorService, ClientesParecidosService],
   exports: [VentasService],
   controllers: [VentasClientesController, VentasLeadsController, VentasOportunidadesController, VentasProyectosController, VentasReportesController, VentasCotizacionesController, VentasOrderTemplatesController],
 })

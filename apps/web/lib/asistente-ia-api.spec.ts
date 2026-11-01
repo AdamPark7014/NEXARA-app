@@ -313,4 +313,13 @@ describe("asistente IA en la pizarra", () => {
     await expect(altaRapidaCliente("tok", "Sephora")).resolves.toEqual({ id: 12, nombre: "Sephora" });
     expect(ventas.provisionSalesServiceClient).toHaveBeenCalledTimes(1);
   });
+
+  it("en una actividad comercial da de alta un cliente comercial, y lleva lo que se decidió en el aviso", async () => {
+    ventas.createSalesClient.mockClear();
+    ventas.createSalesClient.mockResolvedValue({ id: 5, name: "Toks", serviceClientId: 77 });
+    await altaRapidaCliente("tok", "Toks", { tipo: "comercial", confirmarNuevo: true });
+    expect(ventas.createSalesClient).toHaveBeenLastCalledWith("tok", { name: "Toks", status: "Activo", tipo: "COMERCIAL", altaRapida: true, confirmarNuevo: true });
+    await altaRapidaCliente("tok", "BUAP", { tipo: "servicio", reutilizarId: 17 });
+    expect(ventas.createSalesClient).toHaveBeenLastCalledWith("tok", { name: "BUAP", status: "Activo", tipo: "CORPORATIVO", altaRapida: true, reutilizarId: 17 });
+  });
 });

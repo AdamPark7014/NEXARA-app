@@ -266,7 +266,7 @@ describe("documento y autoguardado", () => {
     expect(doc.validUntil).toBe("2026-10-03");
     expect(faltaParaGuardar(doc)).toMatch(/cliente/);
     expect(faltaParaGuardar({ ...doc, clientName: "Hotel Centro" })).toBeNull();
-    expect(faltaParaEnviar({ ...doc, clientName: "Hotel Centro" })).toEqual(["al menos una partida en 04 Cotización"]);
+    expect(faltaParaEnviar({ ...doc, clientName: "Hotel Centro", salesClientId: 9 })).toEqual(["al menos una partida en 04 Cotización"]);
   });
 
   it("el margen no cambia el precio de la partida y 20 se guarda como 20", () => {

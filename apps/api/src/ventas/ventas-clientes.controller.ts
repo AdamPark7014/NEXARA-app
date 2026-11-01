@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   ParseIntPipe,
   Patch,
@@ -19,6 +20,8 @@ import { VentasService } from './ventas.service.js';
 import { CreateSalesClientDto } from './dto/create-sales-client.dto.js';
 import { UpdateSalesClientDto } from './dto/update-sales-client.dto.js';
 import { AddClientSectorDto } from './dto/add-client-sector.dto.js';
+import { BuscarParecidosDto } from './dto/buscar-parecidos.dto.js';
+import { ClientesParecidosService } from './clientes-parecidos.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -44,6 +47,7 @@ export class VentasClientesController {
   constructor(
     private readonly ventasService: VentasService,
     private readonly satService: SatService,
+    private readonly parecidosService: ClientesParecidosService,
   ) {}
 
   @Get('fiscal-lookup')
@@ -65,6 +69,22 @@ export class VentasClientesController {
   @RBAC({ anyPermissions: [...SALES_VIEW_ACCESS, ...SALES_MANAGE_ACCESS] })
   permisos(@CurrentUser() user: any) {
     return this.ventasService.getClientPermissions(user);
+  }
+
+  /**
+   * «¿Ya existe este cliente?» antes de darlo de alta. Ruta literal: `POST /:id` no existe, pero se
+   * deja junto a las otras. Es un POST para que el RFC no viaje en la URL.
+   */
+  @Post('parecidos')
+  @HttpCode(200)
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [...SALES_VIEW_ACCESS, ...SALES_MANAGE_ACCESS] })
+  parecidos(
+    @Body() dto: BuscarParecidosDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.parecidosService.buscar(dto, user, companyId);
   }
 
   // Quién agrega (jefes con personal a cargo, administración, dirección) lo decide el servicio.

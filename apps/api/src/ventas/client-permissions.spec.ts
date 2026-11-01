@@ -282,6 +282,7 @@ describe('VentasService · eliminar y desactivar clientes', () => {
   it('expone los permisos del usuario', async () => {
     const { service } = buildService({ reportees: 1 });
     await expect(service.getClientPermissions(LUIS)).resolves.toEqual({
+      puedeAltaRapida: true,
       puedeAgregar: true,
       puedeEditar: true,
       puedeDesactivar: false,
@@ -289,6 +290,7 @@ describe('VentasService · eliminar y desactivar clientes', () => {
       puedeAltaRapidaCorporativa: false,
     });
     await expect(service.getClientPermissions(DAVID_JEFE)).resolves.toEqual({
+      puedeAltaRapida: false,
       puedeAgregar: false,
       puedeEditar: false,
       puedeDesactivar: false,
@@ -348,7 +350,7 @@ describe('VentasService · eliminar y desactivar clientes', () => {
       ),
     ).rejects.toThrow(BadRequestException);
     await expect(
-      service.createClient({ name: 'Comercial', tipo: 'COMERCIAL', altaRapida: true } as any, TECNICO, 7),
+      service.createClient({ name: 'De proyecto', tipo: 'PROYECTO', altaRapida: true } as any, TECNICO, 7),
     ).rejects.toThrow(BadRequestException);
   });
 

@@ -1,0 +1,830 @@
+{
+  "fecha": "2026-11-01T18:35:30.556Z",
+  "etiqueta": "prompt-3",
+  "modelo": "claude-haiku-5-5",
+  "soloCodigo": {
+    "casos": 58,
+    "conRepetido": 37,
+    "aciertos": 32,
+    "sinRepetido": 21,
+    "limpios": 21,
+    "avisosFalsos": 0
+  },
+  "conClaude": {
+    "casos": 58,
+    "conRepetido": 37,
+    "aciertos": 37,
+    "sinRepetido": 21,
+    "limpios": 18,
+    "avisosFalsos": 3
+  },
+  "msP50": 927,
+  "usdPorLlamada": 0.000104,
+  "filas": [
+    {
+      "caso": "f01",
+      "clase": "forma",
+      "nombre": "buap",
+      "esperados": [
+        1
+      ],
+      "codigo": [
+        1
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "f02",
+      "clase": "forma",
+      "nombre": "B.U.A.P.",
+      "esperados": [
+        1
+      ],
+      "codigo": [
+        1
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "f03",
+      "clase": "forma",
+      "nombre": "GRUPO BIMBO SAB DE CV",
+      "esperados": [
+        7
+      ],
+      "codigo": [
+        7
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "f04",
+      "clase": "forma",
+      "nombre": "Lacteos San Andres, S.A. de C.V.",
+      "esperados": [
+        21
+      ],
+      "codigo": [
+        21
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "f05",
+      "clase": "forma",
+      "nombre": "Crepes & Waffles",
+      "esperados": [
+        20
+      ],
+      "codigo": [
+        20
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "f06",
+      "clase": "forma",
+      "nombre": "colegio bosques de zavaleta a.c.",
+      "esperados": [
+        19
+      ],
+      "codigo": [
+        19
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "f07",
+      "clase": "forma",
+      "nombre": "Volks Wagen de Mexico",
+      "esperados": [
+        13
+      ],
+      "codigo": [
+        13
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "f08",
+      "clase": "forma",
+      "nombre": "Wal-Mart de México",
+      "esperados": [
+        15
+      ],
+      "codigo": [
+        15
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "f09",
+      "clase": "forma",
+      "nombre": "Operadora Hotelera Portal de Analco",
+      "esperados": [
+        17
+      ],
+      "codigo": [
+        17
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "f10",
+      "clase": "forma",
+      "nombre": "Liverpool",
+      "esperados": [
+        9
+      ],
+      "codigo": [
+        9
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "f11",
+      "clase": "forma",
+      "nombre": "Bimbo",
+      "esperados": [
+        7
+      ],
+      "codigo": [
+        7
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "f12",
+      "clase": "forma",
+      "nombre": "Hospital Angeles",
+      "esperados": [
+        12
+      ],
+      "codigo": [
+        12
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "d01",
+      "clase": "dedo",
+      "nombre": "Cuatzacualcos",
+      "esperados": [
+        22
+      ],
+      "codigo": [
+        22
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "d02",
+      "clase": "dedo",
+      "nombre": "Costructora Arcadia Angelopolis",
+      "esperados": [
+        16
+      ],
+      "codigo": [
+        16
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "d03",
+      "clase": "dedo",
+      "nombre": "Cinepollis",
+      "esperados": [
+        14
+      ],
+      "codigo": [
+        14
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "d04",
+      "clase": "dedo",
+      "nombre": "Tecnologico de Monterey",
+      "esperados": [
+        3
+      ],
+      "codigo": [
+        3
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "d05",
+      "clase": "dedo",
+      "nombre": "Anfora",
+      "esperados": [
+        24
+      ],
+      "codigo": [
+        24
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "d06",
+      "clase": "dedo",
+      "nombre": "Ánfo",
+      "esperados": [
+        24
+      ],
+      "codigo": [
+        24
+      ],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 1704,
+      "usd": 0.000222
+    },
+    {
+      "caso": "d07",
+      "clase": "trampa",
+      "nombre": "Bemer",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 1755,
+      "usd": 0.000219
+    },
+    {
+      "caso": "s01",
+      "clase": "siglas",
+      "nombre": "Benemérita Universidad Autónoma de Puebla",
+      "esperados": [
+        1,
+        23
+      ],
+      "codigo": [
+        1,
+        23
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "s02",
+      "clase": "siglas",
+      "nombre": "Universidad de las Américas Puebla",
+      "esperados": [
+        2
+      ],
+      "codigo": [
+        2
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "s03",
+      "clase": "siglas",
+      "nombre": "Instituto Mexicano del Seguro Social",
+      "esperados": [
+        4
+      ],
+      "codigo": [
+        4
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "s04",
+      "clase": "siglas",
+      "nombre": "Comisión Federal de Electricidad",
+      "esperados": [
+        5
+      ],
+      "codigo": [
+        5
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "s05",
+      "clase": "siglas",
+      "nombre": "Pemex",
+      "esperados": [
+        6
+      ],
+      "codigo": [
+        6
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "s06",
+      "clase": "siglas",
+      "nombre": "Instituto Panamericano de Alta Dirección de Empresa",
+      "esperados": [
+        26
+      ],
+      "codigo": [
+        26
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "s07",
+      "clase": "siglas",
+      "nombre": "Universidad Autónoma de Puebla",
+      "esperados": [
+        1
+      ],
+      "codigo": [
+        1
+      ],
+      "codigoAlta": false,
+      "ia": [
+        1
+      ],
+      "ms": 1102,
+      "usd": 0.000107
+    },
+    {
+      "caso": "c01",
+      "clase": "conocer",
+      "nombre": "ITESM",
+      "esperados": [
+        3
+      ],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [
+        3
+      ],
+      "ms": 1199,
+      "usd": 0.000112
+    },
+    {
+      "caso": "c02",
+      "clase": "conocer",
+      "nombre": "Banorte",
+      "esperados": [
+        10
+      ],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [
+        10
+      ],
+      "ms": 1074,
+      "usd": 0.00012
+    },
+    {
+      "caso": "c03",
+      "clase": "conocer",
+      "nombre": "Conagua",
+      "esperados": [
+        11
+      ],
+      "codigo": [
+        11
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "c04",
+      "clase": "conocer",
+      "nombre": "Seguro Social",
+      "esperados": [
+        4
+      ],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [
+        4
+      ],
+      "ms": 1154,
+      "usd": 0.000108
+    },
+    {
+      "caso": "c05",
+      "clase": "conocer",
+      "nombre": "Sedena",
+      "esperados": [
+        25
+      ],
+      "codigo": [
+        25
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "c06",
+      "clase": "conocer",
+      "nombre": "Benemérita",
+      "esperados": [
+        1,
+        23
+      ],
+      "codigo": [
+        23
+      ],
+      "codigoAlta": false,
+      "ia": [
+        1
+      ],
+      "ms": 1129,
+      "usd": 0.00011
+    },
+    {
+      "caso": "c07",
+      "clase": "conocer",
+      "nombre": "La Autónoma de Puebla",
+      "esperados": [
+        1
+      ],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [
+        1
+      ],
+      "ms": 941,
+      "usd": 0.000107
+    },
+    {
+      "caso": "c08",
+      "clase": "conocer",
+      "nombre": "Tec de Monterrey",
+      "esperados": [
+        3
+      ],
+      "codigo": [
+        3
+      ],
+      "codigoAlta": false,
+      "ia": [
+        3
+      ],
+      "ms": 927,
+      "usd": 0.000113
+    },
+    {
+      "caso": "c09",
+      "clase": "conocer",
+      "nombre": "Ibero Puebla",
+      "esperados": [
+        8
+      ],
+      "codigo": [
+        8
+      ],
+      "codigoAlta": false,
+      "ia": [
+        8
+      ],
+      "ms": 894,
+      "usd": 0.000107
+    },
+    {
+      "caso": "c10",
+      "clase": "conocer",
+      "nombre": "VW",
+      "esperados": [
+        13
+      ],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [
+        13
+      ],
+      "ms": 1220,
+      "usd": 0.0001
+    },
+    {
+      "caso": "c11",
+      "clase": "conocer",
+      "nombre": "Luz y fuerza CFE",
+      "esperados": [
+        5
+      ],
+      "codigo": [
+        5
+      ],
+      "codigoAlta": false,
+      "ia": [
+        5
+      ],
+      "ms": 1048,
+      "usd": 0.000109
+    },
+    {
+      "caso": "c12",
+      "clase": "conocer",
+      "nombre": "Grupo Volkswagen Puebla",
+      "esperados": [
+        13
+      ],
+      "codigo": [
+        13
+      ],
+      "codigoAlta": true,
+      "ia": null,
+      "ms": null,
+      "usd": null
+    },
+    {
+      "caso": "t01",
+      "clase": "trampa",
+      "nombre": "UPAEP",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 852,
+      "usd": 0.000088
+    },
+    {
+      "caso": "t02",
+      "clase": "trampa",
+      "nombre": "Universidad Popular Autónoma del Estado de Puebla",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 1042,
+      "usd": 0.00011
+    },
+    {
+      "caso": "t03",
+      "clase": "trampa",
+      "nombre": "ISSSTE",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 829,
+      "usd": 0.000094
+    },
+    {
+      "caso": "t04",
+      "clase": "trampa",
+      "nombre": "Cinemex",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [
+        14
+      ],
+      "ms": 860,
+      "usd": 0.0001
+    },
+    {
+      "caso": "t05",
+      "clase": "trampa",
+      "nombre": "Bodega Aurrerá",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [
+        15
+      ],
+      "ms": 849,
+      "usd": 0.000105
+    },
+    {
+      "caso": "t06",
+      "clase": "trampa",
+      "nombre": "Suburbia",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [
+        9
+      ],
+      "ms": 868,
+      "usd": 0.000103
+    },
+    {
+      "caso": "t07",
+      "clase": "trampa",
+      "nombre": "Colegio Americano",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 793,
+      "usd": 0.000082
+    },
+    {
+      "caso": "t08",
+      "clase": "trampa",
+      "nombre": "Hotel Presidente Puebla",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 753,
+      "usd": 0.000085
+    },
+    {
+      "caso": "t09",
+      "clase": "trampa",
+      "nombre": "Banco Azteca",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 1029,
+      "usd": 0.00009
+    },
+    {
+      "caso": "t10",
+      "clase": "trampa",
+      "nombre": "Farmacias Guadalajara",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 948,
+      "usd": 0.000089
+    },
+    {
+      "caso": "t11",
+      "clase": "trampa",
+      "nombre": "Tecnológico de Puebla",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 879,
+      "usd": 0.000084
+    },
+    {
+      "caso": "t12",
+      "clase": "trampa",
+      "nombre": "Hospital Puebla",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 912,
+      "usd": 0.000082
+    },
+    {
+      "caso": "t13",
+      "clase": "trampa",
+      "nombre": "Grupo Lala",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 1182,
+      "usd": 0.000108
+    },
+    {
+      "caso": "t14",
+      "clase": "trampa",
+      "nombre": "CFA Consultores",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 873,
+      "usd": 0.000082
+    },
+    {
+      "caso": "n01",
+      "clase": "nuevo",
+      "nombre": "Toks",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 993,
+      "usd": 0.000087
+    },
+    {
+      "caso": "n02",
+      "clase": "nuevo",
+      "nombre": "Sephora",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 887,
+      "usd": 0.00008
+    },
+    {
+      "caso": "n03",
+      "clase": "nuevo",
+      "nombre": "Kiosko",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 867,
+      "usd": 0.00008
+    },
+    {
+      "caso": "n04",
+      "clase": "nuevo",
+      "nombre": "Materiales Hernández",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 921,
+      "usd": 0.000082
+    },
+    {
+      "caso": "n05",
+      "clase": "nuevo",
+      "nombre": "Taquería El Fogón",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 693,
+      "usd": 0.000083
+    },
+    {
+      "caso": "n06",
+      "clase": "nuevo",
+      "nombre": "Refaccionaria López",
+      "esperados": [],
+      "codigo": [],
+      "codigoAlta": false,
+      "ia": [],
+      "ms": 766,
+      "usd": 0.000082
+    }
+  ]
+}

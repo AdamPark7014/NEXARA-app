@@ -251,6 +251,8 @@ export class CotizacionesService {
         status: 'Activo',
         tipo: 'COMERCIAL',
         sectors: ['COMERCIAL'],
+        // Esta vía no tiene dónde preguntar «¿es este?»: la decide quien llama.
+        confirmarNuevo: true,
       },
       quien ?? undefined,
       companyId,
@@ -330,11 +332,12 @@ export class CotizacionesService {
 
     // Toda cotización debe quedar ligada a un cliente comercial (maestro CRM),
     // no solo a texto libre: si no vino salesClientId ni oportunidad, se
-    // busca o crea el SalesClient a partir del nombre capturado.
-    if (!salesClientId) {
-      if (!clientName) {
-        throw new BadRequestException('La cotización requiere un cliente: selecciona uno existente o captura al menos el nombre.');
-      }
+    // busca o crea el SalesClient a partir del nombre capturado. El editor de Core lo pide a
+    // mano (`clienteSinAlta`): autoguarda mientras se escribe y no debe crear nombres a medias.
+    if (!salesClientId && !clientName) {
+      throw new BadRequestException('La cotización requiere un cliente: selecciona uno existente o captura al menos el nombre.');
+    }
+    if (!salesClientId && clientName && !dto.clienteSinAlta) {
       const salesClient = await this.clientePorNombreOAlta(
         clientName,
         {
@@ -809,7 +812,7 @@ export class CotizacionesService {
       salesClientIdResuelto === null ||
       (salesClientIdResuelto === undefined && existing.salesClientId == null);
 
-    if (quedaSinCliente && nombreNuevo) {
+    if (quedaSinCliente && nombreNuevo && !dto.clienteSinAlta) {
       if (tenantId == null) {
         throw new BadRequestException('La cotización no tiene empresa; no se puede dar de alta el cliente.');
       }
@@ -1328,6 +1331,10 @@ export class CotizacionesService {
     }
     if (!quote.items?.length) {
       throw new BadRequestException('Agrega al menos una partida antes de enviar la cotización.');
+    }
+    // El borrador puede llevar el cliente como texto (`clienteSinAlta`); enviada ya no.
+    if (!quote.salesClientId) {
+      throw new BadRequestException('Elige o crea el cliente antes de enviar la cotización.');
     }
     // Si la empresa fijó un tope y esta cotización lo supera, sale solo con la autorización de dirección.
     await this.aprobacionPorMonto?.exigir({

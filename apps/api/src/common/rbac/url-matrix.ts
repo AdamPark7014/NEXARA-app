@@ -290,6 +290,7 @@ export const CLIENTES_CORE_URL_RULES: UrlRule[] = [
 export const CLIENT_ADMIN_WRITE_URL_RULES: UrlRule[] = [
   { path: '/api/ventas/clientes/permisos', methods: ['GET'], scope: 'read' },
   { path: '/api/ventas/clientes', methods: ['POST'], scope: 'write' },
+  { path: '/api/ventas/clientes/parecidos', methods: ['POST'], scope: 'read' },
   { path: '/api/ventas/clientes/*', methods: ['PATCH'], scope: 'write' },
 ];
 

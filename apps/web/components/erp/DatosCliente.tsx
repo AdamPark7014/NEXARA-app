@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
 import { formatApiError } from "@/lib/erp-api";
 import {
-  createSalesClient,
   getSalesClient,
   updateSalesClient,
   type SalesClient,
 } from "@/lib/sales-api";
+import { ClienteRapido } from "./ClienteRapido";
 import styles from "./DatosCliente.module.css";
 
 export type TipoCliente = "COMERCIAL" | "PROYECTO" | "CORPORATIVO";
@@ -167,9 +167,8 @@ export function DatosClienteOpcionales({
 }
 
 /**
- * Buscador de un solo tipo de cliente: elegir uno que ya existe, crearlo con el nombre
- * o, en una actividad de servicio, dar de alta un corporativo (nombre obligatorio;
- * correo, teléfono y RFC opcionales).
+ * Selector de un solo tipo de cliente: elegir uno que ya existe o crearlo con el nombre. Si se
+ * parece a otro avisa antes de crear; los datos se completan después.
  */
 export function ClienteTipoPicker({
   token,
@@ -178,9 +177,7 @@ export function ClienteTipoPicker({
   editable,
   puedeCrear,
   puedeEditar,
-  soloContacto,
   altaSoloNombre,
-  altaCorporativa,
   clientes,
   onSelect,
   onCreado,
@@ -191,149 +188,38 @@ export function ClienteTipoPicker({
   editable: boolean;
   puedeCrear: boolean;
   puedeEditar: boolean;
-  soloContacto?: boolean;
-  /** Alta de un cliente de proyecto: solo el nombre, sin contacto ni datos fiscales. */
+  /** Alta de un cliente de proyecto sin permiso de padrón: solo el nombre. */
   altaSoloNombre?: boolean;
-  /** Actividad de servicio: nombre obligatorio; correo, teléfono y RFC opcionales. */
-  altaCorporativa?: boolean;
   clientes: SalesClient[];
   onSelect: (cliente: SalesClient) => void | Promise<void>;
+  /** Un cliente que la lista aún no traía: el recién creado o el que se reutilizó del aviso. */
   onCreado: (cliente: SalesClient) => void;
 }) {
-  const [q, setQ] = useState("");
-  const [correo, setCorreo] = useState("");
-  const [telefono, setTelefono] = useState("");
-  const [rfc, setRfc] = useState("");
-  const [creando, setCreando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const texto = q.trim().toLowerCase();
-  const visibles = (texto
-    ? clientes.filter((c) => `${c.name} ${c.legalName ?? ""}`.toLowerCase().includes(texto))
-    : clientes
-  ).slice(0, 40);
-  const elegido = clientes.find((c) => c.id === salesClientId) ?? null;
-
+  const armar = useCallback(
+    (nombre: string) =>
+      tipo !== "PROYECTO"
+        ? { name: nombre, status: "Activo" as const, tipo, altaRapida: true }
+        : altaSoloNombre
+          ? { name: nombre, status: "Activo" as const, tipo, altaProyecto: true }
+          : { name: nombre, status: "Activo" as const, tipo, sectors: [tipo] },
+    [tipo, altaSoloNombre],
+  );
   return (
-    <div className={styles.bloque}>
-      <input
-        className="input"
-        type="search"
-        value={q}
-        disabled={!editable}
-        placeholder={
-          tipo === "CORPORATIVO"
-            ? "Buscar cliente corporativo"
-            : tipo === "PROYECTO"
-              ? "Buscar cliente de proyecto"
-              : "Buscar cliente comercial"
-        }
-        aria-label="Buscar cliente"
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <select
-        className="input"
-        aria-label="Cliente"
-        disabled={!editable}
-        value={salesClientId ? String(salesClientId) : ""}
-        onChange={(e) => {
-          const id = Number(e.target.value);
-          const c = clientes.find((row) => row.id === id);
-          if (c) void onSelect(c);
-        }}
-      >
-        <option value="">{clientes.length ? `Elige un cliente (${visibles.length})` : "Sin clientes de este tipo"}</option>
-        {visibles.map((c) => (
-          <option key={c.id} value={String(c.id)}>
-            {c.name}
-            {c.legalName && c.legalName !== c.name ? ` — ${c.legalName}` : ""}
-          </option>
-        ))}
-      </select>
-      {puedeCrear && editable ? (
-        <div className={styles.bloque}>
-          <p className={styles.nota}>
-            {altaCorporativa
-              ? "Solo el nombre es obligatorio; correo, teléfono y RFC se pueden dejar vacíos."
-              : altaSoloNombre
-                ? "Si no está en la lista, créalo con el nombre; lo demás se completa después en Proyectos."
-                : soloContacto
-                  ? "Puedes dar de alta aquí el nombre y el contacto; el RFC lo completa después coordinación."
-                  : "Si no está en la lista, créalo con el nombre; los datos fiscales se completan después."}
-          </p>
-          {altaCorporativa || soloContacto ? (
-            <div className={styles.fila}>
-              <label className={styles.campo}>
-                <span>Correo</span>
-                <input className="input" type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} maxLength={200} />
-              </label>
-              <label className={styles.campo}>
-                <span>Teléfono</span>
-                <input className="input" value={telefono} onChange={(e) => setTelefono(e.target.value)} maxLength={60} />
-              </label>
-              {altaCorporativa ? (
-                <label className={styles.campo}>
-                  <span>RFC</span>
-                  <input className="input" value={rfc} onChange={(e) => setRfc(e.target.value)} maxLength={40} />
-                </label>
-              ) : null}
-            </div>
-          ) : null}
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={creando || q.trim().length < 2 || !token}
-            onClick={() => {
-              if (!token) return;
-              setCreando(true);
-              setError(null);
-              const payload = altaCorporativa
-                ? {
-                    name: q.trim(),
-                    status: "Activo" as const,
-                    tipo: "CORPORATIVO" as const,
-                    altaRapida: true,
-                    billingEmail: correo.trim() || undefined,
-                    billingPhone: telefono.trim() || undefined,
-                    taxId: rfc.trim() || undefined,
-                  }
-                : altaSoloNombre
-                  ? { name: q.trim(), status: "Activo" as const, tipo: "PROYECTO" as const, altaProyecto: true }
-                  : soloContacto
-                    ? {
-                        name: q.trim(),
-                        status: "Activo" as const,
-                        tipo,
-                        altaRapida: true,
-                        billingEmail: correo.trim() || undefined,
-                        billingPhone: telefono.trim() || undefined,
-                      }
-                    : { name: q.trim(), status: "Activo" as const, tipo, sectors: [tipo] };
-              createSalesClient(token, payload)
-                .then((creado) => {
-                  onCreado(creado);
-                  setQ("");
-                  setCorreo("");
-                  setTelefono("");
-                  setRfc("");
-                })
-                .catch((e) => setError(formatApiError(e, "No se pudo crear el cliente")))
-                .finally(() => setCreando(false));
-            }}
-          >
-            {creando ? "Creando…" : altaCorporativa ? "+ Nuevo cliente corporativo" : "Crear cliente"}
-          </Button>
-        </div>
-      ) : null}
-      {error ? <p className={styles.error}>{error}</p> : null}
-      {elegido ? <p className={styles.nota}>Cliente: {elegido.name}</p> : null}
-      <DatosClienteOpcionales
-        token={token}
-        clientId={puedeEditar ? salesClientId : null}
-        puedeEditar={puedeEditar && editable}
-        textoBoton={altaCorporativa ? "Editar" : undefined}
-      />
-    </div>
+    <ClienteRapido
+      token={token}
+      clientes={clientes}
+      salesClientId={salesClientId}
+      editable={editable}
+      puedeCrear={puedeCrear}
+      armar={armar}
+      onElegido={(cliente, { enLista }) => (enLista ? onSelect(cliente) : onCreado(cliente))}
+      pie={
+        <DatosClienteOpcionales
+          token={token}
+          clientId={puedeEditar ? salesClientId : null}
+          puedeEditar={puedeEditar && editable}
+        />
+      }
+    />
   );
 }

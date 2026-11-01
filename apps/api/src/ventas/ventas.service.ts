@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject, forwardRef, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException, Inject, forwardRef, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CotizacionesService } from '../cotizaciones/cotizaciones.service.js';
@@ -55,11 +55,16 @@ import {
   esGerenteDeVentas,
   esSuperAdmin,
   gestionaElPadron,
+  porQueNoUsaSectores,
   puedeAbrirDelDueno,
   puedeVerCliente,
   tienePersonalACargo,
   vePadronDeLaEmpresa as vePadronDe,
 } from './client-access.js';
+import { clientesParecidos } from './clientes-parecidos.js';
+import { padronParaComparar } from './clientes-parecidos.service.js';
+import { checkUrlAccess } from '../common/rbac/url-matrix.js';
+import type { RoleKey } from '../common/rbac/roles.v2.js';
 
 @Injectable()
 export class VentasService {
@@ -125,7 +130,7 @@ export class VentasService {
 
   /**
    * Tipo principal: con el que nace el cliente (después puede sumar los otros).
-   * `tipo` gana. El alta rápida de servicio es CORPORATIVO aunque el sector del padrón
+   * `tipo` gana. El alta rápida es CORPORATIVO o COMERCIAL aunque el sector del padrón
    * de quien asigna sea otro.
    * Sin nada explícito: el único sector de su área, o COMERCIAL si tiene varios o ninguno.
    */
@@ -143,13 +148,14 @@ export class VentasService {
       return 'PROYECTO';
     }
     if (dto.altaRapida) {
-      if (dto.tipo && dto.tipo !== 'CORPORATIVO') {
-        throw new BadRequestException('El alta rápida solo crea clientes corporativos.');
+      const tipo = dto.tipo ?? 'CORPORATIVO';
+      if (tipo !== 'CORPORATIVO' && tipo !== 'COMERCIAL') {
+        throw new BadRequestException('El alta rápida solo crea clientes corporativos o comerciales.');
       }
-      if (dto.sectors?.some((s) => s !== 'CORPORATIVO')) {
-        throw new BadRequestException('El alta rápida solo crea clientes corporativos.');
+      if (dto.sectors?.some((s) => s !== tipo)) {
+        throw new BadRequestException('El alta rápida solo crea clientes de un tipo.');
       }
-      return 'CORPORATIVO';
+      return tipo;
     }
     if (dto.tipo && isClientSector(dto.tipo)) return dto.tipo;
     if (dto.sectors?.length) {
@@ -204,7 +210,7 @@ export class VentasService {
   /** Nombre obligatorio. Correo, teléfono y RFC opcionales. Lo demás se rechaza. */
   private assertAltaRapida(dto: CreateSalesClientDto) {
     if (isInactiveClientStatus(dto.status)) {
-      throw new BadRequestException('El alta rápida de un cliente corporativo lo deja activo.');
+      throw new BadRequestException('El alta rápida de un cliente lo deja activo.');
     }
     const pesados: Array<keyof CreateSalesClientDto> = [
       'legalName',
@@ -220,7 +226,7 @@ export class VentasService {
     for (const campo of pesados) {
       if (String(dto[campo] ?? '').trim()) {
         throw new BadRequestException(
-          'En el alta rápida de una actividad de servicio solo se guarda el nombre y, si vienen, correo, teléfono y RFC.',
+          'En el alta rápida solo se guarda el nombre y, si vienen, correo, teléfono y RFC.',
         );
       }
     }
@@ -478,7 +484,18 @@ export class VentasService {
     const actor = { id: user?.id, email: user?.email, roleKey: user?.roleKey };
     const owner = canDeleteOrDeactivateClient(actor);
     const reports = owner ? false : await this.hasDirectReports(user?.id);
-    return clientPermissions(actor, reports);
+    return { ...clientPermissions(actor, reports), puedeAltaRapida: this.llegaAlAlta(user) };
+  }
+
+  /**
+   * El alta de último momento la puede quien llega a la ruta: la matriz deja fuera a ingenieros
+   * y operativos, que además solo crean tareas (sin cliente), y al portal de clientes.
+   */
+  private llegaAlAlta(user?: any): boolean {
+    if (this.isSuperAdminUser(user)) return true;
+    const rol = String(user?.roleKey || '').trim();
+    if (!rol) return Boolean(user);
+    return checkUrlAccess(rol as RoleKey, '/api/ventas/clientes', 'POST').allowed;
   }
 
   private async assertCanManageClients(user?: any) {
@@ -496,7 +513,7 @@ export class VentasService {
   async createClient(dto: CreateSalesClientDto, user?: any, companyId?: number | null) {
     const tipo = this.resolveTipo(dto, user);
     const altaProyecto = Boolean(dto.altaProyecto);
-    const rapida = !altaProyecto && Boolean(dto.altaRapida) && tipo === 'CORPORATIVO';
+    const rapida = !altaProyecto && Boolean(dto.altaRapida);
     const minima = rapida || altaProyecto;
     const sectores = this.resolveSectores(dto, tipo, minima);
     if (altaProyecto) {
@@ -516,11 +533,36 @@ export class VentasService {
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
     const nombre = nombreClienteLimpio(dto.name) || dto.name;
 
+    // «Usar este» en el aviso de parecidos: ese cliente, de esta empresa, con la misma puerta.
+    if (dto.reutilizarId) {
+      const elegido = await this.prisma.salesClient.findFirst({
+        where: { id: dto.reutilizarId, companyId: resolvedCompanyId },
+        include: this.clientInclude(),
+      });
+      if (!elegido || isInactiveClientStatus(elegido.status)) {
+        throw new NotFoundException('Ese cliente ya no está disponible');
+      }
+      return this.reutilizarCliente(elegido, dto, sectores, { rapida, altaProyecto }, user);
+    }
+
     // Un solo padrón: si el cliente ya existe (lo dio de alta otra área, una cotización o
     // una actividad), no se duplica. Se le suma el tipo que pide esta alta y se usa ese.
     const existente = await this.clienteVigenteConEseNombre(nombre, resolvedCompanyId);
     if (existente) {
       return this.reutilizarCliente(existente, dto, sectores, { rapida, altaProyecto }, user);
+    }
+
+    // Casi seguro repetido («Benemérita Universidad Autónoma de Puebla» y BUAP): no entra sin que
+    // alguien lo haya visto. La web pregunta antes con `parecidos`; esto cubre cualquier otra vía.
+    if (!dto.confirmarNuevo) {
+      const parecidos = clientesParecidos(
+        { nombre, razonSocial: minima ? null : dto.legalName, rfc: altaProyecto ? null : dto.taxId },
+        await padronParaComparar(this.prisma, resolvedCompanyId),
+      ).filter((p) => p.confianza === 'alta');
+      if (parecidos.length) {
+        const nombres = parecidos.slice(0, 3).map((p) => p.cliente.name).join(', ');
+        throw new ConflictException(`Ya hay un cliente muy parecido: ${nombres}. Elígelo, o confirma que es otro.`);
+      }
     }
 
     const created = await this.prisma.salesClient.create({
@@ -619,7 +661,10 @@ export class VentasService {
       throw new ForbiddenException(CLIENT_REUSE_FORBIDDEN);
     }
     const yaTiene = sectoresDelCliente(existente);
-    const faltan = sectores.filter((s) => !yaTiene.includes(s));
+    // En el alta de último momento, el tipo que esa persona no lleva no estorba: usa al cliente tal cual.
+    const faltan = sectores
+      .filter((s) => !yaTiene.includes(s))
+      .filter((s) => !alta.rapida || !porQueNoUsaSectores(user, [s]));
     const actual = existente as unknown as Record<string, unknown>;
     const relleno: Record<string, string> = {};
     const llenar = (campo: string, valor?: string | null) => {

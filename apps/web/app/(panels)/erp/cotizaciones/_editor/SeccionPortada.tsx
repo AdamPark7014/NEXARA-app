@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import PersonAddAlt1OutlinedIcon from "@mui/icons-material/PersonAddAlt1Outlined";
 import { Badge, Button, DateInput, Input } from "@/components/base";
 import { DatosClienteOpcionales } from "@/components/erp/DatosCliente";
+import { AvisoParecidos, useAltaCliente, useParecidosEnVivo } from "@/components/erp/ClienteRapido";
 import { useUser } from "@/components/UserContext";
 import { clientSectorsForUser } from "@/lib/client-sectors";
-import { formatApiError } from "@/lib/erp-api";
-import { createSalesClient, getClientPermissions, listSalesClients, type SalesClient } from "@/lib/sales-api";
+import { getClientPermissions, listSalesClients, type SalesClient } from "@/lib/sales-api";
 import { SEGMENTOS, SEGMENTO_LABEL, type Segmento } from "@/lib/cotizaciones-api";
 import type { DocumentoCotizacion } from "@/lib/cotizacion-documento";
 import { Ayuda, Campo, Hoja, Segmentado, TextoAuto } from "./campos";
@@ -23,7 +23,10 @@ const QUE_CAMBIA: Record<Segmento, string> = {
 
 type Cambiar = (cambio: (doc: DocumentoCotizacion) => DocumentoCotizacion) => void;
 
-/** Buscador de cliente: elige uno del CRM o escribe uno nuevo (se da de alta al guardar). */
+/**
+ * Buscador de cliente: elige uno del padrón o crea uno con el nombre. Escribir solo guarda el texto
+ * en el borrador: el autoguardado no da de alta a nadie (así nacieron «Benemer» y «Bodega de»).
+ */
 export function ClienteCombo({
   doc,
   cambiar,
@@ -41,10 +44,8 @@ export function ClienteCombo({
 }) {
   const { user } = useUser();
   const [clientes, setClientes] = useState<SalesClient[] | null>(null);
-  const [puedeAgregar, setPuedeAgregar] = useState(false);
+  const [puedeAltaRapida, setPuedeAltaRapida] = useState(false);
   const [puedeEditar, setPuedeEditar] = useState(false);
-  const [creando, setCreando] = useState(false);
-  const [errorAlta, setErrorAlta] = useState<string | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [activo, setActivo] = useState(0);
   const listaId = useId();
@@ -70,12 +71,12 @@ export function ClienteCombo({
     getClientPermissions(token)
       .then((p) => {
         if (!vivo) return;
-        setPuedeAgregar(Boolean(p?.puedeAgregar));
+        setPuedeAltaRapida(Boolean(p?.puedeAltaRapida));
         setPuedeEditar(Boolean(p?.puedeEditar));
       })
       .catch(() => {
         if (!vivo) return;
-        setPuedeAgregar(false);
+        setPuedeAltaRapida(false);
         setPuedeEditar(false);
       });
     return () => {
@@ -92,23 +93,49 @@ export function ClienteCombo({
     return filtrados.slice(0, 100);
   }, [clientes, doc.clientName]);
 
+  const elegir = useCallback(
+    (c: SalesClient) => {
+      cambiar((d) => ({
+        ...d,
+        salesClientId: c.id,
+        clientName: c.name,
+        clientCompany: c.legalName ?? "",
+        clientEmail: d.clientEmail || c.billingEmail || "",
+        clientPhone: d.clientPhone || c.billingPhone || "",
+      }));
+      setAbierto(false);
+    },
+    [cambiar],
+  );
+
+  const armarAlta = useCallback(
+    (nombre: string) => ({ name: nombre, status: "Activo" as const, tipo: "COMERCIAL" as const, altaRapida: true }),
+    [],
+  );
+  const alListo = useCallback(
+    (creado: SalesClient) => {
+      setClientes((prev) => {
+        const lista = (prev ?? []).filter((c) => c.id !== creado.id);
+        return [...lista, creado].sort((a, b) => a.name.localeCompare(b.name, "es"));
+      });
+      elegir(creado);
+    },
+    [elegir],
+  );
+  const alta = useAltaCliente({ token, armar: armarAlta, onListo: alListo });
+
+  const sinLigar = Boolean(doc.clientName.trim()) && !doc.salesClientId;
+  const parecidos = useParecidosEnVivo(token, doc.clientName, sinLigar && abierto && !alta.aviso);
+  const sugeridos = useMemo(() => {
+    const ya = new Set(coincidencias.map((c) => c.id));
+    return parecidos.filter((p) => p.puedeUsar && !ya.has(p.id));
+  }, [parecidos, coincidencias]);
+
   useEffect(() => {
     if (!porTeclado.current) return;
     porTeclado.current = false;
     document.getElementById(`${listaId}-${activo}`)?.scrollIntoView({ block: "nearest" });
   }, [activo, listaId]);
-
-  const elegir = (c: SalesClient) => {
-    cambiar((d) => ({
-      ...d,
-      salesClientId: c.id,
-      clientName: c.name,
-      clientCompany: c.legalName ?? "",
-      clientEmail: d.clientEmail || c.billingEmail || "",
-      clientPhone: d.clientPhone || c.billingPhone || "",
-    }));
-    setAbierto(false);
-  };
 
   const alTeclear = (e: KeyboardEvent<HTMLInputElement>) => {
     if (!abierto || !coincidencias.length) {
@@ -132,27 +159,9 @@ export function ClienteCombo({
     }
   };
 
-  const mostrar = abierto && editable && coincidencias.length > 0;
+  const mostrar = abierto && editable && (coincidencias.length > 0 || sugeridos.length > 0);
   const exacto = clientes?.some((c) => c.id === doc.salesClientId);
-  const puedeCrearComercial = puedeAgregar && clientSectorsForUser(user).includes("COMERCIAL");
   const puedeEditarComercial = puedeEditar && clientSectorsForUser(user).includes("COMERCIAL");
-
-  const crearAhora = () => {
-    const nombre = doc.clientName.trim();
-    if (!token || nombre.length < 2 || !puedeCrearComercial) return;
-    setCreando(true);
-    setErrorAlta(null);
-    createSalesClient(token, { name: nombre, status: "Activo", tipo: "COMERCIAL", sectors: ["COMERCIAL"] })
-      .then((creado) => {
-        setClientes((prev) => {
-          const lista = (prev ?? []).filter((c) => c.id !== creado.id);
-          return [...lista, creado].sort((a, b) => a.name.localeCompare(b.name, "es"));
-        });
-        elegir(creado);
-      })
-      .catch((e) => setErrorAlta(formatApiError(e, "No se pudo crear el cliente")))
-      .finally(() => setCreando(false));
-  };
 
   return (
     <div className={styles.combo}>
@@ -178,7 +187,8 @@ export function ClienteCombo({
           const valor = e.target.value;
           setAbierto(true);
           setActivo(0);
-          // Escribir otro nombre desliga el cliente del CRM: al guardar se busca o se da de alta.
+          // Escribir otro nombre desliga el cliente: queda como texto hasta que lo elijan o lo creen.
+          if (alta.aviso || alta.error) alta.descartar();
           cambiar((d) => ({ ...d, clientName: valor, salesClientId: null, clientCompany: "" }));
         }}
       />
@@ -189,6 +199,22 @@ export function ClienteCombo({
           className={styles.opciones}
           onMouseDown={(e) => e.preventDefault()}
         >
+          {sugeridos.map((p) => (
+            <li
+              key={`p${p.id}`}
+              role="option"
+              aria-selected={false}
+              className={styles.opcion}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setAbierto(false);
+                void alta.usar(p);
+              }}
+            >
+              <span>{p.nombre}</span>
+              <small>Se parece: {p.porque.toLowerCase()}</small>
+            </li>
+          ))}
           {coincidencias.map((c, i) => (
             <li
               key={c.id}
@@ -209,19 +235,19 @@ export function ClienteCombo({
           ))}
         </ul>
       ) : null}
-      {doc.clientName.trim() && !doc.salesClientId && clientes && !exacto ? (
-        puedeCrearComercial ? (
+      {doc.clientName.trim() && !doc.salesClientId && clientes && !exacto && !alta.aviso ? (
+        puedeAltaRapida ? (
           <Button
             variant="tonal"
             size="sm"
             className={styles.comboAccion}
             iconStart={<PersonAddAlt1OutlinedIcon />}
-            loading={creando}
+            loading={alta.ocupado}
             disabled={doc.clientName.trim().length < 2}
             onMouseDown={(e) => e.preventDefault()}
-            onClick={crearAhora}
+            onClick={() => void alta.pedir(doc.clientName)}
           >
-            {creando ? "Creando…" : "Crear cliente comercial"}
+            {alta.ocupado ? "Revisando si ya existe…" : `Crear «${doc.clientName.trim()}» con solo el nombre`}
           </Button>
         ) : (
           <Badge
@@ -234,9 +260,21 @@ export function ClienteCombo({
           </Badge>
         )
       ) : null}
-      {errorAlta ? (
+      {alta.aviso ? (
+        <div className={styles.comboAccion}>
+          <AvisoParecidos
+            nombre={alta.aviso.nombre}
+            parecidos={alta.aviso.parecidos}
+            ocupado={alta.ocupado}
+            onUsar={(p) => void alta.usar(p)}
+            onCrearOtro={alta.crearOtro}
+            onCancelar={alta.descartar}
+          />
+        </div>
+      ) : null}
+      {alta.error ? (
         <p className={styles.pistaError} role="alert">
-          {errorAlta}
+          {alta.error}
         </p>
       ) : null}
       <DatosClienteOpcionales
