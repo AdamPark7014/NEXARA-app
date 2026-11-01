@@ -1,7 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { PLATFORM_OWNER_EMAIL, isDeveloperSuperAdminEmail, isPlatformOwnerEmail } from '../common/platform-accounts.js';
+import {
+  PLATFORM_OWNER_EMAIL,
+  isCeoEquivalentEmail,
+  isDeveloperSuperAdminEmail,
+  isPlatformOwnerEmail,
+} from '../common/platform-accounts.js';
 import { UsersService } from './users.service.js';
 import type { CreateUserDto } from './dto/create-user.dto.js';
 import type { UpdateUserDto } from './dto/update-user.dto.js';
@@ -455,8 +460,12 @@ export class UsersDelegationService {
       select: { id: true, nombre: true, email: true, managerId: true, avatarUrl: true, isActive: true },
     });
     if (!destino || destino.isActive === false) throw new BadRequestException('No encontramos a esa persona.');
-    if (isPlatformOwnerEmail(destino.email) || isDeveloperSuperAdminEmail(destino.email)) {
+    if (isPlatformOwnerEmail(destino.email) || isDeveloperSuperAdminEmail(destino.email) || isCeoEquivalentEmail(destino.email)) {
       throw new ForbiddenException('Esa cuenta no se edita desde aquí.');
+    }
+    // Súper admin no se reparte desde la delegación: solo lo da la plataforma.
+    if (cambio.roleKey === 'super_admin') {
+      throw new ForbiddenException('Ese tipo de usuario no se puede asignar desde aquí.');
     }
     if (!direccion && destino.managerId !== actor.id) {
       throw new ForbiddenException('Solo puedes editar a quien te reporta.');

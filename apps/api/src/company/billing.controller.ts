@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { CurrentUser } from '../common/current-user.decorator.js';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
@@ -23,6 +24,7 @@ export class BillingController {
   @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.COMPANY_SETTINGS_MANAGE] })
   update(
     @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
     @Body()
     body: Partial<{
       planCode: string;
@@ -32,6 +34,11 @@ export class BillingController {
       stripePriceId: string | null;
     }>,
   ) {
+    // El plan lo cambia el webhook de Stripe al cobrar; a mano, solo la plataforma. Antes un
+    // administrador de la empresa se ponía `active` y más asientos sin pagar.
+    if (!(user?.isSuperAdmin || user?.roleKey === 'super_admin')) {
+      throw new ForbiddenException('El plan se cambia al pagar; habla con NEXARA.');
+    }
     return this.billing.updatePlan(companyId, body);
   }
 

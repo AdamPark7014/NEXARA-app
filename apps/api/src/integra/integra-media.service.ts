@@ -12,6 +12,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { IntegraSiteService } from './integra-site.service';
+import { secretoGo2rtc, tokenDeStream } from './go2rtc-autorizacion';
 import {
   decidirLiberacionHd,
   dentroDelMargenHd,
@@ -38,6 +39,18 @@ export type { StreamQuality };
  * canal 3 y 302 su secundario. Una cámara suelta numera desde 1, así que su
  * secundario es siempre 102.
  */
+/**
+ * URL de go2rtc con la firma `nx` del stream: HLS se pide desde otro subdominio sin cookies, y el
+ * `forwardAuth` de Traefik solo deja pasar firmas válidas o sesiones (`go2rtc-autorizacion.ts`).
+ */
+function conFirmaGo2rtc(url: string, streamName: string): string {
+  try {
+    return `${url}&nx=${encodeURIComponent(tokenDeStream(streamName, secretoGo2rtc()))}`;
+  } catch {
+    return url;
+  }
+}
+
 const SUB_STREAM_ID = 102;
 const MAIN_STREAM_ID = 101;
 
@@ -876,7 +889,7 @@ export class IntegraMediaService {
         cameraIndexCode,
         provider,
         rtsp: rtspForResponse,
-        hls: `${publicBase}/api/stream.m3u8?src=${encodeURIComponent(nombreSub)}`,
+        hls: conFirmaGo2rtc(`${publicBase}/api/stream.m3u8?src=${encodeURIComponent(nombreSub)}`, nombreSub),
         streamName: nombreSub,
         hasAudio,
         audio: withAudio,
@@ -896,7 +909,7 @@ export class IntegraMediaService {
         this.logger.warn(`go2rtc PUT ${res.status}: ${detail}`);
       }
       const publicBase = this.go2rtcPublic() || internal;
-      const hls = `${publicBase}/api/stream.m3u8?src=${encodeURIComponent(streamName)}`;
+      const hls = conFirmaGo2rtc(`${publicBase}/api/stream.m3u8?src=${encodeURIComponent(streamName)}`, streamName);
       return {
         cameraIndexCode,
         provider,

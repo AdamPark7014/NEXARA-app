@@ -5,6 +5,8 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { UsersService } from './users.service.js';
 import { UsersDelegationService } from './users-delegation.service.js';
 import { MfaService } from './mfa.service.js';
+import { isCeoEquivalentEmail, isSuperAdminEmail } from '../common/platform-accounts.js';
+import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
 import { CreateDelegatedUserDto, UpdateDelegatedUserDto } from './dto/create-delegated-user.dto.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
@@ -18,6 +20,15 @@ import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { diskStorage } from 'multer';
 import * as fs from 'node:fs';
+
+/** JSON con las llaves ordenadas: el mismo `moduleAccess` en otro orden no cuenta como cambio. */
+function jsonEstable(valor: unknown): string {
+  return JSON.stringify(valor, (_k, v) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))
+      : v,
+  );
+}
 
 const buildAvatarUploadOptions = (dirname: string) => {
   const destination = getUsersUploadDir(dirname);
@@ -63,6 +74,50 @@ export class UsersController {
     private readonly delegation: UsersDelegationService,
     private readonly mfa: MfaService,
   ) {}
+
+  /**
+   * Quien administra usuarios (sin ser súper admin) no puede: tocar las cuentas de dirección y de la
+   * plataforma (correo, contraseña, rol), cambiarse su propio rol, correo o permisos, ni dar roles con
+   * permisos administrativos. Es la misma regla que ya tenía el alta.
+   *
+   * El formulario de edición siempre manda correo, rol y permisos: solo cuenta lo que cambia.
+   */
+  private async assertEdicionPermitida(
+    actor: { id?: number | string; isSuperAdmin?: boolean } | undefined,
+    userId: number,
+    dto: UpdateUserDto,
+    existente: { email?: string | null; roleId?: number | null; moduleAccess?: unknown } | null | undefined,
+  ) {
+    if (actor?.isSuperAdmin) return;
+    const propia = Number(actor?.id) === userId;
+    const protegida = (email?: string | null) => isSuperAdminEmail(email) || isCeoEquivalentEmail(email);
+    const correo = (email?: string | null) => String(email ?? '').trim().toLowerCase();
+    const cambiaCorreo = dto.email !== undefined && correo(dto.email) !== correo(existente?.email);
+    const cambiaRol = dto.roleId !== undefined && dto.roleId !== null && Number(dto.roleId) !== Number(existente?.roleId);
+    const cambiaPermisos =
+      dto.moduleAccess !== undefined && jsonEstable(dto.moduleAccess) !== jsonEstable(existente?.moduleAccess ?? null);
+    if ((protegida(existente?.email) && !propia) || (cambiaCorreo && protegida(dto.email))) {
+      throw new ForbiddenException('Las cuentas de dirección solo las edita un súper administrador.');
+    }
+    if (propia && (cambiaCorreo || cambiaRol || cambiaPermisos)) {
+      throw new ForbiddenException('No puedes cambiar tu propio rol, correo o permisos.');
+    }
+    if (cambiaRol && dto.roleId !== undefined && dto.roleId !== null) {
+      const rol = await this.usersService.getRoleById(dto.roleId);
+      if (!rol) throw new ForbiddenException('Rol destino no encontrado');
+      const administrativo = Boolean(
+        rol.accesoConsoleAdmin ||
+          rol.accesoGestionUsuarios ||
+          rol.accesoGestionTienda ||
+          rol.accesoGestionWeb ||
+          rol.accesoContabilidad ||
+          ['super_admin', 'ceo'].includes(String(rol.orgRoleKey ?? '')),
+      );
+      if (administrativo) {
+        throw new ForbiddenException('Solo superadmin puede asignar roles con permisos administrativos');
+      }
+    }
+  }
 
   /** Borra el archivo anterior cuando la foto fija cambia. Un fallo aquí no deshace el alta. */
   private olvidarAvatar(previous: string | null | undefined, next: string | null | undefined) {
@@ -403,7 +458,8 @@ export class UsersController {
   }
 
   @Get('orgchart')
-  @UseGuards(AuthGuard('jwt'))
+  // Solo personal: con el token del portal un cliente veía nombres, puestos y fotos del equipo.
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
   async getOrgchart(@CurrentCompanyId() companyId: number | null) {
     return this.usersService.getOrgchart(companyId);
   }
@@ -563,13 +619,18 @@ export class UsersController {
     @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() body: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.usersService.updateDocumentReview(+id, {
-      estatus: body.estatus || 'Pendiente',
-      observaciones: body.observaciones || null,
-      aprobadoPorId: user.id,
-      revisadoEn: new Date(),
-    });
+    return this.usersService.updateDocumentReview(
+      +id,
+      {
+        estatus: body.estatus || 'Pendiente',
+        observaciones: body.observaciones || null,
+        aprobadoPorId: user.id,
+        revisadoEn: new Date(),
+      },
+      companyId,
+    );
   }
 
   @Get('documents/:id/download')
@@ -579,8 +640,9 @@ export class UsersController {
     @CurrentUser() user: any,
     @Param('id') id: string,
     @Res() res: Response,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    const document = await this.usersService.getAuthorizedDocument(+id, user);
+    const document = await this.usersService.getAuthorizedDocument(+id, user, companyId);
     const fileName = basename(document.archivoUrl || 'documento.pdf');
     const absolutePath = join(this.userDocsUploadDir, fileName);
 
@@ -620,10 +682,12 @@ export class UsersController {
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
     @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() actor: any,
     @UploadedFile() file?: any,
   ) {
     const userId = +id;
     return this.usersService.findOne(userId, companyId).then(async (existingUser) => {
+      await this.assertEdicionPermitida(actor, userId, updateUserDto, existingUser);
       const previousAvatar = String(existingUser?.avatarUrl || '').trim();
 
       if (file) {

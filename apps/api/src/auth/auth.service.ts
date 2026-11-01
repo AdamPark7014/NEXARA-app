@@ -1054,6 +1054,16 @@ export class AuthService {
         });
       }
       if (!verifyTotp(user.mfaSecret, loginDto.mfaCode)) {
+        // Cuenta como intento fallido: sin esto, con la contraseña en la mano se podía probar
+        // códigos sin límite (solo el límite por IP).
+        const fallos = (user.failedLoginCount ?? 0) + 1;
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            failedLoginCount: fallos,
+            ...(fallos >= 5 ? { lockedUntil: new Date(Date.now() + 15 * 60_000) } : {}),
+          },
+        });
         throw new UnauthorizedException('Código MFA inválido');
       }
     }
@@ -1065,6 +1075,27 @@ export class AuthService {
   }
 
   /** Login vía OIDC (SSO). El IdP ya autenticó; no exige MFA local. */
+  /**
+   * «Cerrar sesión» revoca la sesión del token en el servidor (antes solo se borraba la cookie y el
+   * JWT seguía sirviendo hasta vencer). Solo esa sesión: las de otras pestañas o equipos siguen.
+   */
+  async revocarSesionDeToken(token: string | null): Promise<void> {
+    if (!token) return;
+    let claims: { sub?: number; jti?: string } | null = null;
+    try {
+      claims = this.jwtService.verify(token, { ignoreExpiration: true });
+    } catch {
+      return;
+    }
+    if (!claims?.jti || !claims.sub) return;
+    await this.prisma.userSession
+      .updateMany({
+        where: { jti: claims.jti, userId: Number(claims.sub), revokedAt: null },
+        data: { revokedAt: new Date(), revokeReason: 'logout' },
+      })
+      .catch(() => undefined);
+  }
+
   async loginWithOidcUser(user: any, req?: any, remember = false) {
     return this.issueSession(user, req, { authMethod: 'oidc', remember });
   }

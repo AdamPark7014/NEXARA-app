@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { IntegraController } from './integra.controller';
+import { IntegraGo2rtcAuthzController } from './integra-go2rtc-authz.controller';
 import { IntegraArtemisService } from './integra-artemis.service';
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraSyncService } from './integra-sync.service';
@@ -40,6 +41,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     NotificationsModule,
   ],
   controllers: [
+    IntegraGo2rtcAuthzController,
     IntegraController,
     IntegraEdgeController,
     IntegraEdgeAdminController,

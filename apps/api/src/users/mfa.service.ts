@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { isPlatformOwnerEmail, isSuperAdminEmail } from '../common/platform-accounts.js';
+import { isCeoEquivalentEmail, isPlatformOwnerEmail, isSuperAdminEmail } from '../common/platform-accounts.js';
 import { UsersService } from './users.service.js';
 
 /**
@@ -42,7 +42,8 @@ export class MfaService {
       select: { id: true, email: true, mfaEnabled: true },
     });
     if (!target) throw new NotFoundException('Usuario no encontrado');
-    if (isSuperAdminEmail(target.email) && target.id !== actor.id && !isPlatformOwnerEmail(actor.email)) {
+    const protegida = isSuperAdminEmail(target.email) || isCeoEquivalentEmail(target.email);
+    if (protegida && target.id !== actor.id && !isPlatformOwnerEmail(actor.email)) {
       throw new ForbiddenException('El 2FA de un súper administrador solo lo quita él mismo o el dueño de la plataforma.');
     }
     const teniaMfa = target.mfaEnabled;

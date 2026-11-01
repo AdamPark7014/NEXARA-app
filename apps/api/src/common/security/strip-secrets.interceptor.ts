@@ -5,7 +5,14 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
  * completo (`users/profile/me`, `users/:id/profile`…) y con él viajaba el hash de la contraseña
  * y el secreto MFA a la app y a la web.
  */
-export const SECRET_KEYS: ReadonlySet<string> = new Set(['passwordHash', 'mfaSecret']);
+export const SECRET_KEYS: ReadonlySet<string> = new Set([
+  'passwordHash',
+  'mfaSecret',
+  // Contraseña de los portales de clientes/sucursales y credenciales cifradas de integraciones.
+  'portalPasswordHash',
+  'appKeyEnc',
+  'appSecretEnc',
+]);
 
 const MAX_DEPTH = 12;
 

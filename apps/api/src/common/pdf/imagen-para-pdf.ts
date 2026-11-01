@@ -403,7 +403,8 @@ export function bufferParaPdf(datos: Buffer, opciones: OpcionesImagen = {}): Ima
 
   try {
     const crudo = desfiltrar(
-      zlib.inflateSync(png.idat),
+      // Tope de 256 MB: un PNG «bomba» de pocos KB descomprimía gigas y tumbaba la API.
+      zlib.inflateSync(png.idat, { maxOutputLength: 256 * 1024 * 1024 }),
       png.ancho,
       png.alto,
       png.bits,

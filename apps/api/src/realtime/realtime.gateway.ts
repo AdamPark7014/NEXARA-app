@@ -30,6 +30,23 @@ type SocketData = {
   ip?: string;
 };
 
+/** Sala de todo el personal (no portales): destino de `emit()` general. */
+const SALA_PERSONAL = 'staff';
+
+/** Los portales se identifican como `client:<id>` / `branch:<id>`; el personal, con su id numérico. */
+export function esSocketDePortal(userId: number | string | undefined): boolean {
+  return typeof userId === 'string' && /^(client|branch):/.test(userId);
+}
+
+/** Lo único que ve un portal de un `entity:updated`: qué cambió, no los datos. */
+export function soloMetadatos(payload: unknown): Record<string, unknown> {
+  const p = (payload ?? {}) as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  // Solo textos: `entity` a veces es el nombre del modelo y nunca debe colarse un objeto con datos.
+  for (const k of ['model', 'entity', 'action', 'timestamp']) if (typeof p[k] === 'string') out[k] = p[k];
+  return out;
+}
+
 const wsConnectionGuard = createInMemoryWsConnectionGuard(
   Number(process.env['WS_MAX_CONNECTIONS_PER_IP']) > 0
     ? Number(process.env['WS_MAX_CONNECTIONS_PER_IP'])
@@ -113,9 +130,13 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     }
 
     client.join(this.roomForUser(data.userId));
+    // Portal de clientes y sucursales (`client:…` / `branch:…`): nunca a la sala interna de la empresa
+    // ni a la del personal; solo a la suya, que recibe `entity:updated` sin datos para refrescar.
+    const portal = esSocketDePortal(data.userId);
     if (data.companyId != null && data.companyId > 0) {
-      client.join(this.roomForCompany(data.companyId));
+      client.join(portal ? this.roomForCompanyPortal(data.companyId) : this.roomForCompany(data.companyId));
     }
+    if (!portal) client.join(SALA_PERSONAL);
 
     this.logger.debug(
       `Socket conectado: ${client.id} (user=${data.userId}, company=${data.companyId ?? 'n/a'})`,
@@ -212,12 +233,20 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     return { ok: true };
   }
 
+  /**
+   * Difusión general: solo al personal. Antes llegaba a todo socket conectado, portales incluidos
+   * (nombres y correos de quien checa, prospectos del formulario web, proyectos).
+   */
   emit(event: string, payload: unknown): void {
     if (!this.server) {
       this.logger.verbose(`emit(${event}) ignorado: server no inicializado`);
       return;
     }
-    this.server.emit(event, payload);
+    if (event === 'entity:updated') {
+      this.server.emit(event, soloMetadatos(payload));
+      return;
+    }
+    this.server.to(SALA_PERSONAL).emit(event, payload);
   }
 
   emitToUser(userId: number | string, event: string, payload: unknown): void {
@@ -234,6 +263,13 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   emitToCompany(companyId: number, event: string, payload: unknown): void {
     if (!this.server) return;
     this.server.to(this.roomForCompany(companyId)).emit(event, payload);
+    if (event === 'entity:updated') {
+      this.server.to(this.roomForCompanyPortal(companyId)).emit(event, soloMetadatos(payload));
+    }
+  }
+
+  private roomForCompanyPortal(companyId: number): string {
+    return `company:${companyId}:portal`;
   }
 
   private roomForUser(userId: number | string): string {

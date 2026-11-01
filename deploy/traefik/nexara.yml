@@ -239,7 +239,9 @@ http:
         PathPrefix(`/go2rtc/api/hls/`) ||
         PathPrefix(`/go2rtc/api/webrtc`) )
       entryPoints: [websecure]
+      # Primero la API decide (firma del stream o sesión de personal), después se quita /go2rtc.
       middlewares:
+        - integra-go2rtc-auth
         - integra-go2rtc-strip
       service: nexara-go2rtc
       priority: 30
@@ -297,6 +299,16 @@ http:
         regex: "^https://www\\.nexara\\.com\\.mx(.*)"
         replacement: "https://nexara.com.mx${1}"
         permanent: true
+
+    # go2rtc no tiene autenticación propia: sin esto, cualquiera veía cámaras con el nombre del
+    # stream. Solo Cookie y Authorization: los encabezados de WebSocket (Upgrade) no deben llegar
+    # a la API. Código: apps/api/src/integra/go2rtc-autorizacion.ts.
+    integra-go2rtc-auth:
+      forwardAuth:
+        address: http://nexara-api:3001/api/integra/media/authz
+        authRequestHeaders:
+          - Cookie
+          - Authorization
 
     integra-go2rtc-strip:
       stripPrefix:

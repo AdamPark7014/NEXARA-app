@@ -266,10 +266,12 @@ export class WebhooksService {
       // hoy puede apuntar mañana a una dirección interna, y la validación de
       // guardado ya habría pasado.
       await assertResolvesPublic(delivery.webhook.url);
+      // Sin seguir redirecciones: un 302 hacia la red interna saltaba la validación de arriba.
       const res = await fetch(delivery.webhook.url, {
         method: 'POST',
         headers,
         body,
+        redirect: 'manual',
         signal: AbortSignal.timeout(12_000),
       });
       responseCode = res.status;
