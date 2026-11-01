@@ -1065,8 +1065,8 @@ export class AuthService {
   }
 
   /** Login vía OIDC (SSO). El IdP ya autenticó; no exige MFA local. */
-  async loginWithOidcUser(user: any, req?: any) {
-    return this.issueSession(user, req, { authMethod: 'oidc' });
+  async loginWithOidcUser(user: any, req?: any, remember = false) {
+    return this.issueSession(user, req, { authMethod: 'oidc', remember });
   }
 
   private async issueSession(
