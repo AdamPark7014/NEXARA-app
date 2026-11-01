@@ -93,9 +93,9 @@
     - Medido: el despliegue de `93e420a3`, primero real con los scripts corregidos (aún con tope de 5 GB), empezó y terminó en
       13 GB libres; antes costaba de 3 a 5 GB. Esa caché casi no ahorra tiempo (API 175 s sin caché y 174 s con ella).
     - **Por qué 3 GB y no 5:** con 5 GB el disco se quedó en 83 % y el vigilante de Ágora (`vigilar-disco.sh`, por ntfy), que avisa
-      desde 80 %, mandaba 4 alertas de prioridad alta por hora. Con 3 GB quedó en **79 %, 16 GB libres**. Hay poco margen y aún no
-      corre un despliegue con 3 GB; el vigilante sonará en los picos al compilar. Borrar `nexara-web:next14-respaldo`, cuando
-      toque, debería dar hasta 2 GB más.
+      desde 80 %, mandaba 4 alertas de prioridad alta por hora. El despliegue de `126d2540`, primero real con 3 GB, terminó en
+      **77 %, 17 GB libres**, sin bajar de 10.8 GB mientras lo medí. El vigilante solo debe sonar en los picos al compilar (ya dio 81 %
+      y 85 %). Borrar `nexara-web:next14-respaldo`, cuando toque, debería dar hasta 2 GB más.
     - En `docker builder du` mira `Private`, no `Total`: `Total` cuenta dos veces las capas compartidas con las imágenes en uso.
     - No se tocaron imágenes ni volúmenes: `nexara-web:next14-respaldo` y `arta-*:prev` siguen, y `docker image prune -a` las borraría.
 
