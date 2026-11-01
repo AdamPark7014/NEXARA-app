@@ -264,6 +264,49 @@ const setSessionCookie = (active: boolean, maxAgeSeconds = 86400) => {
 	}
 };
 
+/**
+ * «Recordarme» en otro subdominio o en una pestaña sin copia guardada.
+ *
+ * La copia de la sesión vive en el `localStorage` de cada origen (core., ventas., …), pero la cookie
+ * `HttpOnly` de la API dura los 30 días y es de todo `.nexara.com.mx`. Si esta pestaña no tiene sesión
+ * y el navegador avisa que hay una (`nx_session`), se pide a la API un JWT nuevo para esa misma sesión.
+ * Solo se usa si es una sesión recordada: sin «Recordarme» cada pestaña sigue siendo independiente
+ * (varias cuentas a la vez en el mismo navegador).
+ */
+const restoreFromSessionCookie = async (): Promise<User | null> => {
+	if (getSharedCookie(SESSION_COOKIE) !== '1') return null;
+	// Que la pantalla no se quede esperando si la API tarda.
+	const signal = typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(8000) : undefined;
+	try {
+		const extended = await fetch(buildApiUrl('auth/session/extend'), {
+			method: 'POST',
+			credentials: 'include',
+			cache: 'no-store',
+			signal,
+		});
+		if (!extended.ok) return null;
+		const data = await extended.json();
+		const token =
+			typeof data?.access_token === 'string' && data.access_token.split('.').length === 3 ? data.access_token : null;
+		if (!token || data.rememberMe !== true) return null;
+		const profile = await fetch(buildApiUrl('auth/profile'), {
+			credentials: 'include',
+			headers: { Authorization: `Bearer ${token}` },
+			cache: 'no-store',
+			signal,
+		});
+		if (!profile.ok) return null;
+		return normalizeUser({
+			...(await profile.json()),
+			token,
+			expiresAt: data.expiresAt ?? null,
+			remember: data.rememberMe === true,
+		});
+	} catch {
+		return null;
+	}
+};
+
 const safePersistUser = (user: User | null) => {
 	if (typeof window === 'undefined') return;
 
@@ -428,7 +471,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		};
 
 		// ?fresh=1 en /login: vaciar sesión de esta pestaña antes de hidratar
-		consumeFreshLoginIntent();
+		const freshLogin = consumeFreshLoginIntent();
 
 		// Cross-subdomain SSO: consume ?_nxt= handoff token first
 		const handoffJson = consumeHandoffParam();
@@ -461,6 +504,17 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 					void syncProfile(storedUser);
 				}
 			}
+		} else if (online && !freshLogin && !isCapacitorNative()) {
+			// Sin copia en esta pestaña: intentar la sesión de la cookie antes de declarar «sin sesión»,
+			// o el AppShell mandaría al login a alguien con «Recordarme» vigente.
+			void restoreFromSessionCookie().then((restored) => {
+				if (cancelled) return;
+				if (restored) setUser(restored);
+				setIsContextReady(true);
+			});
+			return () => {
+				cancelled = true;
+			};
 		}
 		setIsContextReady(true);
 

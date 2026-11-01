@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
-import { OidcService } from './oidc.service.js';
+import { ErrorSso, OidcService } from './oidc.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
@@ -20,9 +20,27 @@ import {
   clearSessionCookie,
   logoutDebeBorrarCookie,
   rememberExpiresIn,
+  sessionCookieOptions,
   sessionTokenFromHeaders,
   setSessionCookie,
 } from '../common/security/session-cookie.js';
+import {
+  COOKIE_SSO,
+  VIGENCIA_ESTADO_MS,
+  leerCookie,
+  leerEstado,
+  vueltaSegura,
+  type EstadoSso,
+} from './sso-reglas.js';
+
+/** Origen de la página que mandó al SSO, si el web no lo pasó en `vuelta`. */
+function origenDeReferer(referer: string | undefined): string | undefined {
+  try {
+    return referer ? new URL(referer).origin : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 @Controller('auth')
 export class AuthController {
@@ -74,33 +92,72 @@ export class AuthController {
     return this.oidc.scimStatus();
   }
 
+  /**
+   * Entrar con Google / Microsoft / OIDC: `?proveedor=google|microsoft&recordar=1&next=/erp/...&vuelta=<origen>`.
+   * El `state`, el `nonce` y el verificador PKCE viajan firmados en la cookie `nx_sso` (10 min).
+   */
   @Get('oidc/start')
-  async oidcStart(@Res() res: Response) {
-    const { url } = await this.oidc.buildAuthorizeUrl();
-    return res.redirect(url);
+  async oidcStart(
+    @Query('proveedor') proveedor: string | undefined,
+    @Query('recordar') recordar: string | undefined,
+    @Query('next') next: string | undefined,
+    @Query('vuelta') vuelta: string | undefined,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const origenPedido = vuelta || origenDeReferer(req.headers?.referer);
+    try {
+      const inicio = await this.oidc.iniciar({
+        proveedor,
+        recordar: recordar === '1' || recordar === 'true',
+        next,
+        vuelta: origenPedido,
+      });
+      res.cookie(COOKIE_SSO, inicio.cookie, sessionCookieOptions(VIGENCIA_ESTADO_MS));
+      return res.redirect(inicio.url);
+    } catch {
+      const web = vueltaSegura(origenPedido, this.oidc.webPredeterminada(), process.env.NODE_ENV !== 'production');
+      return res.redirect(`${web}/login?sso=error&motivo=proveedor`);
+    }
   }
 
   @Get('oidc/callback')
   async oidcCallback(
-    @Query('code') code: string,
+    @Query('code') code: string | undefined,
+    @Query('state') state: string | undefined,
     @Query('error') error: string | undefined,
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    if (error || !code) {
-      const web = process.env.WEB_PUBLIC_URL || 'http://localhost:3000';
-      return res.redirect(`${web}/login?sso=error`);
+    let estado: EstadoSso | null = null;
+    try {
+      estado = leerEstado(leerCookie(req.headers?.cookie, COOKIE_SSO), state, this.oidc.secretoEstado());
+    } catch {
+      estado = null;
     }
-    const user = await this.oidc.exchangeCode(code);
-    const session = await this.authService.loginWithOidcUser(user, req);
-    // Misma sesión por cookie que en el login normal.
-    if (session?.access_token) {
-      setSessionCookie(res, session.access_token);
+    const { maxAge: _sinVigencia, ...opcionesCookie } = sessionCookieOptions(0);
+    res.clearCookie(COOKIE_SSO, opcionesCookie);
+
+    const web = estado?.vuelta ?? this.oidc.webPredeterminada();
+    const conNext = estado?.next ? `&next=${encodeURIComponent(estado.next)}` : '';
+    const fallo = (motivo: string) => res.redirect(`${web}/login?sso=error&motivo=${motivo}${conNext}`);
+
+    if (error) return fallo(error === 'access_denied' ? 'cancelado' : 'proveedor');
+    if (!estado || !code) return fallo('estado');
+
+    try {
+      const user = await this.oidc.completar(estado, code);
+      const session = await this.authService.loginWithOidcUser(user, req, estado.recordar);
+      // Misma sesión por cookie que en el login normal.
+      if (session?.access_token) {
+        setSessionCookie(res, session.access_token, session.rememberMe ? rememberExpiresIn() : undefined);
+      }
+      // Entrega token vía fragmento hash (no viaja a logs de servidor web)
+      const hash = Buffer.from(JSON.stringify(session), 'utf8').toString('base64url');
+      return res.redirect(`${web}/login?sso=ok${conNext}#${hash}`);
+    } catch (e) {
+      return fallo(e instanceof ErrorSso ? e.motivo : 'proveedor');
     }
-    const web = process.env.WEB_PUBLIC_URL || 'http://localhost:3000';
-    // Entrega token vía fragmento hash (no viaja a logs de servidor web)
-    const hash = Buffer.from(JSON.stringify(session), 'utf8').toString('base64url');
-    return res.redirect(`${web}/login?sso=ok#${hash}`);
   }
 
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { getSocketBaseUrl, buildApiUrl } from "@/lib/api-base";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Socket } from "socket.io-client";
@@ -41,6 +41,42 @@ function resolveLandingPath(redirectTo: string): string {
   return panelHomeInternalPath(panel).endsWith("/dashboard") ? redirectTo : "/";
 }
 
+/**
+ * `?next=/erp/cotizaciones/4`: lo pone el middleware cuando abres un enlace sin sesión. Después de
+ * entrar se sigue ahí; solo rutas internas, nunca otra web ni el propio login.
+ */
+function destinoNext(): string | null {
+  if (typeof window === "undefined") return null;
+  const v = new URLSearchParams(window.location.search).get("next") ?? "";
+  if (!v.startsWith("/") || v.startsWith("//") || v.startsWith("/\\")) return null;
+  if (/^\/(auth\/)?login(\/|\?|$)/.test(v)) return null;
+  return v;
+}
+
+type ProveedorSso = "google" | "microsoft" | "oidc";
+
+/** Lo que pasó en el regreso de Google / Microsoft (`?sso=error&motivo=`), en una frase. */
+const MENSAJES_SSO: Record<string, string> = {
+  no_provisionado:
+    "Ese correo no tiene cuenta en NEXARA. Pide que te den de alta con el mismo correo de tu empresa.",
+  inactivo: "Tu cuenta de NEXARA está desactivada; habla con tu administrador.",
+  correo_no_verificado: "Tu proveedor no confirmó el correo; entra con tu correo y contraseña.",
+  dominio_no_coincide: "Esa cuenta de Microsoft no pertenece al dominio de su correo.",
+  cancelado: "Se canceló el inicio de sesión.",
+  estado: "El inicio de sesión tardó demasiado o se abrió en otra ventana; inténtalo de nuevo.",
+  token: "No se pudo validar tu cuenta con el proveedor; inténtalo de nuevo.",
+  proveedor: "Ese acceso no está disponible por ahora; entra con tu correo y contraseña.",
+};
+
+function cookieSesion(recordar: boolean) {
+  const isHttps = window.location.protocol === "https:";
+  const secureFlag = isHttps ? "; Secure" : "";
+  const isProduction = window.location.hostname.includes("nexara.com.mx");
+  const domainFlag = isProduction ? "; Domain=.nexara.com.mx" : "";
+  const maxAge = recordar ? 30 * 86400 : 86400;
+  document.cookie = `nx_session=1; Path=/; SameSite=Lax; Max-Age=${maxAge}${domainFlag}${secureFlag}`;
+}
+
 type PanelLoginProps = {
   redirectTo: string;
   requiredPermission?: string;
@@ -70,10 +106,29 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [ssoEnabled, setSsoEnabled] = useState(false);
+  const [sso, setSso] = useState<Record<ProveedorSso, boolean>>({ google: false, microsoft: false, oidc: false });
   const [panelSkin, setPanelSkin] = useState<"default" | "integra">(skin);
-  const { setUser } = useUser();
+  const { setUser, user: usuarioActual, isContextReady } = useUser();
   const router = useRouter();
+  // Ya hay una navegación en curso (entrar, SSO): no competir con ella desde el efecto de abajo.
+  const navegando = useRef(false);
+
+  // «Recordarme»: si al abrir el login ya hay una sesión recordada en este navegador, seguir de largo.
+  useEffect(() => {
+    if (mode !== "console" || !isContextReady || navegando.current) return;
+    if (!usuarioActual?.remember || usuarioActual.offlineDegraded) return;
+    if (new URLSearchParams(window.location.search).has("sso")) return;
+    navegando.current = true;
+    router.replace(destinoNext() ?? (smartRedirect ? getUserHomeUrl(usuarioActual) : resolveLandingPath(redirectTo)));
+  }, [mode, isContextReady, usuarioActual, smartRedirect, redirectTo, router]);
+
+  const irASso = (proveedor: ProveedorSso) => {
+    navegando.current = true;
+    const q = new URLSearchParams({ proveedor, recordar: rememberMe ? "1" : "0", vuelta: window.location.origin });
+    const destino = destinoNext();
+    if (destino) q.set("next", destino);
+    window.location.href = `${buildApiUrl("auth/oidc/start")}?${q.toString()}`;
+  };
 
   useEffect(() => {
     setPanelSkin(skin);
@@ -91,15 +146,22 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
   useEffect(() => {
     void fetch(buildApiUrl("auth/oidc/status"))
       .then((r) => r.json())
-      .then((d) => setSsoEnabled(Boolean(d?.enabled)))
-      .catch(() => setSsoEnabled(false));
+      .then((d) =>
+        setSso({
+          google: Boolean(d?.proveedores?.google),
+          microsoft: Boolean(d?.proveedores?.microsoft),
+          // API anterior: solo `enabled` (OIDC genérico).
+          oidc: Boolean(d?.proveedores ? d.proveedores.oidc : d?.enabled),
+        }),
+      )
+      .catch(() => setSso({ google: false, microsoft: false, oidc: false }));
   }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || mode !== "console") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("sso") === "error") {
-      setError("SSO falló: revisa OIDC o que el usuario exista en NEXARA.");
+      setError(MENSAJES_SSO[params.get("motivo") ?? ""] ?? "SSO falló: revisa OIDC o que el usuario exista en NEXARA.");
       return;
     }
     if (params.get("sso") !== "ok") return;
@@ -110,6 +172,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       const b64 = hash.replace(/-/g, "+").replace(/_/g, "/") + pad;
       const data = JSON.parse(atob(b64));
       if (!data?.access_token || !data?.user) throw new Error("Sesión SSO incompleta");
+      navegando.current = true;
       void (async () => {
         const userData = {
           id: data.user.id,
@@ -130,14 +193,9 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           isSuperAdmin: data.user.isSuperAdmin || false,
           isPlatformOwner: data.user.isPlatformOwner || false,
           loginDevice: data.loginDevice || data.user.loginDevice,
+          remember: data.rememberMe === true,
         };
-        if (typeof document !== "undefined") {
-          const isHttps = window.location.protocol === "https:";
-          const secureFlag = isHttps ? "; Secure" : "";
-          const isProduction = window.location.hostname.includes("nexara.com.mx");
-          const domainFlag = isProduction ? "; Domain=.nexara.com.mx" : "";
-          document.cookie = `nx_session=1; Path=/; SameSite=Lax; Max-Age=86400${domainFlag}${secureFlag}`;
-        }
+        if (typeof document !== "undefined") cookieSesion(userData.remember);
         const firstName =
           String(data.user?.nombre || "")
             .trim()
@@ -155,7 +213,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           JSON.stringify({ title, device }),
         );
         setUser(userData);
+        const destino = destinoNext();
         window.history.replaceState({}, "", window.location.pathname);
+        if (destino) {
+          router.replace(destino);
+          return;
+        }
         if (smartRedirect) {
           const currentPanel = detectCurrentPanelId();
           if (currentPanel && canUserAccessPanel(userData, currentPanel)) {
@@ -338,15 +401,9 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       // Setear cookie de sesión inmediatamente (sin esperar al ciclo de
       // React) — el middleware la lee en el siguiente request para
       // permitir el acceso a `/erp/...`, `/crm/...`, etc.
-      if (typeof document !== "undefined") {
-        const isHttps = window.location.protocol === "https:";
-        const secureFlag = isHttps ? "; Secure" : "";
-        const isProduction = window.location.hostname.includes("nexara.com.mx");
-        const domainFlag = isProduction ? "; Domain=.nexara.com.mx" : "";
-        const maxAge = userData.remember ? 30 * 86400 : 86400;
-        document.cookie = `nx_session=1; Path=/; SameSite=Lax; Max-Age=${maxAge}${domainFlag}${secureFlag}`;
-      }
+      if (typeof document !== "undefined") cookieSesion(userData.remember);
 
+      navegando.current = true;
       setUser(userData);
 
       // App nativa: cookies compartidas cross-subdominio. En navegador cada
@@ -360,6 +417,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           maxAge: 86400,
           sameSite: 'Lax',
         });
+      }
+
+      const destino = destinoNext();
+      if (destino) {
+        router.replace(destino);
+        return;
       }
 
       if (smartRedirect) {
@@ -520,14 +583,19 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
             {isLoading ? "Iniciando sesión..." : mfaRequired ? "Verificar MFA" : "Entrar"}
           </button>
 
-          {mode === "console" && ssoEnabled && (
-            <button
-              type="button"
-              className={styles.sso}
-              onClick={() => {
-                window.location.href = buildApiUrl("auth/oidc/start");
-              }}
-            >
+          {/* Cada botón aparece solo si su proveedor está configurado en la API. */}
+          {mode === "console" && sso.microsoft && (
+            <button type="button" className={styles.sso} onClick={() => irASso("microsoft")}>
+              Continuar con Microsoft
+            </button>
+          )}
+          {mode === "console" && sso.google && (
+            <button type="button" className={styles.sso} onClick={() => irASso("google")}>
+              Continuar con Google
+            </button>
+          )}
+          {mode === "console" && sso.oidc && (
+            <button type="button" className={styles.sso} onClick={() => irASso("oidc")}>
               Continuar con SSO / OIDC
             </button>
           )}
