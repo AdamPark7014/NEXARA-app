@@ -28,9 +28,13 @@
   - Con sesión: la pizarra se vio funcionando en el Chrome de Adam a las 09:27, 5 min después del despliegue (menú,
     tarjetas de «Asignar con IA»). Desde que arrancó la web (15:22 UTC) Traefik registra pizarra, asistencias, cotizaciones
     y más pantallas del ERP en 200, `asistente/interpretar` en 201 y ni un 5xx en web o API.
-  - **Sin verificar:** consola del navegador y el resto de pantallas con sesión. Una pestaña nueva de Claude en Chrome cae
-    al login porque cada pestaña guarda su JWT si no se marcó «Recordarme» (igual que en Next 14, no es regresión). El
-    servidor no recibe los errores del navegador: un fallo solo de cliente no sale en los logs.
+  - Recorrido con sesión en Chrome (cuenta de Adam, solo lectura): 26 pantallas del ERP sin errores en consola,
+    entre ellas pizarra y `pizarra/8`, Hoy, asistencias e indicadores, chat, cotizaciones y `cotizaciones/4`,
+    almacén, herramientas, contabilidad, pagos y gastos, facturación, bancos y nómina. `por-facturar/999999` pide ese id a
+    la API y muestra «Factura no encontrada», así que `useParams` funciona. Navegar sin recargar y «atrás» funcionan.
+  - Con sesión no se probó guardar ni confirmar nada, solo ver. El servidor no recibe los errores del navegador: un fallo
+    solo de cliente no sale en los logs. Una pestaña nueva cae al login si no se marcó «Recordarme» (igual que en Next 14).
+  - Ajeno a esto, ya pasaba con Next 14: `/manifest.webmanifest` da 404 en `core.` y 500 en `portal.` (200 en el sitio).
   - **Respaldo:** imagen `nexara-web:next14-respaldo` (2.17 GB) en el Hetzner. Para volver:
     `docker tag nexara-web:next14-respaldo nexara-web:latest` y `up -d --no-build web`. Se deja hasta que pase un día de uso
     normal, porque el despliegue fue en domingo; después, `docker rmi nexara-web:next14-respaldo`.
