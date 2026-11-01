@@ -825,6 +825,26 @@ export default function UsersPage() {
     });
   };
 
+  /** Quien perdió el teléfono: le quita el 2FA y le cierra las sesiones; vuelve a entrar con su contraseña. */
+  const quitarDosPasos = (u: ApiUser) => {
+    setConfirmState({
+      title: "Quitar verificación en dos pasos",
+      message: `${u.nombre} podrá entrar solo con su contraseña y se cerrarán sus sesiones abiertas. Úsalo si perdió o cambió su celular; después puede volver a activarla en Mi perfil.`,
+      confirmLabel: "Quitar dos pasos",
+      danger: true,
+      fn: async () => {
+        try {
+          await apiFetch(`users/${u.id}/mfa/quitar`, token, { method: "POST", body: "{}" });
+          toast.success("Se quitó la verificación en dos pasos");
+          if (drawerUser?.id === u.id) setDrawerUser({ ...drawerUser, mfaEnabled: false });
+          void load();
+        } catch (e) {
+          toast.error(formatApiError(e, "No se pudo quitar la verificación en dos pasos"));
+        }
+      },
+    });
+  };
+
   const eraseSubject = (u: ApiUser) => {
     setConfirmState({
       title: "Borrar datos personales",
@@ -1404,6 +1424,11 @@ export default function UsersPage() {
                     <Tag variant={drawerUser.mfaEnabled ? "positive" : "warning"} size="sm">
                       {drawerUser.mfaEnabled ? "Dos pasos activa" : "Sin dos pasos"}
                     </Tag>
+                    {drawerUser.mfaEnabled && (
+                      <Button size="xs" variant="ghost" onClick={() => quitarDosPasos(drawerUser)}>
+                        Quitar dos pasos
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

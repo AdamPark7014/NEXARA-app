@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import PanelLogin from "./PanelLogin";
 
@@ -54,6 +54,31 @@ describe("PanelLogin · sso=error", () => {
 
     const aviso = await screen.findByRole("alert");
     expect(aviso.textContent).toContain("Ese correo no tiene cuenta en NEXARA");
+  });
+});
+
+describe("PanelLogin · verificación en dos pasos", () => {
+  it("con la contraseña correcta pide el código en su propio paso, sin aviso de error", async () => {
+    window.history.pushState({}, "", "/login");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) =>
+        String(url).includes("auth/login")
+          ? new Response(JSON.stringify({ statusCode: 401, message: "MFA_REQUIRED" }), { status: 401 })
+          : new Response(JSON.stringify({ enabled: false }), { status: 200 }),
+      ),
+    );
+
+    render(<PanelLogin redirectTo="/dashboard" />);
+    fireEvent.change(screen.getByLabelText("Correo de empresa"), { target: { value: "ana@nexara.com.mx" } });
+    fireEvent.change(screen.getByLabelText("Contraseña"), { target: { value: "secreta123" } });
+    fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+
+    expect(await screen.findByRole("heading", { name: "Verificación en dos pasos" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Código de verificación")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Contraseña")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Verificar" })).toBeInTheDocument();
   });
 });
 

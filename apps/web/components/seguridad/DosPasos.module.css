@@ -1,0 +1,145 @@
+.cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 4px 12px 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--ui-surface-2, #f8fafb);
+  color: var(--text-secondary, #5b6675);
+}
+
+.estado[data-activo="si"] {
+  background: var(--ui-brand-soft, #e3f3ef);
+  color: var(--ui-brand-text, #0f6b59);
+}
+
+.punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.texto {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.nota {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary, #5b6675);
+}
+
+.pasos {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lista {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.qrFila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+}
+
+.qr {
+  width: 200px;
+  height: 200px;
+  padding: 8px;
+  border: 1px solid var(--ui-border, #e6e9ef);
+  border-radius: 12px;
+  background: #ffffff;
+  image-rendering: pixelated;
+}
+
+.clave {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 240px;
+}
+
+.claveEtiqueta {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary, #5b6675);
+}
+
+.claveValor {
+  font-family: var(--ui-font-mono, ui-monospace, monospace);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--ui-surface-2, #f8fafb);
+  border: 1px solid var(--ui-border, #e6e9ef);
+}
+
+.claveAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.enlaceApp {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ui-brand-text, #0f6b59);
+}
+
+.codigoFila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.codigoEtiqueta {
+  flex-basis: 100%;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.codigo {
+  width: 150px;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-border-strong, #cdd5de);
+  border-radius: 10px;
+  font-family: var(--ui-font-mono, ui-monospace, monospace);
+  font-size: 18px;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
+.codigo:focus {
+  outline: none;
+  border-color: var(--ui-brand, #168570);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-brand, #168570) 18%, transparent);
+}
