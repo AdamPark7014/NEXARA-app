@@ -15,6 +15,7 @@ import {
   loadNexaraLogo,
   type PdfTableContext,
 } from '../common/pdf/nexara-pdf-theme';
+import { getUploadSubdir } from '../common/upload-paths';
 
 type InventoryReportInput = {
   snapshot: any;
@@ -27,39 +28,39 @@ const toLabel = (value?: string | null) => (value && String(value).trim() ? Stri
 
 const cleanUrl = (value?: string | null) => String(value || '').trim();
 
+/** `/uploads/inventory-media/<archivo>`: lo único que devuelven las subidas del inventario. */
+const FOTO_INVENTARIO = /^\/uploads\/inventory-media\/([A-Za-z0-9._-]{1,128})$/;
+
+/**
+ * Foto para el PDF: solo archivos subidos al inventario (o una data URL de imagen chica). Antes
+ * aceptaba cualquier `http(s)://` y cualquier ruta del disco, y un cliente del portal podía hacer que
+ * el servidor pidiera URLs internas (go2rtc, metadatos) o leyera imágenes ajenas del disco.
+ */
 const resolveImageBuffer = async (url?: string | null): Promise<Buffer | null> => {
-  const value = cleanUrl(url);
+  let value = cleanUrl(url);
   if (!value) return null;
 
   try {
-    if (value.startsWith('data:image')) {
+    if (value.startsWith('data:image/')) {
       const base64 = value.split(',')[1] || '';
-      return base64 ? Buffer.from(base64, 'base64') : null;
+      if (!base64 || base64.length > 11_000_000) return null;
+      return Buffer.from(base64, 'base64');
     }
 
-    if (value.startsWith('http://') || value.startsWith('https://')) {
-      const response = await fetch(value);
-      if (!response.ok) return null;
-      const arrayBuffer = await response.arrayBuffer();
-      return Buffer.from(arrayBuffer);
+    // Una URL absoluta de NEXARA vale por su ruta; ningún otro host.
+    if (/^https?:\/\//i.test(value)) {
+      const parsed = new URL(value);
+      const host = parsed.hostname.toLowerCase();
+      if (host !== 'nexara.com.mx' && !host.endsWith('.nexara.com.mx')) return null;
+      value = decodeURIComponent(parsed.pathname);
     }
 
-    const relative = value.replace(/^\/+/, '');
-    const candidates = [
-      path.resolve(process.cwd(), relative),
-      path.resolve(process.cwd(), 'apps', 'api', relative),
-      value,
-    ];
-
-    for (const filePath of candidates) {
-      try {
-        return await fs.readFile(filePath);
-      } catch {
-        continue;
-      }
-    }
-
-    return null;
+    const match = value.match(FOTO_INVENTARIO);
+    if (!match || match[1].includes('..')) return null;
+    const dir = getUploadSubdir(__dirname, 'inventory-media');
+    const absoluto = path.resolve(dir, match[1]);
+    if (!absoluto.startsWith(dir + path.sep)) return null;
+    return await fs.readFile(absoluto);
   } catch {
     return null;
   }

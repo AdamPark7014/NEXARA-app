@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -64,6 +65,21 @@ export class IntegraSchedulesService {
       siteId: number;
       isapiForHost: (ip: string) => HikvisionIsapiClient | null;
     };
+  }
+
+  /**
+   * `:ip` llega de la URL. Sin esto, cualquiera con lectura de Integra hacía que el servidor llamara a
+   * cualquier host con el usuario y la contraseña ISAPI del sitio (y le entregaba su hash Digest).
+   * Solo IPs de equipos ya registrados en el sitio.
+   */
+  private async assertEquipoDelSitio(siteId: number, deviceIp: string) {
+    const ip = String(deviceIp ?? '').trim();
+    if (!isIP(ip)) throw new BadRequestException('IP de equipo inválida');
+    const equipo = await this.prisma.integraDevice.findFirst({
+      where: { siteId, OR: [{ ip }, { ip: { startsWith: `${ip}:` } }] },
+      select: { id: true },
+    });
+    if (!equipo) throw new NotFoundException('Ese equipo no está registrado en el sitio');
   }
 
   private async acsDevices(siteId: number) {
@@ -171,6 +187,7 @@ export class IntegraSchedulesService {
     siteId?: number | null,
   ) {
     const resolved = await this.requireIsapi(companyId, siteId);
+    await this.assertEquipoDelSitio(resolved.siteId, deviceIp);
     const client = resolved.isapiForHost(deviceIp);
     if (!client) throw new BadRequestException(`ACS ${deviceIp} no disponible`);
     const cfg = await getWeekPlan(client, planId);
@@ -192,6 +209,7 @@ export class IntegraSchedulesService {
   ) {
     const resolved = await this.requireIsapi(companyId, siteId);
     if (!companyId) throw new BadRequestException('companyId requerido');
+    await this.assertEquipoDelSitio(resolved.siteId, deviceIp);
     const client = resolved.isapiForHost(deviceIp);
     if (!client) throw new BadRequestException(`ACS ${deviceIp} no disponible`);
     if (planId === 1 && body.segments) {
@@ -240,6 +258,7 @@ export class IntegraSchedulesService {
     siteId?: number | null,
   ) {
     const resolved = await this.requireIsapi(companyId, siteId);
+    await this.assertEquipoDelSitio(resolved.siteId, deviceIp);
     const client = resolved.isapiForHost(deviceIp);
     if (!client) throw new BadRequestException(`ACS ${deviceIp} no disponible`);
     const tmpl = await getPlanTemplate(client, templateId);
@@ -257,6 +276,7 @@ export class IntegraSchedulesService {
   ) {
     const resolved = await this.requireIsapi(companyId, siteId);
     if (!companyId) throw new BadRequestException('companyId requerido');
+    await this.assertEquipoDelSitio(resolved.siteId, deviceIp);
     const client = resolved.isapiForHost(deviceIp);
     if (!client) throw new BadRequestException(`ACS ${deviceIp} no disponible`);
     await putPlanTemplate(client, templateId, body);

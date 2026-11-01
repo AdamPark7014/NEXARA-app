@@ -205,8 +205,11 @@ export const isHoneypotPath = (pathValue?: string | null): boolean => {
   return HONEYPOT_PATH_PATTERN.test(pathValue);
 };
 
-/** Rutas de alto volumen legítimo (socket.io polling, health) — fuera del bucket global por IP. */
-const RATE_LIMIT_EXEMPT_PATH = /^\/(socket\.io|health|api\/health|uploads)\b/i;
+/**
+ * Rutas de alto volumen legítimo (socket.io polling, health) — fuera del bucket global por IP.
+ * `api/integra/media/authz` lo llama Traefik por cada segmento de video del muro.
+ */
+const RATE_LIMIT_EXEMPT_PATH = /^\/(socket\.io|health|api\/health|uploads|api\/integra\/media\/authz$)\b/i;
 
 export const isRateLimitExemptPath = (pathValue?: string | null): boolean => {
   if (!pathValue) {

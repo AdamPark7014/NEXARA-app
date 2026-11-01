@@ -28,6 +28,7 @@ import {
 } from './common/security/security.utils';
 import { isPrivateUploadPath, isPublicUploadPath, readUploadToken } from './common/security/uploads-access';
 import { uploadHeadersFor } from './common/security/upload-content-type.js';
+import { PrismaService } from './prisma/prisma.service';
 
 const toPositiveInt = (rawValue: string | undefined, fallback: number): number => {
   const parsed = Number(rawValue);
@@ -73,15 +74,18 @@ async function bootstrap() {
   // Límite de payload para fotos base64. El `verify` guarda el cuerpo sin tocar
   // porque el webhook de Stripe firma sobre los bytes exactos: parseado y
   // vuelto a serializar, la firma ya no cuadra.
+  // `inflate: false`: ningún cliente manda el cuerpo comprimido, y la descompresión de body-parser
+  // tenía un fallo (GHSA-27r3-jxmh-p828) con el que un POST sin sesión tumbaba la API.
   app.use(
     express.json({
       limit: '10mb',
+      inflate: false,
       verify: (req, _res, buf) => {
         (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
       },
     }),
   );
-  app.use(express.urlencoded({ limit: '10mb', extended: true }));
+  app.use(express.urlencoded({ limit: '10mb', extended: true, inflate: false }));
   app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
     response.setHeader('X-Frame-Options', 'DENY');
     response.setHeader('X-Content-Type-Options', 'nosniff');
@@ -351,6 +355,12 @@ async function bootstrap() {
     keyGenerator: (ip, path) => `auth:${ip}:${path}`,
   });
 
+  const contactLimiter = createInMemoryRateLimiter({
+    maxHits: readPositiveIntEnv('CONTACT_RATE_LIMIT_MAX', 5),
+    windowMs: readPositiveIntEnv('CONTACT_RATE_LIMIT_WINDOW_MS', 10 * 60_000),
+    keyGenerator: (ip) => `contacto:${ip}`,
+  });
+
   app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
     // Prefer Express req.ip (trust proxy = 1). Raw X-Forwarded-For[0] is spoofable.
     const ip = getClientIpFromRequestMeta(undefined, request.ip);
@@ -361,8 +371,22 @@ async function bootstrap() {
       return;
     }
 
+    // Express no distingue mayúsculas ni la barra final: con la ruta cruda, `/api/AUTH/login/` contaba
+    // aparte de `/api/auth/login` y cada variante daba 25 intentos más.
+    const rutaNormal = pathname.toLowerCase().replace(/\/+$/, '') || '/';
+
+    // Formulario público de contacto: cada envío crea mensaje, prospecto y correo al equipo.
+    if (request.method === 'POST' && rutaNormal === '/api/contact-messages') {
+      const contacto = contactLimiter(ip, rutaNormal);
+      if (!contacto.allowed) {
+        response.setHeader('Retry-After', `${Math.max(1, Math.ceil(contacto.retryAfterMs / 1000))}`);
+        response.status(429).json({ statusCode: 429, message: 'Demasiados mensajes; intenta más tarde.' });
+        return;
+      }
+    }
+
     const isAuthPath = /^\/api\/(auth|client-auth|branch-auth|portal)\b/i.test(pathname);
-    const limiterResult = isAuthPath ? authLimiter(ip, pathname) : globalLimiter(ip, pathname);
+    const limiterResult = isAuthPath ? authLimiter(ip, rutaNormal) : globalLimiter(ip, rutaNormal);
 
     response.setHeader('X-RateLimit-Limit', `${isAuthPath ? readPositiveIntEnv('AUTH_RATE_LIMIT_MAX', 25) : globalRateLimitMax}`);
     response.setHeader('X-RateLimit-Remaining', `${limiterResult.remaining}`);
@@ -450,8 +474,21 @@ async function bootstrap() {
     console.error(`Error setting up uploads directory: ${errorMsg}`);
   }
   
+  const prismaUploads = app.get(PrismaService);
+  const sesionDeUploadsVigente = async (userId: number, jti?: string) => {
+    if (!Number.isFinite(userId) || userId <= 0) return false;
+    const user = await prismaUploads.user.findUnique({ where: { id: userId }, select: { isActive: true } });
+    if (!user || user.isActive === false) return false;
+    if (!jti) return true;
+    const sesion = await prismaUploads.userSession.findUnique({
+      where: { jti },
+      select: { userId: true, revokedAt: true, expiresAt: true },
+    });
+    return Boolean(sesion && sesion.userId === userId && !sesion.revokedAt && sesion.expiresAt.getTime() > Date.now());
+  };
+
   // Proteger /uploads con autenticación JWT (lecturas incluidas)
-  app.use('/uploads', (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  app.use('/uploads', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (req.method.toUpperCase() === 'OPTIONS') {
       next();
       return;
@@ -478,12 +515,28 @@ async function bootstrap() {
       res.status(500).json({ statusCode: 500, message: 'Server configuration error' });
       return;
     }
+    let payload: { sub?: number | string; jti?: string; isClient?: boolean; isBranchUser?: boolean };
     try {
-      require('jsonwebtoken').verify(token, secret);
-      next();
+      payload = require('jsonwebtoken').verify(token, secret);
     } catch {
       res.status(401).json({ statusCode: 401, message: 'Invalid or expired token' });
+      return;
     }
+    const ruta = (req.path || req.url || '').toLowerCase();
+    // Los portales nunca ven expedientes del personal: documentos, nómina ni CVs.
+    if ((payload.isClient || payload.isBranchUser) && /^\/(user-docs|employee-payments|cvs)\//.test(ruta)) {
+      res.status(403).json({ statusCode: 403, message: 'Forbidden' });
+      return;
+    }
+    // Personal: además de la firma, cuenta activa y sesión sin cerrar (baja, «cerrar sesiones»).
+    if (!payload.isClient && !payload.isBranchUser) {
+      const vigente = await sesionDeUploadsVigente(Number(payload.sub), payload.jti).catch(() => false);
+      if (!vigente) {
+        res.status(401).json({ statusCode: 401, message: 'Invalid or expired token' });
+        return;
+      }
+    }
+    next();
   });
 
   // Contenido subido por usuarios: nunca debe interpretarse como HTML/script.

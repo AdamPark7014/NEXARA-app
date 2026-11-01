@@ -15,11 +15,19 @@ import {
   type PdfTableContext,
 } from '../common/pdf/nexara-pdf-theme';
 
+/**
+ * Logo del reporte: solo HTTPS a un dominio de NEXARA, sin redirecciones y con tope de tamaño. Antes
+ * el `logoUrl` del cuerpo llegaba tal cual a `fetch` (SSRF hacia la red interna).
+ */
 const fetchImageBuffer = async (url: string): Promise<Buffer | null> => {
   try {
-    const response = await fetch(url);
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (parsed.protocol !== 'https:' || (host !== 'nexara.com.mx' && !host.endsWith('.nexara.com.mx'))) return null;
+    const response = await fetch(parsed, { redirect: 'manual', signal: AbortSignal.timeout(8_000) });
     if (!response.ok) return null;
     const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > 5 * 1024 * 1024) return null;
     return Buffer.from(arrayBuffer);
   } catch {
     return null;

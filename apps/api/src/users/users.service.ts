@@ -963,7 +963,11 @@ export class UsersService {
     });
   }
 
-  async getAuthorizedDocument(documentId: number, currentUser: { id: number; permissions?: string[]; isSuperAdmin?: boolean }) {
+  async getAuthorizedDocument(
+    documentId: number,
+    currentUser: { id: number; permissions?: string[]; isSuperAdmin?: boolean },
+    companyId?: number | null,
+  ) {
     const document = await this.prisma['userDocument'].findUnique({
       where: { id: documentId },
       include: {
@@ -988,6 +992,10 @@ export class UsersService {
     if (currentUser.isSuperAdmin) {
       return document;
     }
+
+    // `UserDocument` no entra al filtro por empresa de Prisma: sin esto, un administrador de otra
+    // empresa descargaba INE, CURP y comprobantes de NEXARA probando ids.
+    await this.assertUserInCompany(document.userId, companyId);
 
     const requester = await this.prisma['user'].findUnique({
       where: { id: currentUser.id },
@@ -1057,7 +1065,10 @@ export class UsersService {
     });
   }
 
-  async updateDocumentReview(id: number, data: any) {
+  async updateDocumentReview(id: number, data: any, companyId?: number | null) {
+    const documento = await this.prisma['userDocument'].findUnique({ where: { id }, select: { userId: true } });
+    if (!documento) throw new NotFoundException('Documento no encontrado');
+    await this.assertUserInCompany(documento.userId, companyId);
     return this.prisma['userDocument'].update({
       where: { id },
       data,
@@ -1071,6 +1082,18 @@ export class UsersService {
     const data: any = { ...updateUserDto };
     // No aceptar roleKey del body (escalada). Se sincroniza desde roleId abajo.
     delete data.roleKey;
+    // El correo decide quién es súper admin (comparado en minúsculas): «GERENCIA@…» en otra cuenta la
+    // volvía dueña de la plataforma. Siempre en minúsculas y sin repetir con otras mayúsculas.
+    if (data.email !== undefined) {
+      const email = String(data.email ?? '').trim().toLowerCase();
+      if (!email) throw new BadRequestException('El correo no puede quedar vacío.');
+      const repetido = await this.prisma.user.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' }, NOT: { id } },
+        select: { id: true },
+      });
+      if (repetido) throw new ConflictException('Ese correo ya está registrado en otra cuenta.');
+      data.email = email;
+    }
     const currentUser = await this.prisma['user'].findUnique({
       where: { id },
       select: { email: true },
@@ -1130,6 +1153,17 @@ export class UsersService {
       if (nuevaContrasena && this.vault) {
         const guardada = await this.vault.guardar({ userId: id, email: user.email, password: nuevaContrasena, companyId });
         if (!guardada) await this.vault.olvidar(id);
+      }
+      // Contraseña nueva o cuenta desactivada: se cierran sus sesiones (un token robado deja de servir).
+      if (nuevaContrasena || (data.isActive === false && before?.isActive !== false)) {
+        try {
+          await this.prisma.userSession.updateMany({
+            where: { userId: id, revokedAt: null },
+            data: { revokedAt: new Date(), revokeReason: nuevaContrasena ? 'cambio_contrasena' : 'cuenta_desactivada' },
+          });
+        } catch (error) {
+          this.logger.warn(`No se cerraron las sesiones del usuario ${id}: ${(error as Error)?.message ?? error}`);
+        }
       }
 
       if (syncMembershipEmployeeNumber && companyId != null) {

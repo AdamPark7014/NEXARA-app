@@ -76,7 +76,8 @@ export class AuthController {
    */
   @Post('logout')
   @HttpCode(200)
-  logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    await this.authService.revocarSesionDeToken(sessionTokenFromHeaders(req.headers ?? {}));
     // Sesión por pestaña: si la cookie es de otra cuenta abierta en otra pestaña, se conserva.
     if (logoutDebeBorrarCookie(req.headers ?? {})) clearSessionCookie(res);
     return { ok: true };
