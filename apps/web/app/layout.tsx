@@ -9,11 +9,13 @@ import Providers from "./providers";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 import {
   NEXARA_APPLE_TOUCH,
+  NEXARA_DIRECCION_POSTAL,
   NEXARA_FAVICON_192,
   NEXARA_FAVICON_48,
   NEXARA_FAVICON_512,
   NEXARA_FAVICON_ICO,
   NEXARA_LOGO_LOCKUP,
+  NEXARA_MAPS_LINK,
 } from "@/lib/brand";
 
 const spaceGrotesk = Space_Grotesk({
@@ -207,14 +209,8 @@ export default function RootLayout({
     logo: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
     telephone: "+52 222 696 0350",
     email: CORREO_PUBLICO,
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: "Calle Ignacio Allende 512",
-      addressLocality: "Santiago Momoxpan",
-      postalCode: "72774",
-      addressRegion: "Puebla",
-      addressCountry: "MX",
-    },
+    address: NEXARA_DIRECCION_POSTAL,
+    hasMap: NEXARA_MAPS_LINK,
     openingHoursSpecification: {
       "@type": "OpeningHoursSpecification",
       dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],

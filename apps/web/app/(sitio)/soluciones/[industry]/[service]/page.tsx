@@ -8,6 +8,7 @@ import { recortarDescripcion, tituloConRemate } from "@/lib/seo/textos";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { GEO_CITIES, isGeoServiceSlug } from "@/lib/seo/geo-cities";
 import { JsonLd } from "@/lib/seo/json-ld";
+import { NEXARA_DIRECCION_POSTAL } from "@/lib/brand";
 import PublicIcon from "@/app/components/PublicIcon";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
@@ -169,13 +170,7 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
             url: siteUrl,
             logo: `${siteUrl}/icon-192.png`,
             telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "+52-222-696-0350",
-            address: {
-              "@type": "PostalAddress",
-              streetAddress: "Explanada Puebla, Santiago Momoxpan",
-              addressLocality: "Puebla",
-              addressRegion: "Puebla",
-              addressCountry: "MX",
-            },
+            address: NEXARA_DIRECCION_POSTAL,
           },
           audience: { "@type": "BusinessAudience", audienceType: industry.name },
           offers: {

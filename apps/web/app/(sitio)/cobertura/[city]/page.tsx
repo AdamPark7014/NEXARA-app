@@ -5,6 +5,7 @@ import { GEO_CITIES, GEO_MONEY_LINKS, GEO_SERVICE_SLUGS, findGeoCity } from "@/l
 import { findServiceLanding } from "@/lib/seo/programmatic-landings";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { JsonLd } from "@/lib/seo/json-ld";
+import { NEXARA_DIRECCION_POSTAL } from "@/lib/brand";
 import { recortarDescripcion } from "@/lib/seo/textos";
 import PublicIcon from "@/app/components/PublicIcon";
 import s from "@/components/sitio/sitio.module.css";
@@ -112,7 +113,7 @@ export default function CoberturaCityPage({ params }: { params: Params }) {
         data={{
           "@context": "https://schema.org",
           "@type": "ProfessionalService",
-          name: `NEXARA · ${city.name}`,
+          name: "NEXARA",
           description: `CCTV, redes, cómputo y soporte TI en ${city.name}, ${city.region}.`,
           url: `${siteUrl}${path}`,
           image: `${siteUrl}/logo-nexara-lockup.png`,
@@ -123,12 +124,8 @@ export default function CoberturaCityPage({ params }: { params: Params }) {
             name: city.name,
             containedInPlace: { "@type": "AdministrativeArea", name: city.region },
           },
-          address: {
-            "@type": "PostalAddress",
-            addressLocality: city.name,
-            addressRegion: city.region,
-            addressCountry: "MX",
-          },
+          // Una sola oficina: la ciudad va como zona de servicio, no como domicilio.
+          address: NEXARA_DIRECCION_POSTAL,
           priceRange: "$$",
         }}
       />
