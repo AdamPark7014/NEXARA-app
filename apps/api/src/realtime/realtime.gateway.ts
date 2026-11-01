@@ -290,6 +290,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
     let payload: {
       sub?: number | string;
+      jti?: string;
       companyId?: number | string;
       isSuperAdmin?: boolean;
       roleKey?: string;
@@ -320,10 +321,39 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       return { userId: null, companyId: null };
     }
 
+    // Cuenta desactivada o sesión cerrada (baja, «cerrar sesiones», rotación de claves): fuera
+    // también del tiempo real, igual que de la API (`jwt.strategy` lo revisa en cada petición).
+    if (!(await this.sesionVigente(Number(payload.sub), payload.jti))) {
+      return { userId: null, companyId: null };
+    }
+
     return {
       userId: payload.sub,
       companyId: await this.resolveCompanyForUser(payload),
     };
+  }
+
+  /** Usuario activo y, si el token trae `jti`, sesión sin revocar ni vencer. Ante un error de base, no. */
+  private async sesionVigente(userId: number, jti: string | undefined): Promise<boolean> {
+    try {
+      const { PrismaService } = await import('../prisma/prisma.service.js');
+      const prisma = this.moduleRef.get(PrismaService, { strict: false });
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { isActive: true } });
+      if (!user || user.isActive === false) return false;
+      // Tokens anteriores a las sesiones (sin `jti`) siguen valiendo hasta vencer, como en la API.
+      if (!jti) return true;
+      const sesion = await prisma.userSession.findUnique({
+        where: { jti },
+        select: { userId: true, revokedAt: true, expiresAt: true },
+      });
+      return Boolean(sesion && sesion.userId === userId && !sesion.revokedAt && sesion.expiresAt.getTime() > Date.now());
+    } catch (error) {
+      this.logger.error(
+        `No se pudo revisar la sesión del socket (user=${userId})`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      return false;
+    }
   }
 
   private toCompanyId(value: unknown): number | null {
