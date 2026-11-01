@@ -8197,3 +8197,172 @@ model ActivityTrayecto {
   @@index([companyId])
   @@map("activity_trayectos")
 }
+
+// ============================================================================
+// LIBRO DE COSTOS (docs/COSTOS-PRECIOS-UNITARIOS.md, propuesta aprobada 01-11-2026)
+// Las referencias a persona, actividad y empresa son columnas sueltas, como en `CctvDiseno`: estas
+// tablas solo leen lo demás y se pueden recalcular. El aislamiento por empresa lo pone el middleware
+// (`tenant-models.ts`) y cada consulta filtra además por `companyId`.
+// ============================================================================
+
+/// Parámetros del costo real por empresa y año. Sin fila rigen los valores por omisión, marcados como
+/// sin validar. `ps` son las cuotas de IMSS e Infonavit: la contadora las da con lo que se paga en el SUA.
+model CostoParametros {
+  id               Int      @id @default(autoincrement())
+  companyId        Int
+  anio             Int
+  /// Cuotas obrero-patronales como fracción del salario (Reglamento LOPSRM art. 191).
+  ps               Decimal  @default(0.25) @db.Decimal(6, 4)
+  /// La contadora confirmó `ps`. Mientras no, las pantallas lo marcan como provisional.
+  psValidado       Boolean  @default(false)
+  /// Permisos e incapacidades: días pagados que no se trabajan.
+  otrosDias        Int      @default(3)
+  aguinaldoDias    Int      @default(15)
+  primaVacacional  Decimal  @default(0.25) @db.Decimal(5, 4)
+  /// Herramienta menor como fracción de la mano de obra (art. 207). Valor inicial, no es de ley.
+  kh               Decimal  @default(0.03) @db.Decimal(5, 4)
+  /// Equipo de seguridad como fracción de la mano de obra (art. 209). Valor inicial, no es de ley.
+  ks               Decimal  @default(0.01) @db.Decimal(5, 4)
+  /// Indirectos del año como fracción del costo directo. Estimado a mano hasta la Fase 6.
+  indirectoPct     Decimal? @db.Decimal(6, 4)
+  /// Tasa anual para inversión y financiamiento, como fracción.
+  tasaInteres      Decimal? @db.Decimal(6, 4)
+  notas            String?  @db.VarChar(500)
+  actualizadoPorId Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([companyId, anio])
+  @@index([companyId])
+  @@map("costo_parametros")
+}
+
+/// Categoría de costo: instalador, soporte, encargado, oficina. Sirve para cotizar y para enseñar
+/// tarifas sin exponer el sueldo de nadie.
+model CostoCategoria {
+  id               Int      @id @default(autoincrement())
+  companyId        Int
+  clave            String   @db.VarChar(30)
+  nombre           String   @db.VarChar(80)
+  /// DIRECTO | INDIRECTO
+  tipo             String   @default("DIRECTO") @db.VarChar(10)
+  /// Sueldo semanal de referencia para cotizar. Vacío: el promedio de quienes están en la categoría.
+  sueldoSemanalRef Decimal? @db.Decimal(10, 2)
+  orden            Int      @default(0)
+  activo           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([companyId, clave])
+  @@index([companyId])
+  @@map("costo_categorias")
+}
+
+/// Lo propio de una persona para el costo. Sin fila, su categoría sale de su puesto.
+model CostoPersona {
+  id          Int      @id @default(autoincrement())
+  companyId   Int
+  userId      Int
+  categoriaId Int?
+  /// Cuotas propias si difieren de las de la empresa (por ejemplo, otro salario base de cotización).
+  psPropio    Decimal? @db.Decimal(6, 4)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, userId])
+  @@index([companyId])
+  @@map("costo_personas")
+}
+
+/// Ficha de costo de un vehículo o herramienta mayor. Misma fórmula para los dos (art. 208).
+model CostoFichaEquipo {
+  id                  Int      @id @default(autoincrement())
+  companyId           Int
+  /// VEHICULO | HERRAMIENTA
+  tipo                String   @db.VarChar(12)
+  nombre              String   @db.VarChar(120)
+  vehicleId           Int?
+  toolId              Int?
+  /// KM | HORA | DIA
+  unidad              String   @db.VarChar(6)
+  valor               Decimal  @db.Decimal(12, 2)
+  valorLlantas        Decimal  @default(0) @db.Decimal(12, 2)
+  rescatePct          Decimal  @default(0) @db.Decimal(5, 4)
+  vidaUnidades        Decimal  @db.Decimal(12, 2)
+  unidadesAnio        Decimal  @db.Decimal(12, 2)
+  tasaInteres         Decimal  @default(0) @db.Decimal(6, 4)
+  primaSeguro         Decimal  @default(0) @db.Decimal(6, 4)
+  ko                  Decimal  @default(0) @db.Decimal(6, 4)
+  rendimiento         Decimal? @db.Decimal(8, 3)
+  precioCombustible   Decimal? @db.Decimal(8, 3)
+  costoAceite         Decimal? @db.Decimal(10, 2)
+  aceiteCadaUnidades  Decimal? @db.Decimal(12, 2)
+  vidaLlantasUnidades Decimal? @db.Decimal(12, 2)
+  otrosAnuales        Decimal  @default(0) @db.Decimal(12, 2)
+  notas               String?  @db.VarChar(300)
+  activo              Boolean  @default(true)
+  actualizadoPorId    Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([vehicleId])
+  @@index([toolId])
+  @@map("costo_fichas_equipo")
+}
+
+/// El libro de costos: un renglón por cada cosa que costó, con su origen. Se deriva de lo que la
+/// operación ya registra y se puede recalcular; nada regresa a nómina, facturas ni pólizas.
+model CostoMovimiento {
+  id            Int      @id @default(autoincrement())
+  companyId     Int
+  /// De dónde salió: `SESION:12`, `VIATICO:5:40`, `GASTO:9`, `SALIDA:3`. Único: recalcular no duplica.
+  origen        String   @db.VarChar(40)
+  /// MATERIAL | MANO_OBRA | VEHICULO | HERRAMIENTA | VIATICO_GASTO | SUBCONTRATO
+  rubro         String   @db.VarChar(14)
+  /// Día de trabajo en America/Mexico_City.
+  fecha         DateTime @db.Date
+  activityId    Int
+  userId        Int?
+  cantidad      Decimal  @db.Decimal(14, 4)
+  unidad        String   @db.VarChar(12)
+  /// En mano de obra es el costo por hora de esa persona: solo lo ven CEO y contadora.
+  costoUnitario Decimal  @db.Decimal(12, 4)
+  importe       Decimal  @db.Decimal(14, 2)
+  nota          String?  @db.VarChar(200)
+  /// PROVISIONAL se recalcula; CERRADO queda congelado.
+  estado        String   @default("PROVISIONAL") @db.VarChar(12)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([companyId, origen])
+  @@index([companyId, activityId])
+  @@index([companyId, fecha])
+  @@map("costo_movimientos")
+}
+
+/// A qué se le carga una actividad cuando ella no lo dice. No toca la actividad: así ligar en la
+/// bandeja no mueve el avance del proyecto ni ningún otro reporte.
+model CostoActividadLiga {
+  id               Int       @id @default(autoincrement())
+  companyId        Int
+  activityId       Int
+  /// PROYECTO | COTIZACION | INTERNA. null = solo hay sugerencia, nadie ha decidido.
+  tipo             String?   @db.VarChar(12)
+  proyectoId       Int?
+  cotizacionId     Int?
+  decididoPorId    Int?
+  decididoAt       DateTime?
+  /// Lo que sugirió la IA, guardado para no volver a pagarlo.
+  sugerenciaTipo   String?   @db.VarChar(12)
+  sugerenciaId     Int?
+  sugerenciaNombre String?   @db.VarChar(200)
+  sugerenciaMotivo String?   @db.VarChar(160)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([companyId, activityId])
+  @@index([companyId, proyectoId])
+  @@index([companyId, cotizacionId])
+  @@map("costo_actividad_ligas")
+}

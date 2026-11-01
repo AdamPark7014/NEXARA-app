@@ -1,5 +1,31 @@
 # RELEVO
 
+- **01-11 ~14:00 (claude-code) — Libro de costos, Fases 0 y 1 en producción: costo real por hora, bandeja de horas sin proyecto y pestaña Costos.**
+  - Adam aprobó las Fases 0 y 1 («Sí, Fases 0 y 1»). Las Fases 2 a 8 siguen en propuesta. Estado y decisiones en
+    `docs/COSTOS-PRECIOS-UNITARIOS.md`, sección «Estado». Mockup: <https://claude.ai/artifact/VJpUHdLxGPRRXSJGK7a7Fe>.
+  - Qué hay: `/erp/costos` (horas sin proyecto), `/erp/costos/proyectos`, `/erp/costos/tarifas` y la pestaña Costos en cada
+    proyecto. API en `apps/api/src/costos/`; las fórmulas, en `calculos/`, puras y con casos hechos a mano.
+  - Migración `20261101190000_libro_costos`: 6 tablas nuevas, ninguna existente tocada. `deploy-api-web.sh` no migra: se corrió
+    `prisma migrate deploy` a mano en `nexara-api`.
+  - Proceso nocturno 03:20 de Ciudad de México (`LibroCostosService`). Solo lee reloj, viáticos, gastos y salidas de almacén, y solo
+    escribe en `costo_movimientos`, que no se audita. Se repite sin duplicar.
+  - **Reglas para no pisarlas:**
+    - Ligar en la bandeja NO escribe en la actividad, a propósito: no mueve el avance del proyecto ni Contabilidad › Proyectos.
+    - «Marcar ganada» no cambia el estado de la cotización: `aprobar` la manda a Por facturar y suma en BI. Gana cuando nace un
+      proyecto de ella.
+    - Sueldos y tarifas por persona: solo CEO y contadora. La contadora tiene rol `administrativo` y se distingue por el puesto
+      (`costos-acceso.ts`). Esto abre a la contadora algo que «Pagos a personal» (`rbac.module_roles`) deja solo al CEO: lo decidió Adam.
+    - En `costo_movimientos.costoUnitario` de mano de obra se puede despejar un sueldo. No exponerlo fuera de CEO y contadora.
+  - **A medias / sin hacer:** las cuotas `Ps` son un supuesto de 25 % hasta que la contadora las capture, y todo sale marcado como
+    provisional. Vehículos y herramienta ya tienen tarifa, pero aún no se cargan a proyectos (Fases 3 y 4). Horas extra sin cargar:
+    `overtime_approvals` y `nomina_semanas` están vacías. La liga al asignar la actividad falta: hoy solo la bandeja; se coordina con
+    la sesión del asistente.
+  - Trampas:
+    - El resto de la oficina (rol `administrativo`) ve «Costos» en el menú y al entrar un aviso: el menú va por rol, no por puesto.
+    - `apps/api/src/ai/eval/resultados/gasto.json` no se incluyó en el commit, para no chocar con otras sesiones que corren evals.
+    - `lib/rbac/role-modules.spec.ts` lista el catálogo por rol: un módulo nuevo se agrega ahí, y en `module-guides.ts`, `core-surface.ts`,
+      `ShellIcons.tsx`, `page-matrix.ts` y `url-matrix.ts`.
+
 - **01-11 ~12:30 (claude-code) — Cotizaciones: el PDF del cliente ahora es la «Memoria descriptiva» del Canva de Adam, con su portada, en todas.**
   - **Lo que hay que saber:** el PDF que sale al cliente (descarga, correo, portal y vista previa) es `generarCotizacionNexaraPdf` en
     `cotizaciones/cotizacion-formato-nexara.ts`. `propuesta-tecnica-pdf.ts` ya no se usa desde el 28-09: `buildPropuesta` no tiene

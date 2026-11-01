@@ -23,6 +23,8 @@ export const AUDIT_EXCLUDED = new Set<string>([
   'ChatMessageRead',
   // Eventos que empujan los terminales Hikvision: la tabla misma es el registro (860 mil copias, 592 MB en un mes).
   'IntegraPushEvent',
+  // Libro de costos: se deriva de otras tablas y se recalcula de noche. Su registro son sus orígenes.
+  'CostoMovimiento',
 ]);
 
 /**

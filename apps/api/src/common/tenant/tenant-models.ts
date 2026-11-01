@@ -136,6 +136,13 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'MovimientoVinculo',
   // Diseñador de videovigilancia (migración 20261029130000_cctv_disenos).
   'CctvDiseno',
+  // Libro de costos (migración 20261101190000_libro_costos).
+  'CostoParametros',
+  'CostoCategoria',
+  'CostoPersona',
+  'CostoFichaEquipo',
+  'CostoMovimiento',
+  'CostoActividadLiga',
 ]);
 
 /** Models where missing companyId on create is a hard error (not soft-injected). */

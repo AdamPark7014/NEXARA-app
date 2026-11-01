@@ -81,6 +81,12 @@ export const PROYECTOS_CORE_PATHS: PageRule[] = ['/erp/proyectos', '/erp/proyect
  * Soporte entra a la página; la API deja pasar solo a quien tiene gente a cargo (José Antonio) y
  * la página muestra «sin acceso» a los demás. Instaladores, no (`docs/DISENADOR-CCTV.md` §8).
  */
+/**
+ * Costos (`/erp/costos`). La página abre a quien coordina y a quien lleva las cuentas; la API afina:
+ * sueldos y tarifas solo para CEO y contadora. Espejo de `COSTOS_URL_RULES` en la API.
+ */
+export const COSTOS_CORE_PATHS: PageRule[] = ['/erp/costos', '/erp/costos/**'];
+
 export const VIDEOVIGILANCIA_CORE_PATHS: PageRule[] = ['/erp/videovigilancia', '/erp/videovigilancia/**'];
 
 /**
@@ -138,6 +144,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── ARQUITECTO — OPS supervisor + ERP parcial ────────────────────────
   [ROLES.ARQUITECTO]: [
+    ...COSTOS_CORE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/ops/**',
     ...CLIENTES_CORE_PATHS,
@@ -168,6 +175,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── DIR. OPERACIONES — visión global, aprobaciones operativas ────────
   [ROLES.DIR_OPERACIONES]: [
+    ...COSTOS_CORE_PATHS,
     ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
@@ -212,6 +220,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── DIR. ADMIN — finanzas, RH, gobierno + lectura OPS para facturación ──
   [ROLES.DIR_ADMIN]: [
+    ...COSTOS_CORE_PATHS,
     '/erp/**',
     '/crm/dashboard',
     '/crm/quotes/**',
@@ -238,6 +247,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── COORD ADMIN — segundo nivel administrativo ───────────────────────
   [ROLES.COORD_ADMIN]: [
+    ...COSTOS_CORE_PATHS,
     ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
@@ -299,6 +309,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── ADMINISTRATIVO — operación día a día ─────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
+    ...COSTOS_CORE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
     ...CLIENTES_CORE_PATHS,
@@ -340,6 +351,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── COORD OPERACIONES — supervisa campo / project manager ────────────
   [ROLES.COORD_OPERACIONES]: [
+    ...COSTOS_CORE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/ops/**',
     ...CLIENTES_CORE_PATHS,
@@ -424,6 +436,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── ENC. SOPORTE — coordina soporte; mismas páginas base que soporte ──
   [ROLES.ENC_SOPORTE]: [
+    ...COSTOS_CORE_PATHS,
     ...CORE_RECURSOS_PATHS,
     ...VIDEOVIGILANCIA_CORE_PATHS,
     '/ops/my-activities',
@@ -573,6 +586,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── CONTABILIDAD ─────────────────────────────────────────────────────
   [ROLES.CONTABILIDAD]: [
+    ...COSTOS_CORE_PATHS,
     ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS,
     // Mesa contable: abrir la cotización que se factura (solo el detalle, sin sumarle el módulo al

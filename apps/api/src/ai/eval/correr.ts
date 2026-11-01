@@ -12,7 +12,7 @@
  * `resultados/gasto.json`) no corre. Lo que se gasta queda en ese archivo.
  *
  *   npm run eval:ia -w apps/api -- \
- *     --funcion asistente|actas|triage|complejidad [--variantes haiku-low-np] [--casos a01,a02] [--sin-juez] [--juez haiku] [--max-usd 0.05]
+ *     --funcion asistente|actas|triage|complejidad|liga [--variantes haiku-low-np] [--casos a01,a02] [--sin-juez] [--juez haiku] [--max-usd 0.05]
  *     [--concurrencia 1] [--etiqueta x]
  *
  * `--concurrencia 1` mide la latencia real (p50/p95 en el resumen); por omisión van 5 a la vez.
@@ -49,6 +49,8 @@ import { ESCENARIOS_ACTA, type EscenarioActa } from './casos-actas.js';
 import { CASOS_TRIAGE, type CasoTriage } from './casos-triage.js';
 import { limpiarTriage, peticionTriage, type ClasificacionTriage } from '../triage-ia.js';
 import { CASOS_COMPLEJIDAD, type CasoComplejidad } from './casos-complejidad.js';
+import { CANDIDATOS_LIGA, CASOS_LIGA, type CasoLiga } from './casos-liga.js';
+import { candidatosParaIa, limpiarLiga, peticionLiga, type RespuestaLiga } from '../../costos/calculos/sugerir-liga.js';
 import { limpiarComplejidad, peticionComplejidad, type SugerenciaComplejidad } from '../complejidad/complejidad-ia.js';
 import { leerTranscripcion } from './generar-transcripciones.js';
 import {
@@ -625,6 +627,39 @@ async function correrComplejidad(caso: CasoComplejidad, v: Variante): Promise<Re
   }
 }
 
+// ─────────────────────────── Liga de costos ───────────────────────────
+
+async function correrLiga(caso: CasoLiga, v: Variante): Promise<Resultado> {
+  const t0 = Date.now();
+  const base = { caso: caso.id, variante: v.nombre };
+  try {
+    asegurarPresupuesto(0.01);
+    const lista = candidatosParaIa(caso.actividad, CANDIDATOS_LIGA);
+    const { datos, uso } = await claude.json<RespuestaLiga>({
+      ...peticionLiga(caso.actividad, lista),
+      proceso: 'eval-costos-liga',
+      companyId: 0,
+      modelo: v.modelo,
+      esfuerzo: v.esfuerzo,
+      pensar: v.pensar,
+      reintentos: 1,
+      timeoutMs: 15_000,
+    });
+    registrarGasto(`liga ${v.nombre}`, uso.usdAprox);
+    const s = limpiarLiga(datos, lista);
+    const leida = s ? (s.tipo === 'INTERNA' ? 'INTERNA' : `${s.tipo}:${s.id}`) : 'NINGUNA';
+    const aceptables = caso.aceptables.map((a) => (typeof a === 'string' ? a : `${a.tipo}:${a.id}`));
+    const revisiones: Revision[] = [
+      { nombre: 'liga', ok: aceptables.includes(leida), detalle: leida },
+      { nombre: 'motivo', ok: String(datos?.motivo ?? '').length <= 120, detalle: String(datos?.motivo ?? '') },
+    ];
+    return { ...base, revisiones, puntaje: revisiones.filter((r) => r.ok).length / revisiones.length, inventos: 0, notaJuez: null, comentarioJuez: null, uso, ms: Date.now() - t0 };
+  } catch (error) {
+    if (error instanceof PresupuestoAgotado) throw error;
+    return { ...base, revisiones: [], puntaje: 0, inventos: 0, notaJuez: null, comentarioJuez: null, uso: null, ms: Date.now() - t0, error: (error as Error).message };
+  }
+}
+
 // ──────────────────────────── Resumen ────────────────────────────
 
 /** Percentil por rango más cercano (p50, p95) de los milisegundos de cada llamada. */
@@ -678,6 +713,7 @@ const TOKENS_TIPICOS: Record<string, { entrada: number; cacheada: number; salida
   actas: { entrada: 12_000, cacheada: 2_500, salida: 2_500, juez: { entrada: 14_000, salida: 1_500 } },
   triage: { entrada: 700, cacheada: 500, salida: 80, juez: { entrada: 0, salida: 0 } },
   complejidad: { entrada: 650, cacheada: 0, salida: 60, juez: { entrada: 0, salida: 0 } },
+  liga: { entrada: 550, cacheada: 0, salida: 40, juez: { entrada: 0, salida: 0 } },
 };
 
 /** Costo estimado de la corrida: cada caso por variante (la primera escribe la caché) + juez. */
@@ -696,7 +732,7 @@ function estimarCorrida(funcion: string, casos: number, variantes: Variante[], c
 async function main() {
   const args = argumentos();
   const funcion = args.funcion;
-  if (!['asistente', 'actas', 'triage', 'complejidad'].includes(funcion)) throw new Error('--funcion asistente|actas|triage|complejidad');
+  if (!['asistente', 'actas', 'triage', 'complejidad', 'liga'].includes(funcion)) throw new Error('--funcion asistente|actas|triage|complejidad');
   const variantes = (args.variantes || 'haiku-low-np').split(',').map(variante);
   const conJuez = !args['sin-juez'];
   JUEZ = modeloDe(args.juez);
@@ -710,7 +746,9 @@ async function main() {
         ? ESCENARIOS_ACTA
         : funcion === 'triage'
           ? CASOS_TRIAGE
-          : CASOS_COMPLEJIDAD;
+          : funcion === 'liga'
+            ? CASOS_LIGA
+            : CASOS_COMPLEJIDAD;
   const casos = todos.filter((c) => !ids || ids.includes(c.id));
   const estimado = estimarCorrida(funcion, casos.length, variantes, conJuez);
   const maximo = args['max-usd'] ? Number(args['max-usd']) : null;
@@ -732,7 +770,9 @@ async function main() {
             ? await correrActa(caso as EscenarioActa, v, conJuez)
             : funcion === 'triage'
               ? await correrTriage(caso as CasoTriage, v)
-              : await correrComplejidad(caso as CasoComplejidad, v);
+              : funcion === 'liga'
+                ? await correrLiga(caso as CasoLiga, v)
+                : await correrComplejidad(caso as CasoComplejidad, v);
       porVariante.get(v.nombre)!.push(r);
       const fallas = r.error ? `ERROR ${r.error}` : r.revisiones.filter((x) => !x.ok).map((x) => x.nombre).join(', ') || 'todo bien';
       console.log(`${caso.id} ${v.nombre}: ${(r.puntaje * 100).toFixed(0)} % · juez ${r.notaJuez ?? '—'} · ${r.uso?.tokensSalida ?? 0} tok salida · $${r.uso?.usdAprox ?? 0} · ${fallas}`);

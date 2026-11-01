@@ -28,6 +28,8 @@ export const CORE_OLA1_MODULE_IDS: readonly string[] = [
   'erp-organigrama',
   // Hub contadora: finanzas orquestadas bajo /erp/contabilidad.
   'erp-contabilidad',
+  // Costos: libro de costos, horas sin ligar y tarifas.
+  'erp-costos',
   'invoicing',
   'banking',
   'employee-payments',
