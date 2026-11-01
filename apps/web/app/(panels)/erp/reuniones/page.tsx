@@ -14,7 +14,7 @@
  * El resto del personal abre en **Mis acuerdos**: lo que le toca, no el archivo de juntas.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -62,7 +62,8 @@ import {
 } from "@/lib/meetings-api";
 import PersonalCalendar from "@/components/calendar/PersonalCalendar";
 import ActaIA from "./ActaIA";
-import GrabarReunion, { type SesionGrabacion } from "./GrabarReunion";
+import GrabarReunion from "./GrabarReunion";
+import { useGrabacionActiva } from "@/components/reuniones/GrabacionProvider";
 import { abrirMicrofono } from "@/lib/use-grabadora";
 import { pedirPermisoMicrofono, usePermisoMicrofono } from "@/lib/use-permiso-microfono";
 import PermisoMicrofono from "./PermisoMicrofono";
@@ -242,6 +243,9 @@ export default function ReunionesPage() {
     }
   }, [tab, filtroMios, verLecciones, token, vencidos, lecciones]);
 
+  // La grabación vive en el layout de /erp: sigue aunque se salga de esta página.
+  const { sesion, comenzar, otraPestana, concluida, limpiarConcluida, descartadas } = useGrabacionActiva();
+
   const abrirDetalle = async (id: number) => {
     if (!token) return;
     setDetalleAbierto(true);
@@ -255,6 +259,32 @@ export default function ReunionesPage() {
       setDetalleCargando(false);
     }
   };
+
+  // Una reunión recién concluida (aquí o desde la barra de otro módulo) o un enlace a ella se abre.
+  useEffect(() => {
+    if (!token) return;
+    const q = Number(new URLSearchParams(window.location.search).get("reunion")) || null;
+    const id = concluida ?? q;
+    if (!id) return;
+    limpiarConcluida();
+    if (q) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("reunion");
+      window.history.replaceState(null, "", url.toString());
+    }
+    void cargar();
+    void abrirDetalle(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, concluida]);
+
+  // Se detuvo sin concluir: la lista lo refleja.
+  const descartadasVistas = useRef(descartadas);
+  useEffect(() => {
+    if (descartadasVistas.current === descartadas) return;
+    descartadasVistas.current = descartadas;
+    void cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [descartadas]);
 
   const bajarPdf = async (id: number) => {
     if (!token || bajandoPdf) return;
@@ -330,7 +360,6 @@ export default function ReunionesPage() {
    * `existente`, graba (o retoma) esa reunión.
    */
   const [empezando, setEmpezando] = useState(false);
-  const [sesion, setSesion] = useState<SesionGrabacion | null>(null);
   type Existente = { id: number; titulo: string; baseMs?: number; baseParte?: number };
 
   // Permiso del micrófono como el de notificaciones: tarjeta antes de grabar si falta.
@@ -348,8 +377,8 @@ export default function ReunionesPage() {
 
   const comenzarGrabacion = async (existente?: Existente, opciones: { desdeTarjeta?: boolean } = {}) => {
     if (!token || empezando) return;
-    if (sesion) {
-      toast.error("Ya hay una reunión grabándose: concluye esa primero.");
+    if (sesion || otraPestana) {
+      toast.error(otraPestana ? "Ya se está grabando una reunión en otra pestaña: concluye esa primero." : "Ya hay una reunión grabándose: concluye esa primero.");
       return;
     }
     if (!opciones.desdeTarjeta && (permisoMic.estado === "prompt" || permisoMic.estado === "denied")) {
@@ -370,7 +399,7 @@ export default function ReunionesPage() {
       const reunion =
         existente ??
         (await createMeeting(token, { tipo: suggestedTypeForToday(), fecha: todayInput(), horaInicio: horaAhora() }));
-      setSesion({ meetingId: reunion.id, titulo: reunion.titulo, stream, baseMs: existente?.baseMs, baseParte: existente?.baseParte });
+      comenzar({ meetingId: reunion.id, titulo: reunion.titulo, stream, baseMs: existente?.baseMs, baseParte: existente?.baseParte });
       cerrarDetalle();
       cambiarTab("reuniones");
       setVerLecciones(false);
@@ -530,22 +559,7 @@ export default function ReunionesPage() {
         />
       )}
 
-      {sesion ? (
-        <GrabarReunion
-          key={sesion.meetingId}
-          token={token}
-          sesion={sesion}
-          onConcluida={(id) => {
-            setSesion(null);
-            void cargar();
-            void abrirDetalle(id);
-          }}
-          onDescartar={() => {
-            setSesion(null);
-            void cargar();
-          }}
-        />
-      ) : null}
+      <GrabarReunion />
 
       {loaded && (
         <div className={s.metrics}>

@@ -1,5 +1,27 @@
 # RELEVO
 
+- **01-11 ~11:30 (claude-code) — Reuniones: la grabación sigue hasta que la concluyas, en cualquier módulo, pestaña o app.**
+  - Causa: el grabador vivía en la página `/erp/reuniones`; al salir se desmontaba y soltaba el micrófono.
+  - El motor (`components/reuniones/useMotorGrabacion.ts`) ahora vive en `GrabacionProvider`, en el layout de `/erp`.
+    `GrabarReunion` quedó como vista. Son dos contextos: `useGrabacionActiva` (estable, lo usa la página) y `useMotor`
+    (cambia 4 veces por segundo, solo barra y panel), para no repintar todo Reuniones con cada tic.
+  - Lo que Adam aprobó con muestra: barra fija abajo en todos los módulos (`BarraGrabacion`; en Reuniones no se pinta), reloj en
+    el título de la pestaña y ventanita siempre encima (Document Picture-in-Picture: Chrome y Edge de computadora). Se abre con
+    «Flotante» y, donde Chrome lo permite, sola al cambiar de pestaña (`enterpictureinpicture`).
+  - Para no parar en segundo plano (`lib/use-grabadora.ts`): reloj en un worker (`public/grabacion-reloj.js`, el navegador frena
+    los timers de una pestaña oculta), bloqueo de pantalla que se pide otra vez al regresar y micrófono que se reabre solo si
+    se desconecta.
+  - Recarga o cierre: nota en `localStorage` cada 5 s. De menos de 2 min se retoma sola con `baseMs`/`baseParte`; más vieja, la
+    barra ofrece Retomar o Concluir (no abre el micrófono sin pedirlo). Si ya se concluyó, se borra.
+  - Otras pestañas de Core (`BroadcastChannel`): ven la grabación, la pausan o concluyen, y no pueden empezar otra.
+  - Concluir desde la barra pide un segundo toque. Al terminar deja «Ver minuta» → `/erp/reuniones?reunion=ID`.
+  - Límites honestos: al cerrar o recargar se pierden a lo mucho los últimos 20 s de audio. Partes sin subir por falta de red
+    viven en memoria: se pierden si además se cierra la pestaña. En el navegador del teléfono el sistema puede suspender el
+    micrófono al cambiar de app (al volver se reabre); grabar de fondo de verdad en iPhone requeriría app nativa, y la nativa
+    no tiene Reuniones.
+  - Verificado con 12 pruebas (navegar, worker, micrófono caído, retomar, otra pestaña) con grabador falso.
+    **Falta una grabación real con sesión en producción:** crea una reunión de verdad, la hace Adam.
+
 - **01-11 ~11:00 (claude-code) — «Asignar con IA»: todo lleno y editable, tarjeta nueva y acceso para David.**
   - Pedido de Adam: entender lo informal, tiempos vagos y hoy si no dicen; responsable cuando se menciona; todo lleno.
     Eligió la tarjeta «B» (renglones que se editan con un lápiz; lo supuesto lleva un punto ámbar). Y dárselo a David Morales.

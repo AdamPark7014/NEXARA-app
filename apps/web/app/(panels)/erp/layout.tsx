@@ -1,6 +1,7 @@
 "use client";
 
 import AppShell from "@/components/app-shell/AppShell";
+import GrabacionProvider from "@/components/reuniones/GrabacionProvider";
 import { ToastViewport } from "@/components/Toast";
 import { resolveShellPanelFromPath } from "@/lib/cross-panel-handoff";
 import { usePathname } from "next/navigation";
@@ -15,9 +16,9 @@ export default function ErpLayout({ children }: { children: React.ReactNode }) {
   const shellPanel = resolveShellPanelFromPath(pathname);
 
   return (
-    <>
+    <GrabacionProvider>
       <ToastViewport />
       <AppShell panel={shellPanel}>{children}</AppShell>
-    </>
+    </GrabacionProvider>
   );
 }
