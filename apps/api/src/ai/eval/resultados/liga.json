@@ -1,0 +1,58 @@
+[
+  {
+    "funcion": "liga",
+    "variante": "haiku-low-np",
+    "modelo": "claude-haiku-5-5",
+    "esfuerzo": "low",
+    "pensar": false,
+    "fecha": "2026-11-01T18:52:44.958Z",
+    "casos": 24,
+    "errores": 0,
+    "puntaje": 0.8958,
+    "casosPerfectos": 19,
+    "inventos": 0,
+    "notaJuez": null,
+    "tokensEntradaMedios": 1033,
+    "tokensSalidaMedios": 69,
+    "tokensPensamientoMedios": 0,
+    "usdPorLlamada": 0.000091,
+    "msMedios": 1339,
+    "msP50": 1027,
+    "msP95": 2850,
+    "fallos": [
+      "l01 motivo (\"Peinar el rack de plaza sur\" apunta a Red de datos Plaza Sur; el texto menciona plaza sur y rack, coincide con ese proyecto.)",
+      "l03 motivo (Medir el estacionamiento del hotel en Cholula para las cámaras coincide con cotización NEX-0044 de cámaras en estacionamiento.)",
+      "l04 liga (NINGUNA)",
+      "l05 motivo (Fusionar fibra en patio de transportes en Coatzacoalcos coincide con el enlace de fibra del cliente Transportes Coatzacoalcos.)",
+      "l06 liga (NINGUNA)"
+    ],
+    "etiqueta": null
+  },
+  {
+    "funcion": "liga",
+    "variante": "haiku-low-np",
+    "modelo": "claude-haiku-5-5",
+    "esfuerzo": "low",
+    "pensar": false,
+    "fecha": "2026-11-01T19:02:22.668Z",
+    "casos": 24,
+    "errores": 0,
+    "puntaje": 0.9375,
+    "casosPerfectos": 21,
+    "inventos": 0,
+    "notaJuez": null,
+    "tokensEntradaMedios": 1027,
+    "tokensSalidaMedios": 61,
+    "tokensPensamientoMedios": 0,
+    "usdPorLlamada": 0.000086,
+    "msMedios": 1138,
+    "msP50": 1044,
+    "msP95": 1505,
+    "fallos": [
+      "l04 liga (NINGUNA)",
+      "l12 liga (NINGUNA)",
+      "l13 liga (NINGUNA)"
+    ],
+    "etiqueta": "motivo 12 palabras"
+  }
+]

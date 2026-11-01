@@ -229,6 +229,19 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `portal KB, support`,
   },
+  'erp-costos': {
+    id: 'erp-costos',
+    summary: `Lo que de verdad cuesta cada proyecto: mano de obra real, material, viáticos y gastos, contra lo cotizado.`,
+    audience: `CEO y contadora ven todo, con sueldos y tarifas. Quien coordina la operación liga horas y ve totales, sin sueldos.`,
+    how: `El libro de costos solo lee lo que la operación ya registra (reloj de actividades, salidas de almacén, viáticos y gastos) y lo recalcula de noche. No cambia nómina, facturas ni pólizas. Cada hora se cuesta con el factor de salario real del Reglamento de Obras Públicas.`,
+    steps: [
+      `En Horas sin proyecto acepta la sugerencia de cada actividad o elige a dónde va. Lo que no es de nadie es trabajo interno.`,
+      `Abre un proyecto y entra a la pestaña Costos para ver lo cotizado contra lo real por rubro.`,
+      `En Tarifas de costo, la contadora captura las cuotas de IMSS e Infonavit con lo que se paga en el SUA y marca que ya las confirmó.`,
+      `Da de alta vehículos y herramienta mayor para sacar su costo por km o por día, y pulsa «Recalcular el libro» si cambiaste tarifas.`,
+    ],
+    connects: `Lee Actividades, Almacén, Viáticos, Gastos, Proyectos y Cotizaciones. Ver docs/COSTOS-PRECIOS-UNITARIOS.md.`,
+  },
   'erp-contabilidad': {
     id: 'erp-contabilidad',
     summary: `Escritorio de la contadora: por cobrar, por pagar, facturas, conciliación, pre-nómina y cierres.`,

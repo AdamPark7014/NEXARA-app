@@ -126,6 +126,23 @@ export const CONTROL_NOMINA_URL_RULE: UrlRule = {
 };
 
 /**
+ * Costos (`/erp/costos`): libro de costos, tarifas y bandeja de horas sin proyecto. La matriz abre la
+ * puerta a quien coordina y a quien lleva las cuentas; el controlador afina: sueldos y tarifas solo
+ * para CEO y contadora (`costos/costos-acceso.ts`). La contadora tiene rol `administrativo`.
+ */
+export const COSTOS_URL_RULES: UrlRule[] = [
+  { path: '/erp/costos', scope: 'write' },
+  { path: '/erp/costos/**', scope: 'write' },
+  { path: '/api/costos/**', methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], scope: 'write' },
+];
+
+/** Ventas ve los totales del proyecto que vendió, en su pestaña «Costos». Ni tarifas ni bandeja. */
+export const COSTOS_PROYECTO_URL_RULES: UrlRule[] = [
+  { path: '/api/costos/acceso', methods: ['GET'], scope: 'read' },
+  { path: '/api/costos/proyectos/*', methods: ['GET'], scope: 'read' },
+];
+
+/**
  * Proyectos en Core (`/erp/proyectos`): mismo público que las cotizaciones de Core.
  *
  * Las páginas van aquí para que `/me/navigation` no recorte el módulo del menú. La escritura en
@@ -377,6 +394,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CEO — ve TODO (lectura) + aprobaciones de tope
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
+    ...COSTOS_URL_RULES,
     // «Asignar con IA» es solo del CEO (Adam, 12-10). Trae el selector de personas.
     ...ASISTENTE_IA_URL_RULES,
     { path: '/api/users/assignable', methods: ['GET'], scope: 'read' },
@@ -424,6 +442,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // Supervisa OPS, valida trabajos antes de reportar a Admin + Dirección
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ARQUITECTO]: [
+    ...COSTOS_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
@@ -475,6 +494,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR DE OPERACIONES — aprueba viáticos/proyectos nivel alto
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_OPERACIONES]: [
+    ...COSTOS_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
@@ -531,6 +551,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR ADMINISTRATIVO — finanzas, compras, RH (alto nivel)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_ADMIN]: [
+    ...COSTOS_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...CCTV_DISENOS_URL_RULES,
@@ -574,6 +595,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD ADMINISTRATIVO — segundo nivel de aprobación
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
+    ...COSTOS_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_URL_RULES,
@@ -655,6 +677,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ADMINISTRATIVO — primer nivel (operación día a día)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
+    ...COSTOS_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...CCTV_DISENOS_URL_RULES,
@@ -716,6 +739,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD OPERACIONES — supervisa ing. de campo, project manager
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_OPERACIONES]: [
+    ...COSTOS_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
@@ -879,6 +903,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ENCARGADO DE SOPORTE — coordina soporte (puede asignar OT)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ENC_SOPORTE]: [
+    ...COSTOS_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
@@ -940,6 +965,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD VENTAS — gerente comercial
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_VENTAS]: [
+    ...COSTOS_PROYECTO_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
@@ -981,6 +1007,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // VENDEDOR — CRM (sus leads, clientes, cotizaciones)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.VENDEDOR]: [
+    ...COSTOS_PROYECTO_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
@@ -1129,6 +1156,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CONTABILIDAD
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CONTABILIDAD]: [
+    ...COSTOS_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...CCTV_DISENOS_URL_RULES,

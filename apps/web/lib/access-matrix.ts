@@ -214,6 +214,7 @@ export type ModuleId =
   | "erp-vehiculos"
   | "erp-organigrama"
   | "erp-contabilidad"
+  | "erp-costos"
   | "activities-daily"
   | "activities-projects"
   | "activities-services"
@@ -511,6 +512,18 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "erp-contabilidad", panel: PANELS.ERP, path: "/contabilidad",
     label: "Mesa contable", description: "Hub financiero: CxC, CxP, facturas, conciliación y cierres",
     icon: "📒", allowedRoles: FINANCE_TEAM,
+    group: "Finanzas", visible: true,
+  },
+  // La API afina: sueldos y tarifas solo para CEO y contadora (rol `administrativo` con su puesto);
+  // el resto de la oficina ve un aviso si entra. `apps/api/src/costos/costos-acceso.ts`.
+  "erp-costos": {
+    id: "erp-costos", panel: PANELS.ERP, path: "/costos",
+    label: "Costos", description: "Costo real por proyecto, horas sin ligar y tarifas",
+    icon: "📊",
+    allowedRoles: [
+      R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.ACCOUNTANT, R.ADMIN_STAFF,
+      R.ARQUITECTO, R.COORD_OPERACIONES, R.PROJECT_MANAGER, R.MAINTENANCE_COORDINATOR, R.SUPPORT_AGENT,
+    ],
     group: "Finanzas", visible: true,
   },
   "activities-daily": {

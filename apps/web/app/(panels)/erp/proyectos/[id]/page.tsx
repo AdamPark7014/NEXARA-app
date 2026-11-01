@@ -50,6 +50,8 @@ import SeccionRequerimientos from "../_componentes/SeccionRequerimientos";
 import SeccionEquipo from "../_componentes/SeccionEquipo";
 import SeccionDocumentos from "../_componentes/SeccionDocumentos";
 import SeccionActividades from "../_componentes/SeccionActividades";
+import SeccionCostos from "../_componentes/SeccionCostos";
+import { useAccesoCostos } from "@/components/costos/piezas";
 import styles from "../ficha.module.css";
 
 const PESTANAS = [
@@ -60,6 +62,7 @@ const PESTANAS = [
   { id: "equipo", titulo: "Equipo" },
   { id: "documentos", titulo: "Documentos" },
   { id: "actividades", titulo: "Actividades" },
+  { id: "costos", titulo: "Costos" },
 ] as const;
 
 type Pestana = (typeof PESTANAS)[number]["id"];
@@ -154,6 +157,7 @@ export default function ProyectoDetallePage() {
   const id = Number(params?.id);
   const router = useRouter();
   const { user, token } = useUser();
+  const accesoCostos = useAccesoCostos(token);
   const hoy = useMemo(() => hoyISO(), []);
 
   const [pestana, setPestana] = useState<Pestana>("resumen");
@@ -309,6 +313,12 @@ export default function ProyectoDetallePage() {
   }
 
   const p = proyecto;
+  // Quien lleva el proyecto ve sus totales; la API revisa lo mismo.
+  const veCostos = Boolean(
+    accesoCostos?.veTodo ||
+      accesoCostos?.puedeLigar ||
+      (user?.id != null && (Number(user.id) === p.responsableId || Number(user.id) === p.vendorId)),
+  );
   // Orden del sistema: peligro → secundarias → la principal al final.
   const acciones = [...accionesDeEstado(p.status)].sort((a, b) => {
     const peso = (x: AccionDeEstado) => (x.peligro ? 0 : esPrincipal(p, x) ? 2 : 1);
@@ -454,7 +464,11 @@ export default function ProyectoDetallePage() {
           <div onKeyDown={teclaEnPestanas} className={styles.pestanas}>
             <Tabs<Pestana>
               ariaLabel="Secciones del proyecto"
-              items={PESTANAS.map((t) => ({ id: t.id, label: t.titulo, count: conteoDe(p, t.id) }))}
+              items={PESTANAS.filter((t) => t.id !== "costos" || veCostos).map((t) => ({
+                id: t.id,
+                label: t.titulo,
+                count: conteoDe(p, t.id),
+              }))}
               value={pestana}
               onChange={elegirPestana}
             />
@@ -541,6 +555,8 @@ export default function ProyectoDetallePage() {
             <SeccionEquipo {...seccion} />
           ) : pestana === "documentos" ? (
             <SeccionDocumentos {...seccion} />
+          ) : pestana === "costos" ? (
+            veCostos ? <SeccionCostos proyecto={p} token={seccion.token} /> : null
           ) : (
             <SeccionActividades {...seccion} />
           )}

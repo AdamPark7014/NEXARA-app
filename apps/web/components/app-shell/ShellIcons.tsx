@@ -147,6 +147,7 @@ const MODULE_ICONS: Record<string, ShellIconName> = {
 
   // ── Finanzas ──
   "erp-contabilidad": "book",
+  "erp-costos": "chart",
   accounting: "book",
   invoicing: "receipt",
   banking: "bank",

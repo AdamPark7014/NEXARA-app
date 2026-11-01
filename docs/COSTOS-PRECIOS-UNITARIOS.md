@@ -1,12 +1,43 @@
 # Libro de costos: precios unitarios para NEXARA
 
-Propuesta del 01-11-2026, en espera del visto bueno de Adam. Nada de esto está construido todavía.
+Propuesta del 01-11-2026. Adam aprobó las Fases 0 y 1 ese mismo día y están construidas (ver «Estado»).
+Las Fases 2 a 8 siguen en propuesta: no se construyen sin su visto bueno.
 
 **En una frase:** cada cotización se arma con una matriz de lo que de verdad cuesta (equipo, técnicos, camioneta,
 herramienta y oficina), y cada proyecto muestra lo gastado contra lo cotizado, casi al día.
 
 Este repositorio es público: aquí no van sueldos, montos ni conteos de producción. La medición con datos reales, los
 mockups y la investigación con diagramas están en el artifact privado que se le entregó a Adam (ver `.ai/RELEVO.md`).
+
+## Estado
+
+**Fase 0, motor y tarifas:** `apps/api/src/costos/calculos/` y `/erp/costos/tarifas`. **Fase 1, horas a proyecto:** libro de
+costos, proceso nocturno, `/erp/costos`, `/erp/costos/proyectos` y la pestaña Costos de cada proyecto.
+
+Cómo quedó, y en qué cambió respecto a la propuesta:
+
+- **Ligar no toca la actividad.** La liga vive en `costo_actividad_ligas`. Así ligar no mueve el avance del proyecto ni el
+  reporte de Contabilidad. Una actividad cuenta para un proyecto si su `projectId` lo dice, si su `cotizacionId` es la del
+  proyecto, o si se ligó en la bandeja.
+- **«Marcar cotización como ganada» no cambia su estado.** `POST /cotizaciones/:id/aprobar` tiene efectos (la manda a Por
+  facturar, suma en BI) y hoy ninguna pasa por «enviada». Lo que hace ganadora a una cotización para Costos es que nazca un
+  proyecto de ella: `/erp/proyectos/nuevo?cotizacionId=…`. Lo gastado en la cotización pasa solo a ese proyecto.
+- **Dos tablas más:** `costo_personas` (categoría y cuotas propias) y `costo_actividad_ligas`. La Fase 0 quedó en 4 tablas y la
+  1 en 2. El nombre en Prisma lleva el prefijo `Costo`: `CostoParametros`, `CostoCategoria`, `CostoFichaEquipo`, `CostoMovimiento`.
+- **El reloj no se cobra en bruto:** si el sistema cerró la sesión (`TOPE_12H`, `CORTE_DIA`) cuenta a lo mucho una jornada, y dos
+  relojes encimados de la misma persona se reparten. Ver `horasEfectivas`.
+- **Viáticos:** lo comprobado; si no, lo aprobado. Lo pendiente o rechazado no es costo. Gasolina y casetas van a Vehículos.
+- **`CostoMovimiento` no se audita** (`AUDIT_EXCLUDED`): se deriva de otras tablas y se recalcula de noche.
+- **Vehículos y herramienta:** ya se les saca tarifa, pero aún no se cargan a los proyectos. Eso es de las Fases 3 y 4.
+- **Horas extra:** aún no entran, porque `overtime_approvals` y `nomina_semanas` están vacías en producción. Cuando haya datos, se
+  cargan aparte, a lo que se pagó.
+- **IA:** Haiku 5.5 con esfuerzo bajo y sin razonamiento, por la puerta. Eval: `npm run eval:ia -w apps/api -- --funcion liga`.
+  Casos: `apps/api/src/ai/eval/casos-liga.ts`. En dos corridas de 24 casos: ninguna liga equivocada; de 2 a 3 veces no se atrevió a decidir, que es el error seguro porque ahí decide una persona.
+  Las reglas resuelven primero y la respuesta de la IA se guarda para no pagarla dos veces.
+
+**Quién ve qué:** CEO y contadora ven todo. La contadora tiene rol `administrativo`; lo que la distingue es su puesto
+(`costos-acceso.ts`). Quien coordina la operación liga horas y ve totales por rubro. Quien lleva o vendió un proyecto ve sus totales.
+Nadie más ve un sueldo. El resto de la oficina tiene el menú, y al entrar ve un aviso.
 
 ## Límite de la ingeniería inversa
 
@@ -164,21 +195,23 @@ erDiagram
 
 | Entidad | Para qué |
 |---|---|
-| `ParametrosCosto` | Por empresa y año: cuotas, vacaciones, permisos, tasas. Solo CEO y contadora |
-| `CategoriaCosto` | Instalador, ayudante, ingeniero: salario de referencia y factor. Sirve para cotizar sin exponer sueldos |
-| `FichaEquipo` | Vehículo o herramienta mayor: valor, rescate, vida, seguro, consumos. Misma fórmula (art. 208) |
+| `CostoParametros` | Por empresa y año: cuotas, vacaciones, permisos, tasas. Solo CEO y contadora |
+| `CostoCategoria` | Instalador, soporte, encargado, oficina: salario de referencia. Sirve para cotizar sin exponer sueldos |
+| `CostoPersona` | Categoría y cuotas propias de una persona, si difieren |
+| `CostoActividadLiga` | A qué se le carga una actividad cuando ella no lo dice, y la sugerencia de la IA |
+| `CostoFichaEquipo` | Vehículo o herramienta mayor: valor, rescate, vida, seguro, consumos. Misma fórmula (art. 208) |
 | `RecursoCosto` | Catálogo propio de insumos, simples o compuestos (la matriz es un compuesto) |
 | `RenglonMatriz` | Recurso, cantidad, desperdicio y si es porcentaje |
 | `AnalisisPartida` | Copia congelada de la matriz en una partida |
 | `PieCotizacion` | Porcentajes de indirecto, financiamiento, utilidad y cargos, por cotización |
-| `MovimientoCosto` | El libro: fecha, actividad, proyecto, rubro, cantidad, costo unitario, importe, origen y versión de tarifa. `origen` único para no duplicar. Se recalcula y se cierra por periodo |
+| `CostoMovimiento` | El libro: fecha, actividad, proyecto, rubro, cantidad, costo unitario, importe, origen y versión de tarifa. `origen` único para no duplicar. Se recalcula y se cierra por periodo |
 | `GastoEquipo` | Gasolina, servicio, seguro y reparación reales de una ficha |
 | `IndirectoPeriodo` | Mes, rubro del art. 213, oficina o campo, presupuesto y real |
 | `AvanceProyecto` | Avance físico por fecha para el valor ganado |
 
 ### Funciones puras con casos hechos a mano
 
-Viven en `apps/api/src/costos/`, sin base de datos ni fechas del sistema. Los casos usan cifras de ejemplo.
+Viven en `apps/api/src/costos/calculos/`, sin base de datos ni fechas del sistema. Los casos usan cifras de ejemplo.
 
 | Función | Caso | Resultado esperado |
 |---|---|---|
@@ -189,6 +222,8 @@ Viven en `apps/api/src/costos/`, sin base de datos ni fechas del sistema. Los ca
 | `tarifaEquipo` | OTDR $90,000, rescate 10 %, 500 días, Ko 0.2 | $194.40/día |
 | `piePrecio` | Directo 1,000; 15 %, 2 %, 10 %, 0.5 % | 150, 23, 117.30, PV 1,290.30, PU 1,296.78 |
 | `financiamiento` | Egresos 50,000 en meses 0 y 1; anticipo 30 %, cobro mes 3; 18 % anual; utilidad 12 % | 2.2 %, 3 vueltas |
+| `calcularMatriz` | Cámara bala con 4 por jornada: la del mockup | Costo directo 2,835.30 |
+| `horasEfectivas` | Relojes de 9 a 13 y de 11 a 15, misma persona | 3 h y 3 h, no 4 y 4 |
 
 Regla de costo hora: `sueldoSemanal ÷ 7 × Fsr ÷ 8`, porque el factor cuenta los 365 días pagados (día = semana ÷ 7, regla
 aprobada el 29-10). Horas extra aparte, a lo que se pagó.
@@ -213,8 +248,8 @@ en paralelo y se compara. Talla: S = una sesión, M = dos, L = de tres a cuatro 
 
 | Fase | Qué se ve | Tablas | Endpoints | Pantallas | Talla |
 |---|---|---:|---:|---:|---|
-| 0. Motor y tarifas | Tarifas de costo | 3 | 10 | 1 | M |
-| 1. Horas a proyecto | Bandeja de horas sin proyecto y pestaña Costos | 1 | 8 | 2 | M |
+| 0. Motor y tarifas (hecha) | Tarifas de costo | 4 | 10 | 1 | M |
+| 1. Horas a proyecto (hecha) | Bandeja, por proyecto y pestaña Costos | 2 | 8 | 3 | M |
 | 2. Matriz en la cotización | Matriz por partida y catálogo | 4 | 14 | 3 | L |
 | 3. Vehículos | Ficha y km por actividad | 1 | 6 | 2 | M |
 | 4. Herramientas | Costo por día y desgaste | 0 | 4 | 1 | S |
@@ -223,7 +258,7 @@ en paralelo y se compara. Talla: S = una sesión, M = dos, L = de tres a cuatro 
 | 7. Control | Proyección, alertas y flujo | 1 | 5 | 2 | M |
 | 8. Opcional | IA propone matriz (puerta única, Haiku con eval) | 0 | 3 | 1 | L |
 
-Total sin la opcional: 11 tablas, 55 endpoints y 13 pantallas o pestañas.
+Total sin la opcional: 13 tablas, 55 endpoints y 14 pantallas o pestañas.
 
 **Coordinación:** las Fases 1 y 2 tocan el asistente, el editor de cotización y el catálogo de equipos, donde hay otras
 sesiones activas. Antes de editar: `git fetch`, partir de `origin/main` y avisar.
