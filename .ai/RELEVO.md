@@ -1,5 +1,35 @@
 # RELEVO
 
+- **01-11 ~10:10 (claude-code) — CI vivo otra vez y multer 2.5.0 en producción (`8c9e031f`, desplegado).**
+  - Síntoma: «Tipos y tests» caía en `npm ci` desde `490068a9` con `lock file's multer@2.4.0 does not satisfy multer@2.5.0`.
+    El aviso engaña: la 2.4.0 no era el problema.
+  - Causa: el `npm audit fix` de `490068a9` dejó en el lock `@nestjs/platform-express/node_modules/multer` 2.0.2 (Nest pide
+    esa versión exacta), y el override `$multer` exige `^2.3.0`. `npm ci` ve esa arista inválida, pide lo más nuevo que
+    cumple (2.5.0, del 22-10), lo sube a la raíz y su árbol ya no coincide con el lock.
+  - **No era solo CI:** Docker respeta el lock, así que `FileInterceptor` corrió en producción con multer 2.0.2 desde el
+    despliegue del 31-10 (9 avisos publicados, 7 altos). Comprobado en la imagen. El bloque de abajo dice que la imagen
+    seguía con 2.4.0: esa era solo la copia de la raíz, la que usa `diskStorage`.
+  - Arreglo: multer 2.5.0 en la raíz (cierra además GHSA-q7qp-rjg7-q26m, alta) y fuera la copia anidada con lo que solo ella
+    usaba (`concat-stream`, `typedarray`, `xtend`). Lock comparado con script: esas 5 entradas y nada más. `package.json` igual.
+  - **Efecto de la versión nueva:** Nest 10 reconoce los errores de multer por el texto y multer cambió «Unexpected field» por
+    «Unexpected file field», así que mandar más archivos de los permitidos o en otro campo pasaba de 400 a 500. Se traduce en
+    el filtro global (`mapMulterError`), con pruebas por HTTP contra multer real: ninguna de las 4,292 lo detectaba.
+    Mejoras sin tocar nada: un archivo justo en el límite ya pasa (antes 413) y una subida cortada no deja restos en disco.
+  - Con el CI vivo salió una carrera en `mesa-contable/pantallas.spec.tsx` (falló 3 de 8 veces): la primera fila se abre en un
+    efecto después de pintar la tabla. Exige lo mismo, pero espera. Quedó 20 de 20.
+  - Trampas:
+    - Después de un `npm audit fix`, correr `npm ci --dry-run` y comparar el lock: puede volver a dejar la copia anidada.
+    - `npm install` sin cambios toca banderas `dev` del lock (`sass`, `@parcel/watcher*`, `@types/react`…). Es cosmético, viene
+      de la cirugía del lock de Next 15 y no se incluyó para que el cambio fuera solo multer.
+    - `cancel-in-progress`: un commit de relevo cancela la corrida anterior de `main`. Mira la de la punta que contiene tu commit.
+    - El hook de git toma `"$SHA:refs/heads/main"` con comillas como la rama `main"`. Va sin comillas.
+  - Verificado: CI de `84e8c4f1` (contiene `8c9e031f`) con los 5 trabajos en verde. En local, `npm ci` con npm 11 y 10.9.9 y el
+    comando del Dockerfile con 10.9.9, que deja una sola copia. En el contenedor desplegado: solo multer 2.5.0, Nest la usa, 19
+    casos de subida por HTTP con el filtro de `dist` (413, 400, disco, acentos, cortada) y salud en verde sin reinicios.
+  - **Sin hacer, para decidir:** multer no limita por omisión un campo como `a[99999999]` (`fieldArrayIndexLimit` y
+    `fieldNestingDepth` son opcionales). Crea un arreglo enorme cuando algo recorre `req.body`; el filtro global lo hace al
+    registrar un error. Según un barrido del código todas las rutas de subida piden sesión, así que requiere una cuenta válida.
+
 - **01-11 ~09:45 (claude-code) — Web en Next 15.5.28 + React 19.3.1 (`19d9245e`, desplegado).**
   - Por qué: 14.x ya no recibe parches. `npm audit --omit=dev` pasa de crítica en `next` a **0 críticas** (46: 14 altas,
     28 moderadas, 4 bajas). `next` queda como moderada solo por su `postcss` 8.4.31 interno, que se usa al compilar.
