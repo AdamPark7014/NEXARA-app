@@ -23,10 +23,15 @@
     - Medido con dos ciclos de compilar API y web, sin reiniciar nada: caché en 5.2 GB; de 14 a 13 GB libres entre ciclos
       (antes bajaba de 3 a 5 GB por despliegue); mínimo al compilar 9.7 GB (antes 3.7 GB); tiempos iguales (API 175 y 174 s,
       web 193 y 187 s). Los scripts corregidos aún no han corrido en un despliegue real; se probó el mismo comando.
-    - Límite: el tope abarca toda la caché, pero solo corre cuando despliega NEXARA. ARTA y los demás no limpian: una compilación
-      de ARTA sumó 3.5 GB justo después de medir. Si solo despliegan ellos, el disco vuelve a subir; mira `df -h /`.
-    - Quedó en 13 GB libres. `nexara-api:latest` y `nexara-web:latest` apuntan a las imágenes de la medición (mismo código que
-      corre); el siguiente despliegue las cambia y suelta las viejas.
+    - ARTA y los demás no limpian (una compilación de ARTA sumó 3.5 GB justo después de medir), así que hay **limpieza diaria a
+      las 03:30 de México (09:30 UTC)**: `/etc/cron.d/limpiar-cache-build` corre `/root/limpiar-cache-build.sh`, con el mismo
+      comando. Si hay una compilación espera hasta una hora. Registro en `/var/log/limpiar-cache-build.log`. Probada bajo cron:
+      de 11 a 13 GB libres.
+    - Quedó en 13 GB libres (83 %). `nexara-api:latest` y `nexara-web:latest` apuntan a las imágenes de la medición (mismo código
+      que corre); el siguiente despliegue suelta unos 3 GB. Docker no encuentra por ID la imagen de los contenedores que corren:
+      es lo normal al mover `:latest` y es inofensivo (probado con uno desechable: reinicia bien).
+    - El vigilante de Ágora (`vigilar-disco.sh`, por ntfy) avisa desde 80 %: seguirá sonando hasta ese despliegue y en los picos
+      al compilar.
     - No se tocaron imágenes ni volúmenes: `nexara-web:next14-respaldo` y `arta-*:prev` siguen, y `docker image prune -a` las borraría.
 
 - **01-11 ~11:30 (claude-code) — Reuniones: la grabación sigue hasta que la concluyas, en cualquier módulo, pestaña o app.**
