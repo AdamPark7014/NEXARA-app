@@ -1,8 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CotizacionesService } from './cotizaciones.service.js';
 import { LIMITES_VISTA_PREVIA, borradorSobreGuardada, validarTamanoBorrador } from './propuesta-vista-previa.js';
-import { generarPropuestaTecnicaPdf, type SeccionesPropuesta } from './propuesta-tecnica-pdf.js';
-import { payloadDePropuesta } from './propuesta-payload.js';
+import { formatoDesdeCotizacion, generarCotizacionNexaraPdf, type SeccionesPropuesta } from './cotizacion-formato-nexara.js';
 import { textoPorHoja } from '../common/pdf/texto-de-pdf.js';
 import type { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 
@@ -116,13 +115,14 @@ describe('borradorSobreGuardada', () => {
       items: [{ name: 'Grabador NVR 16 canales', unit: 'Pieza', qty: 1, unitPrice: 9000, tax: 16 } as any],
     });
     const secciones: SeccionesPropuesta = {};
-    const pdf = await generarPropuestaTecnicaPdf(payloadDePropuesta(q as any), secciones);
+    const pdf = await generarCotizacionNexaraPdf(formatoDesdeCotizacion(q as any), [], secciones);
     const texto = textoDelPdf(pdf);
-    expect(texto).toContain('Renovación escrita hace un segundo');
+    // El título va en mayúsculas y, si es largo, en dos renglones.
+    expect(texto.replace(/\s+/g, ' ')).toContain('RENOVACIÓN ESCRITA HACE UN SEGUNDO');
     expect(texto).toContain('Grabador NVR 16 canales');
     expect(texto).not.toContain('Cámara guardada');
     expect(secciones.portada).toBe(1);
-    expect(secciones.objetivo).toBe(2);
+    expect(secciones.objetivo).toBe(3);
     expect(secciones.cotizacion).toBeGreaterThan(secciones.objetivo!);
   });
 

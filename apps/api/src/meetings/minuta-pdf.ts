@@ -14,8 +14,7 @@ import {
 /**
  * PDF de la minuta de una reunión grabada: el registro oficial de la junta.
  *
- * Mismo lenguaje que la propuesta técnica (`cotizaciones/propuesta-tecnica-pdf.ts`): fondo blanco,
- * Montserrat para títulos e Inter para el cuerpo, el verde de la marca solo como acento y hojas
+ * Fondo blanco, Montserrat para títulos e Inter para el cuerpo, el verde de la marca solo como acento y hojas
  * interiores con encabezado corrido y «Página n de N». La IA solo escribe el contenido (JSON con
  * esquema); la maquetación es toda de aquí.
  *

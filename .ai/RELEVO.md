@@ -1,5 +1,15 @@
 # RELEVO
 
+- **01-11 ~17:40 (claude-code) — Fuera el generador de cotización que nadie llamaba; el PDF del cliente no cambió.**
+  - **El único PDF de cotización para el cliente es `generarCotizacionNexaraPdf`** (`cotizacion-formato-nexara.ts`). El interno, con costo y margen, es `cotizacion-pdf.ts`, y también sigue vivo.
+  - Quitados: `propuesta-tecnica-pdf.ts` (1,781 líneas), `propuesta-payload.ts`, sus dos specs, `buildPropuesta`, `opcionesDePropuesta` y `OpcionesPropuesta` (solo lo alimentaban) y `scripts/bench-propuesta-pdf.ts` (medía el generador muerto).
+  - `SeccionesPropuesta` ahora vive en `cotizacion-formato-nexara.ts`. `planos-pdf.ts` no importaba nada del generador: lo usa el PDF real y solo se corrigió su comentario.
+  - Assets quitados de `cotizacion-nexara/`: `membrete_carta.png` y las dos URW Gothic (sin uso desde `93e420a3`) y `logo_nexara.png` (ningún código de la API lo abrió nunca; el de las apps es otro archivo). Medido al generar: el PDF solo abre `firma_christian.png`, `logo_membrete.png` y `portada-nexara.jpg`.
+  - Pruebas: salieron 36 que solo cubrían código borrado (25 + 6 + 5 de `personalizacion.spec.ts`). «El borrador llega al PDF» no se borró: ahora corre contra el generador real. Lo que se apaga en «Personalizar» ya lo cubre `cotizacion-formato-nexara.spec.ts`.
+  - Verificado antes de subir: 7 casos de muestra pasando por `buildPdf` y `vistaPreviaPdf`, con reloj y azar fijos, dan los mismos bytes antes y después (14 PDF). `tsc` 0 errores; suite de la API 371 archivos y 4,554 pruebas en verde.
+  - **Para repetir la comparación:** con `Date` y `Math.random` fijos, dos corridas del PDF del cliente dan los mismos bytes. El PDF interno cambia aun así entre dos corridas del mismo código: ese se compara por texto.
+  - **Trampas al verificar en una copia con junction a `node_modules`:** el cliente Prisma compartido puede ir atrás del esquema de `origin/main` (95 errores falsos en `src/costos`). Se genera uno aparte con `output` propio en una copia del esquema y `paths` a su `index.d.ts`; si apunta a la carpeta, `await import('@prisma/client')` no lo toma. Con la máquina cargada, unas pruebas agotan sus 5 s: `--testTimeout=180000`.
+
 - **01-11 ~17:15 (claude-code) — Clientes y base común: verificado en producción con la cuenta de Christian (`cee70bdb`, desplegado).**
   - Visto: Clientes abre en Comercial; Facturación y Pólizas con el título, las tarjetas, los filtros y las pestañas nuevos; Viáticos con raya recta;
     Nómina y Almacén sin desborde; actividad comercial con sugerencia de BUAP y aviso; «Nuevo cliente» con aviso al salir del nombre; «Asignar con IA»

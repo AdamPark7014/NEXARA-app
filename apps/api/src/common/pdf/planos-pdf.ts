@@ -1,8 +1,7 @@
 /**
  * Anexos de una cotización (planos de CAD, hoja de servicio del levantamiento, fotos) que se
- * imprimen en el PDF que recibe el cliente. Compartido entre los dos formatos de cotización
- * (`cotizacion-formato-nexara.ts`, el que de verdad se descarga, y `propuesta-tecnica-pdf.ts`) para
- * no mantener dos veces la misma resolución de archivo y el mismo anexado de páginas.
+ * imprimen en el PDF que recibe el cliente (`cotizacion-formato-nexara.ts`): resolución de archivo y
+ * anexado de páginas.
  */
 import fs from 'fs';
 import path from 'path';

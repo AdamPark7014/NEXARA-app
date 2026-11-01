@@ -18,7 +18,6 @@ import { grupoDePartida, GRUPOS, incluyeInstalacion, type GrupoPartida } from '.
 import { dibujarMarco, dibujarPortada, VERDE } from './cotizacion-marco.js';
 import { anticipoDeCotizacion, terminosDeCotizacion, type Terminos } from './terminos-segmento.js';
 import { segmentosLista } from './vinetas-texto.js';
-import type { SeccionesPropuesta } from './propuesta-tecnica-pdf.js';
 import { anexarPaginasPdf, clasificarPlanos, type PlanoArchivo, type PlanosClasificados } from '../common/pdf/planos-pdf.js';
 import { PDF_FUENTES as F, registrarFuentesCorporativas } from '../common/pdf/nexara-pdf-theme.js';
 
@@ -1234,6 +1233,12 @@ async function paginasDePlanos(pdfs: PlanosClasificados['pdfs']): Promise<number
   }
   return total;
 }
+
+/**
+ * Página (1 = portada) donde arranca cada sección. La vista previa del editor la usa para llevar el
+ * PDF a la sección que se está escribiendo. Una sección que no se imprime no aparece.
+ */
+export type SeccionesPropuesta = Partial<Record<'portada' | 'objetivo' | 'alcance' | 'planos' | 'cotizacion', number>>;
 
 /**
  * La cotización que descarga y recibe el cliente: la «Memoria descriptiva y propuesta
