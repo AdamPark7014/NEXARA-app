@@ -3,6 +3,7 @@ import {
   corregidoDe,
   corregirEnTexto,
   distancia,
+  mencion,
   nombresPropiosDe,
   palabrasDe,
   parecido,
@@ -153,5 +154,36 @@ describe('nombres mal oídos o mal escritos', () => {
     expect(nombres).not.toEqual(expect.arrayContaining(['Inventario']));
     expect(nombres).not.toContain('Tienda');
     expect(nombres).not.toContain('CCTV');
+  });
+});
+
+describe('iniciales de un nombre completo', () => {
+  const clientes = [{ name: 'BUAP' }, { name: 'Benemer' }, { name: 'TPM' }, { name: 'Grupo Dice Puebla' }];
+
+  it('el nombre completo encuentra a sus siglas, antes que a un nombre a medias', () => {
+    const r = buscar('Benemérita Universidad Autónoma de Puebla', clientes, (c) => c.name, 5, { aproximado: true });
+    expect(r.elegido?.name).toBe('BUAP');
+  });
+
+  it('también sin acentos y en minúsculas', () => {
+    expect(buscar('benemerita universidad autonoma de puebla', clientes, (c) => c.name, 5, { aproximado: true }).elegido?.name).toBe('BUAP');
+  });
+
+  it('se menciona en la instrucción, para que la IA lo reciba en el catálogo', () => {
+    expect(mencion(palabrasDe('que José revise las cámaras en la Benemérita Universidad Autónoma de Puebla mañana'), 'BUAP').nivel).toBeGreaterThanOrEqual(2);
+  });
+
+  it('tres palabras comunes no son siglas', () => {
+    expect(mencion(palabrasDe('traer portátil mañana'), 'TPM').nivel).toBe(0);
+  });
+
+  it('tres palabras con mayúscula sí', () => {
+    expect(mencion(palabrasDe('Técnicos Proveedores Mexicanos'), 'TPM').nivel).toBeGreaterThanOrEqual(2);
+  });
+
+  it('dice de dónde salió la corrección y la cambia en el texto', () => {
+    const c = corregidoDe('BUAP', 'Revisar cámaras en la Benemérita Universidad Autónoma de Puebla');
+    expect(c?.de).toBe('Benemérita Universidad Autónoma de Puebla');
+    expect(corregirEnTexto('Revisar cámaras en la Benemérita Universidad Autónoma de Puebla', c!.pares)).toBe('Revisar cámaras en la BUAP');
   });
 });
