@@ -1,5 +1,30 @@
 # RELEVO
 
+- **31-10 ~19:20 (claude-code) — Perfil de Google de NEXARA: por qué «Verificar» no hacía nada, correcciones y apelación.**
+  - «Verificar» en business.google.com manda a la búsqueda de «Nexara» y el panel del dueño queda abajo de la
+    pantalla; parece congelado. El panel dice «Se inhabilitó tu acceso porque este perfil no sigue los
+    lineamientos». En la herramienta de apelaciones: decisión del **26-10-2026, «El Perfil de Negocio no existe»**
+    (perfil `10528017769473708093`). Mientras siga inhabilitado no se puede verificar.
+  - Causas en el perfil, ya corregidas desde la búsqueda («Editar información»):
+    - dirección «Calle Ignacio Allende 512, Santiago Momoxpan, Auditorio Explanada Puebla, 72774» → la de la
+      constancia fiscal: **Calle Ignacio Allende 512, Local 2, Santiago Momoxpan, 72775 San Pedro Cholula, Pue.**;
+    - la descripción decía «también nos conocen como Zynora o Zynora Tek» (Zynora Tek tiene perfil verificado en el
+      mismo número): se quitó. Teléfono, sitio y horario (L–V 9–18) ya coincidían.
+  - **Apelación enviada el 31-10 ~19:10** con la Constancia de Situación Fiscal (RFC NEE240925V73, nombre comercial
+    NEXARA, emitida el 26-10). Copia en `C:\dev\secrets\nexara-google-perfil\CSF-NEXARA-NEE240925V73-2026-10-26.pdf`.
+    Solo se puede apelar una vez; Google responde por correo en hasta 5 días hábiles. No crear otro perfil mientras.
+  - Pin del mapa: sigue donde estaba (19.07259, -98.27669, junto a Explanada); falta que Adam lo confirme en la
+    puerta del Local 2 durante la verificación por video. `NEXARA_COORDS` del mapa del sitio está a ~170 m de ahí.
+  - Sitio (`7179374f`, desplegado): `lib/brand.ts` tiene `NEXARA_DOMICILIO`, `NEXARA_DIRECCION_POSTAL` (schema.org)
+    y `NEXARA_MAPS_LINK` (Maps por dirección; antes era `maps.app.goo.gl/uJBZ…`, que abre el perfil suspendido). Los
+    usan el JSON-LD de la raíz, soluciones y cobertura, Contacto, el pie y `BrandMap`. Las páginas `/cobertura/[city]`
+    ya no declaran un domicilio en cada ciudad (eso parecía sucursal falsa). Cuando Google restablezca el perfil se
+    puede volver a enlazar la ficha.
+  - Otros perfiles con el nombre: **«Nexara de Mexico»** (tienda de informática, La Morena 804 Int 301, Narvarte,
+    CDMX, 56 3999 9945, logo de N azul distinto al nuestro, fotos de hace ~4 días) y «Mezcal Nexara» (bebidas, sin
+    choque). No se reportó nada: hace falta saber si NEXARA tiene marca registrada en el IMPI.
+  - Zynora Tek tiene dos perfiles en Allende 512 (uno «Cerrado permanentemente»); no se tocó.
+
 - **29-10 ~17:40 (claude-code) — Aprobar por lote las evidencias en espera de revisión (Adam, 17:17: «guarda en la db
   las 90 actividades más viejas que falten de revisión»).**
   - `POST me/revisiones/aprobar-lote` `{ items: [{ activityId, userId }], observaciones, calificacion }` (máximo 100).
