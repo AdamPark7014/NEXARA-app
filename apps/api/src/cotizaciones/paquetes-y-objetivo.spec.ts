@@ -93,6 +93,17 @@ describe('01 Objetivo con las cifras de la cotización', () => {
     expect(objetivo.beneficios.join(' ')).not.toContain('mano de obra especializada');
   });
 
+  it('una venta de licencias no habla de equipos nuevos ni de levantamiento', () => {
+    const objetivo = objetivoDePropuesta({
+      segmento: 'COMERCIAL',
+      partidas: [{ name: 'Licencia Microsoft 365', unit: 'Pieza', qty: 3, unitPrice: 100 }],
+    });
+    const texto = objetivo.beneficios.join(' ');
+    expect(texto).toContain('3 licencias');
+    expect(texto).not.toMatch(/equipos? nuevos?|levantamiento/);
+    expect(objetivo.beneficios.length).toBeLessThanOrEqual(3);
+  });
+
   it('no pasa de tres beneficios: lo demás ya lo dice la tabla', () => {
     const objetivo = objetivoDePropuesta({
       segmento: 'COMERCIAL',

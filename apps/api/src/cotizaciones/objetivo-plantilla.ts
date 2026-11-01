@@ -226,7 +226,14 @@ export function objetivoDePropuesta(input: {
   const cifras = cifrasDePartidas(input.partidas || []);
   const beneficios: string[] = [];
 
-  if (cifras.piezasEquipo > 0) {
+  // Una venta de licencias no lleva «equipos nuevos» ni levantamiento técnico.
+  const partidas = input.partidas || [];
+  const soloLicencias = partidas.length > 0 && partidas.every((p) => /licen|suscrip/i.test(`${p.name ?? ''} ${p.unit ?? ''}`));
+  if (soloLicencias) {
+    const licencias = partidas.reduce((acc, p) => acc + Math.max(0, Number(p.qty) || 0), 0);
+    beneficios.push(`Licenciamiento: ${entero(licencias)} ${licencias === 1 ? 'licencia' : 'licencias'}, de acuerdo con lo solicitado.`);
+    beneficios.push('Entrega: licenciamiento original, con el soporte del fabricante.');
+  } else if (cifras.piezasEquipo > 0) {
     beneficios.push(
       `Equipamiento: ${entero(cifras.piezasEquipo)} ${
         cifras.piezasEquipo === 1 ? 'equipo nuevo' : 'equipos nuevos'
@@ -235,6 +242,8 @@ export function objetivoDePropuesta(input: {
   }
   if (segmento === 'LICITACION') {
     beneficios.push('Cumplimiento: propuesta alineada al catálogo de conceptos y a las condiciones de las bases.');
+  } else if (soloLicencias) {
+    // Ya están dichos arriba.
   } else if (segmento === 'SERVICIO') {
     beneficios.push('Servicio especializado: personal técnico propio, con reporte de lo atendido.');
     beneficios.push('Entrega: sistema verificado punto por punto al cierre del servicio.');

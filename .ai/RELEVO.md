@@ -1,5 +1,12 @@
 # RELEVO
 
+- **01-11 ~16:40 (claude-code) — Verificado en producción (`58ac22bb`): cotizaciones y pasada premium.** Con el código desplegado y datos reales: 56 de 56
+  PDF válidos con portada, 303 ms el más lento; 53 con los siete puntos y 3 con menos porque ya traen bloques escritos; ninguna sin puntos. Se encendieron
+  objetivo y alcance en 8 borradores (4, 6, 9, 10, 20, 21, 25, 35) y en 2 plantillas, conservando su fecha. Los tokens unificados ya están en el CSS de producción.
+  - **Sin verificar:** nada de esto se vio con sesión. Falta que Adam abra una cotización y edite los puntos en «Portada», y pase por chat, reuniones y herramientas.
+  - Pruebas: en la copia aislada `multer` es 2.4.0 y producción 2.5.0, por eso `interceptores-subida.spec.ts` falla ahí (no en CI). Con la máquina cargada, unas pruebas web
+    agotan sus 15 s; solas pasan. `mesa-contable/pantallas.spec.tsx` tenía una carrera real, ya corregida con `waitFor`.
+
 - **01-11 ~16:50 (claude-code) — Base común de Core: título, cifras, filtros y pestañas iguales en las pantallas viejas (aprobado por Adam con antes y después de Facturación y Pólizas).**
   - Pedido: «haz mucho más premium y profesional todo el sistema»; eligió empezar por la base común. Colores y letra ya eran los mismos (`.nx-app-shell`,
     28-10 y `2872774e`). Lo que se notaba eran cuatro piezas repetidas, y cada una se cambió en un solo lugar:
