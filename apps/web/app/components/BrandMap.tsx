@@ -4,6 +4,7 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 
 type MapLibreModule = typeof import("maplibre-gl");
 import "maplibre-gl/dist/maplibre-gl.css";
+import { NEXARA_DOMICILIO, NEXARA_MAPS_LINK } from "@/lib/brand";
 import styles from "./Map.module.css";
 
 /**
@@ -19,7 +20,6 @@ import styles from "./Map.module.css";
  * `maplibre-worker.spec.ts` falla si se sube MapLibre sin volver a copiarlos.
  */
 export const NEXARA_COORDS: [number, number] = [-98.277838, 19.073803];
-export const NEXARA_MAPS_LINK = "https://maps.app.goo.gl/uJBZyNeAApgAri536";
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 export const MAPLIBRE_WORKER_URL = "/maplibre/maplibre-gl-worker.mjs";
 
@@ -175,7 +175,7 @@ export default function BrandMap({ compact = false, overlay = true, className }:
 
         const pin = document.createElement("div");
         pin.className = styles.pin;
-        pin.setAttribute("aria-label", "NEXARA · Explanada Puebla");
+        pin.setAttribute("aria-label", `NEXARA · ${NEXARA_DOMICILIO.colonia}`);
         const ring = document.createElement("span");
         ring.className = styles.pinRing;
         const dot = document.createElement("span");
@@ -259,21 +259,21 @@ export default function BrandMap({ compact = false, overlay = true, className }:
 
   return (
     <div className={`${styles.mapContainer} ${compact ? styles.compact : ""} ${className || ""}`} data-map-state={state}>
-      <div ref={hostRef} className={styles.brandMap} role="img" aria-label="Mapa de la base operativa de NEXARA en Explanada Puebla, Santiago Momoxpan" />
+      <div ref={hostRef} className={styles.brandMap} role="img" aria-label={`Mapa de la base operativa de NEXARA en ${NEXARA_DOMICILIO.colonia}, ${NEXARA_DOMICILIO.municipio}`} />
 
       {state === "failed" ? (
         <div className={styles.mapFallback}>
           <span className={styles.mapCardKicker}>Base operativa</span>
-          <strong>Explanada Puebla · Santiago Momoxpan</strong>
-          <span>San Pedro Cholula, Puebla</span>
+          <strong>{NEXARA_DOMICILIO.calle}</strong>
+          <span>{NEXARA_DOMICILIO.colonia}, {NEXARA_DOMICILIO.municipio}, {NEXARA_DOMICILIO.estado}</span>
         </div>
       ) : null}
 
       {!compact && overlay && state !== "failed" ? (
         <div className={styles.mapCard}>
           <span className={styles.mapCardKicker}>Base operativa</span>
-          <strong className={styles.mapCardTitle}>NEXARA · Explanada Puebla</strong>
-          <span className={styles.mapCardText}>Santiago Momoxpan, San Pedro Cholula, Puebla</span>
+          <strong className={styles.mapCardTitle}>NEXARA · {NEXARA_DOMICILIO.colonia}</strong>
+          <span className={styles.mapCardText}>{NEXARA_DOMICILIO.calle}, {NEXARA_DOMICILIO.municipio}, {NEXARA_DOMICILIO.estado}</span>
         </div>
       ) : null}
 

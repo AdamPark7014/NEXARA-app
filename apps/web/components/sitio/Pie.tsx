@@ -3,6 +3,7 @@ import s from "./pie.module.css";
 import base from "./sitio.module.css";
 import { ruta } from "./rutas";
 import PieAcciones from "./PieAcciones";
+import { NEXARA_DOMICILIO, NEXARA_MAPS_LINK } from "@/lib/brand";
 
 const WHATSAPP = "https://wa.me/522226960350?text=Hola%2C%20me%20interesa%20informaci%C3%B3n%20de%20Nexara";
 
@@ -54,7 +55,7 @@ const COLUMNAS: { titulo: string; enlaces: { href: string; label: string; extern
       { href: "tel:+522226960350", label: "+52 222 696 0350" },
       { href: "mailto:gerencia@nexara.com.mx", label: "gerencia@nexara.com.mx" },
       { href: WHATSAPP, label: "WhatsApp", externo: true },
-      { href: "https://maps.app.goo.gl/uJBZyNeAApgAri536", label: "Ignacio Allende 512, San Pedro Cholula, Puebla", externo: true },
+      { href: NEXARA_MAPS_LINK, label: `${NEXARA_DOMICILIO.calle}, ${NEXARA_DOMICILIO.municipio}, ${NEXARA_DOMICILIO.estado}`, externo: true },
     ],
   },
 ];

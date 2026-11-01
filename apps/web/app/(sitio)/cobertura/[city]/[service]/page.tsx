@@ -6,6 +6,7 @@ import { findServiceLanding } from "@/lib/seo/programmatic-landings";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { getPageKeywords, categoryFromSlug } from "@/lib/seo/keywords";
 import { JsonLd } from "@/lib/seo/json-ld";
+import { NEXARA_DIRECCION_POSTAL } from "@/lib/brand";
 import { recortarDescripcion } from "@/lib/seo/textos";
 import PublicIcon from "@/app/components/PublicIcon";
 import s from "@/components/sitio/sitio.module.css";
@@ -142,13 +143,7 @@ export default function CoberturaCityServicePage({ params }: { params: Params })
             url: siteUrl,
             logo: `${siteUrl}/icon-192.png`,
             telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "+52-222-696-0350",
-            address: {
-              "@type": "PostalAddress",
-              streetAddress: "Explanada Puebla, Santiago Momoxpan",
-              addressLocality: "Puebla",
-              addressRegion: "Puebla",
-              addressCountry: "MX",
-            },
+            address: NEXARA_DIRECCION_POSTAL,
           },
           offers: {
             "@type": "Offer",

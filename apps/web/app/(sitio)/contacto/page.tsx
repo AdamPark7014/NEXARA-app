@@ -13,6 +13,7 @@ import Preguntas, { type Pregunta } from "@/components/sitio/Preguntas";
 import BrandMap from "@/app/components/BrandMap";
 import PublicIcon from "@/app/components/PublicIcon";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
+import { NEXARA_DOMICILIO, NEXARA_MAPS_LINK } from "@/lib/brand";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("contacto");
@@ -20,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
-const MAPA_URL = "https://maps.app.goo.gl/uJBZyNeAApgAri536";
+const MAPA_URL = NEXARA_MAPS_LINK;
 
 const PREGUNTAS: Pregunta[] = [
   {
@@ -155,7 +156,7 @@ export default function PropuestaContacto() {
             <dl className={s.datos}>
               <div className={s.dato}>
                 <dt className={s.datoEtiqueta}>Dirección</dt>
-                <dd className={s.datoValor}>Ignacio Allende 512, Santiago Momoxpan</dd>
+                <dd className={s.datoValor}>{NEXARA_DOMICILIO.calle}, {NEXARA_DOMICILIO.colonia}</dd>
               </div>
               <div className={s.dato}>
                 <dt className={s.datoEtiqueta}>Visitas</dt>
