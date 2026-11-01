@@ -328,7 +328,9 @@ describe("Pagos y gastos", () => {
     );
     render(<PagosYGastosPage />);
 
-    expect(await screen.findByRole("button", { name: "Iván R. · Atlixco" })).toHaveAttribute("aria-pressed", "true");
+    // La primera fila se abre en un efecto, justo después de pintar la tabla: hay que esperarlo.
+    const fila = await screen.findByRole("button", { name: "Iván R. · Atlixco" });
+    await waitFor(() => expect(fila).toHaveAttribute("aria-pressed", "true"));
     expect(screen.getByText("Sugerencia 96 %")).toBeInTheDocument();
     expect(screen.getByText(`−$23,780.00`)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Solo con pendientes · 9" })).toHaveAttribute("aria-pressed", "true");
