@@ -46,8 +46,10 @@
   color: #a9bcc6;
 }
 
-.bandTitle {
+/* `.band h1`: el estilo global de los títulos del shell los pinta oscuros, y aquí el fondo es oscuro. */
+.band h1.bandTitle {
   margin: 3px 0 0;
+  color: #fff;
   font-family: var(--ui-font-display);
   font-size: clamp(22px, 2.4vw, 28px);
   font-weight: 600;
@@ -280,6 +282,7 @@
 
   > div {
     display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
   }
@@ -303,7 +306,8 @@
 
 .fila {
   display: grid;
-  grid-template-columns: minmax(200px, 1.5fr) 64px minmax(190px, 1.3fr) auto;
+  /* Ancho fijo en acciones: cada renglón es su propia rejilla y con `auto` las columnas no coinciden. */
+  grid-template-columns: minmax(200px, 1.5fr) 64px minmax(190px, 1.3fr) 160px;
   gap: 12px;
   align-items: center;
   min-width: 660px;
@@ -454,6 +458,16 @@
   gap: 8px;
   font-size: 13px;
   color: var(--ui-fg);
+
+  /* El estilo global de los campos también alcanza a las casillas. */
+  input[type="checkbox"] {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    min-height: 0;
+    margin: 0;
+    accent-color: var(--ui-brand);
+  }
 }
 
 .pie {
@@ -479,6 +493,10 @@
     font-weight: 600;
     text-align: left;
     white-space: nowrap;
+
+    &.der {
+      text-align: right;
+    }
   }
 
   td {
@@ -492,7 +510,7 @@
   }
 
   select {
-    max-width: 180px;
+    max-width: 240px;
     min-height: 32px;
     padding: 0 6px;
     border: 1px solid var(--ui-border-strong);

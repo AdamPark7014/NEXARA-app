@@ -49,6 +49,33 @@ describe('sugerencia por reglas', () => {
     expect(sugerirPorReglas({ titulo: 'Capacitación al personal', clientId: 99 }, [])).toBeNull();
   });
 
+  it('el vocabulario del giro no liga: una guía de cableado no es la cotización de cableado', () => {
+    const lista: Candidato[] = [{ tipo: 'COTIZACION', id: 19, nombre: 'NEX-0019 · Propuesta técnica cableado estructurado', cliente: 'Colegio Andes' }];
+    expect(sugerirPorReglas({ titulo: 'Guía mejores prácticas cableado estructurado' }, lista)).toBeNull();
+  });
+
+  it('el nombre propio del trabajo sí liga, aunque el resto sea del giro', () => {
+    const lista: Candidato[] = [{ tipo: 'PROYECTO', id: 7, nombre: 'Renovación CCTV Bodega Ipade', cliente: 'Ipade' }];
+    expect(sugerirPorReglas({ titulo: 'Dibujo de cámaras IPADE nivel 3' }, lista)).toMatchObject({ tipo: 'PROYECTO', id: 7 });
+  });
+
+  it('compartir un cliente de relleno no dice nada', () => {
+    const lista: Candidato[] = [{ tipo: 'COTIZACION', id: 3, nombre: 'NEX-0003 · Suministro', clientId: 5, cliente: 'A QUIEN CORRESPONDA' }];
+    const s = sugerirPorReglas(
+      { titulo: 'Configurar equipos', clientId: 5, cliente: 'A QUIEN CORRESPONDA', lugar: 'A QUIEN CORRESPONDA' },
+      lista,
+    );
+    expect(s).toBeNull();
+  });
+
+  it('con cliente de relleno sí puede ser interno', () => {
+    const s = sugerirPorReglas(
+      { titulo: 'Descarga de CFDI de ingresos', clientId: 5, cliente: 'A quien corresponda', lugar: 'A quien corresponda' },
+      [],
+    );
+    expect(s).toMatchObject({ tipo: 'INTERNA' });
+  });
+
   it('sin señales no adivina', () => {
     expect(sugerirPorReglas({ titulo: 'Revisar pendiente' }, CANDIDATOS)).toBeNull();
   });

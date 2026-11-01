@@ -12,6 +12,8 @@ export type ActividadSuelta = {
   titulo: string;
   coreKind?: string | null;
   clientId?: number | null;
+  /** Nombre del cliente, para reconocer los de relleno. */
+  cliente?: string | null;
   /** Cliente o lugar, en texto: nombre del cliente, sucursal o ciudad. */
   lugar?: string | null;
   cotizacionId?: number | null;
@@ -33,9 +35,16 @@ export type Sugerencia = {
   fuente: 'REGLA' | 'IA';
 };
 
+/**
+ * No distinguen un trabajo de otro: el vocabulario del giro. Con datos reales, «Guía de cableado
+ * estructurado» se sugería para la cotización de cableado de un cliente.
+ */
 const VACIAS = new Set(
   `de del la el los las y o a en con para por un una al su sus que se es lo le cliente proyecto cotizacion
-   instalacion servicio sitio sucursal oficina sa cv rl sapi grupo empresa`.split(/\s+/),
+   instalacion servicio sitio sucursal oficina sa cv rl sapi grupo empresa
+   cctv camara camaras videovigilancia cableado estructurado red redes datos voz fibra control acceso accesos
+   equipo equipos sistema sistemas suministro propuesta tecnica mantenimiento preventivo correctivo soporte
+   ampliacion renovacion migracion nivel nueva nuevo nuevas nuevos`.split(/\s+/),
 );
 
 export function normalizar(texto: unknown): string {
@@ -53,9 +62,16 @@ export function palabras(texto: unknown): string[] {
     .filter((p) => p.length >= 3 && !VACIAS.has(p));
 }
 
+/** Clientes de relleno del padrón: compartirlo no dice nada. */
+const RE_CLIENTE_DE_RELLENO = /^(a quien corresponda|publico en general|publico general|sin cliente|varios|general)$/;
+
+export function esClienteDeRelleno(nombre: unknown): boolean {
+  return RE_CLIENTE_DE_RELLENO.test(normalizar(nombre));
+}
+
 /** Trabajo de la propia empresa: nunca se le cobra a un proyecto. */
 const RE_INTERNA =
-  /\b(ordenar|limpi(ar|eza)|inventario|capacitacion|junta|reunion semanal|lavar|recursos humanos|nomina|factur(a|ar|acion)|papeleria|bodega|almacen|oficina|cursos?|manual interno|pagar|depositar|deposito|banco|administrativ[oa]s?|mantenimiento (de|del) (la )?(camioneta|vehiculo|auto))\b/;
+  /\b(ordenar|limpi(ar|eza)|inventario|capacitacion|junta|reunion semanal|lavar|recursos humanos|nomina|factur(a|ar|acion)|cfdi|ingresos|egresos|impuestos|declaracion|papeleria|bodega|almacen|oficina|cursos?|manual interno|pagar|depositar|deposito|banco|administrativ[oa]s?|mantenimiento (de|del) (la )?(camioneta|vehiculo|auto))\b/;
 
 /** Lo que nombra a un cliente o un trabajo concreto, aunque diga bodega u oficina. */
 const RE_TRABAJO_DE_CLIENTE = /\b(camaras?|cctv|nvr|dvr|cableado|fibra|acceso|lectora|torniquete|switch|rack|levantamiento|cotizar|propuesta)\b/;
@@ -82,12 +98,15 @@ export function sugerirPorReglas(a: ActividadSuelta, candidatos: readonly Candid
     };
   }
 
-  const titulo = palabras(`${a.titulo} ${a.lugar ?? ''}`);
+  const relleno = esClienteDeRelleno(a.cliente);
+  const lugar = relleno ? String(a.lugar ?? '').replace(String(a.cliente), '') : a.lugar;
+  const titulo = palabras(`${a.titulo} ${lugar ?? ''}`);
   const puntos = candidatos
     .map((c) => {
-      const delCliente = Boolean(a.clientId && c.clientId && a.clientId === c.clientId);
+      const clienteVale = !esClienteDeRelleno(c.cliente);
+      const delCliente = Boolean(!relleno && clienteVale && a.clientId && c.clientId && a.clientId === c.clientId);
       const porNombre = coincidencia(palabras(c.nombre), titulo);
-      const porCliente = coincidencia(palabras(c.cliente), titulo);
+      const porCliente = clienteVale ? coincidencia(palabras(c.cliente), titulo) : 0;
       return { c, delCliente, porNombre, porCliente, total: (delCliente ? 3 : 0) + porNombre * 2 + porCliente * 2 };
     })
     .filter((x) => x.total >= 3)
@@ -105,7 +124,8 @@ export function sugerirPorReglas(a: ActividadSuelta, candidatos: readonly Candid
   if (mejor) return null;
 
   const texto = normalizar(a.titulo);
-  if (RE_INTERNA.test(texto) && !RE_TRABAJO_DE_CLIENTE.test(texto) && !a.clientId) {
+  const sinCliente = !a.clientId || relleno;
+  if (RE_INTERNA.test(texto) && !RE_TRABAJO_DE_CLIENTE.test(texto) && sinCliente) {
     return { tipo: 'INTERNA', id: null, nombre: 'Trabajo interno', motivo: 'No es de un cliente: va a indirectos', fuente: 'REGLA' };
   }
   return null;
