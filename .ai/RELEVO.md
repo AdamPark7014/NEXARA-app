@@ -1,5 +1,19 @@
 # RELEVO
 
+- **01-11 ~16:50 (claude-code) — Base común de Core: título, cifras, filtros y pestañas iguales en las pantallas viejas (aprobado por Adam con antes y después de Facturación y Pólizas).**
+  - Pedido: «haz mucho más premium y profesional todo el sistema»; eligió empezar por la base común. Colores y letra ya eran los mismos (`.nx-app-shell`,
+    28-10 y `2872774e`). Lo que se notaba eran cuatro piezas repetidas, y cada una se cambió en un solo lugar:
+    - **Título:** `.head[data-density="ops"]` ya no lo achica a 20 px; todos usan `--ui-fs-page` (28 px). `PageHeader` está en 48 archivos.
+    - **Cifras:** `.statsStrip` son tarjetas sueltas, como en Clientes, con la cifra a 28 px en Inter Tight. `MetricStrip` está en 44 archivos.
+    - **Filtros:** `globals.scss` pone todo control a lo ancho y cada filtro se iba a su propia línea. Regla en `ui-tokens.scss`: un control con
+      `min-width` o `flex` en línea toma lo que le toca. Unos 34 archivos.
+    - **Pestañas:** `ContextRail` deja los estilos en línea y `PanelTabs` pierde la raya curva: raya recta, 14 px.
+  - Dentro de un shell solo (`.nx-app-shell`), el sitio público no cambia. Todo son tokens: claro y oscuro salen solos.
+  - **Sin ver con sesión todavía** los 44 módulos; en producción se revisan los principales tras desplegar (bloque de abajo o el siguiente).
+  - **Lo que sigue, en orden (medido con `style={{}}` en línea y `components/ui`):** contabilidad (18 pantallas, 354 estilos en línea), `finance` (166),
+    `accounting` (141), `invoicing` (86), reuniones (44). `hr`, `settings`, `users`, `procurement` y `audit` tienen mucha deuda pero están fuera del
+    menú de Core: no valen la pena antes. Cotizaciones, clientes, proyectos, pizarra, asistencias y almacén ya van con el sistema nuevo.
+
 - **01-11 ~16:40 (claude-code) — Clientes, lo que salió al verificar en producción con la cuenta de Christian.**
   - «Asignar con IA» resolvía «Benemérita Universidad…» al cliente a medias «Benemer» en vez de BUAP: su buscador (`ai/asistente/nombres.ts`) no
     entendía iniciales de un nombre completo. `palabrasDe` ahora las genera (4 palabras o más, o 3 si todas van con mayúscula, para que «traer

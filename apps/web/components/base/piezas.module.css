@@ -194,38 +194,19 @@
     background-color var(--ui-duration-fast) ease;
 }
 
-/* Tira: una sola tarjeta con divisiones finas. La sombra de cada celda dibuja la
-   raya izquierda y la de arriba; las de la orilla se recortan con overflow. */
+/* Tira de cifras: tarjetas sueltas, las mismas de Clientes y del resto de Core. */
 .statsStrip {
-  gap: 0;
+  gap: var(--ui-s3, 12px);
   margin-bottom: 0;
-  overflow: hidden;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-card-radius, 16px);
-  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
 }
 
 .statsStrip:not([data-cols]) {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-}
-
-.statsStrip > .stat {
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: -1px 0 0 var(--ui-border-subtle), 0 -1px 0 var(--ui-border-subtle);
-}
-
-.statsStrip > .statLink:hover,
-.statsStrip > .statLink:focus-visible {
-  background: var(--ui-hover);
-  box-shadow: -1px 0 0 var(--ui-border-subtle), 0 -1px 0 var(--ui-border-subtle);
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
 .statCompact {
-  gap: 4px;
-  padding: 12px 16px;
+  gap: 8px;
+  padding: 16px 18px;
 }
 
 .statLink {
@@ -244,10 +225,6 @@
 .statLink:focus-visible {
   outline: var(--ui-focus-outline);
   outline-offset: 2px;
-}
-
-.statsStrip > .statLink:focus-visible {
-  outline-offset: -2px;
 }
 
 .stat[aria-pressed="true"],
@@ -315,7 +292,9 @@
 }
 
 .statCompact .statLabel {
-  font-size: var(--ui-text-xs);
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  color: var(--ui-fg-2);
 }
 
 .statDot {
@@ -339,9 +318,11 @@
 }
 
 .statCompact .statValue {
-  font-size: 20px;
+  font-family: var(--ui-font-display);
+  font-size: 28px;
+  font-weight: 700;
   line-height: 1.15;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 
 .statSuffix {

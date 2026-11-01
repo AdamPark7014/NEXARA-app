@@ -1,9 +1,9 @@
 .list {
   display: flex;
-  gap: 2px;
+  gap: 2px 22px;
   flex-wrap: wrap;
-  margin-bottom: 14px;
-  border-bottom: 1px solid var(--ui-border);
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--ui-border-subtle);
 
   @media (max-width: 640px) {
     flex-wrap: nowrap;
@@ -24,17 +24,17 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 36px;
+  min-height: 38px;
   margin-bottom: -1px;
-  padding: 0 12px;
+  padding: 0 2px;
   border: 0;
   border-bottom: 2px solid transparent;
-  border-radius: var(--ui-radius-sm) var(--ui-radius-sm) 0 0;
+  border-radius: 0;
   background: transparent;
   color: var(--ui-fg-2);
   font-family: inherit;
-  font-size: 13px;
-  font-weight: 550;
+  font-size: var(--ui-text-base);
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -44,7 +44,6 @@
 
   &:hover:not(:disabled):not([data-active="true"]) {
     color: var(--ui-fg);
-    background: var(--ui-hover);
   }
 
   &:focus-visible {
@@ -59,7 +58,7 @@
 
   &[data-active="true"] {
     color: var(--ui-fg);
-    font-weight: 650;
+    font-weight: 600;
     border-bottom-color: var(--panel-accent, var(--ui-brand));
   }
 

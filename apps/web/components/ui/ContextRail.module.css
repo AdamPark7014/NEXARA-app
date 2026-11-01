@@ -1,0 +1,63 @@
+/* Las mismas pestañas con raya del resto de Core. En teléfono se desplazan en una fila. */
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 22px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+
+@media (max-width: 640px) {
+  .rail {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .rail::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.item {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  margin-bottom: -1px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ui-fg-2);
+  font: inherit;
+  font-size: var(--ui-text-base);
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color var(--ui-duration-fast) ease,
+    box-shadow var(--ui-duration-fast) ease;
+}
+
+.item:hover {
+  color: var(--ui-fg);
+}
+
+.item:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+.item[data-active="true"] {
+  color: var(--ui-fg);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--panel-accent, var(--ui-brand));
+}
+
+.fijo {
+  cursor: default;
+}

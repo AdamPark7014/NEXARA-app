@@ -551,6 +551,14 @@ body:has(.nx-app-shell) {
   --state-danger-text: var(--ui-danger-text);
 }
 
+/* `globals.scss` pone todo control a lo ancho, y en una fila de filtros cada uno se iba a su
+   propia línea. El que declara su ancho mínimo (o su flex) es de una fila: toma lo que le toca. */
+.nx-app-shell select[style*="min-width"],
+.nx-app-shell input[style*="min-width"],
+.nx-app-shell input[type="search"][style*="flex"] {
+  width: auto;
+}
+
 /* Títulos de página y de sección en la letra de exhibición. */
 .nx-app-shell :is(h1, h2) {
   font-family: var(--ui-font-display);
