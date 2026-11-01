@@ -1,5 +1,27 @@
 # RELEVO
 
+- **01-11 ~10:50 (claude-code) — Tope al índice y la profundidad de los campos en toda subida (`23e20f54`, desplegado).**
+  - Por qué: multer no limita por omisión `a[99999999]`, que crea un arreglo de 100 millones de lugares y cuesta cuando algo
+    recorre `req.body` (el filtro global, al registrar un error). Adam pidió ponerlo.
+  - Qué: `common/files/interceptores-subida.ts` envuelve `FileInterceptor`, `FilesInterceptor` y `FileFieldsInterceptor` con los
+    mismos nombres y parámetros, y agrega `fieldArrayIndexLimit: 1000` y `fieldNestingDepth: 5`, conservando los límites de
+    cada ruta. Pasarse responde 400 `INVALID_UPLOAD`. Ni la web ni Android ni iOS mandan nombres con corchetes.
+  - **Regla nueva:** los controladores importan los interceptores de ese archivo, no de `@nestjs/platform-express`. Nest no deja
+    fijarlo para toda la API (`MulterModule` es por módulo y el `limits` de la ruta reemplaza al del módulo). Una prueba
+    (`interceptores-subida.spec.ts`) falla si alguien importa directo o arma multer sin los topes.
+  - Trampa: los 30 controladores cambiaron una línea de importación. Si subes uno desde una copia vieja con índice temporal,
+    esa línea se revierte; la prueba de arriba lo detecta en CI.
+  - Verificado: 4,310 pruebas de API, y las nuevas fallan al quitar el tope o al importar directo. CI con los 5 trabajos en
+    verde sobre `23e20f54`. En el contenedor desplegado: `a[99999999]` responde 400 en 35 ms, `a[1000]` y 5 niveles pasan, los
+    30 controladores compilados usan el envoltorio y la salud sigue en verde. La prueba usa el código compilado; no pasó por
+    una ruta real con sesión.
+  - **Disco del servidor:** los despliegues de hoy llevaron `/` de 75 % a 93 % sin nada corriendo (pico de 95 % al compilar).
+    La caché de compilación llegó a 16 GB porque `docker builder prune --keep-storage` sin `-a` solo borra lo huérfano. Se
+    liberó con `docker builder prune -af`: **73 %, 21 GB libres**, `/api/health` en 200. No se tocaron imágenes ni volúmenes
+    (`nexara-web:next14-respaldo` y `arta-*:prev` siguen; `docker image prune -a` las borraría). La siguiente compilación va
+    sin caché, más lenta. `/root/deploy-api-web.sh` sigue igual y cada despliegue vuelve a sumar de 3 a 5 GB: mira `df -h /`
+    antes de desplegar.
+
 - **01-11 ~11:30 (claude-code) — Reuniones: la grabación sigue hasta que la concluyas, en cualquier módulo, pestaña o app.**
   - Causa: el grabador vivía en la página `/erp/reuniones`; al salir se desmontaba y soltaba el micrófono.
   - El motor (`components/reuniones/useMotorGrabacion.ts`) ahora vive en `GrabacionProvider`, en el layout de `/erp`.
@@ -83,9 +105,7 @@
   - Verificado: CI de `84e8c4f1` (contiene `8c9e031f`) con los 5 trabajos en verde. En local, `npm ci` con npm 11 y 10.9.9 y el
     comando del Dockerfile con 10.9.9, que deja una sola copia. En el contenedor desplegado: solo multer 2.5.0, Nest la usa, 19
     casos de subida por HTTP con el filtro de `dist` (413, 400, disco, acentos, cortada) y salud en verde sin reinicios.
-  - **Sin hacer, para decidir:** multer no limita por omisión un campo como `a[99999999]` (`fieldArrayIndexLimit` y
-    `fieldNestingDepth` son opcionales). Crea un arreglo enorme cuando algo recorre `req.body`; el filtro global lo hace al
-    registrar un error. Según un barrido del código todas las rutas de subida piden sesión, así que requiere una cuenta válida.
+  - El tope a campos como `a[99999999]` que faltaba aquí ya está: ver el bloque de `23e20f54`, arriba.
 
 - **01-11 ~09:45 (claude-code) — Web en Next 15.5.28 + React 19.3.1 (`19d9245e`, desplegado).**
   - Por qué: 14.x ya no recibe parches. `npm audit --omit=dev` pasa de crítica en `next` a **0 críticas** (46: 14 altas,
