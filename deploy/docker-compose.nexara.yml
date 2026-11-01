@@ -81,6 +81,13 @@ services:
       HTTP_HEADERS_TIMEOUT_MS: ${HTTP_HEADERS_TIMEOUT_MS:-96000}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      JWT_REMEMBER_EXPIRES_IN: ${JWT_REMEMBER_EXPIRES_IN:-30d}
+      # Entrar con Google / Microsoft (OIDC). Vacíos = su botón no aparece en el login.
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      MICROSOFT_OAUTH_CLIENT_ID: ${MICROSOFT_OAUTH_CLIENT_ID:-}
+      MICROSOFT_OAUTH_CLIENT_SECRET: ${MICROSOFT_OAUTH_CLIENT_SECRET:-}
+      MICROSOFT_OAUTH_TENANT: ${MICROSOFT_OAUTH_TENANT:-}
       # Llave de la bóveda de contraseñas del dueño (64 hex). Vive SOLO aquí, nunca en la base ni en el repo.
       # Sin ella la bóveda no guarda ni muestra nada. Respáldala: si se pierde, lo guardado no se puede leer.
       VAULT_ENCRYPTION_KEY: ${VAULT_ENCRYPTION_KEY:-}
