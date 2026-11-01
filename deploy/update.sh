@@ -285,7 +285,7 @@ if [[ "$AUTO_PRUNE_ON_HIGH_DISK" == true ]]; then
     echo "Root filesystem at ${ROOT_USE_PCT}% (>= ${HIGH_DISK_THRESHOLD}%). Running safe Docker auto-prune..."
     # Keep currently running images/containers untouched and trim only dangling image refs + excess build cache.
     docker image prune -f || true
-    docker builder prune -af --max-used-space 5GB --min-free-space 15GB || true
+    docker builder prune -af --max-used-space 3GB --min-free-space 15GB || true
   fi
 fi
 
