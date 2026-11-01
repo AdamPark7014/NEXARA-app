@@ -184,7 +184,7 @@ export function dibujarPortada(doc: Doc, o: { version: number; indice: EntradaIn
 function indiceDePortada(doc: Doc, indice: EntradaIndice[]) {
   if (!indice.length) return;
   const [izquierda, derecha, abajo] = [33, 387, 745];
-  const arribaMinimo = 452;
+  const arribaMinimo = 440;
   const margen = 14;
   const paso = Math.min(38, (abajo - arribaMinimo - margen * 2) / indice.length);
   const alto = paso * indice.length + margen * 2;

@@ -802,6 +802,8 @@ export default function EditorCotizacion({
             editable={editable}
             version={version}
             esNueva={!inicial}
+            puntosSugeridos={detalle?.alcanceSugerido ?? null}
+            hayPlanos={Boolean(detalle?.planos?.length)}
           />
           {!id ? (
             <Alert tone="info">
@@ -832,6 +834,7 @@ export default function EditorCotizacion({
             cambiar={cambiar}
             editable={editable}
             plantillas={plantillaSegmento?.bloques ?? []}
+            sugeridos={detalle?.alcanceSugerido ?? null}
             excluida={!doc.opciones.secciones.alcance}
             onIncluir={() => incluirSeccion("alcance")}
           />

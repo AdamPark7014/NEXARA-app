@@ -231,13 +231,69 @@ describe('formato Nexara', () => {
       expect(texto).not.toContain('•');
     });
 
-    it('más de cinco bloques van juntos en un solo apartado, para no llenar el índice', async () => {
-      const alcanceBloques = Array.from({ length: 6 }, (_, i) => ({ titulo: `Bloque ${i + 1}`, texto: `Texto ${i + 1}.` }));
+    it('los siete puntos del diseño vienen por omisión, en la portada y como apartados', async () => {
+      const hojas = textoPorHoja(
+        await generarCotizacionNexaraPdf({
+          ...grupoDice,
+          items: [
+            { name: 'Cámara domo IP', model: 'DS-2CD', unit: 'Pieza', qty: 10, unitPrice: 1000, tax: 16 },
+            { name: 'NVR 32 canales', unit: 'Pieza', qty: 1, unitPrice: 9000, tax: 16 },
+            { name: 'UPS 1000 VA', unit: 'Pieza', qty: 1, unitPrice: 6000, tax: 16 },
+            { name: 'Tubo conduit 1 pulgada', unit: 'Metro', qty: 50, unitPrice: 50, tax: 16 },
+          ],
+        }),
+      );
+      const puntos = [
+        'ALCANCE EJECUTIVO',
+        'JUSTIFICACIÓN TECNOLÓGICA',
+        'BENEFICIOS DE LA CANALIZACIÓN INDUSTRIAL',
+        'ESPECIFICACIÓN FUNCIONAL DE LAS CÁMARAS SELECCIONADAS',
+        'CENTRO DE MONITOREO, ALMACENAMIENTO Y RESPALDO ELÉCTRICO ONLINE',
+        'PÓLIZA DE GARANTÍAS, EXCLUSIONES Y VIGENCIA COMERCIAL',
+        'PROPUESTA ECONÓMICA DETALLADA',
+      ];
+      const portada = hojas[0]!.replace(/\s+/g, ' ');
+      const interior = hojas.slice(2).join(' ').replace(/\s+/g, ' ');
+      puntos.forEach((punto, i) => {
+        expect(portada).toContain(punto);
+        expect(portada).toContain(`0${i + 1}.`);
+        expect(interior).toContain(`${i + 1}. ${punto}`);
+      });
+    });
+
+    it('cada punto se puede renombrar o quitar, y la portada dice lo mismo que el documento', async () => {
+      const hojas = textoPorHoja(
+        await generarCotizacionNexaraPdf({
+          ...grupoDice,
+          alcanceBloques: [{ titulo: 'Solo este punto', texto: 'Texto.' }],
+          opciones: { titulos: { objetivo: 'Resumen del proyecto', cotizacion: 'Inversión' } },
+        }),
+      );
+      const interior = hojas.slice(2).join('\n');
+      expect(hojas[0]).toContain('RESUMEN DEL PROYECTO');
+      expect(hojas[0]).toContain('SOLO ESTE PUNTO');
+      expect(hojas[0]).toContain('INVERSIÓN');
+      expect(hojas[0]).not.toContain('JUSTIFICACIÓN');
+      expect(interior).toContain('1. RESUMEN DEL PROYECTO');
+      expect(interior).toContain('2. SOLO ESTE PUNTO');
+      expect(interior).toContain('4. INVERSIÓN');
+    });
+
+    it('la póliza trae vigencia y moneda, y las condiciones no las repiten', async () => {
+      const texto = textoPorHoja(await generarCotizacionNexaraPdf(grupoDice)).join('\n');
+      expect(cuantas(texto, 'Vigencia:')).toBe(1);
+      expect(cuantas(texto, 'pesos mexicanos (MXN)')).toBe(1);
+      expect(texto).toContain('Vigencia comercial');
+      expect(texto).toContain('CONDICIONES COMERCIALES');
+    });
+
+    it('más de ocho bloques van juntos en un solo apartado, para no llenar el índice', async () => {
+      const alcanceBloques = Array.from({ length: 9 }, (_, i) => ({ titulo: `Bloque ${i + 1}`, texto: `Texto ${i + 1}.` }));
       const hojas = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, alcanceBloques }));
       const texto = hojas.join('\n');
       expect(texto).toContain('2. ALCANCE TÉCNICO');
       expect(texto).toContain('2.1  Bloque 1');
-      expect(texto).toContain('2.6  Bloque 6');
+      expect(texto).toContain('2.9  Bloque 9');
       expect(hojas[0]).not.toContain('BLOQUE 1');
     });
 
@@ -261,7 +317,7 @@ describe('formato Nexara', () => {
 
     it('la póliza dice la garantía una sola vez, y la de instalación solo si se cobra', async () => {
       const soloEquipo = textoPorHoja(await generarCotizacionNexaraPdf(grupoDice)).join('\n');
-      expect(soloEquipo).toContain('PÓLIZA DE GARANTÍAS Y EXCLUSIONES');
+      expect(soloEquipo).toContain('PÓLIZA DE GARANTÍAS, EXCLUSIONES Y VIGENCIA COMERCIAL');
       expect(soloEquipo).toContain('Equipos:');
       expect(soloEquipo).not.toContain('Instalación:');
       expect(soloEquipo).not.toContain('Garantía:');

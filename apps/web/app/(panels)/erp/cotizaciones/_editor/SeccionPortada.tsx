@@ -12,6 +12,8 @@ import { getClientPermissions, listSalesClients, type SalesClient } from "@/lib/
 import { SEGMENTOS, SEGMENTO_LABEL, type Segmento } from "@/lib/cotizaciones-api";
 import type { DocumentoCotizacion } from "@/lib/cotizacion-documento";
 import { Ayuda, Campo, Hoja, Segmentado, TextoAuto } from "./campos";
+import PuntosPortada from "./PuntosPortada";
+import type { BloqueAlcance } from "@/lib/cotizaciones-api";
 import styles from "./editor.module.css";
 
 const QUE_CAMBIA: Record<Segmento, string> = {
@@ -294,6 +296,8 @@ export default function SeccionPortada({
   editable,
   version,
   esNueva,
+  puntosSugeridos,
+  hayPlanos,
 }: {
   doc: DocumentoCotizacion;
   cambiar: Cambiar;
@@ -301,6 +305,9 @@ export default function SeccionPortada({
   editable: boolean;
   version: string;
   esNueva: boolean;
+  /** Los puntos por omisión de esta cotización; null mientras no se ha guardado. */
+  puntosSugeridos: BloqueAlcance[] | null;
+  hayPlanos: boolean;
 }) {
   return (
     <Hoja
@@ -353,6 +360,7 @@ export default function SeccionPortada({
             deshabilitado={!editable}
           />
         </div>
+        <PuntosPortada doc={doc} cambiar={cambiar} editable={editable} sugeridos={puntosSugeridos} hayPlanos={hayPlanos} />
       </div>
     </Hoja>
   );

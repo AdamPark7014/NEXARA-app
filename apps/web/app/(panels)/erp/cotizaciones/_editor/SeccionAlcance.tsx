@@ -5,8 +5,8 @@ import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRound
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import LibraryAddOutlinedIcon from "@mui/icons-material/LibraryAddOutlined";
-import { Badge, Button } from "@/components/base";
-import type { PlantillasSegmento } from "@/lib/cotizaciones-api";
+import { Badge, Button, LinkButton } from "@/components/base";
+import type { BloqueAlcance, PlantillasSegmento } from "@/lib/cotizaciones-api";
 import {
   esBloqueDePaquete,
   mover,
@@ -37,6 +37,7 @@ export default function SeccionAlcance({
   cambiar,
   editable,
   plantillas,
+  sugeridos,
   excluida,
   onIncluir,
 }: {
@@ -47,6 +48,8 @@ export default function SeccionAlcance({
   cambiar: Cambiar;
   editable: boolean;
   plantillas: PlantillasSegmento["bloques"];
+  /** Los puntos que el PDF lleva si no se escriben otros. */
+  sugeridos: BloqueAlcance[] | null;
 }) {
   const [verPlantillas, setVerPlantillas] = useState(false);
   const titulos = useRef(new Map<string, HTMLTextAreaElement>());
@@ -109,7 +112,7 @@ export default function SeccionAlcance({
       numero="02"
       titulo="Alcance técnico"
       descripcion="Qué se hace, subsección por subsección."
-      ayuda="Cada subsección con título es un apartado del PDF y sale en el índice de la portada; una sin título sigue a la anterior y, con más de cinco, van juntas en un solo apartado."
+      ayuda="Cada subsección con título es un apartado del PDF y sale en el índice de la portada; una sin título sigue a la anterior y, con más de ocho, van juntas en un solo apartado."
       acciones={
         editable ? (
           <Button size="sm" iconStart={<LibraryAddOutlinedIcon />} onClick={() => setVerPlantillas((v) => !v)} aria-expanded={verPlantillas}>
@@ -234,6 +237,26 @@ export default function SeccionAlcance({
             );
           })}
         </ol>
+      ) : sugeridos?.length ? (
+        <div className={styles.sugerido}>
+          El PDF pondría:
+          <ol>
+            {sugeridos.map((s) => (
+              <li key={s.clave}>{s.titulo}</li>
+            ))}
+          </ol>
+          {editable ? (
+            <LinkButton
+              onClick={() =>
+                setBloques(() =>
+                  sugeridos.map((s) => nuevoBloque({ clave: s.clave, titulo: s.titulo, texto: s.texto ?? "", vinetas: s.vinetas })),
+                )
+              }
+            >
+              Usar estos y editarlos
+            </LinkButton>
+          ) : null}
+        </div>
       ) : editable ? (
         <div className={styles.bloque}>
           <Vacio
@@ -253,7 +276,7 @@ export default function SeccionAlcance({
           </Vacio>
         </div>
       ) : (
-        <p className={styles.pista}>Sin subsecciones: el PDF remite a la sección 04.</p>
+        <p className={styles.pista}>Sin subsecciones.</p>
       )}
 
       {bloques.length && editable ? (

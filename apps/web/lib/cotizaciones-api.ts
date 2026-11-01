@@ -247,6 +247,8 @@ export type CotizacionDetalle = {
   /** Lo que el PDF pondría con las partidas si el objetivo se deja vacío. */
   objetivoSugerido?: ObjetivoPartes | null;
   alcanceBloques?: BloqueAlcance[] | null;
+  /** Los puntos que el PDF y la portada llevan si no se escriben otros. */
+  alcanceSugerido?: BloqueAlcance[] | null;
   planos?: PlanoCotizacion[] | null;
   note?: string | null;
   depositPercent?: number;

@@ -30,6 +30,8 @@ export type OpcionesCotizacion = {
   /** Solo con USD: «Tipo de cambio del día de pago según DOF», etc. */
   tipoCambioNota: string;
   condiciones: CondicionesComerciales;
+  /** Título propio de cada apartado fijo del PDF y la portada; vacío = el del diseño. */
+  titulos: { objetivo: string; garantias: string; cotizacion: string };
   /** `null` = el autor de la cotización, con su puesto. */
   elaboro: Firmante | null;
   autorizo: (Firmante & { userId?: number | null }) | null;
@@ -67,6 +69,7 @@ export function opcionesPorOmision(): OpcionesCotizacion {
     carta: null,
     tipoCambioNota: '',
     condiciones: { formaPago: '', tiempoEntrega: '', garantia: '', vigencia: '' },
+    titulos: { objetivo: '', garantias: '', cotizacion: '' },
     elaboro: null,
     autorizo: null,
   };
@@ -94,6 +97,7 @@ export function normalizarOpciones(crudo: unknown): OpcionesCotizacion {
   const s = objeto(o['secciones']);
   const c = objeto(o['columnas']);
   const k = objeto(o['condiciones']);
+  const t = objeto(o['titulos']);
   const cartaCruda = objeto(o['carta']);
   const dirigidaA = texto(cartaCruda['dirigidaA'], 160);
   const mensaje = texto(cartaCruda['mensaje'], 4000);
@@ -122,6 +126,11 @@ export function normalizarOpciones(crudo: unknown): OpcionesCotizacion {
       tiempoEntrega: texto(k['tiempoEntrega'], 4000),
       garantia: texto(k['garantia'], 4000),
       vigencia: texto(k['vigencia'], 4000),
+    },
+    titulos: {
+      objetivo: texto(t['objetivo'], 120),
+      garantias: texto(t['garantias'], 120),
+      cotizacion: texto(t['cotizacion'], 120),
     },
     elaboro: firmante(o['elaboro']),
     autorizo: autorizo ? { ...autorizo, ...(Number.isInteger(userId) && userId > 0 ? { userId } : {}) } : null,

@@ -189,7 +189,7 @@ const SUMINISTRO: PlantillaBase = {
     note: nota({ otras: OTRAS_GENERAL }),
     depositPercent: condicionesPorOmision('COMERCIAL').anticipoPct,
     currency: 'MXN',
-    opciones: opciones('COMERCIAL', { objetivo: true, alcance: false, planos: false, marcaModelo: true, garantia: GARANTIA_EQUIPO }),
+    opciones: opciones('COMERCIAL', { objetivo: true, alcance: true, planos: false, marcaModelo: true, garantia: GARANTIA_EQUIPO }),
     items: [
       partida({ name: 'Computadora de escritorio', grupo: 'EQUIPOS', unit: 'Pieza', brand: 'Lenovo', description: 'Procesador, memoria y almacenamiento según el requerimiento del cliente.' }),
       partida({ name: 'Computadora portátil', grupo: 'EQUIPOS', unit: 'Pieza', brand: 'Lenovo', description: 'Procesador, memoria y almacenamiento según el requerimiento del cliente.' }),
@@ -257,7 +257,7 @@ const LICENCIAMIENTO: PlantillaBase = {
     depositPercent: 100,
     currency: 'MXN',
     opciones: opciones('COMERCIAL', {
-      objetivo: false,
+      objetivo: true,
       alcance: true,
       planos: false,
       marcaModelo: true,

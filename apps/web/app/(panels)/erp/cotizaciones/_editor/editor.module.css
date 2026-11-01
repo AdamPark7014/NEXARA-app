@@ -2521,3 +2521,57 @@ select.celda {
     padding: 18px;
   }
 }
+
+/* Puntos del índice de la portada. */
+.puntosPortada {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.puntoPortada {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 8px;
+}
+
+.puntoNumero {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ui-brand);
+  text-align: right;
+}
+
+.puntoQuitar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-fg-3);
+  cursor: pointer;
+}
+
+.puntoQuitar:hover {
+  background: var(--ui-danger-bg);
+  color: var(--ui-danger-text);
+}
+
+.puntoQuitar:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 1px;
+}
+
+.puntosAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
