@@ -1,5 +1,39 @@
 # RELEVO
 
+- **01-11 ~09:45 (claude-code) — Web en Next 15.5.28 + React 19.3.1 (`19d9245e`, desplegado).**
+  - Por qué: 14.x ya no recibe parches. `npm audit --omit=dev` pasa de crítica en `next` a **0 críticas** (46: 14 altas,
+    28 moderadas, 4 bajas). `next` queda como moderada solo por su `postcss` 8.4.31 interno, que se usa al compilar.
+  - Cambios: `params`/`searchParams` asíncronos en `(sitio)` (blog, cobertura, soluciones) y login; Preparar CFDI con
+    `useParams`; `await headers()` en `not-found`; tipos de React 19 (`RefObject<T | null>`, `useRef` con valor inicial,
+    `ReactElement` en vez de `JSX.Element`). Fuera `swcMinify`.
+  - **Se conservó a propósito lo que Next 15 cambia por omisión (no quitar sin pensarlo):** `feed.xml` con
+    `force-static` + `revalidate = 300`; `experimental.staleTimes.dynamic = 30` (navegación como en 14);
+    `htmlLimitedBots: /.*/` (title, canonical y OG en el `<head>` aun para Googlebot, importa para Search Console).
+    Siguen `images.unoptimized` (`/_next/image` da 404) y cero Server Actions. `ct-media` no cambió.
+  - Trampas para la próxima actualización:
+    - Lock: `npm install` deja `next` y `react` anidados en `apps/web/node_modules` porque el lock conserva `apps/mobile`
+      (`extraneous`, app descontinuada, pide next 14 y react 18). Ahí MUI, en la raíz, ya no encuentra `react`, y
+      `build:lowmem` apunta a `../../node_modules/next`. Se resolvió quitando esas entradas del lock y subiendo `@next/*` a
+      la raíz; si los `@next/swc-*` quedan anidados, `next build` intenta «parchar» el lock. Revisar con un diff del lock.
+    - `core.autocrlf=true`: `git archive` saca CRLF. Al armar el commit con índice temporal, usar
+      `git hash-object -w --path=<ruta>`; sin `--path` el diff sale de archivo completo.
+    - `next-env.d.ts` ahora referencia `.next/types/routes.d.ts`; `tsc` sin `.next` pasa igual.
+    - Next 15.5 corta a 10 MB el cuerpo que pasa por el middleware (`middlewareClientMaxBodySize`). En producción no
+      aplica: en los paneles Traefik manda `/api` directo a la API y el sitio público usa `api.nexara.com.mx`. En local
+      (`/api` por rewrite de Next) una subida de más de 10 MB sí se corta.
+  - Verificado: `tsc` limpio, vitest 1,544 en verde, `build` y `build:lowmem` locales. En producción: 25 rutas iguales a la
+    línea base de Next 14 (200/404/308/400, metadatos en `<head>`, feed con ISR, OG); sitio a 375 y 1536 px sin desborde
+    ni errores en consola; formulario de login; `/erp` sin sesión manda a `/login?next=%2Ferp` y sus 28 archivos estáticos
+    dan 200; la web sin 5xx desde que arrancó (207 MiB).
+  - **Sin verificar:** `/erp` con sesión en un navegador real; hace falta que Adam inicie sesión. Lo cubren las pruebas
+    con React 19 en jsdom, no una pantalla real.
+  - **Respaldo:** imagen `nexara-web:next14-respaldo` (2.17 GB) en el Hetzner. Para volver:
+    `docker tag nexara-web:next14-respaldo nexara-web:latest` y `up -d --no-build web`. Borrarla cuando la pizarra esté
+    revisada con sesión (`docker rmi nexara-web:next14-respaldo`).
+  - **CI en rojo, ajeno a esto:** «Tipos y tests» falla en `npm ci` desde `b1a6880f` (`lock file's multer@2.4.0 does not
+    satisfy multer@2.5.0`, por el override `$multer`). Mientras siga así, CI no corre tipos ni pruebas en ningún commit.
+    Docker no se afecta (`npm install`); la imagen de la API sigue con multer 2.4.0.
+
 - **31-10 ~21:45 (claude-code) — 2FA, cuentas desactivadas y parche de seguridad de todo el sistema.**
   - 2FA de punta a punta (`6f6b21c8`): QR en Mi perfil (`users/mfa/setup` → `MfaService`), paso «Verificación en dos
     pasos» en el login, y `POST users/:id/mfa/quitar` para quien perdió el teléfono (cierra sus sesiones). Cuenta
