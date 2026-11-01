@@ -1,0 +1,123 @@
+/* La grabación en todos los módulos (sistema visual v2, solo tokens --ui-*). */
+.barra {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--ui-s4) + env(safe-area-inset-bottom, 0px));
+  z-index: 1200;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--ui-s4));
+  padding: var(--ui-s2) var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-lg, 0 8px 28px rgb(0 0 0 / 18%));
+}
+
+.controles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2) var(--ui-s3);
+  min-width: 0;
+}
+
+/* La ventanita siempre encima: ocupa toda su ventana. */
+.flotante {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ui-s2) var(--ui-s3);
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: var(--ui-s3);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font-family: var(--ui-font, system-ui, sans-serif);
+}
+
+.flotante > .datos {
+  grid-column: 2;
+}
+
+.flotante > :nth-last-child(2),
+.flotante > :last-child {
+  grid-row: 2;
+}
+
+.punto {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ui-fg-3);
+}
+
+.punto[data-vivo="true"] {
+  background: var(--ui-danger);
+  animation: latido 1.6s ease-out infinite;
+}
+
+.punto[data-listo="true"] {
+  background: var(--ui-success);
+}
+
+@keyframes latido {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ui-danger) 55%, transparent); }
+  100% { box-shadow: 0 0 0 8px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .punto[data-vivo="true"] { animation: none; }
+}
+
+.datos {
+  display: grid;
+  min-width: 0;
+  max-width: 260px;
+}
+
+.reloj {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.titulo {
+  overflow: hidden;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.enlace {
+  font-size: var(--ui-fs-meta);
+  font-weight: 600;
+  color: var(--ui-brand-text);
+  white-space: nowrap;
+}
+
+.cerrar {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-fg-3);
+  cursor: pointer;
+}
+
+.cerrar svg {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.cerrar:hover {
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+}

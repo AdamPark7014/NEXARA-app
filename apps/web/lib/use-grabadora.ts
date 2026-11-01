@@ -13,6 +13,10 @@
  * El micrófono se elige midiendo la señal (`lib/microfono.ts`): un cable virtual mudo ya no
  * graba una junta en silencio. Mientras se graba hay medidor de nivel y cuenta de silencio, y se
  * puede cambiar de micrófono a mitad sin perder nada.
+ *
+ * Pensado para no parar en segundo plano: el reloj va en un worker (el navegador frena los timers
+ * de una pestaña oculta), el bloqueo de pantalla se vuelve a pedir al regresar y, si el micrófono
+ * se desconecta, se vuelve a abrir solo.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { elegirFormatoAudio } from "@/lib/voz-api";
@@ -68,6 +72,31 @@ export async function abrirMicrofono(): Promise<{
 
 type WakeLock = { release: () => Promise<void> };
 
+/** Un tic cada `ms`, en un worker si se puede; si no, con un timer normal. Devuelve cómo pararlo. */
+function crearReloj(ms: number, tic: () => void): () => void {
+  let parar: () => void = () => undefined;
+  const conTimer = () => {
+    const t = window.setInterval(tic, ms);
+    parar = () => window.clearInterval(t);
+  };
+  try {
+    if (typeof Worker === "undefined") conTimer();
+    else {
+      const w = new Worker("/grabacion-reloj.js");
+      w.onmessage = () => tic();
+      w.onerror = () => {
+        w.terminate();
+        conTimer();
+      };
+      w.postMessage(ms);
+      parar = () => w.terminate();
+    }
+  } catch {
+    conTimer();
+  }
+  return () => parar();
+}
+
 type Medidor = { ctx: AudioContext; fuente: MediaStreamAudioSourceNode; analizador: AnalyserNode; datos: Float32Array<ArrayBuffer> };
 
 export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
@@ -84,9 +113,14 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
   const [microfono, setMicrofono] = useState<{ label: string; deviceId: string | null } | null>(null);
   /** Analizador del micrófono en uso (para la onda en vivo). */
   const [analizador, setAnalizador] = useState<AnalyserNode | null>(null);
+  /** El micrófono se desconectó a mitad de la grabación y se está volviendo a abrir. */
+  const [micCaido, setMicCaido] = useState(false);
   const stream = useRef<MediaStream | null>(null);
   const grabadora = useRef<MediaRecorder | null>(null);
   const timers = useRef<number[]>([]);
+  const pararReloj = useRef<(() => void) | null>(null);
+  const ultimaParte = useRef(0);
+  const recuperar = useRef<() => void>(() => undefined);
   const numero = useRef(0);
   const activo = useRef(false);
   const pausa = useRef(false);
@@ -135,6 +169,12 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
       setSilencioMs(0);
       const pista = s.getAudioTracks()[0];
       setMicrofono(pista ? { label: pista.label, deviceId: pista.getSettings?.().deviceId ?? null } : null);
+      // Se desconectó (audífonos, USB, otra app se lo llevó): no se corta la junta por eso.
+      if (pista) {
+        pista.onended = () => {
+          if (activo.current && stream.current === s) recuperar.current();
+        };
+      }
       try {
         const ctx = new AudioContext();
         void ctx.resume().catch(() => undefined);
@@ -196,6 +236,7 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
     const parte = ++numero.current;
     const inicioMs = grabadoMs();
     const trozos: Blob[] = [];
+    ultimaParte.current = Date.now();
     rec.ondataavailable = (e) => {
       if (e.data && e.data.size) trozos.push(e.data);
     };
@@ -221,8 +262,11 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
     pausa.current = false;
     timers.current.forEach((t) => window.clearInterval(t));
     timers.current = [];
+    pararReloj.current?.();
+    pararReloj.current = null;
     setGrabando(false);
     setPausado(false);
+    setMicCaido(false);
     const rec = grabadora.current;
     if (rec && rec.state !== "inactive") rec.stop();
     else soltarMicrofono();
@@ -266,6 +310,44 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
     [abrirParte, conectarMedidor],
   );
 
+  // Reabre el micrófono hasta lograrlo; mientras, la pantalla avisa y lo grabado ya está a salvo.
+  recuperar.current = () => {
+    setMicCaido(true);
+    void (async () => {
+      while (activo.current) {
+        const r = await abrirMicrofono();
+        if (!activo.current) {
+          r.stream?.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        if (r.stream) {
+          cambiarMicrofono(r.stream);
+          setMicCaido(false);
+          return;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 5_000));
+      }
+    })();
+  };
+
+  // El navegador suelta el bloqueo de pantalla al ocultar la pestaña: se vuelve a pedir al regresar.
+  useEffect(() => {
+    if (!grabando) return;
+    const alVolver = () => {
+      if (document.visibilityState !== "visible") return;
+      const wl = (navigator as unknown as { wakeLock?: { request: (t: "screen") => Promise<WakeLock> } }).wakeLock;
+      if (!wl) return;
+      void wl
+        .request("screen")
+        .then((nuevo) => {
+          pantalla.current = nuevo;
+        })
+        .catch(() => undefined);
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => document.removeEventListener("visibilitychange", alVolver);
+  }, [grabando]);
+
   const iniciar = useCallback(
     async (inicio: Inicio = {}) => {
       if (activo.current) return;
@@ -304,27 +386,23 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
         setError("Este navegador no puede grabar audio.");
         return;
       }
-      timers.current.push(
-        window.setInterval(() => {
-          const ms = grabadoMs();
-          setTranscurrido(ms);
-          if (maxMs && ms >= maxMs) {
-            detener();
-            limite.current?.();
-          }
-        }, 500),
-      );
+      pararReloj.current = crearReloj(500, () => {
+        if (!activo.current) return;
+        const ms = grabadoMs();
+        setTranscurrido(ms);
+        if (maxMs && ms >= maxMs) {
+          detener();
+          limite.current?.();
+          return;
+        }
+        if (!parteMs || pausa.current || Date.now() - ultimaParte.current < parteMs) return;
+        // Con el micrófono caído no hay qué partir: `recuperar` abre la siguiente.
+        if (!stream.current?.getAudioTracks().some((t) => t.readyState === "live")) return;
+        const anterior = grabadora.current;
+        abrirParte(); // la nueva arranca antes de cerrar la anterior: no se pierde nada
+        if (anterior && anterior.state !== "inactive") anterior.stop();
+      });
       timers.current.push(window.setInterval(leerNivel, 250));
-      if (parteMs) {
-        timers.current.push(
-          window.setInterval(() => {
-            if (!activo.current || pausa.current) return;
-            const anterior = grabadora.current;
-            abrirParte(); // la nueva arranca antes de cerrar la anterior: no se pierde nada
-            if (anterior && anterior.state !== "inactive") anterior.stop();
-          }, parteMs),
-        );
-      }
     },
     [abrirParte, conectarMedidor, detener, grabadoMs, leerNivel, maxMs, parteMs, soltarMicrofono],
   );
@@ -333,6 +411,7 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
     () => () => {
       activo.current = false;
       timers.current.forEach((t) => window.clearInterval(t));
+      pararReloj.current?.();
       if (grabadora.current && grabadora.current.state !== "inactive") grabadora.current.stop();
       soltarMicrofono();
     },
@@ -353,6 +432,7 @@ export function useGrabadora({ parteMs, maxMs, onParte, onLimite }: Opciones) {
     nivel,
     silencioMs,
     microfono,
+    micCaido,
     iniciar,
     detener,
     pausar,
