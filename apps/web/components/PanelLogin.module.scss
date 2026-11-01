@@ -452,6 +452,15 @@
   }
 }
 
+/* Código de 6 dígitos del segundo paso: grande, centrado y espaciado. */
+.codigo {
+  padding: 0 16px;
+  font-family: var(--ui-font-mono, ui-monospace, monospace);
+  font-size: 24px;
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+
 .control:focus-within .controlIcon {
   color: var(--login-brand-text);
 }

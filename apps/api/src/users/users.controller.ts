@@ -4,6 +4,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { UsersService } from './users.service.js';
 import { UsersDelegationService } from './users-delegation.service.js';
+import { MfaService } from './mfa.service.js';
 import { CreateDelegatedUserDto, UpdateDelegatedUserDto } from './dto/create-delegated-user.dto.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
@@ -60,6 +61,7 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly delegation: UsersDelegationService,
+    private readonly mfa: MfaService,
   ) {}
 
   /** Borra el archivo anterior cuando la foto fija cambia. Un fallo aquí no deshace el alta. */
@@ -325,7 +327,23 @@ export class UsersController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.PEOPLE_VIEW] })
   mfaSetup(@CurrentUser() user: any) {
-    return this.usersService.beginMfaSetup(user.id);
+    return this.mfa.iniciarConfiguracion(user.id);
+  }
+
+  /** Quitar el 2FA a quien perdió el teléfono (administradores de usuarios). Cierra sus sesiones. */
+  @Post(':id/mfa/quitar')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
+  mfaQuitar(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+  ) {
+    return this.mfa.quitarPorAdministrador(id, companyId, {
+      id: Number(user.id),
+      email: user.email,
+      isSuperAdmin: user.isSuperAdmin === true,
+    });
   }
 
   @Post('mfa/confirm')

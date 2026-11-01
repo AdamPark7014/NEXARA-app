@@ -348,9 +348,10 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       const { res, data } = await loginToEndpoint(endpoint);
       const msg = typeof data.message === "string" ? data.message : Array.isArray(data.message) ? data.message.join(" ") : "";
       if (!res.ok) {
-        if (mode === "console" && (msg === "MFA_REQUIRED" || String(data.error || "").includes("MFA"))) {
+        if (mode === "console" && msg === "MFA_REQUIRED") {
+          // Contraseña correcta: segundo paso, sin aviso de error.
           setMfaRequired(true);
-          setError("Ingresa el código de tu autenticador (MFA)");
+          setError("");
           return;
         }
         throw new Error(msg || data.error || "Credenciales incorrectas");
@@ -534,12 +535,16 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         ) : null}
 
         <div className={styles.encabezado}>
-          <h1 className={styles.heading}>{title || "Iniciar sesión"}</h1>
-          <p className={styles.subheading}>{subtitle || "Usa tu cuenta de NEXARA."}</p>
+          <h1 className={styles.heading}>{mfaRequired ? "Verificación en dos pasos" : title || "Iniciar sesión"}</h1>
+          <p className={styles.subheading}>
+            {mfaRequired
+              ? `Escribe el código de 6 dígitos de tu app de autenticación para ${email}.`
+              : subtitle || "Usa tu cuenta de NEXARA."}
+          </p>
         </div>
 
         {/* Cada botón aparece solo si su proveedor está configurado en la API. */}
-        {hayProveedores ? (
+        {hayProveedores && !mfaRequired ? (
           <>
             <div className={styles.ssoGrupo}>
               {sso.microsoft && (
@@ -577,6 +582,8 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         ) : null}
 
         <form className={styles.form} onSubmit={handleLogin}>
+          {!mfaRequired && (
+          <>
           <div className={styles.fieldGroup}>
             <label className={styles.label} htmlFor="email">
               {esPersonal ? "Correo de empresa" : "Correo electrónico"}
@@ -653,29 +660,38 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
               </p>
             ) : null}
           </div>
+          </>
+          )}
 
           {mfaRequired && (
             <div className={styles.fieldGroup}>
               <label className={styles.label} htmlFor="mfaCode">
-                Código MFA
+                Código de verificación
               </label>
-              <div className={styles.control}>
-                <svg className={styles.controlIcon} width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <input
-                  id="mfaCode"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  className={styles.field}
-                  placeholder="000000"
-                  value={mfaCode}
-                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  required
-                  autoFocus
-                />
-              </div>
+              <input
+                id="mfaCode"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                className={`${styles.field} ${styles.codigo}`}
+                placeholder="000000"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                required
+                autoFocus
+              />
+              <button
+                type="button"
+                className={styles.enlace}
+                onClick={() => {
+                  setMfaRequired(false);
+                  setMfaCode("");
+                  setPassword("");
+                  setError("");
+                }}
+              >
+                Usar otra cuenta
+              </button>
             </div>
           )}
 
@@ -704,7 +720,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
           <button type="submit" className={styles.submit} disabled={isLoading}>
             {isLoading && <span className={styles.loader} />}
-            <span>{isLoading ? "Iniciando sesión..." : mfaRequired ? "Verificar MFA" : "Entrar"}</span>
+            <span>{isLoading ? "Iniciando sesión..." : mfaRequired ? "Verificar" : "Entrar"}</span>
             {!isLoading && (
               <svg className={styles.submitFlecha} width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M5 12h14" />

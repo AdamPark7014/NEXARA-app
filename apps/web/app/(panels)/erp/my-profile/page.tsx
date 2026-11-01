@@ -13,6 +13,7 @@ import { isCeoEquivalentEmail, isNonEmployeeEmail } from "@/lib/platform-account
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import PhoneField from "@/components/PhoneField";
+import DosPasos from "@/components/seguridad/DosPasos";
 import s from "./profile.module.css";
 
 interface Profile {
@@ -277,6 +278,8 @@ export default function MyProfilePage() {
               </div>
             </dl>
           </Section>
+
+          <DosPasos token={token} />
 
           {!cuentaDireccion && (
             <Section title="Tu asistencia de hoy" subtitle="El checador de la app es el que cuenta para tu nómina.">
