@@ -129,10 +129,10 @@ function textoGuardado(estado: EstadoGuardado, guardadoEn: Date | null, pausa: s
 const SECCIONES = [
   { id: "portada", numero: "", titulo: "Portada" },
   { id: "personalizar", numero: "", titulo: "Personalizar" },
-  { id: "objetivo", numero: "01", titulo: "Objetivo" },
-  { id: "alcance", numero: "02", titulo: "Alcance" },
+  { id: "objetivo", numero: "01", titulo: "Alcance ejecutivo" },
+  { id: "alcance", numero: "02", titulo: "Alcance técnico" },
   { id: "planos", numero: "03", titulo: "Planos" },
-  { id: "cotizacion", numero: "04", titulo: "Cotización" },
+  { id: "cotizacion", numero: "04", titulo: "Propuesta económica" },
 ] as const;
 
 /**
@@ -169,9 +169,9 @@ function useEsAncho() {
 }
 
 /**
- * Editor de cotizaciones de Core: la propuesta técnica tal como la recibe el cliente (portada, 01
- * Objetivo, 02 Alcance, 03 Planos, 04 Cotización), editable en su lugar, con autoguardado y el PDF
- * real al lado.
+ * Editor de cotizaciones de Core: la propuesta tal como la recibe el cliente (portada, 01 Alcance
+ * ejecutivo, 02 Alcance técnico, 03 Planos, 04 Propuesta económica), editable en su lugar, con
+ * autoguardado y el PDF real al lado.
  *
  * Una cotización nueva no existe en la API hasta que tiene cliente: en ese momento se crea (el
  * servidor emite el folio con la nomenclatura de quien cotiza) y la URL pasa a la de la cotización
@@ -521,20 +521,6 @@ export default function EditorCotizacion({
     if (esSeccionPropuesta(idSeccion)) setSeccionCursor(idSeccion);
   };
 
-  // Firmas: «Elaboró» es el autor (con su puesto); «Autorizó» se elige de quienes intervinieron.
-  const elaboroParticipante = detalle?.participantes.find((p) => p.rol === "ELABORO");
-  const autorFirma = detalle?.elaboro?.nombre
-    ? { nombre: detalle.elaboro.nombre, cargo: elaboroParticipante?.puesto ?? null }
-    : user?.nombre
-      ? { nombre: user.nombre, cargo: null }
-      : null;
-  const personasFirma = useMemo(() => {
-    const vistas = new Map<string, { nombre: string; cargo?: string | null; userId?: number | null }>();
-    for (const p of detalle?.participantes ?? []) vistas.set(p.nombre, { nombre: p.nombre, cargo: p.puesto ?? null, userId: p.userId });
-    if (user?.nombre && !vistas.has(user.nombre)) vistas.set(user.nombre, { nombre: user.nombre, userId: user.id });
-    return [...vistas.values()].filter((p) => p.nombre);
-  }, [detalle, user]);
-
   const claseGuardado = [
     styles.guardado,
     auto.estado === "guardado" ? styles.gGuardado : "",
@@ -818,8 +804,7 @@ export default function EditorCotizacion({
             cambiar={cambiar}
             editable={editable}
             sugeridas={detalle?.condicionesSugeridas ?? plantillaSegmento?.condiciones ?? null}
-            autor={autorFirma}
-            personas={personasFirma}
+
             puedeGuardarPlantilla={Boolean(id) && !falta}
             onGuardarPlantilla={guardarPlantilla}
           />

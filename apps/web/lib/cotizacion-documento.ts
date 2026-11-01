@@ -448,7 +448,7 @@ export type DocumentoCotizacion = {
   clientAddress: string;
   /** Persona de atención en el membrete. */
   atencion: string;
-  /** Franja «Trabajo». Vacío se imprime como Ventas. */
+  /** Ya no se captura ni se imprime; se conserva lo que traían las cotizaciones guardadas. */
   trabajo: string;
   projectName: string;
   /** Párrafo de entrada de 02 Alcance. */

@@ -11,9 +11,9 @@ import styles from "./editor.module.css";
 type Cambiar = (cambio: (doc: DocumentoCotizacion) => DocumentoCotizacion) => void;
 
 /**
- * 01 Objetivo del proyecto: introducción, beneficios numerados y cierre, como en la propuesta.
+ * 01 Alcance ejecutivo: introducción, hasta tres beneficios y el resultado esperado.
  *
- * Lo que se deja vacío lo completa el PDF: la entrada y el cierre del segmento, y los beneficios
+ * Lo que se deja vacío lo completa el PDF: la entrada y el resultado del segmento, y los beneficios
  * calculados con las partidas (con sus cifras reales). Aquí se enseña qué pondría.
  */
 export default function SeccionObjetivo({
@@ -62,9 +62,9 @@ export default function SeccionObjetivo({
       onIncluir={onIncluir}
       id="objetivo"
       numero="01"
-      titulo="Objetivo del proyecto"
-      descripcion="Qué gana el cliente: introducción, beneficios y cierre."
-      ayuda="El PDF imprime introducción, «Entre los principales beneficios se encuentran:» con la lista y el cierre, y lo vacío lo completa la plantilla del segmento con las cifras de tus partidas."
+      titulo="Alcance ejecutivo"
+      descripcion="Qué gana el cliente, en pocas líneas."
+      ayuda="Abre el PDF: introducción, beneficios y resultado esperado en un recuadro. Lo vacío lo completa la plantilla del segmento con las cifras de tus partidas."
       acciones={
         editable ? (
           <Button size="sm" iconStart={<AutoAwesomeOutlinedIcon />} onClick={pedirBorrador}>
@@ -129,12 +129,15 @@ export default function SeccionObjetivo({
           <ListaEditable
             items={objetivo.beneficios}
             onCambio={(beneficios) => cambiar((d) => ({ ...d, objetivo: { ...d.objetivo, beneficios } }))}
-            numerada
+            numerada={false}
             editable={editable}
-            placeholder="Mayor cobertura de vigilancia mediante la incorporación de…"
+            placeholder="Protección activa: disuasión con luz y audio en el perímetro."
             etiquetaAgregar="Agregar beneficio"
             etiquetaElemento="Beneficio"
           />
+          {beneficiosEscritos.length > 3 ? (
+            <p className={styles.pista}>Mejor tres o menos: lo demás ya lo dice la tabla de partidas.</p>
+          ) : null}
           {!beneficiosEscritos.length && sugerido?.beneficios.length ? (
             <div className={styles.sugerido}>
               El PDF pondría:
@@ -159,7 +162,7 @@ export default function SeccionObjetivo({
           ) : null}
         </Campo>
 
-        <Campo etiqueta="Cierre" htmlFor="obj-cierre">
+        <Campo etiqueta="Resultado esperado" htmlFor="obj-cierre">
           <TextoAuto
             id="obj-cierre"
             value={objetivo.cierre}

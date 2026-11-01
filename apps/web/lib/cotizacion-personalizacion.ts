@@ -46,18 +46,15 @@ export type OpcionesCotizacion = {
 export type CondicionesSugeridas = CondicionesComerciales & { anticipoPct: number; vigenciaDias: number };
 
 export const SECCIONES_OPCIONALES: Array<{ clave: keyof SeccionesOpcionales; etiqueta: string; ayuda: string }> = [
-  { clave: "objetivo", etiqueta: "01 Objetivo", ayuda: "Qué gana el cliente" },
-  { clave: "alcance", etiqueta: "02 Alcance", ayuda: "Subsecciones del trabajo" },
-  { clave: "planos", etiqueta: "03 Planos", ayuda: "Planos y fotos a página completa" },
-  { clave: "terminos", etiqueta: "Términos y condiciones", ayuda: "Bajo la tabla de 04" },
-  { clave: "firma", etiqueta: "Firma", ayuda: "Elaboró y, si aplica, Autorizó" },
+  { clave: "objetivo", etiqueta: "01 Alcance ejecutivo", ayuda: "Qué gana el cliente" },
+  { clave: "alcance", etiqueta: "02 Alcance técnico", ayuda: "Subsecciones del trabajo" },
+  { clave: "planos", etiqueta: "03 Planos", ayuda: "Planos y fotos en su propia hoja" },
+  { clave: "terminos", etiqueta: "Términos y póliza", ayuda: "Términos, garantías y exclusiones" },
 ];
 
 export const COLUMNAS_OPCIONALES: Array<{ clave: keyof ColumnasOpcionales; etiqueta: string; ayuda: string }> = [
   { clave: "marcaModelo", etiqueta: "Marca y modelo", ayuda: "Dos columnas junto a la descripción" },
-  { clave: "imagen", etiqueta: "Imagen del producto", ayuda: "Miniatura por partida" },
   { clave: "descuento", etiqueta: "Descuento por partida", ayuda: "Porcentaje en cada renglón" },
-  { clave: "precioUnitario", etiqueta: "Precio unitario", ayuda: "Apagado: solo el total del renglón (a precio alzado)" },
 ];
 
 export function opcionesPorOmision(): OpcionesCotizacion {
@@ -183,14 +180,11 @@ export function conCondicionesSugeridas(o: OpcionesCotizacion, sugeridas: Condic
 /** Una línea para el panel cerrado: qué cambia respecto a lo de siempre. */
 export function resumenOpciones(o: OpcionesCotizacion, moneda: Moneda): string {
   const fuera = SECCIONES_OPCIONALES.filter((s) => !o.secciones[s.clave]).map((s) => s.etiqueta.replace(/^\d+ /, ""));
-  const columnas = COLUMNAS_OPCIONALES.filter((c) => c.clave !== "precioUnitario" && o.columnas[c.clave]).map((c) => c.etiqueta.toLowerCase());
+  const columnas = COLUMNAS_OPCIONALES.filter((c) => o.columnas[c.clave]).map((c) => c.etiqueta.toLowerCase());
   const partes = [
     fuera.length ? `Sin ${fuera.join(", ").toLowerCase()}` : "Todas las secciones",
     columnas.length ? `tabla con ${columnas.join(", ")}` : null,
-    o.columnas.precioUnitario ? null : "a precio alzado",
-    o.carta ? "con carta" : null,
     moneda,
-    o.autorizo?.nombre ? "firma Elaboró y Autorizó" : null,
   ];
   return partes.filter(Boolean).join(" · ");
 }

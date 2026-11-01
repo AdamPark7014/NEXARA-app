@@ -180,10 +180,11 @@ describe('CotizacionesService.vistaPreviaPdf', () => {
 
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     const texto = textoDelPdf(pdf);
-    expect(texto).toContain('Solo en pantalla');
+    expect(texto).toContain('SOLO EN PANTALLA');
     expect(texto).toContain('Switch PoE');
     expect(texto).toContain('COTIZACIÓN');
-    expect(secciones).toMatchObject({ cotizacion: 1 });
+    // Portada, hoja de título, alcance y garantías, y la propuesta económica.
+    expect(secciones).toMatchObject({ portada: 1, objetivo: 3, cotizacion: 4 });
     expect(escrituras).toEqual([]);
     // La fila que devolvió la base sigue como estaba.
     expect(fila.projectName).toBe('Proyecto guardado');

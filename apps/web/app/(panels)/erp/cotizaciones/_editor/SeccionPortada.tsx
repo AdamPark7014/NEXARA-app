@@ -271,7 +271,7 @@ export default function SeccionPortada({
       titulo="Portada"
       icono={<DescriptionOutlinedIcon />}
       descripcion="Proyecto, cliente y datos fiscales: lo primero que ve el cliente."
-      ayuda="Lo primero que ve el cliente es el título del proyecto, para quién es, la fecha y la versión; el folio lo emite el servidor al guardar."
+      ayuda="La portada lleva el diseño de NEXARA, la versión y el índice de esta cotización; el título del proyecto, el cliente y la fecha van en la hoja siguiente. El folio lo emite el servidor al guardar."
     >
       <div className={styles.campos}>
         <Campo etiqueta="Título del proyecto" htmlFor="cot-proyecto">

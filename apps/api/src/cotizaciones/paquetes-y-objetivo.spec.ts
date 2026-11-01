@@ -93,7 +93,7 @@ describe('01 Objetivo con las cifras de la cotización', () => {
     expect(objetivo.beneficios.join(' ')).not.toContain('mano de obra especializada');
   });
 
-  it('no pasa de ocho beneficios, como la propuesta modelo', () => {
+  it('no pasa de tres beneficios: lo demás ya lo dice la tabla', () => {
     const objetivo = objetivoDePropuesta({
       segmento: 'COMERCIAL',
       partidas,
@@ -101,7 +101,8 @@ describe('01 Objetivo con las cifras de la cotización', () => {
       proyecto: 'Renovación de CCTV',
     });
     expect(objetivo.beneficios.length).toBeGreaterThan(0);
-    expect(objetivo.beneficios.length).toBeLessThanOrEqual(8);
+    expect(objetivo.beneficios.length).toBeLessThanOrEqual(3);
+    expect(objetivo.intro).not.toContain('Renovación de CCTV');
   });
 
   it('el texto que escribió quien cotiza manda sobre la plantilla', () => {
