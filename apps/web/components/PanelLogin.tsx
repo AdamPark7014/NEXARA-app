@@ -105,6 +105,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [mostrarOlvido, setMostrarOlvido] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [sso, setSso] = useState<Record<ProveedorSso, boolean>>({ google: false, microsoft: false, oidc: false });
   const [panelSkin, setPanelSkin] = useState<"default" | "integra">(skin);
@@ -121,6 +122,24 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
     navegando.current = true;
     router.replace(destinoNext() ?? (smartRedirect ? getUserHomeUrl(usuarioActual) : resolveLandingPath(redirectTo)));
   }, [mode, isContextReady, usuarioActual, smartRedirect, redirectTo, router]);
+
+  // La casilla recuerda lo último que eligió este navegador (no la sesión: eso lo decide la API).
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem("nx_recordarme") === "1") setRememberMe(true);
+    } catch {
+      /* almacenamiento bloqueado */
+    }
+  }, []);
+
+  const cambiarRecordarme = (valor: boolean) => {
+    setRememberMe(valor);
+    try {
+      window.localStorage.setItem("nx_recordarme", valor ? "1" : "0");
+    } catch {
+      /* almacenamiento bloqueado */
+    }
+  };
 
   const irASso = (proveedor: ProveedorSso) => {
     navegando.current = true;
@@ -451,38 +470,116 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
     }
   };
 
+  const esPersonal = mode === "console";
+  const hayProveedores = esPersonal && (sso.microsoft || sso.google || sso.oidc);
+
   return (
-    <div className={styles.stage} data-panel={panelSkin}>
-      <div className={styles.wrap}>
-        <div className={styles.brand}>
-          <Image
-            src="/logo-nexara-platform.png"
-            alt="Nexara"
-            width={64}
-            height={64}
-            className={styles.brandMark}
-            priority
-          />
-          <p className={styles.brandName}>
-            {panelSkin === "integra" ? "NEXARA · Integra" : "NEXARA"}
-          </p>
+    <div className={`${styles.stage} ${esPersonal ? "" : styles.stagePortal}`} data-panel={panelSkin}>
+      <aside className={styles.marca} aria-label="NEXARA">
+        <svg className={styles.marcaHexagono} viewBox="0 0 620 620" aria-hidden="true">
+          <polygon points="310,20 561,165 561,455 310,600 59,455 59,165" className={styles.hexFondo} />
+          <polygon points="310,80 509,195 509,425 310,540 111,425 111,195" className={styles.hexFondo} />
+          <polyline points="111,195 310,80 509,195" className={styles.hexTeal} />
+          <polyline points="509,195 509,425" className={styles.hexCian} />
+          <polyline points="509,425 310,540" className={styles.hexNaranja} />
+          <polyline points="310,540 111,425" className={styles.hexMorado} />
+        </svg>
+
+        <div className={styles.marcaLogo}>
+          <Image src="/logo-nexara-platform.png" alt="" width={40} height={40} priority />
+          <span className={styles.marcaNombre}>NEXARA</span>
+          {panelSkin === "integra" ? <span className={styles.marcaSub}>Integra</span> : null}
         </div>
 
+        <div className={styles.marcaCuerpo}>
+          <p className={styles.marcaEtiqueta}>{esPersonal ? "Plataforma NEXARA" : "Portal de clientes"}</p>
+          <p className={styles.marcaLema}>
+            {esPersonal ? "Todo tu trabajo, en un solo acceso." : "Tus servicios con NEXARA, en un solo lugar."}
+          </p>
+          <p className={styles.marcaBajada}>
+            {esPersonal
+              ? "ERP, operación en campo, videovigilancia y ventas con la misma cuenta."
+              : "Reportes, tickets y el seguimiento de cada visita técnica."}
+          </p>
+          {esPersonal ? (
+            <ul className={styles.marcaPuntos}>
+              <li>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+                <span>Entra con tu correo de empresa, con Microsoft 365 o con Google.</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+                <span>«Recordarme» te mantiene dentro 30 días en este equipo.</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18.5h2" /></svg>
+                <span>La misma cuenta en la app de celular.</span>
+              </li>
+            </ul>
+          ) : null}
+        </div>
+
+        <p className={styles.marcaPie}>
+          © {new Date().getFullYear()} NEXARA ·{" "}
+          <a href="https://nexara.com.mx/legal/privacidad">Aviso de privacidad</a>
+        </p>
+      </aside>
+
+      <main className={styles.panel}>
+      <div className={styles.wrap}>
         {accessNotice ? (
           <div className={styles.notice} role="status">
             {accessNotice}
           </div>
         ) : null}
 
-        <h1 className={styles.heading}>{title || "Iniciar sesión"}</h1>
-        <p className={styles.subheading}>
-          {subtitle || "Ingresa a tu cuenta de NEXARA"}
-        </p>
+        <div className={styles.encabezado}>
+          <h1 className={styles.heading}>{title || "Iniciar sesión"}</h1>
+          <p className={styles.subheading}>{subtitle || "Usa tu cuenta de NEXARA."}</p>
+        </div>
+
+        {/* Cada botón aparece solo si su proveedor está configurado en la API. */}
+        {hayProveedores ? (
+          <>
+            <div className={styles.ssoGrupo}>
+              {sso.microsoft && (
+                <button type="button" className={styles.sso} onClick={() => irASso("microsoft")}>
+                  <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
+                    <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+                    <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+                    <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+                    <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+                  </svg>
+                  <span>Continuar con Microsoft</span>
+                </button>
+              )}
+              {sso.google && (
+                <button type="button" className={styles.sso} onClick={() => irASso("google")}>
+                  <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                  </svg>
+                  <span>Continuar con Google</span>
+                </button>
+              )}
+              {sso.oidc && (
+                <button type="button" className={styles.sso} onClick={() => irASso("oidc")}>
+                  <span>Continuar con SSO / OIDC</span>
+                </button>
+              )}
+            </div>
+            <div className={styles.separador}>
+              <span>o con tu correo</span>
+            </div>
+          </>
+        ) : null}
 
         <form className={styles.form} onSubmit={handleLogin}>
           <div className={styles.fieldGroup}>
             <label className={styles.label} htmlFor="email">
-              Correo electrónico
+              {esPersonal ? "Correo de empresa" : "Correo electrónico"}
             </label>
             <div className={styles.control}>
               <svg className={styles.controlIcon} width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -492,7 +589,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
                 id="email"
                 type="email"
                 className={styles.field}
-                placeholder="gerencia@nexara.com.mx"
+                placeholder={esPersonal ? "nombre@nexara.com.mx" : "nombre@empresa.com"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -502,9 +599,20 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           </div>
 
           <div className={styles.fieldGroup}>
-            <label className={styles.label} htmlFor="password">
-              Contraseña
-            </label>
+            <div className={styles.labelFila}>
+              <label className={styles.label} htmlFor="password">
+                Contraseña
+              </label>
+              <button
+                type="button"
+                className={styles.enlace}
+                aria-expanded={mostrarOlvido}
+                aria-controls="ayuda-olvido"
+                onClick={() => setMostrarOlvido((v) => !v)}
+              >
+                ¿La olvidaste?
+              </button>
+            </div>
             <div className={`${styles.control} ${styles.hasToggle}`}>
               <svg className={styles.controlIcon} width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M12 15V17M6 21H18C19.1046 21 20 20.1046 20 19V13C20 11.8954 19.1046 11 18 11H6C4.89543 11 4 11.8954 4 13V19C4 20.1046 4.89543 21 6 21ZM16 11V7C16 4.79086 14.2091 3 12 3C9.79086 3 8 4.79086 8 7V11H16Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -537,6 +645,13 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
                 )}
               </button>
             </div>
+            {mostrarOlvido ? (
+              <p id="ayuda-olvido" className={styles.ayudaCampo}>
+                {esPersonal
+                  ? "Tu administrador te da una contraseña nueva desde Accesos. Si tu empresa usa Microsoft 365 o Google, también puedes entrar con ese botón."
+                  : "Escríbenos por WhatsApp o a tu ejecutivo de NEXARA y te damos una contraseña nueva."}
+              </p>
+            ) : null}
           </div>
 
           {mfaRequired && (
@@ -564,7 +679,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
             </div>
           )}
 
-          {mode === "console" && (
+          {esPersonal && (
             <label className={styles.remember} htmlFor="rememberMe">
               <input
                 id="rememberMe"
@@ -572,32 +687,13 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
                 type="checkbox"
                 className={styles.rememberBox}
                 checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
+                onChange={(e) => cambiarRecordarme(e.target.checked)}
               />
-              <span>Recordarme</span>
+              <span className={styles.rememberTexto}>
+                <span>Recordarme 30 días</span>
+                <span className={styles.rememberAyuda}>Solo en este equipo. Desmárcalo en computadoras compartidas.</span>
+              </span>
             </label>
-          )}
-
-          <button type="submit" className={styles.submit} disabled={isLoading}>
-            {isLoading && <span className={styles.loader} />}
-            {isLoading ? "Iniciando sesión..." : mfaRequired ? "Verificar MFA" : "Entrar"}
-          </button>
-
-          {/* Cada botón aparece solo si su proveedor está configurado en la API. */}
-          {mode === "console" && sso.microsoft && (
-            <button type="button" className={styles.sso} onClick={() => irASso("microsoft")}>
-              Continuar con Microsoft
-            </button>
-          )}
-          {mode === "console" && sso.google && (
-            <button type="button" className={styles.sso} onClick={() => irASso("google")}>
-              Continuar con Google
-            </button>
-          )}
-          {mode === "console" && sso.oidc && (
-            <button type="button" className={styles.sso} onClick={() => irASso("oidc")}>
-              Continuar con SSO / OIDC
-            </button>
           )}
 
           {error && (
@@ -605,10 +701,32 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
               <strong>Error:</strong> {error}
             </div>
           )}
+
+          <button type="submit" className={styles.submit} disabled={isLoading}>
+            {isLoading && <span className={styles.loader} />}
+            <span>{isLoading ? "Iniciando sesión..." : mfaRequired ? "Verificar MFA" : "Entrar"}</span>
+            {!isLoading && (
+              <svg className={styles.submitFlecha} width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12h14" />
+                <path d="m13 6 6 6-6 6" />
+              </svg>
+            )}
+          </button>
         </form>
 
-        <p className={styles.foot}>Tecnología que impulsa tu negocio</p>
+        <p className={styles.ayuda}>
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="10" width="16" height="11" rx="2" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+          </svg>
+          <span>
+            {esPersonal
+              ? "¿Sin acceso? Pide a tu administrador que te dé de alta con tu correo de empresa."
+              : "¿Sin acceso? Pide tu usuario a tu ejecutivo de NEXARA."}
+          </span>
+        </p>
       </div>
+      </main>
     </div>
   );
 }
