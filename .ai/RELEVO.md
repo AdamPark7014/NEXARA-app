@@ -16,11 +16,18 @@
     30 controladores compilados usan el envoltorio y la salud sigue en verde. La prueba usa el código compilado; no pasó por
     una ruta real con sesión.
   - **Disco del servidor:** los despliegues de hoy llevaron `/` de 75 % a 93 % sin nada corriendo (pico de 95 % al compilar).
-    La caché de compilación llegó a 16 GB porque `docker builder prune --keep-storage` sin `-a` solo borra lo huérfano. Se
-    liberó con `docker builder prune -af`: **73 %, 21 GB libres**, `/api/health` en 200. No se tocaron imágenes ni volúmenes
-    (`nexara-web:next14-respaldo` y `arta-*:prev` siguen; `docker image prune -a` las borraría). La siguiente compilación va
-    sin caché, más lenta. `/root/deploy-api-web.sh` sigue igual y cada despliegue vuelve a sumar de 3 a 5 GB: mira `df -h /`
-    antes de desplegar.
+    La caché de compilación llegó a 16 GB: la limpieza de los scripts, sin `-a`, liberaba 1.2 GB de esos 16; con `-a`, 13.7 GB.
+    - Corregido: los 6 `/root/deploy-*.sh` (no están en el repo; respaldo en `/root/respaldo-scripts-deploy-20261101`) y
+      `deploy/update.sh` usan `docker builder prune -af --max-used-space 5GB --min-free-space 15GB`, y el resultado sale en
+      el log; antes iba a `/dev/null`.
+    - Medido con dos ciclos de compilar API y web, sin reiniciar nada: caché en 5.2 GB; de 14 a 13 GB libres entre ciclos
+      (antes bajaba de 3 a 5 GB por despliegue); mínimo al compilar 9.7 GB (antes 3.7 GB); tiempos iguales (API 175 y 174 s,
+      web 193 y 187 s). Los scripts corregidos aún no han corrido en un despliegue real; se probó el mismo comando.
+    - Límite: el tope abarca toda la caché, pero solo corre cuando despliega NEXARA. ARTA y los demás no limpian: una compilación
+      de ARTA sumó 3.5 GB justo después de medir. Si solo despliegan ellos, el disco vuelve a subir; mira `df -h /`.
+    - Quedó en 13 GB libres. `nexara-api:latest` y `nexara-web:latest` apuntan a las imágenes de la medición (mismo código que
+      corre); el siguiente despliegue las cambia y suelta las viejas.
+    - No se tocaron imágenes ni volúmenes: `nexara-web:next14-respaldo` y `arta-*:prev` siguen, y `docker image prune -a` las borraría.
 
 - **01-11 ~11:30 (claude-code) — Reuniones: la grabación sigue hasta que la concluyas, en cualquier módulo, pestaña o app.**
   - Causa: el grabador vivía en la página `/erp/reuniones`; al salir se desmontaba y soltaba el micrófono.

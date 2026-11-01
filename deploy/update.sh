@@ -167,7 +167,7 @@ check_disk_before_build() {
   if [[ -n "$use_pct" ]] && (( use_pct >= PRE_BUILD_DISK_THRESHOLD )); then
     if [[ "$AUTO_PRUNE_ON_HIGH_DISK" == true ]]; then
       echo "AVISO: disco al ${use_pct}% (>= ${PRE_BUILD_DISK_THRESHOLD}%) antes de construir $1. Vaciando la caché de build (docker builder prune -f)..."
-      docker builder prune -f || true
+      docker builder prune -af || true
       echo "Disco tras vaciar la caché: $(df -h / | awk 'NR==2 {print $5 " usado, " $4 " libres"}')"
     else
       echo "AVISO: disco al ${use_pct}% (>= ${PRE_BUILD_DISK_THRESHOLD}%) antes de construir $1 y --no-auto-prune activo: no se limpia nada."
@@ -285,7 +285,7 @@ if [[ "$AUTO_PRUNE_ON_HIGH_DISK" == true ]]; then
     echo "Root filesystem at ${ROOT_USE_PCT}% (>= ${HIGH_DISK_THRESHOLD}%). Running safe Docker auto-prune..."
     # Keep currently running images/containers untouched and trim only dangling image refs + excess build cache.
     docker image prune -f || true
-    docker builder prune -f --keep-storage 2GB || true
+    docker builder prune -af --max-used-space 5GB --min-free-space 15GB || true
   fi
 fi
 
