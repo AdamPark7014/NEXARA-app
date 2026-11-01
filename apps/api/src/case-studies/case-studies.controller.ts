@@ -2,7 +2,7 @@ import {
   Controller, Get, Post, Patch, Delete,
   Param, Body, Query, ParseIntPipe, UseGuards, Res, UploadedFile, UseInterceptors, NotFoundException,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '../common/files/interceptores-subida.js';
 import type { Response } from 'express';
 import * as path from 'path';
 import * as fs from 'fs/promises';

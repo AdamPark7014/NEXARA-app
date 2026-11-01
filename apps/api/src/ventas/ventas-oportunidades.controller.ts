@@ -14,7 +14,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '../common/files/interceptores-subida.js';
 import { AuthGuard } from '@nestjs/passport';
 import { VentasService } from './ventas.service.js';
 import { CreateSalesOpportunityDto } from './dto/create-sales-opportunity.dto.js';

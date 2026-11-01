@@ -9,7 +9,7 @@ import { isCeoEquivalentEmail, isSuperAdminEmail } from '../common/platform-acco
 import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
 import { CreateDelegatedUserDto, UpdateDelegatedUserDto } from './dto/create-delegated-user.dto.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '../common/files/interceptores-subida.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { getUsersUploadDir, getUserDocsUploadDir } from '../common/upload-paths.js';

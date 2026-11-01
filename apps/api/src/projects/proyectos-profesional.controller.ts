@@ -20,7 +20,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '../common/files/interceptores-subida.js';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
