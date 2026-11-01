@@ -10,6 +10,7 @@ import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import FilterToolbar from "@/components/FilterToolbar";
 import EmptyState from "@/components/ui/EmptyState";
+import { enlaceSeguro } from "@/lib/enlace-seguro";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
@@ -655,9 +656,9 @@ export default function MovimientosPage() {
         footer={
           detail ? (
             <>
-              {detail.comprobanteUrl && (
+              {enlaceSeguro(detail.comprobanteUrl) && (
                 <a
-                  href={detail.comprobanteUrl}
+                  href={enlaceSeguro(detail.comprobanteUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ fontSize: 12.5, fontWeight: 600 }}

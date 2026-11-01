@@ -204,12 +204,24 @@ export function vueltaSegura(origen: unknown, predeterminado: string, permitirLo
   }
 }
 
-/** Ruta interna a la que seguir después de entrar (`/erp/...`); nunca otra web ni el login. */
+/**
+ * Ruta interna a la que seguir después de entrar (`/erp/...`); nunca otra web ni el login.
+ * Los navegadores borran tabuladores y saltos de línea de una URL: `/\t/evil.com` terminaba en
+ * `//evil.com`. Por eso se rechaza cualquier carácter de control o `\` y se resuelve contra un origen.
+ */
 export function nextSeguro(next: unknown): string | null {
   const v = String(next ?? '').trim();
-  if (!v.startsWith('/') || v.startsWith('//') || v.startsWith('/\\')) return null;
-  if (/^\/(auth\/)?login(\/|\?|$)/.test(v)) return null;
-  return v.slice(0, 500);
+  if (!v.startsWith('/') || v.length > 500 || /[\u0000-\u001f\u007f\\]/.test(v)) return null;
+  let url: URL;
+  try {
+    url = new URL(v, 'https://core.nexara.com.mx');
+  } catch {
+    return null;
+  }
+  if (url.origin !== 'https://core.nexara.com.mx') return null;
+  const ruta = `${url.pathname}${url.search}${url.hash}`;
+  if (ruta.startsWith('//') || /^\/(auth\/)?login(\/|\?|$)/i.test(ruta)) return null;
+  return ruta;
 }
 
 /** Valor de una cookie en la cabecera `Cookie` cruda. */

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { celdaCsv } from '../common/security/celda-csv.js';
 
 @Injectable()
 export class AuditService {
@@ -98,7 +99,7 @@ export class AuditService {
       take: 10_000,
     });
     const header = ['id', 'createdAt', 'source', 'action', 'entityType', 'entityId', 'userEmail', 'companyId', 'ipAddress'];
-    const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const escape = (v: unknown) => celdaCsv(typeof v === 'number' ? v : String(v ?? ''));
     const lines = [header.join(',')];
     for (const r of rows) {
       lines.push(

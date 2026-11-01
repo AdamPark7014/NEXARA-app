@@ -473,21 +473,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		// ?fresh=1 en /login: vaciar sesión de esta pestaña antes de hidratar
 		const freshLogin = consumeFreshLoginIntent();
 
-		// Cross-subdomain SSO: consume ?_nxt= handoff token first
-		const handoffJson = consumeHandoffParam();
-		if (handoffJson) {
-			try {
-				const handoffUser = normalizeUser(JSON.parse(handoffJson));
-				if (handoffUser && !isSessionExpired(handoffUser)) {
-					safePersistUser(handoffUser);
-					setUser(handoffUser);
-					setIsContextReady(true);
-					const online = typeof navigator !== "undefined" && navigator.onLine;
-					if (online) void syncProfile(handoffUser);
-					return;
-				}
-			} catch { /* fallthrough to normal flow */ }
-		}
+		// `?_nxt=` (sesión en la URL) ya no da entrada: con un enlace armado, cualquiera metía a otra
+		// persona en SU cuenta (y el token quedaba en historial y Referer). Entre subdominios la sesión
+		// se recupera con la cookie HttpOnly (`restoreFromSessionCookie`). Solo se borra de la URL.
+		consumeHandoffParam();
 
 		const storedUser = safeGetStoredUser();
 		const online = typeof navigator !== "undefined" && navigator.onLine;

@@ -14,6 +14,7 @@ import type { PacPaymentComplementInput, PacStampInput } from '../pac/pac.types.
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { BASE_CHART_OF_ACCOUNTS } from './base-chart-of-accounts.js';
 import { polizaFacturaEmitida, polizaPagoFactura, type RenglonPoliza } from './mesa-contable/polizas-mesa.js';
+import { celdaCsv } from '../common/security/celda-csv.js';
 
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -355,8 +356,9 @@ export class AccountingService {
     const header = 'RFC,Proveedor,Base 16% IVA,IVA Trasladado,Total,Facturas';
     const lines = report.rows.map((r) =>
       [
-        r.rfc ?? 'SIN RFC',
-        `"${r.supplierName.replace(/"/g, '""')}"`,
+        // RFC y nombre vienen del XML de facturas de terceros: nunca como fórmula de Excel.
+        celdaCsv(r.rfc ?? 'SIN RFC'),
+        celdaCsv(r.supplierName),
         r.baseAmount.toFixed(2),
         r.ivaAmount.toFixed(2),
         r.totalAmount.toFixed(2),

@@ -331,21 +331,15 @@ export function middleware(request: NextRequest) {
     if (isPanelPath && isHtmlNav) {
       const sessionCookie = request.cookies.get('nx_session');
       if (!sessionCookie || sessionCookie.value !== '1') {
-        // ── Cross-subdomain SSO handoff ──────────────────────────────────
-        // Si la URL trae ?_nxt=<token_base64>, es un salto legítimo entre
-        // subdominios desde PanelSwitcher. Dejamos pasar la request para que
-        // UserContext (cliente) pueda consumir el token y setear nx_session.
-        // El token se valida y elimina de la URL en el lado cliente.
-        // Sin ?_nxt=, redirigimos al login normalmente.
-        const hasHandoff = request.nextUrl.searchParams.has('_nxt');
-        if (!hasHandoff) {
-          const url = request.nextUrl.clone();
-          const nextPath = `${requestPathname}${request.nextUrl.search || ''}`;
-          url.pathname = '/login';
-          url.search = `?next=${encodeURIComponent(nextPath)}`;
-          return applySecurityHeaders(NextResponse.redirect(url, 302));
-        }
-        // Con handoff: continúa normalmente, UserContext se encarga
+        // Sin excepción para `?_nxt=` (sesión en la URL): ya no da entrada (ver UserContext).
+        const url = request.nextUrl.clone();
+        const params = new URLSearchParams(request.nextUrl.search);
+        params.delete('_nxt');
+        const query = params.toString();
+        const nextPath = `${requestPathname}${query ? `?${query}` : ''}`;
+        url.pathname = '/login';
+        url.search = `?next=${encodeURIComponent(nextPath)}`;
+        return applySecurityHeaders(NextResponse.redirect(url, 302));
       }
     }
   }
