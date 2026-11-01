@@ -1,5 +1,21 @@
 # RELEVO
 
+- **01-11 ~17:15 (claude-code) — Programa Velocidad Core: medición y plan, sin construir nada. Espera el visto bueno de Adam.**
+  - Pedido: profesionalizar Core, asignar en menos de 30 s, cotizar en 10 min, plano en media hora, y procesos de 10 a 20 veces más rápidos en un mes.
+  - Plan, mockups y cifras en el artifact privado <https://claude.ai/artifact/EMhiXKV9NPgUmsqFjVVtMu>. Aquí no van conteos de producción porque el repo es público. Inventario con rutas y líneas para quien construya, en la carpeta de notas compartidas de la sesión madre (`programa-core-inventario-0111.md` y `programa-core-medicion-0111.md`).
+  - Lo que frena, en orden: revisión de evidencias concentrada en una persona, avisos saturados desde `recordatorios-jornada`, ninguna cotización marcada como enviada (el PDF sale por fuera y `/send` no se usa), casi todas las actividades las crea quien las hace y sin cliente ni proyecto, tiempos sugeridos muy lejos del reloj, y la salida de jornada sin confirmar ni deshacer, que desde `613ee251` puede dejar «No cumplida».
+  - Respuesta dada a Adam: 10 a 20 veces es demostrable en esperas, de 2 a 9 en captura, y el trabajo físico no cambia. No se prometió para toda la empresa.
+  - Olas propuestas: 1 silencio y dirección (cronómetro, tope de avisos, revisión por jefe, «Ya la envié», freno de salida en servidor); 2 formatos; 3 salidas y evidencia en apps; 4 tiempos y navegación; 5 dirección, encargados y módulo por encargo; 6 proactividad; 7 almacén, herramientas y crédito. Pasada premium por módulo, aparte.
+  - **Nada se construye sin su visto bueno.** Decisiones abiertas en el artifact. Lo primero: cronómetro antes de cambiar el alta, para tener línea base.
+  - Coordinado con sus dueños, sin duplicar: vehículos, indirectos y margen por partida con costos; planos, catálogo y `Product` con el diseñador; quién usa «Asignar con IA» con el asistente (falta que Adam diga qué Antonio y si el rango alto sigue dentro); padrón con clientes.
+  - Sin verificar: toques y clics se contaron en el código, sin teléfono ni sesión. La línea base de asignar es aproximada (hueco entre altas seguidas). La «cotización de ejemplo» que Adam dice haber pasado no aparece en ninguna sesión; se le preguntó.
+  - Trampas al medir:
+    - `timestamp` está en UTC sin zona: resta 6 h. `SET TIME ZONE` no lo arregla, y la primera corrida dio salidas «antes de las 13:00».
+    - `ssh ... 'bash -s' < script` con `docker exec -i` adentro se come el resto del script. Manda SQL directo a `psql` por stdin.
+    - Con `BEGIN READ ONLY` no se pueden crear funciones temporales.
+    - Remide los avisos desde el 30-10: el 29-10 cambiaron las reglas y el promedio de 30 días engaña.
+    - `audit_logs` de `Cotizacion BULK_UPDATE` no trae el id real; usa `cotizaciones PUT_OK`.
+
 - **01-11 ~17:05 (claude-code) — Base común: lo que salió al verla en producción.**
   - Facturación: `MetricFrame` traía un `<style>` con `!important` que forzaba la tira vieja y dejaba cuadrada la tarjeta que se puede pulsar. Se quitó; `MetricValue` ya no fija 25 px.
   - Pestañas de finanzas y de operación: `:where(button)` les daba radio y la raya salía curva. `border-radius: 0`.
