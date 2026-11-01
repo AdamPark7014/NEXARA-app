@@ -50,6 +50,7 @@ export function puntosPorOmision(partidas: PartidaDePunto[] | null | undefined):
   const hayCanalizacion = /canaliz|conduit|tuberia|charola|unicanal/.test(todo);
   const hayGrabacion = /\bnvr\b|\bdvr\b|grabador/.test(todo);
   const hayRespaldo = /\bups\b|no ?break/.test(todo);
+  const soloLicencias = lista.length > 0 && lista.every((p) => /licen|suscrip/.test(`${sinAcentos(p.name)} ${sinAcentos(p.unit)}`));
 
   const equipos = lista
     .filter((p) => grupoDePartida(p) === 'EQUIPOS' && String(p.name ?? '').trim())
@@ -65,12 +66,15 @@ export function puntosPorOmision(partidas: PartidaDePunto[] | null | undefined):
     {
       clave: 'omision:justificacion',
       titulo: 'Justificación tecnológica',
-      texto:
-        'La solución se definió a partir de las necesidades del sitio y de su operación diaria, con equipos compatibles entre sí y respaldados por el fabricante.',
-      vinetas: [
-        'Compatibilidad: los equipos propuestos trabajan en conjunto sin adaptaciones.',
-        'Crecimiento: el sistema puede ampliarse sin reemplazar lo que ya está instalado.',
-      ],
+      texto: soloLicencias
+        ? 'El licenciamiento se definió a partir de las necesidades de la operación, con productos originales y respaldados por el fabricante.'
+        : 'La solución se definió a partir de las necesidades del sitio y de su operación diaria, con equipos compatibles entre sí y respaldados por el fabricante.',
+      vinetas: soloLicencias
+        ? ['Cumplimiento: licenciamiento original del fabricante.', 'Soporte: acceso al soporte del fabricante durante su vigencia.']
+        : [
+            'Compatibilidad: los equipos propuestos trabajan en conjunto sin adaptaciones.',
+            'Crecimiento: el sistema puede ampliarse sin reemplazar lo que ya está instalado.',
+          ],
     },
     hayCanalizacion
       ? {
@@ -85,20 +89,26 @@ export function puntosPorOmision(partidas: PartidaDePunto[] | null | undefined):
       : {
           clave: 'omision:beneficios',
           titulo: 'Beneficios de la solución',
-          texto: 'La propuesta da continuidad a la operación con equipos de línea y el respaldo directo de NEXARA.',
+          texto: soloLicencias
+            ? 'La propuesta da continuidad a la operación con licenciamiento vigente y el respaldo directo de NEXARA.'
+            : 'La propuesta da continuidad a la operación con equipos de línea y el respaldo directo de NEXARA.',
           vinetas: [
-            'Continuidad: menos interrupciones y equipos con soporte vigente.',
+            soloLicencias ? 'Continuidad: licencias vigentes y con soporte.' : 'Continuidad: menos interrupciones y equipos con soporte vigente.',
             'Respaldo: un solo responsable para dudas y garantías.',
           ],
         },
     {
       clave: 'omision:especificacion',
-      titulo: hayCamaras
-        ? 'Especificación funcional de las cámaras seleccionadas'
-        : 'Especificación funcional de los equipos seleccionados',
-      texto: equipos.length
-        ? 'Estos son los equipos principales de la propuesta; el detalle completo está en la propuesta económica.'
-        : 'Los equipos y servicios considerados se detallan en la propuesta económica.',
+      titulo: soloLicencias
+        ? 'Especificación funcional de las licencias seleccionadas'
+        : hayCamaras
+          ? 'Especificación funcional de las cámaras seleccionadas'
+          : 'Especificación funcional de los equipos seleccionados',
+      texto: !equipos.length
+        ? 'Los equipos y servicios considerados se detallan en la propuesta económica.'
+        : soloLicencias
+          ? 'Estas son las licencias de la propuesta; el detalle completo está en la propuesta económica.'
+          : 'Estos son los equipos principales de la propuesta; el detalle completo está en la propuesta económica.',
       vinetas: equipos,
     },
     hayGrabacion
@@ -118,7 +128,9 @@ export function puntosPorOmision(partidas: PartidaDePunto[] | null | undefined):
       : {
           clave: 'omision:monitoreo',
           titulo: 'Operación y continuidad del servicio',
-          texto: 'NEXARA da seguimiento a la entrega y atiende las dudas de uso durante la vigencia de la garantía.',
+          texto: soloLicencias
+            ? 'NEXARA da seguimiento a la entrega de las licencias y atiende las dudas de activación y uso.'
+            : 'NEXARA da seguimiento a la entrega y atiende las dudas de uso durante la vigencia de la garantía.',
           vinetas: [],
         },
   ];

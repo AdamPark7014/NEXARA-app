@@ -22,7 +22,8 @@ describe('puntos por omisión de la cotización', () => {
     const bloques = puntosPorOmision([pieza('Licencia de software BioTime', { unit: 'Licencia' })]);
     expect(bloques).toHaveLength(4);
     const todo = JSON.stringify(bloques.map(({ titulo, texto, vinetas }) => ({ titulo, texto, vinetas })));
-    expect(todo).not.toMatch(/cámaras|canalización|monitoreo|UPS/);
+    expect(todo).not.toMatch(/cámaras|canalización|monitoreo|UPS|equipos/);
+    expect(bloques[2]!.titulo).toBe('Especificación funcional de las licencias seleccionadas');
   });
 
   it('sin UPS no ofrece respaldo eléctrico', () => {
