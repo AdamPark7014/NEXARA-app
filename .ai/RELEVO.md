@@ -1,5 +1,37 @@
 # RELEVO
 
+- **31-10 ~21:45 (claude-code) — 2FA, cuentas desactivadas y parche de seguridad de todo el sistema.**
+  - 2FA de punta a punta (`6f6b21c8`): QR en Mi perfil (`users/mfa/setup` → `MfaService`), paso «Verificación en dos
+    pasos» en el login, y `POST users/:id/mfa/quitar` para quien perdió el teléfono (cierra sus sesiones). Cuenta
+    desactivada o sesión cerrada ya no entra al socket (`b71a9231`), a `/uploads` ni a go2rtc.
+  - Auditoría (4 frentes: auth, tenencia, entradas/SSRF, servidor). Parches desplegados:
+    - `108fa2bc` escaladas: editar usuario sin ser súper admin ya no toca cuentas de dirección, ni el propio
+      rol/correo/permisos, ni da roles administrativos (`assertEdicionPermitida`, compara contra lo guardado porque
+      el formulario manda todo); correo en minúsculas sin duplicados; empresa/plan solo de la propia o de la
+      plataforma; documentos del expediente validan empresa; tiempo real: portales solo reciben «qué cambió»;
+      `/uploads` exige sesión vigente; SSRF en PDF de inventario, logo de ventas, webhooks e ISAPI; body-parser sin
+      inflate; PNG con tope; contacto 5/10 min; logout revoca la sesión; 2FA equivocado cuenta como fallo.
+    - go2rtc estaba público: `forwardAuth` de Traefik → `GET /api/integra/media/authz` (`go2rtc-autorizacion.ts`):
+      scripts libres, `src` solo nombre de stream, pasa con firma `nx` (12 h, la pone la API en el HLS) o sesión de
+      personal. Exento del límite global. `f2a40c5c`: go2rtc 1.9.15 y sin `origin: "*"` (copia viva en
+      `/var/lib/nexara/go2rtc/go2rtc.yaml.bak-*`). El precalentado re-registra streams cada 10 min.
+    - `9d4fb2c7`: `next` del login/SSO sin caracteres de control (`/login?next=/%09/evil.com`); `?_nxt=` ya no da
+      entrada (middleware y `UserContext`); `lib/enlace-seguro.ts` para comprobantes y planos; ct-media sin
+      redirecciones ni SVG; CSV de bitácora/DIOT/reportes sin fórmulas (`common/security/celda-csv.ts`).
+    - `490068a9`: `npm audit fix` sin mayores (proxy-addr crítica, body-parser 2.4, follow-redirects, js-yaml…),
+      fuera `@react-pdf-viewer/core`; portales: 5 fallos por correo = 15 min (`FallosPortal`); `export/all` e
+      `import/all` solo plataforma; tope global de 256 MB (`MAX_REQUEST_BODY_BYTES`).
+  - Servidor: Traefik v2.11.61 sin dashboard, HSTS global; SSH solo llave (`00-endurecer.conf`), fail2ban en 2222;
+    `.env` en 600. Ninguna cuenta usa los hashes de demo publicados en el repo (revisado en la BD).
+  - **Decisiones de Adam pendientes:** `play.review@` (cuenta de revisión de tiendas) tiene rol **ceo** en
+    producción y su contraseña la conocen Apple/Google; reboot por kernel/docker; limpiar `authorized_keys`;
+    ACROBAT publica `:8010` directo a internet (nadie lo usa: todo entra por Traefik) y go2rtc 1.9.7 (tras su propio
+    forwardAuth); Redis sin contraseña (solo red interna).
+  - **Siguiente trabajo grande:** Next 14 → 15.5.28 + React 19. Hoy no son alcanzables las fallas más graves (sin
+    `/_next/image` —responde 404—, sin Server Actions ni rewrites externos), pero 14.x ya no recibe parches.
+    Quedan `xlsx` 0.18.5 (solo exporta), multer 2.4 y Nest 11 (sus parches piden mayor).
+  - Microsoft Entra en pausa: falta que el dueño de `gerencia@` apruebe en Authenticator para registrar la app.
+
 - **31-10 ~20:00 (claude-code) — Search Console, «Recordarme» de verdad, entrar con Google/Microsoft y login premium.**
   - Search Console (`sc-domain:nexara.com.mx`, 69 indexadas / 335 sin indexar el 22-10): las 102 «noindex» y los 10
     «5xx» eran del sitio viejo (hoy 200 + `index, follow`); validación iniciada en las dos. Los 34 «404» son imágenes
