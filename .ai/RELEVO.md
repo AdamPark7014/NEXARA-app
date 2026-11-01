@@ -1,5 +1,17 @@
 # RELEVO
 
+- **01-11 ~17:15 (claude-code) — Clientes y base común: verificado en producción con la cuenta de Christian (`cee70bdb`, desplegado).**
+  - Visto: Clientes abre en Comercial; Facturación y Pólizas con el título, las tarjetas, los filtros y las pestañas nuevos; Viáticos con raya recta;
+    Nómina y Almacén sin desborde; actividad comercial con sugerencia de BUAP y aviso; «Nuevo cliente» con aviso al salir del nombre; «Asignar con IA»
+    propone BUAP, corrige el título y trae «+ Escribir otro cliente…». Consola sin errores. CI en verde en `5236fab2`, que contiene todo esto.
+  - **No se probó de punta a punta, para no crear datos:** dar de alta un cliente de verdad ni «Crear otro de todos modos» en producción. Está cubierto por pruebas
+    de API y web. Tampoco se entró con una cuenta que no sea de dirección (David, Daniela, Luis), ni se revisó en teléfono con sesión: en 390 px se vio
+    la muestra real del selector, no las pantallas de Finanzas.
+  - Trampa de esta tarde: varias sesiones despliegan a la vez y cada una reinicia la API unos segundos. Un `Service Unavailable` en esos momentos no es de tu
+    cambio: mira `docker ps` y el 503 en Traefik antes de buscar la causa.
+  - **Decisiones de Adam pendientes:** limpiar o fusionar ANFO/ANFORA, GAMINF/GAMING, Benemer/BUAP y los dudosos («Bodega de», «SE», «Licencia», «A QUIEN
+    CORRESPONDA» con 22 cotizaciones). Mientras sigan, el aviso los ofrece, y la sesión del programa general de Core los necesita limpios.
+
 - **01-11 ~17:15 (claude-code) — Programa Velocidad Core: medición y plan, sin construir nada. Espera el visto bueno de Adam.**
   - Pedido: profesionalizar Core, asignar en menos de 30 s, cotizar en 10 min, plano en media hora, y procesos de 10 a 20 veces más rápidos en un mes.
   - Plan, mockups y cifras en el artifact privado <https://claude.ai/artifact/EMhiXKV9NPgUmsqFjVVtMu>. Aquí no van conteos de producción porque el repo es público. Inventario con rutas y líneas para quien construya, en la carpeta de notas compartidas de la sesión madre (`programa-core-inventario-0111.md` y `programa-core-medicion-0111.md`).
