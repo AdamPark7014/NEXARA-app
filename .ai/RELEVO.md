@@ -1,5 +1,29 @@
 # RELEVO
 
+- **31-10 ~20:00 (claude-code) — Search Console, «Recordarme» de verdad, entrar con Google/Microsoft y login premium.**
+  - Search Console (`sc-domain:nexara.com.mx`, 69 indexadas / 335 sin indexar el 22-10): las 102 «noindex» y los 10
+    «5xx» eran del sitio viejo (hoy 200 + `index, follow`); validación iniciada en las dos. Los 34 «404» son imágenes
+    viejas (`/marcas/*.png`): correcto que den 404. Sitemap sin `/feed.xml` (`bfe2d6c5`) y reenviado; indexación
+    pedida para `/`, `/contacto`, `/qa` (no estaba en Google), `/servicios`, `/nosotros`, `/proyectos`,
+    `/cobertura/puebla`.
+  - «Recordarme» (`21c3ad5a`): la API ya daba 30 días, pero la copia de la sesión vivía en el `localStorage` de un
+    solo subdominio; al abrir un enlace de otro (o una pestaña sin copia) mandaba al login. `UserContext`
+    (`restoreFromSessionCookie`) renueva la sesión de la cookie HttpOnly con `auth/session/extend` si hay
+    `nx_session` y la sesión es recordada; sin «Recordarme» cada pestaña sigue independiente. El login respeta
+    `?next=` y, con sesión recordada abierta, sigue de largo. Tope: 30 días desde que entras.
+  - Google y Microsoft (`21c3ad5a`): `auth/oidc/start?proveedor=google|microsoft&recordar=1&next=&vuelta=` con
+    PKCE, `state`/`nonce` firmados en la cookie `nx_sso` (HMAC con `SSO_STATE_SECRET` o `JWT_SECRET`) y regreso solo
+    a `*.nexara.com.mx`. Reglas puras en `apps/api/src/auth/sso-reglas.ts` (+ spec, 12 casos). Solo entra quien ya
+    tiene cuenta activa con ese correo. Microsoft: el dominio del correo tiene que ser del mismo inquilino que firmó
+    (anti «nOAuth»). `nexara.com.mx` es Microsoft 365 de GoDaddy, federado (`sso.godaddy.com`), inquilino
+    `8a0ab518-8671-4fee-948c-64cd5df828a7`. Redirect por omisión: `https://core.nexara.com.mx/api/auth/oidc/callback`.
+  - **Falta para que aparezcan los botones**: registrar la app en Google Cloud (OAuth web, ese redirect) y en Entra
+    (multiinquilino, ese redirect, secreto) y poner `GOOGLE_OAUTH_CLIENT_ID/SECRET`, `MICROSOFT_OAUTH_CLIENT_ID/SECRET`
+    en `deploy/.env.nexara` del servidor; reiniciar `nexara-api`. Con GoDaddy puede pedir consentimiento de admin.
+  - Login premium (`8a6f803b`): dirección A del canvas https://claude.ai/artifact/2Su3m163MKc6fZw8fSGYpM, aprobada
+    por Adam. Panel de marca oscuro + formulario con tokens de Core; en teléfono el panel es la cabecera. Portales de
+    clientes con su propio texto. «¿La olvidaste?» solo explica (no hay restablecimiento por correo).
+
 - **31-10 ~19:20 (claude-code) — Perfil de Google de NEXARA: por qué «Verificar» no hacía nada, correcciones y apelación.**
   - «Verificar» en business.google.com manda a la búsqueda de «Nexara» y el panel del dueño queda abajo de la
     pantalla; parece congelado. El panel dice «Se inhabilitó tu acceso porque este perfil no sigue los
