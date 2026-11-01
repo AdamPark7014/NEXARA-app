@@ -98,7 +98,7 @@ export class VentasClientesController {
   ) {
     const created = await this.ventasService.createClient(dto, user, companyId);
     await this.ventasService.createAuditEvent({
-      action: 'client.create',
+      action: dto.reutilizarId ? 'client.reuse' : 'client.create',
       entityType: 'client',
       entityId: created.id,
       actorId: user?.id,

@@ -206,6 +206,8 @@ export type Dicha = {
   apodo?: boolean;
   /** Siglas deletreadas («te pe eme» = TPM): solo empatan igual. */
   sigla?: boolean;
+  /** Iniciales de un nombre completo («Benemérita Universidad Autónoma de Puebla» = BUAP). */
+  iniciales?: boolean;
 };
 
 /** Nombres de las letras, para las siglas deletreadas («te pe eme», «be u a pe»). */
@@ -249,6 +251,24 @@ export function palabrasDe(texto: string | null | undefined): Dicha[] {
       salida.push({ original: tramo.map((p) => p.original).join(' '), norm: tramo.map((p) => LETRAS[p.norm]).join(''), pos: tramo[0].pos, sigla: true });
     }
     if (j > i) i = j - 1;
+  }
+  // Iniciales de varias palabras seguidas: de 4 en adelante, o 3 si todas van con mayúscula
+  // («traer portátil mañana» no es TPM). Los conectores se saltan («Autónoma de Puebla»).
+  for (let i = 0; i < palabras.length; i++) {
+    if (PALABRAS_VACIAS.has(palabras[i].norm)) continue;
+    let letras = '';
+    let conMayuscula = true;
+    for (let j = i; j < palabras.length && j - i < 9; j++) {
+      const w = palabras[j];
+      if (PALABRAS_VACIAS.has(w.norm)) continue;
+      if (PALABRAS_RELLENO.has(w.norm) || w.norm.length < 2 || /\d/.test(w.norm)) break;
+      letras += w.norm[0];
+      conMayuscula = conMayuscula && /^\p{Lu}/u.test(w.original);
+      if (letras.length >= 4 || (letras.length === 3 && conMayuscula)) {
+        const tramo = palabras.slice(i, j + 1);
+        salida.push({ original: tramo.map((p) => p.original).join(' '), norm: letras, pos: palabras[i].pos, sigla: true, iniciales: true });
+      }
+    }
   }
   return salida;
 }
@@ -314,6 +334,7 @@ function empates(dichas: Dicha[], nombre: string, modo: 'normal' | 'estricta' | 
 
 /**
  * `puntaje` más lo que suena igual o se parece (para lo que escribió la IA o se dictó):
+ * 1.9 son sus iniciales («Benemérita Universidad Autónoma de Puebla» → BUAP) ·
  * 1.8 suena igual («Talks» → «Grupo Tox», «Chava» → Salvador) · 1.5 se parece («Jair» →
  * Yahir) · 1 algo se parece (se propone, no se elige). Lo de `puntaje` (2 o 3) gana siempre.
  */
@@ -324,6 +345,7 @@ export function puntajeAproximado(consulta: string, nombre: string, modo: 'norma
   if (!dichas.length) return base;
   const { propias, porPalabra, porSiglas } = empates(dichas, nombre, modo);
   if (porSiglas) return 1.8;
+  if (porPalabra.length && porPalabra.every((x) => x.mejor?.dicha.iniciales)) return 1.9;
   // A: todo lo propio del nombre se dijo (como suena o parecido).
   const todas = porPalabra.length > 0 && porPalabra.every((x) => x.mejor);
   const minimaA = todas ? Math.min(...porPalabra.map((x) => x.mejor!.c)) : 0;
@@ -383,7 +405,10 @@ export function buscar<T>(
   if (!puntuados.length) return { elegido: null, candidatos: [], empatados: [] };
   const mejor = puntuados[0].p;
   const empatados = puntuados.filter((x) => x.p === mejor);
-  const unica = empatados.length === 1 && (mejor >= 2 || (opciones.aproximado && mejor >= 1.5 && puntuados.filter((x) => x.p >= 1.5).length === 1));
+  // Las iniciales completas (1.9) dicen más que un nombre parecido: «Benemer» no le empata a BUAP.
+  const unica =
+    empatados.length === 1 &&
+    (mejor >= 1.9 || (opciones.aproximado && mejor >= 1.5 && puntuados.filter((x) => x.p >= 1.5).length === 1));
   return {
     elegido: unica ? empatados[0].item : null,
     candidatos: puntuados.slice(0, max).map((x) => x.item),

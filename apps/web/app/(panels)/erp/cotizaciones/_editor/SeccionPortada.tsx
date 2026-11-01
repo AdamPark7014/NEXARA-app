@@ -139,30 +139,43 @@ export function ClienteCombo({
     document.getElementById(`${listaId}-${activo}`)?.scrollIntoView({ block: "nearest" });
   }, [activo, listaId]);
 
+  const nombreEscrito = doc.clientName.trim();
+  const exacto = clientes?.some((c) => c.id === doc.salesClientId);
+  const hayQueCrear = Boolean(nombreEscrito) && !doc.salesClientId && Boolean(clientes) && !exacto;
+  const ofreceCrear = hayQueCrear && puedeAltaRapida && nombreEscrito.length >= 2;
+  const totalOpciones = sugeridos.length + coincidencias.length + (ofreceCrear ? 1 : 0);
+
+  const elegirOpcion = (i: number) => {
+    setAbierto(false);
+    if (i < sugeridos.length) void alta.usar(sugeridos[i]);
+    else if (i < sugeridos.length + coincidencias.length) elegir(coincidencias[i - sugeridos.length]);
+    else if (ofreceCrear) void alta.pedir(nombreEscrito);
+  };
+
   const alTeclear = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (!abierto || !coincidencias.length) {
+    if (e.key === "Escape") {
+      setAbierto(false);
+      return;
+    }
+    if (!abierto || !totalOpciones) {
       if (e.key === "ArrowDown") setAbierto(true);
       return;
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       porTeclado.current = true;
-      setActivo((a) => Math.min(coincidencias.length - 1, a + 1));
+      setActivo((a) => Math.min(totalOpciones - 1, a + 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       porTeclado.current = true;
       setActivo((a) => Math.max(0, a - 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const c = coincidencias[activo];
-      if (c) elegir(c);
-    } else if (e.key === "Escape") {
-      setAbierto(false);
+      elegirOpcion(activo);
     }
   };
 
-  const mostrar = abierto && editable && (coincidencias.length > 0 || sugeridos.length > 0);
-  const exacto = clientes?.some((c) => c.id === doc.salesClientId);
+  const mostrar = abierto && editable && totalOpciones > 0 && !alta.aviso;
   const puedeEditarComercial = puedeEditar && clientSectorsForUser(user).includes("COMERCIAL");
 
   return (
@@ -201,43 +214,63 @@ export function ClienteCombo({
           className={styles.opciones}
           onMouseDown={(e) => e.preventDefault()}
         >
-          {sugeridos.map((p) => (
+          {sugeridos.map((p, i) => (
             <li
               key={`p${p.id}`}
-              role="option"
-              aria-selected={false}
-              className={styles.opcion}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setAbierto(false);
-                void alta.usar(p);
-              }}
-            >
-              <span>{p.nombre}</span>
-              <small>Se parece: {p.porque.toLowerCase()}</small>
-            </li>
-          ))}
-          {coincidencias.map((c, i) => (
-            <li
-              key={c.id}
               id={`${listaId}-${i}`}
               role="option"
               aria-selected={i === activo}
               className={`${styles.opcion} ${i === activo ? styles.opcionActiva : ""}`}
               onMouseDown={(e) => {
                 e.preventDefault();
-                elegir(c);
+                elegirOpcion(i);
               }}
               onMouseEnter={() => setActivo(i)}
             >
-              <span>{c.name}</span>
-              {c.legalName && c.legalName !== c.name ? <small>{c.legalName}</small> : null}
-              {c.billingEmail ? <small>{c.billingEmail}</small> : null}
+              <span>{p.nombre}</span>
+              <small>Se parece: {p.porque.toLowerCase()}</small>
             </li>
           ))}
+          {coincidencias.map((c, j) => {
+            const i = sugeridos.length + j;
+            return (
+              <li
+                key={c.id}
+                id={`${listaId}-${i}`}
+                role="option"
+                aria-selected={i === activo}
+                className={`${styles.opcion} ${i === activo ? styles.opcionActiva : ""}`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  elegirOpcion(i);
+                }}
+                onMouseEnter={() => setActivo(i)}
+              >
+                <span>{c.name}</span>
+                {c.legalName && c.legalName !== c.name ? <small>{c.legalName}</small> : null}
+                {c.billingEmail ? <small>{c.billingEmail}</small> : null}
+              </li>
+            );
+          })}
+          {ofreceCrear ? (
+            <li
+              id={`${listaId}-${totalOpciones - 1}`}
+              role="option"
+              aria-selected={activo === totalOpciones - 1}
+              className={`${styles.opcion} ${activo === totalOpciones - 1 ? styles.opcionActiva : ""}`}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                elegirOpcion(totalOpciones - 1);
+              }}
+              onMouseEnter={() => setActivo(totalOpciones - 1)}
+            >
+              <span>Crear «{nombreEscrito}» con solo el nombre</span>
+              <small>Sus datos se completan después en Clientes</small>
+            </li>
+          ) : null}
         </ul>
       ) : null}
-      {doc.clientName.trim() && !doc.salesClientId && clientes && !exacto && !alta.aviso ? (
+      {hayQueCrear && !alta.aviso && !mostrar ? (
         puedeAltaRapida ? (
           <Button
             variant="tonal"

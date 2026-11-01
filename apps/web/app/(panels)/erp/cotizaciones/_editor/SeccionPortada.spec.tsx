@@ -63,7 +63,7 @@ describe("cotización: cliente de último momento", () => {
     expect(createSalesClient).not.toHaveBeenCalled();
     expect(screen.getByTestId("ligado")).toHaveTextContent("sin ligar");
 
-    await usuario.click(await screen.findByRole("button", { name: "Crear «Toks» con solo el nombre" }));
+    await usuario.click(await screen.findByRole("option", { name: /Crear «Toks» con solo el nombre/ }));
     await waitFor(() => expect(screen.getByTestId("ligado")).toHaveTextContent("40"));
     expect(createSalesClient).toHaveBeenCalledWith("tok", { name: "Toks", status: "Activo", tipo: "COMERCIAL", altaRapida: true });
   });
@@ -74,7 +74,7 @@ describe("cotización: cliente de último momento", () => {
     render(<Montar />);
     const usuario = userEvent.setup();
     await usuario.type(screen.getByRole("combobox"), "Benemérita Universidad Autónoma de Puebla");
-    await usuario.click(await screen.findByRole("button", { name: /Crear «Benemérita/ }));
+    await usuario.click(await screen.findByRole("option", { name: /Crear «Benemérita/ }));
     await usuario.click(await screen.findByRole("button", { name: "Usar BUAP" }));
     await waitFor(() => expect(screen.getByTestId("ligado")).toHaveTextContent("17"));
     expect(screen.getByRole("combobox")).toHaveValue("BUAP");
@@ -87,7 +87,7 @@ describe("cotización: cliente de último momento", () => {
     render(<Montar />);
     const usuario = userEvent.setup();
     await usuario.type(screen.getByRole("combobox"), "BUAP Deportes");
-    await usuario.click(await screen.findByRole("button", { name: /Crear «BUAP Deportes»/ }));
+    await usuario.click(await screen.findByRole("option", { name: /Crear «BUAP Deportes»/ }));
     await usuario.click(await screen.findByRole("button", { name: "Crear otro de todos modos" }));
     await waitFor(() => expect(screen.getByTestId("ligado")).toHaveTextContent("50"));
     expect(createSalesClient.mock.calls[0][1]).toMatchObject({ confirmarNuevo: true });
@@ -98,6 +98,29 @@ describe("cotización: cliente de último momento", () => {
     render(<Montar />);
     await userEvent.setup().type(screen.getByRole("combobox"), "Benemérita");
     expect(await screen.findByText(/Se parece: son las siglas/)).toBeInTheDocument();
+  });
+
+  it("la lista no tapa el botón: al cerrarla con Escape queda «Crear» a la vista, aun con solo sugerencias", async () => {
+    buscarClientesParecidos.mockImplementation(async (_t: string, q: { soloCodigo?: boolean }) => (q.soloCodigo ? [BUAP] : []));
+    render(<Montar />);
+    const usuario = userEvent.setup();
+    await usuario.type(screen.getByRole("combobox"), "Benemérita");
+    await screen.findByRole("option", { name: /BUAP/ });
+    await usuario.keyboard("{Escape}");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Crear «Benemérita» con solo el nombre" })).toBeInTheDocument();
+  });
+
+  it("con el teclado se llega a la sugerencia y a crear", async () => {
+    buscarClientesParecidos.mockImplementation(async (_t: string, q: { soloCodigo?: boolean }) => (q.soloCodigo ? [BUAP] : []));
+    createSalesClient.mockResolvedValue({ id: 17, name: "BUAP" });
+    render(<Montar />);
+    const usuario = userEvent.setup();
+    await usuario.type(screen.getByRole("combobox"), "Benemérita");
+    await screen.findByRole("option", { name: /BUAP/ });
+    await usuario.keyboard("{Enter}");
+    await waitFor(() => expect(screen.getByTestId("ligado")).toHaveTextContent("17"));
+    expect(createSalesClient.mock.calls[0][1]).toMatchObject({ reutilizarId: 17 });
   });
 
   it("quien no llega al alta elige de la lista", async () => {

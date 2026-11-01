@@ -1,5 +1,19 @@
 # RELEVO
 
+- **01-11 ~16:40 (claude-code) — Clientes, lo que salió al verificar en producción con la cuenta de Christian.**
+  - «Asignar con IA» resolvía «Benemérita Universidad…» al cliente a medias «Benemer» en vez de BUAP: su buscador (`ai/asistente/nombres.ts`) no
+    entendía iniciales de un nombre completo. `palabrasDe` ahora las genera (4 palabras o más, o 3 si todas van con mayúscula, para que «traer
+    portátil mañana» no sea TPM) y pesan 1.9 en `puntajeAproximado`, más que lo parecido. Eval del asistente sin juez: 46/48 perfectos.
+  - Cotización: con solo sugerencias en la lista, Escape no la cerraba y tapaba el botón de crear. La lista ahora trae también «Crear», y las
+    flechas llegan a las sugerencias. El botón de abajo solo sale con la lista cerrada.
+  - Bitácora: «usar este» se registra como `client.reuse`, no como `client.create`. Quedó **una fila** `client.create` de BUAP del 01-11 22:26 UTC
+    por un clic de esta verificación; no se borró. El cliente no cambió.
+  - Verificado en producción sin crear datos (34 clientes, id máximo 37, 0 cotizaciones nuevas): Comercial primero y abre ahí; actividad comercial
+    con sugerencia de BUAP y aviso; cotización con el autoguardado bloqueado en la pestaña; `POST parecidos` con BUAP, siglas con puntos,
+    `Crepes & Waffles`, S.A. de C.V. y, por IA, «La Autónoma de Puebla» y «LOTENAL». «Sephora» y «Toks» salen limpios.
+  - **Para probar `ClienteCombo` o el editor de cotización en producción sin emitir folio:** el borrador se autoguarda 1.2 s después de escribir.
+    Parchar `window.fetch` en la pestaña evita guardar, pero esa pestaña ya no se puede cerrar sin que Chrome pregunte «¿Salir?» y deja de responder.
+
 - **01-11 ~14:00 (claude-code) — Portada de cotización: siete puntos por omisión y editables (corrección de Adam: «faltan todos los puntos»).**
   - Causa: el índice solo listaba lo escrito en cada cotización, y las plantillas Suministro y Licenciamiento apagaban objetivo o alcance. Esos
     interruptores no hacían nada en el PDF desde el 28-09, así que nadie los había elegido viendo su efecto.
