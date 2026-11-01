@@ -117,7 +117,7 @@ export default function SeccionCotizacion({
     <Hoja
       id="cotizacion"
       numero="04"
-      titulo="Cotización"
+      titulo="Propuesta económica"
       descripcion="Cliente, partidas y condiciones."
       ayuda="El folio y la moneda salen de la portada y de Personalizar."
       acciones={
@@ -180,15 +180,6 @@ export default function SeccionCotizacion({
             disabled={!editable}
             placeholder="Puebla, Pue."
             onChange={(e) => cambiar((d) => ({ ...d, clientAddress: e.target.value }))}
-          />
-        </Campo>
-        <Campo etiqueta="Trabajo" htmlFor="cot-trabajo">
-          <Input
-            id="cot-trabajo"
-            value={doc.trabajo}
-            disabled={!editable}
-            placeholder="Ventas"
-            onChange={(e) => cambiar((d) => ({ ...d, trabajo: e.target.value }))}
           />
         </Campo>
         <Campo etiqueta="Correo" htmlFor="cot-correo">

@@ -1,33 +1,63 @@
 /**
- * Cotización en el formato con el que Christian cotiza: hoja membretada, título
- * COTIZACIÓN, datos del cliente, franja comercial, partidas, subtotal / IVA /
+ * La cotización que recibe el cliente, con el diseño de NEXARA («Memoria descriptiva y propuesta
+ * técnica-económica»): portada, hoja de título, alcance, planos, garantías, partidas, subtotal / IVA /
  * total, importe con letra, condiciones y firma. El costo y el margen no entran.
  */
 import fs from 'fs';
 import path from 'path';
 import PDFDocument from 'pdfkit';
+import { PDFDocument as PDFLibDocument } from 'pdf-lib';
 import { importeConLetra } from './importe-letra.js';
 import { factorMargen } from './cotizacion-totals.js';
 import { normalizarOpciones } from './personalizacion.js';
-import { incluyeInstalacion } from './partidas-grupos.js';
+import { normalizarBloques } from './alcance-bloques.js';
+import { objetivoDePropuesta, type Objetivo } from './objetivo-plantilla.js';
+import { ESTADO, estadoDesdeDb } from './estado-cotizacion.js';
+import { grupoDePartida, GRUPOS, incluyeInstalacion, type GrupoPartida } from './partidas-grupos.js';
+import { dibujarMarco, dibujarPortada, VERDE } from './cotizacion-marco.js';
 import { anticipoDeCotizacion, terminosDeCotizacion, type Terminos } from './terminos-segmento.js';
 import { segmentosLista } from './vinetas-texto.js';
-import { anexarPaginasPdf, clasificarPlanos, type PlanoArchivo } from '../common/pdf/planos-pdf.js';
+import type { SeccionesPropuesta } from './propuesta-tecnica-pdf.js';
+import { anexarPaginasPdf, clasificarPlanos, type PlanoArchivo, type PlanosClasificados } from '../common/pdf/planos-pdf.js';
+import { PDF_FUENTES as F, registrarFuentesCorporativas } from '../common/pdf/nexara-pdf-theme.js';
 
-const TEAL = '#1FAF8D';
-const TEAL_OSC = '#15735F';
-const TEAL_CLARO = '#E8F5F1';
+const VERDE_OSC = '#15735F';
 const CARBON = '#24262A';
 const GRIS = '#5F6368';
-const LINEA = '#C9D1CF';
+const GRIS_TITULO = '#4A4A4C';
+const GRIS_RECUADRO = '#EFEFED';
+const AZUL = '#0E2A47';
+const AZUL_GRUPO = '#1F3F66';
+const ZEBRA = '#F2F5F8';
+const LINEA = '#D8DEE6';
 const TINTA = '#222222';
 
 const PAGE_W = 612;
-const PAGE_H = 792;
 const LM = 46;
-const AW = PAGE_W - LM * 2;
-const TOP = 124;
-const BOTTOM = 684;
+const AW = 506;
+const TITULO_X = 58;
+/** Donde empieza el cuerpo de una hoja de continuación y donde termina, antes del pie. */
+const TOP = 112;
+const BOTTOM = 688;
+const CUERPO = { size: 9.6, lh: 14 };
+
+/** Nombre de cada grupo en la tabla, como en el diseño. */
+const ETIQUETA_DE_TABLA: Record<GrupoPartida, string> = {
+  EQUIPOS: 'EQUIPAMIENTO ACTIVO Y ACCESORIOS',
+  MATERIALES: 'INFRAESTRUCTURA Y MATERIALES',
+  MANO_DE_OBRA: 'SERVICIOS DE IMPLEMENTACIÓN Y PUESTA A PUNTO',
+};
+
+/** Garantía de los trabajos cuando se cobra instalación y quien cotiza no escribió otra. */
+const GARANTIA_DE_INSTALACION =
+  'Los trabajos de mano de obra ejecutados por NEXARA cuentan con 6 meses de garantía en sitio contra vicios ocultos de implementación.';
+
+const EXCLUSIONES_DE_GARANTIA = [
+  'Manipulación por terceros: apertura de carcasas, alteración del cableado o cambios de configuración por personal ajeno a NEXARA.',
+  'Vandalismo o daño mecánico: impactos de maquinaria, obras cercanas, cortes de ruta o robo.',
+  'Descargas eléctricas y red del inmueble: rayos, cortocircuitos, falta de tierra física o voltajes fuera de rango.',
+  'Caso fortuito o uso indebido: sismos, inundaciones, químicos o lavado a presión sobre los equipos.',
+] as const;
 
 /**
  * Datos fiscales del emisor: abren la primera hoja de toda cotización (los pidió Adam, arriba del
@@ -63,6 +93,9 @@ const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 export type PartidaFormato = {
   partida: string;
+  /** Quien cotiza numeró a mano (`1.1`): el número se imprime y su orden manda sobre los grupos. */
+  numeroPropio: boolean;
+  grupo: GrupoPartida;
   titulo: string;
   marca: string;
   modelo: string;
@@ -94,6 +127,20 @@ export type FormatoNexara = {
   /** La forma de pago del editor. Vacía (la persona la borró): el renglón no se imprime. */
   condicionesPago: string;
   garantia: string;
+  /** Nota del tipo de cambio («Personalizar»), para cotizaciones en dólares. */
+  tipoCambioNota: string;
+  /** Versión de la portada: la revisión, o la siguiente si es un borrador de algo que ya salió. */
+  version: number;
+  /** Lo escrito en el editor o el borrador corto de las partidas; `null` = apagado en «Personalizar». */
+  objetivo: Objetivo | null;
+  /** Párrafo de entrada del alcance (`scope`) y bloques sin título. */
+  alcanceIntro: string[];
+  /** Bloques con título del alcance. */
+  alcance: Array<{ titulo: string; texto: string; vinetas: string[] }>;
+  /** false = «Planos» apagado en «Personalizar». */
+  conPlanos: boolean;
+  /** Renglones de la póliza; vacío = no se imprime (términos apagados o licitación: mandan las bases). */
+  garantias: string[];
   partidas: PartidaFormato[];
   subtotal: number;
   /** false = el cliente no requiere factura: sin renglón de IVA y «precios sin IVA». */
@@ -117,6 +164,12 @@ type QuoteLike = {
   atencion?: string | null;
   trabajo?: string | null;
   projectName?: string | null;
+  scope?: string | null;
+  objetivo?: string | null;
+  alcanceBloques?: unknown;
+  status?: unknown;
+  revision?: number | null;
+  sentAt?: Date | string | null;
   preparedBy?: string | null;
   /** Con las partidas (si se cobra instalación) decide los términos por omisión. */
   segmento?: unknown;
@@ -133,7 +186,15 @@ type QuoteLike = {
 };
 
 const dinero = (n: number) =>
-  `$ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** Párrafos de un texto libre: cada salto de línea es uno. */
+const parrafosDe = (valor?: string | null) =>
+  String(valor ?? '')
+    .split(/\r?\n+/)
+    // Lo pegado de Word trae tabuladores, que la fuente no tiene: saldrían como un cuadro negro.
+    .map((t) => t.replace(/\t+/g, ' ').replace(/ {2,}/g, ' ').trim())
+    .filter(Boolean);
 
 const fechaCorta = (valor: Date | string | null | undefined): string => {
   if (!valor) return '';
@@ -171,25 +232,46 @@ export function textoVigencia(dias: number, vence: string, propia?: string | nul
 /** Lo que cabe en un renglón de la celda «Condiciones de pago» de la franja (8 pt). */
 const CABE_EN_FRANJA = 26;
 
+/** Lo que necesitan los grupos y las cifras del objetivo de cada partida guardada. */
+function agrupable(item: Record<string, unknown>) {
+  const texto = (valor: unknown) => (valor == null ? null : String(valor));
+  return {
+    grupo: texto(item['grupo']),
+    category: texto(item['category']),
+    name: texto(item['name']),
+    description: texto(item['description']),
+    unit: texto(item['unit']),
+    qty: Number(item['qty'] ?? 0) || 0,
+    unitPrice: Number(item['unitPrice'] ?? 0) || 0,
+    laborHours: Number(item['laborHours'] ?? 0) || 0,
+    laborRate: Number(item['laborRate'] ?? 0) || 0,
+  };
+}
+
+const agrupables = (quote: QuoteLike) => (quote.items ?? []).map(agrupable);
+
+/**
+ * La póliza: la garantía que dejó quien cotiza y, si se cobra instalación y esa frase no habla ya de
+ * los trabajos, la de la mano de obra. En licitación mandan las bases.
+ */
+function garantiasDe(garantia: string, modalidad: Terminos['modalidad'], instalacion: boolean, conTerminos: boolean): string[] {
+  if (!conTerminos || modalidad === 'LICITACION') return [];
+  const hablaDeTrabajos = /trabajo|mano de obra|instalaci|mantenimiento/i.test(garantia);
+  return [
+    `${hablaDeTrabajos ? 'Garantía' : 'Equipos'}: ${garantia}`,
+    ...(instalacion && !hablaDeTrabajos ? [`Instalación: ${GARANTIA_DE_INSTALACION}`] : []),
+  ];
+}
+
 /**
  * Los términos de la cotización, los mismos que enseña el editor: el texto del segmento con el
  * anticipo capturado, o lo que quien cotiza reescribió (`note`). Entrega, garantía y vigencia no van
  * aquí: son renglones propios de las condiciones comerciales.
  */
 function terminosDelEditor(quote: QuoteLike): Terminos {
-  const texto = (valor: unknown) => (valor == null ? null : String(valor));
-  const partidas = (quote.items ?? []).map((item) => ({
-    grupo: texto(item['grupo']),
-    category: texto(item['category']),
-    name: texto(item['name']),
-    description: texto(item['description']),
-    unit: texto(item['unit']),
-    laborHours: Number(item['laborHours'] ?? 0) || 0,
-    laborRate: Number(item['laborRate'] ?? 0) || 0,
-  }));
   return terminosDeCotizacion({
     segmento: quote.segmento,
-    incluyeInstalacion: incluyeInstalacion(partidas),
+    incluyeInstalacion: incluyeInstalacion(agrupables(quote)),
     anticipoPct: quote.depositPercent,
     personalizados: quote.note,
     condiciones: { formaPago: normalizarOpciones(quote.opciones).condiciones.formaPago },
@@ -240,8 +322,11 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
     const taxRaw = item['tax'] == null || item['tax'] === '' ? 16 : Number(item['tax']);
     // Sin factura no hay IVA, aunque la partida conserve su tasa.
     const tax = !conIva ? 0 : Number.isFinite(taxRaw) ? taxRaw : 16;
+    const partidaPropia = String(item['partida'] ?? '').trim();
     const fila: PartidaFormato = {
-      partida: String(item['partida'] ?? '').trim() || String(i + 1),
+      partida: partidaPropia || String(i + 1),
+      numeroPropio: Boolean(partidaPropia) && partidaPropia !== String(i + 1),
+      grupo: grupoDePartida(agrupable(item)),
       titulo: String(item['name'] ?? '').trim(),
       marca: String(item['brand'] ?? '').trim(),
       modelo: String(item['model'] ?? '').trim(),
@@ -270,6 +355,26 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
   const vence = fechaCorta(quote.validUntil);
   const terminos = terminosDelEditor(quote);
   const pago = pagoDeCotizacion(quote, terminos);
+  const garantia = opciones.condiciones.garantia.trim() || GARANTIA_DEFAULT;
+
+  // Un borrador que ya salió antes es la siguiente versión en preparación; al enviar, `send` pasa la nueva.
+  const revision = Math.trunc(Number(quote.revision) || 1);
+  const enPreparacion = Boolean(quote.sentAt) && estadoDesdeDb(quote.status) === ESTADO.BORRADOR;
+
+  // Los bloques sin título se leen como parte de lo anterior: de la entrada, o del último con título.
+  const alcanceIntro = opciones.secciones.alcance ? parrafosDe(quote.scope) : [];
+  const alcance: FormatoNexara['alcance'] = [];
+  if (opciones.secciones.alcance) {
+    for (const b of normalizarBloques(quote.alcanceBloques)) {
+      const textoBloque = String(b.texto ?? '').trim();
+      if (b.titulo.trim()) alcance.push({ titulo: b.titulo.trim(), texto: textoBloque, vinetas: b.vinetas });
+      else if (alcance.length) {
+        const previo = alcance[alcance.length - 1]!;
+        previo.texto = [previo.texto, textoBloque].filter(Boolean).join('\n');
+        previo.vinetas = [...previo.vinetas, ...b.vinetas];
+      } else alcanceIntro.push(...parrafosDe(textoBloque), ...b.vinetas);
+    }
+  }
   return {
     numero: String(quote.quoteNumber ?? '').trim() || 'COTIZACIÓN',
     fecha: fechaCorta(quote.issueDate) || fechaCorta(new Date()),
@@ -288,7 +393,16 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
     pagoCorto: pago.corto,
     entrega: opciones.condiciones.tiempoEntrega.trim() || String(quote.deliveryTime ?? '').trim() || ENTREGA_DEFAULT,
     condicionesPago: pago.texto,
-    garantia: opciones.condiciones.garantia.trim() || GARANTIA_DEFAULT,
+    garantia,
+    tipoCambioNota: moneda === 'USD' ? String(opciones.tipoCambioNota ?? '').trim() : '',
+    version: Math.max(1, revision + (enPreparacion ? 1 : 0)),
+    objetivo: opciones.secciones.objetivo
+      ? objetivoDePropuesta({ segmento: quote.segmento, partidas: agrupables(quote), objetivoLibre: quote.objetivo })
+      : null,
+    alcanceIntro,
+    alcance,
+    conPlanos: opciones.secciones.planos,
+    garantias: garantiasDe(garantia, terminos.modalidad, incluyeInstalacion(agrupables(quote)), opciones.secciones.terminos),
     partidas,
     subtotal,
     conIva,
@@ -311,29 +425,18 @@ function directorioAssets(): string {
     path.resolve(process.cwd(), 'apps/api/src/assets/cotizacion-nexara'),
     path.resolve(process.cwd(), 'dist/assets/cotizacion-nexara'),
   ];
-  return candidatos.find((d) => fs.existsSync(path.join(d, 'membrete_carta.png'))) ?? candidatos[0]!;
+  return candidatos.find((d) => fs.existsSync(path.join(d, 'firma_christian.png'))) ?? candidatos[0]!;
 }
 
 type Doc = PDFKit.PDFDocument;
 
-function fuentes(doc: Doc, dir: string): { regular: string; bold: string } {
-  const regular = path.join(dir, 'URWGothic-Book.ttf');
-  const bold = path.join(dir, 'URWGothic-Demi.ttf');
-  if (fs.existsSync(regular) && fs.existsSync(bold)) {
-    doc.registerFont('NX', regular);
-    doc.registerFont('NX-B', bold);
-    return { regular: 'NX', bold: 'NX-B' };
-  }
-  return { regular: 'Helvetica', bold: 'Helvetica-Bold' };
-}
-
 type Lapiz = {
   doc: Doc;
   y: number;
-  f: string;
-  fb: string;
   numero: string;
   pagina: number;
+  /** Página donde quedó el título de cada parte. */
+  paginaDe: Partial<Record<Apartado['clave'], number>>;
 };
 
 function asegurar(p: Lapiz, alto: number) {
@@ -341,92 +444,27 @@ function asegurar(p: Lapiz, alto: number) {
   hoja(p);
 }
 
+/** Hoja interior nueva, con su marco. `p.y === TOP` quiere decir que sigue en blanco. */
 function hoja(p: Lapiz) {
   p.doc.addPage({ size: 'LETTER', margin: 0 });
   p.pagina += 1;
-  const membrete = path.join(directorioAssets(), 'membrete_carta.png');
-  if (fs.existsSync(membrete)) {
-    p.doc.image(membrete, 0, 0, { width: PAGE_W, height: PAGE_H });
-  }
-  const x = LM + 28;
-  // La primera hoja abre con los datos fiscales del emisor, arriba del título, y todo lo demás baja
-  // lo que ocupan. Las hojas de continuación conservan su encabezado corto.
-  const baja = p.pagina === 1 ? datosDelEmisor(p, x) : 0;
-  p.doc.fillColor(TEAL).font(p.fb).fontSize(20);
-  p.doc.text('COTIZACIÓN', x, 52 + baja, { lineBreak: false });
-  p.doc.fillColor(CARBON).font(p.fb).fontSize(10);
-  p.doc.text(p.pagina === 1 ? 'NEXARA' : `N° ${p.numero}  (continuación)`, x, 76 + baja, { lineBreak: false });
-  p.doc.fillColor(GRIS).font(p.f).fontSize(8);
-  p.doc.text(p.pagina === 1 ? 'Conectando ecosistemas de tecnología' : '', x, 90 + baja, { lineBreak: false });
-  p.doc.save();
-  p.doc.strokeColor(TEAL).lineWidth(1.2).moveTo(x, 106 + baja).lineTo(PAGE_W - LM - 150, 106 + baja).stroke();
-  p.doc.restore();
-  p.y = TOP + baja;
+  dibujarMarco(p.doc);
+  p.y = TOP;
 }
 
-/**
- * Datos fiscales del emisor en la primera hoja: cinco renglones chicos en gris, alineados con el
- * título y la razón social en negritas. Quedan a la izquierda del logotipo del membrete (el renglón
- * más largo termina antes de donde empieza). Devuelve cuánto baja el resto del encabezado.
- */
-function datosDelEmisor(p: Lapiz, x: number): number {
-  const arriba = 17;
-  const renglon = 8.6;
-  RENGLONES_EMISOR.forEach((linea, i) => {
-    p.doc.fillColor(GRIS).font(i === 0 ? p.fb : p.f).fontSize(i === 0 ? 7 : 6.6);
-    p.doc.text(linea, x, arriba + i * renglon, { lineBreak: false });
-  });
-  return 22;
+/** Abre hoja salvo que la actual siga en blanco. */
+function hojaEnBlanco(p: Lapiz) {
+  if (p.y !== TOP) hoja(p);
 }
 
 function texto(p: Lapiz, valor: string, x: number, y: number, ancho: number, opts: PDFKit.Mixins.TextOptions & { font?: string; size?: number; color?: string }) {
-  p.doc.font(opts.font ?? p.f).fontSize(opts.size ?? 8).fillColor(opts.color ?? TINTA);
+  p.doc.font(opts.font ?? F.texto).fontSize(opts.size ?? 8).fillColor(opts.color ?? TINTA);
   p.doc.text(valor, x, y, { width: ancho, lineGap: 1, ...opts });
 }
 
 function altoDe(p: Lapiz, valor: string, ancho: number, size = 8, font?: string): number {
-  p.doc.font(font ?? p.f).fontSize(size);
+  p.doc.font(font ?? F.texto).fontSize(size);
   return p.doc.heightOfString(valor || ' ', { width: ancho, lineGap: 1 });
-}
-
-function cajaDatos(p: Lapiz, x: number, w: number, titulo: string, filas: Array<[string, string]>) {
-  const etiqueta = w * 0.34;
-  const valor = w - etiqueta;
-  let y = p.y;
-  p.doc.save();
-  p.doc.rect(x, y, w, 16).fill(CARBON);
-  p.doc.restore();
-  texto(p, titulo, x + 5, y + 3.5, w - 10, { font: p.fb, size: 8, color: '#FFFFFF' });
-  y += 16;
-  for (const [k, v] of filas) {
-    const h = Math.max(14, altoDe(p, v || '—', valor - 8, 8) + 5);
-    p.doc.save();
-    p.doc.rect(x, y, etiqueta, h).fill(TEAL_CLARO);
-    p.doc.restore();
-    texto(p, k, x + 4, y + 3, etiqueta - 6, { font: p.fb, size: 7.5, color: TEAL_OSC });
-    texto(p, v || '—', x + etiqueta + 4, y + 3, valor - 8, { size: 8, color: TINTA });
-    y += h;
-  }
-  p.doc.save();
-  p.doc.strokeColor(LINEA).lineWidth(0.6).rect(x, p.y, w, y - p.y).stroke();
-  p.doc.restore();
-  return y - p.y;
-}
-
-function franja(p: Lapiz, celdas: Array<[string, string]>) {
-  const w = AW / celdas.length;
-  const y = p.y;
-  const h = 32;
-  celdas.forEach(([titulo, valor], i) => {
-    const x = LM + i * w;
-    p.doc.save();
-    p.doc.rect(x, y, w, 15).fill(TEAL);
-    p.doc.rect(x, y + 15, w, h - 15).fill(TEAL_CLARO);
-    p.doc.restore();
-    texto(p, titulo, x + 2, y + 3, w - 4, { font: p.fb, size: 7.5, color: '#FFFFFF', align: 'center' });
-    texto(p, valor || '—', x + 2, y + 18, w - 4, { size: 8, color: TINTA, align: 'center' });
-  });
-  p.y = y + h;
 }
 
 /** Parte un párrafo en renglones que caben en `ancho`, respetando los saltos de línea. */
@@ -478,46 +516,404 @@ function altoRenglon(p: Lapiz, size: number, font: string): number {
 
 /**
  * Un renglón ya medido. Sin `width` PDFKit no lo parte ni abre una hoja en blanco al llegar al
- * margen: el corte de página lo decide esta tabla.
+ * margen: el corte de página lo deciden estas funciones.
  */
-function renglonFijo(p: Lapiz, valor: string, x: number, y: number, ancho: number, font: string, size: number, color: string, align: 'left' | 'center' | 'right' = 'left') {
+function renglonFijo(p: Lapiz, valor: string, x: number, y: number, ancho: number, font: string, size: number, color: string, align: 'left' | 'center' | 'right' = 'left', tabular = false) {
   p.doc.font(font).fontSize(size).fillColor(color);
+  // Cifras de ancho fijo para que las columnas de importes cuadren.
+  const cifras = tabular ? { features: ['tnum' as const] } : {};
   if (align === 'left') {
-    p.doc.text(valor || ' ', x, y, { lineBreak: false });
+    p.doc.text(valor || ' ', x, y, { lineBreak: false, ...cifras });
     return;
   }
-  p.doc.text(valor || ' ', x, y, { width: ancho, align, lineBreak: false });
+  p.doc.text(valor || ' ', x, y, { width: ancho, align, lineBreak: false, ...cifras });
 }
 
-function filaPartida(p: Lapiz, partida: PartidaFormato | null, anchos: number[], encabezado = false, zebra = false) {
-  const x0 = LM;
-  if (encabezado) {
-    const y = p.y;
-    p.doc.save();
-    p.doc.rect(x0, y, AW, 16).fill(TEAL);
-    p.doc.restore();
-    let x = x0;
-    for (const [i, titulo] of ['Partida', 'Descripción', 'Unidad', 'Cant.', 'Precio unitario', 'Total'].entries()) {
-      texto(p, titulo, x + 3, y + 4, anchos[i]! - 6, { font: p.fb, size: 8, color: '#FFFFFF', align: 'center' });
-      x += anchos[i]!;
-    }
-    p.y = y + 16;
+// ─────────────────────────────────────────────────────────────────────────────
+// Texto corrido
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Título de apartado: gris, en mayúsculas, con el filete verde. En hoja nueva va a la altura del logotipo. */
+function tituloDeApartado(p: Lapiz, a: Apartado) {
+  const etiqueta = `${a.numero}. ${a.titulo.toUpperCase()}`;
+  const opciones = { width: 440, characterSpacing: 0.7, lineGap: 3.4 };
+  p.doc.font(F.semi).fontSize(12.5);
+  const alto = p.doc.heightOfString(etiqueta, opciones);
+  if (p.y !== TOP) asegurar(p, alto + 66);
+  // El alto de hoja en blanco se decide después de `asegurar`, que pudo abrirla.
+  if (p.y === TOP) p.y = alto > 22 ? 64 : 76;
+  else p.y += 14;
+  p.paginaDe[a.clave] ??= p.pagina;
+  p.doc.font(F.semi).fontSize(12.5).fillColor(GRIS_TITULO).text(etiqueta, TITULO_X, p.y, opciones);
+  const yFilete = p.y + alto + 3;
+  const finFilete = Math.min(TITULO_X + 440, TITULO_X + p.doc.widthOfString(etiqueta, opciones) + 26);
+  p.doc.save();
+  p.doc.moveTo(LM, yFilete).lineTo(Math.max(finFilete, LM + 220), yFilete).lineWidth(1.6).strokeColor(VERDE).stroke();
+  p.doc.restore();
+  p.y = yFilete + 15;
+}
+
+function subtitulo(p: Lapiz, valor: string) {
+  asegurar(p, 34);
+  renglonFijo(p, valor, LM, p.y, AW, F.semi, 9.6, GRIS_TITULO);
+  p.y += 15;
+}
+
+/** Párrafo por renglones: el corte de hoja siempre lo decide `BOTTOM`, nunca PDFKit. */
+function parrafo(p: Lapiz, valor: string, o: { despues?: number } = {}) {
+  const lineas = partirTexto(p, valor.trim(), AW, CUERPO.size, F.texto);
+  asegurar(p, CUERPO.lh * Math.min(2, lineas.length));
+  for (const linea of lineas) {
+    asegurar(p, CUERPO.lh);
+    if (linea) renglonFijo(p, linea, LM, p.y, AW, F.texto, CUERPO.size, TINTA);
+    p.y += CUERPO.lh;
+  }
+  p.y += o.despues ?? 6;
+}
+
+/** «Etiqueta: resto» → ['Etiqueta', 'resto'] cuando la etiqueta es corta; si no, `null`. */
+function conEtiqueta(valor: string): [string, string] | null {
+  const m = /^([^:.]{3,40}):\s+(.+)$/s.exec(valor.trim());
+  return m ? [m[1]!.trim(), m[2]!.trim()] : null;
+}
+
+/**
+ * Texto con su etiqueta en negritas en el mismo renglón («Tiempo de entrega: 15 días»). `marca` dibuja
+ * lo que va antes (viñeta o cuadrito), a la altura del primer renglón.
+ */
+function conEtiquetaEnLinea(
+  p: Lapiz,
+  valor: string,
+  o: { x: number; size?: number; lh?: number; colorEtiqueta?: string; despues?: number; marca?: (y: number) => void },
+) {
+  const size = o.size ?? CUERPO.size;
+  const lh = o.lh ?? CUERPO.lh;
+  const ancho = LM + AW - o.x;
+  const partes = conEtiqueta(valor);
+  const cuerpo = partes ? partes[1] : valor.trim();
+  const etiqueta = partes ? `${partes[0]}: ` : '';
+  p.doc.font(F.semi).fontSize(size);
+  const anchoEtiqueta = etiqueta ? p.doc.widthOfString(etiqueta) : 0;
+
+  // El primer renglón es lo que quepa después de la etiqueta; el resto, a todo lo ancho.
+  const parrafos = cuerpo.split(/\r?\n/);
+  const palabras = (parrafos[0] ?? '').split(/\s+/).filter(Boolean);
+  p.doc.font(F.texto).fontSize(size);
+  let primero = '';
+  let i = 0;
+  for (; i < palabras.length; i += 1) {
+    const prueba = primero ? `${primero} ${palabras[i]}` : palabras[i]!;
+    if (p.doc.widthOfString(prueba) > ancho - anchoEtiqueta) break;
+    primero = prueba;
+  }
+  const resto = [palabras.slice(i).join(' '), ...parrafos.slice(1)].filter((t, n) => n > 0 || t).join('\n');
+  const siguientes = resto ? partirTexto(p, resto, ancho, size, F.texto) : [];
+
+  asegurar(p, lh * Math.min(2, 1 + siguientes.length));
+  o.marca?.(p.y);
+  if (etiqueta) renglonFijo(p, etiqueta, o.x, p.y, anchoEtiqueta, F.semi, size, o.colorEtiqueta ?? TINTA);
+  if (primero) renglonFijo(p, primero, o.x + anchoEtiqueta, p.y, ancho, F.texto, size, TINTA);
+  p.y += lh;
+  for (const linea of siguientes) {
+    asegurar(p, lh);
+    if (linea) renglonFijo(p, linea, o.x, p.y, ancho, F.texto, size, TINTA);
+    p.y += lh;
+  }
+  p.y += o.despues ?? 3;
+}
+
+function vineta(p: Lapiz, valor: string) {
+  conEtiquetaEnLinea(p, valor, {
+    x: LM + 14,
+    marca: (y) => {
+      p.doc.save();
+      p.doc.circle(LM + 5, y + CUERPO.size * 0.6, 1.6).fill(TINTA);
+      p.doc.restore();
+    },
+  });
+}
+
+/** Recuadro gris con título en negritas, como la «Ventaja operativa» del diseño. */
+function recuadro(p: Lapiz, titulo: string, cuerpo: string) {
+  const [x, ancho] = [LM - 14, AW + 28];
+  const interior = ancho - 24;
+  const lineas = partirTexto(p, cuerpo.trim(), interior, 8.6, F.texto);
+  const alto = 12 + 13 + lineas.length * 12 + 9;
+  // Un cierre escrito más largo que media hoja ya no es un recuadro: se lee como texto corrido.
+  if (alto > (BOTTOM - TOP) / 2) {
+    subtitulo(p, titulo);
+    for (const t of parrafosDe(cuerpo)) parrafo(p, t);
     return;
   }
-  if (!partida) return;
-  const descAncho = anchos[1]! - 8;
-  const xDesc = x0 + anchos[0]! + 4;
-  const titulo = partida.titulo || 'Concepto';
-  const marca = [partida.marca ? `Marca: ${partida.marca}` : '', partida.modelo ? `Modelo: ${partida.modelo}` : '']
-    .filter(Boolean)
-    .join(' · ');
-  const bloques: Array<{ texto: string; font: string; size: number; color: string }> = [
-    { texto: titulo, font: p.fb, size: 8.5, color: TINTA },
-  ];
-  if (marca) bloques.push({ texto: marca, font: p.f, size: 7.5, color: TEAL_OSC });
-  if (partida.descripcion) bloques.push({ texto: partida.descripcion, font: p.f, size: 7.5, color: GRIS });
+  asegurar(p, alto + 8);
+  p.y += 4;
+  p.doc.save();
+  p.doc.roundedRect(x, p.y, ancho, alto, 7).fill(GRIS_RECUADRO);
+  p.doc.restore();
+  renglonFijo(p, titulo, x + 12, p.y + 11, interior, F.semi, 8.8, GRIS_TITULO);
+  lineas.forEach((linea, i) => renglonFijo(p, linea, x + 12, p.y + 24 + i * 12, interior, F.texto, 8.6, GRIS));
+  p.y += alto + 10;
+}
 
-  const lineas: Array<{ t: string; font: string; size: number; color: string; lh: number; sangria: number; marca: boolean }> = [];
+// ─────────────────────────────────────────────────────────────────────────────
+// Apartados
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Por encima de esto los bloques del alcance dejan de ser apartados y van juntos en uno solo. */
+const MAX_APARTADOS_DE_ALCANCE = 5;
+
+type Apartado = {
+  clave: 'objetivo' | 'alcance' | 'planos' | 'garantias' | 'cotizacion';
+  numero: number;
+  titulo: string;
+  bloque?: FormatoNexara['alcance'][number];
+};
+
+/** Lo que trae esta cotización: lo vacío o apagado no se numera ni sale en el índice de la portada. */
+function apartadosDe(q: FormatoNexara, hayPlanos: boolean): Apartado[] {
+  const lista: Array<Omit<Apartado, 'numero'>> = [];
+  if (q.objetivo || q.alcanceIntro.length) lista.push({ clave: 'objetivo', titulo: 'Alcance ejecutivo' });
+  if (q.alcance.length > MAX_APARTADOS_DE_ALCANCE) lista.push({ clave: 'alcance', titulo: 'Alcance técnico' });
+  else q.alcance.forEach((bloque) => lista.push({ clave: 'alcance', titulo: bloque.titulo, bloque }));
+  if (hayPlanos) lista.push({ clave: 'planos', titulo: 'Planos' });
+  if (q.garantias.length) lista.push({ clave: 'garantias', titulo: 'Póliza de garantías y exclusiones' });
+  lista.push({ clave: 'cotizacion', titulo: 'Propuesta económica detallada' });
+  return lista.map((a, i) => ({ ...a, numero: i + 1 }));
+}
+
+/**
+ * Hoja de título: «Memoria descriptiva…», el proyecto, y una sola vez los datos de la cotización.
+ * Los datos fiscales del emisor van arriba, junto al logotipo (los pidió Adam en toda cotización).
+ */
+function hojaDeTitulo(p: Lapiz, q: FormatoNexara) {
+  hoja(p);
+  const { doc } = p;
+  const xFiscal = LM + 28;
+  RENGLONES_EMISOR.forEach((linea, i) => {
+    doc.fillColor(GRIS).font(i === 0 ? F.semi : F.texto).fontSize(i === 0 ? 7 : 6.6);
+    doc.text(linea, xFiscal, 17 + i * 8.6, { lineBreak: false });
+  });
+
+  const centro = { width: 480, align: 'center' as const };
+  const xCentro = (PAGE_W - 480) / 2;
+  doc.font(F.fuerte).fontSize(18.5).fillColor(GRIS_TITULO);
+  doc.text('MEMORIA DESCRIPTIVA Y', xCentro, 206, { ...centro, lineBreak: false });
+  doc.text('PROPUESTA TÉCNICA-ECONÓMICA', xCentro, 236, { ...centro, lineBreak: false });
+
+  let y = 296;
+  if (q.proyecto) {
+    // El cuerpo más grande con el que el proyecto cabe en cuatro renglones.
+    const titulo = q.proyecto.toUpperCase();
+    let size = 24;
+    doc.font(F.fuerte);
+    while (size > 13 && (doc.fontSize(size), doc.heightOfString(titulo, { width: 440, lineGap: size * 0.42 })) > size * 1.42 * 4.2) size -= 1;
+    doc.fontSize(size).fillColor(GRIS_TITULO);
+    const opciones = { width: 440, align: 'center' as const, lineGap: size * 0.42 };
+    const alto = doc.heightOfString(titulo, opciones);
+    doc.text(titulo, (PAGE_W - 440) / 2, y, opciones);
+    y += alto;
+  }
+
+  const izquierda: Array<[string, string]> = [
+    ['Cliente', q.cliente],
+    ['Atención', q.atencion],
+    ['Teléfono', q.telefono],
+    ['Correo', q.correo],
+    ['Ubicación', q.ubicacion],
+  ];
+  const derecha: Array<[string, string]> = [
+    ['Cotización N°', q.numero],
+    ['Fecha de emisión', q.fecha],
+    ['Responsable comercial', q.responsable],
+  ];
+  const [xIzq, anchoCol] = [76, 220];
+  const xDer = xIzq + anchoCol + 20;
+  const yDatos = Math.max(y + 36, 512);
+  doc.save();
+  doc.moveTo(xIzq, yDatos).lineTo(PAGE_W - xIzq, yDatos).lineWidth(0.8).strokeColor(VERDE).stroke();
+  doc.restore();
+  for (const [x, filas] of [[xIzq, izquierda], [xDer, derecha]] as Array<[number, Array<[string, string]>]>) {
+    let yFila = yDatos + 13;
+    for (const [etiqueta, valor] of filas) {
+      if (!valor.trim()) continue;
+      renglonFijo(p, etiqueta.toUpperCase(), x, yFila, anchoCol, F.semi, 6.6, GRIS);
+      yFila += 9.5;
+      const lineas = partirTexto(p, valor.trim(), anchoCol, 9, F.texto).slice(0, 2);
+      for (const linea of lineas) {
+        if (yFila + 12 > BOTTOM) break;
+        renglonFijo(p, linea, x, yFila, anchoCol, F.texto, 9, TINTA);
+        yFila += 12;
+      }
+      yFila += 5;
+    }
+  }
+  // Lo que sigue arranca en hoja nueva.
+  p.y = BOTTOM;
+}
+
+/** Texto libre: un renglón que empieza con viñeta se imprime como viñeta, lo demás como párrafo. */
+function textoLibre(p: Lapiz, valor: string) {
+  const vinetaEscrita = /^[•·*-]\s+(.+)$/s.exec(valor);
+  if (vinetaEscrita) vineta(p, vinetaEscrita[1]!);
+  else parrafo(p, valor);
+}
+
+function apartadoEjecutivo(p: Lapiz, q: FormatoNexara, a: Apartado) {
+  tituloDeApartado(p, a);
+  for (const t of parrafosDe(q.objetivo?.intro)) textoLibre(p, t);
+  for (const t of q.alcanceIntro) textoLibre(p, t);
+  const beneficios = q.objetivo?.beneficios ?? [];
+  if (beneficios.length) {
+    p.y += 2;
+    subtitulo(p, 'Beneficios principales');
+    beneficios.forEach((b) => vineta(p, b));
+    p.y += 4;
+  }
+  if (q.objetivo?.cierre.trim()) recuadro(p, 'Resultado esperado', q.objetivo.cierre);
+}
+
+function cuerpoDeBloque(p: Lapiz, bloque: FormatoNexara['alcance'][number]) {
+  for (const t of parrafosDe(bloque.texto)) textoLibre(p, t);
+  if (bloque.vinetas.length) {
+    bloque.vinetas.forEach((v) => vineta(p, v));
+    p.y += 4;
+  }
+}
+
+function apartadoDeAlcance(p: Lapiz, q: FormatoNexara, a: Apartado) {
+  tituloDeApartado(p, a);
+  if (a.bloque) {
+    cuerpoDeBloque(p, a.bloque);
+    return;
+  }
+  q.alcance.forEach((bloque, i) => {
+    subtitulo(p, `${a.numero}.${i + 1}  ${bloque.titulo}`);
+    cuerpoDeBloque(p, bloque);
+    p.y += 4;
+  });
+}
+
+/** Leyenda de un plano, centrada y entre corchetes como en el diseño. */
+function leyendaDePlano(p: Lapiz, nombre: string) {
+  texto(p, `[ ${nombre.toUpperCase()} ]`, LM, p.y, AW, { font: F.semi, size: 7.8, color: CARBON, align: 'center', characterSpacing: 0.6 });
+  p.y += altoDe(p, nombre.toUpperCase(), AW, 7.8, F.semi) + 8;
+}
+
+function apartadoDePlanos(p: Lapiz, a: Apartado, anexos: PlanosClasificados) {
+  // Con imágenes el título viaja con la primera; sin ellas basta con la lista.
+  if (anexos.imagenes.length) hojaEnBlanco(p);
+  tituloDeApartado(p, a);
+  let primera = true;
+  for (const { nombre, imagen } of anexos.imagenes) {
+    if (!primera) hoja(p);
+    primera = false;
+    leyendaDePlano(p, nombre);
+    const altoDisponible = BOTTOM - p.y;
+    const escala = Math.min(AW / imagen.ancho, altoDisponible / imagen.alto, 1);
+    const ancho = Math.round(imagen.ancho * escala);
+    const alto = Math.round(imagen.alto * escala);
+    try {
+      p.doc.image(imagen.datos, LM + (AW - ancho) / 2, p.y, { width: ancho, height: alto });
+    } catch {
+      /* un anexo corrupto deja su hueco en blanco, no tumba la cotización */
+    }
+    p.y += alto + 8;
+  }
+  if (anexos.pdfs.length) {
+    if (anexos.imagenes.length) hoja(p);
+    parrafo(p, 'Planos que se anexan en las páginas siguientes:', { despues: 3 });
+    anexos.pdfs.forEach(({ nombre }) => vineta(p, nombre));
+  }
+  if (anexos.otros.length) {
+    if (anexos.imagenes.length && !anexos.pdfs.length) hoja(p);
+    parrafo(p, 'Anexos que acompañan a esta cotización (no se pudieron imprimir aquí):', { despues: 3 });
+    anexos.otros.forEach((nombre) => vineta(p, nombre));
+  }
+}
+
+function apartadoDeGarantias(p: Lapiz, q: FormatoNexara, a: Apartado) {
+  // La póliza se lee junta: si no cabe entera, pasa completa a la hoja siguiente.
+  // La etiqueta en negritas es más ancha que al medirla con texto normal: se mide un poco más angosto.
+  const altoDeVinetas = (lista: readonly string[]) =>
+    lista.reduce((acc, v) => acc + partirTexto(p, v, AW - 24, CUERPO.size, F.texto).length * CUERPO.lh + 3, 0);
+  asegurar(p, 52 + 15 + altoDeVinetas(q.garantias) + 6 + 15 + 17 + altoDeVinetas(EXCLUSIONES_DE_GARANTIA));
+  tituloDeApartado(p, a);
+  subtitulo(p, 'Alcance de la garantía');
+  q.garantias.forEach((g) => vineta(p, g));
+  p.y += 6;
+  subtitulo(p, 'Exclusiones');
+  parrafo(p, 'La garantía no aplica cuando la falla derive de:', { despues: 3 });
+  EXCLUSIONES_DE_GARANTIA.forEach((e) => vineta(p, e));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Propuesta económica
+// ─────────────────────────────────────────────────────────────────────────────
+
+type Columna = {
+  clave: 'unidad' | 'cantidad' | 'concepto' | 'modelo' | 'precio' | 'total';
+  titulo: string;
+  x: number;
+  ancho: number;
+  alinear: 'left' | 'center' | 'right';
+};
+
+const ENCABEZADO_TABLA = 18;
+const FILA_GRUPO = 16;
+
+/** Columnas del diseño. Sin ningún modelo capturado, ese ancho se lo queda el concepto. */
+function columnasDeTabla(conModelo: boolean): Columna[] {
+  const fijas: Array<Omit<Columna, 'x'>> = [
+    { clave: 'unidad', titulo: 'Unidad', ancho: 40, alinear: 'center' },
+    { clave: 'cantidad', titulo: 'Cant.', ancho: 30, alinear: 'center' },
+    { clave: 'concepto', titulo: 'Concepto / Descripción', ancho: 0, alinear: 'left' },
+    ...(conModelo ? [{ clave: 'modelo' as const, titulo: 'Modelo / SKU', ancho: 104, alinear: 'left' as const }] : []),
+    { clave: 'precio', titulo: 'Precio Venta', ancho: 62, alinear: 'right' },
+    { clave: 'total', titulo: 'Total Venta', ancho: 68, alinear: 'right' },
+  ];
+  const concepto = AW - fijas.reduce((acc, c) => acc + c.ancho, 0);
+  let x = LM;
+  return fijas.map((c) => {
+    const col = { ...c, x, ancho: c.clave === 'concepto' ? concepto : c.ancho };
+    x += col.ancho;
+    return col;
+  });
+}
+
+function encabezadoDeTabla(p: Lapiz, columnas: Columna[]) {
+  const y = p.y;
+  p.doc.save();
+  p.doc.rect(LM, y, AW, ENCABEZADO_TABLA).fill(AZUL);
+  p.doc.restore();
+  for (const col of columnas) {
+    renglonFijo(p, col.titulo, col.x + 4, y + 5.2, col.ancho - 8, F.fuerte, 7, '#FFFFFF', col.alinear);
+  }
+  p.y = y + ENCABEZADO_TABLA;
+}
+
+function filaDeGrupo(p: Lapiz, etiqueta: string, columnas: Columna[]) {
+  if (p.y + FILA_GRUPO + 30 > BOTTOM) {
+    hoja(p);
+    encabezadoDeTabla(p, columnas);
+  }
+  p.doc.save();
+  p.doc.rect(LM, p.y, AW, FILA_GRUPO).fill(AZUL_GRUPO);
+  p.doc.restore();
+  renglonFijo(p, etiqueta, LM + 6, p.y + 4.4, AW - 12, F.fuerte, 7.2, '#FFFFFF');
+  p.y += FILA_GRUPO;
+}
+
+type LineaDeFila = { t: string; font: string; size: number; color: string; lh: number; sangria: number; marca: boolean };
+
+/** Renglones del concepto: el nombre y debajo la descripción, con sus viñetas. */
+function lineasDeConcepto(p: Lapiz, partida: PartidaFormato, ancho: number): LineaDeFila[] {
+  const numeroPropio = partida.numeroPropio ? `${partida.partida} · ` : '';
+  const bloques: Array<{ texto: string; font: string; size: number; color: string }> = [
+    { texto: `${numeroPropio}${partida.titulo || 'Concepto'}`, font: F.medio, size: 7.8, color: TINTA },
+  ];
+  if (partida.descripcion) bloques.push({ texto: partida.descripcion, font: F.texto, size: 7.2, color: GRIS });
+
+  const lineas: LineaDeFila[] = [];
   for (const bloque of bloques) {
     const lh = altoRenglon(p, bloque.size, bloque.font);
     p.doc.font(bloque.font).fontSize(bloque.size);
@@ -530,137 +926,319 @@ function filaPartida(p: Lapiz, partida: PartidaFormato | null, anchos: number[],
         continue;
       }
       if (seg.tipo === 'vineta') {
-        const ancho = Math.max(8, descAncho - sangriaVineta);
-        const envueltas = partirTexto(p, seg.texto, ancho, bloque.size, bloque.font);
+        const envueltas = partirTexto(p, seg.texto, Math.max(8, ancho - sangriaVineta), bloque.size, bloque.font);
         envueltas.forEach((t, i) => {
           lineas.push({ t, font: bloque.font, size: bloque.size, color: bloque.color, lh, sangria: sangriaVineta, marca: i === 0 });
         });
       } else {
-        for (const t of partirTexto(p, seg.texto, descAncho, bloque.size, bloque.font)) {
+        for (const t of partirTexto(p, seg.texto, ancho, bloque.size, bloque.font)) {
           lineas.push({ t, font: bloque.font, size: bloque.size, color: bloque.color, lh, sangria: 0, marca: false });
         }
       }
     }
   }
-  const pad = 4;
-  const nuevaHojaDeTabla = () => {
-    hoja(p);
-    filaPartida(p, null, anchos, true);
-  };
-  if (p.y + lineas[0]!.lh + pad * 2 > BOTTOM) nuevaHojaDeTabla();
-
-  const cant = Number.isInteger(partida.cantidad) ? String(partida.cantidad) : String(partida.cantidad);
-  const celdas = [
-    { t: partida.partida, align: 'center' as const },
-    null,
-    { t: partida.unidad, align: 'center' as const },
-    { t: cant, align: 'center' as const },
-    { t: dinero(partida.precioUnitario), align: 'right' as const },
-    { t: dinero(partida.importe), align: 'right' as const },
-  ];
-  let yCeldas = p.y;
-  let celdasPendientes = true;
-  const pintarCeldas = () => {
-    if (!celdasPendientes) return;
-    celdasPendientes = false;
-    let x = x0;
-    celdas.forEach((c, i) => {
-      if (c) renglonFijo(p, c.t, x + 3, yCeldas + pad, anchos[i]! - 6, p.f, 8, TINTA, c.align);
-      x += anchos[i]!;
-    });
-  };
-
-  let y = p.y + pad;
-  for (const linea of lineas) {
-    if (y + linea.lh > BOTTOM) {
-      pintarCeldas();
-      p.doc.save();
-      p.doc.strokeColor(LINEA).lineWidth(0.3).moveTo(x0, y).lineTo(x0 + AW, y).stroke();
-      p.doc.restore();
-      nuevaHojaDeTabla();
-      yCeldas = p.y;
-      y = p.y + pad;
-    }
-    if (zebra) {
-      p.doc.save();
-      p.doc.rect(x0, y, AW, linea.lh).fill(TEAL_CLARO);
-      p.doc.restore();
-    }
-    if (linea.marca) renglonFijo(p, '•', xDesc, y, linea.sangria, linea.font, linea.size, linea.color);
-    if (linea.t) renglonFijo(p, linea.t, xDesc + linea.sangria, y, descAncho - linea.sangria, linea.font, linea.size, linea.color);
-    y += linea.lh;
-  }
-  pintarCeldas();
-  if (zebra) {
-    p.doc.save();
-    p.doc.rect(x0, y, AW, pad).fill(TEAL_CLARO);
-    p.doc.restore();
-  }
-  p.doc.save();
-  p.doc.strokeColor(LINEA).lineWidth(0.3).moveTo(x0, y + pad).lineTo(x0 + AW, y + pad).stroke();
-  p.doc.restore();
-  p.y = y + pad;
-}
-
-function totales(p: Lapiz, q: FormatoNexara) {
-  const cajaW = AW * 0.32;
-  const x = LM + AW - cajaW;
-  const letrasW = AW - cajaW - 12;
-  const hLetras = altoDe(p, q.letras, letrasW, 8);
-  const h = Math.max(62, hLetras + 4);
-  asegurar(p, h + 8);
-  texto(p, q.letras, LM, p.y + 2, letrasW, { size: 8, color: TINTA });
-  const y = p.y;
-  const filas: Array<[string, string, boolean]> = [
-    ['SUBTOTAL', dinero(q.subtotal), false],
-    ...(q.conIva ? ([[`IVA ${q.ivaPorciento}%`, dinero(q.iva), false]] as Array<[string, string, boolean]>) : []),
-    ['TOTAL', dinero(q.total), true],
-  ];
-  filas.forEach((fila, i) => {
-    const yy = y + i * 18;
-    if (fila[2]) {
-      p.doc.save();
-      p.doc.rect(x, yy, cajaW, 20).fill(CARBON);
-      p.doc.restore();
-    }
-    texto(p, fila[0], x + 4, yy + 4, cajaW * 0.42, {
-      font: fila[2] ? p.fb : p.f,
-      size: fila[2] ? 10 : 8,
-      color: fila[2] ? '#FFFFFF' : TINTA,
-      align: 'right',
-    });
-    texto(p, fila[1], x + cajaW * 0.42, yy + 4, cajaW * 0.54, {
-      font: fila[2] ? p.fb : p.f,
-      size: fila[2] ? 10 : 8,
-      color: fila[2] ? '#FFFFFF' : TINTA,
-      align: 'right',
-    });
-  });
-  p.doc.save();
-  p.doc.strokeColor(LINEA).lineWidth(0.6).rect(x, y, cajaW, 56).stroke();
-  p.doc.restore();
-  p.y = y + h;
+  return lineas;
 }
 
 /**
- * Cotización en el formato de Christian — el que de verdad descarga y manda el cliente — más sus
- * planos (plano de CAD, hoja de servicio del levantamiento, fotos): sin ellos, pidió Monica por
- * WhatsApp, solo quedan listados como nombre suelto. Una imagen va a página completa; un PDF (lo
- * normal en CAD y en la hoja de servicio) anexa sus páginas reales al final, sin convertirlo a
- * imagen, así no pierde nitidez ni texto seleccionable.
+ * Una partida. Si cabe en una hoja no se parte: pasa entera a la siguiente. Solo una descripción más
+ * larga que una hoja completa sigue en la de después, con las cifras en su primera parte.
+ */
+function filaPartida(p: Lapiz, partida: PartidaFormato, columnas: Columna[], zebra: boolean, reserva = 0) {
+  const PAD = 4.5;
+  const col = (clave: Columna['clave']) => columnas.find((c) => c.clave === clave);
+  const concepto = col('concepto')!;
+  const descAncho = concepto.ancho - 8;
+  const lineas = lineasDeConcepto(p, partida, descAncho);
+
+  const columnaModelo = col('modelo');
+  // Un modelo es una sola palabra: si le falta poco para caber se reduce en vez de partirlo.
+  let tamanoModelo = 7.2;
+  if (columnaModelo && partida.modelo && !/\s/.test(partida.modelo)) {
+    p.doc.font(F.semi).fontSize(tamanoModelo);
+    const ancho = p.doc.widthOfString(partida.modelo);
+    tamanoModelo = Math.max(6, Math.min(tamanoModelo, (tamanoModelo * (columnaModelo.ancho - 8)) / ancho));
+  }
+  const modelo = columnaModelo && partida.modelo ? partirTexto(p, partida.modelo, columnaModelo.ancho - 8, tamanoModelo, F.semi) : [];
+  const marca =
+    columnaModelo && partida.marca && partida.marca !== partida.modelo
+      ? partirTexto(p, partida.marca, columnaModelo.ancho - 8, 6.6, F.texto)
+      : [];
+  const LH_MODELO = 9.6;
+  const altoModelo = (modelo.length + marca.length) * LH_MODELO;
+  const altoCeldas = Math.max(altoModelo, 10);
+
+  const altoConcepto = lineas.reduce((acc, l) => acc + l.lh, 0);
+  const altoFila = Math.max(altoConcepto, altoCeldas) + PAD * 2;
+  const altoHoja = BOTTOM - TOP - ENCABEZADO_TABLA;
+  const nuevaHojaDeTabla = () => {
+    hoja(p);
+    encabezadoDeTabla(p, columnas);
+  };
+  if (p.y + altoFila + reserva > BOTTOM && altoFila + reserva <= altoHoja) nuevaHojaDeTabla();
+  if (p.y + lineas[0]!.lh + PAD * 2 > BOTTOM) nuevaHojaDeTabla();
+
+  // Tramos de la fila, uno por hoja.
+  const tramos: LineaDeFila[][] = [[]];
+  let disponible = BOTTOM - p.y - PAD * 2;
+  for (const linea of lineas) {
+    if (linea.lh > disponible) {
+      tramos.push([]);
+      disponible = altoHoja - PAD * 2;
+    }
+    tramos[tramos.length - 1]!.push(linea);
+    disponible -= linea.lh;
+  }
+
+  tramos.forEach((tramo, n) => {
+    if (n > 0) nuevaHojaDeTabla();
+    const arriba = p.y;
+    const altoTramo = tramo.reduce((acc, l) => acc + l.lh, 0);
+    const alto = Math.max(altoTramo, n === 0 ? altoCeldas : 0) + PAD * 2;
+    if (zebra) {
+      p.doc.save();
+      p.doc.rect(LM, arriba, AW, alto).fill(ZEBRA);
+      p.doc.restore();
+    }
+    let y = arriba + (alto - altoTramo) / 2;
+    for (const linea of tramo) {
+      const xDesc = concepto.x + 4;
+      if (linea.marca) renglonFijo(p, '•', xDesc, y, linea.sangria, linea.font, linea.size, linea.color);
+      if (linea.t) renglonFijo(p, linea.t, xDesc + linea.sangria, y, descAncho - linea.sangria, linea.font, linea.size, linea.color);
+      y += linea.lh;
+    }
+    if (n === 0) {
+      // Centradas en la fila, salvo en una descripción muy larga: ahí van arriba, junto a su nombre.
+      const yCelda = alto > 140 ? arriba + PAD : arriba + alto / 2 - 4;
+      for (const c of columnas) {
+        const dato =
+          c.clave === 'unidad'
+            ? partida.unidad
+            : c.clave === 'cantidad'
+              ? String(partida.cantidad)
+              : c.clave === 'precio'
+                ? dinero(partida.precioUnitario)
+                : c.clave === 'total'
+                  ? dinero(partida.importe)
+                  : null;
+        if (dato != null) renglonFijo(p, dato, c.x + 3, yCelda, c.ancho - 6, F.texto, 7.6, TINTA, c.alinear, true);
+      }
+      if (columnaModelo) {
+        let yModelo = alto > 140 ? arriba + PAD : arriba + (alto - altoModelo) / 2;
+        for (const t of modelo) {
+          renglonFijo(p, t, columnaModelo.x + 4, yModelo, columnaModelo.ancho - 8, F.semi, tamanoModelo, AZUL_GRUPO);
+          yModelo += LH_MODELO;
+        }
+        for (const t of marca) {
+          renglonFijo(p, t, columnaModelo.x + 4, yModelo, columnaModelo.ancho - 8, F.texto, 6.6, GRIS);
+          yModelo += LH_MODELO;
+        }
+      }
+    }
+    p.doc.save();
+    p.doc.strokeColor(LINEA).lineWidth(0.4).moveTo(LM, arriba + alto).lineTo(LM + AW, arriba + alto).stroke();
+    p.doc.restore();
+    p.y = arriba + alto;
+  });
+}
+
+const ALTO_FILA_TOTAL = 18;
+const altoDeTotales = (q: FormatoNexara) => (q.conIva ? 2 : 1) * ALTO_FILA_TOTAL + 22;
+
+function totales(p: Lapiz, q: FormatoNexara) {
+  const cajaW = 188;
+  const x = LM + AW - cajaW;
+  const letrasW = AW - cajaW - 16;
+  const filas: Array<[string, string]> = [['Subtotal', dinero(q.subtotal)]];
+  if (q.conIva) filas.push([`I.V.A. (${q.ivaPorciento}%)`, dinero(q.iva)]);
+  const altoFila = ALTO_FILA_TOTAL;
+  asegurar(p, altoDeTotales(q) + 8);
+  texto(p, q.letras, LM, p.y + 4, letrasW, { size: 7.6, color: GRIS });
+  let y = p.y;
+  for (const [etiqueta, valor] of filas) {
+    renglonFijo(p, etiqueta, x + 6, y + 5, 90, F.texto, 8, TINTA);
+    renglonFijo(p, valor, x + 80, y + 5, cajaW - 86, F.texto, 8, TINTA, 'right', true);
+    y += altoFila;
+    p.doc.save();
+    p.doc.strokeColor(LINEA).lineWidth(0.4).moveTo(x, y).lineTo(x + cajaW, y).stroke();
+    p.doc.restore();
+  }
+  p.doc.save();
+  p.doc.rect(x, y, cajaW, 22).fill(AZUL);
+  p.doc.restore();
+  renglonFijo(p, `TOTAL PROYECTO (${q.moneda})`, x + 6, y + 7, 112, F.fuerte, 7.6, '#FFFFFF');
+  renglonFijo(p, dinero(q.total), x + 80, y + 6.4, cajaW - 86, F.fuerte, 8.6, '#FFFFFF', 'right', true);
+  p.y = y + 22;
+}
+
+function apartadoEconomico(p: Lapiz, q: FormatoNexara, a: Apartado) {
+  hojaEnBlanco(p);
+  tituloDeApartado(p, a);
+  parrafo(p, 'A continuación se presenta el desglose de inversión correspondiente a esta propuesta.', { despues: 8 });
+
+  const columnas = columnasDeTabla(q.partidas.some((d) => d.modelo || d.marca));
+  encabezadoDeTabla(p, columnas);
+  const grupos = gruposDeTabla(q.partidas);
+  // Los totales nunca quedan solos en una hoja: viajan con la última partida.
+  const reservaFinal = altoDeTotales(q) + 18;
+  let n = 0;
+  grupos.forEach(({ etiqueta, partidas }, i) => {
+    if (etiqueta) filaDeGrupo(p, `${String.fromCharCode(65 + i)}. ${etiqueta}`, columnas);
+    for (const partida of partidas) {
+      n += 1;
+      filaPartida(p, partida, columnas, n % 2 === 0, n === q.partidas.length ? reservaFinal : 0);
+    }
+  });
+  if (!q.partidas.length) {
+    texto(p, 'Sin partidas capturadas.', LM + 8, p.y + 6, AW - 16, { size: 8, color: GRIS });
+    p.y += 22;
+  }
+  p.y += 10;
+  totales(p, q);
+}
+
+/** Los tres grupos del diseño, con letra; si quien cotiza numeró a mano, su orden manda y no hay grupos. */
+function gruposDeTabla(partidas: PartidaFormato[]): Array<{ etiqueta: string | null; partidas: PartidaFormato[] }> {
+  if (partidas.some((d) => d.numeroPropio)) return [{ etiqueta: null, partidas }];
+  const grupos = GRUPOS.map((grupo) => ({
+    etiqueta: ETIQUETA_DE_TABLA[grupo],
+    partidas: partidas.filter((d) => d.grupo === grupo),
+  })).filter((g) => g.partidas.length);
+  return grupos.length === 1 ? [{ etiqueta: null, partidas: grupos[0]!.partidas }] : grupos;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Condiciones y firma
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FIRMA_ANCHO = 96;
+const FIRMA_ALTO = FIRMA_ANCHO * (232 / 288);
+const ALTO_DE_FIRMA = 18 + FIRMA_ALTO - 8 + 6 + 12 + 12 + 12;
+
+function condicionesDe(q: FormatoNexara): string[] {
+  const lineas = [`Tiempo de entrega: ${q.entrega}`];
+  if (q.condicionesPago) lineas.push(`Condiciones de pago: ${q.condicionesPago}`);
+  lineas.push(`Vigencia: ${q.vigencia}`);
+  // Con la póliza impresa la garantía ya está dicha ahí: aquí sería repetirla.
+  if (q.garantia && !q.garantias.length) lineas.push(`Garantía: ${q.garantia}`);
+  lineas.push(
+    `Moneda: Precios en ${q.moneda === 'USD' ? 'dólares americanos (USD)' : 'pesos mexicanos (MXN)'}, ${
+      q.conIva ? `más IVA ${q.ivaPorciento}% desglosado.` : 'sin IVA (no incluye factura).'
+    }${q.tipoCambioNota ? ` ${q.tipoCambioNota}` : ''}`,
+  );
+  return lineas;
+}
+
+const TAMANO_CONDICIONES = 8.6;
+const RENGLON_CONDICIONES = 12;
+
+function cierre(p: Lapiz, q: FormatoNexara) {
+  const condiciones = condicionesDe(q);
+  // Condiciones, términos y firma van juntos en la hoja de los totales si ahí caben; si no, en la suya.
+  const altoDeLista = (lineas: string[]) =>
+    lineas.reduce(
+      (acc, l) => acc + partirTexto(p, l, AW - 14, TAMANO_CONDICIONES, F.texto).length * RENGLON_CONDICIONES + 3,
+      0,
+    );
+  const altoTotal =
+    14 + 16 + altoDeLista(condiciones) + (q.terminos.length ? 10 + 16 + altoDeLista(q.terminos) : 0) + 16 + ALTO_DE_FIRMA;
+  if (p.y + altoTotal > BOTTOM && altoTotal <= BOTTOM - TOP) hoja(p);
+
+  p.y += p.y === TOP ? 0 : 14;
+  if (p.y === TOP) p.y = 76;
+  asegurar(p, 60);
+  renglonFijo(p, 'CONDICIONES COMERCIALES', LM, p.y, AW, F.fuerte, 9.6, VERDE_OSC);
+  p.y += 16;
+  for (const linea of condiciones) {
+    conEtiquetaEnLinea(p, linea, { x: LM, size: TAMANO_CONDICIONES, lh: RENGLON_CONDICIONES, colorEtiqueta: VERDE_OSC });
+  }
+
+  if (q.terminos.length) {
+    p.y += 10;
+    asegurar(p, 36);
+    renglonFijo(p, 'TÉRMINOS Y CONDICIONES', LM, p.y, AW, F.fuerte, 9.6, VERDE_OSC);
+    p.y += 16;
+    for (const linea of q.terminos) {
+      conEtiquetaEnLinea(p, linea, {
+        x: LM + 11,
+        size: TAMANO_CONDICIONES,
+        lh: RENGLON_CONDICIONES,
+        marca: (y) => {
+          p.doc.save();
+          p.doc.rect(LM + 1, y + 2.8, 4.2, 4.2).fill(TINTA);
+          p.doc.restore();
+        },
+      });
+    }
+  }
+
+  p.y += 16;
+  asegurar(p, ALTO_DE_FIRMA);
+  texto(p, 'ATENTAMENTE', LM, p.y, AW, { font: F.fuerte, size: 8.6, color: TINTA, align: 'center' });
+  p.y += 18;
+  // Firma impresa de Christian: queda fija en todas las cotizaciones (pidió Monica por WhatsApp).
+  const firma = path.join(directorioAssets(), 'firma_christian.png');
+  if (fs.existsSync(firma)) {
+    p.doc.image(firma, LM + (AW - FIRMA_ANCHO) / 2, p.y, { width: FIRMA_ANCHO, height: FIRMA_ALTO });
+  }
+  p.y += FIRMA_ALTO - 8;
+  const firmaX = LM + AW * 0.275;
+  p.doc.save();
+  p.doc.strokeColor(CARBON).lineWidth(0.8).moveTo(firmaX, p.y).lineTo(firmaX + AW * 0.45, p.y).stroke();
+  p.doc.restore();
+  p.y += 6;
+  texto(p, FIRMA.nombre, LM, p.y, AW, { size: 8.6, color: TINTA, align: 'center' });
+  p.y += 12;
+  texto(p, FIRMA.cargo, LM, p.y, AW, { size: 7.6, color: TINTA, align: 'center' });
+  p.y += 12;
+  texto(p, FIRMA.razon, LM, p.y, AW, { font: F.semi, size: 7.6, color: TINTA, align: 'center' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Número que imprime una hoja del documento base: las que siguen a los planos en PDF los cuentan. */
+export function paginaImpresa(hoja: number, paginaTrasPlanos: number, paginasPdf: number): number {
+  return paginaTrasPlanos && hoja > paginaTrasPlanos ? hoja + paginasPdf : hoja;
+}
+
+/** Páginas que van a anexar los planos en PDF: la paginación las cuenta antes de escribirse. */
+async function paginasDePlanos(pdfs: PlanosClasificados['pdfs']): Promise<number> {
+  let total = 0;
+  for (const { archivo } of pdfs) {
+    try {
+      total += (await PDFLibDocument.load(await fs.promises.readFile(archivo))).getPageCount();
+    } catch {
+      /* `anexarPaginasPdf` también lo salta */
+    }
+  }
+  return total;
+}
+
+/**
+ * La cotización que descarga y recibe el cliente: la «Memoria descriptiva y propuesta
+ * técnica-económica» del diseño de NEXARA. Portada, hoja de título, alcance ejecutivo (lo escrito o
+ * un borrador corto de las partidas), bloques de alcance, planos, póliza de garantías, propuesta
+ * económica y, al final, condiciones, términos y firma. Cada dato se imprime una sola vez.
+ *
+ * Una imagen de plano va a hoja propia; un PDF (lo normal en CAD y en la hoja de servicio) anexa sus
+ * páginas reales justo después del apartado de planos, sin convertirlo a imagen: no pierde nitidez ni
+ * texto seleccionable. Si se pasa `secciones`, se llena con la página donde empieza cada parte (la
+ * vista previa del editor lleva ahí el PDF).
  */
 export async function generarCotizacionNexaraPdf(
   quote: QuoteLike | FormatoNexara,
   planos: PlanoArchivo[] = [],
+  secciones?: SeccionesPropuesta,
 ): Promise<Buffer> {
   const q = 'partidas' in quote && 'letras' in quote ? (quote as FormatoNexara) : formatoDesdeCotizacion(quote as QuoteLike);
-  const anexos = clasificarPlanos(planos);
-  const dir = directorioAssets();
+  const anexos = clasificarPlanos(q.conPlanos ? planos : []);
+  const hayPlanos = anexos.imagenes.length + anexos.pdfs.length + anexos.otros.length > 0;
+  const paginasPdf = await paginasDePlanos(anexos.pdfs);
   const doc = new PDFDocument({ size: 'LETTER', margin: 0, autoFirstPage: false, bufferPages: true });
   doc.info.Title = `Cotización ${q.numero}`;
   doc.info.Author = 'NEXARA';
-  const { regular, bold } = fuentes(doc, dir);
-  const p: Lapiz = { doc, y: 0, f: regular, fb: bold, numero: q.numero, pagina: 0 };
+  registrarFuentesCorporativas(doc);
+  const p: Lapiz = { doc, y: 0, numero: q.numero, pagina: 0, paginaDe: {} };
   const trozos: Buffer[] = [];
   doc.on('data', (t: Buffer) => trozos.push(t));
   const listo = new Promise<Buffer>((resolve, reject) => {
@@ -668,153 +1246,46 @@ export async function generarCotizacionNexaraPdf(
     doc.on('error', reject);
   });
 
+  const apartados = apartadosDe(q, hayPlanos);
+  doc.addPage({ size: 'LETTER', margin: 0 });
+  p.pagina = 1;
+  dibujarPortada(doc, { version: q.version, indice: apartados.map(({ numero, titulo }) => ({ numero, titulo })) });
+  hojaDeTitulo(p, q);
   hoja(p);
-  const mitad = (AW - 12) / 2;
-  const altoIzq = cajaDatos(p, LM, mitad, 'DATOS DEL CLIENTE', [
-    ['Cliente:', q.cliente],
-    ['Atención:', q.atencion],
-    ['Teléfono:', q.telefono],
-    ['Correo:', q.correo],
-    ['Ubicación:', q.ubicacion],
-  ]);
-  const yDatos = p.y;
-  const altoDer = cajaDatos(p, LM + mitad + 12, mitad, 'DATOS DE LA COTIZACIÓN', [
-    ['Fecha de emisión:', q.fecha],
-    ['Cotización N°:', q.numero],
-    ['Validez:', `${q.vigenciaDias} días`],
-    ['Moneda:', q.moneda],
-    ['Proyecto:', q.proyecto],
-  ]);
-  p.y = yDatos + Math.max(altoIzq, altoDer) + 10;
-  franja(p, [
-    ['Responsable comercial', q.responsable],
-    ['Trabajo', q.trabajo],
-    ['Condiciones de pago', q.pagoCorto],
-    ['Fecha de vencimiento', q.vence || '—'],
-  ]);
-  p.y += 10;
 
-  const anchos = [AW * 0.09, AW * 0.45, AW * 0.1, AW * 0.07, AW * 0.145, AW * 0.145];
-  filaPartida(p, null, anchos, true);
-  q.partidas.forEach((partida, i) => filaPartida(p, partida, anchos, false, i % 2 === 1));
-  if (!q.partidas.length) {
-    texto(p, 'Sin partidas capturadas.', LM + 8, p.y + 6, AW - 16, { size: 8, color: GRIS });
-    p.y += 22;
+  // Última hoja antes de los planos en PDF: ahí se insertan sus páginas.
+  let paginaTrasPlanos = 0;
+  for (const a of apartados) {
+    if (a.clave === 'objetivo') apartadoEjecutivo(p, q, a);
+    else if (a.clave === 'alcance') apartadoDeAlcance(p, q, a);
+    else if (a.clave === 'planos') {
+      apartadoDePlanos(p, a, anexos);
+      paginaTrasPlanos = p.pagina;
+      // Lo que sigue no puede quedar en la misma hoja que precede a las páginas anexadas.
+      if (anexos.pdfs.length) hoja(p);
+    } else if (a.clave === 'garantias') apartadoDeGarantias(p, q, a);
+    else apartadoEconomico(p, q, a);
   }
-  p.doc.save();
-  p.doc.strokeColor(LINEA).lineWidth(0.6).rect(LM, p.y - (q.partidas.length ? 0 : 22), AW, 0.6).stroke();
-  p.doc.restore();
-  p.y += 8;
-  totales(p, q);
+  cierre(p, q);
 
-  p.y += 12;
-  asegurar(p, 80);
-  texto(p, 'CONDICIONES COMERCIALES', LM, p.y, AW, { font: p.fb, size: 10, color: TEAL_OSC });
-  p.y += 16;
-  const condiciones: Array<[string, string]> = [['Tiempo de entrega:', q.entrega]];
-  if (q.condicionesPago) condiciones.push(['Condiciones de pago:', q.condicionesPago]);
-  condiciones.push(['Vigencia:', q.vigencia]);
-  if (q.garantia) condiciones.push(['Garantía:', q.garantia]);
-  condiciones.push([
-    'Moneda:',
-    `Precios en ${q.moneda === 'USD' ? 'dólares americanos (USD)' : 'pesos mexicanos (MXN)'}, ${
-      q.conIva ? `más IVA ${q.ivaPorciento}% desglosado.` : 'sin IVA (no incluye factura).'
-    }`,
-  ]);
-  for (const [k, v] of condiciones) {
-    const h = Math.max(altoDe(p, v, AW * 0.76, 8), 12);
-    asegurar(p, h + 4);
-    texto(p, k, LM, p.y, AW * 0.22, { font: p.fb, size: 8, color: TEAL_OSC });
-    texto(p, v, LM + AW * 0.22, p.y, AW * 0.78, { size: 8, color: TINTA });
-    p.y += h + 3;
-  }
-
-  if (q.terminos.length) {
-    p.y += 8;
-    asegurar(p, 36);
-    texto(p, 'TÉRMINOS Y CONDICIONES', LM, p.y, AW, { font: p.fb, size: 10, color: TEAL_OSC });
-    p.y += 14;
-    for (const linea of q.terminos) {
-      const h = altoDe(p, linea, AW - 16, 7.8);
-      asegurar(p, h + 4);
-      texto(p, '■', LM, p.y, 12, { size: 7, color: TEAL });
-      texto(p, linea, LM + 12, p.y, AW - 14, { size: 7.8, color: TINTA });
-      p.y += h + 4;
-    }
-  }
-
-  if (anexos.otros.length) {
-    hoja(p);
-    texto(p, 'ANEXOS', LM, p.y, AW, { font: p.fb, size: 10, color: TEAL_OSC });
-    p.y += 16;
-    texto(p, 'Anexos que acompañan a esta cotización (no se pudieron imprimir aquí):', LM, p.y, AW, { size: 8, color: TINTA });
-    p.y += 14;
-    for (const nombre of anexos.otros) {
-      texto(p, `•  ${nombre}`, LM + 4, p.y, AW - 8, { size: 8, color: TINTA });
-      p.y += 13;
-    }
-  }
-  // Cada plano en imagen a página completa, como dice la ayuda del editor de «03 Planos».
-  for (const { nombre, imagen } of anexos.imagenes) {
-    hoja(p);
-    texto(p, nombre, LM, p.y, AW, { font: p.fb, size: 9, color: CARBON });
-    p.y += 16;
-    const altoDisponible = BOTTOM - p.y;
-    const escala = Math.min(AW / imagen.ancho, altoDisponible / imagen.alto, 1);
-    const ancho = Math.round(imagen.ancho * escala);
-    const alto = Math.round(imagen.alto * escala);
-    try {
-      p.doc.image(imagen.datos, LM + (AW - ancho) / 2, p.y, { width: ancho, height: alto });
-    } catch {
-      /* un anexo corrupto deja su hueco en blanco, no tumba la cotización */
-    }
-    p.y += alto;
-  }
-
-  // El cierre va siempre al final de verdad: después de los anexos, incluso de los planos en PDF
-  // (que se insertan más abajo antes de esta página) — nunca antes de ellos. Si hubo anexos con
-  // página propia (lista o imagen), el cierre arranca su propia hoja: nunca se encima a un plano.
-  if (anexos.otros.length || anexos.imagenes.length) {
-    hoja(p);
-  } else {
-    p.y += 22;
-  }
-  asegurar(p, 150);
-  texto(p, 'ATENTAMENTE', LM, p.y, AW, { font: p.fb, size: 9, color: TINTA, align: 'center' });
-  p.y += 18;
-  // Firma impresa de Christian: queda fija en todas las cotizaciones (pidió Monica por WhatsApp).
-  const firma = path.join(directorioAssets(), 'firma_christian.png');
-  const firmaW = 110;
-  const firmaH = firmaW * (232 / 288);
-  if (fs.existsSync(firma)) {
-    p.doc.image(firma, LM + (AW - firmaW) / 2, p.y, { width: firmaW, height: firmaH });
-  }
-  p.y += firmaH - 8;
-  const firmaX = LM + AW * 0.275;
-  p.doc.save();
-  p.doc.strokeColor(CARBON).lineWidth(0.8).moveTo(firmaX, p.y).lineTo(firmaX + AW * 0.45, p.y).stroke();
-  p.doc.restore();
-  p.y += 6;
-  texto(p, FIRMA.nombre, LM, p.y, AW, { size: 9, color: TINTA, align: 'center' });
-  p.y += 12;
-  texto(p, FIRMA.cargo, LM, p.y, AW, { size: 8, color: TINTA, align: 'center' });
-  p.y += 12;
-  texto(p, FIRMA.razon, LM, p.y, AW, { font: p.fb, size: 8, color: TINTA, align: 'center' });
-
-  const total = p.pagina;
+  const totalBase = p.pagina;
+  const total = totalBase + paginasPdf;
   const rango = doc.bufferedPageRange();
-  for (let i = 0; i < rango.count; i += 1) {
+  for (let i = 1; i < rango.count; i += 1) {
     doc.switchToPage(rango.start + i);
-    doc.font(regular).fontSize(7).fillColor(GRIS);
-    doc.text(`${q.numero}  ·  Página ${i + 1} de ${total}`, LM, 698, {
-      width: AW,
-      align: 'right',
-      lineBreak: false,
-    });
+    const impresa = paginaImpresa(i + 1, paginaTrasPlanos, paginasPdf);
+    doc.font(F.texto).fontSize(7).fillColor(GRIS);
+    doc.text(`${q.numero}  ·  Página ${impresa} de ${total}`, LM, 696, { width: AW, align: 'right', lineBreak: false });
+  }
+  if (secciones) {
+    const { paginaDe } = p;
+    secciones.portada = 1;
+    if (paginaDe.objetivo) secciones.objetivo = paginaDe.objetivo;
+    if (paginaDe.alcance) secciones.alcance = paginaDe.alcance;
+    if (paginaDe.planos) secciones.planos = paginaDe.planos;
+    if (paginaDe.cotizacion) secciones.cotizacion = paginaImpresa(paginaDe.cotizacion, paginaTrasPlanos, paginasPdf);
   }
   doc.end();
   const base = await listo;
-  // antesDeFinal: 1 — la última página de `base` siempre es la del cierre (ATENTAMENTE y firma);
-  // los planos en PDF se insertan justo antes, nunca después.
-  return anexarPaginasPdf(base, anexos.pdfs, { antesDeFinal: 1 });
+  return anexarPaginasPdf(base, anexos.pdfs, { antesDeFinal: totalBase - paginaTrasPlanos });
 }

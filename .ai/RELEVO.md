@@ -1,5 +1,27 @@
 # RELEVO
 
+- **01-11 ~12:30 (claude-code) — Cotizaciones: el PDF del cliente ahora es la «Memoria descriptiva» del Canva de Adam, con su portada, en todas.**
+  - **Lo que hay que saber:** el PDF que sale al cliente (descarga, correo, portal y vista previa) es `generarCotizacionNexaraPdf` en
+    `cotizaciones/cotizacion-formato-nexara.ts`. `propuesta-tecnica-pdf.ts` ya no se usa desde el 28-09: `buildPropuesta` no tiene
+    quién la llame. Por eso Objetivo y Alcance del editor no se imprimían aunque el editor dijera «el PDF imprime…».
+  - Portada y marco de hoja en `cotizacion-marco.ts` (vectores medidos del Canva; arte `assets/cotizacion-nexara/portada-nexara.jpg`,
+    reescalado con Real-ESRGAN a 2040×2640, 630 KB). Datos del pie fijos en `CONTACTO`, como en el diseño: `soporte@`, no el `soluciones@`
+    del membrete viejo. `membrete_carta.png`, `logo_nexara.png` y las URW Gothic ya no los usa este PDF.
+  - Orden: portada con índice dinámico → hoja de título (datos fiscales arriba, proyecto, cliente y folio una sola vez) → 1 Alcance
+    ejecutivo → un apartado por cada bloque del alcance (más de 5 van juntos en «Alcance técnico») → Planos → Póliza → Propuesta económica
+    (grupos A/B/C con Modelo/SKU) → condiciones, términos y firma. Lo vacío o apagado no se numera ni sale en el índice.
+  - Quitado por repetido: cajas de cliente y de datos, franja (responsable, trabajo, pago corto, vencimiento) y la columna Partida. Si
+    alguien numeró a mano (`1.1`, hoy nadie en producción) el número se imprime y su orden manda sobre los grupos.
+  - Objetivo sin escribir: tres puntos como máximo (`objetivo-plantilla.ts`), sin «Proyecto: X» ni lo que ya dice la tabla. Lo escrito manda.
+  - **Decisión de Adam (01-11):** la garantía es la capturada en cada cotización, no el «1 año» del Canva. Se agregan 6 meses en instalación
+    solo si se cobra instalación y el texto no habla ya de los trabajos, y las 4 exclusiones. Sin términos o en licitación no hay póliza.
+  - Planos en PDF: sus páginas van justo después del apartado de planos y la paginación ya las cuenta (`paginaImpresa`). La vista previa
+    vuelve a saltar a cada sección (`secciones`). «Planos» apagado en Personalizar ya se respeta, y la nota de tipo de cambio se imprime.
+  - Editor: 01 Alcance ejecutivo, 02 Alcance técnico, 04 Propuesta económica. Se quitaron de la vista los controles que el PDF ignoraba:
+    carta, firmas, firma, imagen y precio unitario (ninguna cotización usaba carta, firmas ni precio alzado; una tenía imagen) y el campo
+    Trabajo. Los datos guardados siguen ahí.
+  - Muestra aprobada por Adam antes de desplegar.
+
 - **01-11 ~13:00 (claude-code) — Libro de costos: investigación de OPUS 27, esquema y propuesta. No hay código; espera el visto bueno de Adam.**
   - Pedido: ingeniería inversa de OPUS y construir algo de ese calibre, ligando costos a cotizaciones, nómina, autos,
     herramienta y almacén. Se hizo solo **funcional**: su licencia prohíbe descompilar. No se instaló REA ni se bajó el programa.

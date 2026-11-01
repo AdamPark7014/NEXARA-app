@@ -29,8 +29,8 @@ function origen(b: BloqueEditor): string | null {
 }
 
 /**
- * 02 Alcance del proyecto: el título del proyecto como encabezado, un párrafo de entrada y las
- * subsecciones numeradas (título, párrafo y viñetas), como en la propuesta modelo.
+ * 02 Alcance técnico: el título del proyecto como encabezado, un párrafo de entrada y las
+ * subsecciones (título, párrafo y viñetas), que en el PDF son apartados numerados.
  */
 export default function SeccionAlcance({
   doc,
@@ -107,9 +107,9 @@ export default function SeccionAlcance({
       onIncluir={onIncluir}
       id="alcance"
       numero="02"
-      titulo="Alcance del proyecto"
+      titulo="Alcance técnico"
       descripcion="Qué se hace, subsección por subsección."
-      ayuda="Cada subsección lleva título, párrafos y viñetas y el PDF las numera; una sin título sale como párrafo suelto y, sin subsecciones, el documento remite a la sección 04."
+      ayuda="Cada subsección con título es un apartado del PDF y sale en el índice de la portada; una sin título sigue a la anterior y, con más de cinco, van juntas en un solo apartado."
       acciones={
         editable ? (
           <Button size="sm" iconStart={<LibraryAddOutlinedIcon />} onClick={() => setVerPlantillas((v) => !v)} aria-expanded={verPlantillas}>

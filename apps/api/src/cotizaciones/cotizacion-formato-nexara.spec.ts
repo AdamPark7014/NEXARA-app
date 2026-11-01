@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { PDFDocument as PDFLibDocument } from 'pdf-lib';
-import { formatoDesdeCotizacion, generarCotizacionNexaraPdf } from './cotizacion-formato-nexara.js';
+import { formatoDesdeCotizacion, generarCotizacionNexaraPdf, paginaImpresa } from './cotizacion-formato-nexara.js';
 import { importeConLetra } from './importe-letra.js';
 import { textoPorHoja } from '../common/pdf/texto-de-pdf.js';
 import { loadNexaraLogo } from '../common/pdf/nexara-pdf-theme.js';
@@ -151,7 +151,239 @@ describe('formato Nexara', () => {
     expect(fs.existsSync(firma)).toBe(true);
   });
 
-  it('un plano en PDF (el que de verdad descarga el cliente) anexa sus páginas reales', async () => {
+  describe('el diseño de NEXARA', () => {
+    const instalacion = { name: 'Instalación y puesta en marcha', unit: 'Servicio', qty: 1, unitPrice: 5000, tax: 16 };
+    const cuantas = (texto: string, buscado: string) => texto.split(buscado).length - 1;
+
+    it('la portada lleva el arte y el índice de lo que trae esta cotización', async () => {
+      const pdf = await generarCotizacionNexaraPdf(grupoDice);
+      const [portada] = textoPorHoja(pdf);
+      for (const esperado of ['NEXARA', 'MEMORIA', 'TÉCNICA-ECONÓMICA', 'VERSIÓN 1.0', 'ALCANCE EJECUTIVO', 'PROPUESTA ECONÓMICA DETALLADA']) {
+        expect(portada).toContain(esperado);
+      }
+      // Lo que no trae no se anuncia.
+      expect(portada).not.toContain('PLANOS');
+      expect(portada).not.toContain('Página');
+      expect(pdf.toString('latin1')).toContain('/DCTDecode');
+    });
+
+    it('la versión de la portada es la revisión; un borrador de algo que ya salió es la siguiente', async () => {
+      const r3 = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, revision: 3, status: 'SENT' }));
+      expect(r3[0]).toContain('VERSIÓN 3.0');
+      const borrador = textoPorHoja(
+        await generarCotizacionNexaraPdf({ ...grupoDice, revision: 1, status: 'DRAFT', sentAt: '2026-09-28' }),
+      );
+      expect(borrador[0]).toContain('VERSIÓN 2.0');
+    });
+
+    it('cada dato se imprime una sola vez: sin franja, sin cajas repetidas', async () => {
+      const texto = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, clientName: 'Eva Benavides' })).join('\n');
+      for (const una of ['Grupo Dice Puebla', 'Eva Benavides', 'Puebla, Pue.', '903,724.24', 'Christian Del Pozo', '04/10/2026']) {
+        expect(cuantas(texto, una)).toBe(1);
+      }
+      expect(texto).not.toContain('Trabajo');
+      expect(texto).not.toContain('DATOS DEL CLIENTE');
+      expect(texto).not.toContain('50% anticipo');
+    });
+
+    it('el alcance ejecutivo sin escribir son tres puntos cortos, sin repetir la tabla', async () => {
+      const f = formatoDesdeCotizacion({ ...grupoDice, items: [...grupoDice.items, instalacion] });
+      expect(f.objetivo!.beneficios).toHaveLength(3);
+      const impreso = textoPorHoja(await generarCotizacionNexaraPdf(f)).join('\n');
+      expect(impreso).toContain('Beneficios principales');
+      expect(impreso).toContain('Resultado esperado');
+      expect(impreso).not.toContain('×');
+      expect(impreso).not.toContain('Proyecto:');
+      expect(impreso).not.toContain('Precios firmes');
+    });
+
+    it('lo escrito en el editor es lo que sale, cada bloque como apartado numerado', async () => {
+      const hojas = textoPorHoja(
+        await generarCotizacionNexaraPdf({
+          ...grupoDice,
+          objetivo: 'Mi introducción.\n\nBeneficios:\n1. Uno.\n2. Dos.\n\nCierre:\nMi cierre.',
+          scope: 'Mi párrafo de entrada.',
+          alcanceBloques: [
+            { titulo: 'Justificación tecnológica', texto: 'Por qué estos equipos.', vinetas: ['Protección activa: con luz y audio.'] },
+            { titulo: '', texto: 'Sigue del anterior.' },
+            { titulo: 'Centro de monitoreo', vinetas: ['Con respaldo.'] },
+          ],
+        }),
+      );
+      const texto = hojas.join('\n');
+      for (const esperado of ['Mi introducción.', 'Mi párrafo de entrada.', 'Uno.', 'Dos.', 'Mi cierre.', 'Por qué estos equipos.', 'Sigue del anterior.', 'Protección activa:', 'con luz y audio.', 'Con respaldo.']) {
+        expect(texto).toContain(esperado);
+      }
+      expect(texto).toContain('1. ALCANCE EJECUTIVO');
+      expect(texto).toContain('2. JUSTIFICACIÓN TECNOLÓGICA');
+      expect(texto).toContain('3. CENTRO DE MONITOREO');
+      expect(texto).toContain('5. PROPUESTA ECONÓMICA DETALLADA');
+      expect(hojas[0]).toContain('JUSTIFICACIÓN TECNOLÓGICA');
+    });
+
+    it('lo pegado de Word sale limpio: sin tabuladores y con sus viñetas', async () => {
+      const texto = textoPorHoja(
+        await generarCotizacionNexaraPdf({ ...grupoDice, objetivo: 'Detalle:\n•\tLicencia de software.\n-\tTerminal biométrica.' }),
+      ).join('\n');
+      expect(texto).toContain('Licencia de software.');
+      expect(texto).toContain('Terminal biométrica.');
+      expect(texto).not.toContain('\t');
+      expect(texto).not.toContain('•');
+    });
+
+    it('más de cinco bloques van juntos en un solo apartado, para no llenar el índice', async () => {
+      const alcanceBloques = Array.from({ length: 6 }, (_, i) => ({ titulo: `Bloque ${i + 1}`, texto: `Texto ${i + 1}.` }));
+      const hojas = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, alcanceBloques }));
+      const texto = hojas.join('\n');
+      expect(texto).toContain('2. ALCANCE TÉCNICO');
+      expect(texto).toContain('2.1  Bloque 1');
+      expect(texto).toContain('2.6  Bloque 6');
+      expect(hojas[0]).not.toContain('BLOQUE 1');
+    });
+
+    it('lo apagado en «Personalizar» desaparece y el índice se recorre', async () => {
+      const opciones = { secciones: { objetivo: false, alcance: false, planos: false, terminos: false } };
+      const hojas = textoPorHoja(
+        await generarCotizacionNexaraPdf(
+          { ...grupoDice, scope: 'No debe salir.', objetivo: 'Tampoco.', opciones },
+          [{ url: '/uploads/no-existe.png', nombre: 'Plano apagado' }],
+        ),
+      );
+      const texto = hojas.join('\n');
+      expect(texto).not.toContain('No debe salir.');
+      expect(texto).not.toContain('Tampoco.');
+      expect(texto).not.toContain('Plano apagado');
+      expect(texto).not.toContain('PÓLIZA');
+      expect(texto).toContain('1. PROPUESTA ECONÓMICA DETALLADA');
+      // Sin póliza, la garantía se queda en las condiciones.
+      expect(texto).toContain('Garantía:');
+    });
+
+    it('la póliza dice la garantía una sola vez, y la de instalación solo si se cobra', async () => {
+      const soloEquipo = textoPorHoja(await generarCotizacionNexaraPdf(grupoDice)).join('\n');
+      expect(soloEquipo).toContain('PÓLIZA DE GARANTÍAS Y EXCLUSIONES');
+      expect(soloEquipo).toContain('Equipos:');
+      expect(soloEquipo).not.toContain('Instalación:');
+      expect(soloEquipo).not.toContain('Garantía:');
+      expect(cuantas(soloEquipo, 'La otorgada por el fabricante.')).toBe(1);
+      for (const exclusion of ['Manipulación por terceros:', 'Vandalismo o daño mecánico:', 'Descargas eléctricas y red del inmueble:', 'Caso fortuito o uso indebido:']) {
+        expect(soloEquipo).toContain(exclusion);
+      }
+
+      const conObra = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, items: [...grupoDice.items, instalacion] })).join('\n');
+      expect(conObra).toContain('Instalación:');
+      expect(conObra).toContain('6 meses de garantía');
+
+      // Si quien cotiza ya habló de los trabajos, no se le agrega otra garantía encima.
+      const propia = textoPorHoja(
+        await generarCotizacionNexaraPdf({
+          ...grupoDice,
+          items: [...grupoDice.items, instalacion],
+          opciones: { condiciones: { garantia: '12 meses sobre los trabajos de mano de obra.' } },
+        }),
+      ).join('\n');
+      expect(propia).toContain('12 meses sobre los trabajos de mano de obra.');
+      expect(propia).not.toContain('6 meses de garantía');
+    });
+
+    it('en licitación mandan las bases: sin póliza', async () => {
+      const texto = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, segmento: 'LICITACION' })).join('\n');
+      expect(texto).not.toContain('PÓLIZA');
+      expect(texto).toContain('Garantía:');
+    });
+
+    it('la tabla agrupa con letra; con un solo grupo o con números a mano, no', async () => {
+      const it = (name: string, unit: string, model?: string) => ({ name, unit, model, qty: 1, unitPrice: 100, tax: 16 });
+      const conGrupos = textoPorHoja(
+        await generarCotizacionNexaraPdf({
+          ...grupoDice,
+          items: [it('Instalación de cámaras', 'Servicio'), it('Cámara domo', 'Pieza', 'DS-2CD'), it('Bobina de cable', 'Rollo')],
+        }),
+      ).join('\n');
+      for (const encabezado of ['Unidad', 'Cant.', 'Concepto / Descripción', 'Modelo / SKU', 'Precio Venta', 'Total Venta', 'TOTAL PROYECTO (MXN)', 'I.V.A. (16%)']) {
+        expect(conGrupos).toContain(encabezado);
+      }
+      expect(conGrupos).toContain('A. EQUIPAMIENTO ACTIVO Y ACCESORIOS');
+      expect(conGrupos).toContain('B. INFRAESTRUCTURA Y MATERIALES');
+      expect(conGrupos).toContain('C. SERVICIOS DE IMPLEMENTACIÓN Y PUESTA A PUNTO');
+      // Equipos primero, aunque se haya capturado al final.
+      expect(conGrupos.indexOf('Cámara domo')).toBeLessThan(conGrupos.indexOf('Instalación de cámaras'));
+
+      const unGrupo = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, items: [it('Cámara domo', 'Pieza', 'DS-2CD')] })).join('\n');
+      expect(unGrupo).not.toContain('A. EQUIPAMIENTO');
+
+      const aMano = textoPorHoja(
+        await generarCotizacionNexaraPdf({
+          ...grupoDice,
+          items: [
+            { ...it('Instalación', 'Servicio'), partida: '1' },
+            { ...it('Cámara domo', 'Pieza'), partida: '1.1' },
+          ],
+        }),
+      ).join('\n');
+      expect(aMano).not.toContain('A. EQUIPAMIENTO');
+      expect(aMano).toContain('1.1 · Cámara domo');
+      expect(aMano.indexOf('Instalación')).toBeLessThan(aMano.indexOf('Cámara domo'));
+    });
+
+    it('sin ningún modelo no hay columna vacía', async () => {
+      const texto = textoPorHoja(
+        await generarCotizacionNexaraPdf({ ...grupoDice, items: [{ name: 'Cámara', unit: 'Pieza', qty: 1, unitPrice: 100, tax: 16 }] }),
+      ).join('\n');
+      expect(texto).not.toContain('Modelo / SKU');
+    });
+
+    it('marca y modelo salen en su columna, sin etiquetas repetidas', async () => {
+      const texto = textoPorHoja(await generarCotizacionNexaraPdf(grupoDice)).join('\n');
+      expect(texto).toContain('MS130-48X');
+      expect(texto).toContain('Cisco Meraki');
+      expect(texto).not.toContain('Marca:');
+      expect(texto).not.toContain('Modelo:');
+    });
+
+    it('los totales nunca quedan solos en una hoja: viajan con la última partida', async () => {
+      for (const cantidad of [14, 18, 22, 26, 30, 34, 38]) {
+        const items = Array.from({ length: cantidad }, (_, i) => ({ name: `Equipo ${i + 1}`, unit: 'Pieza', model: `M-${i + 1}`, qty: 1, unitPrice: 100, tax: 16 }));
+        const hojas = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, items }));
+        const hojaDeTotales = hojas.find((h) => h.includes('TOTAL PROYECTO (MXN)'))!;
+        expect(hojaDeTotales).toContain(`Equipo ${cantidad}`);
+      }
+    }, 30_000);
+
+    it('dice en qué página empieza cada parte (la vista previa lleva ahí el PDF)', async () => {
+      const secciones: Record<string, number> = {};
+      const hojas = textoPorHoja(
+        await generarCotizacionNexaraPdf(
+          { ...grupoDice, alcanceBloques: [{ titulo: 'Centro de monitoreo', texto: 'Texto.' }] },
+          [],
+          secciones,
+        ),
+      );
+      expect(secciones.portada).toBe(1);
+      expect(hojas[secciones.objetivo! - 1]).toContain('ALCANCE EJECUTIVO');
+      expect(hojas[secciones.alcance! - 1]).toContain('CENTRO DE MONITOREO');
+      expect(hojas[secciones.cotizacion! - 1]).toContain('PROPUESTA ECONÓMICA DETALLADA');
+    });
+
+    it('en dólares imprime la nota del tipo de cambio', async () => {
+      const nota = 'Tipo de cambio DOF del día de pago.';
+      const texto = textoPorHoja(
+        await generarCotizacionNexaraPdf({ ...grupoDice, currency: 'USD', opciones: { tipoCambioNota: nota } }),
+      ).join('\n');
+      expect(texto).toContain('dólares americanos (USD)');
+      expect(texto).toContain('Tipo de cambio DOF');
+      expect(texto).toContain('TOTAL PROYECTO (USD)');
+    });
+
+    it('la paginación cuenta las páginas de los planos en PDF', () => {
+      // Hoja 4 es la última antes de anexar 2 páginas: la 5 del documento base se imprime como 7.
+      expect(paginaImpresa(4, 4, 2)).toBe(4);
+      expect(paginaImpresa(5, 4, 2)).toBe(7);
+      expect(paginaImpresa(5, 0, 0)).toBe(5);
+    });
+  });
+
+  it('un plano en PDF (el que de verdad descarga el cliente) anexa sus páginas reales después del apartado de planos', async () => {
     const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'nexara-cot-planos-'));
     const planoPdf = await PDFLibDocument.create();
     planoPdf.addPage([1224, 792]).drawText('RED CCTV_IPADE', { x: 40, y: 700, size: 24 });
@@ -160,16 +392,19 @@ describe('formato Nexara', () => {
     process.env['UPLOADS_ROOT'] = carpeta;
     try {
       const planos = [{ url: '/uploads/plano.pdf', nombre: 'RED CCTV_IPADE', tipo: 'pdf' }];
+      const secciones: Record<string, number> = {};
       const [conPlano, sinPlano] = await Promise.all([
-        generarCotizacionNexaraPdf(grupoDice, planos),
+        generarCotizacionNexaraPdf(grupoDice, planos, secciones),
         generarCotizacionNexaraPdf(grupoDice),
       ]);
       // pdf-lib reescribe el PDF al fusionar: el conteo de páginas se hace con la misma librería.
-      const [paginasCon, paginasSin] = await Promise.all([
-        PDFLibDocument.load(conPlano).then((d) => d.getPageCount()),
-        PDFLibDocument.load(sinPlano).then((d) => d.getPageCount()),
-      ]);
-      expect(paginasCon).toBe(paginasSin + 1);
+      const [docCon, docSin] = await Promise.all([PDFLibDocument.load(conPlano), PDFLibDocument.load(sinPlano)]);
+      expect(docCon.getPageCount()).toBeGreaterThan(docSin.getPageCount());
+      // El plano (tabloide, 1224 pt) queda después de «Planos» y antes de la propuesta económica.
+      const anchos = docCon.getPages().map((hoja) => Math.round(hoja.getWidth()));
+      const delPlano = anchos.indexOf(1224) + 1;
+      expect(delPlano).toBeGreaterThan(secciones.planos!);
+      expect(delPlano).toBeLessThan(secciones.cotizacion!);
     } finally {
       if (antes === undefined) delete process.env['UPLOADS_ROOT'];
       else process.env['UPLOADS_ROOT'] = antes;
@@ -190,11 +425,12 @@ describe('formato Nexara', () => {
       ]);
       const hojas = textoPorHoja(conPlano);
       const texto = hojas.join('\n');
-      expect(texto).toContain('Sembrado de cámaras');
-      expect(textoPorHoja(sinPlano).join('\n')).not.toContain('Sembrado de cámaras');
+      expect(texto).toContain('SEMBRADO DE CÁMARAS');
+      expect(textoPorHoja(sinPlano).join('\n')).not.toContain('SEMBRADO DE CÁMARAS');
+      expect(hojas[0]).toContain('PLANOS');
 
       // El cierre (ATENTAMENTE y firma) va al final de verdad: después del plano, no antes.
-      const paginaDelPlano = hojas.findIndex((h) => h.includes('Sembrado de cámaras'));
+      const paginaDelPlano = hojas.findIndex((h) => h.includes('SEMBRADO DE CÁMARAS'));
       const paginaDelCierre = hojas.findIndex((h) => h.includes('CHRISTIAN EDUARDO DEL POZO SÁNCHEZ'));
       expect(paginaDelPlano).toBeGreaterThanOrEqual(0);
       expect(paginaDelCierre).toBe(hojas.length - 1);
@@ -342,27 +578,29 @@ describe('formato Nexara', () => {
       'Teléfonos: 2226960350',
     ];
 
-    it('abren la primera hoja, arriba del título', async () => {
-      const [primera] = textoPorHoja(await generarCotizacionNexaraPdf(grupoDice));
-      const renglones = primera!.split('\n');
+    it('abren la hoja de título, arriba del título', async () => {
+      const [, titulo] = textoPorHoja(await generarCotizacionNexaraPdf(grupoDice));
+      const renglones = titulo!.split('\n');
       for (const linea of fiscales) expect(renglones).toContain(linea);
-      // Se dibujan antes que el título: van arriba de «COTIZACIÓN», en el orden pedido.
-      const posiciones = [...fiscales, 'COTIZACIÓN'].map((linea) => renglones.indexOf(linea));
+      // Se dibujan antes que el título, en el orden pedido.
+      const posiciones = [...fiscales, 'MEMORIA DESCRIPTIVA Y'].map((linea) => renglones.indexOf(linea));
+      expect(posiciones.every((n) => n >= 0)).toBe(true);
       expect(posiciones).toEqual([...posiciones].sort((a, b) => a - b));
     });
 
-    it('las hojas de continuación conservan su encabezado corto, sin datos fiscales', async () => {
+    it('las demás hojas no repiten los datos fiscales, solo el folio al pie', async () => {
       const viñetas = Array.from({ length: 80 }, (_, i) => `• Característica ${i + 1}: detalle`).join('\n');
       const hojas = textoPorHoja(
         await generarCotizacionNexaraPdf({ ...grupoDice, items: [{ ...grupoDice.items[0], description: viñetas }] }),
       );
       expect(hojas.length).toBeGreaterThan(1);
-      expect(hojas[0]).toContain('RFC: NEE240925V73');
-      for (const hoja of hojas.slice(1)) {
+      expect(hojas[1]).toContain('RFC: NEE240925V73');
+      expect(hojas[0]).not.toContain('RFC: NEE240925V73');
+      for (const [i, hoja] of hojas.slice(2).entries()) {
         expect(hoja).not.toContain('RFC: NEE240925V73');
         expect(hoja).not.toContain('Correo electrónico: gerencia@nexara.com.mx');
+        expect(hoja).toContain(`${grupoDice.quoteNumber}  ·  Página ${i + 3} de ${hojas.length}`);
       }
-      expect(hojas[1]).toContain('(continuación)');
     });
   });
 

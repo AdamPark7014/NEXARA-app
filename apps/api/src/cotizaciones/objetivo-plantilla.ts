@@ -1,17 +1,17 @@
 /**
- * 01 Objetivo del proyecto — plantilla por segmento, **con las cifras de la cotización**.
+ * Alcance ejecutivo — plantilla por segmento, **con las cifras de la cotización**.
  *
- * En la propuesta modelo los ocho beneficios están escritos a mano con los números del proyecto
- * («15 nuevas cámaras», «retención aproximada de 30 días»). Escribirlos a mano cada vez es lo que
- * hace que una propuesta diga 15 cámaras y cotice 14. Aquí los números salen de las partidas, así
- * que el objetivo y la tabla no pueden discrepar.
+ * Escribir los beneficios a mano cada vez es lo que hace que una propuesta diga 15 cámaras y cotice
+ * 14. Aquí los números salen de las partidas, así que el texto y la tabla no pueden discrepar.
  *
- * Regla: **nunca se inventa un dato**. Un beneficio cuya cifra no existe no se imprime.
+ * Reglas: **nunca se inventa un dato** (un beneficio cuya cifra no existe no se imprime) y **tres
+ * puntos como máximo**. Lo que ya dice la tabla (cada equipo, su precio, la vigencia) no se repite
+ * aquí: Adam pidió que sea conciso, con ocho puntos se revolvía.
  *
  * Módulo puro (sin Nest ni Prisma) para poder probarlo con jest.
  */
 import { grupoDePartida, importeDePartida, type PartidaAgrupable } from './partidas-grupos.js';
-import { ETIQUETA_SEGMENTO, normalizarSegmento, type Segmento } from './terminos-segmento.js';
+import { normalizarSegmento, type Segmento } from './terminos-segmento.js';
 
 export type CifrasPropuesta = {
   /** Piezas de equipo (suma de cantidades del grupo Equipos). */
@@ -217,10 +217,10 @@ const entero = (n: number) => Math.round(n).toLocaleString('es-MX');
 export function objetivoDePropuesta(input: {
   segmento: unknown;
   partidas: PartidaAgrupable[];
+  /** Ya no se imprimen aquí: el proyecto va en la hoja de título y la vigencia en las condiciones. */
   proyecto?: string | null;
-  objetivoLibre?: string | null;
-  /** Días de vigencia, si se conocen. */
   vigenciaDias?: number | null;
+  objetivoLibre?: string | null;
 }): Objetivo {
   const segmento = normalizarSegmento(input.segmento);
   const cifras = cifrasDePartidas(input.partidas || []);
@@ -228,52 +228,30 @@ export function objetivoDePropuesta(input: {
 
   if (cifras.piezasEquipo > 0) {
     beneficios.push(
-      `Mayor cobertura con la incorporación de ${entero(cifras.piezasEquipo)} ${
+      `Equipamiento: ${entero(cifras.piezasEquipo)} ${
         cifras.piezasEquipo === 1 ? 'equipo nuevo' : 'equipos nuevos'
       } en los puntos definidos durante el levantamiento técnico.`,
     );
   }
-  for (const principal of cifras.principales) {
-    if (principal.cantidad <= 0) continue;
-    beneficios.push(`${entero(principal.cantidad)} × ${principal.nombre}.`);
-  }
-  if (cifras.serviciosManoObra > 0) {
-    beneficios.push(
-      `Instalación, configuración y puesta en marcha incluidas: ${entero(cifras.serviciosManoObra)} ${
-        cifras.serviciosManoObra === 1 ? 'servicio' : 'servicios'
-      } de mano de obra especializada.`,
-    );
-  }
-  if (cifras.piezasMaterial > 0) {
-    beneficios.push(
-      `Material de instalación considerado en el presupuesto (${entero(cifras.piezasMaterial)} piezas), sin cargos posteriores por consumibles del alcance.`,
-    );
-  }
-  if (cifras.importeEquipos > 0 && cifras.importeManoObra > 0) {
-    beneficios.push('Presupuesto detallado partida por partida: cada equipo, material y servicio con su cantidad y su precio.');
-  }
   if (segmento === 'LICITACION') {
-    beneficios.push('Propuesta alineada al catálogo de conceptos y a las condiciones de las bases.');
-  } else {
-    beneficios.push('Entrega de un sistema probado y operativo, verificando el funcionamiento de cada equipo antes de su puesta en servicio.');
-  }
-  if (input.vigenciaDias && input.vigenciaDias > 0) {
-    beneficios.push(`Precios firmes durante ${Math.round(input.vigenciaDias)} días naturales a partir de la emisión.`);
+    beneficios.push('Cumplimiento: propuesta alineada al catálogo de conceptos y a las condiciones de las bases.');
+  } else if (segmento === 'SERVICIO') {
+    beneficios.push('Servicio especializado: personal técnico propio, con reporte de lo atendido.');
+    beneficios.push('Entrega: sistema verificado punto por punto al cierre del servicio.');
+  } else if (cifras.serviciosManoObra > 0) {
+    beneficios.push('Instalación incluida: configuración y puesta en marcha a cargo de personal especializado.');
+    beneficios.push('Entrega: sistema probado y operativo, verificando cada equipo antes de su puesta en servicio.');
+  } else if (cifras.piezasEquipo > 0) {
+    beneficios.push('Suministro: equipos nuevos de línea, listos para su integración.');
   }
 
   // Lo que escribió quien cotiza manda, parte por parte: si dejó vacíos los beneficios, salen de las
   // partidas; si dejó vacío el cierre, va el del segmento.
   const escrito = leerObjetivo(input.objetivoLibre);
-  const proyecto = input.proyecto?.trim();
-  const intro = escrito.intro
-    ? escrito.intro
-    : proyecto
-      ? `${INTRO[segmento]} Proyecto: ${proyecto} (${ETIQUETA_SEGMENTO[segmento]}).`
-      : INTRO[segmento];
 
   return {
-    intro,
-    beneficios: escrito.beneficios.length ? escrito.beneficios.slice(0, 20) : beneficios.slice(0, 8),
+    intro: escrito.intro || INTRO[segmento],
+    beneficios: escrito.beneficios.length ? escrito.beneficios.slice(0, 20) : beneficios.slice(0, 3),
     cierre: escrito.cierre || CIERRE[segmento],
   };
 }

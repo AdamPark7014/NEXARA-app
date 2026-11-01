@@ -1014,8 +1014,8 @@ export class CotizacionesService {
       const quote = borradorSobreGuardada(guardada, borrador);
       // Lo que ve quien cotiza es el mismo PDF que se descarga: el formato de Christian, con planos.
       const planos = await this.planosDePropuesta(quote);
-      const pdf = await generarCotizacionNexaraPdf(formatoDesdeCotizacion(quote), planos as PlanoArchivo[]);
-      const secciones: SeccionesPropuesta = { cotizacion: 1 };
+      const secciones: SeccionesPropuesta = {};
+      const pdf = await generarCotizacionNexaraPdf(formatoDesdeCotizacion(quote), planos as PlanoArchivo[], secciones);
       return { pdf, secciones };
     } finally {
       const quedan = (this.vistasEnCurso.get(clave) ?? 1) - 1;

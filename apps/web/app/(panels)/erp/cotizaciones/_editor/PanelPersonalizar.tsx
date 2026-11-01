@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import { Button, Checkbox, Input, LinkButton, Switch } from "@/components/base";
 import type { DocumentoCotizacion } from "@/lib/cotizacion-documento";
@@ -70,8 +70,6 @@ export default function PanelPersonalizar({
   cambiar,
   editable,
   sugeridas,
-  autor,
-  personas,
   puedeGuardarPlantilla,
   onGuardarPlantilla,
 }: {
@@ -80,10 +78,6 @@ export default function PanelPersonalizar({
   editable: boolean;
   /** Condiciones comerciales del segmento («Usar las del segmento»). */
   sugeridas: CondicionesSugeridas | null;
-  /** Quien la elaboró (firma «Elaboró» por omisión). */
-  autor: { nombre: string; cargo?: string | null } | null;
-  /** Para «Autorizó»: quienes intervinieron y quien edita. */
-  personas: Array<{ nombre: string; cargo?: string | null; userId?: number | null }>;
   puedeGuardarPlantilla: boolean;
   onGuardarPlantilla: (nombre: string, conPartidas: boolean) => Promise<void>;
 }) {
@@ -91,7 +85,6 @@ export default function PanelPersonalizar({
   const [nombrePlantilla, setNombrePlantilla] = useState("");
   const [conPartidas, setConPartidas] = useState(false);
   const [guardando, setGuardando] = useState(false);
-  const listaPersonas = useId();
   const o = doc.opciones;
 
   const setOpciones = (f: (o: OpcionesCotizacion) => OpcionesCotizacion) => cambiar((d) => ({ ...d, opciones: f(d.opciones) }));
@@ -110,7 +103,7 @@ export default function PanelPersonalizar({
             </h2>
           </div>
           <p className={styles.ayudaSeccion}>
-            {abierto ? "Qué secciones, columnas, firmas y condiciones lleva el PDF." : resumenOpciones(o, doc.moneda)}
+            {abierto ? "Qué secciones y condiciones lleva el PDF." : resumenOpciones(o, doc.moneda)}
           </p>
         </div>
         <div className={styles.hojaAcciones}>
@@ -141,11 +134,11 @@ export default function PanelPersonalizar({
                   onCambio={(v) => setOpciones((x) => ({ ...x, secciones: { ...x.secciones, [s.clave]: v } }))}
                 />
               ))}
-              <Interruptor activo bloqueado etiqueta="04 Cotización" ayuda="Siempre va" />
+              <Interruptor activo bloqueado etiqueta="04 Propuesta económica" ayuda="Siempre va, con su firma" />
             </div>
           </Grupo>
 
-          <Grupo titulo="Columnas de la tabla" ayuda="Marca y modelo, imagen del producto y descuento se agregan a la tabla del PDF, y sin precio unitario el cliente solo ve el total de cada renglón (a precio alzado).">
+          <Grupo titulo="Columnas del editor" ayuda="Agregan a la tabla de partidas la captura de marca, modelo y descuento. En el PDF, marca y modelo salen siempre que estén capturados.">
             <div className={styles.rejillaInterruptores}>
               {COLUMNAS_OPCIONALES.map((c) => (
                 <Interruptor
@@ -160,63 +153,9 @@ export default function PanelPersonalizar({
             </div>
           </Grupo>
 
-          <Grupo titulo="Carta de presentación" ayuda="Se imprime como primera hoja después de la portada, dirigida a quien recibe la propuesta.">
-            <Interruptor
-              activo={Boolean(o.carta)}
-              etiqueta="Incluir carta"
-              ayuda="Primera hoja después de la portada"
-              deshabilitado={!editable}
-              onCambio={(v) => setOpciones((x) => ({ ...x, carta: v ? x.carta ?? { dirigidaA: "", mensaje: "" } : null }))}
-            />
-            {o.carta ? (
-              <div className={styles.campos}>
-                <div className={styles.campos2}>
-                  <div className={styles.campo}>
-                    <label className={styles.etiqueta} htmlFor="carta-dirigida">
-                      Dirigida a
-                    </label>
-                    <Input
-                      id="carta-dirigida"
-                      value={o.carta.dirigidaA}
-                      disabled={!editable}
-                      placeholder="Ing. Laura Pérez"
-                      onChange={(e) => setOpciones((x) => ({ ...x, carta: { ...(x.carta ?? { mensaje: "" }), dirigidaA: e.target.value } }))}
-                    />
-                  </div>
-                  <div className={styles.campo}>
-                    <label className={styles.etiqueta} htmlFor="carta-cargo">
-                      Cargo
-                    </label>
-                    <Input
-                      id="carta-cargo"
-                      value={o.carta.cargo ?? ""}
-                      disabled={!editable}
-                      placeholder="Cargo"
-                      onChange={(e) =>
-                        setOpciones((x) => ({ ...x, carta: { ...(x.carta ?? { dirigidaA: "", mensaje: "" }), cargo: e.target.value } }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div className={styles.campo}>
-                  <label className={styles.etiqueta} htmlFor="carta-mensaje">
-                    Mensaje
-                  </label>
-                  <TextoAuto
-                    id="carta-mensaje"
-                    value={o.carta.mensaje}
-                    disabled={!editable}
-                    placeholder="Por medio de la presente le hacemos llegar nuestra propuesta…"
-                    onValor={(v) => setOpciones((x) => ({ ...x, carta: { ...(x.carta ?? { dirigidaA: "" }), mensaje: v } }))}
-                  />
-                </div>
-              </div>
-            ) : null}
-          </Grupo>
-
           <Grupo
             titulo="Condiciones comerciales"
-            ayuda="Alimentan los términos del PDF: la forma de pago completa el renglón del anticipo, el tiempo de entrega y la garantía salen como renglones propios y lo que dejes vacío no se imprime."
+            ayuda="Alimentan el PDF: la forma de pago completa el renglón del anticipo, el tiempo de entrega va en las condiciones comerciales y la garantía en la póliza. Lo que dejes vacío usa el texto de siempre."
             accion={
               editable && sugeridas ? (
                 <LinkButton
@@ -339,92 +278,6 @@ export default function PanelPersonalizar({
                   placeholder="Tipo de cambio DOF del día de pago"
                   onChange={(e) => setOpciones((x) => ({ ...x, tipoCambioNota: e.target.value }))}
                 />
-              </div>
-            ) : null}
-          </Grupo>
-
-          <Grupo titulo="Firmas" ayuda="«Elaboró» usa el nombre y el puesto de quien la hizo si lo dejas vacío, y «Autorizó» es opcional y sugiere a quienes intervinieron.">
-            <datalist id={listaPersonas}>
-              {personas.map((p) => (
-                <option key={`${p.userId ?? p.nombre}`} value={p.nombre}>
-                  {p.cargo ?? ""}
-                </option>
-              ))}
-            </datalist>
-            <div className={styles.campos2}>
-              <div className={styles.campo}>
-                <label className={styles.etiqueta} htmlFor="firma-elaboro">
-                  Elaboró
-                </label>
-                <Input
-                  id="firma-elaboro"
-                  list={listaPersonas}
-                  value={o.elaboro?.nombre ?? ""}
-                  disabled={!editable}
-                  placeholder={autor?.nombre || "Nombre"}
-                  onChange={(e) =>
-                    setOpciones((x) => ({ ...x, elaboro: e.target.value ? { ...(x.elaboro ?? {}), nombre: e.target.value } : null }))
-                  }
-                />
-              </div>
-              <div className={styles.campo}>
-                <label className={styles.etiqueta} htmlFor="firma-elaboro-cargo">
-                  Cargo
-                </label>
-                <Input
-                  id="firma-elaboro-cargo"
-                  value={o.elaboro?.cargo ?? ""}
-                  disabled={!editable || !o.elaboro}
-                  placeholder={autor?.cargo || "Puesto"}
-                  onChange={(e) => setOpciones((x) => ({ ...x, elaboro: x.elaboro ? { ...x.elaboro, cargo: e.target.value } : null }))}
-                />
-              </div>
-            </div>
-            <Interruptor
-              activo={Boolean(o.autorizo)}
-              etiqueta="Agregar «Autorizó»"
-              ayuda="Una segunda firma, por ejemplo dirección"
-              deshabilitado={!editable}
-              onCambio={(v) => setOpciones((x) => ({ ...x, autorizo: v ? x.autorizo ?? { nombre: "" } : null }))}
-            />
-            {o.autorizo ? (
-              <div className={styles.campos2}>
-                <div className={styles.campo}>
-                  <label className={styles.etiqueta} htmlFor="firma-autorizo">
-                    Autorizó
-                  </label>
-                  <Input
-                    id="firma-autorizo"
-                    list={listaPersonas}
-                    value={o.autorizo.nombre}
-                    disabled={!editable}
-                    placeholder="Nombre"
-                    onChange={(e) => {
-                      const nombre = e.target.value;
-                      const persona = personas.find((p) => p.nombre === nombre);
-                      setOpciones((x) => ({
-                        ...x,
-                        autorizo: {
-                          ...(x.autorizo ?? {}),
-                          nombre,
-                          ...(persona ? { cargo: persona.cargo ?? x.autorizo?.cargo, userId: persona.userId ?? null } : {}),
-                        },
-                      }));
-                    }}
-                  />
-                </div>
-                <div className={styles.campo}>
-                  <label className={styles.etiqueta} htmlFor="firma-autorizo-cargo">
-                    Cargo
-                  </label>
-                  <Input
-                    id="firma-autorizo-cargo"
-                    value={o.autorizo.cargo ?? ""}
-                    disabled={!editable}
-                    placeholder="Cargo"
-                    onChange={(e) => setOpciones((x) => ({ ...x, autorizo: x.autorizo ? { ...x.autorizo, cargo: e.target.value } : null }))}
-                  />
-                </div>
               </div>
             ) : null}
           </Grupo>

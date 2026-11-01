@@ -25,12 +25,13 @@ describe("opciones de personalización", () => {
   });
 
   it("toma lo guardado y completa lo que falte", () => {
-    const o = opcionesDesdeApi({ secciones: { planos: false }, columnas: { imagen: true }, autorizo: { nombre: "Christian", userId: 3 } });
+    const o = opcionesDesdeApi({ secciones: { planos: false }, columnas: { imagen: true, descuento: true }, autorizo: { nombre: "Christian", userId: 3 } });
     expect(o.secciones).toEqual({ objetivo: true, alcance: true, planos: false, terminos: true, firma: true });
     expect(o.columnas.imagen).toBe(true);
     expect(o.autorizo).toEqual({ nombre: "Christian", userId: 3 });
+    // El resumen dice solo lo que cambia el documento o la captura: lo demás ya no se ofrece.
     expect(resumenOpciones({ ...o, columnas: { ...o.columnas, precioUnitario: false } }, "USD")).toBe(
-      "Sin planos · tabla con imagen del producto · a precio alzado · USD · firma Elaboró y Autorizó",
+      "Sin planos · tabla con descuento por partida · USD",
     );
   });
 

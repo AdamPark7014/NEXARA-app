@@ -126,18 +126,18 @@ function servidor() {
 }
 
 describe("editor de cotización", () => {
-  it("se lee como la propuesta: portada, 01 Objetivo, 02 Alcance, 03 Planos, 04 Cotización", async () => {
+  it("se lee como la propuesta: portada, 01 Alcance ejecutivo, 02 Alcance técnico, 03 Planos, 04 Propuesta económica", async () => {
     servidor();
     render(<CotizacionDetallePage />);
-    expect(await screen.findByRole("heading", { name: /01\. Objetivo del proyecto/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /01\. Alcance ejecutivo/ })).toBeInTheDocument();
     const titulos = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(titulos.slice(0, 6)).toEqual([
       "Portada",
       "Personalizar",
-      "01. Objetivo del proyecto",
-      "02. Alcance del proyecto",
+      "01. Alcance ejecutivo",
+      "02. Alcance técnico",
       "03. Planos",
-      "04. Cotización",
+      "04. Propuesta económica",
     ]);
     expect(screen.getAllByText("NEX-LJ75100126-0007").length).toBeGreaterThan(0);
     // El título del proyecto está en la portada y como encabezado de 02, como en el PDF.
@@ -260,7 +260,7 @@ describe("editor de cotización", () => {
     const seccion = within(document.getElementById("cotizacion")!);
     expect(seccion.getByRole("textbox", { name: "Alcance de la cotización" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("switch", { name: /Términos y condiciones/ }));
+    await user.click(screen.getByRole("switch", { name: /Términos y póliza/ }));
 
     expect(seccion.queryByRole("textbox", { name: "Alcance de la cotización" })).toBeNull();
     expect(seccion.getByRole("textbox", { name: "Forma de pago" })).toHaveValue("Se requiere un 50 % de anticipo.");
