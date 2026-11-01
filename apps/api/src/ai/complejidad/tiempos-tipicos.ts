@@ -8,7 +8,7 @@
  *
  * Puro: la consulta vive en `complejidad.service.ts`.
  */
-import { SUBTIPOS_TAREA } from '../asistente/asistente-actividades.js';
+import { SUBTIPOS_TAREA } from '../asistente/tipos-actividad.js';
 
 export const COMPLEJIDADES = ['BASICA', 'ESTANDAR', 'COMPLEJA', 'CRITICA'] as const;
 export type Complejidad = (typeof COMPLEJIDADES)[number];

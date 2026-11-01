@@ -3,18 +3,21 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { UsersService } from '../../users/users.service.js';
 import { requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import { ClaudeService, type UsoClaude } from '../claude/claude.service.js';
+import { ComplejidadService } from '../complejidad/complejidad.service.js';
 import {
   CONFIG_ASISTENTE,
-  construirPropuesta,
+  construirPropuestas,
   peticionAsistente,
   planDeSalida,
+  tiposQueCrea,
+  tiposQueRecibe,
   type CatalogosNexara,
   type PropuestaActividad,
   type SalidaIA,
 } from './asistente-actividades.js';
 import { nombresPropiosDe } from './nombres.js';
 
-/** Actividades recientes de las que se toman los nombres ya usados («Toks»). */
+/** Actividades recientes de las que se toman los nombres ya usados («Toks») y quién hace qué. */
 const ACTIVIDADES_PARA_NOMBRES = 400;
 
 export type RespuestaAsistente = {
@@ -48,6 +51,7 @@ export class AsistenteActividadesService {
     private readonly prisma: PrismaService,
     private readonly users: UsersService,
     private readonly claude: ClaudeService,
+    private readonly complejidad: ComplejidadService,
   ) {}
 
   estado() {
@@ -73,10 +77,18 @@ export class AsistenteActividadesService {
     });
 
     const datos = planDeSalida(salida);
-    const acciones = datos.acciones.slice(0, 10);
+    // Sin las medianas la tabla sigue dando un tiempo: no vale la pena fallar por eso.
+    const medianas = await this.complejidad.medianas(tenantId).catch(() => new Map<string, number>());
+    const propuestas = construirPropuestas(datos.acciones, catalogos, {
+      creadoPorId: Number(user.id),
+      ahora,
+      instruccion,
+      medianas,
+      tiposPermitidos: tiposQueCrea(user?.email),
+    });
     return {
-      propuestas: acciones.map((a) => construirPropuesta(a, catalogos, { creadoPorId: Number(user.id), ahora, instruccion })),
-      aclaracion: datos?.aclaracion ?? (acciones.length ? null : 'No encontré ninguna actividad en el texto: ¿qué hay que hacer y quién?'),
+      propuestas,
+      aclaracion: datos?.aclaracion ?? (propuestas.length ? null : 'No encontré ninguna actividad en el texto: ¿qué hay que hacer y quién?'),
       uso,
       opciones: {
         clientes: catalogos.clientes
@@ -125,7 +137,7 @@ export class AsistenteActividadesService {
         where: { companyId, deletedAt: null },
         orderBy: { id: 'desc' },
         take: ACTIVIDADES_PARA_NOMBRES,
-        select: { titulo: true, branchName: true },
+        select: { titulo: true, branchName: true, responsableId: true, coreKind: true, ticketType: true, ticketTypeCustom: true, clientId: true },
       }),
     ]);
     return {
@@ -135,11 +147,21 @@ export class AsistenteActividadesService {
         puesto: p.puesto ?? null,
         email: p.email,
         horaEntrada: p.horaEntrada ?? null,
+        horaSalida: p.horaSalida ?? null,
+        recibe: tiposQueRecibe(p.email),
       })),
       clientes,
       sucursales: sucursales.map(({ client, ...s }) => ({ ...s, clientName: client?.name ?? '' })),
       proyectos: proyectos.map(({ client, ...p }) => ({ ...p, clientName: client?.name ?? '' })),
       nombresUsados: nombresPropiosDe(recientes.map((a) => ({ titulo: a.titulo, lugar: a.branchName }))),
+      actividades: recientes.map((a) => ({
+        responsableId: a.responsableId,
+        coreKind: a.coreKind,
+        ticketType: a.ticketType,
+        ticketTypeCustom: a.ticketTypeCustom,
+        clientId: a.clientId,
+        titulo: a.titulo,
+      })),
     };
   }
 }

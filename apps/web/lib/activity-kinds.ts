@@ -291,6 +291,14 @@ export function isCeoEmail(email?: string | null): boolean {
   return isCeoEquivalentEmail(email);
 }
 
+/**
+ * «Asignar con IA» además de dirección: David, encargado de instaladores (Adam, 01-11-2026). Espejo
+ * de `asistentePorCorreo` en la API, que es la autoridad.
+ */
+export function puedeAsignarConIa(email?: string | null): boolean {
+  return norm(email) === ORG_EMAILS.david;
+}
+
 export function canOfferAssignmentCharge(email?: string | null): boolean {
   return CHARGE_MANAGER_EMAILS.has(norm(email));
 }

@@ -24,7 +24,8 @@ import { join } from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 import { ClaudeService, type UsoClaude } from '../claude/claude.service.js';
 import {
-  construirPropuesta,
+  accionesPorPersona,
+  construirPropuestas,
   fechaLocalISO,
   peticionAsistente,
   planDeSalida,
@@ -120,12 +121,14 @@ async function juzgar<T>(concepto: string, sistema: string, bloques: Anthropic.T
 
 const JUEZ_ASISTENTE = `Calificas la salida de un asistente que convierte instrucciones de dirección (español de México, a veces dictadas por voz) en actividades para el sistema NEXARA. Recibes la instrucción, la fecha actual, el catálogo de la empresa (personas, clientes con sus sucursales y proyectos activos, el mismo que recibió el asistente), lo que se esperaba y las actividades que se crearían.
 
-Cómo se guardan las fechas: «inicio» es cuándo se hace o empieza; «límite» es el día contra el que se mide si se entregó a tiempo (vence al terminar ese día). Una cita o visita sin plazo vence el mismo día. Con un plazo («para el viernes», «antes del viernes», «a más tardar…») empieza hoy (salvo que digan otro inicio) y el límite es el plazo; «para las 3» o «el viernes a las 11» son la hora o el día de la cita. Sin hora dicha se usa la hora actual (si es hoy) o 09:00: no es invento.
+Cómo se guardan las fechas: «inicio» es cuándo se hace o empieza; «límite» es el día contra el que se mide si se entregó a tiempo (vence al terminar ese día). Una cita o visita sin plazo vence el mismo día. Con un plazo («para el viernes», «antes del viernes», «a más tardar…») empieza hoy (salvo que digan otro inicio) y el límite es el plazo; «para las 3» o «el viernes a las 11» son la hora o el día de la cita. Sin hora dicha se usa la hora actual (si es hoy) o la entrada de quien lo hace (10:00 la oficina, 08:00 la cuadrilla): no es invento.
+
+Todo lleno a propósito: una persona revisa la propuesta antes de crearla, así que lo que no se dijo se propone y no es invento: si no dicen cuándo es hoy; la duración es la de la tabla de tiempos; si no dicen quién, o el nombre es de dos personas, se propone a la más probable y un aviso lo dice; un cliente sin registrar se propone como cliente nuevo.
 
 Revisa solo esto:
-- inventos: datos que no salen de la instrucción ni del catálogo: personas, clientes, sucursales, proyectos, lugares, cantidades, fechas u horas que nadie dijo, o una persona elegida cuando el nombre era ambiguo o no existe. Escribir el nombre registrado del cliente, sucursal o proyecto que corresponde a lo que dijeron no es invento («CEDIS de Tox» → sucursal «CEDIS Puebla» de Grupo Tox); poner una sucursal o un proyecto que no mencionaron sí lo es. La prioridad Media por omisión y las fechas calculadas desde «mañana», «el lunes», etc. no son invento.
+- inventos: datos que no salen de la instrucción ni del catálogo: personas, clientes, sucursales, proyectos, lugares, cantidades, fechas u horas que nadie dijo, o una persona elegida cuando el nombre no existe. Escribir el nombre registrado del cliente, sucursal o proyecto que corresponde a lo que dijeron no es invento («CEDIS de Tox» → sucursal «CEDIS Puebla» de Grupo Tox); poner una sucursal o un proyecto que no mencionaron sí lo es. La prioridad Media por omisión y las fechas calculadas desde «mañana», «el lunes», etc. no son invento.
 - titulosOk: cada título es corto, en infinitivo y describe el trabajo pedido.
-- indicacionesFieles: el detalle útil que dieron (síntoma, cantidades, materiales, con quién, a quién entregar, hora límite) queda en el título o en las indicaciones, y las indicaciones no repiten el título, no agregan pasos ni objetivos que nadie dijo («revisar la causa»), no explican el razonamiento y están redactadas de forma clara y profesional. Indicaciones vacías son correctas si todo cabe en el título. La frase «Entregar a más tardar el … a las …» con la hora límite que dijeron es correcta.
+- indicacionesFieles: el detalle útil que dieron (síntoma, cantidades, materiales, con quién, a quién entregar) queda en el título o en las indicaciones (la hora límite va en su propio campo, «entregar a más tardar»), y las indicaciones no repiten el título, no agregan pasos ni objetivos que nadie dijo («revisar la causa»), no explican el razonamiento y están redactadas de forma clara y profesional. Indicaciones vacías son correctas si todo cabe en el título. La frase «Entregar a más tardar el … a las …» con la hora límite que dijeron es correcta.
 - nota: 1 a 5, qué tan lista para usarse está la propuesta (5 = se crea sin tocar nada).
 - comentario: una frase con el problema principal, o «sin problemas».`;
 
@@ -171,6 +174,19 @@ function revisarAccion(e: AccionEsperada, a: AccionPlan, p: PropuestaActividad):
   en('prioridad', e.prioridad, a.prioridad);
   en('encargo', e.encargo, a.encargo ?? null);
   en('duracion', e.duracionMin, a.duracionMin ?? null);
+  if (e.origen) r.push({ nombre: 'origen del responsable', ok: p.responsableOrigen === e.origen, detalle: String(p.responsableOrigen) });
+  en('cliente nuevo', e.clienteNuevo, p.clienteNuevo ?? null);
+  en('entregar a más tardar', e.compromiso, p.agenda?.compromiso ?? null);
+  // Todo lleno: lo que la tarjeta exige para confirmar sin tocar nada.
+  const huecos = [
+    e.responsableId !== null && !p.payload.responsableId ? 'responsable' : null,
+    !p.payload.tiempoEstimadoMin ? 'duración' : null,
+    !p.agenda?.dia ? 'día' : null,
+    !p.agenda?.hora ? 'hora' : null,
+    p.tipo === 'servicio' && !p.payload.clientId && !p.clienteNuevo ? 'cliente' : null,
+    (p.tipo === 'obra' || p.tipo === 'proyecto') && !p.payload.projectId ? 'proyecto' : null,
+  ].filter(Boolean);
+  r.push({ nombre: 'todo lleno', ok: !huecos.length, detalle: huecos.join(',') || undefined });
   if (e.faltan) {
     const faltantes = p.faltantes ?? [];
     r.push({ nombre: 'faltantes', ok: e.faltan.every((f) => faltantes.includes(f)), detalle: faltantes.join(',') || '(ninguno)' });
@@ -191,7 +207,7 @@ function revisarAccion(e: AccionEsperada, a: AccionPlan, p: PropuestaActividad):
 }
 
 function revisarAsistente(caso: CasoAsistente, plan: PlanAsistente, propuestas: PropuestaActividad[]): Revision[] {
-  const acciones = plan.acciones.slice(0, 10);
+  const acciones = accionesPorPersona(plan.acciones, CATALOGO.personas).slice(0, 10);
   const revisiones: Revision[] = [
     { nombre: 'número de actividades', ok: propuestas.length === caso.acciones.length, detalle: `${propuestas.length}/${caso.acciones.length}` },
   ];
@@ -209,7 +225,7 @@ function revisarAsistente(caso: CasoAsistente, plan: PlanAsistente, propuestas: 
       usadas.add(elegido.i);
       revisiones.push(...elegido.r);
     } else {
-      const vacia = revisarAccion(e, { fecha: '∅' } as AccionPlan, { payload: {}, responsable: { id: -1 } } as unknown as PropuestaActividad);
+      const vacia = revisarAccion(e, { fecha: '∅' } as unknown as AccionPlan, { payload: {}, responsable: { id: -1 } } as unknown as PropuestaActividad);
       revisiones.push(...vacia.map((x) => ({ ...x, ok: false, detalle: 'falta la actividad' })));
     }
   }
@@ -233,9 +249,9 @@ function textoPropuestas(propuestas: PropuestaActividad[]): string {
         `${i + 1}. título: ${x.titulo}`,
         `indicaciones: ${x.indicaciones ?? '(vacías)'}`,
         `tipo: ${p.tipoEtiqueta}${x.ticketTypeCustom ? ` · ${x.ticketTypeCustom}` : x.ticketType && p.tipo === 'servicio' ? ` · ${x.ticketType}` : ''}`,
-        `responsable: ${p.responsable?.nombre ?? `sin elegir (dijeron «${p.textoResponsable ?? ''}»)`}`,
-        `cliente: ${p.cliente?.nombre ?? 'ninguno'}${p.sucursal ? ` · sucursal ${p.sucursal.nombre}` : x.branchName ? ` · lugar ${x.branchName}` : ''}${p.proyecto ? ` · proyecto ${p.proyecto.nombre}` : ''}`,
-        `inicio: ${diaHora(x.fechaInicio)} · límite: ${limite}`,
+        `responsable: ${p.responsable?.nombre ?? `sin elegir (dijeron «${p.textoResponsable ?? ''}»)`}${p.responsableOrigen === 'probable' ? ' (la más probable; un aviso lo dice)' : p.responsableOrigen === 'sugerido' ? ' (sugerida; un aviso lo dice)' : ''}`,
+        `cliente: ${p.cliente?.nombre ?? (p.clienteNuevo ? `${p.clienteNuevo} (nuevo, se da de alta al confirmar)` : 'ninguno')}${p.sucursal ? ` · sucursal ${p.sucursal.nombre}` : x.branchName ? ` · lugar ${x.branchName}` : ''}${p.proyecto ? ` · proyecto ${p.proyecto.nombre}` : ''}`,
+        `inicio: ${diaHora(x.fechaInicio)} · límite: ${limite}${p.agenda?.compromiso ? ` · entregar a más tardar ${p.agenda.compromiso}` : ''}`,
         `duración: ${x.tiempoEstimadoMin ? `${x.tiempoEstimadoMin} min` : 'sin dato'} · prioridad: ${x.prioridad} · encargo: ${x.assignmentCharge ?? 'sin dato'}`,
       ].join('\n   ');
     })
@@ -262,7 +278,7 @@ function textoEsperadoAsistente(caso: CasoAsistente): string {
   return caso.acciones
     .map((e, i) =>
       [
-        `${i + 1}. responsable: ${nombre(e.responsableId) ?? `nadie de la lista (conservar «${e.textoResponsable ?? ''}»)`}`,
+        `${i + 1}. responsable: ${nombre(e.responsableId) ?? `nadie de la lista (conservar «${e.textoResponsable ?? ''}»)`}${e.origen && e.origen !== 'dicho' ? ` (${e.origen === 'probable' ? 'la más probable entre varias con ese nombre' : 'sugerida: nadie dijo quién'})` : ''}`,
         `tipo: ${e.tipos.join('/')}`,
         e.clienteId ? `cliente: ${e.clienteId.map((c) => cliente(c) ?? 'ninguno registrado').join(' o ')}` : null,
         e.inicio ? `inicio: ${e.inicio.map((f) => f ?? 'sin fecha').join(' o ')}` : null,
@@ -281,7 +297,8 @@ async function correrAsistente(caso: CasoAsistente, v: Variante, conJuez: boolea
   const base = { caso: caso.id, variante: v.nombre };
   try {
     asegurarPresupuesto(0.02);
-    const pet = peticionAsistente(caso.instruccion, CATALOGO, AHORA, AUTOR);
+    const ahora = caso.ahora ? new Date(caso.ahora) : AHORA;
+    const pet = peticionAsistente(caso.instruccion, CATALOGO, ahora, AUTOR);
     const { datos: salida, uso } = await claude.json<SalidaIA>({
       ...pet,
       proceso: 'eval-asistente',
@@ -293,7 +310,7 @@ async function correrAsistente(caso: CasoAsistente, v: Variante, conJuez: boolea
     const ms = Date.now() - t0;
     registrarGasto(`asistente ${v.nombre}`, uso.usdAprox);
     const plan: PlanAsistente = planDeSalida(salida);
-    const propuestas = plan.acciones.slice(0, 10).map((a) => construirPropuesta(a, CATALOGO, { creadoPorId: 12, ahora: AHORA, instruccion: caso.instruccion }));
+    const propuestas = construirPropuestas(plan.acciones, CATALOGO, { creadoPorId: 12, ahora, instruccion: caso.instruccion });
     const revisiones = revisarAsistente(caso, plan, propuestas);
 
     let notaJuez: number | null = null;
@@ -307,7 +324,7 @@ async function correrAsistente(caso: CasoAsistente, v: Variante, conJuez: boolea
           {
             type: 'text',
             text: [
-              `Fecha actual: miércoles 21 de octubre de 2026, 10:30 (Ciudad de México).`,
+              caso.ahora ? `Fecha actual: ${caso.ahora} (UTC; Ciudad de México es UTC-6).` : `Fecha actual: miércoles 21 de octubre de 2026, 10:30 (Ciudad de México).`,
               textoCatalogo(),
               `Instrucción: ${caso.instruccion}`,
               `Se esperaba:\n${textoEsperadoAsistente(caso)}`,

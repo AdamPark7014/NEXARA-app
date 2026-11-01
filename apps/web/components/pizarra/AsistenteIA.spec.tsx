@@ -92,6 +92,11 @@ const compra: PropuestaActividad = {
   },
 };
 
+/** Abre con el lápiz el renglón `etiqueta` de la tarjeta `n`. */
+async function abrir(usuario: ReturnType<typeof userEvent.setup>, etiqueta: string, n = 0) {
+  await usuario.click(screen.getAllByRole("button", { name: `Editar ${etiqueta}` })[n]);
+}
+
 describe("AsistenteIA", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -118,22 +123,26 @@ describe("AsistenteIA", () => {
     api.sumarAlEquipo.mockResolvedValue({});
   });
 
-  it("muestra todos los campos, pide lo que falta y crea las listas de una vez con su tiempo estimado", async () => {
+  it("muestra todo en renglones, abre solo lo que falta y crea las listas de una vez con su tiempo estimado", async () => {
     const usuario = userEvent.setup();
     render(<AsistenteIA />);
     await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Carolina revise el DVR y Jorge compre conectores");
     await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
 
-    // Lo que leerá quien la hace y la agenda que se guardará, editables antes de crear.
-    expect(await screen.findByDisplayValue("El DVR de la caja no graba desde ayer.")).toBeInTheDocument();
-    expect(screen.getAllByLabelText(/^Día|^Del/)[0]).toHaveValue("2026-10-24");
-    expect(screen.getAllByLabelText(/^Último día/)[1]).toHaveValue("2026-10-23");
-    // A la compra le falta la duración: no se puede crear hasta elegirla.
-    expect(screen.getByText(/No lo dijiste: elige cuánto tarda/)).toBeInTheDocument();
+    // Lo que leerá quien la hace y la agenda que se guardará se leen de un vistazo.
+    expect(await screen.findByText("El DVR de la caja no graba desde ayer.")).toBeInTheDocument();
+    expect(screen.getByText(/24 oct, 9:00 a\. m\./)).toBeInTheDocument();
+    expect(screen.getByText("2 h", { selector: "div" })).toBeInTheDocument();
+    expect(screen.getByText("Servicio · Preventivo")).toBeInTheDocument();
+    expect(screen.getByText("Tarea · Otro")).toBeInTheDocument();
+    // Y se abren con el lápiz para cambiarlas.
+    await abrir(usuario, "Cuándo", 1);
+    expect(screen.getByLabelText(/^Último día/)).toHaveValue("2026-10-23");
+    // A la compra le falta la duración: su renglón queda abierto y no se puede crear hasta elegirla.
     expect(screen.getByText("Indica cuánto tiempo toma.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirmar la que está lista" })).toBeEnabled();
 
-    await usuario.selectOptions(screen.getAllByLabelText(/Cuánto tiempo toma/)[1], "30");
+    await usuario.selectOptions(screen.getByLabelText("Tiempo"), "30");
     await usuario.click(screen.getByRole("button", { name: "Confirmar las 2 que están listas" }));
 
     await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(2));
@@ -151,14 +160,18 @@ describe("AsistenteIA", () => {
     render(<AsistenteIA />);
     await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Carolina revise el DVR");
     await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
-    // Título e indicaciones están a la vista como campos, sin abrir nada.
-    const titulo = await screen.findByLabelText(/^Título/);
+    await screen.findByText("Revisar DVR que no graba en CEDIS");
+    await abrir(usuario, "Título");
+    const titulo = screen.getByLabelText("Título");
     await usuario.clear(titulo);
     await usuario.type(titulo, "Cambiar DVR del CEDIS");
-    await usuario.clear(screen.getByLabelText(/^Indicaciones/));
+    await abrir(usuario, "Indicaciones");
+    await usuario.clear(screen.getByLabelText("Indicaciones"));
     // Los campos de fecha no se teclean letra por letra en jsdom.
+    await abrir(usuario, "Cuándo");
     fireEvent.change(screen.getByLabelText(/^Día/), { target: { value: "2026-10-27" } });
-    await usuario.selectOptions(screen.getByLabelText(/^Prioridad/), "Alta");
+    await abrir(usuario, "Prioridad");
+    await usuario.selectOptions(screen.getByLabelText("Prioridad"), "Alta");
     await usuario.click(screen.getByRole("button", { name: "Confirmar y asignar" }));
 
     await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
@@ -195,13 +208,14 @@ describe("AsistenteIA", () => {
 
     expect(await screen.findByText("Corregido de «talks»")).toBeInTheDocument();
     expect(screen.getByText("Dijiste «Caro»")).toBeInTheDocument();
-    expect(screen.getByText(/Nombres corregidos: «talks» → Grupo Tox · «Caro» es Carolina Pérez/)).toBeInTheDocument();
 
     // El lugar se escribe o se elige de las sucursales del cliente (con sus datos).
+    await abrir(usuario, "Cliente");
     const lugar = screen.getByLabelText(/^Lugar/);
     expect(lugar).toHaveValue("Nave 2");
     await usuario.clear(lugar);
     await usuario.type(lugar, "CEDIS Puebla");
+    await abrir(usuario, "Cuándo");
     fireEvent.change(screen.getByLabelText(/^Entregar a más tardar/), { target: { value: "13:30" } });
     await usuario.click(screen.getByRole("button", { name: "Confirmar y asignar" }));
 
@@ -244,21 +258,136 @@ describe("AsistenteIA", () => {
     expect(screen.getAllByText(/Un servicio necesita un cliente registrado/)).toHaveLength(2);
     await usuario.selectOptions(screen.getAllByLabelText(/^Cliente/)[0], "+ Agregar cliente «Toks»");
 
-    await waitFor(() => expect(api.altaRapidaCliente).toHaveBeenCalledWith("tok", "Toks"));
-    expect(api.altaRapidaCliente).toHaveBeenCalledTimes(1);
-    // Queda elegido en las dos tarjetas que dijeron «Toks», y ya no se ofrece de nuevo.
-    await waitFor(() => expect(screen.getAllByText("Cliente nuevo: completa su ficha en Clientes.")).toHaveLength(2));
+    // Queda elegido en las dos tarjetas que dijeron «Toks», pero nada se crea hasta confirmar.
+    await waitFor(() => expect(screen.getAllByText("Nuevo: alta al confirmar")).toHaveLength(2));
+    expect(api.altaRapidaCliente).not.toHaveBeenCalled();
+    await abrir(usuario, "Cliente");
     expect(screen.queryByRole("option", { name: "+ Agregar cliente «Toks»" })).not.toBeInTheDocument();
-    expect(screen.getAllByLabelText(/^Lugar/)[0]).toHaveValue("");
+    expect(screen.getByRole("option", { name: "Toks (cliente nuevo)" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Lugar/)).toHaveValue("");
 
     await usuario.click(screen.getAllByRole("button", { name: "Confirmar y asignar" })[0]);
     await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
+    expect(api.altaRapidaCliente).toHaveBeenCalledWith("tok", "Toks");
     const cuerpo = api.crearActividad.mock.calls[0][1];
     expect(cuerpo).toMatchObject({ clientId: 77, titulo: "Revisar cámaras en Toks" });
     expect(cuerpo.branchName).toBeUndefined();
+
+    // La otra tarjeta usa el mismo cliente: no se da de alta dos veces.
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Confirmar y asignar" }).length).toBe(2));
+    await usuario.click(screen.getAllByRole("button", { name: "Confirmar y asignar" })[0]);
+    await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(2));
+    expect(api.altaRapidaCliente).toHaveBeenCalledTimes(1);
+    expect(api.crearActividad.mock.calls[1][1]).toMatchObject({ clientId: 77, titulo: "Llevar DVR a Toks" });
   });
 
-  it("si el alta del cliente falla, lo dice en el campo y no elige nada", async () => {
+  it("el caso de la captura: todo propuesto, se confirma sin tocar nada y sigue siendo editable", async () => {
+    const comandera: PropuestaActividad = {
+      ...servicio,
+      resumen: "Servicio para José Antonio Ramírez en Toks hoy 09:30 · a más tardar 17:00",
+      titulo: "Reparar comandera en Toks",
+      indicaciones: null,
+      textoResponsable: "Antonio",
+      responsable: { id: 39, nombre: "José Antonio Ramírez" },
+      responsableOrigen: "probable",
+      responsableCandidatos: [
+        { id: 39, nombre: "José Antonio Ramírez" },
+        { id: 61, nombre: "Antonio Hernández" },
+      ],
+      textoCliente: "Toks",
+      cliente: null,
+      clienteNuevo: "Toks",
+      agenda: { dia: "2026-10-24", hora: "09:30", hasta: null, horaDicha: false, diaDicho: true, compromiso: "17:00" },
+      duracionMin: 180,
+      duracionOrigen: "estimada",
+      duracionDetalle: "Servicio correctivo 120 min + Ida 30 min + Vuelta 30 min",
+      avisos: ["«Antonio» puede ser José Antonio Ramírez o Antonio Hernández: propongo a José Antonio Ramírez porque puede recibir servicios. Cámbialo si era otra persona."],
+      notaResponsable: "«Antonio» puede ser José Antonio Ramírez o Antonio Hernández: propongo a José Antonio Ramírez porque puede recibir servicios. Cámbialo si era otra persona.",
+      payload: {
+        titulo: "Reparar comandera en Toks",
+        coreKind: "servicio",
+        ticketType: "CORRECTIVO",
+        creadoPorId: 1,
+        responsableId: 39,
+        prioridad: "Media",
+        tiempoEstimadoMin: 180,
+        fechaInicio: "2026-10-24T15:30:00.000Z",
+        fechaEntregaEsperada: "2026-10-24T23:00:00.000Z",
+        fechaMaxima: "2026-10-24T23:00:00.000Z",
+        assignmentCharge: "ejecucion",
+      },
+    };
+    api.personasAsignables.mockResolvedValue([
+      { id: 39, nombre: "José Antonio Ramírez", email: "jose.ramirez@nexara.com.mx" },
+      { id: 61, nombre: "Antonio Hernández", email: "antonio.hernandez@nexara.com.mx", horaEntrada: "08:00" },
+    ]);
+    api.interpretar.mockResolvedValue({ propuestas: [comandera], aclaracion: null, uso: null, opciones: { clientes: [{ id: 41, nombre: "IPADE" }], proyectos: [], sucursales: [] } });
+    api.altaRapidaCliente.mockResolvedValue({ id: 77, nombre: "Toks" });
+    const usuario = userEvent.setup();
+    render(<AsistenteIA />);
+    await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que antonio vaya a toks a arreglar una comandera");
+    await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
+
+    // Todo lleno de un vistazo: persona, cliente nuevo y tiempo estimado, cada uno diciendo de dónde salió.
+    expect(await screen.findByText("José Antonio Ramírez")).toBeInTheDocument();
+    expect(screen.getByText("También puede ser Antonio Hernández")).toBeInTheDocument();
+    expect(screen.getByText("Nuevo: alta al confirmar")).toBeInTheDocument();
+    expect(screen.getByText("3 h")).toBeInTheDocument();
+    expect(screen.getByText("Estimado")).toBeInTheDocument();
+    expect(screen.getByText(/a más tardar 5:00 p\. m\./)).toBeInTheDocument();
+    expect(screen.getByText("La reparte a su equipo")).toBeInTheDocument();
+    // Lo que dice su renglón no se repite abajo; al abrirlo se lee el porqué.
+    expect(screen.queryByText(/propongo a José Antonio Ramírez/)).not.toBeInTheDocument();
+    const confirmar = screen.getByRole("button", { name: "Confirmar y asignar" });
+    expect(confirmar).toBeEnabled();
+
+    // Editable: el otro Antonio solo recibe tareas, así que el trabajo pasa a la tarea equivalente.
+    await abrir(usuario, "Responsable");
+    expect(screen.getByText(/propongo a José Antonio Ramírez porque puede recibir servicios/)).toBeInTheDocument();
+    const responsable = screen.getByLabelText("Responsable");
+    expect(responsable).toHaveValue("39");
+    await usuario.selectOptions(responsable, "61");
+    expect(screen.getByText("Tarea · Correctivo y diagnóstico")).toBeInTheDocument();
+    expect(confirmar).toBeEnabled();
+    await usuario.selectOptions(responsable, "39");
+    await abrir(usuario, "Tipo");
+    await usuario.selectOptions(screen.getAllByLabelText(/^Tipo/)[0], "servicio");
+
+    await usuario.click(confirmar);
+    await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
+    expect(api.altaRapidaCliente).toHaveBeenCalledWith("tok", "Toks");
+    expect(api.crearActividad.mock.calls[0][1]).toMatchObject({ responsableId: 39, clientId: 77, coreKind: "servicio", tiempoEstimadoMin: 180, assignmentCharge: "despacho" });
+  });
+
+  it("elegir otro cliente cancela el alta; sin ninguno, un servicio vuelve a pedirlo", async () => {
+    const enToks: PropuestaActividad = {
+      ...servicio,
+      textoCliente: "Toks",
+      cliente: null,
+      clienteNuevo: "Toks",
+      payload: { ...servicio.payload, clientId: undefined },
+    };
+    api.interpretar.mockResolvedValue({ propuestas: [enToks], aclaracion: null, uso: null, opciones: { clientes: [{ id: 41, nombre: "IPADE" }], proyectos: [], sucursales: [] } });
+    const usuario = userEvent.setup();
+    render(<AsistenteIA />);
+    await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Carolina vaya a toks");
+    await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
+    await screen.findByText("Nuevo: alta al confirmar");
+    expect(screen.getByRole("button", { name: "Confirmar y asignar" })).toBeEnabled();
+    await abrir(usuario, "Cliente");
+
+    await usuario.selectOptions(screen.getByLabelText(/^Cliente/), "");
+    expect(screen.getByText(/Un servicio necesita un cliente registrado/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirmar y asignar" })).toBeDisabled();
+
+    await usuario.selectOptions(screen.getByLabelText(/^Cliente/), "IPADE");
+    await usuario.click(screen.getByRole("button", { name: "Confirmar y asignar" }));
+    await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
+    expect(api.altaRapidaCliente).not.toHaveBeenCalled();
+    expect(api.crearActividad.mock.calls[0][1]).toMatchObject({ clientId: 41 });
+  });
+
+  it("si el alta del cliente falla al confirmar, lo dice, no crea la actividad y deja reintentar", async () => {
     const enToks: PropuestaActividad = {
       ...servicio,
       textoCliente: "Toks",
@@ -272,9 +401,11 @@ describe("AsistenteIA", () => {
     await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Carolina vaya a toks");
     await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
     await usuario.selectOptions(await screen.findByLabelText(/^Cliente/), "+ Agregar cliente «Toks»");
-    expect(await screen.findByText(/No tienes permiso para dar de alta clientes/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Cliente/)).toHaveValue("");
-    expect(screen.getByRole("button", { name: "Confirmar y asignar" })).toBeDisabled();
+    expect(api.altaRapidaCliente).not.toHaveBeenCalled();
+    await usuario.click(screen.getByRole("button", { name: "Confirmar y asignar" }));
+    expect(await screen.findByText(/No se pudo dar de alta «Toks»: No tienes permiso para dar de alta clientes/)).toBeInTheDocument();
+    expect(api.crearActividad).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Confirmar y asignar" })).toBeEnabled();
   });
 
   it("una hora límite antes del inicio no deja crear", async () => {
@@ -283,7 +414,9 @@ describe("AsistenteIA", () => {
     render(<AsistenteIA />);
     await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "que Carolina revise el DVR");
     await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
-    fireEvent.change(await screen.findByLabelText(/^Entregar a más tardar/), { target: { value: "08:00" } });
+    await screen.findByText("Revisar DVR que no graba en CEDIS");
+    await abrir(usuario, "Cuándo");
+    fireEvent.change(screen.getByLabelText(/^Entregar a más tardar/), { target: { value: "08:00" } });
     expect(screen.getByText("Tiene que ser después de la hora de inicio.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirmar y asignar" })).toBeDisabled();
   });
@@ -307,15 +440,16 @@ describe("AsistenteIA", () => {
     await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
     expect(await screen.findByText(/Esto entendí · 2 actividades/)).toBeInTheDocument();
 
-    const tipo = screen.getAllByLabelText(/^Tipo$|^Tipo \*/)[1];
+    await abrir(usuario, "Tipo", 1);
+    const tipo = screen.getByLabelText(/^Tipo$|^Tipo \*/);
     // Solo los tipos que esa persona recibe (las reglas de «Asignar»).
     expect([...(tipo as HTMLSelectElement).options].map((o) => o.value)).toEqual(["tarea", "servicio", "proyecto"]);
     await usuario.selectOptions(tipo, "servicio");
-    await usuario.selectOptions(screen.getAllByLabelText(/^Tipo de servicio/)[1], "CORRECTIVO");
-    // Un servicio pide cliente: se elige de la lista de la empresa.
+    await usuario.selectOptions(screen.getByLabelText(/^Tipo de servicio/), "CORRECTIVO");
+    // Un servicio pide cliente: su renglón se abre solo y se elige de la lista de la empresa.
     expect(screen.getByText(/Un servicio necesita un cliente registrado/)).toBeInTheDocument();
-    await usuario.selectOptions(screen.getAllByLabelText(/^Cliente/)[1], "2");
-    await usuario.selectOptions(screen.getAllByLabelText(/Cuánto tiempo toma/)[1], "60");
+    await usuario.selectOptions(screen.getByLabelText(/^Cliente/), "2");
+    await usuario.selectOptions(screen.getByLabelText("Tiempo"), "60");
     await usuario.click(screen.getAllByRole("button", { name: "Confirmar y asignar" })[1]);
 
     await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));

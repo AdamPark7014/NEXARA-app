@@ -6,6 +6,7 @@ import {
   agendaFinal,
   altaRapidaCliente,
   bloqueos,
+  clientePendiente,
   correccionDe,
   lugarEfectivo,
   nombreParaAlta,
@@ -13,7 +14,10 @@ import {
   payloadFinal,
   reglaEncargo,
   subtipoEfectivo,
+  tareaEquivalente,
   textoCorreccion,
+  textoCuando,
+  textoTipo,
   type PropuestaActividad,
   type SucursalOpcion,
 } from "./asistente-ia-api";
@@ -246,6 +250,44 @@ describe("asistente IA en la pizarra", () => {
     expect(correccionDe(p, "lugar")).toBeNull();
     // Un API anterior no manda correcciones.
     expect(correccionDe(lista, "cliente")).toBeNull();
+  });
+
+  it("la agenda y el tipo se leen en una línea", () => {
+    const hoy = "2026-11-03";
+    expect(textoCuando({ dia: hoy, hora: "09:30", hasta: null, horaDicha: true, compromiso: "17:00" }, hoy)).toBe("Hoy, 9:30 a. m. · a más tardar 5:00 p. m.");
+    expect(textoCuando({ dia: "2026-11-04", hora: "12:00", hasta: null, horaDicha: true }, hoy)).toBe("Mañana, 12:00 p. m.");
+    expect(textoCuando({ dia: "2026-11-05", hora: "00:15", hasta: null, horaDicha: true }, hoy)).toBe("jue 5 nov, 12:15 a. m.");
+    expect(textoCuando({ dia: hoy, hora: "10:30", hasta: "2026-11-06", horaDicha: false }, hoy)).toBe("Desde hoy al vie 6 nov");
+    expect(textoCuando({ dia: "2026-11-09", hora: "10:00", hasta: "2026-11-13", horaDicha: false }, hoy)).toBe("Del lun 9 nov al vie 13 nov");
+    expect(textoCuando({ dia: null, hora: null, hasta: null, horaDicha: false }, hoy)).toBe("");
+    expect(textoTipo("servicio", "CORRECTIVO")).toBe("Servicio · Correctivo");
+    expect(textoTipo("tarea", "Instalación")).toBe("Tarea · Instalación");
+    expect(textoTipo("comercial", null)).toBe("Comercial");
+  });
+
+  it("el cliente nuevo cuenta para el servicio y se cancela al elegir otro", () => {
+    const nuevo = { ...base, cliente: null, clienteNuevo: "Toks", tipo: "servicio" as const, payload: { ...base.payload, clientId: undefined, coreKind: "servicio" } };
+    expect(clientePendiente(nuevo, {})).toBe("Toks");
+    expect(clientePendiente(nuevo, { clientId: 3 })).toBeNull();
+    expect(clientePendiente(nuevo, { clientId: null })).toBeNull();
+    expect(clientePendiente(nuevo, { clientId: 3, clienteNuevo: "Otro" })).toBe("Otro");
+    expect(clientePendiente(nuevo, { clienteNuevo: null })).toBeNull();
+    // Una obra lleva el cliente de su proyecto.
+    expect(clientePendiente(nuevo, { tipo: "obra" })).toBeNull();
+    const payload = payloadFinal(nuevo, {});
+    expect(bloqueos(nuevo, payload, { clienteNuevo: "Toks" })).not.toContain("Un servicio necesita un cliente registrado.");
+    expect(bloqueos(nuevo, payload, {})).toContain("Un servicio necesita un cliente registrado.");
+    // Con cliente nuevo propuesto, ese es el nombre del alta aunque el lugar diga otra cosa.
+    expect(nombreParaAlta({ ...nuevo, payload: { ...nuevo.payload, branchName: "Sucursal Centro" } }, {}, [])).toBe("Toks");
+  });
+
+  it("lo que una persona no recibe pasa a la tarea equivalente", () => {
+    expect(tareaEquivalente("servicio", "CORRECTIVO")).toEqual({ tipo: "tarea", subtipo: "Correctivo y diagnóstico" });
+    expect(tareaEquivalente("servicio", "EMERGENCIA")).toEqual({ tipo: "tarea", subtipo: "Correctivo y diagnóstico" });
+    expect(tareaEquivalente("servicio", "PREVENTIVO")).toEqual({ tipo: "tarea", subtipo: "Mantenimiento preventivo" });
+    expect(tareaEquivalente("servicio", "INSTALACION")).toEqual({ tipo: "tarea", subtipo: "Instalación" });
+    expect(tareaEquivalente("obra", null)).toEqual({ tipo: "tarea", subtipo: "Instalación" });
+    expect(tareaEquivalente("comercial", null)).toEqual({ tipo: "tarea", subtipo: "Reporte / documentación" });
   });
 
   it("alta rápida de cliente: con el nombre entendido y nunca si ya hay uno igual o la IA lo encontró", () => {

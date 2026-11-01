@@ -84,6 +84,8 @@ export function tipoDelTitulo(a: TipoActividad & { titulo?: string | null; indic
   if (!a.titulo) return null;
   const kind = String(a.coreKind ?? '').trim().toLowerCase();
   if (['servicio', 'obra', 'proyecto'].includes(kind)) return null;
+  // «Comprar una bobina de cable» es una compra: ir por material o llevarlo no pasa a cableado.
+  if (/^(compra de material|recoleccion|entrega)$/.test(normalizar(a.ticketTypeCustom))) return null;
   const texto = normalizar(`${a.titulo ?? ''} ${a.indicaciones ?? ''}`);
   const actual = reglaDe(a)?.clave ?? null;
   for (const [patron, tipo, deTipos] of TIPO_POR_TITULO) {

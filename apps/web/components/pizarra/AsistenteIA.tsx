@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import CheckIcon from "@mui/icons-material/Check";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import MicNoneOutlinedIcon from "@mui/icons-material/MicNoneOutlined";
 import { Alert, Badge, Button, ButtonLink, Card, DateInput, Field, Input, Select, Textarea } from "@/components/base";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
@@ -13,7 +15,7 @@ import { useDictadoVivo } from "@/lib/use-dictado-vivo";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { formatMinutes } from "@/lib/activity-labels";
-import { kindsForAssignment } from "@/lib/activity-kinds";
+import { kindsForAssignment, puedeAsignarConIa } from "@/lib/activity-kinds";
 import { periodoPorOmision } from "@/lib/actividad-periodo";
 import { hoyISO } from "@/lib/proyecto-plan";
 import { obtenerProgramacion } from "@/lib/proyectos-api";
@@ -28,6 +30,7 @@ import {
   TIPOS_SERVICIO,
   agendaFinal,
   bloqueos,
+  clientePendiente,
   compromisoValido,
   conProyecto,
   correccionDe,
@@ -45,7 +48,10 @@ import {
   reglaEncargo,
   subtipoEfectivo,
   sumarAlEquipo,
+  tareaEquivalente,
   textoCorreccion,
+  textoCuando,
+  textoTipo,
   tipoEfectivo,
   type Ajustes,
   type Encargo,
@@ -75,23 +81,85 @@ const ALTA_CLIENTE = "__alta__";
 type EtapaPropuesta = { nombre: string | null };
 
 /**
+ * Un dato de la tarjeta: se lee de un vistazo y el lápiz lo abre ahí mismo para cambiarlo. Lo que la
+ * IA supuso lleva un punto ámbar. `obligado` = falta para confirmar: se queda abierto hasta llenarse.
+ */
+function Renglon({
+  etiqueta,
+  valor,
+  nota,
+  supuesto,
+  explicacion,
+  abierto,
+  obligado,
+  onAlternar,
+  children,
+}: {
+  etiqueta: string;
+  valor: ReactNode;
+  nota?: string;
+  supuesto?: boolean;
+  /** Por qué se propuso así: se lee al abrir el renglón (y al pasar sobre la nota). */
+  explicacion?: string;
+  abierto?: boolean;
+  obligado?: boolean;
+  onAlternar?: () => void;
+  children?: ReactNode;
+}) {
+  const abiertoAhora = Boolean(abierto && children);
+  return (
+    <div className={s.renglon} data-abierto={abiertoAhora ? "true" : undefined}>
+      <span className={s.etiqueta}>{etiqueta}</span>
+      {abiertoAhora ? (
+        <div className={s.editor}>
+          {children}
+          {explicacion ? <p className={s.explicacion}>{explicacion}</p> : null}
+        </div>
+      ) : (
+        <>
+          <div className={s.valor}>{valor}</div>
+          <span className={s.nota} title={explicacion}>
+            {nota && supuesto ? <span className={s.punto} aria-hidden="true" /> : null}
+            {nota}
+          </span>
+        </>
+      )}
+      {children && !obligado ? (
+        <button
+          type="button"
+          className={s.lapiz}
+          aria-label={`${abiertoAhora ? "Listo con" : "Editar"} ${etiqueta}`}
+          title={abiertoAhora ? "Listo" : "Editar"}
+          aria-expanded={abiertoAhora}
+          onClick={onAlternar}
+        >
+          {abiertoAhora ? <CheckIcon aria-hidden /> : <EditOutlinedIcon aria-hidden />}
+        </button>
+      ) : (
+        <span />
+      )}
+    </div>
+  );
+}
+
+/**
  * «Asignar con IA», hasta arriba de Actividades para el CEO. Se dicta con un toque (el texto
  * aparece en vivo y al callar se prepara solo) o se escribe y «Preparar actividades». La IA
  * propone tipo, persona, cliente, día, plazo y duración; los nombres mal oídos los corrige el
  * API contra el catálogo y lo dice («Corregido de "talks"»). Cada campo se corrige a mano en
  * la tarjeta, sin volver a escribir la instrucción, y se confirma una por una o todas. Solo se
- * muestra al CEO y si el servidor tiene la IA activa.
+ * muestra al CEO y a David, y si el servidor tiene la IA activa.
  */
 export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
   const { user, token } = useUser();
   const [disponible, setDisponible] = useState(false);
   const [personas, setPersonas] = useState<PersonaAsignable[]>([]);
   const v2 = useMemo(() => resolveV2RoleKey(user), [user]);
-  // Solo el CEO asigna con IA (la matriz del API lo vuelve a exigir).
-  const esCeo = v2 === ROLES.CEO || Boolean(user?.isSuperAdmin);
+  // Solo el CEO y David asignan con IA (el API lo vuelve a exigir).
+  const puede = v2 === ROLES.CEO || Boolean(user?.isSuperAdmin) || puedeAsignarConIa(user?.email);
 
   useEffect(() => {
-    if (!token || !esCeo) return;
+    if (!token || !puede) return;
     let vivo = true;
     estadoAsistente(token)
       .then((r) => {
@@ -105,9 +173,9 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
     return () => {
       vivo = false;
     };
-  }, [token, esCeo]);
+  }, [token, puede]);
 
-  if (!esCeo || !disponible || !token) return null;
+  if (!puede || !disponible || !token) return null;
   return (
     <Contenido
       token={token}
@@ -116,6 +184,7 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
       isSuperAdmin={Boolean(user?.isSuperAdmin)}
       v2={v2}
       onCreada={onCreada}
+      verCosto={v2 === ROLES.CEO || Boolean(user?.isSuperAdmin)}
     />
   );
 }
@@ -127,6 +196,7 @@ function Contenido({
   isSuperAdmin,
   v2,
   onCreada,
+  verCosto,
 }: {
   token: string;
   personas: PersonaAsignable[];
@@ -134,6 +204,7 @@ function Contenido({
   isSuperAdmin: boolean;
   v2: RoleKey | null;
   onCreada?: () => void;
+  verCosto: boolean;
 }) {
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
@@ -143,10 +214,11 @@ function Contenido({
   const [ajustes, setAjustes] = useState<Record<number, Ajustes>>({});
   const [estados, setEstados] = useState<Record<number, Estado>>({});
   const [etapas, setEtapas] = useState<Record<number, EtapaPropuesta>>({});
+  /** Renglones abiertos con el lápiz, por tarjeta y campo. */
+  const [abiertos, setAbiertos] = useState<Record<string, boolean>>({});
   const [creandoTodas, setCreandoTodas] = useState(false);
-  /** Clientes dados de alta desde las tarjetas (alta rápida) y el estado de cada alta. */
+  /** Clientes dados de alta al confirmar una tarjeta (alta rápida). */
   const [clientesNuevos, setClientesNuevos] = useState<Referencia[]>([]);
-  const [altas, setAltas] = useState<Record<number, { creando?: boolean; error?: string }>>({});
   const personasOrdenadas = useMemo(() => [...personas].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")), [personas]);
   /** Lo que ya estaba escrito cuando empezó el dictado: lo dicho se agrega después. */
   const base = useRef("");
@@ -155,6 +227,8 @@ function Contenido({
   const generacion = useRef(0);
   /** Proyecto del que se pidió la etapa, por tarjeta (si cambia, la respuesta vieja se ignora). */
   const etapaPedida = useRef<Record<number, number>>({});
+  /** Clientes ya dados de alta al confirmar: «Confirmar todas» corre sin esperar al estado. */
+  const altasHechas = useRef(new Map<string, Referencia>());
 
   const enviar = useCallback(
     async (instruccion: string) => {
@@ -171,7 +245,7 @@ function Contenido({
         setRespuesta(r);
         setListoEnMs(Math.round(performance.now() - inicio));
         setAjustes({});
-        setAltas({});
+        setAbiertos({});
         setEstados({});
         setEtapas({});
       } catch (e) {
@@ -219,32 +293,34 @@ function Contenido({
   );
 
   /**
-   * «+ Agregar cliente "Toks"»: alta rápida (solo el nombre) y queda elegido en la tarjeta; las
+   * «+ Agregar cliente "Toks"»: queda elegido para darse de alta al confirmar (solo el nombre); las
    * demás tarjetas que dijeron el mismo nombre y no tienen cliente también lo toman.
    */
-  const agregarCliente = async (i: number, nombre: string) => {
-    if (altas[i]?.creando) return;
-    setAltas((prev) => ({ ...prev, [i]: { creando: true } }));
-    try {
-      const nuevo = await altaRapidaCliente(token, nombre);
-      setClientesNuevos((prev) => [...prev.filter((c) => c.id !== nuevo.id), nuevo]);
-      const clave = nombreComparable(nombre);
-      setAjustes((prev) => {
-        const sig = { ...prev };
-        propuestas.forEach((p, j) => {
-          const aj = prev[j] || {};
-          const mismo = j === i || (!p.cliente && aj.clientId === undefined && nombreComparable(nombreParaAlta(p, aj, []) ?? "") === clave);
-          if (!mismo) return;
-          // El nombre ya es el cliente: no se repite como lugar.
-          const lugarIgual = !p.sucursal && nombreComparable(lugarEfectivo(p, aj)) === clave;
-          sig[j] = { ...aj, clientId: nuevo.id, ...(lugarIgual ? { lugar: "" } : {}) };
-        });
-        return sig;
+  const agregarCliente = (i: number, nombre: string) => {
+    const clave = nombreComparable(nombre);
+    setAjustes((prev) => {
+      const sig = { ...prev };
+      propuestas.forEach((p, j) => {
+        const aj = prev[j] || {};
+        const mismo = j === i || (!p.cliente && aj.clientId === undefined && nombreComparable(nombreParaAlta(p, aj, []) ?? "") === clave);
+        if (!mismo) return;
+        // El nombre ya es el cliente: no se repite como lugar.
+        const lugarIgual = !p.sucursal && nombreComparable(lugarEfectivo(p, aj)) === clave;
+        sig[j] = { ...aj, clientId: undefined, clienteNuevo: nombre, ...(lugarIgual ? { lugar: "" } : {}) };
       });
-      setAltas((prev) => ({ ...prev, [i]: {} }));
-    } catch (e) {
-      setAltas((prev) => ({ ...prev, [i]: { error: formatApiError(e, "No se pudo dar de alta el cliente.") } }));
-    }
+      return sig;
+    });
+  };
+
+  /** El alta del cliente al confirmar: si otra tarjeta ya lo dio de alta, se reutiliza. */
+  const clienteParaCrear = async (nombre: string): Promise<Referencia> => {
+    const clave = nombreComparable(nombre);
+    const ya = todosLosClientes.find((x) => nombreComparable(x.nombre) === clave) ?? altasHechas.current.get(clave);
+    if (ya) return ya;
+    const nuevo = await altaRapidaCliente(token, nombre);
+    altasHechas.current.set(clave, nuevo);
+    setClientesNuevos((prev) => [...prev.filter((x) => x.id !== nuevo.id), nuevo]);
+    return nuevo;
   };
 
   /** Todo lo que la tarjeta necesita para mostrarse y crearse con lo que se eligió. */
@@ -258,8 +334,9 @@ function Contenido({
     const entrada = destino?.horaEntrada ?? null;
     const payload = payloadFinal(p, aj, { destinoEmail, proyectos: opciones?.proyectos, sucursales: opciones?.sucursales, entrada });
     const agenda = agendaFinal(p, aj, entrada);
-    const motivos = bloqueos(p, payload, { creadorEmail, destinoEmail, v2Role: v2, isSuperAdmin, agenda });
-    return { aj, payload, agenda, destinoEmail, motivos };
+    const pendiente = clientePendiente(p, aj);
+    const motivos = bloqueos(p, payload, { creadorEmail, destinoEmail, v2Role: v2, isSuperAdmin, agenda, clienteNuevo: pendiente });
+    return { aj, payload, agenda, destinoEmail, motivos, pendiente };
   };
 
   // Obra o proyecto sin fechas dichas: el periodo de la etapa vigente, como propone «Asignar».
@@ -267,7 +344,8 @@ function Contenido({
     .map((p, i) => {
       const aj = ajustes[i] || {};
       const id = proyectoEfectivo(p, aj);
-      return id && !agendaFinal(p, aj).dia && aj.dia === undefined && !etapas[i] ? `${i}:${id}` : null;
+      const sinFechaDicha = !agendaFinal(p, aj).dia || p.agenda?.diaDicho === false;
+      return id && sinFechaDicha && aj.dia === undefined && !etapas[i] ? `${i}:${id}` : null;
     })
     .filter(Boolean)
     .join(",");
@@ -295,11 +373,19 @@ function Contenido({
   }, [proyectosPorTarjeta, token]);
 
   const crear = async (i: number, p: PropuestaActividad) => {
-    const { payload, destinoEmail, motivos } = armar(p, i);
+    const { payload, destinoEmail, motivos, pendiente } = armar(p, i);
     if (motivos.length || estados[i]?.creando || estados[i]?.creada) return false;
     setEstados((prev) => ({ ...prev, [i]: { creando: true } }));
     let creada: { id: number; anNumber?: string };
     try {
+      if (pendiente && !payload.clientId) {
+        try {
+          payload.clientId = (await clienteParaCrear(pendiente)).id;
+        } catch (e) {
+          setEstados((prev) => ({ ...prev, [i]: { error: `No se pudo dar de alta «${pendiente}»: ${formatApiError(e, "error de conexión")}. Elige otro cliente o vuelve a intentar.` } }));
+          return false;
+        }
+      }
       creada = await crearActividad(token, payload);
     } catch (e) {
       setEstados((prev) => ({ ...prev, [i]: { error: formatApiError(e, "No se pudo crear.") } }));
@@ -459,30 +545,27 @@ function Contenido({
         {propuestas.map((p, i) => {
           const est = estados[i] || {};
           if (est.descartada) return null;
-          const { aj, payload, agenda, destinoEmail, motivos } = armar(p, i);
+          const { aj, payload, agenda, destinoEmail, motivos, pendiente } = armar(p, i);
           const tipo = tipoEfectivo(p, aj);
           const subtipo = subtipoEfectivo(p, aj);
-          const falta = (campo: string) => p.faltantes.includes(campo);
           const regla = reglaEncargo(tipo, destinoEmail, encargoElegido(p, aj));
           const titulo = String(payload.titulo ?? p.titulo);
           const indicaciones = typeof payload.indicaciones === "string" ? payload.indicaciones : "";
           const lugar = lugarEfectivo(p, aj);
           const sucursalesLista = (opciones?.sucursales ?? []).filter((x) => !payload.clientId || x.clientId === Number(payload.clientId));
-          const corregidos = (p.correcciones ?? []).filter((x) => x.campo !== "sucursal");
           const duracion = Number(payload.tiempoEstimadoMin) || 0;
           const opcionesDuracion = duracion && !DURACIONES_MIN.includes(duracion) ? [...DURACIONES_MIN, duracion].sort((a, b) => a - b) : DURACIONES_MIN;
           const responsableId = aj.responsableId ?? p.responsable?.id;
-          const sugeridas = p.responsable ? [] : p.responsableCandidatos;
+          const sugeridas = p.responsableCandidatos;
           const resto = personasOrdenadas.filter((x) => !sugeridas.some((o) => o.id === x.id));
-          const responsableFuera = p.responsable && !personas.some((x) => x.id === p.responsable!.id) ? [p.responsable] : [];
-          const pide = (campo: string, nota: string) => (falta(campo) ? `No lo dijiste: ${nota}` : undefined);
+          const responsableFuera = p.responsable && !personas.some((x) => x.id === p.responsable!.id) && !sugeridas.some((o) => o.id === p.responsable!.id) ? [p.responsable] : [];
+          const otraPersona = p.responsableOrigen === "probable" ? sugeridas.find((o) => o.id !== p.responsable?.id) : undefined;
           const permitidos = kindsForAssignment({ creatorEmail: creadorEmail, targetEmail: destinoEmail ?? undefined, v2Role: v2, isSuperAdmin });
           const tiposVisibles: ActivityKind[] = TIPOS.filter((t) => permitidos.includes(t) || t === tipo);
           const clienteId = payload.clientId ? Number(payload.clientId) : null;
           const clientesSugeridos = p.cliente ? [p.cliente] : p.clienteCandidatos;
           const otrosClientes = todosLosClientes.filter((x) => !clientesSugeridos.some((o) => o.id === x.id));
-          const altaNombre = clienteId ? null : nombreParaAlta(p, aj, todosLosClientes);
-          const alta = altas[i] || {};
+          const altaNombre = clienteId || pendiente ? null : nombreParaAlta(p, aj, todosLosClientes);
           const clienteNuevo = clienteId ? clientesNuevos.find((x) => x.id === clienteId) : undefined;
           const proyectoId = proyectoEfectivo(p, aj);
           const proyectosLista = [
@@ -495,321 +578,404 @@ function Contenido({
           const corrCliente = correccionDe(p, "cliente");
           const corrLugar = correccionDe(p, "lugar") ?? correccionDe(p, "sucursal");
 
-          return (
-            <div key={i} className={s.propuesta}>
-              <div className={c.filaEntre}>
-                <div className={c.fila}>
+          const abierto = (campo: string) => Boolean(abiertos[`${i}:${campo}`]);
+          const alternar = (campo: string) => setAbiertos((prev) => ({ ...prev, [`${i}:${campo}`]: !prev[`${i}:${campo}`] }));
+          const sinPersona = !responsableId;
+          const sinClienteDeServicio = tipo === "servicio" && !clienteId && !pendiente;
+          const sinTiempo = !duracion;
+          const agendaMal = !compromisoValido(agenda) || Boolean(agenda.dia && agenda.hasta && agenda.hasta < agenda.dia) || ((tipo === "servicio" || tipo === "obra") && !agenda.dia);
+          const nombrePersona = personas.find((x) => x.id === responsableId)?.nombre ?? (responsableId === p.responsable?.id ? p.responsable?.nombre : undefined);
+          const nombreCliente = pendiente ?? (clienteId ? todosLosClientes.find((x) => x.id === clienteId)?.nombre ?? p.cliente?.nombre : undefined);
+          const nombreProyecto = proyectosLista.find((x) => x.id === proyectoId)?.nombre;
+          // Lo que ya se dice en su renglón no se repite abajo.
+          const notasPie = p.avisos.filter((a) => a !== p.notaResponsable && a !== p.notaCliente);
+
+          if (est.creada) {
+            return (
+              <div key={i} className={s.propuesta}>
+                <div className={s.encabezado}>
                   <ActivityKindIcon kind={tipo} />
-                  <strong>{titulo}</strong>
+                  <strong className={s.titulo}>{titulo}</strong>
                   <Badge tone="brand" size="sm">
                     {ETIQUETA_TIPO[tipo]}
                   </Badge>
                 </div>
-                {!est.creada ? (
-                  <Button variant="ghost" size="sm" onClick={() => setEstados((prev) => ({ ...prev, [i]: { descartada: true } }))}>
-                    Descartar
-                  </Button>
+                {indicaciones ? <p className={s.indicaciones}>{indicaciones}</p> : null}
+                {est.avisoEquipo ? (
+                  <Alert tone="warning" role="status">
+                    {est.avisoEquipo}
+                  </Alert>
                 ) : null}
+                <div className={c.fila}>
+                  <span className={c.ok}>Creada{est.creada.folio ? ` · ${est.creada.folio}` : ""}. Ya se le avisó.</span>
+                  <ButtonLink href={`/erp/actividades/${est.creada.id}`} size="sm" iconEnd={<ArrowForwardIcon />}>
+                    Abrir
+                  </ButtonLink>
+                </div>
               </div>
-              {est.creada && indicaciones ? <p className={s.indicaciones}>{indicaciones}</p> : null}
-              {/* El resumen es el de la IA: si se cambió el tipo, ya no aplica (los campos lo dicen). */}
-              {tipo === p.tipo ? <p className={s.resumen}>{p.resumen}</p> : null}
-              {corregidos.length && !est.creada ? (
-                <p className={s.corregidos}>
-                  Nombres corregidos:{" "}
-                  {corregidos.map((x) => (x.como === "apodo" ? `«${x.de}» es ${x.a}` : `«${x.de}» → ${x.a}`)).join(" · ")}
-                </p>
-              ) : null}
+            );
+          }
 
-              {!est.creada ? (
-                <div className={s.ajustes}>
-                  <Field label="Título" required fullWidth>
-                    <Input
-                      value={aj.titulo ?? titulo}
-                      maxLength={200}
-                      invalid={aj.titulo !== undefined && !aj.titulo.trim()}
-                      onChange={(e) => ajustar(i, { titulo: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Tipo" required>
-                    <Select value={tipo} onChange={(e) => ajustar(i, { tipo: e.target.value as ActivityKind, subtipo: undefined })}>
-                      {tiposVisibles.map((t) => (
-                        <option key={t} value={t}>
-                          {ETIQUETA_TIPO[t]}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                  {tipo === "tarea" || tipo === "servicio" ? (
-                    <Field label={tipo === "tarea" ? "Tipo de tarea" : "Tipo de servicio"} required>
-                      <Select value={subtipo ?? ""} onChange={(e) => ajustar(i, { subtipo: e.target.value })}>
-                        {tipo === "tarea"
-                          ? SUBTIPOS_TAREA.map((t) => (
-                              <option key={t} value={t}>
-                                {t}
-                              </option>
-                            ))
-                          : TIPOS_SERVICIO.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.label}
-                              </option>
-                            ))}
+          return (
+            <div key={i} className={s.propuesta}>
+              <div className={s.encabezado}>
+                <ActivityKindIcon kind={tipo} />
+                {abierto("titulo") || !titulo.trim() ? (
+                  <Input
+                    aria-label="Título"
+                    className={s.tituloCampo}
+                    value={aj.titulo ?? titulo}
+                    maxLength={200}
+                    invalid={aj.titulo !== undefined && !aj.titulo.trim()}
+                    onChange={(e) => ajustar(i, { titulo: e.target.value })}
+                  />
+                ) : (
+                  <strong className={s.titulo}>{titulo}</strong>
+                )}
+                <button
+                  type="button"
+                  className={s.lapiz}
+                  aria-label={abierto("titulo") ? "Listo con Título" : "Editar Título"}
+                  title={abierto("titulo") ? "Listo" : "Editar"}
+                  onClick={() => alternar("titulo")}
+                >
+                  {abierto("titulo") ? <CheckIcon aria-hidden /> : <EditOutlinedIcon aria-hidden />}
+                </button>
+                <Button variant="ghost" size="sm" className={s.descartar} onClick={() => setEstados((prev) => ({ ...prev, [i]: { descartada: true } }))}>
+                  Descartar
+                </Button>
+              </div>
+
+              <div className={s.renglones}>
+                <Renglon etiqueta="Tipo" valor={textoTipo(tipo, subtipo)} abierto={abierto("tipo")} onAlternar={() => alternar("tipo")}>
+                  <div className={s.ajustes}>
+                    <Field label="Tipo" required>
+                      <Select value={tipo} onChange={(e) => ajustar(i, { tipo: e.target.value as ActivityKind, subtipo: undefined })}>
+                        {tiposVisibles.map((t) => (
+                          <option key={t} value={t}>
+                            {ETIQUETA_TIPO[t]}
+                          </option>
+                        ))}
                       </Select>
                     </Field>
-                  ) : null}
-                  <Field
-                    label="Responsable"
-                    required
-                    hint={
-                      aj.responsableId === undefined && corrResponsable
+                    {tipo === "tarea" || tipo === "servicio" ? (
+                      <Field label={tipo === "tarea" ? "Tipo de tarea" : "Tipo de servicio"} required>
+                        <Select value={subtipo ?? ""} onChange={(e) => ajustar(i, { subtipo: e.target.value })}>
+                          {tipo === "tarea"
+                            ? SUBTIPOS_TAREA.map((t) => (
+                                <option key={t} value={t}>
+                                  {t}
+                                </option>
+                              ))
+                            : TIPOS_SERVICIO.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {t.label}
+                                </option>
+                              ))}
+                        </Select>
+                      </Field>
+                    ) : null}
+                  </div>
+                </Renglon>
+
+                <Renglon
+                  etiqueta="Responsable"
+                  valor={nombrePersona ?? <span className={s.vacio}>Elige a quién</span>}
+                  nota={
+                    aj.responsableId !== undefined
+                      ? undefined
+                      : corrResponsable
                         ? textoCorreccion(corrResponsable)
-                        : !p.responsable && p.textoResponsable
-                          ? `Dijiste «${p.textoResponsable}»`
-                          : undefined
-                    }
+                        : otraPersona
+                          ? `También puede ser ${otraPersona.nombre}`
+                          : p.responsableOrigen === "sugerido"
+                            ? "No lo dijiste"
+                            : !p.responsable && p.textoResponsable
+                              ? `Dijiste «${p.textoResponsable}»`
+                              : undefined
+                  }
+                  supuesto={aj.responsableId === undefined && (p.responsableOrigen === "probable" || p.responsableOrigen === "sugerido")}
+                  explicacion={p.notaResponsable ?? undefined}
+                  abierto={abierto("responsable") || sinPersona}
+                  obligado={sinPersona}
+                  onAlternar={() => alternar("responsable")}
+                >
+                  <Select
+                    aria-label="Responsable"
+                    value={responsableId ? String(responsableId) : ""}
+                    onChange={(e) => {
+                      const id = Number(e.target.value) || undefined;
+                      const nueva = personas.find((x) => x.id === id);
+                      // Lo que esa persona no recibe no se podría confirmar: pasa a la tarea equivalente.
+                      const recibe = nueva ? kindsForAssignment({ creatorEmail: creadorEmail, targetEmail: nueva.email ?? undefined, v2Role: v2, isSuperAdmin }) : null;
+                      ajustar(i, { responsableId: id, ...(recibe && !recibe.includes(tipo) ? tareaEquivalente(tipo, subtipo) : {}) });
+                    }}
                   >
-                    <Select
-                      value={responsableId ? String(responsableId) : ""}
-                      onChange={(e) => ajustar(i, { responsableId: Number(e.target.value) || undefined })}
-                    >
-                      <option value="">Elige a quién</option>
-                      {sugeridas.length ? (
-                        <optgroup label="Coinciden con lo que dijiste">
-                          {sugeridas.map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {o.nombre}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ) : null}
-                      <optgroup label={sugeridas.length ? "Todas las personas" : "Personas"}>
-                        {[...responsableFuera, ...resto].map((o) => (
+                    <option value="">Elige a quién</option>
+                    {sugeridas.length ? (
+                      <optgroup label={p.responsableOrigen === "sugerido" ? "Las más probables" : "Coinciden con lo que dijiste"}>
+                        {sugeridas.map((o) => (
                           <option key={o.id} value={o.id}>
                             {o.nombre}
                           </option>
                         ))}
                       </optgroup>
-                    </Select>
-                  </Field>
-                  {!conProyecto(tipo) && (clientesSugeridos.length || otrosClientes.length || altaNombre) ? (
-                    <Field
-                      label="Cliente"
-                      required={tipo === "servicio"}
-                      error={alta.error ?? null}
-                      hint={
-                        alta.creando
-                          ? `Dando de alta «${altaNombre ?? ""}»…`
-                          : clienteNuevo
-                            ? "Cliente nuevo: completa su ficha en Clientes."
-                            : aj.clientId === undefined && corrCliente
-                              ? textoCorreccion(corrCliente)
-                              : !p.cliente && p.textoCliente
-                                ? `«${p.textoCliente}» no está registrado`
-                                : undefined
-                      }
-                    >
-                      <Select
-                        value={clienteId ? String(clienteId) : ""}
-                        disabled={alta.creando}
-                        onChange={(e) => {
-                          if (e.target.value === ALTA_CLIENTE) {
-                            if (altaNombre) void agregarCliente(i, altaNombre);
-                            return;
-                          }
-                          const nuevo = Number(e.target.value) || null;
-                          // Otro cliente: la sucursal de la IA ya no aplica (el lugar escrito se queda).
-                          ajustar(i, { clientId: nuevo, ...(p.sucursal && aj.lugar === undefined && nuevo !== (p.cliente?.id ?? null) ? { lugar: "" } : {}) });
-                        }}
-                      >
-                        <option value="">{tipo === "servicio" ? "Elige el cliente" : "Sin cliente"}</option>
-                        {altaNombre ? <option value={ALTA_CLIENTE}>{`+ Agregar cliente «${altaNombre}»`}</option> : null}
-                        {clientesSugeridos.length ? (
-                          <optgroup label={p.cliente ? "El que dijiste" : "Coinciden con lo que dijiste"}>
-                            {clientesSugeridos.map((o) => (
-                              <option key={o.id} value={o.id}>
-                                {o.nombre}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ) : null}
-                        {otrosClientes.length ? (
-                          <optgroup label="Todos los clientes">
-                            {otrosClientes.map((o) => (
-                              <option key={o.id} value={o.id}>
-                                {o.nombre}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ) : null}
-                      </Select>
-                    </Field>
-                  ) : null}
-                  {!conProyecto(tipo) ? (
-                    <Field
-                      label="Lugar"
-                      optional
-                      hint={aj.lugar === undefined && corrLugar ? textoCorreccion(corrLugar) : sucursalesLista.length ? "Sucursal o lugar" : undefined}
-                    >
-                      <Input
-                        value={lugar}
-                        maxLength={160}
-                        list={sucursalesLista.length ? `asistente-lugares-${i}` : undefined}
-                        placeholder="Sucursal, planta o dirección"
-                        onChange={(e) => ajustar(i, { lugar: e.target.value })}
-                      />
-                    </Field>
-                  ) : null}
-                  {!conProyecto(tipo) && sucursalesLista.length ? (
-                    <datalist id={`asistente-lugares-${i}`}>
-                      {sucursalesLista.map((x) => (
-                        <option key={x.id} value={x.nombre} />
+                    ) : null}
+                    <optgroup label={sugeridas.length ? "Todas las personas" : "Personas"}>
+                      {[...responsableFuera, ...resto].map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.nombre}
+                        </option>
                       ))}
-                    </datalist>
-                  ) : null}
-                  {conProyecto(tipo) ? (
-                    <Field label="Proyecto" required>
-                      <Select
-                        value={proyectoId ? String(proyectoId) : ""}
-                        onChange={(e) => {
-                          // Otro proyecto: se vuelve a proponer el periodo de su etapa.
-                          setEtapas((prev) => {
-                            const copia = { ...prev };
-                            delete copia[i];
-                            return copia;
-                          });
-                          ajustar(i, { projectId: Number(e.target.value) || null, dia: undefined, hasta: undefined, etapaId: undefined });
-                        }}
-                      >
-                        <option value="">Elige el proyecto</option>
-                        {proyectosLista.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.nombre}
-                          </option>
-                        ))}
-                      </Select>
-                    </Field>
-                  ) : null}
-                  <Field
-                    label={agenda.hasta ? "Del" : "Día"}
-                    required={tipo === "servicio" || tipo === "obra"}
-                    hint={etapa ? `Etapa: ${etapa}` : agenda.dia ? undefined : pide("fecha", "¿para cuándo?")}
+                    </optgroup>
+                  </Select>
+                </Renglon>
+
+                {regla.ofrecer ? (
+                  <Renglon
+                    etiqueta="Encargo"
+                    valor={regla.valor === "despacho" ? "La reparte a su equipo" : regla.valor === "ejecucion" ? "La hace en persona" : <span className={s.vacio}>Elige</span>}
+                    abierto={abierto("encargo") || !regla.valor}
+                    obligado={!regla.valor}
+                    onAlternar={() => alternar("encargo")}
                   >
-                    <DateInput value={agenda.dia ?? ""} onChange={(e) => ajustar(i, { dia: e.target.value })} />
-                  </Field>
-                  <Field label="Hora" hint={agenda.dia && !agenda.horaDicha ? "No la dijiste: revísala" : undefined}>
-                    <Input type="time" value={agenda.hora ?? ""} disabled={!agenda.dia} onChange={(e) => ajustar(i, { hora: e.target.value })} />
-                  </Field>
-                  {!agenda.hasta ? (
-                    <Field
-                      label="Entregar a más tardar"
-                      optional
-                      hint={agenda.compromiso ? undefined : "Sin hora, el límite es el fin del día."}
-                      error={compromisoValido(agenda) ? null : "Tiene que ser después de la hora de inicio."}
-                    >
-                      <Input
-                        type="time"
-                        value={agenda.compromiso ?? ""}
-                        disabled={!agenda.dia}
-                        onChange={(e) => ajustar(i, { compromiso: e.target.value })}
-                      />
-                    </Field>
-                  ) : null}
-                  <Field label="Último día" optional>
-                    <DateInput
-                      value={agenda.hasta ?? ""}
-                      min={agenda.dia ?? undefined}
-                      disabled={!agenda.dia}
-                      invalid={Boolean(agenda.dia && agenda.hasta && agenda.hasta < agenda.dia)}
-                      onChange={(e) => ajustar(i, { hasta: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="¿Cuánto tiempo toma?" required hint={duracion ? undefined : pide("duración", "elige cuánto tarda")}>
-                    <Select
-                      value={duracion ? String(duracion) : ""}
-                      onChange={(e) => ajustar(i, { duracionMin: Number(e.target.value) || null })}
-                    >
+                    <Select aria-label="Encargo" value={regla.valor ?? ""} onChange={(e) => ajustar(i, { encargo: (e.target.value || null) as Encargo | null })}>
                       <option value="">Elige</option>
-                      {opcionesDuracion.map((m) => (
-                        <option key={m} value={m}>
-                          {formatMinutes(m)}
+                      <option value="ejecucion">La hace en persona</option>
+                      <option value="despacho">La reparte a su equipo</option>
+                    </Select>
+                  </Renglon>
+                ) : regla.fijo ? (
+                  <Renglon etiqueta="Encargo" valor={regla.valor === "despacho" ? "La reparte a su equipo" : "La hace en persona"} />
+                ) : null}
+
+                {conProyecto(tipo) ? (
+                  <Renglon
+                    etiqueta="Proyecto"
+                    valor={nombreProyecto ?? <span className={s.vacio}>Elige el proyecto</span>}
+                    abierto={abierto("proyecto") || !proyectoId}
+                    obligado={!proyectoId}
+                    onAlternar={() => alternar("proyecto")}
+                  >
+                    <Select
+                      aria-label="Proyecto"
+                      value={proyectoId ? String(proyectoId) : ""}
+                      onChange={(e) => {
+                        // Otro proyecto: se vuelve a proponer el periodo de su etapa.
+                        setEtapas((prev) => {
+                          const copia = { ...prev };
+                          delete copia[i];
+                          return copia;
+                        });
+                        ajustar(i, { projectId: Number(e.target.value) || null, dia: undefined, hasta: undefined, etapaId: undefined });
+                      }}
+                    >
+                      <option value="">Elige el proyecto</option>
+                      {proyectosLista.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.nombre}
                         </option>
                       ))}
                     </Select>
-                  </Field>
-                  <Field label="Prioridad">
-                    <Select
-                      value={String(payload.prioridad ?? "Media")}
-                      onChange={(e) => ajustar(i, { prioridad: e.target.value as Prioridad })}
-                    >
-                      <option value="Alta">Alta</option>
-                      <option value="Media">Media</option>
-                      <option value="Baja">Baja</option>
-                    </Select>
-                  </Field>
-                  {regla.ofrecer ? (
-                    <Field label="Encargo" required>
-                      <Select
-                        value={regla.valor ?? ""}
-                        onChange={(e) => ajustar(i, { encargo: (e.target.value || null) as Encargo | null })}
+                  </Renglon>
+                ) : (
+                  <Renglon
+                    etiqueta="Cliente"
+                    valor={
+                      nombreCliente || lugar ? (
+                        <>
+                          {nombreCliente ?? "Sin cliente"}
+                          {lugar ? <span className={s.detalle}> · {lugar}</span> : null}
+                        </>
+                      ) : (
+                        <span className={s.vacio}>{tipo === "servicio" ? "Elige el cliente" : "Sin cliente"}</span>
+                      )
+                    }
+                    nota={
+                      pendiente
+                        ? "Nuevo: alta al confirmar"
+                        : clienteNuevo
+                          ? "Cliente nuevo: completa su ficha en Clientes."
+                          : aj.clientId === undefined && corrCliente
+                            ? textoCorreccion(corrCliente)
+                            : aj.lugar === undefined && corrLugar
+                              ? textoCorreccion(corrLugar)
+                              : !p.cliente && p.textoCliente && !lugar
+                                ? `«${p.textoCliente}» no está registrado`
+                                : undefined
+                    }
+                    supuesto={Boolean(pendiente)}
+                    explicacion={p.notaCliente ?? undefined}
+                    abierto={abierto("cliente") || sinClienteDeServicio}
+                    obligado={sinClienteDeServicio}
+                    onAlternar={() => alternar("cliente")}
+                  >
+                    <div className={s.ajustes}>
+                      <Field label="Cliente" required={tipo === "servicio"}>
+                        <Select
+                          value={pendiente ? ALTA_CLIENTE : clienteId ? String(clienteId) : ""}
+                          onChange={(e) => {
+                            if (e.target.value === ALTA_CLIENTE) {
+                              if (altaNombre) agregarCliente(i, altaNombre);
+                              return;
+                            }
+                            const nuevo = Number(e.target.value) || null;
+                            // Otro cliente: la sucursal de la IA ya no aplica (el lugar escrito se queda).
+                            ajustar(i, { clientId: nuevo, clienteNuevo: null, ...(p.sucursal && aj.lugar === undefined && nuevo !== (p.cliente?.id ?? null) ? { lugar: "" } : {}) });
+                          }}
+                        >
+                          <option value="">{tipo === "servicio" ? "Elige el cliente" : "Sin cliente"}</option>
+                          {pendiente ? <option value={ALTA_CLIENTE}>{`${pendiente} (cliente nuevo)`}</option> : null}
+                          {altaNombre ? <option value={ALTA_CLIENTE}>{`+ Agregar cliente «${altaNombre}»`}</option> : null}
+                          {clientesSugeridos.length ? (
+                            <optgroup label={p.cliente ? "El que dijiste" : "Coinciden con lo que dijiste"}>
+                              {clientesSugeridos.map((o) => (
+                                <option key={o.id} value={o.id}>
+                                  {o.nombre}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ) : null}
+                          {otrosClientes.length ? (
+                            <optgroup label="Todos los clientes">
+                              {otrosClientes.map((o) => (
+                                <option key={o.id} value={o.id}>
+                                  {o.nombre}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ) : null}
+                        </Select>
+                      </Field>
+                      <Field label="Lugar" optional hint={sucursalesLista.length ? "Sucursal o lugar" : undefined}>
+                        <Input
+                          value={lugar}
+                          maxLength={160}
+                          list={sucursalesLista.length ? `asistente-lugares-${i}` : undefined}
+                          placeholder="Sucursal, planta o dirección"
+                          onChange={(e) => ajustar(i, { lugar: e.target.value })}
+                        />
+                      </Field>
+                      {sucursalesLista.length ? (
+                        <datalist id={`asistente-lugares-${i}`}>
+                          {sucursalesLista.map((x) => (
+                            <option key={x.id} value={x.nombre} />
+                          ))}
+                        </datalist>
+                      ) : null}
+                    </div>
+                  </Renglon>
+                )}
+
+                <Renglon
+                  etiqueta="Cuándo"
+                  valor={agenda.dia ? textoCuando(agenda, hoyISO()) : <span className={s.vacio}>{tipo === "servicio" || tipo === "obra" ? "Indica el día" : "Sin fecha"}</span>}
+                  nota={etapa ? `Etapa: ${etapa}` : p.agenda?.diaDicho === false && aj.dia === undefined ? "No dijiste cuándo" : agenda.dia && !agenda.horaDicha ? "Hora sugerida" : undefined}
+                  supuesto={!etapa && p.agenda?.diaDicho === false && aj.dia === undefined}
+                  abierto={abierto("cuando") || agendaMal}
+                  obligado={agendaMal}
+                  onAlternar={() => alternar("cuando")}
+                >
+                  <div className={s.ajustes}>
+                    <Field label={agenda.hasta ? "Del" : "Día"} required={tipo === "servicio" || tipo === "obra"}>
+                      <DateInput value={agenda.dia ?? ""} onChange={(e) => ajustar(i, { dia: e.target.value })} />
+                    </Field>
+                    <Field label="Hora">
+                      <Input type="time" value={agenda.hora ?? ""} disabled={!agenda.dia} onChange={(e) => ajustar(i, { hora: e.target.value })} />
+                    </Field>
+                    {!agenda.hasta ? (
+                      <Field
+                        label="Entregar a más tardar"
+                        optional
+                        hint={agenda.compromiso ? undefined : "Sin hora, el límite es el fin del día."}
+                        error={compromisoValido(agenda) ? null : "Tiene que ser después de la hora de inicio."}
                       >
-                        <option value="">Elige</option>
-                        <option value="ejecucion">La hace en persona</option>
-                        <option value="despacho">La reparte a su equipo</option>
-                      </Select>
+                        <Input type="time" value={agenda.compromiso ?? ""} disabled={!agenda.dia} onChange={(e) => ajustar(i, { compromiso: e.target.value })} />
+                      </Field>
+                    ) : null}
+                    <Field label="Último día" optional>
+                      <DateInput
+                        value={agenda.hasta ?? ""}
+                        min={agenda.dia ?? undefined}
+                        disabled={!agenda.dia}
+                        invalid={Boolean(agenda.dia && agenda.hasta && agenda.hasta < agenda.dia)}
+                        onChange={(e) => ajustar(i, { hasta: e.target.value })}
+                      />
                     </Field>
-                  ) : regla.fijo ? (
-                    <Field label="Encargo">
-                      <Input value={regla.valor === "despacho" ? "La reparte a su equipo" : "La hace en persona"} readOnly />
-                    </Field>
-                  ) : null}
-                  <Field label="Indicaciones" optional fullWidth>
+                  </div>
+                </Renglon>
+
+                <Renglon
+                  etiqueta="Tiempo"
+                  valor={duracion ? formatMinutes(duracion) : <span className={s.vacio}>Elige cuánto tarda</span>}
+                  nota={p.duracionOrigen === "estimada" && aj.duracionMin === undefined && duracion ? "Estimado" : undefined}
+                  supuesto={p.duracionOrigen === "estimada" && aj.duracionMin === undefined && Boolean(duracion)}
+                  explicacion={p.duracionOrigen === "estimada" && p.duracionDetalle ? `Tabla de tiempos: ${p.duracionDetalle}.` : undefined}
+                  abierto={abierto("tiempo") || sinTiempo}
+                  obligado={sinTiempo}
+                  onAlternar={() => alternar("tiempo")}
+                >
+                  <Select aria-label="Tiempo" value={duracion ? String(duracion) : ""} onChange={(e) => ajustar(i, { duracionMin: Number(e.target.value) || null })}>
+                    <option value="">Elige</option>
+                    {opcionesDuracion.map((m) => (
+                      <option key={m} value={m}>
+                        {formatMinutes(m)}
+                      </option>
+                    ))}
+                  </Select>
+                </Renglon>
+
+                <Renglon etiqueta="Prioridad" valor={String(payload.prioridad ?? "Media")} abierto={abierto("prioridad")} onAlternar={() => alternar("prioridad")}>
+                  <Select aria-label="Prioridad" value={String(payload.prioridad ?? "Media")} onChange={(e) => ajustar(i, { prioridad: e.target.value as Prioridad })}>
+                    <option value="Alta">Alta</option>
+                    <option value="Media">Media</option>
+                    <option value="Baja">Baja</option>
+                  </Select>
+                </Renglon>
+
+                {indicaciones || aj.indicaciones !== undefined || abierto("indicaciones") ? (
+                  <Renglon etiqueta="Indicaciones" valor={indicaciones || <span className={s.vacio}>Sin indicaciones</span>} abierto={abierto("indicaciones")} onAlternar={() => alternar("indicaciones")}>
                     <Textarea
+                      aria-label="Indicaciones"
                       rows={2}
                       value={aj.indicaciones ?? indicaciones}
                       maxLength={4000}
                       placeholder="Detalle para quien la hará: síntoma, cantidades, con quién coordinarse…"
                       onChange={(e) => ajustar(i, { indicaciones: e.target.value })}
                     />
-                  </Field>
-                </div>
-              ) : null}
+                  </Renglon>
+                ) : null}
+              </div>
 
-              {p.avisos.map((a) => (
+              {notasPie.map((a) => (
                 <p key={a} className={c.pista}>
                   {a}
                 </p>
               ))}
-              {!est.creada && motivos.length ? <p className={c.error}>{motivos.join(" ")}</p> : null}
+              {motivos.length ? <p className={c.error}>{motivos.join(" ")}</p> : null}
               {est.error ? (
                 <Alert tone="danger" role="alert">
                   {est.error}
                 </Alert>
               ) : null}
-              {est.avisoEquipo ? (
-                <Alert tone="warning" role="status">
-                  {est.avisoEquipo}
-                </Alert>
-              ) : null}
 
-              <div className={c.fila}>
-                {est.creada ? (
-                  <>
-                    <span className={c.ok}>Creada{est.creada.folio ? ` · ${est.creada.folio}` : ""}. Ya se le avisó.</span>
-                    <ButtonLink href={`/erp/actividades/${est.creada.id}`} size="sm" iconEnd={<ArrowForwardIcon />}>
-                      Abrir
-                    </ButtonLink>
-                  </>
-                ) : (
-                  <Button
-                    variant="primary"
-                    className={c.tap}
-                    disabled={motivos.length > 0 || est.creando || creandoTodas}
-                    aria-busy={est.creando}
-                    onClick={() => void crear(i, p)}
-                  >
-                    {est.creando ? "Creando…" : "Confirmar y asignar"}
+              <div className={s.pie}>
+                {!indicaciones && aj.indicaciones === undefined && !abierto("indicaciones") ? (
+                  <Button variant="ghost" size="sm" onClick={() => alternar("indicaciones")}>
+                    Agregar indicaciones
                   </Button>
+                ) : (
+                  <span />
                 )}
+                <Button
+                  variant="primary"
+                  className={c.tap}
+                  disabled={motivos.length > 0 || est.creando || creandoTodas}
+                  aria-busy={est.creando}
+                  onClick={() => void crear(i, p)}
+                >
+                  {est.creando ? "Creando…" : "Confirmar y asignar"}
+                </Button>
               </div>
             </div>
           );
@@ -830,7 +996,7 @@ function Contenido({
         {respuesta && propuestas.length > 0 && pendientes.length === 0 ? (
           <p className={c.ok}>Listo. Todo quedó asignado.</p>
         ) : null}
-        {respuesta?.uso?.usdAprox != null ? (
+        {verCosto && respuesta?.uso?.usdAprox != null ? (
           <p className={s.costo}>
             Costo de esta consulta: ~US${respuesta.uso.usdAprox.toFixed(4)} ({respuesta.uso.tokensEntrada + respuesta.uso.tokensSalida} tokens)
           </p>

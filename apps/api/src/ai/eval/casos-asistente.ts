@@ -13,10 +13,16 @@
 import type { TipoActividad } from '../asistente/asistente-actividades.js';
 
 export type AccionEsperada = {
-  /** Id esperado; null = no debe resolverse a nadie (ambiguo o no existe). */
+  /** Id esperado; null = no debe resolverse a nadie (nombraron a alguien que no existe). */
   responsableId: number | null;
-  /** Si `responsableId` es null: texto que debe conservar («Antonio», «Pedro»). */
+  /** Si `responsableId` es null: texto que debe conservar («Pedro»). */
   textoResponsable?: string;
+  /** De dónde debe salir: dicho, el más probable entre varios o sugerido porque nadie dijo quién. */
+  origen?: 'dicho' | 'probable' | 'sugerido';
+  /** Cliente que no está registrado y se propone dar de alta al confirmar. */
+  clienteNuevo?: Array<string | null>;
+  /** «Entregar a más tardar» que queda en la tarjeta (HH:MM; null = fin del día). */
+  compromiso?: Array<string | null>;
   tipos: TipoActividad[];
   subtipo?: string[];
   tipoServicio?: string[];
@@ -52,6 +58,8 @@ export type CasoAsistente = {
   aclaracion?: boolean;
   /** Lo que el juez debe vigilar en especial. */
   nota?: string;
+  /** Otro momento en vez de `AHORA` (ISO), para lo que depende de la hora. */
+  ahora?: string;
 };
 
 const HOY = '2026-10-21';
@@ -166,8 +174,8 @@ export const CASOS_ASISTENTE: CasoAsistente[] = [
     instruccion: 'Que Antonio revise mañana el control de acceso del Colegio Andes, la puerta principal no abre.',
     acciones: [
       {
-        responsableId: null,
-        textoResponsable: 'Antonio',
+        responsableId: 1,
+        origen: 'probable',
         tipos: ['servicio'],
         tipoServicio: ['CORRECTIVO', 'EMERGENCIA'],
         clienteId: [104],
@@ -176,7 +184,7 @@ export const CASOS_ASISTENTE: CasoAsistente[] = [
         detalleCon: ['puerta principal'],
       },
     ],
-    nota: 'Hay dos Antonio en la lista (José Antonio Ramírez Ortega y Antonio Vázquez Luna): no debe elegir a uno.',
+    nota: 'Hay dos Antonio en la lista: José Antonio Ramírez Ortega (soporte, puede recibir servicios) es el más probable, y un aviso dice que también puede ser Antonio Vázquez Luna.',
   },
   {
     id: 'a08',
@@ -282,14 +290,13 @@ export const CASOS_ASISTENTE: CasoAsistente[] = [
         tipoServicio: ['CORRECTIVO'],
         clienteId: [103],
         sucursalId: [205],
-        inicio: [null],
-        limite: [null],
+        inicio: [HOY],
+        limite: [HOY],
         hora: [null],
-        faltan: ['fecha', 'duración'],
         detalleCon: ['noche'],
       },
     ],
-    nota: 'No dieron fecha, hora ni duración: deben quedar vacías y marcadas como faltantes.',
+    nota: 'No dieron fecha, hora ni duración: se espera que hoy (hora actual) y el tiempo de la tabla.',
   },
   {
     id: 'a15',
@@ -333,14 +340,13 @@ export const CASOS_ASISTENTE: CasoAsistente[] = [
         responsableId: 4,
         tipos: ['comercial'],
         clienteId: [105],
-        inicio: [null],
-        limite: [null],
+        inicio: [HOY],
+        limite: [HOY],
         duracionMin: [null],
-        faltan: ['fecha', 'duración'],
         sinIndicaciones: true,
       },
     ],
-    nota: 'No dieron fecha ni duración: quedan vacías y como faltantes. Las indicaciones no deben repetir el título.',
+    nota: 'No dieron fecha ni duración: se espera que hoy y el tiempo de la tabla. Las indicaciones no deben repetir el título.',
   },
   {
     id: 'a18',
@@ -461,8 +467,8 @@ export const CASOS_ASISTENTE: CasoAsistente[] = [
     acciones: [
       {
         responsableId: 9,
-        tipos: ['servicio'],
-        tipoServicio: ['CORRECTIVO', 'EMERGENCIA'],
+        tipos: ['tarea'],
+        subtipo: ['Correctivo y diagnóstico'],
         clienteId: [101],
         sucursalId: [202],
         inicio: ['2026-10-22'],
@@ -470,7 +476,7 @@ export const CASOS_ASISTENTE: CasoAsistente[] = [
         detalleCon: ['nvr', 'tox'],
       },
     ],
-    nota: '«talks» es Grupo Tox mal oído por el dictado: el título y el cliente deben decir Tox, nunca «Talk».',
+    nota: '«talks» es Grupo Tox mal oído por el dictado: el título y el cliente deben decir Tox, nunca «Talk». Antonio Vázquez solo recibe tareas: el servicio queda como su tarea equivalente.',
   },
   {
     id: 'a25',
@@ -562,5 +568,133 @@ export const CASOS_ASISTENTE: CasoAsistente[] = [
       },
     ],
     nota: 'Maja no es cliente: sin cliente y «Maja» como lugar. Nunca se inventa ni se empata con otro cliente.',
+  },
+  // 01-11: «debe quedar todo lleno y editable». Cada campo con su mejor propuesta, lenguaje informal,
+  // tiempos vagos, nombres repetidos y clientes sin registrar (Adam, captura de la pizarra).
+  {
+    id: 'a31',
+    instruccion:
+      'quiero que antonio vaya a comercial mexicana hoy a arreglar una comandera antes de las 5 y luis acabe con su cotizacion del colegio andes para el final del dia',
+    acciones: [
+      {
+        responsableId: 1,
+        origen: 'probable',
+        tipos: ['servicio'],
+        tipoServicio: ['CORRECTIVO'],
+        clienteId: [null],
+        clienteNuevo: ['Comercial Mexicana'],
+        inicio: [HOY],
+        compromiso: ['17:00'],
+        detalleCon: ['comandera'],
+      },
+      { responsableId: 3, origen: 'dicho', tipos: ['comercial'], clienteId: [104], inicio: [HOY], compromiso: ['18:00', null], detalleCon: ['cotiz'] },
+    ],
+    nota: 'El caso de la captura: dos Antonio, cliente sin registrar y sin duración. Todo debe quedar propuesto: un servicio solo lo recibe el encargado de soporte.',
+  },
+  {
+    id: 'a32',
+    instruccion: 'que carolina revise la compu de recepcion del colegio andes',
+    acciones: [{ responsableId: 2, tipos: ['servicio', 'tarea'], clienteId: [104], inicio: [HOY], detalleCon: ['computadora'] }],
+    nota: '«compu» es computadora. No dijeron cuándo: hoy.',
+  },
+  {
+    id: 'a33',
+    instruccion: 'que jorge le eche un ojo a la lap de patricia al rato',
+    acciones: [{ responsableId: 7, tipos: ['tarea'], clienteId: [null], inicio: [HOY], hora: ['11:00', '11:30', '12:00', '12:30'], detalleCon: ['laptop'] }],
+    nota: '«lap» es laptop; «al rato» es una hora después de la actual; «echar un ojo» es revisar.',
+  },
+  {
+    id: 'a34',
+    instruccion: 'que maría fernanda le mande la coti a bodegas luna mañana temprano',
+    acciones: [{ responsableId: 4, tipos: ['comercial'], clienteId: [103], inicio: ['2026-10-22'], hora: [null], detalleCon: ['cotiz'] }],
+    nota: '«coti» es cotización; «temprano» deja la hora a la entrada de quien lo hace.',
+  },
+  {
+    id: 'a35',
+    instruccion: 'dile a diana que termine los planos del hotel real esta semana',
+    acciones: [{ responsableId: 6, tipos: ['tarea', 'proyecto'], clienteId: [105], inicio: [HOY], limite: ['2026-10-23'], detalleCon: ['plano'] }],
+    nota: '«Esta semana» es hasta el viernes.',
+  },
+  {
+    id: 'a36',
+    instruccion: 'urge la cotizacion de super kwik',
+    acciones: [{ responsableId: 4, origen: 'sugerido', tipos: ['comercial'], clienteId: [107], inicio: [HOY], prioridad: ['Alta'], detalleCon: ['cotiz'] }],
+    nota: 'Nadie dijo quién: se propone a quien hace lo comercial, con un aviso que lo dice.',
+  },
+  {
+    id: 'a37',
+    instruccion: 'hay que ir a arreglar las camaras del colegio andes',
+    acciones: [{ responsableId: 1, origen: 'sugerido', tipos: ['servicio'], tipoServicio: ['CORRECTIVO'], clienteId: [104], inicio: [HOY], detalleCon: ['camara'] }],
+    nota: 'Nadie dijo quién: se propone a quien más ha atendido estos servicios, con un aviso que lo dice.',
+  },
+  {
+    id: 'a38',
+    instruccion: 'que antonio instale 4 camaras en la oficina hoy',
+    acciones: [{ responsableId: 9, origen: 'probable', tipos: ['tarea'], subtipo: ['Instalación'], clienteId: [null], inicio: [HOY], detalleCon: ['4'] }],
+    nota: 'Instalar va con el técnico instalador por su puesto; la oficina no es un cliente.',
+  },
+  {
+    id: 'a39',
+    instruccion: 'que antonio haga el reporte del curso de fortinet para mañana',
+    acciones: [{ responsableId: 1, origen: 'probable', tipos: ['tarea'], subtipo: ['Reporte / documentación'], inicio: [HOY], limite: ['2026-10-22'], detalleCon: ['fortinet'] }],
+    nota: 'El reporte va con quien los hace; «para mañana» es plazo: empieza hoy.',
+  },
+  {
+    id: 'a40',
+    instruccion: 'salvador y erik terminen la tuberia de la biblioteca, les lleva todo el dia',
+    acciones: [
+      { responsableId: 14, tipos: ['tarea'], subtipo: ['Cableado y canalización'], inicio: [HOY], duracionMin: [480], lugarCon: 'biblioteca' },
+      { responsableId: 13, tipos: ['tarea'], subtipo: ['Cableado y canalización'], inicio: [HOY], duracionMin: [480], lugarCon: 'biblioteca' },
+    ],
+    nota: 'Dos personas son dos actividades.',
+  },
+  {
+    id: 'a41',
+    instruccion: 'que jorge vaya a las 5 a bodegas luna por unos equipos',
+    acciones: [{ responsableId: 7, tipos: ['tarea'], subtipo: ['Recolección'], clienteId: [103], inicio: [HOY], hora: ['17:00'] }],
+    nota: 'Sin am ni pm, en horario de trabajo: las 5 son las 17:00.',
+  },
+  {
+    id: 'a42',
+    instruccion: 'la semana que entra que luis haga los preventivos del colegio andes',
+    acciones: [{ responsableId: 3, tipos: ['servicio'], tipoServicio: ['PREVENTIVO'], clienteId: [104], inicio: ['2026-10-26'], limite: ['2026-10-30'], detalleCon: ['preventivo'] }],
+    nota: '«La semana que entra» es del lunes al viernes siguientes.',
+  },
+  {
+    id: 'a43',
+    instruccion: 'que maría fernanda mande la propuesta al hotel real pasado mañana en la tarde',
+    acciones: [{ responsableId: 4, tipos: ['comercial'], clienteId: [105], inicio: ['2026-10-23'], hora: ['16:00'], detalleCon: ['propuesta'] }],
+    nota: '«Pasado mañana» es dos días después; «en la tarde» es a las 16:00, después de la comida.',
+  },
+  {
+    id: 'a44',
+    instruccion: 'que luis prepare el reporte de ventas',
+    ahora: '2026-10-22T01:30:00Z',
+    acciones: [{ responsableId: 3, tipos: ['tarea'], subtipo: ['Reporte / documentación'], inicio: ['2026-10-22'], detalleCon: ['ventas'] }],
+    nota: 'Son las 19:30: la jornada ya terminó y no dijeron cuándo, así que es el día siguiente.',
+  },
+  {
+    id: 'a45',
+    instruccion: 'que antonio vázquez vaya ya a bodegas luna atlixco, se cayó el cctv',
+    acciones: [{ responsableId: 9, origen: 'dicho', tipos: ['tarea'], subtipo: ['Correctivo y diagnóstico'], clienteId: [103], sucursalId: [205], inicio: [HOY], prioridad: ['Alta'], detalleCon: ['cctv'] }],
+    nota: 'Solo recibe tareas: el servicio pasa a la tarea equivalente, sin bloquear la tarjeta.',
+  },
+  {
+    id: 'a46',
+    instruccion: 'que jorge recoja las escaleras en la bodega ahorita',
+    acciones: [{ responsableId: 7, tipos: ['tarea'], subtipo: ['Recolección'], clienteId: [null], inicio: [HOY], lugarCon: 'bodega', detalleCon: ['escalera'] }],
+    nota: '«La bodega» es un sitio propio: no es el cliente mal capturado «Bodega de».',
+  },
+  {
+    id: 'a47',
+    instruccion: 'que patricia pague la fianza de tpm para fin de mes',
+    acciones: [{ responsableId: 10, tipos: ['tarea'], subtipo: ['Trámite'], clienteId: [109], inicio: [HOY], limite: ['2026-10-31'], detalleCon: ['fianza'] }],
+    nota: '«Fin de mes» es el último día del mes.',
+  },
+  {
+    id: 'a48',
+    instruccion: 'para la 1 que alejandra tenga lista la factura de bodegas luna',
+    acciones: [{ responsableId: 8, tipos: ['tarea', 'comercial'], clienteId: [103], inicio: [HOY], compromiso: ['13:00'], detalleCon: ['factura'] }],
+    nota: '«Para la 1» con «que tenga lista» es un plazo a las 13:00, no una cita.',
   },
 ];

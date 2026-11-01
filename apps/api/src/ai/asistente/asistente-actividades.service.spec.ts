@@ -29,8 +29,9 @@ describe('AsistenteActividadesService', () => {
     const claude = {
       json: jest.fn().mockResolvedValue({ datos: salida, uso }),
     };
-    const servicio = new AsistenteActividadesService(prisma as never, users as never, claude as never);
-    return { servicio, claude };
+    const complejidad = { medianas: jest.fn().mockRejectedValue(new Error('sin base')) };
+    const servicio = new AsistenteActividadesService(prisma as never, users as never, claude as never, complejidad as never);
+    return { servicio, claude, users };
   }
 
   it(`cita el texto viejo «${TEXTO_VIEJO}» y lo deja en una frase`, async () => {
@@ -44,5 +45,20 @@ describe('AsistenteActividadesService', () => {
     expect(res.aclaracion!.split('. ')).toEqual([TEXTO_NUEVO]);
     expect(res.propuestas).toEqual([]);
     expect(claude.json).toHaveBeenCalledWith(expect.objectContaining({ proceso: 'asistente-actividades', companyId: 1 }));
+  });
+
+  it('propone tiempo aunque no haya medianas, y separa a dos personas en una sola acción', async () => {
+    const { servicio, users } = armar({
+      acciones: [{ tipo: 'tarea', sub: 'Entrega', titulo: 'Llevar DVR', detalle: null, quien: 'Ana y Luis', cliente: null, lugar: null, inicio: null, limite: null, min: null, prio: 'Media', encargo: null, comp: null, cant: null }],
+      aclaracion: null,
+    });
+    users.findAssignableUsers.mockResolvedValue([
+      { id: 1, nombre: 'Ana Ruiz', email: 'ana@x.mx', horaEntrada: null, horaSalida: null },
+      { id: 2, nombre: 'Luis Soto', email: 'luis@x.mx', horaEntrada: '08:00', horaSalida: '17:00' },
+    ]);
+    const res = await servicio.interpretar('que Ana y Luis lleven el DVR', { id: 7, nombre: 'Ana' }, 1);
+    expect(res.propuestas.map((p) => p.responsable?.id)).toEqual([1, 2]);
+    expect(res.propuestas[0].duracionMin).toBeGreaterThan(0);
+    expect(res.propuestas[0].duracionOrigen).toBe('estimada');
   });
 });

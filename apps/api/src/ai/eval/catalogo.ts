@@ -8,8 +8,12 @@ import type { CatalogosNexara } from '../asistente/asistente-actividades.js';
 export const AHORA = new Date('2026-10-21T16:30:00Z');
 export const AUTOR = 'Adriana Morales Paz';
 
+const ENCARGADO = ['tarea', 'proyecto', 'servicio', 'comercial'] as const;
+const SOLO_TAREA = ['tarea'] as const;
+
 export const PERSONAS = [
-  { id: 1, nombre: 'José Antonio Ramírez Ortega', puesto: 'Técnico de campo' },
+  // Dos Antonio como en la vida real: el encargado de soporte y un técnico que solo recibe tareas.
+  { id: 1, nombre: 'José Antonio Ramírez Ortega', puesto: 'Encargado de soporte', recibe: ENCARGADO },
   { id: 2, nombre: 'Carolina Pérez Lima', puesto: 'Coordinadora de servicio' },
   { id: 3, nombre: 'Luis Fernando Gómez Reyes', puesto: 'Técnico de campo' },
   { id: 4, nombre: 'María Fernanda Ruiz Cano', puesto: 'Ejecutiva comercial' },
@@ -17,7 +21,7 @@ export const PERSONAS = [
   { id: 6, nombre: 'Diana Sánchez Mora', puesto: 'Ingeniera de proyectos' },
   { id: 7, nombre: 'Jorge Méndez Aguilar', puesto: 'Almacén y compras' },
   { id: 8, nombre: 'Alejandra Torres Vega', puesto: 'Administración' },
-  { id: 9, nombre: 'Antonio Vázquez Luna', puesto: 'Técnico de campo' },
+  { id: 9, nombre: 'Antonio Vázquez Luna', puesto: 'Técnico instalador', recibe: SOLO_TAREA, horaEntrada: '08:00', horaSalida: '17:00' },
   { id: 10, nombre: 'Patricia Lozano Ibarra', puesto: 'Recepción' },
   { id: 11, nombre: 'Roberto Castillo Núñez', puesto: 'Jefe de soporte' },
   { id: 12, nombre: 'Adriana Morales Paz', puesto: 'Directora de operaciones' },
@@ -42,6 +46,8 @@ export const CATALOGO: CatalogosNexara = {
     { id: 107, name: 'Super Kwik' },
     { id: 108, name: 'Transportes Coatzacoalcos' },
     { id: 109, name: 'TPM Industrial' },
+    // Cliente mal capturado (existen en producción): «la bodega» no es este cliente.
+    { id: 110, name: 'Bodega de' },
   ],
   sucursales: [
     { id: 201, clientId: 101, clientName: 'Grupo Tox', name: 'CEDIS Puebla', branchNumber: null, address: null, city: 'Puebla', state: 'Puebla' },
@@ -57,4 +63,14 @@ export const CATALOGO: CatalogosNexara = {
     { id: 302, title: 'Control de acceso Colegio Andes', clientId: 104, clientName: 'Colegio Andes' },
     { id: 303, title: 'Red y CCTV Hotel Real', clientId: 105, clientName: 'Hotel Real de Cholula' },
   ],
+  // Quién ha hecho qué: de aquí sale la persona más probable.
+  actividades: [
+    ...repetir(4, { responsableId: 1, coreKind: 'servicio', ticketType: 'CORRECTIVO', ticketTypeCustom: null, clientId: 104 }),
+    ...repetir(6, { responsableId: 1, coreKind: 'tarea', ticketType: 'OTRO', ticketTypeCustom: 'Reporte / documentación', clientId: null }),
+    ...repetir(5, { responsableId: 4, coreKind: 'comercial', ticketType: 'OTRO', ticketTypeCustom: 'COMERCIAL', clientId: null }),
+  ],
 };
+
+function repetir<T>(n: number, x: T): T[] {
+  return Array.from({ length: n }, () => x);
+}
