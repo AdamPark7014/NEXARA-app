@@ -37,16 +37,6 @@ export type OpcionesCotizacion = {
   autorizo: (Firmante & { userId?: number | null }) | null;
 };
 
-/** Contrato con el generador del PDF (`PropuestaPayload.opciones`). */
-export type OpcionesPropuesta = {
-  secciones: SeccionesOpcionales;
-  columnas: ColumnasOpcionales;
-  carta: CartaPresentacion | null;
-  moneda: Moneda;
-  tipoCambioNota?: string;
-  firmas: Array<{ nombre: string; cargo?: string; rol: 'Elaboró' | 'Autorizó' }>;
-};
-
 export const SECCIONES_POR_OMISION: SeccionesOpcionales = {
   objetivo: true,
   alcance: true,
@@ -139,35 +129,6 @@ export function normalizarOpciones(crudo: unknown): OpcionesCotizacion {
 
 /** Moneda de la cotización (`Cotizacion.currency`); cualquier otra cosa es MXN. */
 export const normalizarMoneda = (valor: unknown): Moneda => (String(valor ?? '').trim().toUpperCase() === 'USD' ? 'USD' : 'MXN');
-
-/**
- * Opciones para el generador del PDF. Las firmas se arman aquí: «Elaboró» es el autor (o quien se
- * haya escrito en su lugar) y «Autorizó» solo si se capturó.
- */
-export function opcionesDePropuesta(
-  opciones: OpcionesCotizacion,
-  contexto: { moneda?: unknown; autor?: Firmante | null },
-): OpcionesPropuesta {
-  const moneda = normalizarMoneda(contexto.moneda);
-  const elaboro = opciones.elaboro ?? contexto.autor ?? null;
-  const firmas: OpcionesPropuesta['firmas'] = [];
-  if (elaboro?.nombre) firmas.push({ nombre: elaboro.nombre, ...(elaboro.cargo ? { cargo: elaboro.cargo } : {}), rol: 'Elaboró' });
-  if (opciones.autorizo?.nombre) {
-    firmas.push({
-      nombre: opciones.autorizo.nombre,
-      ...(opciones.autorizo.cargo ? { cargo: opciones.autorizo.cargo } : {}),
-      rol: 'Autorizó',
-    });
-  }
-  return {
-    secciones: { ...opciones.secciones },
-    columnas: { ...opciones.columnas },
-    carta: opciones.carta,
-    moneda,
-    ...(moneda === 'USD' && opciones.tipoCambioNota ? { tipoCambioNota: opciones.tipoCambioNota } : {}),
-    firmas,
-  };
-}
 
 /**
  * Condiciones comerciales sugeridas por segmento (el editor las ofrece ya escritas en una cotización

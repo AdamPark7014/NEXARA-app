@@ -18,7 +18,12 @@ import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
 import { generateCotizacionPdf } from './cotizacion-pdf.js';
-import { formatoDesdeCotizacion, generarCotizacionNexaraPdf, pagoDeCotizacion } from './cotizacion-formato-nexara.js';
+import {
+  formatoDesdeCotizacion,
+  generarCotizacionNexaraPdf,
+  pagoDeCotizacion,
+  type SeccionesPropuesta,
+} from './cotizacion-formato-nexara.js';
 import type { PlanoArchivo } from '../common/pdf/planos-pdf.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -63,8 +68,6 @@ import {
 } from './terminos-segmento.js';
 import { avanceActividadPorEstado } from './estado-cotizacion.js';
 import { isPdfUrl, pasoCubiertoPorCotizacion } from '../activities/evidence/evidence-flow.helpers.js';
-import { generarPropuestaTecnicaPdf, type SeccionesPropuesta } from './propuesta-tecnica-pdf.js';
-import { payloadDePropuesta } from './propuesta-payload.js';
 import { LIMITES_VISTA_PREVIA, borradorSobreGuardada } from './propuesta-vista-previa.js';
 import {
   condicionesPorOmision,
@@ -2088,48 +2091,6 @@ export class CotizacionesService {
     });
   }
 
-  /**
-   * PDF que ve el cliente: la «Propuesta técnica» del contrato.
-   *
-   * El PDF viejo (una tabla y un párrafo de términos fijo) se conserva para la vista interna, que
-   * es la única que lleva costo de proveedor y margen.
-   */
-  private async buildPropuesta(quote: any, secciones?: SeccionesPropuesta): Promise<Buffer> {
-    let company = quote.company;
-    if (!company && quote.companyId) {
-      company = await this.db.companyProfile.findUnique({ where: { id: quote.companyId } });
-    }
-
-    const [planos, participantes] = await Promise.all([
-      this.planosDePropuesta(quote),
-      this.core.participantesParaApi(quote.id),
-    ]);
-
-    // Qué campo del editor va a qué parte del documento: `propuesta-payload.ts`.
-    return generarPropuestaTecnicaPdf(
-      payloadDePropuesta(quote, {
-        planos,
-        participantes: participantes.map((p) => ({ nombre: p.nombre, rolEtiqueta: p.rolEtiqueta, siglas: p.siglas })),
-        // Firma «Elaboró» por omisión: quien la hizo, con su puesto.
-        autor: (() => {
-          const elaboro = participantes.find((p) => p.rol === 'ELABORO');
-          return elaboro?.nombre ? { nombre: elaboro.nombre, ...(elaboro.puesto ? { cargo: elaboro.puesto } : {}) } : null;
-        })(),
-        empresa: company
-          ? {
-              legalName: company.legalName,
-              tradeName: company.tradeName,
-              contactEmail: company.contactEmail,
-              contactPhone: company.contactPhone,
-              websiteUrl: company.websiteUrl,
-              fiscalAddress: company.fiscalAddress,
-            }
-          : null,
-      }),
-      secciones,
-    );
-  }
-
   private async buildPdf(quote: any, internal = false) {
     // Lo que sale al cliente (y lo que se adjunta al enviarla) es el formato de Christian, con sus
     // planos (propios y heredados del levantamiento): sin esto se imprimía sin ellos.
@@ -2138,6 +2099,7 @@ export class CotizacionesService {
       return generarCotizacionNexaraPdf(formatoDesdeCotizacion(quote), planos as PlanoArchivo[]);
     }
 
+    // La vista interna es la única que lleva costo de proveedor y margen.
     let totales: ReturnType<CotizacionesService['calculateTotals']> | null = null;
     if (Array.isArray(quote.items) && quote.items.length) {
       try {
