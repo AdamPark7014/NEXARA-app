@@ -221,7 +221,7 @@ services:
 
   # Media gateway: RTSP Artemis → HLS para player HTML5 (Integra).
   go2rtc:
-    image: alexxit/go2rtc:1.9.7
+    image: alexxit/go2rtc:1.9.15
     container_name: nexara-go2rtc
     restart: unless-stopped
     volumes:

@@ -2,7 +2,8 @@
 # Docs: https://github.com/AlexxIT/go2rtc
 api:
   listen: ":1984"
-  origin: "*"
+  # Sin `origin: "*"`: el WebSocket de video solo acepta páginas del mismo dominio. Quién entra lo
+  # decide el forwardAuth de Traefik (deploy/traefik/nexara.yml → /api/integra/media/authz).
 
 rtsp:
   listen: ":8554"
