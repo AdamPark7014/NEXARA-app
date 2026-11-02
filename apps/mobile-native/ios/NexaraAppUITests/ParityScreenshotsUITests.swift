@@ -155,7 +155,7 @@ final class ParityScreenshotsUITests: XCTestCase {
     }
 
     /// Vehículos del CEO (`NEXARA_DEMO_CEO=1`): la flotilla y la ficha, sin «Solicitar» ni «Salida».
-    /// Capturas 100 y 101.
+    /// Capturas 88 a 90: el flujo de CI solo acepta nombres con dos cifras.
     func testFlotillaDireccion() throws {
         app.terminate()
         app.launchEnvironment["NEXARA_DEMO_CEO"] = "1"
@@ -182,9 +182,10 @@ final class ParityScreenshotsUITests: XCTestCase {
         }
         tocar(fila)
         Thread.sleep(forTimeInterval: 1.5)
-        numero = 99
+        numero = 87
         capturar("flotilla-direccion")
         XCTAssertFalse(app.buttons["Solicitar"].exists, "El CEO no debe ver «Solicitar»")
+        XCTAssertFalse(app.buttons["Salida"].exists, "El CEO no debe ver «Salida»")
         let vehiculo = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Ford Ranger")).firstMatch
         var vueltas = 0
         while !(vehiculo.exists && vehiculo.isHittable), vueltas < 4 {
@@ -197,8 +198,10 @@ final class ParityScreenshotsUITests: XCTestCase {
             omitir("flotilla-ficha: no aparece el vehículo")
             return
         }
+        capturar("flotilla-lista")
         tocar(vehiculo)
-        Thread.sleep(forTimeInterval: 1.5)
+        XCTAssertTrue(app.staticTexts["En qué se va cada kilómetro"].waitForExistence(timeout: 8), "No se abrió la ficha")
+        Thread.sleep(forTimeInterval: 0.5)
         capturar("flotilla-ficha")
     }
 

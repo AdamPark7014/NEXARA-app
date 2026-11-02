@@ -720,7 +720,8 @@ extension DemoStore {
                 "odometroUltimo": 88240, "combustibleUltimoPct": 25, "tieneRastreador": true]),
         ]
         var json = dj(["solicitudes": solicitudes, "disponibles": disponibles])
-        if vehicleAssigned {
+        // El demo de dirección no trae vehículo: así se ve la flotilla como la ve el CEO.
+        if vehicleAssigned && !DemoMode.inicioDireccion {
             json["activa"] = dj([
                 "id": 61,
                 "origen": "solicitud",
