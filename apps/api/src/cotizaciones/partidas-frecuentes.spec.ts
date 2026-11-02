@@ -273,4 +273,69 @@ describe('CotizacionesService.partidasFrecuentes — de quién son las partidas'
       expect(p).not.toHaveProperty('costoDeHoy');
     });
   });
+
+  describe('costos de hoy de una cotización, para partir de ella', () => {
+    const COTIZACION = {
+      companyId: 7,
+      currency: 'MXN',
+      items: [
+        { id: 11, name: 'Switch', model: 'MS130-48X', unit: 'Pieza', unitCost: '100000.00' },
+        { id: 12, name: 'Switch igual', model: 'MS130-48Y', unit: 'Pieza', unitCost: '199000.00' },
+        { id: 13, name: 'Instalación', model: null, unit: 'Servicio', unitCost: '500.00' },
+      ],
+    };
+    const FILAS_CT = [
+      { clave: 'SWT1', modelo: 'MS130-48X', numParte: 'MS130-48X', precio: 200000, moneda: 'MXN', tipoCambio: 1, existencia: { '14A': 2 }, tipoDelDia: 20 },
+      { clave: 'SWT2', modelo: 'MS130-48Y', numParte: 'MS130-48Y', precio: 200000, moneda: 'MXN', tipoCambio: 1, existencia: {}, tipoDelDia: 20 },
+    ];
+
+    function armar(cotizacion: unknown, queryRaw: jest.Mock = jest.fn(async () => FILAS_CT)) {
+      const prisma: any = {
+        cotizacion: { findFirst: jest.fn(async () => cotizacion) },
+        $queryRaw: queryRaw,
+        supplierCatalogSyncRun: { findFirst: jest.fn(async () => ({ finishedAt: new Date() })) },
+      };
+      const service = new CotizacionesService(
+        prisma,
+        { publishEntityLifecycle: jest.fn(), requestAutoApproval: jest.fn() } as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+      );
+      return { service, prisma, queryRaw };
+    }
+
+    it('trae solo lo que difiere, por partida, en una sola consulta', async () => {
+      const { service, queryRaw } = armar(COTIZACION);
+      const costos = await service.costosDeHoy(47, 7);
+      expect(Object.keys(costos)).toEqual(['11']);
+      expect(costos[11]).toMatchObject({ costo: 200000, clave: 'SWT1', piezas: 2 });
+      expect(queryRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('solo lee la cotización de la empresa activa', async () => {
+      const { service, prisma } = armar(COTIZACION);
+      await service.costosDeHoy(47, 7);
+      expect(prisma.cotizacion.findFirst.mock.calls[0][0].where).toEqual({ id: 47, companyId: 7 });
+    });
+
+    it('la de otra empresa no existe', async () => {
+      const { service, queryRaw } = armar({ ...COTIZACION, companyId: 9 });
+      await expect(service.costosDeHoy(47, 7)).rejects.toThrow('Cotizacion no encontrado');
+      expect(queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('en dólares no se compara', async () => {
+      const { service, queryRaw } = armar({ ...COTIZACION, currency: 'usd' });
+      expect(await service.costosDeHoy(47, 7)).toEqual({});
+      expect(queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('si la consulta falla, no estorba: se copia sin aviso', async () => {
+      const { service } = armar(COTIZACION, jest.fn(async () => { throw new Error('sin base'); }));
+      expect(await service.costosDeHoy(47, 7)).toEqual({});
+    });
+  });
 });

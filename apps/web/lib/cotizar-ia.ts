@@ -16,7 +16,7 @@ import {
   type PartidaEditor,
 } from "@/lib/cotizacion-documento";
 import { crearAviso, type AvisoCt, type SubirPrecio } from "@/lib/aviso-costo-ct";
-import { GRUPOS_PARTIDA, type CotizacionDetalle, type GrupoPartida, type OpcionPropuesta, type PartidaPropuesta, type Segmento } from "@/lib/cotizaciones-api";
+import { GRUPOS_PARTIDA, type CostoDeHoy, type CotizacionDetalle, type GrupoPartida, type OpcionPropuesta, type PartidaPropuesta, type Segmento } from "@/lib/cotizaciones-api";
 
 export type FilaPropuesta = PartidaPropuesta & {
   key: string;
@@ -172,6 +172,22 @@ export function documentoConPropuesta(doc: DocumentoCotizacion, datos: DatosDePr
     marginPercent: 0,
     partidas: [...doc.partidas.filter((p) => p.name.trim()), ...partidasDeFilas(datos.filas)],
   };
+}
+
+/**
+ * Lo copiado trae los costos de entonces: cada partida que hoy cuesta otra cosa en CT lleva su aviso.
+ * No cambia ninguna cifra. `conAviso` dice cuántas son, para decirlo al copiar.
+ */
+export function conAvisosDeCosto(doc: DocumentoCotizacion, costos: Record<number, CostoDeHoy>): { doc: DocumentoCotizacion; conAviso: number } {
+  let conAviso = 0;
+  const partidas = doc.partidas.map((p) => {
+    const hoy = p.id ? costos[p.id] : undefined;
+    const avisoCt = crearAviso(hoy, p.unitCost, p.unitPrice, p.unitPrice, p.marginPercent);
+    if (!avisoCt) return p;
+    conAviso += 1;
+    return { ...p, avisoCt };
+  });
+  return { doc: { ...doc, partidas }, conAviso };
 }
 
 /**

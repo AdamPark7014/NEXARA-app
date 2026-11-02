@@ -184,6 +184,17 @@ export class CotizacionesController {
     return this.cotizacionesService.detalleCore(id, companyId);
   }
 
+  /** Lo que hoy cuesta distinto en CT, por partida: para avisar al partir de esta cotización. Devuelve costos. */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Get(':id/costos-de-hoy')
+  costosDeHoy(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.costosDeHoy(id, companyId);
+  }
+
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
   @Get(':id')
