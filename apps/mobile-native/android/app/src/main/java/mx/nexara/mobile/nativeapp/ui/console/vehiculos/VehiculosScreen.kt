@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console.vehiculos
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -84,7 +85,40 @@ fun VehiculosScreen() {
                 error = state.accionError,
                 onCancelar = vm::cerrarChecklist,
                 onEnviar = vm::enviarChecklist,
+                encabezadoRegreso = flujo.encabezadoRegreso,
+                leerTablero = { foto -> vm.leerTablero(foto, flujo.kmInicio) },
             )
+        }
+        return
+    }
+
+    val gasolina = state.gasolina
+    if (gasolina != null) {
+        NxScreenScaffold {
+            val ficha = gasolina.ficha
+            when {
+                ficha != null -> CargarGasolinaFlow(
+                    vehiculo = gasolina.vehiculo,
+                    ficha = ficha,
+                    enviando = state.enviando,
+                    error = state.accionError,
+                    onCancelar = vm::cerrarGasolina,
+                    onGuardar = vm::guardarCarga,
+                    leerTicket = vm::leerTicket,
+                    leerTablero = { foto -> vm.leerTablero(foto, ficha.odometro?.km) },
+                )
+                gasolina.cargando -> Column(Modifier.padding(16.dp)) {
+                    NxSkeletonList(itemCount = 3, itemHeight = 120.dp)
+                }
+                else -> Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BackHandler(onBack = vm::cerrarGasolina)
+                    NxErrorBlock(
+                        gasolina.errorFicha ?: "No se pudo abrir la ficha del vehículo",
+                        onRetry = vm::cargarFichaDeGasolina,
+                    )
+                    TextButton(onClick = vm::cerrarGasolina) { Text("Volver") }
+                }
+            }
         }
         return
     }
@@ -108,7 +142,13 @@ fun VehiculosScreen() {
                 }
             }
             state.activa?.let { activa ->
-                item { AsignacionActivaCard(activa = activa, onAccion = vm::abrirChecklist) }
+                item {
+                    AsignacionActivaCard(
+                        activa = activa,
+                        onAccion = vm::abrirChecklist,
+                        onGasolina = vm::abrirGasolina,
+                    )
+                }
             }
             if (state.solicitudes.isNotEmpty()) {
                 item { NxSectionHeader(title = "Mis solicitudes") }
@@ -179,6 +219,7 @@ internal fun VehiculoFlotaDto.etiqueta(): String =
 private fun AsignacionActivaCard(
     activa: AsignacionActivaDto,
     onAccion: (FlujoChecklist) -> Unit,
+    onGasolina: (vehicleId: Long, vehiculo: String) -> Unit,
 ) {
     val nombre = listOfNotNull(
         activa.vehiculo?.nombre?.takeIf { it.isNotBlank() },
@@ -236,6 +277,12 @@ private fun AsignacionActivaCard(
                                 devolucion = true,
                                 inventario = activa.esInventario,
                                 kmInicio = activa.odometroInicio,
+                                encabezadoRegreso = GasolinaRules.encabezadoRegreso(
+                                    nombre = activa.vehiculo?.nombre,
+                                    placas = activa.vehiculo?.placas,
+                                    actividad = activa.actividad?.titulo,
+                                    proyecto = activa.actividad?.proyecto,
+                                ),
                             ),
                         )
                     },
@@ -243,6 +290,15 @@ private fun AsignacionActivaCard(
                     modifier = Modifier.weight(1f).heightIn(min = 46.dp),
                 ) { Text("Regreso") }
             }
+        }
+        // Solo con el vehículo afuera, y sin id (una solicitud sin inventario) no hay ficha que abrir.
+        val vehicleId = activa.vehiculo?.id?.takeIf { it > 0 }
+        if (activa.pideDevolucion && vehicleId != null) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { onGasolina(vehicleId, nombre) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp),
+            ) { Text("Cargar gasolina") }
         }
     }
 }

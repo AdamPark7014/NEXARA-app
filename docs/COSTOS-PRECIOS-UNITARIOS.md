@@ -283,12 +283,12 @@ los proyectos. `VehicleControl` ya guarda odómetro, gasolina y foto del tablero
 | Gasolina y proyecto | Se reparte por km: quien llena el tanque no paga todo el tanque. Un viático `COMBUSTIBLE` con `vehicleId` entra al vehículo y no directo al proyecto, porque contaría doble. Sin `vehicleId` sigue como hoy. |
 | Indirectos | Oficina: viajes internos. Parado: `(km del plan − km reales) × (Im + Sm + otros)` por mes, porque seguro y dinero invertido se pagan aunque no salga. Hasta la Fase 6 solo se muestran; no entran al margen. |
 | Desgaste | Vida consumida, llantas y aceite contra el programa del manual; próximo servicio por km o fecha, lo que llegue primero. Lo gastado en servicios se compara con lo que apartó `Ko`, para corregirlo con datos. |
-| Fotos en la app | La IA lee odómetro, nivel de gasolina y ticket; la persona confirma y la foto queda de respaldo. Primero web; las apps van después porque pasan por las tiendas. |
+| Fotos en la app | La IA lee odómetro, nivel de gasolina y ticket; la persona confirma y la foto queda de respaldo. Primero web; luego Android e iOS, que pasan por las tiendas. |
 | Quién ve qué | Costo y valor: quien ya ve costos completos. Técnicos: kilómetros y rendimiento, sin importes. |
 | Sin tocar | Nómina, facturas y pólizas. El libro sigue en paralelo. |
 
 Son 5 tablas (especificación, documento, plan de servicio, servicio hecho y carga), 16 endpoints y 4 pantallas web. Las 2 de las
-apps faltan: van aparte porque pasan por las tiendas.
+apps están construidas en Android e iOS y faltan por publicar en las tiendas.
 
 **Rutas:** `/erp/vehiculos` ya está protegida del alias de rutas en español. Lo nuevo va dentro de ella, no bajo `/erp/costos`.
 
@@ -303,7 +303,16 @@ apps faltan: van aparte porque pasan por las tiendas.
   que quien edita la ficha pida recostear. Un viático `COMBUSTIBLE` de un vehículo con ficha no entra al libro: contaría doble.
 - **Salida directa de inventario:** no guarda historial ni actividad. Sus kilómetros solo se ven por el odómetro, como «sin salida».
 - **Riesgo que queda:** un gasto de gasolina capturado sin `vehicleId` y además como carga contaría doble.
-- **Apps:** sin construir. En la web, «Cargar gasolina» es un diálogo y «Mis vehículos» lee la foto del tablero al salir y al volver.
+- **Apps:** «Cargar gasolina» y «Regreso del vehículo» en Android e iOS, sin publicar. En la web, «Cargar gasolina» es un diálogo y
+  «Mis vehículos» lee la foto del tablero al salir y al volver.
+  - **El regreso sigue pidiendo las 7 fotos:** la API las exige, es la evidencia 360° que pidió la dirección. Las seis primeras van en un paso
+    y el mockup es el paso siguiente: foto del tablero, lo leído, cuánto se recorrió y «Confirmar regreso».
+  - **Lectura:** llena lo que la persona no ha escrito y no pisa lo que sí escribió. Repetir la foto reemplaza lo que llenó la lectura anterior.
+    Si falla, se captura a mano. La salida conserva sus cuatro pasos y también lee el tablero.
+  - **Quien no ve costos:** el total leído del ticket viaja sin enseñarse y la celda dice «Leído del ticket». Si no se pudo leer, o las cifras
+    no cuadran, lo escribe del papel, porque el servidor lo exige. La app no pide el importe de las cargas anteriores.
+  - **`GET vehicles/mis-vehiculos`** manda `activa.actividad` (título y proyecto), para las líneas bajo el título del regreso. Sin ella, o en una
+    salida directa de inventario, salen nombre y placas.
 - **Migración y despliegue:** solo agrega columnas y tablas. La imagen de la API suma `poppler-utils` para `pdftotext`.
 
 ### Alimentarlo sin programar

@@ -1,5 +1,16 @@
 # RELEVO
 
+- **02-11 ~12:50 (claude-code) — Apps: «Cargar gasolina» y «Regreso del vehículo» en Android e iOS. Sin publicar en tiendas: falta que Adam vea las capturas y lo apruebe.** Detalle en `docs/COSTOS-PRECIOS-UNITARIOS.md`, «Cómo quedó».
+  - **Qué se ve:** en Vehículos, con el vehículo afuera, la tarjeta suma «Cargar gasolina» bajo «Regreso». Mockups: artifact `2DNGd9xCSM7fG9zAfBPijs`, `AppGasolina` y `AppRegreso`.
+  - **Regreso:** la API sigue exigiendo las 7 fotos, así que van las 6 del vehículo y luego la pantalla del mockup, con su botón «Confirmar regreso». La salida conserva sus 4 pasos y también lee el tablero.
+  - **Quien no ve costos:** el total leído viaja sin enseñarse y la celda dice «Leído del ticket». Si no se pudo leer o las cifras no cuadran, lo escribe del papel, porque el servidor lo exige.
+  - **API:** `GET vehicles/mis-vehiculos` manda `activa.actividad` (título y proyecto). **Hay que desplegarla antes de publicar las apps;** sin ella salen nombre y placas, y nada se rompe.
+  - **Verificado en Android:** 966 pruebas en verde. Capturas a 390×844 contra el mockup. Recorrido real en el emulador con un arnés que no se versiona: cámara, lectura, multipart de `cargas` y de `end-use`, y la pasada sin permiso de costos, contra una API simulada. API: las 51 pruebas de `vehicles` en verde; no corrí la suite completa.
+  - **Sin verificar:** nada contra la API real ni con fotos de campo; el teclado numérico en un teléfono; iOS solo se compila y se ve en CI (`docs/ios-paridad/iphone-69/95` a `98`).
+  - **Diferencias con el mockup:** el cuerpo usa la letra del sistema y no Inter, como el resto de la app; el campo Gasolina es una lista con flecha, porque la API solo acepta cinco niveles; el pie dice «Tomada a las 18:12 · toca para repetir», sin «en el taller», porque no hay ese dato; sin foto, el rótulo cambia.
+  - **Visto de paso, sin tocar:** en Android la flecha de la barra superior hace `popBackStack()` y salta la confirmación de salir: con fotos tomadas, se pierden sin avisar. Ya pasaba con el check list. La AVD `nexara_phone` trae otra firma de NEXARA: para probar sin borrarla se arranca con `-read-only`.
+  - No se delegó a Ollama: era portar pantallas aprobadas mirando cada captura, con poca memoria libre en el equipo.
+
 - **02-11 ~12:50 (claude-code) — Disco del Hetzner con autopurgado, y mapa de Core para decidir.** Sin commits de código.
   - **Disco (Adam: borrar imágenes viejas, barrer logs, que se purguen solos):** borradas `nexara-web:next14-respaldo` y `traefik:v2.11`. Logs de contenedores de 159 a 22 MB, con rotación cada hora a 50 MB (`/etc/cron.d/logs-contenedores`). Bitácora del sistema con tope de 150 MB. `syslog.1` de 239 MB, que eran errores del disco lleno, comprimido. Quitado `node_modules` de Zynoratek en el host: sus despliegues compilan dentro de Docker.
   - **Limpieza semanal:** `/root/mantenimiento-disco.sh`, domingos 03:50 de México. Conserva `:prev`, `node` y `python`, y `--simular` solo enseña.

@@ -3,6 +3,7 @@ package mx.nexara.mobile.nativeapp.ui.console.vehiculos
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,8 +11,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.AsignacionActivaDto
+import mx.nexara.mobile.nativeapp.data.api.FichaVehiculoDto
 import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
 import mx.nexara.mobile.nativeapp.data.api.SolicitudResumenDto
+import mx.nexara.mobile.nativeapp.data.api.TableroLeidoDto
+import mx.nexara.mobile.nativeapp.data.api.TicketLeidoDto
 import mx.nexara.mobile.nativeapp.data.api.VehiculoFlotaDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
@@ -33,9 +37,20 @@ data class FlujoChecklist(
     val inventario: Boolean,
     /** Devolución: el km con el que salió; el final no puede ser menor. */
     val kmInicio: Int? = null,
+    /** Devolución: las líneas bajo «Regreso del vehículo» (`GasolinaRules.encabezadoRegreso`). */
+    val encabezadoRegreso: List<String>? = null,
 ) {
     val titulo: String get() = if (devolucion) "Regreso" else "Salida"
 }
+
+/** La carga de gasolina abierta: `vehiculo` es «Nissan Frontier · TXA-12-34». */
+data class FlujoGasolina(
+    val vehicleId: Long,
+    val vehiculo: String,
+    val ficha: FichaVehiculoDto? = null,
+    val cargando: Boolean = true,
+    val errorFicha: String? = null,
+)
 
 data class VehiculosUiState(
     val loading: Boolean = true,
@@ -47,6 +62,7 @@ data class VehiculosUiState(
     /** Para «Solicitar»: la actividad a la que se carga el uso del vehículo. */
     val actividades: List<MyActivityItemDto> = emptyList(),
     val flujo: FlujoChecklist? = null,
+    val gasolina: FlujoGasolina? = null,
     val enviando: Boolean = false,
     /** Error dentro del checklist o del alta de solicitud (texto del servidor). */
     val accionError: String? = null,
@@ -105,6 +121,74 @@ class VehiculosViewModel(app: Application) : AndroidViewModel(app) {
     fun abrirChecklist(flujo: FlujoChecklist) = _state.update { it.copy(flujo = flujo, accionError = null) }
 
     fun cerrarChecklist() = _state.update { it.copy(flujo = null, accionError = null) }
+
+    fun abrirGasolina(vehicleId: Long, vehiculo: String) {
+        _state.update { it.copy(gasolina = FlujoGasolina(vehicleId, vehiculo), accionError = null) }
+        cargarFichaDeGasolina()
+    }
+
+    fun cerrarGasolina() = _state.update { it.copy(gasolina = null, accionError = null) }
+
+    /** Sin ficha no se sabe si la persona ve costos ni contra qué medir: se reintenta, no se adivina. */
+    fun cargarFichaDeGasolina() {
+        val abierta = _state.value.gasolina ?: return
+        _state.update { it.copy(gasolina = abierta.copy(cargando = true, errorFicha = null)) }
+        viewModelScope.launch {
+            try {
+                val ficha = withContext(Dispatchers.IO) { repo.ficha(abierta.vehicleId) }
+                _state.update { s -> s.copy(gasolina = s.gasolina?.copy(ficha = ficha, cargando = false)) }
+            } catch (e: Throwable) {
+                if (e is CancellationException) throw e
+                _state.update { s ->
+                    s.copy(
+                        gasolina = s.gasolina?.copy(
+                            cargando = false,
+                            errorFicha = e.toUserMessage("No se pudo abrir la ficha del vehículo"),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    /** Lo lee el servidor: la app nunca habla con la IA. `null` = se captura a mano. */
+    suspend fun leerTablero(foto: GeoPhoto, odometroPrevio: Int?): TableroLeidoDto? = leerFoto {
+        repo.leerTablero(foto, odometroPrevio)
+    }
+
+    suspend fun leerTicket(foto: GeoPhoto): TicketLeidoDto? = leerFoto { repo.leerTicket(foto) }
+
+    private suspend fun <T> leerFoto(leer: suspend () -> T): T? = withContext(Dispatchers.IO) {
+        try {
+            leer()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    fun guardarCarga(form: GasolinaRules.FormCarga, ticket: GeoPhoto?, tablero: GeoPhoto?) {
+        val abierta = _state.value.gasolina ?: return
+        if (_state.value.enviando) return
+        val odometro = GasolinaRules.aNumero(form.odometro)?.toInt() ?: return
+        val litros = GasolinaRules.aNumero(form.litros) ?: return
+        val total = GasolinaRules.aNumero(form.total) ?: return
+        _state.update { it.copy(enviando = true, accionError = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.registrarCarga(abierta.vehicleId, odometro, litros, total, form.lleno, ticket, tablero)
+                }
+                _state.update { it.copy(enviando = false, gasolina = null, mensaje = "Carga guardada") }
+                load(refresh = true)
+            } catch (e: Throwable) {
+                if (e is CancellationException) throw e
+                // 400 del servidor: «El odómetro no puede ser menor…». Se enseña igual.
+                _state.update { it.copy(enviando = false, accionError = e.toUserMessage("No se pudo guardar la carga")) }
+            }
+        }
+    }
 
     fun limpiarMensaje() = _state.update { it.copy(mensaje = null) }
 

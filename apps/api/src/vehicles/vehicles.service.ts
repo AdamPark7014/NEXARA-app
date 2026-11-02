@@ -690,7 +690,11 @@ export class VehiclesService {
         where: { solicitanteId: userId, ...where },
         orderBy: { fechaSolicitud: 'desc' },
         take: 30,
-        include: { vehiculo: { select: { id: true, nombre: true, placas: true } } },
+        include: {
+          vehiculo: { select: { id: true, nombre: true, placas: true } },
+          // A qué trabajo se carga el viaje: la app lo enseña al registrar el regreso.
+          actividad: { select: { id: true, anNumber: true, titulo: true, project: { select: { title: true } } } },
+        },
       }),
       this.prisma['vehicleAsset'].findMany({
         where,
@@ -716,6 +720,14 @@ export class VehiclesService {
         vehiculo: control.vehiculo
           ? { id: control.vehiculo.id, nombre: control.vehiculo.nombre, placas: control.vehiculo.placas ?? null }
           : { id: 0, nombre: control.nombreVehiculo ?? 'Vehículo', placas: control.placasVehiculo ?? null },
+        actividad: control.actividad
+          ? {
+              id: control.actividad.id,
+              folio: control.actividad.anNumber ?? null,
+              titulo: control.actividad.titulo ?? null,
+              proyecto: control.actividad.project?.title ?? null,
+            }
+          : null,
         inicio: control.fechaInicio ?? control.fechaInicioAprobada ?? null,
         fin: control.fechaFin ?? control.fechaFinAprobada ?? null,
         odometroInicio: control.odometroInicio ?? null,
@@ -728,6 +740,8 @@ export class VehiclesService {
         id: assetPropio.id,
         origen: 'inventario',
         vehiculo: { id: assetPropio.id, nombre: assetPropio.nombre, placas: assetPropio.placas ?? null },
+        // La salida directa de inventario no se liga a ninguna actividad.
+        actividad: null,
         inicio: assetPropio.assignedAt ?? null,
         fin: null,
         odometroInicio: this.numeroDe(assetPropio.salidaFotos, 'odometroKm'),
