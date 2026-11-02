@@ -61,6 +61,27 @@ describe('armarResumenCeo', () => {
     expect(r.titulo).toBe('Tu día: hay pendientes en operación');
   });
 
+  it('cotizaciones vigentes sin marcar como enviadas: se ven aunque ninguna esté por vencer', () => {
+    const r = armarResumenCeo(con({ cotizaciones: { porVencer: 0, monto: 0, dias: 7, sinEnviar: 18 } }), FECHA);
+    expect(r.items[0]).toMatchObject({ clave: 'cotizaciones', texto: '18 cotizaciones vigentes sin marcar como enviada' });
+  });
+
+  it('evidencias: dice cuántas son suyas y de quién son las demás', () => {
+    const r = armarResumenCeo(
+      con({
+        operacion: { actividadesAtrasadas: 0, porValidar: 38 },
+        evidencias: { tuyas: 20, deOtros: [{ jefe: 'José Antonio', n: 10 }, { jefe: 'David Morales', n: 8 }] },
+      }),
+      FECHA,
+    );
+    expect(r.items[0].texto).toBe('38 evidencias sin revisar: 20 tuyas, 10 de José Antonio, 8 de David Morales');
+  });
+
+  it('sin evidencias pendientes no menciona «por validar» aunque haya actividades en ese estado', () => {
+    const r = armarResumenCeo(con({ operacion: { actividadesAtrasadas: 0, porValidar: 5 }, evidencias: { tuyas: 0, deOtros: [] } }), FECHA);
+    expect(r.items).toHaveLength(0);
+  });
+
   it('nómina: avisa cuando la quincena ya cerró y, si no, solo cuando el corte está a 2 días o menos', () => {
     const cerrada = armarResumenCeo(
       con({ nomina: { listaParaRevisar: { etiqueta: '1.ª quincena de septiembre de 2026 (1–15)', desde: '2026-09-01', hasta: '2026-09-15' }, proximoCorte: null } }),

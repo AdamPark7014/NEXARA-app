@@ -2535,6 +2535,12 @@ model Cotizacion {
   publicToken     String?                  @unique @db.VarChar(80)
   sentToEmail     String?                  @db.VarChar(200)
   sentAt          DateTime?
+  /// Cómo salió: CORREO_CORE | WHATSAPP | CORREO_EXTERNO | EN_PERSONA | OTRO. Casi todas salen por fuera.
+  enviadaPor      String?                  @db.VarChar(20)
+  /// Ya se le preguntó a su autor si la mandó (borrador de más de 48 h).
+  borradorAvisadoAt DateTime?
+  /// Cuántas veces se ha preguntado si ya hubo respuesta desde el último envío.
+  seguimientoEtapa Int                     @default(0)
   signedByName    String?                  @db.VarChar(180)
   signedByEmail   String?                  @db.VarChar(200)
   signedAt        DateTime?

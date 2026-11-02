@@ -76,6 +76,8 @@ import SeccionPlanos from "./SeccionPlanos";
 import SeccionCotizacion from "./SeccionCotizacion";
 import VistaPrevia from "./VistaPrevia";
 import DialogoEnvio from "./DialogoEnvio";
+import YaLaEnvie from "./YaLaEnvie";
+import { useCronometroProceso } from "@/lib/cronometro-proceso";
 import Seguimiento from "./Seguimiento";
 import styles from "./editor.module.css";
 
@@ -190,6 +192,8 @@ export default function EditorCotizacion({
   plantillaId?: number | null;
 }) {
   const { token, user } = useUser();
+  /** Desde que se abre hasta que sale al cliente (Programa Velocidad Core). */
+  const cronometro = useCronometroProceso("cotizar", token);
   const veCostos = hasPermission(user, PERMISSIONS.COTIZACIONES_ACCESS);
   const [arranque] = useState(() => {
     const doc = inicial ? documentoDesdeDetalle(inicial) : documentoVacio();
@@ -197,6 +201,8 @@ export default function EditorCotizacion({
   });
   const [doc, setDoc] = useState<DocumentoCotizacion>(arranque.doc);
   const [detalle, setDetalle] = useState<CotizacionDetalle | null>(inicial);
+  /** «¿Ya la enviaste?» no estorba mientras se arma una nueva: sale al bajar su PDF o al reabrirla. */
+  const [preguntarEnvio, setPreguntarEnvio] = useState(Boolean(inicial));
   const [id, setId] = useState<number | null>(inicial?.id ?? null);
   const idRef = useRef<number | null>(inicial?.id ?? null);
   const docRef = useRef(doc);
@@ -366,6 +372,7 @@ export default function EditorCotizacion({
         mimeType: "application/pdf",
       },
     );
+    if (!interno) setPreguntarEnvio(true);
   }
 
   async function abrirEnvio() {
@@ -661,6 +668,21 @@ export default function EditorCotizacion({
         </div>
       </header>
 
+      {preguntarEnvio && detalle?.estado === "BORRADOR" && id && token ? (
+        <YaLaEnvie
+          id={id}
+          token={token}
+          faltas={faltasEnvio}
+          onError={setError}
+          alEnviar={(folio) => {
+            cronometro.terminar(id, `partidas:${partidasConNombre}`);
+            void recargar();
+            setRecargaVista((v) => v + 1);
+            setAviso(`Listo: ${folio} quedó como enviada. Te avisamos para darle seguimiento.`);
+          }}
+        />
+      ) : null}
+
       {detalle ? (
         <section className={styles.ficha} aria-label="Resumen de la cotización">
           <div className={styles.fichaTop}>
@@ -937,6 +959,7 @@ export default function EditorCotizacion({
           onEnviar={async (datos) => {
             if (!token || !idRef.current) return;
             const enviada = await enviarCotizacion(token, idRef.current, datos);
+            cronometro.terminar(idRef.current, `partidas:${partidasConNombre}`);
             setEnvio(false);
             await recargar();
             setRecargaVista((v) => v + 1);

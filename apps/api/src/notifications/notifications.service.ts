@@ -9,7 +9,7 @@ import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 import { buildCollapseKey, channelForCategory, iconForNotification } from './notification-push-meta.js';
 import { appUrls } from '../common/app-urls.js';
 import { PREF_SOLO_RESUMEN, modoResumenActivo, omitirEnModoResumen } from './notification-noise.js';
-import { workDayStart } from '../common/time/workday.js';
+import { WORKDAY_TIMEZONE, workDayStart } from '../common/time/workday.js';
 import {
   claseDeAviso,
   dentroDeHorarioDeAvisos,
@@ -51,6 +51,9 @@ export interface INotificationPayload {
   /** Entrega explícita; si falta, la decide `presupuesto-avisos.ts`. */
   entrega?: Entrega;
 }
+
+/** Por vencer se avisa con tres días de margen: una vez por cotización. */
+const AVISO_POR_VENCER_SEGUNDOS = 5 * 24 * 60 * 60;
 
 @Injectable()
 export class NotificationsService {
@@ -588,7 +591,7 @@ export class NotificationsService {
    * Check for expiring quotes every hour
    * Notifies salespeople when quotes are expiring soon (within 3 days)
    */
-  @Cron('0 * * * *') // Every hour
+  @Cron('5 10 * * 1-6', { timeZone: WORKDAY_TIMEZONE })
   async checkQuoteExpiration() {
     try {
       const now = new Date();
@@ -628,7 +631,24 @@ export class NotificationsService {
               relatedEntityId: quote.id,
               entityType: 'Cotizacion',
               relatedUrl: appUrls.erpCotizaciones(quote.id),
+              // Se repetía cada hora durante tres días (Programa Velocidad Core).
+              dedupeSeconds: AVISO_POR_VENCER_SEGUNDOS,
             });
+            // También a su jefe, para que nadie la deje vencer sin que se entere.
+            const jefe = (quote.createdBy as { managerId?: number | null } | null)?.managerId;
+            if (jefe) {
+              await this.createNotification({
+                userId: jefe,
+                type: 'QUOTE_EXPIRING',
+                category: 'quotes',
+                title: `Cotización por expirar - ${quote.quoteNumber}`,
+                message: `${quote.quoteNumber} de ${quote.createdBy?.nombre ?? 'tu equipo'} para ${quote.clientCompany || quote.clientName || 'cliente'} expirará en ${daysUntilExpiry} día(s).`,
+                relatedEntityId: quote.id,
+                entityType: 'Cotizacion',
+                relatedUrl: appUrls.erpCotizaciones(quote.id),
+                dedupeSeconds: AVISO_POR_VENCER_SEGUNDOS,
+              });
+            }
           }
 
           // Also notify the opportunity owner if available
@@ -643,6 +663,7 @@ export class NotificationsService {
                 relatedEntityId: quote.id,
                 entityType: 'Cotizacion',
                 relatedUrl: appUrls.erpCotizaciones(quote.id),
+                dedupeSeconds: AVISO_POR_VENCER_SEGUNDOS,
               });
             }
           }
@@ -669,7 +690,9 @@ export class NotificationsService {
           validUntil: {
             lt: now,
           },
-          status: { not: 'APPROVED' },
+          // La enviada la vence y la avisa `marcarVencidas`; aquí, solo la que venció sin salir.
+          status: 'DRAFT',
+          deletedAt: null,
         },
         include: {
           createdBy: true,

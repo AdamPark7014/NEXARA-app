@@ -31,6 +31,8 @@ import { NotificationHierarchyService } from '../notifications/notification-hier
 import { extrasDeAsignacion, reportesDirectos, type Alcanzador } from './equipo-alcance.js';
 import {
   actividadCerradaParaRevision,
+  revisionEscalada,
+  revisionParaTi,
   cadenaConResponsable,
   cadenasDeMando,
   esperaRevision,
@@ -138,6 +140,12 @@ export type RevisionPendienteItem = {
   enviadaAt: Date | null;
   /** Es una corrección de algo que se le devolvió. */
   correccion: boolean;
+  /** Le toca a quien mira. Si no, va en «De otros jefes» (`revisionParaTi`). */
+  paraTi: boolean;
+  /** Lleva más de 24 h sin revisar. */
+  escalada: boolean;
+  /** Su jefe directo, para decir a quién le toca cuando no es a quien mira. */
+  jefe: string | null;
 };
 
 /** Una revisión que hizo quien mira (aprobó o devolvió). */
@@ -958,11 +966,13 @@ export class MyActivitiesService {
    */
   async pendingReviews(viewer: TeamEvidenceViewer, companyId: number | null): Promise<RevisionesResponse> {
     const todo = revisaTodo(viewer);
-    const usuarios = await this.prisma.user.findMany({ select: { id: true, managerId: true } });
+    const usuarios = await this.prisma.user.findMany({ select: { id: true, managerId: true, nombre: true } });
     const jefesDe = cadenasDeMando(
       usuarios,
       usuarios.map((u) => u.id),
     );
+    const usuarioPorId = new Map(usuarios.map((u) => [u.id, u]));
+    const ahora = new Date();
     // Recorte barato antes de la regla fina: su gente por organigrama, lo que tiene como
     // responsable y donde es encargado. Quien revisa todo no se recorta.
     const debajo = usuarios.filter((u) => jefesDe.get(u.id)?.has(viewer.id)).map((u) => u.id);
@@ -1025,7 +1035,7 @@ export class MyActivitiesService {
       if (!m) continue;
       // Se la pasaron a otro compañero: su avance ya no se revisa (igual que en `teamEvidence`).
       if (m.retiradoAt && a.reassignments.some((r) => r.deUsuarioId === ev.userId)) continue;
-      const { puedeRevisar } = reglaDeRevision({
+      const { puedeRevisar, encimaDe } = reglaDeRevision({
         viewerId: viewer.id,
         todo,
         esResponsable: a.responsableId === viewer.id,
@@ -1034,6 +1044,9 @@ export class MyActivitiesService {
         jefesDe,
       });
       if (!puedeRevisar(m)) continue;
+      const enviadaAt = ev.correctionSubmittedAt ?? ev.completedAt;
+      const jefeId = usuarioPorId.get(ev.userId)?.managerId ?? null;
+      const escalada = revisionEscalada(enviadaAt, ahora);
       pendientes.push({
         activityId: a.id,
         anNumber: a.anNumber,
@@ -1044,8 +1057,19 @@ export class MyActivitiesService {
         assignmentCharge: a.assignmentCharge,
         prioridad: a.prioridad,
         persona: ev.user,
-        enviadaAt: ev.correctionSubmittedAt ?? ev.completedAt,
+        enviadaAt,
         correccion: ev.correctionSubmittedAt != null,
+        escalada,
+        jefe: jefeId != null ? (usuarioPorId.get(jefeId)?.nombre ?? null) : null,
+        paraTi: revisionParaTi({
+          revisaTodo: todo,
+          esJefeDirecto: jefeId === viewer.id,
+          esResponsable: a.responsableId === viewer.id,
+          estaEncima: encimaDe(m),
+          tieneJefe: jefeId != null,
+          esJefeArriba: Boolean(jefesDe.get(ev.userId)?.has(viewer.id)),
+          escalada,
+        }),
       });
     }
 

@@ -2575,3 +2575,33 @@ select.celda {
   gap: 12px;
   margin-top: 8px;
 }
+
+/* «Ya la envié»: cómo salió la cotización. */
+.yaLaEnvie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  padding: var(--ui-s3) var(--ui-s4);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-brand-bg, var(--ui-surface));
+}
+
+.yaLaEnvieTexto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.yaLaEnvieTexto span {
+  color: var(--ui-fg-2);
+  font-size: 13px;
+}
+
+.yaLaEnvieBotones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}

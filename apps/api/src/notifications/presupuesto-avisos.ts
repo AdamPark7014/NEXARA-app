@@ -104,6 +104,7 @@ const TIPOS_SOLO_RESUMEN: ReadonlySet<string> = new Set([
   'PRODUCTION_LOG_RECORDED',
   'BIRTHDAY',
   'WORK_ANNIVERSARY',
+  'QUOTE_SENT',
 ]);
 
 /** «Tal actividad está vencida»: a cada quien, una vez por actividad al día. */

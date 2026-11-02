@@ -373,6 +373,23 @@ export function enviarCotizacion(
   });
 }
 
+export type MedioEnvio = "WHATSAPP" | "CORREO_EXTERNO" | "EN_PERSONA" | "OTRO";
+
+export const MEDIOS_ENVIO: Array<{ id: MedioEnvio; label: string }> = [
+  { id: "WHATSAPP", label: "WhatsApp" },
+  { id: "CORREO_EXTERNO", label: "Correo fuera de Core" },
+  { id: "EN_PERSONA", label: "En persona" },
+  { id: "OTRO", label: "Otro" },
+];
+
+/** «Ya la envié»: el PDF salió por fuera; la API hace lo mismo que al enviar, menos mandar el correo. */
+export function marcarEnviada(token: string, id: number, medio: MedioEnvio) {
+  return cotFetch<{ id: number; quoteNumber: string }>(`cotizaciones/${id}/marcar-enviada`, token, {
+    method: "POST",
+    body: JSON.stringify({ medio }),
+  });
+}
+
 export function aprobarCotizacion(token: string, id: number) {
   return cotFetch<CotizacionDetalle>(`cotizaciones/${id}/aprobar`, token, { method: "POST" });
 }

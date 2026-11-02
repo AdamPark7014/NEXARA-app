@@ -23,6 +23,12 @@ export type RevisionPendiente = {
   enviadaAt: string | null;
   /** Es una corrección de algo que se le devolvió. */
   correccion: boolean;
+  /** Le toca a quien mira. `false`: va en «De otros jefes». */
+  paraTi?: boolean;
+  /** Lleva más de 24 h sin revisar. */
+  escalada?: boolean;
+  /** Su jefe directo, para decir a quién le toca. */
+  jefe?: string | null;
 };
 
 export type RevisionHecha = {
@@ -53,6 +59,27 @@ export const TOPE_REVISADAS = 100;
 export function pieRevisadas(total: number): string {
   if (total >= TOPE_REVISADAS) return `Las ${TOPE_REVISADAS} más recientes de los últimos 30 días`;
   return `${total} revisi${total === 1 ? "ón" : "ones"} en los últimos 30 días`;
+}
+
+export type ResultadoLote = {
+  aprobadas: Array<{ activityId: number; userId: number }>;
+  fallidas: Array<{ activityId: number; userId: number; motivo: string }>;
+};
+
+/** Máximo que acepta la API en una sola aprobación por lote. */
+export const TOPE_LOTE = 50;
+
+/** Aprueba varias de un jalón, con la misma regla del botón «Aprobar» y un aviso por persona. */
+export function aprobarLote(
+  token: string,
+  items: Array<{ activityId: number; userId: number }>,
+  calificacion: number,
+  observaciones: string,
+): Promise<ResultadoLote> {
+  return erpFetch<ResultadoLote>("me/revisiones/aprobar-lote", token, {
+    method: "POST",
+    body: JSON.stringify({ items, calificacion, observaciones }),
+  });
 }
 
 export function fetchRevisiones(token: string): Promise<RevisionesResponse> {
