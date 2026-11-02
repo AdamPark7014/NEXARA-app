@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { sinPlazoStatusSqlList } from './activity-status.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
-import { fechaAviso, horaAviso } from '../notifications/notification-push-meta.js';
+import { horaAviso } from '../notifications/notification-push-meta.js';
 import { appUrls } from '../common/app-urls.js';
 
 type SlaRow = {
@@ -109,73 +109,8 @@ export class TicketAlertsService {
     }
   }
 
-  
-  @Cron('*/5 * * * *')
-  async notifyBreachedDeadlines() {
-    await runScheduledJob('ticket-alerts:sla-breach', this.logger, () =>
-      this.scanBreachedDeadlines(),
-    );
-  }
-
-  private async scanBreachedDeadlines() {
-    const now = new Date();
-    const breached = await this.prisma.$queryRaw<SlaRow[]>`
-      SELECT
-        a.id,
-        a.titulo,
-        c.name AS "clientName",
-        a."companyId",
-        a."fechaEntregaEsperada"
-      FROM "Activity" a
-      LEFT JOIN service_clients c ON c.id = a."clientId"
-      WHERE a."clientId" IS NOT NULL
-        AND a.estatus NOT IN (${Prisma.raw(sinPlazoStatusSqlList())})
-        AND a."fechaEntregaEsperada" < ${now}
-        AND a."deletedAt" IS NULL
-        AND (
-          a."slaAlertedAt" IS NULL
-          OR a."slaAlertedAt" < a."fechaEntregaEsperada"
-        )
-    `;
-    // Nota: reutilizamos slaAlertedAt como marca de aviso; si ya se alertó
-    // "por vencer" (slaAlertedAt >= fechaEntregaEsperada no aplica), alertamos
-    // breach una vez poniendo slaAlertedAt = now tras notificar.
-
-    if (!breached.length) return;
-
-    const adminUserIds = await this.getConsoleAdminIds();
-    for (const activity of breached) {
-      const compromiso = activity.fechaEntregaEsperada
-        ? `Debía entregarse el ${fechaAviso(new Date(activity.fechaEntregaEsperada))}`
-        : null;
-      const title = `${nombreActividad(activity.titulo)} está vencida`;
-      const message =
-        [activity.clientName?.trim(), compromiso].filter(Boolean).join(' · ') || 'Superó el tiempo de entrega';
-      await Promise.all(
-        adminUserIds.map((userId) =>
-          this.notifications
-            .createNotification({
-              userId,
-              type: 'SLA_BREACH' as any,
-              category: 'sla-breach',
-              priority: 'high',
-              title,
-              message,
-              icon: 'vencida',
-              entityType: 'Activity',
-              relatedEntityId: activity.id,
-              relatedUrl: appUrls.erpActividad(activity.id),
-              companyId: activity.companyId,
-            })
-            .catch((err) => this.logger.warn(`SLA breach notify: ${err?.message || err}`)),
-        ),
-      );
-      await this.prisma['activity'].update({
-        where: { id: activity.id },
-        data: { slaAlertedAt: new Date() },
-      });
-    }
-  }
+    // «Ya venció» lo avisa `sla-breach-escalate` a su dueño y su cadena: aquí se duplicaba para los
+  // administradores cada que cambiaba la fecha (Programa Velocidad Core, 01-11-2026).
 
   private async getConsoleAdminIds(): Promise<number[]> {
     const admins = await this.prisma.user.findMany({

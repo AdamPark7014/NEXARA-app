@@ -6,10 +6,11 @@ import { NotificationsService } from './notifications.service.js';
 import { NotificationHierarchyService } from './notification-hierarchy.service.js';
 import { NotificationsController } from './notifications.controller.js';
 import { notificationsGatewayProvider } from './notifications-gateway.provider.js';
+import { ResumenAvisosService } from './resumen-avisos.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, DevicesModule],
-  providers: [NotificationsService, NotificationHierarchyService, notificationsGatewayProvider],
+  providers: [NotificationsService, NotificationHierarchyService, ResumenAvisosService, notificationsGatewayProvider],
   controllers: [NotificationsController],
   exports: [NotificationsService, NotificationHierarchyService], // Export so other modules can use it
 })

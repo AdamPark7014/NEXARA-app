@@ -9,6 +9,16 @@ import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 import { buildCollapseKey, channelForCategory, iconForNotification } from './notification-push-meta.js';
 import { appUrls } from '../common/app-urls.js';
 import { PREF_SOLO_RESUMEN, modoResumenActivo, omitirEnModoResumen } from './notification-noise.js';
+import { workDayStart } from '../common/time/workday.js';
+import {
+  claseDeAviso,
+  dentroDeHorarioDeAvisos,
+  entregaDeAvisoNormal,
+  ENTREGAS_AGRUPADAS,
+  ENTREGAS_VISIBLES,
+  esVencidaDeActividad,
+  type Entrega,
+} from './presupuesto-avisos.js';
 
 export interface INotificationPayload {
   userId: number;
@@ -38,6 +48,8 @@ export interface INotificationPayload {
    * con el mismo `collapseKey` en vez de apilarse. Android ya lo reemplaza por `tag`.
    */
   reemplazar?: boolean;
+  /** Entrega explícita; si falta, la decide `presupuesto-avisos.ts`. */
+  entrega?: Entrega;
 }
 
 @Injectable()
@@ -64,9 +76,14 @@ export class NotificationsService {
     limit: number = 50,
     offset: number = 0,
     companyId?: number | null,
+    agrupados = false,
   ) {
     return this.prisma.notification.findMany({
-      where: { userId, ...this.inboxScope(companyId) },
+      where: {
+        userId,
+        entrega: { in: agrupados ? ENTREGAS_AGRUPADAS : ENTREGAS_VISIBLES },
+        ...this.inboxScope(companyId),
+      },
       include: {
         triggerUser: {
           select: {
@@ -232,7 +249,7 @@ export class NotificationsService {
 
   async getUnreadCount(userId: number, companyId?: number | null) {
     return this.prisma.notification.count({
-      where: { userId, isRead: false, ...this.inboxScope(companyId) },
+      where: { userId, isRead: false, entrega: { in: ENTREGAS_VISIBLES }, ...this.inboxScope(companyId) },
     });
   }
 
@@ -342,6 +359,25 @@ export class NotificationsService {
     return activo;
   }
 
+  /** Cómo se entrega este aviso. Si no se puede contar, se avisa: ante la duda no se esconde nada. */
+  private async entregaDe(payload: INotificationPayload): Promise<Entrega> {
+    const clase = claseDeAviso(payload);
+    if (clase !== 'normal') return clase;
+    const ahora = new Date();
+    let enviadosHoy = 0;
+    if (dentroDeHorarioDeAvisos(ahora)) {
+      try {
+        enviadosHoy =
+          (await this.prisma.notification.count?.({
+            where: { userId: payload.userId, entrega: 'push', createdAt: { gte: workDayStart(ahora) } },
+          })) ?? 0;
+      } catch (error) {
+        this.logger.warn(`Sin conteo de avisos: ${error instanceof Error ? error.message : error}`);
+      }
+    }
+    return entregaDeAvisoNormal({ ahora, enviadosHoy });
+  }
+
   async createNotification(payload: INotificationPayload) {
     try {
       if (
@@ -380,6 +416,21 @@ export class NotificationsService {
         }
       }
 
+      // Una actividad vencida, un aviso al día por persona (`presupuesto-avisos.ts`).
+      if (esVencidaDeActividad(payload) && payload.relatedEntityId != null) {
+        const yaHoy = await this.prisma.notification.findFirst({
+          where: {
+            userId: payload.userId,
+            type: payload.type as NotificationType,
+            relatedEntityId: payload.relatedEntityId,
+            createdAt: { gte: workDayStart(new Date()) },
+          },
+          select: { id: true },
+        });
+        if (yaHoy) return yaHoy;
+      }
+      const entrega = await this.entregaDe(payload);
+
       const stampedCompanyId =
         payload.companyId ??
         getRequestCompanyId() ??
@@ -387,6 +438,7 @@ export class NotificationsService {
       const notification = await this.prisma.notification.create({
         data: {
           userId: payload.userId,
+          entrega,
           type: payload.type as NotificationType,
           category: payload.category || 'general',
           title: payload.title,
@@ -410,8 +462,11 @@ export class NotificationsService {
         },
       });
 
-      // Emitir en tiempo real
-      if (this.gateway) {
+      // Espera al resumen: queda la fila y no suena.
+      if (entrega === 'resumen') return notification;
+
+      // Emitir en tiempo real (el recordatorio suena en el teléfono, pero no entra a la bandeja)
+      if (this.gateway && entrega !== 'recordatorio') {
         this.gateway.notifyUser(payload.userId, {
           event: 'notification:new',
           notification,
@@ -481,7 +536,7 @@ export class NotificationsService {
     companyId?: number | null,
   ) {
     return this.prisma.notification.findMany({
-      where: { userId, category, ...this.inboxScope(companyId) },
+      where: { userId, category, entrega: { in: ENTREGAS_VISIBLES }, ...this.inboxScope(companyId) },
       include: {
         triggerUser: {
           select: {
@@ -500,7 +555,7 @@ export class NotificationsService {
    * Obtener estadísticas de notificaciones
    */
   async getStats(userId: number, companyId?: number | null) {
-    const scope = this.inboxScope(companyId);
+    const scope = { ...this.inboxScope(companyId), entrega: { in: ENTREGAS_VISIBLES } };
     const total = await this.prisma.notification.count({
       where: { userId, ...scope },
     });

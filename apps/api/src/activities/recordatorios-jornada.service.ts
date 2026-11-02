@@ -5,19 +5,19 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { appUrls } from '../common/app-urls.js';
 import { isNonEmployeeEmail } from '../common/platform-accounts.js';
-import { workDateColumn, workDateKey } from '../common/time/workday.js';
+import { workDateColumn, workDateKey, workDayStart } from '../common/time/workday.js';
 import { ACTIVITY_STATUS, statusVariants } from './activity-status.js';
 import { limiteDeEntrega } from './semaforo-actividad.js';
 import {
   avisoPorVencer,
   avisoSinActividad,
   CADA_POR_VENCER_MIN,
-  CADA_SIN_ACTIVIDAD_MIN,
   ejecutoresDeActividad,
   horarioDeRecordatorios,
   minutosAlLimite,
   necesitaActividad,
   tocaAvisoPorVencer,
+  tocaAvisoSinActividad,
   yaEntrego,
 } from './recordatorios-jornada.js';
 
@@ -30,8 +30,8 @@ const ABIERTAS = [
 ].flatMap((s) => statusVariants(s));
 
 /**
- * Cada 5 minutos, solo con la jornada abierta (checó entrada y no ha salido): push a quien no
- * tiene actividad corriendo y, cada 10 min, a quien se le vence una sin entregar. Reglas en
+ * Cada 5 minutos, solo con la jornada abierta (checó entrada y no ha salido): push escalonado a quien
+ * no tiene actividad corriendo y, cada 30 min, a quien se le vence una sin entregar. Reglas en
  * `recordatorios-jornada.ts`. El cron no trae empresa en el request: todo filtra por `companyId`.
  */
 @Injectable()
@@ -56,24 +56,37 @@ export class RecordatoriosJornadaService {
 
     const dias = await this.prisma.attendanceDay.findMany({
       where: { date: hoy, isOpen: true },
-      select: { userId: true, companyId: true, user: { select: { email: true, isActive: true } } },
+      select: { userId: true, companyId: true, lastEntryAt: true, user: { select: { email: true, isActive: true } } },
     });
     const enJornada = new Map<number, number>();
+    const entradaDe = new Map<number, Date>();
     for (const d of dias) {
       if (d.user?.isActive === false || isNonEmployeeEmail(d.user?.email)) continue;
       enJornada.set(d.userId, d.companyId);
+      if (d.lastEntryAt) entradaDe.set(d.userId, d.lastEntryAt);
     }
     if (!enJornada.size) return vacio;
     const ids = [...enJornada.keys()];
+    const inicioDelDia = workDayStart(ahora);
 
-    const [comidas, relojes, actividades] = await Promise.all([
+    const [comidasDeHoy, sesiones, avisados, actividades] = await Promise.all([
       this.prisma.lunchBreak.findMany({
-        where: { userId: { in: ids }, date: hoy, checkoutTime: null },
-        select: { userId: true },
+        where: { userId: { in: ids }, date: hoy },
+        select: { userId: true, checkoutTime: true },
       }),
       this.prisma.activityWorkSession.findMany({
-        where: { userId: { in: ids }, endedAt: null },
-        select: { userId: true },
+        where: { userId: { in: ids }, OR: [{ endedAt: null }, { endedAt: { gte: inicioDelDia } }] },
+        select: { userId: true, endedAt: true },
+      }),
+      this.prisma.notification.findMany({
+        where: {
+          userId: { in: ids },
+          type: 'SLA_ALERT',
+          entityType: 'User',
+          entrega: 'recordatorio',
+          createdAt: { gte: inicioDelDia },
+        },
+        select: { userId: true, createdAt: true },
       }),
       this.prisma.activity.findMany({
         where: {
@@ -102,8 +115,18 @@ export class RecordatoriosJornadaService {
         take: 1000,
       }),
     ]);
-    const enComida = new Set(comidas.map((c) => c.userId));
-    const conReloj = new Set(relojes.map((r) => r.userId));
+    const enComida = new Set(comidasDeHoy.filter((c) => !c.checkoutTime).map((c) => c.userId));
+    const conReloj = new Set(sesiones.filter((s) => !s.endedAt).map((s) => s.userId));
+    /** Desde cuándo no tiene reloj: lo último entre su entrada, su último reloj y su regreso de comer. */
+    const sinRelojDesde = new Map<number, Date>(entradaDe);
+    const masReciente = (userId: number, fecha: Date | null) => {
+      const actual = sinRelojDesde.get(userId);
+      if (fecha && (!actual || fecha.getTime() > actual.getTime())) sinRelojDesde.set(userId, fecha);
+    };
+    for (const s of sesiones) masReciente(s.userId, s.endedAt);
+    for (const c of comidasDeHoy) masReciente(c.userId, c.checkoutTime);
+    const avisadosHoy = new Map<number, Date[]>();
+    for (const a of avisados) avisadosHoy.set(a.userId, [...(avisadosHoy.get(a.userId) ?? []), a.createdAt]);
 
     // Lo abierto de cada quien (para el texto) y los avisos de «se te vence».
     const abiertasDe = new Map<number, number>();
@@ -128,6 +151,8 @@ export class RecordatoriosJornadaService {
       if (!necesitaActividad({ enJornada: true, enComida: enComida.has(userId), relojCorriendo: conReloj.has(userId) })) {
         continue;
       }
+      const desde = sinRelojDesde.get(userId) ?? inicioDelDia;
+      if (!tocaAvisoSinActividad({ desde, enviadosHoy: avisadosHoy.get(userId) ?? [], ahora })) continue;
       const { title, message } = avisoSinActividad(abiertasDe.get(userId) ?? 0);
       const ok = await this.notifications.createNotification({
         userId,
@@ -144,7 +169,8 @@ export class RecordatoriosJornadaService {
         // La tarjeta del teléfono se reemplaza, no se apila; uno por corrida del cron (en iOS con `reemplazar`).
         collapseKey: `nx_sin_actividad_u${userId}`,
         reemplazar: true,
-        dedupeSeconds: (CADA_SIN_ACTIVIDAD_MIN - 1) * 60,
+        entrega: 'recordatorio',
+        dedupeSeconds: 4 * 60,
         companyId,
       });
       if (ok) sinActividad += 1;
@@ -167,6 +193,7 @@ export class RecordatoriosJornadaService {
         channel: 'ops',
         collapseKey: `nx_vence_${v.a.id}_u${v.userId}`,
         reemplazar: true,
+        entrega: 'recordatorio',
         dedupeSeconds: (CADA_POR_VENCER_MIN - 1) * 60,
         companyId: v.companyId,
       });

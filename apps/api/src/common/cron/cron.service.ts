@@ -203,6 +203,8 @@ export class CronService {
         Number(viaticAgg._sum.montoSolicitado || 0) + Number(viaticProjAgg._sum.montoSolicitado || 0);
       const actualOperativo = Number(expAgg._sum.montoSolicitado || 0);
       const budget = Number(project.budget) || 0;
+      // Sin presupuesto capturado no hay margen que medir: daba un falso 0 % todos los días.
+      if (budget <= 0) continue;
       const totalActual = Number(project.costProducts) + actualViaticos + actualOperativo;
       const marginActual = budget - totalActual;
       const marginPercent = budget > 0 ? (marginActual / budget) * 100 : 0;

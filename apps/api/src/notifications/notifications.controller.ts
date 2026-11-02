@@ -27,11 +27,12 @@ export class NotificationsController {
     @CurrentCompanyId() companyId: number | null,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('agrupados') agrupados?: string,
   ) {
     const limitNum = limit ? parseInt(limit, 10) : 50;
     const offsetNum = offset ? parseInt(offset, 10) : 0;
 
-    return this.notificationsService.getUserNotifications(user.id, limitNum, offsetNum, companyId);
+    return this.notificationsService.getUserNotifications(user.id, limitNum, offsetNum, companyId, agrupados === '1');
   }
 
   /**

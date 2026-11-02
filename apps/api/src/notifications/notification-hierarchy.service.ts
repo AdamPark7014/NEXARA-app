@@ -1198,7 +1198,11 @@ export class NotificationHierarchyService {
     try {
       const nombre = persona(params.userName);
       const justificacion = params.justificacion?.trim() || 'Sin justificación';
-      for (const uid of await this.lunchReviewerIds(params.userId)) {
+      // Solo su jefe directo; quien no lo tiene, su cadena. Dirección lo ve en el resumen y en Asistencias.
+      const directo = (
+        await this.prisma.user.findUnique({ where: { id: params.userId }, select: { managerId: true } })
+      )?.managerId;
+      for (const uid of directo ? [directo] : await this.lunchReviewerIds(params.userId)) {
         await this.notificationsService.createNotification({
           userId: uid,
           type: params.momento === 'salida' ? 'LUNCH_CHECKIN' : 'LUNCH_CHECKOUT',
@@ -3047,6 +3051,8 @@ export class NotificationHierarchyService {
           entityType: 'SalesProject',
           relatedUrl: appUrls.erpProyectos(opts.projectId),
           priority: 'high',
+          // El cron corre diario: mandaba lo mismo todos los días a cada directivo. Una vez por semana basta.
+          dedupeSeconds: 7 * 24 * 60 * 60,
         });
       }
     } catch (error) {
