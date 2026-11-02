@@ -34,6 +34,7 @@ struct FlotillaDireccionView<Encabezado: View>: View {
                             Image(systemName: "chevron.right").frame(width: 40, height: 40)
                         }
                         .disabled(!puedeAvanzar)
+                        .opacity(puedeAvanzar ? 1 : 0.3)
                         .accessibilityLabel("Mes siguiente")
                     }
                     .foregroundStyle(NxColors.fg)
