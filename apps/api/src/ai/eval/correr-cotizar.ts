@@ -7,17 +7,21 @@
  * puerta con el token de pruebas. Se califica en código: cliente, renglones, cantidades y modelo.
  *
  * `--real` lee un JSON local con `{ padron, usados, filas, catalogo, casos }` de la empresa real: el
- * repo es público y esos datos no se guardan en git. De ahí el resultado solo sale en cifras.
+ * repo es público y esos datos no se guardan en git. De ahí el resultado solo sale en cifras. Con
+ * `--real` también se compara cada renglón con lo que de verdad se cotizó en esa cotización.
+ *
+ * `--ia-guardada archivo.json` guarda lo que respondió la IA y lo reutiliza: para afinar el emparejado
+ * sin volver a pagar las mismas frases.
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ClaudeService, type UsoClaude } from '../claude/claude.service.js';
 import { limpiarSalidaCotizar, peticionCotizar, type SalidaCotizar } from '../cotizar/cotizar-ia.js';
 import { CLIENTE_GENERICO, armarPropuesta, type PropuestaCotizacion } from '../../cotizaciones/cotizar-frase.js';
-import { CANDIDATOS_FIJOS, candidatosDeUsadas, palabrasDePartida, type CandidatoPartida } from '../../cotizaciones/emparejar-partidas.js';
+import { CANDIDATOS_FIJOS, candidatosDeUsadas, consultasDeCatalogo, cumpleLoPedido, palabrasDePartida, type CandidatoPartida } from '../../cotizaciones/emparejar-partidas.js';
 import { normalizarTexto, type FilaCotizada } from '../../cotizaciones/partidas-frecuentes.js';
 import type { FichaComparable } from '../../ventas/clientes-parecidos.js';
-import { CASOS_COTIZAR, CLIENTES_USADOS, FILAS_COTIZAR, PADRON_COTIZAR, type CasoCotizar } from './casos-cotizar.js';
+import { CASOS_COTIZAR, CLIENTES_USADOS, FILAS_COTIZAR, PADRON_COTIZAR, type CasoCotizar, type LineaEsperada } from './casos-cotizar.js';
 import { DIR_RESULTADOS, MODELOS, argumentos, asegurarPresupuesto, cargarLlave, costoLlamada, enParalelo, registrarGasto, restante } from './comun.js';
 
 type CasoReal = CasoCotizar & { antesDe?: number };
@@ -82,6 +86,33 @@ function calificar(caso: CasoCotizar, p: PropuestaCotizacion) {
   return { clienteBien, bien, sobran: libres.length, modelosEsperados, modelosBien, fallas };
 }
 
+/** Lo que de verdad se cotizó contra lo propuesto. Solo cuenta lo que tiene modelo: es lo único comparable. */
+type Verdad = {
+  conModelo: number;
+  /** El modelo real estaba entre lo que se podía ofrecer (ya cotizado o mayorista). */
+  alcanzable: number;
+  llenoBien: number;
+  /** Se llenó solo con otro modelo: puede ser una alternativa válida, o un error. Se revisa a mano. */
+  llenoOtro: number;
+  primera: number;
+  entreOpciones: number;
+};
+
+const mismoModelo = (a: unknown, b: unknown) => {
+  const x = normalizarTexto(a);
+  const y = normalizarTexto(b);
+  return Boolean(x && y && (x === y || (x.length >= 6 && y.startsWith(x)) || (y.length >= 6 && x.startsWith(y))));
+};
+
+/** El renglón verdadero de esa cotización para una línea esperada. */
+function filaVerdadera(linea: LineaEsperada, propias: FilaCotizada[]): FilaCotizada | null {
+  const quiere = linea.busca.flatMap((b) => palabrasDePartida(b));
+  return propias.find((f) => {
+    const suyas = new Set(palabrasDePartida(`${f.name} ${f.brand ?? ''} ${f.model ?? ''}`));
+    return quiere.every((b) => suyas.has(b));
+  }) ?? null;
+}
+
 async function main() {
   const args = argumentos();
   const real = args.real ? (JSON.parse(readFileSync(args.real, 'utf8')) as DatosReales) : null;
@@ -101,23 +132,23 @@ async function main() {
     claude = new ClaudeService();
   }
 
+  const archivoIa = args['ia-guardada'] ?? null;
+  const guardadas: Record<string, SalidaCotizar> = archivoIa && existsSync(archivoIa) ? JSON.parse(readFileSync(archivoIa, 'utf8')) : {};
+
   const padron = real?.padron ?? PADRON_COTIZAR;
   const usados = real?.usados ?? CLIENTES_USADOS;
   const generico = padron.find((c) => normalizarTexto(c.name) === normalizarTexto(CLIENTE_GENERICO));
 
-  // El catálogo real son miles: se indexa una vez y cada concepto ve solo lo que comparte palabras.
-  const porPalabra = new Map<string, CandidatoPartida[]>();
-  for (const c of real?.catalogo ?? []) {
-    for (const palabra of palabrasDePartida(`${c.name} ${c.brand ?? ''} ${c.model ?? ''}`)) {
-      const lista = porPalabra.get(palabra);
-      if (lista) lista.push(c);
-      else porPalabra.set(palabra, [c]);
-    }
-  }
+  // Igual que el buscador de producción: todas las palabras en el nombre, modelo o marca, y solo los primeros.
+  const textosCatalogo = (real?.catalogo ?? []).map((c) => ({ c, texto: normalizarTexto(`${c.name} ${c.brand ?? ''} ${c.model ?? ''}`) }));
+  const tomaCatalogo = Number(args['toma-ct'] ?? 12);
   const delCatalogoReal = (concepto: string) => {
-    const palabras = palabrasDePartida(concepto).filter((p) => (porPalabra.get(p)?.length ?? 0) > 0);
-    const raras = palabras.sort((a, b) => porPalabra.get(a)!.length - porPalabra.get(b)!.length).slice(0, 2);
-    return [...new Set(raras.flatMap((p) => porPalabra.get(p)!.slice(0, 200)))];
+    for (const q of consultasDeCatalogo(concepto)) {
+      const palabras = q.split(/[\s,;|/]+/).filter((p) => p.length >= 2).slice(0, 4);
+      const hallados = textosCatalogo.filter((x) => palabras.every((p) => x.texto.includes(p)));
+      if (hallados.length) return hallados.slice(0, tomaCatalogo).map((x) => x.c);
+    }
+    return [];
   };
 
   const filas = await enParalelo(casos, Number(args.concurrencia ?? 4), async (caso: CasoReal) => {
@@ -134,6 +165,8 @@ async function main() {
       candidatos: [...candidatosDeUsadas(filasCaso), ...CANDIDATOS_FIJOS],
       buscarCatalogo: async (concepto) => delCatalogoReal(concepto),
       preguntarIa: async (frase) => {
+        const ya = guardadas[frase];
+        if (ya) return { ...limpiarSalidaCotizar(ya), uso: null };
         if (!claude) throw new Error('sin IA');
         const p = peticionCotizar(frase);
         const inicio = Date.now();
@@ -142,6 +175,7 @@ async function main() {
           uso = r.uso;
           registrarGasto(`cotizar ${args.modelo ?? 'haiku'}`, r.uso.usdAprox);
           ms = Date.now() - inicio;
+          guardadas[frase] = r.datos;
           return { ...limpiarSalidaCotizar(r.datos), uso: r.uso };
         } catch (e) {
           error = (e as Error).message;
@@ -153,6 +187,57 @@ async function main() {
     const perfecto = !nota.fallas.length;
     return { caso, propuesta, nota, perfecto, ms, uso: uso as UsoClaude | null, error };
   });
+
+  if (archivoIa) writeFileSync(archivoIa, JSON.stringify(guardadas));
+
+  if (real) {
+    const v: Verdad = { conModelo: 0, alcanzable: 0, llenoBien: 0, llenoOtro: 0, primera: 0, entreOpciones: 0 };
+    const detalles: string[] = [];
+    for (const f of filas) {
+      const propias = real.filas.filter((x) => x.cotizacionId === f.caso.antesDe);
+      const antes = candidatosDeUsadas(real.filas.filter((x) => x.cotizacionId < (f.caso.antesDe ?? 0)));
+      const libres = [...f.propuesta.partidas];
+      for (const linea of f.caso.lineas) {
+        const verdad = filaVerdadera(linea, propias);
+        const quiere = linea.busca.flatMap((b) => palabrasDePartida(b));
+        const i = libres.findIndex((x) => {
+          const suyas = new Set(palabrasDePartida(`${x.pedido} ${x.name} ${x.model ?? ''}`));
+          return quiere.every((b) => suyas.has(b));
+        });
+        if (!verdad?.model || i < 0) continue;
+        const p = libres.splice(i, 1)[0]!;
+        v.conModelo += 1;
+        const alcanza = [...antes, ...real.catalogo].some((c) => mismoModelo(c.model, verdad.model));
+        if (alcanza) v.alcanzable += 1;
+        const opciones = p.alternativas;
+        if (p.seguridad === 'alta' && mismoModelo(p.model, verdad.model)) v.llenoBien += 1;
+        else if (p.seguridad === 'alta') {
+          v.llenoOtro += 1;
+          detalles.push(`  otro en ${f.caso.id}: pidió «${p.pedido}» → ${p.fuente} «${p.name.slice(0, 44)}» (${p.model ?? '—'}); real ${verdad.model}`);
+        }
+        if (mismoModelo(opciones[0]?.model, verdad.model)) v.primera += 1;
+        if (opciones.some((o) => mismoModelo(o.model, verdad.model))) v.entreOpciones += 1;
+        else if (alcanza && p.seguridad !== 'alta') detalles.push(`  no ofrecido en ${f.caso.id}: «${p.pedido}»; real ${verdad.model}; ofreció ${opciones.map((o) => o.model ?? o.name.slice(0, 16)).join(' | ') || 'nada'}`);
+      }
+    }
+    // Las opciones contra lo que se pidió: ¿traen la marca y las cifras? Aquí sirve más de un modelo.
+    const opciones = { renglones: 0, primera: 0, alguna: 0, sinOpciones: 0 };
+    const malas: string[] = [];
+    for (const f of filas) {
+      for (const p of f.propuesta.partidas) {
+        if (p.seguridad === 'alta' || cumpleLoPedido(p.pedido, { name: p.pedido, brand: null, model: null }) == null) continue;
+        opciones.renglones += 1;
+        if (!p.alternativas.length) opciones.sinOpciones += 1;
+        if (p.alternativas[0] && cumpleLoPedido(p.pedido, p.alternativas[0])) opciones.primera += 1;
+        if (p.alternativas.some((o) => cumpleLoPedido(p.pedido, o))) opciones.alguna += 1;
+        else malas.push(`  sin opción que cumpla en ${f.caso.id}: «${p.pedido}»; ofreció ${p.alternativas.map((o) => o.model ?? o.name.slice(0, 18)).join(' | ') || 'nada'}`);
+      }
+    }
+    console.log(`Opciones contra lo pedido: renglones con marca o cifras ${opciones.renglones} · la primera cumple ${opciones.primera} · alguna cumple ${opciones.alguna} · sin opciones ${opciones.sinOpciones}`);
+    if (args.ver) malas.forEach((d) => console.log(d));
+    console.log(`Contra lo cotizado: con modelo ${v.conModelo} · alcanzables ${v.alcanzable} · lleno bien ${v.llenoBien} · lleno con otro ${v.llenoOtro} · primera opción ${v.primera} · entre opciones ${v.entreOpciones}`);
+    if (args.ver) detalles.forEach((d) => console.log(d));
+  }
 
   const m: Marcador = { casos: filas.length, perfectos: 0, clientes: 0, renglonesEsperados: 0, renglonesBien: 0, sobran: 0, modelosEsperados: 0, modelosBien: 0, sinTokens: 0, renglones: 0, conPrecio: 0 };
   for (const f of filas) {

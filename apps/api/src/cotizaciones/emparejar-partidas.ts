@@ -111,6 +111,8 @@ const DE_SERVICIO = new Set(['instalacion', 'configuracion', 'mantenimiento', 's
 
 /** Frases que valen por una sola palabra. Se aplican ya sin acentos y en minúsculas. */
 const FRASES: Array<[RegExp, string]> = [
+  [/\bhewlett[- ]packard enterprise\b/g, 'hpe'],
+  [/\bhewlett[- ]packard\b/g, 'hp'],
   [/\baccess ?points?\b|\bpuntos? de acceso\b/g, 'ap'],
   [/\bno ?breaks?\b/g, 'ups'],
   [/\bdiscos? duros?\b/g, 'disco'],
@@ -120,7 +122,7 @@ const FRASES: Array<[RegExp, string]> = [
   [/\bmano de obra\b|\bpuesta a punto\b/g, 'instalacion'],
   [/\bcat(?:egoria)?\.? ?(\d[a-z]?)\b/g, 'cat$1'],
   [/\b(\d+(?:\.\d+)?) ?(?:mp|megapixel(?:es)?)\b/g, '$1mp'],
-  [/\b(\d+) ?(tb|gb|kva|va)\b/g, '$1$2'],
+  [/\b(\d+) ?(tb|gb|kva|va|w)\b/g, '$1$2'],
   [/\b(\d+) ?(?:ch|canal(?:es)?)\b/g, '$1 canal'],
   [/\b(\d+) ?(?:puertos?|ptos?)\b/g, '$1 puerto'],
 ];
@@ -155,7 +157,10 @@ export function palabrasDePartida(texto: unknown): string[] {
 }
 
 /** Se ve como modelo: letras y números juntos, o con guion («DS-2CD», «TL-SG1428PE»). */
-const pareceModelo = (p: string) => /[a-z]/.test(p) && /\d/.test(p) && p.length >= 4 && !/^\d+(?:mp|tb|gb|kva|va)$/.test(p) && !/^cat\d/.test(p);
+const pareceModelo = (p: string) => /[a-z]/.test(p) && /\d/.test(p) && p.length >= 4 && !/^\d+(?:mp|tb|gb|kva|va|w)$/.test(p) && !/^cat\d/.test(p);
+
+/** Cómo escribe el mayorista una marca que la gente dice de otro modo. */
+const MARCA_EN_CATALOGO: Record<string, string> = { hpe: 'hewlett' };
 
 /** Marcas que se dicen en una frase; a estas se suman las que traen los candidatos. */
 const MARCAS = ['hikvision', 'dahua', 'zebra', 'hpe', 'hp', 'dell', 'lenovo', 'cisco', 'tp-link', 'ubiquiti', 'ruijie', 'grandstream', 'zkteco', 'samsung', 'logitech', 'kenwood', 'hikrobot', 'rosslare', 'vivotek', 'panduit', 'belden', 'hanwha', 'axis', 'epson', 'apc'];
@@ -189,13 +194,18 @@ function hallada(palabra: string, lista: Set<string>): boolean {
 }
 
 /** 0 a 1: qué tanto de lo pedido está en la partida. La primera palabra es lo que se pide: pesa más. */
-export function puntuarPartida(consulta: string[], indexado: Pick<Indexado, 'titulo' | 'detalle'> & { primera?: string | null }): number {
+export function puntuarPartida(
+  consulta: string[],
+  indexado: Pick<Indexado, 'titulo' | 'detalle'> & { primera?: string | null },
+  marcas: ReadonlySet<string> = new Set(),
+): number {
   if (!consulta.length) return 0;
   const cabeza = consulta.find((p) => !/^\d/.test(p)) ?? consulta[0]!;
   let total = 0;
   let logrado = 0;
   for (const palabra of consulta) {
-    const peso = palabra === cabeza ? 2.5 : pareceModelo(palabra) ? 3 : /^\d/.test(palabra) ? 2 : 1;
+    // Quien dice una marca la quiere: «Disco HPE 4 TB» no es un Seagate de 4 TB.
+    const peso = palabra === cabeza ? 2.5 : pareceModelo(palabra) || marcas.has(palabra) ? 3 : /^\d/.test(palabra) ? 2 : 1;
     total += peso;
     if (hallada(palabra, indexado.titulo)) logrado += peso;
     else if (hallada(palabra, indexado.detalle)) logrado += peso * 0.5;
@@ -210,6 +220,14 @@ export function puntuarPartida(consulta: string[], indexado: Pick<Indexado, 'tit
 }
 
 const fechaDe = (c: CandidatoPartida) => (c.ultimaVez ? new Date(c.ultimaVez).getTime() || 0 : 0);
+
+/** ¿Trae todo lo específico que se pidió (marca, modelo y cifras)? Para medir las opciones que se ofrecen. */
+export function cumpleLoPedido(concepto: string, candidato: Pick<CandidatoPartida, 'name' | 'brand' | 'model'>): boolean | null {
+  const titulo = new Set(palabrasDePartida(`${candidato.name.slice(0, 160)} ${candidato.brand ?? ''} ${candidato.model ?? ''}`));
+  const marcas = new Set(MARCAS);
+  const pedidas = palabrasDePartida(concepto).filter((p) => esEspecifica(p, marcas));
+  return pedidas.length ? pedidas.every((p) => hallada(p, titulo)) : null;
+}
 
 /** Palabras de marca entre lo que se está comparando. */
 function marcasDe(candidatos: CandidatoPartida[]): Set<string> {
@@ -277,7 +295,7 @@ export function emparejar(concepto: string, candidatos: CandidatoPartida[]): Emp
   const marcas = marcasDe(aComparar);
   const puntuados = aComparar
     .map(indexar)
-    .map((i) => ({ i, puntaje: puntuarPartida(consulta, i) }))
+    .map((i) => ({ i, puntaje: puntuarPartida(consulta, i, marcas) }))
     .filter((x) => x.puntaje >= PUNTAJE_ALTERNATIVA)
     .sort(
       (a, b) =>
@@ -306,32 +324,42 @@ export function emparejar(concepto: string, candidatos: CandidatoPartida[]): Emp
       .map((x) => x.i.candidato),
   );
   // Lo que ES lo pedido va primero: «Cámara domo» antes que una caja de conexiones para cámara.
-  const enOrden = (a: CandidatoPartida, b: CandidatoPartida) => Number(abren.has(b)) - Number(abren.has(a)) || ordenDeOpciones(a, b);
+  // Lo específico que se pidió va antes que lo barato: «Switch PoE 24 puertos» no empieza por uno de 5.
+  const aciertos = new Map(puntuados.map((x) => [x.i.candidato, consulta.filter((p) => esEspecifica(p, marcas) && hallada(p, x.i.titulo)).length]));
+  const puntajes = new Map(puntuados.map((x) => [x.i.candidato, x.puntaje]));
+  const enOrden = (a: CandidatoPartida, b: CandidatoPartida) =>
+    (aciertos.get(b) ?? 0) - (aciertos.get(a) ?? 0) ||
+    (puntajes.get(b) ?? 0) - (puntajes.get(a) ?? 0) ||
+    Number(abren.has(b)) - Number(abren.has(a)) ||
+    ordenDeOpciones(a, b);
   if (!mejor || mejor.puntaje < PUNTAJE_MEDIA) {
     const opciones = distintas(null).slice(0, MAX_ALTERNATIVAS);
     return { elegida: null, seguridad: 'ninguna', puntaje: mejor?.puntaje ?? 0, alternativas: opciones, opciones };
   }
   const elegida = mejor.i.candidato;
-  const segura = mejor.puntaje >= PUNTAJE_ALTA && esSegura(consulta, mejor.i, puntuados, marcas);
+  // La marca ordena las opciones, pero no vuelve seguro lo demás: «Lector UHF Rosslare» no es cualquier lector Rosslare.
+  const segura = puntuarPartida(consulta, mejor.i) >= PUNTAJE_ALTA && esSegura(consulta, mejor.i, puntuados, marcas);
   // Junto a una elegida segura solo se ofrece lo que también es eso («Kit de limpieza» no es «Kit Extensor HDMI»).
   const delMismo = new Set(puntuados.filter((x) => !segura || (cabezaConsulta != null && x.i.primera === cabezaConsulta && x.puntaje >= PUNTAJE_ALTA)).map((x) => x.i.candidato));
   // Las opciones son las que más se parecen; entre ellas, lo más a la mano primero.
   const alternativas = distintas(elegida)
     .filter((c) => delMismo.has(c))
-    .slice(0, MAX_ALTERNATIVAS * 2)
+    .slice(0, MAX_ALTERNATIVAS * 3)
     .sort(enOrden)
     .slice(0, MAX_ALTERNATIVAS);
   const opciones = segura
     ? alternativas
-    : [elegida, ...distintas(elegida).slice(0, MAX_ALTERNATIVAS * 2)].sort(enOrden).slice(0, MAX_ALTERNATIVAS + 1);
+    : [elegida, ...distintas(elegida).slice(0, MAX_ALTERNATIVAS * 3)].sort(enOrden).slice(0, MAX_ALTERNATIVAS + 1);
   return { elegida, seguridad: segura ? 'alta' : 'media', puntaje: mejor.puntaje, alternativas, opciones };
 }
 
 const claveDe = (c: CandidatoPartida) => `${normalizarTexto(c.name)}|${normalizarTexto(c.model)}`;
 
 /**
- * Qué buscar en el catálogo del mayorista: lo pedido y, si no da nada, con menos palabras. Sin
- * sinónimos: el catálogo dice «canaleta», no «canalización». Una sola palabra solo si trae cifra.
+ * Qué buscar en el catálogo del mayorista: lo que se pide con su marca y sus cifras, y si no da nada,
+ * con menos palabras. El buscador devuelve pocos: sin lo específico, los primeros de «switch» son de
+ * 5 puertos aunque se pidan 24. Sin sinónimos: el catálogo dice «canaleta», no «canalización». Una
+ * sola palabra solo si trae cifra.
  */
 export function consultasDeCatalogo(concepto: string): string[] {
   const palabras = [
@@ -342,7 +370,16 @@ export function consultasDeCatalogo(concepto: string): string[] {
         .map(singular),
     ),
   ];
-  const salida = [palabras.slice(0, 3).join(' '), palabras.slice(0, 2).join(' ')];
+  const cabeza = palabras.find((p) => !/^\d/.test(p));
+  const especificas = palabras.filter((p) => p !== cabeza && (/\d/.test(p) || MARCAS.includes(p)));
+  const enCatalogo = (lista: string[]) => lista.map((p) => MARCA_EN_CATALOGO[p] ?? p).join(' ');
+  const salida = [
+    // Un modelo dicho es lo más exacto: se busca solo.
+    ...palabras.filter(pareceModelo),
+    ...(cabeza && especificas.length ? [enCatalogo([cabeza, ...especificas].slice(0, 4))] : []),
+    enCatalogo(palabras.slice(0, 3)),
+    enCatalogo(palabras.slice(0, 2)),
+  ];
   if (/\d/.test(palabras[0] ?? '')) salida.push(palabras[0]!);
   return [...new Set(salida)].filter((q) => q.includes(' ') || /\d/.test(q));
 }

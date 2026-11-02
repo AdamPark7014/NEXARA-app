@@ -1,5 +1,13 @@
 # RELEVO
 
+- **01-11 ~22:30 (claude-code) — «Cotizar con IA»: mejora del modelo (Adam: «mejora el modelo»; nadie lo había usado aún en producción).**
+  - **Sonnet no es mejor y Haiku se queda.** Mismas 40 frases reales: Sonnet 37/40, US$0.0023 por llamada, p95 7.8 s; Haiku 38/40, US$0.00011 leyendo caché (0.00024 sin caché), p95 2.6 s en la misma corrida. Sonnet está permitido en el token de `pruebas`, no se cambió `ANTHROPIC_COTIZAR_MODEL`.
+  - **Medición nueva en el eval `--real`:** cada renglón contra lo que de verdad se cotizó, y las opciones contra lo pedido. `--ia-guardada archivo.json` reutiliza lo que respondió la IA para afinar sin gastar tokens.
+  - **El techo es el catálogo:** de 125 renglones reales con modelo, solo 33 estaban al alcance (ya cotizados o en CT). De esos, 18 se llenan bien. Lo sigue la sesión del otro mayorista.
+  - **Cambios en `emparejar-partidas.ts`:** una marca pedida pesa como un modelo para ordenar opciones, pero no vuelve seguro lo demás (al pesar en la seguridad, «Lector UHF Rosslare» se llenó con un lector de proximidad); las opciones ponen primero lo que cumple marca y cifras; «HPE» es «Hewlett Packard Enterprise»; «1000 W» es «1000W»; un modelo dicho se busca solo y primero en CT. **La primera opción cumple lo pedido en 18 de 60 renglones, antes 6;** alguna opción, 19 (antes 10).
+  - **Corrección de una cifra anterior:** el eval traía del catálogo más de lo que trae producción. Con la búsqueda igual a producción, se autollena 23 %, 52 % queda a un clic y 25 % es renglón libre (antes reporté 22/60/18). Renglones 149/151 y clientes 40/40 no cambian. Muchas opciones que no «cumplen» sí sirven: el modelo trae la cifra (`LM27` para 27 pulgadas) o CT no la dice en el título.
+  - **Queda débil:** una palabra suelta sin contexto («3 cintas» junto a impresoras Zebra) puede llenarse con la única «Cinta» ya cotizada. Se ve en la tarjeta, pero no se corrige solo.
+
 - **01-11 ~22:00 (claude-code) — Vehículos, Fase 3 ampliada del libro de costos: en producción (`ad4df995`, `b94c7632`).** Adam dijo «Sí, constrúyelo». Detalle y eval en `docs/COSTOS-PRECIOS-UNITARIOS.md`, «Fase 3 ampliada».
   - **Qué se ve:** `/erp/vehiculos` con costo, km del mes y a dónde se fue; `/erp/vehiculos/nuevo` para subir el manual o escribir el modelo, y revisar cada dato con su fuente; la ficha con Resumen, Especificaciones, Viajes, Gasolina y Mantenimiento; y la tarjeta de vehículos en Costos del proyecto.
   - **Migración `20261102120000_vehiculos_ficha`:** 5 tablas y `costo_movimientos.detalle`; solo agrega. Ya aplicada. La imagen de la API suma `poppler-utils`.
