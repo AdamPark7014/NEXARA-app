@@ -33,6 +33,16 @@
   box-shadow: 0 24px 60px -32px rgba(13, 15, 18, 0.65);
 }
 
+/* El botón apagado está pensado para fondo claro. */
+.band :global(.nx-btn--ghost) {
+  color: rgba(255, 255, 255, 0.85);
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+}
+
 .bandHead {
   display: flex;
   flex-wrap: wrap;

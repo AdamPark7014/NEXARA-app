@@ -22,27 +22,27 @@ export default function FaltaPorCapturar({
   const accion = (x: Faltante) => {
     if (x.accion === "documentos") {
       return (
-        <button type="button" className={v.botonTexto} onClick={onDocumentos} aria-label={`Agregar ${x.texto}`}>
+        <button type="button" className={v.accionFila} onClick={onDocumentos} aria-label={`Agregar ${x.texto}`}>
           Agregar
         </button>
       );
     }
     if (x.accion === "gasolina") {
       return (
-        <button type="button" className={v.botonTexto} onClick={onGasolina} aria-label="Registrar la primera carga">
+        <button type="button" className={v.accionFila} onClick={onGasolina} aria-label="Registrar la primera carga">
           Registrar
         </button>
       );
     }
     if (x.accion === "salida") {
       return (
-        <Link className={v.enlace} href={`${VEHICULOS_PATH}/mis-vehiculos`} aria-label="Ir a Mis vehículos">
-          Ir
+        <Link className={v.accionFila} href={`${VEHICULOS_PATH}/mis-vehiculos`} aria-label="Ir a Mis vehículos">
+          Abrir
         </Link>
       );
     }
     return (
-      <Link className={v.enlace} href={`${VEHICULOS_PATH}/nuevo?vehiculo=${ficha.vehiculo.id}`} aria-label={`Capturar ${x.texto}`}>
+      <Link className={v.accionFila} href={`${VEHICULOS_PATH}/nuevo?vehiculo=${ficha.vehiculo.id}`} aria-label={`Capturar ${x.texto}`}>
         Capturar
       </Link>
     );

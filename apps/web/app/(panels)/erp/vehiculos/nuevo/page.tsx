@@ -508,8 +508,8 @@ function AltaVehiculo() {
       <div className={v.columnas}>
         <div className={v.principal}>
           <section className={c.card}>
-            <div className={v.cabecera}>
-              <div>
+            <div className={v.cabecera} style={{ alignItems: "center", marginBottom: 0 }}>
+              <div style={{ flex: "1 1 260px" }}>
                 <h2 className={v.titulo}>Manual</h2>
                 <p className={v.nota} style={{ margin: 0 }}>
                   {manual
