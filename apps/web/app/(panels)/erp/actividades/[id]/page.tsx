@@ -4,6 +4,7 @@
 // ahora vive aquí, que es la única superficie alcanzable. La cabecera (folio, estado,
 // pasos, pestañas y datos clave) la pinta `ActivityDetailShell`; aquí va el contenido.
 
+import PreguntaProyecto from "@/components/costos/PreguntaProyecto";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
@@ -536,6 +537,8 @@ export default function ActivityDetailPage() {
           </div>
         </RecordSection>
       ) : null}
+
+      <PreguntaProyecto activityId={activity.id} />
 
       {String(activity.coreKind ?? "").toLowerCase() === "comercial" ? (
         <RecordSection title="Cotización">

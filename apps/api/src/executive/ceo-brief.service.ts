@@ -136,7 +136,27 @@ export class CeoBriefService {
             where: { ...tw, deletedAt: null, status: 'DRAFT', validUntil: { gte: inicioHoy } } as any,
           }),
         );
-        return { porVencer: r._count._all, monto: Number(r._sum.total ?? 0), dias: DIAS_COTIZACION_POR_VENCER, sinEnviar };
+        const [porDecidir, ganadasSinProyecto] = await Promise.all([
+          seguro(0, () => this.prisma.cotizacion.count({ where: { ...tw, deletedAt: null, status: 'SENT' } as any })),
+          seguro(0, () =>
+            this.prisma.cotizacion.count({
+              where: {
+                ...tw,
+                deletedAt: null,
+                status: 'APPROVED',
+                proyectos: { none: { deletedAt: null, status: { not: 'CANCELLED' } } },
+              } as any,
+            }),
+          ),
+        ]);
+        return {
+          porVencer: r._count._all,
+          monto: Number(r._sum.total ?? 0),
+          dias: DIAS_COTIZACION_POR_VENCER,
+          sinEnviar,
+          porDecidir,
+          ganadasSinProyecto,
+        };
       }),
 
       // Operación.

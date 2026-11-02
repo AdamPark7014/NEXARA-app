@@ -275,6 +275,17 @@ export class CostosController {
     return this.liga.sugerirConIa(companyId, this.periodo(dto?.periodo));
   }
 
+  @Get('por-ligar/:activityId/sugerencia')
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  async sugerencia(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('activityId', ParseIntPipe) activityId: number,
+  ) {
+    await this.exigirLigar(user);
+    return this.liga.sugerenciaDe(companyId, activityId);
+  }
+
   @Post('por-ligar/:activityId')
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
   async ligar(

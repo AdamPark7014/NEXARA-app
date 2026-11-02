@@ -91,3 +91,63 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Lo que le toca al proyecto ahora y de dónde viene (Mapa de Core, Bloque A). */
+.siguiente {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 14px 18px;
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-brand-bg, var(--ui-surface));
+}
+
+.siguienteTexto {
+  display: grid;
+  flex: 1 1 320px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.siguienteTexto strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.siguienteTexto span {
+  color: var(--ui-fg-2);
+  font-size: 13.5px;
+}
+
+.folioOrigen {
+  font-family: var(--ui-font-mono, Consolas, monospace);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.faltaTitulo {
+  margin: var(--ui-s3) 0 var(--ui-s2);
+  padding-top: var(--ui-s3);
+  border-top: 1px solid var(--ui-border-subtle);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.faltaLista {
+  display: grid;
+  gap: var(--ui-s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.faltaLista li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+  align-items: center;
+  font-size: 13.5px;
+}

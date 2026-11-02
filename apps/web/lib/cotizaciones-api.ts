@@ -5,6 +5,7 @@
  * servidor; aquí solo se leen y se pintan. Las etiquetas viven aquí para no repetir cadenas sueltas
  * en cada pantalla.
  */
+import type { HiloCobro, HiloFactura } from "./hilo-negocio";
 import { buildApiUrl } from "@/lib/api-base";
 import type { CondicionesSugeridas, Moneda, OpcionesCotizacion } from "@/lib/cotizacion-personalizacion";
 
@@ -24,8 +25,8 @@ export type EstadoCotizacion = (typeof ESTADOS)[number];
 export const ESTADO_LABEL: Record<EstadoCotizacion, string> = {
   BORRADOR: "Borrador",
   ENVIADA: "Enviada",
-  APROBADA: "Aprobada",
-  RECHAZADA: "Rechazada",
+  APROBADA: "Ganada",
+  RECHAZADA: "Perdida",
   VENCIDA: "Vencida",
 };
 
@@ -186,6 +187,11 @@ export type CotizacionRow = {
   issueDate?: string | null;
   validUntil?: string | null;
   sentAt?: string | null;
+  enviadaPor?: string | null;
+  /** Cuándo se registró que el cliente aceptó. */
+  aceptadaAt?: string | null;
+  /** El proyecto que nació de ella, si ya existe. */
+  proyectoId?: number | null;
   revision?: number;
   /** El folio sigue la nomenclatura (`NEX-LJ75100126-0007…`). Los viejos (`NXR-2026-…`) no. */
   conNomenclatura?: boolean;
@@ -228,6 +234,12 @@ export type CotizacionDetalle = {
   issueDate?: string | null;
   validUntil?: string | null;
   sentAt?: string | null;
+  enviadaPor?: string | null;
+  signedAt?: string | null;
+  aceptadaVia?: string | null;
+  aceptadaAt?: string | null;
+  /** En qué va el negocio después de ganarla. */
+  hilo?: HiloNegocio | null;
   sentToEmail?: string | null;
   clientName?: string | null;
   clientCompany?: string | null;
@@ -426,6 +438,47 @@ export function rechazarCotizacion(token: string, id: number, motivo: string) {
   return cotFetch<CotizacionDetalle>(`cotizaciones/${id}/rechazar`, token, {
     method: "POST",
     body: JSON.stringify({ motivo }),
+  });
+}
+
+/** Cómo aceptó el cliente. También cuenta un sí por WhatsApp o en persona. */
+export const MEDIOS_ACEPTACION = [
+  { id: "FIRMA", label: "Firmó el enlace" },
+  { id: "WHATSAPP", label: "Por WhatsApp" },
+  { id: "CORREO", label: "Por correo" },
+  { id: "EN_PERSONA", label: "En persona" },
+] as const;
+export type MedioAceptacion = (typeof MEDIOS_ACEPTACION)[number]["id"];
+
+export const MOTIVOS_PERDIDA = [
+  "Por precio",
+  "Se fue con otro",
+  "Por tiempo de entrega",
+  "Ya no lo necesita",
+  "Dejó de contestar",
+] as const;
+
+export type HiloNegocio = {
+  proyecto: { id: number; title: string; status: string } | null;
+  factura: HiloFactura;
+  cobro: HiloCobro;
+};
+
+export type ResultadoGanada = {
+  cotizacionId: number;
+  proyecto: { id: number; title: string } | null;
+  errorProyecto: string | null;
+};
+
+/** Registra que se ganó y crea su proyecto. Si ya estaba ganada, solo crea lo que falte. */
+export function ganarCotizacion(
+  token: string,
+  id: number,
+  datos: { via?: MedioAceptacion; responsableId?: number; startDate?: string },
+) {
+  return cotFetch<ResultadoGanada>(`cotizaciones/${id}/ganar`, token, {
+    method: "POST",
+    body: JSON.stringify(datos),
   });
 }
 

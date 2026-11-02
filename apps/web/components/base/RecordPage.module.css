@@ -231,6 +231,15 @@
   text-overflow: ellipsis;
 }
 
+.stepT a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.stepT a:hover {
+  text-decoration: underline;
+}
+
 .step[data-state="pending"] .stepT {
   color: var(--ui-fg-3);
   font-weight: 500;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
@@ -10,12 +11,14 @@ import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 import { useUser } from "@/components/UserContext";
 import {
   Alert,
+  AsideCard,
   Badge,
   Button,
   ButtonLink,
   DateInput,
   EmptyState,
   Field,
+  KeyFacts,
   LinkButton,
   Progress,
   RecordPage,
@@ -41,6 +44,8 @@ import { accionesDeEstado, hoyISO, type AccionDeEstado } from "@/lib/proyecto-pl
 import { getServiceProjectTypeLabel } from "@/lib/service-project-types";
 import { cambiarEstado } from "../_componentes/acciones";
 import { usePersonasAsignables } from "../_componentes/personas";
+import NuevaActividad from "../_componentes/NuevaActividad";
+import { aceptoEnPalabras, faltaDeProyecto, pasosDeFacturaYCobro, siguientePasoDeProyecto } from "@/lib/hilo-negocio";
 import { toneDe } from "../_componentes/tono";
 import type { SeccionProps } from "../_componentes/tipos";
 import SeccionResumen from "../_componentes/SeccionResumen";
@@ -121,22 +126,44 @@ function esPrincipal(p: ProyectoDetalle, a: AccionDeEstado): boolean {
   return !a.peligro && (a.hacia === "COMPLETED" || (a.hacia === "ACTIVE" && p.status === "PLANNED"));
 }
 
-/** Planeado → En curso → Entregado, con las fechas que ya se conocen. */
+/** De la cotización al cobro, con las fechas que ya se conocen. */
 function pasosDe(p: ProyectoDetalle): RecordStep[] | undefined {
   if (p.status === "CANCELLED") return undefined;
   const arranco = p.status !== "PLANNED";
   const termino = p.status === "COMPLETED";
   return [
+    ...(p.cotizacion
+      ? [
+          {
+            id: "cotizacion",
+            label: "Cotización",
+            hint: p.cotizacion.aceptadaAt
+              ? `Ganada el ${formatoFecha(p.cotizacion.aceptadaAt, false)}`
+              : p.cotizacion.folioEnviado || p.cotizacion.quoteNumber,
+            state: "done" as const,
+            href: `/erp/cotizaciones/${p.cotizacion.id}`,
+          },
+        ]
+      : []),
     {
       id: "planeado",
       label: "Planeado",
-      hint: p.startDate ? `Inicio ${formatoFecha(p.startDate)}` : "Sin fecha de inicio",
+      hint:
+        !arranco && p.activities.length === 0
+          ? "Falta programar"
+          : p.startDate
+            ? `Inicio ${formatoFecha(p.startDate)}`
+            : "Sin fecha de inicio",
       state: arranco ? "done" : "current",
     },
     {
       id: "curso",
       label: p.status === "ON_HOLD" ? "En pausa" : "En curso",
-      hint: p.actualStartDate ? `Desde ${formatoFecha(p.actualStartDate)}` : "Aún no arranca",
+      hint: p.actualStartDate
+        ? `Desde ${formatoFecha(p.actualStartDate)}`
+        : p.startDate
+          ? `Empieza el ${formatoFecha(p.startDate, false)}`
+          : "Aún no arranca",
       state: termino ? "done" : arranco ? "current" : "pending",
     },
     {
@@ -146,9 +173,10 @@ function pasosDe(p: ProyectoDetalle): RecordStep[] | undefined {
         ? formatoFecha(p.actualEndDate)
         : p.endDate
           ? `Plan ${formatoFecha(p.endDate)}`
-          : "Sin fecha de fin",
+          : "Sin fecha",
       state: termino ? "done" : "pending",
     },
+    ...(p.cotizacion ? pasosDeFacturaYCobro(p.factura, p.cobro, true) : []),
   ];
 }
 
@@ -170,6 +198,7 @@ export default function ProyectoDetallePage() {
   const [confirmacion, setConfirmacion] = useState<ConfirmState | null>(null);
   const [cambio, setCambio] = useState<{ accion: AccionDeEstado; motivo: string; fecha: string } | null>(null);
   const [errorCambio, setErrorCambio] = useState<string | null>(null);
+  const [nuevaActividad, setNuevaActividad] = useState(false);
 
   // ?tab=cronograma abre directo en esa sección.
   useEffect(() => {
@@ -394,6 +423,13 @@ export default function ProyectoDetallePage() {
         ? `Faltan ${r.diasRestantes} día${r.diasRestantes === 1 ? "" : "s"}`
         : undefined;
 
+  const siguiente = siguientePasoDeProyecto(p);
+  const falta = faltaDeProyecto(p);
+  const clienteDeVenta = p.client?.salesClients?.[0]?.id;
+  const aceptada = p.cotizacion?.aceptadaAt
+    ? [formatoFecha(p.cotizacion.aceptadaAt), aceptoEnPalabras(p.cotizacion.aceptadaVia)].filter(Boolean).join(", ")
+    : null;
+
   const datosClave: RecordFact[] = [
     {
       label: "Avance",
@@ -420,6 +456,14 @@ export default function ProyectoDetallePage() {
 
   return (
     <>
+      {seccion ? (
+        <NuevaActividad
+          {...seccion}
+          abierto={nuevaActividad}
+          onCerrar={() => setNuevaActividad(false)}
+          onCreada={() => elegirPestana("actividades")}
+        />
+      ) : null}
       <RecordPage
         className={styles.pagina}
         breadcrumbs={[{ label: "Proyectos", href: "/erp/proyectos" }, { label: p.title }]}
@@ -461,6 +505,24 @@ export default function ProyectoDetallePage() {
         }
         steps={pasosDe(p)}
         tabs={
+          <>
+          {siguiente ? (
+            <section className={styles.siguiente} aria-label="Siguiente paso">
+              <div className={styles.siguienteTexto}>
+                <strong>{siguiente.titulo}</strong>
+                <span>{siguiente.texto}</span>
+              </div>
+              {siguiente.accion === "actividad" ? (
+                <Button variant="primary" disabled={ocupado} onClick={() => setNuevaActividad(true)}>
+                  Nueva actividad
+                </Button>
+              ) : siguiente.accion === "facturar" ? (
+                <ButtonLink variant="primary" href="/erp/contabilidad/por-facturar">
+                  Ir a Por facturar
+                </ButtonLink>
+              ) : null}
+            </section>
+          ) : null}
           <div onKeyDown={teclaEnPestanas} className={styles.pestanas}>
             <Tabs<Pestana>
               ariaLabel="Secciones del proyecto"
@@ -473,6 +535,47 @@ export default function ProyectoDetallePage() {
               onChange={elegirPestana}
             />
           </div>
+          </>
+        }
+        asideTop={
+          p.cotizacion || falta.length ? (
+            <AsideCard title={p.cotizacion ? "De dónde viene" : "Falta"}>
+              {p.cotizacion ? (
+                <KeyFacts
+                  items={[
+                    ...(p.client?.name
+                      ? [
+                          {
+                            label: "Cliente",
+                            value: clienteDeVenta ? <Link href={`/erp/clientes/${clienteDeVenta}`}>{p.client.name}</Link> : p.client.name,
+                          },
+                        ]
+                      : []),
+                    {
+                      label: "Cotización",
+                      value: (
+                        <Link href={`/erp/cotizaciones/${p.cotizacion.id}`} className={styles.folioOrigen}>
+                          {p.cotizacion.folioEnviado || p.cotizacion.quoteNumber}
+                        </Link>
+                      ),
+                    },
+                    ...(aceptada ? [{ label: "Aceptada", value: aceptada }] : []),
+                  ]}
+                />
+              ) : null}
+              {p.cotizacion && falta.length ? <h2 className={styles.faltaTitulo}>Falta</h2> : null}
+              {falta.length ? (
+                <ul className={styles.faltaLista}>
+                  {falta.map((f) => (
+                    <li key={f.etiqueta}>
+                      <span>{f.etiqueta}</span>
+                      <LinkButton onClick={() => elegirPestana(f.pestana)}>Agregar</LinkButton>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </AsideCard>
+          ) : undefined
         }
         factsTitle="Datos clave"
         facts={datosClave}

@@ -10,6 +10,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
 import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import {
   Alert,
   Badge,
@@ -37,18 +38,21 @@ import {
 import { useUser } from "@/components/UserContext";
 import {
   ESTADOS,
-  ESTADO_LABEL,
+  obtenerCotizacion,
   SEGMENTOS,
   SEGMENTO_LABEL,
   formatoFecha,
   formatoMoneda,
   listarCotizaciones,
+  type CotizacionDetalle,
   type CotizacionRow,
   type EstadoCotizacion,
   type Segmento,
 } from "@/lib/cotizaciones-api";
 import { partesDelFolio } from "@/lib/cotizacion-folio";
 import { formatApiError } from "@/lib/erp-api";
+import { diasDesde, medioDeEnvio } from "@/lib/hilo-negocio";
+import { DialogoGanada, DialogoPerdida } from "./_editor/ComoTermino";
 import FolioExplicado from "./_editor/FolioExplicado";
 import styles from "./cotizaciones-core.module.css";
 
@@ -61,6 +65,27 @@ const ROL: Record<string, string> = {
 };
 
 const DIA = 24 * 60 * 60 * 1000;
+
+/** En el orden en que se trabajan: lo que espera respuesta va primero. */
+const FILTROS_DE_ESTADO: Array<{ id: EstadoCotizacion; label: string }> = [
+  { id: "ENVIADA", label: "Por decidir" },
+  { id: "BORRADOR", label: "Por enviar" },
+  { id: "APROBADA", label: "Ganadas" },
+  { id: "RECHAZADA", label: "Perdidas" },
+  { id: "VENCIDA", label: "Vencidas" },
+];
+
+function hace(dias: number | null): string {
+  if (dias === null) return "—";
+  if (dias === 0) return "Hoy";
+  if (dias === 1) return "1 día";
+  return `${dias} días`;
+}
+
+function medioConMayuscula(enviadaPor?: string | null): string {
+  const medio = medioDeEnvio(enviadaPor);
+  return medio ? medio[0]!.toUpperCase() + medio.slice(1) : "—";
+}
 
 /** El folio con sus piezas: clave de quien la hizo, cadena y revisión. */
 function FolioColor({ folio }: { folio: string }) {
@@ -122,7 +147,13 @@ function Intervinieron({ row }: { row: CotizacionRow }) {
 
 /** Vigencia: la fecha límite, cuándo salió y un punto que avisa si ya venció o está por vencer. */
 function Vigencia({ row }: { row: CotizacionRow }) {
-  const salio = row.sentAt ? `enviada ${formatoFecha(row.sentAt)}` : `emitida ${formatoFecha(row.issueDate)}`;
+  const dias = row.estado === "ENVIADA" ? diasDesde(row.sentAt) : null;
+  const salio =
+    dias !== null
+      ? `enviada ${dias === 0 ? "hoy" : dias === 1 ? "ayer" : `hace ${dias} días`}`
+      : row.sentAt
+        ? `enviada ${formatoFecha(row.sentAt)}`
+        : `emitida ${formatoFecha(row.issueDate)}`;
   let tono: Tone = "neutral";
   if (row.estado === "VENCIDA") tono = "danger";
   else if (row.estado === "APROBADA") tono = "success";
@@ -142,6 +173,9 @@ export default function CotizacionesPage() {
   const [q, setQ] = useState("");
   const [segmento, setSegmento] = useState<Segmento | null>(null);
   const [estado, setEstado] = useState<EstadoCotizacion | null>(null);
+  const [soloSinProyecto, setSoloSinProyecto] = useState(false);
+  const [decision, setDecision] = useState<{ tipo: "ganada" | "perdida"; detalle: CotizacionDetalle } | null>(null);
+  const [abriendo, setAbriendo] = useState<number | null>(null);
   const buscador = useRef<HTMLInputElement>(null);
 
   const cargar = useCallback(async () => {
@@ -163,6 +197,32 @@ export default function CotizacionesPage() {
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  // Los avisos de Hoy llegan aquí con el filtro puesto.
+  useEffect(() => {
+    const qs = new URLSearchParams(window.location.search);
+    const pedido = qs.get("estado");
+    if (pedido && (ESTADOS as readonly string[]).includes(pedido)) setEstado(pedido as EstadoCotizacion);
+    if (qs.get("sinProyecto")) setSoloSinProyecto(true);
+  }, []);
+
+  const abrirDecision = async (row: CotizacionRow, tipo: "ganada" | "perdida") => {
+    if (!token) return;
+    setAbriendo(row.id);
+    setError(null);
+    try {
+      setDecision({ tipo, detalle: await obtenerCotizacion(token, row.id) });
+    } catch (e) {
+      setError(formatApiError(e, "No se pudo abrir la cotización"));
+    } finally {
+      setAbriendo(null);
+    }
+  };
+
+  const elegirEstado = (e: EstadoCotizacion | null) => {
+    setSoloSinProyecto(false);
+    setEstado(e);
+  };
 
   // «/» busca, «n» abre una nueva (fuera de campos de texto).
   useEffect(() => {
@@ -201,9 +261,13 @@ export default function CotizacionesPage() {
   const visibles = useMemo(
     () =>
       items.filter(
-        (row) => (!segmento || row.segmento === segmento) && (!estado || row.estado === estado) && coincideTexto(row),
+        (row) =>
+          (!segmento || row.segmento === segmento) &&
+          (!estado || row.estado === estado) &&
+          (!soloSinProyecto || (row.estado === "APROBADA" && !row.proyectoId)) &&
+          coincideTexto(row),
       ),
-    [items, segmento, estado, coincideTexto],
+    [items, segmento, estado, soloSinProyecto, coincideTexto],
   );
 
   const conteoSegmento = useMemo(() => {
@@ -219,17 +283,29 @@ export default function CotizacionesPage() {
   }, [items, segmento, coincideTexto]);
 
   const cifras = useMemo(() => {
-    const sumar = (filtro: (r: CotizacionRow) => boolean) =>
-      visibles.filter(filtro).reduce((acc, r) => acc + Number(r.total || 0), 0);
+    // Por segmento y búsqueda, no por estado: tocar un filtro no debe dejar la tira en ceros.
+    const base = items.filter((r) => (!segmento || r.segmento === segmento) && coincideTexto(r));
+    const de = (e: EstadoCotizacion) => base.filter((r) => r.estado === e);
+    const sumar = (rows: CotizacionRow[]) => rows.reduce((acc, r) => acc + Number(r.total || 0), 0);
+    const inicioDeMes = new Date();
+    inicioDeMes.setDate(1);
+    inicioDeMes.setHours(0, 0, 0, 0);
+    const esteMes = (fecha?: string | null) => Boolean(fecha) && new Date(fecha!).getTime() >= inicioDeMes.getTime();
+    const enviadas = de("ENVIADA");
+    const ganadas = de("APROBADA");
+    const ganadasDelMes = ganadas.filter((r) => esteMes(r.aceptadaAt ?? r.updatedAt));
     return {
-      total: sumar(() => true),
-      enviadas: visibles.filter((r) => r.estado === "ENVIADA").length,
-      porCerrar: sumar((r) => r.estado === "ENVIADA"),
-      aprobadas: sumar((r) => r.estado === "APROBADA"),
-      nAprobadas: visibles.filter((r) => r.estado === "APROBADA").length,
-      borradores: visibles.filter((r) => r.estado === "BORRADOR").length,
+      total: sumar(visibles),
+      borradores: de("BORRADOR").length,
+      enviadas: enviadas.length,
+      porCerrar: sumar(enviadas),
+      sinProyecto: ganadas.filter((r) => !r.proyectoId).length,
+      ganadasDelMes: ganadasDelMes.length,
+      montoDelMes: sumar(ganadasDelMes),
+      // Un borrador descartado también queda rechazado, pero no se perdió con nadie: nunca salió.
+      perdidasDelMes: de("RECHAZADA").filter((r) => r.sentAt && esteMes(r.updatedAt)).length,
     };
-  }, [visibles]);
+  }, [items, visibles, segmento, coincideTexto]);
 
   const viejos = useMemo(() => items.filter((r) => r.necesitaRefolio).length, [items]);
 
@@ -240,7 +316,7 @@ export default function CotizacionesPage() {
     [items],
   );
 
-  const hayFiltros = Boolean(segmento || estado || q.trim());
+  const hayFiltros = Boolean(segmento || estado || soloSinProyecto || q.trim());
   /** El esqueleto solo en la primera carga: al refrescar, la lista se queda. */
   const primeraCarga = cargando && items.length === 0;
   /** Vacío de verdad: cero registros, no «las cifras dieron cero» (regla 7). */
@@ -249,7 +325,7 @@ export default function CotizacionesPage() {
   const quitarFiltros = () => {
     setQ("");
     setSegmento(null);
-    setEstado(null);
+    elegirEstado(null);
   };
 
   const totalEstados = ESTADOS.reduce((a, e) => a + (conteoEstado[e] ?? 0), 0);
@@ -325,6 +401,60 @@ export default function CotizacionesPage() {
     },
   ];
 
+  /** Por decidir: lo único que importa es qué dijo el cliente, y se contesta desde la fila. */
+  const columnasPorDecidir: Column<CotizacionRow>[] = [
+    {
+      key: "cotizacion",
+      label: "Cotización",
+      render: (row) => (
+        <span className={styles.celda}>
+          <Link href={`/erp/cotizaciones/${row.id}`} className={styles.fuerte} onClick={(e) => e.stopPropagation()}>
+            {row.projectName || row.clienteEmpresa || row.clienteNombre || row.folio}
+          </Link>
+          <span className={styles.tenue}>{row.clienteEmpresa || row.clienteNombre || row.folio}</span>
+        </span>
+      ),
+    },
+    { key: "medio", label: "Salió por", render: (row) => medioConMayuscula(row.enviadaPor) },
+    { key: "esperando", label: "Esperando", render: (row) => hace(diasDesde(row.sentAt)) },
+    {
+      key: "total",
+      label: "Total",
+      numeric: true,
+      render: (row) => <span className={styles.total}>{formatoMoneda(row.total, row.currency ?? "MXN")}</span>,
+    },
+    {
+      key: "termino",
+      label: "¿Cómo terminó?",
+      render: (row) => (
+        <span className={styles.comoTermino}>
+          <Button
+            size="sm"
+            variant="tonal"
+            loading={abriendo === row.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              void abrirDecision(row, "ganada");
+            }}
+          >
+            Ganada
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={abriendo === row.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              void abrirDecision(row, "perdida");
+            }}
+          >
+            Perdida
+          </Button>
+        </span>
+      ),
+    },
+  ];
+
   const nueva = (
     <ButtonLink variant="primary" href="/erp/cotizaciones/nueva" iconStart={<AddRoundedIcon />} kbd="N">
       Nueva cotización
@@ -338,18 +468,37 @@ export default function CotizacionesPage() {
         className={styles.tabla}
         ariaLabel="Cotizaciones"
         caption="Cotizaciones"
-        columns={columnas}
+        columns={estado === "ENVIADA" ? columnasPorDecidir : columnas}
         rows={visibles}
         rowKey={(row) => row.id}
         onRowClick={(row) => router.push(`/erp/cotizaciones/${row.id}`)}
         loading={cargando}
         stickyHeader={false}
         rowActionsLabel="Abrir"
-        rowActions={(row) => (
-          <ButtonLink size="sm" variant="ghost" href={`/erp/cotizaciones/${row.id}`} aria-label={`Abrir ${row.folio}`}>
-            Abrir
-          </ButtonLink>
-        )}
+        rowActions={
+          estado === "ENVIADA"
+            ? undefined
+            : (row) => (
+                <>
+                  {row.estado === "APROBADA" && !row.proyectoId ? (
+                    <Button
+                      size="sm"
+                      variant="tonal"
+                      loading={abriendo === row.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void abrirDecision(row, "ganada");
+                      }}
+                    >
+                      Crear proyecto
+                    </Button>
+                  ) : null}
+                  <ButtonLink size="sm" variant="ghost" href={`/erp/cotizaciones/${row.id}`} aria-label={`Abrir ${row.folio}`}>
+                    Abrir
+                  </ButtonLink>
+                </>
+              )
+        }
       />
     );
   } else if (items.length) {
@@ -364,6 +513,7 @@ export default function CotizacionesPage() {
   }
 
   return (
+    <>
     <ModulePage
       className={styles.wrap}
       title="Cotizaciones"
@@ -392,25 +542,46 @@ export default function CotizacionesPage() {
         items.length ? (
           <StatRow ariaLabel="Resumen de cotizaciones">
             <Stat
-              label="En la vista"
-              icon={<RequestQuoteOutlinedIcon />}
-              value={formatoMoneda(cifras.total)}
-              hint={hayFiltros ? `${visibles.length} de ${items.length} cotizaciones` : `${items.length} cotizaciones`}
+              label="Por enviar"
+              icon={<EditNoteOutlinedIcon />}
+              iconTone="neutral"
+              value={cifras.borradores}
+              hint="Borradores vigentes"
+              onClick={() => elegirEstado("BORRADOR")}
             />
-            <Stat label="Borradores" icon={<EditNoteOutlinedIcon />} iconTone="neutral" value={cifras.borradores} hint="por terminar" />
             <Stat
-              label="Enviadas por cerrar"
+              label="Por decidir"
               icon={<SendOutlinedIcon />}
-              value={formatoMoneda(cifras.porCerrar)}
-              hint={cifras.enviadas === 1 ? "1 enviada" : `${cifras.enviadas} enviadas`}
+              value={cifras.enviadas}
+              hint={cifras.enviadas ? `${formatoMoneda(cifras.porCerrar)} sin respuesta registrada` : "Enviadas, sin respuesta registrada"}
               tone="brand"
+              onClick={() => elegirEstado("ENVIADA")}
             />
             <Stat
-              label="Aprobadas"
+              label="Ganadas sin proyecto"
+              icon={<AccountTreeOutlinedIcon />}
+              iconTone="neutral"
+              value={cifras.sinProyecto}
+              hint={cifras.sinProyecto ? "Falta crearlo" : "Todas tienen proyecto"}
+              onClick={() => {
+                elegirEstado("APROBADA");
+                setSoloSinProyecto(true);
+              }}
+            />
+            <Stat
+              label="Ganadas este mes"
               icon={<TaskAltOutlinedIcon />}
               iconTone="success"
-              value={formatoMoneda(cifras.aprobadas)}
-              hint={cifras.nAprobadas === 1 ? "1 aprobada" : `${cifras.nAprobadas} aprobadas`}
+              value={cifras.ganadasDelMes}
+              hint={[
+                cifras.ganadasDelMes ? formatoMoneda(cifras.montoDelMes) : null,
+                cifras.perdidasDelMes
+                  ? `${cifras.ganadasDelMes ? "y" : "Y"} ${cifras.perdidasDelMes} ${cifras.perdidasDelMes === 1 ? "perdida" : "perdidas"}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" ") || "Ninguna todavía"}
+              onClick={() => elegirEstado("APROBADA")}
             />
           </StatRow>
         ) : null
@@ -466,24 +637,34 @@ export default function CotizacionesPage() {
           }
           chips={
             <FilterChips ariaLabel="Filtrar por estado">
-              <FilterChip active={!estado} count={totalEstados} onClick={() => setEstado(null)}>
+              <FilterChip active={!estado} count={totalEstados} onClick={() => elegirEstado(null)}>
                 Todas
               </FilterChip>
-              {ESTADOS.map((e) => (
+              {FILTROS_DE_ESTADO.map((f) => (
                 <FilterChip
-                  key={e}
-                  active={estado === e}
-                  count={conteoEstado[e] ?? 0}
-                  dot={statusTone(e).tone}
-                  onClick={() => setEstado(estado === e ? null : e)}
+                  key={f.id}
+                  active={estado === f.id}
+                  count={conteoEstado[f.id] ?? 0}
+                  dot={statusTone(f.id).tone}
+                  onClick={() => elegirEstado(estado === f.id ? null : f.id)}
                 >
-                  {ESTADO_LABEL[e]}
+                  {f.label}
                 </FilterChip>
               ))}
+              {soloSinProyecto ? (
+                <FilterChip active onRemove={() => setSoloSinProyecto(false)}>
+                  Sin proyecto
+                </FilterChip>
+              ) : null}
             </FilterChips>
           }
           end={
             <>
+              {hayFiltros ? (
+                <span className={styles.tenue}>
+                  {visibles.length} de {items.length} · {formatoMoneda(cifras.total)}
+                </span>
+              ) : null}
               {hayFiltros ? (
                 <Button size="sm" variant="ghost" onClick={quitarFiltros}>
                   Quitar filtros
@@ -521,5 +702,27 @@ export default function CotizacionesPage() {
     >
       {contenido}
     </ModulePage>
+    {decision?.tipo === "ganada" ? (
+      <DialogoGanada
+        detalle={decision.detalle}
+        onCerrar={() => setDecision(null)}
+        onSinProyecto={(mensaje) => {
+          setDecision(null);
+          setError(mensaje);
+          void cargar();
+        }}
+      />
+    ) : null}
+    {decision?.tipo === "perdida" ? (
+      <DialogoPerdida
+        detalle={decision.detalle}
+        onCerrar={() => setDecision(null)}
+        onHecho={() => {
+          setDecision(null);
+          void cargar();
+        }}
+      />
+    ) : null}
+    </>
   );
 }

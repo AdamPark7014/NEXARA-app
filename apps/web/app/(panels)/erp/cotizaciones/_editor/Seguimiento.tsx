@@ -7,7 +7,7 @@ import ForwardToInboxOutlinedIcon from "@mui/icons-material/ForwardToInboxOutlin
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import { Alert, Button, Select, Textarea, Timeline, TimelineItem } from "@/components/base";
 import {
-  aprobarCotizacion,
+  obtenerCotizacion,
   asignarCotizacion,
   companerosQueCotizan,
   formatoFecha,
@@ -22,6 +22,7 @@ import {
 import { formatApiError } from "@/lib/erp-api";
 import { Ayuda, Campo } from "./campos";
 import Dialogo from "./Dialogo";
+import { DialogoGanada, DialogoPerdida } from "./ComoTermino";
 import FolioExplicado from "./FolioExplicado";
 import styles from "./editor.module.css";
 
@@ -47,6 +48,7 @@ export default function Seguimiento({
   onAviso: (m: string) => void;
 }) {
   const [rechazo, setRechazo] = useState<string | null>(null);
+  const [decidir, setDecidir] = useState<"ganada" | "perdida" | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [traspaso, setTraspaso] = useState(false);
   const [companeros, setCompaneros] = useState<CompaneroQueCotiza[] | null>(null);
@@ -112,9 +114,14 @@ export default function Seguimiento({
           <p className={styles.ayudaSeccion}>Historial, folio y decisiones; no va en el PDF.</p>
         </div>
         <div className={styles.hojaAcciones}>
-          {estado === "ENVIADA" || estado === "BORRADOR" ? (
+          {estado === "BORRADOR" ? (
             <Button size="sm" variant="danger-ghost" disabled={ocupado} onClick={() => setRechazo("")}>
-              {estado === "BORRADOR" ? "Descartar" : "Marcar rechazada"}
+              Descartar
+            </Button>
+          ) : null}
+          {estado === "ENVIADA" ? (
+            <Button size="sm" variant="danger-ghost" disabled={ocupado} onClick={() => setDecidir("perdida")}>
+              La perdimos
             </Button>
           ) : null}
           {!detalle.bloqueada ? (
@@ -142,9 +149,9 @@ export default function Seguimiento({
               variant="tonal"
               iconStart={<TaskAltOutlinedIcon />}
               disabled={ocupado}
-              onClick={() => void hacer(() => aprobarCotizacion(token!, detalle.id), "Cotización aprobada.")}
+              onClick={() => setDecidir("ganada")}
             >
-              Aprobar
+              La ganamos
             </Button>
           ) : null}
         </div>
@@ -330,9 +337,32 @@ export default function Seguimiento({
         </Dialogo>
       ) : null}
 
+      {decidir === "ganada" ? (
+        <DialogoGanada
+          detalle={detalle}
+          onCerrar={() => setDecidir(null)}
+          onSinProyecto={(mensaje) => {
+            setDecidir(null);
+            onError(mensaje);
+            if (token) void obtenerCotizacion(token, detalle.id).then(onDetalle).catch(() => undefined);
+          }}
+        />
+      ) : null}
+      {decidir === "perdida" ? (
+        <DialogoPerdida
+          detalle={detalle}
+          onCerrar={() => setDecidir(null)}
+          onHecho={(d) => {
+            setDecidir(null);
+            onDetalle(d);
+            onAviso("Quedó como perdida, con su motivo.");
+          }}
+        />
+      ) : null}
+
       {rechazo !== null ? (
         <Dialogo
-          titulo={estado === "BORRADOR" ? "Descartar la cotización" : "El cliente la rechazó"}
+          titulo="Descartar la cotización"
           onCerrar={() => setRechazo(null)}
           ocupado={ocupado}
           pie={
@@ -347,7 +377,7 @@ export default function Seguimiento({
                 onClick={async () => {
                   const ok = await hacer(
                     () => rechazarCotizacion(token!, detalle.id, rechazo.trim()),
-                    "Cotización marcada como rechazada.",
+                    "Cotización descartada.",
                   );
                   if (ok) setRechazo(null);
                 }}

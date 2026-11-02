@@ -1,5 +1,6 @@
 "use client";
 
+import PreguntaProyecto from "@/components/costos/PreguntaProyecto";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
@@ -675,6 +676,7 @@ function Contenido({
                     Abrir
                   </ButtonLink>
                 </div>
+                <PreguntaProyecto activityId={est.creada.id} />
               </div>
             );
           }

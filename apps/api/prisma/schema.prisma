@@ -2537,6 +2537,9 @@ model Cotizacion {
   sentAt          DateTime?
   /// Cómo salió: CORREO_CORE | WHATSAPP | CORREO_EXTERNO | EN_PERSONA | OTRO. Casi todas salen por fuera.
   enviadaPor      String?                  @db.VarChar(20)
+  /// Cómo aceptó el cliente una cotización ganada: FIRMA | WHATSAPP | CORREO | EN_PERSONA.
+  aceptadaVia     String?                  @db.VarChar(20)
+  aceptadaAt      DateTime?
   /// Ya se le preguntó a su autor si la mandó (borrador de más de 48 h).
   borradorAvisadoAt DateTime?
   /// Cuántas veces se ha preguntado si ya hubo respuesta desde el último envío.

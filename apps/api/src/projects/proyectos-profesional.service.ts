@@ -23,6 +23,7 @@ import {
 } from '../common/tenant/tenant-scope.js';
 import { fueraDeAlcance, mensajeFueraDeAlcance } from './proyecto-equipo-alcance.js';
 import { marcarClienteDeProyectoSinFallar } from './cliente-de-proyecto.js';
+import { FACTURACION_VACIA, facturacionDe } from '../cotizaciones/hilo-negocio.js';
 import { periodoDto } from '../activities/actividad-periodo.js';
 import { esCerrada } from '../activities/actividad-tiempos.js';
 import type { Alcanzador } from '../me/equipo-alcance.js';
@@ -57,10 +58,18 @@ const personaSelect = { id: true, nombre: true, email: true, avatarUrl: true } a
 const detalleInclude = {
   vendor: { select: personaSelect },
   responsable: { select: personaSelect },
-  client: { select: { id: true, name: true, contactEmail: true, contactPhone: true } },
+  client: {
+    select: {
+      id: true,
+      name: true,
+      contactEmail: true,
+      contactPhone: true,
+      salesClients: { select: { id: true }, take: 1, orderBy: { id: 'asc' as const } },
+    },
+  },
   salesProject: { select: { id: true, name: true, status: true } },
   cotizacion: {
-    select: { id: true, quoteNumber: true, status: true, total: true, currency: true, folioEnviado: true },
+    select: { id: true, quoteNumber: true, status: true, total: true, currency: true, folioEnviado: true, aceptadaVia: true, aceptadaAt: true },
   },
   milestones: {
     include: { responsable: { select: personaSelect } },
@@ -226,8 +235,18 @@ export class ProyectosProfesionalService {
 
     const p = proyecto as NonNullable<typeof proyecto>;
     const ahora = new Date();
+    const facturacion = p.cotizacionId
+      ? facturacionDe(
+          await this.prisma.invoice.findMany({
+            where: { cotizacionId: p.cotizacionId, deletedAt: null },
+            orderBy: { id: 'asc' },
+            select: { id: true, status: true, isCancelled: true, invoiceNumber: true, cfdiSerie: true, cfdiFolio: true, paidAmount: true },
+          }),
+        )
+      : FACTURACION_VACIA;
     return {
       ...p,
+      ...facturacion,
       budgetAmount: p.budgetAmount == null ? null : Number(p.budgetAmount),
       cotizacion: p.cotizacion
         ? { ...p.cotizacion, total: p.cotizacion.total == null ? null : Number(p.cotizacion.total) }

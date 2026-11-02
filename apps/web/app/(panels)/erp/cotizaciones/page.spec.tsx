@@ -124,9 +124,63 @@ describe("lista de cotizaciones", () => {
 
     await user.click(within(segmentos).getByRole("button", { name: /Todos/ }));
     const estados = screen.getByRole("group", { name: "Filtrar por estado" });
-    await user.click(within(estados).getByRole("button", { name: /Enviada/ }));
+    await user.click(within(estados).getByRole("button", { name: /Por decidir/ }));
     expect(screen.getByText("Plaza Norte")).toBeInTheDocument();
     expect(screen.queryByText("Hotel Centro")).not.toBeInTheDocument();
+  });
+
+  it("Por decidir: se contesta desde la fila, con cómo salió y cuánto lleva esperando", async () => {
+    const hace = (dias: number) => new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => json([{ ...FILAS[0], enviadaPor: "WHATSAPP", sentAt: hace(6) }, FILAS[1]])),
+    );
+    const user = userEvent.setup();
+    render(<CotizacionesPage />);
+    await screen.findByText("Plaza Norte");
+
+    await user.click(within(screen.getByRole("group", { name: "Filtrar por estado" })).getByRole("button", { name: /Por decidir/ }));
+    expect(screen.getByRole("columnheader", { name: "¿Cómo terminó?" })).toBeInTheDocument();
+    expect(screen.getByText("Renovación del CCTV")).toBeInTheDocument();
+    expect(screen.getByText("WhatsApp")).toBeInTheDocument();
+    expect(screen.getByText("6 días")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ganada" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Perdida" })).toBeInTheDocument();
+  });
+
+  it("la tira no se queda en ceros al filtrar y dice lo que falta", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json([
+          ...FILAS,
+          { ...FILAS[0], id: 8, estado: "APROBADA", estadoEtiqueta: "Ganada", clienteNombre: "Cliente A", proyectoId: null, aceptadaAt: new Date().toISOString() },
+          { ...FILAS[0], id: 9, estado: "APROBADA", estadoEtiqueta: "Ganada", clienteNombre: "Cliente B", proyectoId: 4, aceptadaAt: new Date().toISOString() },
+        ]),
+      ),
+    );
+    const user = userEvent.setup();
+    render(<CotizacionesPage />);
+    await screen.findByText("Plaza Norte");
+
+    const tira = screen.getByLabelText("Resumen de cotizaciones");
+    expect(within(tira).getByText("Ganadas sin proyecto")).toBeInTheDocument();
+    expect(within(tira).getByText("Falta crearlo")).toBeInTheDocument();
+
+    await user.click(within(tira).getByText("Ganadas sin proyecto"));
+    expect(screen.getByText("Cliente A")).toBeInTheDocument();
+    expect(screen.queryByText("Cliente B")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Crear proyecto" })).toBeInTheDocument();
+    expect(within(tira).getByText("Falta crearlo")).toBeInTheDocument();
+  });
+
+  it("los avisos de Hoy llegan con el filtro puesto", async () => {
+    window.history.replaceState({}, "", "/erp/cotizaciones?estado=ENVIADA");
+    vi.stubGlobal("fetch", vi.fn(async () => json(FILAS)));
+    render(<CotizacionesPage />);
+    await screen.findByText("Plaza Norte");
+    expect(screen.queryByText("Hotel Centro")).not.toBeInTheDocument();
+    window.history.replaceState({}, "", "/erp/cotizaciones");
   });
 
   it("busca también por quién intervino", async () => {

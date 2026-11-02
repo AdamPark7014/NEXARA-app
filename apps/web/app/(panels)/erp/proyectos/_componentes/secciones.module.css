@@ -413,3 +413,48 @@ a.tituloFila:hover {
     flex: 1 0 100%;
   }
 }
+
+/* Nueva actividad: lo que hereda del proyecto, para que se vea sin capturarlo. */
+.heredado {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 var(--ui-s3);
+  padding: var(--ui-s2) var(--ui-s3);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-brand-bg, var(--ui-surface));
+  font-size: 13.5px;
+}
+
+.heredado > div {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+  gap: var(--ui-s2);
+  align-items: baseline;
+}
+
+.heredado dt {
+  color: var(--ui-fg-2);
+}
+
+.heredado dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.heredado span {
+  color: var(--ui-fg-2);
+  font-size: 12px;
+}
+
+.dosCampos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-s3);
+}
+
+@media (max-width: 560px) {
+  .dosCampos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

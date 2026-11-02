@@ -474,7 +474,7 @@ export class ActivitiesService {
             salesClients: { select: { id: true, name: true }, take: 1, orderBy: { id: 'asc' } },
           },
         },
-        project: { select: { id: true, title: true } },
+        project: { select: { id: true, title: true, cotizacion: { select: { id: true, quoteNumber: true } } } },
         projectMilestone: { select: { id: true, name: true } },
         serviceSheet: true,
         // Actividad comercial: su cotización, para abrirla desde el detalle.

@@ -113,6 +113,11 @@ export class CreateProjectActivityDto {
   @IsOptional()
   @IsString()
   branchNumber?: string;
+
+  /** Día en que toca, `YYYY-MM-DD`. */
+  @IsOptional()
+  @IsDateString()
+  fecha?: string;
 }
 
 export class RemoveProjectEngineerDto {

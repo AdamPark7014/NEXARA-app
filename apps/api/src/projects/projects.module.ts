@@ -9,10 +9,13 @@ import { ProyectoProgramacionService } from './proyecto-programacion.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { ActivitiesModule } from '../activities/activities.module';
+import { CotizacionesModule } from '../cotizaciones/cotizaciones.module';
+import { CotizacionGanadaController } from './cotizacion-ganada.controller';
+import { CotizacionGanadaService } from './cotizacion-ganada.service';
 
 @Module({
-  imports: [PrismaModule, RealtimeModule, ActivitiesModule],
-  controllers: [ProjectsController, OperationalProjectsController, ProyectosProfesionalController],
-  providers: [ProjectsService, OperationalProjectsService, ProyectosProfesionalService, ProyectoProgramacionService],
+  imports: [PrismaModule, RealtimeModule, ActivitiesModule, CotizacionesModule],
+  controllers: [ProjectsController, OperationalProjectsController, ProyectosProfesionalController, CotizacionGanadaController],
+  providers: [ProjectsService, OperationalProjectsService, ProyectosProfesionalService, ProyectoProgramacionService, CotizacionGanadaService],
 })
 export class ProjectsModule {}
