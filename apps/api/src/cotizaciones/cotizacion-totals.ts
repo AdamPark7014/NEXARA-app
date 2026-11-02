@@ -289,6 +289,16 @@ function decimalJsANumero(o: { s?: number; e: number; d: number[] }): number | n
  * de la cotización (`Cotizacion.marginPercent`), que sigue sin ser un markup por renglón: se aplica
  * después, sobre el total ya con IVA (ver `calculateTotals`).
  */
+const LARGO_COLUMNA = 120;
+
+/** Lo que no cupo en el modelo no se pierde: pasa a la descripción de la partida. */
+function descripcionConModelo(item: Pick<RawCotizacionItem, 'description' | 'model'>): string | null {
+  const descripcion = item.description?.trim() || '';
+  const modelo = item.model?.trim() || '';
+  if (modelo.length <= LARGO_COLUMNA || descripcion.includes(modelo)) return descripcion || null;
+  return descripcion ? `${descripcion}\n${modelo}` : modelo;
+}
+
 export function normalizeItems(
   items: RawCotizacionItem[] | undefined | null,
 ): NormalizedCotizacionItem[] {
@@ -313,6 +323,11 @@ export function normalizeItems(
     if (!Number.isFinite(n)) return null;
     return Math.round(n);
   };
+  /**
+   * Las columnas de texto corto tienen tope, y quien cotiza pega fichas enteras donde va el modelo:
+   * 72 guardados fallaron con «value too long» y la persona seguía capturando sin que se guardara.
+   */
+  const corto = (value: string | null | undefined, largo: number) => value?.trim().slice(0, largo).trim() || null;
 
   return items.map((item) => {
     const supplierCode = inferSupplierCode({
@@ -339,33 +354,33 @@ export function normalizeItems(
     return {
       productId: item.productId ? entero(item.productId) || null : null,
       grupo: item.grupo?.trim().toUpperCase().replace(/[\s-]+/g, '_') || null,
-      paqueteClave: item.paqueteClave?.trim() || null,
+      paqueteClave: corto(item.paqueteClave, 60),
       paqueteCantidad: enteroONulo(item.paqueteCantidad),
-      category: item.category?.trim() || 'Otros',
+      category: corto(item.category, 120) || 'Otros',
       name: item.name?.trim() || 'Concepto',
       partida: item.partida?.trim().slice(0, 16) || null,
-      description: item.description?.trim() || null,
+      description: descripcionConModelo(item),
       scope: item.scope?.trim() || null,
-      brand: item.brand?.trim() || null,
+      brand: corto(item.brand, LARGO_COLUMNA),
       imagenUrl: typeof item.imagenUrl === 'string' ? item.imagenUrl.trim().slice(0, 500) || null : null,
-      model: item.model?.trim() || null,
-      sku: item.sku?.trim() || null,
-      partNumber: item.partNumber?.trim() || null,
-      batchReference: item.batchReference?.trim() || null,
-      unit: item.unit?.trim() || 'pieza',
+      model: corto(item.model, LARGO_COLUMNA),
+      sku: corto(item.sku, LARGO_COLUMNA),
+      partNumber: corto(item.partNumber, LARGO_COLUMNA),
+      batchReference: corto(item.batchReference, LARGO_COLUMNA),
+      unit: corto(item.unit, 40) || 'pieza',
       qty: Math.max(1, entero(item.qty, 1)),
       unitPrice,
       unitCost: pricing.unitCost,
       supplierId: item.supplierId ? entero(item.supplierId) || null : null,
-      supplierSku: item.supplierSku?.trim() || null,
+      supplierSku: corto(item.supplierSku, LARGO_COLUMNA),
       productCtId: item.productCtId ? entero(item.productCtId) || null : null,
       supplierCode: pricing.supplierCode,
       supplierWarehouseCode: item.supplierWarehouseCode?.trim()?.slice(0, 10) || null,
       marginPercent: margenPartida,
       stockSnapshot: enteroONulo(item.stockSnapshot),
       leadTimeDays: enteroONulo(item.leadTimeDays),
-      scoreReason: item.scoreReason?.trim() || null,
-      optimizationMode: item.optimizationMode?.trim() || null,
+      scoreReason: corto(item.scoreReason, 40),
+      optimizationMode: corto(item.optimizationMode, 20),
       discount: entero(percent(item.discount)),
       tax: entero(taxProvided ? taxPercent! : pricing.taxPercent),
       ieps: entero(percent(item.ieps)),
@@ -373,8 +388,8 @@ export function normalizeItems(
       laborHours: Math.max(0, Number(item.laborHours) || 0),
       laborRate: Math.max(0, Number(item.laborRate) || 0),
       warrantyMonths: Math.max(0, entero(item.warrantyMonths, 0)),
-      deliveryTime: item.deliveryTime?.trim() || null,
-      countryOrigin: item.countryOrigin?.trim() || null,
+      deliveryTime: corto(item.deliveryTime, LARGO_COLUMNA),
+      countryOrigin: corto(item.countryOrigin, 80),
       notes: item.notes?.trim() || null,
     };
   });

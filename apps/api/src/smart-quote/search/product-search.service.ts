@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { CT_WAREHOUSE_OPTIONS, type CtWarehouseOption, stockAtPreferredWarehouse } from '../ct-warehouses.js';
 import { CtCatalogSyncService, costMxn, sumStock } from '../sync/ct-catalog-sync.service.js';
 import { scoreProducts, type OptimizeMode, type ScoredOffer } from '../scoring/quote-scoring.js';
+import { variantesDeAcento } from '../../cotizaciones/partidas-frecuentes.js';
 
 /** Campos mínimos para ranking/UI — evita jalar especificaciones pesadas. */
 const SEARCH_SELECT = {
@@ -39,19 +40,21 @@ const PRODUCT_DETAIL_SELECT = {
 type SearchRow = Prisma.ProductCTGetPayload<{ select: typeof SEARCH_SELECT }>;
 
 function looksLikeSku(q: string) {
-  return /^[A-Za-z0-9][A-Za-z0-9._-]{1,24}$/.test(q) && !/\s/.test(q);
+  // Con cifra: «domo» es una palabra, y buscarla solo en la clave no encontraba nada.
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{1,24}$/.test(q) && !/\s/.test(q) && /\d/.test(q);
 }
 
 function tokenOrFields(token: string): Prisma.ProductCTWhereInput {
   // Campos indexables / útiles; sin descripcion/categoría (más lentos y ruidosos).
+  // «camara» también encuentra «Cámara»: `contains` ignora mayúsculas, no acentos.
   return {
-    OR: [
-      { clave: { contains: token, mode: 'insensitive' } },
-      { numParte: { contains: token, mode: 'insensitive' } },
-      { nombre: { contains: token, mode: 'insensitive' } },
-      { modelo: { contains: token, mode: 'insensitive' } },
-      { marca: { contains: token, mode: 'insensitive' } },
-    ],
+    OR: variantesDeAcento(token.toLowerCase()).flatMap((variante) => [
+      { clave: { contains: variante, mode: 'insensitive' as const } },
+      { numParte: { contains: variante, mode: 'insensitive' as const } },
+      { nombre: { contains: variante, mode: 'insensitive' as const } },
+      { modelo: { contains: variante, mode: 'insensitive' as const } },
+      { marca: { contains: variante, mode: 'insensitive' as const } },
+    ]),
   };
 }
 

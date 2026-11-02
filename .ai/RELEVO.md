@@ -1,5 +1,19 @@
 # RELEVO
 
+- **01-11 ~18:30 (claude-code) — «Cotizar con IA»: el motor en la API y el guardado que fallaba (sin cambios en pantalla todavía).**
+  - Pedido de Adam: cotizaciones de 10 minutos o menos, con muy pocos tokens. **Lo visual espera su visto bueno.** Muestra privada: https://claude.ai/artifact/TPCc7b8VqRLEHsG26j1y3x (trae clientes reales: nunca al repo).
+  - **Dónde se va el tiempo** (`CotizacionItem BULK_CREATE` de `audit_logs` trae cada foto de las partidas; 707 min activos en 56 cotizaciones): encabezado y textos 26 %, costo/margen/precio 23 %, agregar partida 17 %, **guardados que fallaron 11 %**, marca/modelo 7 %. Con 8+ partidas: costo/margen/precio 31 %, agregar 23 %, marca/modelo 14 %, y una partida nueva cuesta p50 0.94 min. Lo que pasa fuera del editor (buscar precios) no se ve aquí.
+  - Otros datos: 24 % de las partidas ya se habían cotizado; solo 18 % de los modelos está en CT (`productos_ct`: 6,025, sin datos de Syscom); 0 de 197 partidas salieron de un paquete o de CT; 7 de 52 cotizaciones repiten 80 % de otra; 19 de 56 son «A QUIEN CORRESPONDA»; 16 tuvieron que poner en 0 el margen general de 20 %. Hay filas de Excel pegadas enteras en `model`: la lista pegada es el flujo real.
+  - **`POST /api/cotizaciones/interpretar`** (`COTIZACIONES_ACCESS`; no guarda nada):
+    - `cotizaciones/cotizar-frase.ts`: lee listas pegadas (tabuladores, viñetas, «x14», precios) y frases por código. Lista = 0 tokens; frase = 0 tokens solo si reconoce todo.
+    - `ai/cotizar/cotizar-ia.ts`: a Claude **solo le llega la frase**; devuelve cliente, proyecto y renglones. Ningún catálogo, cliente ni precio viaja. Si falla, queda lo que leyó el código con un aviso.
+    - `cotizaciones/emparejar-partidas.ts`: empareja con lo ya cotizado, paquetes, formato V2 y CT. **Solo se autollena lo seguro** (marca, modelo y cifras pedidas en el título; del mayorista además debe abrir el nombre y sin empates). Lo demás queda como opciones a un clic, sin meter precio: la primera versión eligió un rack para «tornillo» y una bobina para «cable para bocina».
+    - También: complementos (`REGLAS_COMPLEMENTO`, solo se ofrecen) y cotización casi igual (`parecida`).
+  - **Guardado:** `normalizeItems` recorta a su columna lo que se pega (72 `PUT_FAIL` «value too long», la persona seguía capturando sin guardar). El modelo que no cabe pasa a la descripción. La bitácora no dice qué columna era: el modelo es lo probable, por eso se cubren todas las cortas.
+  - **Buscador de CT:** `looksLikeSku` pide cifra y `tokenOrFields` tolera acentos. Antes, escribir «domo» solo buscaba en la clave y «camara» no hallaba «Cámara».
+  - **Eval** `npm run eval:cotizar -w apps/api` (Haiku 5.5 low): muestra 24/24; **real** (`--real C:\dev\secrets\nexara\cotizar-eval-2026-11\cotizar-real.json`, 40 frases escritas a partir de cotizaciones reales, cada una solo ve lo cotizado antes): 38/40 perfectas, clientes 40/40, renglones 150/151, modelos 17/17. p50 1.2 s, p95 2.1 s, **US$0.00011 por llamada** (1,430 de entrada, 175 de salida). Se autollena 21 %, 59 % queda a un clic y 20 % es renglón libre. El autollenado se revisó a mano. Las frases las escribió el agente, no son dictados de quien cotiza.
+  - **Falta:** con su visto bueno, la caja y la tarjeta en `_editor/`; margen que se hereda en la tabla; prueba cronometrada de 8 partidas; verificar con sesión. Follow-up a proponer: otro mayorista en el catálogo. Solo 18 % de los modelos está en CT y muchos nombres parecen de Syscom (sin confirmar con quien cotiza), así que buscar esos precios sigue siendo fuera del editor.
+
 - **01-11 ~19:00 (claude-code) — Diseñador de videovigilancia, fase 1 de la mejora premium: maqueta 3D con WebGL, plano técnico y vista de noche.**
   - Adam aprobó la propuesta y el aspecto («Aprobado, empieza»). Lienzo: <https://claude.ai/artifact/PoFrsCNRTWxHrDDYQDAWeY>. Detalle técnico en
     `docs/DISENADOR-CCTV.md` §4.1 y §10 (fases 8 a 11 ya apuntadas).

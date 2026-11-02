@@ -1,0 +1,199 @@
+import {
+  candidatosDeUsadas,
+  complementosDe,
+  consultasDeCatalogo,
+  emparejar,
+  palabrasDePartida,
+  type CandidatoPartida,
+} from './emparejar-partidas';
+
+const candidato = (name: string, datos: Partial<CandidatoPartida> = {}): CandidatoPartida => ({
+  fuente: 'usada',
+  name,
+  description: null,
+  brand: null,
+  model: null,
+  unit: 'Pieza',
+  unitCost: null,
+  unitPrice: 100,
+  grupo: null,
+  imagenUrl: null,
+  veces: 1,
+  ultimaVez: null,
+  stock: null,
+  productCtId: null,
+  cotizaciones: [],
+  ...datos,
+});
+
+describe('palabrasDePartida', () => {
+  it('une plurales, acentos y sinónimos', () => {
+    expect(palabrasDePartida('Cámaras Bullet')).toEqual(['camara', 'bala']);
+    expect(palabrasDePartida('Switches de 48 puertos')).toEqual(['switch', '48', 'puerto']);
+    expect(palabrasDePartida('Punto de acceso')).toEqual(['ap']);
+    expect(palabrasDePartida('Discos duros de 6 teras')).toEqual(['disco', '6', 'tera']);
+    expect(palabrasDePartida('6 TB')).toEqual(['6tb']);
+    expect(palabrasDePartida('cable categoría 6')).toEqual(['cable', 'cat6']);
+    expect(palabrasDePartida('NVR de 32 canales')).toEqual(['nvr', '32', 'canal']);
+  });
+
+  it('un modelo con guion es una palabra; «Licencia-20» son dos', () => {
+    expect(palabrasDePartida('TL-SG1428PE')).toEqual(['tl-sg1428pe']);
+    expect(palabrasDePartida('Licencia-20 checadores')).toEqual(['licencia', '20', 'asistencia']);
+  });
+});
+
+describe('emparejar', () => {
+  it('elige sola lo que coincide completo', () => {
+    const r = emparejar('NVR 32 canales', [candidato('NVR 32 canales 4K', { model: 'DS-7632' }), candidato('NVR 64 canales', { model: 'DS-7664' })]);
+    expect(r.seguridad).toBe('alta');
+    expect(r.elegida?.model).toBe('DS-7632');
+  });
+
+  it('una cifra pedida no se ignora: si no está, solo se ofrece', () => {
+    const r = emparejar('NVR 32 canales', [candidato('NVR 64 canales', { model: 'DS-7664' })]);
+    expect(r.seguridad).not.toBe('alta');
+  });
+
+  it('una marca pedida no se ignora', () => {
+    const r = emparejar('Memoria HPE 32 GB', [candidato('Memoria RAM 32 GB', { brand: 'Kingston' }), candidato('Disco', { brand: 'HPE' })]);
+    expect(r.seguridad).not.toBe('alta');
+  });
+
+  it('«bocina» no es «bobina»', () => {
+    expect(emparejar('Cable para bocina', [candidato('Bobina de cable Cat6')]).seguridad).not.toBe('alta');
+  });
+
+  it('un producto no es la instalación de ese producto, ni al revés', () => {
+    expect(emparejar('Terminal facial', [candidato('Instalación de terminal facial')]).seguridad).not.toBe('alta');
+    expect(emparejar('Instalación de cableado', [candidato('Bobina de cable para cableado con instalación')]).seguridad).not.toBe('alta');
+    expect(emparejar('Instalación de terminal', [candidato('Instalación de terminal facial')]).seguridad).toBe('alta');
+  });
+
+  it('«mano de obra» a secas no es el servicio largo de otra cosa', () => {
+    const r = emparejar('Mano de obra', [candidato('Instalación, configuración y puesta en operación de terminal biométrica de acceso')]);
+    expect(r.seguridad).not.toBe('alta');
+  });
+
+  it('el mayorista vende cosas: una instalación no se busca ahí', () => {
+    const r = emparejar('Montaje de cámaras', [candidato('Montaje de pared para cámaras', { fuente: 'catalogo', brand: 'Dahua' })]);
+    expect(r.elegida).toBeNull();
+  });
+
+  it('del mayorista, sin nada específico o con empate, se elige de la lista', () => {
+    const a = candidato('Inyector PoE A', { fuente: 'catalogo', model: 'A1', unitCost: 300, stock: 2 });
+    const b = candidato('Inyector PoE B', { fuente: 'catalogo', model: 'B1', unitCost: 200, stock: 2 });
+    const r = emparejar('Inyector PoE', [a, b]);
+    expect(r.seguridad).toBe('media');
+    expect(r.alternativas).toHaveLength(1);
+  });
+
+  it('del mayorista debe abrir el nombre: un adaptador «para laptop Dell XPS» no es una laptop', () => {
+    const r = emparejar('Laptop Dell XPS', [candidato('Adaptador de corriente para laptop Dell XPS', { fuente: 'catalogo', brand: 'Ovaltech', model: 'O1' })]);
+    expect(r.seguridad).not.toBe('alta');
+  });
+
+  it('en un empate gana lo ya cotizado', () => {
+    const r = emparejar('Gabinete 6U', [
+      candidato('Gabinete 6U', { fuente: 'catalogo', model: 'CT1', stock: 2 }),
+      candidato('Gabinete 6U', { fuente: 'usada', model: 'USADO', veces: 3 }),
+    ]);
+    expect(r.elegida?.model).toBe('USADO');
+  });
+});
+
+describe('una sola palabra', () => {
+  it('contra un nombre largo se ofrece; contra uno corto se elige', () => {
+    expect(emparejar('Canalización', [candidato('Suministro y colocación de tubo conduit metálico galvanizado pared delgada')]).seguridad).not.toBe('alta');
+    expect(emparejar('Envío', [candidato('Envío a domicilio')]).seguridad).toBe('alta');
+    expect(emparejar('Access point', [candidato('Access point Wi-Fi 6 para techo interior')]).seguridad).toBe('alta');
+    expect(
+      emparejar('Access point', [candidato('Access point Wi-Fi 6 para techo interior'), candidato('Access point exterior de largo alcance')]).seguridad,
+    ).not.toBe('alta');
+  });
+
+  it('junto a una elegida segura solo se ofrece lo que también es eso', () => {
+    const r = emparejar('Kit de limpieza Zebra', [
+      candidato('Kit de limpieza Zebra', { brand: 'Zebra', model: 'Z1' }),
+      candidato('Kit extensor HDMI', { brand: 'Zebra', model: 'H1' }),
+      candidato('Kit de limpieza Zebra para banda', { brand: 'Zebra', model: 'Z2' }),
+    ]);
+    expect(r.seguridad).toBe('alta');
+    expect(r.alternativas.map((a) => a.model)).toEqual(['Z2']);
+  });
+});
+
+describe('candidatosDeUsadas', () => {
+  it('limpia lo pegado en el modelo y lo que no es dato', () => {
+    const lista = candidatosDeUsadas([
+      { id: 1, cotizacionId: 1, name: 'NVR 32', model: '4\tPza\tNVR 32 Canales\tDHI-NVR5432-EI2\t$64,077.46', brand: 'N/A', unitPrice: 1, createdAt: '2026-10-01' },
+      { id: 2, cotizacionId: 1, name: 'Caja Condulet', model: 'Caja Condulet', unitPrice: 1, createdAt: '2026-10-01' },
+      { id: 3, cotizacionId: 1, name: 'Servicio', model: 'N/A', unitPrice: 1, createdAt: '2026-10-01' },
+    ]);
+    expect(lista.map((c) => [c.model, c.brand])).toEqual([
+      ['DHI-NVR5432-EI2', null],
+      [null, null],
+      [null, null],
+    ]);
+  });
+
+  it('junta repetidas con los datos de la última vez y dice en qué cotizaciones salió', () => {
+    const lista = candidatosDeUsadas([
+      { id: 1, cotizacionId: 10, name: 'Cámara domo', model: 'A', unitCost: 100, unitPrice: 120, createdAt: '2026-09-01T00:00:00Z' },
+      { id: 2, cotizacionId: 11, name: 'CAMARA  DOMO', model: 'a', unitCost: 150, unitPrice: 180, createdAt: '2026-10-01T00:00:00Z' },
+    ]);
+    expect(lista).toHaveLength(1);
+    expect(lista[0]).toMatchObject({ unitCost: 150, unitPrice: 180, veces: 2, cotizaciones: [10, 11] });
+  });
+});
+
+describe('complementosDe', () => {
+  it('ofrece lo que suele ir con las cámaras y el grabador, con su cantidad', () => {
+    const c = complementosDe([
+      { concepto: 'Cámaras domo', cantidad: 14 },
+      { concepto: 'NVR 32 canales', cantidad: 2 },
+    ]);
+    expect(c.find((x) => x.nombre === 'Instalación de cámara')?.cant).toBe(14);
+    expect(c.find((x) => x.nombre === 'Disco duro para videovigilancia')?.cant).toBe(2);
+    expect(c.length).toBeLessThanOrEqual(6);
+  });
+
+  it('lo pide el renglón que es eso, no el que lo menciona', () => {
+    const c = complementosDe([
+      { concepto: 'Terminal facial', cantidad: 12 },
+      { concepto: 'Licencia de 20 checadores', cantidad: 1 },
+    ]);
+    expect(c.find((x) => x.nombre === 'Instalación de terminal')?.cant).toBe(12);
+  });
+
+  it('no ofrece lo que ya se pidió', () => {
+    const c = complementosDe([
+      { concepto: 'Cámaras domo', cantidad: 14 },
+      { concepto: 'Instalación de cámaras', cantidad: 14 },
+    ]);
+    expect(c.some((x) => x.nombre === 'Instalación de cámara')).toBe(false);
+  });
+
+  it('una pieza suelta sin regla no ofrece nada', () => {
+    expect(complementosDe([{ concepto: 'Windows 11 Pro', cantidad: 1 }])).toEqual([]);
+  });
+
+  it('una compu a medias ofrece lo que le falta', () => {
+    const c = complementosDe([
+      { concepto: 'Procesador i7', cantidad: 1 },
+      { concepto: 'Tarjeta madre B760', cantidad: 1 },
+    ]);
+    expect(c.map((x) => x.nombre)).toEqual(expect.arrayContaining(['Gabinete', 'Ssd', 'Fuente de poder']));
+  });
+});
+
+describe('consultasDeCatalogo', () => {
+  it('va de más a menos palabras y sin sinónimos', () => {
+    expect(consultasDeCatalogo('Canaletas de PVC blanca 20x10')).toEqual(['canaleta pvc blanca', 'canaleta pvc']);
+  });
+
+  it('una sola palabra solo si trae cifra', () => {
+    expect(consultasDeCatalogo('Tornillo')).toEqual([]);
+    expect(consultasDeCatalogo('ZD421')).toEqual(['zd421']);
+  });
+});

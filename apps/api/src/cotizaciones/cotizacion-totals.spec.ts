@@ -47,6 +47,43 @@ const item = (overrides: Partial<NormalizedCotizacionItem> = {}): NormalizedCoti
   ...overrides,
 });
 
+describe('normalizeItems: lo pegado que no cabe en su columna', () => {
+  const ficha = 'Unidad de estado sólido '.repeat(10).trim();
+
+  it('recorta el modelo y pasa lo completo a la descripción: el guardado no truena', () => {
+    const [item] = normalizeItems([{ name: 'SSD', model: ficha, unitPrice: 10, qty: 1 } as any]);
+    expect(item!.model!.length).toBeLessThanOrEqual(120);
+    expect(item!.description).toBe(ficha);
+  });
+
+  it('no repite lo que ya está en la descripción y conserva la que había', () => {
+    const [yaEsta] = normalizeItems([{ name: 'SSD', model: ficha, description: ficha, unitPrice: 10, qty: 1 } as any]);
+    expect(yaEsta!.description).toBe(ficha);
+    const [otra] = normalizeItems([{ name: 'SSD', model: ficha, description: 'NVMe', unitPrice: 10, qty: 1 } as any]);
+    expect(otra!.description).toBe(`NVMe\n${ficha}`);
+  });
+
+  it('el resto de las columnas cortas tampoco se pasa', () => {
+    const largo = 'x'.repeat(300);
+    const [item] = normalizeItems([
+      { name: 'A', brand: largo, sku: largo, partNumber: largo, unit: largo, category: largo, deliveryTime: largo, countryOrigin: largo, paqueteClave: largo, unitPrice: 1, qty: 1 } as any,
+    ]);
+    expect(item!.brand!.length).toBe(120);
+    expect(item!.sku!.length).toBe(120);
+    expect(item!.partNumber!.length).toBe(120);
+    expect(item!.unit.length).toBe(40);
+    expect(item!.category!.length).toBe(120);
+    expect(item!.deliveryTime!.length).toBe(120);
+    expect(item!.countryOrigin!.length).toBe(80);
+    expect(item!.paqueteClave!.length).toBe(60);
+  });
+
+  it('un modelo corto no cambia nada', () => {
+    const [item] = normalizeItems([{ name: 'A', model: 'DS-2CD', unitPrice: 1, qty: 1 } as any]);
+    expect(item).toMatchObject({ model: 'DS-2CD', description: null });
+  });
+});
+
 describe('normalizeItems', () => {
   it('rechaza una cotización sin conceptos', () => {
     expect(() => normalizeItems([])).toThrow();
