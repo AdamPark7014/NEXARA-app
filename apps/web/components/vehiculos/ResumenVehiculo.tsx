@@ -22,13 +22,13 @@ export default function ResumenVehiculo({ ficha, estado, faltantes }: { ficha: F
     <>
       <div className={v.columnas}>
         <div className={v.principal}>
+          {faltantes}
           {costos ? <CadaKilometro costos={costos} rendimiento={rendimiento.usado} /> : null}
           <Gasolina tanques={tanques} rendimiento={rendimiento} />
         </div>
 
         <aside className={v.lateral}>
           {estado}
-          {faltantes}
           <section className={c.card}>
             <h2 className={v.titulo}>Desgaste</h2>
             {desgaste.vida.totalKm ? (

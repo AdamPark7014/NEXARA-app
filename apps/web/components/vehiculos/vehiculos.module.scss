@@ -656,6 +656,25 @@
   }
 }
 
+/* El atajo de un renglón se ve igual sea enlace o botón. */
+.accionFila {
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-brand);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .botonTexto {
   padding: 0;
   border: 0;

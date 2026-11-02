@@ -99,7 +99,7 @@ export default function EstandarVehiculos({ token }: { token: string }) {
   return (
     <form className={c.card} onSubmit={guardar} aria-label="Estándar de vehículos">
       <h2 className={c.cardTitle}>Estándar de vehículos</h2>
-      <p className={c.hint}>
+      <p className={c.hint} style={{ margin: "0 0 14px" }}>
         Con esto arranca cada vehículo nuevo y se puede cambiar en su ficha. No toca los que ya tienen ficha. El Reglamento da la fórmula, no estas cifras: ajústalas a tu operación.
       </p>
       {error ? <Aviso tono="danger">{error}</Aviso> : null}
@@ -119,7 +119,7 @@ export default function EstandarVehiculos({ token }: { token: string }) {
           Agregar
         </Button>
       </div>
-      <p className={c.hint}>Para el vehículo sin manual. Son valores de la empresa, no del fabricante: cuando se lee el manual, él manda.</p>
+      <p className={c.hint} style={{ margin: "0 0 6px" }}>Para el vehículo sin manual. Son valores de la empresa, no del fabricante: cuando se lee el manual, él manda.</p>
       {plan.map((p, i) => (
         <FilaPrograma
           key={i}
