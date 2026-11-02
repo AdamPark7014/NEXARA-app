@@ -122,7 +122,7 @@ describe('borradorSobreGuardada', () => {
     expect(texto).toContain('Grabador NVR 16 canales');
     expect(texto).not.toContain('Cámara guardada');
     expect(secciones.portada).toBe(1);
-    expect(secciones.objetivo).toBe(3);
+    expect(secciones.objetivo).toBe(2);
     expect(secciones.cotizacion).toBeGreaterThan(secciones.objetivo!);
   });
 
@@ -183,9 +183,9 @@ describe('CotizacionesService.vistaPreviaPdf', () => {
     expect(texto).toContain('SOLO EN PANTALLA');
     expect(texto).toContain('Switch PoE');
     expect(texto).toContain('COTIZACIÓN');
-    // Portada, hoja de título, alcance y sus puntos, y al final la propuesta económica.
-    expect(secciones).toMatchObject({ portada: 1, objetivo: 3, alcance: 3 });
-    expect(secciones.cotizacion).toBeGreaterThan(3);
+    // Portada, datos con el alcance y sus puntos en la hoja siguiente, y al final la propuesta económica.
+    expect(secciones).toMatchObject({ portada: 1, objetivo: 2, alcance: 2 });
+    expect(secciones.cotizacion).toBeGreaterThan(2);
     expect(escrituras).toEqual([]);
     // La fila que devolvió la base sigue como estaba.
     expect(fila.projectName).toBe('Proyecto guardado');
