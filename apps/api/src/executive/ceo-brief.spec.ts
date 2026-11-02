@@ -4,6 +4,32 @@ const FECHA = '2026-09-28';
 const con = (parcial: Partial<DatosCeo>): DatosCeo => ({ ...datosCeoVacios(), ...parcial });
 
 describe('armarResumenCeo', () => {
+  it('lo que espera saber cómo terminó y lo ganado sin proyecto se avisa con su filtro y su acción', () => {
+    const r = armarResumenCeo(
+      {
+        ...datosCeoVacios(),
+        cotizaciones: { porVencer: 0, monto: 0, dias: 3, porDecidir: 4, ganadasSinProyecto: 1 },
+      },
+      FECHA,
+    );
+    expect(r.items).toEqual([
+      {
+        clave: 'cotizaciones',
+        texto: '4 cotizaciones enviadas esperan saber cómo terminaron',
+        url: '/erp/cotizaciones?estado=ENVIADA',
+        accion: 'Revisar',
+        tono: 'atencion',
+      },
+      {
+        clave: 'cotizaciones',
+        texto: '1 cotización ganada todavía no tiene proyecto',
+        url: '/erp/cotizaciones?estado=APROBADA&sinProyecto=1',
+        accion: 'Crear proyecto',
+        tono: 'atencion',
+      },
+    ]);
+  });
+
   it('sin pendientes: «todo al día» y marcado vacío (no se manda aviso)', () => {
     const r = armarResumenCeo(datosCeoVacios(), FECHA);
     expect(r.vacio).toBe(true);
