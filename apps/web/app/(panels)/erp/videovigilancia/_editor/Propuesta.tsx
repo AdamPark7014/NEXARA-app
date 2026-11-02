@@ -11,7 +11,7 @@
  * Marca NEXARA (CCTV es de NEXARA; ver `.claude/rules/marcas-mailing.md`).
  */
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import { Button } from "@/components/base";
@@ -33,9 +33,12 @@ import { elevacionTexto } from "@/lib/cctv/niveles";
 import type { CamaraPlano } from "@/lib/cctv/plano";
 import type { CalculoNivel } from "./calculo";
 import { COLOR_NIVEL } from "./colores";
+import { hayWebGL } from "@/lib/cctv/medidas";
+import type { Plano } from "@/lib/cctv/plano";
 import Figuras3D from "./Figuras3D";
 import LaminaDetalle from "./LaminaDetalle";
 import PlanoEstatico from "./PlanoEstatico";
+import PlanoTecnico, { HojaAjustada } from "./PlanoTecnico";
 import VistaCamara from "./VistaCamara";
 import { cardinal } from "./FichaCamara";
 import styles from "./propuesta.module.css";
@@ -48,6 +51,9 @@ const IMPRESION = `
   .cctv-propuesta { position: absolute; left: 0; top: 0; width: 8.5in; background: #fff; }
   .cctv-no-imprimir { display: none !important; }
   .cctv-hoja { box-shadow: none !important; margin: 0 !important; border: 0 !important; break-after: page; page-break-after: always; }
+  .cctv-plano-marco { width: 8.5in !important; height: 11in !important; overflow: hidden !important; break-after: page; page-break-after: always; }
+  .cctv-plano-escala { transform: translateX(8.5in) rotate(90deg) scale(0.6471) translateY(0.68in) !important; }
+  .cctv-hoja-plano { box-shadow: none !important; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }`;
 
@@ -84,6 +90,7 @@ export default function Propuesta({
   niveles,
   resumen,
   grabacion,
+  planoTecnico,
 }: {
   disenoId: number;
   nombre: string;
@@ -92,7 +99,24 @@ export default function Propuesta({
   niveles: readonly CalculoNivel[];
   resumen: ResumenDiseno;
   grabacion: Grabacion | null;
+  /** Lo que lleva la carátula del plano técnico; sin esto no salen sus hojas. */
+  planoTecnico?: { raiz: Plano; elaboro: string | null; fecha: string; version: number };
 }) {
+  // Foto de la maqueta 3D; sin WebGL queda la vista isométrica en SVG.
+  const [foto, setFoto] = useState<string | null>(null);
+  useEffect(() => {
+    if (!hayWebGL() || !niveles.length) return;
+    let vigente = true;
+    void import("@/lib/cctv/maqueta/foto")
+      .then(({ fotoDeMaqueta }) => fotoDeMaqueta(niveles))
+      .then((f) => {
+        if (vigente) setFoto(f);
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [niveles]);
   // Cada cámara con el nivel donde está; la numeración sigue entre niveles.
   const conNivel = useMemo(
     () => niveles.flatMap((n) => n.plano.camaras.map((c) => ({ c, n }))).sort((a, b) => a.c.numero - b.c.numero),
@@ -102,7 +126,8 @@ export default function Propuesta({
   const varios = niveles.length > 1;
   const g = grabacion ?? GRABACION_POR_OMISION;
   const hojasDistribucion = niveles.length;
-  const totalHojas = hojasDistribucion + 1 + camaras.length + 1;
+  const hojasPlano = planoTecnico ? niveles.length : 0;
+  const totalHojas = hojasDistribucion + 1 + camaras.length + 1 + hojasPlano;
 
   const iso = useMemo(() => {
     const lim = unirLimites(niveles.map((n) => limitesEnMetros(n.plano)));
@@ -172,7 +197,7 @@ export default function Propuesta({
                   {cal ? ` · sobre croquis calibrado (cota ${cal.metros.toFixed(2)} m)` : ""}
                 </span>
               </div>
-              <div className={styles.marco}>
+              <div className={`${styles.marco} ${styles.marcoDistribucion}`}>
                 <PlanoEstatico
                   plano={nv.plano}
                   tapas={nv.tapas}
@@ -261,7 +286,12 @@ export default function Propuesta({
             Cámaras a su altura real de montaje con su cobertura proyectada al piso{varios ? ", con cada nivel a su elevación" : ""}; los humanoides marcan dónde se midió la densidad de
             píxeles.
           </p>
-          {iso ? (
+          {foto ? (
+            <div className={styles.marco}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={foto} alt={varios ? "Maqueta 3D del edificio con sus niveles" : "Maqueta 3D del sitio"} style={{ display: "block", width: "100%" }} />
+            </div>
+          ) : iso ? (
             <div className={styles.marco}>
               <svg viewBox="0 0 720 380" width="100%" role="img" aria-label={varios ? "Vista isométrica del edificio con sus niveles apilados" : "Vista isométrica del sitio"}>
                 <rect width={720} height={380} fill="var(--ui-surface-2)" />
@@ -281,6 +311,26 @@ export default function Propuesta({
           {camaras.length > 6 ? <p className={styles.nota}>Las vistas de las demás cámaras van en su ficha.</p> : null}
           <Pie hoja={hojasDistribucion + 1} total={totalHojas} />
         </article>
+
+        {/* Plano técnico: una hoja doble carta por nivel */}
+        {planoTecnico
+          ? niveles.map((n, i) => (
+              <div key={`plano-${n.nivel.id}`} className={styles.hojaPlano}>
+                <HojaAjustada>
+                  <PlanoTecnico
+                    raiz={planoTecnico.raiz}
+                    plano={n.plano}
+                    nivel={n.nivel}
+                    numeroHoja={i + 1}
+                    coberturas={n.coberturas}
+                    resumen={resumen}
+                    grabacion={g}
+                    datos={{ proyecto: nombre, cliente, elaboro: planoTecnico.elaboro, fecha: planoTecnico.fecha, version: planoTecnico.version }}
+                  />
+                </HojaAjustada>
+              </div>
+            ))
+          : null}
 
         {/* Una hoja por cámara */}
         {conNivel.map(({ c, n: nv }, i) => {

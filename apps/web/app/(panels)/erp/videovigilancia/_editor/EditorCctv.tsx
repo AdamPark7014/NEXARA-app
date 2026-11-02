@@ -1,11 +1,13 @@
 "use client";
 
 /**
- * Editor del Diseñador de videovigilancia (fase 2): plano 2D con croquis calibrado, muros,
- * huecos y obstáculos, cámaras del catálogo con su cobertura DORI recortada por muros,
- * humanoides y la vista desde cada cámara. Guarda solo, con control de versión: si otro encargado
- * guardó antes, avisa en lugar de pisarlo. Mockup aprobado por Adam el 29-10-2026.
+ * Editor del Diseñador de videovigilancia: maqueta 3D, plano técnico y dibujo 2D con croquis
+ * calibrado, muros, huecos, obstáculos, áreas y ambientación; cámaras del catálogo con su cobertura
+ * DORI recortada por muros, humanoides y la vista desde cada cámara. Guarda solo, con control de
+ * versión: si otro encargado guardó antes, avisa en lugar de pisarlo. Mockups aprobados por Adam
+ * el 29-10-2026 y el 01-11-2026.
  */
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from "react";
@@ -14,6 +16,7 @@ import RedoRoundedIcon from "@mui/icons-material/RedoRounded";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import { Alert, Badge, Button, Input, Segmented } from "@/components/base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { MODELOS_CAMARA, etiquetaModelo, modeloPorId, type ModeloCamara } from "@/lib/cctv/catalogo";
@@ -29,7 +32,8 @@ import {
   type Seleccion,
 } from "@/lib/cctv/editor";
 import { GRABACION_POR_OMISION, type Grabacion } from "@/lib/cctv/infraestructura";
-import { problemasDelPlano, tapasDelPlano, type Plano, type Punto } from "@/lib/cctv/plano";
+import { hayWebGL } from "@/lib/cctv/medidas";
+import { problemasDelPlano, tapasDelPlano, type MaterialPiso, type Plano, type Punto, type TipoMueble } from "@/lib/cctv/plano";
 import {
   actualizarNivel,
   agregarNivel,
@@ -54,8 +58,16 @@ import { TIPOS_CROQUIS, esOscuro, prepararCroquis } from "./croquis";
 import Inspector, { type Pestana } from "./Inspector";
 import Lienzo, { type Herramienta } from "./Lienzo";
 import Lienzo3D from "./Lienzo3D";
+import PanelEquipos from "./PanelEquipos";
+import PlanoTecnico, { HojaAjustada, IMPRIMIR_HOJA } from "./PlanoTecnico";
 import VistaCamara from "./VistaCamara";
 import styles from "./editor.module.css";
+
+/** three.js pesa: la maqueta se baja solo al abrirla. */
+const Maqueta3D = dynamic(() => import("./Maqueta3D"), {
+  ssr: false,
+  loading: () => <p className={styles.maquetaCarga}>Armando la maqueta…</p>,
+});
 
 const HERRAMIENTAS: ReadonlyArray<{ id: Herramienta; etiqueta: string; tecla?: string; icono: string; grupo?: "camara" }> = [
   { id: "seleccionar", etiqueta: "Seleccionar", tecla: "V", icono: "M5 3l14 8-6 1.5L10 19z" },
@@ -64,6 +76,7 @@ const HERRAMIENTAS: ReadonlyArray<{ id: Herramienta; etiqueta: string; tecla?: s
   { id: "ventana", etiqueta: "Ventana", icono: "M4 5h16v14H4zM12 5v14M4 12h16" },
   { id: "acceso", etiqueta: "Acceso", icono: "M3 20h4M17 20h4M7 20V8M17 20V8" },
   { id: "obstaculo", etiqueta: "Obstáculo", icono: "M12 3l8 4.5v9L12 21l-8-4.5v-9z" },
+  { id: "area", etiqueta: "Área", icono: "M4 6h16v12H4zM4 12h16M10 6v12" },
   { id: "cota", etiqueta: "Cota", icono: "M4 8v8M20 8v8M4 12h16M7 9l-3 3 3 3M17 9l3 3-3 3" },
   { id: "etiqueta", etiqueta: "Texto", icono: "M5 6h14M12 6v13" },
   { id: "camara", etiqueta: "+ Cámara", tecla: "C", icono: "M3 8.5L15.5 5l1.5 5.5L4.5 14zM17 8l4-1v5l-3.5.5M8 13.2V19H4", grupo: "camara" },
@@ -78,6 +91,8 @@ const AYUDA_HERRAMIENTA: Record<Herramienta, string> = {
   acceso: "Clic sobre un muro para un acceso o portón de 3 m.",
   obstaculo: "Arrastra para dibujar un anaquel, columna o rack.",
   cota: "Marca los dos extremos de una medida conocida para calibrar la escala.",
+  area: "Arrastra un rectángulo: será un área con su piso. Su material se cambia en el panel.",
+  mueble: "Clic en el sitio para poner la pieza elegida. Es ambientación: no tapa la vista.",
   etiqueta: "Clic donde va el nombre del área.",
   camara: "Clic en el plano para poner la cámara del modelo elegido.",
   persona: "Clic para poner un humanoide; arrástralo para ver cómo lo capta cada cámara.",
@@ -134,7 +149,7 @@ export default function EditorCctv({
   const [aviso, setAviso] = useState<string | null>(null);
   const [resumen, setResumen] = useState<ResumenDiseno | null>(diseno.resumen);
   const [herramienta, setHerramienta] = useState<Herramienta>("seleccionar");
-  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: false, humanoides: true, abajo: true });
+  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: false, humanoides: true, abajo: true, cobertura: true, claves: true, noche: false, tamanoReal: false });
   // Pisos de abajo para la vista apilada (en gris). La raíz cambia con cada edición de cualquier
   // piso; si los de abajo no cambiaron se reutiliza la lista para no recalcular su cobertura.
   const debajoRef = useRef<{ clave: string; valor: NivelConPlano[] }>({ clave: "[]", valor: [] });
@@ -144,7 +159,12 @@ export default function EditorCctv({
     if (clave !== debajoRef.current.clave) debajoRef.current = { clave, valor: lista };
     return debajoRef.current.valor;
   }, [capas.abajo, niveles, nivelActivo.nivel.elevacionM]);
-  const [modo, setModo] = useState<"2d" | "3d">("2d");
+  const [webgl, setWebgl] = useState(() => hayWebGL());
+  // Con muros se abre en la maqueta; sin nada todavía, donde se empieza: el dibujo con su croquis.
+  const [modo, setModo] = useState<"2d" | "3d" | "plano">(() => (webgl && listaNiveles(planoDe(diseno)).some((n) => n.plano.muros.length) ? "3d" : "2d"));
+  const [verDesde, setVerDesde] = useState<string | null>(null);
+  const [muebleNuevo, setMuebleNuevo] = useState<TipoMueble>("escritorio");
+  const [pisoNuevo, setPisoNuevo] = useState<MaterialPiso>("concreto");
   const [todasLasVistas, setTodasLasVistas] = useState(false);
   const [modeloNuevo, setModeloNuevo] = useState<ModeloCamara>(MODELOS_CAMARA[0]);
   const [pestana, setPestana] = useState<Pestana>("seleccion");
@@ -328,23 +348,51 @@ export default function EditorCctv({
           ? "Guardado"
           : "Al día";
 
+  const textoHerramienta =
+    modo === "3d" && !webgl
+      ? "Muros a su altura real y cámaras a su altura de montaje. Clic en un muro, una cámara o una persona para editarla en el panel."
+      : herramienta === "seleccionar"
+        ? null
+        : AYUDA_HERRAMIENTA[herramienta];
+
+  const barraNiveles = (
+    <section className={styles.niveles} aria-label="Niveles del edificio">
+      {niveles.map(({ nivel, plano: p }) => (
+        <button key={nivel.id} type="button" className={styles.nivel} aria-pressed={nivel.id === nivelActivo.nivel.id} onClick={() => cambiarNivel(nivel.id)}>
+          <b>{nivel.nombre}</b>
+          <span>
+            {elevacionTexto(nivel.elevacionM)} · {p.camaras.length ? `${p.camaras.length} ${p.camaras.length === 1 ? "cámara" : "cámaras"}` : "sin cámaras"}
+          </span>
+        </button>
+      ))}
+      <Button
+        size="sm"
+        onClick={() => {
+          const r = agregarNivel(raiz);
+          aplicarRaiz(r.raiz);
+          cambiarNivel(r.id);
+          setPestana("plano");
+          setAviso("Nivel nuevo: sube su croquis o copia los muros del nivel de abajo (pestaña Plano).");
+        }}
+      >
+        + Nivel
+      </Button>
+      {abajo ? (
+        <label className={styles.capa}>
+          <input type="checkbox" checked={capas.abajo} onChange={(e) => setCapas((c) => ({ ...c, abajo: e.target.checked }))} />
+          Ver el nivel de abajo en gris
+        </label>
+      ) : null}
+    </section>
+  );
+
   return (
     <div className={styles.pagina}>
-      <nav className={styles.migas} aria-label="Migas">
-        <Link href="/erp/videovigilancia" className={styles.volver}>
-          <ChevronLeftRoundedIcon fontSize="small" /> Videovigilancia
+      <header className={styles.cabeza}>
+        <Link href="/erp/videovigilancia" className={styles.volver} aria-label="Volver a Videovigilancia" title="Volver a Videovigilancia">
+          <ChevronLeftRoundedIcon fontSize="small" />
         </Link>
-        <span aria-hidden="true">›</span>
-        <b>{meta.nombre || diseno.nombre}</b>
-      </nav>
-
-      <section className={styles.cabeza}>
         <div className={styles.cabezaTexto}>
-          <div className={styles.insignias}>
-            <Badge tone={meta.estado === "aprobada" ? "success" : meta.estado === "enviada" ? "info" : "neutral"}>{ETIQUETA_ESTADO_DISENO[meta.estado]}</Badge>
-            <Badge tone="brand">CCTV · {totalCamaras} {totalCamaras === 1 ? "cámara" : "cámaras"}</Badge>
-            {cal ? <Badge tone="success">Escala calibrada · cota {cal.metros.toFixed(2)} m</Badge> : <Badge tone="warning">Escala sin calibrar</Badge>}
-          </div>
           <h1 className={styles.titulo}>{meta.nombre || diseno.nombre}</h1>
           <div className={styles.sub}>
             <span>{diseno.clienteNombre ?? "Sin cliente"}</span>
@@ -354,6 +402,26 @@ export default function EditorCctv({
             </span>
           </div>
         </div>
+        <div className={styles.insignias}>
+          <Badge tone={meta.estado === "aprobada" ? "success" : meta.estado === "enviada" ? "info" : "neutral"}>{ETIQUETA_ESTADO_DISENO[meta.estado]}</Badge>
+          <Badge tone="brand">CCTV · {totalCamaras} {totalCamaras === 1 ? "cámara" : "cámaras"}</Badge>
+          {cal ? <Badge tone="success">Escala calibrada · cota {cal.metros.toFixed(2)} m</Badge> : <Badge tone="warning">Escala sin calibrar</Badge>}
+        </div>
+        <Segmented
+          ariaLabel="Vista"
+          value={modo}
+          onChange={(m) => {
+            setModo(m);
+            setVerDesde(null);
+            if (m !== "2d" && !webgl) setHerramienta("seleccionar");
+            if (m === "plano") setHerramienta("seleccionar");
+          }}
+          items={[
+            { id: "3d", label: "Maqueta 3D" },
+            { id: "plano", label: "Plano técnico" },
+            { id: "2d", label: "Dibujo" },
+          ]}
+        />
         <div className={styles.cabezaAcciones}>
           <Button variant="ghost" icon aria-label="Deshacer (Ctrl+Z)" title="Deshacer (Ctrl+Z)" disabled={!estado.pasado.length} onClick={() => despachar({ tipo: "deshacer" })}>
             <UndoRoundedIcon fontSize="small" />
@@ -361,7 +429,11 @@ export default function EditorCctv({
           <Button variant="ghost" icon aria-label="Rehacer (Ctrl+Y)" title="Rehacer (Ctrl+Y)" disabled={!estado.futuro.length} onClick={() => despachar({ tipo: "rehacer" })}>
             <RedoRoundedIcon fontSize="small" />
           </Button>
+          <Button iconStart={<UploadFileOutlinedIcon fontSize="small" />} loading={subiendo} onClick={() => archivo.current?.click()}>
+            {plano.croquis ? "Cambiar croquis" : "Subir croquis"}
+          </Button>
           <Button
+            variant="primary"
             iconStart={<DescriptionOutlinedIcon fontSize="small" />}
             onClick={async () => {
               if (estado.sucio || metaSucia) await guardar();
@@ -372,12 +444,9 @@ export default function EditorCctv({
           >
             Propuesta PDF
           </Button>
-          <Button iconStart={<UploadFileOutlinedIcon fontSize="small" />} loading={subiendo} onClick={() => archivo.current?.click()}>
-            {plano.croquis ? "Cambiar croquis" : "Subir croquis"}
-          </Button>
           <input ref={archivo} type="file" accept={TIPOS_CROQUIS} hidden onChange={(e) => void alElegirCroquis(e.target.files?.[0])} />
         </div>
-      </section>
+      </header>
 
       {conflicto ? (
         <Alert tone="danger" action={<Button size="sm" onClick={onRecargar}>Recargar</Button>}>
@@ -389,257 +458,342 @@ export default function EditorCctv({
         </Alert>
       ) : null}
 
-      <section className={styles.niveles} aria-label="Niveles del edificio">
-        {niveles.map(({ nivel, plano: p }) => (
-          <button
-            key={nivel.id}
-            type="button"
-            className={styles.nivel}
-            aria-pressed={nivel.id === nivelActivo.nivel.id}
-            onClick={() => cambiarNivel(nivel.id)}
-          >
-            <b>{nivel.nombre}</b>
-            <span>
-              {elevacionTexto(nivel.elevacionM)} · {p.camaras.length ? `${p.camaras.length} ${p.camaras.length === 1 ? "cámara" : "cámaras"}` : "sin cámaras"}
-            </span>
-          </button>
-        ))}
-        <Button
-          onClick={() => {
-            const r = agregarNivel(raiz);
-            aplicarRaiz(r.raiz);
-            cambiarNivel(r.id);
-            setPestana("plano");
-            setAviso("Nivel nuevo: sube su croquis o copia los muros del nivel de abajo (pestaña Plano).");
-          }}
-        >
-          + Nivel
-        </Button>
-        {abajo ? (
-          <div className={styles.nivelesFin}>
-            <label className={styles.capa}>
-              <input type="checkbox" checked={capas.abajo} onChange={(e) => setCapas((c) => ({ ...c, abajo: e.target.checked }))} />
-              Ver el nivel de abajo en gris
-            </label>
-          </div>
-        ) : null}
-      </section>
-
       <section className={styles.editor}>
-        <div className={styles.barra} role="toolbar" aria-label="Herramientas del plano">
-          <div className={styles.herramientas} hidden={modo === "3d"}>
-            {HERRAMIENTAS.map((h, i) => (
-              <span key={h.id} className={styles.herramientaHueco}>
-                {h.grupo === "camara" && HERRAMIENTAS[i - 1]?.grupo !== "camara" ? <span className={styles.separador} aria-hidden="true" /> : null}
-                <button
-                  type="button"
-                  className={`${styles.herramienta} ${h.grupo === "camara" ? styles.herramientaCamara : ""}`}
-                  aria-pressed={herramienta === h.id}
-                  title={h.tecla ? `${h.etiqueta} (${h.tecla})` : h.etiqueta}
-                  onClick={() => setHerramienta(h.id)}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d={h.icono} />
-                  </svg>
-                  {h.etiqueta}
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className={styles.barraFin}>
-            <Segmented
-              ariaLabel="Vista"
-              value={modo}
-              onChange={(m) => {
-                setModo(m);
-                if (m === "3d") setHerramienta("seleccionar");
-              }}
-              items={[
-                { id: "2d", label: "2D" },
-                { id: "3d", label: "3D" },
-              ]}
-            />
-            {herramienta === "camara" && modo === "2d" ? (
-              <label className={styles.modeloNuevo}>
-                Modelo
-                <select value={modeloNuevo.id} onChange={(e) => setModeloNuevo(modeloPorId(e.target.value) ?? MODELOS_CAMARA[0])}>
-                  {MODELOS_CAMARA.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {etiquetaModelo(m)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            {(modo === "2d"
-              ? ([
-                  ["croquis", "Croquis"],
-                  ["etiquetas", "Etiquetas"],
-                  ["calor", "Mapa de calor"],
-                ] as const)
-              : ([
-                  ["croquis", "Croquis"],
-                  ["etiquetas", "Etiquetas"],
-                  ["translucidos", "Muros translúcidos"],
-                  ["humanoides", "Humanoides"],
-                ] as const)
-            ).map(([k, t]) => (
-              <label key={k} className={styles.capa}>
-                <input type="checkbox" checked={capas[k]} onChange={(e) => setCapas((c) => ({ ...c, [k]: e.target.checked }))} />
-                {t}
-              </label>
-            ))}
-          </div>
-        </div>
-        {/* Siempre presente: si apareciera y desapareciera con la herramienta, el plano saltaría bajo el cursor. */}
-        <p className={styles.ayudaHerramienta}>
-          {modo === "3d"
-            ? "Muros a su altura real y cámaras a su altura de montaje. Clic en un muro, una cámara o una persona para editarla en el panel."
-            : AYUDA_HERRAMIENTA[herramienta]}
-        </p>
-
-        <div className={styles.cuerpo}>
-          <div className={styles.lienzoCaja}>
-            {modo === "3d" ? (
-              <Lienzo3D
+        {modo === "plano" ? (
+          <div className={styles.hojaVista}>
+            <div className={styles.hojaBarra}>
+              {barraNiveles}
+              <Button
+                iconStart={<PrintOutlinedIcon fontSize="small" />}
+                onClick={() => window.print()}
+                title="Sale en doble carta, a escala"
+              >
+                Imprimir plano
+              </Button>
+            </div>
+            <style>{IMPRIMIR_HOJA}</style>
+            <HojaAjustada>
+              <PlanoTecnico
+                raiz={raiz}
                 plano={plano}
-                key={nivelActivo.nivel.id}
-                nombreNivel={nivelActivo.nivel.nombre}
-                elevacionM={nivelActivo.nivel.elevacionM}
-                debajo={debajo}
-                seleccion={seleccion}
-                tapas={tapas}
+                nivel={nivelActivo.nivel}
+                numeroHoja={niveles.findIndex((n) => n.nivel.id === nivelActivo.nivel.id) + 1}
                 coberturas={coberturas}
-                capas={capas}
-                onSeleccionar={seleccionar}
+                resumen={resumen}
+                grabacion={meta.grabacion}
+                datos={{ proyecto: meta.nombre || diseno.nombre, cliente: diseno.clienteNombre, elaboro: diseno.creadoPor?.nombre ?? null, fecha: diseno.updatedAt, version: version.current }}
               />
-            ) : (
-            <Lienzo
-              key={nivelActivo.nivel.id}
+            </HojaAjustada>
+          </div>
+        ) : (
+          <div className={styles.cuerpo}>
+            <PanelEquipos
+              modeloActivo={modeloNuevo}
+              muebleActivo={muebleNuevo}
+              pisoActivo={pisoNuevo}
+              herramienta={herramienta}
+              onElegirCamara={(m) => {
+                setModeloNuevo(m);
+                setHerramienta("camara");
+                setVerDesde(null);
+              }}
+              onElegirMueble={(t) => {
+                setMuebleNuevo(t);
+                setHerramienta("mueble");
+                setVerDesde(null);
+              }}
+              onElegirPiso={(p) => {
+                setPisoNuevo(p);
+                setHerramienta("area");
+                setVerDesde(null);
+              }}
+            />
+            <div className={styles.lienzoCaja}>
+              {modo === "3d" && webgl ? (
+                <Maqueta3D
+                  plano={plano}
+                  nombreNivel={nivelActivo.nivel.nombre}
+                  elevacionM={nivelActivo.nivel.elevacionM}
+                  debajo={debajo}
+                  seleccion={seleccion}
+                  tapas={tapas}
+                  coberturas={coberturas}
+                  capas={capas}
+                  herramienta={herramienta}
+                  modeloNuevo={modeloNuevo}
+                  muebleNuevo={muebleNuevo}
+                  pisoNuevo={pisoNuevo}
+                  numeroNuevo={numeroNuevo}
+                  verDesde={verDesde}
+                  onVerDesde={setVerDesde}
+                  onAplicar={aplicar}
+                  onSeleccionar={seleccionar}
+                  onAviso={setAviso}
+                  onPedirMedida={(a, b) => setMedida({ a, b })}
+                  onPedirTexto={setTextoEn}
+                  onHerramienta={setHerramienta}
+                  onPerderWebGL={() => {
+                    setWebgl(false);
+                    setVerDesde(null);
+                    setAviso("Este equipo no pudo mantener la vista 3D: seguimos con la vista sencilla.");
+                  }}
+                />
+              ) : modo === "3d" ? (
+                <Lienzo3D
+                  plano={plano}
+                  key={nivelActivo.nivel.id}
+                  nombreNivel={nivelActivo.nivel.nombre}
+                  elevacionM={nivelActivo.nivel.elevacionM}
+                  debajo={debajo}
+                  seleccion={seleccion}
+                  tapas={tapas}
+                  coberturas={coberturas}
+                  capas={capas}
+                  onSeleccionar={seleccionar}
+                />
+              ) : (
+                <Lienzo
+                  key={nivelActivo.nivel.id}
+                  plano={plano}
+                  seleccion={seleccion}
+                  herramienta={herramienta}
+                  capas={capas}
+                  tapas={tapas}
+                  coberturas={coberturas}
+                  modeloNuevo={modeloNuevo}
+                  muebleNuevo={muebleNuevo}
+                  pisoNuevo={pisoNuevo}
+                  onAplicar={aplicar}
+                  onSeleccionar={seleccionar}
+                  onAviso={setAviso}
+                  onPedirMedida={(a, b) => setMedida({ a, b })}
+                  onPedirTexto={setTextoEn}
+                  onHerramienta={setHerramienta}
+                  numeroNuevo={numeroNuevo}
+                  planoAbajo={capas.abajo ? abajo?.plano ?? null : null}
+                />
+              )}
+
+              {!verDesde ? (
+                <div className={styles.barra}>
+                  <div className={styles.herramientas} role="toolbar" aria-label="Herramientas del plano" hidden={modo === "3d" && !webgl}>
+                    {HERRAMIENTAS.map((h, i) => (
+                      <span key={h.id} className={styles.herramientaHueco}>
+                        {h.grupo === "camara" && HERRAMIENTAS[i - 1]?.grupo !== "camara" ? <span className={styles.separador} aria-hidden="true" /> : null}
+                        <button
+                          type="button"
+                          className={`${styles.herramienta} ${h.grupo === "camara" ? styles.herramientaCamara : ""}`}
+                          aria-pressed={herramienta === h.id}
+                          title={h.tecla ? `${h.etiqueta} (${h.tecla})` : h.etiqueta}
+                          onClick={() => setHerramienta(h.id)}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d={h.icono} />
+                          </svg>
+                          {h.etiqueta}
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className={styles.capas} role="group" aria-label="Capas">
+                    {modo === "3d" && webgl
+                      ? ([
+                          ["cobertura", "Cobertura"],
+                          ["humanoides", "Personas"],
+                          ["noche", "De noche"],
+                          ["tamanoReal", "Tamaño real"],
+                        ] as const).map(([k, t]) => (
+                          <button key={k} type="button" className={styles.capaBoton} aria-pressed={capas[k]} onClick={() => setCapas((c) => ({ ...c, [k]: !c[k] }))}>
+                            {t}
+                          </button>
+                        ))
+                      : null}
+                    <details className={styles.capasMas}>
+                      <summary>Capas</summary>
+                      <div>
+                        {(modo === "2d"
+                          ? ([
+                              ["croquis", "Croquis"],
+                              ["etiquetas", "Etiquetas"],
+                              ["calor", "Mapa de calor"],
+                            ] as const)
+                          : webgl
+                            ? ([
+                                ["claves", "Claves de equipos"],
+                                ["etiquetas", "Nombres de áreas"],
+                                ["croquis", "Croquis en el piso"],
+                                ["translucidos", "Muros translúcidos"],
+                              ] as const)
+                            : ([
+                                ["croquis", "Croquis"],
+                                ["etiquetas", "Etiquetas"],
+                                ["translucidos", "Muros translúcidos"],
+                                ["humanoides", "Humanoides"],
+                              ] as const)
+                        ).map(([k, t]) => (
+                          <label key={k} className={styles.capa}>
+                            <input type="checkbox" checked={capas[k]} onChange={(e) => setCapas((c) => ({ ...c, [k]: e.target.checked }))} />
+                            {t}
+                          </label>
+                        ))}
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              ) : null}
+              {textoHerramienta && !verDesde ? (
+                <p className={styles.ayudaHerramienta}>
+                  {textoHerramienta}
+                  {herramienta === "camara" ? (
+                    <label className={styles.modeloNuevo}>
+                      Modelo
+                      <select value={modeloNuevo.id} onChange={(e) => setModeloNuevo(modeloPorId(e.target.value) ?? MODELOS_CAMARA[0])}>
+                        {MODELOS_CAMARA.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {etiquetaModelo(m)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                </p>
+              ) : null}
+
+              {!plano.croquis && !plano.muros.length && modo === "2d" ? (
+                <div className={styles.vacio}>
+                  <b>Empieza por el croquis del sitio</b>
+                  <span>JPG, PNG o el PDF que exporta AutoCAD. Después lo calibras con una cota y dibujas o corriges los muros.</span>
+                  <div className={styles.acciones}>
+                    <Button variant="primary" loading={subiendo} onClick={() => archivo.current?.click()}>
+                      Subir croquis
+                    </Button>
+                    <Button onClick={() => setHerramienta("muro")}>Dibujar a mano</Button>
+                  </div>
+                </div>
+              ) : null}
+              {!verDesde ? (
+                <div className={styles.leyenda} aria-label="Nivel de detalle según IEC 62676-4">
+                  {cob ? (
+                    <>
+                      <p className={styles.leyendaTotal}>
+                        <b>{cob.cubierto.toFixed(1)} %</b> del interior cubierto
+                      </p>
+                      <span className={styles.leyendaBarra} aria-hidden="true">
+                        <i style={{ width: `${cob.identificacion}%`, background: COLOR_NIVEL.identificacion }} />
+                        <i style={{ width: `${cob.reconocimiento}%`, background: COLOR_NIVEL.reconocimiento }} />
+                        <i style={{ width: `${cob.observacion}%`, background: COLOR_NIVEL.observacion }} />
+                        <i style={{ width: `${cob.deteccion}%`, background: COLOR_NIVEL.deteccion }} />
+                      </span>
+                    </>
+                  ) : (
+                    <p className={styles.seccion}>Nivel de detalle · IEC 62676-4</p>
+                  )}
+                  {LEYENDA_NIVELES.map((n) => (
+                    <span key={n.nivel} className={styles.leyendaFila}>
+                      <span className={styles.punto} style={{ background: COLOR_NIVEL[n.nivel] }} />
+                      {n.etiqueta}
+                      <b>{cob ? `${Math.round(cob[n.nivel as keyof typeof cob] as number)} %` : n.ppm}</b>
+                    </span>
+                  ))}
+                  {capas.noche && modo === "3d" ? <p className={styles.leyendaNota}>De noche, el cono llega hasta el alcance de IR de cada ficha.</p> : null}
+                </div>
+              ) : null}
+              {camaraVista && modo === "2d" ? (
+                <div className={styles.pipCaja}>
+                  <VistaCamara plano={plano} camara={camaraVista} tapas={tapas} coberturas={coberturas} esHoja={esHoja} />
+                </div>
+              ) : null}
+              {!verDesde ? <div className={styles.nivelesFlota}>{barraNiveles}</div> : null}
+              {medida ? (
+                <DialogoMedida
+                  plano={plano}
+                  a={medida.a}
+                  b={medida.b}
+                  onCancelar={() => setMedida(null)}
+                  onCalibrar={(metrosReales) => {
+                    const nuevo = calibrarPlano(plano, medida.a, medida.b, metrosReales);
+                    if (!nuevo) setAviso("Esa medida no sirve para calibrar: marca dos puntos separados y una medida mayor a cero.");
+                    else {
+                      aplicar(nuevo);
+                      setAviso(`Escala calibrada: ${metrosReales.toFixed(2)} m.`);
+                      setHerramienta("seleccionar");
+                    }
+                    setMedida(null);
+                  }}
+                  onSoloCota={(texto) => {
+                    aplicar({ ...plano, cotas: [...plano.cotas, { id: nuevoId("co"), a: medida.a, b: medida.b, texto }] });
+                    setMedida(null);
+                  }}
+                />
+              ) : null}
+              {textoEn ? (
+                <DialogoTexto
+                  onCancelar={() => setTextoEn(null)}
+                  onAceptar={(t) => {
+                    aplicar(agregarEtiqueta(plano, textoEn, t));
+                    setTextoEn(null);
+                  }}
+                />
+              ) : null}
+              {aviso ? (
+                <div className={styles.aviso} role="status">
+                  {aviso}
+                </div>
+              ) : null}
+            </div>
+            <Inspector
               plano={plano}
               seleccion={seleccion}
-              herramienta={herramienta}
-              capas={capas}
+              pestana={pestana}
+              onPestana={setPestana}
               tapas={tapas}
-              coberturas={coberturas}
-              modeloNuevo={modeloNuevo}
               onAplicar={aplicar}
               onSeleccionar={seleccionar}
-              onAviso={setAviso}
-              onPedirMedida={(a, b) => setMedida({ a, b })}
-              onPedirTexto={setTextoEn}
-              onHerramienta={setHerramienta}
+              meta={meta}
+              onMeta={(m) => {
+                setMeta((x) => ({ ...x, ...m }));
+                setMetaSucia(true);
+              }}
+              resumen={resumen}
+              onRecalibrar={() => {
+                if (!webgl) setModo("2d");
+                setHerramienta("cota");
+                setAviso("Marca los dos extremos de una cota conocida.");
+              }}
+              onCambiarCroquis={() => archivo.current?.click()}
+              onHerramienta={(h) => {
+                if (!webgl) setModo("2d");
+                setHerramienta(h);
+              }}
+              onVerLoQueVe={
+                webgl
+                  ? (id) => {
+                      setModo("3d");
+                      setVerDesde(id);
+                    }
+                  : undefined
+              }
+              fichaDe={(camId) => `/erp/videovigilancia/${diseno.id}/camara/${encodeURIComponent(camId)}`}
               numeroNuevo={numeroNuevo}
-              planoAbajo={capas.abajo ? abajo?.plano ?? null : null}
+              nivel={{
+                nivel: nivelActivo.nivel,
+                esPlantaBaja: esPlantaBaja(raiz, nivelActivo.nivel.id),
+                nombreDeAbajo: abajo?.nivel.nombre ?? null,
+                onCambiar: (cambios) => aplicarRaiz(actualizarNivel(raiz, nivelActivo.nivel.id, cambios)),
+                onCopiarMuros: () => {
+                  aplicarRaiz(copiarMurosDeAbajo(raiz, nivelActivo.nivel.id));
+                  setAviso(`Muros copiados de ${abajo?.nivel.nombre ?? "abajo"}. Ctrl+Z los quita.`);
+                },
+                onQuitar: () => {
+                  const nombre = nivelActivo.nivel.nombre;
+                  aplicarRaiz(quitarNivel(raiz, nivelActivo.nivel.id));
+                  cambiarNivel(nivelBase(raiz).id);
+                  setAviso(`Se quitó ${nombre}. Ctrl+Z lo regresa.`);
+                },
+              }}
             />
-            )}
-            {!plano.croquis && !plano.muros.length && modo === "2d" ? (
-              <div className={styles.vacio}>
-                <b>Empieza por el croquis del sitio</b>
-                <span>JPG, PNG o el PDF que exporta AutoCAD. Después lo calibras con una cota y dibujas o corriges los muros.</span>
-                <div className={styles.acciones}>
-                  <Button variant="primary" loading={subiendo} onClick={() => archivo.current?.click()}>
-                    Subir croquis
-                  </Button>
-                  <Button onClick={() => setHerramienta("muro")}>Dibujar a mano</Button>
-                </div>
-              </div>
-            ) : null}
-            <div className={styles.leyenda} aria-label="Nivel de detalle según IEC 62676-4">
-              <p className={styles.seccion}>Nivel de detalle · IEC 62676-4</p>
-              {LEYENDA_NIVELES.map((n) => (
-                <span key={n.nivel} className={styles.leyendaFila}>
-                  <span className={styles.punto} style={{ background: COLOR_NIVEL[n.nivel] }} />
-                  {n.etiqueta}
-                  <b>{n.ppm}</b>
-                </span>
-              ))}
-            </div>
-            {camaraVista && modo === "2d" ? (
-              <div className={styles.pipCaja}>
-                <VistaCamara plano={plano} camara={camaraVista} tapas={tapas} coberturas={coberturas} esHoja={esHoja} />
-              </div>
-            ) : null}
-            {medida ? (
-              <DialogoMedida
-                plano={plano}
-                a={medida.a}
-                b={medida.b}
-                onCancelar={() => setMedida(null)}
-                onCalibrar={(metrosReales) => {
-                  const nuevo = calibrarPlano(plano, medida.a, medida.b, metrosReales);
-                  if (!nuevo) setAviso("Esa medida no sirve para calibrar: marca dos puntos separados y una medida mayor a cero.");
-                  else {
-                    aplicar(nuevo);
-                    setAviso(`Escala calibrada: ${metrosReales.toFixed(2)} m.`);
-                    setHerramienta("seleccionar");
-                  }
-                  setMedida(null);
-                }}
-                onSoloCota={(texto) => {
-                  aplicar({ ...plano, cotas: [...plano.cotas, { id: nuevoId("co"), a: medida.a, b: medida.b, texto }] });
-                  setMedida(null);
-                }}
-              />
-            ) : null}
-            {textoEn ? (
-              <DialogoTexto
-                onCancelar={() => setTextoEn(null)}
-                onAceptar={(t) => {
-                  aplicar(agregarEtiqueta(plano, textoEn, t));
-                  setTextoEn(null);
-                }}
-              />
-            ) : null}
-            {aviso ? (
-              <div className={styles.aviso} role="status">
-                {aviso}
-              </div>
-            ) : null}
           </div>
-          <Inspector
-            plano={plano}
-            seleccion={seleccion}
-            pestana={pestana}
-            onPestana={setPestana}
-            tapas={tapas}
-            onAplicar={aplicar}
-            onSeleccionar={seleccionar}
-            meta={meta}
-            onMeta={(m) => {
-              setMeta((x) => ({ ...x, ...m }));
-              setMetaSucia(true);
-            }}
-            resumen={resumen}
-            onRecalibrar={() => {
-              setHerramienta("cota");
-              setAviso("Marca los dos extremos de una cota conocida.");
-            }}
-            onCambiarCroquis={() => archivo.current?.click()}
-            onHerramienta={(h) => {
-              setModo("2d");
-              setHerramienta(h);
-            }}
-            fichaDe={(camId) => `/erp/videovigilancia/${diseno.id}/camara/${encodeURIComponent(camId)}`}
-            numeroNuevo={numeroNuevo}
-            nivel={{
-              nivel: nivelActivo.nivel,
-              esPlantaBaja: esPlantaBaja(raiz, nivelActivo.nivel.id),
-              nombreDeAbajo: abajo?.nivel.nombre ?? null,
-              onCambiar: (cambios) => aplicarRaiz(actualizarNivel(raiz, nivelActivo.nivel.id, cambios)),
-              onCopiarMuros: () => {
-                aplicarRaiz(copiarMurosDeAbajo(raiz, nivelActivo.nivel.id));
-                setAviso(`Muros copiados de ${abajo?.nivel.nombre ?? "abajo"}. Ctrl+Z los quita.`);
-              },
-              onQuitar: () => {
-                const nombre = nivelActivo.nivel.nombre;
-                aplicarRaiz(quitarNivel(raiz, nivelActivo.nivel.id));
-                cambiarNivel(nivelBase(raiz).id);
-                setAviso(`Se quitó ${nombre}. Ctrl+Z lo regresa.`);
-              },
-            }}
-          />
-        </div>
+        )}
 
         {modo === "3d" && plano.camaras.length ? (
           <section className={styles.tiraVistas} aria-label="Vistas desde las cámaras">

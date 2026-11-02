@@ -1,5 +1,25 @@
 # RELEVO
 
+- **01-11 ~19:00 (claude-code) — Diseñador de videovigilancia, fase 1 de la mejora premium: maqueta 3D con WebGL, plano técnico y vista de noche.**
+  - Adam aprobó la propuesta y el aspecto («Aprobado, empieza»). Lienzo: <https://claude.ai/artifact/PoFrsCNRTWxHrDDYQDAWeY>. Detalle técnico en
+    `docs/DISENADOR-CCTV.md` §4.1 y §10 (fases 8 a 11 ya apuntadas).
+  - Qué hay: `/erp/videovigilancia/<id>` abre en «Maqueta 3D» si hay muros; «Plano técnico» es la hoja doble carta y «Dibujo» es el 2D de siempre.
+    Código en `apps/web/lib/cctv/maqueta/` (three.js 0.169 con carga diferida) y `_editor/Maqueta3D.tsx`, `PlanoTecnico.tsx`, `PanelEquipos.tsx`.
+  - `Lienzo3D` y `escena3d.ts` se quedan como respaldo sin WebGL: no se borran.
+  - Sin migración: `plano.areas` y `plano.muebles` son opcionales y viajan en el mismo JSON. La ambientación no tapa la vista, para no mover ningún cálculo de cobertura.
+  - Se agregaron turret y PTZ al catálogo con datos leídos de sus hojas técnicas. Los colores DORI pasaron a los del mockup en todas las vistas (`colores.ts`).
+  - Verificado: pruebas del diseñador (120) y de tipos en verde; compilación de producción; recorrido con ratón real en Chrome con la Intel UHD, 16 de 16 y sin errores en consola (dibujar muro y puerta, arrastrar cámara, colocar desde el panel, «Ver lo que ve», deshacer todo); diseños 2 y 3 reales de producción, en copia local. Suite web: 200 archivos; suite API: 368, sin tocar la API. Al correrlas en paralelo se agotan tiempos en cotizaciones y PDF (1 web y 10 API); pasan solas.
+  - **Falta:** verlo en producción con sesión (ver la entrada siguiente si ya se hizo). Probar un croquis real como textura: ningún diseño de producción trae croquis, y si falla sale un aviso y sigue en el dibujo 2D. Medir el tiempo de hacer un plano con una persona real.
+  - Medido en la Intel UHD integrada de la máquina de desarrollo: 47 cuadros por segundo girando el sitio de ejemplo y 61 con el diseño de 14 cámaras.
+  - No se delegó a Ollama: era portar un prototipo ya aprobado y ajustarlo mirando cada captura.
+  - Trampas para quien siga:
+    - `next dev` en `%TEMP%` tardó más de un minuto por recarga. Con esbuild y sustitutos mínimos de `next/link`, `next/navigation` y `next/dynamic` recompila en segundos. Hay que envolver en `.nx-app-shell`, o `section` se angosta por `globals.scss`.
+    - `npm ci --ignore-scripts` deja a esbuild sin binario: `node node_modules/esbuild/install.js` lo arregla.
+    - Una regla `@page` por hoja con otro tamaño no sirve en la propuesta: Chrome reduce todo el documento. Por eso el plano va girado en carta y solo «Imprimir plano» usa 17 × 11 in.
+    - `restoreMocks: true` del runner quita los espías antes de cada prueba: `vi.spyOn` va en `beforeEach`.
+    - Un Chrome de prueba que quede vivo conserva su puerto de depuración y el siguiente se cuelga sin error: usar puerto y perfil nuevos.
+  - Coordinar antes de la fase de catálogo y stock: ver `local_81f7f4ab` (costos) y `local_d255c061` (cotizaciones). Decisiones pendientes de Adam: dónde están sus especificaciones de cotización y si Almacén y catálogo son un solo inventario.
+
 - **01-11 ~17:35 (claude-code) — Libro de costos: revisión en producción con la sesión del CEO; salieron tres defectos que la prueba local no vio (`cbfacd4e`, `5236fab2`).**
   - **«Por proyecto» daba 404:** `SEGMENT_ALIASES` de `legacy-path-remap.ts` traduce cualquier tramo bajo `/erp` (`proyectos`→`projects`), con un 308 que el navegador
     guarda. La pantalla pasó a `/erp/costos/por-proyecto` y las dos direcciones viejas llegan ahí, sin ciclo con el 308 guardado. Una prueba revisa que ninguna pestaña de

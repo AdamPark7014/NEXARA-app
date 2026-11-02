@@ -57,6 +57,17 @@ export type Obstaculo = {
 /** Texto del plano: nombre de un área («Área almacenamiento»). */
 export type Etiqueta = { id: string; texto: string; pos: Punto; tamano?: number };
 
+/** Material del piso de un área en la maqueta. */
+export type MaterialPiso = "concreto" | "madera" | "piedra" | "tecnico" | "asfalto" | "pasto";
+
+/** Zona del sitio con su piso: da el material en la maqueta y el nombre con m² en el plano técnico. */
+export type Area = { id: string; nombre?: string | null; piso: MaterialPiso; puntos: Punto[] };
+
+export type TipoMueble = "escritorio" | "mesa-juntas" | "mostrador" | "sofa" | "planta" | "arbol" | "camion" | "auto";
+
+/** Ambientación de la maqueta. No tapa la vista: lo que sí tape se dibuja como obstáculo. */
+export type Mueble = { id: string; tipo: TipoMueble; pos: Punto; rumboDeg: number };
+
 /** Cota: distancia acotada entre dos puntos (las amarillas del croquis). */
 export type Cota = { id: string; a: Punto; b: Punto; texto?: string };
 
@@ -116,6 +127,9 @@ export type Plano = {
   cotas: Cota[];
   camaras: CamaraPlano[];
   personas: Persona[];
+  /** Pisos y ambientación de la maqueta. Los diseños anteriores no los traen. */
+  areas?: Area[] | null;
+  muebles?: Mueble[] | null;
 };
 
 export const PX_POR_METRO_LIENZO = 50;

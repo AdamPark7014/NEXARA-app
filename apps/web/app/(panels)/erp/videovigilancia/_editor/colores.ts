@@ -1,12 +1,12 @@
-/** Colores de los niveles DORI en el plano y en la vista de cámara: tokens de estado de Core. */
+/** Colores de los niveles DORI en todas las vistas (mockup aprobado 01-11-2026): verde, azul, índigo y violeta. */
 import type { NivelCobertura } from "@/lib/cctv/optica";
 
 export const COLOR_NIVEL: Readonly<Record<NivelCobertura, string>> = {
-  identificacion: "var(--ui-success)",
-  reconocimiento: "var(--ui-info)",
-  observacion: "var(--ui-warning)",
-  deteccion: "var(--ui-neutral)",
-  general: "var(--ui-fg-4)",
+  identificacion: "#0aa870",
+  reconocimiento: "#0d8cd9",
+  observacion: "#3d5ce6",
+  deteccion: "#8c6bd9",
+  general: "#9aa3af",
 };
 
 export const OPACIDAD_NIVEL: Readonly<Record<NivelCobertura, number>> = {

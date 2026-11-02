@@ -29,8 +29,8 @@ export type ModeloCamara = {
   /** Consumo con IR encendido, si la ficha lo trae. */
   wattsPoe?: number | null;
   caracteristicas: string[];
-  /** De dónde salió la óptica. */
-  fuente: "syscom" | "manual";
+  /** De dónde salió la óptica: SYSCOM, captura a mano o la hoja técnica del fabricante. */
+  fuente: "syscom" | "manual" | "ficha";
   verificado: boolean;
 };
 
@@ -85,6 +85,30 @@ export const MODELOS_CAMARA: readonly ModeloCamara[] = [
     ],
     fuente: "syscom",
     verificado: false,
+  },
+  {
+    id: "hik-ds-2cd2347g2-lu",
+    marca: "HIKVISION",
+    modelo: "DS-2CD2347G2-LU",
+    tipo: "turret",
+    descripcion: "Turret 4 MP ColorVu, lente 2.8 mm, luz blanca 30 m",
+    optica: { pxHoriz: 2688, pxVert: 1520, focalMm: 2.8, sensorFormato: "1/1.8", hfovDeclaradoDeg: 112, vfovDeclaradoDeg: 61, irM: 30 },
+    wattsPoe: 7.6,
+    caracteristicas: ["Imagen a color las 24 horas (ColorVu, F1.0)", "Luz blanca hasta 30 m", "Micrófono integrado"],
+    fuente: "ficha",
+    verificado: true,
+  },
+  {
+    id: "hik-ds-2de4a425iwg1-e",
+    marca: "HIKVISION",
+    modelo: "DS-2DE4A425IWG1-E",
+    tipo: "ptz",
+    descripcion: "PTZ 4 MP, zoom 25×, IR 50 m",
+    optica: { pxHoriz: 2560, pxVert: 1440, focalMm: 4.8, focalMinMm: 4.8, focalMaxMm: 120, sensorFormato: "1/2.8", hfovDeclaradoDeg: 53.3, vfovDeclaradoDeg: 30.6, irM: 50 },
+    wattsPoe: 24,
+    caracteristicas: ["Zoom óptico 25×", "Infrarrojo hasta 50 m", "Giro e inclinación motorizados"],
+    fuente: "ficha",
+    verificado: true,
   },
 ];
 

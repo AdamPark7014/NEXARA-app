@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MODELOS_CAMARA } from "@/lib/cctv/catalogo";
 import { agregarCamara, agregarMuro, agregarPersona, resumenDelPlano } from "@/lib/cctv/editor";
 import { planoVacio, type Plano } from "@/lib/cctv/plano";
@@ -7,6 +7,31 @@ import type { Diseno } from "@/lib/cctv/api";
 import EditorCctv from "./EditorCctv";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
+
+// El motor necesita WebGL de verdad: aquí se prueba lo que el editor le pide.
+vi.mock("./Maqueta3D", () => ({
+  default: ({ capas, verDesde, onPerderWebGL }: { capas: { noche: boolean }; verDesde: string | null; onPerderWebGL: () => void }) => (
+    <div data-testid="maqueta" data-noche={String(capas.noche)} data-ver={verDesde ?? undefined}>
+      <button type="button" data-testid="perder-webgl" onClick={onPerderWebGL} />
+    </div>
+  ),
+}));
+
+vi.mock("next/dynamic", async () => {
+  const { lazy, Suspense } = await import("react");
+  return {
+    default: (cargar: () => Promise<{ default: React.ComponentType<Record<string, unknown>> }>) => {
+      const L = lazy(cargar);
+      return function Dinamico(p: Record<string, unknown>) {
+        return (
+          <Suspense fallback={null}>
+            <L {...p} />
+          </Suspense>
+        );
+      };
+    },
+  };
+});
 
 vi.mock("@/lib/cctv/api", async (original) => ({
   ...(await original<typeof import("@/lib/cctv/api")>()),
@@ -74,7 +99,7 @@ describe("editor del diseñador de videovigilancia", () => {
 
   it("en 3D pinta el sitio, sus vistas desde las cámaras y deja elegir la cámara", () => {
     render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "3D" }));
+    fireEvent.click(screen.getByRole("button", { name: "Maqueta 3D" }));
     expect(screen.getByRole("img", { name: /Vista 3D del sitio/ })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Vistas desde las cámaras" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Vista superior" })).toBeInTheDocument();
@@ -99,7 +124,7 @@ describe("editor del diseñador de videovigilancia", () => {
     render(<EditorCctv diseno={{ ...diseno(bodega()), resumen: resumenDelPlano(bodega()) }} token="t" onRecargar={() => {}} />);
     expect(screen.getByText("Para armar el diseño · faltan 1")).toBeInTheDocument();
     expect(screen.getByText("Cobertura del interior")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "3D" }));
+    fireEvent.click(screen.getByRole("button", { name: "Maqueta 3D" }));
     fireEvent.click(screen.getByRole("button", { name: "Poner: Cámaras" }));
     // vuelve al 2D con la herramienta de cámara lista
     expect(screen.getByRole("button", { name: "+ Cámara" })).toHaveAttribute("aria-pressed", "true");
@@ -117,11 +142,88 @@ describe("editor del diseñador de videovigilancia", () => {
     expect(screen.getByRole("textbox", { name: "Nombre" })).toHaveValue("Nivel 2");
     fireEvent.click(screen.getByRole("button", { name: "Copiar muros de Planta baja" }));
     expect(screen.getByText(/Muros copiados de Planta baja/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "3D" }));
+    fireEvent.click(screen.getByRole("button", { name: "Maqueta 3D" }));
     expect(screen.getByText("Nivel 2 +3.50 m")).toBeInTheDocument();
     expect(screen.getByText("Planta baja ±0.00 m")).toBeInTheDocument();
     // volver a la planta baja la deja como estaba
     fireEvent.click(screen.getByRole("button", { name: /^Planta baja/ }));
     expect(screen.getByRole("tab", { name: "Cámaras · 1" })).toBeInTheDocument();
+  });
+
+  it("el plano técnico sale del diseño: ejes, cédula, revisión y carátula", () => {
+    render(<EditorCctv diseno={{ ...diseno(bodega()), resumen: resumenDelPlano(bodega()) }} token="t" onRecargar={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Plano técnico" }));
+    const hoja = screen.getByRole("article", { name: "Plano técnico: Planta baja" });
+    expect(hoja).toHaveTextContent("Cédula de equipos");
+    expect(hoja).toHaveTextContent("DS-2CD1143G2-LIUF");
+    expect(hoja).toHaveTextContent("CAM-01");
+    expect(hoja).toHaveTextContent("Concretos Pronto");
+    expect(hoja).toHaveTextContent("David Morales");
+    expect(hoja).toHaveTextContent("CCTV-01 · Planta baja");
+    expect(hoja).toHaveTextContent("Canales del grabador");
+    expect(screen.getByRole("button", { name: "Imprimir plano" })).toBeInTheDocument();
+    // En la hoja no estorban las herramientas ni el panel.
+    expect(screen.queryByRole("toolbar", { name: "Herramientas del plano" })).toBeNull();
+  });
+
+  it("el panel de equipos arma la herramienta con el modelo elegido", () => {
+    render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
+    const panel = screen.getByRole("complementary", { name: "Equipos" });
+    expect(panel).toHaveTextContent("DS-2CD2347G2-LU");
+    fireEvent.click(screen.getByRole("button", { name: /Turret.*DS-2CD2347G2-LU/ }));
+    expect(screen.getByRole("button", { name: "+ Cámara" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Ambientación" }));
+    fireEvent.click(screen.getByRole("button", { name: "Camión" }));
+    expect(screen.getByRole("button", { name: "+ Cámara" })).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(screen.getByRole("button", { name: "Madera" }));
+    expect(screen.getByRole("button", { name: "Área" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("sin WebGL abre en el dibujo aunque haya muros, y la pestaña 3D usa la vista sencilla", () => {
+    render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
+    expect(screen.getByRole("button", { name: "Dibujo" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Maqueta 3D" }));
+    expect(screen.getByRole("button", { name: "Isométrica" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "De noche" })).toBeNull();
+  });
+});
+
+describe("editor con WebGL", () => {
+  // `restoreMocks` del runner quita los espías antes de cada prueba.
+  beforeEach(() => {
+    vi.stubGlobal("WebGL2RenderingContext", class {});
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(((tipo: string) => (tipo === "webgl2" ? ({} as unknown) : null)) as never);
+  });
+  afterAll(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("con muros abre en la maqueta, con sus capas y herramientas", async () => {
+    render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
+    expect(screen.getByRole("button", { name: "Maqueta 3D" })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByTestId("maqueta")).toBeInTheDocument();
+    expect(screen.getByRole("toolbar", { name: "Herramientas del plano" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "De noche" }));
+    expect(screen.getByRole("button", { name: "De noche" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/alcance de IR/)).toBeInTheDocument();
+    expect(screen.getByTestId("maqueta")).toHaveAttribute("data-noche", "true");
+  });
+
+  it("«Ver lo que ve» pide a la maqueta la vista de esa cámara", async () => {
+    render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
+    await screen.findByTestId("maqueta");
+    fireEvent.click(screen.getByRole("tab", { name: "Cámaras · 1" }));
+    fireEvent.click(screen.getByRole("button", { name: /Domo 2 Z ALM/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Ver lo que ve" }));
+    expect(screen.getByTestId("maqueta").getAttribute("data-ver")).toBeTruthy();
+    // Mientras se ve desde la cámara, no se dibuja.
+    expect(screen.queryByRole("toolbar", { name: "Herramientas del plano" })).toBeNull();
+  });
+
+  it("si se pierde WebGL sigue con la vista sencilla y lo avisa", async () => {
+    render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
+    fireEvent.click(await screen.findByTestId("perder-webgl"));
+    expect(screen.getByRole("button", { name: "Isométrica" })).toBeInTheDocument();
+    expect(screen.getByText(/seguimos con la vista sencilla/)).toBeInTheDocument();
   });
 });
