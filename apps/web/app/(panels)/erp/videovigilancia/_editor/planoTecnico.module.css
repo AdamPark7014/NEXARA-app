@@ -1,0 +1,248 @@
+/* Plano técnico: hoja doble carta (17 × 11 in a 96 px). Es papel: siempre blanca y con tinta negra, también en tema oscuro. */
+
+.hoja {
+  width: 1632px;
+  height: 1056px;
+  display: grid;
+  grid-template-columns: 1196px 436px;
+  background: #fff;
+  color: #14181f;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  transform-origin: 0 0;
+  box-shadow: var(--ui-elev-2);
+}
+
+.marcoHoja {
+  position: relative;
+  overflow: hidden;
+}
+
+.escalaHoja {
+  width: 1632px;
+  height: 1056px;
+  transform-origin: 0 0;
+}
+
+.dibujo {
+  display: block;
+  border-right: 1.3px solid #14181f;
+}
+
+.lado {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 1056px;
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1.3px solid #14181f;
+}
+
+.marca img {
+  height: 44px;
+  width: auto;
+}
+
+.marca b {
+  display: block;
+  font-size: 14px;
+}
+
+.marca span {
+  font-size: 10.5px;
+  color: #5a6370;
+}
+
+.bloque {
+  padding: 13px 18px;
+  border-bottom: 1.3px solid #14181f;
+}
+
+.bloque h3 {
+  margin: 0 0 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.bloque table {
+  width: 100% !important;
+  border-collapse: collapse;
+  font-size: 10.5px;
+}
+
+.bloque th {
+  padding: 0 5px 4px 1px;
+  border-bottom: 1px solid #14181f;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+  color: #5a6370;
+}
+
+.bloque td {
+  padding: 3.4px 5px 3.4px 1px;
+  border-bottom: 0.6px solid #dfe3e8;
+  vertical-align: middle;
+}
+
+.bloque tfoot td {
+  padding-top: 6px;
+  border-bottom: 0;
+  font-weight: 700;
+}
+
+.bloque .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tenue {
+  color: #5a6370;
+}
+
+.simbolos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 12px;
+  font-size: 10.5px;
+}
+
+.simbolos span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.grande {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+}
+
+.grande b {
+  font-size: 24px;
+  letter-spacing: -0.01em;
+}
+
+.grande span {
+  font-size: 10.5px;
+  color: #5a6370;
+}
+
+.barra {
+  display: flex;
+  height: 6px;
+  margin: 7px 0 8px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #eef0f3;
+}
+
+.barra i {
+  display: block;
+}
+
+.niveles {
+  display: grid;
+  gap: 3px;
+  font-size: 10.5px;
+}
+
+.niveles span {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.niveles i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.niveles b {
+  font-variant-numeric: tabular-nums;
+}
+
+.revision {
+  display: flex;
+  gap: 8px;
+  padding: 3.5px 0;
+  border-bottom: 0.6px solid #dfe3e8;
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+
+.revision:last-child {
+  border-bottom: 0;
+}
+
+.bien,
+.alerta {
+  flex: 0 0 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.bien {
+  background: #0a7f6d;
+}
+
+.alerta {
+  background: #c47a0d;
+}
+
+.caratula {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1.3px solid #14181f;
+}
+
+.caratula div {
+  padding: 6px 11px;
+  border-right: 1px solid #14181f;
+  border-bottom: 1px solid #14181f;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.caratula div:nth-child(2n) {
+  border-right: 0;
+}
+
+.caratula div:last-child,
+.caratula div:nth-last-child(2) {
+  border-bottom: 0;
+}
+
+.caratula .ancho {
+  grid-column: 1 / 3;
+  border-right: 0;
+}
+
+.caratula small {
+  display: block;
+  margin-bottom: 1px;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #5a6370;
+}

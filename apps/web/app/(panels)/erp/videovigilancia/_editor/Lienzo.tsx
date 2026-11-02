@@ -5,11 +5,13 @@
  * giro, ventanas, obstáculos, cotas, etiquetas, conos DORI recortados por muros, cámaras con su
  * manija para apuntar y humanoides. Rueda = zoom; arrastrar el fondo = mover la vista.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type { ModeloCamara } from "@/lib/cctv/catalogo";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { modeloPorId, type ModeloCamara } from "@/lib/cctv/catalogo";
 import {
   agregarAbertura,
+  agregarArea,
   agregarCamara,
+  agregarMueble,
   agregarMuro,
   agregarObstaculo,
   agregarPersona,
@@ -23,11 +25,12 @@ import {
   type TipoElemento,
 } from "@/lib/cctv/editor";
 import { etiquetaCono, hfovDeg, distanciaInclinadaM, ppm } from "@/lib/cctv/optica";
-import { dirRumbo, hojasPuerta, type Plano, type Punto, type Tapa } from "@/lib/cctv/plano";
+import { dirRumbo, hojasPuerta, type MaterialPiso, type Plano, type Punto, type Tapa, type TipoMueble } from "@/lib/cctv/plano";
 import { reescalar } from "@/lib/cctv/niveles";
 import { camaraEnMetros, mejorNivelEn, type CamaraM, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import { COLOR_NIVEL, OPACIDAD_NIVEL } from "./colores";
 import Navegacion, { ICONO } from "./Navegacion";
+import { NOMBRE_MUEBLE, TIPO_ARRASTRE, leerArrastre } from "./PanelEquipos";
 import styles from "./editor.module.css";
 
 export type Herramienta =
@@ -37,6 +40,8 @@ export type Herramienta =
   | "ventana"
   | "acceso"
   | "obstaculo"
+  | "area"
+  | "mueble"
   | "cota"
   | "etiqueta"
   | "camara"
@@ -49,9 +54,20 @@ type Arrastre =
   | { modo: "mover"; sel: Seleccion; ultimo: Punto; fusion: string; movido: boolean }
   | { modo: "extremo"; muroId: string; extremo: "a" | "b"; fusion: string }
   | { modo: "apuntar"; camaraId: string; fusion: string }
-  | { modo: "obstaculo"; inicio: Punto };
+  | { modo: "obstaculo"; inicio: Punto }
+  | { modo: "area"; inicio: Punto };
 
-const MOVIBLES: ReadonlySet<TipoElemento> = new Set(["muro", "camara", "persona", "etiqueta", "obstaculo", "cota"]);
+const MOVIBLES: ReadonlySet<TipoElemento> = new Set(["muro", "camara", "persona", "etiqueta", "obstaculo", "cota", "area", "mueble"]);
+
+/** Tinte de cada piso en el dibujo 2D. */
+const TINTE_PISO: Readonly<Record<MaterialPiso, string>> = {
+  concreto: "#c9ccd0",
+  madera: "#d9b78f",
+  piedra: "#e8e6df",
+  tecnico: "#b9bdc2",
+  asfalto: "#8c8f94",
+  pasto: "#b9c7a5",
+};
 
 const f1 = (n: number) => Math.round(n * 10) / 10;
 const pts = (ps: readonly Punto[]) => ps.map((p) => `${f1(p.x)},${f1(p.y)}`).join(" ");
@@ -112,6 +128,8 @@ export default function Lienzo({
   tapas,
   coberturas,
   modeloNuevo,
+  muebleNuevo = "escritorio",
+  pisoNuevo = "concreto",
   onAplicar,
   onSeleccionar,
   onAviso,
@@ -128,6 +146,8 @@ export default function Lienzo({
   tapas: readonly Tapa[];
   coberturas: ReadonlyMap<string, PoligonoCobertura[]>;
   modeloNuevo: ModeloCamara;
+  muebleNuevo?: TipoMueble;
+  pisoNuevo?: MaterialPiso;
   onAplicar: (plano: Plano, opciones?: { seleccion?: Seleccion | null; fusion?: string }) => void;
   onSeleccionar: (s: Seleccion | null) => void;
   onAviso: (texto: string) => void;
@@ -338,6 +358,17 @@ export default function Lienzo({
         setArrastrando("obstaculo");
         capturar();
         return;
+      case "area":
+        arrastre.current = { modo: "area", inicio: p };
+        setArrastrando("area");
+        capturar();
+        return;
+      case "mueble": {
+        const r = agregarMueble(actual, p, muebleNuevo);
+        onAplicar(r.plano, { seleccion: { tipo: "mueble", id: r.mueble.id } });
+        onHerramienta("seleccionar");
+        return;
+      }
       case "cota": {
         const q = ajustar(p, inicioCota, libre);
         if (!inicioCota) {
@@ -413,6 +444,27 @@ export default function Lienzo({
       const r = agregarObstaculo(planoRef.current, a.inicio, p);
       if (r.obstaculo) onAplicar(r.plano, { seleccion: { tipo: "obstaculo", id: r.obstaculo.id } });
     }
+    if (a?.modo === "area") {
+      const r = agregarArea(planoRef.current, a.inicio, aPlano(e.clientX, e.clientY), pisoNuevo);
+      if (r.area) onAplicar(r.plano, { seleccion: { tipo: "area", id: r.area.id } });
+    }
+  };
+
+  /** Un equipo soltado desde el panel de la izquierda. */
+  const alSoltarEquipo = (e: DragEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    const dato = leerArrastre(e.dataTransfer.getData(TIPO_ARRASTRE));
+    if (!dato) return;
+    const p = aPlano(e.clientX, e.clientY);
+    if (dato.clase === "camara") {
+      const m = modeloPorId(dato.id);
+      if (!m) return;
+      const r = agregarCamara(planoRef.current, p, m, { numero: numeroNuevo, nombre: `Cámara ${numeroNuevo}` });
+      onAplicar(r.plano, { seleccion: { tipo: "camara", id: r.camara.id } });
+    } else {
+      const r = agregarMueble(planoRef.current, p, dato.id);
+      onAplicar(r.plano, { seleccion: { tipo: "mueble", id: r.mueble.id } });
+    }
   };
 
   /* ── Lo que se dibuja ── */
@@ -467,10 +519,10 @@ export default function Lienzo({
   const pasoGrid = (1 / k) / u < 8 ? 5 / k : 1 / k;
   const preview = cursor && inicioMuro ? ajustar(cursor, inicioMuro) : null;
   const previewCota = cursor && inicioCota ? ajustar(cursor, inicioCota) : null;
-  const ob = arrastrando === "obstaculo" && arrastre.current?.modo === "obstaculo" && cursor ? arrastre.current.inicio : null;
+  const ob = (arrastrando === "obstaculo" || arrastrando === "area") && (arrastre.current?.modo === "obstaculo" || arrastre.current?.modo === "area") && cursor ? arrastre.current.inicio : null;
 
   const cursorCss =
-    arrastrando === "pan" ? "grabbing" : herramienta === "seleccionar" ? "default" : herramienta === "camara" || herramienta === "persona" || herramienta === "etiqueta" ? "copy" : "crosshair";
+    arrastrando === "pan" ? "grabbing" : herramienta === "seleccionar" ? "default" : herramienta === "camara" || herramienta === "persona" || herramienta === "etiqueta" || herramienta === "mueble" ? "copy" : "crosshair";
 
   // Barra de escala: el largo «redondo» (1, 2, 5, 10, 20, 50 m…) que ocupa entre 70 y 170 px de pantalla.
   const metrosPorPantalla = u * k;
@@ -492,7 +544,7 @@ export default function Lienzo({
       </span>
     </div>
     <Navegacion
-      lugar="arriba"
+      lugar="abajo"
       botones={[
         { etiqueta: "Alejar", icono: ICONO.menos, accion: () => setVista((v) => acercarAlCentro(v, 0.8)) },
         { etiqueta: "Acercar", icono: ICONO.mas, accion: () => setVista((v) => acercarAlCentro(v, 1.25)) },
@@ -512,6 +564,8 @@ export default function Lienzo({
       onPointerLeave={() => setCursor(null)}
       onDoubleClick={() => setInicioMuro(null)}
       onContextMenu={(e) => e.preventDefault()}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={alSoltarEquipo}
       role="application"
       aria-label="Plano del sitio: muros, cámaras y su cobertura"
     >
@@ -534,6 +588,18 @@ export default function Lienzo({
           style={{ pointerEvents: "none", filter: plano.croquis.invertido ? "invert(1) hue-rotate(180deg)" : undefined }}
         />
       ) : null}
+
+      {(plano.areas ?? []).map((a) => (
+        <polygon
+          key={a.id}
+          data-sel={`area:${a.id}`}
+          points={pts(a.puntos)}
+          fill={TINTE_PISO[a.piso]}
+          fillOpacity={0.4}
+          stroke={esSel("area", a.id) ? "var(--ui-brand)" : TINTE_PISO[a.piso]}
+          strokeWidth={(esSel("area", a.id) ? 2.5 : 1) * u}
+        />
+      ))}
 
       {/* El nivel de abajo, en gris, para calcar encima (los croquis comparten origen y se pasa por metros). */}
       {planoAbajo
@@ -712,6 +778,16 @@ export default function Lienzo({
             </text>
           ))
         : null}
+
+      {(plano.muebles ?? []).map((m) => (
+        <g key={m.id} data-sel={`mueble:${m.id}`} transform={`translate(${m.pos.x} ${m.pos.y}) scale(${u})`}>
+          <title>{NOMBRE_MUEBLE[m.tipo]}</title>
+          <rect x={-8} y={-8} width={16} height={16} rx={3} fill="var(--ui-surface)" stroke={esSel("mueble", m.id) ? "var(--ui-brand)" : "var(--ui-fg-4)"} strokeWidth={esSel("mueble", m.id) ? 2.5 : 1.4} />
+          <text y={3.5} fontSize={9.5} fontWeight={700} textAnchor="middle" fill="var(--ui-fg-2)" style={{ userSelect: "none" }}>
+            {NOMBRE_MUEBLE[m.tipo].charAt(0)}
+          </text>
+        </g>
+      ))}
 
       {plano.personas.map((h) => {
         const sel = esSel("persona", h.id);

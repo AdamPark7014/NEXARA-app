@@ -246,6 +246,13 @@ Recalibrar mueve todo junto y los muros siguen encima de sus trazos. Sin croquis
 
 ## 4. Modelo 3D
 
+Desde el 01-11-2026 hay dos vistas 3D:
+
+- **Maqueta** (`_editor/Maqueta3D.tsx` y `lib/cctv/maqueta/`), con three.js y WebGL: la que se abre por omisión.
+- **Respaldo SVG** (`Lienzo3D`, `lib/cctv/escena3d.ts`): si el navegador no tiene WebGL2 o pierde el contexto.
+
+Lo que sigue describe la maqueta; ver §4.1 para lo que se agregó.
+
 - **Librería:** `three` (MIT) más `@types/three`.
   - Se carga con `next/dynamic` (`ssr: false`) solo en la ruta del diseñador; no pesa en el resto de Core.
   - No necesita `eval` ni workers `blob:`, así que pasa la CSP actual.
@@ -261,6 +268,33 @@ Recalibrar mueve todo junto y los muros siguen encima de sus trazos. Sin croquis
   ningún recurso de SYSCOM.
 - **Controles:** orbitar, mover y zoom (`OrbitControls`); «Isométrica», «Vista superior» y «F» para enfocar
   la selección. Las cotas y las etiquetas de área se pintan como texto sobre el plano.
+
+### 4.1 Maqueta y plano técnico (fase 7, aprobada por Adam el 01-11-2026)
+
+Mockup: <https://claude.ai/artifact/PoFrsCNRTWxHrDDYQDAWeY>. Maqueta de muestra: <https://claude.ai/artifact/MLTNVKcT6rGV9q3hGAhkJg>.
+
+- **Modelos propios** (`maqueta/modelos.ts`): domo, turret, bala y PTZ se arman con código a partir de las medidas de la
+  ficha, en milímetros. No usan fotos ni archivos del fabricante: su licencia prohíbe obras derivadas. Las fotos de
+  `public/cctv/` salen de estos mismos modelos.
+- **Capas** (`maqueta/motor.ts`): solo se rehace lo que cambió del plano. Se pinta a pedido; mientras se mueve va sin
+  sombreado de contacto y al soltar se afina. Con tarjeta integrada Intel UHD gira a 47 cuadros por segundo con el sitio de
+  ejemplo (10 cámaras, 25 muebles, 3 anaqueles). Si baja de 20, reduce la resolución sola.
+- **Datos nuevos en el plano**, opcionales y sin migración: `areas` (zona con piso y nombre) y `muebles` (ambientación). La
+  ambientación **no tapa la vista** en el cálculo; lo que tape se dibuja como obstáculo. Un obstáculo llamado «Anaquel» o
+  «Rack» se ve con su estructura y cajas.
+- **Muros tenues:** un muro de afuera se vuelve tenue solo si, desde donde se ve, tapa más de 4.5 m hacia adentro. Una
+  bodega de 3 m se ve sólida desde arriba; una de 5 m o una vista baja abren la «casa de muñecas».
+- **De noche:** cada cono llega hasta `irM`, el alcance de IR o luz blanca de la ficha. Es una aproximación: no considera las
+  lámparas del sitio.
+- **«Ver lo que ve»:** pone la vista en la lente con el ángulo vertical real de la óptica.
+- **Plano técnico** (`_editor/PlanoTecnico.tsx`, `lib/cctv/planoTecnico.ts`): hoja doble carta a escala normalizada. Los ejes
+  salen de las líneas donde corren muros rectos. En «Imprimir plano» sale a 17 × 11 in; dentro de la propuesta va girado en
+  una hoja carta, porque Chrome reduce todo el documento si una hoja es más ancha que las demás.
+- **Claves:** `CAM-01` sale de `numero`. Los demás equipos (AC, AS, GAB…) llegan con el catálogo.
+
+Para ver el editor sin sesión y sin los minutos de `next dev`: empaquetar con esbuild, con `next/link`, `next/navigation` y
+`next/dynamic` sustituidos por versiones mínimas y el `.nx-app-shell` alrededor (sin esa clase, `section` toma el ancho máximo
+del sitio público). Sin GPU, Chrome necesita `--use-angle=swiftshader`.
 
 ## 5. Vista desde cada cámara
 
@@ -395,6 +429,11 @@ lugares a tocar para dar de alta un módulo:
 | 5b | Plano por niveles (varios pisos), artboard 5 aprobado por Adam el 29-10: barra de niveles, cada nivel con su croquis, escala, muros y cámaras; «Copiar muros» del nivel de abajo; numeración que sigue entre niveles; 3D apilado a la elevación real con los de abajo en gris; propuesta con una hoja de distribución por nivel. Motor en `lib/cctv/niveles.ts` | **Hecha** (29-10) |
 | 5 | Detección automática (PDF vectorial y luego IA con eval) y «Leer ficha» | — |
 | 6 | Infraestructura en el plano (gabinetes, rutas de cable, NVR/discos/switch) y mapa de calor en la propuesta | — |
+| 7 | Maqueta 3D con WebGL, modelos propios, vista de noche, «Ver lo que ve», áreas y ambientación, plano técnico y foto de la maqueta en la propuesta (§4.1) | **Hecha** (01-11) |
+| 8 | Catálogo de equipos: agregar modelos; acceso, alarmas, servidores, NVR y gabinete con su modelo y comportamiento; diagrama de conexión y revisión | Propuesta aprobada |
+| 9 | Memoria técnica: subir el PDF, la IA llena la ficha y se arma el modelo. Medido: 92 de 94 datos en 6 fichas con Haiku 5.5 | Propuesta aprobada |
+| 10 | Stock de Almacén, consulta en CT y «Pasar a cotización» | Falta decidir el inventario |
+| 11 | Cotización premium | Faltan las especificaciones de Adam |
 
 Cada fase se despliega sola (`/root/deploy-web.sh` si solo cambia la web; `/root/deploy-api-web.sh` si cambia
 la API).

@@ -21,8 +21,11 @@ import {
   muroMasCercano,
   reducirEditor,
   resumenDelPlano,
+  agregarArea,
+  agregarMueble,
+  existe,
 } from "./editor";
-import { planoVacio, type Plano } from "./plano";
+import { planoVacio, type Plano, tapasDelPlano } from "./plano";
 
 // 10 px por metro para leer las cuentas.
 const base = (): Plano => ({ ...planoVacio(), escala: { metrosPorPx: 0.1, calibracion: null } });
@@ -193,5 +196,48 @@ describe("resumen", () => {
     expect(r.cobertura!.cubierto).toBeGreaterThan(30);
     expect(r.cobertura!.cubierto).toBeLessThan(80);
     expect(resumenDelPlano(base()).cobertura).toBeNull();
+  });
+});
+
+describe("áreas y ambientación", () => {
+  const base = () => ({ ...planoVacio(), escala: { metrosPorPx: 0.02, calibracion: null } });
+
+  it("un área necesita tamaño y guarda su piso", () => {
+    const chica = agregarArea(base(), { x: 0, y: 0 }, { x: 5, y: 5 });
+    expect(chica.area).toBeNull();
+    const r = agregarArea(base(), { x: 0, y: 0 }, { x: 100, y: 200 }, "madera");
+    expect(r.area?.piso).toBe("madera");
+    expect(r.area?.puntos).toHaveLength(4);
+    expect(r.plano.areas).toHaveLength(1);
+  });
+
+  it("áreas y muebles se mueven, se borran y siguen la selección", () => {
+    const conArea = agregarArea(base(), { x: 0, y: 0 }, { x: 100, y: 100 }).plano;
+    const area = conArea.areas![0];
+    const conTodo = agregarMueble(conArea, { x: 50, y: 50 }, "camion");
+    const mueble = conTodo.mueble;
+    const movido = mover(mover(conTodo.plano, { tipo: "area", id: area.id }, { x: 10, y: 0 }), { tipo: "mueble", id: mueble.id }, { x: 0, y: 7 });
+    expect(movido.areas![0].puntos[0]).toEqual({ x: 10, y: 0 });
+    expect(movido.muebles![0].pos).toEqual({ x: 50, y: 57 });
+    expect(existe(movido, { tipo: "mueble", id: mueble.id })).toBe(true);
+    const sinMueble = borrar(movido, { tipo: "mueble", id: mueble.id });
+    expect(sinMueble.muebles).toEqual([]);
+    expect(existe(sinMueble, { tipo: "mueble", id: mueble.id })).toBe(false);
+    expect(borrar(sinMueble, { tipo: "area", id: area.id }).areas).toEqual([]);
+  });
+
+  it("los diseños anteriores, sin esos campos, siguen funcionando", () => {
+    const viejo = base();
+    expect(existe(viejo, { tipo: "area", id: "x" })).toBe(false);
+    expect(mover(viejo, { tipo: "mueble", id: "x" }, { x: 1, y: 1 }).muebles).toEqual([]);
+    expect(borrar(viejo, { tipo: "area", id: "x" }).areas).toEqual([]);
+    expect(agregarMueble(viejo, { x: 1, y: 1 }, "auto").plano.muebles).toHaveLength(1);
+  });
+
+  it("no cambian el cálculo de cobertura: la ambientación no tapa", () => {
+    const p = agregarMuro(base(), { x: 0, y: 0 }, { x: 500, y: 0 }).plano;
+    const antes = tapasDelPlano(p).length;
+    const despues = agregarArea(agregarMueble(p, { x: 10, y: 10 }, "camion").plano, { x: 0, y: 0 }, { x: 100, y: 100 }).plano;
+    expect(tapasDelPlano(despues)).toHaveLength(antes);
   });
 });

@@ -14,17 +14,21 @@ import {
   siguienteNumero,
   tapasDelPlano,
   type Abertura,
+  type Area,
   type CamaraPlano,
+  type MaterialPiso,
+  type Mueble,
   type Muro,
   type Obstaculo,
   type Plano,
   type Punto,
+  type TipoMueble,
 } from "./plano";
 import { camaraEnMetros, repartoDeArea } from "./visibilidad";
 import { nuevoId } from "./ids";
 import { listaNiveles } from "./niveles";
 
-export type TipoElemento = "muro" | "abertura" | "obstaculo" | "etiqueta" | "cota" | "camara" | "persona";
+export type TipoElemento = "muro" | "abertura" | "obstaculo" | "etiqueta" | "cota" | "camara" | "persona" | "area" | "mueble";
 export type Seleccion = { tipo: TipoElemento; id: string };
 
 export { nuevoId };
@@ -160,6 +164,18 @@ export function agregarObstaculo(plano: Plano, a: Punto, b: Punto, alturaM = 2.4
     alturaM,
   };
   return { plano: { ...plano, obstaculos: [...plano.obstaculos, obstaculo] }, obstaculo };
+}
+
+/** Rectángulo de área con su piso, entre dos esquinas. */
+export function agregarArea(plano: Plano, a: Punto, b: Punto, piso: MaterialPiso = "concreto"): { plano: Plano; area: Area | null } {
+  if (mDe(plano, Math.abs(b.x - a.x)) < 0.3 || mDe(plano, Math.abs(b.y - a.y)) < 0.3) return { plano, area: null };
+  const area: Area = { id: nuevoId("ar"), nombre: null, piso, puntos: [a, { x: b.x, y: a.y }, b, { x: a.x, y: b.y }] };
+  return { plano: { ...plano, areas: [...(plano.areas ?? []), area] }, area };
+}
+
+export function agregarMueble(plano: Plano, pos: Punto, tipo: TipoMueble, rumboDeg = 180): { plano: Plano; mueble: Mueble } {
+  const mueble: Mueble = { id: nuevoId("mu"), tipo, pos, rumboDeg };
+  return { plano: { ...plano, muebles: [...(plano.muebles ?? []), mueble] }, mueble };
 }
 
 export function agregarEtiqueta(plano: Plano, pos: Punto, texto: string): Plano {
@@ -304,6 +320,10 @@ export function mover(plano: Plano, sel: Seleccion, delta: Punto): Plano {
       };
     case "cota":
       return { ...plano, cotas: plano.cotas.map((c) => (c.id === sel.id ? { ...c, a: sumar(c.a, delta), b: sumar(c.b, delta) } : c)) };
+    case "area":
+      return { ...plano, areas: (plano.areas ?? []).map((a) => (a.id === sel.id ? { ...a, puntos: a.puntos.map((p) => sumar(p, delta)) } : a)) };
+    case "mueble":
+      return { ...plano, muebles: (plano.muebles ?? []).map((m) => (m.id === sel.id ? { ...m, pos: sumar(m.pos, delta) } : m)) };
     case "abertura":
       return plano;
   }
@@ -343,6 +363,10 @@ export function borrar(plano: Plano, sel: Seleccion): Plano {
       return { ...plano, camaras: plano.camaras.filter((c) => c.id !== sel.id) };
     case "persona":
       return { ...plano, personas: plano.personas.filter((p) => p.id !== sel.id) };
+    case "area":
+      return { ...plano, areas: (plano.areas ?? []).filter((a) => a.id !== sel.id) };
+    case "mueble":
+      return { ...plano, muebles: (plano.muebles ?? []).filter((m) => m.id !== sel.id) };
   }
 }
 
@@ -357,6 +381,8 @@ export function existe(plano: Plano, sel: Seleccion | null): boolean {
     cota: plano.cotas,
     camara: plano.camaras,
     persona: plano.personas,
+    area: plano.areas ?? [],
+    mueble: plano.muebles ?? [],
   };
   return listas[sel.tipo].some((x) => x.id === sel.id) || (plano.niveles ?? []).some((n) => existe(n.plano, sel));
 }

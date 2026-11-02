@@ -7,7 +7,7 @@
  */
 import { useMemo, type ReactNode } from "react";
 import { Button, ButtonLink, Field, Input, Segmented, Select, Switch } from "@/components/base";
-import { MODELOS_CAMARA, MODELO_GENERICO, etiquetaModelo, modeloPorId } from "@/lib/cctv/catalogo";
+import { ETIQUETA_TIPO_CAMARA, MODELOS_CAMARA, MODELO_GENERICO, etiquetaModelo, modeloPorId } from "@/lib/cctv/catalogo";
 import {
   borrar,
   cambiarAlturaEnLote,
@@ -29,11 +29,12 @@ import {
   resumenOptico,
   type Optica,
 } from "@/lib/cctv/optica";
-import { distancia, type Abertura, type CamaraPlano, type Nivel, type Plano, type Tapa } from "@/lib/cctv/plano";
-import { ETIQUETA_ESTADO_PERSONA, camaraEnMetros, leerPersona } from "@/lib/cctv/visibilidad";
+import { aMetros, distancia, type Abertura, type CamaraPlano, type MaterialPiso, type Nivel, type Plano, type Tapa, type TipoMueble } from "@/lib/cctv/plano";
+import { ETIQUETA_ESTADO_PERSONA, areaPoligono, camaraEnMetros, leerPersona } from "@/lib/cctv/visibilidad";
 import { ETIQUETA_ESTADO_DISENO, type EstadoDiseno } from "@/lib/cctv/api";
 import { COLOR_NIVEL } from "./colores";
 import type { Herramienta } from "./Lienzo";
+import { NOMBRE_MUEBLE, NOMBRE_PISO, fotoCamara } from "./PanelEquipos";
 import styles from "./editor.module.css";
 
 export type Pestana = "seleccion" | "camaras" | "plano";
@@ -110,6 +111,7 @@ export default function Inspector({
   onRecalibrar,
   onCambiarCroquis,
   onHerramienta,
+  onVerLoQueVe,
   fichaDe,
   numeroNuevo,
   nivel,
@@ -128,6 +130,8 @@ export default function Inspector({
   onCambiarCroquis: () => void;
   /** Activa una herramienta del lienzo (la guía de pasos la usa). */
   onHerramienta?: (h: Herramienta) => void;
+  /** Lleva la maqueta al punto de vista de la cámara. Sin WebGL no viene. */
+  onVerLoQueVe?: (camaraId: string) => void;
   /** Ruta de la ficha de una cámara. */
   fichaDe: (camaraId: string) => string;
   /** Número de la siguiente cámara (sigue entre niveles). */
@@ -152,7 +156,7 @@ export default function Inspector({
       <div className={styles.inspectorCuerpo}>
         {pestana === "seleccion" ? (
           seleccion ? (
-            <PanelSeleccion plano={plano} seleccion={seleccion} tapas={tapas} onAplicar={onAplicar} onSeleccionar={onSeleccionar} fichaDe={fichaDe} numeroNuevo={numeroNuevo} />
+            <PanelSeleccion plano={plano} seleccion={seleccion} tapas={tapas} onAplicar={onAplicar} onSeleccionar={onSeleccionar} onVerLoQueVe={onVerLoQueVe} fichaDe={fichaDe} numeroNuevo={numeroNuevo} />
           ) : (
             <Guia plano={plano} resumen={resumen} onHerramienta={onHerramienta} onCambiarCroquis={onCambiarCroquis} onRecalibrar={onRecalibrar} />
           )
@@ -179,6 +183,8 @@ function etiquetaSeleccion(plano: Plano, s: Seleccion): string {
     cota: "Cota",
     camara: "Cámara",
     persona: "Persona",
+    area: "Área",
+    mueble: "Ambientación",
   };
   return nombres[s.tipo];
 }
@@ -189,6 +195,7 @@ function PanelSeleccion({
   tapas,
   onAplicar,
   onSeleccionar,
+  onVerLoQueVe,
   fichaDe,
   numeroNuevo,
 }: {
@@ -197,6 +204,7 @@ function PanelSeleccion({
   tapas: readonly Tapa[];
   onAplicar: Aplicar;
   onSeleccionar: (s: Seleccion | null) => void;
+  onVerLoQueVe?: (camaraId: string) => void;
   fichaDe: (camaraId: string) => string;
   numeroNuevo: number;
 }) {
@@ -208,7 +216,7 @@ function PanelSeleccion({
   switch (seleccion.tipo) {
     case "camara": {
       const c = plano.camaras.find((x) => x.id === seleccion.id);
-      return c ? <PanelCamara plano={plano} camara={c} tapas={tapas} onAplicar={onAplicar} quitar={quitar("Quitar cámara")} fichaHref={fichaDe(c.id)} numeroNuevo={numeroNuevo} /> : null;
+      return c ? <PanelCamara plano={plano} camara={c} tapas={tapas} onAplicar={onAplicar} quitar={quitar("Quitar cámara")} fichaHref={fichaDe(c.id)} numeroNuevo={numeroNuevo} onVerLoQueVe={onVerLoQueVe} /> : null;
     }
     case "muro": {
       const m = plano.muros.find((x) => x.id === seleccion.id);
@@ -268,7 +276,7 @@ function PanelSeleccion({
         onAplicar({ ...plano, obstaculos: plano.obstaculos.map((x) => (x.id === o.id ? { ...x, ...cambios } : x)) }, { fusion: `ob-${o.id}` });
       return (
         <div className={styles.panel}>
-          <Field label="Qué es">
+          <Field label="Qué es" hint="En la maqueta, «Anaquel» se ve con su estructura y cajas.">
             <Input value={o.nombre ?? ""} onChange={(e) => cambiar({ nombre: e.target.value })} placeholder="Anaquel, columna, rack…" controlSize="sm" />
           </Field>
           <Numero etiqueta="Altura" valor={o.alturaM} unidad="m" min={0.2} max={30} onCambio={(alturaM) => cambiar({ alturaM })} pista="Tapa la vista hasta esa altura." />
@@ -313,6 +321,52 @@ function PanelSeleccion({
       if (!h) return null;
       return <PanelPersona plano={plano} pos={h.pos} tapas={tapas} quitar={quitar("Quitar persona")} onSeleccionar={onSeleccionar} />;
     }
+    case "area": {
+      const a = (plano.areas ?? []).find((x) => x.id === seleccion.id);
+      if (!a) return null;
+      const cambiar = (cambios: Partial<typeof a>) => onAplicar({ ...plano, areas: (plano.areas ?? []).map((x) => (x.id === a.id ? { ...x, ...cambios } : x)) }, { fusion: `ar-${a.id}` });
+      return (
+        <div className={styles.panel}>
+          <div className={styles.panelTitulo}>
+            <b>Área</b>
+            <span className={styles.tenue}>{areaPoligono(a.puntos.map((p) => aMetros(p, plano.escala))).toFixed(0)} m²</span>
+          </div>
+          <Field label="Nombre" hint="Sale en la maqueta y, con sus m², en el plano técnico.">
+            <Input value={a.nombre ?? ""} onChange={(e) => cambiar({ nombre: e.target.value })} placeholder="Bodega, oficinas, recepción…" controlSize="sm" />
+          </Field>
+          <Field label="Piso">
+            <Select value={a.piso} onChange={(e) => cambiar({ piso: e.target.value as MaterialPiso })} controlSize="sm">
+              {(Object.keys(NOMBRE_PISO) as MaterialPiso[]).map((t) => (
+                <option key={t} value={t}>
+                  {NOMBRE_PISO[t]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <div className={styles.acciones}>{quitar("Quitar área")}</div>
+        </div>
+      );
+    }
+    case "mueble": {
+      const m = (plano.muebles ?? []).find((x) => x.id === seleccion.id);
+      if (!m) return null;
+      const cambiar = (cambios: Partial<typeof m>) => onAplicar({ ...plano, muebles: (plano.muebles ?? []).map((x) => (x.id === m.id ? { ...x, ...cambios } : x)) }, { fusion: `mu-${m.id}` });
+      return (
+        <div className={styles.panel}>
+          <Field label="Pieza" hint="Es ambientación: no tapa la vista en el cálculo. Si debe tapar, dibuja un obstáculo.">
+            <Select value={m.tipo} onChange={(e) => cambiar({ tipo: e.target.value as TipoMueble })} controlSize="sm">
+              {(Object.keys(NOMBRE_MUEBLE) as TipoMueble[]).map((t) => (
+                <option key={t} value={t}>
+                  {NOMBRE_MUEBLE[t]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Numero etiqueta="Rumbo" valor={m.rumboDeg} unidad="°" paso={15} min={0} max={360} onCambio={(rumboDeg) => cambiar({ rumboDeg: rumboDeg % 360 })} />
+          <div className={styles.acciones}>{quitar("Quitar pieza")}</div>
+        </div>
+      );
+    }
   }
 }
 
@@ -324,6 +378,7 @@ function PanelCamara({
   quitar,
   fichaHref,
   numeroNuevo,
+  onVerLoQueVe,
 }: {
   plano: Plano;
   camara: CamaraPlano;
@@ -332,6 +387,7 @@ function PanelCamara({
   quitar: ReactNode;
   fichaHref: string;
   numeroNuevo: number;
+  onVerLoQueVe?: (camaraId: string) => void;
 }) {
   const fusion = `cam-${c.id}`;
   const cambiar = (cambios: Partial<CamaraPlano>) => onAplicar(actualizarCamara(plano, c.id, cambios), { fusion });
@@ -344,6 +400,10 @@ function PanelCamara({
 
   return (
     <div className={styles.panel}>
+      <div className={styles.fotoEquipo}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={fotoCamara(c.esPtz ? "ptz" : (modelo?.tipo ?? "domo"))} alt={`Modelo 3D de la cámara ${modelo ? ETIQUETA_TIPO_CAMARA[modelo.tipo].toLowerCase() : ""}`} />
+      </div>
       <div className={styles.panelTitulo}>
         <span className={styles.numero}>{c.numero}</span>
         <Input value={c.nombre} onChange={(e) => cambiar({ nombre: e.target.value })} aria-label="Nombre de la cámara" controlSize="sm" />
@@ -478,6 +538,11 @@ function PanelCamara({
       <LecturaCamara plano={plano} camara={c} tapas={tapas} />
 
       <div className={styles.acciones}>
+        {onVerLoQueVe ? (
+          <Button size="sm" onClick={() => onVerLoQueVe(c.id)}>
+            Ver lo que ve
+          </Button>
+        ) : null}
         <ButtonLink href={fichaHref} size="sm" variant="primary">
           Abrir ficha
         </ButtonLink>

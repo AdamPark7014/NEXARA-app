@@ -42,6 +42,12 @@
   font-size: var(--ui-fs-meta);
 }
 
+.hojaPlano {
+  width: 8.5in;
+  max-width: 100%;
+  margin: 0 auto var(--ui-s5);
+}
+
 .hoja {
   width: 8.5in;
   min-height: 11in;
@@ -145,6 +151,11 @@
   overflow: hidden;
 }
 
+/* Un sitio casi cuadrado no debe empujar el resto de la hoja a la siguiente. */
+.marcoDistribucion svg {
+  max-height: 4.1in;
+}
+
 .listaCamaras {
   list-style: none;
   margin: 0;
@@ -210,8 +221,8 @@
 
 .vistas {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .vistas > figure,

@@ -39,6 +39,7 @@ export default function PropuestaPage() {
       niveles={calculo.niveles}
       resumen={calculo.resumen}
       grabacion={diseno.grabacion}
+      planoTecnico={{ raiz: plano, elaboro: diseno.creadoPor?.nombre ?? null, fecha: diseno.updatedAt, version: diseno.version }}
     />
   );
 }
