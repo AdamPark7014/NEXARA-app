@@ -252,6 +252,33 @@ describe("ficha: resumen", () => {
   });
 });
 
+describe("alta de un vehículo que ya existe, sin ficha", () => {
+  it("marca, modelo y año salen de su nombre, y con ellos se busca el rendimiento oficial", async () => {
+    estado.consulta = "vehiculo=2";
+    const sinFicha = { ...FICHA, tieneFicha: false, especificacion: null, programa: [], costos: null };
+    servir(
+      { incluye: "costos/acceso", body: { veTodo: true } },
+      { incluye: "vehicles/ficha/omisiones", body: OMISIONES },
+      { incluye: "vehicles/ficha/rendimiento-oficial", metodo: "POST", body: { rendimiento: { valor: 11.91, fuente: { tipo: "CONUEE", pagina: 24 }, version: "FRONTIER" } } },
+      { incluye: "vehicles/ficha/2", metodo: "GET", body: sinFicha },
+    );
+    const user = userEvent.setup();
+    render(<AltaVehiculo />);
+
+    expect(await screen.findByLabelText("Marca")).toHaveValue("Nissan");
+    expect(screen.getByLabelText("Modelo")).toHaveValue("Frontier");
+    expect(screen.getByLabelText("Año")).toHaveValue("2026");
+
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+    await waitFor(() => {
+      const post = llamadas.find((l) => l.url.includes("rendimiento-oficial"));
+      expect(post?.body).toMatchObject({ marca: "Nissan", modelo: "Frontier", anio: 2026 });
+    });
+    expect(await screen.findByText("CONUEE 2023 p. 24")).toBeInTheDocument();
+    estado.consulta = "";
+  });
+});
+
 describe("ficha: pestañas", () => {
   it("especificaciones: cada dato con su fuente, y los documentos con vencimiento", async () => {
     servir(...PARA_FICHA());

@@ -104,6 +104,8 @@ const CAMPOS_TEXTO = {
   llantaMedida: 30,
 } as const;
 
+const CON_MAYUSCULA = new Set(['combustible', 'transmision']);
+
 const CAMPOS_NUMERO = {
   anio: { min: 1980, max: 2035, entero: true },
   potenciaHp: { min: 30, max: 900, entero: true },
@@ -206,7 +208,8 @@ export function limpiarManual(
     const p = pagina(r);
     if (p == null || campos[campo]) continue;
     if (campo in CAMPOS_TEXTO) {
-      const v = String(r?.valor ?? '').trim().slice(0, CAMPOS_TEXTO[campo as keyof typeof CAMPOS_TEXTO]);
+      const texto = String(r?.valor ?? '').trim().slice(0, CAMPOS_TEXTO[campo as keyof typeof CAMPOS_TEXTO]);
+      const v = CON_MAYUSCULA.has(campo) ? texto.charAt(0).toUpperCase() + texto.slice(1) : texto;
       if (v) campos[campo] = { valor: v, fuente: { tipo: 'MANUAL', pagina: p } };
     } else if (campo in CAMPOS_NUMERO) {
       const regla = CAMPOS_NUMERO[campo as keyof typeof CAMPOS_NUMERO];

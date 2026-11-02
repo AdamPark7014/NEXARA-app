@@ -17,6 +17,27 @@ import {
   textoIntervalo,
   textoServicio,
 } from "./vehiculos-ficha";
+import { datosDelNombre } from "./vehiculos-ficha";
+
+describe("datos del nombre del vehículo", () => {
+  it("separa marca, modelo y año", () => {
+    expect(datosDelNombre("Nissan Frontier 2026")).toEqual({ marca: "Nissan", modelo: "Frontier", anio: "2026" });
+    expect(datosDelNombre("  mercedes-benz   Sprinter ")).toEqual({ marca: "Mercedes-Benz", modelo: "Sprinter" });
+    expect(datosDelNombre("Toyota")).toEqual({ marca: "Toyota" });
+  });
+
+  it("no toma por año un número que es parte del modelo", () => {
+    expect(datosDelNombre("Nissan NP300")).toEqual({ marca: "Nissan", modelo: "NP300" });
+    expect(datosDelNombre("Ford F-150 1500")).toEqual({ marca: "Ford", modelo: "F-150 1500" });
+  });
+
+  it("si no empieza con una marca conocida, no adivina", () => {
+    expect(datosDelNombre("Ranger 2021")).toEqual({});
+    expect(datosDelNombre("Camioneta blanca")).toEqual({});
+    expect(datosDelNombre("Fordham 2020")).toEqual({});
+    expect(datosDelNombre(null)).toEqual({});
+  });
+});
 
 describe("formatos", () => {
   it("km y rendimiento, con raya cuando no hay dato", () => {

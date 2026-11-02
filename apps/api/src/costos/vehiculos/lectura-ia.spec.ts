@@ -74,6 +74,12 @@ describe('limpiar lo leído del manual', () => {
     expect(r.campos.aceiteTipo.valor).toBe('5W-30');
   });
 
+  it('combustible y transmisión van como se escriben', () => {
+    const r = limpiarManual({ datos: [dato('combustible', 'gasolina'), dato('transmision', 'manual')] }, enviadas);
+    expect(r.campos.combustible.valor).toBe('Gasolina');
+    expect(r.campos.transmision.valor).toBe('Manual');
+  });
+
   it('entiende la cifra aunque venga con unidad, miles o coma decimal', () => {
     const r = limpiarManual(
       { datos: [dato('tanqueLitros', '80 L'), dato('cargaKg', '1,010 kg'), dato('aceiteLitros', '5,4')] },
