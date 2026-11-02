@@ -528,7 +528,7 @@
 
 .filaServicio {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) 96px 80px auto auto;
+  grid-template-columns: minmax(150px, 1fr) 112px 104px auto auto;
   align-items: center;
   gap: 8px;
   padding: 5px 0;
@@ -550,9 +550,30 @@
   @media (max-width: 560px) {
     grid-template-columns: 1fr 1fr;
 
-    input:first-child {
+    > input:first-child {
       grid-column: 1 / -1;
     }
+  }
+}
+
+.conUnidad {
+  position: relative;
+  display: block;
+  min-width: 0;
+
+  input {
+    width: 100%;
+    padding-right: 48px;
+  }
+
+  span {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    color: var(--ui-fg-3);
+    font-size: 12.5px;
+    pointer-events: none;
   }
 }
 

@@ -503,6 +503,25 @@ export function rendimientoDeEstaCarga(
 }
 
 /** Nombre sugerido a partir del manual o de lo que se escribió. */
+const MARCAS_CONOCIDAS = [
+  "Acura", "Alfa Romeo", "Audi", "BMW", "Buick", "Cadillac", "Chevrolet", "Chrysler", "Dodge", "Fiat", "Ford", "GMC",
+  "Great Wall", "Honda", "Hyundai", "Infiniti", "Isuzu", "JAC", "Jeep", "Kia", "Lexus", "Lincoln", "Mazda",
+  "Mercedes-Benz", "MG", "Mitsubishi", "Nissan", "Peugeot", "Porsche", "RAM", "Renault", "Seat", "Subaru", "Suzuki",
+  "Toyota", "Volkswagen", "VW",
+];
+
+/** «Nissan Frontier 2026» → marca, modelo y año. Si no empieza con una marca conocida, no adivina. */
+export function datosDelNombre(nombre: string | null | undefined): { marca?: string; modelo?: string; anio?: string } {
+  const texto = String(nombre ?? "").trim().replace(/\s+/g, " ");
+  const minusculas = texto.toLowerCase();
+  const marca = MARCAS_CONOCIDAS.find((m) => minusculas === m.toLowerCase() || minusculas.startsWith(`${m.toLowerCase()} `));
+  if (!marca) return {};
+  const resto = texto.slice(marca.length).trim();
+  const anio = resto.match(/(?:^|\s)(19[89]\d|20[0-3]\d)$/)?.[1];
+  const modelo = (anio ? resto.slice(0, -anio.length) : resto).trim();
+  return { marca, ...(modelo ? { modelo } : {}), ...(anio ? { anio } : {}) };
+}
+
 export function nombreDeVehiculo(d: { marca?: string | null; modelo?: string | null; anio?: number | string | null }): string {
   return [d.marca, d.modelo, d.anio].filter(Boolean).join(" ").trim();
 }

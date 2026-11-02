@@ -24,6 +24,7 @@ import {
   getFicha,
   getOmisiones,
   guardarFicha,
+  datosDelNombre,
   leerManual,
   nombreDeVehiculo,
   tarifaEstimada,
@@ -176,6 +177,11 @@ function AltaVehiculo() {
         } else {
           // Sin ficha: lo que se sabe sale del nombre que ya tiene.
           setKmHoy(f.odometro ? String(f.odometro.km) : "");
+          const delNombre: Campos = {};
+          for (const [id, dato] of Object.entries(datosDelNombre(f.vehiculo.nombre))) {
+            delNombre[id] = { valor: dato as string, fuente: { tipo: "CAPTURA" } };
+          }
+          setCampos(delNombre);
         }
         setPlan(f.programa.map((p) => ({ id: p.id, concepto: p.concepto, cadaKm: p.cadaKm, cadaMeses: p.cadaMeses, costoEstimado: p.costoEstimado })));
         if (f.costos) {
@@ -515,20 +521,24 @@ function AltaVehiculo() {
                     placeholder="Aceite y filtro"
                     onChange={(e) => setPlan((x) => x.map((y, j) => (j === i ? { ...y, concepto: e.target.value } : y)))}
                   />
-                  <input
-                    aria-label="Cada cuántos km"
-                    inputMode="numeric"
-                    placeholder="km"
-                    value={p.cadaKm ?? ""}
-                    onChange={(e) => setPlan((x) => x.map((y, j) => (j === i ? { ...y, cadaKm: aNumero(e.target.value) } : y)))}
-                  />
-                  <input
-                    aria-label="Cada cuántos meses"
-                    inputMode="numeric"
-                    placeholder="meses"
-                    value={p.cadaMeses ?? ""}
-                    onChange={(e) => setPlan((x) => x.map((y, j) => (j === i ? { ...y, cadaMeses: aNumero(e.target.value) } : y)))}
-                  />
+                  <span className={v.conUnidad}>
+                    <input
+                      aria-label="Cada cuántos km"
+                      inputMode="numeric"
+                      value={p.cadaKm ?? ""}
+                      onChange={(e) => setPlan((x) => x.map((y, j) => (j === i ? { ...y, cadaKm: aNumero(e.target.value) } : y)))}
+                    />
+                    <span aria-hidden="true">km</span>
+                  </span>
+                  <span className={v.conUnidad}>
+                    <input
+                      aria-label="Cada cuántos meses"
+                      inputMode="numeric"
+                      value={p.cadaMeses ?? ""}
+                      onChange={(e) => setPlan((x) => x.map((y, j) => (j === i ? { ...y, cadaMeses: aNumero(e.target.value) } : y)))}
+                    />
+                    <span aria-hidden="true">meses</span>
+                  </span>
                   {p.paginaManual ? <PastillaFuente fuente={{ tipo: "MANUAL", pagina: p.paginaManual }} /> : <span />}
                   <button type="button" className={v.botonTexto} onClick={() => setPlan((x) => x.filter((_, j) => j !== i))} aria-label={`Quitar ${p.concepto || "renglón"}`}>
                     Quitar

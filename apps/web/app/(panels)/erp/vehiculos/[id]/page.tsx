@@ -97,7 +97,8 @@ export default function VehiculoDetallePage() {
 
   function cambiarPestana(nueva: Pestana) {
     setPestana(nueva);
-    router.replace(`${VEHICULOS_PATH}/${id}?tab=${nueva}`, { scroll: false });
+    // Sin pasar por el enrutador: al cambiar solo la consulta, Next dejaría el título por omisión de la pestaña.
+    window.history.replaceState(null, "", `${VEHICULOS_PATH}/${id}?tab=${nueva}`);
   }
 
   const vehiculo = datos?.vehiculo;
@@ -173,7 +174,7 @@ export default function VehiculoDetallePage() {
               cifra={kmPorLitro(ficha.rendimiento.real ?? ficha.rendimiento.oficial)}
               texto={
                 ficha.rendimiento.real
-                  ? `Rendimiento real${ficha.rendimiento.oficial ? `; oficial ${ficha.rendimiento.oficial}` : ""}`
+                  ? `Rendimiento real${ficha.rendimiento.oficial ? `; oficial ${ficha.rendimiento.oficial.toFixed(1)}` : ""}`
                   : "Rendimiento oficial; faltan cargas reales"
               }
             />
