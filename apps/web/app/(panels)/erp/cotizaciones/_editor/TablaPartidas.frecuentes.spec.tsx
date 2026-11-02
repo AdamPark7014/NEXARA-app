@@ -96,6 +96,18 @@ describe("TablaPartidas · partidas frecuentes («Usadas antes»)", () => {
     ]);
   });
 
+  it("el catálogo también ofrece lo que CT no tiene hoy, como «sobre pedido»", async () => {
+    vi.mocked(smartQuoteSearch).mockResolvedValue({ data: [{ ...OFERTA, stockTotal: 0 }] } as unknown as Awaited<ReturnType<typeof smartQuoteSearch>>);
+    render(<Editor />);
+    await userEvent.type(nueva(), "swi");
+
+    const lista = await screen.findByRole("listbox", { name: "Sugerencias" });
+    const oferta = await within(lista).findByText("Switch TP-Link 24 puertos");
+
+    expect(oferta.closest("[role=option]")?.textContent).toContain("sobre pedido");
+    expect(vi.mocked(smartQuoteSearch).mock.calls.at(-1)?.[1]).toEqual({ q: "swi", take: 6, inStockOnly: false });
+  });
+
   it("con dos letras ya busca lo cotizado (el catálogo sigue pidiendo tres)", async () => {
     render(<Editor />);
     await userEvent.type(nueva(), "sw");

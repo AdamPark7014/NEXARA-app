@@ -94,6 +94,20 @@ describe('emparejar', () => {
     expect(r.seguridad).not.toBe('alta');
   });
 
+  it('lo que el mayorista no tiene hoy se ofrece, pero no se llena solo', () => {
+    const disco = (stock: number) => candidato('Disco duro Seagate 6 TB', { fuente: 'catalogo', brand: 'Seagate', model: 'ST6', unitCost: 3000, stock });
+
+    expect(emparejar('Disco duro Seagate 6 TB', [disco(3)]).seguridad).toBe('alta');
+    const sinPiezas = emparejar('Disco duro Seagate 6 TB', [disco(0)]);
+    expect(sinPiezas.seguridad).toBe('media');
+    expect(sinPiezas.opciones.map((o) => o.model)).toEqual(['ST6']);
+  });
+
+  it('el modelo dicho solo se llena aunque hoy no haya piezas: ya se sabe qué se quiere', () => {
+    const r = emparejar('ZD421D', [candidato('Impresora Zebra de etiquetas', { fuente: 'catalogo', model: 'ZD421D', unitCost: 8000, stock: 0 })]);
+    expect(r).toMatchObject({ seguridad: 'alta', elegida: { model: 'ZD421D' } });
+  });
+
   it('en un empate gana lo ya cotizado', () => {
     const r = emparejar('Gabinete 6U', [
       candidato('Gabinete 6U', { fuente: 'catalogo', model: 'CT1', stock: 2 }),

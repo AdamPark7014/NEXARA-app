@@ -29,7 +29,8 @@ class SmartQuoteJobHandlers implements OnModuleInit {
     this.queue.register('supplier.ct.sync', async (payload) => {
       const source = payload.source === 'FULL' ? 'FULL' : 'PRIMARY';
       const companyId = payload.companyId != null ? Number(payload.companyId) : null;
-      const result = await this.sync.sync({ source, companyId });
+      const result = await this.sync.sync({ source, companyId, saltarSiReciente: companyId == null });
+      if (result.status === 'SKIPPED') return;
       this.logger.log(`supplier.ct.sync → ${result.status} rows=${result.rowsUpserted}`);
       if (result.status === 'ERROR') {
         throw new Error(result.error || 'CT sync failed');

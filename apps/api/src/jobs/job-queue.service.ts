@@ -10,6 +10,11 @@ export interface EnqueueOptions {
   delayMs?: number;
   maxAttempts?: number;
   jobId?: string;
+  /**
+   * Con un `jobId` fijo: nunca hay más de uno esperando o corriendo. Al terminar se borra para que el
+   * siguiente sí entre; si no, BullMQ lo ignoraría mientras siga guardado entre los terminados.
+   */
+  unico?: boolean;
 }
 
 interface MemoryJob {
@@ -42,9 +47,12 @@ export class JobQueueService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly metrics: MetricsService) {
     this.redisConfigured = Boolean(process.env.REDIS_URL?.trim());
+    // Aquí y no en `onModuleInit`: Nest no promete el orden de arranque entre módulos, y `register` sin
+    // conexión guarda el handler sin crear su Worker, sin error. Así se quedó la cola de CT del 22-08 al 02-11-2026.
+    this.elegirBackend();
   }
 
-  onModuleInit() {
+  private elegirBackend() {
     if (this.redisConfigured) {
       try {
         const url = new URL(process.env.REDIS_URL!);
@@ -64,7 +72,9 @@ export class JobQueueService implements OnModuleInit, OnModuleDestroy {
     } else {
       this.logger.warn('REDIS_URL missing — using in-process queue (single-instance only)');
     }
+  }
 
+  onModuleInit() {
     if (this.mode === 'memory') {
       this.timer = setInterval(() => void this.tickMemory(), 1000);
     }
@@ -144,10 +154,14 @@ export class JobQueueService implements OnModuleInit, OnModuleDestroy {
         delay: opts.delayMs,
         attempts: opts.maxAttempts ?? 5,
         backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 1000,
-        removeOnFail: 5000,
+        removeOnComplete: opts.unico ? true : 1000,
+        removeOnFail: opts.unico ? true : 5000,
       });
       return { id: String(job.id), name, backend: 'bullmq' as const };
+    }
+
+    if (opts.unico && opts.jobId && this.pending.some((j) => j.id === opts.jobId)) {
+      return { id: opts.jobId, name, backend: 'memory' as const };
     }
 
     const job: MemoryJob = {
