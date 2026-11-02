@@ -10,7 +10,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from "react";
 import UndoRoundedIcon from "@mui/icons-material/UndoRounded";
 import RedoRoundedIcon from "@mui/icons-material/RedoRounded";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
@@ -19,15 +19,18 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import { Alert, Badge, Button, Input, Segmented } from "@/components/base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
-import { MODELOS_CAMARA, etiquetaModelo, modeloPorId, type ModeloCamara } from "@/lib/cctv/catalogo";
+import { MODELOS_CAMARA, TIPOS_DE_RACK, etiquetaModelo, modeloPorId, type ModeloCamara, type ModeloEquipo, type TipoEquipo } from "@/lib/cctv/catalogo";
 import {
+  agregarEquipo,
   agregarEtiqueta,
+  avisoDeEquipo,
   borrar,
   calibrarPlano,
   estadoInicial,
   nuevoId,
   reducirEditor,
   resumenDelPlano,
+  siguienteNumeroEquipo,
   type ResumenDiseno,
   type Seleccion,
 } from "@/lib/cctv/editor";
@@ -51,10 +54,14 @@ import {
   transformarCroquis,
   type NivelConPlano,
 } from "@/lib/cctv/niveles";
+import { conexionesDelSistema } from "@/lib/cctv/sistema";
+import { useCatalogo } from "@/lib/cctv/useCatalogo";
 import { camaraEnMetros, coberturaCamara, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import { ConflictoDeVersion, ETIQUETA_ESTADO_DISENO, guardarDiseno, subirCroquis, type Diseno, type EstadoDiseno } from "@/lib/cctv/api";
 import { LEYENDA_NIVELES, COLOR_NIVEL } from "./colores";
 import { TIPOS_CROQUIS, esOscuro, prepararCroquis } from "./croquis";
+import DiagramaSistema from "./DiagramaSistema";
+import DialogoEquipo from "./DialogoEquipo";
 import Inspector, { type Pestana } from "./Inspector";
 import Lienzo, { type Herramienta } from "./Lienzo";
 import Lienzo3D from "./Lienzo3D";
@@ -95,6 +102,7 @@ const AYUDA_HERRAMIENTA: Record<Herramienta, string> = {
   mueble: "Clic en el sitio para poner la pieza elegida. Es ambientación: no tapa la vista.",
   etiqueta: "Clic donde va el nombre del área.",
   camara: "Clic en el plano para poner la cámara del modelo elegido.",
+  equipo: "Clic en el sitio para ponerlo. Los de muro se pegan al muro más cercano y los de rack entran al gabinete.",
   persona: "Clic para poner un humanoide; arrástralo para ver cómo lo capta cada cámara.",
 };
 
@@ -149,7 +157,7 @@ export default function EditorCctv({
   const [aviso, setAviso] = useState<string | null>(null);
   const [resumen, setResumen] = useState<ResumenDiseno | null>(diseno.resumen);
   const [herramienta, setHerramienta] = useState<Herramienta>("seleccionar");
-  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: false, humanoides: true, abajo: true, cobertura: true, claves: true, noche: false, tamanoReal: false });
+  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: false, humanoides: true, abajo: true, cobertura: true, claves: true, noche: false, tamanoReal: false, cableado: true });
   // Pisos de abajo para la vista apilada (en gris). La raíz cambia con cada edición de cualquier
   // piso; si los de abajo no cambiaron se reutiliza la lista para no recalcular su cobertura.
   const debajoRef = useRef<{ clave: string; valor: NivelConPlano[] }>({ clave: "[]", valor: [] });
@@ -161,12 +169,15 @@ export default function EditorCctv({
   }, [capas.abajo, niveles, nivelActivo.nivel.elevacionM]);
   const [webgl, setWebgl] = useState(() => hayWebGL());
   // Con muros se abre en la maqueta; sin nada todavía, donde se empieza: el dibujo con su croquis.
-  const [modo, setModo] = useState<"2d" | "3d" | "plano">(() => (webgl && listaNiveles(planoDe(diseno)).some((n) => n.plano.muros.length) ? "3d" : "2d"));
+  const [modo, setModo] = useState<"2d" | "3d" | "plano" | "diagrama">(() => (webgl && listaNiveles(planoDe(diseno)).some((n) => n.plano.muros.length) ? "3d" : "2d"));
   const [verDesde, setVerDesde] = useState<string | null>(null);
   const [muebleNuevo, setMuebleNuevo] = useState<TipoMueble>("escritorio");
   const [pisoNuevo, setPisoNuevo] = useState<MaterialPiso>("concreto");
   const [todasLasVistas, setTodasLasVistas] = useState(false);
   const [modeloNuevo, setModeloNuevo] = useState<ModeloCamara>(MODELOS_CAMARA[0]);
+  const [equipoNuevo, setEquipoNuevo] = useState<ModeloEquipo | null>(null);
+  const [agregando, setAgregando] = useState(false);
+  const catalogo = useCatalogo(token);
   const [pestana, setPestana] = useState<Pestana>("seleccion");
   const [medida, setMedida] = useState<{ a: Punto; b: Punto } | null>(null);
   const [textoEn, setTextoEn] = useState<Punto | null>(null);
@@ -192,6 +203,27 @@ export default function EditorCctv({
     despachar({ tipo: "seleccionar", seleccion: s });
     if (s) setPestana("seleccion");
   }, []);
+
+  const numeroEquipo = useCallback((t: TipoEquipo) => siguienteNumeroEquipo(raizRef.current, t), []);
+  // El cable se traza con todo el edificio; que no estorbe mientras se arrastra algo.
+  const raizDiferida = useDeferredValue(raiz);
+  const conexiones = useMemo(() => conexionesDelSistema(raizDiferida), [raizDiferida]);
+
+  /** Lo de rack, si hay gabinete en este nivel, no necesita un clic en el sitio: entra directo. */
+  const elegirEquipo = (m: ModeloEquipo) => {
+    setVerDesde(null);
+    const gabinete = (plano.equipos ?? []).find((e) => e.tipo === "gabinete");
+    if (TIPOS_DE_RACK.has(m.tipo) && gabinete) {
+      const r = agregarEquipo(plano, gabinete.pos, m, numeroEquipo(m.tipo));
+      aplicar(r.plano, { seleccion: { tipo: "equipo", id: r.equipo.id } });
+      setHerramienta("seleccionar");
+      const texto = avisoDeEquipo(r.plano, r.equipo);
+      if (texto) setAviso(texto);
+      return;
+    }
+    setEquipoNuevo(m);
+    setHerramienta("equipo");
+  };
 
   /* ── Cálculo: lo que tapa y la cobertura de cada cámara (con caché por cámara) ── */
   const tapas = useMemo(() => tapasDelPlano(plano), [plano]);
@@ -416,11 +448,12 @@ export default function EditorCctv({
             setModo(m);
             setVerDesde(null);
             if (m !== "2d" && !webgl) setHerramienta("seleccionar");
-            if (m === "plano") setHerramienta("seleccionar");
+            if (m === "plano" || m === "diagrama") setHerramienta("seleccionar");
           }}
           items={[
             { id: "3d", label: "Maqueta 3D" },
             { id: "plano", label: "Plano técnico" },
+            { id: "diagrama", label: "Diagrama" },
             { id: "2d", label: "Dibujo" },
           ]}
         />
@@ -461,7 +494,20 @@ export default function EditorCctv({
       ) : null}
 
       <section className={styles.editor}>
-        {modo === "plano" ? (
+        {modo === "diagrama" ? (
+          <div className={styles.hojaVista}>
+            <div className={styles.hojaBarra}>
+              <span className={styles.tenue}>Sale solo de lo que está colocado en la maqueta.</span>
+              <Button iconStart={<PrintOutlinedIcon fontSize="small" />} onClick={() => window.print()} title="Sale en doble carta">
+                Imprimir diagrama
+              </Button>
+            </div>
+            <style>{IMPRIMIR_HOJA}</style>
+            <HojaAjustada>
+              <DiagramaSistema raiz={raiz} resumen={resumen} grabacion={meta.grabacion} proyecto={meta.nombre || diseno.nombre} version={version.current} fecha={diseno.updatedAt} />
+            </HojaAjustada>
+          </div>
+        ) : modo === "plano" ? (
           <div className={styles.hojaVista}>
             <div className={styles.hojaBarra}>
               {barraNiveles}
@@ -494,6 +540,11 @@ export default function EditorCctv({
               muebleActivo={muebleNuevo}
               pisoActivo={pisoNuevo}
               herramienta={herramienta}
+              camaras={catalogo.camaras}
+              equipos={catalogo.equipos}
+              equipoActivo={equipoNuevo}
+              onElegirEquipo={elegirEquipo}
+              onAgregar={() => setAgregando(true)}
               onElegirCamara={(m) => {
                 setModeloNuevo(m);
                 setHerramienta("camara");
@@ -513,7 +564,11 @@ export default function EditorCctv({
             <div className={styles.lienzoCaja}>
               {modo === "3d" && webgl ? (
                 <Maqueta3D
+                  // Los modelos agregados cambian cómo se ven las cámaras ya puestas.
+                  key={catalogo.version}
                   plano={plano}
+                  nivelId={nivelActivo.nivel.id}
+                  conexiones={conexiones}
                   nombreNivel={nivelActivo.nivel.nombre}
                   elevacionM={nivelActivo.nivel.elevacionM}
                   debajo={debajo}
@@ -525,6 +580,8 @@ export default function EditorCctv({
                   modeloNuevo={modeloNuevo}
                   muebleNuevo={muebleNuevo}
                   pisoNuevo={pisoNuevo}
+                  equipoNuevo={equipoNuevo}
+                  numeroEquipo={numeroEquipo}
                   numeroNuevo={numeroNuevo}
                   verDesde={verDesde}
                   onVerDesde={setVerDesde}
@@ -565,6 +622,10 @@ export default function EditorCctv({
                   modeloNuevo={modeloNuevo}
                   muebleNuevo={muebleNuevo}
                   pisoNuevo={pisoNuevo}
+                  equipoNuevo={equipoNuevo}
+                  numeroEquipo={numeroEquipo}
+                  conexiones={conexiones}
+                  nivelId={nivelActivo.nivel.id}
                   onAplicar={aplicar}
                   onSeleccionar={seleccionar}
                   onAviso={setAviso}
@@ -601,6 +662,7 @@ export default function EditorCctv({
                     {modo === "3d" && webgl
                       ? ([
                           ["cobertura", "Cobertura"],
+                          ["cableado", "Cableado"],
                           ["humanoides", "Personas"],
                           ["noche", "De noche"],
                           ["tamanoReal", "Tamaño real"],
@@ -617,6 +679,7 @@ export default function EditorCctv({
                           ? ([
                               ["croquis", "Croquis"],
                               ["etiquetas", "Etiquetas"],
+                              ["cableado", "Cableado"],
                               ["calor", "Mapa de calor"],
                             ] as const)
                           : webgl
@@ -650,7 +713,7 @@ export default function EditorCctv({
                     <label className={styles.modeloNuevo}>
                       Modelo
                       <select value={modeloNuevo.id} onChange={(e) => setModeloNuevo(modeloPorId(e.target.value) ?? MODELOS_CAMARA[0])}>
-                        {MODELOS_CAMARA.map((m) => (
+                        {catalogo.camaras.map((m) => (
                           <option key={m.id} value={m.id}>
                             {etiquetaModelo(m)}
                           </option>
@@ -751,6 +814,7 @@ export default function EditorCctv({
               tapas={tapas}
               onAplicar={aplicar}
               onSeleccionar={seleccionar}
+              conexiones={conexiones}
               meta={meta}
               onMeta={(m) => {
                 setMeta((x) => ({ ...x, ...m }));
@@ -817,6 +881,26 @@ export default function EditorCctv({
                 ))}
             </div>
           </section>
+        ) : null}
+
+        {agregando ? (
+          <DialogoEquipo
+            token={token}
+            onCerrar={() => setAgregando(false)}
+            onGuardado={(id) => {
+              setAgregando(false);
+              void catalogo.recargar().then((c) => {
+                const nuevo = c.equipos.find((e) => e.id === id);
+                const camara = c.camaras.find((e) => e.id === id);
+                if (nuevo) elegirEquipo(nuevo);
+                else if (camara) {
+                  setModeloNuevo(camara);
+                  setHerramienta("camara");
+                }
+                setAviso("Agregado al catálogo. Toca el sitio para ponerlo.");
+              });
+            }}
+          />
         ) : null}
 
         <footer className={styles.estado}>

@@ -1,7 +1,8 @@
 /**
  * Medidas del sitio en metros, sin dependencias de dibujo: las usan la maqueta 3D y el plano técnico.
  */
-import { aMetros, type Plano, type Punto } from "./plano";
+import { PREFIJO_TIPO } from "./catalogo";
+import { aMetros, type EquipoPlano, type Plano, type Punto } from "./plano";
 import type { PoligonoCobertura } from "./visibilidad";
 
 export type Limites = { min: Punto; max: Punto };
@@ -33,6 +34,7 @@ export function limitesSitio(plano: Plano, coberturas?: ReadonlyMap<string, Poli
   for (const o of plano.obstaculos) for (const p of o.puntos) ps.push(aMetros(p, plano.escala));
   for (const a of plano.areas ?? []) for (const p of a.puntos) ps.push(aMetros(p, plano.escala));
   for (const m of plano.muebles ?? []) ps.push({ x: m.pos.x * k, y: m.pos.y * k });
+  for (const e of plano.equipos ?? []) ps.push({ x: e.pos.x * k, y: e.pos.y * k });
   if (!ps.length) return { min: { x: 0, y: 0 }, max: { x: 20, y: 12 } };
   const base = cajaDe(ps);
   // Un cono largo no debe volver enorme la base: se admite hasta 40 m más allá del edificio.
@@ -51,6 +53,11 @@ export function limitesSitio(plano: Plano, coberturas?: ReadonlyMap<string, Poli
 /** «CAM-07»: la clave de la cámara en la maqueta y el plano técnico. */
 export function claveCamara(numero: number): string {
   return `CAM-${String(numero).padStart(2, "0")}`;
+}
+
+/** «AC-02», «GAB-01»: la clave de un equipo. */
+export function claveEquipo(e: Pick<EquipoPlano, "tipo" | "numero">): string {
+  return `${PREFIJO_TIPO[e.tipo] ?? "EQ"}-${String(e.numero).padStart(2, "0")}`;
 }
 
 /** ¿Hay WebGL2 en este navegador? Sin él, el editor usa la vista SVG. */

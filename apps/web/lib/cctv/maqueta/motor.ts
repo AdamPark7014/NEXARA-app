@@ -18,12 +18,16 @@ import { limitesEdificio, limitesSitio, unirLimites, type Limites } from "../med
 import type { NivelConPlano } from "../niveles";
 import { aRad } from "../optica";
 import { dirRumbo, type Plano, type Punto } from "../plano";
+import type { Conexion } from "../sistema";
 import { camaraEnMetros, type PoligonoCobertura } from "../visibilidad";
 import {
+  construirAlcances,
   construirArquitectura,
   construirAreas,
+  construirCables,
   construirCamaras,
   construirCoberturas,
+  construirEquipos,
   construirLosa,
   construirMuebles,
   construirObstaculos,
@@ -45,10 +49,14 @@ export type CapasMaqueta = {
   tamanoReal: boolean;
   translucidos: boolean;
   croquis: boolean;
+  cableado: boolean;
 };
 
 export type DatosMaqueta = {
   plano: Plano;
+  nivelId: string;
+  /** Las rutas de cable de todo el edificio; se pinta lo de este nivel. */
+  conexiones: readonly Conexion[];
   coberturas: ReadonlyMap<string, PoligonoCobertura[]>;
   elevacionM: number;
   debajo: readonly NivelConPlano[];
@@ -106,6 +114,9 @@ export class MotorMaqueta {
     muebles: new THREE.Group(),
     personas: new THREE.Group(),
     camaras: new THREE.Group(),
+    equipos: new THREE.Group(),
+    alcances: new THREE.Group(),
+    cables: new THREE.Group(),
     coberturas: new THREE.Group(),
     rayos: new THREE.Group(),
     abajo: new THREE.Group(),
@@ -133,6 +144,8 @@ export class MotorMaqueta {
   private pov: { p: THREE.Vector3; m: THREE.Vector3 } | null = null;
   private tiempos: number[] = [];
   private ultimoCuadro = 0;
+  private etiquetasCamaras: EtiquetaEquipo[] = [];
+  private etiquetasEquipos: EtiquetaEquipo[] = [];
   private ancho = 900;
   private alto = 640;
   private primeraVista = true;
@@ -252,10 +265,26 @@ export class MotorMaqueta {
     if (nivelCambio || pa?.camaras !== p.camaras || pa?.muros !== p.muros || escala !== this.escalaActual || a?.verDesde !== d.verDesde) {
       const { grupo, etiquetas } = construirCamaras(p, { escala, ocultar: d.verDesde });
       this.reponer(this.capas.camaras, grupo);
-      this.etiquetas = etiquetas;
-      this.escalaActual = escala;
+      this.etiquetasCamaras = etiquetas;
+      this.etiquetas = [...this.etiquetasCamaras, ...this.etiquetasEquipos];
       sombras = true;
     }
+    if (nivelCambio || pa?.equipos !== p.equipos || pa?.muros !== p.muros || escala !== this.escalaActual) {
+      const { grupo, etiquetas } = construirEquipos(p, { escala });
+      this.reponer(this.capas.equipos, grupo);
+      this.etiquetasEquipos = etiquetas;
+      this.etiquetas = [...this.etiquetasCamaras, ...this.etiquetasEquipos];
+      sombras = true;
+    }
+    const equipoSel = d.seleccion?.tipo === "equipo" ? d.seleccion.id : null;
+    const equipoSelAntes = a?.seleccion?.tipo === "equipo" ? a.seleccion.id : null;
+    if (nivelCambio || pa?.equipos !== p.equipos || equipoSel !== equipoSelAntes) {
+      this.reponer(this.capas.alcances, construirAlcances(p, equipoSel));
+    }
+    if (nivelCambio || a?.conexiones !== d.conexiones || a?.nivelId !== d.nivelId || escala !== this.escalaActual) {
+      this.reponer(this.capas.cables, construirCables(d.conexiones, d.nivelId, escala));
+    }
+    this.escalaActual = escala;
     const idSel = d.seleccion?.tipo === "camara" ? d.seleccion.id : null;
     const idSelAntes = a?.seleccion?.tipo === "camara" ? a.seleccion.id : null;
     if (nivelCambio || a?.coberturas !== d.coberturas || idSel !== idSelAntes) {
@@ -275,17 +304,19 @@ export class MotorMaqueta {
       }
       this.reponer(this.capas.abajo, g);
     }
-    if (!a || a.seleccion?.id !== d.seleccion?.id || nivelCambio || pa?.muebles !== p.muebles || pa?.obstaculos !== p.obstaculos || pa?.personas !== p.personas) {
-      this.marcarSeleccion(d.seleccion);
+    if (!a || a.seleccion?.id !== d.seleccion?.id || nivelCambio || pa?.muebles !== p.muebles || pa?.obstaculos !== p.obstaculos || pa?.personas !== p.personas || pa?.equipos !== p.equipos) {
+      this.marcarSeleccion(d.seleccion, p);
     }
     this.cargarCroquis(p, d.capas.croquis);
 
     // Lo del nivel activo va a su elevación; lo de abajo ya trae la suya.
-    for (const clave of ["areas", "arquitectura", "obstaculos", "muebles", "personas", "camaras", "coberturas", "rayos", "croquis", "marca"] as const) {
+    for (const clave of ["areas", "arquitectura", "obstaculos", "muebles", "personas", "camaras", "equipos", "alcances", "cables", "coberturas", "rayos", "croquis", "marca"] as const) {
       this.capas[clave].position.y = d.elevacionM;
     }
     this.capas.coberturas.visible = d.capas.cobertura && !d.verDesde;
     this.capas.personas.visible = d.capas.personas;
+    this.capas.alcances.visible = d.capas.cobertura && !d.verDesde;
+    this.capas.cables.visible = d.capas.cableado && !d.verDesde;
 
     if (!a || a.capas.noche !== d.capas.noche || (d.capas.noche && pa?.muros !== p.muros)) this.aplicarLuz(p, d.capas.noche);
     if (sombras) this.sombrasEn = performance.now() + (a ? 150 : 0);
@@ -310,13 +341,15 @@ export class MotorMaqueta {
     capa.add(nuevo);
   }
 
-  private marcarSeleccion(sel: Seleccion | null) {
+  private marcarSeleccion(sel: Seleccion | null, plano: Plano) {
     this.reponer(this.capas.marca, new THREE.Group());
     if (!sel || sel.tipo === "muro" || sel.tipo === "camara" || sel.tipo === "area") return;
+    // Lo que va adentro de un gabinete se marca en su gabinete.
+    const id = sel.tipo === "equipo" ? (plano.equipos?.find((e) => e.id === sel.id)?.gabineteId ?? sel.id) : sel.id;
     const caja = new THREE.Box3();
     this.raiz.traverse((n) => {
       const s = n.userData.sel as Seleccion | undefined;
-      if (s?.id === sel.id) {
+      if (s?.id === id) {
         n.updateWorldMatrix(true, false);
         const geo = (n as THREE.Mesh).geometry;
         if (geo) {
@@ -561,7 +594,7 @@ export class MotorMaqueta {
     this.raycaster.setFromCamera(new THREE.Vector2((x / this.ancho) * 2 - 1, -(y / this.alto) * 2 + 1), this.camara);
   }
 
-  /** Lo que hay bajo el puntero. Cámaras y personas ganan aunque estén detrás de un muro. */
+  /** Lo que hay bajo el puntero. Los equipos y las personas ganan aunque estén detrás de un muro. */
   tocar(x: number, y: number): Seleccion | null {
     this.rayo(x, y);
     const primero = (capas: THREE.Object3D[]): Seleccion | null => {
@@ -571,7 +604,7 @@ export class MotorMaqueta {
       return hit ? (hit.object.userData.sel as Seleccion) : null;
     };
     return (
-      primero([this.capas.camaras, this.capas.personas]) ??
+      primero([this.capas.camaras, this.capas.equipos, this.capas.personas]) ??
       primero([this.capas.muebles, this.capas.obstaculos, this.capas.arquitectura]) ??
       primero([this.capas.areas])
     );

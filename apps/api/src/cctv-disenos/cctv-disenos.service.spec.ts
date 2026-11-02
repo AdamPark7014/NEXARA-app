@@ -343,3 +343,72 @@ describe('croquis', () => {
     expect(fsMock.writeFile).not.toHaveBeenCalled();
   });
 });
+
+describe('Catálogo de equipos', () => {
+  const NVR = { familia: 'grabacion', tipo: 'nvr', marca: 'HIKVISION', modelo: 'DS-7616NXI-K2', datos: { canales: 16, bahias: 2 }, medidas: { anchoMm: 385, altoMm: 52, fondoMm: 315 } };
+
+  function armar() {
+    const prisma: any = {
+      cctvEquipo: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findFirstOrThrow: jest.fn().mockResolvedValue({ id: 7 }),
+        create: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ id: 7, ...data })),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      product: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
+      teamMember: { count: jest.fn().mockResolvedValue(0) },
+    };
+    return { prisma, service: new CctvDisenosService(prisma) };
+  }
+
+  it('lista solo lo de la empresa que sigue vivo', async () => {
+    const { prisma, service } = armar();
+    await service.catalogo(DAVID, EMPRESA);
+    expect(prisma.cctvEquipo.findMany.mock.calls[0][0].where).toEqual({ companyId: EMPRESA, archivadoAt: null });
+  });
+
+  it('agrega un equipo con su empresa y quién lo capturó', async () => {
+    const { prisma, service } = armar();
+    await service.agregarAlCatalogo(DAVID, NVR, EMPRESA);
+    expect(prisma.cctvEquipo.create.mock.calls[0][0].data).toMatchObject({ companyId: EMPRESA, creadoPorId: DAVID.id, tipo: 'nvr', fuente: 'manual', verificado: false });
+  });
+
+  it('no deja el mismo modelo dos veces', async () => {
+    const { prisma, service } = armar();
+    prisma.cctvEquipo.findFirst.mockResolvedValue({ id: 3 });
+    await expect(service.agregarAlCatalogo(DAVID, NVR, EMPRESA)).rejects.toThrow(/ya está en el catálogo/);
+    expect(prisma.cctvEquipo.create).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un tipo que no es de la familia', async () => {
+    const { service } = armar();
+    await expect(service.agregarAlCatalogo(DAVID, { ...NVR, tipo: 'domo' }, EMPRESA)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('una cámara sin óptica no entra: de ahí sale su cobertura', async () => {
+    const { service } = armar();
+    await expect(service.agregarAlCatalogo(DAVID, { familia: 'camaras', tipo: 'domo', modelo: 'X', datos: {} }, EMPRESA)).rejects.toThrow(/resolución o su lente/);
+    await expect(service.agregarAlCatalogo(DAVID, { familia: 'camaras', tipo: 'domo', modelo: 'X', datos: { optica: { pxHoriz: 2560, pxVert: 1440, focalMm: 2.8 } } }, EMPRESA)).resolves.toBeTruthy();
+  });
+
+  it('rechaza textos y medidas que no son números', async () => {
+    const { service } = armar();
+    await expect(service.agregarAlCatalogo(DAVID, { ...NVR, datos: { canales: 'ocho' } }, EMPRESA)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.agregarAlCatalogo(DAVID, { ...NVR, medidas: { anchoMm: -3 } }, EMPRESA)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('editar y archivar no cruzan de empresa', async () => {
+    const { prisma, service } = armar();
+    prisma.cctvEquipo.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.editarCatalogo(DAVID, 9, NVR, EMPRESA)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.archivarDelCatalogo(DAVID, 9, EMPRESA)).rejects.toBeInstanceOf(NotFoundException);
+    for (const [arg] of prisma.cctvEquipo.updateMany.mock.calls) expect(arg.where.companyId).toBe(EMPRESA);
+  });
+
+  it('sin acceso al diseñador no se toca el catálogo', async () => {
+    const { prisma, service } = armar();
+    await expect(service.agregarAlCatalogo(JOAN, NVR, EMPRESA)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.cctvEquipo.create).not.toHaveBeenCalled();
+  });
+});

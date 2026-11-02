@@ -296,6 +296,36 @@ Para ver el editor sin sesión y sin los minutos de `next dev`: empaquetar con e
 `next/dynamic` sustituidos por versiones mínimas y el `.nx-app-shell` alrededor (sin esa clase, `section` toma el ancho máximo
 del sitio público). Sin GPU, Chrome necesita `--use-angle=swiftshader`.
 
+### 4.2 Equipos, cableado y diagrama (fase 8, aprobada por Adam el 01-11-2026)
+
+Además de cámaras se colocan grabador, switch, servidor, UPS, gabinete, terminal de acceso, barrera, sirena,
+alerta sísmica, panel de alarma y un equipo genérico. Viven en `plano.equipos` (opcional: los diseños anteriores
+no lo traen y no hace falta migrarlos) y el `tipo` decide su modelo y su comportamiento:
+
+- **De rack** (`TIPOS_DE_RACK`): si hay gabinete en el nivel entran solos a la unidad libre más alta; un clic en el
+  panel basta. Si no cabe quedan sueltos y se avisa. Al poner un gabinete entra lo que estaba suelto. Al moverlo
+  viaja lo de adentro; al quitarlo, lo de adentro queda suelto, no se pierde.
+- **De muro** (terminal, sirena, alerta, panel, genérico): se pegan al muro a menos de 1 m y miran hacia donde se
+  tocó. Lejos de un muro llevan pedestal en la maqueta.
+- **Terminal:** se liga a la puerta a menos de 3 m (`puertaId`). Si se borra la puerta, queda sin ligar y la revisión
+  lo señala.
+- **Sirena y alerta:** `alcanceM` es un estimado editable, sin descontar muros. Se dice así en la revisión.
+- **Barrera:** la pluma corre hacia el rumbo.
+
+`lib/cctv/sistema.ts` calcula lo demás, y es puro:
+
+- `conexionesDelSistema`: el cable de cada equipo suelto al gabinete de su nivel (si no tiene, al de otro nivel,
+  sumando el desnivel). `rutaCable` compara la L en sus dos sentidos y las Z por cada línea de muros, y elige la que
+  más se pega a ellos. Mide con la misma regla de holgura y reserva de `infraestructura.ts`. El cable no se dibuja a
+  mano: sale de lo colocado, y por eso la lista de equipo ya da metros y bobinas.
+- `balanceDelSistema` y `revisionDelSistema`: PoE contra lo que da el switch, puertos, canales, Mbps, discos contra
+  bahías, UTP arriba de 90 y 100 m, gabinete, terminal sin puerta y alarmas. Dicen el modelo y por cuánto.
+- `DiagramaSistema.tsx`: hoja doble carta, como el plano técnico, con coordenadas calculadas.
+
+Las fotos de `public/cctv/modelos/` y `public/cctv/frente/` son de nuestros propios modelos 3D, sin marca: ningún
+equipo usa imágenes de un tercero. Sin WebGL, `Lienzo3D` no pinta estos equipos: se ven en el dibujo, el plano y el
+diagrama.
+
 ## 5. Vista desde cada cámara
 
 - **Cámara de three.js.** Una `PerspectiveCamera` con `fov = VFOV` y `aspect = px_h / px_v`, puesta en la
@@ -339,6 +369,14 @@ Hace falta un catálogo óptico propio y curado:
   3. Precio y existencia vienen de CT (`productos_ct`) y, cuando haya cliente SYSCOM, de su API.
 - **Respaldo de la óptica:** si una ficha no trae ancho de sensor, se usa el formato. Si tampoco lo trae, el
   HFOV declarado. Si no hay nada, la cámara no calcula y el editor lo pide.
+
+**Hecho en la fase 8.** La lista base vive en el código (`lib/cctv/catalogo.ts`) y lo que agrega cada empresa, en
+`cctv_equipos` (`CctvEquipo`), con la misma forma para cámaras y lo demás: `familia`, `tipo`, `marca`, `modelo`,
+`descripcion`, `datos` (canales, puertos, PoE… y, en cámaras, su `optica`), `medidas` en mm, `fuente` y `productId`.
+Es solo la ficha: el inventario sigue siendo uno, así que `productId` apunta a `Product` (columna suelta, no se
+alteró `products`) y las existencias saldrán de `stock_levels` en la fase de stock. Lo que no sale de una hoja
+técnica lleva `fuente: "tipo"`, sin marca, y la pantalla dice «Falta su ficha». Un diseño guarda su copia de los
+datos: cambiar o archivar el modelo no le mueve nada.
 
 ## 7. Propuesta en PDF
 
@@ -415,6 +453,7 @@ lugares a tocar para dar de alta un módulo:
   - `GET /modelos?q&tipo&mpMin&irMin`
   - `POST /:id/propuesta` (recibe los PNG de las vistas y devuelve el PDF)
   - `POST /:id/cotizacion`
+  - `GET /catalogo` y `POST /catalogo`, `PATCH /catalogo/:id`, `POST /catalogo/:id/archivar` (antes de `:id`)
 - **Seguridad.** Las ligas para el cliente son de solo lectura, firmadas y con caducidad, y **sin precios**
   salvo que se marque. Los croquis no van en el prefijo público de `uploads`.
 
@@ -430,7 +469,7 @@ lugares a tocar para dar de alta un módulo:
 | 5 | Detección automática (PDF vectorial y luego IA con eval) y «Leer ficha» | — |
 | 6 | Infraestructura en el plano (gabinetes, rutas de cable, NVR/discos/switch) y mapa de calor en la propuesta | — |
 | 7 | Maqueta 3D con WebGL, modelos propios, vista de noche, «Ver lo que ve», áreas y ambientación, plano técnico y foto de la maqueta en la propuesta (§4.1) | **Hecha** (01-11) |
-| 8 | Catálogo de equipos: agregar modelos; acceso, alarmas, servidores, NVR y gabinete con su modelo y comportamiento; diagrama de conexión y revisión | Propuesta aprobada |
+| 8 | Catálogo de equipos: agregar modelos; acceso, alarmas, servidores, NVR y gabinete con su modelo y comportamiento; rutas de cable, diagrama de conexión y revisión (§4.2 y §6) | **Hecha** (01-11) |
 | 9 | Memoria técnica: subir el PDF, la IA llena la ficha y se arma el modelo. Medido: 92 de 94 datos en 6 fichas con Haiku 5.5 | Propuesta aprobada |
 | 10 | Stock de Almacén, consulta en CT y «Pasar a cotización» | Falta decidir el inventario |
 | 11 | Cotización premium | Faltan las especificaciones de Adam |

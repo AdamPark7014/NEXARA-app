@@ -21,8 +21,10 @@ import { limitesEnMetros, type ResumenDiseno } from "@/lib/cctv/editor";
 import {
   GRABACION_POR_OMISION,
   WATTS_POR_TIPO,
+  METROS_POR_BOBINA,
   almacenamientoTB,
   anchoBandaMbps,
+  bobinas,
   canalesNvr,
   discosNecesarios,
   presupuestoPoe,
@@ -30,11 +32,13 @@ import {
 } from "@/lib/cctv/infraestructura";
 import { DESCRIPCION_NIVEL, ETIQUETA_NIVEL, NIVELES_DORI, RESOLUCIONES, UMBRAL_DORI, metros, resumenOptico } from "@/lib/cctv/optica";
 import { elevacionTexto } from "@/lib/cctv/niveles";
+import { conexionesDelSistema, gruposDeEquipos } from "@/lib/cctv/sistema";
 import type { CamaraPlano } from "@/lib/cctv/plano";
 import type { CalculoNivel } from "./calculo";
 import { COLOR_NIVEL } from "./colores";
 import { hayWebGL } from "@/lib/cctv/medidas";
 import type { Plano } from "@/lib/cctv/plano";
+import DiagramaSistema from "./DiagramaSistema";
 import Figuras3D from "./Figuras3D";
 import LaminaDetalle from "./LaminaDetalle";
 import PlanoEstatico from "./PlanoEstatico";
@@ -127,7 +131,11 @@ export default function Propuesta({
   const g = grabacion ?? GRABACION_POR_OMISION;
   const hojasDistribucion = niveles.length;
   const hojasPlano = planoTecnico ? niveles.length : 0;
-  const totalHojas = hojasDistribucion + 1 + camaras.length + 1 + hojasPlano;
+  const colocados = useMemo(() => (planoTecnico ? gruposDeEquipos(planoTecnico.raiz, g).filter((g) => g.familia !== "camaras") : []), [planoTecnico, g]);
+  const conexiones = useMemo(() => (planoTecnico ? conexionesDelSistema(planoTecnico.raiz) : []), [planoTecnico]);
+  const cableM = conexiones.reduce((t, c) => t + c.largoM, 0);
+  const hojasDiagrama = planoTecnico && colocados.length ? 1 : 0;
+  const totalHojas = hojasDistribucion + 1 + camaras.length + 1 + hojasPlano + hojasDiagrama;
 
   const iso = useMemo(() => {
     const lim = unirLimites(niveles.map((n) => limitesEnMetros(n.plano)));
@@ -332,10 +340,19 @@ export default function Propuesta({
             ))
           : null}
 
+        {/* Cómo se conecta todo */}
+        {planoTecnico && hojasDiagrama ? (
+          <div className={styles.hojaPlano}>
+            <HojaAjustada>
+              <DiagramaSistema raiz={planoTecnico.raiz} resumen={resumen} grabacion={g} proyecto={nombre} version={planoTecnico.version} fecha={planoTecnico.fecha} />
+            </HojaAjustada>
+          </div>
+        ) : null}
+
         {/* Una hoja por cámara */}
         {conNivel.map(({ c, n: nv }, i) => {
           const { plano, tapas, coberturas, esHoja } = nv;
-          const hoja = hojasDistribucion + 2 + i;
+          const hoja = hojasDistribucion + 2 + hojasPlano + hojasDiagrama + i;
           const o = c.lentes[0]?.optica;
           const f = o ? resumenOptico({ optica: o, distanciaM: c.distanciaM, alturaCamM: c.alturaM, inclinacionDeg: c.inclinacionDeg }) : null;
           const m = modeloPorId(c.productoId);
@@ -482,25 +499,36 @@ export default function Propuesta({
                   <td className={styles.derecha}>{e.cantidad}</td>
                 </tr>
               ))}
-              <tr>
-                <td>NVR de {infra.canales} canales</td>
-                <td>[modelo por elegir]</td>
-                <td className={styles.derecha}>1</td>
-              </tr>
+              {colocados.map((g) => (
+                <tr key={g.clave}>
+                  <td>{g.nombre}</td>
+                  <td>{g.modelo}</td>
+                  <td className={styles.derecha}>{g.cantidad}</td>
+                </tr>
+              ))}
+              {colocados.some((g) => g.tipo === "nvr") ? null : (
+                <tr>
+                  <td>NVR de {infra.canales} canales</td>
+                  <td>[modelo por elegir]</td>
+                  <td className={styles.derecha}>1</td>
+                </tr>
+              )}
               <tr>
                 <td>Disco duro de 8 TB para videovigilancia</td>
                 <td>[modelo por elegir]</td>
                 <td className={styles.derecha}>{infra.discos8}</td>
               </tr>
-              <tr>
-                <td>Switch PoE de {infra.puertosSwitch} puertos</td>
-                <td>[modelo por elegir]</td>
-                <td className={styles.derecha}>1</td>
-              </tr>
+              {colocados.some((g) => g.tipo === "switch") ? null : (
+                <tr>
+                  <td>Switch PoE de {infra.puertosSwitch} puertos</td>
+                  <td>[modelo por elegir]</td>
+                  <td className={styles.derecha}>1</td>
+                </tr>
+              )}
               <tr>
                 <td>Cable UTP Cat 6</td>
-                <td>[se calcula al trazar las rutas]</td>
-                <td className={styles.derecha}>—</td>
+                <td>{conexiones.length ? `${Math.round(cableM)} m trazados, en bobinas de ${METROS_POR_BOBINA} m` : "[se calcula al colocar el gabinete]"}</td>
+                <td className={styles.derecha}>{conexiones.length ? bobinas(cableM) : "—"}</td>
               </tr>
             </tbody>
           </table>
