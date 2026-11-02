@@ -391,7 +391,23 @@ export default function CotizacionesPage() {
     {
       key: "estado",
       label: "Estado",
-      render: (row) => <StatusCell status={row.estado} label={row.estadoEtiqueta} size="sm" />,
+      render: (row) =>
+        row.estado === "APROBADA" && !row.proyectoId ? (
+          <span className={styles.celda}>
+            <StatusCell status={row.estado} label={row.estadoEtiqueta} size="sm" />
+            {/* Lo que falta no se esconde hasta pasar el ratón. */}
+            <LinkButton
+              onClick={(e) => {
+                e.stopPropagation();
+                void abrirDecision(row, "ganada");
+              }}
+            >
+              Crear proyecto
+            </LinkButton>
+          </span>
+        ) : (
+          <StatusCell status={row.estado} label={row.estadoEtiqueta} size="sm" />
+        ),
     },
     {
       key: "total",
@@ -479,24 +495,9 @@ export default function CotizacionesPage() {
           estado === "ENVIADA"
             ? undefined
             : (row) => (
-                <>
-                  {row.estado === "APROBADA" && !row.proyectoId ? (
-                    <Button
-                      size="sm"
-                      variant="tonal"
-                      loading={abriendo === row.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void abrirDecision(row, "ganada");
-                      }}
-                    >
-                      Crear proyecto
-                    </Button>
-                  ) : null}
-                  <ButtonLink size="sm" variant="ghost" href={`/erp/cotizaciones/${row.id}`} aria-label={`Abrir ${row.folio}`}>
-                    Abrir
-                  </ButtonLink>
-                </>
+                <ButtonLink size="sm" variant="ghost" href={`/erp/cotizaciones/${row.id}`} aria-label={`Abrir ${row.folio}`}>
+                  Abrir
+                </ButtonLink>
               )
         }
       />
