@@ -15,6 +15,7 @@ import { useUser } from "@/components/UserContext";
 import EspecificacionesVehiculo from "@/components/vehiculos/EspecificacionesVehiculo";
 import GasolinaVehiculo, { CargarGasolina } from "@/components/vehiculos/GasolinaVehiculo";
 import MantenimientoVehiculo, { RegistrarServicio } from "@/components/vehiculos/MantenimientoVehiculo";
+import FaltaPorCapturar from "@/components/vehiculos/FaltaPorCapturar";
 import ResumenVehiculo from "@/components/vehiculos/ResumenVehiculo";
 import { KpiBanda, c, v } from "@/components/vehiculos/piezas";
 import { pesos2 } from "@/lib/costos";
@@ -221,7 +222,15 @@ export default function VehiculoDetallePage() {
       ) : null}
 
       {pestana === "resumen" ? (
-        ficha ? <ResumenVehiculo ficha={ficha} estado={panelEstado} /> : panelEstado
+        ficha ? (
+          <ResumenVehiculo
+            ficha={ficha}
+            estado={panelEstado}
+            faltantes={puedeEditar ? <FaltaPorCapturar ficha={ficha} onDocumentos={() => cambiarPestana("especificaciones")} onGasolina={() => setDialogo("gasolina")} /> : null}
+          />
+        ) : (
+          panelEstado
+        )
       ) : null}
 
       {pestana === "especificaciones" && ficha ? (

@@ -3,9 +3,10 @@
 /** Ficha › Especificaciones: cada dato con la fuente de donde salió, y los documentos del vehículo. */
 
 import { useState } from "react";
-import { Button, EmptyState } from "@/components/base";
+import { Button, ButtonLink, EmptyState } from "@/components/base";
 import { Aviso, Dialogo } from "@/components/mesa-contable/piezas";
 import { formatApiError } from "@/lib/erp-api";
+import { VEHICULOS_PATH } from "@/lib/recursos-core";
 import { urlFoto } from "@/lib/vehiculos-api";
 import {
   agregarDocumento,
@@ -28,6 +29,9 @@ const ETIQUETA_DOCUMENTO: Record<string, string> = {
   VERIFICACION: "Verificación",
   OTRO: "Otro",
 };
+
+/** El manual se sube desde la ficha, donde además se lee. Aquí solo quedaría guardado sin usarse. */
+const SE_AGREGAN_AQUI = ["TARJETA", "POLIZA", "VERIFICACION", "OTRO"];
 
 const conUnidad = (n: number | null | undefined, unidad: string) => (n == null ? null : `${n.toLocaleString("es-MX")} ${unidad}`);
 
@@ -138,9 +142,16 @@ export default function EspecificacionesVehiculo({
         <div className={v.cabecera}>
           <h2 className={v.titulo}>Documentos</h2>
           {puedeEditar ? (
-            <Button variant="secondary" size="sm" onClick={() => setSubiendo(true)}>
-              Agregar documento
-            </Button>
+            <div className={v.acciones}>
+              {ficha.documentos.some((d) => d.tipo === "MANUAL") ? null : (
+                <ButtonLink variant="secondary" size="sm" href={`${VEHICULOS_PATH}/nuevo?vehiculo=${id}`}>
+                  Subir manual
+                </ButtonLink>
+              )}
+              <Button variant="secondary" size="sm" onClick={() => setSubiendo(true)}>
+                Agregar documento
+              </Button>
+            </div>
           ) : null}
         </div>
         {error ? <Aviso tono="danger">{error}</Aviso> : null}
@@ -240,9 +251,9 @@ function SubirDocumento({
         <label className={v.campo}>
           Tipo
           <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
-            {Object.entries(ETIQUETA_DOCUMENTO).map(([id, texto]) => (
+            {SE_AGREGAN_AQUI.map((id) => (
               <option key={id} value={id}>
-                {texto}
+                {ETIQUETA_DOCUMENTO[id]}
               </option>
             ))}
           </select>

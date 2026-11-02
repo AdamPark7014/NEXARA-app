@@ -273,6 +273,7 @@ export type PlanDeCalculo = {
   cadaKm: number | null;
   cadaMeses: number | null;
   costoEstimado?: number | null;
+  paginaManual?: number | null;
 };
 
 export type EstadoServicio = 'VENCIDO' | 'PRONTO' | 'OK';
@@ -280,6 +281,7 @@ export type EstadoServicio = 'VENCIDO' | 'PRONTO' | 'OK';
 export type ServicioProgramado = {
   id: number;
   concepto: string;
+  paginaManual: number | null;
   cadaKm: number | null;
   cadaMeses: number | null;
   costoEstimado: number | null;
@@ -337,6 +339,7 @@ export function programaDeServicio(
     return {
       id: p.id,
       concepto: p.concepto,
+      paginaManual: p.paginaManual ?? null,
       cadaKm: p.cadaKm,
       cadaMeses: p.cadaMeses,
       costoEstimado: p.costoEstimado ?? null,

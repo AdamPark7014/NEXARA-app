@@ -78,6 +78,7 @@ export type Especificacion = {
 export type ServicioProgramado = {
   id: number;
   concepto: string;
+  paginaManual?: number | null;
   cadaKm: number | null;
   cadaMeses: number | null;
   costoEstimado: number | null;
@@ -181,6 +182,9 @@ export type FichaVehiculo = {
 };
 
 export type Omisiones = FichaCostoOmision;
+export type PlanEstandar = { concepto: string; cadaKm: number | null; cadaMeses: number | null };
+/** Quien no ve costos recibe solo el programa. */
+export type EstandarVehiculos = Partial<Omisiones> & { plan?: PlanEstandar[] };
 type FichaCostoOmision = {
   valorLlantas: number;
   rescatePct: number;
@@ -203,6 +207,8 @@ export type PlanEditable = {
   cadaMeses?: number | null;
   paginaManual?: number | null;
   costoEstimado?: number | null;
+  /** Salió del estándar y aún no se guarda. No viaja a la API. */
+  estandar?: boolean;
 };
 
 export type DatosFicha = Partial<Omit<Especificacion, "fuentes">> & {
@@ -252,7 +258,10 @@ export const getFlotillaMes = (token: string, mes?: string) =>
 
 export const getFicha = (token: string, id: number | string) => erpFetch<FichaVehiculo>(`${API}/${id}`, token);
 
-export const getOmisiones = (token: string) => erpFetch<Omisiones>(`${API}/omisiones`, token);
+export const getOmisiones = (token: string) => erpFetch<EstandarVehiculos>(`${API}/omisiones`, token);
+
+export const guardarEstandar = (token: string, datos: Omisiones & { plan: PlanEstandar[] }) =>
+  erpFetch<EstandarVehiculos>(`${API}/estandar`, token, json(datos, "PUT"));
 
 export const guardarFicha = (token: string, id: number | string | null, datos: DatosFicha, recostear = false) =>
   id == null
@@ -520,6 +529,72 @@ export function datosDelNombre(nombre: string | null | undefined): { marca?: str
   const anio = resto.match(/(?:^|\s)(19[89]\d|20[0-3]\d)$/)?.[1];
   const modelo = (anio ? resto.slice(0, -anio.length) : resto).trim();
   return { marca, ...(modelo ? { modelo } : {}), ...(anio ? { anio } : {}) };
+}
+
+/** 0.045 → 4.5. Redondear a entero volvía 5 % un 4.5 % al guardar. */
+export const aPorcentaje = (fraccion: number) => Math.round(fraccion * 10000) / 100;
+
+const PALABRAS_SIN_PESO = new Set(
+  "a al cambio cambiar de del e el en inspeccion inspeccionar la las los motor reemplazar reemplazo revisar revision servicio sustitucion sustituir y".split(" "),
+);
+const SINONIMOS: Record<string, string> = { neumatico: "llanta", neumaticos: "llanta", balata: "freno", balatas: "freno", pastillas: "freno" };
+
+/** Las palabras que distinguen un concepto: «Cambio de aceite de motor» y «Aceite» hablan de lo mismo. */
+function clavesDeConcepto(concepto: string): Set<string> {
+  const palabras = concepto
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((p) => p && !PALABRAS_SIN_PESO.has(p));
+  return new Set(palabras.map((p) => (SINONIMOS[p] ?? p).slice(0, 4)));
+}
+
+function mismoConcepto(a: Set<string>, b: Set<string>): boolean {
+  const [corto, largo] = a.size <= b.size ? [a, b] : [b, a];
+  return corto.size > 0 && [...corto].every((p) => largo.has(p));
+}
+
+/**
+ * El programa después de leer un manual. Mismo concepto, mismo renglón: conserva su `id` y con él los
+ * servicios ya hechos. El manual manda sobre el intervalo, y la persona lo ve antes de confirmar.
+ */
+export function combinarPlan(actual: readonly PlanEditable[], delManual: ManualLeido["servicios"]): PlanEditable[] {
+  const salida = actual.map((p) => ({ ...p }));
+  const tocados = new Set<number>();
+  const nuevos: PlanEditable[] = [];
+  for (const s of delManual) {
+    const claves = clavesDeConcepto(s.concepto);
+    const i = salida.findIndex((p, j) => !tocados.has(j) && mismoConcepto(clavesDeConcepto(p.concepto), claves));
+    if (i < 0) {
+      nuevos.push({ ...s });
+      continue;
+    }
+    tocados.add(i);
+    salida[i] = { ...salida[i], cadaKm: s.cadaKm, cadaMeses: s.cadaMeses, paginaManual: s.paginaManual, estandar: false };
+  }
+  // El estándar que no se ha guardado cede ante el manual; lo guardado se queda hasta que alguien lo quite.
+  const conservados = delManual.length ? salida.filter((p, j) => tocados.has(j) || !p.estandar) : salida;
+  return [...conservados, ...nuevos];
+}
+
+export type Faltante = { id: string; texto: string; para: string; accion: "ficha" | "documentos" | "gasolina" | "salida" };
+
+/** Lo que el sistema aún no sabe de este vehículo. Nada de esto detiene el trabajo. */
+export function faltantesDeFicha(f: FichaVehiculo): Faltante[] {
+  const salida: Faltante[] = [];
+  const tiene = (tipo: string) => f.documentos.some((d) => d.tipo === tipo);
+  if (!tiene("MANUAL")) salida.push({ id: "manual", texto: "Manual del vehículo", para: "Llena tanque, aceite, llantas y programa de servicio.", accion: "ficha" });
+  if (f.acceso.veCostos && !f.costos) salida.push({ id: "precio", texto: "Precio de compra", para: "Sin él no sale el costo por kilómetro.", accion: "ficha" });
+  if (!f.odometro && f.especificacion?.odometroAlta == null) salida.push({ id: "km", texto: "Km de hoy", para: "De ahí se cuenta el desgaste.", accion: "ficha" });
+  if (!f.rendimiento.oficial && !f.rendimiento.real) salida.push({ id: "rendimiento", texto: "Rendimiento", para: "Sin él, la gasolina no entra al costo.", accion: "ficha" });
+  if (!f.programa.length) salida.push({ id: "programa", texto: "Programa de servicio", para: "Sin él no avisa cuándo toca.", accion: "ficha" });
+  if (!tiene("TARJETA")) salida.push({ id: "tarjeta", texto: "Tarjeta de circulación", para: "Para tenerla a la mano.", accion: "documentos" });
+  if (!tiene("POLIZA")) salida.push({ id: "poliza", texto: "Póliza de seguro", para: "Con su vencimiento, para que avise antes.", accion: "documentos" });
+  if (!tiene("VERIFICACION")) salida.push({ id: "verificacion", texto: "Verificación", para: "Con su vencimiento, para que avise antes.", accion: "documentos" });
+  if (!f.cargas.length) salida.push({ id: "gasolina", texto: "Primera carga de gasolina", para: "Con dos tanques llenos sale el rendimiento real.", accion: "gasolina" });
+  if (f.avisos.sinSalidas) salida.push({ id: "salida", texto: "Primera salida con foto", para: "Los kilómetros nacen ahí, en Mis vehículos.", accion: "salida" });
+  return salida;
 }
 
 export function nombreDeVehiculo(d: { marca?: string | null; modelo?: string | null; anio?: number | string | null }): string {

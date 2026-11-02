@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AltaVehiculo from "@/app/(panels)/erp/vehiculos/nuevo/page";
 import VehiculoDetallePage from "@/app/(panels)/erp/vehiculos/[id]/page";
+import EstandarVehiculos from "@/components/vehiculos/EstandarVehiculos";
 
 const estado = vi.hoisted(() => ({ consulta: "", push: vi.fn(), permisos: ["vehicles.inventory"] as string[] }));
 
@@ -541,6 +542,179 @@ describe("alta", () => {
       const put = llamadas.find((l) => l.metodo === "PUT");
       expect(put?.url).toContain("vehicles/ficha/2?recostear=1");
       expect(put?.body).toMatchObject({ plan: [{ id: 31, concepto: "Aceite y filtro" }] });
+    });
+  });
+});
+
+describe("alimentarlo después", () => {
+  const ACCESO_TODO = { incluye: "/costos/acceso", body: { veTodo: true, puedeLigar: true } };
+  const PLAN_ESTANDAR = [
+    { concepto: "Aceite y filtro", cadaKm: 10000, cadaMeses: 12 },
+    { concepto: "Filtro de aire", cadaKm: 20000, cadaMeses: 12 },
+  ];
+  const OMIS = { incluye: "vehicles/ficha/omisiones", body: { ...OMISIONES, plan: PLAN_ESTANDAR } };
+  const pdf = new File(["%PDF"], "Manual.pdf", { type: "application/pdf" });
+
+  it("sin programa propone el estándar, marcado, y solo lo guarda al confirmar", async () => {
+    servir(ACCESO_TODO, OMIS, { incluye: "vehicles/ficha", metodo: "POST", body: FICHA });
+    const user = userEvent.setup();
+    render(<AltaVehiculo />);
+    await user.type(await screen.findByLabelText("Marca"), "Nissan");
+    await user.type(screen.getByLabelText("Modelo"), "Frontier");
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+    expect(await screen.findAllByText("Estándar")).toHaveLength(2);
+    expect(screen.getByText(/no del fabricante/)).toBeInTheDocument();
+    expect(llamadas.some((l) => l.metodo === "POST" && l.url.endsWith("vehicles/ficha"))).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: "Guardar vehículo" }));
+    await waitFor(() => expect(estado.push).toHaveBeenCalled());
+    const post = llamadas.find((l) => l.metodo === "POST" && l.url.endsWith("vehicles/ficha"));
+    const plan = (post?.body as { plan: Array<Record<string, unknown>> }).plan;
+    expect(plan.map((p) => p.concepto)).toEqual(["Aceite y filtro", "Filtro de aire"]);
+    expect(plan[0]).not.toHaveProperty("estandar");
+  });
+
+  it("quitar el estándar no lo vuelve a poner", async () => {
+    servir(ACCESO_TODO, OMIS);
+    const user = userEvent.setup();
+    render(<AltaVehiculo />);
+    await user.click(await screen.findByRole("button", { name: "Continuar" }));
+    await user.click(await screen.findByRole("button", { name: "Quitar Aceite y filtro" }));
+    await user.click(screen.getByRole("button", { name: "Quitar Filtro de aire" }));
+    expect(await screen.findByText(/Sin programa\./)).toBeInTheDocument();
+  });
+
+  it("un manual que llega después llena lo que falta, no toca lo escrito y corrige el programa", async () => {
+    estado.consulta = "vehiculo=2";
+    const guardada = {
+      ...FICHA,
+      documentos: [],
+      especificacion: { ...FICHA.especificacion, tanqueLitros: 70, aceiteTipo: null, aceiteLitros: null, fuentes: {} },
+      programa: [{ ...FICHA.programa[0], id: 31, concepto: "Aceite y filtro", cadaKm: 10000, cadaMeses: 12 }],
+    };
+    servir(
+      ACCESO_TODO,
+      OMIS,
+      { incluye: "vehicles/ficha/2", metodo: "GET", body: guardada },
+      {
+        incluye: "leer-manual",
+        body: {
+          campos: { tanqueLitros: { valor: 80, fuente: { tipo: "MANUAL", pagina: 418 } }, aceiteTipo: { valor: "5W-30", fuente: { tipo: "MANUAL", pagina: 420 } } },
+          servicios: [
+            { concepto: "Cambio de aceite y filtro", cadaKm: 15000, cadaMeses: 12, paginaManual: 431 },
+            { concepto: "Bujías", cadaKm: 40000, cadaMeses: null, paginaManual: 433 },
+          ],
+          paginas: 612,
+          escaneado: false,
+          archivo: { url: "/uploads/vehicles/m.pdf", nombre: "Manual.pdf", paginas: 612 },
+        },
+      },
+      { incluye: "vehicles/ficha/2", metodo: "PUT", body: FICHA },
+    );
+    const user = userEvent.setup();
+    render(<AltaVehiculo />);
+    expect(await screen.findByLabelText("Tanque (L)")).toHaveValue("70");
+    expect(screen.getByRole("button", { name: "Subir manual" })).toBeInTheDocument();
+
+    await user.upload(screen.getByLabelText("Manual en PDF"), pdf);
+
+    expect(await screen.findByLabelText("Aceite de motor")).toHaveValue("5W-30");
+    await screen.findByText(/lo que ya estaba escrito no se tocó/);
+    expect(screen.getByLabelText("Tanque (L)")).toHaveValue("70");
+    expect(screen.getByText("Manual p. 431")).toBeInTheDocument();
+    expect(screen.getByText("Manual p. 433")).toBeInTheDocument();
+    expect(llamadas.some((l) => l.metodo === "PUT")).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: "Guardar vehículo" }));
+    await waitFor(() => expect(llamadas.some((l) => l.metodo === "PUT")).toBe(true));
+    expect(llamadas.find((l) => l.metodo === "PUT")?.body).toMatchObject({
+      tanqueLitros: 70,
+      aceiteTipo: "5W-30",
+      manual: { url: "/uploads/vehicles/m.pdf" },
+      plan: [
+        { id: 31, concepto: "Aceite y filtro", cadaKm: 15000, paginaManual: 431 },
+        { concepto: "Bujías", cadaKm: 40000, paginaManual: 433 },
+      ],
+    });
+  });
+
+  it("editar una ficha no borra la página del manual de su programa", async () => {
+    estado.consulta = "vehiculo=2";
+    const guardada = { ...FICHA, programa: [{ ...FICHA.programa[0], id: 31, paginaManual: 431 }] };
+    servir(ACCESO_TODO, OMIS, { incluye: "vehicles/ficha/2", metodo: "GET", body: guardada }, { incluye: "vehicles/ficha/2", metodo: "PUT", body: FICHA });
+    const user = userEvent.setup();
+    render(<AltaVehiculo />);
+    expect(await screen.findByText("Manual p. 431")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Guardar vehículo" }));
+    await waitFor(() => expect(llamadas.find((l) => l.metodo === "PUT")?.body).toMatchObject({ plan: [{ id: 31, paginaManual: 431 }] }));
+  });
+
+  it("la ficha dice qué falta, solo a quien puede capturarlo", async () => {
+    servir(...PARA_FICHA({ ...FICHA, documentos: [] }));
+    render(<VehiculoDetallePage />);
+    const tarjeta = await screen.findByRole("region", { name: "Falta por capturar" });
+    expect(within(tarjeta).getByText("Manual del vehículo")).toBeInTheDocument();
+    expect(within(tarjeta).getByRole("link", { name: "Capturar Manual del vehículo" })).toHaveAttribute("href", "/erp/vehiculos/nuevo?vehiculo=2");
+    expect(within(tarjeta).getByRole("button", { name: "Agregar Póliza de seguro" })).toBeInTheDocument();
+  });
+
+  it("sin permiso de inventario, la ficha no pide capturar nada", async () => {
+    estado.permisos = ["vehicles.view"];
+    servir(...PARA_FICHA({ ...FICHA, documentos: [] }));
+    render(<VehiculoDetallePage />);
+    await screen.findByRole("heading", { name: "Nissan Frontier 2026" });
+    expect(screen.queryByRole("region", { name: "Falta por capturar" })).not.toBeInTheDocument();
+  });
+
+  it("el manual no se ofrece en «Agregar documento»: se sube donde se lee", async () => {
+    estado.consulta = "tab=especificaciones";
+    servir(...PARA_FICHA({ ...FICHA, documentos: [] }));
+    const user = userEvent.setup();
+    render(<VehiculoDetallePage />);
+    expect(await screen.findByRole("link", { name: "Subir manual" })).toHaveAttribute("href", "/erp/vehiculos/nuevo?vehiculo=2");
+    await user.click(screen.getByRole("button", { name: "Agregar documento" }));
+    expect(screen.queryByRole("option", { name: "Manual del propietario" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Póliza de seguro" })).toBeInTheDocument();
+  });
+
+  describe("estándar en Tarifas", () => {
+    it("enseña lo guardado en la forma en que se captura, y guarda en fracción", async () => {
+      servir(
+        { incluye: "vehicles/ficha/omisiones", body: { ...OMISIONES, primaSeguro: 0.045, plan: PLAN_ESTANDAR } },
+        { incluye: "vehicles/ficha/estandar", metodo: "PUT", body: { ...OMISIONES, plan: [] } },
+      );
+      const user = userEvent.setup();
+      render(<EstandarVehiculos token="jwt" />);
+      const seguro = await screen.findByLabelText("Seguro (% anual)");
+      expect(seguro).toHaveValue("4.5");
+      await user.clear(screen.getByLabelText("Vida útil (km)"));
+      await user.type(screen.getByLabelText("Vida útil (km)"), "250000");
+      await user.click(screen.getByRole("button", { name: "Quitar Filtro de aire" }));
+      await user.click(screen.getByRole("button", { name: "Guardar estándar" }));
+
+      await screen.findByText(/los que tienen ficha conservan los suyos/);
+      const put = llamadas.find((l) => l.metodo === "PUT");
+      expect(put?.body).toMatchObject({ vidaKm: 250000, primaSeguro: 0.045, plan: [{ concepto: "Aceite y filtro", cadaKm: 10000, cadaMeses: 12 }] });
+    });
+
+    it("no guarda una cifra fuera de rango ni un renglón sin intervalo", async () => {
+      servir({ incluye: "vehicles/ficha/omisiones", body: { ...OMISIONES, plan: [] } });
+      const user = userEvent.setup();
+      render(<EstandarVehiculos token="jwt" />);
+      const vida = await screen.findByLabelText("Vida útil (km)");
+      await user.clear(vida);
+      await user.type(vida, "50");
+      await user.click(screen.getByRole("button", { name: "Guardar estándar" }));
+      expect(await screen.findByText(/Revisa «Vida útil \(km\)»/)).toBeInTheDocument();
+
+      await user.clear(vida);
+      await user.type(vida, "200000");
+      await user.click(screen.getByRole("button", { name: "Agregar" }));
+      await user.type(screen.getByLabelText("Qué toca"), "Bujías");
+      await user.click(screen.getByRole("button", { name: "Guardar estándar" }));
+      expect(await screen.findByText(/Revisa «Bujías»/)).toBeInTheDocument();
+      expect(llamadas.some((l) => l.metodo === "PUT")).toBe(false);
     });
   });
 });

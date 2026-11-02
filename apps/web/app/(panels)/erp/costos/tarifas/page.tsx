@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useUser } from "@/components/UserContext";
 import { Button, EmptyState, SkeletonRows } from "@/components/base";
 import { Aviso, Dialogo } from "@/components/mesa-contable/piezas";
+import EstandarVehiculos from "@/components/vehiculos/EstandarVehiculos";
 import { Banda, Kpi, c, useAccesoCostos } from "@/components/costos/piezas";
 import { formatApiError } from "@/lib/erp-api";
 import {
@@ -408,6 +409,8 @@ export default function TarifasDeCosto() {
               </span>
             </div>
           </form>
+
+          {token ? <EstandarVehiculos token={token} /> : null}
 
           <section className={`${c.card} ${c.scroll}`} aria-label="Categorías">
             <h2 className={c.cardTitle}>Categorías</h2>

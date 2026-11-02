@@ -44,6 +44,45 @@ export const OMISIONES_COSTO = {
   otrosAnuales: 0,
 };
 
+export type PlanEstandar = { concepto: string; cadaKm: number | null; cadaMeses: number | null };
+
+/** Programa de partida de quien aún no tiene manual. Es de NEXARA, no del fabricante: se ajusta en Tarifas. */
+export const PLAN_ESTANDAR: ReadonlyArray<PlanEstandar> = [
+  { concepto: 'Aceite y filtro', cadaKm: 10000, cadaMeses: 12 },
+  { concepto: 'Rotación de llantas', cadaKm: 10000, cadaMeses: null },
+  { concepto: 'Revisión de frenos', cadaKm: 20000, cadaMeses: 12 },
+  { concepto: 'Filtro de aire', cadaKm: 20000, cadaMeses: 12 },
+];
+
+export type EstandarVehiculos = typeof OMISIONES_COSTO & { plan: PlanEstandar[] };
+
+const CLAVE_ESTANDAR = 'vehiculos.estandar';
+const CAMPOS_ESTANDAR = Object.keys(OMISIONES_COSTO) as Array<keyof typeof OMISIONES_COSTO>;
+
+const positivoONulo = (n: unknown): number | null => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : null);
+
+/** Lo guardado sobre los valores de fábrica. Un dato dañado no debe tumbar el alta de un vehículo. */
+export function estandarDesde(guardado: string | null | undefined): EstandarVehiculos {
+  const salida: EstandarVehiculos = { ...OMISIONES_COSTO, plan: PLAN_ESTANDAR.map((p) => ({ ...p })) };
+  if (!guardado) return salida;
+  let datos: any;
+  try {
+    datos = JSON.parse(guardado);
+  } catch {
+    return salida;
+  }
+  if (!datos || typeof datos !== 'object') return salida;
+  for (const campo of CAMPOS_ESTANDAR) {
+    if (typeof datos[campo] === 'number' && Number.isFinite(datos[campo])) salida[campo] = datos[campo];
+  }
+  if (Array.isArray(datos.plan)) {
+    salida.plan = datos.plan
+      .map((p: any) => ({ concepto: String(p?.concepto ?? '').trim().slice(0, 120), cadaKm: positivoONulo(p?.cadaKm), cadaMeses: positivoONulo(p?.cadaMeses) }))
+      .filter((p: PlanEstandar) => p.concepto && (p.cadaKm != null || p.cadaMeses != null));
+  }
+  return salida;
+}
+
 export const TIPOS_DOCUMENTO = ['MANUAL', 'TARJETA', 'POLIZA', 'VERIFICACION', 'OTRO'] as const;
 
 const DIA_MS = 86_400_000;
@@ -53,6 +92,7 @@ const ZONA = '-06:00';
 const RUTA_SUBIDAS = '/uploads/vehicles/';
 
 export type CostoFichaDatos = Partial<typeof OMISIONES_COSTO> & { valor?: number };
+export type DatosEstandar = Partial<typeof OMISIONES_COSTO> & { plan?: ReadonlyArray<Partial<PlanEstandar>> | null };
 
 export type DatosFichaVehiculo = {
   nombre?: string | null;
@@ -264,6 +304,7 @@ export class CostosVehiculosService {
         cadaKm: p.cadaKm,
         cadaMeses: p.cadaMeses,
         costoEstimado: p.costoEstimado == null ? null : numero(p.costoEstimado),
+        paginaManual: p.paginaManual,
       })),
       this.serviciosDeCalculo(v),
       {
@@ -332,8 +373,40 @@ export class CostosVehiculosService {
 
   /* ── Ficha ──────────────────────────────────────────────────────────────── */
 
-  omisiones() {
-    return { ...OMISIONES_COSTO };
+  /** Con qué arranca un vehículo nuevo. Las cifras de dinero, solo para quien ve costos. */
+  async omisiones(companyId: number | null, actor: ActorCostos) {
+    const { plan, ...costos } = await this.estandar(requireCompanyId(companyId));
+    return veTodoCostos(actor) ? { ...costos, plan } : { plan };
+  }
+
+  /** `SystemSetting` no filtra solo por empresa: la consulta lleva el `companyId`. */
+  private async estandar(companyId: number): Promise<EstandarVehiculos> {
+    const fila = await this.prisma.systemSetting.findFirst({ where: { key: CLAVE_ESTANDAR, companyId }, select: { value: true } });
+    return estandarDesde(fila?.value);
+  }
+
+  /** Solo cambia con qué arrancan los vehículos nuevos: las fichas guardadas conservan sus cifras. */
+  async guardarEstandar(companyId: number | null, d: DatosEstandar, actor: ActorCostos) {
+    if (!veTodoCostos(actor)) throw new ForbiddenException('El estándar lo ajusta dirección o contabilidad');
+    const tenantId = requireCompanyId(companyId);
+    const siguiente = await this.estandar(tenantId);
+    for (const campo of CAMPOS_ESTANDAR) {
+      const valor = d[campo];
+      if (valor != null) siguiente[campo] = valor;
+    }
+    if (d.plan) {
+      siguiente.plan = d.plan.flatMap((p) => {
+        const concepto = String(p.concepto ?? '').trim().slice(0, 120);
+        if (!concepto) return [];
+        if (p.cadaKm == null && p.cadaMeses == null) throw new BadRequestException(`A «${concepto}» le falta cada cuánto toca`);
+        return [{ concepto, cadaKm: p.cadaKm ?? null, cadaMeses: p.cadaMeses ?? null }];
+      });
+    }
+    const value = JSON.stringify(siguiente);
+    const fila = await this.prisma.systemSetting.findFirst({ where: { key: CLAVE_ESTANDAR, companyId: tenantId }, select: { id: true } });
+    if (fila) await this.prisma.systemSetting.update({ where: { id: fila.id }, data: { value } });
+    else await this.prisma.systemSetting.create({ data: { key: CLAVE_ESTANDAR, value, category: 'costos', label: 'Estándar de vehículos', companyId: tenantId } });
+    return siguiente;
   }
 
   async ficha(companyId: number | null, id: number, actor: ActorCostos) {
@@ -677,7 +750,8 @@ export class CostosVehiculosService {
   private async guardarCosto(tx: any, companyId: number, vehicleId: number, nombre: string, c: CostoFichaDatos, actorId: number | null) {
     const parametros = await this.tarifas.parametros(companyId, Number(workDateKey(new Date()).slice(0, 4)));
     const existente = await tx.costoFichaEquipo.findFirst({ where: { companyId, tipo: 'VEHICULO', vehicleId, activo: true } });
-    const conPrevio = <K extends keyof typeof OMISIONES_COSTO>(campo: K, columna: string, omision: number = OMISIONES_COSTO[campo]) =>
+    const estandar = await this.estandar(companyId);
+    const conPrevio = <K extends keyof typeof OMISIONES_COSTO>(campo: K, columna: string, omision: number = estandar[campo]) =>
       c[campo] ?? (existente?.[columna] != null ? numero(existente[columna]) : omision);
     const valor = c.valor ?? (existente ? numero(existente.valor) : 0);
     if (!(valor > 0)) throw new BadRequestException('Falta el precio de compra para sacarle costo');
@@ -689,7 +763,7 @@ export class CostosVehiculosService {
       rescatePct: conPrevio('rescatePct', 'rescatePct'),
       vidaUnidades: conPrevio('vidaKm', 'vidaUnidades'),
       unidadesAnio: conPrevio('kmAnio', 'unidadesAnio'),
-      tasaInteres: conPrevio('tasaInteres', 'tasaInteres', parametros.tasaInteres ?? OMISIONES_COSTO.tasaInteres),
+      tasaInteres: conPrevio('tasaInteres', 'tasaInteres', parametros.tasaInteres ?? estandar.tasaInteres),
       primaSeguro: conPrevio('primaSeguro', 'primaSeguro'),
       ko: conPrevio('ko', 'ko'),
       precioCombustible: conPrevio('precioCombustible', 'precioCombustible'),
