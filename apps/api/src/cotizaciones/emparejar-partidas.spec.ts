@@ -159,6 +159,45 @@ describe('nombres largos pegados de una ficha', () => {
   });
 });
 
+describe('lo específico que se pidió', () => {
+  it('una marca pedida gana: «Disco HPE 4 TB» no empieza por un Seagate de 4 TB', () => {
+    const { opciones } = emparejar('Disco HPE 4 TB', [
+      candidato('Disco duro Seagate 4 TB', { fuente: 'catalogo', brand: 'Seagate', model: 'S4', unitCost: 1000, stock: 3 }),
+      candidato('Disco duro HPE para servidor', { fuente: 'catalogo', brand: 'HPE', model: 'H1', unitCost: 5000, stock: 3 }),
+    ]);
+    expect(opciones[0]?.model).toBe('H1');
+  });
+
+  it('las cifras pedidas van antes que lo barato', () => {
+    const { opciones } = emparejar('Switch PoE 24 puertos', [
+      candidato('Switch PoE 5 puertos', { fuente: 'catalogo', model: 'A5', unitCost: 300, stock: 3, brand: 'Otra' }),
+      candidato('Switch PoE 24 puertos gigabit', { fuente: 'catalogo', model: 'B24', unitCost: 3000, stock: 3, brand: 'Otra' }),
+      candidato('Switch PoE 24 puertos administrable', { fuente: 'catalogo', model: 'C24', unitCost: 3500, stock: 3, brand: 'Otra' }),
+    ]);
+    expect(opciones.slice(0, 2).map((o) => o.model)).toEqual(['B24', 'C24']);
+  });
+
+  it('«HPE» y «Hewlett Packard Enterprise» son la misma marca', () => {
+    const r = emparejar('Disco HPE 4 TB', [candidato('Disco duro 4 TB SATA', { brand: 'Hewlett Packard Enterprise', model: 'H4' })]);
+    expect(r).toMatchObject({ seguridad: 'alta', elegida: { model: 'H4' } });
+  });
+
+  it('«1000 W» y «1000W» son lo mismo, y no es un modelo', () => {
+    expect(palabrasDePartida('Fuente de poder 1000 W')).toContain('1000w');
+    expect(emparejar('Fuente 1000 W', [candidato('Fuente de poder 1000W 80 Plus')]).seguridad).toBe('alta');
+  });
+
+  it('acertar la marca no vuelve seguro lo demás', () => {
+    const r = emparejar('Lector enrolador UHF Rosslare', [candidato('Lector enrolador de escritorio para tarjetas de proximidad', { brand: 'Rosslare', model: 'DR6255' })]);
+    expect(r.seguridad).not.toBe('alta');
+    expect(r.opciones.map((o) => o.model)).toEqual(['DR6255']);
+  });
+
+  it('una marca distinta sigue sin llenarse sola', () => {
+    expect(emparejar('Disco HPE 4 TB', [candidato('Disco duro Seagate 4 TB', { brand: 'Seagate' }), candidato('Cable', { brand: 'HPE' })]).seguridad).not.toBe('alta');
+  });
+});
+
 describe('una sola palabra', () => {
   it('contra un nombre largo se ofrece; contra uno corto se elige', () => {
     expect(emparejar('Canalización', [candidato('Suministro y colocación de tubo conduit metálico galvanizado pared delgada')]).seguridad).not.toBe('alta');
@@ -246,7 +285,16 @@ describe('complementosDe', () => {
 
 describe('consultasDeCatalogo', () => {
   it('va de más a menos palabras y sin sinónimos', () => {
-    expect(consultasDeCatalogo('Canaletas de PVC blanca 20x10')).toEqual(['canaleta pvc blanca', 'canaleta pvc']);
+    expect(consultasDeCatalogo('Canaletas de PVC blanca')).toEqual(['canaleta pvc blanca', 'canaleta pvc']);
+  });
+
+  it('lo específico va primero: el buscador devuelve pocos', () => {
+    expect(consultasDeCatalogo('Switch PoE TP-Link 24 puertos')[0]).toBe('switch tp-link 24');
+    expect(consultasDeCatalogo('Disco HPE 4 TB')[0]).toBe('disco hewlett');
+  });
+
+  it('un modelo dicho se busca solo y primero', () => {
+    expect(consultasDeCatalogo('Escáner Zebra DS9308')[0]).toBe('ds9308');
   });
 
   it('una sola palabra solo si trae cifra', () => {
