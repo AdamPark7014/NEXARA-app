@@ -4,9 +4,13 @@ import android.content.Context
 import android.util.Base64
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
+import mx.nexara.mobile.nativeapp.data.api.FichaVehiculoDto
 import mx.nexara.mobile.nativeapp.data.api.MisVehiculosDto
 import mx.nexara.mobile.nativeapp.data.api.SolicitarVehiculoBody
+import mx.nexara.mobile.nativeapp.data.api.TableroLeidoDto
+import mx.nexara.mobile.nativeapp.data.api.TicketLeidoDto
 import mx.nexara.mobile.nativeapp.data.api.VehiclesApi
+import mx.nexara.mobile.nativeapp.data.api.VehiculoFichaApi
 import mx.nexara.mobile.nativeapp.ui.common.GeoPhoto
 import mx.nexara.mobile.nativeapp.ui.console.vehiculos.ChecklistVehiculoRules
 import okhttp3.MediaType.Companion.toMediaType
@@ -28,6 +32,14 @@ class VehiclesRepository(context: Context) {
         tokenProvider = { authRepo.token() },
         companyIdProvider = { authRepo.companyId() },
     ).create(VehiclesApi::class.java)
+
+    // Sin cola offline: leer una foto o subir un ticket no sirve sin red, y la cola contestaría
+    // `{"queued":true}` a una pantalla que espera lo leído.
+    private val fichaApi: VehiculoFichaApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+        withOffline = false,
+    ).create(VehiculoFichaApi::class.java)
 
     private val textMedia = "text/plain".toMediaType()
     private val jpegMedia = "image/jpeg".toMediaType()
@@ -94,6 +106,50 @@ class VehiclesRepository(context: Context) {
             combustible = checklist.combustibleBody(),
             fotos = checklist.partes(),
         ).close()
+    }
+
+    suspend fun ficha(vehicleId: Long): FichaVehiculoDto = fichaApi.ficha(vehicleId)
+
+    /** `odometroPrevio`: el servidor descarta una lectura menor, porque un odómetro no retrocede. */
+    suspend fun leerTablero(foto: GeoPhoto, odometroPrevio: Int?): TableroLeidoDto =
+        fichaApi.leerTablero(
+            tipo = "TABLERO".toRequestBody(textMedia),
+            odometroPrevio = odometroPrevio?.toString()?.toRequestBody(textMedia),
+            foto = parteFoto("foto", foto) ?: error("Foto sin datos"),
+        )
+
+    suspend fun leerTicket(foto: GeoPhoto): TicketLeidoDto =
+        fichaApi.leerTicket(
+            tipo = "TICKET".toRequestBody(textMedia),
+            foto = parteFoto("foto", foto) ?: error("Foto sin datos"),
+        )
+
+    /** Las dos fotos son opcionales para el servidor: si la cámara falló, la carga se guarda a mano. */
+    suspend fun registrarCarga(
+        vehicleId: Long,
+        odometro: Int,
+        litros: Double,
+        importe: Double,
+        tanqueLleno: Boolean,
+        ticket: GeoPhoto?,
+        tablero: GeoPhoto?,
+    ) {
+        fichaApi.registrarCarga(
+            id = vehicleId,
+            odometro = odometro.toString().toRequestBody(textMedia),
+            litros = litros.toString().toRequestBody(textMedia),
+            importe = importe.toString().toRequestBody(textMedia),
+            tanqueLleno = tanqueLleno.toString().toRequestBody(textMedia),
+            fotos = listOfNotNull(
+                ticket?.let { parteFoto("ticket", it) },
+                tablero?.let { parteFoto("tablero", it) },
+            ),
+        ).close()
+    }
+
+    private fun parteFoto(campo: String, foto: GeoPhoto): MultipartBody.Part? {
+        val bytes = jpegBytes(foto.dataUrl) ?: return null
+        return MultipartBody.Part.createFormData(campo, "$campo.jpg", bytes.toRequestBody(jpegMedia))
     }
 
     /** Lo que el flujo del checklist entrega ya listo para armar el multipart. */

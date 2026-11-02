@@ -106,7 +106,7 @@ extension DemoStore {
         case "viatics":
             return routeViatics(method: method, parts: parts, json: json, body: body, now: now)
         case "vehicles":
-            return routeVehicles(method: method, parts: parts, json: json, now: now)
+            return routeVehicles(method: method, parts: parts, json: json, body: body, now: now)
         case "ventas":
             return routeClients(method: method, parts: parts, query: query, json: json)
         case "activity-feed":
@@ -750,9 +750,17 @@ extension DemoStore {
 
     // MARK: vehicles/*
 
-    private func routeVehicles(method: String, parts: [String], json: DemoJSON, now: Date) -> DemoReply {
+    private func routeVehicles(method: String, parts: [String], json: DemoJSON, body: Data?, now: Date) -> DemoReply {
         let sub = parts.count > 1 ? parts[1] : ""
         if method == "GET", sub == "mis-vehiculos" { return reply(fxVehicles()) }
+        if sub == "ficha" {
+            if method == "GET" { return reply(fxFichaVehiculo()) }
+            if parts.count > 2, parts[2] == "leer-foto" {
+                return reply(multipartFields(body)["tipo"] == "TICKET" ? fxTicketLeido() : fxTableroLeido())
+            }
+            // La carga guardada: el demo no lleva historial de cargas.
+            return empty()
+        }
         if method == "POST" {
             if parts.count == 1 {
                 // Solicitud nueva.

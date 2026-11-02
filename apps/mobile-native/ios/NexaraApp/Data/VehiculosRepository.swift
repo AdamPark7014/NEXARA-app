@@ -47,12 +47,31 @@ struct ConductorRef: Decodable, Hashable {
     }
 }
 
+/// El trabajo al que se carga el viaje en curso. La salida directa de inventario no trae.
+struct ActividadDeViaje: Decodable, Hashable {
+    var id: Int = 0
+    var folio: String?
+    var titulo: String?
+    var proyecto: String?
+
+    private enum CodingKeys: String, CodingKey { case id, folio, titulo, proyecto }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(Int.self, forKey: .id)) ?? 0
+        folio = try? c.decode(String.self, forKey: .folio)
+        titulo = try? c.decode(String.self, forKey: .titulo)
+        proyecto = try? c.decode(String.self, forKey: .proyecto)
+    }
+}
+
 /// Lo que traigo ahora mismo: de una solicitud aprobada o tomado del inventario.
 struct AsignacionActiva: Decodable, Identifiable, Hashable {
     var id: Int = 0
     /// `"solicitud"` o `"inventario"`: decide a qué par de rutas va el check list.
     var origen: String = "solicitud"
     var vehiculo: VehiculoRef?
+    var actividad: ActividadDeViaje?
     var inicio: String?
     var fin: String?
     var odometroInicio: Int?
@@ -61,7 +80,7 @@ struct AsignacionActiva: Decodable, Identifiable, Hashable {
     var requiereDevolucion: Bool = false
 
     private enum CodingKeys: String, CodingKey {
-        case id, origen, vehiculo, inicio, fin
+        case id, origen, vehiculo, actividad, inicio, fin
         case odometroInicio, combustibleInicioPct, requiereSalida, requiereDevolucion
     }
 
@@ -70,6 +89,7 @@ struct AsignacionActiva: Decodable, Identifiable, Hashable {
         id = (try? c.decode(Int.self, forKey: .id)) ?? 0
         origen = (try? c.decode(String.self, forKey: .origen)) ?? "solicitud"
         vehiculo = try? c.decode(VehiculoRef.self, forKey: .vehiculo)
+        actividad = try? c.decode(ActividadDeViaje.self, forKey: .actividad)
         inicio = try? c.decode(String.self, forKey: .inicio)
         fin = try? c.decode(String.self, forKey: .fin)
         odometroInicio = try? c.decode(Int.self, forKey: .odometroInicio)
@@ -183,6 +203,84 @@ struct MisVehiculosResponse: Decodable {
     }
 }
 
+// MARK: - Ficha, lectura de fotos y cargas (`apps/api/src/costos/vehiculos`)
+
+/// `POST vehicles/ficha/leer-foto` con `tipo=TABLERO`. Lo que no se pudo leer llega en `nil`.
+struct TableroLeido: Decodable {
+    var odometroKm: Int?
+    var combustible: String?
+    var legible: Bool = false
+
+    private enum CodingKeys: String, CodingKey { case odometroKm, combustible, legible }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        odometroKm = try? c.decode(Int.self, forKey: .odometroKm)
+        combustible = try? c.decode(String.self, forKey: .combustible)
+        legible = (try? c.decode(Bool.self, forKey: .legible)) ?? false
+    }
+}
+
+/// `POST vehicles/ficha/leer-foto` con `tipo=TICKET`. `revisar`: litros × precio no da el total.
+struct TicketLeido: Decodable {
+    var litros: Double?
+    var importe: Double?
+    var legible: Bool = false
+    var revisar: Bool = false
+
+    private enum CodingKeys: String, CodingKey { case litros, importe, legible, revisar }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        litros = try? c.decode(Double.self, forKey: .litros)
+        importe = try? c.decode(Double.self, forKey: .importe)
+        legible = (try? c.decode(Bool.self, forKey: .legible)) ?? false
+        revisar = (try? c.decode(Bool.self, forKey: .revisar)) ?? false
+    }
+}
+
+/// Lo que estas pantallas usan de `GET vehicles/ficha/:id`; el resto de la ficha no se decodifica.
+/// De cada carga solo se lee lo que mide el rendimiento: el importe no se pide a propósito.
+struct FichaVehiculo: Decodable {
+    var odometroKm: Int?
+    var cargas: [GasolinaRules.CargaPrevia] = []
+    var veCostos: Bool = false
+
+    private enum CodingKeys: String, CodingKey { case odometro, cargas, acceso }
+    private enum OdometroKeys: String, CodingKey { case km }
+    private enum AccesoKeys: String, CodingKey { case veCostos }
+
+    private struct Carga: Decodable {
+        var odometro: Int?
+        var litros: Double?
+        var tanqueLleno: Bool?
+
+        private enum CodingKeys: String, CodingKey { case odometro, litros, tanqueLleno }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            odometro = try? c.decode(Int.self, forKey: .odometro)
+            litros = try? c.decode(Double.self, forKey: .litros)
+            tanqueLleno = try? c.decode(Bool.self, forKey: .tanqueLleno)
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let odometro = try? c.nestedContainer(keyedBy: OdometroKeys.self, forKey: .odometro) {
+            odometroKm = try? odometro.decode(Int.self, forKey: .km)
+        }
+        if let acceso = try? c.nestedContainer(keyedBy: AccesoKeys.self, forKey: .acceso) {
+            veCostos = (try? acceso.decode(Bool.self, forKey: .veCostos)) ?? false
+        }
+        let filas = (try? c.decode([Carga].self, forKey: .cargas)) ?? []
+        cargas = filas.compactMap { fila in
+            guard let odometro = fila.odometro, let litros = fila.litros else { return nil }
+            return GasolinaRules.CargaPrevia(odometro: odometro, litros: litros, tanqueLleno: fila.tanqueLleno == true)
+        }
+    }
+}
+
 // MARK: - A qué ruta va el check list
 
 /// Salida o devolución, de una solicitud aprobada o del inventario. Las cuatro
@@ -256,6 +354,79 @@ final class VehiculosRepository {
             fechaFinSolicitada: CoreFormat.isoString(fechaFinSolicitada)
         )
         let data = try await api.postJSON("vehicles", body: body)
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
+    /// `GET vehicles/ficha/:id`.
+    func ficha(vehicleId: Int) async throws -> FichaVehiculo {
+        let data = try await api.get("vehicles/ficha/\(vehicleId)")
+        do {
+            return try JSONDecoder().decode(FichaVehiculo.self, from: data)
+        } catch {
+            throw ApiError.decoding(error)
+        }
+    }
+
+    /// Lee km y gasolina de la foto. Lo lee el servidor: la app nunca habla con la IA.
+    /// `odometroPrevio`: el servidor descarta una lectura menor, porque un odómetro no retrocede.
+    func leerTablero(foto: CapturedGeoPhoto, odometroPrevio: Int?) async throws -> TableroLeido {
+        var campos = ["tipo": "TABLERO"]
+        if let odometroPrevio { campos["odometroPrevio"] = String(odometroPrevio) }
+        let data = try await leerFoto(campos: campos, foto: foto)
+        do {
+            return try JSONDecoder().decode(TableroLeido.self, from: data)
+        } catch {
+            throw ApiError.decoding(error)
+        }
+    }
+
+    func leerTicket(foto: CapturedGeoPhoto) async throws -> TicketLeido {
+        let data = try await leerFoto(campos: ["tipo": "TICKET"], foto: foto)
+        do {
+            return try JSONDecoder().decode(TicketLeido.self, from: data)
+        } catch {
+            throw ApiError.decoding(error)
+        }
+    }
+
+    private func leerFoto(campos: [String: String], foto: CapturedGeoPhoto) async throws -> Data {
+        try await CoreRepository.requireOnline()
+        return try await api.uploadMultipartFiles(
+            "vehicles/ficha/leer-foto",
+            fields: campos,
+            files: [(field: "foto", data: foto.jpeg, fileName: "foto.jpg", mimeType: "image/jpeg")]
+        )
+    }
+
+    /// `POST vehicles/ficha/:id/cargas`. Las dos fotos son opcionales para el servidor. Igual que
+    /// el check list, no va a la cola sin conexión: el cuerpo es binario.
+    func registrarCarga(
+        vehicleId: Int,
+        odometro: Int,
+        litros: Double,
+        importe: Double,
+        tanqueLleno: Bool,
+        ticket: CapturedGeoPhoto?,
+        tablero: CapturedGeoPhoto?
+    ) async throws {
+        try await CoreRepository.requireOnline()
+        var files: [(field: String, data: Data, fileName: String, mimeType: String)] = []
+        if let ticket {
+            files.append((field: "ticket", data: ticket.jpeg, fileName: "ticket.jpg", mimeType: "image/jpeg"))
+        }
+        if let tablero {
+            files.append((field: "tablero", data: tablero.jpeg, fileName: "tablero.jpg", mimeType: "image/jpeg"))
+        }
+        let data = try await api.uploadMultipartFiles(
+            "vehicles/ficha/\(vehicleId)/cargas",
+            fields: [
+                "odometro": String(odometro),
+                "litros": String(litros),
+                "importe": String(importe),
+                "tanqueLleno": tanqueLleno ? "true" : "false",
+            ],
+            files: files
+        )
         if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
     }
 

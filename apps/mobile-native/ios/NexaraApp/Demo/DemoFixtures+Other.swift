@@ -725,6 +725,12 @@ extension DemoStore {
                 "id": 61,
                 "origen": "solicitud",
                 "vehiculo": dj(["id": 11, "nombre": "Ford Ranger", "placas": "DEM-123-A"]),
+                "actividad": dj([
+                    "id": 7,
+                    "folio": "DEM-0107",
+                    "titulo": "Instalación de cámaras",
+                    "proyecto": "CCTV Bodega Norte",
+                ]),
                 "inicio": iso(-180),
                 "fin": iso(300),
                 "odometroInicio": 48210,
@@ -734,6 +740,26 @@ extension DemoStore {
             ])
         }
         return json
+    }
+
+    /// La ficha que usa «Cargar gasolina». Con la lectura de abajo salen las cifras del mockup:
+    /// 450 km desde el tanque anterior, 8.6 km por litro, y 156 km en el regreso.
+    func fxFichaVehiculo() -> DemoJSON {
+        dj([
+            "odometro": dj(["km": 48210, "fecha": iso(-180)]),
+            "cargas": [
+                dj(["id": 1, "fecha": iso(-5 * 1440), "odometro": 47916, "litros": 50, "tanqueLleno": true]),
+            ],
+            "acceso": dj(["veCostos": true]),
+        ])
+    }
+
+    func fxTicketLeido() -> DemoJSON {
+        dj(["litros": 52.3, "precioLitro": 24.5, "importe": 1281.35, "fecha": iso(0), "legible": true, "revisar": false])
+    }
+
+    func fxTableroLeido() -> DemoJSON {
+        dj(["odometroKm": 48366, "combustible": "3/4", "legible": true])
     }
 
     // MARK: Clientes

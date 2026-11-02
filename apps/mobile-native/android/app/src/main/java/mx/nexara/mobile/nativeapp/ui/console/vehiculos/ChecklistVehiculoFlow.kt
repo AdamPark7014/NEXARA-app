@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +49,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
+import mx.nexara.mobile.nativeapp.data.api.TableroLeidoDto
 import mx.nexara.mobile.nativeapp.ui.common.GeoPhoto
 import mx.nexara.mobile.nativeapp.ui.common.LiveCameraCaptureDialog
 import mx.nexara.mobile.nativeapp.ui.console.vehiculos.ChecklistVehiculoRules.Grupo
@@ -65,7 +71,18 @@ private enum class Paso(val titulo: String) {
     TABLERO("Tablero"),
     DATOS("Km y combustible"),
     CONFIRMAR("Confirmar"),
+    REGRESO("Regreso"),
 }
+
+/** La salida va por sus cuatro pasos; el regreso junta tablero, datos y confirmar en una pantalla. */
+private val PASOS_SALIDA = listOf(Paso.FOTOS, Paso.TABLERO, Paso.DATOS, Paso.CONFIRMAR)
+private val PASOS_REGRESO = listOf(Paso.FOTOS, Paso.REGRESO)
+
+private val HORA_MEXICO: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.of("America/Mexico_City"))
+
+private fun horaDe(capturedAt: String?): String? =
+    capturedAt?.let { runCatching { HORA_MEXICO.format(Instant.parse(it)) }.getOrNull() }
 
 /**
  * Checklist de salida / devolución: 7 fotos con cámara en vivo, km y nivel de
@@ -73,6 +90,8 @@ private enum class Paso(val titulo: String) {
  * hora, y así es como se niegan las subidas de galería.
  *
  * @param kmInicio en devolución, el km con el que salió (piso del km final).
+ * @param encabezadoRegreso con valor, el flujo es el regreso: «Regreso del vehículo» y estas líneas.
+ * @param leerTablero lee km y gasolina de la foto; `null` si no pudo, y entonces se captura a mano.
  */
 @Composable
 fun ChecklistVehiculoFlow(
@@ -83,11 +102,18 @@ fun ChecklistVehiculoFlow(
     onCancelar: () -> Unit,
     onEnviar: (fotos: Map<String, GeoPhoto>, odometroKm: Int, combustible: String) -> Unit,
     kmInicio: Int? = null,
+    encabezadoRegreso: List<String>? = null,
+    leerTablero: (suspend (GeoPhoto) -> TableroLeidoDto?)? = null,
 ) {
+    val pasos = if (encabezadoRegreso != null) PASOS_REGRESO else PASOS_SALIDA
     val fotos = remember { mutableStateMapOf<String, GeoPhoto>() }
     var paso by remember { mutableStateOf(Paso.FOTOS) }
     var km by remember { mutableStateOf("") }
     var nivel by remember { mutableStateOf<String?>(null) }
+    var kmEscrito by remember { mutableStateOf(false) }
+    var nivelEscrito by remember { mutableStateOf(false) }
+    var lectura by remember { mutableStateOf(LecturaTablero.SIN_FOTO) }
+    val scope = rememberCoroutineScope()
     var abierta by remember { mutableStateOf<Slot?>(null) }
     var aviso by remember { mutableStateOf<String?>(null) }
     var confirmaSalir by remember { mutableStateOf(false) }
@@ -100,7 +126,21 @@ fun ChecklistVehiculoFlow(
     BackHandler(enabled = !enviando) {
         if (paso == Paso.FOTOS) pedirSalir() else {
             aviso = null
-            paso = Paso.entries[paso.ordinal - 1]
+            paso = pasos[pasos.indexOf(paso) - 1]
+        }
+    }
+
+    /** Lo leído llena lo que la persona no ha escrito; si no se pudo, se escribe a mano. */
+    fun leerFotoDelTablero(foto: GeoPhoto) {
+        val leer = leerTablero ?: return
+        lectura = LecturaTablero.LEYENDO
+        scope.launch {
+            val r = leer(foto)
+            km = GasolinaRules.tras(r?.odometroKm?.toString(), km, kmEscrito)
+            r?.combustible?.takeIf { ChecklistVehiculoRules.combustiblePct(it) != null }?.let { leido ->
+                if (!nivelEscrito || nivel == null) nivel = leido
+            }
+            lectura = if (r?.odometroKm != null || r?.combustible != null) LecturaTablero.LEIDA else LecturaTablero.NO_SE_PUDO
         }
     }
 
@@ -128,21 +168,44 @@ fun ChecklistVehiculoFlow(
             Paso.FOTOS -> faltaEn(ChecklistVehiculoRules.SLOTS_FOTOS)
             Paso.TABLERO -> faltaEn(ChecklistVehiculoRules.slots(Grupo.TABLERO))
             Paso.DATOS -> validacion.errores.firstOrNull()
-            Paso.CONFIRMAR -> validacion.mensaje
+            Paso.CONFIRMAR, Paso.REGRESO -> validacion.mensaje
         }
         if (aviso != null) return
-        paso = when (paso) {
-            Paso.FOTOS -> Paso.TABLERO
-            Paso.TABLERO -> Paso.DATOS
-            Paso.DATOS -> Paso.CONFIRMAR
-            Paso.CONFIRMAR -> {
-                onEnviar(fotos.toMap(), km.trim().toInt(), nivel.orEmpty())
-                Paso.CONFIRMAR
-            }
+        val siguiente = pasos.getOrNull(pasos.indexOf(paso) + 1)
+        if (siguiente != null) {
+            paso = siguiente
+        } else {
+            onEnviar(fotos.toMap(), km.trim().toInt(), nivel.orEmpty())
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    if (paso == Paso.REGRESO) {
+        val tablero = fotos[ChecklistVehiculoRules.TABLERO]
+        RegresoVehiculoContenido(
+            encabezado = encabezadoRegreso.orEmpty(),
+            foto = tablero?.preview,
+            horaFoto = horaDe(tablero?.capturedAt),
+            lectura = lectura,
+            km = km,
+            nivel = nivel,
+            kmInicio = kmInicio,
+            aviso = aviso,
+            error = error,
+            enviando = enviando,
+            onFoto = { abierta = ChecklistVehiculoRules.slots(Grupo.TABLERO).first() },
+            onKm = {
+                km = it
+                kmEscrito = true
+                aviso = null
+            },
+            onNivel = {
+                nivel = it
+                nivelEscrito = true
+                aviso = null
+            },
+            onConfirmar = { avanzar() },
+        )
+    } else Column(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxWidth().weight(1f),
             contentPadding = PaddingValues(16.dp),
@@ -151,7 +214,7 @@ fun ChecklistVehiculoFlow(
             item {
                 NxSectionHeader(
                     title = "$titulo · ${paso.titulo}",
-                    subtitle = "$vehiculo · Paso ${paso.ordinal + 1} de ${Paso.entries.size}",
+                    subtitle = "$vehiculo · Paso ${pasos.indexOf(paso) + 1} de ${pasos.size}",
                     trailing = { PistaCamara() },
                 )
             }
@@ -170,17 +233,42 @@ fun ChecklistVehiculoFlow(
                         onTomar = { abierta = it },
                     )
                 }
+                Paso.REGRESO -> Unit
                 Paso.DATOS -> {
+                    if (lectura == LecturaTablero.LEIDA || lectura == LecturaTablero.LEYENDO) {
+                        item {
+                            Text(
+                                if (lectura == LecturaTablero.LEYENDO) {
+                                    "Leyendo la foto del tablero…"
+                                } else {
+                                    "Esto leímos en la foto. Si no cuadra, corrígelo: la foto queda de respaldo."
+                                },
+                                fontSize = 13.sp,
+                                color = NxColors.Muted,
+                            )
+                        }
+                    }
                     item {
                         NxFormTextField(
                             value = km,
-                            onValueChange = { v -> km = v.filter { it.isDigit() }.take(7) },
+                            onValueChange = { v ->
+                                km = v.filter { it.isDigit() }.take(7)
+                                kmEscrito = true
+                            },
                             label = if (kmInicio != null) "Km final" else "Km",
                             keyboardType = KeyboardType.Number,
                             error = validacion.errores.firstOrNull { it.contains("kilometraje") },
                         )
                     }
-                    item { SelectorCombustible(nivel = nivel, onNivel = { nivel = it }) }
+                    item {
+                        SelectorCombustible(
+                            nivel = nivel,
+                            onNivel = {
+                                nivel = it
+                                nivelEscrito = true
+                            },
+                        )
+                    }
                 }
                 Paso.CONFIRMAR -> item {
                     Resumen(fotos = fotos, km = km, nivel = nivel)
@@ -197,7 +285,7 @@ fun ChecklistVehiculoFlow(
             OutlinedButton(
                 onClick = {
                     aviso = null
-                    if (paso == Paso.FOTOS) pedirSalir() else paso = Paso.entries[paso.ordinal - 1]
+                    if (paso == Paso.FOTOS) pedirSalir() else paso = pasos[pasos.indexOf(paso) - 1]
                 },
                 enabled = !enviando,
                 modifier = Modifier.weight(1f).heightIn(min = 48.dp),
@@ -229,6 +317,7 @@ fun ChecklistVehiculoFlow(
                 fotos[slot.id] = foto
                 aviso = null
                 abierta = null
+                if (slot.id == ChecklistVehiculoRules.TABLERO) leerFotoDelTablero(foto)
             },
             onDismiss = { abierta = null },
         )

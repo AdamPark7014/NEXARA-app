@@ -34,6 +34,14 @@ data class ConductorRefDto(
     val nombre: String? = null,
 )
 
+/** El trabajo al que se carga el viaje en curso. La salida directa de inventario no trae. */
+data class ActividadDeViajeDto(
+    val id: Long? = null,
+    val folio: String? = null,
+    val titulo: String? = null,
+    val proyecto: String? = null,
+)
+
 /**
  * La asignación que traes encima ahora mismo. [origen] es `solicitud` (salió de
  * una solicitud aprobada) o `inventario` (salida directa de la flota); de ahí
@@ -43,6 +51,7 @@ data class AsignacionActivaDto(
     val id: Long? = null,
     val origen: String? = null,
     val vehiculo: VehiculoRefDto? = null,
+    val actividad: ActividadDeViajeDto? = null,
     val inicio: String? = null,
     val fin: String? = null,
     val odometroInicio: Int? = null,
@@ -96,6 +105,75 @@ data class SolicitarVehiculoBody(
     val fechaInicioSolicitada: String,
     val fechaFinSolicitada: String,
 )
+
+/** `POST vehicles/ficha/leer-foto` con `tipo=TABLERO`. Lo que no se pudo leer llega en null. */
+data class TableroLeidoDto(
+    val odometroKm: Int? = null,
+    val combustible: String? = null,
+    val legible: Boolean? = null,
+)
+
+/** `POST vehicles/ficha/leer-foto` con `tipo=TICKET`. [revisar]: litros × precio no da el total. */
+data class TicketLeidoDto(
+    val litros: Double? = null,
+    val importe: Double? = null,
+    val legible: Boolean? = null,
+    val revisar: Boolean? = null,
+)
+
+data class OdometroFichaDto(val km: Int? = null)
+
+/** De cada carga solo se lee lo que mide el rendimiento: el importe no se pide a propósito. */
+data class CargaFichaDto(
+    val odometro: Int? = null,
+    val litros: Double? = null,
+    val tanqueLleno: Boolean? = null,
+)
+
+data class AccesoFichaDto(val veCostos: Boolean? = null)
+
+/** Lo que estas pantallas usan de `GET vehicles/ficha/{id}`; el resto de la ficha no se decodifica. */
+data class FichaVehiculoDto(
+    val odometro: OdometroFichaDto? = null,
+    val cargas: List<CargaFichaDto>? = null,
+    val acceso: AccesoFichaDto? = null,
+)
+
+/**
+ * Ficha del vehículo, lectura de fotos y cargas de gasolina (`apps/api/src/costos/vehiculos`).
+ * La IA solo la llama el servidor: aquí viaja la foto y regresa lo que entendió.
+ */
+interface VehiculoFichaApi {
+    @GET("vehicles/ficha/{id}")
+    suspend fun ficha(@Path("id") id: Long): FichaVehiculoDto
+
+    @Multipart
+    @POST("vehicles/ficha/leer-foto")
+    suspend fun leerTablero(
+        @Part("tipo") tipo: RequestBody,
+        @Part("odometroPrevio") odometroPrevio: RequestBody?,
+        @Part foto: MultipartBody.Part,
+    ): TableroLeidoDto
+
+    @Multipart
+    @POST("vehicles/ficha/leer-foto")
+    suspend fun leerTicket(
+        @Part("tipo") tipo: RequestBody,
+        @Part foto: MultipartBody.Part,
+    ): TicketLeidoDto
+
+    /** Devuelve la ficha completa; aquí no hace falta. */
+    @Multipart
+    @POST("vehicles/ficha/{id}/cargas")
+    suspend fun registrarCarga(
+        @Path("id") id: Long,
+        @Part("odometro") odometro: RequestBody,
+        @Part("litros") litros: RequestBody,
+        @Part("importe") importe: RequestBody,
+        @Part("tanqueLleno") tanqueLleno: RequestBody,
+        @Part fotos: List<MultipartBody.Part>,
+    ): ResponseBody
+}
 
 interface VehiclesApi {
     @GET("vehicles/mis-vehiculos")

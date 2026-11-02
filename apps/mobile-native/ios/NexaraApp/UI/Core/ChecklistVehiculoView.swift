@@ -2,7 +2,11 @@ import SwiftUI
 import UIKit
 
 /// Check list de salida y de regreso: las siete fotos del vehículo, el
-/// kilometraje y la gasolina, en cuatro pasos.
+/// kilometraje y la gasolina. La salida va en cuatro pasos; el regreso junta tablero,
+/// datos y confirmar en una pantalla (`RegresoVehiculoContenido`, mockup `AppRegreso`).
+///
+/// La foto del tablero se lee en el servidor y llena lo que la persona no ha escrito; si
+/// no se pudo leer, se captura a mano.
 ///
 /// Todas las fotos se toman con `GeoPhotoCaptureView` (cámara en vivo). No hay
 /// selector de galería en ninguna parte: el API exige `capturedAt` por foto y
@@ -13,13 +17,15 @@ struct ChecklistVehiculoView: View {
     let vehiculo: String
     /// En el regreso, el kilometraje con el que salió: el final no puede ser menor.
     var odometroInicio: Int? = nil
+    /// Con valor, el flujo es el regreso: «Regreso del vehículo» y estas líneas debajo.
+    var encabezadoRegreso: [String]? = nil
     /// Se llama cuando el API aceptó el check list.
     var onDone: () -> Void
 
     @Environment(\.dismiss) private var dismiss
 
     private enum Paso: Int, CaseIterable {
-        case fotos, tablero, datos, confirmar
+        case fotos, tablero, datos, confirmar, regreso
 
         var titulo: String {
             switch self {
@@ -27,8 +33,14 @@ struct ChecklistVehiculoView: View {
             case .tablero: return "Tablero"
             case .datos: return "Km y gasolina"
             case .confirmar: return "Confirmar"
+            case .regreso: return "Regreso"
             }
         }
+    }
+
+    /// Los pasos de este flujo, en orden.
+    private var secuencia: [Paso] {
+        encabezadoRegreso == nil ? [.fotos, .tablero, .datos, .confirmar] : [.fotos, .regreso]
     }
 
     @State private var paso: Paso = .fotos
@@ -36,6 +48,10 @@ struct ChecklistVehiculoView: View {
     @State private var camara: SlotChecklist?
     @State private var odometro = ""
     @State private var combustible: NivelCombustible?
+    @State private var odometroEscrito = false
+    @State private var nivelEscrito = false
+    @State private var lectura: LecturaTablero = .sinFoto
+    @State private var aviso: String?
     @State private var enviando = false
     @State private var error: String?
     @State private var infoFotos = false
@@ -47,6 +63,39 @@ struct ChecklistVehiculoView: View {
 
     private var odometroKm: Int? {
         Int(odometro.trimmingCharacters(in: .whitespaces))
+    }
+
+    /// Lo que teclea la persona: desde aquí la lectura de una foto ya no lo pisa.
+    private var odometroEscribible: Binding<String> {
+        Binding(
+            get: { odometro },
+            set: { nuevo in
+                let limpio = GasolinaRules.soloDigitos(nuevo)
+                guard limpio != odometro else { return }
+                odometro = limpio
+                odometroEscrito = true
+                aviso = nil
+            }
+        )
+    }
+
+    /// El mismo campo con comas: solo se pintan, lo que se guarda son los dígitos.
+    private var odometroConComas: Binding<String> {
+        Binding(
+            get: { GasolinaRules.agrupado(odometro) },
+            set: { odometroEscribible.wrappedValue = $0 }
+        )
+    }
+
+    private var nivelEscribible: Binding<NivelCombustible?> {
+        Binding(
+            get: { combustible },
+            set: { nuevo in
+                combustible = nuevo
+                nivelEscrito = true
+                aviso = nil
+            }
+        )
     }
 
     private var errores: [ErrorChecklist] {
@@ -69,35 +118,51 @@ struct ChecklistVehiculoView: View {
             return fotos[ChecklistVehiculoRules.tablero] != nil
         case .datos:
             return odometroKm != nil && combustible != nil
-        case .confirmar:
+        case .confirmar, .regreso:
             return false
         }
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            pasos
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    if let error {
-                        NxAlertBanner(alert: NxAlert(id: "checklist", title: error, tone: .danger))
+        Group {
+            if paso == .regreso {
+                regreso
+            } else {
+                VStack(spacing: 0) {
+                    pasos
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 14) {
+                            if let error {
+                                NxAlertBanner(alert: NxAlert(id: "checklist", title: error, tone: .danger))
+                            }
+                            contenido
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 14)
                     }
-                    contenido
+                    barra
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 14)
             }
-            barra
         }
-        .navigationTitle("\(accion.titulo) · \(vehiculo)")
+        .navigationTitle(paso == .regreso ? "" : "\(accion.titulo) · \(vehiculo)")
         .navigationBarTitleDisplayMode(.inline)
         .interactiveDismissDisabled(tieneAvance && !enviando)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cerrar") {
-                    if tieneAvance { confirmaSalir = true } else { dismiss() }
+                Button(paso == .regreso ? "Atrás" : "Cerrar") {
+                    if paso == .regreso {
+                        retroceder()
+                    } else if tieneAvance {
+                        confirmaSalir = true
+                    } else {
+                        dismiss()
+                    }
                 }
                 .disabled(enviando)
+            }
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Listo") { cerrarTeclado() }
             }
         }
         .fullScreenCover(item: $camara) { slot in
@@ -109,6 +174,8 @@ struct ChecklistVehiculoView: View {
                 onConfirm: { captured in
                     fotos[slot] = captured
                     camara = nil
+                    aviso = nil
+                    if slot == ChecklistVehiculoRules.tablero { leerFotoDelTablero(captured) }
                     return nil
                 },
                 onCancel: { camara = nil }
@@ -129,9 +196,27 @@ struct ChecklistVehiculoView: View {
 
     // MARK: Pasos
 
+    private var regreso: some View {
+        let tablero = fotos[ChecklistVehiculoRules.tablero]
+        return RegresoVehiculoContenido(
+            encabezado: encabezadoRegreso ?? [],
+            foto: tablero?.image,
+            horaFoto: tablero.map { FechaMexico.hora($0.capturedAt) },
+            lectura: lectura,
+            odometro: odometroConComas,
+            nivel: nivelEscribible,
+            kmInicio: odometroInicio,
+            aviso: aviso,
+            error: error,
+            enviando: enviando,
+            onFoto: { camara = ChecklistVehiculoRules.tablero },
+            onConfirmar: confirmarRegreso
+        )
+    }
+
     private var pasos: some View {
         HStack(spacing: 6) {
-            ForEach(Paso.allCases, id: \.rawValue) { item in
+            ForEach(secuencia, id: \.rawValue) { item in
                 Capsule()
                     .fill(item.rawValue <= paso.rawValue ? NxBrand.primary : Color(.systemGray4))
                     .frame(height: 4)
@@ -163,9 +248,16 @@ struct ChecklistVehiculoView: View {
             casilla(ChecklistVehiculoRules.tablero, alto: 220)
 
         case .datos:
+            if lectura == .leida || lectura == .leyendo {
+                Text(lectura == .leyendo
+                    ? "Leyendo la foto del tablero…"
+                    : "Esto leímos en la foto. Si no cuadra, corrígelo: la foto queda de respaldo.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             NxSectionHeader(title: "Kilometraje")
             HStack(spacing: 8) {
-                TextField("0", text: $odometro)
+                TextField("0", text: odometroEscribible)
                     .keyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
                 Text("km").foregroundStyle(.secondary)
@@ -176,12 +268,15 @@ struct ChecklistVehiculoView: View {
                     .foregroundStyle(.secondary)
             }
             NxSectionHeader(title: "Gasolina")
-            Picker("Gasolina", selection: $combustible) {
+            Picker("Gasolina", selection: nivelEscribible) {
                 ForEach(NivelCombustible.allCases) { nivel in
                     Text(nivel.label).tag(Optional(nivel))
                 }
             }
             .pickerStyle(.segmented)
+
+        case .regreso:
+            EmptyView()
 
         case .confirmar:
             NxSectionHeader(title: "Resumen")
@@ -312,15 +407,43 @@ struct ChecklistVehiculoView: View {
     }
 
     private func avanzar() {
-        guard let siguiente = Paso(rawValue: paso.rawValue + 1) else { return }
+        guard let i = secuencia.firstIndex(of: paso), i + 1 < secuencia.count else { return }
         error = nil
-        paso = siguiente
+        aviso = nil
+        paso = secuencia[i + 1]
     }
 
     private func retroceder() {
-        guard let anterior = Paso(rawValue: paso.rawValue - 1) else { return }
+        guard let i = secuencia.firstIndex(of: paso), i > 0 else { return }
         error = nil
-        paso = anterior
+        aviso = nil
+        paso = secuencia[i - 1]
+    }
+
+    /// Lo leído llena lo que la persona no ha escrito; si no se pudo, se escribe a mano.
+    private func leerFotoDelTablero(_ foto: CapturedGeoPhoto) {
+        lectura = .leyendo
+        Task { @MainActor in
+            let r = try? await VehiculosRepository.shared.leerTablero(foto: foto, odometroPrevio: odometroInicio)
+            odometro = GasolinaRules.tras(
+                lectura: r?.odometroKm.map { String($0) },
+                actual: odometro,
+                escrito: odometroEscrito
+            )
+            let leido = r?.combustible.flatMap { NivelCombustible(rawValue: $0) }
+            if let leido, !nivelEscrito || combustible == nil { combustible = leido }
+            lectura = (r?.odometroKm != nil || leido != nil) ? .leida : .noSePudo
+        }
+    }
+
+    private func confirmarRegreso() {
+        cerrarTeclado()
+        if errores.isEmpty {
+            aviso = nil
+            enviar()
+        } else {
+            aviso = errores.map(\.mensaje).joined(separator: ". ")
+        }
     }
 
     private func enviar() {

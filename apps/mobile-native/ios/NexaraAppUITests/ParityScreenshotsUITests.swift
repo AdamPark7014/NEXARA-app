@@ -76,6 +76,92 @@ final class ParityScreenshotsUITests: XCTestCase {
         deslizarYCapturar("inicio-direccion-abajo")
     }
 
+    /// «Cargar gasolina» y «Regreso del vehículo» (mockups `AppGasolina` y `AppRegreso`). Las fotos
+    /// las pone el modo demo y la lectura sale de `fxTicketLeido`/`fxTableroLeido`. Capturas 95 a 98.
+    func testGasolinaYRegreso() throws {
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "La app no llegó a primer plano")
+        despejarAlertas()
+        guard buscar(pestana("tab-inicio", "Inicio"), timeout: 30) != nil, irA("tab-mas", "Más") else {
+            adjuntarJerarquia("dbg-vehiculos-sin-shell")
+            XCTFail("No se llegó a «Más» en el demo")
+            return
+        }
+        var fila = buscar(renglon("more-erp-vehiculos", "Vehículos"), timeout: 2)
+        var intentos = 0
+        while fila == nil || !(fila?.isHittable ?? false), intentos < 5 {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.5)
+            fila = buscar(renglon("more-erp-vehiculos", "Vehículos"), timeout: 1)
+            intentos += 1
+        }
+        guard let fila else {
+            adjuntarJerarquia("dbg-vehiculos-sin-fila")
+            XCTFail("No está «Vehículos» en «Más»")
+            return
+        }
+        tocar(fila)
+        numero = 94
+
+        guard tocarSiExiste(textoTocable("Cargar gasolina"), timeout: 10) else {
+            adjuntarJerarquia("dbg-sin-cargar-gasolina")
+            XCTFail("No está el botón «Cargar gasolina»")
+            return
+        }
+        Thread.sleep(forTimeInterval: 1)
+        capturar("gasolina-vacia")
+        tomarFotoDemo(app.buttons["Foto del ticket"], "ticket")
+        tomarFotoDemo(app.buttons["Foto del tablero"], "tablero")
+        Thread.sleep(forTimeInterval: 1.5)
+        capturar("gasolina-leida")
+        _ = tocarSiExiste(textoTocable("Cerrar"), timeout: 3)
+        _ = tocarSiExiste(textoTocable("Salir sin guardar"), timeout: 3)
+        Thread.sleep(forTimeInterval: 1)
+
+        guard tocarSiExiste(textoTocable("Regreso"), timeout: 8) else {
+            adjuntarJerarquia("dbg-sin-regreso")
+            XCTFail("No está el botón «Regreso»")
+            return
+        }
+        for slot in ["Frente", "Trasera", "Lateral izq.", "Lateral der.", "Interior frente", "Interior atrás"] {
+            let casilla = app.buttons["Tomar foto: \(slot)"]
+            var vueltas = 0
+            while !(casilla.exists && casilla.isHittable), vueltas < 4 {
+                app.swipeUp()
+                Thread.sleep(forTimeInterval: 0.4)
+                vueltas += 1
+            }
+            tomarFotoDemo(casilla, slot)
+        }
+        guard tocarSiExiste(textoTocable("Continuar"), timeout: 5) else {
+            adjuntarJerarquia("dbg-sin-continuar")
+            XCTFail("No está «Continuar» tras las seis fotos")
+            return
+        }
+        Thread.sleep(forTimeInterval: 1)
+        capturar("regreso-sin-foto")
+        tomarFotoDemo(app.buttons["Foto del tablero"], "tablero del regreso")
+        Thread.sleep(forTimeInterval: 1.5)
+        capturar("regreso-leido")
+    }
+
+    /// En el demo la cámara ya trae una foto de muestra: solo falta «Usar esta foto».
+    private func tomarFotoDemo(_ casilla: XCUIElement, _ nombre: String) {
+        guard casilla.waitForExistence(timeout: 5) else {
+            omitir("foto de \(nombre): no aparece la casilla")
+            adjuntarJerarquia("dbg-sin-casilla-\(nombre)")
+            return
+        }
+        tocar(casilla)
+        let usar = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Usar esta foto")).firstMatch
+        guard usar.waitForExistence(timeout: 8) else {
+            omitir("foto de \(nombre): no aparece «Usar esta foto»")
+            adjuntarJerarquia("dbg-sin-usar-\(nombre)")
+            return
+        }
+        tocar(usar)
+        Thread.sleep(forTimeInterval: 1)
+    }
+
     /// Festivo de ley que no le toca (mockup de festivos, tablero «App · quien descansa»):
     /// `NEXARA_DEMO_FESTIVO=descansa`. Captura 93.
     func testFestivoDescansa() throws {

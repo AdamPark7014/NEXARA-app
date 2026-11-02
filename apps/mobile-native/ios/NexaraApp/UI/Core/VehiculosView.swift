@@ -15,6 +15,7 @@ struct VehiculosView: View {
     /// Para «Solicitar»: la actividad a la que se carga el uso del vehículo.
     @State private var actividades: [MyActivityItem] = []
     @State private var checklist: ChecklistRequest?
+    @State private var gasolina: GasolinaRequest?
     @State private var solicitar: VehiculoFlota?
     @State private var mensaje: String?
 
@@ -39,7 +40,11 @@ struct VehiculosView: View {
                     }
                 }
                 if let activa = datos.activa {
-                    AsignacionActivaCard(activa: activa) { abrirChecklist($0) }
+                    AsignacionActivaCard(
+                        activa: activa,
+                        onAccion: { abrirChecklist($0) },
+                        onGasolina: { gasolina = $0 }
+                    )
                 }
                 if !datos.solicitudes.isEmpty {
                     NxSectionHeader(title: "Mis solicitudes")
@@ -85,8 +90,22 @@ struct VehiculosView: View {
                     accion: req.accion,
                     vehiculo: req.vehiculo,
                     odometroInicio: req.odometroInicio,
+                    encabezadoRegreso: req.encabezadoRegreso,
                     onDone: {
                         mensaje = req.accion.esSalida ? "Salida registrada" : "Regreso registrado"
+                        Task { await cargar() }
+                    }
+                )
+            }
+        }
+        // El «Cerrar» lo pone `CargarGasolinaView`: pregunta antes de tirar la carga.
+        .sheet(item: $gasolina) { req in
+            NavigationStack {
+                CargarGasolinaView(
+                    vehicleId: req.vehicleId,
+                    vehiculo: req.vehiculo,
+                    onDone: {
+                        mensaje = "Carga guardada"
                         Task { await cargar() }
                     }
                 )
@@ -131,6 +150,16 @@ private struct ChecklistRequest: Identifiable {
     let vehiculo: String
     /// Devolución: el km con el que salió; el final no puede ser menor.
     let odometroInicio: Int?
+    /// Devolución: las líneas bajo «Regreso del vehículo».
+    var encabezadoRegreso: [String]? = nil
+}
+
+/// Qué vehículo abrió «Cargar gasolina», para la hoja.
+private struct GasolinaRequest: Identifiable {
+    let id = UUID()
+    let vehicleId: Int
+    /// «Nissan Frontier · TXA-12-34».
+    let vehiculo: String
 }
 
 // MARK: - Asignación activa
@@ -138,6 +167,7 @@ private struct ChecklistRequest: Identifiable {
 private struct AsignacionActivaCard: View {
     let activa: AsignacionActiva
     let onAccion: (ChecklistRequest) -> Void
+    let onGasolina: (GasolinaRequest) -> Void
 
     private var nombre: String {
         let partes = [activa.vehiculo?.nombre ?? "", activa.vehiculo?.placas ?? ""]
@@ -197,13 +227,26 @@ private struct AsignacionActivaCard: View {
                             onAccion(ChecklistRequest(
                                 accion: .devolucion(asignacion: activa.id, inventario: activa.esInventario),
                                 vehiculo: nombre,
-                                odometroInicio: activa.odometroInicio
+                                odometroInicio: activa.odometroInicio,
+                                encabezadoRegreso: GasolinaRules.encabezadoRegreso(
+                                    nombre: activa.vehiculo?.nombre,
+                                    placas: activa.vehiculo?.placas,
+                                    actividad: activa.actividad?.titulo,
+                                    proyecto: activa.actividad?.proyecto
+                                )
                             ))
                         }
                         .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.success), alto: 46, llenaAncho: true))
                     }
                 }
                 .padding(.top, 10)
+            }
+            // Solo con el vehículo afuera, y sin id (una solicitud sin inventario) no hay ficha que abrir.
+            if activa.requiereDevolucion, let vehicleId = activa.vehiculo?.id, vehicleId > 0 {
+                Button("Cargar gasolina") {
+                    onGasolina(GasolinaRequest(vehicleId: vehicleId, vehiculo: nombre))
+                }
+                .buttonStyle(BotonMaterialStyle(tipo: .contorno(NxColors.brand), alto: 46, llenaAncho: true))
             }
         }
     }
