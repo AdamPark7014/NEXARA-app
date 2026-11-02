@@ -5,9 +5,10 @@ import { armarCatalogo, type CatalogoDeHoy, type FilaCt } from './costo-de-hoy.j
 const logger = new Logger('CostoDeHoy');
 
 /**
- * Lo que CT dice hoy de estos modelos. Es una sola consulta, sin IA, con los índices de
- * `20261102190000_productos_ct_modelo_normalizado`: las expresiones deben quedar igual que las de
- * esos índices. Si falla, la propuesta sale sin aviso: no vale perder lo armado.
+ * Lo que CT dice hoy de estos modelos. Es una sola consulta, sin IA, y corre en cada búsqueda de
+ * «Nueva partida»: las expresiones deben quedar igual que las de los índices de
+ * `20261102190000_productos_ct_modelo_normalizado` y `20261102193000_productos_ct_tipo_del_dia`, o
+ * vuelve a recorrer el catálogo. Si falla, la propuesta sale sin aviso: no vale perder lo armado.
  */
 export async function leerCatalogoDeHoy(db: Pick<PrismaService, '$queryRaw' | 'supplierCatalogSyncRun'>, modelos: string[]): Promise<CatalogoDeHoy | null> {
   if (!modelos.length) return null;
