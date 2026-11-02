@@ -1,5 +1,21 @@
 # RELEVO
 
+- **02-11 ~16:00 (claude-code) — Relojes de las cámaras: grabador en hora automática y una foto por cámara por minuto. Falta ver un rostro real el 03-11.** Código en `26ff403e`, desplegado.
+  - **Decisión de Adam, con cifras:** «Sí, una por minuto». La fila de cada rostro se guarda siempre y los accesos llevan su foto sin límite.
+    | Opción | Fotos al día | Disco al día | A 90 días |
+    |---|---|---|---|
+    | Todas | 29 mil (pico 172 mil) | 580 MB (pico 3.4 GB) | unos 50 GB, no caben |
+    | **Una por cámara por minuto** | 480 (pico 1,400) | 10 MB (pico 28 MB) | unos 0.75 GB |
+    | Sin fotos | 0 | 0 | 0 |
+  - **El reloj lo manda el grabador.** Las nueve cámaras y el NVR iban 481–482 s atrás, con la misma deriva (unos 8 s al día). Se puso solo el NVR en NTP (`time.google.com`): pasó a −1/−2 s en 10 s, y en menos de 5 min las nueve quedaron en −1 a −3 s, aunque siguen en `timeMode=manual`. A las cámaras no se les escribió la hora. En la grabación quedan 8 minutos de hueco a las 15:40; no se perdió video. Las filas viejas siguen con su desfase. Vuelta atrás: `/root/nvr-time-antes-20261102.xml` y `/root/nvr-ntp-antes-20261102.xml`.
+  - **La hora no bastaba: `/picture` se atora en el túnel.** 8 de 27 en las nueve cámaras (.176, 3 de 3). Muere a los 7–10 KB en los dos sentidos, sin confirmar el FIN, y un XML de 18 KB se atora igual. Causa sin encontrar; el NAS trabaja en modo netstack. Por go2rtc (`/api/frame.jpeg`), 27 de 27, en 1–3 s y 15–24 KB (PTZ 56–66 KB). `fotoDeCamara` en `integra-media.service.ts`; si go2rtc no tiene el stream, lo registra y reintenta. Sin foto no se insiste por ISAPI.
+  - **Filtro por tiempo:** `activePostCount` vale 1 y `eventState` active en los 960,037 rostros, así que no distinguen rachas. `cameraPhotoTurn` en `integra-push.service.ts`; un evento atrasado no gasta el turno.
+  - **Poda:** borraba 8 mil filas por noche y entran unas 27 mil al día. Ahora hasta 40 lotes por corrida. El primer corte de 90 días es el 25-12. La tabla llegará a unos 1.6 GB (hoy 650 MB), más que las fotos.
+  - **.176 Coffee Area:** no tenía DNS (`0.0.0.0`, IP fija) y su buzón va por nombre. Lo demás, igual que .175. Se le puso `192.168.9.1`, sin reinicio; anterior en `/root/176-ip-antes-20261102.xml`. **Es la explicación más probable, no está confirmada:** se confirma con su primera fila. .179 sigue sin DNS; no detecta rostro.
+  - **Verificado:** 25 suites de INTEGRA y 253 pruebas en verde; `tsc` sin errores en `integra` ni `hikvision-isapi` (177 en otras carpetas, en las revisadas falta el modelo en el cliente de Prisma local). El `fotoDeCamara` desplegado dio JPEG en las 9 cámaras, en 0.7–2.2 s. Relojes en vigilancia cada 5 min por 3 h: `/tmp/relojes.log` en el servidor.
+  - **Sin ver:** ningún rostro real, porque hoy es festivo y no hay nadie. El camino completo (aviso → fila → foto) no se ha visto de punta a punta. Tarea programada `integra-rostro-real-0311`, el 03-11 a las 11:30.
+  - **Para Adam, sin decidir:** Almacén .172 es 52 % de las filas y 38 % de las suyas son fuera de horario, casi seguro falsos. Bajarle la sensibilidad reduciría la tabla a la mitad; conviene ver antes sus fotos. También se guardan fotos de Privado 01, Privado 02 y Meeting Room durante 90 días.
+
 - **02-11 (claude-code) — Temporales del dictado: borrados del Hetzner.** Adam corrió el borrado de `/tmp/dictado-eval/` y `/tmp/dictado-eval.tar`, y se comprobó que ya no están. Eso cierra lo que `26e37a67` dejaba por decidir. Trampa: los permisos de la sesión rechazan `rm -rf` por `ssh` aun con el sí de Adam; no buscar otra vía, dejarle el comando.
 
 - **02-11 (claude-code) — Asignar con IA: el cliente ya no se pega a otro por un giro o un lugar en común; dictado medido; inventario de IA al día (`0b19c2d3` en producción).**
