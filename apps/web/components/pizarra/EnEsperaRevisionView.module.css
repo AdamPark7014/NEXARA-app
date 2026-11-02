@@ -114,3 +114,38 @@
     justify-content: flex-start;
   }
 }
+
+/* Aprobar por lote */
+.lote {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.loteEstrellas {
+  display: flex;
+  gap: 4px;
+}
+
+.estrellaOn,
+.estrellaOff {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+  padding: 2px;
+}
+
+.estrellaOn {
+  color: var(--ui-warning);
+}
+
+.estrellaOff {
+  color: var(--ui-border);
+}
+
+.loteAcciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}

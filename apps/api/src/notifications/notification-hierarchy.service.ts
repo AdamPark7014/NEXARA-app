@@ -862,16 +862,19 @@ export class NotificationHierarchyService {
         ? `${quien} corrigió lo que se le devolvió`
         : `${quien} envió sus evidencias`;
 
-      const recipientIds = new Set(await this.getEvidenceReviewerUserIds(submitterUserId));
-      for (const sup of await this.getSupervisors(submitterUserId)) {
-        recipientIds.add(sup.id);
-      }
+      // Le toca a su jefe directo, a sus encargados y al responsable (Adam, 01-11: «que todo lo vea
+      // Cristian, pero Cristian no tenga que hacer nada»). Dirección solo es la red de quien no tiene jefe;
+      // lo que pasa de 24 h sube por `EvidenciasEscaladasService`.
+      const recipientIds = new Set<number>();
       if (responsableId && responsableId !== submitterUserId) recipientIds.add(responsableId);
       for (const id of reviewerIds) {
         if (id && id !== submitterUserId) recipientIds.add(id);
       }
-      for (const ceoId of await this.getCeoUserIds()) {
-        if (ceoId !== submitterUserId) recipientIds.add(ceoId);
+      if (!recipientIds.size) {
+        for (const id of await this.getEvidenceReviewerUserIds(submitterUserId)) recipientIds.add(id);
+        for (const ceoId of await this.getCeoUserIds()) {
+          if (ceoId !== submitterUserId) recipientIds.add(ceoId);
+        }
       }
 
       for (const uid of recipientIds) {
@@ -886,7 +889,7 @@ export class NotificationHierarchyService {
           relatedEntityId: activityId,
           entityType: 'Activity',
           relatedUrl: `/erp/actividades/${activityId}/evidencias`,
-          priority: 'high',
+          priority: 'normal',
         });
       }
     } catch (error) {
@@ -904,7 +907,7 @@ export class NotificationHierarchyService {
     status: 'approved' | 'rejected',
     reviewerName: string,
     notes?: string,
-    /** Además del responsable: quien subió la evidencia (y Christian se agrega solo). */
+    /** Además del responsable: quien subió la evidencia. */
     alsoNotify: number[] = [],
     reviewerId?: number | null,
     /** Calificación (1–5), pasos devueltos, si se devolvió todo y si la actividad quedó finalizada. */
@@ -944,7 +947,6 @@ export class NotificationHierarchyService {
       const message = unir(accion, calif, obs);
 
       const recipients = new Set<number>([responsableUserId, ...alsoNotify]);
-      for (const ceoId of await this.getCeoUserIds()) recipients.add(ceoId);
       if (reviewerId) recipients.delete(reviewerId);
       for (const uid of recipients) {
         if (!uid) continue;

@@ -1332,24 +1332,7 @@ export class CotizacionesService {
     const email = dto.email?.trim() || quote.clientEmail?.trim();
     if (!email) throw new BadRequestException('Email de cliente requerido');
 
-    if (!transicionPermitida(quote.status, ESTADO.ENVIADA)) {
-      throw new BadRequestException(motivoTransicionInvalida(quote.status, ESTADO.ENVIADA));
-    }
-    if (!quote.items?.length) {
-      throw new BadRequestException('Agrega al menos una partida antes de enviar la cotización.');
-    }
-    // El borrador puede llevar el cliente como texto (`clienteSinAlta`); enviada ya no.
-    if (!quote.salesClientId) {
-      throw new BadRequestException('Elige o crea el cliente antes de enviar la cotización.');
-    }
-    // Si la empresa fijó un tope y esta cotización lo supera, sale solo con la autorización de dirección.
-    await this.aprobacionPorMonto?.exigir({
-      tipo: 'COTIZACION',
-      entityId: id,
-      monto: Number(quote.total),
-      actorId: senderId ?? quote.createdById,
-      companyId: quote.companyId,
-    });
+    await this.validarParaEnviar(quote, id, senderId);
 
     // Copias: sin repetir al destinatario principal.
     const copias = [...new Set((dto.cc ?? []).map((c) => c.trim().toLowerCase()).filter(Boolean))].filter(
@@ -1357,18 +1340,7 @@ export class CotizacionesService {
     );
 
     const token = quote.publicToken || randomBytes(24).toString('hex');
-
-    // Quien envía queda registrado antes de armar el folio: su sigla tiene que aparecer en la cadena.
-    await this.core.registrarParticipante(id, senderId ?? quote.createdById, 'ENVIO');
-
-    // Primer envío = revisión 1; cada envío posterior agrega -R2, -R3 al folio.
-    const revision = quote.sentAt ? (quote.revision || 1) + 1 : 1;
-    // Al enviar, `quoteNumber` se queda con el folio con cadena: el reenvío parte de la base, o la
-    // cadena se pegaría dos veces (`…-0007-JA-JA.CE-R2`). Los folios viejos se envían tal cual.
-    const base = quote.folioNomenclatura ? folioSinCadena(quote.quoteNumber) : quote.quoteNumber;
-    const folio = quote.folioNomenclatura
-      ? await this.core.folioParaEnvio(id, base, quote.createdById, revision)
-      : quote.quoteNumber;
+    const { revision, folio } = await this.folioDeEnvio(quote, id, senderId);
 
     /**
      * El correo va **antes** de marcarla enviada.
@@ -1389,6 +1361,8 @@ export class CotizacionesService {
         revision,
         publicToken: token,
         sentToEmail: email,
+        enviadaPor: 'CORREO_CORE',
+        seguimientoEtapa: 0,
         sentAt: new Date(),
         updatedAt: new Date(),
         createdBy: quote.createdById || senderId ? { connect: { id: quote.createdById || senderId! } } : undefined,
@@ -1396,6 +1370,84 @@ export class CotizacionesService {
       include: { items: true },
     });
 
+    this.alQuedarEnviada(updated, updated.clientName || email, senderId);
+    return updated;
+  }
+
+  /**
+   * «Ya la envié»: la cotización salió por WhatsApp, por correo propio o en persona, que es como salen
+   * casi todas. Hace lo mismo que `send`, menos mandar el correo: folio, candado, actividad y avisos.
+   */
+  async marcarEnviada(id: number, dto: { medio: string }, senderId?: number, companyId?: number | null) {
+    const quote = await this.db.cotizacion.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+      include: { items: { orderBy: { id: 'asc' } } },
+    });
+    assertCompanyAccess(quote, companyId, 'Cotizacion');
+    // Un doble toque no es otra revisión: ya está enviada y se queda como está.
+    if (estadoDesdeDb(quote.status) === ESTADO.ENVIADA) return quote;
+    await this.validarParaEnviar(quote, id, senderId);
+    const { revision, folio } = await this.folioDeEnvio(quote, id, senderId);
+
+    const updated = await this.db.cotizacion.update({
+      where: { id },
+      data: {
+        status: CotizacionStatus.SENT,
+        quoteNumber: folio,
+        folioEnviado: folio,
+        revision,
+        publicToken: quote.publicToken || randomBytes(24).toString('hex'),
+        enviadaPor: dto.medio,
+        seguimientoEtapa: 0,
+        sentAt: new Date(),
+        updatedAt: new Date(),
+        createdBy: quote.createdById || senderId ? { connect: { id: quote.createdById || senderId! } } : undefined,
+      },
+      include: { items: true },
+    });
+
+    this.alQuedarEnviada(updated, updated.clientCompany || updated.clientName || 'el cliente', senderId);
+    return updated;
+  }
+
+  /** Lo que se exige para que salga, sea por correo o por fuera. */
+  private async validarParaEnviar(quote: any, id: number, senderId?: number) {
+    if (!transicionPermitida(quote.status, ESTADO.ENVIADA)) {
+      throw new BadRequestException(motivoTransicionInvalida(quote.status, ESTADO.ENVIADA));
+    }
+    if (!quote.items?.length) {
+      throw new BadRequestException('Agrega al menos una partida antes de enviar la cotización.');
+    }
+    // El borrador puede llevar el cliente como texto (`clienteSinAlta`); enviada ya no.
+    if (!quote.salesClientId) {
+      throw new BadRequestException('Elige o crea el cliente antes de enviar la cotización.');
+    }
+    // Si la empresa fijó un tope y esta cotización lo supera, sale solo con la autorización de dirección.
+    await this.aprobacionPorMonto?.exigir({
+      tipo: 'COTIZACION',
+      entityId: id,
+      monto: Number(quote.total),
+      actorId: senderId ?? quote.createdById,
+      companyId: quote.companyId,
+    });
+  }
+
+  private async folioDeEnvio(quote: any, id: number, senderId?: number) {
+    // Quien envía queda registrado antes de armar el folio: su sigla tiene que aparecer en la cadena.
+    await this.core.registrarParticipante(id, senderId ?? quote.createdById, 'ENVIO');
+
+    // Primer envío = revisión 1; cada envío posterior agrega -R2, -R3 al folio.
+    const revision = quote.sentAt ? (quote.revision || 1) + 1 : 1;
+    // Al enviar, `quoteNumber` se queda con el folio con cadena: el reenvío parte de la base, o la
+    // cadena se pegaría dos veces (`…-0007-JA-JA.CE-R2`). Los folios viejos se envían tal cual.
+    const base = quote.folioNomenclatura ? folioSinCadena(quote.quoteNumber) : quote.quoteNumber;
+    const folio: string = quote.folioNomenclatura
+      ? await this.core.folioParaEnvio(id, base, quote.createdById, revision)
+      : quote.quoteNumber;
+    return { revision, folio };
+  }
+
+  private alQuedarEnviada(updated: any, destino: string, senderId?: number) {
     void this.applyQuoteSentSideEffects(updated.id).catch((error) => {
       console.error('Error applying quote sent side effects:', error);
     });
@@ -1406,14 +1458,12 @@ export class CotizacionesService {
         quoteNumber: updated.quoteNumber,
         tipo: 'QUOTE_SENT',
         titulo: 'Cotización enviada',
-        mensaje: `${updated.quoteNumber} salió a ${updated.clientName || email}.`,
+        mensaje: `${updated.quoteNumber} salió a ${destino}.`,
         autorId: updated.createdById,
         actorId: senderId,
         companyId: updated.companyId,
       })
       .catch(() => undefined);
-
-    return updated;
   }
 
   /**

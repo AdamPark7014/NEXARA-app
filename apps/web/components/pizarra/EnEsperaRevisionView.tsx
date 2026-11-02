@@ -23,19 +23,25 @@ import {
   Stat,
   StatRow,
   StatusBadge,
+  Textarea,
   WhenCell,
   type Column,
+  type RowKey,
 } from "@/components/base";
+import Modal from "@/components/ui/Modal";
+import { useCronometroProceso } from "@/lib/cronometro-proceso";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
 import { kindIcon, kindLabel } from "@/lib/activity-labels";
 import { conOrigen, type OrigenActividad } from "@/lib/actividad-origen";
 import { cuandoMx } from "@/components/pizarra/equipo-estado";
 import {
+  aprobarLote,
   coincideBusqueda,
   decisionUi,
   minutosEsperando,
   pieRevisadas,
   textoEspera,
+  TOPE_LOTE,
   type RevisionHecha,
   type RevisionPendiente,
   type RevisionesResponse,
@@ -43,7 +49,87 @@ import {
 import c from "./comun.module.css";
 import s from "./EnEsperaRevisionView.module.css";
 
-export type VerRevisiones = "pendientes" | "revisadas";
+export type VerRevisiones = "pendientes" | "otros" | "revisadas";
+
+const llaveDe = (p: RevisionPendiente) => `${p.activityId}-${p.persona.id}`;
+const NOTA_LOTE = "Revisado en lote: todo correcto.";
+
+/** Aprobar varias de un jalón: las estrellas se eligen, como en una sola; la nota se puede editar. */
+function AprobarLote({
+  token,
+  items,
+  onCerrar,
+  onHecho,
+}: {
+  token: string;
+  items: RevisionPendiente[];
+  onCerrar: () => void;
+  onHecho: (aprobadas: number, fallidas: number) => void;
+}) {
+  const [estrellas, setEstrellas] = useState(0);
+  const [nota, setNota] = useState(NOTA_LOTE);
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const notaValida = nota.trim().length >= 5;
+
+  const aprobar = async () => {
+    setEnviando(true);
+    setError(null);
+    try {
+      const r = await aprobarLote(
+        token,
+        items.map((p) => ({ activityId: p.activityId, userId: p.persona.id })),
+        estrellas,
+        nota.trim(),
+      );
+      onHecho(r.aprobadas.length, r.fallidas.length);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudieron aprobar. Intenta de nuevo.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onCerrar} title={items.length === 1 ? "Aprobar 1 evidencia" : `Aprobar ${items.length} evidencias`}>
+      <div className={s.lote}>
+        <p className={s.sub}>Todas quedan aprobadas con la misma calificación y la misma nota. Cada persona recibe un solo aviso.</p>
+        <div role="radiogroup" aria-label="Calificación de eficiencia" className={s.loteEstrellas}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={estrellas === n}
+              aria-label={`${n} de 5`}
+              className={n <= estrellas ? s.estrellaOn : s.estrellaOff}
+              onClick={() => setEstrellas(n)}
+            >
+              ★
+            </button>
+          ))}
+        </div>
+        <label className={s.sub} htmlFor="lote-nota">
+          Observaciones
+        </label>
+        <Textarea id="lote-nota" rows={2} value={nota} invalid={!notaValida} onChange={(e) => setNota(e.target.value)} />
+        {error ? (
+          <Alert tone="danger" role="alert">
+            {error}
+          </Alert>
+        ) : null}
+        <div className={s.loteAcciones}>
+          <Button variant="ghost" onClick={onCerrar}>
+            Cancelar
+          </Button>
+          <Button variant="primary" disabled={!estrellas || !notaValida} loading={enviando} onClick={() => void aprobar()}>
+            {items.length === 1 ? "Aprobar" : `Aprobar ${items.length}`}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 const DESDE_REVISION: OrigenActividad = { tipo: "revision" };
 const DESDE_REVISADAS: OrigenActividad = { tipo: "revisadas" };
@@ -91,6 +177,7 @@ export default function EnEsperaRevisionView({
   onRecargar,
   ver,
   onVer,
+  token,
 }: {
   data: RevisionesResponse | null;
   loading: boolean;
@@ -98,16 +185,26 @@ export default function EnEsperaRevisionView({
   onRecargar: () => void;
   ver: VerRevisiones;
   onVer: (v: VerRevisiones) => void;
+  /** Con él se puede aprobar por lote. */
+  token?: string | null;
 }) {
   const router = useRouter();
   const [busqueda, setBusqueda] = useState("");
+  const [seleccion, setSeleccion] = useState<RowKey[]>([]);
+  const [lote, setLote] = useState<RevisionPendiente[] | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const cronometro = useCronometroProceso("revisar", token);
   const ahora = Date.now();
 
-  const pendientes = useMemo(() => data?.pendientes ?? [], [data]);
+  const todas = useMemo(() => data?.pendientes ?? [], [data]);
+  /** Lo de otros jefes se puede abrir, pero no te estorba: no te toca a ti. */
+  const pendientes = useMemo(() => todas.filter((p) => p.paraTi !== false), [todas]);
+  const deOtros = useMemo(() => todas.filter((p) => p.paraTi === false), [todas]);
+  const lista = ver === "otros" ? deOtros : pendientes;
   const revisadas = useMemo(() => data?.revisadas ?? [], [data]);
   const pendientesVisibles = useMemo(
-    () => pendientes.filter((p) => coincideBusqueda(p, busqueda)),
-    [pendientes, busqueda],
+    () => lista.filter((p) => coincideBusqueda(p, busqueda)),
+    [lista, busqueda],
   );
   const revisadasVisibles = useMemo(
     () => revisadas.filter((r) => coincideBusqueda(r, busqueda)),
@@ -122,7 +219,11 @@ export default function EnEsperaRevisionView({
       label: "Quién la envió",
       width: 220,
       render: (p) => (
-        <PersonCell name={p.persona.nombre} avatarUrl={p.persona.avatarUrl} subtitle={p.persona.puesto ?? undefined} />
+        <PersonCell
+          name={p.persona.nombre}
+          avatarUrl={p.persona.avatarUrl}
+          subtitle={ver === "otros" && p.jefe ? `Le toca a ${p.jefe}` : (p.persona.puesto ?? undefined)}
+        />
       ),
     },
     {
@@ -147,6 +248,11 @@ export default function EnEsperaRevisionView({
           {p.correccion ? (
             <Badge size="sm" tone="violet" title="Le devolvieron evidencia y ya mandó la corrección">
               Corrección
+            </Badge>
+          ) : null}
+          {p.escalada ? (
+            <Badge size="sm" tone="warning" title="Lleva más de 24 horas sin revisar. Revisarla tarde no le cuenta como atraso a quien la entregó">
+              Más de 24 h
             </Badge>
           ) : null}
           <StatusBadge size="sm" status={p.estatus} />
@@ -204,6 +310,11 @@ export default function EnEsperaRevisionView({
           <FilterChip active={ver === "pendientes"} count={pendientes.length} onClick={() => onVer("pendientes")}>
             Por revisar
           </FilterChip>
+          {deOtros.length > 0 ? (
+            <FilterChip active={ver === "otros"} count={deOtros.length} onClick={() => onVer("otros")}>
+              De otros jefes
+            </FilterChip>
+          ) : null}
           <FilterChip active={ver === "revisadas"} count={revisadas.length} onClick={() => onVer("revisadas")}>
             Revisadas por ti
           </FilterChip>
@@ -242,7 +353,11 @@ export default function EnEsperaRevisionView({
         tone="success"
         titleAs="h2"
         title="Nada espera tu revisión"
-        description="Cuando alguien de tu equipo envíe su evidencia, aparece aquí para que la apruebes o la devuelvas."
+        description={
+          deOtros.length > 0
+            ? `Las ${deOtros.length} que siguen pendientes las revisan sus jefes. Si pasan de 24 horas, te aparecen aquí.`
+            : "Cuando alguien de tu equipo envíe su evidencia, aparece aquí para que la apruebes o la devuelvas."
+        }
       />
     );
   } else if (ver === "revisadas" && revisadas.length === 0) {
@@ -254,12 +369,21 @@ export default function EnEsperaRevisionView({
         title="No has revisado nada en los últimos 30 días"
       />
     );
-  } else if (ver === "pendientes") {
+  } else if (ver === "pendientes" || ver === "otros") {
     contenido = (
       <DataTable
         columns={columnasPendientes}
         rows={pendientesVisibles}
-        rowKey={(p) => `${p.activityId}-${p.persona.id}`}
+        rowKey={llaveDe}
+        selectable={Boolean(token)}
+        selectedKeys={seleccion}
+        onSelectionChange={(llaves) => setSeleccion(llaves.slice(0, TOPE_LOTE))}
+        selectRowLabel={(p) => `Elegir la evidencia de ${p.persona.nombre} en ${p.anNumber}`}
+        selectionBar={({ rows }) => (
+          <Button size="sm" variant="primary" onClick={() => setLote(rows)}>
+            {rows.length === 1 ? "Aprobar 1" : `Aprobar ${rows.length}`}
+          </Button>
+        )}
         onRowClick={(p) => router.push(conOrigen(`/erp/actividades/${p.activityId}`, DESDE_REVISION))}
         rowActions={(p) => (
           <ButtonLink
@@ -309,11 +433,36 @@ export default function EnEsperaRevisionView({
     );
   }
 
-  const total = ver === "pendientes" ? pendientes.length : revisadas.length;
-  const visibles = ver === "pendientes" ? pendientesVisibles.length : revisadasVisibles.length;
+  const total = ver === "revisadas" ? revisadas.length : lista.length;
+  const visibles = ver === "revisadas" ? revisadasVisibles.length : pendientesVisibles.length;
 
   return (
     <div className={s.vista}>
+      {aviso ? (
+        <Alert tone="success" role="status">
+          {aviso}
+        </Alert>
+      ) : null}
+      {lote && token ? (
+        <AprobarLote
+          token={token}
+          items={lote}
+          onCerrar={() => setLote(null)}
+          onHecho={(aprobadas, fallidas) => {
+            cronometro.terminar(null, `lote:${aprobadas}`);
+            setLote(null);
+            setSeleccion([]);
+            setAviso(
+              fallidas
+                ? `Aprobadas: ${aprobadas}. No se pudieron aprobar: ${fallidas}; ábrelas una por una.`
+                : aprobadas === 1
+                  ? "Aprobaste 1 evidencia."
+                  : `Aprobaste ${aprobadas} evidencias.`,
+            );
+            onRecargar();
+          }}
+        />
+      ) : null}
       {data && pendientes.length > 0 ? (
         <StatRow cols={2} ariaLabel="Resumen de lo que espera revisión">
           <Stat

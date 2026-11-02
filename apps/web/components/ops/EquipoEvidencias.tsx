@@ -33,6 +33,7 @@ import { Alert, Badge, Button, ButtonLink, Checkbox, Progress, SkeletonRows, Tex
 import { useArchivoProtegido } from "@/components/ops/_piezas";
 import s from "./EquipoEvidencias.module.css";
 import { useUser } from "@/components/UserContext";
+import { useCronometroProceso } from "@/lib/cronometro-proceso";
 import { formatoDistancia, type GeocercaAlerta } from "@/lib/activity-geofence";
 import { formatApiError } from "@/lib/erp-api";
 import { flattenServiceSheetFields, mapsUrl, resolveAssetUrl } from "@/lib/evidence-display";
@@ -767,6 +768,7 @@ function RevisionModal({
   onDone: (data: TeamEvidenceResponse, aviso: string) => void;
 }) {
   const { token } = useUser();
+  const cronometro = useCronometroProceso("revisar", token);
   const pasos = pasosDe(coreKind);
   const [decision, setDecision] = useState(inicial.decision);
   const [todo, setTodo] = useState(false);
@@ -809,6 +811,7 @@ function RevisionModal({
         observaciones: observaciones.trim(),
         calificacion,
       });
+      cronometro.terminar(activityId, decision);
       onDone(
         data,
         decision === "aprobar"

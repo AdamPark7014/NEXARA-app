@@ -18,8 +18,10 @@ export type DatosCeo = {
   };
   cobranza: { vencidas: number; monto: number; diasMasAtrasada: number };
   comprasAtrasadas: number;
-  cotizaciones: { porVencer: number; monto: number; dias: number };
+  cotizaciones: { porVencer: number; monto: number; dias: number; sinEnviar?: number };
   operacion: { actividadesAtrasadas: number; porValidar: number };
+  /** Evidencias sin revisar por jefe directo: las suyas aparte. Si falta, se usa `porValidar`. */
+  evidencias?: { tuyas: number; deOtros: Array<{ jefe: string; n: number }> };
   nomina: {
     /** Periodo que cerró hace poco y espera revisión (solo si quien lee ve «Pagos a personal»). */
     listaParaRevisar: { etiqueta: string; desde: string; hasta: string } | null;
@@ -97,12 +99,33 @@ export function armarResumenCeo(d: DatosCeo, fecha: string): ResumenCeo {
       tono: 'atencion',
     });
   }
+  if ((d.cotizaciones.sinEnviar ?? 0) > 0) {
+    items.push({
+      clave: 'cotizaciones',
+      texto: `${plural(d.cotizaciones.sinEnviar ?? 0, 'cotización vigente', 'cotizaciones vigentes')} sin marcar como enviada`,
+      url: '/erp/cotizaciones',
+      tono: 'atencion',
+    });
+  }
 
   const { actividadesAtrasadas, porValidar } = d.operacion;
-  if (actividadesAtrasadas > 0 || porValidar > 0) {
+  const hayEvidencias = d.evidencias ? d.evidencias.tuyas + d.evidencias.deOtros.length > 0 : porValidar > 0;
+  if (actividadesAtrasadas > 0 || hayEvidencias) {
     const partes: string[] = [];
     if (actividadesAtrasadas > 0) partes.push(plural(actividadesAtrasadas, 'actividad atrasada', 'actividades atrasadas'));
-    if (porValidar > 0) partes.push(`${plural(porValidar, 'trabajo', 'trabajos')} por validar`);
+    const deOtros = d.evidencias?.deOtros ?? [];
+    if (d.evidencias) {
+      const totalEvidencias = d.evidencias.tuyas + deOtros.reduce((s, o) => s + o.n, 0);
+      if (totalEvidencias > 0) {
+        const quien = [
+          ...(d.evidencias.tuyas > 0 ? [`${d.evidencias.tuyas} tuyas`] : []),
+          ...deOtros.map((o) => `${o.n} de ${o.jefe}`),
+        ].join(', ');
+        partes.push(`${plural(totalEvidencias, 'evidencia sin revisar', 'evidencias sin revisar')}: ${quien}`);
+      }
+    } else if (porValidar > 0) {
+      partes.push(`${plural(porValidar, 'trabajo', 'trabajos')} por validar`);
+    }
     items.push({ clave: 'operacion', texto: partes.join(' y '), url: '/erp/pizarra', tono: 'atencion' });
   }
 
@@ -139,7 +162,10 @@ export function armarResumenCeo(d: DatosCeo, fecha: string): ResumenCeo {
     aprobaciones: `${d.porAprobar.cantidad} por aprobar`,
     cobranza: plural(d.cobranza.vencidas, 'factura vencida', 'facturas vencidas'),
     compras: `${d.comprasAtrasadas} ${d.comprasAtrasadas === 1 ? 'OC atrasada' : 'OC atrasadas'}`,
-    cotizaciones: `${d.cotizaciones.porVencer} ${d.cotizaciones.porVencer === 1 ? 'cotización por vencer' : 'cotizaciones por vencer'}`,
+    cotizaciones:
+      d.cotizaciones.porVencer > 0
+        ? `${d.cotizaciones.porVencer} ${d.cotizaciones.porVencer === 1 ? 'cotización por vencer' : 'cotizaciones por vencer'}`
+        : null,
     operacion: null,
     nomina: d.nomina?.listaParaRevisar ? 'pre-nómina lista' : null,
   };

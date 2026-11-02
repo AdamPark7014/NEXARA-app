@@ -292,7 +292,8 @@ export default function PizarraPage() {
   const tieneEquipo = otros > 0;
   const cargandoEquipo = !isCeo && data == null && !error;
   const sinEquipo = !isCeo && !tieneEquipo && (data != null || Boolean(error));
-  const porRevisar = revisiones?.pendientes.length ?? 0;
+  // Lo de otros jefes no cuenta: dirección puede abrirlo, pero no le toca (`revisionParaTi`).
+  const porRevisar = revisiones?.pendientes.filter((p) => p.paraTi !== false).length ?? 0;
   // Sin gente a cargo también revisa quien es responsable de lo que hace otro: la pestaña
   // sale si tiene algo pendiente o ya revisó algo.
   const revisaAlgo = porRevisar > 0 || (revisiones?.revisadas.length ?? 0) > 0;
@@ -353,6 +354,7 @@ export default function PizarraPage() {
       onRecargar={() => void cargarRevisiones()}
       ver={verRevisiones}
       onVer={cambiarVerRevisiones}
+      token={token}
     />
   );
 

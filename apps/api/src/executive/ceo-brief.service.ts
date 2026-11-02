@@ -53,7 +53,7 @@ export class CeoBriefService {
       }
     };
 
-    const [porAprobar, cobranza, comprasAtrasadas, cotizaciones, operacion, nomina] = await Promise.all([
+    const [porAprobar, cobranza, comprasAtrasadas, cotizaciones, operacion, evidencias, nomina] = await Promise.all([
       // Lo que espera su firma, con importe.
       seguro<DatosCeo['porAprobar']>({ cantidad: 0, monto: 0, masAntiguaDias: 0, masGrandes: [] }, async () => {
         const pendientes = await this.workflow.listMyPending(lector.id, tenantId);
@@ -131,7 +131,12 @@ export class CeoBriefService {
           _count: { _all: true },
           _sum: { total: true },
         });
-        return { porVencer: r._count._all, monto: Number(r._sum.total ?? 0), dias: DIAS_COTIZACION_POR_VENCER };
+        const sinEnviar = await seguro(0, () =>
+          this.prisma.cotizacion.count({
+            where: { ...tw, deletedAt: null, status: 'DRAFT', validUntil: { gte: inicioHoy } } as any,
+          }),
+        );
+        return { porVencer: r._count._all, monto: Number(r._sum.total ?? 0), dias: DIAS_COTIZACION_POR_VENCER, sinEnviar };
       }),
 
       // Operación.
@@ -145,6 +150,32 @@ export class CeoBriefService {
           }),
         ]);
         return { actividadesAtrasadas, porValidar };
+      }),
+
+      // Evidencias sin revisar, por jefe directo: revisarlas ya no le toca a dirección salvo las suyas.
+      seguro<DatosCeo['evidencias']>(undefined, async () => {
+        const filas = await this.prisma.activityEvidence.findMany({
+          where: {
+            ...tw,
+            status: 'COMPLETED',
+            reviewStatus: { notIn: ['APPROVED', 'REJECTED'] },
+            activity: { deletedAt: null, estatus: { in: statusVariants(ACTIVITY_STATUS.POR_VALIDAR) } },
+          } as any,
+          select: { user: { select: { manager: { select: { id: true, nombre: true } } } } },
+          take: 1000,
+        });
+        let tuyas = 0;
+        const porJefe = new Map<string, number>();
+        for (const f of filas) {
+          const jefe = (f as any).user?.manager;
+          if (!jefe || jefe.id === lector.id) tuyas += 1;
+          else {
+            const nombre = String(jefe.nombre).trim().split(/\s+/).slice(0, 2).join(' ');
+            porJefe.set(nombre, (porJefe.get(nombre) ?? 0) + 1);
+          }
+        }
+        const deOtros = [...porJefe.entries()].map(([jefe, n]) => ({ jefe, n })).sort((a, b) => b.n - a.n);
+        return { tuyas, deOtros };
       }),
 
       // Nómina: solo si la empresa definió su calendario y quien lee ve «Pagos a personal».
@@ -167,6 +198,6 @@ export class CeoBriefService {
       }),
     ]);
 
-    return { porAprobar, cobranza, comprasAtrasadas, cotizaciones, operacion, nomina };
+    return { porAprobar, cobranza, comprasAtrasadas, cotizaciones, operacion, evidencias, nomina };
   }
 }

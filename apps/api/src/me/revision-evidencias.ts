@@ -81,6 +81,34 @@ export function reglaDeRevision<T extends EslabonRevision>(opts: {
   return { mine, soyEncargado, encimaDe, reparte, puedeRevisar };
 }
 
+/** Pasado esto sin revisar, también le toca a quien está por encima (Programa Velocidad Core). */
+export const HORAS_PARA_ESCALAR = 24;
+
+/** ¿La evidencia lleva más del plazo sin revisar? Sin fecha de envío no se puede decir que sí. */
+export function revisionEscalada(enviadaAt: Date | null | undefined, ahora: Date): boolean {
+  if (!enviadaAt) return false;
+  return ahora.getTime() - new Date(enviadaAt).getTime() >= HORAS_PARA_ESCALAR * 60 * 60 * 1000;
+}
+
+/**
+ * ¿Es de quien mira, o de otro jefe? Quien «revisa todo» (dirección) sigue pudiendo abrir cualquiera,
+ * pero en su cola solo le aparece lo que le toca: su gente directa, lo que tiene como responsable o
+ * encargado, lo de quien no tiene jefe y lo que ya pasó del plazo. El resto lo revisa su jefe.
+ */
+export function revisionParaTi(p: {
+  revisaTodo: boolean;
+  esJefeDirecto: boolean;
+  esResponsable: boolean;
+  estaEncima: boolean;
+  tieneJefe: boolean;
+  esJefeArriba: boolean;
+  escalada: boolean;
+}): boolean {
+  if (!p.revisaTodo) return true;
+  if (p.esJefeDirecto || p.esResponsable || p.estaEncima || !p.tieneJefe) return true;
+  return p.escalada && p.esJefeArriba;
+}
+
 /** Jefes (managerId hacia arriba) de cada usuario, a partir de la lista id → managerId. */
 export function cadenasDeMando(
   usuarios: Array<{ id: number; managerId: number | null }>,

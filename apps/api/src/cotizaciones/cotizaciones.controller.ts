@@ -20,6 +20,7 @@ import { CotizacionesService } from './cotizaciones.service.js';
 import { CreateCotizacionDto } from './dto/create-cotizacion.dto.js';
 import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
+import { MarcarEnviadaDto } from './dto/marcar-enviada.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
 import { AgregarPaqueteDto, LigarActividadDto, RechazarCotizacionDto } from './dto/rechazar-cotizacion.dto.js';
 import { AsignarCotizacionDto } from './dto/asignar-cotizacion.dto.js';
@@ -215,6 +216,19 @@ export class CotizacionesController {
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.cotizacionesService.send(id, dto, user?.id, companyId);
+  }
+
+  /** «Ya la envié»: salió por WhatsApp, correo propio o en persona. */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post(':id/marcar-enviada')
+  marcarEnviada(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: MarcarEnviadaDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.marcarEnviada(id, dto, user?.id, companyId);
   }
 
   @UseGuards(RbacGuard)

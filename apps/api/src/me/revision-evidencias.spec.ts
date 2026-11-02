@@ -7,6 +7,8 @@ import {
   reglaDeRevision,
   revisaTodo,
   type EslabonRevision,
+  revisionEscalada,
+  revisionParaTi,
 } from './revision-evidencias';
 
 // Organigrama de prueba: Christian (1) ← José Antonio (39) ← Roberto (40); David (8) ← Israel (16).
@@ -165,5 +167,44 @@ describe('ordenarPorEspera', () => {
       { id: 'a', enviadaAt: despues(10) },
     ];
     expect(ordenarPorEspera(items).map((i) => i.id)).toEqual(['a', 'b', 'sin']);
+  });
+});
+
+describe('a quién le toca revisar (Adam, 01-11: Christian ve todo sin tener que hacer nada)', () => {
+  const base = {
+    revisaTodo: true,
+    esJefeDirecto: false,
+    esResponsable: false,
+    estaEncima: false,
+    tieneJefe: true,
+    esJefeArriba: true,
+    escalada: false,
+  };
+
+  it('quien no revisa todo: lo que puede ver es suyo', () => {
+    expect(revisionParaTi({ ...base, revisaTodo: false })).toBe(true);
+  });
+
+  it('dirección: lo de otro jefe no le toca, hasta que pasa de 24 h', () => {
+    expect(revisionParaTi(base)).toBe(false);
+    expect(revisionParaTi({ ...base, escalada: true })).toBe(true);
+  });
+
+  it('lo escalado sube por la cadena: a quien está fuera de ella no le aparece', () => {
+    expect(revisionParaTi({ ...base, escalada: true, esJefeArriba: false })).toBe(false);
+  });
+
+  it('su gente directa, lo que tiene a cargo y lo de quien no tiene jefe sí son suyos', () => {
+    expect(revisionParaTi({ ...base, esJefeDirecto: true })).toBe(true);
+    expect(revisionParaTi({ ...base, esResponsable: true })).toBe(true);
+    expect(revisionParaTi({ ...base, estaEncima: true })).toBe(true);
+    expect(revisionParaTi({ ...base, tieneJefe: false })).toBe(true);
+  });
+
+  it('revisionEscalada cuenta 24 h exactas; sin fecha no se escala', () => {
+    const ahora = new Date('2026-11-03T18:00:00Z');
+    expect(revisionEscalada(new Date('2026-11-02T18:00:00Z'), ahora)).toBe(true);
+    expect(revisionEscalada(new Date('2026-11-02T18:00:01Z'), ahora)).toBe(false);
+    expect(revisionEscalada(null, ahora)).toBe(false);
   });
 });

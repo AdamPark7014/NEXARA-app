@@ -10,6 +10,7 @@ import { VentasModule } from '../ventas/ventas.module.js';
 import { SmartQuoteModule } from '../smart-quote/smart-quote.module.js';
 import { AiModule } from '../ai/ai.module.js';
 import { CotizarFraseService } from './cotizar-frase.service.js';
+import { SeguimientoCotizacionService } from './seguimiento-cotizacion.service.js';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { CotizarFraseService } from './cotizar-frase.service.js';
     AiModule,
   ],
   controllers: [CotizacionesController],
-  providers: [CotizacionesService, CotizacionesCoreService, CotizarFraseService],
+  providers: [CotizacionesService, CotizacionesCoreService, CotizarFraseService, SeguimientoCotizacionService],
   exports: [CotizacionesService, CotizacionesCoreService],
 })
 export class CotizacionesModule {}

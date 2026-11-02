@@ -130,6 +130,37 @@ describe("En espera de revisión", () => {
     expect(ver.getAttribute("href")).toBe("/erp/actividades/300/evidencias?origen=revisadas#revision");
   });
 
+  it("lo de otros jefes no estorba: va aparte y dice a quién le toca", () => {
+    const conOtros: RevisionesResponse = {
+      ...data,
+      pendientes: [
+        { ...data.pendientes[0], paraTi: true },
+        { ...data.pendientes[1], paraTi: false, jefe: "David Morales" },
+      ],
+    };
+    const { onVer } = pintar({ data: conOtros });
+    expect(screen.getByText("Instalación de cámaras")).toBeInTheDocument();
+    expect(screen.queryByText("Levantamiento en bodega")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /De otros jefes/ }));
+    expect(onVer).toHaveBeenCalledWith("otros");
+  });
+
+  it("en «De otros jefes» dice de quién es y la que pasó de 24 h se marca", () => {
+    const conOtros: RevisionesResponse = {
+      ...data,
+      pendientes: [{ ...data.pendientes[1], paraTi: false, jefe: "David Morales", escalada: true }],
+    };
+    pintar({ data: conOtros, ver: "otros" });
+    expect(screen.getByText("Le toca a David Morales")).toBeInTheDocument();
+    expect(screen.getByText("Más de 24 h")).toBeInTheDocument();
+  });
+
+  it("si solo quedan de otros jefes, explica que se suben solas a las 24 h", () => {
+    const conOtros: RevisionesResponse = { ...data, pendientes: [{ ...data.pendientes[1], paraTi: false }] };
+    pintar({ data: conOtros });
+    expect(screen.getByText(/las revisan sus jefes/)).toBeInTheDocument();
+  });
+
   it("sin pendientes lo dice, sin tabla vacía", () => {
     pintar({ data: { pendientes: [], revisadas: [] } });
     expect(screen.getByText("Nada espera tu revisión")).toBeTruthy();
