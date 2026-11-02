@@ -1,5 +1,14 @@
 # RELEVO
 
+- **02-11 (claude-code) — «Asignar con IA» es de todo mando con gente a cargo, no de una lista de nombres (Adam, con la lista a la vista).** Sustituye a «solo Christian, David o Antonio».
+  - `ai/asistente/quien-asigna.ts` (`puedeAsignarConIa`) es la única autoridad: cuentas de dirección, o alguien activo con `managerId` hacia esa persona, o en su flujo de despacho
+    (`extrasDeAsignacion`). Un mando nuevo entra solo; quien se queda sin gente sale.
+  - Hoy dentro: Christian, David, José Antonio Ramírez, Luis Joel Aguilar (entra por despacho: en el organigrama no tiene a nadie), Adam y Claudia. Hoy fuera: Daniela y Josué, encargados sin
+    nadie a cargo en el organigrama; entran solos cuando les pongan gente. Adam lo aprobó así.
+  - `rbac.guard.ts` abre `ASISTENTE_IA_URL_RULES` a quien tiene gente, sin importar su rol, y resuelve Prisma con `ModuleRef` porque el guardia vive en más de cien módulos que no lo importan.
+    `GET ai/asistente/estado` pasa para todos (`SHARED_SESSION_URL_RULES`) y responde `disponible: false`; la web ya no repite la regla y se quitó `puedeAsignarConIa` de `activity-kinds.ts`.
+  - `tiposQueCrea` ya es espejo de `CREATE_BY_EMAIL`: un mando sin renglón crea solo tareas, como en la web. Si alguien nuevo reparte otro tipo, agrégalo en los dos lados.
+
 - **02-11 ~12:35 (claude-code) — Tope de 5,000 filas: ninguna consulta sobre `integra_push_events`, `audit_logs`, `notifications` ni `LocationTracking` pierde datos hoy. Sin arreglos: solo cambió el comentario de `row-cap.ts`, y por eso no se desplegó.**
   - **Cómo se midió:** conté en producción cuántas filas trae cada `findMany` sin `take`, con su mismo `where` (o su peor ventana) y con el filtro de empresa que le toca. Solo esas cuatro tablas y `productos_ct` pasan de 5,000; la siguiente es `integra_sync_runs`, con 3,615. Líneas según `451aa85a`.
   - **Sin `take`, con su máximo real (ninguna llega al tope):**

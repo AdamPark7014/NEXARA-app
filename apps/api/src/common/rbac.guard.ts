@@ -1,9 +1,10 @@
-import { Injectable, ExecutionContext, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, ExecutionContext, ForbiddenException, Logger, Optional } from '@nestjs/common';
 import { PERMISSIONS } from './permissions';
-import { Reflector } from '@nestjs/core';
+import { ModuleRef, Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { ASISTENTE_IA_URL_RULES, checkUrlAccess, checkUrlRules } from './rbac/url-matrix.js';
-import { asistentePorCorreo } from '../ai/asistente/tipos-actividad.js';
+import { puedeAsignarConIa } from '../ai/asistente/quien-asigna.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 import { LEGACY_TO_V2, ROLES, type RoleKey } from './rbac/roles.v2.js';
 
 export interface RbacOptions {
@@ -29,8 +30,22 @@ type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export class RbacGuard extends AuthGuard('jwt') {
   private readonly logger = new Logger('RbacGuard');
 
-  constructor(private reflector: Reflector) {
+  constructor(
+    private reflector: Reflector,
+    @Optional() private readonly moduleRef?: ModuleRef,
+  ) {
     super();
+  }
+
+  /** Sin inyectar Prisma: este guardia vive en más de cien módulos que no lo importan. */
+  private async tieneGenteACargo(user: { id?: number; email?: string | null }): Promise<boolean> {
+    try {
+      const prisma = this.moduleRef?.get(PrismaService, { strict: false });
+      return prisma ? await puedeAsignarConIa(prisma as never, user) : false;
+    } catch (error) {
+      this.logger.warn(`No se pudo revisar la gente a cargo: ${String(error)}`);
+      return false;
+    }
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -53,9 +68,11 @@ export class RbacGuard extends AuthGuard('jwt') {
       const method = (request.method as HttpMethod) ?? 'GET';
       const url = request.originalUrl || request.url || '';
       let result = checkUrlAccess(v2Role, url, method);
-      // «Asignar con IA» concedido por persona (David y José Antonio): sin cambiarles el rol.
-      if (!result.allowed && asistentePorCorreo(user.email)) {
-        result = checkUrlRules(ASISTENTE_IA_URL_RULES, url, method);
+      // «Asignar con IA» es de todo mando con gente a cargo, tenga el rol que tenga. Solo se pregunta
+      // a la base por estas rutas y cuando la matriz ya dijo que no.
+      if (!result.allowed) {
+        const delAsistente = checkUrlRules(ASISTENTE_IA_URL_RULES, url, method);
+        if (delAsistente.allowed && (await this.tieneGenteACargo(user))) result = delAsistente;
       }
       if (!result.allowed) {
         this.logger.warn(`[v2 DENY] role=${v2Role} ${method} ${url}`);

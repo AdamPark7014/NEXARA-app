@@ -296,7 +296,8 @@ export const CLIENT_ADMIN_WRITE_URL_RULES: UrlRule[] = [
 
 /**
  * Asignar con IA: la IA solo propone; crear sigue pasando por `POST /api/activities`
- * con sus permisos. Va con quien asigna (superiores y quien usa el selector de personas).
+ * con sus permisos. Además del CEO, entra todo mando con gente a cargo: lo decide `rbac.guard.ts`
+ * con `ai/asistente/quien-asigna.ts`, porque depende de la jerarquía y no del rol.
  */
 export const ASISTENTE_IA_URL_RULES: UrlRule[] = [
   ...VOZ_IA_URL_RULES,
@@ -360,6 +361,8 @@ export const OPS_OPERATIONAL_PROJECTS_URL_RULES: UrlRule[] = [
 
 /** APIs de sesión propias — todo rol autenticado (deny-by-default no las bloquea). */
 export const SHARED_SESSION_URL_RULES: UrlRule[] = [
+  // Todos preguntan si les toca «Asignar con IA»; a quien no, le responde que no está disponible.
+  { path: '/api/ai/asistente/estado', methods: ['GET'], scope: 'read' },
   { path: '/api/notifications/**', scope: 'write' },
   { path: '/api/user-preferences/**', scope: 'write' },
   // Cronómetro: cada quien manda su propio tiempo (Programa Velocidad Core).
