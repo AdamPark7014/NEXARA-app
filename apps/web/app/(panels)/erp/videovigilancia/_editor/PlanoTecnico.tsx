@@ -131,14 +131,22 @@ export function HojaAjustada({ children }: { children: ReactNode }) {
   );
 }
 
-/** El nombre de un área ocupa unos 110 × 40 px: baja hasta que no tape un símbolo. */
-function lugarDeNombre(x: number, y: number, simbolos: ReadonlyArray<{ x: number; y: number }>): number {
-  let lugar = y;
-  for (let i = 0; i < 4; i++) {
-    if (!simbolos.some((s) => Math.abs(s.x - x) < 72 && Math.abs(s.y - lugar) < 34)) return lugar;
-    lugar += 36;
+/**
+ * El nombre de un área ocupa unos 110 × 40 px: se recorre para no tapar un símbolo, pero sin salirse de su
+ * área. Si no cabe sin tapar nada, se queda donde tape menos.
+ */
+function lugarDeNombre(x: number, y: number, simbolos: ReadonlyArray<{ x: number; y: number }>, caja: { x0: number; y0: number; x1: number; y1: number }): { x: number; y: number } {
+  const tapa = (px: number, py: number) => simbolos.filter((s) => Math.abs(s.x - px) < 72 && Math.abs(s.y - py) < 34).length;
+  let mejor = { x, y, n: tapa(x, y) };
+  for (const [dx, dy] of [[0, 36], [0, -36], [64, 0], [-64, 0], [64, 36], [-64, 36], [64, -36], [-64, -36], [0, 72], [0, -72]]) {
+    if (mejor.n === 0) break;
+    const px = x + dx;
+    const py = y + dy;
+    if (px - 40 < caja.x0 || px + 40 > caja.x1 || py - 14 < caja.y0 || py + 18 > caja.y1) continue;
+    const n = tapa(px, py);
+    if (n < mejor.n) mejor = { x: px, y: py, n };
   }
-  return y;
+  return { x: mejor.x, y: mejor.y };
 }
 
 const fechaCorta = new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -280,9 +288,10 @@ export default function PlanoTecnico({
           const pts = a.puntos.map((p) => aMetros(p, plano.escala));
           const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
           const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-          const x = X(cx);
-          const yEnHoja = lugarDeNombre(x, Y(cy), simbolos);
-          return <NombreArea key={a.id} x={x} y={yEnHoja} nombre={a.nombre} m2={areaPoligono(pts)} />;
+          const xs = pts.map((p) => X(p.x));
+          const ys = pts.map((p) => Y(p.y));
+          const lugar = lugarDeNombre(X(cx), Y(cy), simbolos, { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) });
+          return <NombreArea key={a.id} x={lugar.x} y={lugar.y} nombre={a.nombre} m2={areaPoligono(pts)} />;
         })}
         {plano.etiquetas.map((e) => (
           <NombreArea key={e.id} x={X(e.pos.x * k)} y={Y(e.pos.y * k)} nombre={e.texto} />

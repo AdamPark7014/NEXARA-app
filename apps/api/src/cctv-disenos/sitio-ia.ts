@@ -149,3 +149,22 @@ export function limpiarSitio(bruto: Record<string, any> | null | undefined): Sit
     areas,
   };
 }
+
+/** Lo que la frase nombra con todas sus letras. El modelo barato a veces deja fuera justo lo que describe el edificio entero. */
+const MENCIONES: ReadonlyArray<{ tipo: string; nombre: string; patron: RegExp }> = [
+  { tipo: 'bodega', nombre: 'Bodega', patron: /\b(bodegas?|almac[eé]n|almacenes|naves?|taller(es)?)\b/i },
+  { tipo: 'tienda', nombre: 'Piso de venta', patron: /\b(tiendas?|piso de venta|local comercial)\b/i },
+  { tipo: 'oficina', nombre: 'Oficinas', patron: /\b(oficinas?|direcci[oó]n|administraci[oó]n)\b/i },
+  { tipo: 'recepcion', nombre: 'Recepción', patron: /\b(recepci[oó]n|vest[ií]bulo)\b/i },
+  { tipo: 'ti', nombre: 'Cuarto de TI', patron: /\b(site|cuarto de (ti|servidores|sistemas|telecom\w*))\b/i },
+  { tipo: 'sala', nombre: 'Sala de juntas', patron: /\bsalas? de juntas\b/i },
+  { tipo: 'estacionamiento', nombre: 'Estacionamiento', patron: /\bestacionamientos?\b/i },
+  { tipo: 'patio', nombre: 'Patio', patron: /\b(patios?|maniobras)\b/i },
+];
+
+/** Se agrega lo que la frase dice y a la lista le falta. Solo eso: no inventa áreas ni medidas. */
+export function completarAreas(sitio: SitioLeido, frase: string): SitioLeido {
+  const faltan = MENCIONES.filter((m) => m.patron.test(frase) && !sitio.areas.some((a) => a.tipo === m.tipo));
+  if (!faltan.length) return sitio;
+  return { ...sitio, areas: [...sitio.areas, ...faltan.map((m) => ({ nombre: m.nombre, tipo: m.tipo, m2: 0, piso: 0, camaras: 0 }))] };
+}

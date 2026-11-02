@@ -362,8 +362,7 @@ llaman a la IA.
 También sirve para un equipo sin su PDF: «¿No tienes el PDF? Descríbelo» (`POST /catalogo/describir`) llena la misma pantalla de revisión, solo con
 lo que dijo la persona, y lo guarda con `fuente: "manual"`.
 
-Medido (`npm run eval:sitio -w apps/api`, Haiku 5.5 `low`): 12 frases de sitio y 8 de equipo, escritas para la prueba, cortas y con faltas: 20 de
-20 sin inventar nada que no se dijera. US$0.00013 por llamada; p50 1.7 s, p95 3.9 s. Son frases nuestras, todavía no de gente real.
+Medido (`npm run eval:sitio -w apps/api`, Haiku 5.5 `low`): 15 frases de sitio y 8 de equipo, escritas para la prueba, cortas y con faltas: 23 de 23 sin inventar nada que no se dijera. US$0.00013 por llamada; p50 1.7 s, p95 2.2 s. Son frases nuestras, todavía no de gente real. Sobre todo, la prueba real en producción encontró lo que el eval no: a veces la IA dejaba fuera justo el área que describe el edificio («bodega de 36 por 22 con oficinas…» salía sin bodega). `completarAreas` agrega lo que la frase nombra y a la lista le falta.
 
 ## 5. Vista desde cada cámara
 

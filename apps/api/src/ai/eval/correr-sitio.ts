@@ -11,7 +11,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ClaudeService } from '../claude/claude.service.js';
 import { limpiarFicha } from '../../cctv-disenos/ficha-ia.js';
-import { limpiarSitio, peticionDescripcion, peticionSitio } from '../../cctv-disenos/sitio-ia.js';
+import { completarAreas, limpiarSitio, peticionDescripcion, peticionSitio } from '../../cctv-disenos/sitio-ia.js';
 import { DIR_RESULTADOS, asegurarPresupuesto, cargarLlave, gastado, registrarGasto } from './comun.js';
 
 type CasoSitio = { id: string; frase: string; espera: Record<string, unknown>; tipos?: string[]; sinInventar?: string[] };
@@ -29,6 +29,9 @@ const SITIOS: CasoSitio[] = [
   { id: 's10', frase: 'quiero 3 camaras en la caja y 5 en el piso de venta de mi tienda', espera: {}, tipos: ['tienda'], sinInventar: ['anchoM'] },
   { id: 's11', frase: 'restaurante con cocina, comedor, y estacionamiento afuera', espera: {}, tipos: ['estacionamiento'], sinInventar: ['camaras', 'accesos', 'sismica'] },
   { id: 's12', frase: 'bodega hikvision 8 camaras', espera: { camaras: 8, marca: 'hikvision' }, tipos: ['bodega'], sinInventar: ['accesos'] },
+  { id: 's13', frase: 'bodega de 36 por 22 con oficinas al frente, recepcion, sala de juntas, cuarto de ti y patio de maniobras con barrera. 14 camaras dahua, acceso en la recepcion y en el site, dos alertas sismicas y dos sirenas, guardar 45 dias', espera: { anchoM: 36, fondoM: 22, camaras: 14, marca: 'dahua', accesos: 2, sismica: 2, sirena: 2, grabacionDias: 45, barrera: true }, tipos: ['bodega', 'oficina', 'recepcion', 'sala', 'ti', 'patio'] },
+  { id: 's14', frase: 'nave de 50 x 30 con un cuarto de servidores y una oficina', espera: { anchoM: 50, fondoM: 30 }, tipos: ['bodega', 'ti', 'oficina'], sinInventar: ['camaras'] },
+  { id: 's15', frase: 'tienda de 20 por 15 con bodega atras y caja al frente', espera: { anchoM: 20, fondoM: 15 }, tipos: ['tienda', 'bodega'], sinInventar: ['camaras'] },
 ];
 
 type CasoEquipo = { id: string; frase: string; tipo: string; marca?: string; campos: Record<string, number | string>; sinInventar: string[] };
@@ -70,7 +73,7 @@ async function main() {
     const t0 = Date.now();
     const { datos, uso } = await claude.json<Record<string, unknown>>({ ...peticionSitio(c.frase), proceso: 'eval-cctv-sitio', companyId: 0 });
     registrarGasto('cctv-sitio', uso.usdAprox ?? 0);
-    const s = limpiarSitio(datos) as unknown as Record<string, unknown> & { areas: Array<{ tipo: string }> };
+    const s = completarAreas(limpiarSitio(datos), c.frase) as unknown as Record<string, unknown> & { areas: Array<{ tipo: string }> };
     const fallas: string[] = [];
     for (const [k, v] of Object.entries(c.espera)) if (!igual(v, s[k])) fallas.push(`${k}: esperaba ${JSON.stringify(v)}, dijo ${JSON.stringify(s[k])}`);
     for (const t of c.tipos ?? []) if (!s.areas.some((a) => a.tipo === t)) fallas.push(`falta área ${t}: ${s.areas.map((a) => a.tipo).join(',')}`);
