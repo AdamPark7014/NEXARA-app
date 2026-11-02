@@ -1,23 +1,33 @@
 "use client";
 
 /**
- * Panel izquierdo del editor: lo que se puede colocar en el sitio. Se toca y luego se toca el
- * sitio, o se arrastra. Por ahora son las cámaras del catálogo y la ambientación de la maqueta; los
- * demás equipos, el stock y la memoria técnica llegan en sus fases.
+ * Panel izquierdo del editor: lo que se puede colocar en el sitio, por familia. Se toca y luego se
+ * toca el sitio, o se arrastra. Lo de rack, si ya hay gabinete, entra directo. El stock y la memoria
+ * técnica llegan en sus fases.
  */
 import { useMemo, useState } from "react";
-import { MODELOS_CAMARA, MODELO_GENERICO, ETIQUETA_TIPO_CAMARA, etiquetaModelo, type ModeloCamara } from "@/lib/cctv/catalogo";
+import {
+  ETIQUETA_TIPO_CAMARA,
+  ETIQUETA_TIPO_EQUIPO,
+  FAMILIA_DE_TIPO,
+  MODELO_GENERICO,
+  etiquetaModelo,
+  type FamiliaEquipo,
+  type ModeloCamara,
+  type ModeloEquipo,
+} from "@/lib/cctv/catalogo";
 import type { MaterialPiso, TipoMueble } from "@/lib/cctv/plano";
+import { fotoDeTipo } from "@/lib/cctv/sistema";
 import styles from "./editor.module.css";
 
 export const TIPO_ARRASTRE = "application/x-cctv-equipo";
 
-export type DatoArrastre = { clase: "camara"; id: string } | { clase: "mueble"; id: TipoMueble };
+export type DatoArrastre = { clase: "camara"; id: string } | { clase: "equipo"; id: string } | { clase: "mueble"; id: TipoMueble };
 
 export function leerArrastre(texto: string): DatoArrastre | null {
   try {
     const d = JSON.parse(texto) as DatoArrastre;
-    return d?.clase === "camara" || d?.clase === "mueble" ? d : null;
+    return d?.clase === "camara" || d?.clase === "mueble" || d?.clase === "equipo" ? d : null;
   } catch {
     return null;
   }
@@ -49,35 +59,70 @@ export function fotoCamara(tipo: ModeloCamara["tipo"]): string {
   return `/cctv/modelos/${archivo}.webp`;
 }
 
-type Filtro = "camaras" | "ambientacion";
+type Filtro = "camaras" | "rack" | "acceso" | "alarmas" | "ambientacion";
+
+const FILTROS: ReadonlyArray<[Filtro, string]> = [
+  ["camaras", "Cámaras"],
+  ["rack", "Rack y red"],
+  ["acceso", "Acceso"],
+  ["alarmas", "Alarmas"],
+  ["ambientacion", "Ambientación"],
+];
+
+const FAMILIAS_DE_FILTRO: Partial<Record<Filtro, readonly FamiliaEquipo[]>> = {
+  rack: ["infraestructura", "grabacion", "red", "servidores", "otros"],
+  acceso: ["acceso"],
+  alarmas: ["alarmas"],
+};
 
 export default function PanelEquipos({
   modeloActivo,
   muebleActivo,
   pisoActivo,
+  equipoActivo,
   herramienta,
+  camaras,
+  equipos,
   onElegirCamara,
+  onElegirEquipo,
   onElegirMueble,
   onElegirPiso,
+  onAgregar,
 }: {
   modeloActivo: ModeloCamara;
   muebleActivo: TipoMueble;
   pisoActivo: MaterialPiso;
+  equipoActivo: ModeloEquipo | null;
   herramienta: string;
+  camaras: readonly ModeloCamara[];
+  equipos: readonly ModeloEquipo[];
   onElegirCamara: (m: ModeloCamara) => void;
+  onElegirEquipo: (m: ModeloEquipo) => void;
   onElegirMueble: (t: TipoMueble) => void;
   onElegirPiso: (p: MaterialPiso) => void;
+  onAgregar: () => void;
 }) {
   const [buscar, setBuscar] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("camaras");
   const q = buscar.trim().toLowerCase();
 
-  const camaras = useMemo(() => {
-    const todas = [...MODELOS_CAMARA, MODELO_GENERICO];
-    return q ? todas.filter((m) => `${etiquetaModelo(m)} ${ETIQUETA_TIPO_CAMARA[m.tipo]} ${m.descripcion}`.toLowerCase().includes(q)) : todas;
-  }, [q]);
+  const listaCamaras = useMemo(
+    () => (q ? camaras.filter((m) => `${etiquetaModelo(m)} ${ETIQUETA_TIPO_CAMARA[m.tipo]} ${m.descripcion}`.toLowerCase().includes(q)) : camaras),
+    [q, camaras],
+  );
+  const familias = FAMILIAS_DE_FILTRO[filtro];
+  const listaEquipos = useMemo(() => {
+    if (q) return equipos.filter((m) => `${etiquetaModelo(m)} ${ETIQUETA_TIPO_EQUIPO[m.tipo]} ${m.descripcion}`.toLowerCase().includes(q));
+    if (!familias) return [];
+    return equipos.filter((m) => familias.includes(FAMILIA_DE_TIPO[m.tipo])).sort((a, b) => familias.indexOf(FAMILIA_DE_TIPO[a.tipo]) - familias.indexOf(FAMILIA_DE_TIPO[b.tipo]));
+  }, [q, equipos, familias]);
   const muebles = useMemo(() => (Object.keys(NOMBRE_MUEBLE) as TipoMueble[]).filter((t) => !q || NOMBRE_MUEBLE[t].toLowerCase().includes(q)), [q]);
   const pisos = useMemo(() => (Object.keys(NOMBRE_PISO) as MaterialPiso[]).filter((t) => !q || NOMBRE_PISO[t].toLowerCase().includes(q)), [q]);
+
+  // Al buscar se ve todo lo que coincide, sin importar la familia.
+  const verCamaras = q ? listaCamaras.length > 0 : filtro === "camaras";
+  const verEquipos = q ? listaEquipos.length > 0 : Boolean(familias);
+  const verAmbientacion = q ? muebles.length + pisos.length > 0 : filtro === "ambientacion";
 
   return (
     <aside className={styles.equipos} aria-label="Equipos">
@@ -85,17 +130,24 @@ export default function PanelEquipos({
         <b>Equipos</b>
         <input className={styles.equiposBuscar} type="search" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar modelo o tipo" aria-label="Buscar equipo" />
         <div className={styles.equiposFiltros} role="group" aria-label="Filtrar equipos">
-          <button type="button" aria-pressed={filtro === "camaras"} onClick={() => setFiltro("camaras")}>
-            Cámaras
-          </button>
-          <button type="button" aria-pressed={filtro === "ambientacion"} onClick={() => setFiltro("ambientacion")}>
-            Ambientación
-          </button>
+          {FILTROS.map(([id, texto]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={filtro === id}
+              onClick={() => {
+                setFiltro(id);
+                setBuscar("");
+              }}
+            >
+              {texto}
+            </button>
+          ))}
         </div>
       </div>
       <div className={styles.equiposLista}>
-        {filtro === "camaras"
-          ? camaras.map((m) => (
+        {verCamaras
+          ? listaCamaras.map((m) => (
               <button
                 key={m.id}
                 type="button"
@@ -117,7 +169,30 @@ export default function PanelEquipos({
               </button>
             ))
           : null}
-        {filtro === "ambientacion" ? (
+        {verEquipos
+          ? listaEquipos.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                className={styles.equipo}
+                aria-pressed={herramienta === "equipo" && equipoActivo?.id === m.id}
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData(TIPO_ARRASTRE, JSON.stringify({ clase: "equipo", id: m.id } satisfies DatoArrastre))}
+                onClick={() => onElegirEquipo(m)}
+              >
+                <span className={styles.equipoFoto}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={fotoDeTipo(m.tipo)} alt="" draggable={false} />
+                </span>
+                <span className={styles.equipoTexto}>
+                  <b>{ETIQUETA_TIPO_EQUIPO[m.tipo]}</b>
+                  <span>{m.modelo}</span>
+                  <span>{m.fuente === "tipo" ? "Falta su ficha" : m.descripcion}</span>
+                </span>
+              </button>
+            ))
+          : null}
+        {verAmbientacion ? (
           <>
             <p className={styles.seccion}>Muebles y vehículos</p>
             {muebles.map((t) => (
@@ -151,7 +226,11 @@ export default function PanelEquipos({
             </div>
           </>
         ) : null}
-        {(filtro === "camaras" ? !camaras.length : !muebles.length && !pisos.length) ? <p className={styles.ayuda}>Sin resultados para «{buscar.trim()}».</p> : null}
+        {q && !verCamaras && !verEquipos && !verAmbientacion ? <p className={styles.ayuda}>Sin resultados para «{buscar.trim()}».</p> : null}
+        <button type="button" className={styles.equipoAgregar} onClick={onAgregar}>
+          <b>+ Agregar equipo</b>
+          <span>Un modelo que no está en la lista: se queda en el catálogo para siempre.</span>
+        </button>
       </div>
       <p className={styles.equiposPie}>Toca un equipo y luego el sitio, o arrástralo a la maqueta.</p>
     </aside>

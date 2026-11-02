@@ -10,6 +10,7 @@
  * mide en grados en el sentido del reloj desde «arriba» del dibujo; el norte real del
  * terreno se guarda aparte (`norteDeg`) y solo se pinta.
  */
+import type { DatosEquipo, TipoEquipo } from "./catalogo";
 import type { Optica } from "./optica";
 
 export type Punto = { x: number; y: number };
@@ -93,6 +94,31 @@ export type CamaraPlano = {
   montaje?: "muro" | "poste" | "techo";
 };
 
+/**
+ * Equipo que no es cámara: grabador, gabinete, terminal de acceso, sirena… `tipo` decide su modelo
+ * y su comportamiento. Lo que viene del catálogo se copia aquí (`modelo`, `datos`), para que el
+ * diseño siga igual aunque el catálogo cambie.
+ */
+export type EquipoPlano = {
+  id: string;
+  /** Con el prefijo del tipo da la clave: `AC-01`. Sigue entre niveles. */
+  numero: number;
+  tipo: TipoEquipo;
+  nombre: string;
+  productoId?: string | null;
+  modelo: string;
+  pos: Punto;
+  rumboDeg: number;
+  /** Altura a la que se instala (al centro, en los de muro). */
+  alturaM: number;
+  datos: DatosEquipo;
+  /** Dentro de qué gabinete va, y en qué unidad (la 1 es la de abajo). */
+  gabineteId?: string | null;
+  unidad?: number | null;
+  /** Terminal: la puerta que controla. */
+  puertaId?: string | null;
+};
+
 /** Humanoide de referencia: se arrastra para ver cómo lo capta cada cámara. */
 export type Persona = { id: string; pos: Punto; rumboDeg: number };
 
@@ -130,6 +156,8 @@ export type Plano = {
   /** Pisos y ambientación de la maqueta. Los diseños anteriores no los traen. */
   areas?: Area[] | null;
   muebles?: Mueble[] | null;
+  /** Lo que no es cámara. Los diseños anteriores no lo traen. */
+  equipos?: EquipoPlano[] | null;
 };
 
 export const PX_POR_METRO_LIENZO = 50;

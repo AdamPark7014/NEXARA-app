@@ -3,14 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MODELOS_CAMARA } from "../catalogo";
 import { agregarAbertura, agregarArea, agregarCamara, agregarMueble, agregarMuro, agregarObstaculo, type Seleccion } from "../editor";
 import { limitesEdificio, limitesSitio } from "../medidas";
-import { planoVacio, tapasDelPlano, type Plano } from "../plano";
+import { planoVacio, tapasDelPlano, type EquipoPlano, type Plano } from "../plano";
 import { camaraEnMetros, coberturaCamara, type PoligonoCobertura } from "../visibilidad";
 import {
   claseObstaculo,
+  construirAlcances,
   construirArquitectura,
   construirAreas,
+  construirCables,
   construirCamaras,
   construirCoberturas,
+  construirEquipos,
   construirMuebles,
   construirObstaculos,
   construirRayos,
@@ -19,6 +22,8 @@ import {
   materialesArquitectura,
   tipoModeloDe,
 } from "./escena";
+import { crearModeloEquipo } from "./modelosEquipos";
+import type { Conexion } from "../sistema";
 import { crearModelo, inclinarModelo } from "./modelos";
 
 const K = 0.02;
@@ -256,5 +261,58 @@ describe("medidas y noche", () => {
     // El patio no lleva lámpara de interior.
     const patio = agregarArea(cuarto(), { x: 0, y: 0 }, { x: px(8), y: px(8) }, "asfalto").plano;
     expect(lamparasDeNoche(patio).every((l) => l.alcance > 0)).toBe(true);
+  });
+});
+
+describe("Equipos en la maqueta", () => {
+  const equipo = (id: string, tipo: EquipoPlano["tipo"], extra: Partial<EquipoPlano> = {}): EquipoPlano => ({ id, numero: 1, tipo, nombre: tipo, modelo: tipo, pos: { x: 100, y: 100 }, rumboDeg: 180, alturaM: 1.5, datos: {}, ...extra });
+
+  it("arma un modelo para cada tipo, con base en el piso", () => {
+    for (const t of ["nvr", "switch", "servidor", "ups", "gabinete", "terminal", "barrera", "sirena", "sismica", "panel", "generico"] as const) {
+      const c = new THREE.Box3().setFromObject(crearModeloEquipo(t, {}));
+      expect(c.isEmpty(), t).toBe(false);
+      expect(c.min.y, t).toBeGreaterThanOrEqual(-0.001);
+    }
+  });
+
+  it("respeta las medidas de la ficha", () => {
+    const c = new THREE.Box3().setFromObject(crearModeloEquipo("nvr", { anchoMm: 385, altoMm: 52, fondoMm: 315 }));
+    const t = c.getSize(new THREE.Vector3());
+    expect(t.x).toBeCloseTo(0.385, 2);
+    expect(t.y).toBeCloseTo(0.052, 2);
+  });
+
+  it("el gabinete crece con sus unidades", () => {
+    const alto = (u: number) => new THREE.Box3().setFromObject(crearModeloEquipo("gabinete", { unidades: u })).getSize(new THREE.Vector3()).y;
+    expect(alto(42)).toBeGreaterThan(alto(12));
+  });
+
+  it("cada equipo suelto se puede elegir y lleva su clave; lo del rack va adentro", () => {
+    const plano = { ...planoVacio(), equipos: [equipo("g", "gabinete", { alturaM: 0, datos: { unidades: 24 } }), equipo("n", "nvr", { gabineteId: "g", unidad: 20 }), equipo("t", "terminal")] };
+    const { grupo, etiquetas } = construirEquipos(plano, { escala: 2 });
+    expect(etiquetas.map((e) => e.clave).sort()).toEqual(["AC-01", "GAB-01"]);
+    const elegibles: string[] = [];
+    grupo.traverse((n) => n.userData.sel && elegibles.push(n.userData.sel.id));
+    expect(elegibles.sort()).toEqual(["g", "t"]);
+  });
+
+  it("lejos de un muro no flota: lleva pedestal", () => {
+    const plano = { ...planoVacio(), equipos: [equipo("t", "terminal")] };
+    const { grupo } = construirEquipos(plano, { escala: 1 });
+    let hayPedestal = false;
+    grupo.traverse((n) => {
+      if ((n as THREE.Mesh).geometry instanceof THREE.CylinderGeometry && n.parent === grupo) hayPedestal = true;
+    });
+    expect(hayPedestal).toBe(true);
+  });
+
+  it("solo las alarmas llevan anillo de alcance", () => {
+    const plano = { ...planoVacio(), equipos: [equipo("s", "sirena", { datos: { alcanceM: 20 } }), equipo("t", "terminal")] };
+    expect(construirAlcances(plano, null).children).toHaveLength(2);
+  });
+
+  it("pinta el cable del nivel activo, por clase", () => {
+    const con = (clase: Conexion["clase"], nivelId: string): Conexion => ({ id: `${clase}-${nivelId}`, clave: "X", clase, nivelId, ruta: [{ x: 0, y: 0 }, { x: 5, y: 0 }], alturaEquipoM: 2.5, alturaCharolaM: 3, largoM: 7, estado: "ok" });
+    expect(construirCables([con("video", "a"), con("alarmas", "a"), con("red", "b")], "a").children).toHaveLength(2);
   });
 });

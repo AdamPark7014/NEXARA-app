@@ -2,21 +2,23 @@
 
 /**
  * Maqueta 3D del sitio (mockup aprobado 01-11-2026): se gira y se acerca como un objeto, las claves
- * de las cámaras flotan encima y las herramientas del plano funcionan sobre el piso. Pesa lo suyo
+ * de los equipos flotan encima y las herramientas del plano funcionan sobre el piso. Pesa lo suyo
  * (three.js), así que se carga solo al abrirla; sin WebGL, el editor usa `Lienzo3D`.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
 import * as THREE from "three";
-import { etiquetaModelo, modeloPorId, type ModeloCamara } from "@/lib/cctv/catalogo";
+import { equipoPorId, etiquetaModelo, modeloPorId, type ModeloCamara, type ModeloEquipo, type TipoEquipo } from "@/lib/cctv/catalogo";
 import {
   agregarAbertura,
   agregarArea,
   agregarCamara,
+  agregarEquipo,
   agregarMueble,
   agregarMuro,
   agregarObstaculo,
   agregarPersona,
   ajustarPunto,
+  avisoDeEquipo,
   mover,
   muroMasCercano,
   type Seleccion,
@@ -26,6 +28,7 @@ import { elevacionTexto, type NivelConPlano } from "@/lib/cctv/niveles";
 import { MotorMaqueta } from "@/lib/cctv/maqueta/motor";
 import { limitesEdificio, limitesSitio } from "@/lib/cctv/medidas";
 import { type MaterialPiso, type Plano, type Punto, type Tapa, type TipoMueble } from "@/lib/cctv/plano";
+import type { Conexion } from "@/lib/cctv/sistema";
 import { camaraEnMetros, coberturaCamara, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import type { Herramienta } from "./Lienzo";
 import Navegacion, { ICONO } from "./Navegacion";
@@ -41,9 +44,10 @@ export type CapasDeMaqueta = {
   claves: boolean;
   noche: boolean;
   tamanoReal: boolean;
+  cableado: boolean;
 };
 
-const MOVIBLES: ReadonlySet<TipoElemento> = new Set(["camara", "persona", "mueble", "etiqueta", "obstaculo", "area"]);
+const MOVIBLES: ReadonlySet<TipoElemento> = new Set(["camara", "persona", "mueble", "etiqueta", "obstaculo", "area", "equipo"]);
 const SIN_NIVELES: readonly NivelConPlano[] = [];
 
 type Arrastre =
@@ -54,6 +58,8 @@ type Rotulo = { clave: string; texto: string; pos: THREE.Vector3; clase: "area" 
 
 export default function Maqueta3D({
   plano,
+  nivelId,
+  conexiones,
   nombreNivel,
   elevacionM = 0,
   debajo = SIN_NIVELES,
@@ -65,6 +71,8 @@ export default function Maqueta3D({
   modeloNuevo,
   muebleNuevo,
   pisoNuevo,
+  equipoNuevo,
+  numeroEquipo,
   numeroNuevo,
   verDesde,
   onVerDesde,
@@ -78,6 +86,8 @@ export default function Maqueta3D({
   alMotor,
 }: {
   plano: Plano;
+  nivelId: string;
+  conexiones: readonly Conexion[];
   nombreNivel?: string;
   elevacionM?: number;
   debajo?: readonly NivelConPlano[];
@@ -89,6 +99,9 @@ export default function Maqueta3D({
   modeloNuevo: ModeloCamara;
   muebleNuevo: TipoMueble;
   pisoNuevo: MaterialPiso;
+  equipoNuevo: ModeloEquipo | null;
+  /** El siguiente número de ese tipo, entre todos los niveles. */
+  numeroEquipo: (t: TipoEquipo) => number;
   numeroNuevo: number;
   verDesde: string | null;
   onVerDesde: (id: string | null) => void;
@@ -230,15 +243,17 @@ export default function Maqueta3D({
     if (!m || !listo) return;
     m.actualizar({
       plano,
+      nivelId,
+      conexiones,
       coberturas: coberturaVisible,
       elevacionM,
       debajo,
       seleccion,
       verDesde,
-      capas: { cobertura: capas.cobertura, personas: capas.humanoides, noche: capas.noche, tamanoReal: capas.tamanoReal, translucidos: capas.translucidos, croquis: capas.croquis },
+      capas: { cobertura: capas.cobertura, personas: capas.humanoides, noche: capas.noche, tamanoReal: capas.tamanoReal, translucidos: capas.translucidos, croquis: capas.croquis, cableado: capas.cableado },
     });
     setClaves(m.etiquetas);
-  }, [listo, plano, coberturaVisible, elevacionM, debajo, seleccion, verDesde, capas.cobertura, capas.humanoides, capas.noche, capas.tamanoReal, capas.translucidos, capas.croquis]);
+  }, [listo, plano, nivelId, conexiones, capas.cableado, coberturaVisible, elevacionM, debajo, seleccion, verDesde, capas.cobertura, capas.humanoides, capas.noche, capas.tamanoReal, capas.translucidos, capas.croquis]);
 
   // Las claves y rótulos recién montados necesitan su lugar.
   useEffect(() => {
@@ -278,7 +293,7 @@ export default function Maqueta3D({
 
   const enfocarSeleccion = () => {
     const m = motor.current;
-    if (!m || seleccion?.tipo !== "camara") return;
+    if (!m || (seleccion?.tipo !== "camara" && seleccion?.tipo !== "equipo")) return;
     const e = m.etiquetas.find((x) => x.id === seleccion.id);
     if (e) m.enfocar(e.pos, capas.tamanoReal ? 2.5 : 7);
   };
@@ -301,6 +316,13 @@ export default function Maqueta3D({
   const colocarMueble = (p: Punto, tipo: TipoMueble) => {
     const r = agregarMueble(planoRef.current, p, tipo);
     onAplicar(r.plano, { seleccion: { tipo: "mueble", id: r.mueble.id } });
+  };
+
+  const colocarEquipo = (p: Punto, modelo: ModeloEquipo) => {
+    const r = agregarEquipo(planoRef.current, p, modelo, numeroEquipo(modelo.tipo));
+    onAplicar(r.plano, { seleccion: { tipo: "equipo", id: r.equipo.id } });
+    const texto = avisoDeEquipo(r.plano, r.equipo);
+    if (texto) onAviso(texto);
   };
 
   const alPresionar = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -378,6 +400,10 @@ export default function Maqueta3D({
         return;
       case "mueble":
         colocarMueble(p, muebleNuevo);
+        onHerramienta("seleccionar");
+        return;
+      case "equipo":
+        if (equipoNuevo) colocarEquipo(p, equipoNuevo);
         onHerramienta("seleccionar");
         return;
       case "persona": {
@@ -470,6 +496,9 @@ export default function Maqueta3D({
     if (dato.clase === "camara") {
       const m = modeloPorId(dato.id);
       if (m) colocarCamara(p, m);
+    } else if (dato.clase === "equipo") {
+      const m = equipoPorId(dato.id);
+      if (m) colocarEquipo(p, m);
     } else {
       colocarMueble(p, dato.id);
     }
@@ -505,31 +534,6 @@ export default function Maqueta3D({
       {!listo ? <p className={styles.maquetaCarga}>Armando la maqueta…</p> : null}
 
       <div className={styles.maquetaEncima} aria-hidden={verDesde ? true : undefined}>
-        {!verDesde && capas.claves
-          ? claves.map((c) => {
-              const sel = seleccion?.tipo === "camara" && seleccion.id === c.id;
-              return (
-                <button
-                  key={c.id}
-                  ref={(n) => {
-                    if (n) nodos.current.set(`clave-${c.id}`, n);
-                    else nodos.current.delete(`clave-${c.id}`);
-                  }}
-                  type="button"
-                  className={styles.claveEquipo}
-                  aria-pressed={sel}
-                  title={`${c.clave} · ${c.nombre}`}
-                  onClick={() => {
-                    if (sel) enfocarSeleccion();
-                    else onSeleccionar({ tipo: "camara", id: c.id });
-                  }}
-                >
-                  <i />
-                  {c.clave}
-                </button>
-              );
-            })
-          : null}
         {!verDesde
           ? rotulos.map((r) => (
               <span
@@ -543,6 +547,31 @@ export default function Maqueta3D({
                 {r.texto}
               </span>
             ))
+          : null}
+        {!verDesde && capas.claves
+          ? claves.map((c) => {
+              const sel = seleccion?.tipo === c.tipoSel && seleccion.id === c.id;
+              return (
+                <button
+                  key={c.id}
+                  ref={(n) => {
+                    if (n) nodos.current.set(`clave-${c.id}`, n);
+                    else nodos.current.delete(`clave-${c.id}`);
+                  }}
+                  type="button"
+                  className={styles.claveEquipo}
+                  aria-pressed={sel}
+                  title={`${c.clave} · ${c.nombre}`}
+                  onClick={() => {
+                    if (sel) enfocarSeleccion();
+                    else onSeleccionar({ tipo: c.tipoSel, id: c.id });
+                  }}
+                >
+                  <i style={sel ? undefined : { background: c.punto }} />
+                  {c.clave}
+                </button>
+              );
+            })
           : null}
         {guia ? (
           <svg className={styles.maquetaGuia} aria-hidden="true">

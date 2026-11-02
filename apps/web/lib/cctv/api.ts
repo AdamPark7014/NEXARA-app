@@ -5,6 +5,7 @@
  */
 import { buildApiUrl } from "@/lib/api-base";
 import { withTenantHeaders } from "@/lib/tenant";
+import type { FilaCatalogo } from "./catalogo";
 import type { ResumenDiseno } from "./editor";
 import type { Grabacion } from "./infraestructura";
 import type { Plano } from "./plano";
@@ -130,4 +131,25 @@ export function subirCroquis(token: string, id: number, archivo: Blob, nombre = 
   const cuerpo = new FormData();
   cuerpo.append("file", archivo, nombre);
   return pedir(`cctv-disenos/${id}/croquis`, token, { method: "POST", body: cuerpo });
+}
+
+/* ── Catálogo de equipos ── */
+
+export type EquipoParaGuardar = Omit<FilaCatalogo, "id" | "productId" | "verificado"> & { productId?: number | null; verificado?: boolean };
+
+export async function listarCatalogo(token: string): Promise<FilaCatalogo[]> {
+  const r = await pedir<{ equipos: FilaCatalogo[] }>("cctv-disenos/catalogo", token);
+  return r?.equipos ?? [];
+}
+
+export function agregarAlCatalogo(token: string, equipo: EquipoParaGuardar): Promise<FilaCatalogo> {
+  return pedir<FilaCatalogo>("cctv-disenos/catalogo", token, { method: "POST", body: JSON.stringify(equipo) });
+}
+
+export function editarCatalogo(token: string, id: number, equipo: EquipoParaGuardar): Promise<FilaCatalogo> {
+  return pedir<FilaCatalogo>(`cctv-disenos/catalogo/${id}`, token, { method: "PATCH", body: JSON.stringify(equipo) });
+}
+
+export function archivarDelCatalogo(token: string, id: number): Promise<unknown> {
+  return pedir(`cctv-disenos/catalogo/${id}/archivar`, token, { method: "POST" });
 }

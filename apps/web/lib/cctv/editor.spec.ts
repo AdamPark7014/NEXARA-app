@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MODELOS_CAMARA } from "./catalogo";
+import { MODELOS_CAMARA, MODELOS_EQUIPO } from "./catalogo";
 import {
+  agregarEquipo,
+  avisoDeEquipo,
+  moverEnGabinete,
+  siguienteNumeroEquipo,
   agregarAbertura,
   agregarCamara,
   agregarMuro,
@@ -239,5 +243,89 @@ describe("áreas y ambientación", () => {
     const antes = tapasDelPlano(p).length;
     const despues = agregarArea(agregarMueble(p, { x: 10, y: 10 }, "camion").plano, { x: 0, y: 0 }, { x: 100, y: 100 }).plano;
     expect(tapasDelPlano(despues)).toHaveLength(antes);
+  });
+});
+
+describe("Equipos que no son cámara", () => {
+  const K = 0.02;
+  const m = (x: number) => x / K;
+  const modeloDe = (tipo: string) => MODELOS_EQUIPO.find((e) => e.tipo === tipo)!;
+  const base = (): Plano => ({
+    ...planoVacio(),
+    escala: { metrosPorPx: K, calibracion: null },
+    muros: [{ id: "m1", a: { x: 0, y: 0 }, b: { x: m(10), y: 0 }, alturaM: 3, grosorM: 0.2, tipo: "muro" }],
+    aberturas: [{ id: "p1", muroId: "m1", tipo: "puerta", desde: 0.45, hasta: 0.55, baseM: 0, alturaM: 2.1, abierta: true, transparente: false, hojas: 1, bisagra: "inicio", sentido: 1 }],
+  });
+
+  it("lo de rack entra solo al gabinete, de arriba hacia abajo y sin encimarse", () => {
+    const g = agregarEquipo(base(), { x: m(2), y: m(3) }, modeloDe("gabinete"), 1);
+    const a = agregarEquipo(g.plano, { x: m(8), y: m(8) }, modeloDe("nvr"), 1);
+    expect(a.equipo.gabineteId).toBe(g.equipo.id);
+    expect(a.equipo.unidad).toBe(23);
+    expect(a.equipo.pos).toEqual(g.equipo.pos);
+    const b = agregarEquipo(a.plano, { x: 0, y: 0 }, modeloDe("servidor"), 1);
+    expect(b.equipo.unidad).toBe(21);
+  });
+
+  it("lo que quedó suelto entra cuando llega el gabinete", () => {
+    const a = agregarEquipo(base(), { x: m(8), y: m(8) }, modeloDe("nvr"), 1);
+    expect(a.equipo.gabineteId ?? null).toBeNull();
+    const g = agregarEquipo(a.plano, { x: m(2), y: m(3) }, modeloDe("gabinete"), 1);
+    expect(g.plano.equipos!.find((e) => e.id === a.equipo.id)?.gabineteId).toBe(g.equipo.id);
+  });
+
+  it("si ya no cabe, queda suelto y lo dice", () => {
+    const g = agregarEquipo(base(), { x: m(2), y: m(3) }, { ...modeloDe("gabinete"), datos: { unidades: 2 } }, 1);
+    const a = agregarEquipo(g.plano, { x: m(8), y: m(8) }, modeloDe("servidor"), 1);
+    expect(a.equipo.gabineteId ?? null).toBeNull();
+    expect(avisoDeEquipo(a.plano, a.equipo)).toContain("Ya no cabe");
+  });
+
+  it("al mover el gabinete viaja lo de adentro; solo no se mueve", () => {
+    const g = agregarEquipo(base(), { x: m(2), y: m(3) }, modeloDe("gabinete"), 1);
+    const a = agregarEquipo(g.plano, { x: 0, y: 0 }, modeloDe("nvr"), 1);
+    const movido = mover(a.plano, { tipo: "equipo", id: g.equipo.id }, { x: 50, y: 0 });
+    expect(movido.equipos!.find((e) => e.id === a.equipo.id)?.pos.x).toBe(g.equipo.pos.x + 50);
+    const solo = mover(movido, { tipo: "equipo", id: a.equipo.id }, { x: 99, y: 0 });
+    expect(solo.equipos!.find((e) => e.id === a.equipo.id)?.pos.x).toBe(g.equipo.pos.x + 50);
+  });
+
+  it("al quitar el gabinete, lo de adentro queda suelto, no se pierde", () => {
+    const g = agregarEquipo(base(), { x: m(2), y: m(3) }, modeloDe("gabinete"), 1);
+    const a = agregarEquipo(g.plano, { x: 0, y: 0 }, modeloDe("nvr"), 1);
+    const sin = borrar(a.plano, { tipo: "equipo", id: g.equipo.id });
+    expect(sin.equipos).toHaveLength(1);
+    expect(sin.equipos![0].gabineteId).toBeNull();
+    expect(sin.equipos![0].unidad).toBeNull();
+  });
+
+  it("no deja encimar unidades dentro del gabinete", () => {
+    const g = agregarEquipo(base(), { x: m(2), y: m(3) }, modeloDe("gabinete"), 1);
+    const a = agregarEquipo(g.plano, { x: 0, y: 0 }, modeloDe("nvr"), 1);
+    const b = agregarEquipo(a.plano, { x: 0, y: 0 }, modeloDe("switch"), 1);
+    expect(moverEnGabinete(b.plano, b.equipo.id, a.equipo.unidad!)).toBe(b.plano);
+    expect(moverEnGabinete(b.plano, b.equipo.id, 5).equipos!.find((e) => e.id === b.equipo.id)?.unidad).toBe(5);
+    expect(moverEnGabinete(b.plano, b.equipo.id, 99)).toBe(b.plano);
+  });
+
+  it("la terminal se pega al muro, mira al que llega y se liga a la puerta cercana", () => {
+    const r = agregarEquipo(base(), { x: m(5.5), y: m(0.5) }, modeloDe("terminal"), 1);
+    expect(r.equipo.pos.y).toBeCloseTo(m(0.1));
+    expect(r.equipo.rumboDeg).toBe(180);
+    expect(r.equipo.alturaM).toBe(1.15);
+    expect(r.equipo.puertaId).toBe("p1");
+    expect(avisoDeEquipo(r.plano, r.equipo)).toContain("puerta");
+  });
+
+  it("lejos de una puerta no se liga a nada, y al borrar la puerta se suelta", () => {
+    expect(agregarEquipo(base(), { x: m(9.5), y: m(0.5) }, modeloDe("terminal"), 1).equipo.puertaId).toBeNull();
+    const r = agregarEquipo(base(), { x: m(5.5), y: m(0.5) }, modeloDe("terminal"), 1);
+    expect(borrar(r.plano, { tipo: "abertura", id: "p1" }).equipos![0].puertaId).toBeNull();
+  });
+
+  it("cada prefijo lleva su cuenta entre niveles", () => {
+    const a = agregarEquipo(base(), { x: 0, y: 0 }, modeloDe("terminal"), 1).plano;
+    expect(siguienteNumeroEquipo(a, "terminal")).toBe(2);
+    expect(siguienteNumeroEquipo(a, "gabinete")).toBe(1);
   });
 });

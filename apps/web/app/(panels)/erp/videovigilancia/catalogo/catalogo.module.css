@@ -1,0 +1,190 @@
+/* Catálogo de equipos del Diseñador. Solo tokens --ui-*; las fotos van sobre gris claro en los dos temas. */
+
+.pagina {
+  min-width: 0;
+}
+
+.sinAcceso {
+  padding: var(--ui-s6) var(--ui-s5);
+}
+
+.cuerpo {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  gap: var(--ui-s5);
+  align-items: start;
+}
+
+.familias {
+  position: sticky;
+  top: var(--ui-s3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.familias button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 36px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: var(--ui-fs-label);
+  text-align: left;
+  cursor: pointer;
+}
+
+.familias button:hover {
+  background: var(--ui-hover);
+}
+
+.familias button[aria-pressed="true"] {
+  background: var(--ui-fg);
+  color: var(--ui-surface);
+  font-weight: 600;
+}
+
+.familias span {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.contenido {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+}
+
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--ui-s3);
+}
+
+.tarjeta,
+.agregar {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 10px 10px 13px;
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: 13px;
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tarjeta:hover,
+.agregar:hover {
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-elev-1);
+}
+
+.tarjeta:focus-visible,
+.agregar:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 2px;
+}
+
+.foto {
+  position: relative;
+  width: 100%;
+  height: 168px;
+  margin-bottom: 5px;
+  border-radius: 9px;
+  background: #f1f3f5;
+  overflow: hidden;
+}
+
+.foto img {
+  position: absolute;
+  inset: 10px;
+  width: calc(100% - 20px);
+  height: calc(100% - 20px);
+  object-fit: contain;
+}
+
+.tipo {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--ui-neutral-bg);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ui-fg-2);
+}
+
+.nombre {
+  font-size: 13.5px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.specs {
+  min-height: 34px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ui-fg-3);
+}
+
+.estadoBien,
+.estadoFalta {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.estadoBien {
+  color: var(--ui-success-text);
+}
+
+.estadoFalta {
+  color: var(--ui-warning-text);
+}
+
+.agregar {
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  border-style: dashed;
+  border-color: var(--ui-border-strong);
+  background: transparent;
+  text-align: center;
+}
+
+.agregar span {
+  max-width: 200px;
+  font-size: 12px;
+  color: var(--ui-fg-3);
+}
+
+.vacio {
+  grid-column: 1 / -1;
+  color: var(--ui-fg-3);
+}
+
+@media (max-width: 760px) {
+  .cuerpo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .familias {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .familias button {
+    flex: none;
+    gap: 8px;
+  }
+}

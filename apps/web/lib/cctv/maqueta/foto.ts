@@ -28,12 +28,14 @@ export async function fotoDeMaqueta(niveles: readonly NivelParaFoto[], ancho = 1
     motor.medir(ancho, alto);
     motor.actualizar({
       plano: arriba.plano,
+      nivelId: arriba.nivel.id,
+      conexiones: [],
       coberturas: arriba.coberturas,
       elevacionM: arriba.nivel.elevacionM,
       debajo: niveles.slice(0, -1),
       seleccion: null,
       verDesde: null,
-      capas: { cobertura: true, personas: true, noche: false, tamanoReal: false, translucidos: false, croquis: false },
+      capas: { cobertura: true, personas: true, noche: false, tamanoReal: false, translucidos: false, croquis: false, cableado: false },
     });
     motor.vistaGeneral(false, 1.01);
     const base = motor.captura(ancho, alto);
@@ -56,7 +58,7 @@ export async function fotoDeMaqueta(niveles: readonly NivelParaFoto[], ancho = 1
       c.beginPath();
       c.roundRect(x, y, w, 26, 13);
       c.fill();
-      c.fillStyle = "#15b89a";
+      c.fillStyle = e.punto;
       c.beginPath();
       c.arc(x + 12, y + 13, 4.5, 0, Math.PI * 2);
       c.fill();

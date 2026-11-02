@@ -2,11 +2,10 @@
  * Datos del plano técnico: ejes con letras y números, escala normalizada, cédula de equipos y
  * revisión del sistema. Sale todo del diseño real; lo que no se sabe se deja sin decir.
  */
-import { modeloPorId, type TipoCamara } from "./catalogo";
-import type { ResumenDiseno } from "./editor";
-import { WATTS_POR_TIPO, canalesNvr, discosNecesarios, presupuestoPoe, type Grabacion } from "./infraestructura";
+import { ETIQUETA_TIPO_EQUIPO, PREFIJO_TIPO, modeloPorId, type TipoCamara } from "./catalogo";
 import { listaNiveles } from "./niveles";
-import { aMetros, problemasDelPlano, type CamaraPlano, type Plano } from "./plano";
+import { aMetros, type Plano } from "./plano";
+import { wattsCamara } from "./sistema";
 
 export type Eje = { nombre: string; m: number };
 
@@ -84,18 +83,6 @@ export function pasoBarraEscala(denominador: number): number {
   return [0.5, 1, 2, 5, 10, 20, 50, 100].find((m) => m >= metros) ?? 200;
 }
 
-function tipoPoe(t: TipoCamara | undefined): keyof typeof WATTS_POR_TIPO {
-  if (t === "ptz") return "ptz";
-  if (t === "panoramica" || t === "ojo-de-pez") return "panoramica";
-  if (t === "bala") return "bala";
-  return "domo";
-}
-
-function wattsDe(c: CamaraPlano): number {
-  const m = modeloPorId(c.productoId);
-  return m?.wattsPoe ?? WATTS_POR_TIPO[c.esPtz ? "ptz" : tipoPoe(m?.tipo)];
-}
-
 export type FilaCedula = { clave: string; tipo: string; modelo: string; cantidad: number; watts: number };
 
 const NOMBRE_TIPO: Readonly<Record<TipoCamara, string>> = {
@@ -116,7 +103,16 @@ export function cedulaDeEquipos(raiz: Plano): { filas: FilaCedula[]; total: numb
       const clave = c.productoId || c.modelo;
       const fila = porModelo.get(clave) ?? { clave: "CAM", tipo: m ? NOMBRE_TIPO[m.tipo] : c.esPtz ? "PTZ" : "Cámara", modelo: m?.modelo ?? c.modelo, cantidad: 0, watts: 0 };
       fila.cantidad += 1;
-      fila.watts += wattsDe(c);
+      fila.watts += wattsCamara(c);
+      porModelo.set(clave, fila);
+    }
+  }
+  for (const { plano } of listaNiveles(raiz)) {
+    for (const e of plano.equipos ?? []) {
+      const clave = `${e.tipo}|${e.productoId || e.modelo}`;
+      const fila = porModelo.get(clave) ?? { clave: PREFIJO_TIPO[e.tipo], tipo: ETIQUETA_TIPO_EQUIPO[e.tipo], modelo: e.modelo.replace(/^HIKVISION\s+/i, ""), cantidad: 0, watts: 0 };
+      fila.cantidad += 1;
+      fila.watts += e.datos.poeW ?? 0;
       porModelo.set(clave, fila);
     }
   }
@@ -124,29 +120,4 @@ export function cedulaDeEquipos(raiz: Plano): { filas: FilaCedula[]; total: numb
   return { filas, total: filas.reduce((s, f) => s + f.cantidad, 0), watts: filas.reduce((s, f) => s + f.watts, 0) };
 }
 
-export type RenglonRevision = { ok: boolean; titulo: string; detalle: string };
-
-/** Revisión del sistema con lo que hoy se puede calcular del diseño. */
-export function revisionDelSistema(raiz: Plano, resumen: ResumenDiseno | null, grabacion: Grabacion): RenglonRevision[] {
-  const niveles = listaNiveles(raiz);
-  const camaras = niveles.flatMap((n) => n.plano.camaras);
-  const salida: RenglonRevision[] = [];
-  const sinEscala = niveles.filter((n) => !n.plano.escala.calibracion && n.plano.muros.length).map((n) => n.nivel.nombre);
-  salida.push(
-    sinEscala.length
-      ? { ok: false, titulo: "Escala", detalle: `Sin calibrar en ${sinEscala.join(", ")}: las medidas son aproximadas` }
-      : { ok: true, titulo: "Escala", detalle: "Calibrada con una cota del sitio" },
-  );
-  const problemas = niveles.flatMap((n) => problemasDelPlano(n.plano));
-  if (problemas.length) salida.push({ ok: false, titulo: "Plano", detalle: `${problemas.length} ${problemas.length === 1 ? "detalle" : "detalles"} por revisar` });
-  if (!camaras.length) return salida;
-  const watts = camaras.map(wattsDe);
-  salida.push({ ok: true, titulo: "Consumo PoE", detalle: `${watts.reduce((s, w) => s + w, 0).toFixed(1)} W; switch de al menos ${Math.ceil(presupuestoPoe(watts))} W con holgura` });
-  if (resumen) {
-    salida.push({ ok: true, titulo: "Ancho de banda", detalle: `${Math.round(resumen.mbps)} Mbps de entrada al grabador` });
-    const discos = discosNecesarios(resumen.tb, 8);
-    salida.push({ ok: true, titulo: "Grabación", detalle: `${grabacion.retencionDias} días ocupan ${resumen.tb.toFixed(1)} TB; ${discos} ${discos === 1 ? "disco" : "discos"} de 8 TB` });
-  }
-  salida.push({ ok: true, titulo: "Canales del grabador", detalle: `${camaras.length} ${camaras.length === 1 ? "cámara" : "cámaras"}: grabador de ${canalesNvr(camaras.length)} canales` });
-  return salida;
-}
+export { revisionDelSistema, type RenglonRevision } from "./sistema";

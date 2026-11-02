@@ -4,7 +4,8 @@
  * mover, borrar, calibrar y el resumen que se guarda con el diseño. Todas son puras: reciben un
  * plano y devuelven otro, así el deshacer es una pila de planos.
  */
-import { MODELO_GENERICO, etiquetaModelo, type ModeloCamara } from "./catalogo";
+import { claveEquipo } from "./medidas";
+import { MODELO_GENERICO, PREFIJO_TIPO, TIPOS_DE_RACK, etiquetaModelo, type ModeloCamara, type ModeloEquipo, type TipoEquipo } from "./catalogo";
 import { almacenamientoTB, anchoBandaMbps, type Grabacion, GRABACION_POR_OMISION } from "./infraestructura";
 import { RESOLUCIONES, alcancesDori, hfovDeg, inclinacionHacia } from "./optica";
 import {
@@ -16,6 +17,7 @@ import {
   type Abertura,
   type Area,
   type CamaraPlano,
+  type EquipoPlano,
   type MaterialPiso,
   type Mueble,
   type Muro,
@@ -28,7 +30,7 @@ import { camaraEnMetros, repartoDeArea } from "./visibilidad";
 import { nuevoId } from "./ids";
 import { listaNiveles } from "./niveles";
 
-export type TipoElemento = "muro" | "abertura" | "obstaculo" | "etiqueta" | "cota" | "camara" | "persona" | "area" | "mueble";
+export type TipoElemento = "muro" | "abertura" | "obstaculo" | "etiqueta" | "cota" | "camara" | "persona" | "area" | "mueble" | "equipo";
 export type Seleccion = { tipo: TipoElemento; id: string };
 
 export { nuevoId };
@@ -178,6 +180,197 @@ export function agregarMueble(plano: Plano, pos: Punto, tipo: TipoMueble, rumboD
   return { plano: { ...plano, muebles: [...(plano.muebles ?? []), mueble] }, mueble };
 }
 
+/* ── Equipos que no son cámara ─────────────────────────────────────────────────── */
+
+/** Altura típica de instalación de cada tipo. */
+const ALTURA_EQUIPO: Readonly<Record<TipoEquipo, number>> = {
+  nvr: 0,
+  switch: 0,
+  servidor: 0,
+  ups: 0,
+  gabinete: 0,
+  terminal: 1.15,
+  barrera: 0,
+  sirena: 2.2,
+  sismica: 1.9,
+  panel: 1.5,
+  generico: 1.5,
+};
+
+const DE_MURO: ReadonlySet<TipoEquipo> = new Set<TipoEquipo>(["terminal", "sirena", "sismica", "panel", "generico"]);
+
+/** Siguiente número libre para ese prefijo en todo el edificio: los AC y los GAB llevan cuenta aparte. */
+export function siguienteNumeroEquipo(raiz: Plano, tipo: TipoEquipo): number {
+  const prefijo = PREFIJO_TIPO[tipo];
+  let mayor = 0;
+  for (const { plano } of listaNiveles(raiz)) {
+    for (const e of plano.equipos ?? []) if (PREFIJO_TIPO[e.tipo] === prefijo) mayor = Math.max(mayor, e.numero);
+  }
+  return mayor + 1;
+}
+
+export function equiposDelGabinete(plano: Plano, gabineteId: string): EquipoPlano[] {
+  return (plano.equipos ?? []).filter((e) => e.gabineteId === gabineteId).sort((a, b) => (b.unidad ?? 0) - (a.unidad ?? 0));
+}
+
+const unidadesDe = (e: Pick<EquipoPlano, "datos">) => Math.max(1, Math.round(e.datos.unidades ?? 1));
+
+/** La unidad libre más alta donde cabe un equipo de ese alto. Null si ya no cabe. */
+export function unidadLibre(plano: Plano, gabinete: EquipoPlano, alto: number, excepto?: string): number | null {
+  const total = unidadesDe(gabinete);
+  const ocupadas = new Set<number>();
+  for (const e of equiposDelGabinete(plano, gabinete.id)) {
+    if (e.id === excepto || e.unidad == null) continue;
+    for (let u = 0; u < unidadesDe(e); u++) ocupadas.add(e.unidad + u);
+  }
+  // Se deja libre la de arriba de todo, para el organizador de cable.
+  for (let u = total - alto; u >= 1; u--) {
+    let cabe = true;
+    for (let i = 0; i < alto; i++) if (ocupadas.has(u + i)) cabe = false;
+    if (cabe) return u;
+  }
+  return null;
+}
+
+/** El gabinete más cercano de este nivel. */
+export function gabineteCercano(plano: Plano, pos: Punto): EquipoPlano | null {
+  let mejor: EquipoPlano | null = null;
+  let d = Infinity;
+  for (const e of plano.equipos ?? []) {
+    if (e.tipo !== "gabinete") continue;
+    const x = distancia(e.pos, pos);
+    if (x < d) {
+      d = x;
+      mejor = e;
+    }
+  }
+  return mejor;
+}
+
+/** La puerta más cercana, a menos de `maxM` metros. Con ella se liga una terminal de acceso. */
+export function puertaCercana(plano: Plano, pos: Punto, maxM = 3): string | null {
+  let mejor: string | null = null;
+  let d = maxM / plano.escala.metrosPorPx;
+  for (const a of plano.aberturas) {
+    if (a.tipo !== "puerta") continue;
+    const m = plano.muros.find((x) => x.id === a.muroId);
+    if (!m) continue;
+    const t = (a.desde + a.hasta) / 2;
+    const x = distancia(pos, { x: m.a.x + (m.b.x - m.a.x) * t, y: m.a.y + (m.b.y - m.a.y) * t });
+    if (x < d) {
+      d = x;
+      mejor = a.id;
+    }
+  }
+  return mejor;
+}
+
+/**
+ * Coloca un equipo con el comportamiento de su tipo:
+ * - los de rack entran al gabinete que haya, en la unidad libre más alta;
+ * - los de muro se pegan al muro cercano y miran hacia donde se tocó;
+ * - la terminal se liga a la puerta más cercana.
+ */
+export function agregarEquipo(plano: Plano, pos: Punto, modelo: ModeloEquipo, numero: number): { plano: Plano; equipo: EquipoPlano } {
+  const base: EquipoPlano = {
+    id: nuevoId("eq"),
+    numero,
+    tipo: modelo.tipo,
+    nombre: modelo.modelo,
+    productoId: modelo.id,
+    modelo: etiquetaModelo(modelo),
+    pos,
+    rumboDeg: 180,
+    alturaM: ALTURA_EQUIPO[modelo.tipo] ?? 1.5,
+    datos: { ...modelo.datos },
+  };
+  let equipo = base;
+  if (TIPOS_DE_RACK.has(modelo.tipo)) {
+    const g = gabineteCercano(plano, pos);
+    const u = g ? unidadLibre(plano, g, unidadesDe(base)) : null;
+    if (g && u != null) equipo = { ...base, gabineteId: g.id, unidad: u, pos: { ...g.pos }, rumboDeg: g.rumboDeg, alturaM: 0 };
+  } else if (DE_MURO.has(modelo.tipo)) {
+    const cerca = muroMasCercano(plano, pos, 1 / plano.escala.metrosPorPx);
+    if (cerca && cerca.muro.tipo === "muro") {
+      const m = cerca.muro;
+      const p = { x: m.a.x + (m.b.x - m.a.x) * cerca.t, y: m.a.y + (m.b.y - m.a.y) * cerca.t };
+      const largo = distancia(m.a, m.b);
+      let n = { x: -(m.b.y - m.a.y) / largo, y: (m.b.x - m.a.x) / largo };
+      if ((pos.x - p.x) * n.x + (pos.y - p.y) * n.y < 0) n = { x: -n.x, y: -n.y };
+      const cara = pxDe(plano, m.grosorM / 2);
+      equipo = { ...base, pos: { x: p.x + n.x * cara, y: p.y + n.y * cara }, rumboDeg: Math.round(rumboEntre({ x: 0, y: 0 }, n)) };
+    }
+    if (modelo.tipo === "terminal") equipo = { ...equipo, puertaId: puertaCercana(plano, equipo.pos) };
+  }
+  const conEquipo = { ...plano, equipos: [...(plano.equipos ?? []), equipo] };
+  // Lo que quedó suelto esperando gabinete, entra al que se acaba de poner.
+  return { plano: modelo.tipo === "gabinete" ? montarSueltos(conEquipo, equipo) : conEquipo, equipo };
+}
+
+/** Qué pasó al colocar un equipo, cuando no se ve a simple vista. */
+export function avisoDeEquipo(plano: Plano, equipo: EquipoPlano): string | null {
+  if (TIPOS_DE_RACK.has(equipo.tipo)) {
+    if (equipo.gabineteId) {
+      const g = (plano.equipos ?? []).find((e) => e.id === equipo.gabineteId);
+      return `${equipo.nombre} entró a ${g ? claveEquipo(g) : "el gabinete"}, unidad ${equipo.unidad}.`;
+    }
+    return gabineteCercano(plano, equipo.pos) ? "Ya no cabe en el gabinete: quedó suelto a un lado." : "Cuando pongas un gabinete, este equipo entra solo.";
+  }
+  if (equipo.tipo === "gabinete") {
+    const dentro = equiposDelGabinete(plano, equipo.id).length;
+    return dentro ? `${dentro} ${dentro === 1 ? "equipo entró" : "equipos entraron"} a ${claveEquipo(equipo)}.` : null;
+  }
+  if (equipo.tipo === "terminal") return equipo.puertaId ? "Quedó ligada a la puerta más cercana." : "No hay puerta cerca: elige la que controla en el panel.";
+  return null;
+}
+
+/** Sube o baja un equipo dentro de su gabinete, si no choca con otro. */
+export function moverEnGabinete(plano: Plano, id: string, unidad: number): Plano {
+  const e = (plano.equipos ?? []).find((x) => x.id === id);
+  const g = e?.gabineteId ? (plano.equipos ?? []).find((x) => x.id === e.gabineteId) : null;
+  if (!e || !g) return plano;
+  const alto = unidadesDe(e);
+  if (unidad < 1 || unidad + alto - 1 > unidadesDe(g)) return plano;
+  for (const o of equiposDelGabinete(plano, g.id)) {
+    if (o.id === id || o.unidad == null) continue;
+    if (unidad < o.unidad + unidadesDe(o) && o.unidad < unidad + alto) return plano;
+  }
+  return actualizarEquipo(plano, id, { unidad });
+}
+
+/** Mete al gabinete un equipo que estaba suelto. */
+export function montarEnGabinete(plano: Plano, id: string, gabineteId: string): { plano: Plano; error?: string } {
+  const e = (plano.equipos ?? []).find((x) => x.id === id);
+  const g = (plano.equipos ?? []).find((x) => x.id === gabineteId);
+  if (!e || !g) return { plano };
+  const u = unidadLibre(plano, g, unidadesDe(e), id);
+  if (u == null) return { plano, error: `Ya no cabe en ${claveEquipo(g)}.` };
+  return { plano: actualizarEquipo(plano, id, { gabineteId, unidad: u, pos: { ...g.pos }, rumboDeg: g.rumboDeg, alturaM: 0 }) };
+}
+
+export function actualizarEquipo(plano: Plano, id: string, cambios: Partial<EquipoPlano>): Plano {
+  return { ...plano, equipos: (plano.equipos ?? []).map((e) => (e.id === id ? { ...e, ...cambios } : e)) };
+}
+
+/** Saca un equipo del gabinete: queda suelto junto a él. */
+export function sacarDelGabinete(plano: Plano, id: string): Plano {
+  const e = (plano.equipos ?? []).find((x) => x.id === id);
+  if (!e?.gabineteId) return plano;
+  const separacion = pxDe(plano, 1);
+  return actualizarEquipo(plano, id, { gabineteId: null, unidad: null, pos: { x: e.pos.x + separacion, y: e.pos.y } });
+}
+
+/** Monta en el gabinete lo que quedó suelto. Lo que ya no cabe sigue suelto. */
+export function montarSueltos(plano: Plano, gabinete: EquipoPlano): Plano {
+  let actual = plano;
+  for (const e of plano.equipos ?? []) {
+    if (!TIPOS_DE_RACK.has(e.tipo) || e.gabineteId) continue;
+    const u = unidadLibre(actual, gabinete, unidadesDe(e));
+    if (u != null) actual = actualizarEquipo(actual, e.id, { gabineteId: gabinete.id, unidad: u, pos: { ...gabinete.pos }, rumboDeg: gabinete.rumboDeg, alturaM: 0 });
+  }
+  return actual;
+}
+
 export function agregarEtiqueta(plano: Plano, pos: Punto, texto: string): Plano {
   const limpio = texto.trim();
   if (!limpio) return plano;
@@ -324,6 +517,15 @@ export function mover(plano: Plano, sel: Seleccion, delta: Punto): Plano {
       return { ...plano, areas: (plano.areas ?? []).map((a) => (a.id === sel.id ? { ...a, puntos: a.puntos.map((p) => sumar(p, delta)) } : a)) };
     case "mueble":
       return { ...plano, muebles: (plano.muebles ?? []).map((m) => (m.id === sel.id ? { ...m, pos: sumar(m.pos, delta) } : m)) };
+    case "equipo":
+      // Lo que va adentro de un gabinete viaja con él; solo no se mueve.
+      return {
+        ...plano,
+        equipos: (plano.equipos ?? []).map((e) => {
+          if (e.id === sel.id) return e.gabineteId ? e : { ...e, pos: sumar(e.pos, delta) };
+          return e.gabineteId === sel.id ? { ...e, pos: sumar(e.pos, delta) } : e;
+        }),
+      };
     case "abertura":
       return plano;
   }
@@ -352,7 +554,12 @@ export function borrar(plano: Plano, sel: Seleccion): Plano {
         aberturas: plano.aberturas.filter((a) => a.muroId !== sel.id),
       };
     case "abertura":
-      return { ...plano, aberturas: plano.aberturas.filter((a) => a.id !== sel.id) };
+      return {
+        ...plano,
+        aberturas: plano.aberturas.filter((a) => a.id !== sel.id),
+        // Una terminal no puede quedar ligada a una puerta que ya no existe.
+        ...(plano.equipos?.some((e) => e.puertaId === sel.id) ? { equipos: plano.equipos.map((e) => (e.puertaId === sel.id ? { ...e, puertaId: null } : e)) } : {}),
+      };
     case "obstaculo":
       return { ...plano, obstaculos: plano.obstaculos.filter((o) => o.id !== sel.id) };
     case "etiqueta":
@@ -367,6 +574,11 @@ export function borrar(plano: Plano, sel: Seleccion): Plano {
       return { ...plano, areas: (plano.areas ?? []).filter((a) => a.id !== sel.id) };
     case "mueble":
       return { ...plano, muebles: (plano.muebles ?? []).filter((m) => m.id !== sel.id) };
+    case "equipo": {
+      // Al quitar un gabinete, lo de adentro queda suelto en su lugar.
+      const quedan = (plano.equipos ?? []).filter((e) => e.id !== sel.id).map((e) => (e.gabineteId === sel.id ? { ...e, gabineteId: null, unidad: null } : e));
+      return { ...plano, equipos: quedan };
+    }
   }
 }
 
@@ -383,6 +595,7 @@ export function existe(plano: Plano, sel: Seleccion | null): boolean {
     persona: plano.personas,
     area: plano.areas ?? [],
     mueble: plano.muebles ?? [],
+    equipo: plano.equipos ?? [],
   };
   return listas[sel.tipo].some((x) => x.id === sel.id) || (plano.niveles ?? []).some((n) => existe(n.plano, sel));
 }

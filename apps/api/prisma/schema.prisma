@@ -8164,6 +8164,38 @@ model CctvDiseno {
   @@map("cctv_disenos")
 }
 
+/// Equipo que una empresa agrega al catálogo del Diseñador (`apps/web/lib/cctv/catalogo.ts` trae la
+/// lista base). Es solo su ficha técnica: el inventario sigue siendo uno, y si se vende, `productId`
+/// apunta a `Product` y las existencias salen de `stock_levels`.
+model CctvEquipo {
+  id              Int       @id @default(autoincrement())
+  companyId       Int
+  /// camaras | grabacion | acceso | alarmas | red | servidores | infraestructura | otros
+  familia         String    @db.VarChar(24)
+  /// domo, bala, nvr, gabinete, terminal… Decide su modelo 3D y su comportamiento.
+  tipo            String    @db.VarChar(24)
+  marca           String    @default("") @db.VarChar(80)
+  modelo          String    @db.VarChar(120)
+  descripcion     String    @default("") @db.VarChar(300)
+  /// Canales, puertos, PoE, alcance… En cámaras, también su óptica.
+  datos           Json      @default("{}")
+  /// Medidas en milímetros, para armar el modelo 3D.
+  medidas         Json?
+  caracteristicas Json?
+  /// manual | ficha
+  fuente          String    @default("manual") @db.VarChar(12)
+  verificado      Boolean   @default(false)
+  productId       Int?
+  creadoPorId     Int
+  /// Archivado (no se borra): los diseños que ya lo usan guardan su copia.
+  archivadoAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([companyId, familia])
+  @@map("cctv_equipos")
+}
+
 /// Cuánto tarda una persona en un proceso, medido en su pantalla (Programa Velocidad Core, 01-11-2026).
 /// Es la línea base de «asignar en 30 segundos» y de cada ola. Solo se agrega; nadie la edita.
 /// Sin relaciones a propósito, como `CctvDiseno`: el aislamiento por empresa lo pone el middleware.

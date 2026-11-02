@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { MODELOS_CAMARA } from "@/lib/cctv/catalogo";
-import { agregarCamara, agregarMuro, agregarPersona, resumenDelPlano } from "@/lib/cctv/editor";
+import { MODELOS_CAMARA, MODELOS_EQUIPO } from "@/lib/cctv/catalogo";
+import { agregarCamara, agregarEquipo, agregarMuro, agregarPersona, resumenDelPlano } from "@/lib/cctv/editor";
 import { planoVacio, type Plano } from "@/lib/cctv/plano";
 import type { Diseno } from "@/lib/cctv/api";
 import EditorCctv from "./EditorCctv";
@@ -37,6 +37,7 @@ vi.mock("@/lib/cctv/api", async (original) => ({
   ...(await original<typeof import("@/lib/cctv/api")>()),
   guardarDiseno: vi.fn(),
   subirCroquis: vi.fn(),
+  listarCatalogo: vi.fn().mockResolvedValue([]),
 }));
 
 beforeAll(() => {
@@ -218,6 +219,25 @@ describe("editor con WebGL", () => {
     expect(screen.getByTestId("maqueta").getAttribute("data-ver")).toBeTruthy();
     // Mientras se ve desde la cámara, no se dibuja.
     expect(screen.queryByRole("toolbar", { name: "Herramientas del plano" })).toBeNull();
+  });
+
+  it("lo de rack entra directo al gabinete y se ve en sus Equipos", async () => {
+    const gabinete = MODELOS_EQUIPO.find((m) => m.tipo === "gabinete")!;
+    render(<EditorCctv diseno={diseno(agregarEquipo(bodega(), { x: 100, y: 100 }, gabinete, 1).plano)} token="t" onRecargar={() => {}} />);
+    await screen.findByTestId("maqueta");
+    fireEvent.click(screen.getByRole("button", { name: "Rack y red" }));
+    fireEvent.click(screen.getByRole("button", { name: /DS-7608NXI-K2/ }));
+    expect(await screen.findByRole("status")).toHaveTextContent("entró a GAB-01, unidad 23");
+    expect(screen.getByRole("tab", { name: "Equipos · 2" })).toBeInTheDocument();
+  });
+
+  it("el diagrama sale de lo colocado y dice lo que falta", async () => {
+    render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
+    await screen.findByTestId("maqueta");
+    fireEvent.click(screen.getByRole("button", { name: "Diagrama" }));
+    expect(screen.getByRole("article", { name: "Diagrama del sistema" })).toBeInTheDocument();
+    expect(screen.getByText("1 × Domo")).toBeInTheDocument();
+    expect(screen.getByText("GABINETE, POR COLOCAR")).toBeInTheDocument();
   });
 
   it("si se pierde WebGL sigue con la vista sencilla y lo avisa", async () => {

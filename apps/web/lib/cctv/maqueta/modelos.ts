@@ -50,10 +50,17 @@ export function materiales(color: NonNullable<ParamsModelo["color"]> = "blanco",
     ledIr: new THREE.MeshPhysicalMaterial({ color: 0x3a1a1e, roughness: 0.12, clearcoat: 1, emissive: 0x2a0606, emissiveIntensity: 0.6 }),
     ledBlanco: new THREE.MeshPhysicalMaterial({ color: 0xfff7dc, roughness: 0.18, clearcoat: 1, emissive: 0xfff0c0, emissiveIntensity: 0.55 }),
     reflector: new THREE.MeshStandardMaterial({ color: 0xe6e8ea, metalness: 0.95, roughness: 0.16 }),
+    metal: new THREE.MeshStandardMaterial({ color: 0xb6bbc1, metalness: 1, roughness: 0.32 }),
+    ranura: new THREE.MeshStandardMaterial({ color: 0x4a4f57, metalness: 0.6, roughness: 0.4 }),
+    pantalla: new THREE.MeshStandardMaterial({ color: 0x0a1520, emissive: 0x0f3a3f, emissiveIntensity: 0.65, roughness: 0.14 }),
+    verde: new THREE.MeshStandardMaterial({ color: 0x35d48a, emissive: 0x35d48a, emissiveIntensity: 1.4 }),
+    ambar: new THREE.MeshStandardMaterial({ color: 0xf2b23d, emissive: 0xf2b23d, emissiveIntensity: 1.1 }),
+    azul: new THREE.MeshPhysicalMaterial({ color: 0x1b4fd6, transparent: true, opacity: 0.82, roughness: 0.22, clearcoat: 1, emissive: 0x0c2a90, emissiveIntensity: 0.35 }),
+    rojo: new THREE.MeshPhysicalMaterial({ color: 0xc8212c, transparent: true, opacity: 0.86, roughness: 0.24, clearcoat: 1, emissive: 0x7a0d14, emissiveIntensity: 0.4 }),
   };
 }
 
-type Mats = ReturnType<typeof materiales>;
+export type Mats = ReturnType<typeof materiales>;
 type P2 = readonly [number, number];
 
 /** Arco de puntos para perfiles de revolución. */
@@ -66,7 +73,7 @@ function arco(cx: number, cy: number, r: number, a0: number, a1: number, n = 8):
   return out;
 }
 
-function malla(geo: THREE.BufferGeometry, material: THREE.Material) {
+export function malla(geo: THREE.BufferGeometry, material: THREE.Material) {
   const m = new THREE.Mesh(geo, material);
   m.castShadow = true;
   m.receiveShadow = true;
@@ -84,11 +91,11 @@ function torno(puntos: readonly P2[], material: THREE.Material, segmentos = 72) 
   return malla(g, material);
 }
 
-function cilindro(r: number, h: number, material: THREE.Material, seg = 48) {
+export function cilindro(r: number, h: number, material: THREE.Material, seg = 48) {
   return malla(new THREE.CylinderGeometry(r, r, h, seg), material);
 }
 
-function caja(w: number, h: number, d: number, material: THREE.Material, radio = 1.2) {
+export function caja(w: number, h: number, d: number, material: THREE.Material, radio = 1.2) {
   return malla(new RoundedBoxGeometry(w, h, d, 4, Math.min(radio, w / 2.01, h / 2.01, d / 2.01)), material);
 }
 
@@ -116,7 +123,7 @@ function letreroCurvo(texto: string, radio: number, altoMm: number, y: number, a
   return m;
 }
 
-function lenteConAro(rLente: number, largo: number, mats: Mats) {
+export function lenteConAro(rLente: number, largo: number, mats: Mats) {
   const g = new THREE.Group();
   const aro = cilindro(rLente * 1.32, largo, mats.aro);
   aro.rotation.x = Math.PI / 2;

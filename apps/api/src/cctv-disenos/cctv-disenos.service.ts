@@ -8,6 +8,7 @@ import { requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { MENSAJE_SIN_ACCESO_CCTV, puedeDisenarCctvSegunGente } from './acceso-cctv.js';
+import { validarEquipoCatalogo, type EquipoCatalogo } from './catalogo-cctv.js';
 import { CROQUIS_SUBDIR, leerImagenCroquis } from './croquis-imagen.js';
 import { ConflictoVersionDiseno } from './conflicto-version.js';
 import { ESTADOS_DISENO, nombreDiseno, planoVacio, validarExtra, validarPlano } from './plano-cctv.js';
@@ -51,6 +52,25 @@ export const LISTA_DISENOS_MAX = 200;
 
 const NO_ENCONTRADO = 'Diseño no encontrado';
 
+/** El catálogo de una empresa cabe de sobra en una sola respuesta. */
+export const CATALOGO_MAX = 500;
+
+const SELECT_CATALOGO = {
+  id: true,
+  familia: true,
+  tipo: true,
+  marca: true,
+  modelo: true,
+  descripcion: true,
+  datos: true,
+  medidas: true,
+  caracteristicas: true,
+  fuente: true,
+  verificado: true,
+  productId: true,
+  updatedAt: true,
+} as const;
+
 @Injectable()
 export class CctvDisenosService {
   constructor(private readonly prisma: PrismaService) {}
@@ -85,6 +105,80 @@ export class CctvDisenosService {
   async detalle(actor: ActorCctv, id: number, companyId: number | null) {
     await this.exigirAcceso(actor);
     return this.cargar(id, requireCompanyId(companyId));
+  }
+
+  /* ── Catálogo de equipos ── */
+
+  async catalogo(actor: ActorCctv, companyId: number | null) {
+    await this.exigirAcceso(actor);
+    const equipos = await this.prisma.cctvEquipo.findMany({
+      where: { companyId: requireCompanyId(companyId), archivadoAt: null },
+      orderBy: [{ familia: 'asc' }, { marca: 'asc' }, { modelo: 'asc' }],
+      take: CATALOGO_MAX,
+      select: SELECT_CATALOGO,
+    });
+    return { equipos };
+  }
+
+  async agregarAlCatalogo(actor: ActorCctv, cuerpo: unknown, companyId: number | null) {
+    await this.exigirAcceso(actor);
+    const empresa = requireCompanyId(companyId);
+    const e = validarEquipoCatalogo(cuerpo);
+    await this.revisarEquipo(empresa, e, null);
+    return this.prisma.cctvEquipo.create({
+      data: { companyId: empresa, creadoPorId: actor.id, ...this.datosEquipo(e) },
+      select: SELECT_CATALOGO,
+    });
+  }
+
+  async editarCatalogo(actor: ActorCctv, id: number, cuerpo: unknown, companyId: number | null) {
+    await this.exigirAcceso(actor);
+    const empresa = requireCompanyId(companyId);
+    const e = validarEquipoCatalogo(cuerpo);
+    await this.revisarEquipo(empresa, e, id);
+    const r = await this.prisma.cctvEquipo.updateMany({ where: { id, companyId: empresa, archivadoAt: null }, data: this.datosEquipo(e) });
+    if (!r.count) throw new NotFoundException('Equipo no encontrado');
+    return this.prisma.cctvEquipo.findFirstOrThrow({ where: { id, companyId: empresa }, select: SELECT_CATALOGO });
+  }
+
+  /** No se borra: los diseños que lo usan guardan su copia y siguen igual. */
+  async archivarDelCatalogo(actor: ActorCctv, id: number, companyId: number | null) {
+    await this.exigirAcceso(actor);
+    const r = await this.prisma.cctvEquipo.updateMany({ where: { id, companyId: requireCompanyId(companyId), archivadoAt: null }, data: { archivadoAt: new Date() } });
+    if (!r.count) throw new NotFoundException('Equipo no encontrado');
+    return { ok: true };
+  }
+
+  private datosEquipo(e: EquipoCatalogo) {
+    return {
+      familia: e.familia,
+      tipo: e.tipo,
+      marca: e.marca,
+      modelo: e.modelo,
+      descripcion: e.descripcion,
+      datos: e.datos as Prisma.InputJsonValue,
+      medidas: e.medidas === null ? Prisma.DbNull : (e.medidas as Prisma.InputJsonValue),
+      caracteristicas: e.caracteristicas as Prisma.InputJsonValue,
+      fuente: e.fuente,
+      verificado: e.verificado,
+      productId: e.productId,
+    };
+  }
+
+  /** Dos fichas para el mismo modelo se contradicen; y el producto debe ser de la empresa. */
+  private async revisarEquipo(empresa: number, e: EquipoCatalogo, excepto: number | null) {
+    await assertRefsBelongToCompany(empresa, [{ modelo: this.prisma.product, ids: [e.productId], etiqueta: 'Producto' }]);
+    const repetido = await this.prisma.cctvEquipo.findFirst({
+      where: {
+        companyId: empresa,
+        archivadoAt: null,
+        marca: { equals: e.marca, mode: 'insensitive' },
+        modelo: { equals: e.modelo, mode: 'insensitive' },
+        ...(excepto ? { id: { not: excepto } } : {}),
+      },
+      select: { id: true },
+    });
+    if (repetido) throw new BadRequestException(`${e.marca ? `${e.marca} ` : ''}${e.modelo} ya está en el catálogo`);
   }
 
   async crear(actor: ActorCctv, dto: CrearDisenoDto, companyId: number | null) {

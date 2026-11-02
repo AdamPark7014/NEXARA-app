@@ -9,14 +9,16 @@
  * imprimirse sale a su tamaño, así la escala del plano es cierta en el papel.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { modeloPorId } from "@/lib/cctv/catalogo";
+import { ETIQUETA_TIPO_EQUIPO, modeloPorId } from "@/lib/cctv/catalogo";
 import type { ResumenDiseno } from "@/lib/cctv/editor";
 import type { Grabacion } from "@/lib/cctv/infraestructura";
-import { claveCamara, limitesSitio } from "@/lib/cctv/medidas";
+import { claveCamara, claveEquipo, limitesSitio } from "@/lib/cctv/medidas";
 import { aMetros, dirRumbo, hojasPuerta, type Abertura, type CamaraPlano, type Muro, type Nivel, type Plano, type Punto, type TipoMueble } from "@/lib/cctv/plano";
 import { cedulaDeEquipos, ejesDelPlano, escalaNormalizada, pasoBarraEscala, revisionDelSistema } from "@/lib/cctv/planoTecnico";
+import { COLOR_CABLE, ETIQUETA_CABLE, conexionesDelSistema, type ClaseCable } from "@/lib/cctv/sistema";
 import { areaPoligono, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import { COLOR_NIVEL, LEYENDA_NIVELES } from "./colores";
+import { SimboloEquipo, colorPlanoEquipo } from "./SimboloEquipo";
 import styles from "./planoTecnico.module.css";
 
 export const HOJA_ANCHO_PX = 1632;
@@ -129,6 +131,16 @@ export function HojaAjustada({ children }: { children: ReactNode }) {
   );
 }
 
+/** El nombre de un área ocupa unos 110 × 40 px: baja hasta que no tape un símbolo. */
+function lugarDeNombre(x: number, y: number, simbolos: ReadonlyArray<{ x: number; y: number }>): number {
+  let lugar = y;
+  for (let i = 0; i < 4; i++) {
+    if (!simbolos.some((s) => Math.abs(s.x - x) < 72 && Math.abs(s.y - lugar) < 34)) return lugar;
+    lugar += 36;
+  }
+  return y;
+}
+
 const fechaCorta = new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 export default function PlanoTecnico({
@@ -156,6 +168,14 @@ export default function PlanoTecnico({
   const revision = useMemo(() => revisionDelSistema(raiz, resumen, grabacion), [raiz, resumen, grabacion]);
   const cob = resumen?.cobertura;
   const tipos = useMemo(() => new Set(plano.camaras.map(tipoSimbolo)), [plano.camaras]);
+  const conexiones = useMemo(() => conexionesDelSistema(raiz).filter((c) => c.nivelId === nivel.id), [raiz, nivel.id]);
+  const clasesCable = useMemo(() => [...new Set(conexiones.map((c) => c.clase))] as ClaseCable[], [conexiones]);
+  const equiposSueltos = useMemo(() => (plano.equipos ?? []).filter((e) => !e.gabineteId), [plano.equipos]);
+  const tiposEquipo = useMemo(() => [...new Set(equiposSueltos.map((e) => e.tipo))], [equiposSueltos]);
+  const simbolos = [...plano.camaras, ...equiposSueltos].map((e) => {
+    const p = aMetros(e.pos, plano.escala);
+    return { x: dibujo.X(p.x), y: dibujo.Y(p.y) };
+  });
   const { X, Y, S, den } = dibujo;
   const k = plano.escala.metrosPorPx;
   const paso = pasoBarraEscala(den);
@@ -254,17 +274,29 @@ export default function PlanoTecnico({
           return m ? <HuecoPlano key={h.id} hueco={h} muro={m} plano={plano} X={X} Y={Y} S={S} /> : null;
         })}
 
-        {/* Nombres */}
+        {/* Nombres: si caen sobre un equipo, se recorren para no taparlo */}
         {(plano.areas ?? []).map((a) => {
           if (!a.nombre || a.puntos.length < 3) return null;
           const pts = a.puntos.map((p) => aMetros(p, plano.escala));
           const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
           const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-          return <NombreArea key={a.id} x={X(cx)} y={Y(cy)} nombre={a.nombre} m2={areaPoligono(pts)} />;
+          const x = X(cx);
+          const yEnHoja = lugarDeNombre(x, Y(cy), simbolos);
+          return <NombreArea key={a.id} x={x} y={yEnHoja} nombre={a.nombre} m2={areaPoligono(pts)} />;
         })}
         {plano.etiquetas.map((e) => (
           <NombreArea key={e.id} x={X(e.pos.x * k)} y={Y(e.pos.y * k)} nombre={e.texto} />
         ))}
+
+        {/* Rutas de cable y alcance de las alarmas: debajo de los símbolos */}
+        {conexiones.map((c) => (
+          <polyline key={c.id} points={c.ruta.map((q) => `${X(q.x).toFixed(1)},${Y(q.y).toFixed(1)}`).join(" ")} fill="none" stroke={COLOR_CABLE[c.clase]} strokeWidth={1.1} strokeLinejoin="round" />
+        ))}
+        {equiposSueltos.map((e) => {
+          if ((e.tipo !== "sirena" && e.tipo !== "sismica") || !e.datos.alcanceM) return null;
+          const p = aMetros(e.pos, plano.escala);
+          return <circle key={`alc-${e.id}`} cx={X(p.x)} cy={Y(p.y)} r={e.datos.alcanceM * S} fill="none" stroke={colorPlanoEquipo(e.tipo)} strokeWidth={0.7} strokeOpacity={0.5} strokeDasharray="5 5" />;
+        })}
 
         {/* Cámaras: símbolo girado a su rumbo y clave del lado contrario */}
         {plano.camaras.map((c) => {
@@ -288,12 +320,30 @@ export default function PlanoTecnico({
           );
         })}
 
+        {/* Lo demás: su símbolo y su clave */}
+        {equiposSueltos.map((e) => {
+          const p = aMetros(e.pos, plano.escala);
+          const color = colorPlanoEquipo(e.tipo);
+          const clave = claveEquipo(e);
+          const w = clave.length * 6 + 12;
+          return (
+            <g key={e.id} transform={`translate(${X(p.x)} ${Y(p.y)})`}>
+              <SimboloEquipo tipo={e.tipo} color={color} />
+              <line x1={0} y1={0} x2={20} y2={-24} stroke={color} strokeWidth={0.8} />
+              <rect x={20 - w / 2} y={-32} width={w} height={16} rx={8} fill={color} />
+              <text x={20} y={-20.4} fontSize={9.6} fontWeight={700} textAnchor="middle" fill="#fff">
+                {clave}
+              </text>
+            </g>
+          );
+        })}
+
         {/* Título, escala y norte */}
         <text x={40} y={HOJA_ALTO_PX - 62} fontSize={18} fontWeight={700} letterSpacing=".05em" fill="#14181f">
           {nivel.nombre.toUpperCase()}
         </text>
         <text x={40} y={HOJA_ALTO_PX - 42} fontSize={11.5} fill="#5a6370">
-          Cámaras y cobertura · nivel {nivel.elevacionM >= 0 ? "+" : ""}
+          {equiposSueltos.length ? "Equipos, cableado y cobertura" : "Cámaras y cobertura"} · nivel {nivel.elevacionM >= 0 ? "+" : ""}
           {nivel.elevacionM.toFixed(2)} m
         </text>
         {[0, 1, 2, 3, 4].map((i) => (
@@ -339,7 +389,7 @@ export default function PlanoTecnico({
             </thead>
             <tbody>
               {cedula.filas.map((f) => (
-                <tr key={f.modelo}>
+                <tr key={`${f.clave}-${f.modelo}`}>
                   <td>
                     <b>{f.clave}</b>
                   </td>
@@ -376,6 +426,22 @@ export default function PlanoTecnico({
                   <SimboloCamara tipo={t} escala={0.92} />
                 </svg>
                 {n}
+              </span>
+            ))}
+            {tiposEquipo.map((t) => (
+              <span key={t}>
+                <svg width={30} height={30} viewBox="-17 -17 34 34" aria-hidden="true">
+                  <SimboloEquipo tipo={t} />
+                </svg>
+                {ETIQUETA_TIPO_EQUIPO[t]}
+              </span>
+            ))}
+            {clasesCable.map((c) => (
+              <span key={c}>
+                <svg width={30} height={14} viewBox="0 0 30 14" aria-hidden="true">
+                  <line x1={0} y1={7} x2={30} y2={7} stroke={COLOR_CABLE[c]} strokeWidth={2} />
+                </svg>
+                {ETIQUETA_CABLE[c]}
               </span>
             ))}
             <span>

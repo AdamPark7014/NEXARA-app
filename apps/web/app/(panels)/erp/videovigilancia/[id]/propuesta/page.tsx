@@ -5,14 +5,19 @@ import { useMemo } from "react";
 import { useParams } from "next/navigation";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import { ButtonLink, EmptyState, Skeleton } from "@/components/base";
+import { useUser } from "@/components/UserContext";
 import { planoVacio } from "@/lib/cctv/plano";
+import { useCatalogo } from "@/lib/cctv/useCatalogo";
 import { planoDeDiseno, useCalculoDiseno } from "../../_editor/calculo";
 import Propuesta from "../../_editor/Propuesta";
 import { useDiseno } from "../../_editor/useDiseno";
 
 export default function PropuestaPage() {
   const params = useParams<{ id: string }>();
+  const { token } = useUser();
   const { diseno, error } = useDiseno(Number(params?.id));
+  // Antes de la foto de la maqueta: los modelos agregados deciden cómo se ve cada equipo.
+  const catalogo = useCatalogo(token);
   const plano = useMemo(() => (diseno ? planoDeDiseno(diseno) : planoVacio()), [diseno]);
   const calculo = useCalculoDiseno(plano, diseno?.grabacion);
 
@@ -23,7 +28,7 @@ export default function PropuestaPage() {
       </div>
     );
   }
-  if (!diseno) {
+  if (!diseno || catalogo.cargando) {
     return (
       <div style={{ padding: "var(--ui-s5)", display: "grid", gap: "var(--ui-s4)", maxWidth: "8.5in", margin: "0 auto" }}>
         <Skeleton height={48} />

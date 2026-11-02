@@ -6,17 +6,19 @@
  * manija para apuntar y humanoides. Rueda = zoom; arrastrar el fondo = mover la vista.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { modeloPorId, type ModeloCamara } from "@/lib/cctv/catalogo";
+import { equipoPorId, modeloPorId, type ModeloCamara, type ModeloEquipo, type TipoEquipo } from "@/lib/cctv/catalogo";
 import {
   agregarAbertura,
   agregarArea,
   agregarCamara,
+  agregarEquipo,
   agregarMueble,
   agregarMuro,
   agregarObstaculo,
   agregarPersona,
   ajustarPunto,
   apuntarCamara,
+  avisoDeEquipo,
   limitesEnMetros,
   mover,
   moverExtremo,
@@ -26,11 +28,14 @@ import {
 } from "@/lib/cctv/editor";
 import { etiquetaCono, hfovDeg, distanciaInclinadaM, ppm } from "@/lib/cctv/optica";
 import { dirRumbo, hojasPuerta, type MaterialPiso, type Plano, type Punto, type Tapa, type TipoMueble } from "@/lib/cctv/plano";
+import { claveEquipo } from "@/lib/cctv/medidas";
 import { reescalar } from "@/lib/cctv/niveles";
+import { COLOR_CABLE, type Conexion } from "@/lib/cctv/sistema";
 import { camaraEnMetros, mejorNivelEn, type CamaraM, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import { COLOR_NIVEL, OPACIDAD_NIVEL } from "./colores";
 import Navegacion, { ICONO } from "./Navegacion";
 import { NOMBRE_MUEBLE, TIPO_ARRASTRE, leerArrastre } from "./PanelEquipos";
+import { SimboloEquipo, colorPlanoEquipo } from "./SimboloEquipo";
 import styles from "./editor.module.css";
 
 export type Herramienta =
@@ -45,6 +50,7 @@ export type Herramienta =
   | "cota"
   | "etiqueta"
   | "camara"
+  | "equipo"
   | "persona";
 
 type Vista = { x: number; y: number; w: number; h: number };
@@ -57,7 +63,7 @@ type Arrastre =
   | { modo: "obstaculo"; inicio: Punto }
   | { modo: "area"; inicio: Punto };
 
-const MOVIBLES: ReadonlySet<TipoElemento> = new Set(["muro", "camara", "persona", "etiqueta", "obstaculo", "cota", "area", "mueble"]);
+const MOVIBLES: ReadonlySet<TipoElemento> = new Set(["muro", "camara", "persona", "etiqueta", "obstaculo", "cota", "area", "mueble", "equipo"]);
 
 /** Tinte de cada piso en el dibujo 2D. */
 const TINTE_PISO: Readonly<Record<MaterialPiso, string>> = {
@@ -84,7 +90,7 @@ function vistaInicial(plano: Plano): Vista {
       return { x: c.pos.x + (d.x * c.distanciaM) / k, y: c.pos.y + (d.y * c.distanciaM) / k };
     });
   });
-  const ps = [...plano.muros.flatMap((m) => [m.a, m.b]), ...plano.camaras.map((c) => c.pos), ...conos];
+  const ps = [...plano.muros.flatMap((m) => [m.a, m.b]), ...plano.camaras.map((c) => c.pos), ...(plano.equipos ?? []).map((e) => e.pos), ...conos];
   if (ps.length) {
     const minX = Math.min(...ps.map((p) => p.x));
     const minY = Math.min(...ps.map((p) => p.y));
@@ -130,6 +136,10 @@ export default function Lienzo({
   modeloNuevo,
   muebleNuevo = "escritorio",
   pisoNuevo = "concreto",
+  equipoNuevo = null,
+  numeroEquipo,
+  conexiones,
+  nivelId,
   onAplicar,
   onSeleccionar,
   onAviso,
@@ -142,12 +152,17 @@ export default function Lienzo({
   plano: Plano;
   seleccion: Seleccion | null;
   herramienta: Herramienta;
-  capas: { croquis: boolean; etiquetas: boolean; calor: boolean };
+  capas: { croquis: boolean; etiquetas: boolean; calor: boolean; cableado?: boolean };
   tapas: readonly Tapa[];
   coberturas: ReadonlyMap<string, PoligonoCobertura[]>;
   modeloNuevo: ModeloCamara;
   muebleNuevo?: TipoMueble;
   pisoNuevo?: MaterialPiso;
+  equipoNuevo?: ModeloEquipo | null;
+  /** El siguiente número de ese tipo, entre todos los niveles. */
+  numeroEquipo?: (t: TipoEquipo) => number;
+  conexiones?: readonly Conexion[];
+  nivelId?: string;
   onAplicar: (plano: Plano, opciones?: { seleccion?: Seleccion | null; fusion?: string }) => void;
   onSeleccionar: (s: Seleccion | null) => void;
   onAviso: (texto: string) => void;
@@ -388,6 +403,10 @@ export default function Lienzo({
         onHerramienta("seleccionar");
         return;
       }
+      case "equipo":
+        if (equipoNuevo) colocarEquipo(p, equipoNuevo);
+        onHerramienta("seleccionar");
+        return;
       case "persona": {
         const nuevo = agregarPersona(actual, p);
         const persona = nuevo.personas[nuevo.personas.length - 1];
@@ -450,6 +469,13 @@ export default function Lienzo({
     }
   };
 
+  const colocarEquipo = (p: Punto, modelo: ModeloEquipo) => {
+    const r = agregarEquipo(planoRef.current, p, modelo, numeroEquipo?.(modelo.tipo) ?? 1);
+    onAplicar(r.plano, { seleccion: { tipo: "equipo", id: r.equipo.id } });
+    const texto = avisoDeEquipo(r.plano, r.equipo);
+    if (texto) onAviso(texto);
+  };
+
   /** Un equipo soltado desde el panel de la izquierda. */
   const alSoltarEquipo = (e: DragEvent<SVGSVGElement>) => {
     e.preventDefault();
@@ -461,6 +487,9 @@ export default function Lienzo({
       if (!m) return;
       const r = agregarCamara(planoRef.current, p, m, { numero: numeroNuevo, nombre: `Cámara ${numeroNuevo}` });
       onAplicar(r.plano, { seleccion: { tipo: "camara", id: r.camara.id } });
+    } else if (dato.clase === "equipo") {
+      const m = equipoPorId(dato.id);
+      if (m) colocarEquipo(p, m);
     } else {
       const r = agregarMueble(planoRef.current, p, dato.id);
       onAplicar(r.plano, { seleccion: { tipo: "mueble", id: r.mueble.id } });
@@ -788,6 +817,47 @@ export default function Lienzo({
           </text>
         </g>
       ))}
+
+      {/* Por dónde corre el cable: sale de la revisión del sistema, no se dibuja a mano. */}
+      {capas.cableado !== false
+        ? (conexiones ?? [])
+            .filter((c) => c.nivelId === nivelId)
+            .map((c) => (
+              <polyline
+                key={c.id}
+                points={c.ruta.map((q) => `${f1(q.x / k)},${f1(q.y / k)}`).join(" ")}
+                fill="none"
+                stroke={COLOR_CABLE[c.clase]}
+                strokeWidth={1.6 * u}
+                strokeLinejoin="round"
+                strokeOpacity={0.85}
+                style={{ pointerEvents: "none" }}
+              />
+            ))
+        : null}
+
+      {(plano.equipos ?? []).map((e) =>
+        (e.tipo === "sirena" || e.tipo === "sismica") && e.datos.alcanceM ? (
+          <circle key={`alc-${e.id}`} cx={e.pos.x} cy={e.pos.y} r={e.datos.alcanceM / k} fill="#d13f3f" fillOpacity={esSel("equipo", e.id) ? 0.12 : 0.05} stroke="#d13f3f" strokeOpacity={0.5} strokeWidth={1.2 * u} style={{ pointerEvents: "none" }} />
+        ) : null,
+      )}
+      {(plano.equipos ?? [])
+        .filter((e) => !e.gabineteId)
+        .map((e) => {
+          const color = colorPlanoEquipo(e.tipo);
+          const clave = claveEquipo(e);
+          return (
+            <g key={e.id} data-sel={`equipo:${e.id}`} transform={`translate(${e.pos.x} ${e.pos.y}) scale(${u})`} style={{ cursor: herramienta === "seleccionar" ? "move" : undefined }}>
+              <title>{`${clave} · ${e.nombre}`}</title>
+              {esSel("equipo", e.id) ? <circle r={19} fill="var(--ui-brand)" opacity={0.22} /> : null}
+              <SimboloEquipo tipo={e.tipo} color={color} />
+              <rect x={-clave.length * 3.3 - 6} y={15} width={clave.length * 6.6 + 12} height={16} rx={8} fill={color} />
+              <text y={26.6} textAnchor="middle" fontSize={10} fontWeight={700} fill="#fff" style={{ userSelect: "none" }}>
+                {clave}
+              </text>
+            </g>
+          );
+        })}
 
       {plano.personas.map((h) => {
         const sel = esSel("persona", h.id);

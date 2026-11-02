@@ -8,14 +8,16 @@
  */
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { modeloPorId } from "../catalogo";
-import { cajaDe, claveCamara, limitesEdificio, type Limites } from "../medidas";
+import { FAMILIA_DE_TIPO, equipoPorId, modeloPorId, type TipoEquipo } from "../catalogo";
+import { cajaDe, claveCamara, claveEquipo, limitesEdificio, type Limites } from "../medidas";
 import type { Seleccion } from "../editor";
 import { aRad, type NivelCobertura } from "../optica";
-import { aMetros, dirRumbo, distancia, hojasPuerta, type Abertura, type CamaraPlano, type Muro, type Obstaculo, type Plano, type Punto } from "../plano";
+import { aMetros, dirRumbo, distancia, hojasPuerta, type Abertura, type CamaraPlano, type EquipoPlano, type Muro, type Obstaculo, type Plano, type Punto } from "../plano";
+import { COLOR_CABLE, type ClaseCable, type Conexion } from "../sistema";
 import { camaraEnMetros, distanciaPuntoSegmento, type PoligonoCobertura } from "../visibilidad";
 import { crearAnaquel, crearMueble, crearPersona } from "./mobiliario";
 import { crearModelo, inclinarModelo, poste, type TipoModelo } from "./modelos";
+import { crearModeloEquipo, montarEnGabinete, type ParamsEquipo } from "./modelosEquipos";
 import { materialPiso } from "./texturas";
 
 export type { Limites };
@@ -421,7 +423,24 @@ export function tipoModeloDe(c: Pick<CamaraPlano, "productoId" | "esPtz">): Tipo
   return t === "bala" || t === "turret" ? t : "domo";
 }
 
-export type EtiquetaEquipo = { id: string; clave: string; nombre: string; pos: THREE.Vector3; rumboDeg: number };
+export type EtiquetaEquipo = {
+  id: string;
+  clave: string;
+  nombre: string;
+  pos: THREE.Vector3;
+  rumboDeg: number;
+  /** Qué se elige al tocar la clave. */
+  tipoSel: "camara" | "equipo";
+  /** Color del punto: el de su familia. */
+  punto: string;
+};
+
+export const COLOR_PUNTO_CAMARA = "#15b89a";
+
+export function colorPuntoEquipo(tipo: TipoEquipo): string {
+  const f = FAMILIA_DE_TIPO[tipo];
+  return f === "acceso" ? "#f2b23d" : f === "alarmas" ? "#e25555" : "#7aa2ff";
+}
 
 const matAccesorio = new THREE.MeshStandardMaterial({ color: 0xd8dbdf, roughness: 0.5, metalness: 0.5 });
 matAccesorio.userData.compartido = true;
@@ -507,9 +526,126 @@ export function construirCamaras(plano: Plano, opciones: { escala: number; ocult
     toque.visible = false;
     toque.userData.esProxy = true;
     grupo.add(elegible(toque, sel));
-    etiquetas.push({ id: c.id, clave: claveCamara(c.numero), nombre: c.nombre, pos: new THREE.Vector3(x, c.alturaM + Math.max(alto * 0.25, 0.35), z), rumboDeg: c.rumboDeg });
+    etiquetas.push({ id: c.id, clave: claveCamara(c.numero), nombre: c.nombre, pos: new THREE.Vector3(x, c.alturaM + Math.max(alto * 0.25, 0.35), z), rumboDeg: c.rumboDeg, tipoSel: "camara", punto: COLOR_PUNTO_CAMARA });
   }
   return { grupo, etiquetas };
+}
+
+/* ── Lo demás: grabador, gabinete, acceso, alarmas… ─────────────────────────────── */
+
+function paramsDe(e: EquipoPlano): ParamsEquipo {
+  const m = equipoPorId(e.productoId);
+  return {
+    marca: m?.marca || undefined,
+    anchoMm: m?.medidas?.anchoMm,
+    altoMm: m?.medidas?.altoMm,
+    fondoMm: m?.medidas?.fondoMm,
+    puertos: e.datos.puertos ?? undefined,
+    unidades: e.tipo === "gabinete" ? (e.datos.unidades ?? undefined) : undefined,
+    largoMm: e.datos.plumaM ? e.datos.plumaM * 1000 : undefined,
+  };
+}
+
+/** Tan grandes que se ven solos: van a tamaño real. */
+const A_TAMANO_REAL: ReadonlySet<TipoEquipo> = new Set<TipoEquipo>(["gabinete", "barrera"]);
+
+/** Soporte de lo que se coloca lejos de un muro: un equipo no flota. */
+function pedestal(x: number, z: number, altura: number): THREE.Mesh {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, altura, 16), matAccesorio);
+  m.position.set(x, altura / 2, z);
+  m.castShadow = true;
+  return m;
+}
+
+export function construirEquipos(plano: Plano, opciones: { escala: number }): { grupo: THREE.Group; etiquetas: EtiquetaEquipo[] } {
+  const grupo = new THREE.Group();
+  const etiquetas: EtiquetaEquipo[] = [];
+  const muros = plano.muros.filter((m) => m.tipo === "muro").map((m) => ({ a: aMetros(m.a, plano.escala), b: aMetros(m.b, plano.escala), g: m.grosorM }));
+  const equipos = plano.equipos ?? [];
+  for (const e of equipos) {
+    if (e.gabineteId && equipos.some((g) => g.id === e.gabineteId)) continue;
+    const pos = aMetros(e.pos, plano.escala);
+    const modelo = crearModeloEquipo(e.tipo, paramsDe(e));
+    if (e.tipo === "gabinete") {
+      for (const dentro of equipos) {
+        if (dentro.gabineteId === e.id && dentro.unidad != null) montarEnGabinete(modelo, dentro.tipo, paramsDe(dentro), dentro.unidad);
+      }
+    }
+    const caja = new THREE.Box3().setFromObject(modelo);
+    const esc = A_TAMANO_REAL.has(e.tipo) ? 1 : opciones.escala;
+    const alto = (caja.max.y - caja.min.y) * esc;
+    const contenedor = new THREE.Group();
+    contenedor.add(modelo);
+    contenedor.scale.setScalar(esc);
+    // La pluma de la barrera corre hacia el rumbo; lo demás tiene el frente hacia allá.
+    contenedor.rotation.y = anguloDeRumbo(e.rumboDeg) - (e.tipo === "barrera" ? Math.PI / 2 : 0);
+    const enMuro = e.alturaM > 0;
+    const y = enMuro ? Math.max(e.alturaM - alto / 2, 0) : 0;
+    contenedor.position.set(pos.x, y, pos.y);
+    grupo.add(contenedor);
+    if (enMuro && y > 0.05 && !muros.some((m) => distanciaPuntoSegmento(pos, m.a, m.b) < m.g / 2 + 0.25)) grupo.add(pedestal(pos.x, pos.y, y));
+    contenedor.updateMatrixWorld(true);
+    grupo.add(proxy(new THREE.Box3().setFromObject(contenedor), { tipo: "equipo", id: e.id }));
+    etiquetas.push({ id: e.id, clave: claveEquipo(e), nombre: e.nombre, pos: new THREE.Vector3(pos.x, y + alto + 0.12, pos.y), rumboDeg: e.rumboDeg, tipoSel: "equipo", punto: colorPuntoEquipo(e.tipo) });
+  }
+  return { grupo, etiquetas };
+}
+
+/** Hasta dónde se escucha cada sirena o alerta: un anillo en el piso. Es un estimado. */
+export function construirAlcances(plano: Plano, seleccionado: string | null): THREE.Group {
+  const grupo = new THREE.Group();
+  for (const e of plano.equipos ?? []) {
+    const r = e.datos.alcanceM ?? 0;
+    if (!r || (e.tipo !== "sirena" && e.tipo !== "sismica")) continue;
+    const pos = aMetros(e.pos, plano.escala);
+    const sel = e.id === seleccionado;
+    const color = 0xd13f3f;
+    const disco = new THREE.Mesh(new THREE.CircleGeometry(r, 72), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: sel ? 0.14 : 0.06, depthWrite: false }));
+    disco.rotation.x = -Math.PI / 2;
+    disco.position.set(pos.x, 0.05, pos.y);
+    disco.renderOrder = 2;
+    const aro = new THREE.Mesh(new THREE.RingGeometry(Math.max(r - 0.08, 0.01), r, 120), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: sel ? 0.8 : 0.42, depthWrite: false }));
+    aro.rotation.x = -Math.PI / 2;
+    aro.position.set(pos.x, 0.055, pos.y);
+    aro.renderOrder = 2;
+    grupo.add(disco, aro);
+  }
+  return grupo;
+}
+
+const ARRIBA = new THREE.Vector3(0, 1, 0);
+/** A esta altura entra el cable al gabinete, por arriba. */
+const ENTRADA_GABINETE_M = 1.3;
+
+/** El cableado de un nivel: sube a la charola, corre pegado a los muros y baja al gabinete. */
+export function construirCables(conexiones: readonly Conexion[], nivelId: string, escala = 1): THREE.Group {
+  const grupo = new THREE.Group();
+  const radio = 0.018 * Math.max(escala, 1.2);
+  const dummy = new THREE.Object3D();
+  for (const clase of ["video", "acceso", "alarmas", "red"] as const satisfies readonly ClaseCable[]) {
+    const tramos: Array<[THREE.Vector3, THREE.Vector3]> = [];
+    for (const c of conexiones) {
+      if (c.nivelId !== nivelId || c.clase !== clase || c.ruta.length < 2) continue;
+      const ini = c.ruta[0];
+      const fin = c.ruta[c.ruta.length - 1];
+      const puntos = [new THREE.Vector3(ini.x, c.alturaEquipoM, ini.y), ...c.ruta.map((p) => new THREE.Vector3(p.x, c.alturaCharolaM + radio, p.y)), new THREE.Vector3(fin.x, ENTRADA_GABINETE_M, fin.y)];
+      for (let i = 1; i < puntos.length; i++) tramos.push([puntos[i - 1], puntos[i]]);
+    }
+    if (!tramos.length) continue;
+    const color = new THREE.Color(COLOR_CABLE[clase]);
+    const malla = new THREE.InstancedMesh(new THREE.CylinderGeometry(radio, radio, 1, 8), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.3, roughness: 0.55 }), tramos.length);
+    tramos.forEach(([a, b], i) => {
+      const d = b.clone().sub(a);
+      const largo = d.length();
+      dummy.position.copy(a).addScaledVector(d, 0.5);
+      dummy.scale.set(1, Math.max(largo, 1e-3), 1);
+      dummy.quaternion.setFromUnitVectors(ARRIBA, largo > 1e-6 ? d.normalize() : ARRIBA);
+      dummy.updateMatrix();
+      malla.setMatrixAt(i, dummy.matrix);
+    });
+    grupo.add(malla);
+  }
+  return grupo;
 }
 
 /** Lo que ve la cámara elegida: rayos de la lente al pie de la zona ciega y al final del cono. */

@@ -42,6 +42,33 @@ export class CctvDisenosController {
     return this.service.acceso(this.actor(req));
   }
 
+  /** Catálogo de equipos que agregó la empresa. Sus rutas van antes de `:id`. */
+  @Get('catalogo')
+  catalogo(@Req() req: any, @CurrentCompanyId() companyId: number | null) {
+    return this.service.catalogo(this.actor(req), companyId);
+  }
+
+  @Post('catalogo')
+  agregarAlCatalogo(@Req() req: any, @Body() cuerpo: unknown, @CurrentCompanyId() companyId: number | null) {
+    return this.service.agregarAlCatalogo(this.actor(req), cuerpo, companyId);
+  }
+
+  @Patch('catalogo/:id')
+  editarCatalogo(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() cuerpo: unknown,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.editarCatalogo(this.actor(req), id, cuerpo, companyId);
+  }
+
+  @Post('catalogo/:id/archivar')
+  @HttpCode(200)
+  archivarDelCatalogo(@Req() req: any, @Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.service.archivarDelCatalogo(this.actor(req), id, companyId);
+  }
+
   @Get()
   listar(@Req() req: any, @CurrentCompanyId() companyId: number | null) {
     return this.service.listar(this.actor(req), companyId);

@@ -126,6 +126,7 @@ export default function VideovigilanciaPage() {
         description="Diseña el sistema sobre el plano del sitio, revisa qué ve cada cámara y saca la propuesta para el cliente."
         breadcrumbs={[{ label: "Clientes y obra" }, { label: "Videovigilancia" }]}
         icon={<VideocamOutlinedIcon />}
+        secondaryActions={acceso ? <ButtonLink href="/erp/videovigilancia/catalogo">Catálogo de equipos</ButtonLink> : undefined}
         primaryAction={
           <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={() => setAlta(true)} disabled={!acceso}>
             Nuevo diseño

@@ -5,16 +5,21 @@
  * persona), la lista de cámaras y los datos del plano (escala, croquis, alturas en lote y
  * grabación).
  */
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Button, ButtonLink, Field, Input, Segmented, Select, Switch } from "@/components/base";
-import { ETIQUETA_TIPO_CAMARA, MODELOS_CAMARA, MODELO_GENERICO, etiquetaModelo, modeloPorId } from "@/lib/cctv/catalogo";
+import { ETIQUETA_TIPO_CAMARA, ETIQUETA_TIPO_EQUIPO, MODELO_GENERICO, TIPOS_DE_RACK, etiquetaModelo, modeloPorId, todasLasCamarasDelCatalogo } from "@/lib/cctv/catalogo";
 import {
+  actualizarEquipo,
   borrar,
   cambiarAlturaEnLote,
   cambiarModelo,
   duplicarCamara,
+  equiposDelGabinete,
   gruposDeAltura,
   actualizarCamara,
+  montarEnGabinete,
+  moverEnGabinete,
+  sacarDelGabinete,
   type ResumenDiseno,
   type Seleccion,
 } from "@/lib/cctv/editor";
@@ -29,7 +34,9 @@ import {
   resumenOptico,
   type Optica,
 } from "@/lib/cctv/optica";
-import { aMetros, distancia, type Abertura, type CamaraPlano, type MaterialPiso, type Nivel, type Plano, type Tapa, type TipoMueble } from "@/lib/cctv/plano";
+import { claveEquipo } from "@/lib/cctv/medidas";
+import { aMetros, distancia, type Abertura, type CamaraPlano, type EquipoPlano, type MaterialPiso, type Nivel, type Plano, type Tapa, type TipoMueble } from "@/lib/cctv/plano";
+import { fotoDeTipo, type Conexion } from "@/lib/cctv/sistema";
 import { ETIQUETA_ESTADO_PERSONA, areaPoligono, camaraEnMetros, leerPersona } from "@/lib/cctv/visibilidad";
 import { ETIQUETA_ESTADO_DISENO, type EstadoDiseno } from "@/lib/cctv/api";
 import { COLOR_NIVEL } from "./colores";
@@ -37,7 +44,7 @@ import type { Herramienta } from "./Lienzo";
 import { NOMBRE_MUEBLE, NOMBRE_PISO, fotoCamara } from "./PanelEquipos";
 import styles from "./editor.module.css";
 
-export type Pestana = "seleccion" | "camaras" | "plano";
+export type Pestana = "seleccion" | "camaras" | "equipos" | "plano";
 
 /** El nivel que se está editando y lo que se puede hacer con él (artboard 5). */
 export type DatosNivel = {
@@ -105,6 +112,7 @@ export default function Inspector({
   tapas,
   onAplicar,
   onSeleccionar,
+  conexiones,
   meta,
   onMeta,
   resumen,
@@ -123,6 +131,7 @@ export default function Inspector({
   tapas: readonly Tapa[];
   onAplicar: Aplicar;
   onSeleccionar: (s: Seleccion | null) => void;
+  conexiones?: readonly Conexion[];
   meta: { nombre: string; estado: EstadoDiseno; grabacion: Grabacion };
   onMeta: (m: Partial<{ nombre: string; estado: EstadoDiseno; grabacion: Grabacion }>) => void;
   resumen: ResumenDiseno | null;
@@ -145,6 +154,7 @@ export default function Inspector({
           [
             ["seleccion", seleccion ? etiquetaSeleccion(plano, seleccion) : "Selección"],
             ["camaras", `Cámaras · ${plano.camaras.length}`],
+            ...(plano.equipos?.length ? ([["equipos", `Equipos · ${plano.equipos.length}`]] as const) : []),
             ["plano", "Plano"],
           ] as const
         ).map(([id, texto]) => (
@@ -156,12 +166,14 @@ export default function Inspector({
       <div className={styles.inspectorCuerpo}>
         {pestana === "seleccion" ? (
           seleccion ? (
-            <PanelSeleccion plano={plano} seleccion={seleccion} tapas={tapas} onAplicar={onAplicar} onSeleccionar={onSeleccionar} onVerLoQueVe={onVerLoQueVe} fichaDe={fichaDe} numeroNuevo={numeroNuevo} />
+            <PanelSeleccion plano={plano} seleccion={seleccion} tapas={tapas} conexiones={conexiones} onAplicar={onAplicar} onSeleccionar={onSeleccionar} onVerLoQueVe={onVerLoQueVe} fichaDe={fichaDe} numeroNuevo={numeroNuevo} />
           ) : (
             <Guia plano={plano} resumen={resumen} onHerramienta={onHerramienta} onCambiarCroquis={onCambiarCroquis} onRecalibrar={onRecalibrar} />
           )
         ) : pestana === "camaras" ? (
           <ListaCamaras plano={plano} onSeleccionar={(s) => (onSeleccionar(s), onPestana("seleccion"))} />
+        ) : pestana === "equipos" ? (
+          <ListaEquipos plano={plano} onSeleccionar={(s) => (onSeleccionar(s), onPestana("seleccion"))} />
         ) : (
           <PanelPlano plano={plano} onAplicar={onAplicar} meta={meta} onMeta={onMeta} resumen={resumen} onRecalibrar={onRecalibrar} onCambiarCroquis={onCambiarCroquis} nivel={nivel} />
         )}
@@ -175,6 +187,10 @@ function etiquetaSeleccion(plano: Plano, s: Seleccion): string {
     const c = plano.camaras.find((x) => x.id === s.id);
     return c ? `Cámara ${c.numero}` : "Cámara";
   }
+  if (s.tipo === "equipo") {
+    const e = plano.equipos?.find((x) => x.id === s.id);
+    return e ? claveEquipo(e) : "Equipo";
+  }
   const nombres: Record<Seleccion["tipo"], string> = {
     muro: "Muro",
     abertura: "Hueco",
@@ -185,6 +201,7 @@ function etiquetaSeleccion(plano: Plano, s: Seleccion): string {
     persona: "Persona",
     area: "Área",
     mueble: "Ambientación",
+    equipo: "Equipo",
   };
   return nombres[s.tipo];
 }
@@ -193,6 +210,7 @@ function PanelSeleccion({
   plano,
   seleccion,
   tapas,
+  conexiones,
   onAplicar,
   onSeleccionar,
   onVerLoQueVe,
@@ -202,6 +220,7 @@ function PanelSeleccion({
   plano: Plano;
   seleccion: Seleccion;
   tapas: readonly Tapa[];
+  conexiones?: readonly Conexion[];
   onAplicar: Aplicar;
   onSeleccionar: (s: Seleccion | null) => void;
   onVerLoQueVe?: (camaraId: string) => void;
@@ -367,7 +386,192 @@ function PanelSeleccion({
         </div>
       );
     }
+    case "equipo": {
+      const e = (plano.equipos ?? []).find((x) => x.id === seleccion.id);
+      return e ? <PanelEquipo plano={plano} equipo={e} conexion={conexiones?.find((c) => c.id === e.id) ?? null} onAplicar={onAplicar} onSeleccionar={onSeleccionar} quitar={quitar("Quitar equipo")} /> : null;
+    }
   }
+}
+
+/** Lo que aplica a cada tipo: lo demás no se pregunta. */
+function PanelEquipo({
+  plano,
+  equipo: e,
+  conexion,
+  onAplicar,
+  onSeleccionar,
+  quitar,
+}: {
+  plano: Plano;
+  equipo: EquipoPlano;
+  conexion: Conexion | null;
+  onAplicar: Aplicar;
+  onSeleccionar: (s: Seleccion | null) => void;
+  quitar: ReactNode;
+}) {
+  const fusion = `eq-${e.id}`;
+  const cambiar = (cambios: Partial<EquipoPlano>) => onAplicar(actualizarEquipo(plano, e.id, cambios), { fusion });
+  const dato = (k: keyof EquipoPlano["datos"], valor: number) => cambiar({ datos: { ...e.datos, [k]: valor } });
+  const gabinetes = (plano.equipos ?? []).filter((g) => g.tipo === "gabinete");
+  const gabinete = gabinetes.find((g) => g.id === e.gabineteId) ?? null;
+  const dentro = e.tipo === "gabinete" ? equiposDelGabinete(plano, e.id) : [];
+  const puertas = plano.aberturas.filter((a) => a.tipo === "puerta" || a.tipo === "acceso");
+  const [aviso, setAviso] = useState<string | null>(null);
+  const deRack = TIPOS_DE_RACK.has(e.tipo);
+  const deMuro = e.tipo === "terminal" || e.tipo === "sirena" || e.tipo === "sismica" || e.tipo === "panel" || e.tipo === "generico";
+  return (
+    <div className={styles.panel}>
+      <div className={styles.fotoEquipo}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={fotoDeTipo(e.tipo)} alt="" />
+      </div>
+      <div className={styles.panelTitulo}>
+        <b>
+          {claveEquipo(e)} · {ETIQUETA_TIPO_EQUIPO[e.tipo]}
+        </b>
+        <span className={styles.tenue}>{e.modelo}</span>
+      </div>
+      <Field label="Nombre">
+        <Input value={e.nombre} onChange={(ev) => cambiar({ nombre: ev.target.value })} controlSize="sm" />
+      </Field>
+
+      {e.tipo === "nvr" ? (
+        <div className={styles.dosColumnas}>
+          <Numero etiqueta="Canales" valor={e.datos.canales ?? 0} unidad="" paso={1} min={1} max={512} onCambio={(v) => dato("canales", v)} />
+          <Numero etiqueta="Bahías" valor={e.datos.bahias ?? 0} unidad="" paso={1} min={0} max={64} onCambio={(v) => dato("bahias", v)} />
+          <Numero etiqueta="Entrada" valor={e.datos.mbpsEntrada ?? 0} unidad="Mbps" paso={10} min={0} max={10000} onCambio={(v) => dato("mbpsEntrada", v)} />
+        </div>
+      ) : null}
+      {e.tipo === "switch" ? (
+        <div className={styles.dosColumnas}>
+          <Numero etiqueta="Puertos" valor={e.datos.puertos ?? 0} unidad="" paso={1} min={1} max={96} onCambio={(v) => dato("puertos", v)} />
+          <Numero etiqueta="PoE total" valor={e.datos.poeTotalW ?? 0} unidad="W" paso={10} min={0} max={10000} onCambio={(v) => dato("poeTotalW", v)} />
+        </div>
+      ) : null}
+      {e.tipo === "terminal" ? <Numero etiqueta="Consumo PoE" valor={e.datos.poeW ?? 0} unidad="W" paso={1} min={0} max={100} onCambio={(v) => dato("poeW", v)} /> : null}
+      {e.tipo === "gabinete" ? <Numero etiqueta="Unidades" valor={e.datos.unidades ?? 24} unidad="U" paso={1} min={4} max={52} onCambio={(v) => dato("unidades", v)} /> : null}
+      {deRack || e.tipo === "generico" ? <Numero etiqueta="Ocupa en el rack" valor={e.datos.unidades ?? 1} unidad="U" paso={1} min={1} max={12} onCambio={(v) => dato("unidades", v)} /> : null}
+      {e.tipo === "barrera" ? (
+        <div className={styles.dosColumnas}>
+          <Numero etiqueta="Pluma" valor={e.datos.plumaM ?? 4} unidad="m" paso={0.5} min={1} max={12} onCambio={(v) => dato("plumaM", v)} />
+          <Numero etiqueta="Rumbo" valor={e.rumboDeg} unidad="°" paso={15} min={0} max={360} onCambio={(v) => cambiar({ rumboDeg: v % 360 })} />
+        </div>
+      ) : null}
+      {e.tipo === "sirena" || e.tipo === "sismica" ? (
+        <Numero etiqueta="Hasta dónde se escucha" valor={e.datos.alcanceM ?? 0} unidad="m" paso={1} min={1} max={200} onCambio={(v) => dato("alcanceM", v)} pista="Es un estimado: ajústalo con la ficha o con lo que midas en sitio." />
+      ) : null}
+      {deMuro ? (
+        <div className={styles.dosColumnas}>
+          <Numero etiqueta="Altura" valor={e.alturaM} unidad="m" paso={0.05} min={0.3} max={15} onCambio={(alturaM) => cambiar({ alturaM })} />
+          <Numero etiqueta="Rumbo" valor={e.rumboDeg} unidad="°" paso={15} min={0} max={360} onCambio={(v) => cambiar({ rumboDeg: v % 360 })} />
+        </div>
+      ) : null}
+      {e.tipo === "gabinete" ? <Numero etiqueta="Rumbo" valor={e.rumboDeg} unidad="°" paso={15} min={0} max={360} onCambio={(v) => cambiar({ rumboDeg: v % 360 })} /> : null}
+
+      {e.tipo === "terminal" ? (
+        <Field label="Puerta que controla">
+          <Select value={e.puertaId ?? ""} onChange={(ev) => cambiar({ puertaId: ev.target.value || null })} controlSize="sm">
+            <option value="">Sin puerta</option>
+            {puertas.map((a, i) => (
+              <option key={a.id} value={a.id}>
+                {a.tipo === "acceso" ? "Acceso" : "Puerta"} {i + 1}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      ) : null}
+
+      {deRack ? (
+        gabinete ? (
+          <div>
+            <p className={styles.seccion}>En {claveEquipo(gabinete)}</p>
+            <div className={styles.dosColumnas}>
+              <Numero
+                etiqueta="Unidad"
+                valor={e.unidad ?? 1}
+                unidad=""
+                paso={1}
+                min={1}
+                max={gabinete.datos.unidades ?? 52}
+                onCambio={(u) => {
+                  const nuevo = moverEnGabinete(plano, e.id, u);
+                  setAviso(nuevo === plano ? "Esa unidad ya está ocupada." : null);
+                  if (nuevo !== plano) onAplicar(nuevo, { fusion });
+                }}
+              />
+              <Button size="sm" onClick={() => onAplicar(sacarDelGabinete(plano, e.id), { fusion })}>
+                Sacar del gabinete
+              </Button>
+            </div>
+            <button type="button" className={styles.enlace} onClick={() => onSeleccionar({ tipo: "equipo", id: gabinete.id })}>
+              Ver el gabinete
+            </button>
+          </div>
+        ) : gabinetes.length ? (
+          <Button
+            size="sm"
+            onClick={() => {
+              const r = montarEnGabinete(plano, e.id, gabinetes[0].id);
+              setAviso(r.error ?? null);
+              onAplicar(r.plano, { fusion });
+            }}
+          >
+            Montar en {claveEquipo(gabinetes[0])}
+          </Button>
+        ) : (
+          <p className={styles.ayuda}>Cuando pongas un gabinete, este equipo entra solo.</p>
+        )
+      ) : null}
+
+      {e.tipo === "gabinete" ? (
+        <div>
+          <p className={styles.seccion}>
+            Adentro · {dentro.reduce((s, x) => s + Math.max(1, x.datos.unidades ?? 1), 0)} de {e.datos.unidades ?? 24} U
+          </p>
+          {dentro.length ? (
+            dentro.map((x) => (
+              <button key={x.id} type="button" className={styles.fila} onClick={() => onSeleccionar({ tipo: "equipo", id: x.id })}>
+                <span>
+                  <span className={styles.numeroChico}>{x.unidad}</span> {x.nombre}
+                </span>
+                <span className={styles.tenue}>{claveEquipo(x)}</span>
+              </button>
+            ))
+          ) : (
+            <p className={styles.ayuda}>Toca un grabador, un switch o un servidor en el panel de la izquierda y entra aquí.</p>
+          )}
+        </div>
+      ) : null}
+
+      {conexion ? (
+        <p className={conexion.estado === "ok" ? styles.ayuda : styles.conProblemas}>
+          Cable al gabinete: {Math.round(conexion.largoM)} m{conexion.estado === "excede" ? ", pasa del límite de 100 m del UTP" : conexion.estado === "aviso" ? ", al límite del UTP" : ""}.
+        </p>
+      ) : null}
+      {aviso ? <p className={styles.conProblemas}>{aviso}</p> : null}
+      <div className={styles.acciones}>{quitar}</div>
+    </div>
+  );
+}
+
+function ListaEquipos({ plano, onSeleccionar }: { plano: Plano; onSeleccionar: (s: Seleccion) => void }) {
+  return (
+    <div className={styles.panel}>
+      {[...(plano.equipos ?? [])]
+        .sort((a, b) => claveEquipo(a).localeCompare(claveEquipo(b)))
+        .map((e) => (
+          <button key={e.id} type="button" className={styles.fila} onClick={() => onSeleccionar({ tipo: "equipo", id: e.id })}>
+            <span>
+              {claveEquipo(e)} {e.nombre}
+              <span className={styles.tenue} style={{ display: "block" }}>
+                {ETIQUETA_TIPO_EQUIPO[e.tipo]}
+              </span>
+            </span>
+            {e.unidad != null ? <span className={styles.tenue}>Unidad {e.unidad}</span> : null}
+          </button>
+        ))}
+    </div>
+  );
 }
 
 function PanelCamara({
@@ -418,7 +622,7 @@ function PanelCamara({
           controlSize="sm"
         >
           {!modelo ? <option value={c.productoId ?? ""}>{c.modelo}</option> : null}
-          {MODELOS_CAMARA.map((m) => (
+          {todasLasCamarasDelCatalogo().map((m) => (
             <option key={m.id} value={m.id}>
               {etiquetaModelo(m)}
             </option>
