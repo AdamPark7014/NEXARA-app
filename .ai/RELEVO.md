@@ -1,5 +1,12 @@
 # RELEVO
 
+- **02-11 ~17:20 (claude-code) — Giro de UI/UX: «Maqueta viva» tampoco convenció. No se construye nada hasta que Adam señale referencias.**
+  - **Qué pasó:** Adam vio el concepto en 3D y respondió «No me convence», sin decir por qué. Producción y Core no cambiaron.
+  - **Hipótesis, sin confirmar:** repite dos cosas que ya rechazó en ARTA el 01 y 02-11: contenido de ejemplo en vez de la empresa real, y recorrido forzado con el scroll.
+  - **Siguiente paso:** se le entregó una lámina de 7 sitios reales para que señale cuál se acerca: ETEK (él la nombró el 23-09), Apple y Stripe (26-10, con el dueño), Verkada, Ubiquiti, Anduril y Convergint (del mismo giro que NEXARA, con versión en México).
+  - **Material real disponible para lo que elija:** fotos de obra y monitoreo en `apps/web/public/fotos`, 11 retratos con uniforme en `public/fotos/equipo` y las cifras de la portada. Falta saber qué obras y clientes se pueden nombrar en público.
+  - **Trampa:** antes de proponer diseño a Adam, leer lo que ya aprobó y rechazó en otras webs suyas (`nexara-web-publica-rediseno-claro`, `nexara-web-2026-propuesta`, `arta-inicio-nivel-apple` en la memoria). Esta vez lo revisé después de dos rechazos.
+
 - **02-11 ~16:40 (claude-code) — Giro de UI/UX: «Obra» subió a producción, Adam la rechazó y se deshizo; Core «Consola» no se subió.**
   - **Qué pasó:** Adam eligió «Portada B, Core C» en un canvas de tres direcciones. La portada B (`e4331e06`) salió a producción. Al verla dijo: «se ve horrible, se veía mucho mejor antes» y «por qué rayos es naranja». El naranja lo elegí yo; él nunca lo pidió.
   - **Regreso:** `752e479b` deja los 32 archivos de `e4331e06` como estaban. Nadie más los había tocado. Verificado en producción: azul `#0060f0`, aurora, 6 baldosas y botones redondos; `h1`, canonical y robots sin cambio. No corrí pruebas de web sobre el regreso: el código volvió byte a byte al estado anterior.
