@@ -1,0 +1,372 @@
+/* «Cotizar con IA» (muestra aprobada por Adam el 01-11, solo tokens --ui-*). */
+.caja {
+  display: grid;
+  gap: var(--doc-seccion, 20px);
+  min-width: 0;
+}
+
+.tarjeta {
+  min-width: 0;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
+}
+
+.cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px 0;
+}
+
+.icono {
+  color: var(--ui-brand-text);
+  font-size: 18px !important;
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-section);
+  line-height: var(--ui-lh-section);
+  letter-spacing: var(--ui-tracking-section);
+}
+
+.cuerpo {
+  display: grid;
+  gap: 12px;
+  padding: 12px 20px 20px;
+  min-width: 0;
+  /* Según el ancho de la tarjeta, no el de la pantalla: al lado de la vista previa también se angosta. */
+  container: tarjeta / inline-size;
+}
+
+.fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pista {
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-meta);
+}
+
+.bien {
+  color: var(--ui-success-text);
+  font-size: var(--ui-fs-meta);
+}
+
+.empuja {
+  margin-left: auto;
+}
+
+.parecida {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--ui-radius-md, 12px);
+  background: var(--ui-info-bg);
+  color: var(--ui-info-text);
+  font-size: var(--ui-fs-label);
+}
+
+.datos {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) 112px;
+  gap: 12px;
+}
+
+.campo {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.etiqueta {
+  color: var(--ui-fg-2);
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-label);
+}
+
+.lista {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md, 12px);
+}
+
+.renglon {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 104px 104px 28px;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.renglon:first-child {
+  border-top: 0;
+}
+
+.titulos {
+  padding-block: 8px;
+  background: var(--ui-surface-2);
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-meta);
+  font-weight: var(--ui-fw-label);
+}
+
+.derecha {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.importe {
+  padding-top: 6px;
+}
+
+.titulos .importe {
+  padding-top: 0;
+}
+
+.numero {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 6px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm, 8px);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: var(--ui-fs-body);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.numero:focus-visible,
+.opcion:focus-visible,
+.quitar:focus-visible {
+  outline: var(--ui-focus-outline, 2px solid var(--ui-brand));
+  outline-offset: var(--ui-focus-offset, 2px);
+}
+
+.partida {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* El nombre se lee como texto y se corrige ahí mismo. */
+textarea.nombre {
+  width: calc(100% + 8px);
+  min-width: 0;
+  max-width: calc(100% + 8px);
+  min-height: 0;
+  padding: 2px 4px;
+  margin: 0 -4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+textarea.nombre:hover {
+  border-color: var(--ui-border);
+}
+
+.detalle {
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-meta);
+  overflow-wrap: anywhere;
+}
+
+.detalle > span + span {
+  margin-left: 6px;
+}
+
+.etiquetaChica {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: var(--ui-fs-caption);
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.tonoLista {
+  background: var(--ui-success-bg);
+  color: var(--ui-success-text);
+}
+
+.tonoElige {
+  background: var(--ui-warning-bg);
+  color: var(--ui-warning-text);
+}
+
+.opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+.opcion {
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm, 8px);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: var(--ui-fs-meta);
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.opcion:hover {
+  background: var(--ui-surface-2);
+}
+
+.opcion strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.opcion[aria-pressed="true"] {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+}
+
+.quitar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-fg-3);
+  cursor: pointer;
+}
+
+.quitar:hover {
+  background: var(--ui-surface-2);
+  color: var(--ui-fg);
+}
+
+.quitar svg {
+  font-size: 18px;
+}
+
+.seccion {
+  margin: 0;
+  color: var(--ui-fg-2);
+  font-size: var(--ui-fs-label);
+  font-weight: 600;
+}
+
+.extras {
+  display: grid;
+  gap: 4px;
+}
+
+.extra {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--ui-radius-sm, 8px);
+  cursor: pointer;
+}
+
+.extra:hover {
+  background: var(--ui-surface-2);
+}
+
+.extra input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--ui-brand);
+}
+
+.extraTexto {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.extraNombre {
+  font-weight: 550;
+}
+
+.pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.total {
+  font-family: var(--ui-font-display);
+  font-size: var(--ui-text-title);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+@container tarjeta (max-width: 520px) {
+  .datos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* El nombre arriba, a todo lo ancho; cantidad, precio e importe debajo. */
+  .titulos {
+    display: none;
+  }
+
+  .renglon {
+    grid-template-columns: 64px minmax(108px, 1fr) minmax(0, 1fr) 28px;
+    grid-template-areas:
+      "partida partida partida quitar"
+      "cant precio importe importe";
+    row-gap: 8px;
+  }
+
+  .renglon > :nth-child(1) {
+    grid-area: cant;
+  }
+
+  .renglon > :nth-child(2) {
+    grid-area: partida;
+  }
+
+  .renglon > :nth-child(3) {
+    grid-area: precio;
+  }
+
+  .renglon > :nth-child(4) {
+    grid-area: importe;
+  }
+
+  .renglon > :nth-child(5) {
+    grid-area: quitar;
+  }
+}

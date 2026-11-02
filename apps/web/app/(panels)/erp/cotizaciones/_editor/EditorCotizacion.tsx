@@ -64,6 +64,8 @@ import {
 import { folioAlEnviar } from "@/lib/cotizacion-folio";
 import { esSeccionPropuesta, type SeccionPropuesta } from "@/lib/vista-previa-vivo";
 import { conCondicionesSugeridas, type SeccionesOpcionales } from "@/lib/cotizacion-personalizacion";
+import { documentoConPropuesta, documentoCopiadoDe, type DatosDePropuesta } from "@/lib/cotizar-ia";
+import CotizarConIA from "./CotizarConIA";
 import PanelPersonalizar from "./PanelPersonalizar";
 import ElegirPlantilla from "./ElegirPlantilla";
 import { useAutoguardado, type EstadoGuardado } from "./useAutoguardado";
@@ -215,6 +217,8 @@ export default function EditorCotizacion({
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [plantillaElegida, setPlantillaElegida] = useState<number | null>(null);
+  /** «Cotizar con IA» se ofrece mientras se empieza: una cotización que ya trae partidas no la lleva. */
+  const [cotizarAbierta, setCotizarAbierta] = useState(arranque.doc.partidas.length === 0);
   const ancho = useEsAncho();
 
   const aprobada = detalle?.estado === "APROBADA";
@@ -422,6 +426,32 @@ export default function EditorCotizacion({
     plantillaAplicada.current = true;
     void usarPlantilla(plantillaId);
   }, [plantillaId, inicial, token, usarPlantilla]);
+
+  // ─── Cotizar con IA ────────────────────────────────────────────────────
+  const irASeccionPronto = (idSeccion: string) => setTimeout(() => document.getElementById(idSeccion)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+
+  function usarPropuesta(datos: DatosDePropuesta) {
+    const sugeridas = plantillas.find((p) => p.segmento === datos.segmento)?.condiciones ?? null;
+    condicionesPuestas.current = true;
+    setDoc((d) => {
+      const nuevo = documentoConPropuesta(d, datos);
+      // Las condiciones del segmento: si la frase cambió de segmento, se ponen las de ese.
+      return sugeridas && nuevo.segmento !== d.segmento ? { ...nuevo, opciones: conCondicionesSugeridas(nuevo.opciones, sugeridas) } : nuevo;
+    });
+    setCotizarAbierta(false);
+    setAviso("Lista: revisa los precios y se guarda sola.");
+    irASeccionPronto("cotizacion");
+  }
+
+  async function partirDeAnterior(cotizacion: number, cliente: { salesClientId: number | null; nombre: string } | null) {
+    if (!token) return;
+    const anterior = await obtenerCotizacion(token, cotizacion);
+    condicionesPuestas.current = true;
+    setDoc(documentoCopiadoDe(anterior, cliente));
+    setCotizarAbierta(false);
+    setAviso(`Copiada de ${anterior.folio}: es una cotización nueva, con su propio folio.`);
+    irASeccionPronto("cotizacion");
+  }
 
   async function guardarPlantilla(nombre: string, conPartidas: boolean) {
     if (!token || !idRef.current || !(await asegurarGuardado())) return;
@@ -792,6 +822,16 @@ export default function EditorCotizacion({
           className={`${styles.documento} ${pestana === "vista" ? styles.ocultoEnAngosto : ""}`}
           onFocusCapture={alEnfocar}
         >
+          {cotizarAbierta && editable && veCostos ? (
+            <CotizarConIA
+              token={token}
+              excluir={id}
+              hayPartidas={doc.partidas.length > 0}
+              moneda={doc.moneda}
+              onUsar={usarPropuesta}
+              onPartirDe={partirDeAnterior}
+            />
+          ) : null}
           {!id && !inicial ? (
             <ElegirPlantilla token={token} elegida={plantillaElegida} onElegir={usarPlantilla} onError={setError} />
           ) : null}

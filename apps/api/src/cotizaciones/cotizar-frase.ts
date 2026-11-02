@@ -15,7 +15,6 @@ import {
   candidatoLibre,
   complementosDe,
   emparejar,
-  ordenDeOpciones,
   palabrasDePartida,
   type CandidatoPartida,
   type Complemento,
@@ -341,10 +340,9 @@ export function proponerPartida(
   margen: number,
 ): PartidaPropuesta {
   const busqueda = [linea.concepto, linea.modelo].filter(Boolean).join(' ');
-  const { elegida: mejor, seguridad, alternativas: otras } = emparejar(busqueda, candidatos);
+  const { elegida: mejor, seguridad, opciones } = emparejar(busqueda, candidatos);
   // Solo lo seguro se llena solo. Lo que «se parece» queda como opción, sin meter su precio.
   const elegida = seguridad === 'alta' ? mejor : null;
-  const alternativas = seguridad === 'media' && mejor ? [mejor, ...otras].sort(ordenDeOpciones) : otras;
   const base = elegida ?? candidatoLibre(linea.concepto, linea.unidad);
   const precioDeCosto = base.fuente === 'catalogo' && base.unitCost ? conMargen(base.unitCost, margen) : null;
   return {
@@ -365,7 +363,7 @@ export function proponerPartida(
     ultimaVez: base.ultimaVez,
     stock: base.stock,
     productCtId: base.productCtId,
-    alternativas: alternativas.map(sinCotizaciones),
+    alternativas: opciones.map(sinCotizaciones),
   };
 }
 

@@ -45,6 +45,8 @@ export type Emparejada = {
   puntaje: number;
   /** Otras opciones para cambiarla con un clic (sin la elegida). */
   alternativas: CandidatoPartida[];
+  /** Lo que se ofrece en pantalla: lo que abre con lo pedido primero. Si no es segura, incluye a la mejor. */
+  opciones: CandidatoPartida[];
 };
 
 /** A partir de aquí se elige sola; entre media y alta solo se ofrece: un precio equivocado no entra sin que lo vean. */
@@ -201,7 +203,8 @@ export function puntuarPartida(consulta: string[], indexado: Pick<Indexado, 'tit
   const puntaje = logrado / total;
   // «Terminal facial» no es la instalación de una terminal.
   const esTrabajo = indexado.primera != null && DE_SERVICIO.has(indexado.primera);
-  if (esTrabajo && !consulta.some((p) => DE_SERVICIO.has(p))) return puntaje * 0.5;
+  // «Canalización» vale las dos cosas: el material y el trabajo de hacerla.
+  if (esTrabajo && !consulta.some((p) => DE_SERVICIO.has(p) || p === 'canalizacion')) return puntaje * 0.5;
   // «Disco duro» no es una cámara que menciona su disco.
   return hallada(cabeza, indexado.titulo) ? puntaje : puntaje * 0.6;
 }
@@ -229,8 +232,10 @@ function esSegura(consulta: string[], i: Indexado, puntuados: Array<{ i: Indexad
   if (especificas.some((p) => !hallada(p, i.titulo))) return false;
   const utiles = consulta.filter((p) => !DE_SERVICIO.has(p));
   if (!utiles.length && i.titulo.size > consulta.length + 1) return false;
-  // Una sola palabra contra un nombre largo es solo un parecido: «Canalización» no es ese tubo en
-  // particular. Vale si abre el nombre y no hay otra igual: «Access point» cuando solo se ha cotizado uno.
+  // «Canalización» a secas puede ser la canaleta, el tubo o el trabajo: se elige de la lista.
+  if (consulta.length === 1 && consulta[0] === 'canalizacion') return false;
+  // Una sola palabra contra un nombre largo es solo un parecido. Vale si abre el nombre y no hay otra
+  // igual: «Access point» cuando solo se ha cotizado uno.
   if (consulta.length === 1 && i.titulo.size >= 5) {
     const abre = i.primera === consulta[0];
     const otra = puntuados.some((x) => x.i.candidato.fuente === i.candidato.fuente && x.i.primera === consulta[0] && claveDe(x.i.candidato) !== claveDe(i.candidato));
@@ -240,7 +245,13 @@ function esSegura(consulta: string[], i: Indexado, puntuados: Array<{ i: Indexad
   if (utiles.length < consulta.length && !(i.primera && DE_SERVICIO.has(i.primera))) return false;
   // Solo lo que la empresa ya cotizó se llena sin más. Un paquete trae un precio de referencia y una
   // cámara TurboHD: «cámara domo» no basta para meterla junto a un NVR.
-  if (i.candidato.fuente === 'usada') return true;
+  if (i.candidato.fuente === 'usada') {
+    // Con nombres pegados de una ficha, lo pedido debe abrirlo o coincidir en varias cifras y marcas:
+    // «Conector RJ45» no es un convertidor de fibra cuya ficha menciona un puerto RJ45.
+    const pedido = consulta.find((p) => !/^\d/.test(p));
+    const alInicio = [...i.titulo].slice(0, 3).some((p) => pedido != null && hallada(pedido, new Set([p])));
+    return alInicio || i.titulo.size < 8 || especificas.length >= 2;
+  }
   if (!especificas.length) return false;
   const cabeza = consulta.find((p) => !/^\d/.test(p));
   const primeras = [...i.titulo].slice(0, 2);
@@ -253,6 +264,7 @@ function esSegura(consulta: string[], i: Indexado, puntuados: Array<{ i: Indexad
 /** Del mayorista conviene ver primero lo que hay en existencia y más barato. */
 export const ordenDeOpciones = (a: CandidatoPartida, b: CandidatoPartida) =>
   ORDEN_FUENTE[a.fuente] - ORDEN_FUENTE[b.fuente] ||
+  b.veces - a.veces ||
   Number((b.stock ?? 0) > 0) - Number((a.stock ?? 0) > 0) ||
   (a.unitCost ?? a.unitPrice) - (b.unitCost ?? b.unitPrice);
 
@@ -286,21 +298,33 @@ export function emparejar(concepto: string, candidatos: CandidatoPartida[]): Emp
         return true;
       });
   };
+  const cabezaConsulta = consulta.find((p) => !/^\d/.test(p));
+  // «Canalización» también es el trabajo de hacerla: esa opción no debe quedar debajo de los materiales.
+  const abren = new Set(
+    puntuados
+      .filter((x) => cabezaConsulta != null && (x.i.primera === cabezaConsulta || (cabezaConsulta === 'canalizacion' && x.i.primera != null && DE_SERVICIO.has(x.i.primera))))
+      .map((x) => x.i.candidato),
+  );
+  // Lo que ES lo pedido va primero: «Cámara domo» antes que una caja de conexiones para cámara.
+  const enOrden = (a: CandidatoPartida, b: CandidatoPartida) => Number(abren.has(b)) - Number(abren.has(a)) || ordenDeOpciones(a, b);
   if (!mejor || mejor.puntaje < PUNTAJE_MEDIA) {
-    return { elegida: null, seguridad: 'ninguna', puntaje: mejor?.puntaje ?? 0, alternativas: distintas(null).slice(0, MAX_ALTERNATIVAS) };
+    const opciones = distintas(null).slice(0, MAX_ALTERNATIVAS);
+    return { elegida: null, seguridad: 'ninguna', puntaje: mejor?.puntaje ?? 0, alternativas: opciones, opciones };
   }
   const elegida = mejor.i.candidato;
   const segura = mejor.puntaje >= PUNTAJE_ALTA && esSegura(consulta, mejor.i, puntuados, marcas);
   // Junto a una elegida segura solo se ofrece lo que también es eso («Kit de limpieza» no es «Kit Extensor HDMI»).
-  const cabeza = consulta.find((p) => !/^\d/.test(p));
-  const delMismo = new Set(puntuados.filter((x) => !segura || (cabeza != null && x.i.primera === cabeza && x.puntaje >= PUNTAJE_ALTA)).map((x) => x.i.candidato));
+  const delMismo = new Set(puntuados.filter((x) => !segura || (cabezaConsulta != null && x.i.primera === cabezaConsulta && x.puntaje >= PUNTAJE_ALTA)).map((x) => x.i.candidato));
   // Las opciones son las que más se parecen; entre ellas, lo más a la mano primero.
   const alternativas = distintas(elegida)
     .filter((c) => delMismo.has(c))
     .slice(0, MAX_ALTERNATIVAS * 2)
-    .sort(ordenDeOpciones)
+    .sort(enOrden)
     .slice(0, MAX_ALTERNATIVAS);
-  return { elegida, seguridad: segura ? 'alta' : 'media', puntaje: mejor.puntaje, alternativas };
+  const opciones = segura
+    ? alternativas
+    : [elegida, ...distintas(elegida).slice(0, MAX_ALTERNATIVAS * 2)].sort(enOrden).slice(0, MAX_ALTERNATIVAS + 1);
+  return { elegida, seguridad: segura ? 'alta' : 'media', puntaje: mejor.puntaje, alternativas, opciones };
 }
 
 const claveDe = (c: CandidatoPartida) => `${normalizarTexto(c.name)}|${normalizarTexto(c.model)}`;
