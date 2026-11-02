@@ -1,5 +1,7 @@
 # RELEVO
 
+- **02-11 ~12:40 (claude-code) — Freno de disco en el Hetzner.** La limpieza nocturna no alcanzaba: con varias sesiones desplegando, el disco llegó a 89 %, y con 90 % se cae la base. `/root/freno-disco.sh` corre cada 15 minutos (`/etc/cron.d/freno-disco`): desde 85 % recorta la caché de compilación a 3 GB sin esperar a que el servidor quede libre. En su primera corrida liberó 5.09 GB, de 89 % a 83 %, con un despliegue en curso que siguió compilando. Costo: el siguiente build baja dependencias otra vez. Registro en `/var/log/mantenimiento-disco.log`. El disco quedó en 78 %, con 16 GB libres. La limpieza semanal `/root/mantenimiento-disco.sh` ya está instalada: en su simulación de hoy no borraría nada.
+
 - **02-11 ~12:40 (claude-code) — Cierre del retiro del generador muerto: quitarlo no cambió ningún PDF real.**
   - **Medido en producción, solo lectura, con los mismos datos y en el mismo momento:** `4d8d39c8` (con el generador) contra `3d36a41a` (sin él). **0 de 56 cotizaciones cambian**, byte a byte, en el PDF del cliente y en la vista previa, y dicen lo mismo de dónde empieza cada sección. Control: el mismo código dos veces, 0 diferencias. Sin errores.
   - El JS que compilan los dos commits solo difiere en `cotizaciones.service.js` (sin `buildPropuesta`), `personalizacion.js` (sin `opcionesDePropuesta`) y lo borrado. `cotizacion-formato-nexara.js` sale idéntico.
