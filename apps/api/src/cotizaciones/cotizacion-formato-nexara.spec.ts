@@ -169,9 +169,16 @@ describe('formato Nexara', () => {
       expect(pdf.toString('latin1')).toContain('/DCTDecode');
     });
 
-    it('sin proyecto escrito, la hoja de título dice qué se cotiza', async () => {
-      const [, titulo] = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, projectName: null, items: [grupoDice.items[0], instalacion] }));
-      expect(titulo!.replace(/\s+/g, ' ')).toContain('SUMINISTRO E INSTALACIÓN DE EQUIPAMIENTO');
+    it('sin proyecto escrito, la primera hoja dice qué se cotiza', async () => {
+      const [, primera] = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, projectName: null, items: [grupoDice.items[0], instalacion] }));
+      expect(primera!.replace(/\s+/g, ' ')).toContain('SUMINISTRO E INSTALACIÓN DE EQUIPAMIENTO');
+    });
+
+    it('no hay segunda portada: los datos y el alcance ejecutivo van en la misma hoja', async () => {
+      const hojas = textoPorHoja(await generarCotizacionNexaraPdf(grupoDice));
+      for (const esperado of ['MEMORIA DESCRIPTIVA Y PROPUESTA TÉCNICA-ECONÓMICA', 'SUMINISTRO DE EQUIPO CISCO MERAKI', 'Grupo Dice Puebla', 'COTIZACIÓN N°', 'ALCANCE EJECUTIVO']) {
+        expect(deCorrido(hojas[1]!)).toContain(esperado);
+      }
     });
 
     it('el título por omisión sigue a lo cotizado', () => {
@@ -272,7 +279,7 @@ describe('formato Nexara', () => {
         'PROPUESTA ECONÓMICA DETALLADA',
       ];
       const portada = hojas[0]!.replace(/\s+/g, ' ');
-      const interior = hojas.slice(2).join(' ').replace(/\s+/g, ' ');
+      const interior = hojas.slice(1).join(' ').replace(/\s+/g, ' ');
       puntos.forEach((punto, i) => {
         expect(portada).toContain(punto);
         expect(portada).toContain(`0${i + 1}.`);
@@ -288,7 +295,7 @@ describe('formato Nexara', () => {
           opciones: { titulos: { objetivo: 'Resumen del proyecto', cotizacion: 'Inversión' } },
         }),
       );
-      const interior = hojas.slice(2).join('\n');
+      const interior = hojas.slice(1).join('\n');
       expect(hojas[0]).toContain('RESUMEN DEL PROYECTO');
       expect(hojas[0]).toContain('SOLO ESTE PUNTO');
       expect(hojas[0]).toContain('INVERSIÓN');
@@ -435,12 +442,20 @@ describe('formato Nexara', () => {
       }
     }, 30_000);
 
-    it('con un alcance corto la tabla sigue en la misma hoja, y una tabla corta se lleva su cierre', async () => {
-      const f = formatoDesdeCotizacion({ ...grupoDice, items: [grupoDice.items[0]] });
-      const hojas = textoPorHoja(await generarCotizacionNexaraPdf({ ...f, alcance: [], alcanceIntro: [], objetivo: null, garantias: [] }));
-      expect(hojas).toHaveLength(3);
+    it('con un alcance corto la tabla sigue en la misma hoja, y el cierre se queda con ella si cabe', async () => {
+      const f = formatoDesdeCotizacion({ ...grupoDice, items: [{ name: 'Switch', unit: 'Pieza', qty: 1, unitPrice: 100, tax: 16 }] });
+      const sinAlcance = { ...f, alcance: [], alcanceIntro: [], objetivo: null, garantias: [] };
+
+      const conTerminos = textoPorHoja(await generarCotizacionNexaraPdf(sinAlcance));
+      expect(conTerminos).toHaveLength(3);
+      expect(conTerminos[1]).toContain('PROPUESTA ECONÓMICA DETALLADA');
+      expect(conTerminos[1]).toContain('TOTAL PROYECTO (MXN)');
+      expect(conTerminos[2]).toContain('CONDICIONES COMERCIALES');
+
+      const corto = textoPorHoja(await generarCotizacionNexaraPdf({ ...sinAlcance, terminos: [], condicionesPago: '', garantia: '' }));
+      expect(corto).toHaveLength(2);
       for (const esperado of ['PROPUESTA ECONÓMICA DETALLADA', 'TOTAL PROYECTO (MXN)', 'CONDICIONES COMERCIALES', 'ATENTAMENTE']) {
-        expect(hojas[2]).toContain(esperado);
+        expect(corto[1]).toContain(esperado);
       }
     });
 
@@ -672,12 +687,12 @@ describe('formato Nexara', () => {
       'Teléfonos: 2226960350',
     ];
 
-    it('abren la hoja de título, arriba del título', async () => {
-      const [, titulo] = textoPorHoja(await generarCotizacionNexaraPdf(grupoDice));
-      const renglones = titulo!.split('\n');
+    it('abren la primera hoja interior, arriba del título', async () => {
+      const [, primera] = textoPorHoja(await generarCotizacionNexaraPdf(grupoDice));
+      const renglones = primera!.split('\n');
       for (const linea of fiscales) expect(renglones).toContain(linea);
       // Se dibujan antes que el título, en el orden pedido.
-      const posiciones = [...fiscales, 'MEMORIA DESCRIPTIVA Y'].map((linea) => renglones.indexOf(linea));
+      const posiciones = [...fiscales, 'MEMORIA DESCRIPTIVA Y PROPUESTA TÉCNICA-ECONÓMICA'].map((linea) => renglones.indexOf(linea));
       expect(posiciones.every((n) => n >= 0)).toBe(true);
       expect(posiciones).toEqual([...posiciones].sort((a, b) => a - b));
     });

@@ -1,5 +1,12 @@
 # RELEVO
 
+- **02-11 ~11:30 (claude-code) — PDF de cotización: sin segunda portada, decisión de Adam.**
+  - **Pedido:** «sigue con una hoja que parece segunda portada pero pobre». Le enseñé dos opciones sobre su cotización 58 y dijo «la más profesional»; era la que le recomendé, sin esa hoja.
+  - **Se aparta del Canva a propósito:** su hoja 2 es solo título y proyecto sobre blanco, sin arte de fondo; revisado con la página ya cargada. Copiarla era lo que se veía pobre. No regresarla por «igualar el diseño».
+  - **`arranqueDePropuesta`:** en la primera hoja interior van datos fiscales, «Memoria descriptiva…» en una línea verde, proyecto (o `trabajoDePartidas()`) y un recuadro de tres columnas con los datos que traiga la cotización. El alcance ejecutivo sigue en esa hoja.
+  - **`altoDeInicio`:** un bloque de hasta 170 pt no se parte. Si no cabe, pasa entero a la hoja siguiente.
+  - **Medición, 56 cotizaciones reales:** de 321 a 297 hojas; hojas a menos de la mitad, de 11 a 8; llenado interior de 80 % a 78 %, porque los bloques cortos ya no se parten. En las largas la tabla puede empezar a media hoja y seguir en la siguiente: la 60 se queda en 6 hojas.
+
 - **02-11 ~11:40 (claude-code) — Programa Velocidad Core, Ola 1 en producción: cronómetro, freno de salida, tope de avisos, revisión por jefe y «Ya la envié».** (`96202866`, `21bcd67e`, `571f87ca`, `1f6b1ade`)
   - Adam aprobó con «Sí, arranca Ola 1». Plan y mockups: <https://claude.ai/artifact/EMhiXKV9NPgUmsqFjVVtMu>. Las Olas 2 a 7 siguen sin construirse.
   - **Cronómetro:** tabla `proceso_tiempos`, `POST /api/proceso-tiempos` y `lib/cronometro-proceso.ts`. Mide `asignar`, `autoasignar`, `asignar_ia`, `cotizar` y `revisar`, solo en web: las apps quedan para la Ola 3. No se audita cada medición. Es la línea base: no publicar formatos sin 3 días laborales de datos.

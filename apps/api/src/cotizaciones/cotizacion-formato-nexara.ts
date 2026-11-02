@@ -1,7 +1,7 @@
 /**
  * La cotización que recibe el cliente, con el diseño de NEXARA («Memoria descriptiva y propuesta
- * técnica-económica»): portada, hoja de título, alcance, planos, garantías, partidas, subtotal / IVA /
- * total, importe con letra, condiciones y firma. El costo y el margen no entran.
+ * técnica-económica»): portada, datos de la propuesta, alcance, planos, garantías, partidas, subtotal /
+ * IVA / total, importe con letra, condiciones y firma. El costo y el margen no entran.
  */
 import fs from 'fs';
 import path from 'path';
@@ -32,7 +32,6 @@ const ZEBRA = '#F2F5F8';
 const LINEA = '#D8DEE6';
 const TINTA = '#222222';
 
-const PAGE_W = 612;
 const LM = 46;
 const AW = 506;
 const TITULO_X = 58;
@@ -721,8 +720,8 @@ function apartadosDe(q: FormatoNexara, hayPlanos: boolean): Apartado[] {
 }
 
 /**
- * El título grande de la hoja cuando nadie escribió un proyecto (casi 6 de cada 10 cotizaciones): lo
- * que se está cotizando, de los grupos de sus partidas. Sin esto la hoja quedaba hueca.
+ * El título de la propuesta cuando nadie escribió un proyecto (casi 6 de cada 10 cotizaciones): lo
+ * que se está cotizando, de los grupos de sus partidas.
  */
 export function trabajoDePartidas(partidas: Array<Pick<PartidaFormato, 'grupo' | 'titulo' | 'unidad'>>): string {
   if (partidas.length && partidas.every((d) => /licen|suscrip/i.test(`${d.titulo} ${d.unidad}`))) return 'Licenciamiento';
@@ -734,15 +733,12 @@ export function trabajoDePartidas(partidas: Array<Pick<PartidaFormato, 'grupo' |
   return `${entrega} de ${equipo ? 'equipamiento' : 'materiales'}`;
 }
 
-/** Alto de una columna de datos de la hoja de título. */
-const TITULO_DATOS = { etiqueta: 7.4, valor: 10.2, sube: 11, renglon: 13.6, despues: 6 };
-
 /**
- * Hoja de título: «Memoria descriptiva…», el proyecto, y una sola vez los datos de la cotización,
- * todo junto y centrado en la hoja para que no quede un hueco entre el título y los datos.
- * Los datos fiscales del emisor van arriba, junto al logotipo (los pidió Adam en toda cotización).
+ * Arranque de la primera hoja interior: los datos fiscales junto al logotipo (los pidió Adam en toda
+ * cotización), el proyecto y, una sola vez, los datos de la cotización. El contenido sigue en esa misma
+ * hoja: una hoja aparte con el título parecía una segunda portada, pero pobre.
  */
-function hojaDeTitulo(p: Lapiz, q: FormatoNexara) {
+function arranqueDePropuesta(p: Lapiz, q: FormatoNexara) {
   hoja(p);
   const { doc } = p;
   const xFiscal = LM + 28;
@@ -751,74 +747,57 @@ function hojaDeTitulo(p: Lapiz, q: FormatoNexara) {
     doc.text(linea, xFiscal, 16 + i * 9.6, { lineBreak: false });
   });
 
-  // El cuerpo más grande con el que el proyecto cabe en cuatro renglones.
-  const anchoProyecto = 480;
-  const proyecto = (q.proyecto || trabajoDePartidas(q.partidas)).toUpperCase();
-  let size = 29;
-  doc.font(F.fuerte);
-  while (size > 14 && (doc.fontSize(size), doc.heightOfString(proyecto, { width: anchoProyecto, lineGap: size * 0.42 })) > size * 1.42 * 4.2) size -= 1;
-  const opcionesProyecto = { width: anchoProyecto, align: 'center' as const, lineGap: size * 0.42 };
-  doc.fontSize(size);
-  const altoProyecto = proyecto ? doc.heightOfString(proyecto, opcionesProyecto) : 0;
+  let y = 73;
+  doc.font(F.semi).fontSize(8.6).fillColor(VERDE_OSC);
+  doc.text('MEMORIA DESCRIPTIVA Y PROPUESTA TÉCNICA-ECONÓMICA', TITULO_X, y, { lineBreak: false, characterSpacing: 0.5 });
+  y += 15;
 
-  const izquierda: Array<[string, string]> = [
+  // El cuerpo más grande con el que el proyecto cabe en dos renglones, al lado del logotipo.
+  const proyecto = (q.proyecto || trabajoDePartidas(q.partidas)).toUpperCase();
+  if (proyecto) {
+    const opciones = (size: number) => ({ width: 436, lineGap: size * 0.2 });
+    let size = 19;
+    doc.font(F.fuerte);
+    while (size > 11 && (doc.fontSize(size), doc.heightOfString(proyecto, opciones(size))) > size * 1.2 * 2 + size * 0.5) size -= 1;
+    doc.fontSize(size).fillColor(GRIS_TITULO);
+    doc.text(proyecto, TITULO_X, y, opciones(size));
+    y += doc.heightOfString(proyecto, opciones(size));
+  }
+
+  const campos: Array<[string, string]> = [
     ['Cliente', q.cliente],
+    ['Cotización N°', q.numero],
+    ['Fecha de emisión', q.fecha],
     ['Atención', q.atencion],
+    ['Responsable comercial', q.responsable],
     ['Teléfono', q.telefono],
     ['Correo', q.correo],
     ['Ubicación', q.ubicacion],
-  ];
-  const derecha: Array<[string, string]> = [
-    ['Cotización N°', q.numero],
-    ['Fecha de emisión', q.fecha],
-    ['Responsable comercial', q.responsable],
-  ];
-  const [xIzq, anchoCol] = [66, 230];
-  const xDer = xIzq + anchoCol + 20;
-  const D = TITULO_DATOS;
-  const lineasDe = (valor: string) => partirTexto(p, valor.trim(), anchoCol, D.valor, F.texto).slice(0, 2);
-  const altoColumna = (filas: Array<[string, string]>) =>
-    filas.reduce((acc, [, valor]) => (valor.trim() ? acc + D.sube + lineasDe(valor).length * D.renglon + D.despues : acc), 0);
-  const altoDatos = 15 + Math.max(altoColumna(izquierda), altoColumna(derecha));
+  ].filter(([, valor]) => valor!.trim()) as Array<[string, string]>;
 
-  // Título, proyecto y datos forman un solo bloque, centrado entre el encabezado y el pie.
-  const altoTitulo = 2 * 36;
-  const espacio = altoProyecto ? 34 : 0;
-  const altoBloque = altoTitulo + espacio + altoProyecto + 42 + altoDatos;
-  let y = Math.max(TOP + 8, TOP + (BOTTOM - TOP - altoBloque) / 2);
+  const { x, ancho } = RECUADRO;
+  const columnas = 3;
+  const anchoCelda = (ancho - 28) / columnas;
+  const lineasDe = (valor: string) => partirTexto(p, valor.trim(), anchoCelda - 8, 9.6, F.texto).slice(0, 2);
+  const filas: Array<Array<[string, string]>> = [];
+  for (let i = 0; i < campos.length; i += columnas) filas.push(campos.slice(i, i + columnas));
+  const altoFila = (fila: Array<[string, string]>) => 11 + Math.max(...fila.map(([, v]) => lineasDe(v).length)) * 13 + 7;
+  const altoCaja = 11 + filas.reduce((acc, fila) => acc + altoFila(fila), 0) + 3;
 
-  const centro = { width: 500, align: 'center' as const };
-  const xCentro = (PAGE_W - 500) / 2;
-  doc.font(F.fuerte).fontSize(25).fillColor(GRIS_TITULO);
-  doc.text('MEMORIA DESCRIPTIVA Y', xCentro, y, { ...centro, lineBreak: false });
-  doc.text('PROPUESTA TÉCNICA-ECONÓMICA', xCentro, y + 36, { ...centro, lineBreak: false });
-  y += altoTitulo + espacio;
-  if (altoProyecto) {
-    doc.font(F.fuerte).fontSize(size).fillColor(GRIS_TITULO);
-    doc.text(proyecto, (PAGE_W - anchoProyecto) / 2, y, opcionesProyecto);
-    y += altoProyecto;
-  }
-
-  const yDatos = y + 42;
+  const arriba = Math.max(y + 11, 120);
   doc.save();
-  doc.moveTo(xIzq, yDatos).lineTo(PAGE_W - xIzq, yDatos).lineWidth(1).strokeColor(VERDE).stroke();
+  doc.roundedRect(x, arriba, ancho, altoCaja, 7).fill(GRIS_RECUADRO);
   doc.restore();
-  for (const [x, filas] of [[xIzq, izquierda], [xDer, derecha]] as Array<[number, Array<[string, string]>]>) {
-    let yFila = yDatos + 15;
-    for (const [etiqueta, valor] of filas) {
-      if (!valor.trim()) continue;
-      renglonFijo(p, etiqueta.toUpperCase(), x, yFila, anchoCol, F.semi, D.etiqueta, GRIS);
-      yFila += D.sube;
-      for (const linea of lineasDe(valor)) {
-        if (yFila + D.renglon > BOTTOM) break;
-        renglonFijo(p, linea, x, yFila, anchoCol, F.texto, D.valor, TINTA);
-        yFila += D.renglon;
-      }
-      yFila += D.despues;
-    }
+  let yFila = arriba + 11;
+  for (const fila of filas) {
+    fila.forEach(([etiqueta, valor], c) => {
+      const xCelda = x + 14 + c * anchoCelda;
+      renglonFijo(p, etiqueta.toUpperCase(), xCelda, yFila, anchoCelda - 8, F.semi, 7, GRIS);
+      lineasDe(valor).forEach((linea, n) => renglonFijo(p, linea, xCelda, yFila + 11 + n * 13, anchoCelda - 8, F.texto, 9.6, TINTA));
+    });
+    yFila += altoFila(fila);
   }
-  // Lo que sigue arranca en hoja nueva.
-  p.y = BOTTOM;
+  p.y = arriba + altoCaja + 2;
 }
 
 /** Texto libre: un renglón que empieza con viñeta se imprime como viñeta, lo demás como párrafo. */
@@ -850,12 +829,16 @@ function cuerpoDeBloque(p: Lapiz, bloque: FormatoNexara['alcance'][number]) {
   }
 }
 
-/** Lo que debe caber junto al título de un bloque: su primer párrafo y su primera viñeta. */
+/**
+ * Lo que debe caber junto al título de un bloque: si es corto, todo (una viñeta sola en la hoja
+ * siguiente se ve mal); si no, su primer párrafo y su primera viñeta.
+ */
 function altoDeInicio(p: Lapiz, bloque: FormatoNexara['alcance'][number]): number {
   const renglones = (t: string, ancho: number) => partirTexto(p, t, ancho, CUERPO.size, F.texto).length * CUERPO.lh;
-  const primero = parrafosDe(bloque.texto)[0];
-  const vineta1 = bloque.vinetas[0];
-  return (primero ? renglones(primero, AW) + 6 : 0) + (vineta1 ? renglones(vineta1, AW - 26) + 3 : 0);
+  const parrafos = parrafosDe(bloque.texto).map((t) => renglones(t, AW) + 6);
+  const vinetas = bloque.vinetas.map((v) => renglones(v, AW - 26) + 3);
+  const todo = [...parrafos, ...vinetas].reduce((acc, n) => acc + n, 0);
+  return todo <= 170 ? todo : (parrafos[0] ?? 0) + (vinetas[0] ?? 0);
 }
 
 function apartadoDeAlcance(p: Lapiz, q: FormatoNexara, a: Apartado) {
@@ -1350,9 +1333,10 @@ export type SeccionesPropuesta = Partial<Record<'portada' | 'objetivo' | 'alcanc
 
 /**
  * La cotización que descarga y recibe el cliente: la «Memoria descriptiva y propuesta
- * técnica-económica» del diseño de NEXARA. Portada, hoja de título, alcance ejecutivo (lo escrito o
- * un borrador corto de las partidas), bloques de alcance, planos, póliza de garantías, propuesta
- * económica y, al final, condiciones, términos y firma. Cada dato se imprime una sola vez.
+ * técnica-económica» del diseño de NEXARA. Portada, datos de la propuesta y, en esa misma hoja, el
+ * alcance ejecutivo (lo escrito o un borrador corto de las partidas), bloques de alcance, planos, póliza
+ * de garantías, propuesta económica y, al final, condiciones, términos y firma. Cada dato se imprime
+ * una sola vez.
  *
  * Una imagen de plano va a hoja propia; un PDF (lo normal en CAD y en la hoja de servicio) anexa sus
  * páginas reales justo después del apartado de planos, sin convertirlo a imagen: no pierde nitidez ni
@@ -1384,8 +1368,7 @@ export async function generarCotizacionNexaraPdf(
   doc.addPage({ size: 'LETTER', margin: 0 });
   p.pagina = 1;
   dibujarPortada(doc, { version: q.version, indice: apartados.map(({ numero, titulo }) => ({ numero, titulo })) });
-  hojaDeTitulo(p, q);
-  hoja(p);
+  arranqueDePropuesta(p, q);
 
   // Última hoja antes de los planos en PDF: ahí se insertan sus páginas.
   let paginaTrasPlanos = 0;

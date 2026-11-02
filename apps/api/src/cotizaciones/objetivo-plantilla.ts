@@ -217,7 +217,7 @@ const entero = (n: number) => Math.round(n).toLocaleString('es-MX');
 export function objetivoDePropuesta(input: {
   segmento: unknown;
   partidas: PartidaAgrupable[];
-  /** Ya no se imprimen aquí: el proyecto va en la hoja de título y la vigencia en las condiciones. */
+  /** Ya no se imprimen aquí: el proyecto va arriba de la primera hoja y la vigencia en las condiciones. */
   proyecto?: string | null;
   vigenciaDias?: number | null;
   objetivoLibre?: string | null;
