@@ -17,7 +17,7 @@ import {
   textoIntervalo,
   textoServicio,
 } from "./vehiculos-ficha";
-import { datosDelNombre } from "./vehiculos-ficha";
+import { aPorcentaje, combinarPlan, datosDelNombre, faltantesDeFicha, type FichaVehiculo } from "./vehiculos-ficha";
 
 describe("datos del nombre del vehículo", () => {
   it("separa marca, modelo y año", () => {
@@ -204,5 +204,105 @@ describe("captura", () => {
     expect(nombreDeVehiculo({ marca: "Nissan", modelo: "Frontier", anio: 2026 })).toBe("Nissan Frontier 2026");
     expect(nombreDeVehiculo({ modelo: "Frontier" })).toBe("Frontier");
     expect(nombreDeVehiculo({})).toBe("");
+  });
+});
+
+describe("porcentajes", () => {
+  it("no redondea a entero: un 4.5 % sigue siendo 4.5 %", () => {
+    expect(aPorcentaje(0.045)).toBe(4.5);
+    expect(aPorcentaje(0.3)).toBe(30);
+    expect(aPorcentaje(0.07)).toBe(7);
+  });
+});
+
+describe("el manual sobre un programa que ya existe", () => {
+  const delManual = (concepto: string, cadaKm: number | null, cadaMeses: number | null, paginaManual = 431) => ({ concepto, cadaKm, cadaMeses, paginaManual });
+
+  it("mismo concepto, mismo renglón: conserva el id y toma lo del manual", () => {
+    const salida = combinarPlan([{ id: 31, concepto: "Aceite y filtro", cadaKm: 10000, cadaMeses: 12, costoEstimado: 1200 }], [delManual("Cambio de aceite de motor y filtro", 15000, 12)]);
+    expect(salida).toEqual([{ id: 31, concepto: "Aceite y filtro", cadaKm: 15000, cadaMeses: 12, costoEstimado: 1200, paginaManual: 431, estandar: false }]);
+  });
+
+  it("reconoce el mismo concepto dicho de otra forma", () => {
+    const actual = [
+      { id: 1, concepto: "Rotación de llantas", cadaKm: 10000 },
+      { id: 2, concepto: "Revisión de frenos", cadaKm: 20000 },
+    ];
+    const salida = combinarPlan(actual, [delManual("Rotar neumáticos", 12000, null), delManual("Inspección de balatas", 24000, 12)]);
+    expect(salida.map((p) => [p.id, p.cadaKm])).toEqual([
+      [1, 12000],
+      [2, 24000],
+    ]);
+  });
+
+  it("no confunde un filtro con otro", () => {
+    const salida = combinarPlan([{ id: 1, concepto: "Filtro de aire", cadaKm: 20000 }], [delManual("Aceite y filtro", 10000, 12)]);
+    expect(salida.map((p) => p.concepto)).toEqual(["Filtro de aire", "Aceite y filtro"]);
+    expect(salida[0].cadaKm).toBe(20000);
+  });
+
+  it("lo que solo traía el estándar cede; lo ya guardado se queda", () => {
+    const salida = combinarPlan(
+      [
+        { concepto: "Filtro de aire", cadaKm: 20000, estandar: true },
+        { id: 9, concepto: "Lavado de chasis", cadaMeses: 6 },
+      ],
+      [delManual("Aceite y filtro", 10000, 12)],
+    );
+    expect(salida.map((p) => p.concepto)).toEqual(["Lavado de chasis", "Aceite y filtro"]);
+  });
+
+  it("un manual sin programa no borra nada", () => {
+    const actual = [{ concepto: "Filtro de aire", cadaKm: 20000, estandar: true }];
+    expect(combinarPlan(actual, [])).toEqual(actual);
+  });
+
+  it("cada renglón se usa una sola vez", () => {
+    const salida = combinarPlan([{ id: 1, concepto: "Aceite", cadaKm: 10000 }], [delManual("Aceite de motor", 15000, null), delManual("Aceite y filtro", 15000, 12)]);
+    expect(salida.map((p) => p.id ?? "nuevo")).toEqual([1, "nuevo"]);
+  });
+});
+
+describe("lo que falta por capturar", () => {
+  const VACIA = {
+    vehiculo: { id: 2, nombre: "Nissan Frontier 2026", placas: null, estatus: "Disponible", activo: true },
+    tieneFicha: false,
+    especificacion: null,
+    odometro: null,
+    rendimiento: { oficial: null, real: null, usado: null, fuente: null, faltan: 3 },
+    cargas: [],
+    programa: [],
+    documentos: [],
+    costos: null,
+    avisos: { sinFichaDeCosto: true, tanquesFaltantes: 2, salidasSinFoto: 0, sinSalidas: true },
+    acceso: { veCostos: true },
+  } as unknown as FichaVehiculo;
+  const ids = (f: FichaVehiculo) => faltantesDeFicha(f).map((x) => x.id);
+
+  it("de un vehículo vacío lo pide todo, con el manual primero", () => {
+    expect(ids(VACIA)).toEqual(["manual", "precio", "km", "rendimiento", "programa", "tarjeta", "poliza", "verificacion", "gasolina", "salida"]);
+  });
+
+  it("quien no ve costos no ve el precio entre lo que falta", () => {
+    expect(ids({ ...VACIA, acceso: { veCostos: false } })).not.toContain("precio");
+  });
+
+  it("completo, no pide nada", () => {
+    const completa = {
+      ...VACIA,
+      odometro: { km: 12480, fecha: "2026-11-01" },
+      rendimiento: { ...VACIA.rendimiento, oficial: 11.91 },
+      cargas: [{ id: 1 }],
+      programa: [{ id: 1 }],
+      documentos: ["MANUAL", "TARJETA", "POLIZA", "VERIFICACION"].map((tipo) => ({ tipo })),
+      costos: { porKm: 6.64 },
+      avisos: { ...VACIA.avisos, sinSalidas: false },
+    } as unknown as FichaVehiculo;
+    expect(ids(completa)).toEqual([]);
+  });
+
+  it("basta con los km del alta aunque aún no haya lecturas", () => {
+    const conAlta = { ...VACIA, especificacion: { odometroAlta: 87000 } } as unknown as FichaVehiculo;
+    expect(ids(conAlta)).not.toContain("km");
   });
 });

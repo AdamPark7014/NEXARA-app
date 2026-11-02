@@ -16,7 +16,7 @@ import { Barra, Medidor, Pastilla, c, v } from "./piezas";
 
 const ETIQUETA_DESTINO = { PROYECTO: "Proyecto", COTIZACION: "Cotización", OFICINA: "Oficina", SIN_LIGAR: "Sin ligar" };
 
-export default function ResumenVehiculo({ ficha, estado }: { ficha: FichaVehiculo; estado?: React.ReactNode }) {
+export default function ResumenVehiculo({ ficha, estado, faltantes }: { ficha: FichaVehiculo; estado?: React.ReactNode; faltantes?: React.ReactNode }) {
   const { costos, desgaste, proximoServicio: proximo, rendimiento, tanques } = ficha;
   return (
     <>
@@ -28,6 +28,7 @@ export default function ResumenVehiculo({ ficha, estado }: { ficha: FichaVehicul
 
         <aside className={v.lateral}>
           {estado}
+          {faltantes}
           <section className={c.card}>
             <h2 className={v.titulo}>Desgaste</h2>
             {desgaste.vida.totalKm ? (

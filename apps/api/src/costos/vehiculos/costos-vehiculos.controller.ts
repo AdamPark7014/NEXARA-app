@@ -50,6 +50,8 @@ const TOPE_PDF = 120 * 1024 * 1024;
 const TOPE_FOTO = 15 * 1024 * 1024;
 const VER = [PERMISSIONS.VEHICLES_VIEW, PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VEHICLES_INVENTORY];
 const USAR = [PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VEHICLES_INVENTORY];
+/** La contadora ve Tarifas por su puesto, aunque su rol no administre vehículos. */
+const ESTANDAR = [...VER, PERMISSIONS.CONSOLE_ACCESS];
 
 /** Se guarda con su extensión: el navegador abre el PDF en vez de bajar un archivo sin nombre. */
 const almacen = () =>
@@ -126,6 +128,10 @@ class FichaDto {
   @IsOptional() @ValidateNested() @Type(() => ManualDto) manual?: ManualDto | null;
 }
 
+class EstandarDto extends CostoDto {
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => PlanDto) plan?: PlanDto[] | null;
+}
+
 class PlanCompletoDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => PlanDto) plan!: PlanDto[];
 }
@@ -185,9 +191,15 @@ export class CostosVehiculosController {
   /* Rutas fijas antes que `:id`. */
 
   @Get('omisiones')
-  @RBAC({ anyPermissions: VER })
-  omisiones() {
-    return this.vehiculos.omisiones();
+  @RBAC({ anyPermissions: ESTANDAR })
+  async omisiones(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    return this.vehiculos.omisiones(companyId, await this.actor(user));
+  }
+
+  @Put('estandar')
+  @RBAC({ anyPermissions: ESTANDAR })
+  async guardarEstandar(@Body() dto: EstandarDto, @CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    return this.vehiculos.guardarEstandar(companyId, dto, await this.actor(user));
   }
 
   @Get('flotilla')

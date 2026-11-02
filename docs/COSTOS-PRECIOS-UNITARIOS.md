@@ -306,6 +306,24 @@ apps faltan: van aparte porque pasan por las tiendas.
 - **Apps:** sin construir. En la web, «Cargar gasolina» es un diálogo y «Mis vehículos» lee la foto del tablero al salir y al volver.
 - **Migración y despliegue:** solo agrega columnas y tablas. La imagen de la API suma `poppler-utils` para `pdftotext`.
 
+### Alimentarlo sin programar
+
+Adam decidió el 01-11-2026 no pasar el manual de la Frontier por ahora: el sistema debe quedar listo para que él lo alimente cuando
+lo tenga. Se hace todo desde pantallas:
+
+- **Estándar de vehículos, en `/erp/costos/tarifas`:** las cifras de costo y el programa de servicio con que arranca cada vehículo
+  nuevo. Lo cambian dirección y contabilidad. Se guarda por empresa en `SystemSetting` (`vehiculos.estandar`), sin migración, y no
+  toca fichas guardadas ni viajes cargados. Quien no ve costos recibe solo el programa.
+- **Valores de fábrica:** `OMISIONES_COSTO` y `PLAN_ESTANDAR` son supuestos de arranque, no datos de un fabricante. Por eso los
+  renglones que salen del estándar se ven marcados en la revisión y solo se guardan si alguien confirma.
+- **El manual puede llegar en cualquier momento:** la revisión de la ficha tiene «Subir manual». Llena lo que falte, no toca lo escrito
+  y corrige el programa con `combinarPlan`: mismo concepto, mismo renglón, para no perder los servicios ya hechos. Ya no se ofrece en
+  «Agregar documento», donde quedaba guardado sin leerse.
+- **«Falta por capturar», en el Resumen de la ficha:** lo que el sistema aún no sabe de ese vehículo, cada cosa con su atajo. Solo lo
+  ve quien administra inventario, y nada de eso detiene el trabajo.
+- **Sigue en código:** `conuee-2023.ts`. Si CONUEE publica otra edición hay que regenerar la tabla; mientras, el rendimiento se puede
+  escribir a mano en la ficha.
+
 **IA, por la puerta y con esfuerzo bajo, sin razonamiento.** Eval: `npx tsx src/ai/eval/correr-vehiculo.ts` (resumen en
 `src/ai/eval/resultados/vehiculo.json`).
 

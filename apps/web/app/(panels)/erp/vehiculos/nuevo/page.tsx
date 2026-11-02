@@ -14,13 +14,15 @@ import { Button, ButtonLink, SkeletonRows } from "@/components/base";
 import { useAccesoCostos } from "@/components/costos/piezas";
 import { Aviso } from "@/components/mesa-contable/piezas";
 import { useUser } from "@/components/UserContext";
-import { IconoManual, Pastilla, PastillaFuente, c, v } from "@/components/vehiculos/piezas";
+import { FilaPrograma, IconoManual, Pastilla, PastillaFuente, c, v } from "@/components/vehiculos/piezas";
 import { pesos2 } from "@/lib/costos";
 import { formatApiError } from "@/lib/erp-api";
 import { VEHICULOS_PATH } from "@/lib/recursos-core";
 import {
   aNumero,
+  aPorcentaje,
   buscarRendimientoOficial,
+  combinarPlan,
   getFicha,
   getOmisiones,
   guardarFicha,
@@ -74,11 +76,11 @@ type Costo = Record<keyof Omisiones | "valor", string>;
 const costoDesde = (o: Omisiones, valor = ""): Costo => ({
   valor,
   valorLlantas: String(o.valorLlantas),
-  rescatePct: String(Math.round(o.rescatePct * 100)),
+  rescatePct: String(aPorcentaje(o.rescatePct)),
   vidaKm: String(o.vidaKm),
   kmAnio: String(o.kmAnio),
-  tasaInteres: String(Math.round(o.tasaInteres * 100)),
-  primaSeguro: String(Math.round(o.primaSeguro * 100)),
+  tasaInteres: String(aPorcentaje(o.tasaInteres)),
+  primaSeguro: String(aPorcentaje(o.primaSeguro)),
   ko: String(o.ko),
   precioCombustible: String(o.precioCombustible),
   costoAceite: String(o.costoAceite),
@@ -137,23 +139,36 @@ function AltaVehiculo() {
   const [kmHoy, setKmHoy] = useState("");
   const [fechaCompra, setFechaCompra] = useState("");
   const [plan, setPlan] = useState<PlanEditable[]>([]);
+  const [planEstandar, setPlanEstandar] = useState<PlanEditable[]>([]);
   const [manual, setManual] = useState<DatosFicha["manual"]>(null);
+  const [yaTieneManual, setYaTieneManual] = useState(false);
   const [costo, setCosto] = useState<Costo | null>(null);
   const [ajustando, setAjustando] = useState(false);
   const [recostear, setRecostear] = useState(false);
   const [tieneTarifa, setTieneTarifa] = useState(false);
   const entrada = useRef<HTMLInputElement>(null);
+  const estandarPropuesto = useRef(false);
 
   const valor = (id: string) => campos[id]?.valor ?? "";
   const poner = (id: string, texto: string) => setCampos((x) => ({ ...x, [id]: { valor: texto, fuente: { tipo: "CAPTURA" } } }));
 
-  // Valores iniciales de la ficha de costo.
+  // Con qué arranca: el estándar de la empresa, que se ajusta en Tarifas.
   useEffect(() => {
     if (!token) return;
     getOmisiones(token)
-      .then((o) => setCosto((previo) => previo ?? costoDesde(o)))
+      .then((o) => {
+        if (o.vidaKm != null) setCosto((previo) => previo ?? costoDesde(o as Omisiones));
+        setPlanEstandar((o.plan ?? []).map((p) => ({ ...p, estandar: true })));
+      })
       .catch(() => undefined);
   }, [token]);
+
+  // Sin programa, la revisión propone el estándar. Se ve marcado y solo se guarda si se confirma.
+  useEffect(() => {
+    if (paso !== 2 || cargando || estandarPropuesto.current || !planEstandar.length) return;
+    estandarPropuesto.current = true;
+    setPlan((p) => (p.length ? p : planEstandar));
+  }, [paso, cargando, planEstandar]);
 
   // Corregir una ficha: entra a la revisión con lo que ya tiene.
   useEffect(() => {
@@ -183,18 +198,28 @@ function AltaVehiculo() {
           }
           setCampos(delNombre);
         }
-        setPlan(f.programa.map((p) => ({ id: p.id, concepto: p.concepto, cadaKm: p.cadaKm, cadaMeses: p.cadaMeses, costoEstimado: p.costoEstimado })));
+        setPlan(
+          f.programa.map((p) => ({
+            id: p.id,
+            concepto: p.concepto,
+            cadaKm: p.cadaKm,
+            cadaMeses: p.cadaMeses,
+            costoEstimado: p.costoEstimado,
+            paginaManual: p.paginaManual ?? null,
+          })),
+        );
+        setYaTieneManual(f.documentos.some((d) => d.tipo === "MANUAL"));
         if (f.costos) {
           const x = f.costos.ficha;
           setTieneTarifa(true);
           setCosto({
             valor: String(x.valor),
             valorLlantas: String(x.valorLlantas),
-            rescatePct: String(Math.round(x.rescatePct * 100)),
+            rescatePct: String(aPorcentaje(x.rescatePct)),
             vidaKm: String(x.vidaKm),
             kmAnio: String(x.kmAnio),
-            tasaInteres: String(Math.round(x.tasaInteres * 100)),
-            primaSeguro: String(Math.round(x.primaSeguro * 100)),
+            tasaInteres: String(aPorcentaje(x.tasaInteres)),
+            primaSeguro: String(aPorcentaje(x.primaSeguro)),
             ko: String(x.ko),
             precioCombustible: String(f.costos.precioLitro ?? ""),
             costoAceite: String(x.costoAceite),
@@ -238,16 +263,17 @@ function AltaVehiculo() {
     [token],
   );
 
-  async function leerYRevisar() {
+  /** Lee el manual, llena lo que falte y corrige el programa. El manual puede llegar en cualquier momento. */
+  async function leerYLlenar(pdf: File | null) {
     if (!token) return;
     setError(null);
     setAviso(null);
     let actuales = campos;
-    if (archivo) {
+    if (pdf) {
       setLeyendo("Leyendo el manual…");
       try {
         const pista = nombreDeVehiculo({ marca: valor("marca"), modelo: valor("modelo"), anio: valor("anio") });
-        const r = await leerManual(token, archivo, pista);
+        const r = await leerManual(token, pdf, pista);
         setManual(r.archivo);
         if (r.escaneado) {
           setAviso("Ese PDF es una imagen escaneada: no trae texto que leer. El manual queda guardado; llena lo principal a mano.");
@@ -260,7 +286,7 @@ function AltaVehiculo() {
           if (!llenos[id]?.valor) llenos[id] = { valor: String(c2.valor), fuente: c2.fuente };
         }
         actuales = llenos;
-        if (r.servicios.length) setPlan(r.servicios);
+        if (r.servicios.length) setPlan((p) => combinarPlan(p, r.servicios));
       } catch (e) {
         setAviso(`${formatApiError(e, "No se pudo leer el manual")}. Puedes llenarlo a mano.`);
       }
@@ -269,6 +295,10 @@ function AltaVehiculo() {
     actuales = await buscarOficial(actuales);
     setCampos(actuales);
     setLeyendo(null);
+  }
+
+  async function leerYRevisar() {
+    await leerYLlenar(archivo);
     setPaso(2);
   }
 
@@ -477,6 +507,36 @@ function AltaVehiculo() {
 
       <div className={v.columnas}>
         <div className={v.principal}>
+          <section className={c.card}>
+            <div className={v.cabecera}>
+              <div>
+                <h2 className={v.titulo}>Manual</h2>
+                <p className={v.nota} style={{ margin: 0 }}>
+                  {manual
+                    ? `${manual.nombre}: lo que ya estaba escrito no se tocó y el programa de servicio se actualizó con él. Se guarda al confirmar.`
+                    : yaTieneManual
+                      ? "Ya tiene un manual guardado. Si traes otro, lo leemos y llenamos lo que falte."
+                      : "¿Ya lo tienes? Lo leemos, llenamos lo que falte y corregimos el programa de servicio. Lo que ya está escrito no se toca."}
+                </p>
+              </div>
+              <input
+                ref={entrada}
+                type="file"
+                accept="application/pdf,.pdf"
+                hidden
+                aria-label="Manual en PDF"
+                onChange={(e) => {
+                  const pdf = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  if (pdf) void leerYLlenar(pdf);
+                }}
+              />
+              <Button variant="secondary" size="sm" type="button" disabled={Boolean(leyendo)} onClick={() => entrada.current?.click()}>
+                {leyendo ?? (manual || yaTieneManual ? "Leer otro" : "Subir manual")}
+              </Button>
+            </div>
+          </section>
+
           {GRUPOS.map((g) => (
             <section className={c.card} key={g.titulo}>
               <h2 className={v.titulo} style={{ marginBottom: 6 }}>
@@ -512,38 +572,24 @@ function AltaVehiculo() {
                 Agregar
               </Button>
             </div>
+            {plan.some((p) => p.estandar) ? (
+              <p className={v.nota}>Los renglones marcados son el estándar de la empresa, no del fabricante. Con el manual se corrigen.</p>
+            ) : null}
             {plan.length ? (
               plan.map((p, i) => (
-                <div className={v.filaServicio} key={p.id ?? `nuevo-${i}`}>
-                  <input
-                    aria-label="Qué toca"
-                    value={p.concepto}
-                    placeholder="Aceite y filtro"
-                    onChange={(e) => setPlan((x) => x.map((y, j) => (j === i ? { ...y, concepto: e.target.value } : y)))}
-                  />
-                  <span className={v.conUnidad}>
-                    <input
-                      aria-label="Cada cuántos km"
-                      inputMode="numeric"
-                      value={p.cadaKm ?? ""}
-                      onChange={(e) => setPlan((x) => x.map((y, j) => (j === i ? { ...y, cadaKm: aNumero(e.target.value) } : y)))}
-                    />
-                    <span aria-hidden="true">km</span>
-                  </span>
-                  <span className={v.conUnidad}>
-                    <input
-                      aria-label="Cada cuántos meses"
-                      inputMode="numeric"
-                      value={p.cadaMeses ?? ""}
-                      onChange={(e) => setPlan((x) => x.map((y, j) => (j === i ? { ...y, cadaMeses: aNumero(e.target.value) } : y)))}
-                    />
-                    <span aria-hidden="true">meses</span>
-                  </span>
-                  {p.paginaManual ? <PastillaFuente fuente={{ tipo: "MANUAL", pagina: p.paginaManual }} /> : <span />}
-                  <button type="button" className={v.botonTexto} onClick={() => setPlan((x) => x.filter((_, j) => j !== i))} aria-label={`Quitar ${p.concepto || "renglón"}`}>
-                    Quitar
-                  </button>
-                </div>
+                <FilaPrograma
+                  key={p.id ?? `nuevo-${i}`}
+                  fila={p}
+                  onCambio={(cambio) => setPlan((x) => x.map((y, j) => (j === i ? { ...y, ...cambio } : y)))}
+                  onQuitar={() => setPlan((x) => x.filter((_, j) => j !== i))}
+                  etiqueta={
+                    p.paginaManual ? (
+                      <PastillaFuente fuente={{ tipo: "MANUAL", pagina: p.paginaManual }} />
+                    ) : p.estandar ? (
+                      <Pastilla tono="atencion">Estándar</Pastilla>
+                    ) : undefined
+                  }
+                />
               ))
             ) : (
               <p className={c.hint}>Sin programa. Agrégalo aquí o déjalo para después: sin él, no avisa cuándo toca servicio.</p>
@@ -567,7 +613,9 @@ function AltaVehiculo() {
               </section>
               <section className={c.card}>
                 <h2 className={v.titulo}>Para calcular el costo</h2>
-                <p className={v.nota}>Valores iniciales. El Reglamento da la fórmula, no estas cifras: ajústalas a tu operación.</p>
+                <p className={v.nota}>
+                  Valores iniciales: el <Link href="/erp/costos/tarifas">estándar de Tarifas</Link>. El Reglamento da la fórmula, no estas cifras: ajústalas a tu operación.
+                </p>
                 <div style={{ display: "grid", gap: 10 }}>
                   {[...CAMPOS_COSTO, ...(ajustando ? CAMPOS_COSTO_MAS : [])].map((x) => (
                     <label className={v.campo} key={x.id}>

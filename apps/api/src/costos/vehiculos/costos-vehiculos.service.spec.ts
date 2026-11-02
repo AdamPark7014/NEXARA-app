@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { CostosTarifasService } from '../costos-tarifas.service';
 import { LibroCostosService } from '../libro-costos.service';
-import { CostosVehiculosService, limitesDelMes } from './costos-vehiculos.service';
+import { CostosVehiculosService, OMISIONES_COSTO, PLAN_ESTANDAR, estandarDesde, limitesDelMes } from './costos-vehiculos.service';
 import { VehiculosMotorService } from './vehiculos-motor.service';
 
 const CEO = { id: 1, roleKey: 'ceo' };
@@ -18,6 +18,7 @@ function prismaFalso(semilla: Partial<Record<string, any[]>> = {}) {
     controles: [],
     documentos: [],
     fichas: [],
+    ajustes: [],
     movimientos: [],
     ligas: [],
     actividades: [],
@@ -75,6 +76,7 @@ function prismaFalso(semilla: Partial<Record<string, any[]>> = {}) {
     costoFichaEquipo: tabla('fichas'),
     costoMovimiento: tabla('movimientos'),
     costoParametros: { findFirst: jest.fn(async () => null) },
+    systemSetting: tabla('ajustes'),
     costoActividadLiga: tabla('ligas'),
     activity: tabla('actividades'),
     operationalProject: tabla('proyectos'),
@@ -504,5 +506,75 @@ describe('servicios y documentos', () => {
   it('rechaza un tipo de documento que no existe', async () => {
     const { servicio } = armar(semilla);
     await expect(servicio.agregarDocumento(1, 2, { tipo: 'RECIBO', nombre: 'x', url: '/uploads/vehicles/p.pdf' }, CEO)).rejects.toThrow('Tipo de documento');
+  });
+});
+
+describe('estándar de vehículos', () => {
+  const CLAVE = 'vehiculos.estandar';
+  const guardado = (datos: unknown) => ({ id: 90, companyId: 1, key: CLAVE, value: JSON.stringify(datos), category: 'costos' });
+
+  it('sin nada guardado arranca con los valores de fábrica', () => {
+    expect(estandarDesde(null)).toEqual({ ...OMISIONES_COSTO, plan: PLAN_ESTANDAR });
+  });
+
+  it('un dato dañado no tumba el alta: se queda lo de fábrica en lo que no se entienda', () => {
+    expect(estandarDesde('{no es json')).toEqual({ ...OMISIONES_COSTO, plan: PLAN_ESTANDAR });
+    const mezcla = estandarDesde(JSON.stringify({ vidaKm: 250000, kmAnio: 'mucho', plan: [{ concepto: 'Sin intervalo' }, { concepto: 'Bujías', cadaKm: 40000 }] }));
+    expect(mezcla.vidaKm).toBe(250000);
+    expect(mezcla.kmAnio).toBe(OMISIONES_COSTO.kmAnio);
+    expect(mezcla.plan).toEqual([{ concepto: 'Bujías', cadaKm: 40000, cadaMeses: null }]);
+  });
+
+  it('un programa vaciado a propósito se respeta', () => {
+    expect(estandarDesde(JSON.stringify({ plan: [] })).plan).toEqual([]);
+  });
+
+  it('dirección guarda el estándar, por empresa, y lo vuelve a leer', async () => {
+    const { servicio, prisma } = armar({ ajustes: [{ id: 80, companyId: 2, key: CLAVE, value: JSON.stringify({ vidaKm: 111111 }), category: 'costos' }] });
+    const salida = await servicio.guardarEstandar(1, { vidaKm: 250000, plan: [{ concepto: ' Bujías ', cadaKm: 40000 }, { concepto: '   ' }] }, CEO);
+    expect(salida.vidaKm).toBe(250000);
+    expect(salida.kmAnio).toBe(OMISIONES_COSTO.kmAnio);
+    expect(salida.plan).toEqual([{ concepto: 'Bujías', cadaKm: 40000, cadaMeses: null }]);
+    expect(prisma.t.ajustes.filter((f: any) => f.companyId === 1)).toHaveLength(1);
+
+    await servicio.guardarEstandar(1, { kmAnio: 40000 }, CEO);
+    expect(prisma.t.ajustes.filter((f: any) => f.companyId === 1)).toHaveLength(1);
+    const leido = await servicio.omisiones(1, CEO);
+    expect(leido).toMatchObject({ vidaKm: 250000, kmAnio: 40000 });
+    expect(leido.plan).toEqual([{ concepto: 'Bujías', cadaKm: 40000, cadaMeses: null }]);
+    // La otra empresa conserva el suyo.
+    expect(await servicio.omisiones(2, CEO)).toMatchObject({ vidaKm: 111111 });
+  });
+
+  it('un técnico no lo cambia, y al leerlo no ve dinero', async () => {
+    const { servicio } = armar({ ajustes: [guardado({ precioCombustible: 30 })] });
+    await expect(servicio.guardarEstandar(1, { vidaKm: 1000 }, TECNICO)).rejects.toThrow(ForbiddenException);
+    const leido = await servicio.omisiones(1, TECNICO);
+    expect(Object.keys(leido)).toEqual(['plan']);
+  });
+
+  it('un renglón sin intervalo no se guarda', async () => {
+    const { servicio } = armar();
+    await expect(servicio.guardarEstandar(1, { plan: [{ concepto: 'Bujías' }] }, CEO)).rejects.toThrow(BadRequestException);
+  });
+
+  it('la ficha de costo usa el estándar en lo que no se capturó, y no toca las ya guardadas', async () => {
+    const { servicio, prisma } = armar({ assets: [ASSET], ajustes: [guardado({ vidaKm: 250000, otrosAnuales: 5000 })] });
+    await servicio.guardar(1, 2, { costo: { valor: 480000 } }, CEO);
+    expect(prisma.t.fichas[0]).toMatchObject({ vidaUnidades: 250000, otrosAnuales: 5000, unidadesAnio: OMISIONES_COSTO.kmAnio });
+
+    prisma.t.ajustes[0].value = JSON.stringify({ vidaKm: 300000 });
+    await servicio.guardar(1, 2, { marca: 'Nissan' }, CEO);
+    await servicio.guardar(1, 2, { costo: { valor: 500000 } }, CEO);
+    expect(prisma.t.fichas[0]).toMatchObject({ valor: 500000, vidaUnidades: 250000 });
+  });
+
+  it('el programa devuelve la página del manual, para que editar la ficha no la borre', async () => {
+    const { servicio } = armar({
+      assets: [ASSET],
+      planes: [{ id: 31, companyId: 1, vehicleId: 2, concepto: 'Aceite y filtro', cadaKm: 10000, cadaMeses: 12, costoEstimado: null, paginaManual: 431, activo: true, orden: 0 }],
+    });
+    const f = await servicio.ficha(1, 2, CEO);
+    expect(f.programa[0]).toMatchObject({ id: 31, paginaManual: 431 });
   });
 });

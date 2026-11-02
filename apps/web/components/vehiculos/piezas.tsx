@@ -4,7 +4,7 @@
 
 import type { ReactNode } from "react";
 import { c } from "@/components/costos/piezas";
-import { etiquetaFuente, type Fuente } from "@/lib/vehiculos-ficha";
+import { aNumero, etiquetaFuente, type Fuente, type PlanEditable } from "@/lib/vehiculos-ficha";
 import v from "./vehiculos.module.scss";
 
 export { c, v };
@@ -31,6 +31,37 @@ export function Pastilla({ tono, children }: { tono?: string; children: ReactNod
 export function PastillaFuente({ fuente }: { fuente: Fuente | null | undefined }) {
   const { texto, tono } = etiquetaFuente(fuente);
   return <Pastilla tono={tono}>{texto}</Pastilla>;
+}
+
+/** Un renglón editable del programa de servicio: en la revisión de la ficha y en el estándar. */
+export function FilaPrograma({
+  fila,
+  onCambio,
+  onQuitar,
+  etiqueta,
+}: {
+  fila: PlanEditable;
+  onCambio: (cambio: Partial<PlanEditable>) => void;
+  onQuitar: () => void;
+  etiqueta?: ReactNode;
+}) {
+  return (
+    <div className={v.filaServicio}>
+      <input aria-label="Qué toca" value={fila.concepto} placeholder="Aceite y filtro" onChange={(e) => onCambio({ concepto: e.target.value })} />
+      <span className={v.conUnidad}>
+        <input aria-label="Cada cuántos km" inputMode="numeric" value={fila.cadaKm ?? ""} onChange={(e) => onCambio({ cadaKm: aNumero(e.target.value) })} />
+        <span aria-hidden="true">km</span>
+      </span>
+      <span className={v.conUnidad}>
+        <input aria-label="Cada cuántos meses" inputMode="numeric" value={fila.cadaMeses ?? ""} onChange={(e) => onCambio({ cadaMeses: aNumero(e.target.value) })} />
+        <span aria-hidden="true">meses</span>
+      </span>
+      {etiqueta ?? <span />}
+      <button type="button" className={v.botonTexto} onClick={onQuitar} aria-label={`Quitar ${fila.concepto || "renglón"}`}>
+        Quitar
+      </button>
+    </div>
+  );
 }
 
 export function Medidor({ nombre, pct, nota }: { nombre: ReactNode; pct: number | null; nota: ReactNode }) {
