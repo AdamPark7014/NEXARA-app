@@ -92,6 +92,9 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
 import mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen
 import mx.nexara.mobile.nativeapp.ui.shared.OfflineQueueScreen
+import mx.nexara.mobile.nativeapp.ui.console.activities.ActividadesUx
+import mx.nexara.mobile.nativeapp.ui.console.activities.EvidenciaApertura
+import mx.nexara.mobile.nativeapp.ui.console.activities.FormatosScreen
 
 internal object ConsoleRoutes {
     /**
@@ -227,6 +230,7 @@ internal object ConsoleRoutes {
      * Alta Core: `self=true` = /erp/mis-actividades/nueva; `userId` = /erp/pizarra/:userId/asignar.
      */
     const val NewActivity = "console/activities/new?self={self}&userId={userId}"
+    const val Formatos = "console/activities/formatos"
 
     fun clientDetail(id: Long): String = "console/clients/$id"
 
@@ -616,10 +620,17 @@ fun ConsoleNavHost(
                     onOpenActivity = openActivity,
                     onOpenPerson = openPerson,
                     onSelfAssign = openSelfAssign,
+                    onFormatos = { navController.navigate(ConsoleRoutes.Formatos) { launchSingleTop = true } },
                     highlightActivityId = nuevaActividadId,
                 )
                 // El resaltado dura mientras sigues en la lista; al salir se olvida.
                 DisposableEffect(Unit) { onDispose { nuevaActividadId = null } }
+            }
+            nxComposable(ConsoleRoutes.Formatos) {
+                FormatosScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenActivity = { id -> openActivity(id, null) },
+                )
             }
             nxComposable(ConsoleRoutes.NewActivity, style = NxNavAnimStyle.Modal) { entry ->
                 val self = entry.arguments?.getString("self") == "true"
@@ -646,7 +657,13 @@ fun ConsoleNavHost(
             }
             nxComposable(ConsoleRoutes.Attendance) {
                 val tab = attendanceTab
-                ConsoleAttendanceScreen(initialTab = tab)
+                ConsoleAttendanceScreen(
+                    initialTab = tab,
+                    onTerminarActividad = { id ->
+                        EvidenciaApertura.pedirCamara(id)
+                        openActivity(id, ActividadesUx.TAB_EVIDENCIAS)
+                    },
+                )
                 // Se consume una vez: al volver a Asistencias después, abre en su pestaña normal.
                 LaunchedEffect(tab) { if (tab != null) attendanceTab = null }
             }

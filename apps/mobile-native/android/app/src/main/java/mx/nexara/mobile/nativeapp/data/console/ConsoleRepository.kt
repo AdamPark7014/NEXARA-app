@@ -290,6 +290,7 @@ class ConsoleRepository(context: Context) {
         mockLocation: Boolean = false,
         fixAgeMs: Long? = null,
         ubicacionFalla: String? = null,
+        confirmada: Boolean = false,
         photoBase64: String,
         capturedAt: String = java.time.Instant.now().toString(),
     ) =
@@ -303,9 +304,14 @@ class ConsoleRepository(context: Context) {
                 mockLocation = mockLocation,
                 fixAgeMs = fixAgeMs?.takeIf { it >= 0L },
                 ubicacionFalla = ubicacionFalla?.takeIf { lat == null || lng == null },
+                confirmada = confirmada.takeIf { it },
                 photoBase64 = photoBase64,
             )
         )
+
+    suspend fun riesgoSalida() = api.getRiesgoSalida()
+
+    suspend fun deshacerSalida() = api.postDeshacerSalida()
 
     suspend fun gpsMe() = api.getGpsMe()
 

@@ -1497,7 +1497,7 @@ export class AttendanceService {
     this.emitAttendanceUpdate(userId, 'entrada', p.ahora, persona);
     await this.avisarChecadaMarcada({
       userId,
-      titulo: p.porId === userId ? 'Deshizo su salida' : 'Deshicieron tu salida',
+      titulo: 'Salida deshecha',
       mensaje: mensajeSalidaDeshecha({
         hora: horaAviso(checada.timestamp),
         folios: regresadas.map((a) => a.folio).filter((f): f is string => Boolean(f)),

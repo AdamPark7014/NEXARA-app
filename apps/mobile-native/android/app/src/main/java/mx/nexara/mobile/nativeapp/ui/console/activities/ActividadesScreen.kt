@@ -128,6 +128,7 @@ fun ActividadesScreen(
     onOpenActivity: (Long, String?) -> Unit,
     onOpenPerson: (Long) -> Unit,
     onSelfAssign: (() -> Unit)? = null,
+    onFormatos: (() -> Unit)? = null,
     /** Actividad recién auto-asignada: se resalta en «Mis actividades» (`?nueva=` en la web). */
     highlightActivityId: Long? = null,
 ) {
@@ -222,6 +223,11 @@ fun ActividadesScreen(
         )
         if (conPestanas) {
             VistaTabs(vista = vista, onChange = ::cambiarVista)
+        }
+        if (onFormatos != null && FormatosRules.visible(user)) {
+            TextButton(onClick = onFormatos, modifier = Modifier.padding(horizontal = 8.dp)) {
+                Text("Asignar con formato", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
         when {
             // Solo quien volvió a la pestaña «Mi equipo» espera a la pizarra.

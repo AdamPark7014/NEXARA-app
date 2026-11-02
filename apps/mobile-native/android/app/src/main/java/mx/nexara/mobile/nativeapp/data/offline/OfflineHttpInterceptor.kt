@@ -136,6 +136,12 @@ class OfflineHttpInterceptor(
          */
         private val SOLO_EN_LINEA = listOf(
             "/desactivar", "/reactivar", "/cancelar", "/reasignar", "/justificaciones",
+            // Vale 10 minutos: encolado, caería cuando ya no aplica.
+            "/salida/deshacer",
+            // Mover el paso atrás con fotos encoladas las dejaría en el paso equivocado.
+            "/volver-paso",
+            // El paquete necesita la respuesta: dice cuáles actividades quedaron.
+            "/aplicar",
             "/aceptar", "/rechazar",
             // El reloj de una actividad: encolado, la pausa caería cuando vuelva la señal.
             "/pausar", "/reanudar",

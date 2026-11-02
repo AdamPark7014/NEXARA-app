@@ -304,6 +304,16 @@ export class ActivityEvidenceController {
     );
   }
 
+  @Post(':activityId/volver-paso')
+  regresarDePaso(
+    @Param('activityId') activityId: string,
+    @Body() body: { paso?: string },
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.regresarDePaso(parseInt(activityId, 10), req.user.id, String(body?.paso ?? ''), companyId);
+  }
+
   @Post(':activityId/service-sheet-data')
   async completeServiceSheetForm(
     @Param('activityId') activityId: string,

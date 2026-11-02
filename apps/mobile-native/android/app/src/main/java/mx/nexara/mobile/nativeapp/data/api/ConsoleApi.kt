@@ -516,10 +516,33 @@ data class AttendanceRegisterRequest(
      * convierte en el motivo «Sin ubicación: …» que ven los jefes.
      */
     val ubicacionFalla: String? = null,
+    /** La persona ya vio qué se detiene en la hoja de «Terminar mi jornada»: no se vuelve a frenar. */
+    val confirmada: Boolean? = null,
     val photoBase64: String,
 )
 
+/** `GET attendance/salida/riesgo`: qué se detiene si checa salida ahora. No registra nada. */
+data class RiesgoSalidaDto(
+    val corriendo: List<ActividadEnRiesgoDto> = emptyList(),
+    val porCerrar: List<ActividadEnRiesgoDto> = emptyList(),
+)
+
+data class ActividadEnRiesgoDto(
+    val id: Long = 0,
+    val folio: String = "",
+    val titulo: String = "",
+)
+
+/** `POST attendance/salida/deshacer`: la propia persona, dentro de 10 minutos. */
+data class DeshacerSalidaResponse(
+    val message: String? = null,
+    val noCumplidasRegresadas: List<String?>? = null,
+    val relojesReabiertos: Int? = null,
+)
+
 data class AttendanceRegisterResponse(
+    /** Sin red, la cola contesta `{queued:true}`: todavía no se registró. */
+    val queued: Boolean? = null,
     val id: Long? = null,
     val type: String? = null,
     val timestamp: String? = null,
@@ -642,6 +665,12 @@ interface ConsoleApi {
     /** Justificar la falta de un día sin checada. Solo Christian; no crea checadas. */
     @POST("attendance/justificaciones")
     suspend fun justificarFalta(@Body body: JustificarFaltaRequest): okhttp3.ResponseBody
+
+    @GET("attendance/salida/riesgo")
+    suspend fun getRiesgoSalida(): RiesgoSalidaDto
+
+    @POST("attendance/salida/deshacer")
+    suspend fun postDeshacerSalida(): DeshacerSalidaResponse
 
     @GET("attendance/current")
     suspend fun getAttendanceCurrent(): AttendanceCurrentDto

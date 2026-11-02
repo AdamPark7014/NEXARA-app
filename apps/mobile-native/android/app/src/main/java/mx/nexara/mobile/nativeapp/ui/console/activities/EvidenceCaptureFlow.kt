@@ -102,6 +102,9 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxFlotante
 import mx.nexara.mobile.nativeapp.util.DeviceLocation
 import mx.nexara.mobile.nativeapp.util.JornadaGps
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import androidx.compose.material3.TextButton
 
 private const val KIND_ENTRY = "entry"
 private const val KIND_EVIDENCE = "evidence"
@@ -278,6 +281,9 @@ fun EvidenceCaptureFlow(
     var pending by remember { mutableStateOf<GeoPhoto?>(null) }
     var pendingKind by remember { mutableStateOf<String?>(null) }
     var pendingError by remember { mutableStateOf<String?>(null) }
+    /** Fotos de la ráfaga que van en camino: la cámara sigue abierta y cuenta con ellas. */
+    var fotosEnviando by remember { mutableIntStateOf(0) }
+    val envioDeFotos = remember { Mutex() }
 
     fun correctionMessage(saved: EvidenceFlowDto): String = when {
         saved.status == STEP_COMPLETED -> "¡Corrección enviada! Tu evidencia será revisada nuevamente."
@@ -290,6 +296,8 @@ fun EvidenceCaptureFlow(
             // El interceptor offline respondió «en cola»: no hay fila nueva que pintar.
             successIcon = Icons.Outlined.CloudOff
             success = "Sin conexión: se enviará solo en cuanto vuelva la red."
+            // El paso avanza aunque no haya señal: lo encolado llega después, en orden.
+            if (!isCorrection) flow = flow?.copy(status = CoreActivityRules.pasoSiguiente(step, coreKind))
             return
         }
         flow = saved.copy(
@@ -550,6 +558,42 @@ fun EvidenceCaptureFlow(
         }
     }
 
+    /**
+     * Ráfaga: cada foto se guarda sola y la cámara sigue abierta hasta juntar las que pide el paso,
+     * y entonces avanza. De 3 toques por foto y uno por el paso a uno por foto.
+     */
+    fun tomarEnRafaga(photo: GeoPhoto) {
+        val avanzar = drafts.size + fotosEnviando < photoRequired
+        fotosEnviando += 1
+        if (drafts.size + fotosEnviando >= photoRequired) cameraKind = null
+        scope.launch {
+            val ok = envioDeFotos.withLock { sendEvidencePhoto(photo) }
+            fotosEnviando -= 1
+            if (!ok) {
+                error = pendingError ?: "No se guardó una foto: tómala otra vez."
+                pendingError = null
+            } else if (avanzar && fotosEnviando == 0 && drafts.size >= photoRequired) {
+                savePhotos()
+            }
+        }
+    }
+
+    /** Se le olvidó una foto o la quiere repetir: nada se borra. */
+    fun regresarAFotos() {
+        scope.launch {
+            busy = true
+            error = null
+            try {
+                val saved = withContext(Dispatchers.IO) { repo.volverPaso(activity.id, STEP_PHOTOS) }
+                applySaved(saved, "Regresaste a las fotos. Lo que ya tenías sigue guardado.")
+            } catch (e: Exception) {
+                error = e.toUserMessage("No se pudo regresar a las fotos")
+            } finally {
+                busy = false
+            }
+        }
+    }
+
     fun saveForm() {
         val fields = CoreActivityRules.digitalFormLabels(coreKind)
         val missing = fields.filter { formValues[it.key].isNullOrBlank() }
@@ -575,6 +619,8 @@ fun EvidenceCaptureFlow(
                     else if (comercial) "Formulario guardado. Siguiente: conclusión de actividad."
                     else "Formulario guardado. Siguiente: toma la foto de salida.",
                 )
+                // Formulario y foto final son un solo toque: al guardar, abre la cámara.
+                if (!isCorrection && CoreActivityRules.camposBloqueoSalida(campos) == null) cameraKind = KIND_EXIT
             } catch (e: Exception) {
                 error = e.toUserMessage("No se pudo guardar el formulario")
             } finally {
@@ -659,6 +705,16 @@ fun EvidenceCaptureFlow(
     }
 
     // ── Dock inferior (v2): el mismo botón de cada paso, al alcance del pulgar ──
+    // Lo pidió «Terminar actividad» o «Iniciar»: abre la cámara del paso en cuanto se sabe cuál es.
+    LaunchedEffect(flow?.status, loading) {
+        if (flow == null || loading || !EvidenciaApertura.tomar(activity.id) || locked) return@LaunchedEffect
+        when {
+            step == STEP_ENTRY -> cameraKind = KIND_ENTRY
+            step == STEP_PHOTOS && !porCampos && drafts.size < photoRequired -> cameraKind = KIND_EVIDENCE
+            step == STEP_EXIT && CoreActivityRules.camposBloqueoSalida(campos) == null -> cameraKind = KIND_EXIT
+        }
+    }
+
     if (dockHost != null) {
         val bloqueoSalida = CoreActivityRules.camposBloqueoSalida(campos)
         val dockAction: EvidenceDockAction? = when {
@@ -724,13 +780,22 @@ fun EvidenceCaptureFlow(
                     error = null
                     pdfPicker.launch(arrayOf("application/pdf"))
                 },
+                secondaryLabel = if (isCorrection) null else "Regresar a fotos",
+                onSecondary = if (isCorrection) null else ({ regresarAFotos() }),
             )
             step == STEP_DATA -> EvidenceDockAction(
-                label = if (busy) "Guardando…" else "Guardar formulario",
+                label = when {
+                    busy -> "Guardando…"
+                    isCorrection -> "Guardar formulario"
+                    comercial -> "Tomar foto de conclusión"
+                    else -> "Tomar foto de salida"
+                },
                 enabled = !busy,
-                icon = null,
-                hint = "Completa los datos de esta actividad y guarda.",
+                icon = if (isCorrection) null else NxGlyph.PHOTO.icon,
+                hint = if (isCorrection) "Completa los datos de esta actividad y guarda." else "Completa los datos y toma la foto final.",
                 onPrimary = { saveForm() },
+                secondaryLabel = if (isCorrection) null else "Regresar a fotos",
+                onSecondary = if (isCorrection) null else ({ regresarAFotos() }),
             )
             step == STEP_EXIT -> EvidenceDockAction(
                 label = if (comercial) "Tomar foto de conclusión" else "Tomar foto de salida",
@@ -742,6 +807,8 @@ fun EvidenceCaptureFlow(
                     error = null
                     cameraKind = KIND_EXIT
                 },
+                secondaryLabel = if (isCorrection) null else "Regresar a fotos",
+                onSecondary = if (isCorrection) null else ({ regresarAFotos() }),
             )
             else -> null
         }
@@ -1000,7 +1067,15 @@ fun EvidenceCaptureFlow(
                         )
                     }
                     if (dockHost == null) {
-                        PrimaryAction(if (busy) "Guardando…" else "Siguiente paso →", enabled = !busy) {
+                        PrimaryAction(
+                            when {
+                                busy -> "Guardando…"
+                                isCorrection -> "Siguiente paso →"
+                                comercial -> "Tomar foto de conclusión"
+                                else -> "Tomar foto de salida"
+                            },
+                            enabled = !busy,
+                        ) {
                             saveForm()
                         }
                     }
@@ -1037,6 +1112,10 @@ fun EvidenceCaptureFlow(
                     }
                 }
             }
+
+            if (dockHost == null && !locked && CoreActivityRules.puedeRegresarAFotos(step, isCorrection)) {
+                TextButton(onClick = { regresarAFotos() }, enabled = !busy) { Text("Regresar a fotos") }
+            }
         }
     }
 
@@ -1057,15 +1136,25 @@ fun EvidenceCaptureFlow(
                 KIND_ENTRY -> CoreActivityRules.stepLabel(STEP_ENTRY, coreKind)
                 KIND_EXIT -> CoreActivityRules.stepLabel(STEP_EXIT, coreKind)
                 KIND_CAMPO -> campoTitulo ?: "Foto del campo"
-                else -> "Foto de evidencia ${drafts.size + 1} de $photoRequired"
+                else -> "Foto de evidencia ${drafts.size + fotosEnviando + 1} de $photoRequired"
             },
             // El campo se fotografía donde esté; la ubicación viaja si la hay.
             requireLocation = kind == KIND_ENTRY || kind == KIND_EXIT,
+            // Las de evidencia se toman de corrido: cada toque guarda una y la cámara sigue abierta.
+            subtitle = if (kind == KIND_EVIDENCE) {
+                "Toca «Tomar foto» por cada una. Se guardan solas."
+            } else {
+                "Acomódate o encuadra bien y toca «Tomar foto»."
+            },
             onCaptured = { photo ->
-                cameraKind = null
-                pending = photo
-                pendingKind = kind
-                pendingError = null
+                if (kind == KIND_EVIDENCE) {
+                    tomarEnRafaga(photo)
+                } else {
+                    cameraKind = null
+                    pending = photo
+                    pendingKind = kind
+                    pendingError = null
+                }
             },
             onDismiss = {
                 cameraKind = null
@@ -1086,6 +1175,7 @@ fun EvidenceCaptureFlow(
             },
             photo = photo,
             confirmLabel = if (kind == KIND_EVIDENCE) "Usar esta foto" else "Enviar esta foto",
+            autoEnviar = kind != KIND_EVIDENCE,
             sending = busy,
             error = pendingError,
             onConfirm = {

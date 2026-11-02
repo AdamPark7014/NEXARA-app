@@ -81,6 +81,8 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 import mx.nexara.mobile.nativeapp.util.DeviceCoords
 import mx.nexara.mobile.nativeapp.util.DeviceLocation
+import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.delay
 
 /**
  * Foto tomada con la cámara en vivo, lista para mandarse como data URL con su ubicación.
@@ -450,8 +452,23 @@ fun GeoPhotoPreviewDialog(
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
+    /** Se envía sola a los 3 segundos: un toque menos, y sigue dando tiempo de repetirla. */
+    autoEnviar: Boolean = false,
 ) {
     val context = LocalContext.current
+    var cuenta by remember(photo) { mutableStateOf(if (autoEnviar) 3 else 0) }
+    val confirmar by rememberUpdatedState(onConfirm)
+    LaunchedEffect(photo, autoEnviar, error) {
+        if (!autoEnviar || error != null) {
+            cuenta = 0
+            return@LaunchedEffect
+        }
+        while (cuenta > 0) {
+            delay(1000)
+            cuenta -= 1
+        }
+        confirmar()
+    }
     Dialog(
         onDismissRequest = { if (!sending) onCancel() },
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -517,7 +534,7 @@ fun GeoPhotoPreviewDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) {
-                    Text(if (sending) "Enviando…" else confirmLabel, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(if (sending) "Enviando…" else if (cuenta > 0) "$confirmLabel ($cuenta)" else confirmLabel, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),

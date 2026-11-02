@@ -94,7 +94,9 @@ import mx.nexara.mobile.nativeapp.ui.common.NotificationHealthBanner
 import mx.nexara.mobile.nativeapp.ui.common.rememberCameraCapture
 import mx.nexara.mobile.nativeapp.ui.common.rememberProblemaDeAvisos
 import mx.nexara.mobile.nativeapp.ui.console.CoreMenu
+import mx.nexara.mobile.nativeapp.ui.console.activities.ActividadesUx
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityKinds
+import mx.nexara.mobile.nativeapp.ui.console.activities.EvidenciaApertura
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules
 import mx.nexara.mobile.nativeapp.ui.console.activities.NxChip
 import mx.nexara.mobile.nativeapp.ui.console.activities.PausarPropiaDialog
@@ -202,18 +204,31 @@ fun InicioScreen(
             val festivo = FestivoRules.estado(state.festivos, CoreActivityKinds.todayInMexico())
             val festivos = state.festivos
             val puedeChecar = attendanceVm != null && attendance != null && attendanceVm.viewMode.canRegisterSelf
+            // Mockup de la Ola 3: con la jornada abierta, lo de ahora va arriba y la jornada aparte.
+            val jornadaAbajo = puedeChecar && attendance?.current?.isOpen == true && actual != null &&
+                !state.esDireccion && state.tieneActividades && festivo != FestivoRules.Estado.DESCANSA
+            val jornadaHero: (@Composable () -> Unit)? =
+                if (puedeChecar && attendanceVm != null && attendance != null) {
+                    {
+                        JornadaHero(
+                            vm = attendanceVm,
+                            state = attendance,
+                            onComida = onOpenComidas,
+                            onVerJornada = onOpenAsistencia,
+                            onTerminarActividad = { id ->
+                                EvidenciaApertura.pedirCamara(id)
+                                onOpenActivity(id, ActividadesUx.TAB_EVIDENCIAS)
+                            },
+                            festivo = festivos?.festivoHoy?.takeIf { festivo == FestivoRules.Estado.LABORA },
+                        )
+                    }
+                } else {
+                    null
+                }
             if (festivo == FestivoRules.Estado.DESCANSA && festivos != null) {
                 item(key = "festivo") { FestivoDescansaContenido(festivos) }
-            } else if (puedeChecar && attendanceVm != null && attendance != null) {
-                item(key = "jornada") {
-                    JornadaHero(
-                        vm = attendanceVm,
-                        state = attendance,
-                        onComida = onOpenComidas,
-                        onVerJornada = onOpenAsistencia,
-                        festivo = festivos?.festivoHoy?.takeIf { festivo == FestivoRules.Estado.LABORA },
-                    )
-                }
+            } else if (puedeChecar && attendanceVm != null && attendance != null && !jornadaAbajo) {
+                item(key = "jornada") { jornadaHero?.invoke() }
             } else if (festivo == FestivoRules.Estado.LABORA) {
                 festivos?.festivoHoy?.let { f -> item(key = "festivo") { FestivoLaboraTarjeta(f, onEntrada = null) } }
             }
@@ -272,6 +287,7 @@ fun InicioScreen(
                                 accionEnCurso = state.accionEnCurso == actual.id,
                                 accionError = state.accionError,
                                 onPrimary = { accion ->
+                                    if (accion.abreCamara) EvidenciaApertura.pedirCamara(actual.id)
                                     when (accion.kind) {
                                         InicioRules.AccionKind.REANUDAR -> vm.reanudar(actual.id) {}
                                         InicioRules.AccionKind.INICIAR ->
@@ -287,6 +303,7 @@ fun InicioScreen(
                                 onPausar = { pausandoId = actual.id },
                             )
                         }
+                        if (jornadaAbajo) item(key = "jornada") { jornadaHero?.invoke() }
                         if (state.error != null) {
                             item(key = "error-suave") {
                                 NxRefreshErrorBanner(message = state.error, onRetry = { vm.load(initial = false) })
@@ -433,11 +450,14 @@ private fun JornadaHero(
     state: AttendanceUiState,
     onComida: () -> Unit,
     onVerJornada: () -> Unit,
+    /** «Mejor terminar la actividad» de la hoja de salida. */
+    onTerminarActividad: (Long) -> Unit,
     /** Festivo que le toca laborar: su horario arriba y, sin entrada, su botón la sustituye. */
     festivo: FestivoDto? = null,
 ) {
     val context = LocalContext.current
     val c = NxTheme.colors
+    var preguntandoSalida by remember { mutableStateOf(false) }
     var pendiente by rememberSaveable { mutableStateOf<String?>(null) }
     val tomarFoto = rememberCameraCapture { foto ->
         val tipo = pendiente ?: return@rememberCameraCapture
@@ -447,7 +467,19 @@ private fun JornadaHero(
             vm.clearMessage()
             return@rememberCameraCapture
         }
-        vm.checkIn(tipo, dataUrl)
+        vm.checkIn(tipo, dataUrl, confirmada = tipo == "salida")
+    }
+
+    if (preguntandoSalida) {
+        TerminarJornadaHoja(
+            vm = vm,
+            onTerminarActividad = onTerminarActividad,
+            onConfirmar = {
+                pendiente = "salida"
+                tomarFoto()
+            },
+            onCerrar = { preguntandoSalida = false },
+        )
     }
 
     val abierta = state.current?.isOpen == true
@@ -460,8 +492,10 @@ private fun JornadaHero(
     val salidaIso = salidas.maxByOrNull { it.timestamp }?.timestamp
 
     var ahoraMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(abierta) {
-        while (abierta) {
+    val minutosDeshacer = if (abierta) null else TerminarJornadaRules.minutosParaDeshacer(salidaIso, ahoraMs)
+    LaunchedEffect(abierta, salidaIso) {
+        ahoraMs = System.currentTimeMillis()
+        while (abierta || TerminarJornadaRules.minutosParaDeshacer(salidaIso, ahoraMs) != null) {
             delay(30_000)
             ahoraMs = System.currentTimeMillis()
         }
@@ -489,12 +523,15 @@ private fun JornadaHero(
         else -> null
     }
     val titulo = when (jornada) {
-        InicioRules.Jornada.EN_JORNADA -> "Entraste a las ${fmtHoraCorta(inicioIso)}"
+        InicioRules.Jornada.EN_JORNADA -> "Mi jornada"
         InicioRules.Jornada.COMPLETADA -> "Jornada completada · ${fmtHoraCorta(inicioIso)} – ${fmtHoraCorta(salidaIso)}"
         InicioRules.Jornada.SIN_ENTRADA -> estadoTexto
     }
     val detalle = when (jornada) {
         InicioRules.Jornada.SIN_ENTRADA -> subTexto
+        InicioRules.Jornada.EN_JORNADA ->
+            "Entraste ${fmtHoraCorta(inicioIso)} · ${InicioRules.horasMinutos(trabajadoMs)} h" +
+                if (state.gpsActivo) "" else " · GPS apagado"
         else -> "${InicioRules.horasMinutos(trabajadoMs)} h trabajadas · $subTexto"
     }
 
@@ -523,12 +560,11 @@ private fun JornadaHero(
                 pendiente = "entrada"
                 tomarFoto()
             },
-            onSalida = {
-                pendiente = "salida"
-                tomarFoto()
-            },
+            onSalida = { preguntandoSalida = true },
             onComida = onComida,
             onVerJornada = onVerJornada,
+            minutosDeshacer = minutosDeshacer,
+            onDeshacer = { vm.deshacerSalida() },
         )
         state.checkInMessage?.takeIf { it.isNotBlank() }?.let { msg ->
             Row(
@@ -564,6 +600,9 @@ internal fun JornadaTarjeta(
     onSalida: () -> Unit,
     onComida: () -> Unit,
     onVerJornada: () -> Unit,
+    /** Minutos que le quedan para deshacer su salida; null si ya no se puede. */
+    minutosDeshacer: Int? = null,
+    onDeshacer: () -> Unit = {},
 ) {
     val c = NxTheme.colors
     val shape = RoundedCornerShape(NxDimens.PanelRadius)
@@ -607,8 +646,8 @@ internal fun JornadaTarjeta(
                     onClick = onEntrada,
                 )
                 InicioRules.Jornada.EN_JORNADA -> JornadaBoton(
-                    text = "Salida",
-                    icon = Icons.AutoMirrored.Outlined.Logout,
+                    text = "Terminar mi jornada",
+                    icon = null,
                     primario = false,
                     loading = loading,
                     onClick = onSalida,
@@ -618,6 +657,26 @@ internal fun JornadaTarjeta(
                     icon = Icons.Outlined.Schedule,
                     primario = false,
                     onClick = onVerJornada,
+                )
+            }
+        }
+        if (minutosDeshacer != null) {
+            HorizontalDivider(color = c.borderSubtle)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !loading, onClick = onDeshacer)
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("¿Fue un error?", fontSize = 14.sp, color = c.fg2, modifier = Modifier.weight(1f))
+                Text(
+                    "Deshacer · quedan $minutosDeshacer min",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = c.brand,
                 )
             }
         }
@@ -643,7 +702,7 @@ internal fun JornadaTarjeta(
 @Composable
 private fun JornadaBoton(
     text: String,
-    icon: ImageVector,
+    icon: ImageVector?,
     primario: Boolean,
     onClick: () -> Unit,
     loading: Boolean = false,
@@ -669,10 +728,10 @@ private fun JornadaBoton(
                 strokeWidth = 2.dp,
                 color = if (primario) Color.White else c.brand,
             )
-        } else {
+        } else if (icon != null) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
         }
-        Spacer(Modifier.width(6.dp))
+        if (loading || icon != null) Spacer(Modifier.width(6.dp))
         Text(if (loading) "…" else text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
@@ -869,7 +928,7 @@ internal fun ActualCard(
                 icon = if (pausable) Icons.Outlined.Pause else Icons.Outlined.Info,
                 claro = false,
                 onClick = if (pausable) onPausar else onDetalle,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(0.7f),
             )
             BandaBoton(
                 text = InicioRules.etiquetaCorta(accion),
@@ -882,8 +941,12 @@ internal fun ActualCard(
                 claro = true,
                 loading = accionEnCurso,
                 onClick = { onPrimary(accion) },
-                modifier = Modifier.weight(1f),
+                // «Terminar actividad» no se puede cortar: es la palabra que evita la confusión.
+                modifier = Modifier.weight(1.3f),
             )
+        }
+        InicioRules.notaAccion(accion)?.let {
+            Text(it, fontSize = 12.sp, color = tenue)
         }
     }
 }

@@ -86,6 +86,10 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import mx.nexara.mobile.nativeapp.data.api.RiesgoSalidaDto
+import mx.nexara.mobile.nativeapp.ui.console.inicio.TerminarJornadaHoja
+import mx.nexara.mobile.nativeapp.ui.console.inicio.TerminarJornadaRules
+import androidx.compose.material3.OutlinedButton
 
 /*
  * Asistencias — espejo de apps/web/app/(panels)/erp/asistencias/page.tsx.
@@ -402,7 +406,7 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
      * Registra la checada y, en la entrada, enciende el GPS de jornada: consent
      * en el API + servicio en primer plano. En la salida se apagan los dos.
      */
-    fun checkIn(type: String, photoBase64: String) {
+    fun checkIn(type: String, photoBase64: String, confirmada: Boolean = false) {
         _state.update { it.copy(checkInLoading = true, checkInMessage = null) }
         viewModelScope.launch {
             try {
@@ -424,12 +428,12 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                         fixAgeMs = coords?.fixAgeMs,
                         // Para que sus jefes lean «Sin ubicación: …» y no un hueco sin motivo.
                         ubicacionFalla = lectura.falla.takeIf { coords == null },
+                        confirmada = confirmada,
                         photoBase64 = photoBase64,
                     )
                 }
                 val gpsNota = if (type == "entrada") encenderGps(checadaConUbicacion = coords != null) else apagarGps()
-                val base = res.message
-                    ?: if (type == "entrada") "Entrada registrada" else "Salida registrada"
+                val base = TerminarJornadaRules.mensajeChecada(type, res)
                 val geo = AttendanceCheckIn.notaGps(
                     hayCoords = coords != null,
                     accuracyM = coords?.accuracyM,
@@ -471,6 +475,45 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                         } else {
                             null
                         },
+                    )
+                }
+            }
+        }
+    }
+
+    /** Qué se detiene si sale ahora; null si no se pudo leer (sin señal, por ejemplo). */
+    suspend fun riesgoSalida(): RiesgoSalidaDto? = try {
+        withContext(Dispatchers.IO) { repo.riesgoSalida() }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
+    }
+
+    /** Dentro de los 10 minutos: la jornada vuelve a quedar abierta y el rastreo se reenciende. */
+    fun deshacerSalida() {
+        _state.update { it.copy(checkInLoading = true, checkInMessage = null) }
+        viewModelScope.launch {
+            try {
+                val res = withContext(Dispatchers.IO) { repo.deshacerSalida() }
+                val gpsNota = encenderGps(checadaConUbicacion = false)
+                _state.update {
+                    it.copy(
+                        checkInLoading = false,
+                        checkInMessage = TerminarJornadaRules.mensajeDeshecha(res.noCumplidasRegresadas) + gpsNota,
+                        checkInError = false,
+                        gpsActivo = JornadaGps.isRunning(),
+                    )
+                }
+                refresh(initial = false)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        checkInLoading = false,
+                        checkInMessage = e.toUserMessage("No se pudo deshacer tu salida"),
+                        checkInError = true,
                     )
                 }
             }
@@ -537,6 +580,8 @@ fun ConsoleAttendanceScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
     /** `comidas` abre la pestaña de hora de comida (/erp/asistencias?tab=comidas). */
     initialTab: String? = null,
+    /** «Mejor terminar la actividad» de la hoja de salida. */
+    onTerminarActividad: ((Long) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val vm: ConsoleAttendanceViewModel = viewModel()
@@ -629,6 +674,7 @@ fun ConsoleAttendanceScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             ) {
                 EquipoTab(
+                    onTerminarActividad = onTerminarActividad,
                     vm = vm,
                     state = state,
                     contentPadding = contentPadding,
@@ -769,6 +815,7 @@ private fun SelectorFecha(
 
 @Composable
 private fun EquipoTab(
+    onTerminarActividad: ((Long) -> Unit)?,
     vm: ConsoleAttendanceViewModel,
     state: AttendanceUiState,
     contentPadding: PaddingValues,
@@ -805,7 +852,7 @@ private fun EquipoTab(
                     requestOnAppear = true,
                 )
             }
-            item { MiJornadaCard(vm = vm, state = state, esHoy = esHoy, ahoraMs = ahoraMs) }
+            item { MiJornadaCard(vm = vm, state = state, esHoy = esHoy, ahoraMs = ahoraMs, onTerminarActividad = onTerminarActividad) }
             if (state.gpsActivo) {
                 item { GpsJornadaAviso(onDetener = vm::detenerGpsManual) }
             }
@@ -1039,10 +1086,12 @@ private fun MiJornadaCard(
     state: AttendanceUiState,
     esHoy: Boolean,
     ahoraMs: Long,
+    onTerminarActividad: ((Long) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     // Sobrevive a que Android recree la actividad mientras la cámara está abierta.
     var pendiente by rememberSaveable { mutableStateOf<String?>(null) }
+    var preguntandoSalida by remember { mutableStateOf(false) }
     val tomarFoto = rememberCameraCapture { foto ->
         val tipo = pendiente ?: return@rememberCameraCapture
         pendiente = null
@@ -1051,10 +1100,24 @@ private fun MiJornadaCard(
             vm.clearMessage()
             return@rememberCameraCapture
         }
-        vm.checkIn(tipo, dataUrl)
+        vm.checkIn(tipo, dataUrl, confirmada = tipo == "salida")
     }
 
     val asegurarUbicacion = rememberAsegurarUbicacion()
+
+    if (preguntandoSalida) {
+        TerminarJornadaHoja(
+            vm = vm,
+            onTerminarActividad = onTerminarActividad,
+            onConfirmar = {
+                asegurarUbicacion {
+                    pendiente = "salida"
+                    tomarFoto()
+                }
+            },
+            onCerrar = { preguntandoSalida = false },
+        )
+    }
 
     val abierta = state.current?.isOpen == true
     val hayEntrada = state.misChecadas.any { it.type.equals("entrada", true) }
@@ -1127,10 +1190,14 @@ private fun MiJornadaCard(
         if (siguiente != null || state.checkInLoading) {
             Button(
                 onClick = {
-                    // Primero permiso y ubicación encendida (diálogo del sistema); luego la foto.
-                    asegurarUbicacion {
-                        pendiente = siguiente
-                        tomarFoto()
+                    if (siguiente == "salida") {
+                        preguntandoSalida = true
+                    } else {
+                        // Primero permiso y ubicación encendida (diálogo del sistema); luego la foto.
+                        asegurarUbicacion {
+                            pendiente = siguiente
+                            tomarFoto()
+                        }
                     }
                 },
                 enabled = siguiente != null && !state.checkInLoading,
@@ -1154,7 +1221,7 @@ private fun MiJornadaCard(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        if (siguiente == "salida") "Registrar salida" else "Registrar entrada",
+                        if (siguiente == "salida") "Terminar mi jornada" else "Registrar entrada",
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                     )
@@ -1162,6 +1229,18 @@ private fun MiJornadaCard(
             }
         } else if (esHoy && hayEntrada && !haySalida) {
             Text("Ya registraste tu entrada de hoy.", fontSize = 12.sp, color = NxColors.Muted)
+        }
+
+        val salidaIso = state.misChecadas.filter { it.type.equals("salida", true) }.maxByOrNull { it.timestamp }?.timestamp
+        TerminarJornadaRules.minutosParaDeshacer(salidaIso, ahoraMs)?.takeIf { esHoy && !abierta }?.let { minutos ->
+            OutlinedButton(
+                onClick = { vm.deshacerSalida() },
+                enabled = !state.checkInLoading,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
+                shape = RoundedCornerShape(NxUi.Radius),
+            ) {
+                Text("Deshacer mi salida · quedan $minutos min", fontWeight = FontWeight.SemiBold)
+            }
         }
 
         state.checkInMessage?.takeIf { it.isNotBlank() }?.let { msg ->

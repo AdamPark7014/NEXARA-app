@@ -756,6 +756,83 @@ data class AddTeamMemberRequest(
     val horasPlan: Double? = null,
 )
 
+/** `GET formatos-actividad`: la receta. Lo que cambia (cliente, persona, día) se pide al aplicar. */
+data class FormatoActividadDto(
+    val id: Long = 0,
+    val nombre: String = "",
+    val descripcion: String? = null,
+    val usos: Int = 0,
+    val receta: RecetaFormatoDto = RecetaFormatoDto(),
+)
+
+data class RecetaFormatoDto(
+    val unidad: String? = null,
+    val cantidadPorOmision: Int = 1,
+    val renglones: List<RenglonFormatoDto> = emptyList(),
+)
+
+data class RenglonFormatoDto(
+    val titulo: String = "",
+    val coreKind: String = "tarea",
+    val tipo: String? = null,
+    val minutosBase: Int = 60,
+    val minutosPorUnidad: Int = 0,
+    val fotos: Int = 4,
+    val indicaciones: String? = null,
+    val puntos: List<PuntoFormatoDto> = emptyList(),
+    val herramientas: List<HerramientaFormatoDto> = emptyList(),
+)
+
+data class PuntoFormatoDto(val nombre: String = "", val momentos: List<String> = emptyList())
+
+data class HerramientaFormatoDto(val descripcion: String = "", val cantidad: Int = 1)
+
+/** `POST formatos-actividad/:id/aplicar`. La `clave` evita duplicar con dos toques. */
+data class AplicarFormatoRequest(
+    val clave: String,
+    val responsableId: Long,
+    val equipoIds: List<Long> = emptyList(),
+    val fecha: String,
+    val clientId: Long? = null,
+    val sucursal: String? = null,
+    val renglones: List<RenglonAplicarDto>,
+)
+
+data class RenglonAplicarDto(
+    val titulo: String,
+    val coreKind: String,
+    val tipo: String?,
+    val minutos: Int,
+    val minutosBase: Int,
+    val minutosPorUnidad: Int,
+    val fotos: Int,
+    val indicaciones: String?,
+    val puntos: List<PuntoFormatoDto>,
+    val herramientas: List<HerramientaFormatoDto>,
+)
+
+data class ResultadoAplicarDto(
+    val actividades: List<ActividadAplicadaDto> = emptyList(),
+    val fallidas: List<FallidaAplicarDto> = emptyList(),
+)
+
+data class ActividadAplicadaDto(val id: Long = 0, val anNumber: String? = null, val titulo: String = "")
+
+data class FallidaAplicarDto(val titulo: String = "", val motivo: String = "")
+
+/** `POST proceso-tiempos`: cuánto tardó de verdad (Programa Velocidad Core). */
+data class ProcesoTiempoRequest(
+    val proceso: String,
+    val duracionMs: Long,
+    val clics: Int? = null,
+    val entidadId: Long? = null,
+    val detalle: String? = null,
+)
+
+data class ProvisionServiceClientDto(val serviceClient: ServiceClientRefDto? = null)
+
+data class ServiceClientRefDto(val id: Long = 0)
+
 /** Cliente del padrón (`GET ventas/clientes?sector=`). */
 data class SalesClientOwnerDto(
     val id: Long? = null,
@@ -1308,6 +1385,27 @@ interface CoreActivitiesApi {
     suspend fun serviceSheetPdf(
         @Path("id") activityId: Long,
         @Body body: ActivityEvidencePdfStepRequest,
+    ): EvidenceFlowDto
+
+    @GET("formatos-actividad")
+    suspend fun formatosActividad(): List<FormatoActividadDto>
+
+    @POST("formatos-actividad/{id}/aplicar")
+    suspend fun aplicarFormato(@Path("id") id: Long, @Body body: AplicarFormatoRequest): ResultadoAplicarDto
+
+    @POST("proceso-tiempos")
+    suspend fun registrarTiempo(@Body body: ProcesoTiempoRequest): retrofit2.Response<Unit>
+
+    @GET("ventas/clientes")
+    suspend fun salesClientsTodos(): List<SalesClientDto>
+
+    @POST("ventas/clientes/{id}/provision-service-client")
+    suspend fun provisionServiceClient(@Path("id") id: Long): ProvisionServiceClientDto
+
+    @POST("activity-evidence/{id}/volver-paso")
+    suspend fun volverPaso(
+        @Path("id") activityId: Long,
+        @Body body: Map<String, String>,
     ): EvidenceFlowDto
 
     /** El cuerpo ES el formulario (claves según coreKind). */
