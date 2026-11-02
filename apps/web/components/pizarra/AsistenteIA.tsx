@@ -676,7 +676,7 @@ function Contenido({
                     Abrir
                   </ButtonLink>
                 </div>
-                <PreguntaProyecto activityId={est.creada.id} />
+                {tipo === "comercial" ? null : <PreguntaProyecto activityId={est.creada.id} />}
               </div>
             );
           }

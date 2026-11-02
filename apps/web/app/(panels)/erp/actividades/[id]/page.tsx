@@ -435,6 +435,9 @@ export default function ActivityDetailPage() {
         </Alert>
       ) : null}
 
+      {/* Una comercial no es de un proyecto: va con su cotización. */}
+      {String(activity.coreKind ?? "").toLowerCase() === "comercial" ? null : <PreguntaProyecto activityId={activity.id} />}
+
       <RecordSection
         title="Evidencias"
         subtitle={
@@ -537,8 +540,6 @@ export default function ActivityDetailPage() {
           </div>
         </RecordSection>
       ) : null}
-
-      <PreguntaProyecto activityId={activity.id} />
 
       {String(activity.coreKind ?? "").toLowerCase() === "comercial" ? (
         <RecordSection title="Cotización">
