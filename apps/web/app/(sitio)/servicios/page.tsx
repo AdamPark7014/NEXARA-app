@@ -9,6 +9,7 @@ import ip from "@/components/sitio/interior.module.css";
 import TarjetasRuta from "@/components/sitio/TarjetasRuta";
 import SimuladorCobertura from "@/components/sitio/SimuladorCobertura";
 import { GUIAS } from "@/lib/guias";
+import Aurora from "@/components/sitio/Aurora";
 import Flecha from "@/components/sitio/Flecha";
 import SubNav from "@/components/sitio/SubNav";
 import Cierre from "@/components/sitio/Cierre";
@@ -258,6 +259,7 @@ export default function PropuestaServicios() {
         }}
       />
       <section className={p.hero} aria-labelledby="servicios-hero">
+        <Aurora />
         <div className={`${s.contenedor} ${s.centro}`}>
           <p className={s.antetitulo}>Servicios</p>
           <h1 id="servicios-hero" className={p.heroTitulo}>

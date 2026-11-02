@@ -11,7 +11,7 @@ html:has([data-sitio]) body {
 
 html[data-public-theme="dark"]:has([data-sitio]),
 html[data-public-theme="dark"]:has([data-sitio]) body {
-  background: #0e0e0c;
+  background: #000000;
 }
 
 /* Sin el brillo decorativo que la plataforma pinta en body::before. */
