@@ -6,6 +6,7 @@ import {
   minutosAlLimite,
   necesitaActividad,
   tocaAvisoPorVencer,
+  tocaAvisoSinActividad,
   yaEntrego,
 } from './recordatorios-jornada';
 import { RecordatoriosJornadaService } from './recordatorios-jornada.service';
@@ -27,6 +28,22 @@ describe('reglas de los recordatorios de jornada', () => {
     expect(necesitaActividad({ enJornada: true, enComida: false, relojCorriendo: true })).toBe(false);
     expect(necesitaActividad({ enJornada: true, enComida: true, relojCorriendo: false })).toBe(false);
     expect(necesitaActividad({ enJornada: false, enComida: false, relojCorriendo: false })).toBe(false);
+  });
+
+  it('los escalones de «sin actividad»: 10, 20 y 40 min, y se reinician al empezar otra', () => {
+    const desde = minDespues(-100);
+    const ahora = (m: number) => new Date(desde.getTime() + m * 60_000);
+    const tras = (...min: number[]) => min.map(ahora);
+    expect(tocaAvisoSinActividad({ desde, enviadosHoy: [], ahora: ahora(9) })).toBe(false);
+    expect(tocaAvisoSinActividad({ desde, enviadosHoy: [], ahora: ahora(10) })).toBe(true);
+    expect(tocaAvisoSinActividad({ desde, enviadosHoy: tras(10), ahora: ahora(15) })).toBe(false);
+    expect(tocaAvisoSinActividad({ desde, enviadosHoy: tras(10), ahora: ahora(20) })).toBe(true);
+    expect(tocaAvisoSinActividad({ desde, enviadosHoy: tras(10, 20), ahora: ahora(40) })).toBe(true);
+    // Después del tercero ya no, hasta que empiece otra actividad.
+    expect(tocaAvisoSinActividad({ desde, enviadosHoy: tras(10, 20, 40), ahora: ahora(300) })).toBe(false);
+    // Los de antes de esta racha no cuentan para el escalón, sí para el tope.
+    expect(tocaAvisoSinActividad({ desde: ahora(90), enviadosHoy: tras(10, 20, 40), ahora: ahora(100) })).toBe(true);
+    expect(tocaAvisoSinActividad({ desde: ahora(90), enviadosHoy: tras(10, 20, 40, 50, 60, 70), ahora: ahora(100) })).toBe(false);
   });
 
   it('el texto dice si tiene algo abierto o nada', () => {
@@ -101,11 +118,20 @@ describe('RecordatoriosJornadaService', () => {
     comidas?: number[];
     relojes?: number[];
     actividades?: unknown[];
+    cerrados?: Array<{ userId: number; endedAt: Date }>;
+    avisados?: Array<{ userId: number; createdAt: Date }>;
   }) {
     const prisma = {
       attendanceDay: { findMany: jest.fn().mockResolvedValue(opts.dias ?? []) },
-      lunchBreak: { findMany: jest.fn().mockResolvedValue((opts.comidas ?? []).map((userId) => ({ userId }))) },
-      activityWorkSession: { findMany: jest.fn().mockResolvedValue((opts.relojes ?? []).map((userId) => ({ userId }))) },
+      lunchBreak: {
+        findMany: jest.fn().mockResolvedValue((opts.comidas ?? []).map((userId) => ({ userId, checkoutTime: null }))),
+      },
+      activityWorkSession: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([...(opts.relojes ?? []).map((userId) => ({ userId, endedAt: null })), ...(opts.cerrados ?? [])]),
+      },
+      notification: { findMany: jest.fn().mockResolvedValue(opts.avisados ?? []) },
       activity: { findMany: jest.fn().mockResolvedValue(opts.actividades ?? []) },
     };
     const notifications = { createNotification: jest.fn().mockResolvedValue({ id: 1 }) };
@@ -114,6 +140,8 @@ describe('RecordatoriosJornadaService', () => {
   const persona = (userId: number, email = `p${userId}@nexara.com.mx`) => ({
     userId,
     companyId: 1,
+    // Entró hace una hora: ya le toca el primer escalón.
+    lastEntryAt: minDespues(-60),
     user: { email, isActive: true },
   });
   const actividad = (over: Record<string, unknown> = {}) => ({
@@ -139,7 +167,7 @@ describe('RecordatoriosJornadaService', () => {
     expect(prisma.attendanceDay.findMany).not.toHaveBeenCalled();
   });
 
-  it('avisa cada 5 min a quien no tiene reloj; no a quien trabaja, come o no es empleado', async () => {
+  it('avisa a quien no tiene reloj; no a quien trabaja, come o no es empleado', async () => {
     const { service, notifications } = armar({
       dias: [persona(7), persona(8), persona(9), persona(2, 'developer@nexara.com.mx')],
       relojes: [8],
@@ -155,12 +183,26 @@ describe('RecordatoriosJornadaService', () => {
         priority: 'high',
         title: 'No tienes ninguna actividad abierta',
         collapseKey: 'nx_sin_actividad_u7',
+        entrega: 'recordatorio',
         dedupeSeconds: 240,
       }),
     );
   });
 
-  it('a quien se le vence una actividad sin entregar, cada 10 min; con lo abierto en el texto de «sin actividad»', async () => {
+  it('a los 10, 20 y 40 min: acaba de cerrar un reloj y todavía no le toca', async () => {
+    const { service, notifications } = armar({ dias: [persona(7)], cerrados: [{ userId: 7, endedAt: minDespues(-3) }] });
+    await service.revisar(AHORA);
+    expect(notifications.createNotification).not.toHaveBeenCalled();
+  });
+
+  it('con 6 avisos hoy ya no insiste', async () => {
+    const seis = [-300, -280, -260, -200, -180, -160].map((m) => ({ userId: 7, createdAt: minDespues(m) }));
+    const { service, notifications } = armar({ dias: [persona(7)], avisados: seis });
+    await service.revisar(AHORA);
+    expect(notifications.createNotification).not.toHaveBeenCalled();
+  });
+
+  it('a quien se le vence una actividad sin entregar, cada 30 min; con lo abierto en el texto de «sin actividad»', async () => {
     const { service, notifications } = armar({ dias: [persona(10)], actividades: [actividad()] });
     const r = await service.revisar(AHORA);
     expect(r).toEqual({ sinActividad: 1, porVencer: 1 });
@@ -172,7 +214,8 @@ describe('RecordatoriosJornadaService', () => {
         relatedEntityId: 400,
         relatedUrl: '/erp/actividades/400',
         collapseKey: 'nx_vence_400_u10',
-        dedupeSeconds: 540,
+        entrega: 'recordatorio',
+        dedupeSeconds: 1740,
       }),
     );
     expect(notifications.createNotification).toHaveBeenCalledWith(

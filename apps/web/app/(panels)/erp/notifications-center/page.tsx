@@ -17,6 +17,7 @@ import { stripLeadingEmoji } from "@/lib/notification-kind";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
@@ -49,10 +50,10 @@ interface Notif {
   relatedUrl?: string | null;
 }
 
-type ViewMode = "action" | "notifications" | "feed";
+type ViewMode = "action" | "notifications" | "agrupados" | "feed";
 type CategoryFilter = "all" | "ops" | "attendance" | "chat" | "other";
 
-const VIEW_PARAM: Record<ViewMode, string | null> = { action: null, notifications: "all", feed: "feed" };
+const VIEW_PARAM: Record<ViewMode, string | null> = { action: null, notifications: "all", agrupados: "agrupados", feed: "feed" };
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
   const res = await fetch(buildApiUrl(path), {
@@ -143,6 +144,8 @@ export default function NotificationsCenterPage() {
   const [view, setView] = useState<ViewMode>("action");
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [notifs, setNotifs] = useState<Notif[] | null>(null);
+  /** Lo que no sonó: pasó el tope del día o llegó fuera de horario (`presupuesto-avisos.ts`). */
+  const [agrupados, setAgrupados] = useState<Notif[] | null>(null);
   const [feed, setFeed] = useState<ActivityFeedItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [feedLoading, setFeedLoading] = useState(false);
@@ -153,6 +156,7 @@ export default function NotificationsCenterPage() {
     const v = new URLSearchParams(window.location.search).get("view");
     if (v === "feed") setView("feed");
     else if (v === "all") setView("notifications");
+    else if (v === "agrupados") setView("agrupados");
   }, []);
 
   const changeView = useCallback((next: ViewMode) => {
@@ -173,6 +177,20 @@ export default function NotificationsCenterPage() {
       setNotifs(Array.isArray(data) ? data : (data.data ?? []));
     } catch (e: unknown) {
       setError(formatApiError(e, "No pudimos cargar tus notificaciones."));
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  const loadAgrupados = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiFetch("notifications?limit=80&agrupados=1", token);
+      setAgrupados(Array.isArray(data) ? data : (data.data ?? []));
+    } catch (e: unknown) {
+      setError(formatApiError(e, "No pudimos cargar los avisos agrupados."));
     } finally {
       setLoading(false);
     }
@@ -201,6 +219,10 @@ export default function NotificationsCenterPage() {
   }, [view, feed, loadFeed]);
 
   useEffect(() => {
+    if (view === "agrupados" && agrupados === null) void loadAgrupados();
+  }, [view, agrupados, loadAgrupados]);
+
+  useEffect(() => {
     if (!token) return;
     const socket = createRealtimeSocket(getSocketBaseUrl(), { auth: { token } });
     socket.on("notification:new", (payload: Notif) => {
@@ -222,6 +244,7 @@ export default function NotificationsCenterPage() {
     try {
       await apiFetch(`notifications/${id}/read`, token, { method: "PATCH" });
       setNotifs((prev) => prev?.map((n) => (n.id === id ? { ...n, isRead: true } : n)) ?? prev);
+      setAgrupados((prev) => prev?.map((n) => (n.id === id ? { ...n, isRead: true } : n)) ?? prev);
     } catch (e: unknown) {
       toast.error(`No se pudo marcar como leída. ${formatApiError(e, "")}`.trim());
     }
@@ -242,6 +265,7 @@ export default function NotificationsCenterPage() {
     try {
       await apiFetch(`notifications/${id}`, token, { method: "DELETE" });
       setNotifs((prev) => prev?.filter((n) => n.id !== id) ?? prev);
+      setAgrupados((prev) => prev?.filter((n) => n.id !== id) ?? prev);
     } catch (e: unknown) {
       toast.error(`No se pudo eliminar. ${formatApiError(e, "")}`.trim());
     }
@@ -280,13 +304,15 @@ export default function NotificationsCenterPage() {
     const base =
       view === "action"
         ? actionable
-        : category === "all"
-          ? list
-          : list.filter((n) => bucketCategory(n.category) === category);
-    return [...base].sort(byPriorityThenDate);
-  }, [view, actionable, list, category]);
+        : view === "agrupados"
+          ? (agrupados ?? [])
+          : category === "all"
+            ? list
+            : list.filter((n) => bucketCategory(n.category) === category);
+    return view === "agrupados" ? base : [...base].sort(byPriorityThenDate);
+  }, [view, actionable, agrupados, list, category]);
 
-  const firstLoad = notifs === null && loading;
+  const firstLoad = (view === "agrupados" ? agrupados === null : notifs === null) && loading;
 
   return (
     <>
@@ -296,7 +322,7 @@ export default function NotificationsCenterPage() {
         subtitle="Lo que necesita tu atención primero, y todo lo demás en orden."
         actions={
           <>
-            <Button variant="ghost" iconLeft="↻" onClick={() => void (view === "feed" ? loadFeed() : loadNotifs())} loading={view === "feed" ? feedLoading : loading && notifs !== null} disabled={view === "feed" ? feedLoading : loading}>
+            <Button variant="ghost" iconLeft="↻" onClick={() => void (view === "feed" ? loadFeed() : view === "agrupados" ? loadAgrupados() : loadNotifs())} loading={view === "feed" ? feedLoading : loading && notifs !== null} disabled={view === "feed" ? feedLoading : loading}>
               Actualizar
             </Button>
             {stats.unread > 0 && (
@@ -328,6 +354,7 @@ export default function NotificationsCenterPage() {
         tabs={[
           { key: "action", label: <IconLabel icon={TaskAltIcon} size={16}>Para atender</IconLabel>, badge: actionable.length || undefined },
           { key: "notifications", label: <IconLabel icon={InboxOutlinedIcon} size={16}>Todas</IconLabel>, badge: stats.unread || undefined },
+          { key: "agrupados", label: <IconLabel icon={LayersOutlinedIcon} size={16}>Agrupados</IconLabel> },
           { key: "feed", label: <IconLabel icon={InsightsOutlinedIcon} size={16}>Actividad reciente</IconLabel> },
         ]}
       />
@@ -350,11 +377,13 @@ export default function NotificationsCenterPage() {
       {view !== "feed" && (
         <Section
           title={
-            notifs === null
-              ? view === "action" ? "Para atender" : "Todas"
-              : view === "action"
-                ? actionable.length === 1 ? "1 necesita tu atención" : `${actionable.length} necesitan tu atención`
-                : stats.unread === 1 ? "1 sin leer" : `${stats.unread} sin leer`
+            view === "agrupados"
+              ? "Lo que no sonó: pasó el tope del día o llegó fuera de horario"
+              : notifs === null
+                ? view === "action" ? "Para atender" : "Todas"
+                : view === "action"
+                  ? actionable.length === 1 ? "1 necesita tu atención" : `${actionable.length} necesitan tu atención`
+                  : stats.unread === 1 ? "1 sin leer" : `${stats.unread} sin leer`
           }
         >
           {error && (
@@ -366,10 +395,10 @@ export default function NotificationsCenterPage() {
           )}
           {firstLoad ? (
             <SkeletonList />
-          ) : notifs !== null && sortedNotifs.length === 0 ? (
+          ) : (view === "agrupados" ? agrupados !== null : notifs !== null) && sortedNotifs.length === 0 ? (
             <EmptyState
               icon="🔔"
-              title={view === "action" ? "Nada urgente" : "Sin notificaciones"}
+              title={view === "action" ? "Nada urgente" : view === "agrupados" ? "Nada agrupado" : "Sin notificaciones"}
               description={
                 view === "action"
                   ? "No tienes pendientes que requieran acción inmediata."

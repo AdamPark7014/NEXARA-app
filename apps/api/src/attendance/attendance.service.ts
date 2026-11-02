@@ -1904,28 +1904,6 @@ export class AttendanceService {
       await this.anotarEstadoUbicacion({ userId, tenantId, coords, falla: dto.ubicacionFalla, origen, deviceInfo, now });
       this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
 
-      try {
-        await this.avisar({
-          userId,
-          type: 'ATTENDANCE_CHECKIN',
-          category: 'attendance',
-          title: 'Registraste tu entrada',
-          message: [horaAviso(now), deviceInfo].filter(Boolean).join(' · '),
-          icon: 'entrada',
-          relatedEntityId: attendance.id,
-          entityType: 'Attendance',
-          relatedUrl: '/erp/asistencias',
-          priority: 'normal',
-        });
-      } catch (selfNotificationError) {
-        this.logger.warn(`No se pudo crear notificación propia de entrada para userId=${userId}`);
-        this.logger.debug(
-          selfNotificationError instanceof Error
-            ? selfNotificationError.message
-            : String(selfNotificationError),
-        );
-      }
-
       await this.notificationHierarchy.notifyAttendanceChange(
         userId,
         'ATTENDANCE_CHECKIN',
@@ -2037,28 +2015,6 @@ export class AttendanceService {
     // con coordenadas cierra un tramo apagado que siguiera abierto).
     await this.anotarEstadoUbicacion({ userId, tenantId, coords, falla: dto.ubicacionFalla, origen, deviceInfo, now });
     this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
-
-    try {
-      await this.avisar({
-        userId,
-        type: 'ATTENDANCE_CHECKOUT',
-        category: 'attendance',
-        title: 'Registraste tu salida',
-        message: [horaAviso(now), deviceInfo].filter(Boolean).join(' · '),
-        icon: 'salida',
-        relatedEntityId: attendance.id,
-        entityType: 'Attendance',
-        relatedUrl: '/erp/asistencias',
-        priority: 'normal',
-      });
-    } catch (selfNotificationError) {
-      this.logger.warn(`No se pudo crear notificación propia de salida para userId=${userId}`);
-      this.logger.debug(
-        selfNotificationError instanceof Error
-          ? selfNotificationError.message
-          : String(selfNotificationError),
-      );
-    }
 
     await this.notificationHierarchy.notifyAttendanceChange(
       userId,

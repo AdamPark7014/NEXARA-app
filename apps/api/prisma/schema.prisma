@@ -3343,6 +3343,8 @@ model Notification {
   priority        String?          @default("normal") @db.VarChar(20) // "high", "normal", "low"
   isRead          Boolean          @default(false)
   readAt          DateTime?
+  /// Cómo se entregó: push | siempre | recordatorio | resumen | resumida (`presupuesto-avisos.ts`).
+  entrega         String           @default("push") @db.VarChar(12)
   companyId       Int?
   createdAt       DateTime         @default(now())
 
@@ -3354,6 +3356,7 @@ model Notification {
   @@index([userId, isRead, createdAt])
   @@index([userId, category])
   @@index([isRead, createdAt])
+  @@index([userId, entrega, createdAt])
   @@index([companyId])
   @@map("notifications")
 }

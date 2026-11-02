@@ -3,15 +3,18 @@ import { chainExecutorIds, type ChainMember } from './activity-superiors.js';
 import { UMBRAL_POR_VENCER_MIN } from './semaforo-actividad.js';
 
 /**
- * Recordatorios insistentes durante la jornada (Adam, 29-10-2026):
- * - Quien está en jornada sin una actividad corriendo recibe push cada ~5 min hasta que abra una.
+ * Recordatorios durante la jornada (Adam, 29-10-2026; espaciados el 01-11, Programa Velocidad Core):
+ * - Quien está en jornada sin una actividad corriendo recibe push a los 10, 20 y 40 min, con un
+ *   máximo de 6 al día. Cada 5 min sumaban 564 en un día y se leía el 61 %.
  * - Quien tiene una actividad sin entregar a 30 min o menos de su límite (o ya pasada) recibe push
- *   cada ~10 min hasta que la entregue o cheque su salida.
+ *   cada ~30 min hasta que la entregue o cheque su salida.
  * La jornada la marca su checada: antes de la entrada y después de la salida no se avisa nada.
+ * Van como `recordatorio`: suenan y no ensucian la bandeja (`presupuesto-avisos.ts`).
  */
 
-export const CADA_SIN_ACTIVIDAD_MIN = 5;
-export const CADA_POR_VENCER_MIN = 10;
+export const ESCALONES_SIN_ACTIVIDAD_MIN = [10, 20, 40];
+export const TOPE_SIN_ACTIVIDAD_DIA = 6;
+export const CADA_POR_VENCER_MIN = 30;
 /** Desde cuánto antes del límite se insiste: lo mismo que pinta el semáforo en ámbar. */
 export const VENTANA_POR_VENCER_MIN = UMBRAL_POR_VENCER_MIN;
 
@@ -24,6 +27,18 @@ export function horarioDeRecordatorios(ahora: Date): boolean {
 /** En jornada, fuera de su comida y sin ningún reloj de actividad corriendo. */
 export function necesitaActividad(p: { enJornada: boolean; enComida: boolean; relojCorriendo: boolean }): boolean {
   return p.enJornada && !p.enComida && !p.relojCorriendo;
+}
+
+/**
+ * ¿Toca avisar? `desde` = desde cuándo no tiene reloj (su entrada, el último reloj que cerró o su
+ * regreso de comer); `enviadosHoy` = los avisos de hoy. Empezar una actividad reinicia los escalones.
+ */
+export function tocaAvisoSinActividad(p: { desde: Date; enviadosHoy: Date[]; ahora: Date }): boolean {
+  if (p.enviadosHoy.length >= TOPE_SIN_ACTIVIDAD_DIA) return false;
+  const minutos = (p.ahora.getTime() - p.desde.getTime()) / 60_000;
+  const enEstaRacha = p.enviadosHoy.filter((e) => e.getTime() >= p.desde.getTime()).length;
+  const escalon = ESCALONES_SIN_ACTIVIDAD_MIN[enEstaRacha];
+  return escalon != null && minutos >= escalon;
 }
 
 /** Texto del aviso de «sin actividad», según tenga algo abierto sin iniciar o nada. */
@@ -39,7 +54,7 @@ export function avisoSinActividad(abiertas: number): { title: string; message: s
   }
   return {
     title: 'No tienes ninguna actividad abierta',
-    message: 'Crea tu siguiente actividad o pídela a tu encargado. Este aviso se repite hasta que tengas una en curso.',
+    message: 'Crea tu siguiente actividad o pídela a tu encargado.',
   };
 }
 
