@@ -122,6 +122,13 @@ object FormatosRules {
         return d
     }
 
+    /** «Mañana» o «Lun 9»: se lee mejor que una fecha. */
+    fun etiquetaDia(d: LocalDate, hoy: LocalDate): String {
+        if (d == hoy.plusDays(1)) return "Mañana"
+        val nombre = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")[d.dayOfWeek.value - 1]
+        return "$nombre ${d.dayOfMonth}"
+    }
+
     fun faltante(responsableId: Long?, clienteId: Long?, renglones: List<RenglonEditable>): String? = when {
         renglones.isEmpty() -> "Deja al menos una actividad"
         renglones.any { it.titulo.isBlank() } -> "A una actividad le falta el título"
@@ -143,7 +150,12 @@ data class RenglonEditable(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun FormatosScreen(onBack: () -> Unit, onOpenActivity: (Long) -> Unit) {
+fun FormatosScreen(
+    onBack: () -> Unit,
+    onOpenActivity: (Long) -> Unit,
+    /** Solo para las capturas en la JVM: sin red. */
+    formatosDePrueba: List<FormatoActividadDto>? = null,
+) {
     val context = LocalContext.current
     val repo = remember(context) { CoreActivitiesRepository(context) }
     val consola = remember(context) { ConsoleRepository(context) }
@@ -184,9 +196,10 @@ fun FormatosScreen(onBack: () -> Unit, onOpenActivity: (Long) -> Unit) {
 
     LaunchedEffect(Unit) {
         try {
-            val lista = withContext(Dispatchers.IO) { repo.formatosActividad() }
+            val lista = formatosDePrueba ?: withContext(Dispatchers.IO) { repo.formatosActividad() }
             formatos = lista
             lista.firstOrNull()?.let { elegir(it) }
+            if (formatosDePrueba != null) return@LaunchedEffect
             personas = withContext(Dispatchers.IO) { runCatching { consola.usersFetch() }.getOrDefault(emptyList()) }
             clientes = withContext(Dispatchers.IO) { runCatching { repo.salesClientsTodos() }.getOrDefault(emptyList()) }
         } catch (e: Exception) {
@@ -380,10 +393,10 @@ fun FormatosScreen(onBack: () -> Unit, onOpenActivity: (Long) -> Unit) {
                 val hoy = LocalDate.now(zona)
                 val manana = FormatosRules.siguienteDiaLaboral(hoy)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = fecha == manana, onClick = { fecha = manana }, label = { Text("Siguiente día") })
+                    FilterChip(selected = fecha == manana, onClick = { fecha = manana }, label = { Text(FormatosRules.etiquetaDia(manana, hoy)) })
                     FilterChip(selected = fecha == hoy, onClick = { fecha = hoy }, label = { Text("Hoy") })
                     val otro = FormatosRules.siguienteDiaLaboral(manana)
-                    FilterChip(selected = fecha == otro, onClick = { fecha = otro }, label = { Text("$otro".takeLast(5)) })
+                    FilterChip(selected = fecha == otro, onClick = { fecha = otro }, label = { Text(FormatosRules.etiquetaDia(otro, hoy)) })
                 }
                 f.receta.unidad?.let { unidad ->
                     Etiqueta(unidad)
