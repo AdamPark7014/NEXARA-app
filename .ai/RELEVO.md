@@ -1,5 +1,43 @@
 # RELEVO
 
+- **02-11 (claude-code) — Asignar con IA: el cliente ya no se pega a otro por un giro o un lugar en común; dictado medido; inventario de IA al día (`0b19c2d3` en producción).**
+  - **Lo que se ve:** en la tarjeta, un cliente que no existe sale como «Nuevo: alta al confirmar», en vez de caer en otro que solo comparte «Grupo», «Puebla» o «Santa». Las siglas siguen cayendo en su ficha, en las dos direcciones.
+  - **Código:** `ai/asistente/elegir-cliente.ts` decide el cliente: `buscar` más `clientesParecidos`; si el comparador está casi seguro de uno solo, ese es, y se muestra como corrección. `catalogoRelevante` ya no le manda a la IA clientes que solo comparten un giro o un lugar: viéndolos en las coincidencias, los copiaba. La regla `cliente:` del prompt dice qué hacer si lo dicho solo se le parece a un nombre.
+  - **Medido con 45 repetidos y 25 nuevos reales (fuera del repo) y 70 frases por la IA:** nuevos con alta directa 12 → 21 de 25; nuevos equivocados 5 → 3; repetidos elegidos directo 40 → 41 de 45; repetidos equivocados 1 → 0. Sin regresión: repetir las respuestas guardadas da 69 propuestas y 0 cambios; frases reales 39/41 igual que antes; frases ciegas 17/20 → 19/20.
+  - **En producción, con sesión real y sin confirmar nada:** dos nombres inventados salieron como nuevos y unas siglas con puntos cayeron en su ficha. La base confirma que no se creó ningún cliente.
+  - **Pruebas:** CI `Tipos y tests` (tipos de API y web, Jest completo de la API y pruebas de web) en verde sobre `99003c05`, que ya incluye este commit.
+  - **Sigue sin resolver:** en nombres casi iguales a uno existente, la IA todavía cambia lo dicho por el existente. Se ve como corrección en la tarjeta, pero son 3 de 25 nuevos.
+  - **Dictado: se midió y no se cambió.**
+    - La tarjeta usa el reconocimiento del navegador cuando existe (`useDictadoVivo`); el whisper propio solo entra en navegadores sin él, como Firefox. Chrome no deja pasarle nombres, así que ahí la ayuda es el comparador de arriba.
+    - 36 de 61 frases reales, tres prompts, contra el whisper de dictado. Prompt actual: 15 de 27 clientes bien, 17.8 % de error por palabra. Con clientes en el prompt: 19 de 27 y 16.0–16.9 %, pero en una frase apareció un cliente que nadie dijo.
+    - **No se pasó a `dictar()`:** ganancia modesta en un camino que casi no se usa. Las reuniones ya mandan sus clientes por `grabacion.service.ts`.
+    - **Límites:** voz sintética de España, sin ruido y con el servidor cargado. No mide la voz real ni el tiempo de respuesta.
+    - **Trampa:** si `ssh` se cae, el proceso remoto sigue vivo. Mi reintento dejó dos corridas a la vez sobre un servidor ya cargado. Ambas se detuvieron; para algo largo en el Hetzner, revisar `pgrep` antes de reintentar.
+  - **Temporales en el Hetzner, por decidir:** `/tmp/dictado-eval/` y `/tmp/dictado-eval.tar` siguen ahí con frases reales y audios de prueba. El borrado se rechazó y queda en manos de Adam.
+  - **`triage`:** no vale encenderlo. `client_ticket_requests` no tiene ninguna fila.
+  - **Inventario de IA, uso real en la puerta desde 25-10 (324 llamadas, 0 errores, US$0.07 en total):**
+    | Función | Modelo | Uso | Estado |
+    |---|---|---|---|
+    | `complejidad` | Haiku | 260 | Bien, corre sola |
+    | `costos-liga` | Haiku | 25 | Bien |
+    | `asistente-actividades` | Haiku | 16 | Mejorada hoy |
+    | `cctv-ficha` | Haiku | 6 | Alerta de p95: 6.6 s contra 6 s, con muy poca muestra |
+    | `vehiculo-conuee` | Haiku | 5 | Eval sin fotos de campo |
+    | `clientes-duplicados` | Haiku | 3 | Bien; el código resuelve casi todo antes de llamar |
+    | `chat-asistente` | Haiku | 2 | Casi sin uso |
+    | `cotizar-frase` | Haiku | 2 | Casi sin uso |
+    | `vehiculo-manual` | Haiku | 2 | Eval sin fotos de campo |
+    | `vehiculo-ticket` | Haiku | 1 | Eval sin fotos de campo |
+    | `vehiculo-tablero` | Sonnet | 1 | Eval sin fotos de campo |
+    | `reunion-minuta` | Sonnet | 1 | Bien; la más cara por llamada |
+    | `reunion-notas`, `acta-reunion`, `triage`, `lab`, `cctv-sitio`, `cctv-equipo` | — | 0 | Sin tráfico; las frases de `cctv-*` no son de gente real |
+  - **Lo que sigue, en orden:**
+    1. Que se use. Quitando `complejidad`, que corre sola, casi nadie la pide, y el costo no es el freno.
+    2. Los nombres casi iguales que la IA todavía cambia en la tarjeta.
+    3. Eval de `vehiculo-*` con fotos de campo.
+    4. Frases reales para `cctv-*` cuando haya uso; vigilar su p95.
+  - **Sin decidir:** `ing_soporte` puede escribir cotizaciones y no llega al padrón; un cliente de operación «CUATZACUALCOS» ligado al comercial COATZACOALCOS; la ficha «SE» sigue esperando confirmación.
+
 - **02-11 ~15:50 (claude-code) — Listas cortadas por el tope de filas: ahora sale una tarjeta a `developer@` (`3b549f6b`, en producción desde las 20:49 UTC).** Adam: «Sí, agrégala». Corrige el «Falta» del bloque del aviso en `audit_logs`.
   - **Qué hace:** de lunes a sábado a las 9:00 de México, `notifications/aviso-recortes.service.ts` mira si hay recortes nuevos desde la última tarjeta. Si los hay, manda una sola con qué consulta fue y cuántas veces. Si no, no manda nada. Lo del domingo sale el lunes, y un reinicio no la repite.
   - **Texto real:** «Hay listas que salieron incompletas. Se cortaron al tope de 5,000 filas: ProductCT filtrando activo (12 veces); … Hay que paginar esas consultas.» Hasta 5 consultas, y luego «y N más».
