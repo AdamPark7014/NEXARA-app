@@ -52,7 +52,7 @@
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 50%;
+  border-radius: 0;
   color: var(--fg-2);
   transition: color 0.2s var(--ease), background-color 0.2s var(--ease);
 }

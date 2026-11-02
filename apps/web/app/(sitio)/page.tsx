@@ -5,20 +5,14 @@ import Link from "next/link";
 import { foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import { ruta } from "@/components/sitio/rutas";
-import Aurora from "@/components/sitio/Aurora";
-import Tablero from "@/components/sitio/Tablero";
 import Marcas from "@/components/sitio/Marcas";
-import Cifra from "@/components/sitio/Cifra";
 import Flecha from "@/components/sitio/Flecha";
 import Industrias, { type Industria } from "@/components/sitio/Industrias";
 import Galeria, { type FotoGaleria } from "@/components/sitio/Galeria";
 import MapaInteractivo from "@/components/sitio/MapaInteractivo";
 import Preguntas, { type Pregunta } from "@/components/sitio/Preguntas";
-import { GraficaEntregas, TicketSoporte } from "@/components/sitio/MiniInterfaces";
 import PublicIcon from "@/app/components/PublicIcon";
 import pn from "@/components/sitio/portada.module.css";
-import Baldosa from "@/components/sitio/Baldosa";
-import EquipoGrupo from "@/components/sitio/EquipoGrupo";
 import { fetchPageSection, DEFAULT_CTA, type CtaContent } from "@/lib/page-content-api";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
@@ -143,77 +137,52 @@ const DETRAS: FotoGaleria[] = [
   { ...foto("equipo-nexara-polos", "(max-width: 734px) 100vw, 680px"), alt: "Integrantes del equipo NEXARA", tema: "Equipo", pie: "Las mismas personas instalan y dan soporte." },
 ];
 
-/** Servicios en baldosas grandes: foto a sangre o mini interfaz, dos acciones. */
-function Mosaico() {
-  const tam = "(max-width: 734px) 100vw, 50vw";
-  const ancho = "(max-width: 1720px) 100vw, 1720px";
+/** Foto a todo el ancho: reescalada con Real-ESRGAN hasta 2560 px para que no se pixele en pantallas grandes. */
+const aSangre = (nombre: string) => ({
+  src: `/fotos/${nombre}-1200.webp`,
+  srcSet: `/fotos/${nombre}-1200.webp 1200w, /fotos/${nombre}-1920.webp 1920w, /fotos/${nombre}-2560.webp 2560w`,
+  sizes: "100vw",
+});
+
+type TextoCapituloProps = {
+  num: string;
+  nombre: string;
+  texto: string;
+  /** Ancla de /servicios que explica el servicio. */
+  ancla: string;
+  /** Valor de `?servicio=` en Contacto y sufijo del nombre de medición. */
+  servicio: string;
+  medicion: string;
+  className?: string;
+};
+
+/** Número, nombre, una línea y las dos ligas de cada servicio. Cada capítulo abre su propia sección bajo el h1. */
+function TextoCapitulo({ num, nombre, texto, ancla, servicio, medicion, className }: TextoCapituloProps) {
   return (
-    <section aria-label="Servicios" className={pn.mosaico}>
-      <Baldosa
-        ancha
-        nombre="Videovigilancia."
-        texto="Cobertura pensada por zona de riesgo y evidencia cuando se necesita."
-        foto={{ ...foto("muro-video-nexara", ancho), alt: "Centro de monitoreo con muro de video instalado por NEXARA", posicion: "center 2%" }}
-        acciones={[
-          { href: ruta("/servicios#cctv"), label: "Ver más", principal: true },
-          { href: ruta("/contacto?servicio=cctv"), label: "Cotizar", medicion: "home_baldosa_cctv" },
-        ]}
-      />
-      <Baldosa
-        nombre="Redes y Wi‑Fi."
-        texto="Cableado certificado y Wi‑Fi que aguanta la hora pico."
-        foto={{ ...foto("campo-enlace-antena-ciudad", tam), alt: "Radioenlace de NEXARA sobre la ciudad", posicion: "center 70%" }}
-        acciones={[
-          { href: ruta("/servicios#redes"), label: "Ver más", principal: true },
-          { href: ruta("/contacto?servicio=redes"), label: "Cotizar", medicion: "home_baldosa_redes" },
-        ]}
-      />
-      <Baldosa
-        oscura
-        nombre="Infraestructura."
-        texto="Racks, servidores y respaldos listos para operar."
-        foto={{ ...foto("rack-nexara-led", tam), alt: "Rack de servidores y switching instalado por NEXARA", posicion: "center 62%" }}
-        acciones={[
-          { href: ruta("/servicios#computo"), label: "Ver más", principal: true },
-          { href: ruta("/contacto?servicio=computo"), label: "Cotizar", medicion: "home_baldosa_computo" },
-        ]}
-      />
-      <Baldosa
-        nombre="Soporte TI."
-        texto="Mesa de ayuda con SLA, remota y en sitio."
-        arte={<TicketSoporte />}
-        acciones={[
-          { href: ruta("/servicios#soporte"), label: "Ver más", principal: true },
-          { href: ruta("/contacto?servicio=soporte"), label: "Cotizar", medicion: "home_baldosa_soporte" },
-        ]}
-      />
-      <Baldosa
-        nombre="Plataformas."
-        texto="Portales, automatización e indicadores, por fases."
-        arte={<GraficaEntregas />}
-        acciones={[
-          { href: ruta("/servicios#software"), label: "Ver más", principal: true },
-          { href: ruta("/contacto?servicio=software"), label: "Cotizar", medicion: "home_baldosa_software" },
-        ]}
-      />
-      <Baldosa
-        ancha
-        nombre="Un solo equipo."
-        texto="Las mismas personas diseñan, instalan y te atienden después."
-        pie={<EquipoGrupo />}
-        acciones={[
-          { href: ruta("/nosotros#equipo"), label: "Conoce al equipo", principal: true },
-          { href: ruta("/proyectos"), label: "Ver proyectos" },
-        ]}
-      />
-    </section>
+    <div className={className}>
+      <span className={pn.num} aria-hidden="true">
+        {num}
+      </span>
+      <h2 className={pn.capituloNombre}>{nombre}</h2>
+      <p className={pn.capituloBajada}>{texto}</p>
+      <div className={pn.ligas}>
+        <Link href={ruta(`/servicios#${ancla}`)} className={pn.liga}>
+          Ver el servicio
+        </Link>
+        <Link href={ruta(`/contacto?servicio=${servicio}`)} className={pn.liga} data-track-conversion={medicion}>
+          Cotizar
+        </Link>
+      </div>
+    </div>
   );
 }
 
-/** Portada: hero centrado con el tablero como producto, baldosas de servicio, cifras, cobertura y cierre. */
+/** Portada: el título, el trabajo real a sangre, un capítulo por servicio, el equipo, las industrias y el cierre. */
 export default async function Inicio() {
   const cta = (await fetchPageSection<CtaContent>("home_cta")) ?? DEFAULT_CTA;
   const whatsapp = buildWhatsAppLeadUrl({ industryName: "tu empresa", serviceName: "CCTV, redes o soporte TI", path: "/" });
+  const mitad = "(max-width: 900px) 100vw, 60vw";
+  const tercio = "(max-width: 900px) 100vw, 34vw";
 
   return (
     <main aria-label="NEXARA, inicio">
@@ -237,15 +206,26 @@ export default async function Inicio() {
         }}
       />
 
-      <section className={pn.hero} aria-labelledby="hero-titulo">
-        <Aurora />
-        <div className={s.contenedor}>
+      <section aria-labelledby="hero-titulo">
+        <div className={pn.ancho}>
           <h1 id="hero-titulo" className={pn.titulo}>
-            <span>Seguridad que ve.</span>
-            <span className={s.degradado}>Y responde.</span>
+            <span>Seguridad que ve.</span> <span>Y responde.</span>
           </h1>
-          <p className={pn.sub}>Videovigilancia, redes, cómputo y soporte TI para empresas, con un solo equipo responsable.</p>
-          <div className={pn.acciones}>
+        </div>
+        <figure className={pn.heroFoto}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            {...aSangre("campo-instalacion-rack")}
+            alt="Dos técnicos de NEXARA con casco y chaleco fijando un rack en sitio"
+            fetchPriority="high"
+            decoding="async"
+          />
+        </figure>
+        <div className={`${pn.ancho} ${pn.rejilla} ${pn.heroPie}`}>
+          <p className={pn.heroTexto}>
+            Videovigilancia, accesos, redes e infraestructura para empresas. Lo instala el mismo equipo que te atiende después.
+          </p>
+          <div className={pn.heroAcciones}>
             <Link href={ruta("/contacto")} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_hero_cta">
               Agendar diagnóstico
               <Flecha />
@@ -261,30 +241,186 @@ export default async function Inicio() {
               <Flecha />
             </a>
           </div>
-          <Tablero />
         </div>
       </section>
 
       <Marcas />
 
-      <Mosaico />
+      <section className={`${pn.ancho} ${pn.rejilla} ${pn.capitulo} ${pn.conRaya}`} aria-label="Videovigilancia">
+        <figure className={pn.cols1a8} data-aparecer>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            {...foto("muro-video-ancho", mitad)}
+            alt="Centro de monitoreo con muro de video instalado por NEXARA"
+            loading="lazy"
+            decoding="async"
+            className={pn.foto}
+            style={{ aspectRatio: "16 / 10" }}
+          />
+          <figcaption className={pn.pie}>Muro de video listo para operar el primer día.</figcaption>
+        </figure>
+        <TextoCapitulo
+          className={pn.cols8a13}
+          num="01"
+          nombre="Videovigilancia"
+          texto="Cobertura pensada por zona de riesgo y evidencia cuando se necesita."
+          ancla="cctv"
+          servicio="cctv"
+          medicion="home_baldosa_cctv"
+        />
+      </section>
 
-      <section className={s.seccion} aria-label="NEXARA en cifras">
-        <div className={s.contenedor}>
-          <ul className={pn.cifras}>
-            {CIFRAS.map((c) => (
-              <li key={c.texto} data-aparecer>
-                <Cifra valor={c.valor} className={pn.cifra} />
-                <p className={pn.cifraTexto}>{c.texto}</p>
-              </li>
-            ))}
-          </ul>
+      <section className={`${pn.ancho} ${pn.rejilla} ${pn.capitulo}`} aria-label="Control de acceso">
+        <TextoCapitulo
+          className={pn.cols1a6}
+          num="02"
+          nombre="Control de acceso"
+          texto="Torniquetes con reconocimiento facial y lectores por zona, en operación."
+          ancla="cctv"
+          servicio="acceso"
+          medicion="home_baldosa_acceso"
+        />
+        <figure className={pn.cols6a13} data-aparecer>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            {...foto("control-acceso-torniquetes", mitad)}
+            alt="Torniquetes con terminal facial instalados por NEXARA"
+            loading="lazy"
+            decoding="async"
+            className={pn.foto}
+            style={{ aspectRatio: "3 / 2" }}
+          />
+          <figcaption className={pn.pie}>Torniquetes con reconocimiento facial.</figcaption>
+        </figure>
+      </section>
+
+      <section aria-label="Redes y Wi‑Fi">
+        <figure className={pn.sangre} data-aparecer>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img {...aSangre("campo-enlace-antena-ciudad")} alt="Radioenlace de NEXARA sobre la ciudad" loading="lazy" decoding="async" />
+        </figure>
+        <div className={`${pn.ancho} ${pn.rejilla} ${pn.capituloFila}`}>
+          <span className={`${pn.num} ${pn.cols1a4}`} aria-hidden="true">
+            03
+          </span>
+          <h2 className={`${pn.capituloNombre} ${pn.cols4a9}`}>Redes y Wi‑Fi</h2>
+          <div className={pn.cols9a13}>
+            <p className={pn.capituloBajada}>Cableado certificado y Wi‑Fi que aguanta la hora pico.</p>
+            <div className={pn.ligas}>
+              <Link href={ruta("/servicios#redes")} className={pn.liga}>
+                Ver el servicio
+              </Link>
+              <Link href={ruta("/contacto?servicio=redes")} className={pn.liga} data-track-conversion="home_baldosa_redes">
+                Cotizar
+              </Link>
+            </div>
+          </div>
         </div>
+      </section>
+
+      <section className={`${pn.ancho} ${pn.rejilla} ${pn.capitulo}`} aria-label="Infraestructura">
+        <figure className={pn.cols1a5} data-aparecer>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            {...foto("campo-instalacion-ap-altura", tercio)}
+            alt="Técnico de NEXARA instalando un punto de acceso en altura"
+            loading="lazy"
+            decoding="async"
+            className={pn.foto}
+            style={{ aspectRatio: "3 / 4", objectPosition: "50% 40%" }}
+          />
+          <figcaption className={pn.pie}>Trabajo en altura con equipo de seguridad.</figcaption>
+        </figure>
+        <figure className={pn.cols5a9} data-aparecer>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            {...foto("rack-nexara-led", tercio)}
+            alt="Rack de servidores y switching instalado por NEXARA"
+            loading="lazy"
+            decoding="async"
+            className={pn.foto}
+            style={{ aspectRatio: "3 / 4", objectPosition: "50% 62%" }}
+          />
+        </figure>
+        <TextoCapitulo
+          className={pn.cols9a13}
+          num="04"
+          nombre="Infraestructura"
+          texto="Racks, servidores y respaldos listos para operar."
+          ancla="computo"
+          servicio="computo"
+          medicion="home_baldosa_computo"
+        />
+      </section>
+
+      <section className={`${pn.ancho} ${pn.rejilla} ${pn.capitulo} ${pn.sinArriba}`} aria-label="Soporte y plataformas">
+        <TextoCapitulo
+          className={`${pn.cols1a7} ${pn.conRayaBloque}`}
+          num="05"
+          nombre="Soporte TI"
+          texto="Mesa de ayuda con SLA, remota y en sitio."
+          ancla="soporte"
+          servicio="soporte"
+          medicion="home_baldosa_soporte"
+        />
+        <TextoCapitulo
+          className={`${pn.cols7a13} ${pn.conRayaBloque}`}
+          num="06"
+          nombre="Plataformas"
+          texto="Portales, automatización e indicadores, por fases."
+          ancla="software"
+          servicio="software"
+          medicion="home_baldosa_software"
+        />
+      </section>
+
+      <section className={pn.banda} aria-labelledby="equipo-titulo">
+        <div className={`${pn.ancho} ${pn.rejilla} ${pn.capitulo}`}>
+          <div className={pn.cols1a9}>
+            <h2 id="equipo-titulo" className={pn.bandaTitulo}>
+              Las mismas personas diseñan, instalan y te atienden después.
+            </h2>
+            <ul className={pn.cifras}>
+              {CIFRAS.map((c) => (
+                <li key={c.texto}>
+                  <b>{c.valor}</b>
+                  <span>{c.texto}</span>
+                </li>
+              ))}
+            </ul>
+            <div className={pn.ligas}>
+              <Link href={ruta("/nosotros#equipo")} className={pn.liga}>
+                Conoce al equipo
+              </Link>
+              <Link href={ruta("/proyectos")} className={pn.liga}>
+                Ver proyectos
+              </Link>
+            </div>
+          </div>
+          <figure className={pn.cols9a13}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              {...foto("equipo-nexara-espalda", tercio)}
+              alt="Integrantes del equipo NEXARA de espaldas, con el uniforme"
+              loading="lazy"
+              decoding="async"
+              className={pn.foto}
+              style={{ aspectRatio: "3 / 4" }}
+            />
+          </figure>
+        </div>
+      </section>
+
+      <section className={`${pn.ancho} ${pn.capitulo}`} aria-labelledby="industrias-titulo">
+        <h2 id="industrias-titulo" className={pn.subtitulo}>
+          Hecho a la medida de tu industria.
+        </h2>
+        <Industrias industrias={INDUSTRIAS} />
       </section>
 
       <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="cobertura-titulo">
         <div className={s.contenedor}>
-          <header className={s.centro} data-aparecer>
+          <header data-aparecer>
             <h2 id="cobertura-titulo" className={s.titulo}>
               Base en Puebla y CDMX. <span className={s.tenue}>Alcance nacional.</span>
             </h2>
@@ -296,22 +432,9 @@ export default async function Inicio() {
         </div>
       </section>
 
-      <section className={s.seccion} aria-labelledby="industrias-titulo">
+      <section className={s.seccion} aria-labelledby="detras-titulo">
         <div className={s.contenedor}>
-          <header className={s.centro} data-aparecer>
-            <h2 id="industrias-titulo" className={s.titulo}>
-              Hecho a la medida <span className={s.tenue}>de tu industria.</span>
-            </h2>
-          </header>
-          <div data-aparecer>
-            <Industrias industrias={INDUSTRIAS} />
-          </div>
-        </div>
-      </section>
-
-      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="detras-titulo">
-        <div className={s.contenedor}>
-          <header className={s.centro} data-aparecer>
+          <header data-aparecer>
             <h2 id="detras-titulo" className={s.titulo}>
               Trabajo real. <span className={s.tenue}>Ninguna foto es de banco.</span>
             </h2>
@@ -322,7 +445,7 @@ export default async function Inicio() {
         </div>
       </section>
 
-      <section className={s.seccion} aria-labelledby="faq-titulo">
+      <section className={`${s.seccion} ${s.seccionAlt}`} aria-labelledby="faq-titulo">
         <div className={`${s.contenedor} ${s.faq}`}>
           <div data-aparecer>
             <h2 id="faq-titulo" className={s.titulo}>
@@ -336,43 +459,53 @@ export default async function Inicio() {
         </div>
       </section>
 
-      <section className={s.final} aria-labelledby="final-titulo">
-        <div className={s.contenedor}>
-          <div className={s.finalTarjeta} data-aparecer>
-            <Aurora />
-            <h2 id="final-titulo" className={s.titulo}>
-              {cta.title} {cta.titleAccent}.
-            </h2>
-            <p className={s.lead}>{cta.text}</p>
-            <div className={s.acciones}>
-              <Link href={ruta(cta.primaryHref)} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_cta_primary">
-                {cta.primaryLabel}
-                <Flecha />
-              </Link>
-              <a
-                href={whatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`${s.boton} ${s.botonSecundario}`}
-                data-track-conversion="home_cta_whatsapp"
-              >
-                Escríbenos por WhatsApp
-                <Flecha />
-              </a>
-            </div>
-            <ul className={s.finalGarantias}>
-              <li>
-                <PublicIcon name="clock" size={18} /> Primera respuesta en un día hábil
-              </li>
-              <li>
-                <PublicIcon name="mapPin" size={18} /> Diagnóstico en sitio
-              </li>
-              <li>
-                <PublicIcon name="fileCheck" size={18} /> Memoria técnica al entregar
-              </li>
-            </ul>
+      <section className={`${pn.ancho} ${pn.rejilla} ${pn.capitulo}`} aria-labelledby="final-titulo">
+        <div className={pn.cols1a8} data-aparecer>
+          <h2 id="final-titulo" className={pn.cierreTitulo}>
+            {cta.title} {cta.titleAccent}.
+          </h2>
+          <p className={s.lead}>{cta.text}</p>
+          <div className={s.acciones}>
+            <Link href={ruta(cta.primaryHref)} className={`${s.boton} ${s.botonPrimario}`} data-track-conversion="home_cta_primary">
+              {cta.primaryLabel}
+              <Flecha />
+            </Link>
+            <a
+              href={whatsapp}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${s.boton} ${s.botonSecundario}`}
+              data-track-conversion="home_cta_whatsapp"
+            >
+              Escríbenos por WhatsApp
+              <Flecha />
+            </a>
           </div>
+          <ul className={s.finalGarantias}>
+            <li>
+              <PublicIcon name="clock" size={18} /> Primera respuesta en un día hábil
+            </li>
+            <li>
+              <PublicIcon name="mapPin" size={18} /> Diagnóstico en sitio
+            </li>
+            <li>
+              <PublicIcon name="fileCheck" size={18} /> Memoria técnica al entregar
+            </li>
+          </ul>
         </div>
+        <figure className={pn.cols8a13} data-aparecer>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            {...w("descarga-equipo-camioneta-nexara")}
+            sizes={tercio}
+            alt="Técnico de NEXARA descargando cajas de equipo en sitio"
+            loading="lazy"
+            decoding="async"
+            className={pn.foto}
+            style={{ aspectRatio: "4 / 3" }}
+          />
+          <figcaption className={pn.pie}>Flotilla propia, del almacén al sitio. Ninguna foto es de banco.</figcaption>
+        </figure>
       </section>
     </main>
   );

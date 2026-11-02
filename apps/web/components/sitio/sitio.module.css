@@ -1,66 +1,60 @@
 /*
- * Sitio público NEXARA — sistema visual 2026.
+ * Sitio público NEXARA — sistema visual «Obra» (aprobado por Adam el 02-11-2026).
  *
- * Una sola familia tonal por tema (blanco y gris niebla en claro; tinta profunda en
- * oscuro), un único azul de acción y un degradado de marca —los colores del isotipo—
- * reservado para el hero y el cierre. La jerarquía sale del tamaño de la letra, del
- * aire y de superficies del mismo tema. El tema lo fija `<html data-public-theme>`.
+ * Fotos reales a sangre, letra enorme y mucho contraste: blanco y gris piedra en claro, tinta en oscuro, y un solo
+ * color de marca, el naranja del chaleco, con tinta encima. Sin sombras, sin esquinas redondas y sin degradados.
+ * La jerarquía sale del tamaño. El tema lo fija `<html data-public-theme>`.
  */
 
 .sitio {
   /* Deja animar alturas hacia `auto` (el acordeón de preguntas). */
   interpolate-size: allow-keywords;
   --bg: #ffffff;
-  --bg-alt: #f6f8fb;
-  --tile: #f6f8fb;
+  --bg-alt: #efefeb;
+  --tile: #efefeb;
   --tile-alt: #ffffff;
   --card: #ffffff;
   --sobre-tile: #ffffff;
-  --mapa-estado: #dae3ee;
-  --mapa-estado-hover: #c8d5e5;
+  --mapa-estado: #deded8;
+  --mapa-estado-hover: #cfcfc8;
   --mapa-borde: #ffffff;
   --mapa-halo: var(--bg);
-  --fg: #0a2540;
-  --fg-2: #425466;
-  --fg-3: #5b6b80;
-  --line: #e3e8ef;
-  --line-soft: #edf1f6;
-  --accent: #0060f0;
-  --btn: #0060f0;
-  --btn-hover: #0a52cc;
+  --fg: #0e0e0c;
+  --fg-2: #55554f;
+  --fg-3: #66665f;
+  --line: #d6d6cf;
+  --line-soft: #e7e7e2;
+  --accent: #b8360a;
+  --marca: #f2541b;
+  --sobre-marca: #0e0e0c;
+  --btn-hover-fg: #0e0e0c;
+  --btn: #0e0e0c;
+  --btn-hover: #f2541b;
   --btn-fg: #ffffff;
-  --btn-2: #ffffff;
-  --btn-2-fg: #0a2540;
-  --ok: #12a150;
-  --rec: #e5484d;
-  --glass: rgba(255, 255, 255, 0.72);
-  --glass-line: rgba(10, 37, 64, 0.08);
-  --seg-bg: #edf1f6;
+  --btn-2: transparent;
+  --btn-2-fg: #0e0e0c;
+  --ok: #14713f;
+  --rec: #d92d20;
+  --glass: #ffffff;
+  --glass-line: #d6d6cf;
+  --seg-bg: #efefeb;
   --seg-on: #ffffff;
-  --seg-shadow: 0 1px 2px rgba(10, 37, 64, 0.08), 0 4px 12px rgba(10, 37, 64, 0.06);
-  --control: rgba(10, 37, 64, 0.06);
-  --control-hover: rgba(10, 37, 64, 0.1);
-  --sombra-sm: 0 1px 2px rgba(10, 37, 64, 0.06), 0 2px 6px rgba(10, 37, 64, 0.04);
-  --sombra-md: 0 2px 4px rgba(10, 37, 64, 0.04), 0 12px 32px -8px rgba(10, 37, 64, 0.14);
-  --sombra-xl: 0 2px 6px rgba(10, 37, 64, 0.04), 0 30px 60px -12px rgba(50, 50, 93, 0.22),
-    0 18px 36px -18px rgba(0, 0, 0, 0.26);
-  --degradado-texto: linear-gradient(92deg, #0060f0 0%, #0284c7 55%, #0891b2 100%);
-  --aurora-1: #7dd3fc;
-  --aurora-2: #5eead4;
-  --aurora-3: #a5b4fc;
-  --aurora-4: #fdba74;
-  --aurora-5: #f0abfc;
-  --aurora-opacidad: 0.85;
+  --seg-shadow: inset 0 0 0 2px #0e0e0c;
+  --control: rgba(14, 14, 12, 0.06);
+  --control-hover: rgba(14, 14, 12, 0.12);
+  --sombra-sm: none;
+  --sombra-md: none;
+  --sombra-xl: 0 24px 60px -24px rgba(14, 14, 12, 0.35);
+  --degradado-texto: none;
 
-  --font: var(--nx-font-ui), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
-  --font-display: var(--sitio-display), var(--nx-font-ui), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  --radius-xl: 24px;
-  --radius-lg: 18px;
-  --radius-md: 12px;
-  --wide: 1200px;
+  --font: var(--sitio-texto), "Libre Franklin", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-display: var(--sitio-display), "Big Shoulders", Impact, "Arial Narrow", sans-serif;
+  --radius-xl: 0;
+  --radius-lg: 0;
+  --radius-md: 0;
+  --wide: 1320px;
   --narrow: 820px;
-  --gutter: clamp(20px, 4vw, 40px);
+  --gutter: clamp(16px, 3.2vw, 48px);
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -72,51 +66,48 @@
   font-size: 17px;
   line-height: 1.55;
   letter-spacing: -0.006em;
-  font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
 :global(html[data-public-theme="dark"]) .sitio {
-  --bg: #060b14;
-  --bg-alt: #09111d;
-  --tile: #0d1625;
-  --tile-alt: #101b2c;
-  --card: #0f1a2b;
-  --sobre-tile: #16233a;
-  --mapa-estado: #15223a;
-  --mapa-estado-hover: #1c2d4a;
-  --mapa-borde: #060b14;
-  --fg: #f2f5f9;
-  --fg-2: #a3b0c2;
-  --fg-3: #8b98aa;
-  --line: #1d2a3d;
-  --line-soft: #152133;
-  --accent: #4da3ff;
-  --btn: #0a5fe0;
-  --btn-hover: #1a6ff0;
-  --btn-2: #111c2e;
-  --btn-2-fg: #f2f5f9;
-  --ok: #3dd68c;
-  --rec: #ff6369;
-  --glass: rgba(6, 11, 20, 0.72);
-  --glass-line: rgba(255, 255, 255, 0.07);
-  --seg-bg: #0d1625;
-  --seg-on: #1d2a3d;
-  --seg-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --bg: #0e0e0c;
+  --bg-alt: #1b1b18;
+  --tile: #1b1b18;
+  --tile-alt: #24241f;
+  --card: #1b1b18;
+  --sobre-tile: #2a2a25;
+  --mapa-estado: #2a2a25;
+  --mapa-estado-hover: #3a3a33;
+  --mapa-borde: #0e0e0c;
+  --fg: #f5f5f0;
+  --fg-2: #b7b7ae;
+  --fg-3: #a3a39a;
+  --line: #2f2f2a;
+  --line-soft: #24241f;
+  --accent: #ff8a5c;
+  --marca: #ff6a33;
+  --sobre-marca: #0e0e0c;
+  --btn-hover-fg: #0e0e0c;
+  --btn: #f5f5f0;
+  --btn-fg: #0e0e0c;
+  --btn-hover: #ff6a33;
+  --btn-2: transparent;
+  --btn-2-fg: #f5f5f0;
+  --ok: #5fd08f;
+  --rec: #ff6b60;
+  --glass: #0e0e0c;
+  --glass-line: #2f2f2a;
+  --seg-bg: #1b1b18;
+  --seg-on: #2a2a25;
+  --seg-shadow: inset 0 0 0 2px #f5f5f0;
   --control: rgba(255, 255, 255, 0.08);
   --control-hover: rgba(255, 255, 255, 0.14);
-  --sombra-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --sombra-md: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
-  --sombra-xl: 0 30px 60px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
-  --degradado-texto: linear-gradient(92deg, #6cb4ff 0%, #5ad1f0 55%, #5eead4 100%);
-  --aurora-1: #0ea5e9;
-  --aurora-2: #14b8a6;
-  --aurora-3: #4f46e5;
-  --aurora-4: #f97316;
-  --aurora-5: #c026d3;
-  --aurora-opacidad: 0.5;
+  --sombra-sm: none;
+  --sombra-md: none;
+  --sombra-xl: 0 24px 60px -24px rgba(0, 0, 0, 0.8);
+  --degradado-texto: none;
   color-scheme: dark;
 }
 
@@ -153,7 +144,7 @@
 
 .seccion {
   position: relative;
-  padding-block: clamp(96px, 11vw, 160px);
+  padding-block: clamp(64px, 7vw, 112px);
 }
 
 /* En las secciones gris niebla las tarjetas pasan a la superficie clara (y lo que va sobre ellas, a gris). */
@@ -165,7 +156,7 @@
 }
 
 .centro {
-  text-align: center;
+  text-align: left;
 }
 
 /* ── Tipografía ─────────────────────────────────────────────────────────── */
@@ -183,11 +174,12 @@
 
 .titulo {
   font-family: var(--font-display);
-  font-size: clamp(36px, 4.6vw, 60px);
-  line-height: 1.06;
-  font-weight: 600;
-  letter-spacing: -0.035em;
+  font-size: clamp(48px, 6.6vw, 108px);
+  line-height: 0.92;
+  font-weight: 800;
+  letter-spacing: 0;
   text-wrap: balance;
+  text-transform: uppercase;
 }
 
 .tenue {
@@ -195,12 +187,7 @@
 }
 
 .degradado {
-  background: var(--degradado-texto);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
+  color: inherit;
 }
 
 .lead {
@@ -213,10 +200,6 @@
   text-wrap: pretty;
 }
 
-.centro .lead {
-  margin-inline: auto;
-}
-
 /* ── Acciones ───────────────────────────────────────────────────────────── */
 
 .acciones {
@@ -227,18 +210,14 @@
   margin-top: 36px;
 }
 
-.centro .acciones {
-  justify-content: center;
-}
-
 .boton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-height: 46px;
-  padding: 0 20px 0 22px;
-  border-radius: 999px;
+  min-height: 52px;
+  padding: 0 22px 0 24px;
+  border-radius: 0;
   border: 0;
   font: inherit;
   font-size: 16px;
@@ -253,21 +232,22 @@
 .sitio .botonPrimario {
   background: var(--btn);
   color: var(--btn-fg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .sitio .botonPrimario:hover {
   background: var(--btn-hover);
+  color: var(--btn-hover-fg);
 }
 
 .sitio .botonSecundario {
   background: var(--btn-2);
   color: var(--btn-2-fg);
-  box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 2px var(--btn-2-fg);
 }
 
 .sitio .botonSecundario:hover {
-  box-shadow: var(--sombra-md), inset 0 0 0 1px var(--line);
+  background: var(--btn-2-fg);
+  color: var(--bg);
 }
 
 .boton:active {
@@ -345,92 +325,6 @@
   }
 }
 
-/* ── Aurora del hero ────────────────────────────────────────────────────── */
-
-/* Degradado vivo con los colores del isotipo, en una franja inclinada que se desvanece. */
-.aurora {
-  position: absolute;
-  inset: -120px 0 auto;
-  z-index: -1;
-  height: 860px;
-  overflow: hidden;
-  transform: skewY(-9deg);
-  transform-origin: 0 0;
-  mask-image: linear-gradient(180deg, #000 30%, transparent 92%);
-  -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent 92%);
-  pointer-events: none;
-}
-
-.aurora i {
-  position: absolute;
-  width: 46vw;
-  height: 46vw;
-  max-width: 760px;
-  max-height: 760px;
-  border-radius: 50%;
-  filter: blur(70px);
-  opacity: var(--aurora-opacidad);
-  will-change: transform;
-}
-
-.aurora i:nth-child(1) {
-  top: -10%;
-  left: -6%;
-  background: var(--aurora-1);
-  animation: deriva1 22s var(--ease) infinite alternate;
-}
-
-.aurora i:nth-child(2) {
-  top: 8%;
-  left: 26%;
-  background: var(--aurora-2);
-  animation: deriva2 26s var(--ease) infinite alternate;
-}
-
-.aurora i:nth-child(3) {
-  top: -18%;
-  right: 8%;
-  background: var(--aurora-3);
-  animation: deriva3 24s var(--ease) infinite alternate;
-}
-
-.aurora i:nth-child(4) {
-  top: 22%;
-  right: -8%;
-  width: 30vw;
-  height: 30vw;
-  background: var(--aurora-4);
-  opacity: calc(var(--aurora-opacidad) * 0.7);
-  animation: deriva2 30s var(--ease) infinite alternate-reverse;
-}
-
-.aurora i:nth-child(5) {
-  top: 30%;
-  left: 52%;
-  width: 26vw;
-  height: 26vw;
-  background: var(--aurora-5);
-  opacity: calc(var(--aurora-opacidad) * 0.55);
-  animation: deriva1 28s var(--ease) infinite alternate-reverse;
-}
-
-@keyframes deriva1 {
-  to {
-    transform: translate3d(12vw, 6vw, 0) scale(1.15);
-  }
-}
-
-@keyframes deriva2 {
-  to {
-    transform: translate3d(-10vw, 8vw, 0) scale(0.9);
-  }
-}
-
-@keyframes deriva3 {
-  to {
-    transform: translate3d(-8vw, 10vw, 0) scale(1.1);
-  }
-}
 
 /* ── Tablero ilustrativo del hero ───────────────────────────────────────── */
 
@@ -442,7 +336,7 @@
 .ventana {
   position: relative;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: 0;
   background: var(--card);
   box-shadow: var(--sombra-xl);
   animation: flota 9s ease-in-out infinite;
@@ -467,7 +361,7 @@
 .puntos i {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--line);
 }
 
@@ -489,7 +383,7 @@
 .rec i {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: 0;
   background: currentColor;
   animation: late 1.6s ease-in-out infinite;
 }
@@ -512,7 +406,7 @@
 .camara {
   position: relative;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: #0b1220;
 }
 
@@ -577,7 +471,7 @@
   position: absolute;
   z-index: 1;
   border: 1.5px solid #5eead4;
-  border-radius: 4px;
+  border-radius: 0;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
   animation: detecta 4s var(--ease) infinite;
 }
@@ -587,7 +481,7 @@
   top: -18px;
   left: -1.5px;
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: 0;
   background: #5eead4;
   color: #042f2e;
   font-size: 9.5px;
@@ -603,7 +497,7 @@
 
 .estado {
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--tile);
   font-size: 12px;
   line-height: 1.35;
@@ -624,7 +518,7 @@
   content: "";
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--ok);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 18%, transparent);
 }
@@ -657,7 +551,7 @@
 .flotante {
   position: absolute;
   z-index: 2;
-  border-radius: 14px;
+  border-radius: 0;
   background: var(--card);
   box-shadow: var(--sombra-xl);
   font-size: 12.5px;
@@ -689,7 +583,7 @@
 
 .pasitos i {
   height: 4px;
-  border-radius: 4px;
+  border-radius: 0;
   background: var(--ok);
   transform-origin: left;
   animation: llena 0.6s var(--ease-out) both;
@@ -868,7 +762,7 @@
   overflow: hidden;
   padding: 6px 12px 8px;
   border: 0;
-  border-radius: 8px 8px 0 0;
+  border-radius: 0;
   background: transparent;
   color: var(--fg-3);
   font: inherit;
@@ -893,7 +787,7 @@
   right: 10px;
   bottom: 3px;
   height: 2px;
-  border-radius: 2px;
+  border-radius: 0;
   background: var(--accent);
   transform-origin: left;
   animation: llena linear both;
@@ -923,7 +817,7 @@
   position: relative;
   min-height: 276px;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--tile);
 }
 
@@ -948,7 +842,7 @@
   font-size: 14px;
   font-weight: 500;
   color: var(--fg-3);
-  text-align: center;
+  text-align: left;
 }
 
 .marcasVentana {
@@ -1006,11 +900,12 @@
 
 .declaracion {
   font-family: var(--font-display);
-  font-size: clamp(30px, 3.6vw, 48px);
-  line-height: 1.15;
-  font-weight: 600;
-  letter-spacing: -0.032em;
+  font-size: clamp(44px, 5vw, 76px);
+  line-height: 0.92;
+  font-weight: 800;
+  letter-spacing: 0;
   text-wrap: balance;
+  text-transform: uppercase;
 }
 
 /* Las animaciones de entrada arrancan cuando el bloque aparece, no al cargar. */
@@ -1040,7 +935,7 @@
   align-items: center;
   gap: 7px;
   padding: 7px 12px;
-  border-radius: 999px;
+  border-radius: 0;
   background: rgba(255, 255, 255, 0.9);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
@@ -1053,7 +948,7 @@
 .chip i {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--rec);
   animation: late 1.6s ease-in-out infinite;
 }
@@ -1173,7 +1068,7 @@
   display: flex;
   flex-direction: column;
   padding: 18px;
-  border-radius: 16px;
+  border-radius: 0;
   background: var(--tile);
   font-size: 13px;
 }
@@ -1189,9 +1084,9 @@
 
 .ticketPrioridad {
   padding: 2px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--rec) 12%, transparent);
-  color: var(--rec);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--rec) 18%, transparent);
+  color: var(--fg);
   font-size: 11px;
 }
 
@@ -1228,7 +1123,7 @@
   left: 0;
   width: 13px;
   height: 13px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--card);
   box-shadow: inset 0 0 0 2px var(--ok);
 }
@@ -1253,7 +1148,7 @@
   height: 6px;
   margin-top: 6px;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--line-soft);
 }
 
@@ -1261,7 +1156,7 @@
   display: block;
   width: 62%;
   height: 100%;
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--ok);
 }
 
@@ -1272,7 +1167,7 @@
   display: flex;
   flex-direction: column;
   padding: 18px;
-  border-radius: 16px;
+  border-radius: 0;
   background: var(--tile);
   font-size: 12px;
   color: var(--fg-3);
@@ -1299,7 +1194,7 @@
 .graficaChip {
   flex: 0 0 auto;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 0;
   background: color-mix(in srgb, var(--ok) 12%, transparent);
   color: var(--ok);
   font-size: 11.5px;
@@ -1349,7 +1244,7 @@
   position: absolute;
   width: 11px;
   height: 11px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--card), 0 0 0 7px color-mix(in srgb, var(--accent) 22%, transparent);
   transform: translate(-50%, -50%);
@@ -1422,7 +1317,7 @@
 
 .metodoPaso {
   overflow: hidden;
-  border-radius: var(--radius-xl);
+  border-radius: 0;
   background: var(--tile-alt);
   box-shadow: var(--sombra-sm), inset 0 0 0 1px var(--line-soft);
   opacity: 0.45;
@@ -1459,11 +1354,11 @@
 
 .metodoTitulo {
   margin-top: 6px;
-  font-family: var(--font-display);
+  font-family: var(--font);
   font-size: clamp(24px, 2.2vw, 30px);
   line-height: 1.12;
   font-weight: 600;
-  letter-spacing: -0.028em;
+  letter-spacing: -0.016em;
 }
 
 .metodoCopia {
@@ -1475,7 +1370,7 @@
 
 .segmentoMarco {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   margin-top: clamp(36px, 4vw, 52px);
 }
 
@@ -1484,7 +1379,7 @@
   display: inline-flex;
   max-width: 100%;
   padding: 4px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--seg-bg);
   overflow-x: auto;
   scrollbar-width: none;
@@ -1499,7 +1394,7 @@
   top: 4px;
   bottom: 4px;
   left: 0;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--seg-on);
   box-shadow: var(--seg-shadow);
   transition: transform 0.3s var(--ease-out), width 0.3s var(--ease-out);
@@ -1513,7 +1408,7 @@
   min-height: 40px;
   padding: 0 20px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 0;
   background: transparent;
   color: var(--fg-2);
   font: inherit;
@@ -1537,7 +1432,7 @@
 
 .panelTexto,
 .panelLista {
-  border-radius: var(--radius-xl);
+  border-radius: 0;
   padding: clamp(32px, 4vw, 56px);
 }
 
@@ -1616,7 +1511,7 @@
   place-items: center;
   width: 48px;
   height: 48px;
-  border-radius: 14px;
+  border-radius: 0;
   background: var(--sobre-tile);
   box-shadow: var(--sombra-sm);
   color: var(--accent);
@@ -1632,10 +1527,11 @@
 .panelTitulo {
   margin-top: 6px;
   font-family: var(--font-display);
-  font-size: clamp(32px, 3.4vw, 46px);
-  line-height: 1.05;
-  font-weight: 600;
-  letter-spacing: -0.038em;
+  font-size: clamp(42px, 4.4vw, 64px);
+  line-height: 0.92;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .panelCopia {
@@ -1666,9 +1562,8 @@
   inset: auto -20% -40% 30%;
   z-index: -1;
   height: 80%;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--aurora-1) 45%, transparent), transparent);
-  filter: blur(20px);
+  border-radius: 0;
+  display: none;
 }
 
 .panelListaTitulo {
@@ -1690,7 +1585,7 @@
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
-  border-radius: 14px;
+  border-radius: 0;
   background: var(--sobre-tile);
   box-shadow: var(--sombra-sm);
   font-size: 16px;
@@ -1758,7 +1653,7 @@
   position: relative;
   overflow: hidden;
   aspect-ratio: 4 / 5;
-  border-radius: var(--radius-xl);
+  border-radius: 0;
   background: var(--tile);
 }
 
@@ -1811,7 +1706,7 @@
   width: 42px;
   height: 42px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--control);
   color: var(--fg);
   cursor: pointer;
@@ -1949,7 +1844,7 @@
 .mapaLeyenda {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px 24px;
   margin-top: 20px;
   font-size: 14px;
@@ -1966,7 +1861,7 @@
 .leyendaCiudad {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 .leyendaBase {
@@ -2016,7 +1911,7 @@
   align-items: center;
   min-height: 34px;
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--card);
   box-shadow: inset 0 0 0 1px var(--line);
   font-size: 14px;
@@ -2040,7 +1935,7 @@
   width: 7px;
   height: 7px;
   margin-right: 8px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--accent);
 }
 
@@ -2102,7 +1997,7 @@
   justify-content: space-between;
   gap: 24px;
   padding: 24px 0;
-  font-family: var(--font-display);
+  font-family: var(--font);
   font-size: clamp(18px, 1.6vw, 21px);
   font-weight: 600;
   letter-spacing: -0.018em;
@@ -2170,42 +2065,24 @@
 
 .finalTarjeta {
   position: relative;
-  overflow: hidden;
-  isolation: isolate;
-  padding: clamp(56px, 8vw, 112px) clamp(28px, 6vw, 96px);
-  border-radius: 32px;
-  background: var(--tile);
-  text-align: center;
-}
-
-.finalTarjeta .aurora {
-  inset: 0;
-  height: auto;
-  transform: none;
-  mask-image: none;
-  -webkit-mask-image: none;
-  opacity: 0.9;
+  padding-block: clamp(32px, 4vw, 56px) 0;
+  border-top: 2px solid var(--fg);
 }
 
 .finalTarjeta .titulo {
-  margin-inline: auto;
-  max-width: 18ch;
+  max-width: 16ch;
+  font-size: clamp(56px, 8.6vw, 150px);
 }
 
 /* La tarjeta centra el título: el texto y los botones también, o quedaban cargados a la izquierda. */
 .finalTarjeta .lead {
-  margin-inline: auto;
   max-width: 40ch;
-}
-
-.finalTarjeta .acciones {
-  justify-content: center;
 }
 
 .finalGarantias {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 10px 28px;
   margin-top: 40px;
   font-size: 14px;
