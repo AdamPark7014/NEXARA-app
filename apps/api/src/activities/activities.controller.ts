@@ -27,6 +27,7 @@ import { CreateActivityDto } from './dto/create-activity.dto.js';
 import { UpdateActivityDto } from './dto/update-activity.dto.js';
 import { GetActivitiesQueryDto } from './dto/get-activities-query.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { esGestorOperativo, puedeGestionarActividades } from './puede-gestionar.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
 import { COLUMNAS_ACTIVIDADES } from '../common/excel/reportes.js';
@@ -428,21 +429,11 @@ export class ActivitiesController {
    */
   /** Gestión de actividades ajenas: mandos de operación, encargado de soporte o el permiso. */
   private puedeGestionarActividades(user: any): boolean {
-    if (!user) return false;
-    if (user.isSuperAdmin) return true;
-    if (user.permissions?.includes(PERMISSIONS.ACTIVITIES_MANAGE)) return true;
-    if (user.roleKey === 'enc_soporte') return true;
-    return this.isOpsManager(user);
+    return puedeGestionarActividades(user);
   }
 
   private isOpsManager(user: any): boolean {
-    if (!user) return false;
-    if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) return true;
-    const V2_OPS_MANAGER_ROLES = new Set([
-      'ceo', 'dir_admin', 'dir_operaciones', 'arquitecto',
-      'coord_operaciones', 'coord_admin',
-    ]);
-    return Boolean(user.roleKey && V2_OPS_MANAGER_ROLES.has(user.roleKey));
+    return esGestorOperativo(user);
   }
 
   /** Vista de OT del equipo: managers OPS + ingeniero de soporte/NOC. */

@@ -7,7 +7,7 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
-export const PROCESOS_MEDIDOS = ['asignar', 'autoasignar', 'asignar_ia', 'cotizar', 'revisar'] as const;
+export const PROCESOS_MEDIDOS = ['asignar', 'autoasignar', 'asignar_ia', 'asignar_formato', 'cotizar', 'revisar'] as const;
 
 /** Más que esto no es una medición, es una pestaña que se quedó abierta. */
 const TOPE_MS = 8 * 60 * 60 * 1000;

@@ -190,6 +190,8 @@ export class ActivityTeamService {
     companyId?: number | null,
     /** Quien suma a la persona: queda en el registro de despacho. */
     actorId?: number | null,
+    /** Quien crea varias de un jalón (formatos) manda un solo aviso al terminar. */
+    opciones: { sinAviso?: boolean } = {},
   ) {
     const tenantId = requireCompanyId(companyId);
     const activity = await this.loadActivity(activityId, tenantId);
@@ -264,6 +266,8 @@ export class ActivityTeamService {
         update: {},
       });
     }
+
+    if (opciones.sinAviso) return member;
 
     void this.notificationHierarchy?.notifyActivityDispatched({
       activityId,

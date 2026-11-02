@@ -19,6 +19,17 @@ describe('matriz: alta y autoasignación de actividades', () => {
     expect(checkUrlAccess(role, '/api/proyectos/12/programacion', 'GET').allowed).toBe(true);
   });
 
+  it.each(PERSONAL)('%s llega a los formatos; quién los usa lo decide el servicio', (role) => {
+    expect(checkUrlAccess(role, '/api/formatos-actividad', 'GET').allowed).toBe(true);
+    expect(checkUrlAccess(role, '/api/formatos-actividad/7/aplicar', 'POST').allowed).toBe(true);
+    expect(checkUrlAccess(role, '/api/formatos-actividad/7', 'PUT').allowed).toBe(true);
+  });
+
+  it('un cliente no llega a los formatos', () => {
+    expect(checkUrlAccess(ROLES.CLIENTE, '/api/formatos-actividad', 'GET').allowed).toBe(false);
+    expect(checkUrlAccess(ROLES.CLIENTE, '/api/formatos-actividad/7/aplicar', 'POST').allowed).toBe(false);
+  });
+
   it('un cliente no da de alta actividades ni lee el folio', () => {
     expect(checkUrlAccess(ROLES.CLIENTE, '/api/activities', 'POST').allowed).toBe(false);
     expect(checkUrlAccess(ROLES.CLIENTE, '/api/activities/next-an', 'GET').allowed).toBe(false);

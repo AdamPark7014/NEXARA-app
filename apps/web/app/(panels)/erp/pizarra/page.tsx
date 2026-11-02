@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import LibraryAddCheckOutlinedIcon from "@mui/icons-material/LibraryAddCheckOutlined";
 import CelebrationOutlinedIcon from "@mui/icons-material/CelebrationOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import OutboxOutlinedIcon from "@mui/icons-material/OutboxOutlined";
@@ -13,6 +14,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import {
   Alert,
   Button,
+  ButtonLink,
   EmptyState,
   FilterChip,
   FilterChips,
@@ -24,6 +26,7 @@ import {
   type TabItem,
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
+import { formatosVisibles, puedeVerFormatos } from "@/lib/formatos-actividad";
 import { formatApiError } from "@/lib/erp-api";
 import { getSocketBaseUrl } from "@/lib/api-base";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
@@ -42,6 +45,7 @@ import AsistenteIA from "@/components/pizarra/AsistenteIA";
 import { ARO_DE_ESTADO, ARO_LABEL, hayFlujo, resumenEquipo } from "@/components/pizarra/equipo-estado";
 import { RangoSelector } from "@/components/pizarra/PizarraKpi";
 import { isCeoEmail } from "@/lib/activity-kinds";
+import { resolveV2RoleKey } from "@/lib/user-access";
 import { formatHourMinute } from "@/lib/activity-labels";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
@@ -439,15 +443,22 @@ export default function PizarraPage() {
   );
 
   const centroOperativo = verEquipo ? (
-    <Button
-      className={[p.soloEscritorio, c.tap].join(" ")}
-      iconStart={<MonitorOutlinedIcon />}
-      onClick={() => setCentro(true)}
-      disabled={users.length === 0}
-      title="Pantalla completa para dejarla puesta en una pantalla de la oficina"
-    >
-      Centro operativo
-    </Button>
+    <>
+      {formatosVisibles() && puedeVerFormatos(resolveV2RoleKey(user), user) ? (
+        <ButtonLink className={c.tap} href="/erp/actividades/formatos" iconStart={<LibraryAddCheckOutlinedIcon />}>
+          Asignar con formato
+        </ButtonLink>
+      ) : null}
+      <Button
+        className={[p.soloEscritorio, c.tap].join(" ")}
+        iconStart={<MonitorOutlinedIcon />}
+        onClick={() => setCentro(true)}
+        disabled={users.length === 0}
+        title="Pantalla completa para dejarla puesta en una pantalla de la oficina"
+      >
+        Centro operativo
+      </Button>
+    </>
   ) : null;
 
   const avisoRefresco =
