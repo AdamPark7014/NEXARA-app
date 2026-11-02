@@ -1,5 +1,19 @@
 # RELEVO
 
+- **01-11 ~22:00 (claude-code) — Vehículos, Fase 3 ampliada del libro de costos: en producción (`ad4df995`, `b94c7632`).** Adam dijo «Sí, constrúyelo». Detalle y eval en `docs/COSTOS-PRECIOS-UNITARIOS.md`, «Fase 3 ampliada».
+  - **Qué se ve:** `/erp/vehiculos` con costo, km del mes y a dónde se fue; `/erp/vehiculos/nuevo` para subir el manual o escribir el modelo, y revisar cada dato con su fuente; la ficha con Resumen, Especificaciones, Viajes, Gasolina y Mantenimiento; y la tarjeta de vehículos en Costos del proyecto.
+  - **Migración `20261102120000_vehiculos_ficha`:** 5 tablas y `costo_movimientos.detalle`; solo agrega. Ya aplicada. La imagen de la API suma `poppler-utils`.
+  - **Verificado en producción, con la sesión del CEO y sin guardar nada:** subir un PDF de prueba de 7 páginas (`pdftotext` + IA), rendimiento oficial (11.91 km/L, «CONUEE 2023 p. 24»), foto de ticket y de tablero en «Cargar gasolina» (52.3 L, $1,281.35, 87,231 km). Las 5 tablas siguen en cero; borré el PDF de prueba de `/uploads/vehicles/`.
+  - **Con datos de ejemplo inyectados solo en la pestaña:** todas las pestañas contra el mockup y la tarjeta de Costos del proyecto, a 1536 y a 390 px sin desbordes. $6.64/km a 11.91 km/L, igual que el caso a mano.
+  - **Libro:** «Recalcular el libro» con el código nuevo dejó los 345 movimientos de mano de obra idénticos, fila por fila. Nómina, facturas y pólizas no se tocaron.
+  - **Pruebas:** API 381 suites y 4,773 pruebas en verde antes del ajuste final; luego, las de vehículos en verde. Web 1,772 en verde; falla `lib/cctv/maqueta/escena.spec.ts` solo en mi copia porque no tiene instalado `three`, del Diseñador.
+  - **Eval (`src/ai/eval/correr-vehiculo.ts`):** CONUEE 17/17, manual 33/33, tablero 26/26 con Sonnet, ticket 20/20. Manuales y fotos son de prueba. Sí se midió una vez con texto real: 37 páginas del manual en línea de una X-Trail e-POWER 2024, bien en dos vueltas; ese texto no está en el repositorio.
+  - **Sin verificar:** nadie ha guardado una ficha, una carga ni un servicio en producción: el primero será real, porque el precio de la Frontier es de Adam. Tampoco un PDF de manual completo de una marca real ni fotos de campo. Con viajes reales no ha corrido el libro: hoy no hay salidas.
+  - **Falta:** PDF del manual de la Frontier; que alguien registre salidas con foto, o no hay kilómetros; pantallas nativas de las apps.
+  - **Diferencias con el mockup:** el programa de servicio vive en Mantenimiento y no en Especificaciones; el manual se abre desde Documentos y no desde un botón en el encabezado; las filas de la revisión se editan en su lugar; un PDF escaneado no se lee.
+  - **Trampas:** la API rechaza más de 16 campos con null y se ve como «La IA no respondió», por eso el manual responde en una lista. En CONUEE la IA solo elige renglón y la cifra sale de la tabla. Un `Expense` de gasolina sin `vehicleId` y además capturado como carga contaría doble.
+  - **Visto de paso, sin tocar:** en `/erp/proyectos/[id]` cambiar de pestaña con `router.replace` deja el título por omisión de la ventana. En vehículos se resolvió con `history.replaceState`.
+
 - **01-11 ~21:10 (claude-code) — «Cotizar con IA» desplegado (`87b0bf84`).** El servidor ya lo incluye; la caja está en el paquete de la web y la ruta responde 401 sin sesión. Probado dentro del contenedor, sin Nest ni crons y sin crear nada (56 cotizaciones antes y después): frase 2.0 s, lista 0.1 s y 0 tokens; «cámara domo» ya no se llena sola con el paquete. Panel de la puerta: `cotizar-frase`, 2 llamadas, 0 errores, p95 1.5 s, US$0.00024, sin alertas.
   - **Falta ver con sesión:** el panel del navegador no tiene sesión en Core y el inicio de sesión es de Adam. Para probar sin emitir folio: escribir la frase, revisar la tarjeta y darle «Descartar»; «Usar en la cotización» sí crea el borrador con folio.
 
