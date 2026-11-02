@@ -64,6 +64,11 @@ export class CreateAttendanceDto {
   @MaxLength(40, { message: 'ubicacionFalla es demasiado largo' })
   ubicacionFalla?: string;
 
+  /** La persona ya vio qué se detiene y confirmó en la hoja de la app (Ola 3): no se vuelve a frenar. */
+  @IsOptional()
+  @IsBoolean({ message: 'confirmada debe ser booleano' })
+  confirmada?: boolean;
+
   /** Se capturó sin conexión y se manda después: se respeta `capturedAt` si es razonable. */
   @IsOptional()
   @IsBoolean({ message: 'offline debe ser booleano' })

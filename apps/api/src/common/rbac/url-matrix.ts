@@ -52,6 +52,15 @@ export const SELF_ATTENDANCE_URL_RULES: UrlRule[] = [
 ];
 
 /**
+ * Deshacer la salida de otra persona y ver su bitácora: para quien no checa asistencia. El servicio
+ * exige que sea su jefe, dirección o RH.
+ */
+export const SALIDA_DE_OTRO_URL_RULES: UrlRule[] = [
+  { path: '/api/attendance/*/deshacer-salida', methods: ['POST'], scope: 'approve' },
+  { path: '/api/attendance/salidas-deshechas', methods: ['GET'], scope: 'read' },
+];
+
+/**
  * Formatos de actividades: abre el camino a todo el personal. Quién los usa lo decide
  * `FormatosActividadService`, con la misma regla de asignar a otra persona.
  */
@@ -410,6 +419,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CEO — ve TODO (lectura) + aprobaciones de tope
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
+    ...SALIDA_DE_OTRO_URL_RULES,
     ...COSTOS_URL_RULES,
     // «Asignar con IA» es solo del CEO (Adam, 12-10). Trae el selector de personas.
     ...ASISTENTE_IA_URL_RULES,
@@ -568,6 +578,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR ADMINISTRATIVO — finanzas, compras, RH (alto nivel)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_ADMIN]: [
+    ...SALIDA_DE_OTRO_URL_RULES,
     ...COSTOS_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,

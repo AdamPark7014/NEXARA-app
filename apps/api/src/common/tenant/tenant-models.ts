@@ -151,6 +151,7 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'VehiculoCarga',
   'ProcesoTiempo',
   'FormatoActividad',
+  'SalidaDeshecha',
   'FormatoAplicacion',
 ]);
 

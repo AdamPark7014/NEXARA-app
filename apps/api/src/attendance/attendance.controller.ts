@@ -121,6 +121,47 @@ export class AttendanceController {
     return this.attendanceService.registrarPorJefe(this.actor(req), body, companyId);
   }
 
+  /** Qué se detiene y qué queda «No cumplida» si checa salida ahora. No registra nada. */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
+  @Get('salida/riesgo')
+  riesgoSalida(@Req() req: any, @CurrentCompanyId() companyId: number | null) {
+    return this.attendanceService.riesgoSalida(Number(req.user?.id), companyId);
+  }
+
+  /** La propia persona, dentro de 10 minutos: el servicio lo revisa. */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
+  @Post('salida/deshacer')
+  deshacerMiSalida(@Req() req: any, @CurrentCompanyId() companyId: number | null) {
+    return this.attendanceService.deshacerMiSalida(Number(req.user?.id), companyId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
+  @Get('salidas-deshechas')
+  salidasDeshechas(
+    @Req() req: any,
+    @Query('userId') userId: string,
+    @Query('fecha') fecha: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.attendanceService.salidasDeshechas(this.actor(req), { userId: Number(userId), fecha }, companyId);
+  }
+
+  /** Su jefe, dirección o RH, con motivo: el servicio lo revisa, como en el uniforme. */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
+  @Post(':id/deshacer-salida')
+  deshacerSalidaDe(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { motivo?: string },
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.attendanceService.deshacerSalidaDe(this.actor(req), id, body, companyId);
+  }
+
   private actor(req: any) {
     const u = req?.user ?? {};
     return {

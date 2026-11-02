@@ -2049,6 +2049,30 @@ model AttendanceCorrection {
   @@map("attendance_corrections")
 }
 
+/// Salida de jornada que se deshizo (Adam, 02-11-2026): la propia persona dentro de 10 minutos o su
+/// jefe el mismo día, con motivo. La fila sale de `Attendance` porque de ahí se calcula la nómina, y
+/// aquí queda todo lo que tenía y lo que se regresó: esta tabla es la bitácora.
+model SalidaDeshecha {
+  id                 Int      @id @default(autoincrement())
+  companyId          Int
+  userId             Int
+  attendanceId       Int
+  salidaAt           DateTime
+  workDate           DateTime @db.Date
+  /// La checada tal como estaba, con sus correcciones.
+  datos              Json
+  /// Lo que había quedado «No cumplida» por esta salida y regresó a su estatus.
+  noCumplidas        Json     @default("[]")
+  relojesReabiertos  Int[]    @default([])
+  /// Obligatorio cuando lo deshace otra persona.
+  motivo             String?  @db.Text
+  porId              Int
+  createdAt          DateTime @default(now())
+
+  @@index([companyId, userId, workDate])
+  @@map("salidas_deshechas")
+}
+
 /// Intento de checada que el servidor rechazó (ubicación simulada, sin GPS, …).
 /// No entra a `Attendance` —de ahí sale la nómina—, pero el intento queda: RH necesita ver
 /// quién quiso checar, desde dónde y por qué no pasó.

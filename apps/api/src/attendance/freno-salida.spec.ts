@@ -153,6 +153,24 @@ describe('freno al checar salida', () => {
     expect(prisma.attendanceRejection.findFirst).not.toHaveBeenCalled();
   });
 
+  it('con la hoja de la app ya confirmada no se vuelve a frenar', async () => {
+    const { service, prisma } = build({ relojes: [reloj()] });
+    await service.register(salida({ confirmada: true }), 3, PETICION_APP, 7);
+    expect(prisma.attendance.create).toHaveBeenCalled();
+    expect(prisma.attendanceRejection.create).not.toHaveBeenCalled();
+  });
+
+  it('el riesgo dice qué se detiene y qué vence, sin registrar nada', async () => {
+    const { service, prisma } = build({
+      relojes: [{ activity: { id: 1, anNumber: 'AN-1', titulo: 'Rack' } }],
+      actividades: [vencidaHoy({ id: 2, anNumber: 'AN-2', titulo: 'Facturas' })],
+    });
+    const r = await service.riesgoSalida(3, 7);
+    expect(r.corriendo).toEqual([{ id: 1, folio: 'AN-1', titulo: 'Rack' }]);
+    expect(r.porCerrar).toEqual([{ id: 2, folio: 'AN-2', titulo: 'Facturas' }]);
+    expect(prisma.attendance.create).not.toHaveBeenCalled();
+  });
+
   it('lo capturado sin conexión no se frena: ya no hay a quién preguntarle', async () => {
     const { service, prisma } = build({ relojes: [reloj()] });
     await service.register(salida({ offline: true, capturedAt: new Date().toISOString() }), 3, PETICION_APP, 7);

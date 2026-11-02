@@ -30,6 +30,12 @@ import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 import { alcanzaA, esDeTodaLaEmpresa } from '../me/equipo-alcance.js';
 import { cerrarSesionesDeUsuario } from '../activities/sessions/activity-sessions.service.js';
 import { mensajeFrenoSalida, salidaConfirmada, VENTANA_CONFIRMAR_SALIDA_MS } from './freno-salida.js';
+import {
+  dentroDeVentanaPropia,
+  mensajeSalidaDeshecha,
+  type ActividadEnRiesgo,
+  type NoCumplidaRegresada,
+} from './deshacer-salida.js';
 import { ACTIVITY_STATUS, statusVariants } from '../activities/activity-status.js';
 import { ejecutoresDeActividad, yaEntrego } from '../activities/recordatorios-jornada.js';
 import { limiteDeEntrega } from '../activities/semaforo-actividad.js';
@@ -1215,17 +1221,45 @@ export class AttendanceService {
     tenantId: number,
   ): Promise<void> {
     const prisma = this.prisma as any;
-    if (
-      typeof prisma?.attendanceRejection?.findFirst !== 'function' ||
-      typeof prisma?.activityWorkSession?.findMany !== 'function'
-    ) {
-      return;
-    }
+    if (typeof prisma?.attendanceRejection?.findFirst !== 'function') return;
+    const riesgo = await this.riesgoDeSalida(ctx.userId, ahora, tenantId);
+    const mensaje = mensajeFrenoSalida({
+      corriendo: riesgo.corriendo.map((a) => a.folio),
+      porCerrar: riesgo.porCerrar.map((a) => a.folio),
+    });
+    if (!mensaje) return;
+
+    const aviso = await prisma.attendanceRejection.findFirst({
+      where: {
+        userId: ctx.userId,
+        motivo: MOTIVO_RECHAZO.salidaSinConfirmar,
+        at: { gte: new Date(ahora.getTime() - VENTANA_CONFIRMAR_SALIDA_MS) },
+        ...companyWhere(tenantId),
+      },
+      orderBy: { at: 'desc' },
+      select: { at: true },
+    });
+    if (salidaConfirmada(aviso?.at, ahora)) return;
+    await this.rechazar(ctx, MOTIVO_RECHAZO.salidaSinConfirmar, mensaje);
+  }
+
+  /** Qué pasaría si checara salida ahora, para enseñarlo antes en las apps. No registra nada. */
+  async riesgoSalida(userId: number, companyId?: number | null) {
+    return this.riesgoDeSalida(userId, new Date(), requireCompanyId(companyId));
+  }
+
+  private async riesgoDeSalida(
+    userId: number,
+    ahora: Date,
+    tenantId: number,
+  ): Promise<{ corriendo: ActividadEnRiesgo[]; porCerrar: ActividadEnRiesgo[] }> {
+    const prisma = this.prisma as any;
+    if (typeof prisma?.activityWorkSession?.findMany !== 'function') return { corriendo: [], porCerrar: [] };
     const finDelDia = workDayEnd(ahora);
     const [relojes, abiertas] = await Promise.all([
       prisma.activityWorkSession.findMany({
-        where: { userId: ctx.userId, endedAt: null, ...companyWhere(tenantId) },
-        select: { activity: { select: { anNumber: true } } },
+        where: { userId, endedAt: null, ...companyWhere(tenantId) },
+        select: { activity: { select: { id: true, anNumber: true, titulo: true } } },
       }),
       prisma.activity.findMany({
         where: {
@@ -1240,8 +1274,8 @@ export class AttendanceService {
             ].flatMap((s) => statusVariants(s)),
           },
           OR: [
-            { responsableId: ctx.userId },
-            { assignees: { some: { userId: ctx.userId, retiradoAt: null } } },
+            { responsableId: userId },
+            { assignees: { some: { userId, retiradoAt: null } } },
           ],
           AND: [
             {
@@ -1254,7 +1288,9 @@ export class AttendanceService {
           ],
         },
         select: {
+          id: true,
           anNumber: true,
+          titulo: true,
           responsableId: true,
           assignmentCharge: true,
           fechaInicio: true,
@@ -1271,13 +1307,16 @@ export class AttendanceService {
         take: 50,
       }),
     ]);
-    const corriendo: string[] = [
-      ...new Set<string>(
-        (relojes as Array<{ activity?: { anNumber?: string | null } | null }>)
-          .map((r) => r.activity?.anNumber ?? '')
-          .filter(Boolean),
-      ),
-    ];
+    const enRiesgo = (a: any): ActividadEnRiesgo => ({
+      id: Number(a?.id ?? 0),
+      folio: String(a?.anNumber ?? ''),
+      titulo: String(a?.titulo ?? ''),
+    });
+    const corriendo = new Map<string, ActividadEnRiesgo>();
+    for (const r of relojes as Array<{ activity?: unknown }>) {
+      const a = enRiesgo(r.activity);
+      if (a.folio) corriendo.set(a.folio, a);
+    }
     const porCerrar = (abiertas as any[])
       .filter((a) => {
         const limite = limiteDeEntrega(a);
@@ -1287,25 +1326,192 @@ export class AttendanceService {
           ...a,
           assignees: a.assignees.map((m: any) => ({ ...m, rol: String(m.rol) })),
         });
-        return ejecutores.includes(ctx.userId) && !yaEntrego(ctx.userId, a);
+        return ejecutores.includes(userId) && !yaEntrego(userId, a);
       })
-      .map((a) => a.anNumber as string);
+      .map(enRiesgo);
+    return { corriendo: [...corriendo.values()], porCerrar };
+  }
 
-    const mensaje = mensajeFrenoSalida({ corriendo, porCerrar });
-    if (!mensaje) return;
-
-    const aviso = await prisma.attendanceRejection.findFirst({
-      where: {
-        userId: ctx.userId,
-        motivo: MOTIVO_RECHAZO.salidaSinConfirmar,
-        at: { gte: new Date(ahora.getTime() - VENTANA_CONFIRMAR_SALIDA_MS) },
-        ...companyWhere(tenantId),
-      },
-      orderBy: { at: 'desc' },
-      select: { at: true },
+  /** La propia persona, dentro de 10 minutos. Sigue como si nunca hubiera checado: sus relojes corren. */
+  async deshacerMiSalida(userId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const ahora = new Date();
+    const checada = await this.prisma.attendance.findFirst({
+      where: { userId, type: 'salida', workDate: workDateColumn(ahora), ...companyWhere(tenantId) },
+      orderBy: { timestamp: 'desc' },
+      include: { correcciones: true },
     });
-    if (salidaConfirmada(aviso?.at, ahora)) return;
-    await this.rechazar(ctx, MOTIVO_RECHAZO.salidaSinConfirmar, mensaje);
+    if (!checada) throw new BadRequestException('No hay una salida de hoy que deshacer');
+    if (!dentroDeVentanaPropia(checada.timestamp, ahora)) {
+      throw new BadRequestException('Ya pasaron los 10 minutos: pídele a tu jefe que la deshaga');
+    }
+    return this.ejecutarDeshacer(checada, { porId: userId, motivo: null, reabrirRelojes: true, tenantId, ahora });
+  }
+
+  /**
+   * Su jefe, dirección o RH, el mismo día y con motivo. Los relojes no se reabren: el tiempo sin
+   * reloj no se inventa, la persona reanuda su actividad. Otro día queda la corrección de hora.
+   */
+  async deshacerSalidaDe(
+    actor: { id: number; email?: string | null; permissions?: string[]; roleKey?: string | null; isSuperAdmin?: boolean },
+    attendanceId: number,
+    body: { motivo?: string },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    if (!motivoCorreccionValido(body?.motivo)) {
+      throw new BadRequestException('El motivo es obligatorio (al menos 10 caracteres)');
+    }
+    const checada = await this.prisma.attendance.findFirst({
+      where: { id: attendanceId, ...companyWhere(tenantId) },
+      include: { correcciones: true },
+    });
+    if (!checada || checada.type !== 'salida') throw new NotFoundException('Salida no encontrada');
+    if (!(await this.alcanzaAPersona(actor, checada.userId, tenantId))) {
+      throw new ForbiddenException('Solo su jefe, dirección o Recursos Humanos pueden deshacerla');
+    }
+    const ahora = new Date();
+    if (workDateKey(checada.timestamp) !== workDateKey(ahora)) {
+      throw new BadRequestException('Solo se deshace el mismo día; para otros días corrige la hora');
+    }
+    return this.ejecutarDeshacer(checada, {
+      porId: actor.id,
+      motivo: String(body.motivo).trim(),
+      reabrirRelojes: false,
+      tenantId,
+      ahora,
+    });
+  }
+
+  /** La bitácora de un día: lo que se deshizo, por quién y por qué. */
+  async salidasDeshechas(
+    actor: { id: number; email?: string | null; permissions?: string[]; roleKey?: string | null; isSuperAdmin?: boolean },
+    params: { userId: number; fecha: string },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    if (params.userId !== actor.id && !(await this.alcanzaAPersona(actor, params.userId, tenantId))) {
+      throw new ForbiddenException('Solo su jefe, dirección o Recursos Humanos pueden verlo');
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(params.fecha ?? '')) throw new BadRequestException('La fecha no es válida');
+    const filas = await this.prisma.salidaDeshecha.findMany({
+      where: { userId: params.userId, workDate: new Date(`${params.fecha}T00:00:00.000Z`), ...companyWhere(tenantId) },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, salidaAt: true, motivo: true, porId: true, noCumplidas: true, createdAt: true },
+    });
+    const ids = [...new Set(filas.map((f) => f.porId))];
+    const nombres = ids.length
+      ? await this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true } })
+      : [];
+    return filas.map((f) => ({
+      ...f,
+      por: nombres.find((n) => n.id === f.porId)?.nombre ?? null,
+      propia: f.porId === params.userId,
+    }));
+  }
+
+  private async ejecutarDeshacer(
+    checada: { id: number; userId: number; timestamp: Date; correcciones?: Array<{ antes: Date; despues: Date }> } & Record<string, unknown>,
+    p: { porId: number; motivo: string | null; reabrirRelojes: boolean; tenantId: number; ahora: Date },
+  ) {
+    const { userId } = checada;
+    // Si le corrigieron la hora, lo que dejó su salida quedó con la hora original.
+    const instantes = [checada.timestamp, ...(checada.correcciones ?? []).map((c) => c.antes)];
+
+    const cierres = await this.prisma.activityNonCompliance.findMany({
+      where: {
+        companyId: p.tenantId,
+        origen: 'CIERRE_JORNADA',
+        registradoAt: { in: instantes },
+        pendientesIds: { has: userId },
+        reprogramadaAt: null,
+      },
+      include: { activity: { select: { id: true, anNumber: true, estatus: true } } },
+    });
+
+    const { regresadas, relojes } = await this.prisma.$transaction(async (tx) => {
+      const regresadas: NoCumplidaRegresada[] = [];
+      for (const c of cierres) {
+        // Si alguien ya la movió de «No cumplida», se queda donde la dejó.
+        const r = await tx.activity.updateMany({
+          where: { id: c.activityId, companyId: p.tenantId, estatus: { in: statusVariants(ACTIVITY_STATUS.NO_CUMPLIDA) } },
+          data: { estatus: c.estatusPrevio },
+        });
+        if (!r.count) continue;
+        await tx.activityNonCompliance.delete({ where: { id: c.id } });
+        regresadas.push({
+          actividadId: c.activityId,
+          folio: c.activity?.anNumber ?? null,
+          estatusPrevio: c.estatusPrevio,
+          causa: c.causa,
+          limite: c.limite ? c.limite.toISOString() : null,
+          registradaAt: c.registradoAt.toISOString(),
+        });
+      }
+
+      const relojes: number[] = [];
+      if (p.reabrirRelojes) {
+        const regresadasIds = regresadas.map((a) => a.actividadId);
+        const sesiones = await tx.activityWorkSession.findMany({
+          where: {
+            userId,
+            companyId: p.tenantId,
+            endedAt: { in: instantes },
+            OR: [{ endReason: 'SALIDA' }, { endReason: 'CORTE_DIA', activityId: { in: regresadasIds } }],
+          },
+          select: { id: true, activityId: true },
+        });
+        for (const s of sesiones) {
+          const corriendo = await tx.activityWorkSession.count({
+            where: { userId, activityId: s.activityId, endedAt: null, companyId: p.tenantId },
+          });
+          if (corriendo) continue;
+          await tx.activityWorkSession.update({ where: { id: s.id }, data: { endedAt: null, endReason: null } });
+          relojes.push(s.id);
+        }
+      }
+
+      await tx.salidaDeshecha.create({
+        data: {
+          companyId: p.tenantId,
+          userId,
+          attendanceId: checada.id,
+          salidaAt: checada.timestamp,
+          workDate: workDateColumn(checada.timestamp),
+          // Sin la foto en base64 ni nada raro: `datos` es la fila, ya en JSON.
+          datos: JSON.parse(JSON.stringify(checada)),
+          noCumplidas: JSON.parse(JSON.stringify(regresadas)),
+          relojesReabiertos: relojes,
+          motivo: p.motivo,
+          porId: p.porId,
+        },
+      });
+      // De aquí sale la nómina: la salida deshecha ya no existe para ella. La copia queda arriba.
+      await tx.attendance.delete({ where: { id: checada.id } });
+      return { regresadas, relojes };
+    });
+
+    await this.recalcularJornada(userId, checada.timestamp, p.tenantId);
+
+    const persona = await this.prisma.user.findUnique({ where: { id: userId } });
+    this.emitAttendanceUpdate(userId, 'entrada', p.ahora, persona);
+    await this.avisarChecadaMarcada({
+      userId,
+      titulo: p.porId === userId ? 'Deshizo su salida' : 'Deshicieron tu salida',
+      mensaje: mensajeSalidaDeshecha({
+        hora: horaAviso(checada.timestamp),
+        folios: regresadas.map((a) => a.folio).filter((f): f is string => Boolean(f)),
+        motivo: p.motivo,
+      }),
+      attendanceId: null,
+      avisarPersona: p.porId !== userId,
+    });
+
+    return {
+      message: p.reabrirRelojes ? 'Tu jornada sigue abierta' : 'Salida deshecha',
+      noCumplidasRegresadas: regresadas.map((a) => a.folio),
+      relojesReabiertos: relojes.length,
+    };
   }
 
   /** Lo que se escribe en las columnas de validación de una checada. */
@@ -1933,7 +2139,8 @@ export class AttendanceService {
     }
 
     // Lo capturado sin conexión ya pasó: no hay a quién preguntarle.
-    if (!dto.offline) await this.frenoDeSalida(contexto, now, tenantId);
+    // Las apps nuevas ya enseñaron lo que se detiene en su hoja, antes de abrir la cámara.
+    if (!dto.offline && !dto.confirmada) await this.frenoDeSalida(contexto, now, tenantId);
 
     // Salida huérfana de un intento anterior (jornada sigue abierta): se
     // actualiza, no se borra. Un cierre automático de las 23:30 también cae
