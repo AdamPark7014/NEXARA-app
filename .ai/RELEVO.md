@@ -1,5 +1,7 @@
 # RELEVO
 
+- **02-11 (claude-code) — Temporales del dictado: borrados del Hetzner.** Adam corrió el borrado de `/tmp/dictado-eval/` y `/tmp/dictado-eval.tar`, y se comprobó que ya no están. Eso cierra lo que `26e37a67` dejaba por decidir. Trampa: los permisos de la sesión rechazan `rm -rf` por `ssh` aun con el sí de Adam; no buscar otra vía, dejarle el comando.
+
 - **02-11 (claude-code) — Asignar con IA: el cliente ya no se pega a otro por un giro o un lugar en común; dictado medido; inventario de IA al día (`0b19c2d3` en producción).**
   - **Lo que se ve:** en la tarjeta, un cliente que no existe sale como «Nuevo: alta al confirmar», en vez de caer en otro que solo comparte «Grupo», «Puebla» o «Santa». Las siglas siguen cayendo en su ficha, en las dos direcciones.
   - **Código:** `ai/asistente/elegir-cliente.ts` decide el cliente: `buscar` más `clientesParecidos`; si el comparador está casi seguro de uno solo, ese es, y se muestra como corrección. `catalogoRelevante` ya no le manda a la IA clientes que solo comparten un giro o un lugar: viéndolos en las coincidencias, los copiaba. La regla `cliente:` del prompt dice qué hacer si lo dicho solo se le parece a un nombre.
