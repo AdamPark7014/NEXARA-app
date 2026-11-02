@@ -198,6 +198,48 @@ describe('lo específico que se pidió', () => {
   });
 });
 
+describe('un modelo dicho tal cual', () => {
+  it('solo el modelo: se llena con esa pieza, aunque su nombre no se parezca', () => {
+    const r = emparejar('HDWT860UZSVA', [
+      candidato('Disco duro para videovigilancia de 6 TB con garantía de fábrica y uso continuo', { model: 'HDWT860UZSVA', unitPrice: 5993 }),
+      candidato('Disco duro de otra capacidad', { model: 'HDWT840UZSVA', unitPrice: 4000 }),
+    ]);
+    expect(r).toMatchObject({ seguridad: 'alta', elegida: { model: 'HDWT860UZSVA', unitPrice: 5993 } });
+  });
+
+  it('gana aunque otra partida se parezca más en las palabras', () => {
+    const r = emparejar('NVR 32 canales 4K DS-7632NXI', [
+      candidato('NVR 32 canales 4K', { model: 'OTRO-123' }),
+      candidato('Grabador de video en red', { model: 'DS-7632NXI' }),
+    ]);
+    expect(r).toMatchObject({ seguridad: 'alta', elegida: { model: 'DS-7632NXI' } });
+  });
+
+  it('del mayorista se llena si se dijo solo el modelo y una sola pieza lo tiene', () => {
+    const r = emparejar('ZD421D', [candidato('Impresora Zebra de etiquetas', { fuente: 'catalogo', model: 'ZD421D', unitCost: 8000, stock: 2 })]);
+    expect(r).toMatchObject({ seguridad: 'alta', elegida: { fuente: 'catalogo' } });
+  });
+
+  it('del mayorista, con más palabras, va primero pero no se llena: su modelo puede ser de un accesorio', () => {
+    const r = emparejar('Bundle Zebra ZC300', [candidato('Cinta 6 paneles de color Zebra', { fuente: 'catalogo', brand: 'Zebra', model: 'ZC300', unitCost: 1100, stock: 2 })]);
+    expect(r.seguridad).not.toBe('alta');
+    expect(r.opciones[0]?.model).toBe('ZC300');
+  });
+
+  it('dos piezas distintas con el mismo modelo se eligen de la lista', () => {
+    const r = emparejar('ZC300', [
+      candidato('Impresora de tarjetas Zebra', { fuente: 'catalogo', model: 'ZC300', unitCost: 20000, stock: 2 }),
+      candidato('Cinta de color para impresora', { fuente: 'catalogo', model: 'ZC300', unitCost: 1100, stock: 2 }),
+    ]);
+    expect(r.seguridad).not.toBe('alta');
+    expect(r.opciones).toHaveLength(2);
+  });
+
+  it('un modelo que solo empieza igual no cuenta como exacto', () => {
+    expect(emparejar('HDWT860', [candidato('Disco con nombre muy largo para esta prueba de modelos parecidos', { model: 'HDWT860UZSVA' })]).seguridad).not.toBe('alta');
+  });
+});
+
 describe('una sola palabra', () => {
   it('contra un nombre largo se ofrece; contra uno corto se elige', () => {
     expect(emparejar('Canalización', [candidato('Suministro y colocación de tubo conduit metálico galvanizado pared delgada')]).seguridad).not.toBe('alta');

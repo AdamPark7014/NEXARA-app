@@ -293,10 +293,12 @@ export function emparejar(concepto: string, candidatos: CandidatoPartida[]): Emp
   // El mayorista vende cosas: una instalación solo puede ser algo que la empresa ya cobró.
   const aComparar = esTrabajo ? candidatos.filter((c) => c.fuente !== 'catalogo') : candidatos;
   const marcas = marcasDe(aComparar);
+  const modelosPedidos = consulta.filter(pareceModelo);
+  const esModeloPedido = (c: CandidatoPartida) => modelosPedidos.includes(normalizarTexto(c.model));
   const puntuados = aComparar
     .map(indexar)
     .map((i) => ({ i, puntaje: puntuarPartida(consulta, i, marcas) }))
-    .filter((x) => x.puntaje >= PUNTAJE_ALTERNATIVA)
+    .filter((x) => x.puntaje >= PUNTAJE_ALTERNATIVA || esModeloPedido(x.i.candidato))
     .sort(
       (a, b) =>
         b.puntaje - a.puntaje ||
@@ -304,7 +306,16 @@ export function emparejar(concepto: string, candidatos: CandidatoPartida[]): Emp
         b.i.candidato.veces - a.i.candidato.veces ||
         fechaDe(b.i.candidato) - fechaDe(a.i.candidato),
     );
-  const mejor = puntuados[0];
+  // Un modelo dicho tal cual va primero, diga lo que diga el resto del nombre.
+  const exactas = puntuados.filter((x) => esModeloPedido(x.i.candidato));
+  const exacta = exactas[0];
+  const mejor = exacta ?? puntuados[0];
+  // Y se llena solo si ya se cotizó, o si se dijo nada más el modelo y solo una pieza lo tiene. Del
+  // mayorista no basta: en su catálogo una cinta para la impresora ZC300 también dice «ZC300».
+  const porModelo =
+    exacta != null &&
+    (exacta.i.candidato.fuente === 'usada' ||
+      (modelosPedidos.length === consulta.length && new Set(exactas.map((x) => normalizarTexto(x.i.candidato.name))).size === 1));
   const distintas = (excluir: CandidatoPartida | null) => {
     const vistas = new Set(excluir ? [claveDe(excluir)] : []);
     return puntuados
@@ -332,13 +343,13 @@ export function emparejar(concepto: string, candidatos: CandidatoPartida[]): Emp
     (puntajes.get(b) ?? 0) - (puntajes.get(a) ?? 0) ||
     Number(abren.has(b)) - Number(abren.has(a)) ||
     ordenDeOpciones(a, b);
-  if (!mejor || mejor.puntaje < PUNTAJE_MEDIA) {
+  if (!mejor || (!exacta && mejor.puntaje < PUNTAJE_MEDIA)) {
     const opciones = distintas(null).slice(0, MAX_ALTERNATIVAS);
     return { elegida: null, seguridad: 'ninguna', puntaje: mejor?.puntaje ?? 0, alternativas: opciones, opciones };
   }
   const elegida = mejor.i.candidato;
   // La marca ordena las opciones, pero no vuelve seguro lo demás: «Lector UHF Rosslare» no es cualquier lector Rosslare.
-  const segura = puntuarPartida(consulta, mejor.i) >= PUNTAJE_ALTA && esSegura(consulta, mejor.i, puntuados, marcas);
+  const segura = porModelo || (puntuarPartida(consulta, mejor.i) >= PUNTAJE_ALTA && esSegura(consulta, mejor.i, puntuados, marcas));
   // Junto a una elegida segura solo se ofrece lo que también es eso («Kit de limpieza» no es «Kit Extensor HDMI»).
   const delMismo = new Set(puntuados.filter((x) => !segura || (cabezaConsulta != null && x.i.primera === cabezaConsulta && x.puntaje >= PUNTAJE_ALTA)).map((x) => x.i.candidato));
   // Las opciones son las que más se parecen; entre ellas, lo más a la mano primero.
