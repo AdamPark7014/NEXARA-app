@@ -1,5 +1,14 @@
 # RELEVO
 
+- **01-11 ~20:00 (claude-code) — Padrón: fusionados tres clientes repetidos, autorizado por Adam («Sí, fusiónalos»). Solo datos de producción, sin cambio de código.**
+  - Benemer → BUAP (cotización 4), ANFO → ANFORA (cotización 6 y diseño CCTV 3), GAMINF → GAMING (sin nada ligado). Comercial pasa de 32 a 29 clientes; empresa 1 de 34 a 31.
+  - No había actividades, facturas, proyectos ni contratos en los que se fueron. Las cotizaciones conservan su texto y sus montos: la 4 sigue diciendo «Benemérita Universidad Autónoma de Puebla».
+  - Se borraron las fichas `sales_clients` 19, 20, 21 y `service_clients` 36, 37, 38 en una sola transacción, ensayada antes con `ROLLBACK`.
+  - **Para deshacer:** bitácora `audit_logs` con `action = 'client.merge'` (3 filas: ficha completa en `previousData` y qué se movió en `changes`), y copia en `/root/fusion-clientes-20261101.json` del Hetzner. En ese servidor no hay respaldos automáticos.
+  - Ojo con un cliente nuevo que se quiera fusionar: `cctv_disenos.clienteId` e `integra_sites.serviceClientId` apuntan a clientes **sin llave foránea**, y `DELETE` no avisa. Aquí sí se movieron.
+  - Sin tocar, porque Adam no los autorizó: «Bodega de», «SE», «Licencia» y «A QUIEN CORRESPONDA» (22 cotizaciones).
+  - Verificado en producción con la cuenta de Christian: 29 en Comercial, sin los tres nombres; las fichas viejas dan 404; las cotizaciones 4 y 6 y el diseño 3 abren con su cliente. El aviso ahora lleva «ANFO» a ANFORA, «Gaminf» a GAMING y «Benemérita…» solo a BUAP.
+
 - **01-11 ~18:50 (claude-code) — «Cotizar con IA»: lo que salió al probar el motor en producción.**
   - `fb12e0ec` se desplegó y se probó dentro del contenedor, sin Nest ni crons y sin crear nada (56 cotizaciones antes y después): frase 1.9 s, lista 0.1 s y 0 tokens. El panel de la puerta registra `cotizar-frase`.
   - **Costo real US$0.00024 por frase, no 0.00011.** El eval corre en serie y lee caché; en producción, con unas pocas cotizaciones al día, casi toda llamada escribe la caché. Sigue dentro del objetivo (0.0003). Corregido en la guía y en la muestra.
