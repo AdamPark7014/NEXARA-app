@@ -1,0 +1,216 @@
+{
+  "fecha": "2026-11-01T23:54:42.755Z",
+  "modelo": "claude-haiku-5-5",
+  "marcador": {
+    "casos": 24,
+    "perfectos": 24,
+    "clientes": 24,
+    "renglonesEsperados": 53,
+    "renglonesBien": 53,
+    "sobran": 0,
+    "modelosEsperados": 31,
+    "modelosBien": 31,
+    "sinTokens": 10,
+    "renglones": 53,
+    "conPrecio": 39
+  },
+  "msP50": 1274,
+  "msP95": 5696,
+  "usdPorLlamada": 0.000073,
+  "entrada": 1403,
+  "salida": 111,
+  "casos": [
+    {
+      "id": "c01",
+      "via": "codigo",
+      "perfecto": true,
+      "fallas": [],
+      "ms": null,
+      "usd": null
+    },
+    {
+      "id": "c02",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 1614,
+      "usd": 0.00009
+    },
+    {
+      "id": "c03",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 1274,
+      "usd": 0.000055
+    },
+    {
+      "id": "c04",
+      "via": "codigo",
+      "perfecto": true,
+      "fallas": [],
+      "ms": null,
+      "usd": null
+    },
+    {
+      "id": "c05",
+      "via": "codigo",
+      "perfecto": true,
+      "fallas": [],
+      "ms": null,
+      "usd": null
+    },
+    {
+      "id": "c06",
+      "via": "codigo",
+      "perfecto": true,
+      "fallas": [],
+      "ms": null,
+      "usd": null
+    },
+    {
+      "id": "c07",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 1191,
+      "usd": 0.000084
+    },
+    {
+      "id": "c08",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 1919,
+      "usd": 0.000061
+    },
+    {
+      "id": "c09",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 1402,
+      "usd": 0.000067
+    },
+    {
+      "id": "c10",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 5696,
+      "usd": 0.000076
+    },
+    {
+      "id": "c11",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 1718,
+      "usd": 0.000085
+    },
+    {
+      "id": "c12",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 930,
+      "usd": 0.000055
+    },
+    {
+      "id": "c13",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 1377,
+      "usd": 0.000139
+    },
+    {
+      "id": "c14",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 1057,
+      "usd": 0.000049
+    },
+    {
+      "id": "c15",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 944,
+      "usd": 0.000061
+    },
+    {
+      "id": "c16",
+      "via": "codigo",
+      "perfecto": true,
+      "fallas": [],
+      "ms": null,
+      "usd": null
+    },
+    {
+      "id": "c17",
+      "via": "codigo",
+      "perfecto": true,
+      "fallas": [],
+      "ms": null,
+      "usd": null
+    },
+    {
+      "id": "c18",
+      "via": "lista",
+      "perfecto": true,
+      "fallas": [],
+      "ms": null,
+      "usd": null
+    },
+    {
+      "id": "c19",
+      "via": "lista",
+      "perfecto": true,
+      "fallas": [],
+      "ms": null,
+      "usd": null
+    },
+    {
+      "id": "c20",
+      "via": "lista",
+      "perfecto": true,
+      "fallas": [],
+      "ms": null,
+      "usd": null
+    },
+    {
+      "id": "c21",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 1261,
+      "usd": 0.000103
+    },
+    {
+      "id": "c22",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 1013,
+      "usd": 0.000047
+    },
+    {
+      "id": "c23",
+      "via": "ia",
+      "perfecto": true,
+      "fallas": [],
+      "ms": 1171,
+      "usd": 0.000052
+    },
+    {
+      "id": "c24",
+      "via": "codigo",
+      "perfecto": true,
+      "fallas": [],
+      "ms": null,
+      "usd": null
+    }
+  ]
+}

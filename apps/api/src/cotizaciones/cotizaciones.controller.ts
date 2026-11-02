@@ -31,11 +31,16 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { validarTamanoBorrador } from './propuesta-vista-previa.js';
 import { GuardarPlantillaDto } from './dto/plantilla-cotizacion.dto.js';
+import { InterpretarCotizacionDto } from './dto/interpretar-cotizacion.dto.js';
+import { CotizarFraseService } from './cotizar-frase.service.js';
 
 @Controller('cotizaciones')
 @UseGuards(UrlAccessGuard)
 export class CotizacionesController {
-  constructor(private readonly cotizacionesService: CotizacionesService) {}
+  constructor(
+    private readonly cotizacionesService: CotizacionesService,
+    private readonly cotizarFrase: CotizarFraseService,
+  ) {}
 
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
@@ -95,6 +100,17 @@ export class CotizacionesController {
       moneda: typeof moneda === 'string' ? moneda : null,
       excluir: excluir ? Number(excluir) : null,
     });
+  }
+
+  /**
+   * «Cotizar con IA»: de una frase o una lista pegada a una propuesta para revisar. No guarda nada.
+   * Mismo permiso que las partidas frecuentes: devuelve costos.
+   */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post('interpretar')
+  interpretar(@Body() dto: InterpretarCotizacionDto, @CurrentCompanyId() companyId: number | null) {
+    return this.cotizarFrase.interpretar(dto.texto, companyId, { excluir: dto.excluir ?? null });
   }
 
   /** Catálogo de paquetes. Antes de `:id` para que no lo tome por un id. */

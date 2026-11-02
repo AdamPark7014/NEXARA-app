@@ -8,6 +8,8 @@ import { WorkflowModule } from '../workflow/workflow.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { VentasModule } from '../ventas/ventas.module.js';
 import { SmartQuoteModule } from '../smart-quote/smart-quote.module.js';
+import { AiModule } from '../ai/ai.module.js';
+import { CotizarFraseService } from './cotizar-frase.service.js';
 
 @Module({
   imports: [
@@ -17,9 +19,10 @@ import { SmartQuoteModule } from '../smart-quote/smart-quote.module.js';
     NotificationsModule,
     forwardRef(() => VentasModule),
     forwardRef(() => SmartQuoteModule),
+    AiModule,
   ],
   controllers: [CotizacionesController],
-  providers: [CotizacionesService, CotizacionesCoreService],
+  providers: [CotizacionesService, CotizacionesCoreService, CotizarFraseService],
   exports: [CotizacionesService, CotizacionesCoreService],
 })
 export class CotizacionesModule {}
