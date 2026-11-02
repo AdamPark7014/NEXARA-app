@@ -2,13 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { runScheduledJob } from '../../common/cron/run-scheduled-job.js';
 import { WORKDAY_TIMEZONE } from '../../common/time/workday.js';
-import { HORAS_PARA_ESCALAR } from '../../me/revision-evidencias.js';
 import { NotificationsService } from '../../notifications/notifications.service.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { actividadCerradaParaRevision, esperaRevision } from '../../me/revision-evidencias.js';
+import { actividadCerradaParaRevision, esperaRevision, revisionEscalada } from '../../me/revision-evidencias.js';
 import { armarEscaladas, textoEscalada } from './evidencias-escaladas.js';
 
-/** Una vez al día, a media mañana y de lunes a sábado. Reglas en `evidencias-escaladas.ts`. */
+/** Una vez al día, a media mañana y de lunes a viernes. Reglas en `evidencias-escaladas.ts`. */
 @Injectable()
 export class EvidenciasEscaladasService {
   private readonly logger = new Logger(EvidenciasEscaladasService.name);
@@ -18,14 +17,13 @@ export class EvidenciasEscaladasService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  @Cron('30 10 * * 1-6', { name: 'evidencias-escaladas', timeZone: WORKDAY_TIMEZONE })
+  @Cron('30 10 * * 1-5', { name: 'evidencias-escaladas', timeZone: WORKDAY_TIMEZONE })
   async correr() {
     await runScheduledJob('evidencias:escaladas', this.logger, () => this.revisar());
   }
 
   /** Expuesto para las pruebas. Devuelve cuántas tarjetas salieron. */
   async revisar(ahora = new Date()): Promise<number> {
-    const limite = new Date(ahora.getTime() - HORAS_PARA_ESCALAR * 60 * 60 * 1000);
     const [filas, personas] = await Promise.all([
       this.prisma.activityEvidence.findMany({
         where: {
@@ -46,10 +44,12 @@ export class EvidenciasEscaladasService {
       }),
       this.prisma.user.findMany({ select: { id: true, managerId: true, nombre: true, isActive: true } }),
     ]);
-    const enEspera = filas.filter((f) => {
-      const enviada = f.correctionSubmittedAt ?? f.completedAt;
-      return enviada && enviada <= limite && esperaRevision(f) && !actividadCerradaParaRevision(f.activity.estatus);
-    });
+    const enEspera = filas.filter(
+      (f) =>
+        revisionEscalada(f.correctionSubmittedAt ?? f.completedAt, ahora) &&
+        esperaRevision(f) &&
+        !actividadCerradaParaRevision(f.activity.estatus),
+    );
 
     let tarjetas = 0;
     for (const t of armarEscaladas(

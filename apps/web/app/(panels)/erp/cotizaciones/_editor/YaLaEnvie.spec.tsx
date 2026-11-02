@@ -8,7 +8,35 @@ vi.mock("@/lib/cotizaciones-api", async (original) => ({
   marcarEnviada: (...a: unknown[]) => marcarEnviada(...a),
 }));
 
-import YaLaEnvie from "./YaLaEnvie";
+import YaLaEnvie, { ProximosAvisos } from "./YaLaEnvie";
+import { proximosAvisos } from "@/lib/cotizaciones-api";
+
+describe("proximosAvisos", () => {
+  const ahora = new Date("2026-11-03T18:00:00Z");
+  it("en orden, con los días del seguimiento y tres días antes de vencer", () => {
+    const a = proximosAvisos("2026-11-03T17:00:00Z", "2026-11-14T00:00:00Z", ahora);
+    expect(a.map((x) => x.texto)).toEqual([
+      "Te preguntamos si ya hubo respuesta",
+      "Segundo recordatorio",
+      "Aviso de por vencer, a ti y a tu jefe",
+    ]);
+    expect(a[0].fecha.toISOString()).toBe("2026-11-06T17:00:00.000Z");
+    expect(a[2].fecha.toISOString()).toBe("2026-11-11T00:00:00.000Z");
+  });
+  it("lo que ya pasó no se enseña", () => {
+    expect(proximosAvisos("2026-10-20T17:00:00Z", "2026-10-25T00:00:00Z", ahora)).toEqual([]);
+  });
+  it("sin fechas no inventa nada", () => {
+    expect(proximosAvisos(null, null, ahora)).toEqual([]);
+  });
+});
+
+describe("ProximosAvisos", () => {
+  it("sin nada por delante no pinta nada", () => {
+    const { container } = render(<ProximosAvisos sentAt="2020-01-01T00:00:00Z" validUntil="2020-02-01T00:00:00Z" />);
+    expect(container.firstChild).toBeNull();
+  });
+});
 
 describe("YaLaEnvie", () => {
   // Con llaves: una función devuelta por `beforeEach` corre como limpieza al terminar la prueba.

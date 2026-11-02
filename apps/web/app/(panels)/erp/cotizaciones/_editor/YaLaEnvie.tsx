@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/base";
 import { formatApiError } from "@/lib/erp-api";
-import { marcarEnviada, MEDIOS_ENVIO, type MedioEnvio } from "@/lib/cotizaciones-api";
+import { formatoFecha, marcarEnviada, MEDIOS_ENVIO, proximosAvisos, type MedioEnvio } from "@/lib/cotizaciones-api";
 import styles from "./editor.module.css";
 
 /**
@@ -11,6 +11,24 @@ import styles from "./editor.module.css";
  * fuera, y sin este dato no arrancan el seguimiento, el aviso de por vencer ni el avance de la
  * actividad (Programa Velocidad Core, 01-11-2026).
  */
+/** Ya salió: qué sigue y cuándo, para que nadie tenga que acordarse. */
+export function ProximosAvisos({ sentAt, validUntil }: { sentAt?: string | null; validUntil?: string | null }) {
+  const avisos = proximosAvisos(sentAt, validUntil);
+  if (!avisos.length) return null;
+  return (
+    <section className={styles.yaLaEnvie} aria-label="Próximos avisos de seguimiento">
+      <div className={styles.yaLaEnvieTexto}>
+        <strong>Ya salió. Esto sigue:</strong>
+        {avisos.map((a) => (
+          <span key={a.texto}>
+            {a.texto}: {formatoFecha(a.fecha.toISOString())}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function YaLaEnvie({
   id,
   token,

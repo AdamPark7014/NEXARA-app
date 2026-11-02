@@ -382,6 +382,34 @@ export const MEDIOS_ENVIO: Array<{ id: MedioEnvio; label: string }> = [
   { id: "OTRO", label: "Otro" },
 ];
 
+/** Lo mismo que `seguimiento-cotizacion.ts` y el aviso de por vencer de la API. */
+const DIAS_SEGUIMIENTO = [3, 7];
+const DIAS_AVISO_POR_VENCER = 3;
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+/** Lo que falta por pasar en una cotización enviada: se lo decimos a quien la hizo, en orden. */
+export function proximosAvisos(
+  sentAt: string | null | undefined,
+  validUntil: string | null | undefined,
+  ahora = new Date(),
+): Array<{ texto: string; fecha: Date }> {
+  const avisos: Array<{ texto: string; fecha: Date }> = [];
+  const enviada = sentAt ? new Date(sentAt) : null;
+  if (enviada && !Number.isNaN(enviada.getTime())) {
+    DIAS_SEGUIMIENTO.forEach((dias, i) =>
+      avisos.push({
+        texto: i === 0 ? "Te preguntamos si ya hubo respuesta" : "Segundo recordatorio",
+        fecha: new Date(enviada.getTime() + dias * DIA_MS),
+      }),
+    );
+  }
+  const vence = validUntil ? new Date(validUntil) : null;
+  if (vence && !Number.isNaN(vence.getTime())) {
+    avisos.push({ texto: "Aviso de por vencer, a ti y a tu jefe", fecha: new Date(vence.getTime() - DIAS_AVISO_POR_VENCER * DIA_MS) });
+  }
+  return avisos.filter((a) => a.fecha.getTime() > ahora.getTime()).sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
+}
+
 /** «Ya la envié»: el PDF salió por fuera; la API hace lo mismo que al enviar, menos mandar el correo. */
 export function marcarEnviada(token: string, id: number, medio: MedioEnvio) {
   return cotFetch<{ id: number; quoteNumber: string }>(`cotizaciones/${id}/marcar-enviada`, token, {

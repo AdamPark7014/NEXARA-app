@@ -76,7 +76,7 @@ import SeccionPlanos from "./SeccionPlanos";
 import SeccionCotizacion from "./SeccionCotizacion";
 import VistaPrevia from "./VistaPrevia";
 import DialogoEnvio from "./DialogoEnvio";
-import YaLaEnvie from "./YaLaEnvie";
+import YaLaEnvie, { ProximosAvisos } from "./YaLaEnvie";
 import { useCronometroProceso } from "@/lib/cronometro-proceso";
 import Seguimiento from "./Seguimiento";
 import styles from "./editor.module.css";
@@ -594,7 +594,7 @@ export default function EditorCotizacion({
       ? [
           { id: "cliente", label: "Cliente", hecho: Boolean(doc.clientName.trim()), ir: () => focusField("cot-cliente") },
           { id: "partida", label: "Una partida", hecho: completas.cotizacion, ir: () => irASeccion("cotizacion") },
-          { id: "correo", label: "Correo del cliente", hecho: esCorreo(doc.clientEmail), ir: () => focusField("cot-correo") },
+          { id: "correo", label: "Correo, si va por correo", hecho: esCorreo(doc.clientEmail), ir: () => focusField("cot-correo") },
         ]
       : [];
 
@@ -682,6 +682,8 @@ export default function EditorCotizacion({
           }}
         />
       ) : null}
+
+      {detalle?.estado === "ENVIADA" ? <ProximosAvisos sentAt={detalle.sentAt} validUntil={detalle.validUntil} /> : null}
 
       {detalle ? (
         <section className={styles.ficha} aria-label="Resumen de la cotización">
