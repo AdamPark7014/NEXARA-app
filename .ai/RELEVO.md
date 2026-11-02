@@ -1,5 +1,15 @@
 # RELEVO
 
+- **02-11 ~11:00 (claude-code) — Vehículos: el estándar y el manual ya se revisaron en producción con la sesión del CEO (`b903c71b`).** Cierra el «sin verificar» del bloque de `44c26f02`.
+  - **Tarifas:** la tarjeta carga de la API, rechaza una vida útil de 50 km sin llamar a la API y guarda con `PUT` 200. Se guardó una vez con los mismos valores: queda una fila `vehiculos.estandar` en `system_settings`, sin cambiar ninguna cifra. Sigue igual al recargar.
+  - **Ficha:** «Falta por capturar» en la Frontier con sus 10 renglones y sus atajos. «Agregar documento» ya no ofrece el manual y «Subir manual» lleva a la revisión.
+  - **Revisión:** sin guardar, propuso el programa estándar marcado; con 70 escrito en Tanque, subir el PDF de prueba de 7 páginas respetó el 70, llenó el resto con su página y actualizó los renglones del programa en su lugar. El PDF se borró del servidor; `uploads/vehicles` quedó vacía, y especificaciones, documentos, programa y cargas en cero.
+  - **Salió al verlo y se corrigió:** «Falta por capturar» estaba en la columna angosta, abajo de todo; sus atajos se veían distintos; «Actualizar» casi no se leía sobre la banda negra de la ficha y la flotilla.
+  - **Teléfono:** a 375 px sin desbordes, pero **con datos de ejemplo y fuera del marco real**, en un arnés de Vite sobre la copia exportada, porque en producción ya no se pudo: ver la trampa. El marco de Core a ese ancho no se vio con estas pantallas.
+  - **Trampas para revisar:** Core responde `X-Frame-Options: DENY`, así que ya no sirve el iframe a 390 px en la misma pestaña; Chrome bloquea `window.open` y una ventana maximizada ignora `resize_window`. Para desplegar, copiar el script con `scp` y correrlo con `< /dev/null`.
+  - **Sigue sin probarse:** nadie ha guardado una ficha, una carga ni un servicio reales, y ningún manual completo de marca real ha pasado por aquí. Lo captura Adam cuando lo tenga. El programa estándar lo escribió el agente: Adam debe ajustarlo.
+  - **Disco del Hetzner al 83 %** (13 GB libres) después de este despliegue. Con 90 % se cae la base.
+
 - **02-11 ~10:00 (claude-code) — Vehículos: todo se puede alimentar sin programar (`44c26f02`, en producción).** Adam: «deja el estandar de todo dentro del sistema para que yo lo pueda alimentar despues». Ya no se espera el PDF de la Frontier. Detalle en `docs/COSTOS-PRECIOS-UNITARIOS.md`, «Alimentarlo sin programar».
   - **Qué se ve:** tarjeta «Estándar de vehículos» en `/erp/costos/tarifas` (cifras de costo y programa con que arranca cada vehículo nuevo); «Subir manual» en la revisión de la ficha, también con la ficha ya guardada; «Falta por capturar» en el Resumen, cada cosa con su atajo.
   - **Sin migración:** el estándar va en `SystemSetting` (`vehiculos.estandar`, por empresa). No toca fichas guardadas ni viajes cargados. Quien no ve costos recibe solo el programa.
