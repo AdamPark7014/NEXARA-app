@@ -23,6 +23,7 @@ import { IntegraSiteService } from './integra-site.service';
 import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
 import { IntegraEventRouterService } from './integra-event-router.service';
 import { readLocalPersonFace } from './integra-person-media';
+import { identifiesDevice } from './integra-push.parse';
 
 /** Fila lista para consola / SSE (ISO dates, sin `raw`). */
 export type PushEventDto = {
@@ -128,7 +129,7 @@ export class IntegraPushService {
   /** siteId:tokenHash → sitio resuelto (TTL corto). */
   private readonly tokenCache = new Map<
     string,
-    { site: { id: number; companyId: number; pushTokenHash: string | null }; expires: number }
+    { site: { id: number; companyId: number; host: string; pushTokenHash: string | null }; expires: number }
   >();
 
   constructor(
@@ -233,7 +234,7 @@ export class IntegraPushService {
 
     const site = await this.prisma.integraSite.findUnique({
       where: { id: siteId },
-      select: { id: true, companyId: true, pushTokenHash: true },
+      select: { id: true, companyId: true, host: true, pushTokenHash: true },
     });
     if (!site?.pushTokenHash) throw new NotFoundException('Sitio sin token de eventos');
     if (site.pushTokenHash !== hash) throw new NotFoundException('Token no válido');
@@ -1424,6 +1425,7 @@ function publicBase(): string {
  * equipo. Lo demás —latidos, videoloss, puerta abierta por botón— no.
  */
 function worthAPhoto(ev: NormalizedEvent): boolean {
+  if (!identifiesDevice(ev)) return false;
   if (ev.eventType === 'AccessControllerEvent') return ev.major === 5;
   return ['linedetection', 'fielddetection', 'facedetection'].includes(ev.eventType);
 }

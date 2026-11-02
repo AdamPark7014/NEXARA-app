@@ -217,10 +217,32 @@ function faceRectTargets(e: Record<string, any>): NormalizedEvent['targets'] {
 }
 
 /**
+ * A quién se le apunta un aviso que no dice su IP.
+ *
+ * Solo calla el grabador: ninguna de las 972,407 filas medidas el 02-11 viene
+ * sin `ipAddress`, y su VMD no lo trae. La IP de la conexión no sirve, porque es
+ * la pública de la oficina y la misma para todos los equipos. El grabador es la
+ * cabecera del sitio, así que se le apunta a ella.
+ */
+export function fallbackDeviceIp(siteHost: string | null | undefined, connectionIp: string): string {
+  const lanIp = String(siteHost ?? '').replace(/^https?:\/\//i, '').split(/[:/]/)[0];
+  return lanIp || connectionIp;
+}
+
+/**
+ * ¿El aviso dice de qué equipo viene? Si no, es del grabador y no se sabe a qué
+ * canal pedirle la foto: el 102 y el 101 son de otra cámara, y la captura
+ * parecería correcta sin serlo.
+ */
+export function identifiesDevice(ev: Pick<NormalizedEvent, 'raw'>): boolean {
+  return str((ev.raw as { ipAddress?: unknown } | null | undefined)?.ipAddress) != null;
+}
+
+/**
  * Normaliza el cuerpo del aviso, ya decodificado a objeto.
  *
- * `fallbackIp` es la IP de quien abrió la conexión: si el equipo no se
- * identifica en el cuerpo, esa es la única verdad que hay.
+ * `fallbackIp` es la que se usa si el equipo no se identifica en el cuerpo: ver
+ * `fallbackDeviceIp`.
  */
 export function normalizeAlert(body: Record<string, any>, fallbackIp: string): NormalizedEvent | null {
   const alert = (body?.EventNotificationAlert ?? body) as Record<string, any>;

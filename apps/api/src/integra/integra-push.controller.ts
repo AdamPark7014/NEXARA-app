@@ -12,7 +12,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { parseXml } from '../hikvision-isapi/xml';
 import { IntegraPushService } from './integra-push.service';
-import { boundaryOf, normalizeAlert, splitMultipart } from './integra-push.parse';
+import { boundaryOf, fallbackDeviceIp, normalizeAlert, splitMultipart } from './integra-push.parse';
 
 /**
  * Buzón de eventos de los equipos.
@@ -69,7 +69,7 @@ export class IntegraPushController {
     const body = decodePayload(payloadText);
     if (!body) return { ok: true, ignored: 'ilegible' };
 
-    const ev = normalizeAlert(body, req.ip || '');
+    const ev = normalizeAlert(body, fallbackDeviceIp(site.host, req.ip || ''));
     if (!ev) return { ok: true, ignored: 'sin eventType' };
 
     await this.push.ingest({ id: site.id, companyId: site.companyId }, ev, image);
