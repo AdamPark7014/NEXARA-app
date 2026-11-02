@@ -19,8 +19,6 @@ import {
   ModulePage,
   Select,
   SkeletonRows,
-  Stat,
-  StatRow,
 } from "@/components/base";
 import { ClienteRapido } from "@/components/erp/ClienteRapido";
 import { useUser } from "@/components/UserContext";
@@ -112,6 +110,8 @@ function FormatosActividad() {
   const [equipoIds, setEquipoIds] = useState<number[]>([]);
   const [fecha, setFecha] = useState(() => siguienteDiaLaboral());
   const [hora, setHora] = useState("");
+  // Mientras nadie la toque, la hora sigue la entrada de quien lo lleva.
+  const [horaAMano, setHoraAMano] = useState(false);
 
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +131,13 @@ function FormatosActividad() {
     if (resultado || inicio != null) return;
     cronometro.arrancar();
     setInicio(Date.now());
+  };
+
+  const reiniciarReloj = () => {
+    cronometro.descartar();
+    setInicio(null);
+    setSegundos(0);
+    setClics(0);
   };
 
   useEffect(() => {
@@ -194,6 +201,7 @@ function FormatosActividad() {
     [proyectos, clienteServicioId],
   );
   const responsable = personas.find((p) => String(p.id) === responsableId) ?? null;
+  const requiereCliente = renglones.some((r) => r.coreKind === "servicio");
   const faltante = faltanteParaAsignar({
     responsableId,
     fecha,
@@ -258,9 +266,7 @@ function FormatosActividad() {
     clave.current = crypto.randomUUID();
     setResultado(null);
     setIntento(false);
-    setInicio(null);
-    setSegundos(0);
-    setClics(0);
+    reiniciarReloj();
     setCliente(null);
     setClienteServicioId(null);
     setSucursal("");
@@ -268,6 +274,7 @@ function FormatosActividad() {
     setResponsableId("");
     setEquipoIds([]);
     setHora("");
+    setHoraAMano(false);
     setFecha(siguienteDiaLaboral());
     void cargarFormatos(elegidoId);
   };
@@ -282,18 +289,27 @@ function FormatosActividad() {
       breadcrumbs={[{ label: "Actividades", href: "/erp/pizarra" }, { label: "Formatos" }]}
       back={{ href: "/erp/pizarra", label: "Volver a la pizarra" }}
       secondaryActions={
-        <Button iconStart={<AddRoundedIcon />} onClick={() => setEditor({ id: null, inicial: null })}>
-          Nuevo formato
-        </Button>
-      }
-      stats={
-        formatos?.length ? (
-          <StatRow>
-            <Stat label="Tu tiempo" value={`${segundos} s`} tone={segundos > META_SEGUNDOS ? "warning" : "default"} />
-            <Stat label="Clics" value={clics} />
-            <Stat label="Meta" value={`${META_SEGUNDOS} s`} tone="success" />
-          </StatRow>
-        ) : null
+        <div className={s.acciones}>
+          {formatos?.length ? (
+            <dl className={s.kpis}>
+              <div>
+                <dt>Tu tiempo</dt>
+                <dd data-tarde={segundos > META_SEGUNDOS ? "true" : undefined}>{segundos} s</dd>
+              </div>
+              <div>
+                <dt>Clics</dt>
+                <dd>{clics}</dd>
+              </div>
+              <div>
+                <dt>Meta</dt>
+                <dd data-meta="true">{META_SEGUNDOS} s</dd>
+              </div>
+            </dl>
+          ) : null}
+          <Button iconStart={<AddRoundedIcon />} onClick={() => setEditor({ id: null, inicial: null })}>
+            Nuevo formato
+          </Button>
+        </div>
       }
       before={
         error ? (
@@ -382,7 +398,7 @@ function FormatosActividad() {
             ) : null}
 
             <FieldGrid>
-              <Grupo label="Cliente" optional={!renglones.some((r) => r.coreKind === "servicio")}>
+              <Grupo label="Cliente" required={requiereCliente} optional={!requiereCliente}>
                 <ClienteRapido
                   token={token ?? ""}
                   clientes={clientes}
@@ -423,6 +439,7 @@ function FormatosActividad() {
                   onChange={(e) => {
                     setResponsableId(e.target.value);
                     setEquipoIds((ids) => ids.filter((id) => String(id) !== e.target.value));
+                    if (!horaAMano) setHora(personas.find((p) => String(p.id) === e.target.value)?.horaEntrada ?? "");
                   }}
                 >
                   <option value="">Elige a la persona</option>
@@ -486,9 +503,12 @@ function FormatosActividad() {
                     id="formato-hora"
                     type="time"
                     aria-label="Hora de inicio"
-                    title={`Sin hora, a su entrada${responsable?.horaEntrada ? `: ${responsable.horaEntrada}` : ""}`}
+                    title="Sin hora, a la de su entrada"
                     value={hora}
-                    onChange={(e) => setHora(e.target.value)}
+                    onChange={(e) => {
+                      setHora(e.target.value);
+                      setHoraAMano(true);
+                    }}
                   />
                 </div>
               </Grupo>
@@ -657,9 +677,14 @@ function FormatosActividad() {
           abierto={editor != null}
           formatoId={editor?.id ?? null}
           inicial={editor?.inicial ?? null}
-          onCerrar={() => setEditor(null)}
+          onCerrar={() => {
+            setEditor(null);
+            // Editar el formato no es tiempo de asignar.
+            if (!resultado) reiniciarReloj();
+          }}
           onGuardado={(id) => {
             setEditor(null);
+            if (!resultado) reiniciarReloj();
             void cargarFormatos(id);
           }}
         />

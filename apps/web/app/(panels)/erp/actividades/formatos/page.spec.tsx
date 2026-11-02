@@ -95,7 +95,7 @@ beforeEach(() => {
   api.listarFormatos.mockReset().mockResolvedValue([CCTV, PREVENTIVO]);
   api.listAssignableUsers.mockReset().mockResolvedValue([
     { id: 10, nombre: "Ana Ruiz" },
-    { id: 11, nombre: "Beto Díaz" },
+    { id: 11, nombre: "Beto Díaz", horaEntrada: "08:00" },
   ]);
   api.listOperationalProjects.mockReset().mockResolvedValue([]);
   api.getClientPermissions.mockReset().mockResolvedValue({ puedeAltaRapida: true });
@@ -136,6 +136,28 @@ describe("Asignar con un formato", () => {
     await u.click(screen.getByRole("button", { name: /Mantenimiento/ }));
     expect(screen.queryByRole("button", { name: /^Más / })).toBeNull();
     expect(screen.getByRole("button", { name: "Asignar 1 actividad" })).toBeTruthy();
+  });
+
+  it("la hora sigue la entrada de la persona hasta que alguien la escribe", async () => {
+    const u = await abrir();
+    await screen.findAllByRole("option", { name: "Beto Díaz" });
+    const hora = screen.getByLabelText("Hora de inicio");
+    await u.selectOptions(screen.getByRole("combobox", { name: /Quién/ }), "11");
+    expect(hora).toHaveValue("08:00");
+    await u.selectOptions(screen.getByRole("combobox", { name: /Quién/ }), "10");
+    expect(hora).toHaveValue("");
+    await u.type(hora, "12:30");
+    await u.selectOptions(screen.getByRole("combobox", { name: /Quién/ }), "11");
+    expect(hora).toHaveValue("12:30");
+  });
+
+  it("editar el formato no cuenta como tiempo de asignar", async () => {
+    const u = await abrir();
+    await u.click(screen.getByRole("button", { name: "Más cámaras" }));
+    expect(screen.getByText("Clics").nextSibling?.textContent).toBe("1");
+    await u.click(screen.getByRole("button", { name: "Editar formato" }));
+    await u.click(await screen.findByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.getByText("Clics").nextSibling?.textContent).toBe("0"));
   });
 
   it("no manda nada sin persona y lo dice", async () => {
