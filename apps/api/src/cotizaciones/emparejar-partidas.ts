@@ -8,6 +8,8 @@
  */
 import { distancia } from '../ai/asistente/nombres.js';
 import { normalizarTexto, type FilaCotizada } from './partidas-frecuentes.js';
+import { CATALOGO_PARTIDAS_V2 } from './catalogo-partidas-base.js';
+import { PAQUETES } from './paquetes.js';
 import type { GrupoPartida } from './partidas-grupos.js';
 
 export type FuentePartida = 'usada' | 'catalogo' | 'formato' | 'paquete' | 'libre';
@@ -231,12 +233,14 @@ function esSegura(consulta: string[], i: Indexado, puntuados: Array<{ i: Indexad
   // particular. Vale si abre el nombre y no hay otra igual: «Access point» cuando solo se ha cotizado uno.
   if (consulta.length === 1 && i.titulo.size >= 5) {
     const abre = i.primera === consulta[0];
-    const otra = puntuados.some((x) => x.i.primera === consulta[0] && claveDe(x.i.candidato) !== claveDe(i.candidato));
+    const otra = puntuados.some((x) => x.i.candidato.fuente === i.candidato.fuente && x.i.primera === consulta[0] && claveDe(x.i.candidato) !== claveDe(i.candidato));
     if (!abre || otra) return false;
   }
   // «Instalación de cableado» no es una bobina cuyo nombre largo dice que incluye instalación.
   if (utiles.length < consulta.length && !(i.primera && DE_SERVICIO.has(i.primera))) return false;
-  if (i.candidato.fuente !== 'catalogo') return true;
+  // Solo lo que la empresa ya cotizó se llena sin más. Un paquete trae un precio de referencia y una
+  // cámara TurboHD: «cámara domo» no basta para meterla junto a un NVR.
+  if (i.candidato.fuente === 'usada') return true;
   if (!especificas.length) return false;
   const cabeza = consulta.find((p) => !/^\d/.test(p));
   const primeras = [...i.titulo].slice(0, 2);
@@ -386,6 +390,62 @@ export function candidatosDeUsadas(filas: FilaCotizada[]): CandidatoPartida[] {
       productCtId: null,
       cotizaciones: [...cotizaciones],
     };
+  });
+}
+
+const sinPrecio = (parcial: Pick<CandidatoPartida, 'fuente' | 'name'> & Partial<CandidatoPartida>): CandidatoPartida => ({
+  description: null,
+  brand: null,
+  model: null,
+  unit: null,
+  unitCost: null,
+  unitPrice: 0,
+  grupo: null,
+  imagenUrl: null,
+  veces: 0,
+  ultimaVez: null,
+  stock: null,
+  productCtId: null,
+  cotizaciones: [],
+  ...parcial,
+});
+
+/** Lo que ya vive en código: los paquetes con su precio de partida y el formato de conceptos, sin precio. */
+export const CANDIDATOS_FIJOS: CandidatoPartida[] = [
+  ...PAQUETES.flatMap((paquete) =>
+    paquete.partidas.map((p) =>
+      sinPrecio({ fuente: 'paquete', name: p.name, description: p.description ?? null, unit: p.unit, unitPrice: p.unitPrice, grupo: p.grupo }),
+    ),
+  ),
+  ...CATALOGO_PARTIDAS_V2.map((p) =>
+    sinPrecio({ fuente: 'formato', name: p.equipo, brand: p.marca, model: p.modelo, unit: p.unidad, grupo: p.grupo, description: p.descripcion ?? null }),
+  ),
+];
+
+/** Del mayorista: lo que devuelve su buscador como candidato, con costo y sin precio. */
+export function candidatoDelMayorista(oferta: {
+  id: number;
+  nombre?: string | null;
+  clave?: string | null;
+  descripcion?: string | null;
+  marca?: string | null;
+  modelo?: string | null;
+  costMxn?: number | null;
+  imagen?: string | null;
+  stockTotal?: number | null;
+}, concepto: string): CandidatoPartida {
+  return sinPrecio({
+    fuente: 'catalogo',
+    name: oferta.nombre || oferta.clave || concepto,
+    description: oferta.descripcion ?? null,
+    brand: oferta.marca ?? null,
+    model: oferta.modelo ?? null,
+    unit: 'Pieza',
+    unitCost: Number(oferta.costMxn) > 0 ? Number(oferta.costMxn) : null,
+    grupo: 'EQUIPOS',
+    imagenUrl: oferta.imagen ?? null,
+    stock: oferta.stockTotal ?? 0,
+    productCtId: oferta.id,
   });
 }
 

@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { ClaudeService, type UsoClaude } from '../claude/claude.service.js';
 import { limpiarSalidaCotizar, peticionCotizar, type SalidaCotizar } from '../cotizar/cotizar-ia.js';
 import { CLIENTE_GENERICO, armarPropuesta, type PropuestaCotizacion } from '../../cotizaciones/cotizar-frase.js';
-import { candidatosDeUsadas, palabrasDePartida, type CandidatoPartida } from '../../cotizaciones/emparejar-partidas.js';
+import { CANDIDATOS_FIJOS, candidatosDeUsadas, palabrasDePartida, type CandidatoPartida } from '../../cotizaciones/emparejar-partidas.js';
 import { normalizarTexto, type FilaCotizada } from '../../cotizaciones/partidas-frecuentes.js';
 import type { FichaComparable } from '../../ventas/clientes-parecidos.js';
 import { CASOS_COTIZAR, CLIENTES_USADOS, FILAS_COTIZAR, PADRON_COTIZAR, type CasoCotizar } from './casos-cotizar.js';
@@ -130,7 +130,8 @@ async function main() {
       padron,
       usados,
       generico: generico ? { id: generico.id } : null,
-      candidatos: candidatosDeUsadas(filasCaso),
+      // Lo mismo que producción: lo cotizado, los paquetes y el formato de conceptos.
+      candidatos: [...candidatosDeUsadas(filasCaso), ...CANDIDATOS_FIJOS],
       buscarCatalogo: async (concepto) => delCatalogoReal(concepto),
       preguntarIa: async (frase) => {
         if (!claude) throw new Error('sin IA');

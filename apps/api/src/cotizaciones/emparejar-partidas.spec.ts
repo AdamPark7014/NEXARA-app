@@ -1,4 +1,5 @@
 import {
+  CANDIDATOS_FIJOS,
   candidatosDeUsadas,
   complementosDe,
   consultasDeCatalogo,
@@ -99,6 +100,28 @@ describe('emparejar', () => {
       candidato('Gabinete 6U', { fuente: 'usada', model: 'USADO', veces: 3 }),
     ]);
     expect(r.elegida?.model).toBe('USADO');
+  });
+});
+
+describe('lo que no se ha cotizado', () => {
+  it('un paquete se ofrece, pero su precio de referencia no entra solo', () => {
+    const r = emparejar('Cámara domo', CANDIDATOS_FIJOS);
+    expect(r.elegida?.fuente).toBe('paquete');
+    expect(r.seguridad).toBe('media');
+  });
+
+  it('el formato de conceptos tampoco', () => {
+    expect(emparejar('Router', CANDIDATOS_FIJOS).seguridad).not.toBe('alta');
+  });
+
+  it('los conceptos del formato no le quitan la seguridad a lo ya cotizado', () => {
+    const r = emparejar('Access point', [candidato('Access point Wi-Fi 6 para techo interior', { model: 'EAP650' }), ...CANDIDATOS_FIJOS]);
+    expect(r).toMatchObject({ seguridad: 'alta', elegida: { model: 'EAP650' } });
+  });
+
+  it('lo ya cotizado le gana al paquete', () => {
+    const r = emparejar('Cámara domo', [candidato('Cámara domo Hikvision', { model: 'H1' }), ...CANDIDATOS_FIJOS]);
+    expect(r).toMatchObject({ seguridad: 'alta', elegida: { model: 'H1' } });
   });
 });
 
