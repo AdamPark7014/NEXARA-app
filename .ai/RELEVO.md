@@ -664,9 +664,8 @@
   - Con sesión no se probó guardar ni confirmar nada, solo ver. El servidor no recibe los errores del navegador: un fallo
     solo de cliente no sale en los logs. Una pestaña nueva cae al login si no se marcó «Recordarme» (igual que en Next 14).
   - Ajeno a esto, ya pasaba con Next 14: `/manifest.webmanifest` da 404 en `core.` y 500 en `portal.` (200 en el sitio).
-  - **Respaldo:** imagen `nexara-web:next14-respaldo` (2.17 GB) en el Hetzner. Para volver:
-    `docker tag nexara-web:next14-respaldo nexara-web:latest` y `up -d --no-build web`. Se deja hasta que pase un día de uso
-    normal, porque el despliegue fue en domingo; después, `docker rmi nexara-web:next14-respaldo`.
+  - **Respaldo:** la imagen `nexara-web:next14-respaldo` ya no está en el Hetzner (comprobado el 02-11). Ya no hay vuelta
+    rápida a Next 14; habría que revertir el commit y compilar otra vez.
   - **CI en rojo, ajeno a esto:** «Tipos y tests» falla en `npm ci` desde `b1a6880f` (`lock file's multer@2.4.0 does not
     satisfy multer@2.5.0`, por el override `$multer`). Mientras siga así, CI no corre tipos ni pruebas en ningún commit.
     Docker no se afecta (`npm install`); la imagen de la API sigue con multer 2.4.0.
