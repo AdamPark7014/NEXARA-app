@@ -1,5 +1,29 @@
 # RELEVO
 
+- **02-11 ~13:55 (claude-code) — Programa Velocidad Core, Ola 2: formatos de actividades en producción, sin acceso visible hasta el 06-11.** (`c7cbd1f0`, `6bedc328`, `15808179`)
+  - Adam aprobó con «Sí, arranca Ola 2». Plan y mockup: <https://claude.ai/artifact/EMhiXKV9NPgUmsqFjVVtMu>. Olas 3 a 7 sin construir.
+  - **Qué es:** `/erp/actividades/formatos`. Eliges un formato, dices cantidad, cliente, sucursal, persona y día, y salen las actividades con fotos, tiempos y herramientas. Todo se edita al asignar sin tocar el formato.
+  - **API (`formatos-actividad/`):** `receta-formato.ts` tiene las reglas puras; `formatos-actividad.service.ts`, el catálogo y `POST :id/aplicar`. Tablas `formatos_actividad` y `formato_aplicaciones` (migración `20261102190500`, aplicada a mano antes de subir).
+    - **Dos toques no duplican:** la `clave` de la aplicación es única por empresa. Si un renglón falla, los demás quedan y la respuesta dice cuál.
+    - **Sin una lectura de IA por renglón:** cada actividad lleva estimado y estándar iguales y su entrega, así `requiereLectura` da falso. Si te lo asignas a ti mismo, sí lee: la regla de autoasignación no cambió.
+    - **Un aviso por persona:** `ActivitiesService.create` y `ActivityTeamService.addMember` aceptan `{ sinAviso: true }`.
+    - **Calendario:** `planearRenglones` las pone una detrás de otra con la jornada del responsable; lo que no cabe pasa al siguiente lunes a viernes con su periodo. No descuenta festivos.
+    - **Permisos:** `activities/puede-gestionar.ts` se extrajo del controlador; el alta y los formatos usan la misma regla, más `puedeDejarActividadA` por cada persona. La URL está abierta a todo el personal (`FORMATOS_ACTIVIDAD_URL_RULES`) y el servicio decide, igual que en el alta.
+    - **Siembra:** al primer `GET` de una empresa sin formatos crea tres, con minutos de la tabla aprobada. Si ya hay, aunque estén archivados, no siembra. En producción ya se sembraron al abrir la pantalla con la sesión de dirección.
+  - **Web:** `app/(panels)/erp/actividades/formatos/` y `lib/formatos-actividad.ts`. Proyecto y obra quedan fuera de los renglones: esos salen de la programación del proyecto.
+  - **Publicación:** `FORMATOS_VISIBLES_DESDE` abre el 06-11 a las 6:00 de México el botón de Pizarra y «Guardar como formato» en el menú de la actividad. Espera 3 días laborales de cronómetro de `asignar` para poder comparar; `proceso_tiempos` sigue vacía porque el 02-11 fue festivo. La ruta directa ya funciona. Las apps quedan para la Ola 3.
+  - **Corregido de paso, `6bedc328`:** `redactAuditPayload` copiaba un `Decimal` con su `constructor` y Prisma rechazaba el lote entero de auditoría, no solo esa entrada. Una herramienta con cantidad se llevó 59 entradas en la prueba. En producción `activity_tool_requirements` está vacía, pero hay más escritores con `Decimal`, y los logs no alcanzan para contar lotes perdidos antes del arreglo.
+  - **Medido:** suites de formatos, permisos, tenant, actividades y Prisma en verde, y `tsc` de API y web. **No se corrieron las suites completas.**
+    - **Prueba de punta a punta:** `aplicar` real contra una base temporal `prueba_formatos`, con esquema de producción, usuarios sin correo real y sin dispositivos para push; ya borrada. Salieron 5 actividades encadenadas con su cuadrilla, cliente y sucursal, 2 avisos, 370 ms, y la misma clave no creó nada más.
+    - **En producción con sesión de dirección:** pantalla, stepper, detalle del renglón, editor abierto y cancelado, y validaciones sin crear actividades. A 375 px solo con una copia estática de la página: sin desbordes, sin interacción.
+  - **Sin verificar:** nadie ha aplicado un formato en producción. Los 30 s no están medidos con una persona. El botón de Pizarra y el menú de la actividad no se han visto abiertos.
+  - **Lectura repetida del asistente, sin tocar:** el payload de «Asignar con IA» no lleva `tiempoEstandarMin` y el alta vuelve a leer el título. Cuesta casi nada, cifra en el artifact, y un estándar fijo pediría motivo al editar la tarjeta.
+  - No se delegó a Ollama: reglas de negocio entre varios módulos, revisadas contra producción.
+  - **Trampas:**
+    - `Field` es un `<label>`: un `ClienteRapido`, chips o varios controles dentro le roban clics. Para eso va `Grupo` en la página.
+    - `ACTIVIDAD_PROPIA_URL_RULES` no alcanza a todos: siete roles declaran `/api/activities/**` por su cuenta y no la incluyen. Una ruta nueva «de todo el personal» hay que probarla por rol.
+    - El borde de un Nest parcial para pruebas: `createApplicationContext` pide los módulos `@Global` a mano. Sin `ScheduleModule` no corren crons. Quita `REDIS_URL` o tomará trabajos de la cola real.
+
 - **02-11 ~13:50 (claude-code) — El NVR de Oficinas ya llega a la API (`7aaac85c`, en producción; Adam: «Sí, abrir ruta»).** Antes daba 404 en Traefik. Sigue del bloque de abajo.
   - **Medido con tráfico real:** desde las 13:30:04 (hora de México) sus avisos reciben `200 {"ok":true}` por `integra-hik-push-http`. El último 404 fue a las 13:30:03, y en 5 min con la API nueva (arrancó a las 13:35:21) no hay ninguno. Sin 400 ni 403 para la IP de la oficina, los latidos de .160 y .161 siguen entrando y `/api/health/live` da 200.
   - **Traefik:** esa ruta acepta también `Host(5.78.215.109)`, solo en `/api/integra/hik`, y el middleware `integra-hik-host` lo reescribe a `integra.nexara.com.mx`. Si un día cambia la IP del servidor, hay que cambiarla aquí.
