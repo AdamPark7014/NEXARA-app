@@ -26,12 +26,12 @@
  * botón se dice quién lo hace.
  */
 
-import Link from "next/link";
 import { useCallback, type ReactNode } from "react";
-import Button from "@/components/ui/Button";
+import { Badge, ButtonLink } from "@/components/base";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { canUserAccessPath } from "@/lib/user-access";
+import s from "./arranque.module.css";
 
 /** Dónde se da el primer paso, cómo se llama el botón y quién lo hace. */
 export type Destino = {
@@ -135,18 +135,16 @@ export function AccionPrimerPaso({
 
   if (!puedeAbrir(destino.href)) {
     return (
-      <span style={{ fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
+      <span className={s.pasoAjeno}>
         Esto lo hace {destino.loHace}; tu cuenta no abre esa pantalla.
       </span>
     );
   }
 
   return (
-    <Link href={destino.href} style={{ textDecoration: "none" }}>
-      <Button size="sm" variant={variante}>
-        {destino.etiqueta}
-      </Button>
-    </Link>
+    <ButtonLink size="sm" variant={variante} href={destino.href}>
+      {destino.etiqueta}
+    </ButtonLink>
   );
 }
 
@@ -176,15 +174,7 @@ export function VacioConPrimerPaso({
       description={description}
       action={
         destino || extra ? (
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-              justifyContent: "center",
-              flexWrap: "wrap",
-            }}
-          >
+          <div className={s.accionesVacio}>
             {destino ? <AccionPrimerPaso destino={destino} /> : null}
             {extra}
           </div>
@@ -220,64 +210,19 @@ export function PuestaEnMarcha({ pasos }: { pasos: PasoArranque[] }) {
   const puedeAbrir = usePuedeAbrir();
 
   return (
-    <ol
-      style={{
-        listStyle: "none",
-        margin: 0,
-        padding: 0,
-        border: "1px solid var(--nx-panel-hairline, var(--border))",
-        borderRadius: 10,
-        overflow: "hidden",
-        background: "var(--surface)",
-        counterReset: "paso",
-      }}
-    >
+    <ol className={s.pasos}>
       {pasos.map((paso, i) => {
         const hecho = paso.estado === "listo";
         const abrible = puedeAbrir(paso.destino.href);
         return (
-          <li
-            key={paso.id}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "26px minmax(0, 1fr) auto",
-              gap: 12,
-              alignItems: "baseline",
-              padding: "12px 14px",
-              borderTop:
-                i === 0 ? undefined : "1px solid var(--nx-panel-hairline, var(--border))",
-            }}
-          >
-            <span
-              aria-hidden="true"
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                fontVariantNumeric: "tabular-nums",
-                color: hecho ? "var(--state-success-text, #15803d)" : "var(--text-tertiary)",
-              }}
-            >
+          <li key={paso.id} className={s.paso} data-hecho={hecho ? "true" : undefined}>
+            <span aria-hidden="true" className={s.numero}>
               {hecho ? "✓" : i + 1}
             </span>
 
-            <div style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 13.5,
-                  fontWeight: hecho ? 500 : 600,
-                  color: hecho ? "var(--text-secondary)" : "var(--text-primary)",
-                }}
-              >
-                {paso.titulo}
-              </div>
-              <p
-                style={{
-                  margin: "3px 0 0",
-                  fontSize: 12,
-                  color: "var(--text-tertiary)",
-                  lineHeight: 1.45,
-                }}
-              >
+            <div className={s.pasoTexto}>
+              <div className={s.pasoTitulo}>{paso.titulo}</div>
+              <p className={s.pasoPorque}>
                 {paso.porque}
                 {paso.estado === "desconocido" ? (
                   <> No se pudo comprobar si ya está: tu cuenta no consulta esa parte.</>
@@ -285,22 +230,17 @@ export function PuestaEnMarcha({ pasos }: { pasos: PasoArranque[] }) {
               </p>
             </div>
 
-            <span style={{ whiteSpace: "nowrap" }}>
+            <span className={s.pasoAccion}>
               {hecho ? (
-                <span style={{ fontSize: 12, color: "var(--state-success-text, #15803d)" }}>
+                <Badge tone="success" dot size="sm">
                   Ya está
-                </span>
+                </Badge>
               ) : abrible ? (
-                <Link
-                  href={paso.destino.href}
-                  style={{ fontSize: 12.5, fontWeight: 600, color: "var(--primary)" }}
-                >
-                  {paso.destino.etiqueta} →
-                </Link>
+                <ButtonLink size="sm" href={paso.destino.href}>
+                  {paso.destino.etiqueta}
+                </ButtonLink>
               ) : (
-                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                  Lo hace {paso.destino.loHace}
-                </span>
+                <span className={s.pasoAjeno}>Lo hace {paso.destino.loHace}</span>
               )}
             </span>
           </li>

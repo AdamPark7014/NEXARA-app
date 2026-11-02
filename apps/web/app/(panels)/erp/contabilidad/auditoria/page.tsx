@@ -1,17 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import DataTable, { type Column } from "@/components/ui/DataTable";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import EmptyState from "@/components/ui/EmptyState";
-import InlineAlert from "@/components/ui/InlineAlert";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
+import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import DifferenceOutlinedIcon from "@mui/icons-material/DifferenceOutlined";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
+import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  CardHead,
+  Checkbox,
+  DataTable,
+  DateInput,
+  EmptyState,
+  LinkButton,
+  ListCard,
+  ListFooter,
+  ModuleToolbar,
+  SearchInput,
+  Select,
+  Stat,
+  StatRow,
+  type Column,
+  type Tone,
+} from "@/components/base";
 import Modal from "@/components/ui/Modal";
-import FilterToolbar from "@/components/FilterToolbar";
+import { MesaPagina } from "@/components/mesa-contable/MesaPagina";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import {
@@ -20,6 +39,7 @@ import {
   auditFieldLabel,
 } from "@/lib/finance-status-labels";
 import { VacioConPrimerPaso } from "../_arranque";
+import s from "./auditoria.module.css";
 
 type AuditRow = {
   id: number;
@@ -101,7 +121,7 @@ const fechaHora = (iso?: string | null) =>
  * edición, consulta) y roja solo cuando alguien borró algo, que es lo que uno
  * busca al abrir una bitácora.
  */
-function tonoAccion(action: string): StatusTone {
+function tonoAccion(action: string): Tone {
   const a = action.toLowerCase();
   if (/delete|remove|borr|elimin|revoke|revoc/.test(a)) return "danger";
   if (/fail|error|denied|deneg|reject|rechaz/.test(a)) return "danger";
@@ -276,11 +296,7 @@ export default function AuditoriaPage() {
       key: "createdAt",
       label: "Cuándo",
       width: 140,
-      render: (r) => (
-        <span style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-          {fechaHora(r.createdAt)}
-        </span>
-      ),
+      render: (r) => <span className={s.cuando}>{fechaHora(r.createdAt)}</span>,
     },
     {
       key: "usuario",
@@ -291,7 +307,9 @@ export default function AuditoriaPage() {
       key: "action",
       label: "Acción",
       render: (r) => (
-        <StatusDot label={auditActionLabel(r.action)} tone={tonoAccion(r.action)} title={r.action} />
+        <Badge dot size="sm" tone={tonoAccion(r.action)} title={r.action}>
+          {auditActionLabel(r.action)}
+        </Badge>
       ),
     },
     {
@@ -304,7 +322,7 @@ export default function AuditoriaPage() {
         r.entityType ? (
           <span title={r.entityType}>{auditEntityLabel(r.entityType)}</span>
         ) : (
-          <span style={{ color: "var(--text-tertiary)" }}>—</span>
+          <span className={s.tenue}>—</span>
         ),
     },
     {
@@ -326,7 +344,7 @@ export default function AuditoriaPage() {
               const ctx = contextoHttp(r);
               const ruta = ctx?.["path"] ? String(ctx["path"]) : null;
               return (
-                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                <span className={s.contexto}>
                   {[r.source, ruta, r.ipAddress].filter(Boolean).join(" · ") || "—"}
                 </span>
               );
@@ -359,7 +377,7 @@ export default function AuditoriaPage() {
    * Lectura de lo cargado, no del total del servidor: la bitácora trae los
    * últimos {LIMITE} eventos y eso es lo que estas cifras describen.
    */
-  const strip: Metric[] = useMemo(() => {
+  const strip: ComponentProps<typeof Stat>[] = useMemo(() => {
     const borrados = filtradas.filter((r) => tonoAccion(r.action) === "danger").length;
     const personas = new Set(
       filtradas.map((r) => (r.user?.id ?? r.userId ?? "sistema").toString()),
@@ -372,22 +390,30 @@ export default function AuditoriaPage() {
           total > rows.length
             ? `De ${rows.length} en esta página · ${total.toLocaleString("es-MX")} en total`
             : "Todos los del filtro",
+        icon: <HistoryOutlinedIcon />,
+        iconTone: "neutral",
       },
       {
         label: "Personas",
         value: loading ? "…" : personas,
         hint: "Quién tocó algo en esta página",
+        icon: <PeopleAltOutlinedIcon />,
+        iconTone: "neutral",
       },
       {
         label: "Tipos de registro",
         value: loading ? "…" : new Set(filtradas.map((r) => r.entityType)).size,
         hint: "Facturas, pólizas, proveedores…",
+        icon: <CategoryOutlinedIcon />,
+        iconTone: "neutral",
       },
       {
         label: "Bajas y rechazos",
         value: loading ? "…" : borrados,
         hint: borrados === 0 ? "Nada se borró" : "Revisar quién y por qué",
         tone: borrados > 0 ? "danger" : "default",
+        icon: <DeleteOutlineOutlinedIcon />,
+        iconTone: "neutral",
       },
     ];
   }, [filtradas, loading, rows.length, total]);
@@ -397,141 +423,202 @@ export default function AuditoriaPage() {
   const filas = comparar(antes, despues);
   const visibles = soloCambios && antes ? filas.filter((f) => f.cambio) : filas;
 
+  const cambiaUsuario = filtrar(setFUsuario);
+  const cambiaEntidad = filtrar(setFEntidad);
+  const cambiaAccion = filtrar(setFAccion);
+  const cambiaDesde = filtrar(setFDesde);
+  const cambiaHasta = filtrar(setFHasta);
+
   return (
-    <>
-      <PageHeader
-        eyebrow="Contabilidad"
-        title="Auditoría"
-        subtitle="Quién cambió qué y cuándo. Abre un evento para ver el antes y el después."
-        density="ops"
-        actions={
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => void load()}
-            disabled={loading || sinSesion}
-          >
-            {loading ? "Actualizando…" : "Actualizar"}
-          </Button>
-        }
-      />
-
-      {sinSesion && (
-        <InlineAlert
-          variant="warning"
-          message="No hay sesión activa, así que la bitácora no se puede consultar. Vuelve a entrar con tu cuenta para verla."
+    <MesaPagina
+      titulo="Auditoría"
+      descripcion="Quién cambió qué y cuándo. Abre un evento para ver el antes y el después."
+      terciarias={
+        <Button
+          variant="ghost"
+          onClick={() => void load()}
+          disabled={loading || sinSesion}
+        >
+          {loading ? "Actualizando…" : "Actualizar"}
+        </Button>
+      }
+    >
+      {sinSesion ? (
+        <Alert
+          className={s.aviso}
+          tone="warning"
+          role="alert"
           action={
-            <Link href="/login" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap" }}>
+            <ButtonLink size="sm" href="/login">
               Ir a entrar
-            </Link>
+            </ButtonLink>
           }
-        />
-      )}
+        >
+          No hay sesión activa, así que la bitácora no se puede consultar. Vuelve a entrar con tu
+          cuenta para verla.
+        </Alert>
+      ) : null}
 
-      {error && (
-        <InlineAlert
-          message={`No se pudo cargar la bitácora. ${error} Reintenta; si sigue igual, avisa a soporte.`}
-          variant="danger"
+      {error ? (
+        <Alert
+          className={s.aviso}
+          tone="danger"
+          role="alert"
           onDismiss={() => setError(null)}
           action={
-            <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
+            <Button size="sm" onClick={() => void load()} disabled={loading}>
               {loading ? "Reintentando…" : "Reintentar"}
             </Button>
           }
-        />
-      )}
+        >
+          {`No se pudo cargar la bitácora. ${error} Reintenta; si sigue igual, avisa a soporte.`}
+        </Alert>
+      ) : null}
 
       {/* Con la bitácora vacía las cuatro celdas dicen cero, cero, cero y
           «Nada se borró»: parece un informe y es un hueco. La tira aparece
           cuando hay eventos que resumir. */}
-      {(loading || filtradas.length > 0) && !sinSesion && (
-        <div style={{ marginBottom: 12 }}>
-          <MetricStrip metrics={strip} ariaLabel="Resumen de la bitácora cargada" />
-        </div>
-      )}
+      {(loading || filtradas.length > 0) && !sinSesion ? (
+        <StatRow variant="strip" ariaLabel="Resumen de la bitácora cargada">
+          {strip.map((m) => (
+            <Stat key={String(m.label)} {...m} />
+          ))}
+        </StatRow>
+      ) : null}
 
-      <FilterToolbar
-        search={{
-          value: busqueda,
-          onChange: setBusqueda,
-          // El buscador no va al servidor: la API de auditoría no acepta texto
-          // libre. Decirlo evita concluir «no existe» cuando solo no está aquí.
-          placeholder: "Filtrar esta página por usuario, acción o tipo de registro…",
-        }}
-        selects={[
-          {
-            label: "Usuario",
-            value: fUsuario,
-            onChange: filtrar(setFUsuario),
-            options: opcionesUsuario,
-            allowAll: true,
-          },
-          {
-            label: "Tipo de registro",
-            value: fEntidad,
-            onChange: filtrar(setFEntidad),
-            options: opcionesEntidad,
-            allowAll: true,
-          },
-          {
-            label: "Acción",
-            value: fAccion,
-            onChange: filtrar(setFAccion),
-            options: opcionesAccion,
-            allowAll: true,
-          },
-        ]}
-        dates={[
-          { label: "Desde", value: fDesde, onChange: filtrar(setFDesde) },
-          { label: "Hasta", value: fHasta, onChange: filtrar(setFHasta) },
-        ]}
-        onClear={limpiarFiltros}
-        resultCount={loading ? null : filtradas.length}
-      />
-
-      <p style={{ margin: "6px 2px 10px", fontSize: 11.5, color: "var(--text-tertiary)" }}>
-        Usuario, entidad, acción y fechas los aplica el servidor sobre toda la bitácora. El cuadro
-        de texto solo filtra los {LIMITE} eventos de esta página; para buscar más atrás, avanza de
-        página o acota con las fechas.
-      </p>
-
-      <Section
-        title={
-          loading
-            ? "Cargando…"
-            : `${filtradas.length} ${
-                filtradas.length === 1 ? "evento" : "eventos"
-              } en esta página`
-        }
-        subtitle={
-          !sinSesion && total > rows.length
-            ? `${total.toLocaleString("es-MX")} eventos con estos filtros; se traen de ${LIMITE} en ${LIMITE}.`
-            : undefined
-        }
-        flush
-      >
-        {sinSesion ? (
-          <EmptyState
-            title="Sin sesión"
-            description="Vuelve a entrar con tu cuenta para consultar la bitácora."
-          />
-        ) : loading ? (
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "16px 18px" }}>Cargando…</p>
-        ) : filtradas.length === 0 ? (
-          hayFiltros ? (
-            <EmptyState
-              title="Sin eventos con estos filtros"
-              description={
-                busqueda.trim()
-                  ? `Ningún evento de esta página contiene «${busqueda.trim()}». Recuerda que el texto solo filtra lo ya cargado: quita la búsqueda o cambia de página.`
-                  : "No hay registros de auditoría con estos filtros. Amplía el rango de fechas o quita alguno."
+      <ListCard
+        listLabel="Bitácora de auditoría"
+        toolbar={
+          <>
+            <CardHead
+              title={
+                loading
+                  ? "Cargando…"
+                  : `${filtradas.length} ${
+                      filtradas.length === 1 ? "evento" : "eventos"
+                    } en esta página`
               }
-              action={
-                <Button size="sm" variant="secondary" onClick={limpiarFiltros}>
-                  Limpiar filtros
-                </Button>
+              subtitle={
+                !sinSesion && total > rows.length
+                  ? `${total.toLocaleString("es-MX")} eventos con estos filtros; se traen de ${LIMITE} en ${LIMITE}.`
+                  : undefined
               }
             />
+            <ModuleToolbar
+              search={
+                <SearchInput
+                  // El buscador no va al servidor: la API de auditoría no acepta texto
+                  // libre. Decirlo evita concluir «no existe» cuando solo no está aquí.
+                  aria-label="Filtrar esta página por usuario, acción o tipo de registro…"
+                  placeholder="Filtrar esta página por usuario, acción o tipo de registro…"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                />
+              }
+              end={
+                <>
+                  {hayFiltros ? <LinkButton onClick={limpiarFiltros}>Limpiar</LinkButton> : null}
+                  {loading ? null : (
+                    <span className={s.conteo} role="status">
+                      {filtradas.length} resultado{filtradas.length === 1 ? "" : "s"}
+                    </span>
+                  )}
+                </>
+              }
+            >
+              <Select
+                aria-label="Usuario"
+                title="Usuario"
+                controlSize="sm"
+                wrapperClassName={s.filtroSelect}
+                value={fUsuario}
+                onChange={(e) => cambiaUsuario(e.target.value)}
+              >
+                <option value="">Todos · Usuario</option>
+                {opcionesUsuario.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                aria-label="Tipo de registro"
+                title="Tipo de registro"
+                controlSize="sm"
+                wrapperClassName={s.filtroSelect}
+                value={fEntidad}
+                onChange={(e) => cambiaEntidad(e.target.value)}
+              >
+                <option value="">Todos · Tipo de registro</option>
+                {opcionesEntidad.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                aria-label="Acción"
+                title="Acción"
+                controlSize="sm"
+                wrapperClassName={s.filtroSelect}
+                value={fAccion}
+                onChange={(e) => cambiaAccion(e.target.value)}
+              >
+                <option value="">Todos · Acción</option>
+                {opcionesAccion.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </Select>
+              <label className={s.fecha}>
+                <span>Desde</span>
+                <DateInput
+                  aria-label="Desde"
+                  className={s.filtroFecha}
+                  controlSize="sm"
+                  value={fDesde}
+                  onChange={(e) => cambiaDesde(e.target.value)}
+                />
+              </label>
+              <label className={s.fecha}>
+                <span>Hasta</span>
+                <DateInput
+                  aria-label="Hasta"
+                  className={s.filtroFecha}
+                  controlSize="sm"
+                  value={fHasta}
+                  onChange={(e) => cambiaHasta(e.target.value)}
+                />
+              </label>
+            </ModuleToolbar>
+            <p className={s.nota}>
+              Usuario, entidad, acción y fechas los aplica el servidor sobre toda la bitácora. El
+              cuadro de texto solo filtra los {LIMITE} eventos de esta página; para buscar más
+              atrás, avanza de página o acota con las fechas.
+            </p>
+          </>
+        }
+        loading={loading && !sinSesion}
+        empty={sinSesion || (!loading && filtradas.length === 0)}
+        emptyState={
+          sinSesion ? (
+            {
+              icon: <LockOutlinedIcon />,
+              title: "Sin sesión",
+              description: "Vuelve a entrar con tu cuenta para consultar la bitácora.",
+              tone: "neutral",
+            }
+          ) : hayFiltros ? (
+            {
+              icon: <FilterAltOffOutlinedIcon />,
+              title: "Sin eventos con estos filtros",
+              description: busqueda.trim()
+                ? `Ningún evento de esta página contiene «${busqueda.trim()}». Recuerda que el texto solo filtra lo ya cargado: quita la búsqueda o cambia de página.`
+                : "No hay registros de auditoría con estos filtros. Amplía el rango de fechas o quita alguno.",
+              tone: "neutral",
+              action: <Button onClick={limpiarFiltros}>Limpiar filtros</Button>,
+            }
           ) : (
             /* Nada que configurar: la bitácora se escribe sola. Lo único que
                falta es que alguien haga algo en el sistema. */
@@ -541,54 +628,51 @@ export default function AuditoriaPage() {
               description="Nadie ha dado de alta, cambiado ni borrado nada que se anote aquí. No hay que encender nada: en cuanto se registre el primer movimiento, queda anotado con quién lo hizo, cuándo y qué cambió exactamente."
             />
           )
-        ) : (
-          <DataTable
-            columns={columns}
-            rows={filtradas}
-            rowKey={(r) => r.id}
-            density="compact"
-            ariaLabel="Auditoría contable"
-            onRowClick={(r) => {
-              setAbierta(r);
-              setSoloCambios(true);
-            }}
-          />
-        )}
-      </Section>
-
-      {!sinSesion && totalPaginas > 1 && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginTop: -8,
-            marginBottom: 20,
-            fontSize: 12,
-            color: "var(--text-secondary)",
+        }
+        footer={
+          !sinSesion && totalPaginas > 1 ? (
+            <ListFooter
+              end={
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={pagina <= 1 || loading}
+                    onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={pagina >= totalPaginas || loading}
+                    onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                  >
+                    Siguiente
+                  </Button>
+                </>
+              }
+            >
+              <span>
+                Página {pagina} de {totalPaginas}
+              </span>
+            </ListFooter>
+          ) : null
+        }
+      >
+        <DataTable
+          flush
+          columns={columns}
+          rows={filtradas}
+          rowKey={(r) => r.id}
+          density="compact"
+          ariaLabel="Auditoría contable"
+          onRowClick={(r) => {
+            setAbierta(r);
+            setSoloCambios(true);
           }}
-        >
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={pagina <= 1 || loading}
-            onClick={() => setPagina((p) => Math.max(1, p - 1))}
-          >
-            Anterior
-          </Button>
-          <span>
-            Página {pagina} de {totalPaginas}
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={pagina >= totalPaginas || loading}
-            onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-          >
-            Siguiente
-          </Button>
-        </div>
-      )}
+        />
+      </ListCard>
 
       <Modal
         open={!!abierta}
@@ -602,7 +686,7 @@ export default function AuditoriaPage() {
         }
         maxWidth={780}
         footer={
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <div className={s.pie}>
             <Button variant="ghost" onClick={() => setAbierta(null)}>
               Cerrar
             </Button>
@@ -610,16 +694,8 @@ export default function AuditoriaPage() {
         }
       >
         {abierta && (
-          <>
-            <dl
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-                gap: 10,
-                margin: "0 0 14px",
-                fontSize: 12.5,
-              }}
-            >
+          <div className={s.modalCuerpo}>
+            <dl className={s.datos}>
               {/* `userAgent` llegaba en cada evento y no se mostraba en ningún
                   sitio: en una bitácora, con qué equipo se hizo el cambio es
                   parte de la respuesta a «quién fue». */}
@@ -631,76 +707,31 @@ export default function AuditoriaPage() {
                 ["IP", abierta.ipAddress || "—"],
                 ["Equipo", abierta.userAgent || "—"],
               ].map(([k, v]) => (
-                <div key={k as string} style={{ minWidth: 0 }}>
-                  <dt style={{ color: "var(--text-tertiary)", fontSize: 11, textTransform: "uppercase" }}>{k}</dt>
-                  <dd
-                    style={{
-                      margin: "2px 0 0",
-                      fontWeight: 600,
-                      overflowWrap: "anywhere",
-                      // El `userAgent` puede traer 500 caracteres: se corta a
-                      // dos renglones y el completo queda en el título.
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
-                    title={typeof v === "string" ? v : undefined}
-                  >
-                    {v}
-                  </dd>
+                <div key={k as string}>
+                  <dt>{k}</dt>
+                  <dd title={typeof v === "string" ? v : undefined}>{v}</dd>
                 </div>
               ))}
             </dl>
 
             {!antes && (
-              <InlineAlert
-                variant="warning"
-                message="Este evento no guardó el estado anterior del registro, así que no hay comparación posible: abajo va solo lo que quedó registrado."
-              />
+              <Alert className={s.aviso} tone="warning" role="alert">
+                Este evento no guardó el estado anterior del registro, así que no hay comparación
+                posible: abajo va solo lo que quedó registrado.
+              </Alert>
             )}
 
             {antes && (
-              <div
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  marginBottom: 8,
-                  paddingBottom: 8,
-                  borderBottom: "1px solid var(--nx-panel-hairline, var(--border))",
-                }}
-              >
-                <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                  <strong
-                    style={{
-                      fontVariantNumeric: "tabular-nums",
-                      color: "var(--text-primary)",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {filas.filter((f) => f.cambio).length}
-                  </strong>{" "}
-                  de {filas.length} campos cambiaron
+              <div className={s.cambios}>
+                <span className={s.cuenta}>
+                  <strong>{filas.filter((f) => f.cambio).length}</strong> de {filas.length} campos
+                  cambiaron
                 </span>
-                <label
-                  style={{
-                    fontSize: 12.5,
-                    display: "flex",
-                    gap: 6,
-                    alignItems: "center",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={soloCambios}
-                    onChange={(e) => setSoloCambios(e.target.checked)}
-                  />
-                  Mostrar solo lo que cambió
-                </label>
+                <Checkbox
+                  checked={soloCambios}
+                  onChange={(e) => setSoloCambios(e.target.checked)}
+                  label="Mostrar solo lo que cambió"
+                />
               </div>
             )}
 
@@ -709,18 +740,22 @@ export default function AuditoriaPage() {
                  cuando sí los guardó y lo que pasaba es que ninguno cambió. */
               filas.length > 0 && soloCambios && antes ? (
                 <EmptyState
-                  variant="compact"
+                  size="compact"
+                  tone="neutral"
+                  icon={<DifferenceOutlinedIcon />}
                   title="Ningún campo cambió"
                   description={`El evento tocó el registro pero dejó los ${filas.length} campos igual. Desmarca «Mostrar solo lo que cambió» para verlos todos.`}
                   action={
-                    <Button size="sm" variant="secondary" onClick={() => setSoloCambios(false)}>
+                    <Button size="sm" onClick={() => setSoloCambios(false)}>
                       Ver todos los campos
                     </Button>
                   }
                 />
               ) : (
                 <EmptyState
-                  variant="compact"
+                  size="compact"
+                  tone="neutral"
+                  icon={<DifferenceOutlinedIcon />}
                   title="Sin datos del registro"
                   description="Este evento quedó anotado en la bitácora, pero no guardó el contenido del registro: no hay nada que comparar."
                 />
@@ -730,96 +765,27 @@ export default function AuditoriaPage() {
                  se escribe en tinta plena; lo que no cambió se apaga a gris.
                  Dos niveles de gris y un acento bastan para que el ojo caiga
                  solo en los renglones que importan. */
-              <div
-                style={{
-                  overflowX: "auto",
-                  border: "1px solid var(--nx-panel-hairline, var(--border))",
-                  borderRadius: 10,
-                }}
-              >
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontSize: 12.5,
-                    minWidth: 420,
-                  }}
-                >
+              <div className={s.diffMarco}>
+                <table className={s.diff}>
                   <thead>
                     <tr>
                       {["Campo", "Antes", "Después"].map((h) => (
-                        <th
-                          key={h}
-                          scope="col"
-                          style={{
-                            textAlign: "left",
-                            padding: "8px 12px",
-                            borderBottom: "1px solid var(--nx-panel-hairline, var(--border))",
-                            color: "var(--text-tertiary)",
-                            fontSize: 11,
-                            fontWeight: 600,
-                            letterSpacing: "0.05em",
-                            width: h === "Campo" ? "22%" : "39%",
-                          }}
-                        >
+                        <th key={h} scope="col" className={h === "Campo" ? s.colCampo : s.colValor}>
                           {h}
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {visibles.map((f, i) => {
+                    {visibles.map((f) => {
                       const cambio = f.cambio && !!antes;
-                      const borde =
-                        i === 0
-                          ? undefined
-                          : "1px solid var(--nx-panel-hairline, var(--border))";
                       return (
-                        <tr key={f.campo}>
-                          <th
-                            scope="row"
-                            style={{
-                              textAlign: "left",
-                              padding: "8px 12px 8px 9px",
-                              borderTop: borde,
-                              borderLeft: cambio
-                                ? "3px solid var(--state-warning-text, #b45309)"
-                                : "3px solid transparent",
-                              fontWeight: cambio ? 600 : 400,
-                              color: cambio ? "var(--text-primary)" : "var(--text-tertiary)",
-                              verticalAlign: "top",
-                              wordBreak: "break-word",
-                            }}
-                          >
+                        <tr key={f.campo} data-cambio={cambio ? "true" : undefined}>
+                          <th scope="row">
                             <span title={f.campo}>{auditFieldLabel(f.campo)}</span>
                           </th>
-                          <td
-                            style={{
-                              padding: "8px 12px",
-                              borderTop: borde,
-                              color: cambio ? "var(--text-secondary)" : "var(--text-tertiary)",
-                              textDecoration: cambio ? "line-through" : undefined,
-                              textDecorationColor: "var(--text-tertiary)",
-                              whiteSpace: "pre-wrap",
-                              wordBreak: "break-word",
-                              verticalAlign: "top",
-                            }}
-                          >
-                            {antes ? texto(f.antes) : "—"}
-                          </td>
-                          <td
-                            style={{
-                              padding: "8px 12px",
-                              borderTop: borde,
-                              color: cambio ? "var(--text-primary)" : "var(--text-tertiary)",
-                              fontWeight: cambio ? 600 : 400,
-                              whiteSpace: "pre-wrap",
-                              wordBreak: "break-word",
-                              verticalAlign: "top",
-                            }}
-                          >
-                            {texto(f.despues)}
-                          </td>
+                          <td>{antes ? texto(f.antes) : "—"}</td>
+                          <td>{texto(f.despues)}</td>
                         </tr>
                       );
                     })}
@@ -829,27 +795,14 @@ export default function AuditoriaPage() {
             )}
 
             {contextoHttp(abierta) && (
-              <details style={{ marginTop: 12 }}>
-                <summary style={{ cursor: "pointer", fontSize: 12.5, color: "var(--text-secondary)" }}>
-                  Contexto técnico de la petición
-                </summary>
-                <pre
-                  style={{
-                    fontSize: 11.5,
-                    background: "var(--surface-2)",
-                    padding: "8px 10px",
-                    borderRadius: 8,
-                    overflowX: "auto",
-                    margin: "6px 0 0",
-                  }}
-                >
-                  {JSON.stringify(contextoHttp(abierta), null, 2)}
-                </pre>
+              <details className={s.tecnico}>
+                <summary>Contexto técnico de la petición</summary>
+                <pre>{JSON.stringify(contextoHttp(abierta), null, 2)}</pre>
               </details>
             )}
-          </>
+          </div>
         )}
       </Modal>
-    </>
+    </MesaPagina>
   );
 }

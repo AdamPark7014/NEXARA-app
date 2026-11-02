@@ -1,0 +1,218 @@
+/* Facturación CFDI · lista y piezas compartidas con la ficha. Solo tokens --ui-*: claro y oscuro salen solos. */
+
+/* ─── Avisos y cifras ──────────────────────────────────────────────────── */
+
+.cifras {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+/* Los avisos van pegados entre sí; el aire hacia las cifras lo da `.cifras`. */
+.avisos {
+  display: grid;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.avisos:empty {
+  display: none;
+}
+
+.avisos > * {
+  margin-bottom: 0;
+}
+
+.avisoAcciones {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s1);
+}
+
+/* ─── Barra de herramientas de la lista ────────────────────────────────── */
+
+.filtroTipo {
+  flex: 0 1 170px;
+  width: auto;
+}
+
+.filtroEstado {
+  flex: 0 1 180px;
+  width: auto;
+}
+
+.nota {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.nota strong {
+  font-weight: 600;
+  color: var(--ui-fg-2);
+}
+
+.conteo {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ─── Celdas de la tabla ───────────────────────────────────────────────── */
+
+.celda {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.celdaDer {
+  align-items: flex-end;
+}
+
+.folio {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-brand-text);
+  text-decoration: none;
+}
+
+.folio:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.folio:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+  border-radius: var(--ui-radius-xs);
+}
+
+.nombre {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg);
+}
+
+.sub {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.subAviso {
+  color: var(--ui-warning-text);
+}
+
+.subAlerta {
+  color: var(--ui-danger-text);
+}
+
+.fecha {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.acciones {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+/* ─── Folio y UUID copiables ───────────────────────────────────────────── */
+
+.ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.refCodigo {
+  font-size: var(--ui-text-xs);
+  letter-spacing: 0.01em;
+}
+
+.refBoton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  border-radius: var(--ui-radius-xs);
+  background: transparent;
+  color: var(--ui-fg-3);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.refBoton:hover {
+  color: var(--ui-fg);
+}
+
+.refBoton:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+.refBotonListo,
+.refBotonListo:hover {
+  color: var(--ui-success-text);
+}
+
+/* ─── Pie con los metadatos de configuración ───────────────────────────── */
+
+.pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: var(--ui-text-xs);
+  line-height: 1.5;
+  color: var(--ui-fg-3);
+}
+
+/* ─── Dentro de los modales ────────────────────────────────────────────── */
+
+.emisor {
+  margin: 0 0 var(--ui-s3);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.avisoModal {
+  margin-bottom: var(--ui-s3);
+}
+
+.errorModal {
+  margin-top: var(--ui-s3);
+}
+
+.errorModal > * {
+  margin-bottom: 0;
+}
+
+.resumenPago {
+  margin: 0 0 var(--ui-s3);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+.casilla {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}

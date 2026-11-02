@@ -298,7 +298,7 @@ export default function EstadosFinancierosPage() {
   return (
     <div className={m.page}>
       <MesaEncabezado eyebrow="Finanzas · Mesa contable" titulo="Estados financieros" junto={junto} acciones={acciones} />
-      <ContabilidadSidebar enPagina />
+      <ContabilidadSidebar />
 
       <div className={m.stateTabs}>
         <div role="tablist" aria-label="Estado" className={m.stateTabList}>
@@ -351,7 +351,7 @@ export default function EstadosFinancierosPage() {
         </Alert>
       ) : null}
 
-      <div id="panel-estados" role="tabpanel" aria-labelledby={vista === "balance" ? "tab-balance" : "tab-resultados"} aria-busy={cargando || undefined} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <div id="panel-estados" role="tabpanel" aria-labelledby={vista === "balance" ? "tab-balance" : "tab-resultados"} aria-busy={cargando || undefined} className={m.panelEstados}>
         {vista === "resultados" ? (
           <VistaResultados
             res={cargando ? null : res}
@@ -424,8 +424,7 @@ function Agrupador({ agrupador, cuentaId, nombre, onAsignar }: { agrupador: stri
   return (
     <button
       type="button"
-      className={cx(m.btn, m.btnTiny, m.btnWarn)}
-      style={{ minHeight: 28, padding: "0 9px" }}
+      className={cx(m.btn, m.btnTiny, m.btnWarn, m.btnAsignar)}
       onClick={() => onAsignar({ cuentaId, nombre })}
       aria-label={`Asignar código agrupador a ${nombre}`}
     >
@@ -494,7 +493,7 @@ function VistaResultados({
       ) : null}
 
       <div className={m.split}>
-        <section aria-label="Estado de resultados" className={m.cardList} style={{ flex: "3 1 620px" }}>
+        <section aria-label="Estado de resultados" className={cx(m.cardList, m.splitMainEstados)}>
           {cargando || !res ? (
             <SkeletonRows rows={10} label="Armando el estado de resultados" />
           ) : vacio ? (
@@ -510,7 +509,7 @@ function VistaResultados({
               }
             />
           ) : (
-            <table className={cx(m.table, m.tableEstado)} style={{ minWidth: 720 }}>
+            <table className={cx(m.table, m.tableEstado, m.minW720)}>
               <caption className={m.srOnly}>
                 Estado de resultados de {res.periodo.etiqueta} comparado con {res.comparado.etiqueta}
               </caption>
@@ -555,7 +554,7 @@ function VistaResultados({
           )}
         </section>
 
-        <aside className={m.splitAside} style={{ flex: "1 1 280px" }}>
+        <aside className={cx(m.splitAside, m.splitAsideEstados)}>
           {res && !vacio && res.margenes.length ? (
             <section aria-label="Margen neto por mes" className={cx(m.card, m.cardPad)}>
               <h2 className={m.cardTitle}>Margen neto por mes</h2>
@@ -577,7 +576,7 @@ function VistaResultados({
           ) : null}
 
           {res ? (
-            <section aria-label={tituloCierre(res.periodo.etiqueta, periodo)} className={cx(m.card, m.cardPad)} style={{ gap: 12 }}>
+            <section aria-label={tituloCierre(res.periodo.etiqueta, periodo)} className={cx(m.card, m.cardPad, m.cardPadTight)}>
               <h2 className={m.cardTitle}>{tituloCierre(res.periodo.etiqueta, periodo)}</h2>
               <ul className={m.checks}>
                 <li>
@@ -614,7 +613,7 @@ function VistaResultados({
                   <span>{res.cierre.polizasCuadradas ? "Pólizas cuadradas: debe = haber" : "Hay pólizas que no cuadran: debe ≠ haber"}</span>
                 </li>
               </ul>
-              <Link href="/erp/contabilidad/cierres" className={m.btn} style={{ alignSelf: "flex-start" }}>
+              <Link href="/erp/contabilidad/cierres" className={cx(m.btn, m.alineaInicio)}>
                 Ir a cerrar el mes
               </Link>
             </section>
@@ -663,7 +662,7 @@ function SeccionResultados({ s, onAsignar }: { s: EstadoResultados["secciones"][
           <td />
           <td className={m.r}>{cifra(s.total.actual)}</td>
           <td className={m.r}>{pctIngresos(s.total.pctIngresos)}</td>
-          <td className={m.r} data-tinta="muted" style={{ fontWeight: 400 }}>
+          <td className={cx(m.r, m.regular)} data-tinta="muted">
             {cifra(s.total.anterior)}
           </td>
           <td className={m.r} data-tinta={tintaVariacion(tonoVariacion(s.clave, s.total.variacionPct, true))}>
@@ -785,7 +784,7 @@ function TablaBalance({
   onAsignar: (c: CuentaPorAsignar) => void;
 }) {
   return (
-    <table className={cx(m.table, m.tableBalance)} style={{ minWidth: 420 }}>
+    <table className={cx(m.table, m.tableBalance, m.minW420)}>
       <caption className={m.srOnly}>{caption}</caption>
       <thead>
         <tr>

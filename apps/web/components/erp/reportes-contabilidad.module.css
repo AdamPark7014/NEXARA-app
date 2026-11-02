@@ -1,0 +1,94 @@
+/* Piezas compartidas de los reportes contables (reportes y presupuestos).
+   Solo tokens --ui-*: claro y oscuro (body.dark) salen de los tokens. */
+
+.vacio {
+  color: var(--ui-fg-3);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Variación contra el presupuesto ─────────────────────────────────── */
+
+.variacion {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ui-fg);
+  white-space: nowrap;
+}
+
+/* Por encima de lo presupuestado: rojo apagado. Por debajo se queda en el color del texto. */
+.variacionAlta {
+  color: var(--ui-danger-text);
+}
+
+.variacionPct {
+  margin-left: 6px;
+  font-weight: 500;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Totales bajo la tabla (pie de la tarjeta de lista) ──────────────── */
+
+.totales {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--ui-s2) var(--ui-s5);
+  padding: var(--ui-s3) 20px;
+  border-top: 1px solid var(--ui-border-subtle);
+  background: var(--ui-surface-2);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg);
+}
+
+.totalRotulo {
+  margin-right: auto;
+  font-weight: 700;
+  color: var(--ui-fg-2);
+}
+
+.totalItem {
+  white-space: nowrap;
+}
+
+.totalEtiqueta {
+  margin-right: 6px;
+  color: var(--ui-fg-3);
+}
+
+/* ─── Detalle de una línea (dentro del modal) ─────────────────────────── */
+
+.estado {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+.totalLinea {
+  margin-top: var(--ui-s3);
+  text-align: right;
+  font-size: var(--ui-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.totalLineaRotulo {
+  margin-right: var(--ui-s2);
+  color: var(--ui-fg-2);
+}
+
+.nota {
+  margin: var(--ui-s2) 0 0;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+@media (max-width: 640px) {
+  .totales {
+    justify-content: flex-start;
+    padding: var(--ui-s3);
+  }
+}

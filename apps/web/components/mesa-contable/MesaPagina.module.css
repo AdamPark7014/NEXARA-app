@@ -1,0 +1,12 @@
+/* Marco de la Mesa contable: encabezado, chips y contenido con el mismo aire en cada pantalla. */
+
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.pagina > .cabeza {
+  margin-bottom: 0;
+}

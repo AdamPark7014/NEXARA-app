@@ -304,8 +304,13 @@
   flex: 0 0 auto;
 }
 
+.stats > .stat {
+  container-type: inline-size;
+}
+
+/* Una cifra de dinero no se corta: en una tarjeta angosta baja de tamaño antes que perder dígitos. */
 .statValue {
-  font-size: var(--ui-fs-stat, 28px);
+  font-size: min(var(--ui-fs-stat, 28px), 12cqi);
   font-weight: var(--ui-fw-stat, 650);
   line-height: var(--ui-lh-stat, 1.05);
   letter-spacing: var(--ui-tracking-stat, -0.025em);
@@ -319,7 +324,7 @@
 
 .statCompact .statValue {
   font-family: var(--ui-font-display);
-  font-size: 28px;
+  font-size: min(28px, 12cqi);
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.025em;
@@ -469,17 +474,14 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--ui-s3);
   }
-  .statsStrip {
-    gap: 0;
-  }
   .stat {
     padding: var(--ui-s3) var(--ui-s4);
   }
   .statValue {
-    font-size: 22px;
+    font-size: min(22px, 12cqi);
   }
   .statCompact .statValue {
-    font-size: 18px;
+    font-size: min(18px, 12cqi);
   }
   .spark {
     display: none;

@@ -1,0 +1,457 @@
+/* Viáticos (Finanzas): pantalla, formularios y piezas de `_parts.tsx`. Solo tokens --ui-*: claro y oscuro salen solos. */
+
+/* ─── Cabeza de la pantalla: avisos y cifras ───────────────────────────── */
+
+.cabecera {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+/* El aviso base trae un margen inferior propio; aquí el espacio lo pone la rejilla. */
+.cabecera > [data-tone],
+.completo > [data-tone],
+.nota > [data-tone] {
+  margin-bottom: 0;
+}
+
+/* ─── Barra de la lista ────────────────────────────────────────────────── */
+
+.conteo {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fecha {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+}
+
+.fechaInput {
+  flex: 0 1 160px;
+  width: auto;
+}
+
+/* Dentro de un campo de formulario: dos fechas que bajan de renglón en teléfono. */
+.fechaCampo {
+  flex: 1 1 150px;
+  width: auto;
+}
+
+/* ─── Primera carga ────────────────────────────────────────────────────── */
+
+.cargando {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s4) 0;
+}
+
+.cargandoTexto {
+  margin: 0;
+  text-align: center;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Tabla ────────────────────────────────────────────────────────────── */
+
+.celdaConcepto {
+  min-width: 0;
+}
+
+.concepto {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: var(--ui-text-xs);
+  line-height: 1.35;
+  color: var(--ui-fg-3);
+}
+
+.metaAviso {
+  color: var(--ui-danger-text);
+}
+
+.enlace {
+  color: var(--ui-brand-text);
+  text-decoration: none;
+}
+
+.enlace:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.fechaCelda {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+  white-space: nowrap;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s1);
+}
+
+/* En móvil las acciones bajan bajo el concepto y se alinean con él. */
+.accionesEnCelda {
+  justify-content: flex-start;
+  margin-top: var(--ui-s2);
+}
+
+/* ─── Formularios (ventanas) ───────────────────────────────────────────── */
+
+.completo {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.monto {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.periodoFechas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.etiqueta {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  color: var(--ui-fg-2);
+}
+
+.resumen {
+  padding-top: var(--ui-s3);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.frase {
+  margin: 0 0 var(--ui-s2);
+  font-size: var(--ui-text-base);
+  line-height: 1.4;
+  color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.errorCampo {
+  margin-top: 6px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-danger-text);
+}
+
+.folioContable {
+  grid-column: 1 / -1;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.nota {
+  min-width: 0;
+}
+
+/* ─── Revisar un viático ───────────────────────────────────────────────── */
+
+.revisionCabeza {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  padding-bottom: var(--ui-s3);
+  margin-bottom: var(--ui-s3);
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+
+.revisionTexto {
+  min-width: 0;
+}
+
+.revisionImporte {
+  font-size: var(--ui-text-lg);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.repartos {
+  display: grid;
+  gap: var(--ui-s1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reparto {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  font-size: var(--ui-text-sm);
+}
+
+.repartoActividad {
+  color: var(--ui-fg-2);
+}
+
+.repartoMonto {
+  font-variant-numeric: tabular-nums;
+}
+
+.opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* La opción elegida toma el color de marca; el resto queda en gris. */
+.opciones > .opcionActiva {
+  border-color: var(--ui-brand);
+  color: var(--ui-brand-text);
+}
+
+.comprobar {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.comprobarCampo {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.comprobar > button {
+  white-space: nowrap;
+}
+
+/* ─── Análisis: desgloses ──────────────────────────────────────────────── */
+
+.desgloses {
+  display: grid;
+  min-width: 0;
+}
+
+.desglose {
+  min-width: 0;
+  padding-bottom: var(--ui-s2);
+}
+
+.desglose + .desglose {
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.desgloseTitulo {
+  margin: 0;
+  padding: var(--ui-s4) var(--ui-s4) var(--ui-s2);
+  font-size: var(--ui-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.desgloseNota {
+  margin: 0;
+  padding: var(--ui-s2) var(--ui-s4) var(--ui-s1);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.sinDatos {
+  margin: 0;
+  padding: var(--ui-s2) var(--ui-s4) var(--ui-s3);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Reparto entre actividades ────────────────────────────────────────── */
+
+.repartoEditor {
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.repartoFila {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--ui-s2);
+  align-items: center;
+}
+
+.repartoPie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.pista {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Selector de varios ───────────────────────────────────────────────── */
+
+.selector {
+  display: grid;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.fichas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Un solo borde, el de un control: nada de caja dentro de caja. */
+.listaOpciones {
+  max-height: 176px;
+  overflow-y: auto;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+}
+
+.opcion {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-s2);
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+
+.opcion + .opcion {
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.opcion:hover:not(:disabled) {
+  background: var(--ui-hover);
+}
+
+.opcion:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: -2px;
+}
+
+.opcion:disabled {
+  cursor: not-allowed;
+  color: var(--ui-fg-4);
+}
+
+/* Lo elegido se marca con la palomita y la superficie hundida, no con color. */
+.opcion[aria-pressed="true"] {
+  background: var(--ui-surface-2);
+}
+
+.opcionMarca {
+  flex: 0 0 12px;
+  width: 12px;
+  color: var(--ui-brand-text);
+}
+
+.opcionTexto {
+  min-width: 0;
+}
+
+.opcionNombre {
+  display: block;
+}
+
+.opcionDetalle {
+  display: block;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.selectorVacio {
+  padding: 10px 12px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.selectorNota {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Anticipo y cadena de autorización ────────────────────────────────── */
+
+.cifrasAnticipo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2) 18px;
+  margin-bottom: 6px;
+  font-size: var(--ui-text-sm);
+}
+
+.cifrasAnticipo strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.cadena {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cadenaItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-s2);
+  font-size: var(--ui-text-xs);
+  line-height: 1.45;
+  color: var(--ui-fg-2);
+}
+
+.cadenaItem > :first-child {
+  flex: 0 0 auto;
+}
+
+.cadenaTexto {
+  min-width: 0;
+}
+
+.cadenaNota {
+  display: block;
+  color: var(--ui-fg-3);
+}
+
+.cadenaVacia {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}

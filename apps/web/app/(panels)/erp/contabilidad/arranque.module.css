@@ -1,0 +1,91 @@
+/* Puesta en marcha del escritorio contable. Solo tokens --ui-*. */
+
+.pasos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.paso {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 20px;
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.paso:first-child {
+  border-top: 0;
+}
+
+.numero {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+  font-size: var(--ui-text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.paso[data-hecho="true"] .numero {
+  background: var(--ui-success-bg);
+  color: var(--ui-success-text);
+}
+
+.pasoTexto {
+  min-width: 0;
+}
+
+.pasoTitulo {
+  font-size: var(--ui-text-base);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.paso[data-hecho="true"] .pasoTitulo {
+  font-weight: 500;
+  color: var(--ui-fg-2);
+}
+
+.pasoPorque {
+  margin: 2px 0 0;
+  font-size: var(--ui-text-sm);
+  line-height: 1.45;
+  color: var(--ui-fg-3);
+}
+
+.pasoAccion {
+  white-space: nowrap;
+}
+
+.pasoAjeno {
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+  color: var(--ui-fg-3);
+}
+
+.accionesVacio {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s3);
+  align-items: center;
+  justify-content: center;
+}
+
+/* En teléfono la acción baja a su renglón, alineada con el texto. */
+@media (max-width: 560px) {
+  .paso {
+    grid-template-columns: 32px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .pasoAccion {
+    grid-column: 2;
+    white-space: normal;
+  }
+}

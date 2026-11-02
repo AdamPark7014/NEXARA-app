@@ -1,30 +1,52 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
+import RuleOutlinedIcon from "@mui/icons-material/RuleOutlined";
+import SavingsOutlinedIcon from "@mui/icons-material/SavingsOutlined";
+import SwapHorizOutlinedIcon from "@mui/icons-material/SwapHorizOutlined";
+import TrendingDownOutlinedIcon from "@mui/icons-material/TrendingDownOutlined";
 import { todayStamp } from "@/components/finance/download";
-import s from "./banking.module.css";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import StatusDot from "@/components/ui/StatusDot";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import InlineAlert from "@/components/ui/InlineAlert";
 import {
-  FinanceField,
-  FinanceFormGrid,
-  financeInputStyle,
-} from "@/components/finance/FinanceModuleShell";
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  DataTable,
+  DateInput,
+  EmptyState,
+  Field,
+  FieldGrid,
+  Input,
+  LinkButton,
+  ModuleToolbar,
+  SearchInput,
+  Select,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  type Column,
+} from "@/components/base";
+import { Money } from "@/components/ui/DataTable";
+import { FinanceModuleShell } from "@/components/finance/FinanceModuleShell";
 import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
-import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import Modal from "@/components/ui/Modal";
 import FinanceModuleRail from "@/components/erp/FinanceModuleRail";
+import s from "./banking.module.css";
+
 
 interface BankAccount {
   id: number;
@@ -214,7 +236,8 @@ export default function BankingPage() {
     [accounts],
   );
 
-  const metrics: Metric[] = useMemo(() => {
+  /** Conteos de la tira de cifras; los textos que dependen de la cuenta elegida se arman al pintar. */
+  const resumen = useMemo(() => {
     const activas = accounts.filter((a) => a.isActive).length;
     const inactivas = accounts.length - activas;
     const negativas = accounts.filter((a) => Number(a.currentBalance) < 0).length;
@@ -222,41 +245,9 @@ export default function BankingPage() {
       ? accounts.reduce((max, a) => (Number(a.currentBalance) > Number(max.currentBalance) ? a : max), accounts[0])
       : null;
     const porConciliar = txs.filter((t) => t.reconciliationStatus !== "MATCHED").length;
-    return [
-      {
-        label: "Saldo total",
-        value: <Money value={totalBalance} compact bold={false} />,
-        hint: `${accounts.length} cuenta${accounts.length === 1 ? "" : "s"} registrada${accounts.length === 1 ? "" : "s"}`,
-        tone: totalBalance < 0 ? "danger" : "default",
-      },
-      {
-        label: "Cuentas activas",
-        value: activas,
-        hint: inactivas > 0 ? `${inactivas} inactiva${inactivas === 1 ? "" : "s"}` : "ninguna inactiva",
-      },
-      {
-        label: "En negativo",
-        value: negativas,
-        hint: negativas > 0 ? "saldo por debajo de cero" : "sin cuentas sobregiradas",
-        tone: negativas > 0 ? "danger" : "default",
-      },
-      {
-        label: "Más líquida",
-        value: <span style={{ fontSize: 15 }}>{masLiquida?.name ?? "—"}</span>,
-        hint: masLiquida ? masLiquida.bankName : "sin cuentas",
-      },
-      {
-        label: "Por conciliar",
-        value: porConciliar,
-        hint: !selected
-          ? "selecciona una cuenta"
-          : txParcial
-            ? `de los ${txParcial.cargadas} movimientos cargados de ${txParcial.total}`
-            : `movimientos de ${selected.name}`,
-        tone: porConciliar > 0 ? "warning" : "default",
-      },
-    ];
-  }, [accounts, txs, totalBalance, selected, txParcial]);
+    return { activas, inactivas, negativas, masLiquida, porConciliar };
+  }, [accounts, txs]);
+
 
   const openNewAccount = () => { setEditingAccount(null); setForm({ ...emptyForm }); setFormErr(null); setShowForm(true); };
   const openEditAccount = (a: BankAccount) => {
@@ -376,13 +367,11 @@ export default function BankingPage() {
     });
   };
 
-  const inp = financeInputStyle;
-
   const txColumns: Column<BankTransaction>[] = [
     {
       key: "transactionDate", label: "Fecha", width: 100,
       render: (t) => (
-        <span style={{ fontSize: 12, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
+        <span className={s.fecha}>
           {new Date(t.transactionDate).toLocaleDateString("es-MX")}
         </span>
       ),
@@ -392,12 +381,12 @@ export default function BankingPage() {
       render: (t) => {
         const contexto = [t.counterpartyName, t.concept].filter(Boolean).join(" · ");
         return (
-          <div>
-            <div style={{ fontSize: 13 }}>{t.description}</div>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+          <div className={s.concepto}>
+            <span className={s.conceptoTexto}>{t.description}</span>
+            <span className={s.conceptoSub}>
               {t.isDebit ? "Cargo" : "Abono"}
               {contexto ? ` · ${contexto}` : ""}
-            </div>
+            </span>
           </div>
         );
       },
@@ -407,7 +396,7 @@ export default function BankingPage() {
       // cien movimientos, el color por tipo deja de señalar nada.
       key: "amount", label: "Monto", numeric: true, width: 140,
       render: (t) => (
-        <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+        <span className={s.monto}>
           {t.isDebit ? "−" : ""}
           <Money value={Number(t.amount)} bold={false} />
         </span>
@@ -417,217 +406,333 @@ export default function BankingPage() {
       key: "reconciliationStatus", label: "Estado", width: 120,
       render: (t) => (
         t.reconciliationStatus === "MATCHED"
-          ? <StatusDot label="Conciliado" tone="neutral" title="Cruzado contra un movimiento contable" />
-          : <StatusDot label="Por conciliar" tone="warning" title="Todavía no se cruza con la contabilidad" />
+          ? <Badge dot size="sm" tone="neutral" title="Cruzado contra un movimiento contable">Conciliado</Badge>
+          : <Badge dot size="sm" tone="warning" title="Todavía no se cruza con la contabilidad">Por conciliar</Badge>
       ),
     },
     ...(cfg.canApprove ? [{
-      key: "acciones" as keyof BankTransaction, label: "",
-      render: (t: BankTransaction) => t.reconciliationStatus !== "MATCHED" ? <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); void reconcile(t); }}>Conciliar</Button> : null,
+      key: "acciones",
+      label: "",
+      render: (t: BankTransaction) => t.reconciliationStatus !== "MATCHED" ? <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void reconcile(t); }}>Conciliar</Button> : null,
       width: 110,
     }] : []),
   ];
 
+  const hayFiltrosTx = txSearch.trim().length > 0 || txFilterType !== "";
+  const sinCuentas = !loading && !error && accounts.length === 0;
+  const mostrarCuentas = accounts.length > 0 || loading || !error;
+  const hayAvisos = Boolean(error);
+
+  const exportarMovimientos = () => {
+    if (!selected) return;
+    exportToExcel(visibleTxs, [
+      { key: "transactionDate", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
+      { key: "description", label: "Descripción" },
+      { key: "counterpartyName", label: "Contraparte" },
+      { key: "amount", label: "Monto" },
+      { key: "isDebit", label: "Tipo", format: (v) => v ? "Cargo" : "Abono" },
+      { key: "reconciliationStatus", label: "Estado", format: (v) => RECONCILIATION_LABEL[String(v ?? "")] ?? "Por conciliar" },
+    ], `movimientos-${selected.name.toLowerCase().replace(/\s+/g, "-")}`);
+  };
+
   return (
     <>
-      <PageHeader
-        title="Bancos"
-        backHref="/erp/contabilidad"
-        backLabel="Contabilidad"
-        density="ops"
-        actions={
+      {/* Cabeza → rail → avisos → cifras → tarjetas. El «volver» a Contabilidad queda en el eyebrow:
+          el marco no trae enlace propio. Un solo botón primario: en la cabeza, o en el vacío si no hay cuentas. */}
+      <FinanceModuleShell
+        variant="flat"
+        eyebrow={
           <>
-            <Button size="sm" variant="ghost" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && <Button size="sm" variant="secondary" iconLeft="+" onClick={openNewAccount}>Nueva cuenta</Button>}
+            Finanzas
+            <span aria-hidden="true">·</span>
+            <Link href="/erp/contabilidad" className={s.volver}>Contabilidad</Link>
           </>
         }
-      />
-      <FinanceModuleRail />
-
-      {accounts.length > 0 && (
-        <div style={{ marginBottom: 18 }}>
-          <MetricStrip metrics={metrics} ariaLabel="Resumen de bancos" />
-        </div>
-      )}
-
-      {loading && accounts.length === 0 && (
-        <p className={s.frase} role="status">Cargando cuentas.</p>
-      )}
-      {!loading && error && accounts.length === 0 && (
-        <InlineAlert
-          variant="danger"
-          message={error}
-          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
-        />
-      )}
-      {error && accounts.length > 0 && (
-        <InlineAlert
-          variant="warning"
-          message={
-            error === CUENTAS_SIN_CARGAR
-              ? "No se pudo actualizar; se muestran los saldos anteriores."
-              : `No se pudo actualizar; se muestran los saldos anteriores. ${error}`
-          }
-          onDismiss={() => setError(null)}
-          action={
-            <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
-              {loading ? "Reintentando…" : "Reintentar"}
-            </Button>
-          }
-        />
-      )}
-
-      {(accounts.length > 0 || (!loading && !error)) && (
-        <>
-          <Section title="Cuentas">
-            {accounts.length === 0 && (
-              <p className={s.frase} role="status">No hay cuentas.</p>
+        title="Bancos"
+        rail={<FinanceModuleRail />}
+        actions={
+          <>
+            <Button variant="ghost" onClick={() => void load()}>Actualizar</Button>
+            {cfg.canCreate && !sinCuentas && (
+              <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={openNewAccount}>Nueva cuenta</Button>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 10 }}>
-              {accounts.map((a) => {
-                const saldo = Number(a.currentBalance);
-                const share = totalBalance > 0 ? (saldo / totalBalance) * 100 : null;
-                const isSelected = selected?.id === a.id;
-                return (
-                  <div key={a.id} style={{ position: "relative" }}>
-                    <button
-                      type="button"
-                      onClick={() => setSelected(a)}
-                      aria-pressed={isSelected}
-                      className="nx-bank-card"
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "12px 14px",
-                        borderRadius: 10,
-                        cursor: "pointer",
-                        font: "inherit",
-                        border: "1px solid var(--nx-panel-hairline, var(--border))",
-                        borderLeft: `3px solid ${isSelected ? "var(--primary)" : "transparent"}`,
-                        background: isSelected ? "var(--surface-2, var(--surface))" : "var(--surface)",
-                      }}
-                    >
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{a.name}</div>
-                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 8 }}>
-                        {a.bankName} · {a.clabe ?? a.accountNumber} · {a.currency}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 20,
-                          fontWeight: 600,
-                          fontVariantNumeric: "tabular-nums",
-                          lineHeight: 1.15,
-                          color: saldo < 0 ? "var(--state-danger-text)" : "var(--text-primary)",
-                        }}
-                      >
-                        <Money value={saldo} bold={false} />
-                      </div>
-                      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 4 }}>
-                        {share !== null && (
-                          <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{share.toFixed(0)}% del total</span>
-                        )}
-                        {!a.isActive && <StatusDot label="Inactiva" tone="neutral" />}
-                      </div>
-                    </button>
-                    {cfg.canCreate && (
-                      <button
-                        type="button"
-                        onClick={() => openEditAccount(a)}
-                        title="Editar cuenta"
-                        aria-label={`Editar ${a.name}`}
-                        className="nx-bank-edit"
-                        style={{ position: "absolute", top: 6, right: 6, width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)" }}
-                      >
-                        ✎
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </Section>
+          </>
+        }
+        kpis={
+          hayAvisos || accounts.length > 0 ? (
+            <div className={s.cifras}>
+              <div className={s.avisos}>
+                {!loading && error && accounts.length === 0 && (
+                  <Alert
+                    tone="danger"
+                    role="alert"
+                    action={<Button size="sm" onClick={() => void load()}>Reintentar</Button>}
+                  >
+                    {error}
+                  </Alert>
+                )}
+                {error && accounts.length > 0 && (
+                  <Alert
+                    tone="warning"
+                    role="alert"
+                    onDismiss={() => setError(null)}
+                    action={
+                      <Button size="sm" onClick={() => void load()} disabled={loading}>
+                        {loading ? "Reintentando…" : "Reintentar"}
+                      </Button>
+                    }
+                  >
+                    {error === CUENTAS_SIN_CARGAR
+                      ? "No se pudo actualizar; se muestran los saldos anteriores."
+                      : `No se pudo actualizar; se muestran los saldos anteriores. ${error}`}
+                  </Alert>
+                )}
+              </div>
 
-          {selected && (
-            <Section
-              title={loadingTx ? "Cargando movimientos…" : `Movimientos · ${selected.name}`}
-              actions={cfg.canCreate ? (
-                <Button variant="secondary" size="sm" iconLeft="+" onClick={() => setShowTxForm(true)}>Registrar movimiento</Button>
-              ) : undefined}
-            >
-              <FilterToolbar
-                search={{ value: txSearch, onChange: setTxSearch, placeholder: "Buscar por descripción o contraparte…" }}
-                selects={[{
-                  label: "Tipo",
-                  value: txFilterType,
-                  onChange: setTxFilterType,
-                  options: [
-                    { value: "debit", label: "Cargo" },
-                    { value: "credit", label: "Abono" },
-                  ],
-                  allowAll: true,
-                }]}
-                onClear={() => { setTxSearch(""); setTxFilterType(""); }}
-                resultCount={loadingTx ? null : visibleTxs.length}
-                rightActions={txs.length > 0 ? (
-                  <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleTxs, [
-                    { key: "transactionDate", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
-                    { key: "description", label: "Descripción" },
-                    { key: "counterpartyName", label: "Contraparte" },
-                    { key: "amount", label: "Monto" },
-                    { key: "isDebit", label: "Tipo", format: (v) => v ? "Cargo" : "Abono" },
-                    { key: "reconciliationStatus", label: "Estado", format: (v) => RECONCILIATION_LABEL[String(v ?? "")] ?? "Por conciliar" },
-                  ], `movimientos-${selected.name.toLowerCase().replace(/\s+/g, "-")}`)}>Excel</Button>
-                ) : undefined}
-              />
-              {loadingTx && txs.length === 0
-                ? <div aria-busy="true" style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando movimientos…</div>
-                : txError
-                  ? <InlineAlert variant="danger" message={txError} action={<Button size="sm" variant="secondary" onClick={() => setTxReload((n) => n + 1)}>Reintentar</Button>} />
-                  : (
-                    <>
-                      {txParcial && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "0 0 12px" }}>
-                          <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
-                            Se muestran {txParcial.cargadas} de {txParcial.total} movimientos; la búsqueda y los filtros solo miran los cargados.
-                          </p>
-                          <Button size="sm" variant="secondary" onClick={() => setTxTandas((n) => n + 1)} disabled={loadingTx}>
-                            Cargar más
+              {accounts.length > 0 && (
+                <StatRow variant="strip" ariaLabel="Resumen de bancos">
+                  <Stat
+                    label="Saldo total"
+                    value={<Money value={totalBalance} compact />}
+                    hint={`${accounts.length} cuenta${accounts.length === 1 ? "" : "s"} registrada${accounts.length === 1 ? "" : "s"}`}
+                    tone={totalBalance < 0 ? "danger" : "default"}
+                    icon={<AccountBalanceOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                  <Stat
+                    label="Cuentas activas"
+                    value={resumen.activas}
+                    hint={resumen.inactivas > 0 ? `${resumen.inactivas} inactiva${resumen.inactivas === 1 ? "" : "s"}` : "ninguna inactiva"}
+                    icon={<CreditCardOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                  <Stat
+                    label="En negativo"
+                    value={resumen.negativas}
+                    hint={resumen.negativas > 0 ? "saldo por debajo de cero" : "sin cuentas sobregiradas"}
+                    tone={resumen.negativas > 0 ? "danger" : "default"}
+                    icon={<TrendingDownOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                  <Stat
+                    label="Más líquida"
+                    value={<span className={s.valorTexto}>{resumen.masLiquida?.name ?? "—"}</span>}
+                    hint={resumen.masLiquida ? resumen.masLiquida.bankName : "sin cuentas"}
+                    icon={<SavingsOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                  <Stat
+                    label="Por conciliar"
+                    value={resumen.porConciliar}
+                    hint={
+                      !selected
+                        ? "selecciona una cuenta"
+                        : txParcial
+                          ? `de los ${txParcial.cargadas} movimientos cargados de ${txParcial.total}`
+                          : `movimientos de ${selected.name}`
+                    }
+                    tone={resumen.porConciliar > 0 ? "warning" : "default"}
+                    icon={<RuleOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                </StatRow>
+              )}
+            </div>
+          ) : undefined
+        }
+      >
+        {mostrarCuentas && (
+          <>
+            <Card>
+              <CardHead title="Cuentas" />
+              {accounts.length === 0 ? (
+                loading ? (
+                  <div className={s.cuerpo} role="status">
+                    <span className="ui-sr-only">Cargando cuentas.</span>
+                    <SkeletonRows rows={3} label="Cargando cuentas." />
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={<AccountBalanceOutlinedIcon />}
+                    title="No hay cuentas."
+                    action={
+                      cfg.canCreate ? (
+                        <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={openNewAccount}>Nueva cuenta</Button>
+                      ) : undefined
+                    }
+                  />
+                )
+              ) : (
+                <div className={s.cuentas}>
+                  {accounts.map((a) => {
+                    const saldo = Number(a.currentBalance);
+                    const share = totalBalance > 0 ? (saldo / totalBalance) * 100 : null;
+                    const isSelected = selected?.id === a.id;
+                    return (
+                      <div key={a.id} className={s.cuenta}>
+                        <button
+                          type="button"
+                          onClick={() => setSelected(a)}
+                          aria-pressed={isSelected}
+                          className={s.cuentaBtn}
+                        >
+                          <span className={s.cuentaNombre}>{a.name}</span>
+                          <span className={s.cuentaSub}>
+                            {a.bankName} · {a.clabe ?? a.accountNumber} · {a.currency}
+                          </span>
+                          <span className={saldo < 0 ? `${s.cuentaSaldo} ${s.cuentaNeg}` : s.cuentaSaldo}>
+                            <Money value={saldo} bold={false} />
+                          </span>
+                          <span className={s.cuentaPie}>
+                            {share !== null && (
+                              <span className={s.cuentaPct}>{share.toFixed(0)}% del total</span>
+                            )}
+                            {!a.isActive && <Badge dot size="sm" tone="neutral">Inactiva</Badge>}
+                          </span>
+                        </button>
+                        {cfg.canCreate && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon
+                            className={s.cuentaEditar}
+                            onClick={() => openEditAccount(a)}
+                            title="Editar cuenta"
+                            aria-label={`Editar ${a.name}`}
+                          >
+                            <EditOutlinedIcon fontSize="small" />
                           </Button>
-                        </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+
+            {selected && (
+              <Card className={s.tarjetaLista}>
+                <CardHead
+                  title={loadingTx ? "Cargando movimientos…" : `Movimientos · ${selected.name}`}
+                  actions={
+                    cfg.canCreate ? (
+                      <Button size="sm" iconStart={<AddRoundedIcon />} onClick={() => setShowTxForm(true)}>
+                        Registrar movimiento
+                      </Button>
+                    ) : undefined
+                  }
+                />
+                <ModuleToolbar
+                  end={
+                    <>
+                      {hayFiltrosTx && (
+                        <LinkButton onClick={() => { setTxSearch(""); setTxFilterType(""); }}>Limpiar</LinkButton>
                       )}
+                      {!loadingTx && (
+                        <span className={s.conteo} role="status">
+                          {visibleTxs.length} resultado{visibleTxs.length === 1 ? "" : "s"}
+                        </span>
+                      )}
+                      {txs.length > 0 && (
+                        <Button variant="ghost" size="sm" iconStart={<FileDownloadOutlinedIcon />} onClick={exportarMovimientos}>
+                          Excel
+                        </Button>
+                      )}
+                    </>
+                  }
+                >
+                  <SearchInput
+                    className={s.busqueda}
+                    aria-label="Buscar por descripción o contraparte…"
+                    placeholder="Buscar por descripción o contraparte…"
+                    value={txSearch}
+                    onChange={(e) => setTxSearch(e.target.value)}
+                  />
+                  <Select
+                    aria-label="Tipo"
+                    title="Tipo"
+                    controlSize="sm"
+                    wrapperClassName={s.filtroTipo}
+                    value={txFilterType}
+                    onChange={(e) => setTxFilterType(e.target.value)}
+                  >
+                    <option value="">Todos · Tipo</option>
+                    <option value="debit">Cargo</option>
+                    <option value="credit">Abono</option>
+                  </Select>
+                </ModuleToolbar>
+
+                {loadingTx && txs.length === 0 ? (
+                  <div className={s.cuerpo} aria-busy="true">
+                    <SkeletonRows rows={5} label="Cargando movimientos…" />
+                  </div>
+                ) : txError ? (
+                  <div className={s.cuerpo}>
+                    <Alert
+                      tone="danger"
+                      role="alert"
+                      action={<Button size="sm" onClick={() => setTxReload((n) => n + 1)}>Reintentar</Button>}
+                    >
+                      {txError}
+                    </Alert>
+                  </div>
+                ) : (
+                  <>
+                    {txParcial && (
+                      <div className={s.cuerpo}>
+                        <Alert
+                          tone="info"
+                          role="status"
+                          action={
+                            <Button size="sm" onClick={() => setTxTandas((n) => n + 1)} disabled={loadingTx}>
+                              Cargar más
+                            </Button>
+                          }
+                        >
+                          Se muestran {txParcial.cargadas} de {txParcial.total} movimientos; la búsqueda y los filtros solo miran los cargados.
+                        </Alert>
+                      </div>
+                    )}
+                    {visibleTxs.length === 0 ? (
+                      <EmptyState
+                        icon={txs.length > 0 ? <FilterAltOffOutlinedIcon /> : <SwapHorizOutlinedIcon />}
+                        tone="neutral"
+                        title={txs.length > 0 ? "Nada coincide con estos filtros." : "No hay movimientos."}
+                      />
+                    ) : (
                       <DataTable
+                        flush
                         columns={txColumns}
                         rows={visibleTxs}
                         rowKey={(t) => t.id}
                         ariaLabel={`Movimientos de ${selected.name}`}
-                        emptyTitle={txs.length > 0 ? "Nada coincide con estos filtros." : "No hay movimientos."}
-                        emptyDescription=""
                       />
-                      {visibleTxs.length > 0 && (
-                        <div className="nx-bank-totals" aria-label="Totales de los movimientos visibles">
-                          <div>
-                            <span>Abonos</span>
-                            <strong><Money value={txTotals.abonos} bold={false} /></strong>
-                          </div>
-                          <div>
-                            <span>Cargos</span>
-                            <strong>−<Money value={txTotals.cargos} bold={false} /></strong>
-                          </div>
-                          <div>
-                            <span>Neto</span>
-                            <strong style={{ color: txTotals.neto < 0 ? "var(--state-danger-text)" : undefined }}>
-                              <Money value={txTotals.neto} bold={false} />
-                            </strong>
-                          </div>
+                    )}
+                    {visibleTxs.length > 0 && (
+                      <div className={s.totales} aria-label="Totales de los movimientos visibles">
+                        <div>
+                          <span>Abonos</span>
+                          <strong><Money value={txTotals.abonos} bold={false} /></strong>
                         </div>
-                      )}
-                    </>
-                  )
-              }
-            </Section>
-          )}
-        </>
-      )}
+                        <div>
+                          <span>Cargos</span>
+                          <strong>−<Money value={txTotals.cargos} bold={false} /></strong>
+                        </div>
+                        <div>
+                          <span>Neto</span>
+                          <strong className={txTotals.neto < 0 ? s.negativo : undefined}>
+                            <Money value={txTotals.neto} bold={false} />
+                          </strong>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </Card>
+            )}
+          </>
+        )}
+      </FinanceModuleShell>
 
       <Modal
         open={showTxForm && !!selected}
@@ -642,29 +747,29 @@ export default function BankingPage() {
           </>
         }
       >
-        <FinanceFormGrid>
-          <FinanceField label="Fecha" hint="La del estado de cuenta, no la de captura.">
-            <input type="date" value={txForm.transactionDate} onChange={(e) => setTxForm((f) => ({ ...f, transactionDate: e.target.value }))} style={inp} />
-          </FinanceField>
-          <FinanceField label="Tipo" hint="Cargo resta del saldo; abono lo suma.">
-            <select value={txForm.isDebit ? "debit" : "credit"} onChange={(e) => setTxForm((f) => ({ ...f, isDebit: e.target.value === "debit" }))} style={inp}>
+        <FieldGrid>
+          <Field label="Fecha" hint="La del estado de cuenta, no la de captura.">
+            <DateInput value={txForm.transactionDate} onChange={(e) => setTxForm((f) => ({ ...f, transactionDate: e.target.value }))} />
+          </Field>
+          <Field label="Tipo" hint="Cargo resta del saldo; abono lo suma.">
+            <Select value={txForm.isDebit ? "debit" : "credit"} onChange={(e) => setTxForm((f) => ({ ...f, isDebit: e.target.value === "debit" }))}>
               <option value="debit">Cargo (salida)</option>
               <option value="credit">Abono (entrada)</option>
-            </select>
-          </FinanceField>
-          <FinanceField label="Descripción" fullWidth hint="Cópiala del estado de cuenta: así se reconoce al conciliar.">
-            <input value={txForm.description} onChange={(e) => setTxForm((f) => ({ ...f, description: e.target.value }))} placeholder="SPEI recibido, comisión bancaria…" style={inp} />
-          </FinanceField>
-          <FinanceField label="Monto" hint="Pesos, siempre en positivo. El tipo decide el signo.">
-            <input type="number" inputMode="decimal" min={0} step="0.01" value={txForm.amount || ""} placeholder="0.00" onChange={(e) => setTxForm((f) => ({ ...f, amount: Number(e.target.value) }))} style={inp} />
-          </FinanceField>
-          <FinanceField label="Contraparte" optional hint="Quién envía o recibe el dinero.">
-            <input value={txForm.counterpartyName} onChange={(e) => setTxForm((f) => ({ ...f, counterpartyName: e.target.value }))} style={inp} />
-          </FinanceField>
-          <FinanceField label="Concepto" optional fullWidth hint="Referencia o clave de rastreo del movimiento.">
-            <input value={txForm.concept} onChange={(e) => setTxForm((f) => ({ ...f, concept: e.target.value }))} style={inp} />
-          </FinanceField>
-        </FinanceFormGrid>
+            </Select>
+          </Field>
+          <Field label="Descripción" fullWidth hint="Cópiala del estado de cuenta: así se reconoce al conciliar.">
+            <Input value={txForm.description} onChange={(e) => setTxForm((f) => ({ ...f, description: e.target.value }))} placeholder="SPEI recibido, comisión bancaria…" />
+          </Field>
+          <Field label="Monto" hint="Pesos, siempre en positivo. El tipo decide el signo.">
+            <Input type="number" inputMode="decimal" min={0} step="0.01" value={txForm.amount || ""} placeholder="0.00" onChange={(e) => setTxForm((f) => ({ ...f, amount: Number(e.target.value) }))} />
+          </Field>
+          <Field label="Contraparte" optional hint="Quién envía o recibe el dinero.">
+            <Input value={txForm.counterpartyName} onChange={(e) => setTxForm((f) => ({ ...f, counterpartyName: e.target.value }))} />
+          </Field>
+          <Field label="Concepto" optional fullWidth hint="Referencia o clave de rastreo del movimiento.">
+            <Input value={txForm.concept} onChange={(e) => setTxForm((f) => ({ ...f, concept: e.target.value }))} />
+          </Field>
+        </FieldGrid>
       </Modal>
 
       <Modal
@@ -680,77 +785,41 @@ export default function BankingPage() {
           </>
         }
       >
-        {formErr && <InlineAlert variant="danger" message={formErr} style={{ marginBottom: 12 }} />}
-        <FinanceFormGrid>
-          <FinanceField label="Nombre / alias" hint="Como la llaman en la operación, no como la nombra el banco.">
-            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Cuenta operativa MXN" style={inp} />
-          </FinanceField>
-          <FinanceField label="Banco">
-            <input value={form.bankName} onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))} placeholder="Banorte" style={inp} />
-          </FinanceField>
-          <FinanceField label="Número de cuenta" hint="Tal como aparece en el estado de cuenta.">
-            <input value={form.accountNumber} onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))} style={inp} />
-          </FinanceField>
-          <FinanceField label="CLABE" optional hint="18 dígitos. Es lo que se usa para recibir transferencias.">
-            <input value={form.clabe} onChange={(e) => setForm((f) => ({ ...f, clabe: e.target.value }))} style={inp} />
-          </FinanceField>
+        {formErr && <Alert tone="danger" role="alert">{formErr}</Alert>}
+        <FieldGrid>
+          <Field label="Nombre / alias" hint="Como la llaman en la operación, no como la nombra el banco.">
+            <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Cuenta operativa MXN" />
+          </Field>
+          <Field label="Banco">
+            <Input value={form.bankName} onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))} placeholder="Banorte" />
+          </Field>
+          <Field label="Número de cuenta" hint="Tal como aparece en el estado de cuenta.">
+            <Input value={form.accountNumber} onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))} />
+          </Field>
+          <Field label="CLABE" optional hint="18 dígitos. Es lo que se usa para recibir transferencias.">
+            <Input value={form.clabe} onChange={(e) => setForm((f) => ({ ...f, clabe: e.target.value }))} />
+          </Field>
           {!editingAccount && (
             <>
-              <FinanceField label="Moneda" hint="La del estado de cuenta. No se cambia después.">
-                <select value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} style={inp}>
+              <Field label="Moneda" hint="La del estado de cuenta. No se cambia después.">
+                <Select value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}>
                   {MONEDAS.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </FinanceField>
-              <FinanceField label="Tipo de cuenta" hint="Separa la operativa de la de inversión y la de nómina.">
-                <select value={form.accountType} onChange={(e) => setForm((f) => ({ ...f, accountType: e.target.value }))} style={inp}>
+                </Select>
+              </Field>
+              <Field label="Tipo de cuenta" hint="Separa la operativa de la de inversión y la de nómina.">
+                <Select value={form.accountType} onChange={(e) => setForm((f) => ({ ...f, accountType: e.target.value }))}>
                   {TIPOS_CUENTA.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </FinanceField>
-              <FinanceField label="Saldo inicial" fullWidth hint="Solo se captura al dar de alta la cuenta; después lo mueven los movimientos. Cópialo del estado de cuenta del día que arrancas.">
-                <input type="number" step="0.01" value={form.currentBalance} onChange={(e) => setForm((f) => ({ ...f, currentBalance: Number(e.target.value) }))} style={inp} />
-              </FinanceField>
+                </Select>
+              </Field>
+              <Field label="Saldo inicial" fullWidth hint="Solo se captura al dar de alta la cuenta; después lo mueven los movimientos. Cópialo del estado de cuenta del día que arrancas.">
+                <Input type="number" step="0.01" value={form.currentBalance} onChange={(e) => setForm((f) => ({ ...f, currentBalance: Number(e.target.value) }))} />
+              </Field>
             </>
           )}
-        </FinanceFormGrid>
+        </FieldGrid>
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-
-      <style>{`
-        .nx-bank-card:hover { border-color: color-mix(in srgb, var(--primary) 30%, var(--border)) !important; }
-        .nx-bank-card:focus-visible,
-        .nx-bank-edit:focus-visible {
-          outline: 2px solid var(--primary);
-          outline-offset: 2px;
-        }
-        .nx-bank-edit:hover { background: var(--surface-2) !important; color: var(--text-primary) !important; }
-        .nx-bank-totals {
-          display: flex;
-          justify-content: flex-end;
-          flex-wrap: wrap;
-          gap: 28px;
-          padding: 10px 16px;
-          margin-top: -1px;
-          border: 1px solid var(--nx-panel-hairline, var(--border));
-          border-top: none;
-          border-radius: 0 0 var(--nx-panel-radius) var(--nx-panel-radius);
-          background: var(--surface-2, var(--surface));
-        }
-        .nx-bank-totals > div { text-align: right; }
-        .nx-bank-totals span {
-          display: block;
-          font-size: 10.5px;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          color: var(--text-tertiary);
-        }
-        .nx-bank-totals strong {
-          font-size: 14px;
-          font-weight: 600;
-          font-variant-numeric: tabular-nums;
-          white-space: nowrap;
-        }
-      `}</style>
     </>
   );
 }

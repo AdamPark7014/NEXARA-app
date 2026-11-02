@@ -1,18 +1,36 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
-import PageHeader from "@/components/ui/PageHeader";
-import Button from "@/components/ui/Button";
+import CalculateOutlinedIcon from "@mui/icons-material/CalculateOutlined";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import SwapHorizOutlinedIcon from "@mui/icons-material/SwapHorizOutlined";
+import TrendingDownOutlinedIcon from "@mui/icons-material/TrendingDownOutlined";
+import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  DataTable,
+  DateInput,
+  LinkButton,
+  ListCard,
+  ListFooter,
+  ModuleToolbar,
+  SearchInput,
+  Select,
+  Stat,
+  StatRow,
+  buttonClass,
+  type Column,
+  type Tone,
+} from "@/components/base";
+import { MesaPagina } from "@/components/mesa-contable/MesaPagina";
 import Modal from "@/components/ui/Modal";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import FilterToolbar from "@/components/FilterToolbar";
-import EmptyState from "@/components/ui/EmptyState";
+import { Money } from "@/components/ui/DataTable";
 import { enlaceSeguro } from "@/lib/enlace-seguro";
-import InlineAlert from "@/components/ui/InlineAlert";
-import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { saveBlob } from "@/components/finance/download";
 import { buildApiUrl } from "@/lib/api-base";
@@ -37,6 +55,7 @@ import {
   type LedgerRow,
 } from "./_ledger";
 import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
+import s from "./movimientos.module.css";
 
 const PAGE_SIZE = 50;
 
@@ -53,6 +72,9 @@ const MAX_EXPORT_ROWS = 5000;
 
 type BankAccountOption = { id: number; name: string; bankName?: string | null };
 
+/** Una cifra de la tira de totales: lo que se pinta en cada `Stat`. */
+type Cifra = { label: string; icon: ReactNode; value: ReactNode; hint: string };
+
 /** Opciones del filtro de método: el mismo catálogo cerrado que valida la API. */
 const METODO_OPTIONS = Object.entries(METODO_LABELS).map(([value, label]) => ({ value, label }));
 
@@ -62,13 +84,22 @@ const METODO_OPTIONS = Object.entries(METODO_LABELS).map(([value, label]) => ({ 
  * acción (por autorizar, por conciliar) o algo salió mal (vencido, cancelado).
  * Todo lo demás es flujo normal y se queda neutro.
  */
-function tonoEstado(estado: string | null | undefined): StatusTone {
+function tonoEstado(estado: string | null | undefined): Tone {
   const e = (estado ?? "").toLowerCase();
   if (!e) return "neutral";
   if (/vencid|rechaz|cancelad|sin comprobante|devuelt/.test(e)) return "danger";
   if (/pendiente|parcial|autoriz|revis|borrador|sin concilia|proceso/.test(e)) return "warning";
   if (/pagad|cobrad|liquidad|conciliad|aplicad|timbrad/.test(e)) return "success";
   return "neutral";
+}
+
+/** Texto de una celda del libro: dos renglones como mucho; completo al pasar el ratón y en el detalle. */
+function TextoCelda({ valor }: { valor: string }) {
+  return (
+    <span className={s.celdaTexto} title={valor}>
+      {valor}
+    </span>
+  );
 }
 
 export default function MovimientosPage() {
@@ -139,7 +170,8 @@ export default function MovimientosPage() {
   // Con doce columnas, por debajo de 1200px la tabla solo cabía a base de
   // scroll horizontal. Lo secundario baja bajo el concepto en vez de perderse.
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 1200px)");
+    // El marco del panel quita 300 px: con doce columnas, por debajo de 1600 px Egreso y Estado se iban fuera de la vista.
+    const mq = window.matchMedia("(max-width: 1600px)");
     const sync = () => setAngosto(mq.matches);
     sync();
     mq.addEventListener("change", sync);
@@ -231,11 +263,7 @@ export default function MovimientosPage() {
         key: "fecha",
         label: "Fecha",
         width: 108,
-        render: (r) => (
-          <span style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
-            {formatLedgerDate(r.fecha)}
-          </span>
-        ),
+        render: (r) => <span className={s.celdaFecha}>{formatLedgerDate(r.fecha)}</span>,
       },
       {
         key: "tipo",
@@ -243,7 +271,11 @@ export default function MovimientosPage() {
         width: 104,
         // Clasificación normal del flujo: punto neutro. El color se reserva
         // para el estado, que es lo que llega a pedir acción.
-        render: (r) => <StatusDot label={TIPO_LABELS[r.tipo]} tone="neutral" />,
+        render: (r) => (
+          <Badge dot size="sm" tone="neutral">
+            {TIPO_LABELS[r.tipo]}
+          </Badge>
+        ),
       },
       {
         key: "concepto",
@@ -264,11 +296,9 @@ export default function MovimientosPage() {
               : []),
           ].filter(Boolean);
           return (
-            <div style={{ minWidth: angosto ? 160 : 200 }}>
-              <div style={{ fontWeight: 600 }}>{r.concepto}</div>
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", lineHeight: 1.35 }}>
-                {meta.join(" · ")}
-              </div>
+            <div className={angosto ? s.conceptoAngosto : s.concepto}>
+              <div className={s.conceptoNombre}>{r.concepto}</div>
+              <div className={s.conceptoMeta}>{meta.join(" · ")}</div>
             </div>
           );
         },
@@ -279,31 +309,27 @@ export default function MovimientosPage() {
             {
               key: "categoria",
               label: "Categoría",
-              render: (r: LedgerRow) => r.categoria || "—",
+              render: (r: LedgerRow) => <TextoCelda valor={r.categoria || "—"} />,
             },
             {
               key: "cuenta",
               label: "Cuenta",
-              render: (r: LedgerRow) => r.cuenta?.nombre ?? "—",
+              render: (r: LedgerRow) => <TextoCelda valor={r.cuenta?.nombre ?? "—"} />,
             },
             {
               key: "contraparte",
               label: "Contraparte",
-              render: (r: LedgerRow) => r.contraparte?.nombre ?? "—",
+              render: (r: LedgerRow) => <TextoCelda valor={r.contraparte?.nombre ?? "—"} />,
             },
             {
               key: "proyecto",
               label: "Proyecto",
-              render: (r: LedgerRow) => r.proyecto?.nombre ?? "—",
+              render: (r: LedgerRow) => <TextoCelda valor={r.proyecto?.nombre ?? "—"} />,
             },
             {
               key: "referencia",
               label: "Referencia",
-              render: (r: LedgerRow) => (
-                <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                  {r.referencia ?? "—"}
-                </span>
-              ),
+              render: (r: LedgerRow) => <span className={s.referencia}>{r.referencia ?? "—"}</span>,
             },
           ]),
       {
@@ -322,7 +348,7 @@ export default function MovimientosPage() {
           if (egreso === 0 && monto > 0 && (r.tipo === "TRANSFERENCIA" || r.tipo === "AJUSTE")) {
             return <Money value={monto} bold={false} />;
           }
-          return <span style={{ color: "var(--text-tertiary)" }}>—</span>;
+          return <span className={s.sinDato}>—</span>;
         },
       },
       {
@@ -333,7 +359,7 @@ export default function MovimientosPage() {
         render: (r) => {
           const egreso = Number(r.egreso) || 0;
           if (egreso > 0) return <Money value={egreso} bold={false} />;
-          return <span style={{ color: "var(--text-tertiary)" }}>—</span>;
+          return <span className={s.sinDato}>—</span>;
         },
       },
       {
@@ -341,9 +367,11 @@ export default function MovimientosPage() {
         label: "Estado",
         render: (r) =>
           r.estado ? (
-            <StatusDot label={financeStatusLabel(r.estado)} tone={tonoEstado(r.estado)} />
+            <Badge dot size="sm" tone={tonoEstado(r.estado)}>
+              {financeStatusLabel(r.estado)}
+            </Badge>
           ) : (
-            <span style={{ color: "var(--text-tertiary)" }}>—</span>
+            <span className={s.sinDato}>—</span>
           ),
       },
       ...(angosto
@@ -352,7 +380,7 @@ export default function MovimientosPage() {
             {
               key: "registradoPor",
               label: "Registró",
-              render: (r: LedgerRow) => r.registradoPor ?? "—",
+              render: (r: LedgerRow) => <TextoCelda valor={r.registradoPor ?? "—"} />,
             },
           ]),
     ],
@@ -372,7 +400,7 @@ export default function MovimientosPage() {
    * —para eso está «Efectivo»—. Si algún día se recorta la tira, la pista se
    * queda.
    */
-  const totalesStrip: Metric[] = useMemo(() => {
+  const totalesStrip: Cifra[] = useMemo(() => {
     // Cifras cortas: la pista vive en 11px dentro de una celda de 150px y la
     // tira va fija arriba; escrita entera ocupaba tres renglones por celda.
     const dinero = (n: number) => {
@@ -385,16 +413,19 @@ export default function MovimientosPage() {
     return [
       {
         label: "Ingresos",
+        icon: <TrendingUpOutlinedIcon />,
         value: <Money value={totals.ingresos} />,
         hint: "Facturado y cobrado juntos",
       },
       {
         label: "Egresos",
+        icon: <TrendingDownOutlinedIcon />,
         value: <Money value={totals.egresos} />,
         hint: "Devengado y pagado juntos",
       },
       {
         label: "Neto",
+        icon: <CalculateOutlinedIcon />,
         value: <Money value={totals.neto} />,
         hint: "Ingresos menos egresos",
       },
@@ -402,16 +433,19 @@ export default function MovimientosPage() {
       // pintaba el neto: de qué está hecho cada neto se lee en la pista.
       {
         label: "Efectivo",
+        icon: <PaymentsOutlinedIcon />,
         value: <Money value={totals.efectivo.neto} />,
         hint: `${totals.efectivo.conteo} mov · ${dinero(totals.efectivo.ingresos)} entró, ${dinero(totals.efectivo.egresos)} salió`,
       },
       {
         label: "Devengado",
+        icon: <ReceiptLongOutlinedIcon />,
         value: <Money value={totals.devengado.neto} />,
         hint: `${totals.devengado.conteo} mov · ${dinero(totals.devengado.ingresos)} por cobrar, ${dinero(totals.devengado.egresos)} por pagar`,
       },
       {
         label: "Movimientos",
+        icon: <SwapHorizOutlinedIcon />,
         value: totals.conteo.toLocaleString("es-MX"),
         // Traspasos y ajustes no suman al neto, pero su importe sí explica
         // huecos al cuadrar; llegaba en la respuesta y no se veía.
@@ -420,166 +454,251 @@ export default function MovimientosPage() {
     ];
   }, [totals]);
 
-  return (
-    <>
-      <PageHeader
-        eyebrow="Contabilidad"
-        title="Libro de movimientos"
-        subtitle="Cobros, pagos, gastos, nómina, líneas de banco sin conciliar y facturas, en una sola línea de tiempo."
-        density="ops"
-        actions={
-          <>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => void exportCsv()}
-              disabled={exporting || loading || sinSesion}
-            >
-              {exporting ? "Generando…" : "Exportar CSV"}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => void load()}
-              disabled={loading || sinSesion}
-            >
-              {loading ? "Actualizando…" : "Actualizar"}
-            </Button>
-          </>
-        }
-      />
+  /** Lo que enciende «Limpiar»: el mismo criterio que usaba la barra de filtros de antes. */
+  const hayFiltrosActivos =
+    filters.q.trim().length > 0 ||
+    filters.from !== "" ||
+    filters.to !== "" ||
+    [filters.tipo, accounts.length ? filters.cuentaId : "", filters.metodoPago].some(
+      (v) => v !== "" && v !== "all",
+    );
+  const limpiarFiltros = () => {
+    setFilters(emptyFilters());
+    setPage(1);
+  };
+  const hayFilas = !sinSesion && !loading && rows.length > 0;
 
+  return (
+    <MesaPagina
+      titulo="Libro de movimientos"
+      descripcion="Cobros, pagos, gastos, nómina, líneas de banco sin conciliar y facturas, en una sola línea de tiempo."
+      terciarias={
+        <>
+          <Button
+            variant="ghost"
+            onClick={() => void exportCsv()}
+            disabled={exporting || loading || sinSesion}
+          >
+            {exporting ? "Generando…" : "Exportar CSV"}
+          </Button>
+          <Button variant="ghost" onClick={() => void load()} disabled={loading || sinSesion}>
+            {loading ? "Actualizando…" : "Actualizar"}
+          </Button>
+        </>
+      }
+    >
       {/* El resultado de exportar, pegado a la acción que lo produjo. */}
       {exportAviso && (
-        <InlineAlert
-          variant={exportAviso.tono}
-          message={exportAviso.texto}
+        <Alert
+          tone={exportAviso.tono}
+          role="alert"
+          className={s.alerta}
           onDismiss={() => setExportAviso(null)}
-        />
+        >
+          {exportAviso.texto}
+        </Alert>
       )}
 
       {sinSesion && (
-        <InlineAlert
-          variant="warning"
-          message="No hay sesión activa, así que el libro no se puede consultar. Vuelve a entrar con tu cuenta para ver los movimientos."
+        <Alert
+          tone="warning"
+          role="alert"
+          className={s.alerta}
           action={
-            <Link href="/login" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap" }}>
+            <ButtonLink size="sm" href="/login">
               Ir a entrar
-            </Link>
+            </ButtonLink>
           }
-        />
-      )}
-
-      {/* Totales pegados arriba: es lo que la contadora cuadra. Sin un solo
-          movimiento detrás no se pinta: seis ceros no son un total, son ruido
-          encima del renglón que sí explica por qué la pantalla está vacía. */}
-      {data && totals.conteo > 0 && (
-        <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 3,
-            marginBottom: 10,
-            background: "var(--surface)",
-            borderRadius: 10,
-          }}
         >
-          <MetricStrip metrics={totalesStrip} ariaLabel="Totales del periodo filtrado" />
-        </div>
+          No hay sesión activa, así que el libro no se puede consultar. Vuelve a entrar con tu cuenta para ver los movimientos.
+        </Alert>
       )}
-
-      <div style={{ marginBottom: 12 }}>
-        <FilterToolbar
-          search={{
-            value: filters.q,
-            onChange: (v) => setFilter("q", v),
-            placeholder: "Buscar concepto, referencia, cliente o proveedor…",
-          }}
-          dates={[
-            { label: "Del", value: filters.from, onChange: (v) => setFilter("from", v) },
-            { label: "Al", value: filters.to, onChange: (v) => setFilter("to", v) },
-          ]}
-          selects={[
-            {
-              label: "Tipo",
-              value: filters.tipo,
-              onChange: (v) => setFilter("tipo", v),
-              options: TIPO_OPTIONS,
-              allLabel: "Todos los tipos",
-            },
-            ...(accounts.length
-              ? [
-                  {
-                    label: "Cuenta",
-                    value: filters.cuentaId,
-                    onChange: (v: string) => setFilter("cuentaId", v),
-                    options: accounts.map((a) => ({
-                      value: String(a.id),
-                      label: a.bankName ? `${a.name} · ${a.bankName}` : a.name,
-                    })),
-                    allLabel: "Todas las cuentas",
-                  },
-                ]
-              : []),
-            {
-              label: "Método",
-              value: filters.metodoPago,
-              onChange: (v: string) => setFilter("metodoPago", v),
-              options: METODO_OPTIONS,
-              allLabel: "Todos los métodos",
-            },
-          ]}
-          onClear={() => {
-            setFilters(emptyFilters());
-            setPage(1);
-          }}
-          resultCount={loading ? null : totals.conteo}
-        />
-      </div>
 
       {error && (
-        <InlineAlert
-          message={error}
-          variant="danger"
+        <Alert
+          tone="danger"
+          role="alert"
+          className={s.alerta}
           onDismiss={() => setError(null)}
           action={
-            <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
+            <Button size="sm" onClick={() => void load()} disabled={loading}>
               {loading ? "Reintentando…" : "Reintentar"}
             </Button>
           }
-        />
+        >
+          {error}
+        </Alert>
       )}
 
-      {sinSesion ? null : loading ? (
-        <SkeletonList rows={8} tableLike />
-      ) : rows.length === 0 ? (
-        /* Dos vacíos distintos, y solo uno es culpa del filtro. */
-        filtrado ? (
-          <EmptyState
-            title="Ningún movimiento con estos filtros"
-            description="Quita algún filtro o amplía el rango de fechas. El libro sólo muestra lo que existe en la base, no estimaciones."
-            action={
-              <Button
-                size="sm"
-                onClick={() => {
-                  setFilters(emptyFilters());
-                  setPage(1);
-                }}
+      {/* Totales arriba: es lo que la contadora cuadra. Sin un solo movimiento
+          detrás no se pinta: seis ceros no son un total, son ruido encima del
+          renglón que sí explica por qué la pantalla está vacía. */}
+      {data && totals.conteo > 0 && (
+        <StatRow variant="strip" ariaLabel="Totales del periodo filtrado" className={s.totales}>
+          {totalesStrip.map((c) => (
+            <Stat
+              key={c.label}
+              label={c.label}
+              value={c.value}
+              hint={c.hint}
+              icon={c.icon}
+              iconTone="neutral"
+            />
+          ))}
+        </StatRow>
+      )}
+
+      <ListCard
+        listLabel="Libro de movimientos"
+        toolbar={
+          <ModuleToolbar
+            search={
+              <SearchInput
+                aria-label="Buscar concepto, referencia, cliente o proveedor…"
+                placeholder="Buscar concepto, referencia, cliente o proveedor…"
+                value={filters.q}
+                onChange={(e) => setFilter("q", e.target.value)}
+              />
+            }
+            end={
+              loading ? undefined : (
+                <span className={s.conteo} role="status">
+                  {totals.conteo} resultado{totals.conteo === 1 ? "" : "s"}
+                </span>
+              )
+            }
+          >
+            <label className={s.campoFecha}>
+              <span>Del</span>
+              <DateInput
+                aria-label="Del"
+                className={s.fecha}
+                controlSize="sm"
+                value={filters.from}
+                onChange={(e) => setFilter("from", e.target.value)}
+              />
+            </label>
+            <label className={s.campoFecha}>
+              <span>Al</span>
+              <DateInput
+                aria-label="Al"
+                className={s.fecha}
+                controlSize="sm"
+                value={filters.to}
+                onChange={(e) => setFilter("to", e.target.value)}
+              />
+            </label>
+            <Select
+              aria-label="Tipo"
+              title="Tipo"
+              wrapperClassName={s.filtroSelect}
+              controlSize="sm"
+              value={filters.tipo}
+              onChange={(e) => setFilter("tipo", e.target.value)}
+            >
+              <option value="">Todos los tipos</option>
+              {TIPO_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+            {accounts.length ? (
+              <Select
+                aria-label="Cuenta"
+                title="Cuenta"
+                wrapperClassName={s.filtroSelect}
+                controlSize="sm"
+                value={filters.cuentaId}
+                onChange={(e) => setFilter("cuentaId", e.target.value)}
               >
+                <option value="">Todas las cuentas</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={String(a.id)}>
+                    {a.bankName ? `${a.name} · ${a.bankName}` : a.name}
+                  </option>
+                ))}
+              </Select>
+            ) : null}
+            <Select
+              aria-label="Método"
+              title="Método"
+              wrapperClassName={s.filtroSelect}
+              controlSize="sm"
+              value={filters.metodoPago}
+              onChange={(e) => setFilter("metodoPago", e.target.value)}
+            >
+              <option value="">Todos los métodos</option>
+              {METODO_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+            {hayFiltrosActivos ? <LinkButton onClick={limpiarFiltros}>Limpiar</LinkButton> : null}
+          </ModuleToolbar>
+        }
+        loading={loading && !sinSesion}
+        loadingRows={8}
+        empty={!sinSesion && !loading && rows.length === 0}
+        /* Dos vacíos distintos, y solo uno es culpa del filtro. */
+        emptyState={
+          filtrado ? {
+            icon: <FilterAltOffOutlinedIcon />,
+            title: "Ningún movimiento con estos filtros",
+            description:
+              "Quita algún filtro o amplía el rango de fechas. El libro sólo muestra lo que existe en la base, no estimaciones.",
+            action: (
+              <Button size="sm" onClick={limpiarFiltros}>
                 Limpiar filtros
               </Button>
-            }
-          />
-        ) : (
-          <VacioConPrimerPaso
-            title="Sin movimientos en el periodo"
-            description={`Entre el ${formatLedgerDate(filters.from)} y el ${formatLedgerDate(filters.to)} no hay cobros, pagos, gastos, nómina, líneas de banco sin conciliar ni facturas. El libro no se captura: cada renglón entra solo cuando se registra en su módulo. Empieza por una factura y aquí aparece.`}
-            destino={DESTINOS.factura}
-          />
-        )
-      ) : (
-        <>
+            ),
+          } : (
+            <VacioConPrimerPaso
+              title="Sin movimientos en el periodo"
+              description={`Entre el ${formatLedgerDate(filters.from)} y el ${formatLedgerDate(filters.to)} no hay cobros, pagos, gastos, nómina, líneas de banco sin conciliar ni facturas. El libro no se captura: cada renglón entra solo cuando se registra en su módulo. Empieza por una factura y aquí aparece.`}
+              destino={DESTINOS.factura}
+            />
+          )
+        }
+        footer={
+          hayFilas ? (
+            <ListFooter>
+              {/* `loading` también bloquea: dos clics seguidos en «Siguiente»
+                  disparaban dos consultas y se saltaban una página. */}
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Button>
+              <span className={s.paginaTexto}>
+                Página {data?.page ?? page} de {ultimaPagina}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={page >= ultimaPagina || loading}
+                onClick={() => setPage((p) => Math.min(ultimaPagina, p + 1))}
+              >
+                Siguiente
+              </Button>
+              {topeAlcanzado && (
+                <span className={s.tope}>
+                  Hasta aquí llega la paginación ({MAX_SCAN.toLocaleString("es-MX")} movimientos).
+                  Filtra o acorta el periodo para ver el resto.
+                </span>
+              )}
+              <span className={avisoAbajo ? s.notaAbajo : s.nota}>{NATURALEZA_HINT}</span>
+            </ListFooter>
+          ) : undefined
+        }
+      >
+        {sinSesion ? null : (
           <DataTable
+            flush
             columns={columns}
             rows={rows}
             rowKey={(r) => r.id}
@@ -587,66 +706,8 @@ export default function MovimientosPage() {
             ariaLabel="Movimientos del libro"
             onRowClick={(r) => setDetail(r)}
           />
-          <div
-            style={{
-              display: "flex",
-              flexWrap: avisoAbajo ? "wrap" : "nowrap",
-              alignItems: "center",
-              gap: 10,
-              marginTop: 10,
-              fontSize: 12,
-              color: "var(--text-secondary)",
-              ...(avisoAbajo ? { width: "100%", maxWidth: "100%", minWidth: 0 } : {}),
-            }}
-          >
-            {/* `loading` también bloquea: dos clics seguidos en «Siguiente»
-                disparaban dos consultas y se saltaban una página. */}
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={page <= 1 || loading}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Anterior
-            </Button>
-            <span>
-              Página {data?.page ?? page} de {ultimaPagina}
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={page >= ultimaPagina || loading}
-              onClick={() => setPage((p) => Math.min(ultimaPagina, p + 1))}
-            >
-              Siguiente
-            </Button>
-            {topeAlcanzado && (
-              <span style={{ fontSize: 11, color: "var(--state-warning-text, #b45309)" }}>
-                Hasta aquí llega la paginación ({MAX_SCAN.toLocaleString("es-MX")} movimientos).
-                Filtra o acorta el periodo para ver el resto.
-              </span>
-            )}
-            <span
-              style={
-                avisoAbajo
-                  ? {
-                      flexBasis: "100%",
-                      boxSizing: "border-box",
-                      width: "100%",
-                      maxWidth: "calc(100vw - 32px)",
-                      minWidth: 0,
-                      fontSize: 11,
-                      lineHeight: 1.45,
-                      color: "var(--text-tertiary)",
-                    }
-                  : { marginLeft: "auto", fontSize: 11, color: "var(--text-tertiary)" }
-              }
-            >
-              {NATURALEZA_HINT}
-            </span>
-          </div>
-        </>
-      )}
+        )}
+      </ListCard>
 
       <Modal
         open={!!detail}
@@ -661,15 +722,15 @@ export default function MovimientosPage() {
                   href={enlaceSeguro(detail.comprobanteUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: 12.5, fontWeight: 600 }}
+                  className={buttonClass("tertiary", { size: "sm" })}
                 >
                   Ver comprobante
                 </a>
               )}
               {detail.origen.href && (
-                <Link href={detail.origen.href} style={{ fontSize: 12.5, fontWeight: 600 }}>
+                <ButtonLink variant="tertiary" size="sm" href={detail.origen.href}>
                   Abrir documento origen
-                </Link>
+                </ButtonLink>
               )}
               <Button size="sm" variant="ghost" onClick={() => setDetail(null)}>
                 Cerrar
@@ -679,7 +740,7 @@ export default function MovimientosPage() {
         }
       >
         {detail && (
-          <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 16px", margin: 0, fontSize: 13 }}>
+          <dl className={s.detalle}>
             <DetailRow label="Fecha" value={formatLedgerDate(detail.fecha)} />
             <DetailRow
               label="Tipo"
@@ -715,7 +776,7 @@ export default function MovimientosPage() {
           </dl>
         )}
       </Modal>
-    </>
+    </MesaPagina>
   );
 }
 
@@ -725,12 +786,8 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   const vacio = !value || (typeof value === "string" && !value.trim());
   return (
     <>
-      <dt style={{ color: "var(--text-tertiary)", fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-        {label}
-      </dt>
-      <dd style={{ margin: 0, color: vacio ? "var(--text-tertiary)" : "var(--text-primary)" }}>
-        {vacio ? "—" : value}
-      </dd>
+      <dt className={s.detalleEtiqueta}>{label}</dt>
+      <dd className={`${s.detalleValor} ${vacio ? s.detalleVacio : ""}`}>{vacio ? "—" : value}</dd>
     </>
   );
 }

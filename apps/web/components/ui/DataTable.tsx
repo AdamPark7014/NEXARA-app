@@ -122,6 +122,12 @@ function detener(e: { stopPropagation: () => void }) {
   e.stopPropagation();
 }
 
+/** Sin `render` ni `accessor`, la columna muestra el campo del renglón que se llama como su `key`. */
+function valorDelCampo<T>(row: T, key: string): ReactNode {
+  const valor = (row as Record<string, unknown>)[key];
+  return typeof valor === "string" || typeof valor === "number" ? valor : "";
+}
+
 export default function DataTable<T>({
   columns,
   rows,
@@ -284,7 +290,7 @@ export default function DataTable<T>({
                         data-numeric={col.numeric ? "true" : undefined}
                         style={{ textAlign: alignOf(col) }}
                       >
-                        {col.render ? col.render(row) : col.accessor ? col.accessor(row) : ""}
+                        {col.render ? col.render(row) : col.accessor ? col.accessor(row) : valorDelCampo(row, col.key)}
                       </td>
                     ))}
                     {conAcciones ? (

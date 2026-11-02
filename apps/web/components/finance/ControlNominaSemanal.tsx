@@ -611,7 +611,7 @@ export default function ControlNominaSemanal({
                     <dd>{l.texto}</dd>
                   </Fragment>
                 ) : (
-                  <dd key={l.clave} style={{ gridColumn: "1 / -1" }}>
+                  <dd key={l.clave} className={s.howtoWide}>
                     {l.texto}
                   </dd>
                 ),
@@ -1427,7 +1427,7 @@ function CeldaNota({
   }
   return (
     <div className={s.noteRow}>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className={s.noteBody}>
         {fila.notaFila ? (
           <>
             <span className={s.noteText} title={fila.notaFila}>
@@ -1866,7 +1866,7 @@ function PanelDescuentos({
 
           {editable ? (
             <form className={s.addForm} onSubmit={(e) => void agregar(e)} noValidate>
-              <h3 className={s.sectionTitle} style={{ gridColumn: "1 / -1", margin: 0 }}>
+              <h3 className={cx(s.sectionTitle, s.addTitle)}>
                 Agregar descuento
               </h3>
               <Field label="Concepto">

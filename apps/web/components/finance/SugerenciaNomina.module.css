@@ -1,0 +1,143 @@
+/* Sugerencia de nómina. Solo tokens --ui-*: claro y oscuro salen solos. */
+
+.pantalla {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+/* La barra del periodo va en su propia tarjeta: sin la raya de abajo que trae la barra de lista. */
+.barra > [role="search"] {
+  border-bottom: 0;
+}
+
+.filtroPeriodo {
+  flex: 0 1 320px;
+  width: auto;
+}
+
+.fecha {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+}
+
+.fechaCtl {
+  flex: 0 1 160px;
+  width: auto;
+}
+
+.nota {
+  padding: var(--ui-s3) var(--ui-s4);
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface-2);
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+}
+
+.nota strong {
+  color: var(--ui-fg);
+}
+
+.formula {
+  margin-top: var(--ui-s2);
+}
+
+.formula summary {
+  cursor: pointer;
+}
+
+.formula ul {
+  margin: var(--ui-s2) 0 0;
+  padding-left: 18px;
+}
+
+.periodo {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  line-height: 1.45;
+  color: var(--ui-fg-2);
+}
+
+/* Una frase en ancho de escritorio; a 390 px, un dato por renglón. */
+@media (max-width: 480px) {
+  .dato {
+    display: block;
+  }
+
+  .sep {
+    display: none;
+  }
+}
+
+/* ─── Tabla ─────────────────────────────────────────────────────────────── */
+
+.celdaPersona {
+  min-width: 0;
+  max-width: 360px;
+}
+
+.nombre {
+  font-weight: var(--ui-fw-semibold);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg);
+  text-decoration: none;
+}
+
+.nombre:hover {
+  color: var(--ui-brand-text);
+}
+
+.nombre:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+  border-radius: var(--ui-radius-xs);
+}
+
+.meta {
+  margin-top: 2px;
+  font-size: var(--ui-text-xs);
+  line-height: 1.35;
+  color: var(--ui-fg-3);
+}
+
+.aviso {
+  margin-top: 2px;
+  font-size: var(--ui-text-xs);
+  line-height: 1.35;
+  color: var(--ui-warning-text);
+}
+
+.num {
+  font-size: var(--ui-text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bajo {
+  color: var(--ui-warning-text);
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+}
+
+.total {
+  font-size: var(--ui-text-sm);
+}
+
+.sugerido {
+  text-align: right;
+}
+
+.sugeridoEstado {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}

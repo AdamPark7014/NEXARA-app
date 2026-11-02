@@ -207,7 +207,7 @@ export function Kpi({
     <div className={cx(m.kpi, oscura && m.kpiDark)} aria-busy={cargando || undefined}>
       <span className={m.kpiLabel}>{etiqueta}</span>
       <span className={m.kpiValue} data-tinta={oscura ? undefined : tintaValor}>
-        {cargando ? <span className="ui-skeleton" style={{ width: 96, height: 26 }} aria-hidden="true" /> : valor}
+        {cargando ? <span className={cx("ui-skeleton", m.kpiSkeleton)} aria-hidden="true" /> : valor}
       </span>
       {pista != null && pista !== "" ? (
         <span className={m.kpiHint} data-tinta={oscura ? undefined : tintaPista} data-fuerte={pistaFuerte ? "true" : undefined}>
@@ -440,8 +440,8 @@ export function MenuFila({ etiqueta, opciones }: { etiqueta: string; opciones: A
           id={idMenu}
           role="menu"
           aria-label={etiqueta}
-          className={m.menu}
-          style={pos ? { position: "fixed", top: pos.top, left: pos.left, right: "auto", minWidth: 200 } : { visibility: "hidden" }}
+          className={cx(m.menu, pos ? m.menuFijo : m.menuOculto)}
+          style={pos ? { top: pos.top, left: pos.left } : undefined}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.preventDefault();

@@ -2,20 +2,33 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import DataTable, { type Column } from "@/components/ui/DataTable";
-import InlineAlert from "@/components/ui/InlineAlert";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
+import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  DataTable,
+  Field,
+  ListCard,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  Textarea,
+  type Column,
+  type Tone,
+} from "@/components/base";
+import { MesaPagina } from "@/components/mesa-contable/MesaPagina";
 import Modal from "@/components/ui/Modal";
-import MetricStrip from "@/components/ui/MetricStrip";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import { FinanceField, financeInputStyle } from "@/components/finance/FinanceModuleShell";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
+import s from "./cierres.module.css";
 
 type Period = {
   id: number;
@@ -62,25 +75,13 @@ const MIN_JUSTIFICACION = 20;
  * Antes los tres estados llevaban un disco de color con un símbolo en blanco y
  * el renglón entero teñido: con diez puntos, la lista era un semáforo y el
  * bloqueante no se distinguía del aviso. Ahora lo resuelto se queda plano y
- * gris, y solo lo que impide cerrar lleva una regla roja al margen.
+ * gris, y solo lo que impide cerrar lleva una regla roja al margen (la pinta el
+ * CSS según el estado del renglón).
  */
-const MARCA: Record<
-  EstadoItem,
-  { tono: StatusTone; color: string | null; texto: string; peso: number }
-> = {
-  ok: { tono: "neutral", color: null, texto: "Listo", peso: 2 },
-  advertencia: {
-    tono: "warning",
-    color: "var(--state-warning-text, #b45309)",
-    texto: "Revisar",
-    peso: 1,
-  },
-  bloqueante: {
-    tono: "danger",
-    color: "var(--state-danger-text, #b91c1c)",
-    texto: "Bloquea el cierre",
-    peso: 0,
-  },
+const MARCA: Record<EstadoItem, { tono: Tone; texto: string; peso: number }> = {
+  ok: { tono: "neutral", texto: "Listo", peso: 2 },
+  advertencia: { tono: "warning", texto: "Revisar", peso: 1 },
+  bloqueante: { tono: "danger", texto: "Bloquea el cierre", peso: 0 },
 };
 
 const fecha = (iso?: string | null) =>
@@ -222,11 +223,14 @@ export default function CierresPage() {
       key: "status",
       label: "Estado",
       render: (r) => (
-        <StatusDot
-          label={r.isClosed ? `Cerrado ${fecha(r.closedAt)}` : "Abierto"}
+        <Badge
+          dot
+          size="sm"
           tone={r.isClosed ? "success" : "neutral"}
           title={r.isClosed ? "Solo dirección puede reabrirlo" : "Admite pólizas"}
-        />
+        >
+          {r.isClosed ? `Cerrado ${fecha(r.closedAt)}` : "Abierto"}
+        </Badge>
       ),
     },
     {
@@ -255,301 +259,276 @@ export default function CierresPage() {
    */
   const pideJustificacion = checklist?.requiereJustificacion ?? false;
   const conJustificacion = bloqueado || pideJustificacion;
+  const hayMensajes = checking || Boolean(checkError) || Boolean(errorCierre) || Boolean(checklist);
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Contabilidad"
-        title="Cierres"
-        subtitle="Revisa la lista de verificación antes de cerrar. Al cerrar se bloquean las pólizas del periodo."
-        density="ops"
-        actions={
-          <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
-            Actualizar
-          </Button>
-        }
-      />
-
+    <MesaPagina
+      titulo="Cierres"
+      descripcion="Revisa la lista de verificación antes de cerrar. Al cerrar se bloquean las pólizas del periodo."
+      terciarias={
+        <Button variant="ghost" onClick={() => void load()} disabled={loading}>
+          Actualizar
+        </Button>
+      }
+    >
       {error && (
-        <InlineAlert
-          message={`No se pudieron cargar los periodos. ${error}`}
-          variant="danger"
+        <Alert
+          tone="danger"
+          role="alert"
+          className={s.alerta}
           onDismiss={() => setError(null)}
           action={
-            <Button size="sm" variant="secondary" onClick={() => void load()}>
+            <Button size="sm" onClick={() => void load()}>
               Reintentar
             </Button>
           }
-        />
+        >
+          {`No se pudieron cargar los periodos. ${error}`}
+        </Alert>
       )}
 
-      <Section
-        title="Periodos fiscales"
-        subtitle="Elige el periodo que quieres cerrar para ver qué falta."
-        flush
-      >
-        {loading ? (
-          <p
-            style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "16px 18px" }}
-            aria-busy="true"
-          >
-            {token ? "Cargando periodos…" : "Esperando la sesión para pedir los periodos…"}
-          </p>
-        ) : rows.length === 0 ? (
-          /* Sin configurar: no falta movimiento, falta el periodo en sí. */
+      <ListCard
+        listLabel="Periodos fiscales"
+        toolbar={
+          <CardHead
+            title="Periodos fiscales"
+            subtitle="Elige el periodo que quieres cerrar para ver qué falta."
+          />
+        }
+        empty={!loading && rows.length === 0}
+        /* Sin configurar: no falta movimiento, falta el periodo en sí. */
+        emptyState={
           <VacioConPrimerPaso
             variant="default"
             title="Todavía no hay periodos fiscales"
             description="Un periodo fiscal es el mes o el ejercicio que se cuadra y se cierra; sin ninguno no hay nada que verificar ni que bloquear. Créalo en Contabilidad general y vuelve aquí a revisarlo."
             destino={DESTINOS.periodoFiscal}
           />
+        }
+      >
+        {loading ? (
+          <div aria-busy="true">
+            <p className={s.estado}>
+              {token ? "Cargando periodos…" : "Esperando la sesión para pedir los periodos…"}
+            </p>
+            <SkeletonRows rows={3} label="Cargando periodos" />
+          </div>
         ) : (
-          <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} density="compact" ariaLabel="Periodos de cierre" />
+          <DataTable
+            flush
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => r.id}
+            density="compact"
+            ariaLabel="Periodos de cierre"
+          />
         )}
-      </Section>
+      </ListCard>
 
       {selected && (
-        <Section
-          eyebrow="Lista de verificación"
-          title={selected.name}
-          subtitle={`${fecha(selected.startDate)} → ${fecha(selected.endDate)}`}
-          actions={
-            checklist && !yaCerrado ? (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  disabled={conJustificacion || closing}
-                  loading={closing && !forceOpen}
-                  onClick={() => pedirConfirmacion(checklist)}
-                  title={
-                    bloqueado
-                      ? "Resuelve los puntos que bloquean el cierre o ciérralo con justificación"
-                      : pideJustificacion
-                        ? "Este periodo exige justificación por escrito"
-                        : undefined
-                  }
-                >
-                  Cerrar periodo
-                </Button>
-                {conJustificacion && (
+        <Card aria-label="Lista de verificación">
+          <CardHead
+            title={
+              <>
+                <span className={s.sobretitulo}>Lista de verificación</span> {selected.name}
+              </>
+            }
+            subtitle={`${fecha(selected.startDate)} → ${fecha(selected.endDate)}`}
+            actions={
+              checklist && !yaCerrado ? (
+                <>
                   <Button
                     size="sm"
-                    variant="secondary"
-                    disabled={closing}
-                    onClick={() => {
-                      setErrorCierre(null);
-                      setIntentado(false);
-                      setForceOpen(true);
-                    }}
+                    variant="primary"
+                    disabled={conJustificacion || closing}
+                    loading={closing && !forceOpen}
+                    onClick={() => pedirConfirmacion(checklist)}
+                    title={
+                      bloqueado
+                        ? "Resuelve los puntos que bloquean el cierre o ciérralo con justificación"
+                        : pideJustificacion
+                          ? "Este periodo exige justificación por escrito"
+                          : undefined
+                    }
                   >
-                    Cerrar con justificación
+                    Cerrar periodo
                   </Button>
-                )}
-              </div>
-            ) : undefined
-          }
-        >
-          {checking && (
-            <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
-              Calculando pendientes…
-            </p>
-          )}
-          {checkError && (
-            <InlineAlert
-              message={`No se pudo calcular la verificación. ${checkError}`}
-              variant="danger"
-              action={
-                selected ? (
-                  <Button size="sm" variant="secondary" onClick={() => void revisar(selected)}>
-                    Reintentar
-                  </Button>
-                ) : undefined
-              }
-            />
-          )}
+                  {conJustificacion && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={closing}
+                      onClick={() => {
+                        setErrorCierre(null);
+                        setIntentado(false);
+                        setForceOpen(true);
+                      }}
+                    >
+                      Cerrar con justificación
+                    </Button>
+                  )}
+                </>
+              ) : undefined
+            }
+          />
 
-          {/* El resultado del último intento de cierre, en la pantalla donde se
-              pulsó y no en un toast que se va. */}
-          {errorCierre && (
-            <InlineAlert
-              message={errorCierre}
-              variant="danger"
-              onDismiss={() => setErrorCierre(null)}
-            />
-          )}
-
-          {checklist && (
-            <>
-              {yaCerrado ? (
-                <InlineAlert
-                  message={`Este periodo ya está cerrado${
-                    checklist.periodo.cerradoEl ? ` desde el ${fecha(checklist.periodo.cerradoEl)}` : ""
-                  }. Solo dirección puede reabrirlo.`}
-                  variant="info"
-                />
-              ) : bloqueado ? (
-                <InlineAlert
-                  message={`${checklist.bloqueantes} ${
-                    checklist.bloqueantes === 1
-                      ? "punto bloquea el cierre"
-                      : "puntos bloquean el cierre"
-                  }. Resuélvelos —cada uno tiene su enlace— o cierra dejando una justificación por escrito.`}
-                  variant="danger"
-                />
-              ) : pideJustificacion ? (
-                <InlineAlert
-                  message="Nada bloquea el cierre, pero este periodo exige una justificación por escrito para cerrarse."
-                  variant="warning"
-                />
-              ) : (
-                <InlineAlert
-                  message="Todo lo que bloquea el cierre está resuelto. Puedes cerrar el periodo."
-                  variant="success"
-                />
+          {hayMensajes && (
+            <div className={s.mensajes}>
+              {checking && (
+                <p className={s.calculando} aria-busy="true">
+                  Calculando pendientes…
+                </p>
+              )}
+              {checkError && (
+                <Alert
+                  tone="danger"
+                  role="alert"
+                  className={s.alerta}
+                  action={
+                    selected ? (
+                      <Button size="sm" onClick={() => void revisar(selected)}>
+                        Reintentar
+                      </Button>
+                    ) : undefined
+                  }
+                >
+                  {`No se pudo calcular la verificación. ${checkError}`}
+                </Alert>
               )}
 
-              <div style={{ margin: "0 0 12px" }}>
-                <MetricStrip
-                  ariaLabel="Estado de la verificación"
-                  metrics={[
-                    {
-                      label: "Bloquean el cierre",
-                      value: String(checklist.bloqueantes),
-                      tone: checklist.bloqueantes > 0 ? "danger" : "default",
-                      hint:
-                        checklist.bloqueantes > 0
-                          ? "hay que resolverlos o justificar"
-                          : "nada lo impide",
-                    },
-                    {
-                      label: "Para revisar",
-                      value: String(checklist.advertencias),
-                      tone: checklist.advertencias > 0 ? "warning" : "default",
-                      hint: "no impiden cerrar",
-                    },
-                    {
-                      label: "Resueltos",
-                      value: String(checklist.items.filter((i) => i.estado === "ok").length),
-                      hint: `de ${checklist.items.length} puntos`,
-                    },
-                  ]}
-                />
-              </div>
+              {/* El resultado del último intento de cierre, en la pantalla donde se
+                  pulsó y no en un toast que se va. */}
+              {errorCierre && (
+                <Alert
+                  tone="danger"
+                  role="alert"
+                  className={s.alerta}
+                  onDismiss={() => setErrorCierre(null)}
+                >
+                  {errorCierre}
+                </Alert>
+              )}
 
-              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 2 }}>
-                {[...checklist.items]
-                  .sort((a, b) => MARCA[a.estado].peso - MARCA[b.estado].peso)
-                  .map((i) => {
-                    const marca = MARCA[i.estado];
-                    const pide = i.estado !== "ok";
-                    return (
-                      <li
-                        key={i.id}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "minmax(0, 1fr) auto",
-                          gap: 12,
-                          alignItems: "baseline",
-                          padding: "10px 12px 10px 14px",
-                          borderLeft: `2px solid ${marca.color ?? "transparent"}`,
-                          borderBottom: "1px solid var(--nx-panel-hairline, var(--border))",
-                          background: "transparent",
-                        }}
-                      >
-                        <div style={{ minWidth: 0 }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: 10,
-                              alignItems: "baseline",
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 13.5,
-                                fontWeight: pide ? 600 : 500,
-                                color: pide ? "var(--text-primary)" : "var(--text-secondary)",
-                              }}
-                            >
-                              {i.etiqueta}
+              {checklist &&
+                (yaCerrado ? (
+                  <Alert tone="info" role="alert" className={s.alerta}>
+                    {`Este periodo ya está cerrado${
+                      checklist.periodo.cerradoEl ? ` desde el ${fecha(checklist.periodo.cerradoEl)}` : ""
+                    }. Solo dirección puede reabrirlo.`}
+                  </Alert>
+                ) : bloqueado ? (
+                  <Alert tone="danger" role="alert" className={s.alerta}>
+                    {`${checklist.bloqueantes} ${
+                      checklist.bloqueantes === 1
+                        ? "punto bloquea el cierre"
+                        : "puntos bloquean el cierre"
+                    }. Resuélvelos —cada uno tiene su enlace— o cierra dejando una justificación por escrito.`}
+                  </Alert>
+                ) : pideJustificacion ? (
+                  <Alert tone="warning" role="alert" className={s.alerta}>
+                    Nada bloquea el cierre, pero este periodo exige una justificación por escrito para cerrarse.
+                  </Alert>
+                ) : (
+                  <Alert tone="success" role="alert" className={s.alerta}>
+                    Todo lo que bloquea el cierre está resuelto. Puedes cerrar el periodo.
+                  </Alert>
+                ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {selected && checklist && (
+        <>
+          <StatRow variant="strip" ariaLabel="Estado de la verificación">
+            <Stat
+              label="Bloquean el cierre"
+              value={String(checklist.bloqueantes)}
+              hint={
+                checklist.bloqueantes > 0
+                  ? "hay que resolverlos o justificar"
+                  : "nada lo impide"
+              }
+              icon={<LockOutlinedIcon />}
+              iconTone="neutral"
+              tone={checklist.bloqueantes > 0 ? "danger" : "default"}
+            />
+            <Stat
+              label="Para revisar"
+              value={String(checklist.advertencias)}
+              hint="no impiden cerrar"
+              icon={<ReportProblemOutlinedIcon />}
+              iconTone="neutral"
+              tone={checklist.advertencias > 0 ? "warning" : "default"}
+            />
+            <Stat
+              label="Resueltos"
+              value={String(checklist.items.filter((i) => i.estado === "ok").length)}
+              hint={`de ${checklist.items.length} puntos`}
+              icon={<TaskAltOutlinedIcon />}
+              iconTone="neutral"
+            />
+          </StatRow>
+
+          <Card aria-label="Puntos de la verificación">
+            <ul className={s.puntos}>
+              {[...checklist.items]
+                .sort((a, b) => MARCA[a.estado].peso - MARCA[b.estado].peso)
+                .map((i) => {
+                  const marca = MARCA[i.estado];
+                  const pide = i.estado !== "ok";
+                  return (
+                    <li key={i.id} className={s.punto} data-estado={i.estado}>
+                      <div className={s.puntoCuerpo}>
+                        <div className={s.puntoTitulo}>
+                          <span className={pide ? s.etiquetaPide : s.etiqueta}>{i.etiqueta}</span>
+                          {i.conteo > 0 && (
+                            <span className={s.conteo}>
+                              {i.conteo} pendiente{i.conteo === 1 ? "" : "s"}
                             </span>
-                            {i.conteo > 0 && (
-                              <span
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  fontVariantNumeric: "tabular-nums",
-                                  color: marca.color ?? "var(--text-secondary)",
-                                }}
-                              >
-                                {i.conteo} pendiente{i.conteo === 1 ? "" : "s"}
-                              </span>
-                            )}
-                          </div>
-                          <p
-                            style={{
-                              margin: "3px 0 0",
-                              fontSize: 12,
-                              color: "var(--text-tertiary)",
-                              lineHeight: 1.45,
-                            }}
-                          >
-                            {i.descripcion}
-                          </p>
-                          {i.conteo > 0 && i.href && (
-                            <Link
-                              href={i.href}
-                              style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}
-                            >
-                              Ir a resolverlo
-                            </Link>
                           )}
                         </div>
-                        {/* La palabra dice el estado, no el color: con la regla
-                            roja invisible, «Bloquea el cierre» sigue leyéndose. */}
-                        <StatusDot label={marca.texto} tone={marca.tono} wrap />
-                      </li>
-                    );
-                  })}
-              </ul>
+                        <p className={s.descripcion}>{i.descripcion}</p>
+                        {i.conteo > 0 && i.href && (
+                          <Link href={i.href} className={s.resolver}>
+                            Ir a resolverlo
+                          </Link>
+                        )}
+                      </div>
+                      {/* La palabra dice el estado, no el color: con la regla
+                          roja invisible, «Bloquea el cierre» sigue leyéndose. */}
+                      <Badge dot size="sm" tone={marca.tono}>
+                        {marca.texto}
+                      </Badge>
+                    </li>
+                  );
+                })}
+            </ul>
 
-              <div
-                style={{
-                  marginTop: 14,
-                  paddingTop: 12,
-                  borderTop: "1px solid var(--border)",
-                  fontSize: 12.5,
-                  color: "var(--text-secondary)",
-                  display: "grid",
-                  gap: 10,
-                }}
-              >
+            <div className={s.proteccion}>
+              <div>
+                <strong className={s.proteccionTitulo}>Al cerrar se bloquea:</strong>
+                <ul className={s.lista}>
+                  {checklist.proteccion.bloqueado.map((l) => (
+                    <li key={l}>{l}</li>
+                  ))}
+                </ul>
+              </div>
+              {checklist.proteccion.noBloqueado.length > 0 ? (
                 <div>
-                  <strong style={{ color: "var(--text-primary)" }}>Al cerrar se bloquea:</strong>
-                  <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
-                    {checklist.proteccion.bloqueado.map((l) => (
+                  <strong className={s.proteccionAviso}>
+                    Lo que el cierre todavía no bloquea:
+                  </strong>
+                  <ul className={s.lista}>
+                    {checklist.proteccion.noBloqueado.map((l) => (
                       <li key={l}>{l}</li>
                     ))}
                   </ul>
                 </div>
-                {checklist.proteccion.noBloqueado.length > 0 ? (
-                  <div>
-                    <strong style={{ color: "var(--state-warning-text, #b45309)" }}>
-                      Lo que el cierre todavía no bloquea:
-                    </strong>
-                    <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
-                      {checklist.proteccion.noBloqueado.map((l) => (
-                        <li key={l}>{l}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </div>
-            </>
-          )}
-        </Section>
+              ) : null}
+            </div>
+          </Card>
+        </>
       )}
 
       <Modal
@@ -563,7 +542,7 @@ export default function CierresPage() {
         dirty={justificacion.trim().length > 0}
         maxWidth={560}
         footer={
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <div className={s.modalPie}>
             <Button
               variant="ghost"
               onClick={() => {
@@ -597,13 +576,11 @@ export default function CierresPage() {
         }
       >
         {errorCierre && (
-          <InlineAlert
-            variant="danger"
-            message={errorCierre}
-            onDismiss={() => setErrorCierre(null)}
-          />
+          <Alert tone="danger" role="alert" onDismiss={() => setErrorCierre(null)}>
+            {errorCierre}
+          </Alert>
         )}
-        <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+        <p className={s.explica}>
           Vas a cerrar <strong>{checklist?.periodo.nombre}</strong>
           {bloqueado
             ? ` con ${checklist?.bloqueantes ?? 0} ${
@@ -614,14 +591,7 @@ export default function CierresPage() {
           anterior del periodo.
         </p>
         {checklist && bloqueado && (
-          <ul
-            style={{
-              margin: "0 0 12px",
-              paddingLeft: 18,
-              fontSize: 12.5,
-              color: "var(--danger)",
-            }}
-          >
+          <ul className={s.bloquean}>
             {checklist.items
               .filter((i) => i.estado === "bloqueante")
               .map((i) => (
@@ -631,7 +601,7 @@ export default function CierresPage() {
               ))}
           </ul>
         )}
-        <FinanceField
+        <Field
           label="Justificación"
           hint={`Mínimo ${MIN_JUSTIFICACION} caracteres · llevas ${justificacion.trim().length}.`}
           error={
@@ -643,8 +613,9 @@ export default function CierresPage() {
               : null
           }
         >
-          <textarea
+          <Textarea
             id="justificacion-cierre"
+            className={s.justificacion}
             value={justificacion}
             onChange={(e) => setJustificacion(e.target.value)}
             rows={4}
@@ -652,12 +623,11 @@ export default function CierresPage() {
               intentado && justificacion.trim().length < MIN_JUSTIFICACION ? true : undefined
             }
             placeholder="Ej. Cierre autorizado por dirección: las pólizas pendientes se reponen en el siguiente periodo."
-            style={{ ...financeInputStyle, minHeight: 90, resize: "vertical" }}
           />
-        </FinanceField>
+        </Field>
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} danger={false} />
-    </>
+    </MesaPagina>
   );
 }

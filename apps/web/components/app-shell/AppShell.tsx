@@ -1530,6 +1530,13 @@ const SLUG_FRASES: Record<string, string> = {
   "por-facturar": "Por facturar",
   "pagos-y-gastos": "Pagos y gastos",
   estados: "Estados financieros",
+  conciliacion: "Conciliación",
+  polizas: "Pólizas",
+  auditoria: "Auditoría",
+  "pre-nomina": "Pre-nómina",
+  prenomina: "Pre-nómina",
+  "cuentas-por-cobrar": "Por cobrar",
+  "cuentas-por-pagar": "Por pagar",
 };
 
 function humanize(slug: string) {

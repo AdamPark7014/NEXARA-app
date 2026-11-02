@@ -116,6 +116,11 @@
   margin: 0;
 }
 
+/* Línea sin etiqueta: ocupa las dos columnas. */
+.howtoList dd.howtoWide {
+  grid-column: 1 / -1;
+}
+
 .howtoNote {
   margin: 10px 0 0;
   font-size: var(--ui-fs-meta);
@@ -644,6 +649,11 @@ button.chip[aria-disabled="true"] {
   gap: 4px;
 }
 
+.noteBody {
+  flex: 1;
+  min-width: 0;
+}
+
 .noteText {
   display: -webkit-box;
   flex: 1;
@@ -931,6 +941,11 @@ button.chip[aria-disabled="true"] {
 .addForm > button {
   grid-column: 1 / -1;
   justify-self: end;
+}
+
+.addForm > .addTitle {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .formError {

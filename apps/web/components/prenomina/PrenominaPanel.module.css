@@ -1,0 +1,59 @@
+/* Prenómina (Finanzas y RR. HH.). Solo tokens --ui-*: claro y oscuro salen solos. */
+
+/* La barra del periodo va en su propia tarjeta: sin la raya de abajo que trae la barra de lista. */
+.barra > [role="search"] {
+  border-bottom: 0;
+}
+
+.fecha {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+}
+
+.fechaCtl {
+  flex: 0 1 160px;
+  width: auto;
+}
+
+/* ─── Tablas ────────────────────────────────────────────────────────────── */
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+}
+
+.persona {
+  min-width: 0;
+}
+
+.nombre {
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.puesto {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+}
+
+.jornadas {
+  margin-top: var(--ui-s1);
+}
+
+.extras {
+  color: var(--ui-fg);
+}
+
+.decision {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}

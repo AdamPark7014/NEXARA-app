@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
-import Button from "@/components/ui/Button";
-import StatusDot from "@/components/ui/StatusDot";
+import { useState } from "react";
+import { Alert, Badge, Button, DataTable, FilterChip, Input, SearchInput, type Column } from "@/components/base";
 import { Money } from "@/components/ui/DataTable";
-import { financeInputStyle } from "@/components/finance/FinanceModuleShell";
 import type { ViaticoLiquidacion } from "@/lib/viatics-api";
 import {
   centavosViatico as centavos,
@@ -12,6 +10,7 @@ import {
   pesosViatico as dinero,
   type ParteForm,
 } from "@/lib/viatics-display";
+import s from "./viatics.module.css";
 
 /** Entrada de `approvalTrail` (JSON en la API). Todo opcional: es Json, no un contrato duro. */
 export type ApprovalTrailEntry = {
@@ -24,75 +23,6 @@ export type ApprovalTrailEntry = {
 };
 
 export type AnalyticsBucket = { name: string; total: number; count: number };
-
-/* ── Estilos locales del contrato de diseño (.ai/DISENO-FINANZAS.md) ──────── */
-
-/** Regla 2: las acciones de fila no deben engordar el renglón. */
-export const rowButtonStyle: CSSProperties = { height: 28, fontSize: 12, padding: "0 9px" };
-export const choiceLabelStyle: CSSProperties = {
-  fontSize: 11.5,
-  fontWeight: 600,
-  color: "var(--text-secondary)",
-  display: "block",
-  marginBottom: 6,
-};
-const breakdownPanelStyle: CSSProperties = {
-  padding: 14,
-  border: "1px solid var(--nx-panel-hairline, var(--border))",
-  borderRadius: 10,
-  background: "var(--surface-2, var(--surface))",
-};
-const breakdownTitleStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  marginBottom: 10,
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-  color: "var(--text-tertiary)",
-};
-const srOnlyStyle: CSSProperties = {
-  position: "absolute",
-  width: 1,
-  height: 1,
-  overflow: "hidden",
-  clip: "rect(0 0 0 0)",
-};
-/** Ficha de lo ya elegido. Baja para que ocho seguidas no sean un muro. */
-const chipStyle: CSSProperties = { height: 24, fontSize: 11.5, padding: "0 8px" };
-/**
- * La lista de opciones de un selector múltiple.
- *
- * Un solo borde, el de un control —igual que el buscador que lleva encima—, no
- * una tarjeta con su relleno: regla 9, ni una caja dentro de otra caja.
- */
-const listaOpcionesStyle: CSSProperties = {
-  maxHeight: 176,
-  overflowY: "auto",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  background: "var(--surface)",
-};
-/**
- * Fila de opción. Lo elegido se marca con la paloma y con la superficie
- * hundida, nunca con color: un renglón seleccionado no es un estado que pida
- * acción (regla 6).
- */
-const opcionStyle = (elegida: boolean, conLinea: boolean): CSSProperties => ({
-  display: "flex",
-  alignItems: "flex-start",
-  gap: 8,
-  width: "100%",
-  textAlign: "left",
-  padding: "7px 10px",
-  border: "none",
-  borderTop: conLinea ? "1px solid color-mix(in srgb, var(--border) 55%, transparent)" : "none",
-  background: elegida ? "var(--surface-2, var(--surface))" : "transparent",
-  color: "var(--text-primary)",
-  font: "inherit",
-  fontSize: 12.5,
-  lineHeight: 1.35,
-  cursor: "pointer",
-});
 
 /* ── Etiquetas ──────────────────────────────────────────────────────────── */
 
@@ -114,8 +44,8 @@ const ESTATUS_LABEL: Record<string, string> = {
   Aprobado_Coordinador: "Aprobado por coordinador",
 };
 
-export function estatusLabel(s?: string | null) {
-  const v = s || "Pendiente";
+export function estatusLabel(estatus?: string | null) {
+  const v = estatus || "Pendiente";
   return ESTATUS_LABEL[v] ?? v.replace(/_/g, " ");
 }
 
@@ -158,63 +88,42 @@ export function BreakdownTable({
   limit?: number;
 }) {
   const shown = rows.slice(0, limit);
-  const cellBorder = (i: number) =>
-    i === shown.length - 1 ? "none" : "1px solid color-mix(in srgb, var(--border) 55%, transparent)";
+  const columns: Column<AnalyticsBucket>[] = [
+    { key: "name", label: "Concepto", render: (r) => r.name },
+    {
+      key: "count",
+      label: "Registros",
+      numeric: true,
+      width: 120,
+      render: (r) => <span className={s.tenue}>{r.count}</span>,
+    },
+    { key: "total", label: "Total", numeric: true, width: 160, render: (r) => <Money value={r.total} /> },
+  ];
   return (
-    <div style={breakdownPanelStyle}>
-      <div style={breakdownTitleStyle}>{title}</div>
+    <section className={s.desglose}>
+      <h3 className={s.desgloseTitulo}>{title}</h3>
       {shown.length === 0 ? (
-        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Sin datos en el periodo.</div>
+        <p className={s.sinDatos}>Sin datos en el periodo.</p>
       ) : (
         <>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-            <caption style={srOnlyStyle}>{title}</caption>
-            <thead>
-              <tr>
-                <th scope="col" style={{ textAlign: "left", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
-                  Concepto
-                </th>
-                <th scope="col" style={{ textAlign: "right", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
-                  Registros
-                </th>
-                <th scope="col" style={{ textAlign: "right", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((r, i) => (
-                <tr key={r.name}>
-                  <th scope="row" style={{ textAlign: "left", fontWeight: 400, padding: "6px 8px 6px 0", borderBottom: cellBorder(i) }}>
-                    {r.name}
-                  </th>
-                  <td
-                    style={{
-                      textAlign: "right",
-                      fontSize: 11,
-                      color: "var(--text-tertiary)",
-                      fontVariantNumeric: "tabular-nums",
-                      padding: "6px 12px",
-                      borderBottom: cellBorder(i),
-                    }}
-                  >
-                    {r.count}
-                  </td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", padding: "6px 0", borderBottom: cellBorder(i) }}>
-                    <Money value={r.total} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            flush
+            stickyHeader={false}
+            density="compact"
+            ariaLabel={title}
+            caption={title}
+            columns={columns}
+            rows={shown}
+            rowKey={(r) => r.name}
+          />
           {rows.length > limit && (
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>
+            <p className={s.desgloseNota}>
               Se muestran los {limit} primeros de {rows.length}. El PDF trae el desglose completo.
-            </div>
+            </p>
           )}
         </>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -256,13 +165,10 @@ export function RepartoEditor({
           : `Sobran ${dinero(-diferencia)}: ${frasePartesSuman(partes.length)} más que el viático.`;
 
   return (
-    <div style={{ display: "grid", gap: 8 }}>
+    <div className={s.repartoEditor}>
       {partes.map((parte, i) => (
-        <div
-          key={i}
-          style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr) auto", gap: 8, alignItems: "center" }}
-        >
-          <input
+        <div key={i} className={s.repartoFila}>
+          <Input
             type="number"
             inputMode="numeric"
             min="1"
@@ -272,9 +178,8 @@ export function RepartoEditor({
             placeholder="ID actividad"
             aria-label={`Actividad de la parte ${i + 1}`}
             disabled={disabled}
-            style={financeInputStyle}
           />
-          <input
+          <Input
             type="number"
             inputMode="decimal"
             min="0"
@@ -284,12 +189,11 @@ export function RepartoEditor({
             placeholder="0.00"
             aria-label={`Monto de la parte ${i + 1}`}
             disabled={disabled}
-            style={{ ...financeInputStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+            className={s.monto}
           />
           <Button
             size="sm"
             variant="ghost"
-            style={rowButtonStyle}
             disabled={disabled}
             aria-label={`Quitar la parte ${i + 1}`}
             onClick={() => onChange(partes.filter((_, j) => j !== i))}
@@ -299,11 +203,10 @@ export function RepartoEditor({
         </div>
       ))}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div className={s.repartoPie}>
         <Button
           size="sm"
           variant="secondary"
-          style={rowButtonStyle}
           disabled={disabled}
           onClick={() => {
             // La primera parte se abre con lo que falta: casi siempre el total.
@@ -317,16 +220,14 @@ export function RepartoEditor({
           Añadir actividad
         </Button>
         {partes.length > 0 && (
-          <StatusDot
-            wrap
-            tone={diferencia === 0 ? "success" : "warning"}
-            label={pista}
-          />
+          <div className={s.nota}>
+            <Alert dense icon={null} tone={diferencia === 0 ? "success" : "warning"}>
+              {pista}
+            </Alert>
+          </div>
         )}
       </div>
-      {partes.length === 0 && (
-        <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{pista}</span>
-      )}
+      {partes.length === 0 && <span className={s.pista}>{pista}</span>}
     </div>
   );
 }
@@ -341,7 +242,7 @@ export function RepartoEditor({
  * buscar solo filtra lo que se muestra — nunca desmarca lo ya elegido.
  *
  * Las opciones son botones y no casillas porque este bloque vive dentro del
- * `<label>` de un `FinanceField`: un `<input type="checkbox">` ahí dentro
+ * `<label>` de un `Field`: un `<input type="checkbox">` ahí dentro
  * competiría con el buscador por ser el control de esa etiqueta.
  */
 export function SelectorMultiple<T extends { id: number }>({
@@ -360,7 +261,7 @@ export function SelectorMultiple<T extends { id: number }>({
   elegidos: number[];
   onChange: (ids: number[]) => void;
   textoDe: (o: T) => string;
-  /** Segunda línea en 11px: el puesto, el folio de la actividad, el cliente. */
+  /** Segunda línea chica: el puesto, el folio de la actividad, el cliente. */
   detalleDe?: (o: T) => string | null;
   placeholder: string;
   /** Sustantivo en plural («beneficiarios»): de ahí salen los dos nombres
@@ -383,67 +284,56 @@ export function SelectorMultiple<T extends { id: number }>({
     onChange(elegidos.includes(id) ? elegidos.filter((x) => x !== id) : [...elegidos, id]);
 
   return (
-    <div style={{ display: "grid", gap: 8 }}>
+    <div className={s.selector}>
       {/* Lo elegido va ARRIBA y siempre visible: responde a «¿a quién le estoy
           dando dinero?», que abajo ya se lo tragó el scroll de la lista. */}
       {elegidos.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <div className={s.fichas}>
           {elegidos.map((id) => {
             const elegido = porId.get(id);
             const texto = elegido ? textoDe(elegido) : `#${id}`;
             return (
-              <Button
+              <FilterChip
                 key={id}
-                size="sm"
-                variant="secondary"
-                style={chipStyle}
                 disabled={disabled}
-                aria-label={`Quitar ${texto}`}
-                onClick={() => alternar(id)}
+                removeLabel={`Quitar ${texto}`}
+                onRemove={() => alternar(id)}
               >
-                {texto} ×
-              </Button>
+                {texto}
+              </FilterChip>
             );
           })}
         </div>
       )}
-      <input
-        type="search"
+      <SearchInput
         value={busqueda}
         onChange={(e) => setBusqueda(e.target.value)}
         placeholder={placeholder}
         aria-label={`Buscar ${etiqueta}`}
         disabled={disabled}
-        style={financeInputStyle}
       />
-      <div style={listaOpcionesStyle} role="group" aria-label={`Lista de ${etiqueta}`}>
+      <div className={s.listaOpciones} role="group" aria-label={`Lista de ${etiqueta}`}>
         {visibles.length === 0 ? (
-          <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-tertiary)" }}>
-            {q ? "Nada coincide con lo que buscaste." : vacio}
-          </div>
+          <div className={s.selectorVacio}>{q ? "Nada coincide con lo que buscaste." : vacio}</div>
         ) : (
-          visibles.map((o, i) => {
+          visibles.map((o) => {
             const elegida = elegidos.includes(o.id);
             const detalle = detalleDe?.(o);
             return (
               <button
                 key={o.id}
                 type="button"
+                className={s.opcion}
                 aria-pressed={elegida}
                 disabled={disabled}
                 onClick={() => alternar(o.id)}
-                style={opcionStyle(elegida, i > 0)}
               >
-                <span aria-hidden="true" style={{ width: 11, flexShrink: 0 }}>
+                <span aria-hidden="true" className={s.opcionMarca}>
                   {elegida ? "✓" : ""}
                 </span>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block" }}>{textoDe(o)}</span>
-                  {detalle ? (
-                    <span style={{ display: "block", fontSize: 11, color: "var(--text-tertiary)" }}>
-                      {detalle}
-                    </span>
-                  ) : null}
+                <span className={s.opcionTexto}>
+                  <span className={s.opcionNombre}>{textoDe(o)}</span>
+                  {detalle ? <span className={s.opcionDetalle}>{detalle}</span> : null}
                 </span>
               </button>
             );
@@ -451,7 +341,7 @@ export function SelectorMultiple<T extends { id: number }>({
         )}
       </div>
       {filtradas.length > visibles.length && (
-        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+        <span className={s.selectorNota}>
           Se ven {visibles.length} de {filtradas.length}. Escribe arriba para acotar.
         </span>
       )}
@@ -473,28 +363,30 @@ export function LiquidacionResumen({ liquidacion }: { liquidacion?: ViaticoLiqui
           : `Faltaron ${dinero(centavos(Math.abs(saldo ?? 0)))}: la empresa debe ese reembolso.`;
   return (
     <div>
-      <span style={choiceLabelStyle}>Anticipo</span>
-      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 6 }}>
-        <span style={{ fontSize: 12.5 }}>
-          Entregado <strong style={{ fontVariantNumeric: "tabular-nums" }}><Money value={entregado} /></strong>
+      <span className={s.etiqueta}>Anticipo</span>
+      <div className={s.cifrasAnticipo}>
+        <span>
+          Entregado <strong><Money value={entregado} /></strong>
         </span>
-        <span style={{ fontSize: 12.5 }}>
+        <span>
           Comprobado{" "}
-          <strong style={{ fontVariantNumeric: "tabular-nums" }}>
-            {comprobado == null ? "—" : <Money value={comprobado} />}
-          </strong>
+          <strong>{comprobado == null ? "—" : <Money value={comprobado} />}</strong>
         </span>
         {saldo != null && (
-          <span style={{ fontSize: 12.5 }}>
-            Saldo <strong style={{ fontVariantNumeric: "tabular-nums" }}><Money value={Math.abs(saldo)} /></strong>
+          <span>
+            Saldo <strong><Money value={Math.abs(saldo)} /></strong>
           </span>
         )}
       </div>
-      <StatusDot
-        wrap
-        tone={estado === "CUADRADO" ? "success" : estado === "SIN_COMPROBAR" ? "neutral" : "warning"}
-        label={texto}
-      />
+      <div className={s.nota}>
+        <Alert
+          dense
+          icon={null}
+          tone={estado === "CUADRADO" ? "success" : estado === "SIN_COMPROBAR" ? "neutral" : "warning"}
+        >
+          {texto}
+        </Alert>
+      </div>
     </div>
   );
 }
@@ -503,31 +395,25 @@ export function LiquidacionResumen({ liquidacion }: { liquidacion?: ViaticoLiqui
 export function ApprovalTrail({ trail, step }: { trail: ApprovalTrailEntry[]; step?: number }) {
   return (
     <div>
-      <span style={choiceLabelStyle}>Cadena de autorización</span>
+      <span className={s.etiqueta}>Cadena de autorización</span>
       {trail.length === 0 ? (
-        <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+        <div className={s.cadenaVacia}>
           — Nadie la ha revisado todavía{typeof step === "number" ? ` (paso ${step})` : ""}.
         </div>
       ) : (
-        <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 6 }}>
+        <ol className={s.cadena}>
           {trail.map((entry, i) => (
-            <li key={`${entry.at ?? i}-${entry.userId ?? i}`} style={{ fontSize: 12, lineHeight: 1.45 }}>
-              <StatusDot
-                wrap
-                tone={entry.action === "reject" ? "danger" : "success"}
-                label={
-                  <span>
-                    <strong style={{ fontWeight: 600 }}>{trailActionLabel(entry.action)}</strong>{" "}
-                    {entry.userName ?? (entry.userId ? `usuario #${entry.userId}` : "—")}
-                    {entry.role ? ` · ${humanRole(entry.role)}` : ""}
-                    {" · "}
-                    {formatFechaHora(entry.at)}
-                    {entry.note ? (
-                      <span style={{ display: "block", color: "var(--text-tertiary)" }}>“{entry.note}”</span>
-                    ) : null}
-                  </span>
-                }
-              />
+            <li key={`${entry.at ?? i}-${entry.userId ?? i}`} className={s.cadenaItem}>
+              <Badge dot size="sm" tone={entry.action === "reject" ? "danger" : "success"}>
+                {trailActionLabel(entry.action)}
+              </Badge>
+              <span className={s.cadenaTexto}>
+                {entry.userName ?? (entry.userId ? `usuario #${entry.userId}` : "—")}
+                {entry.role ? ` · ${humanRole(entry.role)}` : ""}
+                {" · "}
+                {formatFechaHora(entry.at)}
+                {entry.note ? <span className={s.cadenaNota}>“{entry.note}”</span> : null}
+              </span>
             </li>
           ))}
         </ol>

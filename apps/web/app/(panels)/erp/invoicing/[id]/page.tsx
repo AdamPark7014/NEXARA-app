@@ -2,13 +2,32 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import PageHeader from "@/components/ui/PageHeader";
-import Button from "@/components/ui/Button";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import EmptyState from "@/components/ui/EmptyState";
-import InlineAlert from "@/components/ui/InlineAlert";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
+import HourglassEmptyOutlinedIcon from "@mui/icons-material/HourglassEmptyOutlined";
+import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardHead,
+  Checkbox,
+  DataTable,
+  DateInput,
+  EmptyState,
+  Field,
+  FieldGrid,
+  Input,
+  PageHead,
+  Select,
+  Stat,
+  StatRow,
+  type Column,
+  type Tone,
+} from "@/components/base";
 import { Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -18,25 +37,16 @@ import Modal from "@/components/ui/Modal";
 import { formatApiError } from "@/lib/erp-api";
 import { saveBlob, todayStamp } from "@/components/finance/download";
 import {
-  FinanceField,
-  FinanceFormGrid,
-  financeInputStyle,
-} from "@/components/finance/FinanceModuleShell";
-import {
-  AlertIcon,
-  BlockHeading,
   COMMERCIAL_LABEL,
   CopyableRef,
   Dot,
   fiscalState,
   FootNote,
-  LoadingIcon,
-  MetricFrame,
-  MetricHint,
-  MetricValue,
   NoticeStack,
   type Notice,
 } from "../_parts";
+import s from "./ficha.module.css";
+
 
 interface InvoiceLine {
   id: number;
@@ -99,7 +109,7 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
  * Tono del estado comercial. Neutro mientras el flujo va como debe; el color
  * se reserva para lo que pide acción (vencida) o para lo que ya se liquidó.
  */
-const STATUS_TONE: Record<string, StatusTone> = {
+const STATUS_TONE: Record<string, Tone> = {
   PAID: "success",
   PARTIALLY_PAID: "neutral",
   OVERDUE: "danger",
@@ -108,6 +118,14 @@ const STATUS_TONE: Record<string, StatusTone> = {
   CANCELLED: "danger",
 };
 
+/** Partidas de la factura: las mismas cuatro columnas de siempre, ahora en la tabla de la base. */
+const COLUMNAS_CONCEPTOS: Column<InvoiceLine>[] = [
+  { key: "description", label: "Descripción", render: (l) => l.description },
+  { key: "quantity", label: "Cant.", numeric: true, width: 90, render: (l) => l.quantity },
+  { key: "unitPrice", label: "P. unit.", numeric: true, width: 130, render: (l) => <Money value={l.unitPrice} bold={false} /> },
+  { key: "subtotal", label: "Subtotal", numeric: true, width: 140, render: (l) => <Money value={l.subtotal ?? (l.quantity * l.unitPrice)} /> },
+];
+
 const MATCH_LABELS: Record<string, string> = {
   NOT_REQUIRED: "No aplica",
   PENDING: "Pendiente",
@@ -115,26 +133,6 @@ const MATCH_LABELS: Record<string, string> = {
   VARIANCE: "Variación",
   WAIVED: "Eximido",
 };
-
-const inp = financeInputStyle;
-
-/** Etiqueta de un dato de ficha: pequeña, callada, sin competir con el valor. */
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: 10.5,
-        fontWeight: 600,
-        color: "var(--text-tertiary)",
-        letterSpacing: "0.04em",
-        textTransform: "uppercase",
-        marginBottom: 3,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 export default function InvoiceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -383,9 +381,32 @@ export default function InvoiceDetailPage() {
     return Math.min(100, Math.round(((invoice.paidAmount ?? 0) / invoice.totalAmount) * 100));
   }, [invoice]);
 
-  if (loading && !invoice) return <EmptyState icon={<LoadingIcon />} title="Cargando factura…" description="Consultando el CFDI." />;
-  if (error && !invoice) return <EmptyState icon={<AlertIcon />} title="No se pudo cargar la factura" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />;
+  if (loading && !invoice) {
+    return (
+      <div className={s.pagina}>
+        <Card>
+          <EmptyState tone="neutral" icon={<HourglassEmptyOutlinedIcon />} title="Cargando factura…" description="Consultando el CFDI." />
+        </Card>
+      </div>
+    );
+  }
+  if (error && !invoice) {
+    return (
+      <div className={s.pagina}>
+        <Card>
+          <EmptyState
+            tone="danger"
+            icon={<CloudOffOutlinedIcon />}
+            title="No se pudo cargar la factura"
+            description={error}
+            action={<Button onClick={() => void load()}>Reintentar</Button>}
+          />
+        </Card>
+      </div>
+    );
+  }
   if (!invoice) return null;
+
 
   const isIncome = invoice.type === "ACCOUNTS_RECEIVABLE" || invoice.type === "INCOME";
   const counterparty = isIncome ? invoice.receptorName : invoice.emisorName;
@@ -406,6 +427,21 @@ export default function InvoiceDetailPage() {
 
   const canPay = canEdit && invoice.status !== "PAID" && invoice.status !== "CANCELLED";
   const canStamp = canEdit && invoice.status === "DRAFT" && !invoice.cfdiUuid;
+  const botonPago = canPay ? (
+    <Button
+      variant={canStamp ? "secondary" : "primary"}
+      disabled={!matchAllowsPay}
+      title={!matchAllowsPay ? "Resuelve el cotejo con la orden de compra antes de pagar" : undefined}
+      onClick={openPayment}
+    >
+      Registrar pago
+    </Button>
+  ) : null;
+  const botonTimbrar = canStamp ? (
+    <Button variant="primary" onClick={() => void stampInvoice()} disabled={stamping}>
+      {stamping ? "Timbrando…" : "Timbrar CFDI"}
+    </Button>
+  ) : null;
 
   /* ---------------------------------------------------------------- *
    * Avisos: el 3-way match dejó de ser una tarjeta propia y entra en la
@@ -460,259 +496,204 @@ export default function InvoiceDetailPage() {
     });
   }
 
-  const metrics: Metric[] = [
-    {
-      label: "Total",
-      value: <MetricValue><Money value={invoice.totalAmount} bold={false} /></MetricValue>,
-      hint: <MetricHint>{isIncome ? "por cobrar al cliente" : "por pagar al proveedor"}</MetricHint>,
-    },
-    {
-      label: "Pagado",
-      value: <MetricValue><Money value={invoice.paidAmount ?? 0} bold={false} /></MetricValue>,
-      hint: <MetricHint tone={paidPct === 100 ? "success" : "default"}>{paidPct}% cubierto</MetricHint>,
-      tone: paidPct === 100 ? "success" : "default",
-    },
-    {
-      label: "Pendiente",
-      value: <MetricValue><Money value={pendingAmount} bold={false} /></MetricValue>,
-      hint: (
-        <MetricHint tone={pendingAmount > 0 && invoice.status === "OVERDUE" ? "danger" : "default"}>
-          {pendingAmount > 0
-            ? invoice.status === "OVERDUE"
-              ? "fuera de plazo"
-              : invoice.dueDate
-                ? `vence ${new Date(invoice.dueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}`
-                : "saldo abierto"
-            : "sin saldo"}
-        </MetricHint>
-      ),
-      tone: pendingAmount > 0 && invoice.status === "OVERDUE" ? "danger" : pendingAmount > 0 ? "warning" : "default",
-    },
-  ];
-
   const payments = invoice.payments ?? [];
   const lines = invoice.items ?? [];
 
   return (
     <>
-      {/* 1 · Dónde estoy: folio, contraparte y los dos estados que importan. */}
-      <div style={{ marginBottom: 6 }}>
-        <Link
-          href="/erp/invoicing"
-          style={{ fontSize: 12, color: "var(--text-tertiary)", textDecoration: "none" }}
-        >
-          ← Facturación
-        </Link>
-      </div>
-      <PageHeader
-        eyebrow={`ERP · ${isIncome ? "Cuentas por cobrar" : "Cuentas por pagar"}`}
-        title={invoice.invoiceNumber}
-        subtitle={counterparty ?? "—"}
-        density="ops"
-        meta={
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            <StatusDot label={fiscal.label} tone={fiscal.tone} title={fiscal.title} />
-            <StatusDot
-              label={COMMERCIAL_LABEL[invoice.status] ?? invoice.status}
-              tone={STATUS_TONE[invoice.status] ?? "neutral"}
-            />
-          </span>
-        }
-        /* 2 · Un solo primario: el siguiente paso fiscal de ESTA factura.
-           Lo demás (XML, PDF, estatus, nota de crédito, cancelación) actúa
-           sobre el documento timbrado y baja al bloque del CFDI. */
-        actions={
-          canStamp || canPay ? (
+      <div className={s.pagina}>
+        {/* Cabeza: folio, contraparte y los dos estados que importan. Un solo primario: el siguiente paso fiscal de ESTA
+            factura. Lo demás (XML, PDF, estatus, nota de crédito, cancelación) actúa sobre el documento timbrado y vive
+            en la tarjeta del CFDI. */}
+        <PageHead
+          className={s.cabeza}
+          back={{ href: "/erp/invoicing", label: "Facturación" }}
+          eyebrow={`Finanzas · ${isIncome ? "Cuentas por cobrar" : "Cuentas por pagar"}`}
+          title={invoice.invoiceNumber}
+          description={counterparty ?? "—"}
+          meta={
             <>
-              {canPay && (
-                <Button
-                  size="sm"
-                  variant={canStamp ? "ghost" : "primary"}
-                  disabled={!matchAllowsPay}
-                  title={!matchAllowsPay ? "Resuelve el cotejo con la orden de compra antes de pagar" : undefined}
-                  onClick={openPayment}
-                >
-                  Registrar pago
-                </Button>
-              )}
-              {canStamp && (
-                <Button size="sm" variant="primary" onClick={() => void stampInvoice()} disabled={stamping}>
-                  {stamping ? "Timbrando…" : "Timbrar CFDI"}
-                </Button>
-              )}
+              <Badge dot tone={fiscal.tone} title={fiscal.title}>{fiscal.label}</Badge>
+              <Badge dot tone={STATUS_TONE[invoice.status] ?? "neutral"}>
+                {COMMERCIAL_LABEL[invoice.status] ?? invoice.status}
+              </Badge>
             </>
-          ) : undefined
-        }
-      />
+          }
+          secondaryActions={canStamp ? botonPago : undefined}
+          primaryAction={canStamp ? botonTimbrar : botonPago}
+        />
 
-      {/* 3 · Cómo va el dinero de esta factura. */}
-      <MetricFrame>
-        <MetricStrip metrics={metrics} ariaLabel="Resumen de la factura" />
-      </MetricFrame>
+        <NoticeStack notices={notices} />
 
-      <NoticeStack notices={notices} />
+        {/* Cómo va el dinero de esta factura. */}
+        <StatRow variant="strip" ariaLabel="Resumen de la factura">
+          <Stat
+            label="Total"
+            value={<Money value={invoice.totalAmount} />}
+            hint={isIncome ? "por cobrar al cliente" : "por pagar al proveedor"}
+            icon={<ReceiptLongOutlinedIcon />}
+            iconTone="neutral"
+          />
+          <Stat
+            label="Pagado"
+            value={<Money value={invoice.paidAmount ?? 0} />}
+            hint={`${paidPct}% cubierto`}
+            tone={paidPct === 100 ? "success" : "default"}
+            icon={<CheckCircleOutlineRoundedIcon />}
+            iconTone="neutral"
+          />
+          <Stat
+            label="Pendiente"
+            value={<Money value={pendingAmount} />}
+            hint={
+              pendingAmount > 0
+                ? invoice.status === "OVERDUE"
+                  ? "fuera de plazo"
+                  : invoice.dueDate
+                    ? `vence ${new Date(invoice.dueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}`
+                    : "saldo abierto"
+                : "sin saldo"
+            }
+            tone={pendingAmount > 0 && invoice.status === "OVERDUE" ? "danger" : pendingAmount > 0 ? "warning" : "default"}
+            icon={<PendingActionsOutlinedIcon />}
+            iconTone="neutral"
+          />
+        </StatRow>
 
-      {/* 4 · Lo facturado. */}
-      <BlockHeading title="Conceptos" meta={lines.length > 0 ? `${lines.length} partida${lines.length === 1 ? "" : "s"}` : undefined} />
-      {lines.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", marginBottom: 22 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 70px 110px 120px", gap: 10, padding: "0 12px 6px", fontSize: 10.5, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            <span>Descripción</span><span style={{ textAlign: "right" }}>Cant.</span><span style={{ textAlign: "right" }}>P. unit.</span><span style={{ textAlign: "right" }}>Subtotal</span>
-          </div>
-          <div style={{ border: "1px solid var(--nx-panel-hairline)", borderRadius: 10, background: "var(--surface)", overflow: "hidden" }}>
-            {lines.map((line, i) => (
-              <div
-                key={line.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 70px 110px 120px",
-                  gap: 10,
-                  padding: "11px 12px",
-                  alignItems: "center",
-                  borderTop: i === 0 ? undefined : "1px solid var(--nx-panel-hairline-soft, var(--border))",
-                }}
-              >
-                <span style={{ fontSize: 13 }}>{line.description}</span>
-                <span style={{ textAlign: "right", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{line.quantity}</span>
-                <span style={{ textAlign: "right", fontSize: 13 }}><Money value={line.unitPrice} bold={false} /></span>
-                <span style={{ textAlign: "right", fontSize: 13 }}><Money value={line.subtotal ?? (line.quantity * line.unitPrice)} /></span>
+        {/* Lo facturado. */}
+        <Card className={s.tarjetaTabla}>
+          <CardHead
+            title="Conceptos"
+            subtitle={lines.length > 0 ? `${lines.length} partida${lines.length === 1 ? "" : "s"}` : undefined}
+          />
+          {lines.length > 0 ? (
+            <>
+              <DataTable
+                flush
+                ariaLabel="Conceptos de la factura"
+                columns={COLUMNAS_CONCEPTOS}
+                rows={lines}
+                rowKey={(l) => l.id}
+              />
+              <div className={s.total}>
+                <span className={s.totalEtiqueta}>Total</span>
+                <span className={s.totalMonto}><Money value={invoice.totalAmount} /></span>
+              </div>
+            </>
+          ) : (
+            <EmptyState
+              size="compact"
+              tone="neutral"
+              icon={<ReceiptLongOutlinedIcon />}
+              title="Sin partidas capturadas"
+              description={invoice.description ?? "Esta factura no tiene conceptos desglosados."}
+            />
+          )}
+        </Card>
+
+        {/* Pagos: solo aparece cuando hay historial que leer. */}
+        {payments.length > 0 && (
+          <Card>
+            <CardHead
+              title="Pagos"
+              subtitle={`${payments.length} registrado${payments.length === 1 ? "" : "s"}${invoice.satPaymentMethod === "PPD" ? " · cada uno exige complemento" : ""}`}
+            />
+            <ul className={s.pagos}>
+              {payments.map((p) => (
+                <li key={p.id} className={s.pago}>
+                  <div className={s.pagoInfo}>
+                    <span className={s.pagoMetodo}>{p.method ?? "Transferencia"}{p.reference ? ` · Ref: ${p.reference}` : ""}</span>
+                    {p.notes && <span className={s.pagoNotas}>{p.notes}</span>}
+                    {p.cfdiPaymentUuid && (
+                      <CopyableRef value={p.cfdiPaymentUuid} display={`comp. ${p.cfdiPaymentUuid.slice(0, 8)}…`} label="el UUID del complemento" />
+                    )}
+                  </div>
+                  <span className={s.pagoFecha}>{new Date(p.paymentDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+                  <span className={s.pagoMonto}><Money value={p.amount} /></span>
+                  <div className={s.pagoAccion}>
+                    {canEdit && invoice.satPaymentMethod === "PPD" && invoice.cfdiUuid && !p.cfdiPaymentUuid ? (
+                      <Button size="sm" variant="secondary" onClick={() => void stampComplement(p.id)}>Timbrar comp.</Button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        {/* El documento fiscal: los datos del CFDI y todo lo que actúa sobre él. */}
+        <Card>
+          <CardHead
+            title="CFDI"
+            actions={
+              <>
+                {invoice.cfdiUuid && (
+                  <Button size="sm" variant="ghost" onClick={() => void downloadXml()}>XML</Button>
+                )}
+                {invoice.cfdiUuid && invoice.pdfUrl && (
+                  <ButtonLink size="sm" variant="ghost" href={invoice.pdfUrl} target="_blank" rel="noopener noreferrer">PDF</ButtonLink>
+                )}
+                {invoice.cfdiUuid && (
+                  <Button size="sm" variant="ghost" onClick={() => void checkSatStatus()} disabled={checkingSat}>
+                    {checkingSat ? "Consultando…" : "Estatus SAT"}
+                  </Button>
+                )}
+                {canEdit && invoice.cfdiUuid && !invoice.isCancelled && invoice.cfdiRelationType !== "01" && (
+                  <Button size="sm" variant="ghost" onClick={() => void createCreditNote()}>Nota de crédito</Button>
+                )}
+                {canEdit && invoice.cfdiUuid && !invoice.isCancelled && (
+                  <Button size="sm" onClick={() => { setCancelErr(null); setShowCancel(true); }}>Cancelar CFDI</Button>
+                )}
+              </>
+            }
+          />
+          <dl className={s.datos}>
+            {[
+              { label: isIncome ? "Cliente / Receptor" : "Proveedor", value: counterparty },
+              { label: "RFC receptor", value: invoice.receptorRfc },
+              { label: "Método pago SAT", value: invoice.satPaymentMethod ?? "PUE" },
+              { label: "Emisión", value: new Date(invoice.issueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) },
+              { label: "Vencimiento", value: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) : null },
+            ].map(({ label, value }) => (
+              <div key={label} className={s.dato}>
+                <dt>{label}</dt>
+                <dd className={value ? undefined : s.datoVacio}>{value ?? "—"}</dd>
               </div>
             ))}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 10, padding: "10px 12px 0", alignItems: "baseline" }}>
-            <span style={{ textAlign: "right", fontSize: 11.5, color: "var(--text-tertiary)" }}>Total</span>
-            <span style={{ textAlign: "right", fontSize: 15 }}><Money value={invoice.totalAmount} /></span>
-          </div>
-        </div>
-      ) : (
-        <div style={{ marginBottom: 22 }}>
-          <EmptyState
-            variant="compact"
-            title="Sin partidas capturadas"
-            description={invoice.description ?? "Esta factura no tiene conceptos desglosados."}
-          />
-        </div>
-      )}
-
-      {/* Pagos: solo aparece cuando hay historial que leer. */}
-      {payments.length > 0 && (
-        <>
-          <BlockHeading
-            title="Pagos"
-            meta={`${payments.length} registrado${payments.length === 1 ? "" : "s"}${invoice.satPaymentMethod === "PPD" ? " · cada uno exige complemento" : ""}`}
-          />
-          <div style={{ border: "1px solid var(--nx-panel-hairline)", borderRadius: 10, background: "var(--surface)", overflow: "hidden", marginBottom: 22 }}>
-            {payments.map((p, i) => (
-              <div
-                key={p.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto auto auto",
-                  gap: 12,
-                  alignItems: "center",
-                  padding: "11px 12px",
-                  borderTop: i === 0 ? undefined : "1px solid var(--nx-panel-hairline-soft, var(--border))",
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13 }}>{p.method ?? "Transferencia"}{p.reference ? ` · Ref: ${p.reference}` : ""}</div>
-                  {p.notes && <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{p.notes}</div>}
-                  {p.cfdiPaymentUuid && (
-                    <div style={{ marginTop: 2 }}>
-                      <CopyableRef value={p.cfdiPaymentUuid} display={`comp. ${p.cfdiPaymentUuid.slice(0, 8)}…`} label="el UUID del complemento" />
+            {invoice.cfdiUuid && (
+              <div className={`${s.dato} ${s.datoAncho}`}>
+                <dt>UUID fiscal</dt>
+                <dd>
+                  <CopyableRef value={invoice.cfdiUuid} label="el UUID" />
+                  {satStatus && (
+                    <div className={s.satEstado}>
+                      SAT: <strong>{satStatus.estado}</strong>
+                      {satStatus.esCancelable ? ` · cancelable: ${satStatus.esCancelable}` : ""}
                     </div>
                   )}
-                </div>
-                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{new Date(p.paymentDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
-                <span style={{ fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" }}><Money value={p.amount} /></span>
-                {canEdit && invoice.satPaymentMethod === "PPD" && invoice.cfdiUuid && !p.cfdiPaymentUuid ? (
-                  <Button size="sm" variant="secondary" onClick={() => void stampComplement(p.id)}>Timbrar comp.</Button>
-                ) : (
-                  <span />
-                )}
+                </dd>
               </div>
-            ))}
-          </div>
-        </>
-      )}
+            )}
+            {invoice.description && lines.length > 0 && (
+              <div className={`${s.dato} ${s.datoAncho}`}>
+                <dt>Concepto</dt>
+                <dd className={s.datoSec}>{invoice.description}</dd>
+              </div>
+            )}
+          </dl>
+        </Card>
 
-      {/* 6 · El documento fiscal: los datos del CFDI y todo lo que actúa sobre él. */}
-      <BlockHeading
-        title="CFDI"
-        actions={
-          <>
-            {invoice.cfdiUuid && (
-              <Button size="sm" variant="ghost" onClick={() => void downloadXml()}>XML</Button>
-            )}
-            {invoice.cfdiUuid && invoice.pdfUrl && (
-              <a href={invoice.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <Button size="sm" variant="ghost">PDF</Button>
-              </a>
-            )}
-            {invoice.cfdiUuid && (
-              <Button size="sm" variant="ghost" onClick={() => void checkSatStatus()} disabled={checkingSat}>
-                {checkingSat ? "Consultando…" : "Estatus SAT"}
-              </Button>
-            )}
-            {canEdit && invoice.cfdiUuid && !invoice.isCancelled && invoice.cfdiRelationType !== "01" && (
-              <Button size="sm" variant="ghost" onClick={() => void createCreditNote()}>Nota de crédito</Button>
-            )}
-            {canEdit && invoice.cfdiUuid && !invoice.isCancelled && (
-              <Button size="sm" variant="secondary" onClick={() => { setCancelErr(null); setShowCancel(true); }}>Cancelar CFDI</Button>
-            )}
-          </>
-        }
-      />
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-          gap: "16px 22px",
-          marginBottom: 4,
-        }}
-      >
-        {[
-          { label: isIncome ? "Cliente / Receptor" : "Proveedor", value: counterparty },
-          { label: "RFC receptor", value: invoice.receptorRfc },
-          { label: "Método pago SAT", value: invoice.satPaymentMethod ?? "PUE" },
-          { label: "Emisión", value: new Date(invoice.issueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) },
-          { label: "Vencimiento", value: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) : null },
-        ].map(({ label, value }) => (
-          <div key={label}>
-            <FieldLabel>{label}</FieldLabel>
-            <div style={{ fontSize: 13, color: value ? "var(--text-primary)" : "var(--text-tertiary)" }}>{value ?? "—"}</div>
-          </div>
-        ))}
-        {invoice.cfdiUuid && (
-          <div style={{ gridColumn: "1 / -1" }}>
-            <FieldLabel>UUID fiscal</FieldLabel>
-            <CopyableRef value={invoice.cfdiUuid} label="el UUID" />
-            {satStatus && (
-              <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-secondary)" }}>
-                SAT: <strong style={{ fontWeight: 600 }}>{satStatus.estado}</strong>
-                {satStatus.esCancelable ? ` · cancelable: ${satStatus.esCancelable}` : ""}
-              </div>
-            )}
-          </div>
-        )}
-        {invoice.description && lines.length > 0 && (
-          <div style={{ gridColumn: "1 / -1" }}>
-            <FieldLabel>Concepto</FieldLabel>
-            <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>{invoice.description}</div>
-          </div>
+        {/* Metadatos de configuración, al final y en gris. */}
+        {pacInfo && (
+          <FootNote>
+            <span>PAC {pacInfo.provider?.toUpperCase() ?? "—"}</span>
+            <Dot />
+            <span>{pacInfo.configured ? "credenciales OK" : "sin credenciales"}</span>
+            {pacInfo.env ? (<><Dot /><span>{pacInfo.env}</span></>) : null}
+            {invoice.satPaymentMethod === "PPD" ? (<><Dot /><span>PPD: complemento por cada pago</span></>) : null}
+          </FootNote>
         )}
       </div>
-
-      {/* 7 · Metadatos de configuración. */}
-      {pacInfo && (
-        <FootNote>
-          <span>PAC {pacInfo.provider?.toUpperCase() ?? "—"}</span>
-          <Dot />
-          <span>{pacInfo.configured ? "credenciales OK" : "sin credenciales"}</span>
-          {pacInfo.env ? (<><Dot /><span>{pacInfo.env}</span></>) : null}
-          {invoice.satPaymentMethod === "PPD" ? (<><Dot /><span>PPD: complemento por cada pago</span></>) : null}
-        </FootNote>
-      )}
 
       <Modal
         open={showCancel}
@@ -727,41 +708,44 @@ export default function InvoiceDetailPage() {
           </>
         }
       >
-        <FinanceFormGrid>
-          <FinanceField
+        <FieldGrid>
+          <Field
             label="Motivo SAT"
             fullWidth
             hint="El motivo queda asentado en el acuse; el 01 obliga a indicar la factura que sustituye."
           >
-            <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} style={inp}>
+            <Select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}>
               <option value="01">01 — Comprobante emitido con errores (con relación)</option>
               <option value="02">02 — Comprobante emitido con errores (sin relación)</option>
               <option value="03">03 — No se llevó a cabo la operación</option>
               <option value="04">04 — Operación nominativa en factura global</option>
-            </select>
-          </FinanceField>
+            </Select>
+          </Field>
           {cancelReason === "01" && (
-            <FinanceField
+            <Field
               label="UUID sustituto"
               fullWidth
               hint="UUID completo del CFDI que reemplaza a éste."
             >
-              <input
+              <Input
                 value={substitutionUuid}
                 onChange={(e) => { setSubstitutionUuid(e.target.value); setCancelErr(null); }}
                 placeholder="UUID del CFDI que sustituye"
                 aria-invalid={cancelErr && !substitutionUuid.trim() ? true : undefined}
                 autoComplete="off"
                 spellCheck={false}
-                style={inp}
               />
-            </FinanceField>
+            </Field>
           )}
-        </FinanceFormGrid>
-        <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+        </FieldGrid>
+        <p className={s.aviso}>
           La cancelación se envía al SAT y no se puede deshacer.
         </p>
-        {cancelErr && <div style={{ marginTop: 12 }}><InlineAlert variant="danger" message={cancelErr} /></div>}
+        {cancelErr && (
+          <div className={s.errorModal}>
+            <Alert tone="danger" role="alert">{cancelErr}</Alert>
+          </div>
+        )}
       </Modal>
 
       <Modal
@@ -777,42 +761,45 @@ export default function InvoiceDetailPage() {
           </>
         }
       >
-        <FinanceFormGrid>
-          <FinanceField label="Monto" hint="Pesos. Puede ser menor al saldo: queda como pago parcial.">
-            <input type="number" inputMode="decimal" min="0.01" step="0.01" value={payForm.amount} onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))} style={inp} autoFocus />
-          </FinanceField>
-          <FinanceField label="Fecha de pago" hint="La del estado de cuenta, no la de captura.">
-            <input type="date" value={payForm.paymentDate} onChange={(e) => setPayForm((f) => ({ ...f, paymentDate: e.target.value }))} style={inp} />
-          </FinanceField>
-          <FinanceField label="Método">
-            <select value={payForm.method} onChange={(e) => setPayForm((f) => ({ ...f, method: e.target.value }))} style={inp}>
+        <FieldGrid>
+          <Field label="Monto" hint="Pesos. Puede ser menor al saldo: queda como pago parcial.">
+            <Input type="number" inputMode="decimal" min="0.01" step="0.01" value={payForm.amount} onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))} autoFocus />
+          </Field>
+          <Field label="Fecha de pago" hint="La del estado de cuenta, no la de captura.">
+            <DateInput value={payForm.paymentDate} onChange={(e) => setPayForm((f) => ({ ...f, paymentDate: e.target.value }))} />
+          </Field>
+          <Field label="Método">
+            <Select value={payForm.method} onChange={(e) => setPayForm((f) => ({ ...f, method: e.target.value }))}>
               <option value="SPEI">SPEI / Transferencia</option>
               <option value="CASH">Efectivo</option>
               <option value="CHECK">Cheque</option>
               <option value="CARD">Tarjeta</option>
-            </select>
-          </FinanceField>
-          <FinanceField label="Referencia" optional hint="Clave de rastreo del SPEI o folio del cheque.">
-            <input value={payForm.reference} onChange={(e) => setPayForm((f) => ({ ...f, reference: e.target.value }))} placeholder="Número de transferencia" style={inp} />
-          </FinanceField>
+            </Select>
+          </Field>
+          <Field label="Referencia" optional hint="Clave de rastreo del SPEI o folio del cheque.">
+            <Input value={payForm.reference} onChange={(e) => setPayForm((f) => ({ ...f, reference: e.target.value }))} placeholder="Número de transferencia" />
+          </Field>
           {invoice?.satPaymentMethod === "PPD" && (
-            <FinanceField
+            <Field
               label="Complemento de pago"
               fullWidth
               hint="La factura es PPD: el SAT exige un complemento por cada pago."
             >
-              <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-secondary)" }}>
-                <input
-                  type="checkbox"
+              <span className={s.casilla}>
+                <Checkbox
                   checked={payForm.stampComplement}
                   onChange={(e) => setPayForm((f) => ({ ...f, stampComplement: e.target.checked }))}
                 />
                 Timbrar complemento al registrar
               </span>
-            </FinanceField>
+            </Field>
           )}
-        </FinanceFormGrid>
-        {payErr && <div style={{ marginTop: 14 }}><InlineAlert variant="danger" message={payErr} /></div>}
+        </FieldGrid>
+        {payErr && (
+          <div className={s.errorModal}>
+            <Alert tone="danger" role="alert">{payErr}</Alert>
+          </div>
+        )}
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />

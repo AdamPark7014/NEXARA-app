@@ -1,0 +1,35 @@
+/* Comprobante de un gasto: cámara, zona de arrastre y miniatura. Solo tokens --ui-*. */
+
+.caja {
+  display: grid;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+/* El input de la cámara no se ve: lo abre el botón. */
+.oculto {
+  display: none;
+}
+
+.adjunto {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.miniatura {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: var(--ui-radius);
+  border: 1px solid var(--ui-border);
+}
+
+.archivo {
+  min-width: 0;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+  overflow-wrap: anywhere;
+}

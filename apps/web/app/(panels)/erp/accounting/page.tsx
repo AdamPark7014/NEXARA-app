@@ -1,29 +1,68 @@
 "use client";
 
-import { useEffect, useState, useCallback, useDeferredValue, useMemo } from "react";
-import Link from "next/link";
+import { useEffect, useState, useCallback, useDeferredValue, useMemo, type ReactNode } from "react";
+import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
+import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import BalanceOutlinedIcon from "@mui/icons-material/BalanceOutlined";
+import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
+import CallMadeOutlinedIcon from "@mui/icons-material/CallMadeOutlined";
+import CallReceivedOutlinedIcon from "@mui/icons-material/CallReceivedOutlined";
+import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
+import ChecklistOutlinedIcon from "@mui/icons-material/ChecklistOutlined";
+import DraftsOutlinedIcon from "@mui/icons-material/DraftsOutlined";
+import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import HourglassBottomOutlinedIcon from "@mui/icons-material/HourglassBottomOutlined";
+import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
+import LibraryBooksOutlinedIcon from "@mui/icons-material/LibraryBooksOutlined";
+import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import RuleOutlinedIcon from "@mui/icons-material/RuleOutlined";
+import SavingsOutlinedIcon from "@mui/icons-material/SavingsOutlined";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import SearchOffOutlinedIcon from "@mui/icons-material/SearchOffOutlined";
+import TableChartOutlinedIcon from "@mui/icons-material/TableChartOutlined";
+import TrendingDownOutlinedIcon from "@mui/icons-material/TrendingDownOutlined";
+import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  DataTable,
+  DateInput,
+  EmptyState,
+  Field,
+  FieldGrid,
+  Input,
+  LinkButton,
+  ListCard,
+  ModuleToolbar,
+  SearchInput,
+  Select,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  Tabs,
+  type Column,
+  type Tone,
+} from "@/components/base";
+import { MesaPagina } from "@/components/mesa-contable/MesaPagina";
+import { Money } from "@/components/ui/DataTable";
 import { useUrlQuery } from "@/components/finance/useUrlQuery";
 import { saveBlob, todayStamp } from "@/components/finance/download";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import InlineAlert from "@/components/ui/InlineAlert";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import {
-  FinanceField,
-  FinanceFormGrid,
-  financeInputStyle,
-} from "@/components/finance/FinanceModuleShell";
 import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
-import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import s from "./accounting.module.css";
 
 interface JournalEntry {
   id: number;
@@ -199,26 +238,8 @@ const emptyPeriodForm = { name: "", startDate: "", endDate: "" };
 const emptyCostCenterForm = { code: "", name: "", defaultAccountId: "" };
 const emptyBudgetForm = { name: "", costCenterId: "", year: new Date().getFullYear(), month: "", plannedAmount: 0, notes: "" };
 
-const inp = financeInputStyle;
 
-/** Panel de captura: superficie neutra, sin relleno de color ni sombra. */
-const formCard: React.CSSProperties = {
-  background: "var(--surface)",
-  border: "1px solid var(--border)",
-  borderRadius: 12,
-  padding: 18,
-  marginBottom: 20,
-};
-
-/** Pie de acciones del formulario: línea de corte y guardar a la derecha. */
-const formFooter: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-  justifyContent: "flex-end",
-  marginTop: 16,
-  paddingTop: 14,
-  borderTop: "1px solid var(--border)",
-};
+const TAB_ITEMS: { id: TabKey; label: string }[] = TABS.map((t) => ({ id: t.key, label: t.label }));
 
 /**
  * Cifra de cierre al pie de una tabla contable.
@@ -230,43 +251,125 @@ const formFooter: React.CSSProperties = {
 function TableTotals({
   entries,
 }: {
-  entries: { label: string; value: React.ReactNode; tone?: "default" | "danger" }[];
+  entries: { label: string; value: ReactNode; tone?: "default" | "danger" }[];
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "flex-end",
-        flexWrap: "wrap",
-        gap: 28,
-        padding: "10px 16px",
-        marginTop: -1,
-        border: "1px solid var(--nx-panel-hairline, var(--border))",
-        borderTop: "none",
-        borderRadius: "0 0 var(--nx-panel-radius) var(--nx-panel-radius)",
-        background: "var(--surface-2, var(--surface))",
-      }}
-    >
+    <div className={s.totales}>
       {entries.map((e) => (
-        <div key={e.label} style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-tertiary)" }}>
-            {e.label}
-          </div>
-          <div
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              fontVariantNumeric: "tabular-nums",
-              color: e.tone === "danger" ? "var(--state-danger-text, #b91c1c)" : "var(--text-primary)",
-            }}
-          >
-            {e.value}
-          </div>
+        <div key={e.label} className={s.total}>
+          <div className={s.totalEtiqueta}>{e.label}</div>
+          <div className={e.tone === "danger" ? `${s.totalValor} ${s.totalPeligro}` : s.totalValor}>{e.value}</div>
         </div>
       ))}
     </div>
   );
 }
+
+/**
+ * Panel de captura de un alta (póliza, cuenta, periodo, centro de costo, presupuesto):
+ * título, campos en rejilla, el error de guardado y el pie con cancelar y guardar.
+ * `anidada` lo pinta como banda dentro de la tarjeta de la lista a la que pertenece.
+ */
+function Captura({
+  titulo,
+  descripcion,
+  avisos,
+  error,
+  pie,
+  anidada = false,
+  children,
+}: {
+  titulo: string;
+  descripcion?: string;
+  avisos?: ReactNode;
+  error?: string | null;
+  pie: ReactNode;
+  anidada?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className={s.captura} data-anidada={anidada ? "true" : undefined}>
+      <div>
+        <h3 className={s.capturaTitulo}>{titulo}</h3>
+        {descripcion ? <p className={s.capturaDesc}>{descripcion}</p> : null}
+      </div>
+      {avisos}
+      <FieldGrid>{children}</FieldGrid>
+      {error ? (
+        <Alert tone="danger" role="alert">
+          {error}
+        </Alert>
+      ) : null}
+      <div className={s.capturaPie}>{pie}</div>
+    </div>
+  );
+}
+
+/** Tabla a ras de la tarjeta; sin filas, el vacío con su icono y su explicación. */
+function TablaDatos<T>({
+  columns,
+  rows,
+  rowKey,
+  ariaLabel,
+  density,
+  vacio,
+}: {
+  columns: Column<T>[];
+  rows: T[];
+  rowKey: (row: T) => string | number;
+  ariaLabel: string;
+  density?: "comfortable" | "compact";
+  vacio: { icon: ReactNode; title: string; description: string };
+}) {
+  if (rows.length === 0) {
+    return (
+      <EmptyState size="compact" tone="neutral" icon={vacio.icon} title={vacio.title} description={vacio.description} />
+    );
+  }
+  return <DataTable flush columns={columns} rows={rows} rowKey={rowKey} ariaLabel={ariaLabel} density={density} />;
+}
+
+/** Antigüedad de saldos en cinco cortes (por cobrar o por pagar). */
+function AgingCard({ title, subtitle, aging }: { title: string; subtitle: string; aging: any }) {
+  const cortes: [string, unknown][] = [
+    ["Current", aging?.current],
+    ["1–30d", aging?.d1_30],
+    ["31–60d", aging?.d31_60],
+    ["61–90d", aging?.d61_90],
+    [">90d", aging?.d90_plus],
+  ];
+  return (
+    <Card className={s.tarjeta}>
+      <CardHead title={title} subtitle={subtitle} />
+      <div className={s.aging}>
+        {cortes.map(([label, val]) => (
+          <div key={label} className={s.agingCelda}>
+            <span className={s.agingEtiqueta}>{label}</span>
+            <span className={s.agingValor}>
+              <Money value={Number(val || 0)} compact />
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/** Columnas de los renglones de un estado de resultados (ingresos o gastos). */
+const rubroColumns: Column<{ code: string; name: string; amount: number }>[] = [
+  { key: "code", label: "Código", width: 80, render: (r) => <code className={s.codigo}>{r.code}</code> },
+  { key: "name", label: "Cuenta", render: (r) => r.name },
+  { key: "amount", label: "Importe", numeric: true, render: (r) => <Money value={r.amount} compact bold={false} /> },
+];
+
+/** Columnas de cada bloque del balance general (activo, pasivo, capital). */
+const saldoColumns: Column<{ code: string; name: string; balance: number }>[] = [
+  { key: "code", label: "Código", width: 70, render: (r) => <code className={s.codigo}>{r.code}</code> },
+  { key: "name", label: "Cuenta", render: (r) => r.name },
+  { key: "balance", label: "Saldo", numeric: true, render: (r) => <Money value={r.balance} compact bold={false} /> },
+];
+
+const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 export default function AccountingPage() {
   const { user } = useUser();
@@ -1000,7 +1103,7 @@ export default function AccountingPage() {
    * va en neutro; el color se guarda para lo que pide acción (borrador) o
    * para lo que salió mal (reversada).
    */
-  const entryStatus = (s?: string): { label: string; tone: StatusTone } => {
+  const entryStatus = (s?: string): { label: string; tone: Tone } => {
     if (s === "POSTED" || s === "CONTABILIZADA") return { label: "Contabilizada", tone: "neutral" };
     if (s === "REVERSED") return { label: "Reversada", tone: "danger" };
     return { label: "Borrador", tone: "warning" };
@@ -1034,38 +1137,38 @@ export default function AccountingPage() {
       render: e => {
         const desc = e.createdBy?.nombre ? `${tipoLabel(e.type)} · ${e.createdBy.nombre}` : tipoLabel(e.type);
         return (
-          <div>
-            <div style={{ fontSize: 13 }}>{e.description ?? "—"}</div>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-              <code>{e.reference ?? `P-${e.id}`}</code>
+          <div className={s.celdaDoble}>
+            <span className={s.principal}>{e.description ?? "—"}</span>
+            <span className={s.sub}>
+              <code className={s.codigo}>{e.reference ?? `P-${e.id}`}</code>
               {desc ? ` · ${desc}` : ""}
-            </div>
+            </span>
           </div>
         );
       },
     },
     {
       key: "totalDebit", label: "Cargo", numeric: true, width: 130,
-      render: e => e.totalDebit ? <Money value={e.totalDebit} bold={false} /> : <span style={{ color: "var(--text-tertiary)" }}>—</span>,
+      render: e => e.totalDebit ? <Money value={e.totalDebit} bold={false} /> : <span className={s.tenue}>—</span>,
     },
     {
       key: "totalCredit", label: "Abono", numeric: true, width: 130,
-      render: e => e.totalCredit ? <Money value={e.totalCredit} bold={false} /> : <span style={{ color: "var(--text-tertiary)" }}>—</span>,
+      render: e => e.totalCredit ? <Money value={e.totalCredit} bold={false} /> : <span className={s.tenue}>—</span>,
     },
     {
       key: "date", label: "Fecha",
       render: (e) => {
-        if (!e.date) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        if (!e.date) return <span className={s.tenue}>—</span>;
         const isDraft = e.status === "DRAFT" || e.status === "BORRADOR";
         const days = Math.floor((Date.now() - new Date(e.date).getTime()) / 86400000);
-        const color = days >= 14 ? "var(--state-danger-text)" : days >= 7 ? "var(--state-warning-text)" : "var(--text-tertiary)";
+        const tonoDias = days >= 14 ? s.diasPeligro : days >= 7 ? s.diasAviso : "";
         return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 12, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
+          <div className={s.fechaCelda}>
+            <span className={s.fechaTexto}>
               {new Date(e.date).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })}
             </span>
             {isDraft && days > 0 && (
-              <span style={{ fontSize: 11, color }}>
+              <span className={`${s.diasSin} ${tonoDias}`}>
                 {days === 1 ? "1 día" : `${days} días`} sin contabilizar
               </span>
             )}
@@ -1075,20 +1178,18 @@ export default function AccountingPage() {
       width: 120,
     },
     {
-      key: "status", label: "Estado", width: 150,
+      key: "status", label: "Estado", width: 190,
       render: e => {
         const st = entryStatus(e.status);
         const imbalance = entryImbalance(e);
         const descuadrada = Math.abs(imbalance) >= 0.01;
         return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <StatusDot label={st.label} tone={st.tone} />
+          <div className={s.estadoCelda}>
+            <Badge dot size="sm" tone={st.tone}>{st.label}</Badge>
             {descuadrada && (
-              <StatusDot
-                label={`Descuadre ${Math.abs(imbalance).toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 })}`}
-                tone="danger"
-                title="Los cargos y los abonos de esta póliza no suman lo mismo"
-              />
+              <Badge dot size="sm" tone="danger" title="Los cargos y los abonos de esta póliza no suman lo mismo">
+                {`Descuadre ${Math.abs(imbalance).toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 })}`}
+              </Badge>
             )}
           </div>
         );
@@ -1097,7 +1198,7 @@ export default function AccountingPage() {
     ...(cfg.canApprove || cfg.canDelete ? [{
       key: "acciones" as keyof JournalEntry, label: "", width: 130,
       render: (e: JournalEntry) => (
-        <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+        <div className={s.acciones}>
           {(e.status === "DRAFT" || e.status === "BORRADOR") && cfg.canApprove && (
             <Button size="sm" variant="secondary" onClick={(ev) => { ev.stopPropagation(); postEntry(e.id); }}>Contabilizar</Button>
           )}
@@ -1124,36 +1225,38 @@ export default function AccountingPage() {
 
   // ── Catálogo de cuentas columns ───────────────────────────────────
   const accountColumns: Column<Account>[] = [
-    { key: "code", label: "Código", render: a => <code style={{ fontSize: 12 }}>{a.code}</code>, width: 100 },
+    { key: "code", label: "Código", render: a => <code className={s.codigo}>{a.code}</code>, width: 100 },
     { key: "name", label: "Nombre", render: a => (
-      <div>
-        <div style={{ fontSize: 13 }}>{a.name}</div>
-        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+      <div className={s.celdaDoble}>
+        <span className={s.principal}>{a.name}</span>
+        <span className={s.sub}>
           {ACCOUNT_TYPE_LABEL[a.type] ?? a.type}
           {a.parent ? ` · bajo ${a.parent.code} ${a.parent.name}` : ""}
-        </div>
+        </span>
       </div>
     ) },
     { key: "balance", label: "Saldo", render: a => <Money value={a.balance} compact bold={false} />, width: 130, numeric: true },
-    { key: "satAgrupador", label: "Agrupador SAT", width: 140, render: a => (
+    { key: "satAgrupador", label: "Agrupador SAT", width: 160, render: a => (
       cfg.canEdit ? (
-        <input
+        <Input
+          className={s.agrupador}
+          data-vacio={a.satAgrupador ? undefined : "true"}
+          controlSize="sm"
           defaultValue={a.satAgrupador ?? ""}
           placeholder="Ej. 101.01"
           aria-label={`Agrupador SAT de la cuenta ${a.code}`}
           onBlur={e => void saveAccountAgrupador(a, e.target.value)}
           inputMode="decimal"
-          style={{ width: "100%", minHeight: 30, padding: "3px 6px", fontSize: 16, fontVariantNumeric: "tabular-nums", border: `1px solid ${a.satAgrupador ? "var(--border)" : "var(--state-warning-border)"}`, borderRadius: 6, background: "var(--surface)", color: "var(--foreground)" }}
         />
       ) : (
         a.satAgrupador
-          ? <span style={{ fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{a.satAgrupador}</span>
-          : <StatusDot label="Sin mapear" tone="warning" title="La balanza electrónica exige el código del catálogo SAT" />
+          ? <span className={s.cifra}>{a.satAgrupador}</span>
+          : <Badge dot size="sm" tone="warning" title="La balanza electrónica exige el código del catálogo SAT">Sin mapear</Badge>
       )
     ) },
-    { key: "isActive", label: "Estado", width: 170, render: a => (
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <StatusDot label={a.isActive ? "Activa" : "Inactiva"} tone="neutral" />
+    { key: "isActive", label: "Estado", width: 240, render: a => (
+      <div className={s.estadoFila}>
+        <Badge dot size="sm" tone="neutral">{a.isActive ? "Activa" : "Inactiva"}</Badge>
         {cfg.canEdit && (
           <Button size="sm" variant="ghost" onClick={(ev) => { ev.stopPropagation(); void toggleAccountActive(a); }}>
             {a.isActive ? "Desactivar" : "Reactivar"}
@@ -1166,19 +1269,22 @@ export default function AccountingPage() {
   const visibleAccounts = useMemo(() => [...accounts].sort((a, b) => a.code.localeCompare(b.code)), [accounts]);
 
   const periodColumns: Column<FiscalPeriod>[] = [
-    { key: "name", label: "Periodo", render: p => <strong style={{ fontSize: 13 }}>{p.name}</strong> },
+    { key: "name", label: "Periodo", render: p => <strong className={s.principal}>{p.name}</strong> },
     { key: "range", label: "Rango", render: p => (
-      <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+      <span className={s.fechasCelda}>
         {new Date(p.startDate).toLocaleDateString("es-MX")} — {new Date(p.endDate).toLocaleDateString("es-MX")}
       </span>
     ) },
-    { key: "isClosed", label: "Estado", width: 200, render: p => (
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <StatusDot
-          label={p.isClosed ? "Cerrado" : "Abierto"}
+    { key: "isClosed", label: "Estado", width: 220, render: p => (
+      <div className={s.estadoFila}>
+        <Badge
+          dot
+          size="sm"
           tone="neutral"
           title={p.isClosed ? "No admite pólizas nuevas dentro del rango" : "Admite pólizas dentro del rango"}
-        />
+        >
+          {p.isClosed ? "Cerrado" : "Abierto"}
+        </Badge>
         {!p.isClosed && cfg.canApprove && (
           <Button size="sm" variant="secondary" onClick={(ev) => { ev.stopPropagation(); closePeriod(p); }}>Cerrar</Button>
         )}
@@ -1197,11 +1303,11 @@ export default function AccountingPage() {
   }, [trialBalance]);
 
   const trialColumns: Column<TrialBalanceRow>[] = [
-    { key: "code", label: "Código", render: r => <code style={{ fontSize: 12 }}>{r.code}</code>, width: 100 },
+    { key: "code", label: "Código", render: r => <code className={s.codigo}>{r.code}</code>, width: 100 },
     { key: "name", label: "Cuenta", render: r => (
-      <div>
-        <div style={{ fontSize: 13 }}>{r.name}</div>
-        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{ACCOUNT_TYPE_LABEL[r.type as Account["type"]] ?? r.type}</div>
+      <div className={s.celdaDoble}>
+        <span className={s.principal}>{r.name}</span>
+        <span className={s.sub}>{ACCOUNT_TYPE_LABEL[r.type as Account["type"]] ?? r.type}</span>
       </div>
     ) },
     { key: "debit", label: "Debe", render: r => <Money value={r.debit} compact bold={false} />, width: 130, numeric: true },
@@ -1210,25 +1316,25 @@ export default function AccountingPage() {
 
   // ── Cost center / budget columns ──────────────────────────────────
   const costCenterColumns: Column<CostCenter>[] = [
-    { key: "code", label: "Código", render: c => <code style={{ fontSize: 12 }}>{c.code}</code>, width: 100 },
+    { key: "code", label: "Código", render: c => <code className={s.codigo}>{c.code}</code>, width: 100 },
     { key: "name", label: "Nombre", render: c => (
-      <div>
-        <div style={{ fontSize: 13 }}>{c.name}</div>
-        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+      <div className={s.celdaDoble}>
+        <span className={s.principal}>{c.name}</span>
+        <span className={s.sub}>
           {c.defaultAccount ? `Cuenta por defecto ${c.defaultAccount.code} · ${c.defaultAccount.name}` : "Sin cuenta por defecto"}
-        </div>
+        </span>
       </div>
     ) },
-    { key: "isActive", label: "Estado", width: 120, render: c => <StatusDot label={c.isActive ? "Activo" : "Inactivo"} tone="neutral" /> },
+    { key: "isActive", label: "Estado", width: 140, render: c => <Badge dot size="sm" tone="neutral">{c.isActive ? "Activo" : "Inactivo"}</Badge> },
   ];
 
   const budgetColumns: Column<Budget>[] = [
     { key: "name", label: "Presupuesto", render: b => (
-      <div>
-        <div style={{ fontSize: 13 }}>{b.name}</div>
-        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+      <div className={s.celdaDoble}>
+        <span className={s.principal}>{b.name}</span>
+        <span className={s.sub}>
           {b.costCenter?.code} · {b.costCenter?.name} · {b.month ? `${b.month}/${b.year}` : b.year}
-        </div>
+        </span>
       </div>
     ) },
     { key: "plannedAmount", label: "Planeado", render: b => <Money value={b.plannedAmount} compact bold={false} />, width: 130, numeric: true },
@@ -1238,11 +1344,7 @@ export default function AccountingPage() {
       const over = variance < 0;
       return (
         <span
-          style={{
-            fontSize: 12.5,
-            fontVariantNumeric: "tabular-nums",
-            color: over ? "var(--state-danger-text, #b91c1c)" : "var(--text-secondary)",
-          }}
+          className={over ? s.varPeligro : s.varNormal}
           title={over ? "Gastado por encima de lo planeado" : "Dentro de lo planeado"}
         >
           {over ? "+" : "−"}<Money value={Math.abs(variance)} compact bold={false} />
@@ -1251,292 +1353,374 @@ export default function AccountingPage() {
     } },
   ];
 
+  /** Presupuesto contra lo real de un centro de costo: la misma tabla, en compacto. */
+  const vsRealColumns: Column<Budget>[] = [
+    {
+      key: "name", label: "Presupuesto",
+      render: (b) => (
+        <div className={s.celdaDoble}>
+          <span className={s.principal}>{b.name}</span>
+          <span className={s.sub}>
+            {b.month ? `Mes ${b.month} de ${b.year}` : `Ejercicio ${b.year}`}
+          </span>
+        </div>
+      ),
+    },
+    { key: "plannedAmount", label: "Planeado", numeric: true, width: 130, render: (b) => <Money value={b.plannedAmount} compact bold={false} /> },
+    { key: "actualAmount", label: "Real", numeric: true, width: 130, render: (b) => <Money value={b.actualAmount} compact bold={false} /> },
+    {
+      key: "left", label: "Diferencia", numeric: true, width: 150,
+      render: (b) => {
+        const over = b.actualAmount > b.plannedAmount;
+        return (
+          <span className={over ? s.varPeligro : s.varNormal}>
+            {over ? "+" : "−"}<Money value={Math.abs(b.plannedAmount - b.actualAmount)} compact bold={false} />
+          </span>
+        );
+      },
+    },
+  ];
+
+  /** Proveedores de la DIOT del periodo. */
+  const diotColumns: Column<DiotRow>[] = [
+    {
+      key: "supplierName", label: "Proveedor",
+      render: (r) => (
+        <div className={s.celdaDoble}>
+          <span className={s.principal}>{r.supplierName}</span>
+          <span className={s.sub}>
+            {r.rfc ? <code className={s.codigo}>{r.rfc}</code> : <span className={s.sinRfc}>sin RFC</span>}
+            {` · ${r.invoiceCount} factura${r.invoiceCount === 1 ? "" : "s"}`}
+          </span>
+        </div>
+      ),
+    },
+    { key: "baseAmount", label: "Base 16%", numeric: true, width: 140, render: (r) => <Money value={r.baseAmount} compact bold={false} /> },
+    { key: "ivaAmount", label: "IVA", numeric: true, width: 130, render: (r) => <Money value={r.ivaAmount} compact bold={false} /> },
+    { key: "totalAmount", label: "Total", numeric: true, width: 140, render: (r) => <Money value={r.totalAmount} compact bold={false} /> },
+  ];
+
   const totalPlanned = useMemo(() => budgetVsActual.reduce((s, b) => s + b.plannedAmount, 0), [budgetVsActual]);
   const totalActual = useMemo(() => budgetVsActual.reduce((s, b) => s + b.actualAmount, 0), [budgetVsActual]);
 
+  const hayFiltros = searchQ.trim().length > 0 || filterTipo !== "";
+  const limpiarFiltros = () => {
+    setSearchQ("");
+    setFilterTipo("");
+  };
+  /** Con error y sin una sola póliza cargada no hay lista que pintar: el aviso de arriba lo dice. */
+  const mostrarLista = !error || items.length > 0;
+  const faltanAgrupador = (agrupadorStatus?.missingAccounts.length ?? 0) > 0;
+
   return (
-    <>
-      <PageHeader
-        eyebrow="ERP · Finanzas"
-        title="Pólizas y libros"
-        subtitle="Asientos, catálogo, balanza y presupuesto."
-        density="ops"
-        actions={
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Button size="sm" variant="ghost" onClick={() => void downloadFinancialPdf()} disabled={pdfDownloading}>
-              {pdfDownloading ? "Generando…" : "Reporte PDF"}
-            </Button>
-            {tab === "polizas" && cfg.canCreate ? (
-              <Button size="sm" variant="primary" iconLeft="+" onClick={() => { setForm({ ...emptyForm }); setShowForm(true); }}>Nueva póliza</Button>
-            ) : null}
-          </div>
-        }
-      />
-
-      <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--text-secondary)" }}>
-        <Link href="/erp/contabilidad" style={{ fontWeight: 600 }}>
-          Escritorio Contadora →
-        </Link>
-      </p>
-
-      {/* Pestañas como pestañas: ocho botones rellenos competían con el único
-          primario de la pantalla y ninguno destacaba. */}
-      <div
-        role="tablist"
-        aria-label="Secciones de contabilidad"
-        style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 18, borderBottom: "1px solid var(--border)" }}
-      >
-        {TABS.map((t) => {
-          const active = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(t.key)}
-              style={{
-                appearance: "none",
-                background: "transparent",
-                border: "none",
-                padding: "8px 0 10px",
-                marginBottom: -1,
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: active ? 600 : 500,
-                color: active ? "var(--text-primary)" : "var(--text-secondary)",
-                borderBottom: `2px solid ${active ? "var(--primary)" : "transparent"}`,
-              }}
-            >
-              {t.label}
-            </button>
-          );
-        })}
+    <MesaPagina
+      titulo="Pólizas y libros"
+      descripcion="Asientos, catálogo, balanza y presupuesto."
+      terciarias={
+        <Button
+          variant="ghost"
+          iconStart={<PictureAsPdfOutlinedIcon />}
+          onClick={() => void downloadFinancialPdf()}
+          disabled={pdfDownloading}
+        >
+          {pdfDownloading ? "Generando…" : "Reporte PDF"}
+        </Button>
+      }
+      primaria={
+        tab === "polizas" && cfg.canCreate ? (
+          <Button
+            variant="primary"
+            iconStart={<AddRoundedIcon />}
+            onClick={() => { setForm({ ...emptyForm }); setShowForm(true); }}
+          >
+            Nueva póliza
+          </Button>
+        ) : null
+      }
+    >
+      {/* Pestañas bajo los chips: la raya de la activa es recta (base la dibuja con radio 0). */}
+      <div className={s.pestanas}>
+        <Tabs ariaLabel="Secciones de contabilidad" items={TAB_ITEMS} value={tab} onChange={setTab} />
       </div>
 
       {tab === "inteligencia" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {financeInsightsLoading && <div style={{ color: "var(--text-tertiary)", fontSize: 13 }}>Calculando inteligencia financiera…</div>}
-          {financeInsights && (
+        <>
+          {financeInsightsLoading ? (
+            <Card className={s.tarjeta}>
+              <SkeletonRows rows={3} label="Calculando inteligencia financiera…" />
+            </Card>
+          ) : null}
+          {financeInsights ? (
             <>
-              <MetricStrip
-                ariaLabel="Indicadores financieros"
-                metrics={[
-                  { label: "Cash", value: <Money value={financeInsights.kpis?.cashBalance ?? 0} compact bold={false} />, hint: "saldo en bancos" },
-                  { label: "Working capital", value: <Money value={financeInsights.kpis?.workingCapital ?? 0} compact bold={false} />, hint: "activo menos pasivo circulante" },
-                  { label: "DSO", value: `${financeInsights.kpis?.dso ?? 0}d`, hint: "días en cobrar" },
-                  { label: "DPO", value: `${financeInsights.kpis?.dpo ?? 0}d`, hint: "días en pagar" },
-                  {
-                    label: "Runway",
-                    value: financeInsights.kpis?.runwayMonths != null ? `${financeInsights.kpis.runwayMonths}m` : "∞",
-                    hint: "meses de operación cubiertos",
-                    tone: financeInsights.kpis?.runwayMonths != null && financeInsights.kpis.runwayMonths < 6 ? "danger" : "default",
-                  },
-                  {
-                    label: "Vencidas",
-                    value: financeInsights.overdueInvoices ?? 0,
-                    hint: "facturas fuera de plazo",
-                    tone: financeInsights.overdueInvoices ? "danger" : "default",
-                  },
-                ]}
-              />
               {(financeInsights.alerts || []).map((a: any) => (
-                <InlineAlert key={a.message} variant="warning" message={a.message} style={{ marginBottom: 0 }} />
+                <Alert key={a.message} tone="warning" role="alert">
+                  {a.message}
+                </Alert>
               ))}
-              <Section title="Aging CXC" subtitle="Antigüedad de cuentas por cobrar">
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
-                  {[
-                    ["Current", financeInsights.aging?.ar?.current],
-                    ["1–30d", financeInsights.aging?.ar?.d1_30],
-                    ["31–60d", financeInsights.aging?.ar?.d31_60],
-                    ["61–90d", financeInsights.aging?.ar?.d61_90],
-                    [">90d", financeInsights.aging?.ar?.d90_plus],
-                  ].map(([label, val]) => (
-                    <div key={String(label)} style={{ padding: 12, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-                      <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{label}</div>
-                      <div style={{ fontWeight: 700, fontSize: 16 }}><Money value={Number(val || 0)} compact /></div>
-                    </div>
-                  ))}
+              <StatRow variant="strip" ariaLabel="Indicadores financieros">
+                <Stat
+                  label="Cash"
+                  value={<Money value={financeInsights.kpis?.cashBalance ?? 0} compact />}
+                  hint="saldo en bancos"
+                  icon={<AccountBalanceOutlinedIcon />}
+                  iconTone="neutral"
+                />
+                <Stat
+                  label="Working capital"
+                  value={<Money value={financeInsights.kpis?.workingCapital ?? 0} compact />}
+                  hint="activo menos pasivo circulante"
+                  icon={<AccountBalanceWalletOutlinedIcon />}
+                  iconTone="neutral"
+                />
+                <Stat
+                  label="DSO"
+                  value={`${financeInsights.kpis?.dso ?? 0}d`}
+                  hint="días en cobrar"
+                  icon={<ScheduleOutlinedIcon />}
+                  iconTone="neutral"
+                />
+                <Stat
+                  label="DPO"
+                  value={`${financeInsights.kpis?.dpo ?? 0}d`}
+                  hint="días en pagar"
+                  icon={<EventOutlinedIcon />}
+                  iconTone="neutral"
+                />
+                <Stat
+                  label="Runway"
+                  value={financeInsights.kpis?.runwayMonths != null ? `${financeInsights.kpis.runwayMonths}m` : "∞"}
+                  hint="meses de operación cubiertos"
+                  tone={financeInsights.kpis?.runwayMonths != null && financeInsights.kpis.runwayMonths < 6 ? "danger" : "default"}
+                  icon={<HourglassBottomOutlinedIcon />}
+                  iconTone="neutral"
+                />
+                <Stat
+                  label="Vencidas"
+                  value={financeInsights.overdueInvoices ?? 0}
+                  hint="facturas fuera de plazo"
+                  tone={financeInsights.overdueInvoices ? "danger" : "default"}
+                  icon={<ReceiptLongOutlinedIcon />}
+                  iconTone="neutral"
+                />
+              </StatRow>
+              <AgingCard title="Aging CXC" subtitle="Antigüedad de cuentas por cobrar" aging={financeInsights.aging?.ar} />
+              <AgingCard title="Aging CXP" subtitle="Antigüedad de cuentas por pagar" aging={financeInsights.aging?.ap} />
+              <Card className={s.tarjeta}>
+                <CardHead
+                  title="Cashflow semanal · 90d"
+                  subtitle={`In ${Number(financeInsights.cashflow90d?.inflow || 0).toLocaleString("es-MX")} · Out ${Number(financeInsights.cashflow90d?.outflow || 0).toLocaleString("es-MX")}`}
+                />
+                <div className={s.flujoCuerpo}>
+                  <div className={s.flujo}>
+                    {(financeInsights.cashflow90d?.weekly || []).map((w: any) => {
+                      const max = Math.max(1, ...(financeInsights.cashflow90d.weekly.map((x: any) => Math.abs(x.net))));
+                      const h = Math.max(4, (Math.abs(w.net) / max) * 70);
+                      return (
+                        <div
+                          key={w.weekEnding}
+                          title={`${w.weekEnding}: ${w.net}`}
+                          className={`${s.barra} ${w.net >= 0 ? s.barraPositiva : s.barraNegativa}`}
+                          style={{ height: h }}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
-              </Section>
-              <Section title="Aging CXP" subtitle="Antigüedad de cuentas por pagar">
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
-                  {[
-                    ["Current", financeInsights.aging?.ap?.current],
-                    ["1–30d", financeInsights.aging?.ap?.d1_30],
-                    ["31–60d", financeInsights.aging?.ap?.d31_60],
-                    ["61–90d", financeInsights.aging?.ap?.d61_90],
-                    [">90d", financeInsights.aging?.ap?.d90_plus],
-                  ].map(([label, val]) => (
-                    <div key={String(label)} style={{ padding: 12, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-                      <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{label}</div>
-                      <div style={{ fontWeight: 700, fontSize: 16 }}><Money value={Number(val || 0)} compact /></div>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-              <Section title="Cashflow semanal · 90d" subtitle={`In ${Number(financeInsights.cashflow90d?.inflow || 0).toLocaleString("es-MX")} · Out ${Number(financeInsights.cashflow90d?.outflow || 0).toLocaleString("es-MX")}`}>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 80 }}>
-                  {(financeInsights.cashflow90d?.weekly || []).map((w: any) => {
-                    const max = Math.max(1, ...(financeInsights.cashflow90d.weekly.map((x: any) => Math.abs(x.net))));
-                    const h = Math.max(4, (Math.abs(w.net) / max) * 70);
-                    return (
-                      <div key={w.weekEnding} title={`${w.weekEnding}: ${w.net}`} style={{ flex: 1, height: h, background: w.net >= 0 ? "var(--success)" : "var(--danger)", borderRadius: 3, opacity: 0.85 }} />
-                    );
-                  })}
-                </div>
-              </Section>
+              </Card>
             </>
-          )}
-          {!financeInsightsLoading && !financeInsights && (
-            <div style={{ color: "var(--text-tertiary)", fontSize: 13 }}>Sin datos de inteligencia financiera.</div>
-          )}
-        </div>
+          ) : null}
+          {!financeInsightsLoading && !financeInsights ? (
+            <Card className={s.tarjeta}>
+              <EmptyState
+                size="compact"
+                tone="neutral"
+                icon={<InsightsOutlinedIcon />}
+                title="Sin datos de inteligencia financiera."
+              />
+            </Card>
+          ) : null}
+        </>
       )}
 
       {tab === "polizas" && (
         <>
-          {(() => {
-            const metrics: Metric[] = [
-              {
-                label: "Ingresos registrados",
-                value: <Money value={ingresos} compact bold={false} />,
-                hint: `${items.filter(e => e.type === "INGRESOS").length} pólizas de ingreso`,
-              },
-              {
-                label: "Egresos registrados",
-                value: <Money value={egresos} compact bold={false} />,
-                hint: `${items.filter(e => e.type === "EGRESOS").length} pólizas de egreso`,
-              },
-              {
-                label: "Balance neto",
-                value: <Money value={ingresos - egresos} compact bold={false} />,
-                hint: "ingresos menos egresos",
-                tone: ingresos >= egresos ? "default" : "danger",
-              },
-              {
-                label: "Borradores",
-                value: borradores,
-                hint: "pendientes de contabilizar",
-                tone: borradores > 0 ? "warning" : "default",
-              },
-              {
-                label: "Descuadradas",
-                value: journalTotals.descuadradas,
-                hint: "cargo ≠ abono",
-                tone: journalTotals.descuadradas > 0 ? "danger" : "default",
-              },
-            ];
-            return (
-              <div style={{ marginBottom: 14 }}>
-                <MetricStrip metrics={metrics} ariaLabel="Resumen del libro diario" />
-              </div>
-            );
-          })()}
-
-          {showForm && (
-            <div style={formCard}>
-              <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 14 }}>Nueva póliza</p>
-              <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--text-tertiary)" }}>
-                Asiento de dos partidas: el mismo importe entra al Debe de una cuenta y al Haber de la otra, así la póliza nace cuadrada.
-              </p>
-              {accountsErr && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <InlineAlert variant="warning" message={accountsErr} style={{ marginBottom: 0, flex: 1 }} />
-                  <Button size="sm" variant="secondary" onClick={() => void loadAccountOptions()}>Reintentar</Button>
-                </div>
-              )}
-              <FinanceFormGrid>
-                <FinanceField label="Concepto / Descripción" fullWidth hint="Qué se está asentando. Aparece en el libro diario y en la balanza.">
-                  <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Descripción de la póliza" style={inp} />
-                </FinanceField>
-                <FinanceField label="Tipo">
-                  <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={inp}>
-                    {TIPOS.map(t => <option key={t} value={t}>{tipoLabel(t)}</option>)}
-                  </select>
-                </FinanceField>
-                <FinanceField label="Fecha" hint="Determina en qué periodo fiscal cae la póliza.">
-                  <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} style={inp} />
-                </FinanceField>
-                <FinanceField label="Referencia" optional hint="Folio propio para rastrear el documento de respaldo.">
-                  <input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="REF-001" style={inp} />
-                </FinanceField>
-                <FinanceField label="Importe" hint="Pesos. El mismo monto se asienta al Debe y al Haber.">
-                  <input type="number" min={0} step="0.01" value={form.amount || ""} onChange={e => setForm(f => ({ ...f, amount: +e.target.value }))} style={inp} />
-                </FinanceField>
-                <FinanceField label="Cuenta cargo (Debe)" hint="La que recibe el importe.">
-                  <select value={form.debitAccountId} onChange={e => setForm(f => ({ ...f, debitAccountId: e.target.value }))} style={inp}>
-                    <option value="">— Seleccionar —</option>
-                    {accountOptions.map(a => <option key={a.id} value={a.id}>{a.code ? `${a.code} · ` : ""}{a.name ?? `Cuenta ${a.id}`}</option>)}
-                  </select>
-                </FinanceField>
-                <FinanceField label="Cuenta abono (Haber)" hint="La que entrega el importe. Debe ser distinta a la del cargo.">
-                  <select value={form.creditAccountId} onChange={e => setForm(f => ({ ...f, creditAccountId: e.target.value }))} style={inp}>
-                    <option value="">— Seleccionar —</option>
-                    {accountOptions.map(a => <option key={a.id} value={a.id}>{a.code ? `${a.code} · ` : ""}{a.name ?? `Cuenta ${a.id}`}</option>)}
-                  </select>
-                </FinanceField>
-              </FinanceFormGrid>
-              {saveErr && <div style={{ marginTop: 14 }}><InlineAlert variant="danger" message={saveErr} /></div>}
-              <div style={formFooter}>
-                <Button size="sm" variant="ghost" onClick={() => { setShowForm(false); setSaveErr(null); }}>Cancelar</Button>
-                <Button size="sm" variant="primary" onClick={() => void save()} disabled={saving}>{saving ? "Guardando…" : "Crear póliza"}</Button>
-              </div>
-            </div>
-          )}
-
-          <FilterToolbar
-            search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por concepto, referencia o usuario…" }}
-            selects={[{
-              label: "Tipo",
-              value: filterTipo,
-              onChange: setFilterTipo,
-              options: TIPOS.map((t) => ({ value: t, label: tipoLabel(t) })),
-              allowAll: true,
-            }]}
-            onClear={() => { setSearchQ(""); setFilterTipo(""); }}
-            resultCount={loading ? null : visibleItems.length}
-            rightActions={items.length > 0 ? (
-              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
-                { key: "reference", label: "Referencia", format: (v, e) => String(v ?? `P-${e.id}`) },
-                { key: "description", label: "Concepto" },
-                { key: "type", label: "Tipo", format: (v) => tipoLabel(v as string | undefined) },
-                { key: "totalDebit", label: "Cargo" },
-                { key: "totalCredit", label: "Abono" },
-                { key: "status", label: "Estado", format: (v) => ENTRY_STATUS_LABEL[String(v ?? "")] ?? String(v ?? "") },
-                { key: "date", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
-              ], "polizas-contables")}>Excel</Button>
-            ) : undefined}
-          />
-
-          <Section title={loading ? "Cargando…" : `${visibleItems.length} pólizas`}>
-            {highlightId && (
-              <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
-                Mostrando póliza <strong>#{highlightId}</strong> desde enlace directo.
-              </p>
-            )}
-            {error && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <InlineAlert variant="warning" message={error} style={{ flex: 1 }} />
-                <Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>
-              </div>
-            )}
-            {parcial && (
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "0 0 12px" }}>
-                <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
-                  Se cargaron las {parcial.cargadas} pólizas más recientes de {parcial.total}. La búsqueda y los filtros solo miran las cargadas.
-                </p>
-                <Button size="sm" variant="secondary" onClick={() => setTandas((n) => n + 1)} disabled={loading}>
+          {error ? (
+            <Alert
+              tone="warning"
+              role="alert"
+              action={<Button size="sm" onClick={() => void load()}>Reintentar</Button>}
+            >
+              {error}
+            </Alert>
+          ) : null}
+          {highlightId ? (
+            <Alert tone="info">
+              Mostrando póliza <strong>#{highlightId}</strong> desde enlace directo.
+            </Alert>
+          ) : null}
+          {parcial ? (
+            <Alert
+              tone="info"
+              action={
+                <Button size="sm" onClick={() => setTandas((n) => n + 1)} disabled={loading}>
                   Cargar más
                 </Button>
-              </div>
-            )}
-            {loading && items.length === 0 ? (
-              <div aria-busy="true" style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando pólizas…</div>
-            ) : !error || items.length > 0 ? (
-              <>
-                <DataTable columns={journalColumns} rows={visibleItems} rowKey={e => e.id} emptyTitle="Sin pólizas" emptyDescription="Registra la primera póliza contable." />
-                {visibleItems.length > 0 && (
+              }
+            >
+              Se cargaron las {parcial.cargadas} pólizas más recientes de {parcial.total}. La búsqueda y los filtros solo miran las cargadas.
+            </Alert>
+          ) : null}
+
+          <StatRow variant="strip" ariaLabel="Resumen del libro diario">
+            <Stat
+              label="Ingresos registrados"
+              value={<Money value={ingresos} compact />}
+              hint={`${items.filter(e => e.type === "INGRESOS").length} pólizas de ingreso`}
+              icon={<TrendingUpOutlinedIcon />}
+              iconTone="neutral"
+            />
+            <Stat
+              label="Egresos registrados"
+              value={<Money value={egresos} compact />}
+              hint={`${items.filter(e => e.type === "EGRESOS").length} pólizas de egreso`}
+              icon={<TrendingDownOutlinedIcon />}
+              iconTone="neutral"
+            />
+            <Stat
+              label="Balance neto"
+              value={<Money value={ingresos - egresos} compact />}
+              hint="ingresos menos egresos"
+              tone={ingresos >= egresos ? "default" : "danger"}
+              icon={<BalanceOutlinedIcon />}
+              iconTone="neutral"
+            />
+            <Stat
+              label="Borradores"
+              value={borradores}
+              hint="pendientes de contabilizar"
+              tone={borradores > 0 ? "warning" : "default"}
+              icon={<DraftsOutlinedIcon />}
+              iconTone="neutral"
+            />
+            <Stat
+              label="Descuadradas"
+              value={journalTotals.descuadradas}
+              hint="cargo ≠ abono"
+              tone={journalTotals.descuadradas > 0 ? "danger" : "default"}
+              icon={<RuleOutlinedIcon />}
+              iconTone="neutral"
+            />
+          </StatRow>
+
+          {showForm && (
+            <Card as="div">
+              <Captura
+                titulo="Nueva póliza"
+                descripcion="Asiento de dos partidas: el mismo importe entra al Debe de una cuenta y al Haber de la otra, así la póliza nace cuadrada."
+                avisos={
+                  accountsErr ? (
+                    <Alert
+                      tone="warning"
+                      role="alert"
+                      action={<Button size="sm" onClick={() => void loadAccountOptions()}>Reintentar</Button>}
+                    >
+                      {accountsErr}
+                    </Alert>
+                  ) : null
+                }
+                error={saveErr}
+                pie={
+                  <>
+                    <Button variant="ghost" onClick={() => { setShowForm(false); setSaveErr(null); }}>Cancelar</Button>
+                    <Button variant="tonal" onClick={() => void save()} disabled={saving}>{saving ? "Guardando…" : "Crear póliza"}</Button>
+                  </>
+                }
+              >
+                <Field label="Concepto / Descripción" fullWidth hint="Qué se está asentando. Aparece en el libro diario y en la balanza.">
+                  <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Descripción de la póliza" />
+                </Field>
+                <Field label="Tipo">
+                  <Select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
+                    {TIPOS.map(t => <option key={t} value={t}>{tipoLabel(t)}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Fecha" hint="Determina en qué periodo fiscal cae la póliza.">
+                  <DateInput value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+                </Field>
+                <Field label="Referencia" optional hint="Folio propio para rastrear el documento de respaldo.">
+                  <Input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="REF-001" />
+                </Field>
+                <Field label="Importe" hint="Pesos. El mismo monto se asienta al Debe y al Haber.">
+                  <Input type="number" min={0} step="0.01" value={form.amount || ""} onChange={e => setForm(f => ({ ...f, amount: +e.target.value }))} />
+                </Field>
+                <Field label="Cuenta cargo (Debe)" hint="La que recibe el importe.">
+                  <Select value={form.debitAccountId} onChange={e => setForm(f => ({ ...f, debitAccountId: e.target.value }))}>
+                    <option value="">— Seleccionar —</option>
+                    {accountOptions.map(a => <option key={a.id} value={a.id}>{a.code ? `${a.code} · ` : ""}{a.name ?? `Cuenta ${a.id}`}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Cuenta abono (Haber)" hint="La que entrega el importe. Debe ser distinta a la del cargo.">
+                  <Select value={form.creditAccountId} onChange={e => setForm(f => ({ ...f, creditAccountId: e.target.value }))}>
+                    <option value="">— Seleccionar —</option>
+                    {accountOptions.map(a => <option key={a.id} value={a.id}>{a.code ? `${a.code} · ` : ""}{a.name ?? `Cuenta ${a.id}`}</option>)}
+                  </Select>
+                </Field>
+              </Captura>
+            </Card>
+          )}
+
+          {mostrarLista ? (
+            <ListCard
+              className={s.lista}
+              listLabel="Pólizas"
+              toolbar={
+                <ModuleToolbar
+                  search={
+                    <SearchInput
+                      aria-label="Buscar por concepto, referencia o usuario…"
+                      placeholder="Buscar por concepto, referencia o usuario…"
+                      value={searchQ}
+                      onChange={(e) => setSearchQ(e.target.value)}
+                    />
+                  }
+                  end={
+                    <>
+                      {!loading ? (
+                        <span className={s.conteo} role="status">
+                          {visibleItems.length === 1 ? "1 póliza" : `${visibleItems.length} pólizas`}
+                        </span>
+                      ) : null}
+                      {hayFiltros ? <LinkButton onClick={limpiarFiltros}>Limpiar</LinkButton> : null}
+                      {items.length > 0 ? (
+                        <Button variant="ghost" size="sm" iconStart={<FileDownloadOutlinedIcon />} onClick={() => exportToExcel(visibleItems, [
+                          { key: "reference", label: "Referencia", format: (v, e) => String(v ?? `P-${e.id}`) },
+                          { key: "description", label: "Concepto" },
+                          { key: "type", label: "Tipo", format: (v) => tipoLabel(v as string | undefined) },
+                          { key: "totalDebit", label: "Cargo" },
+                          { key: "totalCredit", label: "Abono" },
+                          { key: "status", label: "Estado", format: (v) => ENTRY_STATUS_LABEL[String(v ?? "")] ?? String(v ?? "") },
+                          { key: "date", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
+                        ], "polizas-contables")}>Excel</Button>
+                      ) : null}
+                    </>
+                  }
+                >
+                  <Select aria-label="Tipo" controlSize="sm" wrapperClassName={s.selTipo} value={filterTipo} onChange={(e) => setFilterTipo(e.target.value)}>
+                    <option value="">Todos · Tipo</option>
+                    {TIPOS.map((t) => <option key={t} value={t}>{tipoLabel(t)}</option>)}
+                  </Select>
+                </ModuleToolbar>
+              }
+              loading={loading && items.length === 0}
+              empty={visibleItems.length === 0}
+              emptyState={{
+                icon: <LibraryBooksOutlinedIcon />,
+                title: "Sin pólizas",
+                description: "Registra la primera póliza contable.",
+                tone: "neutral",
+              }}
+              footer={
+                visibleItems.length > 0 ? (
                   <TableTotals
                     entries={[
                       { label: "Suma de cargos", value: <Money value={journalTotals.debit} bold={false} /> },
@@ -1548,474 +1732,546 @@ export default function AccountingPage() {
                       },
                     ]}
                   />
-                )}
-              </>
-            ) : null}
-          </Section>
+                ) : undefined
+              }
+            >
+              <DataTable flush ariaLabel="Pólizas" columns={journalColumns} rows={visibleItems} rowKey={e => e.id} />
+            </ListCard>
+          ) : null}
         </>
       )}
 
       {tab === "cuentas" && (
         <>
-          <Section
-            title="Catálogo de cuentas"
-            subtitle="Estructura contable base para pólizas, balanza y estados financieros."
-            actions={
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <select value={accountTypeFilter} onChange={e => setAccountTypeFilter(e.target.value)} style={{ ...inp, width: 160 }}>
-                  <option value="">Todos los tipos</option>
-                  {ACCOUNT_TYPES.map(t => <option key={t} value={t}>{ACCOUNT_TYPE_LABEL[t]}</option>)}
-                </select>
-                {cfg.canCreate && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void seedBaseCatalog()}
-                    disabled={seedBaseBusy}
-                  >
-                    {seedBaseBusy ? "Cargando…" : "Cargar catálogo base"}
-                  </Button>
-                )}
-                {cfg.canCreate && (
-                  <Button variant="secondary" size="sm" iconLeft="+" onClick={() => { setAccountForm({ ...emptyAccountForm }); setShowAccountForm(true); }}>
-                    Nueva cuenta
-                  </Button>
-                )}
-              </div>
-            }
-          >
+          <Card className={s.tarjeta}>
+            <CardHead
+              title="Catálogo de cuentas"
+              subtitle="Estructura contable base para pólizas, balanza y estados financieros."
+              actions={
+                <>
+                  <Select aria-label="Filtrar por tipo" controlSize="sm" wrapperClassName={s.selCuenta} value={accountTypeFilter} onChange={e => setAccountTypeFilter(e.target.value)}>
+                    <option value="">Todos los tipos</option>
+                    {ACCOUNT_TYPES.map(t => <option key={t} value={t}>{ACCOUNT_TYPE_LABEL[t]}</option>)}
+                  </Select>
+                  {cfg.canCreate && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void seedBaseCatalog()}
+                      disabled={seedBaseBusy}
+                    >
+                      {seedBaseBusy ? "Cargando…" : "Cargar catálogo base"}
+                    </Button>
+                  )}
+                  {cfg.canCreate && (
+                    <Button variant="secondary" size="sm" iconStart={<AddRoundedIcon />} onClick={() => { setAccountForm({ ...emptyAccountForm }); setShowAccountForm(true); }}>
+                      Nueva cuenta
+                    </Button>
+                  )}
+                </>
+              }
+            />
             {showAccountForm && (
-              <div style={formCard}>
-                <p style={{ margin: "0 0 14px", fontWeight: 700, fontSize: 14 }}>Nueva cuenta contable</p>
-                <FinanceFormGrid>
-                  <FinanceField label="Código" hint="Numeración del catálogo. El orden del código ordena la balanza.">
-                    <input value={accountForm.code} onChange={e => setAccountForm(f => ({ ...f, code: e.target.value }))} placeholder="1000" style={inp} />
-                  </FinanceField>
-                  <FinanceField label="Nombre">
-                    <input value={accountForm.name} onChange={e => setAccountForm(f => ({ ...f, name: e.target.value }))} placeholder="Caja y bancos" style={inp} />
-                  </FinanceField>
-                  <FinanceField label="Tipo" hint="Decide si la cuenta suma al balance o al estado de resultados.">
-                    <select value={accountForm.type} onChange={e => setAccountForm(f => ({ ...f, type: e.target.value as Account["type"] }))} style={inp}>
-                      {ACCOUNT_TYPES.map(t => <option key={t} value={t}>{ACCOUNT_TYPE_LABEL[t]}</option>)}
-                    </select>
-                  </FinanceField>
-                  <FinanceField label="Cuenta padre" optional hint="Para colgar la cuenta de una de mayor nivel.">
-                    <select value={accountForm.parentId} onChange={e => setAccountForm(f => ({ ...f, parentId: e.target.value }))} style={inp}>
-                      <option value="">— Ninguna —</option>
-                      {accounts.map(a => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
-                    </select>
-                  </FinanceField>
-                  <FinanceField label="Descripción" optional fullWidth hint="Para qué se usa la cuenta; lo lee quien captura la póliza.">
-                    <input value={accountForm.description} onChange={e => setAccountForm(f => ({ ...f, description: e.target.value }))} style={inp} />
-                  </FinanceField>
-                </FinanceFormGrid>
-                {accountSaveErr && <div style={{ marginTop: 14 }}><InlineAlert variant="danger" message={accountSaveErr} /></div>}
-                <div style={formFooter}>
-                  <Button size="sm" variant="ghost" onClick={() => { setShowAccountForm(false); setAccountSaveErr(null); }}>Cancelar</Button>
-                  <Button size="sm" variant="primary" onClick={() => void saveAccount()} disabled={accountSaving}>{accountSaving ? "Guardando…" : "Crear cuenta"}</Button>
-                </div>
-              </div>
+              <Captura
+                anidada
+                titulo="Nueva cuenta contable"
+                error={accountSaveErr}
+                pie={
+                  <>
+                    <Button variant="ghost" onClick={() => { setShowAccountForm(false); setAccountSaveErr(null); }}>Cancelar</Button>
+                    <Button variant="tonal" onClick={() => void saveAccount()} disabled={accountSaving}>{accountSaving ? "Guardando…" : "Crear cuenta"}</Button>
+                  </>
+                }
+              >
+                <Field label="Código" hint="Numeración del catálogo. El orden del código ordena la balanza.">
+                  <Input value={accountForm.code} onChange={e => setAccountForm(f => ({ ...f, code: e.target.value }))} placeholder="1000" />
+                </Field>
+                <Field label="Nombre">
+                  <Input value={accountForm.name} onChange={e => setAccountForm(f => ({ ...f, name: e.target.value }))} placeholder="Caja y bancos" />
+                </Field>
+                <Field label="Tipo" hint="Decide si la cuenta suma al balance o al estado de resultados.">
+                  <Select value={accountForm.type} onChange={e => setAccountForm(f => ({ ...f, type: e.target.value as Account["type"] }))}>
+                    {ACCOUNT_TYPES.map(t => <option key={t} value={t}>{ACCOUNT_TYPE_LABEL[t]}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Cuenta padre" optional hint="Para colgar la cuenta de una de mayor nivel.">
+                  <Select value={accountForm.parentId} onChange={e => setAccountForm(f => ({ ...f, parentId: e.target.value }))}>
+                    <option value="">— Ninguna —</option>
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Descripción" optional fullWidth hint="Para qué se usa la cuenta; lo lee quien captura la póliza.">
+                  <Input value={accountForm.description} onChange={e => setAccountForm(f => ({ ...f, description: e.target.value }))} />
+                </Field>
+              </Captura>
             )}
             {accountsLoadErr && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <InlineAlert variant="warning" message={accountsLoadErr} style={{ flex: 1 }} />
-                <Button size="sm" variant="secondary" onClick={() => void loadAccounts()}>Reintentar</Button>
-              </div>
+              <Alert
+                tone="warning"
+                role="alert"
+                className={s.avisoDentro}
+                action={<Button size="sm" onClick={() => void loadAccounts()}>Reintentar</Button>}
+              >
+                {accountsLoadErr}
+              </Alert>
             )}
             {accountsLoading ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+              <SkeletonRows rows={5} label="Cargando…" />
             ) : (
-              <DataTable columns={accountColumns} rows={visibleAccounts} rowKey={a => a.id} emptyTitle="Sin cuentas" emptyDescription="Da de alta la primera cuenta contable." />
+              <TablaDatos
+                ariaLabel="Catálogo de cuentas"
+                columns={accountColumns}
+                rows={visibleAccounts}
+                rowKey={a => a.id}
+                vacio={{ icon: <AccountTreeOutlinedIcon />, title: "Sin cuentas", description: "Da de alta la primera cuenta contable." }}
+              />
             )}
-          </Section>
+          </Card>
 
-          <div style={{ height: 24 }} />
-
-          <Section
-            title="Períodos fiscales"
-            subtitle="Cierre mensual: una vez cerrado, no se pueden contabilizar pólizas dentro del rango."
-            actions={cfg.canCreate ? (
-              <Button variant="secondary" size="sm" iconLeft="+" onClick={() => { setPeriodForm({ ...emptyPeriodForm }); setShowPeriodForm(true); }}>
-                Nuevo periodo
-              </Button>
-            ) : undefined}
-          >
+          <Card className={s.tarjeta}>
+            <CardHead
+              title="Períodos fiscales"
+              subtitle="Cierre mensual: una vez cerrado, no se pueden contabilizar pólizas dentro del rango."
+              actions={cfg.canCreate ? (
+                <Button variant="secondary" size="sm" iconStart={<AddRoundedIcon />} onClick={() => { setPeriodForm({ ...emptyPeriodForm }); setShowPeriodForm(true); }}>
+                  Nuevo periodo
+                </Button>
+              ) : undefined}
+            />
             {showPeriodForm && (
-              <div style={formCard}>
-                <p style={{ margin: "0 0 14px", fontWeight: 700, fontSize: 14 }}>Nuevo periodo fiscal</p>
-                <FinanceFormGrid>
-                  <FinanceField label="Nombre" fullWidth hint="Como se le llama al cierre: «Julio 2026».">
-                    <input value={periodForm.name} onChange={e => setPeriodForm(f => ({ ...f, name: e.target.value }))} placeholder="Julio 2026" style={inp} />
-                  </FinanceField>
-                  <FinanceField label="Fecha de inicio">
-                    <input type="date" value={periodForm.startDate} onChange={e => setPeriodForm(f => ({ ...f, startDate: e.target.value }))} style={inp} />
-                  </FinanceField>
-                  <FinanceField label="Fecha de fin" hint="Al cerrarlo, ninguna póliza dentro del rango podrá contabilizarse.">
-                    <input type="date" value={periodForm.endDate} onChange={e => setPeriodForm(f => ({ ...f, endDate: e.target.value }))} style={inp} />
-                  </FinanceField>
-                </FinanceFormGrid>
-                {periodSaveErr && <div style={{ marginTop: 14 }}><InlineAlert variant="danger" message={periodSaveErr} /></div>}
-                <div style={formFooter}>
-                  <Button size="sm" variant="ghost" onClick={() => { setShowPeriodForm(false); setPeriodSaveErr(null); }}>Cancelar</Button>
-                  <Button size="sm" variant="primary" onClick={() => void savePeriod()} disabled={periodSaving}>{periodSaving ? "Guardando…" : "Crear periodo"}</Button>
-                </div>
-              </div>
+              <Captura
+                anidada
+                titulo="Nuevo periodo fiscal"
+                error={periodSaveErr}
+                pie={
+                  <>
+                    <Button variant="ghost" onClick={() => { setShowPeriodForm(false); setPeriodSaveErr(null); }}>Cancelar</Button>
+                    <Button variant="tonal" onClick={() => void savePeriod()} disabled={periodSaving}>{periodSaving ? "Guardando…" : "Crear periodo"}</Button>
+                  </>
+                }
+              >
+                <Field label="Nombre" fullWidth hint="Como se le llama al cierre: «Julio 2026».">
+                  <Input value={periodForm.name} onChange={e => setPeriodForm(f => ({ ...f, name: e.target.value }))} placeholder="Julio 2026" />
+                </Field>
+                <Field label="Fecha de inicio">
+                  <DateInput value={periodForm.startDate} onChange={e => setPeriodForm(f => ({ ...f, startDate: e.target.value }))} />
+                </Field>
+                <Field label="Fecha de fin" hint="Al cerrarlo, ninguna póliza dentro del rango podrá contabilizarse.">
+                  <DateInput value={periodForm.endDate} onChange={e => setPeriodForm(f => ({ ...f, endDate: e.target.value }))} />
+                </Field>
+              </Captura>
             )}
             {periodsLoadErr && (
-              <div style={{ marginBottom: 14 }}>
-                <InlineAlert
-                  variant="danger"
-                  message={periodsLoadErr}
-                  action={<Button size="sm" variant="ghost" onClick={() => void loadPeriods()}>Reintentar</Button>}
-                />
-              </div>
+              <Alert
+                tone="danger"
+                role="alert"
+                className={s.avisoDentro}
+                action={<Button size="sm" onClick={() => void loadPeriods()}>Reintentar</Button>}
+              >
+                {periodsLoadErr}
+              </Alert>
             )}
             {periodsLoading ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+              <SkeletonRows rows={3} label="Cargando…" />
             ) : (
-              <DataTable columns={periodColumns} rows={periods} rowKey={p => p.id} emptyTitle="Sin periodos" emptyDescription="Crea el primer periodo fiscal para poder cerrarlo al final del mes." />
+              <TablaDatos
+                ariaLabel="Períodos fiscales"
+                columns={periodColumns}
+                rows={periods}
+                rowKey={p => p.id}
+                vacio={{ icon: <CalendarMonthOutlinedIcon />, title: "Sin periodos", description: "Crea el primer periodo fiscal para poder cerrarlo al final del mes." }}
+              />
             )}
-          </Section>
+          </Card>
         </>
       )}
 
       {tab === "balanza" && (
-        <Section
-          title="Balanza de comprobación"
-          subtitle="Suma de cargos y abonos por cuenta a partir de pólizas contabilizadas. Debe cuadrar Debe = Haber."
-          actions={
-            <select value={trialBalancePeriodId} onChange={e => setTrialBalancePeriodId(e.target.value)} style={{ ...inp, width: 200 }}>
-              <option value="">Todos los periodos</option>
-              {periods.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          }
-        >
-          <div style={{ marginBottom: 16 }}>
-            <MetricStrip
-              ariaLabel="Cuadre de la balanza"
-              metrics={[
-                { label: "Total Debe", value: <Money value={trialTotals.debit} compact bold={false} />, hint: `${trialBalance.length} cuentas con movimiento` },
-                { label: "Total Haber", value: <Money value={trialTotals.credit} compact bold={false} />, hint: "suma de abonos" },
-                {
-                  label: "Cuadre",
-                  value: trialTotals.balanced ? "Cuadra" : "Descuadrada",
-                  hint: trialTotals.balanced
-                    ? "Debe = Haber"
-                    : `diferencia de ${new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(Math.abs(trialTotals.debit - trialTotals.credit))}`,
-                  tone: trialTotals.balanced ? "default" : "danger",
-                },
-              ]}
+        <>
+          <StatRow variant="strip" ariaLabel="Cuadre de la balanza">
+            <Stat
+              label="Total Debe"
+              value={<Money value={trialTotals.debit} compact />}
+              hint={`${trialBalance.length} cuentas con movimiento`}
+              icon={<CallMadeOutlinedIcon />}
+              iconTone="neutral"
             />
-          </div>
-          {trialErr && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <InlineAlert variant="warning" message={trialErr} style={{ flex: 1 }} />
-              <Button size="sm" variant="secondary" onClick={() => void loadTrialBalance()}>Reintentar</Button>
-            </div>
-          )}
-          {trialLoading ? (
-            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Calculando…</div>
-          ) : (
-            <>
-              <DataTable columns={trialColumns} rows={trialBalance} rowKey={r => r.code} emptyTitle="Sin movimientos" emptyDescription="Contabiliza pólizas para generar la balanza." />
-              {trialBalance.length > 0 && (
-                <TableTotals
-                  entries={[
-                    { label: "Total Debe", value: <Money value={trialTotals.debit} bold={false} /> },
-                    { label: "Total Haber", value: <Money value={trialTotals.credit} bold={false} /> },
-                    {
-                      label: "Diferencia",
-                      value: <Money value={Math.abs(trialTotals.debit - trialTotals.credit)} bold={false} />,
-                      tone: trialTotals.balanced ? "default" : "danger",
-                    },
-                  ]}
+            <Stat
+              label="Total Haber"
+              value={<Money value={trialTotals.credit} compact />}
+              hint="suma de abonos"
+              icon={<CallReceivedOutlinedIcon />}
+              iconTone="neutral"
+            />
+            <Stat
+              label="Cuadre"
+              value={trialTotals.balanced ? "Cuadra" : "Descuadrada"}
+              hint={
+                trialTotals.balanced
+                  ? "Debe = Haber"
+                  : `diferencia de ${new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(Math.abs(trialTotals.debit - trialTotals.credit))}`
+              }
+              tone={trialTotals.balanced ? "default" : "danger"}
+              icon={<BalanceOutlinedIcon />}
+              iconTone="neutral"
+            />
+          </StatRow>
+          <Card className={s.tarjeta}>
+            <CardHead
+              title="Balanza de comprobación"
+              subtitle="Suma de cargos y abonos por cuenta a partir de pólizas contabilizadas. Debe cuadrar Debe = Haber."
+              actions={
+                <Select aria-label="Periodo" controlSize="sm" wrapperClassName={s.selPeriodo} value={trialBalancePeriodId} onChange={e => setTrialBalancePeriodId(e.target.value)}>
+                  <option value="">Todos los periodos</option>
+                  {periods.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </Select>
+              }
+            />
+            {trialErr && (
+              <Alert
+                tone="warning"
+                role="alert"
+                className={s.avisoDentro}
+                action={<Button size="sm" onClick={() => void loadTrialBalance()}>Reintentar</Button>}
+              >
+                {trialErr}
+              </Alert>
+            )}
+            {trialLoading ? (
+              <SkeletonRows rows={5} label="Calculando…" />
+            ) : (
+              <>
+                <TablaDatos
+                  ariaLabel="Balanza de comprobación"
+                  columns={trialColumns}
+                  rows={trialBalance}
+                  rowKey={r => r.code}
+                  vacio={{ icon: <TableChartOutlinedIcon />, title: "Sin movimientos", description: "Contabiliza pólizas para generar la balanza." }}
                 />
-              )}
-            </>
-          )}
-        </Section>
+                {trialBalance.length > 0 && (
+                  <TableTotals
+                    entries={[
+                      { label: "Total Debe", value: <Money value={trialTotals.debit} bold={false} /> },
+                      { label: "Total Haber", value: <Money value={trialTotals.credit} bold={false} /> },
+                      {
+                        label: "Diferencia",
+                        value: <Money value={Math.abs(trialTotals.debit - trialTotals.credit)} bold={false} />,
+                        tone: trialTotals.balanced ? "default" : "danger",
+                      },
+                    ]}
+                  />
+                )}
+              </>
+            )}
+          </Card>
+        </>
       )}
 
       {tab === "resultados" && (
-        <Section
-          title="Estado de resultados"
-          subtitle="Ingresos y gastos contabilizados en el rango seleccionado."
-          actions={
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input type="date" value={incomeFrom} onChange={e => setIncomeFrom(e.target.value)} style={{ ...inp, width: 150 }} />
-              <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>a</span>
-              <input type="date" value={incomeTo} onChange={e => setIncomeTo(e.target.value)} style={{ ...inp, width: 150 }} />
-            </div>
-          }
-        >
-          {incomeErr && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <InlineAlert variant="warning" message={incomeErr} style={{ flex: 1 }} />
-              <Button size="sm" variant="secondary" onClick={() => void loadIncomeStatement()}>Reintentar</Button>
-            </div>
-          )}
-          {incomeLoading ? (
-            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Calculando…</div>
-          ) : incomeStatement ? (
-            <>
-              <div style={{ marginBottom: 20 }}>
-                <MetricStrip
-                  ariaLabel="Resumen del estado de resultados"
-                  metrics={[
-                    { label: "Ingresos totales", value: <Money value={incomeStatement.totalRevenue} compact bold={false} />, hint: `${incomeStatement.revenue.length} cuentas de ingreso` },
-                    { label: "Gastos totales", value: <Money value={incomeStatement.totalExpenses} compact bold={false} />, hint: `${incomeStatement.expenses.length} cuentas de gasto` },
-                    {
-                      label: "Utilidad neta",
-                      value: <Money value={incomeStatement.netIncome} compact bold={false} />,
-                      hint: "ingresos menos gastos",
-                      tone: incomeStatement.netIncome >= 0 ? "default" : "danger",
-                    },
-                  ]}
-                />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Ingresos</div>
-                  <DataTable
+        <>
+          {!incomeLoading && incomeStatement ? (
+            <StatRow variant="strip" ariaLabel="Resumen del estado de resultados">
+              <Stat
+                label="Ingresos totales"
+                value={<Money value={incomeStatement.totalRevenue} compact />}
+                hint={`${incomeStatement.revenue.length} cuentas de ingreso`}
+                icon={<TrendingUpOutlinedIcon />}
+                iconTone="neutral"
+              />
+              <Stat
+                label="Gastos totales"
+                value={<Money value={incomeStatement.totalExpenses} compact />}
+                hint={`${incomeStatement.expenses.length} cuentas de gasto`}
+                icon={<TrendingDownOutlinedIcon />}
+                iconTone="neutral"
+              />
+              <Stat
+                label="Utilidad neta"
+                value={<Money value={incomeStatement.netIncome} compact />}
+                hint="ingresos menos gastos"
+                tone={incomeStatement.netIncome >= 0 ? "default" : "danger"}
+                icon={<BalanceOutlinedIcon />}
+                iconTone="neutral"
+              />
+            </StatRow>
+          ) : null}
+          <Card className={s.tarjeta}>
+            <CardHead
+              title="Estado de resultados"
+              subtitle="Ingresos y gastos contabilizados en el rango seleccionado."
+              actions={
+                <div className={s.controlesFecha}>
+                  <DateInput aria-label="Desde" controlSize="sm" className={s.fecha} value={incomeFrom} onChange={e => setIncomeFrom(e.target.value)} />
+                  <span className={s.rotulo}>a</span>
+                  <DateInput aria-label="Hasta" controlSize="sm" className={s.fecha} value={incomeTo} onChange={e => setIncomeTo(e.target.value)} />
+                </div>
+              }
+            />
+            {incomeErr && (
+              <Alert
+                tone="warning"
+                role="alert"
+                className={s.avisoDentro}
+                action={<Button size="sm" onClick={() => void loadIncomeStatement()}>Reintentar</Button>}
+              >
+                {incomeErr}
+              </Alert>
+            )}
+            {incomeLoading ? (
+              <SkeletonRows rows={5} label="Calculando…" />
+            ) : incomeStatement ? (
+              <div className={s.dosColumnas}>
+                <section className={s.bloqueTabla} aria-label="Ingresos">
+                  <h3 className={s.bloqueTitulo}>Ingresos</h3>
+                  <TablaDatos
                     density="compact"
-                    columns={[
-                      { key: "code", label: "Código", width: 80, render: (r: { code: string }) => <code style={{ fontSize: 11 }}>{r.code}</code> },
-                      { key: "name", label: "Cuenta", render: (r: { name: string }) => <span style={{ fontSize: 12.5 }}>{r.name}</span> },
-                      { key: "amount", label: "Importe", numeric: true, render: (r: { amount: number }) => <Money value={r.amount} compact bold={false} /> },
-                    ]}
+                    ariaLabel="Ingresos"
+                    columns={rubroColumns}
                     rows={incomeStatement.revenue}
                     rowKey={(r) => r.code}
-                    emptyTitle="Sin ingresos"
-                    emptyDescription="No hay cuentas de ingreso en el rango."
+                    vacio={{ icon: <TrendingUpOutlinedIcon />, title: "Sin ingresos", description: "No hay cuentas de ingreso en el rango." }}
                   />
                   {incomeStatement.revenue.length > 0 && (
                     <TableTotals entries={[{ label: "Total ingresos", value: <Money value={incomeStatement.totalRevenue} bold={false} /> }]} />
                   )}
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Gastos</div>
-                  <DataTable
+                </section>
+                <section className={s.bloqueTabla} aria-label="Gastos">
+                  <h3 className={s.bloqueTitulo}>Gastos</h3>
+                  <TablaDatos
                     density="compact"
-                    columns={[
-                      { key: "code", label: "Código", width: 80, render: (r: { code: string }) => <code style={{ fontSize: 11 }}>{r.code}</code> },
-                      { key: "name", label: "Cuenta", render: (r: { name: string }) => <span style={{ fontSize: 12.5 }}>{r.name}</span> },
-                      { key: "amount", label: "Importe", numeric: true, render: (r: { amount: number }) => <Money value={r.amount} compact bold={false} /> },
-                    ]}
+                    ariaLabel="Gastos"
+                    columns={rubroColumns}
                     rows={incomeStatement.expenses}
                     rowKey={(r) => r.code}
-                    emptyTitle="Sin gastos"
-                    emptyDescription="No hay cuentas de gasto en el rango."
+                    vacio={{ icon: <TrendingDownOutlinedIcon />, title: "Sin gastos", description: "No hay cuentas de gasto en el rango." }}
                   />
                   {incomeStatement.expenses.length > 0 && (
                     <TableTotals entries={[{ label: "Total gastos", value: <Money value={incomeStatement.totalExpenses} bold={false} /> }]} />
                   )}
-                </div>
+                </section>
               </div>
-            </>
-          ) : null}
-        </Section>
+            ) : null}
+          </Card>
+        </>
       )}
 
       {tab === "balance" && (
-        <Section
-          title="Balance general"
-          subtitle="Activo, pasivo y capital contabilizados a la fecha de corte. El activo debe ser igual a pasivo más capital."
-          actions={
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Al</span>
-              <input type="date" value={balanceAsOf} onChange={e => setBalanceAsOf(e.target.value)} style={{ ...inp, width: 150 }} />
-            </div>
-          }
-        >
-          {balanceErr && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <InlineAlert variant="warning" message={balanceErr} style={{ flex: 1 }} />
-              <Button size="sm" variant="secondary" onClick={() => void loadBalanceSheet()}>Reintentar</Button>
-            </div>
-          )}
-          {balanceLoading ? (
-            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Calculando…</div>
-          ) : balanceSheet ? (
-            <>
-              <div style={{ marginBottom: 20 }}>
-                <MetricStrip
-                  ariaLabel="Resumen del balance general"
-                  metrics={[
-                    { label: "Activo total", value: <Money value={balanceSheet.totalAssets} compact bold={false} />, hint: `${balanceSheet.assets.length} cuentas` },
-                    { label: "Pasivo total", value: <Money value={balanceSheet.totalLiabilities} compact bold={false} />, hint: `${balanceSheet.liabilities.length} cuentas` },
-                    { label: "Capital total", value: <Money value={balanceSheet.totalEquity} compact bold={false} />, hint: `${balanceSheet.equity.length} cuentas` },
-                    {
-                      label: "Cuadre",
-                      value: balanceSheet.balanceCheck ? "Cuadra" : "Descuadrado",
-                      hint: "Activo = Pasivo + Capital",
-                      tone: balanceSheet.balanceCheck ? "default" : "danger",
-                    },
-                  ]}
-                />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
+        <>
+          {!balanceLoading && balanceSheet ? (
+            <StatRow variant="strip" ariaLabel="Resumen del balance general">
+              <Stat
+                label="Activo total"
+                value={<Money value={balanceSheet.totalAssets} compact />}
+                hint={`${balanceSheet.assets.length} cuentas`}
+                icon={<AccountBalanceOutlinedIcon />}
+                iconTone="neutral"
+              />
+              <Stat
+                label="Pasivo total"
+                value={<Money value={balanceSheet.totalLiabilities} compact />}
+                hint={`${balanceSheet.liabilities.length} cuentas`}
+                icon={<CallMadeOutlinedIcon />}
+                iconTone="neutral"
+              />
+              <Stat
+                label="Capital total"
+                value={<Money value={balanceSheet.totalEquity} compact />}
+                hint={`${balanceSheet.equity.length} cuentas`}
+                icon={<AccountBalanceWalletOutlinedIcon />}
+                iconTone="neutral"
+              />
+              <Stat
+                label="Cuadre"
+                value={balanceSheet.balanceCheck ? "Cuadra" : "Descuadrado"}
+                hint="Activo = Pasivo + Capital"
+                tone={balanceSheet.balanceCheck ? "default" : "danger"}
+                icon={<BalanceOutlinedIcon />}
+                iconTone="neutral"
+              />
+            </StatRow>
+          ) : null}
+          <Card className={s.tarjeta}>
+            <CardHead
+              title="Balance general"
+              subtitle="Activo, pasivo y capital contabilizados a la fecha de corte. El activo debe ser igual a pasivo más capital."
+              actions={
+                <div className={s.controlesFecha}>
+                  <span className={s.rotulo}>Al</span>
+                  <DateInput aria-label="Fecha de corte" controlSize="sm" className={s.fecha} value={balanceAsOf} onChange={e => setBalanceAsOf(e.target.value)} />
+                </div>
+              }
+            />
+            {balanceErr && (
+              <Alert
+                tone="warning"
+                role="alert"
+                className={s.avisoDentro}
+                action={<Button size="sm" onClick={() => void loadBalanceSheet()}>Reintentar</Button>}
+              >
+                {balanceErr}
+              </Alert>
+            )}
+            {balanceLoading ? (
+              <SkeletonRows rows={5} label="Calculando…" />
+            ) : balanceSheet ? (
+              <div className={s.tresColumnas}>
                 {[
                   { label: "Activo", rows: balanceSheet.assets, total: balanceSheet.totalAssets },
                   { label: "Pasivo", rows: balanceSheet.liabilities, total: balanceSheet.totalLiabilities },
                   { label: "Capital", rows: balanceSheet.equity, total: balanceSheet.totalEquity },
                 ].map(({ label: l, rows, total }) => (
-                  <div key={l}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>{l}</div>
-                    <DataTable
+                  <section key={l} className={s.bloqueTabla} aria-label={l}>
+                    <h3 className={s.bloqueTitulo}>{l}</h3>
+                    <TablaDatos
                       density="compact"
-                      columns={[
-                        { key: "code", label: "Código", width: 70, render: (r: { code: string }) => <code style={{ fontSize: 11 }}>{r.code}</code> },
-                        { key: "name", label: "Cuenta", render: (r: { name: string }) => <span style={{ fontSize: 12 }}>{r.name}</span> },
-                        { key: "balance", label: "Saldo", numeric: true, render: (r: { balance: number }) => <Money value={r.balance} compact bold={false} /> },
-                      ]}
+                      ariaLabel={l}
+                      columns={saldoColumns}
                       rows={rows}
                       rowKey={(r) => r.code}
-                      emptyTitle="Sin cuentas"
-                      emptyDescription={`No hay cuentas de ${l.toLowerCase()} con movimientos.`}
+                      vacio={{ icon: <AccountTreeOutlinedIcon />, title: "Sin cuentas", description: `No hay cuentas de ${l.toLowerCase()} con movimientos.` }}
                     />
                     {rows.length > 0 && (
                       <TableTotals entries={[{ label: `Total ${l.toLowerCase()}`, value: <Money value={total} bold={false} /> }]} />
                     )}
-                  </div>
+                  </section>
                 ))}
               </div>
-            </>
-          ) : null}
-        </Section>
+            ) : null}
+          </Card>
+        </>
       )}
 
       {tab === "presupuestos" && (
         <>
-          <Section
-            title="Centros de costo"
-            subtitle="Agrupan gastos por área o departamento para el control presupuestal."
-            actions={cfg.canCreate ? (
-              <Button variant="secondary" size="sm" iconLeft="+" onClick={() => { setCostCenterForm({ ...emptyCostCenterForm }); setShowCostCenterForm(true); }}>
-                Nuevo centro de costo
-              </Button>
-            ) : undefined}
-          >
+          <Card className={s.tarjeta}>
+            <CardHead
+              title="Centros de costo"
+              subtitle="Agrupan gastos por área o departamento para el control presupuestal."
+              actions={cfg.canCreate ? (
+                <Button variant="secondary" size="sm" iconStart={<AddRoundedIcon />} onClick={() => { setCostCenterForm({ ...emptyCostCenterForm }); setShowCostCenterForm(true); }}>
+                  Nuevo centro de costo
+                </Button>
+              ) : undefined}
+            />
             {showCostCenterForm && (
-              <div style={formCard}>
-                <p style={{ margin: "0 0 14px", fontWeight: 700, fontSize: 14 }}>Nuevo centro de costo</p>
-                <FinanceFormGrid>
-                  <FinanceField label="Código" hint="Clave corta para identificar el área en reportes.">
-                    <input value={costCenterForm.code} onChange={e => setCostCenterForm(f => ({ ...f, code: e.target.value }))} placeholder="CC-OPS" style={inp} />
-                  </FinanceField>
-                  <FinanceField label="Nombre">
-                    <input value={costCenterForm.name} onChange={e => setCostCenterForm(f => ({ ...f, name: e.target.value }))} placeholder="Operaciones" style={inp} />
-                  </FinanceField>
-                  <FinanceField label="Cuenta contable por defecto" optional fullWidth hint="Solo cuentas de gasto. Se sugiere al presupuestar el área.">
-                    <select value={costCenterForm.defaultAccountId} onChange={e => setCostCenterForm(f => ({ ...f, defaultAccountId: e.target.value }))} style={inp}>
-                      <option value="">— Ninguna —</option>
-                      {accounts.filter(a => a.type === "EXPENSE").map(a => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
-                    </select>
-                  </FinanceField>
-                </FinanceFormGrid>
-                {costCenterSaveErr && <div style={{ marginTop: 14 }}><InlineAlert variant="danger" message={costCenterSaveErr} /></div>}
-                <div style={formFooter}>
-                  <Button size="sm" variant="ghost" onClick={() => { setShowCostCenterForm(false); setCostCenterSaveErr(null); }}>Cancelar</Button>
-                  <Button size="sm" variant="primary" onClick={() => void saveCostCenter()} disabled={costCenterSaving}>{costCenterSaving ? "Guardando…" : "Crear"}</Button>
-                </div>
-              </div>
+              <Captura
+                anidada
+                titulo="Nuevo centro de costo"
+                error={costCenterSaveErr}
+                pie={
+                  <>
+                    <Button variant="ghost" onClick={() => { setShowCostCenterForm(false); setCostCenterSaveErr(null); }}>Cancelar</Button>
+                    <Button variant="tonal" onClick={() => void saveCostCenter()} disabled={costCenterSaving}>{costCenterSaving ? "Guardando…" : "Crear"}</Button>
+                  </>
+                }
+              >
+                <Field label="Código" hint="Clave corta para identificar el área en reportes.">
+                  <Input value={costCenterForm.code} onChange={e => setCostCenterForm(f => ({ ...f, code: e.target.value }))} placeholder="CC-OPS" />
+                </Field>
+                <Field label="Nombre">
+                  <Input value={costCenterForm.name} onChange={e => setCostCenterForm(f => ({ ...f, name: e.target.value }))} placeholder="Operaciones" />
+                </Field>
+                <Field label="Cuenta contable por defecto" optional fullWidth hint="Solo cuentas de gasto. Se sugiere al presupuestar el área.">
+                  <Select value={costCenterForm.defaultAccountId} onChange={e => setCostCenterForm(f => ({ ...f, defaultAccountId: e.target.value }))}>
+                    <option value="">— Ninguna —</option>
+                    {accounts.filter(a => a.type === "EXPENSE").map(a => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
+                  </Select>
+                </Field>
+              </Captura>
             )}
             {costCentersLoadErr && (
-              <div style={{ marginBottom: 14 }}>
-                <InlineAlert
-                  variant="danger"
-                  message={costCentersLoadErr}
-                  action={<Button size="sm" variant="ghost" onClick={() => void loadCostCenters()}>Reintentar</Button>}
-                />
-              </div>
+              <Alert
+                tone="danger"
+                role="alert"
+                className={s.avisoDentro}
+                action={<Button size="sm" onClick={() => void loadCostCenters()}>Reintentar</Button>}
+              >
+                {costCentersLoadErr}
+              </Alert>
             )}
             {costCentersLoading ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+              <SkeletonRows rows={3} label="Cargando…" />
             ) : (
-              <DataTable columns={costCenterColumns} rows={costCenters} rowKey={c => c.id} emptyTitle="Sin centros de costo" emptyDescription="Crea el primer centro de costo para presupuestar por área." />
+              <TablaDatos
+                ariaLabel="Centros de costo"
+                columns={costCenterColumns}
+                rows={costCenters}
+                rowKey={c => c.id}
+                vacio={{ icon: <CategoryOutlinedIcon />, title: "Sin centros de costo", description: "Crea el primer centro de costo para presupuestar por área." }}
+              />
             )}
-          </Section>
+          </Card>
 
-          <div style={{ height: 24 }} />
+          {budgetVsActualCostCenter && !budgetVsActualLoading && budgetVsActual.length > 0 ? (
+            <StatRow variant="strip" ariaLabel="Presupuesto contra real">
+              <Stat
+                label="Planeado"
+                value={<Money value={totalPlanned} compact />}
+                hint={`${budgetVsActual.length} presupuestos`}
+                icon={<SavingsOutlinedIcon />}
+                iconTone="neutral"
+              />
+              <Stat
+                label="Real"
+                value={<Money value={totalActual} compact />}
+                hint="gasto contabilizado"
+                icon={<ReceiptLongOutlinedIcon />}
+                iconTone="neutral"
+              />
+              <Stat
+                label="Variación"
+                value={<Money value={totalPlanned - totalActual} compact />}
+                hint={
+                  totalPlanned > 0
+                    ? `${(((totalPlanned - totalActual) / totalPlanned) * 100).toFixed(1)}% del planeado`
+                    : "sin presupuesto base"
+                }
+                tone={totalActual <= totalPlanned ? "default" : "danger"}
+                icon={<BalanceOutlinedIcon />}
+                iconTone="neutral"
+              />
+            </StatRow>
+          ) : null}
 
-          <Section
-            title="Presupuesto vs. real"
-            subtitle="Compara el importe planeado contra el gasto real contabilizado por centro de costo y año."
-            actions={
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <select value={budgetVsActualCostCenter} onChange={e => setBudgetVsActualCostCenter(e.target.value)} style={{ ...inp, width: 200 }}>
-                  <option value="">Selecciona centro de costo</option>
-                  {costCenters.map(c => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
-                </select>
-                <input type="number" value={budgetVsActualYear} onChange={e => setBudgetVsActualYear(e.target.value)} style={{ ...inp, width: 100 }} />
-              </div>
-            }
-          >
+          <Card className={s.tarjeta}>
+            <CardHead
+              title="Presupuesto vs. real"
+              subtitle="Compara el importe planeado contra el gasto real contabilizado por centro de costo y año."
+              actions={
+                <>
+                  <Select aria-label="Centro de costo" controlSize="sm" wrapperClassName={s.selCentro} value={budgetVsActualCostCenter} onChange={e => setBudgetVsActualCostCenter(e.target.value)}>
+                    <option value="">Selecciona centro de costo</option>
+                    {costCenters.map(c => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+                  </Select>
+                  <Input aria-label="Año" type="number" controlSize="sm" className={s.anio} value={budgetVsActualYear} onChange={e => setBudgetVsActualYear(e.target.value)} />
+                </>
+              }
+            />
             {budgetVsActualLoadErr && (
-              <div style={{ marginBottom: 14 }}>
-                <InlineAlert
-                  variant="danger"
-                  message={budgetVsActualLoadErr}
-                  action={<Button size="sm" variant="ghost" onClick={() => void loadBudgetVsActual()}>Reintentar</Button>}
-                />
-              </div>
+              <Alert
+                tone="danger"
+                role="alert"
+                className={s.avisoDentro}
+                action={<Button size="sm" onClick={() => void loadBudgetVsActual()}>Reintentar</Button>}
+              >
+                {budgetVsActualLoadErr}
+              </Alert>
             )}
             {!budgetVsActualCostCenter ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>Selecciona un centro de costo para ver el comparativo.</div>
+              <EmptyState size="compact" tone="neutral" icon={<CategoryOutlinedIcon />} title="Selecciona un centro de costo para ver el comparativo." />
             ) : budgetVsActualLoading ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+              <SkeletonRows rows={4} label="Cargando…" />
             ) : budgetVsActual.length === 0 ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>Sin presupuestos para este centro de costo y año.</div>
+              <EmptyState size="compact" tone="neutral" icon={<SavingsOutlinedIcon />} title="Sin presupuestos para este centro de costo y año." />
             ) : (
               <>
-                <div style={{ marginBottom: 16 }}>
-                  <MetricStrip
-                    ariaLabel="Presupuesto contra real"
-                    metrics={[
-                      { label: "Planeado", value: <Money value={totalPlanned} compact bold={false} />, hint: `${budgetVsActual.length} presupuestos` },
-                      { label: "Real", value: <Money value={totalActual} compact bold={false} />, hint: "gasto contabilizado" },
-                      {
-                        label: "Variación",
-                        value: <Money value={totalPlanned - totalActual} compact bold={false} />,
-                        hint: totalPlanned > 0
-                          ? `${(((totalPlanned - totalActual) / totalPlanned) * 100).toFixed(1)}% del planeado`
-                          : "sin presupuesto base",
-                        tone: totalActual <= totalPlanned ? "default" : "danger",
-                      },
-                    ]}
-                  />
-                </div>
                 <DataTable
+                  flush
                   density="compact"
-                  columns={[
-                    {
-                      key: "name", label: "Presupuesto",
-                      render: (b: Budget) => (
-                        <div>
-                          <div style={{ fontSize: 13 }}>{b.name}</div>
-                          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                            {b.month ? `Mes ${b.month} de ${b.year}` : `Ejercicio ${b.year}`}
-                          </div>
-                        </div>
-                      ),
-                    },
-                    { key: "plannedAmount", label: "Planeado", numeric: true, width: 130, render: (b: Budget) => <Money value={b.plannedAmount} compact bold={false} /> },
-                    { key: "actualAmount", label: "Real", numeric: true, width: 130, render: (b: Budget) => <Money value={b.actualAmount} compact bold={false} /> },
-                    {
-                      key: "left", label: "Diferencia", numeric: true, width: 150,
-                      render: (b: Budget) => {
-                        const over = b.actualAmount > b.plannedAmount;
-                        return (
-                          <span style={{ fontVariantNumeric: "tabular-nums", color: over ? "var(--state-danger-text, #b91c1c)" : "var(--text-secondary)" }}>
-                            {over ? "+" : "−"}<Money value={Math.abs(b.plannedAmount - b.actualAmount)} compact bold={false} />
-                          </span>
-                        );
-                      },
-                    },
-                  ]}
+                  ariaLabel="Presupuesto vs. real"
+                  columns={vsRealColumns}
                   rows={budgetVsActual}
                   rowKey={(b) => b.id}
-                  emptyTitle="Sin presupuestos"
-                  emptyDescription="Sin presupuestos para este centro de costo y año."
                 />
                 <TableTotals
                   entries={[
@@ -2030,198 +2286,218 @@ export default function AccountingPage() {
                 />
               </>
             )}
-          </Section>
+          </Card>
 
-          <div style={{ height: 24 }} />
-
-          <Section
-            title="Presupuestos registrados"
-            actions={cfg.canCreate ? (
-              <Button variant="secondary" size="sm" iconLeft="+" onClick={() => { setBudgetForm({ ...emptyBudgetForm, year: new Date().getFullYear() }); setShowBudgetForm(true); }}>
-                Nuevo presupuesto
-              </Button>
-            ) : undefined}
-          >
+          <Card className={s.tarjeta}>
+            <CardHead
+              title="Presupuestos registrados"
+              actions={cfg.canCreate ? (
+                <Button variant="secondary" size="sm" iconStart={<AddRoundedIcon />} onClick={() => { setBudgetForm({ ...emptyBudgetForm, year: new Date().getFullYear() }); setShowBudgetForm(true); }}>
+                  Nuevo presupuesto
+                </Button>
+              ) : undefined}
+            />
             {showBudgetForm && (
-              <div style={formCard}>
-                <p style={{ margin: "0 0 14px", fontWeight: 700, fontSize: 14 }}>Nuevo presupuesto</p>
-                <FinanceFormGrid>
-                  <FinanceField label="Nombre" fullWidth>
-                    <input value={budgetForm.name} onChange={e => setBudgetForm(f => ({ ...f, name: e.target.value }))} placeholder="Presupuesto de operación 2026" style={inp} />
-                  </FinanceField>
-                  <FinanceField label="Centro de costo" hint="Contra él se compara el gasto real contabilizado.">
-                    <select value={budgetForm.costCenterId} onChange={e => setBudgetForm(f => ({ ...f, costCenterId: e.target.value }))} style={inp}>
-                      <option value="">— Seleccionar —</option>
-                      {costCenters.map(c => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
-                    </select>
-                  </FinanceField>
-                  <FinanceField label="Año">
-                    <input type="number" value={budgetForm.year} onChange={e => setBudgetForm(f => ({ ...f, year: +e.target.value }))} style={inp} />
-                  </FinanceField>
-                  <FinanceField label="Mes" optional hint="Déjalo vacío para un presupuesto anual.">
-                    <input type="number" min={1} max={12} value={budgetForm.month} onChange={e => setBudgetForm(f => ({ ...f, month: e.target.value }))} style={inp} />
-                  </FinanceField>
-                  <FinanceField label="Importe planeado" hint="Pesos. Es el techo con el que se mide la variación.">
-                    <input type="number" min={0} step="0.01" value={budgetForm.plannedAmount || ""} onChange={e => setBudgetForm(f => ({ ...f, plannedAmount: +e.target.value }))} style={inp} />
-                  </FinanceField>
-                  <FinanceField label="Notas" optional fullWidth>
-                    <input value={budgetForm.notes} onChange={e => setBudgetForm(f => ({ ...f, notes: e.target.value }))} style={inp} />
-                  </FinanceField>
-                </FinanceFormGrid>
-                {budgetSaveErr && <div style={{ marginTop: 14 }}><InlineAlert variant="danger" message={budgetSaveErr} /></div>}
-                <div style={formFooter}>
-                  <Button size="sm" variant="ghost" onClick={() => { setShowBudgetForm(false); setBudgetSaveErr(null); }}>Cancelar</Button>
-                  <Button size="sm" variant="primary" onClick={() => void saveBudget()} disabled={budgetSaving}>{budgetSaving ? "Guardando…" : "Crear presupuesto"}</Button>
-                </div>
-              </div>
+              <Captura
+                anidada
+                titulo="Nuevo presupuesto"
+                error={budgetSaveErr}
+                pie={
+                  <>
+                    <Button variant="ghost" onClick={() => { setShowBudgetForm(false); setBudgetSaveErr(null); }}>Cancelar</Button>
+                    <Button variant="tonal" onClick={() => void saveBudget()} disabled={budgetSaving}>{budgetSaving ? "Guardando…" : "Crear presupuesto"}</Button>
+                  </>
+                }
+              >
+                <Field label="Nombre" fullWidth>
+                  <Input value={budgetForm.name} onChange={e => setBudgetForm(f => ({ ...f, name: e.target.value }))} placeholder="Presupuesto de operación 2026" />
+                </Field>
+                <Field label="Centro de costo" hint="Contra él se compara el gasto real contabilizado.">
+                  <Select value={budgetForm.costCenterId} onChange={e => setBudgetForm(f => ({ ...f, costCenterId: e.target.value }))}>
+                    <option value="">— Seleccionar —</option>
+                    {costCenters.map(c => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Año">
+                  <Input type="number" value={budgetForm.year} onChange={e => setBudgetForm(f => ({ ...f, year: +e.target.value }))} />
+                </Field>
+                <Field label="Mes" optional hint="Déjalo vacío para un presupuesto anual.">
+                  <Input type="number" min={1} max={12} value={budgetForm.month} onChange={e => setBudgetForm(f => ({ ...f, month: e.target.value }))} />
+                </Field>
+                <Field label="Importe planeado" hint="Pesos. Es el techo con el que se mide la variación.">
+                  <Input type="number" min={0} step="0.01" value={budgetForm.plannedAmount || ""} onChange={e => setBudgetForm(f => ({ ...f, plannedAmount: +e.target.value }))} />
+                </Field>
+                <Field label="Notas" optional fullWidth>
+                  <Input value={budgetForm.notes} onChange={e => setBudgetForm(f => ({ ...f, notes: e.target.value }))} />
+                </Field>
+              </Captura>
             )}
             {budgetsLoadErr && (
-              <div style={{ marginBottom: 14 }}>
-                <InlineAlert
-                  variant="danger"
-                  message={budgetsLoadErr}
-                  action={<Button size="sm" variant="ghost" onClick={() => void loadBudgets()}>Reintentar</Button>}
-                />
-              </div>
+              <Alert
+                tone="danger"
+                role="alert"
+                className={s.avisoDentro}
+                action={<Button size="sm" onClick={() => void loadBudgets()}>Reintentar</Button>}
+              >
+                {budgetsLoadErr}
+              </Alert>
             )}
             {budgetsLoading ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+              <SkeletonRows rows={3} label="Cargando…" />
             ) : (
-              <DataTable columns={budgetColumns} rows={budgets} rowKey={b => b.id} emptyTitle="Sin presupuestos" emptyDescription="Crea el primer presupuesto por centro de costo." />
+              <TablaDatos
+                ariaLabel="Presupuestos registrados"
+                columns={budgetColumns}
+                rows={budgets}
+                rowKey={b => b.id}
+                vacio={{ icon: <SavingsOutlinedIcon />, title: "Sin presupuestos", description: "Crea el primer presupuesto por centro de costo." }}
+              />
             )}
-          </Section>
+          </Card>
         </>
       )}
 
       {tab === "cumplimiento_sat" && (
         <>
-          <Section
-            title="Mapeo de agrupador SAT"
-            subtitle="Contabilidad Electrónica (Balanza) requiere que cada cuenta con movimiento tenga su código de agrupador del catálogo SAT. Edítalo en la columna de Catálogo de cuentas."
-          >
+          {!agrupadorStatusLoading && agrupadorStatus ? (
+            <StatRow variant="strip" ariaLabel="Mapeo de agrupador SAT">
+              <Stat
+                label="Cuentas totales"
+                value={agrupadorStatus.totalAccounts}
+                hint="en el catálogo"
+                icon={<AccountTreeOutlinedIcon />}
+                iconTone="neutral"
+              />
+              <Stat
+                label="Mapeadas"
+                value={agrupadorStatus.mappedAccounts}
+                hint="con código del catálogo SAT"
+                icon={<FactCheckOutlinedIcon />}
+                iconTone="neutral"
+              />
+              <Stat
+                label="Sin mapear"
+                value={agrupadorStatus.missingAccounts.length}
+                hint={agrupadorStatus.missingAccounts.length ? "bloquean la balanza electrónica" : "listo para exportar"}
+                tone={agrupadorStatus.missingAccounts.length ? "warning" : "default"}
+                icon={<ChecklistOutlinedIcon />}
+                iconTone="neutral"
+              />
+            </StatRow>
+          ) : null}
+
+          <Card className={`${s.tarjeta} ${!agrupadorStatusLoading && !faltanAgrupador ? s.soloCabeza : ""}`}>
+            <CardHead
+              title="Mapeo de agrupador SAT"
+              subtitle="Contabilidad Electrónica (Balanza) requiere que cada cuenta con movimiento tenga su código de agrupador del catálogo SAT. Edítalo en la columna de Catálogo de cuentas."
+            />
             {agrupadorStatusLoading ? (
-              <div style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-            ) : agrupadorStatus ? (
-              <>
-                <div style={{ marginBottom: 16 }}>
-                  <MetricStrip
-                    ariaLabel="Mapeo de agrupador SAT"
-                    metrics={[
-                      { label: "Cuentas totales", value: agrupadorStatus.totalAccounts, hint: "en el catálogo" },
-                      { label: "Mapeadas", value: agrupadorStatus.mappedAccounts, hint: "con código del catálogo SAT" },
-                      {
-                        label: "Sin mapear",
-                        value: agrupadorStatus.missingAccounts.length,
-                        hint: agrupadorStatus.missingAccounts.length ? "bloquean la balanza electrónica" : "listo para exportar",
-                        tone: agrupadorStatus.missingAccounts.length ? "warning" : "default",
-                      },
-                    ]}
-                  />
-                </div>
-                {agrupadorStatus.missingAccounts.length > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <InlineAlert
-                      variant="warning"
-                      style={{ flex: 1 }}
-                      message={`Faltan mapear: ${agrupadorStatus.missingAccounts.map(a => `${a.code} ${a.name}`).join(", ")}.`}
-                    />
-                    <Button size="sm" variant="secondary" onClick={() => setTab("cuentas" as TabKey)}>
-                      Ir al catálogo
-                    </Button>
-                  </div>
-                )}
-              </>
+              <SkeletonRows rows={2} label="Cargando…" />
+            ) : agrupadorStatus && faltanAgrupador ? (
+              <Alert
+                tone="warning"
+                role="alert"
+                className={s.avisoDentro}
+                action={<Button size="sm" onClick={() => setTab("cuentas" as TabKey)}>Ir al catálogo</Button>}
+              >
+                {`Faltan mapear: ${agrupadorStatus.missingAccounts.map(a => `${a.code} ${a.name}`).join(", ")}.`}
+              </Alert>
             ) : null}
-          </Section>
+          </Card>
 
-          <div style={{ height: 24 }} />
+          {!diotLoading && diotReport && diotReport.rows.length > 0 ? (
+            <StatRow variant="strip" ariaLabel="Totales de la DIOT">
+              <Stat
+                label="Base 16%"
+                value={<Money value={diotReport.totals.baseAmount} compact />}
+                hint="importe antes de IVA"
+                icon={<ReceiptLongOutlinedIcon />}
+                iconTone="neutral"
+              />
+              <Stat
+                label="IVA trasladado"
+                value={<Money value={diotReport.totals.ivaAmount} compact />}
+                hint="acreditable del periodo"
+                icon={<TrendingUpOutlinedIcon />}
+                iconTone="neutral"
+              />
+              <Stat
+                label="Total pagado"
+                value={<Money value={diotReport.totals.totalAmount} compact />}
+                hint="base más IVA"
+                icon={<AccountBalanceWalletOutlinedIcon />}
+                iconTone="neutral"
+              />
+              <Stat
+                label="Proveedores"
+                value={diotReport.rows.length}
+                hint={
+                  diotReport.missingRfcSuppliers.length
+                    ? `${diotReport.missingRfcSuppliers.length} sin RFC`
+                    : "todos con RFC"
+                }
+                tone={diotReport.missingRfcSuppliers.length ? "warning" : "default"}
+                icon={<LibraryBooksOutlinedIcon />}
+                iconTone="neutral"
+              />
+            </StatRow>
+          ) : null}
 
-          <Section
-            title="DIOT — Declaración Informativa de Operaciones con Terceros"
-            subtitle="Base e IVA trasladado por proveedor (facturas AP del periodo). Insumo directo para el aplicativo DIOT del SAT."
-            actions={
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <select value={diotMonth} onChange={e => setDiotMonth(+e.target.value)} style={{ ...inp, width: 130 }}>
-                  {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m, i) => (
-                    <option key={m} value={i + 1}>{m}</option>
-                  ))}
-                </select>
-                <input type="number" value={diotYear} onChange={e => setDiotYear(+e.target.value)} style={{ ...inp, width: 90 }} />
-                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => void downloadDiotCsv()} disabled={diotCsvDownloading || !diotReport?.rows.length}>
-                  {diotCsvDownloading ? "Generando…" : "Descargar CSV"}
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => void downloadBalanzaXml()}
-                  disabled={balanzaDownloading || !agrupadorStatus?.readyForBalanzaExport}
-                  title={agrupadorStatus && !agrupadorStatus.readyForBalanzaExport ? "Completa el mapeo de agrupador SAT primero" : undefined}
-                >
-                  {balanzaDownloading ? "Generando…" : "Exportar Balanza XML"}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => void downloadCatalogoCuentasXml()}
-                  disabled={catalogoDownloading || !agrupadorStatus?.readyForBalanzaExport}
-                  title={agrupadorStatus && !agrupadorStatus.readyForBalanzaExport ? "Completa el mapeo de agrupador SAT primero" : undefined}
-                >
-                  {catalogoDownloading ? "Generando…" : "Exportar Catálogo de cuentas XML"}
-                </Button>
-              </div>
-            }
-          >
+          <Card className={s.tarjeta}>
+            <CardHead
+              title="DIOT — Declaración Informativa de Operaciones con Terceros"
+              subtitle="Base e IVA trasladado por proveedor (facturas AP del periodo). Insumo directo para el aplicativo DIOT del SAT."
+            />
+            <ModuleToolbar
+              end={
+                <>
+                  <Button variant="ghost" size="sm" iconStart={<FileDownloadOutlinedIcon />} onClick={() => void downloadDiotCsv()} disabled={diotCsvDownloading || !diotReport?.rows.length}>
+                    {diotCsvDownloading ? "Generando…" : "Descargar CSV"}
+                  </Button>
+                  <Button
+                    variant="tonal"
+                    size="sm"
+                    onClick={() => void downloadBalanzaXml()}
+                    disabled={balanzaDownloading || !agrupadorStatus?.readyForBalanzaExport}
+                    title={agrupadorStatus && !agrupadorStatus.readyForBalanzaExport ? "Completa el mapeo de agrupador SAT primero" : undefined}
+                  >
+                    {balanzaDownloading ? "Generando…" : "Exportar Balanza XML"}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void downloadCatalogoCuentasXml()}
+                    disabled={catalogoDownloading || !agrupadorStatus?.readyForBalanzaExport}
+                    title={agrupadorStatus && !agrupadorStatus.readyForBalanzaExport ? "Completa el mapeo de agrupador SAT primero" : undefined}
+                  >
+                    {catalogoDownloading ? "Generando…" : "Exportar Catálogo de cuentas XML"}
+                  </Button>
+                </>
+              }
+            >
+              <Select aria-label="Mes" controlSize="sm" wrapperClassName={s.selMes} value={diotMonth} onChange={e => setDiotMonth(+e.target.value)}>
+                {MESES.map((m, i) => (
+                  <option key={m} value={i + 1}>{m}</option>
+                ))}
+              </Select>
+              <Input aria-label="Año" type="number" controlSize="sm" className={s.anio} value={diotYear} onChange={e => setDiotYear(+e.target.value)} />
+            </ModuleToolbar>
             {diotLoading ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Calculando…</div>
+              <SkeletonRows rows={5} label="Calculando…" />
             ) : diotReport && diotReport.rows.length > 0 ? (
               <>
-                <div style={{ marginBottom: 16 }}>
-                  <MetricStrip
-                    ariaLabel="Totales de la DIOT"
-                    metrics={[
-                      { label: "Base 16%", value: <Money value={diotReport.totals.baseAmount} compact bold={false} />, hint: "importe antes de IVA" },
-                      { label: "IVA trasladado", value: <Money value={diotReport.totals.ivaAmount} compact bold={false} />, hint: "acreditable del periodo" },
-                      { label: "Total pagado", value: <Money value={diotReport.totals.totalAmount} compact bold={false} />, hint: "base más IVA" },
-                      {
-                        label: "Proveedores",
-                        value: diotReport.rows.length,
-                        hint: diotReport.missingRfcSuppliers.length
-                          ? `${diotReport.missingRfcSuppliers.length} sin RFC`
-                          : "todos con RFC",
-                        tone: diotReport.missingRfcSuppliers.length ? "warning" : "default",
-                      },
-                    ]}
-                  />
-                </div>
                 {diotReport.missingRfcSuppliers.length > 0 && (
-                  <InlineAlert
-                    variant="warning"
-                    message={`Sin RFC capturado: ${diotReport.missingRfcSuppliers.join(", ")}. Complétalo en Compras → Proveedores.`}
-                  />
+                  <Alert tone="warning" role="alert" className={s.avisoDentro}>
+                    {`Sin RFC capturado: ${diotReport.missingRfcSuppliers.join(", ")}. Complétalo en Compras → Proveedores.`}
+                  </Alert>
                 )}
                 <DataTable
+                  flush
                   density="compact"
-                  columns={[
-                    {
-                      key: "supplierName", label: "Proveedor",
-                      render: (r: DiotRow) => (
-                        <div>
-                          <div style={{ fontSize: 13 }}>{r.supplierName}</div>
-                          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                            {r.rfc ? <code>{r.rfc}</code> : <span style={{ color: "var(--state-warning-text, #b45309)" }}>sin RFC</span>}
-                            {` · ${r.invoiceCount} factura${r.invoiceCount === 1 ? "" : "s"}`}
-                          </div>
-                        </div>
-                      ),
-                    },
-                    { key: "baseAmount", label: "Base 16%", numeric: true, width: 140, render: (r: DiotRow) => <Money value={r.baseAmount} compact bold={false} /> },
-                    { key: "ivaAmount", label: "IVA", numeric: true, width: 130, render: (r: DiotRow) => <Money value={r.ivaAmount} compact bold={false} /> },
-                    { key: "totalAmount", label: "Total", numeric: true, width: 140, render: (r: DiotRow) => <Money value={r.totalAmount} compact bold={false} /> },
-                  ]}
+                  ariaLabel="DIOT"
+                  columns={diotColumns}
                   rows={diotReport.rows}
                   rowKey={(r) => r.supplierId}
-                  emptyTitle="Sin operaciones"
-                  emptyDescription="No hay facturas de proveedor en el periodo."
                 />
                 <TableTotals
                   entries={[
@@ -2232,15 +2508,18 @@ export default function AccountingPage() {
                 />
               </>
             ) : (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>
-                Sin facturas de proveedor (AP) en {diotMonth}/{diotYear}.
-              </div>
+              <EmptyState
+                size="compact"
+                tone="neutral"
+                icon={<SearchOffOutlinedIcon />}
+                title={`Sin facturas de proveedor (AP) en ${diotMonth}/${diotYear}.`}
+              />
             )}
-          </Section>
+          </Card>
         </>
       )}
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </MesaPagina>
   );
 }

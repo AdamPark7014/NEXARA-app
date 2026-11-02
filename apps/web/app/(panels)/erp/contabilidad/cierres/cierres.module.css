@@ -1,0 +1,180 @@
+/* Mesa contable · Cierres. Solo tokens --ui-*: claro y oscuro salen solos. */
+
+/* El aviso base trae margen inferior propio; aquí el aire lo da el `gap`. */
+div.alerta {
+  margin-bottom: 0;
+}
+
+.estado {
+  margin: 0;
+  padding: var(--ui-s4) var(--ui-s5) var(--ui-s2);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+.calculando {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Lista de verificación ────────────────────────────────────────────── */
+
+.sobretitulo {
+  display: block;
+  margin-bottom: 2px;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.mensajes {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4) var(--ui-s5);
+}
+
+.puntos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.puntos > li + li {
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+/*
+ * Lo que decide si el periodo puede cerrarse. Lo resuelto se queda plano y gris;
+ * solo lo que impide cerrar lleva una regla roja al margen, y lo que se revisa,
+ * ámbar. La palabra de la derecha dice el estado, no el color.
+ */
+.punto {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--ui-s3);
+  align-items: baseline;
+  padding: 12px var(--ui-s5) 12px 18px;
+  border-left: 2px solid transparent;
+}
+
+.punto[data-estado="bloqueante"] {
+  border-left-color: var(--ui-danger-text);
+}
+
+.punto[data-estado="advertencia"] {
+  border-left-color: var(--ui-warning-text);
+}
+
+.puntoCuerpo {
+  min-width: 0;
+}
+
+.puntoTitulo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+}
+
+.etiqueta {
+  font-size: var(--ui-text-base);
+  font-weight: 500;
+  color: var(--ui-fg-2);
+}
+
+.etiquetaPide {
+  font-size: var(--ui-text-base);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.conteo {
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg-2);
+}
+
+.punto[data-estado="bloqueante"] .conteo {
+  color: var(--ui-danger-text);
+}
+
+.punto[data-estado="advertencia"] .conteo {
+  color: var(--ui-warning-text);
+}
+
+.descripcion {
+  margin: 3px 0 0;
+  font-size: var(--ui-text-xs);
+  line-height: 1.45;
+  color: var(--ui-fg-3);
+}
+
+.resolver {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  color: var(--ui-brand-text);
+}
+
+.resolver:hover {
+  text-decoration: underline;
+}
+
+.resolver:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+.proteccion {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4) var(--ui-s5);
+  border-top: 1px solid var(--ui-border-subtle);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+.proteccionTitulo {
+  color: var(--ui-fg);
+}
+
+.proteccionAviso {
+  color: var(--ui-warning-text);
+}
+
+.lista {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+/* ─── Cerrar con justificación ─────────────────────────────────────────── */
+
+.modalPie {
+  display: flex;
+  gap: var(--ui-s2);
+  justify-content: flex-end;
+}
+
+.explica {
+  margin: 0 0 10px;
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+}
+
+.bloquean {
+  margin: 0 0 var(--ui-s3);
+  padding-left: 18px;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-danger-text);
+}
+
+.justificacion {
+  min-height: 90px;
+  resize: vertical;
+}

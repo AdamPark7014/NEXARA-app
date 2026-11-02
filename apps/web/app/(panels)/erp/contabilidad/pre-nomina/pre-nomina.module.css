@@ -1,0 +1,167 @@
+/* Mesa contable · Pre-nómina: periodo, resumen y detalle. Solo tokens --ui-*. */
+
+/* El aviso base trae margen inferior; en el marco ya separa el gap de 16 px. */
+.aviso {
+  margin-bottom: 0;
+}
+
+/* ─── Periodo: dos fechas compactas, no un formulario a todo el ancho ──── */
+
+.periodo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4) 20px;
+}
+
+.periodo > label {
+  flex: 0 1 220px;
+  min-width: 160px;
+}
+
+.pendiente {
+  margin: 0;
+  padding: 0 20px var(--ui-s4);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-warning-text);
+}
+
+.cuerpo {
+  padding: var(--ui-s4) 20px;
+}
+
+.cargando {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+/* ─── Resumen: título al aire, las cifras ya son tarjetas ──────────────── */
+
+.bloque {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.bloqueTitulo {
+  margin: 0;
+  font-family: var(--ui-font-display);
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-section);
+  letter-spacing: var(--ui-tracking-section);
+  color: var(--ui-fg);
+}
+
+.bloqueSub {
+  margin: calc(-1 * var(--ui-s2)) 0 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+/* ─── Celdas de las tablas ─────────────────────────────────────────────── */
+
+.persona {
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.personaSub {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+}
+
+/* El motivo completo se conserva —es lo que dice por qué no se puede pagar la
+   fila tal cual—, pero baja bajo la palabra para no ensanchar la tabla. */
+.revisar {
+  max-width: 230px;
+}
+
+.motivos {
+  margin-top: 2px;
+  font-size: var(--ui-text-xs);
+  line-height: 1.35;
+  color: var(--ui-fg-3);
+}
+
+/* ─── Detalle de una persona (modal) ───────────────────────────────────── */
+
+.detalle {
+  display: grid;
+  gap: var(--ui-s4);
+}
+
+.ficha {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  font-size: var(--ui-text-sm);
+}
+
+.ficha dt {
+  font-size: var(--ui-text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.ficha dd {
+  margin: 0;
+}
+
+.subtitulo {
+  margin: 0 0 6px;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.calculo {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: var(--ui-text-sm);
+}
+
+.calculo dt {
+  color: var(--ui-fg-2);
+}
+
+.calculo dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.calculo dt.calculoTotal {
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.formula {
+  margin: var(--ui-s2) 0 0;
+  font-size: var(--ui-text-xs);
+  line-height: 1.4;
+  color: var(--ui-fg-3);
+}
+
+.sinDesglose {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}

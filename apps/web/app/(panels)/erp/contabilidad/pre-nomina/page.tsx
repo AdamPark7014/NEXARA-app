@@ -1,25 +1,45 @@
 "use client";
 
-import Link from "next/link";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import InlineAlert from "@/components/ui/InlineAlert";
-import Modal from "@/components/ui/Modal";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import StatusDot from "@/components/ui/StatusDot";
 import {
-  FinanceField,
-  FinanceFormGrid,
-  financeInputStyle,
-} from "@/components/finance/FinanceModuleShell";
+  Fragment,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from "react";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import MoreTimeOutlinedIcon from "@mui/icons-material/MoreTimeOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardHead,
+  DataTable,
+  DateInput,
+  Field,
+  ListCard,
+  Stat,
+  StatRow,
+  type Column,
+} from "@/components/base";
+import Modal from "@/components/ui/Modal";
+import { Money } from "@/components/ui/DataTable";
+import { MesaPagina } from "@/components/mesa-contable/MesaPagina";
 import { todayStamp } from "@/components/finance/download";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { fetchPrenominaPreview, type PrenominaPreviewRow } from "@/lib/finance-api";
 import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
+import s from "./pre-nomina.module.css";
 
 const MODULO_COMPLETO = "/erp/finance/prenomina";
 
@@ -103,6 +123,8 @@ function validarRango(
 export default function ContabilidadPrenominaPage() {
   const { user, isContextReady } = useUser();
   const token = user?.token ?? "";
+  const periodoId = useId();
+  const resumenId = useId();
 
   const [desde, setDesde] = useState(isoHaceDias(6));
   const [hasta, setHasta] = useState(isoHoy());
@@ -219,17 +241,21 @@ export default function ContabilidadPrenominaPage() {
    * «Total sugerido» no es lo que se va a pagar: no lleva bonos ni descuentos,
    * y deja fuera a quien no tiene sueldo capturado.
    */
-  const resumenStrip: Metric[] = useMemo(
+  const resumenStrip: ComponentProps<typeof Stat>[] = useMemo(
     () => [
       {
         label: "Empleados",
         value: resumen.empleados,
         hint: "Con alta activa",
+        icon: <GroupsOutlinedIcon />,
+        iconTone: "neutral",
       },
       {
         label: "Sueldo base semanal",
         value: <Money value={resumen.sueldoBase} />,
         hint: "Suma de los sueldos capturados",
+        icon: <PaymentsOutlinedIcon />,
+        iconTone: "neutral",
       },
       {
         // Se sumaba y no se pintaba: es el contraste que da sentido a las
@@ -237,11 +263,15 @@ export default function ContabilidadPrenominaPage() {
         label: "Horas trabajadas",
         value: horasYMinutos(resumen.minutosTrabajados),
         hint: "Suma de las checadas del periodo",
+        icon: <ScheduleOutlinedIcon />,
+        iconTone: "neutral",
       },
       {
         label: "Horas extra aprobadas",
         value: horasYMinutos(resumen.minutosExtra),
         hint: "Solo las ya autorizadas",
+        icon: <MoreTimeOutlinedIcon />,
+        iconTone: "neutral",
       },
       {
         label: "Total sugerido",
@@ -250,6 +280,8 @@ export default function ContabilidadPrenominaPage() {
           resumen.sinMonto > 0
             ? `Ordinario + extras · ${resumen.sinMonto} de captura manual`
             : "Ordinario + extras del periodo",
+        icon: <RequestQuoteOutlinedIcon />,
+        iconTone: "neutral",
       },
       {
         label: "Por revisar",
@@ -257,6 +289,8 @@ export default function ContabilidadPrenominaPage() {
         hint:
           resumen.conIncidencia === 0 ? "Nada pendiente" : "Filas que no deben pagarse así",
         tone: resumen.conIncidencia > 0 ? "warning" : "default",
+        icon: <WarningAmberOutlinedIcon />,
+        iconTone: "neutral",
       },
     ],
     [resumen],
@@ -268,8 +302,8 @@ export default function ContabilidadPrenominaPage() {
       label: "Persona",
       render: (r) => (
         <div>
-          <div style={{ fontWeight: 600 }}>{r.nombre || `Usuario #${r.userId}`}</div>
-          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          <div className={s.persona}>{r.nombre || `Usuario #${r.userId}`}</div>
+          <div className={s.personaSub}>
             {[r.puesto || r.email || null, angosto ? `${r.daysWithAttendance ?? 0} días` : null]
               .filter(Boolean)
               .join(" · ") || "—"}
@@ -292,7 +326,7 @@ export default function ContabilidadPrenominaPage() {
               r.daysWithAttendance > 0 ? (
                 r.daysWithAttendance
               ) : (
-                <span style={{ color: "var(--text-tertiary)" }}>0</span>
+                <span className={s.tenue}>0</span>
               ),
           },
         ]),
@@ -331,7 +365,7 @@ export default function ContabilidadPrenominaPage() {
         r.suggestedAmount != null ? (
           <Money value={r.suggestedAmount} />
         ) : (
-          <span style={{ color: "var(--text-tertiary)" }}>Captura manual</span>
+          <span className={s.tenue}>Captura manual</span>
         ),
     },
     {
@@ -340,23 +374,18 @@ export default function ContabilidadPrenominaPage() {
       render: (r) => {
         const motivos = incidenciasDe(r);
         // El motivo completo se conserva —es lo que dice por qué no se puede
-        // pagar la fila tal cual—, pero baja a 11px bajo la palabra para no
-        // ensanchar la tabla. El color solo aparece cuando hay un motivo.
+        // pagar la fila tal cual—, pero baja bajo la palabra para no ensanchar
+        // la tabla. El color solo aparece cuando hay un motivo.
         return motivos.length === 0 ? (
-          <StatusDot label="Sin pendientes" tone="neutral" />
+          <Badge dot size="sm" tone="neutral">
+            Sin pendientes
+          </Badge>
         ) : (
-          <div style={{ maxWidth: 230 }}>
-            <StatusDot label="Por revisar" tone="warning" />
-            <div
-              style={{
-                fontSize: 11,
-                color: "var(--text-tertiary)",
-                marginTop: 2,
-                lineHeight: 1.35,
-              }}
-            >
-              {motivos.join(" · ")}
-            </div>
+          <div className={s.revisar}>
+            <Badge dot size="sm" tone="warning">
+              Por revisar
+            </Badge>
+            <div className={s.motivos}>{motivos.join(" · ")}</div>
           </div>
         );
       },
@@ -366,178 +395,168 @@ export default function ContabilidadPrenominaPage() {
   const hayDatos = rows.length > 0;
 
   return (
-    <>
-      <PageHeader
-        eyebrow="ERP · Contabilidad"
-        title="Pre-nómina"
-        subtitle="Lo que se va a pagar este periodo, según checadas y extras ya aprobados."
-        density="ops"
-        actions={
-          <Link
-            href={MODULO_COMPLETO}
-            style={{ fontSize: 12, fontWeight: 600, textDecoration: "none" }}
-          >
-            Abrir módulo completo
-          </Link>
-        }
-      />
-
-      <Section title="Periodo" subtitle="Elige el rango y vuelve a calcular." dense>
+    <MesaPagina
+      titulo="Pre-nómina"
+      descripcion="Lo que se va a pagar este periodo, según checadas y extras ya aprobados."
+      secundarias={<ButtonLink href={MODULO_COMPLETO}>Abrir módulo completo</ButtonLink>}
+      primaria={
+        <Button
+          variant="primary"
+          type="submit"
+          form={periodoId}
+          loading={cargando}
+          disabled={!token}
+          title={sinSesion ? "Necesitas una sesión activa para calcular" : undefined}
+        >
+          {cargando ? "Calculando…" : "Calcular"}
+        </Button>
+      }
+    >
+      {/* El periodo es una barra, no un formulario a todo el ancho: dos fechas
+          compactas. «Calcular» vive en la cabeza y envía este mismo formulario. */}
+      <Card as="div">
+        <CardHead title="Periodo" subtitle="Elige el rango y vuelve a calcular." />
         <form
+          id={periodoId}
+          className={s.periodo}
           onSubmit={(e) => {
             e.preventDefault();
             void cargar();
           }}
         >
-          <FinanceFormGrid>
-            <FinanceField
-              label="Desde"
-              hint="Primer día que entra al cálculo"
-              error={errorRango?.campo === "desde" ? errorRango.mensaje : null}
-            >
-              <input
-                type="date"
-                value={desde}
-                max={hasta}
-                onChange={(e) => {
-                  setDesde(e.target.value);
-                  setErrorRango(null);
-                }}
-                aria-invalid={errorRango?.campo === "desde" ? true : undefined}
-                style={financeInputStyle}
-              />
-            </FinanceField>
-            <FinanceField
-              label="Hasta"
-              hint="Último día, inclusive"
-              error={errorRango?.campo === "hasta" ? errorRango.mensaje : null}
-            >
-              <input
-                type="date"
-                value={hasta}
-                min={desde}
-                onChange={(e) => {
-                  setHasta(e.target.value);
-                  setErrorRango(null);
-                }}
-                aria-invalid={errorRango?.campo === "hasta" ? true : undefined}
-                style={financeInputStyle}
-              />
-            </FinanceField>
-          </FinanceFormGrid>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              alignItems: "center",
-              gap: 12,
-              marginTop: 14,
-              paddingTop: 12,
-              borderTop: "1px solid var(--nx-panel-hairline, var(--border))",
-            }}
+          <Field
+            label="Desde"
+            hint="Primer día que entra al cálculo"
+            error={errorRango?.campo === "desde" ? errorRango.mensaje : null}
           >
-            {/* Cambiar las fechas no recalcula solo. Decirlo evita leer cifras
-                de un periodo creyendo que son de otro. */}
-            {periodoPendiente && !cargando ? (
-              <span
-                role="status"
-                style={{ fontSize: 12, color: "var(--state-warning-text, #b45309)" }}
-              >
-                Cambiaste el periodo. Las cifras de abajo siguen siendo del{" "}
-                {periodoCargado?.from} al {periodoCargado?.to}: pulsa «Calcular» para actualizarlas.
-              </span>
-            ) : null}
-            <Button
-              size="sm"
-              variant="primary"
-              type="submit"
-              loading={cargando}
-              disabled={!token}
-              title={sinSesion ? "Necesitas una sesión activa para calcular" : undefined}
-            >
-              {cargando ? "Calculando…" : "Calcular"}
-            </Button>
-          </div>
+            <DateInput
+              value={desde}
+              max={hasta}
+              onChange={(e) => {
+                setDesde(e.target.value);
+                setErrorRango(null);
+              }}
+            />
+          </Field>
+          <Field
+            label="Hasta"
+            hint="Último día, inclusive"
+            error={errorRango?.campo === "hasta" ? errorRango.mensaje : null}
+          >
+            <DateInput
+              value={hasta}
+              min={desde}
+              onChange={(e) => {
+                setHasta(e.target.value);
+                setErrorRango(null);
+              }}
+            />
+          </Field>
         </form>
-      </Section>
+        {/* Cambiar las fechas no recalcula solo. Decirlo evita leer cifras
+            de un periodo creyendo que son de otro. */}
+        {periodoPendiente && !cargando ? (
+          <p role="status" className={s.pendiente}>
+            Cambiaste el periodo. Las cifras de abajo siguen siendo del {periodoCargado?.from} al{" "}
+            {periodoCargado?.to}: pulsa «Calcular» para actualizarlas.
+          </p>
+        ) : null}
+      </Card>
 
       {sinSesion ? (
-        <InlineAlert
-          variant="warning"
-          message="No hay sesión activa, así que no se puede calcular la pre-nómina. Vuelve a entrar con tu cuenta para consultarla."
+        <Alert
+          className={s.aviso}
+          tone="warning"
+          role="alert"
           action={
-            <Link href="/login" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap" }}>
+            <ButtonLink size="sm" href="/login">
               Ir a entrar
-            </Link>
+            </ButtonLink>
           }
-        />
+        >
+          No hay sesión activa, así que no se puede calcular la pre-nómina. Vuelve a entrar con tu
+          cuenta para consultarla.
+        </Alert>
       ) : null}
 
       {error ? (
-        <InlineAlert
-          message={error}
-          variant="danger"
+        <Alert
+          className={s.aviso}
+          tone="danger"
+          role="alert"
           onDismiss={() => setError(null)}
           action={
-            <Button size="sm" variant="secondary" onClick={() => void cargar()} disabled={cargando}>
+            <Button size="sm" onClick={() => void cargar()} disabled={cargando}>
               {cargando ? "Reintentando…" : "Reintentar"}
             </Button>
           }
-        />
+        >
+          {error}
+        </Alert>
       ) : null}
 
       {cargando && !cargado ? (
-        <Section title="Resumen del periodo" dense>
-          <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
-            Calculando el periodo…
-          </p>
-        </Section>
+        <Card aria-label="Resumen del periodo">
+          <CardHead title="Resumen del periodo" />
+          <div className={s.cuerpo} aria-busy="true">
+            <p className={s.cargando}>Calculando el periodo…</p>
+          </div>
+        </Card>
       ) : null}
 
       {cargado && !error && !sinSesion && !hayDatos ? (
         /* La API contesta una lista por persona: vacía no distingue «nadie
            dado de alta» de «nadie con checadas en estas fechas». Se dice como
            es, sin elegir una de las dos por la persona que lee. */
-        <VacioConPrimerPaso
-          title="Sin gente activa en este periodo"
-          description={`Entre el ${desde} y el ${hasta} no hay personal con alta activa ni checadas, así que no hay nada que pagar. El alta del personal y sus sueldos los lleva Recursos Humanos; las checadas entran por asistencia. Prueba otro periodo, o revisa las altas del mes.`}
-          destino={DESTINOS.nomina}
-          extra={
-            <Button size="sm" variant="secondary" onClick={() => void cargar()} disabled={cargando}>
-              {cargando ? "Calculando…" : "Volver a calcular"}
-            </Button>
-          }
-        />
+        <Card as="div">
+          <VacioConPrimerPaso
+            title="Sin gente activa en este periodo"
+            description={`Entre el ${desde} y el ${hasta} no hay personal con alta activa ni checadas, así que no hay nada que pagar. El alta del personal y sus sueldos los lleva Recursos Humanos; las checadas entran por asistencia. Prueba otro periodo, o revisa las altas del mes.`}
+            destino={DESTINOS.nomina}
+            extra={
+              <Button size="sm" onClick={() => void cargar()} disabled={cargando}>
+                {cargando ? "Calculando…" : "Volver a calcular"}
+              </Button>
+            }
+          />
+        </Card>
       ) : null}
 
       {hayDatos ? (
         <>
-          <Section
-            title="Resumen del periodo"
-            subtitle={
-              periodoCargado
+          <section className={s.bloque} aria-labelledby={resumenId}>
+            <h2 id={resumenId} className={s.bloqueTitulo}>
+              Resumen del periodo
+            </h2>
+            <p className={s.bloqueSub}>
+              {periodoCargado
                 ? `${periodoCargado.from} → ${periodoCargado.to} · ${resumen.empleados} persona(s)`
-                : `${desde} → ${hasta}`
-            }
-            dense
-          >
-            <MetricStrip metrics={resumenStrip} ariaLabel="Resumen de la pre-nómina" />
-
-            <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12.5, color: "var(--text-secondary)" }}>
+                : `${desde} → ${hasta}`}
+            </p>
+            <StatRow variant="strip" ariaLabel="Resumen de la pre-nómina">
+              {resumenStrip.map((m) => (
+                <Stat key={String(m.label)} {...m} />
+              ))}
+            </StatRow>
+            <p className={s.nota}>
               La pre-nómina no lleva bonos ni descuentos: se capturan al generar el pago en el
               módulo completo. Aquí ves el sueldo base, las horas extra ya aprobadas y el total
               sugerido que resulta de ambos. No es un CFDI de nómina.
             </p>
-          </Section>
+          </section>
 
           {resumen.conIncidencia > 0 ? (
-            <Section
-              title="Incidencias que requieren revisión"
-              subtitle={`${filasConIncidencia.length} de ${rows.length} personas necesitan una corrección antes de pagar.`}
-              dense
-              flush
+            <ListCard
+              listLabel="Incidencias que requieren revisión"
+              toolbar={
+                <CardHead
+                  title="Incidencias que requieren revisión"
+                  subtitle={`${filasConIncidencia.length} de ${rows.length} personas necesitan una corrección antes de pagar.`}
+                />
+              }
             >
               <DataTable
+                flush
                 columns={columnas}
                 rows={filasConIncidencia}
                 rowKey={(r) => r.userId}
@@ -546,24 +565,25 @@ export default function ContabilidadPrenominaPage() {
                 emptyTitle="Sin incidencias"
                 onRowClick={(r) => setDetalle(r)}
               />
-            </Section>
+            </ListCard>
           ) : null}
 
-          <Section
-            title="Detalle por persona"
-            subtitle="Lectura. Abre un renglón para ver de dónde sale su total. Para seleccionar gente, aprobar extras y generar los borradores de pago, abre el módulo completo."
-            dense
-            flush
-            actions={
-              <Link
-                href={MODULO_COMPLETO}
-                style={{ fontSize: 12, fontWeight: 600, textDecoration: "none" }}
-              >
-                Operar la pre-nómina
-              </Link>
+          <ListCard
+            listLabel="Detalle por persona"
+            toolbar={
+              <CardHead
+                title="Detalle por persona"
+                subtitle="Lectura. Abre un renglón para ver de dónde sale su total. Para seleccionar gente, aprobar extras y generar los borradores de pago, abre el módulo completo."
+                actions={
+                  <ButtonLink variant="tertiary" size="sm" href={MODULO_COMPLETO}>
+                    Operar la pre-nómina
+                  </ButtonLink>
+                }
+              />
             }
           >
             <DataTable
+              flush
               columns={columnas}
               rows={rows}
               rowKey={(r) => r.userId}
@@ -572,7 +592,7 @@ export default function ContabilidadPrenominaPage() {
               emptyTitle="Sin personas en el periodo"
               onRowClick={(r) => setDetalle(r)}
             />
-          </Section>
+          </ListCard>
         </>
       ) : null}
 
@@ -589,7 +609,7 @@ export default function ContabilidadPrenominaPage() {
       >
         {detalle ? <DetallePersona row={detalle} /> : null}
       </Modal>
-    </>
+    </MesaPagina>
   );
 }
 
@@ -614,95 +634,38 @@ function DetallePersona({ row }: { row: PrenominaPreviewRow }) {
   ];
 
   return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <dl
-        style={{
-          display: "grid",
-          gridTemplateColumns: "auto 1fr",
-          gap: "8px 16px",
-          margin: 0,
-          fontSize: 13,
-        }}
-      >
+    <div className={s.detalle}>
+      <dl className={s.ficha}>
         {filas.map((f) => (
           <Fragment key={f.label}>
-            <dt
-              style={{
-                color: "var(--text-tertiary)",
-                fontSize: 11.5,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
-              {f.label}
-            </dt>
-            <dd style={{ margin: 0 }}>{f.value}</dd>
+            <dt>{f.label}</dt>
+            <dd>{f.value}</dd>
           </Fragment>
         ))}
       </dl>
 
       <div>
-        <h3
-          style={{
-            margin: "0 0 6px",
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            color: "var(--text-tertiary)",
-          }}
-        >
-          Cómo se calculó el total
-        </h3>
+        <h3 className={s.subtitulo}>Cómo se calculó el total</h3>
         {d ? (
           <>
-            <dl
-              style={{
-                display: "grid",
-                gridTemplateColumns: "auto 1fr",
-                gap: "6px 16px",
-                margin: 0,
-                fontSize: 13,
-              }}
-            >
-              <dt style={{ color: "var(--text-secondary)" }}>Sueldo semanal</dt>
-              <dd style={{ margin: 0, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                {d.sueldoSemanal != null ? <Money value={d.sueldoSemanal} bold={false} /> : "—"}
-              </dd>
-              <dt style={{ color: "var(--text-secondary)" }}>Valor del minuto ordinario</dt>
-              <dd style={{ margin: 0, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                {d.minutoOrdinario != null ? `$${d.minutoOrdinario.toFixed(4)}` : "—"}
-              </dd>
-              <dt style={{ color: "var(--text-secondary)" }}>Minutos ordinarios</dt>
-              <dd style={{ margin: 0, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                {d.minutosOrdinarios.toLocaleString("es-MX")}
-              </dd>
-              <dt style={{ color: "var(--text-secondary)" }}>Minutos extra aprobados</dt>
-              <dd style={{ margin: 0, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                {d.minutosExtraAprobados.toLocaleString("es-MX")}
-              </dd>
-              <dt style={{ color: "var(--text-primary)", fontWeight: 600 }}>Total sugerido</dt>
-              <dd style={{ margin: 0, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                {d.suggestedAmount != null ? (
-                  <Money value={d.suggestedAmount} />
-                ) : (
-                  "captura manual"
-                )}
+            <dl className={s.calculo}>
+              <dt>Sueldo semanal</dt>
+              <dd>{d.sueldoSemanal != null ? <Money value={d.sueldoSemanal} bold={false} /> : "—"}</dd>
+              <dt>Valor del minuto ordinario</dt>
+              <dd>{d.minutoOrdinario != null ? `$${d.minutoOrdinario.toFixed(4)}` : "—"}</dd>
+              <dt>Minutos ordinarios</dt>
+              <dd>{d.minutosOrdinarios.toLocaleString("es-MX")}</dd>
+              <dt>Minutos extra aprobados</dt>
+              <dd>{d.minutosExtraAprobados.toLocaleString("es-MX")}</dd>
+              <dt className={s.calculoTotal}>Total sugerido</dt>
+              <dd>
+                {d.suggestedAmount != null ? <Money value={d.suggestedAmount} /> : "captura manual"}
               </dd>
             </dl>
-            <p
-              style={{
-                margin: "8px 0 0",
-                fontSize: 11.5,
-                color: "var(--text-tertiary)",
-                lineHeight: 1.4,
-              }}
-            >
-              Fórmula que aplicó el servidor: {d.formula}
-            </p>
+            <p className={s.formula}>Fórmula que aplicó el servidor: {d.formula}</p>
           </>
         ) : (
-          <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)" }}>
+          <p className={s.sinDesglose}>
             — El servidor no mandó el desglose de esta persona, así que no se puede mostrar de qué
             se compone su total.
           </p>
@@ -710,10 +673,9 @@ function DetallePersona({ row }: { row: PrenominaPreviewRow }) {
       </div>
 
       {motivos.length > 0 ? (
-        <InlineAlert
-          variant="warning"
-          message={`No se debe pagar así: ${motivos.join(" · ")}. Corrígelo en el módulo completo antes de generar el borrador.`}
-        />
+        <Alert className={s.aviso} tone="warning" role="alert">
+          {`No se debe pagar así: ${motivos.join(" · ")}. Corrígelo en el módulo completo antes de generar el borrador.`}
+        </Alert>
       ) : null}
     </div>
   );

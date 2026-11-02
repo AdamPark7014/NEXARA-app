@@ -1,15 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import DataTable from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
-import InlineAlert from "@/components/ui/InlineAlert";
-import ListExportActions from "@/components/ui/ListExportActions";
-import FilterToolbar from "@/components/FilterToolbar";
+import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
+import {
+  Alert,
+  Button,
+  ButtonLink,
+  Card,
+  CardHead,
+  Checkbox,
+  DataTable,
+  DateInput,
+  FilterChip,
+  FilterChips,
+  ListCard,
+  ModuleToolbar,
+  Select,
+  SkeletonRows,
+} from "@/components/base";
+import { MesaPagina } from "@/components/mesa-contable/MesaPagina";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import {
@@ -28,6 +39,7 @@ import {
   type ResultadoReporte,
 } from "@/components/erp/reportes-contabilidad";
 import { VacioConPrimerPaso } from "../_arranque";
+import s from "./reportes.module.css";
 
 /**
  * Reportes de contabilidad.
@@ -202,31 +214,94 @@ export default function ReportesPage() {
     return null;
   })();
 
-  return (
-    <>
-      <PageHeader
-        eyebrow="Contabilidad"
-        title="Reportes"
-        subtitle="Elige un reporte, fija el periodo y revisa los números. Abre una línea para ver de dónde salen."
-        density="ops"
-        actions={
-          <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-            <ListExportActions
-              onExcel={reporte?.exportable ? () => void exportar() : undefined}
-              excelBusy={exportando}
-              excelDisabled={!resultado || cargando}
-            />
-            <Button size="sm" variant="ghost" onClick={() => void ejecutar()} disabled={cargando || !reporte}>
-              Actualizar
-            </Button>
-          </div>
-        }
-      />
+  const nFilas = resultado?.filas.length ?? 0;
+  const hayResultado = !cargando && resultado != null;
+  const hayFilas = hayResultado && nFilas > 0;
 
+  /** Qué ocupa el cuerpo de la tarjeta de lista: espera, vacío o la tabla. */
+  const cuerpo = cargando ? (
+    <div className={s.espera} aria-busy="true">
+      <p>Calculando el reporte…</p>
+      <SkeletonRows rows={4} label="Calculando el reporte" />
+    </div>
+  ) : resultado && nFilas > 0 ? (
+    <DataTable
+      flush
+      columns={columnas}
+      rows={resultado.filas}
+      rowKey={(f) => f.clave}
+      density="compact"
+      ariaLabel="Resultado del reporte"
+      onRowClick={resultado.drilldown ? abrirDetalle : undefined}
+    />
+  ) : null;
+
+  /** Vacío de la tarjeta: sin resultado todavía, o resultado sin renglones. */
+  const vacio = cargando
+    ? undefined
+    : !resultado
+      ? error
+        ? undefined
+        : {
+            icon: <AssessmentOutlinedIcon />,
+            title: "Todavía no hay resultado",
+            description: "El reporte no se ha calculado. Fija el periodo arriba y pulsa Actualizar.",
+            tone: "neutral" as const,
+          }
+      : nFilas === 0
+        ? hayFiltroElegido
+          ? {
+              icon: <FilterAltOffOutlinedIcon />,
+              title: "Nada con estos filtros",
+              description: "Ningún renglón cumple lo que elegiste. Quita el filtro o amplía el periodo.",
+              action: (
+                <Button size="sm" variant="secondary" onClick={() => setSeleccion({})}>
+                  Quitar los filtros
+                </Button>
+              ),
+              tone: "neutral" as const,
+            }
+          : (
+              <VacioConPrimerPaso
+                variant="default"
+                title="Sin datos en este periodo"
+                description={`«${reporte?.nombre ?? "Este reporte"}» no captura nada: se arma con lo que ya está registrado —pólizas, facturas, pagos y gastos— y en este periodo no hay nada de eso. Amplía las fechas, o mira el libro para ver qué sí existe.`}
+                extra={
+                  <ButtonLink variant="tertiary" size="sm" href="/erp/contabilidad/movimientos">
+                    Ver el libro de movimientos →
+                  </ButtonLink>
+                }
+              />
+            )
+        : undefined;
+
+  return (
+    <MesaPagina
+      titulo="Reportes"
+      descripcion="Elige un reporte, fija el periodo y revisa los números. Abre una línea para ver de dónde salen."
+      terciarias={
+        <Button variant="ghost" onClick={() => void ejecutar()} disabled={cargando || !reporte}>
+          Actualizar
+        </Button>
+      }
+      secundarias={
+        reporte?.exportable ? (
+          <Button
+            iconStart={<FileDownloadOutlinedIcon />}
+            onClick={() => void exportar()}
+            disabled={!resultado || cargando || exportando}
+          >
+            {exportando ? "Generando…" : "Exportar Excel"}
+          </Button>
+        ) : null
+      }
+    >
       {error && (
-        <InlineAlert
-          variant="danger"
-          message={`No se pudo calcular «${reporte?.nombre ?? "el reporte"}». ${error} Reintenta o acota el periodo; si sigue igual, avisa a soporte.`}
+        <Alert
+          tone="danger"
+          role="alert"
+          ariaLive="assertive"
+          srLabel="Error"
           onDismiss={() => setError(null)}
           action={
             reporte ? (
@@ -235,94 +310,116 @@ export default function ReportesPage() {
               </Button>
             ) : undefined
           }
-        />
+        >
+          {`No se pudo calcular «${reporte?.nombre ?? "el reporte"}». ${error} Reintenta o acota el periodo; si sigue igual, avisa a soporte.`}
+        </Alert>
       )}
 
       {cargandoCatalogo ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
-          {token
-            ? "Cargando el catálogo de reportes…"
-            : "Esperando la sesión para pedir el catálogo…"}
-        </p>
+        <ListCard>
+          <div className={s.espera} aria-busy="true">
+            <p>
+              {token
+                ? "Cargando el catálogo de reportes…"
+                : "Esperando la sesión para pedir el catálogo…"}
+            </p>
+            <SkeletonRows rows={2} label="Cargando el catálogo de reportes" />
+          </div>
+        </ListCard>
       ) : catalogo.length === 0 ? (
-        <EmptyState
-          title="Sin reportes disponibles"
-          description="Tu empresa todavía no tiene reportes publicados. Revisa los permisos de contabilidad."
+        <ListCard
+          empty
+          emptyState={{
+            icon: <AssessmentOutlinedIcon />,
+            title: "Sin reportes disponibles",
+            description: "Tu empresa todavía no tiene reportes publicados. Revisa los permisos de contabilidad.",
+            tone: "neutral",
+          }}
         />
       ) : (
         <>
-          <Section title="Reporte" dense>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {catalogo.map((r) => {
-                const activo = r.id === reporteId;
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => {
-                      setReporteId(r.id);
-                      setSeleccion({});
-                      setComparar(false);
-                    }}
-                    aria-pressed={activo}
-                    title={r.descripcion}
-                    style={{
-                      height: 32,
-                      padding: "0 12px",
-                      borderRadius: 8,
-                      cursor: "pointer",
-                      fontSize: 13,
-                      fontWeight: activo ? 600 : 500,
-                      textAlign: "left",
-                      color: activo ? "var(--text-primary)" : "var(--text-secondary)",
-                      background: activo
-                        ? "color-mix(in srgb, var(--primary) 8%, var(--surface))"
-                        : "transparent",
-                      border: `1px solid ${
-                        activo
-                          ? "color-mix(in srgb, var(--primary) 40%, var(--border))"
-                          : "var(--nx-panel-hairline, var(--border))"
-                      }`,
-                    }}
-                  >
-                    {r.nombre}
-                  </button>
-                );
-              })}
-            </div>
-            {reporte && (
-              <p style={{ margin: "10px 0 0", fontSize: 12.5, color: "var(--text-secondary)" }}>
-                {reporte.descripcion}
-              </p>
-            )}
-          </Section>
-
-          <div style={{ margin: "12px 0" }}>
-            <FilterToolbar
-              dates={fechas}
-              selects={selectsExtra}
-              toggles={
-                reporte?.comparable
-                  ? [{ label: "Comparar con el periodo anterior", value: comparar, onChange: setComparar }]
-                  : []
+          <Card className={s.tarjeta}>
+            <CardHead title="Reporte" subtitle={reporte?.descripcion} />
+            <ModuleToolbar
+              className={s.barra}
+              chips={
+                <FilterChips ariaLabel="Reporte">
+                  {catalogo.map((r) => (
+                    <FilterChip
+                      key={r.id}
+                      active={r.id === reporteId}
+                      title={r.descripcion}
+                      onClick={() => {
+                        setReporteId(r.id);
+                        setSeleccion({});
+                        setComparar(false);
+                      }}
+                    >
+                      {r.nombre}
+                    </FilterChip>
+                  ))}
+                </FilterChips>
               }
-              resultCount={resultado?.filas.length ?? null}
-            />
-          </div>
+            >
+              <div className={s.filtros}>
+                {fechas.map((f) => (
+                  <label key={f.label} className={s.fecha}>
+                    <span>{f.label}</span>
+                    <DateInput
+                      aria-label={f.label}
+                      className={s.filtroFecha}
+                      controlSize="sm"
+                      value={f.value}
+                      onChange={(e) => f.onChange(e.target.value)}
+                    />
+                  </label>
+                ))}
+                {selectsExtra.map((sel, i) => (
+                  <Select
+                    key={`${sel.label}-${i}`}
+                    aria-label={sel.label}
+                    title={sel.label}
+                    wrapperClassName={s.filtroSelect}
+                    controlSize="sm"
+                    value={sel.value}
+                    onChange={(e) => sel.onChange(e.target.value)}
+                  >
+                    <option value="">{sel.allLabel}</option>
+                    {sel.options.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </Select>
+                ))}
+                {reporte?.comparable ? (
+                  <Checkbox
+                    label="Comparar con el periodo anterior"
+                    checked={comparar}
+                    onChange={(e) => setComparar(e.target.checked)}
+                  />
+                ) : null}
+                {resultado ? (
+                  <span className={s.conteo} role="status">
+                    {nFilas} resultado{nFilas === 1 ? "" : "s"}
+                  </span>
+                ) : null}
+              </div>
+            </ModuleToolbar>
+          </Card>
 
           {faltantes.length > 0 && (
-            <InlineAlert
-              variant="warning"
-              message={`Este reporte pide ${
+            <Alert tone="warning" role="alert" ariaLive="assertive" srLabel="Aviso">
+              {`Este reporte pide ${
                 faltantes.length === 1 ? "un filtro" : "filtros"
               } que todavía no eliges: ${faltantes.join(", ")}. Sin ${
                 faltantes.length === 1 ? "él" : "ellos"
               } el resultado puede venir vacío o incompleto.`}
-            />
+            </Alert>
           )}
 
           {(periodoCalculado || resultado?.comparativo) && (
-            <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--text-secondary)" }}>
+            <p className={s.lectura}>
               {periodoCalculado}
               {resultado?.comparativo && (
                 <>
@@ -335,72 +432,28 @@ export default function ReportesPage() {
             </p>
           )}
 
-          {cargando ? (
-            <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
-              Calculando el reporte…
-            </p>
-          ) : !resultado ? (
-            error ? null : (
-              <EmptyState
-                title="Todavía no hay resultado"
-                description="El reporte no se ha calculado. Fija el periodo arriba y pulsa Actualizar."
-              />
-            )
-          ) : (
-            <>
-              {/* La tira de cifras solo cuando hay renglones que la sostengan:
-                  un reporte vacío devuelve el resumen en ceros, y esa fila de
-                  ceros tapa justo la frase que explica por qué está vacío. */}
-              {resultado.filas.length > 0 && <Resumen items={resultado.resumen} />}
-              {resultado.filas.length === 0 ? (
-                hayFiltroElegido ? (
-                  <EmptyState
-                    title="Nada con estos filtros"
-                    description="Ningún renglón cumple lo que elegiste. Quita el filtro o amplía el periodo."
-                    action={
-                      <Button size="sm" variant="secondary" onClick={() => setSeleccion({})}>
-                        Quitar los filtros
-                      </Button>
-                    }
-                  />
-                ) : (
-                  <VacioConPrimerPaso
-                    variant="default"
-                    title="Sin datos en este periodo"
-                    description={`«${reporte?.nombre ?? "Este reporte"}» no captura nada: se arma con lo que ya está registrado —pólizas, facturas, pagos y gastos— y en este periodo no hay nada de eso. Amplía las fechas, o mira el libro para ver qué sí existe.`}
-                    extra={
-                      <Link
-                        href="/erp/contabilidad/movimientos"
-                        style={{ fontSize: 12.5, fontWeight: 600 }}
-                      >
-                        Ver el libro de movimientos →
-                      </Link>
-                    }
-                  />
-                )
-              ) : (
+          {/* La tira de cifras solo cuando hay renglones que la sostengan:
+              un reporte vacío devuelve el resumen en ceros, y esa fila de
+              ceros tapa justo la frase que explica por qué está vacío. */}
+          {hayFilas && resultado ? <Resumen items={resultado.resumen} /> : null}
+
+          <ListCard
+            empty={vacio !== undefined}
+            emptyState={vacio}
+            footer={
+              hayResultado && resultado ? (
                 <>
-                  <DataTable
-                    columns={columnas}
-                    rows={resultado.filas}
-                    rowKey={(f) => f.clave}
-                    density="compact"
-                    ariaLabel="Resultado del reporte"
-                    onRowClick={resultado.drilldown ? abrirDetalle : undefined}
-                  />
-                  <FilaTotales columnas={resultado.columnas} totales={resultado.totales} />
+                  {nFilas > 0 && <FilaTotales columnas={resultado.columnas} totales={resultado.totales} />}
+                  {resultado.nota && <p className={s.nota}>{resultado.nota}</p>}
+                  {resultado.drilldown && nFilas > 0 && (
+                    <p className={s.nota}>Abre una línea para ver los movimientos que la forman.</p>
+                  )}
                 </>
-              )}
-              {resultado.nota && (
-                <p style={{ marginTop: 10, fontSize: 12, color: "var(--text-tertiary)" }}>{resultado.nota}</p>
-              )}
-              {resultado.drilldown && resultado.filas.length > 0 && (
-                <p style={{ marginTop: 6, fontSize: 12, color: "var(--text-tertiary)" }}>
-                  Abre una línea para ver los movimientos que la forman.
-                </p>
-              )}
-            </>
-          )}
+              ) : undefined
+            }
+          >
+            {cuerpo}
+          </ListCard>
         </>
       )}
 
@@ -411,6 +464,6 @@ export default function ReportesPage() {
         token={token}
         onClose={() => setDetalle(null)}
       />
-    </>
+    </MesaPagina>
   );
 }

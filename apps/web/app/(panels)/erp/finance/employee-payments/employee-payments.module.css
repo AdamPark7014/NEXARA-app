@@ -1,0 +1,209 @@
+/* Pagos a empleados. Solo tokens --ui-*: claro y oscuro salen solos. */
+
+/* ─── Estados sueltos ───────────────────────────────────────────────────── */
+
+.reservada {
+  max-width: 640px;
+  padding: var(--ui-s5);
+}
+
+.volver {
+  margin-top: var(--ui-s4);
+}
+
+.cargandoControl {
+  padding: var(--ui-s5);
+  text-align: center;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Barras de herramientas ────────────────────────────────────────────── */
+
+/* La barra del análisis va en su propia tarjeta: sin la raya de abajo que trae la barra de lista. */
+.barra > [role="search"] {
+  border-bottom: 0;
+}
+
+.filtroSelect {
+  flex: 0 1 220px;
+  width: auto;
+}
+
+.fecha {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+}
+
+.fechaCtl {
+  flex: 0 1 160px;
+  width: auto;
+}
+
+.conteo {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ─── Análisis ──────────────────────────────────────────────────────────── */
+
+.analisis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.tarjeta {
+  overflow: clip;
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+  font-size: var(--ui-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.sinDatos {
+  margin: 0;
+  padding: var(--ui-s4) var(--ui-s5);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+.notaPie {
+  margin: 0;
+  padding: var(--ui-s3) var(--ui-s5);
+  border-top: 1px solid var(--ui-border-subtle);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Tabla de pagos ────────────────────────────────────────────────────── */
+
+.celdaEmpleado {
+  min-width: 0;
+}
+
+.nombre {
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  text-decoration: none;
+}
+
+.nombre:hover {
+  color: var(--ui-brand-text);
+}
+
+.nombre:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+  border-radius: var(--ui-radius-xs);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--ui-s2);
+  margin-top: 2px;
+  font-size: var(--ui-text-xs);
+  line-height: 1.35;
+  color: var(--ui-fg-3);
+}
+
+.accionesMovil {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s1);
+  margin-top: var(--ui-s2);
+}
+
+.sinComprobante {
+  color: var(--ui-danger-text);
+}
+
+.enlace {
+  color: var(--ui-brand-text);
+  text-decoration: none;
+}
+
+.enlace:hover {
+  text-decoration: underline;
+}
+
+.enlace:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+  border-radius: var(--ui-radius-xs);
+}
+
+.periodoCelda {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+  white-space: nowrap;
+}
+
+/* ─── Formulario (ventana) ──────────────────────────────────────────────── */
+
+.completo {
+  grid-column: 1 / -1;
+}
+
+.pista {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.pistaPie {
+  margin-top: var(--ui-s2);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.horas {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.horasInput {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.archivos {
+  display: grid;
+  gap: var(--ui-s1);
+  margin: var(--ui-s2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.archivo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+  padding: var(--ui-s1) 0;
+  border-bottom: 1px solid var(--ui-border-subtle);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+}
+
+.archivoNombre {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.existentes a {
+  margin-right: var(--ui-s2);
+}
