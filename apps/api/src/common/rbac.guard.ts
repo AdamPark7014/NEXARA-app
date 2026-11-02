@@ -53,7 +53,7 @@ export class RbacGuard extends AuthGuard('jwt') {
       const method = (request.method as HttpMethod) ?? 'GET';
       const url = request.originalUrl || request.url || '';
       let result = checkUrlAccess(v2Role, url, method);
-      // «Asignar con IA» concedido por persona (David): sin cambiarle el rol.
+      // «Asignar con IA» concedido por persona (David y José Antonio): sin cambiarles el rol.
       if (!result.allowed && asistentePorCorreo(user.email)) {
         result = checkUrlRules(ASISTENTE_IA_URL_RULES, url, method);
       }

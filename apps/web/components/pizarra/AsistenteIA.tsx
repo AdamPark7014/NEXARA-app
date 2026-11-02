@@ -160,7 +160,7 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
   const [disponible, setDisponible] = useState(false);
   const [personas, setPersonas] = useState<PersonaAsignable[]>([]);
   const v2 = useMemo(() => resolveV2RoleKey(user), [user]);
-  // Solo el CEO y David asignan con IA (el API lo vuelve a exigir).
+  // Solo el CEO, David y José Antonio asignan con IA (el API lo vuelve a exigir).
   const puede = v2 === ROLES.CEO || Boolean(user?.isSuperAdmin) || puedeAsignarConIa(user?.email);
 
   useEffect(() => {

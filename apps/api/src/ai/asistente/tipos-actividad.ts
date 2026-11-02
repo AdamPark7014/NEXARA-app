@@ -61,22 +61,26 @@ export function tiposQueRecibe(email: string | null | undefined): TipoActividad[
 }
 
 /**
- * Quién usa «Asignar con IA» además de dirección: David, encargado de instaladores (Adam,
- * 01-11-2026). Va por correo, como el almacén de Iván: no le cambia el rol ni se lo abre a toda la
- * coordinación. Espejo en la web: `puedeAsignarConIa` de `lib/activity-kinds.ts`.
+ * Quién usa «Asignar con IA» además de dirección, y lo que asigna (espejo de `CREATE_BY_EMAIL` en
+ * la web). David, encargado de instaladores, no reparte servicios (Adam, 01-11-2026); José Antonio,
+ * encargado de soporte, sí, porque son su trabajo (Adam, 02-11-2026). Va por correo, como el almacén
+ * de Iván: no les cambia el rol ni se lo abre a toda la coordinación. Espejo en la web:
+ * `puedeAsignarConIa` de `lib/activity-kinds.ts`.
  */
-const ASISTENTE_POR_CORREO = ['operaciones@nexara.com.mx'];
+const ASISTENTE_POR_CORREO: Record<string, readonly TipoActividad[]> = {
+  'operaciones@nexara.com.mx': ['tarea', 'proyecto', 'obra', 'comercial'],
+  'jose.ramirez@nexara.com.mx': ['tarea', 'proyecto', 'servicio', 'comercial'],
+};
+
+const correoLimpio = (email: string | null | undefined) => (email ?? '').trim().toLowerCase();
 
 export function asistentePorCorreo(email: string | null | undefined): boolean {
-  return ASISTENTE_POR_CORREO.includes((email ?? '').trim().toLowerCase());
+  return Object.prototype.hasOwnProperty.call(ASISTENTE_POR_CORREO, correoLimpio(email));
 }
 
-/**
- * Lo que puede asignar quien escribe (espejo de `CREATE_BY_EMAIL` en la web): David no reparte
- * servicios. Dirección, todo.
- */
+/** Lo que puede asignar quien escribe. Dirección, todo. */
 export function tiposQueCrea(email: string | null | undefined): TipoActividad[] {
-  return asistentePorCorreo(email) ? ['tarea', 'proyecto', 'obra', 'comercial'] : [...TIPOS_ACTIVIDAD];
+  return asistentePorCorreo(email) ? [...ASISTENTE_POR_CORREO[correoLimpio(email)]!] : [...TIPOS_ACTIVIDAD];
 }
 
 const TAREA_DE_SERVICIO: Record<string, (typeof SUBTIPOS_TAREA)[number]> = {

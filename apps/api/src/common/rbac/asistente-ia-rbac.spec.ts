@@ -2,7 +2,7 @@ import { ROLES } from './roles.v2';
 import { ASISTENTE_IA_URL_RULES, checkUrlAccess, checkUrlRules } from './url-matrix';
 import { asistentePorCorreo, tiposQueCrea } from '../../ai/asistente/tipos-actividad';
 
-/** «Asignar con IA» es del CEO y, por persona, de David; crear sigue en `POST /api/activities`. */
+/** «Asignar con IA» es del CEO y, por persona, de David y José Antonio; crear sigue en `POST /api/activities`. */
 describe('matriz: asistente de actividades con IA', () => {
   it('el CEO interpreta instrucciones y ve a quién asignar', () => {
     expect(checkUrlAccess(ROLES.CEO, '/api/ai/asistente/interpretar', 'POST').allowed).toBe(true);
@@ -30,5 +30,21 @@ describe('matriz: asistente de actividades con IA', () => {
   it('David no reparte servicios: lo demás, sí; dirección, todo', () => {
     expect(tiposQueCrea('operaciones@nexara.com.mx')).toEqual(['tarea', 'proyecto', 'obra', 'comercial']);
     expect(tiposQueCrea('gerencia@nexara.com.mx')).toContain('servicio');
+  });
+
+  it('a José Antonio se le concede por correo y reparte servicios; al otro Antonio, no', () => {
+    expect(asistentePorCorreo('jose.ramirez@nexara.com.mx')).toBe(true);
+    expect(asistentePorCorreo(' JOSE.RAMIREZ@nexara.com.mx ')).toBe(true);
+    expect(asistentePorCorreo('antonio.hernandez@nexara.com.mx')).toBe(false);
+    expect(tiposQueCrea('jose.ramirez@nexara.com.mx')).toEqual(['tarea', 'proyecto', 'servicio', 'comercial']);
+    // Su rol no lo trae en la matriz: entra solo por el correo, y conserva a quién asignar.
+    expect(checkUrlAccess(ROLES.ENC_SOPORTE, '/api/ai/asistente/interpretar', 'POST').allowed).toBe(false);
+    expect(checkUrlAccess(ROLES.ENC_SOPORTE, '/api/users/assignable', 'GET').allowed).toBe(true);
+    expect(checkUrlAccess(ROLES.ENC_SOPORTE, '/api/activities', 'POST').allowed).toBe(true);
+  });
+
+  it('un nombre de propiedad del objeto no cuenta como correo con acceso', () => {
+    expect(asistentePorCorreo('constructor')).toBe(false);
+    expect(asistentePorCorreo('__proto__')).toBe(false);
   });
 });
