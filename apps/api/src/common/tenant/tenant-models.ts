@@ -144,6 +144,11 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'CostoFichaEquipo',
   'CostoMovimiento',
   'CostoActividadLiga',
+  'VehiculoEspecificacion',
+  'VehiculoDocumento',
+  'VehiculoServicioPlan',
+  'VehiculoServicio',
+  'VehiculoCarga',
   'ProcesoTiempo',
 ]);
 

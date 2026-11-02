@@ -1,17 +1,18 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
-import ContextRail from "@/components/ui/ContextRail";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
-import { SkeletonRows } from "@/components/base";
+import { ButtonLink, SkeletonRows } from "@/components/base";
 import { useUser } from "@/components/UserContext";
+import { Aviso } from "@/components/mesa-contable/piezas";
+import { Barra, KpiBanda, c, v } from "@/components/vehiculos/piezas";
+import { pesos, pesos2 } from "@/lib/costos";
 import { formatApiError } from "@/lib/erp-api";
 import { usePantallaChica } from "@/lib/recursos-ui";
 import {
@@ -22,7 +23,6 @@ import {
   puedeVerGpsDireccion,
 } from "@/lib/recursos-core";
 import {
-  crearVehiculoInventario,
   etiquetaEstatus,
   formatoFecha,
   formatoKm,
@@ -30,6 +30,17 @@ import {
   nivelDeCombustible,
   type VehiculoFlota,
 } from "@/lib/vehiculos-api";
+import {
+  getFlotillaMes,
+  km,
+  kmPorLitro,
+  mesActual,
+  mesesRecientes,
+  nombreMes,
+  repartoDelMes,
+  textoServicio,
+  type FlotillaMes,
+} from "@/lib/vehiculos-ficha";
 import styles from "./vehiculos-core.module.css";
 
 type Filtro = "todos" | "disponibles" | "uso" | "fuera";
@@ -59,8 +70,8 @@ function EstadoVehiculo({ v }: { v: VehiculoFlota }) {
 }
 
 /**
- * Flotilla en Core (`/erp/vehiculos`): qué hay, quién lo trae y cuándo vuelve.
- * Quien tiene `vehicles.inventory` puede dar de alta unidades (POST inventory).
+ * Flotilla en Core (`/erp/vehiculos`): qué hay, quién lo trae, cuándo vuelve, cuánto cuesta cada
+ * kilómetro y a dónde se fue el costo del mes. El dinero solo lo ve quien ya ve costos completos.
  */
 export default function VehiculosPage() {
   const router = useRouter();
@@ -78,13 +89,9 @@ export default function VehiculosPage() {
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const busquedaDiferida = useDeferredValue(busqueda);
 
-  const [showAlta, setShowAlta] = useState(false);
-  const [nombre, setNombre] = useState("");
-  const [placas, setPlacas] = useState("");
-  const [notas, setNotas] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [altaError, setAltaError] = useState<string | null>(null);
-  const [altaOk, setAltaOk] = useState<string | null>(null);
+  const [mes, setMes] = useState(() => mesActual());
+  const [datosMes, setDatosMes] = useState<FlotillaMes | null>(null);
+  const meses = useMemo(() => mesesRecientes(6), []);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -104,6 +111,22 @@ export default function VehiculosPage() {
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  // Va aparte: si falla, la flotilla de siempre se sigue viendo.
+  useEffect(() => {
+    if (!token) return;
+    let vivo = true;
+    getFlotillaMes(token, mes)
+      .then((d) => vivo && setDatosMes(d?.resumen ? d : null))
+      .catch(() => vivo && setDatosMes(null));
+    return () => {
+      vivo = false;
+    };
+  }, [token, mes]);
+
+  const veCostos = Boolean(datosMes?.acceso?.veCostos);
+  const delMes = useMemo(() => new Map((datosMes?.vehiculos ?? []).map((x) => [x.id, x])), [datosMes]);
+  const reparto = datosMes && veCostos ? repartoDelMes(datosMes.reparto) : null;
 
   const kpis = useMemo(() => {
     const cuenta = { disponibles: 0, uso: 0, fuera: 0 };
@@ -147,18 +170,12 @@ export default function VehiculosPage() {
           v.conductor ? (
             <div className={styles.filaVehiculo}>
               <span>{v.conductor.nombre}</span>
-              {v.desde && <span className={styles.mini}>desde {formatoFecha(v.desde)}</span>}
+              {v.proximaDevolucion ? (
+                <span className={styles.mini}>devuelve {formatoFecha(v.proximaDevolucion)}</span>
+              ) : v.desde ? (
+                <span className={styles.mini}>desde {formatoFecha(v.desde)}</span>
+              ) : null}
             </div>
-          ) : (
-            <span className={styles.tenue}>—</span>
-          ),
-      },
-      {
-        key: "devolucion",
-        label: "Devuelve",
-        render: (v) =>
-          v.proximaDevolucion ? (
-            <span className={styles.num}>{formatoFecha(v.proximaDevolucion)}</span>
           ) : (
             <span className={styles.tenue}>—</span>
           ),
@@ -176,29 +193,67 @@ export default function VehiculosPage() {
           </div>
         ),
       },
+      {
+        key: "kmMes",
+        label: "Km del mes",
+        numeric: true,
+        render: (v) => {
+          const fila = delMes.get(v.id);
+          return fila?.kmDelMes ? fila.kmDelMes.toLocaleString("es-MX") : <span className={styles.tenue}>—</span>;
+        },
+      },
+      ...(veCostos
+        ? [
+            {
+              key: "porKm",
+              label: "Costo por km",
+              numeric: true,
+              render: (v: VehiculoFlota) => {
+                const porKm = delMes.get(v.id)?.porKm;
+                return porKm != null ? <strong>{pesos2(porKm)}</strong> : <span className={styles.tenue}>—</span>;
+              },
+            } satisfies Column<VehiculoFlota>,
+          ]
+        : []),
+      {
+        key: "rendimiento",
+        label: "Rendimiento real",
+        numeric: true,
+        render: (v) => {
+          const fila = delMes.get(v.id);
+          if (!fila?.rendimientoReal && !fila?.rendimientoOficial) return <span className={styles.tenue}>—</span>;
+          return (
+            <div className={styles.filaVehiculo} style={{ alignItems: "flex-end" }}>
+              <span>{kmPorLitro(fila.rendimientoReal)}</span>
+              {fila.rendimientoOficial ? <span className={styles.mini}>oficial {fila.rendimientoOficial}</span> : null}
+            </div>
+          );
+        },
+      },
+      {
+        key: "servicio",
+        label: "Próximo servicio",
+        render: (v) => {
+          const proximo = delMes.get(v.id)?.proximoServicio;
+          if (!proximo) return <span className={styles.tenue}>—</span>;
+          return (
+            <span
+              style={
+                proximo.estado === "VENCIDO"
+                  ? { color: "var(--ui-danger-text, #8f2626)", fontWeight: 600 }
+                  : proximo.estado === "PRONTO"
+                    ? { color: "var(--ui-warning-text)", fontWeight: 500 }
+                    : undefined
+              }
+            >
+              {textoServicio(proximo)}
+            </span>
+          );
+        },
+      },
     ],
-    [],
+    [delMes, veCostos],
   );
-
-  async function guardarAlta(e: FormEvent) {
-    e.preventDefault();
-    if (!nombre.trim() || guardando) return;
-    setGuardando(true);
-    setAltaError(null);
-    setAltaOk(null);
-    try {
-      const creado = await crearVehiculoInventario(token, { nombre, placas, notas });
-      setNombre("");
-      setPlacas("");
-      setNotas("");
-      setAltaOk(`${creado.nombre} quedó en la flotilla`);
-      await cargar();
-    } catch (err) {
-      setAltaError(formatApiError(err, "No se pudo agregar el vehículo"));
-    } finally {
-      setGuardando(false);
-    }
-  }
 
   const chips: { key: Filtro; label: string; cuenta: number }[] = [
     { key: "todos", label: "Todos", cuenta: kpis.total },
@@ -212,24 +267,18 @@ export default function VehiculosPage() {
 
   return (
     <div className={styles.wrap}>
-      <PageHeader
-        eyebrow="Core · Vehículos"
-        title="Flotilla"
-        density="ops"
-        actions={
-          <>
+      <header className={c.band}>
+        <div className={c.bandHead}>
+          <div>
+            <div className={c.crumb}>{datosMes ? nombreMes(datosMes.mes) : "Core · Vehículos"}</div>
+            <h1 className={c.bandTitle}>Vehículos</h1>
+            <p className={c.bandSub}>Cuánto cuesta cada kilómetro, a qué trabajo se fue y cuándo le toca servicio a cada vehículo.</p>
+          </div>
+          <div className={v.acciones}>
             {puedeAlta && (
-              <Button
-                variant="primary"
-                aria-expanded={showAlta}
-                onClick={() => {
-                  setShowAlta((v) => !v);
-                  setAltaError(null);
-                  setAltaOk(null);
-                }}
-              >
-                {showAlta ? "Cerrar" : "Agregar"}
-              </Button>
+              <ButtonLink href={`${VEHICULOS_PATH}/nuevo`} variant="primary">
+                Agregar vehículo
+              </ButtonLink>
             )}
             <Button variant="ghost" onClick={() => void cargar()} disabled={cargando}>
               {cargando && cargadoUnaVez ? "Actualizando…" : "Actualizar"}
@@ -239,18 +288,40 @@ export default function VehiculosPage() {
                 GPS
               </Button>
             )}
-          </>
-        }
-      />
-
-      <ContextRail
-        ariaLabel="Vehículos"
-        items={[
-          { id: "flotilla", label: "Flotilla", href: VEHICULOS_PATH, active: true },
-          { id: "mios", label: "Mis vehículos", href: MIS_VEHICULOS_PATH },
-          ...(verGps ? [{ id: "gps", label: "GPS", href: VEHICULOS_GPS_PATH }] : []),
-        ]}
-      />
+          </div>
+        </div>
+        <div className={c.kpis}>
+          {veCostos && datosMes ? (
+            <>
+              <KpiBanda cifra={pesos(datosMes.resumen.costoMes)} texto="Costo de la flotilla en el mes" />
+              <KpiBanda cifra={km(datosMes.resumen.km)} texto="Recorridos, de las fotos del tablero" />
+              <KpiBanda cifra={pesos2(datosMes.resumen.porKm)} texto="Por kilómetro, en promedio" />
+              <KpiBanda cifra={pesos(datosMes.resumen.aIndirectos)} texto="Se va a indirectos" tono="atencion" />
+            </>
+          ) : (
+            <>
+              <KpiBanda cifra={kpis.total} texto="Vehículos" />
+              <KpiBanda cifra={kpis.disponibles} texto="Disponibles" tono="ok" />
+              <KpiBanda cifra={kpis.uso} texto="En uso" />
+              {kpis.fuera > 0 && <KpiBanda cifra={kpis.fuera} texto="Fuera de servicio" tono="atencion" />}
+              {datosMes?.resumen ? <KpiBanda cifra={km(datosMes.resumen.km)} texto="Recorridos en el mes" /> : null}
+            </>
+          )}
+        </div>
+        <nav className={c.tabs} aria-label="Vehículos">
+          <Link href={VEHICULOS_PATH} className={c.tab} aria-current="page">
+            Flotilla
+          </Link>
+          <Link href={MIS_VEHICULOS_PATH} className={c.tab}>
+            Mis vehículos
+          </Link>
+          {verGps && (
+            <Link href={VEHICULOS_GPS_PATH} className={c.tab}>
+              Mapa
+            </Link>
+          )}
+        </nav>
+      </header>
 
       {error && cargadoUnaVez && (
         <InlineAlert
@@ -263,65 +334,6 @@ export default function VehiculosPage() {
           }
         />
       )}
-
-      {showAlta && puedeAlta && (
-        <Section title="Nuevo vehículo">
-          <form className={styles.altaForm} onSubmit={(e) => void guardarAlta(e)}>
-            {altaError && <InlineAlert message={altaError} variant="danger" />}
-            {altaOk && <InlineAlert message={altaOk} variant="success" />}
-            <div className={styles.altaGrid}>
-              <div className={styles.altaCampo}>
-                <label htmlFor="vehiculo-nombre">Nombre</label>
-                <input
-                  id="vehiculo-nombre"
-                  className={styles.input}
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  placeholder="Nissan Frontier 2026"
-                  required
-                  autoFocus
-                  autoComplete="off"
-                />
-              </div>
-              <div className={styles.altaCampo}>
-                <label htmlFor="vehiculo-placas">Placas</label>
-                <input
-                  id="vehiculo-placas"
-                  className={styles.input}
-                  value={placas}
-                  onChange={(e) => setPlacas(e.target.value)}
-                  placeholder="SR-36-051"
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                />
-              </div>
-              <div className={styles.altaCampoFull}>
-                <label htmlFor="vehiculo-notas">Notas (opcional)</label>
-                <textarea
-                  id="vehiculo-notas"
-                  className={styles.input}
-                  value={notas}
-                  onChange={(e) => setNotas(e.target.value)}
-                  rows={2}
-                  placeholder="Color, número económico, detalles…"
-                />
-              </div>
-            </div>
-            <div className={styles.altaAcciones}>
-              <Button type="submit" variant="primary" disabled={!nombre.trim() || guardando}>
-                {guardando ? "Guardando…" : "Guardar en flotilla"}
-              </Button>
-            </div>
-          </form>
-        </Section>
-      )}
-
-      <div className={styles.kpis}>
-        <KpiCard label="Vehículos" value={kpis.total} />
-        <KpiCard label="Disponibles" value={kpis.disponibles} variant="positive" />
-        <KpiCard label="En uso" value={kpis.uso} variant="accent" />
-        {kpis.fuera > 0 && <KpiCard label="Fuera de servicio" value={kpis.fuera} variant="warning" />}
-      </div>
 
       <Section
         title={primeraCarga ? "Cargando flotilla…" : `${visibles.length} de ${vehiculos.length} vehículos`}
@@ -423,18 +435,69 @@ export default function VehiculosPage() {
             onRowClick={abrirFicha}
             emptyTitle="Sin vehículos"
             emptyDescription={
-              puedeAlta ? "Agrega la primera unidad con el botón Agregar." : "La flotilla está vacía."
+              puedeAlta ? "Agrega la primera unidad con su manual." : "La flotilla está vacía."
             }
             emptyAction={
               puedeAlta ? (
-                <Button size="sm" variant="primary" onClick={() => setShowAlta(true)}>
+                <ButtonLink size="sm" variant="primary" href={`${VEHICULOS_PATH}/nuevo`}>
                   Agregar vehículo
-                </Button>
+                </ButtonLink>
               ) : undefined
             }
           />
         )}
       </Section>
+
+      {datosMes && (reparto || datosMes.avisos.length) ? (
+        <div className={v.columnas}>
+          {reparto ? (
+            <section className={c.card} style={{ flex: "999 1 560px", minWidth: 0 }}>
+              <div className={v.cabecera}>
+                <h2 className={v.titulo}>A dónde se fue el costo este mes</h2>
+                <select className={v.selectorMes} value={mes} onChange={(e) => setMes(e.target.value)} aria-label="Mes">
+                  {meses.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.texto}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className={v.nota}>Lo que va a un proyecto es costo directo. La oficina y el tiempo parado se van a indirectos.</p>
+              <Barra
+                etiqueta={`Reparto del costo de la flotilla: ${reparto.renglones.map((r) => `${r.nombre} ${r.pct} por ciento`).join(", ")}`}
+                partes={reparto.renglones.map((r) => ({ tono: r.tono, pct: r.pct }))}
+              />
+              {reparto.renglones.map((r) => (
+                <div className={v.renglon} key={r.id}>
+                  <span className={v.punto} data-tono={r.tono} aria-hidden="true" />
+                  <div className={v.renglonTexto}>
+                    <b>{r.nombre}</b>
+                    <span>{r.nota}</span>
+                  </div>
+                  <span className={v.renglonDato}>{r.km == null ? "—" : km(r.km)}</span>
+                  <span className={v.renglonImporte}>{pesos(r.importe)}</span>
+                </div>
+              ))}
+            </section>
+          ) : null}
+          {datosMes.avisos.length ? (
+            <section className={c.card} style={{ flex: "1 1 320px", minWidth: 0 }}>
+              <h2 className={v.titulo} style={{ marginBottom: 10 }}>
+                Requiere atención
+              </h2>
+              <div className={c.notas} style={{ marginTop: 0 }}>
+                {datosMes.avisos.map((a) => (
+                  <Link key={`${a.vehicleId}-${a.titulo}`} href={`${VEHICULOS_PATH}/${a.vehicleId}`} style={{ textDecoration: "none", color: "inherit" }}>
+                    <Aviso tono={a.tono} titulo={`${a.titulo}.`}>
+                      {a.texto}
+                    </Aviso>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

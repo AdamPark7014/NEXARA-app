@@ -22,9 +22,10 @@ ENV PORT=3001
 ENV NODE_OPTIONS=--max-old-space-size=2048
 ENV HEALTH_HEAP_LIMIT_MB=1536
 
-# Prisma (migrate) y engines nativos necesitan OpenSSL en imágenes slim
+# Prisma (migrate) y engines nativos necesitan OpenSSL en imágenes slim.
+# poppler-utils: `pdftotext` lee el manual de un vehículo sin cargarlo entero en memoria.
 RUN apt-get update -y \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && apt-get install -y --no-install-recommends openssl ca-certificates poppler-utils \
   && rm -rf /var/lib/apt/lists/*
 
 # Raíz: dependencias hoisted del monorepo

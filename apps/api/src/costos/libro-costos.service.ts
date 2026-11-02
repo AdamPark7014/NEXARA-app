@@ -4,14 +4,19 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { WORKDAY_TIMEZONE, workDateKey } from '../common/time/workday.js';
 import { numero } from './calculos/numeros.js';
+import { KM_VIAJE_SOSPECHOSO, kmDeSalida } from './calculos/vehiculo.js';
 import {
+  conservarTarifaDeViaje,
+  gasolinaYaEnKm,
   movimientoDeGasto,
   movimientoDeSalida,
+  movimientoDeViaje,
   movimientosDeSesiones,
   movimientosDeViatico,
   type MovimientoCalculado,
 } from './calculos/libro-costos.js';
 import { CostosTarifasService } from './costos-tarifas.service.js';
+import { VehiculosMotorService } from './vehiculos/vehiculos-motor.service.js';
 
 export type ResultadoLibro = { creados: number; actualizados: number; borrados: number; total: number };
 
@@ -42,6 +47,7 @@ export class LibroCostosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tarifas: CostosTarifasService,
+    private readonly vehiculos: VehiculosMotorService,
   ) {}
 
   @Cron('20 3 * * *', { name: 'costos-libro', timeZone: WORKDAY_TIMEZONE })
@@ -63,9 +69,10 @@ export class LibroCostosService {
   /** Lo que el libro debería tener, leído de la operación. */
   async calcular(companyId: number): Promise<MovimientoCalculado[]> {
     const tarifa = await this.tarifas.motor(companyId);
+    const motorVehiculos = await this.vehiculos.motor(companyId);
     const fechaDe = (d: Date) => workDateKey(d);
 
-    const [sesiones, viaticos, gastos, salidas] = await Promise.all([
+    const [sesiones, viaticos, gastos, salidas, viajes] = await Promise.all([
       this.prisma.activityWorkSession.findMany({
         where: { companyId, endedAt: { not: null }, activity: { deletedAt: null } },
         select: { id: true, activityId: true, userId: true, startedAt: true, endedAt: true, endReason: true },
@@ -76,6 +83,7 @@ export class LibroCostosService {
           id: true,
           actividadId: true,
           usuarioId: true,
+          vehicleId: true,
           categoria: true,
           estatus: true,
           montoSolicitado: true,
@@ -102,10 +110,25 @@ export class LibroCostosService {
         where: { companyId, activityId: { not: null }, type: { in: ['DISPATCH', 'RETURN'] } },
         select: { id: true, activityId: true, type: true, quantity: true, unitCost: true, totalCost: true, createdAt: true },
       }),
+      this.prisma.vehicleControl.findMany({
+        where: { companyId, vehicleId: { not: null }, odometroFin: { not: null }, actividad: { deletedAt: null } },
+        select: {
+          id: true,
+          vehicleId: true,
+          actividadId: true,
+          solicitanteId: true,
+          odometroInicio: true,
+          odometroFin: true,
+          fechaFin: true,
+          fechaInicio: true,
+          fechaSolicitud: true,
+        },
+      }),
     ]);
 
     const salida: MovimientoCalculado[] = movimientosDeSesiones(sesiones, tarifa, fechaDe);
     for (const v of viaticos) {
+      if (gasolinaYaEnKm(v, motorVehiculos)) continue;
       salida.push(...movimientosDeViatico({ ...v, fecha: fechaDe(v.fechaSolicitud) }));
     }
     for (const g of gastos) {
@@ -116,13 +139,40 @@ export class LibroCostosService {
       const m = movimientoDeSalida({ ...s, type: String(s.type), fecha: fechaDe(s.createdAt) });
       if (m) salida.push(m);
     }
+    for (const v of viajes) {
+      const motor = motorVehiculos.get(v.vehicleId as number);
+      const km = kmDeSalida(v.odometroInicio, v.odometroFin);
+      if (!motor || km == null) continue;
+      salida.push(
+        movimientoDeViaje(
+          {
+            id: v.id,
+            vehicleId: v.vehicleId as number,
+            activityId: v.actividadId,
+            userId: v.solicitanteId,
+            fecha: fechaDe(v.fechaFin ?? v.fechaInicio ?? v.fechaSolicitud),
+            km,
+            tarifa: motor.tarifa,
+            rendimiento: motor.rendimiento.fuente,
+          },
+          KM_VIAJE_SOSPECHOSO,
+        ),
+      );
+    }
     return salida;
   }
 
-  async sincronizar(companyId: number): Promise<ResultadoLibro> {
-    const deseados = await this.calcular(companyId);
+  /**
+   * `recostear`: el vehículo cuyos viajes se vuelven a costear con la tarifa de hoy, porque alguien
+   * corrigió su ficha. Sin eso, cada viaje conserva la tarifa de su día.
+   */
+  async sincronizar(companyId: number, recostear?: { vehicleId: number }): Promise<ResultadoLibro> {
+    const calculados = await this.calcular(companyId);
     const existentes = await this.prisma.costoMovimiento.findMany({ where: { companyId } });
     const porOrigen = new Map(existentes.map((e) => [e.origen, e]));
+    const deseados = calculados.map((m) =>
+      recostear && m.detalle?.vehicleId === recostear.vehicleId ? m : conservarTarifaDeViaje(m, porOrigen.get(m.origen)),
+    );
     const deseadoPorOrigen = new Map(deseados.map((m) => [m.origen, m]));
 
     // Lo que cambió se borra y se vuelve a crear en lote: el libro no se audita, y escribir fila por
@@ -153,7 +203,12 @@ export class LibroCostosService {
       await this.prisma.$transaction([
         this.prisma.costoMovimiento.deleteMany({ where: { companyId, id: { in: aBorrar } } }),
         this.prisma.costoMovimiento.createMany({
-          data: aCrear.map((m) => ({ ...m, companyId, fecha: fechaColumna(m.fecha) })),
+          data: aCrear.map(({ detalle, ...m }) => ({
+            ...m,
+            companyId,
+            fecha: fechaColumna(m.fecha),
+            ...(detalle ? { detalle } : {}),
+          })),
           skipDuplicates: true,
         }),
       ]);

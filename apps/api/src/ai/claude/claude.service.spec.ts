@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { ClaudeService, configuracionPensamiento, estimarUsd, procesoParaPuerta, usoDeRespuesta } from './claude.service.js';
+import { ClaudeService, configuracionPensamiento, contenidoDelMensaje, estimarUsd, procesoParaPuerta, usoDeRespuesta } from './claude.service.js';
 
 function respuesta(texto: string, extra: Partial<Anthropic.Message> = {}): Anthropic.Message {
   return {
@@ -189,5 +189,19 @@ describe('ClaudeService', () => {
       if (topePrevio === undefined) delete process.env.CLAUDE_TOPE_DIARIO;
       else process.env.CLAUDE_TOPE_DIARIO = topePrevio;
     }
+  });
+});
+
+describe('contenido del mensaje', () => {
+  it('sin fotos es texto y nada más', () => {
+    expect(contenidoDelMensaje({ usuario: 'hola' })).toBe('hola');
+    expect(contenidoDelMensaje({ usuario: 'hola', imagenes: [] })).toBe('hola');
+  });
+
+  it('con fotos, las fotos van antes del texto', () => {
+    expect(contenidoDelMensaje({ usuario: 'Lee este ticket.', imagenes: [{ mediaType: 'image/jpeg', base64: 'AAAA' }] })).toEqual([
+      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'AAAA' } },
+      { type: 'text', text: 'Lee este ticket.' },
+    ]);
   });
 });

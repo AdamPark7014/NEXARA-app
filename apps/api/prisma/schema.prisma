@@ -8387,6 +8387,8 @@ model CostoMovimiento {
   costoUnitario Decimal  @db.Decimal(12, 4)
   importe       Decimal  @db.Decimal(14, 2)
   nota          String?  @db.VarChar(200)
+  /// En un viaje: km, tarifa de ese día y de qué se compone. No se reescribe si la tarifa cambia.
+  detalle       Json?
   /// PROVISIONAL se recalcula; CERRADO queda congelado.
   estado        String   @default("PROVISIONAL") @db.VarChar(12)
   createdAt     DateTime @default(now())
@@ -8422,4 +8424,117 @@ model CostoActividadLiga {
   @@index([companyId, proyectoId])
   @@index([companyId, cotizacionId])
   @@map("costo_actividad_ligas")
+}
+
+/// Ficha de un vehículo: lo que dice su manual o CONUEE, o lo que alguien capturó. `fuentes` guarda de
+/// dónde salió cada dato: `{ "tanqueLitros": { "tipo": "MANUAL", "pagina": 418 } }`.
+model VehiculoEspecificacion {
+  id                 Int       @id @default(autoincrement())
+  companyId          Int
+  vehicleId          Int       @unique
+  marca              String?   @db.VarChar(60)
+  modelo             String?   @db.VarChar(80)
+  anio               Int?
+  version            String?   @db.VarChar(80)
+  numeroSerie        String?   @db.VarChar(30)
+  motor              String?   @db.VarChar(80)
+  potenciaHp         Int?
+  transmision        String?   @db.VarChar(40)
+  combustible        String?   @db.VarChar(40)
+  tanqueLitros       Decimal?  @db.Decimal(6, 1)
+  aceiteTipo         String?   @db.VarChar(40)
+  aceiteLitros       Decimal?  @db.Decimal(5, 1)
+  llantaMedida       String?   @db.VarChar(30)
+  llantaPsi          Int?
+  cargaKg            Int?
+  rendimientoOficial Decimal?  @db.Decimal(6, 2)
+  fechaCompra        DateTime? @db.Date
+  /// Con cuántos km se compró. Vacío = nuevo.
+  odometroCompra     Int?
+  /// Con cuántos km se dio de alta: de ahí arranca el programa de servicio si no hay historial.
+  odometroAlta       Int?
+  fuentes            Json?
+  actualizadoPorId   Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([companyId])
+  @@map("vehiculo_especificaciones")
+}
+
+/// Manual, tarjeta, póliza o verificación de un vehículo, con su vencimiento si lo tiene.
+model VehiculoDocumento {
+  id          Int       @id @default(autoincrement())
+  companyId   Int
+  vehicleId   Int
+  /// MANUAL | TARJETA | POLIZA | VERIFICACION | OTRO
+  tipo        String    @db.VarChar(14)
+  nombre      String    @db.VarChar(160)
+  url         String    @db.VarChar(500)
+  paginas     Int?
+  venceEl     DateTime? @db.Date
+  creadoPorId Int?
+  createdAt   DateTime  @default(now())
+
+  @@index([companyId, vehicleId])
+  @@map("vehiculo_documentos")
+}
+
+/// Qué le toca a un vehículo y cada cuánto, según su manual.
+model VehiculoServicioPlan {
+  id            Int      @id @default(autoincrement())
+  companyId     Int
+  vehicleId     Int
+  concepto      String   @db.VarChar(120)
+  cadaKm        Int?
+  cadaMeses     Int?
+  costoEstimado Decimal? @db.Decimal(10, 2)
+  paginaManual  Int?
+  activo        Boolean  @default(true)
+  orden         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([companyId, vehicleId])
+  @@map("vehiculo_servicio_planes")
+}
+
+/// Un servicio hecho. `planIds` dice qué partes del programa cubrió: una visita suele cubrir varias.
+model VehiculoServicio {
+  id              Int      @id @default(autoincrement())
+  companyId       Int
+  vehicleId       Int
+  fecha           DateTime @db.Date
+  odometro        Int?
+  concepto        String   @db.VarChar(200)
+  costo           Decimal  @default(0) @db.Decimal(10, 2)
+  proveedor       String?  @db.VarChar(120)
+  comprobanteUrl  String?  @db.VarChar(500)
+  planIds         Int[]
+  notas           String?  @db.VarChar(300)
+  registradoPorId Int?
+  createdAt       DateTime @default(now())
+
+  @@index([companyId, vehicleId])
+  @@map("vehiculo_servicios")
+}
+
+/// Una carga de gasolina. De aquí salen el rendimiento real y el precio por litro.
+model VehiculoCarga {
+  id              Int      @id @default(autoincrement())
+  companyId       Int
+  vehicleId       Int
+  fecha           DateTime
+  odometro        Int
+  litros          Decimal  @db.Decimal(7, 2)
+  importe         Decimal  @db.Decimal(10, 2)
+  /// Sin tanque lleno no se puede medir: esos litros se suman al siguiente lleno.
+  tanqueLleno     Boolean  @default(true)
+  ticketUrl       String?  @db.VarChar(500)
+  tableroUrl      String?  @db.VarChar(500)
+  registradoPorId Int?
+  createdAt       DateTime @default(now())
+
+  @@index([companyId, vehicleId, fecha])
+  @@map("vehiculo_cargas")
 }

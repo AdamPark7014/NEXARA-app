@@ -1,5 +1,6 @@
 import React from "react";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import VehiculoDetallePage from "./page";
@@ -74,8 +75,10 @@ describe("ficha del vehículo", () => {
         }),
     );
     vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
     render(<VehiculoDetallePage />);
 
+    await user.click(await screen.findByRole("button", { name: "Viajes" }));
     expect(await screen.findByText("Historial · 1 viajes")).toBeInTheDocument();
     expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toContain("vehicles/flotilla/3");
     expect(screen.getByText("120,345 km")).toBeInTheDocument();

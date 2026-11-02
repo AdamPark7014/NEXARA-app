@@ -1,0 +1,35 @@
+{
+  "fecha": "2026-11-02T03:10:16.076Z",
+  "conuee": {
+    "modelo": "claude-haiku-5-5",
+    "aciertos": 17,
+    "total": 17,
+    "usdPorLlamada": 0.00006,
+    "segundosPorLlamada": 0.8,
+    "fallos": []
+  },
+  "manual": {
+    "modelo": "claude-haiku-5-5",
+    "aciertos": 33,
+    "total": 33,
+    "usdPorLlamada": 0.0002,
+    "segundosPorLlamada": 1.6,
+    "fallos": []
+  },
+  "tablero": {
+    "modelo": "claude-sonnet-5-5",
+    "aciertos": 26,
+    "total": 26,
+    "usdPorLlamada": 0.00162,
+    "segundosPorLlamada": 2.5,
+    "fallos": []
+  },
+  "ticket": {
+    "modelo": "claude-haiku-5-5",
+    "aciertos": 20,
+    "total": 20,
+    "usdPorLlamada": 0.00009,
+    "segundosPorLlamada": 1.1,
+    "fallos": []
+  }
+}

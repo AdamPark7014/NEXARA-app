@@ -40,6 +40,8 @@ type Props = {
   odometroInicio?: number | null;
   onSubmit: (payload: ChecklistFormPayload) => Promise<void>;
   loading?: boolean;
+  /** Lee km y gasolina de la foto del tablero. Es ayuda: la persona confirma y puede corregir. */
+  leerTablero?: (foto: File) => Promise<{ odometroKm: number | null; combustible: string | null }>;
 };
 
 const PASOS: { n: Paso; titulo: string }[] = [
@@ -52,13 +54,14 @@ const PASOS: { n: Paso; titulo: string }[] = [
 const AYUDA_CAPTURA =
   "Cada foto se sella con la hora en que se tomó y, si lo permites, con el punto GPS. La API rechaza fotos sin hora, así que no sirven las de la galería.";
 
-export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, loading }: Props) {
+export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, loading, leerTablero }: Props) {
   const [paso, setPaso] = useState<Paso>(1);
   const [files, setFiles] = useState<Record<string, File>>({});
   const [meta, setMeta] = useState<Record<string, MetaFoto>>({});
   const [previas, setPrevias] = useState<Record<string, string>>({});
   const [odometroKm, setOdometroKm] = useState("");
   const [combustible, setCombustible] = useState<string>("");
+  const [lectura, setLectura] = useState<"leyendo" | "leida" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const previasRef = useRef<Record<string, string>>({});
   const raizRef = useRef<HTMLDivElement>(null);
@@ -93,6 +96,17 @@ export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, lo
     const capturedAt = new Date().toISOString();
     setError(null);
     setFiles((prev) => ({ ...prev, [slot]: file }));
+    if (slot === SLOT_TABLERO && leerTablero) {
+      setLectura("leyendo");
+      leerTablero(file)
+        .then((r) => {
+          // Lo que la persona ya escribió no se pisa.
+          if (r.odometroKm != null) setOdometroKm((previo) => previo || String(r.odometroKm));
+          if (r.combustible) setCombustible((previo) => previo || (r.combustible as string));
+          setLectura(r.odometroKm != null || r.combustible ? "leida" : null);
+        })
+        .catch(() => setLectura(null));
+    }
     setMeta((prev) => ({ ...prev, [slot]: { capturedAt, lat: null, lng: null } }));
     setPrevias((prev) => {
       const anterior = prev[slot];
@@ -129,7 +143,7 @@ export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, lo
         { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 },
       );
     }
-  }, []);
+  }, [leerTablero]);
 
   const faltantesVuelta = useMemo(() => SLOTS_VUELTA.filter((s) => !files[s]), [files]);
   const kmNumero = Number(odometroKm);
@@ -263,6 +277,16 @@ export default function VehicleCheckoutForm({ mode, odometroInicio, onSubmit, lo
 
       {paso === 3 && (
         <section aria-label="Kilometraje y combustible">
+          {lectura === "leida" ? (
+            <p className={styles.mini} style={{ marginTop: 0 }} role="status">
+              Esto leímos en la foto. Si no cuadra, corrígelo: la foto queda de respaldo.
+            </p>
+          ) : null}
+          {lectura === "leyendo" ? (
+            <p className={styles.mini} style={{ marginTop: 0 }} role="status">
+              Leyendo la foto del tablero…
+            </p>
+          ) : null}
           <label className={styles.campo}>
             <span className={styles.campoLabel}>Kilometraje del tablero</span>
             <input
