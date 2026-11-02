@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { documentoVacio, partidaNueva } from "@/lib/cotizacion-documento";
-import type { CotizacionDetalle, OpcionPropuesta, PartidaPropuesta } from "@/lib/cotizaciones-api";
+import type { CostoDeHoy, CotizacionDetalle, OpcionPropuesta, PartidaPropuesta } from "@/lib/cotizaciones-api";
 import {
+  conAvisosDeCosto,
   conMargen,
   documentoConPropuesta,
   documentoCopiadoDe,
@@ -196,5 +197,37 @@ describe("documentoCopiadoDe", () => {
 
   it("el mismo cliente dicho de otra forma de mayúsculas conserva su contacto", () => {
     expect(documentoCopiadoDe(detalle, { salesClientId: 2, nombre: "HOTEL AURORA" }, hoy).clientEmail).toBe("compras@hotel.test");
+  });
+});
+
+describe("conAvisosDeCosto", () => {
+  const HOY: CostoDeHoy = { costo: 1200, diferencia: 0.2, piezas: 3, clave: "SWT1", alDia: true, fecha: "2026-11-02T17:00:00.000Z" };
+  const conPartidas = () => ({
+    ...documentoVacio(),
+    partidas: [
+      partidaNueva({ id: 11, name: "Switch", unitCost: 1000, unitPrice: 1200, marginPercent: 20 }),
+      partidaNueva({ id: 12, name: "Instalación", unitCost: 500, unitPrice: 500 }),
+      partidaNueva({ name: "Sin guardar", unitCost: 100, unitPrice: 120 }),
+    ],
+  });
+
+  it("le pone su aviso a la que difiere y no cambia ninguna cifra", () => {
+    const { doc, conAviso } = conAvisosDeCosto(conPartidas(), { 11: HOY });
+    expect(conAviso).toBe(1);
+    expect(doc.partidas[0]).toMatchObject({
+      unitCost: 1000,
+      unitPrice: 1200,
+      marginPercent: 20,
+      avisoCt: { costoGuardado: 1000, precioGuardado: 1200, margenUltimaVez: 20, margenFila: 20 },
+    });
+    expect(doc.partidas[1]!.avisoCt).toBeUndefined();
+    expect(doc.partidas[2]!.avisoCt).toBeUndefined();
+  });
+
+  it("sin costos se queda igual", () => {
+    const original = conPartidas();
+    const { doc, conAviso } = conAvisosDeCosto(original, {});
+    expect(conAviso).toBe(0);
+    expect(doc.partidas).toEqual(original.partidas);
   });
 });

@@ -37,6 +37,7 @@ import {
   formatoMoneda,
   listarPaquetes,
   listarPlantillas,
+  costosDeHoyDeCotizacion,
   obtenerCotizacion,
   urlPdfCotizacion,
   urlPdfCotizacionInterno,
@@ -64,7 +65,7 @@ import {
 import { folioAlEnviar } from "@/lib/cotizacion-folio";
 import { esSeccionPropuesta, type SeccionPropuesta } from "@/lib/vista-previa-vivo";
 import { conCondicionesSugeridas, type SeccionesOpcionales } from "@/lib/cotizacion-personalizacion";
-import { documentoConPropuesta, documentoCopiadoDe, type DatosDePropuesta } from "@/lib/cotizar-ia";
+import { conAvisosDeCosto, documentoConPropuesta, documentoCopiadoDe, type DatosDePropuesta } from "@/lib/cotizar-ia";
 import CotizarConIA from "./CotizarConIA";
 import PanelPersonalizar from "./PanelPersonalizar";
 import ElegirPlantilla from "./ElegirPlantilla";
@@ -490,11 +491,17 @@ export default function EditorCotizacion({
 
   async function partirDeAnterior(cotizacion: number, cliente: { salesClientId: number | null; nombre: string } | null) {
     if (!token) return;
-    const anterior = await obtenerCotizacion(token, cotizacion);
+    const [anterior, costos] = await Promise.all([
+      obtenerCotizacion(token, cotizacion),
+      // Sin esto se copia igual: el aviso no vale perder la copia.
+      costosDeHoyDeCotizacion(token, cotizacion).catch(() => ({})),
+    ]);
     condicionesPuestas.current = true;
-    setDoc(documentoCopiadoDe(anterior, cliente));
+    const { doc: copia, conAviso } = conAvisosDeCosto(documentoCopiadoDe(anterior, cliente), costos);
+    setDoc(copia);
     setCotizarAbierta(false);
-    setAviso(`Copiada de ${anterior.folio}: es una cotización nueva, con su propio folio.`);
+    const delCt = conAviso === 1 ? " 1 partida cuesta distinto en CT: revísala." : conAviso > 1 ? ` ${conAviso} partidas cuestan distinto en CT: revísalas.` : "";
+    setAviso(`Copiada de ${anterior.folio}: es una cotización nueva, con su propio folio.${delCt}`);
     irASeccionPronto("cotizacion");
   }
 

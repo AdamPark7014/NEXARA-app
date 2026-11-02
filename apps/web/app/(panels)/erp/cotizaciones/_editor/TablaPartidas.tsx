@@ -405,9 +405,10 @@ export default function TablaPartidas({
       <div role="cell" className={styles.celdaAviso} data-area="aviso">
         <AvisoCosto
           lectura={lectura}
-          onUsar={() => ponerCosto(p, avisoCt.hoy.costo)}
+          // El margen de la celda se quita: con él, el precio se movería solo. Lo copiado suele traerlo.
+          onUsar={() => cambiar(p.key, { unitCost: avisoCt.hoy.costo, marginPercent: null })}
           onSubir={() => lectura.subir && cambiar(p.key, { unitPrice: lectura.subir.precio, marginPercent: lectura.subir.margen })}
-          onDeshacer={() => cambiar(p.key, { unitCost: avisoCt.costoGuardado, unitPrice: avisoCt.precioGuardado, marginPercent: null })}
+          onDeshacer={() => cambiar(p.key, { unitCost: avisoCt.costoGuardado, unitPrice: avisoCt.precioGuardado, marginPercent: avisoCt.margenFila })}
         />
       </div>
     );

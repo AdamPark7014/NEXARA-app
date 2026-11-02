@@ -1,5 +1,14 @@
 # RELEVO
 
+- **02-11 ~14:30 (claude-code) — «Partir de esa» también avisa si lo copiado cuesta distinto hoy en CT. Adam: «Sí, agrégalo».**
+  - **Qué se ve:** al partir de una cotización, cada partida copiada que difiere más de 3 % de CT lleva el mismo aviso de «Hoy en CT» en su fila, con los mismos botones. El mensaje de arriba dice cuántas: «2 partidas cuestan distinto en CT: revísalas». Ninguna cifra cambia al copiar.
+  - **API:** `GET cotizaciones/:id/costos-de-hoy`, con el permiso de cotizaciones y solo de la empresa activa. Devuelve por partida lo que difiere; en dólares, nada. Reutiliza `leerCatalogoDeHoy`: una sola consulta, sin IA.
+  - **Web:** `partirDeAnterior` pide el detalle y los costos a la vez y arma el documento de un jalón, sin carreras con lo que se esté escribiendo. Si los costos fallan, copia igual y sin aviso. `conAvisosDeCosto` en `lib/cotizar-ia.ts`.
+  - **Cambio que también afecta a «Cotizar con IA» y a «Nueva partida»:** en la tabla, «Usar costo de hoy» ya no pasa por `ponerCosto`. Lo copiado suele traer margen en la celda, y con él el precio se movía solo. Ahora vacía el margen, el precio se queda, y «Deshacer» regresa el margen que traía (`margenFila`).
+  - **Pruebas:** API 5,106 pruebas en verde y web 225 archivos y 1,984 pruebas, tipos sin errores. Una suite no cargó en mi copia: `integra/integra-nvr-ruta.spec.ts` lee `deploy/traefik/nexara.yml`, que la copia no traía; no es de este cambio. Eval sin correr: `armarPropuesta` y todo lo que el eval ejecuta no cambiaron.
+  - **Vista:** el `EditorCotizacion` real en el arnés, con API de mentira, de punta a punta: armar, «Partir de esa», aviso en 2 de 3 filas, sigue tras el primer autoguardado, «Usar» y «Subir» guardan 3,400 / 3,740 / 10 % y nada del aviso viaja. Con la consulta caída copia igual, sin aviso ni error. El detalle de mentira no alcanzó para pintar el editor ya guardado: esa recarga se probó fallando, y el editor nunca reemplaza partidas al recargar.
+  - **Sin verificar:** con sesión real en pantalla.
+
 - **02-11 (claude-code) — Contabilidad y Finanzas: lo que salió al verla en producción (`ea095661` desplegado).**
   - **Visto con la sesión del CEO a 1707 px, sin guardar nada ni pulsar una acción:** Hoy, Por facturar, Estados, Conciliación, Por cobrar, Facturas, Movimientos, Pólizas, Proveedores, Pre-nómina, Proyectos, Presupuestos, Reportes, Auditoría, Viáticos, Gastos, Nómina, Facturación y Bancos. Solo por DOM: Debo pagar, Cierres, Pagos y gastos y Pre-nómina de finanzas. Sin desborde de página ni cifras cortadas; la pestaña activa de Estados y Pólizas ya tiene radio 0.
   - **En oscuro, en producción:** Hoy, Pólizas, Viáticos y Pre-nómina, con la clase de `body` solo en la pestaña. El tema no se guarda: vive en el estado de React y `ThemeContext` también quita `light`; si solo agregas `dark`, las tarjetas se quedan blancas y parece un defecto.
@@ -135,7 +144,7 @@
   - **Vista:** componentes reales en un arnés Vite compilado en el servidor (no se commitea) contra la muestra: a 1280 px con captura; a 375 px por DOM, un dato por renglón y sin desbordes. Las capturas se cuelgan con el panel oculto.
   - **Producción:** `976e0b66` y `5e7d66da` desplegados. Con el código compilado contra la base real, lista pegada, sin IA y sin guardar: `EAP660HD` −22.4 %, `TL-SG1428PE` +11.0 %, `861683-B21` +9.4 %; `ZC300` sin aviso por sus versiones; en dólares, sin aviso. `interpretar` completo unos 0.4 s. Siguen 56 cotizaciones. El texto del botón está en el paquete del web y no hay warn `CostoDeHoy`. El despliegue también aplicó `20261102190500_formatos_actividad`, de otra sesión.
   - **Sin verificar:** nada con sesión real en pantalla ni con quien cotiza.
-  - **Límites:** el aviso se pierde al recargar la cotización, porque no se guarda. «Partir de esa» copia costos viejos sin avisar. Quién captura el costo igual al precio no está averiguado: es lo que más le quita valor a la columna de costo.
+  - **Límites:** el aviso se pierde al recargar la cotización, porque no se guarda. Quién captura el costo igual al precio no está averiguado: es lo que más le quita valor a la columna de costo.
   - No se delegó a Ollama: lo fino era la regla de negocio, ya medida, y el equipo tenía menos de 500 MB libres.
 
 - **02-11 (claude-code) — «Asignar con IA» es de todo mando con gente a cargo, no de una lista de nombres (Adam, con la lista a la vista).** Sustituye a «solo Christian, David o Antonio».

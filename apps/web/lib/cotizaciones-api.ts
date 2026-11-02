@@ -631,6 +631,11 @@ export function buscarPartidasFrecuentes(
   });
 }
 
+/** Por partida, lo que hoy cuesta distinto en CT. Solo trae lo que difiere. */
+export function costosDeHoyDeCotizacion(token: string, id: number) {
+  return cotFetch<Record<number, CostoDeHoy>>(`cotizaciones/${id}/costos-de-hoy`, token);
+}
+
 /** Una opción para cambiar la partida propuesta con un clic. */
 export type OpcionPropuesta = {
   fuente: "usada" | "catalogo" | "formato" | "paquete" | "libre";

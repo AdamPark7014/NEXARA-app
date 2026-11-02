@@ -16,6 +16,8 @@ export type AvisoCt = {
   precioGuardado: number;
   /** Margen de la última vez. `null` si se guardó con el costo igual a su precio: ese margen no dice nada. */
   margenUltimaVez: number | null;
+  /** El margen que traía la celda de la fila: lo copiado puede traerlo y «Deshacer» lo regresa. */
+  margenFila: number | null;
 };
 
 const iguales = (a: number, b: number) => Math.abs(a - b) < 0.005;
@@ -26,11 +28,12 @@ export function crearAviso(
   costo: number | null | undefined,
   precio: number | null | undefined,
   precioDeLaUltimaVez: number | null | undefined = precio,
+  margenFila: number | null | undefined = null,
 ): AvisoCt | null {
   const costoGuardado = Number(costo);
   if (!hoy || !(costoGuardado > 0)) return null;
   const margen = redondo((Number(precioDeLaUltimaVez) / costoGuardado - 1) * 100);
-  return { hoy, costoGuardado, precioGuardado: Number(precio) || 0, margenUltimaVez: margen > 0.01 ? margen : null };
+  return { hoy, costoGuardado, precioGuardado: Number(precio) || 0, margenUltimaVez: margen > 0.01 ? margen : null, margenFila: margenFila ?? null };
 }
 
 export type TonoAviso = "rojo" | "ambar" | "azul" | "verde";

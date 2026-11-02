@@ -3,7 +3,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import TablaPartidas from "./TablaPartidas";
-import { totalesDePartidas, type PartidaEditor } from "@/lib/cotizacion-documento";
+import { crearAviso } from "@/lib/aviso-costo-ct";
+import { partidaNueva, totalesDePartidas, type PartidaEditor } from "@/lib/cotizacion-documento";
 import { buscarPartidasFrecuentes, type PartidaFrecuente } from "@/lib/cotizaciones-api";
 import { smartQuoteSearch } from "@/lib/smart-quote-api";
 
@@ -301,6 +302,29 @@ describe("TablaPartidas · partidas frecuentes («Usadas antes»)", () => {
       await screen.findByRole("listbox", { name: "Sugerencias" });
       await userEvent.keyboard("{ArrowDown}{Enter}");
       expect(screen.getAllByRole("status").find((n) => n.getAttribute("data-tono"))).toHaveTextContent("Con el 20 % general ganas 25 %");
+    });
+  });
+
+  describe("lo copiado de otra cotización, que trae margen en la celda", () => {
+    const HOY = { costo: 1200, diferencia: 0.2, piezas: 4, clave: "SWT1", alDia: true, fecha: "2026-11-02T17:00:00.000Z" };
+
+    function Copiada({ alCambiar }: { alCambiar: (p: PartidaEditor[]) => void }) {
+      const [partidas, setPartidas] = useState<PartidaEditor[]>(() => [
+        partidaNueva({ name: "Switch copiado", unitCost: 1000, unitPrice: 1250, marginPercent: 25, avisoCt: crearAviso(HOY, 1000, 1250, 1250, 25) }),
+      ]);
+      alCambiar(partidas);
+      return <TablaPartidas partidas={partidas} setPartidas={setPartidas} editable moneda="MXN" token="t" totales={totalesDePartidas(partidas)} />;
+    }
+
+    it("«Usar costo de hoy» no mueve el precio aunque la celda traiga margen; «Deshacer» lo regresa", async () => {
+      const alCambiar = vi.fn();
+      render(<Copiada alCambiar={alCambiar} />);
+
+      await userEvent.click(screen.getByRole("button", { name: "Usar costo de hoy" }));
+      expect(ultimas(alCambiar)[0]).toMatchObject({ unitCost: 1200, unitPrice: 1250, marginPercent: null });
+
+      await userEvent.click(screen.getByRole("button", { name: "Deshacer" }));
+      expect(ultimas(alCambiar)[0]).toMatchObject({ unitCost: 1000, unitPrice: 1250, marginPercent: 25 });
     });
   });
 });

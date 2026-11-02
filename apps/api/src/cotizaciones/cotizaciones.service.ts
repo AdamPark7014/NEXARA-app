@@ -60,7 +60,7 @@ import {
 import { agruparPartidas, incluyeInstalacion, totalesPorGrupo } from './partidas-grupos.js';
 import { MAX_FILAS_A_LEER, filtroDePartidas, partidasFrecuentes } from './partidas-frecuentes.js';
 import { leerCatalogoDeHoy } from './costo-de-hoy.consulta.js';
-import { conCostoDeHoy, modelosComparables } from './costo-de-hoy.js';
+import { conCostoDeHoy, modelosComparables, type CostoDeHoy } from './costo-de-hoy.js';
 import {
   ETIQUETA_SEGMENTO,
   diasDeVigencia,
@@ -1721,6 +1721,32 @@ export class CotizacionesService {
     if (moneda === 'USD') return sugerencias;
     const catalogo = await leerCatalogoDeHoy(this.db, modelosComparables(sugerencias));
     return catalogo ? sugerencias.map((s) => conCostoDeHoy(s, catalogo)) : sugerencias;
+  }
+
+  /**
+   * Lo que hoy cuesta distinto en CT, por partida, para avisar al partir de esta cotización. Una sola
+   * consulta y no cambia nada. Solo trae lo que difiere; en dólares, nada: CT vende en pesos.
+   */
+  async costosDeHoy(id: number, companyId?: number | null): Promise<Record<number, CostoDeHoy>> {
+    const quote = await this.db.cotizacion.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+      select: {
+        companyId: true,
+        currency: true,
+        items: { select: { id: true, name: true, model: true, unit: true, unitCost: true } },
+      },
+    });
+    assertCompanyAccess(quote, companyId, 'Cotizacion');
+    if (String(quote.currency ?? '').trim().toUpperCase() === 'USD') return {};
+    const partidas = quote.items.map((i) => ({ ...i, unitCost: i.unitCost == null ? null : Number(i.unitCost) }));
+    const catalogo = await leerCatalogoDeHoy(this.db, modelosComparables(partidas));
+    if (!catalogo) return {};
+    const costos: Record<number, CostoDeHoy> = {};
+    for (const p of partidas) {
+      const { costoDeHoy } = conCostoDeHoy(p, catalogo);
+      if (costoDeHoy) costos[p.id] = costoDeHoy;
+    }
+    return costos;
   }
 
   /** Puntos de partida del editor por segmento: objetivo (entrada y cierre) y subsecciones de alcance. */
