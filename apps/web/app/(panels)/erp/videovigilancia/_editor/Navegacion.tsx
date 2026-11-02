@@ -12,6 +12,7 @@ export const ICONO = {
   encuadrar: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
   girarIzq: "M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4",
   girarDer: "M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4",
+  pantalla: "M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3",
 } as const;
 
 export type BotonNavegacion = { etiqueta: string; icono: string; accion: () => void };

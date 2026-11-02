@@ -17,11 +17,13 @@ import { FileInterceptor } from '../common/files/interceptores-subida.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { CctvDisenosService, type ActorCctv } from './cctv-disenos.service.js';
 import { ConflictoVersionFilter } from './conflicto-version.js';
 import { CROQUIS_MAX_BYTES } from './croquis-imagen.js';
 import { CrearDisenoDto } from './dto/crear-diseno.dto.js';
 import { GuardarDisenoDto } from './dto/guardar-diseno.dto.js';
+import { FICHA_MAX_BYTES, LecturaFichaService } from './lectura-ficha.service.js';
 
 /**
  * Diseñador de videovigilancia (`docs/DISENADOR-CCTV.md` §9).
@@ -34,7 +36,10 @@ import { GuardarDisenoDto } from './dto/guardar-diseno.dto.js';
 @UseGuards(UrlAccessGuard, StaffOnlyGuard)
 @UseFilters(ConflictoVersionFilter)
 export class CctvDisenosController {
-  constructor(private readonly service: CctvDisenosService) {}
+  constructor(
+    private readonly service: CctvDisenosService,
+    private readonly lectura: LecturaFichaService,
+  ) {}
 
   /** `{ puede }`: la web decide con esto si muestra el módulo. Antes de `:id`. */
   @Get('acceso')
@@ -51,6 +56,31 @@ export class CctvDisenosController {
   @Post('catalogo')
   agregarAlCatalogo(@Req() req: any, @Body() cuerpo: unknown, @CurrentCompanyId() companyId: number | null) {
     return this.service.agregarAlCatalogo(this.actor(req), cuerpo, companyId);
+  }
+
+  /** Multipart `file`: la memoria técnica en PDF. Devuelve lo leído; no guarda ni el PDF ni los datos. */
+  @Post('catalogo/leer-ficha')
+  @HttpCode(200)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: FICHA_MAX_BYTES + 1024 * 1024, files: 1 } }))
+  async leerFicha(@Req() req: any, @UploadedFile() file: any, @CurrentCompanyId() companyId: number | null) {
+    await this.service.exigirAcceso(this.actor(req));
+    return this.lectura.leer(requireCompanyId(companyId), file);
+  }
+
+  /** Un equipo a partir de una frase, para quien no tiene su PDF. Tampoco guarda nada. */
+  @Post('catalogo/describir')
+  @HttpCode(200)
+  async describirEquipo(@Req() req: any, @Body() cuerpo: { frase?: unknown }, @CurrentCompanyId() companyId: number | null) {
+    await this.service.exigirAcceso(this.actor(req));
+    return this.lectura.equipoDesdeFrase(requireCompanyId(companyId), cuerpo?.frase);
+  }
+
+  /** Los datos de un sitio a partir de una frase. El diseño lo arma la web con ellos. */
+  @Post('generar-sitio')
+  @HttpCode(200)
+  async generarSitio(@Req() req: any, @Body() cuerpo: { frase?: unknown }, @CurrentCompanyId() companyId: number | null) {
+    await this.service.exigirAcceso(this.actor(req));
+    return this.lectura.sitioDesdeFrase(requireCompanyId(companyId), cuerpo?.frase);
   }
 
   @Patch('catalogo/:id')

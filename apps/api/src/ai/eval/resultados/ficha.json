@@ -1,0 +1,132 @@
+{
+  "fecha": "2026-11-02T17:26:52.939Z",
+  "modelo": "claude-haiku-5-5",
+  "bien": 210,
+  "total": 213,
+  "pct": 98.6,
+  "usdPorFicha": 0.00099,
+  "p50s": 3.105,
+  "maxS": 7.045,
+  "casos": [
+    {
+      "caso": "escrito:empaque",
+      "bien": 8,
+      "total": 8,
+      "fallas": []
+    },
+    {
+      "caso": "escrito:sin-medidas",
+      "bien": 11,
+      "total": 11,
+      "fallas": []
+    },
+    {
+      "caso": "escrito:alerta-sismica",
+      "bien": 9,
+      "total": 9,
+      "fallas": []
+    },
+    {
+      "caso": "escrito:otra-cosa",
+      "bien": 9,
+      "total": 9,
+      "fallas": []
+    },
+    {
+      "caso": "domo-DS-2CD1143G2-LIU.pdf",
+      "bien": 17,
+      "total": 18,
+      "fallas": [
+        "altoCarcasaMm: esperaba 50.1, leyó null"
+      ]
+    },
+    {
+      "caso": "turret-DS-2CD2347G2-LU-C.pdf",
+      "bien": 15,
+      "total": 15,
+      "fallas": []
+    },
+    {
+      "caso": "bala-DS-2CD1T47G3-LIUF-LSL.pdf",
+      "bien": 17,
+      "total": 17,
+      "fallas": []
+    },
+    {
+      "caso": "ptz-DS-2DE4A425IWG1-E.pdf",
+      "bien": 16,
+      "total": 16,
+      "fallas": []
+    },
+    {
+      "caso": "nvr-DS-7608NXI-K2D.pdf",
+      "bien": 10,
+      "total": 10,
+      "fallas": []
+    },
+    {
+      "caso": "alarma-DS-PWA96-Kit1-WE.pdf",
+      "bien": 7,
+      "total": 7,
+      "fallas": []
+    },
+    {
+      "caso": "barrera-DS-TMG421.pdf",
+      "bien": 6,
+      "total": 7,
+      "fallas": [
+        "plumaM: esperaba 3, leyó \"1.5\""
+      ]
+    },
+    {
+      "caso": "switch-DS-3E0526P-E-B.pdf",
+      "bien": 10,
+      "total": 10,
+      "fallas": []
+    },
+    {
+      "caso": "terminal-DS-K1T341AM.pdf",
+      "bien": 6,
+      "total": 6,
+      "fallas": []
+    },
+    {
+      "caso": "axis-domo-P3265-LV.pdf",
+      "bien": 16,
+      "total": 16,
+      "fallas": []
+    },
+    {
+      "caso": "dahua-turret-IPC-HDW2441T-S.pdf",
+      "bien": 14,
+      "total": 14,
+      "fallas": []
+    },
+    {
+      "caso": "dahua-bala-IPC-HFW2541E-S.pdf",
+      "bien": 12,
+      "total": 12,
+      "fallas": []
+    },
+    {
+      "caso": "dahua-nvr-NVR4108HS-8P-4KS3.pdf",
+      "bien": 11,
+      "total": 11,
+      "fallas": []
+    },
+    {
+      "caso": "tplink-switch-TL-SL1218MP.pdf",
+      "bien": 9,
+      "total": 9,
+      "fallas": []
+    },
+    {
+      "caso": "zkteco-terminal-SpeedFaceV5L.pdf",
+      "bien": 7,
+      "total": 8,
+      "fallas": [
+        "pantallaPulgadas: esperaba 5, leyó null"
+      ]
+    }
+  ]
+}

@@ -61,7 +61,9 @@ import { ConflictoDeVersion, ETIQUETA_ESTADO_DISENO, guardarDiseno, subirCroquis
 import { LEYENDA_NIVELES, COLOR_NIVEL } from "./colores";
 import { TIPOS_CROQUIS, esOscuro, prepararCroquis } from "./croquis";
 import DiagramaSistema from "./DiagramaSistema";
+import type { DisenoGenerado } from "@/lib/cctv/generarSitio";
 import DialogoEquipo from "./DialogoEquipo";
+import MemoriaTecnica from "./MemoriaTecnica";
 import Inspector, { type Pestana } from "./Inspector";
 import Lienzo, { type Herramienta } from "./Lienzo";
 import Lienzo3D from "./Lienzo3D";
@@ -71,6 +73,7 @@ import VistaCamara from "./VistaCamara";
 import styles from "./editor.module.css";
 
 /** three.js pesa: la maqueta se baja solo al abrirla. */
+const AsistenteDiseno = dynamic(() => import("./AsistenteDiseno"), { ssr: false });
 const Maqueta3D = dynamic(() => import("./Maqueta3D"), {
   ssr: false,
   loading: () => <p className={styles.maquetaCarga}>Armando la maqueta…</p>,
@@ -101,7 +104,7 @@ const AYUDA_HERRAMIENTA: Record<Herramienta, string> = {
   area: "Arrastra un rectángulo: será un área con su piso. Su material se cambia en el panel.",
   mueble: "Clic en el sitio para poner la pieza elegida. Es ambientación: no tapa la vista.",
   etiqueta: "Clic donde va el nombre del área.",
-  camara: "Clic en el plano para poner la cámara del modelo elegido.",
+  camara: "Clic para poner la cámara. Cerca de una esquina o un muro se pega sola y ve al cuarto; con Alt queda libre.",
   equipo: "Clic en el sitio para ponerlo. Los de muro se pegan al muro más cercano y los de rack entran al gabinete.",
   persona: "Clic para poner un humanoide; arrástralo para ver cómo lo capta cada cámara.",
 };
@@ -171,12 +174,17 @@ export default function EditorCctv({
   // Con muros se abre en la maqueta; sin nada todavía, donde se empieza: el dibujo con su croquis.
   const [modo, setModo] = useState<"2d" | "3d" | "plano" | "diagrama">(() => (webgl && listaNiveles(planoDe(diseno)).some((n) => n.plano.muros.length) ? "3d" : "2d"));
   const [verDesde, setVerDesde] = useState<string | null>(null);
+  const [recorriendo, setRecorriendo] = useState(false);
   const [muebleNuevo, setMuebleNuevo] = useState<TipoMueble>("escritorio");
   const [pisoNuevo, setPisoNuevo] = useState<MaterialPiso>("concreto");
   const [todasLasVistas, setTodasLasVistas] = useState(false);
   const [modeloNuevo, setModeloNuevo] = useState<ModeloCamara>(MODELOS_CAMARA[0]);
   const [equipoNuevo, setEquipoNuevo] = useState<ModeloEquipo | null>(null);
   const [agregando, setAgregando] = useState(false);
+  const [armando, setArmando] = useState(false);
+  /** Sube al armar un diseño nuevo: la maqueta se abre encuadrada en él. */
+  const [disenosArmados, setDisenosArmados] = useState(0);
+  const [leyendoFicha, setLeyendoFicha] = useState(false);
   const catalogo = useCatalogo(token);
   const [pestana, setPestana] = useState<Pestana>("seleccion");
   const [medida, setMedida] = useState<{ a: Punto; b: Punto } | null>(null);
@@ -208,6 +216,39 @@ export default function EditorCctv({
   // El cable se traza con todo el edificio; que no estorbe mientras se arrastra algo.
   const raizDiferida = useDeferredValue(raiz);
   const conexiones = useMemo(() => conexionesDelSistema(raizDiferida), [raizDiferida]);
+
+  /** Lo recién agregado al catálogo queda listo para ponerse. */
+  const alAgregarModelo = (id: string) => {
+    setAgregando(false);
+    setLeyendoFicha(false);
+    void catalogo.recargar().then((c) => {
+      const nuevo = c.equipos.find((e) => e.id === id);
+      const camara = c.camaras.find((e) => e.id === id);
+      if (nuevo) elegirEquipo(nuevo);
+      else if (camara) {
+        setModeloNuevo(camara);
+        setHerramienta("camara");
+      }
+      setAviso("Agregado al catálogo. Toca el sitio para ponerlo.");
+    });
+  };
+
+  /** Un solo paso de deshacer: si no era lo que se quería, Ctrl+Z regresa todo. */
+  const alArmarDiseno = (d: DisenoGenerado) => {
+    const dias = d.grabacionDias;
+    setArmando(false);
+    setVerDesde(null);
+    setHerramienta("seleccionar");
+    despachar({ tipo: "aplicar", plano: d.raiz, seleccion: null });
+    setNivelId(listaNiveles(d.raiz)[0].nivel.id);
+    setDisenosArmados((n) => n + 1);
+    if (dias) {
+      setMeta((x) => ({ ...x, grabacion: { ...x.grabacion, retencionDias: dias } }));
+      setMetaSucia(true);
+    }
+    if (webgl) setModo("3d");
+    setAviso(d.avisos[0] ?? `Listo: ${d.resumen}. Ajusta lo que quieras; Ctrl+Z lo deshace.`);
+  };
 
   /** Lo de rack, si hay gabinete en este nivel, no necesita un clic en el sitio: entra directo. */
   const elegirEquipo = (m: ModeloEquipo) => {
@@ -545,6 +586,7 @@ export default function EditorCctv({
               equipoActivo={equipoNuevo}
               onElegirEquipo={elegirEquipo}
               onAgregar={() => setAgregando(true)}
+              onArmar={() => setArmando(true)}
               onElegirCamara={(m) => {
                 setModeloNuevo(m);
                 setHerramienta("camara");
@@ -565,7 +607,7 @@ export default function EditorCctv({
               {modo === "3d" && webgl ? (
                 <Maqueta3D
                   // Los modelos agregados cambian cómo se ven las cámaras ya puestas.
-                  key={catalogo.version}
+                  key={`${catalogo.version}-${disenosArmados}`}
                   plano={plano}
                   nivelId={nivelActivo.nivel.id}
                   conexiones={conexiones}
@@ -591,6 +633,7 @@ export default function EditorCctv({
                   onPedirMedida={(a, b) => setMedida({ a, b })}
                   onPedirTexto={setTextoEn}
                   onHerramienta={setHerramienta}
+                  onRecorrido={setRecorriendo}
                   onPerderWebGL={() => {
                     setWebgl(false);
                     setVerDesde(null);
@@ -638,8 +681,8 @@ export default function EditorCctv({
               )}
 
               {!verDesde ? (
-                <div className={styles.barra}>
-                  <div className={styles.herramientas} role="toolbar" aria-label="Herramientas del plano" hidden={modo === "3d" && !webgl}>
+                <div className={`${styles.barra} ${recorriendo ? styles.barraRecorrido : ""}`}>
+                  <div className={styles.herramientas} role="toolbar" aria-label="Herramientas del plano" hidden={(modo === "3d" && !webgl) || recorriendo}>
                     {HERRAMIENTAS.map((h, i) => (
                       <span key={h.id} className={styles.herramientaHueco}>
                         {h.grupo === "camara" && HERRAMIENTAS[i - 1]?.grupo !== "camara" ? <span className={styles.separador} aria-hidden="true" /> : null}
@@ -666,7 +709,7 @@ export default function EditorCctv({
                           ["humanoides", "Personas"],
                           ["noche", "De noche"],
                           ["tamanoReal", "Tamaño real"],
-                        ] as const).map(([k, t]) => (
+                        ] as const).filter(([k]) => !(recorriendo && (k === "cableado" || k === "tamanoReal"))).map(([k, t]) => (
                           <button key={k} type="button" className={styles.capaBoton} aria-pressed={capas[k]} onClick={() => setCapas((c) => ({ ...c, [k]: !c[k] }))}>
                             {t}
                           </button>
@@ -733,10 +776,11 @@ export default function EditorCctv({
                       Subir croquis
                     </Button>
                     <Button onClick={() => setHerramienta("muro")}>Dibujar a mano</Button>
+                    <Button onClick={() => setArmando(true)}>Armar con IA</Button>
                   </div>
                 </div>
               ) : null}
-              {!verDesde ? (
+              {!verDesde && !recorriendo ? (
                 <div className={styles.leyenda} aria-label="Nivel de detalle según IEC 62676-4">
                   {cob ? (
                     <>
@@ -887,18 +931,29 @@ export default function EditorCctv({
           <DialogoEquipo
             token={token}
             onCerrar={() => setAgregando(false)}
-            onGuardado={(id) => {
+            onGuardado={alAgregarModelo}
+            onMemoria={() => {
               setAgregando(false);
-              void catalogo.recargar().then((c) => {
-                const nuevo = c.equipos.find((e) => e.id === id);
-                const camara = c.camaras.find((e) => e.id === id);
-                if (nuevo) elegirEquipo(nuevo);
-                else if (camara) {
-                  setModeloNuevo(camara);
-                  setHerramienta("camara");
-                }
-                setAviso("Agregado al catálogo. Toca el sitio para ponerlo.");
-              });
+              setLeyendoFicha(true);
+            }}
+          />
+        ) : null}
+        {armando ? (
+          <AsistenteDiseno
+            token={token}
+            hayContenido={niveles.some((n) => n.plano.muros.length > 0 || n.plano.camaras.length > 0)}
+            onCerrar={() => setArmando(false)}
+            onArmado={alArmarDiseno}
+          />
+        ) : null}
+        {leyendoFicha ? (
+          <MemoriaTecnica
+            token={token}
+            onCerrar={() => setLeyendoFicha(false)}
+            onGuardado={alAgregarModelo}
+            onManual={() => {
+              setLeyendoFicha(false);
+              setAgregando(true);
             }}
           />
         ) : null}

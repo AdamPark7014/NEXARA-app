@@ -25,6 +25,15 @@ export type MedidasModelo = {
   anchoMm?: number;
   altoMm?: number;
   fondoMm?: number;
+  altoCarcasaMm?: number;
+  radioCupulaMm?: number;
+};
+
+/** Cómo se ve su modelo 3D: lo dice su ficha o lo elige quien la revisa. */
+export type AparienciaModelo = {
+  color?: "blanco" | "negro" | "gris";
+  luces?: number | null;
+  cajaTrasera?: boolean;
 };
 
 export type ModeloCamara = {
@@ -37,6 +46,9 @@ export type ModeloCamara = {
   /** Consumo con IR encendido, si la ficha lo trae. */
   wattsPoe?: number | null;
   medidas?: MedidasModelo | null;
+  apariencia?: AparienciaModelo | null;
+  /** Foto de su modelo armado con la ficha; sin ella, la de su tipo. */
+  foto?: string | null;
   caracteristicas: string[];
   /** De dónde salió la óptica: SYSCOM, captura a mano o la hoja técnica del fabricante. */
   fuente: "syscom" | "manual" | "ficha";
@@ -136,6 +148,9 @@ export type ModeloEquipo = {
   descripcion: string;
   datos: DatosEquipo;
   medidas?: MedidasModelo | null;
+  apariencia?: AparienciaModelo | null;
+  /** Foto de su modelo armado con la ficha; sin ella, la de su tipo. */
+  foto?: string | null;
   caracteristicas: string[];
   /** `ficha`: leída de la hoja técnica. `tipo`: valores típicos, falta su ficha. `manual`: capturada a mano. */
   fuente: "ficha" | "tipo" | "manual";
@@ -204,6 +219,9 @@ export function leerFilasCatalogo(filas: readonly FilaCatalogo[]): { camaras: Mo
   const camaras: ModeloCamara[] = [];
   const equipos: ModeloEquipo[] = [];
   for (const f of filas) {
+    const { foto: fotoCruda, apariencia: aparienciaCruda, ficha: _ficha, ...resto } = (f.datos ?? {}) as Record<string, unknown>;
+    const foto = typeof fotoCruda === "string" ? fotoCruda : null;
+    const apariencia = (aparienciaCruda ?? null) as AparienciaModelo | null;
     const base = {
       id: `db-${f.id}`,
       marca: f.marca,
@@ -216,9 +234,10 @@ export function leerFilasCatalogo(filas: readonly FilaCatalogo[]): { camaras: Mo
     };
     if (f.familia === "camaras") {
       const d = (f.datos ?? {}) as { optica?: Optica; wattsPoe?: number | null };
-      if (d.optica && TIPOS_CAMARA.has(f.tipo)) camaras.push({ ...base, tipo: f.tipo as TipoCamara, optica: d.optica, wattsPoe: d.wattsPoe ?? null });
+      if (d.optica && TIPOS_CAMARA.has(f.tipo)) camaras.push({ ...base, tipo: f.tipo as TipoCamara, optica: d.optica, wattsPoe: d.wattsPoe ?? null, apariencia, foto });
     } else if (f.tipo in ETIQUETA_TIPO_EQUIPO) {
-      equipos.push({ ...base, tipo: f.tipo as TipoEquipo, datos: (f.datos ?? {}) as DatosEquipo });
+      // Solo lo que da comportamiento: esto se copia a cada equipo colocado en un diseño.
+      equipos.push({ ...base, tipo: f.tipo as TipoEquipo, datos: resto as DatosEquipo, apariencia, foto });
     }
   }
   return { camaras, equipos };

@@ -27,6 +27,7 @@ import {
   type TipoElemento,
 } from "@/lib/cctv/editor";
 import { etiquetaCono, hfovDeg, distanciaInclinadaM, ppm } from "@/lib/cctv/optica";
+import { lugarParaCamara, moverCamaraPegada, moverEquipoPegado, pegarAMuros, RADIO_PEGADO_M, type Pegado } from "@/lib/cctv/pegado";
 import { dirRumbo, hojasPuerta, type MaterialPiso, type Plano, type Punto, type Tapa, type TipoMueble } from "@/lib/cctv/plano";
 import { claveEquipo } from "@/lib/cctv/medidas";
 import { reescalar } from "@/lib/cctv/niveles";
@@ -57,7 +58,7 @@ type Vista = { x: number; y: number; w: number; h: number };
 
 type Arrastre =
   | { modo: "pan"; inicio: { x: number; y: number }; vista: Vista }
-  | { modo: "mover"; sel: Seleccion; ultimo: Punto; fusion: string; movido: boolean }
+  | { modo: "mover"; sel: Seleccion; ultimo: Punto; fusion: string; movido: boolean; agarre?: Punto }
   | { modo: "extremo"; muroId: string; extremo: "a" | "b"; fusion: string }
   | { modo: "apuntar"; camaraId: string; fusion: string }
   | { modo: "obstaculo"; inicio: Punto }
@@ -256,6 +257,12 @@ export default function Lienzo({
     setInicioCota(null);
   }, [herramienta]);
 
+  /** Dónde va a quedar pegada, mientras se arrastra. */
+  const [pegadoAhora, setPegadoAhora] = useState<Pegado | null>(null);
+  const altKey = useRef(false);
+  /** De lejos, un metro son pocos píxeles: se da más margen para pegarse. */
+  const radioIman = Math.max(RADIO_PEGADO_M, 18 * u * k);
+
   const ajustar = (p: Punto, desde?: Punto | null, libre = false, exceptoMuro?: string) =>
     ajustarPunto(planoRef.current, p, { radio: 10 * u, desde, libre, exceptoMuro }).punto;
 
@@ -327,7 +334,15 @@ export default function Lienzo({
         if (sel) {
           onSeleccionar(sel);
           if (MOVIBLES.has(sel.tipo)) {
-            arrastre.current = { modo: "mover", sel, ultimo: p, fusion: `mover-${sel.id}-${Date.now()}`, movido: false };
+            const pieza = sel.tipo === "camara" ? actual.camaras.find((c) => c.id === sel.id) : sel.tipo === "equipo" ? actual.equipos?.find((c) => c.id === sel.id && !c.gabineteId) : null;
+            arrastre.current = {
+              modo: "mover",
+              sel,
+              ultimo: p,
+              fusion: `mover-${sel.id}-${Date.now()}`,
+              movido: false,
+              ...(pieza ? { agarre: { x: pieza.pos.x - p.x, y: pieza.pos.y - p.y } } : {}),
+            };
             setArrastrando("mover");
             capturar();
           }
@@ -398,7 +413,8 @@ export default function Lienzo({
         onPedirTexto(p);
         return;
       case "camara": {
-        const r = agregarCamara(actual, p, modeloNuevo, { numero: numeroNuevo, nombre: `Cámara ${numeroNuevo}` });
+        const lugar = lugarParaCamara(actual, p, { libre: e.altKey, radioM: radioIman });
+        const r = agregarCamara(actual, lugar.pos, modeloNuevo, { numero: numeroNuevo, nombre: `Cámara ${numeroNuevo}`, ...lugar.extra });
         onAplicar(r.plano, { seleccion: { tipo: "camara", id: r.camara.id } });
         onHerramienta("seleccionar");
         return;
@@ -430,12 +446,20 @@ export default function Lienzo({
     }
     const p = aPlano(e.clientX, e.clientY);
     setCursor(p);
+    altKey.current = e.altKey;
     if (!a) return;
     const actual = planoRef.current;
     if (a.modo === "mover") {
       const delta = { x: p.x - a.ultimo.x, y: p.y - a.ultimo.y };
       if (!a.movido && Math.hypot(delta.x, delta.y) < 3 * u) return;
       a.movido = true;
+      if (a.agarre && (a.sel.tipo === "camara" || a.sel.tipo === "equipo")) {
+        const destino = { x: p.x + a.agarre.x, y: p.y + a.agarre.y };
+        const r = a.sel.tipo === "camara" ? moverCamaraPegada(actual, a.sel.id, destino, { radioM: radioIman, libre: e.altKey }) : moverEquipoPegado(actual, a.sel.id, destino, { radioM: radioIman, libre: e.altKey });
+        setPegadoAhora(r.pegado);
+        onAplicar(r.plano, { fusion: a.fusion });
+        return;
+      }
       a.ultimo = p;
       onAplicar(mover(actual, a.sel, delta), { fusion: a.fusion });
     } else if (a.modo === "extremo") {
@@ -458,6 +482,7 @@ export default function Lienzo({
     const a = arrastre.current;
     arrastre.current = null;
     setArrastrando(null);
+    setPegadoAhora(null);
     if (a?.modo === "obstaculo") {
       const p = aPlano(e.clientX, e.clientY);
       const r = agregarObstaculo(planoRef.current, a.inicio, p);
@@ -485,7 +510,8 @@ export default function Lienzo({
     if (dato.clase === "camara") {
       const m = modeloPorId(dato.id);
       if (!m) return;
-      const r = agregarCamara(planoRef.current, p, m, { numero: numeroNuevo, nombre: `Cámara ${numeroNuevo}` });
+      const lugar = lugarParaCamara(planoRef.current, p, { libre: e.altKey, radioM: radioIman });
+      const r = agregarCamara(planoRef.current, lugar.pos, m, { numero: numeroNuevo, nombre: `Cámara ${numeroNuevo}`, ...lugar.extra });
       onAplicar(r.plano, { seleccion: { tipo: "camara", id: r.camara.id } });
     } else if (dato.clase === "equipo") {
       const m = equipoPorId(dato.id);
@@ -547,6 +573,7 @@ export default function Lienzo({
   // Paso de la retícula: 1 m, o 5 m cuando 1 m queda en menos de 8 px de pantalla.
   const pasoGrid = (1 / k) / u < 8 ? 5 / k : 1 / k;
   const preview = cursor && inicioMuro ? ajustar(cursor, inicioMuro) : null;
+  const imanVisible = pegadoAhora ?? (cursor && herramienta === "camara" && !altKey.current ? pegarAMuros(plano, cursor, { radioM: radioIman }) : null);
   const previewCota = cursor && inicioCota ? ajustar(cursor, inicioCota) : null;
   const ob = (arrastrando === "obstaculo" || arrastrando === "area") && (arrastre.current?.modo === "obstaculo" || arrastre.current?.modo === "area") && cursor ? arrastre.current.inicio : null;
 
@@ -973,6 +1000,17 @@ export default function Lienzo({
       ) : null}
 
       {/* Lo que se está dibujando. */}
+      {imanVisible ? (
+        <g transform={`translate(${imanVisible.pos.x} ${imanVisible.pos.y}) scale(${u})`} style={{ pointerEvents: "none" }}>
+          <circle r={12} fill="var(--ui-brand)" opacity={0.22} />
+          <circle r={6} fill="var(--ui-brand)" stroke="#fff" strokeWidth={2} />
+          <line x2={dirRumbo(imanVisible.rumboDeg).x * 26} y2={dirRumbo(imanVisible.rumboDeg).y * 26} stroke="var(--ui-brand)" strokeWidth={2.5} strokeLinecap="round" />
+          <text x={15} y={-12} fontSize={12} fontWeight={700} fill="var(--ui-brand-text)" paintOrder="stroke" stroke="var(--ui-surface)" strokeWidth={3}>
+            {imanVisible.tipo === "esquina" ? "Esquina" : "Muro"}
+          </text>
+        </g>
+      ) : null}
+
       {inicioMuro && preview ? (
         <g style={{ pointerEvents: "none" }}>
           <line x1={inicioMuro.x} y1={inicioMuro.y} x2={preview.x} y2={preview.y} stroke="var(--ui-brand)" strokeWidth={Math.max(0.15 / k, 2.5 * u)} strokeOpacity={0.7} />

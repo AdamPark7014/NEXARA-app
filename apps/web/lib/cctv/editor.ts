@@ -197,7 +197,7 @@ const ALTURA_EQUIPO: Readonly<Record<TipoEquipo, number>> = {
   generico: 1.5,
 };
 
-const DE_MURO: ReadonlySet<TipoEquipo> = new Set<TipoEquipo>(["terminal", "sirena", "sismica", "panel", "generico"]);
+export const DE_MURO: ReadonlySet<TipoEquipo> = new Set<TipoEquipo>(["terminal", "sirena", "sismica", "panel", "generico"]);
 
 /** Siguiente número libre para ese prefijo en todo el edificio: los AC y los GAB llevan cuenta aparte. */
 export function siguienteNumeroEquipo(raiz: Plano, tipo: TipoEquipo): number {
@@ -282,7 +282,8 @@ export function agregarEquipo(plano: Plano, pos: Punto, modelo: ModeloEquipo, nu
     pos,
     rumboDeg: 180,
     alturaM: ALTURA_EQUIPO[modelo.tipo] ?? 1.5,
-    datos: { ...modelo.datos },
+    // Pocas fichas dicen hasta dónde se escucha: sin ese dato se usa un estimado, editable y dicho como tal.
+    datos: { ...modelo.datos, ...((modelo.tipo === "sirena" || modelo.tipo === "sismica") && !modelo.datos.alcanceM ? { alcanceM: 20 } : {}) },
   };
   let equipo = base;
   if (TIPOS_DE_RACK.has(modelo.tipo)) {
@@ -469,6 +470,21 @@ export function apuntarCamara(plano: Plano, id: string, hacia: Punto): Plano {
   if (!c) return plano;
   const distanciaM = Math.max(1, Math.round(mDe(plano, distancia(c.pos, hacia)) * 10) / 10);
   return actualizarCamara(plano, id, { rumboDeg: Math.round(rumboEntre(c.pos, hacia) * 10) / 10, distanciaM });
+}
+
+/**
+ * Apunta una cámara a lo que se está viendo en la maqueta: rumbo e inclinación hacia ese punto, a su altura.
+ * El cono no se acorta por mirar algo cercano; solo crece si se apunta más lejos de lo que llegaba.
+ */
+export function mirarCamaraHacia(plano: Plano, id: string, hacia: Punto, alturaObjetivoM = 0): Plano {
+  const c = plano.camaras.find((x) => x.id === id);
+  if (!c) return plano;
+  const lejos = Math.max(mDe(plano, distancia(c.pos, hacia)), 0.5);
+  return actualizarCamara(plano, id, {
+    rumboDeg: Math.round(rumboEntre(c.pos, hacia) * 10) / 10,
+    inclinacionDeg: Math.round(inclinacionHacia(c.alturaM, lejos, alturaObjetivoM)),
+    distanciaM: Math.max(c.distanciaM, Math.round(lejos * 10) / 10),
+  });
 }
 
 /** `numero`: el que sigue en todo el edificio cuando hay varios niveles. */

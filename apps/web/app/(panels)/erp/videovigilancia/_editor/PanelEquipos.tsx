@@ -2,10 +2,10 @@
 
 /**
  * Panel izquierdo del editor: lo que se puede colocar en el sitio, por familia. Se toca y luego se
- * toca el sitio, o se arrastra. Lo de rack, si ya hay gabinete, entra directo. El stock y la memoria
- * técnica llegan en sus fases.
+ * toca el sitio, o se arrastra. Lo de rack, si ya hay gabinete, entra directo. El stock llega en su fase.
  */
 import { useMemo, useState } from "react";
+import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import {
   ETIQUETA_TIPO_CAMARA,
   ETIQUETA_TIPO_EQUIPO,
@@ -88,6 +88,7 @@ export default function PanelEquipos({
   onElegirMueble,
   onElegirPiso,
   onAgregar,
+  onArmar,
 }: {
   modeloActivo: ModeloCamara;
   muebleActivo: TipoMueble;
@@ -101,6 +102,8 @@ export default function PanelEquipos({
   onElegirMueble: (t: TipoMueble) => void;
   onElegirPiso: (p: MaterialPiso) => void;
   onAgregar: () => void;
+  /** Para quien no quiere dibujar: el diseño completo a partir de una frase. */
+  onArmar: () => void;
 }) {
   const [buscar, setBuscar] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("camaras");
@@ -127,6 +130,10 @@ export default function PanelEquipos({
   return (
     <aside className={styles.equipos} aria-label="Equipos">
       <div className={styles.equiposCabeza}>
+        <button type="button" className={styles.botonArmar} onClick={onArmar}>
+          <AutoAwesomeRoundedIcon fontSize="small" />
+          Armar con IA
+        </button>
         <b>Equipos</b>
         <input className={styles.equiposBuscar} type="search" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar modelo o tipo" aria-label="Buscar equipo" />
         <div className={styles.equiposFiltros} role="group" aria-label="Filtrar equipos">
@@ -159,7 +166,7 @@ export default function PanelEquipos({
               >
                 <span className={styles.equipoFoto}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={fotoCamara(m.tipo)} alt="" draggable={false} />
+                  <img src={m.foto ?? fotoCamara(m.tipo)} alt="" draggable={false} />
                 </span>
                 <span className={styles.equipoTexto}>
                   <b>{m.id === MODELO_GENERICO.id ? "Genérica" : ETIQUETA_TIPO_CAMARA[m.tipo]}</b>
@@ -182,7 +189,7 @@ export default function PanelEquipos({
               >
                 <span className={styles.equipoFoto}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={fotoDeTipo(m.tipo)} alt="" draggable={false} />
+                  <img src={m.foto ?? fotoDeTipo(m.tipo)} alt="" draggable={false} />
                 </span>
                 <span className={styles.equipoTexto}>
                   <b>{ETIQUETA_TIPO_EQUIPO[m.tipo]}</b>
@@ -229,7 +236,7 @@ export default function PanelEquipos({
         {q && !verCamaras && !verEquipos && !verAmbientacion ? <p className={styles.ayuda}>Sin resultados para «{buscar.trim()}».</p> : null}
         <button type="button" className={styles.equipoAgregar} onClick={onAgregar}>
           <b>+ Agregar equipo</b>
-          <span>Un modelo que no está en la lista: se queda en el catálogo para siempre.</span>
+          <span>Sube su PDF y se llena solo, o captúralo a mano.</span>
         </button>
       </div>
       <p className={styles.equiposPie}>Toca un equipo y luego el sitio, o arrástralo a la maqueta.</p>

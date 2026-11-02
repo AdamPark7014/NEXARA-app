@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * Maqueta 3D del sitio (mockup aprobado 01-11-2026): se gira y se acerca como un objeto, las claves
- * de los equipos flotan encima y las herramientas del plano funcionan sobre el piso. Pesa lo suyo
- * (three.js), así que se carga solo al abrirla; sin WebGL, el editor usa `Lienzo3D`.
+ * Maqueta 3D del sitio (mockup aprobado 01-11-2026): se desliza como un mapa, se gira y se acerca, y
+ * se puede entrar a caminar por dentro. Las claves de los equipos flotan encima y las herramientas del
+ * plano funcionan sobre el piso y sobre los muros. Pesa lo suyo (three.js), así que se carga solo al
+ * abrirla; sin WebGL, el editor usa `Lienzo3D`.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
 import * as THREE from "three";
-import { equipoPorId, etiquetaModelo, modeloPorId, type ModeloCamara, type ModeloEquipo, type TipoEquipo } from "@/lib/cctv/catalogo";
+import { equipoPorId, especificacionesCamara, especificacionesEquipo, etiquetaModelo, modeloPorId, type ModeloCamara, type ModeloEquipo, type TipoEquipo } from "@/lib/cctv/catalogo";
 import {
   agregarAbertura,
   agregarArea,
@@ -17,20 +18,27 @@ import {
   agregarMuro,
   agregarObstaculo,
   agregarPersona,
+  actualizarCamara,
+  actualizarEquipo,
   ajustarPunto,
   avisoDeEquipo,
+  mirarCamaraHacia,
   mover,
   muroMasCercano,
   type Seleccion,
   type TipoElemento,
 } from "@/lib/cctv/editor";
 import { elevacionTexto, type NivelConPlano } from "@/lib/cctv/niveles";
-import { MotorMaqueta } from "@/lib/cctv/maqueta/motor";
-import { limitesEdificio, limitesSitio } from "@/lib/cctv/medidas";
-import { type MaterialPiso, type Plano, type Punto, type Tapa, type TipoMueble } from "@/lib/cctv/plano";
+import { MotorMaqueta, type ModoArrastre, type Montaje } from "@/lib/cctv/maqueta/motor";
+import { claveCamara, claveEquipo, limitesEdificio, limitesSitio } from "@/lib/cctv/medidas";
+import { lugarParaCamara, moverCamaraPegada, moverEquipoPegado, pegarAMuros, RADIO_PEGADO_M, type Pegado } from "@/lib/cctv/pegado";
+import { dirRumbo, type MaterialPiso, type Plano, type Punto, type Tapa, type TipoMueble } from "@/lib/cctv/plano";
+import { ALTURA_OJOS_M, areaEn, camarasQueTeVen, inicioDelRecorrido, moverConChoques, paradasDelSitio, tramosDelPlano, type TeVe } from "@/lib/cctv/recorrido";
 import type { Conexion } from "@/lib/cctv/sistema";
-import { camaraEnMetros, coberturaCamara, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
+import { camaraEnMetros, coberturaCamara, tapado, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
+import { COLOR_NIVEL } from "./colores";
 import type { Herramienta } from "./Lienzo";
+import MiniMapa from "./MiniMapa";
 import Navegacion, { ICONO } from "./Navegacion";
 import { TIPO_ARRASTRE, leerArrastre } from "./PanelEquipos";
 import styles from "./editor.module.css";
@@ -49,9 +57,14 @@ export type CapasDeMaqueta = {
 
 const MOVIBLES: ReadonlySet<TipoElemento> = new Set(["camara", "persona", "mueble", "etiqueta", "obstaculo", "area", "equipo"]);
 const SIN_NIVELES: readonly NivelConPlano[] = [];
+const TIPO_RECORRER = "application/x-cctv-recorrer";
+/** Lo que se mueve siempre al arrastrarlo. Lo demás (áreas, muebles) solo si ya está elegido: si no, arrastrar sobre el piso movería el piso. */
+const MOVIBLES_DE_UNA: ReadonlySet<TipoElemento> = new Set(["camara", "persona", "equipo"]);
+const TECLAS_DE_MOVER: ReadonlySet<string> = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight"]);
+const ICONO_CAMINAR = "M13.5 5.5a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6zM9.8 22l1.4-6-2.1-2V9.4L7 10.4V14H5V9.2l4.6-2.3c.6-.3 1.3-.3 1.9 0 .6.3 1 .7 1.4 1.3l1.1 1.8c.6 1 1.7 1.8 3 1.9v2c-1.8-.1-3.3-1-4.3-2.2l-.6 3 2.1 2V22h-2v-5.5l-2.1-2-1.3 7.5z";
 
 type Arrastre =
-  | { modo: "mover"; sel: Seleccion; ultimo: Punto; fusion: string; movido: boolean }
+  | { modo: "mover"; sel: Seleccion; ultimo: Punto; fusion: string; movido: boolean; agarre?: Punto; alturaM?: number }
   | { modo: "rect"; tipo: "obstaculo" | "area"; inicio: Punto };
 
 type Rotulo = { clave: string; texto: string; pos: THREE.Vector3; clase: "area" | "nivel" };
@@ -83,6 +96,7 @@ export default function Maqueta3D({
   onPedirTexto,
   onHerramienta,
   onPerderWebGL,
+  onRecorrido,
   alMotor,
 }: {
   plano: Plano;
@@ -112,6 +126,8 @@ export default function Maqueta3D({
   onPedirTexto: (pos: Punto) => void;
   onHerramienta: (h: Herramienta) => void;
   onPerderWebGL: () => void;
+  /** Se entró o se salió de caminar: el editor quita lo que estorba. */
+  onRecorrido?: (activo: boolean) => void;
   alMotor?: (m: MotorMaqueta | null) => void;
 }) {
   const lienzo = useRef<HTMLCanvasElement>(null);
@@ -120,7 +136,22 @@ export default function Maqueta3D({
   const [listo, setListo] = useState(false);
   const planoRef = useRef(plano);
   planoRef.current = plano;
+  const tapasRef = useRef(tapas);
+  tapasRef.current = tapas;
   const k = plano.escala.metrosPorPx;
+  const [recorriendo, setRecorriendo] = useState(false);
+  const recorriendoRef = useRef(false);
+  recorriendoRef.current = recorriendo;
+  const [modoVista, setModoVista] = useState<ModoArrastre>("deslizar");
+  const [guiando, setGuiando] = useState(false);
+  const [apuntando, setApuntando] = useState<string | null>(null);
+  const [aqui, setAqui] = useState<{ area: string | null; teVen: TeVe[] }>({ area: null, teVen: [] });
+  const [pistaVista, setPistaVista] = useState(true);
+  const [completa, setCompleta] = useState(false);
+  const marcador = useRef<SVGGElement>(null);
+  const ultimaLectura = useRef("");
+  const recorridoRef = useRef(onRecorrido);
+  recorridoRef.current = onRecorrido;
 
   /* ── De noche, cada cámara ve hasta donde le alcanza su luz: el dato de IR de la ficha. ── */
   const coberturasNoche = useMemo(() => {
@@ -180,6 +211,16 @@ export default function Maqueta3D({
   const colocar = useCallback(() => {
     const m = motor.current;
     if (!m) return;
+    const yo = m.posicionRecorrido();
+    if (yo) {
+      marcador.current?.setAttribute("transform", `translate(${yo.x.toFixed(2)} ${yo.y.toFixed(2)}) rotate(${yo.rumboDeg.toFixed(1)})`);
+      // Cada medio metro basta: es la misma cuenta que la persona de prueba y no hay que hacerla en cada cuadro.
+      const lectura = `${Math.round(yo.x * 2)},${Math.round(yo.y * 2)}`;
+      if (lectura !== ultimaLectura.current) {
+        ultimaLectura.current = lectura;
+        setAqui({ area: areaEn(planoRef.current, yo), teVen: camarasQueTeVen(planoRef.current, tapasRef.current, yo) });
+      }
+    }
     const poner = (id: string, pos: THREE.Vector3) => {
       const el = nodos.current.get(id);
       if (!el) return;
@@ -195,8 +236,12 @@ export default function Maqueta3D({
       if (!el) continue;
       let y = p.y;
       while (puestas.some((q) => Math.abs(q.x - p.x) < 72 && Math.abs(q.y - y) < 24)) y -= 24;
-      if (p.visible) puestas.push({ x: p.x, y });
-      el.style.visibility = p.visible ? "visible" : "hidden";
+      // Adentro solo se ve la clave de lo cercano y lo que no queda detrás de un muro.
+      const e = yo ? clavesRef.current.find((c) => c.id === id) : null;
+      const alcanza = !yo || !e || (Math.hypot(e.pos.x - yo.x, e.pos.z - yo.y) < 15 && !tapado(tapasRef.current, { x: e.pos.x, y: e.pos.z }, e.pos.y, yo, ALTURA_OJOS_M));
+      const visible = p.visible && alcanza;
+      if (visible) puestas.push({ x: p.x, y });
+      el.style.visibility = visible ? "visible" : "hidden";
       el.style.transform = `translate(${p.x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`;
     }
     for (const r of rotulosRef.current) poner(`rotulo-${r.clave}`, r.pos);
@@ -213,6 +258,7 @@ export default function Maqueta3D({
         alPintar: colocar,
         alPerderContexto: () => perderRef.current(),
         alFallarCroquis: () => avisoRef.current("El croquis no se pudo cargar en la maqueta; sigue en el dibujo 2D."),
+        alTerminarGuiado: () => setGuiando(false),
       });
     } catch {
       perderRef.current();
@@ -226,10 +272,18 @@ export default function Maqueta3D({
       m.medir(b.width, b.height);
     });
     ro.observe(contenedor);
+    const rueda = (ev: WheelEvent) => {
+      if (!m.recorriendo) return;
+      ev.preventDefault();
+      m.empujar((-ev.deltaY / 100) * 1.2);
+    };
+    el.addEventListener("wheel", rueda, { passive: false });
     setListo(true);
     alMotor?.(m);
     return () => {
       ro.disconnect();
+      el.removeEventListener("wheel", rueda);
+      if (recorriendoRef.current) recorridoRef.current?.(false);
       alMotor?.(null);
       motor.current = null;
       m.destruir();
@@ -268,6 +322,8 @@ export default function Maqueta3D({
   const [cursor, setCursor] = useState<string>("grab");
   const [guia, setGuia] = useState<{ a: { x: number; y: number }; b: { x: number; y: number } } | null>(null);
   const [marco, setMarco] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  /** Dónde quedaría pegada, en pantalla, mientras se pone o se arrastra. */
+  const [iman, setIman] = useState<{ x: number; y: number; tipo: Pegado["tipo"] } | null>(null);
 
   useEffect(() => {
     setInicioMuro(null);
@@ -283,20 +339,87 @@ export default function Maqueta3D({
         setInicioMuro(null);
         setInicioCota(null);
         setGuia(null);
-        if (verDesde) onVerDesde(null);
+        if (apuntando) dejarDeApuntar();
+        else if (verDesde) onVerDesde(null);
+        else if (recorriendo) salirRecorrido();
       }
       if (e.key.toLowerCase() === "f") enfocarSeleccion();
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && TECLAS_DE_MOVER.has(e.code)) {
+        motor.current?.tecla(e.code, true);
+        setPistaVista(false);
+        if (e.code.startsWith("Arrow")) e.preventDefault();
+      }
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
   });
 
+  useEffect(() => {
+    const suelta = (e: KeyboardEvent) => motor.current?.tecla(e.code, false);
+    const fuera = () => motor.current?.soltarTeclas();
+    const pantalla = () => setCompleta(Boolean(document.fullscreenElement));
+    window.addEventListener("keyup", suelta);
+    window.addEventListener("blur", fuera);
+    document.addEventListener("fullscreenchange", pantalla);
+    return () => {
+      window.removeEventListener("keyup", suelta);
+      window.removeEventListener("blur", fuera);
+      document.removeEventListener("fullscreenchange", pantalla);
+    };
+  }, []);
+
+  const entrarRecorrido = (pos?: Punto, rumboDeg?: number, mirarAlturaM?: number) => {
+    const m = motor.current;
+    if (!m) return;
+    onVerDesde(null);
+    setPistaVista(false);
+    setApuntando(null);
+    const tramos = tramosDelPlano(plano);
+    const sugerido = pos ? null : inicioDelRecorrido(plano, tramos);
+    const inicio = pos ?? (sugerido as { pos: Punto }).pos;
+    m.entrarRecorrido(moverConChoques(tramos, inicio, inicio), rumboDeg ?? sugerido?.rumboDeg, mirarAlturaM);
+    ultimaLectura.current = "";
+    setClaves(m.etiquetas);
+    setRecorriendo(true);
+    onRecorrido?.(true);
+    if (!plano.escala.calibracion) onAviso("La escala no está calibrada: lo que ves puede no medir lo real.");
+  };
+
+  const salirRecorrido = () => {
+    const m = motor.current;
+    if (!m) return;
+    m.salirRecorrido();
+    setClaves(m.etiquetas);
+    setGuiando(false);
+    setRecorriendo(false);
+    onRecorrido?.(false);
+  };
+
+  const dejarDeApuntar = () => {
+    setApuntando(null);
+    motor.current?.controles(true);
+  };
+
+  const alternarPantalla = () => {
+    const el = caja.current?.parentElement;
+    if (!el) return;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void el.requestFullscreen?.().catch(() => onAviso("Este navegador no dejó abrir la pantalla completa."));
+  };
+
   const enfocarSeleccion = () => {
     const m = motor.current;
     if (!m || (seleccion?.tipo !== "camara" && seleccion?.tipo !== "equipo")) return;
+    if (recorriendo) {
+      m.revisar(idParaRevisar(seleccion.id));
+      return;
+    }
     const e = m.etiquetas.find((x) => x.id === seleccion.id);
     if (e) m.enfocar(e.pos, capas.tamanoReal ? 2.5 : 7);
   };
+
+  /** Lo que va adentro de un gabinete se revisa en su gabinete. */
+  const idParaRevisar = (id: string) => plano.equipos?.find((e) => e.id === id)?.gabineteId ?? id;
 
   const relativo = (e: { clientX: number; clientY: number }) => {
     const r = lienzo.current!.getBoundingClientRect();
@@ -309,8 +432,37 @@ export default function Maqueta3D({
   };
   const ajustar = (p: Punto, desde: Punto | null) => ajustarPunto(planoRef.current, p, { radio: 0.35 / k, desde }).punto;
 
-  const colocarCamara = (p: Punto, modelo: ModeloCamara) => {
-    const r = agregarCamara(planoRef.current, p, modelo, { numero: numeroNuevo, nombre: `Cámara ${numeroNuevo}` });
+  /** Qué tan cerca se pega: de lejos, un metro son pocos píxeles y hay que dar más margen. */
+  const radioIman = (m: MotorMaqueta, punto: Punto) => Math.max(RADIO_PEGADO_M, 18 / m.pxPorMetro(punto));
+
+  const verIman = (m: MotorMaqueta, pegado: Pegado | null, alturaM: number) => {
+    if (!pegado) {
+      setIman(null);
+      return;
+    }
+    const q = m.aPantalla(new THREE.Vector3(pegado.pos.x * k, alturaM, pegado.pos.y * k));
+    setIman({ x: q.x, y: q.y, tipo: pegado.tipo });
+  };
+
+  /**
+   * Cerca de una esquina o un muro se pega y ve al cuarto. Adentro, viendo el muro de frente, va a la altura
+   * donde se tocó; desde arriba se usa la de siempre, porque ahí no se está eligiendo la altura.
+   */
+  const colocarCamara = (mon: Montaje, modelo: ModeloCamara, libre = false) => {
+    const m = motor.current;
+    const yo = m?.posicionRecorrido();
+    const lugar = lugarParaCamara(planoRef.current, { x: mon.punto.x / k, y: mon.punto.y / k }, {
+      libre,
+      radioM: m ? radioIman(m, mon.punto) : undefined,
+      alturaM: yo && mon.alturaM != null ? Math.round(mon.alturaM * 10) / 10 : undefined,
+    });
+    const r = agregarCamara(planoRef.current, lugar.pos, modelo, {
+      numero: numeroNuevo,
+      nombre: `Cámara ${numeroNuevo}`,
+      ...(yo && !lugar.pegado ? { rumboDeg: Math.round((yo.rumboDeg + 360) % 360) } : {}),
+      ...lugar.extra,
+    });
+    setIman(null);
     onAplicar(r.plano, { seleccion: { tipo: "camara", id: r.camara.id } });
   };
   const colocarMueble = (p: Punto, tipo: TipoMueble) => {
@@ -318,31 +470,71 @@ export default function Maqueta3D({
     onAplicar(r.plano, { seleccion: { tipo: "mueble", id: r.mueble.id } });
   };
 
-  const colocarEquipo = (p: Punto, modelo: ModeloEquipo) => {
-    const r = agregarEquipo(planoRef.current, p, modelo, numeroEquipo(modelo.tipo));
-    onAplicar(r.plano, { seleccion: { tipo: "equipo", id: r.equipo.id } });
-    const texto = avisoDeEquipo(r.plano, r.equipo);
+  const colocarEquipo = (mon: Montaje, modelo: ModeloEquipo) => {
+    const r = agregarEquipo(planoRef.current, { x: mon.punto.x / k, y: mon.punto.y / k }, modelo, numeroEquipo(modelo.tipo));
+    // En un muro va a la altura donde se tocó, salvo lo que entra a un gabinete.
+    const final = mon.rumboDeg != null && mon.alturaM != null && !r.equipo.gabineteId ? actualizarEquipo(r.plano, r.equipo.id, { alturaM: Math.round(mon.alturaM * 10) / 10, rumboDeg: mon.rumboDeg }) : r.plano;
+    onAplicar(final, { seleccion: { tipo: "equipo", id: r.equipo.id } });
+    const texto = avisoDeEquipo(final, r.equipo);
     if (texto) onAviso(texto);
   };
+
+  const mirada = useRef<{ x: number; y: number; ux: number; uy: number; movio: boolean; sel: Seleccion | null } | null>(null);
 
   const alPresionar = (e: ReactPointerEvent<HTMLDivElement>) => {
     const m = motor.current;
     if (!m || e.target !== lienzo.current || verDesde) return;
-    if (e.button !== 0 || e.shiftKey) return;
+    setPistaVista(false);
+    if (e.button !== 0 || e.shiftKey) {
+      if (recorriendo) {
+        mirada.current = { x: e.clientX, y: e.clientY, ux: e.clientX, uy: e.clientY, movio: true, sel: null };
+        lienzo.current?.setPointerCapture(e.pointerId);
+      }
+      return;
+    }
     const { x, y } = relativo(e);
     const p = enPlano(x, y);
+    if (apuntando) {
+      dejarDeApuntar();
+      return;
+    }
     if (herramienta === "seleccionar") {
-      const sel = m.tocar(x, y);
+      const sel = recorriendo ? m.tocarDeFrente(x, y) : m.tocar(x, y);
+      const yaElegido = sel && seleccion?.tipo === sel.tipo && seleccion.id === sel.id;
+      if (recorriendo && !(yaElegido && sel && MOVIBLES.has(sel.tipo))) {
+        // Adentro, arrastrar es mirar alrededor.
+        mirada.current = { x: e.clientX, y: e.clientY, ux: e.clientX, uy: e.clientY, movio: false, sel };
+        lienzo.current?.setPointerCapture(e.pointerId);
+        return;
+      }
       presion.current = { x, y, sel };
-      if (sel && MOVIBLES.has(sel.tipo) && p) {
+      if (sel && p && MOVIBLES.has(sel.tipo) && (MOVIBLES_DE_UNA.has(sel.tipo) || yaElegido)) {
         m.controles(false);
-        arrastre.current = { modo: "mover", sel, ultimo: p, fusion: `mover3d-${sel.id}-${Date.now()}`, movido: false };
+        // Lo que está en alto se agarra a su altura, para que siga al puntero sin brincar.
+        const pieza = sel.tipo === "camara" ? plano.camaras.find((c) => c.id === sel.id) : sel.tipo === "equipo" ? plano.equipos?.find((c) => c.id === sel.id) : null;
+        const enAlto = pieza ? m.puntoAAltura(x, y, pieza.alturaM) : null;
+        arrastre.current = {
+          modo: "mover",
+          sel,
+          ultimo: p,
+          fusion: `mover3d-${sel.id}-${Date.now()}`,
+          movido: false,
+          ...(pieza && enAlto ? { agarre: { x: pieza.pos.x * k - enAlto.x, y: pieza.pos.y * k - enAlto.y }, alturaM: pieza.alturaM } : {}),
+        };
         lienzo.current?.setPointerCapture(e.pointerId);
       }
       return;
     }
     m.controles(false);
-    if (!p) return;
+    // Adentro, viendo de frente un muro, no hay piso bajo el puntero: se puede poner de todos modos.
+    if (!p && herramienta !== "camara" && herramienta !== "equipo") return;
+    if (!p) {
+      const mon = m.montaje(x, y);
+      if (mon && herramienta === "camara") colocarCamara(mon, modeloNuevo, e.altKey);
+      else if (mon && equipoNuevo) colocarEquipo(mon, equipoNuevo);
+      onHerramienta("seleccionar");
+      return;
+    }
     const actual = planoRef.current;
     switch (herramienta) {
       case "muro": {
@@ -394,18 +586,22 @@ export default function Maqueta3D({
       case "etiqueta":
         onPedirTexto(p);
         return;
-      case "camara":
-        colocarCamara(p, modeloNuevo);
+      case "camara": {
+        const mon = m.montaje(x, y);
+        if (mon) colocarCamara(mon, modeloNuevo, e.altKey);
         onHerramienta("seleccionar");
         return;
+      }
       case "mueble":
         colocarMueble(p, muebleNuevo);
         onHerramienta("seleccionar");
         return;
-      case "equipo":
-        if (equipoNuevo) colocarEquipo(p, equipoNuevo);
+      case "equipo": {
+        const mon = m.montaje(x, y);
+        if (equipoNuevo && mon) colocarEquipo(mon, equipoNuevo);
         onHerramienta("seleccionar");
         return;
+      }
       case "persona": {
         const nuevo = agregarPersona(actual, p);
         onAplicar(nuevo, { seleccion: { tipo: "persona", id: nuevo.personas[nuevo.personas.length - 1].id } });
@@ -420,7 +616,36 @@ export default function Maqueta3D({
     if (!m) return;
     const { x, y } = relativo(e);
     const a = arrastre.current;
+    const mi = mirada.current;
+    if (mi) {
+      if (Math.hypot(e.clientX - mi.x, e.clientY - mi.y) > 5) mi.movio = true;
+      if (mi.movio) {
+        m.mirar(e.clientX - mi.ux, e.clientY - mi.uy);
+        m.marcarDestino(null);
+      }
+      mi.ux = e.clientX;
+      mi.uy = e.clientY;
+      return;
+    }
+    if (apuntando) {
+      const mon = m.montaje(x, y);
+      if (mon) onAplicar(mirarCamaraHacia(planoRef.current, apuntando, { x: mon.punto.x / k, y: mon.punto.y / k }, mon.alturaM ?? 0), { fusion: `apuntar-${apuntando}` });
+      return;
+    }
     if (a?.modo === "mover") {
+      if (a.agarre && a.alturaM != null) {
+        const enAlto = m.puntoAAltura(x, y, a.alturaM);
+        if (!enAlto) return;
+        const destinoM = { x: enAlto.x + a.agarre.x, y: enAlto.y + a.agarre.y };
+        if (!a.movido && Math.hypot(destinoM.x - a.ultimo.x * k, destinoM.y - a.ultimo.y * k) < 0.1 && Math.hypot(x - (presion.current?.x ?? x), y - (presion.current?.y ?? y)) < 4) return;
+        a.movido = true;
+        const destino = { x: destinoM.x / k, y: destinoM.y / k };
+        const radioM = radioIman(m, destinoM);
+        const r = a.sel.tipo === "camara" ? moverCamaraPegada(planoRef.current, a.sel.id, destino, { radioM, libre: e.altKey }) : moverEquipoPegado(planoRef.current, a.sel.id, destino, { radioM, libre: e.altKey });
+        verIman(m, r.pegado, a.alturaM);
+        onAplicar(r.plano, { fusion: a.fusion });
+        return;
+      }
       const p = enPlano(x, y);
       if (!p) return;
       const delta = { x: p.x - a.ultimo.x, y: p.y - a.ultimo.y };
@@ -446,11 +671,32 @@ export default function Maqueta3D({
       setGuia({ a: pa, b: pb });
       return;
     }
+    if (e.buttons === 0 && herramienta === "camara" && !movPendiente.current) {
+      const libre = e.altKey;
+      movPendiente.current = requestAnimationFrame(() => {
+        movPendiente.current = 0;
+        const mo = motor.current;
+        const mon = mo?.montaje(x, y);
+        if (!mo || !mon) return setIman(null);
+        const pegado = libre ? null : pegarAMuros(planoRef.current, { x: mon.punto.x / k, y: mon.punto.y / k }, { radioM: radioIman(mo, mon.punto) });
+        verIman(mo, pegado, pegado ? Math.min(3, pegado.alturaMaxM) : 0);
+      });
+    }
     if (e.buttons === 0 && herramienta === "seleccionar" && !movPendiente.current) {
       movPendiente.current = requestAnimationFrame(() => {
         movPendiente.current = 0;
-        const sel = motor.current?.tocar(x, y);
-        setCursor(sel ? "pointer" : "grab");
+        const mo = motor.current;
+        if (!mo) return;
+        if (recorriendoRef.current) {
+          const sel = mo.tocarDeFrente(x, y);
+          const equipo = sel?.tipo === "camara" || sel?.tipo === "equipo";
+          const destino = equipo ? null : mo.destinoEnPiso(x, y);
+          mo.marcarDestino(destino);
+          setCursor(equipo || destino ? "pointer" : "grab");
+          return;
+        }
+        const sel = mo.tocar(x, y);
+        setCursor(sel && sel.tipo !== "area" ? "pointer" : "grab");
       });
     }
   };
@@ -459,10 +705,31 @@ export default function Maqueta3D({
   const alSoltar = (e: ReactPointerEvent<HTMLDivElement>) => {
     const m = motor.current;
     if (!m) return;
+    const mi = mirada.current;
+    mirada.current = null;
+    if (mi && !mi.movio) {
+      // Un clic: lo que se revisa se revisa, y en el piso se camina hasta ahí.
+      if (mi.sel?.tipo === "camara" || mi.sel?.tipo === "equipo") {
+        onSeleccionar(mi.sel);
+        m.revisar(idParaRevisar(mi.sel.id));
+      } else if (mi.sel?.tipo === "persona" || mi.sel?.tipo === "mueble" || mi.sel?.tipo === "obstaculo") {
+        onSeleccionar(mi.sel);
+      } else {
+        const { x, y } = relativo(e);
+        const destino = m.destinoEnPiso(x, y);
+        if (destino) {
+          onSeleccionar(null);
+          m.irA(destino);
+        }
+      }
+      return;
+    }
+    if (mi) return;
     const a = arrastre.current;
     arrastre.current = null;
-    m.controles(true);
+    if (!apuntando) m.controles(true);
     setMarco(null);
+    setIman(null);
     if (a?.modo === "rect") {
       const { x, y } = relativo(e);
       const p = enPlano(x, y);
@@ -488,23 +755,50 @@ export default function Maqueta3D({
   /* ── Soltar un equipo del panel ── */
   const alSoltarEquipo = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    const { x, y } = relativo(e);
+    const mon = motor.current?.montaje(x, y);
+    if (!mon) return;
+    // El muñeco se suelta donde se quiere entrar, como en un mapa de calle.
+    if (e.dataTransfer.types.includes(TIPO_RECORRER)) {
+      entrarRecorrido(mon.punto);
+      return;
+    }
     const dato = leerArrastre(e.dataTransfer.getData(TIPO_ARRASTRE));
     if (!dato) return;
-    const { x, y } = relativo(e);
-    const p = enPlano(x, y);
-    if (!p) return;
     if (dato.clase === "camara") {
       const m = modeloPorId(dato.id);
-      if (m) colocarCamara(p, m);
+      if (m) colocarCamara(mon, m, e.altKey);
     } else if (dato.clase === "equipo") {
       const m = equipoPorId(dato.id);
-      if (m) colocarEquipo(p, m);
+      if (m) colocarEquipo(mon, m);
     } else {
-      colocarMueble(p, dato.id);
+      colocarMueble({ x: mon.punto.x / k, y: mon.punto.y / k }, dato.id);
     }
   };
 
   const camaraPov = verDesde ? plano.camaras.find((c) => c.id === verDesde) : null;
+  const indicePov = camaraPov ? plano.camaras.indexOf(camaraPov) : -1;
+  const camaraSel = seleccion?.tipo === "camara" ? plano.camaras.find((c) => c.id === seleccion.id) ?? null : null;
+  const equipoSel = seleccion?.tipo === "equipo" ? plano.equipos?.find((c) => c.id === seleccion.id) ?? null : null;
+  const paradas = useMemo(() => (recorriendo ? paradasDelSitio(plano) : []), [recorriendo, plano]);
+  const quienesVen = useMemo(() => new Set(aqui.teVen.map((c) => c.id)), [aqui.teVen]);
+
+  const caminarHacia = (sel: { pos: Punto; rumboDeg: number; alturaM: number }) => {
+    // Enfrente de lo elegido y mirándolo; se le queda a dos metros para verlo completo.
+    const d = dirRumbo(sel.rumboDeg);
+    const pos = { x: sel.pos.x * k + d.x * 2, y: sel.pos.y * k + d.y * 2 };
+    const rumbo = (sel.rumboDeg + 180) % 360;
+    if (recorriendo) motor.current?.irA(pos, true);
+    else entrarRecorrido(pos, rumbo, sel.alturaM);
+  };
+  const cambiarAltura = (delta: number) => {
+    if (camaraSel) onAplicar(actualizarCamara(plano, camaraSel.id, { alturaM: Math.max(0.5, Math.round((camaraSel.alturaM + delta) * 10) / 10) }), { fusion: `altura-${camaraSel.id}` });
+    else if (equipoSel) onAplicar(actualizarEquipo(plano, equipoSel.id, { alturaM: Math.max(0.2, Math.round((equipoSel.alturaM + delta) * 10) / 10) }), { fusion: `altura-${equipoSel.id}` });
+  };
+  const modeloCamaraSel = camaraSel ? modeloPorId(camaraSel.productoId) : null;
+  const modeloEquipoSel = equipoSel ? equipoPorId(equipoSel.productoId) : null;
+  const detalleSel = modeloCamaraSel ? especificacionesCamara(modeloCamaraSel) : modeloEquipoSel ? especificacionesEquipo(modeloEquipoSel) : "";
+  const piezaSel = camaraSel ?? equipoSel;
 
   return (
     <div
@@ -515,10 +809,19 @@ export default function Maqueta3D({
       onPointerMove={alMover}
       onPointerUp={alSoltar}
       onPointerCancel={alSoltar}
-      onDoubleClick={() => {
+      onDoubleClick={(e) => {
         setInicioMuro(null);
         setGuia(null);
-        if (herramienta === "seleccionar") enfocarSeleccion();
+        const m = motor.current;
+        if (herramienta !== "seleccionar" || recorriendo || verDesde || !m || e.target !== lienzo.current) return;
+        const { x, y } = relativo(e);
+        const sel = m.tocar(x, y);
+        if (sel?.tipo === "camara" || sel?.tipo === "equipo") {
+          enfocarSeleccion();
+          return;
+        }
+        const piso = m.pisoEn(x, y);
+        if (piso) entrarRecorrido(piso);
       }}
       onDragOver={(e) => e.preventDefault()}
       onDrop={alSoltarEquipo}
@@ -526,15 +829,15 @@ export default function Maqueta3D({
       <canvas
         ref={lienzo}
         className={styles.maquetaLienzo}
-        style={{ cursor: herramienta === "seleccionar" ? cursor : "crosshair" }}
+        style={{ cursor: apuntando || herramienta !== "seleccionar" ? "crosshair" : cursor }}
         role="img"
-        aria-label="Vista 3D del sitio: maqueta con muros, equipos a su altura de montaje y cobertura en el piso. Arrastra para girar y usa la rueda para acercar."
+        aria-label={recorriendo ? "Caminando dentro del sitio. Usa las flechas o W A S D para moverte, arrastra para mirar y haz clic en el piso para ir." : "Vista 3D del sitio: maqueta con muros, equipos a su altura de montaje y cobertura en el piso. Arrastra para deslizar, clic derecho para girar y rueda para acercar."}
         onContextMenu={(e) => e.preventDefault()}
       />
       {!listo ? <p className={styles.maquetaCarga}>Armando la maqueta…</p> : null}
 
       <div className={styles.maquetaEncima} aria-hidden={verDesde ? true : undefined}>
-        {!verDesde
+        {!verDesde && !recorriendo
           ? rotulos.map((r) => (
               <span
                 key={r.clave}
@@ -579,21 +882,217 @@ export default function Maqueta3D({
           </svg>
         ) : null}
         {marco ? <span className={styles.maquetaMarco} style={{ left: marco.x, top: marco.y, width: marco.w, height: marco.h }} /> : null}
+        {iman ? (
+          <span className={styles.iman} style={{ transform: `translate(${iman.x.toFixed(1)}px,${iman.y.toFixed(1)}px)` }}>
+            <i />
+            <b>{iman.tipo === "esquina" ? "Esquina" : "Muro"}</b>
+          </span>
+        ) : null}
       </div>
 
       {camaraPov ? (
         <div className={styles.povBarra}>
-          <b>Viendo desde {camaraPov.nombre}</b>
+          {plano.camaras.length > 1 ? (
+            <button type="button" className={styles.povFlecha} aria-label="Cámara anterior" title="Cámara anterior" onClick={() => onVerDesde(plano.camaras[(indicePov - 1 + plano.camaras.length) % plano.camaras.length].id)}>
+              ‹
+            </button>
+          ) : null}
+          <b>
+            {claveCamara(camaraPov.numero)} · {camaraPov.nombre}
+          </b>
           <span>{etiquetaModelo({ marca: "", modelo: camaraPov.modelo })}</span>
+          {plano.camaras.length > 1 ? (
+            <button type="button" className={styles.povFlecha} aria-label="Cámara siguiente" title="Cámara siguiente" onClick={() => onVerDesde(plano.camaras[(indicePov + 1) % plano.camaras.length].id)}>
+              ›
+            </button>
+          ) : null}
           <button type="button" onClick={() => onVerDesde(null)}>
             Salir
           </button>
         </div>
       ) : null}
 
-      {!verDesde ? (
+      {apuntando ? (
+        <div className={styles.povBarra} style={{ top: 58 }}>
+          <b>Mueve el puntero hacia lo que debe ver</b>
+          <span>Clic para dejarla así</span>
+          <button type="button" onClick={dejarDeApuntar}>
+            Listo
+          </button>
+        </div>
+      ) : null}
+
+      {piezaSel && !verDesde && !apuntando ? (
+        <div className={styles.tarjetaPieza} style={recorriendo ? { bottom: 96 } : undefined}>
+          <div className={styles.tarjetaPiezaTexto}>
+            <b>
+              {camaraSel ? claveCamara(camaraSel.numero) : equipoSel ? claveEquipo(equipoSel) : ""} · {piezaSel.nombre}
+            </b>
+            <span>{[piezaSel.modelo, detalleSel].filter(Boolean).join(" · ")}</span>
+          </div>
+          {!equipoSel?.gabineteId ? (
+            <span className={styles.tarjetaAltura} role="group" aria-label="Altura de instalación">
+              <button type="button" aria-label="Bajar" onClick={() => cambiarAltura(-0.1)}>
+                −
+              </button>
+              <i>{piezaSel.alturaM.toFixed(1)} m</i>
+              <button type="button" aria-label="Subir" onClick={() => cambiarAltura(0.1)}>
+                +
+              </button>
+            </span>
+          ) : null}
+          {camaraSel ? (
+            <>
+              <button
+                type="button"
+                className={styles.tarjetaBoton}
+                onClick={() => {
+                  motor.current?.controles(false);
+                  setApuntando(camaraSel.id);
+                }}
+              >
+                Apuntar
+              </button>
+              <button type="button" className={styles.tarjetaBoton} onClick={() => onVerDesde(camaraSel.id)}>
+                Ver lo que ve
+              </button>
+            </>
+          ) : null}
+          {recorriendo ? (
+            <button type="button" className={styles.tarjetaBoton} onClick={enfocarSeleccion}>
+              Revisar de cerca
+            </button>
+          ) : (
+            <button type="button" className={styles.tarjetaBoton} onClick={() => caminarHacia(piezaSel)}>
+              Caminar ahí
+            </button>
+          )}
+        </div>
+      ) : null}
+
+      {recorriendo && !verDesde ? (
         <>
+          <aside className={styles.recPanel} aria-label="Dónde estás">
+            <b className={styles.recLugar}>{aqui.area ?? "Sin área"}</b>
+            <MiniMapa ref={marcador} plano={plano} camarasQueVen={quienesVen} onIr={(p) => motor.current?.irA(p, true)} />
+            {aqui.teVen.length ? (
+              <ul className={styles.recVen} aria-label="Cámaras que te ven aquí">
+                {aqui.teVen.slice(0, 4).map((c) => (
+                  <li key={c.id}>
+                    <i style={{ background: COLOR_NIVEL[c.nivel] }} />
+                    <button type="button" title={`Ver lo que ve ${c.nombre}`} onClick={() => onVerDesde(c.id)}>
+                      {c.clave}
+                    </button>
+                    <span>{c.etiqueta}</span>
+                    <em>{c.ppm} PPM</em>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className={styles.recCiego}>Aquí ninguna cámara te ve</p>
+            )}
+            {paradas.length > 1 ? (
+              <div className={styles.recParadas} role="group" aria-label="Ir a un área">
+                {paradas.map((x) => (
+                  <button key={x.nombre} type="button" aria-pressed={aqui.area === x.nombre} onClick={() => motor.current?.irA(x.pos, true)}>
+                    {x.nombre}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </aside>
+
+          <div className={styles.recBarra}>
+            <button type="button" className={styles.recSalir} onClick={salirRecorrido}>
+              Salir del recorrido
+            </button>
+            {paradas.length > 1 ? (
+              <button
+                type="button"
+                aria-pressed={guiando}
+                onClick={() => {
+                  if (guiando) motor.current?.terminarGuiado();
+                  else {
+                    motor.current?.iniciarGuiado(paradas.map((x) => x.pos));
+                    setGuiando(true);
+                  }
+                }}
+              >
+                {guiando ? "Detener" : "Recorrido automático"}
+              </button>
+            ) : null}
+            <span>W A S D o flechas para caminar · Mayús para correr · arrastra para mirar · clic en el piso para ir</span>
+          </div>
+
+          <div className={styles.recPad} role="group" aria-label="Caminar">
+            {(
+              [
+                ["ArrowUp", "Avanzar", "M12 5l6 7H6z", "1 / 2"],
+                ["ArrowLeft", "Voltear a la izquierda", "M5 12l7-6v12z", "2 / 1"],
+                ["ArrowDown", "Retroceder", "M12 19l-6-7h12z", "2 / 2"],
+                ["ArrowRight", "Voltear a la derecha", "M19 12l-7 6V6z", "2 / 3"],
+              ] as const
+            ).map(([codigo, etiqueta, icono, lugar]) => (
+              <button
+                key={codigo}
+                type="button"
+                aria-label={etiqueta}
+                title={etiqueta}
+                style={{ gridArea: lugar }}
+                onPointerDown={() => motor.current?.tecla(codigo, true)}
+                onPointerUp={() => motor.current?.tecla(codigo, false)}
+                onPointerLeave={() => motor.current?.tecla(codigo, false)}
+                onPointerCancel={() => motor.current?.tecla(codigo, false)}
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d={icono} />
+                </svg>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {!verDesde && !recorriendo ? (
+        <>
+          {pistaVista && herramienta === "seleccionar" ? <p className={styles.pistaVista}>Arrastra para deslizar · clic derecho para girar · rueda para acercar · doble clic en el piso para entrar</p> : null}
           <div className={styles.controles3d}>
+            <div className={styles.segmentoVista} role="group" aria-label="Qué hace arrastrar">
+              {(
+                [
+                  ["deslizar", "Deslizar"],
+                  ["girar", "Girar"],
+                ] as const
+              ).map(([id, texto]) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={modoVista === id}
+                  onClick={() => {
+                    setModoVista(id);
+                    motor.current?.modoArrastre(id);
+                  }}
+                >
+                  {texto}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={styles.botonRecorrer}
+              draggable
+              title="Entra a caminar por el sitio. También puedes arrastrar el muñeco al lugar donde quieres entrar."
+              onDragStart={(e) => {
+                e.dataTransfer.setData(TIPO_RECORRER, "1");
+                e.dataTransfer.effectAllowed = "copy";
+              }}
+              onClick={() => entrarRecorrido()}
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d={ICONO_CAMINAR} />
+              </svg>
+              Recorrer
+            </button>
             <button type="button" className={styles.boton3d} onClick={() => motor.current?.vistaGeneral()}>
               Vista general
             </button>
@@ -619,6 +1118,7 @@ export default function Maqueta3D({
               { etiqueta: "Alejar", icono: ICONO.menos, accion: () => motor.current?.acercar(0.8) },
               { etiqueta: "Acercar", icono: ICONO.mas, accion: () => motor.current?.acercar(1.25) },
               { etiqueta: "Encuadrar todo", icono: ICONO.encuadrar, accion: () => motor.current?.vistaGeneral() },
+              { etiqueta: completa ? "Salir de pantalla completa" : "Pantalla completa", icono: ICONO.pantalla, accion: alternarPantalla },
             ]}
           />
         </>

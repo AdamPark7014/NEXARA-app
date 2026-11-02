@@ -62,6 +62,23 @@
   gap: var(--ui-s3);
 }
 
+.filtros {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: var(--ui-s2);
+}
+
+.marca {
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: var(--ui-fs-label);
+}
+
 .rejilla {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -173,6 +190,10 @@
 }
 
 @media (max-width: 760px) {
+  .filtros {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .cuerpo {
     grid-template-columns: minmax(0, 1fr);
   }

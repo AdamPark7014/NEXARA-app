@@ -479,7 +479,16 @@
   background: rgba(15, 18, 23, 0.9);
   color: #fff;
   font-size: var(--ui-fs-label);
-  z-index: 2;
+  z-index: 3;
+}
+
+.povBarra .povFlecha {
+  width: 30px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .povBarra span {
@@ -1072,7 +1081,8 @@
 .aviso {
   position: absolute;
   left: 50%;
-  top: var(--ui-s3);
+  top: 108px;
+  z-index: 3;
   transform: translateX(-50%);
   max-width: min(560px, calc(100% - 32px));
   padding: var(--ui-s2) var(--ui-s4);
@@ -1768,4 +1778,560 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--ui-s2);
+}
+
+/* ── Moverse por la maqueta ── */
+
+.segmentoVista {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-elev-1);
+}
+
+.segmentoVista button {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ui-fg-2);
+  font: inherit;
+  font-size: var(--ui-fs-label);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segmentoVista button[aria-pressed="true"] {
+  background: var(--ui-fg);
+  color: var(--ui-surface);
+}
+
+.botonRecorrer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 13px 0 9px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-brand);
+  color: var(--ui-brand-fg, #fff);
+  font: inherit;
+  font-size: var(--ui-fs-label);
+  font-weight: 650;
+  cursor: grab;
+  box-shadow: var(--ui-elev-1);
+}
+
+.botonRecorrer:hover {
+  filter: brightness(1.08);
+}
+
+.botonRecorrer svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pistaVista {
+  position: absolute;
+  left: 256px;
+  right: 16px;
+  bottom: 112px;
+  width: fit-content;
+  max-width: calc(100% - 272px);
+  margin: 0 auto;
+  padding: 6px 13px;
+  border-radius: 999px;
+  background: rgba(15, 18, 23, 0.78);
+  color: #fff;
+  font-size: var(--ui-fs-meta);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.tarjetaPieza {
+  position: absolute;
+  left: 50%;
+  bottom: 74px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  max-width: calc(100% - 24px);
+  padding: 6px 7px 6px 13px;
+  border-radius: 12px;
+  background: rgba(15, 18, 23, 0.9);
+  color: #fff;
+  z-index: 2;
+}
+
+.tarjetaPiezaTexto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 280px;
+  font-size: var(--ui-fs-label);
+}
+
+.tarjetaPiezaTexto b {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 650;
+}
+
+.tarjetaPiezaTexto span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--ui-fs-meta);
+  opacity: 0.72;
+}
+
+.tarjetaAltura {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 30px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tarjetaAltura i {
+  min-width: 44px;
+  font-size: var(--ui-fs-meta);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.tarjetaAltura button {
+  width: 26px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.tarjetaBoton {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font: inherit;
+  font-size: var(--ui-fs-meta);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tarjetaBoton:hover {
+  background: #fff;
+  color: #14181f;
+}
+
+.recPanel {
+  position: absolute;
+  right: var(--ui-s3);
+  top: var(--ui-s3);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 244px;
+  max-height: calc(100% - 118px);
+  overflow-y: auto;
+  padding: 11px;
+  border-radius: 14px;
+  background: rgba(15, 18, 23, 0.86);
+  color: #fff;
+  z-index: 2;
+}
+
+.recLugar {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.miniMapa {
+  display: block;
+  width: 100%;
+  max-height: 170px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+}
+
+.recVen {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--ui-fs-meta);
+}
+
+.recVen li {
+  display: grid;
+  grid-template-columns: 8px auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.recVen i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.recVen button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.recVen span {
+  overflow: hidden;
+  opacity: 0.78;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.recVen em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.78;
+}
+
+.recCiego {
+  margin: 0;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgba(245, 171, 53, 0.2);
+  color: #ffd893;
+  font-size: var(--ui-fs-meta);
+  font-weight: 600;
+}
+
+.recParadas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.recParadas button {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: inherit;
+  font-size: var(--ui-fs-meta);
+  cursor: pointer;
+}
+
+.recParadas button[aria-pressed="true"] {
+  background: #fff;
+  color: #14181f;
+}
+
+.recBarra {
+  position: absolute;
+  left: var(--ui-s3);
+  bottom: var(--ui-s3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 310px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(15, 18, 23, 0.86);
+  color: #fff;
+  z-index: 2;
+}
+
+.recBarra button {
+  height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font: inherit;
+  font-size: var(--ui-fs-meta);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.recBarra button[aria-pressed="true"] {
+  background: var(--ui-brand);
+}
+
+.recBarra .recSalir {
+  background: #fff;
+  color: #14181f;
+}
+
+.recBarra span {
+  flex-basis: 100%;
+  padding: 0 3px;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.74;
+}
+
+.recPad {
+  position: absolute;
+  right: var(--ui-s3);
+  bottom: var(--ui-s3);
+  display: grid;
+  grid-template-columns: repeat(3, 42px);
+  grid-template-rows: repeat(2, 42px);
+  gap: 4px;
+  z-index: 2;
+}
+
+.recPad button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(15, 18, 23, 0.82);
+  color: #fff;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.recPad button:active {
+  background: var(--ui-brand);
+}
+
+.recPad svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* En pantalla completa, el lienzo llena todo. */
+.lienzoCaja:fullscreen {
+  width: 100vw;
+  height: 100vh;
+}
+
+@media (max-width: 640px) {
+  .recPanel {
+    width: 170px;
+  }
+
+  .recVen,
+  .recParadas,
+  .recBarra span,
+  .pistaVista {
+    display: none;
+  }
+
+  .tarjetaPieza {
+    bottom: 118px;
+    flex-wrap: wrap;
+  }
+}
+
+/* ── Armar con IA ── */
+
+.botonArmar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  height: 36px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-brand);
+  color: var(--ui-brand-fg, #fff);
+  font: inherit;
+  font-size: var(--ui-fs-label);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.botonArmar:hover {
+  filter: brightness(1.08);
+}
+
+.asistenteFondo {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 18, 23, 0.45);
+  z-index: 60;
+}
+
+.asistente {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(620px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  box-shadow: var(--ui-elev-3, 0 16px 50px rgba(15, 18, 23, 0.3));
+}
+
+.asistente header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.asistente h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.asistente h2 svg {
+  color: var(--ui-brand);
+}
+
+.asistenteAyuda {
+  margin: 0;
+  color: var(--ui-fg-2);
+  font-size: 14px;
+}
+
+.asistenteFrase {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.asistenteAcciones {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.asistenteAcciones span {
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-meta);
+}
+
+.asistentePlantillas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.asistentePlantillas button {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 11px;
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.asistentePlantillas button:hover:not(:disabled) {
+  border-color: var(--ui-brand);
+  background: var(--ui-hover);
+}
+
+.asistentePlantillas b {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.asistentePlantillas span {
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-meta);
+}
+
+/* Caminando, las capas van a la izquierda: a la derecha está dónde estás. */
+.barraRecorrido {
+  right: 268px;
+  justify-content: flex-start;
+}
+
+.barraRecorrido .capas {
+  margin-left: 0;
+}
+
+.barraRecorrido .herramientas {
+  display: none;
+}
+
+/* Dónde va a quedar pegada: en la maqueta y en el plano. */
+.iman {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.iman i {
+  position: absolute;
+  left: -9px;
+  top: -9px;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--ui-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-brand) 35%, transparent);
+}
+
+.iman b {
+  position: absolute;
+  left: 14px;
+  top: -11px;
+  padding: 2px 7px;
+  border-radius: 7px;
+  background: rgba(15, 18, 23, 0.9);
+  color: #fff;
+  font-size: var(--ui-fs-meta);
+  font-weight: 600;
+  white-space: nowrap;
 }

@@ -8,6 +8,8 @@ import { withTenantHeaders } from "@/lib/tenant";
 import type { FilaCatalogo } from "./catalogo";
 import type { ResumenDiseno } from "./editor";
 import type { Grabacion } from "./infraestructura";
+import type { FichaLeida } from "./ficha";
+import type { EspecSitio } from "./generarSitio";
 import type { Plano } from "./plano";
 
 export type EstadoDiseno = "borrador" | "enviada" | "aprobada";
@@ -152,4 +154,21 @@ export function editarCatalogo(token: string, id: number, equipo: EquipoParaGuar
 
 export function archivarDelCatalogo(token: string, id: number): Promise<unknown> {
   return pedir(`cctv-disenos/catalogo/${id}/archivar`, token, { method: "POST" });
+}
+
+/** La IA lee la memoria técnica. No guarda nada: lo que regresa se revisa antes de `agregarAlCatalogo`. */
+export function leerFicha(token: string, archivo: File): Promise<FichaLeida> {
+  const cuerpo = new FormData();
+  cuerpo.append("file", archivo, archivo.name);
+  return pedir<FichaLeida>("cctv-disenos/catalogo/leer-ficha", token, { method: "POST", body: cuerpo });
+}
+
+/** Sin su PDF: la IA pasa a datos lo que la persona dice del equipo, y se revisa igual que una ficha. */
+export function describirEquipo(token: string, frase: string): Promise<FichaLeida> {
+  return pedir<FichaLeida>("cctv-disenos/catalogo/describir", token, { method: "POST", body: JSON.stringify({ frase }) });
+}
+
+/** La IA pasa la frase a datos del sitio. Con ellos arma el diseño `generarSitio`, aquí en el navegador. */
+export function leerFraseDeSitio(token: string, frase: string): Promise<EspecSitio> {
+  return pedir<EspecSitio>("cctv-disenos/generar-sitio", token, { method: "POST", body: JSON.stringify({ frase }) });
 }

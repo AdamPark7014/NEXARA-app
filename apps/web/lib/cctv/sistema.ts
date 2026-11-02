@@ -9,6 +9,7 @@ import {
   FAMILIA_DE_TIPO,
   PREFIJO_TIPO,
   TIPOS_DE_RACK,
+  equipoPorId,
   modeloPorId,
   type FamiliaEquipo,
   type ModeloCamara,
@@ -239,7 +240,7 @@ export function gruposDeEquipos(raiz: Plano, grabacion: Grabacion): GrupoEquipo[
       const m: ModeloCamara | null = modeloPorId(c.productoId);
       const tipo: TipoCamara = c.esPtz ? "ptz" : (m?.tipo ?? "domo");
       const k = `cam|${c.productoId || c.modelo}`;
-      const g = grupos.get(k) ?? { clave: k, familia: "camaras" as const, tipo, nombre: ETIQUETA_TIPO_CAMARA[tipo], modelo: m?.modelo ?? c.modelo, foto: fotoDeTipo(tipo), cantidad: 0, claves: [], watts: 0, mbps: 0 };
+      const g = grupos.get(k) ?? { clave: k, familia: "camaras" as const, tipo, nombre: ETIQUETA_TIPO_CAMARA[tipo], modelo: m?.modelo ?? c.modelo, foto: m?.foto ?? fotoDeTipo(tipo), cantidad: 0, claves: [], watts: 0, mbps: 0 };
       g.cantidad += 1;
       g.claves.push(claveCamara(c.numero));
       g.watts += wattsCamara(c);
@@ -250,7 +251,7 @@ export function gruposDeEquipos(raiz: Plano, grabacion: Grabacion): GrupoEquipo[
   for (const { plano } of niveles) {
     for (const e of plano.equipos ?? []) {
       const k = `eq|${e.tipo}|${e.productoId || e.modelo}`;
-      const g = grupos.get(k) ?? { clave: k, familia: FAMILIA_DE_TIPO[e.tipo], tipo: e.tipo, nombre: ETIQUETA_TIPO_EQUIPO[e.tipo], modelo: e.modelo, foto: fotoDeTipo(e.tipo), cantidad: 0, claves: [], watts: 0, mbps: 0 };
+      const g = grupos.get(k) ?? { clave: k, familia: FAMILIA_DE_TIPO[e.tipo], tipo: e.tipo, nombre: ETIQUETA_TIPO_EQUIPO[e.tipo], modelo: e.modelo, foto: equipoPorId(e.productoId)?.foto ?? fotoDeTipo(e.tipo), cantidad: 0, claves: [], watts: 0, mbps: 0 };
       g.cantidad += 1;
       g.claves.push(claveEquipo(e));
       g.watts += e.datos.poeW ?? 0;

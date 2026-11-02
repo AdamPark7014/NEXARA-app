@@ -454,7 +454,14 @@ export function construirCamaras(plano: Plano, opciones: { escala: number; ocult
     const sel: Seleccion = { tipo: "camara", id: c.id };
     const pos = aMetros(c.pos, plano.escala);
     const tipo = tipoModeloDe(c);
-    const modelo = crearModelo(tipo, { marca: modeloPorId(c.productoId)?.marca || undefined });
+    const ficha = modeloPorId(c.productoId);
+    const modelo = crearModelo(tipo, {
+      marca: ficha?.marca || undefined,
+      ...ficha?.medidas,
+      color: ficha?.apariencia?.color,
+      cajaTrasera: ficha?.apariencia?.cajaTrasera,
+      ledsVisibles: ficha?.apariencia?.luces ?? undefined,
+    });
     inclinarModelo(modelo, c.inclinacionDeg);
     const dir = dirRumbo(c.rumboDeg);
     // Las medidas se toman antes de agrandarlo.
@@ -479,29 +486,64 @@ export function construirCamaras(plano: Plano, opciones: { escala: number; ocult
       x = pos.x + dir.x * brazo;
       z = pos.y + dir.y * brazo;
     } else if (montaje === "muro") {
-      // Se separa del muro más cercano lo que mide el equipo, con su ménsula.
-      let cercano: { n: Punto; d: number; g: number } | null = null;
+      // Se separa de los muros que tiene al lado lo que mide el equipo, con su ménsula. En una esquina son dos.
+      const cercanos: Array<{ n: Punto; d: number; g: number; u: Punto }> = [];
       for (const { m, a, b } of muros) {
         if (m.tipo !== "muro") continue;
         const d = distanciaPuntoSegmento(pos, a, b);
-        if (d > 1 || (cercano && d >= cercano.d)) continue;
+        if (d > 1) continue;
         const L = distancia(a, b);
         if (L < 1e-3) continue;
-        let n = { x: -(b.y - a.y) / L, y: (b.x - a.x) / L };
-        if (n.x * dir.x + n.y * dir.y < 0) n = { x: -n.x, y: -n.y };
-        cercano = { n, d, g: m.grosorM };
+        const u = { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
+        let n = { x: -u.y, y: u.x };
+        // El lado lo da dónde está; solo si está sobre el muro se usa hacia dónde mira.
+        const lado = (pos.x - a.x) * n.x + (pos.y - a.y) * n.y;
+        if (Math.abs(lado) > 0.02 ? lado < 0 : n.x * dir.x + n.y * dir.y < 0) n = { x: -n.x, y: -n.y };
+        cercanos.push({ n, d, g: m.grosorM, u });
       }
-      if (cercano) {
-        const salida = cercano.g / 2 + (esBala ? 0.02 : radio + 0.04) - cercano.d;
+      cercanos.sort((p1, p2) => p1.d - p2.d);
+      const primero = cercanos[0];
+      const segundo = primero ? cercanos.find((o) => o.d <= 0.6 && Math.abs(o.u.x * primero.u.y - o.u.y * primero.u.x) > 0.3) : undefined;
+      if (primero && segundo) {
+        // De espaldas a la esquina el equipo es más ancho que hondo: que no se meta en ninguno de los dos muros.
+        const anchoMitad = ((cajaModelo.max.x - cajaModelo.min.x) / 2) * esc;
+        const hueco = Math.max(esBala ? anchoMitad * 0.75 + 0.02 : radio * 0.8 + 0.04, 0.06);
+        let esquinaX = x;
+        let esquinaZ = z;
+        for (const o of [primero, segundo]) {
+          const falta = o.g / 2 + hueco - o.d;
+          if (falta > 0) {
+            x += o.n.x * falta;
+            z += o.n.y * falta;
+          }
+          esquinaX -= o.n.x * Math.max(o.d - o.g / 2, 0);
+          esquinaZ -= o.n.y * Math.max(o.d - o.g / 2, 0);
+        }
+        const dx = x - esquinaX;
+        const dz = z - esquinaZ;
+        const brazoL = Math.max(Math.hypot(dx, dz), 0.06);
+        const giro = Math.atan2(dx, dz);
+        const brazo = new THREE.Mesh(new THREE.BoxGeometry(0.05 * esc, 0.03 * esc, brazoL), matAccesorio);
+        brazo.position.set(esquinaX + dx / 2, c.alturaM + 0.01, esquinaZ + dz / 2);
+        brazo.rotation.y = giro;
+        brazo.castShadow = true;
+        // La placa que abraza la esquina.
+        const placa = new THREE.Mesh(new THREE.BoxGeometry(Math.min(brazoL * 1.5, 0.2 * esc), 0.12 * esc, 0.012), matAccesorio);
+        placa.position.set(esquinaX + (dx / brazoL) * 0.03, c.alturaM + 0.01, esquinaZ + (dz / brazoL) * 0.03);
+        placa.rotation.y = giro;
+        placa.castShadow = true;
+        accesorios.add(brazo, placa);
+      } else if (primero) {
+        const salida = primero.g / 2 + (esBala ? 0.02 : radio + 0.04) - primero.d;
         if (salida > 0) {
-          x = pos.x + cercano.n.x * salida;
-          z = pos.y + cercano.n.y * salida;
+          x = pos.x + primero.n.x * salida;
+          z = pos.y + primero.n.y * salida;
         }
         if (!esBala) {
           const brazoL = Math.max(radio + 0.05, 0.12);
           const m = new THREE.Mesh(new THREE.BoxGeometry(0.05 * esc, 0.03 * esc, brazoL), matAccesorio);
-          m.position.set(x - (cercano.n.x * brazoL) / 2, c.alturaM + 0.01, z - (cercano.n.y * brazoL) / 2);
-          m.rotation.y = Math.atan2(cercano.n.x, cercano.n.y);
+          m.position.set(x - (primero.n.x * brazoL) / 2, c.alturaM + 0.01, z - (primero.n.y * brazoL) / 2);
+          m.rotation.y = Math.atan2(primero.n.x, primero.n.y);
           m.castShadow = true;
           accesorios.add(m);
         }
@@ -537,6 +579,7 @@ function paramsDe(e: EquipoPlano): ParamsEquipo {
   const m = equipoPorId(e.productoId);
   return {
     marca: m?.marca || undefined,
+    modelo: m?.modelo || undefined,
     anchoMm: m?.medidas?.anchoMm,
     altoMm: m?.medidas?.altoMm,
     fondoMm: m?.medidas?.fondoMm,

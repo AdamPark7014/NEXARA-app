@@ -326,6 +326,45 @@ Las fotos de `public/cctv/modelos/` y `public/cctv/frente/` son de nuestros prop
 equipo usa imágenes de un tercero. Sin WebGL, `Lienzo3D` no pinta estos equipos: se ven en el dibujo, el plano y el
 diagrama.
 
+### 4.3 Moverse por la maqueta y por dentro
+
+Adam, 02-11: «le faltan cosas como deslizarte y checar y meter y moverte en el mapa». Antes solo se podía girar desde afuera.
+
+- **Desde arriba:** arrastrar desliza el mapa; clic derecho, o «Girar» en la barra, lo gira; la rueda acerca hacia el puntero. W A S D
+  o las flechas también deslizan, y Q o E giran. El arrastre sobre un área o un mueble ya no los mueve si no están elegidos: antes,
+  arrastrar sobre el piso movía el piso. La vista no deja perder el sitio (`contenerVista`).
+- **Encuadre:** se encuadra lo construido, no los conos de cobertura, que se salen mucho y dejaban el edificio chiquito.
+- **Recorrer:** el botón, el muñeco arrastrado al sitio o doble clic en el piso te meten a 1.60 m (`entrarRecorrido`). W A S D, flechas o
+  el pad caminan y Mayús corre. Arrastrar mira, como en un mapa de calle. Clic en el piso, en el minimapa o en el nombre de un área te lleva.
+  Los muros, anaqueles y ventanas no se cruzan; las puertas y accesos sí; al chocar se resbala por el muro
+  (`lib/cctv/recorrido.ts`, con pruebas). Adentro todo va a tamaño real, con techo y horizonte, y sin las líneas de cable.
+- **Checar:** un panel dice en qué área estás y qué cámaras te ven ahí, con sus PPM: es la misma cuenta que la persona de prueba
+  (`leerPersona`). «Aquí ninguna cámara te ve» es un punto ciego. Clic en un equipo se acerca y lo mira a su altura. «Ver lo que ve» ya
+  deja pasar a la cámara anterior o siguiente. «Recorrido automático» pasea por las áreas, para enseñar el sitio.
+- **Meter:** adentro se eligen equipos del panel y se ponen viendo el muro de frente, a la altura donde se tocó (`montaje`). «Apuntar» deja
+  mirar con el puntero lo que debe ver la cámara, y la tarjeta de lo elegido sube o baja su altura.
+
+**El imán** (`lib/cctv/pegado.ts`, Adam: «no se pegan a las esquinas»). Una cámara cerca de una esquina queda en ella, por el lado del puntero, a
+4 cm de las dos caras y mirando en diagonal al cuarto; cerca de un muro queda de frente. Antes de soltar, un marcador dice «Esquina» o «Muro», en
+la maqueta y en el plano. Al moverla se respeta hacia dónde miraba si desde ahí sigue viendo el cuarto; si no, voltea. No se monta más alto que el
+muro. Alt la deja libre, y en poste o techo no se pega. La escena mide los dos muros de una esquina y le pone su soporte; antes medía solo el más
+cercano y la cámara se metía en el otro. Al arrastrar, el punto se mide a la altura del equipo y no en el piso, para que siga al puntero.
+Terminales, sirenas y alertas se quedan en su muro al moverlas.
+
+### 4.4 Armar el diseño con IA, gastando casi nada
+
+Para quien no quiere dibujar: «Armar con IA» pide la descripción del sitio con palabras, o una plantilla. **La IA solo saca unos datos de
+la frase** (`cctv-disenos/sitio-ia.ts`: medidas, áreas, cuántas cámaras, marca); solo viaja la frase. **El diseño lo arma el código**
+(`lib/cctv/generarSitio.ts`, con pruebas): muros, puertas, áreas, anaqueles, muebles, cámaras pegadas y apuntadas, gabinete con grabador y switches
+según las cámaras, terminales en sus puertas. Son las mismas piezas de siempre, se ajustan igual y Ctrl+Z lo deshace de un paso. Las plantillas no
+llaman a la IA.
+
+También sirve para un equipo sin su PDF: «¿No tienes el PDF? Descríbelo» (`POST /catalogo/describir`) llena la misma pantalla de revisión, solo con
+lo que dijo la persona, y lo guarda con `fuente: "manual"`.
+
+Medido (`npm run eval:sitio -w apps/api`, Haiku 5.5 `low`): 12 frases de sitio y 8 de equipo, escritas para la prueba, cortas y con faltas: 20 de
+20 sin inventar nada que no se dijera. US$0.00013 por llamada; p50 1.7 s, p95 3.9 s. Son frases nuestras, todavía no de gente real.
+
 ## 5. Vista desde cada cámara
 
 - **Cámara de three.js.** Una `PerspectiveCamera` con `fov = VFOV` y `aspect = px_h / px_v`, puesta en la
@@ -377,6 +416,30 @@ Es solo la ficha: el inventario sigue siendo uno, así que `productId` apunta a 
 alteró `products`) y las existencias saldrán de `stock_levels` en la fase de stock. Lo que no sale de una hoja
 técnica lleva `fuente: "tipo"`, sin marca, y la pantalla dice «Falta su ficha». Un diseño guarda su copia de los
 datos: cambiar o archivar el modelo no le mueve nada.
+
+**Hecho en la fase 9: leer la memoria técnica.** «Cargar memoria técnica» (catálogo y «+ Agregar equipo» del editor) sube el
+PDF a `POST /cctv-disenos/catalogo/leer-ficha`. Esa ruta no guarda nada: ni el PDF, porque la licencia de los materiales de
+Hikvision no deja redistribuirlos, ni los datos. La persona revisa lo leído, con la hoja de donde salió cada dato, ve el modelo
+armado con esas medidas y solo entonces guarda.
+
+- **Qué viaja a la IA** (`cctv-disenos/ficha-ia.ts`, `ficha-pdf.ts`): el texto de todas las hojas con `pdftotext -raw` y dos
+  hojas como imagen a 150 dpi, la portada (color y forma) y la del dibujo de dimensiones (sus cotas no están en el texto). `-raw`
+  no es un capricho: el modo normal y `-layout` separan cada etiqueta de su valor en estas tablas. Pesa lo mismo con un PDF de
+  1 MB que con uno de 30; la puerta no acepta más de 2 MB. Un PDF sin texto se lee por las imágenes de sus primeras 4 hojas.
+- **Qué hace el código, no la IA:** la familia sale del tipo; los números se limpian; un dato sin número, de un campo desconocido
+  o repetido se tira; una hoja que no existe se queda sin hoja; una cota imposible (carcasa más alta que el equipo, cúpula más
+  ancha que el diámetro) se quita; en un switch cuentan los puertos con PoE.
+- **Medido** (`npm run eval:ficha -w apps/api -- --carpeta <PDFs>`, Haiku 5.5 `low`, sin razonamiento): 15 fichas reales de varias
+  marcas (Hikvision, Dahua, Axis, TP-Link y ZKTeco: cámaras, grabadores, panel, barrera, switches y terminales) y 4 casos escritos
+  para ver si inventa. 210 de 213 datos (98.6 %). De los 3 que fallan, 2 quedaron vacíos y 1 salió mal: la pluma de la barrera, leída
+  de 1.5 m cuando son 3; por eso la pantalla pide revisar. US$0.00099 por ficha; p50 3.1 s, máximo 7 s. No hay fichas de sirena,
+  sísmica, servidor ni UPS. Los PDF no van en el repo; sí la verdad de cada uno, en `correr-ficha.ts`.
+- **El modelo se parece, no es una copia.** Se arma con las medidas de la ficha, el color y la forma típica de su tipo
+  (`maqueta/modelos.ts`, `modelosEquipos.ts`), y la pantalla lo dice. El parecido medido en la propuesta fue de 0.91 a 0.94 por
+  silueta. En equipos que no son cámara solo cambian las proporciones: una terminal siempre tiene el mismo frente.
+- **Lo que se guarda:** `datos.apariencia` (color, luces, caja trasera), `datos.ficha` (archivo, hojas, de qué hoja salió cada
+  dato y lo que no da comportamiento: peso, IP, IK) y `datos.foto`, una foto de 256 px del modelo ya armado, en base64, para las
+  tarjetas. `leerFilasCatalogo` las separa: no se copian a cada equipo colocado en un diseño.
 
 ## 7. Propuesta en PDF
 
@@ -454,6 +517,8 @@ lugares a tocar para dar de alta un módulo:
   - `POST /:id/propuesta` (recibe los PNG de las vistas y devuelve el PDF)
   - `POST /:id/cotizacion`
   - `GET /catalogo` y `POST /catalogo`, `PATCH /catalogo/:id`, `POST /catalogo/:id/archivar` (antes de `:id`)
+  - `POST /catalogo/leer-ficha` (PDF hasta 30 MB; devuelve lo leído, no guarda nada)
+  - `POST /catalogo/describir` y `POST /generar-sitio` (`{ frase }`, hasta 1,500 caracteres; devuelven datos, no guardan nada)
 - **Seguridad.** Las ligas para el cliente son de solo lectura, firmadas y con caducidad, y **sin precios**
   salvo que se marque. Los croquis no van en el prefijo público de `uploads`.
 
@@ -471,6 +536,7 @@ lugares a tocar para dar de alta un módulo:
 | 7 | Maqueta 3D con WebGL, modelos propios, vista de noche, «Ver lo que ve», áreas y ambientación, plano técnico y foto de la maqueta en la propuesta (§4.1) | **Hecha** (01-11) |
 | 8 | Catálogo de equipos: agregar modelos; acceso, alarmas, servidores, NVR y gabinete con su modelo y comportamiento; rutas de cable, diagrama de conexión y revisión (§4.2 y §6) | **Hecha** (01-11) |
 | 9 | Memoria técnica: subir el PDF, la IA llena la ficha y se arma el modelo. Medido: 92 de 94 datos en 6 fichas con Haiku 5.5 | Propuesta aprobada |
+| 9b | Moverse por dentro, imán de esquinas y muros, armar con IA, modelos y visor con vistas y cotas (§4.3, §4.4) | Pedido de Adam, 02-11 |
 | 10 | Stock de Almacén, consulta en CT y «Pasar a cotización» | Falta decidir el inventario |
 | 11 | Cotización premium | Faltan las especificaciones de Adam |
 

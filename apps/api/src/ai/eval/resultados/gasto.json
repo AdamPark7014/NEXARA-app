@@ -120,6 +120,21 @@
       "fecha": "2026-11-01",
       "concepto": "duplicados haiku",
       "usd": 0.021201
+    },
+    {
+      "fecha": "2026-11-02",
+      "concepto": "cctv-ficha",
+      "usd": 0.060034
+    },
+    {
+      "fecha": "2026-11-02",
+      "concepto": "cctv-sitio",
+      "usd": 0.003646
+    },
+    {
+      "fecha": "2026-11-02",
+      "concepto": "cctv-equipo",
+      "usd": 0.001639
     }
   ]
 }

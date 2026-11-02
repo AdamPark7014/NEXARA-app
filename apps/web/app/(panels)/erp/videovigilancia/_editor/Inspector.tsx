@@ -7,7 +7,7 @@
  */
 import { useMemo, useState, type ReactNode } from "react";
 import { Button, ButtonLink, Field, Input, Segmented, Select, Switch } from "@/components/base";
-import { ETIQUETA_TIPO_CAMARA, ETIQUETA_TIPO_EQUIPO, MODELO_GENERICO, TIPOS_DE_RACK, etiquetaModelo, modeloPorId, todasLasCamarasDelCatalogo } from "@/lib/cctv/catalogo";
+import { ETIQUETA_TIPO_CAMARA, ETIQUETA_TIPO_EQUIPO, MODELO_GENERICO, TIPOS_DE_RACK, equipoPorId, etiquetaModelo, modeloPorId, todasLasCamarasDelCatalogo } from "@/lib/cctv/catalogo";
 import {
   actualizarEquipo,
   borrar,
@@ -423,7 +423,7 @@ function PanelEquipo({
     <div className={styles.panel}>
       <div className={styles.fotoEquipo}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={fotoDeTipo(e.tipo)} alt="" />
+        <img src={equipoPorId(e.productoId)?.foto ?? fotoDeTipo(e.tipo)} alt="" />
       </div>
       <div className={styles.panelTitulo}>
         <b>
@@ -606,7 +606,7 @@ function PanelCamara({
     <div className={styles.panel}>
       <div className={styles.fotoEquipo}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={fotoCamara(c.esPtz ? "ptz" : (modelo?.tipo ?? "domo"))} alt={`Modelo 3D de la cámara ${modelo ? ETIQUETA_TIPO_CAMARA[modelo.tipo].toLowerCase() : ""}`} />
+        <img src={modeloPorId(c.productoId)?.foto ?? fotoCamara(c.esPtz ? "ptz" : (modelo?.tipo ?? "domo"))} alt={`Modelo 3D de la cámara ${modelo ? ETIQUETA_TIPO_CAMARA[modelo.tipo].toLowerCase() : ""}`} />
       </div>
       <div className={styles.panelTitulo}>
         <span className={styles.numero}>{c.numero}</span>

@@ -1,5 +1,21 @@
 # RELEVO
 
+- **02-11 (claude-code) — Diseñador de videovigilancia, fase 3 de la mejora premium: memoria técnica con IA, recorrer por dentro, imán de esquinas, armar con IA y modelos nuevos.**
+  - Adam: «Sí, fase 3», y mientras se hacía: «no solo trabajamos con Hikvision», «el modelo debe ser hiper profesional», «IA que casi no consuma tokens», «deslizarte y checar y meter y moverte en el mapa», «no se pegan a las esquinas», y dejar en producción, como ejemplo para el equipo, todo lo que se genere. Detalle en `docs/DISENADOR-CCTV.md` §4.3, §4.4 y §6.
+  - **Memoria técnica:** `POST /cctv-disenos/catalogo/leer-ficha` lee el PDF de cualquier marca y no guarda nada. Pantalla `_editor/MemoriaTecnica.tsx`, con la hoja de cada dato y el modelo armado con sus medidas. 210 de 213 datos en 15 PDF reales de 5 marcas y 4 casos escritos, US$0.00099 por ficha.
+  - **Armar con IA:** `POST /cctv-disenos/generar-sitio` saca datos de una frase y `lib/cctv/generarSitio.ts` arma todo el diseño. Las plantillas no gastan. `POST /catalogo/describir` arma un equipo sin su PDF. 20 de 20 frases escritas, US$0.00013 por llamada.
+  - **Recorrer:** `lib/cctv/recorrido.ts` (choques, área, qué cámaras te ven) y `maqueta/motor.ts` (caminar, viajar, revisar, recorrido automático). Arrastrar ahora desliza; girar es clic derecho o el botón «Girar».
+  - **Imán:** `lib/cctv/pegado.ts`. La escena mide los dos muros de una esquina y le pone soporte. Al arrastrar se mide a la altura del equipo.
+  - **Modelos:** `maqueta/modelosEquipos.ts` reescrito; `VisorModelo.tsx` con vistas y cotas que solo dicen lo que dice la ficha. Sin marca por omisión.
+  - Sin migración: `plano` y `datos` son JSON. Funciones nuevas en IA-CLAUDE §7 y §8 y con objetivo en la puerta (`cctv-ficha`, `cctv-sitio`, `cctv-equipo`).
+  - Verificado: tipos de web y API limpios; 198 pruebas del diseñador en web y 91 de `cctv-disenos` en API. En el arnés y en Chrome con ratón real: entrar, caminar, cruzar el portón, revisar un equipo, poner una cámara en un muro, apuntar, ver lo que ve y armar con frase. Fotos revisadas a ojo.
+  - **Falta:** las frases del eval de IA son nuestras, no de gente real. No hay fichas de sirena, sísmica, servidor ni UPS. Sin WebGL no hay recorrido. Fase 4 necesita decidir el inventario y la 5 las especificaciones de cotización de Adam.
+  - No se delegó a Ollama: el motor 3D se fue ajustando mirando cada captura.
+  - Trampas para quien siga:
+    - La niebla de la escena nunca se quita, solo se aleja: quitarla recompila todos los materiales y entrar a caminar tardaba 4 s.
+    - `montaje` y `destinoEnPiso` deben saltarse `userData.esProxy`: las mallas invisibles de las puertas tapan el rayo.
+    - Con el pane del navegador oculto no corre `requestAnimationFrame`: el imán y el recorrido parecen rotos. Probar en Chrome con `--disable-backgrounding-occluded-windows`.
+    - `pdftotext` sin `-raw` separa etiqueta y valor en estas tablas.
 - **02-11 ~11:30 (claude-code) — PDF de cotización: sin segunda portada, decisión de Adam.**
   - **Pedido:** «sigue con una hoja que parece segunda portada pero pobre». Le enseñé dos opciones sobre su cotización 58 y dijo «la más profesional»; era la que le recomendé, sin esa hoja.
   - **Se aparta del Canva a propósito:** su hoja 2 es solo título y proyecto sobre blanco, sin arte de fondo; revisado con la página ya cargada. Copiarla era lo que se veía pobre. No regresarla por «igualar el diseño».

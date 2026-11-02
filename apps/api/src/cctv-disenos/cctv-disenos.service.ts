@@ -289,7 +289,7 @@ export class CctvDisenosService {
     };
   }
 
-  private async exigirAcceso(actor: ActorCctv) {
+  async exigirAcceso(actor: ActorCctv) {
     if (!(await this.puede(actor))) throw new ForbiddenException(MENSAJE_SIN_ACCESO_CCTV);
   }
 
