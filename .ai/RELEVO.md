@@ -1,5 +1,34 @@
 # RELEVO
 
+- **02-11 ~18:30 (claude-code) — Programa Velocidad Core, Ola 3: terminar actividad, terminar jornada y evidencia en menos toques. API en producción; apps en `main`, sin publicar en tiendas.** (`9ad37fbf`, `08fa08f0`, `cb5604d4`, `b33c4429`, `9d46af45`)
+  - Adam aprobó con «Sí, arranca Ola 3» y eligió el deshacer recomendado: 10 minutos la propia persona; después, su jefe con motivo y bitácora; regresa lo que quedó «No cumplida» por esa salida.
+  - **Falta publicar:** hay que subir versión (Android 1.3.0 (23) o la que siga, iOS 1.3 (15)) y lanzar `ios-testflight.yml`. En tiendas siguen en revisión las versiones de vehículos. Cualquier build nuevo desde `main` ya lleva todo esto: no se suba sin el visto bueno de Adam.
+  - **API (`attendance/`):**
+    - `GET attendance/salida/riesgo`: qué reloj se detiene y qué vence hoy, para la hoja. `confirmada` en la checada evita el segundo toque del freno; las apps instaladas siguen con el 422.
+    - `POST attendance/salida/deshacer` (propia, `dentroDeVentanaPropia`) y `POST attendance/:id/deshacer-salida` (jefe, dirección o RH, el mismo día, con motivo). Otro día queda la corrección de hora.
+    - **Por qué se borra la checada:** de `Attendance` sale la nómina. La copia completa, con correcciones y lo que se regresó, queda en `salidas_deshechas` (migración `20261102200500`). La ficha de Asistencias la enseña (`SalidasDeshechas.tsx`).
+    - **Relojes:** la propia persona los recupera. Con su jefe no se reabren, para no inventar tiempo.
+    - **«No cumplida»:** se regresan las filas `CIERRE_JORNADA` con `registradoAt` igual a la salida (o a la hora antes de una corrección) y a esa persona entre los pendientes. Si alguien ya la movió, se queda donde la dejó.
+    - `POST activity-evidence/:id/volver-paso`: regresa a un paso ya pasado, nunca a la entrada ni en corrección (`puedeRegresarA`).
+  - **Apps, las dos con los mismos textos:**
+    - **Mi día:** con la jornada abierta, lo de ahora arriba con «Terminar actividad» y «Te pide la foto final. No toca tu jornada.»; la jornada aparte con «Terminar mi jornada» y la hoja «¿Terminar tu jornada?». Fila «Deshacer · quedan N min».
+    - **Evidencia:** de 21 a 10 toques con 4 fotos. Ráfaga con la cámara abierta, envío solo a los 3 s en entrada, salida y campos, formulario y foto final en un toque, «Regresar a fotos», y `EvidenciaApertura` abre la cámara desde Mi día.
+    - **Sin señal:** ya no dice «Salida registrada», y el paso de evidencia avanza mientras lo encolado llega en orden.
+    - **Formatos** en la app (`FormatosScreen.kt`, `FormatosView.swift`); el acceso se abre el 06-11, como en la web. Cronómetro `asignar`, `autoasignar` y `asignar_formato` también en apps.
+    - El port a iOS lo hizo un subagente con el Android ya aprobado; se revisó el diff de evidencia y la hoja.
+  - **Medido:**
+    - **Deshacer de punta a punta** con `register` y servicios reales en una base temporal, ya borrada: sale «No cumplida» y regresa, relojes reabiertos solo en la propia, segunda salida sin choque, ajeno rechazado.
+    - **Android, recorrido en el emulador** contra una API simulada, sin arnés versionado: Mi día, cámara directa, envío solo, las 4 fotos de corrido, avance solo, «Regresar a fotos», hoja, salida con `confirmada: true`, deshacer con `consent: true`. Faltó completar la foto final en el emulador: se atascó el teclado. Pruebas: 983 en verde.
+    - **iOS:** `iOS · compilar (simulador)` en verde y capturas 84 a 86 contra el mockup, en modo demo.
+    - **API:** suites de asistencia, permisos y tenant en verde. **No se corrió la suite completa en local.** CI en verde en `6b1c5af8`, que contiene todo menos `9d46af45`, de iOS, que aún no compila en CI al escribir esto.
+  - **Sin verificar:** nada en un teléfono físico ni con la API real; la cámara del sistema real al checar; en iOS, la ráfaga y la cámara directa no se han ejecutado; la acción del jefe en la web no se ha usado con datos reales.
+  - **Trampas:**
+    - No insertes rutas antes de `@Patch(':id/correccion')` buscando esa línea: arriba están sus `@UseGuards`/`@RBAC` y le quitas los permisos. Pasó en esta copia y se detectó antes de subir.
+    - Una prueba de «No cumplida» necesita `asignadoAt` viejo: `salidaCuentaDesde` ignora salidas dentro del margen tras asignar.
+    - El flujo de capturas de iOS solo acepta nombres de dos cifras; las nuevas son 84 a 86.
+    - El emulador `-read-only` con `swiftshader` va muy lento: da 30 a 60 s entre toques o se pierden.
+  - No se delegó a Ollama: reglas de nómina y flujos de cámara, revisados contra producción.
+
 - **02-11 ~17:20 (claude-code) — Giro de UI/UX: «Maqueta viva» tampoco convenció. No se construye nada hasta que Adam señale referencias.**
   - **Qué pasó:** Adam vio el concepto en 3D y respondió «No me convence», sin decir por qué. Producción y Core no cambiaron.
   - **Hipótesis, sin confirmar:** repite dos cosas que ya rechazó en ARTA el 01 y 02-11: contenido de ejemplo en vez de la empresa real, y recorrido forzado con el scroll.
