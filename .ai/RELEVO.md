@@ -1,5 +1,39 @@
 # RELEVO
 
+- **02-11 ~11:15 (claude-code) — Catálogo de CT: se sincroniza otra vez y trae todo el XML (`4b6cf1bc`). Adam: «Sí, arregla CT».** Syscom sigue pendiente: lo tramita Adam.
+  - **Lo que estaba mal:** la cola `supplier.ct.sync` no tenía Worker desde el 22-08. `JobQueueService.register` corría antes de su `onModuleInit` y se saltaba el Worker sin error (`a1f29d1e` cambió el orden de arranque; causa muy probable, la prueba nueva cubre el orden). Había 7,098 trabajos esperando y 3,972 de 6,025 filas sin tocar desde agosto. `integra.acs.fanout.retry` tenía el mismo problema.
+  - **Costos viejos que ya se ofrecían:** `861683-B21` $5,998 → $12,029; `21T1001BLM` $18,766 → $25,677; `HDWT860UZSVA` $3,516 → $4,835. De 4,868 precios comparables con el JSON, 13.7 % se había movido más de 0.5 %: mediana 7.2 %, p90 25.2 %.
+  - **Cambios:**
+    - La cola elige Redis en el constructor.
+    - El cron deja un solo trabajo por tipo (`unico`), y una corrida reciente se salta: los 7,098 se vaciaron en segundos sin correr 7 mil sincronizaciones.
+    - `connectors/ct-xml.ts` lee `productos.xml`, que trae todo el catálogo; el JSON solo trae lo que hay en existencia y manda en lo que trae.
+    - Lo que CT deja de publicar se apaga, no se borra: 86 filas.
+    - El sync solo escribe lo que cambió, y `{}` en `existencia` quiere decir «sin piezas».
+    - El buscador pone primero el modelo exacto, sin guiones ni espacios, y lo que hay en existencia.
+    - La fila nueva también ofrece lo «sobre pedido».
+    - Lo del mayorista sin piezas no se autollena, salvo si se escribió nada más el modelo (regla agregada en `emparejar-partidas.ts`, avisada a la sesión de Cotizar).
+  - **Cobertura de los modelos cotizados, con el buscador real en producción:** 23 → 37 de 120 productos (19.2 % → 30.8 %), revisado a mano; salió 38 y `TC6-PASS` → `TC6-PASSR` es otro producto. No se perdió ninguno. El «18 %» que se venía citando es otra medida: 26 de 143 textos, contra la tabla y con una regla de coincidencia más floja que el buscador.
+  - **Producción:** primeras corridas OK de esa tabla: JSON 5,619 leídas y 5,437 escritas en 29 s; XML 14,756 leídas y 10,689 escritas en 38 s. Catálogo: 14,877 filas, 14,769 activas, 5,673 con piezas. Tabla de 10 a 18 MB. Una búsqueda pasa de 21 a 106 ms. La corrida automática de las 17:00 UTC escribió 1,552 de 5,619 filas en 7 s; al comparar otra vez ese mismo archivo contra lo guardado hay 0 diferencias, así que lo escrito son cambios del archivo de CT.
+  - **Motor real, con lista pegada, sin IA y sin guardar (56 cotizaciones antes y después):** `CPE210`, que solo está en el XML, se llena con $709.50 y sale «sobre pedido»; `RBC35` se llena con 46 piezas; lo genérico queda como opciones.
+  - **Pruebas:**
+    - API: tipos sin errores, 387 suites y 4,844 pruebas en verde, en un contenedor desechable del servidor, porque el equipo tenía 400 MB libres. `accounting/qa-adversarial` pide `TZ=America/Mexico_City`: en UTC fallan 4 y no es por este cambio.
+    - Web: los 211 archivos en verde. 207 en contenedor (1,754 pruebas); los otros 4 en mi copia, porque la imagen no trae `shared/` ni `apps/api/src`.
+    - Eval `--real` con el catálogo fijo: 38/40, clientes 40/40, renglones 150/151, modelos 17/17, sin bajar.
+    - Eval con el catálogo completo: alcanzables 33 → 42 de 126, lleno bien 18 igual, lleno con otro 12 → 11, la primera opción cumple 20 → 25.
+    - El alcance casi no se vuelve autollenado: las frases del eval rara vez dicen el modelo.
+  - **Decisión de Adam pendiente — Integra:** `integra.acs.fanout.retry` quedó **pausada** en Redis (`meta paused=1`, 2 trabajos en `:paused`). Son `person.update` del 04-09 con datos de entonces, que se repetirían contra equipos de acceso. Esos reintentos nunca han corrido, así que un fallo al mandar a una terminal no se reintenta y sigue igual que antes. Para encenderla: revisar o borrar esos 2 y `queue.resume()`.
+  - **Sin verificar:** nada con sesión real en pantalla (el inicio de sesión es de Adam). Quien cotiza no lo ha usado. Lo «usado» conserva su costo viejo: `EAP660HD` se ofrece a $6,230.84 y hoy CT lo da en $4,837.
+  - **Riesgos vistos, sin tocar:**
+    - El disco llegó a 91 % al compilar la web y bajó a 83 %; con la nota de que al 90 % ya tumbó la base, conviene limpiar imágenes o crecer el disco.
+    - Redis tiene `allkeys-lru` y BullMQ pide `noeviction`: con presión de memoria puede tirar trabajos.
+    - `search` sigue ordenando por clave lo genérico: «monitor» da lo primero con piezas, no lo más relevante.
+  - **Trampas:**
+    - `git archive` en este Windows exporta CRLF y el repo va en LF: al armar un commit con índice temporal, respetar el fin de línea de arriba (salió un diff de 4 mil líneas, no se subió).
+    - El XML no trae `idProducto` ni promociones, y su `nombre` es genérico: se arma como el JSON (nombre + marca + modelo).
+    - Pasar la zona horaria si se corre la API en contenedor.
+  - **Syscom (lo sigue Adam):** cubriría 62 de 120 modelos (51.7 %); con el XML de CT, 92 de 120 (76.7 %). Medido en su buscador público, con precio de lista, no con el de la cuenta. Hace falta número de cliente, formulario de 38 preguntas con acuerdo firmado e IP 5.78.215.109. Notas en `side-session-notes/local_0cf4b585-1470-4114-8b76-55f54f3dc982/mayorista-cobertura-0111.md` (fuera del repo).
+  - No se delegó a Ollama: era un arreglo chico sobre producción, con la causa ya medida.
+
 - **02-11 ~11:00 (claude-code) — Vehículos: el estándar y el manual ya se revisaron en producción con la sesión del CEO (`b903c71b`).** Cierra el «sin verificar» del bloque de `44c26f02`.
   - **Tarifas:** la tarjeta carga de la API, rechaza una vida útil de 50 km sin llamar a la API y guarda con `PUT` 200. Se guardó una vez con los mismos valores: queda una fila `vehiculos.estandar` en `system_settings`, sin cambiar ninguna cifra. Sigue igual al recargar.
   - **Ficha:** «Falta por capturar» en la Frontier con sus 10 renglones y sus atajos. «Agregar documento» ya no ofrece el manual y «Subir manual» lleva a la revisión.
