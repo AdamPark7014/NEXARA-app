@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { registrarCatalogo, type ModeloCamara } from "./catalogo";
+import { resumenDelPlano } from "./editor";
 import { GRABACION_POR_OMISION } from "./infraestructura";
 import { generarSitio, PLANTILLAS, type EspecSitio } from "./generarSitio";
 import { listaNiveles } from "./niveles";
@@ -110,5 +111,48 @@ describe("Armar un diseño a partir de unos cuantos datos", () => {
       expect(listaNiveles(r.raiz).flatMap((n) => n.plano.camaras).length, p.id).toBeGreaterThan(1);
       expect((r.raiz.equipos ?? []).some((e) => e.tipo === "gabinete"), p.id).toBe(true);
     }
+  });
+
+  it("con anaqueles pone una cámara por pasillo, viendo a lo largo", () => {
+    const { raiz } = generarSitio({ anchoM: 30, fondoM: 18, areas: [{ nombre: "Bodega", tipo: "bodega", m2: 540 }] });
+    const pasillos = raiz.camaras.filter((c) => c.nombre.includes("pasillo"));
+    const filas = raiz.obstaculos.filter((o) => o.nombre === "Anaquel").length;
+    expect(filas).toBeGreaterThan(1);
+    expect(pasillos).toHaveLength(filas + 1);
+    for (const c of pasillos) expect([90, 270]).toContain(Math.round(c.rumboDeg));
+    // Cada una en un pasillo distinto.
+    expect(new Set(pasillos.map((c) => Math.round(c.pos.y * K))).size).toBe(pasillos.length);
+  });
+
+  it("las cámaras quedan pegadas a sus muros y no más altas que ellos", () => {
+    const { raiz } = generarSitio(PLANTILLAS[0].espec);
+    for (const c of raiz.camaras.filter((x) => x.montaje !== "poste")) {
+      const cerca = raiz.muros.filter((m) => m.tipo !== "reja").some((m) => {
+        const a = { x: m.a.x * K, y: m.a.y * K };
+        const b = { x: m.b.x * K, y: m.b.y * K };
+        const l = Math.hypot(b.x - a.x, b.y - a.y);
+        const t = Math.max(0, Math.min(1, ((c.pos.x * K - a.x) * (b.x - a.x) + (c.pos.y * K - a.y) * (b.y - a.y)) / (l * l)));
+        return Math.hypot(a.x + (b.x - a.x) * t - c.pos.x * K, a.y + (b.y - a.y) * t - c.pos.y * K) < 0.3;
+      });
+      expect(cerca, c.nombre).toBe(true);
+      expect(c.alturaM).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it("las plantillas salen sin nada que corregir: alarmas, grabador y cable alcanzan", () => {
+    for (const p of PLANTILLAS) {
+      const { raiz } = generarSitio(p.espec as EspecSitio);
+      const resumen = resumenDelPlano(raiz, GRABACION_POR_OMISION);
+      const mal = revisionDelSistema(raiz, resumen, GRABACION_POR_OMISION).filter((x) => !x.ok);
+      expect(mal.map((x) => `${x.titulo}: ${x.detalle}`), p.id).toEqual([]);
+    }
+  });
+
+  it("el porcentaje del interior no cuenta el patio que encierra la reja", () => {
+    const conPatio = generarSitio({ anchoM: 20, fondoM: 12, areas: [{ nombre: "Oficinas", tipo: "oficina", m2: 240, camaras: 4 }, { nombre: "Patio", tipo: "patio", m2: 400, camaras: 1 }] }).raiz;
+    const sinPatio = { ...conPatio, muros: conPatio.muros.filter((m) => m.tipo !== "reja") };
+    const a = resumenDelPlano(conPatio, GRABACION_POR_OMISION).cobertura?.cubierto;
+    expect(a).toBe(resumenDelPlano(sinPatio, GRABACION_POR_OMISION).cobertura?.cubierto);
+    expect(a).toBeGreaterThan(50);
   });
 });
