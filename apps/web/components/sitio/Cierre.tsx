@@ -2,6 +2,7 @@ import Link from "next/link";
 import PublicIcon from "@/app/components/PublicIcon";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import s from "./sitio.module.css";
+import Aurora from "./Aurora";
 import Flecha from "./Flecha";
 import { ruta } from "./rutas";
 
@@ -21,7 +22,7 @@ type Props = {
   medicion?: { primario: string; whatsapp: string; ruta?: string };
 };
 
-/** Llamado final de cada página: título enorme, dos acciones y tres garantías. */
+/** Llamado final de cada página: tarjeta con el degradado de marca, dos acciones y tres garantías. */
 export default function Cierre({
   titulo,
   texto,
@@ -37,6 +38,7 @@ export default function Cierre({
     <section className={s.final} aria-labelledby={`cierre-${clave}`}>
       <div className={s.contenedor}>
         <div className={s.finalTarjeta} data-aparecer>
+          <Aurora />
           <h2 id={`cierre-${clave}`} className={s.titulo}>
             {titulo}
           </h2>

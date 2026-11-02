@@ -1,6 +1,7 @@
 import s from "./sitio.module.css";
 import p from "./paginas.module.css";
 import i from "./interior.module.css";
+import Aurora from "./Aurora";
 import Migas, { type Miga } from "./Migas";
 
 type Props = {
@@ -23,6 +24,7 @@ export default function HeroInterior({ id, migas, antetitulo, titulo, lead, acci
   const marco = tipoVisual === "mapa" ? `${i.heroVisual} ${i.heroVisualMapa}` : i.heroVisual;
   return (
     <section className={`${p.hero} ${i.hero}`} aria-labelledby={id}>
+      <Aurora />
       <div className={`${s.contenedor} ${s.centro}`}>
         {migas ? <Migas migas={migas} /> : null}
         <p className={s.antetitulo}>{antetitulo}</p>

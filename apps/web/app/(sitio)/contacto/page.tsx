@@ -5,6 +5,7 @@ import { buildStudioPageMetadata } from "@/lib/page-seo";
 import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
+import Aurora from "@/components/sitio/Aurora";
 import Flecha from "@/components/sitio/Flecha";
 import FormularioContacto from "@/components/sitio/FormularioContacto";
 import Copiar from "@/components/sitio/Copiar";
@@ -62,6 +63,7 @@ export default function PropuestaContacto() {
         }}
       />
       <section className={p.hero} aria-labelledby="contacto-hero" style={{ paddingBottom: "clamp(40px, 5vw, 64px)" }}>
+        <Aurora />
         <div className={`${s.contenedor} ${s.centro}`}>
           <p className={s.antetitulo}>Contacto</p>
           <h1 id="contacto-hero" className={p.heroTitulo}>

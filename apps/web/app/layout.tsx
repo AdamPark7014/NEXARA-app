@@ -19,7 +19,6 @@ import {
 } from "@/lib/brand";
 
 const spaceGrotesk = Space_Grotesk({
-  preload: false,
   subsets: ["latin"],
   display: "swap",
   weight: ["400", "500", "600", "700"],
@@ -28,7 +27,6 @@ const spaceGrotesk = Space_Grotesk({
 
 // Fallback estable para UI: Inter como variable de UI (en lugar de Inter Tight)
 const interTight = Inter({
-  preload: false,
   subsets: ["latin"],
   display: "swap",
   weight: ["400", "500", "600", "700"],
@@ -55,7 +53,6 @@ const display = Inter_Tight({
 
 // Body fallback: Inter como cuerpo (variable mantiene nombre de marca)
 const manrope = Inter({
-  preload: false,
   subsets: ["latin"],
   display: "swap",
   weight: ["300", "400", "500", "600", "700"],
@@ -66,7 +63,6 @@ const manrope = Inter({
 
 // Sans redondeada para headings públicos (look amable) — fallback a Space Grotesk variable
 const plusJakarta = Space_Grotesk({
-  preload: false,
   subsets: ["latin"],
   display: "swap",
   weight: ["400", "600", "700"],
