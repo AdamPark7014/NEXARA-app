@@ -63,6 +63,7 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import { toast } from "@/components/Toast";
 import { exportToExcel } from "@/lib/export-excel";
 import s from "./accounting.module.css";
+import { aFechaLocal, formatoFechaLocal } from "@/lib/fecha-calendario";
 
 interface JournalEntry {
   id: number;
@@ -332,11 +333,11 @@ function TablaDatos<T>({
 /** Antigüedad de saldos en cinco cortes (por cobrar o por pagar). */
 function AgingCard({ title, subtitle, aging }: { title: string; subtitle: string; aging: any }) {
   const cortes: [string, unknown][] = [
-    ["Current", aging?.current],
-    ["1–30d", aging?.d1_30],
-    ["31–60d", aging?.d31_60],
-    ["61–90d", aging?.d61_90],
-    [">90d", aging?.d90_plus],
+    ["Al corriente", aging?.current],
+    ["1–30 días", aging?.d1_30],
+    ["31–60 días", aging?.d31_60],
+    ["61–90 días", aging?.d61_90],
+    ["Más de 90 días", aging?.d90_plus],
   ];
   return (
     <Card className={s.tarjeta}>
@@ -1160,12 +1161,12 @@ export default function AccountingPage() {
       render: (e) => {
         if (!e.date) return <span className={s.tenue}>—</span>;
         const isDraft = e.status === "DRAFT" || e.status === "BORRADOR";
-        const days = Math.floor((Date.now() - new Date(e.date).getTime()) / 86400000);
+        const days = Math.floor((Date.now() - (aFechaLocal(e.date)?.getTime() ?? Date.now())) / 86400000);
         const tonoDias = days >= 14 ? s.diasPeligro : days >= 7 ? s.diasAviso : "";
         return (
           <div className={s.fechaCelda}>
             <span className={s.fechaTexto}>
-              {new Date(e.date).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })}
+              {formatoFechaLocal(e.date, { day: "2-digit", month: "short", year: "2-digit" })}
             </span>
             {isDraft && days > 0 && (
               <span className={`${s.diasSin} ${tonoDias}`}>
@@ -1272,7 +1273,7 @@ export default function AccountingPage() {
     { key: "name", label: "Periodo", render: p => <strong className={s.principal}>{p.name}</strong> },
     { key: "range", label: "Rango", render: p => (
       <span className={s.fechasCelda}>
-        {new Date(p.startDate).toLocaleDateString("es-MX")} — {new Date(p.endDate).toLocaleDateString("es-MX")}
+        {formatoFechaLocal(p.startDate)} — {formatoFechaLocal(p.endDate)}
       </span>
     ) },
     { key: "isClosed", label: "Estado", width: 220, render: p => (
@@ -1459,36 +1460,36 @@ export default function AccountingPage() {
               ))}
               <StatRow variant="strip" ariaLabel="Indicadores financieros">
                 <Stat
-                  label="Cash"
+                  label="En el banco"
                   value={<Money value={financeInsights.kpis?.cashBalance ?? 0} compact />}
                   hint="saldo en bancos"
                   icon={<AccountBalanceOutlinedIcon />}
                   iconTone="neutral"
                 />
                 <Stat
-                  label="Working capital"
+                  label="Capital de trabajo"
                   value={<Money value={financeInsights.kpis?.workingCapital ?? 0} compact />}
                   hint="activo menos pasivo circulante"
                   icon={<AccountBalanceWalletOutlinedIcon />}
                   iconTone="neutral"
                 />
                 <Stat
-                  label="DSO"
-                  value={`${financeInsights.kpis?.dso ?? 0}d`}
-                  hint="días en cobrar"
+                  label="Tiempo de cobro"
+                  value={`${financeInsights.kpis?.dso ?? 0} ${(financeInsights.kpis?.dso ?? 0) === 1 ? "día" : "días"}`}
+                  hint="promedio en cobrar"
                   icon={<ScheduleOutlinedIcon />}
                   iconTone="neutral"
                 />
                 <Stat
-                  label="DPO"
-                  value={`${financeInsights.kpis?.dpo ?? 0}d`}
-                  hint="días en pagar"
+                  label="Tiempo de pago"
+                  value={`${financeInsights.kpis?.dpo ?? 0} ${(financeInsights.kpis?.dpo ?? 0) === 1 ? "día" : "días"}`}
+                  hint="promedio en pagar"
                   icon={<EventOutlinedIcon />}
                   iconTone="neutral"
                 />
                 <Stat
-                  label="Runway"
-                  value={financeInsights.kpis?.runwayMonths != null ? `${financeInsights.kpis.runwayMonths}m` : "∞"}
+                  label="Alcance de caja"
+                  value={financeInsights.kpis?.runwayMonths != null ? `${financeInsights.kpis.runwayMonths} ${financeInsights.kpis.runwayMonths === 1 ? "mes" : "meses"}` : "∞"}
                   hint="meses de operación cubiertos"
                   tone={financeInsights.kpis?.runwayMonths != null && financeInsights.kpis.runwayMonths < 6 ? "danger" : "default"}
                   icon={<HourglassBottomOutlinedIcon />}
@@ -1503,12 +1504,12 @@ export default function AccountingPage() {
                   iconTone="neutral"
                 />
               </StatRow>
-              <AgingCard title="Aging CXC" subtitle="Antigüedad de cuentas por cobrar" aging={financeInsights.aging?.ar} />
-              <AgingCard title="Aging CXP" subtitle="Antigüedad de cuentas por pagar" aging={financeInsights.aging?.ap} />
+              <AgingCard title="Antigüedad de lo que me deben" subtitle="Cuentas por cobrar, por días de atraso" aging={financeInsights.aging?.ar} />
+              <AgingCard title="Antigüedad de lo que debo pagar" subtitle="Cuentas por pagar, por días de atraso" aging={financeInsights.aging?.ap} />
               <Card className={s.tarjeta}>
                 <CardHead
-                  title="Cashflow semanal · 90d"
-                  subtitle={`In ${Number(financeInsights.cashflow90d?.inflow || 0).toLocaleString("es-MX")} · Out ${Number(financeInsights.cashflow90d?.outflow || 0).toLocaleString("es-MX")}`}
+                  title="Flujo de efectivo semanal · 90 días"
+                  subtitle={`Entró ${Number(financeInsights.cashflow90d?.inflow || 0).toLocaleString("es-MX")} · Salió ${Number(financeInsights.cashflow90d?.outflow || 0).toLocaleString("es-MX")}`}
                 />
                 <div className={s.flujoCuerpo}>
                   <div className={s.flujo}>

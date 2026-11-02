@@ -32,6 +32,7 @@ import { financeStatusLabel } from "@/lib/finance-status-labels";
 import { toast } from "@/components/Toast";
 import TruncatedId from "@/components/ui/TruncatedId";
 import s from "./ContabilidadInvoicesView.module.css";
+import { aFechaLocal, formatoFechaLocal } from "@/lib/fecha-calendario";
 
 type InvoiceRow = {
   id: number;
@@ -52,9 +53,14 @@ function pendingOf(row: InvoiceRow) {
   return Number(row.totalAmount || 0) - Number(row.paidAmount || 0);
 }
 
+/** Una factura pagada, cancelada o en borrador ya no debe nada, aunque su fecha haya pasado. */
+function sigueAbierta(row: InvoiceRow) {
+  return pendingOf(row) > 0.01 && !["PAID", "CANCELLED", "DRAFT"].includes(row.status);
+}
+
 function daysOverdue(due?: string | null) {
-  if (!due) return null;
-  const d = new Date(due);
+  const d = aFechaLocal(due);
+  if (!d) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.floor((today.getTime() - d.getTime()) / 86_400_000);
@@ -208,9 +214,7 @@ export default function ContabilidadInvoicesView({
     const needle = q.trim().toLowerCase();
     let rows = items;
     if (mode !== "all") {
-      rows = rows.filter(
-        (r) => pendingOf(r) > 0.01 && !["PAID", "CANCELLED", "DRAFT"].includes(r.status),
-      );
+      rows = rows.filter(sigueAbierta);
     }
     if (!needle) return rows;
     return rows.filter((r) =>
@@ -227,7 +231,7 @@ export default function ContabilidadInvoicesView({
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const buckets = { today: 0, d7: 0, overdue: 0 };
     for (const r of baseRows) {
-      const due = r.dueDate ? new Date(r.dueDate) : null;
+      const due = aFechaLocal(r.dueDate);
       const pend = pendingOf(r);
       if (!due) continue;
       const diff = Math.floor((due.getTime() - start.getTime()) / 86_400_000);
@@ -243,7 +247,7 @@ export default function ContabilidadInvoicesView({
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     return baseRows.filter((r) => {
-      const due = r.dueDate ? new Date(r.dueDate) : null;
+      const due = aFechaLocal(r.dueDate);
       if (!due) return false;
       const diff = Math.floor((due.getTime() - start.getTime()) / 86_400_000);
       if (aging === "vencido") return diff < 0;
@@ -393,11 +397,11 @@ export default function ContabilidadInvoicesView({
       label: "Vence",
       render: (r) => {
         const od = daysOverdue(r.dueDate);
-        const vencida = od != null && od > 0;
+        const vencida = sigueAbierta(r) && od != null && od > 0;
         return (
           <span className={s.vence}>
             <span className={vencida ? s.fechaVencida : s.fecha}>
-              {r.dueDate ? new Date(r.dueDate).toLocaleDateString("es-MX") : "—"}
+              {formatoFechaLocal(r.dueDate)}
             </span>
             {vencida && (
               <span className={s.diasVencida}>
@@ -631,12 +635,10 @@ export default function ContabilidadInvoicesView({
                 {selected.receptorName || selected.emisorName || "—"}
               </Dato>
               <Dato etiqueta="Emisión">
-                {selected.issueDate
-                  ? new Date(selected.issueDate).toLocaleDateString("es-MX")
-                  : "—"}
+                {formatoFechaLocal(selected.issueDate)}
               </Dato>
               <Dato etiqueta="Vence">
-                {selected.dueDate ? new Date(selected.dueDate).toLocaleDateString("es-MX") : "—"}
+                {formatoFechaLocal(selected.dueDate)}
               </Dato>
               <Dato etiqueta="Estado">
                 <Badge dot tone={TONO_ESTADO[statusLabel(selected).tone]}>

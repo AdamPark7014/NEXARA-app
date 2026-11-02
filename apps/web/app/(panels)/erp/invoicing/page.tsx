@@ -54,6 +54,7 @@ import {
   type Notice,
 } from "./_parts";
 import s from "./invoicing.module.css";
+import { aFechaLocal, formatoFechaLocal } from "@/lib/fecha-calendario";
 
 
 interface InvoiceRow {
@@ -639,13 +640,13 @@ export default function InvoicingPage() {
     {
       key: "issueDate", label: "Emisión",
       render: (f) => {
-        const days = Math.floor((Date.now() - new Date(f.issueDate).getTime()) / 86400000);
+        const days = Math.floor((Date.now() - (aFechaLocal(f.issueDate)?.getTime() ?? Date.now())) / 86400000);
         const isPending = f.status !== "PAID" && f.status !== "CANCELLED";
         const antiguedad = days >= 60 ? `${s.sub} ${s.subAlerta}` : days >= 30 ? `${s.sub} ${s.subAviso}` : s.sub;
         return (
           <div className={s.celda}>
             <span className={s.fecha}>
-              {new Date(f.issueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
+              {formatoFechaLocal(f.issueDate, { day: "2-digit", month: "short" })}
             </span>
             {isPending && days > 0 && (
               <span className={antiguedad} title="Días desde la emisión">

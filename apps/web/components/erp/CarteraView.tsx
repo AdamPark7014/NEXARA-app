@@ -47,6 +47,7 @@ import {
 } from "@/lib/finance-status-labels";
 import { toast } from "@/components/Toast";
 import s from "./CarteraView.module.css";
+import { formatoFechaLocal } from "@/lib/fecha-calendario";
 
 /**
  * Cartera de la contadora — cuentas por cobrar y por pagar.
@@ -228,9 +229,7 @@ function fechaCorta(iso: string | null | undefined) {
 
 function fechaLarga(iso: string | null | undefined) {
   if (!iso) return "—";
-  const d = new Date(iso.length <= 10 ? `${iso}T12:00:00` : iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
+  return formatoFechaLocal(iso, { day: "numeric", month: "long", year: "numeric" }, iso);
 }
 
 /** "12 días vencida" / "faltan 4 días" — en palabras, no en signos. */
