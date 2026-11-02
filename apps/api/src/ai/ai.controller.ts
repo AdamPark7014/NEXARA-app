@@ -58,7 +58,7 @@ export class AiController {
 
   /**
    * ¿Hay IA configurada en el servidor? (la web oculta el asistente si no). «Asignar con IA»
-   * es del CEO y de David (`asistentePorCorreo`): la matriz no basta porque los directores tienen `/api/**`.
+   * es del CEO, de David y de José Antonio (`asistentePorCorreo`): la matriz no basta porque los directores tienen `/api/**`.
    */
   @Get('asistente/estado')
   @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS] })

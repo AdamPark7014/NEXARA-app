@@ -1,5 +1,11 @@
 # RELEVO
 
+- **02-11 (claude-code) — «Asignar con IA»: entra José Antonio Ramírez.** Adam lo eligió entre los dos Antonios; en la base es José Antonio Ramírez Salazar (id 39, `jose.ramirez@`,
+  Encargado de soporte), no Antonio Hernández Matías. Va por correo, como David, en `ASISTENTE_POR_CORREO` (`ai/asistente/tipos-actividad.ts`) y `puedeAsignarConIa` (web). Crea tarea, proyecto,
+  servicio y comercial, igual que `CREATE_BY_EMAIL`; solo le salen las personas que ya puede asignar.
+  - **Falta decidir:** Adam escribió «solamente Christian, David o Antonio», pero sigue sin responder si Claudia y él se quedan. Hoy siguen dentro quienes entran por `isChainTopAuthority`.
+    No saqué a nadie.
+
 - **02-11 (claude-code) — Diseñador de videovigilancia, fase 3 de la mejora premium: memoria técnica con IA, recorrer por dentro, imán de esquinas, armar con IA y modelos nuevos.**
   - Adam: «Sí, fase 3», y mientras se hacía: «no solo trabajamos con Hikvision», «el modelo debe ser hiper profesional», «IA que casi no consuma tokens», «deslizarte y checar y meter y moverte en el mapa», «no se pegan a las esquinas», y dejar en producción, como ejemplo para el equipo, todo lo que se genere. Detalle en `docs/DISENADOR-CCTV.md` §4.3, §4.4 y §6.
   - **Memoria técnica:** `POST /cctv-disenos/catalogo/leer-ficha` lee el PDF de cualquier marca y no guarda nada. Pantalla `_editor/MemoriaTecnica.tsx`, con la hoja de cada dato y el modelo armado con sus medidas. 210 de 213 datos en 15 PDF reales de 5 marcas y 4 casos escritos, US$0.00099 por ficha.

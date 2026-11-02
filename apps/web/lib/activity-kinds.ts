@@ -296,7 +296,8 @@ export function isCeoEmail(email?: string | null): boolean {
  * de `asistentePorCorreo` en la API, que es la autoridad.
  */
 export function puedeAsignarConIa(email?: string | null): boolean {
-  return norm(email) === ORG_EMAILS.david;
+  const correo = norm(email);
+  return correo === ORG_EMAILS.david || correo === ORG_EMAILS.antonio;
 }
 
 export function canOfferAssignmentCharge(email?: string | null): boolean {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ORG_EMAILS, kindsForAssignment, kindsForCreator, kindsForTarget } from "@/lib/activity-kinds";
+import { ORG_EMAILS, kindsForAssignment, kindsForCreator, kindsForTarget, puedeAsignarConIa } from "@/lib/activity-kinds";
 import { clientSectorsForActivityKind } from "@/lib/client-sectors";
 
 const PAULINA = "finanzas@nexara.com.mx";
@@ -51,6 +51,16 @@ describe("tipos de actividad por persona (creador × destinatario)", () => {
     ]);
     expect(kindsForAssignment({ creatorEmail: ORG_EMAILS.roberto, targetEmail: ORG_EMAILS.roberto })).toEqual(["tarea"]);
     expect(kindsForAssignment({ creatorEmail: ORG_EMAILS.joan, targetEmail: ORG_EMAILS.joan })).toEqual(["tarea"]);
+  });
+});
+
+describe("quién asigna con IA, además de dirección", () => {
+  it("David y José Antonio; el otro Antonio y los demás, no", () => {
+    expect(puedeAsignarConIa("operaciones@nexara.com.mx")).toBe(true);
+    expect(puedeAsignarConIa(" JOSE.RAMIREZ@nexara.com.mx ")).toBe(true);
+    expect(puedeAsignarConIa("antonio.hernandez@nexara.com.mx")).toBe(false);
+    expect(puedeAsignarConIa("soporte@nexara.com.mx")).toBe(false);
+    expect(puedeAsignarConIa(null)).toBe(false);
   });
 });
 
