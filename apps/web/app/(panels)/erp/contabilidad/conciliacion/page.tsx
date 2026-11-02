@@ -1,15 +1,31 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import EmptyState from "@/components/ui/EmptyState";
-import InlineAlert from "@/components/ui/InlineAlert";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import FilterScale, { type ScaleItem } from "@/components/ui/FilterScale";
+import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
+import TouchAppOutlinedIcon from "@mui/icons-material/TouchAppOutlined";
+import LinkOffOutlinedIcon from "@mui/icons-material/LinkOffOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardHead,
+  DataTable,
+  DateInput,
+  EmptyState,
+  FilterChip,
+  FilterChips,
+  ListCard,
+  ListFooter,
+  ModuleToolbar,
+  SkeletonRows,
+  Select,
+  type Column,
+  type Tone,
+} from "@/components/base";
+import { MesaPagina } from "@/components/mesa-contable/MesaPagina";
+import { Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
@@ -114,7 +130,7 @@ const ESTADO_LABEL: Record<Estado, string> = {
  * hay algo que hacer —revisar varias opciones, resolver una discrepancia—; el
  * flujo normal se queda neutro.
  */
-const ESTADO_TONO: Record<Estado, StatusTone> = {
+const ESTADO_TONO: Record<Estado, Tone> = {
   CONCILIADO: "success",
   SUGERENCIA_ALTA: "info",
   SUGERENCIA_MULTIPLE: "warning",
@@ -152,7 +168,7 @@ function fechaCorta(iso?: string | null) {
   return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" });
 }
 
-/** Pesos en texto plano — solo para `message`/atributos string de InlineAlert. */
+/** Pesos en texto plano — solo para las frases de los avisos (`Alert`) que se arman como texto. */
 const formatPesos = (n: number) =>
   n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 });
 
@@ -180,11 +196,20 @@ function textoDiferenciaDias(dias: number) {
   return d === 1 ? "1 día de separación" : `${d} días de separación`;
 }
 
-function scoreColor(score: number, alto: number) {
-  if (score >= alto) return "var(--state-success-text, #15803d)";
-  if (score >= alto - 20) return "var(--state-warning-text, #b45309)";
-  return "var(--text-secondary)";
+type NivelPuntaje = "alto" | "medio" | "bajo";
+
+/** El nivel decide el color (en el CSS, por `data-nivel`) y el punto de la coincidencia. */
+function nivelPuntaje(score: number, alto: number): NivelPuntaje {
+  if (score >= alto) return "alto";
+  if (score >= alto - 20) return "medio";
+  return "bajo";
 }
+
+const TONO_PUNTAJE: Record<NivelPuntaje, Tone> = {
+  alto: "success",
+  medio: "warning",
+  bajo: "neutral",
+};
 
 export default function ConciliacionPage() {
   const { user } = useUser();
@@ -200,7 +225,7 @@ export default function ConciliacionPage() {
   const [loading, setLoading] = useState(true);
   const [aplicando, setAplicando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Lo que falló al conciliar: InlineAlert junto al botón (además del toast). */
+  /** Lo que falló al conciliar: aviso junto al botón (además del toast). */
   const [errorAplicar, setErrorAplicar] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const cargaRef = useRef(0);
@@ -313,7 +338,7 @@ export default function ConciliacionPage() {
         toast.success(`Movimiento conciliado con ${cand.folio}`);
         await cargar();
       } catch (e) {
-        // Toast inmediato + InlineAlert junto al botón (el motivo debe quedar
+        // Toast inmediato + aviso junto al botón (el motivo debe quedar
         // visible al releer la pantalla).
         const msg = `No se pudo conciliar con ${cand.folio}. ${formatApiError(e)}`;
         setErrorAplicar(msg);
@@ -375,30 +400,28 @@ export default function ConciliacionPage() {
       key: "fecha",
       label: "Fecha",
       width: 96,
-      render: (r) => (
-        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span
-            aria-hidden="true"
-            style={{
-              width: 3,
-              height: 16,
-              borderRadius: 2,
-              background: r.id === seleccionado?.id ? "var(--primary)" : "transparent",
-            }}
-          />
-          <span style={{ fontWeight: r.id === seleccionado?.id ? 700 : 500 }}>
-            {fechaCorta(r.fecha)}
+      render: (r) => {
+        const elegido = r.id === seleccionado?.id;
+        return (
+          <span className={styles.celdaFecha}>
+            <span
+              aria-hidden="true"
+              className={`${styles.marca} ${elegido ? styles.marcaActiva : ""}`}
+            />
+            <span className={elegido ? styles.fechaActiva : styles.fechaTexto}>
+              {fechaCorta(r.fecha)}
+            </span>
           </span>
-        </span>
-      ),
+        );
+      },
     },
     {
       key: "descripcion",
       label: "Movimiento",
       render: (r) => (
-        <span style={{ display: "grid", gap: 2 }}>
-          <span style={{ fontWeight: 600 }}>{r.descripcion || "Sin descripción"}</span>
-          <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+        <span className={styles.celdaMov}>
+          <span className={styles.movNombre}>{r.descripcion || "Sin descripción"}</span>
+          <span className={styles.movSub}>
             {[r.referencia, r.contraparte, r.speiTrackingKey].filter(Boolean).join(" · ") || "—"}
           </span>
         </span>
@@ -417,8 +440,9 @@ export default function ConciliacionPage() {
       label: "Estado",
       width: 150,
       render: (r) => (
-        <StatusDot
-          label={estadoTexto(r.estado)}
+        <Badge
+          dot
+          size="sm"
           tone={ESTADO_TONO[r.estado]}
           title={
             r.candidatos.length > 0
@@ -427,19 +451,21 @@ export default function ConciliacionPage() {
                 } · mejor puntaje ${r.candidatos[0].score} de 100`
               : "No se parece a ninguna factura ni pago"
           }
-        />
+        >
+          {estadoTexto(r.estado)}
+        </Badge>
       ),
     },
   ];
 
   /**
-   * Los contadores son la misma pieza que la escala de antigüedad de la
-   * cartera: se había escrito dos veces. Ahora los dos sitios usan
-   * `FilterScale`, para que la tercera vez no salga distinta.
+   * Los contadores filtran la lista del banco. Cada chip lleva su cifra y el
+   * punto del mismo tono que el estado de la fila; con cero, el punto se
+   * apaga. La frase que los acompañaba («hay que elegir», «el monto no
+   * cuadra»…) queda como ayuda al pasar el cursor.
    */
   const total = resumen?.total ?? 0;
-  const parte = (n: number) => (total > 0 ? n / total : undefined);
-  const contadores: Array<ScaleItem & { key: Filtro }> = [
+  const contadores: Array<{ key: Filtro; label: string; value: number; hint?: string }> = [
     {
       key: "TODOS",
       label: "Todos",
@@ -451,38 +477,30 @@ export default function ConciliacionPage() {
       label: "Sugerencia alta",
       value: resumen?.sugerenciaAlta ?? 0,
       hint: `puntaje ${scoreAlto} o más`,
-      share: parte(resumen?.sugerenciaAlta ?? 0),
     },
     {
       key: "SUGERENCIA_MULTIPLE",
       label: "Varias opciones",
       value: resumen?.sugerenciaMultiple ?? 0,
       hint: "hay que elegir",
-      tone: (resumen?.sugerenciaMultiple ?? 0) > 0 ? "warning" : "mute",
-      share: parte(resumen?.sugerenciaMultiple ?? 0),
     },
     {
       key: "DISCREPANCIA",
       label: "Discrepancias",
       value: resumen?.discrepancias ?? 0,
       hint: "el monto no cuadra",
-      tone: (resumen?.discrepancias ?? 0) > 0 ? "danger" : "mute",
-      share: parte(resumen?.discrepancias ?? 0),
     },
     {
       key: "PENDIENTE",
       label: "Pendientes",
       value: resumen?.pendientes ?? 0,
       hint: "sin coincidencia",
-      share: parte(resumen?.pendientes ?? 0),
     },
     {
       key: "CONCILIADO",
       label: "Conciliados",
       value: resumen?.conciliados ?? 0,
       hint: "ya aplicados",
-      tone: (resumen?.conciliados ?? 0) > 0 ? "success" : "mute",
-      share: parte(resumen?.conciliados ?? 0),
     },
   ];
 
@@ -499,156 +517,187 @@ export default function ConciliacionPage() {
   const parametros = data?.parametros;
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Contabilidad"
-        title="Conciliación bancaria"
-        subtitle="El banco a la izquierda, lo que NEXARA cree que es a la derecha. Tú confirmas."
-        density="ops"
-        actions={
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <select
+    <MesaPagina
+      titulo="Conciliación bancaria"
+      descripcion="El banco a la izquierda, lo que NEXARA cree que es a la derecha. Tú confirmas."
+      secundarias={<ButtonLink href="/erp/banking">Bancos</ButtonLink>}
+    >
+      {!sinCuentas ? (
+        <Card as="div">
+          <ModuleToolbar
+            end={
+              <Button variant="ghost" size="sm" onClick={() => void cargar()} disabled={loading}>
+                Actualizar
+              </Button>
+            }
+          >
+            <Select
               aria-label="Cuenta bancaria"
+              wrapperClassName={styles.filtroCuenta}
+              controlSize="sm"
               value={accountId ?? ""}
               onChange={(e) => {
                 setAccountId(Number(e.target.value) || null);
                 setMovimientoId(null);
               }}
               disabled={(data?.cuentas.length ?? 0) === 0}
-              style={selectStyle}
             >
               {(data?.cuentas ?? []).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nombre} · {c.banco}
                 </option>
               ))}
-            </select>
-            <input
-              type="date"
+            </Select>
+            <DateInput
               aria-label="Desde"
+              className={styles.filtroFecha}
+              controlSize="sm"
               value={desde}
               onChange={(e) => setDesde(e.target.value)}
-              style={selectStyle}
             />
-            <input
-              type="date"
+            <DateInput
               aria-label="Hasta"
+              className={styles.filtroFecha}
+              controlSize="sm"
               value={hasta}
               onChange={(e) => setHasta(e.target.value)}
-              style={selectStyle}
             />
-            <Link href="/erp/banking" style={linkStyle}>
-              Bancos
-            </Link>
-            <Button size="sm" variant="ghost" onClick={() => void cargar()} disabled={loading}>
-              Actualizar
-            </Button>
-          </div>
-        }
-      />
+          </ModuleToolbar>
+        </Card>
+      ) : null}
 
       {error && (
-        <InlineAlert
-          message={`No se pudieron cargar los movimientos del banco. ${error} Reintenta; si sigue igual, avisa a soporte.`}
-          variant="danger"
+        <Alert
+          tone="danger"
+          role="alert"
+          className={styles.alerta}
           onDismiss={() => setError(null)}
           action={
-            <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+            <Button size="sm" onClick={() => void cargar()}>
               Reintentar
             </Button>
           }
-        />
+        >
+          {`No se pudieron cargar los movimientos del banco. ${error} Reintenta; si sigue igual, avisa a soporte.`}
+        </Alert>
       )}
 
       {sinCuentas ? (
-        <Section dense>
-          <EmptyState
-            title="Todavía no hay cuentas bancarias"
-            description="Para conciliar hace falta una cuenta con movimientos. Crea la cuenta en Bancos y sube el estado de cuenta (CSV); en cuanto haya movimientos, aquí aparecerán las sugerencias."
-            action={
-              <Link href="/erp/banking" style={{ textDecoration: "none" }}>
-                <Button size="sm">Ir a Bancos</Button>
-              </Link>
-            }
-          />
-        </Section>
+        <ListCard
+          listLabel="Conciliación bancaria"
+          empty
+          emptyState={{
+            icon: <AccountBalanceOutlinedIcon />,
+            title: "Todavía no hay cuentas bancarias",
+            description:
+              "Para conciliar hace falta una cuenta con movimientos. Crea la cuenta en Bancos y sube el estado de cuenta (CSV); en cuanto haya movimientos, aquí aparecerán las sugerencias.",
+            action: (
+              <ButtonLink size="sm" href="/erp/banking">
+                Ir a Bancos
+              </ButtonLink>
+            ),
+          }}
+        />
       ) : sinMovimientos ? (
-        <Section dense>
-          <VacioConPrimerPaso
-            title="La cuenta todavía no tiene movimientos"
-            description={`${
-              data?.cuenta ? `${data.cuenta.nombre} · ${data.cuenta.banco}` : "La cuenta elegida"
-            } no trae ninguna línea${
-              rango?.from || rango?.to
-                ? ` entre el ${fechaCorta(rango?.from)} y el ${fechaCorta(rango?.to)}`
-                : ""
-            }. Sube el estado de cuenta en Bancos —o cambia las fechas de arriba— y aquí aparecerá cada cargo y abono con la factura o el pago que NEXARA cree que le corresponde.`}
-            destino={DESTINOS.bancos}
-          />
-        </Section>
+        <ListCard
+          listLabel="Conciliación bancaria"
+          empty
+          emptyState={
+            <VacioConPrimerPaso
+              title="La cuenta todavía no tiene movimientos"
+              description={`${
+                data?.cuenta ? `${data.cuenta.nombre} · ${data.cuenta.banco}` : "La cuenta elegida"
+              } no trae ninguna línea${
+                rango?.from || rango?.to
+                  ? ` entre el ${fechaCorta(rango?.from)} y el ${fechaCorta(rango?.to)}`
+                  : ""
+              }. Sube el estado de cuenta en Bancos —o cambia las fechas de arriba— y aquí aparecerá cada cargo y abono con la factura o el pago que NEXARA cree que le corresponde.`}
+              destino={DESTINOS.bancos}
+            />
+          }
+        />
       ) : (
         <>
-          <FilterScale
-            ariaLabel="Filtrar por estado"
-            items={contadores}
-            active={filtro}
-            onSelect={(clave) => {
-              setFiltro((clave || "TODOS") as Filtro);
-              setMovimientoId(null);
-            }}
-          />
-
-          {/* Qué periodo se está mirando: el API resuelve el rango cuando las
-              fechas van vacías, y hasta ahora no lo decía en ningún sitio. */}
-          {(rango?.from || rango?.to) && (
-            <p
-              style={{
-                margin: "-6px 0 12px",
-                fontSize: 12,
-                color: "var(--text-tertiary)",
-              }}
-            >
-              Movimientos del {fechaCorta(rango?.from)} al {fechaCorta(rango?.to)}
-              {parametros ? (
-                <>
-                  {" "}
-                  · empareja con ±
-                  <Money value={parametros.toleranciaMonto} bold={false} /> o ±
-                  {parametros.toleranciaPorcentaje}% dentro de {parametros.ventanaDias} días
-                </>
-              ) : null}
-              .
-            </p>
-          )}
-
           <div className={styles.split}>
-            <Section
-              title="Movimientos del banco"
-              subtitle={
-                data?.cuenta ? (
-                  <>
-                    {data.cuenta.nombre} · {data.cuenta.banco} · {data.cuenta.moneda}
-                    {cuentaActiva ? (
-                      <>
-                        {" "}
-                        · saldo <Money value={cuentaActiva.saldo} bold={false} />
-                      </>
-                    ) : null}
-                  </>
+            <ListCard
+              listLabel="Movimientos del banco"
+              toolbar={
+                <>
+                  <CardHead
+                    title="Movimientos del banco"
+                    subtitle={
+                      data?.cuenta ? (
+                        <>
+                          {data.cuenta.nombre} · {data.cuenta.banco} · {data.cuenta.moneda}
+                          {cuentaActiva ? (
+                            <>
+                              {" "}
+                              · saldo <Money value={cuentaActiva.saldo} bold={false} />
+                            </>
+                          ) : null}
+                        </>
+                      ) : undefined
+                    }
+                  />
+                  <ModuleToolbar
+                    chips={
+                      <FilterChips ariaLabel="Filtrar por estado">
+                        {contadores.map((c) => (
+                          <FilterChip
+                            key={c.key}
+                            active={filtro === c.key}
+                            count={c.value}
+                            dot={
+                              c.key === "TODOS" || c.value === 0 ? undefined : ESTADO_TONO[c.key]
+                            }
+                            title={c.hint}
+                            onClick={() => {
+                              setFiltro(filtro === c.key ? "TODOS" : c.key);
+                              setMovimientoId(null);
+                            }}
+                          >
+                            {c.label}
+                          </FilterChip>
+                        ))}
+                      </FilterChips>
+                    }
+                  />
+                </>
+              }
+              footer={
+                // Qué periodo se está mirando: el API resuelve el rango cuando las
+                // fechas van vacías, y hasta ahora no lo decía en ningún sitio.
+                rango?.from || rango?.to ? (
+                  <ListFooter>
+                    <span>
+                      Movimientos del {fechaCorta(rango?.from)} al {fechaCorta(rango?.to)}
+                      {parametros ? (
+                        <>
+                          {" "}
+                          · empareja con ±
+                          <Money value={parametros.toleranciaMonto} bold={false} /> o ±
+                          {parametros.toleranciaPorcentaje}% dentro de {parametros.ventanaDias} días
+                        </>
+                      ) : null}
+                      .
+                    </span>
+                  </ListFooter>
                 ) : undefined
               }
-              dense
-              flush
             >
               {loading ? (
-                <p style={{ padding: 16, fontSize: 13, color: "var(--text-tertiary)" }}>
-                  {token
-                    ? "Cargando movimientos y buscando coincidencias…"
-                    : "Esperando la sesión para pedir los movimientos…"}
-                </p>
+                <div aria-busy="true">
+                  <p className={styles.estado}>
+                    {token
+                      ? "Cargando movimientos y buscando coincidencias…"
+                      : "Esperando la sesión para pedir los movimientos…"}
+                  </p>
+                  <SkeletonRows rows={4} label="Cargando movimientos" />
+                </div>
               ) : (
                 <div ref={listaRef}>
                   <DataTable
+                    flush
                     columns={columnas}
                     rows={visibles}
                     rowKey={(r) => r.id}
@@ -666,35 +715,28 @@ export default function ConciliacionPage() {
                   />
                 </div>
               )}
-            </Section>
+            </ListCard>
 
             <div className={styles.match}>
-              <Section title="Coincidencia en NEXARA" subtitle={<AyudaTeclado />} dense>
+              <Card aria-label="Coincidencia en NEXARA">
+                <CardHead title="Coincidencia en NEXARA" subtitle={<AyudaTeclado />} />
                 {!seleccionado ? (
                   <EmptyState
-                    variant="compact"
+                    size="compact"
+                    icon={<TouchAppOutlinedIcon />}
                     title="Elige un movimiento"
                     description="Selecciona un movimiento del banco para ver con qué factura o pago coincide."
                   />
                 ) : (
-                  <div style={{ display: "grid", gap: 12 }}>
-                    <div
-                      style={{
-                        display: "grid",
-                        gap: 3,
-                        padding: "10px 12px",
-                        borderRadius: 8,
-                        background: "var(--surface-2)",
-                        border: "1px solid var(--nx-panel-hairline, var(--border))",
-                      }}
-                    >
-                      <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                  <div className={styles.cuerpo}>
+                    <div className={styles.movimiento}>
+                      <span className={styles.movimientoRotulo}>
                         Movimiento del banco · {seleccionado.esCargo ? "cargo" : "abono"}
                       </span>
-                      <strong style={{ fontSize: 14, lineHeight: 1.3 }}>
+                      <strong className={styles.movimientoTitulo}>
                         {seleccionado.descripcion || "Sin descripción"}
                       </strong>
-                      <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                      <span className={styles.movimientoMeta}>
                         {fechaCorta(seleccionado.fecha)} ·{" "}
                         <Money
                           value={
@@ -713,7 +755,7 @@ export default function ConciliacionPage() {
                         seleccionado.contraparte ||
                         seleccionado.contraparteRfc ||
                         seleccionado.speiTrackingKey) && (
-                        <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.45 }}>
+                        <span className={styles.movimientoExtra}>
                           {[
                             seleccionado.concepto,
                             seleccionado.contraparte,
@@ -730,32 +772,34 @@ export default function ConciliacionPage() {
 
                     {/* La respuesta del último intento, donde se pulsó. */}
                     {errorAplicar && (
-                      <InlineAlert
-                        variant="danger"
-                        style={{ marginBottom: 0 }}
-                        message={errorAplicar}
+                      <Alert
+                        tone="danger"
+                        role="alert"
+                        className={styles.alerta}
                         onDismiss={() => setErrorAplicar(null)}
                         action={
-                          <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+                          <Button size="sm" onClick={() => void cargar()}>
                             Reintentar
                           </Button>
                         }
-                      />
+                      >
+                        {errorAplicar}
+                      </Alert>
                     )}
                     {aviso && (
-                      <InlineAlert
-                        variant="info"
-                        style={{ marginBottom: 0 }}
-                        message={aviso}
+                      <Alert
+                        tone="info"
+                        role="alert"
+                        className={styles.alerta}
                         onDismiss={() => setAviso(null)}
-                      />
+                      >
+                        {aviso}
+                      </Alert>
                     )}
 
                     {seleccionado.estado === "CONCILIADO" ? (
-                      <InlineAlert
-                        variant="success"
-                        style={{ marginBottom: 0 }}
-                        message={`Conciliado${
+                      <Alert tone="success" role="alert" className={styles.alerta}>
+                        {`Conciliado${
                           seleccionado.conciliacion
                             ? ` por ${formatPesos(seleccionado.conciliacion.montoConciliado)}`
                             : ""
@@ -768,10 +812,11 @@ export default function ConciliacionPage() {
                             ? ` · ${fechaCorta(seleccionado.conciliacion.conciliadoEn)}`
                             : ""
                         }${seleccionado.conciliacion?.notas ? ` · ${seleccionado.conciliacion.notas}` : ""}`}
-                      />
+                      </Alert>
                     ) : candidatos.length === 0 ? (
                       <EmptyState
-                        variant="compact"
+                        size="compact"
+                        icon={<LinkOffOutlinedIcon />}
                         title="Sin coincidencias"
                         description={
                           <>
@@ -786,114 +831,65 @@ export default function ConciliacionPage() {
                     ) : (
                       <>
                         {seleccionado.estado === "DISCREPANCIA" && candidato && (
-                          <InlineAlert
-                            variant="warning"
-                            style={{ marginBottom: 0 }}
-                            message={`Los montos no son idénticos: ${
+                          <Alert tone="warning" role="alert" className={styles.alerta}>
+                            {`Los montos no son idénticos: ${
                               Math.abs(Number(candidato.diferenciaMonto) || 0) < 0.005
                                 ? "Coincide al centavo"
                                 : `${formatPesos(Math.abs(Number(candidato.diferenciaMonto) || 0))} de diferencia`
                             } contra ${candidato.folio}. Revisa comisiones o retenciones antes de conciliar.`}
-                          />
+                          </Alert>
                         )}
                         {candidatos.length > 1 && (
-                          <div style={{ display: "grid", gap: 5 }}>
-                            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                          <div className={styles.coincidencias}>
+                            <span className={styles.coincidenciasRotulo}>
                               Coincidencia {Math.min(candidatoIdx, candidatos.length - 1) + 1} de{" "}
                               {candidatos.length} · ordenadas de más a menos parecida
                             </span>
-                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                              {candidatos.map((c, i) => {
-                                const activo = i === candidatoIdx;
-                                return (
-                                  <button
-                                    key={`${c.tipo}-${c.id}`}
-                                    type="button"
-                                    onClick={() => setCandidatoIdx(i)}
-                                    aria-pressed={activo}
-                                    style={{
-                                      display: "inline-flex",
-                                      alignItems: "baseline",
-                                      gap: 6,
-                                      fontSize: 11.5,
-                                      padding: "4px 9px",
-                                      borderRadius: 6,
-                                      cursor: "pointer",
-                                      background: activo
-                                        ? "color-mix(in srgb, var(--primary) 10%, var(--surface))"
-                                        : "transparent",
-                                      border: `1px solid ${
-                                        activo
-                                          ? "color-mix(in srgb, var(--primary) 40%, var(--border))"
-                                          : "var(--border)"
-                                      }`,
-                                      color: "var(--text-primary)",
-                                      fontWeight: activo ? 700 : 500,
-                                    }}
-                                  >
-                                    {c.folio}
-                                    <span
-                                      style={{
-                                        fontSize: 10.5,
-                                        fontWeight: 600,
-                                        fontVariantNumeric: "tabular-nums",
-                                        color: scoreColor(c.score, scoreAlto),
-                                      }}
-                                    >
-                                      {c.score}
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                            </div>
+                            <FilterChips ariaLabel="Coincidencias posibles">
+                              {candidatos.map((c, i) => (
+                                <FilterChip
+                                  key={`${c.tipo}-${c.id}`}
+                                  active={i === candidatoIdx}
+                                  count={c.score}
+                                  dot={TONO_PUNTAJE[nivelPuntaje(c.score, scoreAlto)]}
+                                  onClick={() => setCandidatoIdx(i)}
+                                >
+                                  {c.folio}
+                                </FilterChip>
+                              ))}
+                            </FilterChips>
                           </div>
                         )}
 
                         {candidato && (
-                          <div
-                            style={{
-                              border: "1px solid var(--border)",
-                              borderRadius: 10,
-                              padding: 12,
-                              display: "grid",
-                              gap: 10,
-                              background: "var(--surface)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "flex-start",
-                                gap: 10,
-                              }}
-                            >
-                              <div style={{ display: "grid", gap: 2 }}>
-                                <strong style={{ fontSize: 14 }}>
+                          <div className={styles.candidato}>
+                            <div className={styles.candidatoCabeza}>
+                              <div className={styles.candidatoDatos}>
+                                <strong className={styles.candidatoTitulo}>
                                   {candidato.tipo === "INVOICE" ? "Factura" : "Pago"} {candidato.folio}
                                 </strong>
-                                <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                                <span className={styles.candidatoParte}>
                                   {candidato.contraparte || "Sin nombre registrado"}
                                   {candidato.contraparteRfc ? ` · ${candidato.contraparteRfc}` : ""}
                                 </span>
                                 {candidato.proyecto && (
-                                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                                  <span className={styles.candidatoDetalle}>
                                     Proyecto: {candidato.proyecto}
                                   </span>
                                 )}
                                 {candidato.tipo === "PAYMENT" && candidato.factura && (
-                                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                                  <span className={styles.candidatoDetalle}>
                                     Aplica a la factura {candidato.factura}
                                   </span>
                                 )}
-                                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                                <span className={styles.candidatoDetalle}>
                                   {fechaCorta(candidato.fecha)}
                                   {candidato.vencimiento
                                     ? ` · vence ${fechaCorta(candidato.vencimiento)}`
                                     : ""}
                                 </span>
                               </div>
-                              <div style={{ textAlign: "right", display: "grid", gap: 4 }}>
+                              <div className={styles.candidatoMonto}>
                                 <Money value={candidato.monto} />
                                 <Puntaje score={candidato.score} alto={scoreAlto} />
                               </div>
@@ -903,77 +899,33 @@ export default function ConciliacionPage() {
                                 API lo manda por candidato y no se pintaba: sin
                                 esto, «no son idénticos» no dice por cuánto. */}
                             <div
-                              style={{
-                                display: "flex",
-                                flexWrap: "wrap",
-                                gap: "4px 12px",
-                                fontSize: 12,
-                                color:
-                                  Math.abs(candidato.diferenciaMonto) >= 0.005
-                                    ? "var(--state-warning-text, #b45309)"
-                                    : "var(--text-secondary)",
-                              }}
+                              className={`${styles.diferencias} ${
+                                Math.abs(candidato.diferenciaMonto) >= 0.005
+                                  ? styles.diferenciasAlerta
+                                  : ""
+                              }`}
                             >
-                              <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                                {textoDiferenciaMonto(candidato.diferenciaMonto)}
-                              </span>
-                              <span
-                                style={{
-                                  fontVariantNumeric: "tabular-nums",
-                                  color: "var(--text-secondary)",
-                                }}
-                              >
+                              <span>{textoDiferenciaMonto(candidato.diferenciaMonto)}</span>
+                              <span className={styles.diferenciaDias}>
                                 {textoDiferenciaDias(candidato.diferenciaDias)}
                               </span>
-                              <span style={{ color: "var(--text-tertiary)" }}>
+                              <span className={styles.diferenciaSentido}>
                                 {candidato.sentido === "IN" ? "entra dinero" : "sale dinero"}
                               </span>
                             </div>
 
-                            <div style={{ display: "grid", gap: 5 }}>
-                              <span
-                                style={{
-                                  fontSize: 10.5,
-                                  fontWeight: 700,
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.06em",
-                                  color: "var(--text-tertiary)",
-                                }}
-                              >
-                                Por qué coinciden
-                              </span>
-                              <ul
-                                style={{
-                                  margin: 0,
-                                  padding: 0,
-                                  listStyle: "none",
-                                  display: "grid",
-                                  gap: 4,
-                                  fontSize: 12.5,
-                                  lineHeight: 1.4,
-                                  color: "var(--text-secondary)",
-                                }}
-                              >
+                            <div className={styles.razones}>
+                              <span className={styles.razonesTitulo}>Por qué coinciden</span>
+                              <ul className={styles.razonesLista}>
                                 {candidato.razones.length === 0 ? (
-                                  <li style={{ color: "var(--text-tertiary)" }}>
+                                  <li className={styles.razonSin}>
                                     NEXARA no anotó en qué se parecen. Compara el monto y la
                                     fecha antes de conciliar.
                                   </li>
                                 ) : (
                                   candidato.razones.map((r) => (
-                                    <li
-                                      key={r}
-                                      style={{
-                                        display: "grid",
-                                        gridTemplateColumns: "10px minmax(0, 1fr)",
-                                        gap: 8,
-                                        alignItems: "baseline",
-                                      }}
-                                    >
-                                      <span
-                                        aria-hidden="true"
-                                        style={{ color: "var(--text-tertiary)" }}
-                                      >
+                                    <li key={r} className={styles.razon}>
+                                      <span aria-hidden="true" className={styles.razonPunto}>
                                         ·
                                       </span>
                                       <span>{r}</span>
@@ -995,13 +947,7 @@ export default function ConciliacionPage() {
                                 ? "Conciliando…"
                                 : `Conciliar con ${candidato.folio}`}
                             </Button>
-                            <span
-                              style={{
-                                fontSize: 11,
-                                color: "var(--text-tertiary)",
-                                textAlign: "center",
-                              }}
-                            >
+                            <span className={styles.notaAtajo}>
                               {aplicando ? "Aplicando el movimiento, no cierres la pantalla." : "o pulsa Enter"}
                             </span>
                           </div>
@@ -1010,7 +956,7 @@ export default function ConciliacionPage() {
                     )}
                   </div>
                 )}
-              </Section>
+              </Card>
             </div>
           </div>
 
@@ -1027,7 +973,7 @@ export default function ConciliacionPage() {
           </p>
         </>
       )}
-    </>
+    </MesaPagina>
   );
 }
 
@@ -1036,95 +982,41 @@ export default function ConciliacionPage() {
  * la barra lo vuelve comparable entre candidatos sin leer dos cifras.
  */
 function Puntaje({ score, alto }: { score: number; alto: number }) {
-  const color = scoreColor(score, alto);
   const ancho = Math.max(0, Math.min(100, score));
   return (
-    <span style={{ display: "grid", gap: 3, justifyItems: "end" }}>
+    <span className={styles.puntaje} data-nivel={nivelPuntaje(score, alto)}>
       <span
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          fontVariantNumeric: "tabular-nums",
-          color,
-        }}
+        className={styles.puntajeCifra}
         title={score >= alto ? "Coincidencia fuerte" : "Revisa antes de conciliar"}
       >
         {score} / 100
       </span>
-      <span
-        aria-hidden="true"
-        style={{
-          width: 88,
-          height: 3,
-          borderRadius: 2,
-          background: "var(--surface-2)",
-          overflow: "hidden",
-        }}
-      >
-        <span
-          style={{ display: "block", width: `${ancho}%`, height: "100%", background: color }}
-        />
+      <span aria-hidden="true" className={styles.puntajeBarra}>
+        <span className={styles.puntajeRelleno} style={{ width: `${ancho}%` }} />
       </span>
     </span>
   );
 }
 
-function Tecla({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd
-      style={{
-        display: "inline-block",
-        minWidth: 16,
-        padding: "0 4px",
-        borderRadius: 4,
-        border: "1px solid var(--border)",
-        background: "var(--surface-2)",
-        fontSize: 10.5,
-        fontFamily: "inherit",
-        fontWeight: 600,
-        lineHeight: "16px",
-        textAlign: "center",
-        color: "var(--text-secondary)",
-      }}
-    >
-      {children}
-    </kbd>
-  );
+function Tecla({ children }: { children: ReactNode }) {
+  return <kbd className={styles.tecla}>{children}</kbd>;
 }
 
 /** La navegación por teclado existe; aquí se ve, en una línea discreta. */
 function AyudaTeclado() {
   return (
-    <span style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-      <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+    <span className={styles.ayuda}>
+      <span className={styles.ayudaGrupo}>
         <Tecla>↑</Tecla>
         <Tecla>↓</Tecla> movimiento
       </span>
-      <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+      <span className={styles.ayudaGrupo}>
         <Tecla>[</Tecla>
         <Tecla>]</Tecla> coincidencia
       </span>
-      <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+      <span className={styles.ayudaGrupo}>
         <Tecla>Enter</Tecla> concilia
       </span>
     </span>
   );
 }
-
-const selectStyle: React.CSSProperties = {
-  fontSize: 16,
-  padding: "6px 8px",
-  borderRadius: 8,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "var(--text-primary)",
-};
-
-const linkStyle: React.CSSProperties = {
-  fontSize: 12,
-  fontWeight: 600,
-  padding: "6px 12px",
-  borderRadius: 8,
-  textDecoration: "none",
-  color: "var(--text-secondary)",
-};

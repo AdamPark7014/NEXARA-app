@@ -1,15 +1,33 @@
 "use client";
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import Button from "@/components/ui/Button";
-import MetricStrip from "@/components/ui/MetricStrip";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import InlineAlert from "@/components/ui/InlineAlert";
-import FilterToolbar from "@/components/FilterToolbar";
+import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import SpeedOutlinedIcon from "@mui/icons-material/SpeedOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  DateInput,
+  ListCard,
+  ModuleToolbar,
+  Select,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  type Column,
+  type Tone,
+} from "@/components/base";
+import { Money } from "@/components/ui/DataTable";
 import { financeFetch } from "@/lib/finance-api";
 import { formatApiError } from "@/lib/erp-api";
+import s from "./SugerenciaNomina.module.css";
 
 export type EstadoSugerencia = "ok" | "revisar" | "sin_sueldo" | "sin_jornadas";
 
@@ -130,7 +148,7 @@ export function rangoCorto(desde: string, hasta: string): string {
 export const NOTA_FORMULA =
   "Pago por hora = sueldo semanal ÷ horas semanales de su horario (oficina L–V de 8 h: 40 h; sin horario fijo: 48 h, la jornada legal).";
 
-export const ESTADO_SUGERENCIA: Record<EstadoSugerencia, { label: string; tone: StatusTone }> = {
+export const ESTADO_SUGERENCIA: Record<EstadoSugerencia, { label: string; tone: Tone }> = {
   ok: { label: "Sugerido", tone: "neutral" },
   revisar: { label: "Revisar", tone: "warning" },
   sin_sueldo: { label: "Sin sueldo", tone: "danger" },
@@ -151,22 +169,6 @@ export function formatoHoras(h: number): string {
 }
 
 type Renglon = { tipo: "persona"; fila: FilaSugerencia } | { tipo: "total"; totales: TotalesSugerencia };
-
-const metaStyle: CSSProperties = { marginTop: 2, fontSize: 11, color: "var(--text-tertiary)", lineHeight: 1.35 };
-const avisoStyle: CSSProperties = { ...metaStyle, color: "var(--state-warning-text)" };
-const numStyle: CSSProperties = { fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", fontSize: 13 };
-const toolbarButtonStyle: CSSProperties = { height: 32, fontSize: 13 };
-const notaStyle: CSSProperties = {
-  padding: "10px 14px",
-  border: "1px solid var(--nx-panel-hairline, var(--border))",
-  borderRadius: 10,
-  background: "var(--surface-2, var(--surface))",
-  fontSize: 12.5,
-  color: "var(--text-secondary)",
-  lineHeight: 1.5,
-};
-const statusPanelStyle: CSSProperties = { padding: 24, textAlign: "center", fontSize: 13, color: "var(--text-tertiary)" };
-const periodoStyle: CSSProperties = { fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.45 };
 
 const NOTA_SUGERENCIA =
   "Es una sugerencia que no genera pagos: las horas productivas solo cuentan lo que cae entre la entrada y la salida.";
@@ -193,19 +195,31 @@ function FraseDatos({ partes }: { partes: string[] }) {
   return (
     <>
       {partes.map((parte, i) => (
-        <span key={i} className="nx-sn-dato">
-          {i > 0 ? <span className="nx-sn-sep">{i === ultimo && ultimo > 1 ? " y " : ", "}</span> : null}
+        <span key={i} className={s.dato}>
+          {i > 0 ? <span className={s.sep}>{i === ultimo && ultimo > 1 ? " y " : ", "}</span> : null}
           {parte}
         </span>
       ))}
-      <span className="nx-sn-sep">.</span>
+      <span className={s.sep}>.</span>
     </>
   );
 }
 
-const dinero = (v: number | null) => (v == null ? <span style={{ color: "var(--text-tertiary)" }}>—</span> : <Money value={v} bold={false} />);
+const dinero = (v: number | null) => (v == null ? <span className={s.tenue}>—</span> : <Money value={v} bold={false} />);
 
 const BAJA_PRODUCTIVIDAD = 60;
+
+/** Mientras llega el cálculo: renglones esqueleto y, para el lector de pantalla, la frase de siempre. */
+function Calculando() {
+  return (
+    <>
+      <SkeletonRows rows={5} label="Calculando la sugerencia de nómina…" />
+      <span className="ui-sr-only" role="status" aria-live="polite">
+        Calculando la sugerencia de nómina…
+      </span>
+    </>
+  );
+}
 
 /**
  * «Sugerencia de nómina» de Pagos a empleados: horas laboradas contra productivas, pago por
@@ -255,20 +269,17 @@ export default function SugerenciaNomina({ token }: { token: string }) {
       label: "Empleado",
       render: (r) => {
         if (r.tipo === "total") {
-          return <strong style={{ fontSize: 13 }}>Total · {r.totales.personas} personas</strong>;
+          return <strong className={s.total}>Total · {r.totales.personas} personas</strong>;
         }
         const f = r.fila;
         return (
-          <div style={{ minWidth: 0, maxWidth: 360 }}>
-            <Link
-              href={`/erp/hr/${f.userId}`}
-              style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)", textDecoration: "none" }}
-            >
+          <div className={s.celdaPersona}>
+            <Link href={`/erp/hr/${f.userId}`} className={s.nombre}>
               {f.nombre}
             </Link>
-            <div style={metaStyle}>{f.sugerencia}</div>
+            <div className={s.meta}>{f.sugerencia}</div>
             {f.avisos.map((a) => (
-              <div key={a} style={avisoStyle}>
+              <div key={a} className={s.aviso}>
                 {a}
               </div>
             ))}
@@ -284,10 +295,10 @@ export default function SugerenciaNomina({ token }: { token: string }) {
       render: (r) => {
         const h = r.tipo === "total" ? r.totales.horasLaboradas : r.fila.horasLaboradas;
         return (
-          <div style={numStyle}>
+          <div className={s.num}>
             {formatoHoras(h)}
             {r.tipo === "persona" && r.fila.horasEsperadas > 0 ? (
-              <div style={metaStyle}>de {formatoHoras(r.fila.horasEsperadas)}</div>
+              <div className={s.meta}>de {formatoHoras(r.fila.horasEsperadas)}</div>
             ) : null}
           </div>
         );
@@ -299,7 +310,7 @@ export default function SugerenciaNomina({ token }: { token: string }) {
       align: "right",
       numeric: true,
       render: (r) => (
-        <span style={numStyle}>{formatoHoras(r.tipo === "total" ? r.totales.horasProductivas : r.fila.horasProductivas)}</span>
+        <span className={s.num}>{formatoHoras(r.tipo === "total" ? r.totales.horasProductivas : r.fila.horasProductivas)}</span>
       ),
     },
     {
@@ -309,9 +320,9 @@ export default function SugerenciaNomina({ token }: { token: string }) {
       numeric: true,
       render: (r) => {
         const p = r.tipo === "total" ? r.totales.productividadPct : r.fila.productividadPct;
-        if (p == null) return <span style={{ color: "var(--text-tertiary)" }}>—</span>;
+        if (p == null) return <span className={s.tenue}>—</span>;
         const bajo = p < BAJA_PRODUCTIVIDAD;
-        return <span style={{ ...numStyle, color: bajo ? "var(--state-warning-text)" : undefined }}>{p} %</span>;
+        return <span className={bajo ? `${s.num} ${s.bajo}` : s.num}>{p} %</span>;
       },
     },
     {
@@ -321,9 +332,9 @@ export default function SugerenciaNomina({ token }: { token: string }) {
       numeric: true,
       render: (r) =>
         r.tipo === "total" ? null : (
-          <div style={numStyle} title={r.fila.divisor}>
+          <div className={s.num} title={r.fila.divisor}>
             {dinero(r.fila.pagoHora)}
-            <div style={metaStyle}>÷ {r.fila.horasSemanales} h</div>
+            <div className={s.meta}>÷ {r.fila.horasSemanales} h</div>
           </div>
         ),
     },
@@ -351,18 +362,20 @@ export default function SugerenciaNomina({ token }: { token: string }) {
         const f = r.fila;
         const estado = ESTADO_SUGERENCIA[f.estado];
         return (
-          <div style={{ textAlign: "right" }}>
-            {f.montoSugerido == null ? <span style={{ color: "var(--text-tertiary)" }}>—</span> : <Money value={f.montoSugerido} />}
-            <div style={{ marginTop: 2, display: "flex", justifyContent: "flex-end" }}>
-              <StatusDot label={estado.label} tone={estado.tone} />
+          <div className={s.sugerido}>
+            {f.montoSugerido == null ? <span className={s.tenue}>—</span> : <Money value={f.montoSugerido} />}
+            <div className={s.sugeridoEstado}>
+              <Badge dot size="sm" tone={estado.tone}>
+                {estado.label}
+              </Badge>
             </div>
             {enCurso && f.proyectado != null ? (
-              <div style={metaStyle}>
+              <div className={s.meta}>
                 Periodo completo al {fechaCorta(datos!.periodo.hasta)} <Money value={f.proyectado} bold={false} />
               </div>
             ) : null}
             {f.sueldoPeriodo != null ? (
-              <div style={metaStyle}>
+              <div className={s.meta}>
                 Sueldo del periodo <Money value={f.sueldoPeriodo} bold={false} />
               </div>
             ) : null}
@@ -381,53 +394,91 @@ export default function SugerenciaNomina({ token }: { token: string }) {
   const t = datos?.totales;
   const fechasDe = new Map((datos?.periodos ?? []).map((p) => [p.clave, rangoCorto(p.desde, p.hasta)]));
   const MXN = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
+  const porRevisar = t ? t.revisar + t.sinSueldo + t.sinJornadas : 0;
+
+  const esperandoCalculo = cargando && !datos;
+  const esperandoRango = !datos && !cargando && modo === "rango" && !error;
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <FilterToolbar
-        selects={[
-          {
-            label: "Periodo",
-            value: modo,
-            onChange: (v) => setModo(v as ModoPeriodo),
-            options: [
-              ...PERIODOS_CALCULADOS.map((p) => ({
-                value: p.clave,
-                label: fechasDe.has(p.clave) ? `${p.label} · ${fechasDe.get(p.clave)}` : p.label,
-              })),
-              { value: "rango", label: "Rango personalizado" },
-            ],
-          },
-        ]}
-        dates={
-          modo === "rango"
-            ? [
-                { label: "Desde", value: desde, onChange: setDesde },
-                { label: "Hasta", value: hasta, onChange: setHasta },
-              ]
-            : undefined
-        }
-        style={{ marginBottom: 0 }}
-        rightActions={
-          <Button
-            size="sm"
-            variant="secondary"
-            style={toolbarButtonStyle}
-            onClick={() => void cargar(modo, desde, hasta)}
-            disabled={cargando}
+    <div className={s.pantalla}>
+      <Card as="div" className={s.barra}>
+        <ModuleToolbar
+          end={
+            <Button
+              size="sm"
+              variant={modo === "rango" ? "tonal" : "ghost"}
+              onClick={() => void cargar(modo, desde, hasta)}
+              disabled={cargando}
+            >
+              {cargando ? "Calculando…" : modo === "rango" ? "Aplicar" : "Actualizar"}
+            </Button>
+          }
+        >
+          <Select
+            aria-label="Periodo"
+            title="Periodo"
+            controlSize="sm"
+            wrapperClassName={s.filtroPeriodo}
+            value={modo}
+            onChange={(e) => setModo(e.target.value as ModoPeriodo)}
           >
-            {cargando ? "Calculando…" : modo === "rango" ? "Aplicar" : "Actualizar"}
-          </Button>
-        }
-      />
+            <option value="">Todos · Periodo</option>
+            {PERIODOS_CALCULADOS.map((p) => (
+              <option key={p.clave} value={p.clave}>
+                {fechasDe.has(p.clave) ? `${p.label} · ${fechasDe.get(p.clave)}` : p.label}
+              </option>
+            ))}
+            <option value="rango">Rango personalizado</option>
+          </Select>
+          {modo === "rango" ? (
+            <>
+              <label className={s.fecha}>
+                <span>Desde</span>
+                <DateInput
+                  aria-label="Desde"
+                  controlSize="sm"
+                  className={s.fechaCtl}
+                  value={desde}
+                  onChange={(e) => setDesde(e.target.value)}
+                />
+              </label>
+              <label className={s.fecha}>
+                <span>Hasta</span>
+                <DateInput
+                  aria-label="Hasta"
+                  controlSize="sm"
+                  className={s.fechaCtl}
+                  value={hasta}
+                  onChange={(e) => setHasta(e.target.value)}
+                />
+              </label>
+            </>
+          ) : null}
+        </ModuleToolbar>
+      </Card>
 
-      <div style={notaStyle} role="note">
-        <strong style={{ color: "var(--text-primary)" }}>{NOTA_FORMULA}</strong>
+      {error && (
+        <Alert
+          tone="danger"
+          role="alert"
+          onDismiss={() => setError(null)}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void cargar(modo, desde, hasta)}>
+              Reintentar
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
+      )}
+
+      <div className={s.nota} role="note">
+        <strong>{NOTA_FORMULA}</strong>
         <div>{NOTA_SUGERENCIA}</div>
         {datos?.formula?.length ? (
-          <details style={{ marginTop: 6 }}>
-            <summary style={{ cursor: "pointer" }}>¿Cómo se calcula?</summary>
-            <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+          <details className={s.formula}>
+            <summary>¿Cómo se calcula?</summary>
+            <ul>
               {datos.formula.map((linea) => (
                 <li key={linea}>{linea}</li>
               ))}
@@ -436,82 +487,86 @@ export default function SugerenciaNomina({ token }: { token: string }) {
         ) : null}
       </div>
 
-      {error && (
-        <InlineAlert
-          message={error}
-          variant="danger"
-          style={{ marginBottom: 0 }}
-          onDismiss={() => setError(null)}
-          action={
-            <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void cargar(modo, desde, hasta)}>
-              Reintentar
-            </Button>
-          }
-        />
-      )}
-
       {datos && (
-        <div style={periodoStyle}>
+        <div className={s.periodo}>
           <FraseDatos partes={partesPeriodo(datos)} />
         </div>
       )}
 
       {t && t.personas > 0 && (
-        <MetricStrip
-          ariaLabel="Totales de la sugerencia de nómina"
-          metrics={[
-            {
-              label: enCurso ? `Sugerido al ${fechaCorta(datos!.periodo.calculadoHasta)}` : "Sugerido",
-              value: <Money value={t.montoSugerido} />,
-              hint:
-                enCurso && t.proyectado != null
-                  ? `periodo completo al ${fechaCorta(datos!.periodo.hasta)}: ${MXN.format(t.proyectado)}`
-                  : `sueldo del periodo ${MXN.format(t.sueldoPeriodo)}`,
-            },
-            { label: "Horas laboradas", value: formatoHoras(t.horasLaboradas), hint: `${formatoHoras(t.horasProductivas)} productivas` },
-            {
-              label: "Productividad",
-              value: t.productividadPct == null ? "—" : `${t.productividadPct} %`,
-              hint: "productivas ÷ laboradas",
-              tone: t.productividadPct != null && t.productividadPct < BAJA_PRODUCTIVIDAD ? "warning" : "default",
-            },
-            {
-              label: "Por revisar",
-              value: t.revisar + t.sinSueldo + t.sinJornadas,
-              hint: (
-                <FraseDatos
-                  partes={[`${t.revisar} baja productividad`, `${t.sinSueldo} sin sueldo`, `${t.sinJornadas} sin jornadas`]}
-                />
-              ),
-              tone: t.revisar + t.sinSueldo + t.sinJornadas > 0 ? "warning" : "default",
-            },
-          ]}
-        />
+        <StatRow variant="strip" ariaLabel="Totales de la sugerencia de nómina">
+          <Stat
+            label={enCurso ? `Sugerido al ${fechaCorta(datos!.periodo.calculadoHasta)}` : "Sugerido"}
+            value={<Money value={t.montoSugerido} />}
+            hint={
+              enCurso && t.proyectado != null
+                ? `periodo completo al ${fechaCorta(datos!.periodo.hasta)}: ${MXN.format(t.proyectado)}`
+                : `sueldo del periodo ${MXN.format(t.sueldoPeriodo)}`
+            }
+            icon={<PaymentsOutlinedIcon />}
+            iconTone="neutral"
+          />
+          <Stat
+            label="Horas laboradas"
+            value={formatoHoras(t.horasLaboradas)}
+            hint={`${formatoHoras(t.horasProductivas)} productivas`}
+            icon={<ScheduleOutlinedIcon />}
+            iconTone="neutral"
+          />
+          <Stat
+            label="Productividad"
+            value={t.productividadPct == null ? "—" : `${t.productividadPct} %`}
+            hint="productivas ÷ laboradas"
+            tone={t.productividadPct != null && t.productividadPct < BAJA_PRODUCTIVIDAD ? "warning" : "default"}
+            icon={<SpeedOutlinedIcon />}
+            iconTone="neutral"
+          />
+          <Stat
+            label="Por revisar"
+            value={porRevisar}
+            hint={
+              <FraseDatos
+                partes={[`${t.revisar} baja productividad`, `${t.sinSueldo} sin sueldo`, `${t.sinJornadas} sin jornadas`]}
+              />
+            }
+            tone={porRevisar > 0 ? "warning" : "default"}
+            icon={<FactCheckOutlinedIcon />}
+            iconTone="neutral"
+          />
+        </StatRow>
       )}
 
-      {cargando && !datos ? (
-        <div style={statusPanelStyle} role="status" aria-live="polite">
-          Calculando la sugerencia de nómina…
-        </div>
-      ) : datos ? (
-        <DataTable
-          columns={columnas}
-          rows={renglones}
-          rowKey={(r) => (r.tipo === "total" ? "total" : r.fila.userId)}
-          density="compact"
-          ariaLabel="Sugerencia de nómina por persona"
-          emptyTitle="Nadie en el periodo"
-          emptyDescription="No hay empleados activos a tu alcance para este periodo."
-        />
-      ) : modo === "rango" && !error ? (
-        <div style={statusPanelStyle}>Elige las fechas y pulsa «Aplicar».</div>
-      ) : null}
-      <style>{`
-        @media (max-width: 480px) {
-          .nx-sn-dato { display: block; }
-          .nx-sn-sep { display: none; }
+      <ListCard
+        empty={esperandoRango || (Boolean(datos) && renglones.length === 0)}
+        emptyState={
+          esperandoRango
+            ? {
+                icon: <CalendarMonthOutlinedIcon />,
+                title: "Elige las fechas y pulsa «Aplicar».",
+                tone: "neutral",
+              }
+            : {
+                icon: <PeopleAltOutlinedIcon />,
+                title: "Nadie en el periodo",
+                description: "No hay empleados activos a tu alcance para este periodo.",
+                tone: "neutral",
+              }
         }
-      `}</style>
+      >
+        {esperandoCalculo ? (
+          <Calculando />
+        ) : datos ? (
+          <DataTable
+            flush
+            columns={columnas}
+            rows={renglones}
+            rowKey={(r) => (r.tipo === "total" ? "total" : r.fila.userId)}
+            density="compact"
+            ariaLabel="Sugerencia de nómina por persona"
+            loading={cargando}
+          />
+        ) : null}
+      </ListCard>
     </div>
   );
 }

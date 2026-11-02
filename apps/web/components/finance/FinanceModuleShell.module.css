@@ -1,182 +1,53 @@
+/* Marco de los módulos de finanzas: la misma secuencia de Clientes (cabeza con pestañas, cifras y
+   contenido). Solo tokens --ui-*. */
+
 .shell {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px 20px;
-}
-
-.headerCopy {
+  gap: var(--ui-s4);
   min-width: 0;
-  flex: 1;
 }
 
-.eyebrow {
-  margin: 0 0 4px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
+.shell > .cabeza {
+  margin-bottom: 0;
 }
 
-.title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 750;
-  letter-spacing: -0.02em;
-  color: var(--foreground, var(--text-primary));
-  line-height: 1.2;
+.rail {
+  min-width: 0;
 }
 
-.subtitle {
-  margin: 6px 0 0;
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--text-secondary);
-  max-width: 52rem;
+.rail > nav {
+  margin-bottom: 0;
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.kpiRow {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-}
-
-.tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 4px;
-  width: fit-content;
-  max-width: 100%;
-  background: var(--surface-2, var(--surface));
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.tab {
-  appearance: none;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 7px 14px;
-  border-radius: 7px;
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-}
-
-.tab:hover {
-  color: var(--foreground, var(--text-primary));
-  background: color-mix(in srgb, var(--surface) 80%, transparent);
-}
-
-.tabActive {
-  color: var(--foreground, var(--text-primary));
-  background: var(--surface);
-  border-color: var(--border);
+.kpis {
+  min-width: 0;
 }
 
 .content {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius, 16px);
+  box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
+  padding: var(--ui-card-pad, 20px);
   min-height: 120px;
-}
-
-/* ── Variante «flat» — regla 9 de .ai/DISENO-FINANZAS.md ──────────────────
-   Ni una caja dentro de otra. La píldora de pestañas y la tarjeta de contenido
-   solo añadían un borde y un relleno alrededor de cosas que ya traen el suyo
-   (la tabla, los controles). La jerarquía la dan el espaciado y la tipografía.
-   Es opt-in: sin `variant="flat"` nada cambia para el resto de módulos.       */
-
-.shellFlat {
-  gap: 14px;
-}
-
-/* La tira de cifras ya se reparte sola en celdas: no necesita una rejilla
-   encima que obligue a las pantallas a colarse con `grid-column: 1 / -1`. */
-.kpiRowFlat {
-  display: block;
   min-width: 0;
-}
-
-.tabsFlat {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  border-bottom: 1px solid var(--border);
-}
-
-.tabFlat {
-  appearance: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  background: none;
-  margin-bottom: -1px;
-  padding: 0 0 8px;
-  font-family: inherit;
-  font-size: var(--ui-text-base);
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: color 0.12s ease, border-color 0.12s ease;
-}
-
-.tabFlat:hover {
-  color: var(--foreground, var(--text-primary));
-}
-
-.tabFlat:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-.tabFlatActive {
-  color: var(--foreground, var(--text-primary));
-  font-weight: 600;
-  border-bottom-color: var(--primary);
 }
 
 .contentFlat {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-s4);
   min-width: 0;
 }
 
-/* Con ratón el contrato fija 32px (regla 4). Con el dedo ese mismo control se
-   falla: en un puntero grueso todo lo tocable sube a 40px sin cambiar el
-   diseño de escritorio. */
+/* Con ratón el contrato fija 32 px. Con el dedo ese control se falla: en un puntero grueso todo lo
+   tocable sube a 40 px sin cambiar el escritorio. */
 @media (pointer: coarse) {
-  .shellFlat button,
-  .shellFlat select,
-  .shellFlat input:not([type="checkbox"]):not([type="radio"]) {
+  .shell button,
+  .shell select,
+  .shell input:not([type="checkbox"]):not([type="radio"]) {
     min-height: 40px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tabFlat {
-    transition: none;
   }
 }
 

@@ -1,0 +1,152 @@
+/* Mesa contable · Proveedores: lista y expediente. Solo tokens --ui-*: claro y oscuro salen solos. */
+
+.conteo {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* El aviso base trae margen inferior; en el marco ya separa el gap de 16 px. */
+.aviso {
+  margin-bottom: 0;
+}
+
+.cargando {
+  margin: 0;
+  padding: var(--ui-s3) var(--ui-s4) 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Celdas de la lista ───────────────────────────────────────────────── */
+
+.celdaNombre {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.nombre {
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--ui-s2);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.apilado {
+  display: grid;
+  gap: 1px;
+}
+
+.peligro {
+  color: var(--ui-danger-text);
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+}
+
+.nota {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.secundario {
+  color: var(--ui-fg-2);
+}
+
+.fechaCelda {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+.credito {
+  font-size: var(--ui-text-sm);
+}
+
+.folio {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.folioFiscal {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.vencida {
+  font-size: var(--ui-text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-danger-text);
+  white-space: nowrap;
+}
+
+/* ─── Expediente (dentro del modal) ────────────────────────────────────── */
+
+.expedienteTop {
+  display: grid;
+  gap: var(--ui-s4);
+  margin-bottom: var(--ui-s4);
+  min-width: 0;
+}
+
+.pestana {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.pestana > * {
+  min-width: 0;
+}
+
+.cuerpo {
+  padding: var(--ui-s4) 20px;
+}
+
+.datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s4) 20px;
+}
+
+.dato {
+  min-width: 150px;
+}
+
+.datoEtiqueta {
+  margin-bottom: 3px;
+  font-size: var(--ui-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.datoValor {
+  font-size: var(--ui-text-base);
+  color: var(--ui-fg);
+}
+
+.descripcion {
+  margin: var(--ui-s3) 0 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+/* Chips de antigüedad: bajo el título de la tarjeta, sobre la tabla. */
+.barraChips {
+  padding: var(--ui-s3) 20px;
+  border-bottom: 1px solid var(--ui-border-subtle);
+}

@@ -1,15 +1,33 @@
 "use client";
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import Link from "next/link";
-import Button from "@/components/ui/Button";
-import PageHeader from "@/components/ui/PageHeader";
-import MetricStrip from "@/components/ui/MetricStrip";
-import InlineAlert from "@/components/ui/InlineAlert";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import MoreTimeOutlinedIcon from "@mui/icons-material/MoreTimeOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardHead,
+  Checkbox,
+  DataTable,
+  DateInput,
+  FilterChip,
+  FilterChips,
+  ListCard,
+  ModuleToolbar,
+  Stat,
+  StatRow,
+  type Column,
+  type Tone,
+} from "@/components/base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
-import DataTable, { Money, Tag, type Column } from "@/components/ui/DataTable";
-import FilterToolbar from "@/components/FilterToolbar";
-import { SkeletonList } from "@/components/PageState";
+import { Money } from "@/components/ui/DataTable";
+import { FinanceModuleShell } from "@/components/finance/FinanceModuleShell";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
@@ -21,6 +39,7 @@ import {
   upsertOvertimeCandidates,
   type PrenominaPreviewRow,
 } from "@/lib/finance-api";
+import s from "./PrenominaPanel.module.css";
 
 export type PrenominaPanelProps = {
   eyebrow: string;
@@ -105,13 +124,11 @@ function formatRange(from: string, to: string) {
 
 const MXN = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 
-const OT_STATUS: Record<string, { label: string; variant: "warning" | "positive" | "danger" | "default" }> = {
-  PENDIENTE: { label: "Por decidir", variant: "warning" },
-  APROBADO: { label: "Aprobada", variant: "positive" },
-  RECHAZADO: { label: "Rechazada", variant: "danger" },
+const OT_STATUS: Record<string, { label: string; tone: Tone }> = {
+  PENDIENTE: { label: "Por decidir", tone: "warning" },
+  APROBADO: { label: "Aprobada", tone: "success" },
+  RECHAZADO: { label: "Rechazada", tone: "danger" },
 };
-
-const num: React.CSSProperties = { fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
 
 /**
  * Shared pre-nómina panel (Finance + HR). Period → attendance + approved OT → suggested amount.
@@ -247,18 +264,15 @@ export default function PrenominaPanel({
     {
       key: "sel",
       label: (
-        <input
-          type="checkbox"
+        <Checkbox
           checked={allSelected}
           onChange={toggleAll}
           aria-label="Seleccionar a todas las personas"
-          style={{ width: 18, height: 18 }}
         />
-      ) as unknown as string,
+      ),
       width: 44,
       render: (r) => (
-        <input
-          type="checkbox"
+        <Checkbox
           checked={selected.has(r.userId)}
           onChange={() => {
             setSelected((prev) => {
@@ -269,7 +283,6 @@ export default function PrenominaPanel({
             });
           }}
           aria-label={`Seleccionar a ${r.nombre || r.email || "esta persona"}`}
-          style={{ width: 18, height: 18 }}
         />
       ),
     },
@@ -277,14 +290,14 @@ export default function PrenominaPanel({
       key: "nombre",
       label: "Persona",
       render: (r) => (
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600 }}>{r.nombre || r.email || "Sin nombre"}</div>
-          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{r.puesto || r.email}</div>
+        <div className={s.persona}>
+          <div className={s.nombre}>{r.nombre || r.email || "Sin nombre"}</div>
+          <div className={s.puesto}>{r.puesto || r.email}</div>
           {r.openDays && r.openDays.length > 0 && (
-            <div style={{ marginTop: 4 }}>
-              <Tag variant="warning" size="sm">
+            <div className={s.jornadas}>
+              <Badge tone="warning" size="sm">
                 {r.openDays.length === 1 ? "1 jornada sin cerrar" : `${r.openDays.length} jornadas sin cerrar`}
-              </Tag>
+              </Badge>
             </div>
           )}
         </div>
@@ -295,14 +308,14 @@ export default function PrenominaPanel({
       label: "Días",
       align: "right",
       numeric: true,
-      render: (r) => <span style={num}>{r.daysWithAttendance ?? 0}</span>,
+      render: (r) => <span className={s.num}>{r.daysWithAttendance ?? 0}</span>,
     },
     {
       key: "minutes",
       label: "Tiempo trabajado",
       align: "right",
       numeric: true,
-      render: (r) => <span style={num}>{formatMinutes(r.totalMinutes || 0)}</span>,
+      render: (r) => <span className={s.num}>{formatMinutes(r.totalMinutes || 0)}</span>,
     },
     {
       key: "extras",
@@ -310,7 +323,7 @@ export default function PrenominaPanel({
       align: "right",
       numeric: true,
       render: (r) => (
-        <span style={{ ...num, color: r.approvedOvertimeMinutes ? "var(--text-primary)" : "var(--text-tertiary)" }}>
+        <span className={r.approvedOvertimeMinutes ? `${s.num} ${s.extras}` : `${s.num} ${s.tenue}`}>
           {formatMinutes(r.approvedOvertimeMinutes || 0)}
         </span>
       ),
@@ -320,7 +333,7 @@ export default function PrenominaPanel({
       label: "Sueldo semanal",
       align: "right",
       numeric: true,
-      render: (r) => (r.sueldoSemanal != null ? <Money value={r.sueldoSemanal} bold={false} /> : <span style={{ color: "var(--text-tertiary)" }}>—</span>),
+      render: (r) => (r.sueldoSemanal != null ? <Money value={r.sueldoSemanal} bold={false} /> : <span className={s.tenue}>—</span>),
     },
     {
       key: "suggested",
@@ -330,7 +343,7 @@ export default function PrenominaPanel({
       render: (r) =>
         r.suggestedAmount != null
           ? <Money value={r.suggestedAmount} />
-          : <Tag variant="warning" size="sm">Sin sueldo registrado</Tag>,
+          : <Badge tone="warning" size="sm">Sin sueldo registrado</Badge>,
     },
   ];
 
@@ -338,26 +351,26 @@ export default function PrenominaPanel({
     {
       key: "persona",
       label: "Persona",
-      render: (r) => <span style={{ fontWeight: 600 }}>{r.user?.nombre || "Sin nombre"}</span>,
+      render: (r) => <span className={s.nombre}>{r.user?.nombre || "Sin nombre"}</span>,
     },
     {
       key: "fecha",
       label: "Día",
-      render: (r) => <span style={num}>{formatDay(r.fecha)}</span>,
+      render: (r) => <span className={s.num}>{formatDay(r.fecha)}</span>,
     },
     {
       key: "minutos",
       label: "Tiempo extra",
       align: "right",
       numeric: true,
-      render: (r) => <span style={num}>{formatMinutes(r.minutos)}</span>,
+      render: (r) => <span className={s.num}>{formatMinutes(r.minutos)}</span>,
     },
     {
       key: "estado",
       label: "Estado",
       render: (r) => {
-        const m = OT_STATUS[r.estado] ?? { label: r.estado.charAt(0) + r.estado.slice(1).toLowerCase(), variant: "default" as const };
-        return <Tag variant={m.variant} size="sm" dot>{m.label}</Tag>;
+        const m = OT_STATUS[r.estado] ?? { label: r.estado.charAt(0) + r.estado.slice(1).toLowerCase(), tone: "neutral" as const };
+        return <Badge tone={m.tone} size="sm" dot>{m.label}</Badge>;
       },
     },
     {
@@ -366,7 +379,7 @@ export default function PrenominaPanel({
       align: "right",
       render: (r) =>
         canDecideOt && r.estado === "PENDIENTE" && token ? (
-          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+          <div className={s.decision}>
             <Button size="sm" loading={deciding === r.id} disabled={deciding !== null} onClick={() => void decide(r, "approve")}>
               Aprobar
             </Button>
@@ -379,19 +392,21 @@ export default function PrenominaPanel({
   ];
 
   const firstLoad = loading && !calculated;
+  const hayAvisoDeBorradores = Boolean(calculated) && (totals.withoutSalary > 0 || totals.openDays > 0);
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      {rail}
-      <PageHeader
+    <>
+      <FinanceModuleShell
+        variant="flat"
         eyebrow={eyebrow}
         title={title}
         subtitle={subtitle}
+        rail={rail}
         actions={
           <>
-            <Link href={paymentsHref} style={{ textDecoration: "none" }}>
-              <Button variant="ghost">Ver pagos</Button>
-            </Link>
+            <ButtonLink href={paymentsHref} variant="ghost">
+              Ver pagos
+            </ButtonLink>
             <Button
               variant="secondary"
               disabled={!token || creating || loading || stale || selected.size === 0 || rows.length === 0}
@@ -405,141 +420,201 @@ export default function PrenominaPanel({
             </Button>
           </>
         }
-      />
-
-      <div
-        style={{
-          display: "grid",
-          gap: 12,
-          padding: 14,
-          border: "1px solid var(--border)",
-          borderRadius: 12,
-          background: "var(--surface)",
-        }}
       >
-        <div role="group" aria-label="Periodos rápidos" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {PRESETS.map((p) => {
-            const [pf, pt] = p.range();
-            const active = pf === from && pt === to;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => { setFrom(pf); setTo(pt); }}
-                style={{
-                  minHeight: 36, padding: "6px 12px", borderRadius: 999, fontSize: 13, cursor: "pointer",
-                  border: `1px solid ${active ? "var(--primary)" : "var(--border)"}`,
-                  background: active ? "color-mix(in srgb, var(--primary) 10%, var(--surface))" : "var(--surface)",
-                  color: active ? "var(--primary)" : "var(--text-primary)",
-                  fontWeight: active ? 600 : 500,
-                }}
-              >
-                {p.label}
-              </button>
-            );
-          })}
-        </div>
-        <FilterToolbar
-          dates={[
-            { label: "Desde", value: from, onChange: setFrom },
-            { label: "Hasta", value: to, onChange: setTo },
-          ]}
-        />
-        {rangeError && <InlineAlert variant="warning" message={rangeError} dense />}
-        {stale && !rangeError && (
-          <InlineAlert
-            variant="info"
-            message={`Cambiaste el periodo. Los datos mostrados son de ${formatRange(calculated!.from, calculated!.to)}.`}
-            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Recalcular</Button>}
-            dense
-          />
+        <Card as="div" className={s.barra}>
+          <ModuleToolbar
+            chips={
+              <FilterChips ariaLabel="Periodos rápidos">
+                {PRESETS.map((p) => {
+                  const [pf, pt] = p.range();
+                  const active = pf === from && pt === to;
+                  return (
+                    <FilterChip
+                      key={p.id}
+                      active={active}
+                      onClick={() => {
+                        setFrom(pf);
+                        setTo(pt);
+                      }}
+                    >
+                      {p.label}
+                    </FilterChip>
+                  );
+                })}
+              </FilterChips>
+            }
+          >
+            <label className={s.fecha}>
+              <span>Desde</span>
+              <DateInput
+                aria-label="Desde"
+                controlSize="sm"
+                className={s.fechaCtl}
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+              />
+            </label>
+            <label className={s.fecha}>
+              <span>Hasta</span>
+              <DateInput
+                aria-label="Hasta"
+                controlSize="sm"
+                className={s.fechaCtl}
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+              />
+            </label>
+          </ModuleToolbar>
+        </Card>
+
+        {rangeError && (
+          <Alert tone="warning" role="alert" dense>
+            {rangeError}
+          </Alert>
         )}
-      </div>
+        {stale && !rangeError && (
+          <Alert
+            tone="info"
+            role="alert"
+            dense
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void load()}>
+                Recalcular
+              </Button>
+            }
+          >
+            {`Cambiaste el periodo. Los datos mostrados son de ${formatRange(calculated!.from, calculated!.to)}.`}
+          </Alert>
+        )}
 
-      {error && (
-        <InlineAlert
-          variant={calculated ? "warning" : "danger"}
-          title="No se pudo calcular la prenómina"
-          message={calculated ? `${error} Mostramos el último cálculo.` : error}
-          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
-        />
-      )}
+        {error && (
+          <Alert
+            tone={calculated ? "warning" : "danger"}
+            role="alert"
+            title="No se pudo calcular la prenómina"
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void load()}>
+                Reintentar
+              </Button>
+            }
+          >
+            {calculated ? `${error} Mostramos el último cálculo.` : error}
+          </Alert>
+        )}
 
-      {calculated && (
-        <MetricStrip
-          ariaLabel="Totales del periodo"
-          metrics={[
-            { label: "Personas", value: rows.length, hint: formatRange(calculated.from, calculated.to) },
-            { label: "Tiempo trabajado", value: formatMinutes(totals.minutes) },
-            { label: "Extras aprobadas", value: formatMinutes(totals.extras) },
-            {
-              label: "Extras por decidir",
-              value: pendingOt.length,
-              tone: pendingOt.length ? "warning" : "success",
-              hint: pendingOt.length ? "No suman al monto hasta aprobarse" : undefined,
-            },
-            {
-              label: "Monto sugerido",
-              value: MXN(totals.amount),
-              hint: selected.size !== rows.length ? `${MXN(totals.selectedAmount)} seleccionado` : undefined,
-            },
-          ]}
-        />
-      )}
+        {hayAvisoDeBorradores && (
+          <Alert tone="warning" role="alert" title="Revisa antes de crear borradores">
+            {[
+              totals.withoutSalary > 0
+                ? `${totals.withoutSalary === 1 ? "1 persona no tiene" : `${totals.withoutSalary} personas no tienen`} sueldo semanal registrado y se omitirán.`
+                : "",
+              totals.openDays > 0
+                ? `Hay ${totals.openDays === 1 ? "1 jornada" : `${totals.openDays} jornadas`} con entrada pero sin salida.`
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          </Alert>
+        )}
 
-      {calculated && (totals.withoutSalary > 0 || totals.openDays > 0) && (
-        <InlineAlert
-          variant="warning"
-          title="Revisa antes de crear borradores"
-          message={[
-            totals.withoutSalary > 0
-              ? `${totals.withoutSalary === 1 ? "1 persona no tiene" : `${totals.withoutSalary} personas no tienen`} sueldo semanal registrado y se omitirán.`
-              : "",
-            totals.openDays > 0
-              ? `Hay ${totals.openDays === 1 ? "1 jornada" : `${totals.openDays} jornadas`} con entrada pero sin salida.`
-              : "",
-          ].filter(Boolean).join(" ")}
-        />
-      )}
+        {calculated && (
+          <StatRow variant="strip" ariaLabel="Totales del periodo">
+            <Stat
+              label="Personas"
+              value={rows.length}
+              hint={formatRange(calculated.from, calculated.to)}
+              icon={<GroupsOutlinedIcon />}
+              iconTone="neutral"
+            />
+            <Stat
+              label="Tiempo trabajado"
+              value={formatMinutes(totals.minutes)}
+              icon={<ScheduleOutlinedIcon />}
+              iconTone="neutral"
+            />
+            <Stat
+              label="Extras aprobadas"
+              value={formatMinutes(totals.extras)}
+              icon={<MoreTimeOutlinedIcon />}
+              iconTone="neutral"
+            />
+            <Stat
+              label="Extras por decidir"
+              value={pendingOt.length}
+              tone={pendingOt.length ? "warning" : "success"}
+              hint={pendingOt.length ? "No suman al monto hasta aprobarse" : undefined}
+              icon={<PendingActionsOutlinedIcon />}
+              iconTone="neutral"
+            />
+            <Stat
+              label="Monto sugerido"
+              value={MXN(totals.amount)}
+              hint={selected.size !== rows.length ? `${MXN(totals.selectedAmount)} seleccionado` : undefined}
+              icon={<PaymentsOutlinedIcon />}
+              iconTone="neutral"
+            />
+          </StatRow>
+        )}
 
-      <section aria-labelledby="prenomina-team">
-        <h2 id="prenomina-team" style={{ fontSize: 16, margin: "0 0 8px", fontFamily: "var(--nx-font-display)" }}>Equipo del periodo</h2>
-        {firstLoad ? (
-          <SkeletonList rows={6} tableLike />
-        ) : (
+        <ListCard
+          listLabel="Equipo del periodo"
+          toolbar={<CardHead title="Equipo del periodo" />}
+          loading={firstLoad}
+          empty={!firstLoad && rows.length === 0}
+          emptyState={{
+            icon: <GroupsOutlinedIcon />,
+            title: calculated ? "Nadie registró asistencia en el periodo" : "Aún no hay cálculo",
+            description: calculated ? "Prueba con otro periodo." : "Elige el periodo y pulsa «Calcular periodo».",
+            action: !calculated ? (
+              <Button size="sm" onClick={() => void load()} disabled={!token || !!rangeError}>
+                Calcular periodo
+              </Button>
+            ) : undefined,
+            tone: "neutral",
+          }}
+        >
           <DataTable
+            flush
             columns={teamColumns}
             rows={rows}
             rowKey={(r) => r.userId}
             ariaLabel="Prenómina por persona"
-            emptyTitle={calculated ? "Nadie registró asistencia en el periodo" : "Aún no hay cálculo"}
-            emptyDescription={calculated ? "Prueba con otro periodo." : "Elige el periodo y pulsa «Calcular periodo»."}
-            emptyAction={!calculated ? <Button size="sm" variant="primary" onClick={() => void load()} disabled={!token || !!rangeError}>Calcular periodo</Button> : undefined}
           />
-        )}
-      </section>
+        </ListCard>
 
-      <section aria-labelledby="prenomina-ot">
-        <h2 id="prenomina-ot" style={{ fontSize: 16, margin: "0 0 4px", fontFamily: "var(--nx-font-display)" }}>Horas extra</h2>
-        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 10px", maxWidth: "70ch" }}>
-          Solo las horas extra aprobadas suman al monto sugerido.
-          {!canDecideOt ? " Puedes consultarlas, pero no tienes permiso para aprobarlas o rechazarlas." : null}
-        </p>
-        {firstLoad ? (
-          <SkeletonList rows={3} tableLike />
-        ) : (
+        <ListCard
+          listLabel="Horas extra"
+          toolbar={
+            <CardHead
+              title="Horas extra"
+              subtitle={
+                <>
+                  Solo las horas extra aprobadas suman al monto sugerido.
+                  {!canDecideOt ? " Puedes consultarlas, pero no tienes permiso para aprobarlas o rechazarlas." : null}
+                </>
+              }
+            />
+          }
+          loading={firstLoad}
+          loadingRows={3}
+          empty={!firstLoad && otRows.length === 0}
+          emptyState={{
+            icon: <MoreTimeOutlinedIcon />,
+            title: "Sin horas extra",
+            description: calculated ? "Nadie registró horas extra en el periodo." : "Calcula un periodo para ver las horas extra.",
+            tone: "neutral",
+          }}
+        >
           <DataTable
+            flush
             columns={otColumns}
             rows={otRows}
             rowKey={(r) => r.id}
             ariaLabel="Horas extra del periodo"
-            emptyTitle="Sin horas extra"
-            emptyDescription={calculated ? "Nadie registró horas extra en el periodo." : "Calcula un periodo para ver las horas extra."}
           />
-        )}
-      </section>
+        </ListCard>
+      </FinanceModuleShell>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} danger={false} />
-    </div>
+    </>
   );
 }

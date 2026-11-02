@@ -1,0 +1,430 @@
+/* Mesa contable · Pólizas y libros. Solo tokens --ui-*: claro y oscuro (body.dark) salen de los tokens. */
+
+/* ─── Pestañas ─────────────────────────────────────────────────────────── */
+
+/* Bajo los chips. Las pestañas de base llevan radio 0, así que la raya de la activa es recta
+   y se asienta sobre este filete. Las ocho pestañas no deben ensanchar la página (el layout de
+   contabilidad es una rejilla de pista automática): se desplazan dentro de su fila. */
+.pestanas {
+  min-width: 0;
+  contain: inline-size;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+/* ─── Tarjetas ─────────────────────────────────────────────────────────── */
+
+/* La tarjeta recorta las esquinas de la tabla a ras que lleva dentro. Una tabla ancha se
+   desplaza dentro de su tarjeta: `contain` evita que ensanche la página (el layout de
+   contabilidad es una rejilla de pista automática y la seguiría). */
+.tarjeta,
+.lista {
+  contain: inline-size;
+}
+
+.tarjeta {
+  overflow: clip;
+}
+
+/* Tarjeta que solo trae su cabeza: sin la raya doble al pie. */
+.soloCabeza > div:last-child {
+  border-bottom: 0;
+}
+
+/* Aviso dentro de una tarjeta, entre la cabeza y la tabla. */
+.avisoDentro {
+  margin: var(--ui-s3) var(--ui-s4);
+}
+
+/* ─── Captura (altas) ──────────────────────────────────────────────────── */
+
+.captura {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+  padding: var(--ui-s5) 20px;
+}
+
+/* Dentro de la tarjeta de su lista: banda hundida entre la cabeza y la tabla. */
+.captura[data-anidada="true"] {
+  background: var(--ui-surface-2);
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+
+.capturaTitulo {
+  margin: 0;
+  font-size: var(--ui-text-lg);
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--ui-fg);
+}
+
+.capturaDesc {
+  margin: 2px 0 0;
+  max-width: 44rem;
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+  color: var(--ui-fg-3);
+}
+
+/* Línea de corte y guardar a la derecha. */
+.capturaPie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+  padding-top: var(--ui-s3);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+/* ─── Controles de filtro (anchos; el alto lo da controlSize="sm") ─────── */
+
+/* Selectores y campos chicos: ancho propio (no flex-basis, que dejaría la fila más ancha que su
+   contenido y la partiría en dos); `span.` e `input.` ganan a la clase base del control. */
+span.selTipo,
+span.selCuenta,
+span.selPeriodo,
+span.selCentro,
+span.selMes,
+input.fecha,
+input.anio {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+span.selTipo {
+  width: 190px;
+}
+
+span.selCuenta {
+  width: 180px;
+}
+
+span.selPeriodo {
+  width: 220px;
+}
+
+span.selCentro {
+  width: 240px;
+}
+
+span.selMes {
+  width: 150px;
+}
+
+input.fecha {
+  width: 160px;
+}
+
+input.anio {
+  width: 100px;
+}
+
+/* El buscador de la lista de pólizas lleva un placeholder largo: más ancho que el de base. */
+.lista [role="search"] > div:first-child {
+  flex-basis: 360px;
+}
+
+.controlesFecha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.rotulo {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+.conteo {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ─── Celdas de tabla ──────────────────────────────────────────────────── */
+
+.tenue {
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-meta);
+}
+
+.celdaDoble {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.principal {
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.sub {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.codigo {
+  padding: 0;
+  background: none;
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-fs-meta);
+  letter-spacing: 0.02em;
+  color: var(--ui-fg-2);
+}
+
+.cifra {
+  font-variant-numeric: tabular-nums;
+}
+
+.fechasCelda {
+  color: var(--ui-fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.sinRfc {
+  color: var(--ui-warning-text);
+  font-weight: var(--ui-fw-medium);
+}
+
+.fechaCelda {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fechaTexto {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.diasSin {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+/* Después de .diasSin: gana por orden, con la misma especificidad. */
+.diasAviso {
+  color: var(--ui-warning-text);
+}
+
+.diasPeligro {
+  color: var(--ui-danger-text);
+}
+
+.estadoCelda {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ui-s1);
+}
+
+.estadoFila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ui-s1);
+}
+
+.varNormal,
+.varPeligro {
+  font-variant-numeric: tabular-nums;
+}
+
+.varNormal {
+  color: var(--ui-fg-2);
+}
+
+.varPeligro {
+  color: var(--ui-danger-text);
+}
+
+/* Agrupador SAT editable: con aviso de color mientras la cuenta no está mapeada. */
+.agrupador {
+  font-variant-numeric: tabular-nums;
+}
+
+.agrupador[data-vacio="true"]:not(:focus) {
+  border-color: var(--ui-warning);
+}
+
+/* ─── Cifra de cierre al pie de una tabla ──────────────────────────────── */
+
+.totales {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 28px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--ui-border-subtle);
+  background: var(--ui-surface-2);
+}
+
+.total {
+  text-align: right;
+}
+
+.totalEtiqueta {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.totalValor {
+  font-size: var(--ui-text-base);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg);
+}
+
+.totalPeligro {
+  color: var(--ui-danger-text);
+}
+
+/* ─── Bloques de tablas lado a lado (resultados, balance) ──────────────── */
+
+.dosColumnas,
+.tresColumnas {
+  display: grid;
+  min-width: 0;
+}
+
+.dosColumnas {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tresColumnas {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.bloqueTabla {
+  min-width: 0;
+}
+
+.bloqueTabla + .bloqueTabla {
+  border-left: 1px solid var(--ui-border-subtle);
+}
+
+.bloqueTitulo {
+  margin: 0;
+  padding: var(--ui-s3) var(--ui-s4) var(--ui-s2);
+  font-size: var(--ui-fs-meta);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+@media (max-width: 1100px) {
+  .tresColumnas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tresColumnas > .bloqueTabla + .bloqueTabla {
+    border-left: 0;
+    border-top: 1px solid var(--ui-border-subtle);
+  }
+}
+
+@media (max-width: 900px) {
+  .dosColumnas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dosColumnas > .bloqueTabla + .bloqueTabla {
+    border-left: 0;
+    border-top: 1px solid var(--ui-border-subtle);
+  }
+}
+
+/* ─── Inteligencia: antigüedad de saldos y flujo semanal ───────────────── */
+
+.aging {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.agingCelda {
+  min-width: 0;
+  padding: 14px 20px;
+}
+
+.agingCelda + .agingCelda {
+  border-left: 1px solid var(--ui-border-subtle);
+}
+
+.agingEtiqueta {
+  display: block;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.agingValor {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--ui-text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg);
+}
+
+@media (max-width: 720px) {
+  .aging {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .agingCelda {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--ui-s3);
+    padding: var(--ui-s3) var(--ui-s4);
+  }
+
+  .agingCelda + .agingCelda {
+    border-left: 0;
+    border-top: 1px solid var(--ui-border-subtle);
+  }
+
+  .agingValor {
+    margin-top: 0;
+  }
+}
+
+.flujoCuerpo {
+  padding: var(--ui-s4) 20px;
+}
+
+.flujo {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--ui-s1);
+  height: 80px;
+}
+
+/* El alto de cada barra se calcula al pintar; aquí solo el resto. */
+.barra {
+  flex: 1;
+  border-radius: 3px;
+  opacity: 0.85;
+}
+
+.barraPositiva {
+  background: var(--ui-success);
+}
+
+.barraNegativa {
+  background: var(--ui-danger);
+}

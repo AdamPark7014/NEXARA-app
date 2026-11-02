@@ -351,7 +351,7 @@ export default function PagosYGastosPage() {
         }
         acciones={acciones}
       />
-      <ContabilidadSidebar enPagina />
+      <ContabilidadSidebar />
 
       {avisoLista ? (
         <Alert tone={avisoLista.tono} role="status" onDismiss={() => setAvisoLista(null)}>
@@ -413,7 +413,7 @@ export default function PagosYGastosPage() {
 
       <div className={m.split}>
         <section aria-label="Movimientos" className={cx(m.cardList, m.splitMain)} aria-busy={cargando || undefined}>
-          <div className={m.toolbar} style={{ gap: 10 }}>
+          <div className={cx(m.toolbar, m.toolbarGap10)}>
             <Segmentos
               etiqueta="Tipo"
               valor={tipo}
@@ -461,7 +461,7 @@ export default function PagosYGastosPage() {
               />
             )
           ) : items.length > 0 ? (
-            <table className={cx(m.table, m.tableCompact)} style={{ minWidth: 780 }}>
+            <table className={cx(m.table, m.tableCompact, m.minW780)}>
               <caption className={m.srOnly}>Movimientos de {etiqueta}</caption>
               <thead>
                 <tr>
@@ -504,7 +504,7 @@ export default function PagosYGastosPage() {
                         </button>{" "}
                         {it.folio ? (
                           it.folio.href ? (
-                            <Link href={it.folio.href} style={{ fontSize: 12 }}>
+                            <Link href={it.folio.href} className={m.fs12}>
                               {it.folio.texto}
                             </Link>
                           ) : (
@@ -533,7 +533,7 @@ export default function PagosYGastosPage() {
           ) : null}
 
           {!cargando && items.length > 0 ? (
-            <div className={m.listFoot} style={{ gap: 16 }}>
+            <div className={cx(m.listFoot, m.listFootGap16)}>
               <span>Cada fila nace sola cuando se paga un viático, un gasto, una compra, la nómina o llega un cobro.</span>
               <span>
                 {soloPendientes
@@ -646,7 +646,7 @@ function Celda({
   if (pinta === "aviso") {
     if (celda.accion === "EMITIR_COMPLEMENTO") {
       return (
-        <Link href={`${RUTA_BANDEJA}?origen=COMPLEMENTO`} style={{ fontSize: 13 }} data-tinta="warning">
+        <Link href={`${RUTA_BANDEJA}?origen=COMPLEMENTO`} className={m.fs13} data-tinta="warning">
           {texto}
         </Link>
       );
@@ -659,7 +659,7 @@ function Celda({
       );
     }
     return (
-      <span style={{ fontSize: 13 }} data-tinta="warning">
+      <span className={m.fs13} data-tinta="warning">
         {texto}
       </span>
     );
@@ -667,7 +667,7 @@ function Celda({
 
   if (pinta === "ok" && columna !== "poliza") {
     return (
-      <span className={m.status} data-tinta="ok" style={{ gap: 5 }}>
+      <span className={cx(m.status, m.statusGap5)} data-tinta="ok">
         <IcoPalomita />
         {texto}
       </span>
@@ -677,12 +677,12 @@ function Celda({
   // La póliza registrada se lee como folio (P-0418), sin palomita, como en la maqueta.
   if (columna === "poliza" && (pinta === "ok" || celda.estado === "espera")) {
     return (
-      <span style={{ fontSize: 13, color: "var(--mc-ink-2)" }}>{texto}</span>
+      <span className={m.celdaTexto}>{texto}</span>
     );
   }
 
   return (
-    <span style={{ fontSize: 13 }} data-tinta="muted">
+    <span className={m.fs13} data-tinta="muted">
       {texto}
     </span>
   );
@@ -739,7 +739,7 @@ function Detalle({
           <span className={m.meta}>{d.encabezado}</span>
           <h2>{d.item.titulo}</h2>
         </div>
-        <button type="button" className={cx(m.btn, m.btnIcon)} style={{ marginLeft: "auto" }} aria-label="Cerrar detalle" onClick={onCerrar}>
+        <button type="button" className={cx(m.btn, m.btnIcon, m.mlAuto)} aria-label="Cerrar detalle" onClick={onCerrar}>
           <IcoCerrar />
         </button>
       </div>
@@ -839,8 +839,7 @@ function Detalle({
             {d.banco.vinculado.vinculoId != null ? (
               <button
                 type="button"
-                className={m.linkBtn}
-                style={{ fontSize: 12 }}
+                className={cx(m.linkBtn, m.fs12)}
                 onClick={() => onDesligarBanco(d.banco.vinculado!.vinculoId as number)}
                 disabled={ocupado}
               >

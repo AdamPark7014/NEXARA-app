@@ -1,0 +1,153 @@
+/* Mesa contable · Libro de movimientos. Solo tokens --ui-*: claro y oscuro salen solos. */
+
+/* El aviso base trae margen inferior propio; aquí el aire lo da el `gap` del marco. */
+div.alerta {
+  margin-bottom: 0;
+}
+
+/* ─── Totales ──────────────────────────────────────────────────────────── */
+
+/*
+ * Totales pegados arriba: es lo que la contadora cuadra. Solo cuando la ventana
+ * es amplia y alta; en teléfono o con poca altura seis cifras fijas se comerían
+ * la pantalla y la lista dejaría de verse.
+ */
+@media (min-width: 1025px) and (min-height: 760px) {
+  .totales {
+    position: sticky;
+    top: 0;
+    z-index: var(--ui-z-sticky, 3);
+    background: var(--ui-bg);
+  }
+}
+
+/* ─── Filtros ──────────────────────────────────────────────────────────── */
+
+.campoFecha {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+}
+
+.fecha {
+  flex: 0 1 160px;
+  width: auto;
+}
+
+.filtroSelect {
+  flex: 0 1 190px;
+  width: auto;
+}
+
+.conteo {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Tabla ────────────────────────────────────────────────────────────── */
+
+.celdaTexto {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  min-width: 84px;
+  max-width: 150px;
+  line-height: 1.35;
+}
+
+.celdaFecha {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.concepto {
+  min-width: 200px;
+}
+
+.conceptoAngosto {
+  min-width: 160px;
+}
+
+.conceptoNombre {
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.conceptoMeta {
+  font-size: var(--ui-text-xs);
+  line-height: 1.35;
+  color: var(--ui-fg-3);
+}
+
+.sinDato {
+  color: var(--ui-fg-3);
+}
+
+.referencia {
+  display: block;
+  max-width: 110px;
+  overflow-wrap: anywhere;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+}
+
+/* ─── Pie: paginación ──────────────────────────────────────────────────── */
+
+.paginaTexto {
+  color: var(--ui-fg-2);
+}
+
+.tope {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-warning-text);
+}
+
+.nota {
+  margin-left: auto;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+/* A 390 px la frase no cabe al lado de Anterior / Siguiente: baja a su renglón. */
+.notaAbajo {
+  flex-basis: 100%;
+  min-width: 0;
+  max-width: 100%;
+  font-size: var(--ui-text-xs);
+  line-height: 1.45;
+  color: var(--ui-fg-3);
+}
+
+/* ─── Detalle del renglón ──────────────────────────────────────────────── */
+
+.detalle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px var(--ui-s4);
+  margin: 0;
+  font-size: var(--ui-text-sm);
+}
+
+.detalleEtiqueta {
+  font-size: var(--ui-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ui-fg-3);
+}
+
+.detalleValor {
+  margin: 0;
+  color: var(--ui-fg);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.detalleVacio {
+  color: var(--ui-fg-3);
+}

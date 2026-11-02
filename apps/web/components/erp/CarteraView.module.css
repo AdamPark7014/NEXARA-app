@@ -1,0 +1,459 @@
+/* Cartera · Por cobrar y Por pagar. Solo tokens --ui-*: claro y oscuro salen solos. */
+
+/* Los avisos traen su propio margen inferior; los hijos de la página ya se separan con 16 px. */
+.aviso.aviso {
+  margin-bottom: 0;
+}
+
+.tenue {
+  color: var(--ui-fg-3);
+}
+
+/* El marco del contador (layout) es una rejilla sin `min-width: 0`: una tabla o una fila de chips
+   con scroll propio le impone su ancho mínimo a toda la página. Con `inline-size` la tarjeta no
+   aporta ancho intrínseco y la tabla se desplaza dentro de ella, como pide el teléfono. */
+.tarjeta {
+  contain: inline-size;
+}
+
+/* ─── Barra de herramientas ────────────────────────────────────────────── */
+
+.campoFecha {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+}
+
+.campoFecha .filtroFecha {
+  flex: 0 1 150px;
+  width: auto;
+}
+
+.herramientas .filtroSelect {
+  flex: 0 1 190px;
+  width: auto;
+  min-width: 150px;
+}
+
+.conteo {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Segunda fila de la tarjeta: la escala de antigüedad, que también filtra. */
+.filaTramos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2) var(--ui-s3);
+  padding: var(--ui-s3) var(--ui-s4);
+  border-bottom: 1px solid var(--ui-border-subtle);
+  min-width: 0;
+}
+
+.tramoMonto {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Estados de carga ─────────────────────────────────────────────────── */
+
+.cargando {
+  padding: var(--ui-s2) 0 var(--ui-s4);
+}
+
+.cargandoTexto {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+.cargando .cargandoTexto {
+  padding: 0 var(--ui-s5);
+}
+
+/* ─── Celdas de la tabla ───────────────────────────────────────────────── */
+
+.nombre {
+  font-weight: 600;
+}
+
+.sub {
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.subAngosto {
+  margin-top: 2px;
+}
+
+.proyecto {
+  font-size: var(--ui-text-xs);
+}
+
+.fecha {
+  font-variant-numeric: tabular-nums;
+}
+
+.fechaVencida {
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-danger-text);
+}
+
+/* Los días vencidos son el dato que duele: gris mientras hay plazo, rojo y más peso al pasarse. */
+.diasMal {
+  font-size: var(--ui-text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-danger-text);
+  white-space: nowrap;
+}
+
+.diasHoy {
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  color: var(--ui-warning-text);
+}
+
+.diasEnPlazo {
+  font-size: var(--ui-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg-3);
+}
+
+.sinPlazo {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Calendario de vencimientos (Por pagar) ───────────────────────────── */
+
+.cuerpo {
+  display: grid;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4) 20px;
+  min-width: 0;
+}
+
+.acciones {
+  display: flex;
+  gap: 6px;
+}
+
+.parrafo {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.vencidoQuien {
+  color: var(--ui-fg-2);
+}
+
+.semanas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.semana {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--ui-s3);
+  align-items: baseline;
+  padding: 8px 10px;
+  border-radius: var(--ui-radius-sm);
+  border: 1px solid var(--ui-border-subtle);
+  background: var(--ui-surface);
+}
+
+.semanaTexto {
+  min-width: 0;
+}
+
+.semanaTitulo {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+}
+
+.semanaRango {
+  font-weight: 400;
+  color: var(--ui-fg-3);
+}
+
+.semanaQuien {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.semanaMonto {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.semanaDocs {
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Detalle de la factura ────────────────────────────────────────────── */
+
+.detalle {
+  display: grid;
+  gap: var(--ui-s4);
+  font-size: var(--ui-text-sm);
+}
+
+.datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--ui-s3);
+}
+
+.datosCortos {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.datoEtiqueta {
+  margin-bottom: 2px;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.datoValor {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+}
+
+.datoNormal {
+  font-weight: 400;
+}
+
+.datoSub {
+  font-size: var(--ui-text-xs);
+  font-weight: 400;
+  color: var(--ui-fg-3);
+}
+
+.barra {
+  height: 6px;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-track);
+  overflow: hidden;
+}
+
+.barraRelleno {
+  height: 100%;
+  background: var(--ui-fg-2);
+  opacity: 0.5;
+}
+
+.barraRellenoPagada {
+  background: var(--ui-success-text);
+  opacity: 1;
+}
+
+.cubierto {
+  margin-top: var(--ui-s1);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.bloqueTitulo {
+  margin: 0 0 var(--ui-s2);
+  font-size: var(--ui-fs-caption);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ui-fg-3);
+}
+
+.lineas {
+  display: grid;
+  gap: 5px;
+}
+
+.linea {
+  display: flex;
+  gap: var(--ui-s2);
+  justify-content: space-between;
+  font-size: var(--ui-text-sm);
+}
+
+.lineaValor {
+  min-width: 0;
+  text-align: right;
+}
+
+.uuid {
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-text-xs);
+}
+
+.pagos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.pago {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-2);
+}
+
+.pagoTexto {
+  min-width: 0;
+}
+
+.pagoFecha {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+}
+
+.pagoMeta {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.pagoExtra {
+  margin-top: 2px;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.conceptos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--ui-s1);
+}
+
+.concepto {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.conceptoTexto {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+.masConceptos {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.documentos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px var(--ui-s4);
+  font-size: var(--ui-text-sm);
+}
+
+.aviso.avisoDoc {
+  margin-bottom: var(--ui-s2);
+}
+
+.enlaceDoc {
+  font-weight: 600;
+  color: var(--ui-brand-text);
+  text-decoration: none;
+}
+
+.enlaceDoc:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.enlaceDoc:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+.documentos .docBajando {
+  color: var(--ui-fg-3);
+  cursor: progress;
+}
+
+.historial {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.historialItem {
+  display: grid;
+  gap: 2px;
+}
+
+.historialTitulo {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+}
+
+.historialMeta {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Modales ──────────────────────────────────────────────────────────── */
+
+.pie {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.formPago {
+  display: grid;
+  gap: 14px;
+  font-size: var(--ui-text-sm);
+}
+
+.saldoPendiente {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  padding: 10px var(--ui-s3);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-2);
+  border: 1px solid var(--ui-border-subtle);
+}
+
+.saldoEtiqueta {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+}
+
+.formPago .usarSaldo {
+  justify-self: start;
+  font-size: var(--ui-text-xs);
+}

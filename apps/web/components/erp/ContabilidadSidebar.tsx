@@ -19,10 +19,8 @@ import c from "@/components/mesa-contable/chips.module.scss";
  * Cada chip se filtra por permiso (`hasAnyPermission`): el menú no ofrece puertas que la API
  * cierra con 403. Las rutas no cambian.
  *
- * Dónde se pinta: el layout de contabilidad la pone arriba de cada página. Las pantallas de
- * la Mesa (por facturar, pagos y gastos, estados) la ponen ellas mismas DEBAJO de su
- * encabezado, como en la maqueta, con `<ContabilidadSidebar enPagina />`; en esas rutas la
- * copia del layout no se pinta. La de preparar un CFDI no lleva chips (tampoco en la maqueta).
+ * Dónde se pinta: cada pantalla la pone DEBAJO de su encabezado, como en la maqueta, casi
+ * siempre a través de `MesaPagina`. La de preparar un CFDI no lleva chips (tampoco en la maqueta).
  */
 type NavItem = {
   id: string;
@@ -98,13 +96,6 @@ export const GRUPOS_CONTABILIDAD: NavGroup[] = [
   },
 ];
 
-/** Rutas que pintan los chips ellas mismas, bajo su encabezado (o sin chips, como el CFDI). */
-const RUTAS_CON_CHIPS_PROPIOS = [
-  "/erp/contabilidad/por-facturar",
-  "/erp/contabilidad/pagos-y-gastos",
-  "/erp/contabilidad/estados",
-];
-
 export function filtrarGruposContabilidad(
   user: UserPermissions | null | undefined,
 ): NavGroup[] {
@@ -117,10 +108,6 @@ export function filtrarGruposContabilidad(
 function isActive(pathname: string, item: NavItem) {
   if (item.exact) return pathname === item.href || pathname === `${item.href}/`;
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
-}
-
-function esRutaConChipsPropios(pathname: string) {
-  return RUTAS_CON_CHIPS_PROPIOS.some((r) => pathname === r || pathname.startsWith(`${r}/`));
 }
 
 /** Contadores de los chips; se refrescan al navegar y cuando una pantalla avisa que cambió algo. */
@@ -254,9 +241,7 @@ function ChipsMesa({ pathname }: { pathname: string }) {
   );
 }
 
-export default function ContabilidadSidebar({ enPagina = false }: { enPagina?: boolean }) {
+export default function ContabilidadSidebar() {
   const pathname = usePathname() ?? "";
-  // En las pantallas de la Mesa los chips van bajo el encabezado: la copia del layout se calla.
-  if (!enPagina && esRutaConChipsPropios(pathname)) return null;
   return <ChipsMesa pathname={pathname} />;
 }

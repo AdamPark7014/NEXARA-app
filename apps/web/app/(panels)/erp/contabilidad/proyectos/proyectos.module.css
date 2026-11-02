@@ -1,0 +1,265 @@
+/* Mesa contable · Proyectos: lista y desglose. Solo tokens --ui-*: claro y oscuro salen solos. */
+
+.conteo {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.filtroTipo {
+  flex: 0 1 220px;
+  width: auto;
+}
+
+/* El aviso base trae margen inferior; en el marco ya separa el gap de 16 px. */
+.aviso {
+  margin-bottom: 0;
+}
+
+.cargando {
+  margin: 0;
+  padding: var(--ui-s3) var(--ui-s4) 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Celdas de la lista ───────────────────────────────────────────────── */
+
+.celdaTitulo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.titulo {
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--ui-s2);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.sinFacturar {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+.secundario {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+}
+
+.margen {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.margenNegativo {
+  color: var(--ui-danger-text);
+}
+
+.margenApretado {
+  color: var(--ui-warning-text);
+}
+
+.margenSano {
+  color: var(--ui-fg);
+}
+
+/* ─── Desglose (dentro del modal) ──────────────────────────────────────── */
+
+.detalle {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.detalle > * {
+  min-width: 0;
+}
+
+.cuerpo {
+  padding: var(--ui-s4) 20px;
+}
+
+.ficha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--ui-s3);
+}
+
+.dato {
+  min-width: 0;
+}
+
+.datoEtiqueta {
+  margin-bottom: 2px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.datoValor {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.datoSuave {
+  font-weight: 400;
+  color: var(--ui-fg-3);
+}
+
+.objetivo {
+  margin: var(--ui-s3) 0 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+.alcance {
+  margin: var(--ui-s2) 0 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+.textoCorto {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+/* Bloque con cifras: título al aire, sin tarjeta (las cifras ya son tarjetas). */
+.bloque {
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.bloqueTitulo {
+  margin: 0;
+  font-family: var(--ui-font-display);
+  font-size: var(--ui-fs-section);
+  font-weight: var(--ui-fw-section);
+  letter-spacing: var(--ui-tracking-section);
+  color: var(--ui-fg);
+}
+
+.bloqueSub {
+  margin: calc(-1 * var(--ui-s2)) 0 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Costos por categoría ─────────────────────────────────────────────── */
+
+.categorias {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4) 20px;
+}
+
+.categoria {
+  display: block;
+  width: 100%;
+  padding: 4px 2px 4px 8px;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: var(--ui-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.categoria:hover {
+  background: var(--ui-hover);
+}
+
+.categoria[aria-expanded="true"] {
+  border-left-color: var(--ui-brand);
+  background: color-mix(in srgb, var(--ui-brand) 6%, transparent);
+}
+
+.categoria:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+.barraCategoria {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.categoriaCabeza {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--ui-s3);
+}
+
+.categoriaNombre {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+}
+
+.categoriaLado {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.categoriaPct {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.pista {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--ui-surface-2);
+  border: 1px solid var(--ui-border-subtle);
+  overflow: hidden;
+}
+
+.pistaTotal {
+  height: 100%;
+  background: var(--ui-fg-2);
+  opacity: 0.35;
+}
+
+.pistaPagada {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  background: var(--ui-fg-2);
+}
+
+.categoriaPie {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Documento de un movimiento ───────────────────────────────────────── */
+
+.documento {
+  display: grid;
+  gap: var(--ui-s4);
+  font-size: var(--ui-text-sm);
+}
+
+.registro {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}

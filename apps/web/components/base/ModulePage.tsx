@@ -156,6 +156,45 @@ export function ModulePage({
       tabs ?? null
     );
 
+  return (
+    <div className={[s.page, className].filter(Boolean).join(" ")} style={style} data-loading={loading ? "true" : undefined}>
+      {encabezado}
+      {lead ? <div className={s.lead}>{lead}</div> : null}
+      {stats}
+      {before ? <div className={s.before}>{before}</div> : null}
+      <ListCard
+        toolbar={toolbar}
+        footer={footer}
+        loading={loading}
+        loadingRows={loadingRows}
+        empty={empty}
+        emptyState={emptyState}
+        card={card}
+        listLabel={listLabel}
+      >
+        {children}
+      </ListCard>
+    </div>
+  );
+}
+
+/**
+ * La tarjeta de lista de `ModulePage`, suelta, para las pantallas que traen su propia cabeza:
+ * barra de herramientas → contenido (o esqueleto, o vacío) → pie. Dentro, la `DataTable`
+ * pierde su marco solo. Sin nada que pintar no deja hueco.
+ */
+export function ListCard({
+  toolbar,
+  children,
+  footer,
+  loading = false,
+  loadingRows = 6,
+  empty = false,
+  emptyState,
+  card = true,
+  listLabel,
+  className,
+}: Pick<ModulePageProps, "toolbar" | "children" | "footer" | "loading" | "loadingRows" | "empty" | "emptyState" | "card" | "listLabel" | "className">) {
   let contenido: ReactNode;
   if (loading) {
     contenido = <SkeletonRows rows={loadingRows} />;
@@ -180,29 +219,19 @@ export function ModulePage({
     contenido = children;
   }
 
-  const hayTarjeta = Boolean(toolbar || contenido || footer);
+  if (!toolbar && !contenido && !footer) return null;
 
-  return (
-    <div className={[s.page, className].filter(Boolean).join(" ")} style={style} data-loading={loading ? "true" : undefined}>
-      {encabezado}
-      {lead ? <div className={s.lead}>{lead}</div> : null}
-      {stats}
-      {before ? <div className={s.before}>{before}</div> : null}
-      {hayTarjeta ? (
-        card ? (
-          <section className={s.list} aria-label={listLabel} aria-busy={loading || undefined}>
-            {toolbar}
-            <div className={s.content}>{contenido}</div>
-            {footer}
-          </section>
-        ) : (
-          <div aria-busy={loading || undefined}>
-            {toolbar}
-            <div className={s.content}>{contenido}</div>
-            {footer}
-          </div>
-        )
-      ) : null}
+  return card ? (
+    <section className={[s.list, className].filter(Boolean).join(" ")} aria-label={listLabel} aria-busy={loading || undefined}>
+      {toolbar}
+      <div className={s.content}>{contenido}</div>
+      {footer}
+    </section>
+  ) : (
+    <div className={className} aria-busy={loading || undefined}>
+      {toolbar}
+      <div className={s.content}>{contenido}</div>
+      {footer}
     </div>
   );
 }

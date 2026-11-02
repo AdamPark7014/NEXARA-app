@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Button from "@/components/ui/Button";
+import { Button } from "@/components/base";
 import FileDropzone from "@/components/ui/FileDropzone";
+import s from "./ReceiptCapture.module.css";
 
 /**
  * Comprobante de un gasto o viático: arrastrar o elegir archivo en escritorio
@@ -41,16 +42,16 @@ export default function ReceiptCapture({
   }, [file]);
 
   return (
-    <div style={{ display: "grid", gap: 8 }}>
+    <div className={s.caja}>
       {showCamera && (
         <>
           <Button
             type="button"
             variant="secondary"
+            size="lg"
             fullWidth
             disabled={disabled}
             onClick={() => cameraRef.current?.click()}
-            style={{ height: 44, fontSize: 14 }}
           >
             Tomar foto del ticket
           </Button>
@@ -60,7 +61,7 @@ export default function ReceiptCapture({
             accept="image/*"
             capture="environment"
             aria-label="Tomar foto del ticket con la cámara"
-            style={{ display: "none" }}
+            className={s.oculto}
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) onFile(f);
@@ -71,30 +72,18 @@ export default function ReceiptCapture({
       )}
       <FileDropzone file={file} onFile={onFile} label={label} hint={hint} required={required} />
       {file && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className={s.adjunto}>
           {preview && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={preview}
-              alt="Vista previa del ticket"
-              style={{
-                width: 56,
-                height: 56,
-                objectFit: "cover",
-                borderRadius: 8,
-                border: "1px solid var(--border)",
-                flexShrink: 0,
-              }}
-            />
+            <img src={preview} alt="Vista previa del ticket" className={s.miniatura} />
           )}
-          <span style={{ fontSize: 12, color: "var(--text-secondary)", minWidth: 0, overflowWrap: "anywhere" }}>
+          <span className={s.archivo}>
             {file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB
           </span>
           <Button
             type="button"
             size="sm"
             variant="ghost"
-            style={{ height: 28, fontSize: 12, padding: "0 9px" }}
             disabled={disabled}
             onClick={() => onFile(null)}
             aria-label="Quitar el comprobante adjunto"

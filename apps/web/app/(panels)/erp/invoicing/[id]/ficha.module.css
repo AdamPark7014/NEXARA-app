@@ -1,0 +1,190 @@
+/* Ficha de una factura: cabeza, cifras y tarjetas. Solo tokens --ui-*: claro y oscuro salen solos. */
+
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.pagina > .cabeza {
+  margin-bottom: 0;
+}
+
+/* La tabla de conceptos va sin marco propio: la tarjeta recorta sus esquinas y el renglón del total. */
+.tarjetaTabla {
+  overflow: clip;
+}
+
+/* ─── Total de los conceptos ───────────────────────────────────────────── */
+
+.total {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--ui-s4);
+  padding: 12px 20px;
+  border-top: 1px solid var(--ui-border-subtle);
+  background: var(--ui-surface-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.totalEtiqueta {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.totalMonto {
+  font-size: var(--ui-text-lg);
+}
+
+/* ─── Pagos ────────────────────────────────────────────────────────────── */
+
+.pagos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pago {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-areas: "info fecha monto accion";
+  align-items: center;
+  gap: var(--ui-s3);
+  padding: 12px 20px;
+}
+
+.pago + .pago {
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.pagoInfo {
+  grid-area: info;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pagoMetodo {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg);
+}
+
+.pagoNotas {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.pagoFecha {
+  grid-area: fecha;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.pagoMonto {
+  grid-area: monto;
+  font-size: var(--ui-text-sm);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pagoAccion {
+  grid-area: accion;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pagoAccion:empty {
+  display: none;
+}
+
+/* En teléfono la fecha y la acción bajan a su propio renglón. */
+@media (max-width: 640px) {
+  .pago {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "info monto"
+      "fecha accion";
+  }
+}
+
+/* ─── Datos del CFDI ───────────────────────────────────────────────────── */
+
+.datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--ui-s4) var(--ui-s5);
+  margin: 0;
+  padding: var(--ui-s4) 20px 20px;
+}
+
+.dato {
+  min-width: 0;
+}
+
+.dato dt {
+  margin: 0 0 3px;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.dato dd {
+  margin: 0;
+  font-size: var(--ui-text-base);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.datoAncho {
+  grid-column: 1 / -1;
+}
+
+.datoVacio {
+  color: var(--ui-fg-3);
+}
+
+.datoSec {
+  color: var(--ui-fg-2);
+}
+
+.satEstado {
+  margin-top: 6px;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+.satEstado strong {
+  font-weight: 600;
+}
+
+/* ─── Dentro de los modales ────────────────────────────────────────────── */
+
+.aviso {
+  margin: var(--ui-s3) 0 0;
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+}
+
+.errorModal {
+  margin-top: var(--ui-s3);
+}
+
+.errorModal > * {
+  margin-bottom: 0;
+}
+
+.casilla {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}

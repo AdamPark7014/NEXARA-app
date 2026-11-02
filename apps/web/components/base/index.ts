@@ -16,6 +16,7 @@ export {
   FilterButton,
   FilterChip,
   FilterChips,
+  ListCard,
   ListFooter,
   ModulePage,
   ModuleToolbar,

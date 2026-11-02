@@ -1,14 +1,19 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
+import FindInPageOutlinedIcon from "@mui/icons-material/FindInPageOutlined";
+import NotesOutlinedIcon from "@mui/icons-material/NotesOutlined";
+import NumbersOutlinedIcon from "@mui/icons-material/NumbersOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import PercentOutlinedIcon from "@mui/icons-material/PercentOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import { Alert, Button, DataTable, EmptyState, Stat, StatRow } from "@/components/base";
 import Modal from "@/components/ui/Modal";
-import Button from "@/components/ui/Button";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
-import InlineAlert from "@/components/ui/InlineAlert";
-import MetricStrip from "@/components/ui/MetricStrip";
+import { Money, type Column } from "@/components/ui/DataTable";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
+import s from "./reportes-contabilidad.module.css";
 
 /**
  * Piezas compartidas por `/erp/contabilidad/reportes` y
@@ -141,17 +146,15 @@ const formateadorNumero = new Intl.NumberFormat("es-MX", { maximumFractionDigits
 /** Una celda según el tipo que declaró el API. */
 export function Celda({ valor, tipo }: { valor: unknown; tipo: TipoColumna }): ReactNode {
   if (valor === null || valor === undefined || valor === "") {
-    return <span style={{ color: "var(--text-tertiary)" }}>—</span>;
+    return <span className={s.vacio}>—</span>;
   }
   if (tipo === "moneda") return <Money value={Number(valor) || 0} bold={false} />;
-  if (tipo === "numero") return <span style={{ fontVariantNumeric: "tabular-nums" }}>{formateadorNumero.format(Number(valor) || 0)}</span>;
+  if (tipo === "numero") return <span className={s.num}>{formateadorNumero.format(Number(valor) || 0)}</span>;
   if (tipo === "porcentaje") {
-    return <span style={{ fontVariantNumeric: "tabular-nums" }}>{(Number(valor) || 0).toFixed(1)}%</span>;
+    return <span className={s.num}>{(Number(valor) || 0).toFixed(1)}%</span>;
   }
   if (tipo === "fecha") {
-    return (
-      <span style={{ fontVariantNumeric: "tabular-nums" }}>{fechaLegible(String(valor))}</span>
-    );
+    return <span className={s.num}>{fechaLegible(String(valor))}</span>;
   }
   return <span>{String(valor)}</span>;
 }
@@ -177,17 +180,12 @@ export function Variacion({
   const abs = Math.abs(v).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return (
     <span
-      style={{
-        fontVariantNumeric: "tabular-nums",
-        fontWeight: 600,
-        color: favorable ? "var(--text-primary)" : "var(--danger)",
-        whiteSpace: "nowrap",
-      }}
+      className={favorable ? s.variacion : `${s.variacion} ${s.variacionAlta}`}
       title={favorable ? "Dentro de lo presupuestado" : "Por encima de lo presupuestado"}
     >
       {signo}${abs}
       {porcentaje !== null && porcentaje !== undefined && (
-        <span style={{ marginLeft: 6, fontWeight: 500, fontSize: 11, color: "var(--text-tertiary)" }}>
+        <span className={s.variacionPct}>
           {porcentaje > 0 ? "+" : porcentaje < 0 ? "−" : ""}
           {Math.abs(Number(porcentaje) || 0).toFixed(1)}%
         </span>
@@ -223,31 +221,25 @@ export function FilaTotales({
   const conTotal = columnas.filter((c) => totales[c.clave] !== undefined);
   if (conTotal.length === 0) return null;
   return (
-    <div
-      style={{
-        marginTop: 8,
-        display: "flex",
-        flexWrap: "wrap",
-        justifyContent: "flex-end",
-        alignItems: "center",
-        gap: 24,
-        padding: "10px 16px",
-        borderRadius: "var(--nx-panel-radius)",
-        border: "1px solid var(--nx-panel-hairline)",
-        background: "var(--surface-2)",
-        fontSize: 12.5,
-      }}
-    >
-      <span style={{ marginRight: "auto", fontWeight: 700, color: "var(--text-secondary)" }}>Total</span>
+    <div className={s.totales}>
+      <span className={s.totalRotulo}>Total</span>
       {conTotal.map((c) => (
-        <span key={c.clave} style={{ whiteSpace: "nowrap" }}>
-          <span style={{ color: "var(--text-tertiary)", marginRight: 6 }}>{c.etiqueta}</span>
+        <span key={c.clave} className={s.totalItem}>
+          <span className={s.totalEtiqueta}>{c.etiqueta}</span>
           <Celda valor={totales[c.clave]} tipo={c.tipo} />
         </span>
       ))}
     </div>
   );
 }
+
+const ICONO_TIPO: Record<TipoColumna, ReactNode> = {
+  moneda: <PaymentsOutlinedIcon />,
+  numero: <NumbersOutlinedIcon />,
+  porcentaje: <PercentOutlinedIcon />,
+  fecha: <EventOutlinedIcon />,
+  texto: <NotesOutlinedIcon />,
+};
 
 /**
  * Cifras clave del reporte, en la tira compartida de finanzas. Eran tarjetas
@@ -256,15 +248,17 @@ export function FilaTotales({
 export function Resumen({ items }: { items: Array<{ etiqueta: string; valor: number; tipo: TipoColumna }> }) {
   if (!items.length) return null;
   return (
-    <div style={{ marginBottom: 12 }}>
-      <MetricStrip
-        ariaLabel="Cifras del reporte"
-        metrics={items.map((k) => ({
-          label: k.etiqueta,
-          value: <Celda valor={k.valor} tipo={k.tipo} />,
-        }))}
-      />
-    </div>
+    <StatRow variant="strip" ariaLabel="Cifras del reporte">
+      {items.map((k, i) => (
+        <Stat
+          key={`${k.etiqueta}-${i}`}
+          label={k.etiqueta}
+          value={k.tipo === "moneda" ? <Money value={Number(k.valor) || 0} /> : <Celda valor={k.valor} tipo={k.tipo} />}
+          icon={ICONO_TIPO[k.tipo] ?? ICONO_TIPO.texto}
+          iconTone="neutral"
+        />
+      ))}
+    </StatRow>
   );
 }
 
@@ -322,28 +316,36 @@ export function DetalleModal({
   return (
     <Modal open={abierto} onClose={onClose} title={titulo} maxWidth={900}>
       {error && (
-        <InlineAlert
-          variant="danger"
+        <Alert
+          tone="danger"
+          role="alert"
+          ariaLive="assertive"
+          srLabel="Error"
           title="No se pudo abrir el detalle de esta línea"
-          message={`${error.trim().replace(/[.…]+$/u, "")}; si sigue igual, exporta el reporte.`}
           action={
             <Button size="sm" variant="secondary" onClick={() => setIntento((n) => n + 1)}>
               Reintentar
             </Button>
           }
-        />
+        >
+          {`${error.trim().replace(/[.…]+$/u, "")}; si sigue igual, exporta el reporte.`}
+        </Alert>
       )}
       {cargando ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando el detalle…</p>
+        <p className={s.estado}>Cargando el detalle…</p>
       ) : !detalle ? (
         error ? null : (
           <EmptyState
+            icon={<FindInPageOutlinedIcon />}
+            tone="neutral"
             title="Sin detalle"
             description="Esta línea no trae movimientos que desglosar."
           />
         )
       ) : detalle.filas.length === 0 ? (
         <EmptyState
+          icon={<ReceiptLongOutlinedIcon />}
+          tone="neutral"
           title="Sin movimientos"
           description="Esta línea no tiene movimientos registrados en el periodo elegido."
         />
@@ -357,14 +359,12 @@ export function DetalleModal({
             ariaLabel="Detalle del reporte"
             stickyHeader={false}
           />
-          <div style={{ marginTop: 10, textAlign: "right", fontSize: 13 }}>
-            <span style={{ color: "var(--text-secondary)", marginRight: 8 }}>Total de la línea</span>
+          <div className={s.totalLinea}>
+            <span className={s.totalLineaRotulo}>Total de la línea</span>
             <Money value={detalle.total} />
           </div>
           {detalle.filas.length >= 500 && (
-            <p style={{ marginTop: 8, fontSize: 12, color: "var(--text-tertiary)" }}>
-              Se muestran los primeros 500 movimientos. Exporta el reporte para verlos todos.
-            </p>
+            <p className={s.nota}>Se muestran los primeros 500 movimientos. Exporta el reporte para verlos todos.</p>
           )}
         </>
       )}

@@ -1,24 +1,52 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
+import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
+import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  Checkbox,
+  DataTable,
+  DateInput,
+  EmptyState,
+  Field,
+  FieldGrid,
+  FilterChip,
+  FilterChips,
+  Input,
+  LinkButton,
+  ListCard,
+  ModuleToolbar,
+  SearchInput,
+  Select,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  Textarea,
+  type Column,
+  type Tone,
+} from "@/components/base";
 import { useUrlQuery } from "@/components/finance/useUrlQuery";
 import { todayStamp } from "@/components/finance/download";
 import ReceiptCapture from "@/components/finance/ReceiptCapture";
-import Button from "@/components/ui/Button";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
+import { FinanceModuleShell } from "@/components/finance/FinanceModuleShell";
+import { Money } from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
-import InlineAlert from "@/components/ui/InlineAlert";
-import ListExportActions from "@/components/ui/ListExportActions";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
-import FilterToolbar from "@/components/FilterToolbar";
-import {
-  FinanceField,
-  FinanceFormGrid,
-  FinanceModuleShell,
-  financeInputStyle,
-} from "@/components/finance/FinanceModuleShell";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { getApiAssetOrigin } from "@/lib/api-base";
@@ -38,6 +66,7 @@ import {
   type ExpensesAnalytics,
   type FinanceAnalyticsBucket,
 } from "@/lib/finance-api";
+import s from "./expenses.module.css";
 
 type ExpenseEstado = "Pendiente" | "Aprobado" | "Pagado" | "Rechazado";
 
@@ -63,45 +92,6 @@ const emptyForm = {
   categoria: "Servicios",
   esRecurrente: false,
   fecha: "",
-};
-
-/* ── Estilos locales del contrato de diseño (.ai/DISENO-FINANZAS.md) ──────── */
-
-/** Regla 4: acciones de pantalla a 32px / 13px. El único primario es «Registrar gasto». */
-const toolbarButtonStyle: CSSProperties = { height: 32, fontSize: 13 };
-/** Regla 2: las acciones de fila no deben engordar el renglón. */
-const rowButtonStyle: CSSProperties = { height: 28, fontSize: 12, padding: "0 9px" };
-/** Regla 2: el contexto secundario va en 11px gris bajo el concepto. */
-const rowMetaStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  alignItems: "center",
-  gap: 6,
-  marginTop: 2,
-  fontSize: 11,
-  color: "var(--text-tertiary)",
-  lineHeight: 1.35,
-};
-const rowMetaWarnStyle: CSSProperties = { color: "var(--state-danger-text)" };
-const breakdownPanelStyle: CSSProperties = {
-  padding: 14,
-  border: "1px solid var(--nx-panel-hairline, var(--border))",
-  borderRadius: 10,
-  background: "var(--surface-2, var(--surface))",
-};
-const breakdownTitleStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  marginBottom: 10,
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-  color: "var(--text-tertiary)",
-};
-const statusPanelStyle: CSSProperties = {
-  padding: 24,
-  textAlign: "center",
-  fontSize: 13,
-  color: "var(--text-tertiary)",
 };
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -130,7 +120,7 @@ function useNarrowViewport() {
  * Regla 3: tono neutral para el flujo normal; el color solo entra cuando el
  * renglón pide acción («Pendiente») o algo salió mal («Rechazado»).
  */
-function estadoTone(estado?: string): StatusTone {
+function estadoTone(estado?: string): Tone {
   if (estado === "Pagado") return "success";
   if (estado === "Rechazado") return "danger";
   if (estado === "Pendiente") return "warning";
@@ -188,78 +178,42 @@ function BreakdownTable({
   limit?: number;
 }) {
   const shown = rows.slice(0, limit);
+  const columnas: Column<FinanceAnalyticsBucket>[] = [
+    { key: "name", label: "Concepto", render: (r) => r.name },
+    {
+      key: "count",
+      label: "Registros",
+      align: "right",
+      numeric: true,
+      width: 110,
+      render: (r) => <span className={s.tenue}>{r.count}</span>,
+    },
+    { key: "total", label: "Total", align: "right", numeric: true, width: 150, render: (r) => <Money value={r.total} /> },
+  ];
   return (
-    <div style={breakdownPanelStyle}>
-      <div style={breakdownTitleStyle}>{title}</div>
+    <Card className={s.tarjeta}>
+      <CardHead title={title} />
       {shown.length === 0 ? (
-        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Sin datos en el periodo.</div>
+        <p className={s.sinDatos}>Sin datos en el periodo.</p>
       ) : (
         <>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-            <caption style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
-              {title}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col" style={{ textAlign: "left", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
-                  Concepto
-                </th>
-                <th scope="col" style={{ textAlign: "right", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
-                  Registros
-                </th>
-                <th scope="col" style={{ textAlign: "right", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((r, i) => (
-                <tr key={r.name}>
-                  <th
-                    scope="row"
-                    style={{
-                      textAlign: "left",
-                      fontWeight: 400,
-                      padding: "6px 8px 6px 0",
-                      borderBottom: i === shown.length - 1 ? "none" : "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
-                    }}
-                  >
-                    {r.name}
-                  </th>
-                  <td
-                    style={{
-                      textAlign: "right",
-                      fontSize: 11,
-                      color: "var(--text-tertiary)",
-                      fontVariantNumeric: "tabular-nums",
-                      padding: "6px 12px",
-                      borderBottom: i === shown.length - 1 ? "none" : "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
-                    }}
-                  >
-                    {r.count}
-                  </td>
-                  <td
-                    style={{
-                      textAlign: "right",
-                      fontVariantNumeric: "tabular-nums",
-                      padding: "6px 0",
-                      borderBottom: i === shown.length - 1 ? "none" : "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
-                    }}
-                  >
-                    <Money value={r.total} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            flush
+            stickyHeader={false}
+            density="compact"
+            ariaLabel={title}
+            columns={columnas}
+            rows={shown}
+            rowKey={(r) => r.name}
+          />
           {rows.length > limit && (
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>
+            <p className={s.notaPie}>
               Se muestran los {limit} primeros de {rows.length}. El PDF trae el desglose completo.
-            </div>
+            </p>
           )}
         </>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -371,7 +325,8 @@ export default function ExpensesPage() {
   );
   const hasFilters = Boolean(searchQ.trim() || filterCat || filterEstado);
 
-  const visibleItems = useMemo(() => {
+  /** Búsqueda y categoría; el estado se aplica después para poder contar cada estado en los chips. */
+  const porTexto = useMemo(() => {
     let result = scopedItems;
     if (deferredQ.trim()) {
       const q = deferredQ.trim().toLowerCase();
@@ -384,57 +339,46 @@ export default function ExpensesPage() {
       );
     }
     if (filterCat) result = result.filter((e) => e.categoria === filterCat);
+    return result;
+  }, [scopedItems, deferredQ, filterCat]);
+
+  const visibleItems = useMemo(() => {
+    let result = porTexto;
     if (filterEstado) result = result.filter((e) => e.estado === filterEstado);
     if (highlightId) {
       const id = Number(highlightId);
       if (!Number.isNaN(id)) result = [...result].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
     }
     return result;
-  }, [scopedItems, deferredQ, filterCat, filterEstado, highlightId]);
+  }, [porTexto, filterEstado, highlightId]);
+
+  const conteoEstado = useMemo(() => {
+    const cuenta: Record<string, number> = {};
+    for (const e of porTexto) cuenta[e.estado ?? ""] = (cuenta[e.estado ?? ""] ?? 0) + 1;
+    return cuenta;
+  }, [porTexto]);
 
   /**
    * Regla 1: la tira responde a lo que la persona viene a saber — cuánto falta
    * por autorizar, cuánto está autorizado esperando pago, cuánto ya se pagó y
    * qué bloquea el cierre contable.
    */
-  const metrics = useMemo<Metric[]>(() => {
-    const sum = (rows: Expense[]) => rows.reduce((s, e) => s + (e.monto ?? 0), 0);
+  const resumen = useMemo(() => {
+    const sum = (rows: Expense[]) => rows.reduce((acc, e) => acc + (e.monto ?? 0), 0);
     const porAutorizar = visibleItems.filter((e) => e.estado === "Pendiente");
     const autorizados = visibleItems.filter((e) => e.estado === "Aprobado");
     const pagados = visibleItems.filter((e) => e.estado === "Pagado");
     const sinComprobante = visibleItems.filter(
       (e) => !e.ticketEvidenciaUrl && e.estado !== "Rechazado",
     );
-    const toggleEstado = (estado: string) => setFilterEstado((prev) => (prev === estado ? "" : estado));
-
-    return [
-      {
-        label: "Por autorizar",
-        value: <Money value={sum(porAutorizar)} />,
-        hint: plural(porAutorizar.length, "gasto esperando", "gastos esperando"),
-        tone: porAutorizar.length > 0 ? "warning" : "default",
-        onClick: () => toggleEstado("Pendiente"),
-      },
-      {
-        label: "Autorizado sin pagar",
-        value: <Money value={sum(autorizados)} />,
-        hint: plural(autorizados.length, "gasto listo para pago", "gastos listos para pago"),
-        onClick: () => toggleEstado("Aprobado"),
-      },
-      {
-        label: "Pagado",
-        value: <Money value={sum(pagados)} />,
-        hint: plural(pagados.length, "gasto liquidado", "gastos liquidados"),
-        onClick: () => toggleEstado("Pagado"),
-      },
-      {
-        label: "Sin comprobante",
-        value: sinComprobante.length,
-        hint: sinComprobante.length > 0 ? "bloquean el cierre" : "todo comprobado",
-        tone: sinComprobante.length > 0 ? "danger" : "default",
-      },
-    ];
+    return {
+      porAutorizar: { n: porAutorizar.length, total: sum(porAutorizar) },
+      autorizados: { n: autorizados.length, total: sum(autorizados) },
+      pagados: { n: pagados.length, total: sum(pagados) },
+      sinComprobante: sinComprobante.length,
+    };
   }, [visibleItems]);
+  const toggleEstado = (estado: string) => setFilterEstado((prev) => (prev === estado ? "" : estado));
 
   const openNew = () => {
     const inicial = { ...emptyForm, fecha: todayStamp() };
@@ -662,14 +606,16 @@ export default function ExpensesPage() {
         // Folio contable: solo si la API ya lo asignó; no se inventa.
         if (e.contabilidadRef) meta.push(`Ref. ${e.contabilidadRef}`);
         return (
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)" }}>
-              {e.concepto ?? "—"}
-            </div>
-            <div style={rowMetaStyle}>
+          <div className={s.celdaConcepto}>
+            <div className={s.concepto}>{e.concepto ?? "—"}</div>
+            <div className={s.meta}>
               {/* En móvil el estado deja de ser columna y baja aquí: antes
                   empujaba la tabla más allá del ancho de la pantalla. */}
-              {narrow ? <StatusDot label={e.estado ?? "—"} tone={estadoTone(e.estado)} /> : null}
+              {narrow ? (
+                <Badge dot size="sm" tone={estadoTone(e.estado)}>
+                  {e.estado ?? "—"}
+                </Badge>
+              ) : null}
               <span>{meta.join(" · ")}</span>
               {href ? (
                 <span>
@@ -679,15 +625,17 @@ export default function ExpensesPage() {
                     target="_blank"
                     rel="noreferrer"
                     aria-label={`Ver comprobante de ${e.concepto ?? "el gasto"}`}
-                    style={{ color: "var(--primary)", textDecoration: "none" }}
+                    className={s.enlace}
                   >
                     Ver comprobante
                   </a>
                 </span>
               ) : (
-                <span style={rowMetaWarnStyle}>· Sin comprobante</span>
+                <span className={s.sinComprobante}>· Sin comprobante</span>
               )}
             </div>
+            {/* En el teléfono las acciones bajan bajo el concepto: una columna más obligaba a deslizar la tabla. */}
+            {narrow ? <div className={s.accionesMovil}>{filaAcciones(e)}</div> : null}
           </div>
         );
       },
@@ -706,11 +654,7 @@ export default function ExpensesPage() {
           {
             key: "fecha",
             label: "Fecha",
-            render: (e: Expense) => (
-              <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                {formatFecha(e.fecha)}
-              </span>
-            ),
+            render: (e: Expense) => <span className={s.fechaCelda}>{formatFecha(e.fecha)}</span>,
             width: 110,
           },
         ] as Column<Expense>[])),
@@ -720,87 +664,70 @@ export default function ExpensesPage() {
           {
             key: "estado",
             label: "Estado",
-            render: (e: Expense) => <StatusDot label={e.estado ?? "—"} tone={estadoTone(e.estado)} />,
+            render: (e: Expense) => (
+              <Badge dot size="sm" tone={estadoTone(e.estado)}>
+                {e.estado ?? "—"}
+              </Badge>
+            ),
             width: 110,
           },
         ] as Column<Expense>[])),
-    {
-      key: "id",
-      label: "",
-      align: "right",
-      render: (e) => {
-        const nombre = e.concepto ?? `gasto #${e.id}`;
-        return (
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {cfg.canEdit && e.estado === "Pendiente" && (
-              <Button
-                size="sm"
-                variant="ghost"
-                style={rowButtonStyle}
-                aria-label={`Editar ${nombre}`}
-                onClick={() => openEdit(e)}
-              >
-                Editar
-              </Button>
-            )}
-            {cfg.canApprove && e.estado === "Pendiente" && (
-              <>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  style={rowButtonStyle}
-                  aria-label={`Autorizar ${nombre}`}
-                  onClick={() => runApprove(e)}
-                >
-                  Autorizar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  style={rowButtonStyle}
-                  aria-label={`Rechazar ${nombre}`}
-                  onClick={() => {
-                    setRejectTarget(e);
-                    setRejectNote("");
-                    setRejectErr(null);
-                  }}
-                >
-                  Rechazar
-                </Button>
-              </>
-            )}
-            {cfg.canApprove && e.estado === "Aprobado" && (
-              <Button
-                size="sm"
-                variant="secondary"
-                style={rowButtonStyle}
-                aria-label={`Marcar como pagado ${nombre}`}
-                disabled={rowBusyId === e.id}
-                onClick={() => runMarkPagado(e)}
-              >
-                {rowBusyId === e.id ? "Pagando…" : "Marcar pagado"}
-              </Button>
-            )}
-            {cfg.canDelete && (
-              <Button
-                size="sm"
-                variant="ghost"
-                style={rowButtonStyle}
-                aria-label={`Eliminar ${nombre}`}
-                disabled={rowBusyId === e.id}
-                onClick={() => remove(e)}
-              >
-                Eliminar
-              </Button>
-            )}
-          </div>
-        );
-      },
-      // En móvil la columna se estrecha a lo que ocupen los botones: fijarla en
-      // 260px era lo que obligaba a hacer scroll lateral a 375px.
-      width: narrow ? undefined : 260,
-    },
   ];
+
+  /** Acciones del renglón, todas en una sola línea (columna de acciones de `DataTable`). */
+  const filaAcciones = (e: Expense) => {
+    const nombre = e.concepto ?? `gasto #${e.id}`;
+    return (
+      <>
+        {cfg.canEdit && e.estado === "Pendiente" && (
+          <Button size="sm" variant="ghost" aria-label={`Editar ${nombre}`} onClick={() => openEdit(e)}>
+            Editar
+          </Button>
+        )}
+        {cfg.canApprove && e.estado === "Pendiente" && (
+          <>
+            <Button size="sm" variant="secondary" aria-label={`Autorizar ${nombre}`} onClick={() => runApprove(e)}>
+              Autorizar
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={`Rechazar ${nombre}`}
+              onClick={() => {
+                setRejectTarget(e);
+                setRejectNote("");
+                setRejectErr(null);
+              }}
+            >
+              Rechazar
+            </Button>
+          </>
+        )}
+        {cfg.canApprove && e.estado === "Aprobado" && (
+          <Button
+            size="sm"
+            variant="secondary"
+            aria-label={`Marcar como pagado ${nombre}`}
+            disabled={rowBusyId === e.id}
+            onClick={() => runMarkPagado(e)}
+          >
+            {rowBusyId === e.id ? "Pagando…" : "Marcar pagado"}
+          </Button>
+        )}
+        {cfg.canDelete && (
+          <Button
+            size="sm"
+            variant="danger-ghost"
+            aria-label={`Eliminar ${nombre}`}
+            disabled={rowBusyId === e.id}
+            onClick={() => remove(e)}
+          >
+            Eliminar
+          </Button>
+        )}
+      </>
+    );
+  };
 
   const invalidFields = (Object.keys(formErrors) as (keyof FormErrors)[]).filter((k) => formErrors[k]);
 
@@ -816,6 +743,8 @@ export default function ExpensesPage() {
   const showToolbar = scopedItems.length > 0 || hasFilters;
   /** La primera carga sí tapa la pantalla; un refresco posterior, no. */
   const firstLoad = loading && items.length === 0;
+  /** Sin gastos, sin filtros y sin error: el vacío lleva el botón principal y la cabeza no lo repite. */
+  const sinRegistros = !loading && scopedItems.length === 0 && !hasFilters;
 
   const clearFilters = () => {
     setSearchQ("");
@@ -823,38 +752,54 @@ export default function ExpensesPage() {
     setFilterEstado("");
   };
 
-  /** Regla 4: un solo primario por pantalla, y es la acción a la que se vino. */
-  const primaryAction = cfg.canCreate ? (
-    <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openNew}>
-      Registrar gasto
-    </Button>
-  ) : null;
+  const buscarPlaceholder = "Buscar por concepto, persona o ref. contable…";
 
-  const refreshAction = (
+  const exportarPdf = (
     <Button
       size="sm"
       variant="ghost"
-      style={toolbarButtonStyle}
-      onClick={() => void load()}
-      disabled={loading}
+      iconStart={<DescriptionOutlinedIcon />}
+      disabled={pdfBusy}
+      onClick={() => void downloadPdf()}
     >
+      {pdfBusy ? "Generando…" : "Exportar PDF"}
+    </Button>
+  );
+
+  const refreshAction = (
+    <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
       {loading ? "Actualizando…" : "Actualizar"}
     </Button>
   );
 
+  /** Regla 4: un solo primario por pantalla, y es la acción a la que se vino. */
+  const primaryAction =
+    cfg.canCreate && !(tab === "lista" && sinRegistros && !error) ? (
+      <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={openNew}>
+        Registrar gasto
+      </Button>
+    ) : null;
+
+  const estadoChip = (estado: ExpenseEstado) => (
+    <FilterChip
+      key={estado}
+      active={filterEstado === estado}
+      count={conteoEstado[estado] ?? 0}
+      dot={estadoTone(estado)}
+      onClick={() => toggleEstado(estado)}
+    >
+      {estado}
+    </FilterChip>
+  );
+
   return (
     <>
-      {highlightId && (
-        <InlineAlert
-          variant="info"
-          message={`Mostrando el gasto #${highlightId} desde un enlace directo.`}
-        />
-      )}
       <FinanceModuleShell
         variant="flat"
+        eyebrow="Finanzas"
         title={cfg.title || "Gastos · Admin"}
         subtitle={cfg.subtitle}
-        kpis={showMetrics ? <MetricStrip metrics={metrics} ariaLabel="Resumen de gastos" /> : undefined}
+        actions={primaryAction}
         tabs={[
           { id: "lista", label: "Lista" },
           { id: "analytics", label: "Análisis" },
@@ -862,83 +807,149 @@ export default function ExpensesPage() {
         activeTab={tab}
         onTabChange={(id) => setTab(id as "lista" | "analytics")}
       >
+        {highlightId && (
+          <Alert tone="info" role="alert">
+            {`Mostrando el gasto #${highlightId} desde un enlace directo.`}
+          </Alert>
+        )}
         {tab === "analytics" ? (
-          <div style={{ display: "grid", gap: 16 }}>
+          <div className={s.analisis}>
             {/* Regla 8: rango, acción y exportación en una sola fila, sin caja. */}
-            <FilterToolbar
-              dates={[
-                { label: "Desde", value: dateFrom, onChange: setDateFrom },
-                { label: "Hasta", value: dateTo, onChange: setDateTo },
-              ]}
-              onClear={() => {
-                setDateFrom("");
-                setDateTo("");
-              }}
-              style={{ marginBottom: 0 }}
-              rightActions={
-                <>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    style={toolbarButtonStyle}
-                    onClick={() => void loadAnalytics()}
-                    disabled={analyticsLoading}
+            <Card as="div" className={s.barra}>
+              <ModuleToolbar
+                end={
+                  <>
+                    <Button
+                      size="sm"
+                      variant="tonal"
+                      onClick={() => void loadAnalytics()}
+                      disabled={analyticsLoading}
+                    >
+                      {analyticsLoading ? "Calculando…" : "Aplicar"}
+                    </Button>
+                    {exportarPdf}
+                  </>
+                }
+              >
+                <label className={s.fecha}>
+                  <span>Desde</span>
+                  <DateInput
+                    aria-label="Desde"
+                    controlSize="sm"
+                    className={s.fechaCtl}
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                  />
+                </label>
+                <label className={s.fecha}>
+                  <span>Hasta</span>
+                  <DateInput
+                    aria-label="Hasta"
+                    controlSize="sm"
+                    className={s.fechaCtl}
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                  />
+                </label>
+                {dateFrom || dateTo ? (
+                  <LinkButton
+                    onClick={() => {
+                      setDateFrom("");
+                      setDateTo("");
+                    }}
                   >
-                    {analyticsLoading ? "Calculando…" : "Aplicar"}
-                  </Button>
-                  <ListExportActions onPdf={() => void downloadPdf()} pdfBusy={pdfBusy} />
-                  {primaryAction}
-                </>
-              }
-            />
+                    Limpiar
+                  </LinkButton>
+                ) : null}
+              </ModuleToolbar>
+            </Card>
             {analyticsError && (
-              <InlineAlert
-                message={analyticsError}
-                variant="danger"
-                style={{ marginBottom: 0 }}
+              <Alert
+                tone="danger"
+                role="alert"
                 onDismiss={() => setAnalyticsError(null)}
                 action={
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void loadAnalytics()}>
+                  <Button size="sm" variant="secondary" onClick={() => void loadAnalytics()}>
                     Reintentar
                   </Button>
                 }
-              />
+              >
+                {analyticsError}
+              </Alert>
             )}
             {analyticsLoading && (
-              <div style={statusPanelStyle} role="status" aria-live="polite">
-                Calculando el resumen del periodo…
-              </div>
+              <Card as="div">
+                <EmptyState
+                  size="compact"
+                  tone="neutral"
+                  icon={<InsightsOutlinedIcon />}
+                  title="Calculando el resumen del periodo…"
+                />
+              </Card>
             )}
             {!analyticsLoading && !analytics && !analyticsError && (
-              <div style={statusPanelStyle}>
-                Pulsa «Aplicar» para calcular el resumen. Sin fechas cubre todo el histórico.
-              </div>
+              <Card as="div">
+                <EmptyState
+                  size="compact"
+                  tone="neutral"
+                  icon={<InsightsOutlinedIcon />}
+                  title="Pulsa «Aplicar» para calcular el resumen. Sin fechas cubre todo el histórico."
+                />
+              </Card>
             )}
             {/* Regla 7 en el periodo: si no hubo ni un gasto, la tira de ceros
                 no dice nada; la frase sí. Con filas, aunque sumen cero, se
                 enseña: un periodo que cerró en cero es información. */}
             {!analyticsLoading && analytics && analytics.count === 0 && (
-              <div style={statusPanelStyle}>
-                En el periodo elegido no hay ningún gasto registrado.
-              </div>
+              <Card as="div">
+                <EmptyState
+                  size="compact"
+                  tone="neutral"
+                  icon={<InsightsOutlinedIcon />}
+                  title="En el periodo elegido no hay ningún gasto registrado."
+                />
+              </Card>
             )}
             {!analyticsLoading && analytics && analytics.count > 0 && (
               <>
-                <MetricStrip
-                  ariaLabel="Resumen del periodo"
-                  metrics={[
-                    { label: "Registros", value: analytics.count, hint: analytics.periodLabel || "en el periodo" },
-                    {
-                      label: "Por autorizar",
-                      value: analytics.pendientes,
-                      hint: plural(analytics.pendientes, "gasto esperando", "gastos esperando"),
-                      tone: analytics.pendientes > 0 ? "warning" : "default",
-                    },
-                    { label: "Solicitado", value: <Money value={analytics.totalSolicitado} />, hint: "capturado en el periodo" },
-                    { label: "Autorizado", value: <Money value={analytics.totalAprobado} />, hint: "sin pagar aún" },
-                    { label: "Pagado", value: <Money value={analytics.totalPagado} />, hint: "liquidado en el periodo" },
-                  ]}
-                />
+                <StatRow variant="strip" ariaLabel="Resumen del periodo">
+                  <Stat
+                    label="Registros"
+                    value={analytics.count}
+                    hint={analytics.periodLabel || "en el periodo"}
+                    icon={<ReceiptLongOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                  <Stat
+                    label="Por autorizar"
+                    value={analytics.pendientes}
+                    hint={plural(analytics.pendientes, "gasto esperando", "gastos esperando")}
+                    tone={analytics.pendientes > 0 ? "warning" : "default"}
+                    icon={<PendingActionsOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                  <Stat
+                    label="Solicitado"
+                    value={<Money value={analytics.totalSolicitado} />}
+                    hint="capturado en el periodo"
+                    icon={<RequestQuoteOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                  <Stat
+                    label="Autorizado"
+                    value={<Money value={analytics.totalAprobado} />}
+                    hint="sin pagar aún"
+                    icon={<TaskAltOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                  <Stat
+                    label="Pagado"
+                    value={<Money value={analytics.totalPagado} />}
+                    hint="liquidado en el periodo"
+                    icon={<PaymentsOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                </StatRow>
                 <BreakdownTable title="Por categoría" rows={analytics.byCategory} />
                 <BreakdownTable title="Por persona" rows={analytics.byPerson} />
               </>
@@ -946,96 +957,189 @@ export default function ExpensesPage() {
           </div>
         ) : (
           <>
-            {/* Regla 8: buscador, selectores, exportación y la acción principal
-                en una sola fila. Sin recuadro propio: cada control ya trae su
-                borde y meterlos en una caja es dibujarlo dos veces. */}
-            {showToolbar && (
-              <FilterToolbar
-                search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por concepto, persona o ref. contable…" }}
-                selects={[
-                  {
-                    label: "Categoría",
-                    value: filterCat,
-                    onChange: setFilterCat,
-                    options: EXPENSE_CATEGORIES.map((c) => ({ value: c, label: c })),
-                    allowAll: true,
-                  },
-                  {
-                    label: "Estado",
-                    value: filterEstado,
-                    onChange: setFilterEstado,
-                    options: ESTADOS.map((s) => ({ value: s, label: s })),
-                    allowAll: true,
-                  },
-                ]}
-                onClear={clearFilters}
-                style={{ marginBottom: 0 }}
-                resultCount={firstLoad ? null : visibleItems.length}
-                rightActions={
-                  <>
-                    {refreshAction}
-                    <ListExportActions onExcel={exportExcel} excelDisabled={visibleItems.length === 0} />
-                    {primaryAction}
-                  </>
-                }
-              />
-            )}
             {actionError && (
-              <InlineAlert
-                message={actionError}
-                variant="danger"
+              <Alert
+                tone="danger"
+                role="alert"
                 onDismiss={() => setActionError(null)}
                 action={
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
+                  <Button size="sm" variant="secondary" onClick={() => void load()}>
                     Recargar
                   </Button>
                 }
-              />
+              >
+                {actionError}
+              </Alert>
             )}
             {error && (
-              <InlineAlert
-                message={error}
-                variant="danger"
+              <Alert
+                tone="danger"
+                role="alert"
                 action={
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
+                  <Button size="sm" variant="secondary" onClick={() => void load()}>
                     Reintentar
                   </Button>
                 }
-              />
+              >
+                {error}
+              </Alert>
             )}
-            {firstLoad ? (
-              <div style={{ ...statusPanelStyle, padding: 32 }} role="status" aria-live="polite">
-                Cargando gastos…
-              </div>
-            ) : error && items.length === 0 ? null : (
-              <DataTable
-                columns={columns}
-                rows={visibleItems}
-                rowKey={(e) => e.id}
-                density="compact"
-                ariaLabel="Gastos administrativos"
-                emptyTitle={hasFilters ? "Ningún gasto coincide" : "Todavía no hay gastos"}
-                emptyDescription={
-                  hasFilters
-                    ? "Ningún gasto coincide con los filtros aplicados."
-                    : cfg.canCreate
-                      ? "Aquí van los pagos de la operación que no se cargan a un cliente: renta, internet, licencias, papelería. Registra el primero y queda listo para autorizar."
-                      : "Aquí van los pagos de la operación que no se cargan a un cliente: renta, internet, licencias, papelería. Los captura el equipo administrativo."
-                }
-                emptyAction={
-                  hasFilters ? (
-                    <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={clearFilters}>
-                      Limpiar filtros
-                    </Button>
-                  ) : (
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-                      {primaryAction}
-                      {refreshAction}
-                    </div>
-                  )
-                }
-              />
+            {showMetrics && (
+              <StatRow variant="strip" ariaLabel="Resumen de gastos">
+                <Stat
+                  label="Por autorizar"
+                  value={<Money value={resumen.porAutorizar.total} />}
+                  hint={plural(resumen.porAutorizar.n, "gasto esperando", "gastos esperando")}
+                  tone={resumen.porAutorizar.n > 0 ? "warning" : "default"}
+                  icon={<PendingActionsOutlinedIcon />}
+                  iconTone="neutral"
+                  onClick={() => toggleEstado("Pendiente")}
+                  pressed={filterEstado === "Pendiente"}
+                />
+                <Stat
+                  label="Autorizado sin pagar"
+                  value={<Money value={resumen.autorizados.total} />}
+                  hint={plural(resumen.autorizados.n, "gasto listo para pago", "gastos listos para pago")}
+                  icon={<AccountBalanceWalletOutlinedIcon />}
+                  iconTone="neutral"
+                  onClick={() => toggleEstado("Aprobado")}
+                  pressed={filterEstado === "Aprobado"}
+                />
+                <Stat
+                  label="Pagado"
+                  value={<Money value={resumen.pagados.total} />}
+                  hint={plural(resumen.pagados.n, "gasto liquidado", "gastos liquidados")}
+                  icon={<PaymentsOutlinedIcon />}
+                  iconTone="neutral"
+                  onClick={() => toggleEstado("Pagado")}
+                  pressed={filterEstado === "Pagado"}
+                />
+                <Stat
+                  label="Sin comprobante"
+                  value={resumen.sinComprobante}
+                  hint={resumen.sinComprobante > 0 ? "bloquean el cierre" : "todo comprobado"}
+                  tone={resumen.sinComprobante > 0 ? "danger" : "default"}
+                  icon={<AttachFileOutlinedIcon />}
+                  iconTone="neutral"
+                />
+              </StatRow>
             )}
+            {/* Regla 8: buscador, filtros, exportación y actualizar en una sola fila
+                dentro de la tarjeta de la lista. */}
+            <ListCard
+              toolbar={
+                showToolbar ? (
+                  <ModuleToolbar
+                    search={
+                      <SearchInput
+                        aria-label={buscarPlaceholder}
+                        placeholder={buscarPlaceholder}
+                        value={searchQ}
+                        onChange={(e) => setSearchQ(e.target.value)}
+                      />
+                    }
+                    chips={
+                      <FilterChips ariaLabel="Estado">
+                        <FilterChip
+                          active={filterEstado === ""}
+                          count={porTexto.length}
+                          onClick={() => setFilterEstado("")}
+                        >
+                          Todos
+                        </FilterChip>
+                        {ESTADOS.map(estadoChip)}
+                      </FilterChips>
+                    }
+                    end={
+                      <>
+                        {!firstLoad && (
+                          <span className={s.conteo} role="status">
+                            {visibleItems.length} resultado{visibleItems.length === 1 ? "" : "s"}
+                          </span>
+                        )}
+                        {refreshAction}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          iconStart={<FileDownloadOutlinedIcon />}
+                          disabled={visibleItems.length === 0}
+                          onClick={exportExcel}
+                        >
+                          Exportar Excel
+                        </Button>
+                      </>
+                    }
+                  >
+                    <Select
+                      aria-label="Categoría"
+                      title="Categoría"
+                      controlSize="sm"
+                      wrapperClassName={s.filtroSelect}
+                      value={filterCat}
+                      onChange={(e) => setFilterCat(e.target.value)}
+                    >
+                      <option value="">Todos · Categoría</option>
+                      {EXPENSE_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </Select>
+                    {hasFilters ? <LinkButton onClick={clearFilters}>Limpiar</LinkButton> : null}
+                  </ModuleToolbar>
+                ) : undefined
+              }
+              empty={!firstLoad && visibleItems.length === 0 && !(error && items.length === 0)}
+              emptyState={
+                hasFilters
+                  ? {
+                      icon: <FilterAltOffOutlinedIcon />,
+                      title: "Ningún gasto coincide",
+                      description: "Ningún gasto coincide con los filtros aplicados.",
+                      action: (
+                        <Button size="sm" variant="secondary" onClick={clearFilters}>
+                          Limpiar filtros
+                        </Button>
+                      ),
+                      tone: "neutral",
+                    }
+                  : {
+                      icon: <ReceiptLongOutlinedIcon />,
+                      title: "Todavía no hay gastos",
+                      description: cfg.canCreate
+                        ? "Aquí van los pagos de la operación que no se cargan a un cliente: renta, internet, licencias, papelería. Registra el primero y queda listo para autorizar."
+                        : "Aquí van los pagos de la operación que no se cargan a un cliente: renta, internet, licencias, papelería. Los captura el equipo administrativo.",
+                      action: cfg.canCreate ? (
+                        <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={openNew}>
+                          Registrar gasto
+                        </Button>
+                      ) : undefined,
+                      secondaryAction: refreshAction,
+                      tone: "neutral",
+                    }
+              }
+            >
+              {firstLoad ? (
+                <>
+                  <SkeletonRows rows={6} label="Cargando gastos…" />
+                  <span className="ui-sr-only" role="status" aria-live="polite">
+                    Cargando gastos…
+                  </span>
+                </>
+              ) : error && items.length === 0 ? null : (
+                <DataTable
+                  flush
+                  columns={columns}
+                  rows={visibleItems}
+                  rowKey={(e) => e.id}
+                  density="compact"
+                  ariaLabel="Gastos administrativos"
+                  loading={loading && !firstLoad}
+                  rowActionsLabel="Acciones"
+                  rowActions={narrow ? undefined : filaAcciones}
+                />
+              )}
+            </ListCard>
           </>
         )}
       </FinanceModuleShell>
@@ -1047,38 +1151,30 @@ export default function ExpensesPage() {
         title={editing ? "Editar gasto" : "Registrar gasto"}
         footer={
           <>
-            <Button variant="ghost" style={toolbarButtonStyle} onClick={closeForm} disabled={saving}>
+            <Button variant="ghost" onClick={closeForm} disabled={saving}>
               Cancelar
             </Button>
-            <Button
-              variant="primary"
-              style={toolbarButtonStyle}
-              onClick={() => void save()}
-              disabled={saving}
-              loading={saving}
-            >
+            <Button variant="primary" onClick={() => void save()} disabled={saving} loading={saving}>
               {saving ? "Guardando…" : editing ? "Guardar" : "Registrar gasto"}
             </Button>
           </>
         }
       >
-        <FinanceFormGrid>
+        <FieldGrid>
           {invalidFields.length > 0 && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert
-                variant="warning"
-                style={{ marginBottom: 0 }}
-                message={`Falta por capturar: ${invalidFields.map((k) => FIELD_LABELS[k]).join(", ")}. Cada campo dice abajo qué necesita.`}
-              />
+            <div className={s.completo}>
+              <Alert tone="warning" role="alert">
+                {`Falta por capturar: ${invalidFields.map((k) => FIELD_LABELS[k]).join(", ")}. Cada campo dice abajo qué necesita.`}
+              </Alert>
             </div>
           )}
-          <FinanceField
+          <Field
             label="Concepto"
             fullWidth
             hint="Así aparece en el reporte y en el PDF de cierre."
             error={formErrors.concepto}
           >
-            <input
+            <Input
               value={form.concepto}
               aria-invalid={Boolean(formErrors.concepto)}
               onChange={(e) => {
@@ -1086,24 +1182,22 @@ export default function ExpensesPage() {
                 setFormErrors((prev) => ({ ...prev, concepto: undefined }));
               }}
               placeholder="Renta oficinas, internet, SaaS…"
-              style={financeInputStyle}
             />
-          </FinanceField>
-          <FinanceField label="Categoría" hint="Define en qué rubro suma dentro del reporte.">
-            <select
+          </Field>
+          <Field label="Categoría" hint="Define en qué rubro suma dentro del reporte.">
+            <Select
               value={form.categoria}
               onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))}
-              style={financeInputStyle}
             >
               {EXPENSE_CATEGORIES.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
               ))}
-            </select>
-          </FinanceField>
-          <FinanceField label="Monto" hint="Pesos, con IVA incluido." error={formErrors.monto}>
-            <input
+            </Select>
+          </Field>
+          <Field label="Monto" hint="Pesos, con IVA incluido." error={formErrors.monto}>
+            <Input
               type="number"
               min={0}
               step="0.01"
@@ -1114,35 +1208,24 @@ export default function ExpensesPage() {
                 setForm((f) => ({ ...f, monto: Number(e.target.value) }));
                 setFormErrors((prev) => ({ ...prev, monto: undefined }));
               }}
-              style={financeInputStyle}
             />
-          </FinanceField>
-          <FinanceField label="Fecha" hint="El día en que se realizó el gasto, no el de captura.">
-            <input
-              type="date"
+          </Field>
+          <Field label="Fecha" hint="El día en que se realizó el gasto, no el de captura.">
+            <DateInput
               value={form.fecha}
               onChange={(e) => setForm((f) => ({ ...f, fecha: e.target.value }))}
-              style={financeInputStyle}
             />
-          </FinanceField>
-          <div style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                type="checkbox"
-                id="recurrente"
-                checked={form.esRecurrente}
-                onChange={(e) => setForm((f) => ({ ...f, esRecurrente: e.target.checked }))}
-                style={{ width: 15, height: 15, accentColor: "var(--primary)" }}
-              />
-              <label htmlFor="recurrente" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)" }}>
-                Gasto recurrente mensual
-              </label>
-            </div>
-            <span style={{ fontSize: 11, color: "var(--text-tertiary)", paddingLeft: 23, lineHeight: 1.4 }}>
-              Se repite cada mes; sirve para proyectar el gasto fijo.
-            </span>
+          </Field>
+          <div className={s.completo}>
+            <Checkbox
+              id="recurrente"
+              checked={form.esRecurrente}
+              onChange={(e) => setForm((f) => ({ ...f, esRecurrente: e.target.checked }))}
+              label="Gasto recurrente mensual"
+              description="Se repite cada mes; sirve para proyectar el gasto fijo."
+            />
           </div>
-          <div style={{ gridColumn: "1 / -1" }}>
+          <div className={s.completo}>
             <ReceiptCapture
               file={evidenceFile}
               onFile={(f) => {
@@ -1156,39 +1239,43 @@ export default function ExpensesPage() {
               disabled={saving}
             />
             {formErrors.evidencia && (
-              <div role="alert" style={{ fontSize: 11, color: "var(--state-danger-text)", marginTop: 6 }}>
+              <div role="alert" className={s.errorCampo}>
                 {formErrors.evidencia}
               </div>
             )}
             {editing?.ticketEvidenciaUrl && !evidenceFile && (
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 6 }}>
+              <div className={s.pistaPie}>
                 Actual:{" "}
-                <a href={assetUrl(editing.ticketEvidenciaUrl) ?? "#"} target="_blank" rel="noreferrer">
+                <a
+                  href={assetUrl(editing.ticketEvidenciaUrl) ?? "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={s.enlace}
+                >
                   ver comprobante
                 </a>
               </div>
             )}
           </div>
           {editing?.contabilidadRef && (
-            <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "var(--text-tertiary)" }}>
-              Folio contable: {editing.contabilidadRef}
-            </div>
+            <div className={`${s.completo} ${s.pista}`}>Folio contable: {editing.contabilidadRef}</div>
           )}
           {saveErr && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert
-                message={saveErr}
-                variant="danger"
-                style={{ marginBottom: 0 }}
+            <div className={s.completo}>
+              <Alert
+                tone="danger"
+                role="alert"
                 action={
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void save()} disabled={saving}>
+                  <Button size="sm" variant="secondary" onClick={() => void save()} disabled={saving}>
                     Reintentar
                   </Button>
                 }
-              />
+              >
+                {saveErr}
+              </Alert>
             </div>
           )}
-        </FinanceFormGrid>
+        </FieldGrid>
       </Modal>
 
       <Modal
@@ -1202,7 +1289,6 @@ export default function ExpensesPage() {
           <>
             <Button
               variant="ghost"
-              style={toolbarButtonStyle}
               onClick={() => {
                 setRejectTarget(null);
                 setRejectErr(null);
@@ -1211,57 +1297,40 @@ export default function ExpensesPage() {
             >
               Cancelar
             </Button>
-            <Button
-              variant="danger"
-              style={toolbarButtonStyle}
-              onClick={() => void submitReject()}
-              disabled={rejecting}
-              loading={rejecting}
-            >
+            <Button variant="danger" onClick={() => void submitReject()} disabled={rejecting} loading={rejecting}>
               {rejecting ? "Rechazando…" : "Rechazar"}
             </Button>
           </>
         }
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            justifyContent: "space-between",
-            gap: 12,
-            paddingBottom: 12,
-            marginBottom: 12,
-            borderBottom: "1px solid var(--border)",
-          }}
-        >
-          <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 600 }}>
-            {rejectTarget?.concepto}
-          </span>
-          <span style={{ fontSize: 15, fontVariantNumeric: "tabular-nums" }}>
+        <div className={s.rechazoCabeza}>
+          <span className={s.rechazoConcepto}>{rejectTarget?.concepto}</span>
+          <span className={s.rechazoMonto}>
             <Money value={rejectTarget?.monto ?? 0} />
           </span>
         </div>
-        <FinanceFormGrid>
-          <FinanceField
+        <FieldGrid>
+          <Field
             label="Nota para quien lo solicitó"
             fullWidth
             optional
             hint="Si explicas el motivo, se corrige a la primera."
           >
-            <textarea
+            <Textarea
               value={rejectNote}
               onChange={(e) => setRejectNote(e.target.value)}
               rows={3}
               placeholder="Motivo del rechazo"
-              style={{ ...financeInputStyle, resize: "vertical" }}
             />
-          </FinanceField>
+          </Field>
           {rejectErr && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert message={rejectErr} variant="danger" style={{ marginBottom: 0 }} />
+            <div className={s.completo}>
+              <Alert tone="danger" role="alert">
+                {rejectErr}
+              </Alert>
             </div>
           )}
-        </FinanceFormGrid>
+        </FieldGrid>
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />

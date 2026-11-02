@@ -10,7 +10,7 @@ import { useHiddenModuleIds } from "@/lib/use-hidden-modules";
  * las pólizas al ítem del hub — no hay segunda «Contabilidad».
  */
 const FINANCE_LINKS = [
-  { id: "hub", label: "Escritorio Contadora", href: "/erp/contabilidad" },
+  { id: "hub", label: "Mesa contable", href: "/erp/contabilidad" },
   { id: "polizas", label: "Pólizas y cuentas", href: "/erp/contabilidad/polizas" },
   { id: "invoicing", label: "Facturación", href: "/erp/invoicing" },
   { id: "banking", label: "Bancos", href: "/erp/banking" },

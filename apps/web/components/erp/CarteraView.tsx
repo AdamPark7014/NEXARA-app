@@ -1,22 +1,38 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
-import Button from "@/components/ui/Button";
-import Modal from "@/components/ui/Modal";
-import InlineAlert from "@/components/ui/InlineAlert";
-import EmptyState from "@/components/ui/EmptyState";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import FilterScale, { type ScaleItem } from "@/components/ui/FilterScale";
+import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import ReceiptOutlinedIcon from "@mui/icons-material/ReceiptOutlined";
 import {
-  FinanceField,
-  FinanceFormGrid,
-  financeInputStyle,
-} from "@/components/finance/FinanceModuleShell";
-import FilterToolbar from "@/components/FilterToolbar";
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  DataTable,
+  DateInput,
+  Field,
+  FieldGrid,
+  FilterChip,
+  FilterChips,
+  Input,
+  LinkButton,
+  ListCard,
+  ModuleToolbar,
+  SearchInput,
+  Select,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  type Column,
+  type Tone,
+} from "@/components/base";
+import { MesaPagina } from "@/components/mesa-contable/MesaPagina";
+import Modal from "@/components/ui/Modal";
+import { Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
@@ -30,6 +46,7 @@ import {
   satUsoCfdiLabel,
 } from "@/lib/finance-status-labels";
 import { toast } from "@/components/Toast";
+import s from "./CarteraView.module.css";
 
 /**
  * Cartera de la contadora — cuentas por cobrar y por pagar.
@@ -191,11 +208,11 @@ const METODOS: { value: string; label: string }[] = METODOS_VALIDOS.map((value) 
 }));
 
 /**
- * El tono que manda el API, traducido al vocabulario de `StatusDot`: punto y
+ * El tono que manda el API, traducido al vocabulario de `Badge`: punto y
  * palabra. Antes era texto en negritas de color, y con veinte renglones la
  * columna de estado competía con los montos.
  */
-const TONO_ESTADO: Record<string, StatusTone> = {
+const TONO_ESTADO: Record<string, Tone> = {
   ok: "success",
   warn: "warning",
   bad: "danger",
@@ -246,10 +263,10 @@ function Linea({ etiqueta, valor }: { etiqueta: string; valor: React.ReactNode }
   // sustituye lo que de verdad falta.
   const vacio = valor === null || valor === undefined || valor === "";
   return (
-    <div style={{ display: "flex", gap: 8, justifyContent: "space-between", fontSize: 12.5 }}>
-      <span style={{ color: "var(--text-tertiary)" }}>{etiqueta}</span>
-      <span style={{ textAlign: "right", minWidth: 0 }}>
-        {vacio ? <span style={{ color: "var(--text-tertiary)" }}>—</span> : valor}
+    <div className={s.linea}>
+      <span className={s.tenue}>{etiqueta}</span>
+      <span className={s.lineaValor}>
+        {vacio ? <span className={s.tenue}>—</span> : valor}
       </span>
     </div>
   );
@@ -449,13 +466,9 @@ export default function CarteraView({
    * el API no manda no aparece: no se inventa ninguno, y las etiquetas son las
    * suyas (`agingEtiquetas`), no una lista escrita aquí.
    */
-  const tramos: ScaleItem[] = useMemo(() => {
+  const tramos = useMemo(() => {
     if (!data) return [];
     const presentes = ORDEN_AGING.filter((b) => data.aging[b] != null);
-    const base =
-      data.totales.pendiente > 0
-        ? data.totales.pendiente
-        : presentes.reduce((s, b) => s + Math.abs(data.aging[b].monto), 0);
     if (presentes.every((b) => data.aging[b].documentos === 0)) return [];
     return presentes.map((b) => {
       const tramo = data.aging[b];
@@ -463,14 +476,16 @@ export default function CarteraView({
       return {
         key: b,
         label: data.agingEtiquetas[b] ?? b,
-        value: <Money value={tramo.monto} compact bold={false} />,
+        monto: tramo.monto,
+        documentos: tramo.documentos,
         hint: vacio
           ? "sin facturas"
           : `${tramo.documentos} ${tramo.documentos === 1 ? "factura" : "facturas"}`,
         // El color solo entra donde hay algo que hacer; un tramo en cero nunca
         // se pinta de rojo aunque sea el de vencido.
-        tone: vacio ? "mute" : b === "vencido" ? "danger" : b === "hoy" ? "warning" : "mute",
-        share: base > 0 ? Math.abs(tramo.monto) / base : undefined,
+        dot: (vacio ? undefined : b === "vencido" ? "danger" : b === "hoy" ? "warning" : undefined) as
+          | Tone
+          | undefined,
       };
     });
   }, [data]);
@@ -554,8 +569,8 @@ export default function CarteraView({
       label: etiquetaContraparte,
       render: (r) => (
         <div>
-          <div style={{ fontWeight: 600 }}>{r.contraparte.nombre}</div>
-          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+          <div className={s.nombre}>{r.contraparte.nombre}</div>
+          <div className={s.sub}>
             {r.folio}
             {r.contraparte.rfc ? ` · ${r.contraparte.rfc}` : ""}
             {r.moneda && r.moneda !== "MXN" ? ` · ${r.moneda}` : ""}
@@ -563,7 +578,7 @@ export default function CarteraView({
           {/* Angosto: lo que se quitó de columnas baja aquí, bajo el concepto,
               en vez de empujar la tabla a un scroll horizontal. */}
           {esAngosto && (
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
+            <div className={`${s.sub} ${s.subAngosto}`}>
               {[
                 r.proyecto ? r.proyecto.nombre : "Sin proyecto",
                 `emitida ${fechaCorta(r.emision)}`,
@@ -585,28 +600,21 @@ export default function CarteraView({
             label: "Proyecto",
             render: (r: Fila) =>
               r.proyecto ? (
-                <span style={{ fontSize: 12 }}>{r.proyecto.nombre}</span>
+                <span className={s.proyecto}>{r.proyecto.nombre}</span>
               ) : (
-                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin proyecto</span>
+                <span className={`${s.proyecto} ${s.tenue}`}>Sin proyecto</span>
               ),
           },
           {
             key: "emision",
             label: "Emisión",
-            render: (r: Fila) => (
-              <span style={{ fontVariantNumeric: "tabular-nums" }}>{fechaCorta(r.emision)}</span>
-            ),
+            render: (r: Fila) => <span className={s.fecha}>{fechaCorta(r.emision)}</span>,
           },
           {
             key: "vencimiento",
             label: "Vence",
             render: (r: Fila) => (
-              <span
-                style={{
-                  fontVariantNumeric: "tabular-nums",
-                  color: (r.diasVencido ?? -1) > 0 ? "var(--danger)" : undefined,
-                }}
-              >
+              <span className={(r.diasVencido ?? -1) > 0 ? s.fechaVencida : s.fecha}>
                 {fechaCorta(r.vencimiento)}
               </span>
             ),
@@ -636,11 +644,7 @@ export default function CarteraView({
             align: "right",
             numeric: true,
             render: (r: Fila) =>
-              r.pagado > 0 ? (
-                <Money value={r.pagado} bold={false} />
-              ) : (
-                <span style={{ color: "var(--text-tertiary)" }}>—</span>
-              ),
+              r.pagado > 0 ? <Money value={r.pagado} bold={false} /> : <span className={s.tenue}>—</span>,
           },
         ] as Column<Fila>[])),
     {
@@ -654,11 +658,9 @@ export default function CarteraView({
       key: "estado",
       label: "Estado",
       render: (r) => (
-        <StatusDot
-          label={r.estadoEtiqueta}
-          tone={TONO_ESTADO[r.estadoTono] ?? "neutral"}
-          title={textoDias(r.diasVencido)}
-        />
+        <Badge dot size="sm" tone={TONO_ESTADO[r.estadoTono] ?? "neutral"} title={textoDias(r.diasVencido)}>
+          {r.estadoEtiqueta}
+        </Badge>
       ),
     },
   ];
@@ -692,95 +694,91 @@ export default function CarteraView({
   const vencido = totales?.vencido ?? 0;
   const documentosVencidos = data ? (data.aging.vencido?.documentos ?? 0) : 0;
 
-  /** Tres cifras y de qué se componen. El adorno se queda fuera. */
-  const metricas: Metric[] = [
-    {
-      label: esCobrar ? "Por cobrar" : "Por pagar",
-      value: cargando ? "…" : <Money value={totales?.pendiente ?? 0} />,
-      hint: cargando
-        ? "leyendo la cartera"
-        : `de ${(totales?.total ?? 0).toLocaleString("es-MX", {
-            style: "currency",
-            currency: "MXN",
-            maximumFractionDigits: 0,
-          })} facturados`,
-    },
-    {
-      label: "Vencido",
-      value: cargando ? "…" : <Money value={vencido} />,
-      tone: vencido > 0 ? "danger" : "default",
-      hint: cargando
-        ? "…"
-        : vencido > 0
-          ? `${documentosVencidos} ${documentosVencidos === 1 ? "factura pasada" : "facturas pasadas"} de fecha`
-          : "nada pasado de fecha",
-    },
-    {
-      label: "Facturas",
-      value: cargando ? "…" : String(totales?.documentos ?? 0),
-      hint: cargando
-        ? "…"
-        : `${esCobrar ? "cobrado" : "pagado"} ${(totales?.pagado ?? 0).toLocaleString("es-MX", {
-            style: "currency",
-            currency: "MXN",
-            maximumFractionDigits: 0,
-          })}`,
-    },
-  ];
+  const placeholderBusqueda = `Buscar ${etiquetaContraparte.toLowerCase()}, folio, RFC o folio fiscal…`;
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Contabilidad"
-        title={title}
-        subtitle={subtitle}
-        density="ops"
-        actions={
-          <Button size="sm" variant="ghost" onClick={() => void cargar()} disabled={cargando}>
-            Actualizar
-          </Button>
-        }
-      />
+    <MesaPagina
+      titulo={title}
+      descripcion={subtitle}
+      terciarias={
+        <Button variant="ghost" onClick={() => void cargar()} disabled={cargando}>
+          Actualizar
+        </Button>
+      }
+    >
+      {error && (
+        <Alert
+          tone="danger"
+          role="alert"
+          className={s.aviso}
+          action={
+            <Button size="sm" onClick={() => void cargar()}>
+              Reintentar
+            </Button>
+          }
+        >
+          {`No se pudo cargar la cartera. ${error} Reintenta; si sigue igual, avisa a soporte.`}
+        </Alert>
+      )}
+
+      {data?.meta.truncado && (
+        <Alert tone="warning" role="alert" className={s.aviso}>
+          {`Se muestran ${data.rows.length} de ${data.meta.total} facturas: no caben todas de una vez, así que los totales de arriba solo cubren lo que se ve. Acota el periodo o filtra para que cuadren.`}
+        </Alert>
+      )}
 
       {/* Totales — una tira de cifras, no una pared de tarjetas.
+          Tres cifras y de qué se componen; el adorno se queda fuera.
           Con cero facturas no se pinta: una fila de ceros no informa y le quita
           el sitio al vacío, que sí dice de dónde sale el primer renglón. */}
       {data && data.rows.length > 0 ? (
-        <div style={{ marginBottom: 12 }}>
-          <MetricStrip ariaLabel="Resumen de la cartera" metrics={metricas} />
-        </div>
-      ) : null}
-
-      {/* Antigüedad — la escala compartida: se lee de izquierda a derecha y filtra */}
-      {tramos.length > 0 && (
-        <div>
-          <FilterScale
-            ariaLabel="Antigüedad de saldos"
-            items={tramos}
-            active={aging}
-            onSelect={(clave) => setAging(clave as AgingBucket | "")}
-            minCellWidth={128}
+        <StatRow variant="strip" ariaLabel="Resumen de la cartera">
+          <Stat
+            label={esCobrar ? "Por cobrar" : "Por pagar"}
+            icon={esCobrar ? <PaymentsOutlinedIcon /> : <ReceiptOutlinedIcon />}
+            iconTone="neutral"
+            value={cargando ? "…" : <Money value={totales?.pendiente ?? 0} />}
+            hint={
+              cargando
+                ? "leyendo la cartera"
+                : `de ${(totales?.total ?? 0).toLocaleString("es-MX", {
+                    style: "currency",
+                    currency: "MXN",
+                    maximumFractionDigits: 0,
+                  })} facturados`
+            }
           />
-          {aging !== "" && (
-            <button
-              type="button"
-              onClick={() => setAging("")}
-              style={{
-                margin: "-8px 0 14px",
-                background: "none",
-                border: "none",
-                padding: 0,
-                fontSize: 11.5,
-                fontWeight: 600,
-                color: "var(--primary)",
-                cursor: "pointer",
-              }}
-            >
-              Ver toda la cartera
-            </button>
-          )}
-        </div>
-      )}
+          <Stat
+            label="Vencido"
+            icon={<EventBusyOutlinedIcon />}
+            iconTone="neutral"
+            value={cargando ? "…" : <Money value={vencido} />}
+            tone={vencido > 0 ? "danger" : "default"}
+            hint={
+              cargando
+                ? "…"
+                : vencido > 0
+                  ? `${documentosVencidos} ${documentosVencidos === 1 ? "factura pasada" : "facturas pasadas"} de fecha`
+                  : "nada pasado de fecha"
+            }
+          />
+          <Stat
+            label="Facturas"
+            icon={<ReceiptLongOutlinedIcon />}
+            iconTone="neutral"
+            value={cargando ? "…" : String(totales?.documentos ?? 0)}
+            hint={
+              cargando
+                ? "…"
+                : `${esCobrar ? "cobrado" : "pagado"} ${(totales?.pagado ?? 0).toLocaleString("es-MX", {
+                    style: "currency",
+                    currency: "MXN",
+                    maximumFractionDigits: 0,
+                  })}`
+            }
+          />
+        </StatRow>
+      ) : null}
 
       {!esCobrar && (
         <CalendarioCxP
@@ -794,106 +792,159 @@ export default function CarteraView({
         />
       )}
 
-      <div style={{ marginBottom: 12 }}>
-        <FilterToolbar
-          search={{
-            value: q,
-            onChange: setQ,
-            placeholder: `Buscar ${etiquetaContraparte.toLowerCase()}, folio, RFC o folio fiscal…`,
-          }}
-          dates={[
-            { label: "Emitidas desde", value: desde, onChange: setDesde },
-            { label: "Hasta", value: hasta, onChange: setHasta },
-          ]}
-          selects={[
-            {
-              label: "Estado",
-              value: estado,
-              onChange: setEstado,
-              options: ESTADOS,
-              allowAll: false,
-            },
-            {
-              label: etiquetaContraparte,
-              value: contraparte,
-              onChange: setContraparte,
-              options: (data?.filtros.contrapartes ?? []).map((c) => ({
-                value: String(c.id),
-                label: c.nombre,
-              })),
-              allowAll: true,
-              allLabel: `Todos los ${etiquetaContrapartePlural}`,
-            },
-            {
-              label: "Proyecto",
-              value: proyecto,
-              onChange: setProyecto,
-              options: (data?.filtros.proyectos ?? []).map((p) => ({
-                value: String(p.id),
-                label: p.nombre,
-              })),
-              allowAll: true,
-              allLabel: "Todos los proyectos",
-            },
-          ]}
-          onClear={hayFiltros ? limpiar : undefined}
-          resultCount={data?.rows.length ?? null}
-        />
-      </div>
+      <ListCard
+        className={s.tarjeta}
+        listLabel={esCobrar ? "Facturas por cobrar" : "Facturas por pagar"}
+        toolbar={
+          <>
+            <ModuleToolbar
+              className={s.herramientas}
+              search={
+                <SearchInput
+                  aria-label={placeholderBusqueda}
+                  placeholder={placeholderBusqueda}
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+              }
+              end={
+                <>
+                  {hayFiltros ? <LinkButton onClick={limpiar}>Limpiar</LinkButton> : null}
+                  {data ? (
+                    <span role="status" className={s.conteo}>
+                      {data.rows.length} resultado{data.rows.length === 1 ? "" : "s"}
+                    </span>
+                  ) : null}
+                </>
+              }
+            >
+              <label className={s.campoFecha}>
+                <span>Emitidas desde</span>
+                <DateInput
+                  aria-label="Emitidas desde"
+                  className={s.filtroFecha}
+                  controlSize="sm"
+                  value={desde}
+                  onChange={(e) => setDesde(e.target.value)}
+                />
+              </label>
+              <label className={s.campoFecha}>
+                <span>Hasta</span>
+                <DateInput
+                  aria-label="Hasta"
+                  className={s.filtroFecha}
+                  controlSize="sm"
+                  value={hasta}
+                  onChange={(e) => setHasta(e.target.value)}
+                />
+              </label>
+              <Select
+                aria-label="Estado"
+                title="Estado"
+                wrapperClassName={s.filtroSelect}
+                controlSize="sm"
+                value={estado}
+                onChange={(e) => setEstado(e.target.value)}
+              >
+                {ESTADOS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                aria-label={etiquetaContraparte}
+                title={etiquetaContraparte}
+                wrapperClassName={s.filtroSelect}
+                controlSize="sm"
+                value={contraparte}
+                onChange={(e) => setContraparte(e.target.value)}
+              >
+                <option value="">{`Todos los ${etiquetaContrapartePlural}`}</option>
+                {(data?.filtros.contrapartes ?? []).map((c) => (
+                  <option key={c.id} value={String(c.id)}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                aria-label="Proyecto"
+                title="Proyecto"
+                wrapperClassName={s.filtroSelect}
+                controlSize="sm"
+                value={proyecto}
+                onChange={(e) => setProyecto(e.target.value)}
+              >
+                <option value="">Todos los proyectos</option>
+                {(data?.filtros.proyectos ?? []).map((p) => (
+                  <option key={p.id} value={String(p.id)}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </Select>
+            </ModuleToolbar>
 
-      {error && (
-        <InlineAlert
-          variant="danger"
-          message={`No se pudo cargar la cartera. ${error} Reintenta; si sigue igual, avisa a soporte.`}
-        />
-      )}
-      {error && (
-        <div style={{ marginBottom: 12 }}>
-          <Button size="sm" variant="secondary" onClick={() => void cargar()}>
-            Reintentar
-          </Button>
-        </div>
-      )}
-
-      {data?.meta.truncado && (
-        <InlineAlert
-          variant="warning"
-          message={`Se muestran ${data.rows.length} de ${data.meta.total} facturas: no caben todas de una vez, así que los totales de arriba solo cubren lo que se ve. Acota el periodo o filtra para que cuadren.`}
-        />
-      )}
-
-      {cargando ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
-          {token ? "Cargando la cartera…" : "Esperando la sesión para pedir la cartera…"}
-        </p>
-      ) : !data || data.rows.length === 0 ? (
-        <EmptyState
-          title={hayFiltros ? "Sin resultados con estos filtros" : emptyTitle}
-          description={
-            hayFiltros
-              ? "Prueba a quitar el tramo de antigüedad, ampliar el periodo o limpiar la búsqueda."
-              : emptyDescription
-          }
-          action={
-            hayFiltros ? (
-              <Button size="sm" variant="secondary" onClick={limpiar}>
-                Limpiar filtros
-              </Button>
-            ) : (
-              emptyAction
-            )
-          }
-        />
-      ) : (
-        <DataTable
-          columns={columnas}
-          rows={data.rows}
-          rowKey={(r) => r.id}
-          density="compact"
-          ariaLabel="Cartera por cobrar y pagar"
-          onRowClick={(r) => void abrirDetalle(r)}
-        />
-      )}
+            {/* Antigüedad — la escala compartida: se lee de izquierda a derecha y filtra */}
+            {tramos.length > 0 && (
+              <div className={s.filaTramos}>
+                <FilterChips ariaLabel="Antigüedad de saldos">
+                  {tramos.map((t) => (
+                    <FilterChip
+                      key={t.key}
+                      active={aging === t.key}
+                      count={t.documentos}
+                      dot={t.dot}
+                      title={t.hint}
+                      onClick={() => setAging(aging === t.key ? "" : t.key)}
+                    >
+                      {t.label}
+                      <span className={s.tramoMonto}>
+                        <Money value={t.monto} compact bold={false} />
+                      </span>
+                    </FilterChip>
+                  ))}
+                </FilterChips>
+                {aging !== "" && <LinkButton onClick={() => setAging("")}>Ver toda la cartera</LinkButton>}
+              </div>
+            )}
+          </>
+        }
+        empty={!cargando && (!data || data.rows.length === 0)}
+        emptyState={{
+          icon: hayFiltros ? <FilterAltOffOutlinedIcon /> : <ReceiptLongOutlinedIcon />,
+          title: hayFiltros ? "Sin resultados con estos filtros" : emptyTitle,
+          description: hayFiltros
+            ? "Prueba a quitar el tramo de antigüedad, ampliar el periodo o limpiar la búsqueda."
+            : emptyDescription,
+          action: hayFiltros ? (
+            <Button size="sm" onClick={limpiar}>
+              Limpiar filtros
+            </Button>
+          ) : (
+            emptyAction
+          ),
+          tone: "neutral",
+        }}
+      >
+        {cargando ? (
+          <div className={s.cargando}>
+            <SkeletonRows rows={5} />
+            <p className={s.cargandoTexto} aria-busy="true">
+              {token ? "Cargando la cartera…" : "Esperando la sesión para pedir la cartera…"}
+            </p>
+          </div>
+        ) : data ? (
+          <DataTable
+            flush
+            columns={columnas}
+            rows={data.rows}
+            rowKey={(r) => r.id}
+            density="compact"
+            ariaLabel="Cartera por cobrar y pagar"
+            onRowClick={(r) => void abrirDetalle(r)}
+          />
+        ) : null}
+      </ListCard>
 
       {/* Detalle */}
       <Modal
@@ -906,7 +957,7 @@ export default function CarteraView({
         title={abierta ? `Factura ${abierta.folio}` : "Factura"}
         maxWidth={760}
         footer={
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", width: "100%" }}>
+          <div className={s.pie}>
             <Button
               variant="ghost"
               onClick={() => {
@@ -934,22 +985,25 @@ export default function CarteraView({
         }
       >
         {cargandoDetalle && (
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
+          <p className={s.cargandoTexto} aria-busy="true">
             Abriendo la factura…
           </p>
         )}
         {errorDetalle && (
-          <InlineAlert
-            variant="danger"
-            message={`No se pudo abrir el detalle. ${errorDetalle}`}
+          <Alert
+            tone="danger"
+            role="alert"
+            className={s.aviso}
             action={
               abierta ? (
-                <Button size="sm" variant="secondary" onClick={() => void abrirDetalle(abierta)}>
+                <Button size="sm" onClick={() => void abrirDetalle(abierta)}>
                   Reintentar
                 </Button>
               ) : undefined
             }
-          />
+          >
+            {`No se pudo abrir el detalle. ${errorDetalle}`}
+          </Alert>
         )}
         {detalle && (
           <DetalleFactura
@@ -975,7 +1029,7 @@ export default function CarteraView({
         title={esCobrar ? "Registrar cobro" : "Registrar pago"}
         maxWidth={460}
         footer={
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", width: "100%" }}>
+          <div className={s.pie}>
             <Button
               variant="ghost"
               onClick={() => {
@@ -997,40 +1051,26 @@ export default function CarteraView({
         }
       >
         {detalle && (
-          <div style={{ display: "grid", gap: 14, fontSize: 13 }}>
+          <div className={s.formPago}>
             {errorPago && (
-              <InlineAlert
-                variant="danger"
-                message={errorPago}
-                style={{ marginBottom: 0 }}
-                onDismiss={() => setErrorPago(null)}
-              />
+              <Alert tone="danger" role="alert" className={s.aviso} onDismiss={() => setErrorPago(null)}>
+                {errorPago}
+              </Alert>
             )}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                justifyContent: "space-between",
-                gap: 12,
-                padding: "10px 12px",
-                borderRadius: 8,
-                background: "var(--surface-2)",
-                border: "1px solid var(--nx-panel-hairline, var(--border))",
-              }}
-            >
-              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            <div className={s.saldoPendiente}>
+              <span className={s.saldoEtiqueta}>
                 Saldo pendiente de <strong>{detalle.factura.folio}</strong>
               </span>
               <Money value={detalle.saldo.pendiente} />
             </div>
 
-            <FinanceFormGrid>
-              <FinanceField
+            <FieldGrid>
+              <Field
                 label="Monto"
                 hint="Pesos, con IVA incluido. No puede pasar del saldo pendiente."
                 error={errorMonto}
               >
-                <input
+                <Input
                   type="number"
                   min="0"
                   step="0.01"
@@ -1038,81 +1078,65 @@ export default function CarteraView({
                   onChange={(e) => setPago((p) => ({ ...p, amount: e.target.value }))}
                   placeholder={detalle.saldo.pendiente.toFixed(2)}
                   aria-invalid={errorMonto ? true : undefined}
-                  style={financeInputStyle}
                 />
-                <button
-                  type="button"
+                <LinkButton
+                  className={s.usarSaldo}
                   onClick={() =>
                     setPago((p) => ({ ...p, amount: detalle.saldo.pendiente.toFixed(2) }))
                   }
-                  style={{
-                    justifySelf: "start",
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    fontSize: 11.5,
-                    fontWeight: 600,
-                    color: "var(--primary)",
-                    cursor: "pointer",
-                  }}
                 >
                   Usar el saldo completo
-                </button>
-              </FinanceField>
+                </LinkButton>
+              </Field>
 
-              <FinanceField
+              <Field
                 label="Fecha"
                 hint="El día en que el dinero se movió, no el de captura."
                 error={errorFecha}
               >
-                <input
-                  type="date"
+                <DateInput
                   value={pago.paymentDate}
                   onChange={(e) => setPago((p) => ({ ...p, paymentDate: e.target.value }))}
                   aria-invalid={errorFecha ? true : undefined}
-                  style={financeInputStyle}
                 />
-              </FinanceField>
+              </Field>
 
-              <FinanceField label="Forma de pago">
-                <select
+              <Field label="Forma de pago">
+                <Select
                   value={pago.method}
                   onChange={(e) => setPago((p) => ({ ...p, method: e.target.value }))}
-                  style={financeInputStyle}
                 >
                   {METODOS.map((m) => (
                     <option key={m.value} value={m.value}>
                       {m.label}
                     </option>
                   ))}
-                </select>
-              </FinanceField>
+                </Select>
+              </Field>
 
-              <FinanceField
+              <Field
                 label="Referencia"
                 optional
                 hint="Folio del banco, clave de rastreo o número de cheque."
               >
-                <input
+                <Input
                   value={pago.reference}
                   onChange={(e) => setPago((p) => ({ ...p, reference: e.target.value }))}
                   placeholder="Folio del banco, cheque, etc."
-                  style={financeInputStyle}
                 />
-              </FinanceField>
+              </Field>
 
-              <FinanceField label="Nota" optional fullWidth hint="Queda en el historial de la factura.">
-                <input
+              <Field label="Nota" optional fullWidth hint="Queda en el historial de la factura.">
+                <Input
                   value={pago.notes}
                   onChange={(e) => setPago((p) => ({ ...p, notes: e.target.value }))}
-                  style={financeInputStyle}
                 />
-              </FinanceField>
-            </FinanceFormGrid>
+              </Field>
+            </FieldGrid>
           </div>
         )}
       </Modal>
-    </>
+    </MesaPagina>
   );
 }
 
@@ -1125,39 +1149,24 @@ export default function CarteraView({
  */
 function DiasVencido({ dias }: { dias: number | null }) {
   if (dias === null) {
-    return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin plazo</span>;
+    return <span className={s.sinPlazo}>Sin plazo</span>;
   }
   if (dias > 0) {
     return (
-      <span
-        title={textoDias(dias)}
-        style={{
-          fontSize: 13,
-          fontWeight: 700,
-          fontVariantNumeric: "tabular-nums",
-          color: "var(--state-danger-text, #b91c1c)",
-          whiteSpace: "nowrap",
-        }}
-      >
+      <span title={textoDias(dias)} className={s.diasMal}>
         {dias} {dias === 1 ? "día" : "días"}
       </span>
     );
   }
   if (dias === 0) {
     return (
-      <span
-        title={textoDias(dias)}
-        style={{ fontSize: 12, fontWeight: 600, color: "var(--state-warning-text, #b45309)" }}
-      >
+      <span title={textoDias(dias)} className={s.diasHoy}>
         Hoy
       </span>
     );
   }
   return (
-    <span
-      title={textoDias(dias)}
-      style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", color: "var(--text-tertiary)" }}
-    >
+    <span title={textoDias(dias)} className={s.diasEnPlazo}>
       en {-dias} {-dias === 1 ? "día" : "días"}
     </span>
   );
@@ -1166,8 +1175,8 @@ function DiasVencido({ dias }: { dias: number | null }) {
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>{etiqueta}</div>
-      <div style={{ fontSize: 13, fontWeight: 600 }}>{children}</div>
+      <div className={s.datoEtiqueta}>{etiqueta}</div>
+      <div className={s.datoValor}>{children}</div>
     </div>
   );
 }
@@ -1191,21 +1200,35 @@ function CalendarioCxP({
 }) {
   if (error) {
     return (
-      <Section title="Calendario de vencimientos" dense>
-        <InlineAlert variant="warning" message={`No se pudo cargar el calendario. ${error}`} />
-        <Button size="sm" variant="secondary" onClick={onReintentar}>
-          Reintentar
-        </Button>
-      </Section>
+      <Card className={s.tarjeta}>
+        <CardHead title="Calendario de vencimientos" />
+        <div className={s.cuerpo}>
+          <Alert
+            tone="warning"
+            role="alert"
+            className={s.aviso}
+            action={
+              <Button size="sm" onClick={onReintentar}>
+                Reintentar
+              </Button>
+            }
+          >
+            {`No se pudo cargar el calendario. ${error}`}
+          </Alert>
+        </div>
+      </Card>
     );
   }
   if (!calendario) {
     return (
-      <Section title="Calendario de vencimientos" dense>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
-          Armando el calendario…
-        </p>
-      </Section>
+      <Card className={s.tarjeta}>
+        <CardHead title="Calendario de vencimientos" />
+        <div className={s.cuerpo}>
+          <p className={`${s.parrafo} ${s.tenue}`} aria-busy="true">
+            Armando el calendario…
+          </p>
+        </div>
+      </Card>
     );
   }
 
@@ -1213,194 +1236,167 @@ function CalendarioCxP({
   const vacio =
     resumen.vencido === 0 && resumen.enVentana === 0 && resumen.sinFecha === 0;
 
+  const escalaCaja: {
+    key: AgingBucket;
+    label: string;
+    monto: number;
+    hint: string;
+    dot?: Tone;
+  }[] = [
+    {
+      key: "vencido",
+      label: "Vencido",
+      monto: resumen.vencido,
+      hint: resumen.vencido > 0 ? "ya debió salir" : "nada atrasado",
+      dot: resumen.vencido > 0 ? "danger" : undefined,
+    },
+    {
+      key: "hoy",
+      label: "Hoy",
+      monto: resumen.hoy,
+      hint: "sale hoy",
+      dot: resumen.hoy > 0 ? "warning" : undefined,
+    },
+    {
+      key: "proximos7",
+      label: "Próximos 7 días",
+      monto: resumen.proximos7,
+      hint: "esta semana",
+    },
+    {
+      key: "proximos30",
+      label: "Próximos 30 días",
+      monto: resumen.proximos30,
+      hint: "el mes",
+    },
+  ];
+
   return (
-    <Section
-      title="Calendario de vencimientos"
-      subtitle={`Qué sale de caja del ${fechaLarga(calendario.desde)} al ${fechaLarga(
-        calendario.hasta,
-      )} · ${calendario.ventanaDias} días.`}
-      dense
-      actions={
-        <div style={{ display: "flex", gap: 6 }}>
-          {[30, 60].map((v) => (
-            <Button
-              key={v}
-              size="sm"
-              variant={ventana === v ? "secondary" : "ghost"}
-              onClick={() => onVentana(v)}
-            >
-              {v} días
-            </Button>
-          ))}
-        </div>
-      }
-    >
-      {vacio ? (
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
-          No hay pagos comprometidos en la ventana. Nada urgente por aquí.
-        </p>
-      ) : (
-        <>
-          <div style={{ marginBottom: 12 }}>
-            {(() => {
-              const base =
-                resumen.vencido + resumen.hoy + resumen.proximos7 + resumen.proximos30;
-              const escalaCaja: ScaleItem[] = [
-                {
-                  key: "vencido",
-                  label: "Vencido",
-                  value: <Money value={resumen.vencido} />,
-                  tone: resumen.vencido > 0 ? "danger" : "mute",
-                  hint: resumen.vencido > 0 ? "ya debió salir" : "nada atrasado",
-                  share: base > 0 ? resumen.vencido / base : 0,
-                },
-                {
-                  key: "hoy",
-                  label: "Hoy",
-                  value: <Money value={resumen.hoy} />,
-                  tone: resumen.hoy > 0 ? "warning" : "mute",
-                  hint: "sale hoy",
-                  share: base > 0 ? resumen.hoy / base : 0,
-                },
-                {
-                  key: "proximos7",
-                  label: "Próximos 7 días",
-                  value: <Money value={resumen.proximos7} />,
-                  tone: "mute",
-                  hint: "esta semana",
-                  share: base > 0 ? resumen.proximos7 / base : 0,
-                },
-                {
-                  key: "proximos30",
-                  label: "Próximos 30 días",
-                  value: <Money value={resumen.proximos30} />,
-                  tone: "mute",
-                  hint: "el mes",
-                  share: base > 0 ? resumen.proximos30 / base : 0,
-                },
-              ];
-              return (
-                <FilterScale
-                  ariaLabel="Qué sale de caja"
-                  items={escalaCaja}
-                  active={aging}
-                  onSelect={(clave) => onAging((clave || "") as AgingBucket | "")}
-                  minCellWidth={128}
-                />
-              );
-            })()}
+    <Card className={s.tarjeta}>
+      <CardHead
+        title="Calendario de vencimientos"
+        subtitle={`Qué sale de caja del ${fechaLarga(calendario.desde)} al ${fechaLarga(
+          calendario.hasta,
+        )} · ${calendario.ventanaDias} días.`}
+        actions={
+          <div className={s.acciones}>
+            {[30, 60].map((v) => (
+              <Button
+                key={v}
+                size="sm"
+                variant={ventana === v ? "secondary" : "ghost"}
+                onClick={() => onVentana(v)}
+              >
+                {v} días
+              </Button>
+            ))}
           </div>
-
-          {/* Lo vencido no es una cifra suelta: el API manda a quién se le
-              debe y cuántos documentos son, y no se pintaba en ningún lado. */}
-          {calendario.vencido.documentos > 0 && (
-            <div
-              style={{
-                marginBottom: 12,
-                padding: "9px 12px",
-                borderRadius: 8,
-                border: "1px solid var(--state-danger-border, var(--danger))",
-                background: "var(--state-danger-bg, #fef2f2)",
-                fontSize: 12.5,
-                color: "var(--state-danger-text, #b91c1c)",
-                lineHeight: 1.5,
-              }}
-            >
-              <strong>
-                {calendario.vencido.documentos}{" "}
-                {calendario.vencido.documentos === 1 ? "factura vencida" : "facturas vencidas"}
-              </strong>{" "}
-              por {pesos(calendario.vencido.monto)}.
-              {calendario.vencido.contrapartes.length > 0 && (
-                <span style={{ color: "var(--text-secondary)" }}>
-                  {" "}
-                  {calendario.vencido.contrapartes
-                    .slice(0, 3)
-                    .map((c) => `${c.nombre} (${pesos(c.monto)})`)
-                    .join(" · ")}
-                  {calendario.vencido.contrapartes.length > 3
-                    ? ` y ${calendario.vencido.contrapartes.length - 3} más`
-                    : ""}
-                </span>
-              )}
-            </div>
-          )}
-
-          {calendario.semanas.length > 0 && (
-            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
-              {calendario.semanas.slice(0, 9).map((s) => (
-                <li
-                  key={s.semana}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "minmax(0, 1fr) auto",
-                    gap: 12,
-                    alignItems: "baseline",
-                    padding: "8px 10px",
-                    borderRadius: 8,
-                    border: "1px solid var(--nx-panel-hairline)",
-                    background: "var(--surface)",
-                  }}
+        }
+      />
+      <div className={s.cuerpo}>
+        {vacio ? (
+          <p className={s.parrafo}>
+            No hay pagos comprometidos en la ventana. Nada urgente por aquí.
+          </p>
+        ) : (
+          <>
+            <FilterChips ariaLabel="Qué sale de caja">
+              {escalaCaja.map((t) => (
+                <FilterChip
+                  key={t.key}
+                  active={aging === t.key}
+                  dot={t.dot}
+                  title={t.hint}
+                  onClick={() => onAging(aging === t.key ? "" : t.key)}
                 >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600 }}>
-                      {s.etiqueta}{" "}
-                      <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>
-                        {fechaCorta(s.inicio)} – {fechaCorta(s.fin)}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11.5,
-                        color: "var(--text-secondary)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {s.contrapartes
-                        .slice(0, 3)
-                        .map((c) => c.nombre)
-                        .join(" · ")}
-                      {s.contrapartes.length > 3 ? ` y ${s.contrapartes.length - 3} más` : ""}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                    <Money value={s.monto} />
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                      {s.documentos} {s.documentos === 1 ? "factura" : "facturas"}
-                    </div>
-                  </div>
-                </li>
+                  {t.label}
+                  <span className={s.tramoMonto}>
+                    <Money value={t.monto} bold={false} />
+                  </span>
+                </FilterChip>
               ))}
-            </ul>
-          )}
+            </FilterChips>
 
-          {calendario.semanas.length > 9 && (
-            <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--text-tertiary)" }}>
-              Se muestran las primeras 9 de {calendario.semanas.length} semanas de la ventana.
-            </p>
-          )}
+            {/* Lo vencido no es una cifra suelta: el API manda a quién se le
+                debe y cuántos documentos son, y no se pintaba en ningún lado. */}
+            {calendario.vencido.documentos > 0 && (
+              <Alert tone="danger" dense className={s.aviso}>
+                <strong>
+                  {calendario.vencido.documentos}{" "}
+                  {calendario.vencido.documentos === 1 ? "factura vencida" : "facturas vencidas"}
+                </strong>{" "}
+                por {pesos(calendario.vencido.monto)}.
+                {calendario.vencido.contrapartes.length > 0 && (
+                  <span className={s.vencidoQuien}>
+                    {" "}
+                    {calendario.vencido.contrapartes
+                      .slice(0, 3)
+                      .map((c) => `${c.nombre} (${pesos(c.monto)})`)
+                      .join(" · ")}
+                    {calendario.vencido.contrapartes.length > 3
+                      ? ` y ${calendario.vencido.contrapartes.length - 3} más`
+                      : ""}
+                  </span>
+                )}
+              </Alert>
+            )}
 
-          {(resumen.fueraDeVentana > 0 || resumen.sinFecha > 0) && (
-            <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--text-tertiary)" }}>
-              {resumen.fueraDeVentana > 0 && (
-                <>
-                  Después de la ventana: <Money value={resumen.fueraDeVentana} compact bold={false} />
-                  .{" "}
-                </>
-              )}
-              {resumen.sinFecha > 0 && (
-                <>
-                  Sin fecha de vencimiento:{" "}
-                  <Money value={resumen.sinFecha} compact bold={false} />.
-                </>
-              )}
-            </p>
-          )}
-        </>
-      )}
-    </Section>
+            {calendario.semanas.length > 0 && (
+              <ul className={s.semanas}>
+                {calendario.semanas.slice(0, 9).map((sem) => (
+                  <li key={sem.semana} className={s.semana}>
+                    <div className={s.semanaTexto}>
+                      <div className={s.semanaTitulo}>
+                        {sem.etiqueta}{" "}
+                        <span className={s.semanaRango}>
+                          {fechaCorta(sem.inicio)} – {fechaCorta(sem.fin)}
+                        </span>
+                      </div>
+                      <div className={s.semanaQuien}>
+                        {sem.contrapartes
+                          .slice(0, 3)
+                          .map((c) => c.nombre)
+                          .join(" · ")}
+                        {sem.contrapartes.length > 3 ? ` y ${sem.contrapartes.length - 3} más` : ""}
+                      </div>
+                    </div>
+                    <div className={s.semanaMonto}>
+                      <Money value={sem.monto} />
+                      <div className={s.semanaDocs}>
+                        {sem.documentos} {sem.documentos === 1 ? "factura" : "facturas"}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {calendario.semanas.length > 9 && (
+              <p className={s.nota}>
+                Se muestran las primeras 9 de {calendario.semanas.length} semanas de la ventana.
+              </p>
+            )}
+
+            {(resumen.fueraDeVentana > 0 || resumen.sinFecha > 0) && (
+              <p className={s.nota}>
+                {resumen.fueraDeVentana > 0 && (
+                  <>
+                    Después de la ventana: <Money value={resumen.fueraDeVentana} compact bold={false} />
+                    .{" "}
+                  </>
+                )}
+                {resumen.sinFecha > 0 && (
+                  <>
+                    Sin fecha de vencimiento:{" "}
+                    <Money value={resumen.sinFecha} compact bold={false} />.
+                  </>
+                )}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -1421,46 +1417,37 @@ function DetalleFactura({
 }) {
   const { factura, contraparte, proyecto, pagos, saldo, documentos, historial, conceptos } = detalle;
   return (
-    <div style={{ display: "grid", gap: 16, fontSize: 13 }}>
+    <div className={s.detalle}>
       {factura.cancelada && (
-        <InlineAlert
-          variant="warning"
-          message={`Factura cancelada${
+        <Alert tone="warning" role="alert" className={s.aviso}>
+          {`Factura cancelada${
             satMotivoCancelacionLabel(factura.motivoCancelacion)
               ? `: ${satMotivoCancelacionLabel(factura.motivoCancelacion)}`
               : ""
           }. Ya no admite pagos ni cobros.`}
-          style={{ marginBottom: 0 }}
-        />
+        </Alert>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+      <div className={s.datos}>
         <Dato etiqueta={etiquetaContraparte}>
           {contraparte.nombre}
-          {contraparte.rfc && (
-            <div style={{ fontWeight: 400, fontSize: 11.5, color: "var(--text-tertiary)" }}>
-              {contraparte.rfc}
-            </div>
-          )}
+          {contraparte.rfc && <div className={s.datoSub}>{contraparte.rfc}</div>}
         </Dato>
         <Dato etiqueta="Proyecto">
-          {proyecto ? proyecto.nombre : <span style={{ fontWeight: 400 }}>Sin proyecto ligado</span>}
+          {proyecto ? proyecto.nombre : <span className={s.datoNormal}>Sin proyecto ligado</span>}
         </Dato>
         <Dato etiqueta="Estado">
-          <StatusDot
-            label={factura.estadoEtiqueta}
-            tone={TONO_ESTADO[factura.estadoTono] ?? "neutral"}
-          />
+          <Badge dot tone={TONO_ESTADO[factura.estadoTono] ?? "neutral"}>
+            {factura.estadoEtiqueta}
+          </Badge>
         </Dato>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
+      <div className={`${s.datos} ${s.datosCortos}`}>
         <Dato etiqueta="Emitida">{fechaLarga(factura.emision)}</Dato>
         <Dato etiqueta="Vence">
           {fechaLarga(factura.vencimiento)}
-          <div style={{ fontWeight: 400, fontSize: 11.5, color: "var(--text-tertiary)" }}>
-            {textoDias(factura.diasVencido)}
-          </div>
+          <div className={s.datoSub}>{textoDias(factura.diasVencido)}</div>
         </Dato>
         <Dato etiqueta="Total">
           <Money value={saldo.total} />
@@ -1472,28 +1459,13 @@ function DetalleFactura({
 
       {saldo.total > 0 && (
         <div>
-          <div
-            aria-hidden="true"
-            style={{
-              height: 6,
-              borderRadius: 999,
-              background: "var(--surface-2)",
-              overflow: "hidden",
-            }}
-          >
+          <div aria-hidden="true" className={s.barra}>
             <div
-              style={{
-                width: `${saldo.porcentajePagado}%`,
-                height: "100%",
-                background:
-                  saldo.pendiente <= 0.009
-                    ? "var(--state-success-text, #15803d)"
-                    : "var(--text-secondary)",
-                opacity: saldo.pendiente <= 0.009 ? 1 : 0.5,
-              }}
+              className={`${s.barraRelleno} ${saldo.pendiente <= 0.009 ? s.barraRellenoPagada : ""}`}
+              style={{ width: `${saldo.porcentajePagado}%` }}
             />
           </div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>
+          <div className={s.cubierto}>
             {saldo.porcentajePagado}% cubierto · <Money value={saldo.pagado} compact bold={false} /> de{" "}
             <Money value={saldo.total} compact bold={false} />
           </div>
@@ -1503,16 +1475,14 @@ function DetalleFactura({
       {/* Los datos fiscales del CFDI llegaban en el detalle y no se pintaban:
           sin UUID, forma y método de pago no se puede casar con el SAT. */}
       <Bloque titulo="Datos del comprobante">
-        <div style={{ display: "grid", gap: 5 }}>
+        <div className={s.lineas}>
           <Linea
             etiqueta="Folio fiscal"
             valor={
               factura.uuid ? (
-                <span style={{ fontFamily: "var(--nx-font-mono, monospace)", fontSize: 11.5 }}>
-                  {factura.uuid}
-                </span>
+                <span className={s.uuid}>{factura.uuid}</span>
               ) : (
-                <span style={{ color: "var(--text-tertiary)" }}>Sin timbrar</span>
+                <span className={s.tenue}>Sin timbrar</span>
               )
             }
           />
@@ -1542,26 +1512,14 @@ function DetalleFactura({
 
       <Bloque titulo={`Pagos aplicados (${pagos.length})`}>
         {pagos.length === 0 ? (
-          <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)" }}>
-            Todavía no hay pagos registrados sobre esta factura.
-          </p>
+          <p className={s.parrafo}>Todavía no hay pagos registrados sobre esta factura.</p>
         ) : (
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
+          <ul className={s.pagos}>
             {pagos.map((p) => (
-              <li
-                key={p.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0,1fr) auto",
-                  gap: 10,
-                  padding: "7px 10px",
-                  borderRadius: 8,
-                  background: "var(--surface-2)",
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600 }}>{fechaLarga(p.fecha)}</div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+              <li key={p.id} className={s.pago}>
+                <div className={s.pagoTexto}>
+                  <div className={s.pagoFecha}>{fechaLarga(p.fecha)}</div>
+                  <div className={s.pagoMeta}>
                     {[
                       paymentMethodLabel(p.metodo),
                       p.referencia,
@@ -1574,7 +1532,7 @@ function DetalleFactura({
                   {/* Clave de rastreo, complemento y nota: venían en cada pago
                       y no se enseñaban en ningún sitio. */}
                   {(p.claveRastreo || p.complementoUuid || p.notas) && (
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
+                    <div className={s.pagoExtra}>
                       {[
                         p.claveRastreo ? `clave de rastreo ${p.claveRastreo}` : null,
                         p.complementoUuid
@@ -1596,16 +1554,13 @@ function DetalleFactura({
 
       {conceptos.length > 0 && (
         <Bloque titulo="Conceptos">
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 4 }}>
+          <ul className={s.conceptos}>
             {conceptos.slice(0, 8).map((c) => (
-              <li
-                key={c.id}
-                style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10 }}
-              >
-                <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+              <li key={c.id} className={s.concepto}>
+                <span className={s.conceptoTexto}>
                   {c.cantidad}
                   {c.unidad ? ` ${c.unidad}` : ""} × {c.descripcion}
-                  <span style={{ color: "var(--text-tertiary)" }}>
+                  <span className={s.tenue}>
                     {" "}
                     · {pesos(c.precioUnitario, 2)} c/u
                   </span>
@@ -1614,7 +1569,7 @@ function DetalleFactura({
               </li>
             ))}
             {conceptos.length > 8 && (
-              <li style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+              <li className={s.masConceptos}>
                 y {conceptos.length - 8}{" "}
                 {conceptos.length - 8 === 1 ? "concepto más" : "conceptos más"}
               </li>
@@ -1625,18 +1580,20 @@ function DetalleFactura({
 
       <Bloque titulo="Documentos">
         {errorDescarga && (
-          <InlineAlert
-            variant="danger"
-            message={errorDescarga}
+          <Alert
+            tone="danger"
+            role="alert"
+            className={`${s.aviso} ${s.avisoDoc}`}
             onDismiss={onCerrarErrorDescarga}
-            style={{ marginBottom: 8 }}
-          />
+          >
+            {errorDescarga}
+          </Alert>
         )}
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div className={s.documentos}>
           {documentos.map((d) => {
             if (!d.disponible || !d.url) {
               return (
-                <span key={d.tipo} style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>
+                <span key={d.tipo} className={s.tenue}>
                   {d.tipo.toUpperCase()}: {d.nota ?? "no disponible"}
                 </span>
               );
@@ -1649,7 +1606,7 @@ function DetalleFactura({
                   href={d.url}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ fontSize: 12.5, fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}
+                  className={s.enlaceDoc}
                 >
                   Abrir {d.tipo.toUpperCase()} →
                 </a>
@@ -1657,36 +1614,27 @@ function DetalleFactura({
             }
             const bajando = descargando === d.url;
             return (
-              <button
+              <LinkButton
                 key={d.tipo}
-                type="button"
                 onClick={() => void onDescargarXml(d.url as string, d.nombre)}
                 disabled={bajando}
                 aria-busy={bajando || undefined}
-                style={{
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  color: bajando ? "var(--text-tertiary)" : "var(--primary)",
-                  cursor: bajando ? "progress" : "pointer",
-                }}
+                className={bajando ? s.docBajando : undefined}
               >
                 {bajando
                   ? `Descargando ${d.tipo.toUpperCase()}…`
                   : `Descargar ${d.tipo.toUpperCase()} →`}
-              </button>
+              </LinkButton>
             );
           })}
         </div>
       </Bloque>
 
       <Bloque titulo="Historial">
-        <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+        <ol className={s.historial}>
           {historial.map((h, i) => (
-            <li key={`${h.tipo}-${i}`} style={{ display: "grid", gap: 2 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600 }}>
+            <li key={`${h.tipo}-${i}`} className={s.historialItem}>
+              <div className={s.historialTitulo}>
                 {h.tipo === "match"
                   ? h.titulo.replace(
                       /\b(NOT_REQUIRED|PENDING|MATCHED|VARIANCE|WAIVED)\b/g,
@@ -1694,7 +1642,7 @@ function DetalleFactura({
                     )
                   : h.titulo}
               </div>
-              <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+              <div className={s.historialMeta}>
                 {[
                   h.fecha ? fechaLarga(h.fecha.slice(0, 10)) : null,
                   h.usuario,
@@ -1714,18 +1662,7 @@ function DetalleFactura({
 function Bloque({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <section>
-      <h3
-        style={{
-          margin: "0 0 8px",
-          fontSize: 11,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-          color: "var(--text-tertiary)",
-        }}
-      >
-        {titulo}
-      </h3>
+      <h3 className={s.bloqueTitulo}>{titulo}</h3>
       {children}
     </section>
   );

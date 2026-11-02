@@ -294,7 +294,7 @@ export default function PrepararCfdiPage() {
         </>
       ) : null}
       {motivo ? (
-        <span id={idMotivo} className={m.reason} style={{ flexBasis: "100%", textAlign: "right", marginLeft: "auto" }} role="status">
+        <span id={idMotivo} className={cx(m.reason, m.reasonDerecha)} role="status">
           {motivo}
         </span>
       ) : null}
@@ -337,7 +337,7 @@ export default function PrepararCfdiPage() {
       ) : null}
 
       <div className={m.split}>
-        <div className={m.splitMain} style={{ flex: "3 1 560px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className={cx(m.splitMain, m.splitMainPrep)}>
           <section aria-label="Receptor" className={cx(m.card, m.cardPad)}>
             <div className={m.cardTitleRow}>
               <h2 className={m.cardTitle}>Cliente</h2>
@@ -351,7 +351,7 @@ export default function PrepararCfdiPage() {
                 </span>
               )}
               {puedeEditarCliente && fichaCliente ? (
-                <Link href={fichaCliente} style={{ marginLeft: "auto", fontSize: 13, fontWeight: 600 }}>
+                <Link href={fichaCliente} className={m.linkDerecha}>
                   Editar cliente
                 </Link>
               ) : null}
@@ -479,7 +479,7 @@ export default function PrepararCfdiPage() {
                   : f.relacionados.map((x) => `Relacionado (${x.tipo})${x.folio ? ` · ${x.folio}` : ""}`).join(" · ")}
               </span>
               {editable ? (
-                <Link href={editarConceptos} style={{ fontWeight: 600 }}>
+                <Link href={editarConceptos} className={m.fw600}>
                   Relacionar anticipo o sustitución
                 </Link>
               ) : null}
@@ -487,21 +487,21 @@ export default function PrepararCfdiPage() {
             </div>
           </section>
 
-          <section aria-label="Conceptos" className={m.card} style={{ overflowX: "auto" }}>
-            <div className={m.cardTitleRow} style={{ padding: "16px 20px 6px" }}>
+          <section aria-label="Conceptos" className={cx(m.card, m.cardScroll)}>
+            <div className={cx(m.cardTitleRow, m.cardTitleRowPad)}>
               <h2 className={m.cardTitle}>Conceptos</h2>
               <span className={m.meta}>{textoOrigenConceptos(rev.origen?.tipo)}</span>
               {editable ? (
-                <Link href={editarConceptos} className={cx(m.btn, m.btnRow)} style={{ marginLeft: "auto", height: 34, padding: "0 12px" }}>
+                <Link href={editarConceptos} className={cx(m.btn, m.btnRow, m.btnEditar)}>
                   Editar conceptos
                 </Link>
               ) : null}
             </div>
-            <table className={cx(m.table, m.tableCompact)} style={{ minWidth: 720 }}>
+            <table className={cx(m.table, m.tableCompact, m.tableBordes20, m.minW720)}>
               <caption className={m.srOnly}>Conceptos de la factura {f.folio}</caption>
               <thead>
                 <tr>
-                  <th scope="col" style={{ paddingLeft: 20 }}>
+                  <th scope="col">
                     Descripción
                   </th>
                   <th scope="col">Clave SAT</th>
@@ -515,7 +515,7 @@ export default function PrepararCfdiPage() {
                   <th scope="col" className={m.r}>
                     IVA
                   </th>
-                  <th scope="col" className={m.r} style={{ paddingRight: 20 }}>
+                  <th scope="col" className={m.r}>
                     Importe
                   </th>
                 </tr>
@@ -523,14 +523,14 @@ export default function PrepararCfdiPage() {
               <tbody>
                 {f.conceptos.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ paddingLeft: 20 }} data-tinta="warning">
+                    <td colSpan={7} data-tinta="warning">
                       El borrador no tiene conceptos. Agrégalos con «Editar conceptos».
                     </td>
                   </tr>
                 ) : (
                   f.conceptos.map((c) => (
                     <tr key={c.id}>
-                      <td style={{ paddingLeft: 20 }}>{c.descripcion}</td>
+                      <td>{c.descripcion}</td>
                       <td>{c.claveSat ?? <span data-tinta="warning">Falta</span>}</td>
                       <td>{c.unidadClave ? [c.unidadClave, c.unidad].filter(Boolean).join(" · ") : <span data-tinta="warning">Falta</span>}</td>
                       <td className={m.r}>{c.cantidad.toLocaleString("es-MX")}</td>
@@ -538,7 +538,7 @@ export default function PrepararCfdiPage() {
                         {dinero(c.precio)}
                       </td>
                       <td className={m.r}>{c.ivaPct} %</td>
-                      <td className={m.r} style={{ paddingRight: 20 }}>
+                      <td className={m.r}>
                         {dinero(c.importe)}
                       </td>
                     </tr>
@@ -564,7 +564,7 @@ export default function PrepararCfdiPage() {
                     <dd>{dinero(-f.retenciones)}</dd>
                   </>
                 ) : null}
-                <dt style={{ fontWeight: 600, color: "var(--ui-fg)" }}>Total</dt>
+                <dt className={m.dtTotal}>Total</dt>
                 <dd className={m.totalBig}>{dinero(f.total)}</dd>
               </dl>
             </div>
@@ -572,7 +572,7 @@ export default function PrepararCfdiPage() {
         </div>
 
         <aside aria-label="Revisión antes de timbrar" className={m.splitAside}>
-          <section className={cx(m.card, m.cardPad)} style={{ gap: 12 }}>
+          <section className={cx(m.card, m.cardPad, m.cardPadTight)}>
             <h2 className={m.cardTitle}>Antes de timbrar</h2>
             {rev.revisiones.length === 0 ? (
               <p className={m.note}>Sin observaciones.</p>
@@ -597,7 +597,7 @@ export default function PrepararCfdiPage() {
             )}
           </section>
 
-          <section className={cx(m.card, m.cardPad)} style={{ gap: 12 }}>
+          <section className={cx(m.card, m.cardPad, m.cardPadTight)}>
             <h2 className={m.cardTitle}>Póliza que se registra al timbrar</h2>
             {rev.poliza.length ? (
               <TablaPoliza lineas={rev.poliza} caption={`Póliza de ingreso de ${f.folio}`} />
@@ -605,7 +605,7 @@ export default function PrepararCfdiPage() {
               <p className={m.note}>La póliza se arma en cuanto el borrador tenga conceptos con precio.</p>
             )}
             {rev.notaPoliza ? (
-              <span className={m.note} style={{ color: "var(--ui-fg-2)" }}>
+              <span className={m.note}>
                 {rev.notaPoliza}
               </span>
             ) : null}

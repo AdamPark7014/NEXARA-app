@@ -1,0 +1,124 @@
+/* Facturas · Mesa contable. Solo tokens --ui-*: claro y oscuro salen solos. */
+
+/* Los avisos traen su propio margen inferior; los hijos de la página ya se separan con 16 px. */
+.aviso.aviso {
+  margin-bottom: 0;
+}
+
+.tarjeta {
+  contain: inline-size;
+}
+
+.conteo {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tramoMonto {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Estado de carga ──────────────────────────────────────────────────── */
+
+.cargando {
+  padding: var(--ui-s2) 0 var(--ui-s4);
+}
+
+.cargandoTexto {
+  margin: 0;
+  padding: 0 var(--ui-s5);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Celdas de la tabla ───────────────────────────────────────────────── */
+
+.nombre {
+  font-weight: 600;
+}
+
+.sub {
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.tipo {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-fg-2);
+}
+
+.vence {
+  display: grid;
+  gap: 1px;
+}
+
+.fecha {
+  font-variant-numeric: tabular-nums;
+}
+
+.fechaVencida {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ui-danger-text);
+}
+
+.diasVencida {
+  font-size: var(--ui-fs-caption);
+  font-weight: 700;
+  color: var(--ui-danger-text);
+}
+
+/* ─── Detalle de la factura ────────────────────────────────────────────── */
+
+.detalle,
+.formPago {
+  display: grid;
+  gap: 14px;
+  font-size: var(--ui-text-sm);
+}
+
+.datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--ui-s3);
+}
+
+.datoEtiqueta {
+  margin-bottom: 2px;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.datoValor {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+}
+
+/* ─── Modales ──────────────────────────────────────────────────────────── */
+
+.pie {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.saldoPendiente {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  padding: 10px var(--ui-s3);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-2);
+  border: 1px solid var(--ui-border-subtle);
+}
+
+.saldoEtiqueta {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+}

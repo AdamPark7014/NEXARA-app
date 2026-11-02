@@ -1,26 +1,37 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import PageHeader from "@/components/ui/PageHeader";
-import Button from "@/components/ui/Button";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
-import InlineAlert from "@/components/ui/InlineAlert";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import FilterScale, { type ScaleItem } from "@/components/ui/FilterScale";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import {
-  FinanceField,
-  financeInputStyle,
-} from "@/components/finance/FinanceModuleShell";
-import FilterToolbar from "@/components/FilterToolbar";
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  DataTable,
+  Field,
+  FilterChip,
+  FilterChips,
+  Input,
+  ListCard,
+  ModuleToolbar,
+  SearchInput,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  type Column,
+  type Tone,
+} from "@/components/base";
+import { MesaPagina } from "@/components/mesa-contable/MesaPagina";
+import { Money } from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { financeStatusLabel } from "@/lib/finance-status-labels";
 import { toast } from "@/components/Toast";
 import TruncatedId from "@/components/ui/TruncatedId";
+import s from "./ContabilidadInvoicesView.module.css";
 
 type InvoiceRow = {
   id: number;
@@ -84,8 +95,8 @@ function statusLabel(row: InvoiceRow): { text: string; tone: "ok" | "warn" | "ba
   return { text: row.status ? financeStatusLabel(row.status) : "Pendiente", tone: "mute" };
 }
 
-/** El tono del estado, en el vocabulario de `StatusDot`: punto y palabra. */
-const TONO_ESTADO: Record<"ok" | "warn" | "bad" | "mute", StatusTone> = {
+/** El tono del estado, en el vocabulario de `Badge`: punto y palabra. */
+const TONO_ESTADO: Record<"ok" | "warn" | "bad" | "mute", Tone> = {
   ok: "success",
   warn: "warning",
   bad: "danger",
@@ -326,36 +337,35 @@ export default function ContabilidadInvoicesView({
     return null;
   })();
 
-  const escalaCalendario: ScaleItem[] = calendar
-    ? (() => {
-        const base = calendar.overdue + calendar.today + calendar.d7;
-        return [
-          {
-            key: "vencido",
-            label: "Vencido",
-            value: <Money value={calendar.overdue} />,
-            tone: calendar.overdue > 0 ? "danger" : "mute",
-            hint: calendar.overdue > 0 ? "ya debió salir" : "nada atrasado",
-            share: base > 0 ? calendar.overdue / base : 0,
-          },
-          {
-            key: "hoy",
-            label: "Hoy",
-            value: <Money value={calendar.today} />,
-            tone: calendar.today > 0 ? "warning" : "mute",
-            hint: "sale hoy",
-            share: base > 0 ? calendar.today / base : 0,
-          },
-          {
-            key: "d7",
-            label: "Próximos 7 días",
-            value: <Money value={calendar.d7} />,
-            tone: "mute",
-            hint: "esta semana",
-            share: base > 0 ? calendar.d7 / base : 0,
-          },
-        ];
-      })()
+  const escalaCalendario: {
+    key: "vencido" | "hoy" | "d7";
+    label: string;
+    monto: number;
+    hint: string;
+    dot?: Tone;
+  }[] = calendar
+    ? [
+        {
+          key: "vencido",
+          label: "Vencido",
+          monto: calendar.overdue,
+          hint: calendar.overdue > 0 ? "ya debió salir" : "nada atrasado",
+          dot: calendar.overdue > 0 ? "danger" : undefined,
+        },
+        {
+          key: "hoy",
+          label: "Hoy",
+          monto: calendar.today,
+          hint: "sale hoy",
+          dot: calendar.today > 0 ? "warning" : undefined,
+        },
+        {
+          key: "d7",
+          label: "Próximos 7 días",
+          monto: calendar.d7,
+          hint: "esta semana",
+        },
+      ]
     : [];
 
   const columns: Column<InvoiceRow>[] = [
@@ -364,8 +374,8 @@ export default function ContabilidadInvoicesView({
       label: partyLabel,
       render: (r) => (
         <div>
-          <div style={{ fontWeight: 600 }}>{r.receptorName || r.emisorName || "Sin nombre"}</div>
-          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{r.invoiceNumber}</div>
+          <div className={s.nombre}>{r.receptorName || r.emisorName || "Sin nombre"}</div>
+          <div className={s.sub}>{r.invoiceNumber}</div>
         </div>
       ),
     },
@@ -374,11 +384,7 @@ export default function ContabilidadInvoicesView({
           {
             key: "tipo",
             label: "Tipo",
-            render: (r: InvoiceRow) => (
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)" }}>
-                {tipoFacturaLabel(r.type)}
-              </span>
-            ),
+            render: (r: InvoiceRow) => <span className={s.tipo}>{tipoFacturaLabel(r.type)}</span>,
           } as Column<InvoiceRow>,
         ]
       : []),
@@ -389,24 +395,12 @@ export default function ContabilidadInvoicesView({
         const od = daysOverdue(r.dueDate);
         const vencida = od != null && od > 0;
         return (
-          <span style={{ display: "grid", gap: 1 }}>
-            <span
-              style={{
-                fontVariantNumeric: "tabular-nums",
-                color: vencida ? "var(--state-danger-text, #b91c1c)" : undefined,
-                fontWeight: vencida ? 600 : undefined,
-              }}
-            >
+          <span className={s.vence}>
+            <span className={vencida ? s.fechaVencida : s.fecha}>
               {r.dueDate ? new Date(r.dueDate).toLocaleDateString("es-MX") : "—"}
             </span>
             {vencida && (
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "var(--state-danger-text, #b91c1c)",
-                }}
-              >
+              <span className={s.diasVencida}>
                 {od} {od === 1 ? "día vencida" : "días vencida"}
               </span>
             )}
@@ -425,8 +419,12 @@ export default function ContabilidadInvoicesView({
       key: "estado",
       label: "Estado",
       render: (r) => {
-        const s = statusLabel(r);
-        return <StatusDot label={s.text} tone={TONO_ESTADO[s.tone]} />;
+        const st = statusLabel(r);
+        return (
+          <Badge dot size="sm" tone={TONO_ESTADO[st.tone]}>
+            {st.text}
+          </Badge>
+        );
       },
     },
   ];
@@ -461,138 +459,142 @@ export default function ContabilidadInvoicesView({
       ? "En cuanto emitas o registres una factura, aparecerá aquí con su saldo y su fecha de vencimiento."
       : "Todas las facturas están liquidadas: no queda saldo abierto.";
 
+  const placeholderBusqueda = `Buscar ${partySearchLabel}, folio o folio fiscal…`;
+
   return (
-    <>
-      <PageHeader
-        eyebrow="Contabilidad"
-        title={pageTitle}
-        subtitle={pageSubtitle}
-        density="ops"
-        actions={
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {mode === "all" && (
-              <Link
-                href="/erp/invoicing"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  padding: "6px 12px",
-                  borderRadius: 8,
-                  background: "var(--primary)",
-                  color: "var(--ui-brand-fg, #ffffff)",
-                  textDecoration: "none",
-                }}
-              >
-                Nueva factura
-              </Link>
-            )}
-            <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
-              Actualizar
-            </Button>
-          </div>
-        }
-      />
-
-      {calendar && (calendar.overdue > 0 || calendar.today > 0 || calendar.d7 > 0) && (
-        <div style={{ marginBottom: 12 }}>
-          <FilterScale
-            ariaLabel="Qué sale de caja"
-            items={escalaCalendario}
-            active={aging}
-            onSelect={(clave) => setAging((clave || "") as "" | "vencido" | "hoy" | "d7")}
-            minCellWidth={128}
-          />
-        </div>
-      )}
-
-      <div style={{ marginBottom: 12 }}>
-        <FilterToolbar
-          search={{
-            value: q,
-            onChange: setQ,
-            placeholder: `Buscar ${partySearchLabel}, folio o folio fiscal…`,
-          }}
-          resultCount={filtered.length}
-        />
-      </div>
-
+    <MesaPagina
+      titulo={pageTitle}
+      descripcion={pageSubtitle}
+      terciarias={
+        <Button variant="ghost" onClick={() => void load()} disabled={loading}>
+          Actualizar
+        </Button>
+      }
+      primaria={
+        mode === "all" ? (
+          <ButtonLink variant="primary" href="/erp/invoicing">
+            Nueva factura
+          </ButtonLink>
+        ) : undefined
+      }
+    >
       {parcial && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            flexWrap: "wrap",
-            margin: "-4px 0 12px",
-          }}
+        <Alert
+          tone="info"
+          role="status"
+          className={s.aviso}
+          action={
+            <Button size="sm" onClick={() => setTandas((n) => n + 1)} disabled={loading}>
+              Cargar más
+            </Button>
+          }
         >
-          <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
-            Se cargaron las {parcial.cargadas} facturas más recientes de {parcial.total}. La
-            búsqueda y los filtros solo miran las cargadas.
-          </p>
-          <Button size="sm" variant="secondary" onClick={() => setTandas((n) => n + 1)} disabled={loading}>
-            Cargar más
-          </Button>
-        </div>
+          Se cargaron las {parcial.cargadas} facturas más recientes de {parcial.total}. La
+          búsqueda y los filtros solo miran las cargadas.
+        </Alert>
       )}
 
+      {/* Qué pasó, por qué, y qué hacer — junto a la tabla que quedó vacía. */}
       {error && (
-        <>
-          {/* Qué pasó, por qué, y qué hacer — junto a la tabla que quedó vacía. */}
-          <InlineAlert
-            variant="danger"
-            message={`No se pudieron cargar las facturas. Vuelve a intentarlo; si sigue igual, avisa a soporte con este dato: «${error.replace(/\s*\.?\s*$/, "")}».`}
-          />
-          <div style={{ margin: "-4px 0 12px" }}>
-            <Button size="sm" variant="secondary" onClick={() => void load()}>
+        <Alert
+          tone="danger"
+          role="alert"
+          className={s.aviso}
+          action={
+            <Button size="sm" onClick={() => void load()}>
               Reintentar
             </Button>
-          </div>
-        </>
+          }
+        >
+          {`No se pudieron cargar las facturas. Vuelve a intentarlo; si sigue igual, avisa a soporte con este dato: «${error.replace(/\s*\.?\s*$/, "")}».`}
+        </Alert>
       )}
 
-      {loading ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando…</p>
-      ) : error ? null : filtered.length === 0 ? (
-        <EmptyState
-          title={emptyTitle}
-          description={emptyDesc}
-          action={
-            hayBusqueda ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  setQ("");
-                  setAging("");
-                }}
-              >
-                Limpiar filtros
-              </Button>
-            ) : mode === "all" ? (
-              <Link href="/erp/invoicing" style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
-                Ir a facturación
-              </Link>
-            ) : undefined
-          }
-        />
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={filtered}
-          rowKey={(r) => r.id}
-          density="compact"
-          ariaLabel="Facturas de contabilidad"
-          onRowClick={(r) => setSelected(r)}
-        />
-      )}
+      <ListCard
+        className={s.tarjeta}
+        listLabel="Facturas"
+        toolbar={
+          <ModuleToolbar
+            search={
+              <SearchInput
+                aria-label={placeholderBusqueda}
+                placeholder={placeholderBusqueda}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            }
+            chips={
+              calendar && (calendar.overdue > 0 || calendar.today > 0 || calendar.d7 > 0) ? (
+                <FilterChips ariaLabel="Qué sale de caja">
+                  {escalaCalendario.map((t) => (
+                    <FilterChip
+                      key={t.key}
+                      active={aging === t.key}
+                      dot={t.dot}
+                      title={t.hint}
+                      onClick={() => setAging(aging === t.key ? "" : t.key)}
+                    >
+                      {t.label}
+                      <span className={s.tramoMonto}>
+                        <Money value={t.monto} bold={false} />
+                      </span>
+                    </FilterChip>
+                  ))}
+                </FilterChips>
+              ) : null
+            }
+            end={
+              <span role="status" className={s.conteo}>
+                {filtered.length} resultado{filtered.length === 1 ? "" : "s"}
+              </span>
+            }
+          />
+        }
+        empty={!loading && !error && filtered.length === 0}
+        emptyState={{
+          icon: hayBusqueda ? <FilterAltOffOutlinedIcon /> : <ReceiptLongOutlinedIcon />,
+          title: emptyTitle,
+          description: emptyDesc,
+          action: hayBusqueda ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                setQ("");
+                setAging("");
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          ) : mode === "all" ? (
+            <ButtonLink href="/erp/invoicing">Ir a facturación</ButtonLink>
+          ) : undefined,
+          tone: "neutral",
+        }}
+      >
+        {loading ? (
+          <div className={s.cargando}>
+            <SkeletonRows rows={5} />
+            <p className={s.cargandoTexto}>Cargando…</p>
+          </div>
+        ) : error ? null : (
+          <DataTable
+            flush
+            columns={columns}
+            rows={filtered}
+            rowKey={(r) => r.id}
+            density="compact"
+            ariaLabel="Facturas de contabilidad"
+            onRowClick={(r) => setSelected(r)}
+          />
+        )}
+      </ListCard>
 
       <Modal
         open={!!selected}
         onClose={() => setSelected(null)}
         title={selected?.invoiceNumber || "Factura"}
         footer={
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", width: "100%" }}>
+          <div className={s.pie}>
             <Button variant="ghost" onClick={() => setSelected(null)}>
               Cerrar
             </Button>
@@ -605,31 +607,26 @@ export default function ContabilidadInvoicesView({
         }
       >
         {selected && (
-          <div style={{ display: "grid", gap: 14, fontSize: 13 }}>
-            <MetricStrip
-              ariaLabel="Saldo de la factura"
-              metrics={[
-                {
-                  label: "Total",
-                  value: <Money value={Number(selected.totalAmount || 0)} />,
-                  hint: "facturado",
-                },
-                {
-                  label: "Saldo",
-                  value: <Money value={pendingOf(selected)} />,
-                  tone: pendingOf(selected) > 0.01 ? "warning" : "success",
-                  hint: pendingOf(selected) > 0.01 ? "pendiente de cobro" : "liquidada",
-                },
-              ]}
-            />
+          <div className={s.detalle}>
+            <StatRow variant="strip" cols={2} ariaLabel="Saldo de la factura">
+              <Stat
+                label="Total"
+                icon={<ReceiptLongOutlinedIcon />}
+                iconTone="neutral"
+                value={<Money value={Number(selected.totalAmount || 0)} />}
+                hint="facturado"
+              />
+              <Stat
+                label="Saldo"
+                icon={<PaymentsOutlinedIcon />}
+                iconTone="neutral"
+                value={<Money value={pendingOf(selected)} />}
+                tone={pendingOf(selected) > 0.01 ? "warning" : "success"}
+                hint={pendingOf(selected) > 0.01 ? "pendiente de cobro" : "liquidada"}
+              />
+            </StatRow>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-                gap: 12,
-              }}
-            >
+            <div className={s.datos}>
               <Dato etiqueta={partyLabel}>
                 {selected.receptorName || selected.emisorName || "—"}
               </Dato>
@@ -642,10 +639,9 @@ export default function ContabilidadInvoicesView({
                 {selected.dueDate ? new Date(selected.dueDate).toLocaleDateString("es-MX") : "—"}
               </Dato>
               <Dato etiqueta="Estado">
-                <StatusDot
-                  label={statusLabel(selected).text}
-                  tone={TONO_ESTADO[statusLabel(selected).tone]}
-                />
+                <Badge dot tone={TONO_ESTADO[statusLabel(selected).tone]}>
+                  {statusLabel(selected).text}
+                </Badge>
               </Dato>
               {/* «UUID CFDI» es como lo llama el sistema; en la factura
                   impresa ese mismo número se llama folio fiscal. */}
@@ -656,16 +652,19 @@ export default function ContabilidadInvoicesView({
               ) : null}
             </div>
 
-            <div style={{ fontSize: 12.5 }}>
+            <div>
               {selected.cfdiXml || selected.cfdiUuid ? (
-                <StatusDot label="Timbrada ante el SAT" tone="neutral" />
+                <Badge dot tone="neutral">
+                  Timbrada ante el SAT
+                </Badge>
               ) : (
-                <StatusDot
-                  label="Sin timbrar ante el SAT"
+                <Badge
+                  dot
                   tone="warning"
-                  wrap
                   title="No tiene folio fiscal ni archivo XML: no se puede deducir ni acreditar hasta que se timbre"
-                />
+                >
+                  Sin timbrar ante el SAT
+                </Badge>
               )}
             </div>
           </div>
@@ -683,7 +682,7 @@ export default function ContabilidadInvoicesView({
         title="Registrar pago"
         maxWidth={440}
         footer={
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", width: "100%" }}>
+          <div className={s.pie}>
             <Button
               variant="ghost"
               onClick={() => {
@@ -706,59 +705,44 @@ export default function ContabilidadInvoicesView({
         }
       >
         {selected && (
-          <div style={{ display: "grid", gap: 14, fontSize: 13 }}>
+          <div className={s.formPago}>
             {payErr && (
-              <InlineAlert
-                variant="danger"
-                message={payErr}
-                style={{ marginBottom: 0 }}
-                onDismiss={() => setPayErr(null)}
-              />
+              <Alert tone="danger" role="alert" className={s.aviso} onDismiss={() => setPayErr(null)}>
+                {payErr}
+              </Alert>
             )}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                justifyContent: "space-between",
-                gap: 12,
-                padding: "10px 12px",
-                borderRadius: 8,
-                background: "var(--surface-2)",
-                border: "1px solid var(--nx-panel-hairline, var(--border))",
-              }}
-            >
-              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            <div className={s.saldoPendiente}>
+              <span className={s.saldoEtiqueta}>
                 Saldo pendiente de <strong>{selected.invoiceNumber}</strong>
               </span>
               <Money value={pendingOf(selected)} />
             </div>
-            <FinanceField
+            <Field
               label="Monto"
               hint="Pesos, con IVA incluido. Se registra con la fecha de hoy y forma de pago SPEI."
               error={errorMonto}
             >
-              <input
+              <Input
                 type="number"
                 min="0"
                 step="0.01"
                 value={payAmount}
                 onChange={(e) => setPayAmount(e.target.value)}
                 placeholder={pendingOf(selected).toFixed(2)}
-                style={financeInputStyle}
               />
-            </FinanceField>
+            </Field>
           </div>
         )}
       </Modal>
-    </>
+    </MesaPagina>
   );
 }
 
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>{etiqueta}</div>
-      <div style={{ fontSize: 13, fontWeight: 600 }}>{children}</div>
+      <div className={s.datoEtiqueta}>{etiqueta}</div>
+      <div className={s.datoValor}>{children}</div>
     </div>
   );
 }

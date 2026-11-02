@@ -1,6 +1,16 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
+import GroupAddOutlinedIcon from "@mui/icons-material/GroupAddOutlined";
+import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
+import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
 import { useUrlQuery } from "@/components/finance/useUrlQuery";
 import ReceiptCapture from "@/components/finance/ReceiptCapture";
 import {
@@ -10,21 +20,38 @@ import {
   RepartoEditor,
   SelectorMultiple,
   categoriaLabel,
-  choiceLabelStyle,
   estatusLabel,
-  rowButtonStyle,
   trailActionLabel,
   type AnalyticsBucket,
   type ApprovalTrailEntry,
 } from "./_parts";
-import Button from "@/components/ui/Button";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import InlineAlert from "@/components/ui/InlineAlert";
+import {
+  Alert,
+  Badge,
+  Button,
+  DataTable,
+  DateInput,
+  Field,
+  FieldGrid,
+  FilterChip,
+  FilterChips,
+  Input,
+  LinkButton,
+  ListCard,
+  ModuleToolbar,
+  SearchInput,
+  Select,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  Textarea,
+  type Column,
+  type ModuleEmpty,
+  type Tone,
+} from "@/components/base";
+import { Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getErpViaticsAdminSectionConfig } from "@/lib/section-views";
-import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import ListExportActions from "@/components/ui/ListExportActions";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
@@ -49,12 +76,8 @@ import {
   type ParteForm,
 } from "@/lib/viatics-display";
 import Modal from "@/components/ui/Modal";
-import {
-  FinanceField,
-  FinanceFormGrid,
-  FinanceModuleShell,
-  financeInputStyle,
-} from "@/components/finance/FinanceModuleShell";
+import { FinanceModuleShell } from "@/components/finance/FinanceModuleShell";
+import s from "./viatics.module.css";
 
 interface Viatico {
   id: number;
@@ -104,37 +127,6 @@ const CATEGORIAS = ["COMBUSTIBLE", "CASETA", "HOSPEDAJE", "ALIMENTACION", "TRANS
  */
 const API_LIST_CAP = 200;
 
-/* ── Estilos locales del contrato de diseño (.ai/DISENO-FINANZAS.md) ──────── */
-
-/** Regla 4: acciones de pantalla a 32px / 13px. El único primario es «Solicitar viático». */
-const toolbarButtonStyle: CSSProperties = { height: 32, fontSize: 13 };
-/** Regla 2: el contexto secundario va en 11px gris bajo el concepto. */
-const rowMetaStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  alignItems: "center",
-  gap: 6,
-  marginTop: 2,
-  fontSize: 11,
-  color: "var(--text-tertiary)",
-  lineHeight: 1.35,
-};
-const rowMetaWarnStyle: CSSProperties = { color: "var(--state-danger-text)" };
-const statusPanelStyle: CSSProperties = {
-  padding: 24,
-  textAlign: "center",
-  fontSize: 13,
-  color: "var(--text-tertiary)",
-};
-/** La cuenta del lote, en el tamaño de una cifra que se lee sin buscarla. */
-const resumenFraseStyle: CSSProperties = {
-  margin: "0 0 8px",
-  fontSize: 14,
-  lineHeight: 1.4,
-  color: "var(--text-primary)",
-  fontVariantNumeric: "tabular-nums",
-};
-
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
@@ -160,7 +152,7 @@ function useNarrowViewport() {
  * Regla 3: neutral para el flujo normal; color solo cuando el renglón pide
  * acción (aún sin autorizar) o algo salió mal.
  */
-function estatusTone(estatus?: string): StatusTone {
+function estatusTone(estatus?: string): Tone {
   if (estatus === "Pagado") return "success";
   if (estatus === "Rechazado") return "danger";
   if (estatus === "Aprobado") return "neutral";
@@ -505,6 +497,22 @@ export default function ViaticosPage() {
 
   const hasFilters = Boolean(filter.trim() || filterEstatus);
 
+  /** La búsqueda de texto, separada para que los contadores de estatus cuenten lo mismo que la lista. */
+  const coincide = useMemo(() => {
+    const q = deferredFilter.trim().toLowerCase();
+    if (!q) return () => true;
+    return (v: Viatico) =>
+      (v.concepto ?? "").toLowerCase().includes(q) ||
+      (v.usuario?.nombre ?? "").toLowerCase().includes(q) ||
+      (actividadFolio(v.actividad) ?? "").toLowerCase().includes(q) ||
+      (v.actividad?.titulo ?? "").toLowerCase().includes(q) ||
+      (v.project?.name ?? "").toLowerCase().includes(q) ||
+      (v.categoria ?? "").toLowerCase().includes(q) ||
+      categoriaLabel(v.categoria).toLowerCase().includes(q) ||
+      estatusLabel(v.estatus).toLowerCase().includes(q) ||
+      (v.contabilidadRef ?? "").toLowerCase().includes(q);
+  }, [deferredFilter]);
+
   const filtered = useMemo(() => {
     if (tab === "analytics") return [];
     let rows = tabRows;
@@ -513,29 +521,27 @@ export default function ViaticosPage() {
       if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
     }
     if (filterEstatus) rows = rows.filter((v) => v.estatus === filterEstatus);
-    const q = deferredFilter.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter(
-      (v) =>
-        (v.concepto ?? "").toLowerCase().includes(q) ||
-        (v.usuario?.nombre ?? "").toLowerCase().includes(q) ||
-        (actividadFolio(v.actividad) ?? "").toLowerCase().includes(q) ||
-        (v.actividad?.titulo ?? "").toLowerCase().includes(q) ||
-        (v.project?.name ?? "").toLowerCase().includes(q) ||
-        (v.categoria ?? "").toLowerCase().includes(q) ||
-        categoriaLabel(v.categoria).toLowerCase().includes(q) ||
-        estatusLabel(v.estatus).toLowerCase().includes(q) ||
-        (v.contabilidadRef ?? "").toLowerCase().includes(q),
-    );
-  }, [tabRows, deferredFilter, filterEstatus, highlightId, tab]);
+    return rows.filter(coincide);
+  }, [tabRows, coincide, filterEstatus, highlightId, tab]);
+
+  /** Cuántos hay de cada estatus entre lo que dejó pasar la búsqueda, para los chips. */
+  const conteoEstatus = useMemo(() => {
+    const porTexto = tabRows.filter(coincide);
+    const conteo: Record<string, number> = { "": porTexto.length };
+    for (const v of porTexto) {
+      const clave = v.estatus ?? "";
+      conteo[clave] = (conteo[clave] ?? 0) + 1;
+    }
+    return conteo;
+  }, [tabRows, coincide]);
 
   /**
    * Regla 1: lo que la persona viene a saber — cuánto espera autorización,
    * cuánto está autorizado sin pagar, cuánto ya se liquidó y qué bloquea el
    * cierre por falta de comprobante.
    */
-  const metrics = useMemo<Metric[]>(() => {
-    const sum = (rows: Viatico[]) => rows.reduce((s, v) => s + (Number(v.montoSolicitado) || 0), 0);
+  const metrics = useMemo(() => {
+    const sum = (rows: Viatico[]) => rows.reduce((acc, v) => acc + (Number(v.montoSolicitado) || 0), 0);
     const porAutorizar = visibleItems.filter(
       (v) => v.estatus === "Pendiente" || v.estatus === "Aprobado_Coordinador",
     );
@@ -548,25 +554,31 @@ export default function ViaticosPage() {
     return [
       {
         label: "Por autorizar",
+        icon: <PendingActionsOutlinedIcon />,
         value: <Money value={sum(porAutorizar)} />,
         hint: plural(porAutorizar.length, "solicitud esperando", "solicitudes esperando"),
-        tone: porAutorizar.length > 0 ? "warning" : "default",
+        tone: porAutorizar.length > 0 ? ("warning" as const) : ("default" as const),
       },
       {
         label: "Autorizado sin pagar",
+        icon: <RequestQuoteOutlinedIcon />,
         value: <Money value={sum(autorizados)} />,
         hint: plural(autorizados.length, "solicitud lista para pago", "solicitudes listas para pago"),
+        tone: "default" as const,
       },
       {
         label: "Pagado",
+        icon: <PaymentsOutlinedIcon />,
         value: <Money value={sum(pagados)} />,
         hint: plural(pagados.length, "solicitud liquidada", "solicitudes liquidadas"),
+        tone: "default" as const,
       },
       {
         label: "Sin comprobante",
+        icon: <ReceiptLongOutlinedIcon />,
         value: sinComprobante.length,
         hint: sinComprobante.length > 0 ? "bloquean el cierre" : "todo comprobado",
-        tone: sinComprobante.length > 0 ? "danger" : "default",
+        tone: sinComprobante.length > 0 ? ("danger" as const) : ("default" as const),
       },
     ];
   }, [visibleItems]);
@@ -992,8 +1004,6 @@ export default function ViaticosPage() {
     });
   };
 
-  const inp = financeInputStyle;
-
   const exportExcel = () =>
     exportToExcel(
       filtered,
@@ -1010,6 +1020,83 @@ export default function ViaticosPage() {
       "viaticos",
       { title: "Control de viáticos" },
     );
+
+  /**
+   * Las acciones de un renglón. En escritorio son su propia columna; en móvil
+   * bajan bajo el concepto (como ya hacen el estado y la fecha), porque una
+   * columna más empujaba la tabla más allá del ancho de la pantalla.
+   */
+  const accionesDe = (v: Viatico, enCelda = false) => {
+    const nombre = `${folioViatico(v.id)} · ${v.concepto ?? "viático"}`;
+    const busy = rowBusyId === v.id;
+    return (
+      <div className={enCelda ? `${s.acciones} ${s.accionesEnCelda}` : s.acciones}>
+        {v.estatus === "Pendiente" && (cfg.canCreate || v.usuario?.id === user?.id) && (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={`Editar ${nombre}`}
+            onClick={(e) => { e.stopPropagation(); openEdit(v); }}
+          >
+            Editar
+          </Button>
+        )}
+        {cfg.canApprove && v.estatus === "Pendiente" && (
+          <>
+            <Button
+              size="sm"
+              variant="secondary"
+              aria-label={`Autorizar ${nombre}`}
+              onClick={(e) => { e.stopPropagation(); openApprove(v); }}
+            >
+              Autorizar
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={`Rechazar ${nombre}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelected(v);
+                setApproveForm({
+                  estatus: "Rechazado",
+                  comentariosAdmin: "",
+                  montoAprobado: "",
+                  montoComprobado: "",
+                });
+                setSaveErr(null);
+                setMode("approve");
+              }}
+            >
+              Rechazar
+            </Button>
+          </>
+        )}
+        {cfg.canApprove && v.estatus === "Aprobado" && (
+          <Button
+            size="sm"
+            variant="secondary"
+            aria-label={`Marcar como pagado ${nombre}`}
+            disabled={busy}
+            onClick={(e) => { e.stopPropagation(); markPagadoRow(v); }}
+          >
+            {busy ? "Pagando…" : "Marcar pagado"}
+          </Button>
+        )}
+        {cfg.canDelete && (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={`Cancelar ${nombre}`}
+            disabled={busy}
+            onClick={(e) => { e.stopPropagation(); softDelete(v); }}
+          >
+            Cancelar
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   const columns: Column<Viatico>[] = [
     {
@@ -1042,18 +1129,15 @@ export default function ViaticosPage() {
           );
         }
         return (
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)" }}>
-              {v.concepto ?? "—"}
-            </div>
-            <div style={rowMetaStyle}>
+          <div className={s.celdaConcepto}>
+            <div className={s.concepto}>{v.concepto ?? "—"}</div>
+            <div className={s.meta}>
               {/* En móvil el estado deja de ser columna y baja aquí: antes
                   empujaba la tabla más allá del ancho de la pantalla. */}
               {narrow ? (
-                <StatusDot
-                  label={estatusLabel(v.estatus)}
-                  tone={estatusTone(v.estatus)}
-                />
+                <Badge dot size="sm" tone={estatusTone(v.estatus)}>
+                  {estatusLabel(v.estatus)}
+                </Badge>
               ) : null}
               <span>{meta.join(" · ")}</span>
               {href ? (
@@ -1064,15 +1148,16 @@ export default function ViaticosPage() {
                     target="_blank"
                     rel="noreferrer"
                     aria-label={`Ver comprobante de ${folioViatico(v.id)}`}
-                    style={{ color: "var(--primary)", textDecoration: "none" }}
+                    className={s.enlace}
                   >
                     Ver comprobante
                   </a>
                 </span>
               ) : (
-                <span style={rowMetaWarnStyle}>· Sin comprobante</span>
+                <span className={s.metaAviso}>· Sin comprobante</span>
               )}
             </div>
+            {narrow ? accionesDe(v, true) : null}
           </div>
         );
       },
@@ -1083,7 +1168,7 @@ export default function ViaticosPage() {
       align: "right",
       numeric: true,
       render: (v) => <Money value={Number(v.montoSolicitado) || 0} />,
-      width: 120,
+      width: narrow ? undefined : 120,
     },
     ...(narrow
       ? []
@@ -1091,11 +1176,7 @@ export default function ViaticosPage() {
           {
             key: "fechaSolicitud",
             label: "Fecha",
-            render: (v: Viatico) => (
-              <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                {formatFecha(v.fechaSolicitud)}
-              </span>
-            ),
+            render: (v: Viatico) => <span className={s.fechaCelda}>{formatFecha(v.fechaSolicitud)}</span>,
             width: 110,
           },
         ] as Column<Viatico>[])),
@@ -1106,109 +1187,33 @@ export default function ViaticosPage() {
             key: "estatus",
             label: "Estado",
             render: (v: Viatico) => (
-              <StatusDot
-                label={estatusLabel(v.estatus)}
-                tone={estatusTone(v.estatus)}
-              />
+              <Badge dot size="sm" tone={estatusTone(v.estatus)}>
+                {estatusLabel(v.estatus)}
+              </Badge>
             ),
             width: 150,
           },
         ] as Column<Viatico>[])),
-    {
-      key: "acciones",
-      label: "",
-      align: "right",
-      render: (v) => {
-        const nombre = `${folioViatico(v.id)} · ${v.concepto ?? "viático"}`;
-        const busy = rowBusyId === v.id;
-        return (
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {v.estatus === "Pendiente" && (cfg.canCreate || v.usuario?.id === user?.id) && (
-              <Button
-                size="sm"
-                variant="ghost"
-                style={rowButtonStyle}
-                aria-label={`Editar ${nombre}`}
-                onClick={(e) => { e.stopPropagation(); openEdit(v); }}
-              >
-                Editar
-              </Button>
-            )}
-            {cfg.canApprove && v.estatus === "Pendiente" && (
-              <>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  style={rowButtonStyle}
-                  aria-label={`Autorizar ${nombre}`}
-                  onClick={(e) => { e.stopPropagation(); openApprove(v); }}
-                >
-                  Autorizar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  style={rowButtonStyle}
-                  aria-label={`Rechazar ${nombre}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelected(v);
-                    setApproveForm({
-                      estatus: "Rechazado",
-                      comentariosAdmin: "",
-                      montoAprobado: "",
-                      montoComprobado: "",
-                    });
-                    setSaveErr(null);
-                    setMode("approve");
-                  }}
-                >
-                  Rechazar
-                </Button>
-              </>
-            )}
-            {cfg.canApprove && v.estatus === "Aprobado" && (
-              <Button
-                size="sm"
-                variant="secondary"
-                style={rowButtonStyle}
-                aria-label={`Marcar como pagado ${nombre}`}
-                disabled={busy}
-                onClick={(e) => { e.stopPropagation(); markPagadoRow(v); }}
-              >
-                {busy ? "Pagando…" : "Marcar pagado"}
-              </Button>
-            )}
-            {cfg.canDelete && (
-              <Button
-                size="sm"
-                variant="ghost"
-                style={rowButtonStyle}
-                aria-label={`Cancelar ${nombre}`}
-                disabled={busy}
-                onClick={(e) => { e.stopPropagation(); softDelete(v); }}
-              >
-                Cancelar
-              </Button>
-            )}
-          </div>
-        );
-      },
-      // En móvil la columna se estrecha a lo que ocupen los botones: fijarla en
-      // 240px era lo que obligaba a hacer scroll lateral a 375px.
-      width: narrow ? undefined : 240,
-    },
+    ...(narrow
+      ? []
+      : ([
+          {
+            key: "acciones",
+            label: "",
+            align: "right",
+            render: (v: Viatico) => accionesDe(v),
+            width: 310,
+          },
+        ] as Column<Viatico>[])),
   ];
 
   const invalidFields = (Object.keys(formErrors) as (keyof FormErrors)[]).filter((k) => formErrors[k]);
   const validationSummary =
     invalidFields.length > 0 ? (
-      <div style={{ gridColumn: "1 / -1" }}>
-        <InlineAlert
-          variant="warning"
-          style={{ marginBottom: 0 }}
-          message={`Falta por capturar: ${invalidFields.map((k) => FIELD_LABELS[k]).join(", ")}. Cada campo dice abajo qué necesita.`}
-        />
+      <div className={s.completo}>
+        <Alert tone="warning" role="alert">
+          {`Falta por capturar: ${invalidFields.map((k) => FIELD_LABELS[k]).join(", ")}. Cada campo dice abajo qué necesita.`}
+        </Alert>
       </div>
     ) : null;
 
@@ -1240,16 +1245,15 @@ export default function ViaticosPage() {
    * «Solicitar» como primario, igual que antes.
    */
   const assignAction = cfg.canAssign ? (
-    <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openAssign}>
+    <Button variant="primary" iconStart={<GroupAddOutlinedIcon />} onClick={openAssign}>
       Asignar viático
     </Button>
   ) : null;
 
   const primaryAction = cfg.canCreate ? (
     <Button
-      size="sm"
       variant={cfg.canAssign ? "secondary" : "primary"}
-      style={toolbarButtonStyle}
+      iconStart={<AddRoundedIcon />}
       onClick={openCreate}
     >
       Solicitar viático
@@ -1257,23 +1261,279 @@ export default function ViaticosPage() {
   ) : null;
 
   const refreshAction = (
-    <Button
-      size="sm"
-      variant="ghost"
-      style={toolbarButtonStyle}
-      disabled={loading}
-      onClick={() => void load()}
-    >
+    <Button size="sm" variant="ghost" disabled={loading} onClick={() => void load()}>
       {loading ? "Actualizando…" : "Actualizar"}
     </Button>
   );
 
+  /* ── Avisos y cifras: bajo la cabeza, en este orden ─────────────────────── */
+
+  const hayAvisos =
+    tab === "analytics"
+      ? Boolean(analyticsError)
+      : Boolean(actionError || catalogErr || (truncated && !error) || error);
+
+  const avisos =
+    tab === "analytics" ? (
+      analyticsError ? (
+        <Alert
+          tone="danger"
+          role="alert"
+          onDismiss={() => setAnalyticsError(null)}
+          action={<LinkButton onClick={() => void loadAnalytics()}>Reintentar</LinkButton>}
+        >
+          {analyticsError}
+        </Alert>
+      ) : null
+    ) : (
+      <>
+        {actionError && (
+          <Alert
+            tone="danger"
+            role="alert"
+            onDismiss={() => setActionError(null)}
+            action={<LinkButton onClick={() => void load()}>Recargar</LinkButton>}
+          >
+            {actionError}
+          </Alert>
+        )}
+        {catalogErr && (
+          <Alert tone="warning" role="alert" onDismiss={() => setCatalogErr(null)}>
+            {`${catalogErr}. El desplegable de proyectos saldrá vacío; puedes ligar la solicitud con el ID de actividad.`}
+          </Alert>
+        )}
+        {truncated && !error && (
+          <Alert tone="warning" role="alert">
+            {`La API devuelve como máximo ${API_LIST_CAP} solicitudes por consulta y llegaron ${API_LIST_CAP}: puede haber más sin mostrar, y los totales de arriba solo cubren lo que ves. Usa Analytics con un rango de fechas para cifras del periodo completo.`}
+          </Alert>
+        )}
+        {error && (
+          <Alert
+            tone="danger"
+            role="alert"
+            action={<LinkButton onClick={() => void load()}>Reintentar</LinkButton>}
+          >
+            {error}
+          </Alert>
+        )}
+      </>
+    );
+
+  const analisisConDatos = !analyticsLoading && analytics !== null && analytics.totals.count > 0;
+
+  const cifras =
+    tab === "analytics" ? (
+      analisisConDatos && analytics ? (
+        <StatRow variant="strip" ariaLabel="Resumen del periodo">
+          <Stat
+            label="Registros"
+            value={analytics.totals.count}
+            hint="en el periodo"
+            icon={<ReceiptLongOutlinedIcon />}
+            iconTone="neutral"
+          />
+          <Stat
+            label="Por autorizar"
+            value={analytics.totals.pendientes}
+            hint={plural(analytics.totals.pendientes, "solicitud esperando", "solicitudes esperando")}
+            tone={analytics.totals.pendientes > 0 ? "warning" : "default"}
+            icon={<PendingActionsOutlinedIcon />}
+            iconTone="neutral"
+          />
+          <Stat
+            label="Solicitado"
+            value={<Money value={analytics.totals.totalSolicitado} />}
+            hint="pedido en el periodo"
+            icon={<RequestQuoteOutlinedIcon />}
+            iconTone="neutral"
+          />
+          <Stat
+            label="Autorizado"
+            value={<Money value={analytics.totals.totalAprobado} />}
+            hint="sin pagar aún"
+            icon={<CheckCircleOutlineRoundedIcon />}
+            iconTone="neutral"
+          />
+          <Stat
+            label="Pagado"
+            value={<Money value={analytics.totals.totalPagado} />}
+            hint="liquidado en el periodo"
+            icon={<PaymentsOutlinedIcon />}
+            iconTone="neutral"
+          />
+        </StatRow>
+      ) : null
+    ) : showMetrics ? (
+      <StatRow variant="strip" ariaLabel="Resumen de viáticos">
+        {metrics.map((m) => (
+          <Stat key={m.label} iconTone="neutral" {...m} />
+        ))}
+      </StatRow>
+    ) : null;
+
+  /* ── Tarjeta de lista ─────────────────────────────────────────────────────── */
+
+  const hayFechas = Boolean(dateFrom || dateTo);
+
+  const barraAnalisis = (
+    <ModuleToolbar
+      end={
+        <>
+          <Button size="sm" onClick={() => void loadAnalytics()} disabled={analyticsLoading}>
+            {analyticsLoading ? "Calculando…" : "Aplicar"}
+          </Button>
+          <ListExportActions onPdf={() => void downloadPdf()} pdfBusy={pdfBusy} />
+        </>
+      }
+    >
+      <label className={s.fecha}>
+        <span>Desde</span>
+        <DateInput
+          controlSize="sm"
+          className={s.fechaInput}
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          aria-label="Desde"
+        />
+      </label>
+      <label className={s.fecha}>
+        <span>Hasta</span>
+        <DateInput
+          controlSize="sm"
+          className={s.fechaInput}
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          aria-label="Hasta"
+        />
+      </label>
+      {hayFechas ? (
+        <LinkButton
+          onClick={() => {
+            setDateFrom("");
+            setDateTo("");
+          }}
+        >
+          Limpiar
+        </LinkButton>
+      ) : null}
+    </ModuleToolbar>
+  );
+
+  /** Regla 7 en el periodo: si no hubo ni un viático, la tira de ceros no dice nada; la frase sí. */
+  const analisisVacio: ModuleEmpty | null = analyticsLoading
+    ? { icon: <HourglassEmptyRoundedIcon />, title: "Calculando el resumen del periodo…", tone: "neutral" }
+    : !analytics && !analyticsError
+      ? {
+          icon: <InsightsOutlinedIcon />,
+          title: "Pulsa «Aplicar» para calcular el resumen. Sin fechas cubre todo el histórico.",
+          tone: "neutral",
+        }
+      : analytics && analytics.totals.count === 0
+        ? {
+            icon: <InsightsOutlinedIcon />,
+            title: "En el periodo elegido no hay ningún viático registrado.",
+            tone: "neutral",
+          }
+        : null;
+
+  const barraLista = showToolbar ? (
+    <ModuleToolbar
+      search={
+        <SearchInput
+          aria-label="Buscar por concepto, solicitante, folio o ref…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Buscar por concepto, solicitante, folio o ref…"
+        />
+      }
+      chips={
+        <FilterChips ariaLabel="Estatus">
+          <FilterChip active={filterEstatus === ""} count={conteoEstatus[""]} onClick={() => setFilterEstatus("")}>
+            Todos
+          </FilterChip>
+          {(tab === "contabilidad" ? ESTATUS_CONTABILIDAD : ESTATUS).map((e) => (
+            <FilterChip
+              key={e}
+              active={filterEstatus === e}
+              count={conteoEstatus[e] ?? 0}
+              dot={estatusTone(e)}
+              onClick={() => setFilterEstatus(filterEstatus === e ? "" : e)}
+            >
+              {estatusLabel(e)}
+            </FilterChip>
+          ))}
+        </FilterChips>
+      }
+      end={
+        <>
+          {firstLoad ? null : (
+            <span className={s.conteo} role="status">
+              {filtered.length} resultado{filtered.length === 1 ? "" : "s"}
+            </span>
+          )}
+          {refreshAction}
+          <ListExportActions
+            onExcel={exportExcel}
+            excelDisabled={filtered.length === 0}
+            onPdf={() => void downloadPdf()}
+            pdfBusy={pdfBusy}
+          />
+        </>
+      }
+    >
+      {hasFilters ? <LinkButton onClick={clearFilters}>Limpiar</LinkButton> : null}
+    </ModuleToolbar>
+  ) : undefined;
+
+  /** Sin lista que mostrar: la primera carga o un fallo sin nada previo en pantalla. */
+  const listaVisible = !firstLoad && !(error && items.length === 0);
+  const listaVacia = listaVisible && filtered.length === 0;
+
+  const vacioLista: ModuleEmpty = hasFilters
+    ? {
+        icon: <FilterAltOffOutlinedIcon />,
+        title: "Ningún viático coincide",
+        description: "Ninguna solicitud coincide con los filtros aplicados.",
+        action: <Button onClick={clearFilters}>Limpiar filtros</Button>,
+        tone: "neutral",
+      }
+    : {
+        icon: <RequestQuoteOutlinedIcon />,
+        title: tab === "contabilidad" ? "Todavía no hay viáticos autorizados" : "Todavía no hay viáticos",
+        description:
+          tab === "contabilidad"
+            ? "Un viático llega aquí cuando alguien lo autoriza. Los que siguen esperando resolución están en «Todos»."
+            : cfg.canCreate
+              ? "Un viático es el dinero de un viaje de trabajo —gasolina, casetas, hospedaje o alimentos— ligado a una actividad o a un proyecto. Pide el primero y queda aquí para autorizar."
+              : "Un viático es el dinero de un viaje de trabajo —gasolina, casetas, hospedaje o alimentos—. Los pide el equipo desde su panel y aquí llegan para que los autorices.",
+        // Sin filas la barra de filtros no se pinta, así que «Actualizar» vive aquí;
+        // pedir o asignar el primer viático está en la cabeza de la pantalla.
+        action: tab === "contabilidad" ? <Button onClick={() => setTab("todos")}>Ver todos</Button> : undefined,
+        secondaryAction: refreshAction,
+      };
+
   return (
     <FinanceModuleShell
       variant="flat"
+      eyebrow="Finanzas"
       title={cfg.title}
       subtitle={cfg.subtitle}
-      kpis={showMetrics ? <MetricStrip metrics={metrics} ariaLabel="Resumen de viáticos" /> : undefined}
+      actions={
+        primaryAction || assignAction ? (
+          <>
+            {primaryAction}
+            {assignAction}
+          </>
+        ) : undefined
+      }
+      kpis={
+        hayAvisos || cifras ? (
+          <div className={s.cabecera}>
+            {hayAvisos ? avisos : null}
+            {cifras}
+          </div>
+        ) : undefined
+      }
       tabs={[
         { id: "contabilidad", label: "Contabilidad" },
         { id: "todos", label: "Todos" },
@@ -1283,215 +1543,43 @@ export default function ViaticosPage() {
       onTabChange={(id) => setTab(id as typeof tab)}
     >
       {tab === "analytics" ? (
-        <div style={{ display: "grid", gap: 16 }}>
-          {/* Regla 8: rango, acción y exportación en una sola fila, sin caja. */}
-          <FilterToolbar
-            dates={[
-              { label: "Desde", value: dateFrom, onChange: setDateFrom },
-              { label: "Hasta", value: dateTo, onChange: setDateTo },
-            ]}
-            onClear={() => {
-              setDateFrom("");
-              setDateTo("");
-            }}
-            style={{ marginBottom: 0 }}
-            rightActions={
-              <>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  style={toolbarButtonStyle}
-                  onClick={() => void loadAnalytics()}
-                  disabled={analyticsLoading}
-                >
-                  {analyticsLoading ? "Calculando…" : "Aplicar"}
-                </Button>
-                <ListExportActions onPdf={() => void downloadPdf()} pdfBusy={pdfBusy} />
-                {primaryAction}
-                {assignAction}
-              </>
-            }
-          />
-          {analyticsError && (
-            <InlineAlert
-              message={analyticsError}
-              variant="danger"
-              style={{ marginBottom: 0 }}
-              onDismiss={() => setAnalyticsError(null)}
-              action={
-                <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void loadAnalytics()}>
-                  Reintentar
-                </Button>
-              }
-            />
-          )}
-          {analyticsLoading && (
-            <div style={statusPanelStyle} role="status" aria-live="polite">
-              Calculando el resumen del periodo…
-            </div>
-          )}
-          {!analyticsLoading && !analytics && !analyticsError && (
-            <div style={statusPanelStyle}>
-              Pulsa «Aplicar» para calcular el resumen. Sin fechas cubre todo el histórico.
-            </div>
-          )}
-          {/* Regla 7 en el periodo: si no hubo ni un viático, la tira de ceros
-              no dice nada; la frase sí. Con filas, aunque sumen cero, se
-              enseña: un periodo que cerró en cero es información. */}
-          {!analyticsLoading && analytics && analytics.totals.count === 0 && (
-            <div style={statusPanelStyle}>
-              En el periodo elegido no hay ningún viático registrado.
-            </div>
-          )}
-          {!analyticsLoading && analytics && analytics.totals.count > 0 && (
-            <>
-              <MetricStrip
-                ariaLabel="Resumen del periodo"
-                metrics={[
-                  { label: "Registros", value: analytics.totals.count, hint: "en el periodo" },
-                  {
-                    label: "Por autorizar",
-                    value: analytics.totals.pendientes,
-                    hint: plural(analytics.totals.pendientes, "solicitud esperando", "solicitudes esperando"),
-                    tone: analytics.totals.pendientes > 0 ? "warning" : "default",
-                  },
-                  { label: "Solicitado", value: <Money value={analytics.totals.totalSolicitado} />, hint: "pedido en el periodo" },
-                  { label: "Autorizado", value: <Money value={analytics.totals.totalAprobado} />, hint: "sin pagar aún" },
-                  { label: "Pagado", value: <Money value={analytics.totals.totalPagado} />, hint: "liquidado en el periodo" },
-                ]}
-              />
+        <ListCard
+          listLabel="Análisis de viáticos"
+          toolbar={barraAnalisis}
+          empty={Boolean(analisisVacio)}
+          emptyState={analisisVacio ?? undefined}
+        >
+          {analisisConDatos && analytics ? (
+            <div className={s.desgloses}>
               <BreakdownTable title="Por proyecto" rows={analytics.byProject} />
               <BreakdownTable title="Por persona" rows={analytics.byPerson} />
               <BreakdownTable title="Por categoría" rows={analytics.byCategory} />
-            </>
-          )}
-        </div>
-      ) : (
-        <>
-          {/* Regla 8: buscador, selector, exportación y la acción principal en
-              una sola fila. Sin recuadro propio: cada control ya trae su borde
-              y meterlos en una caja es dibujarlo dos veces. Exportar vive aquí
-              y solo aquí — antes estaba también en la cabecera. */}
-          {showToolbar && (
-            <FilterToolbar
-              search={{ value: filter, onChange: setFilter, placeholder: "Buscar por concepto, solicitante, folio o ref…" }}
-              selects={[{
-                label: "Estatus",
-                value: filterEstatus,
-                onChange: setFilterEstatus,
-                options: (tab === "contabilidad" ? ESTATUS_CONTABILIDAD : ESTATUS).map((s) => ({
-                  value: s,
-                  label: estatusLabel(s),
-                })),
-                allowAll: true,
-              }]}
-              onClear={clearFilters}
-              style={{ marginBottom: 0 }}
-              resultCount={firstLoad ? null : filtered.length}
-              rightActions={
-                <>
-                  {refreshAction}
-                  <ListExportActions
-                    onExcel={exportExcel}
-                    excelDisabled={filtered.length === 0}
-                    onPdf={() => void downloadPdf()}
-                    pdfBusy={pdfBusy}
-                  />
-                  {primaryAction}
-                  {assignAction}
-                </>
-              }
-            />
-          )}
-
-          {actionError && (
-            <InlineAlert
-              message={actionError}
-              variant="danger"
-              onDismiss={() => setActionError(null)}
-              action={
-                <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
-                  Recargar
-                </Button>
-              }
-            />
-          )}
-          {catalogErr && (
-            <InlineAlert
-              message={`${catalogErr}. El desplegable de proyectos saldrá vacío; puedes ligar la solicitud con el ID de actividad.`}
-              variant="warning"
-              onDismiss={() => setCatalogErr(null)}
-            />
-          )}
-          {truncated && !error && (
-            <InlineAlert
-              variant="warning"
-              message={`La API devuelve como máximo ${API_LIST_CAP} solicitudes por consulta y llegaron ${API_LIST_CAP}: puede haber más sin mostrar, y los totales de arriba solo cubren lo que ves. Usa Analytics con un rango de fechas para cifras del periodo completo.`}
-            />
-          )}
-          {error && (
-            <InlineAlert
-              message={error}
-              variant="danger"
-              action={
-                <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
-                  Reintentar
-                </Button>
-              }
-            />
-          )}
-          {firstLoad ? (
-            <div style={{ ...statusPanelStyle, padding: 32 }} role="status" aria-live="polite">
-              Cargando viáticos…
             </div>
-          ) : error && items.length === 0 ? null : (
+          ) : null}
+        </ListCard>
+      ) : (
+        <ListCard
+          listLabel="Lista de viáticos"
+          toolbar={barraLista}
+          empty={listaVacia}
+          emptyState={vacioLista}
+        >
+          {firstLoad ? (
+            <div className={s.cargando} role="status" aria-live="polite">
+              <p className={s.cargandoTexto}>Cargando viáticos…</p>
+              <SkeletonRows rows={4} label="Cargando viáticos" />
+            </div>
+          ) : listaVisible ? (
             <DataTable
+              flush
               columns={columns}
               rows={filtered}
               rowKey={(v) => v.id}
-              density="compact"
               ariaLabel="Solicitudes de viáticos"
-              emptyTitle={
-                hasFilters
-                  ? "Ningún viático coincide"
-                  : tab === "contabilidad"
-                    ? "Todavía no hay viáticos autorizados"
-                    : "Todavía no hay viáticos"
-              }
-              emptyDescription={
-                hasFilters
-                  ? "Ninguna solicitud coincide con los filtros aplicados."
-                  : tab === "contabilidad"
-                    ? "Un viático llega aquí cuando alguien lo autoriza. Los que siguen esperando resolución están en «Todos»."
-                    : cfg.canCreate
-                      ? "Un viático es el dinero de un viaje de trabajo —gasolina, casetas, hospedaje o alimentos— ligado a una actividad o a un proyecto. Pide el primero y queda aquí para autorizar."
-                      : "Un viático es el dinero de un viaje de trabajo —gasolina, casetas, hospedaje o alimentos—. Los pide el equipo desde su panel y aquí llegan para que los autorices."
-              }
-              emptyAction={
-                hasFilters ? (
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={clearFilters}>
-                    Limpiar filtros
-                  </Button>
-                ) : (
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-                    {tab === "contabilidad" ? (
-                      <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => setTab("todos")}>
-                        Ver todos
-                      </Button>
-                    ) : (
-                      primaryAction
-                    )}
-                    {/* Sin filas la barra de filtros no se pinta (regla 8), así
-                        que este es el único sitio desde donde se puede crear el
-                        primer viático: asignar tiene que estar aquí también. */}
-                    {assignAction}
-                    {refreshAction}
-                  </div>
-                )
-              }
+              loading={loading && !firstLoad}
             />
-          )}
-        </>
+          ) : null}
+        </ListCard>
       )}
 
       {/* ── Asignar viático a varias personas de una sola captura ───────────
@@ -1506,12 +1594,11 @@ export default function ViaticosPage() {
         maxWidth={640}
         footer={
           <>
-            <Button variant="ghost" style={toolbarButtonStyle} onClick={closeModal} disabled={saving}>
+            <Button variant="ghost" onClick={closeModal} disabled={saving}>
               Cancelar
             </Button>
             <Button
               variant="primary"
-              style={toolbarButtonStyle}
               onClick={() => void submitAssign()}
               disabled={saving || !resumenAsignacion.listo}
               loading={saving}
@@ -1527,18 +1614,15 @@ export default function ViaticosPage() {
           </>
         }
       >
-        <FinanceFormGrid>
+        <FieldGrid>
           {assignCatalogErr && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert
-                variant="warning"
-                style={{ marginBottom: 0 }}
-                message={`${assignCatalogErr}. Puedes seguir con lo que sí cargó.`}
-                onDismiss={() => setAssignCatalogErr(null)}
-              />
+            <div className={s.completo}>
+              <Alert tone="warning" role="alert" onDismiss={() => setAssignCatalogErr(null)}>
+                {`${assignCatalogErr}. Puedes seguir con lo que sí cargó.`}
+              </Alert>
             </div>
           )}
-          <FinanceField
+          <Field
             label="Beneficiarios"
             fullWidth
             hint={
@@ -1558,8 +1642,8 @@ export default function ViaticosPage() {
               vacio="No hay personas a las que puedas asignarles un viático."
               disabled={saving}
             />
-          </FinanceField>
-          <FinanceField
+          </Field>
+          <Field
             label="Actividades que cubre"
             fullWidth
             optional
@@ -1576,29 +1660,27 @@ export default function ViaticosPage() {
               vacio="No hay actividades a la vista para ligar el viático."
               disabled={saving}
             />
-          </FinanceField>
-          <FinanceField
+          </Field>
+          <Field
             label="Proyecto"
             hint="Hace falta al menos una actividad o un proyecto; puedes poner los dos."
           >
-            <select
+            <Select
               value={assignForm.projectId}
               onChange={(e) => setAssignForm((f) => ({ ...f, projectId: e.target.value }))}
               disabled={saving}
-              style={inp}
             >
               <option value="">— Sin proyecto —</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
-            </select>
-          </FinanceField>
-          <FinanceField label="Vehículo" optional hint="Solo si el gasto es de combustible o casetas.">
-            <select
+            </Select>
+          </Field>
+          <Field label="Vehículo" optional hint="Solo si el gasto es de combustible o casetas.">
+            <Select
               value={assignForm.vehicleId}
               onChange={(e) => setAssignForm((f) => ({ ...f, vehicleId: e.target.value }))}
               disabled={saving}
-              style={inp}
             >
               <option value="">— Sin vehículo —</option>
               {vehicles.map((v) => (
@@ -1606,25 +1688,24 @@ export default function ViaticosPage() {
                   {v.nombre}{v.placas ? ` · ${v.placas}` : ""}
                 </option>
               ))}
-            </select>
-          </FinanceField>
-          <FinanceField label="Categoría" hint="Determina en qué rubro suma el reporte.">
-            <select
+            </Select>
+          </Field>
+          <Field label="Categoría" hint="Determina en qué rubro suma el reporte.">
+            <Select
               value={assignForm.categoria}
               onChange={(e) => setAssignForm((f) => ({ ...f, categoria: e.target.value }))}
               disabled={saving}
-              style={inp}
             >
               {CATEGORIAS.map((c) => (
                 <option key={c} value={c}>{categoriaLabel(c)}</option>
               ))}
-            </select>
-          </FinanceField>
-          <FinanceField
+            </Select>
+          </Field>
+          <Field
             label="Monto por persona"
             hint="Lo que recibe CADA beneficiario, no el total del lote. Pesos, con IVA incluido."
           >
-            <input
+            <Input
               type="number"
               inputMode="decimal"
               min="0.01"
@@ -1633,31 +1714,29 @@ export default function ViaticosPage() {
               onChange={(e) => setAssignForm((f) => ({ ...f, montoPorPersona: e.target.value }))}
               placeholder="0.00"
               disabled={saving}
-              style={{ ...inp, textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+              className={s.monto}
             />
-          </FinanceField>
-          <FinanceField
+          </Field>
+          <Field
             label="Periodo que cubre"
             fullWidth
             optional
             hint="Se añade al motivo: un viático semanal sin decir de qué semana es imposible de conciliar tres meses después."
           >
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <input
-                type="date"
+            <div className={s.periodoFechas}>
+              <DateInput
                 aria-label="Desde"
                 value={assignForm.desde}
                 onChange={(e) => setAssignForm((f) => ({ ...f, desde: e.target.value }))}
                 disabled={saving}
-                style={{ ...inp, width: "auto", flex: "1 1 150px" }}
+                className={s.fechaCampo}
               />
-              <input
-                type="date"
+              <DateInput
                 aria-label="Hasta"
                 value={assignForm.hasta}
                 onChange={(e) => setAssignForm((f) => ({ ...f, hasta: e.target.value }))}
                 disabled={saving}
-                style={{ ...inp, width: "auto", flex: "1 1 150px" }}
+                className={s.fechaCampo}
               />
               {/* El atajo del caso real: la cuadrilla sale el lunes y el viático
                   cubre hasta el domingo. Teclear dos fechas para eso cada
@@ -1665,74 +1744,68 @@ export default function ViaticosPage() {
               <Button
                 size="sm"
                 variant="secondary"
-                style={rowButtonStyle}
                 disabled={saving}
                 onClick={() => setAssignForm((f) => ({ ...f, ...semanaEnCurso() }))}
               >
                 Esta semana
               </Button>
             </div>
-          </FinanceField>
-          <FinanceField
+          </Field>
+          <Field
             label="Motivo"
             fullWidth
             optional
             hint="Lo que leerá quien lo recibe y quien lo autoriza. El periodo y el número de actividades se añaden solos."
           >
-            <textarea
+            <Textarea
               value={assignForm.motivo}
               onChange={(e) => setAssignForm((f) => ({ ...f, motivo: e.target.value }))}
               rows={2}
               disabled={saving}
               placeholder="Ej. Gasolina y casetas de la ruta Puebla–Tehuacán"
-              style={{ ...inp, resize: "vertical" }}
             />
-          </FinanceField>
+          </Field>
           {/* El resumen que evita el error caro. Sin caja propia (regla 9):
               una línea sobre el pie del modal basta para separarlo. */}
-          <div style={{ gridColumn: "1 / -1", borderTop: "1px solid var(--border)", paddingTop: 12 }}>
-            <span style={choiceLabelStyle}>Lo que se va a crear</span>
-            <p style={resumenFraseStyle} role="status" aria-live="polite">
+          <div className={`${s.completo} ${s.resumen}`}>
+            <span className={s.etiqueta}>Lo que se va a crear</span>
+            <p className={s.frase} role="status" aria-live="polite">
               {plural(resumenAsignacion.personas, "persona", "personas")} ×{" "}
               {dinero(resumenAsignacion.porPersonaCent)} ={" "}
-              <strong style={{ fontWeight: 700 }}>{dinero(resumenAsignacion.totalCent)}</strong>
+              <strong>{dinero(resumenAsignacion.totalCent)}</strong>
               {resumenAsignacion.cobertura}
             </p>
-            {resumenAsignacion.listo ? (
-              <StatusDot
-                wrap
-                tone="neutral"
-                label="El lote es todo o nada: si alguien está inactivo o una actividad no es de tu empresa, no se crea ninguno y el aviso dirá cuál."
-              />
-            ) : (
-              <StatusDot
-                wrap
-                tone="warning"
-                label={`Para poder asignar: ${resumenAsignacion.faltan.join("; ")}.`}
-              />
-            )}
+            <div className={s.nota}>
+              {resumenAsignacion.listo ? (
+                <Alert dense icon={null} tone="neutral">
+                  El lote es todo o nada: si alguien está inactivo o una actividad no es de tu empresa, no se crea ninguno y el aviso dirá cuál.
+                </Alert>
+              ) : (
+                <Alert dense icon={null} tone="warning">
+                  {`Para poder asignar: ${resumenAsignacion.faltan.join("; ")}.`}
+                </Alert>
+              )}
+            </div>
           </div>
           {saveErr && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert
-                message={saveErr}
-                variant="danger"
-                style={{ marginBottom: 0 }}
+            <div className={s.completo}>
+              <Alert
+                tone="danger"
+                role="alert"
                 action={
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    style={toolbarButtonStyle}
+                  <LinkButton
                     onClick={() => void submitAssign()}
                     disabled={saving || !resumenAsignacion.listo}
                   >
                     Reintentar
-                  </Button>
+                  </LinkButton>
                 }
-              />
+              >
+                {saveErr}
+              </Alert>
             </div>
           )}
-        </FinanceFormGrid>
+        </FieldGrid>
       </Modal>
 
       <Modal
@@ -1742,17 +1815,17 @@ export default function ViaticosPage() {
         maxWidth={560}
         footer={
           <>
-            <Button variant="ghost" style={toolbarButtonStyle} onClick={closeModal} disabled={saving}>Cancelar</Button>
-            <Button variant="primary" style={toolbarButtonStyle} onClick={() => void submitCreate()} disabled={saving} loading={saving}>
+            <Button variant="ghost" onClick={closeModal} disabled={saving}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void submitCreate()} disabled={saving} loading={saving}>
               {saving ? "Enviando…" : "Enviar solicitud"}
             </Button>
           </>
         }
       >
-        <FinanceFormGrid>
+        <FieldGrid>
           {validationSummary}
-          <FinanceField label="Concepto" fullWidth hint="Qué se va a gastar y para qué viaje." error={formErrors.concepto}>
-            <input
+          <Field label="Concepto" fullWidth hint="Qué se va a gastar y para qué viaje." error={formErrors.concepto}>
+            <Input
               value={form.concepto}
               aria-invalid={Boolean(formErrors.concepto)}
               onChange={(e) => {
@@ -1760,18 +1833,17 @@ export default function ViaticosPage() {
                 setFormErrors((prev) => ({ ...prev, concepto: undefined }));
               }}
               placeholder="Ej. Hospedaje 1 noche + alimentos, Puebla"
-              style={inp}
             />
-          </FinanceField>
-          <FinanceField label="Categoría" hint="Determina en qué rubro suma el reporte.">
-            <select value={form.categoria} onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))} style={inp}>
+          </Field>
+          <Field label="Categoría" hint="Determina en qué rubro suma el reporte.">
+            <Select value={form.categoria} onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))}>
               {CATEGORIAS.map((c) => (
                 <option key={c} value={c}>{categoriaLabel(c)}</option>
               ))}
-            </select>
-          </FinanceField>
-          <FinanceField label="Monto solicitado" hint="Pesos, con IVA incluido." error={formErrors.monto}>
-            <input
+            </Select>
+          </Field>
+          <Field label="Monto solicitado" hint="Pesos, con IVA incluido." error={formErrors.monto}>
+            <Input
               type="number"
               inputMode="decimal"
               min={0}
@@ -1782,29 +1854,27 @@ export default function ViaticosPage() {
                 setForm((f) => ({ ...f, montoSolicitado: +e.target.value }));
                 setFormErrors((prev) => ({ ...prev, monto: undefined }));
               }}
-              style={inp}
             />
-          </FinanceField>
-          <FinanceField
+          </Field>
+          <Field
             label="Proyecto (ventas)"
             hint="Proyecto o actividad: hace falta uno de los dos para cargar el gasto."
             error={formErrors.enlace}
           >
-            <select
+            <Select
               value={form.projectId}
               aria-invalid={Boolean(formErrors.enlace)}
               onChange={(e) => {
                 setForm((f) => ({ ...f, projectId: e.target.value }));
                 setFormErrors((prev) => ({ ...prev, enlace: undefined }));
               }}
-              style={inp}
             >
               <option value="">— Sin proyecto —</option>
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </FinanceField>
-          <FinanceField label="ID actividad OPS" hint="El número de la actividad, si el gasto va por ahí.">
-            <input
+            </Select>
+          </Field>
+          <Field label="ID actividad OPS" hint="El número de la actividad, si el gasto va por ahí.">
+            <Input
               value={form.actividadId}
               aria-invalid={Boolean(formErrors.enlace)}
               onChange={(e) => {
@@ -1812,16 +1882,15 @@ export default function ViaticosPage() {
                 setFormErrors((prev) => ({ ...prev, enlace: undefined }));
               }}
               placeholder="Ej. 128"
-              style={inp}
             />
-          </FinanceField>
-          <FinanceField label="Vehículo" optional hint="Solo si el gasto es de combustible o casetas.">
-            <select value={form.vehicleId} onChange={(e) => setForm((f) => ({ ...f, vehicleId: e.target.value }))} style={inp}>
+          </Field>
+          <Field label="Vehículo" optional hint="Solo si el gasto es de combustible o casetas.">
+            <Select value={form.vehicleId} onChange={(e) => setForm((f) => ({ ...f, vehicleId: e.target.value }))}>
               <option value="">— Sin vehículo —</option>
               {vehicles.map((v) => <option key={v.id} value={v.id}>{v.nombre}{v.placas ? ` · ${v.placas}` : ""}</option>)}
-            </select>
-          </FinanceField>
-          <FinanceField
+            </Select>
+          </Field>
+          <Field
             label="Repartir entre actividades"
             fullWidth
             optional
@@ -1837,8 +1906,8 @@ export default function ViaticosPage() {
               total={form.montoSolicitado}
               disabled={saving}
             />
-          </FinanceField>
-          <div style={{ gridColumn: "1 / -1" }}>
+          </Field>
+          <div className={s.completo}>
             <ReceiptCapture
               file={evidenceFile}
               onFile={(f) => {
@@ -1852,37 +1921,33 @@ export default function ViaticosPage() {
               hint="PDF o imagen. Si no lo tienes a la mano, pega la liga abajo."
             />
             {formErrors.comprobante && (
-              <div role="alert" style={{ fontSize: 11, color: "var(--state-danger-text)", marginTop: 6 }}>
+              <div role="alert" className={s.errorCampo}>
                 {formErrors.comprobante}
               </div>
             )}
           </div>
-          <FinanceField label="URL del comprobante" fullWidth optional hint="Alternativa al archivo: una liga a Drive o al portal del proveedor.">
-            <input
+          <Field label="URL del comprobante" fullWidth optional hint="Alternativa al archivo: una liga a Drive o al portal del proveedor.">
+            <Input
               value={form.comprobante}
               onChange={(e) => {
                 setForm((f) => ({ ...f, comprobante: e.target.value }));
                 setFormErrors((prev) => ({ ...prev, comprobante: undefined }));
               }}
               placeholder="https://…"
-              style={inp}
             />
-          </FinanceField>
+          </Field>
           {saveErr && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert
-                message={saveErr}
-                variant="danger"
-                style={{ marginBottom: 0 }}
-                action={
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void submitCreate()} disabled={saving}>
-                    Reintentar
-                  </Button>
-                }
-              />
+            <div className={s.completo}>
+              <Alert
+                tone="danger"
+                role="alert"
+                action={<LinkButton onClick={() => void submitCreate()} disabled={saving}>Reintentar</LinkButton>}
+              >
+                {saveErr}
+              </Alert>
             </div>
           )}
-        </FinanceFormGrid>
+        </FieldGrid>
       </Modal>
 
       <Modal
@@ -1892,35 +1957,34 @@ export default function ViaticosPage() {
         maxWidth={560}
         footer={
           <>
-            <Button variant="ghost" style={toolbarButtonStyle} onClick={closeModal} disabled={saving}>Cancelar</Button>
-            <Button variant="primary" style={toolbarButtonStyle} onClick={() => void submitEdit()} disabled={saving} loading={saving}>
+            <Button variant="ghost" onClick={closeModal} disabled={saving}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void submitEdit()} disabled={saving} loading={saving}>
               {saving ? "Guardando…" : "Guardar cambios"}
             </Button>
           </>
         }
       >
-        <FinanceFormGrid>
+        <FieldGrid>
           {validationSummary}
-          <FinanceField label="Concepto" fullWidth hint="Qué se va a gastar y para qué viaje." error={formErrors.concepto}>
-            <input
+          <Field label="Concepto" fullWidth hint="Qué se va a gastar y para qué viaje." error={formErrors.concepto}>
+            <Input
               value={form.concepto}
               aria-invalid={Boolean(formErrors.concepto)}
               onChange={(e) => {
                 setForm((f) => ({ ...f, concepto: e.target.value }));
                 setFormErrors((prev) => ({ ...prev, concepto: undefined }));
               }}
-              style={inp}
             />
-          </FinanceField>
-          <FinanceField label="Categoría" hint="Determina en qué rubro suma el reporte.">
-            <select value={form.categoria} onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))} style={inp}>
+          </Field>
+          <Field label="Categoría" hint="Determina en qué rubro suma el reporte.">
+            <Select value={form.categoria} onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))}>
               {CATEGORIAS.map((c) => (
                 <option key={c} value={c}>{categoriaLabel(c)}</option>
               ))}
-            </select>
-          </FinanceField>
-          <FinanceField label="Monto solicitado" hint="Pesos, con IVA incluido." error={formErrors.monto}>
-            <input
+            </Select>
+          </Field>
+          <Field label="Monto solicitado" hint="Pesos, con IVA incluido." error={formErrors.monto}>
+            <Input
               type="number"
               inputMode="decimal"
               min={0}
@@ -1931,45 +1995,42 @@ export default function ViaticosPage() {
                 setForm((f) => ({ ...f, montoSolicitado: +e.target.value }));
                 setFormErrors((prev) => ({ ...prev, monto: undefined }));
               }}
-              style={inp}
             />
-          </FinanceField>
-          <FinanceField
+          </Field>
+          <Field
             label="Proyecto (ventas)"
             hint="Proyecto o actividad: hace falta uno de los dos para cargar el gasto."
             error={formErrors.enlace}
           >
-            <select
+            <Select
               value={form.projectId}
               aria-invalid={Boolean(formErrors.enlace)}
               onChange={(e) => {
                 setForm((f) => ({ ...f, projectId: e.target.value }));
                 setFormErrors((prev) => ({ ...prev, enlace: undefined }));
               }}
-              style={inp}
             >
               <option value="">— Sin proyecto —</option>
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </FinanceField>
-          <FinanceField label="ID actividad OPS" hint="El número de la actividad, si el gasto va por ahí.">
-            <input
+            </Select>
+          </Field>
+          <Field label="ID actividad OPS" hint="El número de la actividad, si el gasto va por ahí.">
+            <Input
               value={form.actividadId}
               aria-invalid={Boolean(formErrors.enlace)}
               onChange={(e) => {
                 setForm((f) => ({ ...f, actividadId: e.target.value }));
                 setFormErrors((prev) => ({ ...prev, enlace: undefined }));
               }}
-              style={inp}
             />
-          </FinanceField>
-          <FinanceField label="Vehículo" optional hint="Solo si el gasto es de combustible o casetas.">
-            <select value={form.vehicleId} onChange={(e) => setForm((f) => ({ ...f, vehicleId: e.target.value }))} style={inp}>
+          </Field>
+          <Field label="Vehículo" optional hint="Solo si el gasto es de combustible o casetas.">
+            <Select value={form.vehicleId} onChange={(e) => setForm((f) => ({ ...f, vehicleId: e.target.value }))}>
               <option value="">— Sin vehículo —</option>
               {vehicles.map((v) => <option key={v.id} value={v.id}>{v.nombre}{v.placas ? ` · ${v.placas}` : ""}</option>)}
-            </select>
-          </FinanceField>
-          <FinanceField
+            </Select>
+          </Field>
+          <Field
             label="Repartir entre actividades"
             fullWidth
             optional
@@ -1985,8 +2046,8 @@ export default function ViaticosPage() {
               total={form.montoSolicitado}
               disabled={saving}
             />
-          </FinanceField>
-          <div style={{ gridColumn: "1 / -1" }}>
+          </Field>
+          <div className={s.completo}>
             <ReceiptCapture
               file={evidenceFile}
               onFile={setEvidenceFile}
@@ -1996,29 +2057,26 @@ export default function ViaticosPage() {
               hint="Opcional · reemplaza el archivo actual (PDF o imagen)"
             />
           </div>
-          <FinanceField label="URL del comprobante" fullWidth optional hint="Alternativa al archivo: una liga a Drive o al portal del proveedor.">
-            <input value={form.comprobante} onChange={(e) => setForm((f) => ({ ...f, comprobante: e.target.value }))} style={inp} />
-          </FinanceField>
+          <Field label="URL del comprobante" fullWidth optional hint="Alternativa al archivo: una liga a Drive o al portal del proveedor.">
+            <Input value={form.comprobante} onChange={(e) => setForm((f) => ({ ...f, comprobante: e.target.value }))} />
+          </Field>
           {selected?.contabilidadRef && (
-            <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "var(--text-tertiary)" }}>
+            <div className={s.folioContable}>
               Folio contable: {selected.contabilidadRef}
             </div>
           )}
           {saveErr && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert
-                message={saveErr}
-                variant="danger"
-                style={{ marginBottom: 0 }}
-                action={
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void submitEdit()} disabled={saving}>
-                    Reintentar
-                  </Button>
-                }
-              />
+            <div className={s.completo}>
+              <Alert
+                tone="danger"
+                role="alert"
+                action={<LinkButton onClick={() => void submitEdit()} disabled={saving}>Reintentar</LinkButton>}
+              >
+                {saveErr}
+              </Alert>
             </div>
           )}
-        </FinanceFormGrid>
+        </FieldGrid>
       </Modal>
 
       <Modal
@@ -2028,15 +2086,14 @@ export default function ViaticosPage() {
         maxWidth={500}
         footer={
           <>
-            <Button variant="ghost" style={toolbarButtonStyle} onClick={closeModal} disabled={saving}>Cancelar</Button>
+            <Button variant="ghost" onClick={closeModal} disabled={saving}>Cancelar</Button>
             {approveForm.estatus === "Rechazado" ? (
-              <Button variant="danger" style={toolbarButtonStyle} onClick={() => void runApprove("reject")} disabled={saving} loading={saving}>
+              <Button variant="danger" onClick={() => void runApprove("reject")} disabled={saving} loading={saving}>
                 {saving ? "Guardando…" : "Confirmar rechazo"}
               </Button>
             ) : (
               <Button
                 variant="primary"
-                style={toolbarButtonStyle}
                 onClick={() => void runApprove(approveForm.estatus === "Pagado" ? "pagado" : "approve")}
                 disabled={saving}
                 loading={saving}
@@ -2049,20 +2106,10 @@ export default function ViaticosPage() {
       >
         {selected && (
           <>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                justifyContent: "space-between",
-                gap: 12,
-                paddingBottom: 12,
-                marginBottom: 12,
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{selected.concepto}</div>
-                <div style={rowMetaStyle}>
+            <div className={s.revisionCabeza}>
+              <div className={s.revisionTexto}>
+                <div className={s.concepto}>{selected.concepto}</div>
+                <div className={s.meta}>
                   <span>
                     {[
                       folioViatico(selected.id),
@@ -2078,25 +2125,22 @@ export default function ViaticosPage() {
                   </span>
                 </div>
               </div>
-              <span style={{ fontSize: 17, fontVariantNumeric: "tabular-nums" }}>
+              <span className={s.revisionImporte}>
                 <Money value={Number(selected.montoSolicitado) || 0} />
               </span>
             </div>
-            <FinanceFormGrid>
+            <FieldGrid>
               {(selected.repartos?.length ?? 0) > 0 && (
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <span style={choiceLabelStyle}>Repartido entre actividades</span>
-                  <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 4 }}>
+                <div className={s.completo}>
+                  <span className={s.etiqueta}>Repartido entre actividades</span>
+                  <ul className={s.repartos}>
                     {selected.repartos!.map((parte) => (
-                      <li
-                        key={parte.id}
-                        style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}
-                      >
-                        <span style={{ color: "var(--text-secondary)" }}>
+                      <li key={parte.id} className={s.reparto}>
+                        <span className={s.repartoActividad}>
                           {parte.actividad?.anNumber ?? `Act-${parte.actividadId}`}
                           {parte.actividad?.titulo ? ` · ${parte.actividad.titulo}` : ""}
                         </span>
-                        <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                        <span className={s.repartoMonto}>
                           <Money value={Number(parte.monto)} />
                         </span>
                       </li>
@@ -2104,15 +2148,15 @@ export default function ViaticosPage() {
                   </ul>
                 </div>
               )}
-              <div style={{ gridColumn: "1 / -1" }}>
+              <div className={s.completo}>
                 <LiquidacionResumen liquidacion={selected.liquidacion} />
               </div>
-              <div style={{ gridColumn: "1 / -1" }}>
+              <div className={s.completo}>
                 <ApprovalTrail trail={selectedTrail} step={selected.approvalStep} />
               </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <span style={choiceLabelStyle} id="resolucion-viatico">Resolución</span>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }} role="group" aria-labelledby="resolucion-viatico">
+              <div className={s.completo}>
+                <span className={s.etiqueta} id="resolucion-viatico">Resolución</span>
+                <div className={s.opciones} role="group" aria-labelledby="resolucion-viatico">
                   {(
                     [
                       ["Aprobado", "Aprobar"],
@@ -2128,13 +2172,7 @@ export default function ViaticosPage() {
                         variant={active ? "secondary" : "ghost"}
                         aria-pressed={active}
                         disabled={saving}
-                        style={{
-                          ...rowButtonStyle,
-                          height: 32,
-                          fontSize: 12.5,
-                          borderColor: active ? "var(--primary)" : undefined,
-                          color: active ? "var(--primary)" : undefined,
-                        }}
+                        className={active ? s.opcionActiva : undefined}
                         onClick={() => setApproveForm((f) => ({ ...f, estatus: value }))}
                       >
                         {active ? `✓ ${label}` : label}
@@ -2144,12 +2182,12 @@ export default function ViaticosPage() {
                 </div>
               </div>
               {approveForm.estatus === "Aprobado" && (
-                <FinanceField
+                <Field
                   label="Monto autorizado"
                   optional
                   hint={`Vacío autoriza los ${dinero(centavos(Number(selected.montoSolicitado) || 0))} solicitados. Puedes recortar, no subir.`}
                 >
-                  <input
+                  <Input
                     type="number"
                     inputMode="decimal"
                     min={0}
@@ -2157,18 +2195,18 @@ export default function ViaticosPage() {
                     value={approveForm.montoAprobado}
                     onChange={(e) => setApproveForm((f) => ({ ...f, montoAprobado: e.target.value }))}
                     placeholder={(Number(selected.montoSolicitado) || 0).toFixed(2)}
-                    style={{ ...inp, textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+                    className={s.monto}
                   />
-                </FinanceField>
+                </Field>
               )}
               {["Aprobado", "Pagado"].includes(selected.estatus ?? "") && (
-                <FinanceField
+                <Field
                   label="Comprobado con tickets"
                   optional
                   hint="Lo que de verdad se gastó del anticipo. La diferencia queda como saldo a favor o en contra."
                 >
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <input
+                  <div className={s.comprobar}>
+                    <Input
                       type="number"
                       inputMode="decimal"
                       min={0}
@@ -2176,39 +2214,37 @@ export default function ViaticosPage() {
                       value={approveForm.montoComprobado}
                       onChange={(e) => setApproveForm((f) => ({ ...f, montoComprobado: e.target.value }))}
                       placeholder="0.00"
-                      style={{ ...inp, textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+                      className={`${s.monto} ${s.comprobarCampo}`}
                     />
                     <Button
                       size="sm"
                       variant="secondary"
-                      style={{ ...rowButtonStyle, height: 32, whiteSpace: "nowrap" }}
                       disabled={saving || !approveForm.montoComprobado.trim()}
                       onClick={() => void runComprobar()}
                     >
                       Registrar
                     </Button>
                   </div>
-                </FinanceField>
+                </Field>
               )}
-              <FinanceField
+              <Field
                 label="Comentarios"
                 fullWidth
                 optional
                 hint="Motivo del rechazo, referencia del pago o nota para contabilidad. Queda en la cadena de autorización."
               >
-                <textarea
+                <Textarea
                   value={approveForm.comentariosAdmin}
                   onChange={(e) => setApproveForm((f) => ({ ...f, comentariosAdmin: e.target.value }))}
                   rows={3}
-                  style={{ ...inp, resize: "vertical" }}
                 />
-              </FinanceField>
+              </Field>
               {saveErr && (
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <InlineAlert message={saveErr} variant="danger" style={{ marginBottom: 0 }} />
+                <div className={s.completo}>
+                  <Alert tone="danger" role="alert">{saveErr}</Alert>
                 </div>
               )}
-            </FinanceFormGrid>
+            </FieldGrid>
           </>
         )}
       </Modal>

@@ -270,7 +270,7 @@ export default function PorFacturarPage() {
   return (
     <div className={m.page}>
       <MesaEncabezado eyebrow="Finanzas · Mesa contable" titulo="Por facturar" acciones={accionesHead} />
-      <ContabilidadSidebar enPagina />
+      <ContabilidadSidebar />
 
       {avisoT ? (
         <Aviso tono={avisoT.tono} titulo={avisoT.titulo}>
@@ -408,11 +408,11 @@ export default function PorFacturarPage() {
             }
           />
         ) : items.length > 0 ? (
-          <table className={m.table} style={{ minWidth: 1100 }}>
+          <table className={cx(m.table, m.minW1100)}>
             <caption className={m.srOnly}>Pendientes de facturar, de lo más antiguo a lo más reciente</caption>
             <thead>
               <tr>
-                <th scope="col" style={{ width: 28 }}>
+                <th scope="col" className={m.thCheck}>
                   <input
                     ref={todos}
                     type="checkbox"

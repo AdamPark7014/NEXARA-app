@@ -1,26 +1,50 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
-import Link from "next/link";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { SkeletonTable } from "@/components/ui/Skeleton";
-import Button from "@/components/ui/Button";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
+import Link from "next/link";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  Card,
+  CardHead,
+  DataTable,
+  DateInput,
+  EmptyState,
+  Field,
+  FieldGrid,
+  FilterChip,
+  FilterChips,
+  Input,
+  LinkButton,
+  ListCard,
+  ModuleToolbar,
+  SearchInput,
+  Select,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  type Column,
+  type Tone,
+} from "@/components/base";
+import { Money } from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import FileDropzone from "@/components/ui/FileDropzone";
-import InlineAlert from "@/components/ui/InlineAlert";
-import ListExportActions from "@/components/ui/ListExportActions";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
-import FilterToolbar from "@/components/FilterToolbar";
 import SugerenciaNomina from "@/components/finance/SugerenciaNomina";
-import {
-  FinanceField,
-  FinanceFormGrid,
-  FinanceModuleShell,
-  financeInputStyle,
-} from "@/components/finance/FinanceModuleShell";
+import { FinanceModuleShell } from "@/components/finance/FinanceModuleShell";
 import { useUser } from "@/components/UserContext";
 import { useHiddenModuleIds } from "@/lib/use-hidden-modules";
 import { toast } from "@/components/Toast";
@@ -44,12 +68,13 @@ import {
   draftGateConfirmCopy,
   needsDraftApprovalConfirm,
 } from "@/lib/prenomina-draft-gate";
+import s from "./employee-payments.module.css";
 
 /** El control semanal es pesado (dos tablas anchas, menús, panel lateral): se carga al abrir su pestaña. */
 const ControlNominaSemanal = dynamic(() => import("@/components/finance/ControlNominaSemanal"), {
   ssr: false,
   loading: () => (
-    <div role="status" aria-live="polite" style={{ padding: 24, textAlign: "center", fontSize: 13, color: "var(--text-tertiary)" }}>
+    <div role="status" aria-live="polite" className={s.cargandoControl}>
       Cargando el control semanal…
     </div>
   ),
@@ -96,52 +121,6 @@ const emptyForm = {
   status: "Borrador" as PaymentStatus,
 };
 
-/* ── Estilos locales del contrato de diseño (.ai/DISENO-FINANZAS.md) ──────── */
-
-/** Regla 4: acciones de pantalla a 32px / 13px. El único primario es «Registrar pago». */
-const toolbarButtonStyle: CSSProperties = { height: 32, fontSize: 13 };
-/** Regla 2: las acciones de fila no deben engordar el renglón. */
-const rowButtonStyle: CSSProperties = { height: 28, fontSize: 12, padding: "0 9px" };
-/** Regla 2: el contexto secundario va en 11px gris bajo el nombre. */
-const rowMetaStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  alignItems: "center",
-  gap: 6,
-  marginTop: 2,
-  fontSize: 11,
-  color: "var(--text-tertiary)",
-  lineHeight: 1.35,
-};
-const rowMetaWarnStyle: CSSProperties = { color: "var(--state-danger-text)" };
-const breakdownPanelStyle: CSSProperties = {
-  padding: 14,
-  border: "1px solid var(--nx-panel-hairline, var(--border))",
-  borderRadius: 10,
-  background: "var(--surface-2, var(--surface))",
-};
-const breakdownTitleStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  marginBottom: 10,
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-  color: "var(--text-tertiary)",
-};
-const statusPanelStyle: CSSProperties = {
-  padding: 24,
-  textAlign: "center",
-  fontSize: 13,
-  color: "var(--text-tertiary)",
-};
-const srOnlyStyle: CSSProperties = {
-  position: "absolute",
-  width: 1,
-  height: 1,
-  overflow: "hidden",
-  clip: "rect(0 0 0 0)",
-};
-
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
@@ -168,7 +147,7 @@ function useNarrowViewport() {
  * Regla 3: neutral para el flujo normal; color solo cuando el renglón pide
  * acción (un borrador esperando aprobación) o algo salió mal.
  */
-function statusTone(status?: string): StatusTone {
+function statusTone(status?: string): Tone {
   if (status === "Pagado") return "success";
   if (status === "Anulado") return "danger";
   if (status === "Borrador") return "warning";
@@ -253,63 +232,42 @@ function BreakdownTable({
   limit?: number;
 }) {
   const shown = rows.slice(0, limit);
-  const cellBorder = (i: number) =>
-    i === shown.length - 1 ? "none" : "1px solid color-mix(in srgb, var(--border) 55%, transparent)";
+  const columnas: Column<FinanceAnalyticsBucket>[] = [
+    { key: "name", label: "Empleado", render: (r) => r.name },
+    {
+      key: "count",
+      label: "Registros",
+      align: "right",
+      numeric: true,
+      width: 110,
+      render: (r) => <span className={s.tenue}>{r.count}</span>,
+    },
+    { key: "total", label: "Total", align: "right", numeric: true, width: 150, render: (r) => <Money value={r.total} /> },
+  ];
   return (
-    <div style={breakdownPanelStyle}>
-      <div style={breakdownTitleStyle}>{title}</div>
+    <Card className={s.tarjeta}>
+      <CardHead title={title} />
       {shown.length === 0 ? (
-        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Sin datos en el periodo.</div>
+        <p className={s.sinDatos}>Sin datos en el periodo.</p>
       ) : (
         <>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-            <caption style={srOnlyStyle}>{title}</caption>
-            <thead>
-              <tr>
-                <th scope="col" style={{ textAlign: "left", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
-                  Empleado
-                </th>
-                <th scope="col" style={{ textAlign: "right", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
-                  Registros
-                </th>
-                <th scope="col" style={{ textAlign: "right", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((r, i) => (
-                <tr key={r.name}>
-                  <th scope="row" style={{ textAlign: "left", fontWeight: 400, padding: "6px 8px 6px 0", borderBottom: cellBorder(i) }}>
-                    {r.name}
-                  </th>
-                  <td
-                    style={{
-                      textAlign: "right",
-                      fontSize: 11,
-                      color: "var(--text-tertiary)",
-                      fontVariantNumeric: "tabular-nums",
-                      padding: "6px 12px",
-                      borderBottom: cellBorder(i),
-                    }}
-                  >
-                    {r.count}
-                  </td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", padding: "6px 0", borderBottom: cellBorder(i) }}>
-                    <Money value={r.total} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            flush
+            stickyHeader={false}
+            density="compact"
+            ariaLabel={title}
+            columns={columnas}
+            rows={shown}
+            rowKey={(r) => r.name}
+          />
           {rows.length > limit && (
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>
+            <p className={s.notaPie}>
               Se muestran los {limit} primeros de {rows.length}. El PDF trae el desglose completo.
-            </div>
+            </p>
           )}
         </>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -321,14 +279,12 @@ export default function EmployeePaymentsPage() {
   const { hidden, listo } = useHiddenModuleIds();
   if (listo && hidden.has("employee-payments")) {
     return (
-      <div style={{ padding: 24, maxWidth: 640 }}>
-        <InlineAlert
-          variant="warning"
-          title="La nómina está reservada a la dirección"
-          message="En esta empresa solo la dirección general consulta y captura estos pagos. Si necesitas verlos, pídele acceso."
-        />
-        <div style={{ marginTop: 16 }}>
-          <Link href="/erp">Volver al inicio</Link>
+      <div className={s.reservada}>
+        <Alert tone="warning" role="alert" title="La nómina está reservada a la dirección">
+          En esta empresa solo la dirección general consulta y captura estos pagos. Si necesitas verlos, pídele acceso.
+        </Alert>
+        <div className={s.volver}>
+          <ButtonLink href="/erp">Volver al inicio</ButtonLink>
         </div>
       </div>
     );
@@ -453,7 +409,8 @@ function EmployeePaymentsContent() {
    */
   const hasFilters = Boolean(searchQ.trim() || filterUser || filterStatus);
 
-  const visibleItems = useMemo(() => {
+  /** Búsqueda y empleado; el estado se aplica después para poder contar cada estado en los chips. */
+  const porTexto = useMemo(() => {
     let result = items;
     if (deferredQ.trim()) {
       const q = deferredQ.trim().toLowerCase();
@@ -466,50 +423,40 @@ function EmployeePaymentsContent() {
       );
     }
     if (filterUser) result = result.filter((p) => String(p.userId) === filterUser);
-    if (filterStatus) result = result.filter((p) => p.status === filterStatus);
     return result;
-  }, [items, deferredQ, filterUser, filterStatus]);
+  }, [items, deferredQ, filterUser]);
+
+  const visibleItems = useMemo(() => {
+    if (!filterStatus) return porTexto;
+    return porTexto.filter((p) => p.status === filterStatus);
+  }, [porTexto, filterStatus]);
+
+  const conteoEstado = useMemo(() => {
+    const cuenta: Record<string, number> = {};
+    for (const p of porTexto) cuenta[p.status ?? ""] = (cuenta[p.status ?? ""] ?? 0) + 1;
+    return cuenta;
+  }, [porTexto]);
 
   /**
    * Regla 1: lo que la persona viene a saber — qué falta por aprobar, cuánto se
    * pagó, a cuánta gente, y qué registros quedan sin comprobante para el cierre.
    */
-  const metrics = useMemo<Metric[]>(() => {
-    const sum = (rows: Payment[]) => rows.reduce((s, p) => s + p.amount, 0);
+  const resumen = useMemo(() => {
+    const sum = (rows: Payment[]) => rows.reduce((acc, p) => acc + p.amount, 0);
     const borradores = visibleItems.filter((p) => p.status === "Borrador");
     const pagados = visibleItems.filter((p) => p.status === "Pagado");
     const empleados = new Set(visibleItems.map((p) => p.userId)).size;
     const sinComprobante = visibleItems.filter(
       (p) => (p.evidenceUrls?.length ?? 0) === 0 && p.status !== "Anulado",
     );
-
-    return [
-      {
-        label: "Por aprobar",
-        value: <Money value={sum(borradores)} />,
-        hint: plural(borradores.length, "borrador esperando", "borradores esperando"),
-        tone: borradores.length > 0 ? "warning" : "default",
-        onClick: () => setFilterStatus((prev) => (prev === "Borrador" ? "" : "Borrador")),
-      },
-      {
-        label: "Pagado",
-        value: <Money value={sum(pagados)} />,
-        hint: plural(pagados.length, "pago liquidado", "pagos liquidados"),
-        onClick: () => setFilterStatus((prev) => (prev === "Pagado" ? "" : "Pagado")),
-      },
-      {
-        label: "Empleados",
-        value: empleados,
-        hint: "con registros en la vista",
-      },
-      {
-        label: "Sin comprobante",
-        value: sinComprobante.length,
-        hint: sinComprobante.length > 0 ? "bloquean el cierre" : "todo comprobado",
-        tone: sinComprobante.length > 0 ? "danger" : "default",
-      },
-    ];
+    return {
+      borradores: { n: borradores.length, total: sum(borradores) },
+      pagados: { n: pagados.length, total: sum(pagados) },
+      empleados,
+      sinComprobante: sinComprobante.length,
+    };
   }, [visibleItems]);
+  const toggleEstado = (estado: string) => setFilterStatus((prev) => (prev === estado ? "" : estado));
 
   const openNew = () => {
     setEditing(null);
@@ -769,17 +716,18 @@ function EmployeePaymentsContent() {
         if (p.createdBy?.nombre) meta.push(`Capturó ${p.createdBy.nombre}`);
         if (p.note) meta.push(p.note);
         return (
-          <div style={{ minWidth: 0 }}>
-            <Link
-              href={`/erp/hr/${p.userId}`}
-              style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)", textDecoration: "none" }}
-            >
+          <div className={s.celdaEmpleado}>
+            <Link href={`/erp/hr/${p.userId}`} className={s.nombre}>
               {nombre}
             </Link>
-            <div style={rowMetaStyle}>
+            <div className={s.meta}>
               {/* En móvil el estado deja de ser columna y baja aquí: antes
                   empujaba la tabla más allá del ancho de la pantalla. */}
-              {narrow ? <StatusDot label={p.status ?? "—"} tone={statusTone(p.status)} /> : null}
+              {narrow ? (
+                <Badge dot size="sm" tone={statusTone(p.status)}>
+                  {p.status ?? "—"}
+                </Badge>
+              ) : null}
               {meta.length > 0 ? <span>{meta.join(" · ")}</span> : null}
               {urls.length > 0 ? (
                 <>
@@ -793,7 +741,7 @@ function EmployeePaymentsContent() {
                           target="_blank"
                           rel="noreferrer"
                           aria-label={`Ver comprobante ${i + 1} del pago a ${nombre}`}
-                          style={{ color: "var(--primary)", textDecoration: "none" }}
+                          className={s.enlace}
                         >
                           Comprobante {i + 1}
                         </a>
@@ -803,9 +751,11 @@ function EmployeePaymentsContent() {
                   {urls.length > 3 ? <span>· +{urls.length - 3} más</span> : null}
                 </>
               ) : (
-                <span style={rowMetaWarnStyle}>· Sin comprobante</span>
+                <span className={s.sinComprobante}>· Sin comprobante</span>
               )}
             </div>
+            {/* En el teléfono las acciones bajan bajo el nombre: una columna más obligaba a deslizar la tabla. */}
+            {narrow ? <div className={s.accionesMovil}>{filaAcciones(p)}</div> : null}
           </div>
         );
       },
@@ -817,7 +767,7 @@ function EmployeePaymentsContent() {
             key: "periodFrom",
             label: "Periodo",
             render: (p: Payment) => (
-              <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+              <span className={s.periodoCelda}>
                 {formatDay(p.periodFrom)} – {formatDay(p.periodTo)}
               </span>
             ),
@@ -838,63 +788,58 @@ function EmployeePaymentsContent() {
           {
             key: "status",
             label: "Estado",
-            render: (p: Payment) => <StatusDot label={p.status ?? "—"} tone={statusTone(p.status)} />,
+            render: (p: Payment) => (
+              <Badge dot size="sm" tone={statusTone(p.status)}>
+                {p.status ?? "—"}
+              </Badge>
+            ),
             width: 110,
           },
         ] as Column<Payment>[])),
-    {
-      key: "id",
-      label: "",
-      align: "right",
-      render: (p) => {
-        const nombre = p.user?.nombre ?? `empleado #${p.userId}`;
-        const busy = rowBusyId === p.id;
-        return (
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {cfg.canEdit && p.status !== "Anulado" && (
-              <Button
-                size="sm"
-                variant="ghost"
-                style={rowButtonStyle}
-                aria-label={`Editar el pago a ${nombre}`}
-                disabled={busy}
-                onClick={() => openEdit(p)}
-              >
-                Editar
-              </Button>
-            )}
-            {cfg.canEdit && p.status === "Borrador" && (
-              <Button
-                size="sm"
-                variant="secondary"
-                style={rowButtonStyle}
-                aria-label={`Aprobar el borrador de ${nombre}`}
-                disabled={busy}
-                onClick={() => runMarkPagado(p)}
-              >
-                {busy ? "Pagando…" : "Aprobar borrador"}
-              </Button>
-            )}
-            {cfg.canDelete && p.status !== "Anulado" && (
-              <Button
-                size="sm"
-                variant="ghost"
-                style={rowButtonStyle}
-                aria-label={`Anular el pago a ${nombre}`}
-                disabled={busy}
-                onClick={() => remove(p)}
-              >
-                Anular
-              </Button>
-            )}
-          </div>
-        );
-      },
-      // En móvil la columna se estrecha a lo que ocupen los botones: fijarla en
-      // 220px era lo que obligaba a hacer scroll lateral a 375px.
-      width: narrow ? undefined : 220,
-    },
   ];
+
+  /** Acciones del renglón, todas en una sola línea (columna de acciones de `DataTable`). */
+  const filaAcciones = (p: Payment) => {
+    const nombre = p.user?.nombre ?? `empleado #${p.userId}`;
+    const busy = rowBusyId === p.id;
+    return (
+      <>
+        {cfg.canEdit && p.status !== "Anulado" && (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={`Editar el pago a ${nombre}`}
+            disabled={busy}
+            onClick={() => openEdit(p)}
+          >
+            Editar
+          </Button>
+        )}
+        {cfg.canEdit && p.status === "Borrador" && (
+          <Button
+            size="sm"
+            variant="secondary"
+            aria-label={`Aprobar el borrador de ${nombre}`}
+            disabled={busy}
+            onClick={() => runMarkPagado(p)}
+          >
+            {busy ? "Pagando…" : "Aprobar borrador"}
+          </Button>
+        )}
+        {cfg.canDelete && p.status !== "Anulado" && (
+          <Button
+            size="sm"
+            variant="danger-ghost"
+            aria-label={`Anular el pago a ${nombre}`}
+            disabled={busy}
+            onClick={() => remove(p)}
+          >
+            Anular
+          </Button>
+        )}
+      </>
+    );
+  };
 
   const invalidFields = (Object.keys(formErrors) as (keyof FormErrors)[]).filter((k) => formErrors[k]);
 
@@ -909,6 +854,8 @@ function EmployeePaymentsContent() {
   const showToolbar = items.length > 0 || hasFilters;
   /** La primera carga sí tapa la pantalla; un refresco posterior, no. */
   const firstLoad = loading && items.length === 0;
+  /** Sin pagos, sin filtros y sin error: el vacío lleva el botón principal y la cabeza no lo repite. */
+  const sinRegistros = !loading && items.length === 0 && !hasFilters;
 
   const clearFilters = () => {
     setSearchQ("");
@@ -916,34 +863,54 @@ function EmployeePaymentsContent() {
     setFilterStatus("");
   };
 
-  /** Regla 4: un solo primario por pantalla, y es la acción a la que se vino. */
-  const primaryAction = cfg.canCreate ? (
-    <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openNew}>
-      Registrar pago
-    </Button>
-  ) : null;
+  const buscarPlaceholder = "Buscar por empleado, concepto o ref. contable…";
 
-  const refreshAction = (
+  const exportarPdf = (
     <Button
       size="sm"
       variant="ghost"
-      style={toolbarButtonStyle}
-      onClick={() => void load()}
-      disabled={loading}
+      iconStart={<DescriptionOutlinedIcon />}
+      disabled={pdfBusy}
+      onClick={() => void downloadPdf()}
     >
+      {pdfBusy ? "Generando…" : "Exportar PDF"}
+    </Button>
+  );
+
+  const refreshAction = (
+    <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
       {loading ? "Actualizando…" : "Actualizar"}
     </Button>
+  );
+
+  /** Regla 4: un solo primario por pantalla, y es la acción a la que se vino. */
+  const primaryAction =
+    cfg.canCreate && (tab === "lista" || tab === "analytics") && !(tab === "lista" && sinRegistros && !error) ? (
+      <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={openNew}>
+        Registrar pago
+      </Button>
+    ) : null;
+
+  const estadoChip = (estado: PaymentStatus) => (
+    <FilterChip
+      key={estado}
+      active={filterStatus === estado}
+      count={conteoEstado[estado] ?? 0}
+      dot={statusTone(estado)}
+      onClick={() => toggleEstado(estado)}
+    >
+      {estado}
+    </FilterChip>
   );
 
   return (
     <>
       <FinanceModuleShell
         variant="flat"
+        eyebrow="Finanzas"
         title={cfg.title || "Pagos a empleados"}
         subtitle={cfg.subtitle}
-        kpis={
-          showMetrics ? <MetricStrip metrics={metrics} ariaLabel="Resumen de pagos a empleados" /> : undefined
-        }
+        actions={primaryAction}
         tabs={[
           { id: "lista", label: "Lista" },
           { id: "analytics", label: "Análisis" },
@@ -963,189 +930,334 @@ function EmployeePaymentsContent() {
         ) : tab === "sugerencia" ? (
           <SugerenciaNomina token={token} />
         ) : tab === "analytics" ? (
-          <div style={{ display: "grid", gap: 16 }}>
+          <div className={s.analisis}>
             {/* Regla 8: rango, acción y exportación en una sola fila, sin caja. */}
-            <FilterToolbar
-              dates={[
-                { label: "Desde", value: dateFrom, onChange: setDateFrom },
-                { label: "Hasta", value: dateTo, onChange: setDateTo },
-              ]}
-              onClear={() => {
-                setDateFrom("");
-                setDateTo("");
-              }}
-              style={{ marginBottom: 0 }}
-              rightActions={
-                <>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    style={toolbarButtonStyle}
-                    onClick={() => void loadAnalytics()}
-                    disabled={analyticsLoading}
+            <Card as="div" className={s.barra}>
+              <ModuleToolbar
+                end={
+                  <>
+                    <Button
+                      size="sm"
+                      variant="tonal"
+                      onClick={() => void loadAnalytics()}
+                      disabled={analyticsLoading}
+                    >
+                      {analyticsLoading ? "Calculando…" : "Aplicar"}
+                    </Button>
+                    {exportarPdf}
+                  </>
+                }
+              >
+                <label className={s.fecha}>
+                  <span>Desde</span>
+                  <DateInput
+                    aria-label="Desde"
+                    controlSize="sm"
+                    className={s.fechaCtl}
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                  />
+                </label>
+                <label className={s.fecha}>
+                  <span>Hasta</span>
+                  <DateInput
+                    aria-label="Hasta"
+                    controlSize="sm"
+                    className={s.fechaCtl}
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                  />
+                </label>
+                {dateFrom || dateTo ? (
+                  <LinkButton
+                    onClick={() => {
+                      setDateFrom("");
+                      setDateTo("");
+                    }}
                   >
-                    {analyticsLoading ? "Calculando…" : "Aplicar"}
-                  </Button>
-                  <ListExportActions onPdf={() => void downloadPdf()} pdfBusy={pdfBusy} />
-                  {primaryAction}
-                </>
-              }
-            />
+                    Limpiar
+                  </LinkButton>
+                ) : null}
+              </ModuleToolbar>
+            </Card>
             {analyticsError && (
-              <InlineAlert
-                message={analyticsError}
-                variant="danger"
-                style={{ marginBottom: 0 }}
+              <Alert
+                tone="danger"
+                role="alert"
                 onDismiss={() => setAnalyticsError(null)}
                 action={
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void loadAnalytics()}>
+                  <Button size="sm" variant="secondary" onClick={() => void loadAnalytics()}>
                     Reintentar
                   </Button>
                 }
-              />
+              >
+                {analyticsError}
+              </Alert>
             )}
             {analyticsLoading && (
-              <div style={statusPanelStyle} role="status" aria-live="polite">
-                Calculando el resumen del periodo…
-              </div>
+              <Card as="div">
+                <EmptyState
+                  size="compact"
+                  tone="neutral"
+                  icon={<InsightsOutlinedIcon />}
+                  title="Calculando el resumen del periodo…"
+                />
+              </Card>
             )}
             {!analyticsLoading && !analytics && !analyticsError && (
-              <div style={statusPanelStyle}>
-                Pulsa «Aplicar» para calcular el resumen. Sin fechas cubre todo el histórico.
-              </div>
+              <Card as="div">
+                <EmptyState
+                  size="compact"
+                  tone="neutral"
+                  icon={<InsightsOutlinedIcon />}
+                  title="Pulsa «Aplicar» para calcular el resumen. Sin fechas cubre todo el histórico."
+                />
+              </Card>
             )}
             {/* Regla 7 en el periodo: si no hubo ni un pago, la tira de ceros
                 no dice nada; la frase sí. Con filas, aunque sumen cero, se
                 enseña: un periodo que cerró en cero es información. */}
             {!analyticsLoading && analytics && analytics.count === 0 && (
-              <div style={statusPanelStyle}>
-                En el periodo elegido no hay ningún pago registrado.
-              </div>
+              <Card as="div">
+                <EmptyState
+                  size="compact"
+                  tone="neutral"
+                  icon={<InsightsOutlinedIcon />}
+                  title="En el periodo elegido no hay ningún pago registrado."
+                />
+              </Card>
             )}
             {!analyticsLoading && analytics && analytics.count > 0 && (
               <>
-                <MetricStrip
-                  ariaLabel="Resumen del periodo"
-                  metrics={[
-                    { label: "Pagado", value: <Money value={analytics.totalPagado} />, hint: analytics.periodLabel || "liquidado en el periodo" },
-                    {
-                      label: "Por aprobar",
-                      value: <Money value={analytics.totalBorrador} />,
-                      hint: "en borradores",
-                      tone: analytics.totalBorrador > 0 ? "warning" : "default",
-                    },
-                    { label: "Empleados", value: analytics.employees, hint: "con pagos en el periodo" },
-                    { label: "Registros", value: analytics.count, hint: "en el periodo" },
-                  ]}
-                />
+                <StatRow variant="strip" ariaLabel="Resumen del periodo">
+                  <Stat
+                    label="Pagado"
+                    value={<Money value={analytics.totalPagado} />}
+                    hint={analytics.periodLabel || "liquidado en el periodo"}
+                    icon={<PaymentsOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                  <Stat
+                    label="Por aprobar"
+                    value={<Money value={analytics.totalBorrador} />}
+                    hint="en borradores"
+                    tone={analytics.totalBorrador > 0 ? "warning" : "default"}
+                    icon={<PendingActionsOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                  <Stat
+                    label="Empleados"
+                    value={analytics.employees}
+                    hint="con pagos en el periodo"
+                    icon={<GroupsOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                  <Stat
+                    label="Registros"
+                    value={analytics.count}
+                    hint="en el periodo"
+                    icon={<ReceiptLongOutlinedIcon />}
+                    iconTone="neutral"
+                  />
+                </StatRow>
                 <BreakdownTable title="Por empleado" rows={analytics.byEmployee} />
               </>
             )}
           </div>
         ) : (
           <>
-            {/* Regla 8: buscador, selectores, exportación y la acción principal
-                en una sola fila. Sin recuadro propio: cada control ya trae su
-                borde y meterlos en una caja es dibujarlo dos veces. */}
-            {showToolbar && (
-              <FilterToolbar
-                search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por empleado, concepto o ref. contable…" }}
-                selects={[
-                  {
-                    label: "Empleado",
-                    value: filterUser,
-                    onChange: setFilterUser,
-                    options: users.map((u) => ({ value: String(u.id), label: u.nombre })),
-                    allowAll: true,
-                  },
-                  {
-                    label: "Estado",
-                    value: filterStatus,
-                    onChange: setFilterStatus,
-                    options: STATUSES.map((s) => ({ value: s, label: s })),
-                    allowAll: true,
-                  },
-                ]}
-                onClear={clearFilters}
-                style={{ marginBottom: 0 }}
-                resultCount={firstLoad ? null : visibleItems.length}
-                rightActions={
-                  <>
-                    {refreshAction}
-                    <ListExportActions onExcel={exportExcel} excelDisabled={visibleItems.length === 0} />
-                    {primaryAction}
-                  </>
-                }
-              />
-            )}
             {actionError && (
-              <InlineAlert
-                message={actionError}
-                variant="danger"
+              <Alert
+                tone="danger"
+                role="alert"
                 onDismiss={() => setActionError(null)}
                 action={
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
+                  <Button size="sm" variant="secondary" onClick={() => void load()}>
                     Recargar
                   </Button>
                 }
-              />
+              >
+                {actionError}
+              </Alert>
             )}
             {usersErr && (
-              <InlineAlert
-                message={`${usersErr}. El filtro por empleado saldrá vacío y no podrás registrar un pago nuevo hasta que cargue.`}
-                variant="warning"
+              <Alert
+                tone="warning"
+                role="alert"
                 onDismiss={() => setUsersErr(null)}
                 action={
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
+                  <Button size="sm" variant="secondary" onClick={() => void load()}>
                     Reintentar
                   </Button>
                 }
-              />
+              >
+                {`${usersErr}. El filtro por empleado saldrá vacío y no podrás registrar un pago nuevo hasta que cargue.`}
+              </Alert>
             )}
             {error && (
-              <InlineAlert
-                message={error}
-                variant="danger"
+              <Alert
+                tone="danger"
+                role="alert"
                 action={
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
+                  <Button size="sm" variant="secondary" onClick={() => void load()}>
                     Reintentar
                   </Button>
                 }
-              />
+              >
+                {error}
+              </Alert>
             )}
-            {firstLoad ? (
-              <div role="status" aria-label="Cargando pagos">
-                <SkeletonTable rows={6} columns={5} />
-              </div>
-            ) : error && items.length === 0 ? null : (
-              <DataTable
-                columns={columns}
-                rows={visibleItems}
-                rowKey={(p) => p.id}
-                density="compact"
-                ariaLabel="Pagos a empleados"
-                emptyTitle={hasFilters ? "Ningún pago coincide" : "Todavía no hay pagos"}
-                emptyDescription={
-                  hasFilters
-                    ? "Ningún pago coincide con los filtros aplicados."
-                    : cfg.canCreate
-                      ? "Un pago nace de un periodo trabajado: eliges a la persona, el rango de fechas y el neto que se deposita. Queda en borrador hasta que alguien lo aprueba."
-                      : "Aquí aparecen los pagos por periodo trabajado que captura el equipo administrativo."
-                }
-                emptyAction={
-                  hasFilters ? (
-                    <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={clearFilters}>
-                      Limpiar filtros
-                    </Button>
-                  ) : (
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-                      {primaryAction}
-                      {refreshAction}
-                    </div>
-                  )
-                }
-              />
+            {showMetrics && (
+              <StatRow variant="strip" ariaLabel="Resumen de pagos a empleados">
+                <Stat
+                  label="Por aprobar"
+                  value={<Money value={resumen.borradores.total} />}
+                  hint={plural(resumen.borradores.n, "borrador esperando", "borradores esperando")}
+                  tone={resumen.borradores.n > 0 ? "warning" : "default"}
+                  icon={<PendingActionsOutlinedIcon />}
+                  iconTone="neutral"
+                  onClick={() => toggleEstado("Borrador")}
+                  pressed={filterStatus === "Borrador"}
+                />
+                <Stat
+                  label="Pagado"
+                  value={<Money value={resumen.pagados.total} />}
+                  hint={plural(resumen.pagados.n, "pago liquidado", "pagos liquidados")}
+                  icon={<PaymentsOutlinedIcon />}
+                  iconTone="neutral"
+                  onClick={() => toggleEstado("Pagado")}
+                  pressed={filterStatus === "Pagado"}
+                />
+                <Stat
+                  label="Empleados"
+                  value={resumen.empleados}
+                  hint="con registros en la vista"
+                  icon={<GroupsOutlinedIcon />}
+                  iconTone="neutral"
+                />
+                <Stat
+                  label="Sin comprobante"
+                  value={resumen.sinComprobante}
+                  hint={resumen.sinComprobante > 0 ? "bloquean el cierre" : "todo comprobado"}
+                  tone={resumen.sinComprobante > 0 ? "danger" : "default"}
+                  icon={<AttachFileOutlinedIcon />}
+                  iconTone="neutral"
+                />
+              </StatRow>
             )}
+            {/* Regla 8: buscador, filtros, exportación y actualizar en una sola fila
+                dentro de la tarjeta de la lista. */}
+            <ListCard
+              toolbar={
+                showToolbar ? (
+                  <ModuleToolbar
+                    search={
+                      <SearchInput
+                        aria-label={buscarPlaceholder}
+                        placeholder={buscarPlaceholder}
+                        value={searchQ}
+                        onChange={(e) => setSearchQ(e.target.value)}
+                      />
+                    }
+                    chips={
+                      <FilterChips ariaLabel="Estado">
+                        <FilterChip
+                          active={filterStatus === ""}
+                          count={porTexto.length}
+                          onClick={() => setFilterStatus("")}
+                        >
+                          Todos
+                        </FilterChip>
+                        {STATUSES.map(estadoChip)}
+                      </FilterChips>
+                    }
+                    end={
+                      <>
+                        {!firstLoad && (
+                          <span className={s.conteo} role="status">
+                            {visibleItems.length} resultado{visibleItems.length === 1 ? "" : "s"}
+                          </span>
+                        )}
+                        {refreshAction}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          iconStart={<FileDownloadOutlinedIcon />}
+                          disabled={visibleItems.length === 0}
+                          onClick={exportExcel}
+                        >
+                          Exportar Excel
+                        </Button>
+                      </>
+                    }
+                  >
+                    <Select
+                      aria-label="Empleado"
+                      title="Empleado"
+                      controlSize="sm"
+                      wrapperClassName={s.filtroSelect}
+                      value={filterUser}
+                      onChange={(e) => setFilterUser(e.target.value)}
+                    >
+                      <option value="">Todos · Empleado</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={String(u.id)}>
+                          {u.nombre}
+                        </option>
+                      ))}
+                    </Select>
+                    {hasFilters ? <LinkButton onClick={clearFilters}>Limpiar</LinkButton> : null}
+                  </ModuleToolbar>
+                ) : undefined
+              }
+              empty={!firstLoad && visibleItems.length === 0 && !(error && items.length === 0)}
+              emptyState={
+                hasFilters
+                  ? {
+                      icon: <FilterAltOffOutlinedIcon />,
+                      title: "Ningún pago coincide",
+                      description: "Ningún pago coincide con los filtros aplicados.",
+                      action: (
+                        <Button size="sm" variant="secondary" onClick={clearFilters}>
+                          Limpiar filtros
+                        </Button>
+                      ),
+                      tone: "neutral",
+                    }
+                  : {
+                      icon: <PaymentsOutlinedIcon />,
+                      title: "Todavía no hay pagos",
+                      description: cfg.canCreate
+                        ? "Un pago nace de un periodo trabajado: eliges a la persona, el rango de fechas y el neto que se deposita. Queda en borrador hasta que alguien lo aprueba."
+                        : "Aquí aparecen los pagos por periodo trabajado que captura el equipo administrativo.",
+                      action: cfg.canCreate ? (
+                        <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={openNew}>
+                          Registrar pago
+                        </Button>
+                      ) : undefined,
+                      secondaryAction: refreshAction,
+                      tone: "neutral",
+                    }
+              }
+            >
+              {firstLoad ? (
+                <div role="status" aria-label="Cargando pagos">
+                  <SkeletonRows rows={6} label="Cargando pagos" />
+                </div>
+              ) : error && items.length === 0 ? null : (
+                <DataTable
+                  flush
+                  columns={columns}
+                  rows={visibleItems}
+                  rowKey={(p) => p.id}
+                  density="compact"
+                  ariaLabel="Pagos a empleados"
+                  loading={loading && !firstLoad}
+                  rowActionsLabel="Acciones"
+                  rowActions={narrow ? undefined : filaAcciones}
+                />
+              )}
+            </ListCard>
           </>
         )}
       </FinanceModuleShell>
@@ -1158,50 +1270,41 @@ function EmployeePaymentsContent() {
         maxWidth={560}
         footer={
           <>
-            <Button variant="ghost" style={toolbarButtonStyle} onClick={closeForm} disabled={saving}>
+            <Button variant="ghost" onClick={closeForm} disabled={saving}>
               Cancelar
             </Button>
-            <Button
-              variant="primary"
-              style={toolbarButtonStyle}
-              onClick={() => void submit()}
-              disabled={saving}
-              loading={saving}
-            >
+            <Button variant="primary" onClick={() => void submit()} disabled={saving} loading={saving}>
               {saving ? "Guardando…" : editing ? "Guardar cambios" : "Registrar pago"}
             </Button>
           </>
         }
       >
-        <FinanceFormGrid>
+        <FieldGrid>
           {invalidFields.length > 0 && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert
-                variant="warning"
-                style={{ marginBottom: 0 }}
-                message={`Revisa: ${invalidFields.map((k) => FIELD_LABELS[k]).join(", ")}. Cada campo dice abajo qué necesita.`}
-              />
+            <div className={s.completo}>
+              <Alert tone="warning" role="alert">
+                {`Revisa: ${invalidFields.map((k) => FIELD_LABELS[k]).join(", ")}. Cada campo dice abajo qué necesita.`}
+              </Alert>
             </div>
           )}
           {editing ? (
-            <FinanceField label="Empleado" fullWidth hint="El empleado no cambia; registra otro pago si te equivocaste.">
-              <input value={editing.user?.nombre ?? `#${editing.userId}`} disabled style={{ ...financeInputStyle, opacity: 0.7 }} />
-            </FinanceField>
+            <Field label="Empleado" fullWidth hint="El empleado no cambia; registra otro pago si te equivocaste.">
+              <Input value={editing.user?.nombre ?? `#${editing.userId}`} disabled />
+            </Field>
           ) : (
-            <FinanceField
+            <Field
               label="Empleado"
               fullWidth
               error={formErrors.userId}
               hint={users.length === 0 ? "El catálogo de empleados no cargó; recarga la lista para elegir." : undefined}
             >
-              <select
+              <Select
                 value={form.userId}
                 aria-invalid={Boolean(formErrors.userId)}
                 onChange={(e) => {
                   setForm((f) => ({ ...f, userId: e.target.value }));
                   setFormErrors((prev) => ({ ...prev, userId: undefined }));
                 }}
-                style={financeInputStyle}
               >
                 <option value="">— Seleccionar —</option>
                 {users.map((u) => (
@@ -1209,46 +1312,43 @@ function EmployeePaymentsContent() {
                     {u.nombre}
                   </option>
                 ))}
-              </select>
-            </FinanceField>
+              </Select>
+            </Field>
           )}
           {usersErr && !editing && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert
-                message={usersErr}
-                variant="warning"
-                style={{ marginBottom: 0 }}
+            <div className={s.completo}>
+              <Alert
+                tone="warning"
+                role="alert"
                 action={
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
+                  <Button size="sm" variant="secondary" onClick={() => void load()}>
                     Reintentar
                   </Button>
                 }
-              />
+              >
+                {usersErr}
+              </Alert>
             </div>
           )}
-          <FinanceField label="Concepto" fullWidth optional hint="Así se identifica el pago en el reporte y en el PDF.">
-            <input
+          <Field label="Concepto" fullWidth optional hint="Así se identifica el pago en el reporte y en el PDF.">
+            <Input
               value={form.concepto}
               onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))}
               placeholder="Nómina quincenal, bono, finiquito…"
-              style={financeInputStyle}
             />
-          </FinanceField>
-          <FinanceField label="Periodo desde" hint="Primer día que cubre el pago." error={formErrors.periodFrom}>
-            <input
-              type="date"
+          </Field>
+          <Field label="Periodo desde" hint="Primer día que cubre el pago." error={formErrors.periodFrom}>
+            <DateInput
               value={form.periodFrom}
               aria-invalid={Boolean(formErrors.periodFrom)}
               onChange={(e) => {
                 setForm((f) => ({ ...f, periodFrom: e.target.value }));
                 setFormErrors((prev) => ({ ...prev, periodFrom: undefined, periodTo: undefined }));
               }}
-              style={financeInputStyle}
             />
-          </FinanceField>
-          <FinanceField label="Periodo hasta" hint="Último día que cubre el pago." error={formErrors.periodTo}>
-            <input
-              type="date"
+          </Field>
+          <Field label="Periodo hasta" hint="Último día que cubre el pago." error={formErrors.periodTo}>
+            <DateInput
               value={form.periodTo}
               min={form.periodFrom || undefined}
               aria-invalid={Boolean(formErrors.periodTo)}
@@ -1256,11 +1356,10 @@ function EmployeePaymentsContent() {
                 setForm((f) => ({ ...f, periodTo: e.target.value }));
                 setFormErrors((prev) => ({ ...prev, periodTo: undefined }));
               }}
-              style={financeInputStyle}
             />
-          </FinanceField>
-          <FinanceField label="Monto" hint="Pesos: el neto que se deposita." error={formErrors.amount}>
-            <input
+          </Field>
+          <Field label="Monto" hint="Pesos: el neto que se deposita." error={formErrors.amount}>
+            <Input
               type="number"
               min={0}
               step="0.01"
@@ -1271,10 +1370,9 @@ function EmployeePaymentsContent() {
                 setForm((f) => ({ ...f, amount: Number(e.target.value) }));
                 setFormErrors((prev) => ({ ...prev, amount: undefined }));
               }}
-              style={financeInputStyle}
             />
-          </FinanceField>
-          <FinanceField
+          </Field>
+          <Field
             label="Horas trabajadas"
             optional
             hint={
@@ -1283,22 +1381,21 @@ function EmployeePaymentsContent() {
                 : "Elige empleado y periodo para poder calcularlas desde asistencia."
             }
           >
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
+            <div className={s.horas}>
+              <Input
                 type="number"
                 min={0}
                 step="0.01"
                 inputMode="decimal"
                 aria-label="Horas trabajadas"
+                className={s.horasInput}
                 value={Math.round((form.totalMinutes / 60) * 100) / 100}
                 onChange={(e) => setForm((f) => ({ ...f, totalMinutes: Math.round(Number(e.target.value) * 60) }))}
-                style={financeInputStyle}
               />
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
-                style={toolbarButtonStyle}
                 onClick={() => void calcularDesdeAsistencia()}
                 disabled={calculatingAttendance || !canCalcAttendance}
                 loading={calculatingAttendance}
@@ -1306,28 +1403,26 @@ function EmployeePaymentsContent() {
                 {calculatingAttendance ? "Calculando…" : "Calcular"}
               </Button>
             </div>
-          </FinanceField>
+          </Field>
           {!editing && (
-            <FinanceField label="Estado" hint="Un borrador se revisa antes de aprobarlo y marcarlo pagado.">
-              <select
+            <Field label="Estado" hint="Un borrador se revisa antes de aprobarlo y marcarlo pagado.">
+              <Select
                 value={form.status}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as PaymentStatus }))}
-                style={financeInputStyle}
               >
                 <option value="Borrador">Borrador</option>
                 <option value="Pagado">Pagado</option>
-              </select>
-            </FinanceField>
+              </Select>
+            </Field>
           )}
-          <FinanceField label="Nota" fullWidth optional hint="Referencia interna; se queda en el ERP.">
-            <input
+          <Field label="Nota" fullWidth optional hint="Referencia interna; se queda en el ERP.">
+            <Input
               value={form.note}
               onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
               placeholder="Ej. transferencia BBVA 1234"
-              style={financeInputStyle}
             />
-          </FinanceField>
-          <div style={{ gridColumn: "1 / -1" }}>
+          </Field>
+          <div className={s.completo}>
             <FileDropzone
               file={null}
               onFile={(f) => {
@@ -1341,48 +1436,27 @@ function EmployeePaymentsContent() {
               }
             />
             {evidenceFiles.length > 0 && (
-              <ul style={{ margin: "8px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 4 }}>
+              <ul className={s.archivos}>
                 {evidenceFiles.map((f, i) => (
-                  <li
-                    key={`${f.name}-${i}`}
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      fontSize: 12,
-                      color: "var(--text-secondary)",
-                      padding: "4px 0",
-                      borderBottom: "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
-                    }}
-                  >
-                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</span>
-                    <button
-                      type="button"
+                  <li key={`${f.name}-${i}`} className={s.archivo}>
+                    <span className={s.archivoNombre}>{f.name}</span>
+                    <LinkButton
                       aria-label={`Quitar ${f.name}`}
                       onClick={() => setEvidenceFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "var(--text-tertiary)",
-                        fontSize: 11,
-                        padding: 0,
-                      }}
                     >
                       Quitar
-                    </button>
+                    </LinkButton>
                   </li>
                 ))}
               </ul>
             )}
             {editing?.evidenceUrls && editing.evidenceUrls.length > 0 && (
-              <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-tertiary)" }}>
+              <div className={`${s.pistaPie} ${s.existentes}`}>
                 Existentes:{" "}
                 {editing.evidenceUrls.map((u, i) => {
                   const href = assetUrl(u);
                   return href ? (
-                    <a key={`${u}-${i}`} href={href} target="_blank" rel="noreferrer" style={{ marginRight: 8 }}>
+                    <a key={`${u}-${i}`} href={href} target="_blank" rel="noreferrer" className={s.enlace}>
                       archivo {i + 1}
                     </a>
                   ) : null;
@@ -1391,27 +1465,28 @@ function EmployeePaymentsContent() {
             )}
           </div>
           {editing && (editing.paidAt || editing.contabilidadRef) && (
-            <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "var(--text-tertiary)" }}>
+            <div className={`${s.completo} ${s.pista}`}>
               {editing.paidAt ? `Pagado el ${formatFechaHora(editing.paidAt)}. ` : ""}
               {editing.contabilidadRef ? `Folio contable: ${editing.contabilidadRef}.` : ""}
             </div>
           )}
           {saveErr && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert
-                message={saveErr}
-                variant="danger"
-                style={{ marginBottom: 0 }}
+            <div className={s.completo}>
+              <Alert
+                tone="danger"
+                role="alert"
                 onDismiss={() => setSaveErr(null)}
                 action={
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void submit()} disabled={saving}>
+                  <Button size="sm" variant="secondary" onClick={() => void submit()} disabled={saving}>
                     Reintentar
                   </Button>
                 }
-              />
+              >
+                {saveErr}
+              </Alert>
             </div>
           )}
-        </FinanceFormGrid>
+        </FieldGrid>
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />

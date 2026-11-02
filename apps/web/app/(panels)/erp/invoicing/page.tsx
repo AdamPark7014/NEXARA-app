@@ -2,20 +2,39 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { useUrlQuery } from "@/components/finance/useUrlQuery";
 import { todayStamp } from "@/components/finance/download";
-import PageHeader from "@/components/ui/PageHeader";
-import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import StatusDot from "@/components/ui/StatusDot";
-import Button from "@/components/ui/Button";
-import DataTable, { Money, type Column } from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
-import InlineAlert from "@/components/ui/InlineAlert";
 import {
-  FinanceField,
-  FinanceFormGrid,
-  financeInputStyle,
-} from "@/components/finance/FinanceModuleShell";
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  DataTable,
+  DateInput,
+  Field,
+  FieldGrid,
+  Input,
+  LinkButton,
+  ListCard,
+  ModuleToolbar,
+  SearchInput,
+  Select,
+  Stat,
+  StatRow,
+  type Column,
+  type ModuleEmpty,
+} from "@/components/base";
+import { Money } from "@/components/ui/DataTable";
+import { FinanceModuleShell } from "@/components/finance/FinanceModuleShell";
 import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
@@ -26,28 +45,16 @@ import { toast } from "@/components/Toast";
 import FinanceModuleRail from "@/components/erp/FinanceModuleRail";
 import { formatApiError } from "@/lib/erp-api";
 import {
-  AlertIcon,
-  BlockHeading,
-  CfdiIcon,
   COMMERCIAL_LABEL,
   CopyableRef,
   Dot,
-  DownloadIcon,
-  FilterIcon,
   fiscalState,
   FootNote,
-  InlineAction,
-  LoadingIcon,
-  MetricFrame,
-  MetricHint,
-  MetricValue,
   NoticeStack,
-  PlusIcon,
-  RefreshIcon,
-  toolbarControl,
-  WorkToolbar,
   type Notice,
 } from "./_parts";
+import s from "./invoicing.module.css";
+
 
 interface InvoiceRow {
   id: number;
@@ -192,8 +199,6 @@ export default function InvoicingPage() {
   });
   /** Filtro de tipo de la última carga buena: si un reintento falla con otro filtro, la lista vieja ya no aplica. */
   const loadedFilterRef = useRef<string | null>(null);
-
-  const inp = financeInputStyle;
 
   const load = useCallback(async () => {
     if (!token) {
@@ -582,17 +587,14 @@ export default function InvoicingPage() {
       label: "Folio",
       width: 150,
       render: (f) => (
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <Link
-            href={`/erp/invoicing/${f.id}`}
-            style={{ fontSize: 12.5, fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}
-          >
+        <div className={s.celda}>
+          <Link href={`/erp/invoicing/${f.id}`} className={s.folio}>
             {f.invoiceNumber}
           </Link>
           {f.cfdiUuid ? (
             <CopyableRef value={f.cfdiUuid} display={`${f.cfdiUuid.slice(0, 8)}…`} label="el UUID" />
           ) : (
-            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>sin UUID</span>
+            <span className={s.sub}>sin UUID</span>
           )}
         </div>
       ),
@@ -603,9 +605,9 @@ export default function InvoicingPage() {
       render: (f) => {
         const t = displayInvoiceType(f.type);
         return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 13 }}>{f.receptorName ?? f.emisorName ?? "—"}</span>
-            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+          <div className={s.celda}>
+            <span className={s.nombre}>{f.receptorName ?? f.emisorName ?? "—"}</span>
+            <span className={s.sub}>
               {t === "INCOME" ? "Ingreso" : "Egreso"}
               {f.satPaymentMethod ? ` · ${f.satPaymentMethod}` : ""}
             </span>
@@ -623,10 +625,10 @@ export default function InvoicingPage() {
         const paid = Number(f.paidAmount ?? 0);
         const pending = Math.max(0, total - paid);
         return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-end" }}>
+          <div className={`${s.celda} ${s.celdaDer}`}>
             <Money value={total} />
             {paid > 0 && pending > 0 && (
-              <span style={{ fontSize: 11, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
+              <span className={s.sub}>
                 pendiente {pending.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 })}
               </span>
             )}
@@ -639,21 +641,21 @@ export default function InvoicingPage() {
       render: (f) => {
         const days = Math.floor((Date.now() - new Date(f.issueDate).getTime()) / 86400000);
         const isPending = f.status !== "PAID" && f.status !== "CANCELLED";
-        const color = days >= 60 ? "var(--state-danger-text)" : days >= 30 ? "var(--state-warning-text)" : "var(--text-tertiary)";
+        const antiguedad = days >= 60 ? `${s.sub} ${s.subAlerta}` : days >= 30 ? `${s.sub} ${s.subAviso}` : s.sub;
         return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 12, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
+          <div className={s.celda}>
+            <span className={s.fecha}>
               {new Date(f.issueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
             </span>
             {isPending && days > 0 && (
-              <span style={{ fontSize: 11, color, fontVariantNumeric: "tabular-nums" }} title="Días desde la emisión">
+              <span className={antiguedad} title="Días desde la emisión">
                 hace {days === 1 ? "1 día" : `${days} días`}
               </span>
             )}
           </div>
         );
       },
-      width: 100,
+      width: 120,
     },
     {
       key: "status", label: "Estado", width: 150,
@@ -661,11 +663,9 @@ export default function InvoicingPage() {
         const fiscal = fiscalState(f);
         const comercial = COMMERCIAL_LABEL[f.status] ?? f.status.replace(/_/g, " ");
         return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <StatusDot label={fiscal.label} tone={fiscal.tone} title={fiscal.title} />
-            {f.status !== "CANCELLED" && (
-              <span style={{ fontSize: 11, color: "var(--text-tertiary)", paddingLeft: 11 }}>{comercial}</span>
-            )}
+          <div className={s.celda}>
+            <Badge dot size="sm" tone={fiscal.tone} title={fiscal.title}>{fiscal.label}</Badge>
+            {f.status !== "CANCELLED" && <span className={s.sub}>{comercial}</span>}
           </div>
         );
       },
@@ -674,9 +674,10 @@ export default function InvoicingPage() {
     // texto. Con cuatro botones sólidos por renglón la tabla era una botonera
     // y no se veía dónde estaba el siguiente paso.
     ...(cfg.canApprove ? [{
-      key: "acciones" as keyof InvoiceRow, label: "",
+      key: "acciones",
+      label: "",
       render: (f: InvoiceRow) => (
-        <div style={{ display: "flex", gap: 2, justifyContent: "flex-end", alignItems: "center" }}>
+        <div className={s.acciones}>
           {f.status === "DRAFT" && cfg.canCreate && (
             <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void openEditDraft(f); }}>Editar</Button>
           )}
@@ -689,47 +690,6 @@ export default function InvoicingPage() {
       ),
       width: 210,
     }] : []),
-  ];
-
-  /* ---------------------------------------------------------------- *
-   * Estado financiero: tres montos y el único conteo que pide acción.
-   *
-   * Eran seis celdas del mismo peso —tres montos y tres conteos—, y la vista
-   * no decía cuál mirar primero. «Vencidas» pasa a ser la pista de «Por
-   * cobrar», que es donde duele, y conserva su clic; «Canceladas» baja a
-   * metadato de pie, que es su rango.
-   * ---------------------------------------------------------------- */
-  const cobranzaPct = facturadoMes > 0 ? Math.round((cobrado / facturadoMes) * 100) : 0;
-
-  const metrics: Metric[] = [
-    {
-      label: "Facturado",
-      value: <MetricValue><Money value={facturadoMes} compact bold={false} /></MetricValue>,
-      hint: <MetricHint>{incomeCount} CFDI de ingreso</MetricHint>,
-    },
-    {
-      label: "Cobrado",
-      value: <MetricValue><Money value={cobrado} compact bold={false} /></MetricValue>,
-      hint: <MetricHint tone={cobranzaPct === 100 && facturadoMes > 0 ? "success" : "default"}>{cobranzaPct}% del facturado</MetricHint>,
-    },
-    {
-      label: "Por cobrar",
-      value: <MetricValue><Money value={pendiente} compact bold={false} /></MetricValue>,
-      hint: (
-        <MetricHint tone={vencidas > 0 ? "danger" : "default"}>
-          {vencidas > 0 ? `${vencidas} vencida${vencidas === 1 ? "" : "s"}` : "sin vencidas"}
-        </MetricHint>
-      ),
-      tone: vencidas > 0 ? "danger" : pendiente > 0 ? "warning" : "default",
-      onClick: vencidas > 0 ? () => setFilterStatus(filterStatus === "OVERDUE" ? "" : "OVERDUE") : undefined,
-    },
-    {
-      label: "Por timbrar",
-      value: <MetricValue>{porTimbrar}</MetricValue>,
-      hint: <MetricHint tone={porTimbrar > 0 ? "warning" : "default"}>borradores sin UUID</MetricHint>,
-      tone: porTimbrar > 0 ? "warning" : "default",
-      onClick: () => setFilterStatus(filterStatus === "DRAFT" ? "" : porTimbrar > 0 ? "DRAFT" : ""),
-    },
   ];
 
   /* ---------------------------------------------------------------- *
@@ -776,181 +736,234 @@ export default function InvoicingPage() {
     { key: "issueDate", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
   ], "facturas");
 
+  /* ---------------------------------------------------------------- *
+   * Estado de la lista: qué se pinta en la tarjeta y en la cabeza.
+   * ---------------------------------------------------------------- */
+  const primeraCarga = loading && items.length === 0;
+  const sinFacturas = !loading && !error && visibleItems.length === 0 && !hasFilters;
+  const cobranzaPct = facturadoMes > 0 ? Math.round((cobrado / facturadoMes) * 100) : 0;
+  const conteoTexto =
+    hasFilters && visibleItems.length !== items.length
+      ? `${visibleItems.length} de ${items.length} facturas`
+      : visibleItems.length === 1
+        ? "1 factura"
+        : `${visibleItems.length} facturas`;
+
+  const vacio: ModuleEmpty =
+    error && items.length === 0
+      ? {
+          icon: <CloudOffOutlinedIcon />,
+          title: "No se pudo cargar la facturación",
+          description: error,
+          action: <Button onClick={() => void load()}>Reintentar</Button>,
+          tone: "danger",
+        }
+      : hasFilters
+        ? {
+            icon: <FilterAltOffOutlinedIcon />,
+            title: "Ningún CFDI con estos filtros",
+            description: "Hay facturas en el libro, pero ninguna coincide con la búsqueda actual.",
+            action: <Button onClick={clearFilters}>Limpiar filtros</Button>,
+            tone: "neutral",
+          }
+        : {
+            icon: <ReceiptLongOutlinedIcon />,
+            title: "Todavía no hay facturas",
+            description: cfg.canCreate
+              ? "Crea el borrador y tímbralo ante el PAC cuando el cliente esté confirmado."
+              : "Las facturas se generan desde un proyecto de ventas cerrado.",
+            action: cfg.canCreate ? (
+              <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={openNew}>
+                Nueva factura
+              </Button>
+            ) : undefined,
+          };
+
   return (
     <>
-      {/* 1 · Dónde estoy. 2 · La acción principal, el único botón sólido de marca. */}
-      <PageHeader
-        eyebrow="ERP · Finanzas"
+      {/* Cabeza → rail → avisos → cifras → tarjeta de lista. Un solo botón primario: en la cabeza,
+          o en el vacío cuando no hay ninguna factura. */}
+      <FinanceModuleShell
+        variant="flat"
+        eyebrow="Finanzas"
         title={cfg.title}
-        density="ops"
+        rail={<FinanceModuleRail />}
         actions={
-          cfg.canCreate ? (
-            <Button size="sm" variant="primary" iconLeft={<PlusIcon />} onClick={openNew}>
+          cfg.canCreate && !sinFacturas ? (
+            <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={openNew}>
               Nueva factura
             </Button>
           ) : undefined
         }
-      />
-      <FinanceModuleRail />
+        kpis={
+          <div className={s.cifras}>
+            <div className={s.avisos}>
+              <NoticeStack notices={notices} />
+              {error && items.length > 0 ? (
+                <Alert
+                  tone="warning"
+                  role="alert"
+                  onDismiss={() => setError(null)}
+                  action={
+                    <Button size="sm" onClick={() => void load()} disabled={loading}>
+                      {loading ? "Reintentando…" : "Reintentar"}
+                    </Button>
+                  }
+                >
+                  {`No se pudo actualizar la lista; se muestran los datos anteriores. ${error}`}
+                </Alert>
+              ) : null}
+            </div>
 
-      {/* 3 · Cómo va el dinero. */}
-      <MetricFrame>
-        <MetricStrip metrics={metrics} ariaLabel="Resumen de facturación" />
-      </MetricFrame>
-
-      <NoticeStack notices={notices} />
-
-      {/* 4 · Las facturas. El título se dice con tipografía, no con tarjeta. */}
-      <BlockHeading
-        title="Facturas"
-        meta={loading ? "cargando…" : `${visibleItems.length}${hasFilters && visibleItems.length !== items.length ? ` de ${items.length}` : ""}`}
-        actions={
-          <>
-            <Button
-              size="sm"
-              variant="ghost"
-              iconLeft={<RefreshIcon />}
-              onClick={() => void load()}
-              title="Actualizar"
-              aria-label="Actualizar la lista"
-            />
-            {items.length > 0 && (
-              <Button size="sm" variant="ghost" iconLeft={<DownloadIcon />} onClick={exportRows}>
-                Excel
-              </Button>
-            )}
-          </>
-        }
-      />
-
-      {/* 5 · Los filtros: herramienta de trabajo, no formulario. */}
-      <WorkToolbar
-        note={
-          hasFilters || highlightId ? (
-            <>
-              {invoiceRef && <span>folio <strong style={{ fontWeight: 600 }}>{invoiceRef}</strong> desde enlace directo</span>}
-              {invoiceRef && highlightId && <Dot />}
-              {highlightId && <span>factura <strong style={{ fontWeight: 600 }}>#{highlightId}</strong> al inicio</span>}
-              {(invoiceRef || highlightId) && hasFilters && <Dot />}
-              {hasFilters && <InlineAction onClick={clearFilters}>Limpiar filtros</InlineAction>}
-            </>
-          ) : undefined
+            <StatRow variant="strip" ariaLabel="Resumen de facturación">
+              <Stat
+                label="Facturado"
+                value={<Money value={facturadoMes} compact />}
+                hint={`${incomeCount} CFDI de ingreso`}
+                icon={<ReceiptLongOutlinedIcon />}
+                iconTone="neutral"
+                loading={primeraCarga}
+              />
+              <Stat
+                label="Cobrado"
+                value={<Money value={cobrado} compact />}
+                hint={`${cobranzaPct}% del facturado`}
+                icon={<PaymentsOutlinedIcon />}
+                iconTone="neutral"
+                tone={cobranzaPct === 100 && facturadoMes > 0 ? "success" : "default"}
+                loading={primeraCarga}
+              />
+              <Stat
+                label="Por cobrar"
+                value={<Money value={pendiente} compact />}
+                hint={vencidas > 0 ? `${vencidas} vencida${vencidas === 1 ? "" : "s"}` : "sin vencidas"}
+                icon={<AccountBalanceWalletOutlinedIcon />}
+                iconTone="neutral"
+                tone={vencidas > 0 ? "danger" : pendiente > 0 ? "warning" : "default"}
+                onClick={vencidas > 0 ? () => setFilterStatus(filterStatus === "OVERDUE" ? "" : "OVERDUE") : undefined}
+                pressed={vencidas > 0 ? filterStatus === "OVERDUE" : undefined}
+                loading={primeraCarga}
+              />
+              <Stat
+                label="Por timbrar"
+                value={porTimbrar}
+                hint="borradores sin UUID"
+                icon={<PendingActionsOutlinedIcon />}
+                iconTone="neutral"
+                tone={porTimbrar > 0 ? "warning" : "default"}
+                onClick={() => setFilterStatus(filterStatus === "DRAFT" ? "" : porTimbrar > 0 ? "DRAFT" : "")}
+                pressed={filterStatus === "DRAFT"}
+                loading={primeraCarga}
+              />
+            </StatRow>
+          </div>
         }
       >
-        <input
-          type="search"
-          value={searchQ}
-          onChange={(e) => setSearchQ(e.target.value)}
-          placeholder="Buscar folio o cliente…"
-          aria-label="Buscar por folio o cliente"
-          style={{ ...toolbarControl, flex: "1 1 240px", minWidth: 190 }}
-        />
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as typeof filter)}
-          aria-label="Filtrar por tipo"
-          style={{ ...toolbarControl, minWidth: 140 }}
+        <ListCard
+          listLabel="Facturas"
+          toolbar={
+            <ModuleToolbar
+              search={
+                <SearchInput
+                  aria-label="Buscar por folio o cliente"
+                  placeholder="Buscar folio o cliente…"
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                />
+              }
+              end={
+                <>
+                  {hasFilters ? <LinkButton onClick={clearFilters}>Limpiar filtros</LinkButton> : null}
+                  <span className={s.conteo}>{loading ? "cargando…" : conteoTexto}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon
+                    onClick={() => void load()}
+                    title="Actualizar"
+                    aria-label="Actualizar la lista"
+                  >
+                    <RefreshRoundedIcon fontSize="small" />
+                  </Button>
+                  {items.length > 0 && (
+                    <Button variant="ghost" size="sm" iconStart={<FileDownloadOutlinedIcon />} onClick={exportRows}>
+                      Excel
+                    </Button>
+                  )}
+                </>
+              }
+            >
+              <Select
+                aria-label="Filtrar por tipo"
+                controlSize="sm"
+                wrapperClassName={s.filtroTipo}
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as typeof filter)}
+              >
+                <option value="">Todos los tipos</option>
+                <option value="INCOME">Ingresos</option>
+                <option value="EXPENSE">Egresos</option>
+              </Select>
+              <Select
+                aria-label="Filtrar por estado"
+                controlSize="sm"
+                wrapperClassName={s.filtroEstado}
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="">Todos los estados</option>
+                <option value="DRAFT">Borrador</option>
+                <option value="SENT">Enviada</option>
+                <option value="PARTIALLY_PAID">Pago parcial</option>
+                <option value="PAID">Pagada</option>
+                <option value="OVERDUE">Vencida</option>
+                <option value="CANCELLED">Cancelada</option>
+              </Select>
+              {invoiceRef || highlightId ? (
+                <span className={s.nota}>
+                  {invoiceRef && <span>folio <strong>{invoiceRef}</strong> desde enlace directo</span>}
+                  {invoiceRef && highlightId && <Dot />}
+                  {highlightId && <span>factura <strong>#{highlightId}</strong> al inicio</span>}
+                </span>
+              ) : null}
+            </ModuleToolbar>
+          }
+          loading={primeraCarga}
+          empty={!primeraCarga && visibleItems.length === 0}
+          emptyState={vacio}
         >
-          <option value="">Todos los tipos</option>
-          <option value="INCOME">Ingresos</option>
-          <option value="EXPENSE">Egresos</option>
-        </select>
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          aria-label="Filtrar por estado"
-          style={{ ...toolbarControl, minWidth: 150 }}
-        >
-          <option value="">Todos los estados</option>
-          <option value="DRAFT">Borrador</option>
-          <option value="SENT">Enviada</option>
-          <option value="PARTIALLY_PAID">Pago parcial</option>
-          <option value="PAID">Pagada</option>
-          <option value="OVERDUE">Vencida</option>
-          <option value="CANCELLED">Cancelada</option>
-        </select>
-      </WorkToolbar>
+          <DataTable
+            flush
+            columns={columns}
+            rows={visibleItems}
+            rowKey={(f) => f.id}
+            ariaLabel="Facturas CFDI"
+          />
+        </ListCard>
 
-      {loading && items.length === 0 && (
-        <EmptyState icon={<LoadingIcon />} title="Cargando facturas…" description="Consultando el libro de CFDI." />
-      )}
-      {!loading && error && items.length === 0 && (
-        <EmptyState
-          icon={<AlertIcon />}
-          title="No se pudo cargar la facturación"
-          description={error}
-          action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
-        />
-      )}
-      {error && items.length > 0 && (
-        <InlineAlert
-          variant="warning"
-          message={`No se pudo actualizar la lista; se muestran los datos anteriores. ${error}`}
-          onDismiss={() => setError(null)}
-          action={
-            <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
-              {loading ? "Reintentando…" : "Reintentar"}
-            </Button>
-          }
-        />
-      )}
-      {!loading && !error && visibleItems.length === 0 && hasFilters && (
-        <EmptyState
-          icon={<FilterIcon />}
-          title="Ningún CFDI con estos filtros"
-          description="Hay facturas en el libro, pero ninguna coincide con la búsqueda actual."
-          action={<Button size="sm" variant="secondary" onClick={clearFilters}>Limpiar filtros</Button>}
-        />
-      )}
-      {!loading && !error && visibleItems.length === 0 && !hasFilters && (
-        <EmptyState
-          icon={<CfdiIcon />}
-          title="Todavía no hay facturas"
-          description={
-            cfg.canCreate
-              ? "Crea el borrador y tímbralo ante el PAC cuando el cliente esté confirmado."
-              : "Las facturas se generan desde un proyecto de ventas cerrado."
-          }
-          action={
-            cfg.canCreate ? (
-              <Button size="sm" variant="primary" iconLeft={<PlusIcon />} onClick={openNew}>
-                Nueva factura
-              </Button>
-            ) : undefined
-          }
-        />
-      )}
-      {visibleItems.length > 0 && (!loading || items.length > 0) && (
-        <DataTable
-          columns={columns}
-          rows={visibleItems}
-          rowKey={(f) => f.id}
-          ariaLabel="Facturas CFDI"
-        />
-      )}
-
-      {/* 6 y 7 · Configuración y metadatos, al final y en gris. */}
-      {(pacInfo || canceladas > 0) && (
-        <FootNote>
-          {pacInfo && (
-            <>
-              <span>PAC {pacInfo.provider?.toUpperCase() ?? "—"}</span>
-              <Dot />
-              <span>{pacInfo.configured ? "credenciales OK" : "sin credenciales"}</span>
-              {pacInfo.env ? (<><Dot /><span>{pacInfo.env}</span></>) : null}
-            </>
-          )}
-          {pacInfo && canceladas > 0 && <Dot />}
-          {canceladas > 0 && (
-            <span>
-              <InlineAction onClick={() => setFilterStatus(filterStatus === "CANCELLED" ? "" : "CANCELLED")}>
-                {canceladas} cancelada{canceladas === 1 ? "" : "s"}
-              </InlineAction>
-              {canceladas === 1 ? " no cuenta al facturado" : " no cuentan al facturado"}
-            </span>
-          )}
-        </FootNote>
-      )}
+        {/* Configuración y metadatos, al final y en gris. */}
+        {(pacInfo || canceladas > 0) && (
+          <FootNote>
+            {pacInfo && (
+              <>
+                <span>PAC {pacInfo.provider?.toUpperCase() ?? "—"}</span>
+                <Dot />
+                <span>{pacInfo.configured ? "credenciales OK" : "sin credenciales"}</span>
+                {pacInfo.env ? (<><Dot /><span>{pacInfo.env}</span></>) : null}
+              </>
+            )}
+            {pacInfo && canceladas > 0 && <Dot />}
+            {canceladas > 0 && (
+              <span>
+                <LinkButton onClick={() => setFilterStatus(filterStatus === "CANCELLED" ? "" : "CANCELLED")}>
+                  {canceladas} cancelada{canceladas === 1 ? "" : "s"}
+                </LinkButton>
+                {canceladas === 1 ? " no cuenta al facturado" : " no cuentan al facturado"}
+              </span>
+            )}
+          </FootNote>
+        )}
+      </FinanceModuleShell>
 
       {/* El alta ya no empuja la lista hacia abajo: vive en su propia capa. */}
       <Modal
@@ -966,13 +979,14 @@ export default function InvoicingPage() {
         }
       >
         {issuerProfile && (
-          <div style={{ marginBottom: 14, fontSize: 11.5, color: "var(--text-tertiary)" }}>
+          <p className={s.emisor}>
             Emite {issuerProfile.emisorName ?? "—"} · RFC {issuerProfile.emisorRfc ?? "—"} · CP{" "}
             {issuerProfile.emisorZipCode ?? "sin capturar"}
-          </div>
+          </p>
         )}
         {issuerProfile && !issuerProfile.emisorZipCode && (
           <NoticeStack
+            className={s.avisoModal}
             notices={[{
               id: "emisor-cp",
               level: "warning",
@@ -981,19 +995,18 @@ export default function InvoicingPage() {
             }]}
           />
         )}
-        <FinanceFormGrid>
-          <FinanceField label="Tipo" hint="Ingreso emite CFDI a un cliente; egreso registra el de un proveedor.">
-            <select
+        <FieldGrid>
+          <Field label="Tipo" hint="Ingreso emite CFDI a un cliente; egreso registra el de un proveedor.">
+            <Select
               value={form.type}
               onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as "INCOME" | "EXPENSE", counterpartyId: "" }))}
-              style={inp}
             >
               <option value="INCOME">Ingreso (cliente)</option>
               <option value="EXPENSE">Egreso (proveedor)</option>
-            </select>
-          </FinanceField>
+            </Select>
+          </Field>
           {!editingInvoice && (form.type === "INCOME" ? salesClients.length > 0 : suppliers.length > 0) && (
-            <FinanceField
+            <Field
               label={form.type === "INCOME" ? "Cliente" : "Proveedor"}
               optional
               hint={
@@ -1002,7 +1015,7 @@ export default function InvoicingPage() {
                   : "Ligarla es lo que la hace aparecer en su expediente y en cuentas por cobrar o por pagar."
               }
             >
-              <select
+              <Select
                 value={form.counterpartyId}
                 onChange={(e) => {
                   const id = e.target.value;
@@ -1010,7 +1023,7 @@ export default function InvoicingPage() {
                     ? salesClients.find((c) => String(c.id) === id)
                     : undefined;
                   const proveedor = form.type === "EXPENSE"
-                    ? suppliers.find((s) => String(s.id) === id)
+                    ? suppliers.find((p) => String(p.id) === id)
                     : undefined;
                   const nombre = cliente?.name ?? proveedor?.name ?? null;
                   const rfc = cliente?.taxId ?? proveedor?.rfc ?? null;
@@ -1023,86 +1036,88 @@ export default function InvoicingPage() {
                     receptorRfc: rfc ?? f.receptorRfc,
                   }));
                 }}
-                style={inp}
               >
                 <option value="">Sin ligar</option>
                 {(form.type === "INCOME" ? salesClients : suppliers).map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
-              </select>
-            </FinanceField>
+              </Select>
+            </Field>
           )}
-          <FinanceField
+          <Field
             label="RFC receptor"
             optional
             hint={rfcValidation?.valid ? rfcValidation.message : "Se valida contra el SAT al salir del campo."}
             error={rfcValidation && !rfcValidation.valid ? rfcValidation.message ?? "RFC inválido" : null}
           >
-            <input
+            <Input
               value={form.receptorRfc}
               onChange={(e) => { setForm((f) => ({ ...f, receptorRfc: e.target.value })); setRfcValidation(null); }}
               onBlur={() => void validateRfc(form.receptorRfc)}
               placeholder="XAXX010101000"
-              style={inp}
             />
-          </FinanceField>
-          <FinanceField
+          </Field>
+          <Field
             label="Nombre cliente / proveedor"
             fullWidth
             hint="Razón social tal como aparece en la Constancia de Situación Fiscal."
           >
-            <input value={form.receptorName} onChange={(e) => setForm((f) => ({ ...f, receptorName: e.target.value }))} style={inp} />
-          </FinanceField>
-          <FinanceField label="CP fiscal receptor" hint="Código postal del domicilio fiscal del receptor.">
-            <input value={form.receptorZipCode} onChange={(e) => setForm((f) => ({ ...f, receptorZipCode: e.target.value }))} placeholder="64000" style={inp} />
-          </FinanceField>
-          <FinanceField label="Régimen receptor" hint="Clave del catálogo c_RegimenFiscal. 601 = General de ley personas morales.">
-            <input value={form.receptorRegime} onChange={(e) => setForm((f) => ({ ...f, receptorRegime: e.target.value }))} placeholder="601" style={inp} />
-          </FinanceField>
-          <FinanceField label="Uso CFDI" hint="Lo elige quien recibe la factura; si no lo sabes, P01.">
-            <select value={form.cfdiUsage} onChange={(e) => setForm((f) => ({ ...f, cfdiUsage: e.target.value }))} style={inp}>
+            <Input value={form.receptorName} onChange={(e) => setForm((f) => ({ ...f, receptorName: e.target.value }))} />
+          </Field>
+          <Field label="CP fiscal receptor" hint="Código postal del domicilio fiscal del receptor.">
+            <Input value={form.receptorZipCode} onChange={(e) => setForm((f) => ({ ...f, receptorZipCode: e.target.value }))} placeholder="64000" />
+          </Field>
+          <Field label="Régimen receptor" hint="Clave del catálogo c_RegimenFiscal. 601 = General de ley personas morales.">
+            <Input value={form.receptorRegime} onChange={(e) => setForm((f) => ({ ...f, receptorRegime: e.target.value }))} placeholder="601" />
+          </Field>
+          <Field label="Uso CFDI" hint="Lo elige quien recibe la factura; si no lo sabes, P01.">
+            <Select value={form.cfdiUsage} onChange={(e) => setForm((f) => ({ ...f, cfdiUsage: e.target.value }))}>
               <option value="G03">G03 — Gastos en general</option>
               <option value="I04">I04 — Equipo de cómputo</option>
               <option value="P01">P01 — Por definir</option>
-            </select>
-          </FinanceField>
-          <FinanceField label="Método de pago SAT" hint="PPD obliga a timbrar un complemento por cada pago recibido.">
-            <select value={form.satPaymentMethod} onChange={(e) => setForm((f) => ({ ...f, satPaymentMethod: e.target.value as "PUE" | "PPD" }))} style={inp}>
+            </Select>
+          </Field>
+          <Field label="Método de pago SAT" hint="PPD obliga a timbrar un complemento por cada pago recibido.">
+            <Select value={form.satPaymentMethod} onChange={(e) => setForm((f) => ({ ...f, satPaymentMethod: e.target.value as "PUE" | "PPD" }))}>
               <option value="PUE">PUE — Pago en una sola exhibición</option>
               <option value="PPD">PPD — Pago en parcialidades (requiere complemento)</option>
-            </select>
-          </FinanceField>
-          <FinanceField label="Forma de pago" hint="Con qué instrumento se cobra. Catálogo c_FormaPago.">
-            <select value={form.satPaymentForm} onChange={(e) => setForm((f) => ({ ...f, satPaymentForm: e.target.value }))} style={inp}>
+            </Select>
+          </Field>
+          <Field label="Forma de pago" hint="Con qué instrumento se cobra. Catálogo c_FormaPago.">
+            <Select value={form.satPaymentForm} onChange={(e) => setForm((f) => ({ ...f, satPaymentForm: e.target.value }))}>
               <option value="03">03 — Transferencia</option>
               <option value="01">01 — Efectivo</option>
               <option value="04">04 — Tarjeta</option>
               <option value="99">99 — Por definir</option>
-            </select>
-          </FinanceField>
-          <FinanceField label="Clave SAT producto" hint="Catálogo c_ClaveProdServ. 80101500 = servicios de consultoría.">
-            <input value={form.satProductKey} onChange={(e) => setForm((f) => ({ ...f, satProductKey: e.target.value }))} placeholder="80101500" style={inp} />
-          </FinanceField>
-          <FinanceField label="Clave SAT unidad" hint="Catálogo c_ClaveUnidad. E48 = unidad de servicio.">
-            <input value={form.satUnitKey} onChange={(e) => setForm((f) => ({ ...f, satUnitKey: e.target.value }))} placeholder="E48" style={inp} />
-          </FinanceField>
-          <FinanceField label="Emisión">
-            <input type="date" value={form.issueDate} onChange={(e) => setForm((f) => ({ ...f, issueDate: e.target.value }))} style={inp} />
-          </FinanceField>
-          <FinanceField label="Vencimiento" hint="Fecha límite de pago; con ella se calcula el vencido.">
-            <input type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} style={inp} />
-          </FinanceField>
-          <FinanceField label="Concepto" fullWidth hint="Aparece tal cual en el CFDI que recibe el cliente.">
-            <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Servicio de instalación CCTV" style={inp} />
-          </FinanceField>
-          <FinanceField label="Cantidad">
-            <input type="number" min={1} value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: +e.target.value }))} style={inp} />
-          </FinanceField>
-          <FinanceField label="Precio unitario" hint="Pesos, antes de IVA. El 16% se agrega al timbrar.">
-            <input type="number" min={0} step="0.01" value={form.unitPrice || ""} onChange={(e) => setForm((f) => ({ ...f, unitPrice: +e.target.value }))} style={inp} />
-          </FinanceField>
-        </FinanceFormGrid>
-        {formErr && <div style={{ marginTop: 14 }}><InlineAlert variant="danger" message={formErr} /></div>}
+            </Select>
+          </Field>
+          <Field label="Clave SAT producto" hint="Catálogo c_ClaveProdServ. 80101500 = servicios de consultoría.">
+            <Input value={form.satProductKey} onChange={(e) => setForm((f) => ({ ...f, satProductKey: e.target.value }))} placeholder="80101500" />
+          </Field>
+          <Field label="Clave SAT unidad" hint="Catálogo c_ClaveUnidad. E48 = unidad de servicio.">
+            <Input value={form.satUnitKey} onChange={(e) => setForm((f) => ({ ...f, satUnitKey: e.target.value }))} placeholder="E48" />
+          </Field>
+          <Field label="Emisión">
+            <DateInput value={form.issueDate} onChange={(e) => setForm((f) => ({ ...f, issueDate: e.target.value }))} />
+          </Field>
+          <Field label="Vencimiento" hint="Fecha límite de pago; con ella se calcula el vencido.">
+            <DateInput value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} />
+          </Field>
+          <Field label="Concepto" fullWidth hint="Aparece tal cual en el CFDI que recibe el cliente.">
+            <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Servicio de instalación CCTV" />
+          </Field>
+          <Field label="Cantidad">
+            <Input type="number" min={1} value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: +e.target.value }))} />
+          </Field>
+          <Field label="Precio unitario" hint="Pesos, antes de IVA. El 16% se agrega al timbrar.">
+            <Input type="number" min={0} step="0.01" value={form.unitPrice || ""} onChange={(e) => setForm((f) => ({ ...f, unitPrice: +e.target.value }))} />
+          </Field>
+        </FieldGrid>
+        {formErr && (
+          <div className={s.errorModal}>
+            <Alert tone="danger" role="alert">{formErr}</Alert>
+          </div>
+        )}
       </Modal>
 
       <Modal
@@ -1120,64 +1135,67 @@ export default function InvoicingPage() {
       >
         {paymentTarget && (
           <>
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 14 }}>
+            <p className={s.resumenPago}>
               {paymentTarget.invoiceNumber} · saldo pendiente{" "}
               <Money value={Math.max(0, Number(paymentTarget.totalAmount) - Number(paymentTarget.paidAmount ?? 0))} />
-            </div>
-            <FinanceFormGrid>
-              <FinanceField label="Monto" hint="Pesos. Puede ser menor al saldo: queda como pago parcial.">
-                <input type="number" min={0} step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm((f) => ({ ...f, amount: e.target.value }))} style={inp} />
-              </FinanceField>
-              <FinanceField label="Fecha de pago" hint="La que aparece en el estado de cuenta, no la de captura.">
-                <input type="date" value={paymentForm.paymentDate} onChange={(e) => setPaymentForm((f) => ({ ...f, paymentDate: e.target.value }))} style={inp} />
-              </FinanceField>
-              <FinanceField label="Método">
-                <select value={paymentForm.method} onChange={(e) => setPaymentForm((f) => ({ ...f, method: e.target.value }))} style={inp}>
+            </p>
+            <FieldGrid>
+              <Field label="Monto" hint="Pesos. Puede ser menor al saldo: queda como pago parcial.">
+                <Input type="number" min={0} step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm((f) => ({ ...f, amount: e.target.value }))} />
+              </Field>
+              <Field label="Fecha de pago" hint="La que aparece en el estado de cuenta, no la de captura.">
+                <DateInput value={paymentForm.paymentDate} onChange={(e) => setPaymentForm((f) => ({ ...f, paymentDate: e.target.value }))} />
+              </Field>
+              <Field label="Método">
+                <Select value={paymentForm.method} onChange={(e) => setPaymentForm((f) => ({ ...f, method: e.target.value }))}>
                   <option value="SPEI">SPEI</option>
                   <option value="TRANSFER">Transferencia</option>
                   <option value="CASH">Efectivo</option>
                   <option value="CHECK">Cheque</option>
                   <option value="CARD">Tarjeta</option>
-                </select>
-              </FinanceField>
-              <FinanceField label="Referencia" optional hint="Clave de rastreo del SPEI o folio del cheque.">
-                <input value={paymentForm.reference} onChange={(e) => setPaymentForm((f) => ({ ...f, reference: e.target.value }))} placeholder="Clave de rastreo, folio…" style={inp} />
-              </FinanceField>
+                </Select>
+              </Field>
+              <Field label="Referencia" optional hint="Clave de rastreo del SPEI o folio del cheque.">
+                <Input value={paymentForm.reference} onChange={(e) => setPaymentForm((f) => ({ ...f, reference: e.target.value }))} placeholder="Clave de rastreo, folio…" />
+              </Field>
               {bankAccounts.length > 0 && (
-                <FinanceField
+                <Field
                   label="Cuenta de destino"
                   optional
                   hint="En qué cuenta entró o salió el dinero. Es lo que permite cruzarlo después con el estado de cuenta."
                 >
-                  <select value={paymentForm.bankAccountId} onChange={(e) => setPaymentForm((f) => ({ ...f, bankAccountId: e.target.value }))} style={inp}>
+                  <Select value={paymentForm.bankAccountId} onChange={(e) => setPaymentForm((f) => ({ ...f, bankAccountId: e.target.value }))}>
                     <option value="">Sin especificar</option>
                     {bankAccounts.map((b) => (
                       <option key={b.id} value={b.id}>{b.name} · {b.bankName} ({b.currency})</option>
                     ))}
-                  </select>
-                </FinanceField>
+                  </Select>
+                </Field>
               )}
-              <FinanceField label="Notas" optional fullWidth>
-                <input value={paymentForm.notes} onChange={(e) => setPaymentForm((f) => ({ ...f, notes: e.target.value }))} style={inp} />
-              </FinanceField>
+              <Field label="Notas" optional fullWidth>
+                <Input value={paymentForm.notes} onChange={(e) => setPaymentForm((f) => ({ ...f, notes: e.target.value }))} />
+              </Field>
               {paymentTarget.satPaymentMethod === "PPD" && (
-                <FinanceField
+                <Field
                   label="Complemento de pago"
                   fullWidth
                   hint="La factura es PPD: el SAT exige un complemento por cada pago."
                 >
-                  <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-secondary)" }}>
-                    <input
-                      type="checkbox"
+                  <span className={s.casilla}>
+                    <Checkbox
                       checked={paymentForm.stampComplement}
                       onChange={(e) => setPaymentForm((f) => ({ ...f, stampComplement: e.target.checked }))}
                     />
                     Timbrar complemento (Pagos 2.0) al registrar
                   </span>
-                </FinanceField>
+                </Field>
               )}
-            </FinanceFormGrid>
-            {paymentErr && <div style={{ marginTop: 14 }}><InlineAlert variant="danger" message={paymentErr} /></div>}
+            </FieldGrid>
+            {paymentErr && (
+              <div className={s.errorModal}>
+                <Alert tone="danger" role="alert">{paymentErr}</Alert>
+              </div>
+            )}
           </>
         )}
       </Modal>

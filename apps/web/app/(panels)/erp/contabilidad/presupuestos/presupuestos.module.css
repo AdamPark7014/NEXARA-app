@@ -1,0 +1,87 @@
+/* Mesa contable · Presupuestos. Solo tokens --ui-*: claro y oscuro salen solos. */
+
+/* El aviso base trae margen inferior propio; aquí el aire lo da el `gap` del marco. */
+div.alerta {
+  margin-bottom: 0;
+}
+
+/* ─── Filtros ──────────────────────────────────────────────────────────── */
+
+.campoFecha {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+}
+
+.fecha {
+  flex: 0 1 160px;
+  width: auto;
+}
+
+.filtroCentro {
+  flex: 0 1 240px;
+  width: auto;
+}
+
+.conteo {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Estados ──────────────────────────────────────────────────────────── */
+
+.estado {
+  margin: 0;
+  padding: var(--ui-s4) var(--ui-s5) var(--ui-s2);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Pie de la tabla: total y notas ───────────────────────────────────── */
+
+.totales {
+  display: flex;
+  /* Sin envolver, en pantalla estrecha el pie se salía del panel. */
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px 24px;
+  padding: 12px var(--ui-s5);
+  border-top: 1px solid var(--ui-border-subtle);
+  background: var(--ui-surface-2);
+  font-size: var(--ui-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.totalRotulo {
+  margin-right: auto;
+  font-weight: 700;
+  color: var(--ui-fg-2);
+}
+
+.totalDato {
+  white-space: nowrap;
+}
+
+.totalEtiqueta {
+  margin-right: 6px;
+  color: var(--ui-fg-3);
+}
+
+.notas {
+  display: grid;
+  gap: 6px;
+  padding: 12px var(--ui-s5);
+  border-top: 1px solid var(--ui-border-subtle);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.notas > p {
+  margin: 0;
+}

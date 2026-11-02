@@ -1,0 +1,88 @@
+/* Reportes de contabilidad. Solo tokens --ui-*: claro y oscuro (body.dark) salen solos. */
+
+/* La barra de la tarjeta de reporte va dentro de la tarjeta: sin raya doble contra su borde. */
+.tarjeta .barra {
+  border-bottom: 0;
+}
+
+/* Segunda fila de la barra: periodo, filtros del reporte y conteo. Siempre baja a su propia línea. */
+.filtros {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2) var(--ui-s3);
+  min-width: 0;
+  padding-top: var(--ui-s1);
+}
+
+.fecha {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+}
+
+.filtroFecha {
+  flex: 0 1 160px;
+  width: auto;
+}
+
+.filtroSelect {
+  flex: 0 1 220px;
+  width: auto;
+  min-width: 140px;
+}
+
+.conteo {
+  margin-left: auto;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Qué periodo calculó el API y contra cuál se compara. */
+.lectura {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-2);
+}
+
+/* Estados de espera dentro de una tarjeta (catálogo o reporte en camino). */
+.espera {
+  padding: var(--ui-s4) 20px;
+}
+
+.espera > p {
+  margin: 0 0 var(--ui-s3);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+.nota {
+  margin: 0;
+  padding: var(--ui-s3) 20px;
+  border-top: 1px solid var(--ui-border-subtle);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+/* Dos notas seguidas comparten una sola raya. */
+.nota + .nota {
+  border-top: 0;
+  padding-top: 0;
+}
+
+@media (max-width: 640px) {
+  .conteo {
+    margin-left: 0;
+  }
+
+  .filtroFecha,
+  .filtroSelect {
+    flex-basis: 140px;
+  }
+}
