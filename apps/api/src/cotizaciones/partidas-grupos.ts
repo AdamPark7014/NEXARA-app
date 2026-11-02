@@ -40,12 +40,34 @@ function sinAcentos(texto: unknown): string {
 }
 
 const RE_MANO_DE_OBRA =
-  /(mano de obra|instalacion|instalacio|reinstalacion|desinstalacion|desmontaje|puesta a punto|puesta en marcha|configuracion|programacion|capacitacion|diagnostico|levantamiento|servicio de|habilitacion|reubicacion|mantenimiento|supervision|flete|viatico)/;
+  /(mano de obra|instalacion|instalacio|reinstalacion|desinstalacion|desmontaje|puesta a punto|puesta en marcha|configuracion|programacion|capacitacion|diagnostico|levantamiento|servicio de|habilitacion|reubicacion|mantenimiento|supervision|flete|viatico|adecuacion|ejecucion de|tendido de)/;
 
 const RE_MATERIAL =
   /(material|insumo|consumible|cable|bobina|grapa|taquete|tornillo|canaliz|tuberia|tubo|conector|jack|adaptador|balun|transceptor|caja de|caja derivacion|abrazadera|cinta|ducto|manguera|silicon|pija|cople|herraje|kit de \d+|etiqueta)/;
 
-/** Grupo de una partida: lo elegido por quien cotiza, o deducido de la unidad y el texto. */
+const RE_EQUIPO =
+  /(impresora|lector|camara|\bdomo\b|turret|\bbala\b|grabador|\bnvr\b|\bdvr\b|\bups\b|no ?break|switch|router|access point|monitor|pantalla|servidor|\bdisco\b|gabinete|\brack\b|torniquete|barrera|cerradura|control de acceso|biometric|sensor|sirena|antena|computadora|laptop|tablet)/;
+
+const posicion = (patron: RegExp, texto: string) => {
+  const hallado = patron.exec(texto);
+  return hallado ? hallado.index : Infinity;
+};
+
+/**
+ * Lo que se nombra primero decide: «Impresora de etiquetas» es equipo y «Etiquetas para impresora»,
+ * material. Solo cuenta el nombre: la ficha de una impresora dice «lenguajes de programación» y la de
+ * un lector «cableado», y por leerla el PDF prometía una instalación que nadie cotizó.
+ */
+function grupoPorNombre(texto: string): GrupoPartida {
+  const obra = posicion(RE_MANO_DE_OBRA, texto);
+  const material = posicion(RE_MATERIAL, texto);
+  const equipo = posicion(RE_EQUIPO, texto);
+  if (obra < material && obra < equipo) return 'MANO_DE_OBRA';
+  if (material < equipo) return 'MATERIALES';
+  return 'EQUIPOS';
+}
+
+/** Grupo de una partida: lo elegido por quien cotiza, o deducido de la unidad y el nombre. */
 export function grupoDePartida(partida: PartidaAgrupable): GrupoPartida {
   const explicito = String(partida.grupo ?? '')
     .trim()
@@ -54,16 +76,16 @@ export function grupoDePartida(partida: PartidaAgrupable): GrupoPartida {
   if ((GRUPOS as readonly string[]).includes(explicito)) return explicito as GrupoPartida;
 
   const unidad = sinAcentos(partida.unit);
-  const texto = `${sinAcentos(partida.category)} ${sinAcentos(partida.name)} ${sinAcentos(partida.description)}`;
+  const nombre = sinAcentos(partida.name).trim();
+  // Sin nombre no queda de otra que la descripción.
+  const texto = `${sinAcentos(partida.category)} ${nombre || sinAcentos(partida.description)}`;
 
   if (Number(partida.laborHours) > 0 && Number(partida.laborRate) > 0) return 'MANO_DE_OBRA';
   // La unidad manda sobre el texto: «insumos materiales para puesta a punto de CCTV» son insumos,
   // aunque la frase mencione la puesta a punto.
   if (/servicio|jornada|hora|hh/.test(unidad)) return 'MANO_DE_OBRA';
   if (/insumo|material|lote|rollo|metro|ml\b/.test(unidad)) return 'MATERIALES';
-  if (RE_MANO_DE_OBRA.test(texto)) return 'MANO_DE_OBRA';
-  if (RE_MATERIAL.test(texto)) return 'MATERIALES';
-  return 'EQUIPOS';
+  return grupoPorNombre(texto);
 }
 
 /** Importe de la partida: el `lineTotal` guardado o, si falta, cantidad × precio + mano de obra. */

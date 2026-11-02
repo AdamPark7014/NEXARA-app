@@ -43,6 +43,26 @@ describe('agrupación Equipos / Materiales / Mano de obra', () => {
     expect(grupoDePartida(PARTIDAS[1]!)).toBe('EQUIPOS');
   });
 
+  it('la ficha no decide el grupo: una impresora que habla de programación sigue siendo equipo', () => {
+    const impresora = { name: 'Impresora de etiquetas ZD421D', unit: 'Pieza', description: 'Lenguajes de programación: ZPL y EPL.' };
+    expect(grupoDePartida(impresora)).toBe('EQUIPOS');
+    expect(grupoDePartida({ name: 'Lector de códigos de barras manual cableado', unit: 'Pieza' })).toBe('EQUIPOS');
+    // Y por eso una venta de equipo no promete una instalación que nadie cotizó.
+    expect(incluyeInstalacion([impresora])).toBe(false);
+  });
+
+  it('decide lo que se nombra primero', () => {
+    expect(grupoDePartida({ name: 'Etiquetas para impresora', unit: 'Pieza' })).toBe('MATERIALES');
+    expect(grupoDePartida({ name: 'Conector para cámara', unit: 'Pieza' })).toBe('MATERIALES');
+    expect(grupoDePartida({ name: 'Cinta eléctrica para reparación y mantenimiento', unit: 'Pieza' })).toBe('MATERIALES');
+    expect(grupoDePartida({ name: 'Instalación de cámaras', unit: 'Pieza' })).toBe('MANO_DE_OBRA');
+    expect(grupoDePartida({ name: 'Adecuación del sistema de audio', unit: 'Pieza' })).toBe('MANO_DE_OBRA');
+  });
+
+  it('sin nombre, queda la descripción', () => {
+    expect(grupoDePartida({ name: '', description: 'Instalación de cámaras' })).toBe('MANO_DE_OBRA');
+  });
+
   it('una línea con horas de mano de obra es mano de obra aunque el nombre no lo diga', () => {
     expect(grupoDePartida({ name: 'Trabajo en sitio', laborHours: 8, laborRate: 350 })).toBe('MANO_DE_OBRA');
   });
