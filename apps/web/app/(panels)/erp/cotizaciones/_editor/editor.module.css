@@ -150,10 +150,6 @@
 /* ─── Ficha: qué es, para quién, cuánto y en qué paso va ──────────────── */
 
 .ficha {
-  /* Sin esto la regla global de <section> la centra y se encoge a su texto. */
-  width: 100%;
-  max-width: none;
-  box-sizing: border-box;
   margin: 4px 0 var(--doc-seccion);
   overflow: hidden;
   background: var(--ui-surface);
@@ -2606,10 +2602,6 @@ select.celda {
 
 /* «Ya la envié»: cómo salió la cotización. */
 .yaLaEnvie {
-  /* Sin esto la regla global de <section> la centra y se encoge a su texto. */
-  width: 100%;
-  max-width: none;
-  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

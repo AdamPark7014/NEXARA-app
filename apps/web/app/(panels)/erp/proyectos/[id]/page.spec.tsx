@@ -139,6 +139,76 @@ describe("detalle del proyecto", () => {
     ]);
   });
 
+  it("nacido de una cotización: enseña toda la cadena, de dónde viene, qué falta y qué sigue", async () => {
+    const partidas = Array.from({ length: 6 }, (_, i) => ({
+      id: 100 + i,
+      kind: "ENTREGABLE",
+      titulo: `Partida ${i + 1}`,
+      detalle: "2 pza",
+      orden: i,
+      origenClave: `partida:${i + 1}`,
+    }));
+    servidor([
+      (l) =>
+        l.method === "GET" && l.url.endsWith("proyectos/7")
+          ? json(
+              proyecto({
+                status: "PLANNED",
+                actualStartDate: null,
+                endDate: null,
+                milestones: [],
+                scopeItems: partidas,
+                cotizacion: {
+                  id: 42,
+                  quoteNumber: "NEX-MG76022606-0042",
+                  aceptadaVia: "WHATSAPP",
+                  aceptadaAt: "2026-11-03T02:00:00.000Z",
+                },
+                factura: { estado: "SIN_FACTURA", id: null, folio: null },
+                cobro: { estado: "PENDIENTE" },
+              }),
+            )
+          : undefined,
+    ]);
+    const user = userEvent.setup();
+    render(<ProyectoDetallePage />);
+
+    const pasos = await screen.findByRole("list", { name: "Pasos" });
+    expect(within(pasos).getByRole("link", { name: "Cotización" })).toHaveAttribute("href", "/erp/cotizaciones/42");
+    expect(within(pasos).getByText("Ganada el 2 nov")).toBeInTheDocument();
+    expect(within(pasos).getByText("Falta programar")).toBeInTheDocument();
+    expect(within(pasos).getByText("En Por facturar")).toBeInTheDocument();
+    expect(within(pasos).getByText("Cobro")).toBeInTheDocument();
+
+    expect(screen.getByText("Siguiente paso: programar el trabajo")).toBeInTheDocument();
+    expect(screen.getByText("Las 6 partidas ya están en el alcance. Falta decidir quién hace qué y cuándo.")).toBeInTheDocument();
+
+    expect(screen.getByRole("heading", { name: "De dónde viene" })).toBeInTheDocument();
+    expect(screen.getByText("2 nov 2026, por WhatsApp")).toBeInTheDocument();
+    for (const liga of screen.getAllByRole("link", { name: "NEX-MG76022606-0042" })) {
+      expect(liga).toHaveAttribute("href", "/erp/cotizaciones/42");
+    }
+    expect(screen.getByText("Fecha de entrega")).toBeInTheDocument();
+    expect(screen.getByText("Requerimientos del sitio")).toBeInTheDocument();
+
+    // El resumen enseña las primeras partidas y lleva a las demás.
+    expect(screen.getByRole("heading", { name: "Alcance, tomado de la cotización" })).toBeInTheDocument();
+    expect(screen.getByText("Partida 4")).toBeInTheDocument();
+    expect(screen.queryByText("Partida 5")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Y 2 partidas más" }));
+    expect(screen.getByRole("tab", { name: /Alcance/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("sin cotización: ni factura ni cobro en la barra, ni «de dónde viene»", async () => {
+    servidor([]);
+    render(<ProyectoDetallePage />);
+    const pasos = await screen.findByRole("list", { name: "Pasos" });
+    expect(within(pasos).queryByText("Cotización")).not.toBeInTheDocument();
+    expect(within(pasos).queryByText("Factura")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "De dónde viene" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Alcance, tomado de la cotización" })).not.toBeInTheDocument();
+  });
+
   it("marcar una etapa como cumplida manda la fecha real de hoy y pinta la respuesta", async () => {
     const llamadas = servidor([
       (l) =>

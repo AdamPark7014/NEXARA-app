@@ -458,3 +458,19 @@ a.tituloFila:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Resumen: las primeras partidas del alcance. */
+.alcanceCorto {
+  display: grid;
+  gap: var(--ui-s2);
+  margin: 0 0 var(--ui-s2);
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+}
+
+.alcanceCorto li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+}

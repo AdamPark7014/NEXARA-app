@@ -651,6 +651,11 @@ button.slot:hover:not(:disabled) {
   .heroTop {
     padding: 16px;
     gap: 12px;
+    flex-wrap: wrap;
+  }
+  /* El título ocupa su renglón y los botones bajan: apretado se partía a media palabra. */
+  .heroText {
+    flex: 1 1 calc(100% - 56px);
   }
   .heroIco {
     width: 44px;

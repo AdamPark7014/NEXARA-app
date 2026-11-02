@@ -354,7 +354,7 @@ export default function ProyectoDetallePage() {
     return peso(a) - peso(b);
   });
   const seccion: SeccionProps | null = token
-    ? { proyecto: p, token, hoy, ocupado, personas, mutar, confirmar: setConfirmacion }
+    ? { proyecto: p, token, hoy, ocupado, personas, mutar, confirmar: setConfirmacion, irA: elegirPestana }
     : null;
 
   function pedirCambio(accion: AccionDeEstado) {

@@ -15,6 +15,7 @@ import {
   Field,
   FieldGrid,
   Input,
+  LinkButton,
   RecordSection,
   Select,
   Stat,
@@ -133,7 +134,7 @@ function diferencia(plan?: string | null, real?: string | null, verbo = "llegó"
   return d > 0 ? `${verbo} ${d} día${d === 1 ? "" : "s"} tarde` : `${verbo} ${-d} día${d === -1 ? "" : "s"} antes`;
 }
 
-export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, personas, mutar }: SeccionProps) {
+export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, personas, mutar, irA }: SeccionProps) {
   const [editando, setEditando] = useState(false);
   const [f, setF] = useState<FormCabecera>(() => formDe(p));
   const [errores, setErrores] = useState<string[]>([]);
@@ -156,6 +157,7 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
 
   const r = p.resumen;
   const avance = r.avance;
+  const deLaCotizacion = p.scopeItems.filter((a) => a.origenClave);
   const etapasVivas = p.milestones.filter((m) => m.status !== "CANCELADO");
   const etapasCumplidas = etapasVivas.filter((m) => m.status === "CUMPLIDO").length;
   const textoAvance =
@@ -249,6 +251,24 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
           icon={<PaymentsOutlinedIcon />}
         />
       </StatRow>
+
+      {deLaCotizacion.length ? (
+        <RecordSection title="Alcance, tomado de la cotización">
+          <ul className={styles.alcanceCorto}>
+            {deLaCotizacion.slice(0, 4).map((a) => (
+              <li key={a.id}>
+                <span>{a.titulo}</span>
+                {a.detalle ? <span className={styles.tenue}>{a.detalle}</span> : null}
+              </li>
+            ))}
+          </ul>
+          {deLaCotizacion.length > 4 && irA ? (
+            <LinkButton onClick={() => irA("alcance")}>
+              Y {deLaCotizacion.length - 4} {deLaCotizacion.length === 5 ? "partida más" : "partidas más"}
+            </LinkButton>
+          ) : null}
+        </RecordSection>
+      ) : null}
 
       <RecordSection title="Fechas: plan contra realidad">
         <div className={styles.tablaMarco}>
