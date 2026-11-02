@@ -21,7 +21,8 @@
  *     El aviso dice qué modelo fue y qué campos filtra: esa consulta es la que
  *     necesita paginación de verdad. Va al log y a `audit_logs`
  *     (`entityType = 'PrismaRowCap'`, se limpia a los 90 días), porque el log
- *     del contenedor se pierde con cada despliegue.
+ *     del contenedor se pierde con cada despliegue. Si hay recortes nuevos, cada
+ *     mañana sale una tarjeta a `developer@` (`aviso-recortes.service.ts`).
  *
  * Limitación conocida: sólo alcanza al `findMany` de primer nivel. Las
  * relaciones traídas con `include` no pasan por el middleware, así que un
