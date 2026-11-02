@@ -15,6 +15,8 @@ export type TuDiaItem = {
   clave: string;
   texto: string;
   url: string;
+  /** Lo que se hace al tocarlo, si no basta con «Pendiente». */
+  accion?: string;
   tono: "alerta" | "atencion" | "info";
 };
 
@@ -86,11 +88,11 @@ export default function TuDiaPanel({ token }: { token: string | null | undefined
           const tono = TONO[item.tono] ?? TONO.atencion;
           return (
             <ListRow
-              key={item.clave}
+              key={item.texto}
               href={enlace(item.url)}
               accent={tono.color}
               title={item.texto}
-              trail={<DashPill tone={tono.pill}>{tono.etiqueta}</DashPill>}
+              trail={<DashPill tone={tono.pill}>{item.accion ?? tono.etiqueta}</DashPill>}
             />
           );
         })

@@ -34,6 +34,8 @@ export type ItemResumen = {
   texto: string;
   /** Ruta de Core donde se resuelve. */
   url: string;
+  /** Lo que se hace al tocarlo, si no basta con «Pendiente». */
+  accion?: string;
   tono: 'alerta' | 'atencion' | 'info';
 };
 
@@ -112,14 +114,16 @@ export function armarResumenCeo(d: DatosCeo, fecha: string): ResumenCeo {
       clave: 'cotizaciones',
       texto: `${plural(d.cotizaciones.porDecidir ?? 0, 'cotización enviada espera', 'cotizaciones enviadas esperan')} saber cómo ${(d.cotizaciones.porDecidir ?? 0) === 1 ? 'terminó' : 'terminaron'}`,
       url: '/erp/cotizaciones?estado=ENVIADA',
+      accion: 'Revisar',
       tono: 'atencion',
     });
   }
   if ((d.cotizaciones.ganadasSinProyecto ?? 0) > 0) {
     items.push({
       clave: 'cotizaciones',
-      texto: `${plural(d.cotizaciones.ganadasSinProyecto ?? 0, 'cotización ganada', 'cotizaciones ganadas')} todavía sin proyecto`,
+      texto: `${plural(d.cotizaciones.ganadasSinProyecto ?? 0, 'cotización ganada todavía no tiene', 'cotizaciones ganadas todavía no tienen')} proyecto`,
       url: '/erp/cotizaciones?estado=APROBADA&sinProyecto=1',
+      accion: 'Crear proyecto',
       tono: 'atencion',
     });
   }
