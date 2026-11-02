@@ -1,5 +1,13 @@
 # RELEVO
 
+- **01-11 ~18:50 (claude-code) — «Cotizar con IA»: lo que salió al probar el motor en producción.**
+  - `fb12e0ec` se desplegó y se probó dentro del contenedor, sin Nest ni crons y sin crear nada (56 cotizaciones antes y después): frase 1.9 s, lista 0.1 s y 0 tokens. El panel de la puerta registra `cotizar-frase`.
+  - **Costo real US$0.00024 por frase, no 0.00011.** El eval corre en serie y lee caché; en producción, con unas pocas cotizaciones al día, casi toda llamada escribe la caché. Sigue dentro del objetivo (0.0003). Corregido en la guía y en la muestra.
+  - **Un paquete ya no se autollena.** «Cámara domo» elegía sola el paquete TurboHD a $606.91, precio de referencia y cámara que no va con un NVR. El eval no lo veía porque no incluía paquetes ni formato; ahora usa `CANDIDATOS_FIJOS`, los mismos de producción. Solo lo ya cotizado se llena sin más.
+  - Eval tras esto: muestra 24/24; real 38/40, clientes 40/40, renglones 149–150/151, modelos 16–17/17 (varía por corrida).
+  - **Este commit no está desplegado:** la web aún no llama a la ruta; se despliega junto con la caja.
+  - Prueba de arranque: `Test.createTestingModule` truena con desbordamiento de pila en una copia aislada, probablemente por dos copias de `@nestjs` (sin confirmar). `NestFactory.createApplicationContext(AppModule)` con base falsa sí sirve: resuelve todo y solo falla al conectar.
+
 - **01-11 ~18:30 (claude-code) — «Cotizar con IA»: el motor en la API y el guardado que fallaba (sin cambios en pantalla todavía).**
   - Pedido de Adam: cotizaciones de 10 minutos o menos, con muy pocos tokens. **Lo visual espera su visto bueno.** Muestra privada: https://claude.ai/artifact/TPCc7b8VqRLEHsG26j1y3x (trae clientes reales: nunca al repo).
   - **Dónde se va el tiempo** (`CotizacionItem BULK_CREATE` de `audit_logs` trae cada foto de las partidas; 707 min activos en 56 cotizaciones): encabezado y textos 26 %, costo/margen/precio 23 %, agregar partida 17 %, **guardados que fallaron 11 %**, marca/modelo 7 %. Con 8+ partidas: costo/margen/precio 31 %, agregar 23 %, marca/modelo 14 %, y una partida nueva cuesta p50 0.94 min. Lo que pasa fuera del editor (buscar precios) no se ve aquí.

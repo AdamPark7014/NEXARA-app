@@ -5,10 +5,8 @@ import { ClaudeService, type UsoClaude } from '../ai/claude/claude.service.js';
 import { CONFIG_COTIZAR, limpiarSalidaCotizar, peticionCotizar, type SalidaCotizar } from '../ai/cotizar/cotizar-ia.js';
 import { ProductSearchService } from '../smart-quote/search/product-search.service.js';
 import { padronParaComparar } from '../ventas/clientes-parecidos.service.js';
-import { CATALOGO_PARTIDAS_V2 } from './catalogo-partidas-base.js';
 import { CLIENTE_GENERICO, MARGEN_POR_OMISION, armarPropuesta, type PropuestaCotizacion } from './cotizar-frase.js';
-import { candidatosDeUsadas, consultasDeCatalogo, type CandidatoPartida } from './emparejar-partidas.js';
-import { PAQUETES } from './paquetes.js';
+import { CANDIDATOS_FIJOS, candidatoDelMayorista, candidatosDeUsadas, consultasDeCatalogo, type CandidatoPartida } from './emparejar-partidas.js';
 import { normalizarTexto } from './partidas-frecuentes.js';
 
 /** Renglones recientes que se comparan con lo pedido; lo más viejo ya no da un precio útil. */
@@ -16,35 +14,6 @@ const PARTIDAS_RECIENTES = 1_500;
 /** Cotizaciones de las que se toman los nombres de cliente ya usados. */
 const COTIZACIONES_RECIENTES = 400;
 const MAX_TEXTO = 6_000;
-
-const sinPrecio = (parcial: Pick<CandidatoPartida, 'fuente' | 'name'> & Partial<CandidatoPartida>): CandidatoPartida => ({
-  description: null,
-  brand: null,
-  model: null,
-  unit: null,
-  unitCost: null,
-  unitPrice: 0,
-  grupo: null,
-  imagenUrl: null,
-  veces: 0,
-  ultimaVez: null,
-  stock: null,
-  productCtId: null,
-  cotizaciones: [],
-  ...parcial,
-});
-
-/** Lo que ya vive en código: los paquetes con su precio de partida y el formato de conceptos, sin precio. */
-const CANDIDATOS_FIJOS: CandidatoPartida[] = [
-  ...PAQUETES.flatMap((paquete) =>
-    paquete.partidas.map((p) =>
-      sinPrecio({ fuente: 'paquete', name: p.name, description: p.description ?? null, unit: p.unit, unitPrice: p.unitPrice, grupo: p.grupo }),
-    ),
-  ),
-  ...CATALOGO_PARTIDAS_V2.map((p) =>
-    sinPrecio({ fuente: 'formato', name: p.equipo, brand: p.marca, model: p.modelo, unit: p.unidad, grupo: p.grupo, description: p.descripcion ?? null }),
-  ),
-];
 
 export type RespuestaCotizar = Omit<PropuestaCotizacion, 'parecida'> & {
   parecida: { id: number; folio: string; cliente: string; proyecto: string | null; enComun: number; deLineas: number } | null;
@@ -127,23 +96,7 @@ export class CotizarFraseService {
   private async delMayorista(concepto: string): Promise<CandidatoPartida[]> {
     for (const q of consultasDeCatalogo(concepto)) {
       const { data } = await this.productos.search({ q, take: 12, inStockOnly: false, targetMarginPercent: MARGEN_POR_OMISION });
-      if (data.length) {
-        return data.map((o) =>
-          sinPrecio({
-            fuente: 'catalogo',
-            name: o.nombre || o.clave || concepto,
-            description: o.descripcion ?? null,
-            brand: o.marca ?? null,
-            model: o.modelo ?? null,
-            unit: 'Pieza',
-            unitCost: Number(o.costMxn) > 0 ? Number(o.costMxn) : null,
-            grupo: 'EQUIPOS',
-            imagenUrl: o.imagen ?? null,
-            stock: o.stockTotal ?? 0,
-            productCtId: o.id,
-          }),
-        );
-      }
+      if (data.length) return data.map((o) => candidatoDelMayorista(o, concepto));
     }
     return [];
   }

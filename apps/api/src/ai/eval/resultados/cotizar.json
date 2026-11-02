@@ -1,5 +1,5 @@
 {
-  "fecha": "2026-11-01T23:54:42.755Z",
+  "fecha": "2026-11-02T00:38:48.613Z",
   "modelo": "claude-haiku-5-5",
   "marcador": {
     "casos": 24,
@@ -14,11 +14,11 @@
     "renglones": 53,
     "conPrecio": 39
   },
-  "msP50": 1274,
-  "msP95": 5696,
-  "usdPorLlamada": 0.000073,
+  "msP50": 1183,
+  "msP95": 1481,
+  "usdPorLlamada": 0.000074,
   "entrada": 1403,
-  "salida": 111,
+  "salida": 112,
   "casos": [
     {
       "id": "c01",
@@ -33,15 +33,15 @@
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 1614,
-      "usd": 0.00009
+      "ms": 1481,
+      "usd": 0.000092
     },
     {
       "id": "c03",
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 1274,
+      "ms": 1135,
       "usd": 0.000055
     },
     {
@@ -73,7 +73,7 @@
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 1191,
+      "ms": 1038,
       "usd": 0.000084
     },
     {
@@ -81,7 +81,7 @@
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 1919,
+      "ms": 1007,
       "usd": 0.000061
     },
     {
@@ -89,7 +89,7 @@
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 1402,
+      "ms": 1113,
       "usd": 0.000067
     },
     {
@@ -97,23 +97,23 @@
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 5696,
-      "usd": 0.000076
+      "ms": 1203,
+      "usd": 0.000078
     },
     {
       "id": "c11",
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 1718,
-      "usd": 0.000085
+      "ms": 1183,
+      "usd": 0.000083
     },
     {
       "id": "c12",
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 930,
+      "ms": 911,
       "usd": 0.000055
     },
     {
@@ -121,7 +121,7 @@
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 1377,
+      "ms": 1387,
       "usd": 0.000139
     },
     {
@@ -129,15 +129,15 @@
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 1057,
-      "usd": 0.000049
+      "ms": 1284,
+      "usd": 0.000054
     },
     {
       "id": "c15",
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 944,
+      "ms": 909,
       "usd": 0.000061
     },
     {
@@ -185,7 +185,7 @@
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 1261,
+      "ms": 1233,
       "usd": 0.000103
     },
     {
@@ -193,7 +193,7 @@
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 1013,
+      "ms": 1272,
       "usd": 0.000047
     },
     {
@@ -201,7 +201,7 @@
       "via": "ia",
       "perfecto": true,
       "fallas": [],
-      "ms": 1171,
+      "ms": 952,
       "usd": 0.000052
     },
     {
