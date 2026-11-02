@@ -116,15 +116,15 @@ export function dibujarMarco(doc: Doc) {
   doc.path('M411.6 794 L480.5 731 Q494.8 718 509 731 L580 794').lineWidth(3.6).strokeColor(VERDE).stroke();
   doc.restore();
 
-  const base = { fuente: F.marca, tamano: 7.2, color: BLANCO };
-  iconoWeb(doc, 19, 721.5, 8);
+  const base = { fuente: F.marca, tamano: 8.8, color: BLANCO };
+  iconoWeb(doc, 18, 720.5, 9);
   escribir(doc, CONTACTO.web, 33, 728, base);
-  icono(doc, ICONO_TELEFONO, 19, 736, 8);
+  icono(doc, ICONO_TELEFONO, 18, 735.5, 9);
   escribir(doc, CONTACTO.telefono, 33, 742.5, base);
-  icono(doc, ICONO_CORREO, 19, 750.5, 8);
+  icono(doc, ICONO_CORREO, 18, 750, 9);
   let x = 33;
-  for (const correo of CONTACTO.correos) x += escribir(doc, correo, x, 757, base) + 10;
-  icono(doc, ICONO_UBICACION, 19, 766, 8);
+  for (const correo of CONTACTO.correos) x += escribir(doc, correo, x, 757, base) + 9;
+  icono(doc, ICONO_UBICACION, 18, 765.5, 9);
   escribir(doc, CONTACTO.oficina, 33, 773, base);
 }
 
@@ -183,10 +183,10 @@ export function dibujarPortada(doc: Doc, o: { version: number; indice: EntradaIn
 
 function indiceDePortada(doc: Doc, indice: EntradaIndice[]) {
   if (!indice.length) return;
-  const [izquierda, derecha, abajo] = [33, 387, 745];
+  const [izquierda, derecha, abajo] = [33, 387, 748];
   const arribaMinimo = 440;
-  const margen = 14;
-  const paso = Math.min(38, (abajo - arribaMinimo - margen * 2) / indice.length);
+  const margen = 10;
+  const paso = Math.min(35.5, (abajo - arribaMinimo - margen * 2) / indice.length);
   const alto = paso * indice.length + margen * 2;
   const arriba = abajo - alto;
   const corte = Math.min(100, alto * 0.42);
@@ -198,17 +198,17 @@ function indiceDePortada(doc: Doc, indice: EntradaIndice[]) {
     .fill(VERDE_PANEL);
   doc.restore();
 
-  const anchoTexto = derecha - 102;
+  const anchoTexto = derecha - 108;
   indice.forEach(({ numero, titulo }, i) => {
     const centro = arriba + margen + paso * (i + 0.5);
-    escribir(doc, `${String(numero).padStart(2, '0')}.`, 62, centro + 4, { fuente: F.titulo, tamano: 11.5, color: VERDE });
+    escribir(doc, `${String(numero).padStart(2, '0')}.`, 58, centro + 5, { fuente: F.titulo, tamano: paso < 30 ? 12.5 : 15, color: VERDE });
 
-    const tamano = paso < 30 ? 7.2 : 8;
+    const tamano = paso < 30 ? 8.4 : 10.4;
     doc.font(F.titulo).fontSize(tamano);
     const opciones = { width: anchoTexto, characterSpacing: 0.25, lineGap: 1.6, height: tamano * 2.8, ellipsis: true };
     const texto = titulo.toUpperCase();
     const altoTexto = Math.min(doc.heightOfString(texto, { width: anchoTexto, characterSpacing: 0.25, lineGap: 1.6 }), opciones.height);
-    doc.fillColor(BLANCO).text(texto, 92, centro - altoTexto / 2 + 0.6, opciones);
+    doc.fillColor(BLANCO).text(texto, 90, centro - altoTexto / 2 + 0.6, opciones);
 
     if (i < indice.length - 1) {
       const linea = arriba + margen + paso * (i + 1);

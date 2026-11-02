@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { PDFDocument as PDFLibDocument } from 'pdf-lib';
-import { formatoDesdeCotizacion, generarCotizacionNexaraPdf, paginaImpresa } from './cotizacion-formato-nexara.js';
+import { formatoDesdeCotizacion, generarCotizacionNexaraPdf, paginaImpresa, trabajoDePartidas } from './cotizacion-formato-nexara.js';
 import { importeConLetra } from './importe-letra.js';
 import { textoPorHoja } from '../common/pdf/texto-de-pdf.js';
 import { loadNexaraLogo } from '../common/pdf/nexara-pdf-theme.js';
@@ -154,6 +154,8 @@ describe('formato Nexara', () => {
   describe('el diseño de NEXARA', () => {
     const instalacion = { name: 'Instalación y puesta en marcha', unit: 'Servicio', qty: 1, unitPrice: 5000, tax: 16 };
     const cuantas = (texto: string, buscado: string) => texto.split(buscado).length - 1;
+    /** Cada trozo de texto es un renglón de la salida: el número en verde y su título se leen de corrido. */
+    const deCorrido = (texto: string) => texto.replace(/\s+/g, ' ');
 
     it('la portada lleva el arte y el índice de lo que trae esta cotización', async () => {
       const pdf = await generarCotizacionNexaraPdf(grupoDice);
@@ -165,6 +167,23 @@ describe('formato Nexara', () => {
       expect(portada).not.toContain('PLANOS');
       expect(portada).not.toContain('Página');
       expect(pdf.toString('latin1')).toContain('/DCTDecode');
+    });
+
+    it('sin proyecto escrito, la hoja de título dice qué se cotiza', async () => {
+      const [, titulo] = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, projectName: null, items: [grupoDice.items[0], instalacion] }));
+      expect(titulo!.replace(/\s+/g, ' ')).toContain('SUMINISTRO E INSTALACIÓN DE EQUIPAMIENTO');
+    });
+
+    it('el título por omisión sigue a lo cotizado', () => {
+      const de = (...grupos: Array<'EQUIPOS' | 'MATERIALES' | 'MANO_DE_OBRA'>) =>
+        trabajoDePartidas(grupos.map((grupo) => ({ grupo, titulo: 'Partida', unidad: 'Pieza' })));
+      expect(de('EQUIPOS')).toBe('Suministro de equipamiento');
+      expect(de('EQUIPOS', 'MATERIALES')).toBe('Suministro de equipamiento e infraestructura');
+      expect(de('EQUIPOS', 'MATERIALES', 'MANO_DE_OBRA')).toBe('Suministro e instalación de equipamiento e infraestructura');
+      expect(de('MATERIALES')).toBe('Suministro de materiales');
+      expect(de('MANO_DE_OBRA')).toBe('Servicios de implementación y puesta a punto');
+      expect(trabajoDePartidas([{ grupo: 'EQUIPOS', titulo: 'Licencia anual', unidad: 'Licencia' }])).toBe('Licenciamiento');
+      expect(de()).toBe('');
     });
 
     it('la versión de la portada es la revisión; un borrador de algo que ya salió es la siguiente', async () => {
@@ -214,10 +233,10 @@ describe('formato Nexara', () => {
       for (const esperado of ['Mi introducción.', 'Mi párrafo de entrada.', 'Uno.', 'Dos.', 'Mi cierre.', 'Por qué estos equipos.', 'Sigue del anterior.', 'Protección activa:', 'con luz y audio.', 'Con respaldo.']) {
         expect(texto).toContain(esperado);
       }
-      expect(texto).toContain('1. ALCANCE EJECUTIVO');
-      expect(texto).toContain('2. JUSTIFICACIÓN TECNOLÓGICA');
-      expect(texto).toContain('3. CENTRO DE MONITOREO');
-      expect(texto).toContain('5. PROPUESTA ECONÓMICA DETALLADA');
+      expect(deCorrido(texto)).toContain('1. ALCANCE EJECUTIVO');
+      expect(deCorrido(texto)).toContain('2. JUSTIFICACIÓN TECNOLÓGICA');
+      expect(deCorrido(texto)).toContain('3. CENTRO DE MONITOREO');
+      expect(deCorrido(texto)).toContain('5. PROPUESTA ECONÓMICA DETALLADA');
       expect(hojas[0]).toContain('JUSTIFICACIÓN TECNOLÓGICA');
     });
 
@@ -274,9 +293,9 @@ describe('formato Nexara', () => {
       expect(hojas[0]).toContain('SOLO ESTE PUNTO');
       expect(hojas[0]).toContain('INVERSIÓN');
       expect(hojas[0]).not.toContain('JUSTIFICACIÓN');
-      expect(interior).toContain('1. RESUMEN DEL PROYECTO');
-      expect(interior).toContain('2. SOLO ESTE PUNTO');
-      expect(interior).toContain('4. INVERSIÓN');
+      expect(deCorrido(interior)).toContain('1. RESUMEN DEL PROYECTO');
+      expect(deCorrido(interior)).toContain('2. SOLO ESTE PUNTO');
+      expect(deCorrido(interior)).toContain('4. INVERSIÓN');
     });
 
     it('la póliza trae vigencia y moneda, y las condiciones no las repiten', async () => {
@@ -291,7 +310,7 @@ describe('formato Nexara', () => {
       const alcanceBloques = Array.from({ length: 9 }, (_, i) => ({ titulo: `Bloque ${i + 1}`, texto: `Texto ${i + 1}.` }));
       const hojas = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, alcanceBloques }));
       const texto = hojas.join('\n');
-      expect(texto).toContain('2. ALCANCE TÉCNICO');
+      expect(deCorrido(texto)).toContain('2. ALCANCE TÉCNICO');
       expect(texto).toContain('2.1  Bloque 1');
       expect(texto).toContain('2.9  Bloque 9');
       expect(hojas[0]).not.toContain('BLOQUE 1');
@@ -310,14 +329,14 @@ describe('formato Nexara', () => {
       expect(texto).not.toContain('Tampoco.');
       expect(texto).not.toContain('Plano apagado');
       expect(texto).not.toContain('PÓLIZA');
-      expect(texto).toContain('1. PROPUESTA ECONÓMICA DETALLADA');
+      expect(deCorrido(texto)).toContain('1. PROPUESTA ECONÓMICA DETALLADA');
       // Sin póliza, la garantía se queda en las condiciones.
       expect(texto).toContain('Garantía:');
     });
 
     it('la póliza dice la garantía una sola vez, y la de instalación solo si se cobra', async () => {
       const soloEquipo = textoPorHoja(await generarCotizacionNexaraPdf(grupoDice)).join('\n');
-      expect(soloEquipo).toContain('PÓLIZA DE GARANTÍAS, EXCLUSIONES Y VIGENCIA COMERCIAL');
+      expect(deCorrido(soloEquipo)).toContain('PÓLIZA DE GARANTÍAS, EXCLUSIONES Y VIGENCIA COMERCIAL');
       expect(soloEquipo).toContain('Equipos:');
       expect(soloEquipo).not.toContain('Instalación:');
       expect(soloEquipo).not.toContain('Garantía:');
@@ -328,7 +347,7 @@ describe('formato Nexara', () => {
 
       const conObra = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, items: [...grupoDice.items, instalacion] })).join('\n');
       expect(conObra).toContain('Instalación:');
-      expect(conObra).toContain('6 meses de garantía');
+      expect(deCorrido(conObra)).toContain('6 meses de garantía');
 
       // Si quien cotiza ya habló de los trabajos, no se le agrega otra garantía encima.
       const propia = textoPorHoja(
@@ -338,8 +357,8 @@ describe('formato Nexara', () => {
           opciones: { condiciones: { garantia: '12 meses sobre los trabajos de mano de obra.' } },
         }),
       ).join('\n');
-      expect(propia).toContain('12 meses sobre los trabajos de mano de obra.');
-      expect(propia).not.toContain('6 meses de garantía');
+      expect(deCorrido(propia)).toContain('12 meses sobre los trabajos de mano de obra.');
+      expect(deCorrido(propia)).not.toContain('6 meses de garantía');
     });
 
     it('en licitación mandan las bases: sin póliza', async () => {
@@ -405,6 +424,25 @@ describe('formato Nexara', () => {
         expect(hojaDeTotales).toContain(`Equipo ${cantidad}`);
       }
     }, 30_000);
+
+    it('un título de grupo nunca queda solo al pie: viaja con su primera partida', async () => {
+      const servicio = { name: 'Servicio de instalación especial', description: 'Detalle del servicio.\n'.repeat(12), unit: 'Servicio', qty: 1, unitPrice: 100, tax: 16 };
+      for (let cantidad = 6; cantidad < 30; cantidad += 2) {
+        const equipos = Array.from({ length: cantidad }, (_, i) => ({ name: `Equipo ${i + 1}`, unit: 'Pieza', qty: 1, unitPrice: 100, tax: 16 }));
+        const hojas = textoPorHoja(await generarCotizacionNexaraPdf({ ...grupoDice, items: [...equipos, servicio] }));
+        const hoja = hojas.find((h) => h.includes('SERVICIOS DE IMPLEMENTACIÓN Y PUESTA A PUNTO') && !h.includes('Página 1 de'))!;
+        expect(hoja).toContain('Servicio de instalación especial');
+      }
+    }, 30_000);
+
+    it('con un alcance corto la tabla sigue en la misma hoja, y una tabla corta se lleva su cierre', async () => {
+      const f = formatoDesdeCotizacion({ ...grupoDice, items: [grupoDice.items[0]] });
+      const hojas = textoPorHoja(await generarCotizacionNexaraPdf({ ...f, alcance: [], alcanceIntro: [], objetivo: null, garantias: [] }));
+      expect(hojas).toHaveLength(3);
+      for (const esperado of ['PROPUESTA ECONÓMICA DETALLADA', 'TOTAL PROYECTO (MXN)', 'CONDICIONES COMERCIALES', 'ATENTAMENTE']) {
+        expect(hojas[2]).toContain(esperado);
+      }
+    });
 
     it('dice en qué página empieza cada parte (la vista previa lleva ahí el PDF)', async () => {
       const secciones: Record<string, number> = {};
