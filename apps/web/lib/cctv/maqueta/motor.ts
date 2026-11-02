@@ -7,7 +7,6 @@
  * soltar se afina el último cuadro; así gira con soltura también en una laptop sin tarjeta gráfica.
  */
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
@@ -43,6 +42,7 @@ import {
   type EtiquetaEquipo,
   type MuroMaqueta,
 } from "./escena";
+import { ControlVista, type Gesto } from "./controlVista";
 
 export type CapasMaqueta = {
   cobertura: boolean;
@@ -79,10 +79,11 @@ export type AvisosMotor = {
   alFallarCroquis?: () => void;
   /** Terminó solo el recorrido automático, o alguien tomó el control. */
   alTerminarGuiado?: () => void;
+  /** Se está arrastrando la vista: para el cursor. */
+  alArrastrarVista?: (activo: boolean) => void;
+  /** Ya se usó este gesto: para quitar la ayuda cuando se aprendió a moverse. */
+  alUsarGesto?: (g: Gesto) => void;
 };
-
-/** Qué hace arrastrar sobre el sitio: deslizarlo como un mapa o girarlo como un objeto. */
-export type ModoArrastre = "deslizar" | "girar";
 
 /** Dónde queda pegado algo al ponerlo: en el muro o en el piso que hay bajo el puntero. */
 export type Montaje = { punto: Punto; alturaM: number | null; rumboDeg: number | null };
@@ -140,7 +141,7 @@ export class MotorMaqueta {
   private readonly ao: GTAOPass | null;
   private readonly brillo: UnrealBloomPass;
   private readonly escena = new THREE.Scene();
-  private readonly ctrl: OrbitControls;
+  private readonly ctrl: ControlVista;
   private readonly mats = materialesArquitectura();
   private readonly raiz = new THREE.Group();
   private readonly capas = {
@@ -222,15 +223,20 @@ export class MotorMaqueta {
     generador.dispose();
 
     this.camara = new THREE.PerspectiveCamera(FOV_MAQUETA, 1.5, 0.05, 500);
-    this.ctrl = new OrbitControls(this.camara, lienzo);
-    this.ctrl.enableDamping = true;
-    this.ctrl.dampingFactor = 0.09;
-    this.ctrl.maxPolarAngle = 1.5;
-    this.ctrl.minDistance = 0.6;
-    this.ctrl.screenSpacePanning = false;
-    this.ctrl.zoomToCursor = true;
-    this.ctrl.addEventListener("change", this.alCambiarVista);
-    this.modoArrastre("deslizar");
+    this.ctrl = new ControlVista(this.camara, lienzo, {
+      alCambiar: this.alCambiarVista,
+      alEmpezar: () => {
+        this.vuelo = null;
+      },
+      alArrastrar: (a) => this.avisos.alArrastrarVista?.(a),
+      alUsar: (g) => this.avisos.alUsarGesto?.(g),
+      // Señalar el horizonte no es señalar el sitio: gira y acerca sobre el centro de la vista.
+      puntoValido: (p) => {
+        const lim = this.limVista;
+        const h = Math.max(4, Math.hypot(lim.max.x - lim.min.x, lim.max.y - lim.min.y) * 0.2);
+        return p.x >= lim.min.x - h && p.x <= lim.max.x + h && p.z >= lim.min.y - h && p.z <= lim.max.y + h;
+      },
+    });
 
     const objetivo = new THREE.WebGLRenderTarget(this.ancho, this.alto, { type: THREE.HalfFloatType, samples: 4 });
     this.composer = new EffectComposer(r, objetivo);
@@ -619,14 +625,44 @@ export class MotorMaqueta {
     this.volar(this.ctrl.target.clone().addScaledVector(d, 1 / factor), this.ctrl.target.clone(), true, 260);
   }
 
-  girar(grados: number) {
-    const d = this.camara.position.clone().sub(this.ctrl.target).applyAxisAngle(new THREE.Vector3(0, 1, 0), aRad(grados));
-    this.volar(this.ctrl.target.clone().add(d), this.ctrl.target.clone(), true, 320);
+  /** Arrastrar la brújula: gira e inclina igual que arrastrar la maqueta. */
+  girarPx(dx: number, dy: number) {
+    this.vuelo = null;
+    this.ctrl.girarPx(dx, dy);
+    this.invalidar();
+  }
+
+  /** Clic en la brújula: el norte del plano hacia arriba, sin cambiar la inclinación. */
+  alNorte(norteDeg: number) {
+    this.vuelo = null;
+    // Con la vista inclinada el rumbo en pantalla no es el ángulo real: se calcula sobre el piso.
+    const n = dirRumbo(norteDeg);
+    const d = this.camara.position.clone().sub(this.ctrl.target);
+    this.ctrl.girarSuave(giroCorto(Math.atan2(-d.x, -d.z), Math.atan2(n.x, n.y)));
+    this.invalidar();
+  }
+
+  /** Qué tan lejos está la vista de lo que mira. */
+  get distanciaVista() {
+    return this.camara.position.distanceTo(this.ctrl.target);
+  }
+
+  /** Doble clic: vuela hacia ese punto, a la mitad de la distancia. */
+  acercarseA(p: Punto) {
+    const destino = new THREE.Vector3(p.x, this.ctrl.target.y, p.y);
+    const d = this.camara.position.clone().sub(this.ctrl.target);
+    const lejos = Math.max(d.length() * 0.5, 4);
+    this.volar(destino.clone().addScaledVector(d.normalize(), lejos), destino, true, 520);
+  }
+
+  conEspacio(activo: boolean) {
+    this.ctrl.conEspacio(activo);
   }
 
   private duracionVuelo = 900;
 
   private volar(p: THREE.Vector3, m: THREE.Vector3, animar: boolean, duracion = 900) {
+    this.ctrl.frenar();
     if (!animar || this.quieto) {
       this.vuelo = null;
       this.camara.position.copy(p);
@@ -679,16 +715,6 @@ export class MotorMaqueta {
     this.ctrl.enabled = activos && !this.previo?.verDesde && !this.rec && !this.transicion;
   }
 
-  modoArrastre(modo: ModoArrastre) {
-    if (modo === "deslizar") {
-      this.ctrl.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
-      this.ctrl.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
-    } else {
-      this.ctrl.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
-      this.ctrl.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
-    }
-  }
-
   /** Teclas que mueven: W A S D, flechas, Q y E, y Mayús para ir más rápido. */
   tecla(codigo: string, abajo: boolean) {
     if (abajo) this.teclas.add(codigo);
@@ -736,6 +762,7 @@ export class MotorMaqueta {
     if (!d) return;
     if (!this.rec) this.orbitaGuardada = { p: this.camara.position.clone(), m: this.ctrl.target.clone() };
     this.vuelo = null;
+    this.ctrl.frenar();
     this.ctrl.enabled = false;
     const frente = this.ctrl.target.clone().sub(this.camara.position);
     const yaw = rumboDeg != null ? aRad(rumboDeg) : Math.atan2(frente.x, -frente.z);
@@ -964,6 +991,11 @@ export class MotorMaqueta {
     const adelante = (t.has("KeyW") || t.has("ArrowUp") ? 1 : 0) - (t.has("KeyS") || t.has("ArrowDown") ? 1 : 0);
     const lado = (t.has("KeyD") || t.has("ArrowRight") ? 1 : 0) - (t.has("KeyA") || t.has("ArrowLeft") ? 1 : 0);
     const giro = (t.has("KeyE") ? 1 : 0) - (t.has("KeyQ") ? 1 : 0);
+    const zoom = (t.has("Minus") || t.has("NumpadSubtract") ? 1 : 0) - (t.has("Equal") || t.has("NumpadAdd") ? 1 : 0);
+    if (zoom) {
+      this.ctrl.acercarPaso(zoom * 1.4 * dt);
+      this.invalidar();
+    }
     if (!adelante && !lado && !giro) return;
     const d = this.camara.position.clone().sub(this.ctrl.target);
     if (giro) {
@@ -1201,7 +1233,7 @@ export class MotorMaqueta {
       if (this.rec) this.pasoRecorrido(this.rec, ahora, dt);
       else {
         if (!this.vuelo) this.pasoOrbita(dt);
-        this.ctrl.update();
+        this.ctrl.update(dt);
         if (!this.vuelo) this.contenerVista();
       }
     }
@@ -1281,7 +1313,6 @@ export class MotorMaqueta {
     this.destruido = true;
     cancelAnimationFrame(this.idCuadro);
     this.lienzo.removeEventListener("webglcontextlost", this.alPerder);
-    this.ctrl.removeEventListener("change", this.alCambiarVista);
     this.ctrl.dispose();
     for (const g of Object.values(this.capas)) liberar(g);
     liberar(this.ambiente);

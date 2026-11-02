@@ -5,6 +5,7 @@
  * giro, ventanas, obstáculos, cotas, etiquetas, conos DORI recortados por muros, cámaras con su
  * manija para apuntar y humanoides. Rueda = zoom; arrastrar el fondo = mover la vista.
  */
+import { clasificarRueda, factorDeRueda, type EstadoRueda } from "@/lib/cctv/gestos";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { equipoPorId, modeloPorId, type ModeloCamara, type ModeloEquipo, type TipoEquipo } from "@/lib/cctv/catalogo";
 import {
@@ -227,10 +228,21 @@ export default function Lienzo({
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
+    const estadoRueda: EstadoRueda = { dosDedosHasta: 0 };
     const rueda = (e: WheelEvent) => {
       e.preventDefault();
+      const tipo = clasificarRueda(e as WheelEvent & { wheelDeltaY?: number }, estadoRueda, performance.now());
+      if (tipo === "dos-dedos") {
+        // Dos dedos deslizan el dibujo; pellizcar o la rueda acercan.
+        const caja = svg.getBoundingClientRect();
+        setVista((v) => {
+          const u = Math.max(v.w / Math.max(caja.width, 1), v.h / Math.max(caja.height, 1));
+          return { ...v, x: v.x + e.deltaX * u, y: v.y + e.deltaY * u };
+        });
+        return;
+      }
       const p = aPlano(e.clientX, e.clientY);
-      const f = Math.exp(-e.deltaY * 0.0015);
+      const f = 1 / factorDeRueda(tipo, e.deltaY);
       setVista((v) => {
         const w = Math.min(Math.max(v.w / f, 20), 200_000);
         const h = (v.h * w) / v.w;
