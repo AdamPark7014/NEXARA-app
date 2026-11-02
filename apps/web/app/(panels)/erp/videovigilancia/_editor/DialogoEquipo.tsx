@@ -68,6 +68,7 @@ export default function DialogoEquipo({
   base,
   onCerrar,
   onGuardado,
+  onMemoria,
 }: {
   token: string;
   /** Lo que se edita. Sin ella, es un modelo nuevo. */
@@ -77,10 +78,12 @@ export default function DialogoEquipo({
   onCerrar: () => void;
   /** Recibe el id con el que queda en el catálogo (`db-7`). */
   onGuardado: (id: string) => void;
+  /** Mejor que capturarlo: que la IA lea su PDF. */
+  onMemoria?: () => void;
 }) {
   const inicio = fila ?? base ?? null;
   const [tipo, setTipo] = useState<Tipo>((inicio?.tipo as Tipo) ?? "domo");
-  const [marca, setMarca] = useState(inicio?.marca ?? "HIKVISION");
+  const [marca, setMarca] = useState(inicio?.marca ?? "");
   const [modelo, setModelo] = useState(inicio?.modelo ?? "");
   const [descripcion, setDescripcion] = useState(inicio?.descripcion ?? "");
   const datosIniciales = (inicio?.datos ?? {}) as Record<string, unknown>;
@@ -100,6 +103,8 @@ export default function DialogoEquipo({
 
   const armar = (): EquipoParaGuardar => {
     const numeros = Object.fromEntries((camara ? [] : (CAMPOS[tipo as TipoEquipo] ?? [])).map((c) => [c.k, aNumero(datos[c.k] ?? "")]));
+    // Lo que no se edita aquí (su foto, su apariencia, de qué ficha salió) se conserva.
+    const conservar = Object.fromEntries(Object.entries(datosIniciales).filter(([k]) => k === "foto" || k === "apariencia" || k === "ficha"));
     const res = pxPorMegapixeles(mp);
     const m = { anchoMm: aNumero(medidas.anchoMm), altoMm: aNumero(medidas.altoMm), fondoMm: aNumero(medidas.fondoMm) };
     const conMedidas = Object.fromEntries(Object.entries(m).filter(([, v]) => v));
@@ -111,10 +116,11 @@ export default function DialogoEquipo({
       descripcion: descripcion.trim(),
       datos: camara
         ? {
+            ...conservar,
             optica: { pxHoriz: res?.pxHoriz ?? 2560, pxVert: res?.pxVert ?? 1440, focalMm: aNumero(focal), hfovDeclaradoDeg: aNumero(hfov), irM: aNumero(ir), sensorFormato: '1/3"' },
             wattsPoe: aNumero(datos.wattsPoe ?? ""),
           }
-        : numeros,
+        : { ...conservar, ...numeros },
       medidas: Object.keys(conMedidas).length ? (conMedidas as FilaCatalogo["medidas"]) : null,
       caracteristicas: fila?.caracteristicas ?? [],
       fuente: fila?.fuente ?? "manual",
@@ -161,6 +167,12 @@ export default function DialogoEquipo({
           </div>
         </header>
         {error ? <Alert tone="danger">{error}</Alert> : null}
+        {onMemoria && !fila ? (
+          <button type="button" className={styles.equipoAgregar} onClick={onMemoria}>
+            <b>¿Tienes su PDF? Súbelo y se llena solo</b>
+            <span>La IA lee su memoria técnica; tú la revisas antes de guardar.</span>
+          </button>
+        ) : null}
         <div className={styles.dosColumnas}>
           <Field label="Tipo">
             <Select value={tipo} onChange={(e) => setTipo(e.target.value as Tipo)} controlSize="sm">
@@ -176,7 +188,7 @@ export default function DialogoEquipo({
             </Select>
           </Field>
           <Field label="Marca">
-            <Input value={marca} onChange={(e) => setMarca(e.target.value)} maxLength={80} controlSize="sm" />
+            <Input value={marca} onChange={(e) => setMarca(e.target.value)} maxLength={80} placeholder="La que sea: Dahua, Axis, ZKTeco…" controlSize="sm" />
           </Field>
         </div>
         <Field label="Modelo">

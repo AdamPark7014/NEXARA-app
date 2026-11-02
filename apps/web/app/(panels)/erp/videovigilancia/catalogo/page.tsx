@@ -3,10 +3,11 @@
 /**
  * Videovigilancia · catálogo de equipos (mockup aprobado 01-11-2026): lo que se puede colocar en la
  * maqueta, con su modelo 3D y su ficha. La lista base viene en el código; lo que agrega cada empresa,
- * de `cctv_equipos`. Las existencias de Almacén y la lectura de la memoria técnica llegan en sus fases.
+ * de `cctv_equipos`. Las existencias de Almacén llegan en su fase.
  */
 import { useEffect, useMemo, useState } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import { Alert, Button, EmptyState, Input, ModulePage, Skeleton } from "@/components/base";
 import { useUser } from "@/components/UserContext";
@@ -25,11 +26,13 @@ import {
 import { fotoDeTipo } from "@/lib/cctv/sistema";
 import { useCatalogo } from "@/lib/cctv/useCatalogo";
 import DialogoEquipo from "../_editor/DialogoEquipo";
+import MemoriaTecnica from "../_editor/MemoriaTecnica";
 import styles from "./catalogo.module.css";
 
 type Familia = FamiliaEquipo | "camaras";
 type Tarjeta = {
   id: string;
+  marca: string;
   familia: Familia;
   tipo: string;
   etiquetaTipo: string;
@@ -53,7 +56,9 @@ export default function CatalogoPage() {
   const catalogo = useCatalogo(acceso ? token : null);
   const [familia, setFamilia] = useState<Familia | "todo">("todo");
   const [buscar, setBuscar] = useState("");
+  const [marca, setMarca] = useState("");
   const [dialogo, setDialogo] = useState<{ fila: FilaCatalogo | null; base: Partial<EquipoParaGuardar> | null } | null>(null);
+  const [leyendoFicha, setLeyendoFicha] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -66,24 +71,26 @@ export default function CatalogoPage() {
     const filaDe = (id: string) => (id.startsWith("db-") ? (catalogo.filas.find((f) => `db-${f.id}` === id) ?? null) : null);
     const camaras: Tarjeta[] = catalogo.camaras.map((m) => ({
       id: m.id,
+      marca: m.marca,
       familia: "camaras",
       tipo: m.tipo,
       etiquetaTipo: ETIQUETA_TIPO_CAMARA[m.tipo],
       nombre: etiquetaModelo(m),
       specs: especificacionesCamara(m),
-      foto: fotoDeTipo(m.tipo),
+      foto: m.foto ?? fotoDeTipo(m.tipo),
       estado: m.fuente === "ficha" || m.verificado ? "ficha" : m.fuente === "manual" ? "manual" : "falta",
       fila: filaDe(m.id),
       base: { familia: "camaras", tipo: m.tipo, marca: m.marca, descripcion: m.descripcion, medidas: m.medidas ?? null, datos: { optica: m.optica, wattsPoe: m.wattsPoe ?? null } },
     }));
     const equipos: Tarjeta[] = catalogo.equipos.map((m) => ({
       id: m.id,
+      marca: m.marca,
       familia: FAMILIA_DE_TIPO[m.tipo],
       tipo: m.tipo,
       etiquetaTipo: ETIQUETA_TIPO_EQUIPO[m.tipo],
       nombre: etiquetaModelo(m),
       specs: especificacionesEquipo(m),
-      foto: fotoDeTipo(m.tipo),
+      foto: m.foto ?? fotoDeTipo(m.tipo),
       estado: m.fuente === "ficha" ? "ficha" : m.fuente === "manual" ? "manual" : "falta",
       fila: filaDe(m.id),
       base: { familia: FAMILIA_DE_TIPO[m.tipo], tipo: m.tipo, marca: m.marca, descripcion: m.descripcion, medidas: m.medidas ?? null, datos: m.datos as Record<string, unknown> },
@@ -97,8 +104,15 @@ export default function CatalogoPage() {
     return c;
   }, [tarjetas]);
 
+  // Sin importar cómo se capturó: «HIKVISION» y «Hikvision» son la misma marca.
+  const claveMarca = (m: string) => m.trim().toLowerCase();
+  const marcas = useMemo(() => {
+    const vistas = new Map<string, string>();
+    for (const t of tarjetas) if (t.marca.trim() && !vistas.has(claveMarca(t.marca))) vistas.set(claveMarca(t.marca), t.marca.trim());
+    return [...vistas.entries()].sort((a, b) => a[1].localeCompare(b[1], "es"));
+  }, [tarjetas]);
   const q = buscar.trim().toLowerCase();
-  const visibles = tarjetas.filter((t) => (familia === "todo" || t.familia === familia) && (!q || `${t.nombre} ${t.etiquetaTipo} ${t.specs}`.toLowerCase().includes(q)));
+  const visibles = tarjetas.filter((t) => (familia === "todo" || t.familia === familia) && (!marca || claveMarca(t.marca) === marca) && (!q || `${t.nombre} ${t.etiquetaTipo} ${t.specs}`.toLowerCase().includes(q)));
 
   if (acceso === false) {
     return (
@@ -115,9 +129,14 @@ export default function CatalogoPage() {
         description="Lo que coloques en la maqueta sale de aquí, con su modelo 3D y su ficha."
         breadcrumbs={[{ label: "Clientes y obra" }, { label: "Videovigilancia", href: "/erp/videovigilancia" }, { label: "Catálogo" }]}
         icon={<VideocamOutlinedIcon />}
+        secondaryActions={
+          <Button iconStart={<AddRoundedIcon />} onClick={() => setDialogo({ fila: null, base: null })}>
+            Agregar a mano
+          </Button>
+        }
         primaryAction={
-          <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={() => setDialogo({ fila: null, base: null })}>
-            Agregar equipo
+          <Button variant="primary" iconStart={<UploadFileOutlinedIcon />} onClick={() => setLeyendoFicha(true)}>
+            Cargar memoria técnica
           </Button>
         }
       >
@@ -134,7 +153,17 @@ export default function CatalogoPage() {
             ))}
           </nav>
           <div className={styles.contenido}>
-            <Input type="search" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar modelo, marca o tipo" aria-label="Buscar en el catálogo" />
+            <div className={styles.filtros}>
+              <Input type="search" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar modelo, marca o tipo" aria-label="Buscar en el catálogo" />
+              <select className={styles.marca} value={marca} onChange={(e) => setMarca(e.target.value)} aria-label="Filtrar por marca">
+                <option value="">Todas las marcas</option>
+                {marcas.map(([clave, nombre]) => (
+                  <option key={clave} value={clave}>
+                    {nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
             {acceso === null || catalogo.cargando ? (
               <Skeleton height={340} />
             ) : (
@@ -151,10 +180,10 @@ export default function CatalogoPage() {
                     <span className={t.estado === "falta" ? styles.estadoFalta : styles.estadoBien}>{ESTADO[t.estado]}</span>
                   </button>
                 ))}
-                <button type="button" className={styles.agregar} onClick={() => setDialogo({ fila: null, base: null })}>
+                <button type="button" className={styles.agregar} onClick={() => setLeyendoFicha(true)}>
                   <AddRoundedIcon />
                   <b>Agregar equipo</b>
-                  <span>Captúralo con los datos de su ficha. Queda para todos los diseños.</span>
+                  <span>Sube su PDF y se llena solo, o captúralo a mano.</span>
                 </button>
                 {!visibles.length && q ? <p className={styles.vacio}>Sin resultados para «{buscar.trim()}».</p> : null}
               </div>
@@ -171,6 +200,24 @@ export default function CatalogoPage() {
           onGuardado={() => {
             setDialogo(null);
             void catalogo.recargar();
+          }}
+          onMemoria={() => {
+            setDialogo(null);
+            setLeyendoFicha(true);
+          }}
+        />
+      ) : null}
+      {leyendoFicha && token ? (
+        <MemoriaTecnica
+          token={token}
+          onCerrar={() => setLeyendoFicha(false)}
+          onGuardado={() => {
+            setLeyendoFicha(false);
+            void catalogo.recargar();
+          }}
+          onManual={() => {
+            setLeyendoFicha(false);
+            setDialogo({ fila: null, base: null });
           }}
         />
       ) : null}

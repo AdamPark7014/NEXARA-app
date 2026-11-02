@@ -21,6 +21,8 @@ const FUENTES = ['manual', 'ficha'] as const;
 /** Los números de `datos` y `medidas`: ni negativos ni absurdos. */
 const NUMERO_MAX = 1_000_000;
 export const DATOS_MAX_CARACTERES = 8_000;
+/** La foto de estudio del modelo armado con su ficha: chica, porque viaja con toda la lista. */
+export const FOTO_MAX_CARACTERES = 40_000;
 const CARACTERISTICAS_MAX = 20;
 
 export type EquipoCatalogo = {
@@ -57,9 +59,22 @@ function validarDatos(v: unknown, familia: string): Record<string, unknown> {
     return {};
   }
   if (!esObjeto(v)) throw new BadRequestException('Los datos del equipo no son válidos');
-  if (JSON.stringify(v).length > DATOS_MAX_CARACTERES) throw new BadRequestException('Los datos del equipo son demasiado grandes');
+  const { foto, ...resto } = v;
+  if (JSON.stringify(resto).length > DATOS_MAX_CARACTERES) throw new BadRequestException('Los datos del equipo son demasiado grandes');
   const salida: Record<string, unknown> = {};
-  for (const [k, x] of Object.entries(v)) {
+  if (foto != null) {
+    if (typeof foto !== 'string' || foto.length > FOTO_MAX_CARACTERES || !/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(foto)) {
+      throw new BadRequestException('La foto del modelo no es válida');
+    }
+    salida.foto = foto;
+  }
+  for (const [k, x] of Object.entries(resto)) {
+    // Cómo se ve su modelo y de dónde salió la ficha: se enseñan, no entran a ningún cálculo.
+    if (k === 'apariencia' || k === 'ficha') {
+      if (!esObjeto(x)) throw new BadRequestException('Los datos del equipo no son válidos');
+      salida[k] = x;
+      continue;
+    }
     if (k === 'optica') {
       if (!esObjeto(x)) throw new BadRequestException('La óptica de la cámara no es válida');
       for (const [ko, xo] of Object.entries(x)) {
@@ -84,7 +99,7 @@ function validarMedidas(v: unknown): Record<string, number> | null {
   if (v == null) return null;
   if (!esObjeto(v)) throw new BadRequestException('Las medidas no son válidas');
   const salida: Record<string, number> = {};
-  for (const k of ['diametroMm', 'anchoMm', 'altoMm', 'fondoMm']) {
+  for (const k of ['diametroMm', 'anchoMm', 'altoMm', 'fondoMm', 'altoCarcasaMm', 'radioCupulaMm']) {
     const x = v[k];
     if (x == null) continue;
     if (!numeroValido(x) || x === 0) throw new BadRequestException('Las medidas van en milímetros y mayores a cero');

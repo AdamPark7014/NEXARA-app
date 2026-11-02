@@ -406,6 +406,15 @@ describe('Catálogo de equipos', () => {
     for (const [arg] of prisma.cctvEquipo.updateMany.mock.calls) expect(arg.where.companyId).toBe(EMPRESA);
   });
 
+  it('guarda la foto del modelo y su apariencia, y rechaza una foto que no es imagen o es enorme', async () => {
+    const { prisma, service } = armar();
+    const foto = 'data:image/webp;base64,AAAA';
+    await service.agregarAlCatalogo(DAVID, { ...NVR, fuente: 'ficha', datos: { ...NVR.datos, foto, apariencia: { color: 'negro' }, ficha: { archivo: 'x.pdf', hojas: 7 } } }, EMPRESA);
+    expect(prisma.cctvEquipo.create.mock.calls[0][0].data.datos).toMatchObject({ foto, apariencia: { color: 'negro' }, ficha: { hojas: 7 }, canales: 16 });
+    await expect(service.agregarAlCatalogo(DAVID, { ...NVR, datos: { foto: 'javascript:alert(1)' } }, EMPRESA)).rejects.toThrow(/foto/);
+    await expect(service.agregarAlCatalogo(DAVID, { ...NVR, datos: { foto: `data:image/webp;base64,${'A'.repeat(50_000)}` } }, EMPRESA)).rejects.toThrow(/foto/);
+  });
+
   it('sin acceso al diseñador no se toca el catálogo', async () => {
     const { prisma, service } = armar();
     await expect(service.agregarAlCatalogo(JOAN, NVR, EMPRESA)).rejects.toBeInstanceOf(ForbiddenException);
