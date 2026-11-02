@@ -22,6 +22,7 @@ import { isAcsDenied, isAcsGranted, minorsDe } from './integra-acs-codes';
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
 import { IntegraEventRouterService } from './integra-event-router.service';
+import { IntegraMediaService } from './integra-media.service';
 import { readLocalPersonFace } from './integra-person-media';
 import { identifiesDevice } from './integra-push.parse';
 
@@ -97,6 +98,13 @@ const NOISE_TYPES = ['heartBeat', 'duration', 'VMD', 'videoloss'] as const;
 const NOISE_TTL_HOURS = 6;
 /** Todo lo demás —accesos, detecciones— aguanta un trimestre. */
 const EVENT_TTL_DAYS = 90;
+/** Lote de la poda: de a poco, para no dejar la tabla bloqueada. */
+const PURGE_BATCH = 8_000;
+/**
+ * Lotes por corrida. Entran unas 27 mil filas al día, con días de 172 mil: un
+ * solo lote por noche dejaba crecer la tabla sin fin. 40 lotes son 320 mil.
+ */
+const PURGE_MAX_BATCHES = 40;
 /** Caché corta del token de empuje (evita 1 SELECT/evento a 200/min). */
 const TOKEN_CACHE_MS = 30_000;
 
@@ -132,11 +140,15 @@ export class IntegraPushService {
     { site: { id: number; companyId: number; host: string; pushTokenHash: string | null }; expires: number }
   >();
 
+  /** Cámara → última vez que le tocó foto. Ver `CAMERA_PHOTO_GAP_MS`. */
+  private readonly lastCameraPhotoAt = new Map<string, number>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly sites: IntegraSiteService,
     private readonly acsFanout: IntegraAcsFanoutService,
     private readonly eventRouter: IntegraEventRouterService,
+    private readonly media: IntegraMediaService,
   ) {}
 
   stream(siteId: number): Observable<PushEventDto> {
@@ -269,6 +281,23 @@ export class IntegraPushService {
     wipeAllNoise: boolean;
     includeBusiness: boolean;
   }) {
+    let deleted = 0;
+    let photos = 0;
+    for (let batch = 0; batch < PURGE_MAX_BATCHES; batch += 1) {
+      const r = await this.purgeBatch(opts);
+      deleted += r.deleted;
+      photos += r.photos;
+      if (r.deleted < PURGE_BATCH) break;
+    }
+    if (deleted > 0) {
+      this.logger.log(
+        `Poda de eventos (${opts.includeBusiness ? 'full' : 'noise'}): ${deleted} filas, ${photos} fotos`,
+      );
+    }
+    return { deleted, photos };
+  }
+
+  private async purgeBatch(opts: { wipeAllNoise: boolean; includeBusiness: boolean }) {
     const now = Date.now();
     const noiseBefore = new Date(now - NOISE_TTL_HOURS * 3_600_000);
     const anyBefore = new Date(now - EVENT_TTL_DAYS * 86_400_000);
@@ -295,7 +324,7 @@ export class IntegraPushService {
         ],
       },
       select: { id: true, photoPath: true },
-      take: 8_000,
+      take: PURGE_BATCH,
       orderBy: { id: 'asc' },
     });
     if (doomed.length === 0) return { deleted: 0, photos: 0 };
@@ -315,9 +344,6 @@ export class IntegraPushService {
     const { count } = await this.prisma.integraPushEvent.deleteMany({
       where: { id: { in: doomed.map((d) => d.id) } },
     });
-    this.logger.log(
-      `Poda de eventos (${opts.includeBusiness ? 'full' : 'noise'}): ${count} filas, ${photos} fotos`,
-    );
     return { deleted: count, photos };
   }
 
@@ -1195,7 +1221,8 @@ export class IntegraPushService {
    * Orden de foto (rápido → lento):
    * 1. JPEG que el equipo empujó (cámaras con httpHosts+images)
    * 2. JPEG enrolado en NEXARA (Face ID) — **inmediato**, sin ISAPI
-   * 3. Snapshot canal 102→101 en background (~100–300 ms) y re-SSE
+   * 3. En background y con re-SSE: el terminal, por canal 102→101 (~100–300 ms);
+   *    la cámara, de su video y a lo más una por minuto (ver `snapshot`)
    *
    * Publica por SSE **antes** del snapshot ISAPI: el nombre y el FaceRect
    * no deben esperar a la JPEG del canal.
@@ -1308,13 +1335,31 @@ export class IntegraPushService {
 
     // Snapshot de canal siempre en fresco (aunque ya haya cara enrolada):
     // captura el instante en puerta; sustituye photoPath si llega.
-    if (worthAPhoto(ev) && isFresh(ev.occurredAt)) {
+    if (worthAPhoto(ev) && isFresh(ev.occurredAt) && this.cameraPhotoTurn(ev)) {
       void this.attachSnapshotLater(site, row.id, ev);
     }
     return row;
   }
 
-  /** Snapshot ISAPI en segundo plano; re-publica el DTO con foto. */
+  /**
+   * ¿Le toca foto a esta cámara? Un acceso siempre lleva la suya.
+   *
+   * Fotografiar cada rostro no cabe: entran hasta 265 por minuto por cámara y
+   * 172 mil en un día, unos 3.4 GB. Con esto son ~480 fotos al día, ~10 MB, y aun
+   * con las nueve cámaras disparando sin parar no pasa de ~260 MB. La fila del
+   * evento se guarda siempre. Se filtra por tiempo porque `activePostCount` no
+   * sirve: vale 1 en los 960 mil rostros medidos.
+   */
+  private cameraPhotoTurn(ev: NormalizedEvent): boolean {
+    if (ev.eventType === 'AccessControllerEvent') return true;
+    const now = Date.now();
+    const last = this.lastCameraPhotoAt.get(ev.deviceIp);
+    if (last !== undefined && now - last < CAMERA_PHOTO_GAP_MS) return false;
+    this.lastCameraPhotoAt.set(ev.deviceIp, now);
+    return true;
+  }
+
+  /** Foto en segundo plano; re-publica el DTO con ella. */
   private async attachSnapshotLater(
     site: { id: number; companyId: number },
     rowId: number,
@@ -1353,12 +1398,23 @@ export class IntegraPushService {
 
   /**
    * Captura del propio equipo que mandó el evento.
-   * Sub-stream `102` primero (más rápido / H.264 bajo); fallback `101`.
+   *
+   * La cámara, de su video: su `/picture` se atora en el túnel y cada intento
+   * gasta una de las pocas ranuras del firmware (ver `fotoDeCamara`). Sin foto
+   * por ahí no se insiste por ISAPI.
+   *
+   * El terminal, por ISAPI: sub-stream `102` primero (más rápido / H.264 bajo);
+   * fallback `101`.
    */
   private async snapshot(
     site: { id: number; companyId: number },
     ev: NormalizedEvent,
   ): Promise<string | null> {
+    if (ev.eventType !== 'AccessControllerEvent') {
+      const foto = await this.media.fotoDeCamara(site, ev.deviceIp);
+      return foto ? this.savePhoto(site, ev, foto) : null;
+    }
+
     const resolved = await this.sites.resolveClient({
       companyId: site.companyId,
       siteId: site.id,
@@ -1444,6 +1500,8 @@ function worthAPhoto(ev: NormalizedEvent): boolean {
  * segundos de deriva sale más caro que tolerarlos.
  */
 const PHOTO_MAX_AGE_MS = 20_000;
+/** Una foto por cámara por minuto, como mucho. Decisión de Adam, 02-11. */
+const CAMERA_PHOTO_GAP_MS = 60_000;
 
 function isFresh(occurredAt: Date): boolean {
   const age = Date.now() - occurredAt.getTime();

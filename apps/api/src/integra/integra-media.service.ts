@@ -53,6 +53,8 @@ function conFirmaGo2rtc(url: string, streamName: string): string {
 
 const SUB_STREAM_ID = 102;
 const MAIN_STREAM_ID = 101;
+/** La PTZ tardó hasta 3.3 s en dar su foto; las demás, un segundo. */
+const FOTO_CAMARA_TIMEOUT_MS = 10_000;
 
 /**
  * `192.168.9.34|301` → `192_168_9_34_301`.
@@ -275,6 +277,51 @@ export class IntegraMediaService {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Una foto de la cámara, sacada de su video.
+   *
+   * `/ISAPI/Streaming/channels/102/picture` no sirve a través del túnel. Medido
+   * el 02-11 en las nueve cámaras, tres rondas: contestó 8 de 27 veces. Las demás,
+   * la conexión muere a los 7–10 KB en los dos sentidos, sin confirmar siquiera el
+   * cierre. No es la imagen: un XML de 18 KB se atora igual. La causa sigue sin
+   * encontrarse, pero el RTSP de esas mismas cámaras va bien: 27 de 27, en uno a
+   * tres segundos.
+   *
+   * Es el secundario de 640×360: alcanza para ver qué pasó y quién andaba cerca,
+   * no para reconocer a alguien de lejos.
+   *
+   * `null` si no se pudo. Si go2rtc no tiene el stream, como tras reiniciarlo, se
+   * registra y se reintenta una vez.
+   */
+  async fotoDeCamara(
+    site: { id: number; companyId: number },
+    deviceIp: string,
+  ): Promise<Buffer | null> {
+    const internal = this.go2rtcInternal();
+    if (!internal) return null;
+
+    const camera = await this.prisma.integraCamera.findFirst({
+      where: { siteId: site.id, raw: { path: ['source', 'ipAddress'], equals: deviceIp } },
+      select: { cameraIndexCode: true },
+    });
+    if (!camera) return null;
+
+    const nombre = encodeURIComponent(nombreStreamMuro(camera.cameraIndexCode));
+    const pedir = () =>
+      fetch(`${internal}/api/frame.jpeg?src=${nombre}`, {
+        signal: AbortSignal.timeout(FOTO_CAMARA_TIMEOUT_MS),
+      });
+
+    let res = await pedir();
+    if (res.status === 404) {
+      await this.liveStream(site.companyId, camera.cameraIndexCode, site.id);
+      res = await pedir();
+    }
+    if (!res.ok) return null;
+    const foto = Buffer.from(await res.arrayBuffer());
+    return foto.length > 500 ? foto : null;
   }
 
   /**
