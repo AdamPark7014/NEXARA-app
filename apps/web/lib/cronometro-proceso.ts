@@ -9,7 +9,7 @@ import { erpFetch } from "@/lib/erp-api";
  *
  * Nunca estorba: si falla el envío no pasa nada y la persona no se entera.
  */
-export type ProcesoMedido = "asignar" | "autoasignar" | "asignar_ia" | "cotizar" | "revisar";
+export type ProcesoMedido = "asignar" | "autoasignar" | "asignar_ia" | "asignar_formato" | "cotizar" | "revisar";
 
 export type Medicion = { inicio: number | null; ocultoDesde: number | null; ocultoMs: number; clics: number };
 

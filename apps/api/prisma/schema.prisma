@@ -8202,6 +8202,46 @@ model CctvEquipo {
   @@map("cctv_equipos")
 }
 
+/// Paquete de actividades reutilizable (Adam, 01-11-2026: «de una crepería a otra crepería, va a ser
+/// muy similar el paquete»). La receta no guarda cliente, personas ni fechas: eso se pide al aplicar.
+/// Columnas sueltas, como `CctvDiseno`: el aislamiento por empresa lo pone el middleware.
+model FormatoActividad {
+  id           Int       @id @default(autoincrement())
+  companyId    Int
+  nombre       String    @db.VarChar(120)
+  descripcion  String?   @db.VarChar(300)
+  /// `RecetaFormato` de `formatos-actividad/receta-formato.ts`.
+  receta       Json
+  /// Cada edición la sube; lo ya aplicado no cambia.
+  version      Int       @default(1)
+  usos         Int       @default(0)
+  ultimoUsoAt  DateTime?
+  creadoPorId  Int?
+  /// Archivado (no se borra): sale del catálogo.
+  archivadoAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([companyId, archivadoAt])
+  @@map("formatos_actividad")
+}
+
+/// Cada vez que se aplicó un formato. La `clave` la pone quien asigna: dos toques no crean dos paquetes.
+model FormatoAplicacion {
+  id           Int      @id @default(autoincrement())
+  companyId    Int
+  formatoId    Int
+  clave        String   @db.VarChar(64)
+  version      Int
+  actividades  Int[]    @default([])
+  creadoPorId  Int
+  createdAt    DateTime @default(now())
+
+  @@unique([companyId, clave])
+  @@index([companyId, formatoId])
+  @@map("formato_aplicaciones")
+}
+
 /// Cuánto tarda una persona en un proceso, medido en su pantalla (Programa Velocidad Core, 01-11-2026).
 /// Es la línea base de «asignar en 30 segundos» y de cada ola. Solo se agrega; nadie la edita.
 /// Sin relaciones a propósito, como `CctvDiseno`: el aislamiento por empresa lo pone el middleware.
@@ -8209,7 +8249,7 @@ model ProcesoTiempo {
   id         Int      @id @default(autoincrement())
   companyId  Int
   userId     Int
-  /// asignar | autoasignar | asignar_ia | cotizar | revisar
+  /// asignar | autoasignar | asignar_ia | asignar_formato | cotizar | revisar
   proceso    String   @db.VarChar(20)
   /// Con la pestaña a la vista: lo que estuvo oculta no cuenta.
   duracionMs Int

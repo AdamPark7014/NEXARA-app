@@ -128,7 +128,8 @@ export class ActivitiesService {
     }
   }
 
-  async create(dtoRecibido: CreateActivityDto, companyId?: number | null) {
+  /** `sinAviso`: quien crea varias de un jalón (formatos) manda un solo aviso al terminar. */
+  async create(dtoRecibido: CreateActivityDto, companyId?: number | null, opciones: { sinAviso?: boolean } = {}) {
     await this.assertResponsableActivo(dtoRecibido.responsableId);
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
     // Ninguna sin tiempo ni entrega; en la autoasignación salen del título y no se editan
@@ -206,7 +207,7 @@ export class ActivitiesService {
     }
 
     // Notify the assigned user about new activity
-    if (activity.responsableId && activity.responsable) {
+    if (!opciones.sinAviso && activity.responsableId && activity.responsable) {
       await this.notificationHierarchy.notifyActivityAssigned(
         activity.responsableId,
         activity.id,

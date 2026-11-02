@@ -52,6 +52,15 @@ export const SELF_ATTENDANCE_URL_RULES: UrlRule[] = [
 ];
 
 /**
+ * Formatos de actividades: abre el camino a todo el personal. Quién los usa lo decide
+ * `FormatosActividadService`, con la misma regla de asignar a otra persona.
+ */
+export const FORMATOS_ACTIVIDAD_URL_RULES: UrlRule[] = [
+  { path: '/api/formatos-actividad', methods: ['GET', 'POST'], scope: 'write' },
+  { path: '/api/formatos-actividad/**', methods: ['GET', 'POST', 'PUT'], scope: 'write' },
+];
+
+/**
  * Ritmo operativo — reuniones, acuerdos y lecciones aprendidas.
  *
  * Todo el personal interno ve las reuniones a las que se le convoca y mueve sus
@@ -331,6 +340,7 @@ export const ACTIVITY_SUPERIOR_URL_RULES: UrlRule[] = [
  */
 export const ACTIVIDAD_PROPIA_URL_RULES: UrlRule[] = [
   { path: '/api/activities', methods: ['POST'], scope: 'write' },
+  ...FORMATOS_ACTIVIDAD_URL_RULES,
   { path: '/api/activities/next-an', methods: ['GET'], scope: 'read' },
   { path: '/api/me/activities', methods: ['POST'], scope: 'write' },
   { path: '/api/operational-projects', methods: ['GET'], scope: 'read' },
@@ -448,6 +458,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // Supervisa OPS, valida trabajos antes de reportar a Admin + Dirección
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ARQUITECTO]: [
+    ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...COSTOS_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
@@ -683,6 +694,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ADMINISTRATIVO — primer nivel (operación día a día)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
+    ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...COSTOS_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
@@ -745,6 +757,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD OPERACIONES — supervisa ing. de campo, project manager
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_OPERACIONES]: [
+    ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...COSTOS_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
@@ -806,6 +819,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // INGENIERO DE CAMPO — solo lo suyo
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ING_CAMPO]: [
+    ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...CORE_OLA1_URL_RULES,
@@ -847,6 +861,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // INGENIERO DE SOPORTE — tickets, NOC, mantenimiento
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ING_SOPORTE]: [
+    ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...CORE_OLA1_URL_RULES,
@@ -909,6 +924,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ENCARGADO DE SOPORTE — coordina soporte (puede asignar OT)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ENC_SOPORTE]: [
+    ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...COSTOS_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
@@ -1049,6 +1065,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // LÍDER DISEÑO — Studio completo
   // ─────────────────────────────────────────────────────────────────
   [ROLES.LIDER_DISENO]: [
+    ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...CCTV_DISENOS_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,

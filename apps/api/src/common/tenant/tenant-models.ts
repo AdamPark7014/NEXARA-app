@@ -150,6 +150,8 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'VehiculoServicio',
   'VehiculoCarga',
   'ProcesoTiempo',
+  'FormatoActividad',
+  'FormatoAplicacion',
 ]);
 
 /** Models where missing companyId on create is a hard error (not soft-injected). */

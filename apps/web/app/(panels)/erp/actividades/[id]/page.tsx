@@ -22,6 +22,7 @@ import { quienMira, useActivityDetail } from "@/components/ops/ActivityDetailShe
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
+import { formatosVisibles, puedeVerFormatos } from "@/lib/formatos-actividad";
 import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missing-evidence";
 import { formatApiError } from "@/lib/erp-api";
 import { esCeoChristian } from "@/lib/ceo-user";
@@ -50,6 +51,7 @@ import {
 import { IcoCamara, IcoDocumento, IcoFormulario, ProtectedEvidencePhoto, type MenuAction } from "@/components/ops/_piezas";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import LibraryAddCheckOutlinedIcon from "@mui/icons-material/LibraryAddCheckOutlined";
 import s from "./detalle.module.css";
 
 const STATUSES = [
@@ -326,18 +328,31 @@ export default function ActivityDetailPage() {
     ];
   });
 
-  const menu: MenuAction[] =
-    puedeEliminar && !editing
-      ? [
-          {
-            id: "eliminar",
-            label: "Eliminar actividad",
-            danger: true,
-            icon: <DeleteOutlineIcon fontSize="inherit" />,
-            onSelect: pedirEliminar,
-          },
-        ]
-      : [];
+  const menu: MenuAction[] = editing
+    ? []
+    : [
+        ...(formatosVisibles() && puedeVerFormatos(v2, user)
+          ? [
+              {
+                id: "formato",
+                label: "Guardar como formato",
+                icon: <LibraryAddCheckOutlinedIcon fontSize="inherit" />,
+                onSelect: () => router.push(`/erp/actividades/formatos?desde=${activity.id}`),
+              },
+            ]
+          : []),
+        ...(puedeEliminar
+          ? [
+              {
+                id: "eliminar",
+                label: "Eliminar actividad",
+                danger: true,
+                icon: <DeleteOutlineIcon fontSize="inherit" />,
+                onSelect: pedirEliminar,
+              },
+            ]
+          : []),
+      ];
 
   return (
     <>
