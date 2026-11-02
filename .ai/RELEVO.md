@@ -1,5 +1,15 @@
 # RELEVO
 
+- **01-11 ~18:45 (claude-code) — Libro de costos: Adam eligió vehículos como siguiente fase; mockup publicado, sin código.**
+  - Mockup privado: https://claude.ai/artifact/2DNGd9xCSM7fG9zAfBPijs. Ocho pantallas: flotilla, alta con manual, revisión con la fuente de cada dato, ficha, especificaciones,
+    dos de app (regreso y gasolina) y la pestaña Costos del proyecto. Decisiones y tamaño: `docs/COSTOS-PRECIOS-UNITARIOS.md`, «Fase 3 ampliada». **No construir hasta su visto bueno.**
+  - Bloqueo real: en producción hay un vehículo y cero salidas. Sin salidas no hay kilómetros, y nada llega a los proyectos.
+  - Trampas para quien construya: la puerta acepta 2 MB por petición, así que el manual no viaja completo; un viático `COMBUSTIBLE` con `vehicleId` contaría doble con la tarifa por km;
+    `/erp/vehiculos` ya está protegida del alias de rutas en español, `/erp/costos/vehiculos` no lo estaría.
+  - Sin verificar: la lectura de un manual real (no se ha probado con ninguno); las cifras del mockup son de ejemplo, salvo el rendimiento oficial de la Frontier (CONUEE, catálogo 2023).
+    Las pantallas de teléfono solo se vieron en miniatura.
+  - No se delegó a Ollama: era diseño y decisiones sobre datos medidos.
+
 - **01-11 ~20:00 (claude-code) — Padrón: fusionados tres clientes repetidos, autorizado por Adam («Sí, fusiónalos»). Solo datos de producción, sin cambio de código.**
   - Benemer → BUAP (cotización 4), ANFO → ANFORA (cotización 6 y diseño CCTV 3), GAMINF → GAMING (sin nada ligado). Comercial pasa de 32 a 29 clientes; empresa 1 de 34 a 31.
   - No había actividades, facturas, proyectos ni contratos en los que se fueron. Las cotizaciones conservan su texto y sus montos: la 4 sigue diciendo «Benemérita Universidad Autónoma de Puebla».

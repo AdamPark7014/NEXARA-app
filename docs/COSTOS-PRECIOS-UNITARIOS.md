@@ -251,14 +251,43 @@ en paralelo y se compara. Talla: S = una sesión, M = dos, L = de tres a cuatro 
 | 0. Motor y tarifas (hecha) | Tarifas de costo | 4 | 10 | 1 | M |
 | 1. Horas a proyecto (hecha) | Bandeja, por proyecto y pestaña Costos | 2 | 8 | 3 | M |
 | 2. Matriz en la cotización | Matriz por partida y catálogo | 4 | 14 | 3 | L |
-| 3. Vehículos | Ficha y km por actividad | 1 | 6 | 2 | M |
+| 3. Vehículos (ampliada, ver abajo) | Manual, ficha, gasolina, desgaste y km por actividad | 5 | 14 | 4 y 2 en apps | L |
 | 4. Herramientas | Costo por día y desgaste | 0 | 4 | 1 | S |
 | 5. Almacén | Consumo por proyecto | 0 | 3 | 1 | S |
 | 6. Indirectos | 9 rubros y porcentaje real | 1 | 5 | 1 | M |
 | 7. Control | Proyección, alertas y flujo | 1 | 5 | 2 | M |
 | 8. Opcional | IA propone matriz (puerta única, Haiku con eval) | 0 | 3 | 1 | L |
 
-Total sin la opcional: 13 tablas, 55 endpoints y 14 pantallas o pestañas.
+Total sin la opcional: 17 tablas, 63 endpoints y 16 pantallas o pestañas, más 2 en las apps.
 
 **Coordinación:** las Fases 1 y 2 tocan el asistente, el editor de cotización y el catálogo de equipos, donde hay otras
 sesiones activas. Antes de editar: `git fetch`, partir de `origin/main` y avisar.
+
+## Fase 3 ampliada: vehículos (propuesta del 01-11, sin aprobar)
+
+Adam eligió vehículos como siguiente fase y pidió más de lo que tenía: subir el manual, una ficha robusta, cuánta gasolina
+gasta, cuánto se desgasta y cuánto le cuesta a cada proyecto. «Muy fácil por fuera y muy complicado por dentro». Mockup
+privado: https://claude.ai/artifact/2DNGd9xCSM7fG9zAfBPijs. No se construye hasta que lo apruebe.
+
+**El bloqueo no es el cálculo:** hay un vehículo dado de alta y ninguna salida registrada. Sin salidas no hay kilómetros, y sin
+kilómetros la ficha se llena pero nada llega a los proyectos. `VehicleControl` ya guarda odómetro, gasolina y foto del tablero, y
+ya exige una actividad. Falta que se use.
+
+| Tema | Decisión propuesta |
+|---|---|
+| Alta | Se sube el manual o se escribe el modelo. Cada dato guarda su fuente: página del manual, CONUEE, capturado o tickets. Nada se guarda sin que alguien lo confirme. |
+| Lectura del manual | La puerta acepta 2 MB por petición, así que el PDF no viaja completo: se extrae el texto en el servidor, se eligen las páginas de capacidades y servicio, y Haiku devuelve JSON con la página de cada dato. Escaneado: esas páginas como imagen. Necesita eval con manuales reales antes de encenderse. |
+| Rendimiento oficial | `Rendimiento de combustible en vehículos ligeros`, CONUEE (catálogo 2023, revisión de mayo de 2024; el de 2024 ya no se pudo bajar). Es de laboratorio y el propio catálogo advierte que puede no repetirse en condiciones reales: sirve de partida, no de costo. |
+| Rendimiento real | Km desde el último tanque lleno entre litros cargados. Con tres cargas reales reemplaza al oficial en la tarifa. Una carga parcial se suma a la siguiente. |
+| Costo por km | `tarifaEquipo` y `CostoFichaEquipo`, que ya existen. El libro guarda la tarifa de cada viaje: si cambia después, no reescribe lo pasado. |
+| Gasolina y proyecto | Se reparte por km: quien llena el tanque no paga todo el tanque. Un viático `COMBUSTIBLE` con `vehicleId` entra al vehículo y no directo al proyecto, porque contaría doble. Sin `vehicleId` sigue como hoy. |
+| Indirectos | Oficina: viajes internos. Parado: `(km del plan − km reales) × (Im + Sm + otros)` por mes, porque seguro y dinero invertido se pagan aunque no salga. Hasta la Fase 6 solo se muestran; no entran al margen. |
+| Desgaste | Vida consumida, llantas y aceite contra el programa del manual; próximo servicio por km o fecha, lo que llegue primero. Lo gastado en servicios se compara con lo que apartó `Ko`, para corregirlo con datos. |
+| Fotos en la app | La IA lee odómetro, nivel de gasolina y ticket; la persona confirma y la foto queda de respaldo. Primero web; las apps van después porque pasan por las tiendas. |
+| Quién ve qué | Costo y valor: quien ya ve costos completos. Técnicos: kilómetros y rendimiento, sin importes. |
+| Sin tocar | Nómina, facturas y pólizas. El libro sigue en paralelo. |
+
+Talla: de M a L, con 5 tablas (especificación, documento, plan de servicio, servicio hecho y carga), 14 endpoints, 4 pantallas
+web y 2 en las apps. Tres funciones nuevas de IA, cada una con su eval, por la puerta y con el modelo más barato que lo pase.
+
+**Rutas:** `/erp/vehiculos` ya está protegida del alias de rutas en español. Lo nuevo va dentro de ella, no bajo `/erp/costos`.
