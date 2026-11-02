@@ -1,5 +1,39 @@
 /* «Asignar con un formato»: lista de formatos a la izquierda, lo que se asigna a la derecha (tokens --ui-*). */
 
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s4);
+}
+
+.kpis {
+  display: flex;
+  gap: var(--ui-s4);
+  margin: 0;
+}
+
+.kpis dt {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.kpis dd {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg);
+}
+
+.kpis dd[data-tarde="true"] {
+  color: var(--ui-warning-text);
+}
+
+.kpis dd[data-meta="true"] {
+  color: var(--ui-brand-text);
+}
+
 .rejilla {
   display: grid;
   grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
@@ -249,13 +283,18 @@
   }
 }
 
+/* Siempre a la vista: la meta es asignar sin bajar a buscar el botón. */
 .pie {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--ui-s3);
-  padding-top: var(--ui-s3);
+  padding-block: var(--ui-s3);
+  background: var(--ui-surface);
   border-top: 1px solid var(--ui-border);
 }
 
