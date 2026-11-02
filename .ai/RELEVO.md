@@ -1,5 +1,18 @@
 # RELEVO
 
+- **02-11 ~16:40 (claude-code) — Giro de UI/UX: «Obra» subió a producción, Adam la rechazó y se deshizo; Core «Consola» no se subió.**
+  - **Qué pasó:** Adam eligió «Portada B, Core C» en un canvas de tres direcciones. La portada B (`e4331e06`) salió a producción. Al verla dijo: «se ve horrible, se veía mucho mejor antes» y «por qué rayos es naranja». El naranja lo elegí yo; él nunca lo pidió.
+  - **Regreso:** `752e479b` deja los 32 archivos de `e4331e06` como estaban. Nadie más los había tocado. Verificado en producción: azul `#0060f0`, aurora, 6 baldosas y botones redondos; `h1`, canonical y robots sin cambio. No corrí pruebas de web sobre el regreso: el código volvió byte a byte al estado anterior.
+  - **Core «Consola»:** no está en `main`. Tokens, Hoy con luces y Cotizaciones con detalle al lado quedaron solo en el scratchpad de la sesión `351d5d39`. Ya avisé a las sesiones de Core que se cancela.
+  - **Medido, portada Obra contra la anterior (Lighthouse, escritorio):** puntaje 85 a 100, LCP 1.1 a 0.7 s, 1,528 a 1,206 KB. El mayor ahorro fue quitar las fuentes precargadas de `app/layout.tsx`: 206 a 64 KB. Se puede recuperar en cualquier dirección; hoy siguen precargadas.
+  - **Concepto nuevo, sin tocar producción:** «Maqueta viva», https://claude.ai/artifact/G1wB3xX9uq4UmtC6WdTDPs. Maqueta blanca en 3D de un sitio de ejemplo que se recorre con el scroll; las cámaras se agregan y se arrastran, y la cobertura se calcula con los muros. Conserva el azul y la letra de hoy. Espera la opinión de Adam.
+  - **Falta:** si le gusta, medir en celular real y decidir cómo cargar three.js después de pintar la página, con una imagen fija de respaldo. three.js pesa unos 150 KB comprimido.
+  - **Trampas:**
+    - No subir un cambio grande de lo visual sin que Adam lo vea a tamaño real y diga que sí. Elegir entre miniaturas no cuenta.
+    - three.js con `MeshStandardMaterial` tardó 18 s en compilar el primer cuadro en la Intel UHD. `MeshLambertMaterial` con sombras fijas va bien.
+    - El panel integrado no tiene WebGL y la extensión de Chrome se atora con la animación: revisar con Chrome sin ventana por CDP y `--use-angle=swiftshader --enable-unsafe-swiftshader`.
+    - `git push origin "$N:refs/heads/main"` lo bloquea el hook `git-solo-main`: hay que escribir el sha literal.
+
 - **02-11 ~23:00 UTC (claude-code) — Diseñador: la maqueta se arma una sola vez al abrir (`c857476b`).** Corrige dos puntos de la entrada de abajo.
   - Con modelos en el catálogo, `key={catalogo.version}` reiniciaba toda la vista al llegar el catálogo: cada diseño abría creando WebGL y compilando sus 49 programas dos veces. Ahora `versionCatalogo` solo rehace los equipos. Tras el arreglo, los ejemplos 8 y 9 abren en producción; antes congelaban Chrome con la PC sin memoria.
   - Ya se vio dentro de Core el ejemplo de la frase corregido: bodega, 4 filas de anaqueles, 14 cámaras, 77 %. La Escuela volvió a la lista. Los seis ejemplos abren.
