@@ -36,6 +36,14 @@ class FormatosRulesTest {
     }
 
     @Test
+    fun `el día se lee fácil`() {
+        val martes = LocalDate.of(2026, 11, 10)
+        assertEquals("Mañana", FormatosRules.etiquetaDia(LocalDate.of(2026, 11, 11), martes))
+        assertEquals("Jue 12", FormatosRules.etiquetaDia(LocalDate.of(2026, 11, 12), martes))
+        assertEquals("Lun 16", FormatosRules.etiquetaDia(LocalDate.of(2026, 11, 16), LocalDate.of(2026, 11, 13)))
+    }
+
+    @Test
     fun `dice lo que falta`() {
         val r = RenglonEditable(montaje, "Montaje", 210)
         assertNull(FormatosRules.faltante(1, null, listOf(r)))

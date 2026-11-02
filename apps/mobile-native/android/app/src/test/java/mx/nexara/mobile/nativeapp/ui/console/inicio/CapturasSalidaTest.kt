@@ -13,8 +13,13 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import java.io.File
 import mx.nexara.mobile.nativeapp.data.api.ActividadEnRiesgoDto
+import mx.nexara.mobile.nativeapp.data.api.FormatoActividadDto
 import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
+import mx.nexara.mobile.nativeapp.data.api.PuntoFormatoDto
+import mx.nexara.mobile.nativeapp.data.api.RecetaFormatoDto
+import mx.nexara.mobile.nativeapp.data.api.RenglonFormatoDto
 import mx.nexara.mobile.nativeapp.data.api.RiesgoSalidaDto
+import mx.nexara.mobile.nativeapp.ui.console.activities.FormatosScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTheme
 import mx.nexara.mobile.nativeapp.ui.theme.NexaraTheme
 import org.junit.Rule
@@ -98,6 +103,38 @@ class CapturasSalidaTest {
         }
         compose.mainClock.advanceTimeBy(500)
         guardar("salida-mi-dia.png")
+    }
+
+    @Test
+    fun formatos() {
+        compose.setContent {
+            NexaraTheme {
+                FormatosScreen(
+                    onBack = {},
+                    onOpenActivity = {},
+                    formatosDePrueba = listOf(
+                        FormatoActividadDto(
+                            id = 1,
+                            nombre = "Instalación CCTV",
+                            receta = RecetaFormatoDto(
+                                unidad = "Cámaras",
+                                cantidadPorOmision = 4,
+                                renglones = listOf(
+                                    RenglonFormatoDto(titulo = "Levantamiento y marcado de puntos", minutosBase = 60),
+                                    RenglonFormatoDto(titulo = "Canalización y cableado", minutosBase = 0, minutosPorUnidad = 45, puntos = listOf(PuntoFormatoDto("Canalización", listOf("ANTES")))),
+                                    RenglonFormatoDto(titulo = "Montaje de cámaras", minutosBase = 30, minutosPorUnidad = 45, puntos = listOf(PuntoFormatoDto("Cámaras montadas", listOf("DESPUES")))),
+                                    RenglonFormatoDto(titulo = "Pruebas y entrega al cliente", coreKind = "servicio", minutosBase = 30, fotos = 2),
+                                ),
+                            ),
+                        ),
+                        FormatoActividadDto(id = 2, nombre = "Sucursal de restaurante"),
+                        FormatoActividadDto(id = 3, nombre = "Mantenimiento preventivo"),
+                    ),
+                )
+            }
+        }
+        compose.waitForIdle()
+        guardar("salida-formatos.png")
     }
 
     @Test

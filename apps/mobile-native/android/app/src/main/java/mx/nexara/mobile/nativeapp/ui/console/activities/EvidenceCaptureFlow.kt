@@ -710,7 +710,8 @@ fun EvidenceCaptureFlow(
         if (flow == null || loading || !EvidenciaApertura.tomar(activity.id) || locked) return@LaunchedEffect
         when {
             step == STEP_ENTRY -> cameraKind = KIND_ENTRY
-            step == STEP_PHOTOS && !porCampos && drafts.size < photoRequired -> cameraKind = KIND_EVIDENCE
+            step == STEP_PHOTOS && !porCampos && flow?.evidencePhotos.orEmpty().size < photoRequired ->
+                cameraKind = KIND_EVIDENCE
             step == STEP_EXIT && CoreActivityRules.camposBloqueoSalida(campos) == null -> cameraKind = KIND_EXIT
         }
     }

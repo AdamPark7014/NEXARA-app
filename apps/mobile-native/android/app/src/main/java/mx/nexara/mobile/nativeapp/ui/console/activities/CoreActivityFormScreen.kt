@@ -71,6 +71,7 @@ import mx.nexara.mobile.nativeapp.data.SessionUser
 import mx.nexara.mobile.nativeapp.data.api.CreateActivityRequest
 import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.SugerenciaComplejidadDto
+import mx.nexara.mobile.nativeapp.data.api.ProcesoTiempoRequest
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
@@ -148,6 +149,7 @@ private fun AssignFlow(
     val k = CoreActivityKinds
     val roleKey = remember(user) { CoreMenu.canonicalRole(user) }
 
+    val inicioFormularioMs = remember { System.currentTimeMillis() }
     var person by remember(targetUserId) { mutableStateOf<TeamBoardUserDto?>(null) }
     var boardUsers by remember(targetUserId) { mutableStateOf<List<TeamBoardUserDto>>(emptyList()) }
     var loadingPerson by remember(targetUserId) { mutableStateOf(!selfAssign) }
@@ -495,6 +497,13 @@ private fun AssignFlow(
             val body: CreateActivityRequest = alta.body
             val id = withContext(Dispatchers.IO) {
                 if (selfAssign) repo.selfAssign(body) else repo.createActivity(body, alta.estandar)
+            }
+            if (id != null) {
+                val proceso = if (selfAssign) "autoasignar" else "asignar"
+                val ms = System.currentTimeMillis() - inicioFormularioMs
+                withContext(Dispatchers.IO) {
+                    repo.registrarTiempo(ProcesoTiempoRequest(proceso, ms, entidadId = id, detalle = "app"))
+                }
             }
             if (selfAssign) {
                 onCreated(id)
