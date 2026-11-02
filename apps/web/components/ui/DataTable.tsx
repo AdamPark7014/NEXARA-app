@@ -96,6 +96,8 @@ type Props<T> = {
   rowActions?: (row: T) => ReactNode;
   /** Encabezado (solo lector de pantalla) de la columna de acciones. */
   rowActionsLabel?: string;
+  /** Acciones siempre a la vista, sin pasar el mouse: para las que deciden algo (autorizar, rechazar). */
+  rowActionsAlwaysVisible?: boolean;
   /** Casilla por fila y en la cabecera. Controlado: `selectedKeys` + `onSelectionChange`. */
   selectable?: boolean;
   selectedKeys?: ReadonlyArray<RowKey> | ReadonlySet<RowKey>;
@@ -147,6 +149,7 @@ export default function DataTable<T>({
   className,
   rowActions,
   rowActionsLabel = "Acciones",
+  rowActionsAlwaysVisible = false,
   selectable = false,
   selectedKeys,
   onSelectionChange,
@@ -200,6 +203,7 @@ export default function DataTable<T>({
       className={[styles.wrap, "nx-table-wrap", className].filter(Boolean).join(" ")}
       data-sticky={stickyHeader ? "true" : undefined}
       data-flush={flush ? "true" : undefined}
+      data-row-actions={rowActionsAlwaysVisible ? "visible" : undefined}
       style={stickyHeader ? { maxHeight: maxHeight ?? "min(72vh, 720px)" } : undefined}
     >
       <table
