@@ -1136,6 +1136,7 @@ export default function ExpensesPage() {
                   ariaLabel="Gastos administrativos"
                   loading={loading && !firstLoad}
                   rowActionsLabel="Acciones"
+                  rowActionsAlwaysVisible
                   rowActions={narrow ? undefined : filaAcciones}
                 />
               )}

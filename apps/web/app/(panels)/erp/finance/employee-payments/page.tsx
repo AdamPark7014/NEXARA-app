@@ -1254,6 +1254,7 @@ function EmployeePaymentsContent() {
                   ariaLabel="Pagos a empleados"
                   loading={loading && !firstLoad}
                   rowActionsLabel="Acciones"
+                  rowActionsAlwaysVisible
                   rowActions={narrow ? undefined : filaAcciones}
                 />
               )}

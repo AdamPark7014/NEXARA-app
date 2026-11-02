@@ -308,7 +308,8 @@
 
 .row:hover .rowActions,
 .row:focus-within .rowActions,
-.row[data-selected="true"] .rowActions {
+.row[data-selected="true"] .rowActions,
+.wrap[data-row-actions="visible"] .rowActions {
   opacity: 1;
 }
 

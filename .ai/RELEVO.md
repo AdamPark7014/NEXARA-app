@@ -1,5 +1,20 @@
 # RELEVO
 
+- **02-11 (claude-code) — Contabilidad y Finanzas: lo que salió al verla en producción (`ea095661` desplegado).**
+  - **Visto con la sesión del CEO a 1707 px, sin guardar nada ni pulsar una acción:** Hoy, Por facturar, Estados, Conciliación, Por cobrar, Facturas, Movimientos, Pólizas, Proveedores, Pre-nómina, Proyectos, Presupuestos, Reportes, Auditoría, Viáticos, Gastos, Nómina, Facturación y Bancos. Solo por DOM: Debo pagar, Cierres, Pagos y gastos y Pre-nómina de finanzas. Sin desborde de página ni cifras cortadas; la pestaña activa de Estados y Pólizas ya tiene radio 0.
+  - **En oscuro, en producción:** Hoy, Pólizas, Viáticos y Pre-nómina, con la clase de `body` solo en la pestaña. El tema no se guarda: vive en el estado de React y `ThemeContext` también quita `light`; si solo agregas `dark`, las tarjetas se quedan blancas y parece un defecto.
+  - **Corregido al verlo:** en Gastos y Nómina, Autorizar, Rechazar y Editar solo salían al pasar el ratón. `DataTable` ahora tiene `rowActionsAlwaysVisible`. Ojo si pasas otra pantalla a `rowActions`: por omisión se esconden.
+  - **Formularios en la copia con datos de ejemplo:** Asignar viático, Nueva factura, Nueva póliza y el expediente de proveedor, sin desborde. Ninguno se envió.
+  - **Sin verificar:**
+    - **A 390 px con sesión.** La ventana de Chrome cambia, pero la pantalla se queda en 1707 px; se vio la copia local con el mismo código y datos de ejemplo, sin desborde de página en las 13 rutas auditadas y con las tablas desplazándose dentro de su tarjeta. Falta verla en un teléfono real.
+    - **1536 px dentro del marco en producción:** por lo mismo, se midió en la copia con el contenido a 1240 px.
+    - **Tablas llenas en producción:** casi no hay datos; solo Por facturar, Auditoría y Pre-nómina traen varios renglones.
+    - **Cuentas que no son de dirección.** Los permisos no se tocaron y los chips se filtran igual, pero solo se entró como CEO.
+    - **Ninguna acción de punta a punta** (timbrar, autorizar, conciliar). La lógica no cambió y las pruebas cubren lo que cubrían.
+    - **`procurement`** usa `FinanceModuleShell` y está fuera del menú: no se revisó.
+  - **Trampas:** `Service Unavailable` en estas pantallas durante la revisión fue la API reiniciándose por el despliegue de otra sesión. Tras un `navigate` que se agota, la pestaña de Chrome queda con `innerWidth` 0 y las capturas se cuelgan; hay que abrir otra. Un commit nuevo de «Consola» cambia los tokens de todo Core encima de esto: si algo cambia de tono después, viene de ahí.
+  - **Siguiente:** las pantallas fuera del menú (`hr`, `settings`, `users`, `procurement`, `audit`) y reuniones siguen sin esta pasada. Los tres defectos del bloque de abajo (fechas con un día menos, facturas canceladas con días vencidos, etiquetas en inglés) esperan a que Adam los pida.
+
 - **02-11 ~13:55 (claude-code) — El aviso del tope de 5,000 filas ya sobrevive a los despliegues: cada recorte queda en `audit_logs` (`6f03b2a8`, en producción desde las 18:50 UTC).** Adam: «Sí, hazlo aquí».
   - **Antes:** el aviso solo salía en el log del contenedor, que se pierde al desplegar, y solo decía el modelo, no qué consulta era.
   - **Ahora:** cada recorte también va a `audit_logs`, con `entityType = 'PrismaRowCap'` y `action = 'RECORTE'`. En `changes` lleva el modelo, el tope, los nombres de los campos que filtra y cuántas veces pasó, nunca los valores del filtro. El log sigue avisando cada vez, con el mismo texto más `filtro=`.
@@ -235,7 +250,7 @@
   - No se delegó a Ollama: la máquina tenía 0.4 GB libres de 15.6 y cargar el modelo congelaba Chrome. Se repartió en ocho agentes con archivos exclusivos y una guía única, y se revisó el resultado a mano.
   - **Cómo se revisó:** arnés con Vite y datos de ejemplo en una copia aislada, 26 rutas, a ancho real de producción (contenido de 1240 px), a 390 y en oscuro. Auditoría por DOM: sin desborde de página, sin cifras cortadas, sin columnas en blanco. Pruebas: 1,609 en verde en la copia; 2 archivos no corren ahí porque importan de `apps/api`, CI los cubre.
   - **Trampas:** `new Date` aparte, `border-radius` de `:where(button)` en `globals.scss:596` vuelve a curvar cualquier pestaña hecha con `<button>` y raya de `box-shadow`. `container-type: inline-size` va solo en `.stats > .stat`, porque en un `Stat` suelto dentro de un flex lo encoge a cero. El arnés y la guía viven en el scratchpad de esta sesión, no en el repo.
-  - **Desplegando.** La revisión en producción queda en el siguiente bloque.
+  - Desplegado el 02-11; la revisión en producción está en el bloque de esa fecha, «lo que salió al verla en producción».
 
 - **02-11 ~11:40 (claude-code) — PDF de cotización: otra vez contra el Canva de Adam, huecos y una instalación prometida sin cobrarla. Muestra aprobada por Adam.**
   - **Pedido:** «estás dejando muchos espacios… checa nuevamente el modelo que te pase de cotización del canva». Su «mejora el modelo» del 01-11 también era esto, no la IA: «el modelo» de Adam es `DAHZhXVJj2A`.

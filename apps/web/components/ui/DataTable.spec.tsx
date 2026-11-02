@@ -20,6 +20,38 @@ const COLUMNAS: Column<Fila>[] = [
   { key: "estado", label: "Estado", render: (r) => <StatusCell status={r.estado} /> },
 ];
 
+describe("DataTable · columnas y acciones", () => {
+  it("una columna sin render ni accessor muestra el campo que se llama como su key", () => {
+    type Periodo = { id: number; name: string; total: number; detalle: { a: number } };
+    const { container } = render(
+      <DataTable<Periodo>
+        columns={[
+          { key: "name", label: "Periodo" },
+          { key: "total", label: "Total" },
+          { key: "detalle", label: "Detalle" },
+          { key: "noExiste", label: "Otro" },
+        ]}
+        rows={[{ id: 1, name: "Enero 2026", total: 12, detalle: { a: 1 } }]}
+        rowKey={(r) => r.id}
+      />,
+    );
+    const celdas = [...container.querySelectorAll("tbody td")].map((c) => c.textContent);
+    // Un objeto o un campo que no existe se queda vacío: no tira la pantalla.
+    expect(celdas).toEqual(["Enero 2026", "12", "", ""]);
+  });
+
+  it("rowActionsAlwaysVisible marca la tabla para que las acciones no esperen al mouse", () => {
+    const { container, rerender } = render(
+      <DataTable columns={COLUMNAS} rows={FILAS} rowKey={(r) => r.id} rowActions={() => <button type="button">Autorizar</button>} />,
+    );
+    expect(container.querySelector(".nx-table-wrap")).not.toHaveAttribute("data-row-actions");
+    rerender(
+      <DataTable columns={COLUMNAS} rows={FILAS} rowKey={(r) => r.id} rowActionsAlwaysVisible rowActions={() => <button type="button">Autorizar</button>} />,
+    );
+    expect(container.querySelector(".nx-table-wrap")).toHaveAttribute("data-row-actions", "visible");
+  });
+});
+
 describe("DataTable · API de siempre", () => {
   it("pinta encabezados y filas, y una fila con onRowClick responde a clic y teclado", async () => {
     const onRowClick = vi.fn();
