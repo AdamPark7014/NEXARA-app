@@ -233,3 +233,10 @@
   border-radius: var(--ui-card-radius, 16px);
   box-shadow: var(--ui-card-shadow, var(--ui-elev-1));
 }
+
+/* Por decidir: se contesta desde la fila. */
+.comoTermino {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}

@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import { ButtonLink, RecordSection, StatusBadge } from "@/components/base";
+import { Button, ButtonLink, RecordSection, StatusBadge } from "@/components/base";
 import { isActivityCompleted, isActivityInProgress } from "@/lib/activity-status";
 import { evaluarSemaforoActividad, textoChipSemaforo } from "@/lib/actividad-tiempos";
 import { formatoFecha, type Tono } from "@/lib/proyectos-api";
+import NuevaActividad from "./NuevaActividad";
 import ProgramarActividades from "./ProgramarActividades";
 import { toneDe } from "./tono";
 import type { SeccionProps } from "./tipos";
@@ -22,10 +24,13 @@ function tonoDeActividad(estatus?: string | null): Tono {
 export default function SeccionActividades(props: SeccionProps) {
   const { proyecto: p, hoy } = props;
   const avance = p.resumen.avance;
+  const [nueva, setNueva] = useState(false);
+  const cerrado = p.status === "CANCELLED" || p.status === "COMPLETED";
   const etapaDe = (id?: number | null) => (id ? (p.milestones.find((h) => h.id === id)?.name ?? null) : null);
   return (
     <div className={styles.pila}>
       <ProgramarActividades {...props} />
+      <NuevaActividad {...props} abierto={nueva} onCerrar={() => setNueva(false)} />
       <RecordSection
         title={
           <>
@@ -34,11 +39,18 @@ export default function SeccionActividades(props: SeccionProps) {
         }
         subtitle="El avance del proyecto sale de aquí: cuenta las actividades cerradas contra el total. Se programan arriba por etapa o se asignan desde la pizarra ligadas al proyecto."
         end={
-          avance.total ? (
-            <span className={styles.tenue}>
-              {avance.abiertas} abiertas · {avance.cerradas} cerradas
-            </span>
-          ) : null
+          <>
+            {avance.total ? (
+              <span className={styles.tenue}>
+                {avance.abiertas} abiertas · {avance.cerradas} cerradas
+              </span>
+            ) : null}
+            {cerrado ? null : (
+              <Button size="sm" onClick={() => setNueva(true)}>
+                Nueva actividad
+              </Button>
+            )}
+          </>
         }
       >
         {p.activities.length === 0 ? (

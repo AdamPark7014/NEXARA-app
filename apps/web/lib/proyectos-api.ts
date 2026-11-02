@@ -8,6 +8,7 @@
  * Las etiquetas viven aquí para no repetir cadenas sueltas en cada pantalla. Las del estado y del
  * papel en el equipo copian `proyecto-estado.ts` de la API, que es la fuente.
  */
+import type { HiloCobro, HiloFactura } from "./hilo-negocio";
 import { buildApiUrl } from "@/lib/api-base";
 import type { PeriodoActividad } from "@/lib/actividad-periodo";
 
@@ -326,7 +327,13 @@ export type ResultadoProgramacion = {
 };
 
 export type ProyectoDetalle = CabeceraProyecto & {
-  client?: { id: number; name: string; contactEmail?: string | null; contactPhone?: string | null } | null;
+  client?: {
+    id: number;
+    name: string;
+    contactEmail?: string | null;
+    contactPhone?: string | null;
+    salesClients?: Array<{ id: number }>;
+  } | null;
   salesProject?: { id: number; name: string; status: string } | null;
   cotizacion?: {
     id: number;
@@ -335,7 +342,12 @@ export type ProyectoDetalle = CabeceraProyecto & {
     total?: number | null;
     currency?: string | null;
     folioEnviado?: string | null;
+    aceptadaVia?: string | null;
+    aceptadaAt?: string | null;
   } | null;
+  /** De las facturas de su cotización: la misma cadena que se ve en la cotización. */
+  factura?: HiloFactura | null;
+  cobro?: HiloCobro | null;
   milestones: HitoProyecto[];
   scopeItems: RenglonAlcance[];
   requirements: Requerimiento[];
@@ -484,6 +496,18 @@ export function cambiarEstadoProyecto(
   datos: { status: EstadoProyecto; cancelReason?: string; actualEndDate?: string },
 ) {
   return pedir<ProyectoDetalle>(`proyectos/${id}/estado`, token, json("PATCH", datos));
+}
+
+/** Actividad que nace del proyecto: cliente y proyecto se heredan. */
+export function crearActividadDeProyecto(
+  token: string,
+  id: number,
+  datos: { titulo: string; responsableId: number; fecha?: string },
+) {
+  return pedir<{ id: number }>(`operational-projects/${id}/activities`, token, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
 }
 
 export function agregarHito(token: string, id: number, datos: NuevoHito) {

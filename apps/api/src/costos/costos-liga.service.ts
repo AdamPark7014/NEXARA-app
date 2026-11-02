@@ -208,6 +208,47 @@ export class CostosLigaService {
     };
   }
 
+  /**
+   * La pregunta de una sola vez sobre una actividad recién creada: solo reglas, sin gastar en IA. Si ya
+   * tiene a qué cargarse no hay nada que preguntar.
+   */
+  async sugerenciaDe(companyId: number | null, activityId: number) {
+    const tenantId = requireCompanyId(companyId);
+    const a = await this.prisma.activity.findFirst({
+      where: { id: activityId, companyId: tenantId },
+      select: {
+        titulo: true,
+        coreKind: true,
+        projectId: true,
+        clientId: true,
+        cotizacionId: true,
+        branchName: true,
+        branchCity: true,
+        client: { select: { name: true } },
+      },
+    });
+    if (!a) throw new NotFoundException('Actividad no encontrada');
+    const liga = await this.prisma.costoActividadLiga.findFirst({
+      where: { companyId: tenantId, activityId, tipo: { not: null } },
+      select: { id: true },
+    });
+    if (a.projectId || a.cotizacionId || liga) return { pendiente: false, sugerencia: null, proyectos: [] };
+
+    const candidatos = await this.candidatos(tenantId);
+    const sugerencia = sugerirPorReglas(
+      {
+        titulo: a.titulo,
+        coreKind: a.coreKind,
+        clientId: a.clientId,
+        cliente: a.client?.name ?? null,
+        lugar: [a.client?.name, a.branchName, a.branchCity].filter(Boolean).join(' · ') || null,
+      },
+      candidatos,
+    );
+    const proyectos = candidatos.filter((c) => c.tipo === 'PROYECTO').map((c) => ({ id: c.id, nombre: c.nombre }));
+    return { pendiente: true, sugerencia: sugerencia?.tipo === 'PROYECTO' ? sugerencia : null, proyectos };
+  }
+
   /** La decisión de una persona. No toca la actividad: el avance del proyecto no se mueve. */
   async decidir(
     companyId: number | null,

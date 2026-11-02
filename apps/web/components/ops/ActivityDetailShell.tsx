@@ -1,5 +1,7 @@
 "use client";
 
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
+import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -420,7 +422,25 @@ export default function ActivityDetailShell({
         : null;
 
   const meta: RecordMetaItem[] = [];
-  if (activity.client?.name) meta.push({ icon: <IcoCliente />, label: activity.client.name });
+  // En Core, de dónde viene se puede abrir: cliente, cotización y proyecto.
+  const clienteDeVenta = (activity.client as { salesClients?: Array<{ id: number }> } | null | undefined)?.salesClients?.[0]?.id;
+  const cotizacionOrigen =
+    (activity as { cotizacion?: { id: number; quoteNumber: string } | null }).cotizacion ??
+    (activity.project as { cotizacion?: { id: number; quoteNumber: string } | null } | null | undefined)?.cotizacion ??
+    null;
+  if (activity.client?.name) {
+    meta.push({
+      icon: <IcoCliente />,
+      label: activity.client.name,
+      href: core && clienteDeVenta ? `/erp/clientes/${clienteDeVenta}` : undefined,
+    });
+  }
+  if (core && cotizacionOrigen) {
+    meta.push({ icon: <RequestQuoteOutlinedIcon fontSize="inherit" />, label: cotizacionOrigen.quoteNumber, href: `/erp/cotizaciones/${cotizacionOrigen.id}` });
+  }
+  if (core && activity.project?.id) {
+    meta.push({ icon: <AccountTreeOutlinedIcon fontSize="inherit" />, label: activity.project.title, href: `/erp/proyectos/${activity.project.id}` });
+  }
   if (sitio) meta.push({ icon: <IcoSitio />, label: sitio });
   if (horario) meta.push({ icon: <IcoCalendario />, label: horario });
 
@@ -476,7 +496,9 @@ export default function ActivityDetailShell({
   push(
     "Proyecto",
     activity.project?.id && core ? (
-      activity.project.title
+      <Link href={`/erp/proyectos/${activity.project.id}`} className={s.factLink}>
+        {activity.project.title} →
+      </Link>
     ) : activity.project?.id ? (
       <Link href={`/ops/projects/${activity.project.id}`} className={s.factLink}>
         {activity.project.title} →

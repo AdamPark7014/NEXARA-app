@@ -170,3 +170,36 @@ describe('OperationalProjectsService: abrir un proyecto no destapa clientes del 
     expect(prisma.salesClientSector.create).not.toHaveBeenCalled();
   });
 });
+
+describe('actividad que nace del proyecto', () => {
+  function armar() {
+    const activities = { create: jest.fn(async () => ({ id: 77 })) };
+    const service = new OperationalProjectsService({} as any, activities as any);
+    jest.spyOn(service, 'findById').mockResolvedValue({ id: 3, clientId: 8, companyId: 7 } as any);
+    return { service, activities };
+  }
+
+  it('hereda cliente y empresa, y queda como trabajo del proyecto', async () => {
+    const { service, activities } = armar();
+    await service.createProjectActivity(3, { titulo: 'Instalar cámaras', responsableId: 21 }, 10, 7);
+    const [dto, empresa] = activities.create.mock.calls[0] as unknown as [any, number];
+    expect(empresa).toBe(7);
+    expect(dto).toMatchObject({
+      titulo: 'Instalar cámaras',
+      projectId: 3,
+      clientId: 8,
+      coreKind: 'proyecto',
+      assignmentCharge: 'ejecucion',
+      creadoPorId: 10,
+      responsableId: 21,
+    });
+    expect(dto.periodoInicio).toBeUndefined();
+  });
+
+  it('el día elegido es su periodo', async () => {
+    const { service, activities } = armar();
+    await service.createProjectActivity(3, { titulo: 'Instalar cámaras', responsableId: 21, fecha: '2026-11-10' }, 10, 7);
+    const [dto] = activities.create.mock.calls[0] as unknown as [any];
+    expect(dto).toMatchObject({ periodoInicio: '2026-11-10', periodoFin: '2026-11-10' });
+  });
+});

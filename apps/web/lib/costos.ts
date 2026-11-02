@@ -218,6 +218,16 @@ export const getBandeja = (token: string, periodo: Periodo) =>
 export const ligarActividad = (token: string, activityId: number, tipo: TipoLiga, id?: number | null) =>
   erpFetch<{ ok: true }>(`${API}/por-ligar/${activityId}`, token, json({ tipo, id: id ?? null }));
 
+export type SugerenciaDeLiga = {
+  pendiente: boolean;
+  sugerencia: Sugerencia | null;
+  proyectos: Array<{ id: number; nombre: string }>;
+};
+
+/** Para preguntar una vez de qué proyecto es una actividad suelta. Solo reglas, sin IA. */
+export const getSugerenciaDeLiga = (token: string, activityId: number) =>
+  erpFetch<SugerenciaDeLiga>(`${API}/por-ligar/${activityId}/sugerencia`, token);
+
 export const deshacerLiga = (token: string, activityId: number) =>
   erpFetch<{ ok: true }>(`${API}/por-ligar/${activityId}`, token, { method: "DELETE" });
 

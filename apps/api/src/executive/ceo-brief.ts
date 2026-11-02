@@ -18,7 +18,7 @@ export type DatosCeo = {
   };
   cobranza: { vencidas: number; monto: number; diasMasAtrasada: number };
   comprasAtrasadas: number;
-  cotizaciones: { porVencer: number; monto: number; dias: number; sinEnviar?: number };
+  cotizaciones: { porVencer: number; monto: number; dias: number; sinEnviar?: number; porDecidir?: number; ganadasSinProyecto?: number };
   operacion: { actividadesAtrasadas: number; porValidar: number };
   /** Evidencias sin revisar por jefe directo: las suyas aparte. Si falta, se usa `porValidar`. */
   evidencias?: { tuyas: number; deOtros: Array<{ jefe: string; n: number }> };
@@ -104,6 +104,22 @@ export function armarResumenCeo(d: DatosCeo, fecha: string): ResumenCeo {
       clave: 'cotizaciones',
       texto: `${plural(d.cotizaciones.sinEnviar ?? 0, 'cotización vigente', 'cotizaciones vigentes')} sin marcar como enviada`,
       url: '/erp/cotizaciones',
+      tono: 'atencion',
+    });
+  }
+  if ((d.cotizaciones.porDecidir ?? 0) > 0) {
+    items.push({
+      clave: 'cotizaciones',
+      texto: `${plural(d.cotizaciones.porDecidir ?? 0, 'cotización enviada espera', 'cotizaciones enviadas esperan')} saber cómo ${(d.cotizaciones.porDecidir ?? 0) === 1 ? 'terminó' : 'terminaron'}`,
+      url: '/erp/cotizaciones?estado=ENVIADA',
+      tono: 'atencion',
+    });
+  }
+  if ((d.cotizaciones.ganadasSinProyecto ?? 0) > 0) {
+    items.push({
+      clave: 'cotizaciones',
+      texto: `${plural(d.cotizaciones.ganadasSinProyecto ?? 0, 'cotización ganada', 'cotizaciones ganadas')} todavía sin proyecto`,
+      url: '/erp/cotizaciones?estado=APROBADA&sinProyecto=1',
       tono: 'atencion',
     });
   }

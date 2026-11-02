@@ -48,8 +48,8 @@ const ESTADO_POR_DB: Record<EstadoDb, EstadoCotizacion> = {
 export const ETIQUETA_ESTADO: Record<EstadoCotizacion, string> = {
   BORRADOR: 'Borrador',
   ENVIADA: 'Enviada',
-  APROBADA: 'Aprobada',
-  RECHAZADA: 'Rechazada',
+  APROBADA: 'Ganada',
+  RECHAZADA: 'Perdida',
   VENCIDA: 'Vencida',
 };
 

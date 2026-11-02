@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
+import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
 import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto, QuickCreateOperationalProjectDto } from './dto/create-operational-project.dto.js';
 import { salesPatchFromOps, opsStatusToSales } from '../common/project-handoff.js';
 import { resolveRequiredCompanyId, companyWhere, requireCompanyId, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
@@ -294,7 +295,7 @@ export class OperationalProjectsService {
   }
 
   /** Cliente de operación de la misma empresa. Si el padrón aún no lo tiene, se crea aquí. */
-  private async ensureServiceClientForProject(
+  async ensureServiceClientForProject(
     sales: {
       id: number;
       name: string;
@@ -695,11 +696,15 @@ export class OperationalProjectsService {
         activityType: 'CLIENT',
         ticketType: 'INSTALACION',
         workType: 'ISSUE',
+        coreKind: 'proyecto',
+        assignmentCharge: 'ejecucion',
+        prioridad: 'MEDIA',
         branchName: dto.branchName,
         branchNumber: dto.branchNumber,
         creadoPorId: userId,
         responsableId: dto.responsableId,
-      },
+        ...(dto.fecha ? { periodoInicio: dto.fecha, periodoFin: dto.fecha } : {}),
+      } as CreateActivityDto,
       (project as any).companyId,
     );
   }

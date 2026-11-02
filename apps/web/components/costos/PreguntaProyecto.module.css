@@ -1,0 +1,48 @@
+/* Una actividad suelta pregunta una vez de qué proyecto es. */
+.caja {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s3) var(--ui-s4);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-brand-bg, var(--ui-surface));
+}
+
+.pregunta {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ui-fg);
+}
+
+.botones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.lista {
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: 340px;
+}
+
+.nota {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ui-fg-2);
+}
+
+.error {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ui-danger-fg, var(--ui-fg));
+}
+
+.listo {
+  margin: 0;
+  padding: var(--ui-s2) var(--ui-s3);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-brand-bg, var(--ui-surface));
+  font-size: 13.5px;
+  color: var(--ui-fg);
+}

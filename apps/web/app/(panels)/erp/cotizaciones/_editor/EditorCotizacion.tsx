@@ -76,8 +76,10 @@ import SeccionPlanos from "./SeccionPlanos";
 import SeccionCotizacion from "./SeccionCotizacion";
 import VistaPrevia from "./VistaPrevia";
 import DialogoEnvio from "./DialogoEnvio";
-import YaLaEnvie, { ProximosAvisos } from "./YaLaEnvie";
+import YaLaEnvie from "./YaLaEnvie";
+import ComoTermino from "./ComoTermino";
 import { useCronometroProceso } from "@/lib/cronometro-proceso";
+import { aceptoEnPalabras, conUnSoloActual, medioDeEnvio, pasosDeFacturaYCobro } from "@/lib/hilo-negocio";
 import Seguimiento from "./Seguimiento";
 import styles from "./editor.module.css";
 
@@ -86,23 +88,11 @@ import styles from "./editor.module.css";
  * qué terminó. Lo que no ha pasado queda pendiente, sin fecha inventada.
  */
 function pasosDe(detalle: CotizacionDetalle, version: string): RecordStep[] {
-  const { estado, sentAt } = detalle;
+  const { estado, sentAt, hilo } = detalle;
   const enBorrador = estado === "BORRADOR";
   const aprobo = [...detalle.participantes].reverse().find((p) => p.rol === "APROBO");
-  const final: RecordStep =
-    estado === "APROBADA"
-      ? { id: "final", label: "Aprobada", hint: aprobo ? formatoFecha(aprobo.at) : undefined, state: "done" }
-      : estado === "RECHAZADA"
-        ? { id: "final", label: "Rechazada", hint: detalle.rejectedByName ? `Por ${detalle.rejectedByName}` : undefined, state: "current" }
-        : estado === "VENCIDA"
-          ? { id: "final", label: "Vencida", hint: detalle.validUntil ? formatoFecha(detalle.validUntil) : undefined, state: "current" }
-          : {
-              id: "final",
-              label: "Aprobada",
-              hint: detalle.validUntil ? `Vigente al ${formatoFecha(detalle.validUntil)}` : "La firma el cliente",
-              state: "pending",
-            };
-  return [
+  const medio = medioDeEnvio(detalle.enviadaPor);
+  const base: RecordStep[] = [
     {
       id: "borrador",
       label: "Borrador",
@@ -112,11 +102,59 @@ function pasosDe(detalle: CotizacionDetalle, version: string): RecordStep[] {
     {
       id: "enviada",
       label: "Enviada",
-      hint: sentAt ? (enBorrador ? `Última: ${formatoFecha(sentAt)}` : formatoFecha(sentAt)) : "Sin enviar",
-      state: estado === "ENVIADA" ? "current" : sentAt && !enBorrador ? "done" : "pending",
+      hint: !sentAt
+        ? "Sin enviar"
+        : enBorrador
+          ? `Última: ${formatoFecha(sentAt)}`
+          : [formatoFecha(sentAt), medio === "en persona" ? medio : medio ? `por ${medio}` : null].filter(Boolean).join(", "),
+      state: sentAt && !enBorrador ? "done" : "pending",
     },
-    final,
   ];
+  if (estado === "RECHAZADA") {
+    return [
+      ...base,
+      {
+        id: "final",
+        label: sentAt ? "Perdida" : "Descartada",
+        hint: detalle.rejectedByName ? `Por ${detalle.rejectedByName}` : undefined,
+        state: "current",
+      },
+    ];
+  }
+  if (estado === "VENCIDA") {
+    return [
+      ...base,
+      { id: "final", label: "Vencida", hint: detalle.validUntil ? formatoFecha(detalle.validUntil) : undefined, state: "current" },
+    ];
+  }
+  const ganada = estado === "APROBADA";
+  const aceptada = detalle.aceptadaAt ?? aprobo?.at;
+  const como = aceptoEnPalabras(detalle.aceptadaVia);
+  const proyecto = hilo?.proyecto ?? null;
+  const pasos: RecordStep[] = [
+    ...base,
+    {
+      id: "final",
+      label: "Ganada",
+      hint: ganada
+        ? [aceptada ? formatoFecha(aceptada) : null, como].filter(Boolean).join(", ") || undefined
+        : estado === "ENVIADA"
+          ? "Falta tu respuesta"
+          : detalle.validUntil
+            ? `Vigente al ${formatoFecha(detalle.validUntil)}`
+            : undefined,
+      state: ganada ? "done" : "pending",
+    },
+    {
+      id: "proyecto",
+      label: "Proyecto",
+      hint: proyecto ? proyecto.title : ganada ? "Falta crearlo" : "Aún no existe",
+      state: proyecto?.status === "COMPLETED" ? "done" : "pending",
+      href: proyecto ? `/erp/proyectos/${proyecto.id}` : undefined,
+    },
+    ...pasosDeFacturaYCobro(hilo?.factura, hilo?.cobro, ganada),
+  ];
+  return enBorrador ? pasos : conUnSoloActual(pasos);
 }
 
 function textoGuardado(estado: EstadoGuardado, guardadoEn: Date | null, pausa: string | null, error: string | null) {
@@ -683,7 +721,7 @@ export default function EditorCotizacion({
         />
       ) : null}
 
-      {detalle?.estado === "ENVIADA" ? <ProximosAvisos sentAt={detalle.sentAt} validUntil={detalle.validUntil} /> : null}
+      {detalle ? <ComoTermino detalle={detalle} onDetalle={onDetalle} onError={setError} onAviso={setAviso} /> : null}
 
       {detalle ? (
         <section className={styles.ficha} aria-label="Resumen de la cotización">
@@ -800,7 +838,7 @@ export default function EditorCotizacion({
         <div className={styles.avisos}>
           {aprobada ? (
             <Alert tone="success">
-              Aprobada: es el compromiso firmado con el cliente y ya no se edita. Puedes descargar el PDF cuando quieras.
+              Ganada: es el compromiso con el cliente y ya no se edita. Puedes descargar el PDF cuando quieras.
             </Alert>
           ) : bloqueada && detalle ? (
             <Alert
@@ -828,7 +866,7 @@ export default function EditorCotizacion({
 
           {detalle?.rejectedReason ? (
             <Alert tone="warning">
-              Rechazada{detalle.rejectedByName ? ` por ${detalle.rejectedByName}` : ""}: {detalle.rejectedReason}
+              {detalle.sentAt ? "Perdida" : "Descartada"}{detalle.rejectedByName ? ` por ${detalle.rejectedByName}` : ""}: {detalle.rejectedReason}
             </Alert>
           ) : null}
 

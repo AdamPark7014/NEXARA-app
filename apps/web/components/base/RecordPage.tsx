@@ -58,7 +58,7 @@ import b from "./base.module.css";
  */
 
 export type RecordStepState = "done" | "current" | "pending";
-export type RecordStep = { id: string; label: ReactNode; hint?: ReactNode; state: RecordStepState };
+export type RecordStep = { id: string; label: ReactNode; hint?: ReactNode; state: RecordStepState; href?: string };
 export type RecordFact = { label: ReactNode; value: ReactNode; hint?: ReactNode };
 export type RecordMetaItem = { icon?: ReactNode; label: ReactNode; href?: string };
 export type RecordPerson = { name: string; avatarUrl?: string | null; role?: ReactNode; presence?: Presence; href?: string };
@@ -273,7 +273,7 @@ export function Stepper({ steps, ariaLabel = "Pasos" }: { steps: ReadonlyArray<R
             )}
           </span>
           <span className={s.stepText}>
-            <span className={s.stepT}>{st.label}</span>
+            <span className={s.stepT}>{st.href ? <Link href={st.href}>{st.label}</Link> : st.label}</span>
             {st.hint != null ? <span className={s.stepM}>{st.hint}</span> : <span className={s.stepM}>—</span>}
           </span>
           <span className="ui-sr-only">{st.state === "done" ? ", hecho" : st.state === "current" ? ", en curso" : ", pendiente"}</span>

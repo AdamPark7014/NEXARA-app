@@ -69,6 +69,7 @@ import {
   type Segmento,
 } from './terminos-segmento.js';
 import { avanceActividadPorEstado } from './estado-cotizacion.js';
+import { FACTURACION_VACIA, facturacionDe } from './hilo-negocio.js';
 import { isPdfUrl, pasoCubiertoPorCotizacion } from '../activities/evidence/evidence-flow.helpers.js';
 import { LIMITES_VISTA_PREVIA, borradorSobreGuardada } from './propuesta-vista-previa.js';
 import {
@@ -542,18 +543,37 @@ export class CotizacionesService {
    * Cotización como la leen Core y las apps: estado y segmento en español, folio con su cadena,
    * términos que corresponden a lo que se cobra y partidas agrupadas.
    */
+  /** Lo que ya salió de esta cotización: su proyecto, su factura y su cobro. */
+  private async hiloDe(cotizacionId: number) {
+    const [proyecto, facturas] = await Promise.all([
+      this.db.operationalProject.findFirst({
+        where: { cotizacionId, deletedAt: null, status: { not: 'CANCELLED' } },
+        orderBy: { id: 'desc' },
+        select: { id: true, title: true, status: true },
+      }),
+      this.db.invoice.findMany({
+        where: { cotizacionId, deletedAt: null },
+        orderBy: { id: 'asc' },
+        select: { id: true, status: true, isCancelled: true, invoiceNumber: true, cfdiSerie: true, cfdiFolio: true, paidAmount: true },
+      }),
+    ]);
+    return { proyecto, ...facturacionDe(facturas) };
+  }
+
   async presentar(quote: any) {
     const partidas = this.partidasParaGrupos(quote.items ?? []);
     const instalacion = incluyeInstalacion(partidas);
     const estado = estadoDesdeDb(quote.status);
     const segmento = normalizarSegmento(quote.segmento);
 
-    const [participantes, actividades, cadena, planos, autor] = await Promise.all([
+    const [participantes, actividades, cadena, planos, autor, hilo] = await Promise.all([
       this.core.participantesParaApi(quote.id),
       this.actividadesLigadas(quote.id),
       this.core.cadenaDeParticipantes(quote.id, quote.createdById ?? null),
       this.planosDePropuesta(quote),
       quote.createdById ? this.core.claveDePersona(quote.createdById) : Promise.resolve(null),
+      // La cadena adorna la pantalla: si falla, la cotización se abre igual.
+      this.hiloDe(quote.id).catch(() => ({ proyecto: null, ...FACTURACION_VACIA })),
     ]);
     const vigenciaDias = diasDeVigencia(quote.issueDate, quote.validUntil);
     const opciones = normalizarOpciones(quote.opciones);
@@ -596,6 +616,7 @@ export class CotizacionesService {
           }
         : null,
       cadenaParticipantes: cadena,
+      hilo,
       // Envío interno: a quién le toca ahora, quién se la pasó y con qué nota. No va en el PDF.
       asignadoA: quote.asignadoA
         ? { id: quote.asignadoA.id, nombre: quote.asignadoA.nombre, puesto: quote.asignadoA.puesto ?? null }
@@ -705,6 +726,7 @@ export class CotizacionesService {
           include: { user: { select: { id: true, nombre: true } } },
         },
         actividades: { select: { id: true, anNumber: true }, take: 3 },
+        proyectos: { where: { deletedAt: null, status: { not: 'CANCELLED' } }, select: { id: true }, take: 1 },
       },
     });
 
@@ -746,6 +768,9 @@ export class CotizacionesService {
         issueDate: quote.issueDate,
         validUntil: quote.validUntil,
         sentAt: quote.sentAt,
+        enviadaPor: quote.enviadaPor ?? null,
+        aceptadaAt: quote.aceptadaAt ?? null,
+        proyectoId: quote.proyectos?.[0]?.id ?? null,
         revision: quote.revision,
         elaboro: autor
           ? {
