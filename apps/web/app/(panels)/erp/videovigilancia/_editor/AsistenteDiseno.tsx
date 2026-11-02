@@ -6,6 +6,7 @@
  * plantillas ni siquiera la llaman. Lo que sale son las mismas piezas de siempre: se ajusta y se deshace.
  */
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { Alert, Button } from "@/components/base";
@@ -52,7 +53,7 @@ export default function AsistenteDiseno({
     }
   };
 
-  return (
+  return createPortal(
     <div className={styles.asistenteFondo} role="dialog" aria-modal="true" aria-label="Armar el diseño con IA">
       <div className={styles.asistente}>
         <header>
@@ -96,6 +97,7 @@ export default function AsistenteDiseno({
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

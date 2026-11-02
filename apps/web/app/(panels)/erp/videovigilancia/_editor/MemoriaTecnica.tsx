@@ -7,6 +7,7 @@
  */
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { createPortal } from "react-dom";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import { Alert, Button } from "@/components/base";
@@ -158,7 +159,8 @@ export default function MemoriaTecnica({
     }
   };
 
-  return (
+  // Va directo al body: dentro del panel, el menú y la barra de Core le quedan encima.
+  return createPortal(
     <div className={styles.fondo} role="dialog" aria-modal="true" aria-label="Cargar memoria técnica">
       <input ref={entrada} type="file" accept="application/pdf,.pdf" hidden aria-label="Elegir el PDF" onChange={(e) => void leer(e.target.files?.[0])} />
       <header className={styles.cabeza}>
@@ -345,6 +347,7 @@ export default function MemoriaTecnica({
           </section>
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -1838,10 +1838,10 @@
 .pistaVista {
   position: absolute;
   left: 256px;
-  right: 16px;
+  right: 66px;
   bottom: 112px;
   width: fit-content;
-  max-width: calc(100% - 272px);
+  max-width: calc(100% - 322px);
   margin: 0 auto;
   padding: 6px 13px;
   border-radius: 999px;
@@ -1849,9 +1849,6 @@
   color: #fff;
   font-size: var(--ui-fs-meta);
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   pointer-events: none;
   z-index: 1;
 }
@@ -2061,7 +2058,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  max-width: 310px;
+  max-width: 226px;
   padding: 8px;
   border-radius: 12px;
   background: rgba(15, 18, 23, 0.86);

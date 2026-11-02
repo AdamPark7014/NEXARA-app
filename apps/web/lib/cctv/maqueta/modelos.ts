@@ -6,6 +6,7 @@
  * El frente mira a +Z y la base queda en Y = 0. Los moldes se guardan y se clonan: las cámaras
  * iguales comparten geometría y material.
  */
+import { marcaCorta } from "../marca";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { marcarCompartido } from "./texturas";
@@ -512,7 +513,8 @@ const FABRICA: Readonly<Record<TipoModelo, (p: ParamsModelo, m: Mats) => THREE.G
 const moldes = new Map<string, THREE.Group>();
 
 /** Arma una cámara. `p` son las medidas de la ficha. */
-export function crearModelo(tipo: TipoModelo, p: ParamsModelo = {}): THREE.Group {
+export function crearModelo(tipo: TipoModelo, original: ParamsModelo = {}): THREE.Group {
+  const p = { ...original, marca: marcaCorta(original.marca) || undefined };
   const clave = JSON.stringify([tipo, p]);
   let molde = moldes.get(clave);
   if (!molde) {

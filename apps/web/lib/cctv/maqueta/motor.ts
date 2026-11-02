@@ -592,7 +592,7 @@ export class MotorMaqueta {
     return { p: centro.clone().addScaledVector(dir, dist), m: centro, dist };
   }
 
-  vistaGeneral(animar = true, holgura = 1.06) {
+  vistaGeneral(animar = true, holgura = 1.14) {
     const { p, m, dist } = this.encuadre(DIR_GENERAL, new THREE.Vector3(0, 1, 0), holgura);
     this.ctrl.maxDistance = dist * 3;
     this.volar(p, m, animar);

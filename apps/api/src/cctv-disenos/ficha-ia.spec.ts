@@ -189,3 +189,10 @@ describe('La IA que convierte una frase en datos', () => {
     expect(e).toMatchObject({ archivo: '', hojas: 0, tipo: 'domo' });
   });
 });
+
+describe('La marca que lee la IA', () => {
+  it('sale sin razón social, para no repetir fabricantes en el catálogo', () => {
+    expect(limpiarFicha({ tipo: 'nvr', marca: 'Dahua Technology', modelo: 'X', datos: [] }, 1).marca).toBe('Dahua');
+    expect(limpiarFicha({ tipo: 'switch', marca: 'TP-Link', modelo: 'X', datos: [] }, 1).marca).toBe('TP-Link');
+  });
+});
