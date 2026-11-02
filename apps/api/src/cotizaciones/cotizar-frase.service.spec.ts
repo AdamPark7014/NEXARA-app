@@ -2,8 +2,10 @@ import { CotizarFraseService } from './cotizar-frase.service';
 
 const USO = { modelo: 'claude-haiku-5-5', tokensEntrada: 400, tokensSalida: 60, tokensCacheLeidos: 0, tokensCacheEscritos: 0, tokensPensamiento: 0, usdAprox: 0.0001 };
 
-function armar(cambios: { disponible?: boolean; json?: jest.Mock; buscar?: jest.Mock } = {}) {
+function armar(cambios: { disponible?: boolean; json?: jest.Mock; buscar?: jest.Mock; queryRaw?: jest.Mock } = {}) {
   const prisma = {
+    $queryRaw: cambios.queryRaw ?? jest.fn(async () => []),
+    supplierCatalogSyncRun: { findFirst: jest.fn(async () => ({ finishedAt: new Date() })) },
     salesClient: { findMany: jest.fn(async () => [{ id: 1, name: 'A QUIEN CORRESPONDA' }, { id: 2, name: 'Hotel Aurora' }]) },
     cotizacion: {
       findMany: jest.fn(async () => [{ clientName: 'Hotel Aurora', salesClientId: 2 }]),
@@ -93,5 +95,52 @@ describe('CotizarFraseService', () => {
     const r = await service.interpretar('2 reguladores 2000 VA\n1 cosa rara', 1);
     expect(buscar).toHaveBeenCalled();
     expect(r.partidas[0]).toMatchObject({ fuente: 'catalogo', unitCost: 700, unitPrice: 840, productCtId: 9, stock: 4 });
+  });
+
+  describe('costo de hoy en CT', () => {
+    const ZC32 = { clave: 'IMP1', modelo: 'ZC300', numParte: 'ZC32', precio: 1200, moneda: 'USD', tipoCambio: 20, existencia: { '14A': 3 }, tipoDelDia: 20 };
+    const FRASE = '3 impresoras Zebra de tarjetas, 1 kit de limpieza Zebra para Hotel Aurora';
+
+    it('avisa en lo ya cotizado sin cambiar costo ni precio, y sin llamar a la IA', async () => {
+      const { service, json } = armar({ queryRaw: jest.fn(async () => [ZC32]) });
+      const r = await service.interpretar(FRASE, 1);
+      expect(json).not.toHaveBeenCalled();
+      expect(r.partidas[0]).toMatchObject({ unitCost: 22000, unitPrice: 26000, costoDeHoy: { costo: 24000, clave: 'IMP1', piezas: 3, alDia: true } });
+      expect(r.partidas[1]).not.toHaveProperty('costoDeHoy');
+    });
+
+    it('a la IA no le llega nada de CT', async () => {
+      const queryRaw = jest.fn(async () => [ZC32]);
+      const { service, json } = armar({ queryRaw });
+      await service.interpretar('seis domos de cuatro megas, algo raro para un cliente nuevo', 1);
+      const peticion = JSON.stringify(json.mock.calls[0]);
+      expect(peticion).not.toContain('IMP1');
+      expect(peticion).not.toContain('24000');
+    });
+
+    it('es una sola consulta y solo con modelos ya cotizados', async () => {
+      const queryRaw = jest.fn(async () => [ZC32]);
+      const { service } = armar({ queryRaw });
+      await service.interpretar(FRASE, 1);
+      expect(queryRaw).toHaveBeenCalledTimes(1);
+      expect(queryRaw.mock.calls[0].slice(1)[0]).toEqual(expect.arrayContaining(['ZC32', '105999']));
+    });
+
+    it('si la consulta falla, la propuesta sale sin aviso', async () => {
+      const { service } = armar({ queryRaw: jest.fn(async () => { throw new Error('sin base'); }) });
+      const r = await service.interpretar(FRASE, 1);
+      expect(r.partidas[0]).toMatchObject({ unitCost: 22000, unitPrice: 26000 });
+      expect(r.partidas[0]).not.toHaveProperty('costoDeHoy');
+    });
+
+    it('en dólares no se compara con CT, y lo cotizado en otra moneda no se ofrece', async () => {
+      const queryRaw = jest.fn(async () => [ZC32]);
+      const { service, prisma } = armar({ queryRaw });
+      await service.interpretar(FRASE, 7, { moneda: 'usd' });
+      expect(queryRaw).not.toHaveBeenCalled();
+      expect(prisma.cotizacionItem.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { cotizacion: { companyId: 7, deletedAt: null, currency: { equals: 'USD', mode: 'insensitive' } } } }),
+      );
+    });
   });
 });

@@ -16,16 +16,21 @@ import {
   type PropuestaCotizacion,
   type Segmento,
 } from "@/lib/cotizaciones-api";
+import { leerAviso, type LecturaAviso } from "@/lib/aviso-costo-ct";
 import {
   conMargen,
+  deshacerCostoDeHoy,
   elegirOpcion,
   filasDePropuesta,
   importeDeFila,
   resumenDeFilas,
+  subirPrecioDeHoy,
+  usarCostoDeHoy,
   type DatosDePropuesta,
   type FilaPropuesta,
 } from "@/lib/cotizar-ia";
 import { porcentajeMargen, textoDePorcentaje } from "@/lib/cotizacion-documento";
+import AvisoCosto from "./AvisoCosto";
 import { TextoAuto } from "./campos";
 import s from "./CotizarConIA.module.css";
 
@@ -44,18 +49,21 @@ function CampoNumero({
   etiqueta,
   decimales = 2,
   placeholder,
+  resaltado = false,
 }: {
   valor: number;
   onValor: (n: number) => void;
   etiqueta: string;
   decimales?: number;
   placeholder?: string;
+  /** Lo movió un botón: se marca para que se vea. */
+  resaltado?: boolean;
 }) {
   const [texto, setTexto] = useState<string | null>(null);
   const visible = texto ?? (valor ? (decimales ? conComas(valor) : String(valor)) : "");
   return (
     <input
-      className={s.numero}
+      className={`${s.numero} ${resaltado ? s.numeroMovido : ""}`}
       inputMode="decimal"
       value={visible}
       placeholder={placeholder}
@@ -149,7 +157,7 @@ export default function CotizarConIA({
     setPensando(true);
     setError(null);
     try {
-      const r = await interpretarCotizacion(token, limpio, { excluir });
+      const r = await interpretarCotizacion(token, limpio, { excluir, moneda });
       const m = r.margen ?? r.margenPorOmision;
       setPropuesta(r);
       setCliente(r.cliente);
@@ -333,6 +341,9 @@ export default function CotizarConIA({
                 {filas.map((f) => {
                   const origen = origenDe(f, moneda);
                   const opciones = f.alternativas;
+                  const lectura: LecturaAviso | null = f.avisoCt
+                    ? leerAviso({ aviso: f.avisoCt, unitCost: f.unitCost, unitPrice: f.unitPrice, moneda, margenBase: margenActual, rotuloBase: ", el de la tarjeta" })
+                    : null;
                   return (
                     <div className={s.renglon} role="row" key={f.key}>
                       <span role="cell">
@@ -356,6 +367,14 @@ export default function CotizarConIA({
                             {origen.texto ? <span className={`${s.etiquetaChica} ${origen.tono === "elige" ? s.tonoElige : s.tonoLista}`}>{origen.texto}</span> : null}
                             {origen.detalle ? <span>{origen.detalle}</span> : null}
                           </div>
+                        ) : null}
+                        {lectura ? (
+                          <AvisoCosto
+                            lectura={lectura}
+                            onUsar={() => cambiarFila(f.key, usarCostoDeHoy)}
+                            onSubir={() => lectura.subir && cambiarFila(f.key, (x) => subirPrecioDeHoy(x, lectura.subir!))}
+                            onDeshacer={() => cambiarFila(f.key, deshacerCostoDeHoy)}
+                          />
                         ) : null}
                         {opciones.length && (f.seguridad !== "alta" || f.opcionElegida != null) ? (
                           <div className={s.opciones} role="group" aria-label={`Opciones para ${f.pedido}`}>
@@ -389,6 +408,7 @@ export default function CotizarConIA({
                           valor={f.unitPrice}
                           placeholder="0.00"
                           etiqueta={`Precio de ${f.pedido}`}
+                          resaltado={lectura?.tono === "verde"}
                           onValor={(n) => cambiarFila(f.key, (x) => ({ ...x, unitPrice: n, marginPercent: null, precioManual: true }))}
                         />
                       </span>

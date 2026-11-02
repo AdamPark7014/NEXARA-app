@@ -111,7 +111,7 @@ export class CotizacionesController {
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
   @Post('interpretar')
   interpretar(@Body() dto: InterpretarCotizacionDto, @CurrentCompanyId() companyId: number | null) {
-    return this.cotizarFrase.interpretar(dto.texto, companyId, { excluir: dto.excluir ?? null });
+    return this.cotizarFrase.interpretar(dto.texto, companyId, { excluir: dto.excluir ?? null, moneda: dto.moneda ?? null });
   }
 
   /** Catálogo de paquetes. Antes de `:id` para que no lo tome por un id. */

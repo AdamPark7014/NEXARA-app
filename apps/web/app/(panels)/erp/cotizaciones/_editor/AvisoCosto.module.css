@@ -1,0 +1,91 @@
+/* «Hoy en CT» (muestra aprobada por Adam el 02-11, solo tokens --ui-*).
+   Rojo: el precio ya no cubre el costo de hoy. Ámbar: baja lo que se gana. Azul: CT está más barato. */
+.aviso {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: var(--ui-radius-sm, 8px);
+  font-size: var(--ui-fs-meta, 12px);
+  line-height: 1.45;
+  /* Según el ancho que le toca: la tarjeta y la tabla se angostan por razones distintas. */
+  container: aviso / inline-size;
+}
+
+.rojo {
+  background: var(--ui-danger-bg);
+  color: var(--ui-danger-text);
+}
+
+.ambar {
+  background: var(--ui-warning-bg);
+  color: var(--ui-warning-text);
+}
+
+.azul {
+  background: var(--ui-info-bg);
+  color: var(--ui-info-text);
+}
+
+.verde {
+  background: var(--ui-success-bg);
+  color: var(--ui-success-text);
+}
+
+.renglon {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cifra {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+/* Sobre un fondo de color también se lee como botón; el texto largo baja de renglón. */
+.boton {
+  height: auto;
+  min-height: 32px;
+  white-space: normal;
+  text-align: left;
+  color: var(--ui-fg);
+}
+
+.deshacer {
+  min-height: 32px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--ui-radius-sm, 8px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 550;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.deshacer:focus-visible {
+  outline: var(--ui-focus-outline, 2px solid var(--ui-brand));
+  outline-offset: var(--ui-focus-offset, 2px);
+}
+
+/* A 390 px, un dato por renglón, como el resto de Core. */
+@container aviso (max-width: 440px) {
+  .parte {
+    display: block;
+  }
+
+  .sep {
+    display: none;
+  }
+}

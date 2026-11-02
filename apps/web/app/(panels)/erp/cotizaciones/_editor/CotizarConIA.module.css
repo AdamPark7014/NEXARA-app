@@ -151,6 +151,11 @@
   text-align: right;
 }
 
+.numeroMovido {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+}
+
 .numero:focus-visible,
 .opcion:focus-visible,
 .quitar:focus-visible {

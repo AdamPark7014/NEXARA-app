@@ -6,6 +6,7 @@
  * `apps/api/src/cotizaciones/objetivo-plantilla.ts`), las subsecciones de alcance con sus viñetas,
  * los importes de las partidas y qué cambió desde el último guardado.
  */
+import type { AvisoCt } from "@/lib/aviso-costo-ct";
 import {
   CLAVES_TERMINO,
   TITULO_TERMINO,
@@ -290,9 +291,13 @@ export function precioConMargen(
   return redondeo(costo * (1 + margen / 100));
 }
 
-export type PartidaEditor = PartidaCotizacion & { key: string };
+export type PartidaEditor = PartidaCotizacion & {
+  key: string;
+  /** Solo mientras se edita: no se guarda ni viaja a la API. */
+  avisoCt?: AvisoCt | null;
+};
 
-export function partidaNueva(parcial: Partial<PartidaCotizacion> = {}): PartidaEditor {
+export function partidaNueva(parcial: Partial<PartidaCotizacion> & Pick<PartidaEditor, "avisoCt"> = {}): PartidaEditor {
   return {
     key: nuevaClave("p"),
     name: "",
@@ -335,7 +340,7 @@ export function partidasDesdeApi(items: PartidaCotizacion[] | null | undefined):
 export function partidasParaApi(partidas: PartidaEditor[]): PartidaCotizacion[] {
   return partidas
     .filter((p) => p.name.trim())
-    .map(({ key: _key, id: _id, lineTotal: _total, ...p }) => ({
+    .map(({ key: _key, id: _id, lineTotal: _total, avisoCt: _aviso, ...p }) => ({
       ...p,
       name: p.name.trim(),
       unit: p.unit?.trim() || "Pieza",
