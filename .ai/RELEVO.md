@@ -1,5 +1,14 @@
 # RELEVO
 
+- **02-11 ~12:50 (claude-code) — Disco del Hetzner con autopurgado, y mapa de Core para decidir.** Sin commits de código.
+  - **Disco (Adam: borrar imágenes viejas, barrer logs, que se purguen solos):** borradas `nexara-web:next14-respaldo` y `traefik:v2.11`. Logs de contenedores de 159 a 22 MB, con rotación cada hora a 50 MB (`/etc/cron.d/logs-contenedores`). Bitácora del sistema con tope de 150 MB. `syslog.1` de 239 MB, que eran errores del disco lleno, comprimido. Quitado `node_modules` de Zynoratek en el host: sus despliegues compilan dentro de Docker.
+  - **Limpieza semanal:** `/root/mantenimiento-disco.sh`, domingos 03:50 de México. Conserva `:prev`, `node` y `python`, y `--simular` solo enseña.
+  - **`/etc/docker/daemon.json`:** tope de logs para contenedores nuevos; validado y **sin reiniciar Docker**, porque reiniciarlo tumba todo: `live-restore` está apagado. Se aplica en el próximo reinicio.
+  - **No se tocó:** volúmenes con datos, fotos de INTEGRA, y `node_modules` de BIBLIOTECA y binlogs de ACROBAT, que están protegidos. Configuraciones anteriores en `/root/respaldo-config-disco-20261102/`.
+  - **El disco sube con los despliegues:** 77–79 % en calma y 84–88 % durante una racha. Lo estructural es el peso de `nexara-web` y `nexara-api`, más de 2 GB cada una.
+  - **Mapa de Core:** https://claude.ai/artifact/G4Gkmiu5cnFZfHw55USGLj. La cadena se corta entre cotización y proyecto. Junta Costos y Programa Velocidad en un solo orden. **Nada aprobado ni construido:** seis decisiones de Adam abiertas.
+  - **Visto de paso, sin resolver:** INTEGRA no guarda eventos desde el 31-10 a las 18:53 de México, aunque los equipos siguen enviando: en 2 días, 9,508 envíos con 200 y 17,359 con 404 sin llegar a la API. `chat_messages` tiene 0 filas con 128 creados en auditoría, el último el 22-10.
+
 - **02-11 ~13:00 (claude-code) — «Hoy en CT»: lo ya cotizado avisa si su costo difiere del de hoy. Adam: «con lo que consideres más propio a nuestra empresa» (se eligió B desde 3 %).** Muestra: https://claude.ai/artifact/BoYErbnfCLmQPnetmnNAEf (privada).
   - **Qué se ve:** en «Cotizar con IA», en la lista de «Nueva partida» y en la fila ya agregada: «Hoy en CT $X · N % más/menos que el costo guardado · piezas» y lo que se gana a este precio. Rojo si el precio ya no cubre el costo de hoy, ámbar si baja lo que se gana, azul si CT está más barato. Con ±3 % o menos no sale nada.
   - **Dos clics, nada solo:** «Usar costo de hoy» mueve solo el costo. El precio sube con un segundo botón («Subir precio a $X · N %, como la última vez») y «Deshacer» regresa las dos cifras. **Bajar el precio nunca se ofrece.**
