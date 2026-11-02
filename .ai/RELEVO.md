@@ -93,7 +93,7 @@
     - **Cuentas que no son de dirección.** Los permisos no se tocaron y los chips se filtran igual, pero solo se entró como CEO.
     - **Ninguna acción de punta a punta** (timbrar, autorizar, conciliar). La lógica no cambió y las pruebas cubren lo que cubrían.
     - **`procurement`** usa `FinanceModuleShell` y está fuera del menú: no se revisó.
-  - **Trampas:** `Service Unavailable` en estas pantallas durante la revisión fue la API reiniciándose por el despliegue de otra sesión. Tras un `navigate` que se agota, la pestaña de Chrome queda con `innerWidth` 0 y las capturas se cuelgan; hay que abrir otra. Un commit nuevo de «Consola» cambia los tokens de todo Core encima de esto: si algo cambia de tono después, viene de ahí.
+  - **Trampas:** `Service Unavailable` en estas pantallas durante la revisión fue la API reiniciándose por el despliegue de otra sesión. Tras un `navigate` que se agota, la pestaña de Chrome queda con `innerWidth` 0 y las capturas se cuelgan; hay que abrir otra.
   - **Siguiente:** las pantallas fuera del menú (`hr`, `settings`, `users`, `procurement`, `audit`) y reuniones siguen sin esta pasada. Los tres defectos del bloque de abajo (fechas con un día menos, facturas canceladas con días vencidos, etiquetas en inglés) esperan a que Adam los pida.
 
 - **02-11 ~13:55 (claude-code) — El aviso del tope de 5,000 filas ya sobrevive a los despliegues: cada recorte queda en `audit_logs` (`6f03b2a8`, en producción desde las 18:50 UTC).** Adam: «Sí, hazlo aquí».
