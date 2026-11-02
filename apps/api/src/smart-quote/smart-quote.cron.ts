@@ -3,6 +3,9 @@ import { Cron } from '@nestjs/schedule';
 import { JobQueueService } from '../jobs/job-queue.service.js';
 import { CtCatalogSyncService } from './sync/ct-catalog-sync.service.js';
 
+/** La siguiente corrida ya la trae el cron: nada se acumula si la cola se atora, y no se reintenta. */
+const unaEnCola = (source: 'PRIMARY' | 'FULL') => ({ jobId: `ct-sync-${source}`, unico: true, maxAttempts: 1 });
+
 @Injectable()
 export class SmartQuoteCronService {
   private readonly logger = new Logger(SmartQuoteCronService.name);
@@ -21,7 +24,7 @@ export class SmartQuoteCronService {
       return;
     }
     try {
-      await this.jobs.enqueue('supplier.ct.sync', { source: 'PRIMARY' });
+      await this.jobs.enqueue('supplier.ct.sync', { source: 'PRIMARY' }, unaEnCola('PRIMARY'));
     } catch (err) {
       this.logger.warn(`CT JSON enqueue failed: ${(err as Error).message}`);
       // Fallback directo si la cola no está disponible
@@ -35,7 +38,7 @@ export class SmartQuoteCronService {
     if (process.env.CT_SYNC_ENABLED === '0') return;
     if (!process.env.CT_FTP_USER || !process.env.CT_FTP_PASSWORD) return;
     try {
-      await this.jobs.enqueue('supplier.ct.sync', { source: 'FULL' });
+      await this.jobs.enqueue('supplier.ct.sync', { source: 'FULL' }, unaEnCola('FULL'));
     } catch (err) {
       this.logger.warn(`CT XML enqueue failed: ${(err as Error).message}`);
     }

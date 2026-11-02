@@ -58,6 +58,13 @@ function tokenOrFields(token: string): Prisma.ProductCTWhereInput {
   };
 }
 
+/** «DS-2FA1208-C16/K» y «ds 2fa1208 c16 k» son el mismo modelo. */
+const soloLetrasYCifras = (texto: string) => texto.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+/** El sync guarda solo los almacenes con piezas: `{}` es que CT no tiene ninguna hoy. */
+const SIN_EXISTENCIA: Prisma.ProductCTWhereInput = { existencia: { equals: {} } };
+const CON_EXISTENCIA: Prisma.ProductCTWhereInput = { NOT: SIN_EXISTENCIA };
+
 @Injectable()
 export class ProductSearchService {
   constructor(
@@ -97,6 +104,7 @@ export class ProductSearchService {
     if (params.brand) where.marca = { contains: params.brand, mode: 'insensitive' };
     if (params.category) where.categoria = { contains: params.category, mode: 'insensitive' };
     if (params.subcategory) where.subcategoria = { contains: params.subcategory, mode: 'insensitive' };
+    const sinPalabras = { ...where };
 
     const rawQ = params.q?.trim() || '';
     if (rawQ) {
@@ -132,28 +140,53 @@ export class ProductSearchService {
       ];
     }
 
-    // Over-fetch corto: stock se filtra en memoria (JSONB). Slim select = menos I/O.
+    // Over-fetch corto. Slim select = menos I/O.
     const fetchTake = inStockOnly ? Math.min(take * 4, 80) : Math.min(take * 2, 48);
-
-    let rows: SearchRow[] = await this.prisma.productCT.findMany({
-      where,
+    const consulta = {
       select: SEARCH_SELECT,
+      orderBy: rawQ ? [{ clave: 'asc' as const }] : [{ updatedAt: 'desc' as const }],
+    };
+
+    // Con todo el catálogo, «monitor» en orden de clave llenaría el corte con lo que no hay.
+    let rows: SearchRow[] = await this.prisma.productCT.findMany({
+      ...consulta,
+      where: { AND: [where, CON_EXISTENCIA] },
       take: fetchTake,
-      orderBy: rawQ ? [{ clave: 'asc' }] : [{ updatedAt: 'desc' }],
     });
+    if (!inStockOnly && rows.length < fetchTake) {
+      rows = rows.concat(
+        await this.prisma.productCT.findMany({
+          ...consulta,
+          where: { AND: [where, SIN_EXISTENCIA] },
+          take: fetchTake - rows.length,
+        }),
+      );
+    }
+
+    // El modelo dicho tal cual no se queda fuera por el corte, aunque hoy no haya piezas.
+    const idsExactos = new Set(rawQ ? await this.idsDelModelo(rawQ) : []);
+    if (idsExactos.size) {
+      const exactas = await this.prisma.productCT.findMany({
+        select: SEARCH_SELECT,
+        where: { AND: [sinPalabras, { id: { in: [...idsExactos] } }] },
+      });
+      rows = [...exactas, ...rows.filter((r) => !idsExactos.has(r.id))];
+    }
 
     if (inStockOnly) {
       rows = rows.filter((r) => sumStock(r.existencia) > 0);
     }
 
     rows.sort((a, b) => {
+      const exacto = Number(idsExactos.has(b.id)) - Number(idsExactos.has(a.id));
+      if (exacto) return exacto;
       const sa = stockAtPreferredWarehouse(a.existencia, preferred);
       const sb = stockAtPreferredWarehouse(b.existencia, preferred);
       if (sb !== sa) return sb - sa;
       return sumStock(b.existencia) - sumStock(a.existencia);
     });
 
-    const scored = scoreProducts(
+    const puntuados = scoreProducts(
       rows.slice(0, take).map((r) => ({
         ...r,
         especificaciones: [],
@@ -164,6 +197,7 @@ export class ProductSearchService {
         preferredWarehouse: preferred,
       },
     );
+    const scored = [...puntuados.filter((o) => idsExactos.has(o.id)), ...puntuados.filter((o) => !idsExactos.has(o.id))];
 
     return {
       data: scored,
@@ -174,6 +208,21 @@ export class ProductSearchService {
         warehouses: CT_WAREHOUSE_OPTIONS,
       },
     };
+  }
+
+  /** Sin guiones ni espacios: CT escribe «EAP660 HD» y se cotiza «EAP660HD». */
+  private async idsDelModelo(q: string): Promise<number[]> {
+    const buscado = soloLetrasYCifras(q);
+    if (buscado.length < 4) return [];
+    const filas = await this.prisma.$queryRaw<Array<{ id: number }>>`
+      SELECT id FROM productos_ct
+      WHERE activo AND (
+        regexp_replace(upper(coalesce(modelo, '')), '[^A-Z0-9]', '', 'g') = ${buscado}
+        OR regexp_replace(upper(coalesce("numParte", '')), '[^A-Z0-9]', '', 'g') = ${buscado}
+        OR upper(clave) = ${buscado}
+      )
+      LIMIT 8`;
+    return filas.map((f) => f.id);
   }
 
   async findSubstitutes(clave: string, mode: OptimizeMode, margin: number, take = 10) {

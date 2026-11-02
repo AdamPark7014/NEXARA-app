@@ -270,6 +270,8 @@ function esSegura(consulta: string[], i: Indexado, puntuados: Array<{ i: Indexad
     const alInicio = [...i.titulo].slice(0, 3).some((p) => pedido != null && hallada(pedido, new Set([p])));
     return alInicio || i.titulo.size < 8 || especificas.length >= 2;
   }
+  // Lo que el mayorista no tiene hoy se ofrece, pero no entra solo: un disco «New Pull» sin piezas no es lo pedido.
+  if (i.candidato.fuente === 'catalogo' && !i.candidato.stock) return false;
   if (!especificas.length) return false;
   const cabeza = consulta.find((p) => !/^\d/.test(p));
   const primeras = [...i.titulo].slice(0, 2);

@@ -791,7 +791,7 @@ function FilaNueva({
     }
     const control = new AbortController();
     const t = setTimeout(() => {
-      smartQuoteSearch(token, { q, take: 6 }, { signal: control.signal })
+      smartQuoteSearch(token, { q, take: 6, inStockOnly: false }, { signal: control.signal })
         .then((r) => {
           setOfertas(r.data ?? []);
         })

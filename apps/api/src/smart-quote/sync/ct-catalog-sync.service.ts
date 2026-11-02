@@ -21,9 +21,102 @@ export function costMxn(price: number, currency: string, fx: number | null | und
   return Math.round(price * rate * 100) / 100;
 }
 
+type ModoSync = 'PRIMARY' | 'FULL';
+
+/** Tras una cola atorada llegan miles de golpe: si la misma corrida acaba de pasar, la siguiente no hace nada. */
+const PAUSA_ENTRE_CORRIDAS_MS: Record<ModoSync, number> = { PRIMARY: 5 * 60_000, FULL: 60 * 60_000 };
+/** Con el disco lleno fallan todas: se corta aquí y no al terminar el catálogo. */
+const MAX_FILAS_CON_ERROR = 20;
+/** Una corrida en RUNNING más vieja que esto se quedó así por un reinicio. */
+const CORRIDA_CORTADA_MS = 60 * 60_000;
+/** Si el XML trae menos de esta parte de lo activo, el archivo está mal: no se apaga nada. */
+const MINIMO_PARA_APAGAR = 0.5;
+const APAGAR_DE_A = 500;
+const CEDER_CADA = 500;
+
+const CAMPOS_COMPARADOS = {
+  id: true,
+  clave: true,
+  numParte: true,
+  nombre: true,
+  modelo: true,
+  marca: true,
+  subcategoria: true,
+  categoria: true,
+  descripcion_corta: true,
+  ean: true,
+  upc: true,
+  sustituto: true,
+  activo: true,
+  protegido: true,
+  existencia: true,
+  precio: true,
+  moneda: true,
+  tipoCambio: true,
+  especificaciones: true,
+  promociones: true,
+  imagen: true,
+} satisfies Prisma.ProductCTSelect;
+
+type FilaComparada = Prisma.ProductCTGetPayload<{ select: typeof CAMPOS_COMPARADOS }>;
+
+/** `{}` quiere decir «sin existencia», y el buscador se apoya en eso. */
+function soloConPiezas(existencia: Record<string, number>): Record<string, number> {
+  return Object.fromEntries(Object.entries(existencia).filter(([, piezas]) => Number(piezas) > 0));
+}
+
+/** La base guarda el JSON con otro orden de llaves. */
+function ordenado(valor: unknown): unknown {
+  if (Array.isArray(valor)) return valor.map(ordenado);
+  if (valor && typeof valor === 'object') {
+    return Object.fromEntries(
+      Object.entries(valor)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([llave, v]) => [llave, ordenado(v)]),
+    );
+  }
+  return valor;
+}
+
+/** Para no reescribir lo que no cambió: cada 15 min serían 5,600 filas, y el disco lleno ya tumbó la base (26-10). */
+export function firmaDeFila(f: Omit<FilaComparada, 'id' | 'clave'>): string {
+  return JSON.stringify(
+    ordenado([
+      f.numParte, f.nombre, f.modelo, f.marca, f.subcategoria, f.categoria, f.descripcion_corta, f.ean, f.upc, f.sustituto,
+      f.activo, f.protegido, f.existencia ?? {}, Number(f.precio) || 0, f.moneda, f.tipoCambio, f.especificaciones ?? [], f.promociones ?? [], f.imagen,
+    ]),
+  );
+}
+
+export function firmaDeProducto(p: NormalizedSupplierProduct): string {
+  return firmaDeFila({
+    numParte: p.partNumber,
+    nombre: p.name,
+    modelo: p.model,
+    marca: p.brand,
+    subcategoria: p.subcategory,
+    categoria: p.category,
+    descripcion_corta: p.shortDescription,
+    ean: p.ean,
+    upc: p.upc,
+    sustituto: p.substituteSku,
+    activo: p.active,
+    protegido: p.protected,
+    existencia: soloConPiezas(p.existencia),
+    precio: p.price,
+    moneda: p.currency,
+    tipoCambio: p.exchangeRate,
+    especificaciones: p.specifications,
+    promociones: p.promotions as Prisma.JsonValue,
+    imagen: p.imageUrl,
+  });
+}
+
 @Injectable()
 export class CtCatalogSyncService {
   private readonly logger = new Logger(CtCatalogSyncService.name);
+  private enCurso = false;
+  private readonly ultimaCorrida: Record<ModoSync, number> = { PRIMARY: 0, FULL: 0 };
 
   constructor(
     private readonly prisma: PrismaService,
@@ -61,14 +154,32 @@ export class CtCatalogSyncService {
     });
   }
 
-  async sync(opts: { source?: 'PRIMARY' | 'FULL'; companyId?: number | null } = {}) {
+  async sync(opts: { source?: ModoSync; companyId?: number | null; saltarSiReciente?: boolean } = {}) {
     const sourceMode = opts.source || 'PRIMARY';
+    const reciente = Date.now() - this.ultimaCorrida[sourceMode] < PAUSA_ENTRE_CORRIDAS_MS[sourceMode];
+    if (this.enCurso || (opts.saltarSiReciente && reciente)) {
+      return { status: 'SKIPPED' as const, rowsUpserted: 0, error: null };
+    }
+    this.enCurso = true;
+    try {
+      return await this.correr(sourceMode, opts.companyId ?? null);
+    } finally {
+      this.enCurso = false;
+      this.ultimaCorrida[sourceMode] = Date.now();
+    }
+  }
+
+  private async correr(sourceMode: ModoSync, companyId: number | null) {
+    await this.prisma.supplierCatalogSyncRun.updateMany({
+      where: { supplierCode: this.connector.code, status: 'RUNNING', startedAt: { lt: new Date(Date.now() - CORRIDA_CORTADA_MS) } },
+      data: { status: 'ERROR', finishedAt: new Date(), error: 'Interrumpida: el proceso terminó antes de cerrar la corrida.' },
+    });
     const run = await this.prisma.supplierCatalogSyncRun.create({
       data: {
         supplierCode: this.connector.code,
         source: sourceMode === 'FULL' ? 'XML' : 'JSON',
         status: 'RUNNING',
-        companyId: opts.companyId ?? null,
+        companyId,
       },
     });
 
@@ -78,18 +189,33 @@ export class CtCatalogSyncService {
           ? await this.connector.pullFull()
           : await this.connector.pullPrimary();
 
+      const existentes = await this.prisma.productCT.findMany({ select: CAMPOS_COMPARADOS });
+      const porClave = new Map(existentes.map((f) => [f.clave, f]));
+
+      let vistos = 0;
       let upserted = 0;
-      const batchSize = 100;
-      for (let i = 0; i < pull.products.length; i += batchSize) {
-        const batch = pull.products.slice(i, i + batchSize);
-        for (const product of batch) {
+      let conError = 0;
+      let primerError: string | null = null;
+      for (const product of pull.products) {
+        // Comparar 15 mil filas sin soltar el hilo detendría las peticiones de la API.
+        if (++vistos % CEDER_CADA === 0) await new Promise((listo) => setImmediate(listo));
+        const guardada = porClave.get(product.sku);
+        if (guardada && firmaDeFila(guardada) === firmaDeProducto(product)) continue;
+        try {
           await this.upsertProduct(product);
           upserted += 1;
+        } catch (err) {
+          conError += 1;
+          primerError ??= `${product.sku}: ${err instanceof Error ? err.message : String(err)}`;
+          if (conError >= MAX_FILAS_CON_ERROR) throw err;
         }
       }
 
-      if (opts.companyId) {
-        const supplier = await this.ensureCtSupplier(opts.companyId);
+      // Solo el XML es el catálogo completo: el JSON trae nada más lo que hay en existencia.
+      const apagados = pull.source === 'XML' ? await this.apagarLoQueYaNoViene(existentes, pull.products) : 0;
+
+      if (companyId) {
+        const supplier = await this.ensureCtSupplier(companyId);
         await this.linkSupplierProducts(supplier.id, pull.products);
       }
 
@@ -103,11 +229,12 @@ export class CtCatalogSyncService {
           fileModifiedAt: pull.fileModifiedAt,
           checksum: pull.checksum,
           source: pull.source as SupplierPullSource,
+          error: primerError ? `${conError} filas sin guardar. ${primerError}`.slice(0, 2000) : null,
         },
       });
 
       this.logger.log(
-        `CT sync OK source=${pull.source} read=${pull.products.length} upserted=${upserted}`,
+        `CT sync OK source=${pull.source} read=${pull.products.length} upserted=${upserted} apagados=${apagados} conError=${conError}`,
       );
       return finished;
     } catch (err) {
@@ -124,9 +251,25 @@ export class CtCatalogSyncService {
     }
   }
 
+  /** Lo que CT dejó de publicar no se borra: alguna cotización u orden puede apuntarle. */
+  private async apagarLoQueYaNoViene(existentes: FilaComparada[], productos: NormalizedSupplierProduct[]) {
+    const activas = existentes.filter((f) => f.activo && f.clave);
+    if (productos.length < activas.length * MINIMO_PARA_APAGAR) {
+      this.logger.warn(`CT XML con ${productos.length} productos contra ${activas.length} activos: no se apaga nada`);
+      return 0;
+    }
+    const vigentes = new Set(productos.map((p) => p.sku));
+    const ausentes = activas.filter((f) => !vigentes.has(f.clave!)).map((f) => f.id);
+    for (let i = 0; i < ausentes.length; i += APAGAR_DE_A) {
+      await this.prisma.productCT.updateMany({ where: { id: { in: ausentes.slice(i, i + APAGAR_DE_A) } }, data: { activo: false } });
+    }
+    return ausentes.length;
+  }
+
   private async upsertProduct(p: NormalizedSupplierProduct) {
     const data = {
-      idProducto: p.externalId,
+      // El XML no trae este id: no se pisa el que dejó el JSON.
+      ...(p.externalId != null ? { idProducto: p.externalId } : {}),
       clave: p.sku,
       numParte: p.partNumber,
       nombre: p.name,
@@ -143,7 +286,7 @@ export class CtCatalogSyncService {
       sustituto: p.substituteSku,
       activo: p.active,
       protegido: p.protected,
-      existencia: p.existencia as Prisma.InputJsonValue,
+      existencia: soloConPiezas(p.existencia) as Prisma.InputJsonValue,
       precio: p.price,
       moneda: p.currency,
       tipoCambio: p.exchangeRate,

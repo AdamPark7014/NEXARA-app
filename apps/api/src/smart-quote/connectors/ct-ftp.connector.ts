@@ -8,8 +8,9 @@ import type {
   SupplierConnector,
   SupplierPullResult,
 } from './supplier-connector.js';
+import { leerCatalogoXml } from './ct-xml.js';
 
-type CtRawProduct = {
+export type CtRawProduct = {
   idProducto?: number;
   clave?: string;
   numParte?: string;
@@ -68,22 +69,43 @@ export class CtFtpConnector implements SupplierConnector {
   }
 
   async pullPrimary(): Promise<SupplierPullResult> {
-    return this.pullFile(this.jsonFile, 'JSON');
+    const { raw, fileModifiedAt, checksum } = await this.bajar(this.jsonFile, 'JSON');
+    const parsed = JSON.parse(raw) as CtRawProduct[];
+    if (!Array.isArray(parsed)) {
+      throw new Error('CT feed no es un array JSON');
+    }
+    return { source: 'JSON', fileModifiedAt, checksum, products: this.normalizar(parsed) };
   }
 
+  /**
+   * Todo el catálogo: el XML, y encima el JSON, que en lo que trae tiene promociones y su `idProducto`.
+   * Si el XML falla queda el JSON solo, con `source: 'JSON'`, y el sync sabe que no es el catálogo completo.
+   */
   async pullFull(): Promise<SupplierPullResult> {
-    // XML completo: por ahora si no hay parser XML dedicado, reutilizamos JSON
-    // cuando XML no esté disponible; el sync nocturno pedirá XML y lo
-    // convertirá cuando se agregue parser. Intentamos JSON fallback.
+    let xml: SupplierPullResult;
     try {
-      return await this.pullFile(this.xmlFile, 'XML');
+      const { raw, fileModifiedAt, checksum } = await this.bajar(this.xmlFile, 'XML');
+      xml = { source: 'XML', fileModifiedAt, checksum, products: this.normalizar(leerCatalogoXml(raw)) };
     } catch (err) {
       this.logger.warn(`CT XML pull failed, falling back to JSON: ${(err as Error).message}`);
       return this.pullPrimary();
     }
+
+    const porClave = new Map(xml.products.map((p) => [p.sku, p]));
+    try {
+      const json = await this.pullPrimary();
+      for (const p of json.products) porClave.set(p.sku, p);
+    } catch (err) {
+      this.logger.warn(`CT JSON pull failed, keeping XML only: ${(err as Error).message}`);
+    }
+    return { ...xml, products: [...porClave.values()] };
   }
 
-  private async pullFile(fileName: string, source: 'JSON' | 'XML'): Promise<SupplierPullResult> {
+  private normalizar(filas: CtRawProduct[]): NormalizedSupplierProduct[] {
+    return filas.map((row) => this.normalize(row)).filter((p): p is NormalizedSupplierProduct => Boolean(p));
+  }
+
+  private async bajar(fileName: string, source: 'JSON' | 'XML') {
     if (!this.user || !this.password) {
       throw new Error('CT_FTP_USER / CT_FTP_PASSWORD no configurados');
     }
@@ -111,31 +133,15 @@ export class CtFtpConnector implements SupplierConnector {
       client.close();
     }
 
-    if (source === 'XML') {
-      // Parser XML liviano: si el archivo no es JSON, dejamos stub hasta fase XML.
-      const head = (await readFile(localPath, 'utf8')).slice(0, 20).trim();
-      if (head.startsWith('<')) {
-        throw new Error('CT XML parser pendiente — usar sync JSON primario');
-      }
-    }
-
     const raw = await readFile(localPath, 'utf8');
     const checksum = createHash('sha256').update(raw).digest('hex');
-    const parsed = JSON.parse(raw) as CtRawProduct[];
-    if (!Array.isArray(parsed)) {
-      throw new Error('CT feed no es un array JSON');
-    }
-
-    const products = parsed
-      .map((row) => this.normalize(row))
-      .filter((p): p is NormalizedSupplierProduct => Boolean(p));
 
     await writeFile(
       path.join(localDir, `${fileName}.meta.json`),
-      JSON.stringify({ fileModifiedAt, checksum, count: products.length, at: new Date().toISOString() }, null, 2),
+      JSON.stringify({ fileModifiedAt, checksum, at: new Date().toISOString() }, null, 2),
     );
 
-    return { source, fileModifiedAt, checksum, products };
+    return { raw, fileModifiedAt, checksum };
   }
 
   normalize(row: CtRawProduct): NormalizedSupplierProduct | null {
