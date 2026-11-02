@@ -50,6 +50,7 @@ import {
 import { KPIS_PATH } from "@/lib/kpis-equipo";
 import { useUser } from "@/components/UserContext";
 import { getSocketBaseUrl } from "@/lib/api-base";
+import SalidasDeshechas from "./SalidasDeshechas";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { attendanceMapUrl, googleMapsPointUrl, toCoord } from "@/lib/gps-map-links";
 import { getAttendanceSectionConfig } from "@/lib/user-access";
@@ -527,6 +528,38 @@ export default function ErpAsistenciasPage() {
     setMotivoCorreccion("");
     setHoraCorreccion(paraInputLocal(checada.timestamp));
     setCorrigiendo({ id: checada.id, nombre, tipo, timestamp: checada.timestamp });
+  };
+
+  // Deshacer la salida de alguien de su equipo, el mismo día y con motivo. La API exige que sea su jefe.
+  const [deshaciendo, setDeshaciendo] = useState<{ id: number; nombre: string; timestamp: string } | null>(null);
+  const [motivoDeshacer, setMotivoDeshacer] = useState("");
+  const [guardandoDeshacer, setGuardandoDeshacer] = useState(false);
+  const [errorDeshacer, setErrorDeshacer] = useState<string | null>(null);
+
+  const abrirDeshacer = (checada: ChecadaValidable | undefined, nombre: string) => {
+    if (!checada?.id || !checada.timestamp) return;
+    setDetalleId(null);
+    setErrorDeshacer(null);
+    setMotivoDeshacer("");
+    setDeshaciendo({ id: checada.id, nombre, timestamp: checada.timestamp });
+  };
+
+  const guardarDeshacer = async () => {
+    if (!deshaciendo || motivoDeshacer.trim().length < MOTIVO_CORRECCION_MINIMO) return;
+    setGuardandoDeshacer(true);
+    setErrorDeshacer(null);
+    try {
+      await erpFetch(`attendance/${deshaciendo.id}/deshacer-salida`, token, {
+        method: "POST",
+        body: JSON.stringify({ motivo: motivoDeshacer.trim() }),
+      });
+      setDeshaciendo(null);
+      await loadEquipo(true);
+    } catch (e) {
+      setErrorDeshacer(formatApiError(e));
+    } finally {
+      setGuardandoDeshacer(false);
+    }
   };
 
   const guardarCorreccion = async () => {
@@ -1209,6 +1242,11 @@ export default function ErpAsistenciasPage() {
                           Corregir hora
                         </Button>
                       ) : null}
+                      {tipo === "salida" && esHoy && checada?.id && m.userId !== user?.id ? (
+                        <Button size="sm" variant="tertiary" onClick={() => abrirDeshacer(checada, m.nombre)}>
+                          Deshacer salida
+                        </Button>
+                      ) : null}
                     </div>
                     {foto?.photoUrl ? (
                       <SessionImage src={resolveAssetUrl(foto.photoUrl)} alt={titulo} className={styles.checadaFoto} />
@@ -1217,6 +1255,8 @@ export default function ErpAsistenciasPage() {
                 );
               })}
             </div>
+
+            <SalidasDeshechas token={token} userId={m.userId} fecha={dateFilter} />
 
             {/* KPI «cumplimiento con uniforme»: el jefe lo marca viendo la foto de entrada. */}
             {checadaEntrada?.id ? (
@@ -1431,6 +1471,53 @@ export default function ErpAsistenciasPage() {
           {errorCorreccion ? (
             <Alert tone="danger" role="alert">
               {errorCorreccion}
+            </Alert>
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        open={deshaciendo != null}
+        onClose={() => !guardandoDeshacer && setDeshaciendo(null)}
+        title="Deshacer la salida"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setDeshaciendo(null)} disabled={guardandoDeshacer}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void guardarDeshacer()}
+              disabled={motivoDeshacer.trim().length < MOTIVO_CORRECCION_MINIMO}
+              loading={guardandoDeshacer}
+            >
+              Deshacer salida
+            </Button>
+          </>
+        }
+      >
+        <div className={styles.modalCuerpo}>
+          <p className={styles.modalTexto}>
+            {deshaciendo?.nombre} · Salida de las {deshaciendo ? horaCorta(deshaciendo.timestamp) : ""}. Su jornada vuelve a
+            quedar abierta y regresa lo que quedó «No cumplida» por esta salida. Sus relojes no se reabren: los reanuda en
+            su actividad. Queda tu nombre y tu motivo, y se avisa a la persona y a sus jefes.
+          </p>
+          <Field
+            label="Motivo"
+            required
+            hint={`${motivoDeshacer.trim().length}/${MOTIVO_CORRECCION_MINIMO} caracteres mínimo`}
+          >
+            <Textarea
+              value={motivoDeshacer}
+              onChange={(e) => setMotivoDeshacer(e.target.value)}
+              rows={3}
+              maxLength={1000}
+              placeholder="Ej. Marcó su salida por error y siguió en la obra."
+            />
+          </Field>
+          {errorDeshacer ? (
+            <Alert tone="danger" role="alert">
+              {errorDeshacer}
             </Alert>
           ) : null}
         </div>
