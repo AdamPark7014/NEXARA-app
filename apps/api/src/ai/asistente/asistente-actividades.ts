@@ -15,6 +15,7 @@
  */
 import { claveDeTipo, type Complejidad } from '../complejidad/tiempos-tipicos.js';
 import { cantidadDelTitulo, estandarDeLectura, tipoDelTitulo } from '../../activities/tiempo-entrega.js';
+import { elegirCliente, mencionaAlCliente, mismoNombreDeCliente } from './elegir-cliente.js';
 import { motivoDe, ordenarPorProbabilidad, tieneRespaldo, type ActividadPasada } from './elegir-persona.js';
 import {
   PALABRAS_GIRO,
@@ -202,7 +203,7 @@ Tipos:
 Campos:
 - Una actividad por persona y por trabajo: «Diana y Luis» son dos actividades iguales, cada una con una sola persona en quien. Con «y» o «y que» entre trabajos, cada trabajo es otra actividad con sus propias fechas.
 - quien: el nombre completo de las coincidencias si lo dicho (nombre o apodo: Beto→Roberto, Toño→Antonio) corresponde a una sola persona; si a varias o a ninguna, copia lo que dijeron. Si piden a alguien que mande a su gente, es esa persona (encargo despacho). null si no dijeron quién. Quien solo ayuda o acompaña va en detalle.
-- cliente: la empresa para la que se trabaja, como en las coincidencias si está («Tox» → «Grupo Tox»); si no está, como la dijeron («arreglar la comandera de Toks» → Toks). Proveedores (Syscom), tiendas donde se compra o entrega y sitios propios (oficina, bodega, almacén, site): cliente null y van en lugar.
+- cliente: la empresa para la que se trabaja, como en las coincidencias si es esa («Tox» → «Grupo Tox»); si no está, o si lo dicho solo se le parece o comparte una palabra y trae otras que ese nombre no tiene («Serta Colchones» no es SERTE, «Waffle House» no es Creppes and Waffles), como la dijeron («arreglar la comandera de Toks» → Toks). Proveedores (Syscom), tiendas donde se compra o entrega y sitios propios (oficina, bodega, almacén, site): cliente null y van en lugar.
 - lugar: sucursal, planta, área o dirección donde se hace, como en las coincidencias si está; null si no lo dijeron. Nunca el equipo ni el mismo nombre del cliente.
 - inicio («AAAA-MM-DD HH:MM», 24 h, o «AAAA-MM-DD» sin hora): cuándo se hace o empieza (cita, visita, «empezando el jueves»). Un día dicho sin «para», «antes de» ni «a más tardar» («que cambie mañana el disco») es inicio. null si no dijeron cuándo o si solo hay plazo.
   Días: «mañana», «pasado mañana»: los que trae el mensaje. «el lunes», «el viernes»: el primero con ese nombre en «Próximos días», nunca hoy. «la otra semana», «la próxima», «la semana que entra»: el lunes de «Próxima semana», y limite su viernes.
@@ -284,7 +285,8 @@ export function catalogoRelevante(instruccion: string, catalogos: CatalogosNexar
   const sucursales = elegir(catalogos.sucursales, 'sucursal', (s) => s.id, (s) => s.name);
   const proyectos = elegir(catalogos.proyectos, 'proyecto', (p) => p.id, (p) => p.title);
   const deOtros = new Set([...sucursales.map((s) => s.clientId), ...proyectos.map((p) => p.clientId)]);
-  const clientes = elegir(catalogos.clientes.filter((c) => !soloGiro(c.name)), 'cliente', (c) => c.id, (c) => c.name, (c) => deOtros.has(c.id));
+  const clientesPosibles = catalogos.clientes.filter((c) => !soloGiro(c.name) && (deOtros.has(c.id) || mencionaAlCliente(instruccion, dichas, c.name)));
+  const clientes = elegir(clientesPosibles, 'cliente', (c) => c.id, (c) => c.name, (c) => deOtros.has(c.id));
   // Nombres ya usados en actividades que no son clientes («Toks»): solo si suenan igual.
   const nombresUsados = (catalogos.nombresUsados ?? []).filter((n) => {
     const m = mencion(dichas, n);
@@ -899,18 +901,18 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
   let cliente: Referencia | null = null;
   let sucursal: SucursalNexara | null = null;
   let clienteCandidatos: Referencia[] = [];
-  const porCliente = buscar(textoClienteDicho, clientesReales, (c) => c.name, 5, aproximado);
+  const porCliente = elegirCliente(textoClienteDicho, clientesReales);
   if (porCliente.elegido) cliente = ref(porCliente.elegido.id, porCliente.elegido.name);
   // «Bodegas Luna Atlixco» puede llegar solo como sitio: el cliente también se busca ahí.
   if (!cliente && paraCliente(sitio)) {
-    const porSitio = buscar(sitio, clientesReales, (c) => c.name, 5, aproximado);
+    const porSitio = elegirCliente(sitio, clientesReales);
     if (porSitio.elegido) cliente = ref(porSitio.elegido.id, porSitio.elegido.name);
   }
   // La IA copió lo mal oído («Talk») y la instrucción sí nombra a un cliente («talks» =
   // Grupo Tox): con eso basta una letra de diferencia.
   if (!cliente && textoCliente && contexto.instruccion) {
     const mencionados = catalogoRelevante(contexto.instruccion, catalogos).clientes;
-    const porMencion = buscar(paraCliente(textoCliente), mencionados, (c) => c.name, 5, { aproximado: true, modo: 'holgada' });
+    const porMencion = elegirCliente(paraCliente(textoCliente), mencionados, 'holgada');
     if (porMencion.elegido) cliente = ref(porMencion.elegido.id, porMencion.elegido.name);
   }
   let notaCliente: string | null = null;
@@ -950,6 +952,10 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
   }
   if (cliente) {
     if (!clienteCandidatos.length) anotar('cliente', cliente.nombre, corregido(cliente.nombre, contexto.instruccion, accion.cliente, sitio));
+    // «Nivel Diez» es N10 para el comparador sin parecerse letra por letra: se dice qué se cambió.
+    if (porCliente.porComparador && textoClienteDicho && !correcciones.some((c) => c.campo === 'cliente') && !mismoNombreDeCliente(textoClienteDicho, cliente.nombre)) {
+      correcciones.push({ campo: 'cliente', de: textoClienteDicho, a: cliente.nombre, como: 'parecido' });
+    }
   } else {
     const vistos = new Set<number>();
     for (const c of porCliente.candidatos) {

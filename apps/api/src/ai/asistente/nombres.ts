@@ -333,6 +333,12 @@ function empates(dichas: Dicha[], nombre: string, modo: 'normal' | 'estricta' | 
   return { propias, porPalabra, porSiglas };
 }
 
+/** ¿Lo dijeron por sus siglas, deletreadas o no, o dijeron el nombre completo de unas siglas? */
+export function porSiglasDe(consulta: string, nombre: string): boolean {
+  const { porPalabra, porSiglas } = empates(palabrasDe(consulta), nombre, 'normal');
+  return Boolean(porSiglas) || (porPalabra.length > 0 && porPalabra.every((x) => x.mejor?.dicha.iniciales));
+}
+
 /**
  * `puntaje` más lo que suena igual o se parece (para lo que escribió la IA o se dictó):
  * 1.9 son sus iniciales («Benemérita Universidad Autónoma de Puebla» → BUAP) ·

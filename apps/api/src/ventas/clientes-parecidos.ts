@@ -138,7 +138,7 @@ function palabrasDe(nucleo: string): string[] {
 
 const compacto = (nucleo: string) => nucleo.replace(/ /g, '');
 const esGiro = (w: string) => Object.prototype.hasOwnProperty.call(GIROS, w);
-const esPropia = (w: string) => !esGiro(w) && !DEBILES.has(w) && !/^\d+$/.test(w);
+export const esPropia = (w: string) => !esGiro(w) && !DEBILES.has(w) && !/^\d+$/.test(w);
 const pareceSiglas = (nucleo: string) => !nucleo.includes(' ') && nucleo.length >= 2 && nucleo.length <= 8;
 
 /** Iniciales del nombre, sin y con conectores: BUAP y UDLAP se forman de maneras distintas. */
