@@ -46,6 +46,7 @@ import {
   type Notice,
 } from "../_parts";
 import s from "./ficha.module.css";
+import { formatoFechaLocal } from "@/lib/fecha-calendario";
 
 
 interface InvoiceLine {
@@ -550,7 +551,7 @@ export default function InvoiceDetailPage() {
                 ? invoice.status === "OVERDUE"
                   ? "fuera de plazo"
                   : invoice.dueDate
-                    ? `vence ${new Date(invoice.dueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}`
+                    ? `vence ${formatoFechaLocal(invoice.dueDate, { day: "2-digit", month: "short" })}`
                     : "saldo abierto"
                 : "sin saldo"
             }
@@ -608,7 +609,7 @@ export default function InvoiceDetailPage() {
                       <CopyableRef value={p.cfdiPaymentUuid} display={`comp. ${p.cfdiPaymentUuid.slice(0, 8)}…`} label="el UUID del complemento" />
                     )}
                   </div>
-                  <span className={s.pagoFecha}>{new Date(p.paymentDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+                  <span className={s.pagoFecha}>{formatoFechaLocal(p.paymentDate, { day: "2-digit", month: "short" })}</span>
                   <span className={s.pagoMonto}><Money value={p.amount} /></span>
                   <div className={s.pagoAccion}>
                     {canEdit && invoice.satPaymentMethod === "PPD" && invoice.cfdiUuid && !p.cfdiPaymentUuid ? (
@@ -652,8 +653,8 @@ export default function InvoiceDetailPage() {
               { label: isIncome ? "Cliente / Receptor" : "Proveedor", value: counterparty },
               { label: "RFC receptor", value: invoice.receptorRfc },
               { label: "Método pago SAT", value: invoice.satPaymentMethod ?? "PUE" },
-              { label: "Emisión", value: new Date(invoice.issueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) },
-              { label: "Vencimiento", value: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) : null },
+              { label: "Emisión", value: formatoFechaLocal(invoice.issueDate, { day: "2-digit", month: "long", year: "numeric" }) },
+              { label: "Vencimiento", value: invoice.dueDate ? formatoFechaLocal(invoice.dueDate, { day: "2-digit", month: "long", year: "numeric" }) : null },
             ].map(({ label, value }) => (
               <div key={label} className={s.dato}>
                 <dt>{label}</dt>

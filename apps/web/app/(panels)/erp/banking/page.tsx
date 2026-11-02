@@ -46,6 +46,7 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import Modal from "@/components/ui/Modal";
 import FinanceModuleRail from "@/components/erp/FinanceModuleRail";
 import s from "./banking.module.css";
+import { formatoFechaLocal } from "@/lib/fecha-calendario";
 
 
 interface BankAccount {
@@ -372,7 +373,7 @@ export default function BankingPage() {
       key: "transactionDate", label: "Fecha", width: 100,
       render: (t) => (
         <span className={s.fecha}>
-          {new Date(t.transactionDate).toLocaleDateString("es-MX")}
+          {formatoFechaLocal(t.transactionDate)}
         </span>
       ),
     },

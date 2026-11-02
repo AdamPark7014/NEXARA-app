@@ -39,6 +39,7 @@ import { erpFetch, financeStatusVariant, formatApiError } from "@/lib/erp-api";
 import { financeStatusLabel } from "@/lib/finance-status-labels";
 import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
 import s from "./proyectos.module.css";
+import { formatoFechaLocal } from "@/lib/fecha-calendario";
 
 /**
  * Estado financiero por proyecto.
@@ -170,12 +171,7 @@ type ProjectDetail = {
 
 // ── Utilidades de presentación ──────────────────────────────────────────────
 
-const fecha = (iso: string | null | undefined): string => {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
-};
+const fecha = (iso: string | null | undefined): string => formatoFechaLocal(iso, { day: "2-digit", month: "short", year: "numeric" });
 
 const FUENTE_LABEL: Record<string, string> = {
   facturas: "Facturas de proveedor",

@@ -29,6 +29,7 @@ import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
 import s from "./cierres.module.css";
+import { formatoFechaLocal } from "@/lib/fecha-calendario";
 
 type Period = {
   id: number;
@@ -84,8 +85,7 @@ const MARCA: Record<EstadoItem, { tono: Tone; texto: string; peso: number }> = {
   bloqueante: { tono: "danger", texto: "Bloquea el cierre", peso: 0 },
 };
 
-const fecha = (iso?: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+const fecha = (iso?: string | null) => formatoFechaLocal(iso, { day: "2-digit", month: "short", year: "numeric" });
 
 export default function CierresPage() {
   const { user } = useUser();

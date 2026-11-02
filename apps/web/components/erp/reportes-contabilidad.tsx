@@ -14,6 +14,7 @@ import { Money, type Column } from "@/components/ui/DataTable";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import s from "./reportes-contabilidad.module.css";
+import { formatoFechaLocal } from "@/lib/fecha-calendario";
 
 /**
  * Piezas compartidas por `/erp/contabilidad/reportes` y
@@ -85,9 +86,7 @@ export const hoyIso = () => new Date().toISOString().slice(0, 10);
 export function fechaLegible(iso: string | null | undefined): string {
   const raw = (iso ?? "").trim();
   if (!raw) return "—";
-  const d = new Date(raw.length <= 10 ? `${raw}T12:00:00` : raw);
-  if (Number.isNaN(d.getTime())) return raw;
-  return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+  return formatoFechaLocal(raw, { day: "2-digit", month: "short", year: "numeric" }, raw);
 }
 
 export const inicioDeMesIso = () => {
