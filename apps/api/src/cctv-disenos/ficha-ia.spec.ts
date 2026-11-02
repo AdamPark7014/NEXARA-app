@@ -2,7 +2,7 @@ import { BadRequestException, ServiceUnavailableException } from '@nestjs/common
 import { familiaDeTipo, hojaDelDibujo, hojasParaImagen, limpiarFicha, numeroDe, textoParaIa } from './ficha-ia';
 import { esPdf } from './ficha-pdf';
 import { LecturaFichaService } from './lectura-ficha.service';
-import { limpiarSitio, peticionDescripcion, peticionSitio } from './sitio-ia';
+import { completarAreas, limpiarSitio, peticionDescripcion, peticionSitio } from './sitio-ia';
 
 /** Lo que se le enseña a la IA y cómo se limpia lo que contesta: aquí no se llama a nadie. */
 
@@ -194,5 +194,31 @@ describe('La marca que lee la IA', () => {
   it('sale sin razón social, para no repetir fabricantes en el catálogo', () => {
     expect(limpiarFicha({ tipo: 'nvr', marca: 'Dahua Technology', modelo: 'X', datos: [] }, 1).marca).toBe('Dahua');
     expect(limpiarFicha({ tipo: 'switch', marca: 'TP-Link', modelo: 'X', datos: [] }, 1).marca).toBe('TP-Link');
+  });
+});
+
+describe('Lo que la frase dice y a la IA se le pasó', () => {
+  const base = limpiarSitio({ areas: [{ nombre: 'Oficinas', tipo: 'oficina', m2: 100, piso: 0, camaras: 0 }] });
+
+  it('se agrega: una bodega no se vuelve un piso de oficinas', () => {
+    const s = completarAreas(base, 'bodega de 36 por 22 con oficinas al frente');
+    expect(s.areas.map((a) => a.tipo).sort()).toEqual(['bodega', 'oficina']);
+    expect(s.areas.find((a) => a.tipo === 'bodega')).toMatchObject({ nombre: 'Bodega', m2: 0 });
+  });
+
+  it('no duplica lo que ya está, ni agrega lo que no dijo', () => {
+    expect(completarAreas(base, 'unas oficinas chicas').areas).toHaveLength(1);
+    expect(completarAreas(base, 'cuatro cámaras').areas).toHaveLength(1);
+  });
+
+  it('entiende sus otros nombres', () => {
+    const tipos = completarAreas(limpiarSitio({}), 'nave con site, sala de juntas, maniobras y estacionamiento').areas.map((a) => a.tipo);
+    expect(tipos).toEqual(expect.arrayContaining(['bodega', 'ti', 'sala', 'patio', 'estacionamiento']));
+  });
+
+  it('el servicio lo aplica', async () => {
+    const ia = { disponible: () => true, json: jest.fn().mockResolvedValue({ datos: { areas: [] } }) } as any;
+    const s = await new LecturaFichaService(ia).sitioDesdeFrase(1, 'una bodega con patio');
+    expect(s.areas.map((a) => a.tipo)).toEqual(['bodega', 'patio']);
   });
 });

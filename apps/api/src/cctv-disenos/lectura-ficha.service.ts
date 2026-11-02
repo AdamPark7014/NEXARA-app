@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger, ServiceUnavailableException } 
 import { ClaudeService } from '../ai/claude/claude.service.js';
 import { hojasParaImagen, limpiarFicha, MINIMO_TEXTO_FICHA, peticionFicha, type FichaLeida } from './ficha-ia.js';
 import { conPdfTemporal, esPdf, imagenesDeHojas, textoDeHojas } from './ficha-pdf.js';
-import { limpiarSitio, MAX_FRASE_DISENO, MIN_FRASE_DISENO, peticionDescripcion, peticionSitio, type SitioLeido } from './sitio-ia.js';
+import { completarAreas, limpiarSitio, MAX_FRASE_DISENO, MIN_FRASE_DISENO, peticionDescripcion, peticionSitio, type SitioLeido } from './sitio-ia.js';
 
 /** Las memorias técnicas de un fabricante rara vez pasan de 10 MB; 30 alcanza y corta lo que no es una ficha. */
 export const FICHA_MAX_BYTES = 30 * 1024 * 1024;
@@ -42,7 +42,7 @@ export class LecturaFichaService {
   async sitioDesdeFrase(companyId: number, frase: unknown): Promise<SitioLeido> {
     const texto = this.exigirFrase(frase);
     const { datos } = await this.claude.json<Record<string, unknown>>({ ...peticionSitio(texto), proceso: 'cctv-sitio', companyId });
-    return limpiarSitio(datos);
+    return completarAreas(limpiarSitio(datos), texto);
   }
 
   /** Sin su PDF: lo que la persona dice del equipo. Queda para revisar, igual que una ficha leída. */
