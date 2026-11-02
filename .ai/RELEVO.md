@@ -1,5 +1,21 @@
 # RELEVO
 
+- **02-11 ~15:50 (claude-code) — Listas cortadas por el tope de filas: ahora sale una tarjeta a `developer@` (`3b549f6b`, en producción desde las 20:49 UTC).** Adam: «Sí, agrégala». Corrige el «Falta» del bloque del aviso en `audit_logs`.
+  - **Qué hace:** de lunes a sábado a las 9:00 de México, `notifications/aviso-recortes.service.ts` mira si hay recortes nuevos desde la última tarjeta. Si los hay, manda una sola con qué consulta fue y cuántas veces. Si no, no manda nada. Lo del domingo sale el lunes, y un reinicio no la repite.
+  - **Texto real:** «Hay listas que salieron incompletas. Se cortaron al tope de 5,000 filas: ProductCT filtrando activo (12 veces); … Hay que paginar esas consultas.» Hasta 5 consultas, y luego «y N más».
+  - **A quién:** va a `developer@` (`PLATFORM_DEVELOPER_EMAIL`, usuario 2), no a `gerencia@`, y con `entrega: 'siempre'` para que el presupuesto de avisos no la mande al resumen.
+  - **Las filas con otro tope son pruebas y no avisan:** por eso la fila 5766712 (`tope: 1`) no dispara nada con el tope real de 5,000.
+  - **Verificado en producción, 21:48 UTC,** con un proceso aparte en `nexara-api` que arma los servicios reales sin crons ni sockets:
+    - Con el tope real: no manda nada.
+    - Contando la fila de prueba: creó el aviso 19995 para el usuario 2, en entrega `siempre`.
+    - Una tercera corrida: no repite.
+    - **El aviso 19995 es de prueba:** dice «tope de 1 filas» y queda en la bandeja de `developer@`. Se puede borrar sin problema.
+    - La API lleva una hora arriba con 0 recortes reales.
+  - **Pruebas:** `aviso-recortes.spec.ts` es nueva. `src/notifications` y `row-cap` dan 14 suites y 118 pruebas en verde, sobre una copia exacta de `origin/main`. `tsc` da 0 errores en lo tocado y 182 en otros archivos de esa copia, que no toqué y no revisé. No corrí la suite completa de la API.
+  - **Falta, y es de Adam:** `developer@` no tiene ningún teléfono en `UserPushEndpoint`, así que hoy la tarjeta **no suena**: solo aparece en su bandeja, y esa cuenta entró por última vez el 29-10. Para que suene, hay que iniciar sesión con `developer@` en la app del teléfono.
+  - **Sin verificar:** el disparo del cron a las 9:00, porque hoy no hay recortes reales y correrá en silencio. La tarjeta tampoco se vio en pantalla, porque el inicio de sesión es de Adam. La fila cumple el filtro de la bandeja según el código: entrega visible y empresa nula.
+  - No se delegó a Ollama: es un servicio chico que sigue el patrón de `resumen-avisos.service.ts`.
+
 - **02-11 ~14:30 (claude-code) — «Partir de esa» también avisa si lo copiado cuesta distinto hoy en CT. Adam: «Sí, agrégalo».**
   - **Qué se ve:** al partir de una cotización, cada partida copiada que difiere más de 3 % de CT lleva el mismo aviso de «Hoy en CT» en su fila, con los mismos botones. El mensaje de arriba dice cuántas: «2 partidas cuestan distinto en CT: revísalas». Ninguna cifra cambia al copiar.
   - **API:** `GET cotizaciones/:id/costos-de-hoy`, con el permiso de cotizaciones y solo de la empresa activa. Devuelve por partida lo que difiere; en dólares, nada. Reutiliza `leerCatalogoDeHoy`: una sola consulta, sin IA.
