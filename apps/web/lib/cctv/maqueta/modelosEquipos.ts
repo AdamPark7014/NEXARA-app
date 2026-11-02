@@ -7,6 +7,7 @@
  * El frente mira a +Z y la base queda en Y = 0; los equipos de muro tienen la espalda en Z = 0. Lo que se
  * repite (puertos, ventilas, luces) va instanciado para que un gabinete lleno siga girando fluido.
  */
+import { marcaCorta } from "../marca";
 import * as THREE from "three";
 import type { TipoEquipo } from "../catalogo";
 import { caja, cilindro, lenteConAro, malla, materiales, type Mats } from "./modelos";
@@ -60,7 +61,7 @@ function rejillaXY(cx: number, cy: number, z: number, n: number, f: number, dx: 
 }
 
 /** Texto serigrafiado: sale con su ancho real y, sin lienzo 2D (pruebas), no se pone. */
-function rotulo(texto: string | undefined, x: number, y: number, z: number, altoMm: number, o: { color?: string; peso?: string; alinea?: "izq" | "centro" | "der"; ry?: number; rx?: number } = {}) {
+function rotulo(texto: string | undefined, x: number, y: number, z: number, altoMm: number, o: { color?: string; peso?: string; alinea?: "izq" | "centro" | "der"; ry?: number; rx?: number; maxAncho?: number } = {}) {
   if (!texto) return null;
   const lienzo = document.createElement("canvas");
   const c = lienzo.getContext("2d");
@@ -78,7 +79,9 @@ function rotulo(texto: string | undefined, x: number, y: number, z: number, alto
   const t = new THREE.CanvasTexture(lienzo);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
-  const h = altoMm * 1.3;
+  // Un nombre largo se achica para no pisar lo que tiene al lado.
+  const ajuste = o.maxAncho ? Math.min(o.maxAncho / ((altoMm * 1.3 * anchoPx) / lienzo.height), 1) : 1;
+  const h = altoMm * 1.3 * ajuste;
   const w = (h * anchoPx) / lienzo.height;
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
   const dx = o.alinea === "izq" ? w / 2 : o.alinea === "der" ? -w / 2 : 0;
@@ -283,7 +286,7 @@ function grabador(p: ParamsEquipo, m: Mats) {
   const lengua = caja(11, 2, 0.5, m.azul, 0.2);
   lengua.position.set(w * 0.33, y0 + alto * 0.62, zt + 0.2);
   g.add(usb, lengua);
-  poner(g, rotulo(p.marca, -w / 2 + 14, y0 + alto * 0.62, zt, Math.min(alto * 0.2, 9), { alinea: "izq", peso: "700" }));
+  poner(g, rotulo(p.marca, -w / 2 + 14, y0 + alto * 0.62, zt, Math.min(alto * 0.2, 9), { alinea: "izq", peso: "700", maxAncho: xBoton - alto * 0.15 - 6 + w / 2 - 14 }));
   poner(g, rotulo(p.modelo, w / 2 - 12, y0 + alto * 0.11, zt, 3.2, { alinea: "der", color: "#9aa0a8", peso: "500" }));
   // Espalda: tomas, video y red.
   const zb = -d / 2 - 0.2;
@@ -866,7 +869,8 @@ const FABRICA: Readonly<Record<TipoEquipo, (p: ParamsEquipo, m: Mats) => THREE.G
 const moldes = new Map<string, THREE.Group>();
 
 /** Arma un equipo. `p` son las medidas de la ficha. */
-export function crearModeloEquipo(tipo: TipoEquipo, p: ParamsEquipo = {}): THREE.Group {
+export function crearModeloEquipo(tipo: TipoEquipo, original: ParamsEquipo = {}): THREE.Group {
+  const p = { ...original, marca: marcaCorta(original.marca) || undefined };
   const clave = JSON.stringify([tipo, p]);
   let molde = moldes.get(clave);
   if (!molde) {

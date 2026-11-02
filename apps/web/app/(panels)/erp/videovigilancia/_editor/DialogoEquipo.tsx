@@ -6,6 +6,7 @@
  * el diseñador no inventa datos.
  */
 import { useState, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Alert, Button, Field, Input, Select } from "@/components/base";
 import { agregarAlCatalogo, archivarDelCatalogo, editarCatalogo, type EquipoParaGuardar } from "@/lib/cctv/api";
 import { ETIQUETA_TIPO_CAMARA, ETIQUETA_TIPO_EQUIPO, FAMILIA_DE_TIPO, type FilaCatalogo, type TipoCamara, type TipoEquipo } from "@/lib/cctv/catalogo";
@@ -153,7 +154,7 @@ export default function DialogoEquipo({
     }
   };
 
-  return (
+  return createPortal(
     <div className={styles.modalFondo} onClick={(e) => e.target === e.currentTarget && onCerrar()}>
       <form className={styles.modal} onSubmit={(e) => void enviar(e)} aria-label={fila ? "Editar equipo" : "Agregar equipo"}>
         <header className={styles.modalCabeza}>
@@ -249,6 +250,7 @@ export default function DialogoEquipo({
           ) : null}
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }

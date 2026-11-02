@@ -5,6 +5,7 @@
  * maqueta, con su modelo 3D y su ficha. La lista base viene en el código; lo que agrega cada empresa,
  * de `cctv_equipos`. Las existencias de Almacén llegan en su fase.
  */
+import { claveMarca, marcaCorta } from "@/lib/cctv/marca";
 import { useEffect, useMemo, useState } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
@@ -104,11 +105,10 @@ export default function CatalogoPage() {
     return c;
   }, [tarjetas]);
 
-  // Sin importar cómo se capturó: «HIKVISION» y «Hikvision» son la misma marca.
-  const claveMarca = (m: string) => m.trim().toLowerCase();
+  // Sin importar cómo se capturó: «HIKVISION» y «Hikvision» son la misma marca, y «Dahua» y «Dahua Technology».
   const marcas = useMemo(() => {
     const vistas = new Map<string, string>();
-    for (const t of tarjetas) if (t.marca.trim() && !vistas.has(claveMarca(t.marca))) vistas.set(claveMarca(t.marca), t.marca.trim());
+    for (const t of tarjetas) if (t.marca.trim() && !vistas.has(claveMarca(t.marca))) vistas.set(claveMarca(t.marca), marcaCorta(t.marca));
     return [...vistas.entries()].sort((a, b) => a[1].localeCompare(b[1], "es"));
   }, [tarjetas]);
   const q = buscar.trim().toLowerCase();

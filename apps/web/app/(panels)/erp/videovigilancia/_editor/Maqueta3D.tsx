@@ -1055,7 +1055,7 @@ export default function Maqueta3D({
 
       {!verDesde && !recorriendo ? (
         <>
-          {pistaVista && herramienta === "seleccionar" ? <p className={styles.pistaVista}>Arrastra para deslizar · clic derecho para girar · rueda para acercar · doble clic en el piso para entrar</p> : null}
+          {pistaVista && herramienta === "seleccionar" ? <p className={styles.pistaVista}>Arrastra para deslizar · clic derecho para girar · doble clic en el piso para entrar</p> : null}
           <div className={styles.controles3d}>
             <div className={styles.segmentoVista} role="group" aria-label="Qué hace arrastrar">
               {(

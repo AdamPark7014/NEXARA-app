@@ -242,6 +242,12 @@ function ordenarMedidas(tipo: string, datos: DatoLeido[]) {
   }
 }
 
+/** «Dahua Technology» y «Dahua» son la misma marca. Es la misma regla que `marcaCorta` en la web. */
+function sinRazonSocial(marca: string): string {
+  const fuera = /[\s,]+(network\s+)?(technolog(y|ies)|tech|corporation|corp\.?|company|co\.?|ltd\.?|limited|inc\.?|llc|s\.?a\.?(\s+de\s+c\.?v\.?)?|gmbh)\b\.?/gi;
+  return marca.replace(fuera, '').replace(/[\s,.]+$/, '').trim() || marca;
+}
+
 export function limpiarFicha(bruto: Record<string, any>, totalHojas: number): FichaLeida {
   const tipo = TIPOS.includes(bruto?.tipo) ? String(bruto.tipo) : 'generico';
   const vistos = new Set<string>();
@@ -283,7 +289,7 @@ export function limpiarFicha(bruto: Record<string, any>, totalHojas: number): Fi
   return {
     familia: familiaDeTipo(tipo),
     tipo,
-    marca: texto(bruto?.marca, 80),
+    marca: sinRazonSocial(texto(bruto?.marca, 80)),
     modelo: texto(bruto?.modelo, 120),
     descripcion: texto(bruto?.descripcion, 300),
     color,
