@@ -1,5 +1,9 @@
 # RELEVO
 
+- **02-11 (claude-code) — Verificado en producción (`ea8031ae`): acceso a «Asignar con IA» por gente a cargo.** Con el guardia y la regla desplegados, persona por persona y sin sesiones ni tokens:
+  6 dentro (Adam, Christian, Claudia, David, José Antonio y Luis Joel), 22 fuera, 0 incoherencias; todo mando dentro pasa el guardia y tiene a quién asignar. Una frase real por mando: Luis propuso un servicio
+  a José Antonio y José Antonio uno a Alejandro, sin crear nada. Sin errores de inyección al arrancar. **Falta verlo con sesión:** que Luis o José Antonio vean la tarjeta en la pizarra.
+
 - **02-11 ~12:40 (claude-code) — Freno de disco en el Hetzner.** La limpieza nocturna no alcanzaba: con varias sesiones desplegando, el disco llegó a 89 %, y con 90 % se cae la base. `/root/freno-disco.sh` corre cada 15 minutos (`/etc/cron.d/freno-disco`): desde 85 % recorta la caché de compilación a 3 GB sin esperar a que el servidor quede libre. En su primera corrida liberó 5.09 GB, de 89 % a 83 %, con un despliegue en curso que siguió compilando. Costo: el siguiente build baja dependencias otra vez. Registro en `/var/log/mantenimiento-disco.log`. El disco quedó en 78 %, con 16 GB libres. La limpieza semanal `/root/mantenimiento-disco.sh` ya está instalada: en su simulación de hoy no borraría nada.
 
 - **02-11 ~12:40 (claude-code) — Cierre del retiro del generador muerto: quitarlo no cambió ningún PDF real.**
