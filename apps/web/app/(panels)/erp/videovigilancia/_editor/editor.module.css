@@ -310,6 +310,7 @@
   grid-template-columns: 252px minmax(0, 1fr) 330px;
   /* Alto de la ventana menos la barra de Core y la cabeza: la maqueta se ve completa sin bajar. */
   height: clamp(520px, calc(100dvh - 180px), 1100px);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 @media (max-width: 1320px) {
@@ -324,6 +325,7 @@
 @media (max-width: 1100px) {
   .cuerpo {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
     height: auto;
   }
   .lienzoCaja {
@@ -1129,6 +1131,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   background: var(--ui-surface);
 }
 
@@ -1160,9 +1163,10 @@
 }
 
 .inspectorCuerpo {
-  padding: var(--ui-s4);
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  max-height: 640px;
+  padding: var(--ui-s4);
 }
 
 .panel {
