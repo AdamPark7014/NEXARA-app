@@ -1,26 +1,30 @@
 /*
- * Portada: hero centrado con el tablero como producto, baldosas grandes con foto a sangre (como la portada de
- * Apple) y una franja de cifras. Usa los tokens de `.sitio`.
+ * Portada «Obra»: el título ocupa la pantalla, el trabajo real va a sangre y cada servicio es un capítulo.
+ * Maqueta aprobada: canvas «NEXARA: tres direcciones», página B · Obra.
  */
 
-/* ── Hero centrado ──────────────────────────────────────────────────────── */
-
-.hero {
-  position: relative;
-  isolation: isolate;
-  padding-top: clamp(56px, 7vw, 104px);
-  padding-bottom: clamp(24px, 3vw, 40px);
-  text-align: center;
+.ancho {
+  width: 100%;
+  max-width: 1600px;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
 }
 
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: clamp(16px, 2.2vw, 32px);
+}
+
+/* Hero: primero el título, abajo la foto, sin nada encima de ella. */
 .titulo {
-  margin-inline: auto;
-  max-width: 14ch;
+  padding-top: clamp(8px, 1.4vw, 24px);
   font-family: var(--font-display);
-  font-size: clamp(52px, 8.4vw, 116px);
-  line-height: 0.98;
-  font-weight: 600;
-  letter-spacing: -0.055em;
+  font-size: clamp(60px, 11.2vw, 210px);
+  font-weight: 900;
+  line-height: 0.86;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
   text-wrap: balance;
 }
 
@@ -28,326 +32,370 @@
   display: block;
 }
 
-.sub {
-  margin: 26px auto 0;
-  max-width: 32ch;
-  font-size: clamp(19px, 1.8vw, 25px);
-  line-height: 1.4;
+.heroFoto {
+  margin-top: clamp(20px, 2.4vw, 36px);
+  background: var(--tile);
+}
+
+.heroFoto img {
+  width: 100%;
+  height: clamp(300px, 50vw, 800px);
+  object-fit: cover;
+  object-position: 50% 22%;
+}
+
+.heroPie {
+  align-items: start;
+  padding-block: clamp(24px, 3vw, 44px) clamp(40px, 5vw, 80px);
+}
+
+.heroTexto {
+  grid-column: 1 / 8;
+  font-size: clamp(24px, 2.7vw, 40px);
+  font-weight: 500;
+  line-height: 1.14;
   letter-spacing: -0.015em;
-  color: var(--fg-2);
   text-wrap: balance;
 }
 
-.acciones {
+.heroAcciones {
+  grid-column: 9 / 13;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 34px;
+  gap: 10px;
 }
 
-/* ── Baldosas ───────────────────────────────────────────────────────────── */
-
-.mosaico {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  max-width: 1720px;
-  margin-inline: auto;
-  padding: clamp(8px, 1vw, 12px);
+/* Capítulos */
+.capitulo {
+  align-items: end;
+  padding-block: clamp(40px, 5vw, 88px);
 }
 
-.baldosa {
+.conRaya {
   position: relative;
-  isolation: isolate;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  overflow: hidden;
-  min-height: clamp(520px, 46vw, 680px);
-  padding: clamp(44px, 5vw, 64px) 24px 0;
-  border-radius: 28px;
-  background: var(--tile);
-  text-align: center;
 }
 
-.ancha {
-  grid-column: 1 / -1;
-  min-height: clamp(560px, 44vw, 720px);
-}
-
-/* Foto a sangre con un velo del color de la baldosa arriba, para que el texto se lea sobre cualquier imagen. */
-.foto {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-}
-
-.foto img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 1.2s var(--ease-out);
-}
-
-.baldosa:hover .foto img {
-  transform: scale(1.035);
-}
-
-/*
- * Paralaje sutil de la foto al bajar: la imagen va un 10 % más grande y se desliza ±5 % con su propia línea de tiempo
- * de scroll, sin chocar con el acercamiento del hover (ese usa `transform`; esto, `translate` y `scale`).
- */
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    /* La línea de tiempo es de la baldosa: con `overflow: hidden` ella misma sería el contenedor de scroll de la foto
-       y la foto nunca avanzaría. */
-    .baldosa {
-      view-timeline: --baldosa block;
-    }
-    .foto img {
-      scale: 1.1;
-      animation: paralaje linear both;
-      animation-timeline: --baldosa;
-    }
-  }
-}
-
-@keyframes paralaje {
-  from {
-    translate: 0 -5%;
-  }
-  to {
-    translate: 0 5%;
-  }
-}
-
-.foto::after {
+.conRaya::before {
   content: "";
   position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    180deg,
-    var(--tile) 0%,
-    color-mix(in srgb, var(--tile) 88%, transparent) 20%,
-    color-mix(in srgb, var(--tile) 40%, transparent) 38%,
-    transparent 56%
-  );
+  top: 0;
+  left: var(--gutter);
+  right: var(--gutter);
+  height: 2px;
+  background: var(--fg);
 }
 
-.nombre {
-  font-family: var(--font-display);
-  font-size: clamp(36px, 4.2vw, 58px);
-  line-height: 1.04;
-  font-weight: 600;
-  letter-spacing: -0.04em;
-  text-wrap: balance;
+.sinArriba {
+  padding-top: 0;
 }
 
-.texto {
-  margin-top: 10px;
-  max-width: 30ch;
-  font-size: clamp(17px, 1.6vw, 22px);
-  line-height: 1.35;
-  letter-spacing: -0.012em;
-  color: var(--fg-2);
-  text-wrap: balance;
+.conRayaBloque {
+  padding-top: 18px;
+  border-top: 2px solid var(--fg);
 }
 
-.botones {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 22px;
+.capituloFila {
+  align-items: start;
+  padding-block: clamp(24px, 3vw, 44px) clamp(40px, 5vw, 88px);
 }
 
-.mosaico .pildora,
-.mosaico .pildoraHueca {
+.cols1a4 {
+  grid-column: 1 / 4;
+}
+.cols1a5 {
+  grid-column: 1 / 5;
+}
+.cols1a6 {
+  grid-column: 1 / 6;
+}
+.cols1a7 {
+  grid-column: 1 / 7;
+}
+.cols1a8 {
+  grid-column: 1 / 8;
+}
+.cols1a9 {
+  grid-column: 1 / 9;
+}
+.cols4a9 {
+  grid-column: 4 / 9;
+}
+.cols5a9 {
+  grid-column: 5 / 9;
+}
+.cols6a13 {
+  grid-column: 6 / 13;
+}
+.cols7a13 {
+  grid-column: 7 / 13;
+}
+.cols8a13 {
+  grid-column: 8 / 13;
+}
+.cols9a13 {
+  grid-column: 9 / 13;
+}
+
+.num {
   display: inline-flex;
   align-items: center;
-  min-height: 40px;
-  padding: 0 20px;
-  border-radius: 999px;
-  font-size: 15.5px;
+  justify-content: center;
+  width: fit-content;
+  min-width: 44px;
+  height: 34px;
+  padding-inline: 6px;
+  background: var(--marca);
+  color: var(--sobre-marca);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.capituloNombre {
+  margin-top: 14px;
+  font-family: var(--font-display);
+  font-size: clamp(46px, 5.1vw, 88px);
+  font-weight: 800;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.capituloFila .capituloNombre {
+  margin-top: 0;
+}
+
+.capituloBajada {
+  margin-top: 16px;
+  max-width: 27em;
+  font-size: clamp(18px, 1.5vw, 22px);
+  line-height: 1.38;
+  text-wrap: pretty;
+}
+
+.capituloFila .capituloBajada {
+  margin-top: 0;
+}
+
+.ligas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 16px;
+}
+
+.liga {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  border-bottom: 2px solid currentColor;
+  font-size: 16px;
   font-weight: 600;
-  letter-spacing: -0.01em;
-  transition: background-color 0.2s var(--ease), color 0.2s var(--ease), box-shadow 0.2s var(--ease),
-    transform 0.15s var(--ease);
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease);
 }
 
-.mosaico .pildora {
-  background: var(--btn);
-  color: var(--btn-fg);
-}
-
-.mosaico .pildora:hover {
-  background: var(--btn-hover);
-}
-
-.mosaico .pildoraHueca {
-  background: color-mix(in srgb, var(--card) 70%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+.liga:hover {
   color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-.mosaico .pildoraHueca:hover {
-  background: var(--accent);
-  color: var(--btn-fg);
+.foto {
+  width: 100%;
+  object-fit: cover;
+  background: var(--tile);
 }
-
-.mosaico .pildora:active,
-.mosaico .pildoraHueca:active {
-  transform: scale(0.97);
-}
-
-/*
- * Mini interfaz al pie de la baldosa (plataformas, soporte), en una ventana que sube desde el piso como la
- * pantalla de un equipo.
- */
-.arte {
-  position: relative;
-  width: min(560px, 88%);
-  height: clamp(280px, 26vw, 360px);
-  margin-top: auto;
-  border-radius: 22px 22px 0 0;
-  background: var(--card);
-  box-shadow: 0 30px 80px -24px color-mix(in srgb, var(--fg) 28%, transparent), inset 0 0 0 1px var(--line-soft);
-}
-
-/* La mini interfaz llena la ventana; su propio panel se vuelve transparente para no hacer caja dentro de caja. */
-.baldosa .arte > * {
-  inset: 0;
-  padding: 28px 30px 0;
-  border-radius: inherit;
-  background: transparent;
-}
-
-/* Baldosa negra para fotos oscuras (el rack con LED): alterna el ritmo del mosaico igual en claro y en oscuro. */
-.oscura {
-  --tile: #000;
-  color: #f5f5f7;
-}
-
-.oscura .nombre {
-  color: #f5f5f7;
-}
-
-.oscura .texto {
-  color: #a1a1a6;
-}
-
-.mosaico .oscura .pildoraHueca {
-  background: rgb(0 0 0 / 0.4);
-  color: #2997ff;
-  box-shadow: inset 0 0 0 1px #2997ff;
-}
-
-.mosaico .oscura .pildoraHueca:hover {
-  background: #2997ff;
-  color: #000;
-}
-
-/* ── Foto de grupo del equipo ───────────────────────────────────────────── */
 
 .pie {
-  display: flex;
-  justify-content: center;
+  display: block;
+  margin-top: 10px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--fg-2);
+}
+
+.sangre img {
   width: 100%;
-  margin-top: auto;
+  height: clamp(280px, 44vw, 720px);
+  object-fit: cover;
+  object-position: 50% 62%;
+  background: var(--tile);
 }
 
-/*
- * Retratos recortados en dos filas, como foto de grupo: atrás más chicos y asentados en el piso de la
- * baldosa; adelante más grandes y hundidos bajo el piso (la baldosa los corta a la altura del pecho), así
- * ninguna orilla recortada queda a la vista. Las medidas van en % del ancho para que la composición escale entera.
- */
-.grupo {
-  position: relative;
-  width: min(1480px, 100%);
-  aspect-ratio: 5.4;
-  margin-top: clamp(32px, 4vw, 56px);
+/* Banda del equipo: el único bloque de color de toda la página. */
+.banda {
+  background: var(--marca);
+  color: var(--sobre-marca);
 }
 
-/*
- * La baldosa del equipo mide lo que su contenido (con la altura fija quedaba un hueco sobre la foto) y lleva luz
- * de estudio detrás del grupo, que en oscuro separa las camisas negras del fondo.
- */
-.ancha:has(.grupo) {
-  min-height: 0;
-  background:
-    radial-gradient(55% 60% at 50% 100%, color-mix(in srgb, var(--aurora-1) 22%, transparent), transparent 72%),
-    var(--tile);
+.banda .capitulo,
+.banda.capitulo {
+  align-items: start;
 }
 
-.grupo img {
-  position: absolute;
-  bottom: -35%;
-  left: calc(var(--x) - 10.5%);
-  z-index: 2;
-  width: 21%;
-  height: auto;
+.banda .liga:hover {
+  color: inherit;
+  border-bottom-width: 4px;
 }
 
-.grupo img[data-fila="atras"] {
-  bottom: 0;
-  left: calc(var(--x) - 9.25%);
-  z-index: 1;
-  width: 18.5%;
+.banda :focus-visible {
+  outline-color: var(--sobre-marca);
 }
 
-/* ── Cifras ─────────────────────────────────────────────────────────────── */
+.bandaTitulo {
+  font-family: var(--font-display);
+  font-size: clamp(56px, 8vw, 150px);
+  font-weight: 900;
+  line-height: 0.86;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
 
 .cifras {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(24px, 4vw, 56px);
-  text-align: center;
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
+  gap: 28px;
+  margin-top: 40px;
 }
 
-.cifra {
+.cifras b {
   display: block;
   font-family: var(--font-display);
-  font-size: clamp(52px, 6vw, 84px);
-  line-height: 1;
-  font-weight: 600;
-  letter-spacing: -0.05em;
-  background: var(--degradado-texto);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  font-variant-numeric: tabular-nums;
+  font-size: clamp(64px, 5.8vw, 104px);
+  font-weight: 900;
+  line-height: 0.9;
 }
 
-.cifraTexto {
-  margin: 14px auto 0;
-  max-width: 18ch;
-  font-size: 17px;
-  line-height: 1.4;
+.cifras span {
+  display: block;
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* Industrias: lista gigante a la izquierda, la industria elegida a la derecha. */
+.subtitulo {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.industrias {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: clamp(16px, 2.2vw, 32px);
+  align-items: start;
+}
+
+.industriasLista {
+  grid-column: 1 / 8;
+}
+
+.industria {
+  display: block;
+  width: 100%;
+  padding: 10px 0 8px;
+  border: 0;
+  border-top: 2px solid var(--fg);
+  background: none;
+  color: var(--fg);
+  font-family: var(--font-display);
+  font-size: clamp(48px, 6.4vw, 112px);
+  font-weight: 800;
+  line-height: 0.92;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.industria:last-child {
+  border-bottom: 2px solid var(--fg);
+}
+
+/* El relleno tapa el trazo interior: la letra variable trae contornos encimados que se verían como rayas. */
+.industria[aria-selected="false"] {
+  color: var(--bg);
+  -webkit-text-stroke: 3px var(--fg);
+  paint-order: stroke fill;
+}
+
+.industria:hover {
+  color: var(--marca);
+}
+
+.industriaPanel {
+  grid-column: 8 / 13;
+  position: sticky;
+  top: 88px;
+}
+
+.industriaEtiqueta {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.industriaRiesgo {
+  margin-top: 8px;
+  font-family: var(--font-display);
+  font-size: clamp(36px, 3.6vw, 62px);
+  font-weight: 800;
+  line-height: 0.94;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.industriaTexto {
+  margin-top: 16px;
+  font-size: clamp(18px, 1.5vw, 20px);
+  line-height: 1.38;
+  text-wrap: pretty;
+}
+
+.industriaLista {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 16px;
+  line-height: 1.35;
   color: var(--fg-2);
 }
 
-@media (max-width: 1068px) {
-  .cifras {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    row-gap: 48px;
-  }
+.industriaLista li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
 }
 
-@media (max-width: 734px) {
-  .mosaico {
-    grid-template-columns: 1fr;
+.cierreTitulo {
+  font-family: var(--font-display);
+  font-size: clamp(56px, 7.6vw, 132px);
+  font-weight: 900;
+  line-height: 0.86;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+@media (max-width: 900px) {
+  .titulo {
+    font-size: 16.4vw;
   }
-  .baldosa,
-  .ancha {
-    min-height: 520px;
-    border-radius: 22px;
+  .heroTexto,
+  .heroAcciones,
+  .cols1a4,
+  .cols1a5,
+  .cols1a6,
+  .cols1a7,
+  .cols1a8,
+  .cols1a9,
+  .cols4a9,
+  .cols5a9,
+  .cols6a13,
+  .cols7a13,
+  .cols8a13,
+  .cols9a13,
+  .industriasLista,
+  .industriaPanel {
+    grid-column: 1 / -1;
   }
-  /* En el teléfono la foto de grupo se agranda y se ven los del centro; la baldosa recorta los extremos. */
-  .grupo {
-    flex: 0 0 auto;
-    width: 240%;
+  .industriaPanel {
+    position: static;
   }
 }

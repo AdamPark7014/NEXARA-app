@@ -16,6 +16,7 @@ import { MENU_INDUSTRIAS } from "./Encabezado";
 /** `?servicio=` llega desde los bloques de Servicios. */
 const SERVICIO_NOMBRE: Record<string, string> = {
   cctv: "videovigilancia",
+  acceso: "control de acceso",
   redes: "redes y Wi‑Fi",
   computo: "infraestructura y cómputo",
   soporte: "soporte TI",

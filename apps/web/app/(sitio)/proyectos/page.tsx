@@ -5,7 +5,6 @@ import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 import { foto, type Foto } from "@/components/sitio/fotos";
 import s from "@/components/sitio/sitio.module.css";
 import p from "@/components/sitio/paginas.module.css";
-import Aurora from "@/components/sitio/Aurora";
 import Flecha from "@/components/sitio/Flecha";
 import Cierre from "@/components/sitio/Cierre";
 import MapaMexico from "@/components/sitio/MapaMexico";
@@ -113,7 +112,6 @@ export default async function PropuestaProyectos() {
         }}
       />
       <section className={p.hero} aria-labelledby="proyectos-hero">
-        <Aurora />
         <div className={`${s.contenedor} ${s.centro}`}>
           <p className={s.antetitulo}>Proyectos</p>
           <h1 id="proyectos-hero" className={p.heroTitulo}>

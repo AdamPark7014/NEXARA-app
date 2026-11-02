@@ -1,4 +1,4 @@
-import { Inter_Tight } from "next/font/google";
+import localFont from "next/font/local";
 import "@/components/sitio/sitio-documento.css";
 import s from "@/components/sitio/sitio.module.css";
 import Encabezado from "@/components/sitio/Encabezado";
@@ -7,12 +7,21 @@ import Aparecer from "@/components/sitio/Aparecer";
 import ExtrasSitio from "@/components/sitio/ExtrasSitio";
 import Paleta from "@/components/sitio/Paleta";
 
-/** Letra de exhibición para titulares y cifras; el texto corrido sigue en Inter. */
-const display = Inter_Tight({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+/** Letra de exhibición para los títulos en mayúsculas y las cifras. */
+const display = localFont({
+  src: "../../components/sitio/fuentes/big-shoulders.woff2",
+  weight: "100 900",
   display: "swap",
   variable: "--sitio-display",
+  fallback: ["Impact", "Arial Narrow", "sans-serif"],
+});
+
+/** Letra de todo el texto corrido. */
+const texto = localFont({
+  src: "../../components/sitio/fuentes/libre-franklin.woff2",
+  weight: "100 900",
+  display: "swap",
+  variable: "--sitio-texto",
 });
 
 /**
@@ -21,7 +30,7 @@ const display = Inter_Tight({
  */
 export default function SitioLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className={`${s.sitio} ${display.variable}`} data-sitio>
+    <div className={`${s.sitio} ${display.variable} ${texto.variable}`} data-sitio>
       <Encabezado />
       {children}
       <Pie />
