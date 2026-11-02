@@ -1,5 +1,28 @@
 # RELEVO
 
+- **02-11 ~12:35 (claude-code) — Tope de 5,000 filas: ninguna consulta sobre `integra_push_events`, `audit_logs`, `notifications` ni `LocationTracking` pierde datos hoy. Sin arreglos: solo cambió el comentario de `row-cap.ts`, y por eso no se desplegó.**
+  - **Cómo se midió:** conté en producción cuántas filas trae cada `findMany` sin `take`, con su mismo `where` (o su peor ventana) y con el filtro de empresa que le toca. Solo esas cuatro tablas y `productos_ct` pasan de 5,000; la siguiente es `integra_sync_runs`, con 3,615. Líneas según `451aa85a`.
+  - **Sin `take`, con su máximo real (ninguna llega al tope):**
+    - `integra-push.service.ts:495` y `:499`, `eventStats` (KPI de Eventos, 30 h): 834 accesos en el peor día.
+    - `integra-push.service.ts:544`, `attendance` (`GET integra/attendance` y la asistencia híbrida): 170 en 7 días, 690 en 31. La poda de 90 días la deja en unas 2,000 al ritmo de hoy.
+    - `integra-push.service.ts:636`, `occupancy` («en sitio», 18 h): menos de 170.
+    - `audit.service.ts:219`, `getEntityHistory` (`GET audit/entity-history`): ninguna pantalla ni app la llama. 10 entidades pasan de 5,000 filas (hasta 14,376), todas con `companyId` nulo, así que por HTTP el filtro de empresa no las trae. Lo mayor que se ve desde una empresa: 551 filas en una entidad real y 2,803 en `entityId` 0, que son escrituras masivas.
+    - `users.service.ts:1511`, `getIamInsights` (`GET users/iam/insights`, 90 días): 584.
+    - `ventas.service.ts:374`, `getQuotaMap`: 0 filas de `quota.set`.
+    - `notification` en `recordatorios-jornada.service.ts:81`, `lunch-breaks.cron.service.ts:69`, `recordatorio-entrada.service.ts:143` y `purchase-order-overdue.cron.ts:133`: ventana de un día, y el peor día tiene 1,367 avisos en toda la tabla.
+    - `notification` en `alerts.service.ts:64`, `celebrations.service.ts:141`, `ceo-brief.cron.ts:59` y `festivos.service.ts:238`: por entidad o destinatario, máximo 463.
+    - `gps.service.ts:298`, `findTeamLocations` (mapa del equipo), y `team-board.service.ts:1180`: 628 filas activas en toda la tabla.
+    - `gps.service.ts:318`, `getMyTrajectory` (recorrido del día): 782 puntos en el peor día de una persona.
+  - **Con `take` propio, el tope no las toca:** `integra-push.service.ts:275`, `:425`, `:734`; `integra-spaces.service.ts:179`, `:417`; `activity-feed.service.ts:37`, `:86`; `audit.service.ts:64`, `:95`; `integra-artemis.service.ts:374`; `users.service.ts:1718`; `ventas.service.ts:454`; `notifications.service.ts:84`, `:142`, `:541`; `resumen-avisos.service.ts:33`; `activity-geofence.service.ts:215`; `gps.service.ts:158`. De paso, en `product-search.service.ts` llevan `take` o buscan por lista de ids.
+  - **Logs:** 0 avisos en los contenedores de las 18:13 y las 18:24 UTC, que llevaban pocos minutos arriba. No se puede mirar más atrás: el aviso vive en el log del contenedor (solo `/app/uploads` es volumen) y se pierde con cada despliegue. Por eso manda la medición y no el log. Lo dejé dicho en `row-cap.ts`.
+  - **Comentario de `row-cap.ts`:** ya no dice «con los datos de hoy no recorta nada» ni «la tabla mayor tiene 15 mil filas». Dice que sí recorta y que quien necesite la tabla entera pagine con `take`.
+  - **Pruebas:** no hay código nuevo que probar; el cambio es de comentario. No corrí pruebas ni `tsc`.
+  - **Si un día crecen:** `attendance`, `getIamInsights` y `getMyTrajectory` ordenan ascendente, así que un recorte les quitaría lo más nuevo, no lo más viejo. `attendance` acepta cualquier rango en `from` y `to`.
+  - **Visto de paso, sin tocar:**
+    - `integra_push_events` no recibe nada desde las 00:53 UTC del 01-11 (sábado 31-10, 18:53 en México). Son 41.5 h, y el mayor hueco de fin de semana en 30 días fue de 42 h. Hoy es 2 de noviembre y puede que no hayan abierto, así que no lo doy por caído; si mañana sigue igual, hay que revisar el enlace de los terminales.
+    - En 7 días entraron 47 mil filas de auditoría de `IntegraPerson`, `IntegraDevice` e `IntegraCamera`, casi todas sin empresa; parecen de la sincronización, y por ellas esas entidades pasan de 5,000 filas.
+  - No se delegó a Ollama: la revisión dependía de leer cada `where` y medirlo en producción.
+
 - **02-11 ~12:20 (claude-code) — Sync de CT: leía 5,000 filas de 14,877 (`575471cd`). Encargo a raíz del aviso «hoy en CT»: 32 filas USD activas con el dólar de agosto a octubre.**
   - **Causa:** `PrismaService` corta en 5,000 todo `findMany` sin `take` (`prisma/row-cap.ts`) y `CtCatalogSyncService.correr()` leía así la tabla. El log lo decía en cada corrida: `recortada al tope de 5000 filas: modelo=ProductCT`.
   - **Qué hacía el recorte:**

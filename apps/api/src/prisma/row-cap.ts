@@ -2,9 +2,8 @@
  * Tope de filas para los `findMany` que no piden `take`.
  *
  * En el código hay 252 métodos que consultan sin límite, 189 de ellos colgados
- * de un `@Get`. Hoy no duele —la tabla mayor tiene 15 mil filas— pero cada uno
- * es una consulta que crece con el negocio hasta que un día trae la tabla
- * entera a memoria y tumba el proceso.
+ * de un `@Get`. Cada uno es una consulta que crece con el negocio hasta que un
+ * día trae la tabla entera a memoria y tumba el proceso.
  *
  * Ponerles paginación a los 189 cambiaría la forma de la respuesta (de arreglo
  * a `{data, meta}`) y rompería las pantallas que hoy esperan un arreglo. Este
@@ -12,12 +11,16 @@
  *
  * Dos decisiones deliberadas:
  *
- *   - El tope es alto (5000 por defecto). Con los datos de hoy no recorta nada;
- *     está para evitar la caída, no para paginar.
+ *   - El tope es alto (5000 por defecto): está para evitar la caída, no para
+ *     paginar. Aun así **sí recorta**: al 02-11-2026 cinco tablas lo rebasan
+ *     (`integra_push_events` va en 970 mil) y el sync de CT leyó así 5000 de
+ *     14,877 filas de `productos_ct` hasta `575471cd`. Quien necesite una tabla
+ *     entera debe pedirla por páginas con `take`, que no pasa por este tope.
  *   - Cuando recorta, **avisa**. Un recorte silencioso es peor que la consulta
  *     sin límite: daría respuestas incompletas que nadie sabría interpretar.
  *     El aviso dice qué modelo fue, y ese modelo es el que necesita paginación
- *     de verdad.
+ *     de verdad. Solo queda en el log del contenedor, que se pierde con cada
+ *     despliegue.
  *
  * Limitación conocida: sólo alcanza al `findMany` de primer nivel. Las
  * relaciones traídas con `include` no pasan por el middleware, así que un
