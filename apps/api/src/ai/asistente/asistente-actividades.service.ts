@@ -16,6 +16,7 @@ import {
   type SalidaIA,
 } from './asistente-actividades.js';
 import { nombresPropiosDe } from './nombres.js';
+import { puedeAsignarConIa } from './quien-asigna.js';
 
 /** Actividades recientes de las que se toman los nombres ya usados («Toks») y quién hace qué. */
 const ACTIVIDADES_PARA_NOMBRES = 400;
@@ -53,6 +54,11 @@ export class AsistenteActividadesService {
     private readonly claude: ClaudeService,
     private readonly complejidad: ComplejidadService,
   ) {}
+
+  /** Todo mando con gente a cargo y dirección (`quien-asigna.ts`). */
+  puedeUsar(user: { id?: number | string | null; email?: string | null } | null | undefined) {
+    return puedeAsignarConIa(this.prisma, user);
+  }
 
   estado() {
     return {

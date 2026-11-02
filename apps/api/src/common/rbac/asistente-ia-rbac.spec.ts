@@ -1,8 +1,11 @@
 import { ROLES } from './roles.v2';
 import { ASISTENTE_IA_URL_RULES, checkUrlAccess, checkUrlRules } from './url-matrix';
-import { asistentePorCorreo, tiposQueCrea } from '../../ai/asistente/tipos-actividad';
+import { tiposQueCrea } from '../../ai/asistente/tipos-actividad';
 
-/** «Asignar con IA» es del CEO y, por persona, de David y José Antonio; crear sigue en `POST /api/activities`. */
+/**
+ * «Asignar con IA» es del CEO en la matriz; para los demás mandos lo abre el guardia según su gente a
+ * cargo (`quien-asigna.spec.ts`). Crear sigue en `POST /api/activities`.
+ */
 describe('matriz: asistente de actividades con IA', () => {
   it('el CEO interpreta instrucciones y ve a quién asignar', () => {
     expect(checkUrlAccess(ROLES.CEO, '/api/ai/asistente/interpretar', 'POST').allowed).toBe(true);
@@ -11,40 +14,43 @@ describe('matriz: asistente de actividades con IA', () => {
   });
 
   it.each([ROLES.DIR_OPERACIONES, ROLES.COORD_OPERACIONES, ROLES.ENC_SOPORTE, ROLES.ARQUITECTO, ROLES.ING_CAMPO])(
-    '%s no lo usa',
+    '%s no lo trae por rol: lo abre su gente a cargo',
     (role) => {
       expect(checkUrlAccess(role, '/api/ai/asistente/interpretar', 'POST').allowed).toBe(false);
     },
   );
 
-  it('a David se le concede por correo, sin abrírselo a toda la coordinación ni darle otras rutas', () => {
-    expect(asistentePorCorreo('operaciones@nexara.com.mx')).toBe(true);
-    expect(asistentePorCorreo(' OPERACIONES@nexara.com.mx ')).toBe(true);
-    expect(asistentePorCorreo('direccion.operaciones@nexara.com.mx')).toBe(false);
-    expect(asistentePorCorreo(null)).toBe(false);
+  it('la excepción del guardia abre solo el asistente y el dictado, ninguna otra ruta', () => {
     expect(checkUrlRules(ASISTENTE_IA_URL_RULES, '/api/ai/asistente/interpretar', 'POST').allowed).toBe(true);
     expect(checkUrlRules(ASISTENTE_IA_URL_RULES, '/api/ai/asistente/estado', 'GET').allowed).toBe(true);
+    expect(checkUrlRules(ASISTENTE_IA_URL_RULES, '/api/ai/voz/transcribir', 'POST').allowed).toBe(true);
     expect(checkUrlRules(ASISTENTE_IA_URL_RULES, '/api/users', 'GET').allowed).toBe(false);
   });
+
+  it.each([ROLES.ING_CAMPO, ROLES.ADMINISTRATIVO, ROLES.ENC_SOPORTE])(
+    '%s puede preguntar si le toca, sin que eso le abra interpretar',
+    (role) => {
+      expect(checkUrlAccess(role, '/api/ai/asistente/estado', 'GET').allowed).toBe(true);
+      expect(checkUrlAccess(role, '/api/ai/asistente/interpretar', 'POST').allowed).toBe(false);
+    },
+  );
 
   it('David no reparte servicios: lo demás, sí; dirección, todo', () => {
     expect(tiposQueCrea('operaciones@nexara.com.mx')).toEqual(['tarea', 'proyecto', 'obra', 'comercial']);
     expect(tiposQueCrea('gerencia@nexara.com.mx')).toContain('servicio');
   });
 
-  it('a José Antonio se le concede por correo y reparte servicios; al otro Antonio, no', () => {
-    expect(asistentePorCorreo('jose.ramirez@nexara.com.mx')).toBe(true);
-    expect(asistentePorCorreo(' JOSE.RAMIREZ@nexara.com.mx ')).toBe(true);
-    expect(asistentePorCorreo('antonio.hernandez@nexara.com.mx')).toBe(false);
+  it('José Antonio y Luis reparten servicios; el mando sin renglón, tareas', () => {
     expect(tiposQueCrea('jose.ramirez@nexara.com.mx')).toEqual(['tarea', 'proyecto', 'servicio', 'comercial']);
-    // Su rol no lo trae en la matriz: entra solo por el correo, y conserva a quién asignar.
-    expect(checkUrlAccess(ROLES.ENC_SOPORTE, '/api/ai/asistente/interpretar', 'POST').allowed).toBe(false);
-    expect(checkUrlAccess(ROLES.ENC_SOPORTE, '/api/users/assignable', 'GET').allowed).toBe(true);
-    expect(checkUrlAccess(ROLES.ENC_SOPORTE, '/api/activities', 'POST').allowed).toBe(true);
+    expect(tiposQueCrea('direccion.operaciones@nexara.com.mx')).toContain('servicio');
+    expect(tiposQueCrea('infraestructura@nexara.com.mx')).not.toContain('servicio');
+    expect(tiposQueCrea('nuevo.mando@nexara.com.mx')).toEqual(['tarea']);
   });
 
-  it('un nombre de propiedad del objeto no cuenta como correo con acceso', () => {
-    expect(asistentePorCorreo('constructor')).toBe(false);
-    expect(asistentePorCorreo('__proto__')).toBe(false);
+  it('los mandos de hoy conservan a quién asignar y cómo crear', () => {
+    for (const role of [ROLES.COORD_OPERACIONES, ROLES.ENC_SOPORTE]) {
+      expect(checkUrlAccess(role, '/api/users/assignable', 'GET').allowed).toBe(true);
+      expect(checkUrlAccess(role, '/api/activities', 'POST').allowed).toBe(true);
+    }
   });
 });

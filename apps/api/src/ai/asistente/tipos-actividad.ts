@@ -1,9 +1,11 @@
 /**
  * Tipos de actividad que entiende el asistente y a quién se le puede asignar cada uno.
  *
- * Archivo hoja (sin imports): lo comparten `asistente-actividades.ts` y
+ * Archivo hoja (solo importa los correos de las cuentas, que no importan nada): lo comparten `asistente-actividades.ts` y
  * `complejidad/tiempos-tipicos.ts` sin dependencia circular.
  */
+import { isCeoEquivalentEmail, isDeveloperSuperAdminEmail } from '../../common/platform-accounts.js';
+
 export const TIPOS_ACTIVIDAD = ['tarea', 'proyecto', 'obra', 'servicio', 'comercial'] as const;
 export type TipoActividad = (typeof TIPOS_ACTIVIDAD)[number];
 
@@ -61,26 +63,23 @@ export function tiposQueRecibe(email: string | null | undefined): TipoActividad[
 }
 
 /**
- * Quién usa «Asignar con IA» además de dirección, y lo que asigna (espejo de `CREATE_BY_EMAIL` en
- * la web). David, encargado de instaladores, no reparte servicios (Adam, 01-11-2026); José Antonio,
- * encargado de soporte, sí, porque son su trabajo (Adam, 02-11-2026). Va por correo, como el almacén
- * de Iván: no les cambia el rol ni se lo abre a toda la coordinación. Espejo en la web:
- * `puedeAsignarConIa` de `lib/activity-kinds.ts`.
+ * Lo que asigna cada quien: espejo de `CREATE_BY_EMAIL` en `apps/web/lib/activity-kinds.ts`. Quién
+ * entra a «Asignar con IA» no se decide aquí, sino en `quien-asigna.ts`, por su gente a cargo.
  */
-const ASISTENTE_POR_CORREO: Record<string, readonly TipoActividad[]> = {
+const CREA_POR_CORREO: Record<string, readonly TipoActividad[]> = {
   'operaciones@nexara.com.mx': ['tarea', 'proyecto', 'obra', 'comercial'],
+  'direccion.operaciones@nexara.com.mx': ['tarea', 'proyecto', 'servicio', 'comercial'],
   'jose.ramirez@nexara.com.mx': ['tarea', 'proyecto', 'servicio', 'comercial'],
+  'daniela.hernandez@nexara.com.mx': ['tarea', 'comercial'],
+  'soluciones@nexara.com.mx': ['tarea', 'comercial'],
+  'finanzas@nexara.com.mx': ['tarea', 'comercial'],
+  'infraestructura@nexara.com.mx': ['tarea', 'proyecto', 'obra', 'comercial'],
 };
 
-const correoLimpio = (email: string | null | undefined) => (email ?? '').trim().toLowerCase();
-
-export function asistentePorCorreo(email: string | null | undefined): boolean {
-  return Object.prototype.hasOwnProperty.call(ASISTENTE_POR_CORREO, correoLimpio(email));
-}
-
-/** Lo que puede asignar quien escribe. Dirección, todo. */
+/** Lo que puede asignar quien escribe. Dirección, todo; un mando sin renglón aquí, tareas, como en la web. */
 export function tiposQueCrea(email: string | null | undefined): TipoActividad[] {
-  return asistentePorCorreo(email) ? [...ASISTENTE_POR_CORREO[correoLimpio(email)]!] : [...TIPOS_ACTIVIDAD];
+  if (isCeoEquivalentEmail(email) || isDeveloperSuperAdminEmail(email)) return [...TIPOS_ACTIVIDAD];
+  return [...(CREA_POR_CORREO[(email ?? '').trim().toLowerCase()] ?? ['tarea'])];
 }
 
 const TAREA_DE_SERVICIO: Record<string, (typeof SUBTIPOS_TAREA)[number]> = {

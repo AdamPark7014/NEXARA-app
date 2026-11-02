@@ -103,6 +103,14 @@ async function abrir(usuario: ReturnType<typeof userEvent.setup>, etiqueta: stri
 }
 
 describe("AsistenteIA", () => {
+  it("no pinta nada si la API dice que no le toca: la regla no se repite aquí", async () => {
+    api.estadoAsistente.mockResolvedValue({ disponible: false });
+    const { container } = render(<AsistenteIA />);
+    await waitFor(() => expect(api.estadoAsistente).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
+    expect(api.personasAsignables).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     buscarClientesParecidos.mockResolvedValue([]);

@@ -18,7 +18,7 @@ import { formatApiError } from "@/lib/erp-api";
 import { AvisoParecidos } from "@/components/erp/ClienteRapido";
 import { buscarClientesParecidos, type ClienteParecido } from "@/lib/sales-api";
 import { formatMinutes } from "@/lib/activity-labels";
-import { kindsForAssignment, puedeAsignarConIa } from "@/lib/activity-kinds";
+import { kindsForAssignment } from "@/lib/activity-kinds";
 import { periodoPorOmision } from "@/lib/actividad-periodo";
 import { hoyISO } from "@/lib/proyecto-plan";
 import { obtenerProgramacion } from "@/lib/proyectos-api";
@@ -148,23 +148,22 @@ function Renglon({
 }
 
 /**
- * «Asignar con IA», hasta arriba de Actividades para el CEO. Se dicta con un toque (el texto
+ * «Asignar con IA», hasta arriba de Actividades. Se dicta con un toque (el texto
  * aparece en vivo y al callar se prepara solo) o se escribe y «Preparar actividades». La IA
  * propone tipo, persona, cliente, día, plazo y duración; los nombres mal oídos los corrige el
  * API contra el catálogo y lo dice («Corregido de "talks"»). Cada campo se corrige a mano en
  * la tarjeta, sin volver a escribir la instrucción, y se confirma una por una o todas. Solo se
- * muestra al CEO y a David, y si el servidor tiene la IA activa.
+ * muestra si la API dice que está disponible: a todo mando con gente a cargo y a dirección, con la
+ * IA activa. La regla vive allá (`quien-asigna.ts`) y aquí no se repite.
  */
 export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
   const { user, token } = useUser();
   const [disponible, setDisponible] = useState(false);
   const [personas, setPersonas] = useState<PersonaAsignable[]>([]);
   const v2 = useMemo(() => resolveV2RoleKey(user), [user]);
-  // Solo el CEO, David y José Antonio asignan con IA (el API lo vuelve a exigir).
-  const puede = v2 === ROLES.CEO || Boolean(user?.isSuperAdmin) || puedeAsignarConIa(user?.email);
 
   useEffect(() => {
-    if (!token || !puede) return;
+    if (!token) return;
     let vivo = true;
     estadoAsistente(token)
       .then((r) => {
@@ -178,9 +177,9 @@ export default function AsistenteIA({ onCreada }: { onCreada?: () => void }) {
     return () => {
       vivo = false;
     };
-  }, [token, puede]);
+  }, [token]);
 
-  if (!puede || !disponible || !token) return null;
+  if (!disponible || !token) return null;
   return (
     <Contenido
       token={token}
