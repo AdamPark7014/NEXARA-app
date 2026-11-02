@@ -740,7 +740,8 @@ export function resumenDelPlano(raiz: Plano, grabacion: Grabacion = GRABACION_PO
   const base = { camaras: todas.length, mbps: anchoBandaMbps(mp, grabacion), tb: almacenamientoTB(mp, grabacion) };
   const suma = { celdas: 0, sinCobertura: 0, identificacion: 0, reconocimiento: 0, observacion: 0, deteccion: 0, general: 0 };
   for (const { plano } of niveles) {
-    const lim = limitesEnMetros(plano);
+    // «Del interior»: la reja deja fuera el patio y el terreno, que no son interior aunque estén dentro del predio.
+    const lim = limitesEnMetros({ ...plano, muros: plano.muros.some((m) => m.tipo !== "reja") ? plano.muros.filter((m) => m.tipo !== "reja") : plano.muros });
     if (!lim) continue;
     const camaras = plano.camaras.map((c) => camaraEnMetros(c, plano.escala)).filter((c): c is NonNullable<typeof c> => c != null);
     // Planos enormes: la celda crece para no pasar de ~20 mil celdas por nivel.

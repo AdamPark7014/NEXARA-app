@@ -62,8 +62,8 @@ export const PLANTILLAS: ReadonlyArray<{ id: string; nombre: string; descripcion
       alturaM: 6,
       accesos: 2,
       barrera: true,
-      sismica: 1,
-      sirena: 1,
+      sismica: 2,
+      sirena: 2,
       areas: [
         { nombre: "Bodega", tipo: "bodega", m2: 400 },
         { nombre: "Oficinas", tipo: "oficina", m2: 70 },
@@ -117,8 +117,8 @@ export const PLANTILLAS: ReadonlyArray<{ id: string; nombre: string; descripcion
       fondoM: 16,
       alturaM: 3.2,
       accesos: 1,
-      sismica: 2,
-      sirena: 1,
+      sismica: 3,
+      sirena: 2,
       areas: [
         { nombre: "Pasillo y salones", tipo: "pasillo", m2: 420 },
         { nombre: "Dirección", tipo: "oficina", m2: 60 },
@@ -170,21 +170,46 @@ function repartir(areas: readonly EspecArea[], W: number, D: number): Cuarto[] {
   return salida;
 }
 
-/** Cuántas cámaras pide cada área si nadie dijo otra cosa. */
-function camarasPorArea(a: EspecArea, m2: number): number {
+const PASO_ANAQUELES_M = 4.4;
+
+/** Dónde va cada fila de anaqueles, de arriba hacia abajo. */
+function filasDeAnaqueles(r: Rect): number[] {
+  const ancho = r.x1 - r.x0;
+  const fondo = r.y1 - r.y0;
+  if (ancho < 8 || fondo < 8) return [];
+  const filas = Math.max(1, Math.floor((fondo - 4) / PASO_ANAQUELES_M));
+  const y0 = r.y0 + (fondo - (filas - 1) * PASO_ANAQUELES_M) / 2;
+  return Array.from({ length: filas }, (_, i) => y0 + i * PASO_ANAQUELES_M);
+}
+
+/** La parte de un área que lleva anaqueles: en una tienda, el frente queda libre para la caja. */
+const zonaDeAnaqueles = (c: { area: EspecArea; rect: Rect }): Rect | null =>
+  c.area.tipo === "bodega" ? c.rect : c.area.tipo === "tienda" ? { ...c.rect, y1: c.rect.y1 - 4 } : null;
+
+/** A la mitad de cada pasillo: entre filas y los dos de las orillas. */
+function pasillosDe(r: Rect): number[] {
+  const filas = filasDeAnaqueles(r);
+  if (!filas.length) return [];
+  return [(r.y0 + filas[0] - 0.55) / 2, ...filas.slice(1).map((y, i) => (filas[i] + y) / 2), (filas[filas.length - 1] + 0.55 + r.y1) / 2];
+}
+
+/** Cuántas cámaras pide cada área si nadie dijo otra cosa. Con anaqueles, una por pasillo: desde la esquina no se ve entre ellos. */
+function camarasPorArea(a: EspecArea, m2: number, rect?: Rect): number {
   if (a.camaras && a.camaras > 0) return Math.round(a.camaras);
+  const zona = rect ? zonaDeAnaqueles({ area: a, rect }) : null;
+  const pasillos = zona ? pasillosDe(zona).length : 0;
   switch (a.tipo) {
     case "bodega":
-      return limita(4 + Math.floor((m2 - 500) / 500), 2, 8);
+      return pasillos ? pasillos + 1 : limita(4 + Math.floor((m2 - 500) / 500), 2, 8);
     case "tienda":
-      return limita(2 + Math.floor(m2 / 150), 2, 8);
+      return pasillos ? pasillos + 1 : limita(2 + Math.floor(m2 / 150), 2, 8);
     case "oficina":
       return m2 > 80 ? 2 : 1;
     case "patio":
     case "estacionamiento":
       return m2 > 250 ? 3 : 2;
     case "pasillo":
-      return m2 > 200 ? 4 : 2;
+      return limita(2 + Math.floor(m2 / 70), 2, 8);
     default:
       return 1;
   }
@@ -192,7 +217,7 @@ function camarasPorArea(a: EspecArea, m2: number): number {
 
 /** Ajusta al total pedido: quita de lo menos importante y agrega donde hay más metros por cámara. */
 function ajustarAlTotal(cuartos: readonly Cuarto[], total: number | undefined): Map<Cuarto, number> {
-  const cuenta = new Map(cuartos.map((c) => [c, camarasPorArea(c.area, c.m2)]));
+  const cuenta = new Map(cuartos.map((c) => [c, camarasPorArea(c.area, c.m2, c.rect)]));
   if (!total || total <= 0) return cuenta;
   const pedidas = (c: Cuarto) => Boolean(c.area.camaras && c.area.camaras > 0);
   const suma = () => [...cuenta.values()].reduce((a, b) => a + b, 0);
@@ -261,7 +286,7 @@ function grabadorDe(canales: number, marca: string | undefined): ModeloEquipo {
   const hay = elegirEquipo("nvr", marca, conCanales);
   if (hay) return hay;
   const n = canalesNvr(canales);
-  return { id: `tipo-nvr-${n}`, tipo: "nvr", marca: "", modelo: `Grabador de ${n} canales`, descripcion: "Falta elegir el modelo", datos: { canales: n, unidades: 2, bahias: n > 16 ? 4 : 2 }, caracteristicas: [], fuente: "tipo", verificado: false };
+  return { id: `tipo-nvr-${n}`, tipo: "nvr", marca: "", modelo: `Grabador de ${n} canales`, descripcion: "Falta elegir el modelo", datos: { canales: n, unidades: 2, bahias: n >= 16 ? 4 : 2 }, caracteristicas: [], fuente: "tipo", verificado: false };
 }
 
 type Armado = { plano: Plano; numeroCamara: number; numeros: Map<TipoEquipo, number>; avisos: string[] };
@@ -313,15 +338,8 @@ const mueble = (a: Armado, x: number, y: number, tipo: TipoMueble, rumbo = 180) 
 
 /** Anaqueles en filas, con pasillos, como en una bodega de verdad. */
 function ponerAnaqueles(a: Armado, r: Rect, alturaM: number) {
-  const ancho = r.x1 - r.x0;
-  const fondo = r.y1 - r.y0;
-  if (ancho < 8 || fondo < 8) return;
-  const largo = ancho - 5;
-  const paso = 4.4;
-  const filas = Math.max(1, Math.floor((fondo - 4) / paso));
-  const y0 = r.y0 + (fondo - (filas - 1) * paso) / 2;
-  for (let i = 0; i < filas; i++) {
-    const y = y0 + i * paso;
+  const largo = r.x1 - r.x0 - 5;
+  for (const y of filasDeAnaqueles(r)) {
     const x = agregarObstaculo(a.plano, P(r.x0 + 2.5, y - 0.55), P(r.x0 + 2.5 + largo, y + 0.55), Math.min(alturaM - 1.2, 4));
     a.plano = x.obstaculo ? { ...x.plano, obstaculos: x.plano.obstaculos.map((o) => (o.id === x.obstaculo?.id ? { ...o, nombre: "Anaquel" } : o)) } : x.plano;
   }
@@ -337,7 +355,7 @@ function amueblar(a: Armado, c: Cuarto, alturaM: number) {
       ponerAnaqueles(a, r, alturaM);
       break;
     case "tienda":
-      ponerAnaqueles(a, { ...r, y1: r.y1 - 4 }, 3);
+      ponerAnaqueles(a, zonaDeAnaqueles(c) as Rect, 3);
       mueble(a, r.x0 + 3, r.y1 - 2, "mostrador");
       break;
     case "oficina":
@@ -377,8 +395,23 @@ function camarasDelCuarto(a: Armado, c: Cuarto, n: number, marca: string | undef
   const tipo: TipoCamara = c.area.tipo === "bodega" || c.area.tipo === "tienda" ? "turret" : "domo";
   const altura = c.area.tipo === "bodega" ? Math.min(alturaM - 0.5, 6) : Math.min(alturaM - 0.2, 3);
   const diagonal = Math.hypot(r.x1 - r.x0, r.y1 - r.y0);
-  lugaresDe(r, n)
+  const zona = zonaDeAnaqueles(c);
+  const pasillos = zona ? pasillosDe(zona) : [];
+  let puestas = 0;
+  // Una por pasillo, de un extremo y luego del otro, viendo a lo largo. Si piden menos, los de en medio primero.
+  pasillos
+    .map((y, i) => ({ y, i }))
+    .sort((u, v) => Math.abs(u.i - (pasillos.length - 1) / 2) - Math.abs(v.i - (pasillos.length - 1) / 2))
     .slice(0, n)
+    .sort((u, v) => u.i - v.i)
+    .forEach(({ y, i }) => {
+      const desdeDerecha = i % 2 === 0;
+      const x = desdeDerecha ? r.x1 - 0.3 : r.x0 + 0.3;
+      puestas += 1;
+      ponerCamara(a, x, y, tipo, marca, `${c.area.nombre}, pasillo ${i + 1}`, { x: desdeDerecha ? r.x0 : r.x1, y }, altura, r.x1 - r.x0);
+    });
+  lugaresDe(r, n)
+    .slice(0, n - puestas)
     .forEach((lugar, i) => {
       const nombre = n > 1 ? `${c.area.nombre} ${i + 1}` : c.area.nombre;
       ponerCamara(a, lugar.x, lugar.y, tipo, marca, nombre, centro, altura, n === 1 ? diagonal * 0.9 : diagonal * 0.62);
@@ -554,16 +587,11 @@ export function generarSitio(espec: EspecSitio): DisenoGenerado {
   }
   if (accesos > terminales) avisos.push(`Quedaron ${accesos - terminales} puertas de acceso por poner: el sitio no tiene tantas.`);
 
-  // Alarmas: en muros, repartidas.
-  const principal = infra?.principal;
-  for (let i = 0; i < Math.round(espec.sismica ?? 0); i++) {
-    const c = i === 0 && principal ? principal : baseCuartos[(i - 1 + baseCuartos.length) % baseCuartos.length];
-    const m = centroDe(c.rect);
-    ponerEquipo(armado, m.x, c.rect.y0 + 0.3, elegirEquipo("sismica", undefined));
-  }
-  for (let i = 0; i < Math.round(espec.sirena ?? 0); i++) {
-    ponerEquipo(armado, W * (0.2 + i * 0.3), D + 0.35, elegirEquipo("sirena", undefined));
-  }
+  // Alarmas: repartidas a lo largo del edificio, para que se escuchen en todo. Las sísmicas adentro; las sirenas, en la fachada.
+  const sismicas = Math.round(espec.sismica ?? 0);
+  for (let i = 0; i < sismicas; i++) ponerEquipo(armado, (W * (i + 0.5)) / sismicas, 0.3, elegirEquipo("sismica", undefined));
+  const sirenas = Math.round(espec.sirena ?? 0);
+  for (let i = 0; i < sirenas; i++) ponerEquipo(armado, (W * (i + 0.5)) / sirenas, D + 0.35, elegirEquipo("sirena", undefined));
 
   // Gabinete en el cuarto de TI, con lo que hace falta para las cámaras colocadas.
   const camarasTotales = armado.numeroCamara;

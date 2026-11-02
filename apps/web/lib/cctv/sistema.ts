@@ -291,7 +291,11 @@ export function balanceDelSistema(raiz: Plano, resumen: ResumenDiseno | null, co
   const conPoe = equipos.filter((e) => (e.datos.poeW ?? 0) > 0);
   const switches = equipos.filter((e) => e.tipo === "switch");
   const grabadores = equipos.filter((e) => e.tipo === "nvr");
-  const suma = (l: readonly EquipoPlano[], f: (e: EquipoPlano) => number | null | undefined) => (l.length ? l.reduce((s, e) => s + (f(e) ?? 0), 0) : null);
+  // Sin el dato en ningún equipo no es cero: no se sabe.
+  const suma = (l: readonly EquipoPlano[], f: (e: EquipoPlano) => number | null | undefined) => {
+    const valores = l.map(f).filter((v): v is number => v != null);
+    return valores.length ? valores.reduce((a, b) => a + b, 0) : null;
+  };
   const cableM = conexiones.reduce((s, c) => s + c.largoM, 0);
   return {
     camaras: camaras.length,
