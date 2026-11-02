@@ -73,6 +73,17 @@ object CoreActivityRules {
             listOf(STEP_ENTRY, STEP_PHOTOS, STEP_DATA, STEP_EXIT)
         }
 
+    /** El paso que sigue. Sin señal la pantalla avanza y lo encolado llega después, en orden. */
+    fun pasoSiguiente(step: String?, coreKind: String?): String {
+        val pasos = evidenceStepsForKind(coreKind)
+        val i = pasos.indexOf(step)
+        return if (i in 0 until pasos.lastIndex) pasos[i + 1] else STEP_COMPLETED
+    }
+
+    /** ¿Se ofrece «Regresar a fotos»? La entrada no se repite y lo devuelto se corrige en su paso. */
+    fun puedeRegresarAFotos(step: String?, correccion: Boolean): Boolean =
+        !correccion && (step == STEP_PDF || step == STEP_DATA || step == STEP_EXIT)
+
     private val STEP_LABEL = mapOf(
         STEP_ENTRY to "Foto de entrada",
         STEP_PHOTOS to "Fotos en sitio",

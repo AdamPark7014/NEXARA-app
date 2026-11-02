@@ -509,7 +509,7 @@ private fun MiComidaCard(
             val minutos = ComidasRules.minutosDesde(r.checkinTime, serverNowMs)
             CardConBorde(if (destiempo) CoreActivityRules.NARANJA else CoreActivityRules.AZUL) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    FotoComida(r.checkinPhotoUrl, "Tu foto de salida", onVerFoto)
+                    FotoComida(r.checkinPhotoUrl, "Tu foto de salida a comer", onVerFoto)
                     Column(Modifier.weight(1f)) {
                         NxIconText(
                             text = "Estás en tu hora de comida",
@@ -555,7 +555,7 @@ private fun MiComidaCard(
             }
             CardConBorde(borde) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FotoComida(r.checkinPhotoUrl, "Tu foto de salida", onVerFoto)
+                    FotoComida(r.checkinPhotoUrl, "Tu foto de salida a comer", onVerFoto)
                     FotoComida(r.checkoutPhotoUrl, "Tu foto de regreso", onVerFoto)
                     Column(Modifier.weight(1f)) {
                         NxIconText(

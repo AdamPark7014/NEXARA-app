@@ -39,6 +39,8 @@ object InicioRules {
         val label: String,
         /** Pestaña del detalle que abre (`evidencias`) o null para Detalle. */
         val tab: String?,
+        /** Abre directo la cámara del paso: un toque menos (`EvidenciaApertura`). */
+        val abreCamara: Boolean = false,
         /** Antes de abrir, guarda la hora real de inicio (`me/activities/:id/iniciar`). */
         val marcaInicio: Boolean = false,
     )
@@ -103,8 +105,16 @@ object InicioRules {
             ActividadesUx.PrimaryKind.REPARTIR -> Accion(AccionKind.REPARTIR, "Repartir", null)
             ActividadesUx.PrimaryKind.ABRIR -> Accion(AccionKind.ABRIR, "Abrir", null)
             ActividadesUx.PrimaryKind.INICIAR ->
-                Accion(AccionKind.INICIAR, ActivitySemaforo.ACCION_INICIAR, p.tab, marcaInicio = p.marcaInicio)
-            ActividadesUx.PrimaryKind.CONTINUAR -> Accion(AccionKind.CONTINUAR, "Continuar evidencia", p.tab)
+                Accion(AccionKind.INICIAR, ActivitySemaforo.ACCION_INICIAR, p.tab, abreCamara = true, marcaInicio = p.marcaInicio)
+            ActividadesUx.PrimaryKind.CONTINUAR -> when (a.evidenceStatus) {
+                // Lo mismo se llama igual en todas partes: la salida de la actividad no es la de la jornada.
+                CoreActivityRules.STEP_DATA, CoreActivityRules.STEP_EXIT ->
+                    Accion(AccionKind.CONTINUAR, "Terminar actividad", p.tab, abreCamara = true)
+                CoreActivityRules.STEP_PHOTOS -> Accion(AccionKind.CONTINUAR, "Tomar fotos", p.tab, abreCamara = true)
+                CoreActivityRules.STEP_ENTRY, null ->
+                    Accion(AccionKind.CONTINUAR, "Tomar foto de inicio", p.tab, abreCamara = true)
+                else -> Accion(AccionKind.CONTINUAR, "Continuar evidencia", p.tab)
+            }
             ActividadesUx.PrimaryKind.CORREGIR -> Accion(AccionKind.CORREGIR, "Corregir evidencias", p.tab)
             ActividadesUx.PrimaryKind.VER -> Accion(AccionKind.VER, "Ver evidencias", p.tab)
         }
@@ -267,11 +277,15 @@ object InicioRules {
     /** El botón principal de la banda, corto para que quepa a la mitad del ancho. */
     fun etiquetaCorta(accion: Accion): String = when (accion.kind) {
         AccionKind.INICIAR -> "Iniciar"
-        AccionKind.CONTINUAR -> "Entregar"
+        AccionKind.CONTINUAR -> accion.label
         AccionKind.CORREGIR -> "Corregir"
         AccionKind.VER -> "Evidencias"
         else -> accion.label
     }
+
+    /** Lo que aclara el mockup bajo el botón: terminar la actividad no toca la jornada. */
+    fun notaAccion(accion: Accion): String? =
+        if (accion.label == "Terminar actividad") "Te pide la foto final. No toca tu jornada." else null
 
     /** Pastilla de la banda: el semáforo («En tiempo», «Por vencer», «Atrasada») o nada. */
     fun pastillaBanda(a: MyActivityItemDto): String? = ActivitySemaforo.luz(a.semaforo)?.etiqueta

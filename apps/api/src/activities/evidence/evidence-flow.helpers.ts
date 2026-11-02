@@ -45,6 +45,17 @@ export function evidenceStepsForKind(coreKind?: string | null): EvidenceStep[] {
   return ['ENTRY_PHOTO', 'EVIDENCE_PHOTOS', 'SERVICE_SHEET_DATA', 'EXIT_PHOTO', 'COMPLETED'];
 }
 
+/**
+ * ¿Se puede regresar a ese paso? Solo a uno anterior ya pasado la entrada: la foto de entrada es la
+ * prueba de cuándo y dónde empezó, y lo terminado va por revisión.
+ */
+export function puedeRegresarA(coreKind: string | null | undefined, actual: string, destino: string): boolean {
+  const pasos = evidenceStepsForKind(coreKind) as string[];
+  const i = pasos.indexOf(actual);
+  const j = pasos.indexOf(destino);
+  return j > 0 && j < i && actual !== 'COMPLETED';
+}
+
 export function nextEvidenceStep(
   current: EvidenceStep,
   coreKind?: string | null,

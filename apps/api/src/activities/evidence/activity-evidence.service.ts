@@ -31,6 +31,7 @@ import {
   clampEvidencePhotoRequired,
   requiresServiceSheetPdf,
   nextEvidenceStep,
+  puedeRegresarA,
   isPdfUrl,
   evidenceProgressPct,
   evidenceStepsForKind,
@@ -986,6 +987,19 @@ export class ActivityEvidenceService {
     });
     this.avisarAvance({ activityId, actorId: userId, paso: 'formulario' });
     return updated;
+  }
+
+  /** Regresar a un paso ya pasado (se le olvidó una foto, o la quiere repetir). Nada se borra. */
+  async regresarDePaso(activityId: number, userId: number, destino: string, companyId?: number | null) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
+    const activity = await this.loadActivityForTenant(activityId, companyId);
+    if (evidence.reviewStatus === 'REJECTED') {
+      throw new BadRequestException('Estás corrigiendo lo que te devolvieron: corrige ese paso');
+    }
+    if (!puedeRegresarA(activity.coreKind, evidence.status, destino)) {
+      throw new BadRequestException('No se puede regresar a ese paso');
+    }
+    return this.prisma.activityEvidence.update({ where: { id: evidence.id }, data: { status: destino } as any });
   }
 
   /**

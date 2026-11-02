@@ -170,7 +170,7 @@ describe('su jefe', () => {
     await service.deshacerSalidaDe(JEFE, 44, { motivo: 'Marcó por error y siguió trabajando' }, EMPRESA);
     expect(tx.activityWorkSession.update).not.toHaveBeenCalled();
     expect(tx.salidaDeshecha.create.mock.calls[0][0].data).toMatchObject({ porId: 8, motivo: 'Marcó por error y siguió trabajando' });
-    expect(notifyAttendanceFlagged.mock.calls[0][0]).toMatchObject({ titulo: 'Deshicieron tu salida', avisarPersona: true });
+    expect(notifyAttendanceFlagged.mock.calls[0][0]).toMatchObject({ titulo: 'Salida deshecha', avisarPersona: true });
   });
 
   it('sin motivo no', async () => {

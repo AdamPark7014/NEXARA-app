@@ -414,6 +414,22 @@ class CoreActivitiesRepository(context: Context) {
     suspend fun serviceSheetPdf(activityId: Long, pdfDataUrl: String): EvidenceFlowDto =
         api.serviceSheetPdf(activityId, ActivityEvidencePdfStepRequest(pdfDataUrl))
 
+    suspend fun formatosActividad() = api.formatosActividad()
+
+    suspend fun aplicarFormato(id: Long, datos: mx.nexara.mobile.nativeapp.data.api.AplicarFormatoRequest) =
+        api.aplicarFormato(id, datos)
+
+    /** Medir nunca estorba: si falla, no pasa nada. */
+    suspend fun registrarTiempo(datos: mx.nexara.mobile.nativeapp.data.api.ProcesoTiempoRequest) {
+        runCatching { api.registrarTiempo(datos) }
+    }
+
+    suspend fun salesClientsTodos() = api.salesClientsTodos()
+
+    suspend fun provisionServiceClient(id: Long): Long? = api.provisionServiceClient(id).serviceClient?.id
+
+    suspend fun volverPaso(activityId: Long, paso: String) = api.volverPaso(activityId, mapOf("paso" to paso))
+
     suspend fun serviceSheetData(activityId: Long, form: Map<String, String>): EvidenceFlowDto =
         api.serviceSheetData(activityId, form)
 
