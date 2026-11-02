@@ -753,7 +753,9 @@ extension DemoStore {
     private func routeVehicles(method: String, parts: [String], json: DemoJSON, body: Data?, now: Date) -> DemoReply {
         let sub = parts.count > 1 ? parts[1] : ""
         if method == "GET", sub == "mis-vehiculos" { return reply(fxVehicles()) }
+        if method == "GET", sub == "flotilla" { return reply(fxFlotilla()) }
         if sub == "ficha" {
+            if method == "GET", parts.count > 2, parts[2] == "flotilla" { return reply(fxFlotillaMes()) }
             if method == "GET" { return reply(fxFichaVehiculo()) }
             if parts.count > 2, parts[2] == "leer-foto" {
                 return reply(multipartFields(body)["tipo"] == "TICKET" ? fxTicketLeido() : fxTableroLeido())

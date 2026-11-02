@@ -46,6 +46,7 @@ import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.profile.ProfileIdentityRepository
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityKinds
 import mx.nexara.mobile.nativeapp.ui.console.activities.DatePickerField
+import mx.nexara.mobile.nativeapp.ui.console.vehiculos.PermisoLecturaIa
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.security.AppLock
@@ -244,6 +245,7 @@ fun MyProfileScreen(
     onLogout: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    var lecturaIaPermitida by remember(context) { mutableStateOf(PermisoLecturaIa.estaConcedido(context)) }
     val authRepo = remember(context) { AuthRepository(context) }
     val user = authRepo.loadSession()
     val vm: MyProfileViewModel = viewModel(
@@ -506,6 +508,21 @@ fun MyProfileScreen(
                     sub = Sub,
                     brand = Brand,
                 )
+            }
+        }
+
+        if (lecturaIaPermitida) {
+            item {
+                OutlinedButton(
+                    onClick = {
+                        PermisoLecturaIa.quitar(context)
+                        lecturaIaPermitida = false
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text("Dejar de leer mis fotos con IA", fontWeight = FontWeight.SemiBold)
+                }
             }
         }
 

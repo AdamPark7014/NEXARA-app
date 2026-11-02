@@ -46,6 +46,8 @@ struct ChecklistVehiculoView: View {
     @State private var paso: Paso = .fotos
     @State private var fotos: [SlotChecklist: CapturedGeoPhoto] = [:]
     @State private var camara: SlotChecklist?
+    @State private var preguntandoIA = false
+    @State private var aMano = false
     @State private var odometro = ""
     @State private var combustible: NivelCombustible?
     @State private var odometroEscrito = false
@@ -175,11 +177,26 @@ struct ChecklistVehiculoView: View {
                     fotos[slot] = captured
                     camara = nil
                     aviso = nil
-                    if slot == ChecklistVehiculoRules.tablero { leerFotoDelTablero(captured) }
+                    if slot == ChecklistVehiculoRules.tablero, PermisoLecturaIa.concedido, !aMano {
+                        leerFotoDelTablero(captured)
+                    }
                     return nil
                 },
                 onCancel: { camara = nil }
             )
+        }
+        .alert(PermisoLecturaIa.titulo, isPresented: $preguntandoIA) {
+            Button(PermisoLecturaIa.permitir) {
+                PermisoLecturaIa.conceder()
+                abrirCamaraDelTablero()
+            }
+            Button(PermisoLecturaIa.aMano) {
+                aMano = true
+                abrirCamaraDelTablero()
+            }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text(PermisoLecturaIa.mensaje)
         }
         .alert("Fotos del momento", isPresented: $infoFotos) {
             Button("Entendido", role: .cancel) {}
@@ -209,7 +226,7 @@ struct ChecklistVehiculoView: View {
             aviso: aviso,
             error: error,
             enviando: enviando,
-            onFoto: { camara = ChecklistVehiculoRules.tablero },
+            onFoto: { tomar(ChecklistVehiculoRules.tablero) },
             onConfirmar: confirmarRegreso
         )
     }
@@ -325,7 +342,7 @@ struct ChecklistVehiculoView: View {
 
     private func casilla(_ slot: SlotChecklist, alto: CGFloat) -> some View {
         Button {
-            camara = slot
+            tomar(slot)
         } label: {
             ZStack(alignment: .bottomLeading) {
                 if let foto = fotos[slot] {
@@ -434,6 +451,20 @@ struct ChecklistVehiculoView: View {
             if let leido, !nivelEscrito || combustible == nil { combustible = leido }
             lectura = (r?.odometroKm != nil || leido != nil) ? .leida : .noSePudo
         }
+    }
+
+    /// Solo el tablero se lee, y sin permiso no se manda a nadie: se pregunta antes de tomarla.
+    private func tomar(_ slot: SlotChecklist) {
+        if slot == ChecklistVehiculoRules.tablero, !PermisoLecturaIa.concedido, !aMano {
+            preguntandoIA = true
+        } else {
+            camara = slot
+        }
+    }
+
+    /// Tras cerrar el aviso: una pantalla completa no se presenta mientras el aviso sigue saliendo.
+    private func abrirCamaraDelTablero() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { camara = ChecklistVehiculoRules.tablero }
     }
 
     private func confirmarRegreso() {

@@ -13,6 +13,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import java.io.File
+import mx.nexara.mobile.nativeapp.data.api.AvisoFlotillaDto
+import mx.nexara.mobile.nativeapp.data.api.CargaDireccionDto
+import mx.nexara.mobile.nativeapp.data.api.ConductorRefDto
+import mx.nexara.mobile.nativeapp.data.api.CostosFichaDto
+import mx.nexara.mobile.nativeapp.data.api.DesgloseCostoDto
+import mx.nexara.mobile.nativeapp.data.api.DestinoViajeDto
+import mx.nexara.mobile.nativeapp.data.api.FichaDireccionDto
+import mx.nexara.mobile.nativeapp.data.api.FlotillaMesDto
+import mx.nexara.mobile.nativeapp.data.api.MantenimientoFichaDto
+import mx.nexara.mobile.nativeapp.data.api.OdometroFichaDto
+import mx.nexara.mobile.nativeapp.data.api.ProximoServicioDto
+import mx.nexara.mobile.nativeapp.data.api.RendimientoFichaDto
+import mx.nexara.mobile.nativeapp.data.api.RenglonRepartoDto
+import mx.nexara.mobile.nativeapp.data.api.RepartoMesDto
+import mx.nexara.mobile.nativeapp.data.api.ResumenMesDto
+import mx.nexara.mobile.nativeapp.data.api.ServicioFichaDto
+import mx.nexara.mobile.nativeapp.data.api.VehiculoDelMesDto
+import mx.nexara.mobile.nativeapp.data.api.VehiculoFlotaDto
+import mx.nexara.mobile.nativeapp.data.api.ViajeFichaDto
 import mx.nexara.mobile.nativeapp.ui.console.vehiculos.GasolinaRules.FormCarga
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTheme
 import mx.nexara.mobile.nativeapp.ui.theme.NexaraTheme
@@ -105,6 +124,71 @@ class CapturasVehiculosTest {
             encabezado = GasolinaRules.encabezadoRegreso("Nissan Frontier", "TXA-12-34", null, null),
         )
     }
+
+    /** La vista del CEO: quién trae qué, lo que costó el mes y a dónde se fue. */
+    @Test
+    fun flotillaDireccion() = pinta("flotilla-direccion.png") {
+        FlotillaDireccionContenido(
+            mes = "2026-11",
+            puedeAvanzar = false,
+            vehiculos = muestraFlotilla,
+            datos = muestraMes,
+            cargando = false,
+            error = null,
+            encabezado = null,
+            onMes = {},
+            onAbrir = {},
+            onReintentar = {},
+        )
+    }
+
+    @Test
+    fun fichaDireccion() = pinta("flotilla-ficha.png") {
+        FichaDireccionContenido(
+            vehiculo = muestraFlotilla.first(),
+            ficha = muestraFicha,
+            cargando = false,
+            error = null,
+            onVolver = {},
+            onReintentar = {},
+        )
+    }
+
+    private val muestraFlotilla = listOf(
+        VehiculoFlotaDto(id = 11, nombre = "Nissan Frontier", placas = "TXA-12-34", conductor = ConductorRefDto(nombre = "Juan Pérez")),
+        VehiculoFlotaDto(id = 12, nombre = "Nissan NP300", placas = "TXB-56-78", disponible = true),
+        VehiculoFlotaDto(id = 13, nombre = "Chevrolet Aveo", placas = "TXC-90-12", conductor = ConductorRefDto(nombre = "Ana López")),
+    )
+
+    private val muestraMes = FlotillaMesDto(
+        mes = "2026-11",
+        vehiculos = listOf(
+            VehiculoDelMesDto(id = 11, kmDelMes = 450.0, porKm = 6.64, proximoServicio = ProximoServicioDto(faltanKm = 7540.0, estado = "OK")),
+            VehiculoDelMesDto(id = 12, kmDelMes = 0.0, proximoServicio = ProximoServicioDto(faltanKm = -320.0, estado = "VENCIDO")),
+            VehiculoDelMesDto(id = 13, kmDelMes = 210.0, porKm = 4.1, proximoServicio = ProximoServicioDto(faltanKm = 400.0, estado = "PRONTO")),
+        ),
+        reparto = RepartoMesDto(
+            proyectos = RenglonRepartoDto(km = 450.0, importe = 2988.0),
+            oficina = RenglonRepartoDto(km = 210.0, importe = 861.0),
+            parado = 1240.0,
+        ),
+        resumen = ResumenMesDto(km = 660.0, costoMes = 5089.0, porKm = 5.83, aIndirectos = 2101.0),
+        avisos = listOf(AvisoFlotillaDto(tono = "warning", titulo = "Nissan NP300: 1 salida sin foto del tablero", texto = "Sin esa foto no hay kilómetros.", vehicleId = 12)),
+    )
+
+    private val muestraFicha = FichaDireccionDto(
+        odometro = OdometroFichaDto(km = 12480),
+        rendimiento = RendimientoFichaDto(usado = 8.6),
+        proximoServicio = ProximoServicioDto(faltanKm = 7540.0, estado = "OK"),
+        costos = CostosFichaDto(
+            porKm = 6.64,
+            desglose = listOf(DesgloseCostoDto(nombre = "Gasolina", importe = 2.85), DesgloseCostoDto(nombre = "Depreciación", importe = 2.2), DesgloseCostoDto(nombre = "Mantenimiento", importe = 1.59)),
+            mantenimiento = MantenimientoFichaDto(apartado = 4200.0, gastado = 1800.0),
+        ),
+        cargas = listOf(CargaDireccionDto(fecha = "2026-11-01", odometro = 12480, litros = 52.3, importe = 1281.35, tanqueLleno = true)),
+        viajes = listOf(ViajeFichaDto(fecha = "2026-11-01", destino = DestinoViajeDto(nombre = "CCTV Bodega Norte"), km = 156.0, importe = 1035.84)),
+        servicios = listOf(ServicioFichaDto(fecha = "2026-10-12", concepto = "Cambio de aceite", proveedor = "Taller Norte", costo = 1800.0)),
+    )
 
     @Composable
     private fun Gasolina(

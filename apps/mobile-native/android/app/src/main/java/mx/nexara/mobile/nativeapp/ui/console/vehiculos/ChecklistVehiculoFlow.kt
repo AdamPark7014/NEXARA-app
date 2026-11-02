@@ -114,6 +114,7 @@ fun ChecklistVehiculoFlow(
     var nivelEscrito by remember { mutableStateOf(false) }
     var lectura by remember { mutableStateOf(LecturaTablero.SIN_FOTO) }
     val scope = rememberCoroutineScope()
+    val permiso = rememberPermisoLecturaIa()
     var abierta by remember { mutableStateOf<Slot?>(null) }
     var aviso by remember { mutableStateOf<String?>(null) }
     var confirmaSalir by remember { mutableStateOf(false) }
@@ -133,6 +134,7 @@ fun ChecklistVehiculoFlow(
     /** Lo leído llena lo que la persona no ha escrito; si no se pudo, se escribe a mano. */
     fun leerFotoDelTablero(foto: GeoPhoto) {
         val leer = leerTablero ?: return
+        if (!permiso.puedeLeer) return
         lectura = LecturaTablero.LEYENDO
         scope.launch {
             val r = leer(foto)
@@ -179,6 +181,17 @@ fun ChecklistVehiculoFlow(
         }
     }
 
+    /** Solo el tablero se lee: las otras fotos no van a ningún servicio. */
+    fun tomarFoto(slot: Slot) {
+        if (slot.id == ChecklistVehiculoRules.TABLERO && leerTablero != null) {
+            permiso.antesDeLaFoto { abierta = slot }
+        } else {
+            abierta = slot
+        }
+    }
+
+    AvisoLecturaIa(permiso)
+
     if (paso == Paso.REGRESO) {
         val tablero = fotos[ChecklistVehiculoRules.TABLERO]
         RegresoVehiculoContenido(
@@ -192,7 +205,7 @@ fun ChecklistVehiculoFlow(
             aviso = aviso,
             error = error,
             enviando = enviando,
-            onFoto = { abierta = ChecklistVehiculoRules.slots(Grupo.TABLERO).first() },
+            onFoto = { tomarFoto(ChecklistVehiculoRules.slots(Grupo.TABLERO).first()) },
             onKm = {
                 km = it
                 kmEscrito = true
@@ -223,14 +236,14 @@ fun ChecklistVehiculoFlow(
                     RejillaFotos(
                         slots = ChecklistVehiculoRules.SLOTS_FOTOS,
                         fotos = fotos,
-                        onTomar = { abierta = it },
+                        onTomar = ::tomarFoto,
                     )
                 }
                 Paso.TABLERO -> item {
                     RejillaFotos(
                         slots = ChecklistVehiculoRules.slots(Grupo.TABLERO),
                         fotos = fotos,
-                        onTomar = { abierta = it },
+                        onTomar = ::tomarFoto,
                     )
                 }
                 Paso.REGRESO -> Unit

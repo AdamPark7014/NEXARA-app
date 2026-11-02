@@ -747,8 +747,60 @@ extension DemoStore {
     func fxFichaVehiculo() -> DemoJSON {
         dj([
             "odometro": dj(["km": 48210, "fecha": iso(-180)]),
+            "rendimiento": dj(["usado": 8.6]),
             "cargas": [
-                dj(["id": 1, "fecha": iso(-5 * 1440), "odometro": 47916, "litros": 50, "tanqueLleno": true]),
+                dj(["id": 1, "fecha": iso(-5 * 1440), "odometro": 47916, "litros": 50, "importe": 1225.5, "tanqueLleno": true]),
+            ],
+            "viajes": [
+                dj(["id": 1, "fecha": iso(-2 * 1440), "destino": dj(["tipo": "PROYECTO", "nombre": "CCTV Bodega Norte"]), "km": 156, "importe": 1035.84, "sinFoto": false]),
+                dj(["id": 2, "fecha": iso(-4 * 1440), "destino": dj(["tipo": "OFICINA", "nombre": "Oficina"]), "km": 38, "importe": 252.32, "sinFoto": true]),
+            ],
+            "servicios": [
+                dj(["id": 1, "fecha": iso(-20 * 1440), "concepto": "Cambio de aceite", "costo": 1800, "proveedor": "Taller Norte"]),
+            ],
+            "proximoServicio": dj(["faltanKm": 7540, "estado": "OK"]),
+            "costos": dj([
+                "porKm": 6.64,
+                "desglose": [
+                    dj(["clave": "gasolina", "nombre": "Gasolina", "importe": 2.85]),
+                    dj(["clave": "depreciacion", "nombre": "Depreciación", "importe": 2.2]),
+                    dj(["clave": "mantenimiento", "nombre": "Mantenimiento", "importe": 1.59]),
+                ],
+                "mantenimiento": dj(["apartado": 4200, "gastado": 1800]),
+            ]),
+            "acceso": dj(["veCostos": true]),
+        ])
+    }
+
+    /// Vista de dirección: toda la flota, con quién trae cada uno.
+    func fxFlotilla() -> DemoJSON {
+        dj(["vehiculos": [
+            dj(["id": 11, "nombre": "Ford Ranger", "placas": "DEM-123-A", "estatus": "En uso", "activo": true, "disponible": false,
+                "conductor": dj(["id": 101, "nombre": DemoData.person(101).nombre]), "odometroUltimo": 48210, "combustibleUltimoPct": 75]),
+            dj(["id": 12, "nombre": "Nissan NP300", "placas": "DEM-456-B", "estatus": "Disponible", "activo": true, "disponible": true,
+                "odometroUltimo": 63120, "combustibleUltimoPct": 50]),
+            dj(["id": 14, "nombre": "Toyota Hilux", "placas": "DEM-321-D", "estatus": "En uso", "activo": true, "disponible": false,
+                "conductor": dj(["id": 102, "nombre": DemoData.person(102).nombre]), "odometroUltimo": 88240, "combustibleUltimoPct": 25]),
+        ]])
+    }
+
+    func fxFlotillaMes() -> DemoJSON {
+        dj([
+            "vehiculos": [
+                dj(["id": 11, "kmDelMes": 450, "porKm": 6.64, "proximoServicio": dj(["faltanKm": 7540, "estado": "OK"])]),
+                dj(["id": 12, "kmDelMes": 0, "proximoServicio": dj(["faltanKm": -320, "estado": "VENCIDO"])]),
+                dj(["id": 14, "kmDelMes": 210, "porKm": 4.1, "proximoServicio": dj(["faltanKm": 400, "estado": "PRONTO"])]),
+            ],
+            "reparto": dj([
+                "proyectos": dj(["km": 450, "importe": 2988]),
+                "cotizaciones": dj(["km": 0, "importe": 0]),
+                "oficina": dj(["km": 210, "importe": 861]),
+                "sinLigar": dj(["km": 0, "importe": 0]),
+                "parado": 1240,
+            ]),
+            "resumen": dj(["km": 660, "costoMes": 5089, "porKm": 5.83, "aIndirectos": 2101]),
+            "avisos": [
+                dj(["tono": "warning", "titulo": "Toyota Hilux: 1 salida sin foto del tablero", "texto": "Sin esa foto no hay kilómetros."]),
             ],
             "acceso": dj(["veCostos": true]),
         ])

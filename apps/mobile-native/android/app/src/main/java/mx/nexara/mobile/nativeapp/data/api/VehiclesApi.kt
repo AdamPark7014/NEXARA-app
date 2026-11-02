@@ -9,6 +9,7 @@ import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * Vehículos de Core (`/erp/vehiculos`) — espejo de `apps/api/src/vehicles`.
@@ -139,6 +140,113 @@ data class FichaVehiculoDto(
     val acceso: AccesoFichaDto? = null,
 )
 
+/** `GET vehicles/flotilla`: toda la flota, con quién trae cada vehículo. */
+data class FlotillaListaDto(val vehiculos: List<VehiculoFlotaDto>? = null)
+
+data class RenglonRepartoDto(val km: Double? = null, val importe: Double? = null)
+
+data class RepartoMesDto(
+    val proyectos: RenglonRepartoDto? = null,
+    val cotizaciones: RenglonRepartoDto? = null,
+    val oficina: RenglonRepartoDto? = null,
+    val sinLigar: RenglonRepartoDto? = null,
+    val parado: Double? = null,
+)
+
+data class ResumenMesDto(
+    val km: Double? = null,
+    val costoMes: Double? = null,
+    val porKm: Double? = null,
+    val aIndirectos: Double? = null,
+)
+
+data class ProximoServicioDto(
+    val km: Double? = null,
+    val faltanKm: Double? = null,
+    val fecha: String? = null,
+    val estado: String? = null,
+)
+
+data class VehiculoDelMesDto(
+    val id: Long? = null,
+    val kmDelMes: Double? = null,
+    val porKm: Double? = null,
+    val rendimientoReal: Double? = null,
+    val rendimientoOficial: Double? = null,
+    val proximoServicio: ProximoServicioDto? = null,
+)
+
+data class AvisoFlotillaDto(
+    val tono: String? = null,
+    val titulo: String? = null,
+    val texto: String? = null,
+    val vehicleId: Long? = null,
+)
+
+/** `GET vehicles/ficha/flotilla`. Los importes llegan en null a quien no ve costos. */
+data class FlotillaMesDto(
+    val mes: String? = null,
+    val vehiculos: List<VehiculoDelMesDto>? = null,
+    val reparto: RepartoMesDto? = null,
+    val resumen: ResumenMesDto? = null,
+    val avisos: List<AvisoFlotillaDto>? = null,
+    val acceso: AccesoFichaDto? = null,
+)
+
+data class RendimientoFichaDto(val usado: Double? = null, val real: Double? = null, val oficial: Double? = null)
+
+data class CargaDireccionDto(
+    val id: Long? = null,
+    val fecha: String? = null,
+    val odometro: Int? = null,
+    val litros: Double? = null,
+    val importe: Double? = null,
+    val tanqueLleno: Boolean? = null,
+)
+
+data class ActividadRefDto(val id: Long? = null, val folio: String? = null, val titulo: String? = null)
+
+data class DestinoViajeDto(val tipo: String? = null, val nombre: String? = null)
+
+data class ViajeFichaDto(
+    val id: Long? = null,
+    val fecha: String? = null,
+    val actividad: ActividadRefDto? = null,
+    val destino: DestinoViajeDto? = null,
+    val km: Double? = null,
+    val importe: Double? = null,
+    val sinFoto: Boolean? = null,
+)
+
+data class ServicioFichaDto(
+    val id: Long? = null,
+    val fecha: String? = null,
+    val concepto: String? = null,
+    val costo: Double? = null,
+    val proveedor: String? = null,
+)
+
+data class DesgloseCostoDto(val clave: String? = null, val nombre: String? = null, val importe: Double? = null)
+
+data class MantenimientoFichaDto(val apartado: Double? = null, val gastado: Double? = null)
+
+data class CostosFichaDto(
+    val porKm: Double? = null,
+    val desglose: List<DesgloseCostoDto>? = null,
+    val mantenimiento: MantenimientoFichaDto? = null,
+)
+
+/** `GET vehicles/ficha/{id}` para la vista de dirección: lo mismo que la web, con importes. */
+data class FichaDireccionDto(
+    val odometro: OdometroFichaDto? = null,
+    val rendimiento: RendimientoFichaDto? = null,
+    val cargas: List<CargaDireccionDto>? = null,
+    val viajes: List<ViajeFichaDto>? = null,
+    val servicios: List<ServicioFichaDto>? = null,
+    val proximoServicio: ProximoServicioDto? = null,
+    val costos: CostosFichaDto? = null,
+)
+
 /**
  * Ficha del vehículo, lectura de fotos y cargas de gasolina (`apps/api/src/costos/vehiculos`).
  * La IA solo la llama el servidor: aquí viaja la foto y regresa lo que entendió.
@@ -146,6 +254,12 @@ data class FichaVehiculoDto(
 interface VehiculoFichaApi {
     @GET("vehicles/ficha/{id}")
     suspend fun ficha(@Path("id") id: Long): FichaVehiculoDto
+
+    @GET("vehicles/ficha/{id}")
+    suspend fun fichaDireccion(@Path("id") id: Long): FichaDireccionDto
+
+    @GET("vehicles/ficha/flotilla")
+    suspend fun flotillaMes(@Query("mes") mes: String?): FlotillaMesDto
 
     @Multipart
     @POST("vehicles/ficha/leer-foto")
@@ -178,6 +292,9 @@ interface VehiculoFichaApi {
 interface VehiclesApi {
     @GET("vehicles/mis-vehiculos")
     suspend fun misVehiculos(): MisVehiculosDto
+
+    @GET("vehicles/flotilla")
+    suspend fun flotilla(): FlotillaListaDto
 
     @POST("vehicles")
     suspend fun solicitar(@Body body: SolicitarVehiculoBody): ResponseBody
