@@ -236,4 +236,71 @@ describe("TablaPartidas · partidas frecuentes («Usadas antes»)", () => {
     expect(buscarPartidasFrecuentes).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Usadas antes")).toBeNull();
   });
+
+  describe("costo de hoy en CT", () => {
+    const HOY = { costo: 1200, diferencia: 0.2, piezas: 4, clave: "SWTCIS1", alDia: true, fecha: "2026-11-02T17:00:00.000Z" };
+    const CON_AVISO: PartidaFrecuente = { ...SWITCH, costoDeHoy: HOY };
+
+    beforeEach(() => {
+      vi.mocked(buscarPartidasFrecuentes).mockReset().mockResolvedValue([CON_AVISO]);
+    });
+
+    it("la sugerencia lo dice antes de elegirla", async () => {
+      render(<Editor />);
+      await userEvent.type(nueva(), "swi");
+      const lista = await screen.findByRole("listbox", { name: "Sugerencias" });
+      expect(lista).toHaveTextContent("Hoy en CT $1,200.00");
+      expect(lista).toHaveTextContent("20 % más que su costo");
+    });
+
+    it("sin diferencia, la sugerencia sale como siempre", async () => {
+      vi.mocked(buscarPartidasFrecuentes).mockReset().mockResolvedValue([SWITCH]);
+      render(<Editor />);
+      await userEvent.type(nueva(), "swi");
+      const lista = await screen.findByRole("listbox", { name: "Sugerencias" });
+      expect(lista).not.toHaveTextContent("Hoy en CT");
+    });
+
+    it("entra con lo de la última vez y el aviso se queda en la fila; el costo cambia con el botón, el precio no", async () => {
+      const alCambiar = vi.fn();
+      render(<Editor alCambiar={alCambiar} />);
+      await userEvent.type(nueva(), "swi");
+      await screen.findByRole("listbox", { name: "Sugerencias" });
+      await userEvent.keyboard("{ArrowDown}{Enter}");
+
+      expect(ultimas(alCambiar)[0]).toMatchObject({ unitCost: 1000, unitPrice: 1250, marginPercent: null });
+      const aviso = screen.getAllByRole("status").find((n) => n.getAttribute("data-tono"))!;
+      expect(aviso).toHaveTextContent("Hoy en CT $1,200.00");
+      expect(aviso).toHaveTextContent("A este precio ganas 4.2 %");
+
+      await userEvent.click(screen.getByRole("button", { name: "Usar costo de hoy" }));
+      expect(ultimas(alCambiar)[0]).toMatchObject({ unitCost: 1200, unitPrice: 1250, marginPercent: null });
+
+      await userEvent.click(screen.getByRole("button", { name: /Subir precio a \$1,500\.00/ }));
+      expect(ultimas(alCambiar)[0]).toMatchObject({ unitCost: 1200, unitPrice: 1500, marginPercent: 25 });
+
+      await userEvent.click(screen.getByRole("button", { name: "Deshacer" }));
+      expect(ultimas(alCambiar)[0]).toMatchObject({ unitCost: 1000, unitPrice: 1250, marginPercent: null });
+    });
+
+    it("quien escribe el nombre completo y da Enter también lo ve", async () => {
+      render(<Editor />);
+      await userEvent.type(nueva(), SWITCH.name);
+      await screen.findByRole("listbox", { name: "Sugerencias" });
+      await userEvent.keyboard("{Enter}");
+      expect(screen.getAllByRole("status").find((n) => n.getAttribute("data-tono"))).toHaveTextContent("Hoy en CT $1,200.00");
+    });
+
+    it("con el margen general, lo que se gana cuenta lo que de verdad se cobra", async () => {
+      function ConMargen() {
+        const [partidas, setPartidas] = useState<PartidaEditor[]>([]);
+        return <TablaPartidas partidas={partidas} setPartidas={setPartidas} editable moneda="MXN" token="t" totales={totalesDePartidas(partidas)} margenPorcentaje={20} />;
+      }
+      render(<ConMargen />);
+      await userEvent.type(nueva(), "swi");
+      await screen.findByRole("listbox", { name: "Sugerencias" });
+      await userEvent.keyboard("{ArrowDown}{Enter}");
+      expect(screen.getAllByRole("status").find((n) => n.getAttribute("data-tono"))).toHaveTextContent("Con el 20 % general ganas 25 %");
+    });
+  });
 });

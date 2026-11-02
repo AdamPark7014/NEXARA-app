@@ -5,7 +5,9 @@ import { ClaudeService, type UsoClaude } from '../ai/claude/claude.service.js';
 import { CONFIG_COTIZAR, limpiarSalidaCotizar, peticionCotizar, type SalidaCotizar } from '../ai/cotizar/cotizar-ia.js';
 import { ProductSearchService } from '../smart-quote/search/product-search.service.js';
 import { padronParaComparar } from '../ventas/clientes-parecidos.service.js';
-import { CLIENTE_GENERICO, MARGEN_POR_OMISION, armarPropuesta, type PropuestaCotizacion } from './cotizar-frase.js';
+import { CLIENTE_GENERICO, MARGEN_POR_OMISION, armarPropuesta, type PartidaPropuesta, type PropuestaCotizacion } from './cotizar-frase.js';
+import { leerCatalogoDeHoy } from './costo-de-hoy.consulta.js';
+import { modelosDePartidas, propuestaConCostos } from './costo-de-hoy.js';
 import { CANDIDATOS_FIJOS, candidatoDelMayorista, candidatosDeUsadas, consultasDeCatalogo, type CandidatoPartida } from './emparejar-partidas.js';
 import { normalizarTexto } from './partidas-frecuentes.js';
 
@@ -34,10 +36,11 @@ export class CotizarFraseService {
     private readonly productos: ProductSearchService,
   ) {}
 
-  async interpretar(texto: string, companyId: number | null, opciones: { excluir?: number | null } = {}): Promise<RespuestaCotizar> {
+  async interpretar(texto: string, companyId: number | null, opciones: { excluir?: number | null; moneda?: string | null } = {}): Promise<RespuestaCotizar> {
     const tenantId = requireCompanyId(companyId);
     const pedido = String(texto ?? '').trim().slice(0, MAX_TEXTO);
     if (!pedido) throw new BadRequestException('Escribe qué hay que cotizar.');
+    const moneda = String(opciones.moneda ?? '').trim().toUpperCase();
 
     const [padron, recientes, filas] = await Promise.all([
       padronParaComparar(this.prisma, tenantId),
@@ -48,7 +51,15 @@ export class CotizarFraseService {
         select: { clientName: true, salesClientId: true },
       }),
       this.prisma.cotizacionItem.findMany({
-        where: { cotizacion: { companyId: tenantId, deletedAt: null, ...(opciones.excluir ? { id: { not: opciones.excluir } } : {}) } },
+        where: {
+          cotizacion: {
+            companyId: tenantId,
+            deletedAt: null,
+            // Un costo en dólares no se ofrece en una cotización en pesos.
+            ...(moneda === 'MXN' || moneda === 'USD' ? { currency: { equals: moneda, mode: 'insensitive' as const } } : {}),
+            ...(opciones.excluir ? { id: { not: opciones.excluir } } : {}),
+          },
+        },
         orderBy: { id: 'desc' },
         take: PARTIDAS_RECIENTES,
         select: {
@@ -89,7 +100,20 @@ export class CotizarFraseService {
       },
     });
 
-    return { ...propuesta, parecida: await this.parecida(propuesta.parecida, tenantId), margenPorOmision: MARGEN_POR_OMISION };
+    return {
+      ...propuesta,
+      ...(await this.conCostosDeHoy(propuesta.partidas, propuesta.complementos, moneda)),
+      parecida: await this.parecida(propuesta.parecida, tenantId),
+      margenPorOmision: MARGEN_POR_OMISION,
+    };
+  }
+
+  /** Lo ya cotizado contra lo que cuesta hoy en CT, que vende en pesos. Va al final: a la IA no le llega. */
+  private async conCostosDeHoy(partidas: PartidaPropuesta[], complementos: PartidaPropuesta[], moneda: string) {
+    if (moneda === 'USD') return { partidas, complementos };
+    const catalogo = await leerCatalogoDeHoy(this.prisma, modelosDePartidas([...partidas, ...complementos]));
+    if (!catalogo) return { partidas, complementos };
+    return { partidas: propuestaConCostos(partidas, catalogo), complementos: propuestaConCostos(complementos, catalogo) };
   }
 
   /** Del mayorista: la búsqueda completa y, si no da nada, con menos palabras. Sin catálogo, sigue sin él. */

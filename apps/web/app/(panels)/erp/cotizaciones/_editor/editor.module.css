@@ -879,6 +879,16 @@
   background: var(--ui-brand-soft);
 }
 
+/* «Hoy en CT» en la lista de «Nueva partida». */
+.opcion small.sugerenciaCt {
+  color: var(--ui-info-text);
+  font-weight: 500;
+}
+
+.opcion small.sugerenciaCtAlerta {
+  color: var(--ui-danger-text);
+}
+
 /* Rótulo de cada grupo de sugerencias de «Nueva partida»: «Usadas antes» y «Catálogo». */
 .sugerenciasGrupo {
   padding: 6px 10px 2px;
@@ -1268,6 +1278,20 @@
 
 .fila:hover {
   background: color-mix(in srgb, var(--ui-hover) 70%, transparent);
+}
+
+/* «Hoy en CT»: un renglón más de la fila, con o sin columnas opcionales. */
+.celdaAviso {
+  grid-column: 2 / -1;
+  min-width: 0;
+  padding: 0 8px 8px;
+}
+
+/* Lo movió un botón del aviso: que se vea qué cifra cambió. */
+.celda.celdaMovida,
+.celda.celdaMovida:hover {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
 }
 
 /* La fila de captura se distingue: es donde se escribe la siguiente partida. */

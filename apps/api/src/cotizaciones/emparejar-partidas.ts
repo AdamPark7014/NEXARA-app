@@ -9,6 +9,7 @@
 import { distancia } from '../ai/asistente/nombres.js';
 import { normalizarTexto, type FilaCotizada } from './partidas-frecuentes.js';
 import { CATALOGO_PARTIDAS_V2 } from './catalogo-partidas-base.js';
+import type { CostoDeHoy } from './costo-de-hoy.js';
 import { PAQUETES } from './paquetes.js';
 import type { GrupoPartida } from './partidas-grupos.js';
 
@@ -35,6 +36,8 @@ export type CandidatoPartida = {
   productCtId: number | null;
   /** Cotizaciones donde salió (solo las usadas): sirve para reconocer una casi igual. */
   cotizaciones: number[];
+  /** Lo que cuesta hoy en CT, si difiere de lo guardado (solo las usadas). */
+  costoDeHoy?: CostoDeHoy;
 };
 
 export type Seguridad = 'alta' | 'media' | 'ninguna';
@@ -415,7 +418,7 @@ const marcaLimpia = (valor: unknown): string | null => {
  * El modelo tal como conviene repetirlo. Hay filas con la fila de Excel pegada entera
  * («4\tPza\tNVR 32 Canales\tDHI-NVR5432-EI2\t$64,077.46»), con «N/A» o con el mismo nombre.
  */
-function modeloLimpio(valor: unknown, nombre: string): string | null {
+export function modeloLimpio(valor: unknown, nombre: string): string | null {
   let texto = limpio(valor);
   if (texto && /\t/.test(texto)) {
     texto = texto.split('\t').map((c) => c.trim()).find((c) => /[a-z]/i.test(c) && /\d/.test(c) && !/\s/.test(c)) ?? null;

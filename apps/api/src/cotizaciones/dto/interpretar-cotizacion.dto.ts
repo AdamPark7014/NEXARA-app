@@ -11,4 +11,10 @@ export class InterpretarCotizacionDto {
   @IsOptional()
   @IsInt()
   excluir?: number;
+
+  /** La moneda de la cotización: lo cotizado en otra no se ofrece, y con CT solo se compara en pesos. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  moneda?: string;
 }

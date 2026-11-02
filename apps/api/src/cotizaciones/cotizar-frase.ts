@@ -20,6 +20,7 @@ import {
   type Complemento,
   type Seguridad,
 } from './emparejar-partidas.js';
+import type { CostoDeHoy } from './costo-de-hoy.js';
 import { normalizarTexto } from './partidas-frecuentes.js';
 
 export type LineaPedida = {
@@ -313,6 +314,8 @@ export type PartidaPropuesta = {
   productCtId: number | null;
   /** Otras opciones para cambiarla con un clic. */
   alternativas: Array<Omit<CandidatoPartida, 'cotizaciones'>>;
+  /** Lo que cuesta hoy en CT, si difiere de lo guardado. Lo pone el servicio al final, sin gastar IA. */
+  costoDeHoy?: CostoDeHoy;
 };
 
 const sinCotizaciones = ({ cotizaciones: _c, ...resto }: CandidatoPartida) => resto;

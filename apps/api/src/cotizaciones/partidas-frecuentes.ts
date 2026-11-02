@@ -9,6 +9,8 @@
  * juntan las repetidas y en qué orden salen. Módulo puro (sin Nest ni Prisma) para probarlo con jest.
  */
 
+import type { CostoDeHoy } from './costo-de-hoy.js';
+
 /** Con menos letras casi todo coincide: no se busca. */
 export const MIN_LETRAS_BUSQUEDA = 2;
 /** Cuántas sugerencias se devuelven. */
@@ -51,6 +53,8 @@ export type PartidaFrecuente = {
   /** En cuántas cotizaciones distintas salió. */
   veces: number;
   ultimaVez: string;
+  /** Lo que cuesta hoy en CT, si difiere de lo guardado. */
+  costoDeHoy?: CostoDeHoy;
 };
 
 /** Minúsculas, sin acentos y con espacios simples: «Cámara  IP» y «camara ip» son lo mismo. */

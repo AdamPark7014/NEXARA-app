@@ -15,6 +15,7 @@ import {
   type DocumentoCotizacion,
   type PartidaEditor,
 } from "@/lib/cotizacion-documento";
+import { crearAviso, type AvisoCt, type SubirPrecio } from "@/lib/aviso-costo-ct";
 import { GRUPOS_PARTIDA, type CotizacionDetalle, type GrupoPartida, type OpcionPropuesta, type PartidaPropuesta, type Segmento } from "@/lib/cotizaciones-api";
 
 export type FilaPropuesta = PartidaPropuesta & {
@@ -26,6 +27,8 @@ export type FilaPropuesta = PartidaPropuesta & {
   opcionElegida: number | null;
   /** Se escribió a mano: el margen ya no lo cambia. */
   precioManual: boolean;
+  /** Lo ya cotizado que hoy cuesta otra cosa en CT. */
+  avisoCt: AvisoCt | null;
 };
 
 /** Trabajo y no producto: se cobra a costo, así que el margen de la tarjeta no le toca. */
@@ -53,6 +56,7 @@ export function filasDePropuesta(partidas: PartidaPropuesta[], margen: number | 
     marginPercent: llevaMargen(p) ? margen : null,
     opcionElegida: null,
     precioManual: false,
+    avisoCt: crearAviso(p.costoDeHoy, p.unitCost, p.unitPrice),
   }));
 }
 
@@ -87,11 +91,27 @@ export function elegirOpcion(fila: FilaPropuesta, indice: number, margen: number
     productCtId: opcion.productCtId,
     opcionElegida: indice,
     precioManual: false,
+    avisoCt: crearAviso(opcion.costoDeHoy, opcion.unitCost, opcion.unitPrice),
   };
   if (opcion.fuente === "catalogo" && !esServicio(base)) {
     return { ...base, marginPercent: margen, unitPrice: precioConMargen(opcion.unitCost, margen) ?? 0 };
   }
   return { ...base, marginPercent: null };
+}
+
+/** Pone el costo de CT. El precio se queda: subirlo es otro clic. */
+export function usarCostoDeHoy(fila: FilaPropuesta): FilaPropuesta {
+  return fila.avisoCt ? { ...fila, unitCost: fila.avisoCt.hoy.costo } : fila;
+}
+
+/** Sube el precio con el margen que dijo el botón. Queda como escrito a mano: el margen de la tarjeta ya no lo mueve. */
+export function subirPrecioDeHoy(fila: FilaPropuesta, subir: SubirPrecio): FilaPropuesta {
+  return { ...fila, unitPrice: subir.precio, marginPercent: subir.margen, precioManual: true };
+}
+
+export function deshacerCostoDeHoy(fila: FilaPropuesta): FilaPropuesta {
+  if (!fila.avisoCt) return fila;
+  return { ...fila, unitCost: fila.avisoCt.costoGuardado, unitPrice: fila.avisoCt.precioGuardado, marginPercent: null, precioManual: false };
 }
 
 export const importeDeFila = (f: Pick<FilaPropuesta, "cantidad" | "unitPrice">) => (Number(f.cantidad) || 0) * (Number(f.unitPrice) || 0);
@@ -124,6 +144,7 @@ export function partidasDeFilas(filas: FilaPropuesta[]): PartidaEditor[] {
         marginPercent: f.marginPercent,
         grupo: grupoValido(f.grupo),
         imagenUrl: f.imagenUrl,
+        avisoCt: f.avisoCt,
       }),
     );
 }

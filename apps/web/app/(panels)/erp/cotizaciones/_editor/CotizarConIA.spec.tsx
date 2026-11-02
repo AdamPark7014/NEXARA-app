@@ -109,7 +109,7 @@ describe("CotizarConIA", () => {
   it("muestra cliente, proyecto y partidas, y nada se guarda hasta usarla", async () => {
     const { onUsar } = armar();
     await pedir();
-    expect(interpretar).toHaveBeenCalledWith("t", "14 cámaras domo", { excluir: null });
+    expect(interpretar).toHaveBeenCalledWith("t", "14 cámaras domo", { excluir: null, moneda: "MXN" });
     expect(screen.getByLabelText("Cliente")).toHaveValue("Materiales Pronto");
     expect(screen.getByLabelText("Proyecto")).toHaveValue("Videovigilancia en bodega");
     expect(screen.getByLabelText("Margen %")).toHaveValue("20");
@@ -226,5 +226,86 @@ describe("CotizarConIA", () => {
     await pedir();
     rerender(<CotizarConIA token="t" excluir={null} hayPartidas moneda="MXN" onUsar={vi.fn()} onPartirDe={vi.fn()} />);
     expect(screen.getByText("Revísala antes de usarla")).toBeInTheDocument();
+  });
+
+  describe("costo de hoy en CT", () => {
+    const HOY = { costo: 3400, diferencia: 0.1333, piezas: 9, clave: "SWT1", alDia: true, fecha: "2026-11-02T17:00:00.000Z" };
+    const SWITCH = fila({
+      pedido: "Switch PoE",
+      name: "Switch PoE Administrable 24 puertos",
+      model: "TL-SG1428PE",
+      fuente: "usada",
+      seguridad: "alta",
+      cantidad: 2,
+      unitCost: 3000,
+      unitPrice: 3300,
+      costoDeHoy: HOY,
+    });
+    const SIN_AVISO = fila({ pedido: "Impresora", name: "Impresora EC Line", fuente: "usada", seguridad: "alta", unitCost: 1800, unitPrice: 2000 });
+
+    async function conSwitch() {
+      interpretar.mockResolvedValue({ ...PROPUESTA, partidas: [SWITCH, SIN_AVISO], complementos: [], avisos: [] });
+      const props = armar();
+      await pedir();
+      return props;
+    }
+    const aviso = () => screen.getAllByRole("status").find((n) => n.getAttribute("data-tono"))!;
+    const precio = () => screen.getByLabelText("Precio de Switch PoE") as HTMLInputElement;
+
+    it("avisa solo en la partida que difiere, sin tocar el precio", async () => {
+      await conSwitch();
+      expect(aviso()).toHaveTextContent("Hoy en CT $3,400.00");
+      expect(aviso()).toHaveTextContent("13 % más que el costo guardado ($3,000.00)");
+      expect(aviso()).toHaveTextContent("A este precio pierdes $100.00 por pieza");
+      expect(screen.getAllByRole("status").filter((n) => n.getAttribute("data-tono"))).toHaveLength(1);
+      expect(precio().value).toBe("3,300.00");
+      expect(screen.getByTestId("cotizar-ia-total")).toHaveTextContent("$8,600.00");
+    });
+
+    it("«Usar costo de hoy» mueve el costo; el precio no, hasta el segundo clic", async () => {
+      const { onUsar } = await conSwitch();
+      await userEvent.click(screen.getByRole("button", { name: "Usar costo de hoy" }));
+      expect(aviso()).toHaveTextContent("Costo de hoy $3,400.00");
+      expect(precio().value).toBe("3,300.00");
+      expect(screen.getByTestId("cotizar-ia-total")).toHaveTextContent("$8,600.00");
+
+      await userEvent.click(screen.getByRole("button", { name: /Subir precio a \$3,740\.00/ }));
+      expect(precio().value).toBe("3,740.00");
+      expect(aviso()).toHaveTextContent("Precio $3,740.00");
+      expect(screen.getByTestId("cotizar-ia-total")).toHaveTextContent("$9,480.00");
+
+      await userEvent.click(screen.getByRole("button", { name: "Usar en la cotización" }));
+      expect(onUsar.mock.calls[0]![0].filas[0]).toMatchObject({ unitCost: 3400, unitPrice: 3740, marginPercent: 10, precioManual: true });
+    });
+
+    it("«Deshacer» regresa las dos cifras", async () => {
+      await conSwitch();
+      await userEvent.click(screen.getByRole("button", { name: "Usar costo de hoy" }));
+      await userEvent.click(screen.getByRole("button", { name: /Subir precio/ }));
+      await userEvent.click(screen.getByRole("button", { name: "Deshacer" }));
+      expect(precio().value).toBe("3,300.00");
+      expect(screen.getByRole("button", { name: "Usar costo de hoy" })).toBeInTheDocument();
+    });
+
+    it("usarla sin tocar el aviso conserva el costo guardado y el aviso sigue con la partida", async () => {
+      const { onUsar } = await conSwitch();
+      await userEvent.click(screen.getByRole("button", { name: "Usar en la cotización" }));
+      expect(onUsar.mock.calls[0]![0].filas[0]).toMatchObject({ unitCost: 3000, unitPrice: 3300, avisoCt: { costoGuardado: 3000 } });
+    });
+
+    it("cambiar el margen de la tarjeta no mueve lo ya cotizado", async () => {
+      await conSwitch();
+      await userEvent.click(screen.getByRole("button", { name: "Usar costo de hoy" }));
+      await userEvent.click(screen.getByRole("button", { name: /Subir precio/ }));
+      const margen = screen.getByLabelText("Margen %");
+      await userEvent.clear(margen);
+      await userEvent.type(margen, "35");
+      expect(precio().value).toBe("3,740.00");
+    });
+
+    it("pide la propuesta en la moneda de la cotización", async () => {
+      await conSwitch();
+      expect(interpretar.mock.calls[0]![2]).toMatchObject({ moneda: "MXN" });
+    });
   });
 });

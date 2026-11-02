@@ -232,4 +232,45 @@ describe('CotizacionesService.partidasFrecuentes — de quién son las partidas'
 
     expect(findMany.mock.calls[0][0].where.cotizacion).toEqual({ companyId: 7, deletedAt: null });
   });
+
+  describe('costo de hoy en CT', () => {
+    const CT = { clave: 'SWT1', modelo: 'MS130-48X', numParte: 'MS130-48X', precio: 200000, moneda: 'MXN', tipoCambio: 1, existencia: { '14A': 2 }, tipoDelDia: 20 };
+
+    function conCt(queryRaw: jest.Mock) {
+      const findMany = jest.fn().mockResolvedValue([SWITCH_NUEVO]);
+      const prisma: any = {
+        cotizacionItem: { findMany },
+        $queryRaw: queryRaw,
+        supplierCatalogSyncRun: { findFirst: jest.fn(async () => ({ finishedAt: new Date() })) },
+      };
+      return new CotizacionesService(
+        prisma,
+        { publishEntityLifecycle: jest.fn(), requestAutoApproval: jest.fn() } as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        {} as any,
+      );
+    }
+
+    it('la sugerencia trae el aviso y conserva costo y precio de la última vez', async () => {
+      const service = conCt(jest.fn(async () => [CT]));
+      const [p] = await service.partidasFrecuentes('meraki', 7);
+      expect(p).toMatchObject({ unitCost: 169516.74, unitPrice: 203420.09, costoDeHoy: { costo: 200000, piezas: 2 } });
+    });
+
+    it('en dólares no se compara', async () => {
+      const queryRaw = jest.fn(async () => [CT]);
+      const [p] = await conCt(queryRaw).partidasFrecuentes('meraki', 7, { moneda: 'USD' });
+      expect(queryRaw).not.toHaveBeenCalled();
+      expect(p).not.toHaveProperty('costoDeHoy');
+    });
+
+    it('si la consulta falla, salen las sugerencias igual', async () => {
+      const [p] = await conCt(jest.fn(async () => { throw new Error('sin base'); })).partidasFrecuentes('meraki', 7);
+      expect(p).toMatchObject({ unitPrice: 203420.09 });
+      expect(p).not.toHaveProperty('costoDeHoy');
+    });
+  });
 });

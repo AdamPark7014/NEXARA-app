@@ -15,6 +15,7 @@ import {
   type PartidaFrecuente,
 } from "@/lib/cotizaciones-api";
 import {
+  MARGEN_INICIAL,
   UNIDADES,
   importeDeLinea,
   mover,
@@ -23,8 +24,10 @@ import {
   type PartidaEditor,
   type Totales,
 } from "@/lib/cotizacion-documento";
+import { avisoDeSugerencia, crearAviso, leerAviso } from "@/lib/aviso-costo-ct";
 import { columnasDeTabla, type ColumnasOpcionales } from "@/lib/cotizacion-personalizacion";
 import { normalizarLista, traeVineta } from "@/lib/vinetas-texto";
+import AvisoCosto from "./AvisoCosto";
 import { TextoAuto } from "./campos";
 
 /** Al pegar una ficha con viñetas en la misma línea, cada una baja a su renglón. */
@@ -123,6 +126,7 @@ function CeldaNumero({
   placeholder,
   decimales = 0,
   tabIndex,
+  movida = false,
 }: {
   /** Decimales fijos al mostrarla fuera de foco (precio: 2; cantidad: 0). */
   decimales?: number;
@@ -135,6 +139,8 @@ function CeldaNumero({
   placeholder?: string;
   /** -1 para sacarla del recorrido de Tab (detalle: costo/margen) sin dejar de ser clicleable. */
   tabIndex?: number;
+  /** La movió un botón del aviso de CT: se marca para que se vea. */
+  movida?: boolean;
 }) {
   const [texto, setTexto] = useState(aTexto(valor));
   const [enfocada, setEnfocada] = useState(false);
@@ -149,7 +155,7 @@ function CeldaNumero({
   return (
     <input
       ref={refCelda}
-      className={`${styles.celda} ${styles.celdaNum}`}
+      className={`${styles.celda} ${styles.celdaNum} ${movida ? styles.celdaMovida : ""}`}
       inputMode="decimal"
       value={visible}
       placeholder={placeholder}
@@ -376,6 +382,37 @@ export default function TablaPartidas({
     }
   };
 
+  /** El aviso de CT según las cifras de la fila en este momento. */
+  const lecturaDeCt = (p: PartidaEditor) =>
+    editable && p.avisoCt
+      ? leerAviso({
+          aviso: p.avisoCt,
+          unitCost: p.unitCost,
+          unitPrice: p.unitPrice,
+          moneda,
+          margenBase: MARGEN_INICIAL,
+          rotuloBase: ", el de siempre",
+          descuento: p.discount,
+          margenGeneral: margenPorcentaje,
+        })
+      : null;
+
+  const avisoDeCt = (p: PartidaEditor) => {
+    const lectura = lecturaDeCt(p);
+    const { avisoCt } = p;
+    if (!lectura || !avisoCt) return null;
+    return (
+      <div role="cell" className={styles.celdaAviso} data-area="aviso">
+        <AvisoCosto
+          lectura={lectura}
+          onUsar={() => ponerCosto(p, avisoCt.hoy.costo)}
+          onSubir={() => lectura.subir && cambiar(p.key, { unitPrice: lectura.subir.precio, marginPercent: lectura.subir.margen })}
+          onDeshacer={() => cambiar(p.key, { unitCost: avisoCt.costoGuardado, unitPrice: avisoCt.precioGuardado, marginPercent: null })}
+        />
+      </div>
+    );
+  };
+
   const gruposConImporte = GRUPOS_PARTIDA.filter((g) => totales.porGrupo[g] > 0);
 
   const extras = hayExtras(columnas);
@@ -534,6 +571,7 @@ export default function TablaPartidas({
               etiqueta={`Costo interno de la partida ${i + 1}`}
               placeholder="Costo"
               decimales={2}
+              movida={lecturaDeCt(p)?.deshacer}
               onValor={(n) => ponerCosto(p, n)}
             />
           </span>
@@ -544,6 +582,7 @@ export default function TablaPartidas({
               etiqueta={`Margen % de la partida ${i + 1}`}
               placeholder="Margen %"
               decimales={2}
+              movida={lecturaDeCt(p)?.tono === "verde" && p.marginPercent != null}
               onValor={(n) => ponerMargenPartida(p, n)}
             />
           </span>
@@ -555,6 +594,7 @@ export default function TablaPartidas({
               etiqueta={`Precio unitario de la partida ${i + 1}`}
               placeholder="0.00"
               decimales={2}
+              movida={lecturaDeCt(p)?.tono === "verde"}
               onValor={(n) => ponerPrecio(p, n)}
               onKeyDown={teclado(p.key, "precio")}
             />
@@ -623,6 +663,7 @@ export default function TablaPartidas({
               />
             ) : null}
           </span>
+          {avisoDeCt(p)}
         </div>
       ))}
 
@@ -835,6 +876,8 @@ function FilaNueva({
    */
   const agregarUsada = (u: PartidaFrecuente, opciones?: { conFoco?: boolean; nombre?: string }) => {
     const costo = Number(u.unitCost);
+    const unitCost = Number.isFinite(costo) && costo > 0 ? costo : null;
+    const unitPrice = Math.max(0, Number.isFinite(precio) ? precio : Number(u.unitPrice) || 0);
     alAgregar(
       partidaNueva({
         name: opciones?.nombre ?? u.name,
@@ -843,11 +886,13 @@ function FilaNueva({
         model: u.model ?? null,
         unit: unidad !== "Pieza" ? unidad : u.unit || unidad,
         qty: cantidadSana,
-        unitCost: Number.isFinite(costo) && costo > 0 ? costo : null,
-        unitPrice: Math.max(0, Number.isFinite(precio) ? precio : Number(u.unitPrice) || 0),
+        unitCost,
+        unitPrice,
         marginPercent: null,
         grupo: u.grupo ?? null,
         imagenUrl: u.imagenUrl ?? null,
+        // Quien escribe el nombre completo no ve la lista: el aviso se queda en la fila.
+        avisoCt: crearAviso(u.costoDeHoy, unitCost, unitPrice, u.unitPrice),
       }),
       opciones,
     );
@@ -950,6 +995,7 @@ function FilaNueva({
             s.oferta.stockTotal > 0 ? "en stock" : "sobre pedido",
           ];
     const partes = detalle.filter(Boolean);
+    const delCt = s.tipo === "usada" && s.usada.costoDeHoy ? avisoDeSugerencia(s.usada.costoDeHoy, s.usada.unitPrice, moneda) : null;
     return (
       <li
         key={s.clave}
@@ -973,6 +1019,16 @@ function FilaNueva({
             </span>
           ))}
         </small>
+        {delCt ? (
+          <small className={`nx-cot-sugerencia-detalle ${styles.sugerenciaCt} ${delCt.alerta ? styles.sugerenciaCtAlerta : ""}`}>
+            {delCt.partes.map((parte, i) => (
+              <span key={i}>
+                {i > 0 ? <span className="nx-cot-sugerencia-sep">{" · "}</span> : null}
+                {parte}
+              </span>
+            ))}
+          </small>
+        ) : null}
       </li>
     );
   };

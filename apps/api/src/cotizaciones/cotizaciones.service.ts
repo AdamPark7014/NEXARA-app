@@ -59,6 +59,8 @@ import {
 } from './estado-cotizacion.js';
 import { agruparPartidas, incluyeInstalacion, totalesPorGrupo } from './partidas-grupos.js';
 import { MAX_FILAS_A_LEER, filtroDePartidas, partidasFrecuentes } from './partidas-frecuentes.js';
+import { leerCatalogoDeHoy } from './costo-de-hoy.consulta.js';
+import { conCostoDeHoy, modelosComparables } from './costo-de-hoy.js';
 import {
   ETIQUETA_SEGMENTO,
   diasDeVigencia,
@@ -1689,7 +1691,11 @@ export class CotizacionesService {
         createdAt: true,
       },
     });
-    return partidasFrecuentes(filas, q);
+    const sugerencias = partidasFrecuentes(filas, q);
+    // CT vende en pesos: en una cotización en dólares no hay con qué comparar.
+    if (moneda === 'USD') return sugerencias;
+    const catalogo = await leerCatalogoDeHoy(this.db, modelosComparables(sugerencias));
+    return catalogo ? sugerencias.map((s) => conCostoDeHoy(s, catalogo)) : sugerencias;
   }
 
   /** Puntos de partida del editor por segmento: objetivo (entrada y cierre) y subsecciones de alcance. */

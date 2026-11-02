@@ -529,6 +529,20 @@ export function aplicarPaquete(
  * Una partida que la empresa ya cotizó, con sus datos de la última vez. No trae margen: en la
  * cotización nueva puede ser otro.
  */
+/** Lo que cuesta hoy en CT lo ya cotizado, si difiere más de 3 % de lo guardado. */
+export type CostoDeHoy = {
+  /** En pesos y sin IVA. */
+  costo: number;
+  /** Contra el costo guardado: 0.11 es que hoy cuesta 11 % más. */
+  diferencia: number;
+  /** Piezas en CT; 0 es que se surte sobre pedido. */
+  piezas: number;
+  clave: string;
+  /** CT sincronizó en las últimas 24 horas. Si no, no se puede decir «hoy». */
+  alDia: boolean;
+  fecha: string | null;
+};
+
 export type PartidaFrecuente = {
   name: string;
   description?: string | null;
@@ -544,6 +558,7 @@ export type PartidaFrecuente = {
   /** En cuántas cotizaciones distintas salió. */
   veces: number;
   ultimaVez?: string | null;
+  costoDeHoy?: CostoDeHoy;
 };
 
 /**
@@ -579,6 +594,7 @@ export type OpcionPropuesta = {
   ultimaVez: string | null;
   stock: number | null;
   productCtId: number | null;
+  costoDeHoy?: CostoDeHoy;
 };
 
 export type PartidaPropuesta = Omit<OpcionPropuesta, "unit"> & {
@@ -618,12 +634,12 @@ export type PropuestaCotizacion = {
 const ESPERA_INTERPRETAR_MS = 25_000;
 
 /** «Cotizar con IA»: de una frase o una lista pegada a una propuesta. No guarda nada. */
-export async function interpretarCotizacion(token: string, texto: string, opciones: { excluir?: number | null } = {}) {
+export async function interpretarCotizacion(token: string, texto: string, opciones: { excluir?: number | null; moneda?: string | null } = {}) {
   const senal = typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(ESPERA_INTERPRETAR_MS) : undefined;
   try {
     return await cotFetch<PropuestaCotizacion>("cotizaciones/interpretar", token, {
       method: "POST",
-      body: JSON.stringify({ texto, ...(opciones.excluir ? { excluir: opciones.excluir } : {}) }),
+      body: JSON.stringify({ texto, ...(opciones.excluir ? { excluir: opciones.excluir } : {}), ...(opciones.moneda ? { moneda: opciones.moneda } : {}) }),
       signal: senal,
     });
   } catch (e) {
