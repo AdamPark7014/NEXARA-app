@@ -393,7 +393,14 @@ export default function EditorCctv({
           <ChevronLeftRoundedIcon fontSize="small" />
         </Link>
         <div className={styles.cabezaTexto}>
-          <h1 className={styles.titulo}>{meta.nombre || diseno.nombre}</h1>
+          <div className={styles.tituloFila}>
+            <h1 className={styles.titulo}>{meta.nombre || diseno.nombre}</h1>
+            <div className={styles.insignias}>
+              <Badge tone={meta.estado === "aprobada" ? "success" : meta.estado === "enviada" ? "info" : "neutral"}>{ETIQUETA_ESTADO_DISENO[meta.estado]}</Badge>
+              <Badge tone="brand">CCTV · {totalCamaras} {totalCamaras === 1 ? "cámara" : "cámaras"}</Badge>
+              {cal ? <Badge tone="success">Escala calibrada · cota {cal.metros.toFixed(2)} m</Badge> : <Badge tone="warning">Escala sin calibrar</Badge>}
+            </div>
+          </div>
           <div className={styles.sub}>
             <span>{diseno.clienteNombre ?? "Sin cliente"}</span>
             <span>Creado por {diseno.creadoPor?.nombre ?? "—"}</span>
@@ -401,11 +408,6 @@ export default function EditorCctv({
               {textoGuardado}
             </span>
           </div>
-        </div>
-        <div className={styles.insignias}>
-          <Badge tone={meta.estado === "aprobada" ? "success" : meta.estado === "enviada" ? "info" : "neutral"}>{ETIQUETA_ESTADO_DISENO[meta.estado]}</Badge>
-          <Badge tone="brand">CCTV · {totalCamaras} {totalCamaras === 1 ? "cámara" : "cámaras"}</Badge>
-          {cal ? <Badge tone="success">Escala calibrada · cota {cal.metros.toFixed(2)} m</Badge> : <Badge tone="warning">Escala sin calibrar</Badge>}
         </div>
         <Segmented
           ariaLabel="Vista"

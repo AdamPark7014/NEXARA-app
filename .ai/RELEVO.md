@@ -23,7 +23,8 @@
   - Sin migración: `plano.areas` y `plano.muebles` son opcionales y viajan en el mismo JSON. La ambientación no tapa la vista, para no mover ningún cálculo de cobertura.
   - Se agregaron turret y PTZ al catálogo con datos leídos de sus hojas técnicas. Los colores DORI pasaron a los del mockup en todas las vistas (`colores.ts`).
   - Verificado: pruebas del diseñador (120) y de tipos en verde; compilación de producción; recorrido con ratón real en Chrome con la Intel UHD, 16 de 16 y sin errores en consola (dibujar muro y puerta, arrastrar cámara, colocar desde el panel, «Ver lo que ve», deshacer todo); diseños 2 y 3 reales de producción, en copia local. Suite web: 200 archivos; suite API: 368, sin tocar la API. Al correrlas en paralelo se agotan tiempos en cotizaciones y PDF (1 web y 10 API); pasan solas.
-  - **Falta:** verlo en producción con sesión (ver la entrada siguiente si ya se hizo). Probar un croquis real como textura: ningún diseño de producción trae croquis, y si falla sale un aviso y sigue en el dibujo 2D. Medir el tiempo de hacer un plano con una persona real.
+  - Visto en producción con la sesión de Adam, sin guardar nada (el diseño 3 siguió «Al día») y sin errores en consola: maqueta, noche, «Ver lo que ve», plano técnico y propuesta con la foto de la maqueta. Se corrigió ahí mismo la cabeza, que ocupaba dos renglones y cortaba la parte de abajo de la maqueta a 1707 × 817.
+  - **Falta:** Probar un croquis real como textura: ningún diseño de producción trae croquis, y si falla sale un aviso y sigue en el dibujo 2D. Medir el tiempo de hacer un plano con una persona real.
   - Medido en la Intel UHD integrada de la máquina de desarrollo: 47 cuadros por segundo girando el sitio de ejemplo y 61 con el diseño de 14 cámaras.
   - No se delegó a Ollama: era portar un prototipo ya aprobado y ajustarlo mirando cada captura.
   - Trampas para quien siga:

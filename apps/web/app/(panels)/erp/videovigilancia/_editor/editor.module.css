@@ -39,8 +39,15 @@
 }
 
 .cabezaTexto {
-  flex: 0 1 auto;
-  min-width: 180px;
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.tituloFila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px var(--ui-s3);
 }
 
 .insignias {
@@ -301,7 +308,8 @@
 .cuerpo {
   display: grid;
   grid-template-columns: 252px minmax(0, 1fr) 330px;
-  height: clamp(520px, calc(100dvh - 150px), 1100px);
+  /* Alto de la ventana menos la barra de Core y la cabeza: la maqueta se ve completa sin bajar. */
+  height: clamp(520px, calc(100dvh - 180px), 1100px);
 }
 
 @media (max-width: 1320px) {
