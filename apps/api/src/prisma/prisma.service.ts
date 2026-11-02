@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { AuditBuffer } from './audit-buffer.js';
 import { getTenantStore } from '../common/tenant/tenant-context.js';
@@ -57,6 +57,9 @@ export function redactAuditPayload(value: unknown, depth = 0): unknown {
   }
   if (typeof value !== 'object') return value;
   if (value instanceof Date) return value;
+  // Un Decimal trae `constructor` como propiedad propia: copiado tal cual, Prisma rechaza el lote
+  // completo de auditoría y se pierden también las entradas de los demás.
+  if (Prisma.Decimal.isDecimal(value)) return value.toString();
 
   const out: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(value as Record<string, unknown>)) {

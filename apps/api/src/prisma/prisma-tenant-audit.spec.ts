@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import {
   buildAuditChanges,
   isAuditNoise,
@@ -50,6 +51,12 @@ describe('whereAlreadyHasCompanyScope', () => {
 });
 
 describe('redactAuditPayload', () => {
+  it('un Decimal queda como texto y no tumba el lote de auditoría', () => {
+    const limpio = redactAuditPayload({ cantidad: new Prisma.Decimal('1.50'), filas: [{ precio: new Prisma.Decimal(2) }] });
+    expect(limpio).toEqual({ cantidad: '1.5', filas: [{ precio: '2' }] });
+    expect(JSON.parse(JSON.stringify(limpio))).toEqual(limpio);
+  });
+
   it('redacts credential-bearing keys', () => {
     expect(redactAuditPayload({ email: 'a@b.com', password: 'hunter2' })).toEqual({
       email: 'a@b.com',
