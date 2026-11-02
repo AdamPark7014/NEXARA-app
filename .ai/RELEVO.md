@@ -1,5 +1,18 @@
 # RELEVO
 
+- **02-11 ~13:55 (claude-code) — El aviso del tope de 5,000 filas ya sobrevive a los despliegues: cada recorte queda en `audit_logs` (`6f03b2a8`, en producción desde las 18:50 UTC).** Adam: «Sí, hazlo aquí».
+  - **Antes:** el aviso solo salía en el log del contenedor, que se pierde al desplegar, y solo decía el modelo, no qué consulta era.
+  - **Ahora:** cada recorte también va a `audit_logs`, con `entityType = 'PrismaRowCap'` y `action = 'RECORTE'`. En `changes` lleva el modelo, el tope, los nombres de los campos que filtra y cuántas veces pasó, nunca los valores del filtro. El log sigue avisando cada vez, con el mismo texto más `filtro=`.
+  - **Para verlo:** `select "createdAt", "userId", changes from audit_logs where "entityType" = 'PrismaRowCap' order by id desc limit 20;`. Se limpia a los 90 días, como toda la auditoría.
+  - **Una fila por hora por consulta:** se guarda el primero y después uno por hora, con `veces`, porque `audit_logs` ya llenó el disco una vez. Lo contado entre una fila y otra se pierde si la API se reinicia, así que `veces` puede quedarse corto. El primero tras reiniciar siempre se guarda.
+  - **Verificado en producción, 19:49 UTC:** con un proceso aparte dentro de `nexara-api` y `PRISMA_MAX_ROWS=1`, un `companyProfile.findMany` devolvió 1 fila, salió el aviso y al cerrar quedó la fila 5766712: `{"tope":1,"veces":1,"filtro":["isActive"],"modelo":"CompanyProfile"}`. **Esa fila es de prueba:** se reconoce por `tope: 1` y la dejé; se va sola a los 90 días. Es la única: hasta ahora no hay ningún recorte real guardado. No esperé a otro despliegue para verla seguir ahí, porque ya está en la base y no en el contenedor.
+  - **Pruebas:** `row-cap-registro.spec.ts` es nueva. `src/prisma` y el sync de CT dan 6 suites y 90 pruebas en verde, sobre una copia exacta de `origin/main`. `tsc` da 0 errores en `src/prisma` y 163 en otros archivos de esa copia, que no toqué y no revisé. No corrí la suite completa de la API.
+  - **Falta:** sigue sin haber un aviso activo; hay que ir a consultarlo. Si Adam lo quiere, sería una tarjeta a `developer@` cuando haya recortes (`PLATFORM_DEVELOPER_EMAIL`). No a `gerencia@`, que es Christian.
+  - **Trampas:**
+    - Si el volcado corre dentro de una petición, `injectTenantData` le pone la empresa de esa petición a la fila, así que puede salir en `/erp/audit` y en el feed de actividad. Se busca por `entityType`, no por `companyId`.
+    - `filtro` puede traer `companyId` o `deletedAt`, que agregan los otros middleware sobre el mismo objeto. No quiere decir que la llamada los pida.
+  - No se delegó a Ollama: es un cambio chico en un middleware por el que pasan todas las consultas.
+
 - **02-11 ~13:55 (claude-code) — Programa Velocidad Core, Ola 2: formatos de actividades en producción, sin acceso visible hasta el 06-11.** (`c7cbd1f0`, `6bedc328`, `15808179`)
   - Adam aprobó con «Sí, arranca Ola 2». Plan y mockup: <https://claude.ai/artifact/EMhiXKV9NPgUmsqFjVVtMu>. Olas 3 a 7 sin construir.
   - **Qué es:** `/erp/actividades/formatos`. Eliges un formato, dices cantidad, cliente, sucursal, persona y día, y salen las actividades con fotos, tiempos y herramientas. Todo se edita al asignar sin tocar el formato.
