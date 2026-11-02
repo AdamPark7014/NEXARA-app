@@ -1,5 +1,8 @@
 # RELEVO
 
+- **01-11 ~21:10 (claude-code) — «Cotizar con IA» desplegado (`87b0bf84`).** El servidor ya lo incluye; la caja está en el paquete de la web y la ruta responde 401 sin sesión. Probado dentro del contenedor, sin Nest ni crons y sin crear nada (56 cotizaciones antes y después): frase 2.0 s, lista 0.1 s y 0 tokens; «cámara domo» ya no se llena sola con el paquete. Panel de la puerta: `cotizar-frase`, 2 llamadas, 0 errores, p95 1.5 s, US$0.00024, sin alertas.
+  - **Falta ver con sesión:** el panel del navegador no tiene sesión en Core y el inicio de sesión es de Adam. Para probar sin emitir folio: escribir la frase, revisar la tarjeta y darle «Descartar»; «Usar en la cotización» sí crea el borrador con folio.
+
 - **01-11 ~21:30 (claude-code) — Diseñador de videovigilancia, fase 2 de la mejora premium: catálogo de equipos, acceso, alarmas y gabinete en la maqueta, con cable y diagrama (`1c5b082c`).**
   - Adam dijo «Sí, fase 2». Mockups aprobados en el lienzo <https://claude.ai/artifact/PoFrsCNRTWxHrDDYQDAWeY>. Detalle en `docs/DISENADOR-CCTV.md` §4.2, §6 y §10.
   - Qué hay: el panel de equipos va por familia (Cámaras, Rack y red, Acceso, Alarmas, Ambientación) y «+ Agregar equipo» guarda el modelo en el catálogo. Lo de rack entra solo al gabinete; lo de muro se pega al muro; la terminal se liga a la puerta cercana. Hay vista «Diagrama» y página `/erp/videovigilancia/catalogo`.
