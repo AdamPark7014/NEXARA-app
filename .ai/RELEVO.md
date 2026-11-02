@@ -1,5 +1,26 @@
 # RELEVO
 
+- **02-11 ~12:20 (claude-code) — Sync de CT: leía 5,000 filas de 14,877 (`575471cd`). Encargo a raíz del aviso «hoy en CT»: 32 filas USD activas con el dólar de agosto a octubre.**
+  - **Causa:** `PrismaService` corta en 5,000 todo `findMany` sin `take` (`prisma/row-cap.ts`) y `CtCatalogSyncService.correr()` leía así la tabla. El log lo decía en cada corrida: `recortada al tope de 5000 filas: modelo=ProductCT`.
+  - **Qué hacía el recorte:**
+    - CT ya no publica esas filas: ninguna de las 32 está en `productos.json` ni en `productos.xml` (bajados el 02-11). Solo se apagaban si caían entre las 5,000 leídas: el XML de las 16:53 UTC apagó 86 y dejó 35 (32 USD y 3 MXN). `pullFull`, `ct-xml.ts` y las firmas estaban bien.
+    - Lo que caía fuera parecía nuevo y se reescribía: 1,552 filas a las 17:00 UTC y 1,555 a las 18:00, con el mismo archivo que la corrida anterior. **Corrige el relevo de las 11:15:** «el sync solo escribe lo que cambió» no pasaba en producción, y sus 5,437 y 10,689 escritas estaban infladas.
+    - La regla de no apagar si el XML trae menos de la mitad se contaba contra 5,000, no contra todo lo activo.
+  - **Arreglo:** `leerCatalogoGuardado()` lee por páginas de 2,000 con `take`, que no pasa por el tope. Tres pruebas nuevas, con el tope real de `row-cap.ts`, fallaban antes del arreglo.
+  - **Producción (API arriba a las 18:04 UTC):**
+    - XML de las 18:05 UTC, encolado a mano con los mismos datos que el cron: 14,756 leídas, 141 escritas (antes 10,689), 35 apagadas, 12.5 s.
+    - USD activas: 7,870, todas en 18.92. Con otro tipo de cambio: 0. Catálogo: 14,877 filas, 14,734 activas, 143 apagadas.
+    - JSON de las 18:15 UTC: 5,618 leídas, 0 escritas. Un cruce aparte, sin usar las firmas, da 0 diferencias en precio, tipo de cambio y existencia.
+    - Ensayo sin escrituras a las 18:17 UTC: otro XML escribiría 0 y apagaría 0. Ninguna fila alterna entre XML y JSON.
+    - Las 35 apagadas no tienen `OrderItem` ni `supplier_products` activos. La API sigue sana: 445 MB de 2.5 GB tras la corrida XML.
+  - **Pruebas:** suites de `smart-quote`, 7 con 49 pruebas en verde. Sin errores de tipos en los archivos tocados; `tsc` en mi copia da errores en otros archivos, y no los revisé. No corrí la suite completa de la API: el cambio solo toca este servicio.
+  - **Sin verificar:** el buscador no se probó en pantalla (inicio de sesión de Adam); filtra `activo` en todas sus rutas según el código. La primera corrida XML del propio cron es la de las 22:00 UTC: debe escribir pocas filas. Si escribe miles, algo volvió a pasar.
+  - **Trampas:**
+    - El comentario de `row-cap.ts` dice «con los datos de hoy no recorta nada», y ya no es cierto: el aviso sale en el log y nadie lo mira. Otras tablas con más de 5,000 filas: `integra_push_events`, `audit_logs`, `notifications` y `LocationTracking`. No revisé si algún `findMany` sin `take` de esas tablas se está recortando.
+    - `desplegar-cuando-libre.sh` por ssh abierto muere si se corta la conexión mientras espera, y el despliegue no se lanza. Va con `nohup` en el servidor.
+    - `docker exec -i` dentro de un `bash -s` se come el resto del script: sin `-i`.
+  - No se delegó a Ollama: era un arreglo chico, y el diagnóstico dependía de medir en producción.
+
 - **02-11 (claude-code) — «Asignar con IA»: entra José Antonio Ramírez.** Adam lo eligió entre los dos Antonios; en la base es José Antonio Ramírez Salazar (id 39, `jose.ramirez@`,
   Encargado de soporte), no Antonio Hernández Matías. Va por correo, como David, en `ASISTENTE_POR_CORREO` (`ai/asistente/tipos-actividad.ts`) y `puedeAsignarConIa` (web). Crea tarea, proyecto,
   servicio y comercial, igual que `CREATE_BY_EMAIL`; solo le salen las personas que ya puede asignar.
