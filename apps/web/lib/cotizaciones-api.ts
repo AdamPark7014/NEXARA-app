@@ -518,6 +518,77 @@ export function buscarPartidasFrecuentes(
   });
 }
 
+/** Una opción para cambiar la partida propuesta con un clic. */
+export type OpcionPropuesta = {
+  fuente: "usada" | "catalogo" | "formato" | "paquete" | "libre";
+  name: string;
+  description: string | null;
+  brand: string | null;
+  model: string | null;
+  unit: string | null;
+  unitCost: number | null;
+  unitPrice: number;
+  grupo: string | null;
+  imagenUrl: string | null;
+  veces: number;
+  ultimaVez: string | null;
+  stock: number | null;
+  productCtId: number | null;
+};
+
+export type PartidaPropuesta = Omit<OpcionPropuesta, "unit"> & {
+  /** Lo que se pidió. */
+  pedido: string;
+  cantidad: number;
+  unidad: string;
+  seguridad: "alta" | "media" | "ninguna";
+  alternativas: OpcionPropuesta[];
+};
+
+export type ClientePropuesta = {
+  salesClientId: number | null;
+  nombre: string;
+  /** alta = es este; media = parece; nuevo = no está; generico = no lo dijeron. */
+  seguridad: "alta" | "media" | "nuevo" | "generico";
+  parecidos: Array<{ id: number; nombre: string }>;
+};
+
+/** Lo que devuelve `POST cotizaciones/interpretar`: una propuesta para revisar, sin nada guardado. */
+export type PropuestaCotizacion = {
+  via: "lista" | "codigo" | "ia";
+  cliente: ClientePropuesta;
+  proyecto: string;
+  segmento: string;
+  /** Margen dicho en la frase; `null` si no se dijo. */
+  margen: number | null;
+  margenPorOmision: number;
+  conIva: boolean;
+  partidas: PartidaPropuesta[];
+  complementos: PartidaPropuesta[];
+  parecida: { id: number; folio: string; cliente: string; proyecto: string | null; enComun: number; deLineas: number } | null;
+  avisos: string[];
+};
+
+/** La API intenta con la IA hasta unos 16 s y luego responde con lo que leyó el código. */
+const ESPERA_INTERPRETAR_MS = 25_000;
+
+/** «Cotizar con IA»: de una frase o una lista pegada a una propuesta. No guarda nada. */
+export async function interpretarCotizacion(token: string, texto: string, opciones: { excluir?: number | null } = {}) {
+  const senal = typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(ESPERA_INTERPRETAR_MS) : undefined;
+  try {
+    return await cotFetch<PropuestaCotizacion>("cotizaciones/interpretar", token, {
+      method: "POST",
+      body: JSON.stringify({ texto, ...(opciones.excluir ? { excluir: opciones.excluir } : {}) }),
+      signal: senal,
+    });
+  } catch (e) {
+    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+      throw new Error("Tardó demasiado en contestar: vuelve a intentarlo o captura a mano.");
+    }
+    throw e;
+  }
+}
+
 /** URL del PDF «Propuesta técnica» (requiere sesión). */
 export function urlPdfCotizacion(id: number) {
   return buildApiUrl(`cotizaciones/${id}/pdf`);

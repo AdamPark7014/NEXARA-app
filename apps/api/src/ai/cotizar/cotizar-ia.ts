@@ -39,9 +39,9 @@ export const PROMPT_COTIZAR = `Pasas a renglones lo que alguien de una empresa m
 lineas: un renglón por cada cosa que se pide, en el orden dicho.
 - cant: cuántas se piden; «un par» = 2, «una docena» = 12; null si no lo dijeron. Lo que describe al producto no es cantidad: «cable HDMI de 5 metros» es 1, «licencia de 300 usuarios y 40 dispositivos» es 1, «switch de 48 puertos» es 1. «120 metros de cable» y «120 metros de tendido» sí son 120.
 - unidad: Metro si la cantidad va en metros; Servicio para instalación, configuración, mantenimiento o mano de obra; Lote para canalización o un conjunto sin cantidad; Licencia, Caja, Kit u Hora si lo dijeron así. null en lo demás.
-- concepto: el producto con sus datos (tipo, marca, modelo, capacidad, canales), sin la cantidad y sin verbos. «NVR de 32» es «NVR 32 canales». Corrige lo mal oído: «en ve erre» es NVR, «de ve erre» es DVR, «pe o e» es PoE, «u pe ese» es UPS.
+- concepto: el producto con sus datos (tipo, marca, modelo, capacidad, canales), sin la cantidad y sin verbos, con las palabras que usaron: no traduzcas ni renombres («body cam» sigue siendo «body cam»). «NVR de 32» es «NVR 32 canales». Corrige lo mal oído: «en ve erre» es NVR, «de ve erre» es DVR, «pe o e» es PoE, «u pe ese» es UPS.
 - Si el producto lleva «instaladas» o «con instalación», agrega «Instalación de <lo que se instala>» con la misma cantidad y unidad Servicio. Si la instalación se dice aparte y sin cantidad («... e instalación y configuración»), es un solo renglón con cant null. «Traslado e instalación de X» también es uno.
-- «con» puede describir el mismo producto o sumar otro: «cámaras con audio» es un renglón; «cámaras con NVR» y «con envío» son dos.
+- «con» puede describir el mismo producto o sumar otro: «cámaras con audio» es un renglón; «cámaras con NVR» son dos, y «con envío» agrega un renglón de 1.
 - Un servicio sobre equipos es un solo renglón: «mantenimiento a 29 cámaras» es 29 de «Mantenimiento a cámaras».
 - No agregues nada que no pidieron: ni armado, ni póliza, ni renglones de título.
 

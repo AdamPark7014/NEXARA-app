@@ -125,6 +125,40 @@ describe('lo que no se ha cotizado', () => {
   });
 });
 
+describe('las opciones que se ofrecen', () => {
+  it('lo que es lo pedido va primero, aunque otra fuente sea más barata', () => {
+    const { opciones } = emparejar('Cámara domo', [
+      candidato('Caja de conexiones para cámara domo', { fuente: 'paquete', unitPrice: 100, model: 'CAJA' }),
+      candidato('Cámara domo Dahua', { fuente: 'catalogo', unitCost: 500, stock: 3, model: 'A', brand: 'Dahua' }),
+      candidato('Cámara domo Uniarch', { fuente: 'catalogo', unitCost: 450, stock: 3, model: 'B', brand: 'Uniarch' }),
+    ]);
+    expect(opciones.map((o) => o.model)).toEqual(['B', 'A', 'CAJA']);
+  });
+
+  it('«Canalización» también ofrece el trabajo, no solo el material', () => {
+    const { opciones, seguridad } = emparejar('Canalización', [
+      candidato('Instalación y trazo de canalización en interiores', { unitPrice: 3500 }),
+      candidato('Canaleta blanca PVC 20x10', { unitPrice: 69 }),
+      candidato('Sección L para canaleta', { unitPrice: 14 }),
+    ]);
+    expect(seguridad).not.toBe('alta');
+    expect(opciones.map((o) => o.unitPrice)).toContain(3500);
+  });
+});
+
+describe('nombres largos pegados de una ficha', () => {
+  const ficha = 'Convertidor Fibra Óptica Monomodo o Multimodo / 1 Puerto SFP 1000 Mbps / 1 Puerto RJ45 10/100/1000 con conector LC';
+
+  it('lo pedido debe abrir el nombre: un convertidor no es un conector', () => {
+    expect(emparejar('Conector RJ45', [candidato(ficha)]).seguridad).not.toBe('alta');
+  });
+
+  it('o coincidir en varias cifras y marcas, como «Memoria HPE 32 GB»', () => {
+    const r = emparejar('Memoria HPE 32 GB DDR5 4800', [candidato('HPE 32GB (1x32gb) Dual Rank x8 DDR5-4800 CAS-40-39-39 EC8 Registered Smart Memory Kit', { brand: 'HPE', model: 'P43328' })]);
+    expect(r).toMatchObject({ seguridad: 'alta', elegida: { model: 'P43328' } });
+  });
+});
+
 describe('una sola palabra', () => {
   it('contra un nombre largo se ofrece; contra uno corto se elige', () => {
     expect(emparejar('Canalización', [candidato('Suministro y colocación de tubo conduit metálico galvanizado pared delgada')]).seguridad).not.toBe('alta');
