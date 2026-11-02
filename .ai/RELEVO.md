@@ -1,5 +1,15 @@
 # RELEVO
 
+- **01-11 ~20:15 (claude-code) — Padrón: limpieza de cuatro fichas, autorizada por Adam («Sí, aplícalos»). Solo datos de producción, sin cambio de código.**
+  - «Bodega de» (ficha 25) ahora es «Concretos Pronto», igual que su cliente de operación 42. La cotización 15 decía «Bodega de» como empresa y se corrigió; la 14 conserva su texto.
+  - «Licencia» (29) no era cliente: la cotización 23 pasó a A QUIEN CORRESPONDA, con su nombre de proyecto intacto, y se borraron `sales_clients` 29 y `service_clients` 46.
+  - De A QUIEN CORRESPONDA salieron tres cotizaciones que sí decían de quién eran: 10 → ficha 41, 39 → ficha 42, 36 → ficha 43 (operación 58, 59 y 60). Se crearon como lo hace `vincularClienteDeOperacion`, con sector Comercial y de encargada quien hizo la cotización. En la 36 se vació `clientCompany`, que decía «A QUIEN CORRESPONDA».
+  - «GAMING» (22, sin nada ligado) se borró con `service_clients` 39.
+  - Comercial pasa de 29 a 30 clientes; empresa 1 de 31 a 32; A QUIEN CORRESPONDA de 22 a 20 cotizaciones, con sus 21 actividades. No se tocaron montos ni el `updatedAt` de las cotizaciones.
+  - **Para deshacer:** bitácora `audit_logs` con `action = 'client.cleanup'` (6 filas: ficha y cliente de operación de antes en las tres viejas, cotización de origen en las tres nuevas) y copia en `/root/limpieza-clientes-20261101.json` del Hetzner, con el texto anterior de las cotizaciones. Ahí no hay respaldos automáticos.
+  - Sin tocar: «SE» (33), hasta que José Antonio confirme de quién es.
+  - Verificado en producción con la cuenta de Christian, solo leyendo: 30 en Comercial sin «Licencia», «GAMING» ni «Bodega de»; las fichas 22 y 29 dan «Cliente no encontrado»; la lista de cotizaciones muestra las cinco con su cliente nuevo. No se abrió el editor de esas cotizaciones ni se generó su PDF.
+
 - **01-11 ~18:45 (claude-code) — Libro de costos: Adam eligió vehículos como siguiente fase; mockup publicado, sin código.**
   - Mockup privado: https://claude.ai/artifact/2DNGd9xCSM7fG9zAfBPijs. Ocho pantallas: flotilla, alta con manual, revisión con la fuente de cada dato, ficha, especificaciones,
     dos de app (regreso y gasolina) y la pestaña Costos del proyecto. Decisiones y tamaño: `docs/COSTOS-PRECIOS-UNITARIOS.md`, «Fase 3 ampliada». **No construir hasta su visto bueno.**
