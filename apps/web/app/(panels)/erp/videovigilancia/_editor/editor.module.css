@@ -772,9 +772,10 @@
 .boton3d {
   height: 32px;
   padding: 0 var(--ui-s3);
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-sm);
-  background: var(--ui-surface);
+  border: 1px solid color-mix(in srgb, var(--ui-border) 70%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ui-surface) 76%, transparent);
+  backdrop-filter: blur(16px) saturate(1.5);
   color: var(--ui-fg);
   font: inherit;
   font-size: var(--ui-fs-label);
@@ -1496,10 +1497,11 @@
   display: flex;
   gap: 2px;
   padding: 3px;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
-  box-shadow: var(--ui-elev-1);
+  background: color-mix(in srgb, var(--ui-surface) 76%, transparent);
+  backdrop-filter: blur(16px) saturate(1.5);
+  border: 1px solid color-mix(in srgb, var(--ui-border) 70%, transparent);
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(15, 20, 28, 0.14);
   z-index: 1;
 }
 
@@ -1617,20 +1619,45 @@
 }
 
 /* Brújula del 3D: gira con el modelo. */
-.brujula {
+/* Se arrastra para girar e inclinar, como la de Mapas. */
+.brujulaBoton {
   position: absolute;
   right: var(--ui-s3);
-  bottom: 110px;
-  width: 44px;
-  height: 44px;
+  bottom: 106px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
   display: grid;
   place-items: center;
+  border: 1px solid color-mix(in srgb, var(--ui-border) 70%, transparent);
   border-radius: 50%;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  box-shadow: var(--ui-elev-1);
+  background: color-mix(in srgb, var(--ui-surface) 76%, transparent);
+  backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: 0 4px 18px rgba(15, 20, 28, 0.16);
+  cursor: grab;
+  touch-action: none;
   z-index: 1;
-  pointer-events: none;
+  transition: transform 0.16s ease;
+}
+
+.brujulaBoton:hover {
+  transform: scale(1.06);
+}
+
+.brujulaBoton:active {
+  cursor: grabbing;
+  transform: scale(0.97);
+}
+
+.brujulaBoton:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 2px;
+}
+
+.brujula {
+  display: grid;
+  place-items: center;
+  will-change: transform;
 }
 
 /* Celular: menos margen, herramientas en una tira que se desliza, lienzo más alto y sin la leyenda encima. */
@@ -1782,33 +1809,6 @@
 
 /* ── Moverse por la maqueta ── */
 
-.segmentoVista {
-  display: inline-flex;
-  padding: 2px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-sm);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-elev-1);
-}
-
-.segmentoVista button {
-  height: 26px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ui-fg-2);
-  font: inherit;
-  font-size: var(--ui-fs-label);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.segmentoVista button[aria-pressed="true"] {
-  background: var(--ui-fg);
-  color: var(--ui-surface);
-}
-
 .botonRecorrer {
   display: inline-flex;
   align-items: center;
@@ -1837,20 +1837,39 @@
 
 .pistaVista {
   position: absolute;
-  left: 256px;
-  right: 66px;
-  bottom: 112px;
-  width: fit-content;
-  max-width: calc(100% - 322px);
-  margin: 0 auto;
-  padding: 6px 13px;
-  border-radius: 999px;
-  background: rgba(15, 18, 23, 0.78);
-  color: #fff;
+  left: 50%;
+  bottom: 158px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 14px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  margin: 0;
+  padding: 9px 16px;
+  border-radius: 16px;
+  background: rgba(22, 26, 32, 0.72);
+  backdrop-filter: blur(18px) saturate(1.6);
+  box-shadow: 0 8px 28px rgba(10, 14, 20, 0.28);
+  color: rgba(255, 255, 255, 0.82);
   font-size: var(--ui-fs-meta);
   text-align: center;
   pointer-events: none;
   z-index: 1;
+  animation: aparecePista 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.pistaVista b {
+  color: #fff;
+  font-weight: 650;
+}
+
+@keyframes aparecePista {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
 }
 
 .tarjetaPieza {

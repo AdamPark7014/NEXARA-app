@@ -29,7 +29,8 @@ import {
   type TipoElemento,
 } from "@/lib/cctv/editor";
 import { elevacionTexto, type NivelConPlano } from "@/lib/cctv/niveles";
-import { MotorMaqueta, type ModoArrastre, type Montaje } from "@/lib/cctv/maqueta/motor";
+import type { Gesto } from "@/lib/cctv/maqueta/controlVista";
+import { MotorMaqueta, type Montaje } from "@/lib/cctv/maqueta/motor";
 import { claveCamara, claveEquipo, limitesEdificio, limitesSitio } from "@/lib/cctv/medidas";
 import { lugarParaCamara, moverCamaraPegada, moverEquipoPegado, pegarAMuros, RADIO_PEGADO_M, type Pegado } from "@/lib/cctv/pegado";
 import { dirRumbo, type MaterialPiso, type Plano, type Punto, type Tapa, type TipoMueble } from "@/lib/cctv/plano";
@@ -60,7 +61,11 @@ const SIN_NIVELES: readonly NivelConPlano[] = [];
 const TIPO_RECORRER = "application/x-cctv-recorrer";
 /** Lo que se mueve siempre al arrastrarlo. Lo demás (áreas, muebles) solo si ya está elegido: si no, arrastrar sobre el piso movería el piso. */
 const MOVIBLES_DE_UNA: ReadonlySet<TipoElemento> = new Set(["camara", "persona", "equipo"]);
-const TECLAS_DE_MOVER: ReadonlySet<string> = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight"]);
+/** Ya usó dos gestos distintos: la ayuda de cómo moverse no vuelve a salir sola. */
+const PISTA_APRENDIDA = "nx-cctv-gestos-aprendidos";
+/** Más cerca de esto, el doble clic ya no acerca: entra a caminar. */
+const DISTANCIA_PARA_ENTRAR_M = 14;
+const TECLAS_DE_MOVER: ReadonlySet<string> = new Set(["KeyW", "Equal", "Minus", "NumpadAdd", "NumpadSubtract", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight"]);
 const ICONO_CAMINAR = "M13.5 5.5a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6zM9.8 22l1.4-6-2.1-2V9.4L7 10.4V14H5V9.2l4.6-2.3c.6-.3 1.3-.3 1.9 0 .6.3 1 .7 1.4 1.3l1.1 1.8c.6 1 1.7 1.8 3 1.9v2c-1.8-.1-3.3-1-4.3-2.2l-.6 3 2.1 2V22h-2v-5.5l-2.1-2-1.3 7.5z";
 
 type Arrastre =
@@ -145,11 +150,18 @@ export default function Maqueta3D({
   const [recorriendo, setRecorriendo] = useState(false);
   const recorriendoRef = useRef(false);
   recorriendoRef.current = recorriendo;
-  const [modoVista, setModoVista] = useState<ModoArrastre>("deslizar");
   const [guiando, setGuiando] = useState(false);
   const [apuntando, setApuntando] = useState<string | null>(null);
   const [aqui, setAqui] = useState<{ area: string | null; teVen: TeVe[] }>({ area: null, teVen: [] });
-  const [pistaVista, setPistaVista] = useState(true);
+  // La ayuda sale hasta que usa dos gestos distintos; después, con el botón «?».
+  const [pistaVista, setPistaVista] = useState(() => {
+    try {
+      return localStorage.getItem(PISTA_APRENDIDA) !== "1";
+    } catch {
+      return true;
+    }
+  });
+  const gestosUsados = useRef(new Set<Gesto>());
   const [completa, setCompleta] = useState(false);
   const marcador = useRef<SVGGElement>(null);
   const ultimaLectura = useRef("");
@@ -262,6 +274,19 @@ export default function Maqueta3D({
         alPerderContexto: () => perderRef.current(),
         alFallarCroquis: () => avisoRef.current("El croquis no se pudo cargar en la maqueta; sigue en el dibujo 2D."),
         alTerminarGuiado: () => setGuiando(false),
+        alArrastrarVista: (activo) => setCursor(activo ? "grabbing" : "grab"),
+        alUsarGesto: (g) => {
+          const usados = gestosUsados.current;
+          if (usados.has(g)) return;
+          usados.add(g);
+          if (usados.size < 2) return;
+          setPistaVista(false);
+          try {
+            localStorage.setItem(PISTA_APRENDIDA, "1");
+          } catch {
+            // Sin almacenamiento la ayuda vuelve a salir la próxima vez, y ya.
+          }
+        },
       });
     } catch {
       perderRef.current();
@@ -348,9 +373,12 @@ export default function Maqueta3D({
         else if (recorriendo) salirRecorrido();
       }
       if (e.key.toLowerCase() === "f") enfocarSeleccion();
+      if (e.code === "Space" && t?.tagName !== "BUTTON" && !recorriendo) {
+        motor.current?.conEspacio(true);
+        e.preventDefault();
+      }
       if (!e.ctrlKey && !e.metaKey && !e.altKey && TECLAS_DE_MOVER.has(e.code)) {
         motor.current?.tecla(e.code, true);
-        setPistaVista(false);
         if (e.code.startsWith("Arrow")) e.preventDefault();
       }
     };
@@ -359,8 +387,14 @@ export default function Maqueta3D({
   });
 
   useEffect(() => {
-    const suelta = (e: KeyboardEvent) => motor.current?.tecla(e.code, false);
-    const fuera = () => motor.current?.soltarTeclas();
+    const suelta = (e: KeyboardEvent) => {
+      if (e.code === "Space") motor.current?.conEspacio(false);
+      motor.current?.tecla(e.code, false);
+    };
+    const fuera = () => {
+      motor.current?.conEspacio(false);
+      motor.current?.soltarTeclas();
+    };
     const pantalla = () => setCompleta(Boolean(document.fullscreenElement));
     window.addEventListener("keyup", suelta);
     window.addEventListener("blur", fuera);
@@ -484,11 +518,11 @@ export default function Maqueta3D({
   };
 
   const mirada = useRef<{ x: number; y: number; ux: number; uy: number; movio: boolean; sel: Seleccion | null } | null>(null);
+  const giroBrujula = useRef<{ x: number; y: number; movio: boolean } | null>(null);
 
   const alPresionar = (e: ReactPointerEvent<HTMLDivElement>) => {
     const m = motor.current;
     if (!m || e.target !== lienzo.current || verDesde) return;
-    setPistaVista(false);
     if (e.button !== 0 || e.shiftKey) {
       if (recorriendo) {
         mirada.current = { x: e.clientX, y: e.clientY, ux: e.clientX, uy: e.clientY, movio: true, sel: null };
@@ -825,7 +859,10 @@ export default function Maqueta3D({
           return;
         }
         const piso = m.pisoEn(x, y);
-        if (piso) entrarRecorrido(piso);
+        if (!piso) return;
+        // Doble clic acerca, y ya de cerca, entra: dos dobles clics y se está adentro.
+        if (m.distanciaVista > DISTANCIA_PARA_ENTRAR_M) m.acercarseA(piso);
+        else entrarRecorrido(piso);
       }}
       onDragOver={(e) => e.preventDefault()}
       onDrop={alSoltarEquipo}
@@ -835,7 +872,7 @@ export default function Maqueta3D({
         className={styles.maquetaLienzo}
         style={{ cursor: apuntando || herramienta !== "seleccionar" ? "crosshair" : cursor }}
         role="img"
-        aria-label={recorriendo ? "Caminando dentro del sitio. Usa las flechas o W A S D para moverte, arrastra para mirar y haz clic en el piso para ir." : "Vista 3D del sitio: maqueta con muros, equipos a su altura de montaje y cobertura en el piso. Arrastra para deslizar, clic derecho para girar y rueda para acercar."}
+        aria-label={recorriendo ? "Caminando dentro del sitio. Usa las flechas o W A S D para moverte, arrastra para mirar y haz clic en el piso para ir." : "Vista 3D del sitio: maqueta con muros, equipos a su altura de montaje y cobertura en el piso. Arrastra para girar, usa dos dedos o clic derecho para deslizar, y pellizca o usa la rueda para acercar."}
         onContextMenu={(e) => e.preventDefault()}
       />
       {!listo ? <p className={styles.maquetaCarga}>Armando la maqueta…</p> : null}
@@ -1059,28 +1096,20 @@ export default function Maqueta3D({
 
       {!verDesde && !recorriendo ? (
         <>
-          {pistaVista && herramienta === "seleccionar" ? <p className={styles.pistaVista}>Arrastra para deslizar · clic derecho para girar · doble clic en el piso para entrar</p> : null}
+          {pistaVista && herramienta === "seleccionar" ? (
+            <p className={styles.pistaVista}>
+              <span>
+                <b>Arrastra</b> para girar
+              </span>
+              <span>
+                <b>Dos dedos</b> o <b>clic derecho</b> para deslizar
+              </span>
+              <span>
+                <b>Pellizca</b> o usa la <b>rueda</b> para acercar
+              </span>
+            </p>
+          ) : null}
           <div className={styles.controles3d}>
-            <div className={styles.segmentoVista} role="group" aria-label="Qué hace arrastrar">
-              {(
-                [
-                  ["deslizar", "Deslizar"],
-                  ["girar", "Girar"],
-                ] as const
-              ).map(([id, texto]) => (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={modoVista === id}
-                  onClick={() => {
-                    setModoVista(id);
-                    motor.current?.modoArrastre(id);
-                  }}
-                >
-                  {texto}
-                </button>
-              ))}
-            </div>
             <button
               type="button"
               className={styles.botonRecorrer}
@@ -1104,24 +1133,53 @@ export default function Maqueta3D({
               Vista superior
             </button>
           </div>
-          <span ref={brujula} className={styles.brujula} role="img" aria-label="Norte" title="Norte">
-            <svg viewBox="0 0 32 32" width="34" height="34" aria-hidden="true">
-              <text x="16" y="8.5" textAnchor="middle" fontSize="8" fontWeight="800" fill="var(--ui-brand-text)">
-                N
-              </text>
-              <path d="M16 10l3.6 7H12.4z" fill="var(--ui-brand)" />
-              <path d="M16 27l-3.6-10h7.2z" fill="var(--ui-fg-4)" />
-              <circle cx="16" cy="17" r="1.6" fill="var(--ui-surface)" stroke="var(--ui-fg-3)" strokeWidth="0.8" />
-            </svg>
-          </span>
+          <button
+            type="button"
+            className={styles.brujulaBoton}
+            aria-label="Brújula: arrástrala para girar e inclinar; un clic pone el norte arriba"
+            title="Arrástrala para girar e inclinar. Un clic pone el norte arriba."
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              giroBrujula.current = { x: e.clientX, y: e.clientY, movio: false };
+            }}
+            onPointerMove={(e) => {
+              const g = giroBrujula.current;
+              if (!g) return;
+              const dx = e.clientX - g.x;
+              const dy = e.clientY - g.y;
+              if (!g.movio && Math.hypot(dx, dy) < 3) return;
+              g.movio = true;
+              g.x = e.clientX;
+              g.y = e.clientY;
+              motor.current?.girarPx(dx, dy);
+            }}
+            onPointerUp={(e) => {
+              const g = giroBrujula.current;
+              giroBrujula.current = null;
+              e.currentTarget.releasePointerCapture(e.pointerId);
+              if (g && !g.movio) motor.current?.alNorte(plano.norteDeg);
+            }}
+            onPointerCancel={() => {
+              giroBrujula.current = null;
+            }}
+          >
+            <span ref={brujula} className={styles.brujula}>
+              <svg viewBox="0 0 32 32" width="34" height="34" aria-hidden="true">
+                <text x="16" y="8.5" textAnchor="middle" fontSize="8" fontWeight="800" fill="var(--ui-brand-text)">
+                  N
+                </text>
+                <path d="M16 10l3.6 7H12.4z" fill="var(--ui-brand)" />
+                <path d="M16 27l-3.6-10h7.2z" fill="var(--ui-fg-4)" />
+                <circle cx="16" cy="17" r="1.6" fill="var(--ui-surface)" stroke="var(--ui-fg-3)" strokeWidth="0.8" />
+              </svg>
+            </span>
+          </button>
           <Navegacion
             lugar="abajo"
             botones={[
-              { etiqueta: "Girar a la izquierda", icono: ICONO.girarIzq, accion: () => motor.current?.girar(-45) },
-              { etiqueta: "Girar a la derecha", icono: ICONO.girarDer, accion: () => motor.current?.girar(45) },
+              { etiqueta: "Cómo moverse", icono: ICONO.ayuda, accion: () => setPistaVista((v) => !v) },
               { etiqueta: "Alejar", icono: ICONO.menos, accion: () => motor.current?.acercar(0.8) },
               { etiqueta: "Acercar", icono: ICONO.mas, accion: () => motor.current?.acercar(1.25) },
-              { etiqueta: "Encuadrar todo", icono: ICONO.encuadrar, accion: () => motor.current?.vistaGeneral() },
               { etiqueta: completa ? "Salir de pantalla completa" : "Pantalla completa", icono: ICONO.pantalla, accion: alternarPantalla },
             ]}
           />
