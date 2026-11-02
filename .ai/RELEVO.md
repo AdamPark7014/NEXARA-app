@@ -1,5 +1,9 @@
 # RELEVO
 
+- **02-11 ~23:00 UTC (claude-code) — Diseñador: la maqueta se arma una sola vez al abrir (`c857476b`).** Corrige dos puntos de la entrada de abajo.
+  - Con modelos en el catálogo, `key={catalogo.version}` reiniciaba toda la vista al llegar el catálogo: cada diseño abría creando WebGL y compilando sus 49 programas dos veces. Ahora `versionCatalogo` solo rehace los equipos. Tras el arreglo, los ejemplos 8 y 9 abren en producción; antes congelaban Chrome con la PC sin memoria.
+  - Ya se vio dentro de Core el ejemplo de la frase corregido: bodega, 4 filas de anaqueles, 14 cámaras, 77 %. La Escuela volvió a la lista. Los seis ejemplos abren.
+  - Sigue sin medirse en otra computadora ni con la PC desahogada: abrir tarda alrededor de 5 s con memoria libre, según lo medido antes de este arreglo.
 - **02-11 (claude-code) — Contabilidad y Finanzas, tres detalles que Adam pidió corregir («Sí, corrígelos»).**
   - **Fechas con un día menos:** confirmado en el esquema: `issueDate`, `dueDate`, `date`, `startDate`, `endDate`, `paymentDate`, `transactionDate` y `orderDate` son `@db.Date` y viajan como medianoche UTC. `new Date(iso)` en México las lee el día anterior. No era solo pintura: en Facturas, una factura que vence hoy caía en «vencido». `lib/fecha-calendario.ts` (`aFechaLocal`, `formatoFechaLocal`) trae la regla de `formatoFecha` de Cotizaciones. Corregido en Cierres, Pólizas, Proveedores, Proyectos, Facturas, Facturación con su ficha, Bancos, Por cobrar y Reportes. **Usa esa utilidad para cualquier columna `@db.Date`.**
   - **Facturas canceladas:** pagada, cancelada o borrador ya no dicen «N días vencida». `sigueAbierta` es la misma condición de la lista con saldo.
