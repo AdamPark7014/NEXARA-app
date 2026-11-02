@@ -29,6 +29,11 @@ import { horaAviso } from '../notifications/notification-push-meta.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 import { alcanzaA, esDeTodaLaEmpresa } from '../me/equipo-alcance.js';
 import { cerrarSesionesDeUsuario } from '../activities/sessions/activity-sessions.service.js';
+import { mensajeFrenoSalida, salidaConfirmada, VENTANA_CONFIRMAR_SALIDA_MS } from './freno-salida.js';
+import { ACTIVITY_STATUS, statusVariants } from '../activities/activity-status.js';
+import { ejecutoresDeActividad, yaEntrego } from '../activities/recordatorios-jornada.js';
+import { limiteDeEntrega } from '../activities/semaforo-actividad.js';
+import { NO_CUMPLIDA_VIGENTE_DESDE } from '../activities/incumplimiento.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { DOMAIN_EVENTS, type SalidaDeJornada } from '../domain-events/domain-event.types.js';
 import { MENSAJE_FIN_DE_SEMANA_SIN_GUARDIA, diaDeGuardia } from '../guardias/guardias-reglas.js';
@@ -826,7 +831,8 @@ export class AttendanceService {
       where: {
         ...companyWhere(tenantId),
         ...(soloUno ? { userId: soloUno } : visibles ? { userId: { in: visibles } } : {}),
-        ...(filtros.motivo ? { motivo: filtros.motivo } : {}),
+        // El freno de salida se cuenta aparte: no es una checada rechazada para RH.
+        ...(filtros.motivo ? { motivo: filtros.motivo } : { motivo: { not: MOTIVO_RECHAZO.salidaSinConfirmar } }),
         ...(desde || hasta ? { at: { ...(desde ? { gte: desde } : {}), ...(hasta ? { lte: hasta } : {}) } } : {}),
       },
       orderBy: { at: 'desc' },
@@ -1175,6 +1181,8 @@ export class AttendanceService {
       MOTIVO_RECHAZO.finDeSemanaSinGuardia,
       MOTIVO_RECHAZO.ubicacionApagada,
       MOTIVO_RECHAZO.sinPermisoUbicacion,
+      // Tampoco el freno de salida: es un aviso a la propia persona.
+      MOTIVO_RECHAZO.salidaSinConfirmar,
     ];
     if (!sinAviso.includes(motivo)) {
       await this.avisarChecadaMarcada({
@@ -1194,6 +1202,110 @@ export class AttendanceService {
     }
 
     throw new UnprocessableEntityException(mensaje);
+  }
+
+  /**
+   * Si la salida detendría un reloj o dejaría algo «No cumplida», la primera vez avisa y no registra.
+   * El aviso queda en `attendance_rejections`, y de ahí sale tanto la confirmación como la medición
+   * de cuántas salidas se evitaron (`freno-salida.ts`).
+   */
+  private async frenoDeSalida(
+    ctx: Parameters<AttendanceService['rechazar']>[0],
+    ahora: Date,
+    tenantId: number,
+  ): Promise<void> {
+    const prisma = this.prisma as any;
+    if (
+      typeof prisma?.attendanceRejection?.findFirst !== 'function' ||
+      typeof prisma?.activityWorkSession?.findMany !== 'function'
+    ) {
+      return;
+    }
+    const finDelDia = workDayEnd(ahora);
+    const [relojes, abiertas] = await Promise.all([
+      prisma.activityWorkSession.findMany({
+        where: { userId: ctx.userId, endedAt: null, ...companyWhere(tenantId) },
+        select: { activity: { select: { anNumber: true } } },
+      }),
+      prisma.activity.findMany({
+        where: {
+          ...companyWhere(tenantId),
+          deletedAt: null,
+          estatus: {
+            in: [
+              ACTIVITY_STATUS.PENDIENTE,
+              ACTIVITY_STATUS.ASIGNADA,
+              ACTIVITY_STATUS.EN_PROCESO,
+              ACTIVITY_STATUS.RECHAZADA,
+            ].flatMap((s) => statusVariants(s)),
+          },
+          OR: [
+            { responsableId: ctx.userId },
+            { assignees: { some: { userId: ctx.userId, retiradoAt: null } } },
+          ],
+          AND: [
+            {
+              OR: [
+                { periodoFin: { lte: finDelDia } },
+                { periodoFin: null, fechaMaxima: { lte: finDelDia } },
+                { periodoFin: null, fechaEntregaEsperada: { lte: finDelDia } },
+              ],
+            },
+          ],
+        },
+        select: {
+          anNumber: true,
+          responsableId: true,
+          assignmentCharge: true,
+          fechaInicio: true,
+          fechaMaxima: true,
+          fechaEntregaEsperada: true,
+          periodoInicio: true,
+          periodoFin: true,
+          assignees: {
+            where: { retiradoAt: null },
+            select: { userId: true, rol: true, asignadoAt: true, finRealAt: true },
+          },
+          activityEvidences: { select: { userId: true, status: true } },
+        },
+        take: 50,
+      }),
+    ]);
+    const corriendo: string[] = [
+      ...new Set<string>(
+        (relojes as Array<{ activity?: { anNumber?: string | null } | null }>)
+          .map((r) => r.activity?.anNumber ?? '')
+          .filter(Boolean),
+      ),
+    ];
+    const porCerrar = (abiertas as any[])
+      .filter((a) => {
+        const limite = limiteDeEntrega(a);
+        if (!limite || limite.getTime() < NO_CUMPLIDA_VIGENTE_DESDE.getTime()) return false;
+        if (limite.getTime() > finDelDia.getTime()) return false;
+        const ejecutores = ejecutoresDeActividad({
+          ...a,
+          assignees: a.assignees.map((m: any) => ({ ...m, rol: String(m.rol) })),
+        });
+        return ejecutores.includes(ctx.userId) && !yaEntrego(ctx.userId, a);
+      })
+      .map((a) => a.anNumber as string);
+
+    const mensaje = mensajeFrenoSalida({ corriendo, porCerrar });
+    if (!mensaje) return;
+
+    const aviso = await prisma.attendanceRejection.findFirst({
+      where: {
+        userId: ctx.userId,
+        motivo: MOTIVO_RECHAZO.salidaSinConfirmar,
+        at: { gte: new Date(ahora.getTime() - VENTANA_CONFIRMAR_SALIDA_MS) },
+        ...companyWhere(tenantId),
+      },
+      orderBy: { at: 'desc' },
+      select: { at: true },
+    });
+    if (salidaConfirmada(aviso?.at, ahora)) return;
+    await this.rechazar(ctx, MOTIVO_RECHAZO.salidaSinConfirmar, mensaje);
   }
 
   /** Lo que se escribe en las columnas de validación de una checada. */
@@ -1841,6 +1953,9 @@ export class AttendanceService {
       }
       throw new BadRequestException('No hay una entrada abierta para cerrar');
     }
+
+    // Lo capturado sin conexión ya pasó: no hay a quién preguntarle.
+    if (!dto.offline) await this.frenoDeSalida(contexto, now, tenantId);
 
     // Salida huérfana de un intento anterior (jornada sigue abierta): se
     // actualiza, no se borra. Un cierre automático de las 23:30 también cae

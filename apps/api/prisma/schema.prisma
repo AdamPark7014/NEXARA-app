@@ -8161,6 +8161,28 @@ model CctvDiseno {
   @@map("cctv_disenos")
 }
 
+/// Cuánto tarda una persona en un proceso, medido en su pantalla (Programa Velocidad Core, 01-11-2026).
+/// Es la línea base de «asignar en 30 segundos» y de cada ola. Solo se agrega; nadie la edita.
+/// Sin relaciones a propósito, como `CctvDiseno`: el aislamiento por empresa lo pone el middleware.
+model ProcesoTiempo {
+  id         Int      @id @default(autoincrement())
+  companyId  Int
+  userId     Int
+  /// asignar | autoasignar | asignar_ia | cotizar | revisar
+  proceso    String   @db.VarChar(20)
+  /// Con la pestaña a la vista: lo que estuvo oculta no cuenta.
+  duracionMs Int
+  clics      Int?
+  /// El registro resultante (actividad, cotización…).
+  entidadId  Int?
+  /// Para separar la mediana: tipo de actividad, «lote», cantidad de partidas…
+  detalle    String?  @db.VarChar(60)
+  at         DateTime @default(now())
+
+  @@index([companyId, proceso, at])
+  @@map("proceso_tiempos")
+}
+
 /// Trayecto de una actividad (Adam, 29-10): «Iniciar trayecto» → llega e «Iniciar actividad» →
 /// «Concluir» en el sitio → regreso a la oficina. Cada tramo se mide aparte del reloj de la
 /// actividad (`ActivityWorkSession`), con lo que daba la ruta con tráfico al salir. Las

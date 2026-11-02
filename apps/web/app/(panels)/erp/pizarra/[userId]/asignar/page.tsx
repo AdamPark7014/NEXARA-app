@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
+import { useCronometroProceso } from "@/lib/cronometro-proceso";
 import { buildApiUrl } from "@/lib/api-base";
 import {
   ACTIVITY_KINDS,
@@ -160,6 +161,7 @@ export default function AsignarActividadPage() {
   const params = useParams();
   const router = useRouter();
   const { user, token } = useUser();
+  const cronometro = useCronometroProceso("asignar", token);
   const userId = Number(params?.userId);
 
   const [kind, setKind] = useState<ActivityKind | null>(null);
@@ -837,6 +839,7 @@ export default function AsignarActividadPage() {
                   />
                 ) : (
                   <OpsActivityForm
+                    cronometro={cronometro}
                     key={`${kind}-${effectiveCharge ?? "none"}-${despachoOnly ? headcount : "x"}`}
                     tone="core"
                     coreKind={kind ?? undefined}

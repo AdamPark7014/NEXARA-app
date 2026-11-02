@@ -33,6 +33,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { GuardiasModule } from './guardias/guardias.module.js';
 import { FestivosModule } from './festivos/festivos.module.js';
 import { CostosModule } from './costos/costos.module.js';
+import { ProcesoTiemposModule } from './proceso-tiempos/proceso-tiempos.module.js';
 import { ProjectsModule } from './projects/projects.module';
 import { ContactMessagesModule } from './contact-messages/contact-messages.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
@@ -140,6 +141,7 @@ import { CctvDisenosModule } from './cctv-disenos/cctv-disenos.module.js';
     GuardiasModule,
     FestivosModule,
     CostosModule,
+    ProcesoTiemposModule,
     ProjectsModule,
     ContactMessagesModule,
     NewsletterModule,
