@@ -1,5 +1,9 @@
 # RELEVO
 
+- **02-11 ~00:10 (claude-code) — «Cotizar con IA»: modelo exacto, y un fallo pasajero al compilar la web.**
+  - **Modelo dicho tal cual:** va primero en las opciones. Se llena solo si ya se cotizó, o si se escribió nada más el modelo y una sola pieza lo tiene. Del mayorista, con más palabras, no: en CT una cinta para la impresora ZC300 también tiene `modelo` «ZC300». Eval: 23 % se llena, 53 % a un clic, 24 % libre; 38/40 sin cambio.
+  - **Trampa de despliegue:** `TypeError: Cannot read properties of null (reading '1')` en `next/font/google/loader.js` al compilar la web es Google Fonts fallando en ese momento, no el código. Ese intento dejó la API nueva y la web anterior, sin cambios web pendientes; Google Fonts respondió bien poco después. Si vuelve a salir, basta con lanzar otra vez `/root/desplegar-cuando-libre.sh`. Revisar `tail /tmp/deploy-api-web.log`: «healthy» y `FIN` no garantizan que la web se haya recompilado.
+
 - **01-11 ~22:30 (claude-code) — «Cotizar con IA»: mejora del modelo (Adam: «mejora el modelo»; nadie lo había usado aún en producción).**
   - **Sonnet no es mejor y Haiku se queda.** Mismas 40 frases reales: Sonnet 37/40, US$0.0023 por llamada, p95 7.8 s; Haiku 38/40, US$0.00011 leyendo caché (0.00024 sin caché), p95 2.6 s en la misma corrida. Sonnet está permitido en el token de `pruebas`, no se cambió `ANTHROPIC_COTIZAR_MODEL`.
   - **Medición nueva en el eval `--real`:** cada renglón contra lo que de verdad se cotizó, y las opciones contra lo pedido. `--ia-guardada archivo.json` reutiliza lo que respondió la IA para afinar sin gastar tokens.
