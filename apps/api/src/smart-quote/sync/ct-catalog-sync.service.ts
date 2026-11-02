@@ -33,6 +33,7 @@ const CORRIDA_CORTADA_MS = 60 * 60_000;
 const MINIMO_PARA_APAGAR = 0.5;
 const APAGAR_DE_A = 500;
 const CEDER_CADA = 500;
+const LEER_DE_A = 2000;
 
 const CAMPOS_COMPARADOS = {
   id: true,
@@ -189,7 +190,7 @@ export class CtCatalogSyncService {
           ? await this.connector.pullFull()
           : await this.connector.pullPrimary();
 
-      const existentes = await this.prisma.productCT.findMany({ select: CAMPOS_COMPARADOS });
+      const existentes = await this.leerCatalogoGuardado();
       const porClave = new Map(existentes.map((f) => [f.clave, f]));
 
       let vistos = 0;
@@ -248,6 +249,21 @@ export class CtCatalogSyncService {
           error: message.slice(0, 2000),
         },
       });
+    }
+  }
+
+  /** Por páginas: un `findMany` sin `take` se corta en 5,000 filas (`row-cap.ts`) y lo demás parecería nuevo o no se apagaría. */
+  private async leerCatalogoGuardado() {
+    const filas: FilaComparada[] = [];
+    for (;;) {
+      const pagina = await this.prisma.productCT.findMany({
+        select: CAMPOS_COMPARADOS,
+        where: { id: { gt: filas[filas.length - 1]?.id ?? 0 } },
+        orderBy: { id: 'asc' },
+        take: LEER_DE_A,
+      });
+      filas.push(...pagina);
+      if (pagina.length < LEER_DE_A) return filas;
     }
   }
 
