@@ -7,6 +7,7 @@ import {
   reglaDeRevision,
   revisaTodo,
   type EslabonRevision,
+  msHabiles,
   revisionEscalada,
   revisionParaTi,
 } from './revision-evidencias';
@@ -201,10 +202,29 @@ describe('a quién le toca revisar (Adam, 01-11: Christian ve todo sin tener que
     expect(revisionParaTi({ ...base, tieneJefe: false })).toBe(true);
   });
 
-  it('revisionEscalada cuenta 24 h exactas; sin fecha no se escala', () => {
-    const ahora = new Date('2026-11-03T18:00:00Z');
-    expect(revisionEscalada(new Date('2026-11-02T18:00:00Z'), ahora)).toBe(true);
-    expect(revisionEscalada(new Date('2026-11-02T18:00:01Z'), ahora)).toBe(false);
+  it('revisionEscalada cuenta 24 h hábiles; sin fecha no se escala', () => {
+    // Martes a miércoles.
+    const ahora = new Date('2026-11-11T18:00:00Z');
+    expect(revisionEscalada(new Date('2026-11-10T17:00:00Z'), ahora)).toBe(true);
+    expect(revisionEscalada(new Date('2026-11-10T19:00:00Z'), ahora)).toBe(false);
     expect(revisionEscalada(null, ahora)).toBe(false);
+  });
+
+  it('el fin de semana no cuenta: lo del viernes en la tarde no le cae a dirección el lunes temprano', () => {
+    const viernes1800 = new Date('2026-11-14T00:00:00Z');
+    expect(revisionEscalada(viernes1800, new Date('2026-11-16T15:00:00Z'))).toBe(false); // lunes 9:00
+    expect(revisionEscalada(viernes1800, new Date('2026-11-17T01:00:00Z'))).toBe(true); // lunes 19:00
+  });
+
+  it('lo que ya estaba pendiente empieza a contar el primer día con la regla nueva', () => {
+    const viejo = new Date('2026-10-20T18:00:00Z');
+    expect(revisionEscalada(viejo, new Date('2026-11-03T18:00:00Z'))).toBe(false); // martes 3
+    expect(revisionEscalada(viejo, new Date('2026-11-04T18:00:00Z'))).toBe(true); // miércoles 4
+  });
+
+  it('msHabiles no cuenta sábado ni domingo', () => {
+    const h = (ms: number) => Math.round(ms / 3_600_000);
+    expect(h(msHabiles(new Date('2026-11-14T18:00:00Z'), new Date('2026-11-15T18:00:00Z')))).toBe(0);
+    expect(h(msHabiles(new Date('2026-11-10T18:00:00Z'), new Date('2026-11-11T18:00:00Z')))).toBe(24);
   });
 });

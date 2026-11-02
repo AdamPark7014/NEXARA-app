@@ -51,7 +51,8 @@ describe('textoEscalada', () => {
 });
 
 describe('EvidenciasEscaladasService', () => {
-  const AHORA = new Date('2026-11-03T16:30:00Z');
+  // Jueves 12-11, 10:30 de México.
+  const AHORA = new Date('2026-11-12T16:30:00Z');
   const hace = (h: number) => new Date(AHORA.getTime() - h * 3_600_000);
   const fila = (userId: number, horas: number, extra: Record<string, unknown> = {}) => ({
     userId,

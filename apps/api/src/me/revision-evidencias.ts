@@ -1,3 +1,4 @@
+import { workClock, workDayEnd } from '../common/time/workday.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 
 /**
@@ -84,10 +85,32 @@ export function reglaDeRevision<T extends EslabonRevision>(opts: {
 /** Pasado esto sin revisar, también le toca a quien está por encima (Programa Velocidad Core). */
 export const HORAS_PARA_ESCALAR = 24;
 
-/** ¿La evidencia lleva más del plazo sin revisar? Sin fecha de envío no se puede decir que sí. */
+/**
+ * El plazo empieza a correr aquí para lo que ya estaba pendiente: el primer día laboral con la regla
+ * nueva. Sin esto, todo lo atrasado le caía a dirección antes de que su jefe supiera que le tocaba.
+ */
+export const REVISION_POR_JEFE_DESDE = new Date('2026-11-03T12:00:00.000Z');
+
+/** Milisegundos entre dos instantes sin contar sábados ni domingos de México. */
+export function msHabiles(desde: Date, hasta: Date): number {
+  let total = 0;
+  let cursor = desde;
+  while (cursor.getTime() < hasta.getTime()) {
+    const finDia = workDayEnd(cursor);
+    const corte = finDia.getTime() < hasta.getTime() ? finDia : hasta;
+    const { weekday } = workClock(cursor);
+    if (weekday !== 0 && weekday !== 6) total += corte.getTime() - cursor.getTime();
+    cursor = new Date(corte.getTime() + 1);
+  }
+  return total;
+}
+
+/** ¿Lleva más del plazo sin revisar, en días hábiles? Sin fecha de envío no se puede decir que sí. */
 export function revisionEscalada(enviadaAt: Date | null | undefined, ahora: Date): boolean {
   if (!enviadaAt) return false;
-  return ahora.getTime() - new Date(enviadaAt).getTime() >= HORAS_PARA_ESCALAR * 60 * 60 * 1000;
+  const enviada = new Date(enviadaAt);
+  const desde = enviada.getTime() > REVISION_POR_JEFE_DESDE.getTime() ? enviada : REVISION_POR_JEFE_DESDE;
+  return msHabiles(desde, ahora) >= HORAS_PARA_ESCALAR * 60 * 60 * 1000;
 }
 
 /**
