@@ -11,6 +11,7 @@ import {
   sumaDe,
   sumarPorRubro,
   ventaSinIva,
+  type DetalleViaje,
   type Rubro,
   type TotalesRubro,
 } from './calculos/libro-costos.js';
@@ -216,7 +217,17 @@ export class CostosProyectoService {
     const filas = ids.length
       ? await this.prisma.costoMovimiento.findMany({
           where: { companyId: tenantId, activityId: { in: ids } },
-          select: { rubro: true, importe: true, cantidad: true, userId: true, nota: true, fecha: true },
+          select: {
+            rubro: true,
+            importe: true,
+            cantidad: true,
+            unidad: true,
+            userId: true,
+            nota: true,
+            fecha: true,
+            activityId: true,
+            detalle: true,
+          },
         })
       : [];
 
@@ -270,7 +281,69 @@ export class CostosProyectoService {
         salidasSinCosto: sinCosto,
         psSinValidar: !parametros.psValidado,
       },
+      vehiculos: await this.vehiculosDelProyecto(tenantId, filas),
       acceso: { detalle: veTodo },
+    };
+  }
+
+  /** Los viajes del proyecto y de qué se compone lo que costaron. */
+  private async vehiculosDelProyecto(
+    companyId: number,
+    filas: ReadonlyArray<{ rubro: string; unidad: string; cantidad: unknown; importe: unknown; fecha: Date; activityId: number; detalle: unknown }>,
+  ) {
+    const delRubro = filas.filter((f) => f.rubro === 'VEHICULO');
+    const viajes = delRubro.filter((f) => f.unidad === 'km');
+    const vehiculoIds = [...new Set(viajes.map((f) => (f.detalle as DetalleViaje | null)?.vehicleId).filter((x): x is number => x != null))];
+    const [vehiculos, actividades] = await Promise.all([
+      vehiculoIds.length
+        ? this.prisma.vehicleAsset.findMany({ where: { companyId, id: { in: vehiculoIds } }, select: { id: true, nombre: true } })
+        : Promise.resolve([] as Array<{ id: number; nombre: string }>),
+      viajes.length
+        ? this.prisma.activity.findMany({
+            where: { companyId, id: { in: [...new Set(viajes.map((f) => f.activityId))] } },
+            select: { id: true, titulo: true },
+          })
+        : Promise.resolve([] as Array<{ id: number; titulo: string }>),
+    ]);
+    const nombreDe = new Map(vehiculos.map((v) => [v.id, v.nombre]));
+    const tituloDe = new Map(actividades.map((a) => [a.id, a.titulo]));
+    const partes = new Map<string, number>();
+    for (const f of viajes) {
+      const d = f.detalle as DetalleViaje | null;
+      for (const [clave, porKm] of Object.entries(d?.tarifa ?? {})) {
+        partes.set(clave, (partes.get(clave) ?? 0) + numero(porKm) * numero(f.cantidad));
+      }
+    }
+    const importeViajes = viajes.reduce((a, f) => a + numero(f.importe), 0);
+    return {
+      km: Math.round(viajes.reduce((a, f) => a + numero(f.cantidad), 0)),
+      importe: redondear(importeViajes),
+      /** Casetas y gasolina sin vehículo: lo que entró directo, sin pasar por los km. */
+      otros: redondear(delRubro.filter((f) => f.unidad !== 'km').reduce((a, f) => a + numero(f.importe), 0)),
+      viajes: viajes
+        .map((f) => {
+          const d = f.detalle as DetalleViaje | null;
+          return {
+            fecha: new Date(f.fecha).toISOString().slice(0, 10),
+            actividad: tituloDe.get(f.activityId) ?? null,
+            vehiculo: d?.vehicleId != null ? (nombreDe.get(d.vehicleId) ?? null) : null,
+            km: Math.round(numero(f.cantidad)),
+            importe: redondear(numero(f.importe)),
+          };
+        })
+        .sort((a, b) => a.fecha.localeCompare(b.fecha)),
+      desglose: [
+        ['co', 'gasolina'],
+        ['d', 'desgaste'],
+        ['im', 'dinero invertido'],
+        ['mn', 'mantenimiento'],
+        ['sm', 'seguro'],
+        ['n', 'llantas'],
+        ['lb', 'aceite'],
+        ['otros', 'tenencia y verificación'],
+      ]
+        .map(([clave, nombre]) => ({ nombre, importe: redondear(partes.get(clave) ?? 0) }))
+        .filter((p) => p.importe > 0),
     };
   }
 

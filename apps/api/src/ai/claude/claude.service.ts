@@ -53,6 +53,8 @@ type PeticionBase = {
   /** Bloques de sistema estables primero: cada uno se marca para caché (máx. 3). */
   sistema: string[];
   usuario: string;
+  /** Fotos que acompañan el mensaje. Van antes del texto. */
+  imagenes?: ReadonlyArray<{ mediaType: 'image/jpeg' | 'image/png' | 'image/webp'; base64: string }>;
   modelo?: string;
   maxTokens?: number;
   /** Esfuerzo de razonamiento. `low` para clasificar y extraer. */
@@ -140,6 +142,18 @@ function tipoDeError(error: InstanceType<typeof Anthropic.APIError>): string | n
   return typeof cuerpo?.error?.type === 'string' ? cuerpo.error.type : null;
 }
 
+/** Sin fotos, el mensaje es texto y nada más: es lo que la caché de las demás funciones ya conoce. */
+export function contenidoDelMensaje(peticion: Pick<PeticionBase, 'usuario' | 'imagenes'>): Anthropic.MessageParam['content'] {
+  if (!peticion.imagenes?.length) return peticion.usuario;
+  return [
+    ...peticion.imagenes.map((i) => ({
+      type: 'image' as const,
+      source: { type: 'base64' as const, media_type: i.mediaType, data: i.base64 },
+    })),
+    { type: 'text' as const, text: peticion.usuario },
+  ];
+}
+
 @Injectable()
 export class ClaudeService {
   private readonly logger = new Logger('Claude');
@@ -212,7 +226,7 @@ export class ClaudeService {
           model: modelo,
           max_tokens: peticion.maxTokens ?? 4096,
           ...(sistema.length ? { system: sistema } : {}),
-          messages: [{ role: 'user', content: peticion.usuario }],
+          messages: [{ role: 'user', content: contenidoDelMensaje(peticion) }],
           ...(thinking ? { thinking } : {}),
           output_config: {
             effort: peticion.esfuerzo ?? 'low',

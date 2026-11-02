@@ -32,6 +32,7 @@ import {
   type MisVehiculos,
   type VehiculoFlota,
 } from "@/lib/vehiculos-api";
+import { leerTablero } from "@/lib/vehiculos-ficha";
 import styles from "../vehiculos-core.module.css";
 
 type Actividad = { id: number; anNumber?: string | null; titulo?: string | null };
@@ -294,6 +295,7 @@ export default function MisVehiculosPage() {
             odometroInicio={captura.odometroInicio}
             loading={enviando}
             onSubmit={enviarCaptura}
+            leerTablero={(foto) => leerTablero(token, foto, captura.modo === "devolucion" ? captura.odometroInicio : null)}
           />
         )}
       </Modal>

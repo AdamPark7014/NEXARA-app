@@ -2,19 +2,26 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import PageHeader from "@/components/ui/PageHeader";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import Modal from "@/components/ui/Modal";
 import { Tag } from "@/components/ui/DataTable";
-import { SkeletonRows } from "@/components/base";
+import { ButtonLink, SkeletonRows } from "@/components/base";
+import { Aviso } from "@/components/mesa-contable/piezas";
 import { useUser } from "@/components/UserContext";
+import EspecificacionesVehiculo from "@/components/vehiculos/EspecificacionesVehiculo";
+import GasolinaVehiculo, { CargarGasolina } from "@/components/vehiculos/GasolinaVehiculo";
+import MantenimientoVehiculo, { RegistrarServicio } from "@/components/vehiculos/MantenimientoVehiculo";
+import ResumenVehiculo from "@/components/vehiculos/ResumenVehiculo";
+import { KpiBanda, c, v } from "@/components/vehiculos/piezas";
+import { pesos2 } from "@/lib/costos";
 import { formatApiError } from "@/lib/erp-api";
-import { VEHICULOS_PATH } from "@/lib/recursos-core";
+import { VEHICULOS_PATH, puedeGestionarInventarioVehiculos } from "@/lib/recursos-core";
 import { googleMapsLink } from "@/lib/static-map";
+import { fechaCorta, getFicha, km, kmPorLitro, type FichaVehiculo } from "@/lib/vehiculos-ficha";
 import {
   ETIQUETA_SLOT,
   etiquetaEstatus,
@@ -31,17 +38,40 @@ import {
 } from "@/lib/vehiculos-api";
 import styles from "../vehiculos-core.module.css";
 
-/** Ficha de un vehículo: quién lo trae y cada viaje con su evidencia. */
+const PESTANAS = [
+  { id: "resumen", texto: "Resumen" },
+  { id: "especificaciones", texto: "Especificaciones" },
+  { id: "viajes", texto: "Viajes" },
+  { id: "gasolina", texto: "Gasolina" },
+  { id: "mantenimiento", texto: "Mantenimiento" },
+] as const;
+
+type Pestana = (typeof PESTANAS)[number]["id"];
+
+/**
+ * Ficha de un vehículo (mockup aprobado 01-11-2026): cuánto cuesta cada kilómetro, gasolina, desgaste y
+ * servicios, además de quién lo trae y cada viaje con su evidencia. El dinero solo lo ve quien ya ve
+ * costos completos: la API no lo manda a los demás.
+ */
 export default function VehiculoDetallePage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
+  const router = useRouter();
+  const consulta = useSearchParams();
   const { user } = useUser();
   const token = user?.token ?? "";
+  const puedeEditar = puedeGestionarInventarioVehiculos(user);
 
   const [datos, setDatos] = useState<DetalleVehiculo | null>(null);
+  const [ficha, setFicha] = useState<FichaVehiculo | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [foto, setFoto] = useState<FotoChecklist | null>(null);
+  const [pestana, setPestana] = useState<Pestana>(() => {
+    const pedida = consulta?.get("tab");
+    return PESTANAS.some((x) => x.id === pedida) ? (pedida as Pestana) : "resumen";
+  });
+  const [dialogo, setDialogo] = useState<"gasolina" | "servicio" | null>(null);
 
   const cargar = useCallback(async () => {
     if (!token || !id) return;
@@ -55,11 +85,20 @@ export default function VehiculoDetallePage() {
     } finally {
       setCargando(false);
     }
+    // Va aparte: si falla, el estado y los viajes se siguen viendo.
+    getFicha(token, id)
+      .then((f) => setFicha(f?.rendimiento ? f : null))
+      .catch(() => setFicha(null));
   }, [token, id]);
 
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  function cambiarPestana(nueva: Pestana) {
+    setPestana(nueva);
+    router.replace(`${VEHICULOS_PATH}/${id}?tab=${nueva}`, { scroll: false });
+  }
 
   const vehiculo = datos?.vehiculo;
   const estado = etiquetaEstatus(vehiculo?.estatus);
@@ -69,35 +108,104 @@ export default function VehiculoDetallePage() {
       Reintentar
     </Button>
   );
+  const odometro = ficha?.odometro?.km ?? vehiculo?.odometroUltimo ?? null;
+  const veCostos = Boolean(ficha?.acceso.veCostos);
+  const especificacion = ficha?.especificacion;
+
+  const panelEstado = vehiculo ? (
+    <Section title="Estado" dense>
+      <div className={styles.datos}>
+        <Dato label="Lo trae" valor={vehiculo.conductor?.nombre ?? "Nadie"} />
+        <Dato label="Desde" valor={formatoFecha(vehiculo.desde)} />
+        <Dato label="Devuelve" valor={formatoFecha(vehiculo.proximaDevolucion)} />
+        <Dato label="Combustible" valor={nivelDeCombustible(vehiculo.combustibleUltimoPct)} />
+      </div>
+    </Section>
+  ) : null;
 
   return (
-    <div className={styles.wrap}>
-      <PageHeader
-        eyebrow={<Link href={VEHICULOS_PATH} className={styles.migas}>← Flotilla</Link>}
-        title={vehiculo?.nombre || (primeraCarga ? "Cargando…" : "Vehículo")}
-        subtitle={vehiculo?.placas || undefined}
-        density="ops"
-        meta={
-          vehiculo ? (
-            <>
-              <Tag variant={vehiculo.disponible ? "positive" : estado.variante} dot>
-                {vehiculo.disponible ? "Disponible" : estado.texto}
-              </Tag>
-              {vehiculo.conductor && <Tag variant="accent">{vehiculo.conductor.nombre}</Tag>}
-              {vehiculo.tieneRastreador && (
-                <Tag variant="neutral">{vehiculo.gpsProveedor || "Con GPS"}</Tag>
-              )}
-            </>
-          ) : undefined
-        }
-        actions={
-          <Button variant="ghost" onClick={() => void cargar()} disabled={cargando}>
-            {cargando && datos ? "Actualizando…" : "Actualizar"}
-          </Button>
-        }
-      />
+    <div className={c.page}>
+      <header className={c.band}>
+        <div className={c.bandHead}>
+          <div>
+            <div className={c.crumb}>
+              <Link href={VEHICULOS_PATH} className={styles.migasBanda}>
+                ← Flotilla
+              </Link>
+              {[vehiculo?.placas, especificacion?.version, especificacion?.combustible].filter(Boolean).map((x) => ` · ${x}`)}
+            </div>
+            <h1 className={c.bandTitle}>{vehiculo?.nombre || (primeraCarga ? "Cargando…" : "Vehículo")}</h1>
+            {vehiculo ? (
+              <div className={v.acciones} style={{ marginTop: 8 }}>
+                <Tag variant={vehiculo.disponible ? "positive" : estado.variante} dot>
+                  {vehiculo.disponible ? "Disponible" : estado.texto}
+                </Tag>
+                {vehiculo.conductor && <Tag variant="accent">{vehiculo.conductor.nombre}</Tag>}
+                {vehiculo.tieneRastreador && <Tag variant="neutral">{vehiculo.gpsProveedor || "Con GPS"}</Tag>}
+              </div>
+            ) : null}
+          </div>
+          <div className={v.acciones}>
+            {ficha && puedeEditar ? (
+              <>
+                <ButtonLink variant="secondary" href={`${VEHICULOS_PATH}/nuevo?vehiculo=${id}`}>
+                  {ficha.tieneFicha ? "Editar ficha" : "Completar ficha"}
+                </ButtonLink>
+                <Button variant="secondary" onClick={() => setDialogo("servicio")}>
+                  Registrar servicio
+                </Button>
+              </>
+            ) : null}
+            {ficha ? <Button onClick={() => setDialogo("gasolina")}>Cargar gasolina</Button> : null}
+            <Button variant="ghost" onClick={() => void cargar()} disabled={cargando}>
+              {cargando && datos ? "Actualizando…" : "Actualizar"}
+            </Button>
+          </div>
+        </div>
+        <div className={c.kpis}>
+          {veCostos && ficha?.costos ? <KpiBanda cifra={pesos2(ficha.costos.porKm)} texto="Cuesta cada kilómetro" /> : null}
+          <KpiBanda
+            cifra={formatoKm(odometro)}
+            texto={ficha?.odometro ? `Odómetro, lectura del ${fechaCorta(ficha.odometro.fecha)}` : "Odómetro"}
+          />
+          {ficha ? (
+            <KpiBanda
+              cifra={kmPorLitro(ficha.rendimiento.real ?? ficha.rendimiento.oficial)}
+              texto={
+                ficha.rendimiento.real
+                  ? `Rendimiento real${ficha.rendimiento.oficial ? `; oficial ${ficha.rendimiento.oficial}` : ""}`
+                  : "Rendimiento oficial; faltan cargas reales"
+              }
+            />
+          ) : null}
+          {ficha?.proximoServicio ? (
+            <KpiBanda
+              cifra={ficha.proximoServicio.faltanKm != null ? km(Math.abs(ficha.proximoServicio.faltanKm)) : fechaCorta(ficha.proximoServicio.fecha)}
+              texto={ficha.proximoServicio.estado === "VENCIDO" ? "Servicio vencido" : "Para el próximo servicio"}
+              tono={ficha.proximoServicio.estado === "VENCIDO" ? "mal" : ficha.proximoServicio.estado === "PRONTO" ? "atencion" : undefined}
+            />
+          ) : null}
+        </div>
+        <nav className={c.tabs} aria-label="Secciones de la ficha">
+          {PESTANAS.map((x) => (
+            <button
+              key={x.id}
+              type="button"
+              className={styles.pestanaBoton}
+              aria-current={pestana === x.id ? "page" : undefined}
+              onClick={() => cambiarPestana(x.id)}
+            >
+              {x.texto}
+            </button>
+          ))}
+        </nav>
+      </header>
 
       {error && datos && <InlineAlert message={error} variant="warning" action={reintentar} />}
+
+      {!cargando && error && !datos && (
+        <EmptyState title="No se pudo cargar el vehículo" description={error} variant="compact" action={reintentar} />
+      )}
 
       {primeraCarga && (
         <Section title="Estado" dense>
@@ -105,43 +213,70 @@ export default function VehiculoDetallePage() {
         </Section>
       )}
 
-      {vehiculo && (
-        <Section title="Estado" dense>
-          <div className={styles.datos}>
-            <Dato label="Lo trae" valor={vehiculo.conductor?.nombre ?? "Nadie"} />
-            <Dato label="Desde" valor={formatoFecha(vehiculo.desde)} />
-            <Dato label="Devuelve" valor={formatoFecha(vehiculo.proximaDevolucion)} />
-            <Dato label="Odómetro" valor={formatoKm(vehiculo.odometroUltimo)} />
-            <Dato label="Combustible" valor={nivelDeCombustible(vehiculo.combustibleUltimoPct)} />
-          </div>
-        </Section>
-      )}
+      {ficha && !ficha.tieneFicha && puedeEditar && pestana !== "viajes" ? (
+        <Aviso tono="info" titulo="Este vehículo aún no tiene ficha.">
+          <Link href={`${VEHICULOS_PATH}/nuevo?vehiculo=${id}`}>Súbele el manual</Link> para sacarle costo, rendimiento oficial y programa de servicio.
+        </Aviso>
+      ) : null}
 
-      <Section title={!datos ? "Historial" : `Historial · ${datos.historial.length} viajes`}>
-        {primeraCarga && <SkeletonRows rows={3} label="Cargando historial" />}
-        {!cargando && error && !datos && (
-          <EmptyState
-            title="No se pudo cargar el vehículo"
-            description={error}
-            variant="compact"
-            action={reintentar}
+      {pestana === "resumen" ? (
+        ficha ? <ResumenVehiculo ficha={ficha} estado={panelEstado} /> : panelEstado
+      ) : null}
+
+      {pestana === "especificaciones" && ficha ? (
+        <EspecificacionesVehiculo ficha={ficha} token={token} puedeEditar={puedeEditar} onCambio={setFicha} />
+      ) : null}
+
+      {pestana === "gasolina" && ficha ? <GasolinaVehiculo ficha={ficha} token={token} puedeEditar={puedeEditar} onCambio={setFicha} /> : null}
+
+      {pestana === "mantenimiento" && ficha ? (
+        <MantenimientoVehiculo ficha={ficha} token={token} puedeEditar={puedeEditar} onCambio={setFicha} />
+      ) : null}
+
+      {pestana === "viajes" ? (
+        <Section title={!datos ? "Historial" : `Historial · ${datos.historial.length} viajes`}>
+          {primeraCarga && <SkeletonRows rows={3} label="Cargando historial" />}
+          {datos && datos.historial.length === 0 && (
+            <EmptyState
+              title="Sin viajes"
+              description="Cuando alguien registre una salida, aquí verás el recorrido y sus fotos."
+              variant="compact"
+            />
+          )}
+          {datos && datos.historial.length > 0 && (
+            <div style={{ display: "grid", gap: 12 }}>
+              {datos.historial.map((viaje) => (
+                <Viaje key={`${viaje.origen}-${viaje.id}`} viaje={viaje} onFoto={setFoto} />
+              ))}
+            </div>
+          )}
+        </Section>
+      ) : null}
+
+      {ficha ? (
+        <>
+          <CargarGasolina
+            abierto={dialogo === "gasolina"}
+            ficha={ficha}
+            token={token}
+            onCerrar={() => setDialogo(null)}
+            onGuardado={(f) => {
+              setFicha(f);
+              setDialogo(null);
+            }}
           />
-        )}
-        {datos && datos.historial.length === 0 && (
-          <EmptyState
-            title="Sin viajes"
-            description="Cuando alguien registre una salida, aquí verás el recorrido y sus fotos."
-            variant="compact"
+          <RegistrarServicio
+            abierto={dialogo === "servicio"}
+            ficha={ficha}
+            token={token}
+            onCerrar={() => setDialogo(null)}
+            onGuardado={(f) => {
+              setFicha(f);
+              setDialogo(null);
+            }}
           />
-        )}
-        {datos && datos.historial.length > 0 && (
-          <div style={{ display: "grid", gap: 12 }}>
-            {datos.historial.map((viaje) => (
-              <Viaje key={`${viaje.origen}-${viaje.id}`} viaje={viaje} onFoto={setFoto} />
-            ))}
-          </div>
-        )}
-      </Section>
+        </>
+      ) : null}
 
       <Modal
         open={Boolean(foto)}

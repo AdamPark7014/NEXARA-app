@@ -1,7 +1,7 @@
 # Libro de costos: precios unitarios para NEXARA
 
-Propuesta del 01-11-2026. Adam aprobó las Fases 0 y 1 ese mismo día y están construidas (ver «Estado»).
-Las Fases 2 a 8 siguen en propuesta: no se construyen sin su visto bueno.
+Propuesta del 01-11-2026. Adam aprobó ese mismo día las Fases 0 y 1 y la Fase 3 ampliada, y están construidas (ver «Estado»).
+Las Fases 2 y 4 a 8 siguen en propuesta: no se construyen sin su visto bueno.
 
 **En una frase:** cada cotización se arma con una matriz de lo que de verdad cuesta (equipo, técnicos, camioneta,
 herramienta y oficina), y cada proyecto muestra lo gastado contra lo cotizado, casi al día.
@@ -12,9 +12,10 @@ mockups y la investigación con diagramas están en el artifact privado que se l
 ## Estado
 
 **Fase 0, motor y tarifas:** `apps/api/src/costos/calculos/` y `/erp/costos/tarifas`. **Fase 1, horas a proyecto:** libro de
-costos, proceso nocturno, `/erp/costos`, `/erp/costos/por-proyecto` y la pestaña Costos de cada proyecto.
+costos, proceso nocturno, `/erp/costos`, `/erp/costos/por-proyecto` y la pestaña Costos de cada proyecto. **Fase 3 ampliada,
+vehículos:** `apps/api/src/costos/vehiculos/`, `/erp/vehiculos`, `/erp/vehiculos/nuevo` y la ficha con cinco pestañas (cómo quedó, más abajo).
 
-Cómo quedó, y en qué cambió respecto a la propuesta:
+Cómo quedaron las Fases 0 y 1, y en qué cambió respecto a la propuesta:
 
 - **Ligar no toca la actividad.** La liga vive en `costo_actividad_ligas`. Así ligar no mueve el avance del proyecto ni el
   reporte de Contabilidad. Una actividad cuenta para un proyecto si su `projectId` lo dice, si su `cotizacionId` es la del
@@ -28,7 +29,7 @@ Cómo quedó, y en qué cambió respecto a la propuesta:
   relojes encimados de la misma persona se reparten. Ver `horasEfectivas`.
 - **Viáticos:** lo comprobado; si no, lo aprobado. Lo pendiente o rechazado no es costo. Gasolina y casetas van a Vehículos.
 - **`CostoMovimiento` no se audita** (`AUDIT_EXCLUDED`): se deriva de otras tablas y se recalcula de noche.
-- **Vehículos y herramienta:** ya se les saca tarifa, pero aún no se cargan a los proyectos. Eso es de las Fases 3 y 4.
+- **Herramienta:** ya se le saca tarifa, pero aún no se carga a los proyectos. Eso es de la Fase 4. Los vehículos ya se cargan.
 - **Horas extra:** aún no entran, porque `overtime_approvals` y `nomina_semanas` están vacías en producción. Cuando haya datos, se
   cargan aparte, a lo que se pagó.
 - **IA:** Haiku 5.5 con esfuerzo bajo y sin razonamiento, por la puerta. Eval: `npm run eval:ia -w apps/api -- --funcion liga`.
@@ -251,32 +252,31 @@ en paralelo y se compara. Talla: S = una sesión, M = dos, L = de tres a cuatro 
 | 0. Motor y tarifas (hecha) | Tarifas de costo | 4 | 10 | 1 | M |
 | 1. Horas a proyecto (hecha) | Bandeja, por proyecto y pestaña Costos | 2 | 8 | 3 | M |
 | 2. Matriz en la cotización | Matriz por partida y catálogo | 4 | 14 | 3 | L |
-| 3. Vehículos (ampliada, ver abajo) | Manual, ficha, gasolina, desgaste y km por actividad | 5 | 14 | 4 y 2 en apps | L |
+| 3. Vehículos (ampliada, hecha en web, ver abajo) | Manual, ficha, gasolina, desgaste y km por actividad | 5 | 16 | 4; faltan 2 en apps | L |
 | 4. Herramientas | Costo por día y desgaste | 0 | 4 | 1 | S |
 | 5. Almacén | Consumo por proyecto | 0 | 3 | 1 | S |
 | 6. Indirectos | 9 rubros y porcentaje real | 1 | 5 | 1 | M |
 | 7. Control | Proyección, alertas y flujo | 1 | 5 | 2 | M |
 | 8. Opcional | IA propone matriz (puerta única, Haiku con eval) | 0 | 3 | 1 | L |
 
-Total sin la opcional: 17 tablas, 63 endpoints y 16 pantallas o pestañas, más 2 en las apps.
+Total sin la opcional: 17 tablas, 65 endpoints y 16 pantallas o pestañas, más 2 en las apps.
 
 **Coordinación:** las Fases 1 y 2 tocan el asistente, el editor de cotización y el catálogo de equipos, donde hay otras
 sesiones activas. Antes de editar: `git fetch`, partir de `origin/main` y avisar.
 
-## Fase 3 ampliada: vehículos (propuesta del 01-11, sin aprobar)
+## Fase 3 ampliada: vehículos
 
 Adam eligió vehículos como siguiente fase y pidió más de lo que tenía: subir el manual, una ficha robusta, cuánta gasolina
 gasta, cuánto se desgasta y cuánto le cuesta a cada proyecto. «Muy fácil por fuera y muy complicado por dentro». Mockup
-privado: https://claude.ai/artifact/2DNGd9xCSM7fG9zAfBPijs. No se construye hasta que lo apruebe.
+privado: https://claude.ai/artifact/2DNGd9xCSM7fG9zAfBPijs. Aprobada y construida el 01-11.
 
-**El bloqueo no es el cálculo:** hay un vehículo dado de alta y ninguna salida registrada. Sin salidas no hay kilómetros, y sin
-kilómetros la ficha se llena pero nada llega a los proyectos. `VehicleControl` ya guarda odómetro, gasolina y foto del tablero, y
-ya exige una actividad. Falta que se use.
+**El bloqueo no es el cálculo:** sin salidas registradas no hay kilómetros, y sin kilómetros la ficha se llena pero nada llega a
+los proyectos. `VehicleControl` ya guarda odómetro, gasolina y foto del tablero, y ya exige una actividad. Falta que se use.
 
-| Tema | Decisión propuesta |
+| Tema | Decisión |
 |---|---|
 | Alta | Se sube el manual o se escribe el modelo. Cada dato guarda su fuente: página del manual, CONUEE, capturado o tickets. Nada se guarda sin que alguien lo confirme. |
-| Lectura del manual | La puerta acepta 2 MB por petición, así que el PDF no viaja completo: se extrae el texto en el servidor, se eligen las páginas de capacidades y servicio, y Haiku devuelve JSON con la página de cada dato. Escaneado: esas páginas como imagen. Necesita eval con manuales reales antes de encenderse. |
+| Lectura del manual | La puerta acepta 2 MB por petición, así que el PDF no viaja completo: se extrae el texto en el servidor, se eligen las páginas de capacidades y servicio, y Haiku devuelve JSON con la página de cada dato. |
 | Rendimiento oficial | `Rendimiento de combustible en vehículos ligeros`, CONUEE (catálogo 2023, revisión de mayo de 2024; el de 2024 ya no se pudo bajar). Es de laboratorio y el propio catálogo advierte que puede no repetirse en condiciones reales: sirve de partida, no de costo. |
 | Rendimiento real | Km desde el último tanque lleno entre litros cargados. Con tres cargas reales reemplaza al oficial en la tarifa. Una carga parcial se suma a la siguiente. |
 | Costo por km | `tarifaEquipo` y `CostoFichaEquipo`, que ya existen. El libro guarda la tarifa de cada viaje: si cambia después, no reescribe lo pasado. |
@@ -287,7 +287,39 @@ ya exige una actividad. Falta que se use.
 | Quién ve qué | Costo y valor: quien ya ve costos completos. Técnicos: kilómetros y rendimiento, sin importes. |
 | Sin tocar | Nómina, facturas y pólizas. El libro sigue en paralelo. |
 
-Talla: de M a L, con 5 tablas (especificación, documento, plan de servicio, servicio hecho y carga), 14 endpoints, 4 pantallas
-web y 2 en las apps. Tres funciones nuevas de IA, cada una con su eval, por la puerta y con el modelo más barato que lo pase.
+Son 5 tablas (especificación, documento, plan de servicio, servicio hecho y carga), 16 endpoints y 4 pantallas web. Las 2 de las
+apps faltan: van aparte porque pasan por las tiendas.
 
 **Rutas:** `/erp/vehiculos` ya está protegida del alias de rutas en español. Lo nuevo va dentro de ella, no bajo `/erp/costos`.
+
+### Cómo quedó, y en qué cambió respecto a la propuesta
+
+- **PDF escaneado:** no se lee. Se avisa y se captura a mano. La propuesta lo mandaba como imagen; se quitó hasta ver si hace falta.
+- **Catálogo de CONUEE:** su PDF no trae celdas y el texto sale desalineado, así que la IA confundía renglones (4 de 10). Se leyó
+  por las rayas que separan cada fila y quedó una tabla de 760 versiones (`conuee-2023.ts`). Ahora la IA solo elige el renglón y
+  **la cifra sale de la tabla**: no la puede inventar ni leer mal. Se comprobó a ojo contra el PDF en dos páginas.
+- **Revisión del alta:** cada fila se edita en su lugar, en vez de un botón «Corregir».
+- **Viajes:** el origen es `VEHICULO:<controlId>`, y la columna `detalle` guarda la tarifa de ese día. El libro la conserva, salvo
+  que quien edita la ficha pida recostear. Un viático `COMBUSTIBLE` de un vehículo con ficha no entra al libro: contaría doble.
+- **Salida directa de inventario:** no guarda historial ni actividad. Sus kilómetros solo se ven por el odómetro, como «sin salida».
+- **Riesgo que queda:** un gasto de gasolina capturado sin `vehicleId` y además como carga contaría doble.
+- **Apps:** sin construir. En la web, «Cargar gasolina» es un diálogo y «Mis vehículos» lee la foto del tablero al salir y al volver.
+- **Migración y despliegue:** solo agrega columnas y tablas. La imagen de la API suma `poppler-utils` para `pdftotext`.
+
+**IA, por la puerta y con esfuerzo bajo, sin razonamiento.** Eval: `npx tsx src/ai/eval/correr-vehiculo.ts` (resumen en
+`src/ai/eval/resultados/vehiculo.json`).
+
+| Lectura | Modelo | Aciertos | US$ por llamada | Con qué se midió |
+|---|---|---:|---:|---|
+| Renglón de CONUEE | Haiku | 17 de 17 | 0.00006 | Cifras comprobadas en el PDF |
+| Manual | Haiku | 33 de 33 | 0.0002 | Páginas escritas para la prueba |
+| Foto del tablero | Sonnet | 26 de 26 | 0.0016 | Imágenes generadas de 900×500 |
+| Foto del ticket | Haiku | 20 de 20 | 0.00009 | Imágenes generadas |
+
+El tablero va con Sonnet porque Haiku no alcanzó con el mismo prompt: 20 de 26, y 23 razonando. Dejaba el odómetro en blanco y la
+aguja en 1/2. Una foto real de 1400 px debe costar unas tres veces más (estimado, por el tamaño).
+
+**Lo que este eval no prueba:** ninguna foto es de campo y ningún PDF de manual completo ha pasado por `pdftotext`. Sí se midió una
+vez con texto real: 37 páginas del manual en línea de una Nissan X-Trail e-POWER 2024, publicado por Nissan. En dos vueltas leyó bien
+tanque, aceite, llantas, motor y los dos servicios con intervalo, y no inventó presión, potencia ni carga, que esas páginas no traen.
+Ese texto no va al repositorio. Falta repetirlo con el PDF de la Frontier y con fotos de verdad.

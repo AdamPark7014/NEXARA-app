@@ -3,6 +3,7 @@ import { CostosLigaService } from './costos-liga.service';
 import { CostosProyectoService } from './costos-proyecto.service';
 import { CostosTarifasService } from './costos-tarifas.service';
 import { LibroCostosService } from './libro-costos.service';
+import { VehiculosMotorService } from './vehiculos/vehiculos-motor.service';
 
 const hora = (h: number) => new Date(Date.UTC(2026, 9, 21, h));
 
@@ -22,6 +23,10 @@ function prismaFalso(semilla: Partial<Record<string, any[]>> = {}) {
     actividades: [],
     proyectos: [],
     cotizaciones: [],
+    fichas: [],
+    especificaciones: [],
+    cargas: [],
+    controles: [],
     ...semilla,
   };
   let siguiente = 1;
@@ -58,7 +63,10 @@ function prismaFalso(semilla: Partial<Record<string, any[]>> = {}) {
       }),
     },
     costoPersona: { findMany: jest.fn(async () => t.personas) },
-    costoFichaEquipo: { findMany: jest.fn(async () => []) },
+    costoFichaEquipo: { findMany: jest.fn(async () => t.fichas) },
+    vehiculoEspecificacion: { findMany: jest.fn(async () => t.especificaciones) },
+    vehiculoCarga: { findMany: jest.fn(async () => t.cargas) },
+    vehicleControl: { findMany: jest.fn(async () => t.controles) },
     vehicleAsset: { findMany: jest.fn(async () => []) },
     toolInventoryItem: { findMany: jest.fn(async () => []) },
     user: {
@@ -107,7 +115,7 @@ const persona = (id: number, sueldoSemanal: number | null, extra: Record<string,
 describe('libro de costos', () => {
   const armar = (semilla: Partial<Record<string, any[]>>) => {
     const prisma = prismaFalso(semilla);
-    return { prisma, libro: new LibroCostosService(prisma, new CostosTarifasService(prisma)) };
+    return { prisma, libro: new LibroCostosService(prisma, new CostosTarifasService(prisma), new VehiculosMotorService(prisma)) };
   };
   const sesion = { id: 1, activityId: 50, userId: 7, startedAt: hora(15), endedAt: hora(19), endReason: 'FIN' };
 
@@ -185,6 +193,107 @@ describe('libro de costos', () => {
     for (const tabla of ['activityWorkSession', 'viatico', 'expense', 'stockMovement', 'activity']) {
       expect(Object.keys(prisma[tabla])).toEqual(expect.not.arrayContaining(['update', 'create', 'delete']));
     }
+  });
+});
+
+describe('libro de costos: vehículos', () => {
+  const ficha = {
+    id: 9,
+    tipo: 'VEHICULO',
+    vehicleId: 2,
+    activo: true,
+    valor: 480000,
+    valorLlantas: 12000,
+    rescatePct: 0.3,
+    vidaUnidades: 200000,
+    unidadesAnio: 30000,
+    tasaInteres: 0.12,
+    primaSeguro: 0.04,
+    ko: 0.6,
+    rendimiento: null,
+    precioCombustible: 24.5,
+    costoAceite: 1200,
+    aceiteCadaUnidades: 10000,
+    vidaLlantasUnidades: 50000,
+    otrosAnuales: 0,
+  };
+  const especificacion = { vehicleId: 2, rendimientoOficial: 8.6 };
+  const control = {
+    id: 11,
+    vehicleId: 2,
+    actividadId: 40,
+    solicitanteId: 7,
+    odometroInicio: 12324,
+    odometroFin: 12480,
+    fechaFin: hora(22),
+    fechaInicio: hora(14),
+    fechaSolicitud: hora(12),
+  };
+  const armar = (semilla: Partial<Record<string, any[]>>) => {
+    const prisma = prismaFalso(semilla);
+    return { prisma, libro: new LibroCostosService(prisma, new CostosTarifasService(prisma), new VehiculosMotorService(prisma)) };
+  };
+
+  it('una salida cerrada se costea por km y se liga a su actividad', async () => {
+    const { prisma, libro } = armar({ fichas: [ficha], especificaciones: [especificacion], controles: [control] });
+    await libro.sincronizar(1);
+    expect(prisma.t.movimientos[0]).toMatchObject({
+      origen: 'VEHICULO:11',
+      rubro: 'VEHICULO',
+      activityId: 40,
+      userId: 7,
+      cantidad: 156,
+      unidad: 'km',
+      costoUnitario: 7.43,
+      importe: 1159.08,
+    });
+    expect(prisma.t.movimientos[0].detalle).toMatchObject({ vehicleId: 2, km: 156 });
+  });
+
+  it('sin ficha, o sin los dos odómetros, no hay renglón', async () => {
+    const sinFicha = armar({ controles: [control] });
+    await sinFicha.libro.sincronizar(1);
+    expect(sinFicha.prisma.t.movimientos).toHaveLength(0);
+    const abierta = armar({ fichas: [ficha], controles: [{ ...control, odometroFin: null }] });
+    await abierta.libro.sincronizar(1);
+    expect(abierta.prisma.t.movimientos).toHaveLength(0);
+  });
+
+  it('si la tarifa sube después, el viaje ya cargado no se reescribe', async () => {
+    const { prisma, libro } = armar({ fichas: [ficha], especificaciones: [especificacion], controles: [control] });
+    await libro.sincronizar(1);
+    prisma.t.fichas = [{ ...ficha, valor: 900000 }];
+    const r = await libro.sincronizar(1);
+    expect(r).toMatchObject({ creados: 0, actualizados: 0 });
+    expect(prisma.t.movimientos[0].costoUnitario).toBe(7.43);
+  });
+
+  it('con `recostear` ese vehículo sí toma la tarifa nueva', async () => {
+    const { prisma, libro } = armar({ fichas: [ficha], especificaciones: [especificacion], controles: [control] });
+    await libro.sincronizar(1);
+    prisma.t.fichas = [{ ...ficha, valor: 900000 }];
+    const r = await libro.sincronizar(1, { vehicleId: 2 });
+    expect(r.actualizados).toBe(1);
+    expect(prisma.t.movimientos[0].costoUnitario).toBeGreaterThan(7.43);
+  });
+
+  it('la gasolina de un vehículo con ficha no entra doble; la de un taxi, sí', async () => {
+    const viatico = (id: number, vehicleId: number | null) => ({
+      id,
+      actividadId: 40,
+      usuarioId: 7,
+      vehicleId,
+      categoria: 'COMBUSTIBLE',
+      estatus: 'Aprobado',
+      montoSolicitado: 500,
+      montoAprobado: 500,
+      montoComprobado: null,
+      fechaSolicitud: hora(15),
+      repartos: [],
+    });
+    const { prisma, libro } = armar({ fichas: [ficha], especificaciones: [especificacion], viaticos: [viatico(1, 2), viatico(2, null), viatico(3, 3)] });
+    await libro.sincronizar(1);
+    expect(prisma.t.movimientos.map((m: any) => m.origen)).toEqual(['VIATICO:2', 'VIATICO:3']);
   });
 });
 

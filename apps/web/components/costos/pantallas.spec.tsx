@@ -358,6 +358,33 @@ describe("Pestaña Costos del proyecto", () => {
     expect(screen.getByText(/3 relojes los cerró el sistema: cuentan a lo mucho una jornada/)).toBeInTheDocument();
   });
 
+  it("enseña los viajes del proyecto y de qué se compone lo que costaron", async () => {
+    const vehiculos = {
+      km: 412,
+      importe: 3061,
+      otros: 480,
+      viajes: [{ fecha: "2026-10-28", actividad: "Instalación de cámaras", vehiculo: "Frontier", km: 156, importe: 1159 }],
+      desglose: [
+        { nombre: "gasolina", importe: 1174 },
+        { nombre: "desgaste", importe: 667 },
+      ],
+    };
+    servir({ incluye: "/costos/proyectos/9", body: { ...DETALLE, vehiculos } });
+    render(<SeccionCostos proyecto={PROYECTO} token="jwt" />);
+    expect(await screen.findByText("Vehículos en este proyecto")).toBeInTheDocument();
+    expect(screen.getByText(/412 km · \$3,541/)).toBeInTheDocument();
+    expect(screen.getByText("Instalación de cámaras")).toBeInTheDocument();
+    expect(screen.getByText("Casetas y gasolina sin vehículo")).toBeInTheDocument();
+    expect(screen.getByText(/gasolina \$1,174, desgaste \$667/)).toBeInTheDocument();
+  });
+
+  it("sin viajes no enseña la tarjeta de vehículos", async () => {
+    servir({ incluye: "/costos/proyectos/9", body: { ...DETALLE, vehiculos: { km: 0, importe: 0, otros: 0, viajes: [], desglose: [] } } });
+    render(<SeccionCostos proyecto={PROYECTO} token="jwt" />);
+    expect(await screen.findByText("Equipos y material")).toBeInTheDocument();
+    expect(screen.queryByText("Vehículos en este proyecto")).not.toBeInTheDocument();
+  });
+
   it("los avisos concuerdan cuando es uno solo", async () => {
     const avisos = { ...DETALLE.avisos, partidasSinCosto: 1, sesionesRecortadas: 1, salidasSinCosto: 1 };
     servir({ incluye: "/costos/proyectos/9", body: { ...DETALLE, avisos } });

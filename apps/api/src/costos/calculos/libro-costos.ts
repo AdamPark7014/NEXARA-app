@@ -26,6 +26,16 @@ export type MovimientoCalculado = {
   importe: number;
   /** Algo que quien revisa debe saber de este renglón. */
   nota: string | null;
+  /** En un viaje: km, tarifa de ese día y de qué se compone. */
+  detalle?: DetalleViaje | null;
+};
+
+export type DetalleViaje = {
+  vehicleId: number;
+  km: number;
+  /** Pesos por km, por parte: `co`, `d`, `im`, `sm`, `mn`, `lb`, `n`, `otros`. */
+  tarifa: Record<string, number>;
+  rendimiento: 'REAL' | 'OFICIAL' | 'SIN_DATO';
 };
 
 /* ── Mano de obra ─────────────────────────────────────────────────────────── */
@@ -254,6 +264,76 @@ export function movimientoDeSalida(m: SalidaDeLibro): MovimientoCalculado | null
     importe: redondear(signo * total),
     nota: total > 0 ? null : 'Salida sin costo: vale cero',
   };
+}
+
+/* ── Vehículos ────────────────────────────────────────────────────────────── */
+
+export type ViajeDeLibro = {
+  id: number;
+  vehicleId: number;
+  activityId: number;
+  userId: number | null;
+  fecha: string;
+  km: number;
+  tarifa: Record<string, number> & { total: number };
+  rendimiento: DetalleViaje['rendimiento'];
+};
+
+/** Un viaje cuesta sus km a la tarifa de ese día. La tarifa ya trae gasolina, desgaste y lo demás. */
+export function movimientoDeViaje(v: ViajeDeLibro, kmSospechoso: number): MovimientoCalculado {
+  const { total, fijos, consumos, ...partes } = v.tarifa as Record<string, number>;
+  return {
+    origen: `VEHICULO:${v.id}`,
+    rubro: 'VEHICULO',
+    fecha: v.fecha,
+    activityId: v.activityId,
+    userId: v.userId,
+    cantidad: v.km,
+    unidad: 'km',
+    costoUnitario: total,
+    importe: redondear(v.km * total),
+    nota:
+      v.km > kmSospechoso
+        ? 'Más de 3,000 km en una salida: revisa el odómetro'
+        : v.rendimiento === 'REAL'
+          ? null
+          : 'Con rendimiento oficial: faltan cargas reales',
+    detalle: { vehicleId: v.vehicleId, km: v.km, tarifa: partes, rendimiento: v.rendimiento },
+  };
+}
+
+/**
+ * Un viaje conserva la tarifa con que se costeó: si la gasolina sube después, no se reescribe lo que ya
+ * pasó. Si cambiaron los km (se corrigió el odómetro) se recalcula el importe con esa misma tarifa.
+ */
+export function conservarTarifaDeViaje(
+  m: MovimientoCalculado,
+  guardado: { costoUnitario: unknown; detalle?: unknown } | null | undefined,
+): MovimientoCalculado {
+  if (!guardado || !m.origen.startsWith('VEHICULO:')) return m;
+  const costoUnitario = numero(guardado.costoUnitario);
+  const previo = guardado.detalle as Partial<DetalleViaje> | null | undefined;
+  return {
+    ...m,
+    costoUnitario,
+    importe: redondear(m.cantidad * costoUnitario),
+    detalle: m.detalle && previo?.tarifa ? { ...m.detalle, tarifa: previo.tarifa, rendimiento: previo.rendimiento ?? m.detalle.rendimiento } : m.detalle,
+  };
+}
+
+/**
+ * La gasolina de un vehículo con ficha ya viene en sus km: si además entrara el viático al proyecto,
+ * contaría doble. Sin ficha, o sin vehículo (un taxi, un coche propio), sigue entrando directo.
+ */
+export function gasolinaYaEnKm(
+  v: { categoria?: string | null; vehicleId?: number | null },
+  vehiculosConFicha: { has(id: number): boolean },
+): boolean {
+  return (
+    String(v.categoria ?? '').trim().toUpperCase() === 'COMBUSTIBLE' &&
+    v.vehicleId != null &&
+    vehiculosConFicha.has(v.vehicleId)
+  );
 }
 
 /* ── Sumas para las pantallas ─────────────────────────────────────────────── */

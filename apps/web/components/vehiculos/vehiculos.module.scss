@@ -1,0 +1,647 @@
+/* NEXARA · Vehículos (mockup aprobado 01-11-2026: https://claude.ai/artifact/2DNGd9xCSM7fG9zAfBPijs).
+
+   La banda y las tarjetas son las de Costos (`components/costos/costos.module.scss`). Aquí va lo propio:
+   barras de reparto, medidores, gráfica de gasolina, fuentes y captura. Todo cuelga de los tokens `--ui-*`. */
+
+.columnas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.principal {
+  display: flex;
+  flex: 999 1 560px;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.lateral {
+  display: flex;
+  flex: 1 1 320px;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.rejillaFicha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.tituloPagina {
+  margin: 0 0 4px;
+  font-family: var(--ui-font-display);
+  font-size: var(--ui-fs-page, 28px);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+}
+
+.titulo {
+  margin: 0;
+  font-family: var(--ui-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.nota {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--ui-fg-3);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.cifra {
+  font-family: var(--ui-font-display);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* ── Reparto y desglose ─────────────────────────────────────────────────── */
+
+.barra {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--ui-border-subtle);
+  margin-bottom: 8px;
+}
+
+.tramo,
+.punto {
+  &[data-tono="proyectos"],
+  &[data-tono="co"] {
+    background: var(--ui-brand, #168570);
+  }
+
+  &[data-tono="cotizaciones"],
+  &[data-tono="mn"] {
+    background: var(--ui-accent-sky, #3aa9cc);
+  }
+
+  &[data-tono="oficina"],
+  &[data-tono="sm"] {
+    background: #76838f;
+  }
+
+  &[data-tono="sinLigar"],
+  &[data-tono="d"] {
+    background: var(--ui-accent-orange, #ee8a2a);
+  }
+
+  &[data-tono="parado"],
+  &[data-tono="im"] {
+    background: var(--ui-accent-magenta, #a64ca6);
+  }
+
+  &[data-tono="n"] {
+    background: var(--ui-fg);
+  }
+
+  &[data-tono="lb"] {
+    background: #b7c2cc;
+  }
+
+  &[data-tono="otros"] {
+    background: var(--ui-accent-wine, #7a2430);
+  }
+}
+
+.punto {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.renglon {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--ui-border-subtle);
+  font-size: 13.5px;
+}
+
+.renglonTexto {
+  flex: 1 1 200px;
+  min-width: 0;
+
+  b {
+    display: block;
+    font-weight: 500;
+  }
+
+  span {
+    font-size: 12.5px;
+    color: var(--ui-fg-3);
+  }
+}
+
+.renglonDato {
+  min-width: 60px;
+  font-size: 12.5px;
+  color: var(--ui-fg-2);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.renglonImporte {
+  min-width: 72px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0 2px;
+  border-top: 2px solid var(--ui-fg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Medidores de desgaste ──────────────────────────────────────────────── */
+
+.medidor {
+  padding: 9px 0;
+  border-top: 1px solid var(--ui-border-subtle);
+  font-size: 13.5px;
+}
+
+.medidorCabeza {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 500;
+}
+
+.medidorPista {
+  height: 8px;
+  margin: 5px 0 4px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--ui-border-subtle);
+}
+
+.medidorValor {
+  height: 100%;
+  background: var(--ui-brand, #168570);
+
+  &[data-tono="atencion"] {
+    background: var(--ui-warning, #e08a0b);
+  }
+
+  &[data-tono="mal"] {
+    background: var(--ui-danger, #c23b3b);
+  }
+}
+
+.medidorNota {
+  font-size: 12.5px;
+  color: var(--ui-fg-3);
+}
+
+.datoFila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--ui-border-subtle);
+  font-size: 13.5px;
+
+  > span:first-child {
+    color: var(--ui-fg-2);
+    font-size: 13px;
+  }
+
+  > :last-child {
+    text-align: right;
+  }
+
+  b {
+    font-weight: 500;
+  }
+}
+
+/* ── Gráfica de gasolina ────────────────────────────────────────────────── */
+
+.grafica {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 150px;
+  border-bottom: 1px solid var(--ui-border-strong);
+}
+
+.graficaColumna {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+}
+
+.graficaBarra {
+  width: 100%;
+  max-width: 44px;
+  border-radius: 5px 5px 0 0;
+  background: var(--ui-brand, #168570);
+}
+
+.graficaOficial {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 2px dashed var(--ui-accent-sky, #1f5487);
+}
+
+.graficaEtiqueta {
+  position: absolute;
+  right: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ui-fg-2);
+}
+
+.graficaFechas {
+  display: flex;
+  gap: 10px;
+  margin-top: 5px;
+
+  > span {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--ui-fg-3);
+    text-align: center;
+  }
+}
+
+/* ── Pastillas ──────────────────────────────────────────────────────────── */
+
+.pastilla {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--ui-surface-2);
+  color: var(--ui-fg-2);
+
+  &[data-tono="manual"],
+  &[data-tono="tickets"],
+  &[data-tono="ok"],
+  &[data-tono="PROYECTO"] {
+    background: var(--ui-positive-bg, #dff2ed);
+    color: var(--ui-positive-text, #0f6554);
+  }
+
+  &[data-tono="conuee"],
+  &[data-tono="COTIZACION"] {
+    background: var(--ui-info-bg, #e3edf7);
+    color: var(--ui-info-text, #1f5487);
+  }
+
+  &[data-tono="atencion"],
+  &[data-tono="falta"],
+  &[data-tono="SIN_LIGAR"] {
+    background: var(--ui-warning-bg, #fff6e6);
+    color: var(--ui-warning-text, #9a5b06);
+  }
+
+  &[data-tono="mal"] {
+    background: var(--ui-danger-bg, #fae4e4);
+    color: var(--ui-danger-text, #8f2626);
+  }
+}
+
+/* ── Tablas ─────────────────────────────────────────────────────────────── */
+
+.tablaCaja {
+  overflow-x: auto;
+}
+
+.tabla {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 13.5px;
+
+  th {
+    padding: 8px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ui-fg-2);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 10px 8px;
+    border-top: 1px solid var(--ui-border-subtle);
+    vertical-align: top;
+  }
+
+  th:first-child,
+  td:first-child {
+    padding-left: 0;
+  }
+
+  th:last-child,
+  td:last-child {
+    padding-right: 0;
+  }
+
+  .der {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.celdaSub {
+  display: block;
+  font-size: 12.5px;
+  color: var(--ui-fg-3);
+}
+
+/* ── Captura ────────────────────────────────────────────────────────────── */
+
+.zonaArchivo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 30px 20px;
+  border: 1.5px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg, 14px);
+  background: var(--ui-surface-2);
+  text-align: center;
+
+  &[data-arrastrando="true"] {
+    border-color: var(--ui-brand, #168570);
+    background: var(--ui-positive-bg, #dff2ed);
+  }
+
+  svg {
+    color: var(--ui-brand, #168570);
+  }
+
+  b {
+    font-family: var(--ui-font-display);
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  span {
+    font-size: 13px;
+    color: var(--ui-fg-2);
+  }
+}
+
+.separador {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--ui-fg-3);
+
+  &::before,
+  &::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--ui-border-subtle);
+  }
+}
+
+.camposGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--ui-fg-2);
+
+  input,
+  select {
+    width: 100%;
+    min-height: 40px;
+    padding: 0 11px;
+    box-sizing: border-box;
+    border: 1px solid var(--ui-border-strong);
+    border-radius: var(--ui-radius-md, 10px);
+    background: transparent;
+    color: var(--ui-fg);
+    font: inherit;
+    font-size: 14px;
+  }
+}
+
+/* En la revisión el dato se lee como texto y se corrige en su lugar. */
+.filaRevision {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 5px 0;
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.filaRevisionNombre {
+  flex: 0 0 150px;
+  font-size: 13px;
+  color: var(--ui-fg-2);
+}
+
+.filaRevisionValor {
+  flex: 1 1 180px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-md, 10px);
+  background: transparent;
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+
+  &:hover {
+    border-color: var(--ui-border-subtle);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--ui-brand, #168570);
+  }
+
+  &::placeholder {
+    color: var(--ui-fg-3);
+    font-weight: 400;
+  }
+}
+
+.filaServicio {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 96px 80px auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px solid var(--ui-border-subtle);
+
+  input {
+    min-width: 0;
+    min-height: 36px;
+    padding: 0 8px;
+    box-sizing: border-box;
+    border: 1px solid var(--ui-border-subtle);
+    border-radius: var(--ui-radius-md, 10px);
+    background: transparent;
+    color: var(--ui-fg);
+    font: inherit;
+    font-size: 13.5px;
+  }
+
+  @media (max-width: 560px) {
+    grid-template-columns: 1fr 1fr;
+
+    input:first-child {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+.casilla {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 13.5px;
+
+  input {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+}
+
+.leido {
+  padding: 10px 12px;
+  border-radius: var(--ui-radius-md, 10px);
+  background: var(--ui-positive-bg, #dff2ed);
+  color: var(--ui-positive-text, #0f6554);
+  font-size: 13.5px;
+
+  b {
+    display: block;
+    font-family: var(--ui-font-display);
+    font-size: 18px;
+    font-weight: 600;
+  }
+}
+
+.bandaCosto {
+  padding: 18px 20px;
+  border-radius: var(--ui-radius-xl, 16px);
+  color: #fff;
+  background:
+    radial-gradient(420px 220px at 90% 0%, rgba(16, 161, 131, 0.45), transparent 65%),
+    #0d0f12;
+
+  span {
+    font-size: 13px;
+    color: #c6d3d8;
+  }
+
+  b {
+    display: block;
+    margin: 2px 0 6px;
+    font-family: var(--ui-font-display);
+    font-size: 34px;
+    font-weight: 600;
+    line-height: 1.15;
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+    color: #c6d3d8;
+  }
+}
+
+.selectorMes {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-md, 10px);
+  background: transparent;
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: 13px;
+}
+
+.enlace {
+  color: inherit;
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.botonTexto {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-fg-3);
+  font: inherit;
+  font-size: 12.5px;
+  text-decoration: underline;
+  cursor: pointer;
+}

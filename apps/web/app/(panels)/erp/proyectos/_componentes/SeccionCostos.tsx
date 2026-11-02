@@ -10,6 +10,8 @@ import { useEffect, useState } from "react";
 import { EmptyState, SkeletonRows } from "@/components/base";
 import { Aviso } from "@/components/mesa-contable/piezas";
 import { Kpi, c } from "@/components/costos/piezas";
+import v from "@/components/vehiculos/vehiculos.module.scss";
+import { fechaCorta } from "@/lib/vehiculos-ficha";
 import { formatApiError } from "@/lib/erp-api";
 import {
   anchoDeBarra,
@@ -29,7 +31,7 @@ import type { SeccionProps } from "./tipos";
 const ORIGEN: Record<Rubro, string> = {
   MATERIAL: "Salidas de almacén",
   MANO_OBRA: "Reloj de actividades",
-  VEHICULO: "Gasolina y casetas por ahora; el costo por km llega con su ficha",
+  VEHICULO: "Km de cada salida a la tarifa de su ficha, y casetas",
   HERRAMIENTA: "Llega con su ficha de costo",
   VIATICO_GASTO: "Comprobados o aprobados",
   SUBCONTRATO: "Llega con compras por proyecto",
@@ -85,6 +87,65 @@ export default function SeccionCostos({ proyecto, token }: Pick<SeccionProps, "p
             ) : null}
           </div>
         </section>
+
+        {datos.vehiculos && (datos.vehiculos.km > 0 || datos.vehiculos.otros > 0) ? (
+          <section className={c.card} aria-label="Vehículos en este proyecto">
+            <div className={v.cabecera} style={{ marginBottom: 2 }}>
+              <h3 className={c.cardTitle} style={{ margin: 0 }}>
+                Vehículos en este proyecto
+              </h3>
+              <strong className={c.num}>
+                {datos.vehiculos.km.toLocaleString("es-MX")} km · {pesos(datos.vehiculos.importe + datos.vehiculos.otros)}
+              </strong>
+            </div>
+            <p className={c.hint} style={{ marginTop: 0 }}>
+              Cuando una salida se liga a una actividad de este proyecto, sus kilómetros se cargan aquí solos.
+            </p>
+            <div className={v.tablaCaja}>
+              <table className={v.tabla} style={{ minWidth: 520 }}>
+                <thead>
+                  <tr>
+                    <th scope="col">Fecha</th>
+                    <th scope="col">Actividad</th>
+                    <th scope="col">Vehículo</th>
+                    <th scope="col" className={v.der}>
+                      Km
+                    </th>
+                    <th scope="col" className={v.der}>
+                      Costo
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {datos.vehiculos.viajes.map((t, i) => (
+                    <tr key={`${t.fecha}-${i}`}>
+                      <td style={{ whiteSpace: "nowrap" }}>{fechaCorta(t.fecha)}</td>
+                      <td>{t.actividad ?? "—"}</td>
+                      <td>{t.vehiculo ?? "—"}</td>
+                      <td className={v.der}>{t.km.toLocaleString("es-MX")}</td>
+                      <td className={v.der}>{pesos(t.importe)}</td>
+                    </tr>
+                  ))}
+                  {datos.vehiculos.otros > 0 ? (
+                    <tr>
+                      <td />
+                      <td>Casetas y gasolina sin vehículo</td>
+                      <td>—</td>
+                      <td className={v.der}>—</td>
+                      <td className={v.der}>{pesos(datos.vehiculos.otros)}</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+            {datos.vehiculos.desglose.length ? (
+              <p className={c.hint}>
+                Los {datos.vehiculos.km.toLocaleString("es-MX")} km incluyen{" "}
+                {datos.vehiculos.desglose.map((p) => `${p.nombre} ${pesos(p.importe)}`).join(", ")}. La gasolina se reparte por kilómetro: quien llena el tanque no paga todo el tanque.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
 
         <div className={c.cols3}>
           <section className={c.card} aria-label="Mano de obra">

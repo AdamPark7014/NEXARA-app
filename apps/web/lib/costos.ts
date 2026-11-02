@@ -157,6 +157,13 @@ export type CostosProyecto = {
   indirecto: { pct: number | null; cotizado: number | null; real: number | null };
   margen: { cotizado: Margen | null; hoy: Margen | null };
   manoDeObra: { horas: number; categorias: Array<{ categoria: string; horas: number; importe: number }> | null };
+  vehiculos?: {
+    km: number;
+    importe: number;
+    otros: number;
+    viajes: Array<{ fecha: string; actividad: string | null; vehiculo: string | null; km: number; importe: number }>;
+    desglose: Array<{ nombre: string; importe: number }>;
+  };
   avisos: {
     sinCotizacion: boolean;
     sinVenta: boolean;

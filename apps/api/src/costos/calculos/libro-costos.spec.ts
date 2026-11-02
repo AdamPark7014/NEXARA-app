@@ -1,9 +1,12 @@
 import {
+  conservarTarifaDeViaje,
   cotizadoPorRubro,
+  gasolinaYaEnKm,
   horasEfectivas,
   margen,
   movimientoDeGasto,
   movimientoDeSalida,
+  movimientoDeViaje,
   movimientosDeSesiones,
   movimientosDeViatico,
   sumaDe,
@@ -238,5 +241,65 @@ describe('lo cotizado', () => {
   it('venta sin IVA con y sin margen general', () => {
     expect(ventaSinIva({ subtotal: 1000, discountTotal: 100 })).toBe(900);
     expect(ventaSinIva({ subtotal: 1000, discountTotal: 100, marginPercent: 20 })).toBe(1080);
+  });
+});
+
+describe('viajes en el libro', () => {
+  const tarifa = { d: 1.62, im: 1.224, sm: 0.408, mn: 0.972, co: 2.8488, lb: 0.12, n: 0.24, otros: 0, fijos: 4.224, consumos: 3.2088, total: 7.43 };
+  const viaje = { id: 7, vehicleId: 2, activityId: 40, userId: 5, fecha: '2026-10-28', km: 156, tarifa, rendimiento: 'REAL' as const };
+
+  it('156 km a $7.43 son $1,159.08, y guarda de qué se compone', () => {
+    const m = movimientoDeViaje(viaje, 3000);
+    expect(m).toMatchObject({
+      origen: 'VEHICULO:7',
+      rubro: 'VEHICULO',
+      activityId: 40,
+      userId: 5,
+      cantidad: 156,
+      unidad: 'km',
+      costoUnitario: 7.43,
+      importe: 1159.08,
+      nota: null,
+    });
+    expect(m.detalle).toEqual({
+      vehicleId: 2,
+      km: 156,
+      rendimiento: 'REAL',
+      tarifa: { d: 1.62, im: 1.224, sm: 0.408, mn: 0.972, co: 2.8488, lb: 0.12, n: 0.24, otros: 0 },
+    });
+  });
+
+  it('avisa si aún usa el rendimiento oficial, o si los km parecen un dedazo', () => {
+    expect(movimientoDeViaje({ ...viaje, rendimiento: 'OFICIAL' }, 3000).nota).toMatch(/rendimiento oficial/);
+    expect(movimientoDeViaje({ ...viaje, km: 45000 }, 3000).nota).toMatch(/revisa el odómetro/);
+  });
+
+  it('un viaje conserva la tarifa de su día aunque la de hoy sea otra', () => {
+    const hoy = movimientoDeViaje({ ...viaje, tarifa: { ...tarifa, total: 9 } }, 3000);
+    const m = conservarTarifaDeViaje(hoy, { costoUnitario: '7.4300', detalle: { tarifa: { co: 2.84 }, rendimiento: 'OFICIAL' } });
+    expect(m.costoUnitario).toBe(7.43);
+    expect(m.importe).toBe(1159.08);
+    expect(m.detalle).toMatchObject({ tarifa: { co: 2.84 }, rendimiento: 'OFICIAL' });
+  });
+
+  it('si se corrigió el odómetro, recalcula con esa misma tarifa', () => {
+    const hoy = movimientoDeViaje({ ...viaje, km: 100, tarifa: { ...tarifa, total: 9 } }, 3000);
+    expect(conservarTarifaDeViaje(hoy, { costoUnitario: 7.43 }).importe).toBe(743);
+  });
+
+  it('solo aplica a viajes y solo si ya estaba guardado', () => {
+    const nuevo = movimientoDeViaje(viaje, 3000);
+    expect(conservarTarifaDeViaje(nuevo, undefined)).toBe(nuevo);
+    const otro = { ...nuevo, origen: 'SESION:1', costoUnitario: 100, importe: 100, cantidad: 1 };
+    expect(conservarTarifaDeViaje(otro, { costoUnitario: 1 }).costoUnitario).toBe(100);
+  });
+
+  it('la gasolina de un vehículo con ficha ya va en sus km; la demás entra directa', () => {
+    const conFicha = new Set([2]);
+    expect(gasolinaYaEnKm({ categoria: 'COMBUSTIBLE', vehicleId: 2 }, conFicha)).toBe(true);
+    expect(gasolinaYaEnKm({ categoria: 'combustible ', vehicleId: 2 }, conFicha)).toBe(true);
+    expect(gasolinaYaEnKm({ categoria: 'COMBUSTIBLE', vehicleId: 3 }, conFicha)).toBe(false);
+    expect(gasolinaYaEnKm({ categoria: 'COMBUSTIBLE', vehicleId: null }, conFicha)).toBe(false);
+    expect(gasolinaYaEnKm({ categoria: 'CASETA', vehicleId: 2 }, conFicha)).toBe(false);
   });
 });

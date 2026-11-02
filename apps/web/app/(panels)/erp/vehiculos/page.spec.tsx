@@ -149,7 +149,7 @@ describe("flotilla en Core", () => {
     expect(screen.getAllByText(/no puede ver la flotilla/).length).toBeGreaterThan(0);
   });
 
-  it("con permiso de inventario aparece Agregar y guarda en vehicles/inventory", async () => {
+  it("con permiso de inventario, Agregar lleva al alta con el manual", async () => {
     usuario.actual = {
       id: 1,
       nombre: "Christian",
@@ -158,29 +158,82 @@ describe("flotilla en Core", () => {
       permissions: ["vehicles.inventory"],
       isSuperAdmin: false,
     };
-    const fetchMock = stubFetch();
-    const user = userEvent.setup();
+    stubFetch();
     render(<VehiculosPage />);
 
-    expect(await screen.findByRole("button", { name: "Agregar" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Agregar" }));
-    expect(await screen.findByRole("heading", { name: "Nuevo vehículo" })).toBeInTheDocument();
+    const agregar = await screen.findByRole("link", { name: "Agregar vehículo" });
+    expect(agregar).toHaveAttribute("href", "/erp/vehiculos/nuevo");
+  });
 
-    await user.type(screen.getByLabelText("Nombre"), "Hilux blanca");
-    await user.type(screen.getByLabelText("Placas"), "XYZ-99-01");
-    await user.click(screen.getByRole("button", { name: "Guardar en flotilla" }));
+  it("sin permiso de inventario no aparece Agregar", async () => {
+    stubFetch();
+    render(<VehiculosPage />);
+    expect(await screen.findByText("Ranger 2021")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Agregar vehículo" })).not.toBeInTheDocument();
+  });
 
-    await vi.waitFor(() => {
-      const post = fetchMock.mock.calls.find(
-        (c) => String(c[0]).includes("vehicles/inventory") && (c[1] as RequestInit)?.method === "POST",
-      );
-      expect(post).toBeTruthy();
-      expect(JSON.parse(String((post![1] as RequestInit).body))).toMatchObject({
-        nombre: "Hilux blanca",
-        placas: "XYZ-99-01",
-        estatus: "Disponible",
-        activo: true,
-      });
+  it("quien ve costos ve el mes: costo por km, reparto y avisos", async () => {
+    const MES = {
+      mes: "2026-10",
+      vehiculos: [
+        {
+          id: 3,
+          kmDelMes: 1240,
+          porKm: 7.43,
+          rendimientoReal: 8.6,
+          rendimientoOficial: 11.9,
+          tieneFicha: true,
+          proximoServicio: { km: 20020, faltanKm: -320, fecha: null, conceptos: ["Aceite"], estado: "VENCIDO" },
+        },
+      ],
+      reparto: {
+        proyectos: { km: 1510, importe: 11310 },
+        cotizaciones: { km: 380, importe: 2840 },
+        oficina: { km: 240, importe: 1790 },
+        sinLigar: { km: 280, importe: 2104 },
+        parado: 3960,
+      },
+      resumen: { km: 2410, costoMes: 22004, porKm: 7.49, aIndirectos: 5750 },
+      avisos: [{ tono: "danger", titulo: "Ranger 2021: servicio vencido", texto: "Pasó por 320 km: Aceite.", vehicleId: 3 }],
+      acceso: { veCostos: true },
+    };
+    const fetchMock = vi.fn(async (url: RequestInfo | URL) => {
+      const cuerpo = String(url).includes("vehicles/ficha/flotilla") ? MES : { vehiculos: FLOTILLA };
+      return new Response(JSON.stringify(cuerpo), { status: 200, headers: { "Content-Type": "application/json" } });
     });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<VehiculosPage />);
+
+    expect(await screen.findByText("Costo de la flotilla en el mes")).toBeInTheDocument();
+    expect(screen.getByText("$22,004")).toBeInTheDocument();
+    expect(screen.getByText("$7.43")).toBeInTheDocument();
+    expect(screen.getByText("8.6 km/L")).toBeInTheDocument();
+    expect(screen.getByText("Vencido por 320 km")).toBeInTheDocument();
+    expect(screen.getByText("A proyectos")).toBeInTheDocument();
+    expect(screen.getByText("$11,310")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /servicio vencido/ })).toHaveAttribute("href", "/erp/vehiculos/3");
+  });
+
+  it("quien no ve costos no recibe columna de dinero ni reparto", async () => {
+    const MES = {
+      mes: "2026-10",
+      vehiculos: [{ id: 3, kmDelMes: 1240, porKm: null, rendimientoReal: 8.6, rendimientoOficial: 11.9, tieneFicha: true, proximoServicio: null }],
+      reparto: { proyectos: { km: 10, importe: null }, cotizaciones: { km: 0, importe: null }, oficina: { km: 0, importe: null }, sinLigar: { km: 0, importe: null }, parado: null },
+      resumen: { km: 1240, costoMes: null, porKm: null, aIndirectos: null },
+      avisos: [],
+      acceso: { veCostos: false },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: RequestInfo | URL) => {
+        const cuerpo = String(url).includes("vehicles/ficha/flotilla") ? MES : { vehiculos: FLOTILLA };
+        return new Response(JSON.stringify(cuerpo), { status: 200, headers: { "Content-Type": "application/json" } });
+      }),
+    );
+    render(<VehiculosPage />);
+
+    expect(await screen.findByText("8.6 km/L")).toBeInTheDocument();
+    expect(screen.queryByText("Costo por km")).not.toBeInTheDocument();
+    expect(screen.queryByText("A proyectos")).not.toBeInTheDocument();
   });
 });

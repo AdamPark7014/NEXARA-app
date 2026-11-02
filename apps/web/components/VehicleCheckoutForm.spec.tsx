@@ -84,6 +84,63 @@ describe("VehicleCheckoutForm", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Falta la foto del tablero");
   });
 
+  describe("lectura de la foto del tablero", () => {
+    async function subirTablero(user: ReturnType<typeof userEvent.setup>) {
+      await subirVuelta(user);
+      await user.click(screen.getByRole("button", { name: "Siguiente" }));
+      await user.upload(entradaDe(SLOT_TABLERO), imagen("tablero"));
+      await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    }
+
+    it("llena el kilometraje y la gasolina, y la persona los puede corregir", async () => {
+      const user = userEvent.setup();
+      const leerTablero = vi.fn(async () => ({ odometroKm: 12480, combustible: "3/4" }));
+      render(<VehicleCheckoutForm mode="salida" onSubmit={vi.fn(async () => undefined)} leerTablero={leerTablero} />);
+
+      await subirTablero(user);
+
+      expect(leerTablero).toHaveBeenCalledTimes(1);
+      const km = await screen.findByDisplayValue("12480");
+      expect(screen.getByRole("button", { name: "3/4" })).toHaveAttribute("aria-pressed", "true");
+
+      await user.clear(km);
+      await user.type(km, "12490");
+      expect(km).toHaveValue(12490);
+    });
+
+    it("no pisa lo que la persona ya escribió", async () => {
+      const user = userEvent.setup();
+      const leerTablero = vi.fn(async () => ({ odometroKm: 99999, combustible: "F" }));
+      render(<VehicleCheckoutForm mode="salida" onSubmit={vi.fn(async () => undefined)} leerTablero={leerTablero} />);
+
+      await subirTablero(user);
+      const km = await screen.findByDisplayValue("99999");
+      await user.clear(km);
+      await user.type(km, "12490");
+      await user.click(screen.getByRole("button", { name: "Atrás" }));
+      await user.upload(entradaDe(SLOT_TABLERO), imagen("tablero-otra"));
+      await user.click(screen.getByRole("button", { name: "Siguiente" }));
+
+      expect(leerTablero).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole("spinbutton")).toHaveValue(12490);
+    });
+
+    it("si no la puede leer, se captura a mano como siempre", async () => {
+      const user = userEvent.setup();
+      const leerTablero = vi.fn(async () => {
+        throw new Error("sin IA");
+      });
+      render(<VehicleCheckoutForm mode="salida" onSubmit={vi.fn(async () => undefined)} leerTablero={leerTablero} />);
+
+      await subirTablero(user);
+
+      expect(screen.getByRole("spinbutton")).toHaveValue(null);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      await user.type(screen.getByRole("spinbutton"), "12480");
+      expect(screen.getByRole("spinbutton")).toHaveValue(12480);
+    });
+  });
+
   it("devolución: el km final no puede ser menor al de salida", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn(async () => undefined);
