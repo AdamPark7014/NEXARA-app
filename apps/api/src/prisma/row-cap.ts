@@ -18,9 +18,10 @@
  *     entera debe pedirla por páginas con `take`, que no pasa por este tope.
  *   - Cuando recorta, **avisa**. Un recorte silencioso es peor que la consulta
  *     sin límite: daría respuestas incompletas que nadie sabría interpretar.
- *     El aviso dice qué modelo fue, y ese modelo es el que necesita paginación
- *     de verdad. Solo queda en el log del contenedor, que se pierde con cada
- *     despliegue.
+ *     El aviso dice qué modelo fue y qué campos filtra: esa consulta es la que
+ *     necesita paginación de verdad. Va al log y a `audit_logs`
+ *     (`entityType = 'PrismaRowCap'`, se limpia a los 90 días), porque el log
+ *     del contenedor se pierde con cada despliegue.
  *
  * Limitación conocida: sólo alcanza al `findMany` de primer nivel. Las
  * relaciones traídas con `include` no pasan por el middleware, así que un
@@ -63,4 +64,82 @@ export type CapResult<T> = { rows: T[]; truncated: boolean };
 export function applyCap<T>(rows: T[], cap: number): CapResult<T> {
   if (rows.length <= cap) return { rows, truncated: false };
   return { rows: rows.slice(0, cap), truncated: true };
+}
+
+/** Con esto se encuentra un recorte en `audit_logs`. */
+export const ENTIDAD_RECORTE = 'PrismaRowCap';
+export const ACCION_RECORTE = 'RECORTE';
+
+export type Recorte = { modelo: string; tope: number; filtro: string[] };
+
+/**
+ * Campos que filtra la consulta, para saber de qué llamada se trata.
+ *
+ * Solo los nombres: los valores pueden ser datos de clientes y no se guardan.
+ */
+export function camposDeFiltro(where: unknown): string[] {
+  const campos = new Set<string>();
+  const visitar = (filtro: unknown) => {
+    if (Array.isArray(filtro)) return filtro.forEach(visitar);
+    if (!filtro || typeof filtro !== 'object') return;
+    for (const [campo, valor] of Object.entries(filtro)) {
+      if (campo === 'AND' || campo === 'OR' || campo === 'NOT') visitar(valor);
+      else campos.add(campo);
+    }
+  };
+  visitar(where);
+  return [...campos].sort();
+}
+
+/**
+ * El middleware del tope: pide uno de más, recorta y dice si sobraba.
+ */
+export async function runWithRowCap<P extends { model?: string; action: string; args?: any }, R>(
+  params: P,
+  next: (params: P) => Promise<R>,
+  cap: number,
+  onRecorte: (recorte: Recorte) => void,
+): Promise<R> {
+  if (!shouldCap(params.action, params.args)) return next(params);
+
+  params.args = { ...(params.args ?? {}), take: probeTake(cap) };
+  const resultado = await next(params);
+  if (!Array.isArray(resultado)) return resultado;
+
+  const { rows, truncated } = applyCap(resultado, cap);
+  if (truncated) {
+    onRecorte({
+      modelo: params.model ?? 'desconocido',
+      tope: cap,
+      filtro: camposDeFiltro(params.args?.where),
+    });
+  }
+  return rows as R;
+}
+
+/**
+ * Cuenta los recortes de cada consulta y dice cuándo guardar uno.
+ *
+ * Una pantalla que se refresca sola podría recortar cada pocos segundos, y
+ * `audit_logs` ya llenó el disco una vez. Se guarda el primero y después uno
+ * por hora, con los que lleva. Lo contado entre uno y otro se pierde si el
+ * servidor se reinicia, pero el primero tras reiniciar siempre se guarda.
+ */
+export class ContadorDeRecortes {
+  private readonly vistos = new Map<string, { desde: number; veces: number }>();
+
+  constructor(private readonly ventanaMs = 3_600_000) {}
+
+  /** Cuántas veces hay que guardar ahora, o `null` si aún no toca. */
+  anotar(consulta: string, ahora = Date.now()): number | null {
+    const visto = this.vistos.get(consulta);
+    if (!visto) {
+      this.vistos.set(consulta, { desde: ahora, veces: 0 });
+      return 1;
+    }
+    visto.veces += 1;
+    if (ahora - visto.desde < this.ventanaMs) return null;
+    this.vistos.set(consulta, { desde: ahora, veces: 0 });
+    return visto.veces;
+  }
 }

@@ -4,7 +4,14 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { AuditBuffer } from './audit-buffer.js';
 import { getTenantStore } from '../common/tenant/tenant-context.js';
 import { TENANT_SCOPED_MODELS } from '../common/tenant/tenant-models.js';
-import { applyCap, probeTake, resolveRowCap, shouldCap } from './row-cap.js';
+import {
+  ACCION_RECORTE,
+  ContadorDeRecortes,
+  ENTIDAD_RECORTE,
+  type Recorte,
+  resolveRowCap,
+  runWithRowCap,
+} from './row-cap.js';
 
 /** Models that support soft-delete (have deletedAt column) */
 const SOFT_DELETE_MODELS = new Set<string>([
@@ -523,6 +530,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private readonly auditLogger = new Logger('PrismaAudit');
   private readonly capLogger = new Logger('PrismaRowCap');
   private readonly rowCap = resolveRowCap();
+  private readonly recortes = new ContadorDeRecortes();
 
   /**
    * Buffer de auditoría. Antes se emitía un INSERT por cada escritura, lo que
@@ -571,25 +579,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     // ── Tope de filas para `findMany` sin `take` ──────────────────
     // Va el primero para que el `take` viaje ya puesto por el resto de la
     // cadena. Ver `row-cap.ts` para el porqué del tope y del aviso.
-    this.$use(async (params, next) => {
-      if (!shouldCap(params.action, params.args)) return next(params);
-
-      const cap = this.rowCap;
-      params.args = { ...(params.args ?? {}), take: probeTake(cap) };
-      const resultado = await next(params);
-      if (!Array.isArray(resultado)) return resultado;
-
-      const { rows, truncated } = applyCap(resultado, cap);
-      if (truncated) {
-        // Recortar en silencio daría respuestas incompletas que nadie sabría
-        // interpretar. Este modelo es el que necesita paginación de verdad.
-        this.capLogger.warn(
-          `Consulta sin paginar recortada al tope de ${cap} filas: ` +
-            `modelo=${params.model ?? 'desconocido'}. Necesita paginación.`,
-        );
-      }
-      return rows;
-    });
+    this.$use((params, next) =>
+      runWithRowCap(params, next, this.rowCap, (recorte) => this.registrarRecorte(recorte)),
+    );
 
     // ── Soft-delete middleware: convert delete → update deletedAt ──
     this.$use(async (params, next) => {
@@ -720,6 +712,30 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       }
 
       return result;
+    });
+  }
+
+  /**
+   * Recortar en silencio daría respuestas incompletas que nadie sabría
+   * interpretar. Esta consulta es la que necesita paginación de verdad.
+   */
+  private registrarRecorte({ modelo, tope, filtro }: Recorte) {
+    this.capLogger.warn(
+      `Consulta sin paginar recortada al tope de ${tope} filas: ` +
+        `modelo=${modelo} filtro=${filtro.join(',') || 'ninguno'}. Necesita paginación.`,
+    );
+
+    const veces = this.recortes.anotar(`${modelo}|${filtro.join(',')}`);
+    if (veces === null) return;
+    const store = getTenantStore();
+    // Sin empresa propia: es un dato técnico, no un cambio de una empresa. Si el volcado corre dentro
+    // de una petición, el filtro de empresa le pone la suya; por eso se busca por `entityType`.
+    this.auditBuffer.add({
+      entityType: ENTIDAD_RECORTE,
+      entityId: 0,
+      action: ACCION_RECORTE,
+      changes: { modelo, tope, filtro, veces },
+      userId: store?.userId != null && store.userId > 0 ? store.userId : undefined,
     });
   }
 
