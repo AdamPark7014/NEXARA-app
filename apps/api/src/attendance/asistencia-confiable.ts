@@ -396,6 +396,8 @@ export const MOTIVO_RECHAZO = {
   finDeSemanaSinGuardia: 'FIN_DE_SEMANA_SIN_GUARDIA',
   sinConexionFueraDeVentana: 'SIN_CONEXION_FUERA_DE_VENTANA',
   festivoSinLaborar: 'FESTIVO_SIN_LABORAR',
+  /** No es un rechazo de verdad: el aviso del freno de salida (`freno-salida.ts`). RH no lo ve en su lista. */
+  salidaSinConfirmar: 'SALIDA_SIN_CONFIRMAR',
 } as const;
 
 export type MotivoRechazo = (typeof MOTIVO_RECHAZO)[keyof typeof MOTIVO_RECHAZO];
@@ -411,6 +413,7 @@ export const ETIQUETA_MOTIVO_RECHAZO: Record<string, string> = {
   FIN_DE_SEMANA_SIN_GUARDIA: 'Fin de semana sin guardia',
   SIN_CONEXION_FUERA_DE_VENTANA: 'Sin conexión fuera de ventana',
   FESTIVO_SIN_LABORAR: 'Festivo que no se labora',
+  SALIDA_SIN_CONFIRMAR: 'Salida sin confirmar: tenía actividad abierta',
 };
 
 /**

@@ -362,6 +362,8 @@ export const OPS_OPERATIONAL_PROJECTS_URL_RULES: UrlRule[] = [
 export const SHARED_SESSION_URL_RULES: UrlRule[] = [
   { path: '/api/notifications/**', scope: 'write' },
   { path: '/api/user-preferences/**', scope: 'write' },
+  // Cronómetro: cada quien manda su propio tiempo (Programa Velocidad Core).
+  { path: '/api/proceso-tiempos', methods: ['POST'], scope: 'write' },
   { path: '/api/users/me', methods: ['GET', 'PATCH'], scope: 'write' },
   { path: '/api/users/profile/**', scope: 'write' },
   // Alta delegada: la ve todo el personal interno, pero el API solo deja pasar a quien tiene

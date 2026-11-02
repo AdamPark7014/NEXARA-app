@@ -13,6 +13,7 @@ import OndaVoz from "@/app/(panels)/erp/reuniones/OndaVoz";
 import { unirDictado } from "@/lib/use-dictado";
 import { useDictadoVivo } from "@/lib/use-dictado-vivo";
 import { useUser } from "@/components/UserContext";
+import { useCronometroProceso } from "@/lib/cronometro-proceso";
 import { formatApiError } from "@/lib/erp-api";
 import { AvisoParecidos } from "@/components/erp/ClienteRapido";
 import { buscarClientesParecidos, type ClienteParecido } from "@/lib/sales-api";
@@ -210,6 +211,8 @@ function Contenido({
   onCreada?: () => void;
   verCosto: boolean;
 }) {
+  /** Desde que empieza a escribir o dictar hasta que confirma cada tarjeta. */
+  const cronometro = useCronometroProceso("asignar_ia", token, { manual: true });
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -273,6 +276,7 @@ function Contenido({
   // Dictado: al callar ~2 s (o con un toque) se interpreta solo, una vez por dictado.
   const dictado = useDictadoVivo({
     alTerminar: (dicho) => {
+      cronometro.arrancar();
       const completo = unirDictado(base.current, dicho).slice(0, 2000);
       setTexto(completo);
       void enviar(completo);
@@ -454,6 +458,9 @@ function Contenido({
       }
     }
     setEstados((prev) => ({ ...prev, [i]: { creada: { id: creada.id, folio: creada.anNumber }, avisoEquipo } }));
+    cronometro.terminar(creada.id, tipoEfectivo(p, aj));
+    // Lo que sigue en la misma instrucción cuenta desde aquí; con la última, el reloj se queda parado.
+    if (pendientes.length > 1) cronometro.arrancar();
     onCreada?.();
     return true;
   };
@@ -466,10 +473,12 @@ function Contenido({
     setCreandoTodas(true);
     // Una por una: si alguna falla, las demás siguen y la tarjeta dice por qué.
     for (const { p, i } of listas) await crear(i, p);
+    cronometro.descartar();
     setCreandoTodas(false);
   };
 
   const limpiar = () => {
+    cronometro.descartar();
     dictado.cancelar();
     setRespuesta(null);
     setTexto("");
@@ -524,7 +533,10 @@ function Contenido({
               className={s.instruccion}
               placeholder="Ej.: que Antonio vaya mañana a las 3 a Tox a revisar las cámaras, le lleva 2 horas; y que Carolina mande la cotización de Banorte para el viernes"
               aria-label="Instrucción para la IA"
-              onChange={(e) => setTexto(e.target.value)}
+              onChange={(e) => {
+                cronometro.arrancar();
+                setTexto(e.target.value);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void enviar(texto);
               }}

@@ -21,6 +21,7 @@ import {
   type PendingItem,
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
+import { useCronometroProceso, type Cronometro } from "@/lib/cronometro-proceso";
 import EvidenciaCamposEditor from "@/components/ops/EvidenciaCamposEditor";
 import HerramientasChecklistEditor from "@/components/ops/HerramientasChecklistEditor";
 import AvisoGuardia from "@/components/asistencias/AvisoGuardia";
@@ -146,6 +147,8 @@ type Props = {
    */
   onEstandar?: (minutos: number | null) => void;
   onSuccess?: (id: number) => void;
+  /** Cronómetro de la página que envuelve al formulario (el flujo de asignar empieza antes). */
+  cronometro?: Cronometro;
   onCancel?: () => void;
 };
 
@@ -170,10 +173,14 @@ export default function OpsActivityForm({
   onTiempoTipico,
   onEstandar,
   onSuccess,
+  cronometro,
   onCancel,
 }: Props) {
   const { user } = useUser();
   const token = user?.token ?? "";
+  const cronometroPropio = useCronometroProceso(selfAssign ? "autoasignar" : "asignar", token, {
+    activo: !activityId && !cronometro,
+  });
   const actCfg = getActivitiesSectionConfig(user);
   const canAssign =
     selfAssign ||
@@ -774,6 +781,7 @@ export default function OpsActivityForm({
       setNextAn("");
     }
     creadaRef.current = null;
+    if (newId > 0) (cronometro ?? cronometroPropio).terminar(newId, coreKind ?? null);
     if (newId > 0) onSuccess?.(newId);
   };
 

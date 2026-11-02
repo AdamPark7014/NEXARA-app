@@ -25,6 +25,8 @@ export const AUDIT_EXCLUDED = new Set<string>([
   'IntegraPushEvent',
   // Libro de costos: se deriva de otras tablas y se recalcula de noche. Su registro son sus orígenes.
   'CostoMovimiento',
+  // Cronómetro: la tabla misma es el registro.
+  'ProcesoTiempo',
 ]);
 
 /**

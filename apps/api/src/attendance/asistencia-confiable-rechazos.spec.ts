@@ -150,6 +150,7 @@ describe('las claves de rechazo son estables', () => {
       'FIN_DE_SEMANA_SIN_GUARDIA',
       'MOCK_LOCATION',
       'ORIGEN_WEB',
+      'SALIDA_SIN_CONFIRMAR',
       'SIN_CONEXION_FUERA_DE_VENTANA',
       'SIN_PERMISO_UBICACION',
       'UBICACION_APAGADA',

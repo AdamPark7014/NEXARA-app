@@ -20,6 +20,8 @@ const SKIP_PREFIXES = [
   // Webhook de los terminales Hikvision (INTEGRA): ~56 mil POST al día sin usuario. Cada evento ya queda en
   // integra_push_events; auditarlos llenó 9.8 GB de audit_logs en un mes (y guardaba el token de la ruta).
   '/api/integra/hik/',
+  // Cronómetro de procesos: una fila por cada alta medida; la tabla misma es el registro.
+  '/api/proceso-tiempos',
 ];
 
 /** ¿Esta ruta queda fuera de la auditoría de mutaciones? */
