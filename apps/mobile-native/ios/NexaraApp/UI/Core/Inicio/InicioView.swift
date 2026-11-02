@@ -33,9 +33,19 @@ struct InicioView: View {
     @State private var tipoPendiente: String?
     @State private var avisoUbicacion: AvisoUbicacionChecada?
     @State private var pausando: MyActivityItem?
+    /// La hoja «¿Terminar tu jornada?» está abierta.
+    @State private var preguntandoSalida = false
 
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
     private var muestraJornada: Bool { tieneAsistencia && attendance.canRegisterSelf }
+    private var festivoDeHoy: FestivoRules.Estado {
+        FestivoRules.estado(store.festivos, hoyMexico: AttendanceClock.today())
+    }
+    /// Mockup de la Ola 3: con la jornada abierta, lo de ahora va arriba y la jornada aparte.
+    private var jornadaAbajo: Bool {
+        muestraJornada && attendance.isOpen && store.actual != nil && !esDireccion
+            && tieneActividades && festivoDeHoy != .descansa
+    }
     /// Dirección general (Christian y su equivalente): el API no le da «Mis actividades»
     /// (403 «no aplica a dirección general»), así que Inicio le enseña el tablero del equipo
     /// (`InicioCeoContenido`, canvas «App · Inicio CEO»).
@@ -55,17 +65,11 @@ struct InicioView: View {
                 )
                 // Festivo (mockup aprobado el 29-10): si descansa, la banda sustituye a la jornada (ese
                 // día no se checa); si le toca, la tarjeta del horario lleva el botón de entrada.
-                let festivo = FestivoRules.estado(store.festivos, hoyMexico: AttendanceClock.today())
+                let festivo = festivoDeHoy
                 if festivo == .descansa, let festivos = store.festivos {
                     FestivoDescansaContenido(festivos: festivos)
                 } else if muestraJornada {
-                    InicioJornadaCard(
-                        vm: attendance,
-                        festivo: festivo == .labora ? store.festivos?.festivoHoy : nil,
-                        onMark: { marcar($0) },
-                        onComida: onOpenComidas,
-                        onVerJornada: onOpenAsistencia
-                    )
+                    if !jornadaAbajo { tarjetaJornada }
                 } else if festivo == .labora, let hoy = store.festivos?.festivoHoy {
                     FestivoLaboraTarjeta(festivo: hoy, onEntrada: nil)
                 }
@@ -109,12 +113,12 @@ struct InicioView: View {
             set: { if !$0 { photoType = nil } }
         )) {
             GeoPhotoCaptureView(
-                title: photoType == "salida" ? "Tu foto de salida" : "Tu foto de entrada",
+                title: photoType == "salida" ? "Tu foto de fin de jornada" : "Tu foto de entrada",
                 confirmLabel: "Registrar con esta foto",
                 requireLocation: false,
                 onConfirm: { captured in
                     let type = photoType ?? "entrada"
-                    let failure = await attendance.checkIn(type, photo: captured)
+                    let failure = await attendance.checkIn(type, photo: captured, confirmada: type == "salida")
                     if failure == nil { photoType = nil }
                     return failure
                 },
@@ -145,6 +149,29 @@ struct InicioView: View {
                 Task { await store.load(enabled: true) }
             }
         }
+        // «Mejor terminar la actividad» abre esa actividad en evidencia, con la cámara del paso.
+        .terminarJornadaHoja(
+            isPresented: $preguntandoSalida,
+            vm: attendance,
+            onTerminarActividad: { id in
+                EvidenciaApertura.pedirCamara(id)
+                onOpenActivity(id, InicioRules.tabEvidencias)
+            },
+            onConfirmar: { marcar("salida") }
+        )
+    }
+
+    /// La tarjeta de la jornada: arriba si no hay entrada o actividad, y debajo de lo de ahora si no.
+    private var tarjetaJornada: some View {
+        InicioJornadaCard(
+            vm: attendance,
+            festivo: festivoDeHoy == .labora ? store.festivos?.festivoHoy : nil,
+            onMark: { marcar($0) },
+            onTerminar: { preguntandoSalida = true },
+            onDeshacer: { Task { await attendance.deshacerSalida() } },
+            onComida: onOpenComidas,
+            onVerJornada: onOpenAsistencia
+        )
     }
 
     /// Antes de la foto de la checada: permiso y ubicación encendida (ver `AvisoUbicacionChecada`).
@@ -201,6 +228,7 @@ struct InicioView: View {
                     },
                     onDetalle: { onOpenActivity(actual.id, nil) }
                 )
+                if jornadaAbajo { tarjetaJornada }
                 if let error = store.error {
                     NxRefreshErrorBanner(message: error, onRetry: { Task { await store.load(enabled: true) } })
                 }
@@ -257,8 +285,12 @@ struct InicioView: View {
         case .reanudar:
             _ = await store.reanudar(item.id)
         case .iniciar where accion.marcaInicio:
-            if await store.iniciar(item.id) { onOpenActivity(item.id, accion.tab) }
+            if await store.iniciar(item.id) {
+                if accion.abreCamara { EvidenciaApertura.pedirCamara(item.id) }
+                onOpenActivity(item.id, accion.tab)
+            }
         default:
+            if accion.abreCamara { EvidenciaApertura.pedirCamara(item.id) }
             onOpenActivity(item.id, accion.tab)
         }
     }
@@ -390,6 +422,10 @@ private struct InicioJornadaCard: View {
     /// entrada, su botón «Checar entrada» sustituye a esta tarjeta hasta que la hay.
     var festivo: Festivo? = nil
     let onMark: (String) -> Void
+    /// «Terminar mi jornada»: abre la hoja que dice qué se detiene.
+    let onTerminar: () -> Void
+    /// «Deshacer · quedan N min», dentro de los 10 minutos.
+    let onDeshacer: () -> Void
     let onComida: () -> Void
     let onVerJornada: () -> Void
 
@@ -458,8 +494,9 @@ private struct InicioJornadaCard: View {
         switch jornada {
         case .enJornada:
             let trabajado = AttendanceClock.elapsed(from: inicioIso, to: nil, now: now)
-            titulo = "Entraste a las \(ActividadesTexto.hora(inicioIso))"
-            detalle = "\(InicioRules.horasMinutos(trabajado)) h trabajadas · " + (tracker.isTracking ? "GPS activo" : "GPS apagado")
+            titulo = "Mi jornada"
+            detalle = "Entraste \(ActividadesTexto.hora(inicioIso)) · \(InicioRules.horasMinutos(trabajado)) h"
+                + (tracker.isTracking ? "" : " · GPS apagado")
         case .completada:
             let trabajado = AttendanceClock.elapsed(from: inicioIso, to: salidaIso, now: now)
             titulo = "Jornada completada · \(ActividadesTexto.hora(inicioIso)) – \(ActividadesTexto.hora(salidaIso))"
@@ -471,6 +508,8 @@ private struct InicioJornadaCard: View {
         // El API contesta 400 a la segunda entrada del día: aquí se apaga antes.
         let puedeEntrar = !hayEntrada && !abierta
         let sinEntrada = jornada == .sinEntrada
+        // Minutos que le quedan para deshacer su salida; nil si ya no se puede.
+        let minutosDeshacer = abierta ? nil : TerminarJornadaRules.minutosParaDeshacer(salidaIso, ahora: now)
 
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 12) {
@@ -488,7 +527,8 @@ private struct InicioJornadaCard: View {
                     Text(detalle)
                         .font(.system(size: 13))
                         .foregroundStyle(NxColors.muted)
-                        .lineLimit(2)
+                        // «Terminar mi jornada» es ancho: el detalle tiene menos lugar en la jornada abierta.
+                        .lineLimit(jornada == .enJornada ? 3 : 2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 switch jornada {
@@ -502,17 +542,37 @@ private struct InicioJornadaCard: View {
                     ) { onMark("entrada") }
                 case .enJornada:
                     InicioJornadaBoton(
-                        title: "Salida",
-                        systemImage: "rectangle.portrait.and.arrow.right",
+                        title: "Terminar mi jornada",
+                        systemImage: nil,
                         primario: false,
-                        loading: vm.checkInLoading
-                    ) { onMark("salida") }
+                        loading: vm.checkInLoading,
+                        action: onTerminar
+                    )
                 case .completada:
                     InicioJornadaBoton(title: "Ver", systemImage: "clock", primario: false, action: onVerJornada)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
+            if let minutosDeshacer {
+                NxRowDivider()
+                Button(action: onDeshacer) {
+                    HStack(alignment: .center, spacing: 12) {
+                        Text("¿Fue un error?")
+                            .font(.system(size: 14))
+                            .foregroundStyle(NxColors.fg2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text("Deshacer · quedan \(minutosDeshacer) min")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(NxColors.brand)
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(NxPressableStyle())
+                .disabled(vm.checkInLoading)
+            }
             if jornada == .enJornada {
                 NxRowDivider()
                 Button(action: onComida) {
@@ -545,10 +605,10 @@ private struct InicioJornadaCard: View {
 }
 
 /// Botón de la tarjeta de jornada (Android `JornadaBoton`): 44 de alto, radio 12; «Entrada»
-/// verde lleno, «Salida» y «Ver» de contorno.
+/// verde lleno, «Terminar mi jornada» (sin icono) y «Ver» de contorno.
 private struct InicioJornadaBoton: View {
     let title: String
-    let systemImage: String
+    let systemImage: String?
     let primario: Bool
     var loading: Bool = false
     var enabled: Bool = true
@@ -564,7 +624,7 @@ private struct InicioJornadaBoton: View {
                         .controlSize(.small)
                         .tint(primario ? Color.white : NxColors.brand)
                         .frame(width: 16, height: 16)
-                } else {
+                } else if let systemImage {
                     Image(systemName: systemImage)
                         .font(.system(size: 15, weight: .medium))
                         .frame(width: 18, height: 18)
@@ -749,19 +809,34 @@ private struct InicioActualCard: View {
                     .foregroundStyle(NxColors.rgb(0xFFB4B4))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            HStack(alignment: .center, spacing: 10) {
-                InicioBandaBoton(
-                    title: pausable ? "Pausar" : "Detalle",
-                    systemImage: pausable ? "pause.fill" : "info.circle",
-                    claro: false,
-                    action: pausable ? onPausar : onDetalle
-                )
-                InicioBandaBoton(
-                    title: InicioRules.etiquetaCorta(accion),
-                    systemImage: accion.systemImage,
-                    claro: true,
-                    loading: enCurso
-                ) { onPrimary(accion) }
+            // «Terminar actividad» no se puede cortar: es la palabra que evita la confusión. Por eso
+            // la acción principal es más ancha (Android: pesos 0.7 y 1.3).
+            GeometryReader { geo in
+                let espacio: CGFloat = 10
+                let util = max(0, geo.size.width - espacio)
+                HStack(alignment: .center, spacing: espacio) {
+                    InicioBandaBoton(
+                        title: pausable ? "Pausar" : "Detalle",
+                        systemImage: pausable ? "pause.fill" : "info.circle",
+                        claro: false,
+                        action: pausable ? onPausar : onDetalle
+                    )
+                    .frame(width: util * 0.35)
+                    InicioBandaBoton(
+                        title: InicioRules.etiquetaCorta(accion),
+                        systemImage: accion.systemImage,
+                        claro: true,
+                        loading: enCurso
+                    ) { onPrimary(accion) }
+                    .frame(width: util * 0.65)
+                }
+            }
+            .frame(height: 48)
+            if let nota = InicioRules.notaAccion(accion) {
+                Text(nota)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Self.tenue)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(20)

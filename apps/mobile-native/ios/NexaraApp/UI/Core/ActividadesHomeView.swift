@@ -8,6 +8,7 @@ let coreActividadesVistaKey = "nx-actividades-vista"
 enum ActividadesRuta: Hashable {
     case actividad(id: Int, tab: String?)
     case persona(id: Int, nombre: String)
+    case formatos
 
     @MainActor @ViewBuilder
     func destino(myId: Int?) -> some View {
@@ -18,6 +19,9 @@ enum ActividadesRuta: Hashable {
         case .persona(let id, let nombre):
             TeamMemberDetailView(userId: id, nombre: nombre, isSelf: id == myId)
                 .nxBrandNavBar()
+        case .formatos:
+            FormatosView()
+                .nxBrandNavBar(title: "Asignar con un formato")
         }
     }
 }
@@ -78,6 +82,20 @@ struct ActividadesHomeView: View {
                     ],
                     selection: vistaSeleccion
                 )
+            }
+            if FormatosRules.visible(session.currentUser) {
+                Button {
+                    ruta = .formatos
+                } label: {
+                    Text("Asignar con formato")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(NxColors.brandText)
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: NxMetrics.minTap)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             contenido
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

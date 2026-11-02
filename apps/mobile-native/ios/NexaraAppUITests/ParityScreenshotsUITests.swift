@@ -154,6 +154,56 @@ final class ParityScreenshotsUITests: XCTestCase {
         capturar("regreso-leido")
     }
 
+    /// Ola 3: «Mi día» con la jornada abierta, la hoja «¿Terminar tu jornada?» y «¿Fue un error?». Las
+    /// fotos las pone el modo demo. Capturas 84 a 86: el flujo de CI solo acepta nombres con dos cifras.
+    func testTerminarJornada() throws {
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "La app no llegó a primer plano")
+        despejarAlertas()
+        guard buscar(pestana("tab-inicio", "Inicio"), timeout: 30) != nil else {
+            adjuntarJerarquia("dbg-salida-sin-shell")
+            XCTFail("No aparece la barra de pestañas en el demo")
+            return
+        }
+        Thread.sleep(forTimeInterval: 1.5)
+        numero = 83
+
+        guard tocarSiExiste(textoTocable("Entrada"), timeout: 8) else {
+            adjuntarJerarquia("dbg-salida-sin-entrada")
+            XCTFail("No está el botón «Entrada» en «Mi día»")
+            return
+        }
+        registrarConFotoDemo("entrada")
+        Thread.sleep(forTimeInterval: 1.5)
+        capturar("mi-dia-jornada-abierta")
+
+        guard tocarSiExiste(textoTocable("Terminar mi jornada"), timeout: 8) else {
+            adjuntarJerarquia("dbg-salida-sin-boton")
+            XCTFail("No está «Terminar mi jornada» en «Mi día»")
+            return
+        }
+        Thread.sleep(forTimeInterval: 1.5)
+        capturar("hoja-terminar-jornada")
+
+        guard tocarSiExiste(textoTocable("Sí, terminar mi jornada"), timeout: 8) else {
+            adjuntarJerarquia("dbg-salida-sin-confirmar")
+            XCTFail("No está «Sí, terminar mi jornada» en la hoja")
+            return
+        }
+        registrarConFotoDemo("salida")
+        Thread.sleep(forTimeInterval: 1.5)
+        capturar("mi-dia-deshacer-salida")
+    }
+
+    /// La checada de «Mi día»: en el demo la cámara ya trae la foto; solo falta confirmarla.
+    private func registrarConFotoDemo(_ nombre: String) {
+        let registrar = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Registrar con esta foto")).firstMatch
+        guard registrar.waitForExistence(timeout: 10) else {
+            omitir("checada de \(nombre): no aparece «Registrar con esta foto»")
+            return
+        }
+        tocar(registrar)
+    }
+
     /// Vehículos del CEO (`NEXARA_DEMO_CEO=1`): la flotilla y la ficha, sin «Solicitar» ni «Salida».
     /// Capturas 88 a 90: el flujo de CI solo acepta nombres con dos cifras.
     func testFlotillaDireccion() throws {

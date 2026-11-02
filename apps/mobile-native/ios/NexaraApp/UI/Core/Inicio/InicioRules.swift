@@ -17,6 +17,8 @@ enum InicioRules {
         let label: String
         /// Pestaña del detalle que abre (`evidencias`) o nil para Detalle.
         let tab: String?
+        /// Abre directo la cámara del paso: un toque menos (`EvidenciaApertura`).
+        var abreCamara: Bool = false
         /// Antes de abrir guarda la hora real de inicio (`me/activities/:id/iniciar`).
         var marcaInicio: Bool = false
 
@@ -86,8 +88,20 @@ enum InicioRules {
         case .repartir: return Accion(kind: .repartir, label: "Repartir", tab: nil)
         case .abrir: return Accion(kind: .abrir, label: "Abrir", tab: nil)
         case .iniciar:
-            return Accion(kind: .iniciar, label: ActividadesSemaforo.accionIniciar, tab: p.tab, marcaInicio: p.marcaInicio)
-        case .continuar: return Accion(kind: .continuar, label: "Continuar evidencia", tab: p.tab)
+            return Accion(kind: .iniciar, label: ActividadesSemaforo.accionIniciar, tab: p.tab, abreCamara: true, marcaInicio: p.marcaInicio)
+        case .continuar:
+            // Lo mismo se llama igual en todas partes: la salida de la actividad no es la de la jornada.
+            let paso = a.evidenceStatus
+            if paso == CoreEvidence.serviceSheetData || paso == CoreEvidence.exitPhoto {
+                return Accion(kind: .continuar, label: "Terminar actividad", tab: p.tab, abreCamara: true)
+            }
+            if paso == CoreEvidence.evidencePhotos {
+                return Accion(kind: .continuar, label: "Tomar fotos", tab: p.tab, abreCamara: true)
+            }
+            if paso == nil || paso == CoreEvidence.entryPhoto {
+                return Accion(kind: .continuar, label: "Tomar foto de inicio", tab: p.tab, abreCamara: true)
+            }
+            return Accion(kind: .continuar, label: "Continuar evidencia", tab: p.tab)
         case .corregir: return Accion(kind: .corregir, label: "Corregir evidencias", tab: p.tab)
         case .ver: return Accion(kind: .ver, label: "Ver evidencias", tab: p.tab)
         }
@@ -282,11 +296,16 @@ enum InicioRules {
     static func etiquetaCorta(_ accion: Accion) -> String {
         switch accion.kind {
         case .iniciar: return "Iniciar"
-        case .continuar: return "Entregar"
+        case .continuar: return accion.label
         case .corregir: return "Corregir"
         case .ver: return "Evidencias"
         case .reanudar, .repartir, .abrir: return accion.label
         }
+    }
+
+    /// Lo que aclara el mockup bajo el botón: terminar la actividad no toca la jornada.
+    static func notaAccion(_ accion: Accion) -> String? {
+        accion.label == "Terminar actividad" ? "Te pide la foto final. No toca tu jornada." : nil
     }
 
     /// Pastilla de la banda: el semáforo («En tiempo», «Por vencer», «Atrasada») o nada.

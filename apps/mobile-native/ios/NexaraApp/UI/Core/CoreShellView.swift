@@ -253,8 +253,11 @@ struct CoreShellView: View {
             }
         case .asistencias:
             NavigationStack {
-                AttendanceView()
-                    .nxBrandNavBar(title: CoreShellTab.asistencias.barTitle)
+                AttendanceView(onTerminarActividad: { id in
+                    EvidenciaApertura.pedirCamara(id)
+                    present(.activity(id: id, tab: InicioRules.tabEvidencias))
+                })
+                .nxBrandNavBar(title: CoreShellTab.asistencias.barTitle)
             }
         case .mas:
             NavigationStack {

@@ -101,6 +101,12 @@ struct EvidenceCaptureFlowView: View {
     @State private var ordenResuelto = false
     /// Foto de entrada esperando a que conteste lo del salto de prioridad.
     @State private var preguntaOrden: JustificacionOrdenPendiente?
+    /// Paso al que ya se avanzó sin señal: lo encolado llega después, en orden (`afterSave`).
+    @State private var pasoLocal: String?
+    /// Fotos de la ráfaga que van en camino: la cámara sigue abierta y cuenta con ellas.
+    @State private var fotosEnviando = 0
+    /// La última foto de la ráfaga en camino: cada una espera a la anterior, para guardarse en orden.
+    @State private var envioDeFotos: Task<Void, Never>?
 
     // MARK: Derivados
 
@@ -116,11 +122,11 @@ struct EvidenceCaptureFlowView: View {
         return min(8, max(2, value))
     }
 
-    private var currentStep: String { flow?.status ?? CoreEvidence.entryPhoto }
+    private var currentStep: String { pasoLocal ?? flow?.status ?? CoreEvidence.entryPhoto }
     private var isCorrection: Bool { flow?.isCorrection ?? false }
     private var rejected: [String] { flow?.rejectedList ?? [] }
     private var isApproved: Bool { flow?.reviewStatus == "APPROVED" }
-    private var isLocked: Bool { flow?.isLocked ?? false }
+    private var isLocked: Bool { pasoLocal == CoreEvidence.completed || (flow?.isLocked ?? false) }
 
     private func canAct(on step: String) -> Bool {
         guard loaded, !isApproved else { return false }
@@ -154,6 +160,15 @@ struct EvidenceCaptureFlowView: View {
     }
 
     // MARK: Dock
+
+    /// «Regresar a fotos» del PDF, del formulario y de la salida; nunca en corrección.
+    private var regresarAFotosAccion: (() -> Void)? {
+        guard !isCorrection else { return nil }
+        let accion: () -> Void = { Task { await regresarAFotos() } }
+        return accion
+    }
+
+    private var regresarAFotosEtiqueta: String? { isCorrection ? nil : "Regresar a fotos" }
 
     /// Paso que manda el dock: el actual o, en corrección, el primero devuelto.
     private var dockStep: String? {
@@ -198,7 +213,7 @@ struct EvidenceCaptureFlowView: View {
                 let faltan = photoRequired - tomadas
                 return EvidenceDockAction(
                     label: "Tomar foto · \(tomadas) de \(photoRequired)",
-                    enabled: !busy && tomadas < Self.maxEvidencePhotos,
+                    enabled: !busy && fotosEnviando == 0 && tomadas < Self.maxEvidencePhotos,
                     systemImage: "camera.fill",
                     hint: "Faltan \(faltan) foto\(faltan == 1 ? "" : "s") para seguir.",
                     onPrimary: tomarFoto,
@@ -212,7 +227,7 @@ struct EvidenceCaptureFlowView: View {
             }
             return EvidenceDockAction(
                 label: busy ? "Guardando…" : "Siguiente paso · \(tomadas) de \(photoRequired)",
-                enabled: !busy,
+                enabled: !busy && fotosEnviando == 0,
                 systemImage: nil,
                 hint: "Ya tienes las fotos y puedes tomar más antes de seguir.",
                 onPrimary: { Task { await sendEvidencePhotos() } },
@@ -230,15 +245,22 @@ struct EvidenceCaptureFlowView: View {
                     message = nil
                     errorText = nil
                     showPdfImporter = true
-                }
+                },
+                secondaryLabel: regresarAFotosEtiqueta,
+                onSecondary: regresarAFotosAccion
             )
         case CoreEvidence.serviceSheetData:
+            // Formulario y foto final son un solo toque; en corrección sigue como siempre.
             return EvidenceDockAction(
-                label: busy ? "Guardando…" : "Guardar formulario",
+                label: etiquetaFormulario,
                 enabled: !busy,
-                systemImage: nil,
-                hint: "Completa los datos de esta actividad y guarda.",
-                onPrimary: { Task { await sendForm() } }
+                systemImage: isCorrection ? nil : "camera.fill",
+                hint: isCorrection
+                    ? "Completa los datos de esta actividad y guarda."
+                    : "Completa los datos y toma la foto final.",
+                onPrimary: { Task { await sendForm() } },
+                secondaryLabel: regresarAFotosEtiqueta,
+                onSecondary: regresarAFotosAccion
             )
         case CoreEvidence.exitPhoto:
             let bloqueo = camposBlockingExit
@@ -253,11 +275,20 @@ struct EvidenceCaptureFlowView: View {
                     message = nil
                     errorText = nil
                     Task { await openExitCamera() }
-                }
+                },
+                secondaryLabel: regresarAFotosEtiqueta,
+                onSecondary: regresarAFotosAccion
             )
         default:
             return nil
         }
+    }
+
+    /// El botón del formulario: fuera de corrección también abre la cámara de la foto final.
+    private var etiquetaFormulario: String {
+        if busy { return "Guardando…" }
+        if isCorrection { return "Guardar formulario" }
+        return CoreEvidence.isComercial(coreKind) ? "Tomar foto de conclusión" : "Tomar foto de salida"
     }
 
     // MARK: Vista
@@ -272,7 +303,10 @@ struct EvidenceCaptureFlowView: View {
                 }
             }
         }
-        .task { await load() }
+        .task {
+            await load()
+            await abrirCamaraPedida()
+        }
         // Se revisa cada vez que cambia el paso: solo aplica a la foto de entrada
         // de un alta, nunca a una corrección.
         .task(id: "\(currentStep)|\(isCorrection)") { await revisarOrdenDePrioridad() }
@@ -373,6 +407,13 @@ struct EvidenceCaptureFlowView: View {
                 }
                 if let errorText {
                     Text(errorText).font(.footnote.weight(.semibold)).foregroundStyle(CorePalette.red)
+                }
+                if dockHost == nil, !isLocked, CoreEvidence.puedeRegresarAFotos(currentStep, correccion: isCorrection) {
+                    Button("Regresar a fotos") {
+                        Task { await regresarAFotos() }
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .disabled(busy)
                 }
             }
         }
@@ -813,7 +854,7 @@ struct EvidenceCaptureFlowView: View {
                 Button {
                     Task { await sendForm() }
                 } label: {
-                    Label(busy ? "Guardando…" : "Guardar formulario", systemImage: "checkmark")
+                    Label(etiquetaFormulario, systemImage: isCorrection ? "checkmark" : "camera.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -917,6 +958,7 @@ struct EvidenceCaptureFlowView: View {
                 confirmLabel: "Enviar esta foto",
                 // El campo se fotografía donde esté; la ubicación viaja si la hay.
                 requireLocation: false,
+                autoEnviar: true,
                 onConfirm: { photo in await sendCampoPhoto(campoId: campoId, momento: momento, photo: photo) },
                 onCancel: { camera = nil }
             )
@@ -933,6 +975,7 @@ struct EvidenceCaptureFlowView: View {
                 title: CoreEvidence.isComercial(coreKind) ? "Tu foto de inicio de actividad" : "Tu foto de entrada",
                 confirmLabel: "Enviar esta foto",
                 requireLocation: true,
+                autoEnviar: true,
                 onConfirm: { photo in
                     // Hay otra de más prioridad sin empezar: se pregunta ANTES de
                     // mandar la foto, igual que Android. La foto no se pierde.
@@ -958,14 +1001,19 @@ struct EvidenceCaptureFlowView: View {
                 title: CoreEvidence.isComercial(coreKind) ? "Tu foto de conclusión de actividad" : "Tu foto de salida",
                 confirmLabel: "Enviar esta foto",
                 requireLocation: true,
+                autoEnviar: true,
                 onConfirm: { photo in await sendGeoPhoto(step: CoreEvidence.exitPhoto, photo: photo) },
                 onCancel: { camera = nil }
             )
         default:
+            // Las de evidencia se toman de corrido: cada toque guarda una y la cámara sigue abierta.
             GeoPhotoCaptureView(
-                title: "Tu foto en sitio \(confirmedPhotoURLs.count + 1)",
+                title: "Foto de evidencia \(confirmedPhotoURLs.count + fotosEnviando + 1) de \(photoRequired)",
                 confirmLabel: "Usar esta foto",
                 requireLocation: false,
+                subtitulo: "Toca «Tomar foto» por cada una. Se guardan solas.",
+                onRafaga: { photo in tomarEnRafaga(photo) },
+                aviso: errorText,
                 onConfirm: { photo in
                     let error = await sendEvidencePhoto(photo)
                     if error == nil { camera = nil }
@@ -982,6 +1030,8 @@ struct EvidenceCaptureFlowView: View {
     private func load() async {
         do {
             flow = try await CoreRepository.shared.evidenceFlow(activityId: activityId)
+            // Ya hay respuesta del servidor: manda sobre el paso al que se avanzó sin señal.
+            pasoLocal = nil
             // Solo el GET trae los campos: los POST de cada paso no los mandan.
             campos = flow?.campos ?? []
             // Recupera fotos libres ya guardadas (de un intento anterior que se interrumpió):
@@ -1004,6 +1054,26 @@ struct EvidenceCaptureFlowView: View {
         }
         loaded = true
         prefillForm()
+    }
+
+    /// Lo pidió «Terminar actividad» o «Iniciar»: abre la cámara del paso en cuanto se sabe cuál es,
+    /// una sola vez y solo para esta actividad (`EvidenciaApertura`).
+    @MainActor
+    private func abrirCamaraPedida() async {
+        guard EvidenciaApertura.tomar(activityId), loadError == nil, canAct(on: currentStep) else { return }
+        // El detalle acaba de entrar: abrir la cámara en el mismo instante no la presenta (mismo
+        // respiro que `CoreShellView.present`).
+        try? await Task.sleep(nanoseconds: 450_000_000)
+        let paso = currentStep
+        if paso == CoreEvidence.entryPhoto {
+            camera = CameraRequest(step: paso)
+        } else if paso == CoreEvidence.evidencePhotos {
+            if !porCampos && confirmedPhotoURLs.count < photoRequired {
+                camera = CameraRequest(step: paso)
+            }
+        } else if paso == CoreEvidence.exitPhoto {
+            if camposBlockingExit == nil { await openExitCamera() }
+        }
     }
 
     /// Contrato B: empezar ésta teniendo otra de más prioridad sin terminar no
@@ -1066,6 +1136,8 @@ struct EvidenceCaptureFlowView: View {
         errorText = nil
         guard let saved else {
             message = CoreError.queuedOffline.errorDescription
+            // El paso avanza aunque no haya señal: lo encolado llega después, en orden.
+            if !correction { pasoLocal = CoreEvidence.pasoSiguiente(step, coreKind: coreKind) }
             return
         }
         // Las respuestas de guardado no traen `activity`: se recarga el flujo.
@@ -1253,6 +1325,48 @@ struct EvidenceCaptureFlowView: View {
         }
     }
 
+    /// Ráfaga: cada foto se guarda sola, en orden, y la cámara sigue abierta hasta juntar las que pide
+    /// el paso; entonces avanza. De 3 toques por foto y uno por el paso a uno por foto. Una foto extra
+    /// tomada después no avanza nada; si una falla, se dice y no avanza.
+    private func tomarEnRafaga(_ photo: CapturedGeoPhoto) {
+        let avanzar = confirmedPhotoURLs.count + fotosEnviando < photoRequired
+        let enCamino = fotosEnviando + 1
+        fotosEnviando = enCamino
+        errorText = nil
+        if confirmedPhotoURLs.count + enCamino >= photoRequired { camera = nil }
+        let anterior = envioDeFotos
+        envioDeFotos = Task { @MainActor in
+            await anterior?.value
+            let fallo = await sendEvidencePhoto(photo)
+            fotosEnviando -= 1
+            if let fallo {
+                errorText = fallo
+            } else if avanzar && fotosEnviando == 0 && confirmedPhotoURLs.count >= photoRequired {
+                await sendEvidencePhotos()
+            }
+        }
+    }
+
+    /// Se le olvidó una foto o la quiere repetir: nada se borra. Solo en línea.
+    @MainActor
+    private func regresarAFotos() async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        errorText = nil
+        message = nil
+        exitBlocked = nil
+        do {
+            _ = try await CoreRepository.shared.volverPaso(activityId: activityId, paso: CoreEvidence.evidencePhotos)
+            await load()
+            geofenceRefresh += 1
+            message = "Regresaste a las fotos. Lo que ya tenías sigue guardado."
+            onChanged?()
+        } catch {
+            errorText = error.toUserMessage(fallback: "No se pudo regresar a las fotos")
+        }
+    }
+
     /// Quita una foto en borrador — ya viajó al servidor, hay que avisarle también. El índice del
     /// servidor es el de `pendingPhotos` corrido por las que se recuperaron de un intento anterior
     /// (esas van primero en `confirmedPhotoURLs`).
@@ -1295,6 +1409,22 @@ struct EvidenceCaptureFlowView: View {
         }
     }
 
+    /// La ubicación que el servidor ya tiene de una foto guardada: reenviarla en blanco la borraría
+    /// en cuanto otra foto de la lista sí traiga la suya.
+    private func geoGuardada(de url: String) -> PhotoGeoPayload? {
+        guard let indice = flow?.photoList.firstIndex(of: url),
+              let filas = flow?.evidencePhotosGeo?.arrayValue,
+              filas.indices.contains(indice),
+              let punto = filas[indice].objectValue,
+              case .number(let latitud)? = punto["latitude"],
+              case .number(let longitud)? = punto["longitude"] else { return nil }
+        return PhotoGeoPayload(
+            latitude: latitud,
+            longitude: longitud,
+            capturedAt: punto["capturedAt"]?.stringValue ?? ""
+        )
+    }
+
     @MainActor
     private func sendEvidencePhotos() async {
         if porCampos {
@@ -1319,10 +1449,12 @@ struct EvidenceCaptureFlowView: View {
         var geo: [PhotoGeoPayload?] = []
         if !porCampos {
             urls = confirmedPhotoURLs
-            // Las recuperadas de un intento anterior no traen geo (el GET no la incluye); las de
-            // esta sesión sí, y van al final porque `confirmedPhotoURLs` se llena en ese orden.
+            // Las recuperadas (de un intento anterior o al «Regresar a fotos») llevan la ubicación que
+            // ya guardó el servidor; las de esta sesión van al final porque `confirmedPhotoURLs` se
+            // llena en ese orden.
             let recoveredCount = max(0, confirmedPhotoURLs.count - pendingPhotos.count)
-            geo = Array(repeating: nil, count: recoveredCount) + pendingPhotos.map { photo -> PhotoGeoPayload? in
+            let recuperadas: [PhotoGeoPayload?] = confirmedPhotoURLs.prefix(recoveredCount).map { geoGuardada(de: $0) }
+            geo = recuperadas + pendingPhotos.map { photo -> PhotoGeoPayload? in
                 guard let coords = photo.coords else { return nil }
                 return PhotoGeoPayload(
                     latitude: coords.latitude,
@@ -1405,6 +1537,10 @@ struct EvidenceCaptureFlowView: View {
                 correction: correction
             )
             await afterSave(saved, step: CoreEvidence.serviceSheetData, correction: correction)
+            // Formulario y foto final son un solo toque: al guardar, abre la cámara si nada la bloquea.
+            if !correction && currentStep == CoreEvidence.exitPhoto && camposBlockingExit == nil {
+                await openExitCamera()
+            }
         } catch {
             errorText = error.toUserMessage(fallback: "No se pudo guardar el formulario")
         }

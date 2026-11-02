@@ -202,6 +202,12 @@ final class ApiClient {
         if path.hasSuffix("/pausar") || path.hasSuffix("/reanudar") || path.hasSuffix("/por-codigo") {
             return true
         }
+        // Deshacer la salida vale 10 minutos: encolado, caería cuando ya no aplica.
+        if path.hasSuffix("/salida/deshacer") { return true }
+        // Mover el paso atrás con fotos encoladas las dejaría en el paso equivocado.
+        if path.hasSuffix("/volver-paso") { return true }
+        // Aplicar un formato necesita la respuesta: dice cuáles actividades quedaron.
+        if path.hasSuffix("/aplicar") { return true }
         // La sugerencia de complejidad solo sirve mientras se llena el formulario: reenviada
         // después nadie la lee y gasta una llamada a la IA.
         if path == "ai/complejidad/sugerir" { return true }

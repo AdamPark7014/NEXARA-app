@@ -365,8 +365,9 @@ final class AttendanceVM: ObservableObject {
 
     /// Marca con foto (el API la exige). Devuelve `nil` si quedó registrada (o si el
     /// servidor la rechazó: eso se explica en el aviso «No se pudo checar»); si no,
-    /// el mensaje para enseñarlo sin cerrar la cámara.
-    func checkIn(_ type: String, photo: CapturedGeoPhoto) async -> String? {
+    /// el mensaje para enseñarlo sin cerrar la cámara. `confirmada`: ya vio en la hoja de «Terminar
+    /// mi jornada» qué se detiene; el servidor no la vuelve a frenar.
+    func checkIn(_ type: String, photo: CapturedGeoPhoto, confirmada: Bool = false) async -> String? {
         checkInLoading = true
         checkInNotice = nil
         checkInNoticeIsError = false
@@ -395,17 +396,16 @@ final class AttendanceVM: ObservableObject {
                 // de hace media hora como si fuera de ahora.
                 fixAgeMs: coords?.fixAgeMs,
                 photoBase64: photo.dataUrl,
-                ubicacionFalla: coords == nil ? falla : nil
+                ubicacionFalla: coords == nil ? falla : nil,
+                confirmada: confirmada
             )
             // Con la ubicación apagada o sin permiso, el servidor deja registrado ese estado
             // con la checada: se recuerda para avisar «ENCENDIDA» cuando se arregle.
             EstadoUbicacionMonitor.shared.checadaRegistrada(falla: coords == nil ? falla : nil)
             if (result.raw["queued"] as? Bool) == true {
-                checkInNotice = "Sin conexión: tu checada se enviará sola en cuanto vuelva la red."
+                checkInNotice = TerminarJornadaRules.mensajeChecada(type, queued: true, message: result.message)
             } else {
-                let base = result.message.isEmpty
-                    ? (type == "entrada" ? "Entrada registrada" : "Salida registrada")
-                    : result.message
+                let base = TerminarJornadaRules.mensajeChecada(type, queued: false, message: result.message)
                 let geo = AttendanceCheckInNota.notaGps(
                     hayCoords: coords != nil,
                     accuracyM: coords?.accuracyM,
@@ -444,6 +444,30 @@ final class AttendanceVM: ObservableObject {
         checkInBloqueo = nil
     }
 
+    /// Qué se detiene si sale ahora; nil si no se pudo leer (sin señal, por ejemplo).
+    func riesgoSalida() async -> RiesgoSalida? {
+        try? await ConsoleRepository.shared.riesgoSalida()
+    }
+
+    /// Dentro de los 10 minutos: la jornada vuelve a quedar abierta y el rastreo se reenciende.
+    func deshacerSalida() async {
+        checkInLoading = true
+        checkInNotice = nil
+        checkInNoticeIsError = false
+        checkInBloqueo = nil
+        defer { checkInLoading = false }
+        do {
+            let resultado = try await ConsoleRepository.shared.deshacerSalida()
+            let gps = await encenderGps(checadaConUbicacion: false)
+            checkInNotice = TerminarJornadaRules.mensajeDeshecha(resultado.noCumplidasRegresadas) + gps
+            await loadMine()
+            if equipoPedido { await loadTeam(initial: false) }
+        } catch {
+            checkInNotice = error.toUserMessage(fallback: "No se pudo deshacer tu salida")
+            checkInNoticeIsError = true
+        }
+    }
+
     /// Entrada: consentimiento en el API + seguimiento. Sin permiso no se enciende nada.
     /// Si la checada llevó ubicación, el servidor ya guardó ese punto: el siguiente sale a los 30 min.
     private func encenderGps(checadaConUbicacion: Bool) async -> String {
@@ -473,6 +497,8 @@ final class AttendanceVM: ObservableObject {
 struct AttendanceView: View {
     /// Los avisos de comida abren `/erp/asistencias?tab=comidas`.
     var initialTab: String?
+    /// «Mejor terminar la actividad» de la hoja de salida.
+    var onTerminarActividad: ((Int) -> Void)? = nil
 
     @StateObject private var vm = AttendanceVM(cargaResumenDelDia: false)
     @ObservedObject private var pedida = AsistenciasPestanaPedida.shared
@@ -481,6 +507,8 @@ struct AttendanceView: View {
     /// Checada que espera a que se resuelva el aviso de ubicación (permiso o ubicación apagada).
     @State private var tipoPendiente: String?
     @State private var avisoUbicacion: AvisoUbicacionChecada?
+    /// La hoja «¿Terminar tu jornada?» está abierta.
+    @State private var preguntandoSalida = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -535,12 +563,12 @@ struct AttendanceView: View {
             set: { if !$0 { photoType = nil } }
         )) {
             GeoPhotoCaptureView(
-                title: photoType == "salida" ? "Tu foto de salida" : "Tu foto de entrada",
-                confirmLabel: photoType == "salida" ? "Registrar salida" : "Registrar entrada",
+                title: photoType == "salida" ? "Tu foto de fin de jornada" : "Tu foto de entrada",
+                confirmLabel: photoType == "salida" ? "Terminar mi jornada" : "Registrar entrada",
                 requireLocation: false,
                 onConfirm: { captured in
                     let type = photoType ?? "entrada"
-                    let failure = await vm.checkIn(type, photo: captured)
+                    let failure = await vm.checkIn(type, photo: captured, confirmada: type == "salida")
                     if failure == nil { photoType = nil }
                     return failure
                 },
@@ -567,6 +595,12 @@ struct AttendanceView: View {
         } message: { mensaje in
             Text(mensaje + "\n\n" + ChecadaRechazo.ayuda(mensaje))
         }
+        .terminarJornadaHoja(
+            isPresented: $preguntandoSalida,
+            vm: vm,
+            onTerminarActividad: onTerminarActividad,
+            onConfirmar: { marcar("salida") }
+        )
     }
 
     /// Antes de la foto de la checada: permiso y ubicación encendida (ver `AvisoUbicacionChecada`).
@@ -598,7 +632,14 @@ struct AttendanceView: View {
             ScrollView {
                 AsistenciasEquipoTab(
                     vm: vm,
-                    onMark: { marcar($0) },
+                    onMark: { tipo in
+                        // La salida pregunta antes qué se detiene; la entrada va directo a la foto.
+                        if tipo == "salida" {
+                            preguntandoSalida = true
+                        } else {
+                            marcar(tipo)
+                        }
+                    },
                     onPhoto: { photo = $0 }
                 )
                 .padding(16)

@@ -160,6 +160,22 @@ final class ClientesRepository {
         return decodeEach(data)
     }
 
+    /// `GET ventas/clientes` sin sector: todo el padrón (asignar con formato).
+    func listAll() async throws -> [CoreSalesClient] {
+        let data = try await api.get("ventas/clientes")
+        return decodeEach(data)
+    }
+
+    /// `POST ventas/clientes/:id/provision-service-client`: el cliente de servicio ligado, creándolo
+    /// si no lo tenía. `nil` si no se pudo o quedó en la cola sin conexión.
+    func provisionServiceClient(id: Int) async throws -> Int? {
+        struct Body: Encodable {}
+        let data = try await api.postJSON("ventas/clientes/\(id)/provision-service-client", body: Body())
+        if CoreRepository.isQueuedOffline(data) { return nil }
+        let servicio = ConsoleHelpers.decodeMap(data)["serviceClient"] as? [String: Any]
+        return ActivityParse.int(servicio?["id"])
+    }
+
     /// `GET ventas/clientes/:id`.
     func detail(id: Int) async throws -> CoreSalesClient {
         let data = try await api.get("ventas/clientes/\(id)")
