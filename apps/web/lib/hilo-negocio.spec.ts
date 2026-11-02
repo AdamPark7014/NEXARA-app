@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   conUnSoloActual,
+  diaDelHecho,
   diasDesde,
   faltaDeProyecto,
   medioProbableDeAceptacion,
@@ -22,6 +23,18 @@ const PROYECTO = {
   requirements: [],
   factura: null,
 };
+
+describe("el día del hecho", () => {
+  it("se cuenta en México, no en UTC", () => {
+    expect(diaDelHecho("2026-11-03T02:00:00Z")).toBe("2 nov");
+    expect(diaDelHecho("2026-11-03T02:00:00Z", true)).toBe("2 nov 2026");
+  });
+
+  it("sin fecha no inventa", () => {
+    expect(diaDelHecho(null)).toBeNull();
+    expect(diaDelHecho("no es fecha")).toBeNull();
+  });
+});
 
 describe("cómo salió", () => {
   it("lo dice como se diría", () => {

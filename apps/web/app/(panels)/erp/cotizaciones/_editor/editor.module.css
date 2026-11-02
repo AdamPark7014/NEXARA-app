@@ -150,6 +150,10 @@
 /* ─── Ficha: qué es, para quién, cuánto y en qué paso va ──────────────── */
 
 .ficha {
+  /* Sin esto la regla global de <section> la centra y se encoge a su texto. */
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
   margin: 4px 0 var(--doc-seccion);
   overflow: hidden;
   background: var(--ui-surface);
@@ -2602,6 +2606,10 @@ select.celda {
 
 /* «Ya la envié»: cómo salió la cotización. */
 .yaLaEnvie {
+  /* Sin esto la regla global de <section> la centra y se encoge a su texto. */
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2649,13 +2657,13 @@ select.celda {
   gap: var(--ui-s3);
 }
 
-.opciones {
+.elecciones {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ui-s2);
 }
 
-.opcion {
+.eleccion {
   min-height: 36px;
   padding: 0 14px;
   border: 1px solid var(--ui-border);
@@ -2667,11 +2675,11 @@ select.celda {
   cursor: pointer;
 }
 
-.opcion:hover {
+.eleccion:hover {
   border-color: var(--ui-brand);
 }
 
-.opcion[aria-checked="true"] {
+.eleccion[aria-checked="true"] {
   border-color: var(--ui-brand);
   background: var(--ui-brand-bg, var(--ui-surface));
   color: var(--ui-brand);

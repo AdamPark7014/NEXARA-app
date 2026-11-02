@@ -45,7 +45,7 @@ import { getServiceProjectTypeLabel } from "@/lib/service-project-types";
 import { cambiarEstado } from "../_componentes/acciones";
 import { usePersonasAsignables } from "../_componentes/personas";
 import NuevaActividad from "../_componentes/NuevaActividad";
-import { aceptoEnPalabras, faltaDeProyecto, pasosDeFacturaYCobro, siguientePasoDeProyecto } from "@/lib/hilo-negocio";
+import { aceptoEnPalabras, diaDelHecho, faltaDeProyecto, pasosDeFacturaYCobro, siguientePasoDeProyecto } from "@/lib/hilo-negocio";
 import { toneDe } from "../_componentes/tono";
 import type { SeccionProps } from "../_componentes/tipos";
 import SeccionResumen from "../_componentes/SeccionResumen";
@@ -138,7 +138,7 @@ function pasosDe(p: ProyectoDetalle): RecordStep[] | undefined {
             id: "cotizacion",
             label: "Cotización",
             hint: p.cotizacion.aceptadaAt
-              ? `Ganada el ${formatoFecha(p.cotizacion.aceptadaAt, false)}`
+              ? `Ganada el ${diaDelHecho(p.cotizacion.aceptadaAt)}`
               : p.cotizacion.folioEnviado || p.cotizacion.quoteNumber,
             state: "done" as const,
             href: `/erp/cotizaciones/${p.cotizacion.id}`,
@@ -427,7 +427,7 @@ export default function ProyectoDetallePage() {
   const falta = faltaDeProyecto(p);
   const clienteDeVenta = p.client?.salesClients?.[0]?.id;
   const aceptada = p.cotizacion?.aceptadaAt
-    ? [formatoFecha(p.cotizacion.aceptadaAt), aceptoEnPalabras(p.cotizacion.aceptadaVia)].filter(Boolean).join(", ")
+    ? [diaDelHecho(p.cotizacion.aceptadaAt, true), aceptoEnPalabras(p.cotizacion.aceptadaVia)].filter(Boolean).join(", ")
     : null;
 
   const datosClave: RecordFact[] = [

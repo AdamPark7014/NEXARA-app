@@ -59,14 +59,14 @@ function Opciones<T extends string>({
   onCambio: (id: T) => void;
 }) {
   return (
-    <div className={styles.opciones} role="radiogroup" aria-label={etiqueta}>
+    <div className={styles.elecciones} role="radiogroup" aria-label={etiqueta}>
       {opciones.map((o) => (
         <button
           key={o.id}
           type="button"
           role="radio"
           aria-checked={valor === o.id}
-          className={styles.opcion}
+          className={styles.eleccion}
           onClick={() => onCambio(o.id)}
         >
           {o.label}

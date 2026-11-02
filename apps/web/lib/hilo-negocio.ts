@@ -18,6 +18,19 @@ export function diasDesde(fecha: string | null | undefined, ahora = new Date()):
   return Math.max(0, Math.floor((ahora.getTime() - t) / DIA));
 }
 
+/** El día en que pasó algo, en México: a las 8 de la noche en UTC ya sería mañana. */
+export function diaDelHecho(fecha: string | null | undefined, conAnio = false): string | null {
+  if (!fecha) return null;
+  const d = new Date(fecha);
+  if (!Number.isFinite(d.getTime())) return null;
+  return d.toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "short",
+    ...(conAnio ? { year: "numeric" } : {}),
+    timeZone: "America/Mexico_City",
+  });
+}
+
 /** «WhatsApp», «correo»…: cómo salió la cotización, para decirlo en una frase. */
 export function medioDeEnvio(enviadaPor: string | null | undefined): string | null {
   switch (enviadaPor) {
