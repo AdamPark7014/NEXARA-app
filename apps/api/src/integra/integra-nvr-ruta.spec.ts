@@ -100,13 +100,15 @@ describe('foto de un aviso sin ipAddress', () => {
         }),
       },
     };
+    const fotoDeCamara = jest.fn().mockResolvedValue(null);
     const servicio = new IntegraPushService(
       prisma as never,
       { resolveClient } as never,
       {} as never,
       {} as never,
+      { fotoDeCamara } as never,
     );
-    return { servicio, resolveClient };
+    return { servicio, resolveClient, fotoDeCamara };
   };
 
   const aviso = (extra: Record<string, unknown>) =>
@@ -116,14 +118,16 @@ describe('foto de un aviso sin ipAddress', () => {
     )!;
 
   it('la detección del grabador se guarda sin pedirle foto a nadie', async () => {
-    const { servicio, resolveClient } = montar();
+    const { servicio, resolveClient, fotoDeCamara } = montar();
     await servicio.ingest({ id: 1, companyId: 2 }, aviso({}));
     expect(resolveClient).not.toHaveBeenCalled();
+    expect(fotoDeCamara).not.toHaveBeenCalled();
   });
 
   it('la detección de una cámara que dice su IP sí pide foto', async () => {
-    const { servicio, resolveClient } = montar();
+    const { servicio, fotoDeCamara } = montar();
     await servicio.ingest({ id: 1, companyId: 2 }, aviso({ ipAddress: '192.168.9.171' }));
-    expect(resolveClient).toHaveBeenCalledTimes(1);
+    expect(fotoDeCamara).toHaveBeenCalledTimes(1);
+    expect(fotoDeCamara).toHaveBeenCalledWith({ id: 1, companyId: 2 }, '192.168.9.171');
   });
 });
