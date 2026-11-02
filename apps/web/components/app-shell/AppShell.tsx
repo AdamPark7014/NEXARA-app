@@ -1480,6 +1480,7 @@ function Breadcrumbs({
 const SEGMENTOS_SIN_MIGA: ReadonlySet<string> = new Set(["finance"]);
 
 const SLUG_DICTIONARY: Record<string, string> = {
+  catalogo: "Catálogo",
   my: "Mis",
   ai: "AI",
   bi: "BI",
