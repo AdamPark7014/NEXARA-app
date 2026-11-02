@@ -66,6 +66,8 @@ export type DatosMaqueta = {
   capas: CapasMaqueta;
   /** Cámara desde la que se está viendo («Ver lo que ve»). */
   verDesde: string | null;
+  /** Sube cuando llega el catálogo: los modelos agregados cambian cómo se ven los equipos ya puestos. */
+  catalogo?: number;
 };
 
 export type AvisosMotor = {
@@ -322,14 +324,15 @@ export class MotorMaqueta {
     }
     // Adentro se ve todo de su tamaño: desde arriba los equipos se agrandan para que se distingan.
     const escala = d.capas.tamanoReal || this.rec ? 1 : escalaVisualEquipos(ed ?? lim);
-    if (nivelCambio || pa?.camaras !== p.camaras || pa?.muros !== p.muros || escala !== this.escalaActual || a?.verDesde !== d.verDesde) {
+    const cambioCatalogo = a?.catalogo !== d.catalogo;
+    if (nivelCambio || cambioCatalogo || pa?.camaras !== p.camaras || pa?.muros !== p.muros || escala !== this.escalaActual || a?.verDesde !== d.verDesde) {
       const { grupo, etiquetas } = construirCamaras(p, { escala, ocultar: d.verDesde });
       this.reponer(this.capas.camaras, grupo);
       this.etiquetasCamaras = etiquetas;
       this.etiquetas = [...this.etiquetasCamaras, ...this.etiquetasEquipos];
       sombras = true;
     }
-    if (nivelCambio || pa?.equipos !== p.equipos || pa?.muros !== p.muros || escala !== this.escalaActual) {
+    if (nivelCambio || cambioCatalogo || pa?.equipos !== p.equipos || pa?.muros !== p.muros || escala !== this.escalaActual) {
       const { grupo, etiquetas } = construirEquipos(p, { escala });
       this.reponer(this.capas.equipos, grupo);
       this.etiquetasEquipos = etiquetas;
