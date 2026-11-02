@@ -538,6 +538,17 @@ final class CoreRepository {
         return try await postEvidence("activity-evidence/\(activityId)/exit-photo", body: photo)
     }
 
+    /// `POST activity-evidence/:id/volver-paso { paso }`: se le olvidó una foto o la quiere
+    /// repetir; nada se borra. Solo en línea (`ApiClient.isOnlineOnly`).
+    func volverPaso(activityId: Int, paso: String) async throws -> EvidenceFlowState? {
+        struct Body: Encodable { let paso: String }
+        try await CoreRepository.requireOnline()
+        return try await postEvidence(
+            "activity-evidence/\(activityId)/volver-paso",
+            body: Body(paso: paso)
+        )
+    }
+
     /// Reemplaza una foto de evidencia ya guardada.
     func replaceEvidencePhoto(activityId: Int, index: Int, photoUrl: String) async throws -> EvidenceFlowState? {
         struct Body: Encodable { let photoUrl: String }

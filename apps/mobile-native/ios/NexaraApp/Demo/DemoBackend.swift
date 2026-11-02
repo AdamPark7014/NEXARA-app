@@ -109,6 +109,13 @@ extension DemoStore {
             return routeVehicles(method: method, parts: parts, json: json, body: body, now: now)
         case "ventas":
             return routeClients(method: method, parts: parts, query: query, json: json)
+        case "formatos-actividad":
+            // Asignar con formato (`DemoFixtures+Formatos`).
+            let respuesta = routeFormatos(method: method, parts: parts, json: json, now: now)
+            return reply(respuesta.payload, status: respuesta.status)
+        case "proceso-tiempos":
+            // Medir nunca estorba: en el demo no se guarda.
+            return reply(dj(["ok": true]))
         case "activity-feed":
             return reply(fxActivityFeed())
         case "operational-projects":
@@ -360,10 +367,24 @@ extension DemoStore {
             state.status = nextEvidenceStep(after: "ENTRY_PHOTO", kind: a.kind)
             startedAt[id] = startedAt[id] ?? now
         case "evidence-photos":
+            // `evidence-photos/draft`: una foto en cuanto se toma; se suma a las que hay y el paso no avanza.
+            if parts.count > 3, parts[3] == "draft" {
+                if let url = json["photoUrl"] as? String, !url.isEmpty { state.photos.append(url) }
+                state.photosAt = now
+                break
+            }
             let urls = json["photoUrls"] as? [String] ?? []
             state.photos = urls
             state.photosAt = now
             state.status = nextEvidenceStep(after: "EVIDENCE_PHOTOS", kind: a.kind)
+        case "evidence-photo":
+            // `evidence-photo/:index/remove`: quita una foto en borrador.
+            if parts.count > 4, parts[4] == "remove", let index = Int(parts[3]), state.photos.indices.contains(index) {
+                state.photos.remove(at: index)
+            }
+        case "volver-paso":
+            // «Regresar a fotos»: nada se borra, solo cambia el paso.
+            state.status = json["paso"] as? String ?? "EVIDENCE_PHOTOS"
         case "service-sheet-pdf":
             state.status = nextEvidenceStep(after: "SERVICE_SHEET_PDF", kind: a.kind)
         case "service-sheet-data":
@@ -424,6 +445,11 @@ extension DemoStore {
     private func routeAttendance(method: String, parts: [String], query: [String: String], json: DemoJSON, now: Date) -> DemoReply {
         let sub = parts.count > 1 ? parts[1] : ""
         if method == "POST" {
+            // `attendance/salida/deshacer`: la jornada vuelve a quedar abierta; no es una checada nueva.
+            if sub == "salida" {
+                let respuesta = deshacerSalidaDemo(now: now)
+                return reply(respuesta.payload, status: respuesta.status)
+            }
             // El estado de la ubicación no es una checada: no debe abrir ni cerrar la jornada demo.
             if sub == "justificaciones" || sub == "estado-ubicacion" { return empty() }
             return checkIn(json: json, now: now)
@@ -444,6 +470,9 @@ extension DemoStore {
             return reply(fxAttendanceRange(from: from, to: query["to"] ?? from))
         case "hybrid":
             return reply(fxAttendanceHybrid(now: now))
+        case "salida":
+            // `attendance/salida/riesgo` (`DemoFixtures+Formatos`).
+            return reply(fxRiesgoSalida(now: now))
         default:
             return empty()
         }
@@ -810,6 +839,10 @@ extension DemoStore {
             // No se guarda el sector nuevo: se devuelve la ficha tal cual.
             return reply(fxClient(id))
         }
+        if method == "POST", parts.count >= 4, parts[3] == "provision-service-client" {
+            let servicio = allClients.first(where: { $0.id == id })?.serviceId ?? id + 1000
+            return reply(dj(["serviceClient": dj(["id": servicio])]))
+        }
         return reply(fxClient(id))
     }
 
@@ -836,6 +869,8 @@ extension DemoStore {
 
     private func routeUsers(method: String, parts: [String], json: DemoJSON) -> DemoReply {
         let sub = parts.count > 1 ? parts[1] : ""
+        // A quién se le puede asignar (`DemoFixtures+Formatos`).
+        if sub == "assignable" { return reply(fxUsuariosAsignables()) }
         if sub == "profile" {
             if method == "PATCH" {
                 for (key, value) in json {

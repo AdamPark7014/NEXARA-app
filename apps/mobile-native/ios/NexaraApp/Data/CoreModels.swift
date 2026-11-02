@@ -117,6 +117,18 @@ enum CoreEvidence {
         return [entryPhoto, evidencePhotos, serviceSheetData, exitPhoto]
     }
 
+    /// El paso que sigue. Sin señal la pantalla avanza y lo encolado llega después, en orden.
+    static func pasoSiguiente(_ step: String?, coreKind: String?) -> String {
+        let pasos = steps(for: coreKind)
+        guard let step, let i = pasos.firstIndex(of: step), i + 1 < pasos.count else { return completed }
+        return pasos[i + 1]
+    }
+
+    /// ¿Se ofrece «Regresar a fotos»? La entrada no se repite y lo devuelto se corrige en su paso.
+    static func puedeRegresarAFotos(_ step: String?, correccion: Bool) -> Bool {
+        !correccion && (step == serviceSheetPdf || step == serviceSheetData || step == exitPhoto)
+    }
+
     static func label(_ step: String) -> String {
         switch step {
         case entryPhoto: return "Foto de entrada"

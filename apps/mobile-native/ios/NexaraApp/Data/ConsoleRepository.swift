@@ -1,5 +1,55 @@
 import Foundation
 
+/// Una actividad que se detiene o queda «No cumplida» si la persona checa salida ahora.
+struct ActividadEnRiesgo: Hashable {
+    let id: Int
+    let folio: String
+    let titulo: String
+
+    init(id: Int, folio: String, titulo: String) {
+        self.id = id
+        self.folio = folio
+        self.titulo = titulo
+    }
+
+    init(raw: [String: Any]) {
+        id = ActivityParse.int(raw["id"]) ?? 0
+        folio = ActivityParse.str(raw["folio"])
+        titulo = ActivityParse.str(raw["titulo"])
+    }
+}
+
+/// `GET attendance/salida/riesgo`: qué se detiene si checa salida ahora. No registra nada.
+struct RiesgoSalida: Hashable {
+    let corriendo: [ActividadEnRiesgo]
+    let porCerrar: [ActividadEnRiesgo]
+
+    init(corriendo: [ActividadEnRiesgo] = [], porCerrar: [ActividadEnRiesgo] = []) {
+        self.corriendo = corriendo
+        self.porCerrar = porCerrar
+    }
+
+    init(raw: [String: Any]) {
+        corriendo = (raw["corriendo"] as? [[String: Any]] ?? []).map { ActividadEnRiesgo(raw: $0) }
+        porCerrar = (raw["porCerrar"] as? [[String: Any]] ?? []).map { ActividadEnRiesgo(raw: $0) }
+    }
+}
+
+/// `POST attendance/salida/deshacer`: la propia persona, dentro de 10 minutos.
+struct DeshacerSalidaResultado {
+    let message: String
+    /// Folios que ya no quedan «No cumplida». El API puede mandar `null` en alguno.
+    let noCumplidasRegresadas: [String?]
+    let relojesReabiertos: Int
+
+    init(raw: [String: Any]) {
+        message = ActivityParse.str(raw["message"])
+        let folios: [Any] = raw["noCumplidasRegresadas"] as? [Any] ?? []
+        noCumplidasRegresadas = folios.map { $0 as? String }
+        relojesReabiertos = ActivityParse.int(raw["relojesReabiertos"]) ?? 0
+    }
+}
+
 /// Capa de datos de Asistencias (Core) y clientes de servicio.
 final class ConsoleRepository {
     static let shared = ConsoleRepository()
@@ -43,6 +93,9 @@ final class ConsoleRepository {
     ///
     /// `ubicacionFalla` dice por qué no hubo coordenadas (`UbicacionFalla`); solo viaja si
     /// de verdad faltan: con coordenadas no hay nada que explicar.
+    ///
+    /// `confirmada`: la persona ya vio qué se detiene en la hoja de «Terminar mi jornada»; el
+    /// servidor no la vuelve a frenar. Solo viaja si es verdadero.
     func attendanceCheckInResult(
         type: String,
         lat: Double? = nil,
@@ -51,7 +104,8 @@ final class ConsoleRepository {
         mockLocation: Bool = false,
         fixAgeMs: Int? = nil,
         photoBase64: String? = nil,
-        ubicacionFalla: String? = nil
+        ubicacionFalla: String? = nil,
+        confirmada: Bool = false
     ) async throws -> AttendanceCheckInResult {
         struct Body: Encodable {
             let type: String
@@ -63,6 +117,7 @@ final class ConsoleRepository {
             let mockLocation: Bool
             let fixAgeMs: Int?
             let ubicacionFalla: String?
+            let confirmada: Bool?
         }
         let data = try await api.postJSON("attendance", body: Body(
             type: type,
@@ -73,9 +128,26 @@ final class ConsoleRepository {
             accuracyM: accuracyM.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil },
             mockLocation: mockLocation,
             fixAgeMs: fixAgeMs.flatMap { $0 >= 0 ? $0 : nil },
-            ubicacionFalla: (lat == nil || lng == nil) ? ubicacionFalla : nil
+            ubicacionFalla: (lat == nil || lng == nil) ? ubicacionFalla : nil,
+            confirmada: confirmada ? true : nil
         ))
         return AttendanceCheckInResult(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// `GET attendance/salida/riesgo`: lo que se detiene si checa salida ahora.
+    func riesgoSalida() async throws -> RiesgoSalida {
+        let data = try await api.get("attendance/salida/riesgo")
+        return RiesgoSalida(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// `POST attendance/salida/deshacer`. Solo en línea (`ApiClient.isOnlineOnly`): vale 10
+    /// minutos y, encolada, caería cuando ya no aplica.
+    func deshacerSalida() async throws -> DeshacerSalidaResultado {
+        struct Body: Encodable {}
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON("attendance/salida/deshacer", body: Body())
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+        return DeshacerSalidaResultado(raw: ConsoleHelpers.decodeMap(data))
     }
 
     /// `POST attendance/estado-ubicacion { estado }`: APAGADA, SIN_PERMISO o ENCENDIDA

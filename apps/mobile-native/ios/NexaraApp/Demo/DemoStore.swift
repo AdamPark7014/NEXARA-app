@@ -72,6 +72,8 @@ final class DemoStore: @unchecked Sendable {
     var nextActivityId = 5200
     /// Complejidad elegida y sugerida de las actividades creadas en esta sesión.
     var complejidadCreada: [Int: DemoComplejidad] = [:]
+    /// Formatos ya aplicados, por `clave`: dos toques no duplican (como la API).
+    var formatoAplicaciones: [String: DemoJSON] = [:]
     /// Reloj por sesiones: pausas abiertas y desde cuándo corre cada reloj reanudado.
     var pausas: [Int: DemoPausa] = [:]
     var sesionDesde: [Int: Date] = [:]
@@ -146,6 +148,7 @@ final class DemoStore: @unchecked Sendable {
         extraActivities = []
         nextActivityId = 5200
         complejidadCreada = [:]
+        formatoAplicaciones = [:]
         pausas = [:]
         sesionDesde = [:]
         trayectos = []

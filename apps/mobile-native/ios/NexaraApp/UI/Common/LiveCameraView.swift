@@ -218,6 +218,16 @@ struct GeoPhotoCaptureView: View {
     var confirmLabel: String = "Enviar esta foto"
     /// Entrada y salida exigen GPS; sin ubicación no se puede enviar.
     var requireLocation: Bool = true
+    /// Línea bajo el título mientras se encuadra (la ráfaga dice cómo se usa).
+    var subtitulo: String? = nil
+    /// Se envía sola a los 3 segundos: un toque menos, y sigue dando tiempo de repetirla. Apagado por
+    /// omisión: asistencia, comida, gastos y vehículos siguen pidiendo el toque.
+    var autoEnviar: Bool = false
+    /// Ráfaga: cada toque entrega la foto aquí, sin vista previa, y la cámara sigue abierta. La cierra
+    /// quien llama, cuando ya juntó las que pide.
+    var onRafaga: ((CapturedGeoPhoto) -> Void)? = nil
+    /// Aviso de quien llama mientras la cámara sigue abierta (una foto de la ráfaga que no se guardó).
+    var aviso: String? = nil
     /// `nil` si se guardó; si no, el mensaje a mostrar sin cerrar la vista.
     let onConfirm: (CapturedGeoPhoto) async -> String?
     let onCancel: () -> Void
@@ -227,6 +237,13 @@ struct GeoPhotoCaptureView: View {
     @State private var working = false
     @State private var locating = false
     @State private var message: String?
+    /// Segundos que faltan para que se envíe sola; 0 = no está contando.
+    @State private var cuenta = 0
+    /// El último envío falló: la cuenta se detiene y ya no se reintenta sola.
+    @State private var envioFallo = false
+    /// Ráfaga: la ubicación se lee una vez al abrir; cada toque la usa sin esperar al GPS.
+    @State private var ubicacionRafaga: DeviceCoords?
+    @State private var ubicacionLeida = false
     @Environment(\.openURL) private var openURL
 
     static let locationError = "No se pudo obtener tu ubicación: activa el GPS y da permiso de ubicación"
@@ -243,13 +260,24 @@ struct GeoPhotoCaptureView: View {
         .onAppear {
             if DemoMode.isActive {
                 // Modo demostración: el simulador no tiene cámara. Se da por tomada una foto de
-                // muestra (dibujada en código) y se salta directo a «Enviar esta foto».
-                if captured == nil { captured = DemoImages.capturedPhoto(title: title) }
+                // muestra (dibujada en código) y se salta directo a «Enviar esta foto». La ráfaga se
+                // queda en el obturador: cada toque entrega una foto de muestra.
+                if captured == nil && onRafaga == nil { captured = DemoImages.capturedPhoto(title: title) }
             } else {
                 camera.start()
             }
         }
         .onDisappear { camera.stop() }
+        .task {
+            guard onRafaga != nil, !DemoMode.isActive else { return }
+            ubicacionRafaga = await DeviceLocation.shared.current()
+            ubicacionLeida = true
+        }
+    }
+
+    /// El obturador se puede tocar: la cámara está lista, o es la ráfaga del modo demostración.
+    private var puedeDisparar: Bool {
+        camera.isReady || (DemoMode.isActive && onRafaga != nil)
     }
 
     private var live: some View {
@@ -275,6 +303,24 @@ struct GeoPhotoCaptureView: View {
                 .padding(.horizontal)
                 .padding(.top, 8)
 
+                if let subtitulo {
+                    Text(subtitulo)
+                        .font(.footnote)
+                        .foregroundStyle(Color.white)
+                        .multilineTextAlignment(.center)
+                        .padding(10)
+                        .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal)
+                }
+                if let aviso, !aviso.isEmpty {
+                    Text(aviso)
+                        .font(.footnote)
+                        .foregroundStyle(Color.white)
+                        .multilineTextAlignment(.center)
+                        .padding(12)
+                        .background(Color.red.opacity(0.75), in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal)
+                }
                 if let error = camera.errorMessage {
                     Text(error)
                         .font(.footnote)
@@ -303,6 +349,16 @@ struct GeoPhotoCaptureView: View {
                         .background(Color.black.opacity(0.55), in: Capsule())
                 }
 
+                // La ráfaga dice «Toca «Tomar foto»»: el obturador lleva ese nombre a la vista.
+                if onRafaga != nil {
+                    Text("Tomar foto")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Color.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background(Color.black.opacity(0.45), in: Capsule())
+                }
+
                 HStack {
                     Color.clear.frame(width: 56, height: 56)
                     Spacer()
@@ -321,7 +377,7 @@ struct GeoPhotoCaptureView: View {
                             }
                         }
                     }
-                    .disabled(!camera.isReady || working)
+                    .disabled(!puedeDisparar || working)
                     .accessibilityLabel("Tomar foto")
                     Spacer()
                     Button {
@@ -340,6 +396,26 @@ struct GeoPhotoCaptureView: View {
                 .padding(.bottom, 24)
             }
         }
+    }
+
+    /// La cuenta corre si esta foto se puede enviar: con su ubicación si la exige y sin un error pendiente.
+    private func puedeContar(_ photo: CapturedGeoPhoto) -> Bool {
+        autoEnviar && !envioFallo && !locating && !(requireLocation && photo.coords == nil)
+    }
+
+    /// Se envía sola a los 3 segundos. Tocar el botón antes, repetirla o cancelar detienen la cuenta.
+    private func contarYEnviar(_ photo: CapturedGeoPhoto) async {
+        guard puedeContar(photo) else {
+            cuenta = 0
+            return
+        }
+        cuenta = 3
+        while cuenta > 0 {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if Task.isCancelled || cuenta <= 0 { return }
+            cuenta -= 1
+        }
+        confirm(photo)
     }
 
     private func preview(_ photo: CapturedGeoPhoto) -> some View {
@@ -389,7 +465,7 @@ struct GeoPhotoCaptureView: View {
                         } else {
                             Image(systemName: "checkmark.circle.fill")
                         }
-                        Text(confirmLabel).bold()
+                        Text(cuenta > 0 ? "\(confirmLabel) (\(cuenta))" : confirmLabel).bold()
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
@@ -412,6 +488,8 @@ struct GeoPhotoCaptureView: View {
                         // En demo no hay cámara a la que volver: se «toma» otra foto de muestra.
                         captured = DemoMode.isActive ? DemoImages.capturedPhoto(title: title) : nil
                         message = nil
+                        envioFallo = false
+                        cuenta = 0
                     } label: {
                         Label("Tomar otra", systemImage: "camera").frame(maxWidth: .infinity)
                     }
@@ -432,10 +510,18 @@ struct GeoPhotoCaptureView: View {
             .padding(.horizontal)
             .padding(.bottom, 20)
         }
+        .task(id: "\(photo.id.uuidString)|\(puedeContar(photo))") {
+            await contarYEnviar(photo)
+        }
     }
 
     private func shoot() {
         guard !working else { return }
+        // Modo demostración: el simulador no tiene cámara; la ráfaga recibe una foto de muestra.
+        if DemoMode.isActive, let onRafaga {
+            onRafaga(DemoImages.capturedPhoto(title: title))
+            return
+        }
         working = true
         message = nil
         camera.capture { image in
@@ -450,6 +536,27 @@ struct GeoPhotoCaptureView: View {
         guard let image, let jpeg = CorePhotoProcessing.jpeg(from: image) else {
             working = false
             message = "No se pudo tomar la foto; intenta de nuevo"
+            return
+        }
+        if let onRafaga {
+            // Ráfaga: la foto sale ya, con la ubicación que se leyó al abrir. Solo se espera al GPS si
+            // esa lectura todavía no termina, una sola vez: nadie espera 8 segundos por foto.
+            var coords = ubicacionRafaga
+            if coords == nil && !ubicacionLeida {
+                locating = true
+                coords = await DeviceLocation.shared.current()
+                locating = false
+                ubicacionRafaga = coords
+                ubicacionLeida = true
+            }
+            working = false
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            onRafaga(CapturedGeoPhoto(
+                image: UIImage(data: jpeg) ?? image,
+                jpeg: jpeg,
+                coords: coords,
+                capturedAt: Date()
+            ))
             return
         }
         locating = true
@@ -492,10 +599,14 @@ struct GeoPhotoCaptureView: View {
         }
         working = true
         message = nil
+        cuenta = 0
         Task { @MainActor in
             let error = await onConfirm(photo)
             working = false
-            if let error { message = error }
+            if let error {
+                message = error
+                envioFallo = true
+            }
         }
     }
 }

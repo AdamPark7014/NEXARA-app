@@ -34,6 +34,14 @@ struct MiJornadaCard: View {
         return nil
     }
 
+    /// Hora de la última salida del día que se ve.
+    private var salidaIso: String? {
+        vm.myPunches
+            .filter { !$0.isEntry }
+            .max { (AttendanceClock.parse($0.timestamp) ?? .distantPast) < (AttendanceClock.parse($1.timestamp) ?? .distantPast) }?
+            .timestamp
+    }
+
     private var subtitulo: String {
         if abierta, let inicio = vm.inicioIso { return "Desde las \(AttendanceClock.time(inicio))" }
         if !esHoy { return "Solo se puede checar en el día de hoy." }
@@ -67,6 +75,21 @@ struct MiJornadaCard: View {
             }
 
             boton
+
+            if esHoy && !abierta && salidaIso != nil {
+                // Los minutos se refrescan solos mientras la ventana de 10 minutos sigue abierta.
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    if let minutos = TerminarJornadaRules.minutosParaDeshacer(salidaIso, ahora: context.date) {
+                        NxSecondaryButton(
+                            "Deshacer mi salida · quedan \(minutos) min",
+                            enabled: !vm.checkInLoading,
+                            fullWidth: true
+                        ) {
+                            Task { await vm.deshacerSalida() }
+                        }
+                    }
+                }
+            }
 
             if let notice = vm.checkInNotice, !notice.isEmpty {
                 AsisIconText(
@@ -114,7 +137,7 @@ struct MiJornadaCard: View {
                             .font(.system(size: 16, weight: .regular))
                             .frame(width: 20, height: 20)
                             .accessibilityHidden(true)
-                        Text(siguiente == "salida" ? "Registrar salida" : "Registrar entrada")
+                        Text(siguiente == "salida" ? "Terminar mi jornada" : "Registrar entrada")
                             .font(.system(size: 15, weight: .bold))
                     }
                 }

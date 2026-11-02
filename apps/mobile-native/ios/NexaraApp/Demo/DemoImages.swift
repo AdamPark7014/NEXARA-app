@@ -47,7 +47,7 @@ enum DemoImages {
         let lower = title.lowercased()
         if lower.contains("ticket") || lower.contains("comprobante") { return .ticket }
         if lower.contains("comer") || lower.contains("regreso") { return .selfie }
-        if lower.contains("salida") { return .exit }
+        if lower.contains("salida") || lower.contains("fin de jornada") { return .exit }
         if lower.contains("entrada") { return .entry }
         lock.lock()
         defer { lock.unlock() }

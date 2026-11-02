@@ -284,7 +284,7 @@ struct ComidasView: View {
         let minutes = max(0, Int(now.timeIntervalSince(since) / 60))
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
-                LunchPhotoThumb(url: record.checkinPhotoUrl, title: "Tu foto de salida", time: record.checkinTime) { photo = $0 }
+                LunchPhotoThumb(url: record.checkinPhotoUrl, title: "Tu foto de salida a comer", time: record.checkinTime) { photo = $0 }
                 VStack(alignment: .leading, spacing: 4) {
                     NxIconText(systemName: "fork.knife", text: "Estás en tu hora de comida", tint: NxBrand.primary)
                         .font(.headline)
@@ -317,7 +317,7 @@ struct ComidasView: View {
         let minutes = record.minutos.map { " · \($0) min" } ?? ""
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
-                LunchPhotoThumb(url: record.checkinPhotoUrl, title: "Tu foto de salida", time: record.checkinTime) { photo = $0 }
+                LunchPhotoThumb(url: record.checkinPhotoUrl, title: "Tu foto de salida a comer", time: record.checkinTime) { photo = $0 }
                 LunchPhotoThumb(url: record.checkoutPhotoUrl, title: "Tu foto de regreso", time: record.checkoutTime) { photo = $0 }
                 VStack(alignment: .leading, spacing: 4) {
                     NxIconText(systemName: "fork.knife", text: "Comida registrada", tint: NxBrand.primary)
