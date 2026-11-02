@@ -4,7 +4,10 @@ import android.content.Context
 import android.util.Base64
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
+import mx.nexara.mobile.nativeapp.data.api.FichaDireccionDto
 import mx.nexara.mobile.nativeapp.data.api.FichaVehiculoDto
+import mx.nexara.mobile.nativeapp.data.api.FlotillaListaDto
+import mx.nexara.mobile.nativeapp.data.api.FlotillaMesDto
 import mx.nexara.mobile.nativeapp.data.api.MisVehiculosDto
 import mx.nexara.mobile.nativeapp.data.api.SolicitarVehiculoBody
 import mx.nexara.mobile.nativeapp.data.api.TableroLeidoDto
@@ -109,6 +112,12 @@ class VehiclesRepository(context: Context) {
     }
 
     suspend fun ficha(vehicleId: Long): FichaVehiculoDto = fichaApi.ficha(vehicleId)
+
+    suspend fun flotilla(): FlotillaListaDto = api.flotilla()
+
+    suspend fun flotillaMes(mes: String?): FlotillaMesDto = fichaApi.flotillaMes(mes)
+
+    suspend fun fichaDireccion(vehicleId: Long): FichaDireccionDto = fichaApi.fichaDireccion(vehicleId)
 
     /** `odometroPrevio`: el servidor descarta una lectura menor, porque un odómetro no retrocede. */
     suspend fun leerTablero(foto: GeoPhoto, odometroPrevio: Int?): TableroLeidoDto =

@@ -29,6 +29,8 @@ struct CargarGasolinaView: View {
     @State private var ticket: CapturedGeoPhoto?
     @State private var tablero: CapturedGeoPhoto?
     @State private var camara: FotoCarga?
+    @State private var fotoPorPreguntar: FotoCarga?
+    @State private var aMano = false
     @State private var leyendoTicket = false
     @State private var leyendoTablero = false
     @State private var leido = false
@@ -39,6 +41,14 @@ struct CargarGasolinaView: View {
 
     private var veCostos: Bool { ficha?.veCostos == true }
     private var leyendo: Bool { leyendoTicket || leyendoTablero }
+    private var puedeLeer: Bool { PermisoLecturaIa.concedido && !aMano }
+
+    private var preguntandoIA: Binding<Bool> {
+        Binding(
+            get: { fotoPorPreguntar != nil },
+            set: { if !$0 { fotoPorPreguntar = nil } }
+        )
+    }
     private var tieneAvance: Bool { form.tieneDatos || ticket != nil || tablero != nil }
 
     private var rendimiento: GasolinaRules.Rendimiento? {
@@ -84,6 +94,19 @@ struct CargarGasolinaView: View {
                     onCancel: { camara = nil }
                 )
             }
+            .alert(PermisoLecturaIa.titulo, isPresented: preguntandoIA, presenting: fotoPorPreguntar) { foto in
+                Button(PermisoLecturaIa.permitir) {
+                    PermisoLecturaIa.conceder()
+                    abrirCamara(foto)
+                }
+                Button(PermisoLecturaIa.aMano) {
+                    aMano = true
+                    abrirCamara(foto)
+                }
+                Button("Cancelar", role: .cancel) {}
+            } message: { _ in
+                Text(PermisoLecturaIa.mensaje)
+            }
             .alert("¿Salir sin guardar?", isPresented: $confirmaSalir) {
                 Button("Seguir aquí", role: .cancel) {}
                 Button("Salir sin guardar", role: .destructive) { dismiss() }
@@ -123,7 +146,7 @@ struct CargarGasolinaView: View {
                             leyendo: leyendoTicket,
                             alto: 132,
                             habilitada: !enviando,
-                            onTomar: { camara = .ticket }
+                            onTomar: { pedirFoto(.ticket) }
                         )
                         CasillaFotoVehiculo(
                             etiqueta: FotoCarga.tablero.rawValue,
@@ -132,7 +155,7 @@ struct CargarGasolinaView: View {
                             leyendo: leyendoTablero,
                             alto: 132,
                             habilitada: !enviando,
-                            onTomar: { camara = .tablero }
+                            onTomar: { pedirFoto(.tablero) }
                         )
                     }
                     datos
@@ -280,8 +303,23 @@ struct CargarGasolinaView: View {
         cargandoFicha = false
     }
 
+    /// Sin permiso no se manda la foto a nadie: por eso se pregunta antes de tomarla.
+    private func pedirFoto(_ foto: FotoCarga) {
+        if PermisoLecturaIa.concedido || aMano {
+            camara = foto
+        } else {
+            fotoPorPreguntar = foto
+        }
+    }
+
+    /// Tras cerrar el aviso: una pantalla completa no se presenta mientras el aviso sigue saliendo.
+    private func abrirCamara(_ foto: FotoCarga) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { camara = foto }
+    }
+
     private func tomoTicket(_ foto: CapturedGeoPhoto) {
         ticket = foto
+        guard puedeLeer else { return }
         leyendoTicket = true
         aviso = nil
         Task { @MainActor in
@@ -297,6 +335,7 @@ struct CargarGasolinaView: View {
 
     private func tomoTablero(_ foto: CapturedGeoPhoto) {
         tablero = foto
+        guard puedeLeer else { return }
         leyendoTablero = true
         Task { @MainActor in
             let r = try? await VehiculosRepository.shared.leerTablero(foto: foto, odometroPrevio: ficha?.odometroKm)

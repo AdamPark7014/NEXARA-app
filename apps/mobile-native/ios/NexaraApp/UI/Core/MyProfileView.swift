@@ -15,6 +15,7 @@ struct MyProfileView: View {
 
     @State private var appLockEnabled = AppLock.isEnabled
     @State private var confirmLogout = false
+    @State private var lecturaIaPermitida = false
     @State private var confirmDeleteAccount = false
 
     @State private var profile: MyProfileSnapshot?
@@ -52,6 +53,7 @@ struct MyProfileView: View {
                             accesoTotal: user.isSuperAdmin || Self.esDireccion(user.email)
                         )
                     }
+                    if lecturaIaPermitida { quitarLecturaIa }
                     cerrarSesion
                     eliminarCuenta
                     NxAppMetaFooter(mostrarSoporte: false)
@@ -66,6 +68,7 @@ struct MyProfileView: View {
         }
         .nxScreenBackground()
         .task { await load() }
+        .onAppear { lecturaIaPermitida = PermisoLecturaIa.concedido }
         .alert("¿Cerrar sesión?", isPresented: $confirmLogout) {
             Button("Cancelar", role: .cancel) {}
             Button("Cerrar sesión", role: .destructive) { AuthRepository.shared.logout() }
@@ -386,6 +389,21 @@ struct MyProfileView: View {
                 .contentShape(RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous))
         }
         .buttonStyle(NxPressableStyle())
+    }
+
+    /// Quien dio permiso de leer sus fotos con IA lo retira aquí (`PermisoLecturaIa`).
+    private var quitarLecturaIa: some View {
+        Button {
+            PermisoLecturaIa.quitar()
+            lecturaIaPermitida = false
+        } label: {
+            Text("Dejar de leer mis fotos con IA")
+                .font(NxType.labelMedium)
+                .foregroundStyle(NxColors.brandText)
+                .frame(maxWidth: .infinity)
+                .nxTapTarget()
+        }
+        .buttonStyle(.plain)
     }
 
     /// Exigencia de Apple (guideline 5.1.1(v)): la baja se pide desde la app y se

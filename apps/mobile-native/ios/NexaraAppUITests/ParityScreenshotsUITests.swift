@@ -77,7 +77,7 @@ final class ParityScreenshotsUITests: XCTestCase {
     }
 
     /// «Cargar gasolina» y «Regreso del vehículo» (mockups `AppGasolina` y `AppRegreso`). Las fotos
-    /// las pone el modo demo y la lectura sale de `fxTicketLeido`/`fxTableroLeido`. Capturas 95 a 98.
+    /// las pone el modo demo y la lectura sale de `fxTicketLeido`/`fxTableroLeido`. Capturas 95 a 99.
     func testGasolinaYRegreso() throws {
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "La app no llegó a primer plano")
         despejarAlertas()
@@ -109,7 +109,17 @@ final class ParityScreenshotsUITests: XCTestCase {
         }
         Thread.sleep(forTimeInterval: 1)
         capturar("gasolina-vacia")
-        tomarFotoDemo(app.buttons["Foto del ticket"], "ticket")
+        // La primera foto pregunta si se puede leer con IA. Ese aviso es el que pide Apple.
+        tocar(app.buttons["Foto del ticket"])
+        let aviso = app.alerts.firstMatch
+        if aviso.waitForExistence(timeout: 5) {
+            capturar("aviso-ia")
+            tocar(aviso.buttons["Permitir"])
+        } else {
+            omitir("aviso-ia: no apareció el aviso de IA")
+            adjuntarJerarquia("dbg-sin-aviso-ia")
+        }
+        usarFotoDemo("ticket")
         tomarFotoDemo(app.buttons["Foto del tablero"], "tablero")
         Thread.sleep(forTimeInterval: 1.5)
         capturar("gasolina-leida")
@@ -144,6 +154,54 @@ final class ParityScreenshotsUITests: XCTestCase {
         capturar("regreso-leido")
     }
 
+    /// Vehículos del CEO (`NEXARA_DEMO_CEO=1`): la flotilla y la ficha, sin «Solicitar» ni «Salida».
+    /// Capturas 100 y 101.
+    func testFlotillaDireccion() throws {
+        app.terminate()
+        app.launchEnvironment["NEXARA_DEMO_CEO"] = "1"
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "La app no llegó a primer plano")
+        despejarAlertas()
+        guard buscar(pestana("tab-inicio", "Inicio"), timeout: 30) != nil, irA("tab-mas", "Más") else {
+            adjuntarJerarquia("dbg-flotilla-sin-shell")
+            XCTFail("No se llegó a «Más» en el demo de dirección")
+            return
+        }
+        var fila = buscar(renglon("more-erp-vehiculos", "Vehículos"), timeout: 2)
+        var intentos = 0
+        while fila == nil || !(fila?.isHittable ?? false), intentos < 5 {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.5)
+            fila = buscar(renglon("more-erp-vehiculos", "Vehículos"), timeout: 1)
+            intentos += 1
+        }
+        guard let fila else {
+            adjuntarJerarquia("dbg-flotilla-sin-fila")
+            XCTFail("No está «Vehículos» en «Más»")
+            return
+        }
+        tocar(fila)
+        Thread.sleep(forTimeInterval: 1.5)
+        numero = 99
+        capturar("flotilla-direccion")
+        XCTAssertFalse(app.buttons["Solicitar"].exists, "El CEO no debe ver «Solicitar»")
+        let vehiculo = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Ford Ranger")).firstMatch
+        var vueltas = 0
+        while !(vehiculo.exists && vehiculo.isHittable), vueltas < 4 {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.4)
+            vueltas += 1
+        }
+        guard vehiculo.exists else {
+            adjuntarJerarquia("dbg-flotilla-sin-vehiculo")
+            omitir("flotilla-ficha: no aparece el vehículo")
+            return
+        }
+        tocar(vehiculo)
+        Thread.sleep(forTimeInterval: 1.5)
+        capturar("flotilla-ficha")
+    }
+
     /// En el demo la cámara ya trae una foto de muestra: solo falta «Usar esta foto».
     private func tomarFotoDemo(_ casilla: XCUIElement, _ nombre: String) {
         guard casilla.waitForExistence(timeout: 5) else {
@@ -152,6 +210,10 @@ final class ParityScreenshotsUITests: XCTestCase {
             return
         }
         tocar(casilla)
+        usarFotoDemo(nombre)
+    }
+
+    private func usarFotoDemo(_ nombre: String) {
         let usar = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Usar esta foto")).firstMatch
         guard usar.waitForExistence(timeout: 8) else {
             omitir("foto de \(nombre): no aparece «Usar esta foto»")

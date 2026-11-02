@@ -281,6 +281,155 @@ struct FichaVehiculo: Decodable {
     }
 }
 
+// MARK: - Vista de dirección
+
+struct RenglonReparto: Decodable, Hashable {
+    var km: Double?
+    var importe: Double?
+}
+
+struct RepartoMes: Decodable, Hashable {
+    var proyectos: RenglonReparto?
+    var cotizaciones: RenglonReparto?
+    var oficina: RenglonReparto?
+    var sinLigar: RenglonReparto?
+    var parado: Double?
+}
+
+struct ResumenMes: Decodable, Hashable {
+    var km: Double?
+    var costoMes: Double?
+    var porKm: Double?
+    var aIndirectos: Double?
+}
+
+struct ProximoServicioFicha: Decodable, Hashable {
+    var faltanKm: Double?
+    var fecha: String?
+    var estado: String?
+}
+
+struct VehiculoDelMes: Decodable, Hashable {
+    var id: Int?
+    var kmDelMes: Double?
+    var porKm: Double?
+    var proximoServicio: ProximoServicioFicha?
+}
+
+struct AvisoFlotilla: Decodable, Hashable {
+    var tono: String?
+    var titulo: String?
+    var texto: String?
+}
+
+/// `GET vehicles/ficha/flotilla`. Los importes llegan en `nil` a quien no ve costos. Cada parte se
+/// decodifica por su lado: una rara deja la pantalla incompleta, no la tumba.
+struct FlotillaMes: Decodable {
+    var vehiculos: [VehiculoDelMes] = []
+    var reparto: RepartoMes?
+    var resumen: ResumenMes?
+    var avisos: [AvisoFlotilla] = []
+
+    private enum CodingKeys: String, CodingKey { case vehiculos, reparto, resumen, avisos }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        vehiculos = (try? c.decode([VehiculoDelMes].self, forKey: .vehiculos)) ?? []
+        reparto = try? c.decode(RepartoMes.self, forKey: .reparto)
+        resumen = try? c.decode(ResumenMes.self, forKey: .resumen)
+        avisos = (try? c.decode([AvisoFlotilla].self, forKey: .avisos)) ?? []
+    }
+}
+
+struct CargaDireccion: Decodable, Hashable {
+    var id: Int?
+    var fecha: String?
+    var odometro: Double?
+    var litros: Double?
+    var importe: Double?
+    var tanqueLleno: Bool?
+}
+
+struct ActividadRef: Decodable, Hashable {
+    var titulo: String?
+}
+
+struct DestinoViaje: Decodable, Hashable {
+    var nombre: String?
+}
+
+struct ViajeFicha: Decodable, Hashable {
+    var id: Int?
+    var fecha: String?
+    var actividad: ActividadRef?
+    var destino: DestinoViaje?
+    var km: Double?
+    var importe: Double?
+    var sinFoto: Bool?
+}
+
+struct ServicioFicha: Decodable, Hashable {
+    var id: Int?
+    var fecha: String?
+    var concepto: String?
+    var costo: Double?
+    var proveedor: String?
+}
+
+struct DesgloseCosto: Decodable, Hashable {
+    var nombre: String?
+    var importe: Double?
+}
+
+struct MantenimientoFicha: Decodable, Hashable {
+    var apartado: Double?
+    var gastado: Double?
+}
+
+struct CostosFicha: Decodable, Hashable {
+    var porKm: Double?
+    var desglose: [DesgloseCosto]?
+    var mantenimiento: MantenimientoFicha?
+}
+
+struct OdometroDireccion: Decodable, Hashable {
+    var km: Double?
+}
+
+struct RendimientoDireccion: Decodable, Hashable {
+    var usado: Double?
+}
+
+/// `GET vehicles/ficha/:id` para la vista de dirección: lo mismo que la web, con importes.
+struct FichaDireccion: Decodable {
+    var odometro: OdometroDireccion?
+    var rendimiento: RendimientoDireccion?
+    var cargas: [CargaDireccion] = []
+    var viajes: [ViajeFicha] = []
+    var servicios: [ServicioFicha] = []
+    var proximoServicio: ProximoServicioFicha?
+    var costos: CostosFicha?
+
+    private enum CodingKeys: String, CodingKey {
+        case odometro, rendimiento, cargas, viajes, servicios, proximoServicio, costos
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        odometro = try? c.decode(OdometroDireccion.self, forKey: .odometro)
+        rendimiento = try? c.decode(RendimientoDireccion.self, forKey: .rendimiento)
+        cargas = (try? c.decode([CargaDireccion].self, forKey: .cargas)) ?? []
+        viajes = (try? c.decode([ViajeFicha].self, forKey: .viajes)) ?? []
+        servicios = (try? c.decode([ServicioFicha].self, forKey: .servicios)) ?? []
+        proximoServicio = try? c.decode(ProximoServicioFicha.self, forKey: .proximoServicio)
+        costos = try? c.decode(CostosFicha.self, forKey: .costos)
+    }
+}
+
+private struct FlotillaLista: Decodable {
+    var vehiculos: [VehiculoFlota] = []
+}
+
 // MARK: - A qué ruta va el check list
 
 /// Salida o devolución, de una solicitud aprobada o del inventario. Las cuatro
@@ -355,6 +504,35 @@ final class VehiculosRepository {
         )
         let data = try await api.postJSON("vehicles", body: body)
         if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
+    /// `GET vehicles/flotilla`: toda la flota, con quién trae cada vehículo.
+    func flotilla() async throws -> [VehiculoFlota] {
+        let data = try await api.get("vehicles/flotilla")
+        do {
+            return try JSONDecoder().decode(FlotillaLista.self, from: data).vehiculos
+        } catch {
+            throw ApiError.decoding(error)
+        }
+    }
+
+    /// `GET vehicles/ficha/flotilla?mes=2026-11`.
+    func flotillaMes(_ mes: String) async throws -> FlotillaMes {
+        let data = try await api.get("vehicles/ficha/flotilla", query: ["mes": mes])
+        do {
+            return try JSONDecoder().decode(FlotillaMes.self, from: data)
+        } catch {
+            throw ApiError.decoding(error)
+        }
+    }
+
+    func fichaDireccion(vehicleId: Int) async throws -> FichaDireccion {
+        let data = try await api.get("vehicles/ficha/\(vehicleId)")
+        do {
+            return try JSONDecoder().decode(FichaDireccion.self, from: data)
+        } catch {
+            throw ApiError.decoding(error)
+        }
     }
 
     /// `GET vehicles/ficha/:id`.

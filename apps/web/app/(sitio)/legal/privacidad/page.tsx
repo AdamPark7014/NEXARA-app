@@ -22,7 +22,7 @@ export default function PrivacidadPage() {
     <main className={styles.page}>
       <p className={styles.eyebrow}>Legal</p>
       <h1 className={styles.title}>Aviso de Privacidad Integral</h1>
-      <p className={styles.updated}>Última actualización: 13/07/2026</p>
+      <p className={styles.updated}>Última actualización: 02/11/2026</p>
 
       <p className={styles.lead}>
         <strong>{COMPANY}</strong>, con domicilio en {ADDRESS}, es
@@ -112,13 +112,21 @@ export default function PrivacidadPage() {
             usuaria realiza como parte de su trabajo. Estos datos se guardan en el sistema de la
             organización que contrató el servicio.
           </li>
+          <li>
+            <strong>Fotos que se leen con inteligencia artificial.</strong> Si lo permites, las fotos
+            del ticket de gasolina y del tablero del vehículo se envían a Anthropic, un proveedor de
+            inteligencia artificial, para leer litros, importe, odómetro y nivel de gasolina. La
+            aplicación te pide permiso antes de la primera foto; sin él, escribes los datos a mano y
+            la foto no se envía a ese proveedor. Puedes retirar el permiso en Mi perfil.
+          </li>
         </ul>
         <p className={styles.p}>
           La aplicación <strong>no contiene publicidad</strong>, no utiliza identificadores
           publicitarios y <strong>no vende ni cede datos personales a terceros</strong> con fines
           comerciales o publicitarios. Los servicios de Google que utilizamos para el envío de
           notificaciones y el reporte de fallos actúan como encargados del tratamiento por cuenta
-          nuestra, no como destinatarios independientes.
+          nuestra, no como destinatarios independientes. Anthropic también actúa como encargado
+          del tratamiento por cuenta nuestra.
         </p>
         <p className={styles.p}>
           Toda la comunicación entre la aplicación y nuestros servidores viaja{" "}
@@ -178,7 +186,8 @@ export default function PrivacidadPage() {
         <p className={styles.p}>
           Los datos personales podrán ser compartidos únicamente cuando sea necesario para el
           cumplimiento de las finalidades descritas, incluyendo proveedores de servicios
-          tecnológicos, fabricantes, distribuidores autorizados, empresas de mensajería,
+          tecnológicos (entre ellos Anthropic, cuya inteligencia artificial se usa en algunas
+          funciones de la plataforma), fabricantes, distribuidores autorizados, empresas de mensajería,
           instituciones financieras, asesores profesionales y autoridades competentes cuando
           exista obligación legal.
         </p>
@@ -295,7 +304,7 @@ export default function PrivacidadPage() {
             </a>
           </p>
         </div>
-        <p className={styles.note}>Última actualización: 13/07/2026</p>
+        <p className={styles.note}>Última actualización: 02/11/2026</p>
       </section>
     </main>
   );

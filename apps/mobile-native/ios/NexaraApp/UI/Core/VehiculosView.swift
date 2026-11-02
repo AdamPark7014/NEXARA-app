@@ -6,8 +6,11 @@ import SwiftUI
 /// kilometraje y gasolina); un vehículo libre del inventario también se puede
 /// sacar directo con «Salida».
 ///
+/// El CEO no pide vehículos: él ve `FlotillaDireccionView`.
+///
 /// Va dentro del `NavigationStack` del shell: aquí no se crea otro.
 struct VehiculosView: View {
+    @ObservedObject private var session = SessionStore.shared
     @State private var datos = MisVehiculosResponse()
     @State private var cargando = true
     @State private var cargado = false
@@ -26,7 +29,69 @@ struct VehiculosView: View {
         datos.activa == nil && datos.solicitudes.isEmpty && disponibles.isEmpty
     }
 
+    /// En demo, solo con `NEXARA_DEMO_CEO=1`: la persona ficticia sigue viendo las pantallas de campo.
+    private var esDireccion: Bool {
+        DemoMode.isActive ? DemoMode.inicioDireccion : CoreActivityRules.isCeoOrSuperAdmin(session.currentUser)
+    }
+
     var body: some View {
+        Group {
+            if esDireccion {
+                FlotillaDireccionView {
+                    if let activa = datos.activa {
+                        AsignacionActivaCard(
+                            activa: activa,
+                            onAccion: { abrirChecklist($0) },
+                            onGasolina: { gasolina = $0 }
+                        )
+                    }
+                }
+            } else {
+                paraQuienUsaVehiculos
+            }
+        }
+        .task {
+            await cargar()
+            await cargarActividades()
+        }
+        .avisoSnackbar($mensaje)
+        // El «Cerrar» lo pone `ChecklistVehiculoView`: pregunta antes de tirar fotos.
+        .sheet(item: $checklist) { req in
+            NavigationStack {
+                ChecklistVehiculoView(
+                    accion: req.accion,
+                    vehiculo: req.vehiculo,
+                    odometroInicio: req.odometroInicio,
+                    encabezadoRegreso: req.encabezadoRegreso,
+                    onDone: {
+                        mensaje = req.accion.esSalida ? "Salida registrada" : "Regreso registrado"
+                        Task { await cargar() }
+                    }
+                )
+            }
+        }
+        // El «Cerrar» lo pone `CargarGasolinaView`: pregunta antes de tirar la carga.
+        .sheet(item: $gasolina) { req in
+            NavigationStack {
+                CargarGasolinaView(
+                    vehicleId: req.vehicleId,
+                    vehiculo: req.vehiculo,
+                    onDone: {
+                        mensaje = "Carga guardada"
+                        Task { await cargar() }
+                    }
+                )
+            }
+        }
+        .sheet(item: $solicitar) { vehiculo in
+            SolicitarVehiculoSheet(vehiculo: vehiculo, actividades: actividades) {
+                mensaje = "Solicitud enviada"
+                Task { await cargar() }
+            }
+        }
+    }
+
+    private var paraQuienUsaVehiculos: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: NxSpacing.m) {
                 if cargando && !cargado {
@@ -78,45 +143,6 @@ struct VehiculosView: View {
         }
         .nxScreenBackground()
         .refreshable { await cargar() }
-        .task {
-            await cargar()
-            await cargarActividades()
-        }
-        .avisoSnackbar($mensaje)
-        // El «Cerrar» lo pone `ChecklistVehiculoView`: pregunta antes de tirar fotos.
-        .sheet(item: $checklist) { req in
-            NavigationStack {
-                ChecklistVehiculoView(
-                    accion: req.accion,
-                    vehiculo: req.vehiculo,
-                    odometroInicio: req.odometroInicio,
-                    encabezadoRegreso: req.encabezadoRegreso,
-                    onDone: {
-                        mensaje = req.accion.esSalida ? "Salida registrada" : "Regreso registrado"
-                        Task { await cargar() }
-                    }
-                )
-            }
-        }
-        // El «Cerrar» lo pone `CargarGasolinaView`: pregunta antes de tirar la carga.
-        .sheet(item: $gasolina) { req in
-            NavigationStack {
-                CargarGasolinaView(
-                    vehicleId: req.vehicleId,
-                    vehiculo: req.vehiculo,
-                    onDone: {
-                        mensaje = "Carga guardada"
-                        Task { await cargar() }
-                    }
-                )
-            }
-        }
-        .sheet(item: $solicitar) { vehiculo in
-            SolicitarVehiculoSheet(vehiculo: vehiculo, actividades: actividades) {
-                mensaje = "Solicitud enviada"
-                Task { await cargar() }
-            }
-        }
     }
 
     private func abrirChecklist(_ req: ChecklistRequest) {

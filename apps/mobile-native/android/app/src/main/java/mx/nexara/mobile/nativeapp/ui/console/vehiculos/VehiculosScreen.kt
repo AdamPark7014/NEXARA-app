@@ -31,10 +31,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.AsignacionActivaDto
 import mx.nexara.mobile.nativeapp.data.api.SolicitudResumenDto
 import mx.nexara.mobile.nativeapp.data.api.VehiculoFlotaDto
@@ -58,7 +60,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.rememberNxSnackbarHostState
 
 /**
  * «Vehículos» de Core en la app: lo que traigo asignado, mis solicitudes y la
- * flota libre. Salida y regreso pasan por [ChecklistVehiculoFlow] — siete fotos
+ * flota libre. El CEO no pide vehículos: él ve [FlotillaDireccionScreen]. Salida y regreso pasan por [ChecklistVehiculoFlow] — siete fotos
  * con cámara en vivo, nunca galería.
  */
 @Composable
@@ -67,6 +69,12 @@ fun VehiculosScreen() {
     val state by vm.state.collectAsState()
     val snackbar = rememberNxSnackbarHostState()
     var solicitando by remember { mutableStateOf<VehiculoFlotaDto?>(null) }
+    val context = LocalContext.current
+    val esDireccion = remember(context) {
+        AuthRepository(context).loadSession()?.let { u ->
+            FlotillaRules.esDireccion(u.email, u.roleKey, u.orgRoleKey, u.role, u.isSuperAdmin)
+        } == true
+    }
 
     LaunchedEffect(state.mensaje) {
         val msg = state.mensaje ?: return@LaunchedEffect
@@ -119,6 +127,18 @@ fun VehiculosScreen() {
                     TextButton(onClick = vm::cerrarGasolina) { Text("Volver") }
                 }
             }
+        }
+        return
+    }
+
+    if (esDireccion) {
+        NxScreenScaffold {
+            FlotillaDireccionScreen(
+                encabezado = state.activa?.let { activa ->
+                    { AsignacionActivaCard(activa = activa, onAccion = vm::abrirChecklist, onGasolina = vm::abrirGasolina) }
+                },
+            )
+            NxSnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter))
         }
         return
     }

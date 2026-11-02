@@ -311,6 +311,10 @@ apps están construidas en Android e iOS y faltan por publicar en las tiendas.
     Si falla, se captura a mano. La salida conserva sus cuatro pasos y también lee el tablero.
   - **Quien no ve costos:** el total leído del ticket viaja sin enseñarse y la celda dice «Leído del ticket». Si no se pudo leer, o las cifras
     no cuadran, lo escribe del papel, porque el servidor lo exige. La app no pide el importe de las cargas anteriores.
+  - **Permiso para la IA (guía 5.1.2(i) de Apple):** antes de la primera foto que se va a leer sale un aviso que nombra a Anthropic, con «Permitir» y
+    «Escribir a mano». Sin permiso la foto no va a `leer-foto`. El «sí» se guarda por persona y se retira en Mi perfil; el «a mano» vale solo esa pantalla.
+  - **El CEO no pide vehículos:** en vez de «Solicitar» y «Salida» ve la flotilla: costo del mes, a dónde se fue, quién trae cada uno, y la ficha con
+    gasolina, viajes y mantenimiento. Solo lectura; editar sigue en la web. Decisión de Adam, 02-11.
   - **`GET vehicles/mis-vehiculos`** manda `activa.actividad` (título y proyecto), para las líneas bajo el título del regreso. Sin ella, o en una
     salida directa de inventario, salen nombre y placas.
 - **Migración y despliegue:** solo agrega columnas y tablas. La imagen de la API suma `poppler-utils` para `pdftotext`.

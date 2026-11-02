@@ -78,6 +78,7 @@ internal fun CargarGasolinaFlow(
     val veCostos = ficha.acceso?.veCostos == true
     val cargas = remember(ficha) { ficha.cargasPrevias() }
     val scope = rememberCoroutineScope()
+    val permiso = rememberPermisoLecturaIa()
     var form by remember { mutableStateOf(FormCarga()) }
     var ticket by remember { mutableStateOf<GeoPhoto?>(null) }
     var tablero by remember { mutableStateOf<GeoPhoto?>(null) }
@@ -96,6 +97,7 @@ internal fun CargarGasolinaFlow(
 
     fun tomoTicket(foto: GeoPhoto) {
         ticket = foto
+        if (!permiso.puedeLeer) return
         leyendoTicket = true
         aviso = null
         scope.launch {
@@ -111,6 +113,7 @@ internal fun CargarGasolinaFlow(
 
     fun tomoTablero(foto: GeoPhoto) {
         tablero = foto
+        if (!permiso.puedeLeer) return
         leyendoTablero = true
         scope.launch {
             val r = leerTablero(foto)
@@ -134,13 +137,15 @@ internal fun CargarGasolinaFlow(
         error = error,
         enviando = enviando,
         onForm = { form = it },
-        onTicket = { camara = FotoCarga.TICKET },
-        onTablero = { camara = FotoCarga.TABLERO },
+        onTicket = { permiso.antesDeLaFoto { camara = FotoCarga.TICKET } },
+        onTablero = { permiso.antesDeLaFoto { camara = FotoCarga.TABLERO } },
         onGuardar = {
             val falta = GasolinaRules.faltaEnCarga(form)
             if (falta != null) aviso = falta else onGuardar(form, ticket, tablero)
         },
     )
+
+    AvisoLecturaIa(permiso)
 
     camara?.let { foto ->
         LiveCameraCaptureDialog(
