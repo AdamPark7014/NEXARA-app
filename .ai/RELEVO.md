@@ -1,5 +1,16 @@
 # RELEVO
 
+- **02-11 ~12:40 (claude-code) — Cierre del retiro del generador muerto: quitarlo no cambió ningún PDF real.**
+  - **Medido en producción, solo lectura, con los mismos datos y en el mismo momento:** `4d8d39c8` (con el generador) contra `3d36a41a` (sin él). **0 de 56 cotizaciones cambian**, byte a byte, en el PDF del cliente y en la vista previa, y dicen lo mismo de dónde empieza cada sección. Control: el mismo código dos veces, 0 diferencias. Sin errores.
+  - El JS que compilan los dos commits solo difiere en `cotizaciones.service.js` (sin `buildPropuesta`), `personalizacion.js` (sin `opcionesDePropuesta`) y lo borrado. `cotizacion-formato-nexara.js` sale idéntico.
+  - **Las diferencias que sí hay no vienen del retiro:**
+    - Línea base del 01-11 contra el mismo código hoy: 3 de 56 (15, 23 y 36). Es la limpieza del padrón del 01-11 ~20:15, que corrigió esas tres y dejó su `updatedAt` a propósito: un PDF puede cambiar sin rastro de edición.
+    - Producción de hoy contra `4d8d39c8`: 56 de 56, esperado. Los únicos commits posteriores que tocan el generador son `df9001b1` y `72cdaf3b`; no se midieron uno por uno. Las 56 se generan sin error.
+  - Producción al medir (`ea8031ae`): `/api/health/live` 200, `dist` sin `propuesta-tecnica-pdf` ni `propuesta-payload`, y `cotizacion-nexara/` con los tres archivos que se conservan.
+  - **Para comparar dos commits sobre datos reales sin desplegarlos:** `tsc -p tsconfig.build.json --outDir` en cada copia, `src/assets` a `<salida>/assets`, `docker cp` al `/tmp` de `nexara-api`, y correr con `-w /app/apps/api` y `NODE_PATH=/app/apps/api/node_modules:/app/node_modules`. Se instancia `CotizacionesService` con stubs, se llama `buildPdf` y `vistaPreviaPdf`, con `Date` y `Math.random` fijos, y se imprime solo id y hash (el repo es público). Los 95 errores de tipos por el cliente Prisma atrasado no impiden emitir.
+  - **Sin medir:** el PDF interno con datos reales (en la muestra del 01-11 da el mismo texto). Nadie abrió estos PDF con sesión; la prueba es de bytes.
+  - Limpieza: quitados del Hetzner y del contenedor los archivos de esta medición.
+
 - **02-11 ~12:50 (claude-code) — Apps: «Cargar gasolina» y «Regreso del vehículo» en Android e iOS. Sin publicar en tiendas: falta que Adam vea las capturas y lo apruebe.** Detalle en `docs/COSTOS-PRECIOS-UNITARIOS.md`, «Cómo quedó».
   - **Qué se ve:** en Vehículos, con el vehículo afuera, la tarjeta suma «Cargar gasolina» bajo «Regreso». Mockups: artifact `2DNGd9xCSM7fG9zAfBPijs`, `AppGasolina` y `AppRegreso`.
   - **Regreso:** la API sigue exigiendo las 7 fotos, así que van las 6 del vehículo y luego la pantalla del mockup, con su botón «Confirmar regreso». La salida conserva sus 4 pasos y también lee el tablero.
