@@ -1,5 +1,6 @@
 import { CtCatalogSyncService, firmaDeFila, firmaDeProducto } from './ct-catalog-sync.service';
 import type { NormalizedSupplierProduct, SupplierPullResult } from '../connectors/supplier-connector';
+import { applyCap, resolveRowCap, shouldCap } from '../../prisma/row-cap';
 
 const producto = (sku: string, extra: Partial<NormalizedSupplierProduct> = {}): NormalizedSupplierProduct => ({
   externalId: 1,
@@ -161,6 +162,49 @@ describe('CtCatalogSyncService.sync', () => {
         existentes: Array.from({ length: 10 }, (_, i) => fila(i + 1, producto(`R${i}`))),
         pull: { source: 'XML', products: [producto('R0'), producto('R1')] },
       });
+
+      await servicio.sync({ source: 'FULL' });
+
+      expect(prisma.productCT.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  // 02-11-2026: 14,877 filas y el sync veía 5,000. 35 filas que CT ya no publica quedaron activas y con el dólar de agosto.
+  describe('un catálogo más grande que el tope de filas de PrismaService', () => {
+    const tope = resolveRowCap();
+    const productos = Array.from({ length: tope * 2 + 1 }, (_, i) => producto(`T${i}`));
+    const existentes = productos.map((p, i) => fila(i + 1, p));
+
+    /** Como en producción: pagina por id, y sin `take` corta con el tope. */
+    const armarConTope = (pull: { source: 'JSON' | 'XML'; products: NormalizedSupplierProduct[] }) => {
+      const armado = armar({ pull });
+      armado.prisma.productCT.findMany.mockImplementation(async (args: { take?: number; where?: { id?: { gt?: number } } }) => {
+        const desde = existentes.filter((f) => f.id > (args.where?.id?.gt ?? 0));
+        return shouldCap('findMany', args) ? applyCap(desde, tope).rows : desde.slice(0, args.take);
+      });
+      return armado;
+    };
+
+    it('no reescribe lo que no cambió, esté donde esté', async () => {
+      const { servicio, prisma } = armarConTope({ source: 'JSON', products: productos });
+
+      const r = await servicio.sync({ source: 'PRIMARY' });
+
+      expect(prisma.productCT.upsert).not.toHaveBeenCalled();
+      expect(r).toMatchObject({ status: 'OK', rowsUpserted: 0 });
+    });
+
+    it('apaga lo que ya no viene, aunque esté más allá del tope', async () => {
+      const { servicio, prisma } = armarConTope({ source: 'XML', products: productos.slice(0, -1) });
+
+      await servicio.sync({ source: 'FULL' });
+
+      expect(prisma.productCT.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.productCT.updateMany).toHaveBeenCalledWith({ where: { id: { in: [existentes[existentes.length - 1]!.id] } }, data: { activo: false } });
+    });
+
+    it('la mitad de lo activo se cuenta contra todo el catálogo', async () => {
+      const { servicio, prisma } = armarConTope({ source: 'XML', products: productos.slice(0, Math.floor(tope * 0.6)) });
 
       await servicio.sync({ source: 'FULL' });
 
