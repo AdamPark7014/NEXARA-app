@@ -80,7 +80,7 @@ import DialogoEnvio from "./DialogoEnvio";
 import YaLaEnvie from "./YaLaEnvie";
 import ComoTermino from "./ComoTermino";
 import { useCronometroProceso } from "@/lib/cronometro-proceso";
-import { aceptoEnPalabras, conUnSoloActual, medioDeEnvio, pasosDeFacturaYCobro } from "@/lib/hilo-negocio";
+import { aceptoEnPalabras, conUnSoloActual, diaDelHecho, medioDeEnvio, pasosDeFacturaYCobro } from "@/lib/hilo-negocio";
 import Seguimiento from "./Seguimiento";
 import styles from "./editor.module.css";
 
@@ -107,7 +107,7 @@ function pasosDe(detalle: CotizacionDetalle, version: string): RecordStep[] {
         ? "Sin enviar"
         : enBorrador
           ? `Última: ${formatoFecha(sentAt)}`
-          : [formatoFecha(sentAt), medio === "en persona" ? medio : medio ? `por ${medio}` : null].filter(Boolean).join(", "),
+          : [diaDelHecho(sentAt), medio === "en persona" ? medio : medio ? `por ${medio}` : null].filter(Boolean).join(", "),
       state: sentAt && !enBorrador ? "done" : "pending",
     },
   ];
@@ -138,7 +138,7 @@ function pasosDe(detalle: CotizacionDetalle, version: string): RecordStep[] {
       id: "final",
       label: "Ganada",
       hint: ganada
-        ? [aceptada ? formatoFecha(aceptada) : null, como].filter(Boolean).join(", ") || undefined
+        ? [diaDelHecho(aceptada), como].filter(Boolean).join(", ") || undefined
         : estado === "ENVIADA"
           ? "Falta tu respuesta"
           : detalle.validUntil
