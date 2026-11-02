@@ -606,8 +606,8 @@ export default function EditorCctv({
             <div className={styles.lienzoCaja}>
               {modo === "3d" && webgl ? (
                 <Maqueta3D
-                  // Los modelos agregados cambian cómo se ven las cámaras ya puestas.
-                  key={`${catalogo.version}-${disenosArmados}`}
+                  key={disenosArmados}
+                  versionCatalogo={catalogo.version}
                   plano={plano}
                   nivelId={nivelActivo.nivel.id}
                   conexiones={conexiones}

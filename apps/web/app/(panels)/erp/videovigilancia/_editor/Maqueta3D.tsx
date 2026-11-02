@@ -88,6 +88,7 @@ export default function Maqueta3D({
   numeroEquipo,
   numeroNuevo,
   verDesde,
+  versionCatalogo,
   onVerDesde,
   onAplicar,
   onSeleccionar,
@@ -118,6 +119,8 @@ export default function Maqueta3D({
   numeroEquipo: (t: TipoEquipo) => number;
   numeroNuevo: number;
   verDesde: string | null;
+  /** Sube cuando llega el catálogo. Antes reiniciaba toda la vista, y al abrir se armaba dos veces. */
+  versionCatalogo: number;
   onVerDesde: (id: string | null) => void;
   onAplicar: (plano: Plano, opciones?: { seleccion?: Seleccion | null; fusion?: string }) => void;
   onSeleccionar: (s: Seleccion | null) => void;
@@ -304,10 +307,11 @@ export default function Maqueta3D({
       debajo,
       seleccion,
       verDesde,
+      catalogo: versionCatalogo,
       capas: { cobertura: capas.cobertura, personas: capas.humanoides, noche: capas.noche, tamanoReal: capas.tamanoReal, translucidos: capas.translucidos, croquis: capas.croquis, cableado: capas.cableado },
     });
     setClaves(m.etiquetas);
-  }, [listo, plano, nivelId, conexiones, capas.cableado, coberturaVisible, elevacionM, debajo, seleccion, verDesde, capas.cobertura, capas.humanoides, capas.noche, capas.tamanoReal, capas.translucidos, capas.croquis]);
+  }, [listo, plano, nivelId, conexiones, capas.cableado, coberturaVisible, elevacionM, debajo, seleccion, verDesde, versionCatalogo, capas.cobertura, capas.humanoides, capas.noche, capas.tamanoReal, capas.translucidos, capas.croquis]);
 
   // Las claves y rótulos recién montados necesitan su lugar.
   useEffect(() => {
