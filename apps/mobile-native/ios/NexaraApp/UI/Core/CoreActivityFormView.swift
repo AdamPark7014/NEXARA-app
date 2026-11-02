@@ -69,6 +69,8 @@ struct CoreActivityFormView: View {
     let submitLabel: String
     /// Recibe el id creado; lo que siga (equipo, cerrar) lo decide quien lo usa.
     let onCreated: (Int) async -> Void
+    /// Desde cuándo está abierto el formulario: el cronómetro de asignar.
+    @State private var inicioFormulario = Date()
 
     @ObservedObject private var session = SessionStore.shared
     @State private var titulo = ""
@@ -1028,6 +1030,13 @@ struct CoreActivityFormView: View {
         defer { saving = false }
         do {
             let id = try await CoreRepository.shared.createCoreActivity(body, selfAssign: selfAssign)
+            await CoreRepository.shared.registrarTiempo(ProcesoTiempoBody(
+                proceso: selfAssign ? "autoasignar" : "asignar",
+                duracionMs: Int(Date().timeIntervalSince(inicioFormulario) * 1000),
+                clics: nil,
+                entidadId: id,
+                detalle: "app"
+            ))
             await onCreated(id)
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo guardar la actividad")
