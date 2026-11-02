@@ -1,5 +1,14 @@
 # RELEVO
 
+- **02-11 ~22:15 UTC (claude-code) — Diseñador: ejemplos en producción para el equipo y lo que salió al probar dentro de Core (`2d890e51`, `451aa85a`, `4f8ec2ca`).**
+  - Adam: «todos los ejemplos que generes súbelos a producción como ejemplo para que el equipo los vea». Sigue vigente.
+  - **Ejemplos en producción (empresa 1, diseños 4 a 9, nombre «Ejemplo · …», sin cliente):** Centro de distribución con oficinas (14 cámaras, 86 %), Bodega con oficinas (11, 79 %), Oficinas (5, 94 %), Tienda (8, 91 %), Escuela de dos pisos (23, 92 %) y Armado con una frase (14, 77 %). Se archivan desde la lista cuando ya no sirvan.
+  - **Catálogo cargado por la pantalla real:** Dahua (turret, bala, grabador), Axis (domo), TP-Link (switch), ZKTeco (terminal), filas `db-2`, 3, 5, 6, 7 y 8. La 4 (grabador con «Dahua Technology») quedó archivada.
+  - Arreglos que el arnés no podía enseñar: las pantallas completas quedaban debajo del menú de Core y tapaban Guardar (ahora `createPortal` a `body`); una marca larga salía cortada en el grabador; la IA a veces omitía el área que describe el edificio (`completarAreas`); el «interior cubierto» contaba el patio dentro de la reja; bodega con una cámara por pasillo.
+  - Verificado en producción: leer las 6 fichas, guardar con clic real, abrir el ejemplo principal con diagrama, plano técnico y propuesta de 19 hojas, recorrerlo con su panel de PPM, armar con frase y guardado automático. 205 pruebas del diseñador en web y 96 en API; eval de frases 23 de 23, eval de fichas 210 de 213.
+  - Medido con Intel UHD en ventana propia: desliza a 56 cuadros por segundo, camina a 40. Abrir por primera vez, con perfil nuevo y la PC sin memoria, tardó de 15 a 30 s; con memoria libre, unos 5 s. No se midió en otra computadora.
+  - **Falta:** ver con ojos el ejemplo de la frase ya corregido dentro de Core (la extensión de Chrome se desconectó; se revisó en el arnés). Fase 4 necesita decidir el inventario y la 5 las especificaciones de cotización de Adam.
+  - Trampa: el 02-11 esta PC estuvo con 0 GB libres (34 procesos de Claude, 12 GB; `llama-server`, 6.7 GB; Java, 3.5 GB). Todo Chrome se congelaba y parecía culpa de un diseño: la Escuela llegó a archivarse por eso. Antes de culpar al código, comparar contra otro diseño en las mismas condiciones.
 - **02-11 ~16:00 (claude-code) — Relojes de las cámaras: grabador en hora automática y una foto por cámara por minuto. Falta ver un rostro real el 03-11.** Código en `26ff403e`, desplegado.
   - **Decisión de Adam, con cifras:** «Sí, una por minuto». La fila de cada rostro se guarda siempre y los accesos llevan su foto sin límite.
     | Opción | Fotos al día | Disco al día | A 90 días |
