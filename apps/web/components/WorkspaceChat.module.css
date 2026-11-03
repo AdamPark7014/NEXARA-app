@@ -199,8 +199,13 @@
   min-height: 0;
   overflow: auto;
   padding: 2px 8px 18px;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-tertiary) 30%, transparent) transparent;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .sidebarScroll {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--text-tertiary) 30%, transparent) transparent;
+  }
 }
 
 .sectionLabel {

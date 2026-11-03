@@ -441,8 +441,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--nav-group-gap);
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--ui-fg-3) 45%, transparent) transparent;
+
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ui-fg-3) 45%, transparent) transparent;
+  }
 }
 
 .menu::-webkit-scrollbar {

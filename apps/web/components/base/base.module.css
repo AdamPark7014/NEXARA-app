@@ -103,14 +103,9 @@
   flex: 0 0 auto;
 }
 
+/* «Core · Almacén» repetía lo que ya dice la miga de arriba. */
 .headEyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--ui-text-xs);
-  font-weight: 600;
-  color: var(--ui-fg-3);
-  margin-bottom: 2px;
+  display: none;
 }
 
 .headTitleRow {
@@ -124,15 +119,11 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--ui-brand-soft);
-  color: var(--ui-brand-text);
+  color: var(--ui-fg-3);
 }
 
 .headIcon svg {
-  font-size: 20px !important;
+  font-size: 22px !important;
 }
 
 .headTitle {
