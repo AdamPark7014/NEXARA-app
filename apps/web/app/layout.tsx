@@ -23,6 +23,7 @@ const spaceGrotesk = Space_Grotesk({
   display: "swap",
   weight: ["400", "500", "600", "700"],
   variable: "--nx-font-display",
+  preload: false,
 });
 
 // Fallback estable para UI: Inter como variable de UI (en lugar de Inter Tight)
@@ -31,9 +32,12 @@ const interTight = Inter({
   display: "swap",
   weight: ["400", "500", "600", "700"],
   variable: "--nx-font-ui",
+  preload: false,
 });
 
-// Paneles (ERP y demás): Inter a 14 px. Sin preload para no cargarlo en el sitio público.
+// Ninguna fuente lleva preload: dos instancias de la misma familia generan archivos distintos y el navegador bajaba
+// el precargado y además el que gana en la hoja de estilos (205 KB en la portada, 90 KB sin los avisos).
+// Paneles (ERP y demás): Inter a 14 px.
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
@@ -57,6 +61,7 @@ const manrope = Inter({
   display: "swap",
   weight: ["300", "400", "500", "600", "700"],
   variable: "--nx-font-body",
+  preload: false,
 });
 
 // Serif y mono: usarán fallbacks de sistema; no cargamos fuentes extra para robustez de build
@@ -67,6 +72,7 @@ const plusJakarta = Space_Grotesk({
   display: "swap",
   weight: ["400", "600", "700"],
   variable: "--nx-font-rounded",
+  preload: false,
 });
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://www.nexara.com.mx").replace(/\/+$/, "");
