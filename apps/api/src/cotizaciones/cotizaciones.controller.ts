@@ -34,6 +34,8 @@ import { validarTamanoBorrador } from './propuesta-vista-previa.js';
 import { GuardarPlantillaDto } from './dto/plantilla-cotizacion.dto.js';
 import { InterpretarCotizacionDto } from './dto/interpretar-cotizacion.dto.js';
 import { CotizarFraseService } from './cotizar-frase.service.js';
+import { RedactarTextosDto } from './dto/redactar-textos.dto.js';
+import { RedactarTextosService } from './redactar-textos.service.js';
 
 @Controller('cotizaciones')
 @UseGuards(UrlAccessGuard)
@@ -41,6 +43,7 @@ export class CotizacionesController {
   constructor(
     private readonly cotizacionesService: CotizacionesService,
     private readonly cotizarFrase: CotizarFraseService,
+    private readonly redactarTextos: RedactarTextosService,
   ) {}
 
   @UseGuards(RbacGuard)
@@ -112,6 +115,14 @@ export class CotizacionesController {
   @Post('interpretar')
   interpretar(@Body() dto: InterpretarCotizacionDto, @CurrentCompanyId() companyId: number | null) {
     return this.cotizarFrase.interpretar(dto.texto, companyId, { excluir: dto.excluir ?? null, moneda: dto.moneda ?? null });
+  }
+
+  /** «Redactar con IA»: los textos de la cotización con las partidas del borrador. No guarda nada. */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post('redactar')
+  redactar(@Body() dto: RedactarTextosDto, @CurrentCompanyId() companyId: number | null) {
+    return this.redactarTextos.redactar(dto, companyId);
   }
 
   /** Catálogo de paquetes. Antes de `:id` para que no lo tome por un id. */

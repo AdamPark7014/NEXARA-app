@@ -43,6 +43,46 @@
   container: tarjeta / inline-size;
 }
 
+.cuerpo > :last-child {
+  margin-bottom: 0;
+}
+
+/* La indicación de «Redactar con IA» ocupa lo que dejen el micrófono y el botón. */
+.indicacion {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.barrita {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--ui-brand-soft);
+  overflow: hidden;
+}
+
+.barrita i {
+  display: block;
+  height: 100%;
+  background: var(--ui-brand);
+  animation: redactando 9s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes redactando {
+  from {
+    width: 4%;
+  }
+  to {
+    width: 92%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barrita i {
+    animation: none;
+    width: 50%;
+  }
+}
+
 .fila {
   display: flex;
   flex-wrap: wrap;

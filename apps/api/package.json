@@ -17,6 +17,7 @@
     "eval:asistente-chat": "cross-env TS_NODE_PROJECT=src/ai/eval/tsconfig.json node -r ts-node/register src/ai/eval/correr-asistente-chat.ts",
     "eval:duplicados": "cross-env TS_NODE_PROJECT=src/ai/eval/tsconfig.json node -r ts-node/register src/ai/eval/correr-duplicados.ts",
     "eval:cotizar": "cross-env TS_NODE_PROJECT=src/ai/eval/tsconfig.json node -r ts-node/register src/ai/eval/correr-cotizar.ts",
+    "eval:redactar": "cross-env TS_NODE_PROJECT=src/ai/eval/tsconfig.json node -r ts-node/register src/ai/eval/correr-redactar.ts",
     "eval:ficha": "cross-env TS_NODE_PROJECT=src/ai/eval/tsconfig.json node -r ts-node/register src/ai/eval/correr-ficha.ts",
     "eval:sitio": "cross-env TS_NODE_PROJECT=src/ai/eval/tsconfig.json node -r ts-node/register src/ai/eval/correr-sitio.ts",
     "user:reset-password": "ts-node ./src/users/reset-user-password.ts",
