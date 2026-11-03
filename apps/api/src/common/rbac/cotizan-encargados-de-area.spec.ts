@@ -44,7 +44,6 @@ const ENCARGADOS: Array<[string, string]> = [
   [ROLES.ADMINISTRATIVO, 'Mónica García · soluciones@'],
   [ROLES.COORD_OPERACIONES, 'Luis Joel Aguilar · direccion.operaciones@'],
   [ROLES.COORD_OPERACIONES, 'David Morales · operaciones@'],
-  [ROLES.ING_SOPORTE, 'José Antonio Ramírez · jose.ramirez@'],
   [ROLES.ARQUITECTO, 'Josué Cervantes · infraestructura@'],
 ];
 
@@ -88,7 +87,7 @@ describe('los encargados de área cotizan', () => {
 });
 
 describe('quien no cotiza, sigue sin cotizar', () => {
-  const ajenos = [ROLES.ING_CAMPO, ROLES.DISENADOR, ROLES.LIDER_DISENO, ROLES.RH, ROLES.CLIENTE];
+  const ajenos = [ROLES.ING_CAMPO, ROLES.ING_SOPORTE, ROLES.DISENADOR, ROLES.LIDER_DISENO, ROLES.RH, ROLES.CLIENTE];
 
   it.each(ajenos)('%s no tiene cotizaciones.access', (roleKey) => {
     expect(permisosDelRol(roleKey)).not.toContain(PERMISSIONS.COTIZACIONES_ACCESS);
@@ -97,6 +96,22 @@ describe('quien no cotiza, sigue sin cotizar', () => {
   it.each(ajenos)('%s no puede crear ni pasar cotizaciones', (roleKey) => {
     expect(puedeUrl(roleKey, '/api/cotizaciones', 'POST')).toBe(false);
     expect(puedeUrl(roleKey, '/api/cotizaciones/88/asignar', 'POST')).toBe(false);
+  });
+});
+
+describe('soporte no entra a Cotizaciones (Adam, 03-11)', () => {
+  it('no lee costos, no guarda, no envía ni marca ganada', () => {
+    expect(permisosDelRol(ROLES.ING_SOPORTE)).not.toContain(PERMISSIONS.COTIZACIONES_ACCESS);
+    expect(puedeUrl(ROLES.ING_SOPORTE, '/api/cotizaciones/core/88')).toBe(false);
+    expect(puedeUrl(ROLES.ING_SOPORTE, '/api/cotizaciones/88', 'PUT')).toBe(false);
+    expect(puedeUrl(ROLES.ING_SOPORTE, '/api/cotizaciones/88/enviar', 'POST')).toBe(false);
+    expect(puedeUrl(ROLES.ING_SOPORTE, '/api/cotizaciones/88/ganar', 'POST')).toBe(false);
+    expect(puedeUrl(ROLES.ING_SOPORTE, '/erp/cotizaciones/88')).toBe(false);
+  });
+
+  it('una cotización abierta para esa persona sigue entrando por su propia ruta', () => {
+    expect(puedeUrl(ROLES.ING_SOPORTE, '/api/activities/7/cotizacion-abierta')).toBe(true);
+    expect(puedeUrl(ROLES.ING_SOPORTE, '/api/activities/7/cotizacion-abierta', 'PUT')).toBe(true);
   });
 });
 

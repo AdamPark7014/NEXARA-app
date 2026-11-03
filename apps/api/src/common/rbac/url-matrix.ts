@@ -884,9 +884,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...MEETINGS_STAFF_URL_RULES,
     ...CORE_OLA1_URL_RULES,
     ...SELF_ATTENDANCE_URL_RULES,
-    // Sistemas es un área y su encargado cotiza (Adam, 20-09): sin esto, el permiso
-    // `cotizaciones.access` le abría el módulo y la matriz le devolvía 403 al guardar.
-    ...COTIZACIONES_CORE_URL_RULES,
+    // Sin Cotizaciones (Adam, 03-11): trae costos y deja enviar. Si le piden apoyo, entra solo a esa
+    // por `cotizacion-abierta`.
     ...CCTV_DISENOS_URL_RULES,
     { path: '/ops', scope: 'read' },
     { path: '/ops/dashboard', scope: 'read' },
