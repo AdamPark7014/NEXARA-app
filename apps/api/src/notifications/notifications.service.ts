@@ -9,7 +9,7 @@ import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 import { buildCollapseKey, channelForCategory, iconForNotification } from './notification-push-meta.js';
 import { appUrls } from '../common/app-urls.js';
 import { PREF_SOLO_RESUMEN, modoResumenActivo, omitirEnModoResumen } from './notification-noise.js';
-import { WORKDAY_TIMEZONE, workDayStart } from '../common/time/workday.js';
+import { WORKDAY_TIMEZONE, workDateColumn, workDayStart } from '../common/time/workday.js';
 import {
   claseDeAviso,
   dentroDeHorarioDeAvisos,
@@ -688,7 +688,7 @@ export class NotificationsService {
       const expiredQuotes = await this.prisma.cotizacion.findMany({
         where: {
           validUntil: {
-            lt: now,
+            lt: workDateColumn(now),
           },
           // La enviada la vence y la avisa `marcarVencidas`; aquí, solo la que venció sin salir.
           status: 'DRAFT',

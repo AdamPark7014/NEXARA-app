@@ -105,6 +105,47 @@ describe('tarea diaria de vencimiento', () => {
   });
 });
 
+describe('la vigencia incluye todo su último día en México', () => {
+  const ultimoDia = '2026-11-18';
+  const firma = (hoy: string) => puedeFirmarse({ estado: 'SENT', validUntil: ultimoDia, hoy: new Date(hoy) }).ok;
+  const tarea = (hoy: string) => debeVencer({ estado: 'SENT', validUntil: ultimoDia, hoy: new Date(hoy) });
+
+  it('sigue abierta la tarde anterior, cuando en UTC ya es el 18', () => {
+    expect(firma('2026-11-18T00:01:00Z')).toBe(true);
+    expect(tarea('2026-11-18T00:01:00Z')).toBe(false);
+  });
+
+  it('la tarea de las 6 am no la vence en su último día', () => {
+    expect(tarea('2026-11-18T12:00:00Z')).toBe(false);
+    expect(firma('2026-11-18T12:00:00Z')).toBe(true);
+  });
+
+  it('se puede firmar hasta las 23:59 del día 18', () => {
+    expect(firma('2026-11-19T05:59:00Z')).toBe(true);
+    expect(tarea('2026-11-19T05:59:00Z')).toBe(false);
+  });
+
+  it('vence al empezar el 19, y la tarea la marca esa mañana', () => {
+    const resultado = puedeFirmarse({ estado: 'SENT', validUntil: ultimoDia, hoy: new Date('2026-11-19T06:00:00Z') });
+    expect(resultado.ok).toBe(false);
+    expect(resultado.motivo).toContain('venció');
+    expect(tarea('2026-11-19T12:00:00Z')).toBe(true);
+  });
+
+  it('da lo mismo la fecha como texto o como la lee Prisma', () => {
+    const hoy = new Date('2026-11-18T12:00:00Z');
+    expect(debeVencer({ estado: 'SENT', validUntil: new Date(ultimoDia), hoy })).toBe(false);
+    expect(puedeFirmarse({ estado: 'SENT', validUntil: new Date(ultimoDia), hoy }).ok).toBe(true);
+    expect(debeVencer({ estado: 'SENT', validUntil: new Date('2026-11-17'), hoy })).toBe(true);
+  });
+
+  it('una fecha ilegible no vence nada', () => {
+    const hoy = new Date('2026-11-18T12:00:00Z');
+    expect(debeVencer({ estado: 'SENT', validUntil: 'no es fecha', hoy })).toBe(false);
+    expect(puedeFirmarse({ estado: 'SENT', validUntil: 'no es fecha', hoy }).ok).toBe(true);
+  });
+});
+
 describe('avance de la actividad comercial ligada', () => {
   it('enviada la deja por validar y aprobada la finaliza', () => {
     expect(avanceActividadPorEstado('SENT')).toBe('Por Validar');

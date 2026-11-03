@@ -4,6 +4,7 @@ import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js
 import { PERMISSIONS } from '../common/permissions.js';
 import { closedStatusVariants } from '../activities/activity-status.js';
 import { appUrls } from '../common/app-urls.js';
+import { workDateColumn } from '../common/time/workday.js';
 
 export type ActivityFeedItem = {
   id: string;
@@ -213,7 +214,8 @@ export class ActivityFeedService {
               ...scope,
               deletedAt: null,
               status: 'SENT',
-              validUntil: { gte: now, lte: threeDays },
+              // El último día todavía se puede firmar: es el que más urge avisar.
+              validUntil: { gte: workDateColumn(now), lte: threeDays },
             },
             orderBy: { validUntil: 'asc' },
             take: 6,

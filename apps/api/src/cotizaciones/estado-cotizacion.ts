@@ -15,6 +15,7 @@
  *
  * Módulo puro (sin Nest ni Prisma) para poder probarlo con jest.
  */
+import { workDateKey } from '../common/time/workday.js';
 
 export const ESTADO = {
   BORRADOR: 'BORRADOR',
@@ -106,6 +107,18 @@ export function motivoTransicionInvalida(desde: unknown, hacia: unknown): string
 }
 
 /**
+ * ¿Ya se acabó la vigencia? `validUntil` es un día de calendario guardado a medianoche UTC, y «válida
+ * hasta el 18» incluye todo el 18 en México. Compararlo como instante la vencía a las 18:00 del 17, y
+ * la tarea de las 6 am la marcaba vencida la mañana de su último día. En consultas, lo mismo es
+ * `validUntil >= workDateColumn(ahora)`.
+ */
+function vigenciaTerminada(validUntil: Date | string, hoy: Date): boolean {
+  const vence = new Date(validUntil);
+  if (Number.isNaN(vence.getTime())) return false;
+  return vence.toISOString().slice(0, 10) < workDateKey(hoy);
+}
+
+/**
  * ¿Sigue firmable desde el enlace público?
  *
  * Solo una enviada y dentro de vigencia. Antes se firmaba cualquier cotización con token —incluidas
@@ -128,12 +141,8 @@ export function puedeFirmarse(input: {
     return { ok: false, motivo: 'Esta cotización todavía no se ha enviado.' };
   }
 
-  const vence = input.validUntil ? new Date(input.validUntil) : null;
-  if (vence && !Number.isNaN(vence.getTime())) {
-    const hoy = input.hoy ?? new Date();
-    if (vence.getTime() < hoy.getTime()) {
-      return { ok: false, motivo: 'Esta cotización ya venció. Pide una actualización a tu asesor.' };
-    }
+  if (input.validUntil && vigenciaTerminada(input.validUntil, input.hoy ?? new Date())) {
+    return { ok: false, motivo: 'Esta cotización ya venció. Pide una actualización a tu asesor.' };
   }
   return { ok: true };
 }
@@ -142,9 +151,7 @@ export function puedeFirmarse(input: {
 export function debeVencer(input: { estado: unknown; validUntil?: Date | string | null; hoy?: Date }): boolean {
   if (estadoDesdeDb(input.estado) !== ESTADO.ENVIADA) return false;
   if (!input.validUntil) return false;
-  const vence = new Date(input.validUntil);
-  if (Number.isNaN(vence.getTime())) return false;
-  return vence.getTime() < (input.hoy ?? new Date()).getTime();
+  return vigenciaTerminada(input.validUntil, input.hoy ?? new Date());
 }
 
 /** Estado de la actividad comercial ligada, según el estado de su cotización. */

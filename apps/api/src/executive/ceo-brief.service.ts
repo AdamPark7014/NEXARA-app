@@ -128,7 +128,7 @@ export class CeoBriefService {
       // Cotizaciones enviadas que vencen pronto.
       seguro<DatosCeo['cotizaciones']>({ porVencer: 0, monto: 0, dias: DIAS_COTIZACION_POR_VENCER }, async () => {
         const r = await this.prisma.cotizacion.aggregate({
-          where: { ...tw, deletedAt: null, status: 'SENT', validUntil: { gte: inicioHoy, lt: vencenAntes } } as any,
+          where: { ...tw, deletedAt: null, status: 'SENT', validUntil: { gte: hoyColumna, lt: vencenAntes } } as any,
           _count: { _all: true },
           _sum: { total: true },
         });

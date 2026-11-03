@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { appUrls } from '../common/app-urls.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
-import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
+import { WORKDAY_TIMEZONE, workDateColumn } from '../common/time/workday.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { etapaDeSeguimiento, HORAS_BORRADOR, textoBorradores, textoSeguimiento } from './seguimiento-cotizacion.js';
@@ -88,7 +88,7 @@ export class SeguimientoCotizacionService {
         borradorAvisadoAt: null,
         createdAt: { lte: limite },
         createdById: { not: null },
-        OR: [{ validUntil: null }, { validUntil: { gte: ahora } }],
+        OR: [{ validUntil: null }, { validUntil: { gte: workDateColumn(ahora) } }],
       },
       select: { id: true, createdById: true, companyId: true },
       take: 500,

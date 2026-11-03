@@ -161,7 +161,7 @@ export class DireccionService {
     const directivos = new Set(org.filter((u) => u.roleKey === 'ceo').map((u) => u.id));
 
     const contar = (fn: () => Promise<number>) => this.seguro<number | null>(null, fn);
-    const hoyInicio = new Date(now);
+    const hoyInicio = workDateColumn(now);
     const porVencerHasta = new Date(now.getTime() + DIAS_COTIZACION_POR_VENCER * 86_400_000);
     const [cotBorrador, cotEnviadas, cotPorVencer, cotTotal] = await Promise.all([
       contar(() => this.prisma.cotizacion.count({ where: { ...tw, deletedAt: null, status: 'DRAFT' } as never })),
