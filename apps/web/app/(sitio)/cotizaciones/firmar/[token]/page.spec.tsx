@@ -85,6 +85,35 @@ describe("firmar cotización", () => {
     expect(await screen.findByText("Gracias, tu firma quedó registrada.")).toBeTruthy();
   });
 
+  it("si ya no se firma, dice por qué y no ofrece el formulario", async () => {
+    responder(() => json({ ...cotizacion, status: "EXPIRED", motivoSinFirma: "Esta cotización ya venció. Pide una actualización a tu asesor." }));
+    render(<FirmarCotizacionPage />);
+    expect(await screen.findByText("Esta cotización ya venció. Pide una actualización a tu asesor.")).toBeTruthy();
+    expect(screen.getByText("Vencida")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Firmar cotización" })).toBeNull();
+  });
+
+  it("no enseña renglones en cero, y las cuentas que quedan son las del total", async () => {
+    responder(() => json({ quoteNumber: "NEX-0008", issueDate: "2026-10-20", status: "SENT", currency: "MXN", subtotal: 100, taxTotal: 16, total: 116, items: [], motivoSinFirma: null }));
+    render(<FirmarCotizacionPage />);
+    expect(await screen.findByText("NEX-0008")).toBeTruthy();
+    for (const renglon of ["Descuento", "IEPS", "Retenciones"]) expect(screen.queryByText(renglon)).toBeNull();
+    expect(screen.getByText("IVA")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Firmar cotización" })).toBeTruthy();
+  });
+
+  it("al firmar, el estado pasa a Aprobada", async () => {
+    responder(
+      () => json({ ...cotizacion, status: "SENT", motivoSinFirma: null }),
+      () => json({ ok: true }),
+    );
+    render(<FirmarCotizacionPage />);
+    expect(await screen.findByText("Enviada")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Firmar cotización" }));
+    expect(await screen.findByText("Gracias, tu firma quedó registrada.")).toBeTruthy();
+    expect(screen.getByText("Aprobada")).toBeTruthy();
+  });
+
   it("sin red, la firma dice que no se pudo, sin el mensaje en inglés del navegador", async () => {
     const fetchMock = vi
       .fn()

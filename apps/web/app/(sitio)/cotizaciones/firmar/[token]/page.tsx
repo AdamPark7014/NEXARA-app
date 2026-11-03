@@ -21,12 +21,14 @@ type PublicQuote = {
   projectName?: string | null;
   currency: string;
   subtotal: number;
-  discountTotal: number;
+  discountTotal?: number;
   taxTotal: number;
   iepsTotal?: number;
   retentionTotal?: number;
   total: number;
   items: Array<{ id: number; name: string; qty: number; unitPrice: number; lineTotal: number }>;
+  /** Por qué ya no se firma (aprobada, vencida, rechazada). */
+  motivoSinFirma?: string | null;
 };
 
 /** La causa que dio el servidor; sin red o con una respuesta ilegible, el texto de respaldo. */
@@ -114,6 +116,7 @@ export default function FirmarCotizacionPage() {
       });
       if (!res.ok) throw new Error(await res.text());
       setSigned(true);
+      setQuote((q) => (q ? { ...q, status: "APPROVED" } : q));
     } catch (e) {
       // El aviso se queda junto al formulario: si el servidor rechazó el correo, se corrige ahí mismo
       // y «Firmar cotización» vuelve a intentarlo.
@@ -127,7 +130,11 @@ export default function FirmarCotizacionPage() {
       ? { texto: "Aprobada", clase: f.estadoAprobada }
       : quote?.status === "SENT"
         ? { texto: "Enviada", clase: f.estadoEnviada }
-        : { texto: "Borrador", clase: "" };
+        : quote?.status === "REJECTED"
+          ? { texto: "Rechazada", clase: "" }
+          : quote?.status === "EXPIRED"
+            ? { texto: "Vencida", clase: "" }
+            : { texto: "Borrador", clase: "" };
 
   return (
     <main className={i.servicioPagina} aria-label="Firma de cotización">
@@ -217,22 +224,28 @@ export default function FirmarCotizacionPage() {
               <span>Subtotal</span>
               <span>{formatMoney(quote.subtotal, quote.currency)}</span>
             </div>
-            <div>
-              <span>Descuento</span>
-              <span>{formatMoney(quote.discountTotal, quote.currency)}</span>
-            </div>
+            {quote.discountTotal ? (
+              <div>
+                <span>Descuento</span>
+                <span>{formatMoney(quote.discountTotal, quote.currency)}</span>
+              </div>
+            ) : null}
             <div>
               <span>IVA</span>
               <span>{formatMoney(quote.taxTotal, quote.currency)}</span>
             </div>
-            <div>
-              <span>IEPS</span>
-              <span>{formatMoney(quote.iepsTotal || 0, quote.currency)}</span>
-            </div>
-            <div>
-              <span>Retenciones</span>
-              <span>- {formatMoney(quote.retentionTotal || 0, quote.currency)}</span>
-            </div>
+            {quote.iepsTotal ? (
+              <div>
+                <span>IEPS</span>
+                <span>{formatMoney(quote.iepsTotal, quote.currency)}</span>
+              </div>
+            ) : null}
+            {quote.retentionTotal ? (
+              <div>
+                <span>Retenciones</span>
+                <span>- {formatMoney(quote.retentionTotal, quote.currency)}</span>
+              </div>
+            ) : null}
             <div className={f.total}>
               <span>Total</span>
               <span>{formatMoney(quote.total, quote.currency)}</span>
@@ -246,6 +259,10 @@ export default function FirmarCotizacionPage() {
             {signed ? (
               <p className={f.listo} role="status" aria-live="polite">
                 <PublicIcon name="check" size={20} /> Gracias, tu firma quedó registrada.
+              </p>
+            ) : quote.motivoSinFirma ? (
+              <p className={f.firmaNota} role="status">
+                {quote.motivoSinFirma}
               </p>
             ) : (
               <>

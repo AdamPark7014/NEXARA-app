@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { CotizacionesService } from './cotizaciones.service.js';
 import { CotizacionesCoreService } from './cotizaciones-core.service.js';
 import { CotizacionesController } from './cotizaciones.controller.js';
+import { CotizacionesPublicasController } from './cotizaciones-publicas.controller.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { WorkflowModule } from '../workflow/workflow.module.js';
@@ -23,7 +24,7 @@ import { SeguimientoCotizacionService } from './seguimiento-cotizacion.service.j
     forwardRef(() => SmartQuoteModule),
     AiModule,
   ],
-  controllers: [CotizacionesController],
+  controllers: [CotizacionesPublicasController, CotizacionesController],
   providers: [CotizacionesService, CotizacionesCoreService, CotizarFraseService, RedactarTextosService, SeguimientoCotizacionService],
   exports: [CotizacionesService, CotizacionesCoreService],
 })

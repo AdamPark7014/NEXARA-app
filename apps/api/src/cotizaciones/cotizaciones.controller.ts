@@ -21,7 +21,6 @@ import { CreateCotizacionDto } from './dto/create-cotizacion.dto.js';
 import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { MarcarEnviadaDto } from './dto/marcar-enviada.dto.js';
-import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
 import { AgregarPaqueteDto, LigarActividadDto, RechazarCotizacionDto } from './dto/rechazar-cotizacion.dto.js';
 import { AsignarCotizacionDto } from './dto/asignar-cotizacion.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -453,21 +452,5 @@ export class CotizacionesController {
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.cotizacionesService.ligarActividad(id, dto.activityId, companyId);
-  }
-
-  @Get('public/:token')
-  getPublic(@Param('token') token: string) {
-    return this.cotizacionesService.getPublicByToken(token);
-  }
-
-  @Post('public/:token/sign')
-  signPublic(@Param('token') token: string, @Body() dto: SignCotizacionDto) {
-    return this.cotizacionesService.signByToken(token, dto);
-  }
-
-  /** El cliente rechaza con motivo desde el enlace, sin tener que escribir un correo. */
-  @Post('public/:token/rechazar')
-  rechazarPublic(@Param('token') token: string, @Body() dto: RechazarCotizacionDto) {
-    return this.cotizacionesService.rechazarPorToken(token, dto.motivo, dto.nombre);
   }
 }
