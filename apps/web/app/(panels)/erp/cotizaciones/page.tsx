@@ -1,5 +1,6 @@
 "use client";
 
+import { useFiltrosEnUrl } from "@/lib/regreso";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -198,13 +199,13 @@ export default function CotizacionesPage() {
     void cargar();
   }, [cargar]);
 
-  // Los avisos de Hoy llegan aquí con el filtro puesto.
-  useEffect(() => {
-    const qs = new URLSearchParams(window.location.search);
-    const pedido = qs.get("estado");
-    if (pedido && (ESTADOS as readonly string[]).includes(pedido)) setEstado(pedido as EstadoCotizacion);
-    if (qs.get("sinProyecto")) setSoloSinProyecto(true);
-  }, []);
+  // Los avisos de Hoy llegan aquí con el filtro puesto, y al volver de una ficha siguen los tuyos.
+  useFiltrosEnUrl({ q, segmento, estado, sinProyecto: soloSinProyecto ? "1" : null }, (leidos) => {
+    if (leidos.q) setQ(leidos.q);
+    if (leidos.segmento) setSegmento(leidos.segmento as Segmento);
+    if (leidos.estado && (ESTADOS as readonly string[]).includes(leidos.estado)) setEstado(leidos.estado as EstadoCotizacion);
+    if (leidos.sinProyecto) setSoloSinProyecto(true);
+  });
 
   const abrirDecision = async (row: CotizacionRow, tipo: "ganada" | "perdida") => {
     if (!token) return;

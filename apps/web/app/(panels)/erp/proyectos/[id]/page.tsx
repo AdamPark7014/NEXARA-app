@@ -1,5 +1,6 @@
 "use client";
 
+import { conRegreso, useRegreso } from "@/lib/regreso";
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -185,6 +186,7 @@ export default function ProyectoDetallePage() {
   const id = Number(params?.id);
   const router = useRouter();
   const { user, token } = useUser();
+  const regreso = useRegreso({ href: "/erp/proyectos", label: "Proyectos" });
   const accesoCostos = useAccesoCostos(token);
   const hoy = useMemo(() => hoyISO(), []);
 
@@ -466,7 +468,7 @@ export default function ProyectoDetallePage() {
       ) : null}
       <RecordPage
         className={styles.pagina}
-        breadcrumbs={[{ label: "Proyectos", href: "/erp/proyectos" }, { label: p.title }]}
+        breadcrumbs={[regreso, { label: p.title }]}
         icon={<AccountTreeOutlinedIcon />}
         kind={p.projectType ? KIND_POR_TIPO[p.projectType] : undefined}
         statusLabel={ESTADO_PROYECTO_LABEL[p.status] ?? "Sin estado"}
@@ -481,7 +483,15 @@ export default function ProyectoDetallePage() {
         title={p.title}
         person={p.responsable ? { name: p.responsable.nombre, role: "Responsable" } : undefined}
         meta={[
-          ...(p.client?.name ? [{ icon: <BusinessOutlinedIcon fontSize="inherit" />, label: p.client.name }] : []),
+          ...(p.client?.name
+            ? [
+                {
+                  icon: <BusinessOutlinedIcon fontSize="inherit" />,
+                  label: p.client.name,
+                  ...(clienteDeVenta ? { href: conRegreso(`/erp/clientes/${clienteDeVenta}`, `/erp/proyectos/${p.id}`) } : {}),
+                },
+              ]
+            : []),
           { icon: <CategoryOutlinedIcon fontSize="inherit" />, label: getServiceProjectTypeLabel(p.projectType) },
           ...(p.siteCount != null
             ? [{ icon: <PlaceOutlinedIcon fontSize="inherit" />, label: `${p.siteCount} sitio${p.siteCount === 1 ? "" : "s"}` }]

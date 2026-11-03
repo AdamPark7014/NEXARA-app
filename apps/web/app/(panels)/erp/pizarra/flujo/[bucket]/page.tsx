@@ -1,5 +1,6 @@
 "use client";
 
+import { aqui, conRegreso, useFiltrosEnUrl } from "@/lib/regreso";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
@@ -71,6 +72,14 @@ export default function FlujoBucketPage() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
+  // Al volver de una actividad siguen el rango y lo que buscabas.
+  useFiltrosEnUrl({ q: busqueda, rango: preset, desde: rango.desde, hasta: rango.hasta }, (leidos) => {
+    if (leidos.q) setBusqueda(leidos.q);
+    if (leidos.rango) {
+      setPreset(leidos.rango as RangoPreset);
+      setRango({ desde: leidos.desde, hasta: leidos.hasta });
+    }
+  });
 
   const cargar = useCallback(async () => {
     if (!token || !bucket) return;
@@ -226,7 +235,7 @@ export default function FlujoBucketPage() {
             rows={visibles}
             rowKey={(i) => i.id}
             onRowClick={(i) => {
-              if (i.activityId) router.push(`/erp/actividades/${i.activityId}`);
+              if (i.activityId) router.push(conRegreso(`/erp/actividades/${i.activityId}`, aqui()));
             }}
             flush
             ariaLabel={WORKFLOW_BUCKET_LABELS[bucket]}

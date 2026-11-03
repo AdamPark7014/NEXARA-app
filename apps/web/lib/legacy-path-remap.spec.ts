@@ -57,6 +57,9 @@ describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
   it('en superficie Core, los proyectos de OPS abren el mismo proyecto en /erp', () => {
     expect(coreSurfaceRedirect('/ops/projects')).toBe('/erp/proyectos');
     expect(coreSurfaceRedirect('/ops/projects/42')).toBe('/erp/proyectos/42');
+    // Un aviso viejo con el proyecto en la query abre su ficha, no la lista.
+    expect(coreSurfaceRedirect('/ops/projects', 'highlight=42')).toBe('/erp/proyectos/42');
+    expect(coreSurfaceRedirect('/ops/projects', 'highlight=x')).toBe('/erp/proyectos');
     expect(coreSurfaceRedirect('/ops/proyectos/42/')).toBe('/erp/proyectos/42');
     // Lo que ya vive en /erp no se toca.
     expect(coreSurfaceRedirect('/erp/proyectos/42')).toBeNull();

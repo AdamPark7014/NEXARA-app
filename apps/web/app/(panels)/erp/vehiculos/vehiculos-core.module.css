@@ -136,6 +136,12 @@
   gap: 12px;
 }
 
+.viajeTop[data-resaltada="true"] {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
 .viajeTop {
   display: flex;
   align-items: flex-start;

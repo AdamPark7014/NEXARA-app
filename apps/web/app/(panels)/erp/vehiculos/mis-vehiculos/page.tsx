@@ -55,6 +55,17 @@ export default function MisVehiculosPage() {
   const verGps = puedeVerGpsDireccion(user);
 
   const [datos, setDatos] = useState<MisVehiculos>({ activa: null, solicitudes: [], disponibles: [] });
+  /** Un aviso abre esta pantalla con `?highlight=<solicitud>`: se lleva a ella y se marca. */
+  const [resaltada, setResaltada] = useState<number | null>(null);
+  useEffect(() => {
+    const id = Number(new URLSearchParams(window.location.search).get("highlight"));
+    if (Number.isInteger(id) && id > 0) setResaltada(id);
+  }, []);
+  useEffect(() => {
+    if (resaltada && datos.solicitudes.some((s) => s.id === resaltada)) {
+      document.getElementById(`solicitud-${resaltada}`)?.scrollIntoView({ block: "center" });
+    }
+  }, [resaltada, datos.solicitudes]);
   const [cargando, setCargando] = useState(true);
   const [cargadoUnaVez, setCargadoUnaVez] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -263,7 +274,7 @@ export default function MisVehiculosPage() {
             {datos.solicitudes.map((s) => {
               const est = etiquetaEstatus(s.estatusAprobacion);
               return (
-                <li key={s.id} className={styles.viajeTop}>
+                <li key={s.id} id={`solicitud-${s.id}`} className={styles.viajeTop} data-resaltada={resaltada === s.id ? "true" : undefined}>
                   <div className={styles.filaVehiculo}>
                     <span className={styles.nombre}>{s.nombreVehiculo || "Vehículo"}</span>
                     <span className={`${styles.mini} ${styles.num}`}>

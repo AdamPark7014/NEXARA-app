@@ -5,6 +5,7 @@
  * Plantilla, asistencia, puntualidad, carga, permisos y productividad de órdenes de trabajo.
  */
 
+import { conRegreso } from "@/lib/regreso";
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
@@ -327,7 +328,7 @@ export default function HrKpisPage() {
                     {insights.workloadTop.map((w) => (
                       <li key={w.userId} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, gap: 8 }}>
                         <div style={{ minWidth: 0 }}>
-                          <Link href={`/erp/hr/${w.userId}`} style={{ fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}>{w.nombre}</Link>
+                          <Link href={conRegreso(`/erp/hr/${w.userId}`, "/erp/hr/kpis")} style={{ fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}>{w.nombre}</Link>
                           <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{[w.department, `${days(w.daysPresent)} con asistencia`].filter(Boolean).join(" · ")}</div>
                         </div>
                         <div style={{ textAlign: "right", flexShrink: 0 }}>

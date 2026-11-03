@@ -1,5 +1,6 @@
 "use client";
 
+import { useFiltrosEnUrl } from "@/lib/regreso";
 import Link from "next/link";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -83,10 +84,12 @@ export default function ClientesHubPage() {
   const buscador = useRef<HTMLInputElement>(null);
   const turno = useRef(0);
 
-  useEffect(() => {
-    const param = new URLSearchParams(window.location.search).get("sector");
-    if (param) setPedido(param.toUpperCase() as ClientSector);
-  }, []);
+  // Al volver de una ficha siguen el sector y lo que filtraste.
+  useFiltrosEnUrl({ sector: sector ? CLIENT_SECTOR_META[sector].slug : null, q, estado: estado === "TODOS" ? null : estado }, (leidos) => {
+    if (leidos.sector) setPedido(leidos.sector.toUpperCase() as ClientSector);
+    if (leidos.q) setQ(leidos.q);
+    if (leidos.estado) setEstado(leidos.estado as FiltroEstado);
+  });
 
   // Solo quien puede agregar (jefes con personal a cargo, administración, dirección) ve «Nuevo».
   useEffect(() => {

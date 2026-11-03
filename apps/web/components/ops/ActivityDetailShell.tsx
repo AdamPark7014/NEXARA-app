@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 import { getActivity, type ActivityDetail } from "@/lib/ops-activities-api";
 import { getActivitiesCanonicalPath } from "@/lib/section-views";
 import { conOrigen, leerOrigen, regresoDeOrigen, type OrigenActividad } from "@/lib/actividad-origen";
+import { conRegreso } from "@/lib/regreso";
 import { iniciarMiActividad } from "@/lib/my-activities-api";
 import { formatApiError } from "@/lib/erp-api";
 import { isCeoEmail } from "@/lib/activity-kinds";
@@ -44,6 +45,7 @@ import {
 } from "@/components/base";
 import ActivityKindIcon from "./ActivityKindIcon";
 import CostoActividad from "./CostoActividad";
+import TiempoDicho from "@/components/ops/TiempoDicho";
 import TiempoActividad from "./TiempoActividad";
 import { IcoCalendario, IcoCamara, IcoCliente, IcoSitio, RouteTabs, type RouteTab } from "./_piezas";
 import s from "./ActivityDetailShell.module.css";
@@ -432,14 +434,14 @@ export default function ActivityDetailShell({
     meta.push({
       icon: <IcoCliente />,
       label: activity.client.name,
-      href: core && clienteDeVenta ? `/erp/clientes/${clienteDeVenta}` : undefined,
+      href: core && clienteDeVenta ? conRegreso(`/erp/clientes/${clienteDeVenta}`, detailHref) : undefined,
     });
   }
   if (core && cotizacionOrigen) {
-    meta.push({ icon: <RequestQuoteOutlinedIcon fontSize="inherit" />, label: cotizacionOrigen.quoteNumber, href: `/erp/cotizaciones/${cotizacionOrigen.id}` });
+    meta.push({ icon: <RequestQuoteOutlinedIcon fontSize="inherit" />, label: cotizacionOrigen.quoteNumber, href: conRegreso(`/erp/cotizaciones/${cotizacionOrigen.id}`, detailHref) });
   }
   if (core && activity.project?.id) {
-    meta.push({ icon: <AccountTreeOutlinedIcon fontSize="inherit" />, label: activity.project.title, href: `/erp/proyectos/${activity.project.id}` });
+    meta.push({ icon: <AccountTreeOutlinedIcon fontSize="inherit" />, label: activity.project.title, href: conRegreso(`/erp/proyectos/${activity.project.id}`, detailHref) });
   }
   if (sitio) meta.push({ icon: <IcoSitio />, label: sitio });
   if (horario) meta.push({ icon: <IcoCalendario />, label: horario });
@@ -496,7 +498,7 @@ export default function ActivityDetailShell({
   push(
     "Proyecto",
     activity.project?.id && core ? (
-      <Link href={`/erp/proyectos/${activity.project.id}`} className={s.factLink}>
+      <Link href={conRegreso(`/erp/proyectos/${activity.project.id}`, detailHref)} className={s.factLink}>
         {activity.project.title} →
       </Link>
     ) : activity.project?.id ? (
@@ -581,7 +583,16 @@ export default function ActivityDetailShell({
               tiempoMaximoMin={activity.tiempoMaximoMin}
               minutosEstandar={(activity as { tiempoEstandarMin?: number | null }).tiempoEstandarMin ?? null}
               enCurso={(activity.assignees ?? []).some((m) => !m.retiradoAt && Boolean(m.sesionAbiertaDesde))}
-            />
+            >
+              <TiempoDicho
+                token={user?.token ?? ""}
+                activityId={activity.id}
+                relojMin={activity.minutosReales}
+                dichoMin={activity.tiempoDichoMin}
+                preguntar={activity.preguntarTiempo}
+                soyQuienEjecuta={Boolean(user?.id && activity.responsable?.id === user.id)}
+              />
+            </TiempoActividad>
           }
           aside={core ? <CostoActividad activityId={activity.id} /> : undefined}
         >

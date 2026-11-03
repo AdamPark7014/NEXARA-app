@@ -1,5 +1,6 @@
 "use client";
 
+import { reflejarEnUrl, useFiltrosEnUrl } from "@/lib/regreso";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import LibraryAddCheckOutlinedIcon from "@mui/icons-material/LibraryAddCheckOutlined";
@@ -73,20 +74,6 @@ const DESCRIPCION: Record<Vista, string> = {
   revision: "Evidencias que tu equipo ya envió y esperan tu visto bueno: revísalas y califícalas.",
   solicitudes: "Actividades que les pides a tus compañeros y las que te piden a ti.",
 };
-
-/** La URL dice en qué pestaña estás: «‹ regresar» desde una actividad vuelve a la misma. */
-function reflejarEnUrl(cambios: Record<string, string | null>) {
-  try {
-    const url = new URL(window.location.href);
-    for (const [k, v] of Object.entries(cambios)) {
-      if (v == null) url.searchParams.delete(k);
-      else url.searchParams.set(k, v);
-    }
-    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
-  } catch {
-    /* sin History API: la pestaña vale para esta visita */
-  }
-}
 
 function TarjetasCargando() {
   return (
@@ -178,6 +165,25 @@ export default function PizarraPage() {
       /* sin storage: queda «mias» */
     }
   }, []);
+
+  // Al volver de una actividad siguen el rango, el filtro y lo que buscabas.
+  useFiltrosEnUrl(
+    {
+      q: busqueda,
+      filtro: filtro === "todos" ? null : filtro,
+      rango: preset === "hoy" ? null : preset,
+      desde: preset === "hoy" ? null : rango.desde ?? null,
+      hasta: preset === "hoy" ? null : rango.hasta ?? null,
+    },
+    (leidos) => {
+      if (leidos.q) setBusqueda(leidos.q);
+      if (leidos.filtro) setFiltro(leidos.filtro as FiltroEquipo);
+      if (leidos.rango) {
+        setPreset(leidos.rango as RangoPreset);
+        setRango({ desde: leidos.desde, hasta: leidos.hasta });
+      }
+    },
+  );
 
   const desde = rango.desde ?? null;
   const hasta = rango.hasta ?? null;

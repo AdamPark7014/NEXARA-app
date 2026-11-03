@@ -103,12 +103,15 @@ export function coreSurfaceRedirect(
   }
 
   // Proyectos operativos: el mismo registro vive ahora en /erp/proyectos, con el mismo id.
+  const params = typeof search === 'string' ? new URLSearchParams(search) : (search ?? null);
   const proyecto = clean.match(/^\/ops\/(?:projects|proyectos)(?:\/(\d+))?(?:\/.*)?$/);
   if (proyecto) {
-    return proyecto[1] ? `/erp/proyectos/${proyecto[1]}` : '/erp/proyectos';
+    // Un aviso viejo trae el proyecto en `?highlight=`: abre su ficha, no la lista.
+    const resaltado = params?.get('highlight');
+    const id = proyecto[1] ?? (resaltado && /^\d+$/.test(resaltado) ? resaltado : null);
+    return id ? `/erp/proyectos/${id}` : '/erp/proyectos';
   }
 
-  const params = typeof search === 'string' ? new URLSearchParams(search) : (search ?? null);
   const activityId = Number(params?.get('activityId'));
   if (Number.isInteger(activityId) && activityId > 0) {
     if (/^\/ops\/(my-evidences|mis-evidencias|evidences|evidencias)$/.test(clean)) {

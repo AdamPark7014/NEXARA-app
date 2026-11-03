@@ -5,6 +5,7 @@
  * lo planeado y el tope, con un anillo que da la vuelta en el plan. Las cuentas son de
  * `medidorDeTiempo` (`lib/actividad-tiempos.ts`).
  */
+import type { ReactNode } from "react";
 import { formatoMinutos, medidorDeTiempo } from "@/lib/actividad-tiempos";
 import s from "./TiempoActividad.module.css";
 
@@ -17,6 +18,7 @@ export default function TiempoActividad({
   tiempoMaximoMin,
   minutosEstandar,
   enCurso = false,
+  children,
 }: {
   minutosPlan?: number | null;
   minutosReales?: number | null;
@@ -24,6 +26,8 @@ export default function TiempoActividad({
   /** Tiempo estándar (tabla + título): la analítica de cuánto debía tardar contra lo real. */
   minutosEstandar?: number | null;
   enCurso?: boolean;
+  /** Lo que dijo quien la ejecutó (`TiempoDicho`). */
+  children?: ReactNode;
 }) {
   const m = medidorDeTiempo({ minutosPlan, minutosReales, tiempoMaximoMin });
   if (m.estado === "sin_plan" && m.real === 0) return null;
@@ -62,6 +66,7 @@ export default function TiempoActividad({
         </p>
       ) : null}
       {m.tope != null ? <p className={s.pie}>Tope: {formatoMinutos(m.tope)}{tiempoMaximoMin ? "" : " (plan + 25 %)"}</p> : null}
+      {children}
     </section>
   );
 }
