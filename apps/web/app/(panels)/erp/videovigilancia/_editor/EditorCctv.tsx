@@ -16,6 +16,7 @@ import RedoRoundedIcon from "@mui/icons-material/RedoRounded";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import { Alert, Badge, Button, Input, Segmented } from "@/components/base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
@@ -56,6 +57,11 @@ import {
 } from "@/lib/cctv/niveles";
 import { conexionesDelSistema } from "@/lib/cctv/sistema";
 import { useCatalogo } from "@/lib/cctv/useCatalogo";
+import { useUser } from "@/components/UserContext";
+import { useExistencias } from "@/lib/cctv/useExistencias";
+import { PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { gruposDeEquipos } from "@/lib/cctv/sistema";
+import PasarACotizacion from "./PasarACotizacion";
 import { camaraEnMetros, coberturaCamara, type PoligonoCobertura } from "@/lib/cctv/visibilidad";
 import { ConflictoDeVersion, ETIQUETA_ESTADO_DISENO, guardarDiseno, subirCroquis, type Diseno, type EstadoDiseno } from "@/lib/cctv/api";
 import { LEYENDA_NIVELES, COLOR_NIVEL } from "./colores";
@@ -186,6 +192,11 @@ export default function EditorCctv({
   const [disenosArmados, setDisenosArmados] = useState(0);
   const [leyendoFicha, setLeyendoFicha] = useState(false);
   const catalogo = useCatalogo(token);
+  const existencias = useExistencias(token, catalogo);
+  const { user } = useUser();
+  const puedeCotizar = hasPermission(user, PERMISSIONS.COTIZACIONES_ACCESS);
+  const [cotizando, setCotizando] = useState(false);
+  const [cotizacionId, setCotizacionId] = useState<number | null>(diseno.cotizacionId);
   const [pestana, setPestana] = useState<Pestana>("seleccion");
   const [medida, setMedida] = useState<{ a: Punto; b: Punto } | null>(null);
   const [textoEn, setTextoEn] = useState<Punto | null>(null);
@@ -508,6 +519,16 @@ export default function EditorCctv({
           <Button iconStart={<UploadFileOutlinedIcon fontSize="small" />} loading={subiendo} onClick={() => archivo.current?.click()}>
             {plano.croquis ? "Cambiar croquis" : "Subir croquis"}
           </Button>
+          {puedeCotizar ? (
+            <Button
+              iconStart={<RequestQuoteOutlinedIcon fontSize="small" />}
+              onClick={() => setCotizando(true)}
+              disabled={!totalCamaras && !gruposDeEquipos(raiz, meta.grabacion).length}
+              title={cotizacionId ? "Actualiza las partidas del diseño en su cotización" : "Crea una cotización con los equipos, el cable y el plano"}
+            >
+              {cotizacionId ? "Actualizar cotización" : "Pasar a cotización"}
+            </Button>
+          ) : null}
           <Button
             variant="primary"
             iconStart={<DescriptionOutlinedIcon fontSize="small" />}
@@ -587,6 +608,7 @@ export default function EditorCctv({
               onElegirEquipo={elegirEquipo}
               onAgregar={() => setAgregando(true)}
               onArmar={() => setArmando(true)}
+              existencias={existencias.porClave}
               onElegirCamara={(m) => {
                 setModeloNuevo(m);
                 setHerramienta("camara");
@@ -937,6 +959,20 @@ export default function EditorCctv({
               setAgregando(false);
               setLeyendoFicha(true);
             }}
+          />
+        ) : null}
+        {cotizando ? (
+          <PasarACotizacion
+            token={token}
+            disenoId={diseno.id}
+            raiz={raiz}
+            grabacion={meta.grabacion}
+            cotizacionId={cotizacionId}
+            disponibilidad={existencias.porClave}
+            filas={catalogo.filas}
+            guardar={guardar}
+            onCerrar={() => setCotizando(false)}
+            onHecho={setCotizacionId}
           />
         ) : null}
         {armando ? (

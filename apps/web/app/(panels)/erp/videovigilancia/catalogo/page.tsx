@@ -2,17 +2,21 @@
 
 /**
  * Videovigilancia · catálogo de equipos (mockup aprobado 01-11-2026): lo que se puede colocar en la
- * maqueta, con su modelo 3D y su ficha. La lista base viene en el código; lo que agrega cada empresa,
- * de `cctv_equipos`. Las existencias de Almacén llegan en su fase.
+ * maqueta, con su modelo 3D, su ficha y sus existencias. La lista base viene en el código; lo que agrega
+ * cada empresa, de `cctv_equipos`. Las piezas salen de Almacén y de CT: aquí no se guarda ninguna.
  */
 import { claveMarca, marcaCorta } from "@/lib/cctv/marca";
 import { useEffect, useMemo, useState } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import { Alert, Button, EmptyState, Input, ModulePage, Skeleton } from "@/components/base";
 import { useUser } from "@/components/UserContext";
-import { consultarAcceso, type EquipoParaGuardar } from "@/lib/cctv/api";
+import { consultarAcceso, fichaDesdeCt, type EquipoParaGuardar } from "@/lib/cctv/api";
+import { esModeloReal, pesos, type Disponibilidad } from "@/lib/cctv/existencias";
+import { useExistencias } from "@/lib/cctv/useExistencias";
+import { PERMISSIONS, hasPermission } from "@/lib/permissions";
 import {
   ETIQUETA_FAMILIA,
   ETIQUETA_TIPO_CAMARA,
@@ -26,6 +30,7 @@ import {
 } from "@/lib/cctv/catalogo";
 import { fotoDeTipo } from "@/lib/cctv/sistema";
 import { useCatalogo } from "@/lib/cctv/useCatalogo";
+import BuscarEnCt from "../_editor/BuscarEnCt";
 import DialogoEquipo from "../_editor/DialogoEquipo";
 import MemoriaTecnica from "../_editor/MemoriaTecnica";
 import styles from "./catalogo.module.css";
@@ -51,14 +56,31 @@ const ORDEN: readonly Familia[] = ["camaras", "grabacion", "acceso", "alarmas", 
 
 const ESTADO: Readonly<Record<Tarjeta["estado"], string>> = { ficha: "Ficha leída", manual: "Capturada a mano", falta: "Falta su ficha" };
 
+/** Como en el mockup: en almacén, en CT y precio. Lo que no se sabe se dice, no se inventa. */
+function StockDeTarjeta({ d, listo }: { d: Disponibilidad | undefined; listo: boolean }) {
+  if (!listo && !d) return <span className={styles.stock} aria-hidden="true">&nbsp;</span>;
+  return (
+    <span className={styles.stock}>
+      <span>
+        <b>{d?.almacen?.piezas ?? 0}</b> en almacén
+      </span>
+      <span>{d?.ct ? <><b>{d.ct.piezas}</b> en CT</> : "No está en CT"}</span>
+      {d?.ct && d.ct.precio > 0 ? <b className={styles.precio}>{pesos(d.ct.precio)}</b> : null}
+    </span>
+  );
+}
+
 export default function CatalogoPage() {
-  const { token } = useUser();
+  const { token, user } = useUser();
   const [acceso, setAcceso] = useState<boolean | null>(null);
   const catalogo = useCatalogo(acceso ? token : null);
+  const existencias = useExistencias(acceso ? token : null, catalogo);
+  const [buscandoCt, setBuscandoCt] = useState(false);
+  const [fichaCt, setFichaCt] = useState<Awaited<ReturnType<typeof fichaDesdeCt>> | null>(null);
   const [familia, setFamilia] = useState<Familia | "todo">("todo");
   const [buscar, setBuscar] = useState("");
   const [marca, setMarca] = useState("");
-  const [dialogo, setDialogo] = useState<{ fila: FilaCatalogo | null; base: Partial<EquipoParaGuardar> | null } | null>(null);
+  const [dialogo, setDialogo] = useState<{ id: string | null; fila: FilaCatalogo | null; base: Partial<EquipoParaGuardar> | null } | null>(null);
   const [leyendoFicha, setLeyendoFicha] = useState(false);
 
   useEffect(() => {
@@ -126,13 +148,18 @@ export default function CatalogoPage() {
     <div className={styles.pagina}>
       <ModulePage
         title="Catálogo de equipos"
-        description="Lo que coloques en la maqueta sale de aquí, con su modelo 3D y su ficha."
+        description="Lo que coloques en la maqueta sale de aquí, con su modelo 3D y sus existencias de Almacén y CT."
         breadcrumbs={[{ label: "Clientes y obra" }, { label: "Videovigilancia", href: "/erp/videovigilancia" }, { label: "Catálogo" }]}
         icon={<VideocamOutlinedIcon />}
         secondaryActions={
-          <Button iconStart={<AddRoundedIcon />} onClick={() => setDialogo({ fila: null, base: null })}>
-            Agregar a mano
-          </Button>
+          <>
+            <Button iconStart={<AddRoundedIcon />} onClick={() => setDialogo({ id: null, fila: null, base: null })}>
+              Agregar a mano
+            </Button>
+            <Button iconStart={<SearchRoundedIcon />} onClick={() => setBuscandoCt(true)}>
+              Buscar en CT
+            </Button>
+          </>
         }
         primaryAction={
           <Button variant="primary" iconStart={<UploadFileOutlinedIcon />} onClick={() => setLeyendoFicha(true)}>
@@ -169,7 +196,7 @@ export default function CatalogoPage() {
             ) : (
               <div className={styles.rejilla}>
                 {visibles.map((t) => (
-                  <button key={t.id} type="button" className={styles.tarjeta} onClick={() => setDialogo(t.fila ? { fila: t.fila, base: null } : { fila: null, base: t.base })} title={t.fila ? "Editar" : "Agregar uno parecido"}>
+                  <button key={t.id} type="button" className={styles.tarjeta} onClick={() => setDialogo(t.fila ? { id: t.id, fila: t.fila, base: null } : { id: t.id, fila: null, base: t.base })} title={t.fila ? "Editar" : "Agregar uno parecido"}>
                     <span className={styles.foto}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={t.foto} alt="" loading="lazy" />
@@ -177,6 +204,7 @@ export default function CatalogoPage() {
                     <span className={styles.tipo}>{t.etiquetaTipo}</span>
                     <b className={styles.nombre}>{t.nombre}</b>
                     <span className={styles.specs}>{t.specs}</span>
+                    {esModeloReal(t) ? <StockDeTarjeta d={existencias.porClave.get(t.id)} listo={!existencias.cargando} /> : null}
                     <span className={t.estado === "falta" ? styles.estadoFalta : styles.estadoBien}>{ESTADO[t.estado]}</span>
                   </button>
                 ))}
@@ -205,19 +233,42 @@ export default function CatalogoPage() {
             setDialogo(null);
             setLeyendoFicha(true);
           }}
+          disponibilidad={dialogo.id ? (existencias.porClave.get(dialogo.id) ?? null) : null}
+          puedeDarDeAlta={hasPermission(user, PERMISSIONS.CATALOG_MANAGE)}
+          onExistencias={() => void catalogo.recargar()}
+        />
+      ) : null}
+      {buscandoCt && token ? (
+        <BuscarEnCt
+          token={token}
+          titulo="Agregar desde CT"
+          accion="Agregar"
+          onCerrar={() => setBuscandoCt(false)}
+          onElegir={async (r) => {
+            const f = await fichaDesdeCt(token, r.clave);
+            setFichaCt(f);
+            setBuscandoCt(false);
+            setLeyendoFicha(true);
+          }}
         />
       ) : null}
       {leyendoFicha && token ? (
         <MemoriaTecnica
           token={token}
-          onCerrar={() => setLeyendoFicha(false)}
+          fichaInicial={fichaCt}
+          onCerrar={() => {
+            setLeyendoFicha(false);
+            setFichaCt(null);
+          }}
           onGuardado={() => {
             setLeyendoFicha(false);
+            setFichaCt(null);
             void catalogo.recargar();
           }}
           onManual={() => {
             setLeyendoFicha(false);
-            setDialogo({ fila: null, base: null });
+            setFichaCt(null);
+            setDialogo({ id: null, fila: null, base: null });
           }}
         />
       ) : null}

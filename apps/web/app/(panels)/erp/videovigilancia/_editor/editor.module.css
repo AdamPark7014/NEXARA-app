@@ -2375,3 +2375,10 @@
   font-weight: 600;
   white-space: nowrap;
 }
+
+.equipoStock {
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--ui-brand-text);
+}

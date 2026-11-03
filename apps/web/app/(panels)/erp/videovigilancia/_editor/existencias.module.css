@@ -1,0 +1,363 @@
+/* Buscar en CT y pasar a cotización: hojas sobre todo lo demás, como el resto de los diálogos del diseñador. */
+.fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: var(--ui-s4);
+  background: rgba(15, 20, 28, 0.44);
+  backdrop-filter: blur(3px);
+}
+
+.hoja {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+  width: min(720px, 100%);
+  max-height: min(84vh, 760px);
+  padding: var(--ui-s4);
+  border-radius: 16px;
+  background: var(--ui-surface);
+  box-shadow: 0 24px 70px rgba(10, 14, 20, 0.32);
+  overflow: hidden;
+  animation: aparece 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.hojaAncha {
+  width: min(880px, 100%);
+}
+
+@keyframes aparece {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+}
+
+.cabeza {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+}
+
+.cabeza h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.cabeza p {
+  margin: 2px 0 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.cerrar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ui-hover);
+  color: var(--ui-fg-2);
+  cursor: pointer;
+}
+
+.busqueda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s2);
+}
+
+.fichas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fichas button {
+  height: 27px;
+  padding: 0 11px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ui-fg-2);
+  font: inherit;
+  font-size: var(--ui-fs-label);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fichas button[aria-pressed="true"] {
+  border-color: var(--ui-fg);
+  background: var(--ui-fg);
+  color: var(--ui-surface);
+}
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 220px;
+  overflow-y: auto;
+}
+
+.resultado {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--ui-s3);
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.resultadoFoto {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 9px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.resultadoFoto img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.resultadoTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.resultadoTexto b {
+  font-size: 13px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.resultadoTexto span {
+  display: -webkit-box;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ui-fg-3);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.resultadoDatos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.resultadoDatos b {
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.resultadoDatos span {
+  font-size: 12px;
+  color: var(--ui-fg-3);
+}
+
+.vacio {
+  margin: auto;
+  padding: var(--ui-s5);
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+  text-align: center;
+}
+
+.tablaCaja {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tabla th {
+  position: sticky;
+  top: 0;
+  padding: 8px 12px;
+  background: var(--ui-surface-2, var(--ui-surface));
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-label);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.tabla td {
+  padding: 9px 12px;
+  border-top: 1px solid var(--ui-border);
+  vertical-align: top;
+}
+
+.tabla td b {
+  display: block;
+  font-weight: 600;
+}
+
+.tabla td span {
+  font-size: 12px;
+  color: var(--ui-fg-3);
+}
+
+.tabla .numero {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tabla .falta {
+  color: var(--ui-warning-text);
+}
+
+.tabla .sinPrecio {
+  color: var(--ui-warning-text);
+  font-weight: 600;
+}
+
+.totales {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+}
+
+.totales b {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.nota {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ui-fg-3);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.botonLiga,
+.botonLigaSec {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--ui-radius-sm);
+  font-size: var(--ui-fs-label);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.botonLiga {
+  background: var(--ui-brand);
+  color: var(--ui-brand-fg, #fff);
+}
+
+.botonLigaSec {
+  border: 1px solid var(--ui-border-strong);
+  color: var(--ui-fg);
+}
+
+.hecho {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+  font-size: var(--ui-fs-body, 14px);
+}
+
+.hecho p {
+  margin: 0;
+}
+
+.planosOcultos {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 1200px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Existencias de un modelo, dentro de su ficha. */
+.existencias {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+}
+
+.existenciasFila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+  font-size: 13px;
+}
+
+.existenciasFila > span {
+  min-width: 0;
+}
+
+.existenciasFila small {
+  display: block;
+  font-size: 12px;
+  color: var(--ui-fg-3);
+}
+
+@media (max-width: 640px) {
+  .resultado {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .resultadoFoto {
+    width: 44px;
+    height: 44px;
+  }
+
+  .resultadoDatos {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .resultado > button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

@@ -135,6 +135,11 @@ export class CctvDisenosService {
     await this.exigirAcceso(actor);
     const empresa = requireCompanyId(companyId);
     const e = validarEquipoCatalogo(cuerpo);
+    // Editar la ficha no la desliga de Almacén: la pantalla no manda el producto.
+    if (e.productId === null) {
+      const actual = await this.prisma.cctvEquipo.findFirst({ where: { id, companyId: empresa }, select: { productId: true } });
+      e.productId = actual?.productId ?? null;
+    }
     await this.revisarEquipo(empresa, e, id);
     const r = await this.prisma.cctvEquipo.updateMany({ where: { id, companyId: empresa, archivadoAt: null }, data: this.datosEquipo(e) });
     if (!r.count) throw new NotFoundException('Equipo no encontrado');

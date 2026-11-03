@@ -46,12 +46,15 @@ const COLORES: ReadonlyArray<{ id: FormaFicha["color"]; etiqueta: string; fondo:
 export default function MemoriaTecnica({
   token,
   archivoInicial,
+  fichaInicial,
   onCerrar,
   onGuardado,
   onManual,
 }: {
   token: string;
   archivoInicial?: File | null;
+  /** Lo que ya se sabe de él: un producto de CT, para revisarlo y completarlo. */
+  fichaInicial?: (FichaLeida & { ct?: string; sinLectura?: boolean }) | null;
   onCerrar: () => void;
   /** Recibe el id con el que queda en el catálogo (`db-7`). */
   onGuardado: (id: string) => void;
@@ -60,8 +63,8 @@ export default function MemoriaTecnica({
 }) {
   const [leyendo, setLeyendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ficha, setFicha] = useState<FichaLeida | null>(null);
-  const [forma, setForma] = useState<FormaFicha | null>(null);
+  const [ficha, setFicha] = useState<(FichaLeida & { ct?: string; sinLectura?: boolean }) | null>(fichaInicial ?? null);
+  const [forma, setForma] = useState<FormaFicha | null>(() => (fichaInicial ? formaDesdeFicha(fichaInicial) : null));
   const [guardando, setGuardando] = useState(false);
   const [sinWebGL, setSinWebGL] = useState(() => !hayWebGL());
   const [encima, setEncima] = useState(false);
@@ -151,7 +154,10 @@ export default function MemoriaTecnica({
     setGuardando(true);
     setError(null);
     try {
-      const r = await agregarAlCatalogo(token, equipoDesdeForma(forma, { archivo: ficha.archivo, hojas: ficha.hojas }, visor.current?.foto() ?? null));
+      const armado = equipoDesdeForma(forma, { archivo: ficha.archivo, hojas: ficha.hojas }, visor.current?.foto() ?? null);
+      // De CT queda ligado a su clave: de ahí salen sus piezas y su precio aunque el modelo se escriba distinto.
+      const conCt = ficha.ct ? { ...armado, datos: { ...armado.datos, ficha: { ...(armado.datos?.ficha as object | undefined), ct: ficha.ct } } } : armado;
+      const r = await agregarAlCatalogo(token, conCt);
       onGuardado(`db-${r.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar.");
@@ -169,6 +175,10 @@ export default function MemoriaTecnica({
           <span>
             {ficha?.archivo
               ? `${ficha.archivo} · ${ficha.hojas} ${ficha.hojas === 1 ? "hoja" : "hojas"} · leído en ${(ficha.ms / 1000).toFixed(1)} s`
+              : ficha?.ct
+                ? ficha.sinLectura
+                  ? `De CT, clave ${ficha.ct}. No se pudo leer su descripción: captura lo que falte.`
+                  : `De CT, clave ${ficha.ct}. Trae lo que dice CT: revísalo y completa lo que falte con su ficha.`
               : ficha
                 ? "Armado con lo que escribiste. Solo trae lo que dijiste: complétalo con su ficha."
                 : "Sube el PDF del fabricante: la IA llena la ficha y tú la revisas antes de guardar."}
