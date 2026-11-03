@@ -174,6 +174,16 @@ export class ControlVista {
     return destino.copy(r.origin).addScaledVector(r.direction, t);
   }
 
+  /** Un arrastre que empezó sobre algo puesto encima del lienzo, como los puntos de los equipos. */
+  tomarPuntero(e: PointerEvent) {
+    this.alBajar(e);
+  }
+
+  /** La rueda sobre algo puesto encima del lienzo mueve la vista igual. */
+  tomarRueda(e: WheelEvent) {
+    this.alRodar(e);
+  }
+
   private readonly alBajar = (e: PointerEvent) => {
     if (!this.enabled) return;
     this.avisos.alEmpezar?.();

@@ -5,6 +5,7 @@
  * el 29-10-2026 (lienzo «Diseñador de videovigilancia — mockup», artboard 0).
  */
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
@@ -76,7 +77,11 @@ export default function VideovigilanciaPage() {
       render: (d) => (
         <div>
           <div className={styles.nombre}>{d.nombre}</div>
-          <div className={styles.tenue}>{d.cotizacionId ? `Cotización ligada` : "Sin cotización ligada"}</div>
+          {d.cotizacionId ? (
+            <Link className={styles.ligaCotizacion} href={`/erp/cotizaciones/${d.cotizacionId}`} onClick={(e) => e.stopPropagation()}>
+              Ver su cotización
+            </Link>
+          ) : null}
         </div>
       ),
     },
@@ -153,7 +158,7 @@ export default function VideovigilanciaPage() {
         empty={!cargando && !disenos.length}
         emptyState={{
           title: "Todavía no hay diseños",
-          description: "Crea el primero con el croquis del sitio: Core lee los muros, tú calibras con una cota y colocas las cámaras.",
+          description: "Descríbele el sitio a la IA y te arma un primer diseño, o parte del croquis o de cero.",
           tone: "brand",
           action: (
             <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={() => setAlta(true)}>
@@ -220,7 +225,7 @@ function AltaDiseno({ token, onCancelar, onCreado }: { token: string; onCancelar
     <form className={styles.alta} onSubmit={enviar} aria-label="Nuevo diseño">
       <div className={styles.altaCabeza}>
         <h2>Nuevo diseño</h2>
-        <p>Después de crearlo subes el croquis (JPG, PNG o PDF) y lo calibras con una cota.</p>
+        <p>Después eliges cómo empezar: con IA, con el croquis del sitio o dibujándolo a mano.</p>
       </div>
       <div className={styles.altaCampos}>
         <Field label="Nombre del diseño" required error={error}>

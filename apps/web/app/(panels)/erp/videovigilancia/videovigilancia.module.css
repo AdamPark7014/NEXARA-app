@@ -75,3 +75,14 @@
   gap: var(--ui-s2);
   flex-wrap: wrap;
 }
+
+.ligaCotizacion {
+  font-size: var(--ui-fs-meta);
+  font-weight: 600;
+  color: var(--ui-brand-text);
+  text-decoration: none;
+}
+
+.ligaCotizacion:hover {
+  text-decoration: underline;
+}

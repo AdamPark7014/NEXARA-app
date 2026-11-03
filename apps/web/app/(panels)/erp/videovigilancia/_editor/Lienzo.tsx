@@ -154,7 +154,7 @@ export default function Lienzo({
   plano: Plano;
   seleccion: Seleccion | null;
   herramienta: Herramienta;
-  capas: { croquis: boolean; etiquetas: boolean; calor: boolean; cableado?: boolean };
+  capas: { croquis: boolean; etiquetas: boolean; calor: boolean; cableado?: boolean; medidas?: boolean; conos?: boolean };
   tapas: readonly Tapa[];
   coberturas: ReadonlyMap<string, PoligonoCobertura[]>;
   modeloNuevo: ModeloCamara;
@@ -700,6 +700,7 @@ export default function Lienzo({
       {/* Conos: los demás primero, la seleccionada encima. */}
       <g style={{ pointerEvents: "none" }}>
         {[...plano.camaras]
+          .filter((c) => capas.conos !== false || c.id === selId)
           .sort((a, b) => Number(a.id === selId) - Number(b.id === selId))
           .flatMap((c) =>
             (coberturas.get(c.id) ?? []).map((pol, i) => (
@@ -848,7 +849,7 @@ export default function Lienzo({
         : null}
 
       {(plano.muebles ?? []).map((m) => (
-        <g key={m.id} data-sel={`mueble:${m.id}`} transform={`translate(${m.pos.x} ${m.pos.y}) scale(${u})`}>
+        <g key={m.id} data-sel={`mueble:${m.id}`} transform={`translate(${m.pos.x} ${m.pos.y}) scale(${u})`} opacity={esSel("mueble", m.id) ? 1 : 0.55}>
           <title>{NOMBRE_MUEBLE[m.tipo]}</title>
           <rect x={-8} y={-8} width={16} height={16} rx={3} fill="var(--ui-surface)" stroke={esSel("mueble", m.id) ? "var(--ui-brand)" : "var(--ui-fg-4)"} strokeWidth={esSel("mueble", m.id) ? 2.5 : 1.4} />
           <text y={3.5} fontSize={9.5} fontWeight={700} textAnchor="middle" fill="var(--ui-fg-2)" style={{ userSelect: "none" }}>
@@ -876,7 +877,7 @@ export default function Lienzo({
         : null}
 
       {(plano.equipos ?? []).map((e) =>
-        (e.tipo === "sirena" || e.tipo === "sismica") && e.datos.alcanceM ? (
+        (e.tipo === "sirena" || e.tipo === "sismica") && e.datos.alcanceM && (capas.medidas || esSel("equipo", e.id)) ? (
           <circle key={`alc-${e.id}`} cx={e.pos.x} cy={e.pos.y} r={e.datos.alcanceM / k} fill="#d13f3f" fillOpacity={esSel("equipo", e.id) ? 0.12 : 0.05} stroke="#d13f3f" strokeOpacity={0.5} strokeWidth={1.2 * u} style={{ pointerEvents: "none" }} />
         ) : null,
       )}
@@ -911,8 +912,8 @@ export default function Lienzo({
 
       {/* «14 m · 109 PPM · Observación» al final de cada cono (la seleccionada lleva la suya, más grande).
           Como en un mapa, cada etiqueta busca lugar libre a lo largo de su cono; si no cabe, cede (al
-          alejar quedan menos y al acercar vuelven). */}
-      {capas.etiquetas
+          alejar quedan menos y al acercar vuelven). Solo a pedido: con muchas cámaras tapan el plano. */}
+      {capas.medidas
         ? (() => {
             type Caja = { x: number; y: number; w: number; h: number };
             const puestas: Caja[] = [];

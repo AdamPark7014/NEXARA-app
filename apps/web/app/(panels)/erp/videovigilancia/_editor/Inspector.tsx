@@ -116,6 +116,7 @@ export default function Inspector({
   meta,
   onMeta,
   resumen,
+  creadoPor,
   onRecalibrar,
   onCambiarCroquis,
   onHerramienta,
@@ -135,6 +136,7 @@ export default function Inspector({
   meta: { nombre: string; estado: EstadoDiseno; grabacion: Grabacion };
   onMeta: (m: Partial<{ nombre: string; estado: EstadoDiseno; grabacion: Grabacion }>) => void;
   resumen: ResumenDiseno | null;
+  creadoPor?: string | null;
   onRecalibrar: () => void;
   onCambiarCroquis: () => void;
   /** Activa una herramienta del lienzo (la guía de pasos la usa). */
@@ -175,7 +177,7 @@ export default function Inspector({
         ) : pestana === "equipos" ? (
           <ListaEquipos plano={plano} onSeleccionar={(s) => (onSeleccionar(s), onPestana("seleccion"))} />
         ) : (
-          <PanelPlano plano={plano} onAplicar={onAplicar} meta={meta} onMeta={onMeta} resumen={resumen} onRecalibrar={onRecalibrar} onCambiarCroquis={onCambiarCroquis} nivel={nivel} />
+          <PanelPlano plano={plano} onAplicar={onAplicar} meta={meta} onMeta={onMeta} resumen={resumen} onRecalibrar={onRecalibrar} onCambiarCroquis={onCambiarCroquis} nivel={nivel} creadoPor={creadoPor} />
         )}
       </div>
     </aside>
@@ -927,11 +929,13 @@ function Guia({
   onCambiarCroquis: () => void;
   onRecalibrar: () => void;
 }) {
-  const pasos: Array<{ hecho: boolean; titulo: string; detalle: string; boton: string; accion: () => void }> = [
+  const pasos: Array<{ hecho: boolean; opcional?: boolean; titulo: string; detalle: string; boton: string; accion: () => void }> = [
     {
-      hecho: Boolean(plano.croquis),
+      // Con los muros ya trazados, el croquis ya no hace falta.
+      hecho: Boolean(plano.croquis) || plano.muros.length > 0,
+      opcional: true,
       titulo: "Croquis del sitio",
-      detalle: "PDF, imagen o captura del plano. Es opcional si trazas los muros a mano.",
+      detalle: "PDF, imagen o captura del plano para trazar encima.",
       boton: plano.croquis ? "Cambiar" : "Subir",
       accion: onCambiarCroquis,
     },
@@ -958,35 +962,50 @@ function Guia({
     },
     {
       hecho: plano.personas.length > 0,
+      opcional: true,
       titulo: "Persona de prueba",
       detalle: "Dice cuántos PPM le llegan y si alguna cámara la reconoce.",
       boton: "Poner",
       accion: () => onHerramienta?.("persona"),
     },
   ];
-  const faltan = pasos.filter((p) => !p.hecho).length;
+  // Lo opcional se ofrece, pero no cuenta como pendiente.
+  const faltan = pasos.filter((p) => !p.hecho && !p.opcional).length;
   const cob = resumen?.cobertura;
+  const lista = (
+    <ol className={styles.guia}>
+      {pasos.map((p, i) => (
+        <li key={p.titulo} className={p.hecho ? styles.guiaHecho : undefined}>
+          <span className={styles.guiaNumero} aria-hidden="true">
+            {p.hecho ? "✓" : i + 1}
+          </span>
+          <span className={styles.guiaTexto}>
+            <b>
+              {p.titulo}
+              {p.opcional && !p.hecho ? <em className={styles.guiaOpcional}> · opcional</em> : null}
+            </b>
+            <span>{p.detalle}</span>
+          </span>
+          <Button size="sm" variant={p.hecho || p.opcional ? "ghost" : "secondary"} onClick={p.accion} aria-label={`${p.boton}: ${p.titulo}`}>
+            {p.boton}
+          </Button>
+        </li>
+      ))}
+    </ol>
+  );
   return (
     <div className={styles.panel}>
-      <div>
-        <p className={styles.seccion}>{faltan ? `Para armar el diseño · faltan ${faltan}` : "Diseño completo"}</p>
-        <ol className={styles.guia}>
-          {pasos.map((p, i) => (
-            <li key={p.titulo} className={p.hecho ? styles.guiaHecho : undefined}>
-              <span className={styles.guiaNumero} aria-hidden="true">
-                {p.hecho ? "✓" : i + 1}
-              </span>
-              <span className={styles.guiaTexto}>
-                <b>{p.titulo}</b>
-                <span>{p.detalle}</span>
-              </span>
-              <Button size="sm" variant={p.hecho ? "ghost" : "secondary"} onClick={p.accion} aria-label={`${p.boton}: ${p.titulo}`}>
-                {p.boton}
-              </Button>
-            </li>
-          ))}
-        </ol>
-      </div>
+      {faltan ? (
+        <div>
+          <p className={styles.seccion}>{`Para armar el diseño · faltan ${faltan}`}</p>
+          {lista}
+        </div>
+      ) : (
+        <div className={styles.guiaLista}>
+          <b>Diseño listo</b>
+          <span>Sigue con «Cotizar» o «Propuesta PDF», arriba. Clic en una cámara o un muro para editarlo.</span>
+        </div>
+      )}
       {cob ? (
         <div>
           <p className={styles.seccion}>Cobertura del interior</p>
@@ -1013,7 +1032,13 @@ function Guia({
           ) : null}
         </div>
       ) : null}
-      <p className={styles.ayuda}>Clic en una cámara, un muro o un hueco para editarlo. Supr borra y Ctrl+Z deshace.</p>
+      {faltan ? null : (
+        <details className={styles.guiaPasos}>
+          <summary>Ver los pasos del diseño</summary>
+          {lista}
+        </details>
+      )}
+      {faltan ? <p className={styles.ayuda}>Clic en una cámara, un muro o un hueco para editarlo. Supr borra y Ctrl+Z deshace.</p> : null}
     </div>
   );
 }
@@ -1052,6 +1077,7 @@ function PanelPlano({
   onRecalibrar,
   onCambiarCroquis,
   nivel,
+  creadoPor,
 }: {
   plano: Plano;
   nivel: DatosNivel;
@@ -1061,6 +1087,7 @@ function PanelPlano({
   resumen: ResumenDiseno | null;
   onRecalibrar: () => void;
   onCambiarCroquis: () => void;
+  creadoPor?: string | null;
 }) {
   const grupos = gruposDeAltura(plano);
   const cal = plano.escala.calibracion;
@@ -1225,6 +1252,7 @@ function PanelPlano({
           </p>
         ) : null}
       </div>
+      {creadoPor ? <p className={styles.ayuda}>Creado por {creadoPor}.</p> : null}
     </div>
   );
 }

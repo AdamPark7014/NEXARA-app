@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MODELOS_CAMARA, MODELOS_EQUIPO } from "@/lib/cctv/catalogo";
 import { agregarCamara, agregarEquipo, agregarMuro, agregarPersona, resumenDelPlano } from "@/lib/cctv/editor";
@@ -85,7 +85,11 @@ describe("editor del diseñador de videovigilancia", () => {
   it("pinta el plano, la cámara con su número y la vista de la cámara", () => {
     render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
     expect(screen.getByRole("heading", { name: "Proyecto CCTV Bodegas VDM" })).toBeInTheDocument();
-    expect(screen.getByText(/Escala calibrada · cota 43.00 m/)).toBeInTheDocument();
+    // Calibrada no se anuncia en la cabeza: se ve en el panel del plano.
+    expect(screen.queryByText("Escala sin calibrar")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Plano" }));
+    expect(screen.getByText("43.00 m")).toBeInTheDocument();
+    expect(screen.getByText("Creado por David Morales.")).toBeInTheDocument();
     expect(screen.getByRole("toolbar", { name: "Herramientas del plano" })).toBeInTheDocument();
     // sin cámara elegida el plano queda libre; al elegirla sale su vista
     expect(screen.queryByLabelText("Vista desde la cámara 1")).toBeNull();
@@ -95,10 +99,34 @@ describe("editor del diseñador de videovigilancia", () => {
     expect(screen.getAllByText(/PPM ·/, { selector: "span" }).length).toBeGreaterThan(0);
   });
 
-  it("sin croquis ni muros invita a subir el croquis", () => {
+  it("sin croquis ni muros pregunta cómo empezar, con la IA primero", () => {
     render(<EditorCctv diseno={diseno({ ...planoVacio() })} token="t" onRecargar={() => {}} />);
-    expect(screen.getByText("Empieza por el croquis del sitio")).toBeInTheDocument();
-    expect(screen.getByText("Escala sin calibrar")).toBeInTheDocument();
+    expect(screen.getByText("¿Cómo quieres empezar?")).toBeInTheDocument();
+    const caja = screen.getByText("¿Cómo quieres empezar?").parentElement as HTMLElement;
+    const botones = within(caja).getAllByRole("button").map((b) => b.textContent);
+    expect(botones).toEqual(["Armar con IA", "Subir croquis", "Dibujar a mano"]);
+    // Sin nada dibujado todavía no hay nada que calibrar.
+    expect(screen.queryByText("Escala sin calibrar")).toBeNull();
+    // Elegir «a mano» quita la tarjeta: estorbaría para trazar el primer muro.
+    fireEvent.click(within(caja).getByRole("button", { name: "Dibujar a mano" }));
+    expect(screen.queryByText("¿Cómo quieres empezar?")).toBeNull();
+    expect(screen.getByRole("button", { name: "Muro" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("con muros y sin calibrar avisa en la cabeza y lleva a marcar la cota", () => {
+    const p = agregarMuro(planoVacio(), { x: 0, y: 0 }, { x: 400, y: 0 }, { alturaM: 3 }).plano;
+    render(<EditorCctv diseno={diseno(p)} token="t" onRecargar={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Escala sin calibrar" }));
+    expect(screen.getByRole("button", { name: "Cota" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Marca los dos extremos de una cota conocida.")).toBeInTheDocument();
+  });
+
+  it("no da por pendiente lo opcional: croquis y persona de prueba", () => {
+    const completo = bodega();
+    render(<EditorCctv diseno={{ ...diseno({ ...completo, personas: [] }), resumen: resumenDelPlano(completo) }} token="t" onRecargar={() => {}} />);
+    expect(screen.getByText("Diseño listo")).toBeInTheDocument();
+    expect(screen.queryByText(/faltan/)).toBeNull();
+    expect(screen.getByText("Cobertura del interior")).toBeInTheDocument();
   });
 
   it("en 3D pinta el sitio, sus vistas desde las cámaras y deja elegir la cámara", () => {
@@ -125,7 +153,8 @@ describe("editor del diseñador de videovigilancia", () => {
   });
 
   it("sin nada elegido guía los pasos y cada botón activa su herramienta", () => {
-    render(<EditorCctv diseno={{ ...diseno(bodega()), resumen: resumenDelPlano(bodega()) }} token="t" onRecargar={() => {}} />);
+    const sinCamaras = { ...bodega(), camaras: [] };
+    render(<EditorCctv diseno={{ ...diseno(sinCamaras), resumen: resumenDelPlano(bodega()) }} token="t" onRecargar={() => {}} />);
     expect(screen.getByText("Para armar el diseño · faltan 1")).toBeInTheDocument();
     expect(screen.getByText("Cobertura del interior")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Maqueta 3D" }));
@@ -139,7 +168,7 @@ describe("editor del diseñador de videovigilancia", () => {
     const barra = screen.getByRole("region", { name: "Niveles del edificio" });
     expect(screen.getByRole("button", { name: /Planta baja.*±0.00 m · 1 cámara/ })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: "+ Nivel" }));
-    expect(barra).toHaveTextContent("Nivel 2+3.50 m · sin cámaras");
+    expect(within(barra).getByRole("button", { name: "Nivel 2 +3.50 m · sin cámaras" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Nivel 2/ })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByLabelText("Ver el nivel de abajo en gris")).toBeChecked();
     // la pestaña Plano trae los datos del nivel
@@ -183,6 +212,17 @@ describe("editor del diseñador de videovigilancia", () => {
     expect(screen.getByRole("button", { name: "Área" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("donde no cabe fijo, los equipos se abren con su botón y se cierran al elegir", () => {
+    render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
+    const abre = screen.getByRole("button", { name: "Equipos" });
+    expect(abre).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(abre);
+    expect(abre).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(screen.getByRole("button", { name: /Turret.*DS-2CD2347G2-LU/ }));
+    expect(abre).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "+ Cámara" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("sin WebGL abre en el dibujo aunque haya muros, y la pestaña 3D usa la vista sencilla", () => {
     render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
     expect(screen.getByRole("button", { name: "Dibujo" })).toHaveAttribute("aria-pressed", "true");
@@ -200,6 +240,28 @@ describe("editor con WebGL", () => {
   });
   afterAll(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("en la maqueta los trazos van en «Dibujar» y el botón dice cuál está en uso", () => {
+    render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
+    expect(screen.queryByRole("button", { name: "Muro" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Dibujar" }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Herramientas de dibujo" })).getByRole("button", { name: "Muro" }));
+    expect(screen.queryByRole("group", { name: "Herramientas de dibujo" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Muro" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: "Dibujar" })).toBeNull();
+  });
+
+  it("las capas de a diario quedan a la vista y lo demás sigue a un clic", () => {
+    render(<EditorCctv diseno={diseno(bodega())} token="t" onRecargar={() => {}} />);
+    expect(screen.getByRole("button", { name: "Cobertura" })).toBeInTheDocument();
+    for (const capa of ["Personas", "Cableado", "Tamaño real", "Claves de equipos", "Nombres de áreas", "Croquis en el piso", "Muros translúcidos"]) {
+      expect(screen.getByLabelText(capa)).toBeInTheDocument();
+    }
+    // La leyenda se abre sola cuando los colores la necesitan.
+    expect(screen.queryByText("Identificación")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cobertura" }));
+    expect(screen.getByText("Identificación")).toBeInTheDocument();
   });
 
   it("con muros abre en la maqueta, con sus capas y herramientas", async () => {
