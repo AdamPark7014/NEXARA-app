@@ -74,6 +74,8 @@ export const FORMATOS_ACTIVIDAD_URL_RULES: UrlRule[] = [
   // Trabajar una sola cotización abierta: lo decide `CotizacionAbiertaService`, por persona y actividad.
   { path: '/api/activities/*/cotizacion-abierta', methods: ['GET', 'PUT'], scope: 'write' },
   { path: '/api/activities/*/cotizacion-abierta/cerrar', methods: ['POST'], scope: 'write' },
+  // Mis festivos en «Mi día» de las apps: todo el personal, y solo lo suyo. No abre el resto de `/api/festivos`.
+  { path: '/api/festivos/mio', methods: ['GET'], scope: 'read' },
 ];
 
 /**
