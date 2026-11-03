@@ -39,6 +39,8 @@ import {
   type Tone,
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
+import { DIRECCION_VISIBLE, ROLES_DE_OBRA } from "@/lib/direccion-api";
+import { resolveV2RoleKey } from "@/lib/rbac/role-mapping";
 import { canAccessClientPadron } from "@/lib/client-sectors";
 import { formatApiError } from "@/lib/erp-api";
 import { isInactiveClient, listSalesClients, type SalesClient } from "@/lib/sales-api";
@@ -120,6 +122,10 @@ export default function ProyectosPage() {
   const { user, token } = useUser();
   const router = useRouter();
   const hoy = useMemo(() => hoyISO(), []);
+  const [muestra, setMuestra] = useState(false);
+  useEffect(() => {
+    setMuestra(new URLSearchParams(window.location.search).has("muestra"));
+  }, []);
 
   const [items, setItems] = useState<ProyectoFila[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -452,6 +458,8 @@ export default function ProyectosPage() {
           Nuevo proyecto
         </ButtonLink>
       ),
+    secondaryActions:
+      (DIRECCION_VISIBLE || muestra) && ROLES_DE_OBRA.includes(resolveV2RoleKey(user) ?? "") ? <ButtonLink href="/erp/proyectos/obra">Obra</ButtonLink> : undefined,
     tabs,
     before: error ? (
       <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>

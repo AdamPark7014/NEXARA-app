@@ -269,7 +269,10 @@ const PALABRAS_DE_TRABAJO = new Set(
   (
     'cableado cable cables tuberia tubo canalizacion charola peinado rack instalacion instalar instalaciones camaras camara cctv nvr ' +
     'biometrico biometricos lectora lectoras traslado continuacion apoyo obra sitio trabajo trabajos voz datos red nodos nodo acoplamiento ' +
-    'contactos mueble pasillo planta piso nivel area de del la el los las en y a al para por con sin un una se su sus que'
+    'contactos mueble pasillo planta piso nivel area de del la el los las en y a al para por con sin un una se su sus que ' +
+    'montado montaje montar site registro registros exterior exteriores interior interiores baja alta principal tendido tendida ' +
+    'colocacion acomodo matado ahogado volado concreto prefabricado pulgada pulgadas numeracion trayectorias analisis tuberias racks ' +
+    'cableados antena amplificador amplificadora revision avances soporte telefonia configuracion documentacion'
   ).split(' '),
 );
 

@@ -118,6 +118,19 @@ describe('obra', () => {
     expect(r.porSitio).toEqual([{ sitio: 'Biblioteca', actividades: 3, minutos: 1380, sinProyecto: [1, 2] }]);
   });
 
+  it('por sitio no toma palabras de trabajo que se repiten en los títulos', () => {
+    const fila = (id: number, titulo: string) => ({ id, titulo, coreKind: 'tarea', ticketTypeCustom: null, projectId: null, minutos: 60, calculadoMin: null });
+    const r = armarObra([
+      fila(1, 'Montado de tubería en Biblioteca'),
+      fila(2, 'montado de tubería en planta baja'),
+      fila(3, 'Peinado de cable en Site y colocación de registros'),
+      fila(4, 'Peinado de cable en Site y colocación de registros para cámaras exteriores'),
+      fila(5, 'Instalación antena tienda MAJA'),
+      fila(6, 'Instalación amplificador en MAJA'),
+    ]);
+    expect(r.porSitio.map((s) => s.sitio)).toEqual(['Maja']);
+  });
+
   it('Obra la abren dirección, coordinación de operaciones y el arquitecto', () => {
     expect(puedeVerObra('arquitecto', false)).toBe(true);
     expect(puedeVerObra('coord_operaciones', false)).toBe(true);

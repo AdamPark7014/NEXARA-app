@@ -13,6 +13,9 @@ import { CotizacionCambio, estadoDelAcceso, mezclarPartidas, PartidaInvalida, pa
 
 export type ActorAbierta = ActorAsignacion & { nombre?: string | null; permissions?: string[] | null };
 
+/** En `page-matrix.ts` estos roles no abren `/erp/actividades/:id`: la actividad les llegaría sin puerta a la cotización. */
+const ROLES_SIN_DETALLE_DE_ACTIVIDAD = new Set(['dir_operaciones', 'coord_admin', 'coord_ventas', 'vendedor', 'disenador', 'rh', 'contabilidad', 'cliente']);
+
 /** Abrir una sola cotización, mientras dure una actividad. Las reglas puras están en `cotizacion-abierta.ts`. */
 @Injectable()
 export class CotizacionAbiertaService {
@@ -40,6 +43,9 @@ export class CotizacionAbiertaService {
     }
     const persona = await this.users.findOne(destinoId, companyId);
     if (!persona || !persona.isActive) throw new BadRequestException('Esa persona ya no está activa');
+    if (ROLES_SIN_DETALLE_DE_ACTIVIDAD.has(String(persona.roleKey ?? ''))) {
+      throw new BadRequestException('Esa persona no abre el detalle de una actividad en Core: no tendría cómo entrar a la cotización');
+    }
     const roster = await this.users.listAssignmentRoster(companyId);
     const destino = {
       id: persona.id,

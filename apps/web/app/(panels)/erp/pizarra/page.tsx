@@ -27,6 +27,7 @@ import {
   type TabItem,
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
+import { DIRECCION_VISIBLE } from "@/lib/direccion-api";
 import { formatosVisibles, puedeVerFormatos } from "@/lib/formatos-actividad";
 import { formatApiError } from "@/lib/erp-api";
 import { getSocketBaseUrl } from "@/lib/api-base";
@@ -146,6 +147,11 @@ export default function PizarraPage() {
       /* sin storage: vale para esta visita */
     }
   };
+
+  const [muestra, setMuestra] = useState(false);
+  useEffect(() => {
+    setMuestra(new URLSearchParams(window.location.search).has("muestra"));
+  }, []);
 
   // ?vista=mias|equipo|asignadas|revision manda (enlaces viejos y «‹ regresar» desde una
   // actividad); si no, la última elegida. `&ver=revisadas` abre lo que ya revisaste.
@@ -450,6 +456,11 @@ export default function PizarraPage() {
 
   const centroOperativo = verEquipo ? (
     <>
+      {DIRECCION_VISIBLE || muestra ? (
+        <ButtonLink className={c.tap} href="/erp/pizarra/area" iconStart={<GroupsOutlinedIcon />}>
+          Mi área
+        </ButtonLink>
+      ) : null}
       {formatosVisibles() && puedeVerFormatos(resolveV2RoleKey(user), user) ? (
         <ButtonLink className={c.tap} href="/erp/actividades/formatos" iconStart={<LibraryAddCheckOutlinedIcon />}>
           Asignar con formato
