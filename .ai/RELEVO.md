@@ -1,5 +1,19 @@
 # RELEVO
 
+- **02-11 ~22:30 (claude-code) — Giro de UI/UX: la portada de hoy, «más pro», ya está en producción. Adam la vio a tamaño real en una copia local y dijo «sí, súbela».**
+  - **Dirección de Adam:** «como lo que existe pero más pro». No otra página: misma estructura, textos, azul y letra. Esto reemplaza a «Obra» y a «Maqueta viva», que rechazó.
+  - **Commits:** `d5235ccc` (acabado), `a978e265` (menú en el teléfono, logos en webp, fotos de 640), `7b102e64` (fuentes).
+  - **Qué cambió:** titulares menos apretados en todo el sitio; luz azul sin rosa ni naranja; más del tablero en la primera pantalla; muro de video casi entero con `muro-video-ancho` y la baldosa nueva `lateral`; velo negro en Infraestructura; 14 logos quietos en vez de 36 en cinta (fuera los de consumo); cifras con filetes; menos espacio entre secciones.
+  - **Bug previo arreglado:** entre 344 y 388 px el encabezado se salía hasta 44 px y cortaba el botón del menú. Hasta 430 px el botón de tema se queda solo en el pie.
+  - **Medido en producción (Lighthouse, 2 corridas, contra la base de esta mañana):** escritorio 85 a 99–100, LCP 1.1 a 0.7–0.8 s, 1,528 a 1,262 KB. Celular 69 a 92, bloqueo 1,200 a 20–60 ms, 1,072 a 955 KB, LCP simulado 3.0 a 3.2 s, FCP simulado 1.4 a 1.6–1.9 s. Fuentes de 205 a 92 KB. La base es de antes de los commits de otros agentes de hoy: no todo el bloqueo menos se debe a esto.
+  - **Verificado:** 1,995 pruebas web y tipos en verde antes de `a978e265`; `7b102e64` solo con tipos y las pruebas del sitio. Auditoría DOM a 1536 y 375 px y en oscuro sin contraste bajo ni desbordes. Canonical, robots y h1 sin cambio. El menú abre con toque a 375 px.
+  - **Falta:** Core no se tocó; Adam pidió el giro también para el sistema. Blog, Soluciones, Cobertura y Proyectos heredan los cambios y solo se comprobó que responden. Sin prueba en un teléfono real. Quedan en `public/marcas` los 36 PNG, ya sin uso.
+  - **Trampas:**
+    - Con `next/font`, dos instancias de la misma familia y `preload` bajan el archivo dos veces: el precargado y el que gana en la hoja de estilos. No volver a poner `preload` en `app/layout.tsx` ni en `(sitio)/layout.tsx`.
+    - Lighthouse en este equipo se satura cuando otros agentes trabajan: dio 10 s de bloqueo falsos con una página que pesaba menos. Repetir y comparar `observedLargestContentfulPaint`.
+    - La auditoría DOM marca solapes falsos en las baldosas: la foto lleva `scale` y su rectángulo se sale, aunque la baldosa la recorta.
+    - Antes de proponer un cambio visual, leer lo que Adam ya aprobó y rechazó, y preguntar si quiere pulir lo que existe.
+
 - **03-11 ~05:10 UTC (claude-code) — Diseñador: corrige un bloqueo que introduje en `80e0eecf`.** Si el catálogo llegaba a media compilación, la maqueta se quedaba para siempre en «Armando la maqueta…». Se reemplazó `compileAsync` por una espera propia con tope de 20 s. Probado con perfil nuevo y el catálogo a 0, 300 y 900 ms de retraso: abre en 3.7 a 5 s. No usar `compileAsync` si la escena se puede rehacer mientras espera: truena en un temporizador sin resolver.
 - **03-11 ~04:30 UTC (claude-code) — Diseñador: la maqueta se mueve sin modos, se ve real y ya tiene stock y «Pasar a cotización» (`6b1c5af8`, `35acce5c`, `80e0eecf`, `55b0c4a1`, `71d30a03`, `361a1a8b`).** Sin migración. Detalle en `docs/DISENADOR-CCTV.md` §4.1, §4.3 y §6.1.
   - **Moverse** (Adam: «muy rápido y fácil con el mouse o el touchpad, tipo Apple»): arrastrar gira, clic derecho o dos dedos deslizan, rueda o pellizco acercan hacia el cursor, con inercia y brújula que se arrastra. Se quitó el botón Deslizar/Girar. **Un touchpad físico no se ha probado:** la prueba manda los eventos a mano; si dos dedos hacen otra cosa, ver `clasificarRueda` en `lib/cctv/gestos.ts`.
