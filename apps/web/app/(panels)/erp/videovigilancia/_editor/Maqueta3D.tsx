@@ -883,7 +883,7 @@ export default function Maqueta3D({
       {!pintada ? <p className={styles.maquetaCarga}>Armando la maqueta…</p> : null}
 
       <div className={styles.maquetaEncima} aria-hidden={verDesde ? true : undefined}>
-        {!verDesde && !recorriendo
+        {pintada && !verDesde && !recorriendo
           ? rotulos.map((r) => (
               <span
                 key={r.clave}
@@ -897,7 +897,7 @@ export default function Maqueta3D({
               </span>
             ))
           : null}
-        {!verDesde && capas.claves
+        {pintada && !verDesde && capas.claves
           ? claves.map((c) => {
               const sel = seleccion?.tipo === c.tipoSel && seleccion.id === c.id;
               return (

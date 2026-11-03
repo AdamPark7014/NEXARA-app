@@ -526,7 +526,7 @@ export default function EditorCctv({
               disabled={!totalCamaras && !gruposDeEquipos(raiz, meta.grabacion).length}
               title={cotizacionId ? "Actualiza las partidas del diseño en su cotización" : "Crea una cotización con los equipos, el cable y el plano"}
             >
-              {cotizacionId ? "Actualizar cotización" : "Pasar a cotización"}
+              {cotizacionId ? "Cotización" : "Cotizar"}
             </Button>
           ) : null}
           <Button
