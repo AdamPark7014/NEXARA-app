@@ -13,6 +13,7 @@ const display = Inter_Tight({
   weight: ["500", "600", "700"],
   display: "swap",
   variable: "--sitio-display",
+  preload: false,
 });
 
 /**
