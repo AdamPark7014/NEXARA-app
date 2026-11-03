@@ -151,6 +151,8 @@ export default function Maqueta3D({
   const recorriendoRef = useRef(false);
   recorriendoRef.current = recorriendo;
   const [guiando, setGuiando] = useState(false);
+  /** Ya salió el primer cuadro: la primera vez en un navegador tarda en preparar sus gráficos. */
+  const [pintada, setPintada] = useState(false);
   const [apuntando, setApuntando] = useState<string | null>(null);
   const [aqui, setAqui] = useState<{ area: string | null; teVen: TeVe[] }>({ area: null, teVen: [] });
   // La ayuda sale hasta que usa dos gestos distintos; después, con el botón «?».
@@ -270,7 +272,10 @@ export default function Maqueta3D({
     let m: MotorMaqueta;
     try {
       m = new MotorMaqueta(el, {
-        alPintar: colocar,
+        alPintar: () => {
+          setPintada(true);
+          colocar();
+        },
         alPerderContexto: () => perderRef.current(),
         alFallarCroquis: () => avisoRef.current("El croquis no se pudo cargar en la maqueta; sigue en el dibujo 2D."),
         alTerminarGuiado: () => setGuiando(false),
@@ -875,7 +880,7 @@ export default function Maqueta3D({
         aria-label={recorriendo ? "Caminando dentro del sitio. Usa las flechas o W A S D para moverte, arrastra para mirar y haz clic en el piso para ir." : "Vista 3D del sitio: maqueta con muros, equipos a su altura de montaje y cobertura en el piso. Arrastra para girar, usa dos dedos o clic derecho para deslizar, y pellizca o usa la rueda para acercar."}
         onContextMenu={(e) => e.preventDefault()}
       />
-      {!listo ? <p className={styles.maquetaCarga}>Armando la maqueta…</p> : null}
+      {!pintada ? <p className={styles.maquetaCarga}>Armando la maqueta…</p> : null}
 
       <div className={styles.maquetaEncima} aria-hidden={verDesde ? true : undefined}>
         {!verDesde && !recorriendo
