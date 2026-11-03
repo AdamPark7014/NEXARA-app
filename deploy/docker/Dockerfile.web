@@ -5,12 +5,14 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 
-RUN --mount=type=cache,target=/root/.npm npm install --prefer-offline --no-audit --legacy-peer-deps
+# Solo lo de la web: las dependencias de la API y de la raíz no se usan aquí.
+RUN --mount=type=cache,target=/root/.npm npm ci --workspace=apps/web --prefer-offline --no-audit --no-fund
 
 FROM deps AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV CLEAR_SKIP_NEXT_CACHE=true
+ENV NEXT_OUTPUT_STANDALONE=1
 ENV NODE_OPTIONS=--max-old-space-size=3072
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_SOCKET_URL
@@ -47,17 +49,24 @@ ENV NEXT_PUBLIC_STATE=${NEXT_PUBLIC_STATE}
 # CACHEBUST invalida la capa COPY cuando el rebuild debe forzar fuentes nuevas
 ARG CACHEBUST=1
 RUN echo "web-cachebust=${CACHEBUST}"
-COPY . .
+COPY apps/web apps/web
+COPY shared shared
+COPY tsconfig.base* ./
+COPY scripts/clear-build-cache.js scripts/next-build-resilient.js scripts/
 RUN --mount=type=cache,target=/app/apps/web/.next/cache npm run build --workspace=apps/web
 
-FROM node:20-slim AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+# Docker pone aquí el id del contenedor; sin esto, server.js no escucharía en todas las interfaces.
+ENV HOSTNAME=0.0.0.0
 
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/apps/web ./apps/web
+# `standalone` trae solo lo que el servidor usa de node_modules; lo estático se copia aparte, como pide Next.
+COPY --from=build /app/apps/web/.next/standalone ./
+COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build /app/apps/web/public ./apps/web/public
 
 EXPOSE 3000
-CMD ["npm", "run", "start", "--workspace=apps/web"]
+CMD ["node", "apps/web/server.js"]

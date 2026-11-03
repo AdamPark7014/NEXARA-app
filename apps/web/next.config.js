@@ -2,6 +2,12 @@ const path = require('path');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // La imagen de Docker corre con la salida standalone: solo lo que el servidor usa de node_modules.
+  // Fuera de Docker sigue `next start` (en Windows, standalone falla al crear symlinks).
+  ...(process.env.NEXT_OUTPUT_STANDALONE === '1' && {
+    output: 'standalone',
+    outputFileTracingRoot: path.join(__dirname, '../..'),
+  }),
   reactStrictMode: true,
   eslint: {
     ignoreDuringBuilds: true,
