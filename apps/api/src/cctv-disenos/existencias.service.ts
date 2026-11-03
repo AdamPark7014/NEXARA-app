@@ -2,11 +2,15 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { CatalogService } from '../catalog/catalog.service.js';
 import { CotizacionesService } from '../cotizaciones/cotizaciones.service.js';
 import { precioConMargen } from '../cotizaciones/cotizacion-totals.js';
+import { NOMBRE_PLANO_TECNICO, NOMBRE_VISTA_3D, NOMBRE_VISTA_COBERTURA } from '../cotizaciones/cotizacion-formato-nexara.js';
 import { esFinal, estaBloqueada } from '../cotizaciones/estado-cotizacion.js';
+import { grupoDePartida, type PartidaAgrupable } from '../cotizaciones/partidas-grupos.js';
+import { normalizarOpciones } from '../cotizaciones/personalizacion.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ScoredOffer } from '../smart-quote/scoring/quote-scoring.js';
 import { ProductSearchService } from '../smart-quote/search/product-search.service.js';
 import {
+  partidaDeInstalacion,
   SIN_PRECIO,
   elegirCandidato,
   fichaDeProducto,
@@ -54,6 +58,8 @@ type FilaCt = { id: number; clave: string; modelo: string | null; numParte: stri
 export type ActorCotizacion = { id: number; email?: string | null; roleKey?: string | null; nombre?: string | null };
 
 const NOMBRE_PLANO = 'Plano de videovigilancia';
+/** Lo que el diseñador adjunta por su cuenta: se reemplaza al actualizar; lo que alguien subió a mano se queda. */
+const ANEXOS_DEL_DISENO = [NOMBRE_PLANO, NOMBRE_PLANO_TECNICO, NOMBRE_VISTA_3D, NOMBRE_VISTA_COBERTURA];
 /** El margen con el que llega una partida de CT a la cotización. */
 const MARGEN_CT = 30;
 
@@ -259,7 +265,7 @@ export class ExistenciasCctvService {
    *
    * `folioManual` es para los ejemplos, que no deben gastar el consecutivo de nadie: no llega desde la pantalla.
    */
-  async pasarACotizacion(actor: ActorCotizacion, id: number, cuerpo: { lineas?: unknown; nueva?: unknown }, empresa: number, opciones: { folioManual?: string } = {}) {
+  async pasarACotizacion(actor: ActorCotizacion, id: number, cuerpo: { lineas?: unknown; nueva?: unknown; memoria?: unknown }, empresa: number, opciones: { folioManual?: string } = {}) {
     const diseno = await this.cargarDiseno(empresa, id);
     const lineas = validarLineas(cuerpo?.lineas);
     const [almacen, ct] = await Promise.all([this.deAlmacen(empresa, lineas), this.deCt(lineas)]);
@@ -273,6 +279,7 @@ export class ExistenciasCctvService {
       });
     });
     const sinPrecio = partidas.filter((p) => p.notes === SIN_PRECIO).length;
+    const memoria = normalizarOpciones({ memoria: cuerpo?.memoria }).memoria;
 
     const actual = cuerpo?.nueva === true || !diseno.cotizacionId ? null : await this.prisma.cotizacion.findFirst({ where: { id: diseno.cotizacionId, companyId: empresa }, select: { id: true, status: true, quoteNumber: true } });
     if (actual) {
@@ -281,16 +288,27 @@ export class ExistenciasCctvService {
       }
       const completa = await this.cotizaciones.findOne(actual.id, empresa);
       const conservadas = (completa?.items ?? []).filter((i: { paqueteClave?: string | null }) => i.paqueteClave !== paqueteClave);
-      await this.cotizaciones.update(actual.id, { items: [...conservadas, ...partidas] } as never, actor.id, empresa, actor);
-      return { cotizacionId: actual.id, quoteNumber: actual.quoteNumber, creada: false, partidas: partidas.length, conservadas: conservadas.length, sinPrecio };
+      // La instalación no es del paquete: su precio lo captura quien cotiza y actualizar no debe borrarlo.
+      const yaTieneManoDeObra = conservadas.some((i) => grupoDePartida(i as unknown as PartidaAgrupable) === 'MANO_DE_OBRA');
+      await this.cotizaciones.update(
+        actual.id,
+        { items: [...conservadas, ...partidas, ...(yaTieneManoDeObra ? [] : [partidaDeInstalacion()])], ...(memoria ? { opciones: { ...normalizarOpciones(completa?.opciones), memoria } } : {}) } as never,
+        actor.id,
+        empresa,
+        actor,
+      );
+      await this.quitarAnexosDelDiseno(actual.id, completa?.planos, empresa);
+      return { cotizacionId: actual.id, quoteNumber: actual.quoteNumber, creada: false, partidas: partidas.length, conservadas: conservadas.length, sinPrecio: sinPrecio + (yaTieneManoDeObra ? 0 : 1) };
     }
 
     const creada = await this.cotizaciones.create(
       {
-        items: partidas,
+        items: [...partidas, partidaDeInstalacion()],
         quoteNumber: opciones.folioManual,
-        // Comercial: la modalidad pasa sola a «suministro e instalación» en cuanto lleve mano de obra.
-        segmento: 'COMERCIAL',
+        // Un sistema de cámaras se cotiza como obra, con 50 % de anticipo (Esquema de cotizaciones, plantilla CCTV).
+        segmento: 'OBRA',
+        depositPercent: 50,
+        ...(memoria ? { opciones: { memoria } } : {}),
         trabajo: diseno.nombre.slice(0, 200),
         projectName: diseno.nombre.slice(0, 200),
         ...(diseno.clienteId ? { salesClientId: diseno.clienteId } : { clientName: 'Cliente por definir', clienteSinAlta: true }),
@@ -300,7 +318,14 @@ export class ExistenciasCctvService {
       actor,
     );
     await this.prisma.cctvDiseno.update({ where: { id }, data: { cotizacionId: creada.id } });
-    return { cotizacionId: creada.id, quoteNumber: creada.quoteNumber, creada: true, partidas: partidas.length, conservadas: 0, sinPrecio };
+    return { cotizacionId: creada.id, quoteNumber: creada.quoteNumber, creada: true, partidas: partidas.length, conservadas: 0, sinPrecio: sinPrecio + 1 };
+  }
+
+  private async quitarAnexosDelDiseno(cotizacionId: number, planos: unknown, empresa: number) {
+    const lista = Array.isArray(planos) ? (planos as Array<{ url?: string; nombre?: string }>) : [];
+    for (const p of lista) {
+      if (p?.url && ANEXOS_DEL_DISENO.some((n) => String(p.nombre ?? '').startsWith(n))) await this.cotizaciones.quitarPlano(cotizacionId, p.url, empresa);
+    }
   }
 
   /** Adjunta el plano a la cotización del diseño. Si ya llevaba uno de este diseño, lo reemplaza. */

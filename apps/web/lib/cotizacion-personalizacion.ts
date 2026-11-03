@@ -41,7 +41,20 @@ export const TITULOS_POR_OMISION: TitulosApartados = {
   cotizacion: "Propuesta económica detallada",
 };
 
+/** Datos que pide el cliente en su propio formato (RITM, SP, orden de compra…); solo se imprime lo capturado. */
+export type ReferenciasCliente = Partial<Record<"proyecto" | "region" | "ritm" | "requerimiento" | "sp" | "oc", string>>;
+
+export const CAMPOS_REFERENCIA: ReadonlyArray<{ clave: keyof ReferenciasCliente; etiqueta: string }> = [
+  { clave: "proyecto", etiqueta: "Proyecto del cliente" },
+  { clave: "region", etiqueta: "Región" },
+  { clave: "ritm", etiqueta: "RITM" },
+  { clave: "requerimiento", etiqueta: "Requerimiento" },
+  { clave: "sp", etiqueta: "SP" },
+  { clave: "oc", etiqueta: "Orden de compra" },
+];
+
 export type OpcionesCotizacion = {
+  referencias?: ReferenciasCliente;
   secciones: SeccionesOpcionales;
   columnas: ColumnasOpcionales;
   carta: CartaPresentacion | null;
@@ -104,7 +117,11 @@ export function opcionesDesdeApi(crudo: unknown): OpcionesCotizacion {
   const carta = objeto(o["carta"]);
   const autorizo = firmante(o["autorizo"]);
   const userId = Number(objeto(o["autorizo"])["userId"]);
+  const r = objeto(o["referencias"]);
+  const referencias: ReferenciasCliente = {};
+  for (const { clave } of CAMPOS_REFERENCIA) if (cadena(r[clave])) referencias[clave] = cadena(r[clave]);
   return {
+    ...(Object.keys(referencias).length ? { referencias } : {}),
     secciones: {
       objetivo: bandera(s["objetivo"], base.secciones.objetivo),
       alcance: bandera(s["alcance"], base.secciones.alcance),
@@ -165,7 +182,13 @@ export function opcionesParaApi(o: OpcionesCotizacion): OpcionesCotizacion {
           mensaje: limpio(o.carta.mensaje),
         }
       : null;
+  const referencias: ReferenciasCliente = {};
+  for (const { clave } of CAMPOS_REFERENCIA) {
+    const valor = limpio(o.referencias?.[clave] ?? "");
+    if (valor) referencias[clave] = valor;
+  }
   return {
+    ...(Object.keys(referencias).length ? { referencias } : {}),
     secciones: { ...o.secciones },
     columnas: { ...o.columnas },
     carta,

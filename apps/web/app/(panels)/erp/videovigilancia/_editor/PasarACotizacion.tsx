@@ -14,11 +14,13 @@ import type { FilaCatalogo } from "@/lib/cctv/catalogo";
 import { equipoPorId, modeloPorId } from "@/lib/cctv/catalogo";
 import { lineaParaEnviar, pesos, renglonesDeCotizacion, totalesDe, type Disponibilidad } from "@/lib/cctv/existencias";
 import type { Grabacion } from "@/lib/cctv/infraestructura";
-import { svgAPng } from "@/lib/cctv/planoImagen";
+import { hayWebGL } from "@/lib/cctv/medidas";
+import { NOMBRE_PLANO_TECNICO, NOMBRE_VISTA_3D, NOMBRE_VISTA_COBERTURA, memoriaDelDiseno } from "@/lib/cctv/memoriaCotizacion";
+import { datosABlob, elementoAPng, fotoDeModeloAPng, svgAPng } from "@/lib/cctv/planoImagen";
 import type { Plano } from "@/lib/cctv/plano";
 import { balanceDelSistema, conexionesDelSistema, gruposDeEquipos } from "@/lib/cctv/sistema";
 import { useCalculoDiseno } from "./calculo";
-import PlanoEstatico from "./PlanoEstatico";
+import PlanoTecnico, { HOJA_ALTO_PX, HOJA_ANCHO_PX } from "./PlanoTecnico";
 import styles from "./existencias.module.css";
 
 export default function PasarACotizacion({
@@ -26,6 +28,7 @@ export default function PasarACotizacion({
   disenoId,
   raiz,
   grabacion,
+  datos,
   cotizacionId,
   disponibilidad,
   filas,
@@ -37,6 +40,8 @@ export default function PasarACotizacion({
   disenoId: number;
   raiz: Plano;
   grabacion: Grabacion;
+  /** Lo que lleva la carátula de la hoja técnica. */
+  datos: { proyecto: string; cliente: string | null; elaboro: string | null; fecha: string; version: number };
   cotizacionId: number | null;
   disponibilidad: ReadonlyMap<string, Disponibilidad>;
   filas: readonly FilaCatalogo[];
@@ -65,6 +70,8 @@ export default function PasarACotizacion({
   const [ocupada, setOcupada] = useState(false);
   const [hecho, setHecho] = useState<ResultadoCotizacion | null>(null);
   const [avisoPlano, setAvisoPlano] = useState<string | null>(null);
+  /** Armar las imágenes tarda unos segundos: se dice qué está pasando. */
+  const [paso, setPaso] = useState<string | null>(null);
   const planos = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -75,14 +82,30 @@ export default function PasarACotizacion({
     return () => window.removeEventListener("keydown", tecla);
   }, [enviando, onCerrar]);
 
-  const adjuntarPlanos = async () => {
+  const memoriaConFotos = async () => {
+    const memoria = memoriaDelDiseno(raiz, calculo.resumen, grabacion);
+    const lineas = await Promise.all(memoria.lineas.map(async (l) => ({ ...l, foto: l.foto ? await fotoDeModeloAPng(l.foto) : null })));
+    return { ...memoria, lineas };
+  };
+
+  /** La hoja técnica de cada nivel y las dos vistas de la maqueta: el PDF las acomoda por su nombre. */
+  const adjuntarAnexos = async () => {
     const hojas = [...(planos.current?.querySelectorAll<HTMLElement>("[data-hoja]") ?? [])];
     for (const hoja of hojas) {
+      const nombre = hojas.length > 1 ? `${NOMBRE_PLANO_TECNICO} · ${hoja.dataset.hoja}` : NOMBRE_PLANO_TECNICO;
+      const article = hoja.querySelector("article");
       const svg = hoja.querySelector("svg");
-      if (!svg) continue;
-      const nombre = hojas.length > 1 ? `Plano de videovigilancia · ${hoja.dataset.hoja}` : "Plano de videovigilancia";
-      await adjuntarPlanoACotizacion(token, disenoId, await svgAPng(svg, 2400), nombre);
+      if (!article || !svg) continue;
+      // Si el navegador no puede con la hoja completa, al menos va el dibujo.
+      const imagen = await elementoAPng(article, HOJA_ANCHO_PX, HOJA_ALTO_PX, 1.5).catch(() => svgAPng(svg, 2400));
+      await adjuntarPlanoACotizacion(token, disenoId, imagen, nombre);
     }
+    if (!hayWebGL()) return;
+    const { vistasParaCotizacion } = await import("@/lib/cctv/maqueta/foto");
+    const vistas = await vistasParaCotizacion(calculo.niveles);
+    if (!vistas) return;
+    await adjuntarPlanoACotizacion(token, disenoId, await datosABlob(vistas.general), NOMBRE_VISTA_3D);
+    await adjuntarPlanoACotizacion(token, disenoId, await datosABlob(vistas.cobertura), NOMBRE_VISTA_COBERTURA);
   };
 
   const enviar = async (nueva: boolean) => {
@@ -90,10 +113,13 @@ export default function PasarACotizacion({
     setError(null);
     setOcupada(false);
     try {
+      setPaso("Guardando el diseño…");
       await guardar();
-      const r = await pasarACotizacion(token, disenoId, renglones.map(lineaParaEnviar), nueva);
+      setPaso("Pasando los equipos…");
+      const r = await pasarACotizacion(token, disenoId, renglones.map(lineaParaEnviar), nueva, await memoriaConFotos());
       try {
-        await adjuntarPlanos();
+        setPaso("Preparando el plano y las vistas 3D…");
+        await adjuntarAnexos();
       } catch (e) {
         // Las partidas ya quedaron: que no parezca que falló todo.
         setAvisoPlano(e instanceof Error ? e.message : "No se pudo adjuntar el plano.");
@@ -106,6 +132,7 @@ export default function PasarACotizacion({
       if (/ya salió al cliente/.test(texto)) setOcupada(true);
     } finally {
       setEnviando(false);
+      setPaso(null);
     }
   };
 
@@ -185,7 +212,12 @@ export default function PasarACotizacion({
               </span>
               <b>{pesos(totales.sinIva)} sin IVA</b>
             </div>
-            <p className={styles.nota}>El precio sale de CT con margen del 30 % y aún no incluye mano de obra. En la cotización se ajusta todo.</p>
+            <p className={styles.nota}>El precio sale de CT con margen del 30 %. La instalación se agrega sin precio, para que la captures en la cotización. Lleva el plano técnico, las vistas 3D y el levantamiento por zona.</p>
+            {paso ? (
+              <p className={styles.nota} role="status">
+                {paso}
+              </p>
+            ) : null}
             <div className={styles.acciones}>
               {ocupada || !cotizacionId ? (
                 <Button variant="primary" loading={enviando} onClick={() => void enviar(true)}>
@@ -212,13 +244,13 @@ export default function PasarACotizacion({
             </div>
           </>
         )}
-        {/* El plano que se adjunta: se dibuja aquí, fuera de la vista, y se vuelve imagen. */}
+        {/* Las hojas que se adjuntan: se dibujan aquí, fuera de la vista, y se vuelven imagen. */}
         <div ref={planos} className={styles.planosOcultos} aria-hidden="true">
           {calculo.niveles
             .filter((n) => n.plano.muros.length || n.plano.camaras.length)
-            .map((n) => (
+            .map((n, i) => (
               <div key={n.nivel.id} data-hoja={n.nivel.nombre}>
-                <PlanoEstatico plano={n.plano} tapas={n.tapas} coberturas={n.coberturas} conEtiquetasCono={false} alto={900} titulo={`Plano de ${n.nivel.nombre}`} />
+                <PlanoTecnico raiz={raiz} plano={n.plano} nivel={n.nivel} numeroHoja={i + 1} coberturas={n.coberturas} resumen={calculo.resumen} grabacion={grabacion} datos={datos} paraCliente />
               </div>
             ))}
         </div>

@@ -24,6 +24,19 @@ describe("opciones de personalización", () => {
     expect(resumenOpciones(opcionesPorOmision(), "MXN")).toBe("Todas las secciones · MXN");
   });
 
+  it("las referencias del cliente van y vienen, y lo vacío no se manda", () => {
+    const o = opcionesDesdeApi({ referencias: { oc: "OC-1", sp: "", otra: "x" } });
+    expect(o.referencias).toEqual({ oc: "OC-1" });
+    expect(opcionesParaApi({ ...o, referencias: { oc: " OC-2 ", ritm: "   " } }).referencias).toEqual({ oc: "OC-2" });
+    expect(opcionesParaApi(opcionesPorOmision())).not.toHaveProperty("referencias");
+  });
+
+  it("el editor no carga con la memoria del diseño: la conserva el servidor", () => {
+    const o = opcionesDesdeApi({ memoria: { camaras: 14 } });
+    expect(o).not.toHaveProperty("memoria");
+    expect(opcionesParaApi(o)).not.toHaveProperty("memoria");
+  });
+
   it("toma lo guardado y completa lo que falte", () => {
     const o = opcionesDesdeApi({ secciones: { planos: false }, columnas: { imagen: true, descuento: true }, autorizo: { nombre: "Christian", userId: 3 } });
     expect(o.secciones).toEqual({ objetivo: true, alcance: true, planos: false, terminos: true, firma: true });

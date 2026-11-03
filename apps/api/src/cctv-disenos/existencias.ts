@@ -294,6 +294,25 @@ export type LineaDeMayorista = Record<string, unknown> & { unitPrice?: number };
 export const SIN_PRECIO = 'Sin precio: capturarlo antes de enviar.';
 
 /**
+ * El sistema se cotiza instalado, pero el diseño no sabe cuánto cuesta instalarlo. Va sin precio y
+ * avisada, para que quien cotiza la llene; sin esta partida el PDF diría que solo se suministra.
+ */
+export function partidaDeInstalacion(): Record<string, unknown> {
+  return {
+    grupo: 'MANO_DE_OBRA',
+    category: 'Mano de obra',
+    name: 'Instalación, configuración y puesta en marcha',
+    description: 'Fijación de equipos, tendido y conectorización del cableado, configuración y entrega operativa del sistema.',
+    unit: 'Servicio',
+    qty: 1,
+    unitPrice: 0,
+    discount: 0,
+    tax: 16,
+    notes: SIN_PRECIO,
+  };
+}
+
+/**
  * Una partida de cotización. Si el equipo está en Almacén con precio, manda ese; si no, el de CT; si no hay
  * ninguno queda en cero y avisado: un precio inventado se enviaría sin que nadie lo notara.
  */

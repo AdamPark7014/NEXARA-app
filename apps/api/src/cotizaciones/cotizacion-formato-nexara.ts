@@ -9,7 +9,7 @@ import PDFDocument from 'pdfkit';
 import { PDFDocument as PDFLibDocument } from 'pdf-lib';
 import { importeConLetra } from './importe-letra.js';
 import { factorMargen } from './cotizacion-totals.js';
-import { normalizarOpciones } from './personalizacion.js';
+import { normalizarOpciones, type ReferenciasCliente } from './personalizacion.js';
 import { normalizarBloques } from './alcance-bloques.js';
 import { puntosPorOmision, TITULOS_POR_OMISION } from './alcance-por-omision.js';
 import { objetivoDePropuesta, type Objetivo } from './objetivo-plantilla.js';
@@ -18,6 +18,7 @@ import { grupoDePartida, GRUPOS, incluyeInstalacion, type GrupoPartida } from '.
 import { dibujarMarco, dibujarPortada, VERDE } from './cotizacion-marco.js';
 import { anticipoDeCotizacion, terminosDeCotizacion, type Terminos } from './terminos-segmento.js';
 import { segmentosLista } from './vinetas-texto.js';
+import { alcanceDeMemoria, calculoDelCentro, justificacionDeMemoria, type LineaDeCamaras, type MemoriaDiseno } from './memoria-diseno.js';
 import { anexarPaginasPdf, clasificarPlanos, type PlanoArchivo, type PlanosClasificados } from '../common/pdf/planos-pdf.js';
 import { PDF_FUENTES as F, registrarFuentesCorporativas } from '../common/pdf/nexara-pdf-theme.js';
 
@@ -91,6 +92,32 @@ const FIRMA = {
 const ENTREGA_DEFAULT = '15 días naturales, o según disponibilidad de inventario al confirmar el pedido.';
 const GARANTIA_DEFAULT = 'La otorgada por el fabricante.';
 
+/**
+ * Nombre con el que el diseñador adjunta sus imágenes (igual en `lib/cctv/memoriaCotizacion.ts`): cada
+ * una tiene su lugar fijo en el PDF. Un edificio de varios niveles lleva una hoja técnica por nivel.
+ */
+export const NOMBRE_VISTA_3D = 'Vista 3D general del sitio';
+export const NOMBRE_PLANO_TECNICO = 'Plano técnico de distribución';
+export const NOMBRE_VISTA_COBERTURA = 'Cobertura en el piso por nivel de detalle';
+
+/** Los cuatro niveles de IEC 62676-4, de más a menos detalle, con los colores del plano y la maqueta. */
+const NIVELES_DORI = [
+  { clave: 'identificacion', titulo: 'Identificación', ppm: '250 PPM o más', uso: 'Se puede saber quién es una persona', color: '#0AA870' },
+  { clave: 'reconocimiento', titulo: 'Reconocimiento', ppm: '125 PPM o más', uso: 'Se reconoce a alguien conocido', color: '#0D8CD9' },
+  { clave: 'observacion', titulo: 'Observación', ppm: '62 PPM o más', uso: 'Se ven rasgos y la actividad', color: '#3D5CE6' },
+  { clave: 'deteccion', titulo: 'Detección', ppm: '25 PPM o más', uso: 'Se nota que hay alguien', color: '#8C6BD9' },
+] as const;
+
+/** Datos que pide el cliente en su propio formato (Esquema de cotizaciones, formato A), en el orden en que se imprimen. */
+const REFERENCIAS_DEL_CLIENTE: ReadonlyArray<[keyof ReferenciasCliente, string]> = [
+  ['proyecto', 'Proyecto del cliente'],
+  ['region', 'Región'],
+  ['ritm', 'RITM'],
+  ['requerimiento', 'Requerimiento'],
+  ['sp', 'SP'],
+  ['oc', 'Orden de compra'],
+];
+
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 export type PartidaFormato = {
@@ -138,7 +165,14 @@ export type FormatoNexara = {
   /** Párrafo de entrada del alcance (`scope`) y bloques sin título. */
   alcanceIntro: string[];
   /** Bloques con título del alcance; sin ninguno escrito, los puntos por omisión. */
-  alcance: Array<{ titulo: string; texto: string; vinetas: string[] }>;
+  alcance: Array<{ titulo: string; texto: string; vinetas: string[]; especial?: 'lineas' | 'centro' }>;
+  /** La ingeniería del diseño de cámaras; solo en lo que viene del diseñador. */
+  memoria: MemoriaDiseno | null;
+  /** El alcance ejecutivo sale de la memoria: nadie escribió el suyo. */
+  ejecutivoDeMemoria: boolean;
+  referencias: Array<[string, string]>;
+  /** Porcentaje de anticipo, para imprimir cuánto es; 0 o 100: un solo pago. */
+  anticipoPorciento: number;
   /** Título de cada apartado fijo: el que escribió quien cotiza o el del diseño. */
   titulos: { objetivo: string; garantias: string; cotizacion: string };
   /** false = «Planos» apagado en «Personalizar». */
@@ -312,8 +346,18 @@ export function pagoDeCotizacion(
 }
 
 /** De la cotización guardada (o del borrador de la vista previa) al formato impreso. */
+/** El título del centro sigue a lo colocado, salvo que alguien le haya puesto el suyo. */
+function tituloDelCentro(m: MemoriaDiseno, titulo: string, esElSugerido: boolean): string {
+  if (!esElSugerido) return titulo;
+  const grabacion = m.centro.some((e) => e.tipo === 'nvr');
+  const respaldo = m.centro.some((e) => e.tipo === 'ups');
+  if (grabacion && respaldo) return 'Centro de monitoreo, almacenamiento y respaldo eléctrico online';
+  return grabacion ? 'Centro de monitoreo y almacenamiento' : titulo;
+}
+
 export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
   const opciones = normalizarOpciones(quote.opciones);
+  const memoria = opciones.memoria ?? null;
   const moneda = String(quote.currency ?? 'MXN').toUpperCase() === 'USD' ? 'USD' : 'MXN';
   // El PDF del cliente no enseña el margen: el precio de cada partida ya lo trae.
   const factor = factorMargen(quote.marginPercent);
@@ -370,9 +414,22 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
   const alcanceIntro = opciones.secciones.alcance ? parrafosDe(quote.scope) : [];
   const alcance: FormatoNexara['alcance'] = [];
   if (opciones.secciones.alcance) {
+    const sugeridos = puntosPorOmision(agrupables(quote));
+    // Un punto por omisión que nadie reescribió (solo se renombró o se reordenó) sigue saliendo del diseño.
+    const conMemoria = (b: { clave?: string; titulo: string; texto?: string | null; vinetas: string[] }): FormatoNexara['alcance'][number] => {
+      const base = { titulo: b.titulo.trim(), texto: String(b.texto ?? '').trim(), vinetas: b.vinetas };
+      if (!memoria || sugeridos.find((s) => s.clave === b.clave)?.texto !== b.texto) return base;
+      if (b.clave === 'omision:justificacion') {
+        const j = justificacionDeMemoria(memoria);
+        return { titulo: base.titulo, texto: j.texto, vinetas: j.vinetas.length ? j.vinetas : b.vinetas };
+      }
+      if (b.clave === 'omision:especificacion') return { ...base, especial: 'lineas' };
+      if (b.clave === 'omision:monitoreo') return { ...base, titulo: tituloDelCentro(memoria, base.titulo, b.titulo === sugeridos.find((s) => s.clave === b.clave)?.titulo), especial: 'centro' };
+      return base;
+    };
     for (const b of normalizarBloques(quote.alcanceBloques)) {
       const textoBloque = String(b.texto ?? '').trim();
-      if (b.titulo.trim()) alcance.push({ titulo: b.titulo.trim(), texto: textoBloque, vinetas: b.vinetas });
+      if (b.titulo.trim()) alcance.push(conMemoria(b));
       else if (alcance.length) {
         const previo = alcance[alcance.length - 1]!;
         previo.texto = [previo.texto, textoBloque].filter(Boolean).join('\n');
@@ -380,11 +437,7 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
       } else alcanceIntro.push(...parrafosDe(textoBloque), ...b.vinetas);
     }
     // Sin puntos escritos van los del diseño: la portada nunca sale sin ellos.
-    if (!alcance.length) {
-      for (const b of puntosPorOmision(agrupables(quote))) {
-        alcance.push({ titulo: b.titulo, texto: b.texto ?? '', vinetas: b.vinetas });
-      }
-    }
+    if (!alcance.length) sugeridos.forEach((b) => alcance.push(conMemoria(b)));
   }
   return {
     numero: String(quote.quoteNumber ?? '').trim() || 'COTIZACIÓN',
@@ -412,6 +465,13 @@ export function formatoDesdeCotizacion(quote: QuoteLike): FormatoNexara {
       : null,
     alcanceIntro,
     alcance,
+    memoria,
+    ejecutivoDeMemoria: Boolean(memoria) && !String(quote.objetivo ?? '').trim() && Boolean(opciones.secciones.objetivo),
+    referencias: REFERENCIAS_DEL_CLIENTE.flatMap(([clave, etiqueta]): Array<[string, string]> => {
+      const valor = String(opciones.referencias?.[clave] ?? '').trim();
+      return valor ? [[etiqueta, valor]] : [];
+    }),
+    anticipoPorciento: anticipoDeCotizacion(quote.depositPercent),
     titulos: {
       objetivo: opciones.titulos.objetivo || TITULOS_POR_OMISION.objetivo,
       garantias: opciones.titulos.garantias || TITULOS_POR_OMISION.garantias,
@@ -453,6 +513,8 @@ type Lapiz = {
   pagina: number;
   /** Página donde quedó el título de cada parte. */
   paginaDe: Partial<Record<Apartado['clave'], number>>;
+  /** Hojas horizontales: su folio va en otro lugar y no llevan marco. */
+  apaisadas: Set<number>;
 };
 
 function asegurar(p: Lapiz, alto: number) {
@@ -701,7 +763,7 @@ function recuadro(p: Lapiz, titulo: string, cuerpo: string) {
 const MAX_APARTADOS_DE_ALCANCE = 8;
 
 type Apartado = {
-  clave: 'objetivo' | 'alcance' | 'planos' | 'garantias' | 'cotizacion';
+  clave: 'objetivo' | 'alcance' | 'levantamiento' | 'planos' | 'garantias' | 'cotizacion';
   numero: number;
   titulo: string;
   bloque?: FormatoNexara['alcance'][number];
@@ -713,6 +775,8 @@ function apartadosDe(q: FormatoNexara, hayPlanos: boolean): Apartado[] {
   if (q.objetivo || q.alcanceIntro.length) lista.push({ clave: 'objetivo', titulo: q.titulos.objetivo });
   if (q.alcance.length > MAX_APARTADOS_DE_ALCANCE) lista.push({ clave: 'alcance', titulo: 'Alcance técnico' });
   else q.alcance.forEach((bloque) => lista.push({ clave: 'alcance', titulo: bloque.titulo, bloque }));
+  // Con el alcance apagado en «Personalizar» tampoco sale el levantamiento: es parte de lo técnico.
+  if (q.memoria?.levantamiento.filas.length && q.alcance.length) lista.push({ clave: 'levantamiento', titulo: 'Levantamiento por zona' });
   if (hayPlanos) lista.push({ clave: 'planos', titulo: 'Planos' });
   if (q.garantias.length) lista.push({ clave: 'garantias', titulo: q.titulos.garantias });
   lista.push({ clave: 'cotizacion', titulo: q.titulos.cotizacion });
@@ -773,6 +837,7 @@ function arranqueDePropuesta(p: Lapiz, q: FormatoNexara) {
     ['Teléfono', q.telefono],
     ['Correo', q.correo],
     ['Ubicación', q.ubicacion],
+    ...q.referencias,
   ].filter(([, valor]) => valor!.trim()) as Array<[string, string]>;
 
   const { x, ancho } = RECUADRO;
@@ -805,6 +870,76 @@ function textoLibre(p: Lapiz, valor: string) {
   const vinetaEscrita = /^[•·*-]\s+(.+)$/s.exec(valor);
   if (vinetaEscrita) vineta(p, vinetaEscrita[1]!);
   else parrafo(p, valor);
+}
+
+/** Franja de cifras del proyecto: el único bloque oscuro del cuerpo, con el color del pie de hoja. */
+function bandaDeCifras(p: Lapiz, cifras: Array<[string, string]>) {
+  const alto = 56;
+  const { x, ancho } = RECUADRO;
+  continuarTexto(p, alto + 12);
+  p.y += 4;
+  p.doc.save();
+  p.doc.roundedRect(x, p.y, ancho, alto, 7).fill(CARBON);
+  p.doc.restore();
+  const celda = ancho / cifras.length;
+  cifras.forEach(([valor, etiqueta], i) => {
+    const xCelda = x + i * celda;
+    if (i) {
+      p.doc.save();
+      p.doc.moveTo(xCelda, p.y + 12).lineTo(xCelda, p.y + alto - 12).lineWidth(0.5).strokeColor('#4A4D52').stroke();
+      p.doc.restore();
+    }
+    renglonFijo(p, valor, xCelda, p.y + 11, celda, F.fuerte, 17, VERDE, 'center', true);
+    renglonFijo(p, etiqueta, xCelda, p.y + 35, celda, F.medio, 7.6, '#D9DCE0', 'center');
+  });
+  p.y += alto + 10;
+}
+
+/**
+ * Imagen a todo lo ancho, con su leyenda: se recorta arriba y abajo para llenar lo que queda de la hoja,
+ * entre `minimo` y `maximo` de alto. Si no alcanza, pasa completa a la hoja siguiente.
+ */
+function imagenConLeyenda(p: Lapiz, nombre: string, imagen: PlanosClasificados['imagenes'][number]['imagen'], o: { minimo?: number; maximo?: number } = {}) {
+  const minimo = o.minimo ?? 190;
+  const maximo = Math.min(o.maximo ?? 300, (AW * imagen.alto) / imagen.ancho);
+  if (BOTTOM - p.y - 20 < Math.min(minimo, maximo)) {
+    hoja(p);
+    fileteDeHoja(p);
+    p.y = 124;
+  }
+  const alto = Math.min(maximo, BOTTOM - p.y - 20);
+  try {
+    p.doc.save();
+    p.doc.roundedRect(LM, p.y, AW, alto, 6).clip();
+    p.doc.image(imagen.datos, LM, p.y, { cover: [AW, alto], align: 'center', valign: 'center' });
+    p.doc.restore();
+  } catch {
+    /* un anexo corrupto deja su hueco en blanco, no tumba la cotización */
+  }
+  p.y += alto + 6;
+  leyendaDePlano(p, nombre);
+}
+
+function apartadoEjecutivoDeMemoria(p: Lapiz, q: FormatoNexara, a: Apartado, m: MemoriaDiseno, vistas: PlanosClasificados['imagenes']) {
+  tituloDeApartado(p, a);
+  const { parrafos, resultado } = alcanceDeMemoria(m);
+  for (const t of q.alcanceIntro) textoLibre(p, t);
+  for (const t of parrafos) parrafo(p, t);
+  const cifras: Array<[string, string]> = [[String(m.camaras), m.camaras === 1 ? 'Cámara proyectada' : 'Cámaras proyectadas']];
+  if (m.cobertura) cifras.push([`${Math.round(m.cobertura.cubierto)} %`, 'Del interior cubierto']);
+  if (m.tb > 0) cifras.push([`${m.tb.toFixed(1)} TB`, m.retencionDias ? `De grabación a ${m.retencionDias} días` : 'De grabación']);
+  if (m.mbps > 0) cifras.push([`${Math.round(m.mbps)} Mbps`, 'De video continuo']);
+  bandaDeCifras(p, cifras);
+  if (m.cobertura) nivelesDeDetalle(p, m.cobertura);
+  if (resultado) recuadro(p, 'Resultado esperado', resultado);
+  // Las vistas del sitio abren su propia hoja y la llenan.
+  if (vistas.length) {
+    hoja(p);
+    fileteDeHoja(p);
+    p.y = 124;
+    const alto = Math.min(300, (BOTTOM - 124) / vistas.length - 24);
+    for (const v of vistas) imagenConLeyenda(p, v.nombre, v.imagen, { minimo: 100, maximo: alto });
+  }
 }
 
 function apartadoEjecutivo(p: Lapiz, q: FormatoNexara, a: Apartado) {
@@ -854,16 +989,273 @@ function apartadoDeAlcance(p: Lapiz, q: FormatoNexara, a: Apartado) {
   });
 }
 
+const cacheModelos = new Map<string, Buffer | null>();
+
+/** El modelo 3D propio del tipo de equipo (nunca fotos del fabricante). Sin archivo, nada: el texto ocupa ese lugar. */
+function imagenDeModelo(tipo: string): Buffer | null {
+  const clave = /^[a-z-]+$/.test(tipo) ? tipo : 'generico';
+  if (cacheModelos.has(clave)) return cacheModelos.get(clave)!;
+  const nombre = clave === 'panoramica' || clave === 'ojo-de-pez' ? 'domo' : clave;
+  const dir = path.join(directorioAssets(), 'modelos');
+  const archivo = [nombre, 'generico'].map((n) => path.join(dir, `${n}.png`)).find((f) => fs.existsSync(f));
+  const datos = archivo ? fs.readFileSync(archivo) : null;
+  cacheModelos.set(clave, datos);
+  return datos;
+}
+
+const FOTO_LINEA = 104;
+
+/** Una línea de cámaras, como en el diseño: qué es, dónde va y qué trae, con su modelo al lado. */
+function bloqueDeLinea(p: Lapiz, l: LineaDeCamaras, letra: string) {
+  const anchoTexto = AW - FOTO_LINEA - 18;
+  const xTexto = LM + FOTO_LINEA + 18;
+  const titulo = `${letra}. ${l.titulo} — ${l.cantidad} ${l.cantidad === 1 ? 'cámara' : 'cámaras'}`;
+  const modelo = [l.marca, l.modelo].filter(Boolean).join(' ');
+  const ubicaciones = `Ubicaciones asignadas: ${l.ubicaciones.join(', ')}.`;
+  const lh = 13.6;
+  const size = 9.8;
+  const lineasUb = l.ubicaciones.length ? partirTexto(p, ubicaciones, anchoTexto, size, F.texto) : [];
+  const lineasDatos = l.datos.flatMap((d) => partirTexto(p, d, anchoTexto - 11, size, F.texto).map((t, i) => ({ t, marca: i === 0 })));
+  const altoTexto = 17 + 14 + 3 + lineasUb.length * lh + (lineasUb.length ? 5 : 0) + lineasDatos.length * lh;
+  const alto = Math.max(altoTexto, FOTO_LINEA);
+  continuarTexto(p, alto + 14);
+  const arriba = p.y;
+  const foto = l.foto ? Buffer.from(l.foto.slice(l.foto.indexOf(',') + 1), 'base64') : imagenDeModelo(l.tipo);
+  p.doc.save();
+  p.doc.roundedRect(LM, arriba, FOTO_LINEA, FOTO_LINEA, 6).fill(GRIS_RECUADRO);
+  p.doc.restore();
+  if (foto) {
+    try {
+      p.doc.image(foto, LM + 8, arriba + 8, { fit: [FOTO_LINEA - 16, FOTO_LINEA - 16], align: 'center', valign: 'center' });
+    } catch {
+      /* el recuadro queda vacío */
+    }
+  }
+  let y = arriba;
+  renglonFijo(p, titulo, xTexto, y, anchoTexto, F.fuerte, 10.8, GRIS_TITULO);
+  y += 15;
+  renglonFijo(p, modelo, xTexto, y, anchoTexto, F.semi, 8.8, VERDE_OSC);
+  y += 17;
+  for (const t of lineasUb) {
+    renglonFijo(p, t, xTexto, y, anchoTexto, F.texto, size, TINTA);
+    y += lh;
+  }
+  if (lineasUb.length) y += 5;
+  for (const { t, marca } of lineasDatos) {
+    if (marca) {
+      p.doc.save();
+      p.doc.circle(xTexto + 3, y + size * 0.6, 1.6).fill(VERDE_OSC);
+      p.doc.restore();
+    }
+    renglonFijo(p, t, xTexto + 11, y, anchoTexto - 11, F.texto, size, TINTA);
+    y += lh;
+  }
+  p.y = arriba + alto + 16;
+}
+
+function apartadoDeLineas(p: Lapiz, a: Apartado, m: MemoriaDiseno) {
+  tituloDeApartado(p, a, 130);
+  parrafo(
+    p,
+    m.lineas.length > 1
+      ? `Cada ubicación tiene condiciones de luz y de geometría propias. En lugar de un modelo genérico para todo el inmueble, se seleccionaron ${m.lineas.length} líneas de equipo:`
+      : 'El equipo seleccionado responde a las condiciones de luz y de geometría de cada ubicación:',
+    { despues: 12 },
+  );
+  m.lineas.forEach((l, i) => bloqueDeLinea(p, l, String.fromCharCode(65 + i)));
+  if (m.otros.length) {
+    subtitulo(p, 'Otros sistemas integrados');
+    m.otros.forEach((o) => vineta(p, `${o.titulo}: ${[o.cantidad > 1 ? `${o.cantidad} ×` : '', o.modelo].filter(Boolean).join(' ')}`));
+  }
+}
+
+const FILA_DATO = 21;
+
+/** Tabla de dos columnas con el estilo de la propuesta económica. */
+function tablaDeDatos(p: Lapiz, titulo: string, filas: Array<[string, string]>) {
+  if (!filas.length) return;
+  continuarTexto(p, 22 + FILA_DATO * (filas.length <= 10 ? filas.length : 3));
+  const { x, ancho } = RECUADRO;
+  p.doc.save();
+  p.doc.rect(x, p.y, ancho, 22).fill(AZUL);
+  p.doc.restore();
+  renglonFijo(p, titulo, x + 8, p.y + 6.6, ancho - 16, F.fuerte, 7.8, '#FFFFFF');
+  p.y += 22;
+  filas.forEach(([etiqueta, valor], i) => {
+    if (p.y + FILA_DATO > BOTTOM) {
+      hoja(p);
+      fileteDeHoja(p);
+      p.y = 124;
+    }
+    if (i % 2) {
+      p.doc.save();
+      p.doc.rect(x, p.y, ancho, FILA_DATO).fill(ZEBRA);
+      p.doc.restore();
+    }
+    renglonFijo(p, etiqueta, x + 8, p.y + 6, 170, F.semi, 8.8, TINTA);
+    renglonFijo(p, valor, x + 180, p.y + 6, ancho - 188, F.texto, 8.8, TINTA);
+    p.y += FILA_DATO;
+    p.doc.save();
+    p.doc.strokeColor(LINEA).lineWidth(0.4).moveTo(x, p.y).lineTo(x + ancho, p.y).stroke();
+    p.doc.restore();
+  });
+  p.y += 12;
+}
+
+function apartadoDelCentro(p: Lapiz, a: Apartado, m: MemoriaDiseno) {
+  tituloDeApartado(p, a, 120);
+  parrafo(p, 'Toda la red converge en un punto donde se concentran la grabación, la supervisión y la protección eléctrica del sistema. Estas son las cifras con las que se dimensionó:', { despues: 10 });
+  tablaDeDatos(p, 'DIMENSIONAMIENTO DEL SISTEMA', calculoDelCentro(m));
+  if (m.centro.length) {
+    tablaDeDatos(
+      p,
+      'EQUIPAMIENTO DEL CENTRO',
+      m.centro.map((e) => [e.titulo, [e.cantidad > 1 ? `${e.cantidad} ×` : '', e.modelo, e.detalle ? `· ${e.detalle}` : ''].filter(Boolean).join(' ')]),
+    );
+  }
+}
+
+/** Cuántas cámaras de cada modelo van en cada zona: la hoja de levantamiento de los formatos de cliente. */
+function apartadoDeLevantamiento(p: Lapiz, a: Apartado, m: MemoriaDiseno) {
+  const { columnas, filas } = m.levantamiento;
+  const altoCabeza = 34;
+  const altoFila = 19;
+  tituloDeApartado(p, a, 80 + altoCabeza);
+  parrafo(p, 'Distribución de las cámaras por zona y por modelo, tal como quedaron en el diseño.', { despues: 10 });
+  const { x, ancho } = RECUADRO;
+  const anchoZona = Math.min(190, ancho - columnas.length * 62 - 44);
+  const anchoTotal = 44;
+  const anchoCol = columnas.length ? (ancho - anchoZona - anchoTotal) / columnas.length : 0;
+  const cabeza = () => {
+    p.doc.save();
+    p.doc.rect(x, p.y, ancho, altoCabeza).fill(AZUL);
+    p.doc.restore();
+    renglonFijo(p, 'Zona', x + 8, p.y + 12, anchoZona - 12, F.fuerte, 7.8, '#FFFFFF');
+    columnas.forEach((c, i) => {
+      const xc = x + anchoZona + i * anchoCol;
+      renglonFijo(p, c.titulo, xc + 2, p.y + 6, anchoCol - 4, F.fuerte, 7.6, '#FFFFFF', 'center');
+      const modelo = partirTexto(p, c.modelo, anchoCol - 6, 6.2, F.texto).slice(0, 2);
+      modelo.forEach((t, n) => renglonFijo(p, t, xc + 2, p.y + 16 + n * 7.6, anchoCol - 4, F.texto, 6.2, '#C9D3DE', 'center'));
+    });
+    renglonFijo(p, 'Total', x + ancho - anchoTotal, p.y + 12, anchoTotal - 6, F.fuerte, 7.8, '#FFFFFF', 'right');
+    p.y += altoCabeza;
+  };
+  cabeza();
+  const varios = new Set(filas.map((f) => f.nivel)).size > 1;
+  let nivel: string | null = null;
+  let n = 0;
+  const totales: Record<string, number> = {};
+  for (const f of filas) {
+    if (p.y + altoFila * 2 > BOTTOM) {
+      hoja(p);
+      cabeza();
+    }
+    if (varios && f.nivel !== nivel) {
+      nivel = f.nivel;
+      p.doc.save();
+      p.doc.rect(x, p.y, ancho, FILA_GRUPO).fill(AZUL_GRUPO);
+      p.doc.restore();
+      renglonFijo(p, f.nivel.toUpperCase(), x + 8, p.y + 5.4, ancho - 16, F.fuerte, 8, '#FFFFFF');
+      p.y += FILA_GRUPO;
+    }
+    n += 1;
+    if (n % 2 === 0) {
+      p.doc.save();
+      p.doc.rect(x, p.y, ancho, altoFila).fill(ZEBRA);
+      p.doc.restore();
+    }
+    renglonFijo(p, partirTexto(p, f.zona, anchoZona - 12, 8.8, F.medio)[0] ?? '', x + 8, p.y + 5, anchoZona - 12, F.medio, 8.8, TINTA);
+    let suma = 0;
+    columnas.forEach((c, i) => {
+      const v = f.piezas[c.clave] ?? 0;
+      suma += v;
+      totales[c.clave] = (totales[c.clave] ?? 0) + v;
+      renglonFijo(p, v ? String(v) : '—', x + anchoZona + i * anchoCol, p.y + 5, anchoCol, v ? F.semi : F.texto, 8.8, v ? TINTA : GRIS, 'center', true);
+    });
+    renglonFijo(p, String(suma), x + ancho - anchoTotal, p.y + 5, anchoTotal - 6, F.fuerte, 8.8, TINTA, 'right', true);
+    p.y += altoFila;
+    p.doc.save();
+    p.doc.strokeColor(LINEA).lineWidth(0.4).moveTo(x, p.y).lineTo(x + ancho, p.y).stroke();
+    p.doc.restore();
+  }
+  p.doc.save();
+  p.doc.rect(x, p.y, ancho, altoFila + 2).fill(AZUL);
+  p.doc.restore();
+  renglonFijo(p, 'TOTAL', x + 8, p.y + 6, anchoZona - 12, F.fuerte, 8.4, '#FFFFFF');
+  let total = 0;
+  columnas.forEach((c, i) => {
+    const v = totales[c.clave] ?? 0;
+    total += v;
+    renglonFijo(p, String(v), x + anchoZona + i * anchoCol, p.y + 6, anchoCol, F.fuerte, 8.8, '#FFFFFF', 'center', true);
+  });
+  renglonFijo(p, String(total), x + ancho - anchoTotal, p.y + 6, anchoTotal - 6, F.fuerte, 8.8, '#FFFFFF', 'right', true);
+  p.y += altoFila + 12;
+}
+
+/** Cuánto del interior alcanza cada nivel de detalle de IEC 62676-4. */
+function nivelesDeDetalle(p: Lapiz, c: NonNullable<MemoriaDiseno['cobertura']>) {
+  const altoFila = 25;
+  continuarTexto(p, 20 + altoFila * NIVELES_DORI.length + 8);
+  renglonFijo(p, 'Nivel de detalle alcanzado (IEC 62676-4)', LM, p.y, AW, F.fuerte, CUERPO.size, GRIS_TITULO);
+  p.y += 18;
+  for (const n of NIVELES_DORI) {
+    const pct = Math.max(0, Math.min(100, c[n.clave]));
+    renglonFijo(p, n.titulo, LM + 12, p.y + 1, 110, F.semi, 9.2, TINTA);
+    renglonFijo(p, `${n.ppm} · ${n.uso}`, LM + 12, p.y + 12, 240, F.texto, 7.4, GRIS);
+    p.doc.save();
+    p.doc.circle(LM + 4, p.y + 6, 3).fill(n.color);
+    p.doc.roundedRect(LM + 244, p.y + 4, 216, 8, 4).fill('#E9ECEF');
+    if (pct > 0) p.doc.roundedRect(LM + 244, p.y + 4, Math.max(8, (216 * pct) / 100), 8, 4).fill(n.color);
+    p.doc.restore();
+    renglonFijo(p, `${Math.round(pct)} %`, LM + 464, p.y + 1, AW - 464, F.fuerte, 10, TINTA, 'right', true);
+    p.y += altoFila;
+  }
+  p.y += 8;
+}
+
 /** Leyenda de un plano, centrada y entre corchetes como en el diseño. */
 function leyendaDePlano(p: Lapiz, nombre: string) {
   texto(p, `[ ${nombre.toUpperCase()} ]`, LM, p.y, AW, { font: F.semi, size: 7.8, color: CARBON, align: 'center', characterSpacing: 0.6 });
   p.y += altoDe(p, nombre.toUpperCase(), AW, 7.8, F.semi) + 8;
 }
 
+/** El plano técnico es doble carta y apaisado: va en hoja horizontal, a todo lo que da, para que se pueda leer. */
+function hojaDePlanoTecnico(p: Lapiz, a: Apartado, nombre: string, imagen: PlanosClasificados['imagenes'][number]['imagen']) {
+  p.doc.addPage({ size: 'LETTER', layout: 'landscape', margin: 0 });
+  p.pagina += 1;
+  p.apaisadas.add(p.pagina);
+  p.paginaDe.planos ??= p.pagina;
+  const { doc } = p;
+  doc.font(F.fuerte).fontSize(11).fillColor(VERDE_OSC).text(`${a.numero}.`, 24, 18, { lineBreak: false, characterSpacing: 0.8 });
+  doc.fillColor(GRIS_TITULO).text(nombre.toUpperCase(), 24 + doc.widthOfString(`${a.numero}.`) + 8, 18, { lineBreak: false, characterSpacing: 0.8 });
+  doc.save();
+  doc.moveTo(24, 34).lineTo(768, 34).lineWidth(1.4).strokeColor(VERDE).stroke();
+  doc.restore();
+  const arriba = 40;
+  const libreW = 792 - 48;
+  const libreH = 612 - arriba - 22;
+  const escala = Math.min(libreW / imagen.ancho, libreH / imagen.alto);
+  const ancho = imagen.ancho * escala;
+  const alto = imagen.alto * escala;
+  try {
+    doc.image(imagen.datos, 24 + (libreW - ancho) / 2, arriba + (libreH - alto) / 2, { width: ancho, height: alto });
+  } catch {
+    /* un anexo corrupto deja su hueco en blanco, no tumba la cotización */
+  }
+  // Lo que siga abre hoja vertical con su marco.
+  p.y = BOTTOM + 1;
+}
+
 function apartadoDePlanos(p: Lapiz, a: Apartado, anexos: PlanosClasificados) {
+  const tecnicos = anexos.imagenes.filter((i) => i.nombre.startsWith(NOMBRE_PLANO_TECNICO));
+  for (const t of tecnicos) hojaDePlanoTecnico(p, a, t.nombre, t.imagen);
+  const resto = anexos.imagenes.filter((i) => !tecnicos.includes(i));
+  if (tecnicos.length && !resto.length && !anexos.pdfs.length && !anexos.otros.length) return;
+  if (tecnicos.length) hoja(p);
+  anexos = { ...anexos, imagenes: resto };
   // Con imágenes el título viaja con la primera; sin ellas basta con la lista.
   if (anexos.imagenes.length) hojaEnBlanco(p);
-  tituloDeApartado(p, a);
+  if (!tecnicos.length) tituloDeApartado(p, a);
   let primera = true;
   for (const { nombre, imagen } of anexos.imagenes) {
     if (!primera) hoja(p);
@@ -1141,6 +1533,16 @@ function totales(p: Lapiz, q: FormatoNexara) {
   const altoFila = ALTO_FILA_TOTAL;
   asegurar(p, altoDeTotales(q) + 8);
   texto(p, q.letras, TABLA_X, p.y + 5, letrasW, { size: 8.8, color: GRIS });
+  // Cuánto es cada pago: el porcentaje solo obliga a sacar la cuenta.
+  const anticipo = q.anticipoPorciento;
+  if (anticipo > 0 && anticipo < 100 && q.total > 0) {
+    const yPago = p.y + 8 + altoDe(p, q.letras, letrasW, 8.8) + 6;
+    const primero = Math.round(q.total * anticipo) / 100;
+    renglonFijo(p, `Anticipo (${anticipo} %)`, TABLA_X, yPago, 110, F.semi, 8.8, TINTA);
+    renglonFijo(p, dinero(primero), TABLA_X + 110, yPago, 80, F.texto, 8.8, TINTA, 'right', true);
+    renglonFijo(p, 'Saldo contra entrega', TABLA_X, yPago + 14, 110, F.semi, 8.8, TINTA);
+    renglonFijo(p, dinero(q.total - primero), TABLA_X + 110, yPago + 14, 80, F.texto, 8.8, TINTA, 'right', true);
+  }
   let y = p.y;
   for (const [etiqueta, valor] of filas) {
     renglonFijo(p, etiqueta, x + 8, y + 6, 100, F.semi, 9.2, TINTA);
@@ -1156,6 +1558,18 @@ function totales(p: Lapiz, q: FormatoNexara) {
   renglonFijo(p, `TOTAL PROYECTO (${q.moneda})`, x + 8, y + 9, 130, F.fuerte, 8.8, '#FFFFFF');
   renglonFijo(p, dinero(q.total), x + 90, y + 8, cajaW - 98, F.fuerte, 10.6, '#FFFFFF', 'right', true);
   p.y = y + ALTO_TOTAL;
+}
+
+const ALTO_SUBTOTAL = 20;
+
+function filaSubtotalDeGrupo(p: Lapiz, etiqueta: string, importe: number) {
+  if (p.y + ALTO_SUBTOTAL > BOTTOM) hoja(p);
+  renglonFijo(p, etiqueta, TABLA_X + TABLA_W - 232, p.y + 5.6, 130, F.semi, 8.6, AZUL_GRUPO);
+  renglonFijo(p, dinero(importe), TABLA_X + TABLA_W - 140, p.y + 5.6, 137, F.fuerte, 8.8, AZUL_GRUPO, 'right', true);
+  p.y += ALTO_SUBTOTAL;
+  p.doc.save();
+  p.doc.strokeColor(AZUL_GRUPO).lineWidth(0.8).moveTo(TABLA_X, p.y).lineTo(TABLA_X + TABLA_W, p.y).stroke();
+  p.doc.restore();
 }
 
 function apartadoEconomico(p: Lapiz, q: FormatoNexara, a: Apartado) {
@@ -1178,12 +1592,15 @@ function apartadoEconomico(p: Lapiz, q: FormatoNexara, a: Apartado) {
   grupos.forEach(({ etiqueta, partidas }, i) => {
     if (etiqueta) {
       const esLaUltima = n + 1 === q.partidas.length;
-      filaDeGrupo(p, `${String.fromCharCode(65 + i)}. ${etiqueta}`, columnas, altoDeConcepto(p, partidas[0]!, columnas) + (esLaUltima ? reservaFinal : 0));
+      const conSubtotal = grupos.length > 1 && partidas.length === 1 ? ALTO_SUBTOTAL : 0;
+      filaDeGrupo(p, `${String.fromCharCode(65 + i)}. ${etiqueta}`, columnas, altoDeConcepto(p, partidas[0]!, columnas) + conSubtotal + (esLaUltima ? reservaFinal : 0));
     }
-    for (const partida of partidas) {
+    partidas.forEach((partida, j) => {
       n += 1;
-      filaPartida(p, partida, columnas, n % 2 === 0, n === q.partidas.length ? reservaFinal : 0);
-    }
+      const conSubtotal = etiqueta && grupos.length > 1 && j === partidas.length - 1 ? ALTO_SUBTOTAL : 0;
+      filaPartida(p, partida, columnas, n % 2 === 0, (n === q.partidas.length ? reservaFinal : 0) + conSubtotal);
+    });
+    if (etiqueta && grupos.length > 1) filaSubtotalDeGrupo(p, `Subtotal ${String.fromCharCode(65 + i)}`, partidas.reduce((acc, d) => acc + d.importe, 0));
   });
   if (!q.partidas.length) {
     texto(p, 'Sin partidas capturadas.', TABLA_X + 8, p.y + 6, TABLA_W - 16, { size: 8.6, color: GRIS });
@@ -1349,14 +1766,18 @@ export async function generarCotizacionNexaraPdf(
   secciones?: SeccionesPropuesta,
 ): Promise<Buffer> {
   const q = 'partidas' in quote && 'letras' in quote ? (quote as FormatoNexara) : formatoDesdeCotizacion(quote as QuoteLike);
-  const anexos = clasificarPlanos(q.conPlanos ? planos : []);
+  // La hoja técnica lleva letra chica: se imprime a más resolución que una foto.
+  const todos = clasificarPlanos(q.conPlanos ? planos : [], { maxLadoDe: (nombre) => (nombre.startsWith(NOMBRE_PLANO_TECNICO) ? 2600 : undefined) });
+  // Las vistas del sitio acompañan al alcance ejecutivo; si ese apartado no sale de la memoria, van con los planos.
+  const vistas = q.ejecutivoDeMemoria ? todos.imagenes.filter((i) => i.nombre === NOMBRE_VISTA_3D || i.nombre === NOMBRE_VISTA_COBERTURA) : [];
+  const anexos = { ...todos, imagenes: todos.imagenes.filter((i) => !vistas.includes(i)) };
   const hayPlanos = anexos.imagenes.length + anexos.pdfs.length + anexos.otros.length > 0;
   const paginasPdf = await paginasDePlanos(anexos.pdfs);
   const doc = new PDFDocument({ size: 'LETTER', margin: 0, autoFirstPage: false, bufferPages: true });
   doc.info.Title = `Cotización ${q.numero}`;
   doc.info.Author = 'NEXARA';
   registrarFuentesCorporativas(doc);
-  const p: Lapiz = { doc, y: 0, numero: q.numero, pagina: 0, paginaDe: {} };
+  const p: Lapiz = { doc, y: 0, numero: q.numero, pagina: 0, paginaDe: {}, apaisadas: new Set() };
   const trozos: Buffer[] = [];
   doc.on('data', (t: Buffer) => trozos.push(t));
   const listo = new Promise<Buffer>((resolve, reject) => {
@@ -1373,8 +1794,14 @@ export async function generarCotizacionNexaraPdf(
   // Última hoja antes de los planos en PDF: ahí se insertan sus páginas.
   let paginaTrasPlanos = 0;
   for (const a of apartados) {
-    if (a.clave === 'objetivo') apartadoEjecutivo(p, q, a);
-    else if (a.clave === 'alcance') apartadoDeAlcance(p, q, a);
+    if (a.clave === 'objetivo') {
+      if (q.ejecutivoDeMemoria && q.memoria) apartadoEjecutivoDeMemoria(p, q, a, q.memoria, vistas);
+      else apartadoEjecutivo(p, q, a);
+    } else if (a.clave === 'alcance') {
+      if (a.bloque?.especial === 'lineas' && q.memoria) apartadoDeLineas(p, a, q.memoria);
+      else if (a.bloque?.especial === 'centro' && q.memoria) apartadoDelCentro(p, a, q.memoria);
+      else apartadoDeAlcance(p, q, a);
+    } else if (a.clave === 'levantamiento' && q.memoria) apartadoDeLevantamiento(p, a, q.memoria);
     else if (a.clave === 'planos') {
       apartadoDePlanos(p, a, anexos);
       paginaTrasPlanos = p.pagina;
@@ -1392,7 +1819,8 @@ export async function generarCotizacionNexaraPdf(
     doc.switchToPage(rango.start + i);
     const impresa = paginaImpresa(i + 1, paginaTrasPlanos, paginasPdf);
     doc.font(F.texto).fontSize(7).fillColor(GRIS);
-    doc.text(`${q.numero}  ·  Página ${impresa} de ${total}`, LM, 696, { width: AW, align: 'right', lineBreak: false });
+    const apaisada = p.apaisadas.has(i + 1);
+    doc.text(`${q.numero}  ·  Página ${impresa} de ${total}`, apaisada ? 24 : LM, apaisada ? 596 : 696, { width: apaisada ? 744 : AW, align: 'right', lineBreak: false });
   }
   if (secciones) {
     const { paginaDe } = p;

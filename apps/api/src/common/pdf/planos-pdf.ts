@@ -53,7 +53,7 @@ export function archivoLocalDePlano(url: string): string | null {
 }
 
 /** Separa imágenes embebibles, PDF (páginas reales al final) y lo que no se puede imprimir. */
-export function clasificarPlanos(planos: PlanoArchivo[]): PlanosClasificados {
+export function clasificarPlanos(planos: PlanoArchivo[], opciones: { maxLadoDe?: (nombre: string) => number | undefined } = {}): PlanosClasificados {
   const vistos = new Set<string>();
   const listos: PlanosClasificados = { imagenes: [], pdfs: [], otros: [] };
   for (const plano of planos) {
@@ -65,7 +65,7 @@ export function clasificarPlanos(planos: PlanoArchivo[]): PlanosClasificados {
       listos.pdfs.push({ nombre, archivo });
       continue;
     }
-    const imagen = archivo && /\.(png|jpe?g)$/i.test(archivo) ? imagenParaPdf(archivo, { maxLado: 1600 }) : null;
+    const imagen = archivo && /\.(png|jpe?g)$/i.test(archivo) ? imagenParaPdf(archivo, { maxLado: opciones.maxLadoDe?.(nombre) ?? 1600 }) : null;
     if (imagen?.ancho && imagen.alto) listos.imagenes.push({ nombre, imagen });
     else listos.otros.push(nombre);
   }

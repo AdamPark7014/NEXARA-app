@@ -110,9 +110,10 @@ describe('pasar a cotización', () => {
   it('crea en borrador con sus partidas y queda ligada al diseño', async () => {
     const { s, cotizaciones, prisma } = armar({ ct: [FILA_CT] });
     const r = await s.pasarACotizacion(actor, 3, { lineas: [linea()] }, 1);
-    expect(r).toMatchObject({ cotizacionId: 500, quoteNumber: 'NX-500', creada: true, partidas: 1, sinPrecio: 0 });
+    // La instalación va sin precio: se cuenta para que quien cotiza la llene.
+    expect(r).toMatchObject({ cotizacionId: 500, quoteNumber: 'NX-500', creada: true, partidas: 1, sinPrecio: 1 });
     const dto = cotizaciones.create.mock.calls[0][0];
-    expect(dto).toMatchObject({ segmento: 'COMERCIAL', trabajo: 'Ejemplo · Bodega', clienteSinAlta: true, clientName: 'Cliente por definir' });
+    expect(dto).toMatchObject({ segmento: 'OBRA', depositPercent: 50, trabajo: 'Ejemplo · Bodega', clienteSinAlta: true, clientName: 'Cliente por definir' });
     expect(dto.items[0]).toMatchObject({ paqueteClave: 'cctv:3', productCtId: 77, qty: 2, unitCost: 3000, marginPercent: 30, supplierCode: 'CT', name: 'Grabador' });
     expect(prisma.cctvDiseno.update).toHaveBeenCalledWith({ where: { id: 3 }, data: { cotizacionId: 500 } });
   });
@@ -128,8 +129,61 @@ describe('pasar a cotización', () => {
   it('lo que no tiene precio va en cero y se cuenta', async () => {
     const { s, cotizaciones } = armar();
     const r = await s.pasarACotizacion(actor, 3, { lineas: [linea({ modelo: 'SIN-CT-1' })] }, 1);
-    expect(r.sinPrecio).toBe(1);
+    expect(r.sinPrecio).toBe(2);
     expect(cotizaciones.create.mock.calls[0][0].items[0]).toMatchObject({ unitPrice: 0, notes: SIN_PRECIO });
+  });
+
+  it('la instalación entra sin precio y fuera del paquete, para que actualizar no le borre su precio', async () => {
+    const { s, cotizaciones } = armar({ ct: [FILA_CT] });
+    await s.pasarACotizacion(actor, 3, { lineas: [linea()] }, 1);
+    const instalacion = cotizaciones.create.mock.calls[0][0].items.at(-1);
+    expect(instalacion).toMatchObject({ grupo: 'MANO_DE_OBRA', unitPrice: 0, notes: SIN_PRECIO, qty: 1 });
+    expect(instalacion).not.toHaveProperty('paqueteClave');
+  });
+
+  it('al actualizar sin mano de obra la agrega, y con ella no la duplica', async () => {
+    const ligada = { ct: [FILA_CT], diseno: { id: 3, nombre: 'X', clienteId: null, cotizacionId: 500 }, cotizacion: { id: 500, status: 'DRAFT', quoteNumber: 'NX-500' } };
+    const sinMano = armar({ ...ligada, items: [{ id: 2, paqueteClave: 'cctv:3', name: 'Grabador viejo', qty: 1, unitPrice: 1 }] });
+    const r = await sinMano.s.pasarACotizacion(actor, 3, { lineas: [linea()] }, 1);
+    expect(r.sinPrecio).toBe(1);
+    expect(sinMano.cotizaciones.update.mock.calls[0][1].items.at(-1)).toMatchObject({ grupo: 'MANO_DE_OBRA' });
+    const mano = { id: 1, paqueteClave: null, name: 'Instalación de cámaras', grupo: 'MANO_DE_OBRA', qty: 1, unitPrice: 5000 };
+    const conMano = armar({ ...ligada, items: [mano] });
+    const r2 = await conMano.s.pasarACotizacion(actor, 3, { lineas: [linea()] }, 1);
+    expect(r2.sinPrecio).toBe(0);
+    const items = conMano.cotizaciones.update.mock.calls[0][1].items;
+    expect(items.filter((i: { grupo?: string }) => i.grupo === 'MANO_DE_OBRA')).toEqual([mano]);
+  });
+
+  const memoria = { camaras: 2, lineas: [{ titulo: 'Domo IP', cantidad: 2 }], levantamiento: { columnas: [], filas: [] } };
+
+  it('la memoria del diseño viaja con la cotización nueva', async () => {
+    const { s, cotizaciones } = armar({ ct: [FILA_CT] });
+    await s.pasarACotizacion(actor, 3, { lineas: [linea()], memoria }, 1);
+    expect(cotizaciones.create.mock.calls[0][0].opciones.memoria.camaras).toBe(2);
+  });
+
+  it('al actualizar reemplaza la memoria sin tocar las demás opciones', async () => {
+    const { s, cotizaciones } = armar({ diseno: { id: 3, nombre: 'X', clienteId: null, cotizacionId: 500 }, cotizacion: { id: 500, status: 'DRAFT', quoteNumber: 'NX-500' } });
+    cotizaciones.findOne.mockResolvedValue({ items: [], planos: [], opciones: { tipoCambioNota: 'DOF', memoria: { camaras: 9, lineas: [{ titulo: 'Vieja', cantidad: 9 }] } } });
+    await s.pasarACotizacion(actor, 3, { lineas: [linea()], memoria }, 1);
+    expect(cotizaciones.update.mock.calls[0][1].opciones).toMatchObject({ tipoCambioNota: 'DOF', memoria: { camaras: 2 } });
+  });
+
+  it('al actualizar quita los anexos del diseño, y lo que alguien subió a mano se queda', async () => {
+    const { s, cotizaciones } = armar({ diseno: { id: 3, nombre: 'X', clienteId: null, cotizacionId: 500 }, cotizacion: { id: 500, status: 'DRAFT', quoteNumber: 'NX-500' } });
+    cotizaciones.findOne.mockResolvedValue({
+      items: [],
+      planos: [
+        { url: '/u/vieja.png', nombre: 'Plano de videovigilancia' },
+        { url: '/u/tecnico.png', nombre: 'Plano técnico de distribución · Planta baja' },
+        { url: '/u/3d.jpg', nombre: 'Vista 3D general del sitio' },
+        { url: '/u/cobertura.jpg', nombre: 'Cobertura en el piso por nivel de detalle' },
+        { url: '/u/mio.pdf', nombre: 'Plano del arquitecto' },
+      ],
+    });
+    await s.pasarACotizacion(actor, 3, { lineas: [linea()] }, 1);
+    expect(cotizaciones.quitarPlano.mock.calls.map((c: unknown[]) => c[1])).toEqual(['/u/vieja.png', '/u/tecnico.png', '/u/3d.jpg', '/u/cobertura.jpg']);
   });
 
   it('un precio de la pantalla se ignora', async () => {

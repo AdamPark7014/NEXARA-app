@@ -1,5 +1,6 @@
 # RELEVO
 
+- **03-11 (claude-code) — Cotización híbrida del Canva y del esquema del 27-09 (fase 11 del diseñador). Muestra aprobada por Adam.** Detalle en `docs/DISENADOR-CCTV.md` §7.1. El PDF del cliente sigue en `cotizaciones/cotizacion-formato-nexara.ts`; lo nuevo sale de `opciones.memoria`, una foto del diseño que manda «Cotizar». Toda cotización gana subtotal por grupo, anticipo y saldo en pesos, y referencias del cliente en Portada si se capturan. Medido sobre las 57 reales con el generador viejo y el nuevo: 303 hojas en los dos, ninguna falla, las únicas líneas nuevas son esas. La instalación entra sin precio y fuera del paquete para que actualizar no la borre. No queda migración: todo va en JSON existente. Sigue sin medirse armar un plano real en media hora.
 - **03-11 (claude-code) — Adam confirmó que la Contadora General opere la Mesa contable.** Eligió «Que la opere» frente a solo consulta: registra pólizas, cuadra banco, prepara facturas y cierra el mes, como quedó en `7cbeba83`. Sin cambios de código; Nómina sigue solo para el CEO.
 
 - **03-11 ~10:40 UTC (claude-code) — La Contadora General ya abre Mesa contable y Bancos, sin Nómina (`7cbeba83`).** Adam: «Sí, dale acceso», a la pregunta de darle Mesa contable con saldos de banco.

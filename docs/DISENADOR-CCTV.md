@@ -512,6 +512,23 @@ cotizaciones. Va con marca **NEXARA** (CCTV es de NEXARA; ver `.claude/rules/mar
 Botón **«Pasar a cotización»**: crea o actualiza una `Cotizacion` con los equipos como `CotizacionItem` y
 adjunta el plano en `planos`. Detalle en §6.1.
 
+### 7.1 Cotización híbrida (fase 11, Adam: «usa un híbrido entre 27-09 y la de Canva», 03-11-2026)
+
+El PDF del cliente sigue siendo uno solo (`cotizaciones/cotizacion-formato-nexara.ts`). El Canva `DAHZhXVJj2A` es un diseño de cámaras real, así que sus apartados pueden salir de los datos del diseñador.
+
+| De dónde | Qué aporta |
+| --- | --- |
+| Canva | Portada, marco, medidas y orden; alcance ejecutivo con los datos del sitio; especificación por línea de cámaras; centro de monitoreo; póliza |
+| `docs/ceo/ESQUEMA-COTIZACIONES-2026-09-27.md` | Levantamiento por zona (formato A), referencias del cliente (RITM, SP, OC…), subtotal por grupo, CCTV como obra con 50 % de anticipo |
+| Del diseñador | Franja de cifras, barras por nivel DORI, vista 3D, cobertura en el piso, plano técnico en hoja horizontal, modelo 3D propio de cada línea |
+
+- **La memoria:** al pasar a cotización, `lib/cctv/memoriaCotizacion.ts` manda una foto del diseño que se guarda en `opciones.memoria` (`cotizaciones/memoria-diseno.ts`). Es una foto a propósito: lo prometido no cambia solo si después alguien mueve el plano. El editor no la maneja; `opcionesAlGuardar` la conserva al guardar. Una plantilla no se la lleva.
+- **Lo escrito manda:** con `objetivo` escrito o un punto reescrito sale ese texto. Un punto por omisión que solo se renombró sigue saliendo del diseño, porque se compara su texto con el sugerido.
+- **Sin diseño:** la estructura no cambia. Solo ganan los subtotales por grupo, el anticipo y el saldo en pesos, y las referencias si se capturan. Medido sobre las 57 reales: 303 hojas antes y después, ninguna falla, y las únicas líneas nuevas son esas.
+- **Instalación:** el diseño no sabe cuánto cuesta. Se agrega sin precio y fuera del paquete `cctv:<id>`, para que actualizar no borre lo que capture quien cotiza. Si la cotización ya trae mano de obra no se duplica.
+- **Imágenes:** los nombres `NOMBRE_VISTA_3D`, `NOMBRE_VISTA_COBERTURA` y `NOMBRE_PLANO_TECNICO` deciden dónde va cada una, y están iguales en web y API. Actualizar reemplaza las del diseño; lo que alguien subió a mano se queda.
+- **Hoja técnica como imagen:** `elementoAPng` la dibuja con `foreignObject` en un SVG, con sus reglas de CSS y sus fuentes incrustadas. Si el navegador no puede, va solo el dibujo. Una variable de CSS sin valor debe quedar sin efecto: sustituirla por un gris pintó de gris la tabla de la cédula.
+
 ## 8. Acceso
 
 Regla de Adam: **encargados de área y arquitecto sí; ingenieros de soporte e instaladores no; el encargado
@@ -582,7 +599,7 @@ lugares a tocar para dar de alta un módulo:
 | 9 | Memoria técnica: subir el PDF, la IA llena la ficha y se arma el modelo. Medido: 92 de 94 datos en 6 fichas con Haiku 5.5 | Propuesta aprobada |
 | 9b | Moverse por dentro, imán de esquinas y muros, armar con IA, modelos y visor con vistas y cotas (§4.3, §4.4) | Pedido de Adam, 02-11 |
 | 10 | Stock de Almacén, consulta en CT y «Pasar a cotización» (§6.1) | **Hecha** (02-11): un solo inventario, sin tabla paralela |
-| 11 | Cotización premium | Faltan las especificaciones de Adam |
+| 11 | Cotización premium: híbrido del Canva y del esquema del 27-09 (§7.1) | **Hecha** (03-11): el PDF sale con los datos del diseño; muestra aprobada por Adam |
 
 Cada fase se despliega sola (`/root/deploy-web.sh` si solo cambia la web; `/root/deploy-api-web.sh` si cambia
 la API).

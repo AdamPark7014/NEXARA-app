@@ -18,7 +18,7 @@ import { normalizarBloques } from './alcance-bloques.js';
 import { calculateLine, calculateTotals, normalizeItems, porcentajeMargen, type RawCotizacionItem } from './cotizacion-totals.js';
 import { ordenarPlanos } from './planos-cotizacion.js';
 import { normalizarSegmento } from './terminos-segmento.js';
-import { normalizarOpciones } from './personalizacion.js';
+import { opcionesAlGuardar } from './personalizacion.js';
 import type { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 
 /** Topes del borrador: el PDF tarda ~25 ms, pero no se arma uno de mil partidas por tecla. */
@@ -96,7 +96,7 @@ export function borradorSobreGuardada<Q extends Record<string, any>>(guardada: Q
     conIva: dto.conIva !== undefined ? dto.conIva !== false : guardada['conIva'] !== false,
     note: texto(dto.note, guardada['note']),
     // Personalización: la del borrador completa (el editor manda todas las opciones juntas).
-    opciones: dto.opciones ? normalizarOpciones(dto.opciones) : guardada['opciones'],
+    opciones: dto.opciones ? opcionesAlGuardar(dto.opciones, guardada['opciones']) : guardada['opciones'],
   };
 
   if (dto.items) {
