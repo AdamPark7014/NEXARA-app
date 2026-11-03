@@ -15,7 +15,7 @@ struct ProyectosView: View {
     private var todos: [ProyectoResumenFila] { estado.datos ?? [] }
 
     var body: some View {
-        let visibles = ProyectosRules.conResaltado(
+        let visibles: [ProyectoResumenFila] = ProyectosRules.conResaltado(
             ProyectosRules.aplicar(todos, filtro: filtro, consulta: consulta),
             todos: todos,
             id: resaltarId
@@ -60,15 +60,7 @@ struct ProyectosView: View {
                             titulo: filtro.etiqueta,
                             trailing: "\(visibles.count)"
                         )
-                        ForEach(visibles) { p in
-                            TarjetaDeProyecto(proyecto: p)
-                                .overlay {
-                                    if p.id == resaltarId {
-                                        RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
-                                            .stroke(NxColors.primary, lineWidth: 2)
-                                    }
-                                }
-                        }
+                        ForEach(visibles) { TarjetaDeProyecto(proyecto: $0, resaltado: $0.id == resaltarId) }
                     }
                 }
 
@@ -115,8 +107,19 @@ struct ProyectosView: View {
 /// Un proyecto: un dato por renglón. El porcentaje desconocido no se pinta como cero.
 private struct TarjetaDeProyecto: View {
     let proyecto: ProyectoResumenFila
+    var resaltado = false
 
     var body: some View {
+        contenido
+            .overlay {
+                if resaltado {
+                    RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+                        .stroke(NxColors.primary, lineWidth: 2)
+                }
+            }
+    }
+
+    private var contenido: some View {
         let tono = ProyectosRules.tono(ProyectosRules.salud(proyecto.resumen?.salud))
         let avance = proyecto.resumen?.avance?.porcentaje
         MoreTarjeta {
