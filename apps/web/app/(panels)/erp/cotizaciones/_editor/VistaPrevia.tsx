@@ -16,22 +16,8 @@ import {
   type Programador,
   type SeccionPropuesta,
 } from "@/lib/vista-previa-vivo";
+import { cargarPdfJs, MENSAJE_WORKER_ATORADO, workerAtorado, type PdfJs } from "@/lib/pdfjs-navegador";
 import styles from "./editor.module.css";
-
-type PdfJs = typeof import("pdfjs-dist");
-
-/** pdf.js se carga una vez y solo en el navegador (el worker es el de `public/`, versión 3.11.174). */
-let pdfjsCargado: Promise<PdfJs> | null = null;
-function cargarPdfJs(): Promise<PdfJs> {
-  if (!pdfjsCargado) {
-    pdfjsCargado = import("pdfjs-dist").then((m) => {
-      const pdfjs = ((m as unknown as { default?: PdfJs }).default ?? m) as PdfJs;
-      pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
-      return pdfjs;
-    });
-  }
-  return pdfjsCargado;
-}
 
 const MARGEN = 16;
 const suave = () =>
@@ -88,6 +74,13 @@ export default function VistaPrevia({
   const pintura = useRef(0);
   const anchoPintado = useRef(0);
   const pendienteDeVer = useRef(false);
+  /** pdf.js guardó el fallo de su worker: reintentar solo sirve recargando la página. */
+  const atorado = useRef(false);
+
+  const reintentar = () => {
+    if (atorado.current) window.location.reload();
+    else programador.current?.ahora(borradorRef.current);
+  };
 
   const irAPagina = useCallback((pagina: number, comportamiento: ScrollBehavior = suave()) => {
     const caja = scroller.current;
@@ -184,9 +177,11 @@ export default function VistaPrevia({
           if (previa) URL.revokeObjectURL(previa);
           return URL.createObjectURL(new Blob([r.bytes.slice()], { type: "application/pdf" }));
         });
-        void pintar(r.bytes, leerSecciones(r.secciones)).catch((e) =>
-          setError(e instanceof Error ? `No se pudo dibujar el PDF: ${formatApiError(e)}` : "No se pudo dibujar el PDF"),
-        );
+        void pintar(r.bytes, leerSecciones(r.secciones)).catch((e) => {
+          atorado.current = workerAtorado(e);
+          if (atorado.current) setError(MENSAJE_WORKER_ATORADO);
+          else setError(e instanceof Error ? `No se pudo dibujar el PDF: ${formatApiError(e)}` : "No se pudo dibujar el PDF");
+        });
       },
       alError: (e) => setError(formatApiError(e, "No se pudo armar la vista previa")),
       alCambiarEstado: setActualizando,
@@ -278,7 +273,7 @@ export default function VistaPrevia({
             variant="ghost"
             size="sm"
             iconStart={<RefreshRoundedIcon />}
-            onClick={() => programador.current?.ahora(borradorRef.current)}
+            onClick={reintentar}
             disabled={!cotizacionId || !token}
             title="Volver a armar el PDF ahora"
           >
@@ -295,7 +290,7 @@ export default function VistaPrevia({
       {error && paginas ? (
         <div className={styles.vistaAviso} role="alert">
           <span>{error}</span>
-          <LinkButton onClick={() => programador.current?.ahora(borradorRef.current)}>Reintentar</LinkButton>
+          <LinkButton onClick={reintentar}>Reintentar</LinkButton>
         </div>
       ) : null}
       <div className={styles.vistaMarco} data-testid="vista-previa-pdf" data-estado={estado ?? "sin-cotizacion"}>
@@ -312,7 +307,7 @@ export default function VistaPrevia({
         ) : error && !paginas ? (
           <div className={styles.vistaCapa} role="alert">
             <p>{error}</p>
-            <Button size="sm" onClick={() => programador.current?.ahora(borradorRef.current)}>
+            <Button size="sm" onClick={reintentar}>
               Reintentar
             </Button>
           </div>

@@ -3,19 +3,7 @@
  * imagen con pdf.js en el navegador (primera hoja, ~3000 px de ancho) y una imagen enorme se
  * reduce. Se sube como PNG; la API solo recibe imágenes.
  */
-type PdfJs = typeof import("pdfjs-dist");
-
-let pdfjsCargado: Promise<PdfJs> | null = null;
-function cargarPdfJs(): Promise<PdfJs> {
-  if (!pdfjsCargado) {
-    pdfjsCargado = import("pdfjs-dist").then((m) => {
-      const pdfjs = ((m as unknown as { default?: PdfJs }).default ?? m) as PdfJs;
-      pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
-      return pdfjs;
-    });
-  }
-  return pdfjsCargado;
-}
+import { cargarPdfJs } from "@/lib/pdfjs-navegador";
 
 export const ANCHO_CROQUIS_PX = 3000;
 const MAXIMO_LADO_PX = 6000;
