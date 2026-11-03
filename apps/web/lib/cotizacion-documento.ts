@@ -311,8 +311,43 @@ export function partidaNueva(parcial: Partial<PartidaCotizacion> & Pick<PartidaE
   };
 }
 
+/**
+ * Lo que la partida guarda y el editor no enseña: liga con CT y proveedor, IEPS, retención, notas…
+ * Guardar rehace todas las partidas y lo que no llegue a la API se borra, así que se devuelve tal cual.
+ * Una columna nueva de `cotizacion_items` va aquí o en `partidasDesdeApi`: una prueba lo revisa contra el esquema.
+ */
+const CAMPOS_SIN_EDITAR = [
+  "productId",
+  "scope",
+  "sku",
+  "partNumber",
+  "batchReference",
+  "supplierId",
+  "supplierSku",
+  "productCtId",
+  "supplierCode",
+  "supplierWarehouseCode",
+  "stockSnapshot",
+  "leadTimeDays",
+  "scoreReason",
+  "optimizationMode",
+  "ieps",
+  "retention",
+  "warrantyMonths",
+  "deliveryTime",
+  "countryOrigin",
+  "notes",
+] as const;
+
+const camposSinEditar = (p: PartidaCotizacion) =>
+  Object.fromEntries(CAMPOS_SIN_EDITAR.filter((campo) => p[campo] != null).map((campo) => [campo, p[campo]])) as Pick<
+    PartidaCotizacion,
+    (typeof CAMPOS_SIN_EDITAR)[number]
+  >;
+
 export function partidasDesdeApi(items: PartidaCotizacion[] | null | undefined): PartidaEditor[] {
   return (items ?? []).map((p) => ({
+    ...camposSinEditar(p),
     key: nuevaClave("p"),
     id: p.id,
     grupo: p.grupo ?? null,

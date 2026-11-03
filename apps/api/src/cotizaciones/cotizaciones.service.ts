@@ -1812,26 +1812,8 @@ export class CotizacionesService {
     const n = Math.max(1, Math.trunc(Number(cantidad) || 0));
     // Las partidas del mismo paquete se reemplazan: dos pasadas de «15 cámaras» no son 30.
     const conservadas = existing.items.filter((item: any) => item.paqueteClave !== paquete.clave);
-    const generadas = partidasDePaquete(paquete, n);
-
-    const items = [
-      ...conservadas.map((item: any) => ({
-        grupo: item.grupo,
-        paqueteClave: item.paqueteClave,
-        paqueteCantidad: item.paqueteCantidad,
-        category: item.category,
-        name: item.name,
-        description: item.description,
-        unit: item.unit,
-        qty: Number(item.qty),
-        unitPrice: Number(item.unitPrice),
-        discount: Number(item.discount),
-        tax: Number(item.tax),
-        laborHours: Number(item.laborHours || 0),
-        laborRate: Number(item.laborRate || 0),
-      })),
-      ...generadas,
-    ];
+    // Las demás van completas: guardar rehace todas las partidas y lo que no llegue se borra.
+    const items = [...conservadas, ...partidasDePaquete(paquete, n)];
 
     const bloques = mezclarBloqueAlcance(
       (Array.isArray(existing.alcanceBloques) ? (existing.alcanceBloques as any[]) : []) as Array<{ clave: string }>,
