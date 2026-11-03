@@ -12,6 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import java.io.File
+import mx.nexara.mobile.nativeapp.data.api.ActivityDto
+import mx.nexara.mobile.nativeapp.ui.console.activities.ActividadTiempoCard
 import mx.nexara.mobile.nativeapp.data.api.ActividadEnRiesgoDto
 import mx.nexara.mobile.nativeapp.data.api.FormatoActividadDto
 import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
@@ -36,6 +38,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w390dp-h844dp-xxhdpi", application = android.app.Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+
 class CapturasSalidaTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
@@ -156,6 +159,30 @@ class CapturasSalidaTest {
         }
         compose.mainClock.advanceTimeBy(500)
         guardar("salida-hoja-riesgo.png")
+    }
+
+    @Test
+    fun preguntaDeTiempo() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            NexaraTheme {
+                Column(Modifier.fillMaxSize().background(NxTheme.colors.card).padding(16.dp)) {
+                    ActividadTiempoCard(
+                        detail = ActivityDto(
+                            id = 368,
+                            estatus = "Por Validar",
+                            minutosPlan = 120.0,
+                            minutosReales = 370.0,
+                            preguntarTiempo = true,
+                        ),
+                        miFila = null,
+                        soyQuienEjecuta = true,
+                    )
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(500)
+        guardar("tiempo-pregunta.png")
     }
 
     @Test

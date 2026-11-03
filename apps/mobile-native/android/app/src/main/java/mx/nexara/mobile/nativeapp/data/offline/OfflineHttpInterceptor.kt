@@ -138,6 +138,8 @@ class OfflineHttpInterceptor(
             "/desactivar", "/reactivar", "/cancelar", "/reasignar", "/justificaciones",
             // Vale 10 minutos: encolado, caería cuando ya no aplica.
             "/salida/deshacer",
+            // Es opcional: sin señal se dice y ya; no vale la pena una cola.
+            "/tiempo-dicho",
             // Mover el paso atrás con fotos encoladas las dejaría en el paso equivocado.
             "/volver-paso",
             // El paquete necesita la respuesta: dice cuáles actividades quedaron.

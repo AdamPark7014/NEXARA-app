@@ -342,6 +342,7 @@ fun ConsoleNavHost(
     var chatMessageId by remember { mutableStateOf<Long?>(null) }
     /** `?vista=mias|equipo` que llegó por deep link a Actividades. */
     var actividadesVista by remember { mutableStateOf<String?>(null) }
+    var proyectoResaltado by remember { mutableStateOf<Long?>(null) }
     /** `comidas` cuando un aviso de hora de comida abre Asistencias. */
     var attendanceTab by remember { mutableStateOf<String?>(null) }
     /** `?nueva=` de la web: la actividad recién auto-asignada se resalta en Mis actividades. */
@@ -424,6 +425,11 @@ fun ConsoleNavHost(
                 // Abrir la lista y dejar que la busque sería perder el enlace.
                 extra == CoreExtraModule.COTIZACIONES && (link.entityId ?: 0L) > 0L ->
                     ConsoleRoutes.cotizacionDetalle(link.entityId!!)
+                // Igual con un proyecto: va primero y marcado en su lista.
+                extra == CoreExtraModule.PROYECTOS && (link.entityId ?: 0L) > 0L -> {
+                    proyectoResaltado = link.entityId
+                    ConsoleRoutes.forExtra(extra)
+                }
                 else -> ConsoleRoutes.forExtra(extra)
             }
             navController.navigate(ruta) { launchSingleTop = true }
@@ -770,7 +776,7 @@ fun ConsoleNavHost(
                 if (CoreExtraModule.KPIS_EQUIPO in extras) KpisEquipoScreen()
             }
             nxComposable(ConsoleRoutes.Proyectos, style = NxNavAnimStyle.Push) {
-                if (CoreExtraModule.PROYECTOS in extras) ProyectosScreen()
+                if (CoreExtraModule.PROYECTOS in extras) ProyectosScreen(resaltarId = proyectoResaltado)
             }
             nxComposable(ConsoleRoutes.Almacen, style = NxNavAnimStyle.Push) {
                 if (CoreExtraModule.ALMACEN in extras) AlmacenScreen()

@@ -78,6 +78,15 @@ object ProyectosRules {
     }
 
     /** Filtro + búsqueda por título, cliente o responsable, ya ordenado. */
+    /**
+     * El proyecto que abrió un aviso va primero, aunque el filtro lo esconda: el aviso habla de él.
+     * Aquí no hay ficha de proyecto; verlo arriba y marcado es lo que evita buscarlo en la lista.
+     */
+    fun conResaltado(visibles: List<ProyectoResumenDto>, todos: List<ProyectoResumenDto>, id: Long?): List<ProyectoResumenDto> {
+        val elegido = id?.let { i -> todos.firstOrNull { it.id == i } } ?: return visibles
+        return listOf(elegido) + visibles.filter { it.id != id }
+    }
+
     fun aplicar(
         proyectos: List<ProyectoResumenDto>,
         filtro: Filtro,

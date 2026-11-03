@@ -5,6 +5,9 @@ import SwiftUI
 /// Cada dato de la tarjeta va en su renglón. El vacío y el error caben en una
 /// frase. La lista sigue poniendo arriba lo que va tarde, y no lo explica.
 struct ProyectosView: View {
+    /// El proyecto que abrió un aviso: va primero, aunque el filtro lo esconda.
+    /// Aquí no hay ficha de proyecto; verlo arriba y marcado evita buscarlo en la lista.
+    var resaltarId: Int?
     @State private var estado = CoreExtrasEstado<[ProyectoResumenFila]>()
     @State private var filtro: ProyectosRules.Filtro = .activos
     @State private var consulta = ""
@@ -12,7 +15,11 @@ struct ProyectosView: View {
     private var todos: [ProyectoResumenFila] { estado.datos ?? [] }
 
     var body: some View {
-        let visibles = ProyectosRules.aplicar(todos, filtro: filtro, consulta: consulta)
+        let visibles = ProyectosRules.conResaltado(
+            ProyectosRules.aplicar(todos, filtro: filtro, consulta: consulta),
+            todos: todos,
+            id: resaltarId
+        )
         let conteos = ProyectosRules.conteos(todos)
         ScrollView {
             LazyVStack(alignment: .leading, spacing: NxSpacing.m) {
@@ -53,7 +60,15 @@ struct ProyectosView: View {
                             titulo: filtro.etiqueta,
                             trailing: "\(visibles.count)"
                         )
-                        ForEach(visibles) { TarjetaDeProyecto(proyecto: $0) }
+                        ForEach(visibles) { p in
+                            TarjetaDeProyecto(proyecto: p)
+                                .overlay {
+                                    if p.id == resaltarId {
+                                        RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
+                                            .stroke(NxColors.primary, lineWidth: 2)
+                                    }
+                                }
+                        }
                     }
                 }
 
@@ -263,6 +278,12 @@ enum ProyectosRules {
     }
 
     /// Filtro + búsqueda por título, cliente o responsable, ya ordenado.
+    /// El proyecto que abrió un aviso va primero, aunque el filtro lo esconda.
+    static func conResaltado(_ visibles: [ProyectoResumenFila], todos: [ProyectoResumenFila], id: Int?) -> [ProyectoResumenFila] {
+        guard let id, let elegido = todos.first(where: { $0.id == id }) else { return visibles }
+        return [elegido] + visibles.filter { $0.id != id }
+    }
+
     static func aplicar(_ proyectos: [ProyectoResumenFila], filtro: Filtro, consulta: String) -> [ProyectoResumenFila] {
         let q = consulta.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return proyectos

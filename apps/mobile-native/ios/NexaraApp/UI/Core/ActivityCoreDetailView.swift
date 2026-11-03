@@ -589,7 +589,11 @@ struct ActivityCoreDetailView: View {
                             medidor: medidorTiempo,
                             enCurso: tiempoEnCurso,
                             tiempoMaximoMin: ActivityParse.double(raw["tiempoMaximoMin"]),
-                            minutosEstandar: ActivityParse.double(raw["tiempoEstandarMin"])
+                            minutosEstandar: ActivityParse.double(raw["tiempoEstandarMin"]),
+                            activityId: activityId,
+                            dichoMin: ActivityParse.int(raw["tiempoDichoMin"]),
+                            preguntar: raw["preguntarTiempo"] as? Bool ?? false,
+                            soyQuienEjecuta: myId != nil && responsableId == myId
                         )
                     }
                     // Trayecto (29-10): ida al sitio y regreso a la oficina, medidos aparte del reloj.

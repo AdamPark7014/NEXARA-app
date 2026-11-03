@@ -346,6 +346,15 @@ final class CoreRepository {
         return try decode(ActivitySuperiorActions.self, from: data)
     }
 
+    /// `POST activities/:id/tiempo-dicho { minutos }`: solo quien la ejecutó. Enseña a los tiempos;
+    /// no toca reloj, KPI ni nómina.
+    func decirTiempo(activityId: Int, minutos: Int) async throws {
+        struct Body: Encodable { let minutos: Int }
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON("activities/\(activityId)/tiempo-dicho", body: Body(minutos: minutos))
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
     /// `POST activities/:id/cancelar { motivo }` (mínimo 10 caracteres).
     func cancelActivity(activityId: Int, motivo: String) async throws {
         struct Body: Encodable { let motivo: String }

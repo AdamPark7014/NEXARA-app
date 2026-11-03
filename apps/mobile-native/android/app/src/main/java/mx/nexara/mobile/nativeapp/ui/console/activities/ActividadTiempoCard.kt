@@ -7,7 +7,25 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -61,6 +79,8 @@ fun ActividadTiempoCard(
     detail: ActivityDto,
     miFila: ActivityAssigneeRefDto?,
     modifier: Modifier = Modifier,
+    soyQuienEjecuta: Boolean = false,
+    onDecirTiempo: suspend (Int) -> Unit = {},
 ) {
     val m = ActividadTiempoRules.medidorDe(detail, miFila)
     if (!ActividadTiempoRules.visible(m)) return
@@ -146,6 +166,118 @@ fun ActividadTiempoCard(
         ActividadTiempoRules.pieTope(m, detail.tiempoMaximoMin?.toDouble())?.let {
             Text(it, fontSize = 12.sp, color = TiempoPie)
         }
+        TiempoDichoFila(
+            relojMin = (detail.minutosReales ?: 0.0).roundToInt(),
+            dichoInicial = detail.tiempoDichoMin,
+            preguntar = detail.preguntarTiempo == true,
+            soyQuienEjecuta = soyQuienEjecuta,
+            onDecir = onDecirTiempo,
+        )
+    }
+}
+
+/**
+ * «¿Te tomó…?» (Velocidad Core, Ola 4; web `TiempoDicho.tsx`): quien la ejecutó confirma el reloj o dice
+ * otro tiempo, una vez y si quiere. No toca reloj, KPI ni nómina: enseña a los tiempos que se sugieren.
+ */
+@Composable
+private fun TiempoDichoFila(
+    relojMin: Int,
+    dichoInicial: Int?,
+    preguntar: Boolean,
+    soyQuienEjecuta: Boolean,
+    onDecir: suspend (Int) -> Unit,
+) {
+    var dicho by remember(dichoInicial) { mutableStateOf(dichoInicial) }
+    var otro by remember { mutableStateOf(false) }
+    var horas by remember { mutableStateOf("") }
+    var minutos by remember { mutableStateOf("") }
+    var guardando by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    dicho?.let {
+        Text(ActividadTiempoRules.textoDicho(it, soyQuienEjecuta), fontSize = 12.sp, color = TiempoPie)
+        return
+    }
+    if (!preguntar || !soyQuienEjecuta) return
+
+    fun guardar(valor: Int) {
+        guardando = true
+        error = null
+        scope.launch {
+            runCatching { onDecir(valor) }
+                .onSuccess { dicho = valor }
+                .onFailure { error = "No se pudo guardar. Intenta de nuevo." }
+            guardando = false
+        }
+    }
+    val escrito = ActividadTiempoRules.minutosEscritos(horas, minutos)
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HorizontalDivider(color = Color.White.copy(alpha = 0.14f))
+        Text(
+            "¿Te tomó ${ActividadTiempoRules.formatoMinutos(relojMin)}?",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
+        )
+        Text("Así mejoran los tiempos que se sugieren.", fontSize = 12.sp, color = TiempoPie)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (otro) {
+                CampoDeTiempo(horas, "h", 3) { horas = it }
+                CampoDeTiempo(minutos, "min", 2) { minutos = it }
+                BotonDeTiempo("Guardar", principal = true, activo = !guardando && escrito >= 1) { guardar(escrito) }
+            } else {
+                BotonDeTiempo("Sí", principal = true, activo = !guardando) { guardar(relojMin) }
+                BotonDeTiempo("Fue otro tiempo", principal = false, activo = !guardando) { otro = true }
+            }
+        }
+        error?.let { Text(it, fontSize = 12.sp, color = Color(0xFFFFB4AB)) }
+    }
+}
+
+@Composable
+private fun BotonDeTiempo(texto: String, principal: Boolean, activo: Boolean, alTocar: () -> Unit) {
+    val forma = RoundedCornerShape(999.dp)
+    Box(
+        modifier = Modifier
+            .heightIn(min = 40.dp)
+            .clip(forma)
+            .background(if (principal) Color.White.copy(alpha = if (activo) 1f else 0.55f) else Color.Transparent)
+            .border(1.dp, if (principal) Color.Transparent else Color.White.copy(alpha = 0.35f), forma)
+            .clickable(enabled = activo, onClick = alTocar)
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            texto,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (principal) TiempoFondo else Color.White,
+        )
+    }
+}
+
+@Composable
+private fun CampoDeTiempo(valor: String, unidad: String, largo: Int, alCambiar: (String) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        BasicTextField(
+            value = valor,
+            onValueChange = { alCambiar(it.filter(Char::isDigit).take(largo)) },
+            singleLine = true,
+            textStyle = TextStyle(color = Color.White, fontSize = 14.sp, textAlign = TextAlign.Center),
+            cursorBrush = SolidColor(Color.White),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier
+                .width(48.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.White.copy(alpha = 0.08f))
+                .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                .padding(vertical = 10.dp)
+                .semantics { contentDescription = if (unidad == "h") "Horas" else "Minutos" },
+        )
+        Text(unidad, fontSize = 13.sp, color = Color.White)
     }
 }
 
