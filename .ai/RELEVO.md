@@ -1,5 +1,18 @@
 # RELEVO
 
+- **02-11 ~22:50 (claude-code) — Core «más pro» en producción (`ad8f55f3`). Adam lo vio sobre pantallas reales y dijo «sí, súbelo».**
+  - **Criterio, el mismo de la portada:** pulir lo que existe. Mismos datos, mismo verde y misma estructura; solo aspecto, sin clics de más ni funciones de menos.
+  - **Qué cambió, en tokens y piezas base:** `--ui-radius-xl` de 20 a 14 px y sombra más fina (siguen flotando, porque en octubre rechazó lo plano); título de página de 26 px; Inter Tight solo en `h1`, los `h2` van en Inter; `headEyebrow` oculto y `headIcon` sin pastilla; tira de cifras más baja, con ícono sin pastilla y `statValueBrand` en negro; `thead th` sin mayúsculas, con `!important` porque cada tabla trae los suyos; filtros de 30 px; barras de desplazamiento delgadas y sin flechas; `--ui-brand-glow` sin resplandor.
+  - **Medido:** en Cotizaciones caben 6 filas enteras antes de bajar, contra 4 antes, a 1523×784 con sesión.
+  - **Verificado:** 2,063 pruebas web y tipos en verde. En producción, valores calculados y capturas de Cotizaciones, Clientes, Hoy y Viáticos, sin arnés, y oscuro en Clientes. Contraste del encabezado de tabla: 5.84 en claro y 5.64 en oscuro. En la vista de prueba, antes de subir: Actividades, Almacén, Costos, Vehículos, Asistencias, Diseños, Mesa contable y oscuro en Cotizaciones y Mesa contable.
+  - **No verificado:** Core en un teléfono con sesión (el Chrome con sesión se queda en escritorio). Tampoco con el cambio aplicado: Nómina, Gastos, Chat, Reuniones, Herramientas, Desempeño, Organigrama y Perfiles, ni pantallas de detalle, formularios y modales. Las tablas con `thead` propio heredan la regla global.
+  - **Avisado:** a las sesiones del diseñador y del programa de velocidad, antes de subir; ninguna ha respondido.
+  - **Quedó fuera, es de estructura y no de acabado:** Almacén con dos buscadores y dos filas de pestañas; doble miga en Asistencias y en Diseños.
+  - **Trampas:**
+    - `scrollbar-width` o `scrollbar-color` hacen que Chrome en Windows dibuje la barra del sistema con flechas e ignore `::-webkit-scrollbar`. En Core van dentro de `@supports not selector(::-webkit-scrollbar)`. No forzar `scrollbar-width: auto` con `!important`: el editor de `videovigilancia` esconde sus barras solo con `scrollbar-width: none`.
+    - Vista previa inyectando CSS en la pestaña con sesión: `/erp/finance/*` recarga la página y borra el estilo. Revisar que siga puesto antes de confiar en una captura.
+    - Las capturas con 503 de esa noche fueron reinicios de despliegues de otras sesiones, no una caída.
+
 - **03-11 ~04:40 UTC (claude-code) — Bloque B del Mapa de Core en producción: menú por lo que hace la empresa y Hoy sin ceros.** Adam: «Sí, constrúyelo», sobre la muestra https://claude.ai/artifact/Y5WFwc5vdYUdaGb84tGh9B.
   - **Menú:** `components/app-shell/sidebar-presentation.ts` agrupa en Hoy, Vender, Hacer, Cobrar y pagar, Saber y Empresa, plegado. Solo acomoda lo que `buildUserSidebar` ya decidió: nadie gana ni pierde acceso. Técnicos: Reuniones y Organigrama en Empresa. Con Mesa contable, Facturación y Bancos salen del menú y se abren desde su riel. Videovigilancia pasa a «Diseños de cámaras». `MODULES.group` no se tocó, para no mover los demás paneles; la paleta usa `grupoCore`.
   - **Hoy:** `executive/c-level` trae `cadena`; `lib/hoy-cadena.ts` dice dónde se detiene el negocio y el siguiente paso. Cuadros y paneles en cero se esconden hasta tener su primer dato. La tira de atajos bajó al final.
