@@ -86,7 +86,8 @@ export class ComplejidadService {
     if (enCache && enCache.hasta > Date.now()) return enCache.datos;
     const desde = new Date(Math.max(DESDE_OPERACION_REAL.getTime(), Date.now() - VENTANA_DIAS * 86_400_000));
     // Reloj de cada persona en cada actividad terminada (o por validar). Se descartan las que el
-    // sistema cortó solo (tope de 12 h o cierre del día): ahí el reloj siguió sin trabajo.
+    // sistema cortó solo (tope de 12 h o cierre del día): ahí el reloj siguió sin trabajo. Lo que
+    // dijo quien la ejecutó manda sobre su reloj, y lo de varios días no enseña cuánto toma una vez.
     const filas = await this.prisma.$queryRaw<FilaTiempo[]>(Prisma.sql`
       WITH ses AS (
         SELECT s."activityId", s."userId",
@@ -96,14 +97,16 @@ export class ComplejidadService {
         WHERE s."companyId" = ${companyId} AND s."endedAt" IS NOT NULL AND s."startedAt" >= ${desde}
         GROUP BY 1, 2
       )
-      SELECT a."coreKind", a."ticketType"::text AS "ticketType", a."ticketTypeCustom", a."complejidad", ses.minutos
+      SELECT a."coreKind", a."ticketType"::text AS "ticketType", a."ticketTypeCustom", a."complejidad",
+             COALESCE(CASE WHEN ses."userId" = a."responsableId" THEN d.minutos::float8 END, ses.minutos) AS minutos
       FROM ses
       JOIN "Activity" a ON a.id = ses."activityId"
+      LEFT JOIN actividad_tiempo_dicho d ON d."activityId" = a.id AND d."companyId" = a."companyId"
       WHERE a."companyId" = ${companyId}
         AND a."deletedAt" IS NULL
         AND a.estatus IN ('Finalizada', 'Por Validar')
-        AND NOT ses.cortada
-        AND ses.minutos >= 5
+        AND NOT (a."periodoInicio" IS NOT NULL AND a."periodoFin" IS NOT NULL)
+        AND ((d.minutos IS NOT NULL AND ses."userId" = a."responsableId") OR (NOT ses.cortada AND ses.minutos >= 5))
     `);
     const datos = agruparTiempos(filas.map((f) => ({ ...f, minutos: Number(f.minutos) })));
     this.cache.set(companyId, { hasta: Date.now() + CACHE_MS, datos });

@@ -30,6 +30,7 @@ import { esNoCumplida } from './incumplimiento.js';
 import { leerIncumplimientos } from './incumplimiento-lectura.js';
 import { esCerrada, normalizarPrioridad, tiemposDto } from './actividad-tiempos.js';
 import { leerSesiones, sesionesDe } from './sessions/activity-sessions.service.js';
+import { debePreguntarTiempo, finDeSesiones, MINUTOS_MAX_DICHOS, motivoParaNoDecir } from './tiempo-dicho.js';
 import { evaluarSemaforo } from './semaforo-actividad.js';
 import {
   camposDePeriodo,
@@ -523,6 +524,11 @@ export class ActivitiesService {
     const propia = equipo.find((a) => a.userId === activity.responsableId) ?? equipo[0] ?? null;
     // El último incumplimiento: vigente si está «No cumplida», historial si ya se reprogramó.
     const [incumplimiento] = await leerIncumplimientos(this.prisma, activity.id, activity.companyId, 1);
+    const dicho = await this.prisma.actividadTiempoDicho.findFirst({
+      where: { activityId: activity.id, companyId: activity.companyId },
+      select: { minutos: true },
+    });
+    const mias = activity.responsableId ? sesionesDe(sesiones, activity.responsableId, activity.id) : [];
     return {
       ...activity,
       prioridad: activity.prioridad == null ? null : normalizarPrioridad(activity.prioridad),
@@ -536,9 +542,52 @@ export class ActivitiesService {
       minutosPlan: propia?.minutosPlan ?? null,
       minutosReales: propia?.minutosReales ?? null,
       excedida: Boolean(propia?.excedida),
+      /** Cuánto dijo quien la ejecutó que tomó de verdad; null si no ha dicho. */
+      tiempoDichoMin: dicho?.minutos ?? null,
+      /** Se le pregunta a quien la ejecutó (la pantalla compara con su usuario). */
+      preguntarTiempo: debePreguntarTiempo({
+        estatus: activity.estatus,
+        periodoInicio: activity.periodoInicio,
+        periodoFin: activity.periodoFin,
+        terminadaEn: activity.fechaFinalizacion ?? finDeSesiones(mias),
+        ahora,
+        dichoMin: dicho?.minutos ?? null,
+        relojMin: propia?.minutosReales ?? null,
+        planMin: propia?.minutosPlan ?? null,
+      }),
       /** «Día 3 de 10 · termina vie 25 sep»; null si es de un solo momento. */
       periodo: periodoDto(activity, ahora, esCerrada(activity.estatus)),
     };
+  }
+
+  /** Cuánto tomó de verdad, dicho por quien la ejecutó. Enseña a los tiempos; no toca reloj, KPI ni nómina. */
+  async decirTiempo(id: number, minutosRaw: unknown, actor: { id: number } | undefined, companyId?: number | null) {
+    if (!actor?.id) throw new ForbiddenException('Usuario no autenticado');
+    const minutos = Math.round(Number(minutosRaw));
+    if (!Number.isFinite(minutos) || minutos < 1 || minutos > MINUTOS_MAX_DICHOS) {
+      throw new BadRequestException('Escribe cuánto tomó, en minutos');
+    }
+    const a = await this.prisma.activity.findFirst({
+      where: { id, ...companyWhere(companyId ?? null), deletedAt: null },
+      select: { id: true, companyId: true, responsableId: true, estatus: true, periodoInicio: true, periodoFin: true, fechaFinalizacion: true },
+    });
+    assertCompanyAccess(a, companyId, 'Actividad');
+    if (a.responsableId !== actor.id) throw new ForbiddenException('Solo quien la ejecutó puede decir cuánto tomó');
+    const sesiones = await leerSesiones(this.prisma, { userIds: [actor.id], activityIds: [id], companyId: a.companyId });
+    const mias = sesionesDe(sesiones, actor.id, id);
+    const motivo = motivoParaNoDecir({
+      estatus: a.estatus,
+      periodoInicio: a.periodoInicio,
+      periodoFin: a.periodoFin,
+      terminadaEn: a.fechaFinalizacion ?? finDeSesiones(mias),
+      ahora: new Date(),
+    });
+    if (motivo) throw new BadRequestException(motivo);
+    const relojMin = Math.round(mias.reduce((suma, s) => (s.endedAt ? suma + (s.endedAt.getTime() - s.startedAt.getTime()) / 60_000 : suma), 0));
+    const ya = await this.prisma.actividadTiempoDicho.findFirst({ where: { activityId: id, companyId: a.companyId }, select: { id: true } });
+    if (ya) await this.prisma.actividadTiempoDicho.update({ where: { id: ya.id }, data: { minutos, relojMin, userId: actor.id } });
+    else await this.prisma.actividadTiempoDicho.create({ data: { companyId: a.companyId, activityId: id, userId: actor.id, minutos, relojMin } });
+    return { tiempoDichoMin: minutos, preguntarTiempo: false };
   }
 
   /** KPIs para la bandeja de actividades (OPS dashboard). */

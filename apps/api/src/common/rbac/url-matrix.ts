@@ -67,6 +67,8 @@ export const SALIDA_DE_OTRO_URL_RULES: UrlRule[] = [
 export const FORMATOS_ACTIVIDAD_URL_RULES: UrlRule[] = [
   { path: '/api/formatos-actividad', methods: ['GET', 'POST'], scope: 'write' },
   { path: '/api/formatos-actividad/**', methods: ['GET', 'POST', 'PUT'], scope: 'write' },
+  // Decir cuánto tomó de verdad: lo mismo, todo el personal; solo quien la ejecutó, lo decide el servicio.
+  { path: '/api/activities/*/tiempo-dicho', methods: ['POST'], scope: 'write' },
 ];
 
 /**

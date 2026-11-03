@@ -5,6 +5,7 @@ import {
   entregaCalculada,
   estandarDeLectura,
   jornadaDeHorario,
+  minutosDeJornadaRestantes,
   JORNADA_OFICINA,
   parametrosCambiados,
   tipoDelTitulo,
@@ -282,5 +283,67 @@ describe('tiempo y entrega de toda actividad', () => {
       // 10:00 + 7 h con la comida: pasa de las 18:00, se topa en la salida.
       expect(hora(cambios.fechaEntregaEsperada!)).toBe('18:00');
     });
+  });
+});
+
+describe('tiempo: persona, parecidos y lo que queda de jornada (02-11)', () => {
+  const instalacion = { coreKind: 'tarea', ticketTypeCustom: 'Instalación', titulo: 'Instalación en biblioteca' };
+
+  it('lo que queda de jornada no cuenta la comida ni lo de antes de entrar', () => {
+    expect(minutosDeJornadaRestantes(cdmx('09:00'))).toBe(420);
+    expect(minutosDeJornadaRestantes(cdmx('14:00'))).toBe(180);
+    // En la comida cuenta desde que acaba.
+    expect(minutosDeJornadaRestantes(cdmx('15:30'))).toBe(120);
+    expect(minutosDeJornadaRestantes(cdmx('17:00'))).toBe(60);
+    expect(minutosDeJornadaRestantes(cdmx('18:00'))).toBeNull();
+  });
+
+  it('sin cantidad en el título, lo que le toma a la persona va antes que la tabla', () => {
+    const r = estandarDeLectura(instalacion, {}, { personaTipo: { minutos: 197, veces: 4 } });
+    expect(r.totalMin).toBe(195);
+    expect(r.desglose[0].concepto).toBe('Lo que te toma este tipo de trabajo (mediana de 4 veces)');
+  });
+
+  it('con cantidad en el título manda la tarifa, ni persona ni tope', () => {
+    const r = estandarDeLectura({ coreKind: 'comercial', titulo: 'Cotización de 50 partidas' }, { cantidad: 50 }, {
+      personaTipo: { minutos: 60, veces: 9 },
+      quedaDeJornadaMin: 30,
+    });
+    expect(r.totalMin).toBe(240);
+  });
+
+  it('el título igual gana, y los parecidos lo dicen en el desglose', () => {
+    const igual = estandarDeLectura(instalacion, {}, { historial: { minutos: 100, veces: 2, propio: true }, personaTipo: { minutos: 300, veces: 9 } });
+    expect(igual.totalMin).toBe(100);
+    const parecidos = estandarDeLectura(instalacion, {}, { historial: { minutos: 100, veces: 3, propio: false, parecidos: true } });
+    expect(parecidos.desglose[0].concepto).toBe('Lo que han tomado títulos parecidos (mediana de 3 veces)');
+  });
+
+  it('sin cantidad no pasa de lo que queda de jornada, y dice cuánto eran', () => {
+    const r = estandarDeLectura(instalacion, {}, { personaTipo: { minutos: 480, veces: 5 }, quedaDeJornadaMin: 92 });
+    expect(r.totalMin).toBe(90);
+    expect(r.desglose).toEqual([{ concepto: 'Lo que queda de tu jornada', minutos: 90 }]);
+    expect(r.supuestos).toContain('sin ese tope serían 480 min');
+    expect(estandarDeLectura(instalacion, {}, { personaTipo: { minutos: 60, veces: 5 }, quedaDeJornadaMin: 92 }).totalMin).toBe(60);
+  });
+
+  it('el tope nunca baja de 15 min ni toca una junta con agenda', () => {
+    expect(estandarDeLectura(instalacion, {}, { personaTipo: { minutos: 480, veces: 5 }, quedaDeJornadaMin: 3 }).totalMin).toBe(15);
+    const junta = estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Junta', titulo: 'Junta semanal' }, {}, { duracionAgendaMin: 120, quedaDeJornadaMin: 30 });
+    expect(junta.totalMin).toBe(120);
+  });
+
+  it('autoasignada a las 16:00 sin cantidad se topa; asignada a otro sin fecha no, porque puede ser mañana', () => {
+    const lectura = {};
+    const auto = completarTiempos({ ...instalacion, creadoPorId: 7, responsableId: 7 }, { lectura, personaTipo: { minutos: 480, veces: 5 }, ahora: cdmx('16:00') });
+    expect(auto.cambios.tiempoEstimadoMin).toBe(120);
+    expect(hora(auto.cambios.fechaEntregaEsperada!)).toBe('18:00');
+    const otro = completarTiempos({ ...instalacion, creadoPorId: 1, responsableId: 7 }, { lectura, personaTipo: { minutos: 480, veces: 5 }, ahora: cdmx('16:00') });
+    expect(otro.cambios.tiempoEstimadoMin).toBe(480);
+    const conPeriodo = completarTiempos(
+      { ...instalacion, creadoPorId: 7, responsableId: 7, periodoInicio: '2026-11-03', periodoFin: '2026-11-05' },
+      { lectura, personaTipo: { minutos: 480, veces: 5 }, ahora: cdmx('16:00') },
+    );
+    expect(conPeriodo.cambios.tiempoEstimadoMin).toBe(480);
   });
 });

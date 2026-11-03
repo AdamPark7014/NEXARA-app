@@ -12,6 +12,9 @@
  *      sitio; en lo demás, la mediana real del tipo (y si no hay, 1 unidad).
  *   Lo que se supone se escribe en el desglose. Sin regla en la tabla (o en juntas y guardias), la
  *   mediana real del tipo, y si no hay, 1 h.
+ *   Desde el 02-11 (`aprendizaje-tiempos.ts`), antes de la tabla van los títulos parecidos y, si el
+ *   título no dice cuántos, lo que a esta persona le toma este tipo. Sin cantidad en el título, no
+ *   pasa de lo que queda de su jornada: las tarifas por cantidad las fijó Adam y no se topan.
  * - La entrega a más tardar es el inicio más ese tiempo, contando la comida, sin pasar del fin de la
  *   jornada de quien la ejecuta (la cuadrilla sale a las 17:00, la oficina a las 18:00).
  * - En la autoasignación esos valores son fijos; en lo asignado a otro solo se llenan si faltan.
@@ -65,8 +68,10 @@ export function jornadaDeHorario(h?: { entrada?: string | null; salida?: string 
 
 export type TipoActividad = { coreKind?: string | null; ticketType?: string | null; ticketTypeCustom?: string | null };
 
-/** Lo que tomó antes el mismo título: mediana, cuántas veces y si son de la misma persona. */
-export type HistorialTitulo = { minutos: number; veces: number; propio: boolean };
+/** Lo que tomó antes el mismo título (o uno parecido): mediana, cuántas veces y si son de la misma persona. */
+export type HistorialTitulo = { minutos: number; veces: number; propio: boolean; parecidos?: boolean };
+/** Lo que a la persona le toma este tipo de trabajo. */
+export type PersonaTipo = { minutos: number; veces: number };
 
 /**
  * Trabajos que el título nombra sin lugar a duda, aunque el tipo elegido diga otro: tubería,
@@ -155,12 +160,36 @@ export function unidadDelTitulo(regla: ReglaEstandar, texto: string | null | und
 export function estandarDeLectura(
   tipoGuardado: TipoActividad & { titulo?: string | null; indicaciones?: string | null },
   lectura: LecturaTitulo,
-  opciones: {
-    traslado?: Traslado | null;
-    tipicoMin?: number | null;
-    duracionAgendaMin?: number | null;
-    historial?: HistorialTitulo | null;
-  } = {},
+  opciones: OpcionesEstandar = {},
+): EstandarCalculado {
+  const base = estandarSinTope(tipoGuardado, lectura, opciones);
+  const queda = opciones.quedaDeJornadaMin;
+  // Lo que el título cuenta sigue la tarifa, y una junta dura lo que diga su agenda.
+  const porAgenda = Boolean(reglaDe(tipoGuardado)?.agenda && opciones.duracionAgendaMin && opciones.duracionAgendaMin > 0);
+  if (queda == null || porAgenda || (lectura.cantidad && lectura.cantidad > 0) || base.totalMin <= queda) return base;
+  const minutos = redondeo5(Math.max(MINIMO_DE_TOPE_MIN, queda));
+  return {
+    ...base,
+    totalMin: minutos,
+    desglose: [{ concepto: 'Lo que queda de tu jornada', minutos }],
+    supuestos: [...base.supuestos, `sin ese tope serían ${base.totalMin} min`],
+  };
+}
+
+type OpcionesEstandar = {
+  traslado?: Traslado | null;
+  tipicoMin?: number | null;
+  duracionAgendaMin?: number | null;
+  historial?: HistorialTitulo | null;
+  personaTipo?: PersonaTipo | null;
+  /** Lo que queda de la jornada de quien la ejecuta (`minutosDeJornadaRestantes`); null, sin tope. */
+  quedaDeJornadaMin?: number | null;
+};
+
+function estandarSinTope(
+  tipoGuardado: TipoActividad & { titulo?: string | null; indicaciones?: string | null },
+  lectura: LecturaTitulo,
+  opciones: OpcionesEstandar,
 ): EstandarCalculado {
   // El tipo que dice el título manda sobre uno elegido que no cuadra (solo para calcular).
   const delTitulo = tipoDelTitulo(tipoGuardado);
@@ -188,7 +217,26 @@ export function estandarDeLectura(
     const minutos = redondeo5(Math.min(TOPE_ESTANDAR_MIN, h.minutos));
     return {
       totalMin: minutos,
-      desglose: [{ concepto: `Lo que ha tomado este mismo título (mediana de ${h.veces} veces${h.propio ? ', tuyas' : ''})`, minutos }],
+      desglose: [
+        {
+          concepto: h.parecidos
+            ? `Lo que han tomado títulos parecidos (mediana de ${h.veces} veces)`
+            : `Lo que ha tomado este mismo título (mediana de ${h.veces} veces${h.propio ? ', tuyas' : ''})`,
+          minutos,
+        },
+      ],
+      complejidad: esComplejidad(lectura.complejidad) ? lectura.complejidad : null,
+      unidades: null,
+      supuestos: [],
+    };
+  }
+  // El título no dice cuántos: lo que a esta persona le toma este tipo predice mejor que la tabla.
+  const pt = opciones.personaTipo;
+  if (pt && pt.minutos > 0 && !(lectura.cantidad && lectura.cantidad > 0)) {
+    const minutos = redondeo5(Math.min(TOPE_ESTANDAR_MIN, pt.minutos));
+    return {
+      totalMin: minutos,
+      desglose: [{ concepto: `Lo que te toma este tipo de trabajo (mediana de ${pt.veces} veces)`, minutos }],
       complejidad: esComplejidad(lectura.complejidad) ? lectura.complejidad : null,
       unidades: null,
       supuestos: [],
@@ -248,6 +296,26 @@ export function estandarDeLectura(
     unidades: unidad && cantidad ? { clave: unidad.clave, cantidad } : null,
     supuestos,
   };
+}
+
+/** Con un tope menor no alcanza ni para empezar: una actividad a las 17:55 no dice 5 minutos. */
+const MINIMO_DE_TOPE_MIN = 15;
+
+/**
+ * Lo que queda de la jornada desde `inicio`, sin la comida. Antes de entrar cuenta desde la entrada.
+ * null si ya salió: lo que se hace fuera de horario no se topa.
+ */
+export function minutosDeJornadaRestantes(inicio: Date, jornada: JornadaEntrega = JORNADA_OFICINA): number | null {
+  const a = (hm: string, respaldo: string) => {
+    const min = minutosHm(hm) ?? (minutosHm(respaldo) as number);
+    return workDayAtClock(inicio, Math.floor(min / 60), min % 60).getTime();
+  };
+  const entrada = a(jornada.entrada, JORNADA_OFICINA.entrada);
+  const salida = a(jornada.salida, JORNADA_OFICINA.salida);
+  if (inicio.getTime() >= salida) return null;
+  const desde = Math.max(inicio.getTime(), entrada);
+  const comida = Math.max(0, Math.min(salida, a(jornada.comidaHasta, JORNADA_OFICINA.comidaHasta)) - Math.max(desde, a(jornada.comidaDesde, JORNADA_OFICINA.comidaDesde)));
+  return Math.max(0, Math.round((salida - desde - comida) / 60_000));
 }
 
 /**
@@ -325,17 +393,22 @@ export function completarTiempos(
     traslado?: Traslado | null;
     ahora: Date;
     historial?: HistorialTitulo | null;
+    personaTipo?: PersonaTipo | null;
     /** La jornada de quien la ejecuta; sin ella, la de la oficina. */
     jornada?: JornadaEntrega | null;
   },
 ): { cambios: TiempoCompletado; error?: string } {
   const auto = esAutoasignacion(dto);
   const conPeriodo = Boolean(dto.periodoInicio && dto.periodoFin);
+  // Lo asignado a otro sin fecha puede ser para mañana: no se topa con lo que queda de hoy.
+  const inicioConocido = aFecha(dto.fechaInicio) ?? (auto ? ctx.ahora : null);
   const est = estandarDeLectura(dto, ctx.lectura, {
     traslado: auto ? null : ctx.traslado,
     tipicoMin: ctx.tipicoMin,
     duracionAgendaMin: dto.tiempoEstimadoMin ?? null,
     historial: ctx.historial ?? null,
+    personaTipo: ctx.personaTipo ?? null,
+    quedaDeJornadaMin: conPeriodo || !inicioConocido ? null : minutosDeJornadaRestantes(inicioConocido, ctx.jornada ?? JORNADA_OFICINA),
   });
   const sugerida = esComplejidad(ctx.lectura.complejidad) ? ctx.lectura.complejidad : null;
   const desglose = [...est.desglose, ...est.supuestos.map((s) => ({ concepto: `Supuesto: ${s}`, minutos: 0 }))];
