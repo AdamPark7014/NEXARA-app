@@ -21,8 +21,14 @@ import {
   Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ALMACEN_POR_CORREO_URL_RULES, checkUrlAccess, checkUrlRules } from './url-matrix';
+import {
+  ALMACEN_POR_CORREO_URL_RULES,
+  MESA_CONTABLE_POR_CORREO_URL_RULES,
+  checkUrlAccess,
+  checkUrlRules,
+} from './url-matrix';
 import { canManageAlmacen } from '../../warehouse/almacen-access';
+import { canUsarMesaContable } from '../../accounting/mesa-contable/mesa-por-correo';
 import { LEGACY_TO_V2, type RoleKey, ROLES } from './roles.v2';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -55,6 +61,10 @@ export class UrlAccessGuard extends AuthGuard('jwt') {
     // Almacén concedido por persona (Iván): sin cambiarle el rol.
     if (!result.allowed && canManageAlmacen(user.email)) {
       result = checkUrlRules(ALMACEN_POR_CORREO_URL_RULES, url, method);
+    }
+    // Mesa contable concedida por persona (Contadora General): sin cambiarle el rol.
+    if (!result.allowed && canUsarMesaContable(user.email)) {
+      result = checkUrlRules(MESA_CONTABLE_POR_CORREO_URL_RULES, url, method);
     }
     // Whitelist: sin match (o deny) → Forbidden. No fallthrough a legacy.
     if (!result.allowed) {

@@ -487,6 +487,13 @@ export default function MovimientosPage() {
         </>
       }
     >
+      {data?.nominaOculta ? (
+        <Alert tone="info" role="status" className={s.alerta}>
+          {data.nominaOculta === 1
+            ? "1 pago de nómina no sale aquí ni en los totales: los pagos por persona son de dirección."
+            : `${data.nominaOculta} pagos de nómina no salen aquí ni en los totales: los pagos por persona son de dirección.`}
+        </Alert>
+      ) : null}
       {/* El resultado de exportar, pegado a la acción que lo produjo. */}
       {exportAviso && (
         <Alert

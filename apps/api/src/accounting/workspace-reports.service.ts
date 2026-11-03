@@ -894,6 +894,7 @@ export class AccountingWorkspaceReportsService {
     clave: string,
     filtros: Filtros,
     companyId: number | null,
+    opciones: { verNomina?: boolean } = {},
   ): Promise<DetalleReporte> {
     const tenantId = requireCompanyId(companyId);
     const def = REGISTRO.find((r) => r.id === id);
@@ -908,7 +909,7 @@ export class AccountingWorkspaceReportsService {
       case 'cuenta':
         return this.detalleCuenta(def, valor, { from, to, asOf: filtros.asOf, periodId: filtros.periodId }, tenantId);
       case 'mes':
-        return this.detalleMes(def, valor, tenantId);
+        return this.detalleMes(def, valor, tenantId, opciones.verNomina !== false);
       case 'categoria':
         // `valor` vacío es la línea «Sin categoría» y debe filtrar por NULL, no
         // dejar pasar todos los gastos. Por eso se conserva la cadena vacía.
@@ -985,7 +986,12 @@ export class AccountingWorkspaceReportsService {
     };
   }
 
-  private async detalleMes(def: DefinicionReporte, claveMes: string, tenantId: number): Promise<DetalleReporte> {
+  private async detalleMes(
+    def: DefinicionReporte,
+    claveMes: string,
+    tenantId: number,
+    verNomina = true,
+  ): Promise<DetalleReporte> {
     const [anio, mes] = claveMes.split('-').map((n) => Number(n));
     if (!Number.isInteger(anio) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
       throw new BadRequestException('Mes inválido');
@@ -1052,14 +1058,29 @@ export class AccountingWorkspaceReportsService {
         entradas: 0,
         salidas: round2(num(g.montoSolicitado)),
       })),
-      ...nomina.map((n) => ({
-        clave: `nomina:${n.id}`,
-        fecha: n.paidAt ? isoDay(new Date(n.paidAt)) : '—',
-        movimiento: 'Nómina',
-        concepto: n.concepto || 'Pago a empleado',
-        entradas: 0,
-        salidas: round2(num(n.amount)),
-      })),
+      // Sin acceso a «Pagos a personal», el mes lleva su total: cuadra con el reporte sin decir
+      // quién cobró cuánto.
+      ...(verNomina
+        ? nomina.map((n) => ({
+            clave: `nomina:${n.id}`,
+            fecha: n.paidAt ? isoDay(new Date(n.paidAt)) : '—',
+            movimiento: 'Nómina',
+            concepto: n.concepto || 'Pago a empleado',
+            entradas: 0,
+            salidas: round2(num(n.amount)),
+          }))
+        : nomina.length
+          ? [
+              {
+                clave: 'nomina:total',
+                fecha: '—',
+                movimiento: 'Nómina',
+                concepto: 'Total del mes',
+                entradas: 0,
+                salidas: round2(nomina.reduce((s, n) => s + num(n.amount), 0)),
+              },
+            ]
+          : []),
     ].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
 
     const entradas = round2(filas.reduce((s, r) => s + num(r.entradas), 0));

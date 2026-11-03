@@ -1,6 +1,9 @@
 import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { VendorProjectFinanceService, type ProjectKind } from './vendor-project-finance.service.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { CurrentUser } from '../common/current-user.decorator.js';
+import { ModulePolicyService } from '../common/tenant/module-policy.service.js';
+import type { UsuarioDePolitica } from '../common/tenant/module-policy.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -37,7 +40,10 @@ const asKind = (value: string | undefined): ProjectKind => {
 @Controller('accounting/workspace')
 @UseGuards(UrlAccessGuard)
 export class VendorProjectFinanceController {
-  constructor(private readonly service: VendorProjectFinanceService) {}
+  constructor(
+    private readonly service: VendorProjectFinanceService,
+    private readonly policy: ModulePolicyService,
+  ) {}
 
   @Get('proveedores')
   @UseGuards(RbacGuard)
@@ -70,11 +76,13 @@ export class VendorProjectFinanceController {
   @Get('proyectos/:id')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [...CONTADORA.anyPermissions] })
-  projectDetail(
+  async projectDetail(
     @Param('id') id: string,
+    @CurrentUser() user: UsuarioDePolitica,
     @CurrentCompanyId() companyId: number | null,
     @Query('tipo') tipo?: string,
   ) {
-    return this.service.getProjectDetail(companyId, asId(id, 'Proyecto'), asKind(tipo));
+    const verNomina = await this.policy.puedeUsar('employee-payments', user, companyId);
+    return this.service.getProjectDetail(companyId, asId(id, 'Proyecto'), asKind(tipo), { verNomina });
   }
 }

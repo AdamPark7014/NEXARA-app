@@ -593,3 +593,24 @@ describe('libro de movimientos · mezcla de fuentes', () => {
     expect(res.totalPages).toBe(23);
   });
 });
+
+describe('nómina para quien no ve «Pagos a personal»', () => {
+  it('no sale ni en las filas ni en los totales, y dice cuántos pagos faltan', async () => {
+    const { service, prisma } = build();
+    const completo = await service.listMovements(TENANT, {});
+    prisma.employeePayment.findMany.mockClear();
+
+    const sinNomina = await service.listMovements(TENANT, {}, { verNomina: false });
+
+    expect(prisma.employeePayment.findMany).not.toHaveBeenCalled();
+    expect(sinNomina.total).toBe(completo.total - 2);
+    expect(sinNomina.nominaOculta).toBe(2);
+    expect(completo.nominaOculta).toBeNull();
+  });
+
+  it('tampoco sale en el CSV', async () => {
+    const { service, prisma } = build();
+    await service.exportMovements(TENANT, {}, { verNomina: false });
+    expect(prisma.employeePayment.findMany).not.toHaveBeenCalled();
+  });
+});

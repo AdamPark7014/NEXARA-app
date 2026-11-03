@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { WebhooksModule } from '../webhooks/webhooks.module.js';
 import { AuditModule } from '../audit/audit.module.js';
+import { ModulePolicyModule } from '../common/tenant/module-policy.module.js';
 import { AccountingService } from './accounting.service.js';
 import { AccountsController } from './accounts.controller.js';
 import { JournalEntriesController } from './journal-entries.controller.js';
@@ -30,7 +31,7 @@ import { EstadosFinancierosService } from './mesa-contable/estados-financieros.s
 import { RevisionFacturaService } from './mesa-contable/revision-factura.service.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, NotificationsModule, WebhooksModule, AuditModule],
+  imports: [PrismaModule, AuthModule, NotificationsModule, WebhooksModule, AuditModule, ModulePolicyModule],
   controllers: [
     AccountsController,
     JournalEntriesController,

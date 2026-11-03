@@ -2,6 +2,9 @@ import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { AccountingWorkspaceLedgerService, type LedgerQuery } from './workspace-ledger.service.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { CurrentUser } from '../common/current-user.decorator.js';
+import { ModulePolicyService } from '../common/tenant/module-policy.service.js';
+import type { UsuarioDePolitica } from '../common/tenant/module-policy.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -16,7 +19,10 @@ import { PERMISSIONS } from '../common/permissions.js';
 @Controller('accounting/workspace')
 @UseGuards(UrlAccessGuard)
 export class AccountingWorkspaceLedgerController {
-  constructor(private readonly service: AccountingWorkspaceLedgerService) {}
+  constructor(
+    private readonly service: AccountingWorkspaceLedgerService,
+    private readonly policy: ModulePolicyService,
+  ) {}
 
   @Get('movimientos')
   @UseGuards(RbacGuard)
@@ -27,8 +33,13 @@ export class AccountingWorkspaceLedgerController {
       PERMISSIONS.CONSOLE_ADMIN,
     ],
   })
-  movimientos(@Query() query: LedgerQuery, @CurrentCompanyId() companyId: number | null) {
-    return this.service.listMovements(companyId, query);
+  async movimientos(
+    @Query() query: LedgerQuery,
+    @CurrentUser() user: UsuarioDePolitica,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const verNomina = await this.policy.puedeUsar('employee-payments', user, companyId);
+    return this.service.listMovements(companyId, query, { verNomina });
   }
 
   @Get('movimientos/export')
@@ -42,10 +53,12 @@ export class AccountingWorkspaceLedgerController {
   })
   async exportMovimientos(
     @Query() query: LedgerQuery,
+    @CurrentUser() user: UsuarioDePolitica,
     @CurrentCompanyId() companyId: number | null,
     @Res() res: Response,
   ) {
-    const { csv, filename, rows, truncated } = await this.service.exportMovements(companyId, query);
+    const verNomina = await this.policy.puedeUsar('employee-payments', user, companyId);
+    const { csv, filename, rows, truncated } = await this.service.exportMovements(companyId, query, { verNomina });
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
     res.setHeader('X-Ledger-Rows', String(rows));

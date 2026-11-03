@@ -1035,9 +1035,10 @@ export class VendorProjectFinanceService {
     companyId: number | null | undefined,
     projectId: number,
     tipo: ProjectKind = 'operacional',
+    opciones: { verNomina?: boolean } = {},
   ) {
     return tipo === 'obra'
-      ? this.getWorkProjectDetail(companyId, projectId)
+      ? this.getWorkProjectDetail(companyId, projectId, opciones.verNomina !== false)
       : this.getOperationalProjectDetail(companyId, projectId);
   }
 
@@ -1335,6 +1336,7 @@ export class VendorProjectFinanceService {
   private async getWorkProjectDetail(
     companyId: number | null | undefined,
     projectId: number,
+    verNomina = true,
   ) {
     const tenantId = requireCompanyId(companyId);
     const scope = companyWhere(tenantId);
@@ -1408,7 +1410,8 @@ export class VendorProjectFinanceService {
         tipo: 'nomina',
         documento: `NOMINA-${n.id}`,
         fecha: toIsoDate(n.paidAt),
-        concepto: n.note ? `${n.employee} · ${n.note}` : n.employee,
+        // Sin acceso a «Pagos a personal», el costo cuenta pero no dice quién lo cobró.
+        concepto: !verNomina ? 'Nómina de obra' : n.note ? `${n.employee} · ${n.note}` : n.employee,
         monto: money(monto),
         pagado: money(monto),
         estatus: 'Pagado',

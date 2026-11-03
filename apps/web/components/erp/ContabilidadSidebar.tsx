@@ -6,6 +6,7 @@ import CrossPanelLink from "@/components/CrossPanelLink";
 import { useUser } from "@/components/UserContext";
 import { EVENTO_RESUMEN, getResumen, type Resumen } from "@/lib/mesa-contable";
 import { PERMISSIONS, hasAnyPermission, type UserPermissions } from "@/lib/permissions";
+import { canUsarMesaContable } from "@/lib/mesa-por-correo";
 import c from "@/components/mesa-contable/chips.module.scss";
 
 /**
@@ -97,12 +98,19 @@ export const GRUPOS_CONTABILIDAD: NavGroup[] = [
   },
 ];
 
+/** Lo que no trae la Mesa concedida por persona (`lib/mesa-por-correo.ts`). */
+const FUERA_DE_MESA_POR_CORREO = new Set(["prenomina", "auditoria"]);
+
 export function filtrarGruposContabilidad(
-  user: UserPermissions | null | undefined,
+  user: (UserPermissions & { email?: string | null }) | null | undefined,
 ): NavGroup[] {
+  // Por correo y no por permiso: su sesión abierta puede traer los permisos de antes de la concesión.
+  const porCorreo = canUsarMesaContable(user?.email);
   return GRUPOS_CONTABILIDAD.map((group) => ({
     ...group,
-    items: group.items.filter((item) => hasAnyPermission(user, item.permissions)),
+    items: group.items.filter((item) =>
+      porCorreo ? !FUERA_DE_MESA_POR_CORREO.has(item.id) : hasAnyPermission(user, item.permissions),
+    ),
   })).filter((group) => group.items.length > 0);
 }
 

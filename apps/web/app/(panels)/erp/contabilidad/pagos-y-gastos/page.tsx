@@ -374,6 +374,14 @@ export default function PagosYGastosPage() {
         </Alert>
       ) : null}
 
+      {data?.nominaOculta ? (
+        <Alert tone="info" role="status">
+          {data.nominaOculta === 1
+            ? "1 pago de nómina de este mes no sale aquí ni en la suma: los pagos por persona son de dirección."
+            : `${data.nominaOculta} pagos de nómina de este mes no salen aquí ni en la suma: los pagos por persona son de dirección.`}
+        </Alert>
+      ) : null}
+
       {cargando || r ? (
         <Kpis etiqueta="Resumen del mes">
           <Kpi cargando={cargando} etiqueta="Entró" valor={dineroCorto(r?.entro.importe)} pista={r ? plural(r.entro.conteo, "cobro") : null} />
@@ -421,7 +429,10 @@ export default function PagosYGastosPage() {
                 setTipo(t);
                 setCargando(true);
               }}
-              items={ORDEN_TIPO_PG.map((id) => ({ id, texto: id === "TODO" ? "Todo" : TIPO_PG[id].pestana }))}
+              items={ORDEN_TIPO_PG.filter((id) => id !== "NOMINA" || data?.nominaOculta == null).map((id) => ({
+                id,
+                texto: id === "TODO" ? "Todo" : TIPO_PG[id].pestana,
+              }))}
             />
             <button
               type="button"

@@ -6,6 +6,7 @@
  */
 import type { ModuleEntry, ModuleId } from '@/lib/access-matrix';
 import { canOpenPage } from '@/lib/rbac/page-matrix';
+import { canUsarMesaContable } from '@/lib/mesa-por-correo';
 import { ROLES, ROLE_TIER, type RoleKey } from '@/lib/rbac/roles';
 import { resolveV2RoleKey, type UserAccessInput } from '@/lib/rbac/role-mapping';
 import { isAdvancedOnlyModuleId, isNavAdvanced } from '@/lib/nav-mode';
@@ -1888,7 +1889,9 @@ export function getErpFinanceSectionConfig(
       subtitle: copy.subtitle,
     };
   }
-  if (!FINANCE_ROLES.has(v2)) {
+  // Mesa contable concedida por persona (Contadora General): como contabilidad, salvo Nómina.
+  const mesaPorCorreo = module !== 'employee-payments' && canUsarMesaContable(user?.email);
+  if (!FINANCE_ROLES.has(v2) && !mesaPorCorreo) {
     return {
       viewMode: 'execute',
       defaultScope: 'self',
@@ -1901,7 +1904,7 @@ export function getErpFinanceSectionConfig(
       subtitle: copy.subtitle,
     };
   }
-  if (v2 === ROLES.CONTABILIDAD) {
+  if (v2 === ROLES.CONTABILIDAD || mesaPorCorreo) {
     return {
       viewMode: 'manage',
       defaultScope: 'team',
