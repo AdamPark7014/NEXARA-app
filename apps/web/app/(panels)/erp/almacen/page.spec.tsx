@@ -89,9 +89,9 @@ describe("portada de almacén", () => {
       "Inventario",
       "Resumen",
       "Movimientos",
-      "Lotes y caducidad",
+      "Lotes",
       "Valuación",
-      "Conteos y reservas",
+      "Conteos",
       "Escáner",
       "Reabastecimiento",
       "Herramientas",
@@ -112,7 +112,7 @@ describe("portada de almacén", () => {
     render(<AlmacenPage />);
     await userEvent.click(screen.getByRole("tab", { name: "Movimientos" }));
     expect(screen.getByTestId("almacen-stock")).toHaveAttribute("data-vista", "movimientos");
-    await userEvent.click(screen.getByRole("tab", { name: "Lotes y caducidad" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Lotes" }));
     expect(screen.getByTestId("almacen-stock")).toHaveAttribute("data-vista", "lotes");
   });
 

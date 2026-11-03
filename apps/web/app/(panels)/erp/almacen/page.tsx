@@ -2,16 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import Inventory2Outlined from "@mui/icons-material/Inventory2Outlined";
-import InsightsOutlined from "@mui/icons-material/InsightsOutlined";
-import EventBusyOutlined from "@mui/icons-material/EventBusyOutlined";
-import PaidOutlined from "@mui/icons-material/PaidOutlined";
-import FactCheckOutlined from "@mui/icons-material/FactCheckOutlined";
-import SwapHorizOutlined from "@mui/icons-material/SwapHorizOutlined";
-import QrCodeScannerOutlined from "@mui/icons-material/QrCodeScannerOutlined";
-import ShoppingCartOutlined from "@mui/icons-material/ShoppingCartOutlined";
-import HandymanOutlined from "@mui/icons-material/HandymanOutlined";
-import BackpackOutlined from "@mui/icons-material/BackpackOutlined";
 import WarehouseOutlined from "@mui/icons-material/WarehouseOutlined";
 import { PageHead, Tabs, type TabItem } from "@/components/base";
 import { useUser } from "@/components/UserContext";
@@ -42,17 +32,18 @@ import s from "./almacen-portada.module.css";
  * activada la superficie Core.
  */
 
+// Sin íconos: con diez pestañas, así caben todas en una fila hasta en una pantalla de 1280 px.
 const PESTANAS = [
-  { key: "inventario", label: "Inventario", icon: Inventory2Outlined },
-  { key: "dashboard", label: "Resumen", icon: InsightsOutlined },
-  { key: "movimientos", label: "Movimientos", icon: SwapHorizOutlined },
-  { key: "lotes", label: "Lotes y caducidad", icon: EventBusyOutlined },
-  { key: "valuacion", label: "Valuación", icon: PaidOutlined },
-  { key: "conteos", label: "Conteos y reservas", icon: FactCheckOutlined },
-  { key: "scanner", label: "Escáner", icon: QrCodeScannerOutlined },
-  { key: "reabastecimiento", label: "Reabastecimiento", icon: ShoppingCartOutlined },
-  { key: "herramientas", label: "Herramientas", icon: HandymanOutlined },
-  { key: "kits", label: "Kits", icon: BackpackOutlined },
+  { key: "inventario", label: "Inventario" },
+  { key: "dashboard", label: "Resumen" },
+  { key: "movimientos", label: "Movimientos" },
+  { key: "lotes", label: "Lotes" },
+  { key: "valuacion", label: "Valuación" },
+  { key: "conteos", label: "Conteos" },
+  { key: "scanner", label: "Escáner" },
+  { key: "reabastecimiento", label: "Reabastecimiento" },
+  { key: "herramientas", label: "Herramientas" },
+  { key: "kits", label: "Kits" },
 ] as const;
 
 type Pestana = (typeof PESTANAS)[number]["key"];
@@ -64,7 +55,7 @@ function esVistaStock(p: Pestana): p is WarehouseView {
   return (VISTAS_STOCK as readonly string[]).includes(p);
 }
 
-const ITEMS_PESTANAS: ReadonlyArray<TabItem<Pestana>> = PESTANAS.map((p) => ({ id: p.key, label: p.label, icon: p.icon }));
+const ITEMS_PESTANAS: ReadonlyArray<TabItem<Pestana>> = PESTANAS.map((p) => ({ id: p.key, label: p.label }));
 
 function pestanaValida(valor: string | null): Pestana | null {
   return PESTANAS.some((p) => p.key === valor) ? (valor as Pestana) : null;
