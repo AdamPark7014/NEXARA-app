@@ -1,37 +1,50 @@
-FROM node:22-slim AS deps
+# Se compila con todo lo de la API y la imagen final solo lleva lo de producción. Las dependencias de la web
+# no entran en ninguna etapa: el 02-11-2026 eran 1.5 GB de los 2.3 GB de esta imagen, y la web tiene la suya.
+FROM node:22-slim AS base
 WORKDIR /app
+# Prisma (migrate) y engines nativos necesitan OpenSSL en imágenes slim. También al generar el cliente: sin
+# OpenSSL detecta «native» como openssl-1.1 y baja un segundo motor (16 MB) que aquí nunca se usa.
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
+FROM base AS manifiestos
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 
-RUN --mount=type=cache,target=/root/.npm npm install --prefer-offline --no-audit --legacy-peer-deps
+FROM manifiestos AS deps
+RUN --mount=type=cache,target=/root/.npm npm ci --workspace=apps/api --include-workspace-root --prefer-offline --no-audit --no-fund
+COPY apps/api/prisma/schema.prisma apps/api/prisma/schema.prisma
+RUN npm run prisma:generate --workspace=apps/api
 
 FROM deps AS build
-WORKDIR /app
 ENV NODE_OPTIONS=--max-old-space-size=3072
-COPY . .
-RUN npm run prisma:generate --workspace=apps/api
+COPY apps/api apps/api
+COPY scripts/clear-build-cache.js scripts/clear-build-cache.js
 RUN npm run build --workspace=apps/api
 
-FROM node:22-slim AS runner
-WORKDIR /app
+FROM deps AS prod-deps
+# `prisma`, `ts-node`, `@types/bcryptjs` y `sharp` son de producción a propósito: migraciones y sembradores corren
+# dentro de la imagen (`prisma db seed` revisa tipos), y los croquis y las fotos de vehículos usan sharp.
+RUN npm prune --omit=dev --workspace=apps/api --include-workspace-root --no-audit --no-fund
+
+FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=3001
 # Default runtime heap; compose may override via NODE_OPTIONS.
 ENV NODE_OPTIONS=--max-old-space-size=2048
 ENV HEALTH_HEAP_LIMIT_MB=1536
 
-# Prisma (migrate) y engines nativos necesitan OpenSSL en imágenes slim.
 # poppler-utils: `pdftotext` lee el manual de un vehículo sin cargarlo entero en memoria.
 RUN apt-get update -y \
-  && apt-get install -y --no-install-recommends openssl ca-certificates poppler-utils \
+  && apt-get install -y --no-install-recommends poppler-utils \
   && rm -rf /var/lib/apt/lists/*
 
 # Raíz: dependencias hoisted del monorepo
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=prod-deps /app/node_modules ./node_modules
 # apps/api: aquí npm deja deps solo del workspace (p. ej. @nestjs/terminus); sin esto el API crashea al arrancar
-COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/src/assets ./apps/api/dist/assets

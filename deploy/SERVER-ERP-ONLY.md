@@ -20,7 +20,7 @@ What is intentionally excluded from the production image
   - `apps/web/components/crm/**`
 
 How it’s enforced
-- `.dockerignore` excludes the folders above so they aren’t copied into the Docker build context. The web Dockerfile (`deploy/docker/Dockerfile.web`) uses `COPY . .`, so the ignore list drives what makes it into the image.
+- `.dockerignore` excludes the folders above so they aren’t copied into the Docker build context. The web Dockerfile (`deploy/docker/Dockerfile.web`) uses `COPY apps/web apps/web`, so the ignore list drives what makes it into the image.
 - ERP code no longer imports from `components/crm/*` (Procurement page now uses `components/erp/erp-chrome.module.css`), so excluding `components/crm/**` does not break the build.
 - ERP and shared presence code must import Integra helpers from the new neutral paths:
   - Use `@/lib/integra-shared/_lib` and `@/lib/integra-shared/_caps`

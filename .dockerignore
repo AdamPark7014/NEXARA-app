@@ -42,3 +42,6 @@ apps/web/app/(panels)/integra/**
 # Components used only by non-ERP panels
 apps/web/components/studio/**
 apps/web/components/crm/**
+
+# Respaldos sueltos del servidor
+**/*.bak-*
