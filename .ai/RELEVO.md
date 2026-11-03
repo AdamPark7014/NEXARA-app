@@ -1,5 +1,7 @@
 # RELEVO
 
+- **03-11 (claude-code) — Adam confirmó que la Contadora General opere la Mesa contable.** Eligió «Que la opere» frente a solo consulta: registra pólizas, cuadra banco, prepara facturas y cierra el mes, como quedó en `7cbeba83`. Sin cambios de código; Nómina sigue solo para el CEO.
+
 - **03-11 ~10:40 UTC (claude-code) — La Contadora General ya abre Mesa contable y Bancos, sin Nómina (`7cbeba83`).** Adam: «Sí, dale acceso», a la pregunta de darle Mesa contable con saldos de banco.
   - **Por persona, no por rol:** `accounting/mesa-contable/mesa-por-correo.ts` (espejo `web/lib/mesa-por-correo.ts`), como el almacén de Iván. Pasarla al rol `contabilidad` le quitaba Asistencias y escribir cotizaciones, y le abría `/api/employee-payments/**`. Rutas: `MESA_CONTABLE_POR_CORREO_URL_RULES`, en `UrlAccessGuard`, `RbacGuard` y `/me/navigation`. Permisos: `AuthService.applyMesaContableByEmail`, los del rol `contabilidad` para la Mesa **sin `CONTABILIDAD_MANAGE`**, que deja ver los pagos a personal de todos (`canViewAll`).
   - **Puede operar, no solo mirar:** registrar pólizas, cuadrar banco, preparar facturas y cerrar el mes, porque la Mesa se hizo para eso. Se le dijo a Adam. Si prefiere solo lectura, se quitan los `*_MANAGE`, `ACCOUNTING_POST`, `ACCOUNTING_CLOSE_PERIOD` y `BANKING_RECONCILE` de ese método.
