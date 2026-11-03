@@ -83,20 +83,16 @@ export default function PreguntaProyecto({ activityId }: { activityId: number })
         ) : null}
         {verLista ? (
           <>
-            <Select
-              aria-label="Elegir proyecto"
-              className={styles.lista}
-              controlSize="sm"
-              value={elegido}
-              onChange={(e) => setElegido(e.target.value)}
-            >
-              <option value="">Elegir proyecto…</option>
-              {datos.proyectos.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
-            </Select>
+            <div className={styles.lista}>
+              <Select aria-label="Elegir proyecto" controlSize="sm" value={elegido} onChange={(e) => setElegido(e.target.value)}>
+                <option value="">Elegir proyecto…</option>
+                {datos.proyectos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <Button
               size="sm"
               variant="primary"

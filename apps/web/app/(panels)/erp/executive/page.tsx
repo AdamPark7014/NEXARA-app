@@ -191,6 +191,7 @@ export default function ExecutivePage() {
               } },
   ];
   const cifras = ready ? cifrasDinero.filter((c) => c.n !== 0) : cifrasDinero;
+  const clientesClave = (data?.topAccounts ?? []).filter((c) => c.margin !== 0 || c.revenue > 0);
   const celdasTrabajo = [
     { label: "Por validar", n: cadena?.actividades.porValidar ?? 0, tone: "accent" as const },
     { label: "En proceso", n: cadena?.actividades.enProceso ?? 0 },
@@ -279,10 +280,10 @@ export default function ExecutivePage() {
           </DashCol>
         ) : null}
 
-        {data?.topAccounts?.length ? (
+        {clientesClave.length ? (
           <DashCol span={6}>
             <DashPanel title="Clientes clave" subtitle="Margen por cliente con proyectos" action="Ver rentabilidad" actionHref="/erp/analytics/bi?section=clients">
-              {data.topAccounts.map((c) => (
+              {clientesClave.map((c) => (
                 <ListRow
                   key={c.clientId}
                   href={`/erp/clientes/${c.clientId}`}

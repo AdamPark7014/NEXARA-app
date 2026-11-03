@@ -304,19 +304,19 @@ export class ExecutiveService {
       alerts.push({ level: 'info', icon: '🚀', title: 'Revenue en alza', message: `+${s.revenueMoMChange}% vs mes anterior` });
     }
     if (s.otOverdue > 0) {
-      alerts.push({ level: 'warning', icon: '⏰', title: 'OT vencidas', message: `${s.otOverdue} órdenes de trabajo vencidas requieren atención` });
+      alerts.push({ level: 'warning', icon: '⏰', title: 'OT vencidas', message: s.otOverdue === 1 ? '1 orden de trabajo vencida requiere atención' : `${s.otOverdue} órdenes de trabajo vencidas requieren atención` });
     }
     if (s.overdueInvoices > 0) {
-      alerts.push({ level: 'warning', icon: '💵', title: 'Facturas vencidas', message: `${s.overdueInvoices} facturas pendientes de cobro` });
+      alerts.push({ level: 'warning', icon: '💵', title: 'Facturas vencidas', message: s.overdueInvoices === 1 ? '1 factura pendiente de cobro' : `${s.overdueInvoices} facturas pendientes de cobro` });
     }
     if (s.lowStockCount > 0) {
-      alerts.push({ level: 'warning', icon: '📦', title: 'Stock bajo', message: `${s.lowStockCount} insumos en nivel crítico` });
+      alerts.push({ level: 'warning', icon: '📦', title: 'Stock bajo', message: s.lowStockCount === 1 ? '1 insumo en nivel crítico' : `${s.lowStockCount} insumos en nivel crítico` });
     }
     if (s.hotLeads >= 5) {
       alerts.push({ level: 'info', icon: '🔥', title: 'Leads calientes', message: `${s.hotLeads} leads de alta puntuación esperan atención` });
     }
     if (s.upcomingVisits > 0) {
-      alerts.push({ level: 'info', icon: '🛠️', title: 'Visitas próximas', message: `${s.upcomingVisits} visitas de mantenimiento en los próximos 30 días` });
+      alerts.push({ level: 'info', icon: '🛠️', title: 'Visitas próximas', message: s.upcomingVisits === 1 ? '1 visita de mantenimiento en los próximos 30 días' : `${s.upcomingVisits} visitas de mantenimiento en los próximos 30 días` });
     }
     return alerts;
   }
