@@ -1,5 +1,31 @@
 # RELEVO
 
+- **03-11 (claude-code) — El cliente ya abre su enlace de firma, sin ver costos ni margen, y `publicToken` salió de las respuestas (`87a96002`). En producción. Adam: «Sí, arréglalo». Sin migración.**
+  - **Qué pasaba:** `cotizaciones/public/:token` daba 401 sin sesión, porque `UrlAccessGuard` está en todo `CotizacionesController`: el cliente no podía abrir el enlace del correo. Y lo que devolvía traía las partidas completas, con costo, margen y proveedor. Todas las cotizaciones siguen en borrador, así que no le pasó a nadie.
+  - **Qué se hizo:**
+    - Las tres rutas pasaron a `CotizacionesPublicasController`, sin guardia.
+    - `vistaPublica` (`cotizacion-publica.ts`) es una lista blanca con los importes de `formatoDesdeCotizacion`, los del PDF del cliente. Con el precio guardado, la diferencia contra el total delataba el margen general.
+    - Un borrador con enlace (ya salió y lo están corrigiendo) da 409 y no se ve; tampoco se rechaza desde el enlace. Firmar y rechazar responden `{ ok: true }`. No se firma sin nombre.
+    - `publicToken` entró a `SECRET_KEYS`: sale de todas las respuestas, también de las versiones guardadas. Por dentro sigue igual.
+    - La página dice por qué ya no se firma, nombra Rechazada y Vencida, y no enseña renglones en cero. No se le cambió el diseño.
+  - **Verificado:**
+    - `AppModule` real, HTTP real y base desechable: 9 de 11 fallaban antes del arreglo y las 11 pasan. Abrir, firmar y rechazar sin sesión; la otra empresa; borrador; vencida; token fuera con sesión; rutas privadas en 401; auditoría de la firma con su empresa y su IP.
+    - Con el código desplegado, en solo lectura: todas las cotizaciones reales pasan por la vista sin falla, sin dato interno y con los importes de su PDF y su total guardado.
+    - En producción, sin sesión: enlace inexistente 404 (antes 401), CORS para `nexara.com.mx`, firma sin nombre 400, otro sitio 403, seis rutas privadas 401.
+    - Página desplegada: «No se encontró la cotización» de verdad, y con `fetch` interceptado en la pestaña y datos de ejemplo, enviada, firmada y vencida, sin desborde a 375 px.
+    - API 5,495 y web 2,115, tipos y CI completo en verde. `mfa.service.spec.ts` y `RecorridoDia.spec.tsx` agotaron su tiempo con tres suites a la vez en la máquina y pasan solas.
+  - **Sin verificar:** un envío real por correo, con su enlace, abierto y firmado en producción. No hay ninguna cotización enviada y no se creó una de prueba. Lo cierra el primer envío: conviene que sea a un correo propio.
+  - **Efectos que ya corren al firmar, nunca usados con cliente real:** la oportunidad ligada pasa a ganada, se crea el borrador de pedido a CT, la actividad se cierra y sale el aviso. Pasaron en la base desechable sin errores en el registro.
+  - **Corrección de la entrada de abajo:** dije que con IEPS o retención el editor enseñaría un total menor que el del PDF. El PDF del cliente (`formatoDesdeCotizacion`) tampoco los imprime, así que editor, PDF y enlace coinciden; el que los cuenta es `Cotizacion.total`, con el PDF interno. Hoy ninguna partida los trae.
+  - **Visto y sin tocar:**
+    - **La vigencia vence un día antes en México:** `validUntil` se guarda a medianoche UTC, y `puedeFirmarse` y `debeVencer` lo comparan como instante. Con vigencia al 18, deja de firmarse el 17 a las 18:00, medido con el código desplegado, y la página sigue diciendo 18.
+    - La página no tiene botón de rechazar, aunque la ruta existe y funciona.
+  - **Trampas:**
+    - **`withTenantBypassAsync(() => prisma.x.find())` no quita el filtro.** Una consulta de Prisma corre al esperarla, ya fuera del contexto. Va con `async () => { return await … }`. Una prueba con un simulacro inmediato no lo ve: el de `cotizacion-publica.spec.ts` es perezoso a propósito. Otros servicios lo usan así; no se tocaron.
+    - Sin sesión, `TenantInterceptor` pone la empresa principal, no «ninguna»: una ruta pública solo encuentra lo de esa empresa si no se busca sin filtro.
+    - La auditoría de un `update` con filtro de empresa queda como `BULK_UPDATE` con `entityId` 0: buscarla por `changes`, no por el id de la cotización.
+    - `git hash-object` con rutas que llevan `[` o `(` no recibe la conversión de MSYS: pasar la ruta con `cygpath -m`.
+
 - **03-11 (claude-code) — Agregar un paquete y autoguardar ya no borran datos de las partidas (`0772edc8`). En producción. Sin migración: no se tocó nada de lo guardado.**
   - **Qué pasaba:** guardar rehace todas las partidas y lo que no llega se borra. Era más de lo que decía la nota de la Ola 5: `POST cotizaciones/:id/paquetes` también borraba marca, modelo, imagen, número de partida, liga con CT, IEPS, retención y notas, y el editor dejaba fuera 20 columnas, no tres.
   - **Por qué importaba:** `previewCtLines` pide `productCtId` más `supplierSku` o `sku`. Después de guardar partidas desde el editor, el pedido a CT decía que no hay partidas de catálogo.
