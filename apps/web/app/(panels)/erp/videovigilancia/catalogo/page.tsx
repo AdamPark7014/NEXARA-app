@@ -149,7 +149,6 @@ export default function CatalogoPage() {
       <ModulePage
         title="Catálogo de equipos"
         description="Lo que coloques en la maqueta sale de aquí, con su modelo 3D y sus existencias de Almacén y CT."
-        breadcrumbs={[{ label: "Vender" }, { label: "Diseños de cámaras", href: "/erp/videovigilancia" }, { label: "Catálogo" }]}
         icon={<VideocamOutlinedIcon />}
         secondaryActions={
           <>
