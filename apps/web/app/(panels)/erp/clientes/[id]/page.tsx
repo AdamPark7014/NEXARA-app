@@ -1,5 +1,6 @@
 "use client";
 
+import { conRegreso, useRegreso } from "@/lib/regreso";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -156,6 +157,7 @@ export default function ClienteDetallePage() {
   const params = useParams();
   const router = useRouter();
   const { user, token } = useUser();
+  const regreso = useRegreso({ href: "/erp/clientes", label: "Clientes" });
   const id = Number(params?.id);
 
   const [client, setClient] = useState<SalesClient | null>(null);
@@ -494,12 +496,15 @@ export default function ClienteDetallePage() {
                   <AccountTreeOutlinedIcon fontSize="inherit" />
                 </span>
                 <div className={styles.proyectoTexto}>
-                  <Link href={`/erp/proyectos/${p.id}`} className={styles.proyectoNombre}>
+                  <Link href={conRegreso(`/erp/proyectos/${p.id}`, `/erp/clientes/${client.id}`)} className={styles.proyectoNombre}>
                     {p.title}
                   </Link>
                   <span className={styles.proyectoSub}>
                     <span>{plazo ?? "Sin fechas"}</span>
                     {p.responsable?.nombre ? <span>Responsable: {p.responsable.nombre}</span> : null}
+                    {p.cotizacion ? (
+                      <Link href={conRegreso(`/erp/cotizaciones/${p.cotizacion.id}`, `/erp/clientes/${client.id}`)}>Cotización {p.cotizacion.quoteNumber}</Link>
+                    ) : null}
                   </span>
                 </div>
                 <div className={styles.proyectoAvance}>
@@ -683,7 +688,7 @@ export default function ClienteDetallePage() {
       <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
       <RecordPage
         className={styles.pagina}
-        breadcrumbs={[{ label: "Clientes", href: "/erp/clientes" }, { label: client.name }]}
+        breadcrumbs={[regreso, { label: client.name }]}
         icon={<IconoTipo />}
         code={client.taxId ? <span className={styles.mono}>{client.taxId}</span> : undefined}
         statusLabel={inactivo ? "Inactivo" : "Activo"}

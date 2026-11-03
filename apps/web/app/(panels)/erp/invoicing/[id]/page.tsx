@@ -1,5 +1,6 @@
 "use client";
 
+import { conRegreso, useRegreso } from "@/lib/regreso";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
@@ -140,6 +141,7 @@ export default function InvoiceDetailPage() {
   const router = useRouter();
   const id = params.id;
   const { user } = useUser();
+  const regreso = useRegreso({ href: "/erp/invoicing", label: "Facturación" });
   const token = user?.token ?? "";
   const canEdit = user?.isSuperAdmin || ["ceo", "super_admin", "dir_admin", "contabilidad", "administrativo"].includes(user?.roleKey ?? "");
 
@@ -311,7 +313,7 @@ export default function InvoiceDetailPage() {
     try {
       const nc = await apiFetch(`accounting/invoices/${id}/credit-note`, token, { method: "POST", body: JSON.stringify({}) });
       toast.success(`Nota de crédito ${nc.invoiceNumber} creada en borrador`);
-      router.push(`/erp/invoicing/${nc.id}`);
+      router.push(conRegreso(`/erp/invoicing/${nc.id}`, `/erp/invoicing/${id}`));
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo crear la nota de crédito"));
     }
@@ -508,7 +510,7 @@ export default function InvoiceDetailPage() {
             en la tarjeta del CFDI. */}
         <PageHead
           className={s.cabeza}
-          back={{ href: "/erp/invoicing", label: "Facturación" }}
+          back={regreso}
           eyebrow={`Finanzas · ${isIncome ? "Cuentas por cobrar" : "Cuentas por pagar"}`}
           title={invoice.invoiceNumber}
           description={counterparty ?? "—"}

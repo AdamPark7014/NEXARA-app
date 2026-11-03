@@ -93,3 +93,18 @@ describe("regresoDeOrigen", () => {
     expect(regresoDeOrigen(null)).toEqual({ href: "/erp/pizarra", label: "Pizarra" });
   });
 });
+
+describe("origen: cualquier pantalla de /erp", () => {
+  it("regresa a donde se abrió, con su query, y la lleva entre pestañas", () => {
+    const origen = leerOrigen("?volver=%2Ferp%2Fproyectos%2F7");
+    expect(origen).toEqual({ tipo: "ruta", href: "/erp/proyectos/7" });
+    expect(regresoDeOrigen(origen)).toEqual({ href: "/erp/proyectos/7", label: "Proyecto" });
+    expect(conOrigen("/erp/actividades/5/evidencias#revision", origen)).toBe("/erp/actividades/5/evidencias?volver=%2Ferp%2Fproyectos%2F7#revision");
+    expect(regresoDeOrigen(leerOrigen("?volver=%2Ferp%2Fpizarra%2Fflujo%2Fx%3Frango%3Dmes"))).toEqual({ href: "/erp/pizarra/flujo/x?rango=mes", label: "Flujo" });
+  });
+
+  it("una ruta de afuera no cuenta como origen", () => {
+    expect(leerOrigen("?volver=https%3A%2F%2Fevil.test")).toBeNull();
+    expect(leerOrigen("?volver=%2F%2Fevil.test%2Ferp")).toBeNull();
+  });
+});

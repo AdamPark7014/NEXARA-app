@@ -1,5 +1,6 @@
 "use client";
 
+import { conRegreso, useRegreso } from "@/lib/regreso";
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
@@ -83,6 +84,7 @@ import ComoTermino from "./ComoTermino";
 import { useCronometroProceso } from "@/lib/cronometro-proceso";
 import { aceptoEnPalabras, conUnSoloActual, diaDelHecho, medioDeEnvio, pasosDeFacturaYCobro } from "@/lib/hilo-negocio";
 import Seguimiento from "./Seguimiento";
+import Link from "next/link";
 import styles from "./editor.module.css";
 
 /**
@@ -232,6 +234,7 @@ export default function EditorCotizacion({
   plantillaId?: number | null;
 }) {
   const { token, user } = useUser();
+  const regreso = useRegreso({ href: "/erp/cotizaciones", label: "Cotizaciones" });
   /** Desde que se abre hasta que sale al cliente (Programa Velocidad Core). */
   const cronometro = useCronometroProceso("cotizar", token);
   const veCostos = hasPermission(user, PERMISSIONS.COTIZACIONES_ACCESS);
@@ -652,11 +655,11 @@ export default function EditorCotizacion({
       <header className={styles.barra}>
         <div className={styles.barraIzq}>
           <ButtonLink
-            href="/erp/cotizaciones"
+            href={regreso.href}
             icon
             className={styles.volver}
-            aria-label="Volver a cotizaciones"
-            title="Cotizaciones"
+            aria-label={`Volver a ${regreso.label.toLowerCase()}`}
+            title={regreso.label}
           >
             <ArrowBackRoundedIcon aria-hidden="true" />
           </ButtonLink>
@@ -745,7 +748,13 @@ export default function EditorCotizacion({
               <div className={styles.fichaDatos}>
                 <span className={styles.fichaDato}>
                   <ApartmentOutlinedIcon aria-hidden="true" />
-                  {doc.clientName.trim() || "Sin cliente"}
+                  {doc.salesClientId && doc.clientName.trim() ? (
+                    <Link href={conRegreso(`/erp/clientes/${doc.salesClientId}`, `/erp/cotizaciones/${detalle.id}`)} className={styles.fichaEnlace}>
+                      {doc.clientName.trim()}
+                    </Link>
+                  ) : (
+                    doc.clientName.trim() || "Sin cliente"
+                  )}
                 </span>
                 {detalle.elaboro?.nombre ? (
                   <span className={styles.fichaDato}>

@@ -97,6 +97,10 @@ export type ActivityDetail = {
   motivoSemaforo?: "inicio" | "tope" | "plan" | null;
   minutosPlan?: number | null;
   minutosReales?: number | null;
+  /** Cuánto dijo quien la ejecutó que tomó de verdad. */
+  tiempoDichoMin?: number | null;
+  /** Se le pregunta a quien la ejecutó: ya terminó y su reloj es largo o no cuadra con el plan. */
+  preguntarTiempo?: boolean;
   excedida?: boolean;
   fechaMaxima?: string | null;
   tiempoEstimadoMin?: number | null;
@@ -254,6 +258,14 @@ export function reassignActivity(
   return apiFetch<{ reassigned: boolean }>(`activities/${activityId}/reasignar`, token, {
     method: "POST",
     body: JSON.stringify(body),
+  });
+}
+
+/** Cuánto tomó de verdad: solo quien la ejecutó. Enseña a los tiempos; no toca reloj, KPI ni nómina. */
+export function decirTiempoActividad(token: string, activityId: number, minutos: number) {
+  return apiFetch<{ tiempoDichoMin: number; preguntarTiempo: boolean }>(`activities/${activityId}/tiempo-dicho`, token, {
+    method: "POST",
+    body: JSON.stringify({ minutos }),
   });
 }
 

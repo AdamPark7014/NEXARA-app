@@ -10,6 +10,7 @@ import { formatoFecha, type Tono } from "@/lib/proyectos-api";
 import NuevaActividad from "./NuevaActividad";
 import ProgramarActividades from "./ProgramarActividades";
 import { toneDe } from "./tono";
+import { conRegreso } from "@/lib/regreso";
 import type { SeccionProps } from "./tipos";
 import styles from "./secciones.module.css";
 
@@ -76,7 +77,7 @@ export default function SeccionActividades(props: SeccionProps) {
               return (
                 <li key={a.id} className={styles.fila} data-luz={franja}>
                   <div className={styles.principal}>
-                    <Link href={`/erp/actividades/${a.id}`} className={styles.tituloFila}>
+                    <Link href={conRegreso(`/erp/actividades/${a.id}`, `/erp/proyectos/${p.id}`)} className={styles.tituloFila}>
                       {a.anNumber ? `${a.anNumber} · ` : ""}
                       {a.titulo || "Actividad sin título"}
                     </Link>
@@ -103,7 +104,7 @@ export default function SeccionActividades(props: SeccionProps) {
                   </div>
                   <div className={styles.acciones}>
                     <StatusBadge size="sm" label={a.estatus || "Pendiente"} tone={toneDe(tonoDeActividad(a.estatus))} />
-                    <ButtonLink size="sm" variant="ghost" href={`/erp/actividades/${a.id}`} iconEnd={<ChevronRightRoundedIcon />}>
+                    <ButtonLink size="sm" variant="ghost" href={conRegreso(`/erp/actividades/${a.id}`, `/erp/proyectos/${p.id}`)} iconEnd={<ChevronRightRoundedIcon />}>
                       Ver actividad
                     </ButtonLink>
                   </div>

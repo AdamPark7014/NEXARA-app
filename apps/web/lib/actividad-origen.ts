@@ -1,3 +1,5 @@
+import { etiquetaDeRegreso, PARAM_REGRESO, rutaDeRegresoValida, type Regreso } from "./regreso";
+
 /**
  * De dónde se llegó al detalle de una actividad, para que «‹ regresar» vuelva ahí y no a la
  * lista general de Actividades. Viaja en la URL (`?origen=…`): así sobrevive a recargar y a
@@ -7,6 +9,8 @@
  * la última pestaña que se usó.
  */
 export type OrigenActividad =
+  /** Cualquier otra pantalla de /erp que la abrió (proyecto, cotización, flujo, desempeño…). */
+  | { tipo: "ruta"; href: string }
   /** Actividades › En espera de revisión. */
   | { tipo: "revision" }
   /** Actividades › En espera de revisión › Revisadas por ti. */
@@ -16,7 +20,7 @@ export type OrigenActividad =
   /** Ficha de una persona, pestaña Ahora. */
   | { tipo: "persona"; persona: number };
 
-export type Regreso = { href: string; label: string };
+export type { Regreso };
 
 /** Pestaña de Actividades con lo que espera revisión (`/erp/pizarra?vista=revision`). */
 export const VISTA_REVISION = "revision";
@@ -33,6 +37,8 @@ function idValido(v: string | null): number | null {
 export function leerOrigen(search: string | URLSearchParams | null | undefined): OrigenActividad | null {
   if (!search) return null;
   const q = typeof search === "string" ? new URLSearchParams(search) : search;
+  const ruta = rutaDeRegresoValida(q.get(PARAM_REGRESO));
+  if (ruta) return { tipo: "ruta", href: ruta };
   const tipo = q.get("origen");
   if (tipo === "revision" || tipo === "revisadas") return { tipo };
   if (tipo === "historial" || tipo === "persona") {
@@ -45,6 +51,7 @@ export function leerOrigen(search: string | URLSearchParams | null | undefined):
 /** Los parámetros que lleva un enlace para no perder el origen. */
 export function parametrosDeOrigen(origen: OrigenActividad | null | undefined): Array<[string, string]> {
   if (!origen) return [];
+  if (origen.tipo === "ruta") return [[PARAM_REGRESO, origen.href]];
   if (origen.tipo === "historial" || origen.tipo === "persona") {
     return [
       ["origen", origen.tipo],
@@ -79,6 +86,8 @@ export function conOrigen(href: string, origen: OrigenActividad | null | undefin
 export function regresoDeOrigen(origen: OrigenActividad | null | undefined, nombre?: string | null): Regreso {
   const corto = (nombre ?? "").trim().split(/\s+/)[0] ?? "";
   switch (origen?.tipo) {
+    case "ruta":
+      return { href: origen.href, label: etiquetaDeRegreso(origen.href) };
     case "revision":
       return { href: `${PIZARRA}?vista=${VISTA_REVISION}`, label: "En espera de revisión" };
     case "revisadas":

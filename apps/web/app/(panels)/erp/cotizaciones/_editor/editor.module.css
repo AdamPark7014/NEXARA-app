@@ -213,6 +213,12 @@
   min-width: 0;
 }
 
+.fichaEnlace {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .fichaDato svg {
   font-size: 17px !important;
   color: var(--ui-fg-3);

@@ -1,5 +1,6 @@
 "use client";
 
+import { conRegreso } from "@/lib/regreso";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
@@ -251,7 +252,7 @@ export default function Seguimiento({
           <p className={`${styles.pista} ${styles.ligadas}`}>
             Actividad comercial ligada:{" "}
             {detalle.actividades.map((a) => (
-              <Link key={a.id} href={`/erp/actividades/${a.id}`} className={styles.enlace}>
+              <Link key={a.id} href={conRegreso(`/erp/actividades/${a.id}`, `/erp/cotizaciones/${detalle.id}`)} className={styles.enlace}>
                 {a.anNumber || `#${a.id}`}
               </Link>
             ))}

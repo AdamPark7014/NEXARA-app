@@ -132,7 +132,8 @@ describe("ficha del cliente · proyectos", () => {
     render(<ClienteDetallePage />);
 
     const enlace = await screen.findByRole("link", { name: "CCTV Plaza Dorada" });
-    expect(enlace).toHaveAttribute("href", "/erp/proyectos/7");
+    // Lleva de dónde viene, para que su flecha regrese a este cliente.
+    expect(enlace).toHaveAttribute("href", "/erp/proyectos/7?volver=%2Ferp%2Fclientes%2F5");
     // Los proyectos se piden al servidor ya filtrados por el cliente de operación.
     const pedido = llamadas.find((l) => /\/proyectos\?/.test(l.url))!;
     expect(pedido.url).toContain("clientId=80");

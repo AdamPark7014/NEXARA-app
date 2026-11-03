@@ -1,5 +1,6 @@
 "use client";
 
+import { aqui, conRegreso } from "@/lib/regreso";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -232,7 +233,7 @@ export default function KpisPersonaPage() {
                         <span role="cell" className={tabla.celda}>
                           <span>
                             {e.anNumber ? (
-                              <Link href={`/erp/actividades/${e.activityId}`} className={s.folio}>
+                              <Link href={conRegreso(`/erp/actividades/${e.activityId}`, aqui())} className={s.folio}>
                                 {e.anNumber}
                               </Link>
                             ) : null}{" "}
@@ -332,7 +333,7 @@ export default function KpisPersonaPage() {
                       <span role="cell" className={tabla.celda}>
                         <span>
                           {a.anNumber ? (
-                            <Link href={`/erp/actividades/${a.activityId}`} className={s.folio}>
+                            <Link href={conRegreso(`/erp/actividades/${a.activityId}`, aqui())} className={s.folio}>
                               {a.anNumber}
                             </Link>
                           ) : null}{" "}

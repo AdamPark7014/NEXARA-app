@@ -1,5 +1,6 @@
 "use client";
 
+import { useFiltrosEnUrl } from "@/lib/regreso";
 import Link from "next/link";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -135,17 +136,18 @@ export default function ProyectosPage() {
   const [clientes, setClientes] = useState<SalesClient[] | null>(null);
   const buscador = useRef<HTMLInputElement>(null);
 
-  // Enlaces del tablero: /erp/proyectos?estado=ACTIVE&salud=RIESGO.
-  useEffect(() => {
-    const qs = new URLSearchParams(window.location.search);
-    const e = String(qs.get("estado") || "").toUpperCase();
-    const s = String(qs.get("salud") || "").toUpperCase();
+  // Enlaces del tablero: /erp/proyectos?estado=ACTIVE&salud=RIESGO. Al volver de una ficha siguen los tuyos.
+  useFiltrosEnUrl({ q, estado, salud, responsable, cliente, vista: vista === "clientes" ? "clientes" : null }, (leidos) => {
+    const e = String(leidos.estado || "").toUpperCase();
+    const s = String(leidos.salud || "").toUpperCase();
+    if (leidos.q) setQ(leidos.q);
     if ((ESTADOS_PROYECTO as readonly string[]).includes(e)) setEstado(e as EstadoProyecto);
     if (FILTROS_SALUD.some((f) => f.valor === s)) setSalud(s as FiltroSalud);
+    if (leidos.responsable) setResponsable(leidos.responsable);
     // Desde la ficha de un cliente: /erp/proyectos?cliente=<id de operación>.
-    if (/^\d+$/.test(qs.get("cliente") || "")) setCliente(String(qs.get("cliente")));
-    if (qs.get("vista") === "clientes") setVista("clientes");
-  }, []);
+    if (/^\d+$/.test(leidos.cliente || "")) setCliente(leidos.cliente);
+    if (leidos.vista === "clientes") setVista("clientes");
+  });
 
   const cargar = useCallback(async () => {
     if (!token) return;

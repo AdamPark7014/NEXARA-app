@@ -1,5 +1,6 @@
 "use client";
 
+import { useRegreso } from "@/lib/regreso";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -79,6 +80,7 @@ export default function EmployeeDetailPage() {
   const id = params.id;
   const router = useRouter();
   const { user } = useUser();
+  const regreso = useRegreso({ href: "/erp/hr", label: "Plantilla" });
   const token = user?.token ?? "";
 
   const [employee, setEmployee] = useState<EmployeeDetail | null>(null);
@@ -240,7 +242,7 @@ export default function EmployeeDetailPage() {
         }
         actions={
           <>
-            <Button variant="ghost" onClick={() => router.push("/erp/hr")}>← Plantilla</Button>
+            <Button variant="ghost" onClick={() => router.push(regreso.href)}>← {regreso.label}</Button>
             <Button variant="primary" onClick={openEdit}>Editar ficha</Button>
           </>
         }

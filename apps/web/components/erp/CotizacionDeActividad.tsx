@@ -7,6 +7,7 @@
  * «Ligar cotización» conecta una que ya existe. La evidencia del levantamiento pasa a ser anexo de
  * la propuesta sin volver a subirla, así que no hay que adjuntar nada dos veces.
  */
+import { aqui, conRegreso } from "@/lib/regreso";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
@@ -83,7 +84,7 @@ export default function CotizacionDeActividad({
       <div>
         <p style={{ margin: 0, fontSize: 13 }}>
           Cotización{" "}
-          <Link href={`/erp/cotizaciones/${cotizacion.id}`} style={{ fontWeight: 700 }}>
+          <Link href={conRegreso(`/erp/cotizaciones/${cotizacion.id}`, aqui())} style={{ fontWeight: 700 }}>
             {cotizacion.quoteNumber}
           </Link>{" "}
           · {estadoEnEspanol(cotizacion.status)}
