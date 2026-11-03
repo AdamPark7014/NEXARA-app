@@ -11,6 +11,8 @@ import { MeService } from './me.service.js';
 import { MyActivitiesService } from './my-activities.service.js';
 import { TeamBoardService } from './team-board.service.js';
 import { KpisEquipoService } from './kpis-equipo.service.js';
+import { DireccionController } from './direccion.controller.js';
+import { DireccionService } from './direccion.service.js';
 import { PeerRequestsService } from './peer-requests.service.js';
 import { HorasExtraService } from './horas-extra.service.js';
 import { TrayectosService } from '../activities/trayectos/trayectos.service.js';
@@ -27,12 +29,13 @@ import { ModulePolicyModule } from '../common/tenant/module-policy.module.js';
     NotificationsModule,
     ModulePolicyModule,
   ],
-  controllers: [MeController],
+  controllers: [MeController, DireccionController],
   providers: [
     MeService,
     TeamBoardService,
     MyActivitiesService,
     KpisEquipoService,
+    DireccionService,
     PeerRequestsService,
     HorasExtraService,
     TrayectosService,

@@ -4,6 +4,7 @@ import { WorkflowService } from '../workflow/workflow.service.js';
 import { ModulePolicyService } from '../common/tenant/module-policy.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS, statusVariants } from '../activities/activity-status.js';
+import { leerRevisores } from '../me/revision-evidencias.js';
 import { workDateColumn, workDateKey, workDayStart } from '../common/time/workday.js';
 import { ESTADOS_OC_POR_RECIBIR, seleccionarAtrasadas, type OrdenParaAtraso } from '../procurement/purchase-order-overdue.js';
 import {
@@ -181,13 +182,19 @@ export class CeoBriefService {
             reviewStatus: { notIn: ['APPROVED', 'REJECTED'] },
             activity: { deletedAt: null, estatus: { in: statusVariants(ACTIVITY_STATUS.POR_VALIDAR) } },
           } as any,
-          select: { user: { select: { manager: { select: { id: true, nombre: true } } } } },
+          select: { user: { select: { id: true, manager: { select: { id: true, nombre: true } } } } },
           take: 1000,
         });
+        // Quien revisa por encargo va en lugar de su jefe: a dirección ya no le toca.
+        const revisores = await leerRevisores(this.prisma as never, companyId);
+        const nombresRevisores = revisores.length
+          ? await this.prisma.user.findMany({ where: { id: { in: revisores.map((r) => r.revisorId) } }, select: { id: true, nombre: true } })
+          : [];
         let tuyas = 0;
         const porJefe = new Map<string, number>();
         for (const f of filas) {
-          const jefe = (f as any).user?.manager;
+          const revisorId = revisores.find((r) => r.userId === (f as any).user?.id)?.revisorId;
+          const jefe = nombresRevisores.find((u) => u.id === revisorId) ?? (f as any).user?.manager;
           if (!jefe || jefe.id === lector.id) tuyas += 1;
           else {
             const nombre = String(jefe.nombre).trim().split(/\s+/).slice(0, 2).join(' ');

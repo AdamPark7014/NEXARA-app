@@ -29,6 +29,17 @@ describe('matriz: alta y autoasignación de actividades', () => {
     expect(checkUrlAccess(role, '/api/activities/7/tiempo-dicho', 'POST').allowed).toBe(true);
   });
 
+  it.each(PERSONAL)('%s llega a Mi área; a quién ve lo decide el servicio', (role) => {
+    expect(checkUrlAccess(role, '/api/me/area', 'GET').allowed).toBe(true);
+    expect(checkUrlAccess(role, '/api/me/direccion/hoy', 'GET').allowed).toBe(true);
+    expect(checkUrlAccess(role, '/api/me/obra', 'GET').allowed).toBe(true);
+    expect(checkUrlAccess(role, '/api/me/obra/ligar', 'POST').allowed).toBe(true);
+  });
+
+  it('un cliente no liga obra a un proyecto', () => {
+    expect(checkUrlAccess(ROLES.CLIENTE, '/api/me/obra/ligar', 'POST').allowed).toBe(false);
+  });
+
   it('un cliente no dice cuánto tomó', () => {
     expect(checkUrlAccess(ROLES.CLIENTE, '/api/activities/7/tiempo-dicho', 'POST').allowed).toBe(false);
   });

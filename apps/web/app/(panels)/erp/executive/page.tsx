@@ -30,6 +30,8 @@ import { CommandCenterRail } from "@/components/command-center/CommandCenterRail
 import { buildExecutiveDynamicWidgets, buildExecutiveBiDrillLinks } from "@/lib/executive-widgets";
 import { ExecutiveBiDrillPanel } from "@/components/command-center/ExecutiveBiDrillPanel";
 import TuDiaPanel from "@/components/executive/TuDiaPanel";
+import DireccionHoy from "@/components/executive/DireccionHoy";
+import { DIRECCION_VISIBLE } from "@/lib/direccion-api";
 import CadenaNegocio, { SiguientePasoNegocio } from "@/components/executive/CadenaNegocio";
 
 /**
@@ -119,6 +121,13 @@ export default function ExecutivePage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Solo dirección: los demás roles que abren esta vista no ven al personal completo.
+  const [muestra, setMuestra] = useState(false);
+  useEffect(() => {
+    setMuestra(new URLSearchParams(window.location.search).has("muestra"));
+  }, []);
+  const verDireccion = (DIRECCION_VISIBLE || muestra) && v2Role === ROLES.CEO;
 
   const dynamicWidgets = useMemo(() => buildExecutiveDynamicWidgets(data), [data]);
   const biDrillLinks = useMemo(
@@ -233,6 +242,8 @@ export default function ExecutivePage() {
       />
 
       <TuDiaPanel token={token} />
+
+      {verDireccion ? <DireccionHoy token={token} /> : null}
 
       {error && !loading && (
         <InlineAlert
