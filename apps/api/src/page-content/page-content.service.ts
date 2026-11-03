@@ -53,11 +53,13 @@ export class PageContentService {
   /** Sitio público: solo contenido publicado del tenant público. */
   async findPublished(section: string) {
     const companyId = await this.publicCompanyId();
-    const row = await withTenantBypassAsync(() =>
-      this.prisma.pageContent.findUnique({
+    // El `await` adentro hace falta: una consulta de Prisma corre al esperarla, y sin él el filtro de la
+    // petición cambiaría la empresa de esta llave por la que venga en `X-Company-Id`.
+    const row = await withTenantBypassAsync(async () => {
+      return await this.prisma.pageContent.findUnique({
         where: { companyId_section: { companyId, section } },
-      }),
-    );
+      });
+    });
     if (!row) throw new NotFoundException(`Sección "${section}" no tiene contenido publicado todavía.`);
     return {
       ...row,

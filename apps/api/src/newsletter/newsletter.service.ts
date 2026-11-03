@@ -40,7 +40,8 @@ export class NewsletterService {
     const subscriber = existing
       ? await withTenantBypassAsync(() =>
           this.db.newsletterSubscriber.update({
-            where: { id: existing.id },
+            // Con la empresa aquí, para que el filtro de la petición no la cambie por otra y actualice 0 filas.
+            where: { id: existing.id, companyId: tenantId },
             data: { name, source, pageUrl, subscribedAt: new Date() },
           }),
         )
