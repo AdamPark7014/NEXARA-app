@@ -95,6 +95,11 @@ export class CotizacionItemDto {
   @IsInt()
   productCtId?: number;
 
+  /** Mayorista homologado (CT, SYSCOM…). Sin él, una partida con `productCtId` se toma por CT. */
+  @IsOptional()
+  @IsString()
+  supplierCode?: string;
+
   @IsOptional()
   @IsString()
   supplierWarehouseCode?: string;

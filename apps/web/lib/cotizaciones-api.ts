@@ -100,6 +100,30 @@ export type PartidaCotizacion = {
   marginPercent?: number | null;
   /** Lleva IVA (el cliente requiere factura). false = sin IVA ni retenciones. */
   conIva?: boolean;
+  /**
+   * Lo demás que guarda la partida. El editor no lo enseña, pero lo devuelve al guardar
+   * (`CAMPOS_SIN_EDITAR` en `cotizacion-documento.ts`).
+   */
+  productId?: number | null;
+  scope?: string | null;
+  sku?: string | null;
+  partNumber?: string | null;
+  batchReference?: string | null;
+  supplierId?: number | null;
+  supplierSku?: string | null;
+  productCtId?: number | null;
+  supplierCode?: string | null;
+  supplierWarehouseCode?: string | null;
+  stockSnapshot?: number | null;
+  leadTimeDays?: number | null;
+  scoreReason?: string | null;
+  optimizationMode?: string | null;
+  ieps?: number;
+  retention?: number;
+  warrantyMonths?: number;
+  deliveryTime?: string | null;
+  countryOrigin?: string | null;
+  notes?: string | null;
 };
 
 /** 02 Alcance: una subsección numerada (título, párrafo y viñetas). */
