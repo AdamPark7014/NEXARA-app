@@ -41,6 +41,9 @@ const PARES = new Set([
   "tecnicos-mantenimiento-pc-colaboracion",
 ]);
 
+/** De estas también hay una de 640: son las que la portada carga en el teléfono. */
+const CON_640 = new Set(["muro-video-ancho", "rack-nexara-led"]);
+
 export type Foto = { src: string; srcSet?: string; sizes?: string };
 
 /** De estas fotos en webp también hay un JPG de 1600 para las vistas previas que no leen webp. */
@@ -56,7 +59,7 @@ export function foto(nombre: string, sizes = "(max-width: 734px) 100vw, 50vw"): 
   if (PARES.has(nombre)) {
     return {
       src: `/fotos/${nombre}-1200.webp`,
-      srcSet: `/fotos/${nombre}-1200.webp 1200w, /fotos/${nombre}-1920.webp 1920w`,
+      srcSet: `${CON_640.has(nombre) ? `/fotos/${nombre}-640.webp 640w, ` : ""}/fotos/${nombre}-1200.webp 1200w, /fotos/${nombre}-1920.webp 1920w`,
       sizes,
     };
   }
