@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useDeferredValue, useMemo, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import AddOutlined from "@mui/icons-material/AddOutlined";
@@ -223,11 +224,17 @@ export function VistaAlmacen({
   embedded,
 }: {
   /**
-   * Montada dentro de otra pantalla (la landing `/erp/almacen`): en vez de su encabezado
-   * enseña solo su fila de acciones, y se limita a las vistas de `views`. Con una sola
-   * vista tampoco pinta sus pestañas, porque las de arriba ya mandan.
+   * Montada dentro de otra pantalla (la landing `/erp/almacen`), que manda en la vista y en el
+   * buscador. Sin encabezado ni pestañas propias: sus acciones van a `slotAcciones`, junto al título.
    */
-  embedded?: { views: readonly WarehouseView[] };
+  embedded?: {
+    views: readonly WarehouseView[];
+    vista?: WarehouseView;
+    busqueda?: string;
+    onLimpiarBusqueda?: () => void;
+    onFilasBuscadas?: (filas: number) => void;
+    slotAcciones?: HTMLElement | null;
+  };
 } = {}) {
   const { user } = useUser();
   const cfg = useMemo(() => getErpInventorySectionConfig(user, "warehouse"), [user]);
@@ -245,7 +252,7 @@ export function VistaAlmacen({
   const [loading, setLoading] = useState(true);
   const [cargadoUnaVez, setCargadoUnaVez] = useState(false);
   const [searchQ, setSearchQ] = useState("");
-  const busqueda = useDeferredValue(searchQ);
+  const busqueda = useDeferredValue(embedded?.busqueda ?? searchQ);
   const [filterEstado, setFilterEstado] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState<StockRow | null>(null);
@@ -269,7 +276,8 @@ export function VistaAlmacen({
   const [savingWarehouse, setSavingWarehouse] = useState(false);
   const [confirmar, setConfirmar] = useState<ConfirmState | null>(null);
 
-  const [tab, setTab] = useState<TabKey>(() => embedded?.views?.[0] ?? "inventario");
+  const [tabPropia, setTab] = useState<TabKey>(() => embedded?.views?.[0] ?? "inventario");
+  const tab = embedded?.vista ?? tabPropia;
   const [insights, setInsights] = useState<InventoryInsights | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
 
@@ -437,7 +445,7 @@ export function VistaAlmacen({
 
   const vistasVisibles = useMemo(
     () => (embedded?.views ? TABS.filter((t) => embedded.views.includes(t.key)) : [...TABS]),
-    [embedded],
+    [embedded?.views],
   );
 
   useEffect(() => {
@@ -967,6 +975,11 @@ export function VistaAlmacen({
     return rows;
   }, [items, productFilter, busqueda, tipoDe]);
 
+  const avisarFilas = embedded?.onFilasBuscadas;
+  useEffect(() => {
+    avisarFilas?.(filasBuscadas.length);
+  }, [avisarFilas, filasBuscadas.length]);
+
   const conteoEstado = useMemo(() => {
     let agotado = 0;
     let bajo = 0;
@@ -990,6 +1003,7 @@ export function VistaAlmacen({
 
   const quitarFiltrosInventario = () => {
     setSearchQ("");
+    embedded?.onLimpiarBusqueda?.();
     setFilterEstado("");
   };
   const alternarEstado = (valor: string) => setFilterEstado((f) => (f === valor ? "" : valor));
@@ -1291,8 +1305,6 @@ export function VistaAlmacen({
   const recargando = loading && cargadoUnaVez;
   const abrirEntrada = () => setShowMovementForm(true);
 
-  // La fila de acciones solo se pinta con encabezado propio o con varias vistas.
-  const mostrarAcciones = !embedded || vistasVisibles.length > 1;
   const accionTerciaria = (
     <Button variant="ghost" iconStart={<RefreshOutlined fontSize="small" />} onClick={refrescar} disabled={recargando}>
       {recargando ? "Actualizando…" : "Actualizar"}
@@ -1374,17 +1386,17 @@ export function VistaAlmacen({
         }
       />}
 
-      {/* Embedded: las acciones van en la misma fila que las sub-pestañas (sin barra extra). */}
-      {embedded && mostrarAcciones ? (
-        <div className={s.barraVistas}>
-          <div className={s.barraPestanas}>{pestanas}</div>
-          <div className={s.barraAcciones}>
-            {accionTerciaria}
-            {accionSecundaria}
-            {accionPrimaria}
-          </div>
-        </div>
-      ) : null}
+      {/* Embedded: las acciones van junto al título de la pantalla que la monta. */}
+      {embedded?.slotAcciones
+        ? createPortal(
+            <>
+              {accionTerciaria}
+              {accionSecundaria}
+              {accionPrimaria}
+            </>,
+            embedded.slotAcciones,
+          )
+        : null}
 
       {/* ── Alta / edición de artículo con su tipo (disponible desde cualquier pestaña) ── */}
       <ArticuloDialog
@@ -1665,12 +1677,14 @@ export function VistaAlmacen({
           toolbar={
             <ModuleToolbar
               search={
-                <SearchInput
-                  value={searchQ}
-                  onChange={(e) => setSearchQ(e.target.value)}
-                  placeholder="Buscar por SKU, nombre o categoría…"
-                  aria-label="Buscar en el inventario"
-                />
+                embedded?.busqueda === undefined ? (
+                  <SearchInput
+                    value={searchQ}
+                    onChange={(e) => setSearchQ(e.target.value)}
+                    placeholder="Buscar por SKU, nombre o categoría…"
+                    aria-label="Buscar en el inventario"
+                  />
+                ) : undefined
               }
               chips={
                 <FilterChips ariaLabel="Estado de las existencias">
@@ -1836,12 +1850,6 @@ export function VistaAlmacen({
                   >
                     Kárdex PDF
                   </Button>
-                  {/* Sin fila de acciones arriba, registrar vive aquí (es el único primario). */}
-                  {!mostrarAcciones && cfg.canCreate ? (
-                    <Button variant="primary" size="sm" iconStart={<AddOutlined fontSize="small" />} onClick={abrirEntrada}>
-                      Registrar
-                    </Button>
-                  ) : null}
                 </>
               }
             >

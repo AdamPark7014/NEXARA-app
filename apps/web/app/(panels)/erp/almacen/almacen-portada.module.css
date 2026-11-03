@@ -6,8 +6,27 @@
   min-width: 0;
 }
 
+.acciones {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
 .pila {
   display: grid;
   gap: var(--ui-s5);
   min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .acciones {
+    justify-content: flex-start;
+  }
+
+  .acciones > * {
+    flex: 1 1 auto;
+  }
 }

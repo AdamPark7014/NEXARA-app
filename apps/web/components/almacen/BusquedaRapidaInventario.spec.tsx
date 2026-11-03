@@ -68,6 +68,30 @@ afterEach(() => {
 });
 
 describe("búsqueda rápida de inventario", () => {
+  it("con una tabla debajo solo lista lo que la tabla no enseña, y avisa lo que se escribe", async () => {
+    responder(() => ({ body: { q: "cin", incluyeAlmacen: true, conteos: CONTEOS, resultados: [CINCHO, TALADRO] } }));
+    const onTexto = vi.fn();
+    render(<BusquedaRapidaInventario tablaDebajo onTexto={onTexto} />);
+    await userEvent.type(screen.getByRole("searchbox", { name: "Buscar en el inventario" }), "cin");
+
+    expect(await screen.findByText("También coincide 1 herramienta.")).toBeInTheDocument();
+    expect(screen.queryByText("Cincho negro 20 cm")).not.toBeInTheDocument();
+    expect(onTexto).toHaveBeenLastCalledWith("cin");
+  });
+
+  it("con una tabla debajo y solo artículos no abre la lista; un chip la abre con todo", async () => {
+    responder(() => ({ body: { q: "cin", incluyeAlmacen: true, conteos: CONTEOS, resultados: [CINCHO] } }));
+    render(<BusquedaRapidaInventario tablaDebajo />);
+    await userEvent.type(screen.getByRole("searchbox", { name: "Buscar en el inventario" }), "cin");
+
+    const chip = await screen.findByRole("button", { name: /Consumibles/ });
+    expect(screen.queryByText("Cincho negro 20 cm")).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Resultados" })).not.toBeInTheDocument();
+
+    await userEvent.click(chip);
+    expect(await screen.findByText("Cincho negro 20 cm")).toBeInTheDocument();
+  });
+
   it("busca al escribir y pinta tipo, existencia con empaque y ubicación", async () => {
     const fetchMock = responder((url) => ({
       body: {

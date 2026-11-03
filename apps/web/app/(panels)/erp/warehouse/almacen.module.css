@@ -15,34 +15,6 @@
 
 /* ─── Fila de sub-pestañas + acciones (montada dentro de /erp/almacen) ─── */
 
-.barraVistas {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--ui-s3);
-  flex-wrap: wrap;
-  border-bottom: 1px solid var(--ui-border-subtle);
-}
-
-.barraPestanas {
-  flex: 1 1 320px;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.barraPestanas::-webkit-scrollbar {
-  display: none;
-}
-
-.barraAcciones {
-  display: flex;
-  align-items: center;
-  gap: var(--ui-s2);
-  flex-wrap: wrap;
-  padding-bottom: var(--ui-s2);
-}
-
 /* ─── Celdas ───────────────────────────────────────────────────────────── */
 
 .doble {
@@ -605,14 +577,6 @@
 /* ─── Teléfono ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 640px) {
-  .barraAcciones {
-    width: 100%;
-  }
-
-  .barraAcciones > * {
-    flex: 1 1 auto;
-  }
-
   .filtro,
   .filtroAncho,
   .fechaFiltro {

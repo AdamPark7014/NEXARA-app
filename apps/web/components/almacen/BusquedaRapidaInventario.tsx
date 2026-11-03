@@ -54,6 +54,13 @@ export type BusquedaRapidaInventarioProps = {
    * si no, se navega a su enlace.
    */
   onAbrir?: (resultado: ResultadoBusqueda, href: string) => boolean | void;
+  /** Avisa lo que hay escrito: la página lo usa para filtrar su tabla con esta misma caja. */
+  onTexto?: (texto: string) => void;
+  /**
+   * Abajo hay una tabla que ya enseña los artículos que coinciden: la lista solo trae lo que ella
+   * no puede (herramientas). Al elegir un chip se enseña todo. Enter y el lector no cambian.
+   */
+  tablaDebajo?: boolean;
   className?: string;
 };
 
@@ -71,6 +78,8 @@ export default function BusquedaRapidaInventario({
   autoFocus = false,
   placeholder = "Buscar herramienta, equipo o material, o escanear su código…",
   onAbrir,
+  onTexto,
+  tablaDebajo = false,
   className,
 }: BusquedaRapidaInventarioProps) {
   const { user } = useUser();
@@ -143,6 +152,10 @@ export default function BusquedaRapidaInventario({
   }, [q, tipo, token, sinAcceso, buscar]);
 
   useEffect(() => () => controlador.current?.abort(), []);
+
+  useEffect(() => {
+    onTexto?.(q);
+  }, [q, onTexto]);
 
   useEffect(() => {
     const input = inputRef.current;
@@ -222,8 +235,9 @@ export default function BusquedaRapidaInventario({
 
   const texto = q.trim();
   const filtros = filtrosVisibles(respuesta?.incluyeAlmacen ?? false);
-  const resultados = respuesta?.resultados ?? [];
-  const mostrarLista = (texto !== "" || chipElegido) && !error;
+  const soloFueraDeTabla = tablaDebajo && !chipElegido;
+  const resultados = (respuesta?.resultados ?? []).filter((r) => !soloFueraDeTabla || r.origen !== "articulo");
+  const mostrarLista = (texto !== "" || chipElegido) && !error && (!soloFueraDeTabla || resultados.length > 0);
   const total = respuesta ? Math.max(respuesta.conteos[tipo] ?? 0, resultados.length) : 0;
   const etiquetaTipo = tipo === "TODOS" ? null : filtros.find((f) => f.id === tipo)?.etiqueta.toLowerCase();
 
@@ -298,7 +312,9 @@ export default function BusquedaRapidaInventario({
                 ))}
               </ul>
               <p className={s.pie} role="status">
-                {total > resultados.length
+                {soloFueraDeTabla
+                  ? `También ${resultados.length === 1 ? "coincide 1 herramienta" : `coinciden ${resultados.length} herramientas`}.`
+                  : total > resultados.length
                   ? `Mostrando ${resultados.length} de ${total}. Escribe más para afinar.`
                   : `${resultados.length} ${resultados.length === 1 ? "resultado" : "resultados"}`}
               </p>

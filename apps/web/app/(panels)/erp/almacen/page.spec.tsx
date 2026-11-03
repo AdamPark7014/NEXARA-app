@@ -28,8 +28,10 @@ vi.mock("@/components/UserContext", () => ({
 }));
 
 vi.mock("../warehouse/VistaAlmacen", () => ({
-  VistaAlmacen: ({ embedded }: { embedded?: { views: readonly string[] } }) => (
-    <div data-testid="almacen-stock">{(embedded?.views ?? []).join(",")}</div>
+  VistaAlmacen: ({ embedded }: { embedded?: { views: readonly string[]; vista?: string; busqueda?: string } }) => (
+    <div data-testid="almacen-stock" data-vista={embedded?.vista} data-busqueda={embedded?.busqueda}>
+      {(embedded?.views ?? []).join(",")}
+    </div>
   ),
 }));
 
@@ -56,19 +58,40 @@ vi.mock("@/components/ToolRequestForm", () => ({ default: () => <div data-testid
 vi.mock("@/components/ToolUserKitPanel", () => ({ default: () => <div data-testid="kits-equipo" /> }));
 vi.mock("@/components/ToolMyKitPanel", () => ({ default: () => <div data-testid="mi-kit" /> }));
 vi.mock("@/components/almacen/BusquedaRapidaInventario", () => ({
-  default: ({ tipoInicial, autoFocus }: { tipoInicial?: string; autoFocus?: boolean }) => (
-    <div data-testid="busqueda-rapida" data-tipo={tipoInicial} data-foco={autoFocus ? "si" : "no"} />
+  default: ({
+    tipoInicial,
+    autoFocus,
+    tablaDebajo,
+    onTexto,
+  }: {
+    tipoInicial?: string;
+    autoFocus?: boolean;
+    tablaDebajo?: boolean;
+    onTexto?: (texto: string) => void;
+  }) => (
+    <div
+      data-testid="busqueda-rapida"
+      data-tipo={tipoInicial}
+      data-foco={autoFocus ? "si" : "no"}
+      data-tabla={tablaDebajo ? "si" : "no"}
+    >
+      <input aria-label="Caja de búsqueda" onChange={(e) => onTexto?.(e.target.value)} />
+    </div>
   ),
 }));
 
 describe("portada de almacén", () => {
-  it("enseña las seis pestañas del frente (incluye Escáner)", () => {
+  it("enseña una sola fila con todas las pestañas (incluye Escáner)", () => {
     ponerUrl("");
     render(<AlmacenPage />);
     const pestanas = screen.getAllByRole("tab").map((t) => t.textContent);
     expect(pestanas).toEqual([
       "Inventario",
+      "Resumen",
       "Movimientos",
+      "Lotes y caducidad",
+      "Valuación",
+      "Conteos y reservas",
       "Escáner",
       "Reabastecimiento",
       "Herramientas",
@@ -79,16 +102,38 @@ describe("portada de almacén", () => {
   it("abre en inventario y monta ahí las vistas de stock", () => {
     ponerUrl("");
     render(<AlmacenPage />);
-    expect(screen.getByTestId("almacen-stock").textContent).toBe(
-      "inventario,dashboard,lotes,valuacion,conteos",
-    );
+    const vista = screen.getByTestId("almacen-stock");
+    expect(vista.textContent).toBe("inventario,dashboard,movimientos,lotes,valuacion,conteos");
+    expect(vista).toHaveAttribute("data-vista", "inventario");
   });
 
-  it("movimientos monta la pantalla de almacén con una sola vista", async () => {
+  it("cada pestaña de stock manda en la misma vista de almacén", async () => {
     ponerUrl("");
     render(<AlmacenPage />);
     await userEvent.click(screen.getByRole("tab", { name: "Movimientos" }));
-    expect(screen.getByTestId("almacen-stock").textContent).toBe("movimientos");
+    expect(screen.getByTestId("almacen-stock")).toHaveAttribute("data-vista", "movimientos");
+    await userEvent.click(screen.getByRole("tab", { name: "Lotes y caducidad" }));
+    expect(screen.getByTestId("almacen-stock")).toHaveAttribute("data-vista", "lotes");
+  });
+
+  it("un enlace con ?tab=valuacion cae en esa pestaña", () => {
+    ponerUrl("tab=valuacion");
+    render(<AlmacenPage />);
+    expect(screen.getByTestId("almacen-stock")).toHaveAttribute("data-vista", "valuacion");
+  });
+
+  it("lo que se escribe en el buscador de arriba llega a la tabla de inventario", async () => {
+    ponerUrl("");
+    render(<AlmacenPage />);
+    await userEvent.type(screen.getByRole("textbox", { name: "Caja de búsqueda" }), "cincho");
+    expect(screen.getByTestId("almacen-stock")).toHaveAttribute("data-busqueda", "cincho");
+  });
+
+  it("fuera de las pestañas de stock no monta la vista de almacén", async () => {
+    ponerUrl("");
+    render(<AlmacenPage />);
+    await userEvent.click(screen.getByRole("tab", { name: "Herramientas" }));
+    expect(screen.queryByTestId("almacen-stock")).not.toBeInTheDocument();
   });
 
   it("escáner monta el panel HID", async () => {

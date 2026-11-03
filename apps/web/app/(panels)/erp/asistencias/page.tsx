@@ -1351,7 +1351,6 @@ export default function ErpAsistenciasPage() {
       <ModulePage
         title="Asistencia del día"
         description={descripcion}
-        breadcrumbs={[{ label: "Hoy", href: "/erp" }, { label: "Asistencias" }]}
         secondaryActions={
           isManager ? (
             <ButtonLink href={KPIS_PATH} iconStart={<InsightsOutlinedIcon fontSize="inherit" aria-hidden="true" />}>
