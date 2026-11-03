@@ -545,7 +545,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
   }, [isContextReady, user, hasAnyAccess, router]);
 
   // Solo presentación: orden de grupos y renglones de la maqueta aprobada. Los módulos son los mismos.
-  const navGroups = useMemo(() => presentSidebarGroups(sidebarGroups, panel), [sidebarGroups, panel]);
+  const navGroups = useMemo(() => presentSidebarGroups(sidebarGroups, panel, v2RoleKey), [sidebarGroups, panel, v2RoleKey]);
 
   const accessGuardWarning = useMemo(() => {
     const path = pathname || "/";

@@ -84,6 +84,7 @@ export const GRUPOS_CONTABILIDAD: NavGroup[] = [
     label: "Más",
     items: [
       { id: "facturas", label: "Facturas", href: "/erp/contabilidad/facturas", permissions: VER_FACTURACION },
+      { id: "bancos", label: "Bancos", href: "/erp/banking", permissions: VER_BANCOS },
       { id: "movimientos", label: "Entradas y salidas", href: "/erp/contabilidad/movimientos", permissions: VER_CONTABILIDAD },
       { id: "polizas", label: "Cuentas y asientos", href: "/erp/contabilidad/polizas", permissions: VER_CONTABILIDAD },
       { id: "proveedores", label: "Proveedores", href: "/erp/contabilidad/proveedores", permissions: VER_FACTURACION },

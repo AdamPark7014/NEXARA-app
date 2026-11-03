@@ -122,9 +122,9 @@ export default function VideovigilanciaPage() {
   return (
     <div className={styles.pagina}>
       <ModulePage
-        title="Videovigilancia"
+        title="Diseños de cámaras"
         description="Diseña el sistema sobre el plano del sitio, revisa qué ve cada cámara y saca la propuesta para el cliente."
-        breadcrumbs={[{ label: "Clientes y obra" }, { label: "Videovigilancia" }]}
+        breadcrumbs={[{ label: "Vender" }, { label: "Diseños de cámaras" }]}
         icon={<VideocamOutlinedIcon />}
         secondaryActions={acceso ? <ButtonLink href="/erp/videovigilancia/catalogo">Catálogo de equipos</ButtonLink> : undefined}
         primaryAction={

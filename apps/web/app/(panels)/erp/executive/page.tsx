@@ -14,7 +14,6 @@ import {
   StatStrip,
   DashPanel,
   MiniStatGrid,
-  BarList,
   AlertRow,
   ListRow,
   DashPill,
@@ -31,6 +30,7 @@ import { CommandCenterRail } from "@/components/command-center/CommandCenterRail
 import { buildExecutiveDynamicWidgets, buildExecutiveBiDrillLinks } from "@/lib/executive-widgets";
 import { ExecutiveBiDrillPanel } from "@/components/command-center/ExecutiveBiDrillPanel";
 import TuDiaPanel from "@/components/executive/TuDiaPanel";
+import CadenaNegocio, { SiguientePasoNegocio } from "@/components/executive/CadenaNegocio";
 
 /**
  * Vista ejecutiva — pantalla principal de dirección.
@@ -153,8 +153,60 @@ export default function ExecutivePage() {
   const skMini = <DashSkeleton width={44} height={20} />;
 
   const momChange = kpis?.revenueMoMChange ?? 0;
+  const cadena = data?.cadena ?? null;
   const momDir: "up" | "down" | "flat" = momChange > 0 ? "up" : momChange < 0 ? "down" : "flat";
   const firstName = (user.nombre || user.email || "").split(" ")[0];
+
+  // Sin datos todavía se enseñan vacías mientras cargan; ya cargado, un cuadro en $0 no dice nada.
+  const cifrasDinero: Array<{ n: number; stat: Parameters<typeof StatStrip>[0]["stats"][number] }> = [
+    { n: kpis?.revenueMtd ?? 0, stat: {
+            label: "Ingresos del mes",
+            value: ready ? <Money value={kpis?.revenueMtd ?? 0} compact /> : sk,
+            delta: ready && momChange !== 0 ? { direction: momDir, value: `${momChange > 0 ? "+" : ""}${momChange}%` } : undefined,
+            sub: ready
+              ? `vs ${fmtCompact(kpis?.revenuePrevMonth ?? 0)} el mes anterior · ${fmtCompact(kpis?.revenueYtd ?? 0)} en el año`
+              : undefined,
+            big: true,
+              } },
+    { n: kpis?.pipelineValue ?? 0, stat: {
+            label: "Oportunidades abiertas",
+            value: ready ? <Money value={kpis?.pipelineValue ?? 0} compact /> : sk,
+            sub: ready ? `${plural(kpis?.pipelineCount ?? 0, "oportunidad", "oportunidades")} en curso` : undefined,
+            tone: "accent",
+              } },
+    { n: kpis?.cashOnHand ?? 0, stat: {
+            label: "Saldo en bancos",
+            value: ready ? <Money value={kpis?.cashOnHand ?? 0} compact /> : sk,
+            sub: ready ? `Capital de trabajo ${fmtCompact(kpis?.workingCapital ?? 0)}` : undefined,
+              } },
+    { n: kpis?.arOutstanding ?? 0, stat: {
+            label: "Por cobrar",
+            value: ready ? <Money value={kpis?.arOutstanding ?? 0} compact /> : sk,
+            sub: !ready
+              ? undefined
+              : fin && fin.overdueInvoices > 0
+                ? plural(fin.overdueInvoices, "factura vencida", "facturas vencidas")
+                : `Por pagar ${fmtCompact(kpis?.apOutstanding ?? 0)}`,
+            tone: fin && fin.overdueInvoices > 0 ? "warning" : "default",
+              } },
+  ];
+  const cifras = ready ? cifrasDinero.filter((c) => c.n !== 0) : cifrasDinero;
+  const celdasTrabajo = [
+    { label: "Por validar", n: cadena?.actividades.porValidar ?? 0, tone: "accent" as const },
+    { label: "En proceso", n: cadena?.actividades.enProceso ?? 0 },
+    { label: "Finalizadas", n: cadena?.actividades.finalizadas ?? 0, tone: "positive" as const },
+    { label: "Órdenes vencidas", n: ops?.otOverdue ?? 0, tone: "danger" as const },
+    { label: "Tickets abiertos", n: ops?.ticketsOpen ?? 0 },
+    { label: "Contratos activos", n: maint?.activeContracts ?? 0 },
+  ].filter((c) => c.n > 0);
+  const celdasVentas = [
+    { label: "Prospectos calientes", n: data?.sales.hotLeads ?? 0, tone: (data?.sales.hotLeads ?? 0) >= 5 ? ("warning" as const) : undefined },
+    { label: "Licitaciones abiertas", n: data?.sales.tendersOpen ?? 0 },
+    { label: "Licitaciones ganadas", n: data?.sales.tendersWon ?? 0, tone: "positive" as const },
+    { label: "Requisiciones", n: proc?.pendingRequisitions ?? 0, tone: "warning" as const },
+    { label: "Órdenes de compra", n: proc?.pendingPOs ?? 0, tone: "warning" as const },
+    { label: "Bajo mínimo", n: proc?.lowStockItems ?? 0, tone: "danger" as const },
+  ].filter((c) => c.n > 0);
 
   return (
     <DashPage>
@@ -181,8 +233,6 @@ export default function ExecutivePage() {
 
       <TuDiaPanel token={token} />
 
-      <CommandCenterRail panel="erp" extraWidgets={dynamicWidgets} ariaLabel="Atajos y pendientes" />
-
       {error && !loading && (
         <InlineAlert
           variant={ready ? "warning" : "danger"}
@@ -191,133 +241,21 @@ export default function ExecutivePage() {
         />
       )}
 
-      <StatStrip
-        stats={[
-          {
-            label: "Ingresos del mes",
-            value: ready ? <Money value={kpis?.revenueMtd ?? 0} compact /> : sk,
-            delta: ready && momChange !== 0 ? { direction: momDir, value: `${momChange > 0 ? "+" : ""}${momChange}%` } : undefined,
-            sub: ready
-              ? `vs ${fmtCompact(kpis?.revenuePrevMonth ?? 0)} el mes anterior · ${fmtCompact(kpis?.revenueYtd ?? 0)} en el año`
-              : undefined,
-            big: true,
-          },
-          {
-            label: "Oportunidades abiertas",
-            value: ready ? <Money value={kpis?.pipelineValue ?? 0} compact /> : sk,
-            sub: ready ? `${plural(kpis?.pipelineCount ?? 0, "oportunidad", "oportunidades")} en curso` : undefined,
-            tone: "accent",
-          },
-          {
-            label: "Saldo en bancos",
-            value: ready ? <Money value={kpis?.cashOnHand ?? 0} compact /> : sk,
-            sub: ready ? `Capital de trabajo ${fmtCompact(kpis?.workingCapital ?? 0)}` : undefined,
-          },
-          {
-            label: "Por cobrar",
-            value: ready ? <Money value={kpis?.arOutstanding ?? 0} compact /> : sk,
-            sub: !ready
-              ? undefined
-              : fin && fin.overdueInvoices > 0
-                ? plural(fin.overdueInvoices, "factura vencida", "facturas vencidas")
-                : `Por pagar ${fmtCompact(kpis?.apOutstanding ?? 0)}`,
-            tone: fin && fin.overdueInvoices > 0 ? "warning" : "default",
-          },
-        ]}
-      />
+      {cadena ? <CadenaNegocio cadena={cadena} faltanCifras={ready && cifras.length < cifrasDinero.length} /> : null}
+      {cadena ? <SiguientePasoNegocio cadena={cadena} /> : null}
+
+      {cifras.length ? <StatStrip stats={cifras.map((c) => c.stat)} /> : null}
 
       <DashGrid>
-        <DashCol span={8}>
-          <DashPanel title="Operación" subtitle="Proyectos, órdenes de trabajo y soporte" action="Actividades" actionHref="/erp/pizarra">
-            <MiniStatGrid
-              items={[
-                { label: "Proyectos activos", value: ops ? num(ops.activeProjects) : skMini, tone: "accent" },
-                { label: "Órdenes abiertas", value: ops ? num(ops.otOpen) : skMini },
-                { label: "Órdenes vencidas", value: ops ? num(ops.otOverdue) : skMini, tone: ops && ops.otOverdue > 0 ? "danger" : "default" },
-                { label: "Cerradas en el mes", value: ops ? num(ops.otCompletedMtd) : skMini, tone: "positive" },
-                { label: "Tickets abiertos", value: ops ? num(ops.ticketsOpen) : skMini, tone: ops && ops.ticketsOpen > 0 ? "warning" : "default" },
-                { label: "Contratos activos", value: maint ? num(maint.activeContracts) : skMini },
-              ]}
-            />
-            {ops && ops.otOpen + ops.otOverdue + ops.otCompletedMtd > 0 && (
-              <div style={{ marginTop: 14 }}>
-                <BarList
-                  items={[
-                    { label: "Cerradas en el mes", value: ops.otCompletedMtd, color: "var(--success)" },
-                    { label: "Abiertas", value: ops.otOpen, color: "var(--panel-accent, var(--primary))" },
-                    { label: "Vencidas", value: ops.otOverdue, color: "var(--danger)" },
-                  ].filter((r) => r.value > 0)}
-                  formatValue={num}
-                />
-              </div>
-            )}
-          </DashPanel>
-        </DashCol>
-
-        <DashCol span={4}>
-          <DashPanel title="Requiere tu atención" subtitle="Lo que afecta la operación o las finanzas">
-            {!ready ? (
-              loading ? <DashSkeleton rows={4} height={34} gap={8} /> : <DashEmpty title="Sin datos por ahora" />
-            ) : alerts.length === 0 ? (
-              <DashEmpty title="Sin alertas" description="Todo funciona con normalidad." />
-            ) : (
-              alerts.slice(0, 6).map((a, i) => <AlertRow key={`${a.title}-${i}`} level={a.level} title={a.title} message={a.message} />)
-            )}
-          </DashPanel>
-        </DashCol>
-
         <DashCol span={6}>
-          <DashPanel title="Clientes clave" subtitle="Margen por cliente con proyectos" action="Ver rentabilidad" actionHref="/erp/analytics/bi?section=clients">
+          <DashPanel title="Trabajo" action="Actividades" actionHref="/erp/pizarra">
             {!ready ? (
-              loading ? <DashSkeleton rows={4} height={14} gap={18} /> : <DashEmpty title="Sin datos por ahora" />
-            ) : !data.topAccounts || data.topAccounts.length === 0 ? (
-              <DashEmpty title="Aún no hay clientes con proyectos" description="Aparecerán aquí en cuanto tengan proyectos activos." />
+              <DashSkeleton rows={2} height={20} gap={10} />
+            ) : celdasTrabajo.length ? (
+              <MiniStatGrid items={celdasTrabajo.map((c) => ({ label: c.label, value: num(c.n), tone: c.tone }))} />
             ) : (
-              data.topAccounts.map((c) => (
-                <ListRow
-                  key={c.clientId}
-                  href={`/erp/clientes/${c.clientId}`}
-                  title={c.clientName}
-                  sub={`${plural(c.projects, "proyecto", "proyectos")} · margen ${c.marginPercent}%`}
-                  trail={<Money value={c.margin} compact bold />}
-                />
-              ))
+              <DashEmpty title="Sin trabajo abierto" />
             )}
-          </DashPanel>
-        </DashCol>
-
-        <DashCol span={6}>
-          <DashPanel title="Mejores vendedores del mes" subtitle="Ingresos por oportunidades ganadas" action="Ver analítica" actionHref="/erp/analytics/bi">
-            {!ready ? (
-              loading ? <DashSkeleton rows={4} height={14} gap={18} /> : <DashEmpty title="Sin datos por ahora" />
-            ) : data.topSellers.length === 0 ? (
-              <DashEmpty title="Sin cierres este mes" description="Aún no hay oportunidades ganadas en el periodo." />
-            ) : (
-              data.topSellers.map((s, i) => (
-                <ListRow
-                  key={s.ownerId}
-                  leading={<RankIndex n={i + 1} />}
-                  title={s.ownerName}
-                  sub={plural(s.wonCount, "oportunidad ganada", "oportunidades ganadas")}
-                  trail={<Money value={s.revenue} compact bold />}
-                />
-              ))
-            )}
-          </DashPanel>
-        </DashCol>
-
-        <DashCol span={6}>
-          <DashPanel title="Ventas y compras" subtitle="Prospectos, licitaciones y abastecimiento" action="Cotizaciones" actionHref="/erp/cotizaciones">
-            <MiniStatGrid
-              items={[
-                { label: "Prospectos calientes", value: data ? num(data.sales.hotLeads) : skMini, tone: data && data.sales.hotLeads >= 5 ? "warning" : "default" },
-                { label: "Licitaciones abiertas", value: data ? num(data.sales.tendersOpen) : skMini },
-                { label: "Licitaciones ganadas", value: data ? num(data.sales.tendersWon) : skMini, tone: "positive" },
-                { label: "Requisiciones", value: proc ? num(proc.pendingRequisitions) : skMini, tone: proc && proc.pendingRequisitions > 0 ? "warning" : "default" },
-                { label: "Órdenes de compra", value: proc ? num(proc.pendingPOs) : skMini, tone: proc && proc.pendingPOs > 0 ? "warning" : "default" },
-                { label: "Bajo mínimo", value: proc ? num(proc.lowStockItems) : skMini, tone: proc && proc.lowStockItems > 0 ? "danger" : "default" },
-              ]}
-            />
           </DashPanel>
         </DashCol>
 
@@ -330,20 +268,74 @@ export default function ExecutivePage() {
             </nav>
           </DashPanel>
         </DashCol>
+
+        {alerts.length > 0 ? (
+          <DashCol span={6}>
+            <DashPanel title="Requiere tu atención" subtitle="Lo que afecta la operación o las finanzas">
+              {alerts.slice(0, 6).map((a, i) => (
+                <AlertRow key={`${a.title}-${i}`} level={a.level} title={a.title} message={a.message} />
+              ))}
+            </DashPanel>
+          </DashCol>
+        ) : null}
+
+        {data?.topAccounts?.length ? (
+          <DashCol span={6}>
+            <DashPanel title="Clientes clave" subtitle="Margen por cliente con proyectos" action="Ver rentabilidad" actionHref="/erp/analytics/bi?section=clients">
+              {data.topAccounts.map((c) => (
+                <ListRow
+                  key={c.clientId}
+                  href={`/erp/clientes/${c.clientId}`}
+                  title={c.clientName}
+                  sub={`${plural(c.projects, "proyecto", "proyectos")} · margen ${c.marginPercent}%`}
+                  trail={<Money value={c.margin} compact bold />}
+                />
+              ))}
+            </DashPanel>
+          </DashCol>
+        ) : null}
+
+        {data?.topSellers?.length ? (
+          <DashCol span={6}>
+            <DashPanel title="Mejores vendedores del mes" subtitle="Ingresos por oportunidades ganadas" action="Ver analítica" actionHref="/erp/analytics/bi">
+              {data.topSellers.map((s, i) => (
+                <ListRow
+                  key={s.ownerId}
+                  leading={<RankIndex n={i + 1} />}
+                  title={s.ownerName}
+                  sub={plural(s.wonCount, "oportunidad ganada", "oportunidades ganadas")}
+                  trail={<Money value={s.revenue} compact bold />}
+                />
+              ))}
+            </DashPanel>
+          </DashCol>
+        ) : null}
+
+        {celdasVentas.length ? (
+          <DashCol span={6}>
+            <DashPanel title="Ventas y compras" subtitle="Prospectos, licitaciones y abastecimiento" action="Cotizaciones" actionHref="/erp/cotizaciones">
+              <MiniStatGrid items={celdasVentas.map((c) => ({ label: c.label, value: num(c.n), tone: c.tone }))} />
+            </DashPanel>
+          </DashCol>
+        ) : null}
       </DashGrid>
 
-      <StatStrip
-        stats={[
-          {
-            label: "Facturado en el mes",
-            value: fin ? <Money value={fin.invoicedMtd} compact /> : sk,
-            sub: fin ? plural(fin.invoicesCountMtd, "factura emitida", "facturas emitidas") : undefined,
-            tone: "positive",
-          },
-          { label: "Colaboradores", value: data ? num(data.teamSize) : sk },
-          { label: "Clientes activos", value: data ? num(data.clientsCount) : sk },
-        ]}
-      />
+      {fin && fin.invoicedMtd > 0 ? (
+        <StatStrip
+          stats={[
+            {
+              label: "Facturado en el mes",
+              value: <Money value={fin.invoicedMtd} compact />,
+              sub: plural(fin.invoicesCountMtd, "factura emitida", "facturas emitidas"),
+              tone: "positive",
+            },
+            { label: "Colaboradores", value: num(data?.teamSize ?? 0) },
+            { label: "Clientes activos", value: num(data?.clientsCount ?? 0) },
+          ]}
+        />
+      ) : null}
+
+      <CommandCenterRail panel="erp" extraWidgets={dynamicWidgets} ariaLabel="Atajos y pendientes" />
 
       {biDrillLinks.length > 0 && <ExecutiveBiDrillPanel links={biDrillLinks} />}
     </DashPage>

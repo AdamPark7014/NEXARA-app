@@ -17,8 +17,12 @@ export type ExecutiveAlert = {
   message: string;
 };
 
+import type { CadenaNegocio } from "./hoy-cadena";
+
 export type ExecutiveDashboard = {
   generatedAt: string;
+  /** De la cotización al cobro; `null` si esa parte falló. */
+  cadena?: CadenaNegocio | null;
   headlineKpis: {
     revenueMtd: number;
     revenuePrevMonth: number;

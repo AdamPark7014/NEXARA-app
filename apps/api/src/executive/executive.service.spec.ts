@@ -97,3 +97,80 @@ describe('ExecutiveService.getCLevelDashboard · indicadores de cobranza, saldos
     expect(abiertas.where.estatus.in).toEqual(expect.arrayContaining(['Pendiente', 'En Proceso', 'Asignada', 'Asignado']));
   });
 });
+
+describe('ExecutiveService · la cadena del negocio', () => {
+  /** Responde cada conteo según el modelo y el filtro. Lo demás, vacío. */
+  function prismaConConteos(conteo: (modelo: string, where: any) => number, cobrado = 0) {
+    const modelo = (nombre: string) =>
+      new Proxy(
+        {},
+        {
+          get: (_t, metodo: string) => async (args: any) => {
+            if (metodo === 'count') return conteo(nombre, args?.where ?? {});
+            if (metodo === 'aggregate') return { _sum: { paidAmount: cobrado }, _count: { _all: 0 } };
+            return [];
+          },
+        },
+      );
+    return new Proxy({ $queryRaw: async () => [{ n: 0 }] } as any, {
+      get: (t: any, k: string) => (k in t ? t[k] : modelo(k)),
+    });
+  }
+
+  it('cuenta cada eslabón, de la cotización al cobro', async () => {
+    const prisma = prismaConConteos((m, w) => {
+      if (m === 'cotizacion') {
+        if (w.proyectos) return 1;
+        if (w.sentAt) return 9;
+        if (w.status === 'DRAFT') return w.validUntil ? 29 : 56;
+        if (w.status === 'SENT') return 4;
+        if (w.status === 'APPROVED') return 2;
+        return 70;
+      }
+      if (m === 'operationalProject') return 3;
+      if (m === 'invoice') return 5;
+      if (m === 'activity') {
+        if (w.projectId) return 12;
+        if (w.estatus === 'Por Validar') return 38;
+        if (w.estatus === 'En Proceso') return 7;
+        if (w.estatus === 'Finalizada') return 305;
+        if (w.estatus) return 0;
+        return w.ticketType || w.fechaFinalizacion ? 0 : 378;
+      }
+      return 0;
+    }, 1500.5);
+    const r = await new ExecutiveService(prisma).getCLevelDashboard(7);
+    expect(r.cadena).toEqual({
+      cotizaciones: { total: 70, borradores: 56, vigentesPorEnviar: 29, enviadas: 9, porDecidir: 4, ganadas: 2, ganadasSinProyecto: 1 },
+      proyectos: 3,
+      facturas: 5,
+      cobrado: 1500.5,
+      actividades: { total: 378, conProyecto: 12, porValidar: 38, enProceso: 7, finalizadas: 305 },
+    });
+  });
+
+  it('no cuenta lo borrado, ni los proyectos cancelados, ni las facturas sin emitir', async () => {
+    const filtros: Record<string, any[]> = {};
+    const prisma = prismaConConteos((m, w) => {
+      (filtros[m] ??= []).push(w);
+      return 0;
+    });
+    await new ExecutiveService(prisma).getCLevelDashboard(7);
+    expect(filtros.cotizacion!.every((w) => w.deletedAt === null && w.companyId === 7)).toBe(true);
+    const proyecto = filtros.operationalProject!.find((w) => w.status?.not === 'CANCELLED');
+    expect(proyecto.deletedAt).toBeNull();
+    const factura = filtros.invoice!.find((w) => w.isCancelled === false);
+    expect(factura.type).toBe('ACCOUNTS_RECEIVABLE');
+    expect(factura.status.notIn).toEqual(expect.arrayContaining(['DRAFT', 'CANCELLED', 'CREDITED']));
+  });
+
+  it('si la cadena falla, Hoy se abre igual', async () => {
+    const prisma = prismaConConteos((m) => {
+      if (m === 'cotizacion') throw new Error('sin conexión');
+      return 0;
+    });
+    const r = await new ExecutiveService(prisma).getCLevelDashboard(7);
+    expect(r.cadena).toBeNull();
+    expect(r.teamSize).toBe(0);
+  });
+});
