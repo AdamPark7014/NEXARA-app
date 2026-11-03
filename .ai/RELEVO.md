@@ -1,5 +1,32 @@
 # RELEVO
 
+- **03-11 ~11:45 (claude-code) — Relojes y fotos de las cámaras de INTEGRA: quedó bien, medido con gente real. Aparte, la terminal .161 trae la red inestable.** Tarea `integra-rostro-real-0311`. Solo lectura: sin código ni escrituras en equipos. Corte de 08:00 a 11:37 de México: 1,137 rostros y 94 fotos. Falta ver la tarde; de noche solo hay una, la del festivo.
+  - **Retraso (`receivedAt - occurredAt`):** de 481 s a una mediana de 3.8 s. Unos 2 s de eso son el reloj de las cámaras, que va −2 s.
+    | Cámara | Filas | Fotos | Mediana |
+    |---|---|---|---|
+    | .171 Planning & Design | 277 | 17 | 3.5 s |
+    | .172 Almacén 01 | 26 | 8 | 2.3 s |
+    | .173 Support & Engineering 01 | 317 | 25 | 3.3 s |
+    | .174 Support & Engineering 02 | 11 | 7 | 2.7 s |
+    | .175 Privado 01 | 15 | 6 | 2.8 s |
+    | .176 Coffee Area | 410 | 18 | 6.4 s |
+    | .177 Privado 02 | 38 | 1 | 3.9 s |
+    | .178 Meeting Room | 43 | 12 | 2.7 s |
+  - **.176 es la única arriba de 5 s, y no es el reloj.** 278 de sus 410 filas salieron en ráfagas (minutos con 50 filas o más; pico de 199 a las 10:37), con mediana de 8.1 s y hasta 19 s. En minutos normales, 3.0 s.
+  - **Una foto por minuto:** nunca más de 1 por cámara y minuto. La menor separación entre dos fotos de una cámara es de 60.1 s.
+  - **Intentos que dan foto: 89 de 89.** Se reprodujeron `cameraPhotoTurn` e `isFresh` sobre las filas (corte 11:33), y ninguna foto cayó fuera de turno. Contando minutos con rostro y foto da 87 de 105 (de 50 a 100 % por cámara), pero no es falla: de los 18 minutos sin foto, 17 tenían todos sus rostros a menos de 60 s de la foto anterior, y el otro llegó con 21.2 s, arriba de `PHOTO_MAX_AGE_MS`.
+  - **`Sin foto diferida` no sirve de prueba:** salen 0, pero otro despliegue reemplazó el contenedor a las 11:31 y se perdió el log anterior. Además, si `snapshot` devuelve null, `attachSnapshotLater` no escribe nada. Para que quede rastro haría falta un `warn` ahí; no se tocó.
+  - **.176 Coffee Area: se confirma el DNS.** 410 filas, la primera a las 09:52, y ninguna antes en toda la tabla. `Attendance` lleva 13 entradas hoy.
+  - **Fotos vistas:** 1 de .176, 1 de .173 y 4 de .172. El rótulo es el de la cámara y la hora de la imagen va 1–2 s después de `occurredAt`. En las seis hay gente. A 640×360 el rostro sale chico: sirven para ver qué pasaba, no para reconocer a alguien. Ya se borraron de la carpeta temporal.
+  - **Relojes:** en tres lecturas (11:35–11:37), el NVR en NTP a −1 s, las cámaras de −1 a −3 s y las terminales de −1 a +1 s.
+  - **Disco:** 9.8 MB a las 11:42, `/` al 78 % con 17 GB libres. A las 11:33, cámaras 2.3 MB y 94 fotos, en línea con los 10 MB al día; terminales 6.4 MB y 110 fotos. **Los 10 MB eran solo de cámaras:** las terminales ya dejaban 17, 25, 30 y 35 MB al día (27 al 30-10). Un día así pasaría de 40 MB, debajo del aviso de 50. Una salida con botón son 4 eventos y 4 fotos de 58 KB (pulsado, desbloqueada, soltado, bloqueada), y por eso .160 Sala de Juntas lleva 88.
+  - **Corrección a lo dicho el 02-11 sobre Almacén .172:** «52 % de las filas y 38 % fuera de horario» es de toda la historia, y casi todo viene de cuatro días: 13-10 (147,497), 17-10 (124,427), 20-10 (74,832) y 21-10 (36,542). **Desde el 22-10 lleva 2,083 filas, 1.4 % del total, y 0 fuera de horario** (fuera de 08 a 20 h). Bajarle la sensibilidad ya no reduciría la tabla a la mitad. Desde el 22-10 la que más genera es .177 Privado 02, con 104,543 filas (69.7 %), también con 0 fuera de horario; hoy lleva 38.
+  - **Almacén .172, qué disparaba los rostros falsos: no se puede saber.** No hay fotos fuera de horario, porque las primeras son de anoche y esa noche no disparó. Las 4 de hoy tienen a una persona, así que son rostros reales. Los picos iban parejos toda la noche (7 a 13 mil filas por hora del 12 al 13-10), lo que apunta a algo fijo en la imagen o a la luz, sin comprobar. A cuadro hay ropa colgada y cajas con impresos, pero hoy no disparan de noche. Si vuelve a pasar, ya habrá foto.
+  - **.161 Acceso Privados: red inestable.** 24 de sus 27 filas de hoy llegaron con más de 20 s (mediana 160 s, máximo 427 s), y por eso 19 de sus 22 eventos de puerta no tienen foto. El 30-10 iba en 1.6 s, sin atrasos; empezó el 31-10 (8 de 27). La terminal avisó 2 caídas: 09:36:55–09:39:57 y 09:54:21–09:59:12 (códigos 39 y 1031, significado inferido). Por ISAPI contestó 3 de 7 peticiones; el resto fueron 1 error sin tipo guardado, 2 `socket hang up` y 1 rechazo de credenciales que antes y después funcionaron. A las 11:42 contestó en 645 ms, así que no quedó bloqueada.
+  - **.161, lo que no se sabe:** no se pudo leer su bitácora, así que no consta si se perdieron eventos. Lleva 27 filas contra 184–312 de los días 28 a 30-10; puede ser falta de gente o pérdida. Las otras cuadran con su bitácora: .160, 93 contra 94 filas; .163, 12 contra 12; .162, 0 contra 0 (no hubo eventos). **Trampa:** no insistir con reintentos a un equipo que da 401; se bloquea a los 5 fallos por 30 min. `IsapiAuthRejectedError` inhabilita el cliente tras el primero.
+  - **NVR .34:** ya tiene filas: 267 `fielddetection` del canal 33 desde el 02-11 (215 hoy), con mediana de 1.7 s. Sin foto por diseño (`identifiesDevice`).
+  - **Para Adam, sin decidir:** revisar cable, puerto y switch de .161; si las terminales fotografían solo accesos concedidos en lugar de cada movimiento de puerta; y si se siguen guardando 90 días las fotos de Privado 01, Privado 02 y Meeting Room (hoy 19). Almacén ya no necesita decisión.
+
 - **03-11 ~11:40 (claude-code) — Vista previa de la cotización: un 502 del worker ya no deja el visor roto (`088b1795`, desplegado).**
   - David vio en la 62 «Setting up fake worker failed: Cannot load script at …/pdf.worker.min.js». El archivo estaba bien.
     Traefik registra dos 502 del worker a las 16:31:06 y :07 UTC, el segundo en que se reinició la web por un despliegue.
