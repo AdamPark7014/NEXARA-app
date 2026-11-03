@@ -11,7 +11,7 @@
    - Acentos del logotipo (cielo, magenta, naranja) = color de CATEGORÍA,
      nunca de estado.
    - Controles de 36 px (32 compacto en tablas, 44 táctil). Radio 8 en
-     controles, 12 en avisos, 16 en tarjetas. Tarjeta = borde + `elev-1`.
+     controles, 12 en avisos, 14 en tarjetas. Tarjeta = borde + `elev-1`.
    - Espaciado 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40.
    El modo oscuro sigue siendo `body.dark` (ThemeContext).
 
@@ -53,10 +53,10 @@
      ---------------------------------------------------------- */
 
   /* Título de página — el H1 de cada pantalla, uno por vista */
-  --ui-fs-page: 28px;
+  --ui-fs-page: 26px;
   --ui-lh-page: 1.15;
-  --ui-fw-page: 700;
-  --ui-tracking-page: -0.025em;
+  --ui-fw-page: 650;
+  --ui-tracking-page: -0.018em;
 
   /* Título de sección — encabezado de tarjeta, bloque o grupo */
   --ui-fs-section: var(--ui-text-lg); /* 16px */
@@ -89,10 +89,10 @@
   --ui-tracking-caption: 0.02em;
 
   /* Cifra — KPI / métrica destacada (no es un papel de texto, es un dato) */
-  --ui-fs-stat: 30px;
+  --ui-fs-stat: 26px;
   --ui-lh-stat: 1.05;
-  --ui-fw-stat: 700;
-  --ui-tracking-stat: -0.025em;
+  --ui-fw-stat: 650;
+  --ui-tracking-stat: -0.018em;
 
   /* Números tabulares para columnas de importes */
   --ui-numeric: "tnum" on, "lnum" on;
@@ -154,7 +154,7 @@
   --ui-brand-soft-2: #c7e8df;
   --ui-brand-bg: var(--ui-brand-soft);
   --ui-brand-border: color-mix(in srgb, #168570 30%, transparent);
-  --ui-brand-glow: 0 10px 24px -12px rgba(22, 133, 112, 0.75);
+  --ui-brand-glow: 0 1px 2px rgba(16, 24, 40, 0.16);
   --ui-ring: 0 0 0 3px rgba(22, 133, 112, 0.25);
   --ui-ring-danger: 0 0 0 3px rgba(220, 38, 38, 0.2);
   --ui-focus-ring: var(--ui-ring);
@@ -220,7 +220,7 @@
   --ui-radius-sm: 8px;
   --ui-radius: 10px;
   --ui-radius-lg: 14px;
-  --ui-radius-xl: 20px;
+  --ui-radius-xl: 14px;
   --ui-radius-pill: 999px;
 
   /* ----------------------------------------------------------
@@ -229,7 +229,7 @@
      casi desaparece. Nada por encima de `pop` salvo diálogos (`elev-3`).
      ---------------------------------------------------------- */
   --ui-elev-0: none;
-  --ui-elev-1: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px -18px rgba(16, 24, 40, 0.2);
+  --ui-elev-1: 0 1px 2px rgba(16, 24, 40, 0.05), 0 8px 20px -14px rgba(16, 24, 40, 0.16);
   --ui-elev-2: 0 1px 2px rgba(16, 24, 40, 0.05), 0 16px 40px -20px rgba(16, 24, 40, 0.24);
   --ui-elev-pop: 0 2px 6px rgba(16, 24, 40, 0.06), 0 24px 56px -20px rgba(16, 24, 40, 0.3);
   --ui-shadow-sm: var(--ui-elev-1);
@@ -410,7 +410,7 @@ body.dark {
   --ui-brand: #1f9e84;
   --ui-brand-hover: #22a98c;
   --ui-brand-press: #188a73;
-  --ui-brand-glow: 0 10px 24px -12px rgba(31, 158, 132, 0.6);
+  --ui-brand-glow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --ui-brand-fg: #ffffff;
   --ui-brand-text: #4fd1b2;
   --ui-brand-soft: rgba(34, 169, 140, 0.14);
@@ -559,10 +559,53 @@ body:has(.nx-app-shell) {
   width: auto;
 }
 
-/* Títulos de página y de sección en la letra de exhibición. */
-.nx-app-shell :is(h1, h2) {
+/* La letra de exhibición solo en el título de página. En los títulos de sección, de 15 a 18 px, Inter Tight
+   se veía apretada: ahí va Inter. */
+.nx-app-shell h1 {
   font-family: var(--ui-font-display);
-  letter-spacing: -0.015em;
+  letter-spacing: var(--ui-tracking-page);
+}
+
+.nx-app-shell h2 {
+  font-family: var(--ui-font);
+  letter-spacing: -0.006em;
+}
+
+/* Encabezados de tabla sin mayúsculas y en una sola medida. Con `!important` porque cada tabla de módulo trae los suyos. */
+.nx-app-shell thead th {
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: var(--ui-fg-3) !important;
+}
+
+/* Barras de desplazamiento delgadas. Con `scrollbar-width` o `scrollbar-color`, Chrome en Windows dibuja la barra del
+   sistema con flechas e ignora estas reglas: los módulos los declaran solo donde no hay `::-webkit-scrollbar`. */
+@supports selector(::-webkit-scrollbar) {
+  html:has(.nx-app-shell) {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+
+  html:has(.nx-app-shell)::-webkit-scrollbar,
+  .nx-app-shell *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  html:has(.nx-app-shell)::-webkit-scrollbar-track,
+  .nx-app-shell *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  html:has(.nx-app-shell)::-webkit-scrollbar-thumb,
+  .nx-app-shell *::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, #5b6272 32%, transparent);
+    border: 2px solid transparent;
+    border-radius: 8px;
+    background-clip: content-box;
+  }
 }
 
 .nx-app-shell ::selection {

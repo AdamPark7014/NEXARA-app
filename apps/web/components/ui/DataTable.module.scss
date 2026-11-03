@@ -19,8 +19,11 @@
     radial-gradient(farthest-side at 0 50%, var(--dt-shadow), transparent) left center / 12px 100% no-repeat scroll,
     radial-gradient(farthest-side at 100% 50%, var(--dt-shadow), transparent) right center / 12px 100% no-repeat scroll,
     var(--dt-bg);
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--ui-fg-3) 45%, transparent) transparent;
+
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ui-fg-3) 45%, transparent) transparent;
+  }
 
   &:focus-visible {
     outline: var(--ui-focus-outline);

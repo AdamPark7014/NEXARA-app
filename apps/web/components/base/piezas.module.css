@@ -177,8 +177,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px 18px;
+  gap: 8px;
+  padding: 14px 16px;
   min-width: 0;
   overflow: hidden;
   background: var(--ui-surface);
@@ -206,7 +206,7 @@
 
 .statCompact {
   gap: 8px;
-  padding: 16px 18px;
+  padding: 14px 16px;
 }
 
 .statLink {
@@ -234,14 +234,12 @@
 }
 
 .statLink .statLabel {
-  text-decoration: underline;
-  text-decoration-color: var(--ui-border);
   text-underline-offset: 3px;
 }
 
 .statLink:hover .statLabel,
 .statLink:focus-visible .statLabel {
-  text-decoration-color: currentColor;
+  text-decoration: underline;
 }
 
 /** Flechita siempre visible junto al número: así se distingue de una cifra suelta sin pasar el mouse. */
@@ -256,29 +254,23 @@
 .statTop {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
 }
 
+/* El ícono acompaña a la etiqueta, sin pastilla: lo que debe resaltar es la cifra. */
 .statIco {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--ui-neutral-bg);
-  color: var(--ui-neutral-text);
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  color: var(--ui-fg-3);
 }
 
 .statIco svg {
-  font-size: 18px !important;
-}
-
-.statCompact .statIco {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  font-size: 16px !important;
 }
 
 .statLabel {
@@ -350,7 +342,8 @@
   vertical-align: middle;
 }
 
-.statValueBrand { color: var(--ui-brand-text); }
+/* El verde en una cifra no decía nada; el color queda para éxito, alerta y riesgo. */
+.statValueBrand { color: var(--ui-fg); }
 .statValueSuccess { color: var(--ui-success-text); }
 .statValueWarning { color: var(--ui-warning-text); }
 .statValueDanger { color: var(--ui-danger-text); }

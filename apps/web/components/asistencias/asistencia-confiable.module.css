@@ -203,5 +203,10 @@
   display: inline-flex;
   max-width: 100%;
   overflow-x: auto;
-  scrollbar-width: thin;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .desliza {
+    scrollbar-width: thin;
+  }
 }

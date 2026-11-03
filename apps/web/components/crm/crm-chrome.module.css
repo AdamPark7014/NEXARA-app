@@ -137,7 +137,12 @@
   gap: 12px;
   overflow-x: auto;
   padding-bottom: 12px;
-  scrollbar-width: thin;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .pipelineBoard {
+    scrollbar-width: thin;
+  }
 }
 
 .pipelineCol {
