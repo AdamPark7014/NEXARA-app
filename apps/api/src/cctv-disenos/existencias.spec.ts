@@ -3,7 +3,10 @@ import {
   SIN_PRECIO,
   elegirCandidato,
   fichaDeProducto,
+  interpretarBusqueda,
   normalizarModelo,
+  primeroConMegapixeles,
+  quitarDatosImposibles,
   partidaDeLinea,
   textoDeProducto,
   tipoDesdeCt,
@@ -129,6 +132,87 @@ describe('ficha desde CT', () => {
   it('si la subcategoría no dice, manda la lectura', () => {
     const leida = { familia: 'camaras', tipo: 'bala', marca: '', modelo: '', descripcion: '', color: 'blanco' as const, cajaTrasera: false, lucesVisibles: 0, datos: [], caracteristicas: [] };
     expect(fichaDeProducto({ ...producto, subcategoria: 'Cámara WiFi' }, leida).tipo).toBe('bala');
+  });
+});
+
+describe('interpretarBusqueda', () => {
+  it('saca la familia y los megapíxeles de lo que no está en el nombre', () => {
+    expect(interpretarBusqueda('domo dahua 5mp')).toEqual({ palabras: ['dahua'], subcategoria: 'domo', megapixeles: 5 });
+  });
+
+  it('entiende «5 MP» con espacio y sin acentos', () => {
+    expect(interpretarBusqueda('Cámara bala 4 MP Hikvision')).toEqual({ palabras: ['hikvision'], subcategoria: 'Bala', megapixeles: 4 });
+  });
+
+  it('un modelo se queda tal cual', () => {
+    expect(interpretarBusqueda('DS-2CD1143G2-LIUF')).toEqual({ palabras: ['ds-2cd1143g2-liuf'], subcategoria: '', megapixeles: null });
+  });
+
+  it('«control de acceso» es una familia, no tres palabras en el nombre', () => {
+    expect(interpretarBusqueda('control de acceso zkteco')).toEqual({ palabras: ['zkteco'], subcategoria: 'Control de Acceso', megapixeles: null });
+  });
+
+  it('la familia elegida con el botón manda', () => {
+    expect(interpretarBusqueda('dahua grabador', 'Switches').subcategoria).toBe('Switches');
+  });
+
+  it('«cámara» sola acota a cámaras', () => {
+    expect(interpretarBusqueda('camara dahua')).toEqual({ palabras: ['dahua'], subcategoria: 'Cámara', megapixeles: null });
+  });
+
+  it.each([
+    ['nvr 8 canales', 'Grabadores'],
+    ['switch poe', 'Switches'],
+    ['ups 1500', 'No Breaks'],
+    ['rack 42u', 'Gabinetes'],
+    ['control de acceso', 'Control de Acceso'],
+    ['servidor hpe', 'Servidores'],
+  ])('«%s» busca en %s', (texto, sub) => {
+    expect(interpretarBusqueda(texto).subcategoria).toBe(sub);
+  });
+});
+
+describe('primeroConMegapixeles', () => {
+  const lista = [{ nombre: 'A', descripcion: 'Domo 2 MP' }, { nombre: 'B', descripcion: 'Domo 5MP lente 2.8' }, { nombre: 'C 15 MP', descripcion: '' }];
+
+  it('pone primero lo que dice esos megapíxeles', () => {
+    expect(primeroConMegapixeles(lista, 5).map((x) => x.nombre)).toEqual(['B', 'A', 'C 15 MP']);
+  });
+
+  it('un 5 no coincide con un 15', () => {
+    expect(primeroConMegapixeles([{ nombre: 'C 15 MP' }], 5)).toHaveLength(1);
+    expect(primeroConMegapixeles(lista, 15)[0].nombre).toBe('C 15 MP');
+  });
+
+  it('sin megapíxeles queda igual', () => {
+    expect(primeroConMegapixeles(lista, null).map((x) => x.nombre)).toEqual(['A', 'B', 'C 15 MP']);
+  });
+});
+
+describe('quitarDatosImposibles', () => {
+  const dato = (campo: string, valor: string) => ({ campo, valor, hoja: null });
+
+  it.each([
+    ['ups', 'unidades', '1900'],
+    ['switch', 'poeTotalW', '2.64'],
+    ['servidor', 'canales', '4'],
+    ['nvr', 'pxHoriz', '2592'],
+    ['nvr', 'mbpsEntrada', '8'],
+  ])('en un %s no vale %s = %s', (tipo, campo, valor) => {
+    expect(quitarDatosImposibles(tipo, [dato(campo, valor)])).toEqual([]);
+  });
+
+  it.each([
+    ['domo', 'pxHoriz', '2560'],
+    ['switch', 'poeTotalW', '250'],
+    ['switch', 'puertos', '16'],
+    ['nvr', 'canales', '8'],
+    ['nvr', 'mbpsEntrada', '80'],
+    ['servidor', 'unidades', '2'],
+    ['gabinete', 'anchoMm', '600'],
+    ['domo', 'ip', 'IP67'],
+  ])('en un %s sí vale %s = %s', (tipo, campo, valor) => {
+    expect(quitarDatosImposibles(tipo, [dato(campo, valor)])).toHaveLength(1);
   });
 });
 

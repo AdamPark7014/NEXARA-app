@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { CatalogService } from '../catalog/catalog.service.js';
 import { CotizacionesService } from '../cotizaciones/cotizaciones.service.js';
+import { precioConMargen } from '../cotizaciones/cotizacion-totals.js';
 import { esFinal, estaBloqueada } from '../cotizaciones/estado-cotizacion.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ScoredOffer } from '../smart-quote/scoring/quote-scoring.js';
@@ -9,9 +10,11 @@ import {
   SIN_PRECIO,
   elegirCandidato,
   fichaDeProducto,
+  interpretarBusqueda,
   normalizarModelo,
   paqueteDelDiseno,
   partidaDeLinea,
+  primeroConMegapixeles,
   textoDeProducto,
   tipoDesdeCt,
   validarLineas,
@@ -51,6 +54,8 @@ type FilaCt = { id: number; clave: string; modelo: string | null; numParte: stri
 export type ActorCotizacion = { id: number; email?: string | null; roleKey?: string | null; nombre?: string | null };
 
 const NOMBRE_PLANO = 'Plano de videovigilancia';
+/** El margen con el que llega una partida de CT a la cotización. */
+const MARGEN_CT = 30;
 
 @Injectable()
 export class ExistenciasCctvService {
@@ -150,7 +155,8 @@ export class ExistenciasCctvService {
       modelo: o.modelo || o.numParte,
       piezas: o.stockTotal,
       cerca: o.stockPreferred,
-      precio: o.sellPriceSuggested,
+      // Lo que va a decir la cotización: costo × (1 + margen). La venta «sugerida» del buscador sale de otra cuenta y daba 10 % más.
+      precio: precioConMargen(o.costMxn, MARGEN_CT) ?? o.sellPriceSuggested,
       dias: o.leadTimeDays,
       ligado,
     };
@@ -173,11 +179,21 @@ export class ExistenciasCctvService {
   /** Buscar en el catálogo de CT, con o sin palabras. Primero lo que tiene piezas. */
   async buscarCt(q: string | undefined, subcategoria: string | undefined) {
     const texto = (q ?? '').trim().slice(0, 80);
-    const sub = (subcategoria ?? '').trim().slice(0, 60);
-    if (!texto && !sub) return { resultados: [] };
-    const r = await this.busqueda.search({ q: texto, subcategory: sub || undefined, inStockOnly: false, optimize: 'BALANCE', targetMarginPercent: 30, take: 24 });
+    const elegida = (subcategoria ?? '').trim().slice(0, 60);
+    if (!texto && !elegida) return { resultados: [] };
+    const pedido = interpretarBusqueda(texto, elegida);
+    const buscar = (palabras: readonly string[]) =>
+      this.busqueda.search({ q: palabras.join(' '), subcategory: pedido.subcategoria || undefined, inStockOnly: false, optimize: 'BALANCE', targetMarginPercent: MARGEN_CT, take: 24 });
+    // Si con todas las palabras no hay nada, se quitan de atrás para adelante: es mejor algo parecido que nada.
+    let palabras = pedido.palabras;
+    let r = await buscar(palabras);
+    // Sin familia, quedarse sin palabras sería enseñar todo el catálogo.
+    while (!r.data.length && palabras.length > (pedido.subcategoria ? 0 : 1)) {
+      palabras = palabras.slice(0, -1);
+      r = await buscar(palabras);
+    }
     return {
-      resultados: r.data.map((o) => ({
+      resultados: primeroConMegapixeles(r.data, pedido.megapixeles).map((o) => ({
         ...this.resumen(o, 'manual'),
         descripcion: o.descripcion,
         imagen: o.imagen,
@@ -253,7 +269,7 @@ export class ExistenciasCctvService {
       return partidaDeLinea(l, {
         paqueteClave,
         almacen: almacen.get(l.clave) ?? null,
-        mayorista: c ? (this.busqueda.lineFromOffer(c.oferta, l.cantidad, 'BALANCE') as unknown as Record<string, unknown>) : null,
+        mayorista: c ? { ...(this.busqueda.lineFromOffer(c.oferta, l.cantidad, 'BALANCE') as unknown as Record<string, unknown>), marginPercent: MARGEN_CT } : null,
       });
     });
     const sinPrecio = partidas.filter((p) => p.notes === SIN_PRECIO).length;

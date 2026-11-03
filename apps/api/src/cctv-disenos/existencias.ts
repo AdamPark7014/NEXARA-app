@@ -156,6 +156,60 @@ export function tipoDesdeCt(o: { categoria?: string | null; subcategoria?: strin
   return null;
 }
 
+/** Palabras que en CT no están en el nombre sino en la subcategoría. */
+const FAMILIA_DE_PALABRA: ReadonlyArray<readonly [RegExp, string]> = [
+  [/^domos?$/, 'domo'],
+  [/^balas?$/, 'Bala'],
+  [/^turrets?$/, 'Turret'],
+  [/^ptz$/, 'PTZ'],
+  [/^(nvr|dvr|xvr|grabador|grabadores)$/, 'Grabadores'],
+  [/^(switch|switches)$/, 'Switches'],
+  [/^(ups|nobreak|nobreaks)$/, 'No Breaks'],
+  [/^(gabinete|gabinetes|rack|racks)$/, 'Gabinetes'],
+  [/^(servidor|servidores)$/, 'Servidores'],
+  [/^(sirena|sirenas)$/, 'Sirena'],
+  [/^(alarma|alarmas)$/, 'Alarma'],
+  [/^(acceso|biometrico|biometricos|lectora|lectoras)$/, 'Control de Acceso'],
+  [/^videoportero$/, 'Videoportero'],
+];
+
+/** No distinguen nada, y el buscador las pediría en el nombre. */
+const SIN_PESO: ReadonlySet<string> = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'con', 'para', 'y', 'en', 'un', 'una', 'control', 'cctv', 'ip']);
+
+/**
+ * Lo que alguien escribe: «domo dahua 5mp». En CT «domo» está en la subcategoría y «5 MP» en la descripción, y
+ * el buscador pide cada palabra en el nombre: sin esto, una búsqueda natural no encontraba nada.
+ */
+export function interpretarBusqueda(texto: string, subcategoria = ''): { palabras: string[]; subcategoria: string; megapixeles: number | null } {
+  let sub = subcategoria;
+  let megapixeles: number | null = null;
+  const crudo = sinAcento(texto).replace(/\b(\d+(?:\.\d+)?)\s*(?:mp|megapixel(?:es)?|megapixeles)\b/g, (_, n: string) => {
+    megapixeles = Number(n);
+    return ' ';
+  });
+  const palabras: string[] = [];
+  for (const p of crudo.split(/\s+/).filter(Boolean)) {
+    if (SIN_PESO.has(p)) continue;
+    // «cámara» no acota nada si ya se dijo de qué familia, y estorba en el nombre.
+    if (/^(camara|camaras)$/.test(p)) {
+      if (!sub) sub = 'Cámara';
+      continue;
+    }
+    const familia = FAMILIA_DE_PALABRA.find(([re]) => re.test(p));
+    if (familia && (!sub || sub === 'Cámara')) sub = familia[1];
+    else if (!familia) palabras.push(p);
+  }
+  return { palabras, subcategoria: sub, megapixeles };
+}
+
+/** Lo que dice esos megapíxeles va primero; si ninguno lo dice, se enseña lo demás. */
+export function primeroConMegapixeles<T extends { nombre?: string | null; descripcion?: string | null }>(lista: readonly T[], mp: number | null): T[] {
+  if (!mp) return [...lista];
+  const re = new RegExp(`(^|[^\\d.])${String(mp).replace('.', '\\.')}\\s*(mp|megap)`, 'i');
+  const dice = (x: T) => re.test(`${x.nombre ?? ''} ${x.descripcion ?? ''}`);
+  return [...lista.filter(dice), ...lista.filter((x) => !dice(x))];
+}
+
 /** Lo que trae CT de un producto. */
 export type ProductoCt = {
   clave: string | null;
@@ -182,6 +236,28 @@ export function textoDeProducto(o: ProductoCt, max: number): string {
   return [`Marca ${o.marca ?? ''}, modelo ${o.modelo || o.numParte || ''}.`, o.nombre, o.descripcion, specs].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+const SOLO_CAMARAS: ReadonlySet<string> = new Set(['pxHoriz', 'pxVert', 'sensor', 'focalesMm', 'focalMinMm', 'focalMaxMm', 'hfovDeg', 'vfovDeg', 'zoomOptico', 'irM']);
+const SOLO_GRABADOR: ReadonlySet<string> = new Set(['canales', 'bahias', 'mbpsEntrada']);
+
+/**
+ * Lo que la lectura sacó y no puede ser de este equipo. Una descripción de CT no es una ficha: medido con
+ * productos reales, tomó los 1900 VA de un UPS como unidades de rack, los 2.6 W que consume un switch como
+ * su PoE y los 4 núcleos de un servidor como canales. Mejor vacío, para capturarlo, que un dato falso que
+ * luego engañe a la revisión del sistema.
+ */
+export function quitarDatosImposibles<T extends { campo: string; valor: string }>(tipo: string, datos: readonly T[]): T[] {
+  const familia = familiaDeTipo(tipo);
+  return datos.filter(({ campo, valor }) => {
+    const n = Number(valor);
+    if (SOLO_CAMARAS.has(campo) && familia !== 'camaras') return false;
+    if (SOLO_GRABADOR.has(campo) && tipo !== 'nvr') return false;
+    if (campo === 'unidades' && !(n >= 1 && n <= 60)) return false;
+    if (campo === 'poeTotalW' && n < 15) return false;
+    if (campo === 'mbpsEntrada' && n < 16) return false;
+    return true;
+  });
+}
+
 /**
  * La ficha para el catálogo a partir del producto de CT. Marca y modelo son los de CT; el tipo, el de su
  * subcategoría si la dice. Sin lectura de IA (`leida` null) va con lo que hay, para capturar el resto.
@@ -203,7 +279,7 @@ export function fichaDeProducto(o: ProductoCt, leida: FichaLeida | null): FichaL
     color: leida?.color ?? 'blanco',
     cajaTrasera: leida?.cajaTrasera ?? false,
     lucesVisibles: leida?.lucesVisibles ?? 0,
-    datos: leida?.datos ?? [],
+    datos: quitarDatosImposibles(tipo, leida?.datos ?? []),
     caracteristicas,
     ct: String(o.clave ?? ''),
   };

@@ -163,7 +163,7 @@ export default function PasarACotizacion({
                     <tr key={r.clave}>
                       <td>
                         <b>{r.nombre}</b>
-                        {r.grupo === "MATERIALES" ? <span>{r.descripcion}</span> : r.faltan > 0 ? <span className={styles.falta}>Faltan {r.faltan} entre Almacén y CT</span> : null}
+                        {r.grupo === "MATERIALES" ? <span>{r.descripcion}</span> : r.faltan > 0 ? <span className={styles.falta}>{r.faltan === 1 ? "Falta 1" : `Faltan ${r.faltan}`} entre Almacén y CT</span> : null}
                       </td>
                       <td className={styles.numero}>
                         {r.cantidad}
