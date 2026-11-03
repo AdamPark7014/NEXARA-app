@@ -74,5 +74,5 @@
 
 .modulo[data-sin-captura="true"] b {
   font-size: 14px;
-  color: var(--ui-warning);
+  color: var(--ui-warning-text);
 }
