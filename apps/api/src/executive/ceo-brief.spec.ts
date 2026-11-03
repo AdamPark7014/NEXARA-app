@@ -87,9 +87,9 @@ describe('armarResumenCeo', () => {
     expect(r.titulo).toBe('Tu día: hay pendientes en operación');
   });
 
-  it('cotizaciones vigentes sin marcar como enviadas: se ven aunque ninguna esté por vencer', () => {
-    const r = armarResumenCeo(con({ cotizaciones: { porVencer: 0, monto: 0, dias: 7, sinEnviar: 18 } }), FECHA);
-    expect(r.items[0]).toMatchObject({ clave: 'cotizaciones', texto: '18 cotizaciones vigentes sin marcar como enviada' });
+  it('un borrador no le pide nada a dirección: le toca a quien lo hizo, y se ve en el cuadro del módulo', () => {
+    const r = armarResumenCeo(con({ cotizaciones: { porVencer: 0, monto: 0, dias: 7 } }), FECHA);
+    expect(JSON.stringify(r.items)).not.toMatch(/sin marcar|borrador/i);
   });
 
   it('evidencias: dice cuántas son suyas y de quién son las demás', () => {

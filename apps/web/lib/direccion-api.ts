@@ -4,11 +4,8 @@
  */
 import { erpFetch } from "@/lib/erp-api";
 
-/**
- * Adam la ve primero en la pantalla real: `/erp/executive?muestra=1`, `/erp/pizarra/area` y
- * `/erp/proyectos/obra`. Con `false` nadie llega por el menú ni por la pantalla Hoy.
- */
-export const DIRECCION_VISIBLE = false;
+/** Adam la vio en la pantalla real y la destapó el 03-11. Con `false` nadie llega por el menú ni por la pantalla Hoy. */
+export const DIRECCION_VISIBLE = true;
 
 export type ResumenGente = {
   personas: number;
