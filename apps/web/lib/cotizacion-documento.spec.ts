@@ -3,6 +3,8 @@ import {
   bloquesDesdeApi,
   bloquesParaApi,
   cambiosEntre,
+  documentoConRedaccion,
+  documentoConTextos,
   documentoDesdeDetalle,
   documentoVacio,
   escribirObjetivo,
@@ -18,12 +20,73 @@ import {
   payloadDeDocumento,
   porcentajeMargen,
   precioConMargen,
+  sinTextosPropios,
   sumarDias,
+  textosDelDocumento,
   terminosPropiosDeDetalle,
   terminosPropiosDeNota,
   totalesDePartidas,
 } from "./cotizacion-documento";
 import { formatoFecha, type CotizacionDetalle } from "./cotizaciones-api";
+
+describe("textos de «Redactar con IA»", () => {
+  const redaccion = {
+    via: "ia" as const,
+    proyecto: "Suministro de lectores",
+    objetivo: { intro: "Intro.", beneficios: ["Uno: dos."], cierre: "Cierre." },
+    bloques: [{ clave: "ia:justificacion", titulo: "Justificación tecnológica", texto: "Por qué.", vinetas: ["A: b."] }],
+    quitadas: 0,
+  };
+
+  it("llena el 01, el 02 y el título que falta", () => {
+    const d = documentoConRedaccion(documentoVacio(), redaccion);
+    expect(d.projectName).toBe("Suministro de lectores");
+    expect(d.objetivo.intro).toBe("Intro.");
+    expect(d.objetivo.beneficios.map((b) => b.texto)).toEqual(["Uno: dos."]);
+    expect(d.bloques[0]).toMatchObject({ clave: "ia:justificacion", titulo: "Justificación tecnológica", texto: "Por qué." });
+  });
+
+  it("un título ya escrito se respeta", () => {
+    expect(documentoConRedaccion({ ...documentoVacio(), projectName: "Bodega norte" }, redaccion).projectName).toBe("Bodega norte");
+  });
+
+  it("sin título sugerido queda vacío: el PDF pone el suyo", () => {
+    expect(documentoConRedaccion(documentoVacio(), { ...redaccion, proyecto: null }).projectName).toBe("");
+  });
+
+  it("reemplaza lo escrito pero deja lo que puso un paquete, al final", () => {
+    const paquete = nuevoBloque({ clave: "paquete:camara", titulo: "Cámara instalada" });
+    const propio = nuevoBloque({ titulo: "Lo mío" });
+    const d = documentoConRedaccion({ ...documentoVacio(), bloques: [propio, paquete] }, redaccion);
+    expect(d.bloques.map((b) => b.titulo)).toEqual(["Justificación tecnológica", "Cámara instalada"]);
+  });
+
+  it("enciende las secciones apagadas, y deshacer las regresa con todo lo demás", () => {
+    const base = documentoVacio();
+    const apagada = { ...base, projectName: "", opciones: { ...base.opciones, secciones: { ...base.opciones.secciones, objetivo: false, alcance: false } } };
+    const d = documentoConRedaccion(apagada, redaccion);
+    expect(d.opciones.secciones).toMatchObject({ objetivo: true, alcance: true });
+    const deshecho = documentoConTextos(d, textosDelDocumento(apagada));
+    expect(deshecho.opciones.secciones).toMatchObject({ objetivo: false, alcance: false });
+    expect(deshecho.projectName).toBe("");
+    expect(deshecho.objetivo.intro).toBe("");
+    expect(deshecho.bloques).toEqual([]);
+  });
+
+  it("deshacer no toca lo que no es texto: las partidas se quedan como estén", () => {
+    const guardados = textosDelDocumento(documentoVacio());
+    const conPartida = { ...documentoVacio(), partidas: [partidaNueva({ name: "Lector" })] };
+    expect(documentoConTextos(conPartida, guardados).partidas.map((p) => p.name)).toEqual(["Lector"]);
+  });
+
+  it("sabe si ya hay texto propio; lo de un paquete no cuenta", () => {
+    expect(sinTextosPropios(documentoVacio())).toBe(true);
+    expect(sinTextosPropios({ ...documentoVacio(), bloques: [nuevoBloque({ clave: "paquete:x", titulo: "X" })] })).toBe(true);
+    expect(sinTextosPropios({ ...documentoVacio(), bloques: [nuevoBloque({ titulo: "X" })] })).toBe(false);
+    expect(sinTextosPropios({ ...documentoVacio(), objetivo: { intro: "Algo", beneficios: [], cierre: "" } })).toBe(false);
+    expect(sinTextosPropios({ ...documentoVacio(), objetivo: { intro: "", beneficios: itemsDesdeTextos(["Algo"]), cierre: "" } })).toBe(false);
+  });
+});
 
 /** Mismos casos que `apps/api/src/cotizaciones/alcance-y-objetivo.spec.ts`: web y PDF leen igual. */
 describe("objetivo como texto", () => {

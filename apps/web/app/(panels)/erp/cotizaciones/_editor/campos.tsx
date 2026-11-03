@@ -40,9 +40,26 @@ export const TextoAuto = forwardRef<HTMLTextAreaElement, TextoAutoProps>(functio
   useMedirLayout(() => {
     const el = interno.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight + 2}px`;
-  }, [value]);
+    const medir = () => {
+      el.style.height = "auto";
+      // Vacío mide el texto gris: es lo que el PDF va a poner y no debe verse cortado.
+      const vacio = !el.value && Boolean(el.placeholder);
+      if (vacio) el.value = el.placeholder;
+      el.style.height = `${el.scrollHeight + 2}px`;
+      if (vacio) el.value = "";
+    };
+    medir();
+    if (typeof ResizeObserver === "undefined") return;
+    // Al cambiar el ancho (la vista previa, la ventana) el texto ocupa otros renglones.
+    let ancho = el.offsetWidth;
+    const observador = new ResizeObserver(() => {
+      if (el.offsetWidth === ancho) return;
+      ancho = el.offsetWidth;
+      medir();
+    });
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, [value, resto.placeholder]);
 
   const clase =
     variante === "titulo"

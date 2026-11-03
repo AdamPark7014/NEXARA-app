@@ -135,16 +135,18 @@ describe("editor de cotización", () => {
     expect(titulos.slice(0, 6)).toEqual([
       "Portada",
       "Personalizar",
+      "Textos de la propuesta",
       "01. Alcance ejecutivo",
       "02. Alcance técnico",
       "03. Planos",
-      "04. Propuesta económica",
     ]);
     expect(screen.getAllByText("NEX-LJ75100126-0007").length).toBeGreaterThan(0);
     // El título del proyecto está en la portada y como encabezado de 02, como en el PDF.
     expect(screen.getAllByDisplayValue("Renovación del CCTV")).toHaveLength(2);
-    // Lo que el PDF pondría si se deja vacío.
-    expect(screen.getByText("Mayor cobertura con la incorporación de 2 equipos nuevos.")).toBeInTheDocument();
+    // Lo vacío lo completa el PDF, y un solo botón lo escribe con las partidas.
+    expect(screen.getByText("Si lo dejas vacío, el PDF usa el texto general que ves en gris.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Redactar con IA" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Redactar borrador" })).not.toBeInTheDocument();
   });
 
   it("guarda solo lo que cambió, un momento después de escribir", async () => {

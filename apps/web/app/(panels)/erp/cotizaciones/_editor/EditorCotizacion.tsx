@@ -67,6 +67,7 @@ import { esSeccionPropuesta, type SeccionPropuesta } from "@/lib/vista-previa-vi
 import { conCondicionesSugeridas, type SeccionesOpcionales } from "@/lib/cotizacion-personalizacion";
 import { conAvisosDeCosto, documentoConPropuesta, documentoCopiadoDe, type DatosDePropuesta } from "@/lib/cotizar-ia";
 import CotizarConIA from "./CotizarConIA";
+import RedactarConIA from "./RedactarConIA";
 import PanelPersonalizar from "./PanelPersonalizar";
 import ElegirPlantilla from "./ElegirPlantilla";
 import { useAutoguardado, type EstadoGuardado } from "./useAutoguardado";
@@ -264,6 +265,8 @@ export default function EditorCotizacion({
   const [plantillaElegida, setPlantillaElegida] = useState<number | null>(null);
   /** «Cotizar con IA» se ofrece mientras se empieza: una cotización que ya trae partidas no la lleva. */
   const [cotizarAbierta, setCotizarAbierta] = useState(arranque.doc.partidas.length === 0);
+  /** Sube al usar «Cotizar con IA»: los textos salen redactados sin otro clic. */
+  const [redactarAhora, setRedactarAhora] = useState(0);
   const ancho = useEsAncho();
 
   const aprobada = detalle?.estado === "APROBADA";
@@ -485,6 +488,7 @@ export default function EditorCotizacion({
       return sugeridas && nuevo.segmento !== d.segmento ? { ...nuevo, opciones: conCondicionesSugeridas(nuevo.opciones, sugeridas) } : nuevo;
     });
     setCotizarAbierta(false);
+    setRedactarAhora((n) => n + 1);
     setAviso("Lista: revisa los precios y se guarda sola.");
     irASeccionPronto("cotizacion");
   }
@@ -929,11 +933,11 @@ export default function EditorCotizacion({
             puedeGuardarPlantilla={Boolean(id) && !falta}
             onGuardarPlantilla={guardarPlantilla}
           />
+          {editable ? <RedactarConIA token={token} doc={doc} cambiar={cambiar} disparar={redactarAhora} /> : null}
           <SeccionObjetivo
             doc={doc}
             cambiar={cambiar}
             editable={editable}
-            sugerido={detalle?.objetivoSugerido ?? null}
             plantilla={plantillaSegmento?.objetivo ?? null}
             excluida={!doc.opciones.secciones.objetivo}
             onIncluir={() => incluirSeccion("objetivo")}
@@ -943,7 +947,6 @@ export default function EditorCotizacion({
             cambiar={cambiar}
             editable={editable}
             plantillas={plantillaSegmento?.bloques ?? []}
-            sugeridos={detalle?.alcanceSugerido ?? null}
             excluida={!doc.opciones.secciones.alcance}
             onIncluir={() => incluirSeccion("alcance")}
           />

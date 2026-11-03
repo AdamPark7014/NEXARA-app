@@ -5,8 +5,8 @@ import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRound
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import LibraryAddOutlinedIcon from "@mui/icons-material/LibraryAddOutlined";
-import { Badge, Button, LinkButton } from "@/components/base";
-import type { BloqueAlcance, PlantillasSegmento } from "@/lib/cotizaciones-api";
+import { Badge, Button } from "@/components/base";
+import type { PlantillasSegmento } from "@/lib/cotizaciones-api";
 import {
   esBloqueDePaquete,
   mover,
@@ -14,7 +14,7 @@ import {
   type BloqueEditor,
   type DocumentoCotizacion,
 } from "@/lib/cotizacion-documento";
-import { Campo, Hoja, ListaEditable, TextoAuto, Vacio } from "./campos";
+import { Campo, Hoja, ListaEditable, TextoAuto } from "./campos";
 import styles from "./editor.module.css";
 
 type Cambiar = (cambio: (doc: DocumentoCotizacion) => DocumentoCotizacion) => void;
@@ -37,7 +37,6 @@ export default function SeccionAlcance({
   cambiar,
   editable,
   plantillas,
-  sugeridos,
   excluida,
   onIncluir,
 }: {
@@ -48,8 +47,6 @@ export default function SeccionAlcance({
   cambiar: Cambiar;
   editable: boolean;
   plantillas: PlantillasSegmento["bloques"];
-  /** Los puntos que el PDF lleva si no se escriben otros. */
-  sugeridos: BloqueAlcance[] | null;
 }) {
   const [verPlantillas, setVerPlantillas] = useState(false);
   const titulos = useRef(new Map<string, HTMLTextAreaElement>());
@@ -237,49 +234,11 @@ export default function SeccionAlcance({
             );
           })}
         </ol>
-      ) : sugeridos?.length ? (
-        <div className={styles.sugerido}>
-          El PDF pondría:
-          <ol>
-            {sugeridos.map((s) => (
-              <li key={s.clave}>{s.titulo}</li>
-            ))}
-          </ol>
-          {editable ? (
-            <LinkButton
-              onClick={() =>
-                setBloques(() =>
-                  sugeridos.map((s) => nuevoBloque({ clave: s.clave, titulo: s.titulo, texto: s.texto ?? "", vinetas: s.vinetas })),
-                )
-              }
-            >
-              Usar estos y editarlos
-            </LinkButton>
-          ) : null}
-        </div>
-      ) : editable ? (
-        <div className={styles.bloque}>
-          <Vacio
-            titulo="Todavía no hay subsecciones"
-            acciones={
-              <>
-                <Button size="sm" variant="tonal" iconStart={<LibraryAddOutlinedIcon />} onClick={() => setVerPlantillas(true)}>
-                  Elegir de las plantillas
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => agregar(nuevoBloque())}>
-                  Subsección en blanco
-                </Button>
-              </>
-            }
-          >
-            Elige de las plantillas del segmento y ajusta las cifras.
-          </Vacio>
-        </div>
       ) : (
-        <p className={styles.pista}>Sin subsecciones.</p>
+        <p className={styles.pista}>{editable ? "Si lo dejas vacío, el PDF lleva los puntos generales." : "Lleva los puntos generales."}</p>
       )}
 
-      {bloques.length && editable ? (
+      {editable ? (
         <Button variant="tonal" size="sm" className={`${styles.agregar} ${styles.agregarSolo}`} onClick={() => agregar(nuevoBloque())}>
           + Subsección
         </Button>

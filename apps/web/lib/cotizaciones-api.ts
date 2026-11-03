@@ -708,6 +708,56 @@ export async function interpretarCotizacion(token: string, texto: string, opcion
   }
 }
 
+export type TextosRedactados = {
+  /** `general`: la IA no respondió y son los textos de siempre. */
+  via: "ia" | "general";
+  proyecto: string | null;
+  objetivo: ObjetivoPartes;
+  bloques: Array<{ clave: string; titulo: string; texto: string; vinetas: string[] }>;
+  quitadas: number;
+};
+
+/** La API intenta con la IA hasta unos 40 s y luego responde con los textos generales. */
+const ESPERA_REDACTAR_MS = 50_000;
+
+/** «Redactar con IA»: los textos de la cotización con las partidas del borrador. No guarda nada. */
+export async function redactarTextos(
+  token: string,
+  pedido: { partidas: PartidaCotizacion[]; segmento?: string | null; indicacion?: string | null },
+): Promise<TextosRedactados> {
+  const senal = typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(ESPERA_REDACTAR_MS) : undefined;
+  const numero = (valor: unknown) => Number(valor) || 0;
+  try {
+    return await cotFetch<TextosRedactados>("cotizaciones/redactar", token, {
+      method: "POST",
+      body: JSON.stringify({
+        // Solo lo que describe la partida: el costo no le hace falta.
+        partidas: pedido.partidas.map((p) => ({
+          name: p.name,
+          description: p.description ?? null,
+          brand: p.brand ?? null,
+          model: p.model ?? null,
+          unit: p.unit ?? null,
+          grupo: p.grupo ?? null,
+          category: p.category ?? null,
+          qty: numero(p.qty),
+          unitPrice: numero(p.unitPrice),
+          laborHours: numero(p.laborHours),
+          laborRate: numero(p.laborRate),
+        })),
+        segmento: pedido.segmento ?? null,
+        indicacion: pedido.indicacion?.trim() || null,
+      }),
+      signal: senal,
+    });
+  } catch (e) {
+    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+      throw new Error("Tardó demasiado en contestar: vuelve a intentarlo en un momento.");
+    }
+    throw e;
+  }
+}
+
 /** URL del PDF «Propuesta técnica» (requiere sesión). */
 export function urlPdfCotizacion(id: number) {
   return buildApiUrl(`cotizaciones/${id}/pdf`);

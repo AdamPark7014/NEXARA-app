@@ -1,0 +1,23 @@
+{
+  "fecha": "2026-11-03T02:55:44.850Z",
+  "modelo": "claude-haiku-5-5",
+  "casos": 8,
+  "sinFallas": 7,
+  "sinNadaQueQuitar": 6,
+  "modelosNombrados": "10/10",
+  "quitado": {
+    "cobertura": 2,
+    "instalacion": 2
+  },
+  "msP50": 4948,
+  "msP95": 5845,
+  "usdPorLlamada": 0.000543,
+  "fallas": [
+    {
+      "id": "acceso",
+      "fallas": [
+        "proyecto de 11 palabras"
+      ]
+    }
+  ]
+}

@@ -19,6 +19,7 @@ import {
   type PartidaCotizacion,
   type ContenidoPlantilla,
   type Segmento,
+  type TextosRedactados,
 } from "@/lib/cotizaciones-api";
 import {
   conCondicionesSugeridas,
@@ -479,6 +480,46 @@ export type DocumentoCotizacion = {
   opciones: OpcionesCotizacion;
   moneda: Moneda;
 };
+
+/** Lo que «Redactar con IA» cambia, para que «Deshacer» lo regrese y nada más. */
+export type TextosGuardados = Pick<DocumentoCotizacion, "projectName" | "objetivo" | "bloques"> & {
+  secciones: DocumentoCotizacion["opciones"]["secciones"];
+};
+
+export const textosDelDocumento = (doc: DocumentoCotizacion): TextosGuardados => ({
+  projectName: doc.projectName,
+  objetivo: doc.objetivo,
+  bloques: doc.bloques,
+  secciones: doc.opciones.secciones,
+});
+
+export const documentoConTextos = (doc: DocumentoCotizacion, { secciones, ...textos }: TextosGuardados): DocumentoCotizacion => ({
+  ...doc,
+  ...textos,
+  opciones: { ...doc.opciones, secciones },
+});
+
+/** Sin texto escrito en el 01 ni en el 02: lo de un paquete no cuenta, lo pone el paquete. */
+export const sinTextosPropios = (doc: DocumentoCotizacion): boolean =>
+  !doc.objetivo.intro.trim() &&
+  !doc.objetivo.cierre.trim() &&
+  !doc.objetivo.beneficios.some((b) => b.texto.trim()) &&
+  !doc.bloques.some((b) => !esBloqueDePaquete(b));
+
+/**
+ * Pone lo redactado en el documento: reemplaza el 01 y el 02, y enciende las dos secciones, porque
+ * quien lo pidió quiere verlas. Un título ya escrito se respeta y lo de un paquete se queda, porque
+ * el paquete lo reescribe al volver a aplicarlo.
+ */
+export function documentoConRedaccion(doc: DocumentoCotizacion, r: TextosRedactados): DocumentoCotizacion {
+  return {
+    ...doc,
+    projectName: doc.projectName.trim() ? doc.projectName : (r.proyecto ?? ""),
+    objetivo: { intro: r.objetivo.intro, beneficios: itemsDesdeTextos(r.objetivo.beneficios), cierre: r.objetivo.cierre },
+    bloques: [...r.bloques.map((b) => nuevoBloque(b)), ...doc.bloques.filter(esBloqueDePaquete)],
+    opciones: { ...doc.opciones, secciones: { ...doc.opciones.secciones, objetivo: true, alcance: true } },
+  };
+}
 
 export const hoyISO = (hoy = new Date()) => {
   const d = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60_000);
