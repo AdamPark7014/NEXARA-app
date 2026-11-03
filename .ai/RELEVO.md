@@ -1,5 +1,42 @@
 # RELEVO
 
+- **03-11 (claude-code) — Revisados los 12 servicios con `withTenantBypassAsync(() => prisma…)`: casi todos aciertan porque su consulta ya lleva la empresa; se corrigieron cuatro fallas (`1fafe3ea`). En producción. Sin migración. El tráfico del sitio queda igual: decisión de Adam.**
+  - **Por qué casi todo acierta sin que el contexto funcione:** una consulta devuelta sin esperar corre con el filtro de la petición, pero el filtro respeta un `where` que ya trae `companyId`. No respeta dos casos: la llave `companyId_section`, cuya empresa reemplaza, y un `create` con `companyId: null`, al que le pone la suya. Un `update` por `{ id }` tampoco lleva empresa y se la pone también.
+  - **Las rutas públicas no validan la sesión:** no llevan guardia, así que `req.user` no existe y `resolveForUser` acepta el `X-Company-Id` de cualquiera. Con sesión de otra empresa o solo con la cabecera sale lo mismo. Sin nada, la empresa es la principal. Ni el sitio ni sus formularios mandan esa cabecera, y `PUBLIC_COMPANY_ID` no está definida en producción: ninguna de estas fallas le ha pasado a nadie por usar la web.
+  - **Tabla por servicio.** (a) consulta devuelta sin esperar, filtro puesto; (b) `async` que espera adentro o `Promise.all`, sin filtro. `resolvePublicCompanyId` es (b) en todos, y `CompanyProfile` no está aislado de todos modos.
+    | Servicio y uso | Forma | Sin sesión | Cabecera de otra empresa | Quedó |
+    |---|---|---|---|---|
+    | `analytics` evento público | (a) `create`, `companyId: null` | En la principal, no «sin empresa» | En la de la cabecera | **Falla, sin corregir** |
+    | `analytics` resumen | (a) SQL crudo, el filtro no lo toca | Vacío: busca `companyId IS NULL` | Vacío | **Falla, sin corregir** |
+    | `case-studies`, `news`, `projects` | (a) con empresa; (b) con `limit` | Bien | Bien | Sin cambio |
+    | `clients` | (a) con empresa; (b) con `limit` | Bien | Bien | Sin cambio |
+    | `contact-messages` | (a) `create` con empresa | Bien | Bien, en la del sitio | Sin cambio |
+    | `hero-slides`, `hero-video` | (a) con empresa | Bien | Bien | Sin cambio |
+    | `kb` lecturas | (a) con empresa | Bien | Bien | Sin cambio |
+    | `kb` «útil» y vistas | `update` por `id`, fuera del contexto | Bien | No contaba, sin error | **Corregido** |
+    | `newsletter` alta | (a) `create` con empresa | Bien | Bien, en la del sitio | Sin cambio |
+    | `newsletter` ya suscrito | (a) `update` por `id` | Bien | 201 vacío, sin actualizar | **Corregido** |
+    | `page-content` publicado | (a) llave `companyId_section` | Bien | Contenido y borrador de esa empresa, o 404 | **Corregido** |
+    | `users` | (a) sobre `CompanyProfile` | Bien | Bien | Sin cambio |
+  - **Con `PUBLIC_COMPANY_ID` en otra empresa, sin sesión, fallaba lo mismo:** `page-content` servía la principal, y `newsletter` y `kb` no escribían. Ya no.
+  - **Arreglo:** `page-content` con `async () => { return await … }`, igual que `desdeElEnlace`. `newsletter` y `kb` con la empresa en el `where` del `update`, no con un contexto sin filtro: así no cambian los avisos ni la auditoría. La función compartida no cambió; solo lleva un comentario.
+  - **La función compartida conviene dejarla así.** Medida con la función corregida solo en un `dist` de prueba: ninguna lectura de estos servicios enseña dos empresas, pero el evento `entity:updated` de contacto, newsletter y cada visita al sitio iría a todos los conectados en vez de a una empresa, y la auditoría de contacto perdería la IP. El tráfico pasaría a «sin empresa» y su resumen se vería con `bi.view` de cualquier empresa.
+  - **Decisión pendiente de Adam, sin tocar: el tráfico del sitio.** Nadie lee esas filas: ni la web ni las apps llaman `public-analytics/summary` ni `analytics/kpi`. Están todas en la empresa principal, y el resumen da vacío. Recomendación: dejarlas ahí, que el resumen lea las de la empresa de la sesión y que el evento use la del sitio. Así no se amplía nada, no hace falta migrar y una cabecera deja de poder meter filas en otra empresa. El comentario de `KpiSnapshot.companyId` en el esquema dice lo contrario y cambiaría con eso.
+  - **Verificado:**
+    - `AppModule` real, HTTP real y Postgres desechable con dos empresas, 25 rutas en tres escenarios, antes y después, también con `PUBLIC_COMPANY_ID`. Solo cambió lo de la tabla, sin errores 5xx.
+    - `bypass-consultas-perezosas.spec.ts`, con simulacros perezosos: 4 fallaban sin el arreglo, por la razón esperada, y las 8 pasan. Ninguna prueba existente se cambió. API 5,504 y tipos en verde. CI completo en verde en `8716a480`, que lo contiene.
+    - En producción, sin sesión, `GET studio/page-content/page_home` con `X-Company-Id: 2` daba 404 antes del despliegue; ahora da 200 con el mismo cuerpo, byte a byte, que sin cabecera. Sin cabecera sigue idéntico a antes. Otras cuatro rutas públicas responden igual con y sin ella. El `dist` de `nexara-api` trae los tres cambios, y en los 15 minutos siguientes no hay `PrismaClientValidationError` en el registro.
+  - **Sin verificar:** en producción no se ejercieron `newsletter` ni «útil»: no hay suscriptores ni artículos, y suscribir a alguien de prueba escribiría también en Brevo. Quedan medidos solo en la base desechable.
+  - **Visto y sin tocar:**
+    - **`GET studio/page-content/:section` entrega a cualquiera `draftContent`, `updatedBy` y `publishedBy`.** Lo que Studio tenga sin publicar en el sitio público se puede leer sin sesión. Hoy ningún borrador difiere de lo publicado. La web solo usa `content`.
+    - **`TenantInterceptor`, sin sesión, acepta cualquier `X-Company-Id`.** Es la causa de fondo: toda ruta sin guardia que use la empresa de la petición la obedece. `users/public-team` lo hace a propósito y enseña el equipo de otra empresa con la cabecera.
+    - **`contacts:changed` manda el mensaje completo, con nombre y correo, a `SALA_PERSONAL`:** el personal de todas las empresas, no solo el de la que lo recibió.
+    - Una auditoría de `kb` o contacto con cabecera ajena queda con la empresa de la cabecera, no con la de la fila. Ya pasaba en contacto; en `kb` ahora también, porque antes no escribía nada.
+  - **Trampas:**
+    - Con `MSYS2_ARG_CONV_EXCL='*'` las rutas no se convierten: `git -C /c/dev/… show … > archivo` falla y deja el archivo vacío, y las pruebas fallan por la razón equivocada. Usar `C:/dev/…` y revisar que fallen solo las que deben.
+    - `newsletter.subscribe` esconde su propio error: el `TypeError` por `subscriber` nulo cae en el `catch` de Brevo y responde 201 vacío. Una falla ahí no da 500, se ve solo en la fila.
+    - `subscribe` pasa el correo a minúsculas: al buscar la fila en una prueba, también.
+
 - **03-11 ~12:10 (claude-code) — Los despliegues ya no cortan la web ni la API (`c6e3b480`, en producción).**
   - Medido con `up -d` a secas: web 502 unos 2 s; API 502 y luego 503 unos 21 s, porque el healthCheck de Traefik la saca
     y tarda en volver a meterla. Eran guardados y pantallas fallando en cada despliegue, varios al día.
