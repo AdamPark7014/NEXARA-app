@@ -19,7 +19,7 @@ const encargadoObra = { id: 7, nombre: 'Josué', roleKey: ROLES.ARQUITECTO, isAc
 
 describe('a quién se le puede pasar', () => {
   it('los encargados de área la reciben', () => {
-    for (const roleKey of [ROLES.ARQUITECTO, ROLES.COORD_OPERACIONES, ROLES.ADMINISTRATIVO, ROLES.ING_SOPORTE]) {
+    for (const roleKey of [ROLES.ARQUITECTO, ROLES.COORD_OPERACIONES, ROLES.ADMINISTRATIVO]) {
       expect(puedeRecibirCotizacion({ id: 1, roleKey })).toBe(true);
     }
   });
@@ -31,7 +31,7 @@ describe('a quién se le puede pasar', () => {
   });
 
   it('quien no cotiza, no la recibe', () => {
-    for (const roleKey of [ROLES.ING_CAMPO, ROLES.DISENADOR, ROLES.RH, ROLES.CLIENTE]) {
+    for (const roleKey of [ROLES.ING_CAMPO, ROLES.ING_SOPORTE, ROLES.DISENADOR, ROLES.RH, ROLES.CLIENTE]) {
       expect(puedeRecibirCotizacion({ id: 1, roleKey })).toBe(false);
     }
   });
