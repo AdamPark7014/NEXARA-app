@@ -1,5 +1,31 @@
 # RELEVO
 
+- **03-11 (claude-code) — Agregar un paquete y autoguardar ya no borran datos de las partidas (`0772edc8`). En producción. Sin migración: no se tocó nada de lo guardado.**
+  - **Qué pasaba:** guardar rehace todas las partidas y lo que no llega se borra. Era más de lo que decía la nota de la Ola 5: `POST cotizaciones/:id/paquetes` también borraba marca, modelo, imagen, número de partida, liga con CT, IEPS, retención y notas, y el editor dejaba fuera 20 columnas, no tres.
+  - **Por qué importaba:** `previewCtLines` pide `productCtId` más `supplierSku` o `sku`. Después de guardar partidas desde el editor, el pedido a CT decía que no hay partidas de catálogo.
+  - **Arreglo:** `agregarPaquete` pasa las filas completas a `update`, como ya hacía `pasarACotizacion`. El editor devuelve `CAMPOS_SIN_EDITAR` (`web/lib/cotizacion-documento.ts`). `supplierCode` entró al DTO: `items` lleva `@IsArray` sin `@ValidateNested`, así que ya pasaba, pero no estaba declarado.
+  - **Columna nueva en `cotizacion_items`:** `agregar-paquete.spec.ts` (contra `Prisma.CotizacionItemScalarFieldEnum`) y `cotizacion-documento.partidas.spec.ts` (contra `schema.prisma`) fallan hasta decidir qué pasa con ella.
+  - **Verificado:**
+    - Las pruebas nuevas fallaban antes del arreglo y pasan después; ninguna existente se cambió. API 5,484 y web 2,112 en verde, tipos en verde, CI completo en verde en `0772edc8`, con iOS y Android.
+    - Postgres desechable, módulos reales de Nest y funciones reales de la web: paquete, autoguardado con el `ValidationPipe` real y los dos seguidos. Las filas quedan idénticas salvo lo editado, y abrir sin tocar no manda nada.
+    - Sobre todas las partidas reales, sin escribir y dentro del servidor: el cálculo nuevo no cambia ninguna columna ni importe por ninguno de los dos caminos. El viejo les quitaba el costo y el modelo a casi todas.
+    - Con la API ya desplegada: `agregarPaquete` sobre cada cotización real con las escrituras interceptadas, sin fallas ni diferencias, y la huella md5 de `cotizacion_items` igual antes y después. El bundle desplegado de la web trae la lista de campos.
+  - **Sin verificar:** nadie ha agregado un paquete ni editado una partida ligada a CT en la pantalla real con este código. Una pestaña abierta con el bundle anterior sigue perdiendo datos hasta recargar.
+  - **Lo que este arreglo deja a la vista:**
+    - Con costo y margen, `normalizeItems` recalcula el precio al guardar, también en las filas conservadas. Hoy ninguna partida real difiere de ese cálculo, y todos los caminos de escritura pasan por ahí.
+    - IEPS y retención ya no se borran, pero `totalesDePartidas` de la web no los cuenta: una partida con ellos enseñaría en el editor un total menor que el del PDF. Hoy ninguna los trae y el editor no los captura.
+    - Una partida ligada a CT sigue ligada aunque le reescriban el modelo, y el pedido usaría la clave original. Antes el primer guardado cortaba la liga.
+    - La nota «Sin precio: capturarlo antes de enviar» ya no se borra al capturar el precio. Nadie la imprime.
+  - **Decisión pendiente de Adam, sin tocar:**
+    - **Enlace de firma:** `cotizaciones/public/:token` responde 401 sin sesión, porque `UrlAccessGuard` está en todo el controlador: el cliente no podría abrir el enlace del correo. Y `getPublicByToken` devuelve `items` completos, con costo, margen y proveedor. Arreglar solo el 401 le enseñaría el costo al cliente: van juntos. Hoy todas las cotizaciones siguen en borrador, así que no le ha pasado a nadie.
+    - **`publicToken`:** sale en `GET cotizaciones/:id`, en `detalleCore` y en lo demás que devuelve la fila. Ni la web ni las apps lo leen, así que quitarlo no rompe nada. Con él, alguien del equipo podría firmar o rechazar como si fuera el cliente en cuanto el enlace funcione.
+    - **`partidas-frecuentes`:** mismo permiso (`COTIZACIONES_ACCESS`) y misma empresa que `GET cotizaciones/:id`, que ya da esos costos: no abre nada nuevo, solo lo facilita. No trae margen, pero sale de costo y precio. Cambiarlo solo aquí no serviría; va con la decisión pendiente de `ing_soporte` de la Ola 5.
+  - **Visto y sin tocar:** `partidasDeFilas` (`cotizar-ia.ts`) no pasa `productCtId` y esas filas no traen `supplierSku`: lo que sale de «Cotizar con IA» nace sin liga con CT.
+  - **Trampas:**
+    - Con `core.autocrlf=true`, `git archive` saca CRLF aunque el repositorio guarde LF. `git hash-object --path` lo normaliza; revisar `git diff --numstat` antes de subir.
+    - Arnés de punta a punta: `createApplicationContext` con `CotizacionesModule` necesita los módulos globales que da `AppModule` (`CoreModule`, `EmailModule`, `ExcelModule`, `FolioModule`, `DomainEventsModule`, `JobsModule`, `ObservabilityModule`, `PacModule`, `RealtimeModule`).
+    - Para probar código sobre datos reales sin sacarlos ni escribir: `esbuild --bundle` y `docker exec -i -w /app/apps/api nexara-api node -` por entrada estándar, imprimiendo solo conteos. No arranca Nest, así que no duplica crons.
+
 - **03-11 (claude-code) — Programa Velocidad Core, Ola 5: Luis Joel ya revisa por encargo; Dirección, Mi área, Obra y la cotización abierta visibles desde el 03-11, con el sí de Adam (`f04f37d2`, `45c8b3ec`, `86300b66`, `df8497c7`, `2b07685f`, `9e8a4583`).**
   - Adam aprobó con «Sí, arranca Ola 5» y «Sí, constrúyelo». Eligió a Luis Joel para revisar a Daniela, Mónica y Paulina. No contestó si quien recibe una cotización ve costo y margen: se tomó la recomendación, que no los ve, y se le dijo.
   - **Ya activo, sin bandera:** `revisores_evidencia` (`me/revision-evidencias.ts`). La evidencia de esas personas le llega a Luis Joel sin moverlas de organigrama; lo usan `pendingReviews`, los avisos, las escaladas y `ceo-brief`.
