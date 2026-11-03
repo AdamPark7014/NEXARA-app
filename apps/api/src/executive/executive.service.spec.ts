@@ -98,6 +98,27 @@ describe('ExecutiveService.getCLevelDashboard · indicadores de cobranza, saldos
   });
 });
 
+describe('ExecutiveService · alertas', () => {
+  it('una sola se dice en singular', () => {
+    const alertas = (new ExecutiveService({} as any) as any).buildAlerts({
+      revenueMoMChange: 0, otOverdue: 1, overdueInvoices: 1, lowStockCount: 1, hotLeads: 0, upcomingVisits: 1,
+    });
+    expect(alertas.map((a: any) => a.message)).toEqual([
+      '1 orden de trabajo vencida requiere atención',
+      '1 factura pendiente de cobro',
+      '1 insumo en nivel crítico',
+      '1 visita de mantenimiento en los próximos 30 días',
+    ]);
+  });
+
+  it('varias, en plural', () => {
+    const alertas = (new ExecutiveService({} as any) as any).buildAlerts({
+      revenueMoMChange: 0, otOverdue: 3, overdueInvoices: 0, lowStockCount: 0, hotLeads: 0, upcomingVisits: 0,
+    });
+    expect(alertas[0].message).toBe('3 órdenes de trabajo vencidas requieren atención');
+  });
+});
+
 describe('ExecutiveService · la cadena del negocio', () => {
   /** Responde cada conteo según el modelo y el filtro. Lo demás, vacío. */
   function prismaConConteos(conteo: (modelo: string, where: any) => number, cobrado = 0) {
