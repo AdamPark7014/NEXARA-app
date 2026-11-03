@@ -2052,6 +2052,22 @@ model AttendanceCorrection {
 /// Salida de jornada que se deshizo (Adam, 02-11-2026): la propia persona dentro de 10 minutos o su
 /// jefe el mismo día, con motivo. La fila sale de `Attendance` porque de ahí se calcula la nómina, y
 /// aquí queda todo lo que tenía y lo que se regresó: esta tabla es la bitácora.
+/// Cuánto tomó de verdad, dicho por quien la ejecutó. Solo enseña a los tiempos: nómina, KPIs y semáforo leen el reloj.
+model ActividadTiempoDicho {
+  id         Int      @id @default(autoincrement())
+  companyId  Int
+  activityId Int      @unique
+  userId     Int
+  minutos    Int
+  /// Lo que decía el reloj al contestar.
+  relojMin   Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("actividad_tiempo_dicho")
+}
+
 model SalidaDeshecha {
   id                 Int      @id @default(autoincrement())
   companyId          Int

@@ -326,6 +326,26 @@ export class ActivitiesController {
     return this.activitiesService.update(+id, updateActivityDto, actor, companyId);
   }
 
+  /** Cuánto tomó de verdad. Guard amplio a propósito: solo quien la ejecutó, lo decide el servicio. */
+  @Post(':id/tiempo-dicho')
+  @UseGuards(RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.ACTIVITIES_MANAGE,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.CONSOLE_ADMIN,
+    ],
+  })
+  decirTiempo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { minutos?: number },
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.activitiesService.decirTiempo(id, body?.minutos, user?.id ? { id: user.id } : undefined, companyId);
+  }
+
   /**
    * Cancelar con motivo (mín. 10 caracteres). Guard amplio a propósito: quién puede (superiores de
    * quien la ejecuta, incluido un encargado sin ACTIVITIES_MANAGE) lo decide el servicio.
