@@ -5,21 +5,7 @@ import styles from "./PDFViewer.module.css";
 import { triggerBlobDownload, triggerFileDownload } from "@/lib/file-download";
 import { isCapacitorNative } from "@/lib/capacitor-env";
 import { openExternalUrl } from "@/lib/open-external-url";
-
-type PdfJs = typeof import("pdfjs-dist");
-
-/** pdf.js se carga una vez en el navegador (worker en `public/`, v3.11.174). */
-let pdfjsCargado: Promise<PdfJs> | null = null;
-function cargarPdfJs(): Promise<PdfJs> {
-  if (!pdfjsCargado) {
-    pdfjsCargado = import("pdfjs-dist").then((m) => {
-      const pdfjs = ((m as unknown as { default?: PdfJs }).default ?? m) as PdfJs;
-      pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
-      return pdfjs;
-    });
-  }
-  return pdfjsCargado;
-}
+import { cargarPdfJs, MENSAJE_WORKER_ATORADO, workerAtorado, type PdfJs } from "@/lib/pdfjs-navegador";
 
 const HEIGHT_PRESETS: Record<string, string> = {
   "400px": styles.viewerH400,
@@ -67,6 +53,8 @@ export default function PDFViewer({
 
   const pagesHostRef = useRef<HTMLDivElement>(null);
   const paintGen = useRef(0);
+  /** pdf.js guardó el fallo de su worker: reintentar solo sirve recargando la página. */
+  const atorado = useRef(false);
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -168,8 +156,9 @@ export default function PDFViewer({
       setLoading(false);
     } catch (e) {
       if (gen !== paintGen.current) return;
+      atorado.current = workerAtorado(e);
       const msg = e instanceof Error ? e.message : "error de visor";
-      setError(msg);
+      setError(atorado.current ? MENSAJE_WORKER_ATORADO : msg);
       setLoading(false);
       host.replaceChildren();
     } finally {
@@ -273,7 +262,7 @@ export default function PDFViewer({
           <div className={styles.error} role="alert">
             <p className={styles.errorText}>No se pudo previsualizar el PDF: {error}</p>
             <div className={styles.errorActions}>
-              <button type="button" className={styles.errorOpenBtn} onClick={() => void paint()}>
+              <button type="button" className={styles.errorOpenBtn} onClick={() => (atorado.current ? window.location.reload() : void paint())}>
                 Reintentar
               </button>
               <button
