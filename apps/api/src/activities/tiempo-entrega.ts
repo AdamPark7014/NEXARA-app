@@ -129,6 +129,16 @@ export function cantidadDelTitulo(texto: string | null | undefined): number | nu
   return Number.isInteger(n) && n > 0 && n <= 500 ? n : null;
 }
 
+/**
+ * La lectura dice «1» aunque el título no cuente nada («Reporte fotográfico de biblioteca» salía en
+ * 20 min): ese 1 no es una cantidad, y sin cantidad manda lo aprendido. Sí lo es «Instalar una cámara».
+ */
+export function cantidadCreible(cantidad: number | null | undefined, texto: string | null | undefined): number | null {
+  const c = cantidad && cantidad > 0 ? Math.round(cantidad) : null;
+  if (c == null || c > 1) return c;
+  return cantidadDelTitulo(texto) === 1 || /\b(un|una|uno)\b/.test(normalizar(texto)) ? 1 : null;
+}
+
 const redondeo5 = (min: number) => Math.max(5, Math.round(min / 5) * 5);
 
 /** Palabras que dicen qué se cuenta, por clave de unidad de la tabla. */
@@ -159,9 +169,10 @@ export function unidadDelTitulo(regla: ReglaEstandar, texto: string | null | und
  */
 export function estandarDeLectura(
   tipoGuardado: TipoActividad & { titulo?: string | null; indicaciones?: string | null },
-  lectura: LecturaTitulo,
+  lecturaCruda: LecturaTitulo,
   opciones: OpcionesEstandar = {},
 ): EstandarCalculado {
+  const lectura = { ...lecturaCruda, cantidad: cantidadCreible(lecturaCruda.cantidad, `${tipoGuardado.titulo ?? ''} ${tipoGuardado.indicaciones ?? ''}`) };
   const base = estandarSinTope(tipoGuardado, lectura, opciones);
   const queda = opciones.quedaDeJornadaMin;
   // Lo que el título cuenta sigue la tarifa, y una junta dura lo que diga su agenda.
