@@ -257,6 +257,12 @@ export class MotorMaqueta {
   /** Hasta que lleguen las texturas no se pinta: el piso se vería negro un instante. */
   private texturasOk = false;
   private esperandoTexturas = false;
+  /**
+   * Compilando los programas de la GPU. Con Direct3D cada uno tarda medio segundo: hechos al pintar, la
+   * primera vez congelaban la página más de 30 s. Así se hacen aparte y la página sigue respondiendo.
+   */
+  private compilando = false;
+  private volverACompilar = false;
   private ancho = 900;
   private alto = 640;
   private primeraVista = true;
@@ -467,6 +473,7 @@ export class MotorMaqueta {
       else if (a?.verDesde) this.salirDeCamara();
     }
     this.previo = d;
+    if (!a || cambioCatalogo || a.capas.noche !== d.capas.noche) void this.compilar();
     if (!this.texturasOk && !this.esperandoTexturas) {
       this.esperandoTexturas = true;
       const listo = () => {
@@ -487,6 +494,35 @@ export class MotorMaqueta {
       this.vistaGeneral(false);
     }
     this.pintarMuros();
+    this.invalidar();
+  }
+
+  /** Lo nuevo se compila sin detener la página; mientras, se queda el último cuadro. */
+  private async compilar() {
+    if (this.compilando) {
+      this.volverACompilar = true;
+      return;
+    }
+    this.compilando = true;
+    const r = this.renderer;
+    const antes = r.getRenderTarget();
+    try {
+      // Los programas dependen de a dónde se pinta: se piden para el mismo destino que usa el compositor.
+      r.setRenderTarget(this.composer.readBuffer);
+      const listo = r.compileAsync(this.escena, this.camara);
+      r.setRenderTarget(antes);
+      await listo;
+    } catch {
+      // Si algo no compila, el error real sale al pintar.
+      r.setRenderTarget(antes);
+    }
+    this.compilando = false;
+    if (this.destruido) return;
+    if (this.volverACompilar) {
+      this.volverACompilar = false;
+      void this.compilar();
+      return;
+    }
     this.invalidar();
   }
 
@@ -1369,7 +1405,7 @@ export class MotorMaqueta {
       this.renderer.shadowMap.needsUpdate = true;
       this.invalidar();
     }
-    if (!this.texturasOk) return;
+    if (!this.texturasOk || this.compilando) return;
     if (this.sucio) {
       this.sucio = false;
       this.pendienteCalidad = true;
