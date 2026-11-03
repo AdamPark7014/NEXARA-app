@@ -2720,3 +2720,22 @@ select.celda {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.referencias > summary {
+  font-size: var(--ui-fs-label);
+  font-weight: 600;
+  color: var(--ui-fg-2);
+  cursor: pointer;
+}
+
+.referenciasAyuda {
+  margin: var(--ui-s1) 0 var(--ui-s2);
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
+
+.referenciasCampos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--ui-s2) var(--ui-s3);
+}

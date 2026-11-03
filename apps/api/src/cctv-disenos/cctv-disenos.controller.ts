@@ -166,7 +166,7 @@ export class CctvDisenosController {
   @HttpCode(200)
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
-  async pasarACotizacion(@Req() req: any, @Param('id', ParseIntPipe) id: number, @Body() cuerpo: { lineas?: unknown; nueva?: unknown }, @CurrentCompanyId() companyId: number | null) {
+  async pasarACotizacion(@Req() req: any, @Param('id', ParseIntPipe) id: number, @Body() cuerpo: { lineas?: unknown; nueva?: unknown; memoria?: unknown }, @CurrentCompanyId() companyId: number | null) {
     const actor = this.actor(req);
     await this.service.exigirAcceso(actor);
     return this.existencias.pasarACotizacion({ id: actor.id, email: actor.email, roleKey: actor.roleKey, nombre: req?.user?.nombre ?? null }, id, cuerpo, requireCompanyId(companyId));

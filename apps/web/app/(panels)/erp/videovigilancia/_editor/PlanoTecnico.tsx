@@ -160,6 +160,7 @@ export default function PlanoTecnico({
   resumen,
   grabacion,
   datos,
+  paraCliente,
 }: {
   raiz: Plano;
   plano: Plano;
@@ -170,6 +171,8 @@ export default function PlanoTecnico({
   resumen: ResumenDiseno | null;
   grabacion: Grabacion;
   datos: { proyecto: string; cliente: string | null; elaboro: string | null; fecha: string; version: number };
+  /** La revisión del sistema es para quien diseña: en la hoja que recibe el cliente no va. */
+  paraCliente?: boolean;
 }) {
   const dibujo = useMemo(() => construirDibujo(plano, coberturas), [plano, coberturas]);
   const cedula = useMemo(() => cedulaDeEquipos(raiz), [raiz]);
@@ -376,7 +379,8 @@ export default function PlanoTecnico({
         </g>
       </svg>
 
-      <div className={styles.lado}>
+      {/* Con muchos equipos la columna no cabe: se aprieta para que la carátula siga en la hoja. */}
+      <div className={`${styles.lado} ${cedula.filas.length > 8 ? styles.ladoDenso : ""}`}>
         <div className={styles.marca}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-nexara.png" alt="NEXARA" />
@@ -508,21 +512,23 @@ export default function PlanoTecnico({
             <p className={styles.tenue}>Se calcula al guardar, con muros y cámaras en el plano.</p>
           )}
         </section>
-        <section className={styles.bloque}>
-          <h3>Revisión del sistema</h3>
-          {revision.map((r) => (
-            <div key={r.titulo} className={styles.revision}>
-              <span className={r.ok ? styles.bien : styles.alerta} aria-label={r.ok ? "Bien" : "Por revisar"}>
-                {r.ok ? "✓" : "!"}
-              </span>
-              <span>
-                <b>{r.titulo}</b>
-                <br />
-                <span className={styles.tenue}>{r.detalle}</span>
-              </span>
-            </div>
-          ))}
-        </section>
+        {paraCliente ? null : (
+          <section className={styles.bloque}>
+            <h3>Revisión del sistema</h3>
+            {revision.map((r) => (
+              <div key={r.titulo} className={styles.revision}>
+                <span className={r.ok ? styles.bien : styles.alerta} aria-label={r.ok ? "Bien" : "Por revisar"}>
+                  {r.ok ? "✓" : "!"}
+                </span>
+                <span>
+                  <b>{r.titulo}</b>
+                  <br />
+                  <span className={styles.tenue}>{r.detalle}</span>
+                </span>
+              </div>
+            ))}
+          </section>
+        )}
         <div className={styles.caratula}>
           <div className={styles.ancho}>
             <small>Proyecto</small>

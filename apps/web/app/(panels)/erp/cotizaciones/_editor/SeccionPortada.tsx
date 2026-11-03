@@ -11,6 +11,7 @@ import { clientSectorsForUser } from "@/lib/client-sectors";
 import { getClientPermissions, listSalesClients, type SalesClient } from "@/lib/sales-api";
 import { SEGMENTOS, SEGMENTO_LABEL, type Segmento } from "@/lib/cotizaciones-api";
 import type { DocumentoCotizacion } from "@/lib/cotizacion-documento";
+import { CAMPOS_REFERENCIA } from "@/lib/cotizacion-personalizacion";
 import { Ayuda, Campo, Hoja, Segmentado, TextoAuto } from "./campos";
 import PuntosPortada from "./PuntosPortada";
 import type { BloqueAlcance } from "@/lib/cotizaciones-api";
@@ -380,6 +381,26 @@ export default function SeccionPortada({
             </span>
           </Campo>
         </div>
+        <details className={styles.referencias} open={Object.keys(doc.opciones.referencias ?? {}).length > 0 || undefined}>
+          <summary>Referencias del cliente</summary>
+          <p className={styles.referenciasAyuda}>Para clientes que piden su número de requerimiento o de orden de compra. Solo se imprime lo que captures.</p>
+          <div className={styles.referenciasCampos}>
+            {CAMPOS_REFERENCIA.map(({ clave, etiqueta }) => (
+              <Campo key={clave} etiqueta={etiqueta} htmlFor={`cot-ref-${clave}`}>
+                <Input
+                  id={`cot-ref-${clave}`}
+                  value={doc.opciones.referencias?.[clave] ?? ""}
+                  maxLength={120}
+                  disabled={!editable}
+                  onChange={(e) => {
+                    const valor = e.target.value;
+                    cambiar((d) => ({ ...d, opciones: { ...d.opciones, referencias: { ...d.opciones.referencias, [clave]: valor } } }));
+                  }}
+                />
+              </Campo>
+            ))}
+          </div>
+        </details>
         <div className={styles.campo}>
           <span className={styles.etiquetaConAyuda}>
             <span className={styles.etiqueta}>Segmento</span>

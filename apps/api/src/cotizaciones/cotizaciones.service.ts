@@ -77,6 +77,7 @@ import {
   contenidoDesdeCotizacion,
   normalizarContenidoPlantilla,
   normalizarOpciones,
+  opcionesAlGuardar,
 } from './personalizacion.js';
 import { leerObjetivo, objetivoDePropuesta } from './objetivo-plantilla.js';
 import { puntosPorOmision } from './alcance-por-omision.js';
@@ -898,7 +899,7 @@ export class CotizacionesService {
       marginPercent: dto.marginPercent !== undefined ? this.margenGeneralDe(dto.marginPercent) : undefined,
       conIva: dto.conIva !== undefined ? dto.conIva !== false : undefined,
       note: dto.note?.trim(),
-      opciones: dto.opciones ? (normalizarOpciones(dto.opciones) as unknown as Prisma.InputJsonValue) : undefined,
+      opciones: dto.opciones ? (opcionesAlGuardar(dto.opciones, existing?.opciones) as unknown as Prisma.InputJsonValue) : undefined,
     };
 
     const status = normalizeStatus(dto.status);

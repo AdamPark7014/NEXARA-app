@@ -10,6 +10,7 @@
  *
  * Módulo puro (sin Nest ni Prisma): lo usan el servicio, la vista previa y la API de mentira.
  */
+import { normalizarMemoria, type MemoriaDiseno } from './memoria-diseno.js';
 import { normalizarBloques } from './alcance-bloques.js';
 import { normalizarSegmento, type Segmento } from './terminos-segmento.js';
 
@@ -23,6 +24,8 @@ export type Firmante = { nombre: string; cargo?: string };
 export type CondicionesComerciales = { formaPago: string; tiempoEntrega: string; garantia: string; vigencia: string };
 
 /** Lo que se guarda en `Cotizacion.opciones`. */
+export type ReferenciasCliente = Partial<Record<'proyecto' | 'region' | 'ritm' | 'requerimiento' | 'sp' | 'oc', string>>;
+
 export type OpcionesCotizacion = {
   secciones: SeccionesOpcionales;
   columnas: ColumnasOpcionales;
@@ -35,6 +38,10 @@ export type OpcionesCotizacion = {
   /** `null` = el autor de la cotización, con su puesto. */
   elaboro: Firmante | null;
   autorizo: (Firmante & { userId?: number | null }) | null;
+  /** Datos que pide el cliente en su propio formato; solo se imprime lo capturado. */
+  referencias?: ReferenciasCliente;
+  /** La foto del diseño de cámaras, cuando la cotización viene del diseñador. */
+  memoria?: MemoriaDiseno;
 };
 
 export const SECCIONES_POR_OMISION: SeccionesOpcionales = {
@@ -94,8 +101,17 @@ export function normalizarOpciones(crudo: unknown): OpcionesCotizacion {
   const cargoCarta = texto(cartaCruda['cargo'], 120);
   const autorizo = firmante(o['autorizo']);
   const userId = Number(objeto(o['autorizo'])['userId']);
+  const r = objeto(o['referencias']);
+  const referencias: ReferenciasCliente = {};
+  for (const clave of ['proyecto', 'region', 'ritm', 'requerimiento', 'sp', 'oc'] as const) {
+    const valor = texto(r[clave], 120);
+    if (valor) referencias[clave] = valor;
+  }
+  const memoria = normalizarMemoria(o['memoria']);
 
   return {
+    ...(Object.keys(referencias).length ? { referencias } : {}),
+    ...(memoria ? { memoria } : {}),
     secciones: {
       objetivo: bandera(s['objetivo'], true),
       alcance: bandera(s['alcance'], true),
@@ -125,6 +141,17 @@ export function normalizarOpciones(crudo: unknown): OpcionesCotizacion {
     elaboro: firmante(o['elaboro']),
     autorizo: autorizo ? { ...autorizo, ...(Number.isInteger(userId) && userId > 0 ? { userId } : {}) } : null,
   };
+}
+
+/**
+ * Lo que llega del editor sobre lo guardado. El editor no maneja la memoria del diseño (la manda el
+ * diseñador), así que guardar desde ahí no la borra.
+ */
+export function opcionesAlGuardar(nuevas: unknown, guardadas: unknown): OpcionesCotizacion {
+  const opciones = normalizarOpciones(nuevas);
+  if (opciones.memoria) return opciones;
+  const memoria = normalizarMemoria(objeto(guardadas)['memoria']);
+  return memoria ? { ...opciones, memoria } : opciones;
 }
 
 /** Moneda de la cotización (`Cotizacion.currency`); cualquier otra cosa es MXN. */
@@ -268,7 +295,8 @@ export function contenidoDesdeCotizacion(
     depositPercent: quote.depositPercent ?? 0,
     currency: quote.currency ?? 'MXN',
     // La firma «Autorizó» es de esa cotización, no de la plantilla.
-    opciones: { ...normalizarOpciones(quote.opciones), autorizo: null, elaboro: null },
+    // Una plantilla sirve para otro cliente y otro sitio: no se lleva sus referencias ni su diseño.
+    opciones: (({ memoria: _memoria, referencias: _referencias, ...resto }) => ({ ...resto, autorizo: null, elaboro: null }))(normalizarOpciones(quote.opciones)),
     items: conPartidas
       ? (quote.items ?? []).map((i) => ({
           name: i['name'],

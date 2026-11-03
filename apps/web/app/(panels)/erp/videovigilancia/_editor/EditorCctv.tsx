@@ -1117,6 +1117,7 @@ export default function EditorCctv({
             disenoId={diseno.id}
             raiz={raiz}
             grabacion={meta.grabacion}
+            datos={{ proyecto: meta.nombre || diseno.nombre, cliente: diseno.clienteNombre, elaboro: diseno.creadoPor?.nombre ?? null, fecha: diseno.updatedAt, version: version.current }}
             cotizacionId={cotizacionId}
             disponibilidad={existencias.porClave}
             filas={catalogo.filas}

@@ -168,13 +168,13 @@ export function altaEnAlmacen(token: string, cuerpo: { marca: string; modelo: st
 
 export type ResultadoCotizacion = { cotizacionId: number; quoteNumber: string; creada: boolean; partidas: number; conservadas: number; sinPrecio: number };
 
-export function pasarACotizacion(token: string, disenoId: number, lineas: readonly LineaEnviar[], nueva: boolean): Promise<ResultadoCotizacion> {
-  return pedir(`cctv-disenos/${disenoId}/cotizacion`, token, { method: "POST", body: JSON.stringify({ lineas, nueva }) });
+export function pasarACotizacion(token: string, disenoId: number, lineas: readonly LineaEnviar[], nueva: boolean, memoria?: unknown): Promise<ResultadoCotizacion> {
+  return pedir(`cctv-disenos/${disenoId}/cotizacion`, token, { method: "POST", body: JSON.stringify({ lineas, nueva, memoria }) });
 }
 
 export function adjuntarPlanoACotizacion(token: string, disenoId: number, png: Blob, nombre: string): Promise<{ ok: true }> {
   const forma = new FormData();
-  forma.append("file", png, "plano.png");
+  forma.append("file", png, png.type === "image/jpeg" ? "plano.jpg" : "plano.png");
   forma.append("nombre", nombre);
   return pedir(`cctv-disenos/${disenoId}/cotizacion/plano`, token, { method: "POST", body: forma });
 }

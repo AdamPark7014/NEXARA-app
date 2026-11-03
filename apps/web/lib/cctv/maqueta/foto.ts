@@ -5,6 +5,8 @@
 import type { NivelConPlano } from "../niveles";
 import type { PoligonoCobertura } from "../visibilidad";
 import { MotorMaqueta } from "./motor";
+import { texturasListas } from "./texturas";
+import { Vector3 } from "three";
 
 export type NivelParaFoto = NivelConPlano & { coberturas: ReadonlyMap<string, PoligonoCobertura[]> };
 
@@ -66,6 +68,68 @@ export async function fotoDeMaqueta(niveles: readonly NivelParaFoto[], ancho = 1
       c.fillText(e.clave, x + 21, y + 13.5);
     }
     return final.toDataURL("image/jpeg", 0.9);
+  } finally {
+    motor.destruir();
+  }
+}
+
+/** Los nombres de las áreas sobre la foto, como en la maqueta: texto con halo y sin caja. */
+function conNombresDeAreas(motor: MotorMaqueta, nivel: NivelParaFoto, base: string, ancho: number, alto: number): Promise<string> {
+  const k = nivel.plano.escala.metrosPorPx;
+  return cargarImagen(base).then((img) => {
+    const final = document.createElement("canvas");
+    final.width = ancho;
+    final.height = alto;
+    const c = final.getContext("2d");
+    if (!c) return base;
+    c.drawImage(img, 0, 0);
+    c.font = "650 22px Inter, 'Segoe UI', Arial, sans-serif";
+    c.textAlign = "center";
+    c.textBaseline = "bottom";
+    for (const a of nivel.plano.areas ?? []) {
+      if (!a.nombre || !a.puntos.length) continue;
+      const cx = a.puntos.reduce((s, p) => s + p.x, 0) / a.puntos.length;
+      const cy = a.puntos.reduce((s, p) => s + p.y, 0) / a.puntos.length;
+      const p = motor.aPantalla(new Vector3(cx * k, 0.2, cy * k));
+      if (!p.visible) continue;
+      c.shadowColor = "rgba(8,12,18,.9)";
+      c.shadowBlur = 8;
+      c.fillStyle = "#fff";
+      c.fillText(a.nombre, p.x, p.y);
+    }
+    return final.toDataURL("image/jpeg", 0.88);
+  });
+}
+
+/** Las dos vistas que lleva la cotización: el sitio limpio y con la cobertura en el piso, desde el mismo punto. */
+export async function vistasParaCotizacion(niveles: readonly NivelParaFoto[], ancho = 1600, alto = 950): Promise<{ general: string; cobertura: string } | null> {
+  const arriba = niveles[niveles.length - 1];
+  if (!arriba) return null;
+  const lienzo = document.createElement("canvas");
+  lienzo.width = ancho;
+  lienzo.height = alto;
+  const motor = new MotorMaqueta(lienzo);
+  try {
+    motor.medir(ancho, alto);
+    const datos = (cobertura: boolean) => ({
+      plano: arriba.plano,
+      nivelId: arriba.nivel.id,
+      conexiones: [],
+      coberturas: arriba.coberturas,
+      elevacionM: arriba.nivel.elevacionM,
+      debajo: niveles.slice(0, -1),
+      seleccion: null,
+      verDesde: null,
+      capas: { cobertura, personas: true, noche: false, tamanoReal: false, translucidos: false, croquis: false, cableado: false },
+    });
+    motor.actualizar(datos(false));
+    // Sin esperar las texturas, el piso saldría negro; si tardan, mejor sin textura que nada.
+    await Promise.race([texturasListas(), new Promise((r) => setTimeout(r, 4000))]);
+    motor.vistaGeneral(false, 1.01);
+    const general = await conNombresDeAreas(motor, arriba, motor.captura(ancho, alto), ancho, alto);
+    motor.actualizar(datos(true));
+    const cobertura = await conNombresDeAreas(motor, arriba, motor.captura(ancho, alto), ancho, alto);
+    return { general, cobertura };
   } finally {
     motor.destruir();
   }
