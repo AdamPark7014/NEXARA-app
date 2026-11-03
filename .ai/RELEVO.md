@@ -33,7 +33,7 @@
     - **Deshacer de punta a punta** con `register` y servicios reales en una base temporal, ya borrada: sale «No cumplida» y regresa, relojes reabiertos solo en la propia, segunda salida sin choque, ajeno rechazado.
     - **Android, recorrido en el emulador** contra una API simulada, sin arnés versionado: Mi día, cámara directa, envío solo, las 4 fotos de corrido, avance solo, «Regresar a fotos», hoja, salida con `confirmada: true`, deshacer con `consent: true`. Faltó completar la foto final en el emulador: se atascó el teclado. Pruebas: 983 en verde.
     - **iOS:** `iOS · compilar (simulador)` en verde y capturas 84 a 86 contra el mockup, en modo demo.
-    - **API:** suites de asistencia, permisos y tenant en verde. **No se corrió la suite completa en local.** CI en verde en `6b1c5af8`, que contiene todo menos `9d46af45`, de iOS, que aún no compila en CI al escribir esto.
+    - **API:** suites de asistencia, permisos y tenant en verde. **No se corrió la suite completa en local.** CI en verde en `922a2bf8`, que contiene todo, con iOS compilado en el simulador.
   - **Sin verificar:** nada en un teléfono físico ni con la API real; la cámara del sistema real al checar; en iOS, la ráfaga y la cámara directa no se han ejecutado; la acción del jefe en la web no se ha usado con datos reales.
   - **Trampas:**
     - No insertes rutas antes de `@Patch(':id/correccion')` buscando esa línea: arriba están sus `@UseGuards`/`@RBAC` y le quitas los permisos. Pasó en esta copia y se detectó antes de subir.
