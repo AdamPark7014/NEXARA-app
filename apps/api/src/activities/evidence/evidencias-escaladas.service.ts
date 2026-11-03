@@ -4,7 +4,7 @@ import { runScheduledJob } from '../../common/cron/run-scheduled-job.js';
 import { WORKDAY_TIMEZONE } from '../../common/time/workday.js';
 import { NotificationsService } from '../../notifications/notifications.service.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { actividadCerradaParaRevision, esperaRevision, revisionEscalada } from '../../me/revision-evidencias.js';
+import { actividadCerradaParaRevision, conRevisores, esperaRevision, leerRevisores, revisionEscalada } from '../../me/revision-evidencias.js';
 import { armarEscaladas, textoEscalada } from './evidencias-escaladas.js';
 
 /** Una vez al día, a media mañana y de lunes a viernes. Reglas en `evidencias-escaladas.ts`. */
@@ -44,6 +44,9 @@ export class EvidenciasEscaladasService {
       }),
       this.prisma.user.findMany({ select: { id: true, managerId: true, nombre: true, isActive: true } }),
     ]);
+    // Quien revisa por encargo va en lugar de su jefe; por empresa, porque el organigrama es uno solo.
+    const revisores = (await Promise.all([...new Set(filas.map((f) => f.companyId))].map((c) => leerRevisores(this.prisma as never, c)))).flat();
+    const organigrama = conRevisores(personas, revisores);
     const enEspera = filas.filter(
       (f) =>
         revisionEscalada(f.correctionSubmittedAt ?? f.completedAt, ahora) &&
@@ -54,7 +57,7 @@ export class EvidenciasEscaladasService {
     let tarjetas = 0;
     for (const t of armarEscaladas(
       enEspera.map((f) => ({ duenoId: f.userId, companyId: f.companyId })),
-      personas,
+      organigrama,
     )) {
       const { title, message } = textoEscalada(t);
       await this.notifications.createNotification({

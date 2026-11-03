@@ -69,6 +69,8 @@ export const FORMATOS_ACTIVIDAD_URL_RULES: UrlRule[] = [
   { path: '/api/formatos-actividad/**', methods: ['GET', 'POST', 'PUT'], scope: 'write' },
   // Decir cuánto tomó de verdad: lo mismo, todo el personal; solo quien la ejecutó, lo decide el servicio.
   { path: '/api/activities/*/tiempo-dicho', methods: ['POST'], scope: 'write' },
+  // Ligar obra a un proyecto: lo mismo; quién puede lo decide `DireccionService`.
+  { path: '/api/me/obra/ligar', methods: ['POST'], scope: 'write' },
 ];
 
 /**

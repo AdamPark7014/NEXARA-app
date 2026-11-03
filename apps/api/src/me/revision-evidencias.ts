@@ -132,6 +132,32 @@ export function revisionParaTi(p: {
   return p.escalada && p.esJefeArriba;
 }
 
+/**
+ * Quien revisa la evidencia de alguien en lugar de su jefe, sin moverlo de organigrama (Adam, 03-11: Luis
+ * Joel por Daniela, Mónica y Paulina, para que a Christian no le lleguen). Solo cambia la revisión:
+ * vacaciones, gastos y lo demás siguen con su jefe. Después del plazo sube al jefe de quien revisa.
+ */
+export type RevisorDeEvidencia = { userId: number; revisorId: number };
+
+export function conRevisores<T extends { id: number; managerId: number | null }>(usuarios: T[], revisores: RevisorDeEvidencia[]): T[] {
+  if (!revisores.length) return usuarios;
+  const revisorDe = new Map(revisores.map((r) => [r.userId, r.revisorId]));
+  return usuarios.map((u) => (revisorDe.has(u.id) ? { ...u, managerId: revisorDe.get(u.id) as number } : u));
+}
+
+/** Los revisores de la empresa. Sin la tabla o sin empresa: ninguno, y manda el organigrama. */
+export async function leerRevisores(
+  prisma: { revisorEvidencia?: { findMany: (args: never) => Promise<RevisorDeEvidencia[]> } },
+  companyId: number | null | undefined,
+): Promise<RevisorDeEvidencia[]> {
+  if (companyId == null) return [];
+  try {
+    return (await prisma.revisorEvidencia?.findMany({ where: { companyId }, select: { userId: true, revisorId: true } } as never)) ?? [];
+  } catch {
+    return [];
+  }
+}
+
 /** Jefes (managerId hacia arriba) de cada usuario, a partir de la lista id → managerId. */
 export function cadenasDeMando(
   usuarios: Array<{ id: number; managerId: number | null }>,

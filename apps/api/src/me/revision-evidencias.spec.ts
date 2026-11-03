@@ -2,6 +2,8 @@ import {
   actividadCerradaParaRevision,
   cadenaConResponsable,
   cadenasDeMando,
+  conRevisores,
+  leerRevisores,
   esperaRevision,
   ordenarPorEspera,
   reglaDeRevision,
@@ -226,5 +228,24 @@ describe('a quién le toca revisar (Adam, 01-11: Christian ve todo sin tener que
     const h = (ms: number) => Math.round(ms / 3_600_000);
     expect(h(msHabiles(new Date('2026-11-14T18:00:00Z'), new Date('2026-11-15T18:00:00Z')))).toBe(0);
     expect(h(msHabiles(new Date('2026-11-10T18:00:00Z'), new Date('2026-11-11T18:00:00Z')))).toBe(24);
+  });
+});
+
+describe('quien revisa por encargo', () => {
+  const org = [{ id: 1, managerId: null }, { id: 7, managerId: 1 }, { id: 38, managerId: 1 }, { id: 61, managerId: 8 }];
+
+  it('le toca a quien revisa, y al pasar el plazo sube a su jefe', () => {
+    const r = conRevisores(org, [{ userId: 38, revisorId: 7 }]);
+    expect(r.find((u) => u.id === 38)?.managerId).toBe(7);
+    expect(r.find((u) => u.id === 61)?.managerId).toBe(8);
+    expect([...(cadenasDeMando(r, [38]).get(38) ?? [])]).toEqual([7, 1]);
+    expect(org.find((u) => u.id === 38)?.managerId).toBe(1);
+  });
+
+  it('sin revisores manda el organigrama, y si la tabla falla también', async () => {
+    expect(conRevisores(org, [])).toBe(org);
+    await expect(leerRevisores({}, 1)).resolves.toEqual([]);
+    await expect(leerRevisores({ revisorEvidencia: { findMany: async () => { throw new Error('sin tabla'); } } }, 1)).resolves.toEqual([]);
+    await expect(leerRevisores({ revisorEvidencia: { findMany: async () => [{ userId: 38, revisorId: 7 }] } }, null)).resolves.toEqual([]);
   });
 });

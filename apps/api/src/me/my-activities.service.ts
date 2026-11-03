@@ -33,6 +33,8 @@ import {
   actividadCerradaParaRevision,
   revisionEscalada,
   revisionParaTi,
+  conRevisores,
+  leerRevisores,
   cadenaConResponsable,
   cadenasDeMando,
   esperaRevision,
@@ -655,7 +657,7 @@ export class MyActivitiesService {
     // Quien la creó ve todo, pero solo lectura (salvo que además sea superior de alguien).
     const esCreador = activity.creadoPorId === viewer.id;
     // Jefes por organigrama (managerId hacia arriba): el jefe de alguien también lo revisa.
-    const jefesDe = await this.managerChains(cadena.map((m) => m.userId));
+    const jefesDe = await this.managerChains(cadena.map((m) => m.userId), companyId);
     const { mine, soyEncargado, puedeRevisar } = reglaDeRevision({
       viewerId: viewer.id,
       todo,
@@ -966,7 +968,10 @@ export class MyActivitiesService {
    */
   async pendingReviews(viewer: TeamEvidenceViewer, companyId: number | null): Promise<RevisionesResponse> {
     const todo = revisaTodo(viewer);
-    const usuarios = await this.prisma.user.findMany({ select: { id: true, managerId: true, nombre: true } });
+    const usuarios = conRevisores(
+      await this.prisma.user.findMany({ select: { id: true, managerId: true, nombre: true } }),
+      await leerRevisores(this.prisma as never, companyId),
+    );
     const jefesDe = cadenasDeMando(
       usuarios,
       usuarios.map((u) => u.id),
@@ -1114,9 +1119,12 @@ export class MyActivitiesService {
   }
 
   /** Jefes (managerId hacia arriba) de cada usuario. */
-  private async managerChains(userIds: number[]): Promise<Map<number, Set<number>>> {
+  private async managerChains(userIds: number[], companyId?: number | null): Promise<Map<number, Set<number>>> {
     if (!userIds.length) return new Map();
-    const users = await this.prisma.user.findMany({ select: { id: true, managerId: true } });
+    const users = conRevisores(
+      await this.prisma.user.findMany({ select: { id: true, managerId: true } }),
+      await leerRevisores(this.prisma as never, companyId),
+    );
     return cadenasDeMando(users, userIds);
   }
 

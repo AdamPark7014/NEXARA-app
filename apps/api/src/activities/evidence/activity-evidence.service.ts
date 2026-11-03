@@ -39,6 +39,7 @@ import {
   type EvidenceStep,
 } from './evidence-flow.helpers.js';
 import PDFDocument from 'pdfkit';
+import { leerRevisores } from '../../me/revision-evidencias.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -164,6 +165,10 @@ export class ActivityEvidenceService {
       const jefe = submitter
         ? await this.prisma.user.findUnique({ where: { id: submitter.id }, select: { managerId: true } })
         : null;
+      // Quien revisa por encargo va en lugar de su jefe (`RevisorDeEvidencia`).
+      const revisor = submitter
+        ? (await leerRevisores(this.prisma as never, activity.companyId)).find((r) => r.userId === submitter.id)?.revisorId
+        : undefined;
       await this.notificationHierarchy.notifyEvidenceSubmitted(
         submitter?.id ?? activity.responsableId,
         activityId,
@@ -171,7 +176,7 @@ export class ActivityEvidenceService {
         submitter?.nombre || activity.responsable.nombre || 'Usuario',
         activity.anNumber,
         activity.responsableId,
-        [...leads.map((l) => l.userId), ...(jefe?.managerId ? [jefe.managerId] : [])],
+        [...leads.map((l) => l.userId), ...(revisor ? [revisor] : jefe?.managerId ? [jefe.managerId] : [])],
         correccion,
       );
     } catch {
