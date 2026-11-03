@@ -36,6 +36,17 @@ describe('matriz: alta y autoasignación de actividades', () => {
     expect(checkUrlAccess(role, '/api/me/obra/ligar', 'POST').allowed).toBe(true);
   });
 
+  it.each(PERSONAL)('%s llega a su cotización abierta; si le toca lo decide el servicio', (role) => {
+    expect(checkUrlAccess(role, '/api/activities/7/cotizacion-abierta', 'GET').allowed).toBe(true);
+    expect(checkUrlAccess(role, '/api/activities/7/cotizacion-abierta', 'PUT').allowed).toBe(true);
+    expect(checkUrlAccess(role, '/api/activities/7/cotizacion-abierta/cerrar', 'POST').allowed).toBe(true);
+  });
+
+  it('un cliente no llega a una cotización abierta', () => {
+    expect(checkUrlAccess(ROLES.CLIENTE, '/api/activities/7/cotizacion-abierta', 'GET').allowed).toBe(false);
+    expect(checkUrlAccess(ROLES.CLIENTE, '/api/activities/7/cotizacion-abierta', 'PUT').allowed).toBe(false);
+  });
+
   it('un cliente no liga obra a un proyecto', () => {
     expect(checkUrlAccess(ROLES.CLIENTE, '/api/me/obra/ligar', 'POST').allowed).toBe(false);
   });
