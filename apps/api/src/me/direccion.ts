@@ -272,7 +272,8 @@ const PALABRAS_DE_TRABAJO = new Set(
     'contactos mueble pasillo planta piso nivel area de del la el los las en y a al para por con sin un una se su sus que ' +
     'montado montaje montar site registro registros exterior exteriores interior interiores baja alta principal tendido tendida ' +
     'colocacion acomodo matado ahogado volado concreto prefabricado pulgada pulgadas numeracion trayectorias analisis tuberias racks ' +
-    'cableados antena amplificador amplificadora revision avances soporte telefonia configuracion documentacion'
+    'cableados antena amplificador amplificadora revision avances soporte telefonia configuracion documentacion ' +
+    'guia proyecto proyectos buenas mejoras practicas correccion'
   ).split(' '),
 );
 

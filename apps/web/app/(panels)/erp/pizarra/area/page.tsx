@@ -7,7 +7,7 @@
  */
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DashEmpty, DashHero, DashPage, DashPanel, DashSkeleton, StatStrip } from "@/components/dashboard/DashKit";
+import { DashCol, DashEmpty, DashGrid, DashHero, DashPage, DashPanel, DashSkeleton, StatStrip } from "@/components/dashboard/DashKit";
 import { useUser } from "@/components/UserContext";
 import InlineAlert from "@/components/ui/InlineAlert";
 import DataTable, { type Column } from "@/components/ui/DataTable";
@@ -86,9 +86,13 @@ export default function MiAreaPage() {
               { label: "Evidencias por revisar", value: datos.resumen.porRevisar, sub: <Link href="/erp/pizarra?vista=revision">Revisar</Link> },
             ]}
           />
-          <DashPanel title="Su gente" subtitle="Primero quien necesita algo">
-            <DataTable columns={columnas} rows={datos.gente} rowKey={(f) => f.id} ariaLabel="Su gente" stickyHeader={false} />
-          </DashPanel>
+          <DashGrid>
+            <DashCol span={12}>
+              <DashPanel title="Su gente" subtitle="Primero quien necesita algo">
+                <DataTable columns={columnas} rows={datos.gente} rowKey={(f) => f.id} ariaLabel="Su gente" stickyHeader={false} />
+              </DashPanel>
+            </DashCol>
+          </DashGrid>
         </>
       ) : null}
     </DashPage>
