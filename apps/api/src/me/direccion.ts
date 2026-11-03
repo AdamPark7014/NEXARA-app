@@ -273,7 +273,7 @@ const PALABRAS_DE_TRABAJO = new Set(
     'montado montaje montar site registro registros exterior exteriores interior interiores baja alta principal tendido tendida ' +
     'colocacion acomodo matado ahogado volado concreto prefabricado pulgada pulgadas numeracion trayectorias analisis tuberias racks ' +
     'cableados antena amplificador amplificadora revision avances soporte telefonia configuracion documentacion ' +
-    'guia proyecto proyectos buenas mejoras practicas correccion'
+    'guia proyecto proyectos buenas mejoras practicas correccion estructurado estructurada'
   ).split(' '),
 );
 
