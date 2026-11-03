@@ -1,5 +1,6 @@
 import { calcularEstandar, reglaDe } from '../ai/estandar/tabla-estandar.js';
 import {
+  cantidadCreible,
   cantidadDelTitulo,
   completarTiempos,
   entregaCalculada,
@@ -310,6 +311,18 @@ describe('tiempo: persona, parecidos y lo que queda de jornada (02-11)', () => {
       quedaDeJornadaMin: 30,
     });
     expect(r.totalMin).toBe(240);
+  });
+
+  it('un «1» de la lectura sin nada que lo diga en el título no cuenta como cantidad', () => {
+    expect(cantidadCreible(1, 'Reporte fotográfico de biblioteca')).toBeNull();
+    expect(cantidadCreible(1, 'Instalar una cámara')).toBe(1);
+    expect(cantidadCreible(1, 'Revisar 1 equipo')).toBe(1);
+    expect(cantidadCreible(4, 'Instalar cuatro cámaras')).toBe(4);
+    expect(cantidadCreible(null, 'Instalar 4 cámaras')).toBeNull();
+    const reporte = { coreKind: 'tarea', ticketTypeCustom: 'Reporte / documentación', titulo: 'Reporte fotográfico de biblioteca' };
+    expect(estandarDeLectura(reporte, { cantidad: 1 }, { personaTipo: { minutos: 240, veces: 6 } }).totalMin).toBe(240);
+    expect(estandarDeLectura(reporte, { cantidad: 1 }, { tipicoMin: 300 }).totalMin).toBe(300);
+    expect(estandarDeLectura({ ...reporte, titulo: 'Reporte de 2 sitios' }, { cantidad: 2 }, { personaTipo: { minutos: 240, veces: 6 } }).totalMin).toBe(40);
   });
 
   it('el título igual gana, y los parecidos lo dicen en el desglose', () => {
