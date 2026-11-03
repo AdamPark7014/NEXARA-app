@@ -214,7 +214,12 @@ export async function fotoDeModeloAPng(foto: string, lado = 320): Promise<string
   }
 }
 
-/** Lo que entrega el lienzo (`data:`) como archivo para subir. */
-export async function datosABlob(datos: string): Promise<Blob> {
-  return (await fetch(datos)).blob();
+/** Lo que entrega el lienzo (`data:`) como archivo para subir. Sin `fetch`: la política de Core no lo deja pedir `data:`. */
+export function datosABlob(datos: string): Blob {
+  const coma = datos.indexOf(",");
+  const tipo = /^data:([^;,]+)/.exec(datos)?.[1] ?? "application/octet-stream";
+  const crudo = atob(datos.slice(coma + 1));
+  const bytes = new Uint8Array(crudo.length);
+  for (let i = 0; i < crudo.length; i++) bytes[i] = crudo.charCodeAt(i);
+  return new Blob([bytes], { type: tipo });
 }

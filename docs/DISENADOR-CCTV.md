@@ -528,6 +528,7 @@ El PDF del cliente sigue siendo uno solo (`cotizaciones/cotizacion-formato-nexar
 - **Instalación:** el diseño no sabe cuánto cuesta. Se agrega sin precio y fuera del paquete `cctv:<id>`, para que actualizar no borre lo que capture quien cotiza. Si la cotización ya trae mano de obra no se duplica.
 - **Imágenes:** los nombres `NOMBRE_VISTA_3D`, `NOMBRE_VISTA_COBERTURA` y `NOMBRE_PLANO_TECNICO` deciden dónde va cada una, y están iguales en web y API. Actualizar reemplaza las del diseño; lo que alguien subió a mano se queda.
 - **Hoja técnica como imagen:** `elementoAPng` la dibuja con `foreignObject` en un SVG, con sus reglas de CSS y sus fuentes incrustadas. Si el navegador no puede, va solo el dibujo. Una variable de CSS sin valor debe quedar sin efecto: sustituirla por un gris pintó de gris la tabla de la cédula.
+- **Política de seguridad de Core:** `connect-src` no permite `data:`, así que un `fetch` a una imagen en `data:` falla solo en producción. Por eso `datosABlob` decodifica a mano.
 
 ## 8. Acceso
 

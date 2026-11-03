@@ -104,8 +104,8 @@ export default function PasarACotizacion({
     const { vistasParaCotizacion } = await import("@/lib/cctv/maqueta/foto");
     const vistas = await vistasParaCotizacion(calculo.niveles);
     if (!vistas) return;
-    await adjuntarPlanoACotizacion(token, disenoId, await datosABlob(vistas.general), NOMBRE_VISTA_3D);
-    await adjuntarPlanoACotizacion(token, disenoId, await datosABlob(vistas.cobertura), NOMBRE_VISTA_COBERTURA);
+    await adjuntarPlanoACotizacion(token, disenoId, datosABlob(vistas.general), NOMBRE_VISTA_3D);
+    await adjuntarPlanoACotizacion(token, disenoId, datosABlob(vistas.cobertura), NOMBRE_VISTA_COBERTURA);
   };
 
   const enviar = async (nueva: boolean) => {
