@@ -151,9 +151,11 @@ function Mosaico() {
     <section aria-label="Servicios" className={pn.mosaico}>
       <Baldosa
         ancha
+        oscura
+        lateral
         nombre="Videovigilancia."
         texto="Cobertura pensada por zona de riesgo y evidencia cuando se necesita."
-        foto={{ ...foto("muro-video-nexara", ancho), alt: "Centro de monitoreo con muro de video instalado por NEXARA", posicion: "center 2%" }}
+        foto={{ ...foto("muro-video-ancho", ancho), alt: "Centro de monitoreo con muro de video instalado por NEXARA", posicion: "center 45%" }}
         acciones={[
           { href: ruta("/servicios#cctv"), label: "Ver más", principal: true },
           { href: ruta("/contacto?servicio=cctv"), label: "Cotizar", medicion: "home_baldosa_cctv" },
@@ -162,7 +164,7 @@ function Mosaico() {
       <Baldosa
         nombre="Redes y Wi‑Fi."
         texto="Cableado certificado y Wi‑Fi que aguanta la hora pico."
-        foto={{ ...foto("campo-enlace-antena-ciudad", tam), alt: "Radioenlace de NEXARA sobre la ciudad", posicion: "center 70%" }}
+        foto={{ ...foto("campo-enlace-antena-ciudad", tam), alt: "Radioenlace de NEXARA sobre la ciudad", posicion: "30% 78%" }}
         acciones={[
           { href: ruta("/servicios#redes"), label: "Ver más", principal: true },
           { href: ruta("/contacto?servicio=redes"), label: "Cotizar", medicion: "home_baldosa_redes" },
@@ -269,7 +271,7 @@ export default async function Inicio() {
 
       <Mosaico />
 
-      <section className={s.seccion} aria-label="NEXARA en cifras">
+      <section className={`${s.seccion} ${pn.seccionCifras}`} aria-label="NEXARA en cifras">
         <div className={s.contenedor}>
           <ul className={pn.cifras}>
             {CIFRAS.map((c) => (

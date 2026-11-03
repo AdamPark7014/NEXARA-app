@@ -2,8 +2,7 @@
  * Sitio público NEXARA — sistema visual 2026.
  *
  * Una sola familia tonal por tema (blanco y gris niebla en claro; tinta profunda en
- * oscuro), un único azul de acción y un degradado de marca —los colores del isotipo—
- * reservado para el hero y el cierre. La jerarquía sale del tamaño de la letra, del
+ * oscuro), un único azul de acción y una luz azul reservada para el hero y el cierre. La jerarquía sale del tamaño de la letra, del
  * aire y de superficies del mismo tema. El tema lo fija `<html data-public-theme>`.
  */
 
@@ -16,8 +15,8 @@
   --tile-alt: #ffffff;
   --card: #ffffff;
   --sobre-tile: #ffffff;
-  --mapa-estado: #dae3ee;
-  --mapa-estado-hover: #c8d5e5;
+  --mapa-estado: #d3deeb;
+  --mapa-estado-hover: #bfcfe2;
   --mapa-borde: #ffffff;
   --mapa-halo: var(--bg);
   --fg: #0a2540;
@@ -33,7 +32,9 @@
   --btn-2-fg: #0a2540;
   --ok: #12a150;
   --rec: #e5484d;
-  --glass: rgba(255, 255, 255, 0.72);
+  --ok-texto: #0b7a3b;
+  --rec-texto: #c5262c;
+  --glass: rgba(255, 255, 255, 0.86);
   --glass-line: rgba(10, 37, 64, 0.08);
   --seg-bg: #edf1f6;
   --seg-on: #ffffff;
@@ -44,13 +45,13 @@
   --sombra-md: 0 2px 4px rgba(10, 37, 64, 0.04), 0 12px 32px -8px rgba(10, 37, 64, 0.14);
   --sombra-xl: 0 2px 6px rgba(10, 37, 64, 0.04), 0 30px 60px -12px rgba(50, 50, 93, 0.22),
     0 18px 36px -18px rgba(0, 0, 0, 0.26);
-  --degradado-texto: linear-gradient(92deg, #0060f0 0%, #0284c7 55%, #0891b2 100%);
-  --aurora-1: #7dd3fc;
-  --aurora-2: #5eead4;
-  --aurora-3: #a5b4fc;
-  --aurora-4: #fdba74;
-  --aurora-5: #f0abfc;
-  --aurora-opacidad: 0.85;
+  --degradado-texto: linear-gradient(92deg, #0060f0 0%, #0277d4 60%, #0284c7 100%);
+  --aurora-1: #9fd2fb;
+  --aurora-2: #b4e4fb;
+  --aurora-3: #b9c8fd;
+  --aurora-4: #cfe4fd;
+  --aurora-5: #d6dcfe;
+  --aurora-opacidad: 0.62;
 
   --font: var(--nx-font-ui), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
   --font-display: var(--sitio-display), var(--nx-font-ui), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -100,7 +101,9 @@
   --btn-2-fg: #f2f5f9;
   --ok: #3dd68c;
   --rec: #ff6369;
-  --glass: rgba(6, 11, 20, 0.72);
+  --ok-texto: #3dd68c;
+  --rec-texto: #ff6369;
+  --glass: rgba(6, 11, 20, 0.84);
   --glass-line: rgba(255, 255, 255, 0.07);
   --seg-bg: #0d1625;
   --seg-on: #1d2a3d;
@@ -110,13 +113,13 @@
   --sombra-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --sombra-md: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
   --sombra-xl: 0 30px 60px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
-  --degradado-texto: linear-gradient(92deg, #6cb4ff 0%, #5ad1f0 55%, #5eead4 100%);
-  --aurora-1: #0ea5e9;
-  --aurora-2: #14b8a6;
-  --aurora-3: #4f46e5;
-  --aurora-4: #f97316;
-  --aurora-5: #c026d3;
-  --aurora-opacidad: 0.5;
+  --degradado-texto: linear-gradient(92deg, #6cb4ff 0%, #66c4f5 60%, #5ad1f0 100%);
+  --aurora-1: #0b4fb3;
+  --aurora-2: #0c6a9c;
+  --aurora-3: #2f3fa8;
+  --aurora-4: #0b3a82;
+  --aurora-5: #24348f;
+  --aurora-opacidad: 0.42;
   color-scheme: dark;
 }
 
@@ -153,7 +156,7 @@
 
 .seccion {
   position: relative;
-  padding-block: clamp(96px, 11vw, 160px);
+  padding-block: clamp(72px, 8vw, 120px);
 }
 
 /* En las secciones gris niebla las tarjetas pasan a la superficie clara (y lo que va sobre ellas, a gris). */
@@ -183,10 +186,10 @@
 
 .titulo {
   font-family: var(--font-display);
-  font-size: clamp(36px, 4.6vw, 60px);
-  line-height: 1.06;
+  font-size: clamp(34px, 4vw, 54px);
+  line-height: 1.08;
   font-weight: 600;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
@@ -204,9 +207,9 @@
 }
 
 .lead {
-  margin-top: 22px;
-  max-width: 46ch;
-  font-size: clamp(18px, 1.55vw, 21px);
+  margin-top: 18px;
+  max-width: 50ch;
+  font-size: clamp(17px, 1.35vw, 20px);
   line-height: 1.5;
   letter-spacing: -0.012em;
   color: var(--fg-2);
@@ -347,7 +350,7 @@
 
 /* ── Aurora del hero ────────────────────────────────────────────────────── */
 
-/* Degradado vivo con los colores del isotipo, en una franja inclinada que se desvanece. */
+/* Luz azul, sin más colores, en una franja inclinada que se desvanece. */
 .aurora {
   position: absolute;
   inset: -120px 0 auto;
@@ -482,7 +485,7 @@
   align-items: center;
   gap: 6px;
   font-weight: 600;
-  color: var(--rec);
+  color: var(--rec-texto);
 }
 
 .vivo i,
@@ -718,8 +721,8 @@
 /* Tablero como «producto» centrado bajo el titular (modelo nuevo de la portada): más ancho y con las cuatro cámaras en una fila. */
 .visualGrande {
   max-width: 1080px;
-  margin: clamp(48px, 6vw, 80px) auto 0;
-  padding: 24px 0 64px;
+  margin: clamp(36px, 3.6vw, 52px) auto 0;
+  padding: 24px 0 56px;
   text-align: left;
 }
 
@@ -941,7 +944,7 @@
 /* ── Fabricantes ────────────────────────────────────────────────────────── */
 
 .marcas {
-  padding-block: 8px clamp(56px, 6vw, 88px);
+  padding-block: 0 clamp(44px, 4.6vw, 68px);
 }
 
 .marcasTitulo {
@@ -951,33 +954,24 @@
   text-align: center;
 }
 
-.marcasVentana {
-  margin-top: 26px;
-  overflow: hidden;
-  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
-}
-
-.marcasCinta {
+.marcasFila {
   display: flex;
-  width: max-content;
-  gap: clamp(36px, 4vw, 64px);
-  animation: marcasCorre 80s linear infinite;
-}
-
-.marcasVentana:hover .marcasCinta {
-  animation-play-state: paused;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(2px, 0.6vw, 8px) clamp(14px, 2.2vw, 34px);
+  margin-top: 18px;
 }
 
 .marca {
   flex: 0 0 auto;
-  width: 100px;
-  height: 56px;
+  width: clamp(84px, 8.6vw, 124px);
+  aspect-ratio: 667 / 384;
   object-fit: contain;
-  filter: grayscale(1) contrast(1.2) brightness(0.9);
+  filter: grayscale(1) contrast(1.08);
   mix-blend-mode: multiply;
-  opacity: 0.55;
-  transition: opacity 0.3s var(--ease), filter 0.3s var(--ease);
+  opacity: 0.66;
+  transition: opacity 0.25s var(--ease), filter 0.25s var(--ease);
 }
 
 .marca:hover {
@@ -986,20 +980,14 @@
 }
 
 :global(html[data-public-theme="dark"]) .marca {
-  filter: grayscale(1) invert(1) contrast(1.1);
+  filter: grayscale(1) invert(1) contrast(1.05);
   mix-blend-mode: screen;
-  opacity: 0.62;
+  opacity: 0.7;
 }
 
 :global(html[data-public-theme="dark"]) .marca:hover {
   filter: grayscale(1) invert(1);
   opacity: 1;
-}
-
-@keyframes marcasCorre {
-  to {
-    transform: translateX(calc(-50% - clamp(18px, 2vw, 32px)));
-  }
 }
 
 /* ── Declaración ────────────────────────────────────────────────────────── */
@@ -1191,7 +1179,7 @@
   padding: 2px 8px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--rec) 12%, transparent);
-  color: var(--rec);
+  color: var(--rec-texto);
   font-size: 11px;
 }
 
@@ -1301,7 +1289,7 @@
   padding: 4px 10px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--ok) 12%, transparent);
-  color: var(--ok);
+  color: var(--ok-texto);
   font-size: 11.5px;
   font-weight: 600;
 }
@@ -2303,10 +2291,6 @@
   .galeriaBarra {
     flex-direction: column-reverse;
     align-items: flex-start;
-  }
-  .marca {
-    width: 84px;
-    height: 48px;
   }
 }
 
