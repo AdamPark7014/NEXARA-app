@@ -1,5 +1,19 @@
 # RELEVO
 
+- **02-11 ~21:50 (claude-code) — Ola 3 enviada a las tiendas, directo a todos por orden de Adam: Android 1.3.0 (22) en revisión de Google e iOS 1.3 (15) en revisión de Apple. Salen solas al aprobarse.** (`933966aa`)
+  - **Pedido:** Adam eligió «Directo a todos», sin la prueba interna de un día que se le recomendó. Así que nadie ha usado la Ola 3 en un teléfono físico antes de que llegue a toda la empresa.
+  - **Qué llevan:** Ola 3, formatos (se abren el 06-11), el aviso de IA y la flotilla del CEO. Android también lleva todo lo de octubre: Play sigue en 1.0.7 hasta que Google apruebe.
+  - **Play:** la 22 reemplazó a la 21 en revisión. Google avisó que eso reinicia la revisión, que había empezado el mismo día; se aceptó. Lanzamiento al 100 % y publicación gestionada apagada. Única advertencia: faltan símbolos de depuración, la misma de la 21. Mapping en `apps/mobile-native/play-releases/mapping-v22-1.3.0.txt`, sin versionar.
+  - **App Store:** se reusó el registro de la 1.2 retirada (`26265583-2dcd-43c8-8d77-0ed35f2a2ace`): con `DEVELOPER_REJECTED` Apple deja cambiar `versionString` a 1.3 y ligar otro build por `PATCH`, sin crear versión. `AFTER_APPROVAL`, como la 1.1. Build del run `41570663943`. Las notas a Apple piden revisar gasolina en modo demo, porque `play.review@` es CEO y ve la flotilla, sin esos botones ni el aviso.
+  - **Lista de `IOS-RESPUESTA-APPLE.md`:** por API, 10 capturas solo en 6,9", sin videos y sin palabras prohibidas. Permisos y `UIBackgroundModes` leídos en `Info.plist`. La cuenta de revisión está activa, sin MFA ni candado en la base; **su contraseña no se probó**, y esa parte es de Adam con `verificar-cuenta-revision.ps1`.
+  - **Comprobado antes de enviar:** el código de las apps es el mismo de `922a2bf8` (CI completo en verde, iOS incluido) salvo el número de versión; `933966aa` no terminó CI porque otros pushes lo cancelaron. APK de release con R8: arranca en el emulador hasta el inicio de sesión, muestra v1.3.0, sin cierres ni fallas de conversión, y el mapping conserva los DTO nuevos. R8 no se probó con sesión.
+  - **Sin verificar:** nada en un teléfono físico ni contra la API real con sesión. Lo que ya se dijo en el bloque de Ola 3 sigue igual: foto final de Android sin completar en el emulador, ráfaga y cámara directa de iOS sin ejecutar.
+  - **Trampas:**
+    - Las notas de revisión de Apple topan en 4,000 caracteres y las de Play en 500 por idioma.
+    - No anunciar formatos en las novedades: el acceso se abre el 06-11 y un revisor no lo encontraría antes.
+    - Compilar, emulador y Chrome no caben juntos con esta RAM: la pestaña de Play se congeló y hubo que abrir otra. `javascript_tool` responde aunque la captura de pantalla no.
+  - **Siguiente:** ver que Google y Apple aprueben; si Apple rechaza por 5.1.1(i) o 5.1.2(i), el aviso ya está en la app y hay que señalar dónde verlo. Primera prueba real en un teléfono en cuanto salgan. Siguiente código de Play: 23; siguiente build de iOS: 16.
+
 - **02-11 ~23:30 UTC (claude-code) — Bloque A del Mapa de Core en producción: de la cotización al cobro, un solo hilo.** Adam: «Sí, constrúyelo». Guía: `docs/CADENA-DEL-NEGOCIO.md`.
   - **Qué se ve:** la cotización enviada pregunta «¿Cómo terminó?» (La ganamos, La perdimos, Sigue en pláticas). Ganarla aprueba, guarda cómo aceptó el cliente y crea el proyecto con las partidas como alcance. La barra llega hasta Factura y Cobro, con ligas, en la cotización y en el proyecto. El proyecto dice su siguiente paso, de dónde viene y qué falta. «Nueva actividad» hereda cliente y proyecto, y una actividad suelta pregunta una vez de qué proyecto es. La lista tiene «Por decidir» con Ganada y Perdida en la fila, y Tu día avisa con Revisar y Crear proyecto.
   - **Base:** dos columnas nuevas, `cotizaciones.aceptadaVia` y `aceptadaAt`, migración `20261102230000_cotizacion_aceptada` aplicada. «Aprobada» y «Rechazada» solo cambian de nombre a la vista: siguen `APPROVED` y `REJECTED`, así que Por facturar, compras y avisos no cambian.
@@ -44,7 +58,7 @@
 
 - **02-11 ~18:30 (claude-code) — Programa Velocidad Core, Ola 3: terminar actividad, terminar jornada y evidencia en menos toques. API en producción; apps en `main`, sin publicar en tiendas.** (`9ad37fbf`, `08fa08f0`, `cb5604d4`, `b33c4429`, `9d46af45`)
   - Adam aprobó con «Sí, arranca Ola 3» y eligió el deshacer recomendado: 10 minutos la propia persona; después, su jefe con motivo y bitácora; regresa lo que quedó «No cumplida» por esa salida.
-  - **Falta publicar:** hay que subir versión (Android 1.3.0 (23) o la que siga, iOS 1.3 (15)) y lanzar `ios-testflight.yml`. En tiendas siguen en revisión las versiones de vehículos. Cualquier build nuevo desde `main` ya lleva todo esto: no se suba sin el visto bueno de Adam.
+  - **Tiendas:** enviada a revisión el 02-11 como Android 1.3.0 (22) e iOS 1.3 (15). Ver el bloque de esa fecha, arriba.
   - **API (`attendance/`):**
     - `GET attendance/salida/riesgo`: qué reloj se detiene y qué vence hoy, para la hoja. `confirmada` en la checada evita el segundo toque del freno; las apps instaladas siguen con el 422.
     - `POST attendance/salida/deshacer` (propia, `dentroDeVentanaPropia`) y `POST attendance/:id/deshacer-salida` (jefe, dirección o RH, el mismo día, con motivo). Otro día queda la corrección de hora.
