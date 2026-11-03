@@ -17,15 +17,17 @@ type Props = {
   ancha?: boolean;
   /** Baldosa negra con texto claro, para fotos oscuras; alterna el ritmo del mosaico en los dos temas. */
   oscura?: boolean;
+  /** Texto a la izquierda y foto completa a la derecha, para la baldosa ancha con una foto horizontal. */
+  lateral?: boolean;
 };
 
 /**
  * Baldosa grande de la portada (el patrón de la portada de Apple): nombre, una línea y dos acciones centradas
  * arriba, y la imagen ocupando toda la baldosa.
  */
-export default function Baldosa({ nombre, texto, acciones, foto, arte, pie, ancha, oscura }: Props) {
+export default function Baldosa({ nombre, texto, acciones, foto, arte, pie, ancha, oscura, lateral }: Props) {
   return (
-    <article className={[b.baldosa, ancha ? b.ancha : "", oscura ? b.oscura : ""].filter(Boolean).join(" ")} data-aparecer>
+    <article className={[b.baldosa, ancha ? b.ancha : "", oscura ? b.oscura : "", lateral ? b.lateral : ""].filter(Boolean).join(" ")} data-aparecer>
       {foto ? (
         <div className={b.foto}>
           {/* eslint-disable-next-line @next/next/no-img-element */}

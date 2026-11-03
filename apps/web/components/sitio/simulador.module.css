@@ -310,7 +310,7 @@
   font-size: clamp(48px, 5vw, 64px);
   line-height: 1;
   font-weight: 600;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.032em;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
 }

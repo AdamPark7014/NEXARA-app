@@ -540,7 +540,7 @@ a.portada:hover img,
   font-size: clamp(36px, 4.8vw, 60px);
   line-height: 1.05;
   font-weight: 600;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.032em;
   text-wrap: balance;
 }
 
