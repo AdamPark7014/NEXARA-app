@@ -1,5 +1,25 @@
 # RELEVO
 
+- **03-11 ~12:10 (claude-code) — Los despliegues ya no cortan la web ni la API (`c6e3b480`, en producción).**
+  - Medido con `up -d` a secas: web 502 unos 2 s; API 502 y luego 503 unos 21 s, porque el healthCheck de Traefik la saca
+    y tarda en volver a meterla. Eran guardados y pantallas fallando en cada despliegue, varios al día.
+  - `deploy/reiniciar-sin-corte.sh api|web`: levanta `nexara-<x>-relevo` con la imagen nueva, y ya sano lo conecta a `proxy`
+    con el mismo alias. Traefik prueba cada dirección del DNS de Docker, así que nunca queda sin a quién llamar. Recrea el
+    principal, espera que responda y quita el relevo. Lo usan `deploy/update.sh` y `/root/deploy-api-web.sh` (fuera del repo,
+    copia en `.bak-20261103`), o sea también `/root/desplegar-cuando-libre.sh`. **Si despliegas a mano, usa este script, no `up -d`.**
+  - **Si la imagen nueva no arranca, aborta y sigue la versión anterior**: `API_LISTO`/`WEB_LISTO` no aparecen y el log trae las
+    últimas líneas del relevo. El relevo copia las variables del contenedor vivo: si un despliegue agrega una variable
+    obligatoria, usar `FORZAR_SIN_RELEVO=1`. Si falla el principal, el relevo se queda atendiendo y el script lo dice.
+  - En la API el relevo solo atiende: sin tareas programadas (`NEXARA_RELEVO=1`, `tareasProgramadas()` en `common/relevo.ts`,
+    porque no tienen candado y correrían dos veces), `JOBS_RUN_WORKERS=0` e `INTEGRA_WARMUP_ENABLED=0`. Una prueba impide
+    prender `ScheduleModule.forRoot()` directo en otro módulo. Las tareas se pausan unos 20 s mientras arranca el principal, igual que antes.
+  - Verificado en producción: web sola, 526 peticiones sin error durante el reinicio. Despliegue completo 17:57–18:04 UTC: API en
+    24 s y web en 8 s, 5,484 peticiones a web y API en Traefik, **0 respuestas 5xx**. Otro despliegue minutos antes, aún con `up -d`, dio
+    18 s de fallos en la misma sonda (52 peticiones). `tsc` de la API limpio y 9 pruebas de alertas y relevo.
+  - Sigue igual: los sockets se reconectan (ahora dos veces); una petición en curso al cerrar un contenedor puede cortarse, aunque
+    no se vio ninguna; quien tenga una pantalla abierta sigue con la versión anterior hasta recargar. No se midió la app móvil.
+  - Tiempo de más: el relevo agrega unos 25 s por despliegue. RAM: dos API a la vez por unos 20 s (hasta 2.5 GB más).
+
 - **03-11 (claude-code) — Todo el personal ya recibe sus festivos en «Mi día» de las apps (`ea1fa69e`). En producción. Sin migración. Las versiones publicadas no necesitan nada.**
   - **Qué pasaba:** `GET /api/festivos/mio` daba 403 a 13 de los 16 roles de personal. La ruta salió el 29-10 sin regla en la matriz, y solo pasaban CEO y los dos directores, por su `/api/**`. Android (`runCatching`) e iOS (`try?`) callan el error, así que nadie lo vio. Para esas personas un festivo se veía como un día normal: la jornada con su botón de entrada, y la checada rechazada con `FESTIVO_SIN_LABORAR`, en vez de «Hoy descansas». El siguiente de ley es el 16-11.
   - **Arreglo:** una regla de solo lectura en `FORMATOS_ACTIVIDAD_URL_RULES`, la lista que ya llega a los 16 roles de personal y no a `cliente`. No va en `SHARED_SESSION_URL_RULES` porque esa sí la recibe `cliente`. `mio` solo devuelve lo de quien pregunta.
@@ -60,7 +80,7 @@
     las 13 suites repetidas con `--maxWorkers=2` pasan (83 pruebas). En producción, con sesión, la 62 dibuja 8 hojas sin avisos.
     El caso del 502 solo se probó en esas pruebas, no con un despliegue real. No se probó el arreglo en `croquis`.
   - Quien tenía abierta la versión anterior durante este mismo despliegue pudo verlo una vez más (hubo otro 502): recargar.
-  - Sigue: cada despliegue de la web corta unos segundos (502), también para los demás archivos.
+  - El corte de cada despliegue se resolvió después, en `c6e3b480`.
 
 - **03-11 (claude-code) — El cliente ya abre su enlace de firma, sin ver costos ni margen, y `publicToken` salió de las respuestas (`87a96002`). En producción. Adam: «Sí, arréglalo». Sin migración.**
   - **Qué pasaba:** `cotizaciones/public/:token` daba 401 sin sesión, porque `UrlAccessGuard` está en todo `CotizacionesController`: el cliente no podía abrir el enlace del correo. Y lo que devolvía traía las partidas completas, con costo, margen y proveedor. Todas las cotizaciones siguen en borrador, así que no le pasó a nadie.
