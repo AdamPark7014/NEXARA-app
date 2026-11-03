@@ -105,6 +105,7 @@ type Recorrido = {
 
 type Transicion = { t0: number; dur: number; p0: THREE.Vector3; q0: THREE.Quaternion; f0: number; p1: THREE.Vector3; q1: THREE.Quaternion; f1: number; alFinal?: () => void };
 
+const ESPERA_COMPILAR_MS = 20_000;
 /** Como un lente normal de foto: con menos, la maqueta se ve como un diagrama isométrico. */
 const FOV_MAQUETA = 34;
 const FOV_RECORRIDO = 62;
@@ -506,15 +507,28 @@ export class MotorMaqueta {
     this.compilando = true;
     const r = this.renderer;
     const antes = r.getRenderTarget();
+    let materiales: Set<THREE.Material> = new Set();
     try {
       // Los programas dependen de a dónde se pinta: se piden para el mismo destino que usa el compositor.
       r.setRenderTarget(this.composer.readBuffer);
-      const listo = r.compileAsync(this.escena, this.camara);
-      r.setRenderTarget(antes);
-      await listo;
+      materiales = r.compile(this.escena, this.camara);
     } catch {
       // Si algo no compila, el error real sale al pintar.
-      r.setRenderTarget(antes);
+    }
+    r.setRenderTarget(antes);
+    /**
+     * No se usa `compileAsync`: si llega el catálogo a media espera, un material se libera, su programa ya no
+     * está y ese método truena en un temporizador sin resolver nunca: la maqueta se quedaba en «Armando» para
+     * siempre. Lo liberado cuenta como listo y, pase lo que pase, a los 20 s se pinta.
+     */
+    const limite = performance.now() + ESPERA_COMPILAR_MS;
+    while (!this.destruido && performance.now() < limite) {
+      const falta = [...materiales].some((m) => {
+        const programa = (r.properties.get(m) as { currentProgram?: { isReady?: () => boolean } }).currentProgram;
+        return Boolean(programa?.isReady && !programa.isReady());
+      });
+      if (!falta) break;
+      await new Promise((listo) => setTimeout(listo, 30));
     }
     this.compilando = false;
     if (this.destruido) return;
