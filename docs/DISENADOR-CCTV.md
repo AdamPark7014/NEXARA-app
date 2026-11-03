@@ -455,6 +455,33 @@ armado con esas medidas y solo entonces guarda.
   dato y lo que no da comportamiento: peso, IP, IK) y `datos.foto`, una foto de 256 px del modelo ya armado, en base64, para las
   tarjetas. `leerFilasCatalogo` las separa: no se copian a cada equipo colocado en un diseño.
 
+### 6.1 Existencias y «Pasar a cotización» (fase 10, Adam: «Sí, fase 4», 02-11-2026)
+
+**Un solo inventario.** Aquí no se guarda ninguna pieza: lo de Almacén sale de `products` y `stock_levels` (`quantity - reservedQty`) y lo del
+mayorista, de `productos_ct`. Reglas en `cctv-disenos/existencias.ts`; consultas en `existencias.service.ts`.
+
+- **Cómo se liga un modelo.** A Almacén, por `CctvEquipo.productId` o por SKU igual al modelo. A CT, por la clave elegida a mano
+  (`datos.ficha.ct`) o por modelo exacto en `modelo` o `numParte`, de la misma marca, ignorando guiones y mayúsculas, sin la versión de
+  hardware («V6.0») ni lo que sigue a la diagonal. Un parecido no cuenta: pondría el precio de otro equipo en una cotización. Los tipos
+  genéricos («Gabinete 24U») no son productos y no se buscan.
+- **Lo que se ve.** Tarjeta del catálogo y panel de equipos: en almacén, en CT y precio. Es el de venta sugerido, con margen de 30 % y sin IVA;
+  el costo no llega a la pantalla. Lo que no se sabe se dice («No está en CT», «Sin precio»).
+- **Buscar en CT** (`_editor/BuscarEnCt.tsx`): cualquier marca, por palabras o familia, con `ProductSearchService`. «Agregar» lee con IA lo que
+  dice CT (`cctv-equipo`, el mismo de la frase) y abre la ficha para revisarla. Marca y modelo son los de CT, y el tipo, el de su subcategoría
+  si la dice. Si la IA no está, queda con eso para capturar el resto. «Ligar» en la ficha de un modelo guarda la clave elegida.
+- **Dar de alta en Almacén:** crea el `Product` con `CatalogService.createProduct` (SKU = modelo, `EQUIPO`) y lo liga. Si ya existía, solo lo liga.
+  Pide `catalog.manage`. Las entradas se registran en Almacén.
+- **Pasar a cotización** (`_editor/PasarACotizacion.tsx`, `POST :id/cotizacion`, pide `cotizaciones.access`). La pantalla manda qué y cuánto; el
+  precio lo pone el servidor. Prioridad: el del `Product`, luego CT con `lineFromOffer`, y si no hay ninguno, `$0` con su nota: nunca inventado. Las
+  partidas llevan `paqueteClave: cctv:<id>`: al actualizar se reemplazan esas y lo capturado a mano se queda. Una cotización que ya salió no se
+  reabre desde aquí: 409 y se ofrece crear otra. Sin cliente en el diseño queda como «Cliente por definir» con `clienteSinAlta`, para no llenar
+  el padrón. Va en segmento `COMERCIAL`: la modalidad pasa a instalación en cuanto lleve mano de obra. El cable va en bobinas y sin precio, porque
+  su tipo lo elige quien cotiza. No lleva mano de obra.
+- **Plano adjunto:** cada nivel de `PlanoEstatico` se vuelve PNG en el navegador (`lib/cctv/planoImagen.ts`), con los colores fijos en claro, y
+  reemplaza al anterior del mismo nombre. Si eso falla, las partidas ya quedaron y se avisa.
+- **Medido el 02-11 en producción:** 0 productos y 0 existencias en Almacén, 14,879 filas en CT. De 13 modelos del catálogo solo 2 están tal cual
+  en CT, y un tercero sin el «V6.0»; lo demás hay que ligarlo o agregarlo con «Buscar en CT». Syscom falta (§11).
+
 ## 7. Propuesta en PDF
 
 Se genera en la API con `pdfkit` y el tema de `common/pdf/nexara-pdf-theme.ts`, como la propuesta técnica de
@@ -480,7 +507,7 @@ cotizaciones. Va con marca **NEXARA** (CCTV es de NEXARA; ver `.claude/rules/mar
    puede variar por obstáculos e iluminación.
 
 Botón **«Pasar a cotización»**: crea o actualiza una `Cotizacion` con los equipos como `CotizacionItem` y
-adjunta el plano en `planos`.
+adjunta el plano en `planos`. Detalle en §6.1.
 
 ## 8. Acceso
 
@@ -551,7 +578,7 @@ lugares a tocar para dar de alta un módulo:
 | 8 | Catálogo de equipos: agregar modelos; acceso, alarmas, servidores, NVR y gabinete con su modelo y comportamiento; rutas de cable, diagrama de conexión y revisión (§4.2 y §6) | **Hecha** (01-11) |
 | 9 | Memoria técnica: subir el PDF, la IA llena la ficha y se arma el modelo. Medido: 92 de 94 datos en 6 fichas con Haiku 5.5 | Propuesta aprobada |
 | 9b | Moverse por dentro, imán de esquinas y muros, armar con IA, modelos y visor con vistas y cotas (§4.3, §4.4) | Pedido de Adam, 02-11 |
-| 10 | Stock de Almacén, consulta en CT y «Pasar a cotización» | Falta decidir el inventario |
+| 10 | Stock de Almacén, consulta en CT y «Pasar a cotización» (§6.1) | **Hecha** (02-11): un solo inventario, sin tabla paralela |
 | 11 | Cotización premium | Faltan las especificaciones de Adam |
 
 Cada fase se despliega sola (`/root/deploy-web.sh` si solo cambia la web; `/root/deploy-api-web.sh` si cambia

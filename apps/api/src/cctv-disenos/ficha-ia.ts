@@ -243,7 +243,7 @@ function ordenarMedidas(tipo: string, datos: DatoLeido[]) {
 }
 
 /** «Dahua Technology» y «Dahua» son la misma marca. Es la misma regla que `marcaCorta` en la web. */
-function sinRazonSocial(marca: string): string {
+export function sinRazonSocial(marca: string): string {
   const fuera = /[\s,]+(network\s+)?(technolog(y|ies)|tech|corporation|corp\.?|company|co\.?|ltd\.?|limited|inc\.?|llc|s\.?a\.?(\s+de\s+c\.?v\.?)?|gmbh)\b\.?/gi;
   return marca.replace(fuera, '').replace(/[\s,.]+$/, '').trim() || marca;
 }

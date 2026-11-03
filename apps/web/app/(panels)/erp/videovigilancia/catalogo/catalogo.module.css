@@ -154,6 +154,28 @@
   color: var(--ui-fg-3);
 }
 
+.stock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-height: 18px;
+  padding-top: 7px;
+  border-top: 1px solid var(--ui-border);
+  font-size: 12px;
+  color: var(--ui-fg-3);
+}
+
+.stock b {
+  font-weight: 650;
+  color: var(--ui-fg);
+}
+
+.stock .precio {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
 .estadoBien,
 .estadoFalta {
   font-size: 11.5px;

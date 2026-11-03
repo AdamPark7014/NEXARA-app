@@ -6,6 +6,7 @@
 import { buildApiUrl } from "@/lib/api-base";
 import { withTenantHeaders } from "@/lib/tenant";
 import type { FilaCatalogo } from "./catalogo";
+import type { Disponibilidad, LineaEnviar, ModeloConsulta, ResumenCt } from "./existencias";
 import type { ResumenDiseno } from "./editor";
 import type { Grabacion } from "./infraestructura";
 import type { FichaLeida } from "./ficha";
@@ -138,6 +139,45 @@ export function subirCroquis(token: string, id: number, archivo: Blob, nombre = 
 /* ── Catálogo de equipos ── */
 
 export type EquipoParaGuardar = Omit<FilaCatalogo, "id" | "productId" | "verificado"> & { productId?: number | null; verificado?: boolean };
+
+/* ── Existencias y cotización ── */
+
+export async function consultarDisponibilidad(token: string, modelos: readonly ModeloConsulta[]): Promise<Disponibilidad[]> {
+  const r = await pedir<{ modelos: Disponibilidad[] }>("cctv-disenos/catalogo/disponibilidad", token, { method: "POST", body: JSON.stringify({ modelos }) });
+  return r?.modelos ?? [];
+}
+
+export type ResultadoCt = ResumenCt & { descripcion: string | null; imagen: string | null; familia: string | null; tipo: string | null };
+
+export async function buscarEnCt(token: string, q: string, subcategoria: string): Promise<ResultadoCt[]> {
+  const parametros = new URLSearchParams();
+  if (q) parametros.set("q", q);
+  if (subcategoria) parametros.set("sub", subcategoria);
+  const r = await pedir<{ resultados: ResultadoCt[] }>(`cctv-disenos/catalogo/buscar-ct?${parametros}`, token);
+  return r?.resultados ?? [];
+}
+
+/** La ficha de un producto de CT, para revisarla antes de agregarla al catálogo. */
+export function fichaDesdeCt(token: string, clave: string): Promise<FichaLeida & { ct: string; sinLectura: boolean }> {
+  return pedir("cctv-disenos/catalogo/desde-ct", token, { method: "POST", body: JSON.stringify({ clave }) });
+}
+
+export function altaEnAlmacen(token: string, cuerpo: { marca: string; modelo: string; descripcion?: string; categoria?: string; equipoId?: number | null }): Promise<{ productId: number; sku: string; yaExistia: boolean }> {
+  return pedir("cctv-disenos/catalogo/alta-almacen", token, { method: "POST", body: JSON.stringify(cuerpo) });
+}
+
+export type ResultadoCotizacion = { cotizacionId: number; quoteNumber: string; creada: boolean; partidas: number; conservadas: number; sinPrecio: number };
+
+export function pasarACotizacion(token: string, disenoId: number, lineas: readonly LineaEnviar[], nueva: boolean): Promise<ResultadoCotizacion> {
+  return pedir(`cctv-disenos/${disenoId}/cotizacion`, token, { method: "POST", body: JSON.stringify({ lineas, nueva }) });
+}
+
+export function adjuntarPlanoACotizacion(token: string, disenoId: number, png: Blob, nombre: string): Promise<{ ok: true }> {
+  const forma = new FormData();
+  forma.append("file", png, "plano.png");
+  forma.append("nombre", nombre);
+  return pedir(`cctv-disenos/${disenoId}/cotizacion/plano`, token, { method: "POST", body: forma });
+}
 
 export async function listarCatalogo(token: string): Promise<FilaCatalogo[]> {
   const r = await pedir<{ equipos: FilaCatalogo[] }>("cctv-disenos/catalogo", token);

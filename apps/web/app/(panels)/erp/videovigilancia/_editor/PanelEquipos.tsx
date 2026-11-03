@@ -18,6 +18,7 @@ import {
 } from "@/lib/cctv/catalogo";
 import type { MaterialPiso, TipoMueble } from "@/lib/cctv/plano";
 import { fotoDeTipo } from "@/lib/cctv/sistema";
+import { pesos, type Disponibilidad } from "@/lib/cctv/existencias";
 import styles from "./editor.module.css";
 
 export const TIPO_ARRASTRE = "application/x-cctv-equipo";
@@ -75,6 +76,12 @@ const FAMILIAS_DE_FILTRO: Partial<Record<Filtro, readonly FamiliaEquipo[]>> = {
   alarmas: ["alarmas"],
 };
 
+function LineaStock({ d }: { d?: Disponibilidad }) {
+  if (!d || (!d.almacen && !d.ct)) return null;
+  const partes = [d.almacen ? `${d.almacen.piezas} en almacén` : null, d.ct ? `${d.ct.piezas} en CT` : null, d.ct && d.ct.precio > 0 ? pesos(d.ct.precio) : null].filter(Boolean);
+  return <em className={styles.equipoStock}>{partes.join(" · ")}</em>;
+}
+
 export default function PanelEquipos({
   modeloActivo,
   muebleActivo,
@@ -89,6 +96,7 @@ export default function PanelEquipos({
   onElegirPiso,
   onAgregar,
   onArmar,
+  existencias,
 }: {
   modeloActivo: ModeloCamara;
   muebleActivo: TipoMueble;
@@ -104,6 +112,8 @@ export default function PanelEquipos({
   onAgregar: () => void;
   /** Para quien no quiere dibujar: el diseño completo a partir de una frase. */
   onArmar: () => void;
+  /** Lo que hay de cada modelo en Almacén y en CT. */
+  existencias?: ReadonlyMap<string, Disponibilidad>;
 }) {
   const [buscar, setBuscar] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("camaras");
@@ -172,6 +182,7 @@ export default function PanelEquipos({
                   <b>{m.id === MODELO_GENERICO.id ? "Genérica" : ETIQUETA_TIPO_CAMARA[m.tipo]}</b>
                   <span>{m.modelo}</span>
                   <span>{m.descripcion}</span>
+                  <LineaStock d={existencias?.get(m.id)} />
                 </span>
               </button>
             ))
@@ -195,6 +206,7 @@ export default function PanelEquipos({
                   <b>{ETIQUETA_TIPO_EQUIPO[m.tipo]}</b>
                   <span>{m.modelo}</span>
                   <span>{m.fuente === "tipo" ? "Falta su ficha" : m.descripcion}</span>
+                  <LineaStock d={existencias?.get(m.id)} />
                 </span>
               </button>
             ))

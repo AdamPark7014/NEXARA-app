@@ -33,11 +33,14 @@ vi.mock("next/dynamic", async () => {
   };
 });
 
+vi.mock("@/components/UserContext", () => ({ useUser: () => ({ token: "t", user: { id: 1, permissions: ["cotizaciones.access"] }, loading: false }) }));
+
 vi.mock("@/lib/cctv/api", async (original) => ({
   ...(await original<typeof import("@/lib/cctv/api")>()),
   guardarDiseno: vi.fn(),
   subirCroquis: vi.fn(),
   listarCatalogo: vi.fn().mockResolvedValue([]),
+  consultarDisponibilidad: vi.fn().mockResolvedValue([]),
 }));
 
 beforeAll(() => {

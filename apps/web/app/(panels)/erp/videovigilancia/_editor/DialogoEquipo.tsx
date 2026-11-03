@@ -8,10 +8,13 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Alert, Button, Field, Input, Select } from "@/components/base";
-import { agregarAlCatalogo, archivarDelCatalogo, editarCatalogo, type EquipoParaGuardar } from "@/lib/cctv/api";
+import { agregarAlCatalogo, altaEnAlmacen, archivarDelCatalogo, editarCatalogo, type EquipoParaGuardar } from "@/lib/cctv/api";
 import { ETIQUETA_TIPO_CAMARA, ETIQUETA_TIPO_EQUIPO, FAMILIA_DE_TIPO, type FilaCatalogo, type TipoCamara, type TipoEquipo } from "@/lib/cctv/catalogo";
 import { RESOLUCIONES, pxPorMegapixeles } from "@/lib/cctv/optica";
 import { fotoDeTipo } from "@/lib/cctv/sistema";
+import { ctDeFila, pesos, type Disponibilidad } from "@/lib/cctv/existencias";
+import BuscarEnCt from "./BuscarEnCt";
+import estilosStock from "./existencias.module.css";
 import styles from "./editor.module.css";
 
 type Tipo = TipoCamara | TipoEquipo;
@@ -70,6 +73,9 @@ export default function DialogoEquipo({
   onCerrar,
   onGuardado,
   onMemoria,
+  disponibilidad,
+  puedeDarDeAlta = false,
+  onExistencias,
 }: {
   token: string;
   /** Lo que se edita. Sin ella, es un modelo nuevo. */
@@ -81,6 +87,11 @@ export default function DialogoEquipo({
   onGuardado: (id: string) => void;
   /** Mejor que capturarlo: que la IA lea su PDF. */
   onMemoria?: () => void;
+  /** Lo que hay de este modelo, si ya se consultó. */
+  disponibilidad?: Disponibilidad | null;
+  puedeDarDeAlta?: boolean;
+  /** Cambió su liga con Almacén o con CT: hay que volver a preguntar. */
+  onExistencias?: () => void;
 }) {
   const inicio = fila ?? base ?? null;
   const [tipo, setTipo] = useState<Tipo>((inicio?.tipo as Tipo) ?? "domo");
@@ -97,6 +108,10 @@ export default function DialogoEquipo({
   const [medidas, setMedidas] = useState({ anchoMm: aTexto(inicio?.medidas?.anchoMm), altoMm: aTexto(inicio?.medidas?.altoMm), fondoMm: aTexto(inicio?.medidas?.fondoMm) });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ct, setCt] = useState<string | null>(ctDeFila(fila));
+  const [ligando, setLigando] = useState(false);
+  const [dandoAlta, setDandoAlta] = useState(false);
+  const [altaHecha, setAltaHecha] = useState(false);
 
   const camara = esCamara(tipo);
   const familia = camara ? "camaras" : FAMILIA_DE_TIPO[tipo];
@@ -105,7 +120,10 @@ export default function DialogoEquipo({
   const armar = (): EquipoParaGuardar => {
     const numeros = Object.fromEntries((camara ? [] : (CAMPOS[tipo as TipoEquipo] ?? [])).map((c) => [c.k, aNumero(datos[c.k] ?? "")]));
     // Lo que no se edita aquí (su foto, su apariencia, de qué ficha salió) se conserva.
-    const conservar = Object.fromEntries(Object.entries(datosIniciales).filter(([k]) => k === "foto" || k === "apariencia" || k === "ficha"));
+    const conservar: Record<string, unknown> = Object.fromEntries(Object.entries(datosIniciales).filter(([k]) => k === "foto" || k === "apariencia" || k === "ficha"));
+    // La liga con CT vive con su ficha; lo elegido a mano gana sobre lo que coincida por modelo.
+    const fichaCon = { ...((conservar.ficha as object | undefined) ?? {}), ct };
+    if (ct || conservar.ficha) conservar.ficha = fichaCon;
     const res = pxPorMegapixeles(mp);
     const m = { anchoMm: aNumero(medidas.anchoMm), altoMm: aNumero(medidas.altoMm), fondoMm: aNumero(medidas.fondoMm) };
     const conMedidas = Object.fromEntries(Object.entries(m).filter(([, v]) => v));
@@ -139,6 +157,20 @@ export default function DialogoEquipo({
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar.");
       setGuardando(false);
+    }
+  };
+
+  const darDeAlta = async () => {
+    setDandoAlta(true);
+    setError(null);
+    try {
+      await altaEnAlmacen(token, { marca: marca.trim(), modelo: modelo.trim(), descripcion: descripcion.trim(), categoria: "Videovigilancia", equipoId: fila?.id ?? null });
+      setAltaHecha(true);
+      onExistencias?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo dar de alta.");
+    } finally {
+      setDandoAlta(false);
     }
   };
 
@@ -236,6 +268,34 @@ export default function DialogoEquipo({
           <Medida etiqueta="Fondo" unidad="mm" valor={medidas.fondoMm} onCambio={(v) => setMedidas((m) => ({ ...m, fondoMm: v }))} />
         </div>
 
+        {fila || disponibilidad ? (
+          <div className={estilosStock.existencias} aria-label="Existencias">
+            <div className={estilosStock.existenciasFila}>
+              <span>
+                <b>Almacén:</b> {disponibilidad?.almacen || altaHecha ? `${disponibilidad?.almacen?.piezas ?? 0} piezas` : "sin dar de alta"}
+                {disponibilidad?.almacen || altaHecha ? <small>Las entradas se registran en Almacén.</small> : null}
+              </span>
+              {!disponibilidad?.almacen && !altaHecha && puedeDarDeAlta && modelo.trim() ? (
+                <Button type="button" size="sm" loading={dandoAlta} onClick={() => void darDeAlta()}>
+                  Dar de alta en Almacén
+                </Button>
+              ) : null}
+            </div>
+            <div className={estilosStock.existenciasFila}>
+              <span>
+                <b>CT:</b>{" "}
+                {disponibilidad?.ct ? `${disponibilidad.ct.piezas} piezas · ${disponibilidad.ct.precio > 0 ? `${pesos(disponibilidad.ct.precio)} sin IVA` : "sin precio"}` : ct ? `ligado a ${ct}` : "no lo encontré con este modelo"}
+                {disponibilidad?.ct ? <small>Clave {disponibilidad.ct.clave}{disponibilidad.ct.ligado === "manual" ? ", elegida a mano" : ", coincide por modelo"}</small> : null}
+              </span>
+              {fila ? (
+                <Button type="button" size="sm" onClick={() => setLigando(true)}>
+                  {ct || disponibilidad?.ct ? "Cambiar" : "Buscar en CT"}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         <div className={styles.acciones}>
           <Button type="submit" variant="primary" disabled={!listo} loading={guardando}>
             {fila ? "Guardar" : "Agregar al catálogo"}
@@ -250,6 +310,19 @@ export default function DialogoEquipo({
           ) : null}
         </div>
       </form>
+      {ligando ? (
+        <BuscarEnCt
+          token={token}
+          titulo={`Ligar ${modelo.trim() || "este equipo"} con CT`}
+          accion="Ligar"
+          busquedaInicial={modelo.trim()}
+          onCerrar={() => setLigando(false)}
+          onElegir={(r) => {
+            setCt(r.clave);
+            setLigando(false);
+          }}
+        />
+      ) : null}
     </div>,
     document.body,
   );
