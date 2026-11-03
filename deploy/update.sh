@@ -209,7 +209,9 @@ fi
 
 echo "Starting services..."
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans db
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans --no-build api web
+# Sin corte: un relevo con la imagen nueva atiende mientras se recrea cada uno. Si no arranca, se aborta aquí.
+ENV_FILE="$ENV_FILE" COMPOSE_FILE="$COMPOSE_FILE" bash "$SCRIPT_DIR/reiniciar-sin-corte.sh" api
+ENV_FILE="$ENV_FILE" COMPOSE_FILE="$COMPOSE_FILE" bash "$SCRIPT_DIR/reiniciar-sin-corte.sh" web
 if [[ "$TRANSCRIPTOR_ON" == true ]]; then
   # Se reconstruye solo si cambió su Dockerfile, si cambió su build en el compose o en el .env
   # (WHISPER_MODEL), si falta la imagen o con --force-all. Antes iba `up --build` en cada deploy:

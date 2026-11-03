@@ -5,7 +5,7 @@ import { appLogger } from './common/errors/logger';
 import { Reflector } from '@nestjs/core';
 import { CoreModule } from './common/core.module';
 import { MapsModule } from './common/maps/maps.module';
-import { ScheduleModule } from '@nestjs/schedule';
+import { tareasProgramadas } from './common/relevo';
 import { AppController } from './app.controller';
 import { StripSecretsInterceptor } from './common/security/strip-secrets.interceptor';
 import { AppService } from './app.service';
@@ -134,7 +134,7 @@ import { CctvDisenosModule } from './cctv-disenos/cctv-disenos.module.js';
     ExpensesModule,
     GpsModule,
     VehicleGpsModule,
-    ScheduleModule.forRoot(),
+    ...tareasProgramadas(),
     DevicesModule,
     NotificationsModule,
     AlertsModule,
