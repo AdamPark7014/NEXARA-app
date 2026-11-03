@@ -1,5 +1,20 @@
 # RELEVO
 
+- **03-11 (claude-code) — La vigencia ya incluye todo su último día en México (`bc82a003`). En producción. Adam: «Sí, corrígelo». Sin migración.**
+  - **Qué pasaba:** `validUntil` es un día guardado a medianoche UTC y se comparaba como instante. Con vigencia al 18, el cliente ya no podía firmar desde el 17 a las 18:00, y la tarea de las 6 am la marcaba vencida la mañana del 18, mientras la página y el PDF decían 18.
+  - **Qué se hizo:**
+    - `puedeFirmarse` y `debeVencer` comparan días (`vigenciaTerminada` en `estado-cotizacion.ts`): vence al empezar el 19 en México, y la tarea la marca esa mañana.
+    - En consultas, la misma regla es `validUntil >= workDateColumn(ahora)`, como ya hacía `executive.service.ts`. Se alinearon `ceo-brief.service.ts`, `direccion.service.ts` y `activity-feed.service.ts`, que dejaban fuera el último día de «por vencer» y que ahora se puede firmar; `seguimiento-cotizacion.service.ts`, y el aviso de «vencida» de un borrador en `notifications.service.ts`.
+  - **No se tocó, a propósito:**
+    - `checkQuoteExpiration`: avisa de 3 a 1 día antes y no repite en 5 días, así que el aviso ya salió antes del último día.
+    - Las apps: su texto ya dice «Vence hoy» ese día. `vigenciaVencida` lo pinta en alerta, que sigue siendo razonable, y así no hace falta publicar versión.
+  - **Verificado:**
+    - `vigencia-ultimo-dia.spec.ts` y `estado-cotizacion.spec.ts`: 10 pruebas fallaban contra el código anterior y pasan. API 5,508 y tipos en verde. La web no cambió. CI verde en `c6e3b480` y `8716a480`, que traen este commit; el de `bc82a003` se canceló porque otros commits lo alcanzaron.
+    - `AppModule` real y base desechable: el último día la tarea no la vence, el cliente la ve abierta y la firma; un día después, la tarea la vence y el enlace dice por qué; sale en el feed y en el resumen; a un borrador le llega «vencida» cuando termina su día. El enlace sigue pasando sus 11.
+    - Con el código desplegado, en solo lectura: la tabla por hora del último día da lo esperado, ninguna vigencia real lleva hora, y hoy no cambia el estado de ninguna cotización, porque no hay enviadas.
+  - **Sin verificar:** una firma real el último día en producción. Sigue sin haber ninguna cotización enviada. El primer envío por correo, mejor a un correo propio, cierra esto y lo del enlace.
+  - **Trampa:** si alguien guarda `validUntil` con hora, cuenta su fecha UTC, que es la que imprimen la página y el PDF. Hoy todas son días sin hora.
+
 - **03-11 (claude-code) — Revisados los 12 servicios con `withTenantBypassAsync(() => prisma…)`: casi todos aciertan porque su consulta ya lleva la empresa; se corrigieron cuatro fallas (`1fafe3ea`). En producción. Sin migración. El tráfico del sitio queda igual: decisión de Adam.**
   - **Por qué casi todo acierta sin que el contexto funcione:** una consulta devuelta sin esperar corre con el filtro de la petición, pero el filtro respeta un `where` que ya trae `companyId`. No respeta dos casos: la llave `companyId_section`, cuya empresa reemplaza, y un `create` con `companyId: null`, al que le pone la suya. Un `update` por `{ id }` tampoco lleva empresa y se la pone también.
   - **Las rutas públicas no validan la sesión:** no llevan guardia, así que `req.user` no existe y `resolveForUser` acepta el `X-Company-Id` de cualquiera. Con sesión de otra empresa o solo con la cabecera sale lo mismo. Sin nada, la empresa es la principal. Ni el sitio ni sus formularios mandan esa cabecera, y `PUBLIC_COMPANY_ID` no está definida en producción: ninguna de estas fallas le ha pasado a nadie por usar la web.
