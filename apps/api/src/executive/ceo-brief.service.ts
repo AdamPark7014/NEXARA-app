@@ -132,11 +132,6 @@ export class CeoBriefService {
           _count: { _all: true },
           _sum: { total: true },
         });
-        const sinEnviar = await seguro(0, () =>
-          this.prisma.cotizacion.count({
-            where: { ...tw, deletedAt: null, status: 'DRAFT', validUntil: { gte: inicioHoy } } as any,
-          }),
-        );
         const [porDecidir, ganadasSinProyecto] = await Promise.all([
           seguro(0, () => this.prisma.cotizacion.count({ where: { ...tw, deletedAt: null, status: 'SENT' } as any })),
           seguro(0, () =>
@@ -154,7 +149,6 @@ export class CeoBriefService {
           porVencer: r._count._all,
           monto: Number(r._sum.total ?? 0),
           dias: DIAS_COTIZACION_POR_VENCER,
-          sinEnviar,
           porDecidir,
           ganadasSinProyecto,
         };
