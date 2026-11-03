@@ -1,5 +1,27 @@
 # RELEVO
 
+- **03-11 (claude-code) — Todo el personal ya recibe sus festivos en «Mi día» de las apps (`ea1fa69e`). En producción. Sin migración. Las versiones publicadas no necesitan nada.**
+  - **Qué pasaba:** `GET /api/festivos/mio` daba 403 a 13 de los 16 roles de personal. La ruta salió el 29-10 sin regla en la matriz, y solo pasaban CEO y los dos directores, por su `/api/**`. Android (`runCatching`) e iOS (`try?`) callan el error, así que nadie lo vio. Para esas personas un festivo se veía como un día normal: la jornada con su botón de entrada, y la checada rechazada con `FESTIVO_SIN_LABORAR`, en vez de «Hoy descansas». El siguiente de ley es el 16-11.
+  - **Arreglo:** una regla de solo lectura en `FORMATOS_ACTIVIDAD_URL_RULES`, la lista que ya llega a los 16 roles de personal y no a `cliente`. No va en `SHARED_SESSION_URL_RULES` porque esa sí la recibe `cliente`. `mio` solo devuelve lo de quien pregunta.
+  - **Sin abrir de más:** el listado sigue en CEO y los dos directores. Marcar y quitar siguen fuera de la matriz para todos los roles; los hace dirección por correo (`puedeEditarFestivos`), que entra como superadmin.
+  - **Verificado:**
+    - `festivos-rbac.spec.ts`: 26 pruebas fallaban antes (13 roles, por matriz y por guardia) y pasan después. Usa el `RbacGuard` real, los permisos de `resolveUserPermissions` y el `@RBAC` de la ruta, porque la matriz y `@RBAC` se suman y pasar solo la primera sería otro 403. Ninguna prueba existente cambió.
+    - Las 15 suites que leen la matriz en verde. Tipos de la API en verde con la prueba nueva incluida.
+    - Con el código desplegado, dentro del contenedor y sin arrancar Nest: la guardia real deja pasar a los 16 roles y detiene a `cliente`; el listado y marcar quedan como antes. `mio` responde bien con una persona real de cada rol que tiene a alguien con `roleKey` activo.
+    - En producción: sin sesión da 401. Desde el despliegue, Traefik marca peticiones reales con 200 y 304 y ningún 403; en las 72 h anteriores solo había 403. La bitácora de `nexara-api` no trae ningún 403 de festivos.
+    - CI completo en verde en `c6e3b480`, que incluye este commit. El de `ea1fa69e` se canceló porque subieron otros encima.
+  - **Sin verificar:**
+    - Traefik no dice el rol: no se puede afirmar quién hizo cada petición. Los roles sin nadie con `roleKey` activo solo pasaron por la guardia.
+    - Nadie con uno de estos roles ha visto todavía «Hoy descansas» en un festivo real. El primero es el 16-11.
+  - **Visto y sin tocar:**
+    - **La pestaña «Días festivos» de Asistencias sale para todos, y `GET /api/festivos` da 403 a esos mismos 13 roles:** ven «No se pudieron cargar los días festivos». El comentario del controlador dice que cualquiera con asistencia puede ver, pero `listar` trae `personas`: nombre, puesto y foto de todo el equipo con horario. No se abrió. Se decide entre esconder la pestaña a quien no la puede leer, o abrirla sin `personas`.
+    - **`GET /api/ai/voz/estado` da 403 a `administrativo`, y por matriz también a `ing_campo`, `ing_soporte`, `vendedor`, `disenador` y `contabilidad`, salvo que tengan gente a cargo:** es ruido, no una falla. `DictadoBoton` (Cotizar y Redactar con IA, Asignar con IA, actas) pregunta al montarse; con el 403 `vozPropiaDisponible` responde `false` y se dicta con el navegador. Como guarda solo los aciertos, vuelve a preguntar en cada montaje. Es la decisión de Adam del 12-10: esos roles no transcriben.
+    - **No abrir `voz/estado` por sí sola:** el botón creería que hay transcriptor, grabaría y el `POST voz/transcribir` daría 403, y hoy el dictado les funciona. Para quitar el ruido, que responda `{ disponible: false }` a quien no puede transcribir, como `ai/asistente/estado` y `cctv-disenos/acceso`.
+  - **Trampas:**
+    - El `node_modules` compartido trae un cliente de Prisma viejo: `tsc` en una copia exportada da 201 errores falsos. No regenerarlo ahí, porque lo usan otras sesiones. Copia del esquema con `output` propio, `prisma generate --schema` y `paths` de `@prisma/client` en un `tsconfig` aparte: 0 errores.
+    - `tsconfig.json` de la API excluye `**/*.spec.ts` y `ts-jest` corre con `isolatedModules`: una prueba nueva no pasa por revisión de tipos si no se agrega con `files`.
+    - `docker logs nexara-api` empieza de cero en cada despliegue: contar 403 de antes con `docker logs traefik-main`, que da el estado por ruta sin importar el contenedor.
+
 - **03-11 ~11:45 (claude-code) — Relojes y fotos de las cámaras de INTEGRA: quedó bien, medido con gente real. Aparte, la terminal .161 trae la red inestable.** Tarea `integra-rostro-real-0311`. Solo lectura: sin código ni escrituras en equipos. Corte de 08:00 a 11:37 de México: 1,137 rostros y 94 fotos. Falta ver la tarde; de noche solo hay una, la del festivo.
   - **Retraso (`receivedAt - occurredAt`):** de 481 s a una mediana de 3.8 s. Unos 2 s de eso son el reloj de las cámaras, que va −2 s.
     | Cámara | Filas | Fotos | Mediana |
