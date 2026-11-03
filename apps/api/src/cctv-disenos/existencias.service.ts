@@ -70,7 +70,7 @@ export class ExistenciasCctvService {
     const nombres = [...new Set(pedidos.flatMap((p) => variantesDeModelo(p.modelo)))];
     if (!ids.length && !nombres.length) return new Map();
     const productos = await this.prisma.$queryRaw<Array<{ id: number; sku: string; price: number | null }>>`
-      SELECT id, sku, price FROM products
+      SELECT id, sku, price FROM "Product"
       WHERE "companyId" = ${empresa} AND activo IS NOT FALSE AND (
         id = ANY(${ids}::int[])
         OR regexp_replace(upper(sku), '[^A-Z0-9]', '', 'g') = ANY(${nombres}::text[])

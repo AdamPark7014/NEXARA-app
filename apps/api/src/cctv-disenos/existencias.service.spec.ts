@@ -32,7 +32,7 @@ const linea = (over: Record<string, unknown> = {}) => ({ clave: 'db-8', marca: '
 function armar(opciones: { productos?: unknown[]; ct?: unknown[]; diseno?: Record<string, unknown> | null; cotizacion?: Record<string, unknown> | null; items?: unknown[] } = {}) {
   const prisma = {
     // La primera consulta cruda que llega a cada tabla se distingue por su texto.
-    $queryRaw: jest.fn((partes: TemplateStringsArray) => Promise.resolve(partes.join(' ').includes('FROM products') ? (opciones.productos ?? []) : (opciones.ct ?? []))),
+    $queryRaw: jest.fn((partes: TemplateStringsArray) => Promise.resolve(partes.join(' ').includes('FROM "Product"') ? (opciones.productos ?? []) : (opciones.ct ?? []))),
     stockLevel: { findMany: jest.fn().mockResolvedValue([{ productId: 5, quantity: 7, reservedQty: 2, unitCost: 900 }]) },
     cctvDiseno: { findFirst: jest.fn().mockResolvedValue(opciones.diseno === undefined ? { id: 3, nombre: 'Ejemplo · Bodega', clienteId: null, cotizacionId: null } : opciones.diseno), update: jest.fn().mockResolvedValue({}) },
     cotizacion: { findFirst: jest.fn().mockResolvedValue(opciones.cotizacion ?? null) },
