@@ -131,6 +131,9 @@ export function montoCorto(v: number | null | undefined): string {
   return `$${Math.round(v)}`;
 }
 
+/** Quién abre Obra. La API es la autoridad (`puedeVerObra`). */
+export const ROLES_DE_OBRA: readonly string[] = ["ceo", "dir_operaciones", "coord_operaciones", "arquitecto"];
+
 /** Un módulo sin un solo registro lo dice en lugar de enseñar un cero. */
 export type CuadroModulo = { id: string; nombre: string; href: string; valor: string | null; nota: string; sinCaptura?: boolean };
 
@@ -147,12 +150,12 @@ export function cuadrosDeModulos(m: DireccionHoy["modulos"]): CuadroModulo[] {
       valor: montoCorto(cot.monto),
       nota: `${cot.borrador ?? "—"} en borrador, ${cot.enviadas ?? "—"} enviadas`,
     },
-    cuadro("proyectos", "Proyectos", "/erp/proyectos", m.proyectos, "activos", "ninguno activo"),
+    cuadro("proyectos", "Proyectos", "/erp/proyectos", m.proyectos, m.proyectos === 1 ? "activo" : "activos", "ninguno activo"),
     cuadro("clientes", "Clientes", "/erp/clientes", m.clientes, "en padrón", "padrón vacío"),
     cuadro("disenos", "Diseños de cámaras", "/erp/videovigilancia", m.disenos, "en el diseñador", "ninguno todavía"),
-    cuadro("costos", "Costos", "/erp/costos", m.costos, "movimientos", "sin movimientos"),
-    cuadro("almacen", "Almacén", "/erp/almacen", m.productos, "productos", "0 productos"),
-    cuadro("herramientas", "Herramientas", "/erp/almacen/herramientas", m.herramientas, "registradas", "ninguna registrada"),
-    cuadro("facturas", "Facturación", "/erp/invoicing", m.facturas, "facturas", "0 facturas"),
+    cuadro("costos", "Costos", "/erp/costos", m.costos, m.costos === 1 ? "movimiento" : "movimientos", "sin movimientos"),
+    cuadro("almacen", "Almacén", "/erp/almacen", m.productos, m.productos === 1 ? "producto" : "productos", "0 productos"),
+    cuadro("herramientas", "Herramientas", "/erp/almacen/herramientas", m.herramientas, m.herramientas === 1 ? "registrada" : "registradas", "ninguna registrada"),
+    cuadro("facturas", "Facturación", "/erp/invoicing", m.facturas, m.facturas === 1 ? "factura" : "facturas", "0 facturas"),
   ];
 }

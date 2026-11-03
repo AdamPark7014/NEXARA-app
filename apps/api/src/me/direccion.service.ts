@@ -195,7 +195,7 @@ export class DireccionService {
       hoy: {
         checaron,
         de: ids.size,
-        fecha: ultima?.workDate ? workDateKey(ultima.workDate) : null,
+        fecha: ultima?.workDate ? ultima.workDate.toISOString().slice(0, 10) : null,
         pctATiempo: empresa.pctATiempo,
         aTiempo: empresa.aTiempo,
         medidas: empresa.medidas,
