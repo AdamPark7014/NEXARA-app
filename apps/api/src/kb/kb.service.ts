@@ -126,7 +126,7 @@ export class KbService {
     );
     if (!article) throw new NotFoundException('Artículo no encontrado');
     this.prisma.kbArticle
-      .update({ where: { id: article.id }, data: { viewCount: { increment: 1 } } })
+      .update({ where: { id: article.id, companyId: tenantId }, data: { viewCount: { increment: 1 } } })
       .catch(() => null);
     return article;
   }
@@ -203,7 +203,7 @@ export class KbService {
     );
     if (!existing) throw new NotFoundException('Artículo no encontrado');
     return this.prisma.kbArticle.update({
-      where: { id },
+      where: { id, companyId },
       data: { helpfulCount: { increment: 1 } },
     });
   }

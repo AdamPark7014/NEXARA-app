@@ -53,6 +53,10 @@ export function withTenantBypass<T>(fn: () => T): T {
   return tenantStorage.run({ companyId: null, bypass: true }, fn);
 }
 
+/**
+ * Ojo: `withTenantBypassAsync(() => prisma.x.find())` NO quita el filtro. Una consulta de Prisma corre al
+ * esperarla, y para entonces ya salió de este contexto. Para quitarlo: `async () => { return await … }`.
+ */
 export async function withTenantBypassAsync<T>(fn: () => Promise<T>): Promise<T> {
   return tenantStorage.run({ companyId: null, bypass: true }, fn);
 }
