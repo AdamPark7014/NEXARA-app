@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   HttpStatus,
   Inject,
@@ -17,6 +18,8 @@ import { CreateCotizacionDto } from './dto/create-cotizacion.dto.js';
 import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
+import { getTenantStore, runWithTenantAsync, withTenantBypassAsync } from '../common/tenant/tenant-context.js';
+import { EN_REVISION, vistaPublica } from './cotizacion-publica.js';
 import { generateCotizacionPdf } from './cotizacion-pdf.js';
 import {
   formatoDesdeCotizacion,
@@ -1079,80 +1082,74 @@ export class CotizacionesService {
     return { pdfUrl: `/uploads/cotizaciones/${filename}` };
   }
 
-  async getPublicByToken(token: string) {
-    const quote = await this.db.cotizacion.findUnique({
-      where: { publicToken: token },
-      include: { items: true },
+  /**
+   * Lo que se hace desde el enlace del cliente. Sin sesión, el filtro de empresa cae en la principal:
+   * el token se busca sin ese filtro y lo demás corre con la empresa de la cotización, para que sus
+   * avisos y su auditoría queden donde van.
+   *
+   * El `await` adentro hace falta: una consulta de Prisma no corre al crearla sino al esperarla, y
+   * sin él correría ya fuera del contexto sin filtro.
+   */
+  private async desdeElEnlace<T>(
+    token: string,
+    trabajo: (quote: Prisma.CotizacionGetPayload<{ include: { items: true } }>) => Promise<T>,
+  ) {
+    const quote = await withTenantBypassAsync(async () => {
+      return await this.db.cotizacion.findUnique({
+        where: { publicToken: token },
+        include: { items: { orderBy: { id: 'asc' } } },
+      });
     });
     if (!quote) throw new NotFoundException('Cotizacion no encontrada');
+    return runWithTenantAsync({ ...getTenantStore(), companyId: quote.companyId, bypass: false }, () => trabajo(quote));
+  }
 
-    return {
-      id: quote.id,
-      quoteNumber: quote.quoteNumber,
-      issueDate: quote.issueDate,
-      validUntil: quote.validUntil,
-      status: quote.status,
-      clientName: quote.clientName,
-      clientCompany: quote.clientCompany,
-      clientEmail: quote.clientEmail,
-      projectName: quote.projectName,
-      currency: quote.currency,
-      subtotal: quote.subtotal,
-      discountTotal: quote.discountTotal,
-      taxTotal: quote.taxTotal,
-      iepsTotal: quote.iepsTotal,
-      retentionTotal: quote.retentionTotal,
-      total: quote.total,
-      items: quote.items,
-    };
+  async getPublicByToken(token: string) {
+    return this.desdeElEnlace(token, async (quote) => {
+      if (estadoDesdeDb(quote.status) === ESTADO.BORRADOR) throw new ConflictException(EN_REVISION);
+      return vistaPublica(quote);
+    });
   }
 
   async signByToken(token: string, dto: SignCotizacionDto) {
-    const quote = await this.db.cotizacion.findUnique({ where: { publicToken: token } });
-    if (!quote) throw new NotFoundException('Cotizacion no encontrada');
+    return this.desdeElEnlace(token, async (quote) => {
+      if (quote.status === CotizacionStatus.APPROVED) return { ok: true };
 
-    if (quote.status === CotizacionStatus.APPROVED) {
-      return this.db.cotizacion.findUnique({
+      /**
+       * Antes bastaba con tener el enlace: se firmaba una cotización vencida, una rechazada o una que
+       * nunca se envió. La vigencia y el estado se revisan aquí, que es donde el cliente aprieta.
+       */
+      const permiso = puedeFirmarse({ estado: quote.status, validUntil: quote.validUntil });
+      if (!permiso.ok) throw new BadRequestException(permiso.motivo);
+
+      const updated = await this.db.cotizacion.update({
         where: { id: quote.id },
-        include: { items: true },
+        data: {
+          status: CotizacionStatus.APPROVED,
+          signedByName: dto.name.trim(),
+          signedByEmail: dto.email.trim(),
+          signedAt: new Date(),
+        },
       });
-    }
 
-    /**
-     * Antes bastaba con tener el enlace: se firmaba una cotización vencida, una rechazada o una que
-     * nunca se envió. La vigencia y el estado se revisan aquí, que es donde el cliente aprieta.
-     */
-    const permiso = puedeFirmarse({ estado: quote.status, validUntil: quote.validUntil });
-    if (!permiso.ok) throw new BadRequestException(permiso.motivo);
+      void this.applyQuoteSignedSideEffects(updated, dto).catch((error) => {
+        console.error('Error applying quote signed side effects:', error);
+      });
+      void this.sincronizarActividad(updated.id, updated.status).catch(() => undefined);
+      void this.core
+        .avisar({
+          cotizacionId: updated.id,
+          quoteNumber: updated.quoteNumber,
+          tipo: 'QUOTE_SIGNED',
+          titulo: 'Cotización aprobada por el cliente',
+          mensaje: `${updated.quoteNumber}: ${dto.name.trim()} la firmó.`,
+          autorId: updated.createdById,
+          companyId: updated.companyId,
+        })
+        .catch(() => undefined);
 
-    const updated = await this.db.cotizacion.update({
-      where: { id: quote.id },
-      data: {
-        status: CotizacionStatus.APPROVED,
-        signedByName: dto.name.trim(),
-        signedByEmail: dto.email.trim(),
-        signedAt: new Date(),
-      },
-      include: { items: true },
+      return { ok: true };
     });
-
-    void this.applyQuoteSignedSideEffects(updated, dto).catch((error) => {
-      console.error('Error applying quote signed side effects:', error);
-    });
-    void this.sincronizarActividad(updated.id, updated.status).catch(() => undefined);
-    void this.core
-      .avisar({
-        cotizacionId: updated.id,
-        quoteNumber: updated.quoteNumber,
-        tipo: 'QUOTE_SIGNED',
-        titulo: 'Cotización aprobada por el cliente',
-        mensaje: `${updated.quoteNumber}: ${dto.name.trim()} la firmó.`,
-        autorId: updated.createdById,
-        companyId: updated.companyId,
-      })
-      .catch(() => undefined);
-
-    return updated;
   }
 
   private async applyQuoteApprovedSideEffects(
@@ -2043,11 +2040,14 @@ export class CotizacionesService {
     return this.presentar(updated);
   }
 
-  /** El cliente rechaza desde el enlace público, con motivo. */
+  /** El cliente rechaza desde el enlace, con motivo. Un borrador no: lo está corrigiendo el equipo. */
   async rechazarPorToken(token: string, motivo: string, nombre?: string) {
-    const quote = await this.db.cotizacion.findUnique({ where: { publicToken: token } });
-    if (!quote) throw new NotFoundException('Cotizacion no encontrada');
-    return this.rechazar(quote.id, motivo, { porNombre: nombre ?? null, companyId: quote.companyId });
+    return this.desdeElEnlace(token, async (quote) => {
+      const permiso = puedeFirmarse({ estado: quote.status, validUntil: quote.validUntil });
+      if (!permiso.ok) throw new BadRequestException(permiso.motivo);
+      await this.rechazar(quote.id, motivo, { porNombre: nombre ?? null, companyId: quote.companyId });
+      return { ok: true };
+    });
   }
 
   /**

@@ -12,6 +12,8 @@ export const SECRET_KEYS: ReadonlySet<string> = new Set([
   'portalPasswordHash',
   'appKeyEnc',
   'appSecretEnc',
+  // El enlace de firma: con él se firma como el cliente. Solo viaja en su correo.
+  'publicToken',
 ]);
 
 const MAX_DEPTH = 12;

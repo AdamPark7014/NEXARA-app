@@ -14,6 +14,12 @@ describe('stripSecrets · nada de hashes ni secretos MFA en las respuestas', () 
     expect(limpio).toEqual({ id: 1, email: 'demo@nexara.mx', manager: { id: 2 }, equipo: [{ id: 3 }, { id: 4 }] });
   });
 
+  it('quita el enlace de firma: con él se firma como el cliente', () => {
+    const version = { snapshot: { publicToken: 'tok-1', total: 116 } };
+    const cotizacion = { id: 50, publicToken: 'tok-1', versiones: [version] };
+    expect(stripSecrets(cotizacion)).toEqual({ id: 50, versiones: [{ snapshot: { total: 116 } }] });
+  });
+
   it('no muta el original (puede venir de una caché que se usa para autenticar)', () => {
     const user = { id: 1, passwordHash: 'hash' };
     stripSecrets(user);
