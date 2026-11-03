@@ -6,6 +6,7 @@ import { limitesEdificio, limitesSitio } from "../medidas";
 import { planoVacio, tapasDelPlano, type EquipoPlano, type Plano } from "../plano";
 import { camaraEnMetros, coberturaCamara, type PoligonoCobertura } from "../visibilidad";
 import {
+  ALTURA_CORTE_M,
   claseObstaculo,
   construirAlcances,
   construirArquitectura,
@@ -13,10 +14,12 @@ import {
   construirCables,
   construirCamaras,
   construirCoberturas,
+  construirContacto,
   construirEquipos,
   construirMuebles,
   construirObstaculos,
   construirRayos,
+  construirSoportes,
   escalaVisualEquipos,
   lamparasDeNoche,
   materialesArquitectura,
@@ -103,10 +106,39 @@ describe("arquitectura de la maqueta", () => {
     const r = agregarAbertura(p0, p0.muros[0].id, 0.5, "ventana");
     const { muros } = construirArquitectura(r.plano, mats);
     const conVentana = muros.find((m) => m.id === p0.muros[0].id)!;
+    const de = (grupo: THREE.Group | null) => conVentana.mallas.filter((m) => m.parent === grupo);
     // Izquierda, derecha, abajo y arriba de la ventana.
-    expect(conVentana.mallas).toHaveLength(4);
+    expect(de(conVentana.alto)).toHaveLength(4);
+    // Cortado ya no hay nada arriba de la ventana.
+    expect(de(conVentana.bajo)).toHaveLength(3);
     const sinHueco = muros.find((m) => m.id === p0.muros[1].id)!;
-    expect(sinHueco.mallas).toHaveLength(1);
+    expect(sinHueco.mallas.filter((m) => m.parent === sinHueco.alto)).toHaveLength(1);
+  });
+
+  it("el muro cortado empieza oculto y no se puede tocar hasta que se usa", () => {
+    const p0 = cuarto();
+    const { muros } = construirArquitectura(p0, mats);
+    const m = muros[0];
+    expect(m.alto.visible).toBe(true);
+    expect(m.bajo?.visible).toBe(false);
+    const hijo = m.bajo!.children[0];
+    expect(hijo.userData.tenue).toBe(true);
+    // No llega al techo: ese es el punto.
+    const caja = new THREE.Box3().setFromObject(m.bajo!);
+    expect(caja.max.y).toBeLessThan(ALTURA_CORTE_M + 0.05);
+  });
+
+  it("una reja alrededor no convierte en interiores los muros del edificio", () => {
+    let p = cuarto();
+    const paredes = p.muros.map((m) => m.id);
+    const a = { x: px(-6), y: px(-6) };
+    const b = { x: px(26), y: px(26) };
+    for (const [de, hasta] of [[a, { x: b.x, y: a.y }], [{ x: b.x, y: a.y }, b], [b, { x: a.x, y: b.y }], [{ x: a.x, y: b.y }, a]] as const) {
+      const r = agregarMuro(p, de, hasta);
+      p = { ...r.plano, muros: r.plano.muros.map((m) => (m.id === r.muro!.id ? { ...m, tipo: "reja" as const } : m)) };
+    }
+    const { muros } = construirArquitectura(p, mats);
+    for (const id of paredes) expect(muros.find((m) => m.id === id)?.exterior).toBe(true);
   });
 
   it("los muros de la orilla saben hacia dónde queda afuera; los de adentro no se vuelven tenues", () => {
@@ -128,7 +160,31 @@ describe("arquitectura de la maqueta", () => {
     expect(elegibles(construirAreas(p))[0]).toEqual({ tipo: "area", id: p.areas![0].id });
     expect(elegibles(construirMuebles(p))[0]).toEqual({ tipo: "mueble", id: p.muebles![0].id });
     expect(elegibles(construirObstaculos(p, mats))[0]).toEqual({ tipo: "obstaculo", id: p.obstaculos[0].id });
-    expect(elegibles(construirArquitectura(p, mats).grupo).filter((s) => s.tipo === "muro").length).toBe(4);
+    // Cada muro se puede elegir entero y también cortado.
+    const dePared = elegibles(construirArquitectura(p, mats).grupo).filter((s) => s.tipo === "muro");
+    expect(new Set(dePared.map((s) => s.id)).size).toBe(4);
+    expect(dePared.length).toBe(8);
+  });
+
+  it("lo montado en un muro conserva ese pedazo de muro cuando se corta", () => {
+    let p = cuarto();
+    const lugar = { x: px(5), y: 0 };
+    p = agregarCamara(p, lugar, MODELOS_CAMARA[0]).plano;
+    const g = construirSoportes(p, mats);
+    const muroId = p.muros[0].id;
+    const piezas = g.children.filter((h) => h.userData.muroId === muroId);
+    expect(piezas.length).toBe(1);
+    // Sube de lo cortado hasta lo alto del muro y empieza oculto.
+    expect(piezas[0].visible).toBe(false);
+    const caja = new THREE.Box3().setFromObject(piezas[0]);
+    expect(caja.min.y).toBeCloseTo(ALTURA_CORTE_M, 1);
+    expect(caja.max.y).toBeGreaterThan(p.muros[0].alturaM - 0.05);
+  });
+
+  it("sin muros no hay soportes ni sombras que armar", () => {
+    const vacio = { ...cuarto(), muros: [] };
+    expect(construirSoportes(vacio, mats).children).toHaveLength(0);
+    expect(() => construirContacto(vacio, { min: { x: 0, y: 0 }, max: { x: 10, y: 10 } })).not.toThrow();
   });
 
   it("el nombre del obstáculo decide cómo se ve", () => {
@@ -215,9 +271,9 @@ describe("cámaras en la maqueta", () => {
   });
 
   it("los equipos se agrandan según el tamaño del sitio, con tope", () => {
-    expect(escalaVisualEquipos({ min: { x: 0, y: 0 }, max: { x: 3, y: 3 } })).toBeCloseTo(1.6);
-    expect(escalaVisualEquipos({ min: { x: 0, y: 0 }, max: { x: 32, y: 18 } })).toBeCloseTo(4.4, 1);
-    expect(escalaVisualEquipos({ min: { x: 0, y: 0 }, max: { x: 300, y: 300 } })).toBe(6);
+    expect(escalaVisualEquipos({ min: { x: 0, y: 0 }, max: { x: 3, y: 3 } })).toBeCloseTo(1.25);
+    expect(escalaVisualEquipos({ min: { x: 0, y: 0 }, max: { x: 32, y: 18 } })).toBeCloseTo(2.02, 1);
+    expect(escalaVisualEquipos({ min: { x: 0, y: 0 }, max: { x: 300, y: 300 } })).toBe(2.6);
   });
 });
 

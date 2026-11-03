@@ -404,29 +404,53 @@
   top: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  height: 22px;
-  padding: 0 8px 0 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0;
   border: 0;
-  border-radius: 11px;
-  background: rgba(15, 18, 23, 0.88);
-  color: #fff;
-  font: 600 11px var(--ui-font-sans, inherit);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 5px rgba(10, 14, 20, 0.35);
+  color: #14181f;
+  font: 650 11px var(--ui-font-sans, inherit);
   white-space: nowrap;
   cursor: pointer;
   pointer-events: auto;
   will-change: transform;
+  transition: background 0.14s ease;
 }
 
 .claveEquipo i {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: #15b89a;
 }
 
+.claveEquipo span {
+  display: none;
+}
+
+.claveEquipo:hover,
+.claveEquipo[aria-pressed="true"],
+.claveEquipo:focus-visible {
+  height: 22px;
+  padding: 0 9px 0 6px;
+  border-radius: 11px;
+  z-index: 2;
+}
+
+.claveEquipo:hover span,
+.claveEquipo[aria-pressed="true"] span,
+.claveEquipo:focus-visible span {
+  display: inline;
+}
+
 .claveEquipo[aria-pressed="true"] {
   background: #0f7f6c;
+  color: #fff;
 }
 
 .claveEquipo[aria-pressed="true"] i {
@@ -447,13 +471,13 @@
   will-change: transform;
 }
 
+/* Como los nombres de un mapa: texto con halo, sin caja que tape el piso. */
 .rotuloArea {
-  padding: 1px 7px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.82);
-  color: #14181f;
-  font-size: 11px;
-  font-weight: 600;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 3px rgba(8, 12, 18, 0.85), 0 0 9px rgba(8, 12, 18, 0.55);
 }
 
 .rotuloNivel {

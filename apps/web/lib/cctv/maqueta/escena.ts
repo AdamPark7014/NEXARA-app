@@ -18,7 +18,7 @@ import { camaraEnMetros, distanciaPuntoSegmento, type PoligonoCobertura } from "
 import { crearAnaquel, crearMueble, crearPersona } from "./mobiliario";
 import { crearModelo, inclinarModelo, poste, type TipoModelo } from "./modelos";
 import { crearModeloEquipo, montarEnGabinete, type ParamsEquipo } from "./modelosEquipos";
-import { materialPiso } from "./texturas";
+import { azarFijo, materialBanqueta, materialFollaje, materialPiso, relieveDeMuro } from "./texturas";
 
 export type { Limites };
 
@@ -31,14 +31,17 @@ export const COLOR_NIVEL_HEX: Readonly<Record<NivelCobertura, number>> = {
   general: 0x9aa3af,
 };
 
-const OPACIDAD: Readonly<Record<NivelCobertura, number>> = { identificacion: 0.56, reconocimiento: 0.46, observacion: 0.38, deteccion: 0.26, general: 0.14 };
+const OPACIDAD: Readonly<Record<NivelCobertura, number>> = { identificacion: 0.44, reconocimiento: 0.36, observacion: 0.3, deteccion: 0.22, general: 0.12 };
 
 /* ── Medidas del sitio ──────────────────────────────────────────────────────────── */
 
-/** Cuánto se agrandan los equipos en la vista general: una cámara real mide 12 cm. */
+/**
+ * Cuánto se agrandan los equipos en la vista general: una cámara real mide 12 cm. Apenas lo necesario:
+ * de lejos los ubica su punto en pantalla, y uno gigante rompe la escala de todo lo demás.
+ */
 export function escalaVisualEquipos(lim: Limites): number {
   const diagonal = Math.hypot(lim.max.x - lim.min.x, lim.max.y - lim.min.y);
-  return Math.min(Math.max(diagonal * 0.12, 1.6), 6);
+  return Math.min(Math.max(diagonal * 0.055, 1.25), 2.6);
 }
 
 /** Sombras y selección: marca una malla como elegible. */
@@ -78,7 +81,17 @@ const rect = (x0: number, y0: number, x1: number, y1: number): Punto[] => [
 
 export const MARGEN_BASE_M = 3;
 
-/** Base de la maqueta, pasto, banqueta y losa del edificio. Solo la lleva el nivel de abajo. */
+/** Tono del pasto a gran escala: rompe la repetición de la textura y da manchas de terreno real. */
+function tonoDeTerreno(x: number, z: number): number {
+  const a = Math.sin(x * 0.061 + Math.sin(z * 0.043) * 1.7) * Math.cos(z * 0.052 + Math.sin(x * 0.037) * 1.3);
+  const b = Math.sin(x * 0.17 + 2.1) * Math.sin(z * 0.14 + 0.7);
+  return 0.86 + a * 0.13 + b * 0.05;
+}
+
+/** Hasta dónde llega el suelo: lo lejano lo funde la niebla con el cielo. */
+const RADIO_SUELO_M = 900;
+
+/** Terreno: pasto hasta el horizonte, banqueta, la calle del frente y árboles alrededor. Solo lo lleva el nivel de abajo. */
 export function construirTerreno(plano: Plano, lim: Limites): THREE.Group {
   const g = new THREE.Group();
   const m = MARGEN_BASE_M;
@@ -86,23 +99,217 @@ export function construirTerreno(plano: Plano, lim: Limites): THREE.Group {
   const y0 = lim.min.y - m;
   const x1 = lim.max.x + m;
   const y1 = lim.max.y + m;
-  const mesa = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), new THREE.MeshStandardMaterial({ color: 0xd9dcdf, roughness: 0.9 }));
-  mesa.rotation.x = -Math.PI / 2;
-  mesa.position.set((x0 + x1) / 2, -1.04, (y0 + y1) / 2);
-  mesa.receiveShadow = true;
-  mesa.userData.esMesa = true;
-  g.add(mesa);
-  const base = new THREE.Mesh(new RoundedBoxGeometry(x1 - x0 + 0.8, 1, y1 - y0 + 0.8, 3, 0.12), new THREE.MeshStandardMaterial({ color: 0xf4f4f2, roughness: 0.66 }));
-  base.position.set((x0 + x1) / 2, -0.56, (y0 + y1) / 2);
-  base.receiveShadow = true;
-  base.castShadow = true;
-  g.add(base);
-  g.add(piso(rect(x0, y0, x1, y1), materialPiso("pasto"), -0.04));
+  const cx = (x0 + x1) / 2;
+  const cz = (y0 + y1) / 2;
+  const R = RADIO_SUELO_M;
+
+  const geo = new THREE.PlaneGeometry(2 * R, 2 * R, 120, 120).rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position;
+  const uv = geo.attributes.uv;
+  const colores = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) + cx;
+    const z = pos.getZ(i) + cz;
+    uv.setXY(i, x, -z);
+    const t = tonoDeTerreno(x, z);
+    colores.set([t * 1.02, t, t * 0.96], i * 3);
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colores, 3));
+  const pasto = materialPiso("pasto").clone();
+  pasto.vertexColors = true;
+  const suelo = new THREE.Mesh(geo, pasto);
+  suelo.position.set(cx, -0.04, cz);
+  suelo.receiveShadow = true;
+  g.add(suelo);
+
   const ed = limitesEdificio(plano);
   if (ed) {
-    g.add(piso(rect(ed.min.x - 1.5, ed.min.y - 1.5, ed.max.x + 1.5, ed.max.y + 1.5), new THREE.MeshStandardMaterial({ color: 0xd9d9d4, roughness: 0.88 }), -0.015));
+    g.add(piso(rect(ed.min.x - 1.5, ed.min.y - 1.5, ed.max.x + 1.5, ed.max.y + 1.5), materialBanqueta(), -0.015));
     g.add(piso(rect(ed.min.x, ed.min.y, ed.max.x, ed.max.y), materialPiso("concreto"), -0.005));
   }
+  // La calle: banqueta, guarnición, asfalto y línea central.
+  const zBanqueta = y1 + 0.6;
+  const zCalle = zBanqueta + 2.4;
+  const ancho = 8.4;
+  g.add(piso(rect(cx - R, zBanqueta, cx + R, zCalle), materialBanqueta(), -0.02));
+  g.add(piso(rect(cx - R, zCalle, cx + R, zCalle + ancho), materialPiso("asfalto"), -0.03));
+  const guarnicion = new THREE.MeshStandardMaterial({ color: 0xb9b6ae, roughness: 0.9 });
+  for (const z of [zCalle, zCalle + ancho]) {
+    const c = new THREE.Mesh(new THREE.BoxGeometry(2 * R, 0.14, 0.16), guarnicion);
+    c.position.set(cx, 0.03, z);
+    c.castShadow = true;
+    c.receiveShadow = true;
+    g.add(c);
+  }
+  const pintura = new THREE.MeshStandardMaterial({ color: 0xe8e4d6, roughness: 0.7 });
+  const tramos = 60;
+  const linea = new THREE.InstancedMesh(new THREE.PlaneGeometry(2.6, 0.13).rotateX(-Math.PI / 2), pintura, tramos);
+  const d = new THREE.Object3D();
+  for (let i = 0; i < tramos; i++) {
+    d.position.set(cx + (i - tramos / 2) * 6.2, -0.022, zCalle + ancho / 2);
+    d.updateMatrix();
+    linea.setMatrixAt(i, d.matrix);
+  }
+  linea.receiveShadow = true;
+  g.add(linea);
+  g.add(construirArboleda(x0, y0, x1, zBanqueta));
+  return g;
+}
+
+/** Árboles alrededor del terreno: dan escala y contexto. Son de ornato: ni se eligen ni estorban a la vista general. */
+function construirArboleda(x0: number, y0: number, x1: number, y1: number): THREE.Group {
+  const g = new THREE.Group();
+  const azar = azarFijo(Math.abs(Math.round(x1 * 7 + y1 * 13)) + 3);
+  const lugares: Array<{ x: number; z: number; alto: number }> = [];
+  const poner = (x: number, z: number) => lugares.push({ x: x + (azar() - 0.5) * 2.4, z: z + (azar() - 0.5) * 2.4, alto: 4.2 + azar() * 2.6 });
+  // Al fondo y a los lados, y en segunda fila más lejos; al frente queda la calle y la vista libre.
+  const paso = 8.4;
+  for (let x = x0 - 6; x <= x1 + 6; x += paso) {
+    poner(x, y0 - 4.5);
+    if (azar() > 0.25) poner(x + paso / 2, y0 - 12);
+  }
+  for (let z = y0; z <= y1 - 2; z += paso) {
+    poner(x1 + 4.5, z);
+    if (azar() > 0.25) poner(x1 + 12, z + paso / 2);
+    if (azar() > 0.35) poner(x0 - 11, z);
+  }
+  // Del otro lado de la calle, ya lejos.
+  for (let x = x0 - 18; x <= x1 + 18; x += paso * 1.5) if (azar() > 0.3) poner(x, y1 + 18 + azar() * 6);
+  const porArbol = 58;
+  const hojas = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), materialFollaje(), lugares.length * porArbol);
+  hojas.castShadow = true;
+  hojas.userData.compartido = false;
+  const tronco = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.1, 0.17, 1, 8), new THREE.MeshStandardMaterial({ color: 0x65523f, roughness: 0.96 }), lugares.length);
+  tronco.castShadow = true;
+  const o = new THREE.Object3D();
+  const tono = new THREE.Color();
+  let k = 0;
+  lugares.forEach((a, i) => {
+    const altoTronco = a.alto * 0.48;
+    o.position.set(a.x, altoTronco / 2, a.z);
+    o.rotation.set(0, 0, 0);
+    o.scale.set(1, altoTronco, 1);
+    o.updateMatrix();
+    tronco.setMatrixAt(i, o.matrix);
+    const radio = a.alto * 0.34;
+    const claro = 0.82 + azar() * 0.34;
+    const calido = azar() * 0.12;
+    for (let j = 0; j < porArbol; j++) {
+      const u = azar() * 2 - 1;
+      const ang = azar() * Math.PI * 2;
+      const r = Math.cbrt(0.35 + azar() * 0.65);
+      const c = Math.sqrt(1 - u * u);
+      o.position.set(a.x + c * Math.cos(ang) * radio * r, a.alto * 0.68 + u * radio * 0.92 * r, a.z + c * Math.sin(ang) * radio * r);
+      o.rotation.set(azar() * Math.PI, azar() * Math.PI, azar() * Math.PI);
+      const t = radio * (0.62 + azar() * 0.38);
+      o.scale.set(t, t, t);
+      o.updateMatrix();
+      hojas.setMatrixAt(k, o.matrix);
+      // Más oscuro abajo: la copa se tapa la luz a sí misma.
+      const luz = claro * (0.74 + (u + 1) * 0.16);
+      hojas.setColorAt(k, tono.setRGB(luz * (1 + calido), luz, luz * (1 - calido)));
+      k += 1;
+    }
+  });
+  g.add(tronco, hojas);
+  return g;
+}
+
+/** Lo que ocupa cada mueble en el piso, para su sombra de contacto. */
+const HUELLA_MUEBLE: Readonly<Partial<Record<string, readonly [number, number]>>> = {
+  escritorio: [1.5, 0.74],
+  "mesa-juntas": [3.2, 1.25],
+  mostrador: [3.3, 0.8],
+  sofa: [2.6, 0.9],
+  planta: [0.36, 0.36],
+  arbol: [0.34, 0.34],
+  camion: [2.5, 7.2],
+  auto: [1.8, 4.5],
+};
+
+/**
+ * Sombra de contacto: donde un muro o un mueble toca el piso, el piso se oscurece suave. Es lo que hace
+ * que las cosas se sienten en el suelo en vez de flotar, y se calcula una vez, no en cada cuadro.
+ */
+export function construirContacto(plano: Plano, lim: Limites): THREE.Group {
+  const g = new THREE.Group();
+  const margen = 3;
+  const x0 = lim.min.x - margen;
+  const y0 = lim.min.y - margen;
+  const w = lim.max.x - lim.min.x + margen * 2;
+  const h = lim.max.y - lim.min.y + margen * 2;
+  if (w <= 0 || h <= 0) return g;
+  const s = Math.min(2048 / Math.max(w, h), 30);
+  const anchoPx = Math.ceil(w * s);
+  const altoPx = Math.ceil(h * s);
+  const forma = document.createElement("canvas");
+  forma.width = anchoPx;
+  forma.height = altoPx;
+  const c = forma.getContext("2d");
+  if (!c) return g;
+  c.fillStyle = "#fff";
+  c.fillRect(0, 0, anchoPx, altoPx);
+  c.fillStyle = c.strokeStyle = "#000";
+  const X = (m: number) => (m - x0) * s;
+  const Y = (m: number) => (m - y0) * s;
+  c.lineCap = "square";
+  const k = plano.escala.metrosPorPx;
+  for (const muro of plano.muros) {
+    if (muro.tipo === "reja") continue;
+    const a = aMetros(muro.a, plano.escala);
+    const b = aMetros(muro.b, plano.escala);
+    c.lineWidth = Math.max(muro.tipo === "vidrio" ? 0.05 : muro.grosorM, 0.05) * s;
+    c.beginPath();
+    c.moveTo(X(a.x), Y(a.y));
+    c.lineTo(X(b.x), Y(b.y));
+    c.stroke();
+  }
+  for (const o of plano.obstaculos) {
+    if (o.puntos.length < 3) continue;
+    c.beginPath();
+    o.puntos.forEach((q, i) => (i ? c.lineTo(X(q.x * k), Y(q.y * k)) : c.moveTo(X(q.x * k), Y(q.y * k))));
+    c.closePath();
+    c.fill();
+  }
+  for (const mu of plano.muebles ?? []) {
+    const huella = HUELLA_MUEBLE[mu.tipo];
+    if (!huella) continue;
+    c.save();
+    c.translate(X(mu.pos.x * k), Y(mu.pos.y * k));
+    c.rotate(-anguloDeRumbo(mu.rumboDeg));
+    c.fillRect((-huella[0] / 2) * s, (-huella[1] / 2) * s, huella[0] * s, huella[1] * s);
+    c.restore();
+  }
+  for (const h2 of plano.personas) {
+    c.beginPath();
+    c.arc(X(h2.pos.x * k), Y(h2.pos.y * k), 0.2 * s, 0, Math.PI * 2);
+    c.fill();
+  }
+  const salida = document.createElement("canvas");
+  salida.width = anchoPx;
+  salida.height = altoPx;
+  const o = salida.getContext("2d");
+  if (!o) return g;
+  o.fillStyle = "#fff";
+  o.fillRect(0, 0, anchoPx, altoPx);
+  o.globalCompositeOperation = "multiply";
+  // Dos escalas: una sombra amplia y suave, y una fina justo en la junta.
+  o.filter = `blur(${(0.5 * s).toFixed(1)}px)`;
+  o.globalAlpha = 0.52;
+  o.drawImage(forma, 0, 0);
+  o.filter = `blur(${(0.13 * s).toFixed(1)}px)`;
+  o.globalAlpha = 0.42;
+  o.drawImage(forma, 0, 0);
+  const t = new THREE.CanvasTexture(salida);
+  t.colorSpace = THREE.NoColorSpace;
+  const malla = new THREE.Mesh(
+    new THREE.PlaneGeometry(anchoPx / s, altoPx / s),
+    new THREE.MeshBasicMaterial({ map: t, blending: THREE.MultiplyBlending, premultipliedAlpha: true, transparent: true, depthWrite: false, toneMapped: false, fog: false }),
+  );
+  malla.rotation.x = -Math.PI / 2;
+  malla.position.set(x0 + anchoPx / s / 2, 0.018, y0 + altoPx / s / 2);
+  malla.renderOrder = 1;
+  g.add(malla);
   return g;
 }
 
@@ -139,12 +346,15 @@ type Materiales = ReturnType<typeof materialesArquitectura>;
 
 export function materialesArquitectura() {
   const mats = {
-    muro: new THREE.MeshStandardMaterial({ color: 0xf1f1ee, roughness: 0.86 }),
+    muro: new THREE.MeshStandardMaterial({ color: 0xf0eee8, roughness: 0.9, vertexColors: true, normalMap: relieveDeMuro(), normalScale: new THREE.Vector2(0.5, 0.5) }),
     /** Muro de afuera que tapa el interior desde donde se ve. */
     muroTenue: new THREE.MeshStandardMaterial({ color: 0xf1f1ee, roughness: 0.86, transparent: true, opacity: 0.16, depthWrite: false }),
     muroSeleccion: new THREE.MeshStandardMaterial({ color: 0xbfe7df, roughness: 0.7, emissive: 0x0f7f6c, emissiveIntensity: 0.18 }),
     muroApagado: new THREE.MeshStandardMaterial({ color: 0xb3b9c1, roughness: 0.9, transparent: true, opacity: 0.32, depthWrite: false }),
-    corte: new THREE.MeshStandardMaterial({ color: 0x23272e, roughness: 0.7 }),
+    /** Lo alto del muro cortado: bloque y mezcla, como una obra vista desde arriba. */
+    corte: new THREE.MeshStandardMaterial({ color: 0x8c8a85, roughness: 0.94 }),
+    zoclo: new THREE.MeshStandardMaterial({ color: 0xcdcac2, roughness: 0.55 }),
+    rodapie: new THREE.MeshStandardMaterial({ color: 0x8f8d88, roughness: 0.88 }),
     marco: new THREE.MeshStandardMaterial({ color: 0x2b2f35, metalness: 0.8, roughness: 0.36 }),
     vidrio: new THREE.MeshPhysicalMaterial({ color: 0xcfe6ee, transparent: true, opacity: 0.22, roughness: 0.04, clearcoat: 1, depthWrite: false, side: THREE.DoubleSide }),
     opaco: new THREE.MeshStandardMaterial({ color: 0xa8b4bc, roughness: 0.3 }),
@@ -158,7 +368,58 @@ export function materialesArquitectura() {
 }
 
 /** Muro armado: sus mallas y hacia dónde queda «afuera» (para volverlo tenue si tapa). */
-export type MuroMaqueta = { id: string; mallas: THREE.Mesh[]; exterior: boolean; normal: Punto; alturaM: number };
+export type MuroMaqueta = {
+  id: string;
+  mallas: THREE.Mesh[];
+  exterior: boolean;
+  normal: Punto;
+  alturaM: number;
+  /** El muro entero, con sus puertas y ventanas. */
+  alto: THREE.Group;
+  /** El mismo muro cortado a poca altura: el que tapa el interior se baja en vez de volverse transparente. */
+  bajo: THREE.Group | null;
+};
+
+/** A esta altura se corta el muro de afuera que tapa la vista. */
+export const ALTURA_CORTE_M = 0.85;
+
+/**
+ * Muro con su color al pie: junto al piso rebota menos luz y se oscurece. Las coordenadas de textura
+ * van en metros, así el relieve mide lo mismo en un muro corto que en uno largo.
+ */
+function geoMuro(largo: number, y0: number, y1: number, grueso: number): THREE.BufferGeometry {
+  const h = y1 - y0;
+  const geo = new THREE.BoxGeometry(largo, 1, grueso, 1, 3, 1);
+  const pos = geo.attributes.position;
+  const nor = geo.attributes.normal;
+  const uv = geo.attributes.uv;
+  const colores = new Float32Array(pos.count * 3);
+  const a = Math.min(0.42, h / 3);
+  const b = Math.min(0.2, h / 3);
+  for (let i = 0; i < pos.count; i++) {
+    const t = pos.getY(i);
+    // -0.5, -1/6, 1/6 y 0.5 pasan a pie, poco arriba del pie, poco abajo del tope y tope.
+    const local = t < -0.4 ? 0 : t < 0 ? a : t < 0.4 ? h - b : h;
+    const yAbs = y0 + local;
+    pos.setY(i, local - h / 2);
+    const tono = yAbs < 0.42 ? 0.7 + (yAbs / 0.42) * 0.3 : 1;
+    colores.set([tono, tono, tono], i * 3);
+    if (Math.abs(nor.getZ(i)) > 0.5) uv.setXY(i, pos.getX(i), yAbs);
+    else if (Math.abs(nor.getX(i)) > 0.5) uv.setXY(i, pos.getZ(i), yAbs);
+    else uv.setXY(i, pos.getX(i), pos.getZ(i));
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colores, 3));
+  return geo;
+}
+
+function muroRecto(a: Punto, b: Punto, y0: number, y1: number, grueso: number, material: THREE.Material): THREE.Mesh {
+  const m = new THREE.Mesh(geoMuro(distancia(a, b), y0, y1, grueso), material);
+  m.position.set((a.x + b.x) / 2, (y0 + y1) / 2, (a.y + b.y) / 2);
+  m.rotation.y = Math.atan2(-(b.y - a.y), b.x - a.x);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
+}
 
 function cajaRecta(a: Punto, b: Punto, y0: number, y1: number, grueso: number, material: THREE.Material): THREE.Mesh {
   const l = distancia(a, b);
@@ -224,22 +485,47 @@ export function construirArquitectura(plano: Plano, mats: Materiales, opciones: 
       continue;
     }
 
+    // Normal hacia afuera y si este muro está en la orilla del edificio: de ese lado ya no hay otro muro.
+    const medio = en(L / 2);
+    const centro = ed ? { x: (ed.min.x + ed.max.x) / 2, y: (ed.min.y + ed.max.y) / 2 } : medio;
+    let normal = { x: -u.y, y: u.x };
+    if ((medio.x - centro.x) * normal.x + (medio.y - centro.y) * normal.y < 0) normal = { x: -normal.x, y: -normal.y };
+    const hayMuroHacia = (n: Punto) => plano.muros.some((o) => o.id !== muro.id && o.tipo === "muro" && rayoCruzaTramo(medio, n, aMetros(o.a, plano.escala), aMetros(o.b, plano.escala)));
+    const fuera = !hayMuroHacia(normal);
+    const adentro = !hayMuroHacia({ x: -normal.x, y: -normal.y });
+    if (!fuera && adentro) normal = { x: -normal.x, y: -normal.y };
+    const exterior = Boolean(ed) && (fuera || adentro);
+
     const material = opciones.apagado ? mats.muroApagado : mats.muro;
     const ext0 = extremoUnido(plano, muro, muro.a) ? muro.grosorM / 2 : 0;
     const ext1 = extremoUnido(plano, muro, muro.b) ? muro.grosorM / 2 : 0;
-    const pieza = (d0: number, d1: number, y0: number, y1: number, conCorte: boolean) => {
+    const alto = new THREE.Group();
+    const bajo = exterior && !opciones.apagado && muro.alturaM > ALTURA_CORTE_M + 0.2 ? new THREE.Group() : null;
+    const pieza = (d0: number, d1: number, y0: number, y1: number, conCorte: boolean, destino: THREE.Group = alto) => {
       if (d1 - d0 <= 1e-3 || y1 - y0 <= 1e-3) return;
       const ini = d0 <= 1e-6 ? d0 - ext0 : d0;
       const fin = d1 >= L - 1e-6 ? d1 + ext1 : d1;
       const { a: pa, b: pb } = dato(ini, fin);
-      const m = elegible(cajaRecta(pa, pb, y0, y1, muro.grosorM, material), sel);
+      const m = elegible(muroRecto(pa, pb, y0, y1, muro.grosorM, material), sel);
       if (opciones.apagado) m.castShadow = false;
-      grupo.add(m);
+      destino.add(m);
       mallas.push(m);
       if (conCorte && !opciones.apagado) {
         const tapa = cajaRecta(pa, pb, y1, y1 + 0.012, muro.grosorM + 0.002, mats.corte);
         tapa.castShadow = false;
-        grupo.add(tapa);
+        destino.add(tapa);
+      }
+      if (y0 <= 1e-6 && !opciones.apagado) {
+        // Zoclo por los dos lados y, por fuera, el rodapié de la fachada.
+        const zoclo = cajaRecta(pa, pb, 0, 0.1, muro.grosorM + 0.022, mats.zoclo);
+        zoclo.castShadow = false;
+        destino.add(zoclo);
+        if (exterior && y1 > 0.3) {
+          const fuera = muro.grosorM / 2 + 0.014;
+          const rodapie = cajaRecta({ x: pa.x + normal.x * fuera, y: pa.y + normal.y * fuera }, { x: pb.x + normal.x * fuera, y: pb.y + normal.y * fuera }, 0, 0.32, 0.03, mats.rodapie);
+          rodapie.castShadow = false;
+          destino.add(rodapie);
+        }
       }
     };
     const huecos = plano.aberturas
@@ -253,22 +539,76 @@ export function construirArquitectura(plano: Plano, mats: Materiales, opciones: 
       pieza(cursor, desde, 0, muro.alturaM, true);
       pieza(desde, d1, 0, Math.min(h.baseM, muro.alturaM), h.baseM > 0);
       pieza(desde, d1, Math.min(h.baseM + h.alturaM, muro.alturaM), muro.alturaM, true);
-      if (!opciones.apagado) construirHueco(grupo, h, en(desde), en(d1), muro, mats);
+      if (!opciones.apagado) construirHueco(alto, h, en(desde), en(d1), muro, mats);
+      if (bajo) {
+        pieza(cursor, desde, 0, ALTURA_CORTE_M, true, bajo);
+        pieza(desde, d1, 0, Math.min(h.baseM, ALTURA_CORTE_M), h.baseM > 0, bajo);
+      }
       cursor = d1;
     }
     pieza(cursor, L, 0, muro.alturaM, true);
-
-    // Normal hacia afuera y si este muro está en la orilla del edificio.
-    const medio = en(L / 2);
-    const centro = ed ? { x: (ed.min.x + ed.max.x) / 2, y: (ed.min.y + ed.max.y) / 2 } : medio;
-    let normal = { x: -u.y, y: u.x };
-    if ((medio.x - centro.x) * normal.x + (medio.y - centro.y) * normal.y < 0) normal = { x: -normal.x, y: -normal.y };
-    const paso = muro.grosorM / 2 + 0.3;
-    const asoma = { x: medio.x + normal.x * paso, y: medio.y + normal.y * paso };
-    const exterior = Boolean(ed && (asoma.x < ed.min.x || asoma.x > ed.max.x || asoma.y < ed.min.y || asoma.y > ed.max.y));
-    muros.push({ id: muro.id, mallas, exterior, normal, alturaM: muro.alturaM });
+    if (bajo) pieza(cursor, L, 0, ALTURA_CORTE_M, true, bajo);
+    grupo.add(alto);
+    if (bajo) {
+      bajo.visible = false;
+      bajo.traverse((n) => {
+        n.userData.tenue = true;
+      });
+      grupo.add(bajo);
+    }
+    muros.push({ id: muro.id, mallas, exterior, normal, alturaM: muro.alturaM, alto, bajo });
   }
   return { grupo, muros };
+}
+
+/**
+ * Lo que va montado en un muro que se baja necesita de qué colgarse: se queda ese pedazo de muro, a su
+ * altura completa. Sin esto, la cámara flotaría en el aire. Cada pedazo dice de qué muro es.
+ */
+export function construirSoportes(plano: Plano, mats: Materiales): THREE.Group {
+  const g = new THREE.Group();
+  const montados = [
+    ...plano.camaras.filter((c) => (c.montaje ?? "muro") === "muro").map((c) => aMetros(c.pos, plano.escala)),
+    ...(plano.equipos ?? []).filter((e) => e.alturaM > ALTURA_CORTE_M && !e.gabineteId).map((e) => aMetros(e.pos, plano.escala)),
+  ];
+  for (const muro of plano.muros) {
+    if (muro.tipo !== "muro" || muro.alturaM <= ALTURA_CORTE_M + 0.2) continue;
+    const a = aMetros(muro.a, plano.escala);
+    const b = aMetros(muro.b, plano.escala);
+    const L = distancia(a, b);
+    if (L < 1e-3) continue;
+    const u = { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
+    const en = (d: number): Punto => ({ x: a.x + u.x * d, y: a.y + u.y * d });
+    for (const p of montados) {
+      if (distanciaPuntoSegmento(p, a, b) > muro.grosorM / 2 + 0.7) continue;
+      const d = (p.x - a.x) * u.x + (p.y - a.y) * u.y;
+      const d0 = Math.max(d - 0.26, 0);
+      const d1 = Math.min(d + 0.26, L);
+      if (d1 - d0 < 0.05) continue;
+      const pieza = new THREE.Group();
+      pieza.add(muroRecto(en(d0), en(d1), ALTURA_CORTE_M, muro.alturaM, muro.grosorM, mats.muro));
+      const tapa = cajaRecta(en(d0), en(d1), muro.alturaM, muro.alturaM + 0.012, muro.grosorM + 0.002, mats.corte);
+      tapa.castShadow = false;
+      pieza.add(tapa);
+      pieza.userData.muroId = muro.id;
+      pieza.visible = false;
+      g.add(pieza);
+    }
+  }
+  return g;
+}
+
+/** ¿La semirrecta desde `o` hacia `d` toca el tramo? */
+function rayoCruzaTramo(o: Punto, d: Punto, a: Punto, b: Punto): boolean {
+  const ex = b.x - a.x;
+  const ey = b.y - a.y;
+  const det = d.x * -ey - -ex * d.y;
+  if (Math.abs(det) < 1e-9) return false;
+  const ox = a.x - o.x;
+  const oy = a.y - o.y;
+  const t = (ox * -ey - -ex * oy) / det;
+  const s = (d.x * oy - d.y * ox) / det;
+  return t > 0.05 && s >= 0 && s <= 1;
 }
 
 function construirHueco(grupo: THREE.Group, h: Abertura, a: Punto, b: Punto, muro: Muro, mats: Materiales) {
@@ -394,11 +734,11 @@ export function construirMuebles(plano: Plano): THREE.Group {
 export function construirPersonas(plano: Plano): THREE.Group {
   const grupo = new THREE.Group();
   const k = plano.escala.metrosPorPx;
-  const anillo = new THREE.MeshBasicMaterial({ color: 0x2f6fde, transparent: true, opacity: 0.8, depthWrite: false });
+  const anillo = new THREE.MeshBasicMaterial({ color: 0x2f6fde, transparent: true, opacity: 0.45, depthWrite: false });
   for (const h of plano.personas) {
     const x = h.pos.x * k;
     const z = h.pos.y * k;
-    const g = crearPersona();
+    const g = crearPersona(variante(h.id));
     g.position.set(x, 0, z);
     g.rotation.y = anguloDeRumbo(h.rumboDeg);
     grupo.add(g);
@@ -713,7 +1053,8 @@ export function construirRayos(plano: Plano, id: string): THREE.LineSegments | n
 
 /* ── Cobertura ──────────────────────────────────────────────────────────────────── */
 
-export function construirCoberturas(coberturas: ReadonlyMap<string, PoligonoCobertura[]>, seleccionada: string | null): THREE.Group {
+/** Con `soloSeleccionada`, la cobertura está apagada: se ve solo el cono de la cámara que se está revisando. */
+export function construirCoberturas(coberturas: ReadonlyMap<string, PoligonoCobertura[]>, seleccionada: string | null, soloSeleccionada = false): THREE.Group {
   const grupo = new THREE.Group();
   const material = (nivel: NivelCobertura, propia: boolean) =>
     new THREE.MeshBasicMaterial({
@@ -729,6 +1070,7 @@ export function construirCoberturas(coberturas: ReadonlyMap<string, PoligonoCobe
   let orden = 0;
   for (const [id, pols] of coberturas) {
     const propia = id === seleccionada;
+    if (soloSeleccionada && !propia) continue;
     for (const pol of pols) {
       if (pol.puntos.length < 3) continue;
       const clave = `${pol.nivel}|${propia}`;

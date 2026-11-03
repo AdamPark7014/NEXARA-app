@@ -250,7 +250,7 @@ export default function Maqueta3D({
       const el = nodos.current.get(`clave-${id}`);
       if (!el) continue;
       let y = p.y;
-      while (puestas.some((q) => Math.abs(q.x - p.x) < 72 && Math.abs(q.y - y) < 24)) y -= 24;
+      while (puestas.some((q) => Math.abs(q.x - p.x) < 20 && Math.abs(q.y - y) < 20)) y -= 20;
       // Adentro solo se ve la clave de lo cercano y lo que no queda detrás de un muro.
       const e = yo ? clavesRef.current.find((c) => c.id === id) : null;
       const alcanza = !yo || !e || (Math.hypot(e.pos.x - yo.x, e.pos.z - yo.y) < 15 && !tapado(tapasRef.current, { x: e.pos.x, y: e.pos.z }, e.pos.y, yo, ALTURA_OJOS_M));
@@ -842,7 +842,7 @@ export default function Maqueta3D({
     <div
       ref={caja}
       className={styles.maqueta}
-      style={{ background: capas.noche ? "#0c0f15" : "#d9dcdf" }}
+      style={{ background: capas.noche ? "#0c0f15" : "#c8d6e2" }}
       onPointerDownCapture={alPresionar}
       onPointerMove={alMover}
       onPointerUp={alSoltar}
@@ -912,7 +912,7 @@ export default function Maqueta3D({
                   }}
                 >
                   <i style={sel ? undefined : { background: c.punto }} />
-                  {c.clave}
+                  <span>{c.clave}</span>
                 </button>
               );
             })

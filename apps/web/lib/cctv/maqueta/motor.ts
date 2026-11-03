@@ -7,7 +7,6 @@
  * soltar se afina el último cuadro; así gira con soltura también en una laptop sin tarjeta gráfica.
  */
 import * as THREE from "three";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
@@ -28,12 +27,14 @@ import {
   construirCables,
   construirCamaras,
   construirCoberturas,
+  construirContacto,
   construirEquipos,
   construirLosa,
   construirMuebles,
   construirObstaculos,
   construirPersonas,
   construirRayos,
+  construirSoportes,
   construirTerreno,
   escalaVisualEquipos,
   lamparasDeNoche,
@@ -43,6 +44,7 @@ import {
   type MuroMaqueta,
 } from "./escena";
 import { ControlVista, type Gesto } from "./controlVista";
+import { texturasListas } from "./texturas";
 
 export type CapasMaqueta = {
   cobertura: boolean;
@@ -103,18 +105,70 @@ type Recorrido = {
 
 type Transicion = { t0: number; dur: number; p0: THREE.Vector3; q0: THREE.Quaternion; f0: number; p1: THREE.Vector3; q1: THREE.Quaternion; f1: number; alFinal?: () => void };
 
-const FOV_MAQUETA = 23;
+/** Como un lente normal de foto: con menos, la maqueta se ve como un diagrama isométrico. */
+const FOV_MAQUETA = 34;
 const FOV_RECORRIDO = 62;
 const VEL_CAMINAR = 2.6;
 const VEL_CORRER = 6.2;
-const CIELO_DIA = 0xcddbe8;
 const CIELO_NOCHE = 0x0c0f15;
-const FONDO_DIA = 0xd9dcdf;
+/** El color del horizonte: a eso se funde el terreno lejano. */
+const HORIZONTE_DIA = 0xd7e1e8;
 const MIRADA = new THREE.Euler(0, 0, 0, "YXZ");
 const suave = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2);
 /** El giro corto entre dos ángulos. */
 const giroCorto = (de: number, a: number) => Math.atan2(Math.sin(a - de), Math.cos(a - de));
-const DIR_GENERAL = new THREE.Vector3(-0.405, 0.7, 0.583).normalize();
+const DIR_GENERAL = new THREE.Vector3(-0.44, 0.64, 0.63).normalize();
+/** De lado respecto a la vista general: el sol de frente aplana todo y el de lado le da relieve. */
+const DIR_SOL = new THREE.Vector3(0.78, 1.02, 0.42);
+
+/** Cielo de día para la luz y los reflejos: azul arriba, claro en el horizonte, tierra abajo y el sol. */
+function escenaDeCielo(dirSol: THREE.Vector3): THREE.Scene {
+  const e = new THREE.Scene();
+  const domo = new THREE.Mesh(
+    new THREE.SphereGeometry(50, 32, 20),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: { sol: { value: dirSol } },
+      vertexShader: "varying vec3 v; void main(){ v = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+      fragmentShader: `
+        varying vec3 v;
+        uniform vec3 sol;
+        void main(){
+          vec3 n = normalize(v);
+          float h = n.y;
+          vec3 zenit = vec3(0.42, 0.56, 0.78);
+          vec3 horizonte = vec3(0.86, 0.9, 0.95);
+          vec3 tierra = vec3(0.26, 0.25, 0.2);
+          vec3 c = h > 0.0 ? mix(horizonte, zenit, pow(h, 0.55)) : mix(horizonte * 0.72, tierra, pow(-h, 0.42));
+          float s = max(dot(n, sol), 0.0);
+          c += vec3(1.0, 0.93, 0.8) * (pow(s, 600.0) * 40.0 + pow(s, 24.0) * 0.42);
+          gl_FragColor = vec4(c, 1.0);
+        }`,
+    }),
+  );
+  e.add(domo);
+  return e;
+}
+
+/** El fondo de día: de cielo arriba a neblina en el horizonte. */
+function texturaDeCielo(): THREE.Texture | null {
+  if (typeof document === "undefined") return null;
+  const el = document.createElement("canvas");
+  el.width = 4;
+  el.height = 256;
+  const c = el.getContext("2d");
+  if (!c) return null;
+  const g = c.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, "#8fb4dc");
+  g.addColorStop(0.55, "#c4d6e6");
+  g.addColorStop(1, "#dfe6ea");
+  c.fillStyle = g;
+  c.fillRect(0, 0, 4, 256);
+  const t = new THREE.CanvasTexture(el);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
 function liberar(o: THREE.Object3D) {
   o.traverse((n) => {
@@ -147,7 +201,9 @@ export class MotorMaqueta {
   private readonly capas = {
     terreno: new THREE.Group(),
     areas: new THREE.Group(),
+    contacto: new THREE.Group(),
     arquitectura: new THREE.Group(),
+    soportes: new THREE.Group(),
     obstaculos: new THREE.Group(),
     muebles: new THREE.Group(),
     personas: new THREE.Group(),
@@ -167,6 +223,7 @@ export class MotorMaqueta {
   private readonly raycaster = new THREE.Raycaster();
   private muros: MuroMaqueta[] = [];
   private estadoMuro = new Map<string, THREE.Material>();
+  private readonly muroBajo = new Set<string>();
   private previo: DatosMaqueta | null = null;
   private limites: Limites = { min: { x: 0, y: 0 }, max: { x: 20, y: 12 } };
   private limEdificio: Limites | null = null;
@@ -195,7 +252,11 @@ export class MotorMaqueta {
   private guiado: { paradas: Punto[]; i: number; hasta: number } | null = null;
   private readonly ambiente = new THREE.Group();
   private readonly reticula: THREE.Mesh;
-  private readonly niebla = new THREE.Fog(FONDO_DIA, 1e5, 2e5);
+  private readonly niebla = new THREE.Fog(HORIZONTE_DIA, 1e5, 2e5);
+  private readonly fondoDia = texturaDeCielo();
+  /** Hasta que lleguen las texturas no se pinta: el piso se vería negro un instante. */
+  private texturasOk = false;
+  private esperandoTexturas = false;
   private ancho = 900;
   private alto = 640;
   private primeraVista = true;
@@ -219,8 +280,10 @@ export class MotorMaqueta {
     r.shadowMap.autoUpdate = false;
     r.shadowMap.needsUpdate = true;
     const generador = new THREE.PMREMGenerator(r);
-    this.escena.environment = generador.fromScene(new RoomEnvironment(), 0.04).texture;
+    const cielo = escenaDeCielo(DIR_SOL.clone().normalize());
+    this.escena.environment = generador.fromScene(cielo, 0.02).texture;
     generador.dispose();
+    liberar(cielo);
 
     this.camara = new THREE.PerspectiveCamera(FOV_MAQUETA, 1.5, 0.05, 500);
     this.ctrl = new ControlVista(this.camara, lienzo, {
@@ -254,13 +317,13 @@ export class MotorMaqueta {
 
     for (const g of Object.values(this.capas)) this.raiz.add(g);
     this.escena.add(this.raiz);
-    this.sol = new THREE.DirectionalLight(0xfff1df, 2.35);
+    this.sol = new THREE.DirectionalLight(0xfff0dc, 2.6);
     this.sol.castShadow = true;
     this.sol.shadow.mapSize.set(this.movil ? 2048 : 4096, this.movil ? 2048 : 4096);
     this.sol.shadow.bias = -0.00028;
     this.sol.shadow.normalBias = 0.018;
     this.sol.shadow.radius = 5;
-    this.dia.add(this.sol, this.sol.target, new THREE.HemisphereLight(0xdfeaf6, 0xb9b3a8, 0.42));
+    this.dia.add(this.sol, this.sol.target);
     this.escena.add(this.dia);
     this.ambiente.visible = false;
     this.escena.add(this.ambiente);
@@ -309,12 +372,19 @@ export class MotorMaqueta {
     if (nivelCambio || pa?.areas !== p.areas) {
       this.reponer(this.capas.areas, construirAreas(p));
     }
+    if (nivelCambio || cambioLimites || pa?.muros !== p.muros || pa?.muebles !== p.muebles || pa?.obstaculos !== p.obstaculos || pa?.personas !== p.personas) {
+      this.reponer(this.capas.contacto, construirContacto(p, lim));
+    }
     if (nivelCambio || pa?.muros !== p.muros || pa?.aberturas !== p.aberturas) {
       const { grupo, muros } = construirArquitectura(p, this.mats);
       this.reponer(this.capas.arquitectura, grupo);
       this.muros = muros;
       this.estadoMuro.clear();
+      this.muroBajo.clear();
       sombras = true;
+    }
+    if (nivelCambio || pa?.muros !== p.muros || pa?.camaras !== p.camaras || pa?.equipos !== p.equipos) {
+      this.reponer(this.capas.soportes, construirSoportes(p, this.mats));
     }
     if (nivelCambio || pa?.obstaculos !== p.obstaculos) {
       this.reponer(this.capas.obstaculos, construirObstaculos(p, this.mats));
@@ -356,8 +426,8 @@ export class MotorMaqueta {
     this.escalaActual = escala;
     const idSel = d.seleccion?.tipo === "camara" ? d.seleccion.id : null;
     const idSelAntes = a?.seleccion?.tipo === "camara" ? a.seleccion.id : null;
-    if (nivelCambio || a?.coberturas !== d.coberturas || idSel !== idSelAntes) {
-      this.reponer(this.capas.coberturas, construirCoberturas(d.coberturas, idSel));
+    if (nivelCambio || a?.coberturas !== d.coberturas || idSel !== idSelAntes || a?.capas.cobertura !== d.capas.cobertura) {
+      this.reponer(this.capas.coberturas, construirCoberturas(d.coberturas, idSel, !d.capas.cobertura));
     }
     if (nivelCambio || idSel !== idSelAntes || pa?.camaras !== p.camaras) {
       const r = idSel && !d.verDesde ? construirRayos(p, idSel) : null;
@@ -379,10 +449,11 @@ export class MotorMaqueta {
     this.cargarCroquis(p, d.capas.croquis);
 
     // Lo del nivel activo va a su elevación; lo de abajo ya trae la suya.
-    for (const clave of ["areas", "arquitectura", "obstaculos", "muebles", "personas", "camaras", "equipos", "alcances", "cables", "coberturas", "rayos", "croquis", "marca"] as const) {
+    for (const clave of ["areas", "contacto", "arquitectura", "soportes", "obstaculos", "muebles", "personas", "camaras", "equipos", "alcances", "cables", "coberturas", "rayos", "croquis", "marca"] as const) {
       this.capas[clave].position.y = d.elevacionM;
     }
-    this.capas.coberturas.visible = d.capas.cobertura && !d.verDesde;
+    // Apagada, sigue viéndose el cono de la cámara elegida: se está revisando esa.
+    this.capas.coberturas.visible = (d.capas.cobertura || Boolean(idSel)) && !d.verDesde;
     this.capas.personas.visible = d.capas.personas;
     this.capas.alcances.visible = d.capas.cobertura && !d.verDesde;
     // Adentro no: tan de cerca, una línea de cable se ve como un rayón en la pared.
@@ -396,6 +467,17 @@ export class MotorMaqueta {
       else if (a?.verDesde) this.salirDeCamara();
     }
     this.previo = d;
+    if (!this.texturasOk && !this.esperandoTexturas) {
+      this.esperandoTexturas = true;
+      const listo = () => {
+        this.texturasOk = true;
+        this.renderer.shadowMap.needsUpdate = true;
+        this.invalidar();
+      };
+      void texturasListas().then(listo);
+      // Si una tarda, se pinta de todos modos: mejor un piso sin textura que no ver nada.
+      setTimeout(listo, 2500);
+    }
     if (this.rec && (nivelCambio || pa?.muros !== p.muros || pa?.aberturas !== p.aberturas || pa?.obstaculos !== p.obstaculos)) {
       this.tramos = tramosDelPlano(p);
       this.armarAmbiente(p, d.elevacionM);
@@ -488,8 +570,9 @@ export class MotorMaqueta {
     const lim = this.limites;
     const cx = (lim.min.x + lim.max.x) / 2;
     const cz = (lim.min.y + lim.max.y) / 2;
-    const r = Math.hypot(lim.max.x - lim.min.x, lim.max.y - lim.min.y) / 2 + MARGEN_BASE_M + 2;
-    this.sol.position.set(cx - r * 0.85, r * 1.5 + 8, cz + r * 0.85);
+    // Los árboles de alrededor también dan sombra.
+    const r = Math.hypot(lim.max.x - lim.min.x, lim.max.y - lim.min.y) / 2 + MARGEN_BASE_M + 10;
+    this.sol.position.set(cx + DIR_SOL.x * r * 1.6, DIR_SOL.y * r * 1.6 + 8, cz + DIR_SOL.z * r * 1.6);
     this.sol.target.position.set(cx, 0, cz);
     const s = this.sol.shadow.camera;
     s.left = -r * 1.1;
@@ -519,38 +602,67 @@ export class MotorMaqueta {
     this.escena.remove(noche ? this.dia : this.noche);
     this.escena.add(noche ? this.noche : this.dia);
     this.pintarCielo(noche);
-    this.escena.environmentIntensity = noche ? 0.12 : 0.34;
-    this.renderer.toneMappingExposure = noche ? 0.8 : 0.86;
+    this.escena.environmentIntensity = noche ? 0.1 : 0.95;
+    this.renderer.toneMappingExposure = noche ? 0.8 : 0.84;
     this.brillo.enabled = noche;
     this.renderer.shadowMap.needsUpdate = true;
     this.invalidar();
   }
 
-  /** Afuera hay cielo y horizonte cuando se camina; desde arriba, fondo liso. */
   private pintarCielo(noche: boolean) {
-    const color = this.rec ? (noche ? CIELO_NOCHE : CIELO_DIA) : noche ? CIELO_NOCHE : FONDO_DIA;
-    this.escena.background = new THREE.Color(color);
+    this.escena.background = noche || !this.fondoDia ? new THREE.Color(noche ? CIELO_NOCHE : HORIZONTE_DIA) : this.fondoDia;
     // La niebla siempre existe, solo se aleja: quitarla obligaría a recompilar todos los materiales al entrar.
-    this.niebla.color.set(color);
-    this.niebla.near = this.rec ? 70 : 1e5;
-    this.niebla.far = this.rec ? 520 : 2e5;
+    this.niebla.color.set(noche ? CIELO_NOCHE : HORIZONTE_DIA);
+    this.ajustarNiebla();
   }
 
-  /** Para caminar hace falta techo y un suelo que llegue al horizonte; desde arriba estorban. */
+  /** Lo lejano se funde con el horizonte, a la distancia que le toque según desde dónde se mire. */
+  private ajustarNiebla() {
+    if (this.rec) {
+      this.niebla.near = 70;
+      this.niebla.far = 520;
+      return;
+    }
+    const dist = this.camara.position.distanceTo(this.ctrl.target);
+    this.niebla.near = dist * 2.2 + 50;
+    this.niebla.far = dist * 7 + 320;
+  }
+
+  /** Para caminar hace falta techo; desde arriba estorba. */
   private armarAmbiente(p: Plano, elevacionM: number) {
     const g = new THREE.Group();
-    const suelo = new THREE.Mesh(new THREE.CircleGeometry(700, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xa7ab9e, roughness: 1 }));
-    suelo.position.y = -0.05;
-    g.add(suelo);
     const paredes = p.muros.filter((m) => m.tipo !== "reja");
     if (paredes.length) {
       const caja = cajaDe(paredes.flatMap((m) => [aMetros(m.a, p.escala), aMetros(m.b, p.escala)]));
+      const anchoX = Math.max(caja.max.x - caja.min.x, 0.1);
+      const anchoZ = Math.max(caja.max.y - caja.min.y, 0.1);
+      const altura = elevacionM + Math.max(...paredes.map((m) => m.alturaM));
+      // El plafón ve el piso, no el cielo: se ilumina a sí mismo para no quedar pardo.
       const techo = new THREE.Mesh(
-        new THREE.PlaneGeometry(Math.max(caja.max.x - caja.min.x, 0.1), Math.max(caja.max.y - caja.min.y, 0.1)).rotateX(Math.PI / 2),
-        new THREE.MeshStandardMaterial({ color: 0xf1f0ec, roughness: 0.95, side: THREE.DoubleSide }),
+        new THREE.PlaneGeometry(anchoX, anchoZ).rotateX(Math.PI / 2),
+        new THREE.MeshStandardMaterial({ color: 0xf4f3ef, roughness: 0.95, side: THREE.DoubleSide, emissive: 0xf4f3ef, emissiveIntensity: 0.42 }),
       );
-      techo.position.set((caja.min.x + caja.max.x) / 2, elevacionM + Math.max(...paredes.map((m) => m.alturaM)), (caja.min.y + caja.max.y) / 2);
+      techo.position.set((caja.min.x + caja.max.x) / 2, altura, (caja.min.y + caja.max.y) / 2);
       g.add(techo);
+      // Luminarias cada 2.4 m, como en cualquier oficina o bodega.
+      const paso = 2.4;
+      const nx = Math.max(1, Math.floor(anchoX / paso));
+      const nz = Math.max(1, Math.floor(anchoZ / paso));
+      const luminarias = new THREE.InstancedMesh(
+        new THREE.PlaneGeometry(1.2, 0.6).rotateX(Math.PI / 2),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfffbf2, emissiveIntensity: 2.2, roughness: 0.6 }),
+        Math.ceil(nx / 2) * Math.ceil(nz / 2),
+      );
+      const o = new THREE.Object3D();
+      let k = 0;
+      for (let i = 0; i < nx; i += 2) {
+        for (let j = 0; j < nz; j += 2) {
+          o.position.set(caja.min.x + (i + 0.5) * (anchoX / nx), altura - 0.012, caja.min.y + (j + 0.5) * (anchoZ / nz));
+          o.updateMatrix();
+          luminarias.setMatrixAt(k++, o.matrix);
+        }
+      }
+      g.add(luminarias);
     }
     this.reponer(this.ambiente, g);
   }
@@ -1192,7 +1304,7 @@ export class MotorMaqueta {
     this.pintarMuros();
   };
 
-  /** Los muros de afuera que quedan entre quien ve y el interior se vuelven tenues («casa de muñecas»). */
+  /** Los muros de afuera que quedan entre quien ve y el interior se bajan, como en un corte de arquitecto. */
   private pintarMuros() {
     const d = this.previo;
     if (!d) return;
@@ -1203,16 +1315,31 @@ export class MotorMaqueta {
     const pendiente = Math.max(porEncima, 0.01) / l;
     const selMuro = d.seleccion?.tipo === "muro" ? d.seleccion.id : null;
     for (const m of this.muros) {
-      // Un muro tapa, hacia adentro, altura ÷ pendiente: si son más de 4.5 m, estorba y se vuelve tenue.
-      const tapa = !this.rec && m.exterior && m.alturaM / pendiente > 4.5 && (m.normal.x * dx + m.normal.y * dz) / l > 0.18;
-      const material = m.id === selMuro ? this.mats.muroSeleccion : d.capas.translucidos || tapa ? this.mats.muroTenue : this.mats.muro;
+      // Un muro tapa, hacia adentro, altura ÷ pendiente: si son más de 3 m, estorba y se baja.
+      const tapa = !this.rec && Boolean(m.bajo) && m.exterior && m.alturaM / pendiente > 3 && (m.normal.x * dx + m.normal.y * dz) / l > 0.18;
+      if (m.bajo && this.muroBajo.has(m.id) !== tapa) {
+        if (tapa) this.muroBajo.add(m.id);
+        else this.muroBajo.delete(m.id);
+        m.alto.visible = !tapa;
+        m.bajo.visible = tapa;
+        m.alto.traverse((n) => {
+          n.userData.tenue = tapa;
+        });
+        m.bajo.traverse((n) => {
+          n.userData.tenue = !tapa;
+        });
+        // Sin ese muro la luz entra distinto; se rehace la sombra cuando deje de girar.
+        this.sombrasEn = performance.now() + 220;
+      }
+      const material = m.id === selMuro ? this.mats.muroSeleccion : d.capas.translucidos ? this.mats.muroTenue : this.mats.muro;
       if (this.estadoMuro.get(m.id) === material) continue;
       this.estadoMuro.set(m.id, material);
       for (const malla of m.mallas) {
         malla.material = material;
-        malla.userData.tenue = material === this.mats.muroTenue;
+        if (!tapa || !m.alto.getObjectById(malla.id)) malla.userData.tenue = material === this.mats.muroTenue || (tapa && Boolean(m.alto.getObjectById(malla.id)));
       }
     }
+    for (const pieza of this.capas.soportes.children[0]?.children ?? []) pieza.visible = this.muroBajo.has(pieza.userData.muroId as string);
   }
 
   private readonly cuadro = (ahora: number) => {
@@ -1242,6 +1369,7 @@ export class MotorMaqueta {
       this.renderer.shadowMap.needsUpdate = true;
       this.invalidar();
     }
+    if (!this.texturasOk) return;
     if (this.sucio) {
       this.sucio = false;
       this.pendienteCalidad = true;
@@ -1266,8 +1394,9 @@ export class MotorMaqueta {
     if (this.previo?.verDesde || this.rec || this.transicion) return;
     const dist = this.camara.position.distanceTo(this.ctrl.target);
     this.camara.near = Math.min(Math.max(dist * 0.03, 0.05), 3);
-    this.camara.far = dist * 5 + 200;
+    this.camara.far = dist * 8 + 500;
     this.camara.updateProjectionMatrix();
+    this.ajustarNiebla();
   }
 
   /** Si no alcanza a 20 cuadros por segundo, baja la resolución: mejor fluido que nítido. */

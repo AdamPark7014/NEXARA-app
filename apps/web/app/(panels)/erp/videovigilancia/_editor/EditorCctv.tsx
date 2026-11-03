@@ -160,7 +160,7 @@ export default function EditorCctv({
   const [aviso, setAviso] = useState<string | null>(null);
   const [resumen, setResumen] = useState<ResumenDiseno | null>(diseno.resumen);
   const [herramienta, setHerramienta] = useState<Herramienta>("seleccionar");
-  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: false, humanoides: true, abajo: true, cobertura: true, claves: true, noche: false, tamanoReal: false, cableado: true });
+  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: false, humanoides: true, abajo: true, cobertura: false, claves: true, noche: false, tamanoReal: false, cableado: true, cableado3d: false });
   // Pisos de abajo para la vista apilada (en gris). La raíz cambia con cada edición de cualquier
   // piso; si los de abajo no cambiaron se reutiliza la lista para no recalcular su cobertura.
   const debajoRef = useRef<{ clave: string; valor: NivelConPlano[] }>({ clave: "[]", valor: [] });
@@ -606,6 +606,7 @@ export default function EditorCctv({
             <div className={styles.lienzoCaja}>
               {modo === "3d" && webgl ? (
                 <Maqueta3D
+                  // De entrada la maqueta se ve limpia: cobertura y cable se encienden con un clic. En el dibujo el cable sigue visible.
                   key={disenosArmados}
                   versionCatalogo={catalogo.version}
                   plano={plano}
@@ -617,7 +618,7 @@ export default function EditorCctv({
                   seleccion={seleccion}
                   tapas={tapas}
                   coberturas={coberturas}
-                  capas={capas}
+                  capas={{ ...capas, cableado: capas.cableado3d }}
                   herramienta={herramienta}
                   modeloNuevo={modeloNuevo}
                   muebleNuevo={muebleNuevo}
@@ -705,11 +706,11 @@ export default function EditorCctv({
                     {modo === "3d" && webgl
                       ? ([
                           ["cobertura", "Cobertura"],
-                          ["cableado", "Cableado"],
+                          ["cableado3d", "Cableado"],
                           ["humanoides", "Personas"],
                           ["noche", "De noche"],
                           ["tamanoReal", "Tamaño real"],
-                        ] as const).filter(([k]) => !(recorriendo && (k === "cableado" || k === "tamanoReal"))).map(([k, t]) => (
+                        ] as const).filter(([k]) => !(recorriendo && (k === "cableado3d" || k === "tamanoReal"))).map(([k, t]) => (
                           <button key={k} type="button" className={styles.capaBoton} aria-pressed={capas[k]} onClick={() => setCapas((c) => ({ ...c, [k]: !c[k] }))}>
                             {t}
                           </button>
