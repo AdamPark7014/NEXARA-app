@@ -40,6 +40,14 @@ object ActividadTiempoRules {
 
     fun formatoMinutos(min: Int?): String? = formatoMinutos(min?.toDouble())
 
+    /** Lo escrito en «Fue otro tiempo», en minutos. */
+    fun minutosEscritos(horas: String, minutos: String): Int =
+        (horas.toIntOrNull() ?: 0) * 60 + (minutos.toIntOrNull() ?: 0)
+
+    /** «Dijiste que tomó 2 h»; a quien revisa, «Quien la ejecutó dijo…». */
+    fun textoDicho(minutos: Int, soyQuienEjecuta: Boolean): String =
+        "${if (soyQuienEjecuta) "Dijiste" else "Quien la ejecutó dijo"} que tomó ${formatoMinutos(minutos)}"
+
     /**
      * Lo trabajado contra lo planeado y el tope (su tiempo máximo, o el plan + 25 %).
      * «Cerca» = ya pasó el plan sin llegar al tope; «excedida» = pasó el tope.

@@ -11,6 +11,7 @@ import mx.nexara.mobile.nativeapp.data.api.ActivityMaterialesDto
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.AttendanceJustificacionDto
 import mx.nexara.mobile.nativeapp.data.api.CancelActivityRequest
+import mx.nexara.mobile.nativeapp.data.api.DecirTiempoRequest
 import mx.nexara.mobile.nativeapp.data.api.ConsoleApi
 import mx.nexara.mobile.nativeapp.data.api.JustificarFaltaRequest
 import mx.nexara.mobile.nativeapp.data.api.NoCumplidaRequest
@@ -65,6 +66,10 @@ class ConsoleRepository(context: Context) {
 
     /** Qué puede hacer un superior: cancelar y a quién puede reemplazar. */
     suspend fun activityActions(activityId: Long): ActivityAccionesDto = api.getActivityActions(activityId)
+
+    suspend fun decirTiempo(activityId: Long, minutos: Int) {
+        api.decirTiempo(activityId, DecirTiempoRequest(minutos)).close()
+    }
 
     suspend fun cancelActivity(activityId: Long, motivo: String) {
         api.cancelActivity(activityId, CancelActivityRequest(motivo.trim())).close()

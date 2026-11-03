@@ -82,6 +82,10 @@ data class ActivityDto(
     val semaforo: String? = null,
     val minutosPlan: Double? = null,
     val minutosReales: Double? = null,
+    /** Cuánto dijo quien la ejecutó que tomó de verdad. */
+    val tiempoDichoMin: Int? = null,
+    /** Se le pregunta a quien la ejecutó: ya terminó y su reloj es largo o no cuadra con el plan. */
+    val preguntarTiempo: Boolean? = null,
     val excedida: Boolean? = null,
     val asignadoPor: ActivityPersonRefDto? = null,
     /** Actividad de varios días (la frase la arma la API). */
@@ -192,6 +196,9 @@ data class ActivityAccionesDto(
     val puedeReprogramar: Boolean? = null,
     val causasIncumplimiento: List<CausaIncumplimientoDto>? = null,
 )
+
+/** `POST activities/:id/tiempo-dicho`: cuánto tomó de verdad. */
+data class DecirTiempoRequest(val minutos: Int)
 
 data class CancelActivityRequest(
     val motivo: String,
@@ -698,6 +705,13 @@ interface ConsoleApi {
     /** Cancelar y «pasar a otro compañero»: qué puede hacer quien consulta. */
     @GET("activities/{id}/acciones")
     suspend fun getActivityActions(@Path("id") id: Long): ActivityAccionesDto
+
+    /** Solo quien la ejecutó. Enseña a los tiempos; no toca reloj, KPI ni nómina. */
+    @POST("activities/{id}/tiempo-dicho")
+    suspend fun decirTiempo(
+        @Path("id") id: Long,
+        @Body body: DecirTiempoRequest,
+    ): okhttp3.ResponseBody
 
     /** Solo superiores de quien la ejecuta; motivo de al menos `motivoMinimo` caracteres. */
     @POST("activities/{id}/cancelar")

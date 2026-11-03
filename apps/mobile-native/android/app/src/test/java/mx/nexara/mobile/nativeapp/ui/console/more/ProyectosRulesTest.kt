@@ -215,4 +215,16 @@ class ProyectosRulesTest {
             ProyectosRules.contextoTexto(proyecto(cliente = null, responsable = null)),
         )
     }
+
+    @Test
+    fun elProyectoDelAvisoVaPrimeroAunqueElFiltroLoEsconda() {
+        val a = proyecto(id = 1L)
+        val b = proyecto(id = 2L)
+        val escondido = proyecto(id = 3L)
+        val todos = listOf(a, b, escondido)
+        assertEquals(listOf(3L, 1L, 2L), ProyectosRules.conResaltado(listOf(a, b), todos, 3L).map { it.id })
+        assertEquals(listOf(2L, 1L), ProyectosRules.conResaltado(listOf(a, b), todos, 2L).map { it.id })
+        assertEquals(listOf(1L, 2L), ProyectosRules.conResaltado(listOf(a, b), todos, null).map { it.id })
+        assertEquals(listOf(1L, 2L), ProyectosRules.conResaltado(listOf(a, b), todos, 99L).map { it.id })
+    }
 }

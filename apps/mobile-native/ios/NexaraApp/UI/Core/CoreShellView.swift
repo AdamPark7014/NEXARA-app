@@ -11,6 +11,7 @@ private enum CoreShellOverlay: Identifiable {
     case extra(CoreExtraModule)
     /// Un viático concreto: el aviso trae su id y hay que abrir ÉSE, no la lista.
     case viatico(id: Int)
+    case proyecto(id: Int)
     /// Clientes dejó de ser pestaña (v2): `/erp/clientes/:id` y `?sector=` se abren encima.
     case clientes(id: Int?, sector: String?)
     /// Mi perfil dejó de ser pestaña (v2): su enlace se abre encima.
@@ -24,6 +25,7 @@ private enum CoreShellOverlay: Identifiable {
         case .comidas: return "comidas"
         case .extra(let module): return "extra-\(module.rawValue)"
         case .viatico(let id): return "viatico-\(id)"
+        case .proyecto(let id): return "proyecto-\(id)"
         case .clientes(let id, let sector): return "clientes-\(id ?? 0)-\(sector ?? "")"
         case .perfil: return "perfil"
         }
@@ -316,6 +318,14 @@ struct CoreShellView: View {
                     // Raíz de cubierta: sin el «volver» del sistema (salía junto a la flecha propia).
                     .navigationBarBackButtonHidden(true)
             }
+        case .proyecto(let id):
+            NavigationStack {
+                ProyectosView(resaltarId: id)
+                    .nxBrandNavBar(title: CoreExtraModule.proyectos.title)
+                    .toolbar { closeItem }
+                    // Raíz de cubierta: sin el «volver» del sistema (salía junto a la flecha propia).
+                    .navigationBarBackButtonHidden(true)
+            }
         case .viatico(let id):
             NavigationStack {
                 ViaticosView(abrirId: id)
@@ -413,6 +423,9 @@ struct CoreShellView: View {
             // Es la diferencia entre «te autorizaron algo» y saber qué.
             if extra == .viaticos, let id = link.entityId, id > 0 {
                 present(.viatico(id: Int(id)))
+            } else if extra == .proyectos, let id = link.entityId, id > 0 {
+                // Igual con un proyecto: va primero y marcado en su lista.
+                present(.proyecto(id: Int(id)))
             } else {
                 present(.extra(extra))
             }

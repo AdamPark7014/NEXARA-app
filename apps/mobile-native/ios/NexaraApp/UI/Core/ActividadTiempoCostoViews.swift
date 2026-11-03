@@ -7,11 +7,121 @@ import PDFKit
 /// lo trabajado contra lo planeado y el tope, con un anillo que da la vuelta en el plan. Banda
 /// oscura con aurora verde como la de «Mi día». «En curso» si el reloj de cualquiera del equipo
 /// está corriendo. Sin plan y sin nada trabajado no se pinta.
+/// «¿Te tomó…?» (Velocidad Core, Ola 4; web `TiempoDicho.tsx`): quien la ejecutó confirma el reloj o dice
+/// otro tiempo, una vez y si quiere. No toca reloj, KPI ni nómina: enseña a los tiempos que se sugieren.
+private struct TiempoDichoFila: View {
+    let activityId: Int
+    let relojMin: Int
+    let dichoInicial: Int?
+    let preguntar: Bool
+    let soyQuienEjecuta: Bool
+
+    @State private var dicho: Int?
+    @State private var otro = false
+    @State private var horas = ""
+    @State private var minutos = ""
+    @State private var guardando = false
+    @State private var error: String?
+
+    private static let pie = NxColors.rgb(0xB9BFCC)
+    private var escrito: Int { (Int(horas) ?? 0) * 60 + (Int(minutos) ?? 0) }
+
+    var body: some View {
+        if let valor = dicho ?? dichoInicial {
+            Text("\(soyQuienEjecuta ? "Dijiste" : "Quien la ejecutó dijo") que tomó \(ActividadTiempoRules.formatoMinutos(valor) ?? "")")
+                .font(.system(size: 12))
+                .foregroundStyle(Self.pie)
+        } else if preguntar && soyQuienEjecuta {
+            VStack(alignment: .leading, spacing: 8) {
+                Divider().overlay(Color.white.opacity(0.14))
+                Text("¿Te tomó \(ActividadTiempoRules.formatoMinutos(relojMin) ?? "")?")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("Así mejoran los tiempos que se sugieren.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Self.pie)
+                HStack(spacing: 8) {
+                    if otro {
+                        campo($horas, unidad: "h", etiqueta: "Horas", largo: 3)
+                        campo($minutos, unidad: "min", etiqueta: "Minutos", largo: 2)
+                        boton("Guardar", principal: true, activo: !guardando && escrito >= 1) { guardar(escrito) }
+                    } else {
+                        boton("Sí", principal: true, activo: !guardando) { guardar(relojMin) }
+                        boton("Fue otro tiempo", principal: false, activo: !guardando) { otro = true }
+                    }
+                }
+                if let error {
+                    Text(error)
+                        .font(.system(size: 12))
+                        .foregroundStyle(NxColors.rgb(0xFFB4AB))
+                }
+            }
+        }
+    }
+
+    private func guardar(_ valor: Int) {
+        guardando = true
+        error = nil
+        Task {
+            do {
+                try await CoreRepository.shared.decirTiempo(activityId: activityId, minutos: valor)
+                dicho = valor
+            } catch {
+                self.error = "No se pudo guardar. Intenta de nuevo."
+            }
+            guardando = false
+        }
+    }
+
+    private func boton(_ texto: String, principal: Bool, activo: Bool, accion: @escaping () -> Void) -> some View {
+        Button(action: accion) {
+            Text(texto)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(principal ? NxColors.rgb(0x0D0F12) : .white)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 40)
+                .background(
+                    Capsule().fill(principal ? Color.white.opacity(activo ? 1 : 0.55) : Color.clear)
+                )
+                .overlay(
+                    Capsule().stroke(principal ? Color.clear : Color.white.opacity(0.35), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(!activo)
+    }
+
+    private func campo(_ valor: Binding<String>, unidad: String, etiqueta: String, largo: Int) -> some View {
+        HStack(spacing: 4) {
+            TextField("", text: Binding(
+                get: { valor.wrappedValue },
+                set: { valor.wrappedValue = String($0.filter(\.isNumber).prefix(largo)) }
+            ))
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.center)
+            .font(.system(size: 14))
+            .foregroundStyle(.white)
+            .frame(width: 48, height: 40)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.08)))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.35), lineWidth: 1))
+            .accessibilityLabel(etiqueta)
+            Text(unidad)
+                .font(.system(size: 13))
+                .foregroundStyle(.white)
+        }
+    }
+}
+
 struct ActivityTiempoCard: View {
     let medidor: ActividadTiempoRules.Medidor
     let enCurso: Bool
     let tiempoMaximoMin: Double?
     let minutosEstandar: Double?
+    /// «¿Te tomó…?»: sin actividad no se pinta.
+    var activityId: Int?
+    var dichoMin: Int?
+    var preguntar = false
+    var soyQuienEjecuta = false
 
     fileprivate static let fondo = NxColors.rgb(0x0D0F12)
     private static let tenue = NxColors.rgb(0xC9CED8)
@@ -87,6 +197,15 @@ struct ActivityTiempoCard: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Self.pie)
             }
+            if let activityId {
+                TiempoDichoFila(
+                    activityId: activityId,
+                    relojMin: medidor.real,
+                    dichoInicial: dichoMin,
+                    preguntar: preguntar,
+                    soyQuienEjecuta: soyQuienEjecuta
+                )
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
@@ -99,7 +218,8 @@ struct ActivityTiempoCard: View {
                 .fill(Self.fondo)
                 .shadow(color: NxColors.rgb(0x0D0F12, alpha: 0.3), radius: 16, x: 0, y: 10)
         }
-        .accessibilityElement(children: .combine)
+        // Con la pregunta hay botones: si se combina, VoiceOver no llega a ellos.
+        .accessibilityElement(children: preguntar && soyQuienEjecuta ? .contain : .combine)
         .accessibilityLabel("Tiempo\(enCurso ? ", en curso" : ""). \(ActividadTiempoRules.etiquetaAccesible(medidor))")
     }
 }

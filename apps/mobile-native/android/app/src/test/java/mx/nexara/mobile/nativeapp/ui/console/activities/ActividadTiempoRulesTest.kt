@@ -156,4 +156,13 @@ class ActividadTiempoRulesTest {
         assertNull(ActividadTiempoRules.resumenEstandar(ActivityDto(id = 2, estatus = "Pendiente")))
         assertNull(ActividadTiempoRules.resumenEstandar(ActivityDto(id = 3, estatus = "Pendiente", tiempoEstandarMin = 30.0))!!.detalle)
     }
+
+    @Test
+    fun loQueDijoCuantoTomo() {
+        assertEquals(150, ActividadTiempoRules.minutosEscritos("2", "30"))
+        assertEquals(45, ActividadTiempoRules.minutosEscritos("", "45"))
+        assertEquals(0, ActividadTiempoRules.minutosEscritos("", ""))
+        assertEquals("Dijiste que tomó 2 h", ActividadTiempoRules.textoDicho(120, soyQuienEjecuta = true))
+        assertEquals("Quien la ejecutó dijo que tomó 2 h 30 min", ActividadTiempoRules.textoDicho(150, soyQuienEjecuta = false))
+    }
 }

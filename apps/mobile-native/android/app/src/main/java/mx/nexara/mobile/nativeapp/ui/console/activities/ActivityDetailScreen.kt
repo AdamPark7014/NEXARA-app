@@ -511,7 +511,12 @@ fun ActivityDetailScreen(
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     ActivityPlaceCard(detail = detail, onOpenMap = { url -> openExternalUrl(context, url) })
                                     // «Tiempo» (28-10): lo trabajado contra el plan y el tope, antes de la tira.
-                                    ActividadTiempoCard(detail = detail, miFila = miFila)
+                                    ActividadTiempoCard(
+                                        detail = detail,
+                                        miFila = miFila,
+                                        soyQuienEjecuta = user?.id != null && (detail.responsable?.id ?: detail.responsableId) == user.id,
+                                        onDecirTiempo = { minutos -> withContext(Dispatchers.IO) { repo.decirTiempo(detail.id, minutos) } },
+                                    )
                                     ActivityFactsStrip(detail = detail, sesion = sesion)
                                     // Trayecto (29-10): ida al sitio y regreso a la oficina, medidos aparte del reloj.
                                     if (captura && !despachador) {

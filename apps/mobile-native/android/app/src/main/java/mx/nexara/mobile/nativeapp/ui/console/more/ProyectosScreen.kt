@@ -24,7 +24,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.nexara.mobile.nativeapp.data.api.ProyectoResumenDto
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
@@ -41,7 +44,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.nxFriendlyError
  * frase. Los filtros y los textos viven en [ProyectosRules], que se prueba sin Android.
  */
 @Composable
-fun ProyectosScreen(vm: ProyectosViewModel = viewModel()) {
+fun ProyectosScreen(vm: ProyectosViewModel = viewModel(), resaltarId: Long? = null) {
     val state by vm.state.collectAsState()
     val filtro by vm.filtro.collectAsState()
     val consulta by vm.consulta.collectAsState()
@@ -49,7 +52,9 @@ fun ProyectosScreen(vm: ProyectosViewModel = viewModel()) {
     LaunchedEffect(Unit) { vm.arrancar() }
 
     val todos = state.datos.orEmpty()
-    val visibles = remember(todos, filtro, consulta) { ProyectosRules.aplicar(todos, filtro, consulta) }
+    val visibles = remember(todos, filtro, consulta, resaltarId) {
+        ProyectosRules.conResaltado(ProyectosRules.aplicar(todos, filtro, consulta), todos, resaltarId)
+    }
     val conteos = remember(todos) { ProyectosRules.conteos(todos) }
 
     NxScreenScaffold(isRefreshing = state.refrescando, onRefresh = vm::refrescar) {
@@ -129,7 +134,7 @@ fun ProyectosScreen(vm: ProyectosViewModel = viewModel()) {
                         )
                     }
                     items(visibles, key = { it.id ?: it.hashCode().toLong() }) { proyecto ->
-                        TarjetaDeProyecto(proyecto)
+                        TarjetaDeProyecto(proyecto, resaltado = proyecto.id != null && proyecto.id == resaltarId)
                     }
                 }
             }
@@ -141,7 +146,7 @@ fun ProyectosScreen(vm: ProyectosViewModel = viewModel()) {
 
 /** Un proyecto: un dato por renglón. El porcentaje desconocido no se pinta como cero. */
 @Composable
-private fun TarjetaDeProyecto(proyecto: ProyectoResumenDto) {
+private fun TarjetaDeProyecto(proyecto: ProyectoResumenDto, resaltado: Boolean = false) {
     val salud = ProyectosRules.saludDe(proyecto)
     val tono = when (salud) {
         ProyectosRules.Salud.RETRASADO -> NxTone.Danger
@@ -153,7 +158,13 @@ private fun TarjetaDeProyecto(proyecto: ProyectoResumenDto) {
     }
     val avance = ProyectosRules.avancePct(proyecto)
 
-    MoreTarjeta {
+    MoreTarjeta(
+        modifier = if (resaltado) {
+            Modifier.border(2.dp, NxColors.Brand, RoundedCornerShape(NxDimens.PanelRadius))
+        } else {
+            Modifier
+        },
+    ) {
         Text(
             proyecto.title?.trim()?.ifEmpty { null } ?: "Proyecto sin título",
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
