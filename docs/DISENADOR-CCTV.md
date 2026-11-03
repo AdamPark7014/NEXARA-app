@@ -464,11 +464,14 @@ mayorista, de `productos_ct`. Reglas en `cctv-disenos/existencias.ts`; consultas
   (`datos.ficha.ct`) o por modelo exacto en `modelo` o `numParte`, de la misma marca, ignorando guiones y mayúsculas, sin la versión de
   hardware («V6.0») ni lo que sigue a la diagonal. Un parecido no cuenta: pondría el precio de otro equipo en una cotización. Los tipos
   genéricos («Gabinete 24U») no son productos y no se buscan.
-- **Lo que se ve.** Tarjeta del catálogo y panel de equipos: en almacén, en CT y precio. Es el de venta sugerido, con margen de 30 % y sin IVA;
-  el costo no llega a la pantalla. Lo que no se sabe se dice («No está en CT», «Sin precio»).
-- **Buscar en CT** (`_editor/BuscarEnCt.tsx`): cualquier marca, por palabras o familia, con `ProductSearchService`. «Agregar» lee con IA lo que
-  dice CT (`cctv-equipo`, el mismo de la frase) y abre la ficha para revisarla. Marca y modelo son los de CT, y el tipo, el de su subcategoría
-  si la dice. Si la IA no está, queda con eso para capturar el resto. «Ligar» en la ficha de un modelo guarda la clave elegida.
+- **Lo que se ve.** Tarjeta del catálogo y panel de equipos: en almacén, en CT y precio. Es costo × 1.30 sin IVA, el mismo que va a decir la
+  cotización; la venta «sugerida» del buscador sale de otra cuenta y da 10 % más. El costo no llega a la pantalla. Lo que no se sabe se dice («No está en CT», «Sin precio»).
+- **Buscar en CT** (`_editor/BuscarEnCt.tsx`): cualquier marca, por palabras o familia, con `ProductSearchService`. «domo», «NVR» o «UPS» acotan
+  por subcategoría y «5 MP» ordena, porque en CT no están en el nombre (`interpretarBusqueda`). «Agregar» lee con IA lo que dice CT (`cctv-equipo`, el
+  mismo de la frase; 1 a 2.4 s en 10 productos reales) y abre la ficha para revisarla. Marca y modelo son los de CT, y el tipo, el de su subcategoría
+  si la dice. Se quita lo que no puede ser de ese equipo (`quitarDatosImposibles`): la IA tomó 1900 VA como unidades de rack, el consumo de un switch
+  como su PoE y los núcleos de un servidor como canales. Si la IA no está, queda con lo de CT para capturar el resto. «Ligar» en la ficha guarda la
+  clave elegida.
 - **Dar de alta en Almacén:** crea el `Product` con `CatalogService.createProduct` (SKU = modelo, `EQUIPO`) y lo liga. Si ya existía, solo lo liga.
   Pide `catalog.manage`. Las entradas se registran en Almacén.
 - **Pasar a cotización** (`_editor/PasarACotizacion.tsx`, `POST :id/cotizacion`, pide `cotizaciones.access`). La pantalla manda qué y cuánto; el

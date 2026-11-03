@@ -97,7 +97,7 @@ export default function BuscarEnCt({
           </button>
         </header>
         <div className={styles.busqueda}>
-          <Input type="search" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Modelo, marca o lo que buscas: domo Dahua 5 MP" aria-label="Buscar en CT" />
+          <Input type="search" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Modelo o lo que buscas: domo Dahua 5 MP, NVR 8 canales, switch PoE" aria-label="Buscar en CT" />
           <div className={styles.fichas} role="group" aria-label="Familia">
             {FAMILIAS_CT.map(([etiqueta, sub]) => (
               <button key={sub} type="button" aria-pressed={familia === sub} onClick={() => setFamilia((f) => (f === sub ? "" : sub))}>

@@ -22,6 +22,7 @@ const oferta = (over: Record<string, unknown> = {}) => ({
   stockTotal: 4,
   stockPreferred: 1,
   sellPriceSuggested: 4752,
+  costMxn: 3000,
   leadTimeDays: 1,
   especificaciones: [],
   ...over,
@@ -67,7 +68,13 @@ describe('disponibilidad', () => {
     const { s } = armar({ productos: [{ id: 5, sku: 'DHI-NVR4108HS-8P-4KS3', price: null }], ct: [FILA_CT] });
     const [d] = await s.disponibilidad(1, [pedido]);
     expect(d.almacen).toEqual({ productId: 5, sku: 'DHI-NVR4108HS-8P-4KS3', piezas: 5 });
-    expect(d.ct).toMatchObject({ clave: 'NVRDAH700', piezas: 4, cerca: 1, precio: 4752, ligado: 'modelo' });
+    expect(d.ct).toMatchObject({ clave: 'NVRDAH700', piezas: 4, cerca: 1, ligado: 'modelo' });
+  });
+
+  it('el precio que enseña es el mismo que va a decir la cotización: costo más 30 %', async () => {
+    const { s } = armar({ ct: [FILA_CT] });
+    const [d] = await s.disponibilidad(1, [pedido]);
+    expect(d.ct?.precio).toBe(3900);
   });
 
   it('nunca enseña el costo de CT', async () => {
@@ -106,7 +113,7 @@ describe('pasar a cotización', () => {
     expect(r).toMatchObject({ cotizacionId: 500, quoteNumber: 'NX-500', creada: true, partidas: 1, sinPrecio: 0 });
     const dto = cotizaciones.create.mock.calls[0][0];
     expect(dto).toMatchObject({ segmento: 'COMERCIAL', trabajo: 'Ejemplo · Bodega', clienteSinAlta: true, clientName: 'Cliente por definir' });
-    expect(dto.items[0]).toMatchObject({ paqueteClave: 'cctv:3', productCtId: 77, qty: 2, unitPrice: 4752, supplierCode: 'CT', name: 'Grabador' });
+    expect(dto.items[0]).toMatchObject({ paqueteClave: 'cctv:3', productCtId: 77, qty: 2, unitCost: 3000, marginPercent: 30, supplierCode: 'CT', name: 'Grabador' });
     expect(prisma.cctvDiseno.update).toHaveBeenCalledWith({ where: { id: 3 }, data: { cotizacionId: 500 } });
   });
 
@@ -174,6 +181,50 @@ describe('pasar a cotización', () => {
   it('un diseño de otra empresa o archivado no existe', async () => {
     const { s } = armar({ diseno: null });
     await expect(s.pasarACotizacion(actor, 3, { lineas: [linea()] }, 1)).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('buscar en CT', () => {
+  it('«domo dahua 5mp» busca a Dahua dentro de los domos y pone primero los de 5 MP', async () => {
+    const { s, busqueda } = armar();
+    busqueda.search.mockResolvedValue({ data: [oferta({ clave: 'A', descripcion: 'Domo 2 MP' }), oferta({ clave: 'B', descripcion: 'Domo 5 MP' })], meta: {} });
+    const r = await s.buscarCt('domo dahua 5mp', '');
+    expect(busqueda.search).toHaveBeenCalledWith(expect.objectContaining({ q: 'dahua', subcategory: 'domo', inStockOnly: false }));
+    expect(r.resultados.map((x) => x.clave)).toEqual(['B', 'A']);
+  });
+
+  it('si con todas las palabras no hay nada, quita las últimas', async () => {
+    const { s, busqueda } = armar();
+    busqueda.search.mockResolvedValueOnce({ data: [], meta: {} }).mockResolvedValueOnce({ data: [oferta()], meta: {} });
+    const r = await s.buscarCt('dahua exterior', '');
+    expect(busqueda.search.mock.calls.map((c: Array<{ q: string }>) => c[0].q)).toEqual(['dahua exterior', 'dahua']);
+    expect(r.resultados).toHaveLength(1);
+  });
+
+  it('con familia, se queda sin palabras antes que sin resultados', async () => {
+    const { s, busqueda } = armar();
+    busqueda.search.mockResolvedValueOnce({ data: [], meta: {} }).mockResolvedValueOnce({ data: [oferta()], meta: {} });
+    await s.buscarCt('nvr canales', '');
+    expect(busqueda.search.mock.calls.map((c: Array<{ q: string; subcategory: string }>) => [c[0].q, c[0].subcategory])).toEqual([['canales', 'Grabadores'], ['', 'Grabadores']]);
+  });
+
+  it('sin familia no se queda sin palabras: sería todo el catálogo', async () => {
+    const { s, busqueda } = armar();
+    busqueda.search.mockResolvedValue({ data: [], meta: {} });
+    expect((await s.buscarCt('xyzzy', '')).resultados).toEqual([]);
+    expect(busqueda.search).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin texto ni familia no busca', async () => {
+    const { s, busqueda } = armar();
+    expect(await s.buscarCt('', '')).toEqual({ resultados: [] });
+    expect(busqueda.search).not.toHaveBeenCalled();
+  });
+
+  it('nunca enseña el costo', async () => {
+    const { s } = armar();
+    const r = await s.buscarCt('dahua', '');
+    expect(JSON.stringify(r)).not.toMatch(/cost/i);
   });
 });
 
