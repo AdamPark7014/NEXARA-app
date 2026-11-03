@@ -180,6 +180,8 @@ export interface PagosGastosRespuesta {
   conteos: Record<FiltroTipoPG, number>;
   pendientes: number;
   items: PagoGastoItem[];
+  /** Pagos de nómina que esta persona no ve; `null` si sí los ve. */
+  nominaOculta?: number | null;
 }
 
 export interface DetallePagoGasto {

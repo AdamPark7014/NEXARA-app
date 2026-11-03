@@ -7,6 +7,8 @@ import { CurrentCompanyId } from '../../common/tenant/current-company.decorator.
 import { RBAC, RbacGuard } from '../../common/rbac.guard.js';
 import { UrlAccessGuard } from '../../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../../common/permissions.js';
+import { ModulePolicyService } from '../../common/tenant/module-policy.service.js';
+import type { UsuarioDePolitica } from '../../common/tenant/module-policy.js';
 import { PorFacturarService } from './por-facturar.service.js';
 import { PagosGastosService } from './pagos-gastos.service.js';
 import { EstadosFinancierosService } from './estados-financieros.service.js';
@@ -50,6 +52,8 @@ class LigarBancoDto {
 
 const VER = [PERMISSIONS.CONTABILIDAD_VIEW, PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.INVOICING_VIEW];
 
+type UsuarioMesa = UsuarioDePolitica & { id: number };
+
 /**
  * Mesa contable: el espacio de la contadora (por facturar, pagos y gastos, estados financieros).
  * Ver `.ai/RELEVO.md` del 29-10-2026 y el mockup aprobado.
@@ -62,14 +66,23 @@ export class MesaContableController {
     private readonly pagosGastos: PagosGastosService,
     private readonly estados: EstadosFinancierosService,
     private readonly revision: RevisionFacturaService,
+    private readonly policy: ModulePolicyService,
   ) {}
+
+  /** Un pago de nómina dice a quién y cuánto: solo para quien ve «Pagos a personal» en su empresa. */
+  private async exigirNomina(origen: string, user: UsuarioMesa, companyId: number | null) {
+    if (String(origen ?? '').toUpperCase() === 'NOMINA') {
+      await this.policy.exigir('employee-payments', user, companyId);
+    }
+  }
 
   @Get('resumen')
   @RBAC({ anyPermissions: VER })
-  async resumen(@CurrentCompanyId() companyId: number | null) {
+  async resumen(@CurrentUser() user: UsuarioMesa, @CurrentCompanyId() companyId: number | null) {
+    const verNomina = await this.policy.puedeUsar('employee-payments', user, companyId);
     const [porFacturar, pagosPendientes] = await Promise.all([
       this.porFacturar.resumenConteo(companyId),
-      this.pagosGastos.conteoPendientes(companyId),
+      this.pagosGastos.conteoPendientes(companyId, { verNomina }),
     ]);
     return { porFacturar, pagosPendientes };
   }
@@ -102,57 +115,64 @@ export class MesaContableController {
   // ── Pagos y gastos ──
   @Get('pagos-gastos')
   @RBAC({ anyPermissions: VER })
-  pagosYGastos(
+  async pagosYGastos(
+    @CurrentUser() user: UsuarioMesa,
     @CurrentCompanyId() companyId: number | null,
     @Query('mes') mes?: string,
     @Query('tipo') tipo?: string,
     @Query('soloPendientes') soloPendientes?: string,
   ) {
-    return this.pagosGastos.listar(companyId, { mes, tipo, soloPendientes });
+    const verNomina = await this.policy.puedeUsar('employee-payments', user, companyId);
+    return this.pagosGastos.listar(companyId, { mes, tipo, soloPendientes }, { verNomina });
   }
 
   @Get('pagos-gastos/:origen/:origenId')
   @RBAC({ anyPermissions: VER })
-  detalle(
+  async detalle(
     @Param('origen') origen: string,
     @Param('origenId', ParseIntPipe) origenId: number,
+    @CurrentUser() user: UsuarioMesa,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    await this.exigirNomina(origen, user, companyId);
     return this.pagosGastos.detalle(companyId, origen, origenId);
   }
 
   @Post('pagos-gastos/:origen/:origenId/cfdi')
   @RBAC({ anyPermissions: [PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONTABILIDAD_MANAGE] })
-  ligarCfdi(
+  async ligarCfdi(
     @Param('origen') origen: string,
     @Param('origenId', ParseIntPipe) origenId: number,
     @Body() dto: CfdiRecibidoDto,
-    @CurrentUser() user: { id: number },
+    @CurrentUser() user: UsuarioMesa,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    await this.exigirNomina(origen, user, companyId);
     return this.pagosGastos.ligarCfdi(companyId, origen, origenId, dto, user.id);
   }
 
   @Post('pagos-gastos/:origen/:origenId/banco')
   @RBAC({ anyPermissions: [PERMISSIONS.BANKING_RECONCILE, PERMISSIONS.CONTABILIDAD_MANAGE] })
-  ligarBanco(
+  async ligarBanco(
     @Param('origen') origen: string,
     @Param('origenId', ParseIntPipe) origenId: number,
     @Body() dto: LigarBancoDto,
-    @CurrentUser() user: { id: number },
+    @CurrentUser() user: UsuarioMesa,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    await this.exigirNomina(origen, user, companyId);
     return this.pagosGastos.ligarBanco(companyId, origen, origenId, dto.bankTransactionId, user.id);
   }
 
   @Post('pagos-gastos/:origen/:origenId/poliza')
   @RBAC({ anyPermissions: [PERMISSIONS.ACCOUNTING_POST, PERMISSIONS.CONTABILIDAD_MANAGE] })
-  registrarPoliza(
+  async registrarPoliza(
     @Param('origen') origen: string,
     @Param('origenId', ParseIntPipe) origenId: number,
-    @CurrentUser() user: { id: number },
+    @CurrentUser() user: UsuarioMesa,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    await this.exigirNomina(origen, user, companyId);
     return this.pagosGastos.registrarPoliza(companyId, origen, origenId, user.id);
   }
 

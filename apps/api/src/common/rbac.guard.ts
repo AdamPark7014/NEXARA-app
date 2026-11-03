@@ -2,8 +2,14 @@ import { Injectable, ExecutionContext, ForbiddenException, Logger, Optional } fr
 import { PERMISSIONS } from './permissions';
 import { ModuleRef, Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { ASISTENTE_IA_URL_RULES, checkUrlAccess, checkUrlRules } from './rbac/url-matrix.js';
+import {
+  ASISTENTE_IA_URL_RULES,
+  MESA_CONTABLE_POR_CORREO_URL_RULES,
+  checkUrlAccess,
+  checkUrlRules,
+} from './rbac/url-matrix.js';
 import { puedeAsignarConIa } from '../ai/asistente/quien-asigna.js';
+import { canUsarMesaContable } from '../accounting/mesa-contable/mesa-por-correo.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LEGACY_TO_V2, ROLES, type RoleKey } from './rbac/roles.v2.js';
 
@@ -73,6 +79,10 @@ export class RbacGuard extends AuthGuard('jwt') {
       if (!result.allowed) {
         const delAsistente = checkUrlRules(ASISTENTE_IA_URL_RULES, url, method);
         if (delAsistente.allowed && (await this.tieneGenteACargo(user))) result = delAsistente;
+      }
+      // Mesa contable concedida por persona (Contadora General): sin cambiarle el rol.
+      if (!result.allowed && canUsarMesaContable(user.email)) {
+        result = checkUrlRules(MESA_CONTABLE_POR_CORREO_URL_RULES, url, method);
       }
       if (!result.allowed) {
         this.logger.warn(`[v2 DENY] role=${v2Role} ${method} ${url}`);

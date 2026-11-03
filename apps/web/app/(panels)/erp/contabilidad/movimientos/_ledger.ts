@@ -68,6 +68,8 @@ export type LedgerResponse = {
   totalPages: number;
   items: LedgerRow[];
   totals: LedgerTotals;
+  /** Pagos de nómina que esta persona no ve; `null` si sí los ve. */
+  nominaOculta?: number | null;
 };
 
 /** Filtros que maneja la barra superior. Vacío = sin filtrar. */

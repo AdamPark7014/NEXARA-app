@@ -552,3 +552,31 @@ describe('contrato de autorización', () => {
     }
   });
 });
+
+describe('flujo de efectivo · detalle del mes y nómina', () => {
+  const pagosDeNomina = () => ({
+    payment: { findMany: jest.fn().mockResolvedValue([]) },
+    expense: { findMany: jest.fn().mockResolvedValue([]), groupBy: jest.fn().mockResolvedValue([]) },
+    employeePayment: {
+      findMany: jest.fn().mockResolvedValue([
+        { id: 1, amount: 2500, concepto: 'Persona de ejemplo', paidAt: new Date(2026, 8, 12) },
+        { id: 2, amount: 1500, concepto: 'Otra persona', paidAt: new Date(2026, 8, 28) },
+      ]),
+    },
+  });
+
+  it('quien no ve «Pagos a personal» recibe el total del mes, sin renglones por persona', async () => {
+    const { service } = build(pagosDeNomina());
+    const r = await service.detalle('flujo-efectivo', 'mes:2026-09', {}, EMPRESA, { verNomina: false });
+
+    expect(JSON.stringify(r)).not.toContain('persona');
+    expect(r.filas).toEqual([expect.objectContaining({ clave: 'nomina:total', salidas: 4000 })]);
+  });
+
+  it('quien sí los ve recibe lo mismo de siempre', async () => {
+    const { service } = build(pagosDeNomina());
+    const r = await service.detalle('flujo-efectivo', 'mes:2026-09', {}, EMPRESA);
+
+    expect(r.filas.map((f) => f.clave).sort()).toEqual(['nomina:1', 'nomina:2']);
+  });
+});

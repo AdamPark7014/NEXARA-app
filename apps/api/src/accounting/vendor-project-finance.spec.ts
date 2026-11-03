@@ -491,3 +491,24 @@ describe('sin N+1', () => {
     expect(prisma.$calls).toHaveLength(9);
   });
 });
+
+describe('detalle de obra · nómina de obra', () => {
+  const conNomina = () =>
+    fakePrisma({
+      'workProject.findFirst': { id: 1, title: 'Obra', status: 'ACTIVO', budgetTotal: 0, budgetUsed: 0, progress: 0 },
+      'workProjectPayroll.findMany': [
+        { id: 5, employee: 'Persona de ejemplo', amount: 900, paidAt: new Date('2026-09-01'), note: null },
+      ],
+    });
+
+  it('quien no ve «Pagos a personal» recibe el costo sin el nombre', async () => {
+    const r: any = await service(conNomina()).getProjectDetail(1, 1, 'obra', { verNomina: false });
+    expect(JSON.stringify(r)).not.toContain('Persona de ejemplo');
+    expect(JSON.stringify(r)).toContain('Nómina de obra');
+  });
+
+  it('quien sí los ve recibe lo mismo de siempre', async () => {
+    const r: any = await service(conNomina()).getProjectDetail(1, 1, 'obra');
+    expect(JSON.stringify(r)).toContain('Persona de ejemplo');
+  });
+});

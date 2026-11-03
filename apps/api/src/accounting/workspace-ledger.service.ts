@@ -124,6 +124,8 @@ export interface LedgerResult {
   totalPages: number;
   items: LedgerRow[];
   totals: LedgerTotals;
+  /** Pagos de nómina que esta persona no ve; `null` si sí los ve. */
+  nominaOculta: number | null;
   filters: Record<string, unknown>;
 }
 
@@ -377,7 +379,11 @@ export class AccountingWorkspaceLedgerService {
 
   // ───────────────────────── consulta principal ─────────────────────────
 
-  async listMovements(companyId: number | null | undefined, query: LedgerQuery): Promise<LedgerResult> {
+  async listMovements(
+    companyId: number | null | undefined,
+    query: LedgerQuery,
+    opciones: { verNomina?: boolean } = {},
+  ): Promise<LedgerResult> {
     const tenantId = requireCompanyId(companyId);
     const f = this.normalize(query);
 
@@ -388,8 +394,11 @@ export class AccountingWorkspaceLedgerService {
       );
     }
 
+    // Sin acceso a «Pagos a personal», nómina no entra al libro: cada fila dice a quién y cuánto.
+    const verNomina = opciones.verNomina !== false;
     const buckets = await this.buildBuckets(tenantId, f);
-    const active = buckets.filter((b) => b.enabled);
+    const active = buckets.filter((b) => b.enabled && (verNomina || b.tabla !== 'employee_payments'));
+    const nomina = verNomina ? null : buckets.find((b) => b.enabled && b.tabla === 'employee_payments');
 
     const take = offset + f.pageSize;
     const [rowGroups, totalGroups] = await Promise.all([
@@ -411,6 +420,7 @@ export class AccountingWorkspaceLedgerService {
       totalPages: Math.max(1, Math.ceil(totals.conteo / f.pageSize)),
       items,
       totals,
+      nominaOculta: verNomina ? null : nomina ? (await nomina.totals()).conteo : 0,
       filters: {
         from: f.from,
         to: f.to,
@@ -431,11 +441,15 @@ export class AccountingWorkspaceLedgerService {
   async exportMovements(
     companyId: number | null | undefined,
     query: LedgerQuery,
+    opciones: { verNomina?: boolean } = {},
   ): Promise<{ csv: string; filename: string; rows: number; truncated: boolean }> {
     const tenantId = requireCompanyId(companyId);
     const f = this.normalize({ ...query, page: 1, pageSize: 1 });
 
-    const buckets = (await this.buildBuckets(tenantId, f)).filter((b) => b.enabled);
+    const verNomina = opciones.verNomina !== false;
+    const buckets = (await this.buildBuckets(tenantId, f)).filter(
+      (b) => b.enabled && (verNomina || b.tabla !== 'employee_payments'),
+    );
     const rowGroups = await Promise.all(buckets.map((b) => b.fetch(MAX_EXPORT_ROWS)));
 
     const merged = rowGroups.flat().sort(compararFilasLibro);

@@ -1370,6 +1370,19 @@ export const ALMACEN_POR_CORREO_URL_RULES: UrlRule[] = [
   { path: '/api/catalog/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
 ];
 
+/**
+ * Mesa contable concedida por persona (`accounting/mesa-contable/mesa-por-correo.ts`): el dinero de
+ * la empresa y sus bancos. No lleva `/api/employee-payments`: Nómina no se abre por aquí.
+ */
+export const MESA_CONTABLE_POR_CORREO_URL_RULES: UrlRule[] = [
+  { path: '/erp/contabilidad', scope: 'write' },
+  { path: '/erp/contabilidad/**', scope: 'write' },
+  { path: '/erp/accounting/**', scope: 'write' },
+  { path: '/erp/banking', scope: 'write' },
+  { path: '/erp/banking/**', scope: 'write' },
+  { path: '/api/accounting/**', scope: 'write' },
+];
+
 /** Igual que `checkUrlAccess`, contra una lista de reglas dada (concesiones por persona). */
 export function checkUrlRules(
   rules: UrlRule[],

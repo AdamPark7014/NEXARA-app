@@ -1,4 +1,5 @@
 import { canManageAlmacen } from '../warehouse/almacen-access.js';
+import { canUsarMesaContable } from '../accounting/mesa-contable/mesa-por-correo.js';
 import { rememberExpiresIn, rememberMaxMs } from '../common/security/session-cookie.js';
 import { ModuleRef } from '@nestjs/core';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -104,14 +105,20 @@ export class AuthService {
   resolveUserPermissions(user: UserWithRole, isSuperAdmin = false): string[] {
     const roleKey = this.resolveEffectiveRoleKey(user);
     if (roleKey) {
-      return this.applyAlmacenByEmail(
-        this.addV2RolePermissions(this.buildBaseAuthenticatedPermissions(isSuperAdmin), roleKey, user.email),
+      return this.applyMesaContableByEmail(
+        this.applyAlmacenByEmail(
+          this.addV2RolePermissions(this.buildBaseAuthenticatedPermissions(isSuperAdmin), roleKey, user.email),
+          user.email,
+        ),
         user.email,
       );
     }
     const legacy = this.buildPermissions(user.role, isSuperAdmin);
     // TOOLS_MANAGE es por email (Christian / Iván), no por flag legacy de consola.
-    return this.applyAlmacenByEmail(this.applyToolsManageByEmail(legacy, user.email), user.email);
+    return this.applyMesaContableByEmail(
+      this.applyAlmacenByEmail(this.applyToolsManageByEmail(legacy, user.email), user.email),
+      user.email,
+    );
   }
 
   /** Control de almacén concedido por persona (`warehouse/almacen-access.ts`), sin cambiar su rol. */
@@ -126,6 +133,30 @@ export class AuthService {
       PERMISSIONS.CATALOG_VIEW,
       // Dar de alta y corregir artículos (por código de barras o desde el formulario).
       PERMISSIONS.CATALOG_MANAGE,
+    ]) {
+      set.add(p);
+    }
+    return Array.from(set);
+  }
+
+  /**
+   * Mesa contable concedida por persona (`accounting/mesa-contable/mesa-por-correo.ts`), sin cambiar
+   * su rol. Lo mismo que trae el rol `contabilidad` para la Mesa, menos `CONTABILIDAD_MANAGE`: ese
+   * permiso deja ver los pagos a personal de todos (`EmployeePaymentsService.canViewAll`).
+   */
+  private applyMesaContableByEmail(permissions: string[], email?: string | null): string[] {
+    if (!canUsarMesaContable(email)) return permissions;
+    const set = new Set(permissions);
+    for (const p of [
+      PERMISSIONS.ACCOUNTING_VIEW,
+      PERMISSIONS.ACCOUNTING_MANAGE,
+      PERMISSIONS.ACCOUNTING_POST,
+      PERMISSIONS.ACCOUNTING_CLOSE_PERIOD,
+      PERMISSIONS.INVOICING_VIEW,
+      PERMISSIONS.INVOICING_MANAGE,
+      PERMISSIONS.BANKING_VIEW,
+      PERMISSIONS.BANKING_MANAGE,
+      PERMISSIONS.BANKING_RECONCILE,
     ]) {
       set.add(p);
     }

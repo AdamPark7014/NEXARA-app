@@ -26,6 +26,7 @@ import {
 import { MesaPagina } from "@/components/mesa-contable/MesaPagina";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
+import { canUserAccessPath } from "@/lib/user-access";
 import { Money } from "@/components/ui/DataTable";
 import {
   DESTINOS,
@@ -194,6 +195,9 @@ export default function ContabilidadDashboardPage() {
     tone: "danger" | "warning" | "info";
   };
 
+  // Nómina se queda fuera de la Mesa concedida por persona: no se ofrece un enlace que no abre.
+  const veNomina = canUserAccessPath(user, "/erp/contabilidad/pre-nomina");
+
   const attention = useMemo(() => {
     if (!data) return [] as Atencion[];
     const items: Atencion[] = [];
@@ -214,6 +218,7 @@ export default function ContabilidadDashboardPage() {
       });
     }
     for (const a of data.alerts) {
+      if (a.id === "prenomina-draft" && !veNomina) continue;
       if (items.some((i) => i.href === a.href && i.label === a.message)) continue;
       items.push({
         label: a.message,
@@ -223,7 +228,7 @@ export default function ContabilidadDashboardPage() {
       });
     }
     return items.slice(0, 5);
-  }, [data]);
+  }, [data, veNomina]);
 
   /**
    * ¿Detrás de estas cifras no hay absolutamente nada? No es lo mismo que «dio
@@ -717,11 +722,13 @@ export default function ContabilidadDashboardPage() {
                     `${data?.invoicesPeriod.total ?? 0} (${data?.invoicesPeriod.issued ?? 0} hechas · ${data?.invoicesPeriod.received ?? 0} recibidas)`,
                   )}
                 />
-                <CtxRow
-                  label="Nómina en borrador"
-                  value={ctx(<Money value={data?.prenominaDraftTotal ?? 0} bold={false} />)}
-                  href="/erp/contabilidad/pre-nomina"
-                />
+                {veNomina ? (
+                  <CtxRow
+                    label="Nómina en borrador"
+                    value={ctx(<Money value={data?.prenominaDraftTotal ?? 0} bold={false} />)}
+                    href="/erp/contabilidad/pre-nomina"
+                  />
+                ) : null}
               </dl>
               <div className={s.contextoPie}>
                 <ButtonLink variant="tertiary" size="sm" href="/erp/contabilidad/reportes">

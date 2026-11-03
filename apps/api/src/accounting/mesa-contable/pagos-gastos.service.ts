@@ -81,10 +81,20 @@ export class PagosGastosService {
     private readonly accounting: AccountingService,
   ) {}
 
-  async listar(companyId: number | null | undefined, q: { mes?: string; tipo?: string; soloPendientes?: string }) {
+  /**
+   * Con `verNomina: false` (quien no ve «Pagos a personal» en su empresa) los pagos de nómina no
+   * salen: cada fila dice a quién se le pagó y cuánto. `nominaOculta` dice cuántos se quedaron fuera.
+   */
+  async listar(
+    companyId: number | null | undefined,
+    q: { mes?: string; tipo?: string; soloPendientes?: string },
+    opciones: { verNomina?: boolean } = {},
+  ) {
     const tenantId = requireCompanyId(companyId);
     const periodo = rangoMes(q.mes, diaMexico(new Date()));
-    const todos = await this.movimientos(tenantId, periodo.from, periodo.to);
+    const completos = await this.movimientos(tenantId, periodo.from, periodo.to);
+    const verNomina = opciones.verNomina !== false;
+    const todos = verNomina ? completos : completos.filter((i) => i.tipo !== 'NOMINA');
 
     const conteos = Object.fromEntries([
       ['TODO', todos.length],
@@ -120,13 +130,19 @@ export class PagosGastosService {
       conteos,
       pendientes: todos.filter((i) => i.pendiente).length,
       items,
+      nominaOculta: verNomina ? null : completos.length - todos.length,
     };
   }
 
-  async conteoPendientes(companyId: number | null | undefined): Promise<number> {
+  async conteoPendientes(
+    companyId: number | null | undefined,
+    opciones: { verNomina?: boolean } = {},
+  ): Promise<number> {
     const tenantId = requireCompanyId(companyId);
     const periodo = rangoMes(undefined, diaMexico(new Date()));
-    return (await this.movimientos(tenantId, periodo.from, periodo.to)).filter((i) => i.pendiente).length;
+    return (await this.movimientos(tenantId, periodo.from, periodo.to)).filter(
+      (i) => i.pendiente && (opciones.verNomina !== false || i.tipo !== 'NOMINA'),
+    ).length;
   }
 
   // ───────────────────────── armado ─────────────────────────

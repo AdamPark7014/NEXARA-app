@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service.js';
-import { ALMACEN_POR_CORREO_URL_RULES, listAllowedUrls, type UrlRule } from '../common/rbac/url-matrix.js';
+import {
+  ALMACEN_POR_CORREO_URL_RULES,
+  MESA_CONTABLE_POR_CORREO_URL_RULES,
+  listAllowedUrls,
+  type UrlRule,
+} from '../common/rbac/url-matrix.js';
 import { canManageAlmacen } from '../warehouse/almacen-access.js';
+import { canUsarMesaContable } from '../accounting/mesa-contable/mesa-por-correo.js';
 import { ALL_ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 import { deriveModuleKeysFromPaths } from './navigation-module-map.js';
 import { applyModuleAccessOverrides, parseModuleAccess } from './module-access-merge.js';
@@ -40,9 +46,14 @@ export class MeService {
         ? (roleKeyRaw as RoleKey)
         : null;
 
-    // Almacén concedido por persona (Iván): también le abre el módulo en el menú de la web y las apps.
+    // Almacén (Iván) y Mesa contable (Contadora General) concedidos por persona: también le abren el
+    // módulo en el menú de la web y las apps.
     const rules: UrlRule[] = roleKey
-      ? [...listAllowedUrls(roleKey), ...(canManageAlmacen(profile?.email) ? ALMACEN_POR_CORREO_URL_RULES : [])]
+      ? [
+          ...listAllowedUrls(roleKey),
+          ...(canManageAlmacen(profile?.email) ? ALMACEN_POR_CORREO_URL_RULES : []),
+          ...(canUsarMesaContable(profile?.email) ? MESA_CONTABLE_POR_CORREO_URL_RULES : []),
+        ]
       : [];
     const paths = rules.map((r) => r.path);
     const panels = this.derivePanels(paths);

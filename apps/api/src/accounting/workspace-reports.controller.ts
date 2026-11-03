@@ -2,6 +2,9 @@ import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { AccountingWorkspaceReportsService } from './workspace-reports.service.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { CurrentUser } from '../common/current-user.decorator.js';
+import { ModulePolicyService } from '../common/tenant/module-policy.service.js';
+import type { UsuarioDePolitica } from '../common/tenant/module-policy.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -36,7 +39,10 @@ const esVerdadero = (raw: string | undefined): boolean =>
 @Controller('accounting/workspace')
 @UseGuards(UrlAccessGuard)
 export class AccountingWorkspaceReportsController {
-  constructor(private readonly service: AccountingWorkspaceReportsService) {}
+  constructor(
+    private readonly service: AccountingWorkspaceReportsService,
+    private readonly policy: ModulePolicyService,
+  ) {}
 
   /** Catálogo de reportes ejecutables, con las opciones reales de cada filtro. */
   @Get('reportes/catalogo')
@@ -110,20 +116,23 @@ export class AccountingWorkspaceReportsController {
   @Get('reportes/:id/detalle')
   @UseGuards(RbacGuard)
   @RBAC(SOLO_LECTURA_CONTABILIDAD)
-  detalle(
+  async detalle(
     @Param('id') id: string,
     @Query('clave') clave: string,
+    @CurrentUser() user: UsuarioDePolitica,
     @CurrentCompanyId() companyId: number | null,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('asOf') asOf?: string,
     @Query('periodId') periodId?: string,
   ) {
+    const verNomina = await this.policy.puedeUsar('employee-payments', user, companyId);
     return this.service.detalle(
       id,
       clave,
       { from, to, asOf, periodId: opcionalEntero(periodId, 'periodId') },
       companyId,
+      { verNomina },
     );
   }
 
