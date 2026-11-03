@@ -2052,6 +2052,25 @@ model AttendanceCorrection {
 /// Salida de jornada que se deshizo (Adam, 02-11-2026): la propia persona dentro de 10 minutos o su
 /// jefe el mismo día, con motivo. La fila sale de `Attendance` porque de ahí se calcula la nómina, y
 /// aquí queda todo lo que tenía y lo que se regresó: esta tabla es la bitácora.
+/// Una sola cotización abierta a una persona mientras dure su actividad. La bitácora de quién, cuándo y cuántos cambios.
+model CotizacionAcceso {
+  id             Int       @id @default(autoincrement())
+  companyId      Int
+  cotizacionId   Int
+  activityId     Int       @unique
+  userId         Int
+  otorgadoPorId  Int
+  cambios        Int       @default(0)
+  ultimoCambioAt DateTime?
+  revocadoAt     DateTime?
+  revocadoPorId  Int?
+  createdAt      DateTime  @default(now())
+
+  @@index([companyId, cotizacionId])
+  @@index([userId])
+  @@map("cotizacion_accesos")
+}
+
 /// Quien revisa la evidencia de una persona en lugar de su jefe, sin moverla de organigrama.
 model RevisorEvidencia {
   id        Int      @id @default(autoincrement())

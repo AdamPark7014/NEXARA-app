@@ -23,6 +23,8 @@ import {
 import { formatApiError } from "@/lib/erp-api";
 import { Ayuda, Campo } from "./campos";
 import Dialogo from "./Dialogo";
+import PedirApoyo from "./PedirApoyo";
+import { DIRECCION_VISIBLE } from "@/lib/direccion-api";
 import { DialogoGanada, DialogoPerdida } from "./ComoTermino";
 import FolioExplicado from "./FolioExplicado";
 import styles from "./editor.module.css";
@@ -52,6 +54,11 @@ export default function Seguimiento({
   const [decidir, setDecidir] = useState<"ganada" | "perdida" | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [traspaso, setTraspaso] = useState(false);
+  const [apoyo, setApoyo] = useState(false);
+  const [muestra, setMuestra] = useState(false);
+  useEffect(() => {
+    setMuestra(new URLSearchParams(window.location.search).has("muestra"));
+  }, []);
   const [companeros, setCompaneros] = useState<CompaneroQueCotiza[] | null>(null);
   const [destinatario, setDestinatario] = useState("");
   const [notaTraspaso, setNotaTraspaso] = useState("");
@@ -259,6 +266,16 @@ export default function Seguimiento({
           </p>
         ) : null}
       </div>
+
+      {DIRECCION_VISIBLE || muestra ? (
+        <p className={styles.pista}>
+          ¿Necesitas a alguien que no tiene Cotizaciones?{" "}
+          <button type="button" className={styles.enlace} onClick={() => setApoyo(true)}>
+            Pedirle apoyo solo en esta
+          </button>
+        </p>
+      ) : null}
+      {apoyo && token ? <PedirApoyo token={token} cotizacionId={detalle.id} onCerrar={() => setApoyo(false)} /> : null}
 
       {traspaso ? (
         <Dialogo

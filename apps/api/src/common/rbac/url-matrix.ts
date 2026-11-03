@@ -71,6 +71,9 @@ export const FORMATOS_ACTIVIDAD_URL_RULES: UrlRule[] = [
   { path: '/api/activities/*/tiempo-dicho', methods: ['POST'], scope: 'write' },
   // Ligar obra a un proyecto: lo mismo; quién puede lo decide `DireccionService`.
   { path: '/api/me/obra/ligar', methods: ['POST'], scope: 'write' },
+  // Trabajar una sola cotización abierta: lo decide `CotizacionAbiertaService`, por persona y actividad.
+  { path: '/api/activities/*/cotizacion-abierta', methods: ['GET', 'PUT'], scope: 'write' },
+  { path: '/api/activities/*/cotizacion-abierta/cerrar', methods: ['POST'], scope: 'write' },
 ];
 
 /**

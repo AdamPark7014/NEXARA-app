@@ -16,6 +16,7 @@ import { puedeSubirFotoDePunto } from "@/lib/evidencia-campos";
 import HerramientasChecklist from "@/components/ops/HerramientasChecklist";
 import CotizacionDeActividad, { type CotizacionLigada } from "@/components/erp/CotizacionDeActividad";
 import ArchivosDeActividad from "@/components/erp/ArchivosDeActividad";
+import CotizacionAbiertaTarjeta from "@/components/erp/CotizacionAbiertaTarjeta";
 import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
 import ActivitySuperiorActions from "@/components/ops/ActivitySuperiorActions";
 import AvisoIncumplimiento from "@/components/ops/AvisoIncumplimiento";
@@ -540,6 +541,8 @@ export default function ActivityDetailPage() {
           </div>
         </RecordSection>
       ) : null}
+
+      {token ? <CotizacionAbiertaTarjeta activityId={activity.id} token={token} /> : null}
 
       {String(activity.coreKind ?? "").toLowerCase() === "comercial" ? (
         <RecordSection title="Cotización">
