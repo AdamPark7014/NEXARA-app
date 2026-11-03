@@ -83,6 +83,8 @@ function LineaStock({ d }: { d?: Disponibilidad }) {
 }
 
 export default function PanelEquipos({
+  abierto,
+  onCerrar,
   modeloActivo,
   muebleActivo,
   pisoActivo,
@@ -105,6 +107,9 @@ export default function PanelEquipos({
   herramienta: string;
   camaras: readonly ModeloCamara[];
   equipos: readonly ModeloEquipo[];
+  /** Donde el panel no cabe fijo, entra como cajón sobre el lienzo. */
+  abierto?: boolean;
+  onCerrar?: () => void;
   onElegirCamara: (m: ModeloCamara) => void;
   onElegirEquipo: (m: ModeloEquipo) => void;
   onElegirMueble: (t: TipoMueble) => void;
@@ -138,13 +143,18 @@ export default function PanelEquipos({
   const verAmbientacion = q ? muebles.length + pisos.length > 0 : filtro === "ambientacion";
 
   return (
-    <aside className={styles.equipos} aria-label="Equipos">
+    <aside className={`${styles.equipos} ${abierto ? styles.equiposAbierto : ""}`} aria-label="Equipos">
       <div className={styles.equiposCabeza}>
         <button type="button" className={styles.botonArmar} onClick={onArmar}>
           <AutoAwesomeRoundedIcon fontSize="small" />
           Armar con IA
         </button>
-        <b>Equipos</b>
+        <div className={styles.equiposTitulo}>
+          <b>Equipos</b>
+          <button type="button" className={styles.equiposCerrar} aria-label="Cerrar equipos" title="Cerrar" onClick={onCerrar}>
+            ×
+          </button>
+        </div>
         <input className={styles.equiposBuscar} type="search" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar modelo o tipo" aria-label="Buscar equipo" />
         <div className={styles.equiposFiltros} role="group" aria-label="Filtrar equipos">
           {FILTROS.map(([id, texto]) => (

@@ -587,6 +587,26 @@ lugares a tocar para dar de alta un módulo:
 Cada fase se despliega sola (`/root/deploy-web.sh` si solo cambia la web; `/root/deploy-api-web.sh` si cambia
 la API).
 
+### 10.1 Pasada de facilidad de uso (Adam: «Sí, pasada final», 02-11-2026)
+
+Se recorrió como alguien nuevo, de la lista a la propuesta, a varios tamaños. Lo que estorbaba y cómo quedó:
+
+| Antes | Ahora |
+| --- | --- |
+| Cabecera de 130 px, tres etiquetas, título partido | Una línea de título y una de datos («Borrador · 14 cámaras · cliente · Al día»). «Creado por» y la cota pasan al panel. Solo se avisa «Escala sin calibrar», y lleva a calibrar |
+| Ocho grupos de controles sobre la maqueta | Arriba: Seleccionar · Dibujar · + Cámara · Persona · Cobertura · De noche · Capas. Abajo, en una fila: cobertura y niveles a la izquierda, moverse y brújula a la derecha |
+| Once herramientas siempre a la vista | En la maqueta van dentro de «Dibujar», que muestra la que está en uso. En el Dibujo siguen a la vista si caben |
+| Sin panel de equipos en laptops y sin forma de elegir uno | Cajón con el botón «Equipos» |
+| La guía marcaba «falta 1» para siempre por el croquis opcional | Croquis y persona de prueba ya no cuentan. Sin pendientes dice «Diseño listo» y guarda los pasos |
+| Cobertura repetida en una tarjeta grande | Píldora con el total; la leyenda se abre sola con «Cobertura» o «De noche» |
+| Dibujo saturado de etiquetas y anillos | Solo los de lo elegido. Lo demás está en Capas: «Medidas y alcances» y «Cobertura». El mobiliario se ve tenue |
+| Tarjeta de la cámara encima de los controles y de la ayuda | Cada una tiene su lugar y la tarjeta se quita al tomar una herramienta |
+| Arrastrar o usar la rueda sobre un punto no hacía nada | Mueven la vista; el punto solo se queda con el clic. Con una herramienta en la mano, el clic va al sitio de abajo |
+| Diseño en blanco: «Empieza por el croquis» | «¿Cómo quieres empezar?», con «Armar con IA» primero, y la tarjeta se quita al empezar a dibujar |
+| Lista: «Sin cotización ligada» en cada fila | Solo «Ver su cotización», con liga |
+
+El acomodo sigue al ancho real del editor y no al de la ventana, porque el menú de Core le quita hasta 280 px: una pantalla de 1536 px deja unos 1224. Los cortes están en `lib/cctv/acomodo.ts` y los estilos los leen de `data-columnas` y `data-lienzo`. No se usaron container queries: harían que los diálogos con `position: fixed` se midieran contra el editor y no contra la ventana.
+
 ## 11. Pendientes que no son de código
 
 - **Fichas Hikvision verificadas** de los modelos que NEXARA instala de verdad. Lista a David.

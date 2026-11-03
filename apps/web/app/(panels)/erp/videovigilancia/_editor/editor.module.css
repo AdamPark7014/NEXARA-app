@@ -39,38 +39,56 @@
 }
 
 .cabezaTexto {
-  flex: 1 1 300px;
+  flex: 1 1 200px;
   min-width: 0;
-}
-
-.tituloFila {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3px var(--ui-s3);
-}
-
-.insignias {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ui-s1);
 }
 
 .titulo {
   margin: 0;
+  overflow: hidden;
   font-family: var(--ui-font-display);
   font-size: 16px;
   font-weight: 650;
   letter-spacing: -0.01em;
+  line-height: 1.3;
   color: var(--ui-fg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sub {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0 var(--ui-s3);
+  gap: 0 6px;
   font-size: var(--ui-fs-meta);
   color: var(--ui-fg-2);
+  white-space: nowrap;
+}
+
+.subCliente {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sub > * + *::before {
+  content: "·";
+  margin-right: 6px;
+  color: var(--ui-fg-3);
+  font-weight: 400;
+}
+
+.subAviso {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ui-warning-text);
+  cursor: pointer;
+}
+
+.subAviso:hover {
+  text-decoration: underline;
 }
 
 .guardadoBien {
@@ -132,7 +150,73 @@
   display: none;
 }
 
+/* En la maqueta: lo poco que se usa a cada rato; lo demás, en «Dibujar». */
+.herramientas.herramientasCompactas {
+  flex-wrap: nowrap;
+  overflow: visible;
+}
+
+.menuDibujar {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  width: 226px;
+  padding: 6px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-elev-pop);
+  z-index: 3;
+}
+
+.menuDibujar button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ui-fg);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuDibujar button:hover {
+  background: var(--ui-hover);
+}
+
+.menuDibujar button[aria-pressed="true"] {
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+  font-weight: 600;
+}
+
+.menuDibujar svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+/* El botón de equipos solo existe donde el panel no cabe fijo. */
+.herramientaHueco.abreEquipos {
+  display: none;
+}
+
+.pagina[data-columnas="1"] .herramientaHueco.abreEquipos,
+.pagina[data-columnas="2"] .herramientaHueco.abreEquipos {
+  display: inline-flex;
+}
+
 .herramientaHueco {
+  position: relative;
   display: inline-flex;
   align-items: center;
 }
@@ -291,7 +375,7 @@
 .ayudaHerramienta {
   position: absolute;
   left: 50%;
-  bottom: 72px;
+  bottom: 64px;
   transform: translateX(-50%);
   max-width: min(640px, calc(100% - 32px));
   margin: 0;
@@ -306,6 +390,7 @@
 
 /* Tres columnas: equipos, lienzo y panel. */
 .cuerpo {
+  position: relative;
   display: grid;
   grid-template-columns: 252px minmax(0, 1fr) 330px;
   /* Alto de la ventana menos la barra de Core y la cabeza: la maqueta se ve completa sin bajar. */
@@ -313,24 +398,112 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
-@media (max-width: 1320px) {
-  .cuerpo {
-    grid-template-columns: minmax(0, 1fr) 320px;
-  }
-  .equipos {
-    display: none !important;
-  }
+/* El lienzo se queda con el ancho y los equipos entran como cajón; ver acomodoDelEditor. */
+.pagina[data-columnas="2"] .cuerpo {
+  grid-template-columns: minmax(0, 1fr) 320px;
 }
 
-@media (max-width: 1100px) {
-  .cuerpo {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto;
-    height: auto;
-  }
-  .lienzoCaja {
-    height: clamp(460px, 72dvh, 900px);
-  }
+.pagina[data-columnas="1"] .cuerpo {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto;
+  height: auto;
+}
+
+.pagina[data-columnas="1"] .lienzoCaja,
+.pagina[data-columnas="1"] .equipos {
+  height: clamp(460px, 72dvh, 900px);
+}
+
+.pagina[data-columnas="1"] .equipos,
+.pagina[data-columnas="2"] .equipos {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: min(272px, 86%);
+  border-right: 1px solid var(--ui-border);
+  box-shadow: var(--ui-elev-pop);
+  transform: translateX(-104%);
+  visibility: hidden;
+  transition: transform 0.18s ease, visibility 0.18s;
+  z-index: 6;
+}
+
+.pagina[data-columnas="2"] .equipos {
+  bottom: 0;
+}
+
+.pagina .equipos.equiposAbierto {
+  transform: none;
+  visibility: visible;
+}
+
+.pagina[data-columnas="1"] .equiposCerrar,
+.pagina[data-columnas="2"] .equiposCerrar {
+  display: inline-grid;
+}
+
+.pagina[data-lienzo="medio"] .boton3dLargo,
+.pagina[data-lienzo="angosto"] .boton3dLargo,
+.pagina[data-lienzo="celular"] .boton3dLargo {
+  display: none;
+}
+
+/* Sin ancho para una sola fila: moverse sube a una segunda fila. */
+.pagina[data-lienzo="angosto"] .controles3d,
+.pagina[data-lienzo="celular"] .controles3d {
+  right: var(--ui-s3);
+  bottom: 62px;
+}
+
+.pagina[data-lienzo="angosto"] .tarjetaPieza,
+.pagina[data-lienzo="angosto"] .pistaVista,
+.pagina[data-lienzo="angosto"] .ayudaHerramienta,
+.pagina[data-lienzo="celular"] .tarjetaPieza,
+.pagina[data-lienzo="celular"] .pistaVista,
+.pagina[data-lienzo="celular"] .ayudaHerramienta {
+  bottom: 112px;
+}
+
+/* Caminando: entre los botones de la izquierda y las flechas de la derecha. */
+.tarjetaPieza.tarjetaPiezaRecorrido {
+  left: 262px;
+  right: 168px;
+  bottom: 64px;
+  flex-wrap: wrap;
+  max-width: none;
+  transform: none;
+}
+
+.pagina[data-lienzo="angosto"] .tarjetaPieza.tarjetaPiezaRecorrido,
+.pagina[data-lienzo="celular"] .tarjetaPieza.tarjetaPiezaRecorrido {
+  left: var(--ui-s2);
+  right: var(--ui-s2);
+  bottom: 166px;
+}
+
+.pagina[data-lienzo="celular"] .leyenda {
+  display: none;
+}
+
+.pagina[data-lienzo="celular"] .piePlano {
+  left: var(--ui-s2);
+  bottom: var(--ui-s2);
+  max-width: calc(100% - 166px);
+}
+
+.pagina[data-lienzo="celular"] .navegacionAbajo {
+  right: var(--ui-s2);
+  bottom: var(--ui-s2);
+}
+
+.pagina[data-lienzo="celular"] .brujulaBoton {
+  right: var(--ui-s2);
+  bottom: 60px;
+}
+
+.pagina[data-lienzo="celular"] .controles3d {
+  right: 56px;
+  bottom: 60px;
 }
 
 .lienzoCaja {
@@ -413,6 +586,7 @@
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 1px 5px rgba(10, 14, 20, 0.35);
+  touch-action: none;
   color: #14181f;
   font: 650 11px var(--ui-font-sans, inherit);
   white-space: nowrap;
@@ -548,9 +722,33 @@
   padding: var(--ui-s3);
 }
 
-.equiposCabeza > b {
+.equiposTitulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.equiposTitulo b {
   font-size: 14px;
   font-weight: 650;
+}
+
+.equiposCerrar {
+  display: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  font-size: 19px;
+  line-height: 1;
+  color: var(--ui-fg-2);
+  cursor: pointer;
+}
+
+.equiposCerrar:hover {
+  background: var(--ui-hover);
 }
 
 .equiposBuscar {
@@ -752,23 +950,46 @@
   gap: var(--ui-s2);
 }
 
-.leyendaTotal {
-  margin: 0;
+.leyendaResumen {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  font: inherit;
   font-size: var(--ui-fs-meta);
   color: var(--ui-fg-2);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.leyendaTotal b {
-  margin-right: 3px;
-  font-size: 22px;
+.leyendaResumen:hover {
+  background: var(--ui-hover);
+}
+
+.leyendaResumen b {
+  font-size: 13.5px;
   font-weight: 700;
-  letter-spacing: -0.01em;
   color: var(--ui-fg);
+}
+
+.leyendaFilas {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 212px;
+  padding: 8px 10px 6px;
 }
 
 .leyendaBarra {
   display: flex;
-  height: 6px;
+  height: 4px;
   overflow: hidden;
   border-radius: 3px;
   background: var(--ui-track);
@@ -784,13 +1005,18 @@
   color: var(--ui-fg-3);
 }
 
+/* Abajo a la derecha, en una sola fila: moverse, brújula y acercar. */
 .controles3d {
   position: absolute;
-  right: var(--ui-s3);
-  bottom: 62px;
+  right: 210px;
+  bottom: var(--ui-s3);
   display: flex;
   gap: var(--ui-s2);
   z-index: 1;
+}
+
+.controles3d > button {
+  height: 40px;
 }
 
 .boton3d {
@@ -806,6 +1032,10 @@
   font-weight: 600;
   cursor: pointer;
   box-shadow: var(--ui-elev-1);
+}
+
+.boton3d::first-letter {
+  text-transform: uppercase;
 }
 
 .boton3d:hover {
@@ -931,21 +1161,30 @@
   align-items: center;
 }
 
-.leyenda {
+/* Abajo a la izquierda: cuánto se cubre (se abre para ver el detalle) y los niveles. */
+.piePlano {
   position: absolute;
   left: var(--ui-s3);
   bottom: var(--ui-s3);
   display: flex;
+  align-items: flex-end;
+  gap: var(--ui-s2);
+  z-index: 1;
+}
+
+.piePlanoRecorrido {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.leyenda {
+  display: flex;
   flex-direction: column;
-  gap: 5px;
-  width: 232px;
-  padding: var(--ui-s3) var(--ui-s4);
+  padding: 3px;
   background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  box-shadow: var(--ui-elev-2);
+  border-radius: 13px;
+  box-shadow: 0 2px 10px rgba(20, 24, 31, 0.13);
   font-size: var(--ui-fs-meta);
-  pointer-events: none;
 }
 
 .leyendaFila {
@@ -1184,6 +1423,7 @@
   height: 44px;
   padding: 0 2px;
   border: 0;
+  border-radius: 0;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   background: transparent;
@@ -1382,30 +1622,7 @@
   box-shadow: 0 2px 10px rgba(20, 24, 31, 0.13);
 }
 
-.nivelesFlota {
-  position: absolute;
-  left: 50%;
-  bottom: var(--ui-s3);
-  transform: translateX(-50%);
-  max-width: calc(100% - 500px);
-  z-index: 1;
-}
-
-/* Lienzo angosto: sin la tarjeta encima y los niveles a todo lo ancho. */
 @media (max-width: 760px) {
-  .leyenda {
-    display: none;
-  }
-  .nivelesFlota {
-    left: var(--ui-s2);
-    right: 190px;
-    bottom: var(--ui-s2);
-    transform: none;
-    max-width: none;
-  }
-  .controles3d {
-    bottom: 56px;
-  }
   .equiposFiltros button,
   .capaBoton {
     font-size: 12px;
@@ -1414,10 +1631,9 @@
 
 .nivel {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
-  padding: 3px 12px;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
   border-radius: 9px;
   border: 0;
   background: transparent;
@@ -1430,12 +1646,6 @@
   font-size: 12.5px;
   font-weight: 600;
   color: var(--ui-fg);
-}
-
-.nivel span {
-  font-size: 11px;
-  color: var(--ui-fg-2);
-  font-variant-numeric: tabular-nums;
 }
 
 .nivel:hover {
@@ -1458,11 +1668,14 @@
 
 @media (max-width: 640px) {
   .niveles {
-    padding: var(--ui-s2) var(--ui-s3);
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
   .nivel {
-    min-width: 0;
-    flex: 1 1 140px;
+    flex: none;
+    padding: 0 9px;
   }
   .nivelesFin {
     margin-left: 0;
@@ -1534,7 +1747,8 @@
 }
 
 .navegacionAbajo {
-  bottom: var(--ui-s4);
+  right: var(--ui-s3);
+  bottom: var(--ui-s3);
 }
 
 .botonNav {
@@ -1646,10 +1860,10 @@
 /* Se arrastra para girar e inclinar, como la de Mapas. */
 .brujulaBoton {
   position: absolute;
-  right: var(--ui-s3);
-  bottom: 106px;
-  width: 48px;
-  height: 48px;
+  right: 162px;
+  bottom: var(--ui-s3);
+  width: 40px;
+  height: 40px;
   padding: 0;
   display: grid;
   place-items: center;
@@ -1684,6 +1898,11 @@
   will-change: transform;
 }
 
+.brujula svg {
+  width: 30px;
+  height: 30px;
+}
+
 /* Celular: menos margen, herramientas en una tira que se desliza, lienzo más alto y sin la leyenda encima. */
 @media (max-width: 640px) {
   .pagina {
@@ -1712,7 +1931,9 @@
     font-size: 12px;
   }
   .lienzoCaja,
-  .lienzo {
+  .lienzo,
+  .pagina[data-columnas="1"] .lienzoCaja,
+  .pagina[data-columnas="1"] .equipos {
     min-height: 0;
     height: clamp(360px, 62dvh, 620px);
   }
@@ -1723,8 +1944,8 @@
     display: none;
   }
   .escalaNorte {
-    top: auto;
-    bottom: var(--ui-s3);
+    top: 76px;
+    left: var(--ui-s2);
   }
   .pipCaja {
     left: var(--ui-s2);
@@ -1862,7 +2083,7 @@
 .pistaVista {
   position: absolute;
   left: 50%;
-  bottom: 158px;
+  bottom: 64px;
   transform: translateX(-50%);
   display: flex;
   flex-wrap: wrap;
@@ -1899,7 +2120,7 @@
 .tarjetaPieza {
   position: absolute;
   left: 50%;
-  bottom: 74px;
+  bottom: 64px;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -2381,4 +2602,39 @@
   font-style: normal;
   font-weight: 600;
   color: var(--ui-brand-text);
+}
+
+/* Guía del panel: con todo lo necesario hecho, se resume. */
+.guiaLista {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--ui-s3);
+  border-radius: var(--ui-radius);
+  background: var(--ui-brand-soft);
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+}
+
+.guiaLista b {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ui-brand-text);
+}
+
+.guiaOpcional {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--ui-fg-3);
+}
+
+.guiaPasos > summary {
+  font-size: var(--ui-fs-meta);
+  font-weight: 600;
+  color: var(--ui-fg-2);
+  cursor: pointer;
+}
+
+.guiaPasos > ol {
+  margin-top: var(--ui-s2);
 }

@@ -788,6 +788,14 @@ export class MotorMaqueta {
   }
 
   /** Arrastrar la brújula: gira e inclina igual que arrastrar la maqueta. */
+  tomarPuntero(e: PointerEvent) {
+    this.ctrl.tomarPuntero(e);
+  }
+
+  tomarRueda(e: WheelEvent) {
+    this.ctrl.tomarRueda(e);
+  }
+
   girarPx(dx: number, dy: number) {
     this.vuelo = null;
     this.ctrl.girarPx(dx, dy);

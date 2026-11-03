@@ -10,15 +10,15 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from "react";
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type FormEvent } from "react";
 import UndoRoundedIcon from "@mui/icons-material/UndoRounded";
 import RedoRoundedIcon from "@mui/icons-material/RedoRounded";
-import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
-import { Alert, Badge, Button, Input, Segmented } from "@/components/base";
+import { Alert, Button, Input, Segmented } from "@/components/base";
+import { acomodoDelEditor } from "@/lib/cctv/acomodo";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { MODELOS_CAMARA, TIPOS_DE_RACK, etiquetaModelo, modeloPorId, type ModeloCamara, type ModeloEquipo, type TipoEquipo } from "@/lib/cctv/catalogo";
 import {
@@ -99,6 +99,10 @@ const HERRAMIENTAS: ReadonlyArray<{ id: Herramienta; etiqueta: string; tecla?: s
   { id: "persona", etiqueta: "Persona", tecla: "H", icono: "M12 3a2 2 0 110 4 2 2 0 010-4zM12 8v7M8 11h8M12 15l-3 6M12 15l3 6", grupo: "camara" },
 ];
 
+const DE_DIBUJO = HERRAMIENTAS.filter((h) => !h.grupo && h.id !== "seleccionar");
+const ICONO_DIBUJAR = "M4 20l1-4L16 5l3 3L8 19zM14 7l3 3";
+const ICONO_EQUIPOS = "M4 5h7v7H4zM13 5h7v7h-7zM4 14h7v5H4zM13 14h7v5h-7z";
+
 const AYUDA_HERRAMIENTA: Record<Herramienta, string> = {
   seleccionar: "Clic para elegir y arrastrar para mover. Arrastra el fondo para mover la vista; la rueda acerca. Supr borra y Ctrl+Z deshace.",
   muro: "Clic para empezar y clic para terminar; sigue encadenando. Doble clic o Esc corta. Alt suelta el imán.",
@@ -116,6 +120,70 @@ const AYUDA_HERRAMIENTA: Record<Herramienta, string> = {
 };
 
 type Meta = { nombre: string; estado: EstadoDiseno; grabacion: Grabacion };
+
+function IconoHerramienta({ d }: { d: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
+  );
+}
+
+/** En la maqueta, los trazos van juntos en un botón: muestra el que está en uso. */
+function MenuDibujar({ herramienta, onElegir }: { herramienta: Herramienta; onElegir: (h: Herramienta) => void }) {
+  const [abierto, setAbierto] = useState(false);
+  const caja = useRef<HTMLSpanElement>(null);
+  const activa = DE_DIBUJO.find((h) => h.id === herramienta);
+  useEffect(() => {
+    if (!abierto) return;
+    const fuera = (e: PointerEvent) => {
+      if (!caja.current?.contains(e.target as Node)) setAbierto(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAbierto(false);
+    };
+    document.addEventListener("pointerdown", fuera);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", fuera);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [abierto]);
+  return (
+    <span ref={caja} className={styles.herramientaHueco}>
+      <button
+        type="button"
+        className={styles.herramienta}
+        aria-pressed={Boolean(activa)}
+        aria-expanded={abierto}
+        title="Muros, puertas, áreas y medidas"
+        onClick={() => setAbierto((a) => !a)}
+      >
+        <IconoHerramienta d={activa?.icono ?? ICONO_DIBUJAR} />
+        {activa?.etiqueta ?? "Dibujar"}
+      </button>
+      {abierto ? (
+        <div className={styles.menuDibujar} role="group" aria-label="Herramientas de dibujo">
+          {DE_DIBUJO.map((h) => (
+            <button
+              key={h.id}
+              type="button"
+              aria-pressed={herramienta === h.id}
+              title={h.tecla ? `${h.etiqueta} (${h.tecla})` : h.etiqueta}
+              onClick={() => {
+                onElegir(h.id);
+                setAbierto(false);
+              }}
+            >
+              <IconoHerramienta d={h.icono} />
+              {h.etiqueta}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </span>
+  );
+}
 
 /** Diseño recién guardado: la API manda el plano tal cual, con los croquis en ruta relativa. */
 function planoDe(d: Diseno): Plano {
@@ -166,7 +234,7 @@ export default function EditorCctv({
   const [aviso, setAviso] = useState<string | null>(null);
   const [resumen, setResumen] = useState<ResumenDiseno | null>(diseno.resumen);
   const [herramienta, setHerramienta] = useState<Herramienta>("seleccionar");
-  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: false, humanoides: true, abajo: true, cobertura: false, claves: true, noche: false, tamanoReal: false, cableado: true, cableado3d: false });
+  const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: false, humanoides: true, abajo: true, cobertura: false, claves: true, noche: false, tamanoReal: false, cableado: true, cableado3d: false, medidas: false, conos: true });
   // Pisos de abajo para la vista apilada (en gris). La raíz cambia con cada edición de cualquier
   // piso; si los de abajo no cambiaron se reutiliza la lista para no recalcular su cobertura.
   const debajoRef = useRef<{ clave: string; valor: NivelConPlano[] }>({ clave: "[]", valor: [] });
@@ -202,6 +270,39 @@ export default function EditorCctv({
   const [textoEn, setTextoEn] = useState<Punto | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const archivo = useRef<HTMLInputElement>(null);
+  /** Abre y cierra el panel de equipos donde no cabe fijo (laptops y celular). */
+  const [equiposAbierto, setEquiposAbierto] = useState(false);
+  /** null = lo decide lo que se está viendo: con cobertura o de noche, los colores necesitan su leyenda. */
+  const [leyendaAbierta, setLeyendaAbierta] = useState<boolean | null>(null);
+  const capasMenu = useRef<HTMLDetailsElement>(null);
+  const pagina = useRef<HTMLDivElement>(null);
+  const [barraCompacta, setBarraCompacta] = useState(false);
+
+  // El acomodo sigue al ancho real del editor; los estilos lo leen de estos atributos.
+  useLayoutEffect(() => {
+    const n = pagina.current;
+    if (!n || typeof ResizeObserver === "undefined") return;
+    const medir = (ancho: number) => {
+      const a = acomodoDelEditor(ancho);
+      n.dataset.columnas = String(a.columnas);
+      n.dataset.lienzo = a.lienzo;
+      setBarraCompacta(a.barraCompacta);
+    };
+    medir(n.clientWidth);
+    const obs = new ResizeObserver(([e]) => medir(e.contentRect.width));
+    obs.observe(n);
+    return () => obs.disconnect();
+  }, []);
+
+  // El menú de capas se cierra al tocar fuera, como cualquier otro.
+  useEffect(() => {
+    const fuera = (e: PointerEvent) => {
+      const d = capasMenu.current;
+      if (d?.open && !d.contains(e.target as Node)) d.open = false;
+    };
+    document.addEventListener("pointerdown", fuera);
+    return () => document.removeEventListener("pointerdown", fuera);
+  }, []);
 
   /** Aplica un cambio al nivel activo (todo lo del editor trabaja sobre un solo piso). */
   const aplicar = useCallback(
@@ -439,16 +540,23 @@ export default function EditorCctv({
         ? null
         : AYUDA_HERRAMIENTA[herramienta];
 
+  const verLeyenda = leyendaAbierta ?? (modo === "3d" && (capas.cobertura || capas.noche));
+  const recalibrar = () => {
+    if (!webgl) setModo("2d");
+    setHerramienta("cota");
+    setAviso("Marca los dos extremos de una cota conocida.");
+  };
+
   const barraNiveles = (
     <section className={styles.niveles} aria-label="Niveles del edificio">
-      {niveles.map(({ nivel, plano: p }) => (
-        <button key={nivel.id} type="button" className={styles.nivel} aria-pressed={nivel.id === nivelActivo.nivel.id} onClick={() => cambiarNivel(nivel.id)}>
-          <b>{nivel.nombre}</b>
-          <span>
-            {elevacionTexto(nivel.elevacionM)} · {p.camaras.length ? `${p.camaras.length} ${p.camaras.length === 1 ? "cámara" : "cámaras"}` : "sin cámaras"}
-          </span>
-        </button>
-      ))}
+      {niveles.map(({ nivel, plano: p }) => {
+        const detalle = `${elevacionTexto(nivel.elevacionM)} · ${p.camaras.length ? `${p.camaras.length} ${p.camaras.length === 1 ? "cámara" : "cámaras"}` : "sin cámaras"}`;
+        return (
+          <button key={nivel.id} type="button" className={styles.nivel} aria-pressed={nivel.id === nivelActivo.nivel.id} aria-label={`${nivel.nombre} ${detalle}`} title={detalle} onClick={() => cambiarNivel(nivel.id)}>
+            <b>{nivel.nombre}</b>
+          </button>
+        );
+      })}
       <Button
         size="sm"
         onClick={() => {
@@ -461,36 +569,38 @@ export default function EditorCctv({
       >
         + Nivel
       </Button>
-      {abajo ? (
-        <label className={styles.capa}>
-          <input type="checkbox" checked={capas.abajo} onChange={(e) => setCapas((c) => ({ ...c, abajo: e.target.checked }))} />
-          Ver el nivel de abajo en gris
-        </label>
-      ) : null}
     </section>
   );
 
   return (
-    <div className={styles.pagina}>
+    <div ref={pagina} className={styles.pagina}>
       <header className={styles.cabeza}>
         <Link href="/erp/videovigilancia" className={styles.volver} aria-label="Volver a Videovigilancia" title="Volver a Videovigilancia">
           <ChevronLeftRoundedIcon fontSize="small" />
         </Link>
         <div className={styles.cabezaTexto}>
-          <div className={styles.tituloFila}>
-            <h1 className={styles.titulo}>{meta.nombre || diseno.nombre}</h1>
-            <div className={styles.insignias}>
-              <Badge tone={meta.estado === "aprobada" ? "success" : meta.estado === "enviada" ? "info" : "neutral"}>{ETIQUETA_ESTADO_DISENO[meta.estado]}</Badge>
-              <Badge tone="brand">CCTV · {totalCamaras} {totalCamaras === 1 ? "cámara" : "cámaras"}</Badge>
-              {cal ? <Badge tone="success">Escala calibrada · cota {cal.metros.toFixed(2)} m</Badge> : <Badge tone="warning">Escala sin calibrar</Badge>}
-            </div>
-          </div>
+          <h1 className={styles.titulo} title={meta.nombre || diseno.nombre}>
+            {meta.nombre || diseno.nombre}
+          </h1>
           <div className={styles.sub}>
-            <span>{diseno.clienteNombre ?? "Sin cliente"}</span>
-            <span>Creado por {diseno.creadoPor?.nombre ?? "—"}</span>
+            <span>{ETIQUETA_ESTADO_DISENO[meta.estado]}</span>
+            <span>
+              {totalCamaras} {totalCamaras === 1 ? "cámara" : "cámaras"}
+            </span>
+            {diseno.clienteNombre ? (
+              <span className={styles.subCliente} title={diseno.clienteNombre}>
+                {diseno.clienteNombre}
+              </span>
+            ) : null}
             <span className={conflicto || errorGuardar ? styles.guardadoMal : styles.guardadoBien} aria-live="polite">
               {textoGuardado}
             </span>
+            {/* Sin calibrar, las medidas son aproximadas: es lo único de la escala que hay que avisar. */}
+            {!cal && (plano.muros.length || plano.camaras.length) ? (
+              <button type="button" className={styles.subAviso} onClick={recalibrar}>
+                Escala sin calibrar
+              </button>
+            ) : null}
           </div>
         </div>
         <Segmented
@@ -515,9 +625,6 @@ export default function EditorCctv({
           </Button>
           <Button variant="ghost" icon aria-label="Rehacer (Ctrl+Y)" title="Rehacer (Ctrl+Y)" disabled={!estado.futuro.length} onClick={() => despachar({ tipo: "rehacer" })}>
             <RedoRoundedIcon fontSize="small" />
-          </Button>
-          <Button iconStart={<UploadFileOutlinedIcon fontSize="small" />} loading={subiendo} onClick={() => archivo.current?.click()}>
-            {plano.croquis ? "Cambiar croquis" : "Subir croquis"}
           </Button>
           {puedeCotizar ? (
             <Button
@@ -598,6 +705,8 @@ export default function EditorCctv({
         ) : (
           <div className={styles.cuerpo}>
             <PanelEquipos
+              abierto={equiposAbierto}
+              onCerrar={() => setEquiposAbierto(false)}
               modeloActivo={modeloNuevo}
               muebleActivo={muebleNuevo}
               pisoActivo={pisoNuevo}
@@ -605,27 +714,41 @@ export default function EditorCctv({
               camaras={catalogo.camaras}
               equipos={catalogo.equipos}
               equipoActivo={equipoNuevo}
-              onElegirEquipo={elegirEquipo}
+              onElegirEquipo={(m) => {
+                elegirEquipo(m);
+                setEquiposAbierto(false);
+              }}
               onAgregar={() => setAgregando(true)}
-              onArmar={() => setArmando(true)}
+              onArmar={() => {
+                setArmando(true);
+                setEquiposAbierto(false);
+              }}
               existencias={existencias.porClave}
               onElegirCamara={(m) => {
                 setModeloNuevo(m);
                 setHerramienta("camara");
                 setVerDesde(null);
+                setEquiposAbierto(false);
               }}
               onElegirMueble={(t) => {
                 setMuebleNuevo(t);
                 setHerramienta("mueble");
                 setVerDesde(null);
+                setEquiposAbierto(false);
               }}
               onElegirPiso={(p) => {
                 setPisoNuevo(p);
                 setHerramienta("area");
                 setVerDesde(null);
+                setEquiposAbierto(false);
               }}
             />
-            <div className={styles.lienzoCaja}>
+            <div
+              className={styles.lienzoCaja}
+              onPointerDownCapture={(e) => {
+                if (equiposAbierto && !(e.target as HTMLElement).closest("[data-abre-equipos]")) setEquiposAbierto(false);
+              }}
+            >
               {modo === "3d" && webgl ? (
                 <Maqueta3D
                   // De entrada la maqueta se ve limpia: cobertura y cable se encienden con un clic. En el dibujo el cable sigue visible.
@@ -705,10 +828,11 @@ export default function EditorCctv({
 
               {!verDesde ? (
                 <div className={`${styles.barra} ${recorriendo ? styles.barraRecorrido : ""}`}>
-                  <div className={styles.herramientas} role="toolbar" aria-label="Herramientas del plano" hidden={(modo === "3d" && !webgl) || recorriendo}>
-                    {HERRAMIENTAS.map((h, i) => (
+                  <div className={`${styles.herramientas} ${modo === "3d" || barraCompacta ? styles.herramientasCompactas : ""}`} role="toolbar" aria-label="Herramientas del plano" hidden={(modo === "3d" && !webgl) || recorriendo}>
+                    {(modo === "3d" || barraCompacta ? HERRAMIENTAS.filter((h) => h.grupo || h.id === "seleccionar") : HERRAMIENTAS).map((h) => (
                       <span key={h.id} className={styles.herramientaHueco}>
-                        {h.grupo === "camara" && HERRAMIENTAS[i - 1]?.grupo !== "camara" ? <span className={styles.separador} aria-hidden="true" /> : null}
+                        {(modo === "3d" || barraCompacta) && h.id === "camara" ? <MenuDibujar herramienta={herramienta} onElegir={setHerramienta} /> : null}
+                        {h.id === "camara" ? <span className={styles.separador} aria-hidden="true" /> : null}
                         <button
                           type="button"
                           className={`${styles.herramienta} ${h.grupo === "camara" ? styles.herramientaCamara : ""}`}
@@ -716,40 +840,51 @@ export default function EditorCctv({
                           title={h.tecla ? `${h.etiqueta} (${h.tecla})` : h.etiqueta}
                           onClick={() => setHerramienta(h.id)}
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d={h.icono} />
-                          </svg>
+                          <IconoHerramienta d={h.icono} />
                           {h.etiqueta}
                         </button>
                       </span>
                     ))}
+                    <span className={`${styles.herramientaHueco} ${styles.abreEquipos}`}>
+                      <span className={styles.separador} aria-hidden="true" />
+                      <button type="button" data-abre-equipos className={styles.herramienta} aria-pressed={equiposAbierto} aria-expanded={equiposAbierto} title="Elegir modelo, mobiliario o armar con IA" onClick={() => setEquiposAbierto((a) => !a)}>
+                        <IconoHerramienta d={ICONO_EQUIPOS} />
+                        Equipos
+                      </button>
+                    </span>
                   </div>
                   <div className={styles.capas} role="group" aria-label="Capas">
                     {modo === "3d" && webgl
                       ? ([
                           ["cobertura", "Cobertura"],
-                          ["cableado3d", "Cableado"],
-                          ["humanoides", "Personas"],
                           ["noche", "De noche"],
-                          ["tamanoReal", "Tamaño real"],
-                        ] as const).filter(([k]) => !(recorriendo && (k === "cableado3d" || k === "tamanoReal"))).map(([k, t]) => (
+                        ] as const).map(([k, t]) => (
                           <button key={k} type="button" className={styles.capaBoton} aria-pressed={capas[k]} onClick={() => setCapas((c) => ({ ...c, [k]: !c[k] }))}>
                             {t}
                           </button>
                         ))
                       : null}
-                    <details className={styles.capasMas}>
+                    <details ref={capasMenu} className={styles.capasMas}>
                       <summary>Capas</summary>
                       <div>
                         {(modo === "2d"
                           ? ([
                               ["croquis", "Croquis"],
+                              ["conos", "Cobertura"],
                               ["etiquetas", "Etiquetas"],
+                              ["medidas", "Medidas y alcances"],
                               ["cableado", "Cableado"],
                               ["calor", "Mapa de calor"],
                             ] as const)
                           : webgl
                             ? ([
+                                ["humanoides", "Personas"],
+                                ...(recorriendo
+                                  ? []
+                                  : ([
+                                      ["cableado3d", "Cableado"],
+                                      ["tamanoReal", "Tamaño real"],
+                                    ] as const)),
                                 ["claves", "Claves de equipos"],
                                 ["etiquetas", "Nombres de áreas"],
                                 ["croquis", "Croquis en el piso"],
@@ -767,6 +902,12 @@ export default function EditorCctv({
                             {t}
                           </label>
                         ))}
+                        {abajo ? (
+                          <label className={styles.capa}>
+                            <input type="checkbox" checked={capas.abajo} onChange={(e) => setCapas((c) => ({ ...c, abajo: e.target.checked }))} />
+                            Ver el nivel de abajo en gris
+                          </label>
+                        ) : null}
                       </div>
                     </details>
                   </div>
@@ -790,44 +931,19 @@ export default function EditorCctv({
                 </p>
               ) : null}
 
-              {!plano.croquis && !plano.muros.length && modo === "2d" ? (
+              {!plano.croquis && !plano.muros.length && herramienta === "seleccionar" && !recorriendo ? (
                 <div className={styles.vacio}>
-                  <b>Empieza por el croquis del sitio</b>
-                  <span>JPG, PNG o el PDF que exporta AutoCAD. Después lo calibras con una cota y dibujas o corriges los muros.</span>
+                  <b>¿Cómo quieres empezar?</b>
+                  <span>Descríbele el sitio a la IA y te arma un primer diseño, o parte del croquis (JPG, PNG o PDF de AutoCAD) o de cero.</span>
                   <div className={styles.acciones}>
-                    <Button variant="primary" loading={subiendo} onClick={() => archivo.current?.click()}>
+                    <Button variant="primary" onClick={() => setArmando(true)}>
+                      Armar con IA
+                    </Button>
+                    <Button loading={subiendo} onClick={() => archivo.current?.click()}>
                       Subir croquis
                     </Button>
                     <Button onClick={() => setHerramienta("muro")}>Dibujar a mano</Button>
-                    <Button onClick={() => setArmando(true)}>Armar con IA</Button>
                   </div>
-                </div>
-              ) : null}
-              {!verDesde && !recorriendo ? (
-                <div className={styles.leyenda} aria-label="Nivel de detalle según IEC 62676-4">
-                  {cob ? (
-                    <>
-                      <p className={styles.leyendaTotal}>
-                        <b>{cob.cubierto.toFixed(1)} %</b> del interior cubierto
-                      </p>
-                      <span className={styles.leyendaBarra} aria-hidden="true">
-                        <i style={{ width: `${cob.identificacion}%`, background: COLOR_NIVEL.identificacion }} />
-                        <i style={{ width: `${cob.reconocimiento}%`, background: COLOR_NIVEL.reconocimiento }} />
-                        <i style={{ width: `${cob.observacion}%`, background: COLOR_NIVEL.observacion }} />
-                        <i style={{ width: `${cob.deteccion}%`, background: COLOR_NIVEL.deteccion }} />
-                      </span>
-                    </>
-                  ) : (
-                    <p className={styles.seccion}>Nivel de detalle · IEC 62676-4</p>
-                  )}
-                  {LEYENDA_NIVELES.map((n) => (
-                    <span key={n.nivel} className={styles.leyendaFila}>
-                      <span className={styles.punto} style={{ background: COLOR_NIVEL[n.nivel] }} />
-                      {n.etiqueta}
-                      <b>{cob ? `${Math.round(cob[n.nivel as keyof typeof cob] as number)} %` : n.ppm}</b>
-                    </span>
-                  ))}
-                  {capas.noche && modo === "3d" ? <p className={styles.leyendaNota}>De noche, el cono llega hasta el alcance de IR de cada ficha.</p> : null}
                 </div>
               ) : null}
               {camaraVista && modo === "2d" ? (
@@ -835,7 +951,44 @@ export default function EditorCctv({
                   <VistaCamara plano={plano} camara={camaraVista} tapas={tapas} coberturas={coberturas} esHoja={esHoja} />
                 </div>
               ) : null}
-              {!verDesde ? <div className={styles.nivelesFlota}>{barraNiveles}</div> : null}
+              {!verDesde ? (
+                <div className={`${styles.piePlano} ${recorriendo ? styles.piePlanoRecorrido : ""}`}>
+                  {!recorriendo && (cob || plano.camaras.length) ? (
+                    <div className={styles.leyenda} role="group" aria-label="Nivel de detalle según IEC 62676-4">
+                      {verLeyenda ? (
+                        <div className={styles.leyendaFilas}>
+                          {LEYENDA_NIVELES.map((n) => (
+                            <span key={n.nivel} className={styles.leyendaFila}>
+                              <span className={styles.punto} style={{ background: COLOR_NIVEL[n.nivel] }} />
+                              {n.etiqueta}
+                              <b>{cob ? `${Math.round(cob[n.nivel as keyof typeof cob] as number)} %` : n.ppm}</b>
+                            </span>
+                          ))}
+                          {capas.noche && modo === "3d" ? <p className={styles.leyendaNota}>De noche, el cono llega hasta el alcance de IR de cada ficha.</p> : null}
+                        </div>
+                      ) : null}
+                      <button type="button" className={styles.leyendaResumen} aria-expanded={verLeyenda} title="Qué tanto detalle da cada cámara, según IEC 62676-4" onClick={() => setLeyendaAbierta(!verLeyenda)}>
+                        {cob ? (
+                          <>
+                            <span>
+                              <b>{cob.cubierto.toFixed(1)} %</b> cubierto
+                            </span>
+                            <span className={styles.leyendaBarra} aria-hidden="true">
+                              <i style={{ width: `${cob.identificacion}%`, background: COLOR_NIVEL.identificacion }} />
+                              <i style={{ width: `${cob.reconocimiento}%`, background: COLOR_NIVEL.reconocimiento }} />
+                              <i style={{ width: `${cob.observacion}%`, background: COLOR_NIVEL.observacion }} />
+                              <i style={{ width: `${cob.deteccion}%`, background: COLOR_NIVEL.deteccion }} />
+                            </span>
+                          </>
+                        ) : (
+                          <span>Nivel de detalle</span>
+                        )}
+                      </button>
+                    </div>
+                  ) : null}
+                  {barraNiveles}
+                </div>
+              ) : null}
               {medida ? (
                 <DialogoMedida
                   plano={plano}
@@ -888,11 +1041,8 @@ export default function EditorCctv({
                 setMetaSucia(true);
               }}
               resumen={resumen}
-              onRecalibrar={() => {
-                if (!webgl) setModo("2d");
-                setHerramienta("cota");
-                setAviso("Marca los dos extremos de una cota conocida.");
-              }}
+              creadoPor={diseno.creadoPor?.nombre ?? null}
+              onRecalibrar={recalibrar}
               onCambiarCroquis={() => archivo.current?.click()}
               onHerramienta={(h) => {
                 if (!webgl) setModo("2d");

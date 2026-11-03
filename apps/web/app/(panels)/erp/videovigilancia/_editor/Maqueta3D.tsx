@@ -140,6 +140,9 @@ export default function Maqueta3D({
 }) {
   const lienzo = useRef<HTMLCanvasElement>(null);
   const caja = useRef<HTMLDivElement>(null);
+  const encima = useRef<HTMLDivElement>(null);
+  /** Presión sobre un punto: si se mueve, deja de ser clic y pasa a mover la vista. */
+  const presionPunto = useRef<{ id: number; x: number; y: number; button: number; buttons: number } | null>(null);
   const motor = useRef<MotorMaqueta | null>(null);
   const [listo, setListo] = useState(false);
   const planoRef = useRef(plano);
@@ -525,6 +528,15 @@ export default function Maqueta3D({
   const mirada = useRef<{ x: number; y: number; ux: number; uy: number; movio: boolean; sel: Seleccion | null } | null>(null);
   const giroBrujula = useRef<{ x: number; y: number; movio: boolean } | null>(null);
 
+  // La rueda sobre un punto también acerca (su evento no pasa por el lienzo).
+  useEffect(() => {
+    const capa = encima.current;
+    if (!capa) return;
+    const rodar = (e: WheelEvent) => motor.current?.tomarRueda(e);
+    capa.addEventListener("wheel", rodar, { passive: false });
+    return () => capa.removeEventListener("wheel", rodar);
+  }, []);
+
   const alPresionar = (e: ReactPointerEvent<HTMLDivElement>) => {
     const m = motor.current;
     if (!m || e.target !== lienzo.current || verDesde) return;
@@ -882,7 +894,7 @@ export default function Maqueta3D({
       />
       {!pintada ? <p className={styles.maquetaCarga}>Armando la maqueta…</p> : null}
 
-      <div className={styles.maquetaEncima} aria-hidden={verDesde ? true : undefined}>
+      <div ref={encima} className={styles.maquetaEncima} aria-hidden={verDesde ? true : undefined}>
         {pintada && !verDesde && !recorriendo
           ? rotulos.map((r) => (
               <span
@@ -911,6 +923,24 @@ export default function Maqueta3D({
                   className={styles.claveEquipo}
                   aria-pressed={sel}
                   title={`${c.clave} · ${c.nombre}`}
+                  // Con una herramienta en la mano, el clic es para el sitio que queda debajo.
+                  style={herramienta === "seleccionar" ? undefined : { pointerEvents: "none" }}
+                  onPointerDown={(e) => {
+                    presionPunto.current = { id: e.pointerId, x: e.clientX, y: e.clientY, button: e.button, buttons: e.buttons };
+                  }}
+                  onPointerMove={(e) => {
+                    const a = presionPunto.current;
+                    if (!a || a.id !== e.pointerId || Math.hypot(e.clientX - a.x, e.clientY - a.y) < 5) return;
+                    presionPunto.current = null;
+                    motor.current?.tomarPuntero(new PointerEvent("pointerdown", { pointerId: a.id, clientX: a.x, clientY: a.y, button: a.button, buttons: a.buttons, pointerType: e.pointerType, shiftKey: e.shiftKey }));
+                  }}
+                  onPointerUp={() => {
+                    presionPunto.current = null;
+                  }}
+                  onPointerCancel={() => {
+                    presionPunto.current = null;
+                  }}
+                  onContextMenu={(e) => e.preventDefault()}
                   onClick={() => {
                     if (sel) enfocarSeleccion();
                     else onSeleccionar({ tipo: c.tipoSel, id: c.id });
@@ -968,13 +998,13 @@ export default function Maqueta3D({
         </div>
       ) : null}
 
-      {piezaSel && !verDesde && !apuntando ? (
-        <div className={styles.tarjetaPieza} style={recorriendo ? { bottom: 96 } : undefined}>
+      {piezaSel && !verDesde && !apuntando && herramienta === "seleccionar" ? (
+        <div className={`${styles.tarjetaPieza} ${recorriendo ? styles.tarjetaPiezaRecorrido : ""}`}>
           <div className={styles.tarjetaPiezaTexto}>
             <b>
               {camaraSel ? claveCamara(camaraSel.numero) : equipoSel ? claveEquipo(equipoSel) : ""} · {piezaSel.nombre}
             </b>
-            <span>{[piezaSel.modelo, detalleSel].filter(Boolean).join(" · ")}</span>
+            <span title={[piezaSel.modelo, detalleSel].filter(Boolean).join(" · ")}>{[piezaSel.modelo, detalleSel].filter(Boolean).join(" · ")}</span>
           </div>
           {!equipoSel?.gabineteId ? (
             <span className={styles.tarjetaAltura} role="group" aria-label="Altura de instalación">
@@ -1101,7 +1131,7 @@ export default function Maqueta3D({
 
       {!verDesde && !recorriendo ? (
         <>
-          {pistaVista && herramienta === "seleccionar" ? (
+          {pistaVista && herramienta === "seleccionar" && !piezaSel ? (
             <p className={styles.pistaVista}>
               <span>
                 <b>Arrastra</b> para girar
@@ -1132,10 +1162,10 @@ export default function Maqueta3D({
               Recorrer
             </button>
             <button type="button" className={styles.boton3d} onClick={() => motor.current?.vistaGeneral()}>
-              Vista general
+              <span className={styles.boton3dLargo}>Vista </span>general
             </button>
             <button type="button" className={styles.boton3d} onClick={() => motor.current?.vistaSuperior()}>
-              Vista superior
+              <span className={styles.boton3dLargo}>Vista </span>superior
             </button>
           </div>
           <button
