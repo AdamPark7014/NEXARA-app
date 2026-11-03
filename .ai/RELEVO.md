@@ -1,5 +1,18 @@
 # RELEVO
 
+- **03-11 ~11:40 (claude-code) — Vista previa de la cotización: un 502 del worker ya no deja el visor roto (`088b1795`, desplegado).**
+  - David vio en la 62 «Setting up fake worker failed: Cannot load script at …/pdf.worker.min.js». El archivo estaba bien.
+    Traefik registra dos 502 del worker a las 16:31:06 y :07 UTC, el segundo en que se reinició la web por un despliegue.
+  - Causa: pdf.js crea un Worker por documento (cada dibujo pide el archivo) y si falla guarda el rechazo para siempre
+    (`_setupFakeWorkerGlobal`), así que «Reintentar» y «Actualizar» no servían hasta recargar la página.
+  - `lib/pdfjs-navegador.ts`, un cargador para `VistaPrevia`, `PDFViewer` y `croquis`: antes de cada documento hace HEAD al
+    worker y reintenta unos 15 s. Si pdf.js aun así se queda con el fallo, el mensaje lo dice y Reintentar recarga.
+  - Verificado: 5 pruebas nuevas, `tsc` limpio. La corrida completa en esta máquina dio 17 fallos, sobre todo por tiempo;
+    las 13 suites repetidas con `--maxWorkers=2` pasan (83 pruebas). En producción, con sesión, la 62 dibuja 8 hojas sin avisos.
+    El caso del 502 solo se probó en esas pruebas, no con un despliegue real. No se probó el arreglo en `croquis`.
+  - Quien tenía abierta la versión anterior durante este mismo despliegue pudo verlo una vez más (hubo otro 502): recargar.
+  - Sigue: cada despliegue de la web corta unos segundos (502), también para los demás archivos.
+
 - **03-11 (claude-code) — El cliente ya abre su enlace de firma, sin ver costos ni margen, y `publicToken` salió de las respuestas (`87a96002`). En producción. Adam: «Sí, arréglalo». Sin migración.**
   - **Qué pasaba:** `cotizaciones/public/:token` daba 401 sin sesión, porque `UrlAccessGuard` está en todo `CotizacionesController`: el cliente no podía abrir el enlace del correo. Y lo que devolvía traía las partidas completas, con costo, margen y proveedor. Todas las cotizaciones siguen en borrador, así que no le pasó a nadie.
   - **Qué se hizo:**
