@@ -1,5 +1,18 @@
 # RELEVO
 
+- **03-11 ~04:30 (claude-code) — Almacén con una sola fila de pestañas y un solo buscador; fuera las migas repetidas (`e7ec21c2`, `04867ed5`). Adam: «sí, ordénalos».**
+  - **Pestañas:** Resumen, Lotes, Valuación y Conteos suben a la fila de arriba: 10 pestañas, un clic en vez de dos. Sin íconos, y «Lotes» y «Conteos» más cortos para que quepan desde 1280 px. Los enlaces con `?tab=` siguen sirviendo, con `dashboard`, `lotes`, `valuacion` y `conteos` nuevos.
+  - **Buscador:** la caja de arriba también filtra la tabla de Inventario, y el Excel sigue saliendo de lo filtrado. Con filas en la tabla, la lista solo trae lo que ella no enseña, las herramientas (`tablaDebajo`). Con un chip elegido, o sin filas en la tabla, enseña todo. Enter y lector no cambian. Abrir un artículo limpia la caja, porque un código escaneado dejaría la tabla vacía.
+  - **Acciones:** van junto al título por un portal (`embedded.slotAcciones`). «Registrar» de Movimientos se quitó porque «Entrada» abre el mismo formulario y ya está ahí.
+  - **`VistaAlmacen`:** una sola instancia entre pestañas de stock; la vista la manda `embedded.vista`. Al pasar a Escáner, Reabastecimiento, Herramientas o Kits se desmonta y al volver recarga, como antes.
+  - **Migas:** fuera en Asistencias, Diseños de cámaras y su catálogo, que repetían la barra de arriba. Las de detalle y `nuevo` se quedan.
+  - **Verificado:** 2,088 pruebas web y tipos en verde en `e7ec21c2`; `04867ed5` con tipos y las 12 pruebas de la portada. Con el arnés local y datos de ejemplo: 1536, 1280 y 375 px, oscuro, buscador escrito, inventario vacío y Movimientos. En producción, por DOM con sesión: una fila, 10 pestañas, una caja, cuatro acciones.
+  - **No verificado:** captura de Almacén en producción, porque el Chrome con sesión da `innerWidth` 0 desde la noche del 02-11. Sin teléfono real.
+  - **Visto y sin investigar:** el arnés avisa en consola «two children with the same key» con la clave `0`. Puede venir de los datos de ejemplo.
+  - **Trampas:**
+    - Arnés de Vite para pantallas de Core: alias de `next/*`, `UserContext` y `@nexara/offline-shared` (`../../shared/offline-fetch-rules.ts`), `fetch` interceptado y `define: { "process.env": {} }`. No se subió.
+    - Si Chrome con sesión da `innerWidth` 0, las capturas se cuelgan aunque se abra otra pestaña o se cambie el tamaño. El DOM sí se puede leer.
+
 - **02-11 ~23:30 (claude-code) — Programa Velocidad Core, Ola 4: los tiempos aprenden, se pregunta cuánto tomó de verdad, las flechas regresan a donde estabas y los filtros no se pierden. API y web en producción; apps en `main`, sin publicar.** (`e371862f`, `a0cf061c`, `387cd81b`, `a750ed67`, `f319f653`, `ad36f791`, `1b69e3a8`)
   - Adam aprobó con «Sí, arranca Ola 4».
   - **La meta de 75 % no se alcanzó, y por qué.** Medido sin mirar el futuro contra el reloj, dentro de ±50 %: de 56 a 61 %, y de 60 a 69 % desde el 15-10, ya con historial. 2 de cada 3 relojes corren hasta que acaba el día, haya trabajo o no: ese es el techo. «Lo que queda del día» sin más da 67 % y no sirve, porque en lo que de verdad terminó antes cae a 8 %. No se usó para llegar a la cifra. La salida es la pregunta a la persona: remedir cuando haya respuestas. Backtest en el scratchpad de la sesión; no se versiona porque lleva datos de producción.
