@@ -26,7 +26,7 @@ export default function Marcas() {
         <div className={s.marcasFila}>
           {MARCAS.map(([n, nombre]) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={n} src={`/marcas/marcas-${n}.png`} alt={nombre} className={s.marca} loading="lazy" decoding="async" />
+            <img key={n} src={`/marcas/marcas-${n}.webp`} alt={nombre} className={s.marca} loading="lazy" decoding="async" />
           ))}
         </div>
       </div>
