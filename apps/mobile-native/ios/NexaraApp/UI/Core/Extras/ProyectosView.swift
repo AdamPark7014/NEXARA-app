@@ -114,11 +114,12 @@ private struct TarjetaDeProyecto: View {
             .overlay {
                 if resaltado {
                     RoundedRectangle(cornerRadius: NxRadius.m, style: .continuous)
-                        .stroke(NxColors.primary, lineWidth: 2)
+                        .stroke(NxColors.brand, lineWidth: 2)
                 }
             }
     }
 
+    @ViewBuilder
     private var contenido: some View {
         let tono = ProyectosRules.tono(ProyectosRules.salud(proyecto.resumen?.salud))
         let avance = proyecto.resumen?.avance?.porcentaje
