@@ -591,3 +591,10 @@ a.row { min-height: 44px; }
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
+
+/* En teléfono un aviso se lee completo: cortado a media frase no dice qué hacer. */
+@media (max-width: 640px) {
+  .rowTitle {
+    white-space: normal;
+  }
+}

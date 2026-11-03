@@ -15,6 +15,7 @@
  * Se monta una sola vez dentro de AppShell y escucha ⌘K / Ctrl+K en window.
  */
 
+import { grupoCore } from "./sidebar-presentation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -282,7 +283,7 @@ export default function CommandPalette({
         label: m.label,
         description: m.description,
         icon: m.icon ?? "•",
-        group: `${PANEL_LABEL[m.panel]} · ${m.group ?? "General"}`,
+        group: `${PANEL_LABEL[m.panel]} · ${grupoCore(m.id, m.group ?? "General")}`,
         panel: m.panel,
         url: resolveCrossPanelHref(internal, userJson, current),
         keywords: [m.id, m.path],

@@ -467,7 +467,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "erp-videovigilancia": {
     id: "erp-videovigilancia", panel: PANELS.ERP, path: "/videovigilancia",
-    label: "Videovigilancia", description: "Diseño de CCTV sobre el plano: cobertura DORI, vista por cámara y propuesta",
+    label: "Diseños de cámaras", description: "Diseño de CCTV sobre el plano: cobertura DORI, vista por cámara y propuesta",
     icon: "📹",
     // Encargados de área y el arquitecto (`lib/cctv/acceso.ts`); la API es la autoridad.
     allowedRoles: [

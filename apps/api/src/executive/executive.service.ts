@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS, FINISHED_ACTIVITY_WHERE, statusVariants } from '../activities/activity-status.js';
@@ -38,6 +38,8 @@ export function saldoPendiente(suma: { totalAmount?: unknown; paidAmount?: unkno
 
 @Injectable()
 export class ExecutiveService {
+  private readonly logger = new Logger(ExecutiveService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   /** Snapshot completo C-Level con datos de todos los módulos. */
@@ -271,6 +273,7 @@ export class ExecutiveService {
       },
       clientsCount: activeClients,
       teamSize: activeUsers,
+      cadena: await this.cadenaDelNegocio(tenantId, now),
       topSellers: topSellers.map((s: any) => ({
         ownerId: s.ownerId,
         ownerName: ownerMap.get(s.ownerId) || `User ${s.ownerId}`,
@@ -316,6 +319,53 @@ export class ExecutiveService {
       alerts.push({ level: 'info', icon: '🛠️', title: 'Visitas próximas', message: `${s.upcomingVisits} visitas de mantenimiento en los próximos 30 días` });
     }
     return alerts;
+  }
+
+  /** De la cotización al cobro, para que Hoy diga dónde se detiene el negocio. Si falla, Hoy se abre igual. */
+  private async cadenaDelNegocio(tenantId: number, now: Date) {
+    const tw = companyWhere(tenantId);
+    const cotizacion = { ...tw, deletedAt: null } as any;
+    const actividad = { ...tw, deletedAt: null } as any;
+    const factura = {
+      ...tw,
+      deletedAt: null,
+      type: 'ACCOUNTS_RECEIVABLE',
+      isCancelled: false,
+      status: { notIn: ['DRAFT', 'CANCELLED', 'CREDITED'] },
+    } as any;
+    try {
+      const [total, borradores, vigentesPorEnviar, enviadas, porDecidir, ganadas, ganadasSinProyecto] = await Promise.all([
+        this.prisma.cotizacion.count({ where: cotizacion }),
+        this.prisma.cotizacion.count({ where: { ...cotizacion, status: 'DRAFT' } }),
+        this.prisma.cotizacion.count({ where: { ...cotizacion, status: 'DRAFT', validUntil: { gte: workDateColumn(now) } } }),
+        this.prisma.cotizacion.count({ where: { ...cotizacion, sentAt: { not: null } } }),
+        this.prisma.cotizacion.count({ where: { ...cotizacion, status: 'SENT' } }),
+        this.prisma.cotizacion.count({ where: { ...cotizacion, status: 'APPROVED' } }),
+        this.prisma.cotizacion.count({
+          where: { ...cotizacion, status: 'APPROVED', proyectos: { none: { deletedAt: null, status: { not: 'CANCELLED' } } } },
+        }),
+      ]);
+      const [proyectos, facturas, cobrado, actividades, conProyecto, porValidar, enProceso, finalizadas] = await Promise.all([
+        this.prisma.operationalProject.count({ where: { ...tw, deletedAt: null, status: { not: 'CANCELLED' } } as any }),
+        this.prisma.invoice.count({ where: factura }),
+        this.prisma.invoice.aggregate({ where: factura, _sum: { paidAmount: true } }),
+        this.prisma.activity.count({ where: actividad }),
+        this.prisma.activity.count({ where: { ...actividad, projectId: { not: null } } }),
+        this.prisma.activity.count({ where: { ...actividad, estatus: 'Por Validar' } }),
+        this.prisma.activity.count({ where: { ...actividad, estatus: 'En Proceso' } }),
+        this.prisma.activity.count({ where: { ...actividad, estatus: 'Finalizada' } }),
+      ]);
+      return {
+        cotizaciones: { total, borradores, vigentesPorEnviar, enviadas, porDecidir, ganadas, ganadasSinProyecto },
+        proyectos,
+        facturas,
+        cobrado: Number((cobrado as any)?._sum?.paidAmount ?? 0),
+        actividades: { total: actividades, conProyecto, porValidar, enProceso, finalizadas },
+      };
+    } catch (e) {
+      this.logger.warn(`Cadena del negocio: ${e instanceof Error ? e.message : e}`);
+      return null;
+    }
   }
 
   private async getTopClientAccounts(companyId: number, limit = 5) {
