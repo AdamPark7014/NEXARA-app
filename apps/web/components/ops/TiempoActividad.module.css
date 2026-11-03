@@ -127,6 +127,8 @@
   gap: 2px;
   font-size: 14px;
   font-weight: 600;
+  /* Los `p` traen color de la base: sin esto sale oscuro sobre la tarjeta oscura. */
+  color: #ffffff;
 }
 
 .preguntaFila {
@@ -170,6 +172,7 @@
   align-items: center;
   gap: 4px;
   font-size: 13px;
+  color: #ffffff;
 }
 
 .preguntaCampo input {
