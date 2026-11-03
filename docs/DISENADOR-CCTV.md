@@ -282,8 +282,16 @@ Mockup: <https://claude.ai/artifact/PoFrsCNRTWxHrDDYQDAWeY>. Maqueta de muestra:
 - **Datos nuevos en el plano**, opcionales y sin migración: `areas` (zona con piso y nombre) y `muebles` (ambientación). La
   ambientación **no tapa la vista** en el cálculo; lo que tape se dibuja como obstáculo. Un obstáculo llamado «Anaquel» o
   «Rack» se ve con su estructura y cajas.
-- **Muros tenues:** un muro de afuera se vuelve tenue solo si, desde donde se ve, tapa más de 4.5 m hacia adentro. Una
-  bodega de 3 m se ve sólida desde arriba; una de 5 m o una vista baja abren la «casa de muñecas».
+- **Muros cortados (02-11):** un muro de afuera que tapa más de 3 m hacia adentro, desde donde se ve, se baja a 85 cm en vez de
+  volverse transparente, como un corte de arquitecto (`bajo` en `MuroMaqueta`). Lo montado en ese muro conserva su pedazo a altura
+  completa (`construirSoportes`), para que no flote. Es exterior el muro que de un lado ya no tiene otro muro; una reja no cuenta.
+- **Realismo (02-11, Adam: «sigue faltándole realismo»):** lente de 34° en vez de 23°, que parecía diagrama isométrico. Cielo propio
+  para luz y reflejos, sol de lado, pasto hasta el horizonte con niebla, banqueta, calle y árboles de ornato (`construirTerreno`).
+  Texturas con relieve hechas con código, sin material de terceros (`scripts/cctv/generar_texturas.py`, `public/cctv/texturas`, 1 MB).
+  Sombra de contacto calculada una vez en un lienzo (`construirContacto`), muebles con detalle y fundidos por material, personas con
+  ropa, plafón con luminarias al caminar. De entrada no se ve cobertura ni cable: se encienden con un clic, y la cámara elegida siempre
+  muestra su cono. Los equipos ya no se agrandan hasta ×6, sino hasta ×2.6, y los ubica un punto; el nombre sale al pasar. Con Intel UHD
+  el centro de distribución (14 cámaras, 192 mil triángulos, 132 llamadas) va a 60 cuadros por segundo moviéndose y a 68 caminando.
 - **De noche:** cada cono llega hasta `irM`, el alcance de IR o luz blanca de la ficha. Es una aproximación: no considera las
   lámparas del sitio.
 - **«Ver lo que ve»:** pone la vista en la lente con el ángulo vertical real de la óptica.
@@ -328,11 +336,18 @@ diagrama.
 
 ### 4.3 Moverse por la maqueta y por dentro
 
-Adam, 02-11: «le faltan cosas como deslizarte y checar y meter y moverte en el mapa». Antes solo se podía girar desde afuera.
+Adam, 02-11: «le faltan cosas como deslizarte y checar y meter y moverte en el mapa» y luego «muy rápido y fácil con el mouse o el
+touchpad, tipo Apple». Antes había que cambiar de modo para girar, y dos dedos en el touchpad solo acercaban.
 
-- **Desde arriba:** arrastrar desliza el mapa; clic derecho, o «Girar» en la barra, lo gira; la rueda acerca hacia el puntero. W A S D
-  o las flechas también deslizan, y Q o E giran. El arrastre sobre un área o un mueble ya no los mueve si no están elegidos: antes,
-  arrastrar sobre el piso movía el piso. La vista no deja perder el sitio (`contenerVista`).
+- **Sin modos** (`maqueta/controlVista.ts`, `lib/cctv/gestos.ts`): arrastrar gira, alrededor de lo que se señaló; clic derecho, botón de
+  en medio, barra espaciadora o dos dedos deslizan, y lo agarrado sigue bajo el cursor; la rueda o pellizcar acercan hacia el cursor. En
+  una pantalla táctil, un dedo gira y dos deslizan, acercan y giran. Mirando desde arriba es un plano: arrastrar desliza y el clic derecho
+  gira. Lo que se suelta en movimiento sigue un poco y frena solo. Doble clic acerca y, ya de cerca, entra a caminar. La brújula se
+  arrastra para girar e inclinar; un clic pone el norte arriba. W A S D o las flechas deslizan, Q o E giran, y + o − acercan. El arrastre
+  sobre un área o un mueble no los mueve si no están elegidos. La vista no deja perder el sitio (`contenerVista`).
+- **Rueda o dos dedos:** el navegador manda lo mismo para los dos. Una rueda da saltos de 120 en `wheelDeltaY` sin moverse de lado; dos dedos
+  dan pasos chicos o lateral; el pellizco llega con Ctrl (`clasificarRueda`). Una rueda de giro libre se lee como dos dedos. No se ha probado
+  con un touchpad físico: la prueba manda esos eventos a mano.
 - **Encuadre:** se encuadra lo construido, no los conos de cobertura, que se salen mucho y dejaban el edificio chiquito.
 - **Recorrer:** el botón, el muñeco arrastrado al sitio o doble clic en el piso te meten a 1.60 m (`entrarRecorrido`). W A S D, flechas o
   el pad caminan y Mayús corre. Arrastrar mira, como en un mapa de calle. Clic en el piso, en el minimapa o en el nombre de un área te lleva.
