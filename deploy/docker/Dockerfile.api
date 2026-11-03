@@ -52,6 +52,9 @@ COPY --from=build /app/apps/api/prisma ./apps/api/prisma
 
 # Fallar el build si Terminus no está (evita imagen “verde” que crashea al arrancar)
 RUN test -d node_modules/@nestjs/terminus || test -d apps/api/node_modules/@nestjs/terminus
+# Y si dist/ usa un paquete que no quedó en la imagen: sharp, por ejemplo, no truena al arrancar sino al usarse.
+RUN --mount=type=bind,from=build,source=/app/apps/api/scripts/comprobar-dependencias-dist.cjs,target=/tmp/comprobar-dependencias-dist.cjs \
+  node /tmp/comprobar-dependencias-dist.cjs
 
 RUN mkdir -p /app/uploads
 

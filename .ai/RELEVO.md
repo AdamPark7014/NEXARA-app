@@ -1,5 +1,45 @@
 # RELEVO
 
+- **02-11 ~22:00 (claude-code) — Imágenes de la API y la web a la mitad y a la cuarta parte; compilar las dos gasta unos 3 GB de disco en vez de 10.** `439429df` en producción.
+  - **Antes y después, mismo commit y misma limpieza de caché que un despliegue:**
+    - `nexara-api`: de 2.3 GB a 1.17 GB (−49 %).
+    - `nexara-web`: de 2.14 GB a 518 MB (−76 %).
+    - Disco que suben los dos builds: de +10.2 GB a entre +2.5 y +3.4 GB.
+    - Tiempo de los dos builds: de 471 s a 366 s.
+    - **Un despliegue real terminó en 77 %, empezando en 73 %.** Antes acababan en 84–88 %.
+  - **El tiempo casi no cambia en despliegues reales:** 203 s la API y 155 s la web, contra 176 s y 176 s en calma, o 286 s y 315 s con carga. Lo que se ahorró fue disco. La medida varía mucho con la carga del servidor: la web nueva tardó de 155 a 300 s.
+  - **Qué pesaba:** 1.57 GB y 1.45 GB de `node_modules`. Era casi la misma carpeta en las dos imágenes, con las dependencias de ambas apps y las de desarrollo. El `npm install` dejaba 1.87 GB en cada build.
+  - **API (`Dockerfile.api`):** instala solo su workspace y la raíz, compila y poda con `npm prune --omit=dev`. La imagen final queda como antes, sin `package.json` raíz y sin la web. Lleva 889 paquetes contra 1,594, todos en la misma versión que la imagen anterior.
+  - **Web (`Dockerfile.web`):** corre con `output: 'standalone'`, solo si `NEXT_OUTPUT_STANDALONE=1`, que pone el Dockerfile; fuera de Docker sigue `next start`. CMD `node apps/web/server.js`. La imagen final sube de Node 20 a 22, el de compilar, y comparte base con la API. El `node_modules` del servidor bajó de 1,385 MB a 69 MB y usa unos 30 MB menos de RAM.
+  - **`deploy/docker-compose.nexara.yml` no necesitó cambios.**
+  - **Tienen que seguir en `dependencies` de `apps/api`:**
+    - `sharp`: croquis y fotos de vehículos. Estaba solo en desarrollo, en la raíz.
+    - `ts-node`: sembradores dentro de la imagen.
+    - `@types/bcryptjs`: `prisma db seed` revisa tipos.
+    - El lock se editó con script: esa entrada y 40 banderas de desarrollo. `npm install` reescribía `libc` y banderas ajenas.
+  - **Regla nueva:** la API ya no encuentra por casualidad lo que solo declaran la web o las dependencias de desarrollo. `apps/api/scripts/comprobar-dependencias-dist.cjs` tira el build de la imagen si `dist/` usa un paquete que no quedó en ella; quitándole `sharp` lo señala. Si salta, el paquete va a `dependencies` de `apps/api`.
+  - **Probado antes de subir, en base y Redis temporales sin internet:**
+    - 245 migraciones sobre una base vacía con `npx prisma migrate deploy`.
+    - `/api/health` en 200.
+    - El PDF de cotización sale byte por byte igual en la imagen vieja y la nueva (sha `1ae5190d`): 5 hojas, 7 imágenes y sus fuentes.
+    - `sharp` lee un croquis; `pdftotext` lee el PDF.
+    - `seed:plantillas --list-companies`, `prisma db seed` y `seed:play-reviewer` corren igual que antes.
+    - Ningún `require` falla solo en la nueva al arrancar.
+    - Web: 50 rutas de 20 dominios contra la actual, sin diferencias en estado, cabeceras ni título; 76 archivos de `_next/static` en 200; mismo `routes-manifest`.
+    - `npm ci --ignore-scripts` en Node 20, como el CI.
+  - **Verificado en producción:**
+    - `nexara-api` healthy, `/api/health` en 200.
+    - `docker exec nexara-api sh -c "cd apps/api && npx prisma migrate deploy"` dice «No pending migrations to apply».
+    - `pdftotext`, `sharp` y el PDF funcionan.
+    - Login de Core y portada en navegador real, sin errores de consola ni archivos rotos.
+    - **Sin probar con sesión iniciada:** pantallas de Core por dentro. El código de la web no cambió, solo cómo se empaqueta.
+  - **La imagen vieja de la API bajaba el motor de Prisma de internet al correr `prisma db seed`**, porque se compilaba sin OpenSSL. La nueva lo trae: migraciones y sembradores corrieron sin internet. Tampoco lleva el motor de openssl-1.1, que no se usaba (16 MB).
+  - **Tocado en el servidor:** el `CACHEBUST` fijo del 24-09 en `deploy/docker/Dockerfile.web` se apartó con un stash (`stash@{0}`; copia en `/root/respaldo-Dockerfile.web-cachebust-20261102.diff`). Con ese cambio suelto, el `git pull` de los despliegues habría fallado en cuanto un commit tocara ese archivo, y `deploy-api-web.sh` no se detiene si falla el pull: habría compilado código viejo sin avisar.
+  - **Pendientes y riesgos:**
+    - `next/font` falló dos veces seguidas a las 15:50 de México, al bajar fuentes de Google con la caché vacía (`Cannot read properties of null (reading '1')`). Diez minutos después pasó con el mismo código. Si un build web cae ahí, se reintenta; la web sigue con la versión anterior, pero la API ya pudo cambiar.
+    - Quedan 89 MB en la API solo por `@nestjs/cli`, que no se usa al correr. No se movió porque obliga a otra edición grande del lock.
+    - La caché de webpack ahorra unos 50 s, pero la limpieza de 3 GB la borra a veces.
+
 - **02-11 ~21:50 (claude-code) — Ola 3 enviada a las tiendas, directo a todos por orden de Adam: Android 1.3.0 (22) en revisión de Google e iOS 1.3 (15) en revisión de Apple. Salen solas al aprobarse.** (`933966aa`)
   - **Pedido:** Adam eligió «Directo a todos», sin la prueba interna de un día que se le recomendó. Así que nadie ha usado la Ola 3 en un teléfono físico antes de que llegue a toda la empresa.
   - **Qué llevan:** Ola 3, formatos (se abren el 06-11), el aviso de IA y la flotilla del CEO. Android también lleva todo lo de octubre: Play sigue en 1.0.7 hasta que Google apruebe.
