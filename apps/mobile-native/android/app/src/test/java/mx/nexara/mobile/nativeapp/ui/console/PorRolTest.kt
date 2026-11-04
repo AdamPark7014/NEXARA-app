@@ -67,6 +67,14 @@ class PorRolTest {
     }
 
     @Test
+    fun `el permiso de vehiculos solo no da de alta unidades`() {
+        // Así llegan hoy operaciones y arquitectura; a arquitectura el servidor le contesta 403.
+        val operaciones = persona(permisos = listOf("vehicles.inventory", "tools.inventory"))
+        assertFalse(PorRol.daDeAltaUnidades(operaciones))
+        assertFalse(PorRol.administraHerramientas(operaciones))
+    }
+
+    @Test
     fun `cada permiso cuenta por si solo`() {
         val soloHerramientas = persona(permisos = listOf(" TOOLS.MANAGE "))
         assertTrue(PorRol.administraHerramientas(soloHerramientas))

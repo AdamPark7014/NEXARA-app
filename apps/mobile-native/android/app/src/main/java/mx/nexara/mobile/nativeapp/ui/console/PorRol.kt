@@ -35,8 +35,13 @@ object PorRol {
     /** Iván: escanea, da de alta artículos y registra entradas y salidas. */
     fun operaAlmacen(user: SessionUser?): Boolean = !esDireccion(user) && tiene(user, STOCK_MANAGE)
 
-    /** Iván: además de sacar y regresar, da de alta unidades. */
-    fun daDeAltaUnidades(user: SessionUser?): Boolean = !esDireccion(user) && tiene(user, VEHICLES_INVENTORY)
+    /**
+     * Iván: además de sacar y regresar, da de alta unidades. `vehicles.inventory` no basta: también lo traen
+     * operaciones y arquitectura, y a arquitectura el servidor se lo niega. Adam (04-11-2026): «el que debe
+     * dar de alta es Iván».
+     */
+    fun daDeAltaUnidades(user: SessionUser?): Boolean =
+        !esDireccion(user) && tiene(user, VEHICLES_INVENTORY) && tiene(user, STOCK_MANAGE)
 
     /** Lo que dice cada renglón de «Más»: lo que esa persona hace ahí, no lo que hacen otros. */
     fun resumen(modulo: CoreExtraModule, user: SessionUser?): String {
