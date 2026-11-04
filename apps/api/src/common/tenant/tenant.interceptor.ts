@@ -5,10 +5,8 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import { CompanyService } from '../../company/company.service.js';
 import { getClientIpFromRequestMeta } from '../security/security.utils.js';
-import { EMPRESA_POR_CABECERA_SIN_SESION } from './current-company.decorator.js';
 import { runWithTenantAsync } from './tenant-context.js';
 
 /**
@@ -22,10 +20,7 @@ import { runWithTenantAsync } from './tenant-context.js';
  */
 @Injectable()
 export class TenantInterceptor implements NestInterceptor {
-  constructor(
-    private readonly companyService: CompanyService,
-    private readonly reflector: Reflector,
-  ) {}
+  constructor(private readonly companyService: CompanyService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): any {
     const req = context.switchToHttp().getRequest();
@@ -71,7 +66,7 @@ export class TenantInterceptor implements NestInterceptor {
         const company =
           userId && userId > 0
             ? await this.companyService.resolveForUser({ companyId: cabecera, userId, isSuperAdmin })
-            : await this.companyService.resolve(this.empresaSinPersona(context, req, cabecera));
+            : await this.companyService.resolve(this.empresaSinPersona(req, cabecera));
         req.companyId = company?.id ?? null;
         req.company = company ?? null;
       } catch (err) {
@@ -100,15 +95,14 @@ export class TenantInterceptor implements NestInterceptor {
    * que trae `id: null`. `undefined` es la principal. La cabecera no cuenta: con ella, un cliente del portal leía los
    * borradores de otra empresa.
    */
-  private empresaSinPersona(context: ExecutionContext, req: any, cabecera?: number): number | undefined {
+  private empresaSinPersona(req: any, cabecera?: number): number | undefined {
     // Portales: la dice su token firmado.
     if (req.user?.isClient || req.user?.isBranchUser) {
       const delToken = Number(req.user.companyId);
       return Number.isFinite(delToken) && delToken > 0 ? delToken : undefined;
     }
     // SCIM con el secreto de la plataforma: elige empresa con la cabecera (`ScimController.companyIdFrom`).
-    if (req.scimLegacyAuth) return cabecera;
-    return this.reflector.get<boolean>(EMPRESA_POR_CABECERA_SIN_SESION, context.getHandler()) ? cabecera : undefined;
+    return req.scimLegacyAuth ? cabecera : undefined;
   }
 }
 

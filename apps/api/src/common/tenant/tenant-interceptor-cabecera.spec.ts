@@ -7,12 +7,8 @@
  */
 import 'reflect-metadata';
 import { ForbiddenException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { of } from 'rxjs';
 import { CompanyService } from '../../company/company.service.js';
-import { EmpresaPorCabeceraSinSesion } from './current-company.decorator.js';
 import { getTenantStore } from './tenant-context.js';
 import { TenantInterceptor } from './tenant.interceptor.js';
 
@@ -45,18 +41,12 @@ const armarServicio = (membresias: Array<{ userId: number; companyId: number; is
   return new CompanyService(prisma as any);
 };
 
-const rutaSinMarca = () => undefined;
-
 /** Pasa la petición por el interceptor y dice con qué empresa llegó al controlador. */
-const pedir = async (
-  servicio: CompanyService,
-  req: Record<string, unknown>,
-  ruta: (...args: never[]) => unknown = rutaSinMarca,
-) => {
-  const contexto = { switchToHttp: () => ({ getRequest: () => req }), getHandler: () => ruta } as any;
+const pedir = async (servicio: CompanyService, req: Record<string, unknown>) => {
+  const contexto = { switchToHttp: () => ({ getRequest: () => req }) } as any;
   const siguiente = { handle: () => of(getTenantStore()?.companyId ?? null) };
   const filtro = await new Promise((resolve, reject) =>
-    new TenantInterceptor(servicio, new Reflector()).intercept(contexto, siguiente).subscribe({ next: resolve, error: reject }),
+    new TenantInterceptor(servicio).intercept(contexto, siguiente).subscribe({ next: resolve, error: reject }),
   );
   return { req: req.companyId, filtro };
 };
@@ -144,37 +134,9 @@ describe('con sesión de persona no cambia nada', () => {
   });
 });
 
-describe('las dos excepciones', () => {
+describe('la única excepción', () => {
   it('SCIM con el secreto de la plataforma elige empresa con la cabecera', async () => {
     const r = await pedir(armarServicio(), { headers: cabecera(OTRA), scimLegacyAuth: true, scimCompanyId: PRINCIPAL });
     expect(r).toEqual({ req: OTRA, filtro: OTRA });
-  });
-
-  it('la ruta marcada sigue obedeciendo la cabecera sin sesión', async () => {
-    class Ruta {
-      @EmpresaPorCabeceraSinSesion()
-      marcada() {
-        return undefined;
-      }
-    }
-    const r = await pedir(armarServicio(), { headers: cabecera(OTRA) }, Ruta.prototype.marcada);
-    expect(r).toEqual({ req: OTRA, filtro: OTRA });
-  });
-
-  // Cada ruta que se agregue aquí vuelve a abrir la cabecera sin sesión: es una decisión de Adam, no un detalle.
-  it('la marca solo está en users/public-team', () => {
-    const raiz = join(__dirname, '..', '..');
-    const conMarca: string[] = [];
-    const recorrer = (dir: string) => {
-      for (const e of readdirSync(dir, { withFileTypes: true })) {
-        const ruta = join(dir, e.name);
-        if (e.isDirectory()) recorrer(ruta);
-        else if (e.name.endsWith('.ts') && !e.name.endsWith('.spec.ts') && /@EmpresaPorCabeceraSinSesion\(\)/.test(readFileSync(ruta, 'utf8'))) {
-          conMarca.push(ruta.slice(raiz.length + 1).replace(/\\/g, '/'));
-        }
-      }
-    };
-    recorrer(raiz);
-    expect(conMarca).toEqual(['users/users.controller.ts']);
   });
 });
