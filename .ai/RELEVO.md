@@ -1,5 +1,40 @@
 # RELEVO
 
+- **04-11 (claude-code) — Las apps cambian según quién entra: versión 1.4, en `main` (`b297197e`, `9249b176`). Servidor en producción. Sin migración.**
+  - **Pedido de Adam:** «al CEO le aparece para escanear una herramienta y ya eso que el deberia ver todo lo relacionado a lo administrativo», «el que debe dar de alta es ivan», «la gente debe poder pues solamente solicitar prestamos», «es asignar un viatico o aprobar», «pagos empleados deberian poder realizar acciones en movil». Decidió: cualquiera saca un vehículo libre; Pagos con registrar y marcar pagado; Ola 6 visible; los contactos de campaña a Daniela.
+  - **Quién es quién en la app:** `PorRol` en Android y `CoreOrg.esDireccion` en iOS. Dirección es el rol CEO, además de Christian y Claudia por correo. Iván se reconoce por sus permisos (`tools.manage`, `stock.manage`, `vehicles.inventory`), no por nombre.
+  - **Qué ve cada quien:**
+    | Sección | Dirección | Iván | Personal |
+    |---|---|---|---|
+    | Aprobaciones | Evidencias con lote, viáticos, gastos, firmas | Sus evidencias, si tiene gente | No aparece |
+    | Herramientas | Préstamos e inventario, solo lectura | Escáner, aprobar, entregar, recibir, alta | Pedir préstamo, mi kit, más plazo, reportar daño |
+    | Almacén | Existencias y movimientos, sin escáner | Escáner, alta, entradas y salidas | Consulta, si lo abre |
+    | Vehículos | Flotilla y solicitudes | Lo de todos y alta de unidad | Sacar, regresar, gasolina |
+    | Pagos | Registrar y marcar pagado, con confirmación | No aparece | No aparece |
+    | Viáticos | Asignar y autorizar, sin pedir | Pedir, repartir, comprobar | Pedir, repartir, comprobar |
+    | Proyectos | Detalle y cambiar estado | Según su menú | Detalle si le sale en el menú |
+    | Cotizaciones | Aprobar y marcar enviada | No aparece | Marcar enviada, si la abre |
+    | Gastos | Abre en lo que falta autorizar, sin registrar | No aparece | Registrar, si la abre |
+  - **Servidor, medido con las guardas reales por rol:**
+    - Iván tenía 403 en todo el almacén desde el 07-10: `RbacGuard` no conocía la excepción por correo.
+    - Pedir préstamo solo le funcionaba a David, y salida, regreso y gasolina solo a dirección y `coord_operaciones`. Abiertos a todo el personal; cada servicio revisa que sea lo propio.
+    - Viáticos: el arquitecto no podía abrirlos y nadie de campo, soporte ni administración podía repartir.
+    - Préstamos e inventario de toda la empresa para dirección e Iván, sin recortar por departamento.
+  - **Datos:** los contactos de campaña pasaron de Christian a Daniela y le salen en «¿Qué sigue?». Al tomar un contacto deja de ser nuevo.
+  - **Verificado:**
+    - Android: 1,093 pruebas y recorrido en emulador con tres cuentas contra API simulada: dirección, Iván y personal. Aprobar lote, asignar viático, pedir préstamo, confirmar pago y foto de comida.
+    - iOS: compilación del simulador en CI y capturas del modo demostración con `NEXARA_DEMO_ROL`.
+    - API: pruebas y guardas desplegadas con los seis roles de personal.
+  - **Sin verificar:** nada de esto se ha probado en un teléfono físico contra la API real. Las acciones que mueven dinero o inventario no se han ejercido en producción, y NEXARA no tiene productos, herramientas ni pagos capturados.
+  - **Pendiente de decidir o visto y sin tocar:**
+    - Vehículos: el CEO solo aprueba en el último paso de la cadena; Christian avanza un paso por toque. Hay cero solicitudes hoy.
+    - `cotizaciones/:id/aprobar` no se limita a dirección en el servidor: solo la app lo esconde.
+    - `tool-requests/inventory` no dice quién trae la pieza: la app lo cruza con préstamos y kits.
+  - **Trampas:**
+    - iOS: un `.task` sobre un `Group` vacío nunca corre. «¿Qué sigue?» no habría salido nunca; lo enseñó la captura, no la compilación.
+    - La copia exportada puede quedar vieja: se rehace con `git archive`, y `armar-commit.sh` ya imprime lo que borra. Ver `b92d67eb` y `a6b91a7e`.
+    - `tsc` de la API roza los 2 GB de Node: CI ya usa 4 GB.
+
 - **04-11 (claude-code) — Iván ya puede dar de alta y mover almacén (`RbacGuard`). En producción. Sin migración. Inventario de las apps hecho; lo demás espera a Adam.**
   - **Qué pasaba:** desde el 07-10 Iván tiene el almacén por correo, pero solo `UrlAccessGuard` conocía la excepción. Las rutas que escriben también pasan por `RbacGuard`, que le contestaba 403. Medido con las guardas reales: ni consultar existencias podía. Tampoco `PUT` de herramientas.
   - **Cómo quedó:** `RbacGuard` usa `ALMACEN_POR_CORREO_URL_RULES` y la nueva `HERRAMIENTAS_POR_CORREO_URL_RULES`, que no incluye borrar. El permiso del endpoint se sigue exigiendo. Prueba: `common/rbac-por-persona.spec.ts`.
