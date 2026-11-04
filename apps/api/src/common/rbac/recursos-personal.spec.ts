@@ -1,3 +1,5 @@
+import { AuthService } from '../../auth/auth.service';
+import { PERMISSIONS } from '../permissions';
 import { checkUrlAccess } from './url-matrix';
 import { ROLES, type RoleKey } from './roles.v2';
 
@@ -9,6 +11,7 @@ describe('recursos para todo el personal', () => {
   const PERSONAL: RoleKey[] = [
     ROLES.ARQUITECTO,
     ROLES.DIR_OPERACIONES,
+    ROLES.DIR_ADMIN,
     ROLES.COORD_ADMIN,
     ROLES.ADMINISTRATIVO,
     ROLES.COORD_OPERACIONES,
@@ -23,7 +26,7 @@ describe('recursos para todo el personal', () => {
     ROLES.CONTABILIDAD,
   ];
 
-  const SI: Array<['GET' | 'POST', string]> = [
+  const SI: Array<['GET' | 'POST' | 'PATCH' | 'PUT', string]> = [
     ['POST', '/api/tool-requests'],
     ['POST', '/api/tool-requests/7/renewal-request'],
     ['POST', '/api/tool-requests/kits/7/report'],
@@ -38,11 +41,26 @@ describe('recursos para todo el personal', () => {
     ['POST', '/api/vehicles/inventory/7/return'],
     ['POST', '/api/vehicles/ficha/leer-foto'],
     ['POST', '/api/vehicles/ficha/7/cargas'],
+    ['GET', '/api/viatics'],
+    ['POST', '/api/viatics'],
+    ['GET', '/api/viatics/7'],
+    ['PATCH', '/api/viatics/7/comprobar'],
+    ['PUT', '/api/viatics/7/reparto'],
   ];
 
   it.each(PERSONAL)('%s pide herramienta y usa vehículos', (rol) => {
     for (const [metodo, ruta] of SI) {
       expect([ruta, checkUrlAccess(rol, ruta, metodo).allowed]).toEqual([ruta, true]);
+    }
+  });
+
+  it('todos traen los permisos de pedir: la ruta sola no basta', () => {
+    const auth: any = Object.create(AuthService.prototype);
+    for (const rol of PERSONAL) {
+      const permisos = auth.resolveUserPermissions({ email: 'x@example.com', roleKey: rol, role: { key: rol } }, false);
+      for (const p of [PERMISSIONS.TOOLS_REQUEST, PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_CREATE]) {
+        expect([rol, p, permisos.includes(p)]).toEqual([rol, p, true]);
+      }
     }
   });
 
@@ -61,6 +79,10 @@ describe('recursos para todo el personal', () => {
       expect(checkUrlAccess(rol, '/api/vehicles/inventory', 'POST').allowed).toBe(false);
       expect(checkUrlAccess(rol, '/api/vehicles/7/approve', 'PATCH').allowed).toBe(false);
       expect(checkUrlAccess(rol, '/api/vehicles/inventory/7', 'DELETE').allowed).toBe(false);
+      // Soporte y campo ya pasaban `PATCH /api/viatics/**`: ahí manda `viatics.manage` del endpoint.
+      expect(checkUrlAccess(ROLES.VENDEDOR, '/api/viatics/7/approve', 'PATCH').allowed).toBe(false);
+      expect(checkUrlAccess(ROLES.CONTABILIDAD, '/api/viatics/7/approve', 'PATCH').allowed).toBe(false);
+      expect(checkUrlAccess(ROLES.VENDEDOR, '/api/viatics/assign', 'POST').allowed).toBe(false);
     }
   });
 });
