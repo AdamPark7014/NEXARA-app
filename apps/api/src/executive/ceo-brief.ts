@@ -138,7 +138,15 @@ export function armarResumenCeo(d: DatosCeo, fecha: string): ResumenCeo {
     } else if (porValidar > 0) {
       partes.push(`${plural(porValidar, 'trabajo', 'trabajos')} por validar`);
     }
-    items.push({ clave: 'operacion', texto: partes.join(' y '), url: '/erp/pizarra', tono: 'atencion' });
+    // Adam, 04-11: Christian revisa a los encargados en lote; desde aquí llega directo a esa lista.
+    const leTocanEvidencias = (d.evidencias?.tuyas ?? 0) > 0;
+    items.push({
+      clave: 'operacion',
+      texto: partes.join(' y '),
+      url: leTocanEvidencias ? '/erp/pizarra?vista=revision' : '/erp/pizarra',
+      ...(leTocanEvidencias ? { accion: 'Aprobar en lote' } : {}),
+      tono: 'atencion',
+    });
   }
 
   if (d.nomina?.listaParaRevisar) {
