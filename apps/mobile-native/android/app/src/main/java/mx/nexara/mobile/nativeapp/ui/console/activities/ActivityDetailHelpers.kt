@@ -10,6 +10,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -21,6 +23,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 internal val ActivStatusColors = mapOf(
     // Primero: «No cumplida» es un fallo (rojo), no un cierre neutro.
@@ -130,7 +133,12 @@ fun toIsoDateTime(local: String): String {
 
 internal val ISO_DATE_FMT: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 internal val ISO_DATE_TIME_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
-internal val DISPLAY_DATE_TIME_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+/** «4 nov 2026», como en el resto de la app. Lo que se guarda y se manda sigue en ISO. */
+private val FECHA_LEGIBLE: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale("es", "MX"))
+
+private fun fechaLegible(fecha: LocalDate): String = FECHA_LEGIBLE.format(fecha).replace(".", "")
+
+private val HORA_LEGIBLE: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 internal fun parseIsoLocalDate(value: String): LocalDate? = runCatching {
     if (value.isBlank()) null else LocalDate.parse(value.take(10), ISO_DATE_FMT)
@@ -173,28 +181,31 @@ fun DatePickerField(
     modifier: Modifier = Modifier,
 ) {
     var showPicker by remember { mutableStateOf(false) }
-    val display = value.takeIf { it.isNotBlank() }?.take(10) ?: ""
+    val display = runCatching { parseIsoLocalDate(value) }.getOrNull()?.let(::fechaLegible) ?: ""
 
-    OutlinedTextField(
-        value = display,
-        onValueChange = {},
-        readOnly = true,
-        label = { Text(label) },
-        placeholder = { Text("Seleccionar fecha") },
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { showPicker = true },
-        trailingIcon = {
-            Row {
-                if (value.isNotBlank()) {
-                    IconButton(onClick = { onValueChange("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+    Box(modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = display,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            placeholder = { Text("Seleccionar fecha") },
+            modifier = Modifier.fillMaxWidth(),
+            trailingIcon = {
+                Row {
+                    if (value.isNotBlank()) {
+                        IconButton(onClick = { onValueChange("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+                        }
+                    }
+                    IconButton(onClick = { showPicker = true }) {
+                        Icon(Icons.Default.DateRange, contentDescription = "Seleccionar fecha")
                     }
                 }
-                Icon(Icons.Default.DateRange, contentDescription = "Seleccionar fecha")
-            }
-        },
-    )
+            },
+        )
+        CapaQueAbreElCalendario(hayValor = value.isNotBlank(), etiqueta = label) { showPicker = true }
+    }
 
     if (showPicker) {
         val datePickerState = rememberDatePickerState(
@@ -221,6 +232,22 @@ fun DatePickerField(
     }
 }
 
+/**
+ * Un campo de solo lectura se come el toque: un `clickable` puesto en el campo nunca se dispara, y el
+ * calendario no abría. Sin él no se podía pedir préstamo, solicitar vehículo ni registrar un pago.
+ * Esta capa va encima y deja libres los botones de la derecha.
+ */
+@Composable
+private fun BoxScope.CapaQueAbreElCalendario(hayValor: Boolean, etiqueta: String, onAbrir: () -> Unit) {
+    Box(
+        Modifier
+            .matchParentSize()
+            .padding(end = if (hayValor) 96.dp else 48.dp)
+            .semantics { contentDescription = etiqueta }
+            .clickable(onClickLabel = "Elegir fecha", onClick = onAbrir),
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DateTimePickerField(
@@ -234,28 +261,31 @@ fun DateTimePickerField(
     var pendingDate by remember { mutableStateOf<LocalDate?>(null) }
 
     val parsed = parseIsoLocalDateTime(value)
-    val display = parsed?.let { (d, t) -> DISPLAY_DATE_TIME_FMT.format(d.atTime(t)) } ?: ""
+    val display = parsed?.let { (d, t) -> "${fechaLegible(d)}, ${HORA_LEGIBLE.format(t)}" } ?: ""
 
-    OutlinedTextField(
-        value = display,
-        onValueChange = {},
-        readOnly = true,
-        label = { Text(label) },
-        placeholder = { Text("Seleccionar fecha y hora") },
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { showDatePicker = true },
-        trailingIcon = {
-            Row {
-                if (value.isNotBlank()) {
-                    IconButton(onClick = { onValueChange("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+    Box(modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = display,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            placeholder = { Text("Seleccionar fecha y hora") },
+            modifier = Modifier.fillMaxWidth(),
+            trailingIcon = {
+                Row {
+                    if (value.isNotBlank()) {
+                        IconButton(onClick = { onValueChange("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+                        }
+                    }
+                    IconButton(onClick = { showDatePicker = true }) {
+                        Icon(Icons.Default.DateRange, contentDescription = "Seleccionar fecha")
                     }
                 }
-                Icon(Icons.Default.DateRange, contentDescription = "Seleccionar fecha")
-            }
-        },
-    )
+            },
+        )
+        CapaQueAbreElCalendario(hayValor = value.isNotBlank(), etiqueta = label) { showDatePicker = true }
+    }
 
     if (showDatePicker) {
         val initial = parsed?.first ?: todayInMexico()

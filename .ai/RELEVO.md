@@ -22,7 +22,7 @@
     - Préstamos e inventario de toda la empresa para dirección e Iván, sin recortar por departamento.
   - **Datos:** los contactos de campaña pasaron de Christian a Daniela y le salen en «¿Qué sigue?». Al tomar un contacto deja de ser nuevo.
   - **Verificado:**
-    - Android: 1,093 pruebas y recorrido en emulador con tres cuentas contra API simulada: dirección, Iván y personal. Aprobar lote, asignar viático, pedir préstamo, confirmar pago y foto de comida.
+    - Android: 1,098 pruebas y recorrido en emulador con tres cuentas contra API simulada: dirección, Iván y personal. Aprobar lote, asignar viático, registrar pago, confirmar pago, pedir préstamo, aprobarlo, solicitar vehículo, dar de alta unidad y foto de comida.
     - iOS: compilación del simulador en CI y capturas del modo demostración con `NEXARA_DEMO_ROL`.
     - API: pruebas y guardas desplegadas con los seis roles de personal.
     - Persona por persona contra el servidor desplegado, sin sesión ni escritura: menú real (`me/navigation`), permisos y cada llamada de su pantalla. Solo faltan `workflow/my-pending` y `expenses` en Aprobaciones de arquitectura, operaciones y encargado de soporte, y la app ya los trata como vacío.
@@ -33,6 +33,7 @@
     - `cotizaciones/:id/aprobar` no se limita a dirección en el servidor: solo la app lo esconde.
     - `tool-requests/inventory` no dice quién trae la pieza: la app lo cruza con préstamos y kits.
   - **Trampas:**
+    - Android: un `clickable` en un campo de solo lectura nunca se dispara. `DatePickerField` y `DateTimePickerField` no abrían el calendario, y sin fecha no se podía pedir préstamo, solicitar vehículo ni registrar pago. Lo enseñó llenar el formulario en el emulador: las pruebas de reglas no lo ven. Ver `CamposDeFechaTest`.
     - iOS: un `.task` sobre un `Group` vacío nunca corre. «¿Qué sigue?» no habría salido nunca; lo enseñó la captura, no la compilación.
     - La copia exportada puede quedar vieja: se rehace con `git archive`, y `armar-commit.sh` ya imprime lo que borra. Ver `b92d67eb` y `a6b91a7e`.
     - `tsc` de la API roza los 2 GB de Node: CI ya usa 4 GB.
