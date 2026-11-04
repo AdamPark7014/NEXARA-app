@@ -130,13 +130,13 @@ export class ActivitiesService {
   }
 
   /** `sinAviso`: quien crea varias de un jalón (formatos) manda un solo aviso al terminar. */
-  async create(dtoRecibido: CreateActivityDto, companyId?: number | null, opciones: { sinAviso?: boolean } = {}) {
+  async create(dtoRecibido: CreateActivityDto, companyId?: number | null, opciones: { sinAviso?: boolean; tiempoFijoMin?: number } = {}) {
     await this.assertResponsableActivo(dtoRecibido.responsableId);
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
     // Ninguna sin tiempo ni entrega; en la autoasignación salen del título y no se editan
     // (`tiempo-entrega.ts`). Todas las altas pasan por aquí: web, apps, asistente y servicios.
     const createActivityDto = this.tiempos
-      ? ((await this.tiempos.completar(dtoRecibido, resolvedCompanyId)) as CreateActivityDto)
+      ? ((await this.tiempos.completar(dtoRecibido, resolvedCompanyId, { tiempoFijoMin: opciones.tiempoFijoMin })) as CreateActivityDto)
       : dtoRecibido;
     const trimmed = createActivityDto.anNumber?.trim();
     const anNumber = trimmed ? trimmed : await this.generateNextAnNumber(resolvedCompanyId);

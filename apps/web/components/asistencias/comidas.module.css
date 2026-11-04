@@ -273,6 +273,19 @@
   gap: var(--ui-s3);
 }
 
+.lugar,
+.lugarMotivo {
+  display: grid;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.lugarBotones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s1);
+}
+
 .camara {
   position: relative;
   display: grid;

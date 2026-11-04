@@ -2071,6 +2071,20 @@ model CotizacionAcceso {
   @@map("cotizacion_accesos")
 }
 
+/// Lista personal de pendientes (Ola 6). Solo la ve quien la escribe; con un toque se vuelve actividad.
+model PendientePersonal {
+  id         Int       @id @default(autoincrement())
+  companyId  Int
+  userId     Int
+  texto      String    @db.VarChar(200)
+  hechoAt    DateTime?
+  activityId Int?
+  createdAt  DateTime  @default(now())
+
+  @@index([companyId, userId, hechoAt])
+  @@map("pendientes_personales")
+}
+
 /// Quien revisa la evidencia de una persona en lugar de su jefe, sin moverla de organigrama.
 model RevisorEvidencia {
   id        Int      @id @default(autoincrement())
@@ -2266,6 +2280,12 @@ model LunchBreak {
   checkoutTime          DateTime?
   checkinPhotoUrl       String // Foto obligatoria al entrar a comida
   checkoutPhotoUrl      String? // Foto opcional al volver
+  /// De qué es la foto: `escritorio` o `personal`. Null: se tomó antes de esta regla o con una app vieja.
+  checkinFotoTipo     String? @db.VarChar(12)
+  checkoutFotoTipo    String? @db.VarChar(12)
+  /// Por qué no está en oficina, cuando la foto es personal.
+  checkinMotivoFuera  String? @db.VarChar(300)
+  checkoutMotivoFuera String? @db.VarChar(300)
   status                String         @default("IN_PROGRESS") // PENDING, IN_PROGRESS, COMPLETED
   isCheckinLate         Boolean        @default(false) // Si checkin fue fuera de 15:00-16:00
   isCheckoutLate        Boolean        @default(false) // Si checkout fue fuera de horario esperado

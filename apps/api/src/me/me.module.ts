@@ -14,6 +14,8 @@ import { KpisEquipoService } from './kpis-equipo.service.js';
 import { DireccionController } from './direccion.controller.js';
 import { DireccionService } from './direccion.service.js';
 import { PeerRequestsService } from './peer-requests.service.js';
+import { QueSigueController } from './que-sigue.controller.js';
+import { QueSigueService } from './que-sigue.service.js';
 import { HorasExtraService } from './horas-extra.service.js';
 import { TrayectosService } from '../activities/trayectos/trayectos.service.js';
 import { ModulePolicyModule } from '../common/tenant/module-policy.module.js';
@@ -29,13 +31,16 @@ import { ModulePolicyModule } from '../common/tenant/module-policy.module.js';
     NotificationsModule,
     ModulePolicyModule,
   ],
-  controllers: [MeController, DireccionController],
+  controllers: [MeController, DireccionController, QueSigueController],
   providers: [
     MeService,
     TeamBoardService,
     MyActivitiesService,
     KpisEquipoService,
     DireccionService,
+    QueSigueService,
+    // Por nombre: el aviso de «sin actividad» vive en `activities`, que no puede importar este módulo.
+    { provide: 'QUE_SIGUE_AVISOS', useExisting: QueSigueService },
     PeerRequestsService,
     HorasExtraService,
     TrayectosService,

@@ -76,6 +76,11 @@ export const FORMATOS_ACTIVIDAD_URL_RULES: UrlRule[] = [
   { path: '/api/activities/*/cotizacion-abierta/cerrar', methods: ['POST'], scope: 'write' },
   // Mis festivos en «Mi día» de las apps: todo el personal, y solo lo suyo. No abre el resto de `/api/festivos`.
   { path: '/api/festivos/mio', methods: ['GET'], scope: 'read' },
+  // «¿Qué sigue?» y Mis pendientes: todo el personal, y solo lo suyo (`QueSigueService`).
+  { path: '/api/me/que-sigue', methods: ['GET'], scope: 'read' },
+  { path: '/api/me/que-sigue/empezar', methods: ['POST'], scope: 'write' },
+  { path: '/api/me/pendientes', methods: ['GET', 'POST'], scope: 'write' },
+  { path: '/api/me/pendientes/**', methods: ['POST', 'DELETE'], scope: 'write' },
 ];
 
 /**
