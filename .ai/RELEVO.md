@@ -1,5 +1,47 @@
 # RELEVO
 
+- **03-11 (claude-code) — Sin sesión la cabecera ya no cambia de empresa, lo público ya no entrega borradores, y los contactos solo avisan a su empresa (`581fbd8c`). En producción. Sin migración. Falta la decisión de Adam sobre `users/public-team`.**
+  - **Qué pasaba:**
+    - `GET studio/page-content/:section` entregaba la fila completa sin sesión: `draftContent`, `updatedBy`, `publishedBy`, `companyId`.
+    - `X-Company-Id` se aceptaba sin revisar nada si no había una persona. En una ruta sin guardia no existe `req.user`, y un token de portal trae `id: null`, así que los dos caían en la misma rama. **Esto es más de lo que se había visto:** un cliente o sucursal del portal leía contenido y borradores de cualquier empresa en `GET studio/page-content`, que solo pide `AuthGuard('jwt')`. Hoy no hay ningún portal con correo en producción, así que no le pasó a nadie.
+    - `contacts:changed` y `leads:changed` mandaban nombre, correo y teléfono al personal de todas las empresas. Nadie los escucha todavía en la web ni en las apps, pero viajaban a cada navegador conectado.
+  - **Qué se hizo:**
+    - `findPublished` responde `{ section, content }`, lista blanca. `fetchPageSection` solo lee `content`, Studio usa `/draft`, y las apps no llaman esta ruta.
+    - `TenantInterceptor`, sin persona: la cabecera no cuenta. Lo público queda en la principal, como ya estaba sin cabecera, y el portal en la empresa de su token. `resolveForUser` sin persona también regresa la principal.
+    - Los avisos van con `emitToCompany`. Al borrar se usa la fila leída antes: con el filtro puesto, `delete` se vuelve `deleteMany` y regresa `{ count }`, sin `companyId`.
+  - **Quién dependía de la cabecera.** De 1,343 rutas, 57 no tienen guardia (metadatos de Nest con el `AppModule` real). Cada una, con y sin cabecera:
+    | Ruta o grupo | Con la cabecera, antes | Quedó |
+    |---|---|---|
+    | `users/public-team` | Enseña el equipo de esa empresa, a propósito | **Igual, marcada con `EmpresaPorCabeceraSinSesion`, hasta que Adam decida** |
+    | SCIM con `SCIM_BEARER_TOKEN` | Elige empresa, y su filtro la necesita (`department`) | Igual: es un secreto de plataforma. En producción SCIM está apagado |
+    | `portal/login`, `client-auth/login`, `branch-auth/login` sin slug | Servía de pista de empresa, y sacaba a los de la principal | Ya no: va con `companySlug` o `companyId`, como la web. Sin cabecera, igual que antes |
+    | Portal con sesión | Cualquier empresa, sin revisar | La de su token. Un cliente de otra empresa ya ve lo suyo: antes su filtro era el de la principal |
+    | El resto: sitio, `auth/*`, Integra, Stripe, cotización pública | Nada: ya van con empresa explícita o no la usan | Sin cambio |
+  - **Ninguna pantalla mandaba la cabecera en lo que cambió.** La web entra con `fetch` sin ella y Android también. iOS la agrega si hay `currentUser`, que al entrar no hay; no se probó un `currentUser` viejo: con él, el resultado es el mismo que sin cabecera.
+  - **Decisión pendiente de Adam: `users/public-team`.** Sin sesión y con cualquier número, enseña nombre, foto y puesto de la gente de esa empresa. Nadie la llama: `/nosotros` pinta el equipo desde `components/sitio/equipo`, y las apps no la usan. Recomendación: quitarla. Si prefiere conservarla, basta borrar la marca para que siempre enseñe la empresa del sitio. No se tocó su conducta. Si se quita, `public-team-exclusions.spec.ts` prueba el servicio y se decide aparte si se queda.
+  - **Verificado:**
+    - `tenant-interceptor-cabecera.spec.ts`, `page-content-publico.spec.ts` y `contactos-por-empresa.spec.ts`, con el interceptor, `CompanyService` y `RealtimeGateway` de verdad: 19 fallaban antes, por la razón esperada, y las 28 pasan. Ninguna prueba existente cambió. API 5,627 y tipos en verde, también con las pruebas nuevas. CI completo en verde en `581fbd8c`.
+    - `AppModule` real, HTTP real, sockets reales y Postgres desechable con dos empresas, antes y después, y otra vez con `PUBLIC_COMPANY_ID` en la otra empresa: 811 mediciones. Sin errores 5xx. Solo cambió lo de arriba. SCIM, `users/public-team`, login de personal, renovar y cerrar sesión, sin cambio. Personal con cabecera ajena sigue en 403; la plataforma sigue eligiendo.
+    - Sockets reales con personal de las dos empresas y un portal: alta, alta de ventas, actualizar y borrar llegan solo a la empresa de la fila. El portal no recibe nada.
+    - En producción, con el código desplegado y una sonda de solo lectura dentro de `nexara-api`, antes y después:
+      - Las 19 secciones, con y sin cabecera: mismo estado y `content` idéntico. Las que existen ya responden solo `section` y `content`.
+      - `GET studio/page-content` con un token de portal de la principal y la cabecera de la otra empresa: antes leía esa empresa, y ahora la suya. El token fue de vida corta, firmado ahí mismo para un cliente que no existe y sin imprimirse.
+      - `users/public-team` responde igual que antes, con y sin cabecera. Otras ocho rutas públicas, igual byte a byte, también con una empresa que no existe.
+      - El sitio da los mismos estados y títulos. El `dist` trae los cambios, sin errores de arranque y sin 5xx en Traefik en los 10 minutos siguientes.
+      - Ojo: hoy la portada solo lee `home_cta` y las `seo_*`, y ninguna existe en producción, así que caen a sus textos de respaldo. El sitio no podía cambiar con esto; lo que comprueba la lectura es que `content` quedó idéntico.
+  - **Sin verificar:** un mensaje real del formulario en producción, porque manda correo y crea un prospecto; el aviso quedó medido en la base desechable y su código en el `dist` desplegado. Un portal real entrando con su correo: no hay ninguno.
+  - **Visto y sin tocar:**
+    - **`GET studio/page-content` y `sections` solo piden `AuthGuard('jwt')`:** un portal ya no ve otra empresa, pero sí los borradores de la suya, y lo mismo cualquier persona del personal sin permiso de Studio.
+    - **`attendance:notification` lleva nombre y correo de quien checa, y `projects:changed` el proyecto completo, a todo el personal de todas las empresas.** Misma falla que `contacts:changed`. `attendance:updated` también sale a todos, con el id de la persona; ese sí lo escucha la web.
+    - `GET company-public/list` enseña sin sesión las empresas activas, y `GET company-public?id=` los datos públicos de cualquiera.
+    - `contacts:changed` llega a todo el personal de la empresa, tenga o no permiso de ver contactos.
+    - `integra/hik`: `acs-ops-bridge.service.ts` actualiza `Activity` por `{ id }` con el filtro de la principal. Leído en el código, sin probar con un sitio de otra empresa.
+  - **Trampas:**
+    - Un portal no es «sin sesión» ni «persona»: revisar `req.user` no basta, hay que revisar `req.user.id`.
+    - Una ruta nueva que necesite la cabecera sin sesión no funcionará hasta marcarla, y una prueba detiene esa marca: es decisión de Adam, no un detalle.
+    - Probar `POST auth/login` con clave mala bloquea la cuenta a los 5 intentos, y después falla también con la buena.
+    - `fetch` sigue redirecciones: `GET auth/oidc/start` hacia un proveedor local revienta la prueba si no lleva `redirect: 'manual'`.
+
 - **03-11 (claude-code) — Ningún encargado de área queda a cargo de otro, José Antonio ya cotiza, y «Esperan revisión» dice qué cuenta (`cdd4f824`, `596dd1a0`, `0eabdd94`). En producción.**
   - Adam: «Sí, que cotice»; «los encargados de área no debe Luis estar a cargo de ellos»; «a Christian le aparecen 4 en espera de revisión y hay demasiados».
   - **Por qué a Luis le llegaba Daniela:** no fue el organigrama, donde todos reportan a Christian y Luis no tiene a nadie. Fueron las filas de `revisores_evidencia` de la Ola 5. Adam eligió a Luis Joel en la muestra, por recomendación de este agente, que no le señaló que esas tres personas son encargadas de área.
