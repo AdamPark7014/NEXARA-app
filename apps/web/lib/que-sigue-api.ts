@@ -5,7 +5,7 @@ import { erpFetch } from "@/lib/erp-api";
  * Adam la ve primero en la pantalla real, con `?muestra=1` en Mis actividades y en Asistencias.
  * Con `false`, nadie ve «¿Qué sigue?», Mis pendientes ni la foto del escritorio.
  */
-export const QUE_SIGUE_VISIBLE = false;
+export const QUE_SIGUE_VISIBLE = true;
 
 export type Sugerencia = {
   clave: string;

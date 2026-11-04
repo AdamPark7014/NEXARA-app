@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   canCreateToolLoan,
-  canCreateToolLoanClient,
   canManageTools,
 } from "@/lib/tools-access";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
@@ -16,11 +15,13 @@ describe("tools-access (web mirror)", () => {
     expect(canManageTools("jose.ramirez@nexara.com.mx")).toBe(false);
   });
 
-  it("solo José Antonio y David crean préstamos", () => {
-    expect(canCreateToolLoan("jose.ramirez@nexara.com.mx")).toBe(true);
-    expect(canCreateToolLoan("operaciones@nexara.com.mx")).toBe(true);
-    expect(canCreateToolLoan("gerencia@nexara.com.mx")).toBe(false);
-    expect(canCreateToolLoanClient("administracion.ventas@nexara.com.mx")).toBe(false);
+  it("todo el personal pide préstamo; dirección y clientes no", () => {
+    expect(canCreateToolLoan({ roleKey: "ing_soporte" })).toBe(true);
+    expect(canCreateToolLoan({ roleKey: "administrativo" })).toBe(true);
+    expect(canCreateToolLoan({ roleKey: "ceo" })).toBe(false);
+    expect(canCreateToolLoan({ roleKey: "ing_campo", isSuperAdmin: true })).toBe(false);
+    expect(canCreateToolLoan({ roleKey: "cliente" })).toBe(false);
+    expect(canCreateToolLoan(null)).toBe(false);
   });
 });
 
@@ -46,9 +47,9 @@ describe("getOpsTeamSectionConfig('tools') por email", () => {
       },
       "tools",
     );
-    expect(cfg.viewMode).toBe("manage");
+    expect(cfg.viewMode).toBe("manage_execute");
     expect(cfg.canApprove).toBe(true);
-    expect(cfg.canCreate).toBe(false);
+    expect(cfg.canCreate).toBe(true);
   });
 
   it("Christian (ceo) manage por email", () => {
@@ -58,6 +59,7 @@ describe("getOpsTeamSectionConfig('tools') por email", () => {
     );
     expect(cfg.viewMode).toBe("manage");
     expect(cfg.canApprove).toBe(true);
+    expect(cfg.canCreate).toBe(false);
   });
 
   it("TOOLS_MANAGE en JWT abre manage si el email no está en la lista", () => {
@@ -69,17 +71,17 @@ describe("getOpsTeamSectionConfig('tools') por email", () => {
       },
       "tools",
     );
-    expect(cfg.viewMode).toBe("manage");
+    expect(cfg.viewMode).toBe("manage_execute");
     expect(cfg.canApprove).toBe(true);
   });
 
-  it("campo genérico sin email de préstamo: execute read-only", () => {
+  it("campo genérico: pide préstamo, no aprueba", () => {
     const cfg = getOpsTeamSectionConfig(
       { email: "tecnico@nexara.com.mx", roleKey: ROLES.ING_CAMPO },
       "tools",
     );
     expect(cfg.viewMode).toBe("execute");
-    expect(cfg.canCreate).toBe(false);
+    expect(cfg.canCreate).toBe(true);
     expect(cfg.canApprove).toBe(false);
   });
 });
