@@ -17,7 +17,7 @@ import { createReadStream, existsSync, unlinkSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { Response } from 'express';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
-import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { CurrentCompanyId, EmpresaPorCabeceraSinSesion } from '../common/tenant/current-company.decorator.js';
 import { diskStorage } from 'multer';
 import * as fs from 'node:fs';
 
@@ -492,6 +492,7 @@ export class UsersController {
   }
 
   @Get('public-team')
+  @EmpresaPorCabeceraSinSesion()
   async findPublicTeam(
     @Query('limit') limit?: string,
     @CurrentCompanyId() companyId?: number | null,

@@ -5,13 +5,16 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { CompanyService } from '../../company/company.service.js';
 import { getClientIpFromRequestMeta } from '../security/security.utils.js';
+import { EMPRESA_POR_CABECERA_SIN_SESION } from './current-company.decorator.js';
 import { runWithTenantAsync } from './tenant-context.js';
 
 /**
  * Resuelve la empresa activa desde `X-Company-Id` (o primaria) y la adjunta a `req.companyId`.
- * Valida membresía UserCompany excepto super_admin.
+ * Valida membresía UserCompany excepto super_admin. Sin persona no hay membresía que validar, así que ahí la
+ * cabecera no cuenta (ver `empresaSinPersona`).
  * Propaga el contexto vía AsyncLocalStorage para middleware Prisma fail-closed.
  *
  * Cast `as any` + require local rxjs evita conflicto de tipos por rxjs duplicado en monorepo
@@ -19,7 +22,10 @@ import { runWithTenantAsync } from './tenant-context.js';
  */
 @Injectable()
 export class TenantInterceptor implements NestInterceptor {
-  constructor(private readonly companyService: CompanyService) {}
+  constructor(
+    private readonly companyService: CompanyService,
+    private readonly reflector: Reflector,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): any {
     const req = context.switchToHttp().getRequest();
@@ -57,15 +63,15 @@ export class TenantInterceptor implements NestInterceptor {
 
       const raw = req.headers?.['x-company-id'] ?? req.headers?.['X-Company-Id'];
       const headerId = raw != null && String(raw).trim() !== '' ? Number(raw) : undefined;
+      const cabecera = Number.isFinite(headerId) ? headerId : undefined;
       const userId = req.user?.id != null ? Number(req.user.id) : undefined;
       const isSuperAdmin = Boolean(req.user?.isSuperAdmin || req.user?.roleKey === 'super_admin');
 
       try {
-        const company = await this.companyService.resolveForUser({
-          companyId: Number.isFinite(headerId) ? headerId : undefined,
-          userId: userId && userId > 0 ? userId : undefined,
-          isSuperAdmin,
-        });
+        const company =
+          userId && userId > 0
+            ? await this.companyService.resolveForUser({ companyId: cabecera, userId, isSuperAdmin })
+            : await this.companyService.resolve(this.empresaSinPersona(context, req, cabecera));
         req.companyId = company?.id ?? null;
         req.company = company ?? null;
       } catch (err) {
@@ -87,6 +93,22 @@ export class TenantInterceptor implements NestInterceptor {
     };
 
     return from(run());
+  }
+
+  /**
+   * La empresa de quien no es una persona: una ruta sin guardia, donde no existe `req.user`, o un token de portal,
+   * que trae `id: null`. `undefined` es la principal. La cabecera no cuenta: con ella, un cliente del portal leía los
+   * borradores de otra empresa.
+   */
+  private empresaSinPersona(context: ExecutionContext, req: any, cabecera?: number): number | undefined {
+    // Portales: la dice su token firmado.
+    if (req.user?.isClient || req.user?.isBranchUser) {
+      const delToken = Number(req.user.companyId);
+      return Number.isFinite(delToken) && delToken > 0 ? delToken : undefined;
+    }
+    // SCIM con el secreto de la plataforma: elige empresa con la cabecera (`ScimController.companyIdFrom`).
+    if (req.scimLegacyAuth) return cabecera;
+    return this.reflector.get<boolean>(EMPRESA_POR_CABECERA_SIN_SESION, context.getHandler()) ? cabecera : undefined;
   }
 }
 
