@@ -115,4 +115,19 @@ describe("ResumenEquipo", () => {
     expect(screen.getByText("Libres")).toBeInTheDocument();
     expect(screen.queryByText("Flujo del periodo")).toBeNull();
   });
+
+  it("esperan revisión: toda la cola, y dice cuántas te tocan y cuántas tienen sus jefes", async () => {
+    const abrir = vi.fn();
+    render(<ResumenEquipo users={EQUIPO} cola={{ teTocan: 28, deOtros: 27 }} onRevisar={abrir} />);
+    expect(screen.getByText("55")).toBeInTheDocument();
+    const pista = screen.getByText("28 te tocan · 27 con sus jefes");
+    await userEvent.click(pista);
+    expect(abrir).toHaveBeenCalledTimes(1);
+  });
+
+  it("si todas te tocan, no habla de otros jefes", () => {
+    render(<ResumenEquipo users={EQUIPO} cola={{ teTocan: 3, deOtros: 0 }} />);
+    expect(screen.getByText("entregadas que nadie ha aprobado")).toBeInTheDocument();
+    expect(screen.queryByText(/con sus jefes/)).toBeNull();
+  });
 });
