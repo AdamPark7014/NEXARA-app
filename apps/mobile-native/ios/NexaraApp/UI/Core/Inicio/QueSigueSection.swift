@@ -13,14 +13,14 @@ struct QueSigueSection: View {
     @State private var error: String?
 
     var body: some View {
-        Group {
+        // Un `Group` vacío no aparece y su `.task` no corre: nunca llegaban los datos.
+        VStack(alignment: .leading, spacing: 12) {
             if let datos, datos.aplica {
-                VStack(alignment: .leading, spacing: 12) {
-                    tarjetaSugerencias(datos)
-                    tarjetaPendientes
-                }
+                tarjetaSugerencias(datos)
+                tarjetaPendientes
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .task { await recargar() }
     }
 
