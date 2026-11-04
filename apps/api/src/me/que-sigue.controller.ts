@@ -40,6 +40,11 @@ export class QueSigueController {
     return this.service.queSigue(this.viewer(user), companyId);
   }
 
+  @Get('que-sigue/de/:id')
+  queSigueDe(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null, @Param('id', ParseIntPipe) id: number) {
+    return this.service.queSigueDe(this.viewer(user), companyId, id);
+  }
+
   @Post('que-sigue/empezar')
   empezar(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null, @Body() body: EmpezarSugerenciaDto) {
     return this.service.empezar(this.viewer(user), companyId, body.clave);

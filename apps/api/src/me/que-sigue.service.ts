@@ -174,6 +174,26 @@ export class QueSigueService {
     return { aplica: true as const, area, sugerencias, resumen };
   }
 
+  /**
+   * Lo que le saldría a otra persona, para que dirección lo vea sin entrar con su cuenta. De solo lectura y
+   * sin sus pendientes: esas notas son suyas.
+   */
+  async queSigueDe(viewer: Viewer, companyIdRaw: number | null, userId: number) {
+    if (!esDeTodaLaEmpresa(viewer as never)) throw new ForbiddenException('Solo dirección ve lo de otra persona');
+    const companyId = requireCompanyId(companyIdRaw);
+    const persona = await this.prisma.user.findFirst({
+      where: { id: userId, isActive: true, companyMemberships: { some: { companyId } } },
+      select: { id: true, email: true, roleKey: true, nombre: true },
+    });
+    if (!persona) throw new NotFoundException('Esa persona no existe');
+    const suya: Viewer = { id: persona.id, email: persona.email, roleKey: persona.roleKey, isSuperAdmin: false, permissions: [] };
+    const area = await this.areaDe(suya);
+    if (!area) return { aplica: false as const, area: null, nombre: persona.nombre, sugerencias: [], resumen: null };
+    const datos = await this.datos(suya, companyId, area, new Date());
+    const { sugerencias, resumen } = armarSugerencias({ ...datos, pendientes: [] });
+    return { aplica: true as const, area, nombre: persona.nombre, sugerencias, resumen };
+  }
+
   /** Lo que dice el aviso de «sin actividad». `null`: que diga lo de siempre. */
   async paraAviso(userId: number, companyId: number, enviadosHoy: number) {
     const persona = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, roleKey: true } });
