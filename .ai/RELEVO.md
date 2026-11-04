@@ -1,6 +1,6 @@
 # RELEVO
 
-- **04-11 (claude-code) — Las apps cambian según quién entra: versión 1.4, en `main` (`b297197e`, `aa96a915`). Servidor en producción. Sin migración.**
+- **04-11 (claude-code) — Las apps cambian según quién entra: versión 1.4, en `main` (`b297197e`, `aa96a915`, `ce88545d`, `72cd839a`). Servidor en producción. Sin migración. Enviada el 04-11: iOS 1.4 (16) en TestFlight y `WAITING_FOR_REVIEW`; Android 1.4.0 (23) en revisión de Google, lanzamiento completo. Las dos salen solas al aprobarse. Siguientes números: iOS 17, Play 24.**
   - **Pedido de Adam:** «al CEO le aparece para escanear una herramienta y ya eso que el deberia ver todo lo relacionado a lo administrativo», «el que debe dar de alta es ivan», «la gente debe poder pues solamente solicitar prestamos», «es asignar un viatico o aprobar», «pagos empleados deberian poder realizar acciones en movil». Decidió: cualquiera saca un vehículo libre; Pagos con registrar y marcar pagado; Ola 6 visible; los contactos de campaña a Daniela.
   - **Quién es quién en la app:** `PorRol` en Android y `CoreOrg.esDireccion` en iOS. Dirección es el rol CEO, además de Christian y Claudia por correo. Iván se reconoce por sus permisos (`tools.manage`, `stock.manage`, `vehicles.inventory`), no por nombre.
   - **Qué ve cada quien:**
@@ -33,7 +33,7 @@
     - `cotizaciones/:id/aprobar` no se limita a dirección en el servidor: solo la app lo esconde.
     - `tool-requests/inventory` no dice quién trae la pieza: la app lo cruza con préstamos y kits.
   - **Trampas:**
-    - Android: un `clickable` en un campo de solo lectura nunca se dispara. `DatePickerField` y `DateTimePickerField` no abrían el calendario, y sin fecha no se podía pedir préstamo, solicitar vehículo ni registrar pago. Lo enseñó llenar el formulario en el emulador: las pruebas de reglas no lo ven. Ver `CamposDeFechaTest`.
+    - Android: un `clickable` en un campo de solo lectura nunca se dispara. `DatePickerField` y `DateTimePickerField` no abrían el calendario, y sin fecha no se podía pedir préstamo, solicitar vehículo ni registrar pago. Lo enseñó llenar el formulario en el emulador: las pruebas de reglas no lo ven. Ver `CamposDeFechaTest`, en `src/testDebug` porque `ui-test-manifest` solo existe en debug: en `src/test` truena en `testReleaseUnitTest`, que corre CI y no la orden local.
     - iOS: un `.task` sobre un `Group` vacío nunca corre. «¿Qué sigue?» no habría salido nunca; lo enseñó la captura, no la compilación.
     - La copia exportada puede quedar vieja: se rehace con `git archive`, y `armar-commit.sh` ya imprime lo que borra. Ver `b92d67eb` y `a6b91a7e`.
     - `tsc` de la API roza los 2 GB de Node: CI ya usa 4 GB.
