@@ -1,5 +1,27 @@
 # RELEVO
 
+- **04-11 (claude-code) — Ola 6, gente proactiva: «¿Qué sigue?», Mis pendientes y foto del escritorio. En producción y oculta; falta el sí de Adam (`cee257d2`, `647d3f70`, `631649f6`, `f71a2122`). Migración `20261104120000_que_sigue_y_foto_escritorio` aplicada.**
+  - **Qué es:** quien no trae nada corriendo ve hasta 5 sugerencias de su área, en Mis actividades y en Mi día de las apps. «Empezar» crea la actividad a su nombre y arranca el reloj, sin escribir nada. Sin IA: las arma `me/que-sigue.ts`, función pura.
+  - **Orden de las sugerencias:** abiertas, pendientes, cotización por vencer, contacto de la página sin dueño, revisar, obra, banco, seguir la última, lista fija. La lista fija por área vive en el código (`LISTA_FIJA`).
+  - **Mis pendientes:** `PendientePersonal`. Solo los ve cada quien; se palomean o se vuelven actividad con un toque.
+  - **Foto de la comida (Adam, 04-11):** «todos pero pueden tomarsela personalmente justificando que no se encuentran en oficina». En oficina, cámara de atrás y el escritorio; fuera, cámara frontal y motivo de 3 letras o más, o da 400. Una app vieja que no manda nada sigue pasando. Son cuatro columnas nuevas en `LunchBreak`. No cuenta en KPI ni en nómina: la recomendación es 2 semanas de prueba y que él decida después.
+  - **Contactos:** los de la página sin dueño se le sugieren a comercial y son de quien los tome primero (`updateMany` con `ownerId: null`; 409 si ya se fue). Los de campaña siguen a nombre de Christian: falta que Adam diga de quién son.
+  - **Dos banderas, las dos en `false`:** `QUE_SIGUE_VISIBLE` en `web/lib/que-sigue-api.ts` (tarjetas y foto) y `QUE_SIGUE_EN_AVISOS` en `api/src/me/que-sigue.ts` (el aviso de «sin actividad» dice la sugerencia; si no, el texto de antes). **Las apps no tienen bandera:** salen al publicarse, Play 23 e iOS 16, junto con «¿Te tomó…?» de la Ola 4.
+  - **Dirección lo revisa antes:** `/erp/pizarra/que-sigue?de=<id>` enseña lo que le sale a cada persona, sin sus pendientes y sin poder empezar. No está en ningún menú. `?muestra` en Mis actividades o en la pestaña Comidas enseña lo oculto a quien la abre.
+  - **Verificado:**
+    - Jest, Vitest y tipos de API y web; 7 de 7 con la API real y un Postgres desechable; pruebas de Android; `ios-static-check`.
+    - Con el código desplegado y solo lecturas, lo que le sale a 9 personas de 6 áreas. Dirección da «no aplica».
+    - Web a 1536 y 375 px con los componentes reales en un arnés: de ahí salieron `f71a2122` y sus correcciones.
+    - La página por persona, en producción con la sesión de Christian.
+  - **Sin verificar:** nadie la ha usado. La cámara con la opción nueva en un navegador real: el panel de pruebas la bloquea. iOS solo compila en CI: no hay Mac. Faltan las capturas de las apps antes de tiendas.
+  - **Límites que Adam debe oír:** soporte no ve recomendaciones porque no hay ninguna capturada, y contabilidad solo ve banco cuando hay movimientos.
+  - **Después del sí:** poner las dos banderas en `true` y desplegar. Publicar las apps con capturas del mismo commit y todos los flujos de CI revisados. Medir 2 semanas después: la meta es bajar a la mitad el tiempo de la entrada a la primera actividad.
+  - **Trampas:**
+    - `Card` no trae margen si no se le pasa `pad`. Una casilla nativa suelta salió enorme y dejó el texto en vertical: usar `Checkbox` de `components/base`. Las dos cosas pasaron las pruebas y solo se vieron a tamaño real.
+    - `selfCreate` con un tercer argumento `{}` rompe tres pruebas que revisan la llamada: sin tiempo fijo, se llama con dos.
+    - `ComidasPanel` lee `user.token` y pide `fecha`, no el `token` de `useUser()`: el arnés se queda cargando si falta.
+    - Dirección no puede abrir Mis actividades: para revisar lo que ve cada quien está la página por persona.
+
 - **03-11 (claude-code) — Los avisos en vivo de asistencia y de proyectos se quedan en su empresa (`e364ac81`). En producción. Sin migración.**
   - **Qué pasaba:** `attendance:updated`, `attendance:notification` y `projects:changed` salían con `emit()`, al personal de todas las empresas. Los portales ya estaban fuera. Hoy la otra empresa es una cuenta de revisión, así que no hay daño conocido.
   - **Más de lo que se había visto:** `User` no está en `TENANT_SCOPED_MODELS`, así que la consulta de administradores de `emitAttendanceUpdate` traía a los de todas las empresas. Cada checada mandaba a todo el personal una copia con nombre y correo por cada uno de ellos.
