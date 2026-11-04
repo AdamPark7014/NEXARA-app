@@ -33,6 +33,7 @@ struct LunchRecord: Decodable, Identifiable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case id, userId, status, checkinTime, checkoutTime, checkinPhotoUrl, checkoutPhotoUrl
         case isCheckinLate, isCheckoutLate, checkinJustificacion, checkoutJustificacion
+        case checkinMotivoFuera, checkoutMotivoFuera
         case revisionEstado, revisionNotas, revisadoPor, revisadoAt, minutos
     }
 
@@ -58,6 +59,8 @@ struct LunchRecord: Decodable, Identifiable, Hashable {
         isCheckoutLate = try? c.decode(Bool.self, forKey: .isCheckoutLate)
         checkinJustificacion = try? c.decode(String.self, forKey: .checkinJustificacion)
         checkoutJustificacion = try? c.decode(String.self, forKey: .checkoutJustificacion)
+        checkinMotivoFuera = try? c.decode(String.self, forKey: .checkinMotivoFuera)
+        checkoutMotivoFuera = try? c.decode(String.self, forKey: .checkoutMotivoFuera)
         revisionEstado = try? c.decode(String.self, forKey: .revisionEstado)
         revisionNotas = try? c.decode(String.self, forKey: .revisionNotas)
         revisadoPor = try? c.decode(String.self, forKey: .revisadoPor)
