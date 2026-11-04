@@ -204,6 +204,84 @@ final class ParityScreenshotsUITests: XCTestCase {
         tocar(registrar)
     }
 
+    /// «¿Qué sigue?», un proyecto abierto y la foto de la comida (Ola 6 y app por rol). Capturas 77 a 81.
+    func testQueSigueProyectoYComida() throws {
+        app.terminate()
+        app.launchEnvironment["NEXARA_DEMO_QUE_SIGUE"] = "1"
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "La app no llegó a primer plano")
+        despejarAlertas()
+        guard buscar(pestana("tab-inicio", "Inicio"), timeout: 30) != nil else {
+            adjuntarJerarquia("dbg-por-rol-sin-shell")
+            XCTFail("No se llegó a «Mi día»")
+            return
+        }
+        Thread.sleep(forTimeInterval: 2)
+        numero = 76
+        let queSigue = app.staticTexts["¿Qué sigue?"]
+        var vueltas = 0
+        while !(queSigue.exists && queSigue.isHittable), vueltas < 6 {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.4)
+            vueltas += 1
+        }
+        if queSigue.exists {
+            capturar("que-sigue")
+        } else {
+            adjuntarJerarquia("dbg-sin-que-sigue")
+            omitir("que-sigue: no aparece en «Mi día»")
+            numero = 77
+        }
+
+        guard irA("tab-mas", "Más") else {
+            XCTFail("No se llegó a «Más»")
+            return
+        }
+        var fila = buscar(renglon("more-erp-proyectos", "Proyectos"), timeout: 2)
+        vueltas = 0
+        while fila == nil || !(fila?.isHittable ?? false), vueltas < 5 {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.5)
+            fila = buscar(renglon("more-erp-proyectos", "Proyectos"), timeout: 1)
+            vueltas += 1
+        }
+        if let fila {
+            tocar(fila)
+            Thread.sleep(forTimeInterval: 1.5)
+            let tarjeta = app.descendants(matching: .any).matching(identifier: "proyecto-tarjeta").firstMatch
+            if tarjeta.waitForExistence(timeout: 8) {
+                tocar(tarjeta)
+                Thread.sleep(forTimeInterval: 1.5)
+                capturar("proyecto-detalle")
+                if tocarSiExiste(textoTocable("Cronograma"), timeout: 4) {
+                    capturar("proyecto-cronograma")
+                }
+            } else {
+                adjuntarJerarquia("dbg-sin-tarjeta-proyecto")
+                omitir("proyecto-detalle: no aparece la tarjeta")
+            }
+        } else {
+            omitir("proyecto-detalle: no está en «Más»")
+        }
+
+        numero = 79
+        guard irA("tab-asistencias", "Asistencia") else {
+            omitir("comida-lugar: no se llegó a Asistencia")
+            return
+        }
+        guard tocarSiExiste(textoTocable("Comidas"), timeout: 6),
+              tocarSiExiste(textoTocable("Salir a comer"), timeout: 8) else {
+            adjuntarJerarquia("dbg-sin-salir-a-comer")
+            omitir("comida-lugar: no aparece «Salir a comer»")
+            return
+        }
+        Thread.sleep(forTimeInterval: 1.5)
+        capturar("comida-lugar")
+        if tocarSiExiste(textoTocable("No estoy en oficina"), timeout: 5) {
+            capturar("comida-fuera-de-oficina")
+        }
+    }
+
     /// Vehículos del CEO (`NEXARA_DEMO_CEO=1`): la flotilla y la ficha, sin «Solicitar» ni «Salida».
     /// Capturas 88 a 90: el flujo de CI solo acepta nombres con dos cifras.
     func testFlotillaDireccion() throws {
