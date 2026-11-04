@@ -142,7 +142,7 @@ internal fun QueSigueSection(
                 OutlinedTextField(
                     value = texto,
                     onValueChange = { texto = it.take(QueSigueRules.LARGO_PENDIENTE) },
-                    placeholder = { Text("Anota algo para no olvidarlo…") },
+                    placeholder = { Text("Anota un pendiente…") },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )

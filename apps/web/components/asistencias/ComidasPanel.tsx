@@ -358,7 +358,7 @@ function RegistroModal({
               <div className={s.lugarMotivo}>
                 <div className={s.lugarBotones}>
                   {MOTIVOS_FUERA.map((m) => (
-                    <Button key={m} size="sm" variant="ghost" aria-pressed={motivoFuera === m} onClick={() => setMotivoFuera(m)} disabled={enviando}>
+                    <Button key={m} size="sm" variant={motivoFuera === m ? "primary" : "secondary"} aria-pressed={motivoFuera === m} onClick={() => setMotivoFuera(m)} disabled={enviando}>
                       {m}
                     </Button>
                   ))}
