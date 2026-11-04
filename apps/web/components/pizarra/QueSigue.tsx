@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Alert, Button, Card, Input } from "@/components/base";
+import { Alert, Button, Card, Checkbox, Input } from "@/components/base";
 import { formatApiError } from "@/lib/erp-api";
 import {
   agregarPendiente,
@@ -93,7 +93,7 @@ export default function QueSigue({ token, onCambio }: { token: string; onCambio?
 
   return (
     <div className={s.dos}>
-      <Card>
+      <Card pad>
         <section className={s.bloque} aria-label="¿Qué sigue?">
           <h3 className={s.titulo}>¿Qué sigue?</h3>
           {error ? <Alert tone="danger">{error}</Alert> : null}
@@ -126,13 +126,13 @@ export default function QueSigue({ token, onCambio }: { token: string; onCambio?
         </section>
       </Card>
 
-      <Card>
+      <Card pad>
         <section className={s.bloque} aria-label="Mis pendientes">
           <h3 className={s.titulo}>Mis pendientes</h3>
           <form className={s.agregar} onSubmit={agregar}>
             <Input
               aria-label="Nuevo pendiente"
-              placeholder="Anota algo para no olvidarlo…"
+              placeholder="Anota un pendiente…"
               value={texto}
               maxLength={200}
               onChange={(e) => setTexto(e.target.value)}
@@ -145,14 +145,12 @@ export default function QueSigue({ token, onCambio }: { token: string; onCambio?
             <ul className={s.lista}>
               {pendientes.map((p) => (
                 <li key={p.id} className={s.fila}>
-                  <label className={s.palomita}>
-                    <input
-                      type="checkbox"
-                      disabled={trabado}
-                      onChange={() => void correr(`hecho:${p.id}`, () => palomearPendiente(token, p.id), "No se pudo palomear")}
-                    />
-                    <span>{p.texto}</span>
-                  </label>
+                  <Checkbox
+                    className={s.palomita}
+                    label={p.texto}
+                    disabled={trabado}
+                    onChange={() => void correr(`hecho:${p.id}`, () => palomearPendiente(token, p.id), "No se pudo palomear")}
+                  />
                   <div className={s.acciones}>
                     <Button
                       size="sm"

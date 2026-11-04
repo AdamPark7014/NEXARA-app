@@ -140,7 +140,7 @@ struct QueSigueSection: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(NxColors.fg)
             HStack(spacing: 8) {
-                TextField("Anota algo para no olvidarlo…", text: $texto)
+                TextField("Anota un pendiente…", text: $texto)
                     .textFieldStyle(.roundedBorder)
                 Button("Agregar") { agregar() }
                     .disabled(ocupado || !QueSigueRules.pendienteValido(texto))
