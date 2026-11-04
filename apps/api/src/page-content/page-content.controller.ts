@@ -42,13 +42,15 @@ export class PageContentController {
   constructor(private readonly svc: PageContentService) {}
 
   @Get()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   findAll(@CurrentCompanyId() companyId: number | null) {
     return this.svc.findAll(companyId);
   }
 
   @Get('sections')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   listSections() {
     return { sections: VALID_SECTIONS };
   }
