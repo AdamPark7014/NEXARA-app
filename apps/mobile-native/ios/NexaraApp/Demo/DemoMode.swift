@@ -44,6 +44,11 @@ enum DemoMode {
         }
     }
 
+    /// Demo como si no trajera nada corriendo (`NEXARA_DEMO_QUE_SIGUE=1`): solo para capturar «¿Qué sigue?».
+    static var verQueSigue: Bool {
+        ProcessInfo.processInfo.environment["NEXARA_DEMO_QUE_SIGUE"] == "1"
+    }
+
     /// Demo con el inicio de dirección general (`NEXARA_DEMO_CEO=1`): solo para la captura de paridad
     /// del tablero del CEO. Sin la variable, el demo conserva «Mi día» con su cola (capturas de tienda).
     static var inicioDireccion: Bool {

@@ -248,7 +248,7 @@ struct InicioView: View {
                 }
             }
             // Ola 6: lo que puede hacer si no trae nada corriendo, y su lista de pendientes.
-            if store.data != nil, QueSigueRules.mostrar(algoCorriendo: store.open.contains { $0.enCurso == true }) {
+            if store.data != nil, DemoMode.verQueSigue || QueSigueRules.mostrar(algoCorriendo: store.open.contains { $0.enCurso == true }) {
                 QueSigueSection(
                     onOpenActivity: { onOpenActivity($0, nil) },
                     onOpenActividades: onOpenActividades
