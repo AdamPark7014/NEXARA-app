@@ -1,5 +1,6 @@
 import { workClock, workDayEnd } from '../common/time/workday.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
+import { ROLES, ROLES_ENCARGADOS_DE_AREA } from '../common/rbac/roles.v2.js';
 
 /**
  * Quién revisa la evidencia de quién en una actividad. Una sola regla para la vista de
@@ -133,11 +134,22 @@ export function revisionParaTi(p: {
 }
 
 /**
- * Quien revisa la evidencia de alguien en lugar de su jefe, sin moverlo de organigrama (Adam, 03-11: Luis
- * Joel por Daniela, Mónica y Paulina, para que a Christian no le lleguen). Solo cambia la revisión:
- * vacaciones, gastos y lo demás siguen con su jefe. Después del plazo sube al jefe de quien revisa.
+ * Quien revisa la evidencia de alguien en lugar de su jefe, sin moverlo de organigrama. Solo cambia la
+ * revisión: vacaciones, gastos y lo demás siguen con su jefe. Después del plazo sube al jefe de quien revisa.
  */
 export type RevisorDeEvidencia = { userId: number; revisorId: number };
+
+const DIRECCION = new Set<string>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.DIR_OPERACIONES]);
+const ENCARGADOS_DE_AREA = new Set<string>(ROLES_ENCARGADOS_DE_AREA);
+
+/**
+ * Un encargado de área no queda a cargo de otro (Adam, 03-11: «los encargados de área no debe Luis estar a
+ * cargo de ellos»). Solo dirección los revisa por encargo; si la fila dice otra cosa, no cuenta y manda su
+ * jefe por organigrama. Así, avisos, cola y permiso de aprobar cambian juntos y nada se queda sin revisor.
+ */
+export function revisoresVigentes(revisores: RevisorDeEvidencia[], rolDe: Map<number, string | null | undefined>): RevisorDeEvidencia[] {
+  return revisores.filter((r) => !ENCARGADOS_DE_AREA.has(String(rolDe.get(r.userId) ?? '')) || DIRECCION.has(String(rolDe.get(r.revisorId) ?? '')));
+}
 
 export function conRevisores<T extends { id: number; managerId: number | null }>(usuarios: T[], revisores: RevisorDeEvidencia[]): T[] {
   if (!revisores.length) return usuarios;
@@ -145,14 +157,21 @@ export function conRevisores<T extends { id: number; managerId: number | null }>
   return usuarios.map((u) => (revisorDe.has(u.id) ? { ...u, managerId: revisorDe.get(u.id) as number } : u));
 }
 
-/** Los revisores de la empresa. Sin la tabla o sin empresa: ninguno, y manda el organigrama. */
+/** Los revisores de la empresa. Sin la tabla, sin empresa o si algo falla: ninguno, y manda el organigrama. */
 export async function leerRevisores(
-  prisma: { revisorEvidencia?: { findMany: (args: never) => Promise<RevisorDeEvidencia[]> } },
+  prisma: {
+    revisorEvidencia?: { findMany: (args: never) => Promise<RevisorDeEvidencia[]> };
+    user?: { findMany: (args: never) => Promise<Array<{ id: number; roleKey?: string | null }>> };
+  },
   companyId: number | null | undefined,
 ): Promise<RevisorDeEvidencia[]> {
   if (companyId == null) return [];
   try {
-    return (await prisma.revisorEvidencia?.findMany({ where: { companyId }, select: { userId: true, revisorId: true } } as never)) ?? [];
+    const filas = (await prisma.revisorEvidencia?.findMany({ where: { companyId }, select: { userId: true, revisorId: true } } as never)) ?? [];
+    if (!filas.length) return [];
+    const ids = [...new Set(filas.flatMap((r) => [r.userId, r.revisorId]))];
+    const personas = (await prisma.user?.findMany({ where: { id: { in: ids } }, select: { id: true, roleKey: true } } as never)) ?? [];
+    return revisoresVigentes(filas, new Map(personas.map((p) => [p.id, p.roleKey])));
   } catch {
     return [];
   }

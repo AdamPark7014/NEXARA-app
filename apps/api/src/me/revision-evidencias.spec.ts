@@ -242,6 +242,40 @@ describe('quien revisa por encargo', () => {
     expect(org.find((u) => u.id === 38)?.managerId).toBe(1);
   });
 
+  describe('un encargado de área no queda a cargo de otro (Adam, 03-11)', () => {
+    const roles = [
+      { id: 38, roleKey: 'administrativo' },
+      { id: 39, roleKey: 'enc_soporte' },
+      { id: 3, roleKey: 'arquitecto' },
+      { id: 8, roleKey: 'coord_operaciones' },
+      { id: 7, roleKey: 'coord_operaciones' },
+      { id: 61, roleKey: 'ing_campo' },
+      { id: 35, roleKey: 'ceo' },
+    ];
+    const conFilas = (filas: Array<{ userId: number; revisorId: number }>) => ({
+      revisorEvidencia: { findMany: async () => filas },
+      user: { findMany: async () => roles },
+    });
+
+    it('la fila no cuenta: avisos, cola y permiso vuelven con su jefe', async () => {
+      const vigentes = await leerRevisores(conFilas([38, 39, 3, 8].map((userId) => ({ userId, revisorId: 7 }))), 1);
+      expect(vigentes).toEqual([]);
+      const r = conRevisores(org, vigentes);
+      expect(r.find((u) => u.id === 38)?.managerId).toBe(1);
+      expect([...(cadenasDeMando(r, [38]).get(38) ?? [])]).toEqual([1]);
+    });
+
+    it('dirección sí puede revisarlos por encargo, y a quien no es encargado se le puede delegar', async () => {
+      const filas = [{ userId: 38, revisorId: 35 }, { userId: 61, revisorId: 7 }];
+      await expect(leerRevisores(conFilas(filas), 1)).resolves.toEqual(filas);
+    });
+
+    it('si no se pueden leer los roles, manda el organigrama', async () => {
+      const prisma = { ...conFilas([{ userId: 38, revisorId: 7 }]), user: { findMany: async () => { throw new Error('sin base'); } } };
+      await expect(leerRevisores(prisma, 1)).resolves.toEqual([]);
+    });
+  });
+
   it('sin revisores manda el organigrama, y si la tabla falla también', async () => {
     expect(conRevisores(org, [])).toBe(org);
     await expect(leerRevisores({}, 1)).resolves.toEqual([]);
