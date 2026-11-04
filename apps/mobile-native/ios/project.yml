@@ -28,11 +28,11 @@ settings:
     # La versión real la inyecta el flujo de trabajo por línea de órdenes
     # (`MARKETING_VERSION` de la entrada, `CURRENT_PROJECT_VERSION` del número
     # de ejecución). Estos valores solo sirven para compilar en local.
-    MARKETING_VERSION: "1.0.0"
+    MARKETING_VERSION: "1.4"
     # Mayor que 1.0.0 (3) ya subida a TestFlight. El 4 no llegó a subirse
     # (el paso quedó en verde sin acuse). El tag ios-testflight-* no
     # reescribe este número: Info.plist lleva el mismo CFBundleVersion.
-    CURRENT_PROJECT_VERSION: "5"
+    CURRENT_PROJECT_VERSION: "16"
 
 packages:
   SocketIO:
