@@ -734,6 +734,17 @@ export class AuthService {
       set.add(PERMISSIONS.GPS_VIEW);
     }
 
+    // Lo de pedir es de todo el personal (Adam, 04-11-2026): herramienta, vehículo y viático. Autorizar,
+    // entregar y dar de alta siguen en cada rol. Dirección no pide, y un cliente no es personal.
+    if (roleKey !== 'ceo' && roleKey !== 'super_admin' && roleKey !== 'cliente') {
+      set.add(PERMISSIONS.TOOLS_VIEW);
+      set.add(PERMISSIONS.TOOLS_REQUEST);
+      set.add(PERMISSIONS.VEHICLES_VIEW);
+      set.add(PERMISSIONS.VEHICLES_REQUEST);
+      set.add(PERMISSIONS.VIATICS_VIEW);
+      set.add(PERMISSIONS.VIATICS_CREATE);
+    }
+
     // ── Ingeniero de soporte — ejecuta OT asignadas (no asigna ni administra) ──
     if (roleKey === 'ing_soporte') {
       set.add(PERMISSIONS.CONSOLE_ACCESS);

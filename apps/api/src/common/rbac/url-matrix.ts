@@ -250,6 +250,12 @@ export const CORE_RECURSOS_URL_RULES: UrlRule[] = [
   { path: '/api/vehicles/inventory/*/return', methods: ['POST'], scope: 'write' },
   { path: '/api/vehicles/ficha/leer-foto', methods: ['POST'], scope: 'write' },
   { path: '/api/vehicles/ficha/*/cargas', methods: ['POST'], scope: 'write' },
+  // Viáticos: todo el personal pide, reparte y comprueba lo suyo (el servicio lo revisa). Autorizar y
+  // asignar siguen aparte. El arquitecto no podía ni abrirlos, y nadie de campo podía repartir.
+  { path: '/api/viatics', methods: ['GET', 'POST'], scope: 'write' },
+  { path: '/api/viatics/*', methods: ['GET'], scope: 'read' },
+  { path: '/api/viatics/*/comprobar', methods: ['PATCH'], scope: 'write' },
+  { path: '/api/viatics/*/reparto', methods: ['PUT'], scope: 'write' },
 ];
 
 /**
@@ -614,6 +620,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR ADMINISTRATIVO — finanzas, compras, RH (alto nivel)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_ADMIN]: [
+    ...CORE_RECURSOS_URL_RULES,
     ...SALIDA_DE_OTRO_URL_RULES,
     ...COSTOS_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
