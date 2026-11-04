@@ -18,11 +18,26 @@ export type FiltroEquipo = EstadoAro | "todos";
  * Regla 7: sin nadie en el tablero, una fila de ceros no informa y no se pinta;
  * lo que ayuda ahí es el vacío con el primer paso, no cuatro ceros encima.
  */
-export default function ResumenEquipo({ users }: { users: readonly TeamBoardUser[] }) {
+export default function ResumenEquipo({
+  users,
+  cola,
+  onRevisar,
+}: {
+  users: readonly TeamBoardUser[];
+  /** Lo que sigue sin revisar, de cualquier fecha. Sin esto, lo entregado en el periodo que se está viendo. */
+  cola?: { teTocan: number; deOtros: number } | null;
+  onRevisar?: () => void;
+}) {
   if (users.length === 0) return null;
   const r = resumenEquipo(users);
-  const espera = users.reduce((n, u) => n + (u.enEsperaAprobacion ?? 0), 0);
+  const espera = cola ? cola.teTocan + cola.deOtros : users.reduce((n, u) => n + (u.enEsperaAprobacion ?? 0), 0);
   const corrigiendo = users.filter((u) => (u.enCorreccion ?? 0) > 0).length;
+  const pistaEspera =
+    cola && cola.deOtros > 0
+      ? `${cola.teTocan} te ${cola.teTocan === 1 ? "toca" : "tocan"} · ${cola.deOtros} con sus jefes`
+      : corrigiendo > 0
+        ? `${corrigiendo} corrigiendo evidencia`
+        : "entregadas que nadie ha aprobado";
   // «2 atrasados · 9 sin nada asignado · 3 sin entrada»: sin ceros.
   const desgloseRetraso = desglose(r);
 
@@ -59,7 +74,8 @@ export default function ResumenEquipo({ users }: { users: readonly TeamBoardUser
         label="Esperan revisión"
         value={espera}
         tone={espera > 0 ? "brand" : "default"}
-        hint={corrigiendo > 0 ? `${corrigiendo} corrigiendo evidencia` : "entregadas que nadie ha aprobado"}
+        hint={pistaEspera}
+        onClick={espera > 0 ? onRevisar : undefined}
         icon={<RateReviewOutlinedIcon />}
         iconTone={espera > 0 ? "violet" : "neutral"}
       />

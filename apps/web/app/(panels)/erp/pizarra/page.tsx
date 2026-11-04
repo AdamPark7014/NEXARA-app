@@ -636,7 +636,11 @@ export default function PizarraPage() {
         stats={
           verEquipo && data ? (
             <>
-              <ResumenEquipo users={users} />
+              <ResumenEquipo
+                users={users}
+                cola={revisiones ? { teTocan: porRevisar, deOtros: revisiones.pendientes.length - porRevisar } : null}
+                onRevisar={() => cambiarVista("revision")}
+              />
               {/* «Desde hace cuánto» es de hoy: con otros rangos el panel no aplica. */}
               {preset === "hoy" ? (
                 <AtencionEquipo users={users} ahora={updatedAt ?? undefined} asignarHref={asignarA} />
