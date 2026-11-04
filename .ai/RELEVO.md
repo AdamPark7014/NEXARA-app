@@ -1,5 +1,34 @@
 # RELEVO
 
+- **03-11 (claude-code) — Los avisos en vivo de asistencia y de proyectos se quedan en su empresa (`e364ac81`). En producción. Sin migración.**
+  - **Qué pasaba:** `attendance:updated`, `attendance:notification` y `projects:changed` salían con `emit()`, al personal de todas las empresas. Los portales ya estaban fuera. Hoy la otra empresa es una cuenta de revisión, así que no hay daño conocido.
+  - **Más de lo que se había visto:** `User` no está en `TENANT_SCOPED_MODELS`, así que la consulta de administradores de `emitAttendanceUpdate` traía a los de todas las empresas. Cada checada mandaba a todo el personal una copia con nombre y correo por cada uno de ellos.
+  - **Cómo quedó:**
+    | Aviso | Lleva | Va a |
+    |---|---|---|
+    | `attendance:updated` | Id de la persona y tipo | Personal de la empresa de la fila (`tenantId`), no de la empresa de la persona: quien está en dos checa en la que eligió |
+    | `attendance:notification` | Nombre y correo | Sala privada de cada administrador de esa empresa. Ya traía `adminId`: era para una persona, y con `emitToCompany` a toda la empresa le seguiría llegando el correo de sus compañeros. La consulta ahora pide `companyMemberships`; sin eso, `emitToUser` le entregaría la checada a un administrador de otra empresa |
+    | `projects:changed` | El proyecto completo | Personal de la empresa de la fila. Al borrar, la fila leída antes: `delete` regresa `{ count }` |
+  - **Quién los escucha:** `attendance:updated`, `erp/asistencias/page.tsx` (pestaña de equipo) y `AttendanceHierarchyStats`. Los otros dos, nadie: ni la web, ni Android, ni iOS. La web no usa `onAny`.
+  - **El selector de empresa:** el socket entra solo a la sala de su empresa por defecto. Medido con una persona en las dos: ya no recibe en vivo `attendance:updated` ni `projects:changed` de la otra; `attendance:notification` sí, porque va por persona. `entity:updated` ya era así. La pantalla no se queda vieja: la pestaña de equipo consulta cada 15 s, las estadísticas cada 30 s, y las dos al volver a la pestaña. Hoy nadie lo nota: el selector está oculto (`CORE_SURFACE_ONLY`; `NEXT_PUBLIC_CORE_SURFACE_ONLY` no está definida), cada persona activa está en una sola empresa y ninguna tiene `super_admin`.
+  - **Una prueba lo vigila:** `difusion-general.spec.ts` revisa el código y falla si otro aviso con datos sale por `emit()`. Solo queda `entity:updated`, que sale sin datos.
+  - **Verificado:**
+    - `avisos-por-empresa.spec.ts`, `proyectos-por-empresa.spec.ts` y `difusion-general.spec.ts`, con `RealtimeGateway` de verdad: de 18, 14 fallaban contra el código anterior, por la razón esperada (sala `staff`), y las 18 pasan. Las otras 4 fijan lo que no debía cambiar. Ninguna prueba existente cambió. API 5,638 y tipos en verde. CI completo en verde en `e364ac81`.
+    - `AppModule` real, HTTP real, sockets reales y Postgres desechable con dos empresas, antes y después, sobre la punta `df70b7a3`: 16 flujos con 7 sockets (personal y administrador de cada empresa, un portal de cada una, y una persona en las dos). Los cinco caminos de la checada: entrada, salida, deshacer, por su jefe y sugerida por un acceso; y alta, cambio y baja de proyectos, en las dos empresas. Todos respondieron 200 o 201; la sugerida se pidió al servicio porque no tiene ruta. Antes llegaba a todos los sockets de personal; después, solo a su empresa. Los portales no reciben nada, antes ni después. El aviso sigue a la fila: quien está en las dos y checa en la otra avisa solo a esa.
+    - En producción, con el código desplegado y solo lecturas: el `dist` trae los avisos con su nuevo destino y el filtro; sin errores de arranque ni `Error emitting attendance notifications`, y sin 5xx en Traefik en los 10 minutos siguientes. La consulta nueva contra los datos reales: cada administrador sale solo en la empresa a la que pertenece y no se pierde ninguno, porque por empresa suman lo mismo que la consulta anterior.
+  - **Sin verificar:** una checada real en producción con un navegador conectado. A esta hora no hay checadas y no se crean filas de prueba en la base real. Lo mismo un proyecto. Quedó medido en la base desechable. Para confirmarlo tras la primera checada del día: `docker logs nexara-api 2>&1 | grep -c "Error emitting attendance notifications"` debe dar 0, y la pestaña de equipo de Asistencias debe seguir refrescando.
+  - **Visto y sin tocar:**
+    - `attendance:notification` no tiene quien lo escuche y cuesta una consulta por checada. Se dejó porque el encargo era acotarlo. Si nadie lo va a usar, se puede quitar.
+    - `registerSuggestedAcsEntry` no tiene quien la llame.
+    - Ninguna pantalla llama `POST projects`. Por multipart, una lista con un solo valor da 400: `parseListFields` la convertiría, pero el `ValidationPipe` la rechaza antes.
+    - `projects:changed` de baja lleva `{ count }` en `project`: no dice cuál se borró.
+    - `attendance:updated` y `projects:changed` llegan a todo el personal de la empresa, tenga o no permiso de verlo. Igual que `contacts:changed`.
+    - La rama de `emit()` hacia `SALA_PERSONAL` quedó sin uso: `entity:updated` sale por la suya.
+  - **Trampas:**
+    - Antes de mandar con `emitToUser` a una lista sacada de `User`, filtrar por `companyMemberships`: esa tabla no se filtra sola.
+    - `pg_isready` contesta por cualquier servidor en ese puerto. Aquí el 55461 ya era de otra sesión: el `pg_ctl` propio falló sin avisar y `createdb` cayó en el servidor ajeno. Revisar con `show data_directory`.
+    - La copia de `git archive` en Windows trae CRLF y la historia va en LF: `git hash-object --path` lo corrige, pero un reemplazo de texto en la copia tiene que contar con `\r\n`.
+
 - **03-11 (claude-code) — La lista completa de Studio ya pide permiso de Studio (`df70b7a3`). En producción. Sin migración.**
   - **Qué pasaba:** `GET studio/page-content` entregaba las filas completas de la empresa, con `draftContent` y `updatedBy`, a cualquier token firmado: clientes y sucursales del portal, y personal sin permiso de Studio. `sections` tenía la misma guardia, aunque solo da nombres. Hoy no hay ningún portal con correo en producción y ningún borrador difiere de lo publicado, así que no hay daño conocido.
   - **Qué se hizo:** las dos rutas piden lo mismo que `:section/draft`: `AuthGuard('jwt')`, `RbacGuard` y `@RBAC({ anyPermissions: [STUDIO_CONTENT_MANAGE, PANEL_WEB, CONSOLE_ADMIN] })`.
