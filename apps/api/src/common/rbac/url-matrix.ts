@@ -1382,6 +1382,14 @@ export const ALMACEN_POR_CORREO_URL_RULES: UrlRule[] = [
 ];
 
 /**
+ * Herramientas concedidas por persona (`tool-requests/tools-access.ts`): dar de alta, corregir y
+ * llevar préstamos. Sin borrar: eso sigue siendo de dirección.
+ */
+export const HERRAMIENTAS_POR_CORREO_URL_RULES: UrlRule[] = [
+  { path: '/api/tool-requests/**', methods: ['GET', 'POST', 'PUT', 'PATCH'], scope: 'write' },
+];
+
+/**
  * Mesa contable concedida por persona (`accounting/mesa-contable/mesa-por-correo.ts`): el dinero de
  * la empresa y sus bancos. No lleva `/api/employee-payments`: Nómina no se abre por aquí.
  */

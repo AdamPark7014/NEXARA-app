@@ -1,5 +1,23 @@
 # RELEVO
 
+- **04-11 (claude-code) — Iván ya puede dar de alta y mover almacén (`RbacGuard`). En producción. Sin migración. Inventario de las apps hecho; lo demás espera a Adam.**
+  - **Qué pasaba:** desde el 07-10 Iván tiene el almacén por correo, pero solo `UrlAccessGuard` conocía la excepción. Las rutas que escriben también pasan por `RbacGuard`, que le contestaba 403. Medido con las guardas reales: ni consultar existencias podía. Tampoco `PUT` de herramientas.
+  - **Cómo quedó:** `RbacGuard` usa `ALMACEN_POR_CORREO_URL_RULES` y la nueva `HERRAMIENTAS_POR_CORREO_URL_RULES`, que no incluye borrar. El permiso del endpoint se sigue exigiendo. Prueba: `common/rbac-por-persona.spec.ts`.
+  - **Lo que encontró el inventario, para quien siga:**
+    - Las dos tiendas ya tienen la 1.3: la falta de funciones no es por versión vieja.
+    - En Core nunca se ha capturado ningún producto, herramienta, préstamo, pago o solicitud de vehículo: esas pantallas están vacías de verdad.
+    - `Aprobaciones` solo lee `workflow/my-pending`, que nunca ha tenido filas. Las evidencias van por `me/revisiones`, y ninguna app usa `me/revisiones/aprobar-lote`.
+    - `Proyectos`, `Pagos`, `Cotizaciones` y `KPIs` no tienen acciones en las apps. `GET proyectos/:id` ya lo pueden leer todos los perfiles medidos.
+    - Pedir préstamo: la guarda deja a dirección, Iván, David y `ing_campo`; `assertCanCreateToolLoan` solo a David y José Antonio, y a José Antonio lo frena la guarda. Queda David.
+    - Vehículos: `POST` y `PATCH` solo dirección y `coord_operaciones`, aunque las apps le ofrecen Salida y Regreso a todos.
+    - «Pedir viático» sale al CEO y el servicio se lo niega. Las apps no tienen `viatics/assign`.
+    - Inicio, Actividades y varias reglas deciden por correo (`isCeoEquivalentEmail`): `developer@` no ve lo que ve `gerencia@`.
+  - **Cómo se midió:** spec desechable con `RbacGuard` y `UrlAccessGuard` reales sobre cada ruta de diez controladores y nueve personas. Las reglas dentro de los servicios no entran en esa cuenta.
+  - **Trampas:**
+    - `ios-static-check` no ve inicializadores incompletos: el campo nuevo en `LunchRecord` rompió la compilación de iOS (`f968dd73`) y solo lo dijo el flujo de capturas. Revisar todos los flujos antes de dar por buena una tanda de iOS.
+    - `esperar-ci.py` puede dar «rate limit» de GitHub. `gh` sí va autenticado.
+  - **Falta:** la tabla por rol está en un artifact privado esperando su visto bueno; nada de eso se construyó todavía.
+
 - **04-11 (claude-code) — Ola 6, gente proactiva: «¿Qué sigue?», Mis pendientes y foto del escritorio. En producción y oculta; falta el sí de Adam (`cee257d2`, `647d3f70`, `631649f6`, `f71a2122`). Migración `20261104120000_que_sigue_y_foto_escritorio` aplicada.**
   - **Qué es:** quien no trae nada corriendo ve hasta 5 sugerencias de su área, en Mis actividades y en Mi día de las apps. «Empezar» crea la actividad a su nombre y arranca el reloj, sin escribir nada. Sin IA: las arma `me/que-sigue.ts`, función pura.
   - **Orden de las sugerencias:** abiertas, pendientes, cotización por vencer, contacto de la página sin dueño, revisar, obra, banco, seguir la última, lista fija. La lista fija por área vive en el código (`LISTA_FIJA`).
