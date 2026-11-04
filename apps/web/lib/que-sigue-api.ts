@@ -29,6 +29,9 @@ export type Arrancada = { activityId: number; iniciada: boolean };
 
 export const fetchQueSigue = (token: string) => erpFetch<QueSigue>("me/que-sigue", token);
 
+/** Solo dirección: lo que le saldría a otra persona, sin sus pendientes. */
+export const fetchQueSigueDe = (token: string, userId: number) => erpFetch<QueSigue & { nombre: string }>(`me/que-sigue/de/${userId}`, token);
+
 export const empezarSugerencia = (token: string, clave: string) =>
   erpFetch<Arrancada>("me/que-sigue/empezar", token, { method: "POST", body: JSON.stringify({ clave }) });
 
