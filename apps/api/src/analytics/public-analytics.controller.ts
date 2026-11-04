@@ -3,6 +3,7 @@ import { AnalyticsService } from './analytics.service.js';
 import { RecordPublicLandingEventDto } from './dto/record-public-landing-event.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 @Controller('public-analytics')
 export class PublicAnalyticsController {
@@ -17,8 +18,8 @@ export class PublicAnalyticsController {
   @Get('summary')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.BI_VIEW] })
-  summary(@Query('days') days?: string) {
+  summary(@CurrentCompanyId() companyId: number | null, @Query('days') days?: string) {
     const parsed = Number(days);
-    return this.svc.getPublicLandingSummary(Number.isFinite(parsed) && parsed > 0 ? parsed : 30);
+    return this.svc.getPublicLandingSummary(companyId, Number.isFinite(parsed) && parsed > 0 ? parsed : 30);
   }
 }
