@@ -1,5 +1,23 @@
 # RELEVO
 
+- **03-11 (claude-code) — Ningún encargado de área queda a cargo de otro, José Antonio ya cotiza, y «Esperan revisión» dice qué cuenta (`cdd4f824`, `596dd1a0`, `0eabdd94`). En producción.**
+  - Adam: «Sí, que cotice»; «los encargados de área no debe Luis estar a cargo de ellos»; «a Christian le aparecen 4 en espera de revisión y hay demasiados».
+  - **Por qué a Luis le llegaba Daniela:** no fue el organigrama, donde todos reportan a Christian y Luis no tiene a nadie. Fueron las filas de `revisores_evidencia` de la Ola 5. Adam eligió a Luis Joel en la muestra, por recomendación de este agente, que no le señaló que esas tres personas son encargadas de área.
+  - **La regla:** `revisoresVigentes`, dentro de `leerRevisores`: a un encargado de área solo lo revisa por encargo dirección; si la fila dice otra cosa, no cuenta y manda su jefe por organigrama. Como todos leen de ahí, cambian juntos avisos, cola, permiso de aprobar, escaladas, `ceo-brief` y dirección. Encargado = `ROLES_ENCARGADOS_DE_AREA`.
+  - **Filas y avisos:** las tres filas siguen en la tabla, sin efecto; borrarlas al decidir Adam quién revisa. Los avisos sin leer de esas personas en la bandeja de Luis se marcaron como leídos. Luis no alcanzó a revisar ninguna, así que no hay nada que deshacer.
+  - **Lo pendiente no se perdió:** la cola se calcula en cada petición y volvió con Christian. Ninguna evidencia quedó sin revisor; comprobado con el código desplegado.
+  - **Los dos números:**
+    - La pestaña «En espera de revisión» es lo que le toca a quien mira. Decía poco porque lo delegado a Luis no contaba.
+    - La tarjeta «Esperan revisión» sumaba solo lo entregado en el periodo a la vista (`enEsperaAprobacion`). Ahora es toda la cola, de cualquier fecha, dice «N te tocan · M con sus jefes» y abre la revisión. Sin la cola cargada, cae al cálculo anterior. La marca por persona sigue por periodo.
+  - **José Antonio:** `enc_soporte` entró a `ROLES_ENCARGADOS_DE_AREA` y a `COTIZACIONES_CORE_PATHS`; le aparece Cotizaciones en el menú. Ve costos y puede enviar. Las apps muestran cotizaciones por el permiso.
+  - **«Asignar con IA» no cambia:** `quien-asigna.ts` lee `managerId` y `extrasDeAsignacion`, no la tabla de revisores. Luis lo conserva por pasarle trabajo a José Antonio.
+  - **Decisión pendiente de Adam:** quién revisa a los encargados. Hoy es Christian, por organigrama, y eso choca con que no haga casi nada. La regla ya deja delegarlos a dirección.
+  - **Va a pasar:** el plazo de 24 h de David y José Antonio se cumple el 04-11 a las 6:00 (`REVISION_POR_JEFE_DESDE`). Lo que no hayan revisado sube a la cola de Christian y la pestaña crece. Es la regla de la Ola 1, no un error.
+  - **`extrasDeAsignacion` no se tocó:** Luis puede repartirle a José Antonio, otro encargado, y revisa lo que reparte si queda encima en la cadena. Hoy no hay nada así pendiente. Si Adam lo quiere fuera, es otro cambio.
+  - **Verificado:** por DOM en producción con la sesión de Christian, sin guardar nada: pestaña, tarjeta con su desglose, «Tu día», «Por encargado» sin Luis, Hoy sin `?muestra=1` y sin «cotizaciones sin marcar». Pruebas de `me`, `activities/evidence`, `executive`, `rbac` y `pizarra`, y tipos de API y web en verde. CI completo en verde en `581fbd8c`, que ya los incluye.
+  - **Sin verificar:** José Antonio con su propia sesión; se calculó su menú y su acceso con el código real. Nadie ha revisado una evidencia desde el 30-10, así que el flujo no se ha visto con la gente.
+  - **Trampas:** `buildUserSidebar` es `(panel, user)`. Al leer `notifications`, la columna es `readAt`; `audit_logs` usa `entityType`.
+
 - **03-11 (claude-code) — El tráfico del sitio se queda en la empresa del sitio y su resumen ya no sale vacío (`6dcb63e1`). En producción. Adam: «Sí, arréglalo». Sin migración. Sigue sin haber pantalla que lo enseñe.**
   - **Qué pasaba:** `recordPublicLandingEvent` pedía `companyId: null`, pero el `create` corría con el filtro de la petición y caía en la empresa de esa petición. El resumen buscaba `companyId IS NULL`, así que siempre salía vacío. Y una cabecera `X-Company-Id` sin sesión podía meter filas en otra empresa.
   - **Arreglo:**
@@ -206,7 +224,7 @@
 
 - **03-11 (claude-code) — Programa Velocidad Core, Ola 5: Luis Joel ya revisa por encargo; Dirección, Mi área, Obra y la cotización abierta visibles desde el 03-11, con el sí de Adam (`f04f37d2`, `45c8b3ec`, `86300b66`, `df8497c7`, `2b07685f`, `9e8a4583`).**
   - Adam aprobó con «Sí, arranca Ola 5» y «Sí, constrúyelo». Eligió a Luis Joel para revisar a Daniela, Mónica y Paulina. No contestó si quien recibe una cotización ve costo y margen: se tomó la recomendación, que no los ve, y se le dijo.
-  - **Ya activo, sin bandera:** `revisores_evidencia` (`me/revision-evidencias.ts`). La evidencia de esas personas le llega a Luis Joel sin moverlas de organigrama; lo usan `pendingReviews`, los avisos, las escaladas y `ceo-brief`.
+  - **Corregido el mismo día:** `revisores_evidencia` (`me/revision-evidencias.ts`) mandaba la evidencia de esas personas a Luis Joel. Adam pidió que ningún encargado de área quede a cargo de él: ver la entrada de arriba. Lo usan `pendingReviews`, los avisos, las escaladas y `ceo-brief`.
   - **Dónde se ve:** `/erp/executive` (solo CEO), `/erp/pizarra?vista=equipo` (botón Mi área), `/erp/proyectos` (botón Obra, a quien la API deja pasar) y Seguimiento de una cotización (pedir apoyo). `DIRECCION_VISIBLE` en `web/lib/direccion-api.ts` está en `true`; en `false` esconde todo eso y queda `?muestra=1` para revisarlo.
   - **Destapado:** Adam revisó y contestó «Sí, déjala visible». Con eso, «cotizaciones vigentes sin marcar» salió de `executive/ceo-brief.ts`, como pedía la muestra: le toca a quien las hizo, y dirección lo ve en el cuadro del módulo.
   - **Qué hay:**
@@ -221,7 +239,7 @@
     - Arnés local a 1536 y 375 px, sin desborde de página; las tablas se desplazan dentro de su marco. 36 pruebas de lo tocado y tipos de API y web en verde. CI completo en verde en `9e8a4583`, con iOS y Android, que no cambiaron.
   - **Sin verificar:** la pantalla ya destapada sin `?muestra=1`, porque Chrome se desconectó al terminar el despliegue. Lo comprobado: `9e8a4583` en el servidor, la bandera en `true` en el paquete de la web y la API sin `sinEnviar`; las mismas pantallas ya se habían leído en producción con `?muestra=1`. Nadie ha usado la cotización abierta en la interfaz, ni con la pantalla de edición abierta. Modo oscuro: el arnés no cambió de tema. Captura de producción: Chrome da `innerWidth` 0.
   - **Seguridad, resuelto (`c059af10`, Adam: «Sí, quítaselo»):** `ing_soporte` tenía `COTIZACIONES_ACCESS` en la API por la decisión del 20-09, cuando José Antonio tenía ese rol. Solo la web lo frenaba: con su sesión se podían ver costos, enviar y ganar. Salió de `ROLES_ENCARGADOS_DE_AREA` y de la matriz de URLs, y aplica a las cuatro personas con ese rol. Nadie con él ha creado ni tiene asignada una cotización. Comprobado con el código desplegado, sin entrar como ellas; los permisos se calculan en cada petición, así que no hace falta volver a entrar. Spec: `cotizan-encargados-de-area.spec.ts`.
-  - **Decisión pendiente de Adam:** José Antonio (`enc_soporte`) tampoco entra a Cotizaciones: su matriz de URLs lo deja pero `puedeCotizar` y la web no, aunque la decisión del 20-09 dice que cotizan los encargados de área. Ya era así y no se cambió.
+  - **José Antonio (`enc_soporte`) tampoco entraba a Cotizaciones**, aunque la decisión del 20-09 dice que cotizan los encargados de área. Adam: «Sí, que cotice»; ver la entrada de arriba.
   - **Si una actividad comercial llega a `ing_soporte`:** su detalle pide cotizaciones (`CotizacionDeActividad`) y ahora enseña el error de permiso. No hay ninguna hoy, ni ha habido.
   - **Visto y sin tocar:** `POST cotizaciones/:id/paquetes` borra costo y margen de las demás partidas; el autoguardado pierde `productCtId`, `ieps` y `retention` (`cotizacion-documento.ts`); `partidas-frecuentes` enseña costos de otras cotizaciones.
   - **Corrección de la Ola 4:** el Chrome conectado tiene abierta la sesión de **Christian**, no la de Adam («Buenos días, Christian»). Donde dice «sesión de Adam», revisar quién era. Solo lectura ahí: cualquier escritura queda a nombre de Christian.
