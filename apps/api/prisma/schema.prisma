@@ -5598,7 +5598,7 @@ model KpiSnapshot {
   periodStart DateTime        @db.Date
   periodEnd   DateTime        @db.Date
   metadata    Json?
-  /// Null only for PUBLIC_TRAFFIC (landing anónima). KPIs de producto exigen companyId.
+  /// Null solo en el resumen global del cron (`hourly_summary`). El tráfico público lleva la empresa del sitio.
   companyId   Int?
   createdAt   DateTime        @default(now())
   company     CompanyProfile? @relation(fields: [companyId], references: [id], onDelete: Cascade)

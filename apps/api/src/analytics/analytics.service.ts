@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { RecordPublicLandingEventDto } from './dto/record-public-landing-event.dto.js';
-import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { companyWhere, requireCompanyId, resolvePublicCompanyId } from '../common/tenant/tenant-scope.js';
 import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 import { OPEN_ACTIVITY_WHERE, finishedStatusSqlList } from '../activities/activity-status.js';
 import { kpiFallback } from '../common/kpi-fallback.js';
@@ -22,44 +22,43 @@ export class AnalyticsService {
   async recordPublicLandingEvent(dto: RecordPublicLandingEventDto) {
     const now = new Date();
     const key = this.normalizeLandingKey(dto.landingKey || 'unknown');
+    // El tráfico es de la empresa del sitio. Con ella puesta, la que venga en `X-Company-Id` no la cambia.
+    const companyId = await withTenantBypassAsync(() => resolvePublicCompanyId(this.prisma));
 
-    return withTenantBypassAsync(() =>
-      this.prisma.kpiSnapshot.create({
-        data: {
-          kpiName: `landing:${key}`,
-          kpiCategory: 'PUBLIC_TRAFFIC',
-          value: new Prisma.Decimal(1),
-          unit: dto.eventType,
-          periodStart: now,
-          periodEnd: now,
-          companyId: null,
-          metadata: {
-            eventName: dto.eventName || null,
-            landingPath: dto.landingPath || null,
-            referrer: dto.referrer || null,
-            ...(dto.metadata || {}),
-          },
+    return this.prisma.kpiSnapshot.create({
+      data: {
+        kpiName: `landing:${key}`,
+        kpiCategory: 'PUBLIC_TRAFFIC',
+        value: new Prisma.Decimal(1),
+        unit: dto.eventType,
+        periodStart: now,
+        periodEnd: now,
+        companyId,
+        metadata: {
+          eventName: dto.eventName || null,
+          landingPath: dto.landingPath || null,
+          referrer: dto.referrer || null,
+          ...(dto.metadata || {}),
         },
-      }),
-    );
+      },
+    });
   }
 
-  async getPublicLandingSummary(days: number = 30) {
+  async getPublicLandingSummary(companyId: number | null | undefined, days: number = 30) {
+    const tenantId = requireCompanyId(companyId);
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const rows = await withTenantBypassAsync(() =>
-      this.prisma.$queryRaw<Array<{ landing: string; event: string | null; total: bigint }>>`
-        SELECT
-          "kpiName" AS landing,
-          "unit" AS event,
-          COUNT(*)::bigint AS total
-        FROM "kpi_snapshots"
-        WHERE "kpiCategory" = 'PUBLIC_TRAFFIC'
-          AND "companyId" IS NULL
-          AND "createdAt" >= ${since}
-        GROUP BY "kpiName", "unit"
-        ORDER BY total DESC
-      `,
-    );
+    const rows = await this.prisma.$queryRaw<Array<{ landing: string; event: string | null; total: bigint }>>`
+      SELECT
+        "kpiName" AS landing,
+        "unit" AS event,
+        COUNT(*)::bigint AS total
+      FROM "kpi_snapshots"
+      WHERE "kpiCategory" = 'PUBLIC_TRAFFIC'
+        AND "companyId" = ${tenantId}
+        AND "createdAt" >= ${since}
+      GROUP BY "kpiName", "unit"
+      ORDER BY total DESC
+    `;
 
     const summaryMap = new Map<string, { views: number; clicks: number; conversions: number }>();
 
