@@ -1,6 +1,9 @@
 package mx.nexara.mobile.nativeapp.data.api
 
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
@@ -28,6 +31,17 @@ interface CoreExtrasApi {
 
     @GET("proyectos")
     suspend fun proyectos(): List<ProyectoResumenDto>
+
+    /** Todo el proyecto: etapas, alcance, requerimientos, equipo, documentos y actividades. */
+    @GET("proyectos/{id}")
+    suspend fun proyecto(@Path("id") id: Long): ProyectoDetalleDto
+
+    /** Pide `activities.manage`. Cancelar exige motivo; contesta el proyecto ya cambiado. */
+    @PATCH("proyectos/{id}/estado")
+    suspend fun cambiarEstadoProyecto(
+        @Path("id") id: Long,
+        @Body cuerpo: CambiarEstadoProyectoRequest,
+    ): ProyectoDetalleDto
 
     @GET("stock/levels")
     suspend fun stockLevels(): List<StockLevelDto>
@@ -316,6 +330,88 @@ data class ProyectoResumenSaludDto(
     val avance: ProyectoAvanceDto? = null,
     val requerimientos: ProyectoRequerimientosDto? = null,
     val estadoEtiqueta: String? = null,
+)
+
+/** Una etapa del cronograma. */
+data class ProyectoEtapaDto(
+    val id: Long? = null,
+    val name: String? = null,
+    val description: String? = null,
+    val orden: Int? = null,
+    val plannedDate: String? = null,
+    val actualDate: String? = null,
+    val status: String? = null,
+    val responsable: ProyectoPersonaDto? = null,
+)
+
+/** Un renglón del alcance: `kind` es ENTREGABLE, EXCLUSION o SUPUESTO. */
+data class ProyectoAlcanceDto(
+    val id: Long? = null,
+    val kind: String? = null,
+    val titulo: String? = null,
+    val detalle: String? = null,
+    val orden: Int? = null,
+)
+
+data class ProyectoRequerimientoDto(
+    val id: Long? = null,
+    val titulo: String? = null,
+    val detalle: String? = null,
+    val status: String? = null,
+    val dueDate: String? = null,
+    val responsable: ProyectoPersonaDto? = null,
+)
+
+data class ProyectoMiembroDto(
+    val id: Long? = null,
+    val rolEtiqueta: String? = null,
+    val role: String? = null,
+    val user: ProyectoPersonaDto? = null,
+)
+
+data class ProyectoDocumentoDto(
+    val id: Long? = null,
+    val nombre: String? = null,
+    val fileUrl: String? = null,
+    val kind: String? = null,
+)
+
+data class ProyectoActividadDto(
+    val id: Long? = null,
+    val anNumber: String? = null,
+    val titulo: String? = null,
+    val estatus: String? = null,
+    val branchName: String? = null,
+    val fechaEntregaEsperada: String? = null,
+    val responsable: ProyectoPersonaDto? = null,
+)
+
+/** `GET proyectos/:id`. */
+data class ProyectoDetalleDto(
+    val id: Long? = null,
+    val title: String? = null,
+    val description: String? = null,
+    val objective: String? = null,
+    val scopeSummary: String? = null,
+    val status: String? = null,
+    val startDate: String? = null,
+    val endDate: String? = null,
+    val actualEndDate: String? = null,
+    val cancelReason: String? = null,
+    val client: ProyectoClienteDto? = null,
+    val responsable: ProyectoPersonaDto? = null,
+    val resumen: ProyectoResumenSaludDto? = null,
+    val milestones: List<ProyectoEtapaDto>? = null,
+    val scopeItems: List<ProyectoAlcanceDto>? = null,
+    val requirements: List<ProyectoRequerimientoDto>? = null,
+    val members: List<ProyectoMiembroDto>? = null,
+    val documents: List<ProyectoDocumentoDto>? = null,
+    val activities: List<ProyectoActividadDto>? = null,
+)
+
+data class CambiarEstadoProyectoRequest(
+    val status: String,
+    val cancelReason: String? = null,
 )
 
 data class ProyectoResumenDto(

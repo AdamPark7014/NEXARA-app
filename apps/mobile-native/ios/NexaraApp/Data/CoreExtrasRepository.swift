@@ -593,6 +593,76 @@ struct ProyectoResumenSalud: Decodable, Hashable {
     }
 }
 
+struct ProyectoEtapa: Decodable, Identifiable, Hashable {
+    let id: Int
+    let name: String?
+    let orden: Int?
+    let plannedDate: String?
+    let actualDate: String?
+    let status: String?
+    let responsable: ProyectoRefPersona?
+}
+
+struct ProyectoAlcance: Decodable, Identifiable, Hashable {
+    let id: Int
+    let kind: String?
+    let titulo: String?
+    let detalle: String?
+    let orden: Int?
+}
+
+struct ProyectoRequerimiento: Decodable, Identifiable, Hashable {
+    let id: Int
+    let titulo: String?
+    let status: String?
+    let dueDate: String?
+    let responsable: ProyectoRefPersona?
+}
+
+struct ProyectoMiembro: Decodable, Identifiable, Hashable {
+    let id: Int
+    let rolEtiqueta: String?
+    let role: String?
+    let user: ProyectoRefPersona?
+}
+
+struct ProyectoDocumento: Decodable, Identifiable, Hashable {
+    let id: Int
+    let nombre: String?
+}
+
+struct ProyectoActividad: Decodable, Identifiable, Hashable {
+    let id: Int
+    let anNumber: String?
+    let titulo: String?
+    let estatus: String?
+    let branchName: String?
+    let fechaEntregaEsperada: String?
+    let responsable: ProyectoRefPersona?
+}
+
+/// `GET proyectos/:id`. Todo opcional: un campo que falte no tumba la pantalla.
+struct ProyectoDetalle: Decodable, Hashable {
+    let id: Int?
+    let title: String?
+    let description: String?
+    let objective: String?
+    let status: String?
+    let startDate: String?
+    let endDate: String?
+    let actualEndDate: String?
+    let cancelReason: String?
+    let client: ProyectoRefCliente?
+    let responsable: ProyectoRefPersona?
+    let resumen: ProyectoResumenSalud?
+    let milestones: [ProyectoEtapa]?
+    let scopeItems: [ProyectoAlcance]?
+    let requirements: [ProyectoRequerimiento]?
+    let members: [ProyectoMiembro]?
+    let documents: [ProyectoDocumento]?
+    let activities: [ProyectoActividad]?
+}
+
 struct ProyectoResumenFila: Decodable, Identifiable, Hashable {
     var id: Int = 0
     var title: String = ""
@@ -776,6 +846,26 @@ final class CoreExtrasRepository {
     func proyectos() async throws -> [ProyectoResumenFila] {
         let data = try await api.get("proyectos")
         return try ApiClient.decodeList(data)
+    }
+
+    /// `GET proyectos/:id`: etapas, alcance, requerimientos, equipo, documentos y actividades.
+    func proyecto(id: Int) async throws -> ProyectoDetalle {
+        let data = try await api.get("proyectos/\(id)")
+        return try ApiClient.decodeOne(data)
+    }
+
+    /// `PATCH proyectos/:id/estado`. Pide `activities.manage`; cancelar exige motivo.
+    func cambiarEstadoProyecto(id: Int, estado: String, motivo: String?) async throws -> ProyectoDetalle {
+        struct Cuerpo: Encodable {
+            let status: String
+            let cancelReason: String?
+        }
+        let limpio = motivo?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let data = try await api.patchJSON(
+            "proyectos/\(id)/estado",
+            body: Cuerpo(status: estado, cancelReason: (limpio?.isEmpty == false) ? limpio : nil)
+        )
+        return try ApiClient.decodeOne(data)
     }
 
     /// `GET stock/levels` y `GET stock/alerts/low-stock`, en paralelo.

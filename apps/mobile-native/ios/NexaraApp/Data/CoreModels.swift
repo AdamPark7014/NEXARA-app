@@ -420,6 +420,14 @@ enum CoreOrg {
         (email ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
+    /// Dirección: el rol CEO, además de Christian y Claudia por correo. Adam (04-11-2026) prueba con su
+    /// cuenta, que es CEO, y veía otra app. Espejo de `PlatformAccounts.esDireccion`.
+    static func esDireccion(email: String?, roleKey: String?) -> Bool {
+        if isCeo(email) { return true }
+        let rol = (roleKey ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return rol == "ceo" || rol == "super_admin"
+    }
+
     static func isCeo(_ email: String?) -> Bool {
         // Modo demostración: la persona ficticia tiene la vista completa de dirección
         // (pizarra del equipo, Clientes, justificar faltas…) sin exponer ninguna cuenta real.

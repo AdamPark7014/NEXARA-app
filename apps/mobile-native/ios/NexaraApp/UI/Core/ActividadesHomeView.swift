@@ -49,7 +49,9 @@ struct ActividadesHomeView: View {
 
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
     /// En demo la persona ve «Mis actividades» y «Mi equipo» (no solo la pizarra de dirección).
-    private var isCeo: Bool { !DemoMode.isActive && CoreOrg.isCeo(session.currentUser?.email) }
+    private var isCeo: Bool {
+        !DemoMode.isActive && CoreOrg.esDireccion(email: session.currentUser?.email, roleKey: session.currentUser?.roleKey)
+    }
 
     /// Uno mismo primero.
     private var users: [TeamBoardUser] {

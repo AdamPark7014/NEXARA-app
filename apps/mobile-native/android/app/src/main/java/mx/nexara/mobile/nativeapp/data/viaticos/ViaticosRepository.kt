@@ -3,7 +3,9 @@ package mx.nexara.mobile.nativeapp.data.viaticos
 import android.content.Context
 import android.util.Base64
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
+import mx.nexara.mobile.nativeapp.data.api.AsignarViaticoBody
 import mx.nexara.mobile.nativeapp.data.api.ResolverViaticoBody
 import mx.nexara.mobile.nativeapp.data.api.SetRepartoBody
 import mx.nexara.mobile.nativeapp.data.api.ViaticoDto
@@ -52,7 +54,29 @@ class ViaticosRepository(context: Context) {
         return user.permissions.any { it == "viatics.manage" || it == "CONSOLE_ADMIN" }
     }
 
+    /** Dirección no pide viáticos: los asigna o los autoriza. El servidor tampoco la deja pedir. */
+    fun pideViaticos(): Boolean {
+        val user = authRepo.loadSession() ?: return true
+        return !user.isSuperAdmin && !PlatformAccounts.esDireccion(user.email, user.roleKey)
+    }
+
     suspend fun lista(): List<ViaticoDto> = api.lista()
+
+    suspend fun asignar(
+        usuarioId: Long,
+        actividadId: Long,
+        centavos: Long,
+        categoria: String,
+        motivo: String,
+    ): ViaticoDto = api.asignar(
+        AsignarViaticoBody(
+            usuarioId = usuarioId,
+            actividadId = actividadId,
+            montoSolicitado = importe(centavos),
+            categoria = categoria,
+            motivo = motivo.trim(),
+        ),
+    )
 
     suspend fun detalle(id: Long): ViaticoDto = api.detalle(id)
 

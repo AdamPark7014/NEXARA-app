@@ -64,8 +64,30 @@ struct RevisionPendiente: Decodable, Identifiable, Hashable {
     let enviadaAt: String?
     /// Es una corrección de algo que se le devolvió.
     let correccion: Bool?
+    /// Le toca a quien mira. `false`: la revisa su jefe directo; dirección la ve para saber que existe.
+    var paraTi: Bool? = nil
+    /// Su jefe directo, para decir a quién le toca.
+    var jefe: String? = nil
 
     var id: Int { activityId }
+}
+
+/// Una evidencia del lote: de qué actividad y de quién.
+struct LoteItem: Codable, Hashable {
+    let activityId: Int
+    let userId: Int
+}
+
+struct LoteFallida: Decodable, Hashable {
+    let activityId: Int?
+    let userId: Int?
+    let motivo: String?
+}
+
+/// `POST me/revisiones/aprobar-lote`.
+struct ResultadoLote: Decodable {
+    let aprobadas: [LoteItem]?
+    let fallidas: [LoteFallida]?
 }
 
 /// `{ pendientes, revisadas }`; el teléfono solo usa lo pendiente.
@@ -88,6 +110,20 @@ extension CoreRepository {
         let data = try await ApiClient.shared.get("me/revisiones")
         let sobre = try JSONDecoder().decode(RevisionesSobre.self, from: data)
         return EnEsperaRevision.ordenar(sobre.pendientes ?? [])
+    }
+
+    /// Varias a la vez, con la misma regla del botón «Aprobar» y un aviso por persona.
+    func aprobarRevisionesLote(items: [LoteItem], calificacion: Int, observaciones: String) async throws -> ResultadoLote {
+        struct Cuerpo: Encodable {
+            let items: [LoteItem]
+            let calificacion: Int
+            let observaciones: String
+        }
+        let data = try await ApiClient.shared.postJSON(
+            "me/revisiones/aprobar-lote",
+            body: Cuerpo(items: items, calificacion: calificacion, observaciones: observaciones)
+        )
+        return try JSONDecoder().decode(ResultadoLote.self, from: data)
     }
 
     /// «Asignadas por mí» en el rango. Se aceptan las dos formas que puede tomar la

@@ -158,6 +158,30 @@ final class StoreScreenshotsUITests: XCTestCase {
                 omitir("clientes: no se encontro more-clientes en «Más»")
             }
 
+            // App por rol (04-11-2026): la bandeja, un proyecto abierto y viáticos.
+            if tocarSiExiste(renglonDelHub("more-aprobaciones", etiqueta: "Aprobaciones"), timeout: 5) {
+                capturar(11, "aprobaciones")
+                volver(a: tituloMas)
+            } else {
+                omitir("aprobaciones: no se encontro en «Más»")
+            }
+            if tocarSiExiste(renglonDelHub("more-proyectos", etiqueta: "Proyectos"), timeout: 5) {
+                capturar(12, "proyectos")
+                let tarjeta = app.descendants(matching: .any).matching(identifier: "proyecto-tarjeta").firstMatch
+                if tocarSiExiste([tarjeta], timeout: 5) {
+                    capturar(13, "proyecto-detalle")
+                }
+                volver(a: tituloMas)
+            } else {
+                omitir("proyectos: no se encontro en «Más»")
+            }
+            if tocarSiExiste(renglonDelHub("more-viaticos", etiqueta: "Viáticos"), timeout: 5) {
+                capturar(14, "viaticos")
+                volver(a: tituloMas)
+            } else {
+                omitir("viaticos: no se encontro en «Más»")
+            }
+
             // 9. Notificaciones (campana).
             if tocarSiExiste(botonCampana(), timeout: 5) {
                 capturar(9, "notificaciones")

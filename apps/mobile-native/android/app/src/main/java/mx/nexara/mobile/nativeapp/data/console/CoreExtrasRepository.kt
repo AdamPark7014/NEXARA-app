@@ -9,6 +9,8 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.CoreExtrasApi
 import mx.nexara.mobile.nativeapp.data.api.KpisEquipoDto
+import mx.nexara.mobile.nativeapp.data.api.CambiarEstadoProyectoRequest
+import mx.nexara.mobile.nativeapp.data.api.ProyectoDetalleDto
 import mx.nexara.mobile.nativeapp.data.api.ProyectoResumenDto
 import mx.nexara.mobile.nativeapp.data.api.StockLevelDto
 
@@ -32,6 +34,14 @@ class CoreExtrasRepository(context: Context) {
 
     suspend fun proyectos(): List<ProyectoResumenDto> =
         withContext(Dispatchers.IO) { api.proyectos() }
+
+    suspend fun proyecto(id: Long): ProyectoDetalleDto =
+        withContext(Dispatchers.IO) { api.proyecto(id) }
+
+    suspend fun cambiarEstadoProyecto(id: Long, estado: String, motivo: String?): ProyectoDetalleDto =
+        withContext(Dispatchers.IO) {
+            api.cambiarEstadoProyecto(id, CambiarEstadoProyectoRequest(estado, motivo?.trim()?.takeIf { it.isNotEmpty() }))
+        }
 
     /** Existencias y alertas de mínimo. */
     data class Almacen(

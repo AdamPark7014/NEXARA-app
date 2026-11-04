@@ -136,7 +136,7 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .gastos: return "Gastos de la operación: captura, comprobación y estado."
         case .aprobaciones: return "Lo que espera tu visto bueno, en un solo sitio."
         case .pagosEmpleados: return "Pagos y anticipos al personal, con su comprobante."
-        case .viaticos: return "Pide un viático con la foto del ticket, repártelo y compruébalo."
+        case .viaticos: return "Lo que pides o autorizas, con la foto del ticket."
         }
     }
 
@@ -200,8 +200,12 @@ enum CoreNavigation {
         guard !nav.isEmpty else { return [.herramientas, .vehiculos, .viaticos] }
         return CoreExtraModule.allCases.filter { modulo in
             modulo.paraTodoElPersonal || !modulo.claves.isDisjoint(with: nav)
+                || (modulo == .aprobaciones && revisanEvidencias.contains((user.roleKey ?? "").lowercased()))
         }
     }
+
+    /// Revisan a su gente aunque `me/navigation` no les dé la bandeja de firmas.
+    private static let revisanEvidencias: Set<String> = ["arquitecto", "enc_soporte"]
 
     /// El módulo de «Más» que nombra esta clave de `me/navigation`.
     static func extraModule(forKey key: String) -> CoreExtraModule? {

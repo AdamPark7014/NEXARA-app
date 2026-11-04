@@ -30,6 +30,14 @@ final class AprobacionesModelo: ObservableObject {
     /// El servidor confirmó, y dice exactamente qué hizo.
     @Published var avisoDecision: String?
     @Published private(set) var filtro: AprobacionesRules.Filtro = .todas
+    /// Evidencias en espera: lo que más le llega a dirección y a los encargados.
+    @Published private(set) var evidencias = BandejaRules.Evidencias()
+    /// Viáticos del equipo por autorizar; abren su pantalla.
+    @Published private(set) var viaticos = 0
+    /// Gastos por autorizar; abren su pantalla.
+    @Published private(set) var gastos = 0
+    /// Va en camino un lote. Bloquea también las decisiones sueltas.
+    @Published private(set) var aprobandoLote = false
 
     private let repo = AprobacionesRepository.shared
     private var arrancado = false
@@ -37,7 +45,7 @@ final class AprobacionesModelo: ObservableObject {
     /// `hayDatos` es «hay filas»: una bandeja limpia cae en VACÍO y enseña la
     /// buena noticia, no una barra de filtros en ceros.
     var estadoPantalla: EstadoPantalla {
-        if !filas.isEmpty { return .contenido }
+        if BandejaRules.hayAlgo(filas: filas.count, evidencias: evidencias, viaticos: viaticos, gastos: gastos) { return .contenido }
         if cargando { return .cargando }
         if let error, !error.isEmpty { return .error }
         return .vacio
@@ -82,8 +90,21 @@ final class AprobacionesModelo: ObservableObject {
             avisoRefresco = nil
         }
         do {
-            let nuevas = AprobacionesRules.ordenadas(try await repo.pendientes())
-            filas = nuevas
+            // A varios mandos el flujo de firmas les contesta 403 y aun así tienen evidencias que
+            // revisar: la bandeja solo falla si no se pudo leer ninguna de las dos.
+            let revisiones = try? await CoreRepository.shared.revisionesPendientes()
+            var firmas: [AprobacionesRules.Pendiente]?
+            var fallaFirmas: Error?
+            do {
+                firmas = AprobacionesRules.ordenadas(try await repo.pendientes())
+            } catch let problema {
+                fallaFirmas = problema
+            }
+            if revisiones == nil, let fallaFirmas { throw fallaFirmas }
+            viaticos = await contarViaticos()
+            gastos = await contarGastos()
+            evidencias = BandejaRules.separar(revisiones ?? [])
+            filas = firmas ?? []
             cargando = false
             refrescando = false
             error = nil
@@ -93,11 +114,48 @@ final class AprobacionesModelo: ObservableObject {
             let mensaje = problema.toUserMessage(fallback: "No se pudieron cargar las aprobaciones")
             cargando = false
             refrescando = false
-            if filas.isEmpty {
+            if !BandejaRules.hayAlgo(filas: filas.count, evidencias: evidencias, viaticos: viaticos, gastos: gastos) {
                 error = mensaje
             } else {
                 avisoRefresco = mensaje
             }
+        }
+    }
+
+    /// Lo de otras pantallas es un extra: si falla, esa fila no sale y la bandeja sigue.
+    private func contarViaticos() async -> Int {
+        guard ViaticoSesion.administra, let yo = ViaticoSesion.miId,
+              let lista = try? await ViaticosRepository.shared.lista() else { return 0 }
+        return lista.filter { $0.usuarioId != nil && $0.usuarioId != yo && $0.estaPendiente }.count
+    }
+
+    private func contarGastos() async -> Int {
+        guard GastosRepository.administraGastos(),
+              let lista = try? await GastosRepository.shared.lista() else { return 0 }
+        return lista.filter(GastosRules.puedeAutorizar).count
+    }
+
+    /// Aprueba lo que te toca de un jalón; lo que no pasó se queda en la lista, con su motivo por separado.
+    func aprobarLote(estrellas: Int, nota: String) {
+        guard !aprobandoLote, decidiendo == nil else { return }
+        let items = BandejaRules.loteDe(evidencias)
+        guard !items.isEmpty, BandejaRules.calificacionValida(estrellas), BandejaRules.notaValida(nota) else { return }
+        aprobandoLote = true
+        errorDecision = nil
+        avisoDecision = nil
+        Task {
+            do {
+                let r = try await CoreRepository.shared.aprobarRevisionesLote(
+                    items: items,
+                    calificacion: estrellas,
+                    observaciones: nota.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+                avisoDecision = BandejaRules.mensajeLote(aprobadas: r.aprobadas?.count ?? 0, fallidas: r.fallidas?.count ?? 0)
+            } catch let problema {
+                errorDecision = problema.toUserMessage(fallback: "No se pudieron aprobar")
+            }
+            aprobandoLote = false
+            await cargar(refresco: true)
         }
     }
 
@@ -129,6 +187,156 @@ final class AprobacionesModelo: ObservableObject {
     }
 }
 
+// MARK: - Evidencias y lo que vive en otra pantalla
+
+/// Lo que espera revisión: cuántas te tocan, las más viejas a la vista y un botón para el lote.
+private struct SeccionEvidencias: View {
+    let evidencias: BandejaRules.Evidencias
+    let bloqueada: Bool
+    let enviando: Bool
+    let onLote: () -> Void
+
+    var body: some View {
+        let cuantas = BandejaRules.loteDe(evidencias).count
+        let aLaVista = Array((evidencias.teTocan + evidencias.deOtros).prefix(BandejaRules.filasALaVista))
+        let ahora = Date()
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Evidencias")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(NxColors.fg)
+            Text(BandejaRules.resumen(evidencias))
+                .font(.system(size: 13))
+                .foregroundStyle(NxColors.muted)
+            if cuantas > 0 {
+                Button(action: onLote) {
+                    Group {
+                        if enviando {
+                            ProgressView()
+                        } else {
+                            Text(BandejaRules.textoBotonLote(cuantas)).fontWeight(.semibold)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(NxColors.brand)
+                .disabled(bloqueada)
+            }
+            ForEach(aLaVista) { r in
+                NavigationLink {
+                    ActivityCoreDetailView(activityId: r.activityId, initialTab: "evidencias")
+                        .nxBrandNavBar(title: "Actividad")
+                } label: {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(BandejaRules.titulo(r))
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(NxColors.fg)
+                                .lineLimit(1)
+                            Text(BandejaRules.detalle(r, ahora: ahora))
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(NxColors.muted)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Text("Revisar")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(NxColors.brandText)
+                    }
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            let faltan = evidencias.total - aLaVista.count
+            if faltan > 0 {
+                Text("Y \(faltan) más. Las más viejas salen primero.")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(NxColors.muted)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .nxCardSurface(radius: 14)
+    }
+}
+
+/// Lo que se autoriza en su propia pantalla: aquí solo se avisa cuántos esperan.
+private struct FilaDeOtraPantalla: View {
+    let titulo: String
+    let detalle: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(titulo)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(NxColors.fg)
+                Text(detalle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(NxColors.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Abrir")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(NxColors.brandText)
+        }
+        .padding(14)
+        .nxCardSurface(radius: 14)
+    }
+}
+
+/// Las estrellas se eligen, como al revisar una sola; la nota se puede editar. Igual que en la web.
+private struct HojaDeLote: View {
+    let cuantas: Int
+    let onConfirmar: (Int, String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var estrellas = 0
+    @State private var nota = BandejaRules.notaLote
+
+    private var valido: Bool { BandejaRules.calificacionValida(estrellas) && BandejaRules.notaValida(nota) }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack(spacing: 8) {
+                        ForEach(1...5, id: \.self) { n in
+                            Button {
+                                estrellas = n
+                            } label: {
+                                Image(systemName: n <= estrellas ? "star.fill" : "star")
+                                    .font(.system(size: 26))
+                                    .foregroundStyle(n <= estrellas ? NxColors.brand : NxColors.muted)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(n) de 5 estrellas")
+                        }
+                    }
+                } footer: {
+                    Text("Cada persona recibe su aviso, con la misma calificación y la misma nota.")
+                }
+                Section("Nota") {
+                    TextField("Nota", text: $nota, axis: .vertical)
+                        .lineLimit(2...5)
+                }
+            }
+            .navigationTitle(BandejaRules.textoBotonLote(cuantas))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Aprobar") { onConfirmar(estrellas, nota) }
+                        .disabled(!valido)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Pantalla
 
 /// Aprobaciones (`/erp/approvals`) en el teléfono (`AprobacionesScreen.kt`).
@@ -146,6 +354,7 @@ struct AprobacionesView: View {
     /// Qué se está rechazando. El motivo se pide en un diálogo y no en la
     /// tarjeta: un campo entre los dos botones hace que se toque el que no era.
     @State private var rechazando: AprobacionesRules.Pendiente?
+    @State private var pidiendoLote = false
 
     var body: some View {
         let todas = modelo.filas
@@ -189,6 +398,12 @@ struct AprobacionesView: View {
         .refreshable { await modelo.refrescar() }
         .nxScreenBackground()
         .task { await modelo.arrancar() }
+        .sheet(isPresented: $pidiendoLote) {
+            HojaDeLote(cuantas: BandejaRules.loteDe(modelo.evidencias).count) { estrellas, nota in
+                pidiendoLote = false
+                modelo.aprobarLote(estrellas: estrellas, nota: nota)
+            }
+        }
         .fullScreenCover(item: $rechazando) { fila in
             DialogoDeRechazo(
                 fila: fila,
@@ -204,6 +419,37 @@ struct AprobacionesView: View {
 
     @ViewBuilder
     private func contenido(_ todas: [AprobacionesRules.Pendiente]) -> some View {
+        if modelo.evidencias.total > 0 {
+            SeccionEvidencias(
+                evidencias: modelo.evidencias,
+                bloqueada: modelo.aprobandoLote || modelo.decidiendo != nil,
+                enviando: modelo.aprobandoLote,
+                onLote: { pidiendoLote = true }
+            )
+        }
+        if modelo.viaticos > 0 {
+            NavigationLink {
+                ViaticosView().nxBrandNavBar(title: CoreExtraModule.viaticos.title)
+            } label: {
+                FilaDeOtraPantalla(titulo: "Viáticos", detalle: "\(modelo.viaticos) por autorizar")
+            }
+            .buttonStyle(.plain)
+        }
+        if modelo.gastos > 0 {
+            NavigationLink {
+                GastosView().nxBrandNavBar(title: CoreExtraModule.gastos.title)
+            } label: {
+                FilaDeOtraPantalla(titulo: "Gastos", detalle: "\(modelo.gastos) por autorizar")
+            }
+            .buttonStyle(.plain)
+        }
+        if !todas.isEmpty {
+            bandejaDeFirmas(todas)
+        }
+    }
+
+    @ViewBuilder
+    private func bandejaDeFirmas(_ todas: [AprobacionesRules.Pendiente]) -> some View {
         let filtro = modelo.filtro
         let visibles = AprobacionesRules.aplicar(todas, filtro)
         let conteos = AprobacionesRules.conteos(todas)

@@ -258,6 +258,27 @@ final class ViaticosRepository {
 
     /// `GET viatics` — sin `limit`, el API devuelve el arreglo completo (tope de
     /// 200 del lado del servidor). Trae ya los repartos y la liquidación.
+    /// Asignar a alguien, ligado a una de sus actividades. No lleva ticket: se comprueba después.
+    func asignar(usuarioId: Int, actividadId: Int, centavos: Int, categoria: String, motivo: String) async throws {
+        struct Cuerpo: Encodable {
+            let usuarioId: Int
+            let actividadId: Int
+            let montoSolicitado: String
+            let categoria: String
+            let motivo: String
+        }
+        _ = try await ApiClient.shared.postJSON(
+            "viatics/assign",
+            body: Cuerpo(
+                usuarioId: usuarioId,
+                actividadId: actividadId,
+                montoSolicitado: Dinero.formatear(centavos).replacingOccurrences(of: ",", with: ""),
+                categoria: categoria,
+                motivo: motivo.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        )
+    }
+
     func lista() async throws -> [Viatico] {
         let data = try await api.get("viatics")
         do {

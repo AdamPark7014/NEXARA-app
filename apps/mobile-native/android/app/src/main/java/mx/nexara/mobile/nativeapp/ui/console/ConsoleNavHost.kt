@@ -75,11 +75,13 @@ import mx.nexara.mobile.nativeapp.ui.console.inicio.InicioViewModel
 import mx.nexara.mobile.nativeapp.ui.console.more.AlmacenScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.KpisEquipoScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreHubScreen
+import mx.nexara.mobile.nativeapp.ui.console.more.ProyectoDetalleScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.ProyectosScreen
 import mx.nexara.mobile.nativeapp.ui.console.pagos.PagosEmpleadosScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.vehiculos.VehiculosScreen
+import mx.nexara.mobile.nativeapp.ui.console.viaticos.AsignarViaticoScreen
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.NuevoViaticoScreen
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.RepartoViaticoScreen
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.ViaticoDetalleScreen
@@ -140,6 +142,7 @@ internal object ConsoleRoutes {
 
     /** Proyectos (`/erp/proyectos`) — tarjetas por salud. */
     const val Proyectos = "console/proyectos"
+    const val ProyectoDetalle = "console/proyectos/{id}"
 
     /** Almacén (`/erp/almacen`) — existencias y bajo mínimo, solo consulta. */
     const val Almacen = "console/almacen"
@@ -184,6 +187,7 @@ internal object ConsoleRoutes {
      * resolver la ruta (mismo motivo que [NewClient]).
      */
     const val NuevoViatico = "console/viaticos-nuevo"
+    const val AsignarViatico = "console/viaticos-asignar"
 
     const val ViaticoDetalle = "console/viaticos/{id}"
 
@@ -476,6 +480,7 @@ fun ConsoleNavHost(
         ConsoleRoutes.Vehiculos -> "Vehículos"
         ConsoleRoutes.KpisEquipo -> "KPIs del equipo"
         ConsoleRoutes.Proyectos -> "Proyectos"
+        ConsoleRoutes.ProyectoDetalle -> "Proyecto"
         ConsoleRoutes.Almacen -> "Almacén"
         ConsoleRoutes.Herramientas -> "Herramientas"
         ConsoleRoutes.Cotizaciones -> "Cotizaciones"
@@ -485,6 +490,7 @@ fun ConsoleNavHost(
         ConsoleRoutes.Aprobaciones -> "Aprobaciones"
         ConsoleRoutes.Viaticos -> "Viáticos"
         ConsoleRoutes.NuevoViatico -> "Pedir viático"
+        ConsoleRoutes.AsignarViatico -> "Asignar viático"
         ConsoleRoutes.ViaticoDetalle -> "Viático"
         ConsoleRoutes.RepartoViatico -> "Repartir viático"
         ConsoleRoutes.Notifications -> "Notificaciones"
@@ -776,7 +782,20 @@ fun ConsoleNavHost(
                 if (CoreExtraModule.KPIS_EQUIPO in extras) KpisEquipoScreen()
             }
             nxComposable(ConsoleRoutes.Proyectos, style = NxNavAnimStyle.Push) {
-                if (CoreExtraModule.PROYECTOS in extras) ProyectosScreen(resaltarId = proyectoResaltado)
+                if (CoreExtraModule.PROYECTOS in extras) {
+                    ProyectosScreen(
+                        resaltarId = proyectoResaltado,
+                        onOpenProyecto = { id ->
+                            navController.navigate("console/proyectos/$id") { launchSingleTop = true }
+                        },
+                    )
+                }
+            }
+            nxComposable(ConsoleRoutes.ProyectoDetalle, style = NxNavAnimStyle.Push) { entry ->
+                val id = entry.arguments?.getString("id")?.toLongOrNull()
+                if (CoreExtraModule.PROYECTOS in extras && id != null) {
+                    ProyectoDetalleScreen(proyectoId = id, onOpenActivity = openActivity)
+                }
             }
             nxComposable(ConsoleRoutes.Almacen, style = NxNavAnimStyle.Push) {
                 if (CoreExtraModule.ALMACEN in extras) AlmacenScreen()
@@ -827,7 +846,13 @@ fun ConsoleNavHost(
             // (`workflow.service.ts` exige ser el aprobador de ese paso, por
             // usuario o por rol), y su 403 se enseña tal cual.
             nxComposable(ConsoleRoutes.Aprobaciones, style = NxNavAnimStyle.Push) {
-                if (CoreExtraModule.APROBACIONES in extras) AprobacionesScreen()
+                if (CoreExtraModule.APROBACIONES in extras) {
+                    AprobacionesScreen(
+                        onOpenActivity = openActivity,
+                        onOpenViaticos = { navController.navigate(ConsoleRoutes.Viaticos) { launchSingleTop = true } },
+                        onOpenGastos = { navController.navigate(ConsoleRoutes.Gastos) { launchSingleTop = true } },
+                    )
+                }
             }
             // Viáticos: el técnico pide desde la calle y la dirección resuelve
             // desde donde esté. La lista se recarga sola cuando el alta, una
@@ -843,9 +868,20 @@ fun ConsoleNavHost(
                     onNuevoViatico = {
                         navController.navigate(ConsoleRoutes.NuevoViatico) { launchSingleTop = true }
                     },
+                    onAsignarViatico = {
+                        navController.navigate(ConsoleRoutes.AsignarViatico) { launchSingleTop = true }
+                    },
                     recargar = recargar,
                     onRecargaConsumida = {
                         entry.savedStateHandle[ConsoleRoutes.VIATICOS_CHANGED_KEY] = false
+                    },
+                )
+            }
+            nxComposable(ConsoleRoutes.AsignarViatico, style = NxNavAnimStyle.Modal) {
+                AsignarViaticoScreen(
+                    onCreado = {
+                        marcarViaticosCambiaron(navController)
+                        navController.popBackStack()
                     },
                 )
             }

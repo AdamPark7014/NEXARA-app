@@ -2,6 +2,7 @@ package mx.nexara.mobile.nativeapp.ui.console.aprobaciones
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,11 +39,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.nexara.mobile.nativeapp.ui.console.activities.EnEsperaRevision
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreAvisoDesactualizado
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDenseSectionHeader
@@ -85,9 +88,15 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.nxEstadoPantalla
  * Android.
  */
 @Composable
-fun AprobacionesScreen(vm: AprobacionesViewModel = viewModel()) {
+fun AprobacionesScreen(
+    onOpenActivity: (Long, String?) -> Unit = { _, _ -> },
+    onOpenViaticos: () -> Unit = {},
+    onOpenGastos: () -> Unit = {},
+    vm: AprobacionesViewModel = viewModel(),
+) {
     val state by vm.state.collectAsState()
     val filtro by vm.filtro.collectAsState()
+    var pidiendoLote by remember { mutableStateOf(false) }
 
     // Qué se está rechazando. El motivo se pide en un diálogo y no en la
     // tarjeta: un campo de texto entre los dos botones es justo lo que hace que
@@ -107,7 +116,7 @@ fun AprobacionesScreen(vm: AprobacionesViewModel = viewModel()) {
     val estado = nxEstadoPantalla(
         cargando = state.cargando,
         error = state.error,
-        hayDatos = todas.isNotEmpty(),
+        hayDatos = BandejaRules.hayAlgo(todas.size, state.evidencias, state.viaticos, state.gastos),
     )
 
     NxScreenScaffold(isRefreshing = state.refrescando, onRefresh = vm::refrescar) {
@@ -155,6 +164,37 @@ fun AprobacionesScreen(vm: AprobacionesViewModel = viewModel()) {
                 }
 
                 NxEstadoPantalla.CONTENIDO -> {
+                    if (state.evidencias.total > 0) {
+                        item(key = "evidencias") {
+                            SeccionEvidencias(
+                                evidencias = state.evidencias,
+                                bloqueada = state.aprobandoLote || state.decidiendo != null,
+                                enviando = state.aprobandoLote,
+                                onLote = { pidiendoLote = true },
+                                onRevisar = { id -> onOpenActivity(id, "evidencias") },
+                            )
+                        }
+                    }
+                    if (state.viaticos > 0) {
+                        item(key = "viaticos") {
+                            FilaDeOtraPantalla(
+                                titulo = "Viáticos",
+                                detalle = BandejaRules.textoCuenta(state.viaticos, "por autorizar", "por autorizar"),
+                                onClick = onOpenViaticos,
+                            )
+                        }
+                    }
+                    if (state.gastos > 0) {
+                        item(key = "gastos") {
+                            FilaDeOtraPantalla(
+                                titulo = "Gastos",
+                                detalle = BandejaRules.textoCuenta(state.gastos, "por autorizar", "por autorizar"),
+                                onClick = onOpenGastos,
+                            )
+                        }
+                    }
+                    if (todas.isEmpty()) return@LazyColumn
+
                     // Regla 7: la tira aparece porque hay filas que contar, no
                     // porque las cifras den distinto de cero.
                     item(key = "cifras") {
@@ -228,6 +268,17 @@ fun AprobacionesScreen(vm: AprobacionesViewModel = viewModel()) {
         }
     }
 
+    if (pidiendoLote) {
+        DialogoDeLote(
+            cuantas = BandejaRules.loteDe(state.evidencias).size,
+            onCancelar = { pidiendoLote = false },
+            onConfirmar = { estrellas, nota ->
+                pidiendoLote = false
+                vm.aprobarLote(estrellas, nota)
+            },
+        )
+    }
+
     rechazando?.let { fila ->
         DialogoDeRechazo(
             fila = fila,
@@ -238,6 +289,170 @@ fun AprobacionesScreen(vm: AprobacionesViewModel = viewModel()) {
             },
         )
     }
+}
+
+// ── Evidencias y lo que vive en otra pantalla ─
+
+/** Lo que espera revisión: cuántas te tocan, las más viejas a la vista y un botón para el lote. */
+@Composable
+private fun SeccionEvidencias(
+    evidencias: BandejaRules.Evidencias,
+    bloqueada: Boolean,
+    enviando: Boolean,
+    onLote: () -> Unit,
+    onRevisar: (Long) -> Unit,
+) {
+    val forma = RoundedCornerShape(NxUi.RadiusLg)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(forma)
+            .background(NxColors.Card)
+            .border(1.dp, NxUi.Border, forma)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text("Evidencias", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
+        Text(BandejaRules.resumen(evidencias), fontSize = 13.sp, color = NxUi.Fg2)
+        val cuantas = BandejaRules.loteDe(evidencias).size
+        if (cuantas > 0) {
+            Button(
+                onClick = onLote,
+                enabled = !bloqueada,
+                modifier = Modifier.fillMaxWidth().heightIn(min = ALTO_BOTON),
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+            ) {
+                if (enviando) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = NxColors.Card)
+                } else {
+                    Text(BandejaRules.textoBotonLote(cuantas), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+        val ahora = remember { java.time.Instant.now() }
+        val aLaVista = (evidencias.teTocan + evidencias.deOtros).take(BandejaRules.FILAS_A_LA_VISTA)
+        aLaVista.forEach { r ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onRevisar(r.activityId) }
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        EnEsperaRevision.titulo(r),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = NxColors.Slate,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        EnEsperaRevision.detalle(r, ahora),
+                        fontSize = 12.5.sp,
+                        color = NxUi.Fg2,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text("Revisar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Brand)
+            }
+        }
+        val faltan = evidencias.total - aLaVista.size
+        if (faltan > 0) {
+            Text(
+                "Y $faltan más. Las más viejas salen primero.",
+                fontSize = 12.5.sp,
+                color = NxUi.Fg2,
+            )
+        }
+    }
+}
+
+/** Lo que se autoriza en su propia pantalla: aquí solo se avisa cuántos esperan. */
+@Composable
+private fun FilaDeOtraPantalla(titulo: String, detalle: String, onClick: () -> Unit) {
+    val forma = RoundedCornerShape(NxUi.RadiusLg)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(forma)
+            .background(NxColors.Card)
+            .border(1.dp, NxUi.Border, forma)
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(titulo, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
+            Text(detalle, fontSize = 13.sp, color = NxUi.Fg2)
+        }
+        Text("Abrir", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Brand)
+    }
+}
+
+/** Las estrellas se eligen, como al revisar una sola; la nota se puede editar. Igual que en la web. */
+@Composable
+private fun DialogoDeLote(
+    cuantas: Int,
+    onCancelar: () -> Unit,
+    onConfirmar: (Int, String) -> Unit,
+) {
+    var estrellas by remember { mutableStateOf(0) }
+    var nota by remember { mutableStateOf(BandejaRules.NOTA_LOTE) }
+    val valido = BandejaRules.calificacionValida(estrellas) && BandejaRules.notaValida(nota)
+
+    AlertDialog(
+        onDismissRequest = onCancelar,
+        title = { Text(BandejaRules.textoBotonLote(cuantas)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Cada persona recibe su aviso, con la misma calificación y la misma nota.",
+                    fontSize = 13.sp,
+                    color = NxUi.Fg2,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    (1..5).forEach { n ->
+                        TextButton(
+                            onClick = { estrellas = n },
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            modifier = Modifier.semantics { contentDescription = "$n de 5 estrellas" },
+                        ) {
+                            Text(
+                                if (n <= estrellas) "★" else "☆",
+                                fontSize = 26.sp,
+                                color = if (n <= estrellas) NxColors.Brand else NxUi.Fg2,
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = nota,
+                    onValueChange = { nota = it },
+                    label = { Text("Nota") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirmar(estrellas, nota.trim()) }, enabled = valido) {
+                Text(
+                    "Aprobar",
+                    fontWeight = FontWeight.Bold,
+                    color = if (valido) NxColors.Brand else NxColors.Muted,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancelar) { Text("Cancelar", color = NxUi.Fg2) }
+        },
+        containerColor = NxColors.Card,
+    )
 }
 
 // ── Una pendiente ────────────────────────────────────────────────────────────

@@ -141,6 +141,15 @@ data class ResolverViaticoBody(
  * este módulo nació precisamente de limpiar tres métodos de viáticos que nadie
  * llamaba. Se añade el día que haya pantalla que lo pida.
  */
+/** `POST viatics/assign`. El servidor exige actividad o proyecto. */
+data class AsignarViaticoBody(
+    val usuarioId: Long,
+    val actividadId: Long,
+    val montoSolicitado: String,
+    val categoria: String,
+    val motivo: String,
+)
+
 interface ViaticosApi {
 
     /**
@@ -149,6 +158,10 @@ interface ViaticosApi {
      */
     @GET("viatics")
     suspend fun lista(): List<ViaticoDto>
+
+    /** Asignar a alguien, ligado a una de sus actividades. No lleva ticket: se comprueba después. */
+    @POST("viatics/assign")
+    suspend fun asignar(@Body cuerpo: AsignarViaticoBody): ViaticoDto
 
     /** `GET viatics/:id` — el detalle trae además el nombre de cada actividad del reparto. */
     @GET("viatics/{id}")

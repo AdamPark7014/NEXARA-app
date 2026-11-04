@@ -1084,6 +1084,34 @@ data class RevisionPendienteDto(
     val enviadaAt: String? = null,
     /** Es una corrección de algo que se le devolvió. */
     val correccion: Boolean? = null,
+    /** Le toca a quien mira. `false`: la revisa su jefe directo; dirección la ve para saber que existe. */
+    val paraTi: Boolean? = null,
+    /** Su jefe directo, para decir a quién le toca. */
+    val jefe: String? = null,
+)
+
+/** Una evidencia del lote: de qué actividad y de quién. */
+data class LoteItemDto(
+    val activityId: Long,
+    val userId: Long,
+)
+
+/** `POST me/revisiones/aprobar-lote`: `observaciones` pide al menos 5 letras, igual que la web. */
+data class AprobarLoteRequest(
+    val items: List<LoteItemDto>,
+    val calificacion: Int,
+    val observaciones: String,
+)
+
+data class LoteFallidaDto(
+    val activityId: Long? = null,
+    val userId: Long? = null,
+    val motivo: String? = null,
+)
+
+data class ResultadoLoteDto(
+    val aprobadas: List<LoteItemDto>? = null,
+    val fallidas: List<LoteFallidaDto>? = null,
 )
 
 /** `GET me/revisiones`: lo pendiente (y lo revisado en 30 días, que el teléfono no usa). */
@@ -1208,6 +1236,10 @@ interface CoreActivitiesApi {
     /** «En espera de revisión»: la misma regla de quién revisa a quién que `me/activities/:id/evidencias`. */
     @GET("me/revisiones")
     suspend fun revisiones(): RevisionesResponseDto
+
+    /** Varias a la vez, con la misma regla del botón «Aprobar» y un aviso por persona. */
+    @POST("me/revisiones/aprobar-lote")
+    suspend fun aprobarRevisionesLote(@Body body: AprobarLoteRequest): ResultadoLoteDto
 
     @GET("me/celebraciones/hoy")
     suspend fun celebracionesHoy(): CelebracionesHoyDto

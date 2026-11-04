@@ -81,7 +81,7 @@ enum class CoreExtraModule(
         CoreKeys.VIATICOS,
         "Viáticos",
         "/erp/finance/viatics",
-        "Pide un viático con la foto del ticket, repártelo y compruébalo.",
+        "Lo que pides o autorizas, con la foto del ticket.",
         Group.FINANZAS,
         paraTodoElPersonal = true,
     ),
@@ -142,9 +142,13 @@ object CoreMenu {
         val keys = user.navModuleKeys?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
         if (keys.isNullOrEmpty()) return EVERYONE_EXTRAS
         return CoreExtraModule.entries.filter { modulo ->
-            modulo.paraTodoElPersonal || modulo.claves.any { it in keys }
+            modulo.paraTodoElPersonal || modulo.claves.any { it in keys } ||
+                (modulo == CoreExtraModule.APROBACIONES && canonicalRole(user) in REVISAN_EVIDENCIAS)
         }
     }
+
+    /** Revisan a su gente aunque `me/navigation` no les dé la bandeja de firmas. */
+    private val REVISAN_EVIDENCIAS = setOf("arquitecto", "enc_soporte")
 
     fun canOpenExtra(user: SessionUser?, key: String): Boolean {
         val buscado = key.trim().lowercase()

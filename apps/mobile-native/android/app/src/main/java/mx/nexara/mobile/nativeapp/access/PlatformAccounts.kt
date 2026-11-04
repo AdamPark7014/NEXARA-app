@@ -22,6 +22,13 @@ object PlatformAccounts {
 
     fun isCeoEquivalentEmail(email: String?): Boolean = norm(email) in CEO_EQUIVALENT_EMAILS
 
+    /**
+     * Dirección: el rol CEO, además de Christian y Claudia por correo. Adam (04-11-2026) prueba con su
+     * cuenta, que es CEO, y veía otra app: lo que decide por correo no sale para quien tiene el rol.
+     */
+    fun esDireccion(email: String?, roleKey: String?): Boolean =
+        isCeoEquivalentEmail(email) || roleKey?.trim()?.lowercase() in setOf("ceo", "super_admin")
+
     fun isDeveloperEmail(email: String?): Boolean = norm(email) == DEVELOPER_EMAIL
 
     /**

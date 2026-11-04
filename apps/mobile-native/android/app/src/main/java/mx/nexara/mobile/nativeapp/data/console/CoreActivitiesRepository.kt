@@ -5,6 +5,8 @@ import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePdfStepRequest
 import mx.nexara.mobile.nativeapp.data.api.AddTeamMemberRequest
+import mx.nexara.mobile.nativeapp.data.api.AprobarLoteRequest
+import mx.nexara.mobile.nativeapp.data.api.ResultadoLoteDto
 import mx.nexara.mobile.nativeapp.data.api.GeocercaAlertaDto
 import mx.nexara.mobile.nativeapp.data.api.GeocercaDto
 import mx.nexara.mobile.nativeapp.data.api.HerramientasChecklistDto
@@ -135,6 +137,9 @@ class CoreActivitiesRepository(context: Context) {
     /** Lo que espera mi revisión; la que más lleva esperando, primero. */
     suspend fun revisionesPendientes(): List<RevisionPendienteDto> =
         EnEsperaRevision.ordenar(api.revisiones().pendientes.orEmpty())
+
+    suspend fun aprobarRevisionesLote(cuerpo: AprobarLoteRequest): ResultadoLoteDto =
+        api.aprobarRevisionesLote(cuerpo)
 
     suspend fun tiemposTipicos(coreKind: String, tipo: String?): TiemposTipicosDto =
         api.tiemposTipicos(coreKind, tipo?.takeIf { it.isNotBlank() })

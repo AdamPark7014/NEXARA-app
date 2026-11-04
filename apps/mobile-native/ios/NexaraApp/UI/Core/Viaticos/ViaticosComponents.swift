@@ -245,6 +245,12 @@ struct ChipLargoViatico: View {
 /// Quién soy y si administro viáticos (Android `ViaticosRepository.miUsuarioId`
 /// / `administraViaticos`).
 enum ViaticoSesion {
+    /// Dirección no pide viáticos: los asigna o los autoriza. El servidor tampoco la deja pedir.
+    static var pide: Bool {
+        guard let user = SessionStore.shared.currentUser else { return true }
+        return !user.isSuperAdmin && !CoreOrg.esDireccion(email: user.email, roleKey: user.roleKey)
+    }
+
     static var miId: Int? { SessionStore.shared.currentUser.flatMap { Int($0.id) } }
 
     /// `viatics.manage` / super admin: quien puede autorizar, pagar y ver a su gente.
