@@ -1481,6 +1481,7 @@ const SEGMENTOS_SIN_MIGA: ReadonlySet<string> = new Set(["finance"]);
 
 const SLUG_DICTIONARY: Record<string, string> = {
   area: "Área",
+  "que-sigue": "¿Qué sigue?",
   catalogo: "Catálogo",
   my: "Mis",
   ai: "AI",
