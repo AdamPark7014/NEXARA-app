@@ -14,6 +14,23 @@ import org.junit.Test
 
 /** Hora de comida: ventana 15:00–16:00 México, regreso hasta 16:05, justificación ≥5 letras. */
 class ComidasRulesTest {
+    @org.junit.Test
+    fun laFotoEsDeEscritorioEnOficinaYPersonalFuera() {
+        org.junit.Assert.assertEquals("escritorio", ComidasRules.fotoTipo(enOficina = true))
+        org.junit.Assert.assertEquals("personal", ComidasRules.fotoTipo(enOficina = false))
+        org.junit.Assert.assertEquals("Foto de tu escritorio limpio", ComidasRules.tituloCamara(ComidasRules.SALIDA, true))
+        org.junit.Assert.assertEquals("Foto de tu escritorio en orden", ComidasRules.tituloCamara(ComidasRules.REGRESO, true))
+        org.junit.Assert.assertEquals("Foto de salida a comer", ComidasRules.tituloCamara(ComidasRules.SALIDA, false))
+    }
+
+    @org.junit.Test
+    fun fueraDeOficinaPideMotivo() {
+        org.junit.Assert.assertFalse(ComidasRules.motivoFueraValido("  "))
+        org.junit.Assert.assertFalse(ComidasRules.motivoFueraValido(null))
+        org.junit.Assert.assertTrue(ComidasRules.motivoFueraValido("En obra"))
+        ComidasRules.MOTIVOS_FUERA.forEach { org.junit.Assert.assertTrue(ComidasRules.motivoFueraValido(it)) }
+    }
+
 
     private val mi = ComidaMiDiaDto(
         ventana = ComidaVentanaDto(

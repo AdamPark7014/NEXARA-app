@@ -43,10 +43,19 @@ enum LunchUI {
     }
 }
 
+/// Antes de la cámara se pregunta dónde está: en oficina, foto del escritorio; fuera, la personal con su motivo.
+private struct LunchLugarRequest: Identifiable {
+    let id = UUID()
+    let checkIn: Bool
+    let askReason: Bool
+}
+
 private struct LunchCameraRequest: Identifiable {
     let id = UUID()
     /// `true` = salida a comer; `false` = regreso.
     let checkIn: Bool
+    let enOficina: Bool
+    let motivoFuera: String?
     /// El horario ya dice que va a destiempo: se toma la foto igual y el motivo
     /// se escribe después, con la foto ya guardada.
     let askReason: Bool
@@ -56,6 +65,8 @@ private struct LunchCameraRequest: Identifiable {
 private struct LunchPendingPhoto: Identifiable {
     let id = UUID()
     let checkIn: Bool
+    let enOficina: Bool
+    let motivoFuera: String?
     let photo: CapturedGeoPhoto
     /// Lo que contestó el API cuando fue él quien dijo que era a destiempo.
     let serverMessage: String?
@@ -99,6 +110,9 @@ struct ComidasView: View {
     @State private var notice: String?
     @State private var now = Date()
     @State private var camera: LunchCameraRequest?
+    @State private var lugar: LunchLugarRequest?
+    /// Elegido el lugar, la cámara abre al cerrarse esa hoja: dos pantallas a la vez no se pueden presentar.
+    @State private var cameraTrasLugar: LunchCameraRequest?
     @State private var pendingPhoto: LunchPendingPhoto?
     @State private var reasonRequest: LunchPendingPhoto?
     /// El API dijo que ya es a destiempo: la próxima vez se pide el motivo.
@@ -166,24 +180,35 @@ struct ComidasView: View {
         .onChange(of: externalFecha) { _, _ in
             Task { await load() }
         }
+        .sheet(item: $lugar, onDismiss: {
+            camera = cameraTrasLugar
+            cameraTrasLugar = nil
+        }) { pedido in
+            LunchLugarSheet { enOficina, motivo in
+                cameraTrasLugar = LunchCameraRequest(checkIn: pedido.checkIn, enOficina: enOficina, motivoFuera: motivo, askReason: pedido.askReason)
+                lugar = nil
+            }
+        }
         .fullScreenCover(item: $camera, onDismiss: openReasonAfterCamera) { request in
             GeoPhotoCaptureView(
-                title: request.checkIn ? "Tu foto de salida a comer" : "Tu foto de regreso",
+                title: ComidasFotoRules.titulo(checkIn: request.checkIn, enOficina: request.enOficina),
                 confirmLabel: request.askReason ? "Continuar" : "Registrar con esta foto",
                 requireLocation: false,
+                subtitulo: ComidasFotoRules.subtitulo(checkIn: request.checkIn, enOficina: request.enOficina),
+                abrirConFrontal: !request.enOficina,
                 onConfirm: { captured in
                     if request.askReason {
-                        pendingPhoto = LunchPendingPhoto(checkIn: request.checkIn, photo: captured, serverMessage: nil)
+                        pendingPhoto = LunchPendingPhoto(checkIn: request.checkIn, enOficina: request.enOficina, motivoFuera: request.motivoFuera, photo: captured, serverMessage: nil)
                         camera = nil
                         return nil
                     }
-                    switch await register(checkIn: request.checkIn, photo: captured, reason: nil) {
+                    switch await register(checkIn: request.checkIn, enOficina: request.enOficina, motivoFuera: request.motivoFuera, photo: captured, reason: nil) {
                     case .done:
                         camera = nil
                         return nil
                     case .needsReason(let message):
                         // El API decidió con su reloj: la foto no se tira.
-                        pendingPhoto = LunchPendingPhoto(checkIn: request.checkIn, photo: captured, serverMessage: message)
+                        pendingPhoto = LunchPendingPhoto(checkIn: request.checkIn, enOficina: request.enOficina, motivoFuera: request.motivoFuera, photo: captured, serverMessage: message)
                         camera = nil
                         return nil
                     case .failed(let message):
@@ -199,7 +224,7 @@ struct ComidasView: View {
                 windowText: myDay?.windowText ?? "3:00 a 4:00 p.m.",
                 lateReturnText: myDay?.lateReturnText ?? "Ya pasó la hora de regreso"
             ) { reason in
-                await register(checkIn: pending.checkIn, photo: pending.photo, reason: reason)
+                await register(checkIn: pending.checkIn, enOficina: pending.enOficina, motivoFuera: pending.motivoFuera, photo: pending.photo, reason: reason)
             }
         }
         .sheet(item: $review) { request in
@@ -345,7 +370,7 @@ struct ComidasView: View {
     /// la cámara y volver, y un tropiezo en medio perdía las dos cosas.
     private func startRegister(checkIn: Bool, late: Bool) {
         notice = nil
-        camera = LunchCameraRequest(checkIn: checkIn, askReason: late || forceReason)
+        lugar = LunchLugarRequest(checkIn: checkIn, askReason: late || forceReason)
     }
 
     /// La cámara ya se cerró: si la foto quedó esperando motivo, se pide ahora.
@@ -356,19 +381,23 @@ struct ComidasView: View {
     }
 
     @MainActor
-    private func register(checkIn: Bool, photo captured: CapturedGeoPhoto, reason: String?) async -> LunchRegisterOutcome {
+    private func register(checkIn: Bool, enOficina: Bool, motivoFuera: String?, photo captured: CapturedGeoPhoto, reason: String?) async -> LunchRegisterOutcome {
         do {
             let sent: Bool
             if checkIn {
                 sent = try await LunchCoreRepository.shared.checkIn(
                     photoDataUrl: captured.dataUrl,
                     justificacion: reason,
+                    fotoTipo: ComidasFotoRules.fotoTipo(enOficina: enOficina),
+                    motivoFuera: motivoFuera,
                     at: serverNow()
                 )
             } else {
                 sent = try await LunchCoreRepository.shared.checkOut(
                     photoDataUrl: captured.dataUrl,
                     justificacion: reason,
+                    fotoTipo: ComidasFotoRules.fotoTipo(enOficina: enOficina),
+                    motivoFuera: motivoFuera,
                     at: serverNow()
                 )
             }
@@ -592,6 +621,12 @@ private struct LunchTeamRowCard: View {
                     }
                 }
             }
+            if let text = record.checkinMotivoFuera, !text.isEmpty {
+                NxIconText(systemName: "text.bubble", text: "Salió fuera de oficina: «\(text)»")
+            }
+            if let text = record.checkoutMotivoFuera, !text.isEmpty {
+                NxIconText(systemName: "text.bubble", text: "Regresó fuera de oficina: «\(text)»")
+            }
             if let text = record.checkinJustificacion, !text.isEmpty {
                 NxIconText(systemName: "text.bubble", text: "Salida a las \(LunchUI.hour(record.checkinTime)): «\(text)»").font(.caption)
             }
@@ -629,6 +664,47 @@ private struct LunchTeamRowCard: View {
             .buttonStyle(.bordered)
             .font(.subheadline)
             .controlSize(.large)
+        }
+    }
+}
+
+/// Antes de la cámara: todos toman foto de su escritorio, y quien no está en oficina se toma la personal
+/// diciendo por qué (Adam, 04-11). No cuenta en KPI ni en nómina: lo ve quien revisa comidas.
+private struct LunchLugarSheet: View {
+    let onElegir: (_ enOficina: Bool, _ motivo: String?) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var fuera = false
+    @State private var motivo = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if fuera {
+                    Section("Te tomas la foto personal. Di por qué no estás en oficina: lo ve quien revisa comidas.") {
+                        ForEach(ComidasFotoRules.motivosFuera, id: \.self) { opcion in
+                            Button(opcion) { motivo = opcion }
+                        }
+                        TextField("¿Por qué?", text: $motivo)
+                    }
+                    Section {
+                        Button("Tomar foto personal") { onElegir(false, motivo) }
+                            .disabled(!ComidasFotoRules.motivoValido(motivo))
+                    }
+                } else {
+                    Section("En oficina, la foto es de tu escritorio limpio y en orden.") {
+                        Button("Estoy en oficina") { onElegir(true, nil) }
+                        Button("No estoy en oficina") { fuera = true }
+                    }
+                }
+            }
+            .navigationTitle("¿Dónde estás?")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
+                }
+            }
         }
     }
 }

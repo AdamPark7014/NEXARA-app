@@ -38,6 +38,12 @@ object ComidasRules {
     }
 
     const val MIN_JUSTIFICACION = 5
+    /** Lo que pide la API para una foto personal. */
+    const val MIN_MOTIVO_FUERA = 3
+    const val FOTO_ESCRITORIO = "escritorio"
+    const val FOTO_PERSONAL = "personal"
+    /** Motivos de un toque para quien no está en oficina (Adam, 04-11). */
+    val MOTIVOS_FUERA = listOf("En obra", "Con un cliente", "En ruta", "Trabajando en casa")
     const val SALIDA = "salida"
     const val REGRESO = "regreso"
 
@@ -111,6 +117,24 @@ object ComidasRules {
     fun minutosDesde(iso: String?, serverNowMs: Long): Long {
         val desde = CoreActivityRules.parseInstant(iso)?.toEpochMilli() ?: return 0
         return ((serverNowMs - desde) / 60_000.0).let { Math.round(it) }.coerceAtLeast(0)
+    }
+
+    fun motivoFueraValido(texto: String?): Boolean = (texto?.trim()?.length ?: 0) >= MIN_MOTIVO_FUERA
+
+    fun fotoTipo(enOficina: Boolean): String = if (enOficina) FOTO_ESCRITORIO else FOTO_PERSONAL
+
+    fun tituloCamara(momento: String, enOficina: Boolean): String = when {
+        enOficina && momento == SALIDA -> "Foto de tu escritorio limpio"
+        enOficina -> "Foto de tu escritorio en orden"
+        momento == SALIDA -> "Foto de salida a comer"
+        else -> "Foto de regreso de comer"
+    }
+
+    fun subtituloCamara(momento: String, enOficina: Boolean): String = when {
+        enOficina && momento == SALIDA -> "Déjalo en orden antes de salir: se guarda con la hora en que sales."
+        enOficina -> "Al volver a tu lugar: se guarda con la hora en que regresas."
+        momento == SALIDA -> "Acomódate y toma la foto: se guarda con la hora en que sales."
+        else -> "Toma la foto al volver a tu lugar: se guarda con la hora en que regresas."
     }
 
     fun justificacionValida(texto: String?): Boolean = (texto?.trim()?.length ?: 0) >= MIN_JUSTIFICACION
