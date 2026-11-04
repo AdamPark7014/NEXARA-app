@@ -50,7 +50,10 @@ export class PageContentService {
     return withTenantBypassAsync(() => resolvePublicCompanyId(this.prisma));
   }
 
-  /** Sitio público: solo contenido publicado del tenant público. */
+  /**
+   * Sitio público, sin sesión: solo lo publicado. Lista blanca: la fila trae el borrador de Studio y quién lo
+   * editó. La web solo lee `content` (`fetchPageSection`).
+   */
   async findPublished(section: string) {
     const companyId = await this.publicCompanyId();
     // El `await` adentro hace falta: una consulta de Prisma corre al esperarla, y sin él el filtro de la
@@ -61,12 +64,7 @@ export class PageContentService {
       });
     });
     if (!row) throw new NotFoundException(`Sección "${section}" no tiene contenido publicado todavía.`);
-    return {
-      ...row,
-      content: row.content,
-      isDraft: false,
-      hasUnpublishedChanges: this.hasUnpublishedChanges(row),
-    };
+    return { section: row.section, content: row.content };
   }
 
   /** Studio: borrador del tenant activo. */

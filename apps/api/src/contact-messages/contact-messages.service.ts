@@ -43,8 +43,8 @@ export class ContactMessagesService {
       }),
     );
 
-    // Notify the new contact via realtime
-    this.realtimeGateway.emit('contacts:changed', {
+    // Trae nombre y correo: solo al personal de la empresa que lo recibió.
+    this.realtimeGateway.emitToCompany(message.companyId, 'contacts:changed', {
       type: 'created',
       message,
     });
@@ -128,7 +128,7 @@ export class ContactMessagesService {
       },
     });
 
-    this.realtimeGateway.emit('leads:changed', { type: 'created', lead });
+    this.realtimeGateway.emitToCompany(companyId, 'leads:changed', { type: 'created', lead });
     return lead;
   }
 
@@ -390,7 +390,7 @@ export class ContactMessagesService {
       },
     });
 
-    this.realtimeGateway.emit('contacts:changed', {
+    this.realtimeGateway.emitToCompany(existing.companyId, 'contacts:changed', {
       type: 'updated',
       message,
     });
@@ -399,12 +399,13 @@ export class ContactMessagesService {
   }
 
   async remove(id: number, companyId?: number | null) {
-    await this.findOne(id, companyId);
+    const existing = await this.findOne(id, companyId);
     const removed = await this.db.contactMessage.delete({
       where: { id },
     });
 
-    this.realtimeGateway.emit('contacts:changed', {
+    // De `existing`: con el filtro de empresa puesto, `delete` regresa la cuenta, no la fila.
+    this.realtimeGateway.emitToCompany(existing.companyId, 'contacts:changed', {
       type: 'deleted',
       message: removed,
     });

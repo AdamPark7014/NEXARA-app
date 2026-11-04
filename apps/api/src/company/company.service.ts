@@ -60,6 +60,7 @@ export class CompanyService {
    * Resuelve empresa para un request autenticado.
    * Super-admin puede operar cualquier empresa activa.
    * Usuarios normales requieren membresía UserCompany.
+   * Sin persona no hay membresía que revisar: la empresa pedida no cuenta y queda la primaria.
    */
   async resolveForUser(input: {
     companyId?: number;
@@ -69,7 +70,7 @@ export class CompanyService {
     const primary = await this.get();
 
     if (!input.userId) {
-      return this.resolve(input.companyId || primary.id);
+      return primary;
     }
 
     if (input.isSuperAdmin) {
