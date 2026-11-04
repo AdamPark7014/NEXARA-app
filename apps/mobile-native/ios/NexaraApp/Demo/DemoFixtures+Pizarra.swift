@@ -97,6 +97,54 @@ extension DemoStore {
         ])
     }
 
+    /// `me/que-sigue`: lo que le sale a quien no trae nada corriendo.
+    func fxQueSigue() -> DemoJSON {
+        func sugerencia(_ clave: String, _ tipo: String, _ titulo: String, _ detalle: String) -> DemoJSON {
+            dj(["clave": clave, "tipo": tipo, "titulo": titulo, "detalle": detalle, "accion": "empezar"])
+        }
+        return dj([
+            "aplica": true,
+            "area": "comercial",
+            "resumen": "También tienes 3 cotizaciones que vencen esta semana.",
+            "sugerencias": [
+                sugerencia("contacto:1", "contacto", "Llamar a Laura Méndez", "Pidió contacto por la página y nadie le ha respondido"),
+                sugerencia("fija:prospectos", "fija", "Buscar 5 prospectos nuevos", "Comercial · 1 hora"),
+            ],
+        ])
+    }
+
+    /// `me/pendientes`: la lista personal.
+    func fxPendientes() -> DemoJSON {
+        dj(["pendientes": [dj(["id": 1, "texto": "Pedir los datos de la fianza"])]])
+    }
+
+    /// `proyectos/:id`: un proyecto con todas sus secciones.
+    func fxProyectoDetalle(id: Int) -> DemoJSON {
+        dj([
+            "id": id,
+            "title": "Modernización eléctrica",
+            "status": "ACTIVE",
+            "objective": "Dejar el edificio con instalación nueva y documentada.",
+            "startDate": "2026-09-01",
+            "endDate": "2026-12-15",
+            "client": dj(["id": 1, "name": "Grupo de ejemplo"]),
+            "responsable": dj(["id": 2, "nombre": "Encargado de ejemplo"]),
+            "resumen": dj(["avance": dj(["total": 12, "cerradas": 8, "abiertas": 4, "porcentaje": 67, "origen": "actividades"])]),
+            "milestones": [
+                dj(["id": 1, "name": "Levantamiento", "orden": 1, "status": "CUMPLIDO", "plannedDate": "2026-09-15"]),
+                dj(["id": 2, "name": "Energización", "orden": 2, "status": "EN_CURSO", "plannedDate": "2026-11-20"]),
+            ],
+            "scopeItems": [
+                dj(["id": 1, "kind": "ENTREGABLE", "titulo": "Tableros nuevos", "orden": 1]),
+                dj(["id": 2, "kind": "EXCLUSION", "titulo": "Obra civil", "orden": 1]),
+            ],
+            "requirements": [dj(["id": 1, "titulo": "Planos aprobados", "status": "CUMPLIDO"])],
+            "members": [dj(["id": 1, "role": "RESPONSABLE", "user": dj(["id": 2, "nombre": "Encargado de ejemplo"])])],
+            "documents": [dj(["id": 1, "nombre": "Planos.pdf"])],
+            "activities": [dj(["id": 1, "anNumber": "AN-100", "titulo": "Visita de obra", "estatus": "En Proceso"])],
+        ])
+    }
+
     /// `me/revisiones`: dos de lo que repartí esperan mi visto bueno (una es corrección
     /// reenviada), para que la pizarra enseñe «En espera de revisión».
     func fxRevisiones(now: Date) -> DemoJSON {

@@ -122,6 +122,7 @@ extension DemoStore {
             if isGet { return reply(fxOperationalProjects()) }
             return reply(dj(["id": 7100, "ok": true]))
         case "proyectos":
+            if isGet, let id = intAt(parts, 1) { return reply(fxProyectoDetalle(id: id)) }
             return reply(fxProyectos())
         case "stock":
             if isGet, parts.count >= 2, parts[1] == "levels" { return reply(fxStockLevels()) }
@@ -197,6 +198,10 @@ extension DemoStore {
             return reply(fxCelebraciones(now: now))
         case "revisiones":
             return reply(fxRevisiones(now: now))
+        case "que-sigue":
+            return reply(fxQueSigue())
+        case "pendientes":
+            return reply(fxPendientes())
         case "kpis":
             let range = ConsoleHelpersFallback.range(query)
             return reply(fxKpis(desde: range.desde, hasta: range.hasta))

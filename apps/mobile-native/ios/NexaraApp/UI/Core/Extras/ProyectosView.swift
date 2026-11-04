@@ -6,7 +6,7 @@ import SwiftUI
 /// frase. La lista sigue poniendo arriba lo que va tarde, y no lo explica.
 struct ProyectosView: View {
     /// El proyecto que abrió un aviso: va primero, aunque el filtro lo esconda.
-    /// Aquí no hay ficha de proyecto; verlo arriba y marcado evita buscarlo en la lista.
+    /// Verlo arriba y marcado evita buscarlo en la lista.
     var resaltarId: Int?
     @State private var estado = CoreExtrasEstado<[ProyectoResumenFila]>()
     @State private var filtro: ProyectosRules.Filtro = .activos
@@ -60,7 +60,16 @@ struct ProyectosView: View {
                             titulo: filtro.etiqueta,
                             trailing: "\(visibles.count)"
                         )
-                        ForEach(visibles) { TarjetaDeProyecto(proyecto: $0, resaltado: $0.id == resaltarId) }
+                        ForEach(visibles) { proyecto in
+                            NavigationLink {
+                                ProyectoDetalleView(proyectoId: proyecto.id)
+                                    .nxBrandNavBar(title: "Proyecto")
+                            } label: {
+                                TarjetaDeProyecto(proyecto: proyecto, resaltado: proyecto.id == resaltarId)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("proyecto-tarjeta")
+                        }
                     }
                 }
 

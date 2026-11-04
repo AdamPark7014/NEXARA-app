@@ -52,7 +52,9 @@ struct InicioView: View {
     /// En modo demo `CoreOrg.isCeo` es verdadero para la persona ficticia: ahí sí hay cola propia.
     /// En demo, solo con `NEXARA_DEMO_CEO=1` (captura de paridad del tablero de dirección).
     private var esDireccion: Bool {
-        DemoMode.isActive ? DemoMode.inicioDireccion : CoreOrg.isCeo(session.currentUser?.email)
+        DemoMode.isActive
+            ? DemoMode.inicioDireccion
+            : CoreOrg.esDireccion(email: session.currentUser?.email, roleKey: session.currentUser?.roleKey)
     }
 
     var body: some View {

@@ -36,6 +36,8 @@ data class ViaticosUiState(
     val delEquipo: List<ViaticoDto> = emptyList(),
     val miUsuarioId: Long? = null,
     val puedeAutorizar: Boolean = false,
+    /** Dirección no pide: abre directo en lo del equipo. */
+    val pideViaticos: Boolean = true,
     /** Alta en curso (incluye la subida de la foto). */
     val enviando: Boolean = false,
     val accionError: String? = null,
@@ -56,6 +58,7 @@ class ViaticosViewModel(app: Application) : AndroidViewModel(app) {
         ViaticosUiState(
             miUsuarioId = repo.miUsuarioId(),
             puedeAutorizar = repo.administraViaticos(),
+            pideViaticos = repo.pideViaticos(),
         ),
     )
     val state: StateFlow<ViaticosUiState> = _state

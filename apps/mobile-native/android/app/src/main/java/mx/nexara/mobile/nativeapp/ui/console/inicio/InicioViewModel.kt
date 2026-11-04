@@ -83,7 +83,7 @@ class InicioViewModel(app: Application) : AndroidViewModel(app) {
         authRepo.loadSession().let { session ->
             InicioUiState(
                 tieneActividades = CoreMenu.canOpen(session, CoreKeys.ACTIVITIES),
-                esDireccion = PlatformAccounts.isCeoEquivalentEmail(session?.email),
+                esDireccion = PlatformAccounts.esDireccion(session?.email, session?.roleKey),
             )
         },
     )

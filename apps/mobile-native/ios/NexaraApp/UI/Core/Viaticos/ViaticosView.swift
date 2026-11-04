@@ -24,6 +24,7 @@ struct ViaticosView: View {
     @State private var error: String?
     @State private var pestana = PestanaViaticos.mios
     @State private var pidiendo = false
+    @State private var asignando = false
     @State private var mensaje: String?
     @State private var decision: Viatico?
     @State private var destino: ViaticoDestino?
@@ -51,9 +52,14 @@ struct ViaticosView: View {
     /// Cuántos del equipo esperan una decisión: es la insignia de la pestaña.
     private var porAutorizar: Int { delEquipo.filter(\.estaPendiente).count }
 
-    private var hayEquipo: Bool { ViaticoSesion.administra && !delEquipo.isEmpty }
+    /// Dirección solo ve lo del equipo; los demás mandos, sus pestañas si tienen a alguien.
+    private var soloEquipo: Bool { !ViaticoSesion.pide }
 
-    private var enEquipo: Bool { hayEquipo && pestana == .equipo }
+    private var hayEquipo: Bool { !soloEquipo && ViaticoSesion.administra && !delEquipo.isEmpty }
+
+    private var enEquipo: Bool { soloEquipo || (hayEquipo && pestana == .equipo) }
+
+    private var asignar: Bool { enEquipo && ViaticoSesion.administra }
 
     private var lista: [Viatico] { enEquipo ? delEquipo : mios }
 
@@ -118,12 +124,19 @@ struct ViaticosView: View {
         }
         .nxScreenBackground()
         // Pedir es la acción de esta pantalla: siempre a la mano del pulgar.
-        .nxFab("Pedir viático", systemImage: "plus", visible: !vacioYaInvita) {
-            pidiendo = true
+        .nxFab(asignar ? "Asignar viático" : "Pedir viático", systemImage: "plus", visible: !vacioYaInvita && (asignar || !soloEquipo)) {
+            if asignar { asignando = true } else { pidiendo = true }
         }
         .avisoSnackbar($mensaje, abajo: 72)
         .task {
             if !cargado { await cargar() }
+        }
+        .navigationDestination(isPresented: $asignando) {
+            AsignarViaticoView(onCreado: {
+                mensaje = "Viático asignado"
+                Task { await cargar() }
+            })
+            .nxBrandNavBar(title: "Asignar viático")
         }
         .navigationDestination(isPresented: $pidiendo) {
             NuevoViaticoView(onCreado: { texto in

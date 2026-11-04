@@ -7,7 +7,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import mx.nexara.mobile.nativeapp.data.api.AprobarLoteRequest
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
+import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
+import mx.nexara.mobile.nativeapp.data.console.GastosRepository
+import mx.nexara.mobile.nativeapp.data.viaticos.ViaticosRepository
+import mx.nexara.mobile.nativeapp.ui.console.gastos.GastosRules
 import mx.nexara.mobile.nativeapp.data.console.AprobacionesRepository
 
 /**
@@ -32,6 +37,14 @@ data class AprobacionesUiState(
     val errorDecision: String? = null,
     /** El servidor confirmó, y dice exactamente qué hizo. */
     val avisoDecision: String? = null,
+    /** Evidencias en espera: lo que más le llega a dirección y a los encargados. */
+    val evidencias: BandejaRules.Evidencias = BandejaRules.Evidencias(),
+    /** Viáticos del equipo por autorizar; abren su pantalla. */
+    val viaticos: Int = 0,
+    /** Gastos por autorizar; abren su pantalla. */
+    val gastos: Int = 0,
+    /** Va en camino un lote. Bloquea también las decisiones sueltas. */
+    val aprobandoLote: Boolean = false,
 )
 
 /**
@@ -55,6 +68,9 @@ data class AprobacionesUiState(
 class AprobacionesViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = AprobacionesRepository(app.applicationContext)
+    private val actividades = CoreActivitiesRepository(app.applicationContext)
+    private val viaticosRepo = ViaticosRepository(app.applicationContext)
+    private val gastosRepo = GastosRepository(app.applicationContext)
 
     private val _state = MutableStateFlow(AprobacionesUiState())
     val state: StateFlow<AprobacionesUiState> = _state
@@ -100,12 +116,26 @@ class AprobacionesViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             try {
-                val filas = AprobacionesRules.ordenadas(repo.pendientes())
+                // A varios mandos el flujo de firmas les contesta 403 y aun así tienen evidencias que
+                // revisar: la bandeja solo falla si no se pudo leer ninguna de las dos.
+                val revisiones = runCatching { actividades.revisionesPendientes() }
+                val firmas = runCatching { repo.pendientes() }
+                revisiones.exceptionOrNull()?.takeIf { firmas.isFailure }?.let { throw firmas.exceptionOrNull() ?: it }
+                val viaticos = contar(viaticosRepo.administraViaticos()) {
+                    val yo = viaticosRepo.miUsuarioId()
+                    viaticosRepo.lista().count { v -> yo != null && v.usuarioId != null && v.usuarioId != yo && v.estaPendiente() }
+                }
+                val gastos = contar(gastosRepo.administraGastos()) {
+                    gastosRepo.lista().count(GastosRules::puedeAutorizar)
+                }
                 _state.update {
                     it.copy(
                         cargando = false,
                         refrescando = false,
-                        filas = filas,
+                        filas = AprobacionesRules.ordenadas(firmas.getOrNull().orEmpty()),
+                        evidencias = BandejaRules.separar(revisiones.getOrNull().orEmpty()),
+                        viaticos = viaticos,
+                        gastos = gastos,
                         error = null,
                         avisoRefresco = null,
                     )
@@ -115,13 +145,42 @@ class AprobacionesViewModel(app: Application) : AndroidViewModel(app) {
                 // `toUserMessage`: un 403 del guard RBAC dice qué permiso falta.
                 val mensaje = e.toUserMessage("No se pudieron cargar las aprobaciones")
                 _state.update {
-                    if (it.filas.isNotEmpty()) {
+                    if (BandejaRules.hayAlgo(it.filas.size, it.evidencias, it.viaticos, it.gastos)) {
                         it.copy(cargando = false, refrescando = false, avisoRefresco = mensaje)
                     } else {
                         it.copy(cargando = false, refrescando = false, error = mensaje)
                     }
                 }
             }
+        }
+    }
+
+    /** Lo de otras pantallas es un extra: si falla, esa fila no sale y la bandeja sigue. */
+    private suspend fun contar(aplica: Boolean, cuenta: suspend () -> Int): Int =
+        if (aplica) runCatching { cuenta() }.getOrDefault(0) else 0
+
+    /** Aprueba lo que te toca de un jalón; lo que no pasó se queda en la lista, con su motivo por separado. */
+    fun aprobarLote(estrellas: Int, nota: String) {
+        val estado = _state.value
+        if (estado.aprobandoLote || estado.decidiendo != null) return
+        val items = BandejaRules.loteDe(estado.evidencias)
+        if (items.isEmpty() || !BandejaRules.calificacionValida(estrellas) || !BandejaRules.notaValida(nota)) return
+        _state.update { it.copy(aprobandoLote = true, errorDecision = null, avisoDecision = null) }
+        viewModelScope.launch {
+            try {
+                val r = actividades.aprobarRevisionesLote(AprobarLoteRequest(items, estrellas, nota.trim()))
+                _state.update {
+                    it.copy(
+                        aprobandoLote = false,
+                        avisoDecision = BandejaRules.mensajeLote(r.aprobadas.orEmpty().size, r.fallidas.orEmpty().size),
+                    )
+                }
+            } catch (e: Throwable) {
+                _state.update {
+                    it.copy(aprobandoLote = false, errorDecision = e.toUserMessage("No se pudieron aprobar"))
+                }
+            }
+            cargar(refresco = true)
         }
     }
 

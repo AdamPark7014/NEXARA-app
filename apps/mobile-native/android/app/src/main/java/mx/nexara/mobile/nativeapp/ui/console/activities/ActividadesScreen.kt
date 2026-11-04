@@ -71,6 +71,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.SessionUser
 import mx.nexara.mobile.nativeapp.data.api.BoardAsignadaPorMiDto
@@ -136,7 +137,7 @@ fun ActividadesScreen(
     val user = remember(context) { AuthRepository(context).loadSession() }
     val repo = remember(context) { CoreActivitiesRepository(context) }
     val prefs = remember(context) { context.getSharedPreferences(ACTIVIDADES_PREFS, Context.MODE_PRIVATE) }
-    val isCeo = CoreActivityRules.isCeoEmail(user?.email)
+    val isCeo = PlatformAccounts.esDireccion(user?.email, user?.roleKey)
 
     var vista by rememberSaveable(initialVista) {
         mutableStateOf(

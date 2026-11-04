@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.nexara.mobile.nativeapp.data.api.ProyectoResumenDto
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
@@ -44,7 +45,11 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.nxFriendlyError
  * frase. Los filtros y los textos viven en [ProyectosRules], que se prueba sin Android.
  */
 @Composable
-fun ProyectosScreen(vm: ProyectosViewModel = viewModel(), resaltarId: Long? = null) {
+fun ProyectosScreen(
+    vm: ProyectosViewModel = viewModel(),
+    resaltarId: Long? = null,
+    onOpenProyecto: (Long) -> Unit = {},
+) {
     val state by vm.state.collectAsState()
     val filtro by vm.filtro.collectAsState()
     val consulta by vm.consulta.collectAsState()
@@ -134,7 +139,7 @@ fun ProyectosScreen(vm: ProyectosViewModel = viewModel(), resaltarId: Long? = nu
                         )
                     }
                     items(visibles, key = { it.id ?: it.hashCode().toLong() }) { proyecto ->
-                        TarjetaDeProyecto(proyecto, resaltado = proyecto.id != null && proyecto.id == resaltarId)
+                        TarjetaDeProyecto(proyecto, resaltado = proyecto.id != null && proyecto.id == resaltarId, onOpen = onOpenProyecto)
                     }
                 }
             }
@@ -146,7 +151,7 @@ fun ProyectosScreen(vm: ProyectosViewModel = viewModel(), resaltarId: Long? = nu
 
 /** Un proyecto: un dato por renglón. El porcentaje desconocido no se pinta como cero. */
 @Composable
-private fun TarjetaDeProyecto(proyecto: ProyectoResumenDto, resaltado: Boolean = false) {
+private fun TarjetaDeProyecto(proyecto: ProyectoResumenDto, resaltado: Boolean = false, onOpen: (Long) -> Unit = {}) {
     val salud = ProyectosRules.saludDe(proyecto)
     val tono = when (salud) {
         ProyectosRules.Salud.RETRASADO -> NxTone.Danger
@@ -159,11 +164,13 @@ private fun TarjetaDeProyecto(proyecto: ProyectoResumenDto, resaltado: Boolean =
     val avance = ProyectosRules.avancePct(proyecto)
 
     MoreTarjeta(
-        modifier = if (resaltado) {
-            Modifier.border(2.dp, NxColors.Brand, RoundedCornerShape(NxDimens.PanelRadius))
-        } else {
-            Modifier
-        },
+        modifier = (
+            if (resaltado) {
+                Modifier.border(2.dp, NxColors.Brand, RoundedCornerShape(NxDimens.PanelRadius))
+            } else {
+                Modifier
+            }
+            ).then(proyecto.id?.let { id -> Modifier.clickable { onOpen(id) } } ?: Modifier),
     ) {
         Text(
             proyecto.title?.trim()?.ifEmpty { null } ?: "Proyecto sin título",

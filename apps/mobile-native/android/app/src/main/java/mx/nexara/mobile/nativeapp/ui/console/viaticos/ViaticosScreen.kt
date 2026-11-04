@@ -62,6 +62,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.rememberNxSnackbarHostState
 fun ViaticosScreen(
     onAbrirViatico: (Long) -> Unit,
     onNuevoViatico: () -> Unit,
+    onAsignarViatico: () -> Unit = {},
     /** Se pone a true al volver del alta, para releer del servidor. */
     recargar: Boolean = false,
     onRecargaConsumida: () -> Unit = {},
@@ -84,8 +85,11 @@ fun ViaticosScreen(
         snackbar.showSnackbar(msg)
     }
 
-    val hayEquipo = state.puedeAutorizar && state.delEquipo.isNotEmpty()
-    val lista = if (hayEquipo && pestana == 1) state.delEquipo else state.mios
+    // Dirección solo ve lo del equipo; los demás mandos, sus pestañas si tienen a alguien.
+    val soloEquipo = !state.pideViaticos
+    val hayEquipo = !soloEquipo && state.puedeAutorizar && state.delEquipo.isNotEmpty()
+    val enEquipo = soloEquipo || (hayEquipo && pestana == 1)
+    val lista = if (enEquipo) state.delEquipo else state.mios
 
     NxScreenScaffold(isRefreshing = state.refreshing, onRefresh = { vm.cargar(refresh = true) }) {
         Column(Modifier.fillMaxSize()) {
@@ -143,14 +147,14 @@ fun ViaticosScreen(
                 items(lista, key = { it.id }) { viatico ->
                     TarjetaViatico(
                         viatico = viatico,
-                        mostrarPersona = hayEquipo && pestana == 1,
+                        mostrarPersona = enEquipo,
                         onClick = { onAbrirViatico(viatico.id) },
                     )
                 }
 
                 if (!state.loading && lista.isEmpty()) {
                     item {
-                        if (hayEquipo && pestana == 1) {
+                        if (enEquipo) {
                             NxEmptyState(
                                 title = "Nada por autorizar",
                                 subtitle = "Tu equipo no tiene viáticos esperando decisión.",
@@ -177,12 +181,13 @@ fun ViaticosScreen(
         // mismo botón: ahí eran dos primarios a la vez para una sola acción
         // (regla 4), uno encima del otro y con distinta etiqueta —«Pedir un
         // viático» y «Pedir viático»— como si fueran cosas distintas.
-        val vacioYaInvita = !state.loading && lista.isEmpty() && !(hayEquipo && pestana == 1)
-        if (!vacioYaInvita) {
+        val vacioYaInvita = !state.loading && lista.isEmpty() && !enEquipo
+        val asignar = enEquipo && state.puedeAutorizar
+        if (!vacioYaInvita && (asignar || !soloEquipo)) {
             ExtendedFloatingActionButton(
-                onClick = onNuevoViatico,
+                onClick = if (asignar) onAsignarViatico else onNuevoViatico,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Pedir viático", fontWeight = FontWeight.SemiBold) },
+                text = { Text(if (asignar) "Asignar viático" else "Pedir viático", fontWeight = FontWeight.SemiBold) },
                 containerColor = NxColors.Brand,
                 contentColor = Color.White,
                 modifier = Modifier
