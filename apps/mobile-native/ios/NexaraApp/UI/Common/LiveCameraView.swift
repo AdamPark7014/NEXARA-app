@@ -228,6 +228,8 @@ struct GeoPhotoCaptureView: View {
     var onRafaga: ((CapturedGeoPhoto) -> Void)? = nil
     /// Aviso de quien llama mientras la cámara sigue abierta (una foto de la ráfaga que no se guardó).
     var aviso: String? = nil
+    /// Abre con la de frente (la foto personal de la comida). Por omisión, la de atrás.
+    var abrirConFrontal: Bool = false
     /// `nil` si se guardó; si no, el mensaje a mostrar sin cerrar la vista.
     let onConfirm: (CapturedGeoPhoto) async -> String?
     let onCancel: () -> Void
@@ -265,6 +267,7 @@ struct GeoPhotoCaptureView: View {
                 if captured == nil && onRafaga == nil { captured = DemoImages.capturedPhoto(title: title) }
             } else {
                 camera.start()
+                if abrirConFrontal && !camera.usingFrontCamera { camera.switchCamera() }
             }
         }
         .onDisappear { camera.stop() }

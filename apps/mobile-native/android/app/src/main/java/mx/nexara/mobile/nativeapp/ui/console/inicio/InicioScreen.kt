@@ -323,6 +323,15 @@ fun InicioScreen(
                         }
                     }
                 }
+                // Ola 6: lo que puede hacer si no trae nada corriendo, y su lista de pendientes.
+                if (!state.isLoading && QueSigueRules.mostrar(state.esDireccion, state.open.any { it.enCurso == true })) {
+                    item(key = "que-sigue") {
+                        QueSigueSection(
+                            onOpenActivity = { onOpenActivity(it, null) },
+                            onOpenActividades = onOpenActividades,
+                        )
+                    }
+                }
             } else if (attendanceVm == null) {
                 item(key = "sin-modulos") {
                     TodoAlDiaCard(hechasHoy = 0, onVerTodas = null)

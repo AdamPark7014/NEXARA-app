@@ -38,6 +38,9 @@ data class ComidaRegistroDto(
     val isCheckoutLate: Boolean? = null,
     val checkinJustificacion: String? = null,
     val checkoutJustificacion: String? = null,
+    /** Por qué no estaba en oficina, cuando la foto es personal. */
+    val checkinMotivoFuera: String? = null,
+    val checkoutMotivoFuera: String? = null,
     /** null = a tiempo · PENDIENTE | APROBADA | RECHAZADA cuando fue a destiempo. */
     val revisionEstado: String? = null,
     val revisionNotas: String? = null,
@@ -87,12 +90,18 @@ data class ComidaSalidaRequest(
     val checkinTime: String,
     val checkinPhotoUrl: String,
     val justificacion: String? = null,
+    /** escritorio | personal */
+    val fotoTipo: String? = null,
+    val motivoFuera: String? = null,
 )
 
 data class ComidaRegresoRequest(
     val checkoutTime: String,
     val checkoutPhotoUrl: String,
     val justificacion: String? = null,
+    /** escritorio | personal */
+    val fotoTipo: String? = null,
+    val motivoFuera: String? = null,
 )
 
 data class ComidaRevisionRequest(

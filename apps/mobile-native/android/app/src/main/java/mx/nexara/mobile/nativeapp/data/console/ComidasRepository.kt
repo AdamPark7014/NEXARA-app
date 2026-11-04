@@ -25,22 +25,26 @@ class ComidasRepository(context: Context) {
     suspend fun equipo(fecha: String? = null): ComidaEquipoDto = api.equipo(fecha)
 
     /** @return false si quedó en la cola sin conexión (se envía al volver la red). */
-    suspend fun registrarSalida(horaIso: String, fotoDataUrl: String, justificacion: String?): Boolean =
+    suspend fun registrarSalida(horaIso: String, fotoDataUrl: String, justificacion: String?, fotoTipo: String, motivoFuera: String?): Boolean =
         !api.salida(
             ComidaSalidaRequest(
                 checkinTime = horaIso,
                 checkinPhotoUrl = fotoDataUrl,
                 justificacion = justificacion?.trim()?.takeIf { it.isNotEmpty() },
+                fotoTipo = fotoTipo,
+                motivoFuera = motivoFuera?.trim()?.takeIf { it.isNotEmpty() },
             ),
         ).isQueued()
 
     /** @return false si quedó en la cola sin conexión. */
-    suspend fun registrarRegreso(horaIso: String, fotoDataUrl: String, justificacion: String?): Boolean =
+    suspend fun registrarRegreso(horaIso: String, fotoDataUrl: String, justificacion: String?, fotoTipo: String, motivoFuera: String?): Boolean =
         !api.regreso(
             ComidaRegresoRequest(
                 checkoutTime = horaIso,
                 checkoutPhotoUrl = fotoDataUrl,
                 justificacion = justificacion?.trim()?.takeIf { it.isNotEmpty() },
+                fotoTipo = fotoTipo,
+                motivoFuera = motivoFuera?.trim()?.takeIf { it.isNotEmpty() },
             ),
         ).isQueued()
 

@@ -119,6 +119,9 @@ fun ComidasPanel(
 
     var registro by remember { mutableStateOf<RegistroEnCurso?>(null) }
     var camaraAbierta by remember { mutableStateOf(false) }
+    var eligeLugar by remember { mutableStateOf(false) }
+    var enOficina by remember { mutableStateOf(true) }
+    var motivoFuera by remember { mutableStateOf("") }
     var foto by remember { mutableStateOf<GeoPhoto?>(null) }
     var pideMotivo by remember { mutableStateOf(false) }
     var motivo by remember { mutableStateOf("") }
@@ -180,13 +183,15 @@ fun ComidasPanel(
         motivo = ""
         registroError = null
         foto = null
-        camaraAbierta = true
+        motivoFuera = ""
+        eligeLugar = true
     }
 
     fun cerrarRegistro() {
         registro = null
         foto = null
         camaraAbierta = false
+        eligeLugar = false
         registroError = null
     }
 
@@ -204,10 +209,12 @@ fun ComidasPanel(
             try {
                 val hora = ComidasRules.ahoraIso()
                 val enviado = withContext(Dispatchers.IO) {
+                    val tipo = ComidasRules.fotoTipo(enOficina)
+                    val fuera = motivoFuera.takeUnless { enOficina }
                     if (r.momento == ComidasRules.SALIDA) {
-                        repo.registrarSalida(hora, f.dataUrl, texto)
+                        repo.registrarSalida(hora, f.dataUrl, texto, tipo, fuera)
                     } else {
-                        repo.registrarRegreso(hora, f.dataUrl, texto)
+                        repo.registrarRegreso(hora, f.dataUrl, texto, tipo, fuera)
                     }
                 }
                 if (enviado) {
@@ -342,17 +349,31 @@ fun ComidasPanel(
     }
 
     val enCurso = registro
+    if (enCurso != null && eligeLugar) {
+        LugarFotoDialog(
+            motivo = motivoFuera,
+            onMotivo = { motivoFuera = it.take(300) },
+            onOficina = {
+                enOficina = true
+                motivoFuera = ""
+                eligeLugar = false
+                camaraAbierta = true
+            },
+            onFuera = {
+                enOficina = false
+                eligeLugar = false
+                camaraAbierta = true
+            },
+            onCancelar = { cerrarRegistro() },
+        )
+    }
     if (enCurso != null && camaraAbierta) {
         LiveCameraCaptureDialog(
-            title = if (enCurso.momento == ComidasRules.SALIDA) "Foto de salida a comer" else "Foto de regreso de comer",
+            title = ComidasRules.tituloCamara(enCurso.momento, enOficina),
             requireLocation = false,
             captureLocation = false,
-            frontCamera = true,
-            subtitle = if (enCurso.momento == ComidasRules.SALIDA) {
-                "Acomódate y toma la foto: se guarda con la hora en que sales."
-            } else {
-                "Toma la foto al volver a tu lugar: se guarda con la hora en que regresas."
-            },
+            frontCamera = !enOficina,
+            subtitle = ComidasRules.subtituloCamara(enCurso.momento, enOficina),
             onCaptured = { photo ->
                 foto = photo
                 camaraAbierta = false
@@ -626,6 +647,8 @@ private fun FilaComidaCard(
                 }
             }
             val justificaciones = listOfNotNull(
+                r.checkinMotivoFuera?.takeIf { it.isNotBlank() }?.let { "Salió fuera de oficina: «$it»" },
+                r.checkoutMotivoFuera?.takeIf { it.isNotBlank() }?.let { "Regresó fuera de oficina: «$it»" },
                 r.checkinJustificacion?.takeIf { it.isNotBlank() }?.let {
                     "Salida a las ${CoreActivityRules.formatClock(r.checkinTime)}: «$it»"
                 },
@@ -663,6 +686,75 @@ private fun FilaComidaCard(
                     OutlinedButton(onClick = { onRevisar(fila, r.revisionEstado != "APROBADA") }) {
                         Text("Cambiar decisión", fontSize = 13.sp)
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Antes de la cámara: todos toman foto de su escritorio, y quien no está en oficina se toma la personal
+ * diciendo por qué (Adam, 04-11). No cuenta en KPI ni en nómina: lo ve quien revisa comidas.
+ */
+@Composable
+private fun LugarFotoDialog(
+    motivo: String,
+    onMotivo: (String) -> Unit,
+    onOficina: () -> Unit,
+    onFuera: () -> Unit,
+    onCancelar: () -> Unit,
+) {
+    var fuera by remember { mutableStateOf(false) }
+    Dialog(onDismissRequest = onCancelar, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White,
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                NxIconText(
+                    text = "¿Dónde estás?",
+                    icon = NxGlyph.PHOTO.icon,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = NxColors.Slate,
+                )
+                if (!fuera) {
+                    Text("En oficina, la foto es de tu escritorio limpio y en orden.", fontSize = 14.sp, color = NxColors.Slate)
+                    androidx.compose.material3.Button(onClick = onOficina, modifier = Modifier.fillMaxWidth()) {
+                        Text("Estoy en oficina")
+                    }
+                    androidx.compose.material3.OutlinedButton(onClick = { fuera = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("No estoy en oficina")
+                    }
+                } else {
+                    Text("Te tomas la foto personal. Di por qué no estás en oficina: lo ve quien revisa comidas.", fontSize = 14.sp, color = NxColors.Slate)
+                    ComidasRules.MOTIVOS_FUERA.chunked(2).forEach { fila ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            fila.forEach { m ->
+                                androidx.compose.material3.OutlinedButton(onClick = { onMotivo(m) }, modifier = Modifier.weight(1f)) {
+                                    Text(m, fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = motivo,
+                        onValueChange = onMotivo,
+                        label = { Text("¿Por qué?") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    androidx.compose.material3.Button(
+                        onClick = onFuera,
+                        enabled = ComidasRules.motivoFueraValido(motivo),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Tomar foto personal") }
+                }
+                androidx.compose.material3.TextButton(onClick = onCancelar, modifier = Modifier.fillMaxWidth()) {
+                    Text("Cancelar")
                 }
             }
         }

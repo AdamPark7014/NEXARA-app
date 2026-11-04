@@ -245,6 +245,13 @@ struct InicioView: View {
                     InicioTodoAlDiaCard(hechasHoy: store.hechasHoy, onVerTodas: onOpenActividades)
                 }
             }
+            // Ola 6: lo que puede hacer si no trae nada corriendo, y su lista de pendientes.
+            if store.data != nil, QueSigueRules.mostrar(algoCorriendo: store.open.contains { $0.enCurso == true }) {
+                QueSigueSection(
+                    onOpenActivity: { onOpenActivity($0, nil) },
+                    onOpenActividades: onOpenActividades
+                )
+            }
         } else if !tieneAsistencia {
             // Sin Actividades ni Asistencia: Inicio no se queda en blanco.
             InicioTodoAlDiaCard(hechasHoy: 0, onVerTodas: nil)
