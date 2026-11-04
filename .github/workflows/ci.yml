@@ -44,11 +44,16 @@ jobs:
       # los encadena en local) para que CI y el portátil comprueben exactamente
       # lo mismo. Siguen separados a propósito: así el fallo dice de una ojeada
       # si el roto es la API o la web.
+      # El límite de Node por omisión (2 GB) ya queda justo: el mismo código pasa o revienta por poco.
       - name: Tipos · API
         run: npm run typecheck:api
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Tipos · Web
         run: npm run typecheck:web
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
       # Sin `--rootDir`: el propio jest.config.js ya fija rootDir a `src`, y
       # sobrescribirlo desde fuera hace que ts-jest busque `apps/tsconfig.json`
