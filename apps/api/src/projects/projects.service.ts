@@ -96,7 +96,8 @@ export class ProjectsService {
       },
     });
 
-    this.realtimeGateway.emit('projects:changed', {
+    // Lleva el proyecto completo: solo al personal de su empresa.
+    this.realtimeGateway.emitToCompany(project.companyId, 'projects:changed', {
       type: 'created',
       project,
     });
@@ -211,7 +212,7 @@ export class ProjectsService {
       data: updateData,
     });
 
-    this.realtimeGateway.emit('projects:changed', {
+    this.realtimeGateway.emitToCompany(existing.companyId, 'projects:changed', {
       type: 'updated',
       project,
     });
@@ -233,7 +234,8 @@ export class ProjectsService {
 
     const removed = await this.db.project.delete({ where: { id } });
 
-    this.realtimeGateway.emit('projects:changed', {
+    // De la fila leída antes: con el filtro de empresa puesto, `delete` regresa la cuenta, no la fila.
+    this.realtimeGateway.emitToCompany(project.companyId, 'projects:changed', {
       type: 'deleted',
       project: removed,
     });

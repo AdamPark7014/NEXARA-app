@@ -663,7 +663,7 @@ export class AttendanceService {
       },
     });
 
-    this.emitAttendanceUpdate(opts.targetUserId, 'entrada', now, attendance.user);
+    this.emitAttendanceUpdate(tenantId, opts.targetUserId, 'entrada', now, attendance.user);
 
     try {
       await this.avisar({
@@ -786,7 +786,7 @@ export class AttendanceService {
       this.logger.warn(`No se pudo recalcular la jornada: ${(err as Error).message}`),
     );
 
-    this.emitAttendanceUpdate(targetId, type, at, checada.user);
+    this.emitAttendanceUpdate(tenantId, targetId, type, at, checada.user);
 
     await this.avisarChecadaMarcada({
       userId: targetId,
@@ -1494,7 +1494,7 @@ export class AttendanceService {
     await this.recalcularJornada(userId, checada.timestamp, p.tenantId);
 
     const persona = await this.prisma.user.findUnique({ where: { id: userId } });
-    this.emitAttendanceUpdate(userId, 'entrada', p.ahora, persona);
+    this.emitAttendanceUpdate(p.tenantId, userId, 'entrada', p.ahora, persona);
     await this.avisarChecadaMarcada({
       userId,
       titulo: 'Salida deshecha',
@@ -2108,7 +2108,7 @@ export class AttendanceService {
       // Ubicación apagada o sin permiso al checar: queda en el registro de estados (y una checada
       // con coordenadas cierra un tramo apagado que siguiera abierto).
       await this.anotarEstadoUbicacion({ userId, tenantId, coords, falla: dto.ubicacionFalla, origen, deviceInfo, now });
-      this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
+      this.emitAttendanceUpdate(tenantId, userId, dto.type, now, attendance.user);
 
       await this.notificationHierarchy.notifyAttendanceChange(
         userId,
@@ -2221,7 +2221,7 @@ export class AttendanceService {
     // Ubicación apagada o sin permiso al checar: queda en el registro de estados (y una checada
     // con coordenadas cierra un tramo apagado que siguiera abierto).
     await this.anotarEstadoUbicacion({ userId, tenantId, coords, falla: dto.ubicacionFalla, origen, deviceInfo, now });
-    this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
+    this.emitAttendanceUpdate(tenantId, userId, dto.type, now, attendance.user);
 
     await this.notificationHierarchy.notifyAttendanceChange(
       userId,
@@ -2296,9 +2296,9 @@ export class AttendanceService {
     });
   }
 
-  private async emitAttendanceUpdate(userId: number, type: string, timestamp: Date, user: any) {
-    // Emit al usuario para actualizar su UI
-    this.realtimeGateway.emit('attendance:updated', {
+  private async emitAttendanceUpdate(tenantId: number, userId: number, type: string, timestamp: Date, user: any) {
+    // Solo a la empresa de la checada: `tenantId` es la de la fila, una persona puede estar en dos.
+    this.realtimeGateway.emitToCompany(tenantId, 'attendance:updated', {
       userId,
       type,
       timestamp: timestamp.toISOString(),
@@ -2309,6 +2309,8 @@ export class AttendanceService {
     try {
       const allAdmins = await this.prisma.user.findMany({
         where: {
+          // `User` no se filtra solo por empresa: sin esto salen los administradores de todas.
+          companyMemberships: { some: { companyId: tenantId } },
           OR: [
             // Superadmins
             { email: { in: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] } },
@@ -2339,8 +2341,8 @@ export class AttendanceService {
         try {
           // El aviso con push lo manda NotificationHierarchyService.notifyAttendanceChange a sus
           // jefes y a Christian; aquí solo queda el evento en vivo para la consola web.
-          // Emitir notificación en tiempo real al admin
-          this.realtimeGateway.emit('attendance:notification', {
+          // Trae nombre y correo: solo a este admin, no a toda su empresa.
+          this.realtimeGateway.emitToUser(admin.id, 'attendance:notification', {
             adminId: admin.id,
             userId,
             type,
