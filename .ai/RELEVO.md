@@ -1,5 +1,17 @@
 # RELEVO
 
+- **03-11 (claude-code) — `users/public-team` ya no existe (`2a5f0afa`). En producción. Sin migración. Adam: «lo que creas conveniente», y se tomó la recomendación. Cierra la decisión pendiente de la entrada de `581fbd8c`.**
+  - **Por qué:** enseñaba sin sesión nombre, foto y puesto del personal, y con `X-Company-Id` el de cualquier empresa. Nadie la llamaba: `/nosotros` pinta el equipo desde `components/sitio/equipo`, y ni la web ni las apps la usan. En las horas de registro que guarda Traefik solo aparecen las sondas de esta revisión; lo anterior no se pudo ver.
+  - **Qué se fue:** la ruta, `findPublicTeam` con su lista de correos excluidos, y la marca `EmpresaPorCabeceraSinSesion` con su rama en `TenantInterceptor`. Sin persona, la cabecera ya solo cuenta para SCIM con el secreto de la plataforma.
+  - **Pruebas que salieron, todas de lo que ya no existe:** `public-team-exclusions.spec.ts`, una de `user-directory-tenant.spec.ts` que ni llamaba la consulta, y las dos de la marca en `tenant-interceptor-cabecera.spec.ts`.
+  - **Verificado:**
+    - `equipo-publico-retirado.spec.ts`: las 2 fallaban con la ruta puesta y pasan. API 5,619 y tipos en verde. CI completo en verde en `2a5f0afa`.
+    - `AppModule` real, HTTP real, sockets reales y Postgres desechable con dos empresas, contra la medición de `581fbd8c`: de 811 mediciones cambian 9, todas de esta ruta, sin errores 5xx.
+    - En producción, con la sonda de solo lectura dentro de `nexara-api`: la ruta da 401 sin sesión, con y sin cabecera. Las 19 secciones de `page-content` y las otras ocho rutas públicas responden igual, byte a byte, que antes de este commit. El sitio da los mismos estados y títulos, y Traefik no marca 5xx en la API en los 30 minutos siguientes.
+  - **Sin verificar:** con permiso `USERS_MANAGE`, esa dirección llega a `users/:id` con un id inválido, como cualquier otra palabra. No se probó esa combinación.
+  - **Trampa:** ahora da 401 sin sesión y 403 sin permiso, no 404, porque cae en `users/:id`. Una sonda que espere 404 se equivoca.
+  - **Si el sitio vuelve a necesitar al equipo:** la consulta y su lista de exclusiones siguen en la historia de git, en `581fbd8c`. Conviene que no salga de la tabla `User` ni elija empresa con una cabecera.
+
 - **03-11 (claude-code) — Sin sesión la cabecera ya no cambia de empresa, lo público ya no entrega borradores, y los contactos solo avisan a su empresa (`581fbd8c`). En producción. Sin migración. Falta la decisión de Adam sobre `users/public-team`.**
   - **Qué pasaba:**
     - `GET studio/page-content/:section` entregaba la fila completa sin sesión: `draftContent`, `updatedBy`, `publishedBy`, `companyId`.
