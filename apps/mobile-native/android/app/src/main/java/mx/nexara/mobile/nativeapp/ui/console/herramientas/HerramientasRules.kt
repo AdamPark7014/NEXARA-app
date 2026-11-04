@@ -543,11 +543,11 @@ object HerramientasRules {
 
     data class Vacio(val titulo: String, val texto: String)
 
-    /** No hay coincidencias o no hay nada dado de alta: el servidor no distingue, y los dos se dicen igual. */
+    /** Sin coincidencias o sin nada dado de alta: el servidor no distingue, así que no se afirma ninguna. */
     fun vacioDeBusqueda(consulta: String): Vacio = Vacio(
-        titulo = "Todavía no hay herramientas dadas de alta con ese nombre",
-        texto = "No encontramos «${consulta.trim()}» disponible. Iván da de alta las herramientas; " +
-            "si ya existe, puede estar prestada.",
+        titulo = "No salió ninguna herramienta libre",
+        texto = "Con «${consulta.trim()}» no encontramos ninguna disponible. Prueba con otra palabra o " +
+            "pregúntale a Iván: él las da de alta, y la que buscas puede estar prestada.",
     )
 
     const val AYUDA_BUSQUEDA = "Escribe el nombre, el modelo o la serie."

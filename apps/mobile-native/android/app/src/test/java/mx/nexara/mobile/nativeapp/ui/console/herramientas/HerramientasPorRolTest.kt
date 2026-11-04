@@ -246,7 +246,7 @@ class HerramientasPorRolTest {
     @Test
     fun `buscar y no encontrar no parece un error`() {
         val vacio = HerramientasRules.vacioDeBusqueda(" taladro ")
-        assertTrue(vacio.titulo.contains("Todavía no hay herramientas dadas de alta"))
+        assertEquals("No salió ninguna herramienta libre", vacio.titulo)
         assertTrue(vacio.texto.contains("«taladro»"))
         assertTrue(vacio.texto.contains("Iván"))
         assertFalse(vacio.titulo.contains("rror"))

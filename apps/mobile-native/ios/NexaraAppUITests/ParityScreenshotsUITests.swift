@@ -559,7 +559,17 @@ final class ParityScreenshotsUITests: XCTestCase {
         capturar("pagos")
         if tocarSiExiste(textoTocable("Registrar pago"), timeout: 6) {
             capturar("pagos-registrar")
-            _ = tocarSiExiste(textoTocable("Cancelar"), timeout: 4)
+            // «Cancelar» queda al final del formulario, fuera de la pantalla: tocarlo sin subir no
+            // cierra la hoja, y el siguiente toque caería dentro de ella.
+            let cancelar = app.buttons["Cancelar"].firstMatch
+            var subidas = 0
+            while !(cancelar.exists && cancelar.isHittable), subidas < 4 {
+                app.swipeUp()
+                Thread.sleep(forTimeInterval: 0.4)
+                subidas += 1
+            }
+            tocar(cancelar)
+            Thread.sleep(forTimeInterval: 1)
         } else {
             omitir("pagos-registrar: no está el botón")
         }

@@ -378,6 +378,10 @@ enum GastosRules {
         "Aquí registras, autorizas y pagas; corregir un gasto ya capturado, borrarlo y " +
         "sacar el reporte por rango de fechas se hacen desde la computadora."
 
+    static let limiteDireccion =
+        "Aquí autorizas y pagas; corregir un gasto ya capturado, borrarlo y " +
+        "sacar el reporte por rango de fechas se hacen desde la computadora."
+
     // MARK: Por rol
 
     /// Con qué filtro abre: dirección va directo a lo que falta autorizar, si hay algo.

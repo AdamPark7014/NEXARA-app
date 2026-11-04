@@ -122,10 +122,10 @@ enum FlotillaRules {
         solicitud.solicitante?.nombre.nilSiVacio ?? "Sin persona registrada"
     }
 
-    /// «Da de alta unidades»: no es dirección y trae `vehicles.inventory`. Dirección ve su
-    /// flotilla; dar de alta es de quien lleva el inventario.
+    /// «Da de alta unidades»: Iván. `vehicles.inventory` no basta: también lo traen operaciones y
+    /// arquitectura, y a arquitectura el servidor se lo niega. Dirección ve su flotilla.
     static func daDeAltaUnidades(esDireccion: Bool, permisos: [String]) -> Bool {
-        !esDireccion && permisos.contains("vehicles.inventory")
+        !esDireccion && permisos.contains("vehicles.inventory") && permisos.contains("stock.manage")
     }
 
     /// El vacío de quien usa vehículos, según lo que puede hacer al respecto.

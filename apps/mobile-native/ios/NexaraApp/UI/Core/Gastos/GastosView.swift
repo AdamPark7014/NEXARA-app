@@ -286,7 +286,7 @@ struct GastosView: View {
                         contenido(todos)
                     }
 
-                    MoreNotaDeAlcance(texto: GastosRules.limite)
+                    MoreNotaDeAlcance(texto: modelo.esDireccion ? GastosRules.limiteDireccion : GastosRules.limite)
                         .padding(.top, 12)
                 }
                 .padding(.horizontal, NxSpacing.screenH)

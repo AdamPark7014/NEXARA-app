@@ -657,13 +657,14 @@ enum HerramientasReglas {
         return nil
     }
 
-    /// El vacío de la búsqueda no es un error: hoy el inventario está vacío y es lo normal.
-    static let vacioBusquedaTitulo = "Todavía no hay herramientas dadas de alta"
+    /// Sin coincidencias o sin nada dado de alta: el servidor no distingue, así que no se afirma
+    /// ninguna de las dos.
+    static let vacioBusquedaTitulo = "No salió ninguna herramienta libre"
 
     static func vacioBusquedaTexto(consulta: String) -> String {
         let q = consulta.trimmingCharacters(in: .whitespacesAndNewlines)
-        return "Con «\(q)» no salió ninguna libre. Prueba con otra palabra o pregunta en almacén: "
-            + "en cuanto la registren, aquí aparece para pedirla."
+        return "Con «\(q)» no encontramos ninguna disponible. Prueba con otra palabra o pregúntale a Iván: "
+            + "él las da de alta, y la que buscas puede estar prestada."
     }
 
     static func etiquetaActividad(_ actividad: ActividadDeSolicitud) -> String {

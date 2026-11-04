@@ -1,6 +1,6 @@
 # RELEVO
 
-- **04-11 (claude-code) — Las apps cambian según quién entra: versión 1.4, en `main` (`b297197e`, `9249b176`). Servidor en producción. Sin migración.**
+- **04-11 (claude-code) — Las apps cambian según quién entra: versión 1.4, en `main` (`b297197e`, `aa96a915`). Servidor en producción. Sin migración.**
   - **Pedido de Adam:** «al CEO le aparece para escanear una herramienta y ya eso que el deberia ver todo lo relacionado a lo administrativo», «el que debe dar de alta es ivan», «la gente debe poder pues solamente solicitar prestamos», «es asignar un viatico o aprobar», «pagos empleados deberian poder realizar acciones en movil». Decidió: cualquiera saca un vehículo libre; Pagos con registrar y marcar pagado; Ola 6 visible; los contactos de campaña a Daniela.
   - **Quién es quién en la app:** `PorRol` en Android y `CoreOrg.esDireccion` en iOS. Dirección es el rol CEO, además de Christian y Claudia por correo. Iván se reconoce por sus permisos (`tools.manage`, `stock.manage`, `vehicles.inventory`), no por nombre.
   - **Qué ve cada quien:**
@@ -9,7 +9,7 @@
     | Aprobaciones | Evidencias con lote, viáticos, gastos, firmas | Sus evidencias, si tiene gente | No aparece |
     | Herramientas | Préstamos e inventario, solo lectura | Escáner, aprobar, entregar, recibir, alta | Pedir préstamo, mi kit, más plazo, reportar daño |
     | Almacén | Existencias y movimientos, sin escáner | Escáner, alta, entradas y salidas | Consulta, si lo abre |
-    | Vehículos | Flotilla y solicitudes | Lo de todos y alta de unidad | Sacar, regresar, gasolina |
+    | Vehículos | Flotilla y solicitudes | Lo de todos y alta de unidad (solo con `stock.manage`) | Sacar, regresar, gasolina |
     | Pagos | Registrar y marcar pagado, con confirmación | No aparece | No aparece |
     | Viáticos | Asignar y autorizar, sin pedir | Pedir, repartir, comprobar | Pedir, repartir, comprobar |
     | Proyectos | Detalle y cambiar estado | Según su menú | Detalle si le sale en el menú |
@@ -25,6 +25,8 @@
     - Android: 1,093 pruebas y recorrido en emulador con tres cuentas contra API simulada: dirección, Iván y personal. Aprobar lote, asignar viático, pedir préstamo, confirmar pago y foto de comida.
     - iOS: compilación del simulador en CI y capturas del modo demostración con `NEXARA_DEMO_ROL`.
     - API: pruebas y guardas desplegadas con los seis roles de personal.
+    - Persona por persona contra el servidor desplegado, sin sesión ni escritura: menú real (`me/navigation`), permisos y cada llamada de su pantalla. Solo faltan `workflow/my-pending` y `expenses` en Aprobaciones de arquitectura, operaciones y encargado de soporte, y la app ya los trata como vacío.
+    - Las respuestas vacías de préstamos, inventario, existencias, movimientos y pagos son listas, que es lo que la app espera.
   - **Sin verificar:** nada de esto se ha probado en un teléfono físico contra la API real. Las acciones que mueven dinero o inventario no se han ejercido en producción, y NEXARA no tiene productos, herramientas ni pagos capturados.
   - **Pendiente de decidir o visto y sin tocar:**
     - Vehículos: el CEO solo aprueba en el último paso de la cadena; Christian avanza un paso por toque. Hay cero solicitudes hoy.
@@ -34,6 +36,10 @@
     - iOS: un `.task` sobre un `Group` vacío nunca corre. «¿Qué sigue?» no habría salido nunca; lo enseñó la captura, no la compilación.
     - La copia exportada puede quedar vieja: se rehace con `git archive`, y `armar-commit.sh` ya imprime lo que borra. Ver `b92d67eb` y `a6b91a7e`.
     - `tsc` de la API roza los 2 GB de Node: CI ya usa 4 GB.
+    - `vehicles.inventory` también lo traen operaciones y arquitectura, y a arquitectura el servidor le niega el alta: «Dar de alta unidad» pide además `stock.manage`.
+    - Una lista de rutas escrita desde Python trae CRLF: pasarla por `tr -d '\r'` antes de `xargs`, o el commit sale vacío. Así salió `9249b176`, y el real es `aa96a915`.
+    - `cambios.py` también lista archivos que `main` ya borró: revisar el estado `A` antes de confirmar.
+    - Prueba de iOS: un `tocar` sobre un botón fuera de pantalla no falla, toca otra cosa. «Marcar pagado» no pedía confirmación en la prueba porque la hoja seguía abierta; el video lo enseñó.
 
 - **04-11 (claude-code) — Iván ya puede dar de alta y mover almacén (`RbacGuard`). En producción. Sin migración. Inventario de las apps hecho; lo demás espera a Adam.**
   - **Qué pasaba:** desde el 07-10 Iván tiene el almacén por correo, pero solo `UrlAccessGuard` conocía la excepción. Las rutas que escriben también pasan por `RbacGuard`, que le contestaba 403. Medido con las guardas reales: ni consultar existencias podía. Tampoco `PUT` de herramientas.
