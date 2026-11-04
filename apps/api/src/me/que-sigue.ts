@@ -8,7 +8,7 @@
 import { esDeObra } from './direccion.js';
 
 /** Con `false`, el aviso de «sin actividad» sigue diciendo lo de siempre. */
-export const QUE_SIGUE_EN_AVISOS = false;
+export const QUE_SIGUE_EN_AVISOS = true;
 
 export const MAX_SUGERENCIAS = 5;
 /** Minutos con los que nacen las actividades que salen de un dato del sistema. */
@@ -120,7 +120,16 @@ export type DatosQueSigue = {
   abiertas: Array<{ id: number; anNumber: string | null; titulo: string | null }>;
   pendientes: Array<{ id: number; texto: string }>;
   cotizaciones: Array<{ id: number; folio: string; cliente: string | null; proyecto: string | null; validUntil: Date; total: number }>;
-  contactos: Array<{ id: number; nombre: string; email: string | null; phone: string | null; notas: string | null; createdAt: Date }>;
+  contactos: Array<{
+    id: number;
+    nombre: string;
+    email: string | null;
+    phone: string | null;
+    notas: string | null;
+    createdAt: Date;
+    /** Ya está a tu nombre (de campaña, por ejemplo). Sin esto: pidió contacto por la página y no es de nadie. */
+    esTuyo?: boolean;
+  }>;
   porRevisar: number;
   obraSinLigar: number;
   bancoSinConciliar: number;
@@ -157,7 +166,14 @@ function duracion(minutos: number): string {
 
 const nombreDeCotizacion = (c: DatosQueSigue['cotizaciones'][number]) => c.cliente?.trim() || c.proyecto?.trim() || c.folio;
 const tituloDeCotizacion = (c: DatosQueSigue['cotizaciones'][number]) => `Seguir cotización de ${nombreDeCotizacion(c)}`;
-const tituloDeContacto = (c: DatosQueSigue['contactos'][number]) => `Llamar a ${c.nombre}`;
+const tituloDeContacto = (c: DatosQueSigue['contactos'][number]) =>
+  !c.phone && c.email ? `Escribirle a ${c.nombre}` : `Llamar a ${c.nombre}`;
+
+function porQueContacto(c: DatosQueSigue['contactos'][number]) {
+  return c.esTuyo
+    ? 'Está a tu nombre y nadie le ha hablado'
+    : `Pidió contacto por la página el ${diaMes(c.createdAt)} y nadie le ha respondido`;
+}
 const tituloDeUltima = (u: NonNullable<DatosQueSigue['ultima']>) => String(u.titulo ?? '').trim();
 
 function cotizacionesVigentes(d: DatosQueSigue) {
@@ -223,15 +239,14 @@ export function armarSugerencias(d: DatosQueSigue): { sugerencias: Sugerencia[];
 
   const [contacto] = contactosLibres(d);
   if (contacto) {
-    const dia = diaMes(contacto.createdAt);
     lista.push({
       clave: `contacto:${contacto.id}`,
       tipo: 'contacto',
       titulo: tituloDeContacto(contacto),
-      detalle: `Pidió contacto por la página el ${dia} y nadie le ha respondido`,
+      detalle: porQueContacto(contacto),
       accion: 'empezar',
       href: null,
-      aviso: { title: tituloDeContacto(contacto), message: `Pidió contacto por la página el ${dia} y nadie le ha respondido.` },
+      aviso: { title: tituloDeContacto(contacto), message: `${porQueContacto(contacto)}.` },
     });
   }
 

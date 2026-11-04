@@ -228,6 +228,28 @@ export const CORE_RECURSOS_URL_RULES: UrlRule[] = [
   { path: '/erp/vehiculos', scope: 'write' },
   { path: '/erp/vehiculos/**', scope: 'write' },
   { path: '/erp/organigrama', methods: ['GET'], scope: 'read' },
+  // Pedir herramienta y usar un vehículo: todo el personal (Adam, 04-11-2026). Las apps ya ofrecían
+  // salida, regreso y gasolina a todos, y aquí solo pasaba `coord_operaciones`. Cada servicio revisa
+  // que sea lo propio; aprobar, entregar y dar de alta siguen aparte.
+  { path: '/api/tool-requests', methods: ['POST'], scope: 'write' },
+  { path: '/api/tool-requests/*/renewal-request', methods: ['POST'], scope: 'write' },
+  { path: '/api/tool-requests/kits/*/report', methods: ['POST'], scope: 'write' },
+  { path: '/api/tool-requests/kits/my', methods: ['GET'], scope: 'read' },
+  { path: '/api/tool-requests/my-requests', methods: ['GET'], scope: 'read' },
+  { path: '/api/tool-requests/my-active', methods: ['GET'], scope: 'read' },
+  { path: '/api/tool-requests/my-stats', methods: ['GET'], scope: 'read' },
+  { path: '/api/tool-requests/notifications/my', methods: ['GET'], scope: 'read' },
+  { path: '/api/tool-requests/mis-actividades', methods: ['GET'], scope: 'read' },
+  { path: '/api/tool-requests/busqueda-rapida', methods: ['GET'], scope: 'read' },
+  { path: '/api/tool-requests/inventory/search', methods: ['GET'], scope: 'read' },
+  { path: '/api/vehicles', methods: ['POST'], scope: 'write' },
+  { path: '/api/vehicles/mis-vehiculos', methods: ['GET'], scope: 'read' },
+  { path: '/api/vehicles/*/start-use', methods: ['POST'], scope: 'write' },
+  { path: '/api/vehicles/*/end-use', methods: ['POST'], scope: 'write' },
+  { path: '/api/vehicles/inventory/*/checkout', methods: ['POST'], scope: 'write' },
+  { path: '/api/vehicles/inventory/*/return', methods: ['POST'], scope: 'write' },
+  { path: '/api/vehicles/ficha/leer-foto', methods: ['POST'], scope: 'write' },
+  { path: '/api/vehicles/ficha/*/cargas', methods: ['POST'], scope: 'write' },
 ];
 
 /**
@@ -1379,6 +1401,9 @@ export const ALMACEN_POR_CORREO_URL_RULES: UrlRule[] = [
   { path: '/api/stock/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
   { path: '/api/warehouse/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
   { path: '/api/catalog/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+  // «El que debe dar de alta es Iván, todo en el sistema» (Adam, 04-11-2026): unidades también, sin borrar.
+  { path: '/api/vehicles/inventory', methods: ['POST'], scope: 'write' },
+  { path: '/api/vehicles/inventory/*', methods: ['PATCH'], scope: 'write' },
 ];
 
 /**

@@ -155,8 +155,12 @@ export class ToolRequestsService {
     private notificationHierarchy: NotificationHierarchyService,
   ) {}
 
-  async create(data: CreateToolRequestDto, companyId?: number | null, requesterEmail?: string | null) {
-    assertCanCreateToolLoan(requesterEmail);
+  async create(
+    data: CreateToolRequestDto,
+    companyId?: number | null,
+    solicitante?: { roleKey?: string | null; isSuperAdmin?: boolean | null } | null,
+  ) {
+    assertCanCreateToolLoan(solicitante);
     const inventoryItemId = Number(data.inventoryItemId);
     if (!Number.isFinite(inventoryItemId) || inventoryItemId <= 0) {
       throw new BadRequestException('Debes seleccionar una herramienta del inventario');

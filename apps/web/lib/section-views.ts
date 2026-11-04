@@ -1671,14 +1671,14 @@ export function getOpsTeamSectionConfig(
     };
   }
 
-  // Tools: gate por email (espejo API), NO por OPS_MANAGERS/WAREHOUSE.
-  // David pide; Christian/Iván aprueban. TOOLS_MANAGE JWT = señal secundaria.
+  // Tools: administrar por correo (espejo API), NO por OPS_MANAGERS/WAREHOUSE.
+  // Todo el personal pide; Christian/Iván aprueban. TOOLS_MANAGE JWT = señal secundaria.
   if (module === 'tools') {
     const manageUi =
       canManageTools(user?.email)
       || Boolean(user?.isSuperAdmin)
       || Boolean(user?.permissions?.includes(PERMISSIONS.TOOLS_MANAGE));
-    const createLoan = canCreateToolLoan(user?.email);
+    const createLoan = canCreateToolLoan({ roleKey: v2, isSuperAdmin: user?.isSuperAdmin });
 
     if (manageUi && createLoan) {
       return {

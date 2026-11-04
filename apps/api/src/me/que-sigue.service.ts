@@ -99,18 +99,23 @@ export class QueSigueService {
       comercial
         ? this.seguro([] as DatosQueSigue['contactos'], async () => {
             const filas = await this.prisma.salesLead.findMany({
-              where: { companyId, ownerId: null, status: 'NEW', source: 'contacto-page' },
+              where: {
+                companyId,
+                status: 'NEW',
+                OR: [{ ownerId: null, source: 'contacto-page' }, { ownerId: viewer.id }],
+              },
               orderBy: { createdAt: 'desc' },
               take: 20,
-              select: { id: true, name: true, company: true, email: true, phone: true, notes: true, createdAt: true },
+              select: { id: true, name: true, company: true, email: true, phone: true, notes: true, createdAt: true, ownerId: true },
             });
             return filas.map((l) => ({
               id: l.id,
-              nombre: l.name?.trim() || l.company?.trim() || 'el contacto de la página',
+              nombre: l.name?.trim() || l.company?.trim() || 'el contacto',
               email: l.email,
               phone: l.phone,
               notas: l.notes,
               createdAt: l.createdAt,
+              esTuyo: l.ownerId === viewer.id,
             }));
           })
         : ([] as DatosQueSigue['contactos']),
@@ -218,11 +223,12 @@ export class QueSigueService {
   }
 
   private async crear(viewer: Viewer, companyId: number, plan: PlanDeActividad) {
-    // Un contacto es de quien lo toma primero; si dos le dan a la vez, solo uno se lo queda.
+    // Un contacto libre es de quien lo toma primero; si dos le dan a la vez, solo uno se lo queda.
+    // Al tomarlo deja de ser nuevo, para no volverlo a sugerir.
     if (plan.contactoId != null) {
       const { count } = await this.prisma.salesLead.updateMany({
-        where: { id: plan.contactoId, companyId, ownerId: null },
-        data: { ownerId: viewer.id },
+        where: { id: plan.contactoId, companyId, status: 'NEW', OR: [{ ownerId: null }, { ownerId: viewer.id }] },
+        data: { ownerId: viewer.id, status: 'NURTURING' },
       });
       if (!count) throw new ConflictException('Ese contacto ya lo tomó otra persona.');
     }

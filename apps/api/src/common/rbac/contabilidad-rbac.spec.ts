@@ -20,7 +20,6 @@ import { AuthService } from '../../auth/auth.service.js';
 import { AccountingService } from '../../accounting/accounting.service.js';
 import { companyWhere, requireCompanyId } from '../tenant/tenant-scope.js';
 import {
-  assertCanCreateToolLoan,
   assertCanManageTools,
   hasToolsManageAccess,
 } from '../../tool-requests/tools-access.js';
@@ -134,7 +133,8 @@ describe('CONTADORA · herramientas y préstamos (403)', () => {
 
   it('no aprueba préstamos de herramienta (ni el suyo)', () => {
     // `POST /api/tool-requests/:id/approve` exige TOOLS_MANAGE + lista de correos.
-    expect(() => assertCanCreateToolLoan(CORREO_CONTADORA)).toThrow();
+    expect(() => assertCanManageTools(CORREO_CONTADORA)).toThrow();
+    expect(puede(ROLES.CONTABILIDAD, '/api/tool-requests/7/approve', 'POST')).toBe(false);
   });
 
   it('no puede tocar el inventario ni las aprobaciones por URL', () => {

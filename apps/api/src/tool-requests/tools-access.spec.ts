@@ -17,16 +17,41 @@ describe('tools-access', () => {
     expect(canManageTools('developer@nexara.com.mx')).toBe(false);
   });
 
-  it('solo José Antonio y David crean préstamos', () => {
-    expect(canCreateToolLoan('jose.ramirez@nexara.com.mx')).toBe(true);
-    expect(canCreateToolLoan('operaciones@nexara.com.mx')).toBe(true);
-    expect(canCreateToolLoan('gerencia@nexara.com.mx')).toBe(false);
-    expect(canCreateToolLoan('administracion.ventas@nexara.com.mx')).toBe(false);
+  it('todo el personal pide préstamo, de cualquier rol', () => {
+    for (const roleKey of [
+      'ing_campo',
+      'ing_soporte',
+      'enc_soporte',
+      'coord_operaciones',
+      'arquitecto',
+      'administrativo',
+      'contabilidad',
+      'vendedor',
+      'coord_ventas',
+      'disenador',
+      'lider_diseno',
+      'rh',
+      'coord_admin',
+      'dir_operaciones',
+      'dir_admin',
+    ]) {
+      expect(canCreateToolLoan({ roleKey })).toBe(true);
+    }
+  });
+
+  it('dirección no pide: administra; y una cuenta sin rol o de cliente tampoco', () => {
+    expect(canCreateToolLoan({ roleKey: 'ceo' })).toBe(false);
+    expect(canCreateToolLoan({ roleKey: 'super_admin' })).toBe(false);
+    expect(canCreateToolLoan({ roleKey: 'ing_campo', isSuperAdmin: true })).toBe(false);
+    expect(canCreateToolLoan({ roleKey: 'cliente' })).toBe(false);
+    expect(canCreateToolLoan({ roleKey: null })).toBe(false);
+    expect(canCreateToolLoan({})).toBe(false);
+    expect(canCreateToolLoan(null)).toBe(false);
   });
 
   it('assertCanCreateToolLoan lanza ForbiddenException si no aplica', () => {
-    expect(() => assertCanCreateToolLoan('soporte@nexara.com.mx')).toThrow(ForbiddenException);
-    expect(() => assertCanCreateToolLoan('operaciones@nexara.com.mx')).not.toThrow();
+    expect(() => assertCanCreateToolLoan({ roleKey: 'ceo' })).toThrow(ForbiddenException);
+    expect(() => assertCanCreateToolLoan({ roleKey: 'ing_soporte' })).not.toThrow();
   });
 
   it('assertCanManageTools solo pasa Christian/Iván', () => {

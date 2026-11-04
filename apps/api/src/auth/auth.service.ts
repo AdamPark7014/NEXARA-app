@@ -133,6 +133,9 @@ export class AuthService {
       PERMISSIONS.CATALOG_VIEW,
       // Dar de alta y corregir artículos (por código de barras o desde el formulario).
       PERMISSIONS.CATALOG_MANAGE,
+      // Y las unidades: Iván da de alta todo (Adam, 04-11-2026).
+      PERMISSIONS.VEHICLES_VIEW,
+      PERMISSIONS.VEHICLES_INVENTORY,
     ]) {
       set.add(p);
     }

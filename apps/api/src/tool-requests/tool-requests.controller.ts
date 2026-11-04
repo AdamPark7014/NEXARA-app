@@ -451,17 +451,12 @@ export class ToolRequestsController {
     @Body() data: CreateToolRequestDto,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    assertCanCreateToolLoan(user?.email);
+    assertCanCreateToolLoan(user);
     // El usuario solo puede crear solicitudes para sí mismo
     if (data.usuarioId !== user.id) {
       throw new UnauthorizedException('No puedes crear solicitudes para otros usuarios');
     }
-    try {
-      assertCanCreateToolLoan(user.email);
-    } catch (e) {
-      throw new ForbiddenException(e instanceof Error ? e.message : 'No puedes solicitar herramientas');
-    }
-    return this.toolRequestsService.create(data, companyId, user?.email);
+    return this.toolRequestsService.create(data, companyId, user);
   }
 
   // Obtener todas las solicitudes (admin/superadmin)

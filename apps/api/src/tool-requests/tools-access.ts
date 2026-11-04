@@ -1,15 +1,20 @@
 import { ForbiddenException } from '@nestjs/common';
 
-/** Quién aprueba/administra herramientas vs quién puede pedir préstamo. */
+/**
+ * Quién aprueba y administra herramientas, y quién puede pedir préstamo.
+ *
+ * Adam (04-11-2026): «la gente debe poder pues solamente solicitar prestamos [...] usuarios que sean de
+ * todo tipo excepto CEO». Antes solo podían José Antonio y David, por correo.
+ */
 export const TOOLS_MANAGE_EMAILS = [
   'gerencia@nexara.com.mx', // Christian
   'administracion.ventas@nexara.com.mx', // Iván Camargo
 ] as const;
 
-export const TOOLS_LOAN_CREATE_EMAILS = [
-  'jose.ramirez@nexara.com.mx', // José Antonio
-  'operaciones@nexara.com.mx', // David
-] as const;
+type Solicitante = { roleKey?: string | null; isSuperAdmin?: boolean | null };
+
+/** Dirección administra, no pide; una cuenta de cliente no es personal. */
+const ROLES_SIN_PRESTAMO: ReadonlySet<string> = new Set(['ceo', 'super_admin', 'cliente']);
 
 export function normalizeEmail(email: string | null | undefined): string {
   return String(email ?? '')
@@ -22,16 +27,15 @@ export function canManageTools(email: string | null | undefined): boolean {
   return (TOOLS_MANAGE_EMAILS as readonly string[]).includes(e);
 }
 
-export function canCreateToolLoan(email: string | null | undefined): boolean {
-  const e = normalizeEmail(email);
-  return (TOOLS_LOAN_CREATE_EMAILS as readonly string[]).includes(e);
+export function canCreateToolLoan(solicitante: Solicitante | null | undefined): boolean {
+  if (!solicitante || solicitante.isSuperAdmin) return false;
+  const rol = String(solicitante.roleKey ?? '').trim().toLowerCase();
+  return rol !== '' && !ROLES_SIN_PRESTAMO.has(rol);
 }
 
-export function assertCanCreateToolLoan(email: string | null | undefined): void {
-  if (!canCreateToolLoan(email)) {
-    throw new ForbiddenException(
-      'Solo José Antonio y David (quien va a sitio) pueden solicitar herramientas.',
-    );
+export function assertCanCreateToolLoan(solicitante: Solicitante | null | undefined): void {
+  if (!canCreateToolLoan(solicitante)) {
+    throw new ForbiddenException('Dirección no pide herramientas prestadas: las administra.');
   }
 }
 

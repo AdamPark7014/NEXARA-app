@@ -5,10 +5,10 @@ export const TOOLS_MANAGE_EMAILS = [
   "administracion.ventas@nexara.com.mx", // Iván Camargo
 ] as const;
 
-export const TOOLS_LOAN_CREATE_EMAILS = [
-  "jose.ramirez@nexara.com.mx", // José Antonio
-  "operaciones@nexara.com.mx", // David
-] as const;
+type Solicitante = { roleKey?: string | null; isSuperAdmin?: boolean | null };
+
+/** Todo el personal pide préstamo (Adam, 04-11-2026). Dirección administra; una cuenta de cliente no es personal. */
+const ROLES_SIN_PRESTAMO: ReadonlySet<string> = new Set(["ceo", "super_admin", "cliente"]);
 
 export function normalizeEmail(email: string | null | undefined): string {
   return String(email ?? "")
@@ -21,12 +21,8 @@ export function canManageTools(email: string | null | undefined): boolean {
   return (TOOLS_MANAGE_EMAILS as readonly string[]).includes(e);
 }
 
-export function canCreateToolLoan(email: string | null | undefined): boolean {
-  const e = normalizeEmail(email);
-  return (TOOLS_LOAN_CREATE_EMAILS as readonly string[]).includes(e);
-}
-
-/** Alias legacy — prefer canCreateToolLoan. */
-export function canCreateToolLoanClient(email: string | null | undefined): boolean {
-  return canCreateToolLoan(email);
+export function canCreateToolLoan(solicitante: Solicitante | null | undefined): boolean {
+  if (!solicitante || solicitante.isSuperAdmin) return false;
+  const rol = String(solicitante.roleKey ?? "").trim().toLowerCase();
+  return rol !== "" && !ROLES_SIN_PRESTAMO.has(rol);
 }

@@ -144,6 +144,14 @@ describe('lo que crea «Empezar»', () => {
     expect(planDeSugerencia('seguir:5', d)).toEqual({ titulo: 'Cableado biblioteca', copiaDe: 5 });
   });
 
+  it('un contacto a tu nombre dice que es tuyo, y sin teléfono toca escribirle', () => {
+    const tuyo = { ...contacto, id: 4, phone: null, esTuyo: true };
+    const { sugerencias } = armarSugerencias({ ...d, contactos: [tuyo] });
+    const s = sugerencias.find((x) => x.tipo === 'contacto');
+    expect(s).toMatchObject({ titulo: 'Escribirle a Eduardo', detalle: 'Está a tu nombre y nadie le ha hablado' });
+    expect(s?.aviso?.message).toBe('Está a tu nombre y nadie le ha hablado.');
+  });
+
   it('el contacto lleva sus datos para poder llamarle, porque Core no tiene pantalla de prospectos', () => {
     const plan = planDeSugerencia('contacto:3', d);
     expect(plan).toMatchObject({ titulo: 'Llamar a Eduardo', contactoId: 3, minutos: 20 });

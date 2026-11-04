@@ -54,6 +54,8 @@ describe('RbacGuard: almacén y herramientas por persona', () => {
     ['POST', '/api/catalog/products'],
     ['PUT', '/api/tool-requests/inventory/1'],
     ['PUT', '/api/tool-requests/kits/1/inspeccion-programada'],
+    ['POST', '/api/vehicles/inventory'],
+    ['PATCH', '/api/vehicles/inventory/1'],
   ])('Iván sí: %s %s', async (metodo, url) => {
     await expect(pasa(IVAN, metodo, url)).resolves.toBe(true);
   });
@@ -61,6 +63,7 @@ describe('RbacGuard: almacén y herramientas por persona', () => {
   it.each([
     ['DELETE', '/api/stock/1'],
     ['DELETE', '/api/tool-requests/1'],
+    ['DELETE', '/api/vehicles/inventory/1'],
     ['GET', '/api/users'],
     ['POST', '/api/employee-payments'],
   ])('Iván no: %s %s', async (metodo, url) => {
@@ -72,6 +75,7 @@ describe('RbacGuard: almacén y herramientas por persona', () => {
     ['POST', '/api/stock/movements'],
     ['POST', '/api/catalog/products'],
     ['PUT', '/api/tool-requests/inventory/1'],
+    ['POST', '/api/vehicles/inventory'],
   ])('otro de campo sigue sin poder: %s %s', async (metodo, url) => {
     await expect(pasa('instalador@example.com', metodo, url)).rejects.toBeInstanceOf(ForbiddenException);
   });
