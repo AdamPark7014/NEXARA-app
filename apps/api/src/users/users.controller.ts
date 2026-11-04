@@ -17,7 +17,7 @@ import { createReadStream, existsSync, unlinkSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { Response } from 'express';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
-import { CurrentCompanyId, EmpresaPorCabeceraSinSesion } from '../common/tenant/current-company.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { diskStorage } from 'multer';
 import * as fs from 'node:fs';
 
@@ -489,16 +489,6 @@ export class UsersController {
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.usersService.setLateral(id, lateralDeId, companyId);
-  }
-
-  @Get('public-team')
-  @EmpresaPorCabeceraSinSesion()
-  async findPublicTeam(
-    @Query('limit') limit?: string,
-    @CurrentCompanyId() companyId?: number | null,
-  ) {
-    const parsed = Number(limit);
-    return this.usersService.findPublicTeam(Number.isFinite(parsed) ? parsed : 12, companyId);
   }
 
   /** Plantilla RRHH — devuelve todos los usuarios con campos de RRHH */

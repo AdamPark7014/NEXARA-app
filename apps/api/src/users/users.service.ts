@@ -9,7 +9,6 @@ import * as bcrypt from 'bcryptjs';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ChatService } from '../chat/chat.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
-import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 import { IntegraAcsFanoutService } from '../integra/integra-acs-fanout.service.js';
 import { CredentialVaultService } from '../credential-vault/credential-vault.service.js';
 import { NON_EMPLOYEE_EMAILS, PLATFORM_DEVELOPER_EMAIL, STORE_REVIEWER_EMAIL, TESTER_CEO_EMAIL } from '../common/platform-accounts.js';
@@ -855,59 +854,6 @@ export class UsersService {
       console.error('Error finding assignable users:', error);
       return [];
     }
-  }
-
-  /** Cuentas que no deben aparecer en la página pública "Nosotros / equipo" (ej. solo panel ventas). */
-  private readonly excludedPublicTeamEmails = [
-    'vendedor@nexara.com.mx',
-    // Cuentas internas: existen en el ERP pero no forman parte del equipo que se
-    // muestra en el sitio público. OJO: es el email, no el nombre — renombrar al
-    // usuario desde RRHH no debe devolverlo a la web.
-    'claudia.bernal@nexara.com.mx',
-    'direccion.operaciones@nexara.com.mx',
-    'soluciones@nexara.com.mx',
-    ...this.superAdminEmails,
-  ];
-
-  /** Public site company: PUBLIC_COMPANY_ID > explicit X-Company-Id > isPrimary. Never all tenants. */
-  private async resolvePublicTeamCompanyId(explicit?: number | null): Promise<number> {
-    const fromEnv = Number(process.env.PUBLIC_COMPANY_ID);
-    if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
-    if (explicit != null && Number.isFinite(Number(explicit)) && Number(explicit) > 0) {
-      return requireCompanyId(explicit);
-    }
-    const primary = await withTenantBypassAsync(() =>
-      this.prisma.companyProfile.findFirst({
-        where: { isPrimary: true, isActive: true },
-        select: { id: true },
-        orderBy: { id: 'asc' },
-      }),
-    );
-    if (!primary?.id) {
-      throw new ForbiddenException('No hay empresa configurada para contenido público');
-    }
-    return primary.id;
-  }
-
-  async findPublicTeam(limit = 12, companyId?: number | null) {
-    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(24, Math.trunc(limit))) : 12;
-    const tenantId = await this.resolvePublicTeamCompanyId(companyId);
-    return this.prisma['user'].findMany({
-      where: {
-        email: { notIn: this.excludedPublicTeamEmails },
-        companyMemberships: { some: { companyId: tenantId } },
-        // Una cuenta dada de baja no se anuncia en público (salía, p. ej., una cuenta de diseño que ya no existe).
-        isActive: true,
-      },
-      select: {
-        id: true,
-        nombre: true,
-        avatarUrl: true,
-        role: { select: { nombre: true } },
-      },
-      orderBy: [{ fechaCreacion: 'desc' }, { id: 'desc' }],
-      take: safeLimit,
-    });
   }
 
   findByDepartment(departmentId: number) {
