@@ -702,6 +702,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'chat',
     'documents',
     'erp-costos',
+    'erp-cotizaciones',
     'erp-herramientas',
     'erp-organigrama',
     'erp-vehiculos',

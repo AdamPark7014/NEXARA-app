@@ -205,6 +205,7 @@ export const ROLES_ENCARGADOS_DE_AREA: RoleKey[] = [
   ROLES.ARQUITECTO,        // Obra
   ROLES.COORD_OPERACIONES, // Operaciones y servicios
   ROLES.ADMINISTRATIVO,    // Administración / comercial
+  ROLES.ENC_SOPORTE,       // Sistemas y soporte (José Antonio; Adam, 03-11)
 ];
 
 /**

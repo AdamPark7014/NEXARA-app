@@ -44,6 +44,7 @@ const ENCARGADOS: Array<[string, string]> = [
   [ROLES.ADMINISTRATIVO, 'Mónica García · soluciones@'],
   [ROLES.COORD_OPERACIONES, 'Luis Joel Aguilar · direccion.operaciones@'],
   [ROLES.COORD_OPERACIONES, 'David Morales · operaciones@'],
+  [ROLES.ENC_SOPORTE, 'José Antonio Ramírez · jose.ramirez@'],
   [ROLES.ARQUITECTO, 'Josué Cervantes · infraestructura@'],
 ];
 
