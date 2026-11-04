@@ -434,9 +434,68 @@ enum CotizacionesRules {
         return (interno ? "\(nombre)-interno" : nombre) + ".pdf"
     }
 
+    // MARK: - Acciones
+
+    /// Cómo salió la cotización. Las claves son las de `MEDIOS_ENVIO` del servidor y los
+    /// textos los de la web (`YaLaEnvie.tsx`).
+    enum MedioEnvio: String, CaseIterable, Identifiable {
+        case whatsapp = "WHATSAPP"
+        case correo = "CORREO_EXTERNO"
+        case enPersona = "EN_PERSONA"
+        case otro = "OTRO"
+
+        var id: String { rawValue }
+
+        var etiqueta: String {
+            switch self {
+            case .whatsapp: return "WhatsApp"
+            case .correo: return "Correo fuera de Core"
+            case .enPersona: return "En persona"
+            case .otro: return "Otro"
+            }
+        }
+    }
+
+    /// Solo un borrador se marca como enviada: `transicionPermitida` no deja pasar a ENVIADA
+    /// una rechazada ni una vencida, y una enviada ya está como está.
+    static func puedeMarcarEnviada(_ detalle: CotizacionDetalle) -> Bool {
+        estado(detalle.estado) == .borrador
+    }
+
+    /// Lo que le falta para poder salir, con las palabras de la web (`faltaParaEnviar`).
+    /// Vacío = puede salir. Son las mismas dos revisiones de `validarParaEnviar`.
+    static func faltasParaEnviar(_ detalle: CotizacionDetalle) -> [String] {
+        var faltas: [String] = []
+        if totalPartidas(detalle) == 0 { faltas.append("al menos una partida") }
+        if detalle.salesClientId == nil { faltas.append("elegir o crear el cliente") }
+        return faltas
+    }
+
+    /// «Antes falta al menos una partida y elegir o crear el cliente.» `nil` si no falta nada.
+    static func textoFaltas(_ detalle: CotizacionDetalle) -> String? {
+        let faltas = faltasParaEnviar(detalle)
+        return faltas.isEmpty ? nil : "Antes falta \(faltas.joined(separator: " y ")). Eso se completa desde la computadora."
+    }
+
+    /// Dirección aprueba, y solo lo que está enviada: `transicionPermitida` no deja aprobar
+    /// un borrador, una vencida ni una rechazada.
+    static func puedeAprobar(_ detalle: CotizacionDetalle, esDireccion: Bool) -> Bool {
+        esDireccion && estado(detalle.estado) == .enviada
+    }
+
     /// Qué no hace esta pantalla.
     static let limite =
-        "Consulta. Crear y editar una cotización, mandarla al cliente y decidirla se hacen desde la computadora."
+        "Crear y editar una cotización se hace desde la computadora. Aquí se consulta, se marca como enviada "
+        + "y dirección la aprueba."
+
+    /// El vacío de una empresa que todavía no cotiza: qué sigue para quien mira.
+    static func vacioSinRegistros(esDireccion: Bool) -> String {
+        esDireccion
+            ? "Todavía no hay ninguna cotización en esta empresa. Cuando el equipo arme la primera, aquí ves "
+                + "cómo va y la apruebas."
+            : "Todavía no hay ninguna cotización en esta empresa. La primera se arma desde la computadora; "
+                + "después aquí la consultas y la marcas como enviada."
+    }
 
     // MARK: - Utilidades
 

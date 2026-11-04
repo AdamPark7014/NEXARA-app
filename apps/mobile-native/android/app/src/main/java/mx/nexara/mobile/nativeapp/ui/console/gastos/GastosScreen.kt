@@ -195,10 +195,9 @@ fun GastosScreen(vm: GastosViewModel = viewModel()) {
                     NxEstadoPantalla.VACIO -> item(key = "vacio") {
                         NxEmptyState(
                             title = "Todavía no hay gastos",
-                            subtitle = "Aquí se juntan la renta, los servicios, las suscripciones y lo que " +
-                                "se paga de la bolsa. El primero se registra con la foto de su ticket.",
-                            actionLabel = "Registrar un gasto",
-                            onAction = { altaAbierta = true },
+                            subtitle = GastosRules.vacio(vm.esDireccion),
+                            actionLabel = "Registrar un gasto".takeIf { GastosRules.puedeRegistrar(vm.esDireccion) },
+                            onAction = { altaAbierta = true }.takeIf { GastosRules.puedeRegistrar(vm.esDireccion) },
                         )
                     }
 
@@ -265,24 +264,26 @@ fun GastosScreen(vm: GastosViewModel = viewModel()) {
 
                 item(key = "alcance") {
                     Espacio(12)
-                    MoreNotaDeAlcance(GastosRules.LIMITE)
+                    MoreNotaDeAlcance(if (vm.esDireccion) GastosRules.LIMITE_DIRECCION else GastosRules.LIMITE)
                 }
             }
         }
 
         // Regla 4: un solo botón primario, y es a lo que se vino. En el
         // teléfono vive donde alcanza el pulgar, no arriba entre los filtros.
-        ExtendedFloatingActionButton(
-            onClick = { altaAbierta = true },
-            icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            text = { Text("Registrar gasto", fontWeight = FontWeight.SemiBold) },
-            containerColor = NxColors.Brand,
-            contentColor = Color.White,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .heightIn(min = 56.dp),
-        )
+        if (GastosRules.puedeRegistrar(vm.esDireccion)) {
+            ExtendedFloatingActionButton(
+                onClick = { altaAbierta = true },
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text("Registrar gasto", fontWeight = FontWeight.SemiBold) },
+                containerColor = NxColors.Brand,
+                contentColor = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .heightIn(min = 56.dp),
+            )
+        }
 
         NxSnackbarHost(
             snackbar,

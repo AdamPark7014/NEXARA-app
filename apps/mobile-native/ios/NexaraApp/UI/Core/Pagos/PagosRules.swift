@@ -10,8 +10,9 @@ import SwiftUI
 /// servidor normaliza lo raro a `Pagado` al escribir, pero al leer eso sería
 /// afirmar que el dinero salió sin saberlo.
 ///
-/// Aquí no se paga nada: se consulta. Cada pago es una fila densa que contesta
-/// **a quién, cuánto, de qué periodo y si ya salió**.
+/// Cada pago es una fila densa que contesta **a quién, cuánto, de qué periodo y si ya
+/// salió**. Dirección registra y marca pagado desde aquí: **nada es optimista**, la fila
+/// cambia cuando el servidor confirma.
 enum PagosRules {
 
     // MARK: - Estado
@@ -401,6 +402,39 @@ enum PagosRules {
         filtro == .todos ? "Todos los pagos" : filtro.etiqueta
     }
 
+    // MARK: - Registrar y marcar pagado
+
+    /// Solo un borrador se marca pagado. Tiene que tener id para decir cuál y un importe
+    /// que se pueda leer: la confirmación dice cuánto, y un «—» ahí no confirma nada.
+    /// El estado ilegible tampoco se ofrece: no se sabe si el dinero ya salió.
+    static func puedeMarcarPagado(_ row: PagoEmpleado) -> Bool {
+        estadoDe(row) == .borrador && row.id != nil && tieneImporteLegible(row)
+    }
+
+    static let tituloConfirmarPagado = "¿Marcar como pagado?"
+
+    /// A quién, cuánto y qué genera: lo que hay que saber antes de decir que sí.
+    static func mensajeConfirmarPagado(_ row: PagoEmpleado) -> String {
+        "A \(empleadoTexto(row)): \(montoTexto(row)). Se genera la póliza contable de este pago."
+    }
+
+    /// Lo primero que falta para registrar un pago, en una frase. `nil` = se puede mandar.
+    /// Son las mismas revisiones del servidor (`employee-payments.service.ts create`).
+    static func faltaParaRegistrar(personaId: Int?, centavos: Int, concepto: String, desde: Date, hasta: Date) -> String? {
+        if personaId == nil { return "Elige a quién se le paga" }
+        if centavos <= 0 { return "Captura cuánto se le paga" }
+        if limpio(concepto) == nil { return "Di de qué es el pago" }
+        if diaParaApi(desde) > diaParaApi(hasta) { return "El periodo termina antes de empezar" }
+        return nil
+    }
+
+    /// `AAAA-MM-DD` del día que eligió la persona, en hora de México: el periodo es un día
+    /// de calendario y no debe correrse con el huso del teléfono.
+    static func diaParaApi(_ fecha: Date) -> String {
+        let c = calendario.dateComponents([.year, .month, .day], from: fecha)
+        return String(format: "%04d-%02d-%02d", c.year ?? 1970, c.month ?? 1, c.day ?? 1)
+    }
+
     // MARK: - Constantes
 
     /// Lo que se escribe cuando no hay cifra. Nunca un cero.
@@ -408,7 +442,12 @@ enum PagosRules {
 
     /// Qué NO hace esta pantalla. Se dice al pie, sin botón que eche al navegador.
     static let limite =
-        "Consulta: registrar un pago, autorizarlo, marcarlo pagado o anularlo se hacen desde la computadora."
+        "Corregir o anular un pago, y calcularlo con las horas de la pre-nómina, se hacen desde la computadora."
+
+    /// El vacío de una empresa sin pagos: dice qué sigue.
+    static let vacioSinPagos =
+        "Todavía no hay ningún pago al personal en esta empresa. Registra el primero: "
+        + "queda en borrador y el dinero no se mueve hasta que lo marques pagado."
 
     // MARK: - Utilidades
 

@@ -1,7 +1,9 @@
 package mx.nexara.mobile.nativeapp.data.api
 
 import okhttp3.ResponseBody
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Streaming
@@ -14,6 +16,8 @@ import retrofit2.http.Streaming
  * | Lista               | `GET cotizaciones/core?search=`   |
  * | Detalle             | `GET cotizaciones/core/:id`       |
  * | PDF de la propuesta | `GET cotizaciones/:id/pdf`        |
+ * | «Ya la envié»       | `POST cotizaciones/:id/marcar-enviada` |
+ * | Aprobar             | `POST cotizaciones/:id/aprobar`   |
  *
  * Se usan **las rutas de Core** (`/core`) y no `GET cotizaciones`, porque son
  * las que el servidor ya devuelve presentadas: estado y segmento en español,
@@ -57,7 +61,18 @@ interface CotizacionesApi {
     @Streaming
     @GET("cotizaciones/{id}/pdf/internal")
     suspend fun pdfInterno(@Path("id") id: Long): ResponseBody
+
+    /** El PDF salió por fuera: arranca el seguimiento y el aviso de por vencer. No manda correo. */
+    @POST("cotizaciones/{id}/marcar-enviada")
+    suspend fun marcarEnviada(@Path("id") id: Long, @Body body: MarcarEnviadaBody): ResponseBody
+
+    /** Sin cuerpo. Una aprobada ya no se reabre. */
+    @POST("cotizaciones/{id}/aprobar")
+    suspend fun aprobar(@Path("id") id: Long): ResponseBody
 }
+
+/** `medio` es uno de `MEDIOS_ENVIO` del servidor (`CotizacionesRules.MedioEnvio`). */
+data class MarcarEnviadaBody(val medio: String)
 
 // ── Piezas compartidas por la lista y el detalle ─────────────────────────────
 
@@ -216,6 +231,8 @@ data class CotizacionDetalleDto(
     val bloqueada: Boolean? = null,
     val segmento: String? = null,
     val segmentoEtiqueta: String? = null,
+    /** Cliente dado de alta. Sin él el servidor no deja que salga (`validarParaEnviar`). */
+    val salesClientId: Long? = null,
     val clientName: String? = null,
     val clientCompany: String? = null,
     val clientEmail: String? = null,

@@ -218,8 +218,21 @@ final class ApiClient {
         // Chat: el asistente de #general y las tarjetas de las ligas son consultas del momento
         // (Android `SOLO_EN_LINEA`). Encoladas, la respuesta llegaría a nadie.
         if path == "chat/asistente" || path == "chat/ligas" { return true }
+        // Pagos a empleados mueve dinero: reenviado después daría por hecho un pago y una
+        // póliza que el servidor todavía puede rechazar. Lo mismo decidir una cotización.
+        if path.hasPrefix("employee-payments") { return true }
+        if path.hasPrefix("cotizaciones/"), path.hasSuffix("/marcar-enviada") || path.hasSuffix("/aprobar") {
+            return true
+        }
+        // Decidir una solicitud y dar de alta una unidad necesitan saber si el servidor los aceptó.
+        if path == "vehicles/inventory" { return true }
+        if path.hasPrefix("vehicles/"), path.hasSuffix("/approve") { return true }
+        // Pedir préstamo: el servidor revisa si la pieza sigue libre. Encolado se enteraría tarde.
+        if path == "tool-requests" { return true }
+        if path.hasPrefix("tool-requests/inventory") { return true }
         if path.hasPrefix("tool-requests/") {
             return path.hasSuffix("/deliver") || path.hasSuffix("/return")
+                || path.hasSuffix("/approve") || path.hasSuffix("/reject")
         }
         return false
     }

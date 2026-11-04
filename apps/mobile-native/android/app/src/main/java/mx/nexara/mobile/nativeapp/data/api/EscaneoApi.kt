@@ -12,9 +12,9 @@ import retrofit2.http.Query
  * código) y de `tool-requests.controller.ts` (etiqueta de herramienta, entregar y
  * recibir).
  *
- * Aquí sí hay mutaciones que exigen `stock.manage` o `tools.manage`: la app no
- * esconde los botones por permiso (el rol puede cambiar sin cerrar sesión), los
- * enseña y traduce el 403 a un mensaje claro. Ninguna se encola sin conexión
+ * Aquí sí hay mutaciones que exigen `stock.manage` o `tools.manage`. El escáner solo
+ * lo ve quien opera (`AlmacenRules`, `HerramientasRules`); como el rol puede cambiar
+ * sin cerrar sesión, el 403 se traduce a un mensaje claro. Ninguna se encola sin conexión
  * (`OfflineHttpInterceptor`): el API decide si el código existe y si el préstamo
  * sigue en el estado que se vio.
  *

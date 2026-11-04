@@ -14,26 +14,38 @@ struct HerramientasEstado {
     var error: String?
     /// Refresco fallido con datos viejos todavía puestos.
     var avisoRefresco: String?
-    /// Una de las dos mitades falló y la otra no: se dice, pero no tapa lo que sí llegó.
+    /// Una parte falló y las otras no: se dice, pero no tapa lo que sí llegó.
     var avisoParcial: String?
     var kit: [KitAsignacion] = []
     var prestamos: [PrestamoHerramienta] = []
+    /// Los préstamos de toda la empresa (dirección y quien administra).
+    var empresa: [PrestamoHerramienta] = []
+    var renovaciones: [RenovacionHerramienta] = []
+    var inventario: [PiezaDeInventario] = []
+    /// Los kits de la gente: solo sirven para decir quién trae cada pieza.
+    var kitsEmpresa: [KitAsignacion] = []
     var cargado = false
-    /// Prórroga en curso: el diálogo se bloquea mientras tanto.
+    /// Una acción en curso: los botones y las hojas se bloquean mientras tanto.
     var enviando = false
     var accionError: String?
 }
 
-/// «Mi kit» y «Mis préstamos» del personal de campo.
+/// Herramientas por rol: lo que cada quien lee y lo que puede hacer (`HerramientasReglas.Perfil`).
 ///
 /// El día de hoy se fija al crear la pantalla (`hoy`) en vez de leerse en cada
 /// dibujo: los plazos («vence mañana») se calculan en varios sitios de la misma
 /// lista y dos lecturas del reloj a caballo de la medianoche darían dos respuestas.
 @MainActor
 final class HerramientasViewModel: ObservableObject {
+    /// Quién mira. Se fija al abrir: el menú ya se decidió con la misma sesión.
+    let perfil: HerramientasReglas.Perfil = HerramientasReglas.perfil(de: SessionStore.shared.currentUser)
+
     @Published private(set) var estado = HerramientasEstado()
-    @Published var vista: HerramientasReglas.Vista = .kit
+    @Published var vista: HerramientasReglas.Vista = HerramientasReglas.vistaInicial(
+        HerramientasReglas.perfil(de: SessionStore.shared.currentUser)
+    )
     @Published var filtro: HerramientasReglas.FiltroPrestamo = .abiertos
+    @Published var filtroEmpresa: HerramientasReglas.FiltroEmpresa = .abiertos
     @Published var consulta = ""
     /// Aviso pasajero al pie (Android `Snackbar`).
     @Published private(set) var mensaje: String?
@@ -67,6 +79,32 @@ final class HerramientasViewModel: ObservableObject {
         )
     }
 
+    /// «Préstamos» de toda la empresa: primero lo vencido y lo que vence antes.
+    var empresaVisibles: [PrestamoHerramienta] {
+        HerramientasReglas.ordenarPrestamos(
+            HerramientasReglas.buscarPrestamos(
+                HerramientasReglas.prestamosDeEmpresa(estado.empresa, perfil: perfil, filtro: filtroEmpresa, hoy: hoy),
+                consulta: consulta
+            ),
+            hoy: hoy
+        )
+    }
+
+    var pendientes: [PrestamoHerramienta] { HerramientasReglas.pendientes(estado.empresa) }
+
+    var renovacionesPendientes: [RenovacionHerramienta] {
+        HerramientasReglas.renovacionesPendientes(estado.renovaciones)
+    }
+
+    var inventarioVisible: [PiezaDeInventario] {
+        HerramientasReglas.buscarInventario(estado.inventario, consulta: consulta)
+    }
+
+    /// El botón principal de la pestaña en que se está; `nil` en las que solo se consulta.
+    var botonPrincipal: HerramientasReglas.BotonPrincipal? {
+        HerramientasReglas.botonPrincipal(perfil, vista: vista)
+    }
+
     /// Primera carga fallida: no hay nada que enseñar y el vacío no aplica.
     var soloError: Bool { estado.error != nil && !estado.cargado }
 
@@ -86,9 +124,15 @@ final class HerramientasViewModel: ObservableObject {
 
     func descartarAviso() { estado.avisoRefresco = nil }
 
-    func cambiarVista(_ nueva: HerramientasReglas.Vista) { vista = nueva }
+    /// La búsqueda es de la pestaña en que se escribió: en otra lista no significa nada.
+    func cambiarVista(_ nueva: HerramientasReglas.Vista) {
+        if nueva != vista { consulta = "" }
+        vista = nueva
+    }
 
     func cambiarFiltro(_ nuevo: HerramientasReglas.FiltroPrestamo) { filtro = nuevo }
+
+    func cambiarFiltroEmpresa(_ nuevo: HerramientasReglas.FiltroEmpresa) { filtroEmpresa = nuevo }
 
     func limpiarAccionError() { estado.accionError = nil }
 
@@ -104,16 +148,16 @@ final class HerramientasViewModel: ObservableObject {
             estado.avisoRefresco = nil
         }
 
-        let datos = await HerramientasRepository.shared.cargar()
+        let datos = await HerramientasRepository.shared.cargar(perfil: perfil)
         guard mia == generacion else { return }
 
-        // Las dos listas caídas es lo único que cuenta como «no se pudo»: con una sola
-        // viva la pantalla sigue sirviendo. Se prefiere el fallo de los préstamos: es la
-        // mitad que todo el mundo tiene, así que su mensaje es el que más veces acierta.
+        // Que caiga todo es lo único que cuenta como «no se pudo»: con una parte viva la
+        // pantalla sigue sirviendo. Se prefiere el mensaje de la parte principal de cada
+        // quien, que es el que más veces acierta.
         if datos.todoFallo {
-            let mensaje = (datos.falloPrestamos ?? datos.falloKit)?
-                .toUserMessage(fallback: "No se pudieron cargar tus herramientas")
-                ?? "No se pudieron cargar tus herramientas"
+            let primero = datos.falloPrestamos ?? datos.falloEmpresa ?? datos.falloKit ?? datos.falloInventario
+            let mensaje = primero?.toUserMessage(fallback: "No se pudieron cargar las herramientas")
+                ?? "No se pudieron cargar las herramientas"
             estado.cargando = false
             estado.refrescando = false
             if estado.cargado {
@@ -131,15 +175,138 @@ final class HerramientasViewModel: ObservableObject {
         estado.avisoParcial = Self.avisoParcial(datos)
         estado.kit = datos.kit
         estado.prestamos = datos.prestamos
+        estado.empresa = datos.empresa
+        estado.renovaciones = datos.renovaciones
+        estado.inventario = datos.inventario
+        estado.kitsEmpresa = datos.kitsEmpresa
         estado.cargado = true
         ahora = Date()
     }
 
-    /// Qué mitad no llegó, en una línea. `nil` cuando llegaron las dos.
+    /// Qué parte no llegó, en una línea. `nil` cuando llegaron todas.
     private static func avisoParcial(_ datos: HerramientasRepository.Datos) -> String? {
+        if let fallo = datos.falloEmpresa { return fallo.toUserMessage(fallback: "No se pudieron leer los préstamos") }
+        if let fallo = datos.falloInventario { return fallo.toUserMessage(fallback: "No se pudo leer el inventario") }
+        if let fallo = datos.falloRenovaciones { return fallo.toUserMessage(fallback: "No se pudieron leer las prórrogas") }
         if let fallo = datos.falloKit { return fallo.toUserMessage(fallback: "No se pudo leer tu kit") }
         if let fallo = datos.falloPrestamos { return fallo.toUserMessage(fallback: "No se pudieron leer tus préstamos") }
         return nil
+    }
+
+    // MARK: Acciones
+
+    /// Nada es optimista: la fila cambia cuando el servidor confirma y se relee. Mientras
+    /// falle, la hoja se queda abierta con lo que la persona escribió.
+    private func ejecutar(
+        hecho: String,
+        fallo: String,
+        bloque: @escaping () async throws -> Void
+    ) async -> Bool {
+        guard !estado.enviando else { return false }
+        estado.enviando = true
+        estado.accionError = nil
+        do {
+            try await bloque()
+            estado.enviando = false
+            avisar(hecho)
+            await cargar(refresco: true)
+            return true
+        } catch {
+            estado.enviando = false
+            estado.accionError = error.toUserMessage(fallback: fallo)
+            return false
+        }
+    }
+
+    /// Lo que no tiene hoja abierta cuenta su error en el aviso del pie.
+    private func contarError() {
+        guard let texto = estado.accionError else { return }
+        estado.accionError = nil
+        avisar(texto)
+    }
+
+    func aprobar(_ prestamo: PrestamoHerramienta) async {
+        let id = prestamo.id
+        _ = await ejecutar(
+            hecho: "Préstamo aprobado: ya tiene su código para recoger.",
+            fallo: "No se pudo aprobar el préstamo"
+        ) { try await HerramientasRepository.shared.aprobar(prestamoId: id) }
+        contarError()
+    }
+
+    func rechazar(_ prestamo: PrestamoHerramienta, motivo: String) async -> Bool {
+        let id = prestamo.id
+        return await ejecutar(
+            hecho: "Préstamo rechazado.",
+            fallo: "No se pudo rechazar el préstamo"
+        ) { try await HerramientasRepository.shared.rechazar(prestamoId: id, motivo: motivo) }
+    }
+
+    func aprobarRenovacion(_ renovacion: RenovacionHerramienta) async {
+        let id = renovacion.id
+        _ = await ejecutar(
+            hecho: "Prórroga aprobada.",
+            fallo: "No se pudo aprobar la prórroga"
+        ) { try await HerramientasRepository.shared.aprobarRenovacion(id: id) }
+        contarError()
+    }
+
+    func rechazarRenovacion(_ renovacion: RenovacionHerramienta, motivo: String) async -> Bool {
+        let id = renovacion.id
+        return await ejecutar(
+            hecho: "Prórroga rechazada.",
+            fallo: "No se pudo rechazar la prórroga"
+        ) { try await HerramientasRepository.shared.rechazarRenovacion(id: id, motivo: motivo) }
+    }
+
+    /// Registra la salida con el código que enseña quien la recoge.
+    func entregar(_ prestamo: PrestamoHerramienta, codigo: String) async -> Bool {
+        let id = prestamo.id
+        return await ejecutar(
+            hecho: "Salida registrada: \(HerramientasReglas.tituloPrestamo(prestamo)).",
+            fallo: "No se pudo registrar la salida"
+        ) { try await EscaneoRepository.shared.entregarHerramienta(prestamoId: id, pickupCode: codigo) }
+    }
+
+    /// Registra la entrada. Con daño, la pieza queda en reparación.
+    func recibir(_ prestamo: PrestamoHerramienta, danio: String) async -> Bool {
+        let id = prestamo.id
+        let hecho = danio.nilSiVacio == nil
+            ? "Entrada registrada: \(HerramientasReglas.tituloPrestamo(prestamo))."
+            : "Entrada registrada con daño: queda en reparación."
+        return await ejecutar(
+            hecho: hecho,
+            fallo: "No se pudo registrar la entrada"
+        ) { try await EscaneoRepository.shared.recibirHerramienta(prestamoId: id, damageDescription: danio) }
+    }
+
+    /// Reporta un daño de una pieza de mi kit. Es lo único de aquí que puede esperar en la cola.
+    func reportarDanio(_ asignacion: KitAsignacion, descripcion: String) async -> Bool {
+        guard !estado.enviando else { return false }
+        estado.enviando = true
+        estado.accionError = nil
+        do {
+            let encolado = try await HerramientasRepository.shared.reportarDanio(
+                asignacionId: asignacion.id,
+                descripcion: descripcion
+            )
+            estado.enviando = false
+            avisar(encolado
+                ? "Sin conexión: el reporte quedó en la cola y sale solo al volver la señal."
+                : "Daño reportado: almacén lo revisa.")
+            if !encolado { await cargar(refresco: true) }
+            return true
+        } catch {
+            estado.enviando = false
+            estado.accionError = error.toUserMessage(fallback: "No se pudo reportar el daño")
+            return false
+        }
+    }
+
+    /// Lo que crearon las hojas con formulario propio: el aviso y la relectura.
+    func alCrear(_ aviso: String) {
+        avisar(aviso)
+        Task { await self.cargar(refresco: true) }
     }
 
     // MARK: Prórroga

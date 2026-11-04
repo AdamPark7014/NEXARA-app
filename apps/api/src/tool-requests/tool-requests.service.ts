@@ -340,17 +340,12 @@ export class ToolRequestsService {
 
     if (currentUser?.isSuperAdmin) {
       // tenant scope only
-    } else if (hasToolsManageAccess(currentUser?.email, currentUser?.permissions)) {
-      // Solo Christian/Iván (email o TOOLS_MANAGE) — nunca CONSOLE_ADMIN solo.
-      where = {
-        ...companyWhere(tenantId),
-        usuario: {
-          AND: [
-            { departmentId: currentUser.departmentId },
-            { role: { accesoConsoleAdmin: false } },
-          ],
-        },
-      };
+    } else if (
+      hasToolsManageAccess(currentUser?.email, currentUser?.permissions) ||
+      currentUser?.permissions?.includes(PERMISSIONS.TOOLS_INVENTORY)
+    ) {
+      // Quien administra herramientas (Iván) y dirección ven los préstamos de toda la empresa. Antes
+      // se recortaba al departamento de quien mira, y a Iván le escondía a casi todos.
     } else {
       return [];
     }
@@ -1359,12 +1354,16 @@ export class ToolRequestsService {
   }
 
   async getUsersKit(
-    currentUser: { id: number; email?: string | null; isSuperAdmin?: boolean; permissions?: string[] },
+    currentUser: { id: number; email?: string | null; isSuperAdmin?: boolean; roleKey?: string | null; permissions?: string[] },
     userId?: number,
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
-    const canManageTools = hasToolsManageAccess(currentUser.email, currentUser.permissions);
+    // Dirección ve los kits de todos, aunque no los administre.
+    const canManageTools =
+      hasToolsManageAccess(currentUser.email, currentUser.permissions) ||
+      Boolean(currentUser.isSuperAdmin) ||
+      currentUser.roleKey === 'ceo';
     const canAssign = Boolean(
       currentUser.isSuperAdmin || currentUser.permissions?.includes(PERMISSIONS.ACTIVITIES_MANAGE),
     );

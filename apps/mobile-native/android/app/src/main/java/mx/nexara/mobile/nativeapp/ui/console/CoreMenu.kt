@@ -142,6 +142,8 @@ object CoreMenu {
         val keys = user.navModuleKeys?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
         if (keys.isNullOrEmpty()) return EVERYONE_EXTRAS
         return CoreExtraModule.entries.filter { modulo ->
+            // Pagos a empleados es solo de dirección, aunque `me/navigation` lo nombre (Adam, 04-11-2026).
+            if (modulo == CoreExtraModule.PAGOS_EMPLEADOS && !PorRol.esDireccion(user)) return@filter false
             modulo.paraTodoElPersonal || modulo.claves.any { it in keys } ||
                 (modulo == CoreExtraModule.APROBACIONES && canonicalRole(user) in REVISAN_EVIDENCIAS)
         }

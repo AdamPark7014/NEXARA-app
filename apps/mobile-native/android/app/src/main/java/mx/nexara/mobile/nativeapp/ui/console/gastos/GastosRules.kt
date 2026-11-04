@@ -448,6 +448,28 @@ object GastosRules {
         "Aquí registras, autorizas y pagas; corregir un gasto ya capturado, borrarlo y " +
             "sacar el reporte por rango de fechas se hacen desde la computadora."
 
+    const val LIMITE_DIRECCION =
+        "Aquí autorizas y pagas; corregir un gasto ya capturado, borrarlo y " +
+            "sacar el reporte por rango de fechas se hacen desde la computadora."
+
+    // ── Por rol ──────────────────────────────────────────────────────────────
+
+    /** Dirección viene a autorizar: abre en lo que le falta, si le falta algo. */
+    fun filtroInicial(esDireccion: Boolean, gastos: List<GastoDto>): Filtro =
+        if (esDireccion && gastos.any { estadoDe(it) == Estado.PENDIENTE }) Filtro.POR_AUTORIZAR else Filtro.TODOS
+
+    /** Dirección no registra gastos desde el teléfono; los demás, como siempre. */
+    fun puedeRegistrar(esDireccion: Boolean): Boolean = !esDireccion
+
+    fun vacio(esDireccion: Boolean): String =
+        if (esDireccion) {
+            "Aquí se juntan la renta, los servicios, las suscripciones y lo que se paga de la bolsa. " +
+                "Cuando alguien registre uno con su ticket, aquí lo autorizas."
+        } else {
+            "Aquí se juntan la renta, los servicios, las suscripciones y lo que se paga de la bolsa. " +
+                "El primero se registra con la foto de su ticket."
+        }
+
     // ── Utilidades ───────────────────────────────────────────────────────────
 
     /** «1 gasto esperando» / «3 gastos esperando». */

@@ -816,6 +816,58 @@ struct StockNivel: Decodable, Identifiable, Hashable {
     }
 }
 
+/// Quien registró un movimiento.
+struct MovimientoPersona: Decodable, Hashable {
+    var id: Int = 0
+    var nombre: String?
+
+    private enum CodingKeys: String, CodingKey { case id, nombre }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(Int.self, forKey: .id)) ?? 0
+        nombre = try? c.decode(String.self, forKey: .nombre)
+    }
+}
+
+/// Un movimiento de inventario (`GET stock/movements`, los últimos 500, el más nuevo primero).
+struct MovimientoDeAlmacen: Decodable, Identifiable, Hashable {
+    var id: Int = 0
+    var movementNumber: String?
+    /// `RECEIPT` · `DISPATCH` · `TRANSFER` · `ADJUSTMENT` · `RETURN` · `SCRAP`…
+    var type: String?
+    var cantidad: Double?
+    var notes: String?
+    var createdAt: String?
+    var product: StockProducto?
+    var fromWarehouse: StockAlmacenRef?
+    var toWarehouse: StockAlmacenRef?
+    var createdBy: MovimientoPersona?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, movementNumber, type, quantity, notes, createdAt, product, fromWarehouse, toWarehouse, createdBy
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(Int.self, forKey: .id)) ?? 0
+        movementNumber = try? c.decode(String.self, forKey: .movementNumber)
+        type = try? c.decode(String.self, forKey: .type)
+        // `Decimal` de Prisma: número o texto, lo que mande el servidor.
+        if let numero = try? c.decode(Double.self, forKey: .quantity) {
+            cantidad = numero
+        } else if let texto = try? c.decode(String.self, forKey: .quantity) {
+            cantidad = StockParse.dbl(texto)
+        }
+        notes = try? c.decode(String.self, forKey: .notes)
+        createdAt = try? c.decode(String.self, forKey: .createdAt)
+        product = try? c.decode(StockProducto.self, forKey: .product)
+        fromWarehouse = try? c.decode(StockAlmacenRef.self, forKey: .fromWarehouse)
+        toWarehouse = try? c.decode(StockAlmacenRef.self, forKey: .toWarehouse)
+        createdBy = try? c.decode(MovimientoPersona.self, forKey: .createdBy)
+    }
+}
+
 // MARK: - Repositorio
 
 /// Existencias y alertas de mínimo, juntas.
@@ -889,6 +941,12 @@ final class CoreExtrasRepository {
             bajoMinimo = niveles.filter { $0.bajoMinimo }
         }
         return AlmacenConsulta(niveles: niveles, bajoMinimo: bajoMinimo)
+    }
+
+    /// `GET stock/movements`: qué se movió y quién lo hizo.
+    func movimientosAlmacen() async throws -> [MovimientoDeAlmacen] {
+        let data = try await api.get("stock/movements")
+        return try ApiClient.decodeList(data)
     }
 }
 

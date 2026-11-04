@@ -8,13 +8,13 @@ import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDetalleDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionResumenDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionesApi
+import mx.nexara.mobile.nativeapp.data.api.MarcarEnviadaBody
 
 /**
- * Lectura de Cotizaciones de Core.
+ * Cotizaciones de Core.
  *
- * Es de solo lectura a propósito: la propuesta se arma en la computadora —
- * objetivo, alcance, partidas, planos y el envío al cliente— y el teléfono es
- * para consultarla, enseñarla y mandar el PDF desde donde estés. Lo que la app
+ * La propuesta se arma en la computadora —objetivo, alcance, partidas y planos— y el teléfono es para
+ * consultarla, enseñarla, mandar el PDF, decir que ya salió y, a dirección, aprobarla. Lo que la app
  * no hace lo dice la pantalla; no hay ningún botón que eche al navegador.
  */
 class CotizacionesRepository(context: Context) {
@@ -22,6 +22,13 @@ class CotizacionesRepository(context: Context) {
     private val api: CotizacionesApi = ApiClient.authed(
         tokenProvider = { authRepo.token() },
         companyIdProvider = { authRepo.companyId() },
+    ).create(CotizacionesApi::class.java)
+
+    /** Sin cola: el servidor decide según el estado de ese momento, y encolado daría por hecho algo que puede rechazar. */
+    private val apiSinCola: CotizacionesApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+        withOffline = false,
     ).create(CotizacionesApi::class.java)
 
     /**
@@ -50,4 +57,12 @@ class CotizacionesRepository(context: Context) {
 
     suspend fun pdfInterno(id: Long): ByteArray =
         withContext(Dispatchers.IO) { api.pdfInterno(id).use { it.bytes() } }
+
+    suspend fun marcarEnviada(id: Long, medio: String) = withContext(Dispatchers.IO) {
+        apiSinCola.marcarEnviada(id, MarcarEnviadaBody(medio)).close()
+    }
+
+    suspend fun aprobar(id: Long) = withContext(Dispatchers.IO) {
+        apiSinCola.aprobar(id).close()
+    }
 }

@@ -42,8 +42,8 @@ private fun Throwable.mensajeHerramienta(accion: String, fallback: String): Stri
 /**
  * Escáner de etiquetas de herramienta (Code 128 con la nomenclatura interna, p. ej.
  * `MUL-12345`): enseña la herramienta, quién la tiene y, si hay un préstamo aprobado
- * o en uso, deja registrar la salida o la entrada. Entregar y recibir son de almacén
- * (`tools.manage`): a los demás el API contesta 403 y aquí se explica.
+ * o en uso, deja registrar la salida o la entrada. Solo lo ve quien administra herramientas
+ * ([HerramientasRules.muestraEscaner]); si le quitan el permiso, el 403 del API se explica aquí.
  *
  * Quien puede abrir Almacén lee aquí también artículos (es el mismo escáner,
  * [EscanerDeCodigos]); se relee con la sesión, así que si le dan o quitan Almacén
@@ -115,7 +115,7 @@ internal fun AccionDeHerramienta(
             )
             if (r.prestamo.vencido == true) {
                 Text(
-                    "El código de recolección ya venció: hay que generar otro en la web.",
+                    "El código de recolección ya venció: genera otro en la pestaña Préstamos.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = NxColors.Danger,
                 )

@@ -4,15 +4,17 @@ import Foundation
 /// `apps/api/src/employee-payments/employee-payments.controller.ts` y de
 /// `EmployeePaymentsApi.kt` / `PagosEmpleadosRepository.kt` de Android:
 ///
-/// | Pantalla | Endpoint                  | Permiso              |
-/// |----------|---------------------------|----------------------|
-/// | Lista    | `GET employee-payments`   | `CONTABILIDAD_VIEW`  |
+/// | Pantalla      | Endpoint                             | Permiso               |
+/// |---------------|--------------------------------------|-----------------------|
+/// | Lista         | `GET employee-payments`              | `CONTABILIDAD_VIEW`   |
+/// | Registrar     | `POST employee-payments` (multipart) | `CONTABILIDAD_MANAGE` |
+/// | Marcar pagado | `PATCH employee-payments/:id/pagado` | `CONTABILIDAD_MANAGE` |
 ///
-/// **Un solo endpoint, y sin parámetros**, igual que la web y que Android. El
-/// controlador acepta además `from`, `to`, `userId` y `status`, pero la web no
-/// los usa: filtra sobre la lista completa. Mandar filtros que la web no manda
-/// sería ampliar por la puerta de atrás lo que se consulta de la nómina ajena
-/// (el alcance —toda la empresa o solo el departamento— lo decide el servidor).
+/// La lista va **sin parámetros**, igual que la web y que Android. El controlador
+/// acepta además `from`, `to`, `userId` y `status`, pero la web no los usa: filtra
+/// sobre la lista completa. Mandar filtros que la web no manda sería ampliar por la
+/// puerta de atrás lo que se consulta de la nómina ajena (el alcance —toda la empresa
+/// o solo el departamento— lo decide el servidor).
 ///
 /// Sin `limit`, el servicio devuelve el arreglo entero (no el sobre paginado).
 ///
@@ -150,15 +152,61 @@ struct PagoEmpleado: Decodable, Hashable {
 
 // MARK: - Repositorio
 
-/// Lectura de Pagos a empleados (`/erp/finance/employee-payments`).
+/// Pagos a empleados (`/erp/finance/employee-payments`): dirección registra y marca pagado.
 ///
-/// **Solo lectura, y a propósito** (igual que Android): crear, editar, marcar
-/// pagado y anular piden `CONTABILIDAD_MANAGE` y mueven contabilidad de verdad
-/// —marcar pagado asienta una póliza—. Eso se hace en la computadora.
+/// **Mueve dinero: solo con señal.** Registrar y marcar pagado nunca van a la cola sin
+/// conexión (`ApiClient.isOnlineOnly`): marcar pagado asienta una póliza, y encolado se
+/// daría por hecho un dinero que el servidor todavía puede rechazar. Corregir y anular
+/// siguen en la computadora.
 final class PagosEmpleadosRepository {
     static let shared = PagosEmpleadosRepository()
 
     private init() {}
+
+    /// `POST employee-payments` (multipart, comprobante en el campo `files`).
+    ///
+    /// `status` va explícito: sin él el servidor lo da por pagado y genera la póliza en el
+    /// acto. Aquí un pago nace en borrador, y pagarlo es otro paso con su confirmación.
+    func registrar(
+        usuarioId: Int,
+        centavos: Int,
+        concepto: String,
+        desde: Date,
+        hasta: Date,
+        nota: String?,
+        comprobante: CapturedGeoPhoto?
+    ) async throws {
+        try await CoreRepository.requireOnline()
+        var campos: [String: String] = [
+            "userId": String(usuarioId),
+            "amount": Dinero.textoApi(centavos),
+            "concepto": concepto.trimmingCharacters(in: .whitespacesAndNewlines),
+            "periodFrom": PagosRules.diaParaApi(desde),
+            "periodTo": PagosRules.diaParaApi(hasta),
+            "status": PagosRules.Estado.borrador.rawValue,
+        ]
+        let limpia = nota?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let limpia, !limpia.isEmpty { campos["note"] = limpia }
+
+        var archivos: [(field: String, data: Data, fileName: String, mimeType: String)] = []
+        if let comprobante {
+            archivos.append((field: "files", data: comprobante.jpeg, fileName: "comprobante.jpg", mimeType: "image/jpeg"))
+        }
+        let data = try await ApiClient.shared.uploadMultipartFiles(
+            "employee-payments",
+            fields: campos,
+            files: archivos
+        )
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
+    /// `PATCH employee-payments/:id/pagado`: marca el pago y asienta la póliza contable.
+    func marcarPagado(id: Int) async throws {
+        struct Vacio: Encodable {}
+        try await CoreRepository.requireOnline()
+        let data = try await ApiClient.shared.patchJSON("employee-payments/\(id)/pagado", body: Vacio())
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
 
     /// La lista completa, sin filtros de servidor: el periodo, el estado y la
     /// búsqueda se resuelven en el teléfono (`PagosRules`).

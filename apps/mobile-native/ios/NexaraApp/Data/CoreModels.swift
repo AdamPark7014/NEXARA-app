@@ -431,7 +431,8 @@ enum CoreOrg {
     static func isCeo(_ email: String?) -> Bool {
         // Modo demostración: la persona ficticia tiene la vista completa de dirección
         // (pizarra del equipo, Clientes, justificar faltas…) sin exponer ninguna cuenta real.
-        if DemoMode.isActive { return true }
+        // Con `NEXARA_DEMO_ROL` se ve como ese rol, y entonces `esDireccion` también da falso.
+        if DemoMode.isActive { return DemoMode.rol == nil }
         return ceoEquivalentEmails.contains(normalized(email))
     }
 

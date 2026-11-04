@@ -21,10 +21,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.nexara.mobile.nativeapp.data.api.MovimientoStockDto
 import mx.nexara.mobile.nativeapp.data.api.StockLevelDto
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
@@ -33,8 +35,9 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import mx.nexara.mobile.nativeapp.ui.enterprise.fg
 
 /**
- * Almacén (`/erp/almacen`) en el teléfono: consulta y, arriba, el escáner de
- * códigos ([EscanerDeAlmacen]) para buscar un producto y registrar entradas y salidas.
+ * Almacén (`/erp/almacen`) en el teléfono. Dirección consulta y ve quién movió qué; quien opera
+ * (Iván) lleva arriba el escáner de códigos ([EscanerDeAlmacen]) para dar de alta y registrar entradas
+ * y salidas; los demás solo consultan.
  *
  * La tabla de la web tiene nueve columnas: producto, SKU, almacén, ubicación,
  * cantidad, reservado, disponible, punto de reorden y costo. En un teléfono eso
@@ -54,16 +57,23 @@ fun AlmacenScreen(vm: AlmacenViewModel = viewModel()) {
     val state by vm.state.collectAsState()
     val vista by vm.vista.collectAsState()
     val consulta by vm.consulta.collectAsState()
+    val movimientos by vm.movimientos.collectAsState()
 
     LaunchedEffect(Unit) { vm.arrancar() }
 
+    val perfil = vm.perfil
+    val vistas = remember(perfil) { AlmacenRules.vistas(perfil) }
     val datos = state.datos
     val visibles = remember(datos, vista, consulta) {
         val base = when (vista) {
             AlmacenRules.Vista.BAJO_MINIMO -> AlmacenRules.ordenarPorUrgencia(datos?.bajoMinimo.orEmpty())
             AlmacenRules.Vista.TODO -> AlmacenRules.ordenarPorNombre(datos?.niveles.orEmpty())
+            AlmacenRules.Vista.MOVIMIENTOS -> emptyList()
         }
         AlmacenRules.filtrar(base, consulta)
+    }
+    val movimientosVisibles = remember(movimientos.datos, consulta) {
+        AlmacenRules.filtrarMovimientos(movimientos.datos.orEmpty(), consulta)
     }
 
     NxScreenScaffold(isRefreshing = state.refrescando, onRefresh = vm::refrescar) {
@@ -72,16 +82,19 @@ fun AlmacenScreen(vm: AlmacenViewModel = viewModel()) {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item(key = "escaner") { EscanerDeAlmacen(onMovimiento = vm::refrescar) }
+            if (AlmacenRules.muestraEscaner(perfil)) {
+                item(key = "escaner") { EscanerDeAlmacen(onMovimiento = vm::refrescar) }
+            }
 
             item(key = "vistas") {
                 MoreFilaDePastillas(
-                    AlmacenRules.Vista.entries.map { opcion ->
+                    vistas.map { opcion ->
                         MorePastilla(
                             etiqueta = opcion.etiqueta,
                             conteo = when (opcion) {
                                 AlmacenRules.Vista.BAJO_MINIMO -> datos?.bajoMinimo?.size
                                 AlmacenRules.Vista.TODO -> datos?.niveles?.size
+                                AlmacenRules.Vista.MOVIMIENTOS -> movimientos.datos?.size
                             },
                             seleccionada = opcion == vista,
                             onClick = { vm.cambiarVista(opcion) },
@@ -102,7 +115,59 @@ fun AlmacenScreen(vm: AlmacenViewModel = viewModel()) {
                 item(key = "error") { NxErrorBlock(error, onRetry = vm::reintentar) }
             }
 
-            if (datos != null) {
+            if (vista == AlmacenRules.Vista.MOVIMIENTOS) {
+                movimientos.avisoRefresco?.let { aviso ->
+                    item(key = "aviso-movimientos") {
+                        MoreAvisoDesactualizado(aviso, onCerrar = vm::descartarAvisoMovimientos)
+                    }
+                }
+                when {
+                    movimientos.cargando -> item(key = "esqueleto-movimientos") {
+                        NxSkeletonList(itemCount = 6, itemHeight = 88.dp)
+                    }
+                    movimientos.error != null && !movimientos.hayDatos -> item(key = "error-movimientos") {
+                        NxErrorBlock(movimientos.error.orEmpty(), onRetry = vm::cargarMovimientos)
+                    }
+                    movimientos.datos.isNullOrEmpty() -> item(key = "vacio-movimientos") {
+                        NxEmptyState(
+                            title = "Todavía no hay movimientos",
+                            subtitle = AlmacenRules.vacioMovimientos(perfil),
+                        )
+                    }
+                    else -> {
+                        if (movimientos.datos.orEmpty().size > 6) {
+                            item(key = "buscar-movimientos") {
+                                NxSearchField(
+                                    value = consulta,
+                                    onValueChange = vm::buscar,
+                                    placeholder = "Buscar por producto, persona o almacén",
+                                )
+                            }
+                        }
+                        if (movimientosVisibles.isEmpty()) {
+                            item(key = "sin-movimientos") {
+                                NxEmptyState(
+                                    title = "Sin coincidencias",
+                                    subtitle = "Ningún movimiento coincide con «$consulta».",
+                                    actionLabel = "Limpiar búsqueda",
+                                    onAction = { vm.buscar("") },
+                                )
+                            }
+                        } else {
+                            item(key = "cabecera-movimientos") {
+                                MoreCabecera(
+                                    titulo = "Movimientos",
+                                    subtitulo = "Del más reciente al más viejo",
+                                    trailing = "${movimientosVisibles.size}",
+                                )
+                            }
+                            items(movimientosVisibles, key = { "mov-${it.id ?: it.hashCode().toLong()}" }) { m ->
+                                FilaDeMovimiento(m)
+                            }
+                        }
+                    }
+                }
+            } else if (datos != null) {
                 AlmacenRules.resumenAlertas(datos.bajoMinimo)?.let { resumen ->
                     item(key = "resumen") {
                         MoreTarjeta {
@@ -136,14 +201,14 @@ fun AlmacenScreen(vm: AlmacenViewModel = viewModel()) {
                 }
 
                 if (visibles.isEmpty()) {
-                    item(key = "vacio") { VacioDeAlmacen(vista, consulta, datos.niveles.size, vm) }
+                    item(key = "vacio") { VacioDeAlmacen(vista, consulta, datos.niveles.size, perfil, vm) }
                 } else {
                     item(key = "cabecera") {
                         MoreCabecera(
                             titulo = vista.etiqueta,
                             subtitulo = when (vista) {
                                 AlmacenRules.Vista.BAJO_MINIMO -> "Primero lo que ya se acabó"
-                                AlmacenRules.Vista.TODO -> "En orden alfabético"
+                                else -> "En orden alfabético"
                             },
                             trailing = "${visibles.size}",
                         )
@@ -154,7 +219,7 @@ fun AlmacenScreen(vm: AlmacenViewModel = viewModel()) {
                 }
             }
 
-            item(key = "alcance") { MoreNotaDeAlcance(AlmacenRules.LIMITE) }
+            item(key = "alcance") { MoreNotaDeAlcance(AlmacenRules.limite(perfil)) }
         }
     }
 }
@@ -164,6 +229,7 @@ private fun VacioDeAlmacen(
     vista: AlmacenRules.Vista,
     consulta: String,
     totalNiveles: Int,
+    perfil: AlmacenRules.Perfil,
     vm: AlmacenViewModel,
 ) {
     when {
@@ -181,8 +247,57 @@ private fun VacioDeAlmacen(
         )
         else -> NxEmptyState(
             title = "Sin existencias",
-            subtitle = "Todavía no hay productos con existencia en los almacenes de esta empresa.",
+            subtitle = AlmacenRules.vacioSinExistencias(perfil),
         )
+    }
+}
+
+/** Un movimiento: qué, cuánto, de dónde a dónde y, sobre todo, quién lo hizo. */
+@Composable
+private fun FilaDeMovimiento(m: MovimientoStockDto) {
+    val entra = AlmacenRules.entra(m.type)
+    MoreTarjeta {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    AlmacenRules.tituloMovimiento(m),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = NxColors.Slate,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                AlmacenRules.rutaMovimiento(m)?.let {
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = NxColors.Muted)
+                }
+                Text(
+                    AlmacenRules.quienLoHizo(m),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = NxColors.Slate,
+                )
+                Text(NxFormat.dateTime(m.createdAt), style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
+            }
+            Text(
+                AlmacenRules.formato(AlmacenRules.numero(m.quantity)),
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                color = NxColors.Slate,
+                maxLines = 1,
+            )
+        }
+        NxStatusChip(
+            AlmacenRules.etiquetaMovimiento(m.type),
+            when (entra) {
+                true -> NxTone.Success
+                false -> NxTone.Warning
+                null -> NxTone.Neutral
+            },
+        )
+        m.notes?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted, maxLines = 3)
+        }
     }
 }
 

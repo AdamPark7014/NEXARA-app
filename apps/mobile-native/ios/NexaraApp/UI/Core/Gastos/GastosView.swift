@@ -30,8 +30,16 @@ final class GastosModelo: ObservableObject {
     /// Si se enseñan los botones de decidir (`contabilidad.manage`). Pista, no autoridad.
     let puedeDecidir: Bool = GastosRepository.administraGastos()
 
+    /// Dirección autoriza, no captura: abre en lo que falta autorizar y sin «Registrar».
+    let esDireccion: Bool = CoreOrg.esDireccion(
+        email: SessionStore.shared.currentUser?.email,
+        roleKey: SessionStore.shared.currentUser?.roleKey
+    )
+
     private let repo = GastosRepository.shared
     private var arrancado = false
+    /// El filtro de entrada se pone una sola vez: un refresco no le cambia el que ya eligió.
+    private var filtroInicialPuesto = false
 
     var todos: [Gasto] { datos ?? [] }
     var hayDatos: Bool { datos != nil }
@@ -175,6 +183,10 @@ final class GastosModelo: ObservableObject {
         do {
             let lista = try await repo.lista()
             datos = lista
+            if !filtroInicialPuesto {
+                filtroInicialPuesto = true
+                filtro = GastosRules.filtroInicial(lista, esDireccion: esDireccion)
+            }
             cargando = false
             refrescando = false
             error = nil
@@ -204,7 +216,8 @@ final class GastosModelo: ObservableObject {
 ///
 /// Arriba, una sola fila de filtros; debajo, la tira de cifras (que también
 /// filtra), el buscador, el encabezado denso y las filas pegadas con el monto a
-/// la derecha. Un único botón primario, el flotante «Registrar gasto».
+/// la derecha. Un único botón primario, el flotante «Registrar gasto». Dirección no
+/// lo tiene: abre en lo que falta autorizar (`GastosRules.filtroInicial`).
 ///
 /// Va dentro del `NavigationStack` del hub «Más»: aquí no se crea otro.
 struct GastosView: View {
@@ -253,14 +266,22 @@ struct GastosView: View {
                     case .error:
                         NxErrorBlock(message: modelo.error, onRetry: { modelo.reintentar() })
                     case .vacio:
-                        NxEmptyState(
-                            title: "Todavía no hay gastos",
-                            subtitle: "Aquí se juntan la renta, los servicios, las suscripciones y lo que "
-                                + "se paga de la bolsa. El primero se registra con la foto de su ticket.",
-                            systemImage: CoreExtraModule.gastos.systemImage,
-                            actionLabel: "Registrar un gasto",
-                            onAction: { altaAbierta = true }
-                        )
+                        if modelo.esDireccion {
+                            NxEmptyState(
+                                title: "Todavía no hay gastos",
+                                subtitle: GastosRules.vacioDireccion,
+                                systemImage: CoreExtraModule.gastos.systemImage
+                            )
+                        } else {
+                            NxEmptyState(
+                                title: "Todavía no hay gastos",
+                                subtitle: "Aquí se juntan la renta, los servicios, las suscripciones y lo que "
+                                    + "se paga de la bolsa. El primero se registra con la foto de su ticket.",
+                                systemImage: CoreExtraModule.gastos.systemImage,
+                                actionLabel: "Registrar un gasto",
+                                onAction: { altaAbierta = true }
+                            )
+                        }
                     case .contenido:
                         contenido(todos)
                     }
@@ -279,7 +300,7 @@ struct GastosView: View {
             }
         }
         .nxScreenBackground()
-        .nxFab("Registrar gasto", systemImage: "plus") { altaAbierta = true }
+        .nxFab("Registrar gasto", systemImage: "plus", visible: !modelo.esDireccion) { altaAbierta = true }
         .overlay(alignment: .bottom) {
             if let snackbar {
                 FinanzasSnackbar(mensaje: snackbar)

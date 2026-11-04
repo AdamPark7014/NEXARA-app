@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -31,7 +32,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
+import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.CotizacionResumenDto
+import mx.nexara.mobile.nativeapp.ui.console.PorRol
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreAvisoDesactualizado
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreCabecera
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreFilaDePastillas
@@ -76,6 +79,8 @@ fun CotizacionesScreen(
     onAbrirCotizacion: (Long) -> Unit,
     vm: CotizacionesViewModel = viewModel(),
 ) {
+    val context = LocalContext.current
+    val esDireccion = remember(context) { PorRol.esDireccion(AuthRepository(context).loadSession()) }
     val state by vm.state.collectAsState()
     val filtro by vm.filtro.collectAsState()
     val consulta by vm.consulta.collectAsState()
@@ -139,7 +144,7 @@ fun CotizacionesScreen(
                 }
 
                 if (visibles.isEmpty()) {
-                    item(key = "vacio") { VacioDeCotizaciones(todas.isEmpty(), consulta, filtro, vm) }
+                    item(key = "vacio") { VacioDeCotizaciones(todas.isEmpty(), esDireccion, consulta, filtro, vm) }
                 } else {
                     item(key = "cabecera") {
                         MoreCabecera(
@@ -158,7 +163,7 @@ fun CotizacionesScreen(
                 }
             }
 
-            item(key = "alcance") { MoreNotaDeAlcance(CotizacionesRules.LIMITE) }
+            item(key = "alcance") { MoreNotaDeAlcance(CotizacionesRules.limite(esDireccion)) }
         }
     }
 }
@@ -174,6 +179,7 @@ fun CotizacionesScreen(
 @Composable
 private fun VacioDeCotizaciones(
     sinRegistros: Boolean,
+    esDireccion: Boolean,
     consulta: String,
     filtro: CotizacionesRules.Filtro,
     vm: CotizacionesViewModel,
@@ -181,8 +187,7 @@ private fun VacioDeCotizaciones(
     when {
         sinRegistros -> NxEmptyState(
             title = "Sin cotizaciones",
-            subtitle = "Todavía no hay ninguna cotización en esta empresa. " +
-                "La primera se arma desde la computadora.",
+            subtitle = CotizacionesRules.vacioSinRegistros(esDireccion),
         )
         consulta.isNotBlank() -> NxEmptyState(
             title = "Sin coincidencias",

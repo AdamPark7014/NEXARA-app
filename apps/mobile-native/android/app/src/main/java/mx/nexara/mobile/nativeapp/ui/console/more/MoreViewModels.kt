@@ -8,10 +8,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.KpisEquipoDto
+import mx.nexara.mobile.nativeapp.data.api.MovimientoStockDto
 import mx.nexara.mobile.nativeapp.data.api.ProyectoResumenDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.CoreExtrasRepository
+import mx.nexara.mobile.nativeapp.ui.console.PorRol
 import mx.nexara.mobile.nativeapp.ui.console.activities.BoardRange
 
 /**
@@ -163,7 +166,16 @@ class ProyectosViewModel(app: Application) : CargaViewModel<List<ProyectoResumen
 class AlmacenViewModel(app: Application) : CargaViewModel<CoreExtrasRepository.Almacen>(app) {
     override val mensajeDeFallo = "No se pudo cargar el almacén"
 
-    override suspend fun cargar(): CoreExtrasRepository.Almacen = repo.almacen()
+    /** Se lee una vez: la sesión no cambia con la pantalla abierta, y el servidor decide de todos modos. */
+    val perfil: AlmacenRules.Perfil = AuthRepository(app.applicationContext).loadSession().let { sesion ->
+        AlmacenRules.perfil(PorRol.esDireccion(sesion), PorRol.operaAlmacen(sesion))
+    }
+
+    override suspend fun cargar(): CoreExtrasRepository.Almacen {
+        // Un refresco también trae lo último que se movió, si ya se abrió esa pestaña.
+        if (_movimientos.value.hayDatos || _movimientos.value.error != null) cargarMovimientos()
+        return repo.almacen()
+    }
 
     private val _vista = MutableStateFlow(AlmacenRules.Vista.BAJO_MINIMO)
     val vista: StateFlow<AlmacenRules.Vista> = _vista
@@ -171,7 +183,34 @@ class AlmacenViewModel(app: Application) : CargaViewModel<CoreExtrasRepository.A
     private val _consulta = MutableStateFlow("")
     val consulta: StateFlow<String> = _consulta
 
-    fun cambiarVista(nueva: AlmacenRules.Vista) { _vista.value = nueva }
+    private val _movimientos = MutableStateFlow(CargaUiState<List<MovimientoStockDto>>(cargando = false))
+    val movimientos: StateFlow<CargaUiState<List<MovimientoStockDto>>> = _movimientos
+
+    fun cambiarVista(nueva: AlmacenRules.Vista) {
+        _vista.value = nueva
+        // Cada pestaña busca en lo suyo: una búsqueda vieja escondería filas sin caja a la vista.
+        _consulta.value = ""
+        // Son 500 renglones: se piden hasta que alguien abre la pestaña.
+        if (nueva == AlmacenRules.Vista.MOVIMIENTOS && !_movimientos.value.hayDatos) cargarMovimientos()
+    }
 
     fun buscar(texto: String) { _consulta.value = texto }
+
+    fun cargarMovimientos() {
+        _movimientos.update { it.copy(cargando = !it.hayDatos, error = null, avisoRefresco = null) }
+        viewModelScope.launch {
+            try {
+                val lista = repo.movimientosDeAlmacen()
+                _movimientos.update { it.copy(cargando = false, datos = lista, error = null, avisoRefresco = null) }
+            } catch (e: Throwable) {
+                val mensaje = e.toUserMessage("No se pudieron cargar los movimientos")
+                _movimientos.update {
+                    if (it.hayDatos) it.copy(cargando = false, avisoRefresco = mensaje)
+                    else it.copy(cargando = false, error = mensaje)
+                }
+            }
+        }
+    }
+
+    fun descartarAvisoMovimientos() = _movimientos.update { it.copy(avisoRefresco = null) }
 }

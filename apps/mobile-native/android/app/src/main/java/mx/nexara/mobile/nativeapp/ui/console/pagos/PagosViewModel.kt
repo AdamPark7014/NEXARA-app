@@ -7,10 +7,22 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import mx.nexara.mobile.nativeapp.data.api.PagoEmpleadoDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
+import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.data.console.PagosEmpleadosRepository
+import mx.nexara.mobile.nativeapp.ui.common.GeoPhoto
 import mx.nexara.mobile.nativeapp.ui.console.more.CargaUiState
+import mx.nexara.mobile.nativeapp.ui.console.viaticos.Dinero
+
+/** Registrar o marcar pagado. Mientras falle, el diálogo se queda abierto con el mensaje del servidor. */
+data class PagoAccionUiState(
+    val enviando: Boolean = false,
+    val error: String? = null,
+    val aviso: String? = null,
+)
 
 /**
  * La lista de pagos a empleados.
@@ -28,6 +40,7 @@ import mx.nexara.mobile.nativeapp.ui.console.more.CargaUiState
  */
 class PagosViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = PagosEmpleadosRepository(app.applicationContext)
+    private val usuarios = ConsoleRepository(app.applicationContext)
 
     private val _state = MutableStateFlow(CargaUiState<List<PagoEmpleadoDto>>())
     val state: StateFlow<CargaUiState<List<PagoEmpleadoDto>>> = _state
@@ -37,6 +50,13 @@ class PagosViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _consulta = MutableStateFlow("")
     val consulta: StateFlow<String> = _consulta
+
+    private val _accion = MutableStateFlow(PagoAccionUiState())
+    val accion: StateFlow<PagoAccionUiState> = _accion
+
+    /** A quién se le puede pagar: id y nombre, en orden alfabético. */
+    private val _personas = MutableStateFlow<List<Pair<Long, String>>>(emptyList())
+    val personas: StateFlow<List<Pair<Long, String>>> = _personas
 
     private var arrancado = false
 
@@ -64,6 +84,71 @@ class PagosViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun buscar(texto: String) { _consulta.value = texto }
+
+    fun limpiarAccion() = _accion.update { it.copy(error = null, aviso = null) }
+
+    /** Se pide al abrir el alta: quien solo consulta los pagos no la necesita. */
+    fun cargarPersonas() {
+        if (_personas.value.isNotEmpty()) return
+        viewModelScope.launch {
+            try {
+                val lista = withContext(Dispatchers.IO) { usuarios.usersFetch() }
+                _personas.value = lista.map { it.id to it.nombre }.sortedBy { it.second }
+            } catch (e: Throwable) {
+                _accion.update { it.copy(error = e.toUserMessage("No se pudo cargar al personal")) }
+            }
+        }
+    }
+
+    fun registrar(
+        personaId: Long,
+        importe: String,
+        concepto: String,
+        desde: String,
+        hasta: String,
+        nota: String,
+        comprobante: GeoPhoto?,
+        onListo: () -> Unit,
+    ) {
+        val centavos = Dinero.parsearCentavos(importe)
+        if (centavos == null || centavos <= 0L) {
+            _accion.value = PagoAccionUiState(error = "Ese importe no se entiende")
+            return
+        }
+        ejecutar(
+            hecho = PagosRules.AVISO_PAGO_REGISTRADO,
+            fallo = "No se pudo registrar el pago",
+            onListo = onListo,
+        ) { repo.registrar(personaId, centavos, concepto, desde, hasta, nota, comprobante) }
+    }
+
+    fun marcarPagado(pago: PagoEmpleadoDto, onListo: () -> Unit) {
+        val id = pago.id ?: return
+        ejecutar(
+            hecho = PagosRules.avisoPagoMarcado(pago),
+            fallo = "No se pudo marcar el pago como pagado",
+            onListo = onListo,
+        ) { repo.marcarPagado(id) }
+    }
+
+    /**
+     * Nada optimista: mueve dinero. La lista se relee hasta que el servidor confirmó, y si contesta
+     * error se enseña su mensaje y no se cierra nada.
+     */
+    private fun ejecutar(hecho: String, fallo: String, onListo: () -> Unit, bloque: suspend () -> Unit) {
+        if (_accion.value.enviando) return
+        _accion.value = PagoAccionUiState(enviando = true)
+        viewModelScope.launch {
+            try {
+                bloque()
+                _accion.value = PagoAccionUiState(aviso = hecho)
+                onListo()
+                lanzar(refresco = true)
+            } catch (e: Throwable) {
+                _accion.value = PagoAccionUiState(error = e.toUserMessage(fallo))
+            }
+        }
+    }
 
     private fun lanzar(refresco: Boolean) {
         _state.update {

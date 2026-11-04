@@ -72,8 +72,9 @@ export class ToolRequestsController {
     return this.busquedaRapidaService.buscar({ q, tipo, limite, usuario: user }, companyId);
   }
 
+  // Dirección ve todo sin administrar (Adam, 04-11-2026): leer pide `tools.inventory` o `tools.manage`.
   @Get('inventory')
-  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.TOOLS_MANAGE, PERMISSIONS.TOOLS_INVENTORY] })
   async getInventory(
     @Query('q') q?: string,
     @Query('includeRetired') includeRetired?: string,
@@ -273,6 +274,7 @@ export class ToolRequestsController {
         id: user.id,
         email: user.email,
         isSuperAdmin: user.isSuperAdmin,
+        roleKey: user.roleKey,
         permissions: user.permissions,
       },
       userId ? parseInt(userId, 10) : undefined,
@@ -461,7 +463,7 @@ export class ToolRequestsController {
 
   // Obtener todas las solicitudes (admin/superadmin)
   @Get()
-  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.TOOLS_MANAGE, PERMISSIONS.TOOLS_INVENTORY] })
   async findAll(
     @CurrentUser() user: any,
     @Query() query: PaginationQueryDto,
@@ -486,7 +488,7 @@ export class ToolRequestsController {
 
   // Obtener solicitudes por estado
   @Get('status/:status')
-  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.TOOLS_MANAGE, PERMISSIONS.TOOLS_INVENTORY] })
   async findByStatus(@Param('status') status: string, @CurrentCompanyId() companyId: number | null) {
     return this.toolRequestsService.findByStatus(status as any, companyId);
   }

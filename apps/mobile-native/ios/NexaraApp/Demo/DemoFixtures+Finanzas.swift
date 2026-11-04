@@ -20,6 +20,8 @@ private final class FinDemoEstado {
     var gastos: [DemoJSON] = []
     var siguienteGasto = 6500
     var decididas: Set<Int> = []
+    /// Cotizaciones que cambiaron de estado en esta sesión (`marcar-enviada`, `aprobar`).
+    var estadosDeCotizacion: [Int: String] = [:]
 }
 
 private struct FinPartida {
@@ -35,7 +37,7 @@ private struct FinPartida {
 private struct FinCotizacionSemilla {
     let id: Int
     let consecutivo: Int
-    let estado: String
+    var estado: String
     let segmento: String
     let clienteId: Int
     let contacto: String
@@ -43,7 +45,7 @@ private struct FinCotizacionSemilla {
     let alcance: String
     let emitidaHaceDias: Int
     let vigenciaDias: Int
-    let enviadaHaceDias: Int?
+    var enviadaHaceDias: Int?
     let elaboroId: Int
     let revisoId: Int?
     let revision: Int
@@ -91,8 +93,6 @@ extension DemoStore {
         switch parts.first ?? "" {
         case "cotizaciones":
             return finRutaCotizaciones(method: method, parts: parts)
-        case "employee-payments":
-            return method == "GET" && parts.count == 1 ? finRespuesta(fxPagosEmpleados()) : nil
         case "expenses":
             return finRutaGastos(method: method, parts: parts, json: json, body: body)
         case "workflow":
@@ -111,6 +111,7 @@ extension DemoStore {
         estado.gastos = finSembrarGastos()
         estado.siguienteGasto = 6500
         estado.decididas = []
+        estado.estadosDeCotizacion = [:]
     }
 
     private func finRespuesta(_ payload: Any, status: Int = 200) -> DemoReply {
@@ -155,7 +156,18 @@ extension DemoStore {
 
     // MARK: Cotizaciones
 
+    /// Las semillas, con lo que cambió de estado en esta sesión.
     private var finCotizaciones: [FinCotizacionSemilla] {
+        finSemillasDeCotizacion.map { semilla -> FinCotizacionSemilla in
+            guard let nuevo = FinDemoEstado.shared.estadosDeCotizacion[semilla.id] else { return semilla }
+            var cambiada = semilla
+            cambiada.estado = nuevo
+            if nuevo == "ENVIADA" { cambiada.enviadaHaceDias = 0 }
+            return cambiada
+        }
+    }
+
+    private var finSemillasDeCotizacion: [FinCotizacionSemilla] {
         [
             FinCotizacionSemilla(
                 id: 7312, consecutivo: 12, estado: "ENVIADA", segmento: "SERVICIO", clienteId: 3102,
@@ -257,6 +269,26 @@ extension DemoStore {
     }
 
     private func finRutaCotizaciones(method: String, parts: [String]) -> DemoReply? {
+        // cotizaciones/:id/marcar-enviada · cotizaciones/:id/aprobar, con las transiciones del API.
+        if method == "POST", parts.count >= 3, let id = Int(parts[1]),
+           let semilla = finCotizaciones.first(where: { $0.id == id }) {
+            switch parts[2] {
+            case "marcar-enviada":
+                guard semilla.estado == "BORRADOR" || semilla.estado == "ENVIADA" else {
+                    return finFallo(400, "No se puede pasar de \(finEstadoEtiqueta(semilla.estado)) a Enviada.")
+                }
+                FinDemoEstado.shared.estadosDeCotizacion[id] = "ENVIADA"
+                return finRespuesta(dj(["id": id, "quoteNumber": finFolio(semilla)]))
+            case "aprobar":
+                guard semilla.estado == "ENVIADA" else {
+                    return finFallo(400, "No se puede pasar de \(finEstadoEtiqueta(semilla.estado)) a Ganada.")
+                }
+                FinDemoEstado.shared.estadosDeCotizacion[id] = "APROBADA"
+                return finRespuesta(dj(["id": id, "estado": "APROBADA"]))
+            default:
+                return nil
+            }
+        }
         guard method == "GET" else { return nil }
         // cotizaciones/core · cotizaciones/core/:id
         if parts.count >= 2, parts[1] == "core" {
@@ -414,6 +446,7 @@ extension DemoStore {
         detalle["quoteNumber"] = "COT-\(s.id)"
         detalle["cadenaParticipantes"] = siglas
         detalle["bloqueada"] = s.estado != "BORRADOR"
+        detalle["salesClientId"] = s.clienteId
         detalle["clientName"] = s.contacto
         detalle["clientCompany"] = finNulo(cliente?.name)
         detalle["clientEmail"] = "\(correo)@\(dominio).example"

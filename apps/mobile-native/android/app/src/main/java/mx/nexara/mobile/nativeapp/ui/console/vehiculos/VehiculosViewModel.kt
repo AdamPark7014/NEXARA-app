@@ -194,6 +194,26 @@ class VehiculosViewModel(app: Application) : AndroidViewModel(app) {
 
     fun limpiarAccionError() = _state.update { it.copy(accionError = null) }
 
+    /** Lo que otra pieza de la pantalla quiere decir en la misma cinta. */
+    fun avisar(mensaje: String) = _state.update { it.copy(mensaje = mensaje) }
+
+    /** Iván. Mientras falle, el diálogo se queda abierto con lo que escribió y lo que dijo el servidor. */
+    fun altaUnidad(nombre: String, placas: String, notas: String, onListo: () -> Unit) {
+        if (_state.value.enviando) return
+        _state.update { it.copy(enviando = true, accionError = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.altaUnidad(nombre, placas, notas) }
+                _state.update { it.copy(enviando = false, mensaje = FlotillaRules.avisoUnidadCreada(nombre)) }
+                onListo()
+                load(refresh = true)
+            } catch (e: Throwable) {
+                if (e is CancellationException) throw e
+                _state.update { it.copy(enviando = false, accionError = e.toUserMessage("No se pudo dar de alta la unidad")) }
+            }
+        }
+    }
+
     fun solicitar(
         actividadId: Long,
         vehicleId: Long,

@@ -16,19 +16,26 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.ReportProblem
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import mx.nexara.mobile.nativeapp.data.api.PagoEmpleadoDto
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreAvisoDesactualizado
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreNotaDeAlcance
@@ -50,17 +58,20 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxMetricStrip
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSnackbarHost
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusDot
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxUi
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxEstadoPantalla
+import mx.nexara.mobile.nativeapp.ui.enterprise.rememberNxSnackbarHostState
 
 /**
  * Pagos a empleados (`/erp/finance/employee-payments`) en el teléfono.
  *
- * La web es una tabla con alta, edición, comprobantes y anulación. Aquí **no se
- * paga nada**: se consulta. Cada pago es una fila densa que contesta, en este
- * orden, lo que se pregunta con el teléfono en la mano: **a quién**, **cuánto**,
- * **de qué periodo** y **si el dinero ya salió**.
+ * Adam (04-11-2026): «pagos empleados deberían poder realizar acciones en móvil». Solo dirección lo
+ * abre: registra un pago en borrador y lo marca pagado, con confirmación. Cada pago es una fila densa
+ * que contesta, en este orden, lo que se pregunta con el teléfono en la mano: **a quién**, **cuánto**,
+ * **de qué periodo** y **si el dinero ya salió**. Nada es optimista: la fila cambia cuando el servidor
+ * confirma, y si contesta error se enseña su mensaje.
  *
  * Los cuatro estados de la pantalla —cargando, error, vacío y contenido— los
  * decide [nxEstadoPantalla] y por construcción no pueden coincidir: la pantalla
@@ -80,8 +91,28 @@ fun PagosEmpleadosScreen(vm: PagosViewModel = viewModel()) {
     val state by vm.state.collectAsState()
     val filtro by vm.filtro.collectAsState()
     val consulta by vm.consulta.collectAsState()
+    val accion by vm.accion.collectAsState()
+    val personas by vm.personas.collectAsState()
+    val snackbar = rememberNxSnackbarHostState()
+    var registrando by remember { mutableStateOf(false) }
+    var confirmando by remember { mutableStateOf<PagoEmpleadoDto?>(null) }
 
     LaunchedEffect(Unit) { vm.arrancar() }
+
+    // El aviso se lanza en el ámbito de la pantalla: `limpiarAccion` cambia la clave de este efecto,
+    // y en el ámbito del efecto la cinta se apagaría a media frase.
+    val alcance = rememberCoroutineScope()
+    LaunchedEffect(accion.aviso) {
+        val aviso = accion.aviso ?: return@LaunchedEffect
+        vm.limpiarAccion()
+        alcance.launch { snackbar.showSnackbar(aviso) }
+    }
+
+    val abrirAlta = {
+        vm.limpiarAccion()
+        vm.cargarPersonas()
+        registrando = true
+    }
 
     val todos = state.datos.orEmpty()
     val visibles = remember(todos, filtro, consulta) { PagosRules.aplicar(todos, filtro, consulta) }
@@ -102,7 +133,8 @@ fun PagosEmpleadosScreen(vm: PagosViewModel = viewModel()) {
     NxScreenScaffold(isRefreshing = state.refrescando, onRefresh = vm::refrescar) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
+            // Abajo cabe el botón principal sin tapar la última fila.
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // La cinta de «esto es de hace un momento» convive con el contenido:
@@ -124,7 +156,9 @@ fun PagosEmpleadosScreen(vm: PagosViewModel = viewModel()) {
                     NxEmptyState(
                         title = "Sin pagos registrados",
                         subtitle = "Todavía no hay ningún pago al personal en esta empresa. " +
-                            "El primero se captura desde la computadora, con su comprobante.",
+                            "Registra el primero: a quién, cuánto y de qué periodo.",
+                        actionLabel = "Registrar pago",
+                        onAction = abrirAlta,
                     )
                 }
 
@@ -203,7 +237,7 @@ fun PagosEmpleadosScreen(vm: PagosViewModel = viewModel()) {
                             ) {
                                 visibles.forEachIndexed { i, pago ->
                                     if (i > 0) HorizontalDivider(color = NxUi.BorderSubtle)
-                                    FilaDePago(pago)
+                                    FilaDePago(pago, onMarcarPagado = { confirmando = pago })
                                 }
                             }
                         }
@@ -214,6 +248,54 @@ fun PagosEmpleadosScreen(vm: PagosViewModel = viewModel()) {
             item(key = "alcance") { MoreNotaDeAlcance(PagosRules.LIMITE) }
             item(key = "fin") { Spacer(Modifier.height(8.dp)) }
         }
+
+        // Un solo botón principal. En el vacío ya lo trae el propio mensaje.
+        if (estado == NxEstadoPantalla.CONTENIDO) {
+            ExtendedFloatingActionButton(
+                onClick = abrirAlta,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text("Registrar pago", fontWeight = FontWeight.SemiBold) },
+                containerColor = NxColors.Brand,
+                contentColor = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .heightIn(min = 56.dp),
+            )
+        }
+
+        NxSnackbarHost(
+            snackbar,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 72.dp),
+        )
+    }
+
+    confirmando?.let { pago ->
+        DialogoMarcarPagado(
+            pago = pago,
+            enviando = accion.enviando,
+            error = accion.error,
+            onCerrar = {
+                confirmando = null
+                vm.limpiarAccion()
+            },
+            onConfirmar = { vm.marcarPagado(pago) { confirmando = null } },
+        )
+    }
+
+    if (registrando) {
+        HojaRegistrarPago(
+            personas = personas,
+            enviando = accion.enviando,
+            error = accion.error,
+            onRegistrar = { persona, importe, concepto, desde, hasta, nota, comprobante ->
+                vm.registrar(persona, importe, concepto, desde, hasta, nota, comprobante) { registrando = false }
+            },
+            onCerrar = {
+                registrando = false
+                vm.limpiarAccion()
+            },
+        )
     }
 }
 
@@ -226,7 +308,7 @@ fun PagosEmpleadosScreen(vm: PagosViewModel = viewModel()) {
  * pantalla: leída pieza a pieza sonaría a lista de palabras sueltas.
  */
 @Composable
-private fun FilaDePago(pago: PagoEmpleadoDto) {
+private fun FilaDePago(pago: PagoEmpleadoDto, onMarcarPagado: () -> Unit) {
     val empleado = PagosRules.empleadoTexto(pago)
     val concepto = PagosRules.conceptoTexto(pago)
     val contexto = PagosRules.contextoTexto(pago)
@@ -301,6 +383,19 @@ private fun FilaDePago(pago: PagoEmpleadoDto) {
                 text = estado.etiqueta,
                 color = PagosRules.colorDe(estado),
             )
+        }
+    }
+
+    // Va aparte de la fila: su lector de pantalla se lee de una vez y dejaría al botón sin voz.
+    if (PagosRules.puedeMarcarPagado(pago)) {
+        OutlinedButton(
+            onClick = onMarcarPagado,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
+                .heightIn(min = NxUi.TouchH),
+        ) {
+            Text("Marcar pagado", color = NxColors.Brand, fontWeight = FontWeight.SemiBold)
         }
     }
 }

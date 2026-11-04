@@ -12,10 +12,22 @@ import PDFKit
 ///
 /// El PDF se abre dentro de la app (visor de PDFKit con «Compartir»), nunca en
 /// el navegador.
+///
+/// Un borrador listo se marca como enviada y, para dirección, una enviada se aprueba. Lo
+/// que el servidor no permitiría en ese estado no se ofrece (`CotizacionesRules`).
 struct CotizacionDetalleView: View {
     let cotizacionId: Int
+    /// Avisa a la lista cuando cambió el estado, para que no enseñe el de antes.
+    var onCambio: () -> Void = {}
+
+    @ObservedObject private var session = SessionStore.shared
 
     @State private var cotizacion: CotizacionDetalle?
+    @State private var eligiendoMedio = false
+    @State private var confirmandoAprobar = false
+    @State private var actuando = false
+    @State private var errorAccion: String?
+    @State private var aviso: String?
     @State private var cargando = true
     @State private var error: String?
     @State private var avisoRefresco: String?
@@ -48,9 +60,12 @@ struct CotizacionDetalleView: View {
                 if let cotizacion {
                     CabezaDeCotizacion(cotizacion: cotizacion)
 
+                    acciones(cotizacion)
+
                     BotonesDePdf(
                         descargando: descargandoPdf,
                         error: errorPdf,
+                        pdfEsPrincipal: !hayAccion(cotizacion),
                         onAbrir: { Task { await bajarPdf(interno: false) } },
                         onAbrirInterno: { Task { await bajarPdf(interno: true) } },
                         onReintentar: {
@@ -83,6 +98,118 @@ struct CotizacionDetalleView: View {
         .navigationDestination(item: $pdfAbierto) { pdf in
             PDFViewerScreen(title: pdf.titulo, data: pdf.data)
                 .nxBrandNavBar(title: pdf.titulo, showsBell: false)
+        }
+        .avisoSnackbar($aviso)
+        .confirmationDialog("¿Cómo salió?", isPresented: $eligiendoMedio, titleVisibility: .visible) {
+            ForEach(CotizacionesRules.MedioEnvio.allCases) { medio in
+                Button(medio.etiqueta) { marcarEnviada(medio) }
+            }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Con eso le damos seguimiento y te avisamos antes de que venza.")
+        }
+        .alert("¿Aprobar esta cotización?", isPresented: $confirmandoAprobar) {
+            Button("Cancelar", role: .cancel) {}
+            Button("Sí, aprobar") { aprobar() }
+        } message: {
+            Text("Queda como ganada y ya no se puede cambiar.")
+        }
+    }
+
+    // MARK: Acciones
+
+    private var esDireccion: Bool {
+        CoreOrg.esDireccion(email: session.currentUser?.email, roleKey: session.currentUser?.roleKey)
+    }
+
+    private func hayAccion(_ cotizacion: CotizacionDetalle) -> Bool {
+        CotizacionesRules.puedeMarcarEnviada(cotizacion)
+            || CotizacionesRules.puedeAprobar(cotizacion, esDireccion: esDireccion)
+    }
+
+    /// Lo que se puede hacer con ella en este estado. Lo demás no se ofrece.
+    @ViewBuilder
+    private func acciones(_ cotizacion: CotizacionDetalle) -> some View {
+        if hayAccion(cotizacion) {
+            MoreTarjeta {
+                if CotizacionesRules.puedeMarcarEnviada(cotizacion) {
+                    Text("¿Ya la enviaste?")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(NxColors.fg)
+                        .accessibilityAddTraits(.isHeader)
+                    if let faltas = CotizacionesRules.textoFaltas(cotizacion) {
+                        Text(faltas)
+                            .font(NxType.bodySmall)
+                            .foregroundStyle(NxColors.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("Dinos cómo salió: con eso le damos seguimiento y te avisamos antes de que venza.")
+                            .font(NxType.bodySmall)
+                            .foregroundStyle(NxColors.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button {
+                            errorAccion = nil
+                            eligiendoMedio = true
+                        } label: {
+                            Text(actuando ? "Enviando…" : "Marcar como enviada")
+                                .fontWeight(.bold)
+                        }
+                        .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.brand), alto: 48, llenaAncho: true))
+                        .disabled(actuando)
+                    }
+                } else {
+                    Text("Ya salió: ¿la apruebas?")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(NxColors.fg)
+                        .accessibilityAddTraits(.isHeader)
+                    Button {
+                        errorAccion = nil
+                        confirmandoAprobar = true
+                    } label: {
+                        Text(actuando ? "Enviando…" : "Aprobar")
+                            .fontWeight(.bold)
+                    }
+                    .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.brand), alto: 48, llenaAncho: true))
+                    .disabled(actuando)
+                }
+                if let errorAccion {
+                    Text(errorAccion)
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(NxColors.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private func marcarEnviada(_ medio: CotizacionesRules.MedioEnvio) {
+        ejecutar(hecho: "Cotización marcada como enviada.", fallo: "No se pudo marcar como enviada") {
+            try await CotizacionesRepository.shared.marcarEnviada(id: cotizacionId, medio: medio)
+        }
+    }
+
+    private func aprobar() {
+        ejecutar(hecho: "Cotización aprobada.", fallo: "No se pudo aprobar la cotización") {
+            try await CotizacionesRepository.shared.aprobar(id: cotizacionId)
+        }
+    }
+
+    /// Nada es optimista: el estado cambia cuando el servidor confirma y se relee.
+    private func ejecutar(hecho: String, fallo: String, bloque: @escaping () async throws -> Void) {
+        guard !actuando else { return }
+        actuando = true
+        errorAccion = nil
+        Task { @MainActor in
+            do {
+                try await bloque()
+                await cargar(refresco: true)
+                actuando = false
+                aviso = hecho
+                onCambio()
+            } catch {
+                actuando = false
+                errorAccion = error.toUserMessage(fallback: fallo)
+            }
         }
     }
 
@@ -378,15 +505,22 @@ private struct DosColumnas: Layout {
 
 // MARK: - PDF
 
-/// El PDF de la propuesta: lo único que esta pantalla «hace», y por eso va
-/// arriba. Mientras baja, los botones se bloquean y lo dicen; si falla, el aviso
-/// va aparte y no toca el detalle.
+/// El PDF de la propuesta. Mientras baja, los botones se bloquean y lo dicen; si falla,
+/// el aviso va aparte y no toca el detalle. Si hay algo que decidir, el botón principal
+/// es ese y el PDF se queda de contorno: uno solo por pantalla.
 private struct BotonesDePdf: View {
     let descargando: Bool
     let error: String?
+    let pdfEsPrincipal: Bool
     let onAbrir: () -> Void
     let onAbrirInterno: () -> Void
     let onReintentar: () -> Void
+
+    private var estilo: NxPillButtonStyle {
+        pdfEsPrincipal
+            ? NxPillButtonStyle(fill: NxColors.brand, foreground: .white)
+            : NxPillButtonStyle(fill: .clear, foreground: NxColors.brand, border: NxColors.borderStrong)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -395,7 +529,7 @@ private struct BotonesDePdf: View {
                     if descargando {
                         ProgressView()
                             .controlSize(.small)
-                            .tint(Color.white)
+                            .tint(pdfEsPrincipal ? Color.white : NxColors.brand)
                             .frame(width: 16, height: 16)
                         Spacer().frame(width: 10)
                         Text("Bajando el PDF…")
@@ -410,7 +544,7 @@ private struct BotonesDePdf: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(NxPillButtonStyle(fill: NxColors.brand, foreground: .white))
+            .buttonStyle(estilo)
             .disabled(descargando)
 
             Button(action: onAbrirInterno) {

@@ -67,7 +67,12 @@ class GastosViewModel(app: Application) : AndroidViewModel(app) {
      */
     val puedeDecidir: Boolean = repo.administraGastos()
 
+    val esDireccion: Boolean = repo.esDireccion()
+
     private var arrancado = false
+
+    /** El filtro de arranque se pone una vez: después manda lo que la persona elija. */
+    private var filtroInicialPuesto = false
 
     /**
      * La primera carga la dispara la pantalla, y solo una vez: girar el
@@ -209,6 +214,10 @@ class GastosViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val datos = repo.lista()
+                if (!filtroInicialPuesto) {
+                    filtroInicialPuesto = true
+                    _filtro.value = GastosRules.filtroInicial(esDireccion, datos)
+                }
                 _state.update {
                     it.copy(
                         cargando = false,

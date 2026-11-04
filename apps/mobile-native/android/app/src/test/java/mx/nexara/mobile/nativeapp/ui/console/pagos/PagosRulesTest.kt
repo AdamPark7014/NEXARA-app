@@ -619,18 +619,19 @@ class PagosRulesTest {
         assertNull(PagosRules.pagadoElTexto(fila))
     }
 
-    /** El pie cabe en una frase. Consultar se queda; lo demás sigue en la computadora. */
+    /**
+     * El pie cabe en una frase. Registrar y marcar pagado ya se hacen aquí (Adam, 04-11-2026): en la
+     * computadora solo sigue corregir y anular, y no puede volver a decir que el alta se hace allá.
+     */
     @Test
     fun elPieCabeEnUnaFrase() {
-        val viejo =
-            "Consulta. Registrar un pago, autorizarlo, marcarlo pagado o anularlo se hacen desde la computadora."
         val pie = PagosRules.LIMITE
-        assertFalse(pie.contains(viejo))
         assertEquals(
-            "Consulta: registrar un pago, autorizarlo, marcarlo pagado o anularlo se hacen desde la computadora.",
+            "Aquí registras y marcas pagado; corregir o anular un pago se hace desde la computadora.",
             pie,
         )
         assertEquals(1, pie.count { it == '.' })
-        assertTrue(pie.startsWith("Consulta"))
+        assertFalse(pie.contains("Consulta"))
+        assertFalse(pie.contains("registrar un pago"))
     }
 }

@@ -12,17 +12,26 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +52,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.FichaDireccionDto
 import mx.nexara.mobile.nativeapp.data.api.FlotillaMesDto
+import mx.nexara.mobile.nativeapp.data.api.SolicitudVehiculoDto
 import mx.nexara.mobile.nativeapp.data.api.VehiculoDelMesDto
 import mx.nexara.mobile.nativeapp.data.api.VehiculoFlotaDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
@@ -52,6 +62,8 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlertBanner
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormat
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormTextField
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpiGrid
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxListRow
@@ -77,6 +89,11 @@ data class FlotillaDireccionUi(
     val ficha: FichaDireccionDto? = null,
     val cargandoFicha: Boolean = false,
     val errorFicha: String? = null,
+    /** Solo lo pendiente: si no hay nada, la sección no sale. */
+    val solicitudes: List<SolicitudVehiculoDto> = emptyList(),
+    val decidiendo: Boolean = false,
+    val errorDecision: String? = null,
+    val aviso: String? = null,
 )
 
 class FlotillaDireccionViewModel(app: Application) : AndroidViewModel(app) {
@@ -95,17 +112,47 @@ class FlotillaDireccionViewModel(app: Application) : AndroidViewModel(app) {
             // Van aparte: si falla el mes, la lista de quién trae qué se sigue viendo.
             val lista = withContext(Dispatchers.IO) { intento { repo.flotilla().vehiculos.orEmpty() } }
             val datos = withContext(Dispatchers.IO) { intento { repo.flotillaMes(mes) } }
+            val solicitudes = withContext(Dispatchers.IO) { intento { repo.solicitudes() } }
             _state.update { s ->
                 s.copy(
                     cargando = false,
                     vehiculos = lista.getOrNull() ?: s.vehiculos,
                     datos = datos.getOrNull(),
-                    error = (lista.exceptionOrNull() ?: datos.exceptionOrNull())
+                    solicitudes = solicitudes.getOrNull()?.let(FlotillaRules::porAprobar) ?: s.solicitudes,
+                    error = (lista.exceptionOrNull() ?: datos.exceptionOrNull() ?: solicitudes.exceptionOrNull())
                         ?.toUserMessage("No se pudo cargar la flotilla"),
                 )
             }
         }
     }
+
+    /** Lo decide el servidor: se relee al terminar, y si contesta error se enseña su mensaje. */
+    fun decidir(solicitud: SolicitudVehiculoDto, aprobar: Boolean, nota: String?, onListo: () -> Unit) {
+        val id = solicitud.id ?: return
+        if (_state.value.decidiendo) return
+        _state.update { it.copy(decidiendo = true, errorDecision = null) }
+        viewModelScope.launch {
+            val r = withContext(Dispatchers.IO) { intento { repo.decidirSolicitud(id, aprobar, nota) } }
+            r.fold(
+                onSuccess = { hecha ->
+                    _state.update {
+                        it.copy(decidiendo = false, aviso = FlotillaRules.avisoDecision(aprobar, hecha.estatusAprobacion))
+                    }
+                    onListo()
+                    cargar()
+                },
+                onFailure = { e ->
+                    _state.update {
+                        it.copy(decidiendo = false, errorDecision = e.toUserMessage("No se pudo decidir la solicitud"))
+                    }
+                },
+            )
+        }
+    }
+
+    fun limpiarDecision() = _state.update { it.copy(errorDecision = null) }
+
+    fun limpiarAviso() = _state.update { it.copy(aviso = null) }
 
     fun cambiarMes(mes: String) {
         _state.update { it.copy(mes = mes, datos = null) }
@@ -143,11 +190,38 @@ class FlotillaDireccionViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
-/** Vehículos para el CEO. [encabezado] es la tarjeta de lo que él traiga, si trae algo. */
+/**
+ * Vehículos para el CEO. [encabezado] es la tarjeta de lo que él traiga, si trae algo; [onAviso] lleva
+ * a la cinta de la pantalla el resultado de decidir una solicitud.
+ */
 @Composable
-internal fun FlotillaDireccionScreen(encabezado: (@Composable () -> Unit)? = null) {
+internal fun FlotillaDireccionScreen(
+    encabezado: (@Composable () -> Unit)? = null,
+    onAviso: (String) -> Unit = {},
+) {
     val vm: FlotillaDireccionViewModel = viewModel()
     val state by vm.state.collectAsState()
+    var rechazando by remember { mutableStateOf<SolicitudVehiculoDto?>(null) }
+
+    LaunchedEffect(state.aviso) {
+        val aviso = state.aviso ?: return@LaunchedEffect
+        vm.limpiarAviso()
+        onAviso(aviso)
+    }
+
+    rechazando?.let { solicitud ->
+        DialogoRechazarSolicitud(
+            solicitud = solicitud,
+            enviando = state.decidiendo,
+            error = state.errorDecision,
+            onCerrar = {
+                rechazando = null
+                vm.limpiarDecision()
+            },
+            onConfirmar = { nota -> vm.decidir(solicitud, aprobar = false, nota = nota) { rechazando = null } },
+        )
+    }
+
     val abierto = state.abierto
     if (abierto != null) {
         BackHandler(onBack = vm::cerrar)
@@ -172,6 +246,14 @@ internal fun FlotillaDireccionScreen(encabezado: (@Composable () -> Unit)? = nul
         onMes = vm::cambiarMes,
         onAbrir = vm::abrir,
         onReintentar = vm::cargar,
+        solicitudes = state.solicitudes,
+        decidiendo = state.decidiendo,
+        errorDecision = state.errorDecision.takeIf { rechazando == null },
+        onAprobar = { vm.decidir(it, aprobar = true, nota = null) {} },
+        onRechazar = {
+            vm.limpiarDecision()
+            rechazando = it
+        },
     )
 }
 
@@ -188,6 +270,11 @@ internal fun FlotillaDireccionContenido(
     onMes: (String) -> Unit,
     onAbrir: (VehiculoFlotaDto) -> Unit,
     onReintentar: () -> Unit,
+    solicitudes: List<SolicitudVehiculoDto> = emptyList(),
+    decidiendo: Boolean = false,
+    errorDecision: String? = null,
+    onAprobar: (SolicitudVehiculoDto) -> Unit = {},
+    onRechazar: (SolicitudVehiculoDto) -> Unit = {},
 ) {
     val delMes = datos?.vehiculos.orEmpty().associateBy { it.id }
     val reparto = FlotillaRules.repartoDelMes(datos?.reparto)
@@ -218,6 +305,22 @@ internal fun FlotillaDireccionContenido(
             )
         }
         encabezado?.let { tarjeta -> item { tarjeta() } }
+        if (solicitudes.isNotEmpty()) {
+            item(key = "solicitudes-cabecera") {
+                NxSectionHeader(title = "Solicitudes por aprobar", subtitle = "${solicitudes.size} esperando tu visto bueno")
+            }
+            errorDecision?.let { mensaje ->
+                item(key = "solicitudes-error") { Text(mensaje, fontSize = 13.sp, color = NxColors.Danger) }
+            }
+            items(solicitudes, key = { "solicitud-${it.id}" }) { solicitud ->
+                TarjetaSolicitud(
+                    solicitud = solicitud,
+                    decidiendo = decidiendo,
+                    onAprobar = { onAprobar(solicitud) },
+                    onRechazar = { onRechazar(solicitud) },
+                )
+            }
+        }
         if (cargando && vehiculos.isEmpty()) {
             item { NxSkeletonList(itemCount = 3, itemHeight = 96.dp) }
         }
@@ -281,6 +384,86 @@ internal fun FlotillaDireccionContenido(
         }
         item { Spacer(Modifier.height(16.dp)) }
     }
+}
+
+@Composable
+private fun TarjetaSolicitud(
+    solicitud: SolicitudVehiculoDto,
+    decidiendo: Boolean,
+    onAprobar: () -> Unit,
+    onRechazar: () -> Unit,
+) {
+    NxPanelShell {
+        Text(FlotillaRules.nombreSolicitud(solicitud), fontWeight = FontWeight.Bold, color = NxColors.Slate)
+        Text(FlotillaRules.quienPide(solicitud), fontSize = 14.sp, color = NxColors.Slate)
+        solicitud.actividad?.titulo?.takeIf { it.isNotBlank() }?.let {
+            Text(it, fontSize = 12.5.sp, color = NxColors.Muted)
+        }
+        val fechas = listOfNotNull(
+            solicitud.fechaInicioSolicitada?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime),
+            solicitud.fechaFinSolicitada?.takeIf { it.isNotBlank() }?.let(NxFormat::dateTime),
+        ).joinToString(" → ")
+        if (fechas.isNotBlank()) Text(fechas, fontSize = 12.5.sp, color = NxColors.Muted)
+        solicitud.motivoUso?.takeIf { it.isNotBlank() }?.let {
+            Text("«$it»", fontSize = 12.5.sp, color = NxColors.Muted)
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = onAprobar,
+                enabled = !decidiendo,
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+                modifier = Modifier.weight(1f).heightIn(min = 46.dp),
+            ) { Text("Aprobar", fontWeight = FontWeight.Bold) }
+            OutlinedButton(
+                onClick = onRechazar,
+                enabled = !decidiendo,
+                modifier = Modifier.weight(1f).heightIn(min = 46.dp),
+            ) { Text("Rechazar") }
+        }
+    }
+}
+
+@Composable
+private fun DialogoRechazarSolicitud(
+    solicitud: SolicitudVehiculoDto,
+    enviando: Boolean,
+    error: String?,
+    onCerrar: () -> Unit,
+    onConfirmar: (String) -> Unit,
+) {
+    var nota by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = { if (!enviando) onCerrar() },
+        title = { Text("Rechazar solicitud", fontWeight = FontWeight.Bold, color = NxColors.Slate) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "${FlotillaRules.nombreSolicitud(solicitud)} para ${FlotillaRules.quienPide(solicitud)}.",
+                    fontSize = 14.sp,
+                    color = NxColors.Slate,
+                )
+                NxFormTextField(
+                    value = nota,
+                    onValueChange = { nota = it.take(300) },
+                    label = "¿Por qué?",
+                    singleLine = false,
+                    minLines = 2,
+                )
+                error?.let { Text(it, fontSize = 12.5.sp, color = NxColors.Danger) }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirmar(nota) },
+                enabled = !enviando && nota.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+            ) { Text(if (enviando) "Enviando…" else "Rechazar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onCerrar, enabled = !enviando) { Text("Mejor no") }
+        },
+    )
 }
 
 @Composable

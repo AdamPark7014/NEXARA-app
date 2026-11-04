@@ -40,6 +40,7 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.AsignacionActivaDto
 import mx.nexara.mobile.nativeapp.data.api.SolicitudResumenDto
 import mx.nexara.mobile.nativeapp.data.api.VehiculoFlotaDto
+import mx.nexara.mobile.nativeapp.ui.console.PorRol
 import mx.nexara.mobile.nativeapp.ui.console.activities.DateTimePickerField
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
@@ -61,7 +62,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.rememberNxSnackbarHostState
 /**
  * «Vehículos» de Core en la app: lo que traigo asignado, mis solicitudes y la
  * flota libre. El CEO no pide vehículos: él ve [FlotillaDireccionScreen]. Salida y regreso pasan por [ChecklistVehiculoFlow] — siete fotos
- * con cámara en vivo, nunca galería.
+ * con cámara en vivo, nunca galería. Quien lleva el inventario (Iván) además da de alta unidades.
  */
 @Composable
 fun VehiculosScreen() {
@@ -75,6 +76,8 @@ fun VehiculosScreen() {
             FlotillaRules.esDireccion(u.email, u.roleKey, u.orgRoleKey, u.role, u.isSuperAdmin)
         } == true
     }
+    val daDeAlta = remember(context) { PorRol.daDeAltaUnidades(AuthRepository(context).loadSession()) }
+    var dandoDeAlta by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.mensaje) {
         val msg = state.mensaje ?: return@LaunchedEffect
@@ -137,6 +140,7 @@ fun VehiculosScreen() {
                 encabezado = state.activa?.let { activa ->
                     { AsignacionActivaCard(activa = activa, onAccion = vm::abrirChecklist, onGasolina = vm::abrirGasolina) }
                 },
+                onAviso = vm::avisar,
             )
             NxSnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter))
         }
@@ -197,8 +201,19 @@ fun VehiculosScreen() {
                 item {
                     NxEmptyState(
                         title = "Sin vehículos",
-                        subtitle = "No traes asignación ni hay unidades libres.",
+                        subtitle = FlotillaRules.vacioVehiculos(daDeAlta),
+                        actionLabel = "Dar de alta unidad".takeIf { daDeAlta },
+                        onAction = { dandoDeAlta = true }.takeIf { daDeAlta },
                     )
+                }
+            }
+            // Con la lista vacía el botón ya viene en el mensaje de arriba.
+            if (daDeAlta && !state.vacio) {
+                item(key = "dar-de-alta") {
+                    OutlinedButton(
+                        onClick = { dandoDeAlta = true },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp),
+                    ) { Text("Dar de alta unidad") }
                 }
             }
             item { Spacer(Modifier.height(16.dp)) }
@@ -228,6 +243,58 @@ fun VehiculosScreen() {
             },
         )
     }
+
+    if (dandoDeAlta) {
+        DialogoAltaUnidad(
+            enviando = state.enviando,
+            error = state.accionError,
+            onCerrar = {
+                dandoDeAlta = false
+                vm.limpiarAccionError()
+            },
+            onGuardar = { nombre, placas, notas -> vm.altaUnidad(nombre, placas, notas) { dandoDeAlta = false } },
+        )
+    }
+}
+
+@Composable
+private fun DialogoAltaUnidad(
+    enviando: Boolean,
+    error: String?,
+    onCerrar: () -> Unit,
+    onGuardar: (nombre: String, placas: String, notas: String) -> Unit,
+) {
+    var nombre by remember { mutableStateOf("") }
+    var placas by remember { mutableStateOf("") }
+    var notas by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = { if (!enviando) onCerrar() },
+        title = { Text("Dar de alta unidad") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                NxFormTextField(value = nombre, onValueChange = { nombre = it.take(120) }, label = "Nombre")
+                NxFormTextField(value = placas, onValueChange = { placas = it.take(20) }, label = "Placas (opcional)")
+                NxFormTextField(
+                    value = notas,
+                    onValueChange = { notas = it.take(300) },
+                    label = "Notas (opcional)",
+                    singleLine = false,
+                    minLines = 2,
+                )
+                error?.let { Text(it, color = NxColors.Danger, fontSize = 12.5.sp) }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onGuardar(nombre, placas, notas) },
+                enabled = nombre.isNotBlank() && !enviando,
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+            ) { Text(if (enviando) "Enviando…" else "Dar de alta") }
+        },
+        dismissButton = {
+            TextButton(onClick = onCerrar, enabled = !enviando) { Text("Cancelar") }
+        },
+    )
 }
 
 internal fun VehiculoFlotaDto.etiqueta(): String =

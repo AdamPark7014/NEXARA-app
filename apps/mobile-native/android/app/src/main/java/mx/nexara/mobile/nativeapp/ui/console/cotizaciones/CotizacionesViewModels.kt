@@ -97,7 +97,7 @@ class CotizacionesViewModel(app: Application) : AndroidViewModel(app) {
 
 /**
  * Una cotización por dentro: cliente, importes, partidas agrupadas, términos y
- * quién intervino. Más el PDF, que es lo único que se «hace» desde el teléfono.
+ * quién intervino. Más el PDF, decir que ya salió y, a dirección, aprobarla.
  */
 data class CotizacionDetalleUiState(
     val cargando: Boolean = true,
@@ -111,6 +111,10 @@ data class CotizacionDetalleUiState(
     val errorPdf: String? = null,
     /** El PDF ya bajado, abierto dentro de la app (Guardar · Compartir · Abrir con…). */
     val pdfAbierto: PdfDeCotizacion? = null,
+    val enviandoAccion: Boolean = false,
+    /** Lo que contestó el servidor: el diálogo se queda abierto para que se lea. */
+    val errorAccion: String? = null,
+    val avisoAccion: String? = null,
 ) {
     val hayDatos: Boolean get() = cotizacion != null
 }
@@ -166,6 +170,36 @@ class CotizacionDetalleViewModel(app: Application) : AndroidViewModel(app) {
     fun limpiarErrorPdf() = _state.update { it.copy(errorPdf = null) }
 
     fun cerrarPdf() = _state.update { it.copy(pdfAbierto = null) }
+
+    fun limpiarAccion() = _state.update { it.copy(errorAccion = null, avisoAccion = null) }
+
+    fun marcarEnviada(medio: CotizacionesRules.MedioEnvio, onListo: () -> Unit) = accion(
+        hecho = CotizacionesRules.AVISO_ENVIADA,
+        fallo = "No se pudo marcar como enviada",
+        onListo = onListo,
+    ) { repo.marcarEnviada(cotizacionId, medio.clave) }
+
+    fun aprobar(onListo: () -> Unit) = accion(
+        hecho = CotizacionesRules.AVISO_APROBADA,
+        fallo = "No se pudo aprobar la cotización",
+        onListo = onListo,
+    ) { repo.aprobar(cotizacionId) }
+
+    /** El estado lo decide el servidor: se relee en vez de adivinarlo, y un error deja todo como estaba. */
+    private fun accion(hecho: String, fallo: String, onListo: () -> Unit, bloque: suspend () -> Unit) {
+        if (cotizacionId <= 0L || _state.value.enviandoAccion) return
+        _state.update { it.copy(enviandoAccion = true, errorAccion = null) }
+        viewModelScope.launch {
+            try {
+                bloque()
+                _state.update { it.copy(enviandoAccion = false, avisoAccion = hecho) }
+                onListo()
+                cargar(cotizacionId, refresco = true)
+            } catch (e: Throwable) {
+                _state.update { it.copy(enviandoAccion = false, errorAccion = e.toUserMessage(fallo)) }
+            }
+        }
+    }
 
     /**
      * Descarga el PDF y lo abre **dentro de la app** (`DocumentoDialog`), con
