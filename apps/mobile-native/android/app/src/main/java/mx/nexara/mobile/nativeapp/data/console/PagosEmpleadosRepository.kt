@@ -7,23 +7,29 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.EmployeePaymentsApi
 import mx.nexara.mobile.nativeapp.data.api.PagoEmpleadoDto
+import mx.nexara.mobile.nativeapp.data.api.parteJpeg
+import mx.nexara.mobile.nativeapp.data.api.textoMultipart
+import mx.nexara.mobile.nativeapp.ui.common.GeoPhoto
+import mx.nexara.mobile.nativeapp.ui.console.viaticos.Dinero
 
 /**
- * Lectura de Pagos a empleados (`/erp/finance/employee-payments`).
+ * Pagos a empleados (`/erp/finance/employee-payments`): la lista, registrar en borrador y marcar pagado.
  *
- * **Solo lectura, y a propósito.** El controlador sí expone crear, editar,
- * marcar pagado y anular, pero los cuatro piden `CONTABILIDAD_MANAGE` y los
- * cuatro mueven contabilidad de verdad: marcar pagado asienta una póliza
- * (`postOperationalDisbursement`) que después hay que cancelar a mano si se
- * hizo de más. Autorizar nómina con el teléfono en la mano, en la calle y sin
- * ver el comprobante completo, es una decisión del dueño, no de esta pantalla.
- * Mientras no la tome, aquí solo se consulta.
+ * Adam (04-11-2026) decidió que dirección registra y marca pagado desde el teléfono. Marcar pagado
+ * mueve dinero y asienta una póliza (`postOperationalDisbursement`), así que **nada se encola**: sin
+ * señal falla a la vista, y la fila solo cambia cuando el servidor confirma.
  */
 class PagosEmpleadosRepository(context: Context) {
     private val authRepo = AuthRepository(context)
     private val api: EmployeePaymentsApi = ApiClient.authed(
         tokenProvider = { authRepo.token() },
         companyIdProvider = { authRepo.companyId() },
+    ).create(EmployeePaymentsApi::class.java)
+
+    private val apiSinCola: EmployeePaymentsApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+        withOffline = false,
     ).create(EmployeePaymentsApi::class.java)
 
     /**
@@ -37,4 +43,31 @@ class PagosEmpleadosRepository(context: Context) {
      */
     suspend fun lista(): List<PagoEmpleadoDto> =
         withContext(Dispatchers.IO) { api.lista() }
+
+    /** Siempre en borrador: el dinero sale hasta que alguien lo marca pagado. */
+    suspend fun registrar(
+        personaId: Long,
+        centavos: Long,
+        concepto: String,
+        /** `YYYY-MM-DD`. */
+        desde: String,
+        hasta: String,
+        nota: String?,
+        comprobante: GeoPhoto?,
+    ): PagoEmpleadoDto = withContext(Dispatchers.IO) {
+        apiSinCola.registrar(
+            userId = textoMultipart(personaId.toString()),
+            // Sin comas: el servidor hace `Number(amount)`, y una de millares daría «Monto invalido».
+            amount = textoMultipart(Dinero.formatear(centavos).replace(",", "")),
+            concepto = textoMultipart(concepto.trim()),
+            periodFrom = textoMultipart(desde),
+            periodTo = textoMultipart(hasta),
+            status = textoMultipart("Borrador"),
+            note = nota?.trim()?.takeIf { it.isNotEmpty() }?.let(::textoMultipart),
+            files = comprobante?.parteJpeg("files", "comprobante-pago.jpg"),
+        )
+    }
+
+    suspend fun marcarPagado(id: Long): PagoEmpleadoDto =
+        withContext(Dispatchers.IO) { apiSinCola.marcarPagado(id) }
 }

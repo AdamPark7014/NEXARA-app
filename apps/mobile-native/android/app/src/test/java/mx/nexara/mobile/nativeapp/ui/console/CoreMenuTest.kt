@@ -199,6 +199,27 @@ class CoreMenuTest {
         assertTrue(CoreMenu.extraModulesFor(ceo).contains(CoreExtraModule.VIATICOS))
     }
 
+    /** Adam (04-11-2026): Pagos a empleados es solo de dirección, aunque `me/navigation` lo nombre. */
+    @Test
+    fun pagosAEmpleadosSoloLeSaleADireccion() {
+        val claves = listOf("erp-vehiculos", CoreExtraModule.PAGOS_EMPLEADOS.key)
+
+        val contadora = user(roleKey = "administrativo", navModuleKeys = claves)
+        assertFalse(CoreExtraModule.PAGOS_EMPLEADOS in CoreMenu.extraModulesFor(contadora))
+        assertFalse(CoreMenu.canOpenExtra(contadora, CoreExtraModule.PAGOS_EMPLEADOS.key))
+        // Lo demás que le da la navegación se queda.
+        assertTrue(CoreExtraModule.VEHICULOS in CoreMenu.extraModulesFor(contadora))
+
+        val ceo = user(roleKey = "ceo", navModuleKeys = claves)
+        assertTrue(CoreExtraModule.PAGOS_EMPLEADOS in CoreMenu.extraModulesFor(ceo))
+        val christian = user(email = "gerencia@nexara.com.mx", roleKey = null, navModuleKeys = claves)
+        assertTrue(CoreExtraModule.PAGOS_EMPLEADOS in CoreMenu.extraModulesFor(christian))
+
+        // Si la navegación no se lo da, tampoco se inventa: sin clave no le sale ni a dirección.
+        val ceoSinClave = user(roleKey = "ceo", navModuleKeys = listOf("erp-vehiculos"))
+        assertFalse(CoreExtraModule.PAGOS_EMPLEADOS in CoreMenu.extraModulesFor(ceoSinClave))
+    }
+
     @Test
     fun ruleMatchingIsStrict() {
         assertTrue(CoreMenu.ruleMatches("/erp/**", "/erp/pizarra"))

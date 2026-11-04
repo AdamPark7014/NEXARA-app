@@ -140,6 +140,43 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    /// Lo mismo, dicho según lo que esa persona hace en el módulo: a dirección, Herramientas
+    /// no le dice «Solicita herramienta». Lo que no cambia con el rol usa `summary`.
+    func resumen(para rol: RolDelMenu) -> String {
+        switch self {
+        case .herramientas:
+            switch rol {
+            case .direccion: return "Préstamos de toda la empresa e inventario, con quién trae cada pieza."
+            case .administra: return "Aprueba préstamos, entrega y recibe, y da de alta herramientas."
+            case .personal: return "Pide herramienta prestada, revisa tu kit y reporta daños."
+            }
+        case .almacen:
+            switch rol {
+            case .direccion: return "Existencias, lo que está bajo mínimo y quién movió qué."
+            case .administra: return "Escanea, da de alta y registra entradas y salidas."
+            case .personal: return "Consulta qué hay en existencia y en qué almacén."
+            }
+        case .vehiculos:
+            switch rol {
+            case .direccion: return "Tu flotilla: quién trae cada unidad, lo que cuesta y qué falta aprobar."
+            case .administra: return "Saca y regresa unidades con fotos, y da de alta las nuevas."
+            case .personal: return "Saca un vehículo libre, regrésalo y carga gasolina."
+            }
+        case .gastos:
+            return rol == .direccion ? "Lo que falta autorizar o pagar, con su comprobante." : summary
+        case .cotizaciones:
+            return rol == .direccion
+                ? "Propuestas del equipo: en qué van, su PDF y aprobarlas."
+                : "Propuestas técnicas: su PDF, marcarlas como enviadas y seguimiento."
+        case .pagosEmpleados:
+            return "Registra pagos al personal y márcalos como pagados."
+        case .viaticos:
+            return rol == .direccion ? "Autoriza y asigna viáticos, con la foto de cada ticket." : summary
+        case .proyectos, .kpisEquipo, .aprobaciones:
+            return summary
+        }
+    }
+
     /// Claves con las que `me/navigation` puede nombrar el módulo. Casi siempre
     /// una; Viáticos llega como `viatics` o como `my-viatics` según la ruta que
     /// tenga el rol en url-matrix.
@@ -177,6 +214,25 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+/// Cómo se le habla a cada quien en el menú «Más»: dirección consulta y autoriza, quien
+/// administra da de alta y entrega, y el personal pide y usa.
+enum RolDelMenu: Hashable {
+    case direccion, administra, personal
+
+    static func de(_ user: SessionUser?) -> RolDelMenu {
+        de(
+            esDireccion: CoreOrg.esDireccion(email: user?.email, roleKey: user?.roleKey),
+            permisos: user?.permissions ?? []
+        )
+    }
+
+    static func de(esDireccion: Bool, permisos: [String]) -> RolDelMenu {
+        if esDireccion { return .direccion }
+        let administra = permisos.contains("tools.manage") || permisos.contains("stock.manage")
+        return administra ? .administra : .personal
+    }
+}
+
 /// Qué ve cada quien en la app: solo ERP (Core) para el personal y el portal
 /// externo para cuentas de cliente o sucursal.
 enum CoreNavigation {
@@ -188,20 +244,32 @@ enum CoreNavigation {
     /// - sin navegación todavía (primer arranque u offline): Herramientas,
     ///   Vehículos y Viáticos, los tres que tiene todo el personal. (El
     ///   organigrama se quedó en la web: es una pantalla de escritorio.)
+    ///
+    /// Pagos a empleados solo le sale a dirección, aunque `me/navigation` lo nombre.
     static func extraModules(for user: SessionUser?) -> [CoreExtraModule] {
         guard let user, !isExternal(user) else { return [] }
+        let esDireccion = CoreOrg.esDireccion(email: user.email, roleKey: user.roleKey) || user.isSuperAdmin
         // Modo demostración: solo los módulos con pantalla propia y datos de muestra.
         // Los demás todavía no tienen pantalla y harían parecer la app incompleta.
         if DemoMode.isActive {
-            return CoreExtraModule.allCases.filter { CoreExtraDestination.tienePantallaNativa($0) }
+            return CoreExtraModule.allCases.filter {
+                CoreExtraDestination.tienePantallaNativa($0) && permitePorRol($0, esDireccion: esDireccion)
+            }
         }
         if user.isSuperAdmin { return CoreExtraModule.allCases }
         let nav = Set((user.navModules ?? []).map { $0.lowercased() })
         guard !nav.isEmpty else { return [.herramientas, .vehiculos, .viaticos] }
         return CoreExtraModule.allCases.filter { modulo in
-            modulo.paraTodoElPersonal || !modulo.claves.isDisjoint(with: nav)
+            let concedido = modulo.paraTodoElPersonal || !modulo.claves.isDisjoint(with: nav)
                 || (modulo == .aprobaciones && revisanEvidencias.contains((user.roleKey ?? "").lowercased()))
+            return concedido && permitePorRol(modulo, esDireccion: esDireccion)
         }
+    }
+
+    /// Lo que el rol le quita aunque la navegación se lo conceda. Hoy, solo los pagos: mueven
+    /// dinero y son de dirección (Adam, 04-11-2026).
+    static func permitePorRol(_ modulo: CoreExtraModule, esDireccion: Bool) -> Bool {
+        modulo != .pagosEmpleados || esDireccion
     }
 
     /// Revisan a su gente aunque `me/navigation` no les dé la bandeja de firmas.

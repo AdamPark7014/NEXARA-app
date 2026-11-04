@@ -67,7 +67,7 @@ struct CoreMoreHubView: View {
                             CoreMoreHubCard(
                                 systemImage: module.systemImage,
                                 title: module.title,
-                                summary: module.summary
+                                summary: module.resumen(para: RolDelMenu.de(session.currentUser))
                             )
                         }
                         .buttonStyle(NxPressableStyle())

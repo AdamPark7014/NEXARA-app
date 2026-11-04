@@ -57,6 +57,7 @@ import mx.nexara.mobile.nativeapp.data.SessionStore
 import mx.nexara.mobile.nativeapp.data.SessionUser
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.ui.console.CoreExtraModule
+import mx.nexara.mobile.nativeapp.ui.console.PorRol
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTheme
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpacing
@@ -133,7 +134,7 @@ fun MoreHubScreen(
                 GroupHeader(title = group.title, topPadding = if (gi == 0 && onOpenClientes == null) 0.dp else NxSpacing.M)
             }
             items(list, key = { it.key }, contentType = { "module" }) { module ->
-                ExtraCard(module = module, onOpen = onOpen)
+                ExtraCard(module = module, user = user, onOpen = onOpen)
             }
         }
     }
@@ -216,11 +217,11 @@ private fun GroupHeader(title: String, topPadding: Dp = 0.dp) {
 }
 
 @Composable
-private fun ExtraCard(module: CoreExtraModule, onOpen: (CoreExtraModule) -> Unit) {
+private fun ExtraCard(module: CoreExtraModule, user: SessionUser?, onOpen: (CoreExtraModule) -> Unit) {
     HubCard(
         icon = module.icon(),
         label = module.label,
-        summary = module.summary,
+        summary = PorRol.resumen(module, user),
         onClick = { onOpen(module) },
     )
 }

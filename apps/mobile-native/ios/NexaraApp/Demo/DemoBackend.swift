@@ -127,6 +127,7 @@ extension DemoStore {
         case "stock":
             if isGet, parts.count >= 2, parts[1] == "levels" { return reply(fxStockLevels()) }
             if isGet, parts.count >= 3, parts[1] == "alerts" { return reply(fxLowStock()) }
+            if isGet, parts.count == 2, parts[1] == "movements" { return reply(fxMovimientosAlmacen()) }
             if let escaneo = routeStockEscaneo(method: method, parts: parts, query: query, json: json) {
                 return reply(escaneo.payload, status: escaneo.status)
             }
@@ -134,6 +135,10 @@ extension DemoStore {
         case "warehouse":
             return isGet ? reply(fxAlmacenes()) : empty()
         case "tool-requests":
+            // Lo de toda la empresa, pedir y dar de alta (`DemoFixtures+PorRol`).
+            if let porRol = routeHerramientasPorRol(method: method, parts: parts, query: query, json: json, body: body) {
+                return reply(porRol.payload, status: porRol.status)
+            }
             // Mi kit, mis préstamos y prórrogas (`DemoFixtures+Herramientas`); lo demás, el escáner.
             if let mio = routeMisHerramientas(method: method, parts: parts, json: json) {
                 return reply(mio.payload, status: mio.status)
@@ -165,8 +170,12 @@ extension DemoStore {
                 return DemoReply(status: 200, data: Data("null".utf8))
             }
             return empty()
-        case "cotizaciones", "employee-payments", "expenses", "workflow":
-            // Cotizaciones, Pagos a empleados, Gastos y Aprobaciones (`DemoFixtures+Finanzas`).
+        case "employee-payments":
+            // Lista, registrar y marcar pagado (`DemoFixtures+PorRol`).
+            let respuesta = routePagosPorRol(method: method, parts: parts, body: body)
+            return reply(respuesta.payload, status: respuesta.status)
+        case "cotizaciones", "expenses", "workflow":
+            // Cotizaciones, Gastos y Aprobaciones (`DemoFixtures+Finanzas`).
             return routeFinanzas(method: method, parts: parts, json: json, body: body) ?? empty()
         default:
             return empty()
@@ -786,6 +795,10 @@ extension DemoStore {
 
     private func routeVehicles(method: String, parts: [String], json: DemoJSON, body: Data?, now: Date) -> DemoReply {
         let sub = parts.count > 1 ? parts[1] : ""
+        // Solicitudes por aprobar y dar de alta unidades (`DemoFixtures+PorRol`).
+        if let porRol = routeVehiculosPorRol(method: method, parts: parts, json: json) {
+            return reply(porRol.payload, status: porRol.status)
+        }
         if method == "GET", sub == "mis-vehiculos" { return reply(fxVehicles()) }
         if method == "GET", sub == "flotilla" { return reply(fxFlotilla()) }
         if sub == "ficha" {

@@ -378,6 +378,20 @@ enum GastosRules {
         "Aquí registras, autorizas y pagas; corregir un gasto ya capturado, borrarlo y " +
         "sacar el reporte por rango de fechas se hacen desde la computadora."
 
+    // MARK: Por rol
+
+    /// Con qué filtro abre: dirección va directo a lo que falta autorizar, si hay algo.
+    /// Sin pendientes abre en «Todos»: un filtro vacío parecería que no hay gastos.
+    static func filtroInicial(_ gastos: [Gasto], esDireccion: Bool) -> Filtro {
+        guard esDireccion, gastos.contains(where: { estadoDe($0) == .pendiente }) else { return .todos }
+        return .porAutorizar
+    }
+
+    /// El vacío de una empresa sin gastos, dicho a dirección: ella no los captura.
+    static let vacioDireccion =
+        "Aquí se juntan la renta, los servicios, las suscripciones y lo que se paga de la bolsa. "
+        + "Cuando el equipo registre el primero, aquí lo autorizas."
+
     // MARK: Utilidades
 
     static let espanol = Locale(identifier: "es_MX")

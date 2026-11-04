@@ -110,8 +110,11 @@ struct CotizacionesView: View {
             await cargar(refresco: false)
         }
         .navigationDestination(item: $destino) { item in
-            CotizacionDetalleView(cotizacionId: item.id)
-                .nxBrandNavBar(title: "Cotización")
+            CotizacionDetalleView(
+                cotizacionId: item.id,
+                onCambio: { Task { await cargar(refresco: true) } }
+            )
+            .nxBrandNavBar(title: "Cotización")
         }
     }
 
@@ -125,7 +128,12 @@ struct CotizacionesView: View {
         if sinRegistros {
             NxEmptyState(
                 title: "Sin cotizaciones",
-                subtitle: "Todavía no hay ninguna cotización en esta empresa. La primera se arma desde la computadora."
+                subtitle: CotizacionesRules.vacioSinRegistros(
+                    esDireccion: CoreOrg.esDireccion(
+                        email: SessionStore.shared.currentUser?.email,
+                        roleKey: SessionStore.shared.currentUser?.roleKey
+                    )
+                )
             )
         } else if !consulta.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             NxEmptyState(

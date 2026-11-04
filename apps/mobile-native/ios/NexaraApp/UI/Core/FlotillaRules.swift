@@ -100,6 +100,41 @@ enum FlotillaRules {
         return v.estatus.isEmpty ? "Sin asignar" : v.estatus
     }
 
+    // MARK: Solicitudes y altas
+
+    /// Lo que todavía se puede decidir: el servidor rechaza lo que ya está `Aprobado` o `Rechazado`.
+    static func porAprobar(_ solicitudes: [SolicitudPorAprobar]) -> [SolicitudPorAprobar] {
+        solicitudes.filter { solicitud in
+            let estatus = solicitud.estatusAprobacion.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return !["aprobado", "aprobada", "rechazado", "rechazada"].contains(estatus)
+        }
+    }
+
+    /// El vehículo pedido, con lo que traiga la solicitud o la unidad ligada.
+    static func vehiculoDe(_ solicitud: SolicitudPorAprobar) -> String {
+        let nombre = solicitud.vehiculo?.nombre.nilSiVacio ?? solicitud.nombreVehiculo?.nilSiVacio
+        let placas = solicitud.vehiculo?.placas?.nilSiVacio ?? solicitud.placasVehiculo?.nilSiVacio
+        let partes = [nombre, placas].compactMap { $0 }
+        return partes.isEmpty ? "Vehículo sin nombre" : partes.joined(separator: " · ")
+    }
+
+    static func quienPide(_ solicitud: SolicitudPorAprobar) -> String {
+        solicitud.solicitante?.nombre.nilSiVacio ?? "Sin persona registrada"
+    }
+
+    /// «Da de alta unidades»: no es dirección y trae `vehicles.inventory`. Dirección ve su
+    /// flotilla; dar de alta es de quien lleva el inventario.
+    static func daDeAltaUnidades(esDireccion: Bool, permisos: [String]) -> Bool {
+        !esDireccion && permisos.contains("vehicles.inventory")
+    }
+
+    /// El vacío de quien usa vehículos, según lo que puede hacer al respecto.
+    static func vacioSinVehiculos(daDeAlta: Bool) -> String {
+        daDeAlta
+            ? "Todavía no hay unidades libres. Da de alta la primera y aquí aparece para sacarla."
+            : "No traes vehículo y ahora no hay unidades libres. Cuando haya una, aquí la puedes sacar."
+    }
+
     // MARK: A dónde se fue el dinero
 
     struct RenglonGasto: Identifiable, Hashable {

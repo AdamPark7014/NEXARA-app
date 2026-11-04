@@ -32,16 +32,58 @@ enum HerramientasReglas {
         }
     }
 
-    /// Las dos mitades de la pantalla. La primera es la que se abre.
+    /// Quién mira la pantalla. Se decide igual que en el servidor: dirección por rol o
+    /// correo; quien administra, porque trae `tools.manage` sin ser dirección; los demás
+    /// son personal. Es pista para no enseñar botones de más: quien decide es el API.
+    enum Perfil: Hashable {
+        case direccion, administra, personal
+    }
+
+    /// Las pestañas de la pantalla. Cada perfil ve las suyas (`vistas(_:)`) y abre en la primera.
     enum Vista: CaseIterable, Hashable {
-        case kit, prestamos
+        case porAprobar, prestamosEmpresa, inventario, kit, prestamos
 
         var etiqueta: String {
             switch self {
+            case .porAprobar: return "Por aprobar"
+            case .prestamosEmpresa: return "Préstamos"
+            case .inventario: return "Inventario"
             case .kit: return "Mi kit"
             case .prestamos: return "Mis préstamos"
             }
         }
+    }
+
+    /// El único botón principal de cada pestaña.
+    enum BotonPrincipal: Hashable {
+        case pedirPrestamo, nuevaHerramienta
+
+        var etiqueta: String {
+            switch self {
+            case .pedirPrestamo: return "Pedir préstamo"
+            case .nuevaHerramienta: return "Nueva herramienta"
+            }
+        }
+    }
+
+    /// Filtro de los préstamos de toda la empresa.
+    enum FiltroEmpresa: CaseIterable, Hashable {
+        case abiertos, vencidos, historial
+
+        var etiqueta: String {
+            switch self {
+            case .abiertos: return "Abiertos"
+            case .vencidos: return "Vencidos"
+            case .historial: return "Historial"
+            }
+        }
+    }
+
+    /// Lo que se puede hacer con un préstamo de otra persona desde «Préstamos».
+    enum AccionDePrestamo: Hashable {
+        case entregar, recibir
+
+        var etiqueta: String { self == .entregar ? "Entregar" : "Recibir" }
     }
 
     /// Qué préstamos se enseñan. «Abiertos» es lo que todavía se debe.
@@ -377,12 +419,12 @@ enum HerramientasReglas {
         }
     }
 
-    /// Buscar por nombre, modelo, serie o motivo, que es como se busca una herramienta a ojo.
+    /// Buscar por nombre, modelo, serie, motivo o persona, que es como se busca a ojo.
     static func buscarPrestamos(_ prestamos: [PrestamoHerramienta], consulta: String) -> [PrestamoHerramienta] {
         let q = consulta.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return prestamos }
         return prestamos.filter { p in
-            [p.toolName, p.model, p.serialNumber, p.reason]
+            [p.toolName, p.model, p.serialNumber, p.reason, p.usuario?.nombre]
                 .compactMap { $0 }
                 .contains { $0.lowercased().contains(q) }
         }
@@ -415,6 +457,222 @@ enum HerramientasReglas {
         return partes.isEmpty ? nil : partes.joined(separator: " · ")
     }
 
+    // MARK: - Por rol
+
+    static func perfil(esDireccion: Bool, permisos: [String]) -> Perfil {
+        if esDireccion { return .direccion }
+        return permisos.contains("tools.manage") ? .administra : .personal
+    }
+
+    static func perfil(de usuario: SessionUser?) -> Perfil {
+        perfil(
+            esDireccion: CoreOrg.esDireccion(email: usuario?.email, roleKey: usuario?.roleKey),
+            permisos: usuario?.permissions ?? []
+        )
+    }
+
+    static func vistas(_ perfil: Perfil) -> [Vista] {
+        switch perfil {
+        case .direccion: return [.prestamosEmpresa, .inventario]
+        case .administra: return [.porAprobar, .prestamosEmpresa, .inventario, .kit, .prestamos]
+        case .personal: return [.kit, .prestamos]
+        }
+    }
+
+    static func vistaInicial(_ perfil: Perfil) -> Vista {
+        vistas(perfil).first ?? .kit
+    }
+
+    /// Solo quien lleva el inventario escanea: registrar salidas y entradas es suyo.
+    static func muestraEscaner(_ perfil: Perfil) -> Bool { perfil == .administra }
+
+    /// Dirección administra, no pide: el servidor se lo rechaza (`assertCanCreateToolLoan`).
+    static func botonPrincipal(_ perfil: Perfil, vista: Vista) -> BotonPrincipal? {
+        switch (perfil, vista) {
+        case (.personal, _), (.administra, .prestamos): return .pedirPrestamo
+        case (.administra, .inventario): return .nuevaHerramienta
+        default: return nil
+        }
+    }
+
+    /// Lo que la pantalla no hace, según quién la mira.
+    static func limite(_ perfil: Perfil) -> String {
+        switch perfil {
+        case .direccion:
+            return "Consulta de toda la empresa. Aprobar, entregar y dar de alta lo hace quien lleva el inventario."
+        case .administra:
+            return "Asignar kits, dictaminar daños y dar de baja piezas se hacen desde la computadora."
+        case .personal:
+            return "Tú pides y reportas. Aprobar, entregar y recibir lo hace quien lleva el inventario."
+        }
+    }
+
+    // MARK: - Préstamos de la empresa
+
+    /// El estado dicho por quien mira desde fuera: `IN_USE` ya no es «la traes tú».
+    static func etiquetaEstadoEmpresa(_ status: String?) -> String {
+        clave(status) == "IN_USE" ? "En uso" : etiquetaEstado(status)
+    }
+
+    /// De quién es el préstamo. Sin nombre, el id: es feo, pero es cierto.
+    static func nombreDe(_ prestamo: PrestamoHerramienta) -> String {
+        if let nombre = prestamo.usuario?.nombre?.nilSiVacio { return nombre }
+        if let id = prestamo.usuarioId { return "Usuario #\(id)" }
+        return "Sin persona registrada"
+    }
+
+    /// El que lleva más tiempo esperando va primero.
+    static func pendientes(_ prestamos: [PrestamoHerramienta]) -> [PrestamoHerramienta] {
+        prestamos
+            .filter { clave($0.status) == "PENDING" }
+            .sorted { ($0.requestDate ?? "") < ($1.requestDate ?? "") }
+    }
+
+    /// La lista del API ya viene filtrada, pero una prórroga que alguien decidió mientras
+    /// tanto no debe volver a ofrecer los botones.
+    static func renovacionesPendientes(_ renovaciones: [RenovacionHerramienta]) -> [RenovacionHerramienta] {
+        renovaciones.filter { clave($0.status) == "PENDING" }
+    }
+
+    /// Lo que se ve en «Préstamos». Quien administra ya tiene lo pendiente en «Por aprobar».
+    static func prestamosDeEmpresa(
+        _ prestamos: [PrestamoHerramienta],
+        perfil: Perfil,
+        filtro: FiltroEmpresa,
+        hoy: Dia
+    ) -> [PrestamoHerramienta] {
+        let base = perfil == .administra ? prestamos.filter { clave($0.status) != "PENDING" } : prestamos
+        switch filtro {
+        case .abiertos: return base.filter { estaAbierto($0) }
+        case .vencidos: return base.filter { estaVencido($0, hoy: hoy) }
+        case .historial: return base
+        }
+    }
+
+    /// `APPROVED` se entrega y `IN_USE` se recibe. Lo demás ya no es de la ventanilla.
+    static func accionDePrestamo(_ prestamo: PrestamoHerramienta) -> AccionDePrestamo? {
+        switch clave(prestamo.status) {
+        case "APPROVED": return .entregar
+        case "IN_USE": return .recibir
+        default: return nil
+        }
+    }
+
+    /// Un préstamo con código pide teclearlo al entregar (`validarPickup` del servidor).
+    static func pideCodigoAlEntregar(_ prestamo: PrestamoHerramienta) -> Bool {
+        prestamo.pickupCode?.nilSiVacio != nil
+    }
+
+    static func tituloRenovacion(_ renovacion: RenovacionHerramienta) -> String {
+        renovacion.toolRequest.map { tituloPrestamo($0) } ?? "Herramienta sin nombre"
+    }
+
+    static func nombreDe(_ renovacion: RenovacionHerramienta) -> String {
+        renovacion.toolRequest.map { nombreDe($0) } ?? "Sin persona registrada"
+    }
+
+    // MARK: - Inventario
+
+    static func tituloPieza(_ pieza: PiezaDeInventario) -> String {
+        pieza.toolName?.nilSiVacio ?? pieza.model?.nilSiVacio ?? pieza.codigoInterno?.nilSiVacio ?? "Herramienta sin nombre"
+    }
+
+    /// Código, modelo y serie, cada uno listo para su renglón y en ese orden.
+    static func renglonesPieza(_ pieza: PiezaDeInventario) -> [String] {
+        [
+            pieza.codigoInterno?.nilSiVacio,
+            pieza.model?.nilSiVacio,
+            pieza.serialNumber?.nilSiVacio.map { "Serie \($0)" },
+        ].compactMap { $0 }
+    }
+
+    /// El inventario del API no dice quién la tiene: se cruza con los préstamos y los kits.
+    /// `nil` = ninguna de las dos fuentes la tiene a nombre de alguien.
+    static func quienLaTrae(
+        _ pieza: PiezaDeInventario,
+        prestamos: [PrestamoHerramienta],
+        kits: [KitAsignacion]
+    ) -> String? {
+        let suyos = prestamos.filter { $0.inventoryItemId == pieza.id }
+        if let enUso = suyos.first(where: { clave($0.status) == "IN_USE" }) {
+            return "La trae \(nombreDe(enUso))"
+        }
+        if let apartada = suyos.first(where: { clave($0.status) == "APPROVED" }) {
+            return "Apartada para \(nombreDe(apartada))"
+        }
+        let kit = kits.first { $0.inventoryItemId == pieza.id && $0.isActive != false && $0.returnedAt == nil }
+        if let nombre = kit?.user?.nombre?.nilSiVacio {
+            return "En el kit de \(nombre)"
+        }
+        return nil
+    }
+
+    /// Buscar por nombre, modelo, serie o código, que es lo que trae la etiqueta.
+    static func buscarInventario(_ piezas: [PiezaDeInventario], consulta: String) -> [PiezaDeInventario] {
+        let q = consulta.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return piezas }
+        return piezas.filter { p in
+            [p.toolName, p.model, p.serialNumber, p.codigoInterno, p.barcode]
+                .compactMap { $0 }
+                .contains { $0.lowercased().contains(q) }
+        }
+    }
+
+    /// Lo que falta para dar de alta una pieza. El servidor exige las dos fotos.
+    static func faltaParaAlta(
+        nombre: String,
+        modelo: String,
+        serie: String,
+        conPanoramica: Bool,
+        conFotoDeSerie: Bool
+    ) -> String? {
+        if nombre.nilSiVacio == nil { return "Escribe el nombre de la herramienta" }
+        if modelo.nilSiVacio == nil { return "Escribe el modelo" }
+        if serie.nilSiVacio == nil { return "Escribe el número de serie" }
+        if !conPanoramica { return "Falta la foto de la herramienta completa" }
+        if !conFotoDeSerie { return "Falta la foto del modelo y la serie" }
+        return nil
+    }
+
+    // MARK: - Pedir préstamo
+
+    /// Hasta cuándo se pide. Sin calendario, igual que la prórroga: en campo se piensa en
+    /// «una semana». Nunca hoy: un préstamo que nace vencido no le sirve a nadie.
+    static func plazosParaPedir(hoy: Dia) -> [OpcionPlazo] {
+        [
+            OpcionPlazo(etiqueta: "Mañana", fecha: hoy.sumando(dias: 1)),
+            OpcionPlazo(etiqueta: "3 días", fecha: hoy.sumando(dias: 3)),
+            OpcionPlazo(etiqueta: "1 semana", fecha: hoy.sumando(dias: 7)),
+            OpcionPlazo(etiqueta: "2 semanas", fecha: hoy.sumando(dias: 14)),
+            OpcionPlazo(etiqueta: "1 mes", fecha: hoy.sumando(dias: 30)),
+        ]
+    }
+
+    /// El plazo que viene marcado: una semana.
+    static let plazoPorOmision = 2
+
+    static func faltaParaPedir(tienePieza: Bool, motivo: String) -> String? {
+        if !tienePieza { return "Elige la herramienta que necesitas" }
+        if motivo.nilSiVacio == nil { return "Di para qué la necesitas" }
+        return nil
+    }
+
+    /// El vacío de la búsqueda no es un error: hoy el inventario está vacío y es lo normal.
+    static let vacioBusquedaTitulo = "Todavía no hay herramientas dadas de alta"
+
+    static func vacioBusquedaTexto(consulta: String) -> String {
+        let q = consulta.trimmingCharacters(in: .whitespacesAndNewlines)
+        return "Con «\(q)» no salió ninguna libre. Prueba con otra palabra o pregunta en almacén: "
+            + "en cuanto la registren, aquí aparece para pedirla."
+    }
+
+    static func etiquetaActividad(_ actividad: ActividadDeSolicitud) -> String {
+        let texto = [actividad.anNumber?.nilSiVacio, actividad.titulo?.nilSiVacio]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+        return texto.isEmpty ? "Actividad \(actividad.id)" : texto
+    }
+
     // MARK: - Renovación
 
     /// Una opción de prórroga: «+7 días» y la fecha que resultaría.
@@ -436,10 +694,4 @@ enum HerramientasReglas {
     /// con `T00:00:00Z` el mismo día se leería como el anterior en México («pedí hasta
     /// el 30 y me dieron hasta el 29»).
     static func fechaParaApi(_ dia: Dia) -> String { "\(dia.iso)T12:00:00.000Z" }
-
-    /// Lo que esta pantalla no hace, dicho al pie sin mandar a nadie al navegador.
-    /// Texto idéntico al de Android (`HerramientasRules.LIMITE`).
-    static let limite =
-        "Consulta, prórrogas y escáner de etiquetas. Entregar y recibir con el escáner solo lo " +
-        "puede quien lleva el inventario; pedir una herramienta prestada y aprobar se hacen desde almacén."
 }

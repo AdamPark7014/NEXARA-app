@@ -9,6 +9,8 @@ import Foundation
 /// | Detalle             | `GET cotizaciones/core/:id`       |
 /// | PDF de la propuesta | `GET cotizaciones/:id/pdf`        |
 /// | PDF interno         | `GET cotizaciones/:id/pdf/internal` |
+/// | «Ya la envié»       | `POST cotizaciones/:id/marcar-enviada` |
+/// | Aprobar (dirección) | `POST cotizaciones/:id/aprobar`   |
 ///
 /// Se usan **las rutas de Core** (`/core`) porque el servidor ya las devuelve
 /// presentadas: estado y segmento en español, partidas agrupadas en Equipos /
@@ -409,8 +411,11 @@ struct CotizacionDetalle: Decodable, Hashable {
     var terminos: CotizacionTerminos?
     var participantes: [CotizacionParticipante]?
     var actividades: [CotizacionActividad]?
+    /// El cliente dado de alta. Sin él el servidor no la deja salir (`validarParaEnviar`).
+    var salesClientId: Int? = nil
 
     private enum CodingKeys: String, CodingKey {
+        case salesClientId
         case id, folio, folioBase, quoteNumber, conNomenclatura, necesitaRefolio, revision
         case cadenaParticipantes, estado, estadoEtiqueta, bloqueada, segmento, segmentoEtiqueta
         case clientName, clientCompany, clientEmail, clientPhone, clientAddress, projectName, scope
@@ -465,17 +470,18 @@ struct CotizacionDetalle: Decodable, Hashable {
         terminos = CotizacionLectura.objeto(c, .terminos, CotizacionTerminos.self)
         participantes = CotizacionLectura.lista(c, .participantes, CotizacionParticipante.self)
         actividades = CotizacionLectura.lista(c, .actividades, CotizacionActividad.self)
+        salesClientId = CotizacionLectura.entero(c, .salesClientId)
     }
 }
 
 // MARK: - Repositorio
 
-/// Lectura de Cotizaciones de Core.
+/// Cotizaciones de Core.
 ///
-/// Es de solo lectura a propósito (igual que Android): la propuesta se arma en
-/// la computadora —objetivo, alcance, partidas, planos y el envío al cliente— y
-/// el teléfono es para consultarla, enseñarla y mandar el PDF desde donde estés.
-/// Lo que la app no hace lo dice la pantalla; ningún botón echa al navegador.
+/// La propuesta se arma en la computadora —objetivo, alcance, partidas, planos— y el
+/// teléfono es para consultarla, enseñarla, mandar el PDF desde donde estés, decir que
+/// ya salió y, para dirección, aprobarla. Lo que la app no hace lo dice la pantalla;
+/// ningún botón echa al navegador.
 final class CotizacionesRepository {
     static let shared = CotizacionesRepository()
 
@@ -516,5 +522,22 @@ final class CotizacionesRepository {
     /// PDF interno: costo, markup y precio. La API responde 403 si el rol no ve costos.
     func pdfInterno(id: Int) async throws -> Data {
         try await ApiClient.shared.getBinary("cotizaciones/\(id)/pdf/internal")
+    }
+
+    /// `POST cotizaciones/:id/marcar-enviada` («Ya la envié»): salió por fuera del correo del
+    /// sistema. Solo con señal: da folio, bloquea la cotización y arranca el seguimiento.
+    func marcarEnviada(id: Int, medio: CotizacionesRules.MedioEnvio) async throws {
+        struct Body: Encodable { let medio: String }
+        try await CoreRepository.requireOnline()
+        let data = try await ApiClient.shared.postJSON("cotizaciones/\(id)/marcar-enviada", body: Body(medio: medio.rawValue))
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
+    /// `POST cotizaciones/:id/aprobar`. Solo con señal: una aprobada ya no se puede cambiar.
+    func aprobar(id: Int) async throws {
+        struct Vacio: Encodable {}
+        try await CoreRepository.requireOnline()
+        let data = try await ApiClient.shared.postJSON("cotizaciones/\(id)/aprobar", body: Vacio())
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
     }
 }

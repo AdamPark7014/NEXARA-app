@@ -25,10 +25,10 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxMetric
  * normaliza cualquier cosa rara a `Pagado` al escribir (`normalizeStatus`),
  * pero al leer eso sería afirmar que el dinero salió sin saberlo.
  *
- * La web (`app/(panels)/erp/finance/employee-payments/page.tsx`) es una tabla
- * con alta, edición, anulación y comprobantes. Aquí no se paga nada: se
- * consulta. Cada pago es una fila densa que contesta lo que se pregunta con el
- * teléfono en la mano — **a quién, cuánto, de qué periodo y si ya salió**.
+ * Solo dirección abre este módulo. Aquí se registra un pago en borrador y se marca pagado, con
+ * confirmación: nada es optimista, la fila cambia cuando el servidor confirma. Corregir y anular
+ * siguen en la computadora. Cada pago es una fila densa que contesta lo que se pregunta con el teléfono en
+ * la mano — **a quién, cuánto, de qué periodo y si ya salió**.
  *
  * Sin Android ni Compose: se prueba entera en la JVM (`PagosRulesTest`).
  */
@@ -496,8 +496,46 @@ object PagosRules {
     const val GRIS = 0xFF94A3B8L
 
     /** Qué NO hace esta pantalla. Se dice al pie, sin botón que eche al navegador. */
-    const val LIMITE =
-        "Consulta: registrar un pago, autorizarlo, marcarlo pagado o anularlo se hacen desde la computadora."
+    const val LIMITE = "Aquí registras y marcas pagado; corregir o anular un pago se hace desde la computadora."
+
+    // ── Registrar y marcar pagado ────────────────────────────────────────────
+
+    /**
+     * Solo un borrador con cifra legible: el servidor no paga un anulado, y la confirmación tiene que
+     * poder decir cuánto. Un estado que no se entiende tampoco se ofrece: no se sabe si ya salió.
+     */
+    fun puedeMarcarPagado(row: PagoEmpleadoDto): Boolean =
+        row.id != null && estadoDe(row) == Estado.BORRADOR && tieneImporteLegible(row)
+
+    /** A quién, cuánto y qué pasa. Es lo último que se lee antes de mover dinero. */
+    fun confirmacionPago(row: PagoEmpleadoDto): String =
+        "Vas a marcar ${montoTexto(row)} como pagados a ${empleadoTexto(row)}. " +
+            "Esto genera la póliza contable y ya no se deshace desde el teléfono."
+
+    fun avisoPagoMarcado(row: PagoEmpleadoDto): String =
+        "Pago a ${empleadoTexto(row)} marcado como pagado; la póliza quedó generada."
+
+    const val AVISO_PAGO_REGISTRADO = "Pago registrado en borrador: falta marcarlo pagado."
+
+    /** Qué le falta al alta; `null` si ya se puede mandar. Las fechas llegan como `YYYY-MM-DD`. */
+    fun faltaParaRegistrar(
+        personaId: Long?,
+        importe: String,
+        concepto: String,
+        desde: String,
+        hasta: String,
+    ): String? {
+        val inicio = dia(desde)
+        val fin = dia(hasta)
+        return when {
+            personaId == null -> "Elige a quién se le paga."
+            (Dinero.parsearCentavos(importe) ?: 0L) <= 0L -> "Escribe el importe."
+            concepto.isBlank() -> "Escribe el concepto."
+            inicio == null || fin == null -> "Elige el periodo: desde y hasta."
+            fin.isBefore(inicio) -> "El periodo no puede terminar antes de empezar."
+            else -> null
+        }
+    }
 
     private val ESPANOL = Locale.forLanguageTag("es-MX")
     private val FORMATO_CORTO = NxFormat.patron("d MMM")

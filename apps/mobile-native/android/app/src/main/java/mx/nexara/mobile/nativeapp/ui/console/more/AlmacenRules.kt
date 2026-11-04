@@ -2,6 +2,7 @@ package mx.nexara.mobile.nativeapp.ui.console.more
 
 import java.math.BigDecimal
 import kotlin.math.roundToInt
+import mx.nexara.mobile.nativeapp.data.api.MovimientoStockDto
 import mx.nexara.mobile.nativeapp.data.api.StockLevelDto
 
 /**
@@ -106,10 +107,104 @@ object AlmacenRules {
         return partes.joinToString("\n")
     }
 
-    /** Las dos vistas de la pantalla. La primera es la que se abre. */
+    /** Las vistas de la pantalla. La primera de [vistas] es la que se abre. */
     enum class Vista(val etiqueta: String) {
         BAJO_MINIMO("Bajo mínimo"),
         TODO("Todo el inventario"),
+        MOVIMIENTOS("Movimientos"),
+    }
+
+    // ── Quién mira ───────────────────────────────────────────────────────────
+
+    /** Dirección consulta y ve quién movió qué; Iván (`stock.manage`) opera; los demás consultan. */
+    enum class Perfil { DIRECCION, OPERA, CONSULTA }
+
+    fun perfil(esDireccion: Boolean, opera: Boolean): Perfil = when {
+        esDireccion -> Perfil.DIRECCION
+        opera -> Perfil.OPERA
+        else -> Perfil.CONSULTA
+    }
+
+    /** Solo quien da de alta y registra entradas y salidas lleva el escáner. */
+    fun muestraEscaner(perfil: Perfil): Boolean = perfil == Perfil.OPERA
+
+    fun vistas(perfil: Perfil): List<Vista> = when (perfil) {
+        Perfil.CONSULTA -> listOf(Vista.BAJO_MINIMO, Vista.TODO)
+        Perfil.DIRECCION, Perfil.OPERA -> listOf(Vista.BAJO_MINIMO, Vista.TODO, Vista.MOVIMIENTOS)
+    }
+
+    // ── Movimientos ──────────────────────────────────────────────────────────
+
+    /** Los mismos nombres que el kardex de la web (`stock-movement-pdf.ts`). */
+    fun etiquetaMovimiento(tipo: String?): String = when (tipo?.trim()?.uppercase()) {
+        "RECEIPT" -> "Entrada"
+        "DISPATCH" -> "Salida"
+        "TRANSFER" -> "Traspaso"
+        "ADJUSTMENT" -> "Ajuste"
+        "RETURN" -> "Devolución"
+        "SCRAP" -> "Merma"
+        "PRODUCTION_IN" -> "Entrada de producción"
+        "PRODUCTION_OUT" -> "Salida de producción"
+        else -> "Movimiento"
+    }
+
+    /** Lo que entra se lee distinto de lo que sale; `null` para lo demás. */
+    fun entra(tipo: String?): Boolean? = when (tipo?.trim()?.uppercase()) {
+        "RECEIPT", "RETURN", "PRODUCTION_IN" -> true
+        "DISPATCH", "SCRAP", "PRODUCTION_OUT" -> false
+        else -> null
+    }
+
+    fun tituloMovimiento(m: MovimientoStockDto): String =
+        m.product?.name?.trim()?.ifEmpty { null } ?: m.product?.sku?.trim()?.ifEmpty { null } ?: "Producto sin nombre"
+
+    private fun almacenDe(a: mx.nexara.mobile.nativeapp.data.api.StockAlmacenDto?): String? =
+        a?.name?.trim()?.ifEmpty { null } ?: a?.code?.trim()?.ifEmpty { null }
+
+    /** «De Central a Obra» · «A Central» · «De Central». `null` si el movimiento no dice almacén. */
+    fun rutaMovimiento(m: MovimientoStockDto): String? {
+        val desde = almacenDe(m.fromWarehouse)
+        val hacia = almacenDe(m.toWarehouse)
+        return when {
+            desde != null && hacia != null -> "De $desde a $hacia"
+            hacia != null -> "A $hacia"
+            desde != null -> "De $desde"
+            else -> null
+        }
+    }
+
+    /** Quién lo hizo es lo que dirección viene a ver; sin dato se dice, no se inventa. */
+    fun quienLoHizo(m: MovimientoStockDto): String =
+        m.createdBy?.nombre?.trim()?.ifEmpty { null }?.let { "Lo hizo $it" } ?: "Sin persona registrada"
+
+    fun filtrarMovimientos(movimientos: List<MovimientoStockDto>, consulta: String): List<MovimientoStockDto> {
+        val q = consulta.trim().lowercase()
+        if (q.isEmpty()) return movimientos
+        return movimientos.filter { m ->
+            listOfNotNull(
+                m.product?.name,
+                m.product?.sku,
+                m.createdBy?.nombre,
+                m.fromWarehouse?.name,
+                m.toWarehouse?.name,
+                m.movementNumber,
+            ).any { it.lowercase().contains(q) }
+        }
+    }
+
+    // ── Vacíos ───────────────────────────────────────────────────────────────
+
+    /** Hoy NEXARA no tiene productos capturados: cada quien lee qué sigue. */
+    fun vacioSinExistencias(perfil: Perfil): String = when (perfil) {
+        Perfil.OPERA -> "Todavía no hay productos con existencia. Escanea el código de uno para darlo de alta " +
+            "y registra su primera entrada."
+        Perfil.DIRECCION -> "Todavía no hay productos con existencia. Los da de alta Iván; en cuanto entren, aquí los ves."
+        Perfil.CONSULTA -> "Todavía no hay productos con existencia. Los da de alta almacén."
+    }
+
+    fun vacioMovimientos(perfil: Perfil): String = when (perfil) {
+        Perfil.OPERA -> "Cuando registres una entrada o una salida con el escáner, aquí queda."
+        else -> "Cuando almacén registre una entrada o una salida, aquí sale con quién la hizo."
     }
 
     /** Búsqueda por producto, SKU o almacén; sin texto devuelve la lista entera. */
@@ -156,7 +251,10 @@ object AlmacenRules {
     }
 
     /** Qué no hace esta pantalla. */
-    const val LIMITE =
-        "Con el escáner se consultan productos y se registran entradas y salidas (si tu usuario " +
-            "puede mover inventario). Traspasos, ajustes y costos se hacen desde la computadora."
+    fun limite(perfil: Perfil): String = when (perfil) {
+        Perfil.DIRECCION -> "Solo lectura: dar de alta y registrar entradas y salidas lo hace Iván."
+        Perfil.OPERA -> "Con el escáner das de alta y registras entradas y salidas. Traspasos, ajustes y costos " +
+            "se hacen desde la computadora."
+        Perfil.CONSULTA -> "Solo consulta: dar de alta y registrar entradas y salidas lo hace almacén."
+    }
 }

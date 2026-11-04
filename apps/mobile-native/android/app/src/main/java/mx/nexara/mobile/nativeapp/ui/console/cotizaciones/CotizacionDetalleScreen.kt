@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -23,26 +24,33 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
+import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDetalleDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionGrupoDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionPartidaDto
 import mx.nexara.mobile.nativeapp.ui.common.DocumentoDialog
+import mx.nexara.mobile.nativeapp.ui.console.PorRol
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreAvisoDesactualizado
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreCabecera
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreNotaDeAlcance
@@ -52,8 +60,10 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxScreenScaffold
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSnackbarHost
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
+import mx.nexara.mobile.nativeapp.ui.enterprise.rememberNxSnackbarHostState
 
 /**
  * Una cotización por dentro.
@@ -64,7 +74,8 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
  * —las partidas agrupadas en Equipos, Materiales y Mano de obra, que es la
  * pregunta que hace un cliente delante—, después lo que se prometió (términos)
  * y quién respondió por ella. Y arriba del todo, el PDF: el documento que el
- * cliente ya tiene, para enseñarlo o reenviarlo desde donde estés.
+ * cliente ya tiene, para enseñarlo o reenviarlo desde donde estés. Debajo, lo único que se decide aquí
+ * y solo cuando el estado lo permite ([CotizacionesRules.accion]): decir que ya salió y aprobarla.
  */
 @Composable
 fun CotizacionDetalleScreen(
@@ -72,8 +83,20 @@ fun CotizacionDetalleScreen(
     vm: CotizacionDetalleViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsState()
+    val context = LocalContext.current
+    val esDireccion = remember(context) { PorRol.esDireccion(AuthRepository(context).loadSession()) }
+    val snackbar = rememberNxSnackbarHostState()
+    var dialogo by remember { mutableStateOf<CotizacionesRules.Accion?>(null) }
 
     LaunchedEffect(cotizacionId) { vm.cargar(cotizacionId) }
+
+    // En el ámbito de la pantalla: `limpiarAccion` cambia la clave y cancelaría el aviso a media frase.
+    val alcance = rememberCoroutineScope()
+    LaunchedEffect(state.avisoAccion) {
+        val aviso = state.avisoAccion ?: return@LaunchedEffect
+        vm.limpiarAccion()
+        alcance.launch { snackbar.showSnackbar(aviso) }
+    }
 
     NxScreenScaffold(isRefreshing = state.refrescando, onRefresh = vm::refrescar) {
         LazyColumn(
@@ -97,16 +120,29 @@ fun CotizacionDetalleScreen(
 
             val cotizacion = state.cotizacion
             if (cotizacion != null) {
+                val accion = CotizacionesRules.accion(cotizacion, esDireccion)
+
                 item(key = "cabeza") { CabezaDeCotizacion(cotizacion) }
 
                 item(key = "pdf") {
                     BotonDePdf(
+                        // Un solo botón principal: si hay algo que decidir, es eso.
+                        principal = accion == null,
                         descargando = state.descargandoPdf,
                         error = state.errorPdf,
                         onAbrir = vm::abrirPdf,
                         onAbrirInterno = vm::abrirPdfInterno,
                         onDescartarError = vm::limpiarErrorPdf,
                     )
+                }
+
+                if (accion != null) {
+                    item(key = "accion") { AccionDeCotizacion(accion, onAbrir = { dialogo = accion }) }
+                }
+                CotizacionesRules.avisoFaltas(cotizacion)?.let { faltan ->
+                    item(key = "faltas") {
+                        Text(faltan, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                    }
                 }
 
                 item(key = "importes") { ImportesDeCotizacion(cotizacion) }
@@ -118,7 +154,36 @@ fun CotizacionDetalleScreen(
                 participantesDeCotizacion(cotizacion)
             }
 
-            item(key = "alcance") { MoreNotaDeAlcance(CotizacionesRules.LIMITE) }
+            item(key = "alcance") { MoreNotaDeAlcance(CotizacionesRules.limite(esDireccion)) }
+        }
+
+        NxSnackbarHost(
+            snackbar,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+        )
+    }
+
+    val abierta = state.cotizacion
+    if (abierta != null) {
+        val cerrar = {
+            dialogo = null
+            vm.limpiarAccion()
+        }
+        when (dialogo) {
+            CotizacionesRules.Accion.MARCAR_ENVIADA -> DialogoMarcarEnviada(
+                enviando = state.enviandoAccion,
+                error = state.errorAccion,
+                onCerrar = cerrar,
+                onConfirmar = { medio -> vm.marcarEnviada(medio) { dialogo = null } },
+            )
+            CotizacionesRules.Accion.APROBAR -> DialogoAprobar(
+                texto = CotizacionesRules.confirmacionAprobar(abierta),
+                enviando = state.enviandoAccion,
+                error = state.errorAccion,
+                onCerrar = cerrar,
+                onConfirmar = { vm.aprobar { dialogo = null } },
+            )
+            null -> Unit
         }
     }
 
@@ -132,6 +197,118 @@ fun CotizacionDetalleScreen(
             onClose = vm::cerrarPdf,
         )
     }
+}
+
+/** Lo que le toca decidir aquí a quien la mira. */
+@Composable
+private fun AccionDeCotizacion(accion: CotizacionesRules.Accion, onAbrir: () -> Unit) {
+    MoreTarjeta {
+        Text(
+            when (accion) {
+                CotizacionesRules.Accion.MARCAR_ENVIADA ->
+                    "¿Ya la enviaste? Dinos cómo salió: con eso le damos seguimiento y te avisamos antes de que venza."
+                CotizacionesRules.Accion.APROBAR ->
+                    "Ya salió al cliente. Si la aceptó, apruébala."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = NxColors.Slate,
+        )
+        Button(
+            onClick = onAbrir,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+        ) {
+            Text(
+                when (accion) {
+                    CotizacionesRules.Accion.MARCAR_ENVIADA -> "Marcar como enviada"
+                    CotizacionesRules.Accion.APROBAR -> "Aprobar"
+                },
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DialogoMarcarEnviada(
+    enviando: Boolean,
+    error: String?,
+    onCerrar: () -> Unit,
+    onConfirmar: (CotizacionesRules.MedioEnvio) -> Unit,
+) {
+    var medio by remember { mutableStateOf(CotizacionesRules.MedioEnvio.WHATSAPP) }
+    AlertDialog(
+        onDismissRequest = { if (!enviando) onCerrar() },
+        title = {
+            Text(
+                "¿Cómo salió?",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = NxColors.Slate,
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                CotizacionesRules.MedioEnvio.entries.forEach { opcion ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !enviando) { medio = opcion },
+                    ) {
+                        RadioButton(selected = medio == opcion, onClick = { medio = opcion }, enabled = !enviando)
+                        Text(opcion.etiqueta, style = MaterialTheme.typography.bodyMedium, color = NxColors.Slate)
+                    }
+                }
+                error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = NxColors.Danger) }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirmar(medio) },
+                enabled = !enviando,
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+            ) { Text(if (enviando) "Enviando…" else "Marcar como enviada", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onCerrar, enabled = !enviando) { Text("Mejor no") }
+        },
+    )
+}
+
+@Composable
+private fun DialogoAprobar(
+    texto: String,
+    enviando: Boolean,
+    error: String?,
+    onCerrar: () -> Unit,
+    onConfirmar: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!enviando) onCerrar() },
+        title = {
+            Text(
+                "¿Aprobar cotización?",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = NxColors.Slate,
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(texto, style = MaterialTheme.typography.bodyMedium, color = NxColors.Slate)
+                error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = NxColors.Danger) }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirmar,
+                enabled = !enviando,
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+            ) { Text(if (enviando) "Enviando…" else "Sí, aprobar", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onCerrar, enabled = !enviando) { Text("Mejor no") }
+        },
+    )
 }
 
 /** Folio, estado, cliente y proyecto: de quién es esta cotización. */
@@ -217,13 +394,13 @@ private fun Linea(etiqueta: String, valor: String?) {
 /**
  * El PDF de la propuesta.
  *
- * Es lo único que esta pantalla «hace», y por eso vive arriba: quien abre una
- * cotización en el teléfono casi siempre está delante del cliente o a punto de
- * reenviársela. Mientras baja, el botón se bloquea y lo dice; si falla, el
- * aviso va aparte y no toca el detalle que se está leyendo.
+ * Vive arriba: quien abre una cotización en el teléfono casi siempre está delante del cliente o a
+ * punto de reenviársela. Mientras baja, el botón se bloquea y lo dice; si falla, el aviso va aparte y
+ * no toca el detalle que se está leyendo.
  */
 @Composable
 private fun BotonDePdf(
+    principal: Boolean,
     descargando: Boolean,
     error: String?,
     onAbrir: () -> Unit,
@@ -231,25 +408,19 @@ private fun BotonDePdf(
     onDescartarError: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(
-            onClick = onAbrir,
-            enabled = !descargando,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
-        ) {
-            if (descargando) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = NxColors.Card,
-                )
-                Spacer(Modifier.size(10.dp))
-                Text("Bajando el PDF…")
-            } else {
-                Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(8.dp))
-                Text("PDF final")
-            }
+        if (principal) {
+            Button(
+                onClick = onAbrir,
+                enabled = !descargando,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+            ) { ContenidoBotonPdf(descargando, colorProgreso = NxColors.Card) }
+        } else {
+            OutlinedButton(
+                onClick = onAbrir,
+                enabled = !descargando,
+                modifier = Modifier.fillMaxWidth(),
+            ) { ContenidoBotonPdf(descargando, colorProgreso = NxColors.Brand) }
         }
         OutlinedButton(
             onClick = onAbrirInterno,
@@ -261,6 +432,23 @@ private fun BotonDePdf(
         if (error != null) {
             NxErrorBlock(error, onRetry = { onDescartarError(); onAbrir() })
         }
+    }
+}
+
+@Composable
+private fun ContenidoBotonPdf(descargando: Boolean, colorProgreso: androidx.compose.ui.graphics.Color) {
+    if (descargando) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(16.dp),
+            strokeWidth = 2.dp,
+            color = colorProgreso,
+        )
+        Spacer(Modifier.size(10.dp))
+        Text("Bajando el PDF…")
+    } else {
+        Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.size(8.dp))
+        Text("PDF final")
     }
 }
 

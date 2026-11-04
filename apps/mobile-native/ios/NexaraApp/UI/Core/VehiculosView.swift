@@ -6,7 +6,8 @@ import SwiftUI
 /// kilometraje y gasolina); un vehículo libre del inventario también se puede
 /// sacar directo con «Salida».
 ///
-/// El CEO no pide vehículos: él ve `FlotillaDireccionView`.
+/// El CEO no pide vehículos: él ve `FlotillaDireccionView`. Quien lleva el inventario
+/// (`vehicles.inventory`) además puede dar de alta unidades.
 ///
 /// Va dentro del `NavigationStack` del shell: aquí no se crea otro.
 struct VehiculosView: View {
@@ -21,6 +22,7 @@ struct VehiculosView: View {
     @State private var gasolina: GasolinaRequest?
     @State private var solicitar: VehiculoFlota?
     @State private var mensaje: String?
+    @State private var dandoDeAlta = false
 
     /// El API ya manda solo los libres; el demo trae también uno en uso.
     private var disponibles: [VehiculoFlota] { datos.disponibles.filter(\.disponible) }
@@ -32,6 +34,10 @@ struct VehiculosView: View {
     /// En demo, solo con `NEXARA_DEMO_CEO=1`: la persona ficticia sigue viendo las pantallas de campo.
     private var esDireccion: Bool {
         DemoMode.isActive ? DemoMode.inicioDireccion : CoreActivityRules.isCeoOrSuperAdmin(session.currentUser)
+    }
+
+    private var daDeAltaUnidades: Bool {
+        FlotillaRules.daDeAltaUnidades(esDireccion: esDireccion, permisos: session.currentUser?.permissions ?? [])
     }
 
     var body: some View {
@@ -89,6 +95,12 @@ struct VehiculosView: View {
                 Task { await cargar() }
             }
         }
+        .sheet(isPresented: $dandoDeAlta) {
+            AltaDeUnidadSheet { nombre in
+                mensaje = "Unidad dada de alta: \(nombre)"
+                Task { await cargar() }
+            }
+        }
     }
 
     private var paraQuienUsaVehiculos: some View {
@@ -134,8 +146,13 @@ struct VehiculosView: View {
                 if !cargando && error == nil && vacio {
                     NxEmptyState(
                         title: "Sin vehículos",
-                        subtitle: "No traes asignación ni hay unidades libres."
+                        subtitle: FlotillaRules.vacioSinVehiculos(daDeAlta: daDeAltaUnidades)
                     )
+                }
+                // De contorno: el principal de esta pantalla es sacar o regresar la unidad.
+                if daDeAltaUnidades {
+                    Button("Dar de alta unidad") { dandoDeAlta = true }
+                        .buttonStyle(BotonMaterialStyle(tipo: .contorno(NxColors.brand), alto: 46, llenaAncho: true))
                 }
                 Spacer(minLength: NxSpacing.l)
             }
@@ -362,6 +379,93 @@ private struct DisponibleVehiculoRow: View {
                     ))
                     .fixedSize()
                     .accessibilityLabel("Salida de \(vehiculo.titulo)")
+            }
+        }
+    }
+}
+
+// MARK: - Dar de alta
+
+/// `POST vehicles/inventory`: nombre, placas y notas. Queda disponible y sale en la flota.
+private struct AltaDeUnidadSheet: View {
+    /// Recibe el nombre con que quedó.
+    var onDone: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var nombre = ""
+    @State private var placas = ""
+    @State private var notas = ""
+    @State private var enviando = false
+    @State private var error: String?
+
+    private var listo: Bool { nombre.nilSiVacio != nil }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Dar de alta unidad")
+                    .font(NxType.headlineSmall)
+                    .foregroundStyle(NxColors.fg)
+                    .padding(.bottom, NxSpacing.s)
+
+                CampoDelineado(etiqueta: "Nombre (marca y modelo)", texto: $nombre, habilitado: !enviando, fondo: NxColors.card, maxLargo: 120)
+                CampoDelineado(etiqueta: "Placas", texto: $placas, mayusculas: true, habilitado: !enviando, fondo: NxColors.card, maxLargo: 20)
+                CampoDelineado(
+                    etiqueta: "Notas (opcional)",
+                    texto: $notas,
+                    multilinea: true,
+                    minLineas: 2,
+                    habilitado: !enviando,
+                    fondo: NxColors.card,
+                    maxLargo: 500
+                )
+
+                if let error {
+                    Text(error)
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(NxColors.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(spacing: NxSpacing.s) {
+                    Spacer()
+                    Button("Cancelar") { dismiss() }
+                        .buttonStyle(BotonMaterialStyle(tipo: .texto(NxColors.brand)))
+                        .disabled(enviando)
+                    Button(enviando ? "Guardando…" : "Dar de alta") { enviar() }
+                        .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.brand)))
+                        .disabled(!listo || enviando)
+                }
+                .padding(.top, NxSpacing.s)
+            }
+            .padding(NxSpacing.xl)
+        }
+        .background(NxColors.card.ignoresSafeArea())
+        .interactiveDismissDisabled(enviando)
+        .hojaMaterial(detents: [.medium, .large])
+    }
+
+    private func enviar() {
+        guard listo, !enviando else { return }
+        enviando = true
+        error = nil
+        let nombreLimpio = nombre.trimmingCharacters(in: .whitespacesAndNewlines)
+        let placasCapturadas = placas
+        let notasCapturadas = notas
+        Task { @MainActor in
+            do {
+                try await VehiculosRepository.shared.darDeAltaUnidad(
+                    nombre: nombreLimpio,
+                    placas: placasCapturadas,
+                    notas: notasCapturadas
+                )
+                enviando = false
+                onDone(nombreLimpio)
+                dismiss()
+            } catch {
+                enviando = false
+                self.error = error.toUserMessage(fallback: "No se pudo dar de alta la unidad")
             }
         }
     }

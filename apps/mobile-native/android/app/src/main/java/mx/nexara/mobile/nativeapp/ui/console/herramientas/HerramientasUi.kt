@@ -76,6 +76,7 @@ internal fun HerramientasRules.Tono.nx(): NxTone = when (this) {
 internal fun TarjetaKit(
     asignacion: KitAsignacionDto,
     hoy: LocalDate,
+    onReportar: () -> Unit,
 ) {
     val titulo = HerramientasRules.tituloPieza(asignacion)
     val identificacion = HerramientasRules.identificacionPieza(asignacion)
@@ -95,77 +96,89 @@ internal fun TarjetaKit(
         plazoRevision?.let { append("Revisión: $it. ") }
     }
 
-    MoreTarjeta(modifier = Modifier.clearAndSetSemantics { contentDescription = descripcion }) {
-        Text(
-            titulo,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = NxColors.Slate,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        // Código, modelo y serie, uno por renglón. Con dos se cortaba la serie.
-        Text(
-            renglones.joinToString("\n").ifEmpty { identificacion },
-            style = MaterialTheme.typography.labelMedium,
-            color = NxColors.Muted,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (desdeCuando.isNotEmpty()) {
-            Text(
-                "Asignada desde el $desdeCuando",
-                style = MaterialTheme.typography.labelSmall,
-                color = NxColors.Muted,
-            )
-        }
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    MoreTarjeta {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.clearAndSetSemantics { contentDescription = descripcion },
         ) {
-            NxStatusChip(estadoPieza, HerramientasRules.tonoEstadoPieza(asignacion.inventoryItem?.status).nx())
-            if (abiertos > 0) {
-                NxStatusChip(
-                    if (abiertos == 1) "1 daño sin cerrar" else "$abiertos daños sin cerrar",
-                    NxTone.Danger,
-                )
-            }
-            if (revisionVencida) NxStatusChip("Revisión vencida", NxTone.Warning)
-        }
-
-        // El plazo de revisión solo se enseña cuando hay revisión programada:
-        // recordar una fecha que nadie fijó sería inventarse una obligación.
-        if (!revisionVencida && plazoRevision != null) {
             Text(
-                "Próxima revisión: ${HerramientasRules.fechaCorta(asignacion.proximaInspeccion)} · $plazoRevision",
-                style = MaterialTheme.typography.labelSmall,
-                color = NxColors.Muted,
+                titulo,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = NxColors.Slate,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-        }
-
-        // El último parte abierto, con sus palabras: un «1 daño sin cerrar» sin
-        // decir cuál obliga a llamar a alguien para saber de qué se trata.
-        asignacion.events.orEmpty()
-            .firstOrNull { it.resolvedAt == null }
-            ?.description
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { parte ->
+            // Código, modelo y serie, uno por renglón. Con dos se cortaba la serie.
+            Text(
+                renglones.joinToString("\n").ifEmpty { identificacion },
+                style = MaterialTheme.typography.labelMedium,
+                color = NxColors.Muted,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (desdeCuando.isNotEmpty()) {
                 Text(
-                    parte,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxColors.Slate,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(NxTone.Danger.bg(), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    "Asignada desde el $desdeCuando",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxColors.Muted,
                 )
             }
 
-        asignacion.notes?.trim()?.takeIf { it.isNotEmpty() }?.let { nota ->
-            Text(nota, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted, maxLines = 3)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NxStatusChip(estadoPieza, HerramientasRules.tonoEstadoPieza(asignacion.inventoryItem?.status).nx())
+                if (abiertos > 0) {
+                    NxStatusChip(
+                        if (abiertos == 1) "1 daño sin cerrar" else "$abiertos daños sin cerrar",
+                        NxTone.Danger,
+                    )
+                }
+                if (revisionVencida) NxStatusChip("Revisión vencida", NxTone.Warning)
+            }
+
+            // El plazo de revisión solo se enseña cuando hay revisión programada:
+            // recordar una fecha que nadie fijó sería inventarse una obligación.
+            if (!revisionVencida && plazoRevision != null) {
+                Text(
+                    "Próxima revisión: ${HerramientasRules.fechaCorta(asignacion.proximaInspeccion)} · $plazoRevision",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxColors.Muted,
+                )
+            }
+
+            // El último parte abierto, con sus palabras: un «1 daño sin cerrar» sin
+            // decir cuál obliga a llamar a alguien para saber de qué se trata.
+            asignacion.events.orEmpty()
+                .firstOrNull { it.resolvedAt == null }
+                ?.description
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { parte ->
+                    Text(
+                        parte,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxColors.Slate,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(NxTone.Danger.bg(), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                    )
+                }
+
+            asignacion.notes?.trim()?.takeIf { it.isNotEmpty() }?.let { nota ->
+                Text(nota, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted, maxLines = 3)
+            }
+        }
+
+        OutlinedButton(
+            onClick = onReportar,
+            modifier = Modifier.heightIn(min = AlturaToque),
+        ) {
+            Text("Reportar daño", color = NxColors.Brand, fontWeight = FontWeight.SemiBold)
         }
     }
 }

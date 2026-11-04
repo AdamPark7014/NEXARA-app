@@ -329,6 +329,8 @@ struct HerrSnackbar: View {
 struct TarjetaKit: View {
     let asignacion: KitAsignacion
     let hoy: HerramientasReglas.Dia
+    /// «Reportar daño»: `nil` = quien mira no reporta esta pieza.
+    var onReportar: (() -> Void)? = nil
 
     var body: some View {
         let titulo = HerramientasReglas.tituloPieza(asignacion)
@@ -344,69 +346,77 @@ struct TarjetaKit: View {
         let nota = asignacion.notes?.nilSiVacio
 
         MoreTarjeta {
-            Text(titulo)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(NxColors.fg)
-                .lineLimit(2)
-            // Código, modelo y serie, uno por renglón. Con dos se cortaba la serie.
-            Text(identificacionVisible)
-                .font(NxType.labelMedium)
-                .foregroundStyle(NxColors.muted)
-                .lineLimit(3)
-            if !desdeCuando.isEmpty {
-                Text("Asignada desde el \(desdeCuando)")
-                    .font(NxType.labelSmall)
-                    .foregroundStyle(NxColors.muted)
-            }
-
-            HStack(alignment: .center, spacing: 6) {
-                NxStatusChip(
-                    text: estadoPieza,
-                    tone: HerramientasReglas.tonoEstadoPieza(asignacion.inventoryItem?.status).nx
-                )
-                if abiertos > 0 {
-                    NxStatusChip(text: abiertos == 1 ? "1 daño sin cerrar" : "\(abiertos) daños sin cerrar", tone: .danger)
-                }
-                if revisionVencida {
-                    NxStatusChip(text: "Revisión vencida", tone: .warning)
-                }
-            }
-
-            // El plazo de revisión solo se enseña cuando hay revisión programada:
-            // recordar una fecha que nadie fijó sería inventarse una obligación.
-            if !revisionVencida, let plazoRevision {
-                Text("Próxima revisión: \(HerramientasReglas.fechaCorta(asignacion.proximaInspeccion)) · \(plazoRevision)")
-                    .font(NxType.labelSmall)
-                    .foregroundStyle(NxColors.muted)
-            }
-
-            // El último parte abierto, con sus palabras: un «1 daño sin cerrar» sin decir
-            // cuál obliga a llamar a alguien para saber de qué se trata.
-            if let parteAbierto {
-                Text(parteAbierto)
-                    .font(NxType.bodySmall)
+            VStack(alignment: .leading, spacing: NxSpacing.s) {
+                Text(titulo)
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(NxColors.fg)
-                    .lineLimit(3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(NxTone.danger.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            }
-
-            if let nota {
-                Text(nota)
-                    .font(NxType.bodySmall)
+                    .lineLimit(2)
+                // Código, modelo y serie, uno por renglón. Con dos se cortaba la serie.
+                Text(identificacionVisible)
+                    .font(NxType.labelMedium)
                     .foregroundStyle(NxColors.muted)
                     .lineLimit(3)
+                if !desdeCuando.isEmpty {
+                    Text("Asignada desde el \(desdeCuando)")
+                        .font(NxType.labelSmall)
+                        .foregroundStyle(NxColors.muted)
+                }
+
+                HStack(alignment: .center, spacing: 6) {
+                    NxStatusChip(
+                        text: estadoPieza,
+                        tone: HerramientasReglas.tonoEstadoPieza(asignacion.inventoryItem?.status).nx
+                    )
+                    if abiertos > 0 {
+                        NxStatusChip(text: abiertos == 1 ? "1 daño sin cerrar" : "\(abiertos) daños sin cerrar", tone: .danger)
+                    }
+                    if revisionVencida {
+                        NxStatusChip(text: "Revisión vencida", tone: .warning)
+                    }
+                }
+
+                // El plazo de revisión solo se enseña cuando hay revisión programada:
+                // recordar una fecha que nadie fijó sería inventarse una obligación.
+                if !revisionVencida, let plazoRevision {
+                    Text("Próxima revisión: \(HerramientasReglas.fechaCorta(asignacion.proximaInspeccion)) · \(plazoRevision)")
+                        .font(NxType.labelSmall)
+                        .foregroundStyle(NxColors.muted)
+                }
+
+                // El último parte abierto, con sus palabras: un «1 daño sin cerrar» sin decir
+                // cuál obliga a llamar a alguien para saber de qué se trata.
+                if let parteAbierto {
+                    Text(parteAbierto)
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(NxColors.fg)
+                        .lineLimit(3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(NxTone.danger.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+
+                if let nota {
+                    Text(nota)
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(NxColors.muted)
+                        .lineLimit(3)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // La tarjeta se lee de una sola vez con VoiceOver: los chips sueltos sonarían
+            // a lista de palabras sin sujeto. El botón va aparte para que se pueda tocar.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(descripcion(
+                titulo: titulo, identificacion: identificacion, estado: estadoPieza,
+                desde: desdeCuando, abiertos: abiertos, plazo: plazoRevision
+            ))
+
+            if let onReportar {
+                Button("Reportar daño", action: onReportar)
+                    .buttonStyle(HerrBotonContornoStyle(alto: 48))
             }
         }
-        // La tarjeta se lee de una sola vez con VoiceOver: los chips sueltos sonarían
-        // a lista de palabras sin sujeto.
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(descripcion(
-            titulo: titulo, identificacion: identificacion, estado: estadoPieza,
-            desde: desdeCuando, abiertos: abiertos, plazo: plazoRevision
-        ))
     }
 
     private func descripcion(

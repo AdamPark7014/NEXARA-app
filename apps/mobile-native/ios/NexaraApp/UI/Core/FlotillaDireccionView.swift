@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Vehículos para el CEO (Android `FlotillaDireccionScreen`): quién trae cada uno, lo que costó el
-/// mes y a dónde se fue. Solo lectura: editar la ficha sigue en la web.
+/// mes y a dónde se fue. Editar la ficha sigue en la web. Lo único que decide aquí son las
+/// solicitudes por aprobar; si no hay, la sección no sale.
 ///
 /// Va dentro del `NavigationStack` del shell. `encabezado` es la tarjeta de lo que él traiga, si trae algo.
 struct FlotillaDireccionView<Encabezado: View>: View {
@@ -17,6 +18,13 @@ struct FlotillaDireccionView<Encabezado: View>: View {
     @State private var cargando = true
     @State private var error: String?
     @State private var abierto: VehiculoFlota?
+    @State private var solicitudes: [SolicitudPorAprobar] = []
+    /// No poder leer las solicitudes no es «no hay ninguna»: se dice.
+    @State private var errorSolicitudes: String?
+    @State private var decidiendo = false
+    @State private var errorDecision: String?
+    @State private var rechazando: SolicitudPorAprobar?
+    @State private var aviso: String?
 
     private var puedeAvanzar: Bool { mes < FlotillaRules.mesDeHoy() }
     private var ocupados: Int { vehiculos.filter { !($0.conductor?.nombre ?? "").isEmpty }.count }
@@ -40,6 +48,7 @@ struct FlotillaDireccionView<Encabezado: View>: View {
                     .foregroundStyle(NxColors.fg)
                 }
                 encabezado
+                seccionSolicitudes
                 if cargando && vehiculos.isEmpty {
                     NxSkeletonList(itemCount: 3, itemHeight: 96)
                 }
@@ -77,7 +86,10 @@ struct FlotillaDireccionView<Encabezado: View>: View {
                 )
                 ForEach(vehiculos) { fila($0) }
                 if !cargando && error == nil && vehiculos.isEmpty {
-                    NxEmptyState(title: "Sin vehículos", subtitle: "Todavía no hay vehículos dados de alta.")
+                    NxEmptyState(
+                        title: "Sin vehículos",
+                        subtitle: "Todavía no hay vehículos dados de alta. Cuando estén, aquí ves quién trae cada uno y lo que cuesta."
+                    )
                 }
                 Spacer(minLength: NxSpacing.l)
             }
@@ -88,6 +100,88 @@ struct FlotillaDireccionView<Encabezado: View>: View {
         .task { await cargar() }
         .navigationDestination(item: $abierto) { vehiculo in
             FichaDireccionView(vehiculo: vehiculo)
+        }
+        .avisoSnackbar($aviso)
+        .sheet(item: $rechazando, onDismiss: { errorDecision = nil }) { solicitud in
+            HojaConMotivo(
+                sobretitulo: "RECHAZAR SOLICITUD",
+                titulo: FlotillaRules.vehiculoDe(solicitud),
+                explicacion: "La pidió \(FlotillaRules.quienPide(solicitud)).",
+                etiqueta: "¿Por qué no? (opcional)",
+                confirmar: "Rechazar",
+                obligatorio: false,
+                enviando: decidiendo,
+                error: errorDecision,
+                onCerrar: { rechazando = nil },
+                onConfirmar: { texto in decidir(solicitud, aprobar: false, nota: texto) }
+            )
+        }
+    }
+
+    // MARK: Solicitudes por aprobar
+
+    /// Solo sale si hay algo que decidir, o si no se pudo saber.
+    @ViewBuilder
+    private var seccionSolicitudes: some View {
+        let pendientes = FlotillaRules.porAprobar(solicitudes)
+        if let errorSolicitudes {
+            NxRefreshErrorBanner(message: errorSolicitudes, onRetry: { Task { await cargarSolicitudes() } })
+        }
+        if !pendientes.isEmpty {
+            NxSectionHeader(title: "Solicitudes por aprobar", subtitle: "Quién pide qué y para cuándo") {
+                Text("\(pendientes.count)")
+                    .font(NxType.labelMedium)
+                    .foregroundStyle(NxColors.muted)
+            }
+            // Un error sin hoja abierta se cuenta aquí, junto a lo que se intentó decidir.
+            if rechazando == nil, let errorDecision {
+                Text(errorDecision)
+                    .font(NxType.bodySmall)
+                    .foregroundStyle(NxColors.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(pendientes) { solicitud in
+                TarjetaSolicitudVehiculo(
+                    solicitud: solicitud,
+                    decidiendo: decidiendo,
+                    onAprobar: { decidir(solicitud, aprobar: true, nota: nil) },
+                    onRechazar: {
+                        errorDecision = nil
+                        rechazando = solicitud
+                    }
+                )
+            }
+        }
+    }
+
+    /// Nada es optimista: la fila se va cuando el servidor confirma y se relee la lista.
+    private func decidir(_ solicitud: SolicitudPorAprobar, aprobar: Bool, nota: String?) {
+        guard !decidiendo else { return }
+        decidiendo = true
+        errorDecision = nil
+        let id = solicitud.id
+        Task { @MainActor in
+            do {
+                try await VehiculosRepository.shared.decidirSolicitud(id: id, aprobar: aprobar, nota: nota)
+                await cargarSolicitudes()
+                decidiendo = false
+                rechazando = nil
+                aviso = aprobar ? "Solicitud aprobada." : "Solicitud rechazada."
+            } catch {
+                decidiendo = false
+                // Un 403 («no te toca este paso») lo decide el servidor: se enseña tal cual.
+                errorDecision = error.toUserMessage(fallback: "No se pudo decidir la solicitud")
+            }
+        }
+    }
+
+    @MainActor
+    private func cargarSolicitudes() async {
+        do {
+            solicitudes = try await VehiculosRepository.shared.solicitudes()
+            errorSolicitudes = nil
+        } catch {
+            errorSolicitudes = error.toUserMessage(fallback: "No se pudieron leer las solicitudes")
         }
     }
 
@@ -143,6 +237,7 @@ struct FlotillaDireccionView<Encabezado: View>: View {
         cargando = true
         error = nil
         let pedido = mes
+        await cargarSolicitudes()
         // Van aparte: si falla el mes, la lista de quién trae qué se sigue viendo.
         do {
             vehiculos = try await VehiculosRepository.shared.flotilla()
@@ -156,6 +251,59 @@ struct FlotillaDireccionView<Encabezado: View>: View {
             if self.error == nil { self.error = error.toUserMessage(fallback: "No se pudo cargar el mes") }
         }
         cargando = false
+    }
+}
+
+/// Una solicitud de otra persona: quién, qué vehículo, para qué y cuándo, con aprobar y rechazar.
+private struct TarjetaSolicitudVehiculo: View {
+    let solicitud: SolicitudPorAprobar
+    let decidiendo: Bool
+    let onAprobar: () -> Void
+    let onRechazar: () -> Void
+
+    private var fechas: String? {
+        let texto = [
+            FechaMexico.diaHora(iso: solicitud.fechaInicioSolicitada),
+            FechaMexico.diaHora(iso: solicitud.fechaFinSolicitada),
+        ]
+        .compactMap { $0 }
+        .joined(separator: " → ")
+        return texto.isEmpty ? nil : texto
+    }
+
+    var body: some View {
+        MoreTarjeta {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(FlotillaRules.vehiculoDe(solicitud))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(NxColors.fg)
+                    .lineLimit(2)
+                Text(FlotillaRules.quienPide(solicitud))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(NxColors.fg)
+                if let fechas {
+                    Text(fechas)
+                        .font(NxType.labelMedium)
+                        .foregroundStyle(NxColors.muted)
+                }
+                if let actividad = solicitud.actividad?.titulo?.nilSiVacio {
+                    Text(actividad)
+                        .font(NxType.labelMedium)
+                        .foregroundStyle(NxColors.muted)
+                        .lineLimit(2)
+                }
+                if let motivo = solicitud.motivoUso?.nilSiVacio {
+                    Text(motivo)
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(NxColors.muted)
+                        .lineLimit(3)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+
+            NxDecisionButtons(acting: decidiendo, onApprove: onAprobar, onReject: onRechazar)
+        }
     }
 }
 

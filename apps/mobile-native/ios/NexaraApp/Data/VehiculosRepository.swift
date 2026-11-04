@@ -185,6 +185,40 @@ struct VehiculoFlota: Decodable, Identifiable, Hashable {
     var tituloRenglones: String { tituloNombreYPlacas(nombre: nombre, placas: placas, separador: "\n") }
 }
 
+/// Una solicitud de vehículo de otra persona (`GET vehicles`), para que dirección la decida.
+struct SolicitudPorAprobar: Decodable, Identifiable, Hashable {
+    var id: Int = 0
+    var nombreVehiculo: String?
+    var placasVehiculo: String?
+    var motivoUso: String?
+    /// `Pendiente` | `Aprobado` | `Rechazado`.
+    var estatusAprobacion: String = ""
+    var fechaInicioSolicitada: String?
+    var fechaFinSolicitada: String?
+    var solicitante: ConductorRef?
+    var vehiculo: VehiculoRef?
+    var actividad: ViaticoActividadRef?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, nombreVehiculo, placasVehiculo, motivoUso, estatusAprobacion
+        case fechaInicioSolicitada, fechaFinSolicitada, solicitante, vehiculo, actividad
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(Int.self, forKey: .id)) ?? 0
+        nombreVehiculo = try? c.decode(String.self, forKey: .nombreVehiculo)
+        placasVehiculo = try? c.decode(String.self, forKey: .placasVehiculo)
+        motivoUso = try? c.decode(String.self, forKey: .motivoUso)
+        estatusAprobacion = (try? c.decode(String.self, forKey: .estatusAprobacion)) ?? ""
+        fechaInicioSolicitada = try? c.decode(String.self, forKey: .fechaInicioSolicitada)
+        fechaFinSolicitada = try? c.decode(String.self, forKey: .fechaFinSolicitada)
+        solicitante = try? c.decode(ConductorRef.self, forKey: .solicitante)
+        vehiculo = try? c.decode(VehiculoRef.self, forKey: .vehiculo)
+        actividad = try? c.decode(ViaticoActividadRef.self, forKey: .actividad)
+    }
+}
+
 /// `GET vehicles/mis-vehiculos`.
 struct MisVehiculosResponse: Decodable {
     var activa: AsignacionActiva?
@@ -503,6 +537,48 @@ final class VehiculosRepository {
             fechaFinSolicitada: CoreFormat.isoString(fechaFinSolicitada)
         )
         let data = try await api.postJSON("vehicles", body: body)
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
+    /// `GET vehicles`: las solicitudes que este usuario alcanza a ver. La lista completa;
+    /// lo que está por decidir lo separa `FlotillaRules.porAprobar`.
+    func solicitudes() async throws -> [SolicitudPorAprobar] {
+        let data = try await api.get("vehicles")
+        return try ApiClient.decodeList(data)
+    }
+
+    /// `PATCH vehicles/:id/approve`. Solo con señal: el servidor revisa si la solicitud sigue
+    /// abierta y si a esta persona le toca el paso; su 403 se enseña tal cual.
+    func decidirSolicitud(id: Int, aprobar: Bool, nota: String?) async throws {
+        struct Body: Encodable {
+            let action: String
+            let note: String?
+        }
+        try await CoreRepository.requireOnline()
+        let limpia = nota?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let data = try await api.patchJSON(
+            "vehicles/\(id)/approve",
+            body: Body(action: aprobar ? "approve" : "reject", note: (limpia?.isEmpty ?? true) ? nil : limpia)
+        )
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
+    /// `POST vehicles/inventory` (`vehicles.inventory`): solo el nombre es obligatorio.
+    func darDeAltaUnidad(nombre: String, placas: String?, notas: String?) async throws {
+        struct Body: Encodable {
+            let nombre: String
+            let placas: String?
+            let notas: String?
+        }
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON(
+            "vehicles/inventory",
+            body: Body(
+                nombre: nombre.trimmingCharacters(in: .whitespacesAndNewlines),
+                placas: placas?.nilSiVacio,
+                notas: notas?.nilSiVacio
+            )
+        )
         if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
     }
 

@@ -8,6 +8,7 @@ import mx.nexara.mobile.nativeapp.data.api.GastoDto
 import mx.nexara.mobile.nativeapp.data.api.GastosApi
 import mx.nexara.mobile.nativeapp.data.api.ResolverGastoBody
 import mx.nexara.mobile.nativeapp.ui.common.GeoPhoto
+import mx.nexara.mobile.nativeapp.ui.console.PorRol
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.Dinero
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -33,6 +34,9 @@ class GastosRepository(context: Context) {
 
     private val textMedia = "text/plain".toMediaType()
     private val jpegMedia = "image/jpeg".toMediaType()
+
+    /** Dirección autoriza y paga; no registra gastos desde aquí. */
+    fun esDireccion(): Boolean = PorRol.esDireccion(authRepo.loadSession())
 
     /** Quién soy: para separar «lo mío» de lo del resto del departamento. */
     fun miUsuarioId(): Long? = authRepo.loadSession()?.id

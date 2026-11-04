@@ -449,8 +449,68 @@ object CotizacionesRules {
     }
 
     /** Qué no hace esta pantalla. */
-    const val LIMITE =
-        "Consulta. Crear y editar una cotización, mandarla al cliente y decidirla se hacen desde la computadora."
+    fun limite(esDireccion: Boolean): String =
+        if (esDireccion) {
+            "Aquí consultas, mandas el PDF, la marcas como enviada y la apruebas. Crearla y editarla se hacen desde la computadora."
+        } else {
+            "Aquí consultas, mandas el PDF y la marcas como enviada. Crearla, editarla y decidirla se hacen desde la computadora."
+        }
+
+    /** La empresa todavía no tiene cotizaciones: se dice qué sigue, según quién mira. */
+    fun vacioSinRegistros(esDireccion: Boolean): String =
+        if (esDireccion) {
+            "Todavía no hay ninguna cotización en esta empresa. Cuando alguien arme una, aquí la revisas y la apruebas."
+        } else {
+            "Todavía no hay ninguna cotización en esta empresa. Se arman en la computadora; aquí la ves, " +
+                "mandas el PDF y la marcas como enviada."
+        }
+
+    // ── Acciones ─────────────────────────────────────────────────────────────
+
+    /** `MEDIOS_ENVIO` del servidor, con las palabras de la web. */
+    enum class MedioEnvio(val clave: String, val etiqueta: String) {
+        WHATSAPP("WHATSAPP", "WhatsApp"),
+        CORREO_EXTERNO("CORREO_EXTERNO", "Correo fuera de Core"),
+        EN_PERSONA("EN_PERSONA", "En persona"),
+        OTRO("OTRO", "Otro"),
+    }
+
+    /** Lo que se puede hacer con una cotización. Solo hay una a la vez: depende del estado. */
+    enum class Accion { MARCAR_ENVIADA, APROBAR }
+
+    /** Lo mismo que exige `validarParaEnviar`. La web lo dice igual (`faltaParaEnviar`). */
+    fun faltasParaEnviar(d: CotizacionDetalleDto): List<String> = listOfNotNull(
+        "al menos una partida".takeIf { totalPartidas(d) == 0 },
+        "elegir o crear el cliente".takeIf { d.salesClientId == null },
+    )
+
+    /**
+     * Lo que la API no permite en ese estado no se ofrece (`estado-cotizacion.ts`): sale desde borrador,
+     * se aprueba una enviada. Rechazada, vencida y aprobada no tienen nada que hacer aquí.
+     */
+    fun accion(d: CotizacionDetalleDto, esDireccion: Boolean): Accion? = when (estado(d.estado)) {
+        Estado.BORRADOR -> Accion.MARCAR_ENVIADA.takeIf { faltasParaEnviar(d).isEmpty() }
+        Estado.ENVIADA -> Accion.APROBAR.takeIf { esDireccion }
+        else -> null
+    }
+
+    /** Un borrador al que le falta algo: en vez de un botón que fallaría, se dice qué. */
+    fun avisoFaltas(d: CotizacionDetalleDto): String? {
+        if (estado(d.estado) != Estado.BORRADOR) return null
+        val faltas = faltasParaEnviar(d)
+        if (faltas.isEmpty()) return null
+        return "Para marcarla como enviada falta ${faltas.joinToString(" y ")}: se completa en la computadora."
+    }
+
+    fun confirmacionAprobar(d: CotizacionDetalleDto): String {
+        val cliente = d.clientCompany?.trim()?.ifEmpty { null } ?: d.clientName?.trim()?.ifEmpty { null } ?: "el cliente"
+        return "Vas a aprobar ${d.folio?.trim()?.ifEmpty { null } ?: "esta cotización"} por ${pesos(d.total)} de $cliente. " +
+            "Queda ganada y ya no se reabre."
+    }
+
+    const val AVISO_ENVIADA = "Marcada como enviada: arranca su seguimiento."
+
+    const val AVISO_APROBADA = "Cotización aprobada."
 
     private val ESPANOL = Locale.forLanguageTag("es-MX")
     private val FORMATO_CORTO = NxFormat.patron("d MMM")

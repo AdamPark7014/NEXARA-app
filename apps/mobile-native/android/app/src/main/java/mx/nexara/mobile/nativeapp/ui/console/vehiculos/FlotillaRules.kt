@@ -5,6 +5,7 @@ import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.access.RoleKeys
 import mx.nexara.mobile.nativeapp.data.api.ProximoServicioDto
 import mx.nexara.mobile.nativeapp.data.api.RepartoMesDto
+import mx.nexara.mobile.nativeapp.data.api.SolicitudVehiculoDto
 import mx.nexara.mobile.nativeapp.data.api.VehiculoFlotaDto
 
 /**
@@ -23,8 +24,46 @@ object FlotillaRules {
         isSuperAdmin: Boolean,
     ): Boolean =
         isSuperAdmin ||
-            PlatformAccounts.isCeoEquivalentEmail(email) ||
+            PlatformAccounts.esDireccion(email, roleKey) ||
             RoleKeys.canonicalRoleKey(roleKey, orgRoleKey, role) == RoleKeys.CEO
+
+    // ── Solicitudes por aprobar ─────────────────────────────────────────────
+
+    private fun estatus(valor: String?): String = valor?.trim()?.lowercase(Locale.ROOT).orEmpty()
+
+    /** Lo cerrado es `Aprobado` o `Rechazado`; `GET vehicles` también trae lo cerrado. */
+    fun porAprobar(solicitudes: List<SolicitudVehiculoDto>): List<SolicitudVehiculoDto> =
+        solicitudes.filter { it.id != null && estatus(it.estatusAprobacion) == "pendiente" }
+
+    fun nombreSolicitud(s: SolicitudVehiculoDto): String =
+        listOfNotNull(
+            (s.nombreVehiculo ?: s.vehiculo?.nombre)?.takeIf { it.isNotBlank() },
+            (s.placasVehiculo ?: s.vehiculo?.placas)?.takeIf { it.isNotBlank() },
+        ).joinToString(" · ").ifBlank { "Vehículo sin nombre" }
+
+    fun quienPide(s: SolicitudVehiculoDto): String =
+        s.solicitante?.nombre?.trim()?.ifEmpty { null } ?: "Sin persona registrada"
+
+    /**
+     * La cadena de vehículos tiene varios pasos (`approval-policy.ts`) y el servidor avanza uno por
+     * aprobación: si sigue `Pendiente`, le falta el siguiente. Decir «aprobada» sería mentira.
+     */
+    fun avisoDecision(aprobar: Boolean, estatusFinal: String?): String = when {
+        !aprobar -> "Solicitud rechazada."
+        estatus(estatusFinal) == "aprobado" -> "Solicitud aprobada."
+        else -> "Paso aprobado: le falta el siguiente visto bueno."
+    }
+
+    // ── Alta de unidad ──────────────────────────────────────────────────────
+
+    fun avisoUnidadCreada(nombre: String): String = "${nombre.trim()} dada de alta: ya la puede sacar cualquiera."
+
+    fun vacioVehiculos(daDeAlta: Boolean): String =
+        if (daDeAlta) {
+            "No traes asignación y no hay unidades libres. Da de alta la primera: con su nombre basta."
+        } else {
+            "No traes asignación y no hay unidades libres. Cuando Iván dé de alta una, aquí la puedes sacar."
+        }
 
     // ── Mes ─────────────────────────────────────────────────────────────────
 

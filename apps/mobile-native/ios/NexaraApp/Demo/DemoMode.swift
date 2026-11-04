@@ -20,6 +20,8 @@ import Foundation
 /// Cómo se intercepta: `ApiClient.performOnce` y `refreshSessionToken` preguntan por
 /// `DemoMode.isActive` ANTES de `NetworkMonitor`, de la caché sin conexión y de la cola de
 /// mutaciones, y contestan `DemoBackend.handle(...)`.
+///
+/// Con quién se ve: por omisión, dirección. `NEXARA_DEMO_ROL=personal|ivan` lo cambia (ver `RolDemo`).
 enum DemoMode {
     static let launchArgument = "-NEXARA_DEMO"
     static let environmentKey = "NEXARA_DEMO"
@@ -53,6 +55,16 @@ enum DemoMode {
     /// del tablero del CEO. Sin la variable, el demo conserva «Mi día» con su cola (capturas de tienda).
     static var inicioDireccion: Bool {
         ProcessInfo.processInfo.environment["NEXARA_DEMO_CEO"] == "1"
+    }
+
+    /// Con qué rol se ve el demo (`NEXARA_DEMO_ROL=personal|ivan`); `nil` = dirección, lo de siempre.
+    /// Solo para ver y capturar las pantallas por rol: `CoreOrg.isCeo` da falso y la sesión
+    /// trae los permisos de ese rol.
+    static var rol: RolDemo? {
+        let valor = ProcessInfo.processInfo.environment["NEXARA_DEMO_ROL"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return valor.flatMap { RolDemo(rawValue: $0) }
     }
 
     /// Festivo de hoy en el demo (`NEXARA_DEMO_FESTIVO=descansa|labora`): solo para las capturas de
@@ -110,28 +122,65 @@ enum DemoMode {
 
     // MARK: Sesión ficticia
 
-    /// La persona en sesión: directora de una constructora ficticia, con permisos plenos.
+    /// La persona en sesión: directora de una constructora ficticia, con permisos plenos; o,
+    /// con `NEXARA_DEMO_ROL`, alguien de campo con los permisos de ese rol.
     static func sessionUser() -> SessionUser {
-        SessionUser(
+        let rol = DemoMode.rol
+        return SessionUser(
             id: String(meId),
             nombre: DemoData.me.nombre,
             email: DemoData.me.email,
-            role: DemoData.me.puesto,
+            role: rol?.puesto ?? DemoData.me.puesto,
             department: DemoData.me.departamento,
             token: "demo-token",
-            permissions: DemoData.permissions,
-            isSuperAdmin: true,
+            permissions: rol?.permisos ?? DemoData.permissions,
+            isSuperAdmin: rol == nil,
             isClient: false,
             isBranchUser: false,
             clientId: nil,
             branchId: nil,
-            roleKey: "ceo",
-            orgRoleKey: "ceo",
+            roleKey: rol?.roleKey ?? "ceo",
+            orgRoleKey: rol?.roleKey ?? "ceo",
             navPanels: ["erp"],
             navModules: DemoData.navModules,
             companyId: 1,
             // Lejos en el futuro: `needsRefresh` nunca es verdadero y nadie intenta renovar.
             expiresAt: "2099-01-01T00:00:00Z"
         )
+    }
+}
+
+/// El rol con que se ve el demo cuando no es dirección. Los permisos son los que el servidor
+/// le da a cada quien (`auth.service.ts`): Iván es `ing_campo` con el almacén y las
+/// herramientas concedidos por persona.
+enum RolDemo: String {
+    case personal
+    case ivan
+
+    var roleKey: String { "ing_campo" }
+
+    var puesto: String {
+        switch self {
+        case .personal: return "Ingeniería de campo"
+        case .ivan: return "Almacén y herramientas"
+        }
+    }
+
+    var permisos: [String] {
+        let comunes = [
+            "activities.view", "activities.create", "evidences.view",
+            "attendance.view", "lunch_breaks.view", "chat.view",
+            "tools.view", "tools.request", "vehicles.view", "vehicles.request",
+        ]
+        switch self {
+        case .personal:
+            return comunes
+        case .ivan:
+            return comunes + [
+                "tools.manage", "tools.inventory", "stock.view", "stock.manage",
+                "warehouse.view", "warehouse.manage", "catalog.view", "catalog.manage",
+                "vehicles.inventory",
+            ]
+        }
     }
 }

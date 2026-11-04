@@ -126,7 +126,8 @@ extension DemoStore {
             ),
         ]
         // Mismo orden que `getMyKit` (`assignedAt desc`); la pantalla vuelve a ordenar.
-        return kit.sorted { ($0["assignedAt"] as? String ?? "") > ($1["assignedAt"] as? String ?? "") }
+        let ordenado = kit.sorted { ($0["assignedAt"] as? String ?? "") > ($1["assignedAt"] as? String ?? "") }
+        return porRolConPartesNuevos(ordenado)
     }
 
     // MARK: Mis préstamos
@@ -228,7 +229,8 @@ extension DemoStore {
 
     /// `GET tool-requests/my-requests`: de la solicitud más reciente a la más vieja.
     func fxMisPrestamos() -> [DemoJSON] {
-        DemoStore.prestamosDemo
+        // Lo que se pidió en esta sesión va primero: es lo más reciente.
+        porRolMisPrestamosNuevos() + DemoStore.prestamosDemo
             .sorted { $0.pedidoHaceDias < $1.pedidoHaceDias }
             .map { prestamoJSON($0) }
     }

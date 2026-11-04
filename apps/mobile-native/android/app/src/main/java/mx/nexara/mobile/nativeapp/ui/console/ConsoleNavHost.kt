@@ -129,7 +129,7 @@ internal object ConsoleRoutes {
     /** Vehículos: ya tiene pantalla nativa (solicitar, salida y regreso con fotos). */
     const val Vehiculos = "console/vehiculos"
 
-    /** Cotizaciones (`/erp/cotizaciones`) — consulta: lista, detalle y PDF. */
+    /** Cotizaciones (`/erp/cotizaciones`): lista, detalle, PDF, marcar como enviada y, a dirección, aprobar. */
     const val Cotizaciones = "console/cotizaciones"
 
     /** Una cotización por dentro (`/erp/cotizaciones/:id`). */
@@ -144,18 +144,15 @@ internal object ConsoleRoutes {
     const val Proyectos = "console/proyectos"
     const val ProyectoDetalle = "console/proyectos/{id}"
 
-    /** Almacén (`/erp/almacen`) — existencias y bajo mínimo, solo consulta. */
+    /** Almacén (`/erp/almacen`): existencias, bajo mínimo y movimientos; quien opera, además, el escáner. */
     const val Almacen = "console/almacen"
 
-    /** Herramientas (`/erp/almacen/herramientas`) — mi kit, mis préstamos y pedir más plazo. */
+    /** Herramientas (`/erp/almacen/herramientas`): cambia según quién mira (`HerramientasRules.Perfil`). */
     const val Herramientas = "console/herramientas"
 
     /**
-     * Pagos a empleados (`/erp/finance/employee-payments`) — consulta.
-     *
-     * Solo la lista: capturar un pago, autorizarlo, marcarlo pagado o anularlo
-     * piden `CONTABILIDAD_MANAGE` y asientan contabilidad, así que se quedan en
-     * la computadora.
+     * Pagos a empleados (`/erp/finance/employee-payments`), solo de dirección (`CoreMenu`):
+     * la lista, registrar en borrador y marcar pagado. Corregir y anular se quedan en la computadora.
      */
     const val PagosEmpleados = "console/pagos-empleados"
 
@@ -800,10 +797,9 @@ fun ConsoleNavHost(
             nxComposable(ConsoleRoutes.Almacen, style = NxNavAnimStyle.Push) {
                 if (CoreExtraModule.ALMACEN in extras) AlmacenScreen()
             }
-            // Herramientas: mi kit, mis préstamos y pedir más plazo. Comprueba el
-            // módulo igual que el resto de «Más»; el permiso de verdad
-            // (`tools.view`) lo decide el API, y su 403 se enseña tal cual —la
-            // pantalla aguanta que falle solo una de las dos listas.
+            // Herramientas: según quién mira. Comprueba el módulo igual que el resto de
+            // «Más»; el permiso de verdad lo decide el API, y su 403 se enseña tal cual
+            // —la pantalla aguanta que falle solo una de las listas.
             nxComposable(ConsoleRoutes.Herramientas, style = NxNavAnimStyle.Push) {
                 if (CoreExtraModule.HERRAMIENTAS in extras) HerramientasScreen()
             }
@@ -815,7 +811,7 @@ fun ConsoleNavHost(
             nxComposable(ConsoleRoutes.Gastos, style = NxNavAnimStyle.Push) {
                 if (CoreExtraModule.GASTOS in extras) GastosScreen()
             }
-            // Cotizaciones: consulta. La lista y el detalle comprueban el
+            // Cotizaciones: la lista y el detalle comprueban el
             // módulo igual que el resto de «Más»; el permiso de verdad
             // (`cotizaciones.access`) lo decide el API, y su 403 se enseña tal
             // cual.
@@ -834,10 +830,9 @@ fun ConsoleNavHost(
                 val id = entry.arguments?.getString("id")?.toLongOrNull() ?: return@nxComposable
                 if (CoreExtraModule.COTIZACIONES in extras) CotizacionDetalleScreen(cotizacionId = id)
             }
-            // Pagos a empleados: consulta. Comprueba el módulo igual que el resto
-            // de «Más»; el permiso de verdad (`CONTABILIDAD_VIEW`) y hasta dónde
-            // llega el alcance —toda la empresa o solo el departamento— los
-            // decide el API, y su 403 se enseña tal cual.
+            // Pagos a empleados: comprueba el módulo igual que el resto de «Más»
+            // (solo dirección lo tiene); el permiso de verdad y hasta dónde llega
+            // el alcance los decide el API, y su 403 se enseña tal cual.
             nxComposable(ConsoleRoutes.PagosEmpleados, style = NxNavAnimStyle.Push) {
                 if (CoreExtraModule.PAGOS_EMPLEADOS in extras) PagosEmpleadosScreen()
             }

@@ -13,7 +13,7 @@ import retrofit2.http.Query
  * |-------------------|-------------------------------------------------------|
  * | KPIs del equipo   | `GET me/kpis/equipo?desde&hasta` (`me/me.controller.ts`) |
  * | Proyectos         | `GET proyectos` (`projects/proyectos-profesional.controller.ts`) |
- * | Almacén           | `GET stock/levels` · `GET stock/alerts/low-stock` (`warehouse/stock.controller.ts`) |
+ * | Almacén           | `GET stock/levels` · `GET stock/alerts/low-stock` · `GET stock/movements` (`warehouse/stock.controller.ts`) |
  *
  * Reglas de los DTO, iguales en todo el árbol: **todo anulable con valor por
  * omisión**. Un campo que el servidor deje de mandar no puede tumbar la
@@ -48,6 +48,10 @@ interface CoreExtrasApi {
 
     @GET("stock/alerts/low-stock")
     suspend fun lowStock(): List<StockLevelDto>
+
+    /** Los últimos 500, del más reciente al más viejo, con quién los hizo. */
+    @GET("stock/movements")
+    suspend fun movimientosDeAlmacen(): List<MovimientoStockDto>
 }
 
 // ── KPIs del equipo ──────────────────────────────────────────────────────────
@@ -450,6 +454,25 @@ data class StockUbicacionDto(
     val id: Long? = null,
     val code: String? = null,
     val name: String? = null,
+)
+
+data class StockPersonaDto(
+    val id: Long? = null,
+    val nombre: String? = null,
+)
+
+/** Un movimiento de almacén (`listStockMovements`). `type`: RECEIPT, DISPATCH, TRANSFER, ADJUSTMENT… */
+data class MovimientoStockDto(
+    val id: Long? = null,
+    val movementNumber: String? = null,
+    val type: String? = null,
+    val quantity: String? = null,
+    val notes: String? = null,
+    val createdAt: String? = null,
+    val product: StockProductoDto? = null,
+    val fromWarehouse: StockAlmacenDto? = null,
+    val toWarehouse: StockAlmacenDto? = null,
+    val createdBy: StockPersonaDto? = null,
 )
 
 /**

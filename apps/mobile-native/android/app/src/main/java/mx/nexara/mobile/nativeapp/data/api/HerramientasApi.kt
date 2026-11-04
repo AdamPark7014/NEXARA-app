@@ -1,40 +1,43 @@
 package mx.nexara.mobile.nativeapp.data.api
 
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * Herramientas de Core — espejo de `apps/api/src/tool-requests/tool-requests.controller.ts`.
  *
- * Solo se declaran aquí los endpoints que **una persona de campo puede llamar**,
- * es decir los que el guard deja pasar con `tools.view`. Todo lo demás del
- * controlador (inventario, kits de otros, aprobar, entregar, recibir, etiquetas)
- * exige `tools.manage` y, en varios casos, estar además en la lista de correos
- * de `tools-access.ts` —Christian e Iván—; declararlo aquí solo serviría para
- * pintar botones que contestan 403 al tocarlos.
+ * Cada quien llama lo suyo (`HerramientasRules.Perfil`):
+ * - **Personal** (`tools.view` / `tools.request`): mi kit, mis préstamos, más plazo, reportar daño y
+ *   pedir préstamo. El servidor solo le niega pedir a dirección (`assertCanCreateToolLoan`).
+ * - **Iván y dirección** (`tools.manage`): préstamos e inventario de toda la empresa. Aprobar,
+ *   rechazar, entregar y recibir exigen además estar en la lista de correos de `tools-access.ts`.
  *
- * `GET tool-requests/my-stats` tampoco está: cuenta por estado exactamente la
- * misma lista que ya devuelve `my-requests`, y traerla otra vez sería una
- * petición más en cada refresco para un número que la app puede sumar sola.
+ * Los préstamos de la empresa se leen por estado (`status/:status`) y no con `GET tool-requests`:
+ * ése recorta al departamento de quien pregunta si no es super admin, y a Iván se le perderían
+ * préstamos por aprobar sin que nada lo dijera.
  *
- * Tampoco se declara `POST tool-requests` (pedir prestada una herramienta):
- * `assertCanCreateToolLoan` lo limita por correo a José Antonio y David, y el
- * alta exige elegir una pieza concreta del inventario —que es justo el endpoint
- * que esas dos personas tampoco pueden leer sin `tools.manage`—. Mientras el
- * servidor no abra esa puerta, la app no finge tenerla.
+ * `GET tool-requests/my-stats` no está: cuenta por estado exactamente la misma lista que ya devuelve
+ * `my-requests`, y traerla otra vez sería una petición más en cada refresco para un número que la
+ * app puede sumar sola.
  *
- * La excepción es el escáner de etiquetas (`EscaneoApi`): buscar por código lo
- * deja pasar `tools.view`, y entregar/recibir se ofrecen porque es justo lo que
- * hace almacén con la herramienta en la mano; a los demás el 403 se les explica.
+ * Entregar y recibir viven en `EscaneoApi`: son lo mismo se escanee la etiqueta o se toque en la lista.
  *
- * Todo campo llega anulable con valor por omisión: un registro raro deja la
- * tarjeta incompleta, nunca tumba la pantalla.
+ * Todo campo llega anulable con valor por omisión: un registro raro deja la tarjeta incompleta,
+ * nunca tumba la pantalla.
  */
 
-/** La pieza física del inventario detrás de una asignación de kit. */
+/**
+ * Una pieza física del inventario: la de una asignación de kit, una fila de `GET
+ * tool-requests/inventory` o un resultado de `inventory/search`.
+ */
 data class KitPiezaDto(
     val id: Long? = null,
     val toolName: String? = null,
@@ -86,6 +89,8 @@ data class KitAsignacionDto(
     val inventoryItem: KitPiezaDto? = null,
     /** Las 20 últimas incidencias, de la más reciente a la más vieja. */
     val events: List<KitEventoDto>? = null,
+    /** De quién es el kit. Solo llega en `kits/users`: en `kits/my` es de quien pregunta. */
+    val user: HerramientaPersonaDto? = null,
 )
 
 /** Quién autorizó el préstamo. Aparte de [SimpleUserDto] porque aquí todo puede venir nulo. */
@@ -124,6 +129,10 @@ data class PrestamoHerramientaDto(
     val renewalCount: Int? = null,
     /** OT para la que se pidió. `null` = préstamo suelto. */
     val activityId: Long? = null,
+    /** La pieza del inventario prestada: con ella se sabe quién trae cada herramienta. */
+    val inventoryItemId: Long? = null,
+    /** Quien la pidió. Solo llega en las listas de la empresa. */
+    val usuario: HerramientaPersonaDto? = null,
     val pickupCode: String? = null,
     val pickupExpiresAt: String? = null,
     val pickedUpAt: String? = null,
@@ -140,6 +149,33 @@ data class PedirRenovacionBody(
     val newReturnDate: String,
     val renewalReason: String? = null,
 )
+
+/** `POST tool-requests` — pedir prestada una pieza del inventario. `usuarioId` es el propio. */
+data class PedirPrestamoBody(
+    val usuarioId: Long,
+    val inventoryItemId: Long,
+    val reason: String,
+    val startDate: String,
+    val expectedReturnDate: String,
+    val activityId: Long? = null,
+)
+
+/** Una petición de más plazo esperando decisión (`GET tool-requests/renewals/pending`). */
+data class RenovacionPendienteDto(
+    val id: Long? = null,
+    val toolRequestId: Long? = null,
+    val previousReturnDate: String? = null,
+    val newReturnDate: String? = null,
+    val renewalReason: String? = null,
+    val requestDate: String? = null,
+    val toolRequest: PrestamoHerramientaDto? = null,
+)
+
+data class ReportarDanioBody(val description: String)
+
+data class RechazarPrestamoBody(val adminNotes: String)
+
+data class RechazarRenovacionBody(val reason: String)
 
 interface HerramientasApi {
 
@@ -166,4 +202,59 @@ interface HerramientasApi {
         @Path("id") id: Long,
         @Body body: PedirRenovacionBody,
     ): ResponseBody
+
+    /** `POST tool-requests/kits/:id/report` (`tools.view`): reportar daño de una pieza de mi kit. */
+    @POST("tool-requests/kits/{id}/report")
+    suspend fun reportarDanio(@Path("id") id: Long, @Body body: ReportarDanioBody): ResponseBody
+
+    /** `GET tool-requests/inventory/search?q=`: solo lo disponible. Sin texto contesta vacío. */
+    @GET("tool-requests/inventory/search")
+    suspend fun buscarInventario(@Query("q") q: String): List<KitPiezaDto>
+
+    /** `GET tool-requests/mis-actividades`: mis actividades abiertas, para ligar el préstamo. */
+    @GET("tool-requests/mis-actividades")
+    suspend fun misActividades(): List<HerramientaActividadDto>
+
+    /** `POST tool-requests`: queda `PENDING` hasta que Iván la apruebe. */
+    @POST("tool-requests")
+    suspend fun pedirPrestamo(@Body body: PedirPrestamoBody): PrestamoHerramientaDto
+
+    /** `GET tool-requests/status/:status` (`tools.manage`): de toda la empresa, con quién la pidió. */
+    @GET("tool-requests/status/{status}")
+    suspend fun prestamosPorEstado(@Path("status") status: String): List<PrestamoHerramientaDto>
+
+    @GET("tool-requests/renewals/pending")
+    suspend fun renovacionesPendientes(): List<RenovacionPendienteDto>
+
+    /** `GET tool-requests/inventory` (`tools.manage`): no dice quién la trae. */
+    @GET("tool-requests/inventory")
+    suspend fun inventario(): List<KitPiezaDto>
+
+    /** `GET tool-requests/kits/users` (`tools.manage`): kits, con su dueño, para decir quién trae qué. */
+    @GET("tool-requests/kits/users")
+    suspend fun kitsDeLaEmpresa(): List<KitAsignacionDto>
+
+    /** Genera el código de recolección. Sobre una ya aprobada, genera otro: es como se renueva. */
+    @POST("tool-requests/{id}/approve")
+    suspend fun aprobarPrestamo(@Path("id") id: Long): ResponseBody
+
+    @POST("tool-requests/{id}/reject")
+    suspend fun rechazarPrestamo(@Path("id") id: Long, @Body body: RechazarPrestamoBody): ResponseBody
+
+    @POST("tool-requests/renewals/{id}/approve")
+    suspend fun aprobarRenovacion(@Path("id") id: Long): ResponseBody
+
+    @POST("tool-requests/renewals/{id}/reject")
+    suspend fun rechazarRenovacion(@Path("id") id: Long, @Body body: RechazarRenovacionBody): ResponseBody
+
+    /** `POST tool-requests/inventory` (`tools.manage`): las dos fotos son obligatorias. */
+    @Multipart
+    @POST("tool-requests/inventory")
+    suspend fun nuevaHerramienta(
+        @Part("toolName") toolName: RequestBody,
+        @Part("model") model: RequestBody,
+        @Part("serialNumber") serialNumber: RequestBody,
+        @Part panoramicPhoto: MultipartBody.Part,
+        @Part serialPhoto: MultipartBody.Part,
+    ): KitPiezaDto
 }

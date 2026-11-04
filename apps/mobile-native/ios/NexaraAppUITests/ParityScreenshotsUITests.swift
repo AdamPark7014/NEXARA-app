@@ -471,6 +471,163 @@ final class ParityScreenshotsUITests: XCTestCase {
         cerrarRecorrido()
     }
 
+    // MARK: - App por rol (capturas 60 a 75)
+
+    /// Herramientas de dirección: préstamos de toda la empresa e inventario, sin escáner ni kit.
+    func testHerramientasDireccion() throws {
+        guard abrirModulo("erp-herramientas", "Herramientas", rol: nil) else { return }
+        numero = 59
+        capturar("herramientas-direccion")
+        XCTAssertFalse(escaner().exists, "Dirección no debe ver el escáner")
+        XCTAssertFalse(pastilla("Mi kit").first?.exists ?? false, "Dirección no debe ver «Mi kit»")
+        XCTAssertFalse(app.buttons["Pedir préstamo"].exists, "Dirección no pide préstamos")
+        if tocarSiExiste(pastilla("Inventario"), timeout: 4) {
+            capturar("herramientas-direccion-inventario")
+        } else {
+            omitir("herramientas-direccion-inventario: no está la pastilla")
+        }
+    }
+
+    /// Herramientas del personal: su kit, sus préstamos y «Pedir préstamo», sin escáner.
+    func testHerramientasPersonalYPedirPrestamo() throws {
+        guard abrirModulo("erp-herramientas", "Herramientas", rol: "personal") else { return }
+        numero = 61
+        capturar("herramientas-personal")
+        XCTAssertFalse(escaner().exists, "El personal no debe ver el escáner")
+        guard tocarSiExiste(textoTocable("Pedir préstamo"), timeout: 8) else {
+            adjuntarJerarquia("dbg-sin-pedir-prestamo")
+            XCTFail("No está el botón «Pedir préstamo»")
+            return
+        }
+        capturar("pedir-prestamo")
+        let buscador = app.textFields.firstMatch
+        guard buscador.waitForExistence(timeout: 5) else {
+            omitir("pedir-prestamo: no apareció el buscador")
+            return
+        }
+        tocar(buscador)
+        buscador.typeText("zzz")
+        Thread.sleep(forTimeInterval: 1.5)
+        capturar("pedir-prestamo-sin-resultados")
+        tocar(buscador)
+        for _ in 0..<3 { buscador.typeText(XCUIKeyboardKey.delete.rawValue) }
+        buscador.typeText("taladro")
+        Thread.sleep(forTimeInterval: 1.5)
+        capturar("pedir-prestamo-resultados")
+        if tocarSiExiste(textoTocable("Taladro percutor"), timeout: 4) {
+            capturar("pedir-prestamo-formulario")
+        } else {
+            omitir("pedir-prestamo-formulario: no salió el resultado")
+        }
+    }
+
+    /// Herramientas de quien administra: escáner arriba, por aprobar, préstamos e inventario.
+    func testHerramientasIvan() throws {
+        guard abrirModulo("erp-herramientas", "Herramientas", rol: "ivan") else { return }
+        numero = 66
+        capturar("herramientas-ivan")
+        XCTAssertTrue(escaner().exists, "Quien administra debe ver el escáner")
+        if tocarSiExiste(pastilla("Préstamos"), timeout: 4) {
+            capturar("herramientas-ivan-prestamos")
+        } else {
+            omitir("herramientas-ivan-prestamos: no está la pastilla")
+        }
+        if tocarSiExiste(pastilla("Inventario"), timeout: 4) {
+            capturar("herramientas-ivan-inventario")
+        } else {
+            omitir("herramientas-ivan-inventario: no está la pastilla")
+        }
+    }
+
+    /// Almacén de dirección: existencias y movimientos con quién los hizo, sin escáner.
+    func testAlmacenDireccion() throws {
+        guard abrirModulo("erp-almacen", "Almacén", rol: nil) else { return }
+        numero = 69
+        capturar("almacen-direccion")
+        XCTAssertFalse(escaner().exists, "Dirección no debe ver el escáner")
+        if tocarSiExiste(pastilla("Movimientos"), timeout: 4) {
+            capturar("almacen-direccion-movimientos")
+        } else {
+            omitir("almacen-direccion-movimientos: no está la pastilla")
+        }
+    }
+
+    /// Pagos: registrar, confirmar con a quién y cuánto, y la fila ya pagada.
+    func testPagosRegistrarYConfirmar() throws {
+        guard abrirModulo("erp-pagos-empleados", "Pagos a empleados", rol: nil) else { return }
+        numero = 71
+        capturar("pagos")
+        if tocarSiExiste(textoTocable("Registrar pago"), timeout: 6) {
+            capturar("pagos-registrar")
+            _ = tocarSiExiste(textoTocable("Cancelar"), timeout: 4)
+        } else {
+            omitir("pagos-registrar: no está el botón")
+        }
+        let marcar = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Marcar pagado")).firstMatch
+        var vueltas = 0
+        while !(marcar.exists && marcar.isHittable), vueltas < 4 {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.4)
+            vueltas += 1
+        }
+        guard marcar.exists else {
+            adjuntarJerarquia("dbg-sin-marcar-pagado")
+            XCTFail("No está «Marcar pagado» en ningún borrador")
+            return
+        }
+        tocar(marcar)
+        let alerta = app.alerts.firstMatch
+        guard alerta.waitForExistence(timeout: 5) else {
+            adjuntarJerarquia("dbg-sin-confirmacion")
+            XCTFail("Marcar pagado no pidió confirmación")
+            return
+        }
+        capturar("pagos-confirmar-pagado")
+        tocar(alerta.buttons["Sí, marcar pagado"])
+        Thread.sleep(forTimeInterval: 1.5)
+        capturar("pagos-marcado")
+    }
+
+    /// Relanza el demo con el rol pedido y abre un módulo de «Más». Si no llega, el fallo ya quedó dicho.
+    private func abrirModulo(_ clave: String, _ etiqueta: String, rol: String?) -> Bool {
+        app.terminate()
+        if let rol { app.launchEnvironment["NEXARA_DEMO_ROL"] = rol }
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "La app no llegó a primer plano")
+        despejarAlertas()
+        guard buscar(pestana("tab-inicio", "Inicio"), timeout: 30) != nil, irA("tab-mas", "Más") else {
+            adjuntarJerarquia("dbg-\(clave)-sin-shell")
+            XCTFail("No se llegó a «Más» en el demo")
+            return false
+        }
+        var fila = buscar(renglon("more-\(clave)", etiqueta), timeout: 2)
+        var intentos = 0
+        while fila == nil || !(fila?.isHittable ?? false), intentos < 5 {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.5)
+            fila = buscar(renglon("more-\(clave)", etiqueta), timeout: 1)
+            intentos += 1
+        }
+        guard let fila else {
+            adjuntarJerarquia("dbg-\(clave)-sin-fila")
+            XCTFail("No está «\(etiqueta)» en «Más»")
+            return false
+        }
+        tocar(fila)
+        Thread.sleep(forTimeInterval: 1.5)
+        return true
+    }
+
+    /// El título del escáner único, en cualquiera de sus tres textos.
+    private func escaner() -> XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Escanear ")).firstMatch
+    }
+
+    /// Una pastilla con cuenta («Inventario · 9»): se busca por cómo empieza.
+    private func pastilla(_ texto: String) -> [XCUIElement] {
+        [app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", texto)).firstMatch]
+    }
+
     // MARK: - Recorrido
 
     private func cerrarRecorrido() {

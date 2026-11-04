@@ -9,6 +9,7 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.CoreExtrasApi
 import mx.nexara.mobile.nativeapp.data.api.KpisEquipoDto
+import mx.nexara.mobile.nativeapp.data.api.MovimientoStockDto
 import mx.nexara.mobile.nativeapp.data.api.CambiarEstadoProyectoRequest
 import mx.nexara.mobile.nativeapp.data.api.ProyectoDetalleDto
 import mx.nexara.mobile.nativeapp.data.api.ProyectoResumenDto
@@ -42,6 +43,9 @@ class CoreExtrasRepository(context: Context) {
         withContext(Dispatchers.IO) {
             api.cambiarEstadoProyecto(id, CambiarEstadoProyectoRequest(estado, motivo?.trim()?.takeIf { it.isNotEmpty() }))
         }
+
+    suspend fun movimientosDeAlmacen(): List<MovimientoStockDto> =
+        withContext(Dispatchers.IO) { api.movimientosDeAlmacen() }
 
     /** Existencias y alertas de mínimo. */
     data class Almacen(

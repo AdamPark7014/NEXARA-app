@@ -6,6 +6,7 @@ import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Multipart
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
@@ -105,6 +106,34 @@ data class SolicitarVehiculoBody(
     val motivoUso: String,
     val fechaInicioSolicitada: String,
     val fechaFinSolicitada: String,
+)
+
+/** Una fila de `GET vehicles`: quién pidió qué unidad, para qué y si ya la aprobaron. */
+data class SolicitudVehiculoDto(
+    val id: Long? = null,
+    /** `Pendiente` · `Aprobado` · `Rechazado`. Sigue `Pendiente` mientras falten pasos de la cadena. */
+    val estatusAprobacion: String? = null,
+    val nombreVehiculo: String? = null,
+    val placasVehiculo: String? = null,
+    val motivoUso: String? = null,
+    val fechaInicioSolicitada: String? = null,
+    val fechaFinSolicitada: String? = null,
+    val solicitante: ConductorRefDto? = null,
+    val vehiculo: VehiculoRefDto? = null,
+    val actividad: HerramientaActividadDto? = null,
+)
+
+/** `PATCH vehicles/:id/approve`. [action]: `approve` · `reject`. */
+data class DecidirSolicitudBody(
+    val action: String,
+    val note: String? = null,
+)
+
+/** `POST vehicles/inventory`: una unidad nueva, `Disponible` para que cualquiera la saque. */
+data class AltaUnidadBody(
+    val nombre: String,
+    val placas: String? = null,
+    val notas: String? = null,
 )
 
 /** `POST vehicles/ficha/leer-foto` con `tipo=TABLERO`. Lo que no se pudo leer llega en null. */
@@ -298,6 +327,18 @@ interface VehiclesApi {
 
     @POST("vehicles")
     suspend fun solicitar(@Body body: SolicitarVehiculoBody): ResponseBody
+
+    /** Las solicitudes que el rol puede ver (`vehicles.view`). */
+    @GET("vehicles")
+    suspend fun solicitudes(): List<SolicitudVehiculoDto>
+
+    /** `vehicles.review`. Contesta la solicitud ya decidida. */
+    @PATCH("vehicles/{id}/approve")
+    suspend fun decidirSolicitud(@Path("id") id: Long, @Body body: DecidirSolicitudBody): SolicitudVehiculoDto
+
+    /** `vehicles.inventory`. */
+    @POST("vehicles/inventory")
+    suspend fun altaUnidad(@Body body: AltaUnidadBody): ResponseBody
 
     /** Salida de una solicitud aprobada. [fotos] trae las 7 partes del checklist. */
     @Multipart

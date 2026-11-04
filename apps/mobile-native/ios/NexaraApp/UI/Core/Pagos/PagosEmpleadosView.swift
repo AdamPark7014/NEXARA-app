@@ -3,9 +3,12 @@ import SwiftUI
 /// Pagos a empleados (`/erp/finance/employee-payments`) en el teléfono — espejo
 /// de `PagosScreen.kt` (`PagosEmpleadosScreen`).
 ///
-/// La web es una tabla con alta, edición, comprobantes y anulación. Aquí **no
-/// se paga nada**: se consulta. Cada pago es una fila densa que contesta **a
-/// quién**, **cuánto**, **de qué periodo** y **si el dinero ya salió**.
+/// Solo le sale a dirección (`CoreNavigation.extraModules`). Cada pago es una fila densa
+/// que contesta **a quién**, **cuánto**, **de qué periodo** y **si el dinero ya salió**.
+/// Desde aquí se registra un pago y se marca pagado; corregir y anular siguen en la web.
+///
+/// **Mueve dinero: nada es optimista.** La fila cambia cuando el servidor confirma y se
+/// relee la lista; si contesta error, se enseña su mensaje y la fila se queda como estaba.
 ///
 /// Los cuatro estados de la pantalla —cargando, error, vacío y contenido— no
 /// pueden coincidir (igual que `nxEstadoPantalla` de Android). Quién puede ver
@@ -21,9 +24,23 @@ struct PagosEmpleadosView: View {
     @State private var filtro: PagosRules.Filtro = .todos
     @State private var consulta = ""
     @State private var arrancado = false
+    @State private var registrando = false
+    /// El pago que está pidiendo confirmación; `nil` = sin alerta.
+    @State private var porConfirmar: PagoEmpleado?
+    /// El id del pago que ya salió al servidor y no ha contestado.
+    @State private var marcando: Int?
+    /// Lo que dijo el servidor al registrar o marcar: su error, o que ya quedó.
+    @State private var aviso: String?
 
     /// A partir de cuántos pagos aparece el buscador. Con menos, estorba.
     private static let umbralBusqueda = 6
+
+    private var confirmando: Binding<Bool> {
+        Binding(
+            get: { porConfirmar != nil },
+            set: { if !$0 { porConfirmar = nil } }
+        )
+    }
 
     private enum EstadoPantalla { case cargando, error, vacio, contenido }
 
@@ -50,20 +67,37 @@ struct PagosEmpleadosView: View {
                 case .vacio:
                     NxEmptyState(
                         title: "Sin pagos registrados",
-                        subtitle: "Todavía no hay ningún pago al personal en esta empresa. "
-                            + "El primero se captura desde la computadora, con su comprobante."
+                        subtitle: PagosRules.vacioSinPagos,
+                        actionLabel: "Registrar pago",
+                        onAction: { registrando = true }
                     )
                 case .contenido:
                     contenido(todos: todos, visibles: visibles)
                 }
 
                 MoreNotaDeAlcance(texto: PagosRules.limite)
-                Spacer().frame(height: 8)
+                // Con botón flotante, lo último de la lista no se queda debajo de él.
+                Spacer().frame(height: estado == .contenido ? 72 : 8)
             }
             .padding(16)
         }
         .nxScreenBackground()
         .refreshable { await cargar(refresco: true) }
+        // En el vacío el botón ya está en el mensaje: uno solo por pantalla.
+        .nxFab("Registrar pago", systemImage: "plus", visible: estado == .contenido) { registrando = true }
+        .avisoSnackbar($aviso, abajo: estado == .contenido ? 80 : 12)
+        .sheet(isPresented: $registrando) {
+            RegistrarPagoView(onRegistrado: {
+                aviso = "Pago registrado en borrador."
+                Task { await cargar(refresco: true) }
+            })
+        }
+        .alert(PagosRules.tituloConfirmarPagado, isPresented: confirmando, presenting: porConfirmar) { pago in
+            Button("Cancelar", role: .cancel) {}
+            Button("Sí, marcar pagado") { marcarPagado(pago) }
+        } message: { pago in
+            Text(PagosRules.mensajeConfirmarPagado(pago))
+        }
         .task {
             guard !arrancado else { return }
             arrancado = true
@@ -119,7 +153,12 @@ struct PagosEmpleadosView: View {
             VStack(spacing: 0) {
                 ForEach(Array(visibles.enumerated()), id: \.element.claveLista) { indice, pago in
                     if indice > 0 { NxRowDivider() }
-                    FilaDePago(pago: pago)
+                    FilaDePago(
+                        pago: pago,
+                        marcando: pago.id != nil && marcando == pago.id,
+                        bloqueado: marcando != nil,
+                        onMarcarPagado: { porConfirmar = pago }
+                    )
                 }
             }
             .background(NxColors.card)
@@ -173,6 +212,25 @@ struct PagosEmpleadosView: View {
         filtro = filtro == nuevo ? .todos : nuevo
     }
 
+    /// Ya confirmado. La fila solo cambia cuando el servidor contesta y se relee la lista;
+    /// mientras tanto dice «Marcando…» y los demás botones esperan.
+    private func marcarPagado(_ pago: PagoEmpleado) {
+        guard let id = pago.id, marcando == nil else { return }
+        marcando = id
+        Task { @MainActor in
+            do {
+                try await PagosEmpleadosRepository.shared.marcarPagado(id: id)
+                await cargar(refresco: true)
+                marcando = nil
+                aviso = "Pago marcado como pagado: se generó su póliza."
+            } catch {
+                marcando = nil
+                // Su mensaje tal cual: un 403 o un «ya estaba anulado» los decide el servidor.
+                aviso = error.toUserMessage(fallback: "No se pudo marcar como pagado")
+            }
+        }
+    }
+
     @MainActor
     private func cargar(refresco: Bool) async {
         if refresco {
@@ -210,9 +268,14 @@ struct PagosEmpleadosView: View {
 
 /// Un pago, en una fila: a la izquierda quién y de qué; a la derecha **el
 /// importe, alineado a la derecha** y debajo el estado como punto y palabra.
-/// Toda la fila se lee de una vez con VoiceOver.
+/// La fila se lee de una vez con VoiceOver; «Marcar pagado» va aparte para poder tocarlo.
 private struct FilaDePago: View {
     let pago: PagoEmpleado
+    /// Este pago ya salió al servidor y no ha contestado.
+    let marcando: Bool
+    /// Otro pago está en camino: mover dos a la vez no se ofrece.
+    let bloqueado: Bool
+    let onMarcarPagado: () -> Void
 
     var body: some View {
         let empleado = PagosRules.empleadoTexto(pago)
@@ -222,47 +285,56 @@ private struct FilaDePago: View {
         let estado = PagosRules.estadoDe(pago)
         let pagadoEl = PagosRules.pagadoElTexto(pago)
 
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(empleado)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(NxColors.fg)
-                    .lineLimit(1)
-                Text(concepto)
-                    .font(NxType.bodySmall)
-                    .foregroundStyle(NxColors.fg2)
-                    .lineLimit(2)
-                if let contexto {
-                    Text(contexto)
-                        .font(NxType.labelSmall)
-                        .foregroundStyle(NxColors.muted)
-                        .lineLimit(2)
-                }
-                if let pagadoEl {
-                    Text(pagadoEl)
-                        .font(NxType.labelSmall)
-                        .foregroundStyle(NxColors.muted)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(empleado)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(NxColors.fg)
                         .lineLimit(1)
+                    Text(concepto)
+                        .font(NxType.bodySmall)
+                        .foregroundStyle(NxColors.fg2)
+                        .lineLimit(2)
+                    if let contexto {
+                        Text(contexto)
+                            .font(NxType.labelSmall)
+                            .foregroundStyle(NxColors.muted)
+                            .lineLimit(2)
+                    }
+                    if let pagadoEl {
+                        Text(pagadoEl)
+                            .font(NxType.labelSmall)
+                            .foregroundStyle(NxColors.muted)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(monto)
+                        .font(.system(size: 16, weight: .bold))
+                        // Un importe ilegible no grita en rojo, pero tampoco se disfraza
+                        // de cifra: va en gris y dice «—».
+                        .foregroundStyle(monto == PagosRules.sinDato ? NxColors.muted : NxColors.fg)
+                        .lineLimit(1)
+                        .multilineTextAlignment(.trailing)
+                    NxStatusDot(text: estado.etiqueta, color: PagosRules.colorDe(estado))
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(monto)
-                    .font(.system(size: 16, weight: .bold))
-                    // Un importe ilegible no grita en rojo, pero tampoco se disfraza
-                    // de cifra: va en gris y dice «—».
-                    .foregroundStyle(monto == PagosRules.sinDato ? NxColors.muted : NxColors.fg)
-                    .lineLimit(1)
-                    .multilineTextAlignment(.trailing)
-                NxStatusDot(text: estado.etiqueta, color: PagosRules.colorDe(estado))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(descripcion(empleado: empleado, concepto: concepto, monto: monto,
+                                            estado: estado, contexto: contexto, pagadoEl: pagadoEl))
+
+            if PagosRules.puedeMarcarPagado(pago) {
+                Button(marcando ? "Marcando…" : "Marcar pagado", action: onMarcarPagado)
+                    .buttonStyle(HerrBotonContornoStyle(alto: 44))
+                    .disabled(marcando || bloqueado)
+                    .accessibilityLabel("Marcar pagado: \(empleado), \(monto)")
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(minHeight: 44)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(descripcion(empleado: empleado, concepto: concepto, monto: monto,
-                                        estado: estado, contexto: contexto, pagadoEl: pagadoEl))
     }
 
     /// «—» se lee fatal en voz alta: se dice con palabras qué pasa.

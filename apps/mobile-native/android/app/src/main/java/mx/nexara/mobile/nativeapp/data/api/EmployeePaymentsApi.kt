@@ -1,33 +1,30 @@
 package mx.nexara.mobile.nativeapp.data.api
 
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.http.GET
+import retrofit2.http.Multipart
+import retrofit2.http.PATCH
+import retrofit2.http.POST
+import retrofit2.http.Part
+import retrofit2.http.Path
 
 /**
  * Pagos a empleados en el teléfono — espejo de
  * `apps/api/src/employee-payments/employee-payments.controller.ts`:
  *
- * | Pantalla | Endpoint                  | Permiso              |
- * |----------|---------------------------|----------------------|
- * | Lista    | `GET employee-payments`   | `CONTABILIDAD_VIEW`  |
+ * | Acción        | Endpoint                             | Permiso               |
+ * |---------------|--------------------------------------|-----------------------|
+ * | Lista         | `GET employee-payments`              | `CONTABILIDAD_VIEW`   |
+ * | Registrar     | `POST employee-payments` (multipart) | `CONTABILIDAD_MANAGE` |
+ * | Marcar pagado | `PATCH employee-payments/:id/pagado` | `CONTABILIDAD_MANAGE` |
  *
- * **Un solo endpoint, y sin parámetros**, igual que la web
- * (`app/(panels)/erp/finance/employee-payments/page.tsx` llama
- * `financeFetch("employee-payments")` a secas). El controlador acepta además
- * `from`, `to`, `userId` y `status`, pero la web no los usa: filtra en el
- * navegador sobre la lista completa. Aquí se hace lo mismo en
- * `PagosRules`, por dos motivos:
+ * La lista va **sin parámetros**, igual que la web: filtra en el navegador sobre la lista completa.
+ * Aquí se hace lo mismo en `PagosRules`, porque si el teléfono acotara el periodo y la web no, la misma
+ * persona vería dos totales distintos del mismo mes. Sin `limit`, el servicio devuelve el arreglo
+ * entero (no el sobre paginado).
  *
- * 1. **Alcance.** `userId` deja consultar a una persona concreta. El servidor
- *    ya decide a quién puede ver cada quien (`canViewAll`: con
- *    `CONTABILIDAD_MANAGE` o super admin ve toda la empresa; sin él, solo su
- *    propio departamento). Mandar filtros que la web no manda sería ampliar por
- *    la puerta de atrás lo que se consulta de la nómina ajena.
- * 2. **Una sola verdad.** Si el teléfono acotara el periodo y la web no, la
- *    misma persona vería dos totales distintos del mismo mes y ninguno de los
- *    dos estaría mal. En nómina eso termina en una junta.
- *
- * Sin `limit`, el servicio devuelve el arreglo entero (no el sobre paginado):
- * `findAll` solo pagina cuando `query.limit` viene, y la web nunca lo manda.
+ * Solo dirección abre este módulo (`CoreMenu`). Quien manda de verdad es el servidor.
  *
  * Reglas de los DTO, iguales que en el resto del árbol: **todo anulable con
  * valor por omisión**, para que un campo que el servidor deje de mandar no
@@ -45,6 +42,27 @@ interface EmployeePaymentsApi {
      */
     @GET("employee-payments")
     suspend fun lista(): List<PagoEmpleadoDto>
+
+    /**
+     * Registra un pago. [status] se manda siempre: sin él, el servidor lo da por `Pagado` y levanta
+     * la póliza en ese mismo momento. Los comprobantes van en el campo `files`.
+     */
+    @Multipart
+    @POST("employee-payments")
+    suspend fun registrar(
+        @Part("userId") userId: RequestBody,
+        @Part("amount") amount: RequestBody,
+        @Part("concepto") concepto: RequestBody,
+        @Part("periodFrom") periodFrom: RequestBody,
+        @Part("periodTo") periodTo: RequestBody,
+        @Part("status") status: RequestBody,
+        @Part("note") note: RequestBody?,
+        @Part files: MultipartBody.Part?,
+    ): PagoEmpleadoDto
+
+    /** Sin cuerpo: el controlador no lee ninguno. Levanta la póliza contable. */
+    @PATCH("employee-payments/{id}/pagado")
+    suspend fun marcarPagado(@Path("id") id: Long): PagoEmpleadoDto
 }
 
 /** El empleado del pago, o quien lo capturó. Es un `User` de Prisma recortado. */

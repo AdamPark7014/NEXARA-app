@@ -719,7 +719,9 @@ extension DemoStore {
                 "disponible": false, "conductor": dj(["id": 102, "nombre": DemoData.person(102).nombre]),
                 "odometroUltimo": 88240, "combustibleUltimoPct": 25, "tieneRastreador": true]),
         ]
-        var json = dj(["solicitudes": solicitudes, "disponibles": disponibles])
+        // Las unidades dadas de alta en esta sesión ya salen entre las libres.
+        let conNuevas: [DemoJSON] = disponibles + porRolUnidadesNuevas()
+        var json = dj(["solicitudes": solicitudes, "disponibles": conNuevas])
         // El demo de dirección no trae vehículo: así se ve la flotilla como la ve el CEO.
         if vehicleAssigned && !DemoMode.inicioDireccion {
             json["activa"] = dj([
@@ -913,23 +915,26 @@ extension DemoStore {
     }
 
     func fxAuthProfile() -> DemoJSON {
-        dj([
+        let rol = DemoMode.rol
+        return dj([
             "id": DemoMode.meId,
             "nombre": DemoData.me.nombre,
             "email": DemoData.me.email,
-            "role": DemoData.me.puesto,
-            "roleKey": "ceo",
-            "orgRoleKey": "ceo",
+            "role": rol?.puesto ?? DemoData.me.puesto,
+            "roleKey": rol?.roleKey ?? "ceo",
+            "orgRoleKey": rol?.roleKey ?? "ceo",
             "department": DemoData.me.departamento,
-            "permissions": DemoData.permissions,
-            "isSuperAdmin": true,
+            "permissions": rol?.permisos ?? DemoData.permissions,
+            "isSuperAdmin": rol == nil,
         ])
     }
 
     func fxNavigation() -> DemoJSON {
-        dj([
-            "roleKey": "ceo",
-            "orgRoleKey": "ceo",
+        // La sesión copia de aquí su `roleKey`: tiene que decir lo mismo que `NEXARA_DEMO_ROL`.
+        let clave = DemoMode.rol?.roleKey ?? "ceo"
+        return dj([
+            "roleKey": clave,
+            "orgRoleKey": clave,
             "panels": ["erp"],
             "moduleKeys": DemoData.navModules,
             "webModuleIds": [String](),

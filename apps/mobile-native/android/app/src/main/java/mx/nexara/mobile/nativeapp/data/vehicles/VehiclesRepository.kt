@@ -3,13 +3,16 @@ package mx.nexara.mobile.nativeapp.data.vehicles
 import android.content.Context
 import android.util.Base64
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.api.AltaUnidadBody
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
+import mx.nexara.mobile.nativeapp.data.api.DecidirSolicitudBody
 import mx.nexara.mobile.nativeapp.data.api.FichaDireccionDto
 import mx.nexara.mobile.nativeapp.data.api.FichaVehiculoDto
 import mx.nexara.mobile.nativeapp.data.api.FlotillaListaDto
 import mx.nexara.mobile.nativeapp.data.api.FlotillaMesDto
 import mx.nexara.mobile.nativeapp.data.api.MisVehiculosDto
 import mx.nexara.mobile.nativeapp.data.api.SolicitarVehiculoBody
+import mx.nexara.mobile.nativeapp.data.api.SolicitudVehiculoDto
 import mx.nexara.mobile.nativeapp.data.api.TableroLeidoDto
 import mx.nexara.mobile.nativeapp.data.api.TicketLeidoDto
 import mx.nexara.mobile.nativeapp.data.api.VehiclesApi
@@ -47,7 +50,35 @@ class VehiclesRepository(context: Context) {
     private val textMedia = "text/plain".toMediaType()
     private val jpegMedia = "image/jpeg".toMediaType()
 
+    /** Sin cola: aprobar y dar de alta dependen de cómo estén las cosas en ese momento. */
+    private val apiSinCola: VehiclesApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+        withOffline = false,
+    ).create(VehiclesApi::class.java)
+
     suspend fun misVehiculos(): MisVehiculosDto = api.misVehiculos()
+
+    suspend fun solicitudes(): List<SolicitudVehiculoDto> = api.solicitudes()
+
+    suspend fun decidirSolicitud(id: Long, aprobar: Boolean, nota: String?): SolicitudVehiculoDto =
+        apiSinCola.decidirSolicitud(
+            id,
+            DecidirSolicitudBody(
+                action = if (aprobar) "approve" else "reject",
+                note = nota?.trim()?.takeIf { it.isNotEmpty() },
+            ),
+        )
+
+    suspend fun altaUnidad(nombre: String, placas: String, notas: String) {
+        apiSinCola.altaUnidad(
+            AltaUnidadBody(
+                nombre = nombre.trim(),
+                placas = placas.trim().takeIf { it.isNotEmpty() },
+                notas = notas.trim().takeIf { it.isNotEmpty() },
+            ),
+        ).close()
+    }
 
     suspend fun solicitar(
         actividadId: Long,
