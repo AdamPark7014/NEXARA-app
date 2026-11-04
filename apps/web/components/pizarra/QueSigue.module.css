@@ -1,0 +1,105 @@
+/* «¿Qué sigue?» y Mis pendientes. Solo tokens --ui-*: claro y oscuro salen de ellos. */
+
+.dos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.bloque {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.titulo {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.lista {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2) var(--ui-s3);
+  padding: var(--ui-s2) 0;
+  border-top: 1px solid var(--ui-border);
+}
+
+.fila:first-child {
+  border-top: 0;
+}
+
+.texto {
+  display: grid;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.texto strong {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.texto small {
+  color: var(--ui-fg-2);
+  font-size: 12.5px;
+}
+
+.abrir {
+  color: var(--ui-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.nota {
+  margin: 0;
+  color: var(--ui-fg-2);
+  font-size: 13px;
+}
+
+.agregar {
+  display: flex;
+  gap: var(--ui-s2);
+  align-items: center;
+  min-width: 0;
+}
+
+.agregar > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.palomita {
+  display: flex;
+  flex: 1 1 200px;
+  gap: var(--ui-s2);
+  align-items: flex-start;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.palomita input {
+  flex: none;
+  margin-top: 3px;
+}
+
+.palomita span {
+  overflow-wrap: anywhere;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s1);
+}

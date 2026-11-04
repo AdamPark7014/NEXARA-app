@@ -67,6 +67,8 @@ import {
   type MyActivityItem,
 } from "@/lib/my-activities-api";
 import c from "./comun.module.css";
+import QueSigue from "./QueSigue";
+import { QUE_SIGUE_VISIBLE } from "@/lib/que-sigue-api";
 import m from "./MisActividadesView.module.css";
 
 const MIN_REASON = 10;
@@ -114,6 +116,10 @@ export default function MisActividadesPage() {
   const [moveError, setMoveError] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const [muestra, setMuestra] = useState(false);
+  useEffect(() => {
+    setMuestra(new URLSearchParams(window.location.search).has("muestra"));
+  }, []);
 
   const isCeo = isCeoEmail(user?.email);
   const myId = user?.id;
@@ -150,6 +156,8 @@ export default function MisActividadesPage() {
   const atrasadas = open.filter((a) => a.semaforo === "rojo").length;
   const porVencer = open.filter((a) => a.semaforo === "amarillo").length;
   const enTiempo = open.length - atrasadas - porVencer;
+  // Solo cuando no trae nada corriendo: con el reloj andando, estorba.
+  const verQueSigue = (QUE_SIGUE_VISIBLE || muestra) && data != null && !open.some((a) => a.enCurso);
 
   const askMove = (from: number, to: number) => {
     const item = open[from];
@@ -299,6 +307,8 @@ export default function MisActividadesPage() {
       ) : !loading && open.length > 1 && !data?.canReorder ? (
         <p className={c.pista}>El orden sale de la prioridad y la fecha. Si algo no cuadra, avísale a tu encargado.</p>
       ) : null}
+
+      {verQueSigue && token ? <QueSigue token={token} onCambio={() => void load()} /> : null}
 
       {loading && !data ? (
         <Card>

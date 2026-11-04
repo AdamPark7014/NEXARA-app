@@ -1137,17 +1137,15 @@ export class MyActivitiesService {
    * No pasa por ACTIVITIES_MANAGE porque responsable y creador se fuerzan al viewer.
    * Dirección general no usa esta cola.
    */
-  async selfCreate(viewer: MyActivitiesViewer, companyId: number | null, dto: CreateActivityDto) {
+  async selfCreate(viewer: MyActivitiesViewer, companyId: number | null, dto: CreateActivityDto, opciones: { tiempoFijoMin?: number } = {}) {
     this.assertNotCeo(viewer);
-    return this.activities.create(
-      {
-        ...dto,
-        responsableId: viewer.id,
-        creadoPorId: viewer.id,
-        assignmentCharge: 'ejecucion',
-      } as CreateActivityDto,
-      companyId,
-    );
+    const propia = {
+      ...dto,
+      responsableId: viewer.id,
+      creadoPorId: viewer.id,
+      assignmentCharge: 'ejecucion',
+    } as CreateActivityDto;
+    return opciones.tiempoFijoMin ? this.activities.create(propia, companyId, opciones) : this.activities.create(propia, companyId);
   }
 
   private assertNotCeo(viewer: MyActivitiesViewer): void {

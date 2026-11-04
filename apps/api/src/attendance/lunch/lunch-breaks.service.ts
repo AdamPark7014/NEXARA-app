@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, ForbiddenException, NotFoundException 
 import type { LunchBreak } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
-import { CreateLunchBreakDto, RevisarComidaDto, UpdateLunchBreakDto } from './dto/lunch-break.dto.js';
+import { CreateLunchBreakDto, RevisarComidaDto, UpdateLunchBreakDto, type FotoDeComida } from './dto/lunch-break.dto.js';
 import { companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import { parseWorkDate, workDateColumn, workDayAtClock } from '../../common/time/workday.js';
 import { NON_EMPLOYEE_EMAILS } from '../../common/platform-accounts.js';
@@ -109,7 +109,20 @@ export class LunchBreaksService {
     return workDayAtClock(ref, Math.floor(minutoDia / 60), minutoDia % 60);
   }
 
+  /**
+   * Adam, 04-11: todos toman foto de su escritorio, y quien no está en oficina se toma la foto personal
+   * diciendo por qué. No cuenta en KPI ni en nómina: lo ve quien revisa comidas.
+   */
+  private fotoDeComida(data: { fotoTipo?: FotoDeComida; motivoFuera?: string }) {
+    const motivo = String(data.motivoFuera ?? '').trim();
+    if (data.fotoTipo === 'personal' && motivo.length < 3) {
+      throw new BadRequestException('Escribe por qué no estás en oficina');
+    }
+    return { tipo: data.fotoTipo ?? null, motivo: data.fotoTipo === 'personal' ? motivo : null };
+  }
+
   async createCheckin(usuarioId: number, data: CreateLunchBreakDto, companyId?: number | null) {
+    const foto = this.fotoDeComida(data);
     const tenantId = requireCompanyId(companyId);
     const now = new Date();
     const today = this.dayColumn(now);
@@ -165,6 +178,8 @@ export class LunchBreaksService {
           checkinPhotoUrl: data.checkinPhotoUrl,
           isCheckinLate: isLate,
           checkinJustificacion: isLate ? justificacion : null,
+          checkinFotoTipo: foto.tipo,
+          checkinMotivoFuera: foto.motivo,
           ...revision,
           notes,
           status: 'IN_PROGRESS',
@@ -182,6 +197,8 @@ export class LunchBreaksService {
           checkinPhotoUrl: data.checkinPhotoUrl,
           isCheckinLate: isLate,
           checkinJustificacion: isLate ? justificacion : null,
+          checkinFotoTipo: foto.tipo,
+          checkinMotivoFuera: foto.motivo,
           ...revision,
           notes,
           status: 'IN_PROGRESS',
@@ -212,6 +229,7 @@ export class LunchBreaksService {
   }
 
   async createCheckout(usuarioId: number, data: UpdateLunchBreakDto, companyId?: number | null) {
+    const foto = this.fotoDeComida(data);
     const tenantId = requireCompanyId(companyId);
     const now = new Date();
     const today = this.dayColumn(now);
@@ -262,6 +280,8 @@ export class LunchBreaksService {
         checkoutPhotoUrl: data.checkoutPhotoUrl,
         isCheckoutLate: isLate,
         checkoutJustificacion: isLate ? justificacion : null,
+        checkoutFotoTipo: foto.tipo,
+        checkoutMotivoFuera: foto.motivo,
         // Regreso tarde: vuelve a pendiente aunque la salida ya se hubiera aprobado.
         ...(isLate ? { revisionEstado: 'PENDIENTE', revisionNotas: null, revisadoPorId: null, revisadoAt: null } : {}),
         notes,
@@ -487,6 +507,10 @@ export class LunchBreaksService {
       isCheckoutLate: r.isCheckoutLate,
       checkinJustificacion: r.checkinJustificacion,
       checkoutJustificacion: r.checkoutJustificacion,
+      checkinFotoTipo: r.checkinFotoTipo,
+      checkoutFotoTipo: r.checkoutFotoTipo,
+      checkinMotivoFuera: r.checkinMotivoFuera,
+      checkoutMotivoFuera: r.checkoutMotivoFuera,
       revisionEstado: r.revisionEstado,
       revisionNotas: r.revisionNotas,
       revisadoPor: r.revisadoPorId != null ? (nombre.get(r.revisadoPorId) ?? null) : null,

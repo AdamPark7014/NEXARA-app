@@ -4,8 +4,18 @@ import { dentroDeVentanaPropia, mensajeSalidaDeshecha, VENTANA_DESHACER_MS } fro
 import { ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 import { checkUrlAccess } from '../common/rbac/url-matrix.js';
 
-const AHORA = new Date();
+// Reloj fijo a media tarde en México: de medianoche a las 2 a.m., `hace(120)` caía en otro día y fallaba.
+const AHORA = new Date('2026-11-03T20:00:00.000Z');
 const hace = (min: number) => new Date(AHORA.getTime() - min * 60_000);
+beforeAll(() => {
+  jest.useFakeTimers({
+    now: AHORA,
+    doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance'],
+  });
+});
+afterAll(() => {
+  jest.useRealTimers();
+});
 const ANA = 3;
 const EMPRESA = 7;
 

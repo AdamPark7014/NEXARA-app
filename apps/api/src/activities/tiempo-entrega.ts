@@ -407,6 +407,8 @@ export function completarTiempos(
     personaTipo?: PersonaTipo | null;
     /** La jornada de quien la ejecuta; sin ella, la de la oficina. */
     jornada?: JornadaEntrega | null;
+    /** Autoasignación que sale de una lista con su tiempo ya dicho. */
+    tiempoFijoMin?: number;
   },
 ): { cambios: TiempoCompletado; error?: string } {
   const auto = esAutoasignacion(dto);
@@ -429,6 +431,18 @@ export function completarTiempos(
     const iso = entregaCalculada(inicio, minutos, ctx.jornada ?? JORNADA_OFICINA).toISOString();
     return { fechaEntregaEsperada: iso, fechaMaxima: iso };
   };
+
+  if (auto && ctx.tiempoFijoMin) {
+    return {
+      cambios: {
+        tiempoEstimadoMin: ctx.tiempoFijoMin,
+        tiempoEstandarMin: ctx.tiempoFijoMin,
+        estandarDesglose: [{ concepto: 'Tiempo de la lista de sugerencias', minutos: ctx.tiempoFijoMin }],
+        estandarCambiadoMotivo: null,
+        ...entrega(ctx.tiempoFijoMin),
+      },
+    };
+  }
 
   if (auto) {
     return {

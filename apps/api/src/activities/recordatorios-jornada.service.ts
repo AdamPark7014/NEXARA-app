@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -8,6 +9,7 @@ import { isNonEmployeeEmail } from '../common/platform-accounts.js';
 import { workDateColumn, workDateKey, workDayStart } from '../common/time/workday.js';
 import { ACTIVITY_STATUS, statusVariants } from './activity-status.js';
 import { limiteDeEntrega } from './semaforo-actividad.js';
+import { QUE_SIGUE_EN_AVISOS } from '../me/que-sigue.js';
 import {
   avisoPorVencer,
   avisoSinActividad,
@@ -41,7 +43,21 @@ export class RecordatoriosJornadaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
+
+  /** La sugerencia de «¿Qué sigue?» para este aviso. Si no hay o algo falla, dice lo de siempre. */
+  private async textoSinActividad(userId: number, companyId: number, abiertas: number, enviadosHoy: number) {
+    const base = { ...avisoSinActividad(abiertas), relatedUrl: '/erp/pizarra?vista=mias' };
+    if (!QUE_SIGUE_EN_AVISOS) return base;
+    try {
+      const queSigue = this.moduleRef?.get<{ paraAviso(u: number, c: number, n: number): Promise<typeof base | null> }>('QUE_SIGUE_AVISOS', { strict: false });
+      return (await queSigue?.paraAviso(userId, companyId, enviadosHoy)) ?? base;
+    } catch (error) {
+      this.logger.warn(`aviso sin sugerencia: ${(error as Error).message}`);
+      return base;
+    }
+  }
 
   @Cron('*/5 * * * *', { name: 'recordatorios-jornada' })
   async correr() {
@@ -153,7 +169,7 @@ export class RecordatoriosJornadaService {
       }
       const desde = sinRelojDesde.get(userId) ?? inicioDelDia;
       if (!tocaAvisoSinActividad({ desde, enviadosHoy: avisadosHoy.get(userId) ?? [], ahora })) continue;
-      const { title, message } = avisoSinActividad(abiertasDe.get(userId) ?? 0);
+      const { title, message, relatedUrl } = await this.textoSinActividad(userId, companyId, abiertasDe.get(userId) ?? 0, avisadosHoy.get(userId)?.length ?? 0);
       const ok = await this.notifications.createNotification({
         userId,
         type: 'SLA_ALERT',
@@ -163,7 +179,7 @@ export class RecordatoriosJornadaService {
         icon: 'atraso',
         relatedEntityId: userId,
         entityType: 'User',
-        relatedUrl: '/erp/pizarra?vista=mias',
+        relatedUrl,
         priority: 'high',
         channel: 'ops',
         // La tarjeta del teléfono se reemplaza, no se apila; uno por corrida del cron (en iOS con `reemplazar`).

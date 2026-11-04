@@ -31,9 +31,11 @@ import {
   SkeletonRows,
   Textarea,
   type Tone,
+  Input,
 } from "@/components/base";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { resolveAssetUrl } from "@/lib/evidence-display";
+import { MIN_MOTIVO_FUERA, MOTIVOS_FUERA, QUE_SIGUE_VISIBLE } from "@/lib/que-sigue-api";
 import { horaCorta, minutosCortos } from "./formato";
 import s from "./comidas.module.css";
 
@@ -50,6 +52,8 @@ type Registro = {
   isCheckoutLate: boolean;
   checkinJustificacion: string | null;
   checkoutJustificacion: string | null;
+  checkinMotivoFuera?: string | null;
+  checkoutMotivoFuera?: string | null;
   /** null = a tiempo · PENDIENTE | APROBADA | RECHAZADA cuando fue a destiempo. */
   revisionEstado: "PENDIENTE" | "APROBADA" | "RECHAZADA" | null;
   revisionNotas: string | null;
@@ -174,7 +178,11 @@ function RegistroModal({
 }) {
   const { token } = useUser();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [facing, setFacing] = useState<"user" | "environment">("user");
+  // Todos toman foto de su escritorio; quien no está en oficina, una personal diciendo por qué (Adam, 04-11).
+  const [conEscritorio] = useState(() => QUE_SIGUE_VISIBLE || new URLSearchParams(window.location.search).has("muestra"));
+  const [enOficina, setEnOficina] = useState(true);
+  const [motivoFuera, setMotivoFuera] = useState("");
+  const [facing, setFacing] = useState<"user" | "environment">(conEscritorio ? "environment" : "user");
   const [lista, setLista] = useState(false);
   const [foto, setFoto] = useState<string | null>(null);
   const [pideMotivo, setPideMotivo] = useState(aDestiempo);
@@ -233,6 +241,12 @@ function RegistroModal({
       setError("Escribe por qué (al menos 5 letras): tu jefe lo revisará.");
       return;
     }
+    const fuera = motivoFuera.trim();
+    if (conEscritorio && !enOficina && fuera.length < MIN_MOTIVO_FUERA) {
+      setError("Di por qué no estás en oficina.");
+      return;
+    }
+    const deLaFoto = conEscritorio ? { fotoTipo: enOficina ? "escritorio" : "personal", motivoFuera: enOficina ? undefined : fuera } : {};
     setEnviando(true);
     setError(null);
     try {
@@ -240,12 +254,12 @@ function RegistroModal({
       if (momento === "salida") {
         await erpFetch("lunch-breaks/checkin", token, {
           method: "POST",
-          body: JSON.stringify({ checkinTime: ahora, checkinPhotoUrl: foto, justificacion: texto || undefined }),
+          body: JSON.stringify({ checkinTime: ahora, checkinPhotoUrl: foto, justificacion: texto || undefined, ...deLaFoto }),
         });
       } else {
         await erpFetch("lunch-breaks/checkout", token, {
           method: "PUT",
-          body: JSON.stringify({ checkoutTime: ahora, checkoutPhotoUrl: foto, justificacion: texto || undefined }),
+          body: JSON.stringify({ checkoutTime: ahora, checkoutPhotoUrl: foto, justificacion: texto || undefined, ...deLaFoto }),
         });
       }
       onDone(avisoRegistro(momento, pideMotivo));
@@ -259,16 +273,33 @@ function RegistroModal({
     }
   };
 
-  const titulo = momento === "salida" ? "Foto de salida a comer" : "Foto de regreso de comer";
+  const deEscritorio = conEscritorio && enOficina;
+  const titulo = deEscritorio
+    ? momento === "salida"
+      ? "Foto de tu escritorio limpio"
+      : "Foto de tu escritorio en orden"
+    : momento === "salida"
+      ? "Foto de salida a comer"
+      : "Foto de regreso de comer";
+  const cambiarLugar = (oficina: boolean) => {
+    setEnOficina(oficina);
+    setFacing(oficina ? "environment" : "user");
+    setFoto(null);
+    setError(null);
+  };
   return (
     <Modal
       open
       onClose={() => !enviando && onClose()}
       title={titulo}
       description={
-        momento === "salida"
-          ? "Acomódate y toma la foto: se guarda con la hora en que sales."
-          : "Toma la foto al volver a tu lugar: se guarda con la hora en que regresas."
+        deEscritorio
+          ? momento === "salida"
+            ? "Déjalo en orden antes de salir: se guarda con la hora en que sales."
+            : "Al volver a tu lugar: se guarda con la hora en que regresas."
+          : momento === "salida"
+            ? "Acomódate y toma la foto: se guarda con la hora en que sales."
+            : "Toma la foto al volver a tu lugar: se guarda con la hora en que regresas."
       }
       maxWidth={520}
       footer={
@@ -313,6 +344,36 @@ function RegistroModal({
       }
     >
       <div className={s.cuerpo}>
+        {conEscritorio ? (
+          <div className={s.lugar}>
+            <div className={s.lugarBotones} role="group" aria-label="Dónde estás">
+              <Button size="sm" variant={enOficina ? "primary" : "secondary"} aria-pressed={enOficina} onClick={() => cambiarLugar(true)} disabled={enviando}>
+                Estoy en oficina
+              </Button>
+              <Button size="sm" variant={enOficina ? "secondary" : "primary"} aria-pressed={!enOficina} onClick={() => cambiarLugar(false)} disabled={enviando}>
+                No estoy en oficina
+              </Button>
+            </div>
+            {enOficina ? null : (
+              <div className={s.lugarMotivo}>
+                <div className={s.lugarBotones}>
+                  {MOTIVOS_FUERA.map((m) => (
+                    <Button key={m} size="sm" variant="ghost" aria-pressed={motivoFuera === m} onClick={() => setMotivoFuera(m)} disabled={enviando}>
+                      {m}
+                    </Button>
+                  ))}
+                </div>
+                <Input
+                  aria-label="Por qué no estás en oficina"
+                  placeholder="Por qué no estás en oficina"
+                  value={motivoFuera}
+                  maxLength={300}
+                  onChange={(e) => setMotivoFuera(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        ) : null}
         <div className={s.camara}>
           {foto ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -448,6 +509,12 @@ function RevisionModal({
               " · sigue en comida"
             )}
           </ConIcono>
+          {r.checkinMotivoFuera ? (
+            <ConIcono icon={<ChatBubbleOutlineIcon fontSize="inherit" aria-hidden="true" />}>Salió fuera de oficina: «{r.checkinMotivoFuera}»</ConIcono>
+          ) : null}
+          {r.checkoutMotivoFuera ? (
+            <ConIcono icon={<ChatBubbleOutlineIcon fontSize="inherit" aria-hidden="true" />}>Regresó fuera de oficina: «{r.checkoutMotivoFuera}»</ConIcono>
+          ) : null}
           {r.checkinJustificacion ? (
             <ConIcono icon={<ChatBubbleOutlineIcon fontSize="inherit" aria-hidden="true" />}>Salida: «{r.checkinJustificacion}»</ConIcono>
           ) : null}

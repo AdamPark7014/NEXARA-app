@@ -188,16 +188,19 @@ export class TiemposActividadService {
     return !(dto.tiempoEstandarMin && dto.tiempoEstimadoMin && (dto.fechaEntregaEsperada || dto.fechaMaxima || dto.periodoFin));
   }
 
-  /** El alta con tiempo y entrega siempre; en autoasignación, fijos desde el título. */
-  async completar<T extends DatosTiempo & { indicaciones?: string | null }>(dto: T, companyId: number): Promise<T> {
-    const leer = this.requiereLectura(dto);
+  /**
+   * El alta con tiempo y entrega siempre; en autoasignación, fijos desde el título. `tiempoFijoMin` lo pone
+   * el servidor para lo que sale de una lista («¿Qué sigue?»): no se lee el título ni se gasta IA.
+   */
+  async completar<T extends DatosTiempo & { indicaciones?: string | null }>(dto: T, companyId: number, opciones: { tiempoFijoMin?: number } = {}): Promise<T> {
+    const leer = !opciones.tiempoFijoMin && this.requiereLectura(dto);
     const conTipo = this.conTipoDelTitulo(dto);
     const lectura = leer ? await this.lectura(companyId, conTipo) : {};
     const tipicoMin = leer ? await this.tipicoMin(companyId, conTipo) : null;
     const historial = leer ? await this.historial(companyId, dto.titulo, dto.responsableId) : null;
     const personaTipo = leer ? await this.personaTipo(companyId, dto) : null;
     const jornada = await this.jornada(dto.responsableId);
-    const { cambios, error } = completarTiempos(dto, { lectura, tipicoMin, historial, personaTipo, jornada, ahora: new Date() });
+    const { cambios, error } = completarTiempos(dto, { tiempoFijoMin: opciones.tiempoFijoMin, lectura, tipicoMin, historial, personaTipo, jornada, ahora: new Date() });
     if (error) throw new BadRequestException(error);
     return { ...dto, ...cambios };
   }
