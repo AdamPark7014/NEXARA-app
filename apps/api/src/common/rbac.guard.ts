@@ -3,13 +3,15 @@ import { PERMISSIONS } from './permissions';
 import { ModuleRef, Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import {
+  ALMACEN_POR_CORREO_URL_RULES,
   ASISTENTE_IA_URL_RULES,
-  MESA_CONTABLE_POR_CORREO_URL_RULES,
+  HERRAMIENTAS_POR_CORREO_URL_RULES,
   checkUrlAccess,
   checkUrlRules,
 } from './rbac/url-matrix.js';
+import { canManageAlmacen } from '../warehouse/almacen-access.js';
+import { canManageTools } from '../tool-requests/tools-access.js';
 import { puedeAsignarConIa } from '../ai/asistente/quien-asigna.js';
-import { canUsarMesaContable } from '../accounting/mesa-contable/mesa-por-correo.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LEGACY_TO_V2, ROLES, type RoleKey } from './rbac/roles.v2.js';
 
@@ -80,9 +82,13 @@ export class RbacGuard extends AuthGuard('jwt') {
         const delAsistente = checkUrlRules(ASISTENTE_IA_URL_RULES, url, method);
         if (delAsistente.allowed && (await this.tieneGenteACargo(user))) result = delAsistente;
       }
-      // Mesa contable concedida por persona (Contadora General): sin cambiarle el rol.
-      if (!result.allowed && canUsarMesaContable(user.email)) {
-        result = checkUrlRules(MESA_CONTABLE_POR_CORREO_URL_RULES, url, method);
+      // Almacén y herramientas concedidos por persona (Iván), sin cambiarle el rol. `UrlAccessGuard` ya
+      // lo dejaba pasar, pero las rutas que escriben también pasan por aquí y le contestaban 403.
+      if (!result.allowed && canManageAlmacen(user.email)) {
+        result = checkUrlRules(ALMACEN_POR_CORREO_URL_RULES, url, method);
+      }
+      if (!result.allowed && canManageTools(user.email)) {
+        result = checkUrlRules(HERRAMIENTAS_POR_CORREO_URL_RULES, url, method);
       }
       if (!result.allowed) {
         this.logger.warn(`[v2 DENY] role=${v2Role} ${method} ${url}`);
