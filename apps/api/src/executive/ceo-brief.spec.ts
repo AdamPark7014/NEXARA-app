@@ -92,6 +92,14 @@ describe('armarResumenCeo', () => {
     expect(JSON.stringify(r.items)).not.toMatch(/sin marcar|borrador/i);
   });
 
+  it('con evidencias suyas lleva directo a aprobarlas en lote; si solo son de otros, al tablero', () => {
+    const suyas = armarResumenCeo(con({ evidencias: { tuyas: 3, deOtros: [] } }), FECHA);
+    expect(suyas.items[0]).toMatchObject({ clave: 'operacion', url: '/erp/pizarra?vista=revision', accion: 'Aprobar en lote' });
+    const deOtros = armarResumenCeo(con({ evidencias: { tuyas: 0, deOtros: [{ jefe: 'David Morales', n: 8 }] } }), FECHA);
+    expect(deOtros.items[0]).toMatchObject({ clave: 'operacion', url: '/erp/pizarra' });
+    expect(deOtros.items[0].accion).toBeUndefined();
+  });
+
   it('evidencias: dice cuántas son suyas y de quién son las demás', () => {
     const r = armarResumenCeo(
       con({
