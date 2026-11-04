@@ -436,6 +436,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── ENC. SOPORTE — coordina soporte; mismas páginas base que soporte ──
   [ROLES.ENC_SOPORTE]: [
+    ...COTIZACIONES_CORE_PATHS,
     ...COSTOS_CORE_PATHS,
     ...CORE_RECURSOS_PATHS,
     ...VIDEOVIGILANCIA_CORE_PATHS,
