@@ -1,5 +1,23 @@
 # RELEVO
 
+- **03-11 (claude-code) — El tráfico del sitio se queda en la empresa del sitio y su resumen ya no sale vacío (`6dcb63e1`). En producción. Adam: «Sí, arréglalo». Sin migración. Sigue sin haber pantalla que lo enseñe.**
+  - **Qué pasaba:** `recordPublicLandingEvent` pedía `companyId: null`, pero el `create` corría con el filtro de la petición y caía en la empresa de esa petición. El resumen buscaba `companyId IS NULL`, así que siempre salía vacío. Y una cabecera `X-Company-Id` sin sesión podía meter filas en otra empresa.
+  - **Arreglo:**
+    - El evento usa `resolvePublicCompanyId` y pone la empresa en el `create`: el filtro la respeta, venga la cabecera que venga.
+    - `getPublicLandingSummary(companyId, days)` lee solo la empresa de la sesión y exige una (`requireCompanyId`). Sigue con `RbacGuard` y `bi.view`.
+    - El comentario de `KpiSnapshot.companyId` no cuadraba: el nulo es del `hourly_summary` del cron, no del tráfico. Se corrigió; no cambia la base.
+  - **Por qué no «sin empresa», como decía el código:** con esa lectura, cualquier persona con `bi.view` de cualquier empresa veía esas filas. Medido antes del arreglo con una fila sin empresa. Dejar las filas en su empresa no amplía nada: quien tiene BI en ella ya podía leerlas con `GET analytics/kpi`.
+  - **Filas viejas:** no hay que migrar nada; ya estaban todas en la empresa principal, y ninguna sin empresa ni en la otra.
+  - **Verificado:**
+    - `trafico-publico.spec.ts`: 4 fallaban sin el arreglo, por la razón esperada, y las 7 pasan. API 5,593 y tipos en verde. Ninguna prueba existente se cambió.
+    - `AppModule` real, HTTP real y Postgres desechable con dos empresas y personas con BI en cada una, también con `PUBLIC_COMPANY_ID`. Con cabecera ajena, el evento queda en la empresa del sitio. BI de cada empresa ve solo lo suyo; la fila sin empresa ya no le sale a nadie. Sin sesión 401, sin permiso 403, y pedir otra empresa sin ser miembro 403. Fuera del evento y el resumen, nada cambió.
+    - Con el código desplegado, sobre datos reales y con el `create` interceptado: un evento con la empresa 2 en la petición lleva la empresa 1; el resumen de la principal trae sus páginas y el de la otra sale vacío. En producción, `summary` sin sesión da 401, con cabecera también, y el sitio responde 200.
+  - **Sin verificar:** en producción no se mandó un evento real con cabecera ajena, para no dejar una fila de prueba en el tráfico. Tampoco se abrió el resumen con la sesión de una persona real; eso quedó medido en la base desechable.
+  - **Falta, si Adam lo quiere:** ninguna pantalla llama a `public-analytics/summary`. Los datos ya están bien, pero nadie los ve todavía. Es diseño nuevo: va con muestra antes.
+  - **Trampas:**
+    - `git fetch origin main | tail -1` se quedó colgado más de dos minutos, sin candado a la vista. Con `timeout 90 git fetch origin main`, sin tubería, salió enseguida.
+    - Una prueba de `create` donde la empresa de la petición es la misma del sitio pasa también con el código viejo. La que distingue es la de la cabecera ajena.
+
 - **03-11 (claude-code) — La vigencia ya incluye todo su último día en México (`bc82a003`). En producción. Adam: «Sí, corrígelo». Sin migración.**
   - **Qué pasaba:** `validUntil` es un día guardado a medianoche UTC y se comparaba como instante. Con vigencia al 18, el cliente ya no podía firmar desde el 17 a las 18:00, y la tarea de las 6 am la marcaba vencida la mañana del 18, mientras la página y el PDF decían 18.
   - **Qué se hizo:**
