@@ -134,3 +134,9 @@ NEXARA-usuarios-*.xlsx
 *credenciales*.xlsx
 *credenciales*.json
 personal.json
+
+# Temporales de sesión: nunca al repo (07-11)
+/tmp-*
+/.tmp-*
+/compile-out.txt
+.ai/tmp-*

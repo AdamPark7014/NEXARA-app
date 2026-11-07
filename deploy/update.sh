@@ -18,6 +18,7 @@ FORCE_ALL=false
 RUN_MIGRATE=false
 RUN_PRUNE=false
 SKIP_PULL=false
+SKIP_CI=false
 STOP_LEGACY=true
 AUTO_PRUNE_ON_HIGH_DISK=true
 HIGH_DISK_THRESHOLD=85
@@ -31,11 +32,12 @@ for arg in "$@"; do
     --with-migrate) RUN_MIGRATE=true ;;
     --with-prune) RUN_PRUNE=true ;;
     --no-pull) SKIP_PULL=true ;;
+    --skip-ci) SKIP_CI=true ;;
     --no-stop-legacy) STOP_LEGACY=false ;;
     --no-auto-prune) AUTO_PRUNE_ON_HIGH_DISK=false ;;
     *)
       echo "Unknown option: $arg"
-      echo "Usage: ./deploy/update.sh [--force-all] [--with-migrate] [--with-prune] [--no-pull] [--no-stop-legacy] [--no-auto-prune]"
+      echo "Usage: ./deploy/update.sh [--force-all] [--with-migrate] [--with-prune] [--no-pull] [--skip-ci] [--no-stop-legacy] [--no-auto-prune]"
       exit 1
       ;;
   esac
@@ -79,6 +81,27 @@ fi
 NEW_REV=""
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   NEW_REV="$(git rev-parse HEAD)"
+fi
+
+# El CI manda (07-11-2026): si el workflow CI de este commit falló, no se construye. Si sigue
+# corriendo o no hay corrida (commit [skip ci], sin red), avisa y sigue. Emergencia: --skip-ci.
+if [[ "$SKIP_CI" == false && -n "$NEW_REV" ]] && command -v python3 >/dev/null 2>&1; then
+  CI_ESTADO="$(curl -fsS -m 15 "https://api.github.com/repos/AdamPark7014/NEXARA-app/actions/runs?head_sha=${NEW_REV}&per_page=20" 2>/dev/null \
+    | python3 -c 'import json,sys
+try:
+    runs=[r for r in json.load(sys.stdin).get("workflow_runs",[]) if r.get("path","").endswith("/ci.yml")]
+except Exception:
+    runs=[]
+if not runs: print("sin-corrida")
+else:
+    r=runs[0]; print(r.get("conclusion") or r.get("status") or "desconocido")' || echo sin-red)"
+  case "$CI_ESTADO" in
+    failure|timed_out|startup_failure)
+      echo "El CI de ${NEW_REV:0:8} terminó en «${CI_ESTADO}»: no se despliega. Arréglalo o usa --skip-ci." >&2
+      exit 1 ;;
+    success) echo "CI de ${NEW_REV:0:8}: en verde." ;;
+    *) echo "Aviso: CI de ${NEW_REV:0:8} en «${CI_ESTADO}»; se sigue sin esperarlo." ;;
+  esac
 fi
 
 build_api=false

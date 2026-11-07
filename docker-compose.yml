@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: nexara_user
-      POSTGRES_PASSWORD: bb3030adpozoont
+      POSTGRES_PASSWORD: ${DEV_DB_PASSWORD:-nexara_dev}
       POSTGRES_DB: nexara_db
     ports:
       - "5432:5432"
@@ -46,9 +46,9 @@ services:
       - "4000:3001"
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://nexara_user:bb3030adpozoont@db:5432/nexara_db?schema=public
+      DATABASE_URL: postgresql://nexara_user:${DEV_DB_PASSWORD:-nexara_dev}@db:5432/nexara_db?schema=public
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: dev-secret-key-change-in-production
+      JWT_SECRET: ${DEV_JWT_SECRET:-solo-desarrollo-local}
       OFFICES_HIK_HOST: ${OFFICES_HIK_HOST:-}
       OFFICES_HIK_APP_KEY: ${OFFICES_HIK_APP_KEY:-}
       OFFICES_HIK_APP_SECRET: ${OFFICES_HIK_APP_SECRET:-}

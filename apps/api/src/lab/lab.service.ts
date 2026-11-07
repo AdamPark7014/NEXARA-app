@@ -105,11 +105,13 @@ export class LabService {
     isMock?: boolean;
   }> {
     const t0 = Date.now();
-    const isAnthropic = input.model.startsWith('claude');
-    const provider = isAnthropic ? 'anthropic' : 'openai';
+    // Solo Claude por la puerta (regla de la empresa, 07-11): un modelo que no es Claude se
+    // atiende con el de omisión de la puerta en vez de salir a otro proveedor.
+    if (!input.model.startsWith('claude')) input = { ...input, model: 'claude-haiku-5-5' };
+    const provider = 'anthropic';
     // Claude va por el mismo cliente que el resto de NEXARA: la puerta de IA (CLAUDE_BASE_URL)
     // con el token del proyecto (ANTHROPIC_API_KEY); solo los modelos que la puerta permite.
-    const configurado = isAnthropic ? this.claude.disponible() : Boolean(process.env.OPENAI_API_KEY);
+    const configurado = this.claude.disponible();
     const liveEnabled = await this.isEnabled('lab.ai.live');
 
     if (!configurado || !liveEnabled) {
@@ -118,43 +120,20 @@ export class LabService {
         model: input.model,
         isMock: true,
         elapsedMs: Date.now() - t0,
-        output: `⚠️ Lab AI desconectado.\n\nPara habilitarlo:\n  1. Activa el feature flag 'lab.ai.live' en /lab/flags\n  2. Configura ${isAnthropic ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY'} en el .env del API\n  3. Reinicia el servicio\n\n--- Eco del prompt ---\n${input.prompt}`,
+        output: `⚠️ Lab AI desconectado.\n\nPara habilitarlo:\n  1. Activa el feature flag 'lab.ai.live' en /lab/flags\n  2. Configura ANTHROPIC_API_KEY y CLAUDE_BASE_URL (la puerta) en el .env del API\n  3. Reinicia el servicio\n\n--- Eco del prompt ---\n${input.prompt}`,
       };
     }
 
     try {
-      if (isAnthropic) {
-        const { texto } = await this.claude.texto({
-          proceso: 'lab',
-          companyId: 0,
-          sistema: input.systemPrompt ? [input.systemPrompt] : [],
-          usuario: input.prompt,
-          modelo: input.model,
-          maxTokens: 2048,
-        });
-        return { output: texto, model: input.model, provider, elapsedMs: Date.now() - t0 };
-      } else {
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-          body: JSON.stringify({
-            model: input.model,
-            messages: [
-              ...(input.systemPrompt ? [{ role: 'system', content: input.systemPrompt }] : []),
-              { role: 'user', content: input.prompt },
-            ],
-            max_tokens: 1024,
-          }),
-        });
-        if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`);
-        const data: any = await res.json();
-        return {
-          output: data.choices?.[0]?.message?.content ?? '(sin respuesta)',
-          model: input.model,
-          provider,
-          elapsedMs: Date.now() - t0,
-        };
-      }
+      const { texto } = await this.claude.texto({
+        proceso: 'lab',
+        companyId: 0,
+        sistema: input.systemPrompt ? [input.systemPrompt] : [],
+        usuario: input.prompt,
+        modelo: input.model,
+        maxTokens: 2048,
+      });
+      return { output: texto, model: input.model, provider, elapsedMs: Date.now() - t0 };
     } catch (err) {
       return {
         provider,
