@@ -28,6 +28,9 @@ export const ACTIVIDAD_PROPIA_PAGE_PATHS: PageRule[] = [
   '/erp/mis-actividades/**',
   '/erp/pizarra',
   '/erp/pizarra/**',
+  // Detalle de su propia actividad (07-11): «Mis actividades», la revisión y el chat enlazan
+  // aquí. Solo el número (`:id` es numérico); la API decide si es suya.
+  '/erp/actividades/:id',
 ];
 
 /** Core ola1 — Pizarra / Asistencias / Chat / Actividades (paths canónicos ERP). */
@@ -175,6 +178,9 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── DIR. OPERACIONES — visión global, aprobaciones operativas ────────
   [ROLES.DIR_OPERACIONES]: [
+    // 07-11: tablero de asistencias de su gente (espejo de url-matrix).
+    '/erp/asistencias',
+    '/erp/asistencias/**',
     ...COSTOS_CORE_PATHS,
     ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
@@ -247,6 +253,9 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── COORD ADMIN — segundo nivel administrativo ───────────────────────
   [ROLES.COORD_ADMIN]: [
+    // 07-11: tablero de asistencias de su gente (espejo de url-matrix).
+    '/erp/asistencias',
+    '/erp/asistencias/**',
     ...COSTOS_CORE_PATHS,
     ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
@@ -508,6 +517,8 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── VENDEDOR — su pipeline ──────────────────────────────────────────
   [ROLES.VENDEDOR]: [
     ...ACTIVIDAD_PROPIA_PAGE_PATHS,
+    // 07-11: cotiza (`ROLES_QUE_COTIZAN` y la API ya se lo daban; la web lo rebotaba).
+    ...COTIZACIONES_CORE_PATHS,
     ...CORE_RECURSOS_PATHS,
     '/crm/**',
     ...CLIENTES_CORE_PATHS,
@@ -559,6 +570,9 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── RH ───────────────────────────────────────────────────────────────
   [ROLES.RH]: [
+    // 07-11: tablero de asistencias de su gente (espejo de url-matrix).
+    '/erp/asistencias',
+    '/erp/asistencias/**',
     ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS,
     '/erp',
@@ -650,6 +664,7 @@ function compilePattern(path: string): RegExp {
     .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
     .replace(/\/\*\*/g, '(/.*)?')
     .replace(/\/\*/g, '/[^/]+')
+    .replace(/:id\b/g, '\\d+')
     .replace(/:[a-zA-Z_]+/g, '[^/]+');
   return new RegExp(`^${escaped}$`);
 }

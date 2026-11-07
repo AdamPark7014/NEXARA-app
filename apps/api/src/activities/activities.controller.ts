@@ -28,6 +28,7 @@ import { UpdateActivityDto } from './dto/update-activity.dto.js';
 import { GetActivitiesQueryDto } from './dto/get-activities-query.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { esGestorOperativo, puedeGestionarActividades } from './puede-gestionar.js';
+import { puedeVerDetalleActividad } from './detalle-actividad-propia.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
 import { COLUMNAS_ACTIVIDADES } from '../common/excel/reportes.js';
@@ -281,8 +282,16 @@ export class ActivitiesController {
   @Get(':id')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
-  findOne(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
-    return this.activitiesService.findOne(+id, companyId);
+  async findOne(
+    @Param('id') id: string,
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user?: any,
+  ) {
+    const actividad = await this.activitiesService.findOne(+id, companyId);
+    if (!puedeVerDetalleActividad(user, actividad as any)) {
+      throw new ForbiddenException('Esta actividad no es tuya ni estás en su equipo');
+    }
+    return actividad;
   }
 
   @Get(':id/report')

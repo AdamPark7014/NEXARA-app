@@ -68,7 +68,7 @@ describe("el menú de cada persona", () => {
 
   it("administración: Facturación sigue a la vista, porque no tiene Mesa contable", () => {
     expect(menu("administrativo", ORG_EMAILS.daniela)).toEqual({
-      Hoy: ["Actividades", "Asistencias", "Chat", "Reuniones"],
+      Hoy: ["Actividades", "Asistencias", "Chat", "Reuniones", "Aprobaciones jerárquicas"],
       Vender: ["Clientes", "Cotizaciones", "Diseños de cámaras"],
       Hacer: ["Proyectos", "Almacén"],
       "Cobrar y pagar": ["Facturación", "Viáticos", "Gastos"],
@@ -79,7 +79,7 @@ describe("el menú de cada persona", () => {
 
   it("encargados", () => {
     expect(menu("coord_operaciones", ORG_EMAILS.david)).toEqual({
-      Hoy: ["Actividades", "Asistencias", "Chat", "Reuniones"],
+      Hoy: ["Actividades", "Asistencias", "Chat", "Reuniones", "Aprobaciones jerárquicas"],
       Vender: ["Clientes", "Cotizaciones", "Diseños de cámaras"],
       Hacer: ["Proyectos", "Almacén", "Herramientas", "Vehículos"],
       Saber: ["Costos", "Desempeño"],
@@ -93,12 +93,14 @@ describe("el menú de cada persona", () => {
 
   it("dirección: Facturación y Bancos se abren desde Mesa contable", () => {
     expect(menu("ceo")).toEqual({
-      Hoy: ["Hoy", "Actividades", "Asistencias", "Chat", "Reuniones"],
+      Hoy: ["Hoy", "Actividades", "Asistencias", "Chat", "Reuniones", "Aprobaciones jerárquicas"],
       Vender: ["Clientes", "Cotizaciones", "Diseños de cámaras"],
       Hacer: ["Proyectos", "Almacén", "Herramientas", "Vehículos"],
       "Cobrar y pagar": ["Mesa contable", "Viáticos", "Gastos", "Nómina"],
+      Personas: ["Plantilla RRHH", "Multas e incidencias"],
       Saber: ["Costos", "Desempeño"],
       Empresa: ["Organigrama", "Mi perfil"],
+      Gobierno: ["Usuarios y roles"],
     });
   });
 });

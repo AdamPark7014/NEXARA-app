@@ -393,6 +393,9 @@ export const ACTIVIDAD_PROPIA_URL_RULES: UrlRule[] = [
   { path: '/api/activities', methods: ['POST'], scope: 'write' },
   ...FORMATOS_ACTIVIDAD_URL_RULES,
   { path: '/api/activities/next-an', methods: ['GET'], scope: 'read' },
+  // Detalle de su propia actividad (07-11): «Mis actividades» enlaza ahí. El controlador
+  // (`puedeVerDetalleActividad`) solo deja abrir la que tiene asignada, creó o comparte en equipo.
+  { path: '/api/activities/*', methods: ['GET'], scope: 'read' },
   { path: '/api/me/activities', methods: ['POST'], scope: 'write' },
   { path: '/api/operational-projects', methods: ['GET'], scope: 'read' },
   { path: '/api/operational-projects/*', methods: ['GET'], scope: 'read' },
@@ -563,6 +566,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR DE OPERACIONES — aprueba viáticos/proyectos nivel alto
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_OPERACIONES]: [
+    // 07-11: el tablero de asistencias de su gente (su modo en `section-views` es gestionar).
+    { path: '/erp/asistencias', scope: 'write' },
+    { path: '/erp/asistencias/**', scope: 'write' },
     ...COSTOS_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES,
@@ -666,6 +672,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD ADMINISTRATIVO — segundo nivel de aprobación
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
+    // 07-11: el tablero de asistencias de su gente (su modo en `section-views` es gestionar).
+    { path: '/erp/asistencias', scope: 'write' },
+    { path: '/erp/asistencias/**', scope: 'write' },
     ...COSTOS_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
@@ -1084,6 +1093,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   [ROLES.VENDEDOR]: [
     ...COSTOS_PROYECTO_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
+    // 07-11: cotiza desde Core (`ROLES_QUE_COTIZAN`); la página `/erp/cotizaciones` le faltaba.
+    ...COTIZACIONES_CORE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...CLIENTES_CORE_URL_RULES,
@@ -1191,6 +1202,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // RH
   // ─────────────────────────────────────────────────────────────────
   [ROLES.RH]: [
+    // 07-11: el tablero de asistencias de su gente (su modo en `section-views` es gestionar).
+    { path: '/erp/asistencias', scope: 'write' },
+    { path: '/erp/asistencias/**', scope: 'write' },
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...CCTV_DISENOS_URL_RULES,

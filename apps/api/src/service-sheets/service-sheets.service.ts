@@ -253,7 +253,10 @@ export class ServiceSheetsService {
       // terminado en campo queda `Por Validar` y los efectos en cadena esperan
       // a su visto bueno. Si no lo tiene, se cierra directo como siempre: no
       // dejamos actividades atascadas donde nadie configuró el flujo.
-      const needsValidation = await this.activityLifecycle.requiresArchitectValidation(companyId);
+      // Regla de Adam: «Finalizada solo al aprobar». Desde el 07-11 este camino también deja la
+      // actividad en `Por Validar`, igual que la evidencia nueva; ya no se cierra sola aunque la
+      // empresa no tenga el flujo configurado. (En producción no se usaba desde octubre.)
+      const needsValidation = true;
 
       await this.prisma['activity'].update({
         where: { id: activityId },

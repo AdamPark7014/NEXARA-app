@@ -353,6 +353,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
   dir_operaciones: [
     'approvals',
     'architecture',
+    'asistencias',
     'attendance',
     'bi',
     'calendar',
@@ -398,6 +399,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'integra-video',
     'integra-visitors',
     'kb',
+    'kpis-equipo',
     'lunch-breaks',
     'my-profile',
     'news',
@@ -489,6 +491,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
   ],
   coord_admin: [
     'approvals',
+    'asistencias',
     'attendance',
     'banking',
     'calendar',
@@ -521,6 +524,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'hr',
     'invoicing',
     'kb',
+    'kpis-equipo',
     'kpis-hr',
     'lunch-breaks',
     'my-profile',
@@ -535,7 +539,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'users',
     'viatics-admin',
     'warehouse',
-
   ],
   administrativo: [
     'approvals',
@@ -792,6 +795,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'crm-products',
     'crm-projects',
     'crm-quotes',
+    'erp-cotizaciones',
     'erp-herramientas',
     'erp-organigrama',
     'erp-vehiculos',
@@ -855,6 +859,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
   ],
   rh: [
     'approvals',
+    'asistencias',
     'attendance',
     'calendar',
     'chat',
@@ -867,6 +872,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'fines',
     'hr',
     'kb',
+    'kpis-equipo',
     'kpis-hr',
     'lunch-breaks',
     'my-profile',
