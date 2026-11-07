@@ -77,13 +77,8 @@ jobs:
     name: Secretos en el código
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # No bloquea TODAVÍA: hoy fallaría siempre porque `seed-demo-users.ts` tiene
-    # 17 contraseñas en claro, y rotarlas exige una decisión de negocio (son
-    # cuentas vivas en producción). El aviso aparece en cada ejecución.
-    #
-    # QUITAR esta línea en cuanto el seeder lea las contraseñas del entorno:
-    # a partir de ahí, cualquier credencial nueva debe romper la construcción.
-    continue-on-error: true
+    # Bloquea desde el 07-11: los seeders ya leen las contraseñas del entorno
+    # (`SEED_PASSWORD_*`), así que cualquier credencial nueva rompe la construcción.
 
     steps:
       - uses: actions/checkout@v4
@@ -97,12 +92,21 @@ jobs:
           PATRON="(password|contrasena|secret|api[_-]?key|token)\s*[:=]\s*['\"][^'\"[:space:]]{8,}['\"]"
           if grep -rInE "$PATRON" \
                --include='*.ts' --include='*.tsx' --include='*.js' --include='*.json' \
+               --include='*.yml' --include='*.yaml' --include='*.sql' --include='*.sh' \
                --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=dist \
                --exclude='*.spec.ts' --exclude='*.test.ts' \
                --exclude='*.spec.tsx' --exclude='*.test.tsx' \
                . > /tmp/fugas.txt; then
             echo "::error::Posibles credenciales en claro:"
             cat /tmp/fugas.txt
+            exit 1
+          fi
+          # Contraseñas y secretos sin comillas en compose y scripts (`POSTGRES_PASSWORD: abc…`).
+          if grep -rInE "(PASSWORD|SECRET)[A-Z_]*[[:space:]]*[:=][[:space:]]*[A-Za-z0-9!@#%^&*]{8,}" \
+               --include='*.yml' --include='*.yaml' --include='*.sh' --include='*.sql' \
+               --exclude-dir=node_modules . | grep -v '\${' > /tmp/fugas2.txt; then
+            echo "::error::Posibles secretos en claro en compose o scripts:"
+            cat /tmp/fugas2.txt
             exit 1
           fi
           echo "Sin credenciales en claro."

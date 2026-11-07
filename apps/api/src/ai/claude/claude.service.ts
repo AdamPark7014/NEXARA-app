@@ -171,11 +171,19 @@ export class ClaudeService {
       );
     }
     if (!this.cliente) {
+      const base = (process.env.CLAUDE_BASE_URL || '').trim();
+      // Regla de la empresa: en producción toda la IA pasa por la puerta (`ia.zynoratek.com` /
+      // `puerta-ia:8080`), que lleva el tope de gasto. Sin CLAUDE_BASE_URL no se sale directo.
+      if (!base && process.env.NODE_ENV === 'production') {
+        throw new ServiceUnavailableException(
+          'La IA no está configurada: falta CLAUDE_BASE_URL (la puerta) en el entorno del servidor.',
+        );
+      }
       this.cliente = new Anthropic({
         apiKey: process.env.ANTHROPIC_API_KEY!.trim(),
         // La puerta (o Anthropic directo si no hay CLAUDE_BASE_URL). Sin Authorization: la
         // puerta lee `x-api-key`, y un ANTHROPIC_AUTH_TOKEN viejo del entorno no debe colarse.
-        baseURL: (process.env.CLAUDE_BASE_URL || '').trim() || 'https://api.anthropic.com',
+        baseURL: base || 'https://api.anthropic.com',
         authToken: null,
         maxRetries: 2,
         timeout: 60_000,
