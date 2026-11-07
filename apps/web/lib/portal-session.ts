@@ -70,8 +70,11 @@ export function clearPortalSessions() {
 
 export function isBranchPortalRoute(pathname: string): boolean {
   const normalized = pathname.replace(/\/$/, "");
-  const match = normalized.match(/\/tickets\/([^/]+)$/);
-  if (!match) return false;
+  // En portal.nexara.com.mx el middleware reescribe `/<sucursal>` a `/tickets/<sucursal>`, pero
+  // `usePathname()` devuelve la URL visible, sin `/tickets`: sin aceptar las dos formas, entrar
+  // directo a la sucursal pintaba la página sin su shell y tronaba (07-11).
+  const match = normalized.match(/^(?:\/tickets)?\/([^/]+)$/);
+  if (!match || match[1] === "tickets") return false;
   return !STATIC_TICKETS_SEGMENTS.has(match[1]);
 }
 
