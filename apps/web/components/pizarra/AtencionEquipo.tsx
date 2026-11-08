@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Fragment, useId, useState, type ReactNode } from "react";
 import { Card, CardHead } from "@/components/base";
 import { AvatarAro } from "@/components/pizarra/EquipoPersonaCard";
-import { ARO_DE_ESTADO, atencionEquipo } from "@/components/pizarra/equipo-estado";
+import { ARO_DE_ESTADO, atencionEquipo, esFinDeSemanaMx } from "@/components/pizarra/equipo-estado";
 import type { TeamBoardUser } from "@/lib/team-board-api";
 import s from "./AtencionEquipo.module.css";
 import layout from "./EquipoPersonaCard.module.css";
@@ -103,7 +103,7 @@ export default function AtencionEquipo({
   /** Con permiso de asignar: a dónde lleva «＋ Asignar» para esa persona (undefined = sin botón). */
   asignarHref?: (u: TeamBoardUser) => string | undefined;
 }) {
-  const a = atencionEquipo(users, ahora);
+  const a = atencionEquipo(users, ahora, { finDeSemana: esFinDeSemanaMx(ahora) });
   if (a.atrasados.length === 0 && a.sinNada.length === 0 && a.sinEntrada.length === 0) return null;
 
   const atrasados: Renglon[] = a.atrasados.map((x) => ({

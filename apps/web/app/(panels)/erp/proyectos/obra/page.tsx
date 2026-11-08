@@ -83,7 +83,7 @@ export default function ObraPage() {
     <DashPage>
       <DashHero
         eyebrow={regreso.label}
-        title="Obra"
+        title="Tiempos de obra"
         subtitle="Lo que de verdad tomó cada trabajo contra lo que se calculó"
         actions={<Button variant="ghost" onClick={() => window.location.assign(regreso.href)}>← {regreso.label}</Button>}
       />

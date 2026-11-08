@@ -459,7 +459,7 @@ export default function ProyectosPage() {
         </ButtonLink>
       ),
     secondaryActions:
-      (DIRECCION_VISIBLE || muestra) && ROLES_DE_OBRA.includes(resolveV2RoleKey(user) ?? "") ? <ButtonLink href="/erp/proyectos/obra">Obra</ButtonLink> : undefined,
+      (DIRECCION_VISIBLE || muestra) && ROLES_DE_OBRA.includes(resolveV2RoleKey(user) ?? "") ? <ButtonLink href="/erp/proyectos/obra">Tiempos de obra</ButtonLink> : undefined,
     tabs,
     before: error ? (
       <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>

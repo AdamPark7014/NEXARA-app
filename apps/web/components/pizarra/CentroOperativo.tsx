@@ -10,6 +10,7 @@ import {
   contextoActividad,
   filtrarCentroOperativo,
   queHace,
+  esFinDeSemanaMx,
   resumenEquipo,
 } from "@/components/pizarra/equipo-estado";
 import type { TeamBoardUser } from "@/lib/team-board-api";
@@ -197,7 +198,7 @@ export default function CentroOperativo({
   }, []);
 
   const gente = useMemo(() => filtrarCentroOperativo(users), [users]);
-  const r = useMemo(() => resumenEquipo(gente), [gente]);
+  const r = useMemo(() => resumenEquipo(gente, { finDeSemana: esFinDeSemanaMx() }), [gente]);
 
   const reparto = useMemo(
     () => repartoQueCabe(gente.length, zona.w, zona.h),

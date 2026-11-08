@@ -81,7 +81,8 @@ const num = (v: number) => v.toLocaleString("es-MX");
 const plural = (n: number, one: string, many: string) => `${num(n)} ${n === 1 ? one : many}`;
 
 function greetingFor(hour: number) {
-  return hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
+  // De 0 a 5 h también es «Buenas noches» (07-11: a las 00:26 decía «Buenos días»).
+  return hour < 6 ? "Buenas noches" : hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
 }
 
 function friendlyLoadError(status?: number) {
