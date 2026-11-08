@@ -199,7 +199,7 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
               onChange={(e) => updateClientField('contactName', e.target.value)}
             />
           </FormField>
-          <FormField label="Email de contacto" optional>
+          <FormField label="Correo de contacto" optional>
             <input
               className="input"
               placeholder="Email de contacto"
@@ -255,7 +255,7 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
               onChange={(e) => updateClientField('accountCode', e.target.value)}
             />
           </FormField>
-          <FormField label="Email del portal" optional hint="Usuario para tickets.nexara.com.mx.">
+          <FormField label="Correo del portal" optional hint="Usuario para tickets.nexara.com.mx.">
             <input
               className="input"
               placeholder="Email para portal de tickets"

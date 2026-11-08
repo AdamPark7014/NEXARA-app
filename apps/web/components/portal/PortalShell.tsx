@@ -65,16 +65,16 @@ type NavItem = {
 };
 
 const NAV_ACCOUNT: NavItem[] = [
-  { href: "/tickets?tab=profile", label: "🪪 Mi perfil corporativo", match: (p) => p.includes("tab=profile") || p === "/tickets" },
-  { href: "/tickets/mis-sucursales", label: "🏬 Gestión de sucursales", match: (p) => p.endsWith("/mis-sucursales") },
+  { href: "/tickets?tab=profile", label: "Mi perfil corporativo", match: (p) => p.includes("tab=profile") || p === "/tickets" },
+  { href: "/tickets/mis-sucursales", label: "Gestión de sucursales", match: (p) => p.endsWith("/mis-sucursales") },
 ];
 
 const NAV_SERVICE: NavItem[] = [
-  { href: "/tickets?tab=tickets", label: "🎫 Estado de tickets", match: (p) => p.includes("tab=tickets") },
-  { href: "/tickets?tab=new-ticket", label: "➕ Nueva solicitud", match: (p) => p.includes("tab=new-ticket") },
-  { href: "/tickets/mis-servicios", label: "🛎️ Mis servicios", match: (p) => p.endsWith("/mis-servicios") },
-  { href: "/tickets?tab=inventories", label: "🧰 Inventarios", match: (p) => p.includes("tab=inventories") },
-  { href: "/tickets/ayuda", label: "🆘 Centro de ayuda", match: (p) => p.endsWith("/ayuda") },
+  { href: "/tickets?tab=tickets", label: "Estado de tickets", match: (p) => p.includes("tab=tickets") },
+  { href: "/tickets?tab=new-ticket", label: "Nueva solicitud", match: (p) => p.includes("tab=new-ticket") },
+  { href: "/tickets/mis-servicios", label: "Mis servicios", match: (p) => p.endsWith("/mis-servicios") },
+  { href: "/tickets?tab=inventories", label: "Inventarios", match: (p) => p.includes("tab=inventories") },
+  { href: "/tickets/ayuda", label: "Centro de ayuda", match: (p) => p.endsWith("/ayuda") },
 ];
 
 export default function PortalShell({ children }: { children: React.ReactNode }) {

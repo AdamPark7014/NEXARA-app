@@ -1969,7 +1969,7 @@ export function getApprovalsSectionConfig(user: UserAccessInput | null | undefin
     canDelete: false,
     canAssign: false,
     canApprove: true,
-    title: 'Aprobaciones jerárquicas',
+    title: 'Aprobaciones',
     subtitle: manage
       ? 'Firmas pendientes y flujo jerárquico del equipo.'
       : 'Solicitudes que requieren tu visto bueno.',
