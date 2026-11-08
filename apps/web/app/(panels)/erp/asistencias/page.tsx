@@ -474,6 +474,12 @@ export default function ErpAsistenciasPage() {
   const presentes = mapped.filter((m) => m.estado === "PRESENTE").length;
   const completos = mapped.filter((m) => m.estado === "COMPLETO").length;
   const ausentes = mapped.filter((m) => m.estado === "AUSENTE").length;
+  // Sábado y domingo solo trabaja quien tiene guardia: «19 sin checada» en rojo un domingo asustaba
+  // sin razón (07-11). Ese día la cifra va neutra y lo dice.
+  const finDeSemana = (() => {
+    const d = new Date(`${dateFilter}T12:00:00`);
+    return !Number.isNaN(d.getTime()) && (d.getDay() === 0 || d.getDay() === 6);
+  })();
   const justificadas = mapped.filter((m) => m.estado === "JUSTIFICADA").length;
   const jornadas = useMemo<Jornada[]>(
     () => mapped.map((m) => ({ checkIn: m.checkIn, checkOut: m.checkOut, abierta: m.estado === "PRESENTE" })),
@@ -923,10 +929,16 @@ export default function ErpAsistenciasPage() {
         <Stat
           label="Sin checada"
           value={ausentes}
-          tone={ausentes > 0 ? "danger" : "default"}
+          tone={ausentes > 0 && !finDeSemana ? "danger" : "default"}
           icon={<PersonOffOutlinedIcon aria-hidden="true" />}
-          iconTone={ausentes > 0 ? "danger" : "neutral"}
-          hint={justificadas > 0 ? `${justificadas} con falta justificada` : "Sin entrada registrada"}
+          iconTone={ausentes > 0 && !finDeSemana ? "danger" : "neutral"}
+          hint={
+            finDeSemana
+              ? "Fin de semana: solo checa quien tiene guardia"
+              : justificadas > 0
+                ? `${justificadas} con falta justificada`
+                : "Sin entrada registrada"
+          }
           onClick={() => elegirEstado("AUSENTE")}
           pressed={filterEstado === "AUSENTE"}
           loading={cargandoEquipo}

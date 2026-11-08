@@ -44,7 +44,7 @@ import LineaDelDia, { ConmutadorModo, type ModoEquipo } from "@/components/pizar
 import ResumenEquipo, { type FiltroEquipo } from "@/components/pizarra/ResumenEquipo";
 import AtencionEquipo from "@/components/pizarra/AtencionEquipo";
 import AsistenteIA from "@/components/pizarra/AsistenteIA";
-import { ARO_DE_ESTADO, ARO_LABEL, hayFlujo, resumenEquipo } from "@/components/pizarra/equipo-estado";
+import { ARO_DE_ESTADO, ARO_LABEL, esFinDeSemanaMx, hayFlujo, resumenEquipo } from "@/components/pizarra/equipo-estado";
 import { RangoSelector } from "@/components/pizarra/PizarraKpi";
 import { isCeoEmail } from "@/lib/activity-kinds";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -285,7 +285,7 @@ export default function PizarraPage() {
     });
   }, [data?.users, user?.id]);
 
-  const conteo = useMemo(() => resumenEquipo(users), [users]);
+  const conteo = useMemo(() => resumenEquipo(users, { finDeSemana: esFinDeSemanaMx() }), [users]);
 
   const visibles = useMemo(() => {
     const q = normalizar(busqueda);

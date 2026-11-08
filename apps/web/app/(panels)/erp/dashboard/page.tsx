@@ -215,7 +215,8 @@ const HEALTH_COLOR: Record<HealthDomain["variant"], string> = {
 };
 
 function greetingFor(hour: number) {
-  return hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
+  // De 0 a 5 h también es «Buenas noches» (07-11: a las 00:26 decía «Buenos días»).
+  return hour < 6 ? "Buenas noches" : hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
 }
 
 export default function ErpDashboardPage() {

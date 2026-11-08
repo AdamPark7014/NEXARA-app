@@ -5,7 +5,7 @@ import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
 import { Stat, StatRow } from "@/components/base";
-import { desgloseRetraso as desglose, resumenEquipo, type EstadoAro } from "@/components/pizarra/equipo-estado";
+import { desgloseRetraso as desglose, esFinDeSemanaMx, resumenEquipo, type EstadoAro } from "@/components/pizarra/equipo-estado";
 import type { TeamBoardUser } from "@/lib/team-board-api";
 
 export type FiltroEquipo = EstadoAro | "todos";
@@ -29,7 +29,7 @@ export default function ResumenEquipo({
   onRevisar?: () => void;
 }) {
   if (users.length === 0) return null;
-  const r = resumenEquipo(users);
+  const r = resumenEquipo(users, { finDeSemana: esFinDeSemanaMx() });
   const espera = cola ? cola.teTocan + cola.deOtros : users.reduce((n, u) => n + (u.enEsperaAprobacion ?? 0), 0);
   const corrigiendo = users.filter((u) => (u.enCorreccion ?? 0) > 0).length;
   const pistaEspera =

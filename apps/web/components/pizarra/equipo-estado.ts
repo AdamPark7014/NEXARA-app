@@ -79,7 +79,16 @@ export function motivoSinActividad(u: TeamBoardUser): MotivoSinActividad | null 
   return "sinNada";
 }
 
-export function resumenEquipo(users: readonly TeamBoardUser[]): ResumenEquipo {
+/**
+ * ¿Es sábado o domingo en México? Esos días solo trabaja quien tiene guardia: quien no checó
+ * descansa, no va «con retraso» (07-11: el domingo la pizarra decía «19 con retraso»).
+ */
+export function esFinDeSemanaMx(ahora: number = Date.now()): boolean {
+  const dia = new Intl.DateTimeFormat("en-US", { timeZone: "America/Mexico_City", weekday: "short" }).format(new Date(ahora));
+  return dia === "Sat" || dia === "Sun";
+}
+
+export function resumenEquipo(users: readonly TeamBoardUser[], opciones: { finDeSemana?: boolean } = {}): ResumenEquipo {
   const r: ResumenEquipo = {
     trabajando: 0,
     retraso: 0,
@@ -92,6 +101,11 @@ export function resumenEquipo(users: readonly TeamBoardUser[]): ResumenEquipo {
     sinActividad: 0,
   };
   for (const u of users) {
+    // Fin de semana: quien no checó descansa; no cuenta en el retraso ni en «sin entrada».
+    if (opciones.finDeSemana && motivoSinActividad(u) === "sinEntrada") {
+      r.libres += 1;
+      continue;
+    }
     const aro = ARO_DE_ESTADO[u.status] ?? "retraso";
     if (aro === "trabajando") r.trabajando += 1;
     else if (aro === "libre") r.libres += 1;
@@ -347,7 +361,11 @@ function sinNadaEnAtencion(u: TeamBoardUser, ahora: number): SinNadaEnAtencion {
  * qué, a quién dejaron sin nada (y desde cuándo, y qué fue lo último que hizo) y
  * quién no ha checado. Quien ya salió y los libres no piden nada.
  */
-export function atencionEquipo(users: readonly TeamBoardUser[], ahora: number = Date.now()): AtencionDelEquipo {
+export function atencionEquipo(
+  users: readonly TeamBoardUser[],
+  ahora: number = Date.now(),
+  opciones: { finDeSemana?: boolean } = {},
+): AtencionDelEquipo {
   const atrasados: AtrasadoEnAtencion[] = [];
   const sinNada: SinNadaEnAtencion[] = [];
   const sinEntrada: SinEntradaEnAtencion[] = [];
@@ -358,7 +376,7 @@ export function atencionEquipo(users: readonly TeamBoardUser[], ahora: number = 
     }
     const motivo = motivoSinActividad(u);
     if (motivo === "sinNada") sinNada.push(sinNadaEnAtencion(u, ahora));
-    else if (motivo === "sinEntrada") {
+    else if (motivo === "sinEntrada" && !opciones.finDeSemana) {
       sinEntrada.push({
         persona: u,
         ultima: ultimaActividad(u, ahora),
