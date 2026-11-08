@@ -501,7 +501,7 @@ export function queHace(u: TeamBoardUser): string {
  */
 function partesJornadaSinNada(u: TeamBoardUser, ahora: number): string[] {
   const entrada = fecha(u.entradaHoyAt);
-  if (!entrada) return ["Sin entrada hoy"];
+  if (!entrada) return [esFinDeSemanaMx(ahora) ? "Descansa · fin de semana" : "Sin entrada hoy"];
   const salida = fecha(u.salidaHoyAt);
   if (salida) return [`Salió ${hora(salida)}`];
   const min = minutosDesde(u.idleSinceAt, ahora);

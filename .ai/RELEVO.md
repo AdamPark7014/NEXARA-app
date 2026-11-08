@@ -1,5 +1,18 @@
 # RELEVO
 
+- **08-11 ~00:45 México (claude-code) — Pulida de UI/UX de Core (Adam: «dale una pulida a todos los módulos»,
+  tomado como visto bueno de la maqueta de plantilla). `bc1eedcd`, `1511a00f`, `c1fd1865`, `ddf4cfa0` y este.**
+  - API: solo los 5xx se registran como `error` (los 4xx, ~800/día, van como aviso); migración `20261108060000` quita
+    el índice único global `workflow_definitions_name_key` (la siembra de la empresa demo chocaba en cada arranque);
+    `checkExpiredQuotes` en una consulta. Web: 404 a cualquier `Next-Action` (no hay Server Actions).
+  - `DataTable` pagina de 50 (`pageSize`, `false` en auditoría, movimientos y cartera, que paginan en el servidor) y
+    bajo 768 px cada fila es tarjeta con `data-label` (`phoneCards`). `PageState` delega en `components/ui/*`.
+  - Revisión por DOM en el Chrome de Adam (sesión de Christian, 1920 px) de 31 rutas de Core: sin solapes ni
+    desbordes reales. Arreglado lo que se vio: matriz de permisos con nombres en español; fin de semana sin falsas
+    alarmas en Pizarra, Centro operativo y Asistencias (`esFinDeSemanaMx`, «Descansa · fin de semana»); saludo
+    «Buenas noches» de 0 a 5 h; «Tiempos de obra». **No se revisó a 390 px**: la ventana de Chrome no cambió de tamaño.
+  - Pruebas web 2,136 en verde; API 5,788. Desplegado con respaldo previo (semanal 117 MB).
+
 - **07-11 ~18:40 (claude-code) — Barrido de Core y olas 1–3 del plan (`ba5cf241`, `dd872f7b`, `c1a6489f`). Sin migración.**
   - Pedido de Adam: barrido completo de diseño, infraestructura, procesos y roles, y «empieza tú con todo en orden e
     implementa todo». Informe y plan: https://claude.ai/artifact/2RSv7KQgqMEh4WW1jQkqMT

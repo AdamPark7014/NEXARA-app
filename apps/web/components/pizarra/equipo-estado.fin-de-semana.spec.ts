@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { atencionEquipo, esFinDeSemanaMx, resumenEquipo } from "./equipo-estado";
+import { atencionEquipo, contextoActividad, esFinDeSemanaMx, resumenEquipo } from "./equipo-estado";
 
 describe("pizarra en fin de semana", () => {
   const sinEntrada = { id: 1, nombre: "Ana", status: "sin_actividad", entradaHoyAt: null } as any;
@@ -16,5 +16,10 @@ describe("pizarra en fin de semana", () => {
     expect(r.retraso).toBe(0);
     expect(r.sinEntrada).toBe(0);
     expect(atencionEquipo([sinEntrada], Date.now(), { finDeSemana: true }).sinEntrada).toHaveLength(0);
+  });
+
+  it("la tarjeta de quien no checó dice que descansa el domingo y «Sin entrada hoy» entre semana", () => {
+    expect(contextoActividad(sinEntrada, Date.parse("2026-11-08T18:00:00Z"))).toBe("Descansa · fin de semana");
+    expect(contextoActividad(sinEntrada, Date.parse("2026-11-09T18:00:00Z"))).toBe("Sin entrada hoy");
   });
 });
