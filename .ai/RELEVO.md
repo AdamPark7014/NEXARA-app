@@ -1,5 +1,33 @@
 # RELEVO
 
+- **07-11 ~18:40 (claude-code) — Barrido de Core y olas 1–3 del plan (`ba5cf241`, `dd872f7b`, `c1a6489f`). Sin migración.**
+  - Pedido de Adam: barrido completo de diseño, infraestructura, procesos y roles, y «empieza tú con todo en orden e
+    implementa todo». Informe y plan: https://claude.ai/artifact/2RSv7KQgqMEh4WW1jQkqMT
+  - Laptop homologada: estaba en el 29-10 con 285 archivos sin commit; todo ya estaba en main o superado. Respaldo en
+    `C:\dev\_scratch\respaldos-nexara\laptop-20261107`, dos stash y la etiqueta local `respaldo-laptop-20261029`.
+  - **Ola 1:** siete roles abren su actividad (`detalle-actividad-propia.ts`, `GET /api/activities/:id` en
+    `ACTIVIDAD_PROPIA_URL_RULES`, `/erp/actividades/:id` numérico en la web); Aprobaciones, `hr`, `fines`, `kpis-hr` y
+    `users` en `CORE_OLA1_MODULE_IDS`; Asistencias para RH, dir. operaciones y coord. administrativa; vendedor con
+    Cotizaciones; la hoja de servicio siempre deja «Por Validar» (en prod no se usaba desde octubre); portal de
+    sucursales sin el error de `useBranchPortalSession`.
+  - **Ola 2:** fuera del repo `.ai/tmp-att.json` y los `tmp-*` de la raíz (copia en `_scratch/respaldos-nexara/
+    tmp-raiz-20261107`); el compose de desarrollo lee la clave del entorno; el escáner de secretos del CI bloquea y
+    revisa yml/sql/sh; `ClaudeService` no sale directo en producción sin `CLAUDE_BASE_URL`; Lab sin OpenAI;
+    `update.sh` no construye si el CI del commit falló (`--skip-ci`); sin `build:lowmem`.
+  - **Ola 3:** «Timbrar» deshabilitado sin PAC; «Ir a Por facturar» solo con permiso; solicitudes de clientes al asignar
+    para quien despacha (`client-ticket-requests` GET para coord. operaciones); purga mensual de `audit_logs` (> 365 días).
+  - **Respaldo diario** (`deploy/backup/respaldo-nexara.sh`, `/etc/cron.d/respaldo-nexara`, 09:30 UTC): primero el
+    08-11 00:02 UTC, 116 MB. Falta copia fuera del servidor (decisión de Adam).
+  - Pruebas: API 436 suites / 5,787; web 242 archivos / 2,129; CI de `c1a6489f` en verde.
+  - **Desplegado** `c1a6489f` con relevo (API 00:14 UTC; web 00:20 UTC tras un reintento: el primer build falló en
+    `next/font` al bajar Google Fonts, no por el código). Verificado: `portal.nexara.com.mx/<sucursal>` ya pinta el
+    acceso de sucursal sin error; sitio, Core y API en 200. Al arrancar la API sale un `prisma:error` de
+    `workflowDefinition.create` (nombre único entre empresas en `workflow-seed.service.ts`, de agosto): se atrapa y no
+    afecta, pendiente de limpiar.
+  - **Pendiente:** contraseña de `nexara-db` igual a la que estuvo publicada en el compose de desarrollo (preguntado a
+    Adam si se rota); ola 4 (plantilla única, maqueta https://claude.ai/artifact/K1xDJWwKG77vvJQq6h976V esperando su sí);
+    ola 5 (Batch e IA con eval); ~20 ramas `cursor/*` viejas (Adam decide); Pagos a empleados web vs app.
+
 - **04-11 (claude-code) — Las apps cambian según quién entra: versión 1.4, en `main` (`b297197e`, `aa96a915`, `ce88545d`, `72cd839a`). Servidor en producción. Sin migración. Enviada el 04-11: iOS 1.4 (16) en TestFlight y `WAITING_FOR_REVIEW`; Android 1.4.0 (23) en revisión de Google, lanzamiento completo. Las dos salen solas al aprobarse. Siguientes números: iOS 17, Play 24.**
   - **Pedido de Adam:** «al CEO le aparece para escanear una herramienta y ya eso que el deberia ver todo lo relacionado a lo administrativo», «el que debe dar de alta es ivan», «la gente debe poder pues solamente solicitar prestamos», «es asignar un viatico o aprobar», «pagos empleados deberian poder realizar acciones en movil». Decidió: cualquiera saca un vehículo libre; Pagos con registrar y marcar pagado; Ola 6 visible; los contactos de campaña a Daniela.
   - **Quién es quién en la app:** `PorRol` en Android y `CoreOrg.esDireccion` en iOS. Dirección es el rol CEO, además de Christian y Claudia por correo. Iván se reconoce por sus permisos (`tools.manage`, `stock.manage`, `vehicles.inventory`), no por nombre.
