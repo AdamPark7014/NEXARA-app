@@ -10,6 +10,8 @@ import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
 import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 import { useUser } from "@/components/UserContext";
+import { resolveV2RoleKey } from "@/lib/user-access";
+import { canOpenPage } from "@/lib/rbac/page-matrix";
 import {
   Alert,
   AsideCard,
@@ -186,6 +188,9 @@ export default function ProyectoDetallePage() {
   const id = Number(params?.id);
   const router = useRouter();
   const { user, token } = useUser();
+  // «Ir a Por facturar» solo para quien puede abrir la Mesa contable; a los demás los rebotaba (07-11).
+  const rolV2 = resolveV2RoleKey(user);
+  const puedeIrAFacturar = Boolean(user?.isSuperAdmin || (rolV2 && canOpenPage(rolV2, "/erp/contabilidad/por-facturar")));
   const regreso = useRegreso({ href: "/erp/proyectos", label: "Proyectos" });
   const accesoCostos = useAccesoCostos(token);
   const hoy = useMemo(() => hoyISO(), []);
@@ -526,7 +531,7 @@ export default function ProyectoDetallePage() {
                 <Button variant="primary" disabled={ocupado} onClick={() => setNuevaActividad(true)}>
                   Nueva actividad
                 </Button>
-              ) : siguiente.accion === "facturar" ? (
+              ) : siguiente.accion === "facturar" && puedeIrAFacturar ? (
                 <ButtonLink variant="primary" href="/erp/contabilidad/por-facturar">
                   Ir a Por facturar
                 </ButtonLink>

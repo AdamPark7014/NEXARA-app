@@ -178,6 +178,8 @@ export default function InvoicingPage() {
   const [paying, setPaying] = useState(false);
   const payingRef = useRef(false);
   const [pacInfo, setPacInfo] = useState<{ provider?: string; configured?: boolean; productionWarning?: string | null; env?: string; csd?: { configured?: boolean } } | null>(null);
+  // Sin servicio de timbrado conectado, «Timbrar» se muestra deshabilitado (07-11).
+  const pacBloqueado = Boolean(pacInfo && (pacInfo.configured === false || pacInfo.productionWarning));
   const [issuerProfile, setIssuerProfile] = useState<{ emisorRfc?: string | null; emisorName?: string | null; emisorZipCode?: string | null; source?: string } | null>(null);
   const [rfcValidation, setRfcValidation] = useState<{ valid?: boolean; message?: string } | null>(null);
   const [form, setForm] = useState({
@@ -683,7 +685,7 @@ export default function InvoicingPage() {
             <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void openEditDraft(f); }}>Editar</Button>
           )}
           {cfg.canDelete && f.status !== "CANCELLED" && <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void cancel(f); }}>Cancelar</Button>}
-          {f.status === "DRAFT" && <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void stamp(f); }}>Timbrar</Button>}
+          {f.status === "DRAFT" && <Button size="sm" variant="secondary" disabled={pacBloqueado} title={pacBloqueado ? "Todavía no se puede timbrar: falta conectar el servicio de timbrado." : undefined} onClick={(e) => { e.stopPropagation(); void stamp(f); }}>Timbrar</Button>}
           {cfg.canCreate && f.status !== "DRAFT" && f.status !== "CANCELLED" && f.status !== "PAID" && (
             <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openPayment(f); }}>Pago</Button>
           )}

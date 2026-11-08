@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
+import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { celdaCsv } from '../common/security/celda-csv.js';
 
@@ -119,6 +121,23 @@ export class AuditService {
       );
     }
     return lines.join('\n');
+  }
+
+  private readonly logger = new Logger(AuditService.name);
+
+  /**
+   * Retención automática (07-11): `audit_logs` crecía sin límite (283 MB, 1.2 M filas al 07-11)
+   * y la purga solo existía a mano. El día 1 de cada mes, a las 04:15 de México, borra lo de más
+   * de un año, igual que el `POST audit/purge` por omisión.
+   */
+  @Cron('15 4 1 * *', { name: 'purga-bitacora', timeZone: WORKDAY_TIMEZONE })
+  async purgaMensual() {
+    try {
+      const r = await this.purgeOlderThan(365);
+      this.logger.log(`Bitácora: ${r.deleted} registros anteriores a ${r.cutoff} borrados`);
+    } catch (e) {
+      this.logger.warn(`No se pudo purgar la bitácora: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   /** Retención: borra logs más viejos que N días (default 365). */
