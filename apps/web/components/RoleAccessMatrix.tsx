@@ -35,11 +35,79 @@ const SCOPE_LABEL: Record<string, string> = {
   admin: "Administración",
 };
 
+/** Nombre en español de cada módulo de la matriz (07-11): la cabecera mostraba los códigos internos. */
+const MODULO_LABEL: Record<string, string> = {
+  "access-control": "Control de acceso",
+  "account-access": "Cuentas y acceso",
+  "accounting": "Contabilidad",
+  "activities": "Actividades",
+  "activity-evidence": "Evidencias de actividad",
+  "ai": "Asistente IA",
+  "assets": "Activos",
+  "attendance": "Asistencia",
+  "case-studies": "Casos de éxito",
+  "catalog": "Catálogo",
+  "cctv-disenos": "Diseños de cámaras",
+  "chat": "Chat",
+  "client-ticket-requests": "Solicitudes de clientes",
+  "clients": "Clientes",
+  "company": "Empresa",
+  "contact-messages": "Mensajes del sitio",
+  "costos": "Costos",
+  "cotizaciones": "Cotizaciones",
+  "devices": "Dispositivos",
+  "documents": "Documentos",
+  "evidences": "Evidencias",
+  "executive": "Vista ejecutiva",
+  "expenses": "Gastos",
+  "festivos": "Días festivos",
+  "formatos-actividad": "Formatos de actividad",
+  "gps": "GPS",
+  "grabaciones-reuniones": "Grabaciones de reuniones",
+  "hero-slides": "Portada del sitio",
+  "hero-video": "Video del sitio",
+  "integra": "INTEGRA",
+  "internal-comunicados": "Comunicados",
+  "inventories": "Inventarios",
+  "kb": "Base de conocimiento",
+  "lab": "Laboratorio",
+  "lunch-breaks": "Comidas",
+  "maintenance": "Mantenimiento",
+  "maintenance-contracts": "Contratos de mantenimiento",
+  "me": "Mi cuenta",
+  "news": "Noticias",
+  "newsletter": "Boletín",
+  "noc": "Monitoreo (NOC)",
+  "operational-projects": "Proyectos operativos",
+  "procurement": "Compras",
+  "projects": "Proyectos (comercial)",
+  "proyectos": "Proyectos",
+  "reuniones": "Reuniones",
+  "service-clients": "Clientes de servicio",
+  "service-sheets": "Hojas de servicio",
+  "sla": "SLA",
+  "sla-tracker": "Seguimiento de SLA",
+  "smart-quote": "Cotizador",
+  "social-posts": "Redes sociales",
+  "stock": "Existencias",
+  "studio": "Contenido del sitio",
+  "tool-requests": "Préstamo de herramientas",
+  "users": "Usuarios",
+  "vehicles": "Vehículos",
+  "ventas": "Ventas",
+  "viaticos": "Viáticos",
+  "viatics": "Viáticos (aprobación)",
+  "warehouse": "Almacén",
+  "workflow": "Flujos de aprobación",
+};
+
+const etiquetaModulo = (m: string) => MODULO_LABEL[m] ?? m;
+
 const SCOPE_STYLE: Record<string, { bg: string; fg: string }> = {
-  read: { bg: "var(--surface-2, #eef2f7)", fg: "var(--text-2, #475569)" },
-  write: { bg: "#dbeafe", fg: "#1e40af" },
-  approve: { bg: "#fef3c7", fg: "#92400e" },
-  admin: { bg: "#dcfce7", fg: "#166534" },
+  read: { bg: "var(--ui-neutral-bg, var(--ui-surface-2))", fg: "var(--ui-fg-2)" },
+  write: { bg: "var(--ui-info-bg)", fg: "var(--ui-info-text, var(--ui-info))" },
+  approve: { bg: "var(--ui-warning-bg)", fg: "var(--ui-warning-text, var(--ui-warning))" },
+  admin: { bg: "var(--ui-success-bg)", fg: "var(--ui-success-text, var(--ui-success))" },
 };
 
 export default function RoleAccessMatrix({ token }: { token?: string | null }) {
@@ -78,14 +146,14 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
 
   const orphanRoles = roles.filter((r) => !r.acceso.recognizedByMatrix);
 
-  if (loading) return <p style={{ color: "var(--text-2)" }}>Cargando matriz de accesos…</p>;
-  if (error) return <p style={{ color: "var(--danger, #b91c1c)" }}>{error}</p>;
+  if (loading) return <p style={{ color: "var(--ui-fg-2)" }}>Cargando matriz de accesos…</p>;
+  if (error) return <p style={{ color: "var(--ui-danger-text, var(--ui-danger))" }}>{error}</p>;
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
       <header>
         <h3 style={{ margin: 0 }}>Qué alcanza cada rol</h3>
-        <p style={{ margin: "4px 0 0", color: "var(--text-2)", fontSize: 14 }}>
+        <p style={{ margin: "4px 0 0", color: "var(--ui-fg-2)", fontSize: 14 }}>
           Resuelto contra la matriz de permisos. Es lo que el sistema aplica de verdad,
           no lo que dicen las casillas del formulario.
         </p>
@@ -97,8 +165,8 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
           style={{
             padding: 12,
             borderRadius: 8,
-            background: "#fef2f2",
-            color: "#991b1b",
+            background: "var(--ui-danger-bg)",
+            color: "var(--ui-danger-text, var(--ui-danger))",
             fontSize: 14,
           }}
         >
@@ -115,19 +183,19 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
         <table style={{ borderCollapse: "collapse", fontSize: 13, minWidth: 720 }}>
           <thead>
             <tr>
-              <th style={{ textAlign: "left", padding: "8px 12px", position: "sticky", left: 0, background: "var(--surface, #fff)" }}>
+              <th style={{ textAlign: "left", padding: "8px 12px", position: "sticky", left: 0, background: "var(--ui-surface)" }}>
                 Rol
               </th>
               {allModules.map((m) => (
-                <th key={m} style={{ padding: "8px 6px", textAlign: "center", fontWeight: 500 }}>
-                  {m}
+                <th key={m} title={m} style={{ padding: "8px 6px", textAlign: "center", fontWeight: 500, minWidth: 72 }}>
+                  {etiquetaModulo(m)}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {roles.map((role) => (
-              <tr key={role.id} style={{ borderTop: "1px solid var(--border, #e2e8f0)" }}>
+              <tr key={role.id} style={{ borderTop: "1px solid var(--ui-border)" }}>
                 <th
                   scope="row"
                   style={{
@@ -136,7 +204,7 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
                     fontWeight: 600,
                     position: "sticky",
                     left: 0,
-                    background: "var(--surface, #fff)",
+                    background: "var(--ui-surface)",
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -148,7 +216,7 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
                   >
                     {role.nombre}
                   </button>
-                  <div style={{ fontWeight: 400, fontSize: 11, color: "var(--text-2)" }}>
+                  <div style={{ fontWeight: 400, fontSize: 11, color: "var(--ui-fg-2)" }}>
                     {role.acceso.isSuperAdmin
                       ? "acceso total"
                       : role.acceso.resolvedRoleKey ?? "sin plantilla"}
@@ -169,7 +237,7 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
                   const found = role.acceso.modules.find((x) => x.module === m);
                   if (!found) {
                     return (
-                      <td key={m} style={{ textAlign: "center", padding: "6px 4px", color: "var(--text-3, #cbd5e1)" }}>
+                      <td key={m} style={{ textAlign: "center", padding: "6px 4px", color: "var(--ui-fg-4, var(--ui-fg-3))" }}>
                         ·
                       </td>
                     );
@@ -192,7 +260,7 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
         </table>
       </div>
 
-      <footer style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "var(--text-2)" }}>
+      <footer style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "var(--ui-fg-2)" }}>
         {Object.entries(SCOPE_LABEL).map(([key, label]) => {
           const s = SCOPE_STYLE[key];
           return (
@@ -203,7 +271,7 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
           );
         })}
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span style={{ color: "var(--text-3, #cbd5e1)" }}>·</span> Sin acceso
+          <span style={{ color: "var(--ui-fg-4, var(--ui-fg-3))" }}>·</span> Sin acceso
         </span>
       </footer>
     </section>
