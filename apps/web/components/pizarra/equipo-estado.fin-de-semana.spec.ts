@@ -15,6 +15,7 @@ describe("pizarra en fin de semana", () => {
     const r = resumenEquipo([sinEntrada], { finDeSemana: true });
     expect(r.retraso).toBe(0);
     expect(r.sinEntrada).toBe(0);
+    expect(r.descansan).toBe(1);
     expect(atencionEquipo([sinEntrada], Date.now(), { finDeSemana: true }).sinEntrada).toHaveLength(0);
   });
 

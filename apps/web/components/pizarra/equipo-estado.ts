@@ -59,6 +59,8 @@ export type ResumenEquipo = {
   sinEntrada: number;
   /** Ya checó su salida y no tiene nada abierto. */
   yaSalieron: number;
+  /** Sábado o domingo: quien no checó y por eso cuenta en `libres`, pero no «terminó lo suyo». */
+  descansan: number;
   /** `sinNada + sinEntrada + yaSalieron`: se queda por compatibilidad. */
   sinActividad: number;
 };
@@ -98,12 +100,14 @@ export function resumenEquipo(users: readonly TeamBoardUser[], opciones: { finDe
     sinNada: 0,
     sinEntrada: 0,
     yaSalieron: 0,
+    descansan: 0,
     sinActividad: 0,
   };
   for (const u of users) {
     // Fin de semana: quien no checó descansa; no cuenta en el retraso ni en «sin entrada».
     if (opciones.finDeSemana && motivoSinActividad(u) === "sinEntrada") {
       r.libres += 1;
+      r.descansan += 1;
       continue;
     }
     const aro = ARO_DE_ESTADO[u.status] ?? "retraso";

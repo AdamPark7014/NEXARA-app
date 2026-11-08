@@ -66,7 +66,7 @@ export default function ResumenEquipo({
       <Stat
         label="Libres"
         value={r.libres}
-        hint="terminaron lo suyo"
+        hint={r.descansan > 0 ? `${r.descansan} descansan por fin de semana` : "terminaron lo suyo"}
         icon={<GroupsOutlinedIcon />}
         iconTone="info"
       />
