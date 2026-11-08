@@ -104,8 +104,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
     };
 
     // Keep expected public internet probes out of error-level noise.
+    // Desde el 07-11 solo un 5xx es `error`: un 4xx (sección SEO sin publicar, escáneres que piden
+    // /phpinfo.php, sesión vencida) es culpa de quien llama y antes eran ~800 «errores» al día que
+    // tapaban los de verdad.
     if (status === 404 && this.isExpectedNoise404(request.url, request.method)) {
       this.logger.warn('API Not Found (noise)', payload);
+    } else if (status < 500) {
+      this.logger.warn('API Client Error', payload);
     } else {
       this.logger.error('API Exception', payload);
     }

@@ -242,6 +242,12 @@ export function middleware(request: NextRequest) {
     return rejectWithSecurityHeaders('Método no permitido', 405);
   }
 
+  // La app no tiene Server Actions: un `Next-Action` solo lo mandan escáneres que prueban fallas de
+  // Next/React. Se corta aquí para que no llenen el log con «Server Reference ID…» (07-11).
+  if (request.headers.has('next-action')) {
+    return rejectWithSecurityHeaders('No encontrado', 404);
+  }
+
   const userAgent = request.headers.get('user-agent') || '';
   if (MALICIOUS_USER_AGENT_PATTERN.test(userAgent)) {
     return rejectWithSecurityHeaders('Cliente no permitido', 403);
