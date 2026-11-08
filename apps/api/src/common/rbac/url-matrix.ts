@@ -820,6 +820,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD OPERACIONES — supervisa ing. de campo, project manager
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_OPERACIONES]: [
+    // 07-11: despacha las solicitudes aprobadas de clientes al asignar una OT.
+    { path: '/api/client-ticket-requests', methods: ['GET'], scope: 'read' },
+    { path: '/api/client-ticket-requests/**', methods: ['GET'], scope: 'read' },
     ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...COSTOS_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,

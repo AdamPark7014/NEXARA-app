@@ -440,8 +440,15 @@ export default function InvoiceDetailPage() {
       Registrar pago
     </Button>
   ) : null;
+  // Sin servicio de timbrado conectado el botón no se ofrece como si fuera a funcionar (07-11).
+  const pacBloqueado = Boolean(pacInfo && (pacInfo.configured === false || pacInfo.productionWarning));
   const botonTimbrar = canStamp ? (
-    <Button variant="primary" onClick={() => void stampInvoice()} disabled={stamping}>
+    <Button
+      variant="primary"
+      onClick={() => void stampInvoice()}
+      disabled={stamping || pacBloqueado}
+      title={pacBloqueado ? "Todavía no se puede timbrar: falta conectar el servicio de timbrado." : undefined}
+    >
       {stamping ? "Timbrando…" : "Timbrar CFDI"}
     </Button>
   ) : null;

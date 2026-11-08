@@ -296,8 +296,11 @@ export default function OpsActivityForm({
             ? fetchNextAnNumber(token).catch(() => ({ next: "" }))
             : fetchNextAnNumber(token)
           : Promise.resolve({ next: "" }),
-        hasPermission(user, PERMISSIONS.CONSOLE_ADMIN)
-          ? listApprovedTicketRequests(token)
+        // Las solicitudes aprobadas de clientes las ve quien despacha (07-11): antes solo
+        // CONSOLE_ADMIN, y Coord. de Operaciones y el Encargado de Soporte no las veían.
+        // La API decide; un 403 no tumba el formulario.
+        hasPermission(user, PERMISSIONS.CONSOLE_ADMIN) || (canAssign && !selfAssign)
+          ? listApprovedTicketRequests(token).catch(() => [])
           : Promise.resolve([]),
       ]);
       setProjects(Array.isArray(projs) ? projs : []);
