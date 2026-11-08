@@ -934,6 +934,7 @@ export default function CarteraView({
           </div>
         ) : data ? (
           <DataTable
+            pageSize={false}
             flush
             columns={columnas}
             rows={data.rows}

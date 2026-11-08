@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import EmptyState from "./EmptyState";
 import Skeleton from "./Skeleton";
 import { Checkbox } from "@/components/base/campos";
@@ -110,6 +110,13 @@ type Props<T> = {
   selectionLabel?: (count: number) => ReactNode;
   /** Sin borde, radio ni sombra propios (va dentro de una tarjeta). */
   flush?: boolean;
+  /**
+   * Filas por página (07-11, plantilla única de Core). Con más filas que esto la tabla pagina y
+   * dice «Mostrando 1–50 de N». `false` la deja sin paginar (quien ya pagina en el servidor).
+   */
+  pageSize?: number | false;
+  /** En teléfono (< 768 px) cada fila se vuelve tarjeta con etiqueta por dato. `false` lo apaga. */
+  phoneCards?: boolean;
 };
 
 function alignOf<T>(col: Column<T>) {
@@ -157,12 +164,27 @@ export default function DataTable<T>({
   selectionBar,
   selectionLabel = etiquetaSeleccion,
   flush = false,
+  pageSize = 50,
+  phoneCards = true,
 }: Props<T>) {
   const showSkeleton = loading && rows.length === 0;
 
+  // Paginación del lado del cliente: una lista de 300 viáticos ya no se pinta entera de golpe.
+  const porPagina = pageSize && pageSize > 0 ? pageSize : Infinity;
+  const totalPaginas = Number.isFinite(porPagina) ? Math.max(1, Math.ceil(rows.length / porPagina)) : 1;
+  const [pagina, setPagina] = useState(0);
+  const paginaActual = Math.min(pagina, totalPaginas - 1);
+  useEffect(() => {
+    if (pagina > totalPaginas - 1) setPagina(0);
+  }, [pagina, totalPaginas]);
+  const filasPagina = useMemo(
+    () => (totalPaginas > 1 ? rows.slice(paginaActual * porPagina, (paginaActual + 1) * porPagina) : rows),
+    [rows, totalPaginas, paginaActual, porPagina],
+  );
+
   // Selección controlada: el padre guarda las llaves; aquí solo se calcula qué está marcado.
   const seleccion = useMemo(() => new Set<RowKey>(selectedKeys ?? []), [selectedKeys]);
-  const llavesVisibles = useMemo(() => rows.map(rowKey), [rows, rowKey]);
+  const llavesVisibles = useMemo(() => filasPagina.map(rowKey), [filasPagina, rowKey]);
   const todasMarcadas = llavesVisibles.length > 0 && llavesVisibles.every((k) => seleccion.has(k));
   const algunaMarcada = !todasMarcadas && llavesVisibles.some((k) => seleccion.has(k));
   const cabeceraRef = useRef<HTMLInputElement>(null);
@@ -204,6 +226,7 @@ export default function DataTable<T>({
       data-sticky={stickyHeader ? "true" : undefined}
       data-flush={flush ? "true" : undefined}
       data-row-actions={rowActionsAlwaysVisible ? "visible" : undefined}
+      data-phone-cards={phoneCards ? "true" : undefined}
       style={stickyHeader ? { maxHeight: maxHeight ?? "min(72vh, 720px)" } : undefined}
     >
       <table
@@ -257,7 +280,7 @@ export default function DataTable<T>({
                   {conAcciones ? <td className={styles.actionsCell} /> : null}
                 </tr>
               ))
-            : rows.map((row) => {
+            : filasPagina.map((row) => {
                 const key = rowKey(row);
                 const marcada = selectable && seleccion.has(key);
                 return (
@@ -292,6 +315,7 @@ export default function DataTable<T>({
                       <td
                         key={col.key}
                         data-numeric={col.numeric ? "true" : undefined}
+                        data-label={col.shortLabel ?? (typeof col.label === "string" ? col.label : undefined)}
                         style={{ textAlign: alignOf(col) }}
                       >
                         {col.render ? col.render(row) : col.accessor ? col.accessor(row) : valorDelCampo(row, col.key)}
@@ -311,7 +335,29 @@ export default function DataTable<T>({
     </div>
   );
 
-  if (!selectable) return tabla;
+  const desde = paginaActual * (Number.isFinite(porPagina) ? porPagina : 0) + 1;
+  const hasta = desde + filasPagina.length - 1;
+  const pie =
+    totalPaginas > 1 ? (
+      <Paginacion
+        desde={desde}
+        hasta={hasta}
+        total={rows.length}
+        pagina={paginaActual}
+        paginas={totalPaginas}
+        onPagina={setPagina}
+      />
+    ) : null;
+  const tablaConPie = pie ? (
+    <div className={styles.conPie}>
+      {tabla}
+      {pie}
+    </div>
+  ) : (
+    tabla
+  );
+
+  if (!selectable) return tablaConPie;
 
   const cuenta = seleccion.size;
   const ctx: SelectionContext<T> = { count: cuenta, keys: Array.from(seleccion), rows: rows.filter((r) => seleccion.has(rowKey(r))), clear: limpiar };
@@ -319,13 +365,76 @@ export default function DataTable<T>({
 
   return (
     <div className={styles.outer}>
-      {tabla}
+      {tablaConPie}
       {cuenta > 0 && selectionBar !== null ? (
         <SelectionBar count={cuenta} label={selectionLabel(cuenta)} onClear={limpiar}>
           {acciones}
         </SelectionBar>
       ) : null}
     </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────── */
+
+/** Páginas que se ofrecen: la primera, la última y dos alrededor de la actual. */
+function paginasVisibles(pagina: number, paginas: number): Array<number | "…"> {
+  const set = new Set([0, paginas - 1, pagina - 1, pagina, pagina + 1].filter((p) => p >= 0 && p < paginas));
+  const lista = Array.from(set).sort((a, b) => a - b);
+  const out: Array<number | "…"> = [];
+  lista.forEach((p, i) => {
+    if (i > 0 && p - lista[i - 1] > 1) out.push("…");
+    out.push(p);
+  });
+  return out;
+}
+
+/** Pie de la tabla: «Mostrando 1–50 de 312» y las páginas. */
+export function Paginacion({
+  desde,
+  hasta,
+  total,
+  pagina,
+  paginas,
+  onPagina,
+}: {
+  desde: number;
+  hasta: number;
+  total: number;
+  pagina: number;
+  paginas: number;
+  onPagina: (p: number) => void;
+}) {
+  const fmt = (n: number) => n.toLocaleString("es-MX");
+  return (
+    <nav className={styles.pie} aria-label="Páginas de la tabla">
+      <span className={styles.pieCuenta} aria-live="polite">
+        Mostrando {fmt(desde)}–{fmt(hasta)} de {fmt(total)}
+      </span>
+      <div className={styles.piePaginas}>
+        <button type="button" className={styles.pieBtn} onClick={() => onPagina(pagina - 1)} disabled={pagina === 0} aria-label="Página anterior">
+          ‹
+        </button>
+        {paginasVisibles(pagina, paginas).map((p, i) =>
+          p === "…" ? (
+            <span key={`h${i}`} className={styles.pieHueco} aria-hidden="true">…</span>
+          ) : (
+            <button
+              key={p}
+              type="button"
+              className={styles.pieBtn}
+              aria-current={p === pagina ? "page" : undefined}
+              onClick={() => onPagina(p)}
+            >
+              {p + 1}
+            </button>
+          ),
+        )}
+        <button type="button" className={styles.pieBtn} onClick={() => onPagina(pagina + 1)} disabled={pagina >= paginas - 1} aria-label="Página siguiente">
+          ›
+        </button>
+      </div>
+    </nav>
   );
 }
 

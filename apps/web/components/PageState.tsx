@@ -21,6 +21,10 @@
  */
 
 import Simbolo from "@/components/ui/Simbolo";
+import UiEmptyState from "@/components/ui/EmptyState";
+import UiPageHeader from "@/components/ui/PageHeader";
+import UiSkeleton from "@/components/ui/Skeleton";
+import Button from "@/components/ui/Button";
 import { type CSSProperties, type ReactNode } from "react";
 
 // ─── LOADING ────────────────────────────────────────────────────────────────
@@ -93,47 +97,17 @@ type EmptyStateProps = {
   variant?: "default" | "subtle";
 };
 
-export function EmptyState({ icon = "📭", title, description, actionLabel, onAction, variant = "default" }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, actionLabel, onAction, variant = "default" }: EmptyStateProps) {
+  // Desde el 07-11 dibuja el vacío común de Core (`components/ui/EmptyState`): misma API, sin emoji
+  // por omisión ni colores sueltos. Un ícono de texto que se pase sigue saliendo con `Simbolo`.
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: variant === "subtle" ? "32px 16px" : "48px 24px",
-        textAlign: "center",
-        background: variant === "subtle" ? "transparent" : "var(--surface, #fff)",
-        border: variant === "subtle" ? "1px dashed var(--border, #e5e7eb)" : "1px solid var(--border, #e5e7eb)",
-        borderRadius: 14,
-        color: "var(--text-secondary, #6b7280)",
-      }}
-    >
-      <div style={{ fontSize: 38, marginBottom: 8, color: "var(--ui-fg-3)" }}><Simbolo valor={icon} size={36} /></div>
-      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--text-primary, #111)" }}>{title}</h3>
-      {description && (
-        <p style={{ margin: "6px 0 0", fontSize: 13, maxWidth: 420, lineHeight: 1.5 }}>{description}</p>
-      )}
-      {actionLabel && onAction && (
-        <button
-          type="button"
-          onClick={onAction}
-          style={{
-            marginTop: 16,
-            padding: "8px 18px",
-            background: "var(--primary, #0ea5e9)",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            cursor: "pointer",
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          {actionLabel}
-        </button>
-      )}
-    </div>
+    <UiEmptyState
+      icon={icon ? <Simbolo valor={icon} size={24} /> : undefined}
+      title={title}
+      description={description}
+      variant={variant === "subtle" ? "compact" : "default"}
+      action={actionLabel && onAction ? <Button variant="primary" size="sm" onClick={onAction}>{actionLabel}</Button> : undefined}
+    />
   );
 }
 
@@ -144,46 +118,16 @@ type ErrorStateProps = {
   onRetry?: () => void;
 };
 
-export function ErrorState({ error, title = "Algo salió mal", onRetry }: ErrorStateProps) {
-  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "Error desconocido";
-
+export function ErrorState({ error, title = "No se pudo cargar", onRetry }: ErrorStateProps) {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "Intenta de nuevo en un momento.";
   return (
-    <div
-      role="alert"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        textAlign: "center",
-        padding: "32px 24px",
-        background: "color-mix(in srgb, #dc2626 6%, var(--surface, #fff))",
-        border: "1px solid color-mix(in srgb, #dc2626 35%, var(--border, #e5e7eb))",
-        borderRadius: 14,
-        color: "var(--text-primary, #111)",
-      }}
-    >
-      <div style={{ marginBottom: 6, color: "var(--ui-danger)" }}><Simbolo valor="⚠" size={32} /></div>
-      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{title}</h3>
-      <p style={{ margin: "6px 0 0", fontSize: 13, maxWidth: 480, color: "var(--text-secondary, #6b7280)" }}>{message}</p>
-      {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          style={{
-            marginTop: 16,
-            padding: "8px 18px",
-            background: "#dc2626",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            cursor: "pointer",
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          Reintentar
-        </button>
-      )}
+    <div role="alert">
+      <UiEmptyState
+        tone="danger"
+        title={title}
+        description={message}
+        action={onRetry ? <Button variant="secondary" size="sm" onClick={onRetry}>Reintentar</Button> : undefined}
+      />
     </div>
   );
 }
@@ -198,32 +142,10 @@ type PageHeaderProps = {
   style?: CSSProperties;
 };
 
-export function PageHeader({ title, subtitle, icon, actions, badge, style }: PageHeaderProps) {
-  return (
-    <header
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 16,
-        padding: "0 0 18px 0",
-        marginBottom: 18,
-        borderBottom: "1px solid var(--border, #e5e7eb)",
-        flexWrap: "wrap",
-        ...style,
-      }}
-    >
-      <div style={{ flex: 1, minWidth: 240 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--text-primary, #111)", display: "flex", alignItems: "center", gap: 10 }}>
-          {icon && <span style={{ fontSize: 26 }}>{icon}</span>}
-          <span>{title}</span>
-          {badge && <span style={{ marginLeft: 4 }}>{badge}</span>}
-        </h1>
-        {subtitle && <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text-secondary, #6b7280)", lineHeight: 1.5 }}>{subtitle}</p>}
-      </div>
-      {actions && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{actions}</div>}
-    </header>
-  );
+export function PageHeader({ title, subtitle, actions, badge, style }: PageHeaderProps) {
+  // Encabezado común de Core (`components/ui/PageHeader`). El `icon` de emoji ya no se pinta: los
+  // títulos van sin adornos en todas las pantallas (07-11).
+  return <UiPageHeader title={title} subtitle={subtitle} actions={actions} meta={badge} style={style} density="ops" />;
 }
 
 // ─── CARD ───────────────────────────────────────────────────────────────────
@@ -283,24 +205,7 @@ type SkeletonProps = {
 };
 
 export function Skeleton({ width = "100%", height = 14, radius = 6, style }: SkeletonProps) {
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        display: "inline-block",
-        width,
-        height,
-        borderRadius: radius,
-        background:
-          "linear-gradient(90deg, var(--bg-secondary, #f3f4f6) 0%, var(--border, #e5e7eb) 50%, var(--bg-secondary, #f3f4f6) 100%)",
-        backgroundSize: "200% 100%",
-        animation: "nx-shimmer 1.4s ease-in-out infinite",
-        ...style,
-      }}
-    >
-      <style>{`@keyframes nx-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
-    </span>
-  );
+  return <UiSkeleton width={width} height={height} radius={radius} style={style} />;
 }
 
 type SkeletonListProps = {
@@ -403,7 +308,7 @@ type StatCardProps = {
   color?: string;
 };
 
-export function StatCard({ label, value, delta, deltaPositive = true, icon, color = "#0ea5e9" }: StatCardProps) {
+export function StatCard({ label, value, delta, deltaPositive = true, icon, color = "var(--ui-brand)" }: StatCardProps) {
   return (
     <div
       style={{

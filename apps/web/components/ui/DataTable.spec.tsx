@@ -192,3 +192,32 @@ describe("DataTable · selección múltiple", () => {
     expect(onClear).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("DataTable · paginación", () => {
+  type Fila = { id: number; nombre: string };
+  const muchas: Fila[] = Array.from({ length: 120 }, (_, i) => ({ id: i + 1, nombre: `Fila ${i + 1}` }));
+  const cols: Column<Fila>[] = [{ key: "nombre", label: "Nombre" }];
+
+  it("pagina de 50 en 50 y dice cuántas hay", async () => {
+    render(<DataTable<Fila> columns={cols} rows={muchas} rowKey={(r) => r.id} />);
+    expect(screen.getByText("Mostrando 1–50 de 120")).toBeTruthy();
+    expect(screen.getByText("Fila 50")).toBeTruthy();
+    expect(screen.queryByText("Fila 51")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Página siguiente" }));
+    expect(screen.getByText("Mostrando 51–100 de 120")).toBeTruthy();
+    expect(screen.getByText("Fila 51")).toBeTruthy();
+  });
+
+  it("con pocas filas o pageSize={false} no pinta el pie", () => {
+    const { rerender } = render(<DataTable<Fila> columns={cols} rows={muchas.slice(0, 10)} rowKey={(r) => r.id} />);
+    expect(screen.queryByRole("navigation", { name: "Páginas de la tabla" })).toBeNull();
+    rerender(<DataTable<Fila> columns={cols} rows={muchas} rowKey={(r) => r.id} pageSize={false} />);
+    expect(screen.queryByRole("navigation", { name: "Páginas de la tabla" })).toBeNull();
+    expect(screen.getByText("Fila 120")).toBeTruthy();
+  });
+
+  it("cada celda lleva su etiqueta para la vista de tarjetas en teléfono", () => {
+    const { container } = render(<DataTable<Fila> columns={cols} rows={muchas.slice(0, 1)} rowKey={(r) => r.id} />);
+    expect(container.querySelector('td[data-label="Nombre"]')).toBeTruthy();
+  });
+});

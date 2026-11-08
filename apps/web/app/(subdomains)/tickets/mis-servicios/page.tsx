@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { buildApiUrl } from "@/lib/api-base";
+import { toast } from "@/components/Toast";
 import { usePortalSession } from "@/components/portal/PortalShell";
 
 type ServicesSummary = {
@@ -180,7 +181,7 @@ export default function MisServiciosPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert((err as Error).message || "No se pudo descargar el archivo");
+      toast.error((err as Error).message || "No se pudo descargar el archivo");
     } finally {
       setDownloadingInvoice(null);
     }
@@ -234,7 +235,7 @@ export default function MisServiciosPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert((err as Error).message || "No se pudo descargar la cotización");
+      toast.error((err as Error).message || "No se pudo descargar la cotización");
     } finally {
       setDownloadingQuoteId(null);
     }

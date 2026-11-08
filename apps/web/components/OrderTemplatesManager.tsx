@@ -445,7 +445,7 @@ export default function OrderTemplatesManager() {
                     <input name="companyName" value={form.companyName} onChange={onFormChange} />
                   </div>
                   <div className={styles.field}>
-                    <label>Email</label>
+                    <label>Correo</label>
                     <input name="companyEmail" value={form.companyEmail} onChange={onFormChange} />
                   </div>
                   <div className={styles.field}>

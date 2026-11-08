@@ -661,6 +661,7 @@ export default function AuditoriaPage() {
         }
       >
         <DataTable
+            pageSize={false}
           flush
           columns={columns}
           rows={filtradas}

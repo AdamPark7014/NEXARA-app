@@ -705,6 +705,7 @@ export default function MovimientosPage() {
       >
         {sinSesion ? null : (
           <DataTable
+            pageSize={false}
             flush
             columns={columns}
             rows={rows}
