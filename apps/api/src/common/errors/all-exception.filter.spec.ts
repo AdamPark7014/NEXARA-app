@@ -190,3 +190,25 @@ describe('subidas por HTTP con multer real', () => {
     expect(cuerpo['errorCode']).toBe('UNEXPECTED_FILE');
   });
 });
+
+describe('AllExceptionsFilter · nivel del log', () => {
+  function host(url = '/api/page-content/seo_home') {
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    const req = { url, method: 'GET', headers: {}, body: {}, query: {}, params: {} };
+    return {
+      switchToHttp: () => ({ getResponse: () => res, getRequest: () => req }),
+    } as any;
+  }
+
+  it('un 4xx va como aviso y un 5xx como error', () => {
+    const { NotFoundException } = jest.requireActual('@nestjs/common');
+    const warn = jest.fn();
+    const error = jest.fn();
+    const filter = new AllExceptionsFilter({ warn, error, log: jest.fn() }) as any;
+    filter.catch(new NotFoundException('Sección "seo_home" no tiene contenido publicado todavía.'), host());
+    expect(warn).toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+    filter.catch(new Error('falla real'), host('/api/x'));
+    expect(error).toHaveBeenCalledTimes(1);
+  });
+});

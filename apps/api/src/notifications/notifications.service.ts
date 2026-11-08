@@ -702,17 +702,25 @@ export class NotificationsService {
         },
       });
 
-      for (const quote of expiredQuotes) {
-        // Check if we already notified (don't send duplicate)
-        const alreadyNotified = await this.prisma.notification.findFirst({
-          where: {
-            relatedEntityId: quote.id,
-            type: 'QUOTE_EXPIRED',
-            entityType: 'Cotizacion',
-          },
-        });
+      // Una sola consulta para saber cuáles ya se avisaron (antes, una por cotización cada 30 min).
+      const yaAvisadas = new Set(
+        expiredQuotes.length
+          ? (
+              await this.prisma.notification.findMany({
+                where: {
+                  relatedEntityId: { in: expiredQuotes.map((q) => q.id) },
+                  type: 'QUOTE_EXPIRED',
+                  entityType: 'Cotizacion',
+                },
+                select: { relatedEntityId: true },
+              })
+            ).map((n) => n.relatedEntityId)
+          : [],
+      );
 
-        if (alreadyNotified) continue;
+      for (const quote of expiredQuotes) {
+        // Don't send duplicate
+        if (yaAvisadas.has(quote.id)) continue;
 
         // Notify creator
         if (quote.createdById) {
