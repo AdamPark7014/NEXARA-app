@@ -952,6 +952,9 @@ export function filaControl(e: EntradaFila): FilaControl {
   }
   const sinSalida = dias.filter((d) => d.sinSalida).length;
   if (sinSalida) avisos.push(`${sinSalida} día(s) sin salida registrada: sus horas quedan en 0.00.`);
+  if (sueldo != null && dias.every((d) => !d.horas)) {
+    avisos.push('Sin checadas en toda la semana: el total lleva su sueldo completo, revísalo antes de pagar.');
+  }
   for (const f of festivosTrabajados) {
     const dia = `${NOMBRES_DIA[diaDeLaSemana(f.fecha)]} ${ddmm(f.fecha)}`;
     avisos.push(

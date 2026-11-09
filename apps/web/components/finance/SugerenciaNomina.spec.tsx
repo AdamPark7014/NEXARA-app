@@ -157,7 +157,7 @@ describe("SugerenciaNomina", () => {
 
     expect(screen.getByText(NOTA_FORMULA)).toBeTruthy();
     expect(screen.getByText(/no genera pagos/)).toBeTruthy();
-    expect(screen.getByText(/en curso: lo esperado se cuenta hasta el 2026-10-01/)).toBeTruthy();
+    expect(screen.getByText(/en curso: lo esperado se cuenta hasta el 1 oct/)).toBeTruthy();
     expect(screen.getByText(/«a la fecha» corta el 1 oct y «periodo completo» el 15 oct/)).toBeTruthy();
     // El selector ya trae las fechas de cada periodo.
     expect(screen.getByRole("option", { name: "Semana actual · 28 sep – 4 oct" })).toBeTruthy();

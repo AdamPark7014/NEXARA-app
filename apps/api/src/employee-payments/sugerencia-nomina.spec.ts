@@ -91,6 +91,13 @@ describe('el pago por hora sale de su horario', () => {
     // Con la jornada legal también cuentan los sábados 19 y 26.
     expect(minutosEsperados(divisorDeHorario(SIN_HORARIO), QUINCENA.desde, QUINCENA.hasta)).toBe(13 * 480);
   });
+
+  it('un festivo que no le toca no cuenta como horas esperadas', () => {
+    // Semana del 2 al 8 de noviembre de 2026: el lunes 2 es Día de Muertos.
+    const divisor = divisorDeHorario(OFICINA);
+    expect(minutosEsperados(divisor, '2026-11-02', '2026-11-08')).toBe(5 * 480);
+    expect(minutosEsperados(divisor, '2026-11-02', '2026-11-08', ['2026-11-02'])).toBe(4 * 480);
+  });
 });
 
 describe('periodo de nómina', () => {

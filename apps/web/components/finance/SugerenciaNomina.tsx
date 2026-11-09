@@ -180,8 +180,10 @@ function partesPeriodo(datos: SugerenciaNominaRespuesta): string[] {
   const partes = p.clave?.startsWith("semana")
     ? [encabezadoSemana(p.desde, p.hasta, p.pagoEl)]
     : [`${p.origen === "manual" ? "Rango" : "Periodo"} ${p.etiqueta}`, `del ${p.desde} al ${p.hasta}`];
-  if (p.enCurso) {
-    partes.push(`en curso: lo esperado se cuenta hasta el ${p.calculadoHasta}`);
+  if (p.enCurso && p.calculadoHasta < p.desde) {
+    partes.push("apenas empieza: el primer día se calcula al terminar la jornada");
+  } else if (p.enCurso) {
+    partes.push(`en curso: lo esperado se cuenta hasta el ${fechaCorta(p.calculadoHasta)}`);
     partes.push(`«a la fecha» corta el ${fechaCorta(p.calculadoHasta)} y «periodo completo» el ${fechaCorta(p.hasta)}`);
   }
   if (p.origen === "por_omision") partes.push("la empresa no tiene calendario de nómina: se asume semanal, de lunes a domingo");
@@ -394,7 +396,9 @@ export default function SugerenciaNomina({ token }: { token: string }) {
   const t = datos?.totales;
   const fechasDe = new Map((datos?.periodos ?? []).map((p) => [p.clave, rangoCorto(p.desde, p.hasta)]));
   const MXN = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
-  const porRevisar = t ? t.revisar + t.sinSueldo + t.sinJornadas : 0;
+  // Una semana que empieza hoy todavía no tiene días cerrados: «sin jornadas» ahí no es una alarma.
+  const sinDiasCerrados = Boolean(datos?.periodo.enCurso && datos.periodo.calculadoHasta < datos.periodo.desde);
+  const porRevisar = t ? t.revisar + t.sinSueldo + (sinDiasCerrados ? 0 : t.sinJornadas) : 0;
 
   const esperandoCalculo = cargando && !datos;
   const esperandoRango = !datos && !cargando && modo === "rango" && !error;
@@ -493,10 +497,23 @@ export default function SugerenciaNomina({ token }: { token: string }) {
         </div>
       )}
 
+      {sinDiasCerrados && (
+        <Alert
+          tone="info"
+          action={
+            <Button size="sm" variant="secondary" onClick={() => setModo("semana_anterior")}>
+              Ver la semana anterior
+            </Button>
+          }
+        >
+          Esta semana todavía no tiene días cerrados. La que se paga hoy es la semana anterior.
+        </Alert>
+      )}
+
       {t && t.personas > 0 && (
         <StatRow variant="strip" ariaLabel="Totales de la sugerencia de nómina">
           <Stat
-            label={enCurso ? `Sugerido al ${fechaCorta(datos!.periodo.calculadoHasta)}` : "Sugerido"}
+            label={sinDiasCerrados ? "Sugerido a la fecha" : enCurso ? `Sugerido al ${fechaCorta(datos!.periodo.calculadoHasta)}` : "Sugerido"}
             value={<Money value={t.montoSugerido} />}
             hint={
               enCurso && t.proyectado != null
@@ -526,7 +543,11 @@ export default function SugerenciaNomina({ token }: { token: string }) {
             value={porRevisar}
             hint={
               <FraseDatos
-                partes={[`${t.revisar} baja productividad`, `${t.sinSueldo} sin sueldo`, `${t.sinJornadas} sin jornadas`]}
+                partes={
+                  sinDiasCerrados
+                    ? ["la semana apenas empieza"]
+                    : [`${t.revisar} baja productividad`, `${t.sinSueldo} sin sueldo`, `${t.sinJornadas} sin jornadas`]
+                }
               />
             }
             tone={porRevisar > 0 ? "warning" : "default"}

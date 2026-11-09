@@ -1023,7 +1023,13 @@ function EmployeePaymentsContent() {
                   size="compact"
                   tone="neutral"
                   icon={<InsightsOutlinedIcon />}
-                  title="En el periodo elegido no hay ningún pago registrado."
+                  title={dateFrom || dateTo ? "En el periodo elegido no hay ningún pago registrado." : "Todavía no hay pagos registrados."}
+                  description="El análisis se llena con los pagos que salen al cerrar cada semana en Control semanal."
+                  action={
+                    <Button size="sm" variant="secondary" onClick={() => setTab("control")}>
+                      Ir a Control semanal
+                    </Button>
+                  }
                 />
               </Card>
             )}
@@ -1048,7 +1054,7 @@ function EmployeePaymentsContent() {
                   <Stat
                     label="Empleados"
                     value={analytics.employees}
-                    hint="con pagos en el periodo"
+                    hint="con pago liquidado"
                     icon={<GroupsOutlinedIcon />}
                     iconTone="neutral"
                   />
@@ -1228,7 +1234,7 @@ function EmployeePaymentsContent() {
                       icon: <PaymentsOutlinedIcon />,
                       title: "Todavía no hay pagos",
                       description: cfg.canCreate
-                        ? "Un pago nace de un periodo trabajado: eliges a la persona, el rango de fechas y el neto que se deposita. Queda en borrador hasta que alguien lo aprueba."
+                        ? "Los de cada semana salen al cerrar el Control semanal. También puedes registrar uno suelto: eliges a la persona, el rango de fechas y el neto que se deposita, y queda en borrador hasta que alguien lo aprueba."
                         : "Aquí aparecen los pagos por periodo trabajado que captura el equipo administrativo.",
                       action: cfg.canCreate ? (
                         <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={openNew}>
