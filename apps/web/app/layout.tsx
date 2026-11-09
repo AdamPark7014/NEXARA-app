@@ -15,7 +15,9 @@ import {
   NEXARA_FAVICON_512,
   NEXARA_FAVICON_ICO,
   NEXARA_LOGO_LOCKUP,
-  NEXARA_MAPS_LINK,
+  NEXARA_GEO,
+  NEXARA_MAPS_PERFIL,
+  NEXARA_PERFILES_OFICIALES,
 } from "@/lib/brand";
 
 const spaceGrotesk = Space_Grotesk({
@@ -201,11 +203,13 @@ export default function RootLayout({
       availableLanguage: "Spanish",
     },
     areaServed: { "@type": "Country", name: "Mexico" },
+    sameAs: [...NEXARA_PERFILES_OFICIALES],
   };
 
   const localBusinessJson = {
     "@context": "https://schema.org",
     "@type": "ProfessionalService",
+    "@id": `${siteUrl}/#negocio`,
     name: "NEXARA",
     alternateName: NOMBRES_ALTERNOS,
     description:
@@ -216,7 +220,9 @@ export default function RootLayout({
     telephone: "+52 222 696 0350",
     email: CORREO_PUBLICO,
     address: NEXARA_DIRECCION_POSTAL,
-    hasMap: NEXARA_MAPS_LINK,
+    hasMap: NEXARA_MAPS_PERFIL,
+    geo: NEXARA_GEO,
+    sameAs: [...NEXARA_PERFILES_OFICIALES],
     openingHoursSpecification: {
       "@type": "OpeningHoursSpecification",
       dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],

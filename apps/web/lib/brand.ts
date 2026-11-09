@@ -48,3 +48,19 @@ export const NEXARA_DIRECCION_POSTAL = {
 
 /** Google Maps por dirección: abre aunque el Perfil de Negocio esté en revisión. */
 export const NEXARA_MAPS_LINK = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(NEXARA_DOMICILIO_TEXTO)}`;
+
+/**
+ * Ficha real de NEXARA en Google Maps (perfil verificado, visto el 09-11-2026). Va en los datos
+ * estructurados para que Google ligue el sitio con esa ficha, no solo con una dirección.
+ */
+export const NEXARA_MAPS_PERFIL = "https://www.google.com/maps?cid=18142932209612815098";
+
+/** Coordenadas del pin de esa ficha. */
+export const NEXARA_GEO = { "@type": "GeoCoordinates", latitude: 19.0725922, longitude: -98.2766862 } as const;
+
+/** Páginas oficiales de la marca; las mismas del pie del sitio. */
+export const NEXARA_PERFILES_OFICIALES = [
+  NEXARA_MAPS_PERFIL,
+  "https://www.facebook.com/nexara.mexico/",
+  "https://www.instagram.com/nexara_mx/",
+] as const;
