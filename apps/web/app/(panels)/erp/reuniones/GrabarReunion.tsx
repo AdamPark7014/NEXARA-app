@@ -49,6 +49,8 @@ export default function GrabarReunion() {
 
   const minutos = Math.floor(grabadora.transcurrido / 60_000);
   const enTexto = estado?.listas ?? 0;
+  // Cada parte son 20 s de audio: «6 ya en texto» parecía que solo se grababan esos pedazos (09-11).
+  const minutosEnTexto = Math.floor((enTexto * 20) / 60);
   const etiqueta = concluyendo ? "Concluyendo" : grabadora.pausado ? "En pausa" : grabadora.grabando ? "Grabando" : "Detenida";
   const enVivo = grabadora.grabando && !grabadora.pausado && !concluyendo;
   const mudo = enVivo && grabadora.silencioMs >= SILENCIO_MS;
@@ -94,7 +96,7 @@ export default function GrabarReunion() {
           ? enCola
             ? `Subiendo lo último de la grabación (${enCola} ${enCola === 1 ? "parte" : "partes"})…`
             : "Guardando la grabación para escribir la minuta…"
-          : `${minutos} ${minutos === 1 ? "minuto grabado" : "minutos grabados"} · ${enTexto} ya en texto · las notas se toman cada ~4 minutos · sigue grabando aunque cambies de módulo, pestaña o aplicación`}
+          : `${minutos} ${minutos === 1 ? "minuto grabado completo" : "minutos grabados completos"} · ${minutosEnTexto} ya ${minutosEnTexto === 1 ? "pasó" : "pasaron"} a texto${minutosEnTexto < minutos ? " (lo demás se transcribe solo y entra a la minuta)" : ""} · las notas se toman cada ~4 minutos · sigue grabando aunque cambies de módulo, pestaña o aplicación`}
         {!concluyendo && enCola > 1 ? ` · ${enCola} partes por subir` : ""}
       </p>
 
