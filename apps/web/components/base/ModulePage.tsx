@@ -309,6 +309,8 @@ export function FilterChip({
   children: ReactNode;
   className?: string;
 }) {
+  // Un filtro que no encontraría nada solo estorba: se ve cuando tiene algo o cuando está puesto.
+  if (count === 0 && !active && !onRemove) return null;
   const cuerpo = (
     <>
       {dot ? <span className={s.chipDot} style={{ background: TONE_COLOR[dot] }} aria-hidden="true" /> : null}

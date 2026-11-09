@@ -450,7 +450,7 @@ export default function ProyectosPage() {
     className: styles.pagina,
     title: "Proyectos",
     description:
-      "Fechas planeadas y reales, cronograma por etapas, alcance, equipo y documentos. El avance y el semáforo se calculan solos con las actividades y las fechas.",
+      "Fechas, avance y equipo de cada obra.",
     icon: <AccountTreeOutlinedIcon />,
     primaryAction:
       sinRegistros && !error ? null : (

@@ -263,6 +263,44 @@
   color: var(--ui-brand);
 }
 
+/* Menú «Más» de las pestañas: se pinta en <body>, sin recortes de la barra. */
+.tabsMenu {
+  position: fixed;
+  z-index: 1200;
+  display: grid;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid var(--ui-border, #e3e8e6);
+  border-radius: 12px;
+  background: var(--ui-surface, #fff);
+  box-shadow: 0 16px 36px -14px rgb(16 40 32 / 35%);
+}
+
+.tabsMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ui-fg, #16201d);
+  font: inherit;
+  font-size: var(--ui-text-sm, 13.5px);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tabsMenuItem:hover,
+.tabsMenuItem:focus-visible {
+  background: var(--ui-surface-2, #f1f5f3);
+}
+
+.tabsMenuItem svg {
+  font-size: 17px !important;
+  color: var(--ui-fg-3, #6b7874);
+}
+
 .count {
   display: inline-grid;
   place-items: center;

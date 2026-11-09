@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { isValidElement, type ComponentType, type CSSProperties, type ReactNode } from "react";
+import { isValidElement, useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import s from "./base.module.css";
 
 export type PageHeadCrumb = { label: ReactNode; href?: string };
@@ -137,17 +138,56 @@ export function Tabs<T extends string>({
   onChange,
   ariaLabel,
   modo = "pestanas",
+  todasVisibles = false,
 }: {
   items: ReadonlyArray<TabItem<T>>;
   value: T | null;
   onChange: (id: T) => void;
   ariaLabel: string;
   modo?: "pestanas" | "filtro";
+  /** Para el módulo que debe enseñar todas sus secciones en una fila, sin «Más». */
+  todasVisibles?: boolean;
 }) {
   const esTab = modo === "pestanas";
+  const [masAbierto, setMasAbierto] = useState(false);
+  const [masPos, setMasPos] = useState<{ top: number; left: number } | null>(null);
+  const masBoton = useRef<HTMLButtonElement>(null);
+  const masMenu = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!masAbierto) return;
+    const r = masBoton.current?.getBoundingClientRect();
+    if (r) setMasPos({ top: r.bottom + 6, left: Math.min(r.left, window.innerWidth - 228) });
+    const fuera = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!masMenu.current?.contains(t) && !masBoton.current?.contains(t)) setMasAbierto(false);
+    };
+    const cerrar = () => setMasAbierto(false);
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMasAbierto(false);
+    };
+    document.addEventListener("mousedown", fuera);
+    document.addEventListener("keydown", tecla);
+    window.addEventListener("scroll", cerrar, true);
+    window.addEventListener("resize", cerrar);
+    return () => {
+      document.removeEventListener("mousedown", fuera);
+      document.removeEventListener("keydown", tecla);
+      window.removeEventListener("scroll", cerrar, true);
+      window.removeEventListener("resize", cerrar);
+    };
+  }, [masAbierto]);
+
+  // Más de seis secciones no se leen de un vistazo: cinco a la vista y el resto en «Más»; la abierta siempre se ve.
+  const conMas = esTab && !todasVisibles && items.length > 6;
+  const primeras = conMas ? items.slice(0, 5) : items;
+  const abiertaOculta = conMas && !primeras.some((i) => i.id === value) ? items.find((i) => i.id === value) : undefined;
+  const visibles = abiertaOculta ? [...primeras.slice(0, 4), abiertaOculta] : primeras;
+  const resto = conMas ? items.filter((i) => !visibles.some((v) => v.id === i.id)) : [];
+
   return (
     <div className={s.tabs} role={esTab ? "tablist" : "group"} aria-label={ariaLabel}>
-      {items.map(({ id, label, icon: Icon, count }) => {
+      {visibles.map(({ id, label, icon: Icon, count }) => {
         const on = value === id;
         return (
           <button
@@ -163,6 +203,42 @@ export function Tabs<T extends string>({
           </button>
         );
       })}
+      {resto.length > 0 ? (
+        <button
+          ref={masBoton}
+          type="button"
+          className={s.tab}
+          aria-haspopup="menu"
+          aria-expanded={masAbierto}
+          onClick={() => setMasAbierto((v) => !v)}
+        >
+          Más
+          <span className={s.count}>{resto.length}</span>
+        </button>
+      ) : null}
+      {masAbierto && masPos
+        ? createPortal(
+            <div ref={masMenu} role="menu" aria-label={`Más: ${ariaLabel}`} className={s.tabsMenu} style={masPos}>
+              {resto.map(({ id, label, icon: Icon, count }) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="menuitem"
+                  className={s.tabsMenuItem}
+                  onClick={() => {
+                    setMasAbierto(false);
+                    onChange(id);
+                  }}
+                >
+                  {Icon ? <Icon aria-hidden="true" /> : null}
+                  {label}
+                  {count != null ? <span className={s.count}>{count}</span> : null}
+                </button>
+              ))}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
