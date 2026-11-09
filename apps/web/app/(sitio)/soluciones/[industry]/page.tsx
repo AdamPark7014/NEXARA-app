@@ -5,6 +5,7 @@ import { findIndustryLanding, getProgrammaticLandings } from "@/lib/seo/programm
 import { INDUSTRY_HUB_SLUGS } from "@/lib/seo/industry-hubs";
 import { buildWhatsAppLeadUrl, MONEY_SERVICE_SLUGS } from "@/lib/seo/money-pages";
 import { GEO_CITIES } from "@/lib/seo/geo-cities";
+import { recortarDescripcion, tituloConRemate } from "@/lib/seo/textos";
 import { JsonLd } from "@/lib/seo/json-ld";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
 import s from "@/components/sitio/sitio.module.css";
@@ -176,8 +177,10 @@ export async function generateMetadata(props: { params: Promise<Params> }): Prom
     return { title: "Soluciones | Nexara", robots: { index: false, follow: false } };
   }
   const path = `/soluciones/${params.industry}`;
-  const title = `${hub.name}: CCTV, redes y soporte TI en México | NEXARA`;
-  const description = `${hub.lead} Cotiza soluciones NEXARA para ${hub.name.toLowerCase()} en Puebla, CDMX y todo México.`;
+  const title = tituloConRemate(`${hub.name}: CCTV, redes y soporte TI`, "en México");
+  const description = recortarDescripcion(
+    `${hub.lead} Cotiza soluciones NEXARA para ${hub.name.toLowerCase()} en Puebla, CDMX y todo México.`,
+  );
   const imagen = fotoOg(visualIndustria(params.industry).foto ?? "campo-instalacion-rack");
   return {
     title: { absolute: title },

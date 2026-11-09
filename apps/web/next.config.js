@@ -235,6 +235,13 @@ const nextConfig = {
 
     return [
       {
+        // Solo el sitio público se indexa (09-11): core.nexara.com.mx salía «index, follow» con el
+        // título del sitio y sin canonical, compitiendo con nexara.com.mx en Google.
+        source: '/:path*',
+        has: [{ type: 'host', value: '^(?!www\\.)[a-z0-9-]+\\.nexara\\.com\\.mx$' }],
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      },
+      {
         // Service worker: sin caché agresiva para que los clientes reciban actualizaciones;
         // en producción el sitio debe ser HTTPS (requisito del navegador para SW y push).
         source: '/sw.js',

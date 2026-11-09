@@ -12,7 +12,8 @@ export function recortarDescripcion(texto: string, max = 158): string {
 }
 
 /** El título largo deja fuera el remate («en Puebla y CDMX») antes que la marca. */
-export function tituloConRemate(base: string, remate: string, max = 70): string {
+/** Google corta los títulos cerca de 60 caracteres: más largos se ven con «…» (09-11). */
+export function tituloConRemate(base: string, remate: string, max = 62): string {
   const completo = `${base} ${remate} | NEXARA`;
   return completo.length <= max ? completo : `${base} | NEXARA`;
 }
