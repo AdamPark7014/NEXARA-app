@@ -12,6 +12,8 @@ import { KPI_MAX_DIAS, KpisEquipoService } from '../me/kpis-equipo.service.js';
 import { diasDelRango } from '../me/kpis-equipo.js';
 import { WORKDAY_TIMEZONE, workDateKey } from '../common/time/workday.js';
 import { NOMINA_SETTING_KEY, parsearConfigNomina } from './nomina-calendario.js';
+import { leerFestivos } from '../festivos/festivos-datos.js';
+import { comoLeToca } from '../festivos/festivos-reglas.js';
 import {
   divisorDeHorario,
   esClavePeriodo,
@@ -289,9 +291,18 @@ export class EmployeePaymentsService {
     }
 
     const rango = { desde: periodo.desde, hasta: periodo.hasta };
-    const datos = await this.kpis.getEquipo(viewer, tenantId, rango, null);
+    const ventana = ventanaDeCalculo(rango, hoy, null, incluyeHoy);
+    // Lo laborado se corta donde se corta lo esperado (09-11): hoy a media jornada sumaba horas contra
+    // días que todavía no se exigían, y un lunes salía «Sugerido al 8 nov» de una semana que empieza el 9.
+    const datos = await this.kpis.getEquipo(
+      viewer,
+      tenantId,
+      ventana.dias > 0 ? { desde: rango.desde, hasta: ventana.hasta } : rango,
+      null,
+    );
     const userIds = datos.personas.map((p) => p.persona.id);
     const ids = userIds.length ? userIds : [-1];
+    const festivos = await leerFestivos(this.prisma, tenantId, rango.desde, rango.hasta);
 
     const [usuarios, perfiles] = await Promise.all([
       this.prisma.user.findMany({
@@ -317,16 +328,16 @@ export class EmployeePaymentsService {
           puesto: p.persona.puesto,
           numeroEmpleado: u?.employeeNumber ?? null,
           horario: p.horario,
-          totales: p.totales,
+          totales: ventana.dias > 0 ? p.totales : { ...p.totales, minutosLaborados: 0, minutosProductivos: 0 },
           sueldoSemanal: sueldoPor.get(p.persona.id) ?? null,
           periodo: rango,
           hoy,
           incluyeHoy,
           fechaIngreso: u?.fechaIngreso ? workDateKey(u.fechaIngreso) : null,
+          diasSinExigir: festivos.filter((f) => !comoLeToca(f, { userId: p.persona.id }).trabaja).map((f) => f.fecha),
         });
       }),
     );
-    const ventana = ventanaDeCalculo(rango, hoy, null, incluyeHoy);
 
     return {
       // «A la fecha» corta en `calculadoHasta` (hoy después de las 18:00; si no, ayer); «periodo completo», en `hasta`.

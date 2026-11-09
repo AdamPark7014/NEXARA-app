@@ -194,10 +194,20 @@ export function divisorDeHorario(h: {
   };
 }
 
-/** Minutos que se esperaba que laborara entre `desde` y `hasta` (ambos incluidos). */
-export function minutosEsperados(divisor: Divisor, desde: string, hasta: string): number {
+/**
+ * Minutos que se esperaba que laborara entre `desde` y `hasta` (ambos incluidos). `sinExigir` son las fechas que
+ * no se le piden aunque caigan en su horario: los festivos que no le toca trabajar.
+ */
+export function minutosEsperados(
+  divisor: Divisor,
+  desde: string,
+  hasta: string,
+  sinExigir: readonly string[] = [],
+): number {
   if (desde > hasta) return 0;
-  const laborables = diasDelRango(desde, hasta).filter((d) => divisor.dias.includes(diaDeLaSemana(d))).length;
+  const laborables = diasDelRango(desde, hasta).filter(
+    (d) => divisor.dias.includes(diaDeLaSemana(d)) && !sinExigir.includes(d),
+  ).length;
   return laborables * divisor.jornadaMin;
 }
 
@@ -226,6 +236,8 @@ export type EntradaSugerencia = {
   /** La jornada de hoy ya terminó (18:00): hoy entra en «a la fecha». */
   incluyeHoy?: boolean;
   fechaIngreso?: string | null;
+  /** Festivos del periodo que no le toca trabajar: no cuentan como horas esperadas (igual que en Control semanal). */
+  diasSinExigir?: readonly string[];
 };
 
 export type FilaSugerencia = {
@@ -286,7 +298,7 @@ export function filaSugerencia(e: EntradaSugerencia): FilaSugerencia {
   const productivos = Math.max(0, Math.min(t.minutosProductivos, laborados));
 
   const ventana = ventanaDeCalculo(e.periodo, e.hoy, e.fechaIngreso, e.incluyeHoy);
-  const esperados = ventana.dias > 0 ? minutosEsperados(divisor, ventana.desde, ventana.hasta) : 0;
+  const esperados = ventana.dias > 0 ? minutosEsperados(divisor, ventana.desde, ventana.hasta, e.diasSinExigir) : 0;
   const diasPeriodo = diasDelRango(e.periodo.desde, e.periodo.hasta).length;
 
   const pagoHora = sueldo != null ? sueldo / divisor.horasSemanales : null;

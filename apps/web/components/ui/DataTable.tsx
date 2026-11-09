@@ -89,7 +89,7 @@ type Props<T> = {
   zebra?: boolean;
   /** Título de la tabla para el lector de pantalla (no se ve). */
   caption?: ReactNode;
-  /** Alto máximo del área desplazable con `stickyHeader`. */
+  /** Alto máximo si esta tabla debe tener scroll propio; sin él, se desplaza la página. */
   maxHeight?: number | string;
   className?: string;
   /** Acciones por fila (columna final); visibles al pasar el mouse o con foco, siempre en táctil. */
@@ -210,6 +210,21 @@ export default function DataTable<T>({
   };
   const limpiar = () => avisar(new Set());
 
+  // ¿Le caben las columnas? Entonces no hay nada que desplazar dentro de la tabla (ver `data-pagina`).
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [caben, setCaben] = useState(false);
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const tabla = wrap?.querySelector("table");
+    if (!wrap || !tabla || typeof ResizeObserver === "undefined") return;
+    const medir = () => setCaben(tabla.offsetWidth <= wrap.clientWidth + 1);
+    medir();
+    const obs = new ResizeObserver(medir);
+    obs.observe(wrap);
+    obs.observe(tabla);
+    return () => obs.disconnect();
+  }, [rows.length === 0, showSkeleton]);
+
   if (rows.length === 0 && !showSkeleton) {
     return <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />;
   }
@@ -218,16 +233,18 @@ export default function DataTable<T>({
 
   const tabla = (
     <div
+      ref={wrapRef}
       role="region"
       aria-label={ariaLabel}
       aria-busy={loading || undefined}
       tabIndex={0}
       className={[styles.wrap, "nx-table-wrap", className].filter(Boolean).join(" ")}
       data-sticky={stickyHeader ? "true" : undefined}
+      data-pagina={stickyHeader && maxHeight == null && caben ? "true" : undefined}
       data-flush={flush ? "true" : undefined}
       data-row-actions={rowActionsAlwaysVisible ? "visible" : undefined}
       data-phone-cards={phoneCards ? "true" : undefined}
-      style={stickyHeader ? { maxHeight: maxHeight ?? "min(72vh, 720px)" } : undefined}
+      style={stickyHeader && maxHeight != null ? { maxHeight } : undefined}
     >
       <table
         className={styles.table}
@@ -704,7 +721,7 @@ export function Money({
   }
   return (
     <span style={baseStyle}>
-      {negative && "−"}${abs.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+      {negative && "−"}${abs.toLocaleString("es-MX", { minimumFractionDigits: Number.isInteger(abs) ? 0 : 2, maximumFractionDigits: 2 })}
       {currency === "USD" && (
         <span style={{ fontSize: "0.7em", opacity: 0.55, marginLeft: 4, fontWeight: 600 }}>USD</span>
       )}

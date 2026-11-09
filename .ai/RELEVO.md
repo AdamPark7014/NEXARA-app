@@ -1,5 +1,15 @@
 # RELEVO
 
+- **09-11 ~16:30 México (claude-code) — Scroll de tablas y cifras de Nómina.**
+  - `DataTable` ya no tiene scroll vertical propio por omisión (antes `min(72vh, 720px)` en 104 tablas): si le caben las
+    columnas va con `overflow: clip` (`data-pagina`) y la cabecera se pega bajo la barra superior; si no, solo scroll horizontal.
+  - Sugerencia de nómina: lo laborado se corta donde lo esperado (`ventana.hasta`) y los festivos que no le tocan ya no
+    cuentan como horas esperadas (semana 2–8 nov: Día de Muertos bajaba el sugerido). Control semanal avisa si no hay checadas.
+  - Sigue habiendo dos respuestas a «cuánto pago» esa semana: Control $48,230.77 (sueldo menos descuentos aceptados) y
+    Sugerencia $35,312.41 antes de este arreglo (proporcional). Falta que Adam decida cuál manda. `employee_payments` está
+    vacía: ninguna semana se ha cerrado, por eso Lista y Análisis salen vacíos.
+  - Propuesta premium de Análisis solo inyectada en su Chrome con datos reales de 6 semanas; sin su «súbelo» no se publica.
+
 - **09-11 ~16:00 México (claude-code) — SEO y Maps (`f31d0be5`, `a67325ee`), letrero de reuniones (`3a9b5527`) y menú ⋯ del chat.**
   - Chat: `.msg` lleva `content-visibility: auto` desde `6af85d36`, que recorta lo que sale de la fila. El menú ⋯ y la
     barra de acciones quedaban cortados y parecía que no abría. Se apaga con la fila en hover, foco o menú abierto.

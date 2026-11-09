@@ -183,7 +183,6 @@
 .scroller {
   position: relative;
   max-width: 100%;
-  max-height: max(420px, calc(100vh - 240px));
   overflow: auto;
   overscroll-behavior-x: contain;
 }

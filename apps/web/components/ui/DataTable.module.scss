@@ -126,6 +126,16 @@
   top: 0;
 }
 
+/* Sin columnas que desplazar la tabla no es un área de scroll: se mueve solo la página y la cabecera se
+   queda bajo la barra superior (09-11; `clip` no crea contenedor de scroll, `auto` sí). */
+.wrap[data-sticky="true"][data-pagina="true"] {
+  overflow: clip;
+}
+
+.wrap[data-sticky="true"][data-pagina="true"] thead th {
+  top: var(--ui-sticky-top, 0px);
+}
+
 .row {
   transition: background var(--ui-duration-fast) ease;
 
