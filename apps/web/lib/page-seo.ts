@@ -98,7 +98,7 @@ export const DEFAULT_PAGE_SEO: Record<PageSeoKey, PageSeoContent> = {
     noIndex: true,
   },
   nosotros: {
-    title: "Nosotros | NEXARA",
+    title: "Nosotros: integrador de CCTV y redes en Puebla | NEXARA",
     description:
       "Ingeniería, implementación y soporte tecnológico desde Puebla y Ciudad de México, con cobertura nacional.",
     ogTitle: "Nosotros | NEXARA",
@@ -118,7 +118,7 @@ export const DEFAULT_PAGE_SEO: Record<PageSeoKey, PageSeoContent> = {
     noIndex: false,
   },
   proyectos: {
-    title: "Proyectos | NEXARA",
+    title: "Proyectos de CCTV, redes y TI en México | NEXARA",
     description:
       "Casos y proyectos de CCTV, redes y soporte ejecutados por Nexara en retail, manufactura, hospitalidad y más.",
     ogTitle: "Proyectos | NEXARA",
@@ -128,7 +128,7 @@ export const DEFAULT_PAGE_SEO: Record<PageSeoKey, PageSeoContent> = {
     noIndex: false,
   },
   blog: {
-    title: "Blog | NEXARA",
+    title: "Blog de CCTV, redes y soporte TI | NEXARA",
     description:
       "Noticias, guías y notas de campo sobre CCTV, redes, cómputo y soporte TI.",
     ogTitle: "Blog | NEXARA",
