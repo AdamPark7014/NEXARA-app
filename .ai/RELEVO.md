@@ -1,7 +1,7 @@
 # RELEVO
 
 - **09-11 ~16:30 México (claude-code) — Scroll de tablas y cifras de Nómina.**
-  - `DataTable` ya no tiene scroll vertical propio por omisión (antes `min(72vh, 720px)` en 104 tablas): si le caben las
+  - `DataTable` ya no tiene scroll vertical propio por omisión (antes `min(72vh, 720px)` en toda tabla con cabecera fija): si le caben las
     columnas va con `overflow: clip` (`data-pagina`) y la cabecera se pega bajo la barra superior; si no, solo scroll horizontal.
   - Sugerencia de nómina: lo laborado se corta donde lo esperado (`ventana.hasta`) y los festivos que no le tocan ya no
     cuentan como horas esperadas (semana 2–8 nov: Día de Muertos bajaba el sugerido). Control semanal avisa si no hay checadas.

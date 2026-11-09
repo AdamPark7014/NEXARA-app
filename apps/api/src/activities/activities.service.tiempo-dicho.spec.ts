@@ -1,8 +1,9 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ActivitiesService } from './activities.service';
 
-const inicio = new Date('2026-11-02T16:00:00Z');
-const fin = new Date('2026-11-02T22:10:00Z');
+// Terminada ayer: con fechas fijas, la prueba caducó sola al pasar los 7 días que permite la regla (09-11).
+const fin = new Date(Date.now() - 24 * 60 * 60 * 1000);
+const inicio = new Date(fin.getTime() - 370 * 60 * 1000);
 
 function build(actividad: Record<string, unknown> | null, yaDicho: { id: number } | null = null) {
   const create = jest.fn(async () => ({}));
