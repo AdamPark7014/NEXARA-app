@@ -744,6 +744,14 @@
   contain-intrinsic-size: auto 72px;
 }
 
+/* `content-visibility: auto` recorta lo que sale de la fila: la barra de acciones y el menú de ⋯
+   quedaban cortados y parecía que el botón no hacía nada (09-11). Con la fila en uso, se apaga. */
+.msg:hover,
+.msg:focus-within,
+.msg:has([role="menu"]) {
+  content-visibility: visible;
+}
+
 .msg:hover {
   background: var(--nx-msg-hover);
 }

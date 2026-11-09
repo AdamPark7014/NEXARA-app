@@ -1,5 +1,15 @@
 # RELEVO
 
+- **09-11 ~16:00 México (claude-code) — SEO y Maps (`f31d0be5`, `a67325ee`), letrero de reuniones (`3a9b5527`) y menú ⋯ del chat.**
+  - Chat: `.msg` lleva `content-visibility: auto` desde `6af85d36`, que recorta lo que sale de la fila. El menú ⋯ y la
+    barra de acciones quedaban cortados y parecía que no abría. Se apaga con la fila en hover, foco o menú abierto.
+    Probado en el Chrome de Adam con el CSS inyectado. Cuidado al usar `content-visibility` en filas con popovers.
+  - Reuniones: sí graba completo; los 20 s son piezas de subida (`PARTE_MS`), sin huecos. El texto se atrasa porque
+    whisper tarda ~44 s por pieza de 20 s con el servidor cargado (`dockerd` a 134–200 % de CPU, 3 `docker logs`
+    colgados, causa sin demostrar; falta el sí de Adam para terminarlos).
+  - Pendiente de Adam: subir el diseño premium (solo prototipo en su Chrome; sin su «súbelo» no se publica), credenciales
+    Syscom (solicitud enviada 09-11, cliente 104584725), reseñas de Google, contraseña de la BD.
+
 - **08-11 ~00:45 México (claude-code) — Pulida de UI/UX de Core (Adam: «dale una pulida a todos los módulos»,
   tomado como visto bueno de la maqueta de plantilla). `bc1eedcd`, `1511a00f`, `c1fd1865`, `ddf4cfa0` y este.**
   - API: solo los 5xx se registran como `error` (los 4xx, ~800/día, van como aviso); migración `20261108060000` quita
