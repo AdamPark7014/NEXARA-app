@@ -490,11 +490,9 @@ function Contenido({
     ? "Te escucho… cuando termines de hablar lo preparo solo."
     : dictado.estado === "terminando" || pensando
       ? "Entendiendo…"
-      : respuesta && propuestas.length
-        ? null
-        : dictado.soportado
-          ? "Toca el micrófono y dilo como se lo dirías a alguien: quién, qué, dónde, para cuándo y cuánto tarda."
-          : "Escribe la instrucción: quién, qué, dónde, para cuándo y cuánto tarda.";
+      : null;
+  // En reposo la caja es una sola línea: lo demás aparece cuando ya hay algo que preparar.
+  const enUso = Boolean(texto.trim() || respuesta || ocupado);
 
   return (
     <Card pad className={s.caja} aria-label="Asignar con IA">
@@ -525,7 +523,7 @@ function Contenido({
 
           <div className={s.campo}>
             <Textarea
-              rows={2}
+              rows={enUso ? 2 : 1}
               value={textoVisible}
               maxLength={2000}
               readOnly={dictado.estado !== "inactivo"}
@@ -549,6 +547,7 @@ function Contenido({
           </div>
         </div>
 
+        {enUso ? (
         <div className={c.fila}>
           <Button
             variant={dictado.soportado ? "secondary" : "primary"}
@@ -577,11 +576,14 @@ function Contenido({
             </Button>
           ) : null}
         </div>
-        <p className={s.privacidad}>
-          {dictado.soportado
-            ? "El dictado usa el reconocimiento de voz de tu navegador."
-            : "Si dictas, la voz se pasa a texto en el servidor de NEXARA."}
-        </p>
+        ) : null}
+        {enUso ? (
+          <p className={s.privacidad}>
+            {dictado.soportado
+              ? "El dictado usa el reconocimiento de voz de tu navegador."
+              : "Si dictas, la voz se pasa a texto en el servidor de NEXARA."}
+          </p>
+        ) : null}
 
         {dictado.error ? (
           <Alert tone="warning" role="alert">

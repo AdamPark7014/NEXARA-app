@@ -548,6 +548,7 @@ export default function ProyectoDetallePage() {
               }))}
               value={pestana}
               onChange={elegirPestana}
+              todasVisibles
             />
           </div>
           </>

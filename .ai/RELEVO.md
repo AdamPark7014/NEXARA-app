@@ -1,5 +1,12 @@
 # RELEVO
 
+- **09-11 ~17:45 México (claude-code) — Menos ruido en Core (Adam: «se ve complicado todo», pidió seguir por todo el sistema).**
+  - Medido en 30 pantallas (botones a primera vista: Perfiles 45, Chat 33, Asistencias 32, Almacén 25). Sin cambio de estilo.
+  - `FilterChip` con `count === 0` y sin estar activo no se pinta. `Tabs` con más de 6 secciones agrupa en «Más»; Almacén
+    y detalle de Proyecto llevan `todasVisibles` (su prueba exige todas en una fila y el detalle navega con teclado).
+  - «Nueva actividad» de la barra ya no sale en módulos con primario propio. RH: Dar de baja y Eliminar en ⋯, personas
+    por área plegado. Caja «Asignar con IA» de una línea en reposo. Faltan Perfiles y Chat, las más cargadas.
+
 - **09-11 ~16:30 México (claude-code) — Scroll de tablas y cifras de Nómina.**
   - `DataTable` ya no tiene scroll vertical propio por omisión (antes `min(72vh, 720px)` en toda tabla con cabecera fija): si le caben las
     columnas va con `overflow: clip` (`data-pagina`) y la cabecera se pega bajo la barra superior; si no, solo scroll horizontal.

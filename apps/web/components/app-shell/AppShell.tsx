@@ -105,7 +105,7 @@ const COLLAPSED_STORAGE_KEY = "nx-shell-collapsed";
 /** Acción principal de la barra superior en Core. */
 const NEW_ACTIVITY_PATH = "/erp/mis-actividades/nueva";
 /** Listas que ya traen su propio «Nuevo» como primario: un solo primario por pantalla. */
-const OWN_PRIMARY_ROUTE_RE = /^\/erp\/(clientes|cotizaciones|proyectos|mis-actividades\/nueva)(\/|$)/;
+const OWN_PRIMARY_ROUTE_RE = /^\/erp\/(clientes|cotizaciones|proyectos|almacen|vehiculos|finance|contabilidad|hr|users|mis-actividades\/nueva)(\/|$)/;
 
 type RailTip = { text: string; meta?: string; kbd?: string; top: number };
 type NavCount = { text: string; tone: "neutral" | "hot"; label: string };

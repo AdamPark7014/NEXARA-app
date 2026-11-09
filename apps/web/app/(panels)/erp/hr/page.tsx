@@ -17,6 +17,7 @@ import PanelTabs from "@/components/ui/PanelTabs";
 import HrModuleRail from "@/components/hr/HrModuleRail";
 import { SkeletonList } from "@/components/PageState";
 import { Avatar } from "@/components/base";
+import { MenuFila } from "@/components/mesa-contable/piezas";
 import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -713,26 +714,20 @@ export default function HrPage() {
     {
       key: "acciones", label: "Acciones", align: "right",
       render: (e) => (
-        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
-          <Button size="sm" variant="ghost" onClick={(ev) => { ev.stopPropagation(); openEdit(e); }} aria-label={`Editar ficha de ${e.nombre}`}>Editar</Button>
+        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }} onClick={(ev) => ev.stopPropagation()}>
+          <Button size="sm" variant="ghost" onClick={() => openEdit(e)} aria-label={`Editar ficha de ${e.nombre}`}>Editar</Button>
           {cfg.canEdit && (
-            <>
-              <Button
-                size="sm"
-                variant="secondary"
-                loading={busyId === `emp-${e.id}`}
-                onClick={(ev) => { ev.stopPropagation(); toggleActive(e); }}
-              >
-                {e.isActive === false ? "Reactivar" : "Dar de baja"}
-              </Button>
-              <Button size="sm" variant="danger" onClick={(ev) => { ev.stopPropagation(); deleteEmpleado(e); }} aria-label={`Eliminar a ${e.nombre}`}>
-                Eliminar
-              </Button>
-            </>
+            <MenuFila
+              etiqueta={`Más acciones de ${e.nombre}`}
+              opciones={[
+                { texto: e.isActive === false ? "Reactivar" : "Dar de baja", onElegir: () => toggleActive(e) },
+                { texto: "Eliminar", onElegir: () => deleteEmpleado(e) },
+              ]}
+            />
           )}
         </div>
       ),
-      width: 290,
+      width: 120,
     },
   ];
 
@@ -821,15 +816,6 @@ export default function HrPage() {
         title={cfg.title}
         subtitle={cfg.subtitle}
         density="ops"
-        meta={
-          loaded ? (
-            <>
-              <Tag variant="accent" dot>{stats.total} {stats.total === 1 ? "persona" : "personas"} en plantilla</Tag>
-              <Tag variant="positive">{stats.activos} activas</Tag>
-              {stats.vac > 0 && <Tag variant="default">{stats.vac} de vacaciones</Tag>}
-            </>
-          ) : undefined
-        }
         actions={
           <>
             <Button variant="ghost" onClick={() => void fetchStaff()} loading={loading && loaded}>Actualizar</Button>
@@ -892,12 +878,9 @@ export default function HrPage() {
                 ]}
               />
               {stats.byDept.length > 0 && (
-                <section
-                  aria-label="Personas por área"
-                  style={{ margin: "14px 0 16px", padding: "12px 14px", background: "var(--nx-panel-surface-overlay)", border: "1px solid var(--nx-panel-hairline)", borderRadius: "var(--nx-panel-radius-sm)", boxShadow: "var(--nx-panel-elev-1)" }}
-                >
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Personas por área</div>
-                  <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                <details style={{ margin: "12px 0 14px", fontSize: 13, color: "var(--text-secondary)" }}>
+                  <summary style={{ cursor: "pointer", fontWeight: 600 }}>Ver personas por área</summary>
+                  <ul style={{ listStyle: "none", margin: "10px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
                     {stats.byDept.map(({ nombre, count }) => (
                       <li key={nombre} style={{ display: "grid", gridTemplateColumns: "minmax(90px, 160px) 1fr 36px", gap: 10, alignItems: "center" }}>
                         <span style={{ fontSize: 12.5, color: "var(--text-secondary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={nombre}>{nombre}</span>
@@ -908,7 +891,7 @@ export default function HrPage() {
                       </li>
                     ))}
                   </ul>
-                </section>
+                </details>
               )}
             </>
           )}

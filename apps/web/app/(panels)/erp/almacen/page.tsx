@@ -146,7 +146,7 @@ export default function AlmacenPage() {
         description={cfg.subtitle}
         icon={<WarehouseOutlined />}
         actions={vistaStock ? <div ref={setSlotAcciones} className={s.acciones} /> : undefined}
-        tabs={<Tabs ariaLabel="Secciones de almacén" value={tab} onChange={cambiarTab} items={ITEMS_PESTANAS} />}
+        tabs={<Tabs ariaLabel="Secciones de almacén" value={tab} onChange={cambiarTab} items={ITEMS_PESTANAS} todasVisibles />}
       />
 
       <div className={s.cuerpo}>

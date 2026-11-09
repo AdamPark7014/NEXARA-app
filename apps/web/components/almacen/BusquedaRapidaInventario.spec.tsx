@@ -111,7 +111,8 @@ describe("búsqueda rápida de inventario", () => {
     expect(screen.getByText("DCD771 · Con Juan Pérez")).toBeInTheDocument();
 
     const chips = screen.getAllByRole("button", { pressed: false }).map((b) => b.textContent);
-    expect(chips).toEqual(["Herramientas1", "Equipo0", "Consumibles1", "Por medida0"]);
+    // Los tipos sin resultados no se enseñan (09-11).
+    expect(chips).toEqual(["Herramientas1", "Consumibles1"]);
     expect(screen.getByRole("button", { pressed: true })).toHaveTextContent("Todos2");
 
     const ultima = new URL(String(fetchMock.mock.calls.at(-1)?.[0]), "http://localhost");
