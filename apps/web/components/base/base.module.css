@@ -638,3 +638,29 @@
   outline-offset: 2px;
   border-radius: var(--ui-radius-xs);
 }
+
+/* Core premium (10-11): títulos con más peso visual y el primario con relieve. */
+.headTitle {
+  font-family: var(--ui-font-display, var(--ui-font));
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.headIcon {
+  display: none;
+}
+
+.btnPrimary {
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #1b9a81, #137a65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 1px 2px rgba(16, 24, 40, 0.2),
+    0 8px 18px -8px rgba(19, 122, 101, 0.65);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #1fa88d, #148069);
+}

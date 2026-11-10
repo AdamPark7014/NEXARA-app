@@ -2169,3 +2169,110 @@
     animation: none;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Core premium (Adam, 10-11: «sí», con la barra lateral incluida). El menú es
+   de noche en los dos temas; el contenido sigue los tokens de cada tema.
+   ───────────────────────────────────────────────────────────────────────── */
+.shell,
+:global(body.dark) .shell {
+  --sb-bg: linear-gradient(180deg, #0d1a25 0%, #0a141d 100%);
+  --sb-fg: #c3ced9;
+  --sb-fg-2: #7f91a3;
+  --sb-label: #5f7286;
+  --sb-hover: rgba(255, 255, 255, 0.055);
+  --sb-active-bg: linear-gradient(90deg, rgba(45, 212, 172, 0.2), rgba(45, 212, 172, 0.07));
+  --sb-active-fg: #ffffff;
+  --sb-active-shadow: inset 0 0 0 1px rgba(94, 234, 200, 0.16);
+  --sb-border: transparent;
+  --sb-tip-bg: #13222f;
+}
+
+:global(body:not(.dark)) .shell {
+  background: #f3f5f9;
+}
+
+.sidebar {
+  --nav-item-h: 33px;
+  --nav-group-gap: 16px;
+  --nav-item-gap: 2px;
+  border-right: 0;
+}
+
+.brandName,
+.userName {
+  color: #ffffff;
+}
+
+.collapseBtn:hover,
+.menuItem:hover,
+.menuItem:focus-visible {
+  color: #ffffff;
+}
+
+.menu::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.menu:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.searchBtn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  box-shadow: none;
+  color: #93a4b5;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+    color: #c3ced9;
+  }
+}
+
+.kbd {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
+  color: #93a4b5;
+}
+
+.groupTitle {
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.menuItem {
+  border-radius: 9px;
+  font-weight: 450;
+}
+
+.menuItem.active .menuItemIcon {
+  color: #4fe3bf;
+}
+
+.userBlock {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.avatar {
+  background: rgba(79, 227, 191, 0.16);
+  color: #7ff0d3;
+}
+
+.topbar {
+  background: color-mix(in srgb, var(--ui-bg) 78%, transparent);
+  -webkit-backdrop-filter: saturate(170%) blur(14px);
+  backdrop-filter: saturate(170%) blur(14px);
+  border-bottom: 0;
+}
+
+.primaryAction {
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #1b9a81, #137a65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 1px 2px rgba(16, 24, 40, 0.2),
+    0 8px 18px -8px rgba(19, 122, 101, 0.65);
+}
