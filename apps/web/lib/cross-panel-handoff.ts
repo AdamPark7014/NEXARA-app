@@ -95,8 +95,8 @@ export function resolveShellPanelFromPath(pathname?: string | null): PanelId {
   const p = (pathname || '').split('?')[0].split('#')[0];
   if (p === '/finance' || p.startsWith('/finance/')) return 'finance';
   if (p === '/hr' || p.startsWith('/hr/')) return 'hr';
-  if (p.startsWith('/erp/hr/attendance') || p.startsWith('/erp/hr/lunch-breaks')) return 'ops';
-  if (p === '/erp/hr' || p.startsWith('/erp/hr/')) return 'hr';
+  // Recursos Humanos también se queda en el menú de Core (Adam, 10-11: «que no se bifurquen en otro
+  // sidebar»). Antes /erp/hr cambiaba a un menú propio con solo Plantilla y Multas.
   // Las rutas financieras viven en /erp y se quedan en la cáscara del ERP.
   //
   // Antes devolvían 'finance': seguías bajo /erp pero el menú se encogía a solo

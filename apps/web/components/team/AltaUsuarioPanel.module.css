@@ -90,22 +90,39 @@
   font-weight: 600;
 }
 
+.tarjeta {
+  position: relative;
+}
+
+/* Las acciones flotan a la derecha al pasar el mouse: en reposo el nombre usa todo el ancho. */
 .acciones {
+  position: absolute;
+  top: 50%;
+  right: 8px;
   display: flex;
-  flex: 0 0 auto;
   gap: 2px;
+  padding-left: 16px;
+  background: linear-gradient(90deg, transparent, var(--ui-surface, #fff) 16px);
   opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
   transition: opacity 0.12s ease;
 }
 
 .tarjeta:hover .acciones,
 .tarjeta:focus-within .acciones {
   opacity: 1;
+  pointer-events: auto;
 }
 
 @media (hover: none) {
   .acciones {
+    position: static;
+    padding-left: 0;
+    background: none;
     opacity: 1;
+    pointer-events: auto;
+    transform: none;
   }
 }
 
