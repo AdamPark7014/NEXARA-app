@@ -352,3 +352,22 @@
     padding: 10px 12px;
   }
 }
+
+/* Core premium (10-11): la lista es una tarjeta sin borde con sombra suave. */
+.list {
+  border: 0;
+  border-radius: 18px;
+  background: var(--ui-surface);
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04),
+    0 16px 36px -26px rgba(16, 24, 40, 0.22);
+}
+
+.toolbar {
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-border) 60%, transparent);
+  padding: 14px 18px;
+}
+
+.chip {
+  border-radius: 999px;
+}

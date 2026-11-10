@@ -549,3 +549,30 @@
   color: var(--ui-fg-3);
   font-variant-numeric: tabular-nums;
 }
+
+/* Core premium (10-11): cifras en tarjeta flotante. */
+.stat {
+  border: 0;
+  border-radius: 16px;
+  background: var(--ui-surface);
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04),
+    0 16px 36px -26px rgba(16, 24, 40, 0.26);
+  padding: 18px 20px;
+}
+
+.statIco {
+  color: #168570;
+}
+
+.statLabel {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.statValue {
+  font-family: var(--ui-font-display, var(--ui-font));
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}

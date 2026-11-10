@@ -581,3 +581,22 @@
     margin-top: 8px;
   }
 }
+
+/* Core premium (10-11): cabecera sin fondo, filas con aire y separadores tenues. */
+.table thead th {
+  background: var(--ui-surface);
+  color: var(--ui-fg-3);
+  font-size: 12px;
+  font-weight: 500;
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-border) 70%, transparent);
+}
+
+.table tbody td {
+  padding-top: 13px;
+  padding-bottom: 13px;
+  border-bottom-color: color-mix(in srgb, var(--ui-border) 45%, transparent);
+}
+
+.wrap {
+  box-shadow: none;
+}
