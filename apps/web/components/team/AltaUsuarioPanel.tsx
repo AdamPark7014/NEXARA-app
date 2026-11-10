@@ -19,6 +19,7 @@ import InlineAlert from "@/components/ui/InlineAlert";
 import { useUser } from "@/components/UserContext";
 import FotoPerfilCampo from "@/components/team/FotoPerfilCampo";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
+import s from "./AltaUsuarioPanel.module.css";
 import {
   cambiarActivoPersona,
   cargarContextoAlta,
@@ -212,14 +213,65 @@ export default function AltaUsuarioPanel() {
   };
 
   const etiquetaTipos = ctx.tipos.map((t) => t.etiqueta).join(", ");
+  const activos = ctx.equipo.filter((p) => p.activo !== false);
+  const desactivados = ctx.equipo.filter((p) => p.activo === false);
+
+  const tarjeta = (p: (typeof ctx.equipo)[number]) => {
+    const src = resolveUserAvatarUrl(p.avatarUrl);
+    const activo = p.activo !== false;
+    return (
+      <div key={p.id} className={s.tarjeta}>
+        <span className={activo ? s.foto : `${s.foto} ${s.apagada}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {src ? <img src={src} alt="" /> : null}
+        </span>
+        <span className={s.nombre} title={p.nombre}>
+          {p.nombre}
+        </span>
+        {!activo ? <span className={s.estado}>Desactivado</span> : null}
+        <div className={s.acciones}>
+          {activo ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setEditando(p);
+                setFotoEquipo(null);
+                setPreviewEquipo(src || null);
+                setNombreEquipo(p.nombre);
+                setTelefonoEquipo(p.telefono ?? "");
+                setRoleKeyEquipo(p.roleKey ?? "");
+                setDepartmentIdEquipo(p.departmentId != null ? String(p.departmentId) : "");
+                setManagerIdEquipo(p.managerId != null ? String(p.managerId) : "");
+                setEmployeeNumberEquipo(p.employeeNumber ?? "");
+                setErrorEquipo(null);
+              }}
+            >
+              Editar
+            </Button>
+          ) : null}
+          {puedeActivar ? (
+            <Button type="button" variant="ghost" size="sm" onClick={() => alternarActivo(p)}>
+              {activo ? "Desactivar" : "Activar"}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between", padding: "0 0 12px" }}>
-        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-          Puedes dar de alta personal de tipo: <strong style={{ color: "var(--text-primary)" }}>{etiquetaTipos}</strong>
-        </span>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div className={s.barra}>
+        <details className={s.ayuda}>
+          <summary>¿Qué puedo hacer aquí?</summary>
+          <p>
+            Puedes dar de alta personal de tipo: <strong>{etiquetaTipos}</strong>. La foto es la fija, la misma que se ve en actividades y en el celular.
+            {puedeActivar ? " Desactivar a alguien corta su acceso sin borrar su historial; lo puedes reactivar." : ""}
+          </p>
+        </details>
+        <div className={s.botones}>
           <Button variant="secondary" onClick={() => router.push("/erp/my-profile")}>
             Mi perfil
           </Button>
@@ -229,59 +281,12 @@ export default function AltaUsuarioPanel() {
         </div>
       </div>
 
-      {ctx.equipo.length > 0 ? (
-        <div style={{ display: "grid", gap: 8, padding: "0 0 16px" }}>
-          <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-            Perfiles de tu equipo. Edita foto, nombre y teléfono; la foto es la fija, la misma que se ve en actividades y en el celular.{puedeActivar ? " Desactivar a alguien corta su acceso y su asignación sin borrar su historial; lo puedes reactivar." : ""}
-          </span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {ctx.equipo.map((p) => {
-              const src = resolveUserAvatarUrl(p.avatarUrl);
-              const activo = p.activo !== false;
-              return (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, opacity: activo ? 1 : 0.6 }}>
-                  <span style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", background: "var(--surface-2)", flex: "0 0 auto", filter: activo ? undefined : "grayscale(1)" }}>
-                    {src ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    ) : null}
-                  </span>
-                  <span style={{ fontSize: 13 }}>{p.nombre}</span>
-                  {!activo ? (
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 999, background: "var(--surface-2)", color: "var(--text-secondary)" }}>
-                      Desactivado
-                    </span>
-                  ) : null}
-                  {activo ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setEditando(p);
-                      setFotoEquipo(null);
-                      setPreviewEquipo(src || null);
-                      setNombreEquipo(p.nombre);
-                      setTelefonoEquipo(p.telefono ?? "");
-                      setRoleKeyEquipo(p.roleKey ?? "");
-                      setDepartmentIdEquipo(p.departmentId != null ? String(p.departmentId) : "");
-                      setManagerIdEquipo(p.managerId != null ? String(p.managerId) : "");
-                      setEmployeeNumberEquipo(p.employeeNumber ?? "");
-                      setErrorEquipo(null);
-                    }}
-                  >
-                    Editar
-                  </Button>
-                  ) : null}
-                  {puedeActivar ? (
-                    <Button type="button" variant="ghost" onClick={() => alternarActivo(p)}>
-                      {activo ? "Desactivar" : "Activar"}
-                    </Button>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      {activos.length > 0 ? <div className={s.rejilla}>{activos.map(tarjeta)}</div> : null}
+      {desactivados.length > 0 ? (
+        <details className={s.desactivados}>
+          <summary>Desactivados ({desactivados.length})</summary>
+          <div className={s.rejilla}>{desactivados.map(tarjeta)}</div>
+        </details>
       ) : null}
 
       {avisoActivo ? <InlineAlert variant="danger" message={avisoActivo} /> : null}
