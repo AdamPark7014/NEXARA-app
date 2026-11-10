@@ -1208,6 +1208,11 @@
   margin: 0 0 4px;
 }
 
+/* Los botones de formato salen al escribir: en reposo el redactor es solo la caja (09-11). */
+.composer:not(:focus-within) > .fmtBar {
+  display: none;
+}
+
 .composer:focus-within {
   border-color: color-mix(in srgb, var(--nx-accent) 50%, var(--nx-line));
   box-shadow:

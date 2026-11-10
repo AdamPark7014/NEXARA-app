@@ -1,0 +1,122 @@
+/* Perfiles: una tarjeta por persona; las acciones aparecen al pasar por encima. */
+
+.barra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 14px;
+}
+
+.botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ayuda {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.ayuda summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ayuda p {
+  max-width: 760px;
+  margin: 8px 0 0;
+}
+
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 8px;
+}
+
+.tarjeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 60px;
+  padding: 8px 12px;
+  border: 1px solid var(--ui-border, rgb(16 40 32 / 8%));
+  border-radius: 12px;
+  background: var(--ui-surface, #fff);
+}
+
+.foto {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface-2);
+}
+
+.foto img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.apagada {
+  filter: grayscale(1);
+  opacity: 0.7;
+}
+
+.nombre {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.estado {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.acciones {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.tarjeta:hover .acciones,
+.tarjeta:focus-within .acciones {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .acciones {
+    opacity: 1;
+  }
+}
+
+.desactivados {
+  margin-top: 16px;
+}
+
+.desactivados summary {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
