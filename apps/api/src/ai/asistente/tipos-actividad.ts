@@ -49,6 +49,10 @@ const RECIBE_POR_CORREO: Record<string, readonly TipoActividad[]> = {
   'joan.sanchez@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
   'israel.ramos@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
   'juan.gonzalez@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
+  'salvador.hernandez@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
+  'erick.juarez@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
+  'ricardo.flores@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
+  'genaro.salazar@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
   'soporte@nexara.com.mx': ['tarea', 'proyecto', 'servicio'],
   'alejandro.gonzalez@nexara.com.mx': ['tarea', 'proyecto', 'servicio'],
   'roberto.vivanco@nexara.com.mx': ['tarea', 'proyecto', 'servicio'],
@@ -58,8 +62,11 @@ const RECIBE_POR_CORREO: Record<string, readonly TipoActividad[]> = {
   'infraestructura@nexara.com.mx': ['tarea', 'proyecto', 'obra', 'comercial'],
 };
 
-export function tiposQueRecibe(email: string | null | undefined): TipoActividad[] {
-  return [...(RECIBE_POR_CORREO[(email ?? '').trim().toLowerCase()] ?? ['tarea'])];
+export function tiposQueRecibe(email: string | null | undefined, rolDeQuienAsigna?: string | null): TipoActividad[] {
+  const recibe = [...(RECIBE_POR_CORREO[(email ?? '').trim().toLowerCase()] ?? ['tarea'])];
+  // A quien llega el arquitecto (las cuadrillas de David y José Antonio) le puede dejar obra (10-11).
+  if ((rolDeQuienAsigna || '').trim() === 'arquitecto' && !recibe.includes('obra')) recibe.push('obra');
+  return recibe;
 }
 
 /**
@@ -77,9 +84,13 @@ const CREA_POR_CORREO: Record<string, readonly TipoActividad[]> = {
 };
 
 /** Lo que puede asignar quien escribe. Dirección, todo; un mando sin renglón aquí, tareas, como en la web. */
-export function tiposQueCrea(email: string | null | undefined): TipoActividad[] {
+export function tiposQueCrea(email: string | null | undefined, roleKey?: string | null): TipoActividad[] {
   if (isCeoEquivalentEmail(email) || isDeveloperSuperAdminEmail(email)) return [...TIPOS_ACTIVIDAD];
-  return [...(CREA_POR_CORREO[(email ?? '').trim().toLowerCase()] ?? ['tarea'])];
+  // Cualquier arquitecto asigna obra aunque su correo no esté en la tabla (Jorge, 10-11). Sin comercial, como en la web.
+  const propio = CREA_POR_CORREO[(email ?? '').trim().toLowerCase()];
+  if (propio) return [...propio];
+  if ((roleKey || '').trim() === 'arquitecto') return ['tarea', 'proyecto', 'obra'];
+  return ['tarea'];
 }
 
 const TAREA_DE_SERVICIO: Record<string, (typeof SUBTIPOS_TAREA)[number]> = {

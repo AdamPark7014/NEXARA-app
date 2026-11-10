@@ -206,6 +206,11 @@ const RECEIVE_BY_EMAIL: Record<string, ActivityKind[]> = {
   [ORG_EMAILS.carolina]: ['tarea', 'proyecto', 'servicio'],
   [ORG_EMAILS.alejandro]: ['tarea', 'proyecto', 'servicio'],
   [ORG_EMAILS.roberto]: ['tarea', 'proyecto', 'servicio'],
+  // Cuadrilla nueva de David (10-11).
+  'salvador.hernandez@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
+  'erick.juarez@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
+  'ricardo.flores@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
+  'genaro.salazar@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
   // Comercial / admin
   [ORG_EMAILS.daniela]: ['tarea', 'comercial'],
   [ORG_EMAILS.monica]: ['tarea', 'comercial'],
@@ -445,6 +450,8 @@ export function kindsForCreator(opts: {
   }
   const email = norm(opts.email);
   if (CREATE_BY_EMAIL[email]) return CREATE_BY_EMAIL[email];
+  // Cualquier arquitecto asigna obra (Jorge Leonardo, 10-11). Sin comercial: eso abriría Clientes a todo el rol.
+  if (opts.v2Role === ROLES.ARQUITECTO) return ['tarea', 'proyecto', 'obra'];
   return ['tarea'];
 }
 
@@ -479,7 +486,13 @@ export function kindsForAssignment(opts: {
     isSuperAdmin: opts.isSuperAdmin,
   });
   if (!opts.targetEmail) return create.length ? create : ['tarea'];
-  const visibles = intersect(create, kindsForTarget(opts.targetEmail));
+  // El arquitecto también deja obra a la gente de sistemas de José Antonio (Adam, 10-11); el servidor
+  // decide a quién llega (`arquitectoAlcanzaA`), aquí solo se suma el tipo.
+  const recibe = kindsForTarget(opts.targetEmail);
+  const visibles = intersect(
+    create,
+    opts.v2Role === ROLES.ARQUITECTO && !recibe.includes('obra') ? [...recibe, 'obra'] : recibe,
+  );
   // Autoasignación: si la intersección queda vacía (Roberto solo recibe servicio
   // y no puede crear ninguno), igual puede darse una tarea a sí mismo.
   if (

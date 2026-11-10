@@ -90,7 +90,7 @@ export class AsistenteActividadesService {
       ahora,
       instruccion,
       medianas,
-      tiposPermitidos: tiposQueCrea(user?.email),
+      tiposPermitidos: tiposQueCrea(user?.email, user?.roleKey),
     });
     return {
       propuestas,
@@ -154,7 +154,7 @@ export class AsistenteActividadesService {
         email: p.email,
         horaEntrada: p.horaEntrada ?? null,
         horaSalida: p.horaSalida ?? null,
-        recibe: tiposQueRecibe(p.email),
+        recibe: tiposQueRecibe(p.email, user?.roleKey),
       })),
       clientes,
       sucursales: sucursales.map(({ client, ...s }) => ({ ...s, clientName: client?.name ?? '' })),

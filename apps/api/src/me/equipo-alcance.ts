@@ -162,6 +162,24 @@ export function esJefe(userId: number, users: Array<{ id: number; managerId: num
  * ¿`viewer` puede **asignarle** trabajo a `targetId`? Su organigrama hacia abajo (no él mismo) más
  * el flujo de despacho. Dirección puede con todos.
  */
+/**
+ * Arquitectos (Josué Teódulo, Jorge Leonardo): asignan obra a los instaladores de David y a la gente de
+ * sistemas de José Antonio (Adam, 10-11-2026). Se mira el jefe de cada quien, así entra la gente nueva.
+ */
+const JEFES_DE_QUIEN_ASIGNA_EL_ARQUITECTO = new Set(['operaciones@nexara.com.mx', 'jose.ramirez@nexara.com.mx']);
+
+export function arquitectoAlcanzaA(
+  viewer: Alcanzador,
+  users: Array<{ id: number; email: string; managerId: number | null }>,
+  targetId: number,
+): boolean {
+  if ((viewer.roleKey || '').trim() !== 'arquitecto') return false;
+  const target = users.find((u) => Number(u.id) === Number(targetId));
+  if (!target || target.managerId == null) return false;
+  const jefe = users.find((u) => Number(u.id) === Number(target.managerId));
+  return Boolean(jefe && JEFES_DE_QUIEN_ASIGNA_EL_ARQUITECTO.has((jefe.email || '').toLowerCase()));
+}
+
 export function puedeAsignarA(
   viewer: Alcanzador,
   users: Array<{ id: number; email: string; managerId: number | null }>,
@@ -170,6 +188,7 @@ export function puedeAsignarA(
   if (Number(targetId) === Number(viewer.id)) return false;
   if (asignaEnTodaLaEmpresa(viewer)) return true;
   if (subarbolIds(viewer.id, users).has(Number(targetId))) return true;
+  if (arquitectoAlcanzaA(viewer, users, targetId)) return true;
   const target = users.find((u) => Number(u.id) === Number(targetId));
   return Boolean(target && extrasDeAsignacion(viewer.email).includes(target.email.toLowerCase()));
 }
