@@ -44,6 +44,7 @@ import Modal from "@/components/ui/Modal";
 import FileDropzone from "@/components/ui/FileDropzone";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import SugerenciaNomina from "@/components/finance/SugerenciaNomina";
+import AnalisisNomina from "@/components/finance/AnalisisNomina";
 import { FinanceModuleShell } from "@/components/finance/FinanceModuleShell";
 import { useUser } from "@/components/UserContext";
 import { useHiddenModuleIds } from "@/lib/use-hidden-modules";
@@ -931,6 +932,8 @@ function EmployeePaymentsContent() {
           <SugerenciaNomina token={token} />
         ) : tab === "analytics" ? (
           <div className={s.analisis}>
+            <AnalisisNomina token={token} onIrControl={() => setTab("control")} />
+            <h3 className={s.subtitulo}>Pagos registrados</h3>
             {/* Regla 8: rango, acción y exportación en una sola fila, sin caja. */}
             <Card as="div" className={s.barra}>
               <ModuleToolbar

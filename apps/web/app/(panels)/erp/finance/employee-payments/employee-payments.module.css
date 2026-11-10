@@ -207,3 +207,9 @@
 .existentes a {
   margin-right: var(--ui-s2);
 }
+
+.subtitulo {
+  margin: 10px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+}
