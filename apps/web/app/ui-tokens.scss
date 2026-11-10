@@ -102,7 +102,7 @@
      surface-0 (fondo de página) < surface (tarjeta) < surface-3 (elevada)
      `--ui-surface-2` es la superficie *hundida* (zebra, thead, wells).
      ---------------------------------------------------------- */
-  --ui-bg: #eef1f5; /* fondo de página: un tono más hondo para que las tarjetas floten */
+  --ui-bg: #f3f5f9; /* fondo de página: un tono más hondo para que las tarjetas floten */
   --ui-surface: #ffffff; /* superficie 1 — tarjeta, panel, modal */
   --ui-surface-2: #f8fafb; /* superficie hundida — thead, zebra, well */
   --ui-surface-3: #ffffff; /* superficie elevada — popover, dropdown, tooltip */
@@ -229,8 +229,8 @@
      casi desaparece. Nada por encima de `pop` salvo diálogos (`elev-3`).
      ---------------------------------------------------------- */
   --ui-elev-0: none;
-  --ui-elev-1: 0 1px 2px rgba(16, 24, 40, 0.05), 0 8px 20px -14px rgba(16, 24, 40, 0.16);
-  --ui-elev-2: 0 1px 2px rgba(16, 24, 40, 0.05), 0 16px 40px -20px rgba(16, 24, 40, 0.24);
+  --ui-elev-1: 0 1px 2px rgba(16, 24, 40, 0.04), 0 16px 36px -26px rgba(16, 24, 40, 0.22); /* premium 10-11 */
+  --ui-elev-2: 0 1px 2px rgba(16, 24, 40, 0.04), 0 24px 48px -28px rgba(16, 24, 40, 0.3); /* premium 10-11 */
   --ui-elev-pop: 0 2px 6px rgba(16, 24, 40, 0.06), 0 24px 56px -20px rgba(16, 24, 40, 0.3);
   --ui-shadow-sm: var(--ui-elev-1);
   --ui-shadow-pop: var(--ui-elev-pop);

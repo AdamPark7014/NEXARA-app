@@ -4,7 +4,9 @@
   - Estilo del prototipo del 08-11 pasado a código como bloque final en cada módulo base: `AppShell.module.scss` (menú de
     noche en los dos temas vía `--sb-*`, buscador, activo verde, barra superior translúcida), `base.module.css` (título 30 px,
     primario con relieve), `piezas` (Stat en tarjeta), `ModulePage` (lista), `DataTable`, `DashKit` (banda de Hoy) y `ui/PageHeader`.
-  - Falta: recorrer cada pestaña, Análisis de Nómina con datos reales y las pantallas con estilos propios.
+  - Ola 2: Análisis de Nómina (`components/finance/AnalisisNomina.tsx`, seis semanas del Control semanal) arriba de los
+    pagos registrados; tokens claros `--ui-bg` #f3f5f9 y `--ui-elev-1/2` con la sombra premium; bandas de Costos,
+    Vehículos y Desempeño con el mismo azul noche. Recorridas 16 pantallas; faltan subpestañas y editores (cotización, CCTV).
 
 - **09-11 ~17:45 México (claude-code) — Menos ruido en Core (Adam: «se ve complicado todo», pidió seguir por todo el sistema).**
   - Medido en 30 pantallas (botones a primera vista: Perfiles 45, Chat 33, Asistencias 32, Almacén 25). Sin cambio de estilo.
