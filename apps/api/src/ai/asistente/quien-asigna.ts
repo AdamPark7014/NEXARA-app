@@ -18,10 +18,12 @@ export type ConteoDePersonas = {
 
 export async function puedeAsignarConIa(
   prisma: ConteoDePersonas,
-  actor: { id?: number | string | null; email?: string | null } | null | undefined,
+  actor: { id?: number | string | null; email?: string | null; roleKey?: string | null } | null | undefined,
 ): Promise<boolean> {
   if (!actor) return false;
   if (isCeoEquivalentEmail(actor.email) || isDeveloperSuperAdminEmail(actor.email)) return true;
+  // El arquitecto no tiene gente a cargo, pero asigna obra a las cuadrillas de David y José Antonio (10-11).
+  if ((actor.roleKey || '').trim() === 'arquitecto') return true;
   const id = Number(actor.id);
   if (!Number.isInteger(id) || id <= 0) return false;
   const extras = extrasDeAsignacion(actor.email);
