@@ -84,3 +84,8 @@
     color: var(--ui-brand-text);
   }
 }
+
+/* Core premium (10-11): las pestañas usan el verde de marca en todos los paneles. */
+.list {
+  --panel-accent: var(--ui-brand);
+}
