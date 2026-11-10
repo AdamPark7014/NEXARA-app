@@ -554,3 +554,13 @@
     color: var(--ui-warning-text, var(--ui-fg));
   }
 }
+
+/* Core premium (10-11): la banda usa el mismo azul noche con brillo verde que Hoy y Nómina. */
+.band {
+  background:
+    radial-gradient(760px 340px at 88% -30%, rgba(45, 212, 172, 0.42), transparent 68%),
+    radial-gradient(620px 320px at 52% 135%, rgba(70, 130, 235, 0.34), transparent 70%),
+    linear-gradient(115deg, #0c1a26 0%, #10262f 60%, #0e2230 100%);
+  border-radius: 20px;
+  box-shadow: 0 30px 60px -36px rgba(12, 26, 38, 0.75);
+}
