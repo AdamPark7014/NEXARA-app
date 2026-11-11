@@ -36,9 +36,11 @@ export function clasificarRueda(
 }
 
 /** Qué hace un botón. El principal hace lo natural de cada vista; los demás, o con tecla, lo otro. */
-export function gestoDeBoton(boton: number, teclas: { mayus?: boolean; alt?: boolean; espacio?: boolean }, desdeArriba: boolean): Exclude<Gesto, "acercar"> {
-  const principal: Exclude<Gesto, "acercar"> = desdeArriba ? "deslizar" : "girar";
-  const otro: Exclude<Gesto, "acercar"> = desdeArriba ? "girar" : "deslizar";
+export function gestoDeBoton(boton: number, teclas: { mayus?: boolean; alt?: boolean; espacio?: boolean }, _desdeArriba: boolean): Exclude<Gesto, "acercar"> {
+  // 11-11 (Adam: «con el mouse se debe poder hacer todo», moverse de un lado a otro): como un mapa, arrastrar
+  // siempre te mueve por el sitio, igual que en el plano; girar es clic derecho, rueda apretada, Mayús o Alt.
+  const principal: Exclude<Gesto, "acercar"> = "deslizar";
+  const otro: Exclude<Gesto, "acercar"> = "girar";
   if (teclas.espacio) return "deslizar";
   if (boton !== 0) return otro;
   return teclas.mayus || teclas.alt ? otro : principal;
