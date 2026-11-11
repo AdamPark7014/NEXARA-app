@@ -393,3 +393,8 @@
   flex: 1;
   min-width: 0;
 }
+
+/* En reposo la instrucción ocupa una línea; crece al escribir (11-11). */
+.instruccion[rows="1"] {
+  min-height: 44px;
+}

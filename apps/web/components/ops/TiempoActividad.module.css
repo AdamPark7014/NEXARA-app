@@ -197,3 +197,12 @@
     transition: none;
   }
 }
+
+/* Core premium (11-11): mismo azul noche que las demás bandas. */
+.tarjeta {
+  background:
+    radial-gradient(260px 160px at 100% 0%, rgba(45, 212, 172, 0.42), transparent 70%),
+    radial-gradient(240px 150px at 0% 130%, rgba(70, 130, 235, 0.34), transparent 70%),
+    linear-gradient(115deg, #0c1a26 0%, #10262f 60%, #0e2230 100%);
+  box-shadow: 0 18px 44px -26px rgba(12, 26, 38, 0.75);
+}
