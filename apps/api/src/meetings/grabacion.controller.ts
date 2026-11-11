@@ -20,6 +20,7 @@ import { RbacGuard } from '../common/rbac.guard.js';
 import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { ReunionVisibleGuard } from './visibilidad.js';
 import { GrabacionService, type AcuerdoConfirmado, type CuerpoParte } from './grabacion.service.js';
 
 /**
@@ -35,7 +36,7 @@ import { GrabacionService, type AcuerdoConfirmado, type CuerpoParte } from './gr
  *   GET  :id/pdf · POST :id/enviar · GET :id/transcripcion · POST :id/regenerar · DELETE :id
  */
 @Controller('grabaciones-reuniones')
-@UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
+@UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard, ReunionVisibleGuard)
 export class GrabacionController {
   constructor(private readonly grabacion: GrabacionService) {}
 

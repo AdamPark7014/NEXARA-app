@@ -366,6 +366,13 @@ export default function ReunionesPage() {
    * `existente`, graba (o retoma) esa reunión.
    */
   const [empezando, setEmpezando] = useState(false);
+  // Antes de grabar se elige quién está: solo ellos y sus jefes verán la reunión (Adam, 11-11).
+  const [presentes, setPresentes] = useState<number[] | null>(null);
+  const presentesElegidos = useRef<number[]>([]);
+  const elegirPresentes = () => {
+    setFiltroPersonas("");
+    setPresentes(user?.id ? [Number(user.id)] : []);
+  };
   type Existente = { id: number; titulo: string; baseMs?: number; baseParte?: number };
 
   // Permiso del micrófono como el de notificaciones: tarjeta antes de grabar si falta.
@@ -404,7 +411,12 @@ export default function ReunionesPage() {
     try {
       const reunion =
         existente ??
-        (await createMeeting(token, { tipo: suggestedTypeForToday(), fecha: todayInput(), horaInicio: horaAhora() }));
+        (await createMeeting(token, {
+          tipo: suggestedTypeForToday(),
+          fecha: todayInput(),
+          horaInicio: horaAhora(),
+          asistentes: presentesElegidos.current.length ? presentesElegidos.current : undefined,
+        }));
       comenzar({ meetingId: reunion.id, titulo: reunion.titulo, stream, baseMs: existente?.baseMs, baseParte: existente?.baseParte });
       cerrarDetalle();
       cambiarTab("reuniones");
@@ -548,7 +560,7 @@ export default function ReunionesPage() {
           puedeConvocar ? (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Button variant="secondary" onClick={() => setConvocando(true)}>Programar</Button>
-              <Button variant="primary" iconLeft="●" onClick={() => void comenzarGrabacion()} loading={empezando} disabled={Boolean(sesion)}>
+              <Button variant="primary" iconLeft="●" onClick={elegirPresentes} loading={empezando} disabled={Boolean(sesion)}>
                 Comenzar a grabar reunión
               </Button>
             </div>
@@ -708,7 +720,7 @@ export default function ReunionesPage() {
               }
               action={
                 puedeConvocar ? (
-                  <Button variant="primary" onClick={() => void comenzarGrabacion()} loading={empezando} disabled={Boolean(sesion)}>
+                  <Button variant="primary" onClick={elegirPresentes} loading={empezando} disabled={Boolean(sesion)}>
                     Comenzar a grabar reunión
                   </Button>
                 ) : undefined
@@ -752,6 +764,63 @@ export default function ReunionesPage() {
       )}
 
       {/* ── Convocar ─────────────────────────────────────────────────── */}
+      <Modal
+        open={presentes !== null}
+        onClose={() => setPresentes(null)}
+        title="¿Quién está en la reunión?"
+        maxWidth={520}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPresentes(null)}>Cancelar</Button>
+            <Button
+              variant="primary"
+              iconLeft="●"
+              disabled={!presentes?.length}
+              onClick={() => {
+                presentesElegidos.current = presentes ?? [];
+                setPresentes(null);
+                void comenzarGrabacion();
+              }}
+            >
+              Empezar a grabar
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: "grid", gap: 10 }}>
+          <p className={s.hint} style={{ margin: 0 }}>
+            Solo ellos y sus jefes verán la reunión, la minuta y los acuerdos. Christian las ve todas.
+          </p>
+          <input
+            className={s.input}
+            type="search"
+            aria-label="Buscar persona"
+            placeholder="Buscar persona…"
+            value={filtroPersonas}
+            onChange={(e) => setFiltroPersonas(e.target.value)}
+          />
+          <div className={s.people}>
+            {personasVisibles.map((p) => (
+              <label key={p.id} className={s.person}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(presentes?.includes(p.id))}
+                  onChange={(e) =>
+                    setPresentes((prev) =>
+                      e.target.checked ? [...(prev ?? []), p.id] : (prev ?? []).filter((x) => x !== p.id),
+                    )
+                  }
+                />
+                {p.nombre}
+              </label>
+            ))}
+          </div>
+          <p className={s.hint} style={{ margin: 0 }}>
+            {presentes?.length ?? 0} {(presentes?.length ?? 0) === 1 ? "persona" : "personas"}
+          </p>
+        </div>
+      </Modal>
+
       <Modal
         open={convocando}
         onClose={() => setConvocando(false)}

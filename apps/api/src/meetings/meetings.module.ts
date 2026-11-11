@@ -8,11 +8,12 @@ import { ActivitiesModule } from '../activities/activities.module.js';
 import { ActaIaService } from './acta-ia.service.js';
 import { GrabacionService } from './grabacion.service.js';
 import { GrabacionController } from './grabacion.controller.js';
+import { ReunionVisibleGuard } from './visibilidad.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, AiModule, ActivitiesModule],
   controllers: [MeetingsController, GrabacionController],
-  providers: [MeetingsService, ActaIaService, GrabacionService],
+  providers: [MeetingsService, ActaIaService, GrabacionService, ReunionVisibleGuard],
   exports: [MeetingsService],
 })
 export class MeetingsModule {}

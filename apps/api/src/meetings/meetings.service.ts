@@ -19,6 +19,7 @@ import {
 } from './meeting-rhythm.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { actividadDeAcuerdo } from './acuerdo-actividad.js';
+import { SELECT_VISIBILIDAD, organigrama, veReunion, visorDe, type ReunionVisible } from './visibilidad.js';
 
 const USER_BRIEF = { select: { id: true, nombre: true, email: true } };
 
@@ -44,6 +45,7 @@ export class MeetingsService {
   async list(
     companyId?: number | null,
     filters?: { tipo?: string; estado?: string; desde?: string; hasta?: string },
+    viewer?: unknown,
   ) {
     const tenantId = requireCompanyId(companyId);
 
@@ -65,13 +67,15 @@ export class MeetingsService {
       where,
       include: {
         facilitador: USER_BRIEF,
+        asistentes: { select: { userId: true } },
         _count: { select: { asistentes: true, acuerdos: true } },
       },
       orderBy: { fecha: 'desc' },
       take: 200,
     });
 
-    return reuniones.map((r) => ({
+    const visibles = await this.soloVisibles(reuniones, viewer);
+    return visibles.map(({ asistentes: _a, ...r }) => ({
       ...r,
       asistentes: r._count.asistentes,
       acuerdos: r._count.acuerdos,
@@ -462,23 +466,37 @@ export class MeetingsService {
    * Antes se decían el viernes y se olvidaban el lunes. Aquí quedan escritas y
    * ligadas —cuando aplica— al servicio del que salieron.
    */
-  async lessons(companyId?: number | null, q?: string) {
+  async lessons(companyId?: number | null, q?: string, viewer?: unknown) {
     const tenantId = requireCompanyId(companyId);
     const texto = q?.trim();
 
-    return this.prisma.meetingAgreement.findMany({
+    const lecciones = await this.prisma.meetingAgreement.findMany({
       where: {
         tipo: 'LECCION',
         ...companyWhere(tenantId),
         ...(texto ? { descripcion: { contains: texto, mode: 'insensitive' as const } } : {}),
       },
       include: {
-        meeting: { select: { id: true, titulo: true, tipo: true, fecha: true } },
+        meeting: { select: { id: true, titulo: true, tipo: true, fecha: true, ...SELECT_VISIBILIDAD } },
         activity: { select: { id: true, anNumber: true, titulo: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
+    // Solo las lecciones de reuniones que esa persona puede ver (11-11).
+    const usuarios = await organigrama(this.prisma);
+    const visor = visorDe(viewer);
+    return lecciones
+      .filter((l) => !viewer || veReunion(visor, l.meeting, usuarios))
+      .map((l) => ({ ...l, meeting: { id: l.meeting.id, titulo: l.meeting.titulo, tipo: l.meeting.tipo, fecha: l.meeting.fecha } }));
+  }
+
+  /** Lo que de la lista puede ver quien pregunta; sin quien pregunta (procesos internos) va todo. */
+  private async soloVisibles<T extends ReunionVisible>(reuniones: T[], viewer?: unknown): Promise<T[]> {
+    if (!viewer) return reuniones;
+    const usuarios = await organigrama(this.prisma);
+    const visor = visorDe(viewer);
+    return reuniones.filter((r) => veReunion(visor, r, usuarios));
   }
 
   // ── Interno ───────────────────────────────────────────────────────────

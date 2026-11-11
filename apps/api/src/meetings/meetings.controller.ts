@@ -14,6 +14,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
 import { MeetingsService } from './meetings.service.js';
+import { ReunionVisibleGuard } from './visibilidad.js';
 import { ActaIaService } from './acta-ia.service.js';
 import { GrabacionService } from './grabacion.service.js';
 import { generarActaPdf, nombreArchivoActa } from './acta-pdf.js';
@@ -41,7 +42,7 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
  * antes que `:id` para que Nest no las tome por el id de una reunión.
  */
 @Controller('reuniones')
-@UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
+@UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard, ReunionVisibleGuard)
 export class MeetingsController {
   constructor(
     private readonly service: MeetingsService,
@@ -69,8 +70,8 @@ export class MeetingsController {
 
   /** Lecciones aprendidas de toda la empresa, buscables. */
   @Get('lecciones')
-  lessons(@CurrentCompanyId() companyId: number | null, @Query('q') q?: string) {
-    return this.service.lessons(companyId, q);
+  lessons(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null, @Query('q') q?: string) {
+    return this.service.lessons(companyId, q, user);
   }
 
   /** Acuerdos abiertos fuera de fecha: el tablero de la junta de cierre. */
@@ -83,13 +84,14 @@ export class MeetingsController {
 
   @Get()
   list(
+    @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Query('tipo') tipo?: string,
     @Query('estado') estado?: string,
     @Query('desde') desde?: string,
     @Query('hasta') hasta?: string,
   ) {
-    return this.service.list(companyId, { tipo, estado, desde, hasta });
+    return this.service.list(companyId, { tipo, estado, desde, hasta }, user);
   }
 
   @Post()
