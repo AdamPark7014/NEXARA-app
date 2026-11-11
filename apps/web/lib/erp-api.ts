@@ -4,7 +4,8 @@
 import { buildApiUrl } from "@/lib/api-base";
 import { withTenantHeaders } from "@/lib/tenant";
 
-const INTERNAL_ROUTE_ERROR = /\bCannot (GET|POST|PUT|PATCH|DELETE) \//;
+// La ruta interna o el «Tu rol (x) no puede acceder a GET /api/…» nunca se le enseñan a nadie (11-11).
+const INTERNAL_ROUTE_ERROR = /\bCannot (GET|POST|PUT|PATCH|DELETE) \/|no puede acceder a (GET|POST|PUT|PATCH|DELETE) \//;
 
 export function formatApiError(err: unknown, fallback = "Error desconocido"): string {
   const raw = (err instanceof Error ? err.message : typeof err === "string" ? err : "").trim();

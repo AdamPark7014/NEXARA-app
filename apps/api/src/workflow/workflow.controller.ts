@@ -48,7 +48,8 @@ export class WorkflowController {
   }
 
   @Get('my-pending')
-  @RBAC({ anyPermissions: VIEW })
+  // Sus propias firmas pendientes: todos lo preguntan al abrir Core (11-11).
+  @RBAC({})
   myPending(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
     return this.service.listMyPending(user.id, companyId);
   }

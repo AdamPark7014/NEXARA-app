@@ -447,6 +447,14 @@ export const SHARED_SESSION_URL_RULES: UrlRule[] = [
   // Los comunicados internos son PARA el personal: todos leen, solo
   // Administracion y Direccion publican.
   { path: '/api/internal-comunicados/**', methods: ['GET'], scope: 'read' },
+  // Lo propio de cada quien (11-11: a Jorge, arquitecto, «Mi perfil» le decía que su rol no podía ver
+  // su verificación en dos pasos). Cada endpoint trabaja solo con el usuario de la sesión.
+  { path: '/api/users/mfa/status', methods: ['GET'], scope: 'read' },
+  { path: '/api/users/mfa/setup', methods: ['POST'], scope: 'write' },
+  { path: '/api/users/mfa/confirm', methods: ['POST'], scope: 'write' },
+  { path: '/api/users/mfa/disable', methods: ['POST'], scope: 'write' },
+  { path: '/api/workflow/my-pending', methods: ['GET'], scope: 'read' },
+  { path: '/api/ai/voz/estado', methods: ['GET'], scope: 'read' },
 ];
 
 /**
