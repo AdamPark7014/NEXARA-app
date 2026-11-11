@@ -7347,6 +7347,8 @@ model OperationalMeeting {
   agenda        String?       @db.Text
   notas         String?       @db.Text
   facilitadorId Int?
+  /// Reuniones de antes del 11-11-2026: solo las ve dirección (Adam). Las nuevas las ven quienes estuvieron y sus jefes.
+  soloDireccion Boolean       @default(false)
   realizadaAt   DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
