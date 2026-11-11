@@ -373,14 +373,16 @@ export class UsersController {
 
   @Get('mfa/status')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.PEOPLE_VIEW] })
+  // Solo toca al usuario de la sesión: lo puede usar cualquier persona (11-11).
+  @RBAC({})
   mfaStatus(@CurrentUser() user: any) {
     return this.usersService.getMfaStatus(user.id);
   }
 
   @Post('mfa/setup')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.PEOPLE_VIEW] })
+  // Solo toca al usuario de la sesión: lo puede usar cualquier persona (11-11).
+  @RBAC({})
   mfaSetup(@CurrentUser() user: any) {
     return this.mfa.iniciarConfiguracion(user.id);
   }
@@ -403,14 +405,16 @@ export class UsersController {
 
   @Post('mfa/confirm')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.PEOPLE_VIEW] })
+  // Solo toca al usuario de la sesión: lo puede usar cualquier persona (11-11).
+  @RBAC({})
   mfaConfirm(@CurrentUser() user: any, @Body('token') token: string) {
     return this.usersService.confirmMfaSetup(user.id, token);
   }
 
   @Post('mfa/disable')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.PEOPLE_VIEW] })
+  // Solo toca al usuario de la sesión: lo puede usar cualquier persona (11-11).
+  @RBAC({})
   mfaDisable(@CurrentUser() user: any, @Body('token') token?: string) {
     return this.usersService.disableMfa(user.id, token);
   }
@@ -446,7 +450,8 @@ export class UsersController {
 
   @Get('assignable')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
+  // Responde solo con el alcance de quien pregunta; el arquitecto lo necesita para asignar obra (11-11).
+  @RBAC({})
   async findAssignable(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
     // Cargar rol completo del usuario actual
     const userWithRole = await this.usersService.findOne(user.id, companyId);
