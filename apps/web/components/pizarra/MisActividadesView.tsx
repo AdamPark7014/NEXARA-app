@@ -69,6 +69,7 @@ import {
 import c from "./comun.module.css";
 import QueSigue from "./QueSigue";
 import { QUE_SIGUE_VISIBLE } from "@/lib/que-sigue-api";
+import TuDesempeno from "@/components/kpis/TuDesempeno";
 import m from "./MisActividadesView.module.css";
 
 const MIN_REASON = 10;
@@ -238,6 +239,7 @@ export default function MisActividadesPage() {
           ) : null}
         </div>
       </header>
+      <TuDesempeno />
 
       {data ? (
         <StatRow cols={seguimiento.length ? 4 : 3} ariaLabel="Resumen de tu día">

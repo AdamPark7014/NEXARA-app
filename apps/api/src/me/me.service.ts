@@ -14,10 +14,13 @@ import { applyModuleAccessOverrides, parseModuleAccess } from './module-access-m
 import { ModulePolicyService } from '../common/tenant/module-policy.service.js';
 import { aplicarPoliticaANavegacion } from '../common/tenant/module-policy.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { TeamBoardService } from './team-board.service.js';
 import { puedeDisenarCctvSegunGente } from '../cctv-disenos/acceso-cctv.js';
 
 /** Diseñador de videovigilancia: la matriz se lo abre a soporte, RH, contabilidad y diseño, pero solo entra quien lleva gente. */
 const MODULO_CCTV = 'erp-videovigilancia';
+/** Desempeño del equipo: solo quien ve a alguien más; quien solo se ve a sí mismo lo tiene en su inicio (Adam, 11-11). */
+const MODULO_DESEMPENO = 'kpis-equipo';
 
 /** Prefijo de panel web → PanelId móvil / hub. */
 const PANEL_PREFIXES: Array<{ prefix: string; panel: string }> = [
@@ -36,6 +39,7 @@ export class MeService {
     private readonly auth: AuthService,
     private readonly policy: ModulePolicyService,
     private readonly prisma: PrismaService,
+    private readonly teamBoard: TeamBoardService,
   ) {}
 
   async navigation(userId: number, companyId?: number | null) {
@@ -85,6 +89,17 @@ export class MeService {
       recortada.webModuleIds = recortada.webModuleIds.filter((m) => m !== MODULO_CCTV);
       recortada.moduleKeys = recortada.moduleKeys.filter((m) => m !== MODULO_CCTV);
       recortada.hiddenModuleIds = [...new Set([...recortada.hiddenModuleIds, MODULO_CCTV])].sort();
+    }
+    if (recortada.webModuleIds.includes(MODULO_DESEMPENO) || recortada.moduleKeys.includes(MODULO_DESEMPENO)) {
+      const { companyWide, scoped } = await this.teamBoard.resolveScope(
+        { id: userId, roleKey: roleKeyRaw ?? null, email: profile?.email ?? null, isSuperAdmin: roleKey === 'super_admin' },
+        companyId ?? null,
+      );
+      if (!companyWide && !scoped.some((u) => u.id !== userId)) {
+        recortada.webModuleIds = recortada.webModuleIds.filter((m) => m !== MODULO_DESEMPENO);
+        recortada.moduleKeys = recortada.moduleKeys.filter((m) => m !== MODULO_DESEMPENO);
+        recortada.hiddenModuleIds = [...new Set([...recortada.hiddenModuleIds, MODULO_DESEMPENO])].sort();
+      }
     }
     const webModuleIds = recortada.webModuleIds;
     const moduleKeys = recortada.moduleKeys;
