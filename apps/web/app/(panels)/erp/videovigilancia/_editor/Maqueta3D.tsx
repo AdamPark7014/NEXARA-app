@@ -1134,13 +1134,16 @@ export default function Maqueta3D({
           {pistaVista && herramienta === "seleccionar" && !piezaSel ? (
             <p className={styles.pistaVista}>
               <span>
-                <b>Arrastra</b> para girar
+                <b>Arrastra</b> para moverte
               </span>
               <span>
-                <b>Dos dedos</b> o <b>clic derecho</b> para deslizar
+                <b>Clic derecho</b> o <b>Mayús</b> para girar alrededor
               </span>
               <span>
-                <b>Pellizca</b> o usa la <b>rueda</b> para acercar
+                <b>Rueda</b> para acercarte a donde apuntas
+              </span>
+              <span>
+                <b>Doble clic</b> para ir ahí
               </span>
             </p>
           ) : null}

@@ -43,19 +43,19 @@ describe("clasificarRueda", () => {
 });
 
 describe("gestoDeBoton", () => {
-  it("en la maqueta, arrastrar gira y el clic derecho desliza", () => {
-    expect(gestoDeBoton(0, {}, false)).toBe("girar");
-    expect(gestoDeBoton(2, {}, false)).toBe("deslizar");
-    expect(gestoDeBoton(1, {}, false)).toBe("deslizar");
+  it("como un mapa: arrastrar mueve por el sitio y el clic derecho o la rueda apretada giran (11-11)", () => {
+    expect(gestoDeBoton(0, {}, false)).toBe("deslizar");
+    expect(gestoDeBoton(2, {}, false)).toBe("girar");
+    expect(gestoDeBoton(1, {}, false)).toBe("girar");
   });
 
-  it("desde arriba es un plano: arrastrar desliza y el clic derecho gira", () => {
+  it("desde arriba igual: arrastrar desliza y el clic derecho gira", () => {
     expect(gestoDeBoton(0, {}, true)).toBe("deslizar");
     expect(gestoDeBoton(2, {}, true)).toBe("girar");
   });
 
-  it("Mayús o Alt dan lo otro con el botón principal", () => {
-    expect(gestoDeBoton(0, { mayus: true }, false)).toBe("deslizar");
+  it("Mayús o Alt giran con el botón principal", () => {
+    expect(gestoDeBoton(0, { mayus: true }, false)).toBe("girar");
     expect(gestoDeBoton(0, { alt: true }, true)).toBe("girar");
   });
 
