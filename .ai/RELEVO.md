@@ -1,5 +1,14 @@
 # RELEVO
 
+- **15-11 ~10:30 México (claude-code) — Aprobaciones como bandeja única y menú «Por estrenar» (Adam: «lo que consideres apropiado»).**
+  - Aprobaciones nunca tuvo datos (`workflow_instances` = 0). `lib/bandeja.ts` junta evidencias por revisar (me/revisiones,
+    paraTi), viáticos Pendiente, horas extra y descuentos de la semana pasada (control-semanal), solicitudes de equipo y
+    firmas de flujo; cada fuente callada si da 403. `components/approvals/BandejaUnica.tsx` arriba de las firmas; cifras y
+    filtros de flujo solo si hay firmas. El número del menú = `contarBandeja` (sin la nómina, que pesa).
+  - `me/navigation` devuelve `porEstrenar` (almacén sin stock ni movimientos, documentos, compras en cero por empresa); el
+    menú los manda a «Por estrenar», al final y plegado (`FOLDED_GROUPS_STORAGE_KEY` v3).
+  - Este despliegue también lleva `4e07de69` (dependencias Node 26/npm 12) que estaba sin desplegar.
+
 - **15-11 ~01:05 México (claude-code) — Dependencias al día con Node 26.13.1 / npm 12.2.2 (solo parches y menores). NO desplegado.**
   - Subidas: next 15.5.29, MUI 7.3.11, maplibre-gl 6.18.0 (con sus `.mjs` copiados a `public/maplibre/`), sass 1.108,
     recharts 3.10, hls.js 1.7, axios 1.21.1, openai 6.49, nodemailer 10.5, firebase-admin 13.10, bullmq 5.81.5,

@@ -15,7 +15,11 @@ export const CORE_GROUP_ORDER: readonly string[] = [
   "Gobierno",
   "Auditoría",
   "Empresa",
+  // Módulos que la empresa aún no estrena (sin un solo registro): al final y plegados (15-11).
+  "Por estrenar",
 ];
+
+export const GRUPO_POR_ESTRENAR = "Por estrenar";
 
 /** A qué grupo va cada módulo. El `group` de `MODULES` se queda como estaba para los demás paneles. */
 const GRUPO_CORE: Readonly<Record<string, string>> = {
@@ -90,10 +94,10 @@ export const CORE_ITEM_ORDER: readonly string[] = [
 ];
 
 /** Grupos que arrancan plegados (id = slug del título, como lo genera `buildUserSidebar`). */
-export const DEFAULT_FOLDED_GROUP_IDS: readonly string[] = ["empresa"];
+export const DEFAULT_FOLDED_GROUP_IDS: readonly string[] = ["empresa", "por-estrenar"];
 
-// v2: los grupos cambiaron de nombre; lo guardado con los viejos ya no significa nada.
-export const FOLDED_GROUPS_STORAGE_KEY = "nx-shell-folded-groups-v2";
+// v3 (15-11): llegó «Por estrenar», que arranca plegado aunque ya hubiera preferencias guardadas.
+export const FOLDED_GROUPS_STORAGE_KEY = "nx-shell-folded-groups-v3";
 
 /** El chat es el mismo en todos los paneles: el mismo contador de no leídos. */
 export const CHAT_MODULE_IDS: ReadonlySet<string> = new Set([
@@ -122,6 +126,7 @@ export function presentSidebarGroups<I extends { id: string }, G extends { title
   groups: G[],
   panel: PanelId,
   rol?: string | null,
+  porEstrenar: ReadonlySet<string> = new Set(),
 ): G[] {
   if (panel !== "erp") return groups;
   const conMesa = groups.some((g) => g.items.some((it) => it.id === "erp-contabilidad"));
@@ -130,18 +135,22 @@ export function presentSidebarGroups<I extends { id: string }, G extends { title
   for (const g of groups) {
     for (const it of g.items) {
       if (conMesa && DENTRO_DE_MESA.has(it.id)) continue;
-      const titulo = deCampo && it.id === "reuniones" ? "Empresa" : grupoCore(it.id, g.title);
+      const titulo = porEstrenar.has(it.id)
+        ? GRUPO_POR_ESTRENAR
+        : deCampo && it.id === "reuniones"
+          ? "Empresa"
+          : grupoCore(it.id, g.title);
       porTitulo.set(titulo, [...(porTitulo.get(titulo) ?? []), it]);
     }
   }
   const acomodados = [...porTitulo.entries()].map(
     ([title, items]) => ({ id: idDeGrupo(title), title, items }) as unknown as G,
   );
-  const lastIdx = CORE_GROUP_ORDER.length - 1;
+  const empresaIdx = CORE_GROUP_ORDER.indexOf("Empresa");
   const groupRank = (g: G) => {
     const r = rank(CORE_GROUP_ORDER, g.title);
-    // Desconocidos: después de lo listado, pero «Empresa» siempre al final.
-    return r === Number.MAX_SAFE_INTEGER ? lastIdx - 0.5 : r;
+    // Desconocidos: después de lo listado, pero antes de «Empresa» (y de «Por estrenar», que va al final).
+    return r === Number.MAX_SAFE_INTEGER ? empresaIdx - 0.5 : r;
   };
   return acomodados
     .map((g, i) => ({ g, i }))

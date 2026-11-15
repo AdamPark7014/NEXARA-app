@@ -103,6 +103,7 @@ export class MeService {
     }
     const webModuleIds = recortada.webModuleIds;
     const moduleKeys = recortada.moduleKeys;
+    const porEstrenar = (await this.modulosPorEstrenar(companyId ?? null)).filter((m) => webModuleIds.includes(m));
 
     return {
       roleKey: roleKeyRaw ?? null,
@@ -119,12 +120,38 @@ export class MeService {
        * descarta después del filtro por rutas; las apps ya los reciben recortados de `moduleKeys`.
        */
       hiddenModuleIds: recortada.hiddenModuleIds,
+      porEstrenar,
       rules: rules.map((r) => ({
         path: r.path,
         methods: r.methods ?? null,
         scope: r.scope ?? null,
       })),
     };
+  }
+
+  /**
+   * Módulos que la empresa no ha estrenado: ni un registro. El menú los deja al final, plegados, para que
+   * no estorben y sigan a la mano el día que alguien los use (Adam, 15-11).
+   */
+  private async modulosPorEstrenar(companyId: number | null): Promise<string[]> {
+    if (!companyId) return [];
+    try {
+      const donde = { companyId };
+      const [stock, movimientos, documentos, requisiciones, ordenes] = await Promise.all([
+        this.prisma.stockLevel.count({ where: donde }),
+        this.prisma.stockMovement.count({ where: donde }),
+        this.prisma.managedDocument.count({ where: donde }),
+        this.prisma.purchaseRequisition.count({ where: donde }),
+        this.prisma.purchaseOrder.count({ where: donde }),
+      ]);
+      const ids: string[] = [];
+      if (stock + movimientos === 0) ids.push('erp-almacen', 'warehouse');
+      if (documentos === 0) ids.push('documents');
+      if (requisiciones + ordenes === 0) ids.push('procurement');
+      return ids;
+    } catch {
+      return [];
+    }
   }
 
   private derivePanels(paths: string[]): string[] {
