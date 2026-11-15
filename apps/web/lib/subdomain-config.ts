@@ -28,8 +28,8 @@ export const SUBDOMAIN_CONFIG: Record<string, SubdomainConfig> = {
   // ── Núcleo empresarial ──
   console: {
     name: 'Core ERP',
-    publicDomain: 'core.nexara.com.mx',
-    aliases: ['consola.nexara.com.mx', 'console.nexara.com.mx', 'app.nexara.com.mx'],
+    publicDomain: 'app.nexara.com.mx',
+    aliases: ['core.nexara.com.mx', 'consola.nexara.com.mx', 'console.nexara.com.mx'],
     rootPath: '/',
     description:
       'Núcleo empresarial: usuarios, permisos, proyectos, clientes, inventario, OC, tickets, dashboards globales, auditoría, RRHH.',

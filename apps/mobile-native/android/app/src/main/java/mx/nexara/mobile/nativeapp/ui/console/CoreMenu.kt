@@ -44,7 +44,7 @@ enum class CoreModule(
 enum class CoreExtraModule(
     val key: String,
     val label: String,
-    /** Página web del módulo (se abre en `https://core.nexara.com.mx`). */
+    /** Página web del módulo (se abre en `https://app.nexara.com.mx`). */
     val webPath: String,
     val summary: String,
     /** Grupo del hub «Más», alineado con la web: Hoy / Recursos / Finanzas / Gobierno. */
@@ -115,7 +115,7 @@ enum class CoreExtraModule(
 object CoreMenu {
 
     /** Donde vive la web de Core; «Abrir en la web» arma sus enlaces aquí. */
-    const val CORE_WEB_BASE = "https://core.nexara.com.mx"
+    const val CORE_WEB_BASE = "https://app.nexara.com.mx"
 
     /**
      * Los de «Más» que todo el personal tiene: herramientas, vehículos y

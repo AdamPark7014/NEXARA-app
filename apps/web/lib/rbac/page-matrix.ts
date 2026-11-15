@@ -6,7 +6,7 @@
  *
  * Convención de paths (canónica, alineada con `apps/web/app/(panels)/*` y
  * con el subdominio bonito):
- *   /erp/...     → core.nexara.com.mx        (ERP: CEO, directores, admin, RH, contabilidad)
+ *   /erp/...     → app.nexara.com.mx        (ERP: CEO, directores, admin, RH, contabilidad)
  *   /crm/...     → sales.nexara.com.mx       (CRM: vendedores, coord. ventas)
  *   /ops/...     → ops.nexara.com.mx         (Ingenieros de campo, soporte, NOC)
  *   /studio/...  → studio.nexara.com.mx      (Diseñadores, marketing)

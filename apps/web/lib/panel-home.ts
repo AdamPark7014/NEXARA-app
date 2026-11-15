@@ -62,20 +62,20 @@ export function getUserHome(
  * Resuelve el URL absoluto (con subdominio) del panel HOME del usuario.
  * Usado para redirecciones cross-subdomain después del login.
  * 
- * Ej: designer → https://studio.nexara.com.mx/dashboard
- *     ceo      → https://core.nexara.com.mx/executive
+ * Ej: designer → https://app.nexara.com.mx/studio/dashboard (todo vive en app.)
+ *     ceo      → https://app.nexara.com.mx/executive
  */
 export function getUserHomeUrlAbsolute(
   user: (UserPermissions & { role?: string | null; orgRoleKey?: string | null; roleKey?: string | null }) | null | undefined,
 ): string {
-  if (!user) return 'https://core.nexara.com.mx/login';
+  if (!user) return 'https://app.nexara.com.mx/login';
 
   const panel = getUserHomePanel(user);
   const path = getUserHomePath(user);
   const userJson = JSON.stringify(user);
 
   if (typeof window === 'undefined') {
-    return `https://${panel === 'erp' ? 'core' : panel === 'crm' ? 'sales' : panel}.nexara.com.mx${path}`;
+    return `https://app.nexara.com.mx${path}`;
   }
 
   return buildCrossPanelUrl(panel, path, userJson);

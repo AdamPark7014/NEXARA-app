@@ -87,7 +87,7 @@ describe("workerAtorado", () => {
 
     expect(
       workerAtorado(
-        new Error('Setting up fake worker failed: "Cannot load script at: https://core.nexara.com.mx/pdf.worker.min.js".'),
+        new Error('Setting up fake worker failed: "Cannot load script at: https://app.nexara.com.mx/pdf.worker.min.js".'),
       ),
     ).toBe(true);
     expect(workerAtorado(new Error("Invalid PDF structure."))).toBe(false);

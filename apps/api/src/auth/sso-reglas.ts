@@ -214,11 +214,11 @@ export function nextSeguro(next: unknown): string | null {
   if (!v.startsWith('/') || v.length > 500 || /[\u0000-\u001f\u007f\\]/.test(v)) return null;
   let url: URL;
   try {
-    url = new URL(v, 'https://core.nexara.com.mx');
+    url = new URL(v, 'https://app.nexara.com.mx');
   } catch {
     return null;
   }
-  if (url.origin !== 'https://core.nexara.com.mx') return null;
+  if (url.origin !== 'https://app.nexara.com.mx') return null;
   const ruta = `${url.pathname}${url.search}${url.hash}`;
   if (ruta.startsWith('//') || /^\/(auth\/)?login(\/|\?|$)/i.test(ruta)) return null;
   return ruta;

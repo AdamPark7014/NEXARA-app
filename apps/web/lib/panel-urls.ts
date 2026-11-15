@@ -15,14 +15,14 @@ export type PanelSlug =
 /**
  * Subdominios canónicos públicos para cada slug interno.
  * Estos son los nombres "bonitos" que verá el usuario final en producción y
- * en dev local (p.ej. core.localhost:3000).
+ * en dev local (p.ej. app.localhost:3000). En producción el ERP vive solo en app.nexara.com.mx.
  *
  * Aliases legacy (consola, ventas, operacion, contabilidad, web, tickets, help,
  * monitor, rh, hr, dev) son soportados por el middleware pero redirigen 308 a
  * estos canónicos.
  */
 const SUBDOMAIN_PUBLIC_KEYS: Record<PanelSlug, string> = {
-  console: "core",
+  console: "app",
   operacion: "ops",
   ventas: "sales",
   contabilidad: "finance",

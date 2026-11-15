@@ -3,7 +3,7 @@ import { enlaceSeguro } from "./enlace-seguro";
 
 describe("enlaceSeguro", () => {
   it("deja pasar http(s) y rutas del sitio", () => {
-    expect(enlaceSeguro("https://core.nexara.com.mx/uploads/a.pdf")).toBe("https://core.nexara.com.mx/uploads/a.pdf");
+    expect(enlaceSeguro("https://app.nexara.com.mx/uploads/a.pdf")).toBe("https://app.nexara.com.mx/uploads/a.pdf");
     expect(enlaceSeguro("/uploads/viaticos/123.jpg")).toBe("/uploads/viaticos/123.jpg");
     expect(enlaceSeguro("mailto:hola@nexara.com.mx")).toBe("mailto:hola@nexara.com.mx");
   });

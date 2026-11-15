@@ -55,7 +55,7 @@ describe("buildCrossPanelUrl dentro del mismo subdominio", () => {
       configurable: true,
       value: {
         protocol: "https:",
-        hostname: "core.nexara.com.mx",
+        hostname: "app.nexara.com.mx",
         port: "",
       } as Location,
     });

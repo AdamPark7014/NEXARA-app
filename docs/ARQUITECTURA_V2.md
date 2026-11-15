@@ -53,7 +53,7 @@ NEXARA es una empresa **tech-services** con dos vertientes:
 
 | Subdominio | Slug interno | Para quién | Notas |
 |------------|--------------|-----------|-------|
-| `core.nexara.com.mx` | `console` | ERP: CEO, directores, admin, RH, contabilidad | Eje principal |
+| `app.nexara.com.mx` | `console` | ERP: CEO, directores, admin, RH, contabilidad | Eje principal |
 | `sales.nexara.com.mx` | `ventas` | CRM: vendedores, coord. ventas | |
 | `ops.nexara.com.mx` | `operacion` | Ingenieros de campo, soporte, NOC, coord. ops | |
 | `studio.nexara.com.mx` | `web` | Diseñadores, marketing | CMS del sitio público |

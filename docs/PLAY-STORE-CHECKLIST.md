@@ -310,7 +310,7 @@ registro público porque las cuentas las crea el administrador de cada empresa.
      se detiene al registrar la salida.
    - Cámara: se pide al adjuntar evidencia fotográfica a una actividad.
 
-La misma cuenta funciona en la versión web: https://core.nexara.com.mx
+La misma cuenta funciona en la versión web: https://app.nexara.com.mx
 ```
 
 > **Por qué un tenant aparte y no la cuenta de un empleado:** entregar credenciales reales
