@@ -43,6 +43,7 @@ export async function fetchMeNavigation(
       moduleKeys,
       webModuleIds,
       hiddenModuleIds: Array.isArray(data.hiddenModuleIds) ? data.hiddenModuleIds : [],
+      porEstrenar: Array.isArray(data.porEstrenar) ? data.porEstrenar : [],
     };
   } catch {
     return null;
