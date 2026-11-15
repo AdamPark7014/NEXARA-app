@@ -21,8 +21,10 @@ class WebPanelUrlTest {
     }
 
     @Test
-    fun thePortalKeepsItsOwnHost() {
-        assertEquals("https://portal.nexara.com.mx/tickets", WebPanelUrl.forPath("/portal"))
+    fun thePortalHasNoWebSinceTheSubdomainsWereRetired() {
+        // 14-11-2026: portal. ya no existe en el DNS y app./tickets da 404.
+        assertNull(WebPanelUrl.forPath("/portal"))
+        assertNull(WebPanelUrl.forPath("/tickets/12"))
     }
 
     @Test
