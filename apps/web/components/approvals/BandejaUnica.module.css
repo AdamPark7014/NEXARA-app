@@ -81,8 +81,18 @@
 }
 
 .ejemplos li small {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
   color: var(--ui-fg-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ejemplos li span {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .boton {
