@@ -45,3 +45,5 @@ apps/web/components/crm/**
 
 # Respaldos sueltos del servidor
 **/*.bak-*
+# respaldos nocturnos de produccion (no van a imagenes)
+.respaldos-prod
