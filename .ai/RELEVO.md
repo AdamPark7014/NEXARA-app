@@ -1,5 +1,23 @@
 # RELEVO
 
+- **15-11 ~01:05 México (claude-code) — Dependencias al día con Node 26.13.1 / npm 12.2.2 (solo parches y menores). NO desplegado.**
+  - Subidas: next 15.5.29, MUI 7.3.11, maplibre-gl 6.18.0 (con sus `.mjs` copiados a `public/maplibre/`), sass 1.108,
+    recharts 3.10, hls.js 1.7, axios 1.21.1, openai 6.49, nodemailer 10.5, firebase-admin 13.10, bullmq 5.81.5,
+    express 5.3 (raíz), zod 4.6.7 (raíz), testing-library y especificadores de Nest 10.4.22 / Prisma 5.22 (ya estaban en el lock).
+    `@testing-library/jest-dom` se queda en 6.9.1: npm marca la 6.10.0 como deprecada («minor con cambios que rompen»).
+  - **npm 12 bloquea los scripts de instalación de las dependencias.** `package.json` lleva ahora `allowScripts`
+    (Prisma, sharp, esbuild, @parcel/watcher, msgpackr-extract, protobufjs, @firebase/util, @nestjs/core; `canvas: false`,
+    que no tiene binario para Node 26 y nunca compiló aquí). npm 10 (Docker) ignora ese campo.
+  - npm 12 dejó `next` dentro de `apps/web/node_modules`: `scripts/next-build-resilient.js` ya lo resuelve con
+    `require.resolve` desde la web (antes ruta fija a la raíz). El lock nuevo pasa `npm ci --dry-run` con npm 10.9.9
+    (el de `node:22-slim`), para api y para web.
+  - Node 25+ trae un `localStorage` global vacío que tapaba al de jsdom: las 248 pruebas de la web caían. Arreglo en
+    `apps/web/vitest.config.mts` (`poolOptions.forks.execArgv: ['--no-experimental-webstorage']`).
+  - Verificado con Node 26: typecheck, 439 archivos de pruebas de API, 248 de web (2,143 pruebas), `build:server`,
+    `AppModule` carga, `next start` sirve `/contacto` y el mapa se dibuja con calles. Mayores pendientes y su costo:
+    `C:\dev\.ai\dependencias-2026-11.md`.
+  - No tocado: `apps/web/lib/integra-shared/_lib.ts` y `.codex/` (cambios ajenos sin commitear desde el 07/09-11).
+
 - **14-11 ~22:10 México (claude-code) — El ERP vive solo en `app.nexara.com.mx` (Adam cambió core → app en el DNS).**
   - En GoDaddy solo quedan raíz/`www`, `app.`, `api.`, `email.` y `autodiscover.`; `core.`, `integra.` y los demás
     subdominios de páginas ya no resuelven. El middleware mandaba `app.` → `core.` (308) y el ERP no abría.

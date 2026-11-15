@@ -1,7 +1,8 @@
 /* eslint-disable no-console */
 const { spawnSync } = require('node:child_process');
 
-const nextBin = '../../node_modules/next/dist/bin/next';
+// npm puede dejar `next` en la raíz o dentro de apps/web/node_modules según el lock; se resuelve desde la web.
+const nextBin = require.resolve('next/dist/bin/next', { paths: [process.cwd()] });
 
 function runBuild(maxOldSpaceSize, ignoreTypeErrors) {
   const env = {

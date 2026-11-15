@@ -45,5 +45,10 @@ export default defineConfig({
     // prueba más lenta ya gasta 2,6 s en solitario tecleando con `userEvent`.
     // Con la máquina cargada se pasaba de largo y el suite fallaba a ratos.
     testTimeout: 15_000,
+    // Node 25+ trae su propio `localStorage` global (vacío sin `--localstorage-file`) y tapa al de jsdom:
+    // con Node 26 las 248 pruebas caían en «Cannot read properties of undefined (reading 'getItem')».
+    poolOptions: {
+      forks: { execArgv: ['--no-experimental-webstorage'] },
+    },
   },
 });
