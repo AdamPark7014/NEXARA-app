@@ -11,8 +11,11 @@
     Health check del web: `hostname: app.nexara.com.mx` + `followRedirects: false`.
   - Certificado propio de `app.` (Let's Encrypt, vence 13-02-2027): se quitó de `acme.json` el certificado de `console`
     que llevaba `app.` como SAN con 15 hosts muertos (respaldo en `/root/respaldo-acme-20261115/`). Traefik reiniciado ~3 s.
-  - Pendiente de Adam: agregar el callback de `app.` en Google Cloud (hoy Google da `redirect_uri_mismatch`); decidir si
-    vuelve `core` al DNS para ligas viejas; publicar apps móviles nuevas; equipos/agentes con `integra.nexara.com.mx`.
+  - Google Cloud (cliente «NEXARA Core (login web)», con el sí de Adam): agregado URI 2
+    `https://app.nexara.com.mx/api/auth/oidc/callback` (se dejó el de core.). Probado: Google ya lleva a «Elige tu cuenta»
+    en vez de `redirect_uri_mismatch`; el login completo con Google lo prueba Adam con su cuenta.
+  - Pendiente de Adam: decidir si vuelve `core` al DNS para ligas viejas; publicar apps móviles nuevas; equipos/agentes
+    con `integra.nexara.com.mx`.
   - Navegadores que ya visitaron `app.` guardan el 308 viejo a `core.`: se arregla borrando «Imágenes y archivos en caché».
 
 - **2026-11-14 (claude-code) — Limpieza de documentación (Adam: «quita documentación y unifica»).** Borrados 25 documentos obsoletos sin referencias (auditorías, planes y prompts viejos; están en el historial de git). Índice único del repo: `docs/INDICE.md`; índice de todos los proyectos: `C:\dev\DOCS.md`; memoria compartida de Codex/Claude/Cursor/Grok: `C:\dev\.ai\memoria`. RELEVO recortado a los 3 turnos más recientes.
