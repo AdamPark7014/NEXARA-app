@@ -124,7 +124,7 @@ NEXARA debe quedar como **ERP vertical de servicios tecnológicos MX** con:
 - Gastos / viáticos / pagos empleados al `markPagado` → `JournalEntry` + `journalEntryId`
 - Cuentas `102.01`, `601.01`, `601.02`, `602.01`
 - Audit en approve/pagado/remove
-- **DoD prod:** marcar un gasto pagado en `core.nexara.com.mx` y ver póliza en Contabilidad
+- **DoD prod:** marcar un gasto pagado en `app.nexara.com.mx` y ver póliza en Contabilidad
 
 ### Sprint P0-B — OC → GR → stock → AP ✅ código
 - Recepción crea `StockMovement` + WAC en `StockLevel`

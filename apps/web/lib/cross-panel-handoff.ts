@@ -1,7 +1,7 @@
 /**
  * NEXARA · Cross-Panel Token Handoff
  * ====================================
- * Permite que al cambiar de subdominio (ej. ops.nexara.com.mx → core.nexara.com.mx)
+ * Permite que al cambiar de subdominio (ej. ops.nexara.com.mx → app.nexara.com.mx)
  * el JWT del usuario viaje en la URL (?_nxt=<encoded>) para que el destino lo
  * guarde en su propio sessionStorage sin pedir login de nuevo.
  *
@@ -20,16 +20,16 @@ import { CORE_SURFACE_ONLY, coreSurfaceRedirect } from '@/lib/core-surface';
 
 export const HANDOFF_PARAM = '_nxt';
 
-/** Panel ID → subdominio canónico (ver middleware CANONICAL_BY_INTERNAL_PREFIX). */
+/** Panel ID → subdominio canónico (ver middleware CANONICAL_BY_INTERNAL_PREFIX): todo vive en app. desde el 14-11-2026. */
 export const PANEL_CANONICAL_SUBDOMAIN: Record<PanelId, string> = {
-  erp: 'core',
-  finance: 'core',
-  hr: 'core',
-  crm: 'sales',
-  ops: 'ops',
-  studio: 'studio',
-  lab: 'lab',
-  integra: 'integra',
+  erp: 'app',
+  finance: 'app',
+  hr: 'app',
+  crm: 'app',
+  ops: 'app',
+  studio: 'app',
+  lab: 'app',
+  integra: 'app',
 };
 
 const SUBDOMAIN_TO_PANEL_ID: Record<string, PanelId> = {

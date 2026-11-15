@@ -26,8 +26,8 @@ describe('getApiBase · a qué backend apunta la web', () => {
   });
 
   it('en un subdominio de panel usa el mismo origen (Traefik enruta /api)', () => {
-    setLocation('https://core.nexara.com.mx/erp/dashboard');
-    expect(getApiBase()).toBe('https://core.nexara.com.mx/api');
+    setLocation('https://app.nexara.com.mx/erp/dashboard');
+    expect(getApiBase()).toBe('https://app.nexara.com.mx/api');
     setLocation('https://ops.nexara.com.mx/ops/activities');
     expect(getApiBase()).toBe('https://ops.nexara.com.mx/api');
     setLocation('https://integra.nexara.com.mx/integra');
@@ -45,9 +45,9 @@ describe('getApiBase · a qué backend apunta la web', () => {
   });
 
   it('buildApiUrl no duplica ni se come las barras', () => {
-    setLocation('https://core.nexara.com.mx/');
-    expect(buildApiUrl('company/mine')).toBe('https://core.nexara.com.mx/api/company/mine');
-    expect(buildApiUrl('/company/mine')).toBe('https://core.nexara.com.mx/api/company/mine');
+    setLocation('https://app.nexara.com.mx/');
+    expect(buildApiUrl('company/mine')).toBe('https://app.nexara.com.mx/api/company/mine');
+    expect(buildApiUrl('/company/mine')).toBe('https://app.nexara.com.mx/api/company/mine');
   });
 });
 

@@ -68,7 +68,7 @@ function clave() {
         '',
         'Tus datos para entrar al panel de NEXARA:',
         '',
-        '  Panel:      https://core.nexara.com.mx (y la app NEXARA del teléfono)',
+        '  Panel:      https://app.nexara.com.mx (y la app NEXARA del teléfono)',
         `  Correo:     ${c.email}`,
         `  Contraseña: ${c.password}`,
         '',

@@ -1,23 +1,16 @@
 ## Traefik routing for NEXARA ERP
 ##
-## Estructura de subdominios canónicos (todos terminan en .nexara.com.mx):
-##   core      → ERP principal (console)
-##   sales     → CRM (ventas)
-##   ops       → Operaciones técnicas (operacion)
-##   finance   → Administración / contabilidad
-##   studio    → Estudio creativo / marketing (panel web)
-##   portal    → Portal de clientes empresariales (tickets)
-##   support   → Helpdesk interno
-##   noc       → Centro de monitoreo 24/7
-##   people    → Recursos humanos
-##   lab       → Playground interno (AI/dev)
-##   integra   → Seguridad física (CCTV/ACS Artemis)
+## Desde el 14-11-2026 el ERP vive SOLO en app.nexara.com.mx (Adam cambió core → app en
+## el DNS de GoDaddy y borró los demás subdominios de páginas). En el DNS quedan:
+##   app       → ERP (web Next.js; /api, /socket.io y /uploads van a la API)
 ##   api       → Backend NestJS
-##   (raíz)    → Sitio público
+##   (raíz)    → Sitio público (www → raíz)
+##   email / autodiscover → correo (GoDaddy / Microsoft 365), no pasan por aquí
 ##
-## Hosts legacy vivos (con router HTTPS): console, app, ventas, operacion,
-## contabilidad, web, tickets. Aliases rotos (consola, crm, admin, media, help,
-## monitor, rh, hr, dev) se retiraron del redirect HTTP→HTTPS permanente.
+## core.nexara.com.mx ya no resuelve; si algún día vuelve al DNS, el router
+## `core-a-app` lo manda con 301 a app. conservando la ruta.
+## integra.nexara.com.mx tampoco resuelve; se conservan sus rutas de equipos (aviso del
+## NVR por HTTP, go2rtc y /api) porque no son páginas.
 
 http:
   routers:
@@ -29,23 +22,8 @@ http:
       # media, help, monitor, rh, hr, dev) NO van aquí: un 301 permanente + HSTS
       # con includeSubDomains deja el host inaccesible un año en el navegador.
       rule: >-
-        (Host(`core.nexara.com.mx`) ||
-        Host(`console.nexara.com.mx`) ||
-        Host(`app.nexara.com.mx`) ||
-        Host(`sales.nexara.com.mx`) ||
-        Host(`ventas.nexara.com.mx`) ||
-        Host(`ops.nexara.com.mx`) ||
-        Host(`operacion.nexara.com.mx`) ||
-        Host(`finance.nexara.com.mx`) ||
-        Host(`contabilidad.nexara.com.mx`) ||
-        Host(`studio.nexara.com.mx`) ||
-        Host(`web.nexara.com.mx`) ||
-        Host(`portal.nexara.com.mx`) ||
-        Host(`tickets.nexara.com.mx`) ||
-        Host(`support.nexara.com.mx`) ||
-        Host(`noc.nexara.com.mx`) ||
-        Host(`people.nexara.com.mx`) ||
-        Host(`lab.nexara.com.mx`) ||
+        (Host(`app.nexara.com.mx`) ||
+        Host(`core.nexara.com.mx`) ||
         Host(`integra.nexara.com.mx`)) && !PathPrefix(`/api/integra/hik`)
       entryPoints:
         - web
@@ -91,12 +69,10 @@ http:
       service: dummy
 
     # ───────────────────────────────────────────────────────────
-    # Socket.IO backend (real-time) en TODOS los subdominios del ERP
+    # Socket.IO backend (real-time) en app. (integra: equipos)
     # ───────────────────────────────────────────────────────────
     socket-io:
-      # Incluye aliases vivos (console/app/ventas/…) para que POST/WS no den 404
-      # de Traefik antes del redirect canónico de Next (que solo cubre GET).
-      rule: 'Host(`core.nexara.com.mx`,`sales.nexara.com.mx`,`ops.nexara.com.mx`,`finance.nexara.com.mx`,`studio.nexara.com.mx`,`portal.nexara.com.mx`,`support.nexara.com.mx`,`noc.nexara.com.mx`,`people.nexara.com.mx`,`lab.nexara.com.mx`,`integra.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`,`ventas.nexara.com.mx`,`operacion.nexara.com.mx`,`contabilidad.nexara.com.mx`,`web.nexara.com.mx`,`tickets.nexara.com.mx`) && PathPrefix(`/socket.io`)'
+      rule: 'Host(`app.nexara.com.mx`,`integra.nexara.com.mx`) && PathPrefix(`/socket.io`)'
       entryPoints:
         - websecure
       service: nexara-api
@@ -117,10 +93,10 @@ http:
         certResolver: letsencrypt
 
     # ───────────────────────────────────────────────────────────
-    # API backend bajo /api en todos los subdominios del ERP
+    # API backend bajo /api en app. (integra: equipos y agentes edge)
     # ───────────────────────────────────────────────────────────
     api:
-      rule: 'Host(`core.nexara.com.mx`,`sales.nexara.com.mx`,`ops.nexara.com.mx`,`finance.nexara.com.mx`,`studio.nexara.com.mx`,`portal.nexara.com.mx`,`support.nexara.com.mx`,`noc.nexara.com.mx`,`people.nexara.com.mx`,`lab.nexara.com.mx`,`integra.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`,`ventas.nexara.com.mx`,`operacion.nexara.com.mx`,`contabilidad.nexara.com.mx`,`web.nexara.com.mx`,`tickets.nexara.com.mx`) && PathPrefix(`/api`)'
+      rule: 'Host(`app.nexara.com.mx`,`integra.nexara.com.mx`) && PathPrefix(`/api`)'
       entryPoints:
         - websecure
       service: nexara-api
@@ -137,94 +113,29 @@ http:
         certResolver: letsencrypt
 
     # ───────────────────────────────────────────────────────────
-    # Frontends (Next.js). El middleware de Next mapea cada host
-    # a su carpeta interna y redirige aliases → canónicos.
+    # Frontend (Next.js): el ERP vive solo en app.nexara.com.mx.
+    # Certificado propio de app. (antes iba como SAN del certificado de console,
+    # junto con subdominios que ya no existen y no se podría renovar).
     # ───────────────────────────────────────────────────────────
-    core-frontend:
-      rule: 'Host(`core.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+    app-frontend:
+      rule: 'Host(`app.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
       entryPoints: [websecure]
       service: nexara-web
       priority: 20
       tls:
         certResolver: letsencrypt
+        domains:
+          - main: app.nexara.com.mx
 
-    sales-frontend:
-      rule: 'Host(`sales.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+    # core.nexara.com.mx → app.nexara.com.mx (301 en GET, 308 en el resto), con la misma ruta.
+    # Hoy core. no tiene DNS; esto sirve si vuelve, para ligas viejas de correos y apps.
+    core-a-app:
+      rule: 'Host(`core.nexara.com.mx`)'
       entryPoints: [websecure]
-      service: nexara-web
-      priority: 20
-      tls:
-        certResolver: letsencrypt
-
-    ops-frontend:
-      rule: 'Host(`ops.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
-      entryPoints: [websecure]
-      service: nexara-web
-      priority: 20
-      tls:
-        certResolver: letsencrypt
-
-    finance-frontend:
-      rule: 'Host(`finance.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
-      entryPoints: [websecure]
-      service: nexara-web
-      priority: 20
-      tls:
-        certResolver: letsencrypt
-
-    studio-frontend:
-      rule: 'Host(`studio.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
-      entryPoints: [websecure]
-      service: nexara-web
-      priority: 20
-      tls:
-        certResolver: letsencrypt
-
-    portal-frontend:
-      rule: 'Host(`portal.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
-      entryPoints: [websecure]
-      service: nexara-web
-      priority: 20
-      tls:
-        certResolver: letsencrypt
-
-    support-frontend:
-      rule: 'Host(`support.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
-      entryPoints: [websecure]
-      service: nexara-web
-      priority: 20
-      tls:
-        certResolver: letsencrypt
-
-    noc-frontend:
-      rule: 'Host(`noc.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
-      entryPoints: [websecure]
-      service: nexara-web
-      priority: 20
-      tls:
-        certResolver: letsencrypt
-
-    people-frontend:
-      rule: 'Host(`people.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
-      entryPoints: [websecure]
-      service: nexara-web
-      priority: 20
-      tls:
-        certResolver: letsencrypt
-
-    lab-frontend:
-      rule: 'Host(`lab.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
-      entryPoints: [websecure]
-      service: nexara-web
-      priority: 20
-      tls:
-        certResolver: letsencrypt
-
-    integra-frontend:
-      rule: 'Host(`integra.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`) && !PathPrefix(`/go2rtc`)'
-      entryPoints: [websecure]
-      service: nexara-web
-      priority: 20
+      middlewares:
+        - core-a-app
+      service: dummy
+      priority: 200
       tls:
         certResolver: letsencrypt
 
@@ -249,15 +160,6 @@ http:
         - integra-go2rtc-strip
       service: nexara-go2rtc
       priority: 30
-      tls:
-        certResolver: letsencrypt
-
-    erp-frontends:
-      rule: 'Host(`core.nexara.com.mx`,`sales.nexara.com.mx`,`ops.nexara.com.mx`,`finance.nexara.com.mx`,`studio.nexara.com.mx`,`portal.nexara.com.mx`,`support.nexara.com.mx`,`noc.nexara.com.mx`,`people.nexara.com.mx`,`lab.nexara.com.mx`,`integra.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`,`ventas.nexara.com.mx`,`operacion.nexara.com.mx`,`contabilidad.nexara.com.mx`,`web.nexara.com.mx`,`tickets.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`) && !PathPrefix(`/go2rtc`)'
-      entryPoints:
-        - websecure
-      service: nexara-web
-      priority: 10
       tls:
         certResolver: letsencrypt
 
@@ -296,6 +198,12 @@ http:
       redirectRegex:
         regex: "^http://www\\.nexara\\.com\\.mx(.*)"
         replacement: "https://nexara.com.mx${1}"
+        permanent: true
+
+    core-a-app:
+      redirectRegex:
+        regex: "^https?://core\\.nexara\\.com\\.mx(.*)"
+        replacement: "https://app.nexara.com.mx${1}"
         permanent: true
 
     www-to-apex:
@@ -344,7 +252,10 @@ http:
           # core, sales, ops e integra cayeron a la vez. Verificado en el
           # servidor: con `Host: nexara-web:3000` → 400; con un host de la lista
           # → 200.
-          hostname: core.nexara.com.mx
+          hostname: app.nexara.com.mx
+          # Sin seguir redirecciones: una 3xx ya prueba que Next responde; seguirla saldría
+          # a internet y, si el destino no resuelve (pasó con core. el 14-11), daría 503 en todo.
+          followRedirects: false
           interval: 15s
           timeout: 5s
         servers:

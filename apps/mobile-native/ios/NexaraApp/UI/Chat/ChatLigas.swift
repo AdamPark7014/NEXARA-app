@@ -132,7 +132,7 @@ enum ChatLigas {
     /// Tope de tarjetas por mensaje: un mensaje con diez folios no debe volverse un tablero.
     static let maxTarjetas = 3
     /// Donde vive la web de Core (Android `CoreMenu.CORE_WEB_BASE`).
-    static let webBase = "https://core.nexara.com.mx"
+    static let webBase = "https://app.nexara.com.mx"
 
     static let sinAcceso = "Sin acceso"
     static let noSePudoCargar = "No se pudo cargar"

@@ -3,7 +3,7 @@ package mx.nexara.mobile.nativeapp.access
 /**
  * Construye la URL web canónica de un módulo de Core, igual que la resolvería el panel.
  *
- * Solo existe NEXARA Core (`core.nexara.com.mx/erp/...`) y el portal de clientes
+ * Solo existe NEXARA Core (`app.nexara.com.mx/erp/...`) y el portal de clientes
  * (`portal.nexara.com.mx/tickets/...`). Los prefijos viejos de consola se leen
  * como `/erp`.
  *

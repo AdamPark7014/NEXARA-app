@@ -1,7 +1,7 @@
 /**
  * Utilidades para cookies compartidas entre subdomios.
  * Las cookies con Domain=.nexara.com.mx funcionan en:
- * - core.nexara.com.mx
+ * - app.nexara.com.mx
  * - studio.nexara.com.mx
  * - ops.nexara.com.mx
  * - sales.nexara.com.mx

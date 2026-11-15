@@ -235,7 +235,7 @@ const nextConfig = {
 
     return [
       {
-        // Solo el sitio público se indexa (09-11): core.nexara.com.mx salía «index, follow» con el
+        // Solo el sitio público se indexa (09-11): app.nexara.com.mx salía «index, follow» con el
         // título del sitio y sin canonical, compitiendo con nexara.com.mx en Google.
         source: '/:path*',
         has: [{ type: 'host', value: '^(?!www\\.)[a-z0-9-]+\\.nexara\\.com\\.mx$' }],

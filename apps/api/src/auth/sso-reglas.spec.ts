@@ -24,7 +24,7 @@ const estado = (extra: Partial<EstadoSso> = {}): EstadoSso => ({
   verifier: 'v',
   recordar: true,
   next: '/erp/cotizaciones/4',
-  vuelta: 'https://core.nexara.com.mx',
+  vuelta: 'https://app.nexara.com.mx',
   t: Date.now(),
   ...extra,
 });
@@ -130,13 +130,13 @@ describe('sso-reglas · correo confiable', () => {
 });
 
 describe('sso-reglas · a dónde se regresa', () => {
-  const pred = 'https://core.nexara.com.mx';
+  const pred = 'https://app.nexara.com.mx';
 
   it('solo origenes de NEXARA (o localhost en desarrollo)', () => {
     expect(vueltaSegura('https://ventas.nexara.com.mx/x?y=1', pred, false)).toBe('https://ventas.nexara.com.mx');
     expect(vueltaSegura('https://nexara.com.mx', pred, false)).toBe('https://nexara.com.mx');
     expect(vueltaSegura('https://nexara.com.mx.evil.com', pred, false)).toBe(pred);
-    expect(vueltaSegura('http://core.nexara.com.mx', pred, false)).toBe(pred);
+    expect(vueltaSegura('http://app.nexara.com.mx', pred, false)).toBe(pred);
     expect(vueltaSegura('http://localhost:3000', pred, false)).toBe(pred);
     expect(vueltaSegura('http://localhost:3000', pred, true)).toBe('http://localhost:3000');
     expect(vueltaSegura('basura', pred, true)).toBe(pred);

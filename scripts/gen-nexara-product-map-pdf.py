@@ -44,7 +44,7 @@ WHITE = colors.white
 PANEL_META = {
     "erp": {
         "name": "NEXARA ERP (Core)",
-        "host": "core.nexara.com.mx",
+        "host": "app.nexara.com.mx",
         "tagline": "Administración, finanzas, RH, almacén, compras y gobierno",
         "color": SKY,
         "who": "CEO, directores, admin, RH, contabilidad, almacén",

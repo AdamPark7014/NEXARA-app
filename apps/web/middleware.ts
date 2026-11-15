@@ -68,22 +68,19 @@ const SUBDOMAIN_MAP: Record<string, string> = {
   'tickets': '/tickets',
 };
 
-// Subdominio canónico por panel interno (la URL "bonita" en producción).
-// El resto de aliases se redirige 308 al canónico cuando estás en .nexara.com.mx.
-//   /erp        → core.nexara.com.mx
-//   /crm        → sales.nexara.com.mx
-//   /ops        → ops.nexara.com.mx
-//   /studio     → studio.nexara.com.mx
-//   /lab        → lab.nexara.com.mx
-//   /tickets    → portal.nexara.com.mx
+// Subdominio canónico por panel interno. Desde el 14-11-2026 todo el ERP vive SOLO en
+// app.nexara.com.mx: Adam cambió core → app en el DNS y borró los demás subdominios de
+// páginas (solo quedan app., api. y los de correo). Cualquier otro host del ERP (core,
+// console, sales, ops…) se redirige 308 a app. conservando la ruta; nunca a un host
+// que ya no resuelve.
 const CANONICAL_BY_INTERNAL_PREFIX: Record<string, string> = {
-  '/erp': 'core',
-  '/crm': 'sales',
-  '/ops': 'ops',
-  '/studio': 'studio',
-  '/lab': 'lab',
-  '/integra': 'integra',
-  '/tickets': 'portal',
+  '/erp': 'app',
+  '/crm': 'app',
+  '/ops': 'app',
+  '/studio': 'app',
+  '/lab': 'app',
+  '/integra': 'app',
+  '/tickets': 'app',
 };
 
 const DEFAULT_ALLOWED_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
@@ -288,7 +285,7 @@ export function middleware(request: NextRequest) {
   const hostWithoutPort = hostname.split(':')[0];
   const requestPathname = request.nextUrl.pathname;
 
-  // Core-only: subdominios no-core → core.nexara.com.mx (soft redirect)
+  // Core-only: subdominios no-core → app.nexara.com.mx (soft redirect)
   if (
     CORE_SURFACE_ONLY &&
     (request.method === 'GET' || request.method === 'HEAD') &&
@@ -297,7 +294,7 @@ export function middleware(request: NextRequest) {
     const sub = hostWithoutPort.split('.')[0];
     if (sub && NON_CORE_SUBDOMAINS.includes(sub)) {
       const url = request.nextUrl.clone();
-      url.hostname = 'core.nexara.com.mx';
+      url.hostname = 'app.nexara.com.mx';
       url.port = '';
       if (!requestPathname.startsWith('/erp') && requestPathname !== '/login') {
         url.pathname = CORE_HOME_PATH;

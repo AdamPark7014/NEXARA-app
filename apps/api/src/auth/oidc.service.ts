@@ -123,14 +123,14 @@ export class OidcService {
     const fija = process.env.OIDC_REDIRECT_URI?.trim();
     if (fija) return fija;
     const base = (process.env.API_PUBLIC_URL?.trim() ||
-      (PRODUCCION() ? 'https://core.nexara.com.mx/api' : 'http://localhost:3001/api')).replace(/\/+$/, '');
+      (PRODUCCION() ? 'https://app.nexara.com.mx/api' : 'http://localhost:3001/api')).replace(/\/+$/, '');
     return `${base}/auth/oidc/callback`;
   }
 
   /** Web a la que se vuelve si el origen no viene o no es de NEXARA. */
   webPredeterminada(): string {
     return (process.env.WEB_PUBLIC_URL?.trim() ||
-      (PRODUCCION() ? 'https://core.nexara.com.mx' : 'http://localhost:3000')).replace(/\/+$/, '');
+      (PRODUCCION() ? 'https://app.nexara.com.mx' : 'http://localhost:3000')).replace(/\/+$/, '');
   }
 
   /** Secreto con el que se firma la cookie `nx_sso`. */

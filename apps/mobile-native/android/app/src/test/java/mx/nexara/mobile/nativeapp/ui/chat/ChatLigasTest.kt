@@ -42,7 +42,7 @@ class ChatLigasTest {
         // Asistencia sin día y viático sin id no son ligas (el API tampoco las reconoce).
         assertNull(ChatLigas.parsearLiga("/erp/asistencias/indicadores/7"))
         assertNull(ChatLigas.parsearLiga("/erp/finance/viatics"))
-        assertNull(ChatLigas.parsearLiga("https://core.nexara.com.mx/erp/actividades/2"))
+        assertNull(ChatLigas.parsearLiga("https://app.nexara.com.mx/erp/actividades/2"))
     }
 
     // ── Refs de un mensaje ──────────────────────────────────────────────────
@@ -175,13 +175,13 @@ class ChatLigasTest {
     fun `asistencia propia en la app y la de otra persona en la web`() {
         val href = "/erp/asistencias/indicadores/7?desde=2026-10-29&hasta=2026-10-29"
         assertEquals(CoreKeys.ATTENDANCE, app(href, yo = 7L).key)
-        assertEquals("https://core.nexara.com.mx$href", web(href, yo = 3L))
+        assertEquals("https://app.nexara.com.mx$href", web(href, yo = 3L))
     }
 
     @Test
     fun `facturas y rutas que la app no tiene van a la web, nunca a Inicio`() {
-        assertEquals("https://core.nexara.com.mx/erp/invoicing/9", web("/erp/invoicing/9"))
-        assertEquals("https://core.nexara.com.mx/erp/dashboard", web("/erp/dashboard"))
+        assertEquals("https://app.nexara.com.mx/erp/invoicing/9", web("/erp/invoicing/9"))
+        assertEquals("https://app.nexara.com.mx/erp/dashboard", web("/erp/dashboard"))
         // La casa de Core de verdad sigue abriéndose en la app.
         assertEquals(DeepLinkParser.CORE_HOME, app("/erp/actividades"))
     }

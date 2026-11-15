@@ -100,7 +100,7 @@ type PanelLoginProps = {
   /**
    * Si es `true`, después del login se redirige al panel HOME del usuario
    * (ventas/operacion/contabilidad/console según su rol) en vez de a la
-   * ruta `redirectTo` fija. Útil para `core.nexara.com.mx/login` donde no
+   * ruta `redirectTo` fija. Útil para `app.nexara.com.mx/login` donde no
    * sabemos a qué panel debe ir cada persona.
    */
   smartRedirect?: boolean;
