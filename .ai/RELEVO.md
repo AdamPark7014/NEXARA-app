@@ -26,6 +26,9 @@
     `FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`: Adam debe entrar a App Store Connect y aceptar el acuerdo nuevo.
     Luego: `gh workflow run ios-testflight.yml --ref main -f version=1.4.1 -f build=17 -f upload=true` y enviar a revisión
     (script de ASC en el scratchpad de la sesión: crear versión, build, novedades, `reviewSubmissions`).
+    ~23:40 Adam dijo haber aceptado un acuerdo, pero la API siguió con el mismo 403 durante 8 min: falta otro (App Store
+    Connect → Negocio → Acuerdos, o el banner de developer.apple.com/account). Play: la 24 pasó las comprobaciones y está
+    «en proceso de revisión».
   - Laptop: `JAVA_HOME` apunta a `jdk-21.0.10.7-hotspot`, que ya no existe; el instalado es `jdk-21.0.13.21-hotspot`
     (Gradle falla sin ajustar `JAVA_HOME` en el comando).
   - Navegadores que ya visitaron `app.` guardan el 308 viejo a `core.`: se arregla borrando «Imágenes y archivos en caché».
