@@ -129,10 +129,13 @@ http:
 
     # core.nexara.com.mx → app.nexara.com.mx (301 en GET, 308 en el resto), con la misma ruta.
     # Hoy core. no tiene DNS; esto sirve si vuelve, para ligas viejas de correos y apps.
+    # La raíz va a /erp/pizarra y no a app./: hasta el 14-11 app./ redirigía 308 a core./ y los
+    # navegadores guardan esa redirección; core./ → app./ haría un bucle en ellos.
     core-a-app:
       rule: 'Host(`core.nexara.com.mx`)'
       entryPoints: [websecure]
       middlewares:
+        - core-raiz-a-app
         - core-a-app
       service: dummy
       priority: 200
@@ -198,6 +201,12 @@ http:
       redirectRegex:
         regex: "^http://www\\.nexara\\.com\\.mx(.*)"
         replacement: "https://nexara.com.mx${1}"
+        permanent: true
+
+    core-raiz-a-app:
+      redirectRegex:
+        regex: "^https?://core\\.nexara\\.com\\.mx/?$"
+        replacement: "https://app.nexara.com.mx/erp/pizarra"
         permanent: true
 
     core-a-app:
