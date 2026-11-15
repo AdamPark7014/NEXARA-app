@@ -3,8 +3,9 @@ package mx.nexara.mobile.nativeapp.access
 /**
  * Construye la URL web canónica de un módulo de Core, igual que la resolvería el panel.
  *
- * Solo existe NEXARA Core (`app.nexara.com.mx/erp/...`) y el portal de clientes
- * (`portal.nexara.com.mx/tickets/...`). Los prefijos viejos de consola se leen
+ * Desde el 14-11-2026 la web vive solo en `app.nexara.com.mx/erp/...`: core., portal. y los
+ * demás subdominios ya no existen en el DNS. El portal de clientes (`/tickets`) no tiene web,
+ * así que no se ofrece «Abrir en la web» para él. Los prefijos viejos de consola se leen
  * como `/erp`.
  *
  * `scripts/check-app-web-parity.py` lee las tablas de este archivo y verifica
@@ -45,10 +46,9 @@ object WebPanelUrl {
         "/erp/offline-queue",
     )
 
-    /** Prefijo interno → subdominio canónico. */
+    /** Prefijo interno → subdominio canónico. Solo Core tiene web (`app.`). */
     private val CANONICAL_SUBDOMAIN = mapOf(
-        "/erp" to "core",
-        "/tickets" to "portal",
+        "/erp" to "app",
     )
 
     /**
