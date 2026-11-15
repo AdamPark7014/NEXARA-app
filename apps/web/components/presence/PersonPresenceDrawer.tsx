@@ -74,6 +74,9 @@ export function PersonPresenceDrawer({
         onClick={(e) => e.stopPropagation()}
       >
         <header className={styles.drawerHead}>
+          <button type="button" className={styles.back} onClick={onClose}>
+            ‹ En sitio
+          </button>
           <PersonFaceThumb
             className={styles.photo}
             size="lg"
@@ -83,19 +86,12 @@ export function PersonPresenceDrawer({
           />
           <div>
             <h2>{name}</h2>
-            <p>
-              {detail?.lastDoor || person.lastDoor || "Acceso"}
-              {detail?.personCode ? ` · código ${detail.personCode}` : ""}
-            </p>
-            <div style={{ marginTop: 8 }}>
-              <span className={styles.badge} data-off={detail && !detail.onSite ? "1" : undefined}>
-                {detail ? (detail.onSite ? "En sitio ahora" : "No en sitio") : "Cargando…"}
-              </span>
-            </div>
+            <p>{detail?.lastDoor || person.lastDoor || "Acceso"}</p>
+            {detail?.personCode ? <p>Código {detail.personCode}</p> : null}
+            <span className={styles.badge} data-off={detail && !detail.onSite ? "1" : undefined}>
+              {detail ? (detail.onSite ? "En sitio ahora" : "No en sitio") : "Cargando…"}
+            </span>
           </div>
-          <button type="button" className={styles.close} aria-label="Cerrar" onClick={onClose}>
-            ×
-          </button>
         </header>
 
         <div className={styles.drawerBody}>
@@ -130,9 +126,7 @@ export function PersonPresenceDrawer({
                     </div>
                   </dl>
                 ) : (
-                  <p className={styles.empty}>
-                    Sin vínculo ERP. Enlace employeeNumber ↔ personId en Personas / Asistencia híbrida.
-                  </p>
+                  <p className={styles.empty}>Sin vínculo con un usuario del ERP.</p>
                 )}
               </section>
 
@@ -145,11 +139,9 @@ export function PersonPresenceDrawer({
                     {detail.doorsToday.map((d) => (
                       <li key={d.id}>
                         <strong>{d.door}</strong>
-                        <span>
-                          {hhmmEs(d.at)}
-                          {d.verifyMode ? ` · ${d.verifyMode}` : ""}
-                          {d.label ? ` · ${d.label}` : ""}
-                        </span>
+                        <span>{hhmmEs(d.at)}</span>
+                        {d.verifyMode ? <span>{d.verifyMode}</span> : null}
+                        {d.label ? <span>{d.label}</span> : null}
                       </li>
                     ))}
                   </ul>
@@ -170,13 +162,10 @@ export function PersonPresenceDrawer({
                         href={`/ops/activities/${a.id}`}
                         className={styles.linkRow}
                       >
-                        <strong>
-                          {a.anNumber} · {a.titulo}
-                        </strong>
-                        <span>
-                          {a.estatus}
-                          {a.clientName ? ` · ${a.clientName}` : ""}
-                        </span>
+                        <strong>{a.anNumber}</strong>
+                        <span>{a.titulo}</span>
+                        <span>{a.estatus}</span>
+                        {a.clientName ? <span>{a.clientName}</span> : null}
                       </Link>
                     ))}
                   </ul>
@@ -194,10 +183,9 @@ export function PersonPresenceDrawer({
                     {detail.crm.leads.map((l) => (
                       <Link key={`l-${l.id}`} href={`/crm/leads/${l.id}`} className={styles.linkRow}>
                         <strong>{l.name || l.company || `Lead #${l.id}`}</strong>
-                        <span>
-                          Lead · {STAGE_ES[l.status] || l.status}
-                          {l.company ? ` · ${l.company}` : ""}
-                        </span>
+                        <span>Lead</span>
+                        <span>{STAGE_ES[l.status] || l.status}</span>
+                        {l.name && l.company ? <span>{l.company}</span> : null}
                       </Link>
                     ))}
                     {detail.crm.opportunities.map((o) => (
@@ -207,24 +195,22 @@ export function PersonPresenceDrawer({
                         className={styles.linkRow}
                       >
                         <strong>{o.title}</strong>
-                        <span>
-                          {STAGE_ES[o.stage] || o.stage}
-                          {o.clientName ? ` · ${o.clientName}` : ""}
-                          {o.value > 0
-                            ? ` · ${o.value.toLocaleString("es-MX", {
-                                style: "currency",
-                                currency: "MXN",
-                                maximumFractionDigits: 0,
-                              })}`
-                            : ""}
-                        </span>
+                        <span>{STAGE_ES[o.stage] || o.stage}</span>
+                        {o.clientName ? <span>{o.clientName}</span> : null}
+                        {o.value > 0 ? (
+                          <span>
+                            {o.value.toLocaleString("es-MX", {
+                              style: "currency",
+                              currency: "MXN",
+                              maximumFractionDigits: 0,
+                            })}
+                          </span>
+                        ) : null}
                       </Link>
                     ))}
                   </ul>
                 )}
               </section>
-
-              {detail?.note && <p className={styles.hint}>{detail.note}</p>}
             </>
           )}
         </div>
