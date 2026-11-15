@@ -1,17 +1,16 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
-import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
 import { saveBlob, todayStamp } from "@/components/finance/download";
+import s from "./exports.module.css";
 
 type ExportFormat = "xlsx" | "pdf";
 
@@ -199,7 +198,7 @@ function formatFecha(iso: string) {
 
 function problemaRango(from: string, to: string): string | null {
   if (!from || !to) return "Elige las dos fechas para poder exportar.";
-  if (from > to) return "La fecha final es anterior a la inicial. Ponla en el mismo día o después.";
+  if (from > to) return "La fecha final es anterior a la inicial.";
   return null;
 }
 
@@ -207,7 +206,6 @@ type Job = { entity: ExportCard; format: ExportFormat };
 
 export default function ExportsPage() {
   const { user } = useUser();
-  const cfg = useMemo(() => getErpFinanceSectionConfig(user, "exports"), [user]);
   const token = user?.token ?? "";
 
   const [from, setFrom] = useState(() => todayStamp(new Date(Date.now() - 30 * 86400000)));
@@ -252,9 +250,9 @@ export default function ExportsPage() {
         },
         ...prev.slice(0, 4),
       ]);
-    } catch (e) {
+    } catch {
       setError({
-        text: `No se pudo generar ${entity.label} (${format === "pdf" ? "PDF" : "Excel"}). ${formatApiError(e, "Intenta de nuevo en un momento.")}`,
+        text: "No se pudo generar el reporte.",
         job: { entity, format },
       });
     } finally {
@@ -292,11 +290,10 @@ export default function ExportsPage() {
   ];
 
   return (
-    <>
+    <div className={s.zona}>
+      <Link href="/erp/pizarra" className={s.volver}>‹ Pizarra</Link>
       <PageHeader
-        eyebrow="ERP · Finanzas"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
+        title="Exportaciones"
         density="ops"
       />
 
@@ -304,14 +301,7 @@ export default function ExportsPage() {
         <MetricStrip metrics={metrics} ariaLabel="Resumen de exportaciones" />
       </div>
 
-      {cfg.viewMode !== "manage" && (
-        <InlineAlert
-          variant="info"
-          message="Las exportaciones solo incluyen los datos a los que tienes acceso según tu rol."
-        />
-      )}
-
-      <Section title="Periodo" subtitle="Aplica a los reportes que filtran por fecha. Los que no lo usan lo indican en su tarjeta.">
+      <Section title="Periodo">
         <div role="group" aria-label="Periodos rápidos" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
           {PRESETS.map((p) => {
             const r = p.range();
@@ -396,7 +386,6 @@ export default function ExportsPage() {
 
       <Section
         title="Reportes"
-        subtitle="Excel o PDF según el reporte."
         actions={
           <input
             type="search"
@@ -409,12 +398,7 @@ export default function ExportsPage() {
         }
       >
         {porGrupo.length === 0 ? (
-          <EmptyState
-            variant="compact"
-            title="Ningún reporte coincide"
-            description={`No hay reportes que contengan «${busqueda.trim()}».`}
-            action={<Button size="sm" variant="secondary" onClick={() => setBusqueda("")}>Limpiar búsqueda</Button>}
-          />
+          <p className={s.frase} role="status">Nada coincide con la búsqueda.</p>
         ) : (
           <div style={{ display: "grid", gap: 20 }}>
             {porGrupo.map(({ grupo, items }) => (
@@ -451,7 +435,7 @@ export default function ExportsPage() {
       </Section>
 
       {downloadLog.length > 0 && (
-        <Section title="Descargas recientes" subtitle="En esta sesión">
+        <Section title="Descargas recientes">
           <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
             {downloadLog.map((l) => (
               <li
@@ -487,7 +471,7 @@ export default function ExportsPage() {
           outline-offset: 2px;
         }
       `}</style>
-    </>
+    </div>
   );
 }
 
@@ -509,17 +493,6 @@ function ReportCard({
   const excedeMax = e.maxDias != null && dias > e.maxDias;
   const bloqueado = !!downloading || rangoInvalido;
 
-  const notaRango =
-    e.xlsxRango === "sin-rango"
-      ? e.pdfPath
-        ? "El Excel trae todo el histórico; el PDF usa el periodo."
-        : "Trae todo el histórico; no usa el periodo."
-      : e.xlsxRango === "dia-final"
-        ? "Usa solo el día final del periodo."
-        : e.maxDias
-          ? `Máximo ${e.maxDias} días.`
-          : null;
-
   return (
     <div
       aria-busy={xlsxBusy || pdfBusy || undefined}
@@ -536,15 +509,9 @@ function ReportCard({
     >
       <div style={{ fontWeight: 650, fontSize: 13.5, color: "var(--text-primary)" }}>{e.label}</div>
       <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.45 }}>{e.desc}</div>
-      {notaRango && (
-        <div
-          style={{
-            fontSize: 11.5,
-            lineHeight: 1.4,
-            color: excedeMax ? "var(--state-danger-text)" : "var(--text-tertiary)",
-          }}
-        >
-          {excedeMax ? `El periodo tiene ${dias} días y este reporte acepta máximo ${e.maxDias}. Acórtalo para exportar.` : notaRango}
+      {excedeMax && (
+        <div style={{ fontSize: 11.5, lineHeight: 1.4, color: "var(--state-danger-text)" }}>
+          Este reporte acepta máximo {e.maxDias} días.
         </div>
       )}
       <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>

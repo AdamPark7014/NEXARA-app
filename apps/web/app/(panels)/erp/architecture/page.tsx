@@ -7,8 +7,8 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import MetricStrip from "@/components/ui/MetricStrip";
-import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
+import s from "./architecture.module.css";
 import {
   MODULES,
   PANELS,
@@ -111,11 +111,11 @@ export default function ArchitecturePage() {
   const totalModules = Object.keys(MODULES).length;
 
   return (
-    <>
+    <div className={s.zona}>
+      <Link href="/erp/pizarra" className={s.volver}>‹ Pizarra</Link>
       <PageHeader
-        eyebrow="Gobierno · Mapa del sistema"
         title="Mapa del sistema"
-        subtitle="Paneles, módulos y roles de NEXARA, con el flujo del negocio de punta a punta y una guía de cómo funciona cada módulo."
+        density="ops"
         actions={
           <Link href="/erp/users" style={{ textDecoration: "none" }}>
             <Button variant="secondary">Ver usuarios y roles</Button>
@@ -134,10 +134,7 @@ export default function ArchitecturePage() {
         />
       </div>
 
-      <Section
-        title="Flujo del negocio de punta a punta"
-        subtitle="Cómo viaja la información desde el primer contacto hasta la facturación y el servicio posventa."
-      >
+      <Section title="Flujo del negocio">
         <ol
           style={{
             display: "flex", gap: 14, alignItems: "stretch", overflowX: "auto",
@@ -186,7 +183,7 @@ export default function ArchitecturePage() {
         </ol>
       </Section>
 
-      <Section title="Una sola fuente de verdad por tema" subtitle="Dónde vive el dato oficial y con qué no confundirlo, para no duplicar información.">
+      <Section title="Dónde vive cada dato">
         <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
           {DOMAIN_TRUTHS.map((row) => (
             <li
@@ -216,7 +213,7 @@ export default function ArchitecturePage() {
         </ul>
       </Section>
 
-      <Section title="Módulos" subtitle="Filtra por panel o busca un módulo para ver qué hace y quién lo usa.">
+      <Section title="Módulos">
         <div role="group" aria-label="Filtrar por panel" style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
           <button
             type="button"
@@ -257,12 +254,7 @@ export default function ArchitecturePage() {
       </Section>
 
       {filteredByPanel.size === 0 && (
-        <EmptyState
-          icon="🔎"
-          title="Sin coincidencias"
-          description="Ningún módulo coincide con la búsqueda."
-          action={<Button size="sm" variant="secondary" onClick={() => setQuery("")}>Limpiar búsqueda</Button>}
-        />
+        <p className={s.frase} role="status">Nada coincide con la búsqueda.</p>
       )}
 
       {Array.from(filteredByPanel.entries()).map(([panelId, grouped]) => {
@@ -285,7 +277,6 @@ export default function ArchitecturePage() {
                 </span>
               </span>
             }
-            subtitle={panelMeta.tagline}
           >
             <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
               {Array.from(grouped.entries()).map(([groupName, mods]) => (
@@ -293,7 +284,6 @@ export default function ArchitecturePage() {
                   <h3 style={{ ...eyebrowStyle, fontSize: 11, letterSpacing: "0.08em", margin: "0 0 8px" }}>{groupName}</h3>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
                     {mods.map((m) => {
-                      const guide = getModuleGuide(m.id);
                       const roleNames = m.allowedRoles.map((r: OrgRoleKey) => ORG_ROLE_META[r]?.label).filter(Boolean);
                       return (
                         <article
@@ -312,30 +302,6 @@ export default function ArchitecturePage() {
                               {m.description}
                             </p>
                           </Link>
-                          {guide && (
-                            <details style={{ marginTop: 6 }}>
-                              <summary
-                                style={{
-                                  cursor: "pointer", fontSize: 12.5, fontWeight: 650, color: "var(--primary)",
-                                  minHeight: 32, display: "flex", alignItems: "center",
-                                }}
-                              >
-                                Cómo funciona
-                              </summary>
-                              <div style={{ marginTop: 6, fontSize: 12.5, lineHeight: 1.55, color: "var(--text-secondary)", maxWidth: "70ch" }}>
-                                <p style={{ margin: "0 0 6px" }}><strong>Qué es:</strong> {guide.summary}</p>
-                                <p style={{ margin: "0 0 6px" }}><strong>Quién lo usa:</strong> {guide.audience}</p>
-                                <p style={{ margin: "0 0 6px" }}><strong>Cómo:</strong> {guide.how}</p>
-                                <p style={{ margin: "0 0 4px" }}><strong>Pasos:</strong></p>
-                                <ol style={{ margin: "0 0 6px", paddingLeft: 18 }}>
-                                  {guide.steps.map((s) => (
-                                    <li key={s} style={{ marginBottom: 3 }}>{s}</li>
-                                  ))}
-                                </ol>
-                                <p style={{ margin: 0 }}><strong>Se conecta con:</strong> {guide.connects}</p>
-                              </div>
-                            </details>
-                          )}
                           {roleNames.length > 0 && (
                             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }} title={roleNames.join(", ")}>
                               {roleNames.slice(0, 3).map((label) => (
@@ -366,7 +332,7 @@ export default function ArchitecturePage() {
           </Section>
         );
       })}
-    </>
+    </div>
   );
 }
 
