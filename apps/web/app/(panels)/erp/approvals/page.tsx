@@ -23,6 +23,8 @@ import {
   type PendingApproval,
   type ApprovalChainStep,
 } from "@/lib/workflow-api";
+import BandejaUnica from "@/components/approvals/BandejaUnica";
+import type { GrupoBandeja } from "@/lib/bandeja";
 import s from "./approvals.module.css";
 
 /**
@@ -288,8 +290,12 @@ export default function ApprovalsPage() {
     setInfoTarget(null);
   };
 
+  const [gruposBandeja, setGruposBandeja] = useState<GrupoBandeja[] | null>(null);
   const showSkeleton = loading && data === null;
   const hasFilters = filter !== "all" || searchQ.trim() !== "";
+  // Firmas de flujo: sus cifras, filtros y buscador solo cuando hay alguna (15-11: «módulos sin info»).
+  const hayFirmas = counts.all > 0 || hasFilters;
+  const bandejaVacia = gruposBandeja !== null && gruposBandeja.length === 0;
 
   return (
     <PageChrome
@@ -302,7 +308,7 @@ export default function ApprovalsPage() {
         </Button>
       }
       filters={
-        <FilterToolbar
+        !hayFirmas ? undefined : <FilterToolbar
           search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por tipo, título, folio o solicitante…" }}
           onClear={() => {
             setSearchQ("");
@@ -347,7 +353,11 @@ export default function ApprovalsPage() {
       )}
       {notice && <InlineAlert variant="success" message={notice} onDismiss={() => setNotice(null)} />}
 
-      {!showSkeleton && data && (
+      {token ? <BandejaUnica token={token} onGrupos={setGruposBandeja} /> : null}
+
+      {hayFirmas ? <h2 id="firmas" className={s.subtitulo}>Firmas de flujo</h2> : null}
+
+      {!showSkeleton && data && hayFirmas && (
         <div style={{ marginBottom: 14 }}>
           <MetricStrip
             ariaLabel="Resumen de la bandeja"
@@ -362,7 +372,7 @@ export default function ApprovalsPage() {
         </div>
       )}
 
-      <div className={s.chips} role="group" aria-label="Filtrar por prioridad">
+      {hayFirmas ? <div className={s.chips} role="group" aria-label="Filtrar por prioridad">
         {FILTERS.map((f) => (
           <button
             key={f.key}
@@ -375,7 +385,7 @@ export default function ApprovalsPage() {
             <span className={s.chipCount}>{counts[f.key]}</span>
           </button>
         ))}
-      </div>
+      </div> : null}
 
       {showSkeleton ? (
         <div className={s.list} aria-busy="true" aria-label="Cargando aprobaciones">
@@ -399,9 +409,9 @@ export default function ApprovalsPage() {
             description="Ninguna solicitud coincide con la búsqueda o el filtro."
             action={<Button variant="secondary" onClick={() => { setFilter("all"); setSearchQ(""); }}>Ver todas</Button>}
           />
-        ) : (
-          <EmptyState icon="✅" title="Todo al día" description="No hay solicitudes esperando tu firma. Buen trabajo." />
-        )
+        ) : bandejaVacia ? (
+          <EmptyState icon="✅" title="Todo al día" description="Nada espera tu firma: ni evidencias, ni viáticos, ni horas extra, ni solicitudes. Buen trabajo." />
+        ) : null
       ) : (
         <div className={s.list}>
           {highlightId !== null && rows.some((r) => r.instanceId === highlightId) && (

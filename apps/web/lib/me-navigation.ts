@@ -18,6 +18,8 @@ export type MeNavigation = {
    * los comodines de ruta (`/erp/**`, `/erp/finance/**`) que de otro modo los abrirían.
    */
   hiddenModuleIds?: string[];
+  /** Módulos sin un solo registro en la empresa: el menú los manda plegados a «Por estrenar». */
+  porEstrenar?: string[];
 };
 
 export async function fetchMeNavigation(

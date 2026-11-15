@@ -93,7 +93,7 @@ import { IconBadge } from "@/components/ui/IconBadge";
 import NotificationKindIcon from "@/components/ui/NotificationKindIcon";
 import { stripLeadingEmoji } from "@/lib/notification-kind";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
-import { listMyPendingApprovals } from "@/lib/workflow-api";
+import { contarBandeja } from "@/lib/bandeja";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 
@@ -545,7 +545,11 @@ export default function AppShell({ panel, children }: AppShellProps) {
   }, [isContextReady, user, hasAnyAccess, router]);
 
   // Solo presentación: orden de grupos y renglones de la maqueta aprobada. Los módulos son los mismos.
-  const navGroups = useMemo(() => presentSidebarGroups(sidebarGroups, panel, v2RoleKey), [sidebarGroups, panel, v2RoleKey]);
+  const porEstrenar = useMemo(() => new Set(serverNav?.porEstrenar ?? []), [serverNav]);
+  const navGroups = useMemo(
+    () => presentSidebarGroups(sidebarGroups, panel, v2RoleKey, porEstrenar),
+    [sidebarGroups, panel, v2RoleKey, porEstrenar],
+  );
 
   const accessGuardWarning = useMemo(() => {
     const path = pathname || "/";
@@ -629,7 +633,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
     };
   }, [user?.token, showsChat, onChatRoute]);
 
-  // Aprobaciones: `GET workflow/my-pending` (la misma bandeja de /erp/approvals).
+  // Aprobaciones: el mismo conteo que la bandeja única de /erp/approvals.
   useEffect(() => {
     if (!user?.token || !showsApprovals) {
       setPendingApprovals(0);
@@ -640,8 +644,9 @@ export default function AppShell({ panel, children }: AppShellProps) {
     const load = async () => {
       if (document.hidden) return;
       try {
-        const rows = await listMyPendingApprovals(token);
-        if (!cancelled) setPendingApprovals(rows.length);
+        // Todo lo que espera su firma (evidencias, viáticos, solicitudes y firmas), como la bandeja (15-11).
+        const total = await contarBandeja(token);
+        if (!cancelled) setPendingApprovals(total);
       } catch {
         /* non-critical */
       }
