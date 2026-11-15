@@ -47,8 +47,10 @@ export default defineConfig({
     testTimeout: 15_000,
     // Node 25+ trae su propio `localStorage` global (vacío sin `--localstorage-file`) y tapa al de jsdom:
     // con Node 26 las 248 pruebas caían en «Cannot read properties of undefined (reading 'getItem')».
+    // Solo ahí: el CI corre Node 20, que no conoce la bandera; con ella el worker moría (EPIPE) y la web
+    // salía en rojo con todas sus pruebas sin correr (15-11).
     poolOptions: {
-      forks: { execArgv: ['--no-experimental-webstorage'] },
+      forks: { execArgv: Number(process.versions.node.split('.')[0]) >= 25 ? ['--no-experimental-webstorage'] : [] },
     },
   },
 });
