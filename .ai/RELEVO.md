@@ -22,13 +22,15 @@
     portal no tiene web (app./tickets da 404). 1,098 pruebas de Android, paridad app-web e `ios-static-check` en verde.
   - **Android 24 (1.4.1)** subida a Play (AAB de `be8988b`, SHA-256 F2607201…8E77, sin `core.` en el dex), enviada a
     revisión: lanzamiento completo 100 %, 0 dispositivos pierden compatibilidad, publicación gestionada apagada (sale sola).
-  - **iOS 1.4.1 (17):** compila y firma (corrida `43676732062`), pero la subida a TestFlight y la API de ASC dan
-    `FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`: Adam debe entrar a App Store Connect y aceptar el acuerdo nuevo.
-    Luego: `gh workflow run ios-testflight.yml --ref main -f version=1.4.1 -f build=17 -f upload=true` y enviar a revisión
-    (script de ASC en el scratchpad de la sesión: crear versión, build, novedades, `reviewSubmissions`).
-    ~23:40 Adam dijo haber aceptado un acuerdo, pero la API siguió con el mismo 403 durante 8 min: falta otro (App Store
-    Connect → Negocio → Acuerdos, o el banner de developer.apple.com/account). Play: la 24 pasó las comprobaciones y está
-    «en proceso de revisión».
+  - **iOS 1.4.1 (17): enviada a App Store el 15-11 ~00:35 México, `WAITING_FOR_REVIEW`, `AFTER_APPROVAL`** (sale sola).
+    La primera corrida (`43676732062`) falló al subir: `FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`. El que faltaba
+    era el **contrato de licencia del Apple Developer Program** en developer.apple.com/account (no en Negocio de ASC);
+    Adam lo aceptó y la API se abrió ~30 min después. Corrida `43684319731` subió el build 17 (VALID); la versión heredó
+    10 capturas de iPhone 6.7", cuenta de revisión y notas (3,908 car.), cifrado `false`. Novedades: ligas a app.
+    Script para la próxima: `scripts/asc_publicar.py` (estado, builds, preparar, enviar). Siguientes números: Play 25, iOS 18.
+  - Play: la 24 pasó las comprobaciones y está «en proceso de revisión» (la ficha pública aún dice 1.4.0).
+  - Pendientes en ASC → Negocio (no bloquean hoy): declarar estatus de comerciante para la UE y el «Acuerdo para apps
+    gratuitas» tiene versión nueva disponible.
   - Laptop: `JAVA_HOME` apunta a `jdk-21.0.10.7-hotspot`, que ya no existe; el instalado es `jdk-21.0.13.21-hotspot`
     (Gradle falla sin ajustar `JAVA_HOME` en el comando).
   - Navegadores que ya visitaron `app.` guardan el 308 viejo a `core.`: se arregla borrando «Imágenes y archivos en caché».
