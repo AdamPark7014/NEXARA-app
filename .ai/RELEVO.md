@@ -14,8 +14,20 @@
   - Google Cloud (cliente «NEXARA Core (login web)», con el sí de Adam): agregado URI 2
     `https://app.nexara.com.mx/api/auth/oidc/callback` (se dejó el de core.). Probado: Google ya lleva a «Elige tu cuenta»
     en vez de `redirect_uri_mismatch`; el login completo con Google lo prueba Adam con su cuenta.
-  - Pendiente de Adam: decidir si vuelve `core` al DNS para ligas viejas; publicar apps móviles nuevas; equipos/agentes
-    con `integra.nexara.com.mx`.
+  - Adam: `core` NO vuelve al DNS («todo ahora en app»). Pendiente suyo: equipos/agentes con `integra.nexara.com.mx`.
+  - **Apps 1.4.1 (~22:45):** la 1.4 instalada (iOS build de `72cd839a4`) solo usaba `core.` en las ligas del chat que abre
+    en el navegador (facturas, asistencia ajena); todo lo demás va a `api.nexara.com.mx`, que no cambió, y no hay
+    actualización obligatoria: la 1.4 sigue funcionando mientras sale la nueva. `77c09d364`: Android armaba la URL con el
+    subdominio del panel en `WebPanelUrl` (`/erp`→core, `/tickets`→portal), aparte de `CORE_WEB_BASE`; ahora `/erp`→app y el
+    portal no tiene web (app./tickets da 404). 1,098 pruebas de Android, paridad app-web e `ios-static-check` en verde.
+  - **Android 24 (1.4.1)** subida a Play (AAB de `be8988b`, SHA-256 F2607201…8E77, sin `core.` en el dex), enviada a
+    revisión: lanzamiento completo 100 %, 0 dispositivos pierden compatibilidad, publicación gestionada apagada (sale sola).
+  - **iOS 1.4.1 (17):** compila y firma (corrida `43676732062`), pero la subida a TestFlight y la API de ASC dan
+    `FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`: Adam debe entrar a App Store Connect y aceptar el acuerdo nuevo.
+    Luego: `gh workflow run ios-testflight.yml --ref main -f version=1.4.1 -f build=17 -f upload=true` y enviar a revisión
+    (script de ASC en el scratchpad de la sesión: crear versión, build, novedades, `reviewSubmissions`).
+  - Laptop: `JAVA_HOME` apunta a `jdk-21.0.10.7-hotspot`, que ya no existe; el instalado es `jdk-21.0.13.21-hotspot`
+    (Gradle falla sin ajustar `JAVA_HOME` en el comando).
   - Navegadores que ya visitaron `app.` guardan el 308 viejo a `core.`: se arregla borrando «Imágenes y archivos en caché».
 
 - **2026-11-14 (claude-code) — Limpieza de documentación (Adam: «quita documentación y unifica»).** Borrados 25 documentos obsoletos sin referencias (auditorías, planes y prompts viejos; están en el historial de git). Índice único del repo: `docs/INDICE.md`; índice de todos los proyectos: `C:\dev\DOCS.md`; memoria compartida de Codex/Claude/Cursor/Grok: `C:\dev\.ai\memoria`. RELEVO recortado a los 3 turnos más recientes.
