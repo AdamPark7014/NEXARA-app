@@ -280,11 +280,11 @@ PLAY_REVIEWER_PASSWORD='...' npm run seed:play-reviewer
 |---|---|
 | Nombre de las credenciales | `Cuenta de demostración NEXARA` |
 | Nombre de usuario | `play.review@nexara.com.mx` |
-| Contraseña | `NexaraPlayReview2026!` |
+| Contraseña | En `C:\dev\secrets\nexara\credenciales-2026-10-23\por-persona\Play-Review-Demo-Account.txt` (fuera del repo) |
 
-*(Verificada contra producción el 21-09-2026: `POST /api/auth/login` responde 200 y la app
-nativa entra con ella. Si se vuelve a sembrar sin `PLAY_REVIEWER_PASSWORD`, el script genera
-una nueva y esta tabla queda mintiendo.)*
+*(Este repo es público: la contraseña nunca va escrita aquí. Antes de pegarla en Play Console, verifica que
+entra contra producción con `POST /api/auth/login`. Si se vuelve a sembrar sin `PLAY_REVIEWER_PASSWORD`, el
+script genera una nueva: actualiza el archivo de secretos y Play Console en el mismo momento.)*
 
 Y en el campo de instrucciones:
 
