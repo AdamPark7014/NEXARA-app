@@ -32,6 +32,7 @@ import {
   clientSectorsForActor,
   filtroPorSector,
   isClientSector,
+  esNombreDeRelleno,
   nombreClienteLimpio,
   sectoresDelCliente,
   type ClientSectorCode,
@@ -550,6 +551,11 @@ export class VentasService {
     const existente = await this.clienteVigenteConEseNombre(nombre, resolvedCompanyId);
     if (existente) {
       return this.reutilizarCliente(existente, dto, sectores, { rapida, altaProyecto }, user);
+    }
+
+    // «N/a», «Varios»: no es un cliente, es un hueco que después nadie puede empatar.
+    if (esNombreDeRelleno(nombre)) {
+      throw new BadRequestException(`«${nombre}» no es el nombre de un cliente. Escribe su nombre real, o usa A QUIEN CORRESPONDA.`);
     }
 
     // Casi seguro repetido («Benemérita Universidad Autónoma de Puebla» y BUAP): no entra sin que

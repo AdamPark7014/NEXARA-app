@@ -118,8 +118,32 @@
 
 .datos {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) 112px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) 112px 140px 100px;
   gap: 12px;
+}
+
+.selector {
+  height: 36px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  color: inherit;
+  padding: 0 8px;
+  font: inherit;
+}
+
+.marca > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+}
+
+.pedido {
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-meta);
+  font-style: italic;
+  overflow-wrap: anywhere;
 }
 
 .campo {

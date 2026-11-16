@@ -117,6 +117,11 @@ describe('leerFrase', () => {
 
   it('«para una oficina» no es un cliente', () => {
     expect(leerFrase('20 conectores RJ45 para una oficina').destino).toBeNull();
+    // El cliente es el último «para» y los renglones de en medio no se pierden (caso real de tarjetas).
+    const t = leerFrase('1000 tarjetas de acceso para control de acceso y 2 lectores para Hotel Aurora');
+    expect(t.destino).toBe('Hotel Aurora');
+    expect(t.lineas.map((l) => [l.cantidad, l.concepto])).toEqual([[1000, 'tarjetas de acceso para control de acceso'], [2, 'lectores']]);
+    expect(leerFrase('4 cámaras para exterior y 1 NVR').destino).toBeNull();
   });
 
   it('lo que se dice de la cotización no se vuelve renglón', () => {

@@ -115,3 +115,24 @@ export function nombreClienteLimpio(nombre?: string | null): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/**
+ * Nombres que no son un cliente sino un hueco («N/a», «Varios», «Sin cliente»): en producción
+ * entraron así al padrón y luego no se pueden empatar con nada. «A QUIEN CORRESPONDA» se queda
+ * a propósito (Adam, 01-11): es el destinatario genérico de cotizaciones.
+ */
+const RELLENO = new Set([
+  'na', 'n a', 'no aplica', 'ninguno', 'ninguna', 'nada', 'varios', 'varias', 'general', 'otro', 'otros',
+  'cliente', 'cliente nuevo', 'sin cliente', 'sin nombre', 'pendiente', 'por definir', 'por confirmar',
+  'desconocido', 'prueba', 'test', 'x', 'xx', 'xxx', 'nn', 's n', 'sn',
+]);
+
+export function esNombreDeRelleno(nombre?: string | null): boolean {
+  const n = nombreClienteLimpio(nombre)
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9ñ]+/g, ' ')
+    .trim();
+  return !n || n.length < 2 || RELLENO.has(n);
+}

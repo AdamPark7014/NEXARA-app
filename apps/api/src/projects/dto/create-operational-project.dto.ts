@@ -134,8 +134,18 @@ export class QuickCreateOperationalProjectDto {
   @MinLength(3)
   title!: string;
 
+  /** Cliente del padrón comercial. Uno de los dos: este o `serviceClientId`. */
+  @IsOptional()
   @IsInt()
-  salesClientId!: number;
+  salesClientId?: number;
+
+  /**
+   * Cliente de operación (el que usan las actividades). Lo manda «Asignar con IA» al confirmar un
+   * proyecto que todavía no existe («instalar 4 cámaras en IPADE»).
+   */
+  @IsOptional()
+  @IsInt()
+  serviceClientId?: number;
 
   @IsOptional()
   @IsDateString()

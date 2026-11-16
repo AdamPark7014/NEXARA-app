@@ -195,3 +195,11 @@ describe('«usar este»', () => {
     await expect(service.createClient({ name: 'BUAP', tipo: 'COMERCIAL', altaRapida: true, reutilizarId: 1 } as any, DANIELA, 7)).rejects.toThrow(NotFoundException);
   });
 });
+
+describe('esNombreDeRelleno', () => {
+  it('rechaza huecos que no son clientes', () => {
+    const { esNombreDeRelleno } = jest.requireActual('./client-sectors.js');
+    for (const n of ['N/a', 'n/a', 'Varios', ' sin cliente ', 'Pendiente', 'X', '-', '']) expect(esNombreDeRelleno(n)).toBe(true);
+    for (const n of ['A QUIEN CORRESPONDA', 'BUAP', 'IPADE', 'SE', 'La Comer', 'N10']) expect(esNombreDeRelleno(n)).toBe(false);
+  });
+});

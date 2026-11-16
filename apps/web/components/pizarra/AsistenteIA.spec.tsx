@@ -25,6 +25,15 @@ vi.mock("@/lib/sales-api", async (original) => ({
   ...(await original<typeof import("@/lib/sales-api")>()),
   buscarClientesParecidos,
 }));
+const extra = vi.hoisted(() => ({ quickCreateOperationalProject: vi.fn(), definirCamposEvidencia: vi.fn() }));
+vi.mock("@/lib/ops-operational-api", async (original) => ({
+  ...(await original<typeof import("@/lib/ops-operational-api")>()),
+  quickCreateOperationalProject: extra.quickCreateOperationalProject,
+}));
+vi.mock("@/lib/evidencia-campos", async (original) => ({
+  ...(await original<typeof import("@/lib/evidencia-campos")>()),
+  definirCamposEvidencia: extra.definirCamposEvidencia,
+}));
 vi.mock("@/lib/asistente-ia-api", async (original) => ({ ...(await original<typeof import("@/lib/asistente-ia-api")>()), ...api }));
 
 import AsistenteIA from "./AsistenteIA";
@@ -590,5 +599,46 @@ describe("AsistenteIA", () => {
     } finally {
       delete (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
     }
+  });
+});
+
+
+describe("Asignar con IA: proyecto nuevo con evidencia por elemento (15-11)", () => {
+  it("«instalar 4 cámaras en IPADE» crea el proyecto, la actividad y los 4 campos editados", async () => {
+    const proyecto: PropuestaActividad = {
+      ...servicio,
+      tipo: "proyecto",
+      tipoEtiqueta: "Proyecto",
+      titulo: "Instalar 4 cámaras en IPADE",
+      cliente: { id: 26, nombre: "IPADE" },
+      indicaciones: null,
+      proyectoNuevo: "Instalar 4 cámaras en IPADE",
+      camposEvidencia: [1, 2, 3, 4].map((n) => ({ nombre: `Cámara ${n}`, momentos: ["ANTES", "EN_PROGRESO", "DESPUES"] })),
+      payload: { ...servicio.payload, titulo: "Instalar 4 cámaras en IPADE", coreKind: "proyecto", clientId: 26, indicaciones: undefined },
+    };
+    buscarClientesParecidos.mockResolvedValue([]);
+    api.estadoAsistente.mockResolvedValue({ disponible: true, modelo: "claude-haiku-5-5" });
+    api.personasAsignables.mockResolvedValue([{ id: 8, nombre: "Carolina Pérez", email: "soporte@nexara.com.mx" }]);
+    api.interpretar.mockResolvedValue({ propuestas: [proyecto], aclaracion: null, uso: null, opciones: { clientes: [{ id: 26, nombre: "IPADE" }], proyectos: [] } });
+    api.crearActividad.mockResolvedValue({ id: 501, anNumber: "AN-0501" });
+    api.sumarAlEquipo.mockResolvedValue({});
+    extra.quickCreateOperationalProject.mockResolvedValue({ id: 900 });
+    extra.definirCamposEvidencia.mockResolvedValue([]);
+    const usuario = userEvent.setup();
+    render(<AsistenteIA />);
+    await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "instalar 4 cámaras en IPADE");
+    await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
+    expect(await screen.findByText("Nuevo: se crea al confirmar")).toBeInTheDocument();
+    expect(screen.getByText(/4 elementos: Cámara 1, Cámara 2, Cámara 3/)).toBeInTheDocument();
+    await abrir(usuario, "Evidencia");
+    await usuario.clear(screen.getByLabelText("Elemento 1"));
+    await usuario.type(screen.getByLabelText("Elemento 1"), "Cámara acceso");
+    await usuario.click(screen.getByRole("button", { name: /Confirmar/ }));
+    await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
+    expect(extra.quickCreateOperationalProject).toHaveBeenCalledWith("tok", { title: "Instalar 4 cámaras en IPADE", serviceClientId: 26 });
+    expect(api.crearActividad.mock.calls[0][1]).toMatchObject({ projectId: 900, clientId: 26, coreKind: "proyecto" });
+    const campos = extra.definirCamposEvidencia.mock.calls[0][2];
+    expect(campos.map((c: { nombre: string }) => c.nombre)).toEqual(["Cámara acceso", "Cámara 2", "Cámara 3", "Cámara 4"]);
+    expect(campos[0].momentos).toEqual(["ANTES", "EN_PROGRESO", "DESPUES"]);
   });
 });

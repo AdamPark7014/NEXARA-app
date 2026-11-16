@@ -49,7 +49,14 @@ export type Correccion = {
   como: "apodo" | "parecido";
 };
 
+/** Un campo de evidencia propuesto por elemento («Cámara 1» con antes, en progreso y después). */
+export type CampoPropuesto = { nombre: string; momentos: string[] };
+
 export type PropuestaActividad = {
+  /** Proyecto que no existe y se crea al confirmar (con el cliente de la tarjeta). */
+  proyectoNuevo?: string | null;
+  /** Campos de evidencia por elemento; se guardan al crear la actividad. */
+  camposEvidencia?: CampoPropuesto[];
   tipo: ActivityKind;
   tipoEtiqueta: string;
   razonTipo: string;
@@ -180,6 +187,10 @@ export type Ajustes = {
   /** Se vio el aviso de parecidos y es otro: se crea de todos modos. */
   clienteNuevoConfirmado?: boolean;
   projectId?: number | null;
+  /** Nombre del proyecto a crear al confirmar; `""` = no crear (se elige uno existente). */
+  proyectoNuevo?: string;
+  /** Campos por elemento ya corregidos en la tarjeta. */
+  campos?: CampoPropuesto[];
   titulo?: string;
   indicaciones?: string;
   /** Lugar: el nombre de una sucursal del cliente o texto libre. `""` = sin lugar. */
@@ -248,6 +259,18 @@ export function tareaEquivalente(tipo: ActivityKind, subtipo: string | null): { 
 }
 
 /** Proyecto vigente (solo obra y proyecto): el elegido o el que encontró la IA. */
+/** Proyecto a crear al confirmar: solo si no se eligió uno existente y el tipo lleva proyecto. */
+export function proyectoNuevoEfectivo(p: PropuestaActividad, aj: Ajustes): string | null {
+  if (!conProyecto(tipoEfectivo(p, aj)) || proyectoEfectivo(p, aj)) return null;
+  const nombre = (aj.proyectoNuevo !== undefined ? aj.proyectoNuevo : p.proyectoNuevo ?? "").trim();
+  return nombre.length >= 3 ? nombre : null;
+}
+
+/** Campos por elemento vigentes (los de la tarjeta o los de la IA), sin renglones vacíos. */
+export function camposEfectivos(p: PropuestaActividad, aj: Ajustes): CampoPropuesto[] {
+  return (aj.campos ?? p.camposEvidencia ?? []).map((c) => ({ ...c, nombre: c.nombre.trim() })).filter((c) => c.nombre && c.momentos.length);
+}
+
 export function proyectoEfectivo(p: PropuestaActividad, aj: Ajustes): number | null {
   if (!conProyecto(tipoEfectivo(p, aj))) return null;
   if (aj.projectId !== undefined) return aj.projectId || null;
@@ -541,13 +564,18 @@ export function bloqueos(
     agenda?: Agenda;
     /** Cliente que se da de alta al confirmar: cuenta como cliente del servicio. */
     clienteNuevo?: string | null;
+    /** Proyecto que se crea al confirmar: cuenta como proyecto elegido. */
+    proyectoNuevo?: string | null;
   },
 ): string[] {
   const out: string[] = [];
   const tipo = (payload.coreKind as ActivityKind | undefined) ?? p.tipo;
   if (!payload.responsableId) out.push("Elige a quién se le asigna.");
   if (tipo === "servicio" && !payload.clientId && !ctx.clienteNuevo) out.push("Un servicio necesita un cliente registrado.");
-  if (conProyecto(tipo) && !payload.projectId) out.push("Elige el proyecto.");
+  if (conProyecto(tipo) && !payload.projectId) {
+    if (!ctx.proyectoNuevo) out.push("Elige el proyecto.");
+    else if (!payload.clientId && !ctx.clienteNuevo) out.push("El proyecto nuevo necesita un cliente.");
+  }
   if ((tipo === "servicio" || tipo === "obra") && !payload.fechaInicio) {
     out.push(tipo === "servicio" ? "Indica el día del servicio." : "Indica el día de la obra.");
   }
