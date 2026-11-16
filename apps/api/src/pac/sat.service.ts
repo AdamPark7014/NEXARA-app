@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { digitoRfcCorrecto } from './rfc-checksum.js';
+import { leerEfirma, MENSAJE_FALTA_EFIRMA } from './descarga-masiva/credencial-efirma.js';
 
 /**
  * Servicios REST del SAT (consulta pública, sin e.firma).
@@ -389,10 +390,8 @@ export class SatService {
 
   /** ¿Hay e.firma configurada para Descarga Masiva? */
   isEfirmaConfigured(): boolean {
-    const hasCer = Boolean(process.env['EFIRMA_CER_BASE64'] || process.env['EFIRMA_CER_PATH']);
-    const hasKey = Boolean(process.env['EFIRMA_KEY_BASE64'] || process.env['EFIRMA_KEY_PATH']);
-    const hasPass = Boolean(process.env['EFIRMA_KEY_PASSWORD']);
-    return hasCer && hasKey && hasPass;
+    // La carpeta montada (`/etc/nexara-secrets/sat/efirma`) o las variables de siempre.
+    return leerEfirma() !== null;
   }
 
   /**
@@ -410,8 +409,7 @@ export class SatService {
       return {
         configured: false,
         message:
-          'Descarga Masiva requiere e.firma (EFIRMA_CER_BASE64, EFIRMA_KEY_BASE64, EFIRMA_KEY_PASSWORD). ' +
-          'La e.firma es distinta del CSD y se usa para autenticación WS-Security ante el SAT.',
+          `${MENSAJE_FALTA_EFIRMA}. La e.firma es distinta del CSD: el SAT la pide para autenticar la descarga.`,
         endpoints: [
           'https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/Autenticacion/Autenticacion.svc',
           'https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/SolicitaDescargaService.svc',

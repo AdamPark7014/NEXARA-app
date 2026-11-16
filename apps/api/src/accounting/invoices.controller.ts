@@ -15,10 +15,14 @@ import {
 } from './dto/invoice.dto.js';
 import { ListInvoicesQueryDto } from './dto/list-query.dto.js';
 
+import { DescargaMasivaService } from '../pac/descarga-masiva/descarga-masiva.service.js';
 @Controller('accounting/invoices')
 @UseGuards(UrlAccessGuard)
 export class InvoicesController {
-  constructor(private readonly service: AccountingService) {}
+  constructor(
+    private readonly service: AccountingService,
+    private readonly descargaMasiva: DescargaMasivaService,
+  ) {}
 
   @Post()
   @UseGuards(RbacGuard)
@@ -100,6 +104,33 @@ export class InvoicesController {
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
   descargaMasivaStatus() {
     return this.service.descargaMasivaStatus();
+  }
+
+  /** Pide al SAT los CFDI de un periodo (emitidos o recibidos, XML o metadatos). Necesita la e.firma. */
+  @Post('sat/descarga-masiva/solicitudes')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
+  solicitarDescargaMasiva(@Body() body: { desde: string; hasta: string; tipo: 'emitidos' | 'recibidos'; formato: 'xml' | 'metadata' }) {
+    return this.descargaMasiva.solicitar({
+      desde: String(body?.desde ?? ''),
+      hasta: String(body?.hasta ?? ''),
+      tipo: body?.tipo,
+      formato: body?.formato ?? 'xml',
+    });
+  }
+
+  @Get('sat/descarga-masiva/solicitudes/:id')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
+  verificarDescargaMasiva(@Param('id') id: string) {
+    return this.descargaMasiva.verificar(id);
+  }
+
+  @Post('sat/descarga-masiva/paquetes/:id/descargar')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
+  descargarPaqueteSat(@Param('id') id: string) {
+    return this.descargaMasiva.descargar(id);
   }
 
   @Get('sat/validate-rfc/:rfc')
