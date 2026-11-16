@@ -1,5 +1,18 @@
 # RELEVO
 
+- **16-11 ~01:30 México (claude-code) — Ola 5: diseñador como proyecto formal (mockup aprobado por Adam: «continua»).**
+  - API (`cctv-disenos`): `POST :id/digitalizar {url}` lee con IA el croquis ya subido (`digitalizar-ia.ts`, Haiku low,
+    imagen reducida a 1568 px; `CCTV_DIGITALIZAR_MODELO` lo cambia sin desplegar) y regresa muros, áreas y cámaras en px
+    del croquis + dudas; no guarda. Solo croquis de ese diseño por nombre. `POST :id/documentos` guarda documentos del
+    expediente en `uploads/cctv-documentos/` (PDF, imagen, Excel, Word, PowerPoint, DWG/DXF; rechaza MZ/#!).
+  - Web: «Revisa lo que leyó la IA» (`DigitalizarConIA.tsx`: plano con lo detectado encima, cámaras editables, ancho
+    real para la escala, muros/áreas opcionales, dudas) → `aplicarLectura` (`lib/cctv/digitalizar.ts`). Se abre solo al
+    subir el primer croquis, con «Digitalizar plano con IA» al empezar y en la pestaña Plano. «Expediente» en la cabecera
+    (`ExpedienteProyecto.tsx`): datos del sitio, documentos (cada PDF o imagen se digitaliza con un clic) y «Qué falta
+    para entregar» (`lib/cctv/expediente.ts`). Todo vive en `plano.expediente` del plano raíz: sin migración.
+  - Cadena Cursor → Codex: no se usó en esta ola (en la anterior ninguno pudo usar la terminal); la hice yo.
+  - Sin probar con sesión real en el navegador (el login es de Adam); pruebas de API y web en verde.
+
 - **15-11 ~21:20 México (claude-code) — Descarga Masiva del SAT lista para cuando llegue la e.firma. NO desplegado.**
   - `pac/descarga-masiva/`: `credencial-efirma.ts` (lee `/etc/nexara-secrets/sat/efirma/{efirma.cer,efirma.key,password}`
     o las `EFIRMA_*` de siempre; RFC, serie y vigencia del .cer; periodo ≤ 1 año, cerrado y en el pasado) y

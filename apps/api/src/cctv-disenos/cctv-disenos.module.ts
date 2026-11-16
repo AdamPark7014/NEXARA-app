@@ -8,12 +8,13 @@ import { CctvDisenosController } from './cctv-disenos.controller.js';
 import { CctvDisenosService } from './cctv-disenos.service.js';
 import { ExistenciasCctvService } from './existencias.service.js';
 import { LecturaFichaService } from './lectura-ficha.service.js';
+import { DigitalizarCctvService } from './digitalizar.service.js';
 
 /** Diseñador de videovigilancia de Core (`/erp/videovigilancia`). */
 @Module({
   imports: [PrismaModule, AiModule, CatalogModule, CotizacionesModule, SmartQuoteModule],
   controllers: [CctvDisenosController],
-  providers: [CctvDisenosService, LecturaFichaService, ExistenciasCctvService],
+  providers: [CctvDisenosService, LecturaFichaService, ExistenciasCctvService, DigitalizarCctvService],
   exports: [CctvDisenosService],
 })
 export class CctvDisenosModule {}

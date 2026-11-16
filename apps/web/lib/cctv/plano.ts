@@ -158,6 +158,8 @@ export type Plano = {
   muebles?: Mueble[] | null;
   /** Lo que no es cámara. Los diseños anteriores no lo traen. */
   equipos?: EquipoPlano[] | null;
+  /** Expediente del proyecto (Ola 5): datos y documentos. Solo en el plano raíz. */
+  expediente?: import("./expediente").Expediente | null;
 };
 
 export const PX_POR_METRO_LIENZO = 50;

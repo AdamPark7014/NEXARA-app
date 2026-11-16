@@ -24,11 +24,13 @@ import { requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { CctvDisenosService, type ActorCctv } from './cctv-disenos.service.js';
 import { ConflictoVersionFilter } from './conflicto-version.js';
 import { CROQUIS_MAX_BYTES } from './croquis-imagen.js';
+import { DOCUMENTO_MAX_BYTES } from './documento-expediente.js';
 import { validarModelos } from './existencias.js';
 import { ExistenciasCctvService } from './existencias.service.js';
 import { CrearDisenoDto } from './dto/crear-diseno.dto.js';
 import { GuardarDisenoDto } from './dto/guardar-diseno.dto.js';
 import { FICHA_MAX_BYTES, LecturaFichaService } from './lectura-ficha.service.js';
+import { DigitalizarCctvService } from './digitalizar.service.js';
 
 /**
  * Diseñador de videovigilancia (`docs/DISENADOR-CCTV.md` §9).
@@ -45,6 +47,7 @@ export class CctvDisenosController {
     private readonly service: CctvDisenosService,
     private readonly lectura: LecturaFichaService,
     private readonly existencias: ExistenciasCctvService,
+    private readonly digitalizador: DigitalizarCctvService,
   ) {}
 
   /** `{ puede }`: la web decide con esto si muestra el módulo. Antes de `:id`. */
@@ -187,6 +190,29 @@ export class CctvDisenosController {
   @HttpCode(200)
   archivar(@Req() req: any, @Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
     return this.service.archivar(this.actor(req), id, companyId);
+  }
+
+  /**
+   * Lee con IA el croquis ya subido (`{ url }` que devolvió `:id/croquis`) y propone muros, áreas y
+   * cámaras para revisar. No guarda nada.
+   */
+  @Post(':id/digitalizar')
+  @HttpCode(200)
+  async digitalizar(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() cuerpo: { url?: unknown; nota?: unknown },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    await this.service.exigirAcceso(this.actor(req));
+    return this.digitalizador.digitalizar(id, companyId, cuerpo ?? {});
+  }
+
+  /** Multipart `file`: un documento del expediente (PDF, imagen, Excel, Word, PowerPoint, DWG/DXF; 25 MB). */
+  @Post(':id/documentos')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: DOCUMENTO_MAX_BYTES + 1024 * 1024, files: 1 } }))
+  subirDocumento(@Req() req: any, @Param('id', ParseIntPipe) id: number, @UploadedFile() file: any, @CurrentCompanyId() companyId: number | null) {
+    return this.service.subirDocumento(this.actor(req), id, file, companyId);
   }
 
   /** Multipart `file`: PNG, JPEG o WebP hasta 20 MB (multer corta a los 25 MB). */

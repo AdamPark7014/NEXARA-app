@@ -15,6 +15,7 @@ import UndoRoundedIcon from "@mui/icons-material/UndoRounded";
 import RedoRoundedIcon from "@mui/icons-material/RedoRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import FolderOpenOutlinedIcon from "@mui/icons-material/FolderOpenOutlined";
 import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import { Alert, Button, Input, Segmented } from "@/components/base";
@@ -76,6 +77,9 @@ import Lienzo3D from "./Lienzo3D";
 import PanelEquipos from "./PanelEquipos";
 import PlanoTecnico, { HojaAjustada, IMPRIMIR_HOJA } from "./PlanoTecnico";
 import VistaCamara from "./VistaCamara";
+import DigitalizarConIA from "./DigitalizarConIA";
+import ExpedienteProyecto from "./ExpedienteProyecto";
+import { expedienteDe, queFalta, type DocumentoExpediente } from "@/lib/cctv/expediente";
 import styles from "./editor.module.css";
 
 /** three.js pesa: la maqueta se baja solo al abrirla. */
@@ -256,6 +260,10 @@ export default function EditorCctv({
   const [equipoNuevo, setEquipoNuevo] = useState<ModeloEquipo | null>(null);
   const [agregando, setAgregando] = useState(false);
   const [armando, setArmando] = useState(false);
+  /** «Digitalizar con IA» (Ola 5): abierto, y si tras subir el croquis se abre solo. */
+  const [digitalizando, setDigitalizando] = useState(false);
+  const digitalizarTrasSubir = useRef(false);
+  const [verExpediente, setVerExpediente] = useState(false);
   /** Sube al armar un diseño nuevo: la maqueta se abre encuadrada en él. */
   const [disenosArmados, setDisenosArmados] = useState(0);
   const [leyendoFicha, setLeyendoFicha] = useState(false);
@@ -491,6 +499,17 @@ export default function EditorCctv({
   }, [plano, seleccion, aplicar]);
 
   /* ── Croquis ── */
+  /** Un documento del expediente (PDF o imagen) pasa a croquis del nivel abierto y la IA lo digitaliza. */
+  const digitalizarDocumento = async (d: DocumentoExpediente) => {
+    const res = await fetch(resolveAssetUrl(d.url) || d.url, { credentials: "include" });
+    if (!res.ok) throw new Error("No se pudo abrir el documento.");
+    const blob = await res.blob();
+    const tipo = blob.type || (d.tipo === "pdf" ? "application/pdf" : "image/png");
+    digitalizarTrasSubir.current = true;
+    setVerExpediente(false);
+    await alElegirCroquis(new File([blob], d.nombre, { type: tipo }));
+  };
+
   const alElegirCroquis = async (f: File | undefined) => {
     if (!f) return;
     setSubiendo(true);
@@ -505,7 +524,10 @@ export default function EditorCctv({
         escala,
         croquis: { url: resolveAssetUrl(r.url) || r.url, anchoPx: r.anchoPx, altoPx: r.altoPx, opacidad: plano.croquis?.opacidad ?? 0.6, invertido },
       });
-      if (!escala.calibracion) {
+      if (digitalizarTrasSubir.current || vacio) {
+        // Plano vacío o pedido desde «Digitalizar plano con IA»: la IA lo lee y se revisa antes de usarlo.
+        setDigitalizando(true);
+      } else if (!escala.calibracion) {
         setHerramienta("cota");
         setAviso("Croquis cargado. Marca los extremos de una cota conocida para calibrar la escala.");
       }
@@ -513,6 +535,7 @@ export default function EditorCctv({
       setAviso(e instanceof Error ? e.message : "No se pudo subir el croquis.");
     } finally {
       setSubiendo(false);
+      digitalizarTrasSubir.current = false;
       if (archivo.current) archivo.current.value = "";
     }
   };
@@ -625,6 +648,9 @@ export default function EditorCctv({
           </Button>
           <Button variant="ghost" icon aria-label="Rehacer (Ctrl+Y)" title="Rehacer (Ctrl+Y)" disabled={!estado.futuro.length} onClick={() => despachar({ tipo: "rehacer" })}>
             <RedoRoundedIcon fontSize="small" />
+          </Button>
+          <Button iconStart={<FolderOpenOutlinedIcon fontSize="small" />} onClick={() => setVerExpediente(true)} title="Datos del proyecto, documentos y qué falta para entregar">
+            Expediente
           </Button>
           {puedeCotizar ? (
             <Button
@@ -939,6 +965,15 @@ export default function EditorCctv({
                     <Button variant="primary" onClick={() => setArmando(true)}>
                       Armar con IA
                     </Button>
+                    <Button
+                      loading={subiendo}
+                      onClick={() => {
+                        digitalizarTrasSubir.current = true;
+                        archivo.current?.click();
+                      }}
+                    >
+                      Digitalizar plano con IA
+                    </Button>
                     <Button loading={subiendo} onClick={() => archivo.current?.click()}>
                       Subir croquis
                     </Button>
@@ -1044,6 +1079,7 @@ export default function EditorCctv({
               creadoPor={diseno.creadoPor?.nombre ?? null}
               onRecalibrar={recalibrar}
               onCambiarCroquis={() => archivo.current?.click()}
+              onDigitalizar={plano.croquis ? () => setDigitalizando(true) : undefined}
               onHerramienta={(h) => {
                 if (!webgl) setModo("2d");
                 setHerramienta(h);
@@ -1124,6 +1160,39 @@ export default function EditorCctv({
             guardar={guardar}
             onCerrar={() => setCotizando(false)}
             onHecho={setCotizacionId}
+          />
+        ) : null}
+        {verExpediente ? (
+          <ExpedienteProyecto
+            abierto={verExpediente}
+            token={token}
+            disenoId={diseno.id}
+            cliente={diseno.clienteNombre ?? null}
+            expediente={expedienteDe(raiz)}
+            pendientes={queFalta(raiz, niveles.filter((n) => n.plano !== raiz).map((n) => n.plano))}
+            onCambiar={(e) => aplicarRaiz({ ...raiz, expediente: e })}
+            onDigitalizar={digitalizarDocumento}
+            onCerrar={() => setVerExpediente(false)}
+          />
+        ) : null}
+        {digitalizando ? (
+          <DigitalizarConIA
+            abierto={digitalizando}
+            token={token}
+            disenoId={diseno.id}
+            plano={plano}
+            onCerrar={() => {
+              setDigitalizando(false);
+              if (!plano.escala.calibracion) {
+                setHerramienta("cota");
+                setAviso("Marca los extremos de una cota conocida para calibrar la escala.");
+              }
+            }}
+            onAplicar={(nuevo, resumen) => {
+              aplicar(nuevo);
+              setDigitalizando(false);
+              setAviso(`Listo: se agregaron ${resumen}. Revisa la escala con una cota y elige el modelo de cada cámara.`);
+            }}
           />
         ) : null}
         {armando ? (

@@ -212,3 +212,15 @@ export function describirEquipo(token: string, frase: string): Promise<FichaLeid
 export function leerFraseDeSitio(token: string, frase: string): Promise<EspecSitio> {
   return pedir<EspecSitio>("cctv-disenos/generar-sitio", token, { method: "POST", body: JSON.stringify({ frase }) });
 }
+
+/** Lee con IA un croquis ya subido y propone muros, áreas y cámaras (no guarda nada). */
+export function digitalizarCroquis(token: string, id: number, url: string, nota?: string): Promise<import("./digitalizar").ResultadoDigitalizar> {
+  return pedir(`cctv-disenos/${id}/digitalizar`, token, { method: "POST", body: JSON.stringify({ url, ...(nota ? { nota } : {}) }) });
+}
+
+/** Sube un documento del expediente; la lista se guarda con el diseño (`plano.expediente`). */
+export function subirDocumentoExpediente(token: string, id: number, archivo: File): Promise<import("./expediente").DocumentoExpediente> {
+  const cuerpo = new FormData();
+  cuerpo.append("file", archivo, archivo.name);
+  return pedir(`cctv-disenos/${id}/documentos`, token, { method: "POST", body: cuerpo });
+}

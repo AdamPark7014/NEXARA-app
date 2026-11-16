@@ -12,6 +12,7 @@ import { validarEquipoCatalogo, type EquipoCatalogo } from './catalogo-cctv.js';
 import { CROQUIS_SUBDIR, leerImagenCroquis } from './croquis-imagen.js';
 import { ConflictoVersionDiseno } from './conflicto-version.js';
 import { ESTADOS_DISENO, nombreDiseno, planoVacio, validarExtra, validarPlano } from './plano-cctv.js';
+import { DOCUMENTOS_SUBDIR, revisarDocumento } from './documento-expediente.js';
 import type { CrearDisenoDto } from './dto/crear-diseno.dto.js';
 import type { GuardarDisenoDto } from './dto/guardar-diseno.dto.js';
 
@@ -291,6 +292,35 @@ export class CctvDisenosService {
       url: `/uploads/${CROQUIS_SUBDIR}/${nombreArchivo}`,
       anchoPx: imagen.anchoPx,
       altoPx: imagen.altoPx,
+    };
+  }
+
+  /**
+   * Un documento del expediente (Ola 5). Solo guarda el archivo: la lista va en `plano.expediente`,
+   * que la web guarda con el diseño.
+   */
+  async subirDocumento(
+    actor: ActorCctv,
+    id: number,
+    archivo: { buffer?: Buffer; originalname?: string; size?: number } | undefined,
+    companyId: number | null,
+  ) {
+    await this.exigirAcceso(actor);
+    const empresa = requireCompanyId(companyId);
+    const existe = await this.prisma.cctvDiseno.findFirst({ where: { id, companyId: empresa, archivadoAt: null }, select: { id: true } });
+    if (!existe) throw new NotFoundException(NO_ENCONTRADO);
+    const doc = revisarDocumento(archivo);
+    const carpeta = getUploadSubdir(__dirname, DOCUMENTOS_SUBDIR);
+    const nombreArchivo = `${id}-${Date.now()}-${randomBytes(8).toString('hex')}.${doc.extension}`;
+    await fs.writeFile(path.join(carpeta, nombreArchivo), archivo!.buffer!);
+    return {
+      id: randomBytes(6).toString('hex'),
+      nombre: doc.nombre,
+      tipo: doc.tipo,
+      bytes: archivo!.buffer!.length,
+      url: `/uploads/${DOCUMENTOS_SUBDIR}/${nombreArchivo}`,
+      subidoAt: new Date().toISOString(),
+      subidoPor: actor.id,
     };
   }
 
