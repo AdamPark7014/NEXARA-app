@@ -1,5 +1,15 @@
 # RELEVO
 
+- **16-11 ~13:50 México (claude-code; Cursor codifica, Codex pule) — Supervisor General: plan de mañana y cierre diario. NO desplegado.**
+  - `src/supervision/` (tablas `planes_diarios`, `cierres_diarios`; migración `20261116122800_planes_diarios` SIN
+    aplicar): coordinadores/encargados mandan el plan de mañana a su `managerId` (o a Luis); el supervisor lo marca
+    programado o lo devuelve (aviso); faltantes; cron L-V 17:00 recuerda el plan y 18:30 el cierre. Cierre del día con
+    actividades y asistencias de todo el árbol de `managerId`, entregado a dirección (solo `dir_operaciones` entrega).
+  - Web `/erp/supervision` (pestañas Plan de mañana / Cierre del día). Visible para dirección, arquitecto,
+    dir_operaciones, coord_admin, administrativo, coord_operaciones, enc_soporte, coord_ventas, lider_diseno y rh;
+    `me/navigation` lo esconde a quien no tiene gente ni es encargado. No va en «Más» de las apps (no hay pantalla).
+  - Sigue en cola para Cursor: `.ai/encargos/2026-11-16-cola-02-*` (mesa de Liz) y `cola-03-*` (RH de Tere).
+
 - **16-11 ~12:50 México (claude-code; código de Cursor, pulido de Codex) — RH: bajas con aprobación de dirección, cadenas de viáticos/vehículos e incidencias. NO desplegado (Hetzner bloqueó la IP por factura sin pagar).**
   - Bajas (`src/users/bajas/`, tabla `user_deactivation_requests`): RH solicita → PENDIENTE y aviso push a dirección
     (ceo activos sin demo/tester ni developer@); dirección aprueba/rechaza/revierte; RH puede aplicar con «Christian ya

@@ -23,6 +23,7 @@ export const GRUPO_POR_ESTRENAR = "Por estrenar";
 
 /** A qué grupo va cada módulo. El `group` de `MODULES` se queda como estaba para los demás paneles. */
 const GRUPO_CORE: Readonly<Record<string, string>> = {
+  supervision: "Hoy",
   "erp-clients": "Vender",
   "erp-cotizaciones": "Vender",
   "erp-videovigilancia": "Vender",
@@ -64,6 +65,7 @@ export const CORE_ITEM_ORDER: readonly string[] = [
   "dashboard",
   "mis-actividades",
   "pizarra",
+  "supervision",
   "asistencias",
   "chat",
   "reuniones",

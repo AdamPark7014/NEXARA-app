@@ -62,6 +62,18 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `asistencias, activities-daily, activities-projects, activities-services, chat`,
   },
+  'supervision': {
+    id: 'supervision',
+    summary: `Plan de mañana de cada coordinador y cierre del día que el supervisor general entrega a dirección.`,
+    audience: `Supervisor general (Luis), coordinadores y encargados de área; dirección lee los cierres.`,
+    how: `Cada tarde el coordinador manda qué hará su gente mañana; el supervisor lo marca programado o lo devuelve. Al final del día el supervisor entrega el cierre con actividades y asistencias de todo su equipo. Datos de /api/supervision.`,
+    steps: [
+      `Coordinador: entra a /erp/supervision y manda el plan de mañana antes de las 17:00.`,
+      `Supervisor: revisa los planes, programa las actividades y marca cada plan como programado o devuélvelo con nota.`,
+      `Supervisor: en «Cierre del día» revisa el resumen, agrega un comentario y entrégalo a dirección.`,
+    ],
+    connects: `pizarra, mis-actividades, asistencias, approvals`,
+  },
   'mis-actividades': {
     id: 'mis-actividades',
     summary: `Tu cola personal: lo que te toca hacer hoy, en orden.`,

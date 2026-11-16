@@ -2,6 +2,7 @@ export const CORE_SURFACE_ONLY: boolean = process.env.NEXT_PUBLIC_CORE_SURFACE_O
 export const CORE_OLA1_MODULE_IDS: readonly string[] = [
   'mis-actividades',
   'pizarra',
+  'supervision',
   'asistencias',
   'chat',
   // Reuniones y acuerdos: convocar, grabar, acta con IA y archivo de actas en PDF.

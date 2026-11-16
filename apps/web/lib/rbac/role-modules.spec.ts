@@ -175,6 +175,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'studio-newsletter',
     'studio-pages',
     'studio-social',
+    'supervision',
     'users',
     'viatics-admin',
     'warehouse',
@@ -285,6 +286,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'studio-newsletter',
     'studio-pages',
     'studio-social',
+    'supervision',
     'users',
     'viatics-admin',
     'warehouse',
@@ -349,6 +351,8 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'orgchart',
     'pizarra',
     'reuniones',
+    'supervision',
+
   ],
   dir_operaciones: [
     'approvals',
@@ -424,7 +428,9 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'pizarra',
     'procurement',
     'reuniones',
+    'supervision',
     'warehouse',
+
   ],
   dir_admin: [
     'approvals',
@@ -484,6 +490,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'procurement',
     'reuniones',
     'settings',
+    'supervision',
     'users',
     'viatics-admin',
     'warehouse',
@@ -536,9 +543,11 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'pizarra',
     'procurement',
     'reuniones',
+    'supervision',
     'users',
     'viatics-admin',
     'warehouse',
+
   ],
   administrativo: [
     'approvals',
@@ -569,8 +578,10 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'pizarra',
     'procurement',
     'reuniones',
+    'supervision',
     'viatics-admin',
     'warehouse',
+
   ],
   coord_operaciones: [
     'approvals',
@@ -630,6 +641,8 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'orgchart',
     'pizarra',
     'reuniones',
+    'supervision',
+
   ],
   ing_campo: [
     'asistencias',
@@ -742,6 +755,8 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'ops-tools',
     'pizarra',
     'reuniones',
+    'supervision',
+
   ],
   coord_ventas: [
     'approvals',
@@ -780,6 +795,8 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'reuniones',
     'studio-contacts',
     'studio-leads',
+    'supervision',
+
   ],
   vendedor: [
     'attendance',
@@ -831,6 +848,8 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'studio-newsletter',
     'studio-pages',
     'studio-social',
+    'supervision',
+
   ],
   disenador: [
     'attendance',
@@ -881,7 +900,9 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'orgchart',
     'pizarra',
     'reuniones',
+    'supervision',
     'viatics-admin',
+
   ],
   contabilidad: [
     'approvals',

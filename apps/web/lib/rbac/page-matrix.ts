@@ -65,6 +65,15 @@ export const CORE_OLA1_PAGE_PATHS: PageRule[] = [
 ];
 
 /**
+ * Plan de mañana y cierre diario. No va en CORE_OLA1 ni ACTIVIDAD_PROPIA: técnicos,
+ * vendedores, diseñadores y contabilidad no lo ven (espejo de SUPERVISION_URL_RULES).
+ */
+export const SUPERVISION_PAGE_PATHS: PageRule[] = [
+  '/erp/supervision',
+  '/erp/supervision/**',
+];
+
+/**
  * Cotizaciones en Core (contrato del viernes, D): dirección, administración y coordinadores.
  *
  * No entra en `CORE_OLA1_PAGE_PATHS` a propósito: eso lo abriría para todo el personal de campo, y
@@ -147,6 +156,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── ARQUITECTO — OPS supervisor + ERP parcial ────────────────────────
   [ROLES.ARQUITECTO]: [
+    ...SUPERVISION_PAGE_PATHS,
     ...COSTOS_CORE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/ops/**',
@@ -178,6 +188,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── DIR. OPERACIONES — visión global, aprobaciones operativas ────────
   [ROLES.DIR_OPERACIONES]: [
+    ...SUPERVISION_PAGE_PATHS,
     // 07-11: tablero de asistencias de su gente (espejo de url-matrix).
     '/erp/asistencias',
     '/erp/asistencias/**',
@@ -253,6 +264,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── COORD ADMIN — segundo nivel administrativo ───────────────────────
   [ROLES.COORD_ADMIN]: [
+    ...SUPERVISION_PAGE_PATHS,
     // 07-11: tablero de asistencias de su gente (espejo de url-matrix).
     '/erp/asistencias',
     '/erp/asistencias/**',
@@ -318,6 +330,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── ADMINISTRATIVO — operación día a día ─────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
+    ...SUPERVISION_PAGE_PATHS,
     ...COSTOS_CORE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
@@ -360,6 +373,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── COORD OPERACIONES — supervisa campo / project manager ────────────
   [ROLES.COORD_OPERACIONES]: [
+    ...SUPERVISION_PAGE_PATHS,
     ...COSTOS_CORE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/ops/**',
@@ -445,6 +459,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── ENC. SOPORTE — coordina soporte; mismas páginas base que soporte ──
   [ROLES.ENC_SOPORTE]: [
+    ...SUPERVISION_PAGE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...COSTOS_CORE_PATHS,
     ...CORE_RECURSOS_PATHS,
@@ -484,6 +499,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── COORD VENTAS — gerente comercial ─────────────────────────────────
   [ROLES.COORD_VENTAS]: [
+    ...SUPERVISION_PAGE_PATHS,
     ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS,
     '/crm/**',
@@ -534,6 +550,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── LÍDER DISEÑO — Studio + material comercial (CRM) + cuenta ERP ─────
   [ROLES.LIDER_DISENO]: [
+    ...SUPERVISION_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS,
     // Daniela también es personal Core: la API ya le da estas páginas (`CORE_OLA1_URL_RULES`)
     // desde dad8869a; sin ellas aquí, la web Core-only le bloqueaba pizarra y asistencias.
@@ -570,6 +587,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── RH ───────────────────────────────────────────────────────────────
   [ROLES.RH]: [
+    ...SUPERVISION_PAGE_PATHS,
     // 07-11: tablero de asistencias de su gente (espejo de url-matrix).
     '/erp/asistencias',
     '/erp/asistencias/**',
