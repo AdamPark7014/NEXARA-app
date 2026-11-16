@@ -1,5 +1,16 @@
 # RELEVO
 
+- **15-11 ~20:50 México (claude-code) — Ola 4: revisión con IA de actividades calificadas y avisos por chat. NO desplegado
+  (Adam: «subes todo de golpe cuando acabes»).**
+  - `POST ai/revision/actividad/:id` (`ai/revision/`): el código mide a tiempo/tarde (mismo `limiteDeEntrega`), fotos por
+    campo, incidencias y la última calificación; Haiku dice si la calificación corresponde, sugiere 1–5, por qué, qué
+    atender y qué hacer. No guarda ni cambia nada. Ficha de la actividad: «Revisión con IA» (`RevisionConIA.tsx`), solo
+    con `evidences.review` o `activities.manage`.
+  - Avisos por chat (`ChatService.avisoDirecto` + textos en `chat/avisos-chat.ts`): mensaje directo de quien revisó al
+    dueño de la evidencia (aprobada con calificación o devuelta con observaciones), de quien reporta una incidencia a quien
+    asignó y al responsable, y de quien cerró o asignó a cada pendiente cuando queda «No cumplida». Nunca truena al que
+    lo llama. ChatModule entra a ActivitiesModule y ActivityEvidenceModule; el grafo de Nest resuelve (preview).
+
 - **15-11 ~19:30 México (claude-code) — Asignar con IA por tipo y elementos, cotización editable, cotización ligada en todo tipo. NO desplegado.**
   - Asignar con IA: «instalar 4 cámaras en IPADE» = proyecto (prompt), `elem` en la salida y respaldo en código
     (`ai/asistente/elementos.ts`) → `camposEvidencia` (Cámara 1…4 × antes/en progreso/después; mantenimiento solo

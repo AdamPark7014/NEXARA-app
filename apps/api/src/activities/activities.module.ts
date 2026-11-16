@@ -1,3 +1,4 @@
+import { ChatModule } from '../chat/chat.module.js';
 import { Module } from '@nestjs/common';
 import { ActivitiesService } from './activities.service.js';
 import { ActivitiesController } from './activities.controller.js';
@@ -31,6 +32,7 @@ import {
     UsersModule,
     NotificationsModule,
     AiModule,
+    ChatModule,
   ],
   // El orden importa: los controladores con rutas literales van primero para
   // que `activities/reportes/...` no caiga en `activities/:id`.

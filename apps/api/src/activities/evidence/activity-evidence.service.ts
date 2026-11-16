@@ -26,6 +26,8 @@ import {
 } from '../actividad-tiempos.js';
 import { distanciaAlSitio, sitioDeActividad, type PrismaSitio } from '../sitio-actividad.js';
 import { esNoCumplida } from '../incumplimiento.js';
+import { ChatService } from '../../chat/chat.service.js';
+import { avisoRevision } from '../../chat/avisos-chat.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import {
   clampEvidencePhotoRequired,
@@ -136,6 +138,7 @@ export class ActivityEvidenceService {
     @Optional() private geofence?: ActivityGeofenceService,
     @Optional() private campos?: ActivityEvidenceFieldsService,
     @Optional() private sesiones?: ActivitySessionsService,
+    @Optional() private chat?: ChatService,
   ) {}
 
   private async notifyEvidenceReadyForReview(
@@ -2164,6 +2167,13 @@ export class ActivityEvidenceService {
         },
       },
     });
+    // A quien la hizo le llega por el chat, de quien la revisó (15-11).
+    if (this.chat) {
+      const actividad = await this.prisma.activity
+        .findUnique({ where: { id: evidence.activityId }, select: { id: true, anNumber: true, titulo: true } })
+        .catch(() => null);
+      if (actividad) void this.chat.avisoDirecto(reviewerId, evidence.userId, avisoRevision(actividad, decision, notes, score), evidence.companyId);
+    }
   }
 
   /**

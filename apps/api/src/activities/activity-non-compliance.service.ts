@@ -1,3 +1,5 @@
+import { ChatService } from '../chat/chat.service.js';
+import { avisoNoCumplida } from '../chat/avisos-chat.js';
 import { BadRequestException, ForbiddenException, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
@@ -103,6 +105,7 @@ export class ActivityNonComplianceService implements OnModuleInit {
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly team: ActivityTeamService,
     @Optional() private readonly domainEvents?: DomainEventBusService,
+    @Optional() private readonly chat?: ChatService,
   ) {}
 
   /** El cierre de jornada sale de la checada de salida, no de un reloj: ver `incumplimiento.ts`. */
@@ -408,6 +411,7 @@ export class ActivityNonComplianceService implements OnModuleInit {
         cierre: p.limite,
       })
       .catch(() => undefined);
+    void this.avisarPorChat(fila, p);
     this.publicar(fila.id, fila.companyId, p.actorId, {
       estatus: ACTIVITY_STATUS.NO_CUMPLIDA,
       prevEstatus: fila.estatus,
@@ -415,6 +419,19 @@ export class ActivityNonComplianceService implements OnModuleInit {
       causa: p.causa,
     });
     return true;
+  }
+
+  /** A cada pendiente le llega por el chat, de quien la cerró o de quien la asignó (15-11). */
+  private async avisarPorChat(fila: FilaCierre, p: { causa: string; limite: Date | null; pendientesIds: number[]; actorId: number | null }) {
+    if (!this.chat) return;
+    const a = await this.prisma.activity
+      .findFirst({ where: { id: fila.id, companyId: fila.companyId }, select: { id: true, anNumber: true, titulo: true, creadoPorId: true } })
+      .catch(() => null);
+    const de = p.actorId ?? a?.creadoPorId ?? null;
+    if (!a || !de) return;
+    const texto = avisoNoCumplida(a, etiquetaCausa(p.causa).toLowerCase(), p.limite);
+    const para = p.pendientesIds.length ? p.pendientesIds : [fila.responsableId];
+    for (const id of new Set(para)) await this.chat.avisoDirecto(de, id, texto, fila.companyId);
   }
 
   private publicar(activityId: number, companyId: number, userId: number | null, payload: Record<string, unknown>) {
