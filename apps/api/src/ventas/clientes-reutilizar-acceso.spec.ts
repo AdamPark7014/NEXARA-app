@@ -145,10 +145,10 @@ describe('alta que reutiliza: la misma puerta que la ficha', () => {
 
   it('si no existe ninguno con ese nombre, el técnico sigue dando de alta el suyo (alta rápida intacta)', async () => {
     const { service, prisma } = armar([]);
-    const res = await service.createClient({ name: 'Cliente Nuevo', altaProyecto: true } as any, TECNICO, 7);
+    const res = await service.createClient({ name: 'Taller Nuevo', altaProyecto: true } as any, TECNICO, 7);
     expect(prisma.salesClient.create).toHaveBeenCalledTimes(1);
     expect(prisma.salesClient.create.mock.calls[0][0].data).toEqual(
-      expect.objectContaining({ name: 'Cliente Nuevo', tipo: 'PROYECTO', ownerId: 12, companyId: 7 }),
+      expect.objectContaining({ name: 'Taller Nuevo', tipo: 'PROYECTO', ownerId: 12, companyId: 7 }),
     );
     expect(res.id).toBe(9);
   });

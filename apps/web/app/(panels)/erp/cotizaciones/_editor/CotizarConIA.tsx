@@ -14,6 +14,8 @@ import {
   type ClientePropuesta,
   type OpcionPropuesta,
   type PropuestaCotizacion,
+  SEGMENTOS,
+  SEGMENTO_LABEL,
   type Segmento,
 } from "@/lib/cotizaciones-api";
 import { leerAviso, type LecturaAviso } from "@/lib/aviso-costo-ct";
@@ -143,6 +145,9 @@ export default function CotizarConIA({
   const [cliente, setCliente] = useState<ClientePropuesta | null>(null);
   const [proyecto, setProyecto] = useState("");
   const [margen, setMargen] = useState("");
+  /** Lo demás que la IA leyó de la frase: se ve y se corrige antes de usarla (caso de las 1000 tarjetas). */
+  const [segmento, setSegmento] = useState<Segmento>("COMERCIAL");
+  const [conIva, setConIva] = useState(true);
   const [filas, setFilas] = useState<FilaPropuesta[]>([]);
   const [extras, setExtras] = useState<FilaPropuesta[]>([]);
   const [copiando, setCopiando] = useState(false);
@@ -162,6 +167,8 @@ export default function CotizarConIA({
       setPropuesta(r);
       setCliente(r.cliente);
       setProyecto(r.proyecto);
+      setSegmento(r.segmento as Segmento);
+      setConIva(r.conIva);
       setMargen(textoDePorcentaje(m));
       setFilas(filasDePropuesta(r.partidas, m));
       setExtras(filasDePropuesta(r.complementos, m, false));
@@ -195,8 +202,8 @@ export default function CotizarConIA({
     onUsar({
       cliente: { salesClientId: cliente.salesClientId, nombre: cliente.nombre },
       proyecto,
-      segmento: propuesta.segmento as Segmento,
-      conIva: propuesta.conIva,
+      segmento,
+      conIva,
       filas: [...filas, ...extras],
     });
   }
@@ -321,6 +328,24 @@ export default function CotizarConIA({
                 <Input id="cotizar-ia-margen" inputMode="decimal" value={margen} onChange={(e) => cambiarMargen(e.target.value)} />
                 <span className={s.pista}>Solo a lo del mayorista</span>
               </div>
+              <div className={s.campo}>
+                <label htmlFor="cotizar-ia-segmento" className={s.etiqueta}>
+                  Tipo
+                </label>
+                <select id="cotizar-ia-segmento" className={s.selector} value={segmento} onChange={(e) => setSegmento(e.target.value as Segmento)}>
+                  {SEGMENTOS.map((x) => (
+                    <option key={x} value={x}>
+                      {SEGMENTO_LABEL[x]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <label className={`${s.campo} ${s.marca}`}>
+                <span className={s.etiqueta}>Factura</span>
+                <span>
+                  <input type="checkbox" checked={conIva} onChange={(e) => setConIva(e.target.checked)} /> Con IVA
+                </span>
+              </label>
             </div>
 
             {filas.length ? (
@@ -362,6 +387,9 @@ export default function CotizarConIA({
                           aria-label={`Nombre de ${f.pedido}`}
                           onValor={(v) => cambiarFila(f.key, (x) => ({ ...x, name: v }))}
                         />
+                        <div className={s.pedido} data-testid="cotizar-ia-pedido">
+                          Pediste: «{f.pedido}»{f.seguridad !== "alta" ? " — revisa que la partida sea eso" : ""}
+                        </div>
                         {origen.texto || origen.detalle ? (
                           <div className={s.detalle}>
                             {origen.texto ? <span className={`${s.etiquetaChica} ${origen.tono === "elige" ? s.tonoElige : s.tonoLista}`}>{origen.texto}</span> : null}
@@ -460,7 +488,7 @@ export default function CotizarConIA({
           </div>
           <div className={s.pie}>
             <div>
-              <div className={s.pista}>Subtotal {propuesta.conIva ? "sin IVA" : "(sin factura)"}</div>
+              <div className={s.pista}>Subtotal {conIva ? "sin IVA" : "(sin factura)"}</div>
               <div className={s.total} data-testid="cotizar-ia-total">
                 {formatoMoneda(resumen.subtotal, moneda)}
               </div>

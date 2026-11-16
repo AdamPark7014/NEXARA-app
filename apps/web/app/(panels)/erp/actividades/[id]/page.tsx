@@ -544,16 +544,14 @@ export default function ActivityDetailPage() {
 
       {token ? <CotizacionAbiertaTarjeta activityId={activity.id} token={token} /> : null}
 
-      {String(activity.coreKind ?? "").toLowerCase() === "comercial" ? (
-        <RecordSection title="Cotización">
-          <CotizacionDeActividad
-            activityId={activity.id}
-            coreKind={activity.coreKind}
-            cotizacion={(activity as { cotizacion?: CotizacionLigada | null }).cotizacion ?? null}
-            onLigada={() => void reload()}
-          />
-        </RecordSection>
-      ) : null}
+      {/* Cotización ligada en cualquier tipo; el componente se oculta solo si no hay nada que ver ni hacer. */}
+      <CotizacionDeActividad
+        activityId={activity.id}
+        coreKind={activity.coreKind}
+        cotizacion={(activity as { cotizacion?: CotizacionLigada | null }).cotizacion ?? null}
+        onLigada={() => void reload()}
+        enSeccion
+      />
 
       {/* Documentos opcionales en cualquier actividad (PowerPoint, Excel, Word, PDF): se ven sin salir de la ficha. */}
       <ArchivosDeActividad activityId={activity.id} />

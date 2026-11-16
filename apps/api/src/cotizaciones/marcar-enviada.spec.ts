@@ -104,3 +104,18 @@ describe('«Ya la envié»', () => {
     expect(await validate(plainToInstance(MarcarEnviadaDto, {}))).not.toHaveLength(0);
   });
 });
+
+describe('cotización ligada a una actividad que no es comercial (15-11)', () => {
+  it('solo la actividad comercial avanza con la cotización; el proyecto sigue su flujo', async () => {
+    const { service, prisma } = armar(borrador());
+    prisma.activity.findMany.mockResolvedValueOnce([
+      { id: 10, coreKind: 'comercial' },
+      { id: 11, coreKind: 'proyecto' },
+      { id: 12, coreKind: null },
+    ]);
+    prisma.activityEvidence = { updateMany: jest.fn(async () => ({ count: 0 })) };
+    prisma.cotizacion.findUnique = jest.fn(async () => ({ quoteNumber: 'NEX-LJ-0007', sentAt: new Date() }));
+    await (service as any).sincronizarActividad(4, 'SENT');
+    expect(prisma.activity.updateMany.mock.calls[0][0].where.id.in).toEqual([10, 12]);
+  });
+});

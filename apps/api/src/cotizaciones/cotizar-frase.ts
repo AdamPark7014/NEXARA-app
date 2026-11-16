@@ -179,12 +179,18 @@ const VERBOS =
 function destinoDe(texto: string): { resto: string; destino: string | null } {
   const inicio = texto.match(/^\s*([^:\n]{2,50}):\s*(.+)$/s);
   if (inicio && !/\d/.test(inicio[1]!)) return { resto: inicio[2]!, destino: inicio[1]!.trim() };
-  const m = texto.match(/\b(?:para|cliente|a nombre de)\s+((?:el|la|los|las|un|una)\s+)?([^,;]+)$/i);
+  // El último «para»: en «1000 tarjetas para control de acceso y 2 lectores para BUAP» el cliente es
+  // BUAP; con el primero, los lectores se iban dentro del destino y se perdía el renglón.
+  const m = texto.match(/^(.*)\b(?:para|cliente|a nombre de)\s+((?:el|la|los|las|un|una)\s+)?([^,;]+)$/is);
   if (!m) return { resto: texto, destino: null };
-  const resto = texto.slice(0, m.index).trim();
+  const resto = m[1]!.trim();
+  // «… y 2 lectores» después del último «para» también es un renglón, no un destino.
+  if (/\b(?:y|e|con|m[aá]s)\s+(?:\d+|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+[a-záéíóúñ]/i.test(m[3]!)) {
+    return { resto: texto, destino: null };
+  }
   // «para una oficina» dice el uso, no a quién: un cliente no se nombra con «un» o «una».
-  if (/^un/i.test(m[1] ?? '')) return { resto, destino: null };
-  return { resto, destino: m[2]!.replace(/[.\s]+$/, '').trim() };
+  if (/^un/i.test(m[2] ?? '')) return { resto, destino: null };
+  return { resto, destino: m[3]!.replace(/[.\s]+$/, '').trim() };
 }
 
 /** Lo que se dice de la cotización y no de las partidas («sin factura», «con margen de 22», «al 20 %»). */

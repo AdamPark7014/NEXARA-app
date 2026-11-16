@@ -1,7 +1,9 @@
 "use client";
 
 /**
- * Una actividad comercial **es** una cotización (contrato del viernes, D).
+ * Una actividad comercial **es** una cotización (contrato del viernes, D). Cualquier otro tipo (proyecto,
+ * obra, servicio, tarea) también puede llevar ligada la cotización de ese trabajo (Adam, 15-11: «homologado
+ * en todos los tipos»), pero ahí la cotización no mueve el avance de la actividad.
  *
  * Desde el detalle de la actividad: «Hacer cotización» la crea con ese cliente y las deja ligadas;
  * «Ligar cotización» conecta una que ya existe. La evidencia del levantamiento pasa a ser anexo de
@@ -9,9 +11,11 @@
  */
 import { aqui, conRegreso } from "@/lib/regreso";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useUser } from "@/components/UserContext";
+import { canUserAccessPath } from "@/lib/user-access";
 import PropuestaEmbebida from "./PropuestaEmbebida";
+import { RecordSection } from "@/components/base";
 import {
   ESTADO_LABEL,
   formatoMoneda,
@@ -46,14 +50,19 @@ export default function CotizacionDeActividad({
   coreKind,
   cotizacion,
   onLigada,
+  enSeccion = false,
 }: {
   activityId: number;
   coreKind?: string | null;
   cotizacion?: CotizacionLigada | null;
   onLigada?: () => void;
+  /** Se pinta dentro de su propia sección «Cotización» (el detalle de la actividad). */
+  enSeccion?: boolean;
 }) {
-  const { token } = useUser();
+  const { token, user } = useUser();
   const esComercial = String(coreKind ?? "").toLowerCase() === "comercial";
+  // En los demás tipos la sección solo estorba a quien no cotiza: se ve si ya hay una ligada o si puede ligarla.
+  const puedeCotizar = canUserAccessPath(user, "/erp/cotizaciones");
 
   const [eligiendo, setEligiendo] = useState(false);
   const [opciones, setOpciones] = useState<CotizacionRow[]>([]);
@@ -77,10 +86,12 @@ export default function CotizacionDeActividad({
     [opciones, activityId],
   );
 
-  if (!esComercial) return null;
+  if (!esComercial && !cotizacion?.id && !puedeCotizar) return null;
+
+  const envolver = (contenido: ReactNode) => (enSeccion ? <RecordSection title="Cotización">{contenido}</RecordSection> : contenido);
 
   if (cotizacion?.id) {
-    return (
+    return envolver(
       <div>
         <p style={{ margin: 0, fontSize: 13 }}>
           Cotización{" "}
@@ -95,7 +106,7 @@ export default function CotizacionDeActividad({
           </span>
         </p>
         <PropuestaEmbebida cotizacionId={cotizacion.id} quoteNumber={cotizacion.quoteNumber} token={token} />
-      </div>
+      </div>,
     );
   }
 
@@ -114,10 +125,12 @@ export default function CotizacionDeActividad({
     }
   }
 
-  return (
+  return envolver(
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
-        Esta actividad es comercial: su entregable es una cotización, no una hoja de servicio.
+        {esComercial
+          ? "Esta actividad es comercial: su entregable es una cotización, no una hoja de servicio."
+          : "Liga la cotización de este trabajo para tenerla a la mano. No cambia el avance de la actividad."}
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <Link
@@ -198,6 +211,6 @@ export default function CotizacionDeActividad({
       ) : null}
 
       {error ? <p style={{ margin: 0, color: "#dc2626", fontSize: 13 }}>{error}</p> : null}
-    </div>
+    </div>,
   );
 }

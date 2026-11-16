@@ -268,6 +268,25 @@ export class OperationalProjectsService {
       throw new ForbiddenException('No puedes crear un proyecto desde esta cuenta');
     }
     const tenantId = requireCompanyId(companyId);
+    if (!dto.salesClientId && dto.serviceClientId) {
+      const operacion = await this.prisma.serviceClient.findFirst({
+        where: { id: dto.serviceClientId, companyId: tenantId },
+        select: { id: true, companyId: true },
+      });
+      assertCompanyAccess(operacion, tenantId, 'Cliente');
+      return this.create(
+        {
+          title: dto.title.trim(),
+          clientId: operacion.id,
+          vendorId: Number(user.id),
+          projectType: 'OTRO',
+          ...(dto.startDate ? { startDate: dto.startDate } : {}),
+        },
+        Number(user.id),
+        user,
+      );
+    }
+    if (!dto.salesClientId) throw new BadRequestException('Falta el cliente del proyecto.');
     const sales = await this.prisma.salesClient.findFirst({
       where: { id: dto.salesClientId, ...companyWhere(tenantId) },
       include: { sectors: { select: { sector: true } } },

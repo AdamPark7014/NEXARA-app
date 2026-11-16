@@ -146,7 +146,8 @@ describe("CotizarConIA", () => {
   it("marcar un extra suma; usar entrega lo editado", async () => {
     const { onUsar } = armar();
     await pedir();
-    await userEvent.click(screen.getByRole("checkbox"));
+    const extra = screen.getAllByRole("checkbox").find((c) => !/Con IVA/.test(c.closest("label")?.textContent ?? ""))!;
+    await userEvent.click(extra);
     expect(screen.getByTestId("cotizar-ia-total").textContent).toContain("19,500");
 
     const cantidad = screen.getByLabelText("Cantidad de NVR 32 canales");
@@ -162,6 +163,20 @@ describe("CotizarConIA", () => {
     expect(datos.cliente).toEqual({ salesClientId: 5, nombre: "Materiales Pronto" });
     expect(datos.filas.find((f: { pedido: string }) => f.pedido === "NVR 32 canales").cantidad).toBe(2);
     expect(datos.filas.filter((f: { incluida: boolean }) => f.incluida)).toHaveLength(3);
+  });
+
+  it("muestra lo que se pidió en cada renglón y deja corregir tipo e IVA antes de usarla", async () => {
+    const { onUsar } = armar();
+    await pedir();
+    expect(screen.getAllByTestId("cotizar-ia-pedido").map((n) => n.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("«NVR 32 canales»")]),
+    );
+    await userEvent.selectOptions(screen.getByLabelText("Tipo"), "OBRA");
+    await userEvent.click(screen.getByRole("checkbox", { name: /Con IVA/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Usar en la cotización" }));
+    const datos = onUsar.mock.calls[0]![0];
+    expect(datos.segmento).toBe("OBRA");
+    expect(datos.conIva).toBe(false);
   });
 
   it("escribir otro nombre de cliente lo desliga", async () => {

@@ -23,6 +23,8 @@ import { kindsForAssignment } from "@/lib/activity-kinds";
 import { periodoPorOmision } from "@/lib/actividad-periodo";
 import { hoyISO } from "@/lib/proyecto-plan";
 import { obtenerProgramacion } from "@/lib/proyectos-api";
+import { quickCreateOperationalProject } from "@/lib/ops-operational-api";
+import { campoVacio, definirCamposEvidencia, MOMENTOS, MOMENTO_LABEL, type Momento } from "@/lib/evidencia-campos";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
 import {
@@ -34,6 +36,7 @@ import {
   TIPOS_SERVICIO,
   agendaFinal,
   bloqueos,
+  camposEfectivos,
   clientePendiente,
   compromisoValido,
   conProyecto,
@@ -49,6 +52,7 @@ import {
   payloadFinal,
   personasAsignables,
   proyectoEfectivo,
+  proyectoNuevoEfectivo,
   reglaEncargo,
   subtipoEfectivo,
   sumarAlEquipo,
@@ -389,10 +393,11 @@ function Contenido({
     const payload = payloadFinal(p, aj, { destinoEmail, proyectos: opciones?.proyectos, sucursales: opciones?.sucursales, entrada });
     const agenda = agendaFinal(p, aj, entrada);
     const pendiente = clientePendiente(p, aj);
-    const motivos = bloqueos(p, payload, { creadorEmail, destinoEmail, v2Role: v2, isSuperAdmin, agenda, clienteNuevo: pendiente });
+    const proyectoNuevo = proyectoNuevoEfectivo(p, aj);
+    const motivos = bloqueos(p, payload, { creadorEmail, destinoEmail, v2Role: v2, isSuperAdmin, agenda, clienteNuevo: pendiente, proyectoNuevo });
     const parecidosCliente = pendiente && !aj.clienteNuevoConfirmado ? parecidos[nombreComparable(pendiente)] ?? [] : [];
     if (parecidosCliente.length) motivos.push(`«${pendiente}» se parece a un cliente que ya existe: elige si es el mismo.`);
-    return { aj, payload, agenda, destinoEmail, motivos, pendiente, parecidosCliente };
+    return { aj, payload, agenda, destinoEmail, motivos, pendiente, parecidosCliente, proyectoNuevo, campos: camposEfectivos(p, aj) };
   };
 
   // Obra o proyecto sin fechas dichas: el periodo de la etapa vigente, como propone «Asignar».
@@ -429,7 +434,7 @@ function Contenido({
   }, [proyectosPorTarjeta, token]);
 
   const crear = async (i: number, p: PropuestaActividad) => {
-    const { aj, payload, destinoEmail, motivos, pendiente } = armar(p, i);
+    const { aj, payload, destinoEmail, motivos, pendiente, proyectoNuevo, campos } = armar(p, i);
     if (motivos.length || estados[i]?.creando || estados[i]?.creada) return false;
     setEstados((prev) => ({ ...prev, [i]: { creando: true } }));
     let creada: { id: number; anNumber?: string };
@@ -442,10 +447,30 @@ function Contenido({
           return false;
         }
       }
+      // Proyecto que no existía («instalar 4 cámaras en IPADE»): se crea con el cliente de la tarjeta.
+      if (proyectoNuevo && !payload.projectId) {
+        try {
+          const proyecto = await quickCreateOperationalProject(token, { title: proyectoNuevo, serviceClientId: Number(payload.clientId) });
+          payload.projectId = proyecto.id;
+          ajustar(i, { projectId: proyecto.id });
+        } catch (e) {
+          setEstados((prev) => ({ ...prev, [i]: { error: `No se pudo crear el proyecto «${proyectoNuevo}»: ${formatApiError(e, "error de conexión")}. Elige uno existente o vuelve a intentar.` } }));
+          return false;
+        }
+      }
       creada = await crearActividad(token, payload);
     } catch (e) {
       setEstados((prev) => ({ ...prev, [i]: { error: formatApiError(e, "No se pudo crear.") } }));
       return false;
+    }
+    // Lo que hay que fotografiar por elemento (Cámara 1… antes, en progreso, después).
+    let avisoCampos: string | undefined;
+    if (campos.length) {
+      try {
+        await definirCamposEvidencia(token, creada.id, campos.map((c) => campoVacio(c.nombre, c.momentos as Momento[])));
+      } catch (e) {
+        avisoCampos = `La actividad se creó, pero no se guardaron los campos de evidencia: ${formatApiError(e, "error de conexión")}. Agrégalos desde la actividad.`;
+      }
     }
     // Como «Asignar»: el responsable queda en el equipo con su tiempo estimado.
     let avisoEquipo: string | undefined;
@@ -457,7 +482,7 @@ function Contenido({
         avisoEquipo = `No se guardó el tiempo estimado del responsable: ${formatApiError(e, "error de conexión")}. Ponlo desde la actividad.`;
       }
     }
-    setEstados((prev) => ({ ...prev, [i]: { creada: { id: creada.id, folio: creada.anNumber }, avisoEquipo } }));
+    setEstados((prev) => ({ ...prev, [i]: { creada: { id: creada.id, folio: creada.anNumber }, avisoEquipo: [avisoEquipo, avisoCampos].filter(Boolean).join(" ") || undefined } }));
     cronometro.terminar(creada.id, tipoEfectivo(p, aj));
     // Lo que sigue en la misma instrucción cuenta desde aquí; con la última, el reloj se queda parado.
     if (pendientes.length > 1) cronometro.arrancar();
@@ -611,7 +636,7 @@ function Contenido({
         {propuestas.map((p, i) => {
           const est = estados[i] || {};
           if (est.descartada) return null;
-          const { aj, payload, agenda, destinoEmail, motivos, pendiente, parecidosCliente } = armar(p, i);
+          const { aj, payload, agenda, destinoEmail, motivos, pendiente, parecidosCliente, proyectoNuevo, campos } = armar(p, i);
           const tipo = tipoEfectivo(p, aj);
           const subtipo = subtipoEfectivo(p, aj);
           const regla = reglaEncargo(tipo, destinoEmail, encargoElegido(p, aj));
@@ -819,11 +844,30 @@ function Contenido({
                 {conProyecto(tipo) ? (
                   <Renglon
                     etiqueta="Proyecto"
-                    valor={nombreProyecto ?? <span className={s.vacio}>Elige el proyecto</span>}
-                    abierto={abierto("proyecto") || !proyectoId}
-                    obligado={!proyectoId}
+                    valor={
+                      nombreProyecto ??
+                      (proyectoNuevo ? (
+                        <>
+                          {proyectoNuevo}
+                          {nombreCliente ? <span className={s.detalle}> · {nombreCliente}</span> : null}
+                        </>
+                      ) : (
+                        <span className={s.vacio}>Elige el proyecto</span>
+                      ))
+                    }
+                    nota={!proyectoId && proyectoNuevo ? "Nuevo: se crea al confirmar" : undefined}
+                    abierto={abierto("proyecto") || (!proyectoId && !proyectoNuevo)}
+                    obligado={!proyectoId && !proyectoNuevo}
                     onAlternar={() => alternar("proyecto")}
                   >
+                    {!proyectoId && (p.proyectoNuevo || aj.proyectoNuevo !== undefined) ? (
+                      <Input
+                        aria-label="Nombre del proyecto nuevo"
+                        placeholder="Nombre del proyecto nuevo"
+                        value={aj.proyectoNuevo ?? p.proyectoNuevo ?? ""}
+                        onChange={(e) => ajustar(i, { proyectoNuevo: e.target.value })}
+                      />
+                    ) : null}
                     <Select
                       aria-label="Proyecto"
                       value={proyectoId ? String(proyectoId) : ""}
@@ -973,6 +1017,57 @@ function Contenido({
                     </div>
                   </Renglon>
                 )}
+
+                {campos.length || aj.campos ? (
+                  <Renglon
+                    etiqueta="Evidencia"
+                    valor={campos.length ? `${campos.length} ${campos.length === 1 ? "elemento" : "elementos"}: ${campos.slice(0, 3).map((c) => c.nombre).join(", ")}${campos.length > 3 ? "…" : ""}` : <span className={s.vacio}>Sin campos</span>}
+                    nota="Fotos por elemento: edítalas antes de confirmar"
+                    abierto={abierto("evidencia")}
+                    onAlternar={() => alternar("evidencia")}
+                  >
+                    <div className={s.campos}>
+                      {(aj.campos ?? p.camposEvidencia ?? []).map((c, k, lista) => (
+                        <div key={k} className={s.campoElemento}>
+                          <Input
+                            aria-label={`Elemento ${k + 1}`}
+                            value={c.nombre}
+                            onChange={(e) => ajustar(i, { campos: lista.map((x, j) => (j === k ? { ...x, nombre: e.target.value } : x)) })}
+                          />
+                          {MOMENTOS.map((m) => (
+                            <label key={m} className={s.momento}>
+                              <input
+                                type="checkbox"
+                                checked={c.momentos.includes(m)}
+                                onChange={(e) =>
+                                  ajustar(i, {
+                                    campos: lista.map((x, j) =>
+                                      j === k ? { ...x, momentos: e.target.checked ? MOMENTOS.filter((y) => y === m || x.momentos.includes(y)) : x.momentos.filter((y) => y !== m) } : x,
+                                    ),
+                                  })
+                                }
+                              />
+                              {MOMENTO_LABEL[m]}
+                            </label>
+                          ))}
+                          <Button size="sm" variant="ghost" aria-label={`Quitar ${c.nombre || "elemento"}`} onClick={() => ajustar(i, { campos: lista.filter((_, j) => j !== k) })}>
+                            Quitar
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          const lista = aj.campos ?? p.camposEvidencia ?? [];
+                          ajustar(i, { campos: [...lista, { nombre: "", momentos: lista[0]?.momentos ?? ["ANTES", "EN_PROGRESO", "DESPUES"] }] });
+                        }}
+                      >
+                        Agregar elemento
+                      </Button>
+                    </div>
+                  </Renglon>
+                ) : null}
 
                 <Renglon
                   etiqueta="Cuándo"

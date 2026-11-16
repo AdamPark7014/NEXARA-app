@@ -398,3 +398,29 @@
 .instruccion[rows="1"] {
   min-height: 44px;
 }
+
+/* Evidencia por elemento: nombre editable, momentos y quitar (15-11). */
+.campos {
+  display: grid;
+  gap: 8px;
+}
+
+.campoElemento {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.campoElemento > :first-child {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.momento {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--ui-fs-meta, 13px);
+  color: var(--ui-fg-2);
+}

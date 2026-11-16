@@ -2089,10 +2089,14 @@ export class CotizacionesService {
     const estatus = avanceActividadPorEstado(status);
     if (!estatus) return;
 
-    const actividades = await this.db.activity.findMany({
-      where: { cotizacionId, deletedAt: null, estatus: { notIn: ['Finalizada', 'Cancelada'] } },
-      select: { id: true, coreKind: true },
-    });
+    // Solo la actividad comercial avanza con su cotización: un proyecto, una obra o un servicio que
+    // la tienen ligada (15-11) siguen su propio flujo de evidencia.
+    const actividades = (
+      await this.db.activity.findMany({
+        where: { cotizacionId, deletedAt: null, estatus: { notIn: ['Finalizada', 'Cancelada'] } },
+        select: { id: true, coreKind: true },
+      })
+    ).filter((a) => !a.coreKind || a.coreKind.toLowerCase() === 'comercial');
     if (!actividades.length) return;
 
     await this.db.activity.updateMany({

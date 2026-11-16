@@ -180,7 +180,7 @@ export function createOperationalProject(token: string, dto: CreateOperationalPr
  */
 export function quickCreateOperationalProject(
   token: string,
-  dto: { title: string; salesClientId: number; startDate?: string },
+  dto: { title: string; salesClientId?: number; serviceClientId?: number; startDate?: string },
 ) {
   return opsProjectRequest<OperationalProject>(
     "operational-projects/alta-rapida",

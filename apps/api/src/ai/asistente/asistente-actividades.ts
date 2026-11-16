@@ -16,6 +16,7 @@
 import { claveDeTipo, type Complejidad } from '../complejidad/tiempos-tipicos.js';
 import { cantidadDelTitulo, estandarDeLectura, tipoDelTitulo } from '../../activities/tiempo-entrega.js';
 import { elegirCliente, mencionaAlCliente, mismoNombreDeCliente } from './elegir-cliente.js';
+import { camposDeElementos } from './elementos.js';
 import { motivoDe, ordenarPorProbabilidad, tieneRespaldo, type ActividadPasada } from './elegir-persona.js';
 import {
   PALABRAS_GIRO,
@@ -77,6 +78,8 @@ export type AccionPlan = {
   /** Lo que lee la tabla de tiempos cuando no dijeron cuánto tarda (los minutos no salen de la IA). */
   complejidad?: Complejidad | null;
   cantidad?: number | null;
+  /** Equipos/elementos a documentar (salida `elem` de la IA). */
+  elementos?: { nombre: string; cantidad: number }[] | null;
 };
 
 export type PlanAsistente = {
@@ -106,6 +109,8 @@ export type AccionIA = {
   encargo: 'ejecucion' | 'despacho' | null;
   comp: Complejidad | null;
   cant: number | null;
+  /** [{n,c}] equipos a documentar; null si no hay. */
+  elem: { n: string; c: number }[] | null;
 };
 export type SalidaIA = { acciones: AccionIA[]; aclaracion: string | null };
 
@@ -123,7 +128,7 @@ export const ESQUEMA_PLAN: Record<string, unknown> = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['tipo', 'sub', 'titulo', 'detalle', 'quien', 'cliente', 'lugar', 'inicio', 'limite', 'min', 'prio', 'encargo', 'comp', 'cant'],
+        required: ['tipo', 'sub', 'titulo', 'detalle', 'quien', 'cliente', 'lugar', 'inicio', 'limite', 'min', 'prio', 'encargo', 'comp', 'cant', 'elem'],
         properties: {
           tipo: { type: 'string', enum: [...TIPOS_ACTIVIDAD] },
           sub: enumONulo([...SUBTIPOS_TAREA, ...TIPOS_SERVICIO]),
@@ -139,6 +144,20 @@ export const ESQUEMA_PLAN: Record<string, unknown> = {
           encargo: enumONulo(['ejecucion', 'despacho']),
           comp: enumONulo(['BASICA', 'ESTANDAR', 'COMPLEJA', 'CRITICA']),
           cant: { type: ['integer', 'null'] },
+          elem: {
+            anyOf: [
+              {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['n', 'c'],
+                  properties: { n: { type: 'string' }, c: { type: 'integer' } },
+                },
+              },
+              { type: 'null' },
+            ],
+          },
         },
       },
     },
@@ -178,6 +197,11 @@ export function planDeSalida(salida: unknown): PlanAsistente {
       encargo: (a.encargo as AccionPlan['encargo']) ?? null,
       complejidad: (a.comp as Complejidad | null | undefined) ?? null,
       cantidad: typeof a.cant === 'number' ? a.cant : null,
+      elementos: Array.isArray(a.elem)
+        ? (a.elem as Array<{ n?: unknown; c?: unknown }>)
+            .filter((x) => typeof x?.n === 'string' && typeof x?.c === 'number')
+            .map((x) => ({ nombre: String(x.n), cantidad: Number(x.c) }))
+        : null,
     };
   });
   return { acciones, aclaracion: typeof s.aclaracion === 'string' && s.aclaracion.trim() ? s.aclaracion : null };
@@ -196,7 +220,7 @@ Lenguaje informal: entiéndelo y escribe título y detalle con la palabra comple
 Tipos:
 - tarea: sin proyecto. sub (elige siempre uno): Instalación (equipo nuevo: cámaras, control de acceso, biométrico, red, audio), Cableado y canalización (cable, tubería, charola, nodos), Mantenimiento preventivo, Correctivo y diagnóstico (falla, revisar por qué no funciona), Levantamiento (revisar o medir un sitio antes de cotizar), Recolección (recoger o ir por material, pedidos o equipo), Entrega (llevar material, traslados), Preparación de equipo (almacén, armar y probar antes de ir), Diseño, CAD y memoria técnica (planos, dibujos), Configuración y soporte remoto (software, instalar programas, NVR, Hik-Connect, Fortinet, módem), Trámite (fianzas, permisos, pagos, cheques), Compra de material, Facturación y contabilidad (facturas, nómina, pólizas), Reporte / documentación (hacer o mandar un reporte o documento), Capacitación, Junta (reunión o llamada para revisar o acordar algo, también con un cliente), Evento o guardia.
 - servicio: trabajo técnico sobre los equipos de un cliente en su sitio. sub: PREVENTIVO (mantenimiento), CORRECTIVO (falla o cambio de una pieza), EMERGENCIA (sistema caído o urgente), INSTALACION (equipo nuevo de pocas horas). Una falla o revisión técnica en un cliente es servicio, no tarea Correctivo: esa es para equipo propio o sin cliente. Llevar o recoger cosas, preparar equipo, levantar, cablear o tirar nodos son tareas aunque sean para un cliente.
-- obra: instalación grande de un proyecto. proyecto: ingeniería, planos, pruebas o puesta en marcha de un proyecto. Solo si mencionan el proyecto, la obra o la puesta en marcha.
+- obra: instalación grande de un proyecto. proyecto: ingeniería, planos, pruebas o puesta en marcha de un proyecto; también la instalación de un sistema o de varios equipos para un cliente («instalar 4 cámaras en IPADE», «poner control de acceso en BUAP»), aunque no digan la palabra proyecto. Una sola pieza de pocas horas sigue siendo servicio INSTALACION o tarea Instalación. Si mencionan obra o puesta en marcha, usa obra/proyecto.
 - comercial: solo para vender: cotizar, hacer o enviar una cotización o propuesta, seguimiento de venta, visita de venta. Una junta con un cliente para revisar algo es tarea Junta.
 - obra, proyecto y comercial: sub null.
 
@@ -213,6 +237,7 @@ Campos:
 - min: duración en minutos, solo si la dijeron («hora y media» 90, «media hora» 30, «jornadas de 8 horas» o «todo el día» 480), máximo 720. Si no la dijeron, null: no la calcules.
 - comp: complejidad comparada con lo normal de ese trabajo. BASICA: rutina de un solo punto. ESTANDAR: lo normal (si no hay señales). COMPLEJA: varios equipos o sitios, o falla sin causa clara. CRITICA: el cliente está detenido o el sistema caído.
 - cant: cuántas unidades se cuentan si lo dijeron, con número o palabra («dos cámaras» 2, «50 productos» 50); si no, null.
+- elem: equipos o elementos que se instalan, revisan o documentan, con su cantidad si la dijeron ([{n:«Cámara»,c:4}]); null si no hay.
 - prio: Alta si es urgente, ya, cuanto antes o algo está caído; Baja si sin prisa; si no, Media.
 - encargo: despacho solo si debe mandar a alguien de su equipo o repartir el trabajo («que mande a su gente»); mandar un documento no lo es. Si no, ejecucion.
 - titulo: infinitivo + qué + dónde, máximo 80 caracteres («Revisar DVR que no graba en Angelópolis»).
@@ -673,6 +698,10 @@ export type PropuestaActividad = {
   responsableOrigen: 'dicho' | 'probable' | 'sugerido' | null;
   /** Cliente que no está registrado y se da de alta al confirmar («Toks»); nada se crea antes. */
   clienteNuevo: string | null;
+  /** Proyecto que no existe y se crea al confirmar; null si ya hay projectId o no aplica. */
+  proyectoNuevo: string | null;
+  /** Campos de evidencia por elemento (Cámara 1 × ANTES/EN_PROGRESO/DESPUES, …). */
+  camposEvidencia: { nombre: string; momentos: string[] }[];
   /** Por qué se propuso a esa persona o ese cliente (también va en `avisos`): se lee en su renglón. */
   notaResponsable: string | null;
   notaCliente: string | null;
@@ -983,9 +1012,9 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
     }
     if (!proyecto) {
       proyectoCandidatos = (delCliente.length ? delCliente : porNombre.candidatos).slice(0, 5).map((p) => ref(p.id, p.title));
-      // Sin proyecto activo que se le parezca no hay obra que ligar: el trabajo queda como tarea.
+      // Sin proyecto activo: si hay cliente (o nombre para clienteNuevo) se propone proyectoNuevo; si no, tarea.
       if (proyectoCandidatos.length) faltantes.push('proyecto');
-      else {
+      else if (!(cliente || nombreDicho)) {
         pasarATarea();
         avisos.push('No encontré un proyecto activo para esto: quedó como tarea.');
       }
@@ -1082,7 +1111,7 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
   // cotización también es para alguien: se propone darlo de alta al confirmar con el nombre ya
   // corregido; nada se crea antes. En una tarea (302 de 302 sin cliente) queda como lugar.
   const nombreNuevo =
-    !cliente && !clienteCandidatos.length && nombreDicho && (tipo === 'servicio' || tipo === 'comercial')
+    !cliente && !clienteCandidatos.length && nombreDicho && (tipo === 'servicio' || tipo === 'comercial' || tipo === 'proyecto' || tipo === 'obra')
       ? corregirEnTexto(nombreDicho, pares, { primera: true }).trim().slice(0, 200)
       : null;
   const clienteNuevo = nombreNuevo || null;
@@ -1207,6 +1236,20 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
       (agenda.hasta ? ` · vence ${diaCorto(agenda.hasta)}` : ''),
   ].filter(Boolean);
 
+  let proyectoNuevo: string | null = null;
+  if ((tipo === 'obra' || tipo === 'proyecto') && !proyecto && !proyectoCandidatos.length && (cliente || clienteNuevo)) {
+    const nombreCli = cliente?.nombre ?? clienteNuevo!;
+    proyectoNuevo = (tituloFinal.includes(nombreCli) ? tituloFinal : `${tituloFinal} — ${nombreCli}`).slice(0, 200);
+    avisos.push(`El proyecto «${proyectoNuevo}» no existe: se crea al confirmar. Cámbialo si ya existe.`);
+  }
+  const subParaCampos =
+    tipo === 'tarea' ? (ticketTypeCustom ?? null) : tipo === 'servicio' ? ((tipoServicio as string | null | undefined) ?? null) : null;
+  const camposEvidencia = camposDeElementos(
+    { titulo: tituloFinal, indicaciones, elementos: accion.elementos },
+    tipo,
+    subParaCampos,
+  );
+
   return {
     tipo,
     tipoEtiqueta: ETIQUETA_TIPO[tipo],
@@ -1219,6 +1262,8 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
     notaResponsable,
     responsableCandidatos: responsableOrigen === 'dicho' ? [] : candidatosPersona.map((p) => ref(p.id, p.nombre)),
     clienteNuevo,
+    proyectoNuevo,
+    camposEvidencia,
     notaCliente,
     textoCliente: textoCliente ?? null,
     cliente,

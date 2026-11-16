@@ -1,5 +1,23 @@
 # RELEVO
 
+- **15-11 ~19:30 México (claude-code) — Asignar con IA por tipo y elementos, cotización editable, cotización ligada en todo tipo. NO desplegado.**
+  - Asignar con IA: «instalar 4 cámaras en IPADE» = proyecto (prompt), `elem` en la salida y respaldo en código
+    (`ai/asistente/elementos.ts`) → `camposEvidencia` (Cámara 1…4 × antes/en progreso/después; mantenimiento solo
+    antes/después; junta, trámite y comercial sin campos; tope 40). Sin proyecto activo y con cliente: `proyectoNuevo`
+    en vez de pasar a tarea. La tarjeta (`AsistenteIA.tsx`) muestra «Evidencia» editable (nombre, momentos, quitar,
+    agregar) y el proyecto nuevo editable; al confirmar crea el proyecto con `operational-projects/alta-rapida`
+    (ahora acepta `serviceClientId`), la actividad y `PUT evidencia-campos`.
+  - Clientes: el alta rechaza nombres de relleno («N/a», «Varios», «Sin cliente»; `esNombreDeRelleno`). Siglas y
+    mayúsculas ya empataban (BUAP ↔ Benemérita…, ipade ↔ IPADE), medido con el padrón real (40 clientes).
+  - Cotizar con IA: cada renglón dice «Pediste: «…»», tipo (segmento) e IVA se corrigen antes de usarla;
+    `destinoDe` toma el último «para» (antes «1000 tarjetas para control de acceso y 2 lectores para X» perdía los lectores).
+  - Cotización ligada en cualquier tipo de actividad (`CotizacionDeActividad`, visible si ya hay una o si puede
+    cotizar); solo la comercial avanza con el estado de la cotización (`sincronizarActividad` filtra).
+  - Cadena Cursor → Codex → Claude: Cursor dejó el primer borrador y se colgó; su segunda corrida y Codex no pudieron
+    usar la terminal (hooks de PowerShell envueltos en bash). Lo terminé yo.
+  - Pendiente: descarga masiva del SAT (falta la e.firma; el CSD ya está en `/etc/nexara-secrets/sat/csd`), revisión
+    con IA de calificaciones, avisos por chat, diseñador de proyectos. Desplegar pide OK de Adam.
+
 - **15-11 ~10:30 México (claude-code) — Aprobaciones como bandeja única y menú «Por estrenar» (Adam: «lo que consideres apropiado»).**
   - Aprobaciones nunca tuvo datos (`workflow_instances` = 0). `lib/bandeja.ts` junta evidencias por revisar (me/revisiones,
     paraTi), viáticos Pendiente, horas extra y descuentos de la semana pasada (control-semanal), solicitudes de equipo y
