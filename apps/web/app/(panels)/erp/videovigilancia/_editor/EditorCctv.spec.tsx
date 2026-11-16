@@ -104,7 +104,7 @@ describe("editor del diseñador de videovigilancia", () => {
     expect(screen.getByText("¿Cómo quieres empezar?")).toBeInTheDocument();
     const caja = screen.getByText("¿Cómo quieres empezar?").parentElement as HTMLElement;
     const botones = within(caja).getAllByRole("button").map((b) => b.textContent);
-    expect(botones).toEqual(["Armar con IA", "Subir croquis", "Dibujar a mano"]);
+    expect(botones).toEqual(["Armar con IA", "Digitalizar plano con IA", "Subir croquis", "Dibujar a mano"]);
     // Sin nada dibujado todavía no hay nada que calibrar.
     expect(screen.queryByText("Escala sin calibrar")).toBeNull();
     // Elegir «a mano» quita la tarjeta: estorbaría para trazar el primer muro.

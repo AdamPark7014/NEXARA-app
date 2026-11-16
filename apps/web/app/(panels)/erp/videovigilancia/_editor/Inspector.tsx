@@ -119,6 +119,7 @@ export default function Inspector({
   creadoPor,
   onRecalibrar,
   onCambiarCroquis,
+  onDigitalizar,
   onHerramienta,
   onVerLoQueVe,
   fichaDe,
@@ -139,6 +140,8 @@ export default function Inspector({
   creadoPor?: string | null;
   onRecalibrar: () => void;
   onCambiarCroquis: () => void;
+  /** «Digitalizar con IA» sobre el croquis actual (solo si hay croquis). */
+  onDigitalizar?: () => void;
   /** Activa una herramienta del lienzo (la guía de pasos la usa). */
   onHerramienta?: (h: Herramienta) => void;
   /** Lleva la maqueta al punto de vista de la cámara. Sin WebGL no viene. */
@@ -177,7 +180,7 @@ export default function Inspector({
         ) : pestana === "equipos" ? (
           <ListaEquipos plano={plano} onSeleccionar={(s) => (onSeleccionar(s), onPestana("seleccion"))} />
         ) : (
-          <PanelPlano plano={plano} onAplicar={onAplicar} meta={meta} onMeta={onMeta} resumen={resumen} onRecalibrar={onRecalibrar} onCambiarCroquis={onCambiarCroquis} nivel={nivel} creadoPor={creadoPor} />
+          <PanelPlano plano={plano} onAplicar={onAplicar} meta={meta} onMeta={onMeta} resumen={resumen} onRecalibrar={onRecalibrar} onCambiarCroquis={onCambiarCroquis} onDigitalizar={onDigitalizar} nivel={nivel} creadoPor={creadoPor} />
         )}
       </div>
     </aside>
@@ -1076,6 +1079,7 @@ function PanelPlano({
   resumen,
   onRecalibrar,
   onCambiarCroquis,
+  onDigitalizar,
   nivel,
   creadoPor,
 }: {
@@ -1087,6 +1091,7 @@ function PanelPlano({
   resumen: ResumenDiseno | null;
   onRecalibrar: () => void;
   onCambiarCroquis: () => void;
+  onDigitalizar?: () => void;
   creadoPor?: string | null;
 }) {
   const grupos = gruposDeAltura(plano);
@@ -1196,6 +1201,11 @@ function PanelPlano({
         <Button size="sm" onClick={onCambiarCroquis}>
           {plano.croquis ? "Cambiar croquis" : "Subir croquis"}
         </Button>
+        {onDigitalizar ? (
+          <Button size="sm" variant="tonal" onClick={onDigitalizar}>
+            Digitalizar con IA
+          </Button>
+        ) : null}
       </div>
 
       {grupos.length ? (
