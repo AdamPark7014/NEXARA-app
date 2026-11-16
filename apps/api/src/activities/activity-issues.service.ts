@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { ChatService } from '../chat/chat.service.js';
+import { avisoIncidencia } from '../chat/avisos-chat.js';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { workDayEnd } from '../common/time/workday.js';
@@ -64,7 +66,10 @@ const USER_BRIEF = { select: { id: true, nombre: true } };
 
 @Injectable()
 export class ActivityIssuesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly chat?: ChatService,
+  ) {}
 
   private async loadActivity(activityId: number, companyId: number) {
     const activity = await this.prisma.activity.findFirst({
@@ -116,7 +121,7 @@ export class ActivityIssuesService {
       throw new BadRequestException('Las horas perdidas deben ser un número no negativo');
     }
 
-    return this.prisma.activityIncident.create({
+    const creada = await this.prisma.activityIncident.create({
       data: {
         activityId,
         tipo,
@@ -129,6 +134,21 @@ export class ActivityIssuesService {
       },
       include: { reportadoPor: USER_BRIEF },
     });
+    void this.avisarIncidencia(activityId, actorId ?? null, tipo, severidad, descripcion, tenantId);
+    return creada;
+  }
+
+  /** Quien asignó y el responsable se enteran por el chat, de quien la reportó (15-11). */
+  private async avisarIncidencia(activityId: number, actorId: number | null, tipo: string, severidad: string, descripcion: string, companyId: number) {
+    if (!this.chat || !actorId) return;
+    const a = await this.prisma.activity
+      .findFirst({ where: { id: activityId, companyId }, select: { id: true, anNumber: true, titulo: true, creadoPorId: true, responsableId: true } })
+      .catch(() => null);
+    if (!a) return;
+    const texto = avisoIncidencia(a, tipo, severidad, descripcion);
+    for (const para of new Set([a.creadoPorId, a.responsableId])) {
+      if (para && para !== actorId) await this.chat.avisoDirecto(actorId, para, texto, companyId);
+    }
   }
 
   /**

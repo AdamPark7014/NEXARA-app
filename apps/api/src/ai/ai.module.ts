@@ -3,6 +3,7 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { AiTriageService } from './ai-triage.service.js';
+import { RevisionActividadService } from './revision/revision-actividad.service.js';
 import { AiController } from './ai.controller.js';
 import { ClaudeService } from './claude/claude.service.js';
 import { AsistenteActividadesService } from './asistente/asistente-actividades.service.js';
@@ -12,7 +13,7 @@ import { EstandarService } from './estandar/estandar.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, UsersModule],
-  providers: [AiTriageService, ClaudeService, AsistenteActividadesService, TranscriptorService, ComplejidadService, EstandarService],
+  providers: [AiTriageService, ClaudeService, AsistenteActividadesService, TranscriptorService, ComplejidadService, EstandarService, RevisionActividadService],
   controllers: [AiController],
   exports: [AiTriageService, ClaudeService, TranscriptorService, ComplejidadService, EstandarService],
 })

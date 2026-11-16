@@ -1,3 +1,4 @@
+import { ChatModule } from '../../chat/chat.module.js';
 import { Module } from '@nestjs/common';
 import { ActivityEvidenceService } from './activity-evidence.service';
 import { ActivityEvidenceFieldsService } from './activity-evidence-fields.service.js';
@@ -20,6 +21,7 @@ import { EvidenciasEscaladasService } from './evidencias-escaladas.service.js';
     NotificationsModule,
     ActivityGeofenceModule,
     ActivitySessionsModule,
+    ChatModule,
   ],
   controllers: [ActivityEvidenceController, ActivityEvidenceFieldsController],
   // Sin recordatorio diario de «evidencia por revisar» (Adam, 29-10): lo enviado ya está cumplido y

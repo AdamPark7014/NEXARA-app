@@ -4,6 +4,8 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Param,
+  ParseIntPipe,
   Post,
   Query,
   UploadedFile,
@@ -24,6 +26,8 @@ import { ComplejidadService } from './complejidad/complejidad.service.js';
 import { SugerirComplejidadDto } from './complejidad/sugerir-complejidad.dto.js';
 import { EstandarService } from './estandar/estandar.service.js';
 import { RutaEstandarDto } from './estandar/ruta.dto.js';
+import { RevisionActividadService } from './revision/revision-actividad.service.js';
+import { requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 /** Un dictado son segundos o un par de minutos: 10 MB sobran en opus. */
 const MAX_DICTADO_BYTES = 10 * 1024 * 1024;
@@ -37,7 +41,18 @@ export class AiController {
     private readonly transcriptor: TranscriptorService,
     private readonly complejidad: ComplejidadService,
     private readonly estandar: EstandarService,
+    private readonly revision: RevisionActividadService,
   ) {}
+
+  /**
+   * «Revisar con IA»: los hechos medibles de una actividad (a tiempo, fotos, incidencias, calificación)
+   * y la opinión de la IA sobre si su calificación les corresponde. Solo lee.
+   */
+  @Post('revision/actividad/:id')
+  @RBAC({ anyPermissions: [PERMISSIONS.EVIDENCES_REVIEW, PERMISSIONS.ACTIVITIES_MANAGE] })
+  revisarActividad(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.revision.revisar(id, requireCompanyId(companyId));
+  }
 
   @Post('triage')
   @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ADMIN] })

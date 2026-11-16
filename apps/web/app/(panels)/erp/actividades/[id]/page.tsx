@@ -16,6 +16,7 @@ import { puedeSubirFotoDePunto } from "@/lib/evidencia-campos";
 import HerramientasChecklist from "@/components/ops/HerramientasChecklist";
 import CotizacionDeActividad, { type CotizacionLigada } from "@/components/erp/CotizacionDeActividad";
 import ArchivosDeActividad from "@/components/erp/ArchivosDeActividad";
+import RevisionConIA from "@/components/erp/RevisionConIA";
 import CotizacionAbiertaTarjeta from "@/components/erp/CotizacionAbiertaTarjeta";
 import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
 import ActivitySuperiorActions from "@/components/ops/ActivitySuperiorActions";
@@ -562,6 +563,9 @@ export default function ActivityDetailPage() {
       <RecordSection title="Evidencias del equipo" subtitle="Lo que subió cada persona y su revisión.">
         <EquipoEvidencias activityId={activity.id} compact verMasHref={hrefs.evidences} />
       </RecordSection>
+
+      {/* Si la calificación corresponde a lo que pasó (solo quien califica la ve). */}
+      <RevisionConIA activityId={activity.id} />
 
       <EvidenciaPorCampos
         activityId={activity.id}

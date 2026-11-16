@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ChatChannelKind, ChatMessageKind, Prisma } from '@prisma/client';
@@ -62,6 +63,8 @@ export type PostMessageInput = {
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger('Chat');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeGateway,
@@ -592,6 +595,22 @@ export class ChatService {
 
     const detail = await this.getChannel(channel.id, userId, cid);
     return { ...detail, name: display, peer: other, self: me };
+  }
+
+  /**
+   * Aviso de la plataforma por mensaje directo (Adam, 15-11-2026: «que las incidencias y los avisos
+   * lleguen por el chat»). Lo escribe quien causó el aviso (quien revisó, reportó o asignó) a quien le
+   * toca, con la liga de siempre `[etiqueta](/erp/…)`. Nunca truena al que lo llama: si falla, se registra.
+   */
+  async avisoDirecto(deUserId: number | null | undefined, paraUserId: number | null | undefined, texto: string, companyId?: number | null) {
+    if (!deUserId || !paraUserId || deUserId === paraUserId || !texto.trim()) return null;
+    try {
+      const canal = await this.openDirect(deUserId, paraUserId, companyId);
+      return await this.postMessage(canal.id, deUserId, { body: texto.trim().slice(0, 8000) }, companyId);
+    } catch (error) {
+      this.logger.warn(`Aviso por chat de ${deUserId} a ${paraUserId}: ${String((error as Error)?.message ?? error)}`);
+      return null;
+    }
   }
 
   async listMessages(
