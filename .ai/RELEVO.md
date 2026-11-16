@@ -1,5 +1,22 @@
 # RELEVO
 
+- **16-11 ~12:50 México (claude-code; código de Cursor, pulido de Codex) — RH: bajas con aprobación de dirección, cadenas de viáticos/vehículos e incidencias. NO desplegado (Hetzner bloqueó la IP por factura sin pagar).**
+  - Bajas (`src/users/bajas/`, tabla `user_deactivation_requests`): RH solicita → PENDIENTE y aviso push a dirección
+    (ceo activos sin demo/tester ni developer@); dirección aprueba/rechaza/revierte; RH puede aplicar con «Christian ya
+    autorizó» + justificación y dirección recibe aviso para revisar. Desactivar pone `estadoRRHH='Baja'`. Bandeja única:
+    «Bajas por aprobar» y «Bajas para revisar». `BajasController` va antes que `UsersController` (si no, `users/:id`
+    se come `users/bajas`). RH puede dar de alta ing_campo, ing_soporte, administrativo, vendedor, disenador, contabilidad.
+  - `approval-policy.ts`: viáticos y vehículos = coord_admin (Liz) → ceo.
+  - Bitácora de incidencias (`src/hr/incidencias/`, tabla `incidencias_personal`, `/erp/hr/incidencias`): CRUD,
+    `aplicar-semana` → NominaDescuento sin duplicar ni escribir en semana cerrada, importar la hoja «Incidencias» del
+    Excel de Tere; resumen por persona en la prenómina.
+  - Migraciones `20261116104211_bajas_con_aprobacion` y `20261116104212_incidencias_personal` SIN aplicar en prod.
+  - Pendiente en prod (autorizado por Adam 16-11 16:36 UTC): altas de Oscar Muñoz, Elisa Antonio (coord_admin) y Tere
+    García (rh) con `alta-usuario.ps1`; Luis a `dir_operaciones` («Supervisor General») y todo el personal activo con
+    `managerId` = Luis; filas `Role` para rh y dir_operaciones.
+  - En curso aparte (Cursor): `src/supervision/` plan de mañana y cierre diario de Luis; su `app.module.ts` quedó
+    truncado a media edición: revisar antes de commitear eso.
+
 - **16-11 ~01:30 México (claude-code) — Ola 5: diseñador como proyecto formal (mockup aprobado por Adam: «continua»).**
   - API (`cctv-disenos`): `POST :id/digitalizar {url}` lee con IA el croquis ya subido (`digitalizar-ia.ts`, Haiku low,
     imagen reducida a 1568 px; `CCTV_DIGITALIZAR_MODELO` lo cambia sin desplegar) y regresa muros, áreas y cámaras en px

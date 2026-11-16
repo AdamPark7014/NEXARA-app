@@ -132,24 +132,19 @@ async function mensajeDeError(res: Response, fallback: string): Promise<string> 
   return fallback;
 }
 
-/** Lo que esta persona puede dar de alta. Cualquier fallo = nada (no se ofrece el módulo). */
+/** Un 403 oculta el formulario; los errores operativos se muestran con opción de reintentar. */
 export async function cargarContextoAlta(token: string): Promise<ContextoAlta> {
-  try {
-    const res = await fetch(buildApiUrl("users/delegated/contexto"), {
-      headers: { Authorization: `Bearer ${token}` },
-      credentials: "include",
-      cache: "no-store",
-    });
-    if (!res.ok) return CONTEXTO_VACIO;
-    return interpretarContexto(await res.json());
-  } catch {
-    return CONTEXTO_VACIO;
-  }
+  const res = await fetch(buildApiUrl("users/delegated/contexto"), {
+    headers: { Authorization: `Bearer ${token}` }, credentials: "include", cache: "no-store",
+  });
+  if (res.status === 403) return CONTEXTO_VACIO;
+  if (!res.ok) throw new Error(await mensajeDeError(res, "No se pudo cargar el equipo. Intenta de nuevo."));
+  return interpretarContexto(await res.json());
 }
 
 /** Tipos que esta persona puede dar de alta. Cualquier fallo = ninguno (no se ofrece el botón). */
 export async function listarTiposCreables(token: string): Promise<TipoUsuario[]> {
-  return (await cargarContextoAlta(token)).tipos;
+  try { return (await cargarContextoAlta(token)).tipos; } catch { return []; }
 }
 
 export async function crearUsuarioDelegado(token: string, alta: AltaUsuario): Promise<UsuarioCreado> {
@@ -262,4 +257,67 @@ export function generarContrasena(largo = 14): string {
 /** Igual que el API: 8+ caracteres con letra y número. */
 export function contrasenaAceptable(valor: string): boolean {
   return valor.length >= 8 && valor.length <= 72 && /[A-Za-z]/.test(valor) && /\d/.test(valor);
+}
+
+export type MotivoBaja = 'RENUNCIA' | 'ABANDONO' | 'DESPIDO' | 'FIN_CONTRATO' | 'OTRO';
+
+export type BajaRequest = {
+  id: number;
+  userId: number;
+  estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'REVERTIDA';
+  modo: 'SOLICITUD' | 'APLICADA_CON_VOBO';
+  motivo: MotivoBaja;
+  fechaBaja: string;
+  comentario?: string | null;
+  justificacion?: string | null;
+  user?: { id: number; nombre: string; email?: string };
+  solicitadoPor?: { id: number; nombre: string };
+};
+
+export async function solicitarBaja(
+  token: string,
+  body: {
+    userId: number;
+    motivo: MotivoBaja;
+    fechaBaja: string;
+    comentario?: string;
+    yaAutorizadoPorDireccion?: boolean;
+    justificacion?: string;
+  },
+): Promise<BajaRequest> {
+  const res = await fetch(buildApiUrl('users/bajas'), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await mensajeDeError(res, 'No se pudo solicitar la baja.'));
+  return (await res.json()) as BajaRequest;
+}
+
+export async function listarBajas(token: string, estado?: string): Promise<BajaRequest[]> {
+  const q = estado ? `?estado=${encodeURIComponent(estado)}` : '';
+  const res = await fetch(buildApiUrl(`users/bajas${q}`), {
+    headers: { Authorization: `Bearer ${token}` },
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error(await mensajeDeError(res, 'No se pudieron cargar las bajas.'));
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+export async function decidirBaja(
+  token: string,
+  id: number,
+  accion: 'aprobar' | 'rechazar' | 'revertir',
+  motivo?: string,
+): Promise<BajaRequest> {
+  const res = await fetch(buildApiUrl(`users/bajas/${id}/${accion}`), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(accion === 'rechazar' ? { motivo } : {}),
+  });
+  if (!res.ok) throw new Error(await mensajeDeError(res, 'No se pudo actualizar la baja.'));
+  return (await res.json()) as BajaRequest;
 }

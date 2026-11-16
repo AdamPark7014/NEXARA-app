@@ -14,7 +14,7 @@ import { lunesDe, sumarDias } from "@/lib/control-nomina";
 export type ElementoBandeja = { titulo: string; detalle?: string };
 
 export type GrupoBandeja = {
-  clave: "evidencias" | "viaticos" | "extras" | "descuentos" | "solicitudes" | "firmas";
+  clave: "evidencias" | "viaticos" | "extras" | "descuentos" | "solicitudes" | "firmas" | "bajas" | "bajasRevisar";
   titulo: string;
   cantidad: number;
   /** Una frase con lo que importa: importe, horas, desde cuándo. */
@@ -40,6 +40,8 @@ export function armarBandeja(d: {
   viaticos?: Viatico[] | null;
   semana?: { lunes: string; totales?: Record<string, unknown> } | null;
   firmas?: Array<{ titulo?: string; title?: string; definitionName?: string }> | null;
+  bajasPendientes?: Array<{ id: number; user?: { nombre?: string }; motivo?: string; fechaBaja?: string }> | null;
+  bajasVoBo?: Array<{ id: number; user?: { nombre?: string }; justificacion?: string | null }> | null;
 }): GrupoBandeja[] {
   const grupos: GrupoBandeja[] = [];
 
@@ -110,6 +112,40 @@ export function armarBandeja(d: {
     });
   }
 
+  const bajasPendientes = d.bajasPendientes ?? [];
+  if (bajasPendientes.length) {
+    grupos.push({
+      clave: "bajas",
+      titulo: "Bajas por aprobar",
+      cantidad: bajasPendientes.length,
+      resumen: bajasPendientes.length === 1
+        ? "Una baja espera tu autorización para desactivar la cuenta."
+        : `${bajasPendientes.length} bajas esperan tu autorización.`,
+      accion: "Revisar bajas",
+      href: "/erp/approvals",
+      ejemplos: bajasPendientes.slice(0, 3).map((x) => ({
+        titulo: x.user?.nombre || "Persona",
+        detalle: x.motivo || undefined,
+      })),
+    });
+  }
+
+  const bajasVoBo = d.bajasVoBo ?? [];
+  if (bajasVoBo.length) {
+    grupos.push({
+      clave: "bajasRevisar",
+      titulo: "Bajas para revisar",
+      cantidad: bajasVoBo.length,
+      resumen: "Aplicadas con tu visto bueno: puedes revertirlas si hace falta.",
+      accion: "Revisar",
+      href: "/erp/approvals",
+      ejemplos: bajasVoBo.slice(0, 3).map((x) => ({
+        titulo: x.user?.nombre || "Persona",
+        detalle: x.justificacion || undefined,
+      })),
+    });
+  }
+
   const firmas = d.firmas ?? [];
   if (firmas.length) {
     grupos.push({
@@ -128,17 +164,19 @@ export function armarBandeja(d: {
 
 /** Lo ligero, para el número del menú: sin el cálculo de nómina, que es pesado. */
 export async function contarBandeja(token: string): Promise<number> {
-  const [revisiones, solicitudes, viaticos, firmas] = await Promise.all([
+  const [revisiones, solicitudes, viaticos, firmas, bajasPendientes] = await Promise.all([
     callado(erpFetch<{ pendientes?: Revision[] }>("me/revisiones", token)),
     callado(erpFetch<{ received?: Solicitud[] }>("me/activity-requests", token)),
     callado(financeFetch("viatics", token).then((r) => sinEnvoltura(r) as Viatico[])),
     callado(erpFetch<unknown[]>("workflow/my-pending", token)),
+    callado(erpFetch<unknown[]>("users/bajas?estado=PENDIENTE", token)),
   ]);
   return armarBandeja({
     revisiones,
     solicitudes,
     viaticos: Array.isArray(viaticos) ? viaticos : null,
     firmas: Array.isArray(firmas) ? (firmas as never[]) : null,
+    bajasPendientes: Array.isArray(bajasPendientes) ? (bajasPendientes as never[]) : null,
   })
     .filter((g) => g.clave !== "extras" && g.clave !== "descuentos")
     .reduce((a, g) => a + g.cantidad, 0);
@@ -147,18 +185,25 @@ export async function contarBandeja(token: string): Promise<number> {
 /** Todo lo de la bandeja, con la semana de nómina que se paga (la anterior a la de hoy). */
 export async function cargarBandeja(token: string): Promise<GrupoBandeja[]> {
   const lunes = sumarDias(lunesDe(new Date()), -7);
-  const [revisiones, solicitudes, viaticos, semana, firmas] = await Promise.all([
+  const [revisiones, solicitudes, viaticos, semana, firmas, bajasPendientes, bajasAprobadas] = await Promise.all([
     callado(erpFetch<{ pendientes?: Revision[] }>("me/revisiones", token)),
     callado(erpFetch<{ received?: Solicitud[] }>("me/activity-requests", token)),
     callado(financeFetch("viatics", token).then((r) => sinEnvoltura(r) as Viatico[])),
     callado(financeFetch(rutaControlSemanal(lunes), token).then((r) => sinEnvoltura(r) as { totales?: Record<string, unknown> })),
     callado(erpFetch<unknown[]>("workflow/my-pending", token)),
+    callado(erpFetch<unknown[]>("users/bajas?estado=PENDIENTE", token)),
+    callado(erpFetch<unknown[]>("users/bajas?estado=APROBADA", token)),
   ]);
+  const vobo = Array.isArray(bajasAprobadas)
+    ? (bajasAprobadas as Array<{ modo?: string }>).filter((x) => x.modo === "APLICADA_CON_VOBO")
+    : null;
   return armarBandeja({
     revisiones,
     solicitudes,
     viaticos: Array.isArray(viaticos) ? viaticos : null,
     semana: semana ? { lunes, totales: semana.totales } : null,
     firmas: Array.isArray(firmas) ? (firmas as never[]) : null,
+    bajasPendientes: Array.isArray(bajasPendientes) ? (bajasPendientes as never[]) : null,
+    bajasVoBo: vobo as never[],
   });
 }

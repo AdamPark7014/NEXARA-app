@@ -9,13 +9,17 @@ import { ChatModule } from '../chat/chat.module.js';
 import { IntegraModule } from '../integra/integra.module.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { UsersDelegationService } from './users-delegation.service.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
+import { BajasController } from './bajas/bajas.controller.js';
+import { BajasService } from './bajas/bajas.service.js';
 import { MfaService } from './mfa.service.js';
 import { CredentialVaultModule } from '../credential-vault/credential-vault.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, AuditModule, CredentialVaultModule, forwardRef(() => ChatModule), IntegraModule],
-  controllers: [UsersController, RolesController],
-  providers: [UsersService, UsersDelegationService, MfaService, RbacGuard],
-  exports: [UsersService, UsersDelegationService],
+  imports: [PrismaModule, AuthModule, AuditModule, CredentialVaultModule, NotificationsModule, forwardRef(() => ChatModule), IntegraModule],
+  // Las rutas literales de bajas deben registrarse antes de GET users/:id.
+  controllers: [BajasController, UsersController, RolesController],
+  providers: [UsersService, UsersDelegationService, BajasService, MfaService, RbacGuard],
+  exports: [UsersService, UsersDelegationService, BajasService],
 })
 export class UsersModule {}
