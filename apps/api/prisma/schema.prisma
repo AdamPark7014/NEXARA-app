@@ -762,6 +762,9 @@ model Department {
 }
 
 model User {
+  planesDiariosAutor PlanDiario[] @relation("PlanesDiariosAutor")
+  planesDiariosSupervisor PlanDiario[] @relation("PlanesDiariosSupervisor")
+  cierresDiarios CierreDiario[] @relation("CierresDiariosSupervisor")
   id                        Int                        @id @default(autoincrement())
   nombre                    String                     @db.VarChar(100)
   email                     String                     @unique @db.VarChar(150)
@@ -6161,6 +6164,8 @@ model KbArticle {
 // ============================================================================
 
 model CompanyProfile {
+  planesDiarios PlanDiario[]
+  cierresDiarios CierreDiario[]
   id                   Int       @id @default(autoincrement())
   slug                 String?   @unique @db.VarChar(80)
   legalName            String    @db.VarChar(220)
@@ -8792,5 +8797,55 @@ model IncidenciaPersonal {
   @@index([companyId, tipo])
   @@index([nominaDescuentoId])
   @@map("incidencias_personal")
+}
+
+
+
+enum EstadoPlanDiario {
+  ENVIADO
+  PROGRAMADO
+  DEVUELTO
+}
+
+model PlanDiario {
+  id            Int              @id @default(autoincrement())
+  companyId     Int
+  autorId       Int
+  supervisorId  Int
+  /// Día planeado (mañana laboral).
+  fecha         DateTime         @db.Date
+  texto         String           @db.Text
+  estado        EstadoPlanDiario @default(ENVIADO)
+  notaSupervisor String?         @db.Text
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  autor      User           @relation("PlanesDiariosAutor", fields: [autorId], references: [id], onDelete: Restrict)
+  supervisor User           @relation("PlanesDiariosSupervisor", fields: [supervisorId], references: [id], onDelete: Restrict)
+
+  @@unique([autorId, fecha])
+  @@index([companyId, fecha])
+  @@index([supervisorId, fecha])
+  @@map("planes_diarios")
+}
+
+model CierreDiario {
+  id             Int      @id @default(autoincrement())
+  companyId      Int
+  supervisorId   Int
+  fecha          DateTime @db.Date
+  comentario     String?  @db.Text
+  /// Resumen armado al entregar (conteos por persona), para que dirección lo lea sin recalcular.
+  resumenJson    Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  supervisor User           @relation("CierresDiariosSupervisor", fields: [supervisorId], references: [id], onDelete: Restrict)
+
+  @@unique([supervisorId, fecha])
+  @@index([companyId, fecha])
+  @@map("cierres_diarios")
 }
 

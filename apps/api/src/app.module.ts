@@ -32,6 +32,7 @@ import { ViaticosModule } from './viaticos/viaticos.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { GuardiasModule } from './guardias/guardias.module.js';
 import { FestivosModule } from './festivos/festivos.module.js';
+import { SupervisionModule } from './supervision/supervision.module.js';
 import { CostosModule } from './costos/costos.module.js';
 import { ProcesoTiemposModule } from './proceso-tiempos/proceso-tiempos.module.js';
 import { CotizacionAbiertaModule } from './cotizacion-abierta/cotizacion-abierta.module.js';
@@ -142,6 +143,7 @@ import { CctvDisenosModule } from './cctv-disenos/cctv-disenos.module.js';
     AttendanceModule,
     GuardiasModule,
     FestivosModule,
+    SupervisionModule,
     CostosModule,
     ProcesoTiemposModule,
     FormatosActividadModule,

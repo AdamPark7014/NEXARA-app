@@ -3,6 +3,8 @@
  * Middleware auto-injects tenant filters for these models.
  */
 export const TENANT_SCOPED_MODELS = new Set<string>([
+  'PlanDiario',
+  'CierreDiario',
   'Product',
   'OperationalProject',
   'Brand',

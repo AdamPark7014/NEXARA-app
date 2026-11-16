@@ -8,7 +8,7 @@ import {
 } from '../common/rbac/url-matrix.js';
 import { canManageAlmacen } from '../warehouse/almacen-access.js';
 import { canUsarMesaContable } from '../accounting/mesa-contable/mesa-por-correo.js';
-import { ALL_ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
+import { ALL_ROLES, ROLES_ENCARGADOS_DE_AREA, type RoleKey } from '../common/rbac/roles.v2.js';
 import { deriveModuleKeysFromPaths } from './navigation-module-map.js';
 import { applyModuleAccessOverrides, parseModuleAccess } from './module-access-merge.js';
 import { ModulePolicyService } from '../common/tenant/module-policy.service.js';
@@ -99,6 +99,18 @@ export class MeService {
         recortada.webModuleIds = recortada.webModuleIds.filter((m) => m !== MODULO_DESEMPENO);
         recortada.moduleKeys = recortada.moduleKeys.filter((m) => m !== MODULO_DESEMPENO);
         recortada.hiddenModuleIds = [...new Set([...recortada.hiddenModuleIds, MODULO_DESEMPENO])].sort();
+      }
+    }
+    if (companyId && recortada.webModuleIds.includes('supervision')) {
+      const esEncargado = roleKey && ROLES_ENCARGADOS_DE_AREA.includes(roleKey);
+      const tieneGente = await this.prisma.user.findFirst({
+        where: { managerId: userId, isActive: true, companyMemberships: { some: { companyId } } },
+        select: { id: true },
+      });
+      if (!esEncargado && !tieneGente && !['ceo', 'dir_operaciones'].includes(roleKeyRaw ?? '')) {
+        recortada.webModuleIds = recortada.webModuleIds.filter((m) => m !== 'supervision');
+        recortada.moduleKeys = recortada.moduleKeys.filter((m) => m !== 'supervision');
+        recortada.hiddenModuleIds = [...new Set([...recortada.hiddenModuleIds, 'supervision'])];
       }
     }
     const webModuleIds = recortada.webModuleIds;

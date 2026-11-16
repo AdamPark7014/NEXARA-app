@@ -51,6 +51,21 @@ const FINANCE_ROLES = new Set<RoleKey>([ROLES.SUPER_ADMIN, ROLES.CEO, ROLES.DIR_
 const HR_ONLY = new Set<RoleKey>([ROLES.RH]);
 const WAREHOUSE_ROLES = new Set<RoleKey>([ROLES.SUPER_ADMIN, ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.DIR_OPERACIONES]);
 const DESIGN_TEAM = new Set<RoleKey>([ROLES.LIDER_DISENO, ROLES.DISENADOR]);
+/** Plan de mañana / cierre diario: encargados y dirección (no técnicos, vendedores, diseñadores ni contabilidad). */
+const SUPERVISION_ROLES = new Set<RoleKey>([
+  ROLES.SUPER_ADMIN,
+  ROLES.CEO,
+  ROLES.ARQUITECTO,
+  ROLES.DIR_OPERACIONES,
+  ROLES.DIR_ADMIN,
+  ROLES.COORD_ADMIN,
+  ROLES.ADMINISTRATIVO,
+  ROLES.COORD_OPERACIONES,
+  ROLES.ENC_SOPORTE,
+  ROLES.COORD_VENTAS,
+  ROLES.LIDER_DISENO,
+  ROLES.RH,
+]);
 
 function isOpsManager(role: RoleKey): boolean {
   return EXECUTIVE.has(role) || OPS_MANAGERS.has(role);
@@ -350,6 +365,8 @@ export function shouldShowModuleInSidebar(
     case 'employee-payments':
     case 'erp-contabilidad':
       return FINANCE_ROLES.has(v2) || v2 === ROLES.RH || v2 === ROLES.ADMINISTRATIVO;
+    case 'supervision':
+      return SUPERVISION_ROLES.has(v2);
     case 'pizarra':
       // Todo el personal interno crea y se autoasigna actividades desde aquí.
       return true;

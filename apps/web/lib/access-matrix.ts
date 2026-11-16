@@ -202,6 +202,7 @@ export type ModuleId =
   | "procurement"
   | "documents"
   | "chat"
+  | "supervision"
   | "pizarra"
   | "asistencias"
   | "kpis-equipo"
@@ -464,6 +465,16 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
       R.ADMIN_STAFF, R.MAINTENANCE_COORDINATOR,
     ],
     group: "Clientes y obra", visible: true,
+  },
+  supervision: {
+    id: "supervision", panel: PANELS.ERP, path: "/supervision",
+    label: "Supervisión", description: "Plan de mañana y cierre diario del equipo",
+    icon: "assignment",
+    allowedRoles: [
+      R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.ARQUITECTO, R.ADMIN_STAFF,
+      R.COORD_OPERACIONES, R.SUPPORT_AGENT, R.SALES_MANAGER, R.DESIGNER, R.HR_SPECIALIST,
+    ],
+    group: "Hoy", visible: true,
   },
   "erp-videovigilancia": {
     id: "erp-videovigilancia", panel: PANELS.ERP, path: "/videovigilancia",

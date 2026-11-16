@@ -37,6 +37,13 @@ export type UrlRule = {
   scope?: Scope;
 };
 
+/** Plan de mañana y cierre diario del Supervisor General (el servicio decide quién manda y quién decide). */
+export const SUPERVISION_URL_RULES: UrlRule[] = [
+  { path: '/erp/supervision', scope: 'write' },
+  { path: '/erp/supervision/**', scope: 'write' },
+  { path: '/api/supervision/**', methods: ['GET', 'POST'], scope: 'write' },
+];
+
 /** API + páginas de asistencia personal (check-in propio). Alineado con `SELF_ATTENDANCE_PATHS` web. */
 export const SELF_ATTENDANCE_URL_RULES: UrlRule[] = [
   { path: '/erp/hr/attendance', scope: 'write' },
@@ -472,6 +479,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CEO — ve TODO (lectura) + aprobaciones de tope
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
+    ...SUPERVISION_URL_RULES,
     ...SALIDA_DE_OTRO_URL_RULES,
     ...COSTOS_URL_RULES,
     // «Asignar con IA» es solo del CEO (Adam, 12-10). Trae el selector de personas.
@@ -521,6 +529,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // Supervisa OPS, valida trabajos antes de reportar a Admin + Dirección
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ARQUITECTO]: [
+    ...SUPERVISION_URL_RULES,
     ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...COSTOS_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
@@ -574,6 +583,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR DE OPERACIONES — aprueba viáticos/proyectos nivel alto
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_OPERACIONES]: [
+    ...SUPERVISION_URL_RULES,
     // 07-11: el tablero de asistencias de su gente (su modo en `section-views` es gestionar).
     { path: '/erp/asistencias', scope: 'write' },
     { path: '/erp/asistencias/**', scope: 'write' },
@@ -634,6 +644,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR ADMINISTRATIVO — finanzas, compras, RH (alto nivel)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_ADMIN]: [
+    ...SUPERVISION_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...SALIDA_DE_OTRO_URL_RULES,
     ...COSTOS_URL_RULES,
@@ -680,6 +691,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD ADMINISTRATIVO — segundo nivel de aprobación
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
+    ...SUPERVISION_URL_RULES,
     // 07-11: el tablero de asistencias de su gente (su modo en `section-views` es gestionar).
     { path: '/erp/asistencias', scope: 'write' },
     { path: '/erp/asistencias/**', scope: 'write' },
@@ -765,6 +777,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ADMINISTRATIVO — primer nivel (operación día a día)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
+    ...SUPERVISION_URL_RULES,
     ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...COSTOS_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_URL_RULES,
@@ -828,6 +841,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD OPERACIONES — supervisa ing. de campo, project manager
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_OPERACIONES]: [
+    ...SUPERVISION_URL_RULES,
     // 07-11: despacha las solicitudes aprobadas de clientes al asignar una OT.
     { path: '/api/client-ticket-requests', methods: ['GET'], scope: 'read' },
     { path: '/api/client-ticket-requests/**', methods: ['GET'], scope: 'read' },
@@ -997,6 +1011,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ENCARGADO DE SOPORTE — coordina soporte (puede asignar OT)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ENC_SOPORTE]: [
+    ...SUPERVISION_URL_RULES,
     ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...COSTOS_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
@@ -1060,6 +1075,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD VENTAS — gerente comercial
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_VENTAS]: [
+    ...SUPERVISION_URL_RULES,
     ...COSTOS_PROYECTO_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
@@ -1140,6 +1156,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // LÍDER DISEÑO — Studio completo
   // ─────────────────────────────────────────────────────────────────
   [ROLES.LIDER_DISENO]: [
+    ...SUPERVISION_URL_RULES,
     ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...CCTV_DISENOS_URL_RULES,
@@ -1213,6 +1230,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // RH
   // ─────────────────────────────────────────────────────────────────
   [ROLES.RH]: [
+    ...SUPERVISION_URL_RULES,
     // 07-11: el tablero de asistencias de su gente (su modo en `section-views` es gestionar).
     { path: '/erp/asistencias', scope: 'write' },
     { path: '/erp/asistencias/**', scope: 'write' },
