@@ -1,5 +1,16 @@
 # RELEVO
 
+- **15-11 ~21:20 México (claude-code) — Descarga Masiva del SAT lista para cuando llegue la e.firma. NO desplegado.**
+  - `pac/descarga-masiva/`: `credencial-efirma.ts` (lee `/etc/nexara-secrets/sat/efirma/{efirma.cer,efirma.key,password}`
+    o las `EFIRMA_*` de siempre; RFC, serie y vigencia del .cer; periodo ≤ 1 año, cerrado y en el pasado) y
+    `DescargaMasivaService` sobre `@nodecfdi/sat-ws-descarga-masiva` 2.0 (ESM: `import()` dinámico, verificado en
+    `dist`). Rechaza el CSD (`Fiel.isValid`). ZIP en `uploads/sat-descargas/<rfc>/` (privada en `PRIVATE_UPLOAD_PREFIXES`).
+  - Endpoints (facturación): `POST invoices/sat/descarga-masiva/solicitudes`, `GET …/solicitudes/:id`,
+    `POST …/paquetes/:id/descargar`; `GET invoices/sat/descarga-masiva` ya detecta la carpeta.
+  - `deploy/docker-compose.nexara.yml`: la API monta `/etc/nexara-secrets/sat/efirma` de solo lectura. El CSD ya está
+    en `/etc/nexara-secrets/sat/csd` (lo subió Adam el 15-11); la e.firma la está pidiendo Adam.
+  - Lock probado con `npm@10.9.9 ci --dry-run` (el de Docker).
+
 - **15-11 ~20:50 México (claude-code) — Ola 4: revisión con IA de actividades calificadas y avisos por chat. NO desplegado
   (Adam: «subes todo de golpe cuando acabes»).**
   - `POST ai/revision/actividad/:id` (`ai/revision/`): el código mide a tiempo/tarde (mismo `limiteDeEntrega`), fotos por

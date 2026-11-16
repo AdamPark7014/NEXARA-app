@@ -5,12 +5,13 @@ import { CsdService } from './csd.service.js';
 import { SatService } from './sat.service.js';
 import { PacReadinessService } from './pac-readiness.service.js';
 import { PacController } from './pac.controller.js';
+import { DescargaMasivaService } from './descarga-masiva/descarga-masiva.service.js';
 
 @Global()
 @Module({
   imports: [PrismaModule],
   controllers: [PacController],
-  providers: [PacService, CsdService, SatService, PacReadinessService],
-  exports: [PacService, CsdService, SatService, PacReadinessService],
+  providers: [PacService, CsdService, SatService, PacReadinessService, DescargaMasivaService],
+  exports: [PacService, CsdService, SatService, PacReadinessService, DescargaMasivaService],
 })
 export class PacModule {}

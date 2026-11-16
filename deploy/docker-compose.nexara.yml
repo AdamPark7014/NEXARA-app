@@ -170,6 +170,8 @@ services:
       CT_FALLBACK_FX: ${CT_FALLBACK_FX:-17}
     volumes:
       - ../uploads:/app/uploads
+      # e.firma para la Descarga Masiva del SAT (la sube subir-llaves-sat.ps1; solo lectura).
+      - /etc/nexara-secrets/sat/efirma:/etc/nexara-secrets/sat/efirma:ro
     networks:
       - internal
       - proxy
