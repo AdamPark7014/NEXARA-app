@@ -351,7 +351,7 @@ describe('UsersDelegationService.cambiarActivo', () => {
     const { servicio, prisma, updateHrFields, log } = crear();
     prisma.user.findFirst.mockResolvedValue(destino);
     const r = await servicio.cambiarActivo({ id: 1 }, 5, false, 7);
-    expect(updateHrFields).toHaveBeenCalledWith(5, { isActive: false }, 7);
+    expect(updateHrFields).toHaveBeenCalledWith(5, { isActive: false, estadoRRHH: 'Baja' }, 7);
     expect(log).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_DEACTIVATED', entityId: 5 }), 1);
     expect(r).toEqual({ id: 5, nombre: 'Carolina', activo: false });
   });
@@ -360,7 +360,7 @@ describe('UsersDelegationService.cambiarActivo', () => {
     const { servicio, prisma, updateHrFields, log } = crear();
     prisma.user.findFirst.mockResolvedValue({ ...destino, id: 6, isActive: false });
     await servicio.cambiarActivo({ id: 1 }, 6, true, 7);
-    expect(updateHrFields).toHaveBeenCalledWith(6, { isActive: true }, 7);
+    expect(updateHrFields).toHaveBeenCalledWith(6, { isActive: true, estadoRRHH: 'Activo' }, 7);
     expect(log).toHaveBeenCalledWith(expect.objectContaining({ action: 'USER_REACTIVATED' }), 1);
   });
 

@@ -569,7 +569,7 @@ export class UsersDelegationService {
     }
     if ((destino.isActive !== false) === activo) return { id: destino.id, nombre: destino.nombre, activo };
 
-    await this.users.updateHrFields(destino.id, { isActive: activo }, companyId);
+    await this.users.updateHrFields(destino.id, { isActive: activo, estadoRRHH: activo ? 'Activo' : 'Baja' }, companyId);
     await this.audit
       .log(
         {
@@ -585,3 +585,4 @@ export class UsersDelegationService {
     return { id: destino.id, nombre: destino.nombre, activo };
   }
 }
+

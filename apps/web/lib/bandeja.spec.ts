@@ -22,4 +22,14 @@ describe("bandeja única de Aprobaciones (15-11)", () => {
   it("sin nada pendiente no hay grupos", () => {
     expect(armarBandeja({})).toEqual([]);
   });
+
+  it("incluye bajas por aprobar y para revisar", () => {
+    const g = armarBandeja({
+      bajasPendientes: [{ id: 1, user: { nombre: "Ana" }, motivo: "RENUNCIA" }],
+      bajasVoBo: [{ id: 2, user: { nombre: "Luis" }, justificacion: "Autorizado en junta" }],
+    });
+    expect(g.map((x) => x.clave)).toEqual(["bajas", "bajasRevisar"]);
+    expect(g[0].titulo).toBe("Bajas por aprobar");
+    expect(g[1].titulo).toBe("Bajas para revisar");
+  });
 });

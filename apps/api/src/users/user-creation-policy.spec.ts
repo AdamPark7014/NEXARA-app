@@ -1,5 +1,6 @@
 import {
   ROLES_DELEGABLES,
+  ROLES_RH_PUEDE_CREAR,
   contrasenaAceptable,
   esDireccion,
   formularioDeAlta,
@@ -49,6 +50,18 @@ describe('parsearConcesiones', () => {
 
   it('todos los roles delegables son operativos (por debajo de coordinación)', () => {
     for (const r of ROLES_DELEGABLES) expect(ROLE_TIER[r]).toBeLessThanOrEqual(50);
+  });
+});
+
+describe('RH da de alta personal', () => {
+  const tere = { email: 'tere@nexara.com.mx', roleKey: 'rh' };
+  it('puede crear roles operativos fijos, nunca dirección ni cliente', () => {
+    expect(rolesQuePuedeCrear(tere, {}, DUENO)).toEqual(ROLES_RH_PUEDE_CREAR);
+    expect(puedeCrearRol(tere, 'ing_campo', {}, DUENO)).toBe(true);
+    expect(puedeCrearRol(tere, 'contabilidad', {}, DUENO)).toBe(true);
+    for (const r of ['ceo', 'super_admin', 'cliente', 'coord_admin', 'dir_admin']) {
+      expect(puedeCrearRol(tere, r, {}, DUENO)).toBe(false);
+    }
   });
 });
 

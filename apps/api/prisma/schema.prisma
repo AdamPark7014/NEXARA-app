@@ -996,6 +996,12 @@ model User {
   nominaFilasEditadas     NominaSemanaFila[]    @relation("NominaFilaActualizadoPor")
   nominaDescuentos        NominaDescuento[]     @relation("NominaDescuentoUser")
   nominaDescuentosCreados NominaDescuento[]     @relation("NominaDescuentoCreadoPor")
+  bajasSolicitadas        UserDeactivationRequest[] @relation("BajaSolicitadaPor")
+  bajasRecibidas          UserDeactivationRequest[] @relation("BajaUsuario")
+  bajasDecididas          UserDeactivationRequest[] @relation("BajaDecididaPor")
+  incidenciasPersonal     IncidenciaPersonal[]      @relation("IncidenciaPersonalUser")
+  incidenciasAutorizadas  IncidenciaPersonal[]      @relation("IncidenciaAutorizadaPor")
+  incidenciasCreadas      IncidenciaPersonal[]      @relation("IncidenciaCreadaPor")
   activityAttachments     ActivityAttachment[]  @relation("ActivityAttachmentUploader")
 
   // === Asistencia confiable, herramientas de la OT, kits y horas extra ===
@@ -6351,6 +6357,8 @@ model CompanyProfile {
   nominaSemanaDias        NominaSemanaDia[]
   nominaSemanaFilas       NominaSemanaFila[]
   nominaDescuentos        NominaDescuento[]
+  userDeactivationRequests UserDeactivationRequest[]
+  incidenciasPersonal      IncidenciaPersonal[]
   activityAttachments     ActivityAttachment[]
   activityEvidenceFields  ActivityEvidenceField[]
   activityEvidenceFieldPhotos ActivityEvidenceFieldPhoto[]
@@ -7087,6 +7095,7 @@ model NominaDescuento {
   company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
   user      User           @relation("NominaDescuentoUser", fields: [userId], references: [id])
   creadoPor User?          @relation("NominaDescuentoCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  incidenciasOrigen IncidenciaPersonal[]
 
   @@index([semanaId, userId])
   @@index([companyId])
@@ -8680,3 +8689,108 @@ model VehiculoCarga {
   @@index([companyId, vehicleId, fecha])
   @@map("vehiculo_cargas")
 }
+
+
+enum MotivoBaja {
+  RENUNCIA
+  ABANDONO
+  DESPIDO
+  FIN_CONTRATO
+  OTRO
+}
+
+enum ModoBaja {
+  SOLICITUD
+  APLICADA_CON_VOBO
+}
+
+enum EstadoBaja {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  REVERTIDA
+}
+
+enum TipoIncidenciaPersonal {
+  FALTA_JUSTIFICADA
+  FALTA_INJUSTIFICADA
+  RETARDO
+  PERMISO_CON_GOCE
+  PERMISO_SIN_GOCE
+  INCAPACIDAD
+  VACACIONES
+  HORAS_EXTRA
+  BONO
+  DESCUENTO
+  PRESTAMO
+  OTRO
+}
+
+enum EstadoIncidenciaPersonal {
+  REGISTRADA
+  APLICADA
+  CANCELADA
+}
+
+
+
+/// Solicitud o aplicación de baja (RH pide; dirección aprueba o RH aplica con VoBo).
+model UserDeactivationRequest {
+  id              Int        @id @default(autoincrement())
+  companyId       Int
+  userId          Int
+  solicitadoPorId Int
+  motivo          MotivoBaja
+  fechaBaja       DateTime   @db.Date
+  comentario      String?    @db.Text
+  modo            ModoBaja
+  justificacion   String?    @db.Text
+  estado          EstadoBaja @default(PENDIENTE)
+  decididoPorId   Int?
+  decididoAt      DateTime?
+  motivoRechazo   String?    @db.Text
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user          User           @relation("BajaUsuario", fields: [userId], references: [id])
+  solicitadoPor User           @relation("BajaSolicitadaPor", fields: [solicitadoPorId], references: [id])
+  decididoPor   User?          @relation("BajaDecididaPor", fields: [decididoPorId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, estado])
+  @@index([userId, estado])
+  @@map("user_deactivation_requests")
+}
+
+/// Bitácora única de incidencias de personal (alimenta prenómina / NominaDescuento).
+model IncidenciaPersonal {
+  id               Int                       @id @default(autoincrement())
+  companyId        Int
+  userId           Int
+  fecha            DateTime                  @db.Date
+  tipo             TipoIncidenciaPersonal
+  concepto         String                    @db.VarChar(200)
+  cantidad         Decimal?                  @db.Decimal(10, 2)
+  monto            Decimal?                  @db.Decimal(12, 2)
+  autorizadoPorId  Int?
+  justificanteUrl  String?                   @db.VarChar(500)
+  estado           EstadoIncidenciaPersonal  @default(REGISTRADA)
+  semanaNomina     String?                   @db.VarChar(20)
+  nominaDescuentoId Int?
+  creadoPorId      Int
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  company         CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user            User           @relation("IncidenciaPersonalUser", fields: [userId], references: [id])
+  autorizadoPor   User?          @relation("IncidenciaAutorizadaPor", fields: [autorizadoPorId], references: [id], onDelete: SetNull)
+  creadoPor       User           @relation("IncidenciaCreadaPor", fields: [creadoPorId], references: [id])
+  nominaDescuento NominaDescuento? @relation(fields: [nominaDescuentoId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, semanaNomina])
+  @@index([companyId, userId])
+  @@index([companyId, tipo])
+  @@index([nominaDescuentoId])
+  @@map("incidencias_personal")
+}
+

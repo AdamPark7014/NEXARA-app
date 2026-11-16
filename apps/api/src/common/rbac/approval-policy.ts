@@ -1,11 +1,14 @@
 /**
  * NEXARA · RBAC v2 — Política de Aprobaciones Jerárquicas
  * --------------------------------------------------------
- * Flujos:
- *   1. VIÁTICOS  (Ing. Campo → Admin → Coord.Admin → Dir.Admin → CEO)
- *   2. EVIDENCIAS / ACTIVIDADES (Ing. Campo → Coord.Ops → Admin → Coord.Admin)
- *   3. COTIZACIONES (Vendedor → Coord.Ventas → Dir.Ops → CEO)
- *   4. COMPRAS / PROCUREMENT (Solicitante → Coord.Admin → Dir.Admin → CEO)
+ * Flujos actualizados (15-11-2026):
+ *   1. VIÁTICOS        → Solo dos pasos: Coordinación Admin → CEO (Autorización final).
+ *      Eliminado: ADMINISTRATIVO, DIR_ADMIN.
+ *   2. VEHÍCULOS       → Solo dos pasos: Coordinación Admin → CEO (Autorización final).
+ *      Eliminados: COORD_OPERACIONES, ARQUITECTO, ADMINISTRATIVO.
+ *   3. EVIDENCIAS / ACTIVIDADES (Ing. Campo → Coord.Ops → Admin → Coord.Admin)
+ *   4. COTIZACIONES (Vendedor → Coord.Ventas → Dir.Ops → CEO)
+ *   5. COMPRAS / PROCUREMENT (Solicitante → Coord.Admin → Dir.Admin → CEO)
  *
  * Los umbrales en MXN son CONFIGURABLES desde /core/configuracion/aprobaciones
  * (tabla `ApprovalThreshold` en BD). Aquí solo se exponen los defaults.
@@ -32,12 +35,10 @@ export type ApprovalStep = {
  */
 export const APPROVAL_CHAINS: Record<ApprovalFlow, ApprovalStep[]> = {
   // ─── VIÁTICOS ────────────────────────────────────────────────────
-  // Campo solicita → Admin / Coord.Admin preaprueban → Dir.Admin (≥$10k) → CEO siempre cierra
+  // Actualizado 15-11-2026: Flujo simplificado a Coordinación Admin → CEO.
   viaticos: [
-    { role: ROLES.ADMINISTRATIVO,    label: 'Revisión administrativa' },
-    { role: ROLES.COORD_ADMIN,       label: 'Coordinación administrativa' },
-    { role: ROLES.DIR_ADMIN,         thresholdMxn: 10_000,  label: 'Dir. Administrativo' },
-    { role: ROLES.CEO,               label: 'CEO — Autorización final', isFinal: true },
+    { role: ROLES.COORD_ADMIN, label: 'Gestión de viáticos' },
+    { role: ROLES.CEO, label: 'CEO — Autorización final', isFinal: true },
   ],
 
   // ─── EVIDENCIAS / ACTIVIDADES DE CAMPO ───────────────────────────
@@ -61,12 +62,10 @@ export const APPROVAL_CHAINS: Record<ApprovalFlow, ApprovalStep[]> = {
     { role: ROLES.CEO,               thresholdMxn: 200_000,  label: 'CEO', isFinal: true },
   ],
 
-  // ─── VEHÍCULOS (Operaciones → Arquitecto → Admin → CEO) ─────────
+  // ─── VEHÍCULOS ───────────────────────────────────────────────────
   vehicles: [
-    { role: ROLES.COORD_OPERACIONES, label: 'Coordinación de Operaciones' },
-    { role: ROLES.ARQUITECTO,        label: 'Arquitecto / validación técnica' },
-    { role: ROLES.ADMINISTRATIVO,    label: 'Administración' },
-    { role: ROLES.CEO,               label: 'CEO — Autorización final', isFinal: true },
+    { role: ROLES.COORD_ADMIN, label: 'Gestión de vehículos' },
+    { role: ROLES.CEO, label: 'CEO — Autorización final', isFinal: true },
   ],
 
   // ─── MULTAS ──────────────────────────────────────────────────────

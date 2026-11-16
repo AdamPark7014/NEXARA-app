@@ -27,7 +27,10 @@ import {
   crearUsuarioDelegado,
   editarPersonaEquipo,
   generarContrasena,
+  listarBajas,
+  solicitarBaja,
   type ContextoAlta,
+  type MotivoBaja,
   type PersonaEquipo,
   type UsuarioCreado,
 } from "@/lib/delegated-users-api";
@@ -47,8 +50,11 @@ const correoValido = (valor: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor.
 const telefonoValido = (valor: string) => valor.replace(/\D/g, "").length >= 10 && valor.trim().length <= 30;
 
 export default function AltaUsuarioPanel() {
-  const { token } = useUser();
+  const { token, user } = useUser();
+  const esRh = String(user?.roleKey || "").toLowerCase() === "rh";
   const router = useRouter();
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(true);
   const [ctx, setCtx] = useState<ContextoAlta | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -79,19 +85,39 @@ export default function AltaUsuarioPanel() {
   const [guardandoFoto, setGuardandoFoto] = useState(false);
   const [recarga, setRecarga] = useState(0);
   const [confirmActivo, setConfirmActivo] = useState<ConfirmState | null>(null);
+  const [bajaDe, setBajaDe] = useState<PersonaEquipo | null>(null);
+  const [motivoBaja, setMotivoBaja] = useState<MotivoBaja>("RENUNCIA");
+  const [fechaBaja, setFechaBaja] = useState("");
+  const [comentarioBaja, setComentarioBaja] = useState("");
+  const [yaAutorizado, setYaAutorizado] = useState(false);
+  const [justificacionBaja, setJustificacionBaja] = useState("");
+  const [pendientesBaja, setPendientesBaja] = useState<Set<number>>(new Set());
+  const [avisoBaja, setAvisoBaja] = useState<string | null>(null);
+  const [guardandoBaja, setGuardandoBaja] = useState(false);
   const [avisoActivo, setAvisoActivo] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
     let cancelado = false;
-    void cargarContextoAlta(token).then((c) => {
-      if (!cancelado) setCtx(c);
-    });
+    setCargando(true);
+    setErrorCarga(null);
+    void cargarContextoAlta(token).then(async (c) => {
+      if (cancelado) return;
+      setCtx(c);
+      if (esRh || c.formulario === "completo") {
+        const rows = await listarBajas(token, "PENDIENTE");
+        if (!cancelado) setPendientesBaja(new Set(rows.map((r) => r.userId)));
+      }
+    }).catch((err) => {
+      if (!cancelado) setErrorCarga(err instanceof Error ? err.message : "No se pudo cargar el equipo.");
+    }).finally(() => { if (!cancelado) setCargando(false); });
     return () => {
       cancelado = true;
     };
-  }, [token, recarga]);
+  }, [token, recarga, esRh]);
 
+  if (token && errorCarga) return <div role="alert"><InlineAlert variant="danger" message={errorCarga} /><Button onClick={() => setRecarga((n) => n + 1)}>Reintentar</Button></div>;
+  if (token && cargando && !ctx) return <p role="status">Cargando equipo…</p>;
   if (!token || !ctx || !ctx.puede || ctx.tipos.length === 0) return null;
 
   const completo = ctx.formulario === "completo";
@@ -191,6 +217,7 @@ export default function AltaUsuarioPanel() {
 
   // Solo dirección ve el formulario completo, y solo ella activa o desactiva perfiles.
   const puedeActivar = completo;
+  const puedeSolicitarBaja = esRh;
   const alternarActivo = (p: (typeof ctx.equipo)[number]) => {
     const activo = p.activo !== false;
     setAvisoActivo(null);
@@ -229,6 +256,7 @@ export default function AltaUsuarioPanel() {
           {p.nombre}
         </span>
         {!activo ? <span className={s.estado}>Desactivado</span> : null}
+        {activo && pendientesBaja.has(p.id) ? <span className={s.estado}>Baja pendiente de aprobación</span> : null}
         <div className={s.acciones}>
           {activo ? (
             <Button
@@ -254,6 +282,24 @@ export default function AltaUsuarioPanel() {
           {puedeActivar ? (
             <Button type="button" variant="ghost" size="sm" onClick={() => alternarActivo(p)}>
               {activo ? "Desactivar" : "Activar"}
+            </Button>
+          ) : null}
+          {puedeSolicitarBaja && activo && !pendientesBaja.has(p.id) ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setBajaDe(p);
+                setMotivoBaja("RENUNCIA");
+                setFechaBaja(new Date().toISOString().slice(0, 10));
+                setComentarioBaja("");
+                setYaAutorizado(false);
+                setJustificacionBaja("");
+                setAvisoBaja(null);
+              }}
+            >
+              Solicitar baja
             </Button>
           ) : null}
         </div>
@@ -291,6 +337,73 @@ export default function AltaUsuarioPanel() {
 
       {avisoActivo ? <InlineAlert variant="danger" message={avisoActivo} /> : null}
       <ConfirmDialog state={confirmActivo} onClose={() => setConfirmActivo(null)} />
+      {bajaDe ? (
+        <Modal open={true} title="Solicitar baja" onClose={() => !guardandoBaja && setBajaDe(null)}>
+          <p style={{ marginTop: 0 }}>Vas a solicitar la baja de <strong>{bajaDe.nombre}</strong>. La cuenta sigue activa hasta que dirección la apruebe, salvo que marques que Christian ya autorizó.</p>
+          <div style={{ display: "grid", gap: 12 }}>
+            <label style={campo}>
+              Motivo
+              <select style={entrada} value={motivoBaja} onChange={(e) => setMotivoBaja(e.target.value as MotivoBaja)}>
+                <option value="RENUNCIA">Renuncia</option>
+                <option value="ABANDONO">Abandono</option>
+                <option value="DESPIDO">Despido</option>
+                <option value="FIN_CONTRATO">Fin de contrato</option>
+                <option value="OTRO">Otro</option>
+              </select>
+            </label>
+            <label style={campo}>
+              Fecha de baja
+              <input style={entrada} type="date" value={fechaBaja} onChange={(e) => setFechaBaja(e.target.value)} />
+            </label>
+            <label style={campo}>
+              Comentario
+              <textarea style={{ ...entrada, minHeight: 72 }} value={comentarioBaja} onChange={(e) => setComentarioBaja(e.target.value)} />
+            </label>
+            <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13 }}>
+              <input type="checkbox" checked={yaAutorizado} onChange={(e) => setYaAutorizado(e.target.checked)} />
+              <span>Christian ya la autorizó (se aplica de inmediato y él recibe aviso para revisarla)</span>
+            </label>
+            {yaAutorizado ? (
+              <label style={campo}>
+                Justificación
+                <textarea style={{ ...entrada, minHeight: 72 }} value={justificacionBaja} onChange={(e) => setJustificacionBaja(e.target.value)} required />
+              </label>
+            ) : null}
+            {avisoBaja ? <InlineAlert variant="danger" message={avisoBaja} /> : null}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <Button type="button" variant="ghost" disabled={guardandoBaja} onClick={() => setBajaDe(null)}>Cancelar</Button>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={guardandoBaja || !fechaBaja || (yaAutorizado && justificacionBaja.trim().length < 10)}
+                onClick={async () => {
+                  if (!token || !bajaDe) return;
+                  setGuardandoBaja(true);
+                  setAvisoBaja(null);
+                  try {
+                    await solicitarBaja(token, {
+                      userId: bajaDe.id,
+                      motivo: motivoBaja,
+                      fechaBaja,
+                      comentario: comentarioBaja || undefined,
+                      yaAutorizadoPorDireccion: yaAutorizado || undefined,
+                      justificacion: yaAutorizado ? justificacionBaja : undefined,
+                    });
+                    setBajaDe(null);
+                    setRecarga((n) => n + 1);
+                  } catch (err) {
+                    setAvisoBaja(err instanceof Error ? err.message : "No se pudo solicitar la baja.");
+                  } finally {
+                    setGuardandoBaja(false);
+                  }
+                }}
+              >
+                {yaAutorizado ? "Aplicar baja" : "Enviar solicitud"}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
 
       <Modal open={abierto} onClose={() => setAbierto(false)} title={creado ? "Usuario creado" : "Dar de alta a alguien"}>
         {creado ? (

@@ -39,6 +39,7 @@ import {
   upsertOvertimeCandidates,
   type PrenominaPreviewRow,
 } from "@/lib/finance-api";
+import { buildApiUrl } from "@/lib/api-base";
 import s from "./PrenominaPanel.module.css";
 
 export type PrenominaPanelProps = {
@@ -143,6 +144,7 @@ export default function PrenominaPanel({
   canDecideOt = true,
 }: PrenominaPanelProps) {
   const { token } = useUser();
+  const [resumenIncidencias, setResumenIncidencias] = useState<Record<number, string>>({});
   const [from, setFrom] = useState(isoDaysAgo(6));
   const [to, setTo] = useState(isoLocal(new Date()));
   const [loading, setLoading] = useState(false);
@@ -172,6 +174,32 @@ export default function PrenominaPanel({
       setRows(preview.rows || []);
       setOtRows(Array.isArray(ots) ? ots : []);
       setSelected(new Set((preview.rows || []).map((r) => r.userId)));
+      if (token) {
+        setResumenIncidencias({});
+        await fetch(buildApiUrl(`hr/incidencias?desde=${encodeURIComponent(from)}&hasta=${encodeURIComponent(to)}`), {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+        })
+          .then((r) => { if (!r.ok) throw new Error("No se pudo cargar el resumen de incidencias."); return r.json(); })
+          .then((rows: any[]) => {
+            const map: Record<number, string> = {};
+            for (const row of rows || []) {
+              if (row.estado === "CANCELADA") continue;
+              const uid = Number(row.userId);
+              if (!uid) continue;
+              const parts = map[uid] ? map[uid].split(", ") : [];
+              const label = String(row.tipo || "OTRO").toLowerCase().replace(/_/g, " ");
+              const idx = parts.findIndex((x) => x.startsWith(label + " ×"));
+              if (idx >= 0) {
+                const n = Number(parts[idx].split("×")[1]) + 1;
+                parts[idx] = `${label} ×${n}`;
+              } else parts.push(`${label} ×1`);
+              map[uid] = parts.join(", ");
+            }
+            setResumenIncidencias(map);
+          })
+          .catch((err) => { setResumenIncidencias({}); toast.error(formatApiError(err, "No se pudo cargar el resumen de incidencias.")); });
+      }
       setCalculated({ from, to });
     } catch (e) {
       setError(formatApiError(e, "No se pudo calcular la prenómina."));
@@ -292,6 +320,11 @@ export default function PrenominaPanel({
       render: (r) => (
         <div className={s.persona}>
           <div className={s.nombre}>{r.nombre || r.email || "Sin nombre"}</div>
+          {resumenIncidencias[r.userId] ? (
+            <div style={{ fontSize: 12, color: "var(--ds-muted, var(--text-secondary))", marginTop: 2 }}>
+              Incidencias: {resumenIncidencias[r.userId]}
+            </div>
+          ) : null}
           <div className={s.puesto}>{r.puesto || r.email}</div>
           {r.openDays && r.openDays.length > 0 && (
             <div className={s.jornadas}>

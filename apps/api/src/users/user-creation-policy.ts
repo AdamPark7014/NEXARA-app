@@ -14,10 +14,22 @@
  *    ella: nunca otro `ceo` ni `super_admin`, y los clientes del portal no se crean por aquí.
  *  · Una concesión solo puede nombrar roles **delegables** (operativos, sin poderes de administración);
  *    lo demás se ignora al leerla, aunque alguien lo escriba en la base.
+ *  · El responsable de Recursos Humanos (RH) puede dar de alta a los roles operativos estándar
+ *    sin necesidad de una concesión específica en SystemSetting.
  *
  * Módulo puro (sin Nest ni Prisma).
  */
 import { ALL_ROLES, ROLES, ROLE_LABELS, ROLE_TIER, type RoleKey } from '../common/rbac/roles.v2.js';
+
+/** Constante para pruebas: los roles operativos que RH (Tere) puede crear sin grant de SystemSetting. */
+export const ROLES_RH_PUEDE_CREAR = [
+  ROLES.ING_CAMPO,
+  ROLES.ING_SOPORTE,
+  ROLES.ADMINISTRATIVO,
+  ROLES.VENDEDOR,
+  ROLES.DISENADOR,
+  ROLES.CONTABILIDAD,
+];
 
 export const USER_CREATION_GRANTS_SETTING_KEY = 'users.creation_grants';
 
@@ -109,6 +121,9 @@ export function rolesQuePuedeCrear(
 ): RoleKey[] {
   if (!actor) return [];
   if (esDireccion(actor, correoDueno)) return rolesBajoDireccion();
+
+  if (actor.roleKey === ROLES.RH) return [...ROLES_RH_PUEDE_CREAR];
+
   const propios = concesiones[normalizarCorreo(actor.email)] ?? [];
   return propios.filter((r) => ROLES_DELEGABLES.includes(r));
 }
@@ -138,7 +153,7 @@ export function contrasenaAceptable(valor: unknown): boolean {
 
 /**
  * Teléfono de contacto. Vacío solo vale si no es obligatorio (el formulario completo de dirección).
- * Acepta espacios, guiones y +52; lo que cuenta son 10 a 15 dígitos.
+ * Acepta espacios, guiones y +52; lo que cuentan son 10 a 15 dígitos.
  */
 export function telefonoAceptable(valor: unknown, obligatorio = false): boolean {
   const raw = String(valor ?? '').trim();

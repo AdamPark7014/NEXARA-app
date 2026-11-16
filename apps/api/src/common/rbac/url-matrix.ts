@@ -1249,6 +1249,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/fines/**', scope: 'write' },
     { path: '/api/lunch-breaks/**', scope: 'write' },
     { path: '/api/users', methods: ['GET'], scope: 'read' },
+    { path: '/api/users/bajas', methods: ['GET', 'POST'], scope: 'write' },
+    { path: '/api/users/bajas/*', methods: ['GET', 'POST'], scope: 'write' },
     { path: '/api/documents/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     ...CLIENT_ADMIN_WRITE_URL_RULES,
   ],
@@ -1477,3 +1479,4 @@ export function checkUrlRules(
 export function listAllowedUrls(role: RoleKey): UrlRule[] {
   return URL_MATRIX[role] ?? [];
 }
+

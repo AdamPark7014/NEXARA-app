@@ -13,6 +13,7 @@ const INSTALADOR = { roleKey: "ing_campo", etiqueta: "Instalador" };
 
 function respuestas(tipos: unknown, alta?: () => unknown) {
   return vi.fn(async (url: string, init?: RequestInit) => {
+    if (String(url).includes("users/bajas")) return { ok: true, json: async () => [] };
     if (String(url).includes("users/delegated/contexto")) return { ok: true, json: async () => tipos };
     if (init?.method === "POST") {
       const r = alta ? alta() : { ok: true, cuerpo: { id: 9, nombre: "Persona Nueva", email: "nueva@nexara.com.mx", roleKey: "ing_soporte", departmentId: 1, employeeNumber: null, managerId: 2 } };
@@ -22,7 +23,11 @@ function respuestas(tipos: unknown, alta?: () => unknown) {
   });
 }
 
-beforeEach(() => useUser.mockReturnValue({ token: "tok", user: { id: 2 } }));
+let usuario: ReturnType<typeof userEvent.setup>;
+beforeEach(() => {
+  usuario = userEvent.setup();
+  useUser.mockReturnValue({ token: "tok", user: { id: 2 } });
+});
 afterEach(() => vi.unstubAllGlobals());
 
 describe("AltaUsuarioPanel", () => {
@@ -47,17 +52,17 @@ describe("AltaUsuarioPanel", () => {
     const f = respuestas([SOPORTE]);
     vi.stubGlobal("fetch", f);
     render(<AltaUsuarioPanel />);
-    await userEvent.click(await screen.findByRole("button", { name: "Dar de alta a alguien" }));
+    await usuario.click(await screen.findByRole("button", { name: "Dar de alta a alguien" }));
 
     const dialogo = await screen.findByRole("dialog");
-    await userEvent.type(within(dialogo).getByLabelText("Nombre completo"), "Persona Nueva");
-    await userEvent.type(within(dialogo).getByLabelText("Correo"), "nueva@nexara.com.mx");
-    await userEvent.type(within(dialogo).getByLabelText("Teléfono"), "5512345678");
+    await usuario.type(within(dialogo).getByLabelText("Nombre completo"), "Persona Nueva");
+    await usuario.type(within(dialogo).getByLabelText("Correo"), "nueva@nexara.com.mx");
+    await usuario.type(within(dialogo).getByLabelText("Teléfono"), "5512345678");
     expect(within(dialogo).queryByLabelText("Tipo de usuario")).toBeNull();
     expect(within(dialogo).getByText(/Rol y jefe quedan fijos/)).toBeTruthy();
     const clave = (within(dialogo).getByLabelText(/^Contraseña/) as HTMLInputElement).value;
     expect(clave.length).toBeGreaterThanOrEqual(10); // ya viene generada
-    await userEvent.click(within(dialogo).getByRole("button", { name: "Crear usuario" }));
+    await usuario.click(within(dialogo).getByRole("button", { name: "Crear usuario" }));
 
     await screen.findByText(/ya puede entrar como Soporte/);
     expect(screen.getByText("nueva@nexara.com.mx")).toBeTruthy();
@@ -76,12 +81,12 @@ describe("AltaUsuarioPanel", () => {
   it("con varios tipos obliga a elegir uno antes de poder crear", async () => {
     vi.stubGlobal("fetch", respuestas([SOPORTE, INSTALADOR]));
     render(<AltaUsuarioPanel />);
-    await userEvent.click(await screen.findByRole("button", { name: "Dar de alta a alguien" }));
+    await usuario.click(await screen.findByRole("button", { name: "Dar de alta a alguien" }));
     const dialogo = await screen.findByRole("dialog");
-    await userEvent.type(within(dialogo).getByLabelText("Nombre completo"), "Persona Nueva");
-    await userEvent.type(within(dialogo).getByLabelText("Correo"), "nueva@nexara.com.mx");
+    await usuario.type(within(dialogo).getByLabelText("Nombre completo"), "Persona Nueva");
+    await usuario.type(within(dialogo).getByLabelText("Correo"), "nueva@nexara.com.mx");
     expect((within(dialogo).getByRole("button", { name: "Crear usuario" }) as HTMLButtonElement).disabled).toBe(true);
-    await userEvent.selectOptions(within(dialogo).getByLabelText("Tipo de usuario"), "ing_campo");
+    await usuario.selectOptions(within(dialogo).getByLabelText("Tipo de usuario"), "ing_campo");
     expect((within(dialogo).getByRole("button", { name: "Crear usuario" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -109,6 +114,8 @@ describe("AltaUsuarioPanel", () => {
       ],
     };
     const f = vi.fn(async (url: string, init?: RequestInit) => {
+    if (String(url).includes("users/bajas")) return { ok: true, json: async () => [] };
+      if (String(url).includes("users/bajas")) return { ok: true, json: async () => [] };
       if (String(url).includes("users/delegated/contexto")) return { ok: true, json: async () => contexto };
       if (init?.method === "PATCH") {
         return {
@@ -121,16 +128,16 @@ describe("AltaUsuarioPanel", () => {
     vi.stubGlobal("fetch", f);
     render(<AltaUsuarioPanel />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Editar" }));
+    await usuario.click(await screen.findByRole("button", { name: "Editar" }));
     const dialogo = await screen.findByRole("dialog");
     expect((within(dialogo).getByLabelText("Nombre completo") as HTMLInputElement).value).toBe("Instalador Viejo");
     expect((within(dialogo).getByLabelText("Teléfono") as HTMLInputElement).value).toBe("5511112222");
     expect((within(dialogo).getByLabelText("Número de empleado") as HTMLInputElement).value).toBe("NX-57");
 
-    await userEvent.clear(within(dialogo).getByLabelText("Nombre completo"));
-    await userEvent.type(within(dialogo).getByLabelText("Nombre completo"), "Instalador Nuevo");
-    await userEvent.selectOptions(within(dialogo).getByLabelText("Tipo de usuario"), "ing_soporte");
-    await userEvent.click(within(dialogo).getByRole("button", { name: "Guardar" }));
+    await usuario.clear(within(dialogo).getByLabelText("Nombre completo"));
+    await usuario.type(within(dialogo).getByLabelText("Nombre completo"), "Instalador Nuevo");
+    await usuario.selectOptions(within(dialogo).getByLabelText("Tipo de usuario"), "ing_soporte");
+    await usuario.click(within(dialogo).getByRole("button", { name: "Guardar" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     const patch = (f.mock.calls as unknown as Array<[string, RequestInit]>).find(([, i]) => i?.method === "PATCH")!;
@@ -151,6 +158,7 @@ describe("AltaUsuarioPanel", () => {
     });
     const servidor = (ctx: unknown) =>
       vi.fn(async (url: string, init?: RequestInit) => {
+    if (String(url).includes("users/bajas")) return { ok: true, json: async () => [] };
         if (String(url).includes("users/delegated/contexto")) return { ok: true, json: async () => ctx };
         if (String(url).includes("/activo") && init?.method === "PATCH") return { ok: true, json: async () => ({ id: 57, nombre: "x", activo: false }) };
         return { ok: false, json: async () => ({}) };
@@ -160,10 +168,10 @@ describe("AltaUsuarioPanel", () => {
       const f = servidor(contexto("completo", [persona()]));
       vi.stubGlobal("fetch", f);
       render(<AltaUsuarioPanel />);
-      await userEvent.click(await screen.findByRole("button", { name: "Desactivar" }));
+      await usuario.click(await screen.findByRole("button", { name: "Desactivar" }));
       const dialogo = await screen.findByRole("alertdialog");
       expect(within(dialogo).getByText(/historial se conserva/)).toBeTruthy();
-      await userEvent.click(within(dialogo).getByRole("button", { name: "Desactivar" }));
+      await usuario.click(within(dialogo).getByRole("button", { name: "Desactivar" }));
       await waitFor(() => {
         const patch = (f.mock.calls as unknown as Array<[string, RequestInit]>).find(([u]) => String(u).includes("/activo"));
         expect(patch).toBeTruthy();
@@ -178,9 +186,9 @@ describe("AltaUsuarioPanel", () => {
       render(<AltaUsuarioPanel />);
       expect(await screen.findByText("Desactivado")).toBeTruthy();
       expect(screen.queryByRole("button", { name: "Editar" })).toBeNull();
-      await userEvent.click(screen.getByRole("button", { name: "Activar" }));
+      await usuario.click(screen.getByRole("button", { name: "Activar" }));
       const dialogo = await screen.findByRole("alertdialog");
-      await userEvent.click(within(dialogo).getByRole("button", { name: "Activar" }));
+      await usuario.click(within(dialogo).getByRole("button", { name: "Activar" }));
       await waitFor(() => {
         const patch = (f.mock.calls as unknown as Array<[string, RequestInit]>).find(([u]) => String(u).includes("/activo"));
         expect(JSON.parse(String(patch![1].body))).toEqual({ activo: true });
@@ -199,13 +207,47 @@ describe("AltaUsuarioPanel", () => {
   it("si el API rechaza el alta, muestra el motivo y deja corregir", async () => {
     vi.stubGlobal("fetch", respuestas([SOPORTE], () => ({ ok: false, cuerpo: { message: "El correo ya está registrado (Otra Persona)." } })));
     render(<AltaUsuarioPanel />);
-    await userEvent.click(await screen.findByRole("button", { name: "Dar de alta a alguien" }));
+    await usuario.click(await screen.findByRole("button", { name: "Dar de alta a alguien" }));
     const dialogo = await screen.findByRole("dialog");
-    await userEvent.type(within(dialogo).getByLabelText("Nombre completo"), "Persona Nueva");
-    await userEvent.type(within(dialogo).getByLabelText("Correo"), "repetido@nexara.com.mx");
-    await userEvent.type(within(dialogo).getByLabelText("Teléfono"), "5512345678");
-    await userEvent.click(within(dialogo).getByRole("button", { name: "Crear usuario" }));
+    await usuario.type(within(dialogo).getByLabelText("Nombre completo"), "Persona Nueva");
+    await usuario.type(within(dialogo).getByLabelText("Correo"), "repetido@nexara.com.mx");
+    await usuario.type(within(dialogo).getByLabelText("Teléfono"), "5512345678");
+    await usuario.click(within(dialogo).getByRole("button", { name: "Crear usuario" }));
     expect(await screen.findByText("El correo ya está registrado (Otra Persona).")).toBeTruthy();
     expect(within(dialogo).getByRole("button", { name: "Crear usuario" })).toBeTruthy();
+  });
+});
+
+describe("solicitudes de baja de RH", () => {
+  it("exige justificación antes de aplicar con visto bueno y envía la solicitud correcta", async () => {
+    useUser.mockReturnValue({ token: "tok", user: { id: 10, roleKey: "rh" } });
+    const f = vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).includes("delegated/contexto")) return { ok: true, json: async () => ({
+        puede: true, formulario: "basico", tipos: [INSTALADOR], rolAutomatico: true, jefeAutomatico: true,
+        telefonoObligatorio: false, departamentos: [], jefes: [], equipo: [{ id: 50, nombre: "Ana", activo: true }],
+      }) };
+      if (init?.method === "POST") return { ok: true, json: async () => ({ id: 9, estado: "APROBADA" }) };
+      return { ok: true, json: async () => [] };
+    });
+    vi.stubGlobal("fetch", f);
+    render(<AltaUsuarioPanel />);
+    await usuario.click(await screen.findByRole("button", { name: "Solicitar baja" }));
+    const dialogo = await screen.findByRole("dialog", { name: "Solicitar baja" });
+    await usuario.click(within(dialogo).getByRole("checkbox"));
+    expect(within(dialogo).getByRole("button", { name: "Aplicar baja" })).toBeDisabled();
+    await usuario.type(within(dialogo).getByLabelText("Justificación"), "Autorizada en la reunión de dirección");
+    await usuario.click(within(dialogo).getByRole("button", { name: "Aplicar baja" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const post = f.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ userId: 50, motivo: "RENUNCIA", yaAutorizadoPorDireccion: true, justificacion: "Autorizada en la reunión de dirección" });
+  });
+  it("muestra error de carga y permite reintentar sin ocultarlo como falta de permiso", async () => {
+    const f = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ message: "Servidor temporalmente fuera de servicio" }) });
+    vi.stubGlobal("fetch", f);
+    render(<AltaUsuarioPanel />);
+    expect(await screen.findByText("Servidor temporalmente fuera de servicio")).toBeTruthy();
+    f.mockImplementation(respuestas([SOPORTE]));
+    await usuario.click(screen.getByRole("button", { name: "Reintentar" }));
+    expect(await screen.findByRole("button", { name: "Dar de alta a alguien" })).toBeTruthy();
   });
 });
