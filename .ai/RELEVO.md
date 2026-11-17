@@ -1,5 +1,15 @@
 # RELEVO
 
+- **16-11 ~18:30 México (claude-code, código de Cursor) — Asignar con IA: evidencia hiper profesional y reglas del grupo
+  de WhatsApp (rigen 17-11). NO desplegado: espera OK de Adam.**
+  - `ai/asistente/elementos.ts`: cada campo trae la foto pedida por momento (`notas`, por equipo; mantenimiento con su
+    texto); instalación agrega «Grabador (NVR)» si no se nombró y «Pruebas y entrega»; plural sin número →
+    «Cámaras (cantidad por confirmar)» + aviso; singular sin número es uno. Ningún tipo queda sin secuencia:
+    administrativas y comerciales → «Capturas de pantalla» (no fotos del monitor) + «Archivo entregable»; junta →
+    «Junta»; campo sin equipos → «Trabajo realizado» con texto por subtipo. Línea «Alcance: …» al final de indicaciones.
+  - Tarjeta (`AsistenteIA.tsx`): la nota de cada campo se edita y viaja en `definirCamposEvidencia`.
+  - Encargos en `.ai/encargos/2026-11-16-asignar-ia-*.md` (sin versionar). Las revisiones con Luis las llevó el hilo de personal.
+
 - **16-11 ~13:50 México (claude-code; Cursor codifica, Codex pule) — Supervisor General: plan de mañana y cierre diario. NO desplegado.**
   - `src/supervision/` (tablas `planes_diarios`, `cierres_diarios`; migración `20261116122800_planes_diarios` SIN
     aplicar): coordinadores/encargados mandan el plan de mañana a su `managerId` (o a Luis); el supervisor lo marca

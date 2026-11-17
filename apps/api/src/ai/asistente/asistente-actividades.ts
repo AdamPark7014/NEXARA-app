@@ -16,7 +16,7 @@
 import { claveDeTipo, type Complejidad } from '../complejidad/tiempos-tipicos.js';
 import { cantidadDelTitulo, estandarDeLectura, tipoDelTitulo } from '../../activities/tiempo-entrega.js';
 import { elegirCliente, mencionaAlCliente, mismoNombreDeCliente } from './elegir-cliente.js';
-import { camposDeElementos } from './elementos.js';
+import { avisoCantidadPorConfirmar, camposDeElementos, lineaAlcanceEvidencia } from './elementos.js';
 import { motivoDe, ordenarPorProbabilidad, tieneRespaldo, type ActividadPasada } from './elegir-persona.js';
 import {
   PALABRAS_GIRO,
@@ -701,7 +701,7 @@ export type PropuestaActividad = {
   /** Proyecto que no existe y se crea al confirmar; null si ya hay projectId o no aplica. */
   proyectoNuevo: string | null;
   /** Campos de evidencia por elemento (Cámara 1 × ANTES/EN_PROGRESO/DESPUES, …). */
-  camposEvidencia: { nombre: string; momentos: string[] }[];
+  camposEvidencia: { nombre: string; momentos: string[]; notas: string }[];
   /** Por qué se propuso a esa persona o ese cliente (también va en `avisos`): se lee en su renglón. */
   notaResponsable: string | null;
   notaCliente: string | null;
@@ -1249,6 +1249,15 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
     tipo,
     subParaCampos,
   );
+  const avisoCantidad = avisoCantidadPorConfirmar(camposEvidencia);
+  if (avisoCantidad) avisos.push(avisoCantidad);
+  const alcance = lineaAlcanceEvidencia(camposEvidencia);
+  const indicacionesConAlcance = alcance
+    ? indicaciones
+      ? `${indicaciones}\n${alcance}`
+      : alcance
+    : indicaciones;
+  if (alcance) payload.indicaciones = recortar(indicacionesConAlcance, 4000);
 
   return {
     tipo,
@@ -1278,7 +1287,7 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
     duracionDetalle,
     prioridad,
     encargo,
-    indicaciones: (payload.indicaciones as string | undefined) ?? null,
+    indicaciones: (indicacionesConAlcance ? recortar(indicacionesConAlcance, 4000) : null) ?? null,
     faltantes,
     avisos,
     correcciones,

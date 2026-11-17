@@ -50,7 +50,7 @@ export type Correccion = {
 };
 
 /** Un campo de evidencia propuesto por elemento («Cámara 1» con antes, en progreso y después). */
-export type CampoPropuesto = { nombre: string; momentos: string[] };
+export type CampoPropuesto = { nombre: string; momentos: string[]; notas?: string };
 
 export type PropuestaActividad = {
   /** Proyecto que no existe y se crea al confirmar (con el cliente de la tarjeta). */

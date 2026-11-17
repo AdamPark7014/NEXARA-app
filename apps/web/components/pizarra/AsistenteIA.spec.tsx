@@ -613,7 +613,11 @@ describe("Asignar con IA: proyecto nuevo con evidencia por elemento (15-11)", ()
       cliente: { id: 26, nombre: "IPADE" },
       indicaciones: null,
       proyectoNuevo: "Instalar 4 cámaras en IPADE",
-      camposEvidencia: [1, 2, 3, 4].map((n) => ({ nombre: `Cámara ${n}`, momentos: ["ANTES", "EN_PROGRESO", "DESPUES"] })),
+      camposEvidencia: [1, 2, 3, 4].map((n) => ({
+        nombre: `Cámara ${n}`,
+        momentos: ["ANTES", "EN_PROGRESO", "DESPUES"],
+        notas: "Antes: punto de montaje. · Durante: fijada. · Después: en vivo.",
+      })),
       payload: { ...servicio.payload, titulo: "Instalar 4 cámaras en IPADE", coreKind: "proyecto", clientId: 26, indicaciones: undefined },
     };
     buscarClientesParecidos.mockResolvedValue([]);
@@ -631,6 +635,10 @@ describe("Asignar con IA: proyecto nuevo con evidencia por elemento (15-11)", ()
     expect(await screen.findByText("Nuevo: se crea al confirmar")).toBeInTheDocument();
     expect(screen.getByText(/4 elementos: Cámara 1, Cámara 2, Cámara 3/)).toBeInTheDocument();
     await abrir(usuario, "Evidencia");
+    const foto1 = screen.getByLabelText("Foto que se pide para Cámara 1");
+    expect(foto1).toHaveValue("Antes: punto de montaje. · Durante: fijada. · Después: en vivo.");
+    await usuario.clear(foto1);
+    await usuario.type(foto1, "Foto del acceso principal");
     await usuario.clear(screen.getByLabelText("Elemento 1"));
     await usuario.type(screen.getByLabelText("Elemento 1"), "Cámara acceso");
     await usuario.click(screen.getByRole("button", { name: /Confirmar/ }));
@@ -640,5 +648,7 @@ describe("Asignar con IA: proyecto nuevo con evidencia por elemento (15-11)", ()
     const campos = extra.definirCamposEvidencia.mock.calls[0][2];
     expect(campos.map((c: { nombre: string }) => c.nombre)).toEqual(["Cámara acceso", "Cámara 2", "Cámara 3", "Cámara 4"]);
     expect(campos[0].momentos).toEqual(["ANTES", "EN_PROGRESO", "DESPUES"]);
+    expect(campos[0].notas).toBe("Foto del acceso principal");
+    expect(campos[1].notas).toMatch(/montaje/);
   });
 });

@@ -467,7 +467,14 @@ function Contenido({
     let avisoCampos: string | undefined;
     if (campos.length) {
       try {
-        await definirCamposEvidencia(token, creada.id, campos.map((c) => campoVacio(c.nombre, c.momentos as Momento[])));
+        await definirCamposEvidencia(
+          token,
+          creada.id,
+          campos.map((c) => ({
+            ...campoVacio(c.nombre, c.momentos as Momento[]),
+            notas: (c.notas ?? "").slice(0, 500),
+          })),
+        );
       } catch (e) {
         avisoCampos = `La actividad se creó, pero no se guardaron los campos de evidencia: ${formatApiError(e, "error de conexión")}. Agrégalos desde la actividad.`;
       }
@@ -1034,6 +1041,16 @@ function Contenido({
                             value={c.nombre}
                             onChange={(e) => ajustar(i, { campos: lista.map((x, j) => (j === k ? { ...x, nombre: e.target.value } : x)) })}
                           />
+                          <Textarea
+                            rows={2}
+                            aria-label={`Foto que se pide para ${c.nombre || "elemento"}`}
+                            value={c.notas ?? ""}
+                            onChange={(e) =>
+                              ajustar(i, {
+                                campos: lista.map((x, j) => (j === k ? { ...x, notas: e.target.value } : x)),
+                              })
+                            }
+                          />
                           {MOMENTOS.map((m) => (
                             <label key={m} className={s.momento}>
                               <input
@@ -1060,7 +1077,12 @@ function Contenido({
                         variant="secondary"
                         onClick={() => {
                           const lista = aj.campos ?? p.camposEvidencia ?? [];
-                          ajustar(i, { campos: [...lista, { nombre: "", momentos: lista[0]?.momentos ?? ["ANTES", "EN_PROGRESO", "DESPUES"] }] });
+                          ajustar(i, {
+                            campos: [
+                              ...lista,
+                              { nombre: "", momentos: lista[0]?.momentos ?? ["ANTES", "EN_PROGRESO", "DESPUES"], notas: "" },
+                            ],
+                          });
                         }}
                       >
                         Agregar elemento
