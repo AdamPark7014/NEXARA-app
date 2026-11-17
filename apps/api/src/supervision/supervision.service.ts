@@ -22,6 +22,14 @@ import {
   mananaIso,
   parseFechaIso,
 } from './supervision-helpers.js';
+import {
+  indicadoresDeRenglones,
+  normalizarRenglones,
+  renglonesDesdeTextoLibre,
+  textoResumenDeRenglones,
+  type PlanRenglon,
+} from './plan-renglones.js';
+import { ActivitiesService } from '../activities/activities.service.js';
 
 export type SupervisionActor = {
   id: number;
@@ -67,6 +75,7 @@ export class SupervisionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly activities: ActivitiesService,
   ) {}
 
 
@@ -199,11 +208,25 @@ export class SupervisionService {
       );
   }
 
-  async enviarPlan(sesion: Sesion, companyId: number | null, body: { fecha?: string; texto?: string }) {
+  async enviarPlan(
+    sesion: Sesion,
+    companyId: number | null,
+    body: { fecha?: string; texto?: string; renglones?: unknown; pegarTexto?: string },
+  ) {
     const tenantId = requireCompanyId(companyId);
     const actor = await this.resolveActor(sesion, tenantId);
-    const texto = String(body?.texto ?? '').trim();
-    if (texto.length < 3) throw new BadRequestException('Escribe qué hará tu gente (mínimo 3 caracteres).');
+    let renglones = normalizarRenglones(body?.renglones);
+    if (!renglones.length && body?.pegarTexto) {
+      renglones = renglonesDesdeTextoLibre(String(body.pegarTexto));
+    }
+    const textoLibre = String(body?.texto ?? '').trim();
+    if (!renglones.length && textoLibre) {
+      renglones = renglonesDesdeTextoLibre(textoLibre);
+    }
+    const texto = renglones.length ? textoResumenDeRenglones(renglones) : textoLibre;
+    if (texto.length < 3) {
+      throw new BadRequestException('Agrega al menos un renglón con qué hará tu gente (mínimo 3 caracteres).');
+    }
     const fecha = body?.fecha?.trim() || mananaIso();
     const fechaCol = parseFechaIso(fecha);
     const users = await this.usuariosEmpresa(tenantId);
@@ -214,18 +237,20 @@ export class SupervisionService {
     }
     const supervisorId = await this.resolverSupervisorId(actor, tenantId);
     const plan = await this.prisma.planDiario.upsert({
-      where: { companyId: tenantId, autorId_fecha: { autorId: actor.id, fecha: fechaCol } },
+      where: { autorId_fecha: { autorId: actor.id, fecha: fechaCol } },
       create: {
         companyId: tenantId,
         autorId: actor.id,
         supervisorId,
         fecha: fechaCol,
         texto,
+        renglonesJson: renglones,
         estado: 'ENVIADO',
         notaSupervisor: null,
       },
       update: {
         texto,
+        renglonesJson: renglones,
         estado: 'ENVIADO',
         notaSupervisor: null,
         supervisorId,
@@ -234,13 +259,13 @@ export class SupervisionService {
     await this.avisar(supervisorId, {
       type: 'WORKFLOW_PENDING',
       title: 'Plan de mañana',
-      message: `${actor.nombre} mandó el plan del ${fecha}.`,
+      message: `${actor.nombre} mandó el plan del ${fecha} (${renglones.length} renglones).`,
       triggerUserId: actor.id,
       relatedEntityId: plan.id,
       companyId: tenantId,
       entityType: 'PlanDiario',
     });
-    return { ...plan, fecha, autor: { id: actor.id, nombre: actor.nombre } };
+    return { ...plan, fecha, renglones, autor: { id: actor.id, nombre: actor.nombre } };
   }
 
   async listarPlanes(sesion: Sesion, companyId: number | null, fecha?: string) {
@@ -267,7 +292,29 @@ export class SupervisionService {
         where: { companyId: tenantId, autorId: actor.id, fecha: fechaCol },
         orderBy: { updatedAt: 'desc' },
       });
-      return { rol: 'supervisor' as const, propios, puedeEnviar, puedeCerrar: actor.roleKey === ROLES.DIR_OPERACIONES, fecha: fechaIso, planes, faltantes };
+      const planesConRenglones = planes.map((p) => ({
+        ...p,
+        renglones: normalizarRenglones(p.renglonesJson),
+      }));
+      const equipoIds = users.filter((u) => u.managerId === actor.id).map((u) => u.id);
+      const indicadores = indicadoresDeRenglones(
+        planesConRenglones.map((p) => ({
+          renglones: p.renglones,
+          autorId: p.autorId,
+          autorNombre: p.autor?.nombre,
+        })),
+        equipoIds,
+      );
+      return {
+        rol: 'supervisor' as const,
+        propios,
+        puedeEnviar,
+        puedeCerrar: actor.roleKey === ROLES.DIR_OPERACIONES,
+        fecha: fechaIso,
+        planes: planesConRenglones,
+        faltantes,
+        indicadores,
+      };
     }
 
     const planes = await this.prisma.planDiario.findMany({
@@ -280,8 +327,9 @@ export class SupervisionService {
       puedeEnviar,
       puedeCerrar: actor.roleKey === ROLES.CEO,
       fecha: fechaIso,
-      planes,
+      planes: planes.map((p) => ({ ...p, renglones: normalizarRenglones(p.renglonesJson) })),
       faltantes: [] as Array<{ id: number; nombre: string; email: string }>,
+      indicadores: null,
     };
   }
 
@@ -335,7 +383,7 @@ export class SupervisionService {
     const ids = [...arbol];
     if (!ids.length) {
       return {
-        personas: [] as Array<{ userId: number; nombre: string; programadas: number; terminadas: number; en_revision: number; no_cumplidas: number; sin_empezar: number; en_curso: number; checo: boolean; retardo: boolean; minutosTarde: number; falta: boolean }>,
+        personas: [] as Array<{ userId: number; nombre: string; programadas: number; terminadas: number; en_revision: number; no_cumplidas: number; sin_empezar: number; en_curso: number; checo: boolean; retardo: boolean; minutosTarde: number; falta: boolean; actividades: Array<{ id: number; titulo: string; estatus: string; bucket: string }> }>,
         totales: {
           programadas: 0,
           terminadas: 0,
@@ -354,6 +402,7 @@ export class SupervisionService {
       where: { companyId, deletedAt: null, cancelledAt: null, OR: [{ responsableId: { in: ids } }, { assignees: { some: { userId: { in: ids }, retiradoAt: null, companyId } } }], estatus: { not: { equals: 'Cancelada' } } },
       select: {
         id: true,
+        titulo: true,
         estatus: true,
         responsableId: true,
         periodoInicio: true,
@@ -389,6 +438,7 @@ export class SupervisionService {
         retardo: boolean;
         minutosTarde: number;
         falta: boolean;
+        actividades: Array<{ id: number; titulo: string; estatus: string; bucket: string }>;
       }
     >();
 
@@ -408,6 +458,7 @@ export class SupervisionService {
         retardo: false,
         minutosTarde: 0,
         falta: false,
+        actividades: [],
       });
     }
 
@@ -420,6 +471,7 @@ export class SupervisionService {
       const evidencia = a.activityEvidences?.find((e) => e.userId === userId);
       const asignado = a.assignees?.find((x) => x.userId === userId);
       const bucket = clasificarEstatusActividad(a.estatus, evidencia, asignado?.inicioRealAt);
+      row.actividades.push({ id: a.id, titulo: a.titulo, estatus: a.estatus, bucket });
       if (bucket === 'terminada') row.terminadas += 1;
       else if (bucket === 'en_revision') row.en_revision += 1;
       else if (bucket === 'no_cumplida') row.no_cumplidas += 1;
@@ -506,11 +558,13 @@ export class SupervisionService {
     const cierre = await this.prisma.cierreDiario.findFirst({
       where: { companyId: tenantId, supervisorId: actor.id, fecha: fechaCol },
     });
+    const planVsReal = await this.compararPlanVsReal(actor.id, tenantId, fechaIso, personas);
     return {
       rol: 'supervisor' as const,
       fecha: fechaIso,
       personas,
       totales,
+      planVsReal,
       cierre,
       puedeEntregar: !cierre,
     };
@@ -657,4 +711,152 @@ export class SupervisionService {
     }
     return avisos;
   }
+
+  private async compararPlanVsReal(
+    supervisorId: number,
+    companyId: number,
+    fechaIso: string,
+    personas: Array<{ userId: number; actividades?: Array<{ id: number; bucket: string }> }>,
+  ) {
+    const fechaCol = parseFechaIso(fechaIso);
+    const users = await this.usuariosEmpresa(companyId);
+    const arbol = subarbolIds(supervisorId, users);
+    const planes = await this.prisma.planDiario.findMany({
+      where: { companyId, fecha: fechaCol, autorId: { in: [...arbol] } },
+      select: { id: true, autorId: true, renglonesJson: true, estado: true },
+    });
+    const porActividad = new Map<number, string>();
+    for (const p of personas) {
+      for (const a of p.actividades ?? []) porActividad.set(a.id, a.bucket);
+    }
+    let planificados = 0;
+    let conActividad = 0;
+    let cumplidos = 0;
+    const detalle: Array<{
+      planId: number;
+      renglonId: string;
+      personaNombre: string;
+      actividad: string;
+      actividadCreadaId: number | null;
+      bucket: string | null;
+    }> = [];
+    for (const plan of planes) {
+      for (const r of normalizarRenglones(plan.renglonesJson)) {
+        planificados += 1;
+        const actId = r.actividadCreadaId ?? null;
+        const bucket = actId != null ? porActividad.get(actId) ?? null : null;
+        if (actId) conActividad += 1;
+        if (bucket === 'terminada') cumplidos += 1;
+        detalle.push({
+          planId: plan.id,
+          renglonId: r.id,
+          personaNombre: r.personaNombre || '',
+          actividad: r.actividad || '',
+          actividadCreadaId: actId,
+          bucket,
+        });
+      }
+    }
+    return { planificados, conActividad, cumplidos, sinProgramar: Math.max(0, planificados - conActividad), detalle: detalle.slice(0, 200) };
+  }
+
+  private renglonesDePlan(plan: { renglonesJson?: unknown; texto?: string }): PlanRenglon[] {
+    const rows = normalizarRenglones(plan.renglonesJson);
+    if (rows.length) return rows;
+    return renglonesDesdeTextoLibre(String(plan.texto ?? ''));
+  }
+
+  async programarRenglon(
+    sesion: Sesion,
+    companyId: number | null,
+    planId: number,
+    renglonId: string,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const actor = await this.resolveActor(sesion, tenantId);
+    const plan = await this.planDelSupervisor(planId, actor.id, tenantId);
+    const renglones = this.renglonesDePlan(plan);
+    const idx = renglones.findIndex((r) => r.id === renglonId);
+    if (idx < 0) throw new NotFoundException('No encontré ese renglón.');
+    const r = renglones[idx];
+    if (!r.actividad.trim()) throw new BadRequestException('El renglón no tiene actividad.');
+    if (!r.personaId) throw new BadRequestException('Asigna una persona al renglón antes de programar.');
+    if (r.actividadCreadaId) {
+      return { actividadId: r.actividadCreadaId, renglon: r, yaExistia: true };
+    }
+    const fechaIso = plan.fecha.toISOString().slice(0, 10);
+    const indicaciones = [
+      r.como ? `Cómo/alcance: ${r.como}` : '',
+      r.porque ? `Por qué/objetivo: ${r.porque}` : '',
+      r.horarioEstimado ? `Horario estimado: ${r.horarioEstimado}` : '',
+      r.clienteNombre ? `Cliente: ${r.clienteNombre}` : '',
+      r.proyectoNombre ? `Proyecto: ${r.proyectoNombre}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const prioridad =
+      r.prioridad === 'alta' ? 'ALTA' : r.prioridad === 'baja' ? 'BAJA' : 'MEDIA';
+    const creada = await this.activities.create(
+      {
+        titulo: r.actividad.slice(0, 200),
+        indicaciones: indicaciones || undefined,
+        descripcion: r.porque || undefined,
+        responsableId: r.personaId,
+        creadoPorId: actor.id,
+        clientId: r.clienteId ?? undefined,
+        projectId: r.proyectoId ?? undefined,
+        fechaInicio: fechaIso,
+        fechaMaxima: fechaIso,
+        prioridad,
+        estatus: 'Pendiente',
+      } as any,
+      tenantId,
+      { sinAviso: false },
+    );
+    renglones[idx] = { ...r, actividadCreadaId: creada.id };
+    await this.prisma.planDiario.update({
+      where: { id: plan.id },
+      data: {
+        renglonesJson: renglones,
+        texto: textoResumenDeRenglones(renglones),
+        estado: 'PROGRAMADO',
+      },
+    });
+    return { actividadId: creada.id, renglon: renglones[idx], yaExistia: false };
+  }
+
+  async programarTodo(sesion: Sesion, companyId: number | null, planId: number) {
+    const tenantId = requireCompanyId(companyId);
+    const actor = await this.resolveActor(sesion, tenantId);
+    const plan = await this.planDelSupervisor(planId, actor.id, tenantId);
+    const renglones = this.renglonesDePlan(plan);
+    const resultados: Array<{ renglonId: string; actividadId?: number; error?: string }> = [];
+    for (const r of renglones) {
+      if (!r.actividad || !r.personaId) {
+        resultados.push({ renglonId: r.id, error: 'Falta persona o actividad' });
+        continue;
+      }
+      try {
+        const out = await this.programarRenglon(sesion, companyId, planId, r.id);
+        resultados.push({ renglonId: r.id, actividadId: out.actividadId });
+      } catch (e) {
+        resultados.push({
+          renglonId: r.id,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+    return { resultados };
+  }
+
+  async equipoParaPlan(sesion: Sesion, companyId: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const actor = await this.resolveActor(sesion, tenantId);
+    const users = await this.usuariosEmpresa(tenantId);
+    const equipo = users
+      .filter((u) => u.managerId === actor.id || u.id === actor.id)
+      .map((u) => ({ id: u.id, nombre: u.nombre, email: u.email, puesto: u.puesto }));
+    return { equipo };
+  }
+
 }

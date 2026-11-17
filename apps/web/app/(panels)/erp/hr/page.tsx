@@ -20,6 +20,7 @@ import { SkeletonList } from "@/components/PageState";
 import { Avatar } from "@/components/base";
 import { MenuFila } from "@/components/mesa-contable/piezas";
 import { exportToExcel } from "@/lib/export-excel";
+import ExcelExportadorDinamico from "@/components/excel/ExcelExportadorDinamico";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
@@ -40,6 +41,8 @@ type HrEmpleado = {
   fechaCreacion?: string;
   department?: { id: number; nombre: string } | null;
   role?: { id: number; nombre: string; nivelAutoridad?: number | null } | null;
+  managerId?: number | null;
+  manager?: { id: number; nombre: string } | null;
 };
 
 type ApiRole = { id: number; nombre: string };
@@ -209,6 +212,8 @@ export default function HrPage() {
   const deferredFilter = useDeferredValue(filter);
   const [filterDept, setFilterDept] = useState("");
   const [filterEstado, setFilterEstado] = useState("");
+  const [filterJefe, setFilterJefe] = useState("");
+  const [filterContrato, setFilterContrato] = useState("");
 
   const [roles, setRoles] = useState<ApiRole[]>([]);
   const [depts, setDepts] = useState<ApiDept[]>([]);
@@ -291,8 +296,24 @@ export default function HrPage() {
       else if (filterEstado === "baja") rows = rows.filter((e) => e.estadoRRHH === "Baja");
       else rows = rows.filter((e) => e.estadoRRHH === filterEstado);
     }
+    if (filterJefe) rows = rows.filter((e) => String(e.managerId ?? e.manager?.id ?? "") === filterJefe);
+    if (filterContrato) rows = rows.filter((e) => (e.tipoContrato ?? "") === filterContrato);
     return rows;
-  }, [items, deferredFilter, filterDept, filterEstado]);
+  }, [items, deferredFilter, filterDept, filterEstado, filterJefe, filterContrato]);
+
+  const jefesOpciones = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const e of items) {
+      const id = e.managerId ?? e.manager?.id;
+      const nombre = e.manager?.nombre;
+      if (id != null && nombre) map.set(id, nombre);
+      else if (id != null && !map.has(id)) {
+        const jefe = items.find((x) => x.id === id);
+        if (jefe) map.set(id, jefe.nombre);
+      }
+    }
+    return Array.from(map.entries()).map(([id, nombre]) => ({ value: String(id), label: nombre })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [items]);
 
   const stats = useMemo(() => {
     let activos = 0, vac = 0, incidencias = 0, honorarios = 0;
@@ -920,10 +941,55 @@ export default function HrPage() {
                 ],
                 allowAll: true,
               },
+              {
+                label: "Contrato",
+                value: filterContrato,
+                onChange: setFilterContrato,
+                options: TIPO_CONTRATO.map((t) => ({ value: t, label: t })),
+                allowAll: true,
+              },
+              ...(jefesOpciones.length > 0 ? [{
+                label: "Jefe",
+                value: filterJefe,
+                onChange: setFilterJefe,
+                options: jefesOpciones,
+                allowAll: true,
+              }] : []),
             ]}
-            onClear={() => { setFilter(""); setFilterDept(""); setFilterEstado(""); }}
+            onClear={() => { setFilter(""); setFilterDept(""); setFilterEstado(""); setFilterJefe(""); setFilterContrato(""); }}
             resultCount={loaded ? filtered.length : null}
             rightActions={loaded && filtered.length > 0 ? (
+              <>
+              <ExcelExportadorDinamico
+                preferenciaKey="nx-excel-cols-hr-plantilla"
+                titulo="Plantilla de personal"
+                filename="plantilla-rh"
+                rows={filtered.map((e) => ({
+                  fecha: (e.fechaIngreso ?? e.fechaCreacion ?? "").toString().slice(0, 10),
+                  nombre: e.nombre,
+                  email: e.email,
+                  puesto: e.puesto ?? "",
+                  area: e.department?.nombre ?? "",
+                  estado: e.estadoRRHH ?? "",
+                  contrato: e.tipoContrato ?? "",
+                  jefe: e.manager?.nombre ?? (e.managerId != null ? String(e.managerId) : ""),
+                }))}
+                getFecha={(r) => r.fecha || null}
+                getPersonaArea={(r) => `${r.nombre} ${r.area}`}
+                estadoKey="estado"
+                estados={ESTADOS_RRHH.map((s) => ({ value: s, label: s }))}
+                columns={[
+                  { key: "nombre", label: "Nombre" },
+                  { key: "email", label: "Correo" },
+                  { key: "puesto", label: "Puesto" },
+                  { key: "area", label: "Área" },
+                  { key: "estado", label: "Situación" },
+                  { key: "contrato", label: "Contrato" },
+                  { key: "jefe", label: "Jefe" },
+                  { key: "fecha", label: "Ingreso" },
+                ]}
+                generadoPor={user?.nombre}
+              />
               <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
                 { key: "nombre", label: "Nombre" },
                 { key: "email", label: "Correo" },
@@ -931,7 +997,9 @@ export default function HrPage() {
                 { key: "department", label: "Área", format: (v) => (v as HrEmpleado["department"])?.nombre ?? "—" },
                 { key: "estadoRRHH", label: "Situación" },
                 { key: "tipoContrato", label: "Contrato" },
-              ], "plantilla")}>Exportar a Excel</Button>
+                { key: "manager", label: "Jefe", format: (v) => (v as HrEmpleado["manager"])?.nombre ?? "—" },
+              ], "plantilla")}>Exportar rápido</Button>
+              </>
             ) : undefined}
           />
 
@@ -957,7 +1025,7 @@ export default function HrPage() {
                 emptyAction={items.length === 0 && cfg.canCreate
                   ? <Button size="sm" variant="primary" onClick={openCreate}>Alta de personal</Button>
                   : items.length > 0
-                    ? <Button size="sm" variant="secondary" onClick={() => { setFilter(""); setFilterDept(""); setFilterEstado(""); }}>Quitar filtros</Button>
+                    ? <Button size="sm" variant="secondary" onClick={() => { setFilter(""); setFilterDept(""); setFilterEstado(""); setFilterJefe(""); setFilterContrato(""); }}>Quitar filtros</Button>
                     : undefined}
               />
             )}

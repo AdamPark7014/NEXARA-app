@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
-import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { SupervisionService } from './supervision.service.js';
 
@@ -12,12 +11,24 @@ export class SupervisionController {
 
   private sesion(req: any) {
     const u = req?.user ?? {};
-    return { id: Number(u.id), email: u.email, roleKey: u.roleKey, isSuperAdmin: Boolean(u.isSuperAdmin), isClient: Boolean(u.isClient), isBranchUser: Boolean(u.isBranchUser), nombre: u.nombre };
+    return {
+      id: Number(u.id),
+      email: u.email,
+      roleKey: u.roleKey,
+      isSuperAdmin: Boolean(u.isSuperAdmin),
+      isClient: Boolean(u.isClient),
+      isBranchUser: Boolean(u.isBranchUser),
+      nombre: u.nombre,
+    };
   }
 
   @RBAC({})
   @Post('plan')
-  enviar(@Req() req: any, @CurrentCompanyId() companyId: number | null, @Body() body: { fecha?: string; texto?: string }) {
+  enviar(
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: { fecha?: string; texto?: string; renglones?: unknown; pegarTexto?: string },
+  ) {
     return this.service.enviarPlan(this.sesion(req), companyId, body ?? {});
   }
 
@@ -28,6 +39,12 @@ export class SupervisionController {
   }
 
   @RBAC({})
+  @Get('equipo')
+  equipo(@Req() req: any, @CurrentCompanyId() companyId: number | null) {
+    return this.service.equipoParaPlan(this.sesion(req), companyId);
+  }
+
+  @RBAC({})
   @Post('plan/:id/programado')
   programado(@Req() req: any, @CurrentCompanyId() companyId: number | null, @Param('id', ParseIntPipe) id: number) {
     return this.service.programarPlan(this.sesion(req), companyId, id);
@@ -35,8 +52,34 @@ export class SupervisionController {
 
   @RBAC({})
   @Post('plan/:id/devolver')
-  devolver(@Req() req: any, @CurrentCompanyId() companyId: number | null, @Param('id', ParseIntPipe) id: number, @Body() body: { nota?: string }) {
+  devolver(
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { nota?: string },
+  ) {
     return this.service.devolverPlan(this.sesion(req), companyId, id, body?.nota);
+  }
+
+  @RBAC({})
+  @Post('plan/:id/programar-renglon')
+  programarRenglon(
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { renglonId?: string },
+  ) {
+    return this.service.programarRenglon(this.sesion(req), companyId, id, String(body?.renglonId ?? ''));
+  }
+
+  @RBAC({})
+  @Post('plan/:id/programar-todo')
+  programarTodo(
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.service.programarTodo(this.sesion(req), companyId, id);
   }
 
   @RBAC({})
@@ -47,7 +90,11 @@ export class SupervisionController {
 
   @RBAC({})
   @Post('cierre')
-  entregar(@Req() req: any, @CurrentCompanyId() companyId: number | null, @Body() body: { fecha?: string; comentario?: string }) {
+  entregar(
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: { fecha?: string; comentario?: string },
+  ) {
     return this.service.entregarCierre(this.sesion(req), companyId, body ?? {});
   }
 }

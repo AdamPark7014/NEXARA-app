@@ -28,6 +28,7 @@ import {
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { Money } from "@/components/ui/DataTable";
 import { FinanceModuleShell } from "@/components/finance/FinanceModuleShell";
+import ExcelExportadorDinamico from "@/components/excel/ExcelExportadorDinamico";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
@@ -143,7 +144,7 @@ export default function PrenominaPanel({
   rail,
   canDecideOt = true,
 }: PrenominaPanelProps) {
-  const { token } = useUser();
+  const { token, user } = useUser();
   const [resumenIncidencias, setResumenIncidencias] = useState<Record<number, string>>({});
   const [from, setFrom] = useState(isoDaysAgo(6));
   const [to, setTo] = useState(isoLocal(new Date()));
@@ -454,6 +455,35 @@ export default function PrenominaPanel({
           </>
         }
       >
+        {rows.length > 0 ? (
+          <div style={{ marginBottom: 12 }}>
+            <ExcelExportadorDinamico
+              preferenciaKey="nx-excel-cols-prenomina"
+              titulo="Prenómina"
+              filename="prenomina"
+              rows={rows.map((r) => ({
+                fecha: from,
+                nombre: r.nombre || r.email || "",
+                puesto: r.puesto || "",
+                dias: r.daysWithAttendance ?? 0,
+                monto: Number(r.suggestedAmount ?? 0),
+                estado: selected.has(r.userId) ? "seleccionado" : "fuera",
+              }))}
+              getFecha={(r) => r.fecha}
+              getPersonaArea={(r) => `${r.nombre} ${r.puesto}`}
+              estadoKey="estado"
+              columns={[
+                { key: "nombre", label: "Persona" },
+                { key: "puesto", label: "Puesto" },
+                { key: "dias", label: "Días", tipo: "numero" as const },
+                { key: "monto", label: "Sugerido", tipo: "dinero" as const, total: "suma" as const },
+                { key: "estado", label: "Selección" },
+                { key: "fecha", label: "Desde" },
+              ]}
+              generadoPor={(user as { nombre?: string } | null)?.nombre}
+            />
+          </div>
+        ) : null}
         <Card as="div" className={s.barra}>
           <ModuleToolbar
             chips={

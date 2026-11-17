@@ -13,6 +13,10 @@ import { PersonalImportController } from './personal-import/personal-import.cont
 import { RhAlertasService } from './alertas/rh-alertas.service.js';
 import { RhSolicitudesService } from './rh-solicitudes.service.js';
 import { RhSolicitudesController } from './rh-solicitudes.controller.js';
+import { MedidasDisciplinariasService } from './medidas-disciplinarias/medidas-disciplinarias.service.js';
+import { MedidasDisciplinariasController } from './medidas-disciplinarias/medidas-disciplinarias.controller.js';
+import { CargosPerdidaService } from './cargos-perdida/cargos-perdida.service.js';
+import { CargosPerdidaController } from './cargos-perdida/cargos-perdida.controller.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, AprobacionesModule],
@@ -23,6 +27,8 @@ import { RhSolicitudesController } from './rh-solicitudes.controller.js';
     PersonalImportService,
     RhAlertasService,
     RhSolicitudesService,
+    MedidasDisciplinariasService,
+    CargosPerdidaService,
   ],
   controllers: [
     HrController,
@@ -30,6 +36,8 @@ import { RhSolicitudesController } from './rh-solicitudes.controller.js';
     ExpedienteController,
     PersonalImportController,
     RhSolicitudesController,
+    MedidasDisciplinariasController,
+    CargosPerdidaController,
   ],
   exports: [HrService, IncidenciasPersonalService, ExpedienteService],
 })

@@ -284,8 +284,10 @@ export class UsersService {
       id: true, nombre: true, email: true, employeeNumber: true,
       avatarUrl: true, fechaCreacion: true,
       puesto: true, tipoContrato: true, estadoRRHH: true, isActive: true, fechaIngreso: true,
+      managerId: true,
       department: { select: { id: true, nombre: true } },
       role: { select: { id: true, nombre: true, nivelAutoridad: true } },
+      manager: { select: { id: true, nombre: true } },
     };
 
     if (query?.limit) {
