@@ -28,6 +28,7 @@ import {
   type FilaBandeja,
   type TipoTicket,
 } from './gestion-viaticos.helpers.js';
+import { portalDeGasolinera } from '../accounting/buzon-sat/portales-gasolina.js';
 
 type Sesion = {
   id?: number | string | null;
@@ -746,7 +747,14 @@ export class GestionViaticosService {
     }
     const leido = await this.lectura.leerTicket(companyId, buffer);
     const tipo: TipoTicket = normalizarTipo(
-      (leido as { tipo?: string }).tipo || (leido as { concepto?: string }).concepto || 'GASOLINA',
+      (leido as { tipo?: string }).tipo ||
+        (leido as { combustible?: string | null }).combustible ||
+        (leido as { concepto?: string }).concepto ||
+        'GASOLINA',
+    );
+    const portal = portalDeGasolinera(
+      (leido as { comercio?: string | null }).comercio,
+      (leido as { rfc?: string | null }).rfc,
     );
     return {
       disponible: true,
@@ -754,10 +762,37 @@ export class GestionViaticosService {
       datos: {
         ...leido,
         tipo,
+        estacionComercio: (leido as { comercio?: string | null }).comercio ?? null,
+        rfcEmisor: (leido as { rfc?: string | null }).rfc ?? null,
         puedeFacturar: true,
         fechaLimiteFacturacion: plazoFacturacionPorOmision(tipo, new Date(), true)
           ?.toISOString()
           .slice(0, 10),
+        portalFacturacion: portal
+          ? {
+              nombre: portal.nombre,
+              url: portal.url,
+              recordatorio: portal.recordatorio,
+              datosACopiar: {
+                rfc: (leido as { rfc?: string | null }).rfc ?? null,
+                folio: (leido as { folio?: string | null }).folio ?? null,
+                importe: (leido as { importe?: number | null }).importe ?? null,
+                fecha: (leido as { fecha?: string | null }).fecha ?? null,
+              },
+            }
+          : (leido as { webFacturacion?: string | null }).webFacturacion
+            ? {
+                nombre: 'Portal del ticket',
+                url: (leido as { webFacturacion?: string | null }).webFacturacion!,
+                recordatorio: tipo === 'GASOLINA' ? 'Gasolina: factura el mismo día del ticket.' : 'Factura dentro del plazo.',
+                datosACopiar: {
+                  rfc: (leido as { rfc?: string | null }).rfc ?? null,
+                  folio: (leido as { folio?: string | null }).folio ?? null,
+                  importe: (leido as { importe?: number | null }).importe ?? null,
+                  fecha: (leido as { fecha?: string | null }).fecha ?? null,
+                },
+              }
+            : null,
       },
     };
   }

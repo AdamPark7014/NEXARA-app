@@ -55,6 +55,7 @@ import {
   type PorFacturarItem,
   type PorFacturarRespuesta,
 } from "@/lib/mesa-contable";
+import { ArmarFacturaIA } from "@/components/contabilidad/ArmarFacturaIA";
 
 type AvisoAccion = { tono: "success" | "warning" | "danger"; texto: string };
 
@@ -270,6 +271,9 @@ export default function PorFacturarPage() {
   return (
     <div className={m.page}>
       <MesaEncabezado eyebrow="Finanzas · Mesa contable" titulo="Por facturar" acciones={accionesHead} />
+      <div style={{ padding: "0 16px 12px" }}>
+        <ArmarFacturaIA />
+      </div>
       <ContabilidadSidebar />
 
       {avisoT ? (

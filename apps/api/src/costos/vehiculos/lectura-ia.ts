@@ -390,24 +390,46 @@ export function limpiarTablero(
   return { odometroKm: posible ? km : null, combustible, legible: r?.legible === true && posible };
 }
 
-export const PROMPT_TICKET = `Lees la foto de un ticket de gasolina de México. Devuelve los litros despachados, el precio por litro, el importe total en pesos y la fecha.
+export const PROMPT_TICKET = `Lees la foto de un ticket de gasto de México (gasolina u otro). Devuelve JSON con:
+- litros, precioLitro, importe, iva (si se ve), fecha (AAAA-MM-DD), hora (HH:MM o null)
+- comercio (nombre de la estación/tienda), rfc (si aparece), combustible (Magna/Premium/Diésel o null)
+- folio (número de ticket si se ve), webFacturacion (URL impresa para facturar, o null)
+- legible true solo si el importe se lee con claridad. No adivines.
 
-- "litros" es la cantidad despachada, no el número de bomba. "importe" es el total pagado. El precio suele estar entre 15 y 40 pesos.
-- "fecha" en formato AAAA-MM-DD; si no se ve, null.
-- Si el papel no es de gasolina o no se puede leer, legible false y lo demás null. No adivines.`;
+"litros" es la cantidad despachada, no el número de bomba. El precio por litro suele estar entre 15 y 40 pesos.`;
 
 export const ESQUEMA_TICKET: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
   required: ['litros', 'precioLitro', 'importe', 'fecha', 'legible'],
-  properties: { litros: numeroONulo, precioLitro: numeroONulo, importe: numeroONulo, fecha: cadena, legible: { type: 'boolean' } },
+  properties: {
+    litros: numeroONulo,
+    precioLitro: numeroONulo,
+    importe: numeroONulo,
+    iva: numeroONulo,
+    fecha: cadena,
+    hora: cadena,
+    comercio: cadena,
+    rfc: cadena,
+    combustible: cadena,
+    folio: cadena,
+    webFacturacion: cadena,
+    legible: { type: 'boolean' },
+  },
 };
 
 export type TicketLeido = {
   litros: number | null;
   precioLitro: number | null;
   importe: number | null;
+  iva: number | null;
   fecha: string | null;
+  hora: string | null;
+  comercio: string | null;
+  rfc: string | null;
+  combustible: string | null;
+  folio: string | null;
+  webFacturacion: string | null;
   legible: boolean;
   /** Litros × precio no da el importe: alguna cifra se leyó mal. */
   revisar: boolean;
@@ -419,7 +441,20 @@ const enRango = (v: unknown, min: number, max: number) =>
 
 /** Rangos posibles y una cuenta: litros × precio tiene que dar el importe. */
 export function limpiarTicket(
-  r: { litros?: unknown; precioLitro?: unknown; importe?: unknown; fecha?: unknown; legible?: unknown } | null | undefined,
+  r: {
+    litros?: unknown;
+    precioLitro?: unknown;
+    importe?: unknown;
+    iva?: unknown;
+    fecha?: unknown;
+    hora?: unknown;
+    comercio?: unknown;
+    rfc?: unknown;
+    combustible?: unknown;
+    folio?: unknown;
+    webFacturacion?: unknown;
+    legible?: unknown;
+  } | null | undefined,
 ): TicketLeido {
   let litros = enRango(r?.litros, 0.5, 400);
   let precio = enRango(r?.precioLitro, 10, 60);
@@ -428,6 +463,11 @@ export function limpiarTicket(
   if (importe == null && litros != null && precio != null) importe = enRango(redondea(litros * precio), 5, 25000);
   if (precio == null && litros != null && importe != null) precio = enRango(redondea(importe / litros), 10, 60);
   const fecha = typeof r?.fecha === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.fecha) ? r.fecha : null;
+  const hora =
+    typeof r?.hora === 'string' && /^\d{1,2}:\d{2}/.test(r.hora) ? r.hora.slice(0, 5) : null;
+  const texto = (v: unknown, max: number) =>
+    typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null;
+  const rfc = texto(r?.rfc, 13)?.toUpperCase() ?? null;
   const cuadra =
     litros != null && precio != null && importe != null ? Math.abs(litros * precio - importe) / importe <= 0.03 : false;
   const completo = litros != null && importe != null;
@@ -435,7 +475,14 @@ export function limpiarTicket(
     litros: litros == null ? null : redondea(litros),
     precioLitro: precio == null ? null : redondea(precio),
     importe: importe == null ? null : redondea(importe),
+    iva: enRango(r?.iva, 0, 5000),
     fecha,
+    hora,
+    comercio: texto(r?.comercio, 160),
+    rfc: rfc && /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc) ? rfc : null,
+    combustible: texto(r?.combustible, 40),
+    folio: texto(r?.folio, 80),
+    webFacturacion: texto(r?.webFacturacion, 500),
     legible: r?.legible === true && completo,
     revisar: completo && !cuadra,
   };

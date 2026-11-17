@@ -5,6 +5,8 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
 import { WebhooksModule } from '../webhooks/webhooks.module.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { ModulePolicyModule } from '../common/tenant/module-policy.module.js';
+import { PacModule } from '../pac/pac.module.js';
+import { AiModule } from '../ai/ai.module.js';
 import { AccountingService } from './accounting.service.js';
 import { AccountsController } from './accounts.controller.js';
 import { JournalEntriesController } from './journal-entries.controller.js';
@@ -29,9 +31,22 @@ import { PorFacturarService } from './mesa-contable/por-facturar.service.js';
 import { PagosGastosService } from './mesa-contable/pagos-gastos.service.js';
 import { EstadosFinancierosService } from './mesa-contable/estados-financieros.service.js';
 import { RevisionFacturaService } from './mesa-contable/revision-factura.service.js';
+import { BuzonSatController } from './buzon-sat/buzon-sat.controller.js';
+import { BuzonSatService } from './buzon-sat/buzon-sat.service.js';
+import { PolizaPropuestaService } from './buzon-sat/poliza-propuesta.service.js';
+import { FacturaIaService } from './buzon-sat/factura-ia.service.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, NotificationsModule, WebhooksModule, AuditModule, ModulePolicyModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    NotificationsModule,
+    WebhooksModule,
+    AuditModule,
+    ModulePolicyModule,
+    PacModule,
+    AiModule,
+  ],
   controllers: [
     AccountsController,
     JournalEntriesController,
@@ -46,6 +61,7 @@ import { RevisionFacturaService } from './mesa-contable/revision-factura.service
     WorkspaceArApController,
     VendorProjectFinanceController,
     MesaContableController,
+    BuzonSatController,
   ],
   providers: [
     AccountingService,
@@ -59,7 +75,10 @@ import { RevisionFacturaService } from './mesa-contable/revision-factura.service
     PagosGastosService,
     EstadosFinancierosService,
     RevisionFacturaService,
+    BuzonSatService,
+    PolizaPropuestaService,
+    FacturaIaService,
   ],
-  exports: [AccountingService, VendorProjectFinanceService],
+  exports: [AccountingService, VendorProjectFinanceService, BuzonSatService],
 })
 export class AccountingModule {}
