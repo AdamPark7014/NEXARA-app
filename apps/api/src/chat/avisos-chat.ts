@@ -7,6 +7,24 @@ export type ActividadAviso = { id: number; anNumber?: string | null; titulo: str
 const etiqueta = (a: ActividadAviso) => `${a.anNumber ? `${a.anNumber} · ` : ''}${a.titulo}`.replace(/[[\]]/g, '').slice(0, 120);
 export const ligaActividad = (a: ActividadAviso, sub = '') => `[${etiqueta(a)}](/erp/actividades/${a.id}${sub})`;
 
+/** Actividad autoasignada o del mismo día: aviso al supervisor (Luis). */
+export function avisoActividadNoProgramada(
+  a: ActividadAviso,
+  creadorNombre: string,
+  motivo: 'autoasignada' | 'mismo_dia',
+): string {
+  const que =
+    motivo === 'autoasignada'
+      ? 'se autoasignó una actividad'
+      : 'creó una actividad para ejecutar hoy';
+  return `📌 ${creadorNombre} ${que}: ${ligaActividad(a)}. Revísala y aprueba cuando corresponda.`;
+}
+
+/** Evidencia lista para revisión: aviso al revisor con liga directa. */
+export function avisoEvidenciaPorRevisar(a: ActividadAviso, quienNombre: string): string {
+  return `📷 ${quienNombre} envió evidencias de ${ligaActividad(a, '/evidencias')} listas para tu revisión.`;
+}
+
 export function avisoRevision(
   a: ActividadAviso,
   decision: 'APROBADA' | 'DEVUELTA_PASOS' | 'DEVUELTA_TODO',

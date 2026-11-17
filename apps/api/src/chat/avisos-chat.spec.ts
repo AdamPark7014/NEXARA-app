@@ -1,4 +1,11 @@
-import { avisoIncidencia, avisoNoCumplida, avisoRevision, ligaActividad } from './avisos-chat.js';
+import {
+  avisoActividadNoProgramada,
+  avisoEvidenciaPorRevisar,
+  avisoIncidencia,
+  avisoNoCumplida,
+  avisoRevision,
+  ligaActividad,
+} from './avisos-chat.js';
 
 const a = { id: 20, anNumber: 'AN-0020', titulo: 'Instalar 4 cámaras [Hotel Aurora]' };
 
@@ -20,5 +27,16 @@ describe('avisos por chat', () => {
       '⚠️ Reporté una incidencia alta (falta material) en [AN-0020 · Instalar 4 cámaras Hotel Aurora](/erp/actividades/20): No llegó el cable',
     );
     expect(avisoNoCumplida(a, 'venció sin entrega', null)).toContain('quedó como «No cumplida»: venció sin entrega.');
+  });
+
+  it('actividad no programada y evidencia por revisar llevan liga', () => {
+    const auto = avisoActividadNoProgramada(a, 'Joan', 'autoasignada');
+    expect(auto).toContain('se autoasignó');
+    expect(auto).toContain('(/erp/actividades/20)');
+    const hoy = avisoActividadNoProgramada(a, 'Joan', 'mismo_dia');
+    expect(hoy).toContain('para ejecutar hoy');
+    const rev = avisoEvidenciaPorRevisar(a, 'Joan');
+    expect(rev).toContain('(/erp/actividades/20/evidencias)');
+    expect(rev).toContain('Joan');
   });
 });

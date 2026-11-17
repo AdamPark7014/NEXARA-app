@@ -67,6 +67,8 @@ export function extrasDeAsignacion(email?: string | null): string[] {
 export function esDeTodaLaEmpresa(viewer: Alcanzador): boolean {
   if (viewer.isSuperAdmin) return true;
   if (viewer.roleKey === 'ceo') return true;
+  // RH (Tere): nómina y métricas de personal de toda la empresa, sin filtro de árbol.
+  if (viewer.roleKey === 'rh') return true;
   const email = (viewer.email || '').toLowerCase();
   return isCeoEquivalentEmail(email) || email === 'developer@nexara.com.mx';
 }

@@ -223,3 +223,13 @@ describe('quién puede cerrar una asignación', () => {
     await expect(service.checkoutAsset(3, 5, completo(), 7)).rejects.toThrow(/ya está asignado/);
   });
 });
+
+it('km menor avisa solo a Liz real de la empresa antes de devolver 400', async () => {
+  const { service, prisma } = build({ control: { fotosSalida: {}, odometroInicio: 50000 } });
+  prisma.user = { findMany: jest.fn().mockResolvedValue([{id: 8, email: 'lizeth.antonio@nexara.com.mx'}, {id: 9, email: 'developer@nexara.com.mx'}, {id: 10, email: 'demo@example.com'}]) };
+  prisma.notification = { create: jest.fn().mockResolvedValue({}) };
+  await expect(service.endUse(1, 5, completo({ odometroKm: 49000 }), 7)).rejects.toBeInstanceOf(BadRequestException);
+  expect(prisma.notification.create).toHaveBeenCalledTimes(1);
+  expect(prisma.notification.create.mock.calls[0][0].data).toMatchObject({ userId: 8, companyId: 7 });
+  expect(prisma.vehicleControl.update).not.toHaveBeenCalled();
+});

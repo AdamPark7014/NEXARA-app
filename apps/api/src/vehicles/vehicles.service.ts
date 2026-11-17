@@ -1,3 +1,4 @@
+import { esDestinatarioFinanzas } from '../common/finance-notification-recipient.js';
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -320,6 +321,62 @@ export class VehiclesService {
     return revision.datos;
   }
 
+  /** Avisa a Liz (coord_admin) si el checklist de devolución viene incompleto o con km raro. */
+  private async avisarLizChecklist(
+    companyId: number | null | undefined,
+    titulo: string,
+    mensaje: string,
+    relatedId: number,
+  ) {
+    try {
+      if (!companyId) return;
+      const liz = await this.prisma.user.findMany({
+        where: {
+          isActive: true,
+          roleKey: ROLES.COORD_ADMIN,
+          companyMemberships: { some: { companyId } },
+        },
+        select: { id: true, email: true, puesto: true },
+      });
+      for (const u of liz.filter(esDestinatarioFinanzas)) {
+        await this.prisma.notification.create({
+          data: {
+            userId: u.id,
+            type: 'VEHICLE_USAGE_EXPIRING',
+            category: 'vehicles',
+            title: titulo,
+            message: mensaje.slice(0, 2000),
+            relatedEntityId: relatedId,
+            entityType: 'VehicleControl',
+            relatedUrl: `/erp/vehiculos/${relatedId}`,
+            priority: 'high',
+            companyId,
+          },
+        });
+      }
+    } catch {
+      /* el rechazo del checklist no depende del aviso */
+    }
+  }
+
+  private async revisarDevolucionOFallar(
+    entrada: EntradaChecklist,
+    ctx: { companyId?: number | null; relatedId: number; etiqueta: string },
+  ): Promise<ChecklistNormalizado> {
+    const revision = revisarChecklist(entrada);
+    if (!revision.ok) {
+      const msg = mensajeErrores(revision.errores);
+      await this.avisarLizChecklist(
+        ctx.companyId,
+        `Checklist de vehículo: ${ctx.etiqueta}`,
+        msg,
+        ctx.relatedId,
+      );
+      throw new BadRequestException(msg);
+    }
+    return revision.datos;
+  }
+
   /** Lo que se guarda en `fotosSalida` / `fotosDevolucion`. */
   private payloadFotos(datos: ChecklistNormalizado) {
     return {
@@ -370,8 +427,12 @@ export class VehiclesService {
     const record = await this.findOne(id, companyId);
     if (record.solicitanteId !== userId) throw new ForbiddenException('Solo el solicitante puede registrar la devolución');
     if (!record.fotosSalida) throw new BadRequestException('Primero registra la salida del vehículo');
+    if (record.fotosDevolucion || record.entregaEstatus === 'Devuelto') throw new BadRequestException('Ya registraste la devolución del vehículo');
 
-    const datos = this.revisarOFallar({ ...entrada, odometroInicio: record.odometroInicio });
+    const datos = await this.revisarDevolucionOFallar(
+      { ...entrada, odometroInicio: record.odometroInicio },
+      { companyId, relatedId: id, etiqueta: record.nombreVehiculo || `solicitud #${id}` },
+    );
 
     return this.prisma['vehicleControl'].update({
       where: { id },
@@ -428,7 +489,16 @@ export class VehiclesService {
     if (asset.estatus !== 'Asignado') throw new BadRequestException('El vehículo no está asignado');
 
     const salida = asset.salidaFotos as { odometroKm?: number } | null;
-    const datos = this.revisarOFallar({ ...entrada, odometroInicio: salida?.odometroKm ?? null });
+    const datos = await this.revisarDevolucionOFallar(
+      { ...entrada, odometroInicio: salida?.odometroKm ?? null },
+      {
+        companyId,
+        relatedId: id,
+        etiqueta: (asset as { alias?: string; placa?: string }).alias
+          || (asset as { placa?: string }).placa
+          || `inventario #${id}`,
+      },
+    );
 
     const minutosUso = asset.assignedAt
       ? Math.round((Date.now() - new Date(asset.assignedAt).getTime()) / 60000)

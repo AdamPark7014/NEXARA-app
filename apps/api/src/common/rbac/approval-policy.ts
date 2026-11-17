@@ -1,10 +1,11 @@
 /**
  * NEXARA · RBAC v2 — Política de Aprobaciones Jerárquicas
  * --------------------------------------------------------
- * Flujos actualizados (15-11-2026):
+ * Flujos actualizados (16-11-2026):
  *   1. VIÁTICOS        → Solo dos pasos: Coordinación Admin → CEO (Autorización final).
  *      Eliminado: ADMINISTRATIVO, DIR_ADMIN.
- *   2. VEHÍCULOS       → Solo dos pasos: Coordinación Admin → CEO (Autorización final).
+ *   2. VEHÍCULOS       → Único paso: COORD_ADMIN (Liz). Autorización final activa inmediatamente sin paso de CEO.
+ *      Nota: Desde 16-11 solo aprueba Liz (coord_admin), eliminado el rol del CEO para este flujo.
  *      Eliminados: COORD_OPERACIONES, ARQUITECTO, ADMINISTRATIVO.
  *   3. EVIDENCIAS / ACTIVIDADES (Ing. Campo → Coord.Ops → Admin → Coord.Admin)
  *   4. COTIZACIONES (Vendedor → Coord.Ventas → Dir.Ops → CEO)
@@ -64,8 +65,7 @@ export const APPROVAL_CHAINS: Record<ApprovalFlow, ApprovalStep[]> = {
 
   // ─── VEHÍCULOS ───────────────────────────────────────────────────
   vehicles: [
-    { role: ROLES.COORD_ADMIN, label: 'Gestión de vehículos' },
-    { role: ROLES.CEO, label: 'CEO — Autorización final', isFinal: true },
+    { role: ROLES.COORD_ADMIN, label: 'Gestión de vehículos (Liz)', isFinal: true },
   ],
 
   // ─── MULTAS ──────────────────────────────────────────────────────

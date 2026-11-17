@@ -50,6 +50,10 @@ import {
 import { esAutoasignacion, parametrosCambiados } from './tiempo-entrega.js';
 import { TiemposActividadService } from './tiempos-actividad.service.js';
 import { normalizarMomento, normalizarMomentos, progresoDeCampos, type Momento } from './evidence/evidence-fields.helpers.js';
+import { ChatService } from '../chat/chat.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
+import { esActividadNoProgramada } from './aviso-luis.js';
+import { avisoActividadNoProgramada as textoAvisoLuis } from '../chat/avisos-chat.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -64,6 +68,8 @@ export class ActivitiesService {
     private readonly domainEvents: DomainEventBusService,
     @Optional() private readonly realtime?: RealtimeGateway,
     @Optional() private readonly tiempos?: TiemposActividadService,
+    @Optional() private readonly chat?: ChatService,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   // Dummy implementation to avoid controller errors
@@ -112,6 +118,87 @@ export class ActivitiesService {
   async getNextAnNumber(companyId?: number | null): Promise<string> {
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
     return this.generateNextAnNumber(resolvedCompanyId);
+  }
+
+  /**
+   * Autoasignada o del mismo día: push + chat al supervisor (Luis / dir_operaciones
+   * o el managerId del creador). No truena el alta si el aviso falla.
+   */
+  private async avisarLuisSiNoProgramada(
+    activity: {
+      id: number;
+      anNumber?: string | null;
+      titulo?: string | null;
+      creadoPorId?: number | null;
+      responsableId?: number | null;
+      fechaInicio?: Date | string | null;
+      periodoInicio?: Date | string | null;
+      createdAt?: Date | string | null;
+      creador?: { nombre?: string | null } | null;
+    },
+    companyId: number,
+  ) {
+    try {
+      const { avisar, motivo } = esActividadNoProgramada({
+        creadoPorId: activity.creadoPorId,
+        responsableId: activity.responsableId,
+        fechaInicio: activity.fechaInicio,
+        periodoInicio: activity.periodoInicio,
+        createdAt: activity.createdAt,
+      });
+      if (!avisar || !motivo) return;
+
+      const creadorId = Number(activity.creadoPorId);
+      const creador = Number.isInteger(creadorId) && creadorId > 0
+        ? await this.prisma.user.findUnique({
+            where: { id: creadorId },
+            select: { id: true, nombre: true, managerId: true },
+          })
+        : null;
+
+      // Adam (16-11): toda actividad que surge en el momento se le avisa al Supervisor General (Luis);
+      // solo si la empresa no tiene uno, va al jefe directo de quien la creó.
+      const luis = await this.prisma.user.findFirst({
+        where: {
+          isActive: true,
+          roleKey: 'dir_operaciones',
+          companyMemberships: { some: { companyId } },
+        },
+        select: { id: true },
+        orderBy: { id: 'asc' },
+      });
+      const supervisorId = luis?.id ?? creador?.managerId ?? null;
+      if (!supervisorId || supervisorId === creadorId) return;
+
+      const nombre = creador?.nombre || activity.creador?.nombre || 'Alguien';
+      const aviso = {
+        id: activity.id,
+        anNumber: activity.anNumber,
+        titulo: activity.titulo || 'Actividad',
+      };
+      const texto = textoAvisoLuis(aviso, nombre, motivo);
+
+      if (this.chat) {
+        await this.chat.avisoDirecto(creadorId || null, supervisorId, texto, companyId);
+      }
+      if (this.notifications) {
+        await this.notifications.createNotification({
+          userId: supervisorId,
+          type: 'ACTIVITY_ASSIGNED',
+          category: 'activities',
+          title: motivo === 'autoasignada' ? 'Actividad autoasignada' : 'Actividad del día',
+          message: `${nombre}: ${activity.titulo || 'Nueva actividad'}`,
+          triggerUserId: creadorId || undefined,
+          relatedEntityId: activity.id,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${activity.id}`,
+          priority: 'high',
+          companyId,
+        });
+      }
+    } catch {
+      /* el alta no depende del aviso */
+    }
   }
 
   /** A quien se le desactivó el perfil no se le asigna nada (su historial se queda). */
@@ -217,6 +304,10 @@ export class ActivitiesService {
         activity.creador?.nombre || 'Sistema',
         activity.creadoPorId,
       );
+    }
+
+    if (!opciones.sinAviso) {
+      void this.avisarLuisSiNoProgramada(activity, resolvedCompanyId);
     }
 
     this.domainEvents.publishEntityLifecycle('created', {

@@ -22,6 +22,7 @@ import { ModulePolicyService } from '../common/tenant/module-policy.service.js';
 import { esSuperAdmin } from '../common/tenant/module-policy.js';
 import { ControlNominaService } from './control-nomina.service.js';
 import { nombreArchivoControl } from './control-nomina-excel.js';
+import { esContadoraNomina, esRhNomina } from './nomina-alcance.js';
 import {
   AceptarSugeridosControlDto,
   ActualizarFilaControlDto,
@@ -34,13 +35,10 @@ import {
 /**
  * Control de nómina semanal (`/api/employee-payments/control-semanal`).
  *
- * Ver: quien lleva contabilidad (CONTABILIDAD_VIEW/MANAGE) y RH (HR_MANAGE). Los montos solo los
- * ve quien tiene permiso contable y además la política del módulo `employee-payments` le deja
- * usar «Pagos a personal» (en NEXARA, solo el CEO); el resto recibe horas y lugares con los
- * montos en null. Editar, cerrar y reabrir: CONTABILIDAD_MANAGE + la misma política.
- *
- * La política va dentro de cada endpoint y no en un guard porque la empresa activa la resuelve
- * el `TenantInterceptor`, que corre después de los guards (igual que en Pagos a empleados).
+ * Lectura/montos/edición de filas: contabilidad (CONTABILIDAD_*), RH (toda la plantilla) y la
+ * contadora (finanzas@ / rol contabilidad) con alcance configurable. La política de módulo
+ * `employee-payments` (p. ej. solo CEO en prod) no bloquea a RH ni a la contadora.
+ * Cerrar/reabrir semana: solo CONTABILIDAD_MANAGE (dirección/contabilidad), no se amplía a RH.
  */
 @Controller('employee-payments/control-semanal')
 export class ControlNominaController {
@@ -66,18 +64,24 @@ export class ControlNominaController {
   private async acceso(user: any, companyId: number | null) {
     const permisos: string[] = Array.isArray(user?.permissions) ? user.permissions : [];
     const superAdmin = esSuperAdmin(user);
-    const modulo = await this.policy.puedeUsar('employee-payments', user, companyId);
+    const v = this.viewer(user);
+    const rh = esRhNomina(v);
+    const contadora = esContadoraNomina(v);
+    const modulo =
+      (await this.policy.puedeUsar('employee-payments', user, companyId)) || rh || contadora;
     const contable =
       superAdmin ||
       permisos.includes(PERMISSIONS.CONTABILIDAD_VIEW) ||
       permisos.includes(PERMISSIONS.CONTABILIDAD_MANAGE);
     return {
-      verMontos: modulo && contable,
-      puedeEditar: modulo && (superAdmin || permisos.includes(PERMISSIONS.CONTABILIDAD_MANAGE)),
+      verMontos: modulo && (contable || rh || contadora),
+      puedeEditar: modulo && (superAdmin || permisos.includes(PERMISSIONS.CONTABILIDAD_MANAGE) || rh),
     };
   }
 
   private gate(user: any, companyId: number | null) {
+    const v = this.viewer(user);
+    if (esRhNomina(v) || esContadoraNomina(v)) return;
     return this.policy.exigir('employee-payments', user, companyId);
   }
 
@@ -117,7 +121,7 @@ export class ControlNominaController {
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE] })
   @Patch('dia')
   async ajustarDia(
     @CurrentUser() user: any,
@@ -129,7 +133,7 @@ export class ControlNominaController {
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE] })
   @Patch('fila')
   async actualizarFila(
     @CurrentUser() user: any,
@@ -141,7 +145,7 @@ export class ControlNominaController {
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE] })
   @Post('descuentos/sugeridos/aceptar')
   async aceptarSugeridos(
     @CurrentUser() user: any,
@@ -153,7 +157,7 @@ export class ControlNominaController {
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE] })
   @Post('descuentos')
   async crearDescuento(
     @CurrentUser() user: any,
@@ -165,7 +169,7 @@ export class ControlNominaController {
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE] })
   @Delete('descuentos/:id')
   async borrarDescuento(
     @CurrentUser() user: any,
