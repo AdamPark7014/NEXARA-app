@@ -8,6 +8,12 @@ const modulos = [
   { id: "erp-pagos-empleados", panel: "erp", path: "/finance/employee-payments" },
 ];
 
+it('WorkProject retirado no se muestra ni sin navegación ni con acceso total', () => {
+  const legacy = [{ id: 'work-projects', panel: 'ops', path: '/work-projects' }, { id: 'ops-legacy', panel: 'ops', path: '/work-projects' }, { id: 'proyectos', panel: 'erp', path: '/proyectos' }];
+  expect(filterModulesByNavigation(legacy, null).map(m => m.id)).toEqual(['proyectos']);
+  expect(filterModulesByNavigation(legacy, nav({ paths: ['/**'] })).map(m => m.id)).toEqual(['proyectos']);
+});
+
 function nav(parcial: Partial<MeNavigation>): MeNavigation {
   return {
     roleKey: "contabilidad",

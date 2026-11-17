@@ -6,9 +6,8 @@
  */
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useUser } from "@/components/UserContext";
-import { ButtonLink, EmptyState, SkeletonRows } from "@/components/base";
+import { ButtonLink, EmptyState } from "@/components/base";
 import { Aviso } from "@/components/mesa-contable/piezas";
 import { Banda, Kpi, c, useAccesoCostos } from "@/components/costos/piezas";
 import { formatApiError } from "@/lib/erp-api";
@@ -18,7 +17,6 @@ import {
   pct,
   pesos,
   rutaProyectoDesdeCotizacion,
-  tonoDeMargen,
   type ListaProyectos,
 } from "@/lib/costos";
 
@@ -64,41 +62,10 @@ export default function CostosPorProyecto() {
 
       {error ? <Aviso tono="danger" role="alert">{error}</Aviso> : null}
 
-      <section className={`${c.card} ${c.scroll}`} aria-label="Proyectos">
+      <section className={c.card} aria-label="Proyectos">
         <h2 className={c.cardTitle}>Proyectos</h2>
-        {!datos ? (
-          <SkeletonRows rows={3} />
-        ) : !datos.proyectos.length ? (
-          <EmptyState title="Todavía no hay proyectos" description="Crea uno desde Proyectos o desde una cotización ganada." />
-        ) : (
-          <table className={c.tabla}>
-            <thead>
-              <tr>
-                <th>Proyecto</th>
-                <th className={c.der}>Venta sin IVA</th>
-                <th className={c.der}>Costo real</th>
-                <th className={c.der}>Mano de obra</th>
-                <th className={c.der}>Margen hoy</th>
-              </tr>
-            </thead>
-            <tbody>
-              {datos.proyectos.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <Link href={`/erp/proyectos/${p.id}?tab=costos`}>{p.titulo}</Link>
-                    <small>{[p.cliente, p.cotizacion].filter(Boolean).join(" · ")}</small>
-                  </td>
-                  <td className={c.der}>{pesos(p.venta)}</td>
-                  <td className={c.der}>{pesos(p.costo)}</td>
-                  <td className={c.der}>{pesos(p.real.MANO_OBRA)}</td>
-                  <td className={`${c.der} ${c.tx}`} data-tone={tonoDeMargen(p.margen?.pct)}>
-                    {p.margen ? pct(p.margen.pct) : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <p className={c.hint}>Consulta venta, costo real y margen en el listado único de Proyectos.</p>
+        <ButtonLink href="/erp/proyectos" variant="secondary">Ver proyectos y margen real</ButtonLink>
       </section>
 
       {datos?.cotizacionesSinProyecto.length ? (

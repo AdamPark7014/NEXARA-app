@@ -209,6 +209,17 @@ function joinRemapTarget(target: string, rest: string): string {
  * `apps/web/app/(panels)/*`.
  */
 export function remapLegacySlugs(pathname: string): string {
+  if (/^\/(?:crm|sales)\/(?:projects|proyectos)\/(?:new|nuevo)\/?$/.test(pathname)) return '/erp/proyectos/nuevo';
+  // SalesProject usa otro id: resolver el vínculo antes de abrir la ficha maestra.
+  const comercial = pathname.match(/^\/(?:crm|sales)\/(?:projects|proyectos)\/(\d+)(?:\/.*)?$/);
+  if (comercial) return `/erp/proyectos/comercial/${comercial[1]}`;
+  // WorkProject tiene ids propios: nunca trasladarlos al maestro.
+  if (/^\/(?:erp|ops|core|crm|sales)\/work-projects(?:\/|$)/.test(pathname)) return '/erp/proyectos';
+  // Los proyectos OPS ya usan el id del maestro operativo.
+  const operational = pathname.match(/^\/(?:ops|core)\/(?:projects|proyectos)(\/.*)?$/);
+  if (operational) return '/erp/proyectos' + (operational[1] ?? '');
+  if (/^\/(?:crm|sales)\/(?:projects|proyectos)\/?$/.test(pathname)) return '/erp/proyectos';
+
   // Core ola1 canónicas en ES — evaluar ANTES de CROSS_PANEL / SEGMENT_ALIASES.
   if (pathname === '/erp/asistencias' || pathname.startsWith('/erp/asistencias/')) {
     return pathname;

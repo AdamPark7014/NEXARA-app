@@ -314,8 +314,8 @@ export class CostosController {
 
   @Get('proyectos')
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
-  async lista(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
-    return this.proyectos.lista(companyId, await this.actor(user));
+  async lista(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null, @Query('resumen') resumen?: string) {
+    return this.proyectos.lista(companyId, await this.actor(user), resumen === '1');
   }
 
   @Get('proyectos/:id')

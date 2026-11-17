@@ -356,7 +356,7 @@ export default function Customer360Dashboard({ client, snapshot, timeline }: Pro
                 return (
                   <li key={id}>
                     {id ? (
-                      <CrossPanelLink href={`/ops/projects/${id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                      <CrossPanelLink href={`/erp/proyectos/${id}`} style={{ textDecoration: "none", color: "inherit" }}>
                         {inner}
                       </CrossPanelLink>
                     ) : inner}

@@ -17,6 +17,7 @@ import {
 } from './calculos/libro-costos.js';
 import { CostosTarifasService } from './costos-tarifas.service.js';
 import { VehiculosMotorService } from './vehiculos/vehiculos-motor.service.js';
+import { leerPaginasCostos } from './calculos/paginar-costos.js';
 
 export type ResultadoLibro = { creados: number; actualizados: number; borrados: number; total: number };
 
@@ -73,11 +74,13 @@ export class LibroCostosService {
     const fechaDe = (d: Date) => workDateKey(d);
 
     const [sesiones, viaticos, gastos, salidas, viajes] = await Promise.all([
-      this.prisma.activityWorkSession.findMany({
+      leerPaginasCostos((skip) => this.prisma.activityWorkSession.findMany({
+        skip, take: 500, orderBy: { id: 'asc' },
         where: { companyId, endedAt: { not: null }, activity: { deletedAt: null } },
         select: { id: true, activityId: true, userId: true, startedAt: true, endedAt: true, endReason: true },
-      }),
-      this.prisma.viatico.findMany({
+      })),
+      leerPaginasCostos((skip) => this.prisma.viatico.findMany({
+        skip, take: 500, orderBy: { id: 'asc' },
         where: { companyId, deletedAt: null },
         select: {
           id: true,
@@ -92,8 +95,9 @@ export class LibroCostosService {
           fechaSolicitud: true,
           repartos: { select: { actividadId: true, monto: true } },
         },
-      }),
-      this.prisma.expense.findMany({
+      })),
+      leerPaginasCostos((skip) => this.prisma.expense.findMany({
+        skip, take: 500, orderBy: { id: 'asc' },
         where: { companyId, deletedAt: null, isAdministrative: false },
         select: {
           id: true,
@@ -105,12 +109,14 @@ export class LibroCostosService {
           fechaGasto: true,
           fechaSolicitud: true,
         },
-      }),
-      this.prisma.stockMovement.findMany({
+      })),
+      leerPaginasCostos((skip) => this.prisma.stockMovement.findMany({
+        skip, take: 500, orderBy: { id: 'asc' },
         where: { companyId, activityId: { not: null }, type: { in: ['DISPATCH', 'RETURN'] } },
         select: { id: true, activityId: true, type: true, quantity: true, unitCost: true, totalCost: true, createdAt: true },
-      }),
-      this.prisma.vehicleControl.findMany({
+      })),
+      leerPaginasCostos((skip) => this.prisma.vehicleControl.findMany({
+        skip, take: 500, orderBy: { id: 'asc' },
         where: { companyId, vehicleId: { not: null }, odometroFin: { not: null }, actividad: { deletedAt: null } },
         select: {
           id: true,
@@ -123,7 +129,7 @@ export class LibroCostosService {
           fechaInicio: true,
           fechaSolicitud: true,
         },
-      }),
+      })),
     ]);
 
     const salida: MovimientoCalculado[] = movimientosDeSesiones(sesiones, tarifa, fechaDe);
@@ -162,10 +168,26 @@ export class LibroCostosService {
     return salida;
   }
 
-  /**
-   * `recostear`: el vehículo cuyos viajes se vuelven a costear con la tarifa de hoy, porque alguien
-   * corrigió su ficha. Sin eso, cada viaje conserva la tarifa de su día.
-   */
+  /** Lee el costo a la fecha sin persistir ni modificar ninguna fuente. */
+  async leer(companyId: number) {
+    const calculados = await this.calcular(companyId);
+    const existentes = await this.prisma.costoMovimiento.findMany({ where: { companyId }, orderBy: { id: 'asc' }, take: 500 });
+    let pagina = existentes;
+    while (pagina.length === 500) {
+      pagina = await this.prisma.costoMovimiento.findMany({ where: { companyId }, orderBy: { id: 'asc' }, take: 500, cursor: { id: pagina[pagina.length - 1].id }, skip: 1 });
+      existentes.push(...pagina);
+    }
+    const porOrigen = new Map(existentes.map((e) => [e.origen, e]));
+    // La lectura actualiza lo provisional en memoria. Lo cerrado y la tarifa histórica del viaje se conservan.
+    return [
+      ...calculados.filter((m) => porOrigen.get(m.origen)?.estado !== 'CERRADO').map((m) => ({
+        ...conservarTarifaDeViaje(m, porOrigen.get(m.origen)), fecha: fechaColumna(m.fecha),
+      })),
+      ...existentes.filter((m) => m.estado === 'CERRADO'),
+    ];
+  }
+
+  /** `recostear` vuelve a costear solo ese vehículo; el resto conserva la tarifa de su día. */
   async sincronizar(companyId: number, recostear?: { vehicleId: number }): Promise<ResultadoLibro> {
     const calculados = await this.calcular(companyId);
     const existentes = await this.prisma.costoMovimiento.findMany({ where: { companyId } });

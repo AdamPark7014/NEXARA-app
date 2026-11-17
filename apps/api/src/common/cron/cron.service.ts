@@ -10,6 +10,7 @@ import { DomainEventBusService } from '../../domain-events/domain-event-bus.serv
 import { sinPlazoStatusVariants } from '../../activities/activity-status.js';
 import { finDelPeriodo, periodoDeActividad } from '../../activities/actividad-periodo.js';
 import { horasResolucionPorActividad, limiteResolucionMs } from '../../sla-tracker/sla-tracker.service.js';
+import { ProyectoCostosAvisosService } from './proyecto-costos-avisos.service.js';
 import { WORKDAY_TIMEZONE, workClock } from '../time/workday.js';
 
 @Injectable()
@@ -24,6 +25,7 @@ export class CronService {
     private readonly vehiclesService: VehiclesService,
     private readonly domainEvents: DomainEventBusService,
     @Optional() private readonly webhooks?: WebhooksService,
+    @Optional() private readonly costosAvisos?: ProyectoCostosAvisosService,
   ) {}
 
   // ── Contratos de mantenimiento — generar OT cada hora ───────────
@@ -169,64 +171,9 @@ export class CronService {
   // ── Alertas de margen de proyectos — cada día 10AM ─────────────
   @Cron('0 10 * * *', { name: 'project-margin-alerts', timeZone: WORKDAY_TIMEZONE })
   async handleProjectMarginAlerts() {
-    this.logger.log('Verificando proyectos con riesgo de margen...');
-    const activeProjects = await this.prisma.salesProject.findMany({
-      where: { status: { in: ['IN_PROGRESS', 'PLANNED'] } },
-      include: { opportunity: { select: { ownerId: true, title: true } } },
-    });
-
-    let alertsSent = 0;
-    for (const project of activeProjects) {
-      const opProject = await this.prisma.operationalProject.findFirst({
-        where: { salesProjectId: project.id },
-        select: { id: true },
-      });
-      if (!opProject) continue;
-
-      const acts = await this.prisma.activity.findMany({
-        where: { projectId: opProject.id, deletedAt: null },
-        select: { id: true },
-      });
-      const activityIds = acts.map((a) => a.id);
-
-      const [viaticAgg, expAgg, viaticProjAgg] = await Promise.all([
-        activityIds.length
-          ? this.prisma.viatico.aggregate({ where: { actividadId: { in: activityIds } }, _sum: { montoSolicitado: true } })
-          : Promise.resolve({ _sum: { montoSolicitado: null } }),
-        activityIds.length
-          ? this.prisma.expense.aggregate({ where: { actividadId: { in: activityIds }, deletedAt: null }, _sum: { montoSolicitado: true } })
-          : Promise.resolve({ _sum: { montoSolicitado: null } }),
-        this.prisma.viatico.aggregate({ where: { projectId: project.id }, _sum: { montoSolicitado: true } }),
-      ]);
-
-      const actualViaticos =
-        Number(viaticAgg._sum.montoSolicitado || 0) + Number(viaticProjAgg._sum.montoSolicitado || 0);
-      const actualOperativo = Number(expAgg._sum.montoSolicitado || 0);
-      const budget = Number(project.budget) || 0;
-      // Sin presupuesto capturado no hay margen que medir: daba un falso 0 % todos los días.
-      if (budget <= 0) continue;
-      const totalActual = Number(project.costProducts) + actualViaticos + actualOperativo;
-      const marginActual = budget - totalActual;
-      const marginPercent = budget > 0 ? (marginActual / budget) * 100 : 0;
-
-      let severity: 'overspend' | 'low_margin' | null = null;
-      if (marginPercent < 0) severity = 'overspend';
-      else if (marginPercent < 10) severity = 'low_margin';
-
-      if (severity) {
-        await this.notificationHierarchy.notifyProjectMarginAlert({
-          projectId: project.id,
-          projectName: project.name || project.opportunity?.title || `Proyecto ${project.id}`,
-          ownerId: project.opportunity?.ownerId,
-          marginPercent,
-          severity,
-          actualMargin: marginActual,
-          budget,
-        });
-        alertsSent += 1;
-      }
-    }
-    this.logger.log(`Alertas de margen emitidas: ${alertsSent}`);
+    if (!this.costosAvisos) throw new Error('Servicio de avisos de costos no configurado');
+    const enviados = await this.costosAvisos.ejecutar();
+    this.logger.log(`Alertas de costos emitidas: ${enviados}`);
   }
 
   // ── Vehículos por vencer — 8AM y 4PM ───────────────────────────

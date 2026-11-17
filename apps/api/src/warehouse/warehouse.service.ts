@@ -409,6 +409,7 @@ export class WarehouseService {
     purchaseOrderId?: number;
     productionOrderId?: number;
     activityId?: number;
+    projectId?: number;
     /** Empaque: presentación elegida y lo que tecleó la persona («3 cajas»). */
     packagingId?: number;
     unidadCaptura?: string;
@@ -466,6 +467,15 @@ export class WarehouseService {
     // La OT a la que se carga el material tiene que ser de esta empresa: si no se
     // comprueba, un movimiento de la empresa A queda ligado a una actividad de la B.
     let activityId: number | null = null;
+    let projectId: number | null = null;
+    if (dto.projectId != null) {
+      projectId = Number(dto.projectId);
+      if (!Number.isInteger(projectId) || projectId <= 0) throw new BadRequestException('Proyecto inválido');
+      const project = await this.prisma.operationalProject.findFirst({
+        where: { id: projectId, companyId: tenantId, deletedAt: null }, select: { id: true },
+      });
+      if (!project) throw new NotFoundException('Proyecto no encontrado');
+    }
     if (dto.activityId != null) {
       activityId = Number(dto.activityId);
       if (!Number.isInteger(activityId) || activityId <= 0) {
@@ -473,9 +483,12 @@ export class WarehouseService {
       }
       const activity = await this.prisma.activity.findFirst({
         where: { id: activityId, ...companyWhere(tenantId) },
-        select: { id: true },
+        select: { id: true, projectId: true },
       });
       if (!activity) throw new NotFoundException('Actividad no encontrada');
+      if (projectId != null && activity.projectId !== projectId) {
+        throw new BadRequestException('La actividad no pertenece al proyecto indicado');
+      }
     }
 
     // Todo el movimiento — validación de stock disponible, ajuste de niveles y
@@ -540,6 +553,7 @@ export class WarehouseService {
           purchaseOrderId: dto.purchaseOrderId ?? null,
           productionOrderId: dto.productionOrderId ?? null,
           activityId,
+          projectId,
           createdById: userId,
           companyId: tenantId,
         },

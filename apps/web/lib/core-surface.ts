@@ -75,7 +75,10 @@ const MOVED_TO_CORE: ReadonlyArray<[RegExp, (m: RegExpMatchArray) => string]> = 
   // CRM ola1 ya vive en Core: sin este mapa, /crm/quotes cae en la pizarra.
   [/^\/crm\/(?:quotes|cotizaciones)(?:\/(\d+))?(?:\/.*)?$/, (m) => (m[1] ? `/erp/cotizaciones/${m[1]}` : '/erp/cotizaciones')],
   [/^\/crm\/(?:clients|clientes)(?:\/(\d+))?(?:\/.*)?$/, (m) => (m[1] ? `/erp/clientes/${m[1]}` : '/erp/clientes')],
-  [/^\/crm\/(?:projects|proyectos)(?:\/(\d+))?(?:\/.*)?$/, (m) => (m[1] ? `/erp/proyectos/${m[1]}` : '/erp/proyectos')],
+  [/^\/(?:ops|erp|crm|core|sales)\/work-projects(?:\/.*)?$/, () => '/erp/proyectos'],
+  [/^\/(?:crm|sales)\/(?:projects|proyectos)\/(?:new|nuevo)\/?$/, () => '/erp/proyectos/nuevo'],
+  // El id comercial se resuelve por su vínculo 1:1, nunca se usa como id operativo.
+  [/^\/(?:crm|sales)\/(?:projects|proyectos)(?:\/(\d+))?(?:\/.*)?$/, (m) => (m[1] ? `/erp/proyectos/comercial/${m[1]}` : '/erp/proyectos')],
 ];
 
 /** Core-only: la ruta nueva de un módulo que se mudó a /erp, o null si no es uno de ellos. */

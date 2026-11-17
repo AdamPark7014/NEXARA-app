@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { workDateKey } from '../common/time/workday.js';
@@ -18,6 +18,12 @@ import {
 import { puedeLigarHoras, veTodoCostos, type ActorCostos } from './costos-acceso.js';
 import { CostosTarifasService } from './costos-tarifas.service.js';
 import { categoriaPorPuesto } from './categorias-base.js';
+import { evaluarCompletitud } from '../projects/proyecto-completitud.js';
+import { calcularSalud } from '../projects/proyecto-salud.js';
+import { esNombreDeRelleno } from '../ventas/client-sectors.js';
+import { estimarCostoAlTerminar } from './calculos/costo-al-terminar.js';
+import { LibroCostosService } from './libro-costos.service.js';
+import { leerPaginasCostos } from './calculos/paginar-costos.js';
 
 export const ETIQUETA_RUBRO: Record<Rubro, string> = {
   MATERIAL: 'Equipos y material',
@@ -67,17 +73,44 @@ export class CostosProyectoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tarifas: CostosTarifasService,
+    @Optional() private readonly libro?: LibroCostosService,
   ) {}
+
+  /** Material al costo de salida: se lee en vivo sin escribir ni duplicar el libro. */
+  private async materialDirecto(companyId: number, projectId?: number, activityIds: number[] = []) {
+    const consulta = {
+      where: { companyId, ...(projectId != null ? { OR: [{ activityId: null, projectId }, { activityId: { in: activityIds } }] } : {}), type: { in: ['DISPATCH', 'RETURN'] as Array<'DISPATCH' | 'RETURN'> } },
+      select: { id: true, activityId: true, projectId: true, type: true, quantity: true, unitCost: true, totalCost: true, createdAt: true, notes: true },
+      orderBy: { id: 'asc' },
+      take: 500,
+    } as const;
+    const salidas = await this.prisma.stockMovement.findMany(consulta);
+    let ultimaPagina = salidas;
+    while (ultimaPagina.length === 500) {
+      ultimaPagina = await this.prisma.stockMovement.findMany({ ...consulta, cursor: { id: ultimaPagina[ultimaPagina.length - 1].id }, skip: 1 });
+      salidas.push(...ultimaPagina);
+    }
+    return salidas.map((s) => {
+      const signo = s.type === 'RETURN' ? -1 : 1;
+      return {
+        origen: `SALIDA:${s.id}`, projectId: s.projectId, rubro: 'MATERIAL' as const,
+        importe: redondear(signo * (numero(s.totalCost) || numero(s.quantity) * numero(s.unitCost))),
+        cantidad: signo * numero(s.quantity), unidad: 'pza', userId: null,
+        nota: numero(s.totalCost) === 0 && numero(s.unitCost) === 0 ? 'Salida sin costo: vale cero' : s.notes, fecha: s.createdAt, activityId: s.activityId, detalle: null,
+      };
+    });
+  }
 
   /** Qué actividades se le cargan a cada proyecto: las suyas, las de su cotización y las ligadas a mano. */
   private async mapaDeActividades(companyId: number) {
     const [ligas, actividades, proyectos] = await Promise.all([
-      this.prisma.costoActividadLiga.findMany({ where: { companyId, tipo: { not: null } } }),
-      this.prisma.activity.findMany({
+      leerPaginasCostos((skip) => this.prisma.costoActividadLiga.findMany({ skip, take: 500, orderBy: { id: 'asc' }, where: { companyId, tipo: { not: null } } })),
+      leerPaginasCostos((skip) => this.prisma.activity.findMany({
+        skip, take: 500, orderBy: { id: 'asc' },
         where: { companyId, deletedAt: null, OR: [{ projectId: { not: null } }, { cotizacionId: { not: null } }] },
         select: { id: true, projectId: true, cotizacionId: true },
-      }),
-      this.prisma.operationalProject.findMany({ where: { companyId }, select: { id: true, cotizacionId: true } }),
+      })),
+      leerPaginasCostos((skip) => this.prisma.operationalProject.findMany({ skip, take: 500, orderBy: { id: 'asc' }, where: { companyId, deletedAt: null }, select: { id: true, cotizacionId: true } })),
     ]);
     const proyectoDeCotizacion = new Map(proyectos.filter((p) => p.cotizacionId).map((p) => [p.cotizacionId!, p.id]));
 
@@ -94,8 +127,12 @@ export class CostosProyectoService {
       if (proyecto) agregar(deProyecto, proyecto, activityId);
       else if (cotizacionId) agregar(deCotizacion, cotizacionId, activityId);
     };
-    for (const a of actividades) anclar(a.id, a.projectId, a.cotizacionId);
-    for (const l of ligas) {
+    const manuales = ligas.filter((l) => l.tipo != null);
+    const conDecisionManual = new Set(manuales.map((l) => l.activityId));
+    for (const a of actividades) {
+      if (!conDecisionManual.has(a.id)) anclar(a.id, a.projectId, a.cotizacionId);
+    }
+    for (const l of manuales) {
       if (l.tipo === 'INTERNA') internas.add(l.activityId);
       else anclar(l.activityId, l.proyectoId, l.cotizacionId);
     }
@@ -103,18 +140,24 @@ export class CostosProyectoService {
   }
 
   /** Lista para CEO y contadora: cuánto va costando cada proyecto y qué queda sin ligar. */
-  async lista(companyId: number | null, actor: ActorCostos) {
-    if (!veTodoCostos(actor)) throw new ForbiddenException('Solo dirección y contabilidad ven los costos de todos');
+  async lista(companyId: number | null, actor: ActorCostos, soloResumen = false) {
+    const veTodo = veTodoCostos(actor);
+    const coordina = puedeLigarHoras(actor);
+    if (!soloResumen && !veTodo) throw new ForbiddenException('Solo dirección y contabilidad ven los costos de todos');
+    if (!veTodo && !coordina && !actor.id) throw new ForbiddenException('Los costos de proyectos no están disponibles para tu perfil');
     const tenantId = requireCompanyId(companyId);
-    const [mapa, movimientos, proyectos] = await Promise.all([
+    const [mapa, movimientos, proyectos, material, parametros] = await Promise.all([
       this.mapaDeActividades(tenantId),
-      this.prisma.costoMovimiento.groupBy({
+      this.libro ? this.libro.leer(tenantId).then((filas) => filas.filter((m) => m.rubro !== 'MATERIAL').map((m) => ({ activityId: m.activityId, rubro: m.rubro, _sum: { importe: m.importe, cantidad: m.cantidad } }))) : this.prisma.costoMovimiento.groupBy({
         by: ['activityId', 'rubro'],
-        where: { companyId: tenantId },
+        where: { companyId: tenantId, rubro: { not: 'MATERIAL' } },
         _sum: { importe: true, cantidad: true },
       }),
-      this.prisma.operationalProject.findMany({
-        where: { companyId: tenantId, status: { not: 'CANCELLED' } },
+      leerPaginasCostos((skip) => this.prisma.operationalProject.findMany({
+        skip, take: 500,
+        where: { companyId: tenantId, deletedAt: null, status: { not: 'CANCELLED' },
+          ...(!veTodo && !coordina ? { OR: [{ responsableId: actor.id! }, { vendorId: actor.id! }] } : {}),
+        },
         select: {
           id: true,
           title: true,
@@ -122,10 +165,12 @@ export class CostosProyectoService {
           budgetAmount: true,
           cotizacionId: true,
           client: { select: { name: true } },
-          cotizacion: { select: { quoteNumber: true, subtotal: true, discountTotal: true, marginPercent: true } },
+          cotizacion: { select: SELECCION_COTIZACION },
         },
-        orderBy: { createdAt: 'desc' },
-      }),
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      })),
+      this.materialDirecto(tenantId),
+      this.tarifas.parametros(tenantId, Number(workDateKey(new Date()).slice(0, 4))),
     ]);
 
     const filasDe = (ids: Set<number> | undefined) =>
@@ -135,9 +180,12 @@ export class CostosProyectoService {
     for (const c of mapa.deCotizacion.values()) for (const id of c) ligadas.add(id);
 
     const filas = proyectos.map((p) => {
-      const real = sumarPorRubro(filasDe(mapa.deProyecto.get(p.id)));
+      const real = sumarPorRubro([...filasDe(mapa.deProyecto.get(p.id)), ...material.filter((m) => m.activityId != null ? mapa.deProyecto.get(p.id)?.has(m.activityId) : m.projectId === p.id)]);
       const venta = p.budgetAmount != null ? numero(p.budgetAmount) : p.cotizacion ? ventaSinIva(p.cotizacion) : null;
-      const costo = sumaDe(real);
+      const costo = redondear(sumaDe(real) * (1 + (parametros.indirectoPct ?? 0)));
+      const cotizado = p.cotizacion ? sumaDe(cotizadoPorRubro(partidasDe(p.cotizacion.items)).porRubro) * (1 + (parametros.indirectoPct ?? 0)) : null;
+      const margenReal = venta == null ? null : margen(venta, costo);
+      const margenCotizado = venta != null && cotizado != null ? margen(venta, cotizado) : null;
       return {
         id: p.id,
         titulo: p.title,
@@ -147,7 +195,10 @@ export class CostosProyectoService {
         venta,
         costo,
         real,
-        margen: venta == null ? null : margen(venta, costo),
+        margen: margenReal,
+        margenCotizado,
+        semaforoMargen: margenReal?.pct == null ? null : margenReal.pct < 0 ? 'rojo' : margenCotizado?.pct == null ? null : margenReal.pct >= margenCotizado.pct - 5 ? 'verde' : 'ambar',
+        sobrecosto: cotizado != null && costo > cotizado,
       };
     });
 
@@ -167,8 +218,17 @@ export class CostosProyectoService {
 
     return {
       proyectos: filas,
-      cotizacionesSinProyecto: cotizaciones.map((c) => {
-        const real = sumarPorRubro(filasDe(mapa.deCotizacion.get(c.id)));
+      conSobrecosto: filas.filter((p) => p.sobrecosto).length,
+      sinLigar: {
+        etiqueta: 'Sin ligar',
+        importe: veTodo ? redondear(material.filter((m) => m.projectId == null && m.activityId == null).reduce((total, m) => total + m.importe, 0)) : 0,
+        movimientos: veTodo ? material.filter((m) => m.projectId == null && m.activityId == null).map((m) => ({ origen: m.origen, fecha: m.fecha.toISOString(), actividadId: null, cantidad: m.cantidad, unidad: m.unidad, importe: m.importe, nota: m.nota })) : [],
+      },
+      cotizacionesSinProyecto: (veTodo ? cotizaciones : []).map((c) => {
+        const real = sumarPorRubro([
+          ...filasDe(mapa.deCotizacion.get(c.id)),
+          ...material.filter((m) => m.activityId != null && mapa.deCotizacion.get(c.id)?.has(m.activityId)),
+        ]);
         return {
           id: c.id,
           folio: c.quoteNumber,
@@ -179,18 +239,31 @@ export class CostosProyectoService {
         };
       }),
       manoDeObra: {
-        horas: horas(manoDeObra),
-        importe: importe(manoDeObra),
-        horasSinLigar: horas(sinLigar),
-        importeSinLigar: importe(sinLigar),
-        horasInternas: horas(internas),
-        importeInterno: importe(internas),
+        horas: veTodo ? horas(manoDeObra) : 0,
+        importe: veTodo ? importe(manoDeObra) : 0,
+        horasSinLigar: veTodo ? horas(sinLigar) : 0,
+        importeSinLigar: veTodo ? importe(sinLigar) : 0,
+        horasInternas: veTodo ? horas(internas) : 0,
+        importeInterno: veTodo ? importe(internas) : 0,
       },
     };
   }
 
+  /** Contexto de una ejecución: el cron reutiliza la misma lectura por empresa, sin caché persistente. */
+  async contextoLectura(companyId: number) {
+    const tenantId = requireCompanyId(companyId);
+    const [mapa, movimientos, material, parametros] = await Promise.all([
+      this.mapaDeActividades(tenantId),
+      this.libro ? this.libro.leer(tenantId) : leerPaginasCostos((skip) => this.prisma.costoMovimiento.findMany({ where: { companyId: tenantId }, skip, take: 500, orderBy: { id: 'asc' } })),
+      this.materialDirecto(tenantId),
+      this.tarifas.parametros(tenantId, Number(workDateKey(new Date()).slice(0, 4))),
+    ]);
+    return { companyId: tenantId, mapa, movimientos, material, parametros };
+  }
+
   /** El detalle de un proyecto: la pestaña «Costos». */
-  async proyecto(companyId: number | null, proyectoId: number, actor: ActorCostos) {
+  async proyecto(companyId: number | null, proyectoId: number, actor: ActorCostos,
+    contexto?: Awaited<ReturnType<CostosProyectoService['contextoLectura']>>) {
     const tenantId = requireCompanyId(companyId);
     const p = await this.prisma.operationalProject.findFirst({
       where: { id: proyectoId, companyId: tenantId },
@@ -201,6 +274,16 @@ export class CostosProyectoService {
         cotizacionId: true,
         responsableId: true,
         vendorId: true,
+        clientId: true,
+        projectType: true,
+        description: true,
+        startDate: true,
+        endDate: true,
+        actualEndDate: true,
+        status: true,
+        client: { select: { name: true } },
+        activities: { where: { deletedAt: null }, select: { estatus: true } },
+        milestones: { select: { status: true, plannedDate: true, actualDate: true } },
         cotizacion: { select: SELECCION_COTIZACION },
       },
     });
@@ -212,12 +295,15 @@ export class CostosProyectoService {
       throw new ForbiddenException('Los costos de este proyecto no están disponibles para tu perfil');
     }
 
-    const { deProyecto } = await this.mapaDeActividades(tenantId);
+    if (contexto && contexto.companyId !== tenantId) throw new ForbiddenException('El contexto de costos pertenece a otra empresa');
+    const { deProyecto } = contexto?.mapa ?? await this.mapaDeActividades(tenantId);
     const ids = [...(deProyecto.get(p.id) ?? [])];
-    const filas = ids.length
-      ? await this.prisma.costoMovimiento.findMany({
-          where: { companyId: tenantId, activityId: { in: ids } },
+    const libro = contexto ? contexto.movimientos.filter((m) => ids.includes(m.activityId) && m.rubro !== 'MATERIAL') : this.libro ? (await this.libro.leer(tenantId)).filter((m) => ids.includes(m.activityId) && m.rubro !== 'MATERIAL') : ids.length
+      ? await leerPaginasCostos((skip) => this.prisma.costoMovimiento.findMany({
+          skip, take: 500, orderBy: { id: 'asc' },
+          where: { companyId: tenantId, activityId: { in: ids }, rubro: { not: 'MATERIAL' } },
           select: {
+            origen: true,
             rubro: true,
             importe: true,
             cantidad: true,
@@ -228,8 +314,13 @@ export class CostosProyectoService {
             activityId: true,
             detalle: true,
           },
-        })
+        }))
       : [];
+
+    const material = contexto ? contexto.material.filter((m) => m.activityId != null ? ids.includes(m.activityId) : m.projectId === p.id) : await this.materialDirecto(tenantId, p.id, ids);
+    const filas = [...libro, ...material];
+    const ficha = evaluarCompletitud({ ...p, clientName: p.client?.name, clientEsRelleno: esNombreDeRelleno(p.client?.name) });
+    const salud = calcularSalud({ ...p, actividades: p.activities, hitos: p.milestones, fichaCompleta: ficha.fichaOk });
 
     const real: TotalesRubro = sumarPorRubro(filas);
     const cotizado = p.cotizacion ? cotizadoPorRubro(partidasDe(p.cotizacion.items)) : null;
@@ -237,7 +328,7 @@ export class CostosProyectoService {
     const directoCotizado = cotizado ? sumaDe(porRubroCotizado) : null;
     const directoReal = sumaDe(real);
 
-    const parametros = await this.tarifas.parametros(tenantId, Number(workDateKey(new Date()).slice(0, 4)));
+    const parametros = contexto?.parametros ?? await this.tarifas.parametros(tenantId, Number(workDateKey(new Date()).slice(0, 4)));
     const pct = parametros.indirectoPct;
     const indirectoCotizado = pct != null && directoCotizado != null ? redondear(directoCotizado * pct) : null;
     const indirectoReal = pct != null ? redondear(directoReal * pct) : null;
@@ -256,11 +347,20 @@ export class CostosProyectoService {
     return {
       proyecto: { id: p.id, titulo: p.title, cotizacion: p.cotizacion?.quoteNumber ?? null, cotizacionId: p.cotizacionId },
       venta,
+      costoReal: redondear(directoReal + (indirectoReal ?? 0)),
+      avance: salud.avance.porcentaje,
+      costoAlTerminar: estimarCostoAlTerminar(directoReal + (indirectoReal ?? 0), salud.avance.porcentaje, !ficha.fichaOk),
       rubros: RUBROS.map((r) => ({
         rubro: r,
         etiqueta: ETIQUETA_RUBRO[r],
         cotizado: cotizado ? porRubroCotizado[r] : null,
         real: real[r],
+        diferencia: cotizado ? redondear(real[r] - porRubroCotizado[r]) : null,
+        consumidoPct: cotizado && porRubroCotizado[r] > 0 ? redondear(real[r] / porRubroCotizado[r] * 100, 1) : null,
+        movimientos: r === 'MANO_OBRA' && !veTodo ? [] : filas.filter((f) => f.rubro === r).map((f) => ({
+          origen: f.origen, fecha: f.fecha.toISOString(), actividadId: f.activityId,
+          cantidad: numero(f.cantidad), unidad: f.unidad, importe: numero(f.importe), nota: f.nota,
+        })),
       })),
       directo: { cotizado: directoCotizado, real: directoReal },
       indirecto: { pct, cotizado: indirectoCotizado, real: indirectoReal },
@@ -289,7 +389,7 @@ export class CostosProyectoService {
   /** Los viajes del proyecto y de qué se compone lo que costaron. */
   private async vehiculosDelProyecto(
     companyId: number,
-    filas: ReadonlyArray<{ rubro: string; unidad: string; cantidad: unknown; importe: unknown; fecha: Date; activityId: number; detalle: unknown }>,
+    filas: ReadonlyArray<{ rubro: string; unidad: string; cantidad: unknown; importe: unknown; fecha: Date; activityId: number | null; detalle?: unknown }>,
   ) {
     const delRubro = filas.filter((f) => f.rubro === 'VEHICULO');
     const viajes = delRubro.filter((f) => f.unidad === 'km');
@@ -300,7 +400,7 @@ export class CostosProyectoService {
         : Promise.resolve([] as Array<{ id: number; nombre: string }>),
       viajes.length
         ? this.prisma.activity.findMany({
-            where: { companyId, id: { in: [...new Set(viajes.map((f) => f.activityId))] } },
+            where: { companyId, id: { in: [...new Set(viajes.map((f) => f.activityId).filter((id): id is number => id != null))] } },
             select: { id: true, titulo: true },
           })
         : Promise.resolve([] as Array<{ id: number; titulo: string }>),
@@ -325,7 +425,7 @@ export class CostosProyectoService {
           const d = f.detalle as DetalleViaje | null;
           return {
             fecha: new Date(f.fecha).toISOString().slice(0, 10),
-            actividad: tituloDe.get(f.activityId) ?? null,
+            actividad: f.activityId != null ? tituloDe.get(f.activityId) ?? null : null,
             vehiculo: d?.vehicleId != null ? (nombreDe.get(d.vehicleId) ?? null) : null,
             km: Math.round(numero(f.cantidad)),
             importe: redondear(numero(f.importe)),

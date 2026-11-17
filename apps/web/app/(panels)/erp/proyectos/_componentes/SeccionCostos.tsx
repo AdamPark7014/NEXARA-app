@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { EmptyState, SkeletonRows } from "@/components/base";
+import { Button, EmptyState, SkeletonRows } from "@/components/base";
 import { Aviso } from "@/components/mesa-contable/piezas";
 import { Kpi, c } from "@/components/costos/piezas";
 import v from "@/components/vehiculos/vehiculos.module.scss";
@@ -26,6 +26,7 @@ import {
   type Rubro,
 } from "@/lib/costos";
 import type { SeccionProps } from "./tipos";
+import vista from "./costos.module.css";
 
 /** Debajo del nombre de cada rubro: de dónde sale. */
 const ORIGEN: Record<Rubro, string> = {
@@ -40,19 +41,21 @@ const ORIGEN: Record<Rubro, string> = {
 export default function SeccionCostos({ proyecto, token }: Pick<SeccionProps, "proyecto" | "token">) {
   const [datos, setDatos] = useState<CostosProyecto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
     let vivo = true;
     setError(null);
+    setDatos(null);
     getCostosProyecto(token, proyecto.id)
       .then((d) => vivo && setDatos(d))
       .catch((e) => vivo && setError(formatApiError(e, "No se pudieron leer los costos del proyecto.")));
     return () => {
       vivo = false;
     };
-  }, [token, proyecto.id]);
+  }, [token, proyecto.id, intento]);
 
-  if (error) return <EmptyState title="Costos no disponibles" description={error} />;
+  if (error) return <EmptyState title="Costos no disponibles" description={error} action={<Button onClick={() => setIntento((n) => n + 1)}>Reintentar</Button>} />;
   if (!datos) return <SkeletonRows rows={6} />;
 
   const { avisos: a, margen, directo, indirecto } = datos;
@@ -61,25 +64,34 @@ export default function SeccionCostos({ proyecto, token }: Pick<SeccionProps, "p
       <div className={c.band}>
         <div className={c.kpis}>
           <Kpi cifra={pesos(datos.venta)} texto="Venta sin IVA" />
-          <Kpi cifra={pct(margen.cotizado?.pct)} texto="Margen cotizado" tono={tonoDeMargen(margen.cotizado?.pct)} />
-          <Kpi cifra={pct(margen.hoy?.pct)} texto="Margen hoy, con lo gastado" tono={tonoDeMargen(margen.hoy?.pct)} />
-          <Kpi cifra={pct(proyecto.resumen.avance.porcentaje)} texto="Avance por actividades" />
+          <Kpi cifra={pesos(datos.costoReal)} texto="Costo real a la fecha" />
+          <Kpi cifra={`${pesos(margen.cotizado?.importe)} · ${pct(margen.cotizado?.pct)}`} texto="Margen cotizado" tono={tonoDeMargen(margen.cotizado?.pct)} />
+          <Kpi cifra={`${pesos(margen.hoy?.importe)} · ${pct(margen.hoy?.pct)}`} texto="Margen real" tono={tonoDeMargen(margen.hoy?.pct)} />
+          <Kpi cifra={pesos(datos.costoAlTerminar)} texto="Costo al terminar" />
+          <Kpi cifra={pct(datos.avance)} texto="Avance calculable" />
           <Kpi cifra={horas(datos.manoDeObra.horas)} texto="Horas de trabajo" />
         </div>
       </div>
 
       <div className={c.page}>
-        <section className={`${c.card} ${c.scroll}`} aria-label="Cotizado contra real">
-          <div className={c.rubros}>
-            <div className={c.rubro}>
+        <p className={c.hint}>{datos.costoAlTerminar == null ? "No se proyecta el costo al terminar: el proyecto está incompleto o aún no tiene avance calculable." : "Costo al terminar: costo real dividido entre el avance calculable. Es una estimación; no modifica la cotización."}</p>
+        <section className={c.card} aria-label="Cotizado contra real">
+          <div className={vista.rubros}>
+            <div className={`${vista.rubro} ${vista.encabezado}`}>
               <span className={c.rubroHead}>Rubro</span>
               <span className={`${c.rubroHead} ${c.der}`}>Cotizado</span>
               <span className={`${c.rubroHead} ${c.der}`}>Real</span>
-              <span className={c.rubroHead}>Real contra cotizado (raya = 100 %)</span>
-              <span className={`${c.rubroHead} ${c.der}`}>%</span>
+              <span className={`${c.rubroHead} ${c.der}`}>Diferencia</span>
+              <span className={c.rubroHead}>% consumido</span>
             </div>
             {datos.rubros.map((r) => (
-              <Renglon key={r.rubro} titulo={r.etiqueta} detalle={ORIGEN[r.rubro]} cotizado={r.cotizado} real={r.real} />
+              <div key={r.rubro}>
+                <Renglon titulo={r.etiqueta} detalle={ORIGEN[r.rubro]} cotizado={r.cotizado} real={r.real} diferencia={r.diferencia} consumidoPct={r.consumidoPct} />
+                <details className={vista.origen}>
+                  <summary>Ver de dónde sale · {r.etiqueta}</summary>
+                  {r.rubro === "MANO_OBRA" && !datos.acceso.detalle ? <p className={c.hint}>El detalle de mano de obra está disponible para dirección y contabilidad.</p> : r.movimientos?.length ? <ul className={vista.movimientos}>{r.movimientos.map((m, i) => <li key={`${m.origen}-${i}`}><span>{fechaCorta(m.fecha)} · {m.actividadId ? `Actividad #${m.actividadId}` : "Ligado al proyecto"}<small>{m.cantidad} {m.unidad}{m.nota ? ` · ${m.nota}` : ""}</small></span><strong>{pesos(m.importe)}</strong></li>)}</ul> : <p className={c.hint}>Todavía no hay movimientos en este rubro.</p>}
+                </details>
+              </div>
             ))}
             <Renglon titulo="Costo directo" fuerte cotizado={directo.cotizado} real={directo.real} />
             {indirecto.pct != null ? (
@@ -232,30 +244,36 @@ function Renglon({
   cotizado,
   real,
   fuerte = false,
+  diferencia,
+  consumidoPct,
 }: {
   titulo: string;
   detalle?: string;
   cotizado: number | null;
   real: number;
   fuerte?: boolean;
+  diferencia?: number | null;
+  consumidoPct?: number | null;
 }) {
   const tono = tonoDeAvance(real, cotizado);
-  const avance = pctDeAvance(real, cotizado);
-  const peso = fuerte ? { fontWeight: 600 } : undefined;
+  const avance = consumidoPct === undefined ? pctDeAvance(real, cotizado) : consumidoPct;
   return (
-    <div className={c.rubro} style={peso}>
+    <div className={vista.rubro} data-fuerte={fuerte}>
       <span>
         {titulo}
         {detalle ? <small>{detalle}</small> : null}
       </span>
-      <span className={c.der}>{pesos(cotizado)}</span>
-      <span className={c.der}>{pesos(real)}</span>
+      <span className={c.der} data-label="Cotizado">{pesos(cotizado)}</span>
+      <span className={c.der} data-label="Real">{pesos(real)}</span>
+      <span className={c.der} data-label="Diferencia">{pesos(diferencia === undefined ? (cotizado == null ? null : real - cotizado) : diferencia)}</span>
+      <span className={vista.consumido} data-label="Consumido">
       <span className={c.bar} aria-hidden="true">
         <i data-tone={tono} style={{ width: `${anchoDeBarra(real, cotizado)}%` }} />
         <u />
       </span>
       <span className={`${c.der} ${c.tx}`} data-tone={tono}>
-        {avance ?? "—"}
+        {pct(avance)}
+      </span>
       </span>
     </div>
   );

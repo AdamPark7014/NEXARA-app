@@ -138,6 +138,8 @@
   .tabla td:nth-child(3),
   .tabla th:nth-child(5),
   .tabla td:nth-child(5),
+  .tabla th:nth-child(6),
+  .tabla td:nth-child(6),
   .tabla th:last-child,
   .tabla td:last-child {
     display: none;
