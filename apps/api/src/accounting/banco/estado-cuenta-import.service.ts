@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AccountingService } from '../accounting.service.js';
 import { requireCompanyId } from '../../common/tenant/tenant-scope.js';
+import { PaginationQueryDto } from '../../common/dto/pagination.dto.js';
 import {
   type BancoLayout,
   parseCsvEstadoCuenta,
@@ -63,8 +64,9 @@ export class EstadoCuentaImportService {
 
   async proponerMatches(accountId: number, companyIdRaw: number | null) {
     const companyId = requireCompanyId(companyIdRaw);
-    const txs = await this.accounting.listBankTransactions(accountId, {}, { take: 100 }, companyId);
-    const items = Array.isArray(txs) ? txs : (txs as { items?: unknown[] }).items ?? [];
+    const pagina = Object.assign(new PaginationQueryDto(), { page: 1, limit: 100 });
+    const txs = await this.accounting.listBankTransactions(accountId, {}, pagina, companyId);
+    const items: unknown[] = Array.isArray(txs) ? txs : (txs as { data?: unknown[] }).data ?? [];
     const invoices = await this.prisma.invoice.findMany({
       where: { companyId, deletedAt: null },
       select: {
