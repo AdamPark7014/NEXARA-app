@@ -1,3 +1,5 @@
+import { ProyectosIncompletosService } from '../projects/proyectos-incompletos.service.js';
+import { Optional as ProyectoOptional } from '@nestjs/common';
 import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException, Inject, forwardRef, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -78,6 +80,7 @@ export class VentasService {
     private readonly domainEvents: DomainEventBusService,
     private readonly serviceClientsService: ServiceClientsService,
     @Optional() private readonly audit?: AuditService,
+    @ProyectoOptional() private readonly avisosProyecto?: ProyectosIncompletosService,
   ) {}
 
   private isSuperAdminUser(user?: any) {
@@ -1748,6 +1751,7 @@ export class VentasService {
         siteCount: patch.siteCount,
         salesProjectId: project.id,
         vendorId,
+        createdById: vendorId,
         clientId: salesClient.serviceClientId,
         startDate: patch.startDate,
         endDate: patch.endDate,
@@ -1760,6 +1764,7 @@ export class VentasService {
       },
     });
 
+    await this.avisosProyecto?.avisarAlNacer(operationalProject.id);
     return { salesProject: project, operationalProject, created: true };
   }
 

@@ -1,3 +1,5 @@
+import { ProyectosIncompletosService } from '../projects/proyectos-incompletos.service.js';
+import { Optional as ProyectoOptional } from '@nestjs/common';
 /**
  * El proyecto completo: plan, alcance, requerimientos, equipo y documentos.
  *
@@ -24,6 +26,7 @@ import {
 import { fueraDeAlcance, mensajeFueraDeAlcance } from './proyecto-equipo-alcance.js';
 import { marcarClienteDeProyectoSinFallar } from './cliente-de-proyecto.js';
 import { FACTURACION_VACIA, facturacionDe } from '../cotizaciones/hilo-negocio.js';
+import { parseWorkDate, workDayEnd } from '../common/time/workday.js';
 import { periodoDto } from '../activities/actividad-periodo.js';
 import { esCerrada } from '../activities/actividad-tiempos.js';
 import type { Alcanzador } from '../me/equipo-alcance.js';
@@ -33,6 +36,12 @@ import {
   siguienteHito,
   type ResumenSalud,
 } from './proyecto-salud.js';
+import { esNombreDeRelleno } from '../ventas/client-sectors.js';
+import {
+  evaluarCompletitud,
+  mensajeFaltantes,
+  type ResultadoCompletitud,
+} from './proyecto-completitud.js';
 import {
   esEstadoProyecto,
   etiquetaEstadoProyecto,
@@ -122,6 +131,8 @@ const listaInclude = {
     select: { id: true, name: true, orden: true, plannedDate: true, actualDate: true, status: true },
   },
   requirements: { select: { status: true } },
+  scopeItems: { select: { kind: true } },
+  documents: { select: { kind: true, nombre: true } },
   _count: { select: { documents: true, members: true } },
 } satisfies Prisma.OperationalProjectInclude;
 
@@ -134,35 +145,65 @@ export type FiltrosProyecto = {
   salud?: string;
   q?: string;
   incluirCancelados?: boolean;
+  incompletos?: boolean;
 };
 
 @Injectable()
 export class ProyectosProfesionalService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @ProyectoOptional() private readonly avisosProyecto?: ProyectosIncompletosService) {}
 
   // ---------------------------------------------------------------------------
   // Lectura
   // ---------------------------------------------------------------------------
 
-  private resumen(proyecto: {
-    status: string;
-    endDate: Date | null;
-    actualEndDate: Date | null;
-    activities?: Array<{ estatus?: string | null }>;
-    milestones?: Array<{ plannedDate?: Date | null; actualDate?: Date | null; status?: string | null }>;
-    requirements?: Array<{ status?: string | null }>;
-  }): ResumenSalud & { requerimientos: ReturnType<typeof resumirRequerimientos>; estadoEtiqueta: string } {
+  private completitudDe(proyecto: any): ResultadoCompletitud {
+    return evaluarCompletitud({
+      title: proyecto.title,
+      clientName: proyecto.client?.name,
+      clientDeletedAt: proyecto.client?.deletedAt,
+      clientId: proyecto.clientId ?? proyecto.client?.id,
+      clientEsRelleno: esNombreDeRelleno(proyecto.client?.name),
+      projectType: proyecto.projectType,
+      description: proyecto.description,
+      responsableId: proyecto.responsableId,
+      startDate: proyecto.startDate,
+      endDate: proyecto.endDate,
+      objective: proyecto.objective,
+      scopeSummary: proyecto.scopeSummary,
+      scopeItems: proyecto.scopeItems,
+      milestones: proyecto.milestones,
+      activities: proyecto.activities,
+      documents: (proyecto.documents ?? []).map((d: any) => ({
+        kind: d.kind,
+        nombre: d.nombre,
+        titulo: d.nombre,
+      })),
+    });
+  }
+
+  private resumen(proyecto: any): ResumenSalud & {
+    requerimientos: ReturnType<typeof resumirRequerimientos>;
+    estadoEtiqueta: string;
+    completitud: ResultadoCompletitud;
+  } {
+    const completitud = this.completitudDe(proyecto);
+    const faltantesFicha = completitud.faltantes.filter((f) =>
+      ['nombre_descriptivo', 'cliente_valido', 'tipo', 'responsable', 'fecha_inicio', 'fecha_fin'].includes(f.clave),
+    ).length;
     const salud = calcularSalud({
       status: proyecto.status,
       endDate: proyecto.endDate,
       actualEndDate: proyecto.actualEndDate,
       actividades: proyecto.activities ?? [],
       hitos: proyecto.milestones ?? [],
+      fichaCompleta: completitud.fichaOk,
+      faltantesFicha,
     });
     return {
       ...salud,
       requerimientos: resumirRequerimientos(proyecto.requirements ?? []),
       estadoEtiqueta: etiquetaEstadoProyecto(proyecto.status),
+      completitud,
     };
   }
 
@@ -219,10 +260,17 @@ export class ProyectosProfesionalService {
     });
 
     // La salud se calcula, así que filtrar por ella se hace aquí y no en SQL.
+    let out = conResumen;
+    if (filtros.incompletos) {
+      out = out.filter((p: any) => p.resumen?.salud === 'INCOMPLETO' || p.resumen?.completitud?.fichaOk === false || (p.status === 'ACTIVE' && p.resumen?.completitud?.planOk === false));
+    }
     const salud = filtros.salud?.trim().toUpperCase();
-    if (!salud) return conResumen;
-    if (salud === 'RIESGO') return conResumen.filter((p) => p.resumen.enRiesgo);
-    return conResumen.filter((p) => p.resumen.salud === salud);
+    if (!salud) return out;
+    if (salud === 'RIESGO') return out.filter((p) => p.resumen.enRiesgo);
+    if (salud === 'INCOMPLETOS' || salud === 'INCOMPLETO') {
+      return out.filter((p: any) => p.resumen?.salud === 'INCOMPLETO' || p.resumen?.completitud?.fichaOk === false || (p.status === 'ACTIVE' && p.resumen?.completitud?.planOk === false));
+    }
+    return out.filter((p) => p.resumen.salud === salud);
   }
 
   async detalle(id: number, companyId?: number | null) {
@@ -314,10 +362,23 @@ export class ProyectosProfesionalService {
     return d;
   }
 
+  private assertFichaAlta(entrada: Parameters<typeof evaluarCompletitud>[0]) {
+    const c = evaluarCompletitud(entrada);
+    if (!c.fichaOk) {
+      const faltan = mensajeFaltantes(
+        c.faltantes.filter((f) =>
+          ['nombre_descriptivo', 'cliente_valido', 'tipo', 'responsable', 'fecha_inicio', 'fecha_fin'].includes(f.clave),
+        ),
+      );
+      throw new BadRequestException(`El proyecto no tiene la ficha mínima: ${faltan}.`);
+    }
+  }
+
   async crear(
     dto: CrearProyectoProfesionalDto,
     actor: { id: number; isSuperAdmin?: boolean },
     companyId?: number | null,
+    opts?: { permitirIncompleto?: boolean },
   ) {
     const client = await this.prisma.serviceClient.findUnique({ where: { id: dto.clientId } });
     if (!client) throw new NotFoundException('Cliente no encontrado');
@@ -336,6 +397,22 @@ export class ProyectosProfesionalService {
     const responsableId = dto.responsableId ?? actor.id;
     const vendorId = dto.vendorId ?? actor.id;
 
+    if (!opts?.permitirIncompleto) this.assertFichaAlta({
+      title: dto.title,
+      clientName: client.name,
+      clientDeletedAt: (client as any).deletedAt,
+      clientId: client.id,
+      clientEsRelleno: esNombreDeRelleno(client.name),
+      projectType: dto.projectType ?? 'OTRO',
+      description: dto.description,
+      responsableId: dto.responsableId,
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+    });
+
+    if (!opts?.permitirIncompleto && (estado === 'ACTIVE' || estado === 'COMPLETED')) {
+      throw new BadRequestException('Crea el proyecto Planeado; completa el plan y liga actividades antes de ponerlo En curso o Terminado.');
+    }
     const miembros = this.normalizarEquipo(dto.members ?? [], responsableId);
     await this.assertAlcanzaA(actor, [responsableId, ...miembros.map((m) => m.userId)]);
     await this.assertAlcanzaA(actor, (dto.milestones ?? []).map((h) => h.responsableId));
@@ -368,6 +445,7 @@ export class ProyectosProfesionalService {
         status: estado,
         vendorId,
         responsableId,
+        createdById: actor.id,
         clientId: dto.clientId,
         companyId: tenantId,
         startDate,
@@ -396,6 +474,8 @@ export class ProyectosProfesionalService {
       },
       include: detalleInclude,
     });
+
+    if (opts?.permitirIncompleto) await this.avisosProyecto?.avisarAlNacer(creado.id);
 
     // El cliente queda en el padrón como cliente de proyecto (sin perder sus otros tipos),
     // si quien crea puede sumarle el tipo (misma regla que la ficha); si no, coordinación lo suma.
@@ -518,6 +598,36 @@ export class ProyectosProfesionalService {
   /** Comprueba que el hijo es de este proyecto antes de tocarlo (y que el proyecto es tuyo). */
   private async assertDelProyecto(projectId: number, tenantId: number) {
     await this.cargar(projectId, tenantId);
+  }
+
+  /** Candidatas de la misma empresa y cliente, dentro de la ventana planeada. */
+  async actividadesSinProyecto(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const p = await this.cargar(id, tenantId);
+    if (!p.startDate || !p.endDate) return [];
+    const inicio = parseWorkDate(p.startDate.toISOString().slice(0, 10));
+    const fin = workDayEnd(parseWorkDate(p.endDate.toISOString().slice(0, 10)));
+    return this.prisma.activity.findMany({
+      where: { companyId: tenantId, clientId: p.clientId, projectId: null, fechaInicio: { gte: inicio, lte: fin }, OR: [{ fechaEntregaEsperada: null }, { fechaEntregaEsperada: { lte: fin } }] },
+      select: { id: true, anNumber: true, titulo: true, fechaInicio: true, fechaEntregaEsperada: true },
+      orderBy: { fechaInicio: 'asc' },
+    });
+  }
+
+  async ligarActividades(id: number, ids: number[], companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const p = await this.cargar(id, tenantId);
+    if (p.status === 'COMPLETED' || p.status === 'CANCELLED') throw new BadRequestException('Reabre el proyecto antes de ligar actividades.');
+    if (!ids.length || ids.length > 200) throw new BadRequestException('Elige entre 1 y 200 actividades.');
+    const candidatas = await this.actividadesSinProyecto(id, tenantId);
+    const elegidas = [...new Set(ids)];
+    if (elegidas.some((i) => !candidatas.some((a) => a.id === i))) throw new BadRequestException('Solo puedes ligar actividades sin proyecto del mismo cliente y dentro de las fechas planeadas.');
+    // El filtro vuelve a comprobar la pertenencia al escribir: no reasigna actividades de otro proyecto.
+    await this.prisma.$transaction(async (tx) => {
+      const resultado = await tx.activity.updateMany({ where: { id: { in: elegidas }, companyId: tenantId, clientId: p.clientId, projectId: null }, data: { projectId: id } });
+      if (resultado.count !== elegidas.length) throw new BadRequestException('Una actividad cambió mientras la ligabas. Actualiza e inténtalo de nuevo.');
+    });
+    return this.detalle(id, tenantId);
   }
 
   // ---------------------------------------------------------------------------

@@ -76,6 +76,7 @@ struct CoreActivityFormView: View {
     @State private var titulo = ""
     @State private var indicaciones = ""
     @State private var prioridad = "Media"
+    @State private var sinProyectoExplicito = false
     @State private var projectId: Int?
     @State private var clientId: Int?
     @State private var ticketType = "PREVENTIVO"
@@ -140,7 +141,7 @@ struct CoreActivityFormView: View {
     private var scheduled: Bool { kind.requiresSchedule || withSchedule }
 
     private var activeProjects: [CoreProjectOption] {
-        let active = projects.filter { $0.status.uppercased() == "ACTIVE" }
+        let active = projects.filter { !["COMPLETED", "CANCELLED"].contains($0.status.uppercased()) }
         guard filtersProjectsBySector, !sectorClients.isEmpty else { return active }
         let allowed = Set(sectorClients.map(\.serviceClientId))
         return active.filter { project in
@@ -149,11 +150,25 @@ struct CoreActivityFormView: View {
         }
     }
 
+    private var proyectosCliente: [CoreProjectOption] {
+        activeProjects.filter { clientId != nil && $0.clientId == clientId }
+    }
     private var selectedProject: CoreProjectOption? {
         guard let projectId else { return nil }
         return activeProjects.first(where: { $0.id == projectId })
     }
 
+    private var fueraDeFechasProyecto: Bool {
+        guard let project = selectedProject else { return false }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "America/Mexico_City")
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dia = formatter.string(from: fecha)
+        if let inicio = project.startDate, dia < String(inicio.prefix(10)) { return true }
+        if let fin = project.endDate, dia > String(fin.prefix(10)) { return true }
+        return false
+    }
     private var tareaTipo: CoreTareaTipo? {
         guard let tareaTipoId else { return nil }
         return CoreTareaTipo.all.first(where: { $0.id == tareaTipoId })
@@ -262,8 +277,24 @@ struct CoreActivityFormView: View {
                      : (needsClientPicker ? "Elige el cliente de este padrón." : "Trabajo del día sin proyecto."))
             }
 
+            if fueraDeFechasProyecto {
+                Section { Label("La actividad queda fuera de las fechas planeadas del proyecto. Puedes continuar.", systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
+            }
+            if kind == .servicio && !proyectosCliente.isEmpty {
+                Section("¿De qué proyecto es?") {
+                    Picker("Proyecto", selection: $projectId) {
+                        Text("Seleccionar proyecto…").tag(Int?.none)
+                        ForEach(proyectosCliente) { project in Text(project.title).tag(Int?.some(project.id)) }
+                    }
+                    if ["CORRECTIVO", "PREVENTIVO", "GARANTIA", "SERVICIO"].contains(ticketType) {
+                        Button("No es de un proyecto") { sinProyectoExplicito = true; projectId = nil }
+                    }
+                }
+                .onChange(of: clientId) { _, _ in sinProyectoExplicito = false; projectId = proyectosCliente.count == 1 ? proyectosCliente.first?.id : nil }
+                .onAppear { if !sinProyectoExplicito && projectId == nil && proyectosCliente.count == 1 { projectId = proyectosCliente.first?.id } }
+            }
             if kind.withProject {
-                Section("Proyecto *") {
+                Section("¿De qué proyecto es?") {
                     Picker("Proyecto", selection: $projectId) {
                         Text("Seleccionar proyecto…").tag(Int?.none)
                         ForEach(activeProjects) { project in
@@ -961,6 +992,10 @@ struct CoreActivityFormView: View {
             return
         }
 
+        if !proyectosCliente.isEmpty && projectId == nil && (!sinProyectoExplicito || ticketType == "INSTALACION") {
+            error = "Elige de qué proyecto es. Una instalación no puede quedar sin proyecto."
+            return
+        }
         let project = selectedProject
         if kind.withProject && project == nil {
             error = "Selecciona un proyecto"
@@ -996,7 +1031,7 @@ struct CoreActivityFormView: View {
             ticketType: type == "INVENTARIO" ? "PREVENTIVO" : type,
             ticketTypeCustom: type == "OTRO" ? custom : nil,
             workType: type == "INVENTARIO" ? "PREVENTIVE_INVENTORY" : "ISSUE",
-            projectId: kind.withProject ? project?.id : nil,
+            projectId: project?.id,
             clientId: kind.withProject ? (project?.clientId ?? clientId) : clientId,
             responsableId: responsableId,
             tiempoEstimadoMin: {

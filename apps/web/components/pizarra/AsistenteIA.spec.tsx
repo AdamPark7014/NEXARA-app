@@ -720,7 +720,7 @@ describe("Asignar con IA: evidencia agrupada en la tarjeta (16-11)", () => {
     await preparar(usuario);
     await usuario.click(screen.getByRole("button", { name: /Confirmar/ }));
     await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
-    expect(extra.quickCreateOperationalProject).toHaveBeenCalledWith("tok", { title: "Instalar 4 cámaras en IPADE", serviceClientId: 26 });
+    expect(extra.quickCreateOperationalProject).toHaveBeenCalledWith("tok", { title: "Instalar 4 cámaras en IPADE", serviceClientId: 26, responsableId: 8, startDate: "2026-10-24", endDate: "2026-10-24" });
     expect(api.crearActividad.mock.calls[0][1]).toMatchObject({ projectId: 900, clientId: 26, coreKind: "proyecto" });
     const campos = extra.definirCamposEvidencia.mock.calls[0][2];
     expect(campos.map((c: { nombre: string }) => c.nombre)).toEqual(["Cámara 1", "Cámara 2", "Cámara 3", "Cámara 4"]);

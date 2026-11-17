@@ -117,6 +117,7 @@ export class ActivitiesService {
 
   async getNextAnNumber(companyId?: number | null): Promise<string> {
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
+
     return this.generateNextAnNumber(resolvedCompanyId);
   }
 
@@ -220,6 +221,24 @@ export class ActivitiesService {
   async create(dtoRecibido: CreateActivityDto, companyId?: number | null, opciones: { sinAviso?: boolean; tiempoFijoMin?: number } = {}) {
     await this.assertResponsableActivo(dtoRecibido.responsableId);
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
+    // Misma puerta para web, apps y Asignar con IA: una instalación del cliente
+    // con proyecto vigente se liga al proyecto, sin adivinar cuál si hay varios.
+    if (dtoRecibido.clientId && dtoRecibido.ticketType === 'INSTALACION' && !dtoRecibido.projectId) {
+      const vigente = await this.prisma.operationalProject.findFirst({
+        where: { companyId: resolvedCompanyId, clientId: dtoRecibido.clientId, deletedAt: null, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+        select: { id: true },
+      });
+      if (vigente) throw new BadRequestException('¿De qué proyecto es? Liga la instalación a un proyecto vigente del cliente.');
+    }
+    if (dtoRecibido.projectId) {
+      const proyecto = await this.prisma.operationalProject.findFirst({
+        where: { id: dtoRecibido.projectId, companyId: resolvedCompanyId, deletedAt: null }, select: { id: true, clientId: true },
+      });
+      if (!proyecto || (dtoRecibido.clientId && proyecto.clientId !== dtoRecibido.clientId)) {
+        throw new BadRequestException('El proyecto debe ser de este cliente y de tu empresa.');
+      }
+      dtoRecibido = { ...dtoRecibido, clientId: proyecto.clientId };
+    }
     // Ninguna sin tiempo ni entrega; en la autoasignación salen del título y no se editan
     // (`tiempo-entrega.ts`). Todas las altas pasan por aquí: web, apps, asistente y servicios.
     const createActivityDto = this.tiempos

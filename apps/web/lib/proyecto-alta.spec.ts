@@ -9,7 +9,7 @@ import {
 } from "./proyecto-alta";
 
 function borrador(cambios: Partial<BorradorProyecto> = {}): BorradorProyecto {
-  return { ...borradorVacio("2026-09-17", "7"), title: "CCTV Plaza Norte", clienteId: "12", ...cambios };
+  return { ...borradorVacio("2026-09-17", "7"), title: "Instalación de cámaras Plaza Norte", clienteId: "12", projectType: "INSTALACION_CCTV", startDate: "2026-09-17", endDate: "2026-12-15", ...cambios };
 }
 
 describe("errores por paso", () => {
@@ -57,6 +57,10 @@ describe("errores por paso", () => {
     expect(erroresDelBorrador(borradorVacio("2026-09-17", ""))).toEqual([
       "Escribe el nombre del proyecto (al menos 3 letras).",
       "Elige el cliente.",
+      "Elige el responsable del proyecto.",
+      "Pon el inicio planeado.",
+      "Pon el fin planeado.",
+      "Describe el tipo de proyecto o elige otro tipo.",
     ]);
   });
 });
@@ -90,7 +94,7 @@ describe("cuerpo del POST", () => {
       501,
     );
     expect(cuerpo).toMatchObject({
-      title: "CCTV Plaza Norte",
+      title: "Instalación de cámaras Plaza Norte",
       clientId: 501,
       responsableId: 7,
       startDate: "2026-09-17",

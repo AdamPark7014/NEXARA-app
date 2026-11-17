@@ -665,7 +665,7 @@ internal fun ActivityFormPanel(
     val needsClientPicker = meta.id == k.SERVICIO || meta.id == k.COMERCIAL
     val filtersProjectsBySector = meta.id == k.PROYECTO || meta.id == k.OBRA
     val tareaTipo = k.tareaTipo(form)
-    val activeProjects = projects.filter { it.status == "ACTIVE" }.let { active ->
+    val activeProjects = projects.filter { it.status != "COMPLETED" && it.status != "CANCELLED" }.let { active ->
         if (!filtersProjectsBySector || sectorClients.isEmpty()) {
             active
         } else {
@@ -674,6 +674,14 @@ internal fun ActivityFormPanel(
         }
     }
     val selectedProject = activeProjects.firstOrNull { it.id == form.projectId }
+    var sinProyectoExplicito by remember { mutableStateOf(false) }
+    val proyectosCliente = activeProjects.filter { form.clientId != null && it.client?.id == form.clientId }
+    LaunchedEffect(form.clientId) { sinProyectoExplicito = false }
+    LaunchedEffect(form.clientId, projects, sinProyectoExplicito) {
+        if (!sinProyectoExplicito && form.projectId == null && proyectosCliente.size == 1 && meta.id == k.SERVICIO) {
+            form = form.copy(projectId = proyectosCliente.first().id)
+        }
+    }
 
     fun submit() {
         error = null
@@ -684,7 +692,13 @@ internal fun ActivityFormPanel(
             return
         }
         val project = activeProjects.firstOrNull { it.id == current.projectId }
-        val base: CreateActivityRequest = k.buildRequest(current, project?.client?.id, creadoPorId, autoasignacion = autoasignacion)
+        if (proyectosCliente.isNotEmpty() && current.projectId == null && (!sinProyectoExplicito || current.ticketType == "INSTALACION")) {
+            error = "Elige de qué proyecto es. Una instalación no puede quedar sin proyecto."
+            return
+        }
+        val base: CreateActivityRequest = k.buildRequest(current, project?.client?.id, creadoPorId, autoasignacion = autoasignacion).let { body ->
+            if (project != null) body.copy(projectId = project.id, clientId = project.client?.id) else body
+        }
         // Al asignar a otro, el tiempo estándar viaja aparte; sin motivo, el estimado es el estándar.
         val envio = if (autoasignacion || !Complejidad.visible(meta.id, current)) null else estandar
         val alta = AltaCore(TiempoEstandar.ajustar(base, envio), envio)
@@ -730,7 +744,7 @@ internal fun ActivityFormPanel(
 
         if (form.projectMode == k.WITH_PROJECT) {
             PickerField(
-                label = "Proyecto",
+                label = "¿De qué proyecto es?",
                 value = selectedProject?.title,
                 placeholder = "Seleccionar proyecto…",
                 options = activeProjects.filter { form.clientId == null || it.client?.id == form.clientId },
@@ -784,6 +798,26 @@ internal fun ActivityFormPanel(
                     optionText = { it.name },
                     onPick = { c -> form = form.copy(clientId = c?.serviceClientId) },
                 )
+            }
+        }
+
+        val inicioProyecto = selectedProject?.startDate?.take(10)
+        val finProyecto = selectedProject?.endDate?.take(10)
+        if (form.fecha.isNotBlank() && ((inicioProyecto != null && form.fecha < inicioProyecto) || (finProyecto != null && form.fecha > finProyecto))) {
+            Text("La actividad queda fuera de las fechas planeadas del proyecto. Puedes continuar.", color = WarningText)
+        }
+        if (meta.id == k.SERVICIO && proyectosCliente.isNotEmpty()) {
+            Gap()
+            PickerField(
+                label = "¿De qué proyecto es?",
+                value = selectedProject?.title,
+                placeholder = "Seleccionar proyecto…",
+                options = proyectosCliente,
+                optionText = { it.title },
+                onPick = { p -> sinProyectoExplicito = false; form = form.copy(projectId = p?.id) },
+            )
+            if (form.ticketType in listOf("CORRECTIVO", "PREVENTIVO", "GARANTIA", "SERVICIO")) {
+                TextButton(onClick = { sinProyectoExplicito = true; form = form.copy(projectId = null) }) { Text("No es de un proyecto") }
             }
         }
 

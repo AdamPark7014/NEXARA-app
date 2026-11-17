@@ -34,6 +34,7 @@ import { ProyectoProgramacionService } from './proyecto-programacion.service.js'
 import { ProgramarActividadesDto } from './dto/programar-actividades.dto.js';
 import {
   ActualizarProyectoProfesionalDto,
+  LigarActividadesProyectoDto,
   CambiarEstadoProyectoDto,
   CrearProyectoProfesionalDto,
   ProjectDocumentMetaDto,
@@ -100,6 +101,7 @@ export class ProyectosProfesionalController {
     @Query('salud') salud?: string,
     @Query('q') q?: string,
     @Query('incluirCancelados') incluirCancelados?: string,
+    @Query('incompletos') incompletos?: string,
   ) {
     return this.proyectos.listar(
       {
@@ -110,6 +112,7 @@ export class ProyectosProfesionalController {
         salud,
         q,
         incluirCancelados: incluirCancelados === '1' || incluirCancelados === 'true',
+        incompletos: incompletos === '1' || incompletos === 'true',
       },
       companyId,
     );
@@ -130,6 +133,18 @@ export class ProyectosProfesionalController {
   // ---------------------------------------------------------------------------
   // Alta, cabecera y estado
   // ---------------------------------------------------------------------------
+
+  @Get(':id/actividades-sin-proyecto')
+  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  actividadesSinProyecto(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.proyectos.actividadesSinProyecto(id, companyId);
+  }
+
+  @Post(':id/ligar-actividades')
+  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  ligarActividades(@Param('id', ParseIntPipe) id: number, @Body() dto: LigarActividadesProyectoDto, @CurrentCompanyId() companyId: number | null) {
+    return this.proyectos.ligarActividades(id, dto.activityIds, companyId);
+  }
 
   @Post()
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })

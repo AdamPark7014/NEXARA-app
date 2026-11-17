@@ -112,10 +112,12 @@ export class CotizacionGanadaService {
         scopeItems: alcanceDePartidas(cotizacion.items),
         ...(subtotal > 0 ? { budgetAmount: subtotal } : {}),
         ...(cotizacion.currency ? { currency: cotizacion.currency } : {}),
-        ...(startDate ? { startDate } : {}),
-      },
+        startDate: startDate || new Date().toISOString().slice(0, 10),
+        endDate: startDate || new Date().toISOString().slice(0, 10),
+      } as any,
       { id: actor.id, isSuperAdmin: true },
       tenantId,
+      { permitirIncompleto: true },
     );
   }
 }

@@ -7,6 +7,8 @@ struct CoreProjectOption: Identifiable, Hashable {
     let status: String
     let clientId: Int?
     let clientName: String
+    var startDate: String? = nil
+    var endDate: String? = nil
 }
 
 /// Cliente del padrón por sector (`GET ventas/clientes?sector=`). La actividad
@@ -126,7 +128,9 @@ extension CoreRepository {
                 title: ActivityParse.str(row["title"]),
                 status: ActivityParse.str(row["status"]),
                 clientId: ActivityParse.int(client["id"]),
-                clientName: ActivityParse.str(client["name"])
+                clientName: ActivityParse.str(client["name"]),
+                startDate: row["startDate"] as? String,
+                endDate: row["endDate"] as? String
             )
         }
     }

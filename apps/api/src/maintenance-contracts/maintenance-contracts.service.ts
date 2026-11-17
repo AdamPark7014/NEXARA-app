@@ -1,3 +1,5 @@
+import { ProyectosIncompletosService } from '../projects/proyectos-incompletos.service.js';
+import { Optional as ProyectoOptional } from '@nestjs/common';
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
@@ -25,6 +27,7 @@ export class MaintenanceContractsService {
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly folio: FolioService,
+    @ProyectoOptional() private readonly avisosProyecto?: ProyectosIncompletosService,
   ) {}
 
   // ── Contracts ──────────────────────────────────────────────────────
@@ -284,6 +287,7 @@ export class MaintenanceContractsService {
           scopeSummary: contract.serviceScope || null,
           clientId: contract.clientId,
           vendorId,
+          createdById: vendorId,
           startDate: contract.startDate,
           endDate: contract.endDate || null,
           status: 'ACTIVE' as any,
@@ -291,6 +295,7 @@ export class MaintenanceContractsService {
         },
       });
       operationalProjectId = created.id;
+      await this.avisosProyecto?.avisarAlNacer(created.id);
       await (this.prisma as any).maintenanceContract.update({
         where: { id: contract.id },
         data: { operationalProjectId },

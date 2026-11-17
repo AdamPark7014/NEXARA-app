@@ -67,19 +67,25 @@ const FILTROS_SALUD = [
   { valor: "EN_TIEMPO", etiqueta: "En tiempo" },
   { valor: "PLANEADO", etiqueta: "Por arrancar" },
   { valor: "SIN_PLAN", etiqueta: "Sin fecha de fin" },
+  { valor: "INCOMPLETO", etiqueta: "Incompletos" },
 ] as const;
 
 type FiltroSalud = (typeof FILTROS_SALUD)[number]["valor"];
 
 const PUNTO_SALUD: Partial<Record<FiltroSalud, Tone>> = {
+  INCOMPLETO: "danger",
   RIESGO: "warning",
   RETRASADO: "danger",
   EN_TIEMPO: "success",
   PLANEADO: "info",
 };
 
+function esIncompleto(p: ProyectoFila): boolean {
+  return p.resumen.salud === "INCOMPLETO" || p.resumen.completitud?.fichaOk === false || (p.status === "ACTIVE" && p.resumen.completitud?.planOk === false);
+}
 function cumpleSalud(p: ProyectoFila, filtro: FiltroSalud): boolean {
   if (!filtro) return true;
+  if (filtro === "INCOMPLETO") return esIncompleto(p);
   if (filtro === "RIESGO") return p.resumen.enRiesgo;
   return p.resumen.salud === filtro;
 }
@@ -134,6 +140,7 @@ export default function ProyectosPage() {
   const qDiferida = useDeferredValue(q);
   const [estado, setEstado] = useState<EstadoProyecto | "">("");
   const [salud, setSalud] = useState<FiltroSalud>("");
+  useEffect(() => { if (new URLSearchParams(window.location.search).get("incompletos") === "1") setSalud("INCOMPLETO"); }, []);
   const [responsable, setResponsable] = useState("");
   /** Filtro por cliente: el id del cliente de operación, que es al que se liga el proyecto. */
   const [cliente, setCliente] = useState("");
@@ -299,6 +306,11 @@ export default function ProyectosPage() {
     return { enCurso, porIniciar, atrasados, cerrados, enRiesgo };
   }, [items]);
 
+  const incompletosCount = useMemo(
+    () => items.filter(esIncompleto).length,
+    [items],
+  );
+
   const hayFiltros = Boolean(q.trim() || estado || salud || responsable || cliente);
   const quitarFiltros = () => {
     setQ("");
@@ -366,13 +378,22 @@ export default function ProyectosPage() {
         p.responsable?.nombre ? (
           <PersonCell name={p.responsable.nombre} size={26} subtitle={`${p.equipoCount} en equipo`} />
         ) : (
-          <span className={styles.tenue}>Sin asignar</span>
+          <span className={styles.alerta}>Sin asignar</span>
         ),
     },
     {
       key: "avance",
       label: "Avance",
       render: (p) => {
+        const faltan = p.resumen.completitud?.faltantes?.length ?? 0;
+        const incompleto = esIncompleto(p);
+        if (incompleto) {
+          return (
+            <span className={styles.avance} title={p.resumen.completitud?.faltantes.map((f) => f.etiqueta).join(", ") || p.resumen.motivo}>
+              <StatusBadge size="sm" label={`Incompleto · faltan ${faltan || "?"}`} tone="danger" />
+            </span>
+          );
+        }
         const avance = p.resumen.avance.porcentaje;
         return (
           <span className={styles.avance}>
@@ -589,7 +610,14 @@ export default function ProyectosPage() {
       {...encabezado}
       stats={
         items.length || primeraCarga ? (
-          <StatRow cols={4} ariaLabel="Cartera de proyectos">
+          <StatRow cols={5} ariaLabel="Cartera de proyectos">
+            <Stat
+              label="Incompletos"
+              value={String(incompletosCount)}
+              hint="les falta información"
+              tone={incompletosCount > 0 ? "danger" : "default"}
+              onClick={incompletosCount > 0 ? () => setSalud("INCOMPLETO") : undefined}
+            />
             <Stat
               label="En curso"
               value={cifras.enCurso}
