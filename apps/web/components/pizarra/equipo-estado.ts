@@ -10,6 +10,7 @@
  */
 import {
   CLAUDIA_TESTER_EMAIL,
+  DIRECCION_GENERAL_EMAIL,
   PLATFORM_OWNER_EMAIL,
   normalizePlatformEmail,
 } from "@/lib/platform-accounts";
@@ -410,6 +411,7 @@ export function atencionEquipo(
  */
 export const CENTRO_OPERATIVO_EMAILS_EXCLUIDOS: readonly string[] = [
   PLATFORM_OWNER_EMAIL, // gerencia@nexara.com.mx — Christian, dueño/CEO
+  DIRECCION_GENERAL_EMAIL, // getzemani.delvalle@nexara.com.mx — Getzemani, Dirección General
   CLAUDIA_TESTER_EMAIL, // claudia.bernal@nexara.com.mx — tester, no es empleada
 ];
 
