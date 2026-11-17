@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { AccountingService } from './accounting.service.js';
+import { EstadoCuentaImportService } from './banco/estado-cuenta-import.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -16,7 +17,10 @@ import { ListBankTransactionsQueryDto } from './dto/list-query.dto.js';
 @Controller('accounting/banking')
 @UseGuards(UrlAccessGuard)
 export class BankingController {
-  constructor(private readonly service: AccountingService) {}
+  constructor(
+    private readonly service: AccountingService,
+    private readonly importService: EstadoCuentaImportService,
+  ) {}
 
   @Post('accounts')
   @UseGuards(RbacGuard)
@@ -70,6 +74,24 @@ export class BankingController {
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.service.importBankTransactions(+id, dto.transactions, companyId);
+  }
+
+@Post('accounts/:id/transactions/import-file')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.BANKING_MANAGE] })
+  importFile(
+    @Param('id') id: string,
+    @Body() body: { texto: string; filename: string; layout?: 'bbva' | 'banorte' | 'santander' | 'auto' },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.importService.importarArchivo(+id, companyId, body.texto, body.filename, body.layout ?? 'auto');
+  }
+
+  @Get('accounts/:id/match-proposals')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.BANKING_VIEW] })
+  matchProposals(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
+    return this.importService.proponerMatches(+id, companyId);
   }
 
   @Get('spei/:trackingKey')

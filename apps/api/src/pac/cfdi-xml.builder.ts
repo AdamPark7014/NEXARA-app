@@ -1,5 +1,6 @@
 import type { CsdService } from './csd.service.js';
 import type { PacStampInput } from './pac.types.js';
+import { impuestosDrDePago, xmlNodosImpuestosDr } from './pago-impuestos-dr.js';
 
 /**
  * Constructor de CFDI 4.0 sellado (cadena original + sello con CSD).
@@ -318,13 +319,20 @@ export function buildSealedPaymentCfdi(
 
   const doc = input.relatedDocs[0];
   const doctoRelacionado = doc
-    ? `<pago20:DoctoRelacionado IdDocumento="${esc(doc.uuid)}"` +
-      `${doc.serie ? ` Serie="${esc(doc.serie)}"` : ''}` +
-      `${doc.folio ? ` Folio="${esc(doc.folio)}"` : ''}` +
-      ` MonedaDR="${doc.currency || 'MXN'}" EquivalenciaDR="1" NumParcialidad="${doc.partialityNumber}"` +
-      ` ImpSaldoAnt="${m(doc.previousBalance)}" ImpPagado="${m(doc.amountPaid)}" ImpSaldoInsoluto="${m(doc.remainingBalance)}" ObjetoImpDR="02">` +
-      `<pago20:ImpuestosDR><pago20:TrasladosDR><pago20:TrasladoDR BaseDR="${m(doc.amountPaid / 1.16)}" ImpuestoDR="002" TipoFactorDR="Tasa" TasaOCuotaDR="0.160000" ImporteDR="${m(doc.amountPaid - doc.amountPaid / 1.16)}"/></pago20:TrasladosDR></pago20:ImpuestosDR>` +
-      `</pago20:DoctoRelacionado>`
+    ? (() => {
+        const imp = impuestosDrDePago(doc.amountPaid, doc.ivaRate === undefined ? 16 : doc.ivaRate, {
+          exento: doc.ivaRate === null,
+        });
+        return (
+          `<pago20:DoctoRelacionado IdDocumento="${esc(doc.uuid)}"` +
+          `${doc.serie ? ` Serie="${esc(doc.serie)}"` : ''}` +
+          `${doc.folio ? ` Folio="${esc(doc.folio)}"` : ''}` +
+          ` MonedaDR="${doc.currency || 'MXN'}" EquivalenciaDR="1" NumParcialidad="${doc.partialityNumber}"` +
+          ` ImpSaldoAnt="${m(doc.previousBalance)}" ImpPagado="${m(doc.amountPaid)}" ImpSaldoInsoluto="${m(doc.remainingBalance)}" ObjetoImpDR="02">` +
+          xmlNodosImpuestosDr(imp) +
+          `</pago20:DoctoRelacionado>`
+        );
+      })()
     : '';
 
   const pagosXml =
