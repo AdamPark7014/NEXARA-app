@@ -25,6 +25,8 @@ enum AsistenciasAccess {
         RolePanelMatrix.dirAdmin,
         RolePanelMatrix.coordAdmin,
         RolePanelMatrix.coordOperaciones,
+        // Supervisor general (Luis): ve a su equipo y también checa.
+        RolePanelMatrix.dirOperaciones,
         RolePanelMatrix.arquitecto,
         RolePanelMatrix.ingSoporte,
     ]
@@ -49,8 +51,7 @@ enum AsistenciasAccess {
         if user.isSuperAdmin { return .manage }
         guard let role = role(user) else { return .register }
         if role == RolePanelMatrix.ceo
-            || role == RolePanelMatrix.superAdmin
-            || role == RolePanelMatrix.dirOperaciones {
+            || role == RolePanelMatrix.superAdmin {
             return .manage
         }
         return manageAndRegister.contains(role) ? .manageRegister : .register
