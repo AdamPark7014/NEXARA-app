@@ -68,6 +68,8 @@ export function filterModulesByNavigation<T extends { id: string; panel?: string
   modules: T[],
   navigation: MeNavigation | null | undefined,
 ): T[] {
+  // Retirado incluso para super_admin y durante el fallback sin navegación.
+  modules = modules.filter((m) => m.id !== "work-projects" && !m.path?.includes("work-projects"));
   if (!navigation) return modules;
   const hidden = new Set(navigation.hiddenModuleIds ?? []);
   if (hidden.size > 0) {

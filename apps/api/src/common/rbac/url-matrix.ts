@@ -1167,6 +1167,10 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...CLIENTES_CORE_URL_RULES,
+    // 17-11: «Proyectos» del CRM abre el listado único /erp/proyectos (maestro). Solo páginas:
+    // qué proyectos ve lo sigue decidiendo el alcance del servicio.
+    { path: '/erp/proyectos', scope: 'read' },
+    { path: '/erp/proyectos/**', scope: 'read' },
     { path: '/crm', scope: 'read' },
     { path: '/crm/dashboard', scope: 'read' },
     { path: '/crm/chat', scope: 'write' },

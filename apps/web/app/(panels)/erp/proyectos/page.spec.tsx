@@ -70,6 +70,21 @@ const FILAS = [
 ];
 
 describe("lista de proyectos", () => {
+  it("une costos por id operativo, muestra margen y cuenta sobrecostos vigentes", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => String(input).includes("/costos/proyectos") ? json({
+      proyectos: [
+        { id: 1, margen: { importe: 6000, pct: 30 }, margenCotizado: { importe: 7000, pct: 35 }, semaforoMargen: "verde", sobrecosto: false },
+        { id: 2, margen: { importe: -300, pct: -3 }, margenCotizado: { importe: 4000, pct: 40 }, semaforoMargen: "rojo", sobrecosto: true },
+        { id: 3, margen: { importe: -500, pct: -5 }, semaforoMargen: "rojo", sobrecosto: true },
+      ], sinLigar: { importe: 800, movimientos: [{ origen: "stock:4" }] },
+    }) : json(FILAS)));
+    render(<ProyectosPage />);
+    expect(await screen.findByText("Cotizado 35 %")).toBeInTheDocument();
+    const filaProyecto = screen.getByText("CCTV bodega Cuautlancingo").closest("tr")!;
+    expect(within(filaProyecto).getByText("-3 %")).toBeInTheDocument();
+    expect(screen.getByText("Con sobrecosto").parentElement?.parentElement).toHaveTextContent("1");
+    expect(screen.getByText(/Sin ligar:/)).toHaveTextContent("$800");
+  });
   it("pide todo una vez y esconde los cancelados en «Vigentes»", async () => {
     const fetchMock = vi.fn(async () => json(FILAS));
     vi.stubGlobal("fetch", fetchMock);

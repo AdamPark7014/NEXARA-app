@@ -5,6 +5,8 @@ import { MaintenanceContractsModule } from '../../maintenance-contracts/maintena
 import { VehiclesModule } from '../../vehicles/vehicles.module.js';
 import { WebhooksModule } from '../../webhooks/webhooks.module.js';
 import { CronService } from './cron.service.js';
+import { CostosModule } from '../../costos/costos.module.js';
+import { ProyectoCostosAvisosService } from './proyecto-costos-avisos.service.js';
 
 @Module({
   imports: [
@@ -13,7 +15,8 @@ import { CronService } from './cron.service.js';
     MaintenanceContractsModule,
     VehiclesModule,
     WebhooksModule,
+    CostosModule,
   ],
-  providers: [CronService],
+  providers: [CronService, ProyectoCostosAvisosService],
 })
 export class CronModule {}

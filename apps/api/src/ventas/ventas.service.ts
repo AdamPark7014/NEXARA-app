@@ -1428,7 +1428,27 @@ export class VentasService {
   async createProject(dto: CreateSalesProjectDto, user?: any, companyId?: number | null) {
     const opp = await this.getOpportunity(dto.opportunityId, user, companyId);
     const tenantId = opp.companyId ?? requireCompanyId(companyId);
+    // Validar antes de crear el espejo: una petición rechazada no deja un comercial huérfano.
+    let clienteProyecto = opp.client;
+    if (!clienteProyecto || esNombreDeRelleno(clienteProyecto.name)) {
+      throw new BadRequestException('El proyecto requiere un cliente real del padrón.');
+    }
+    if (!clienteProyecto.serviceClientId) {
+      clienteProyecto = (await this.provisionServiceClient(clienteProyecto.id, user)).salesClient as typeof clienteProyecto;
+    }
+    const clienteOperativo = clienteProyecto?.serviceClientId ? await this.prisma.serviceClient.findFirst({
+      where: { id: clienteProyecto.serviceClientId, companyId: tenantId, isActive: true }, select: { id: true, name: true },
+    }) : null;
+    if (!clienteOperativo || esNombreDeRelleno(clienteOperativo.name)) {
+      throw new BadRequestException('El proyecto requiere un cliente real y activo de la misma empresa.');
+    }
+    if (!opp.ownerId && !user?.id) throw new BadRequestException('No se pudo determinar el responsable comercial del proyecto');
     const margin = this.calculateProjectMargin(dto);
+    const maestro = opsPatchFromSales({
+      name: dto.name, projectType: dto.projectType ?? 'OTRO', scopeSummary: dto.scopeSummary?.trim() || null,
+      siteCount: dto.siteCount ?? null, startDate: dto.startDate ? new Date(dto.startDate) : null,
+      endDate: dto.endDate ? new Date(dto.endDate) : null, status: dto.status ?? 'PLANNED',
+    });
     const created = await this.prisma.salesProject.create({
       data: {
         companyId: tenantId,
@@ -1445,8 +1465,16 @@ export class VentasService {
         status: dto.status,
         startDate: dto.startDate || null,
         endDate: dto.endDate || null,
+        // Nested write: comercial y maestro nacen juntos o no se crea ninguno.
+        operationalProject: { create: {
+          companyId: tenantId, title: maestro.title, projectType: maestro.projectType,
+          scopeSummary: maestro.scopeSummary, description: maestro.scopeSummary || opp.description || null,
+          siteCount: maestro.siteCount, startDate: maestro.startDate, endDate: maestro.endDate, status: maestro.status,
+          clientId: clienteOperativo.id, vendorId: opp.ownerId || user.id, createdById: user?.id ?? opp.ownerId,
+          budgetAmount: dto.budget ?? 0,
+        } },
       },
-      include: { opportunity: true },
+      include: { opportunity: true, operationalProject: true },
     });
 
     if (user?.id) {
@@ -1466,7 +1494,7 @@ export class VentasService {
     }
 
     void this.ensureProjectSalesOrder(created.id, user, tenantId).catch(() => undefined);
-    void this.tryAutoProvisionOperational(created.id, user, tenantId).catch(() => undefined);
+    await this.avisosProyecto?.avisarAlNacer(created.operationalProject!.id);
 
     return created;
   }
@@ -1514,7 +1542,7 @@ export class VentasService {
       }
     } else {
       void this.ensureProjectSalesOrder(project.id, actorUser, opportunity.companyId).catch(() => undefined);
-      void this.tryAutoProvisionOperational(project.id, actorUser, opportunity.companyId).catch(() => undefined);
+      await this.provisionOperationalProject(project.id, actorUser, opportunity.companyId);
     }
 
     return project;
@@ -1569,13 +1597,14 @@ export class VentasService {
         this.prisma.salesProject.findMany({ where, orderBy: { updatedAt: 'desc' }, include, skip: query.skip, take: query.take }),
         this.prisma.salesProject.count({ where }),
       ]);
-      return buildPaginatedResponse(data, total, query);
+      const linked = await Promise.all(data.map(async (p) => ({ ...p, operationalProject: p.operationalProject ?? (await this.provisionOperationalProject(p.id, user, tenantId)).operationalProject })));
+      return buildPaginatedResponse(linked, total, query);
     }
     return this.prisma.salesProject.findMany({
       where,
       orderBy: { updatedAt: 'desc' },
       include,
-    });
+    }).then(data => Promise.all(data.map(async (p) => ({ ...p, operationalProject: p.operationalProject ?? (await this.provisionOperationalProject(p.id, user, tenantId)).operationalProject }))));
   }
 
   private async loadSalesProject(id: number, companyId?: number | null, include?: any): Promise<any> {
@@ -1589,6 +1618,9 @@ export class VentasService {
   }
 
   async updateProject(id: number, dto: UpdateSalesProjectDto, user?: any, companyId?: number | null) {
+    if ([dto.name, dto.projectType, dto.scopeSummary, dto.siteCount, dto.status, dto.startDate, dto.endDate].some(v => v !== undefined)) {
+      throw new BadRequestException('Edita el nombre, alcance, fechas y estado en Proyectos: esa ficha es el maestro.');
+    }
     const project = await this.loadSalesProject(id, companyId);
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
     const margin = this.calculateProjectMargin(dto);
@@ -1611,32 +1643,6 @@ export class VentasService {
       include: { opportunity: true, operationalProject: true },
     });
 
-    // Propagar identidad + status al proyecto OPS vinculado (misma entrega).
-    if (updated.operationalProject) {
-      const patch = opsPatchFromSales({
-        name: updated.name,
-        projectType: updated.projectType,
-        scopeSummary: updated.scopeSummary,
-        siteCount: updated.siteCount,
-        startDate: updated.startDate,
-        endDate: updated.endDate,
-        status: updated.status,
-      });
-      await this.prisma.operationalProject.update({
-        where: { id: updated.operationalProject.id },
-        data: {
-          title: patch.title,
-          projectType: patch.projectType,
-          scopeSummary: patch.scopeSummary,
-          siteCount: patch.siteCount,
-          startDate: patch.startDate,
-          endDate: patch.endDate,
-          status: patch.status,
-          ...(patch.status === 'COMPLETED' ? { actualEndDate: new Date() } : {}),
-        },
-      }).catch(() => undefined);
-    }
-
     const requesterId = user?.id ?? project.opportunity?.ownerId ?? undefined;
     if (requesterId) {
       // Si el budget sube y rebasa el umbral, dispara workflow. Idempotente:
@@ -1654,7 +1660,8 @@ export class VentasService {
       });
     }
 
-    return updated;
+    const linked = updated.operationalProject ?? (await this.provisionOperationalProject(id, user, companyId)).operationalProject;
+    return { ...updated, operationalProject: linked };
   }
 
   /** Crea proyecto operativo en campo vinculado a un proyecto comercial ganado. */
@@ -1673,34 +1680,9 @@ export class VentasService {
       where: { salesProjectId: id },
     });
     if (existing) {
-      // Re-provision: refrescar identidad compartida desde CRM (SoT comercial).
-      const patch = opsPatchFromSales({
-        name: project.name,
-        projectType: project.projectType,
-        scopeSummary: project.scopeSummary,
-        siteCount: project.siteCount,
-        startDate: project.startDate,
-        endDate: project.endDate,
-        status: project.status,
-      });
-      const refreshed = await this.prisma.operationalProject.update({
-        where: { id: existing.id },
-        data: {
-          title: patch.title,
-          description: project.scopeSummary || project.opportunity?.description || existing.description,
-          projectType: patch.projectType,
-          scopeSummary: patch.scopeSummary,
-          siteCount: patch.siteCount,
-          startDate: patch.startDate,
-          endDate: patch.endDate,
-          status: patch.status,
-        },
-        include: {
-          client: { select: { id: true, name: true } },
-          vendor: { select: { id: true, nombre: true, email: true } },
-        },
-      });
-      return { salesProject: project, operationalProject: refreshed, created: false };
+      assertCompanyAccess(existing, requireCompanyId(project.companyId), 'Proyecto');
+      // OperationalProject es el maestro: consultar el espejo nunca lo modifica.
+      return { salesProject: project, operationalProject: existing, created: false };
     }
 
     let salesClient = project.opportunity?.client;
@@ -1709,6 +1691,7 @@ export class VentasService {
         'El proyecto comercial no tiene cliente. Asigna un cliente a la oportunidad antes de desplegar en campo.',
       );
     }
+    if (esNombreDeRelleno(salesClient.name)) throw new BadRequestException('El proyecto requiere un cliente real del padrón.');
     if (!salesClient.serviceClientId) {
       const provisioned = await this.provisionServiceClient(salesClient.id, user);
       salesClient = provisioned.salesClient as typeof salesClient;
@@ -1727,21 +1710,20 @@ export class VentasService {
       siteCount: project.siteCount,
       startDate: project.startDate,
       endDate: project.endDate,
-      status: project.status === 'PLANNED' ? 'IN_PROGRESS' : project.status,
+      status: project.status,
     });
-
-    // Al desplegar a campo, el comercial pasa a IN_PROGRESS si seguía en PLANNED.
-    if (project.status === 'PLANNED') {
-      await this.prisma.salesProject.update({
-        where: { id: project.id },
-        data: { status: 'IN_PROGRESS' },
-      });
-    }
 
     const opsCompanyId = await resolveRequiredCompanyId(
       this.prisma,
       companyId ?? (salesClient as any).companyId ?? project.companyId ?? project.opportunity?.companyId,
     );
+    const serviceClient = await this.prisma.serviceClient.findFirst({
+      where: { id: salesClient.serviceClientId, companyId: opsCompanyId, isActive: true },
+      select: { id: true, name: true },
+    });
+    if (!serviceClient || esNombreDeRelleno(serviceClient.name)) {
+      throw new BadRequestException('El proyecto requiere un cliente real y activo de la misma empresa.');
+    }
     const operationalProject = await this.prisma.operationalProject.create({
       data: {
         title: patch.title,
@@ -1751,7 +1733,7 @@ export class VentasService {
         siteCount: patch.siteCount,
         salesProjectId: project.id,
         vendorId,
-        createdById: vendorId,
+        createdById: user?.id ?? vendorId,
         clientId: salesClient.serviceClientId,
         startDate: patch.startDate,
         endDate: patch.endDate,
@@ -2470,7 +2452,7 @@ export class VentasService {
 
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
-    const opProject = project.operationalProject;
+    const opProject = project.operationalProject ?? (await this.provisionOperationalProject(projectId, user, companyId ?? user?.companyId)).operationalProject;
 
     let activityStats: { total: number; completed: number; inProgress: number; pending: number } | null = null;
     if (opProject?.id) {
@@ -2493,13 +2475,13 @@ export class VentasService {
     return {
       project: {
         id: project.id,
-        name: project.name,
-        status: project.status,
-        projectType: project.projectType,
-        scopeSummary: project.scopeSummary,
-        siteCount: project.siteCount,
-        startDate: project.startDate,
-        endDate: project.endDate,
+        name: opProject.title,
+        status: opProject.status,
+        projectType: opProject.projectType,
+        scopeSummary: opProject.scopeSummary,
+        siteCount: opProject.siteCount,
+        startDate: opProject.startDate,
+        endDate: opProject.endDate,
         budget: Number(project.budget),
         margin: Number(project.margin),
       },

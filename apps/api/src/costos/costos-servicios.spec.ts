@@ -134,6 +134,31 @@ describe('libro de costos', () => {
     });
   });
 
+  it('lectura a la fecha incluye horas reales nuevas sin escribir ni duplicar el libro', async () => {
+    const { prisma, libro } = armar({ sesiones: [sesion], usuarios: [persona(7, 3500)] });
+    await libro.sincronizar(1);
+    prisma.t.sesiones = [{ ...sesion, endedAt: hora(20) }];
+    prisma.costoMovimiento.createMany.mockClear();
+    prisma.costoMovimiento.deleteMany.mockClear();
+    const r = await libro.leer(1);
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ origen: 'SESION:1', cantidad: 5, importe: 625.95 });
+    expect(prisma.t.movimientos[0]).toMatchObject({ cantidad: 4, importe: 500.76 });
+    expect(prisma.costoMovimiento.createMany).not.toHaveBeenCalled();
+    expect(prisma.costoMovimiento.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('lectura conserva costo cerrado aunque cambien horas o tarifa', async () => {
+    const { prisma, libro } = armar({ sesiones: [sesion], usuarios: [persona(7, 3500)] });
+    await libro.sincronizar(1);
+    prisma.t.movimientos[0].estado = 'CERRADO';
+    prisma.t.sesiones = [{ ...sesion, endedAt: hora(20) }];
+    prisma.t.usuarios = [persona(7, 7000)];
+    const r = await libro.leer(1);
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ cantidad: 4, importe: 500.76, estado: 'CERRADO' });
+  });
+
   it('correrlo dos veces no duplica ni reescribe', async () => {
     const { prisma, libro } = armar({ sesiones: [sesion], usuarios: [persona(7, 3500)] });
     await libro.sincronizar(1);

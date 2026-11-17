@@ -552,6 +552,8 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     ...CORE_RECURSOS_PATHS,
     '/crm/**',
     ...CLIENTES_CORE_PATHS,
+    // 17-11: /crm/projects ahora abre el listado único (maestro OperationalProject).
+    ...PROYECTOS_CORE_PATHS,
     '/crm/chat',
     '/erp/chat',
     '/erp/reuniones',
@@ -669,6 +671,8 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/quotes',
     '/crm/quotes/**',
     '/crm/projects/**',
+    // 17-11: /crm/projects ahora abre el listado único; contabilidad lo usa para el costeo.
+    ...PROYECTOS_CORE_PATHS,
     ...SELF_ATTENDANCE_PATHS,
   ],
 

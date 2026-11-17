@@ -43,6 +43,7 @@ import { DIRECCION_VISIBLE, ROLES_DE_OBRA } from "@/lib/direccion-api";
 import { resolveV2RoleKey } from "@/lib/rbac/role-mapping";
 import { canAccessClientPadron } from "@/lib/client-sectors";
 import { formatApiError } from "@/lib/erp-api";
+import { getListaProyectos, pct, pesos, type ListaProyectos } from "@/lib/costos";
 import { isInactiveClient, listSalesClients, type SalesClient } from "@/lib/sales-api";
 import {
   ESTADOS_PROYECTO,
@@ -134,6 +135,9 @@ export default function ProyectosPage() {
   }, []);
 
   const [items, setItems] = useState<ProyectoFila[]>([]);
+  const [costos, setCostos] = useState<ListaProyectos | null>(null);
+  const [errorCostos, setErrorCostos] = useState<string | null>(null);
+  const [cargandoCostos, setCargandoCostos] = useState(true);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -177,9 +181,21 @@ export default function ProyectosPage() {
     }
   }, [token]);
 
+  const cargarCostos = useCallback(async () => {
+    if (!token) return;
+    setCargandoCostos(true);
+    setErrorCostos(null);
+    try { setCostos(await getListaProyectos(token, true)); }
+    catch (e) { setErrorCostos(formatApiError(e, "No se pudieron cargar los márgenes reales.")); }
+    finally { setCargandoCostos(false); }
+  }, [token]);
+  const costoPorId = useMemo(() => new Map((costos?.proyectos ?? []).map((p) => [p.id, p])), [costos]);
+  const conSobrecosto = useMemo(() => items.filter((p) => esVigente(p) && costoPorId.get(p.id)?.sobrecosto).length, [items, costoPorId]);
+
   useEffect(() => {
     void cargar();
   }, [cargar]);
+  useEffect(() => { void cargarCostos(); }, [cargarCostos]);
 
   // Los clientes de proyecto salen del mismo padrón que Clientes: los que se dieron de alta
   // ahí, los del alta rápida de una actividad y los que ya tienen un proyecto. Si este puesto
@@ -358,6 +374,7 @@ export default function ProyectosPage() {
           </Link>
           <span className={`${styles.sub} ${styles.soloTelefono}`}>{p.client?.name ?? "Sin cliente"}</span>
           <span className={styles.sub}>{getServiceProjectTypeLabel(p.projectType)}</span>
+          <span className={`${styles.sub} ${styles.soloTelefono}`}>Margen real {pct(costoPorId.get(p.id)?.margen?.pct)}</span>
         </span>
       ),
     },
@@ -405,6 +422,16 @@ export default function ProyectosPage() {
             <span className={styles.sub}>{origenAvance(p.resumen.avance.origen)}</span>
           </span>
         );
+      },
+    },
+    {
+      key: "margen",
+      label: "Margen real",
+      render: (p) => {
+        const costo = costoPorId.get(p.id);
+        if (!costo?.margen || costo.margen.pct == null) return <span className={styles.tenue}>{cargandoCostos ? "Cargando…" : errorCostos ? "No disponible" : "Sin venta"}</span>;
+        const tono = costo.semaforoMargen === "rojo" ? "danger" : costo.semaforoMargen === "ambar" ? "warning" : costo.semaforoMargen === "verde" ? "success" : "neutral";
+        return <span className={styles.estado}><StatusBadge size="sm" label={pct(costo.margen.pct)} tone={tono} /><span className={styles.sub}>{pesos(costo.margen.importe)}</span><span className={styles.sub}>Cotizado {pct(costo.margenCotizado?.pct)}</span></span>;
       },
     },
     {
@@ -482,11 +509,15 @@ export default function ProyectosPage() {
     secondaryActions:
       (DIRECCION_VISIBLE || muestra) && ROLES_DE_OBRA.includes(resolveV2RoleKey(user) ?? "") ? <ButtonLink href="/erp/proyectos/obra">Tiempos de obra</ButtonLink> : undefined,
     tabs,
-    before: error ? (
+    before: <>
+    {error ? (
       <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>
         {error}
       </Alert>
-    ) : null,
+    ) : null}
+    {errorCostos ? <p role="status" className={styles.tenue}>Margen real no disponible: {errorCostos} <LinkButton onClick={() => void cargarCostos()}>Reintentar costos</LinkButton></p> : null}
+    {costos?.sinLigar && costos.sinLigar.movimientos.length > 0 ? <Alert tone="warning">Sin ligar: {pesos(costos.sinLigar.importe)} en salidas de almacén sin proyecto ni actividad. No se cargan a ningún proyecto.</Alert> : null}
+    </>,
   };
 
   if (vista === "clientes" && clientes) {
@@ -610,7 +641,8 @@ export default function ProyectosPage() {
       {...encabezado}
       stats={
         items.length || primeraCarga ? (
-          <StatRow cols={5} ariaLabel="Cartera de proyectos">
+          <StatRow cols={6} ariaLabel="Cartera de proyectos">
+            <Stat label="Con sobrecosto" value={errorCostos ? "—" : conSobrecosto} hint="costo real mayor al cotizado" tone={conSobrecosto ? "danger" : "default"} loading={cargandoCostos} />
             <Stat
               label="Incompletos"
               value={String(incompletosCount)}

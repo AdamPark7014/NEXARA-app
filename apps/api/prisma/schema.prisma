@@ -146,6 +146,7 @@ model Client {
   @@map("clients")
 }
 
+/// Casos de éxito del sitio público; no es el maestro operativo (OperationalProject).
 model Project {
   id         Int            @id @default(autoincrement())
   slug       String         @db.VarChar(120)
@@ -323,6 +324,7 @@ model OperationalProject {
   requirements        ProjectRequirement[]
   documents           ProjectDocument[]
   activities          Activity[]
+  stockMovements      StockMovement[]
   maintenanceContract MaintenanceContract? @relation("MaintenanceContractProject")
 
   @@index([vendorId])
@@ -4728,10 +4730,14 @@ model StockMovement {
   /// Operaciones y el "Material utilizado" que reporta Ingeniería.
   activityId        Int?
   activity          Activity?         @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  /// Destino operativo directo, cuando la salida todavía no tiene actividad.
+  projectId         Int?
+  project           OperationalProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   createdBy         User?             @relation("StockMovementCreator", fields: [createdById], references: [id])
   company           CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([companyId, movementNumber])
+  @@index([companyId, projectId])
   @@index([productId, type])
   @@index([createdAt])
   @@index([companyId])

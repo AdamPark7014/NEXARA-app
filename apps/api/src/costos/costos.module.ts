@@ -23,6 +23,6 @@ import { VehiculosMotorService } from './vehiculos/vehiculos-motor.service.js';
     CostosVehiculosService,
     LecturaVehiculoService,
   ],
-  exports: [LibroCostosService, LecturaVehiculoService],
+  exports: [LibroCostosService, LecturaVehiculoService, CostosProyectoService],
 })
 export class CostosModule {}

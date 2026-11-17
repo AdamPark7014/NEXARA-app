@@ -22,8 +22,8 @@ const fichas = [
   {
     archivo: "ProjectDetailShell.tsx",
     viejo: "← Proyectos comerciales",
-    nuevo: "‹ Proyectos comerciales",
-    href: 'href="/crm/projects"',
+    nuevo: "‹ Proyectos",
+    href: 'href="/erp/proyectos"',
   },
 ] as const;
 

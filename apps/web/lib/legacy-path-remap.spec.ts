@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { coreSurfaceRedirect } from './core-surface';
+describe('proyecto maestro único', () => {
+  it('retira WorkProject sin confundir sus ids con el maestro', () => {
+    for (const ruta of ['/ops/work-projects', '/ops/work-projects/42', '/erp/work-projects/42']) expect(normalizeLegacyPath(ruta)).toBe('/erp/proyectos');
+  });
+  it('mantiene ids operativos y retira el listado comercial duplicado', () => {
+    expect(normalizeLegacyPath('/ops/projects/42')).toBe('/erp/proyectos/42');
+    expect(normalizeLegacyPath('/core/proyectos/42')).toBe('/erp/proyectos/42');
+    expect(normalizeLegacyPath('/crm/projects')).toBe('/erp/proyectos');
+    expect(normalizeLegacyPath('/sales/proyectos')).toBe('/erp/proyectos');
+  });
+  it('resuelve los ids comerciales antes de abrir el maestro', () => {
+    expect(normalizeLegacyPath('/crm/projects/7')).toBe('/erp/proyectos/comercial/7');
+    expect(normalizeLegacyPath('/sales/proyectos/7/costos')).toBe('/erp/proyectos/comercial/7');
+    expect(normalizeLegacyPath('/erp/proyectos/comercial/7')).toBe('/erp/proyectos/comercial/7');
+    for (const prefix of ['/crm/projects', '/sales/projects', '/sales/proyectos']) {
+      expect(coreSurfaceRedirect(`${prefix}/7/edit`)).toBe('/erp/proyectos/comercial/7');
+      expect(coreSurfaceRedirect(`${prefix}/new`)).toBe('/erp/proyectos/nuevo');
+      expect(normalizeLegacyPath(`${prefix}/nuevo`)).toBe('/erp/proyectos/nuevo');
+    }
+    expect(coreSurfaceRedirect('/ops/work-projects/7')).toBe('/erp/proyectos');
+  });
+});
 import {
   LEGACY_PANEL_PREFIX_MAP,
   normalizeLegacyPath,
@@ -64,7 +86,7 @@ describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
     // Lo que ya vive en /erp no se toca.
     expect(coreSurfaceRedirect('/erp/proyectos/42')).toBeNull();
     // Otras rutas de OPS siguen cayendo en la pizarra.
-    expect(coreSurfaceRedirect('/ops/work-projects')).toBe('/erp/pizarra');
+    expect(coreSurfaceRedirect('/ops/work-projects')).toBe('/erp/proyectos');
   });
 
   it('aplica los remapeos cross-panel conservando el resto de la ruta', () => {
@@ -124,7 +146,7 @@ describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
     expect(coreSurfaceRedirect('/crm/quotes/17')).toBe('/erp/cotizaciones/17');
     expect(coreSurfaceRedirect('/crm/clients')).toBe('/erp/clientes');
     expect(coreSurfaceRedirect('/crm/clients/3')).toBe('/erp/clientes/3');
-    expect(coreSurfaceRedirect('/crm/projects/42')).toBe('/erp/proyectos/42');
+    expect(coreSurfaceRedirect('/crm/projects/42')).toBe('/erp/proyectos/comercial/42');
     // Lo que ya vive en su ruta de Core no se toca, y el resto de /erp/hr tampoco.
     expect(coreSurfaceRedirect('/erp/almacen')).toBeNull();
     expect(coreSurfaceRedirect('/erp/vehiculos/mis-vehiculos')).toBeNull();

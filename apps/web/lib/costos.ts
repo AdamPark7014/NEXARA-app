@@ -149,10 +149,15 @@ export type Rubro = "MATERIAL" | "MANO_OBRA" | "VEHICULO" | "HERRAMIENTA" | "VIA
 
 export type Margen = { importe: number; pct: number | null };
 
+export type MovimientoCostoProyecto = { origen: string; fecha: string; actividadId: number | null; cantidad: number; unidad: string; importe: number; nota: string | null };
+
 export type CostosProyecto = {
   proyecto: { id: number; titulo: string; cotizacion: string | null; cotizacionId: number | null };
   venta: number | null;
-  rubros: Array<{ rubro: Rubro; etiqueta: string; cotizado: number | null; real: number }>;
+  costoReal?: number;
+  avance?: number | null;
+  costoAlTerminar?: number | null;
+  rubros: Array<{ rubro: Rubro; etiqueta: string; cotizado: number | null; real: number; diferencia?: number | null; consumidoPct?: number | null; movimientos?: MovimientoCostoProyecto[] }>;
   directo: { cotizado: number | null; real: number };
   indirecto: { pct: number | null; cotizado: number | null; real: number | null };
   margen: { cotizado: Margen | null; hoy: Margen | null };
@@ -189,7 +194,12 @@ export type ListaProyectos = {
     costo: number;
     real: Record<Rubro, number>;
     margen: Margen | null;
+    margenCotizado?: Margen | null;
+    semaforoMargen?: "verde" | "ambar" | "rojo" | null;
+    sobrecosto?: boolean;
   }>;
+  conSobrecosto?: number;
+  sinLigar?: { etiqueta: "Sin ligar"; importe: number; movimientos: MovimientoCostoProyecto[] };
   cotizacionesSinProyecto: Array<{
     id: number;
     folio: string;
@@ -262,7 +272,7 @@ export const quitarEquipo = (token: string, id: number) => erpFetch(`${API}/fich
 export const recalcularLibro = (token: string) =>
   erpFetch<{ creados: number; actualizados: number; borrados: number; total: number }>(`${API}/recalcular`, token, { method: "POST" });
 
-export const getListaProyectos = (token: string) => erpFetch<ListaProyectos>(`${API}/proyectos`, token);
+export const getListaProyectos = (token: string, resumen = false) => erpFetch<ListaProyectos>(`${API}/proyectos${resumen ? "?resumen=1" : ""}`, token);
 
 export const getCostosProyecto = (token: string, id: number) => erpFetch<CostosProyecto>(`${API}/proyectos/${id}`, token);
 

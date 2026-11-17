@@ -2,6 +2,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   GoneException,
   Param,
   ParseIntPipe,
@@ -24,13 +25,14 @@ export class WorkProjectsController {
 
   private rejectWrites(): never {
     throw new GoneException(
-      'work-projects está deprecado. Usa operational-projects (OPS) y sales-projects (CRM).',
+      'Este módulo se retiró: usa Proyectos',
     );
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   @Get()
+  @Header('X-Module-Notice', 'Este módulo se retiró: usa Proyectos')
   findAll(@Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
     return this.service.findAll(query, companyId);
   }
@@ -38,6 +40,7 @@ export class WorkProjectsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   @Get(':id')
+  @Header('X-Module-Notice', 'Este módulo se retiró: usa Proyectos')
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
     return this.service.findOne(id, companyId);
   }
