@@ -1,5 +1,27 @@
 # RELEVO
 
+- **17-11 ~22:00 México (cursor) — Contadora ampliación E2–E4. NO desplegar: espera OK de Adam.**
+  - E2: tabla `SatCfdi` (+ migración `20261117210000_contadora_e2_e4`); ingest escribe SatCfdi además de Invoice;
+    job diario vía BullMQ (`buzon-sat.diario`) + `runScheduledJob`; UI Buzón en `/erp/contabilidad/cfdi`;
+    cruces SAT (`GET …/buzon-sat/cruces`: sin póliza / póliza sin UUID / cancelado contabilizado / 69-B).
+  - E3: plantillas I/E/P/N + endpoints; tablero PPD; export PLZ XML; `FiscalPeriod.bloqueoModo` + módulo
+    suave/duro; bug IVA complemento de pago (`pago-impuestos-dr` + `cfdi-xml.builder`, tasas 16/8/0/exento).
+  - E4: parsers CSV/OFX BBVA·Banorte·Santander; import-file + match-proposals (top 3); tablero Mi cierre
+    (`/erp/contabilidad/mi-cierre`).
+  - Pruebas unitarias propias 23 ok (pago-impuestos, parsers, reglas, cruces, mi-cierre, bloqueo).
+  - Pendiente fino: aplicar `bloqueoModo` en todas las escrituras de periodo; historial de cuenta = última
+    póliza del RFC (hoy sigue la regla aprendida); Excel binario → pedir CSV/filas.
+  - No tocado: projects/supervision/hr/cctv ni otros sucios ajenos (salvo schema/tenant compartidos).
+- **17-11 ~21:00 México (cursor) — Estándar de proyecto (ficha/plan/listo). SIN commit ni deploy (pedido de Adam).**
+  - `proyecto-completitud.ts` (+spec): niveles FICHA/PLAN/LISTO; `proyecto-salud` con INCOMPLETO, tope 99 %, ponderación por hitos.
+  - Schema: solo `createdById` (+rel) en OperationalProject; migración `20261117080000_proyecto_creado_por`.
+  - Alta manual exige FICHA (400 ES); altas auto/quickCreate con `permitirIncompleto`; status ACTIVE exige PLAN, COMPLETED exige LISTO.
+  - Cron `proyectos-incompletos` L–S 09:00; listado KPI/chip Incompletos; ficha banner + bloqueo terminar/arrancar.
+  - Pruebas: `src/projects` 102 ok; vitest `proyectos` 25 ok. typecheck limpio en rutas de projects/proyectos.
+  - Falta: selector «¿De qué proyecto es?» al crear actividad, bloque «Actividades del cliente sin proyecto»+Ligar,
+    Asignar con IA (responsable/fechas/nombre), medidor FICHA→PLAN→LISTO editable campo a campo, sugerencia en vivo en /nuevo,
+    cablear `avisarAlNacer` en todas las altas auto.
+  - No tocado: cambios ajenos (contabilidad/buzón, RH, supervision, integra-shared, client-sectors dirty).
 - **17-11 ~20:45 México (cursor) — Contadora ola 1 (puntos 1–5). NO desplegar: espera OK de Adam.**
   - Buzón SAT (src/accounting/buzon-sat/): cron 06:00 MX (BUZON_SAT_AUTO), ingest idempotente por UUID, 69-B, UI /erp/contabilidad/buzon-sat.
   - Pólizas IA + bandeja /erp/contabilidad/por-contabilizar (aceptar/corregir/aprender por RFC); nada a JournalEntry sin clic.
@@ -223,3 +245,10 @@
 
 _Turnos anteriores recortados el 2026-11-14 (limpieza de documentación). Historial completo: `git log -p -- .ai/RELEVO.md`._
 
+
+
+- **16-11 ~21:52 México (codex) — Pulido del estándar de proyectos de Cursor. SIN commit, push ni deploy por orden de Adam.**
+  - Hecho: editor de faltantes + foco completar=1, FICHA→PLAN→LISTO y botones bloqueados; alta con ficha en paso 1 y nombre sugerido editable. Selector cliente/proyecto en web/IA y nativos; ligar actividades transaccional por empresa/cliente y fechas de México; API bloquea instalación sin proyecto. Avisos al nacer conectados, agrupados por persona/día local, escalado con historial al tercer día hábil y supervisor por rol/membresía. Salud no cierra por fecha real aislada ni con hitos pendientes.
+  - Verificado: typecheck web verde; foco API 138/138 y web 80/80. Typecheck global: 4 errores ajenos de contabilidad. Suite completa API: 6028 pasan/46 fallan, 12 suites ajenas; web: 2256 pasan/2 fallan, clientes y cotizaciones ajenos. Detalle y lista exacta de rutas: .ai/REVISION-PROYECTOS-CODEX.md.
+  - A medias / siguiente: QA visual 390/1536, compilar y recorrer móviles, integración con BD y notificaciones reales; corregir fallos globales desde sus sesiones responsables. Cliente inválido se corrige en padrón; banner no cambia identidad. No declarar producto visualmente validado.
+  - No tocar: schema.prisma, contabilidad, RH, supervisión, CCTV, viáticos, vehículos, prenómina, AppShell, integra-shared y migraciones ajenas. Se preservó todo lo previo; sin producción.

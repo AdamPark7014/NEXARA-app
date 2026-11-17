@@ -10,6 +10,7 @@ import { PERMISSIONS } from '../../common/permissions.js';
 import { BuzonSatService } from './buzon-sat.service.js';
 import { PolizaPropuestaService } from './poliza-propuesta.service.js';
 import { FacturaIaService } from './factura-ia.service.js';
+import { E2E4ContabilidadService } from './e2-e4.service.js';
 import type { RenglonPoliza } from '../mesa-contable/polizas-mesa.js';
 
 const VER = [PERMISSIONS.CONTABILIDAD_VIEW, PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.INVOICING_VIEW];
@@ -72,6 +73,7 @@ export class BuzonSatController {
     private readonly buzon: BuzonSatService,
     private readonly polizas: PolizaPropuestaService,
     private readonly facturaIa: FacturaIaService,
+    private readonly e2e4: E2E4ContabilidadService,
   ) {}
 
   @Get()
@@ -165,5 +167,54 @@ export class BuzonSatController {
     @CurrentUser() user: { id: number },
   ) {
     return this.facturaIa.armarBorrador(companyId, user.id, body);
+  }
+
+  @Get('cruces')
+  @RBAC({ anyPermissions: VER })
+  cruces(@CurrentCompanyId() companyId: number | null) {
+    return this.e2e4.cruces(companyId);
+  }
+
+  @Get('mi-cierre')
+  @RBAC({ anyPermissions: VER })
+  miCierre(@CurrentCompanyId() companyId: number | null) {
+    return this.e2e4.miCierre(companyId);
+  }
+
+  @Get('plantillas-poliza')
+  @RBAC({ anyPermissions: VER })
+  listarPlantillas(@CurrentCompanyId() companyId: number | null) {
+    return this.e2e4.listarPlantillas(companyId);
+  }
+
+  @Post('plantillas-poliza')
+  @RBAC({ anyPermissions: MANAGE })
+  guardarPlantilla(
+    @Body() body: { tipo: string; nombre: string; renglones: unknown },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.e2e4.guardarPlantilla(companyId, body);
+  }
+
+  @Get('ppd')
+  @RBAC({ anyPermissions: VER })
+  tableroPpd(@CurrentCompanyId() companyId: number | null) {
+    return this.e2e4.tableroPpd(companyId);
+  }
+
+  @Get('polizas-xml')
+  @RBAC({ anyPermissions: VER })
+  async exportXml(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('mes') mes?: string,
+    @Query('anio') anio?: string,
+    @Res() res?: Response,
+  ) {
+    const m = Number(mes) || new Date().getMonth() + 1;
+    const a = Number(anio) || new Date().getFullYear();
+    const xml = await this.e2e4.exportPolizasXml(companyId, m, a);
+    res!.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res!.setHeader('Content-Disposition', `attachment; filename="polizas-${a}-${String(m).padStart(2, '0')}.xml"`);
+    res!.send(xml);
   }
 }

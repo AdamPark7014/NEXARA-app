@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
@@ -16,22 +16,31 @@ import { URL_LISTA_69B_SAT, normalizarRfc, parsearCsv69B } from './lista-69b.js'
 import {
   coincideImporte,
   datosInvoiceDesdeCfdi,
+  datosSatCfdiDesdeCfdi,
   dentroDeDias,
   sentidoCfdi,
 } from './ingest-cfdi.js';
 import { PolizaPropuestaService } from './poliza-propuesta.service.js';
+import { JobQueueService } from '../../jobs/job-queue.service.js';
 
 type Pestana = 'recibidos' | 'emitidos' | 'cancelados' | 'alertas';
 
 @Injectable()
-export class BuzonSatService {
+export class BuzonSatService implements OnModuleInit {
   private readonly logger = new Logger('BuzonSat');
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly descarga: DescargaMasivaService,
     private readonly polizas: PolizaPropuestaService,
+    private readonly jobs: JobQueueService,
   ) {}
+
+  onModuleInit() {
+    this.jobs.register('buzon-sat.diario', async () => {
+      await runScheduledJob('buzon-sat:diario', this.logger, () => this.correrDescargaAutomatica());
+    });
+  }
 
   async listar(
     companyIdRaw: number | null,
@@ -165,6 +174,39 @@ export class BuzonSatService {
       .trim()
       .toUpperCase();
     const sentido = sentidoCfdi(cfdi, rfcEmpresa);
+    const datosSat = datosSatCfdiDesdeCfdi(cfdi, xml, sentido);
+    const satModel = (this.prisma as any).satCfdi;
+    if (satModel) {
+      const satExistente = await satModel.findFirst({ where: { uuid: { equals: cfdi.uuid, mode: 'insensitive' } } });
+      if (!satExistente) {
+        await satModel.create({
+          data: {
+            companyId,
+            uuid: datosSat.uuid,
+            rfcEmisor: datosSat.rfcEmisor,
+            nombreEmisor: datosSat.nombreEmisor,
+            rfcReceptor: datosSat.rfcReceptor,
+            nombreReceptor: datosSat.nombreReceptor,
+            total: new Prisma.Decimal(datosSat.total),
+            subtotal: new Prisma.Decimal(datosSat.subtotal),
+            ivaTrasladado: new Prisma.Decimal(datosSat.ivaTrasladado),
+            ivaRetenido: new Prisma.Decimal(datosSat.ivaRetenido),
+            isrRetenido: new Prisma.Decimal(datosSat.isrRetenido),
+            tipo: String(datosSat.tipo).slice(0, 1),
+            metodoPago: datosSat.metodoPago,
+            formaPago: datosSat.formaPago,
+            usoCfdi: datosSat.usoCfdi,
+            sentido: datosSat.sentido,
+            estatusSat: datosSat.estatusSat,
+            fecha: datosSat.fecha,
+            xml: datosSat.xml,
+            serie: datosSat.serie,
+            folio: datosSat.folio,
+            moneda: datosSat.moneda,
+          },
+        });
+      }
+    }
     const datos = datosInvoiceDesdeCfdi(cfdi, xml, sentido);
 
     let supplierId: number | null = null;
@@ -393,7 +435,12 @@ export class BuzonSatService {
 
   @Cron('0 6 * * *', { name: 'buzon-sat-diario', timeZone: WORKDAY_TIMEZONE })
   async cronDiario() {
-    await runScheduledJob('buzon-sat:diario', this.logger, () => this.correrDescargaAutomatica());
+    try {
+      await this.jobs.enqueue('buzon-sat.diario', {}, { jobId: 'buzon-sat-diario', unico: true, maxAttempts: 1 });
+    } catch (err) {
+      this.logger.warn(`Cola buzón SAT: ${String((err as Error).message ?? err)}`);
+      await runScheduledJob('buzon-sat:diario', this.logger, () => this.correrDescargaAutomatica());
+    }
   }
 
   @Cron('0 7 * * 1', { name: 'buzon-sat-69b', timeZone: WORKDAY_TIMEZONE })

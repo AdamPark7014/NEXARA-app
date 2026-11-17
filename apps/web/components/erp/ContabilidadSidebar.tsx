@@ -69,13 +69,19 @@ export const GRUPOS_CONTABILIDAD: NavGroup[] = [
       {
         id: "buzonSat",
         label: "Buzón SAT",
-        href: "/erp/contabilidad/buzon-sat",
+        href: "/erp/contabilidad/cfdi",
         permissions: VER_CONTABILIDAD,
       },
       {
         id: "porContabilizar",
         label: "Por contabilizar",
         href: "/erp/contabilidad/por-contabilizar",
+        permissions: VER_CONTABILIDAD,
+      },
+      {
+        id: "miCierre",
+        label: "Mi cierre",
+        href: "/erp/contabilidad/mi-cierre",
         permissions: VER_CONTABILIDAD,
       },
       {

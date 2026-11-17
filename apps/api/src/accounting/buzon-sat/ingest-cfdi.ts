@@ -23,6 +23,64 @@ export function dentroDeDias(fechaA: string, fechaB: string, dias = 7): boolean 
   return Math.abs(a - b) <= dias * 86_400_000;
 }
 
+export type DatosSatCfdi = {
+  uuid: string;
+  rfcEmisor: string;
+  nombreEmisor: string | null;
+  rfcReceptor: string;
+  nombreReceptor: string | null;
+  total: number;
+  subtotal: number;
+  ivaTrasladado: number;
+  ivaRetenido: number;
+  isrRetenido: number;
+  tipo: 'I' | 'E' | 'P' | 'N';
+  metodoPago: string;
+  formaPago: string | null;
+  usoCfdi: string | null;
+  sentido: SentidoCfdi;
+  estatusSat: string;
+  fecha: Date;
+  xml: string;
+  serie: string | null;
+  folio: string | null;
+  moneda: string;
+};
+
+export function datosSatCfdiDesdeCfdi(
+  cfdi: CfdiLeido,
+  xml: string,
+  sentido: SentidoCfdi,
+  cancelado = false,
+): DatosSatCfdi {
+  const fecha = new Date(`${cfdi.fecha || '1970-01-01'}T12:00:00Z`);
+  const ivaTrasladado = (cfdi.iva + cfdi.otrosTraslados);
+
+  return {
+    uuid: cfdi.uuid,
+    rfcEmisor: cfdi.emisor.rfc,
+    nombreEmisor: cfdi.emisor.nombre,
+    rfcReceptor: cfdi.receptor.rfc,
+    nombreReceptor: cfdi.receptor.nombre,
+    total: cfdi.total,
+    subtotal: cfdi.subtotal - cfdi.descuento,
+    ivaTrasladado: Math.round(ivaTrasladado * 100) / 100,
+    ivaRetenido: cfdi.ivaRetenido,
+    isrRetenido: cfdi.isrRetenido,
+    tipo: cfdi.tipo.toUpperCase() as 'I' | 'E' | 'P' | 'N',
+    metodoPago: cfdi.metodoPago || 'PUE',
+    formaPago: cfdi.formaPago,
+    usoCfdi: cfdi.receptor.uso,
+    sentido: sentido,
+    estatusSat: cancelado ? 'cancelado' : 'vigente',
+    fecha: fecha,
+    xml: xml,
+    serie: cfdi.serie,
+    folio: cfdi.folio,
+    moneda: cfdi.moneda || 'MXN',
+  };
+}
+
 export type DatosInvoiceDesdeCfdi = {
   invoiceNumber: string;
   type: 'ACCOUNTS_PAYABLE' | 'ACCOUNTS_RECEIVABLE';

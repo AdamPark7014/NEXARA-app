@@ -4057,6 +4057,8 @@ model FiscalPeriod {
   startDate      DateTime       @db.Date
   endDate        DateTime       @db.Date
   isClosed       Boolean        @default(false)
+  /// abierto | suave | duro
+  bloqueoModo    String         @default("abierto") @db.VarChar(20)
   closedAt       DateTime?
   closedById     Int?
   companyId      Int
@@ -4083,6 +4085,7 @@ model JournalEntry {
   totalCredit      Decimal            @default(0) @db.Decimal(16, 2)
   createdById      Int?
   postedAt         DateTime?
+  cfdiUuid         String?            @db.VarChar(80)
   companyId        Int
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
@@ -4102,6 +4105,7 @@ model JournalEntry {
   @@index([date])
   @@index([status])
   @@index([companyId])
+  @@index([cfdiUuid])
   @@map("journal_entries")
 }
 
@@ -4230,6 +4234,7 @@ model Invoice {
   /// Pagos y gastos que este CFDI (recibido) respalda.
   vinculos            MovimientoVinculo[]
   polizaPropuesta     PolizaPropuesta?
+  satCfdi             SatCfdi?
 
   @@unique([cfdiUuid])
   @@unique([companyId, invoiceNumber])
@@ -4254,6 +4259,73 @@ model SatLista69B {
 
   @@map("sat_lista_69b")
 }
+/// CFDI del buzón SAT (tabla propia; la factura en libros se liga opcionalmente).
+model SatCfdi {
+  id              Int            @id @default(autoincrement())
+  companyId       Int
+  uuid            String         @unique @db.VarChar(80)
+  rfcEmisor       String         @db.VarChar(13)
+  nombreEmisor    String?        @db.VarChar(300)
+  rfcReceptor     String         @db.VarChar(13)
+  nombreReceptor  String?        @db.VarChar(300)
+  total           Decimal        @db.Decimal(14, 2)
+  subtotal        Decimal?       @db.Decimal(14, 2)
+  ivaTrasladado   Decimal?       @db.Decimal(14, 2)
+  ivaRetenido     Decimal?       @db.Decimal(14, 2)
+  isrRetenido     Decimal?       @db.Decimal(14, 2)
+  tipo            String         @db.VarChar(1)
+  metodoPago      String?        @db.VarChar(3)
+  formaPago       String?        @db.VarChar(5)
+  usoCfdi         String?        @db.VarChar(5)
+  sentido         String         @db.VarChar(10)
+  estatusSat      String         @default("vigente") @db.VarChar(20)
+  fecha           DateTime
+  xml             String
+  serie           String?        @db.VarChar(25)
+  folio           String?        @db.VarChar(40)
+  moneda          String?        @default("MXN") @db.VarChar(10)
+  invoiceId       Int?           @unique
+  journalEntryId  Int?
+  supplierId      Int?
+  lista69B        String?        @db.VarChar(20)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  company         CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  invoice         Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  polizaPropuesta PolizaPropuesta?
+  @@index([companyId, sentido])
+  @@index([companyId, fecha])
+  @@index([estatusSat])
+  @@map("sat_cfdis")
+}
+
+/// Plantilla de póliza editable por tipo de CFDI (I/E/P/N).
+model PolizaPlantilla {
+  id         Int      @id @default(autoincrement())
+  companyId  Int
+  tipo       String   @db.VarChar(1)
+  nombre     String   @db.VarChar(120)
+  renglones  Json
+  activa     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@unique([companyId, tipo])
+  @@map("poliza_plantillas")
+}
+
+/// Regla de conciliación: si el concepto contiene X, cuenta Y.
+model ConciliacionRegla {
+  id           Int      @id @default(autoincrement())
+  companyId    Int
+  contiene     String   @db.VarChar(200)
+  cuentaCodigo String   @db.VarChar(40)
+  activa       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([companyId])
+  @@map("conciliacion_reglas")
+}
+
 
 /// Cuenta de gasto aprendida por RFC de proveedor (corrección de la contadora).
 model ProveedorContabilizacionRegla {
@@ -4288,9 +4360,11 @@ model PolizaPropuesta {
   aceptadaPorId     Int?
   aceptadaAt        DateTime?
   journalEntryId    Int?
+  satCfdiId         Int?      @unique
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   invoice           Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  satCfdi           SatCfdi?  @relation(fields: [satCfdiId], references: [id], onDelete: SetNull)
 
   @@index([companyId, estado])
   @@map("poliza_propuestas")
@@ -6365,6 +6439,7 @@ model CompanyProfile {
   maintenanceContractVisits  MaintenanceContractVisit[]
   accounts                   Account[]
   fiscalPeriods              FiscalPeriod[]
+  satCfdis                   SatCfdi[]
   bankAccounts               BankAccount[]
   idempotencyKeys            IdempotencyKey[]
   costCenters                CostCenter[]

@@ -7,6 +7,7 @@ import { AuditModule } from '../audit/audit.module.js';
 import { ModulePolicyModule } from '../common/tenant/module-policy.module.js';
 import { PacModule } from '../pac/pac.module.js';
 import { AiModule } from '../ai/ai.module.js';
+import { JobsModule } from '../jobs/jobs.module.js';
 import { AccountingService } from './accounting.service.js';
 import { AccountsController } from './accounts.controller.js';
 import { JournalEntriesController } from './journal-entries.controller.js';
@@ -35,6 +36,8 @@ import { BuzonSatController } from './buzon-sat/buzon-sat.controller.js';
 import { BuzonSatService } from './buzon-sat/buzon-sat.service.js';
 import { PolizaPropuestaService } from './buzon-sat/poliza-propuesta.service.js';
 import { FacturaIaService } from './buzon-sat/factura-ia.service.js';
+import { E2E4ContabilidadService } from './buzon-sat/e2-e4.service.js';
+import { EstadoCuentaImportService } from './banco/estado-cuenta-import.service.js';
 
 @Module({
   imports: [
@@ -46,6 +49,7 @@ import { FacturaIaService } from './buzon-sat/factura-ia.service.js';
     ModulePolicyModule,
     PacModule,
     AiModule,
+    JobsModule,
   ],
   controllers: [
     AccountsController,
@@ -78,6 +82,8 @@ import { FacturaIaService } from './buzon-sat/factura-ia.service.js';
     BuzonSatService,
     PolizaPropuestaService,
     FacturaIaService,
+    E2E4ContabilidadService,
+    EstadoCuentaImportService,
   ],
   exports: [AccountingService, VendorProjectFinanceService, BuzonSatService],
 })
