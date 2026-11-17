@@ -1,7 +1,7 @@
 Dispositivo: iPhone 17 Pro Max
 Runtime: com.apple.CoreSimulator.SimRuntime.iOS-26-2
 Xcode: Xcode 26.3 Build version 17C529 
-Commit de la app: 5efbd72c5eb87e9409fdc7223053db18f36d2267
+Commit de la app: db28f2f6658b31e0be6ad48841c669fbc4fc19c0
 Fecha (UTC): 2026-11-17
 Codigo de xcodebuild test: 0
 Capturas: 73
