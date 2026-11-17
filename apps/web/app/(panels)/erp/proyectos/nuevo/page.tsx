@@ -63,6 +63,7 @@ import {
   type BorradorProyecto,
   type PasoAlta,
 } from "@/lib/proyecto-alta";
+import { nombreProyectoValido, sugerirNombreProyecto } from "@/lib/proyecto-nombre";
 import { hoyISO, repartirFechas } from "@/lib/proyecto-plan";
 import { SERVICE_PROJECT_TYPE_OPTIONS, getServiceProjectTypeLabel } from "@/lib/service-project-types";
 import LineaDeTiempo from "../_componentes/LineaDeTiempo";
@@ -263,7 +264,9 @@ export default function NuevoProyectoPage() {
 
   const cotizacionElegida = cotizaciones.find((c) => String(c.id) === b.cotizacionId) ?? null;
   const indice = PASOS_ALTA.findIndex((p) => p.id === paso);
-  const erroresActuales = erroresDelPaso(paso, b);
+  const errorNombre = !nombreProyectoValido(b.title, clienteElegido?.name || "");
+  const sugerenciaNombre = sugerirNombreProyecto(b.projectType, clienteElegido?.name || "");
+  const erroresActuales = [...erroresDelPaso(paso, b), ...(paso === "datos" && errorNombre ? ["Di qué se hace y dónde: al menos 3 palabras, sin usar solo el nombre del cliente."] : [])];
   const nombrePersona = (id: string) => personas.find((p) => String(p.id) === id)?.nombre ?? "";
   const marcarInvalido = mostrarErrores && erroresActuales.length > 0;
 
@@ -283,9 +286,9 @@ export default function NuevoProyectoPage() {
 
   async function crear() {
     if (!token) return;
-    const pendientes = erroresDelBorrador(b);
+    const pendientes = [...erroresDelBorrador(b), ...(errorNombre ? ["Completa el nombre descriptivo del proyecto."] : [])];
     if (pendientes.length) {
-      const primero = PASOS_ALTA.find((p) => erroresDelPaso(p.id, b).length);
+      const primero = errorNombre ? PASOS_ALTA[0] : PASOS_ALTA.find((p) => erroresDelPaso(p.id, b).length);
       if (primero) {
         setPaso(primero.id);
         setMostrarErrores(true);
@@ -355,11 +358,11 @@ export default function NuevoProyectoPage() {
   // --- Pasos ---------------------------------------------------------------
 
   function pasoDatos() {
-    const errorTitulo = marcarInvalido && b.title.trim().length < 3;
+    const errorTitulo = marcarInvalido && errorNombre;
     const errorCliente = marcarInvalido && !b.clienteId;
     return (
       <>
-        <Field label="Nombre del proyecto" required fullWidth>
+        <Field label="Nombre del proyecto" required fullWidth error={b.title && errorNombre ? "Describe el trabajo; el nombre del cliente por sí solo no es un proyecto." : undefined}>
           <Input
             id="titulo"
             value={b.title}
@@ -370,6 +373,7 @@ export default function NuevoProyectoPage() {
           />
         </Field>
 
+        {sugerenciaNombre ? <Button variant="tertiary" onClick={() => cambiar("title", sugerenciaNombre)}>Usar sugerencia: {sugerenciaNombre}</Button> : null}
         <div className={styles.bloqueCliente}>
           <label className={styles.etiqueta} htmlFor="cliente">
             Cliente <span className={styles.obligatorio} aria-hidden="true">*</span>
@@ -518,15 +522,24 @@ export default function NuevoProyectoPage() {
             />
           </Field>
         </FieldGrid>
+        {pasoFechasBasicas()}
       </>
     );
+  }
+
+  function pasoFechasBasicas() {
+    return <FieldGrid>
+      <Field label="Inicio planeado" required><DateInput required value={b.startDate} onChange={(e) => cambiar("startDate", e.target.value)} /></Field>
+      <Field label="Fin planeado" required><DateInput required min={b.startDate || undefined} value={b.endDate} onChange={(e) => cambiar("endDate", e.target.value)} /></Field>
+      <Field label="Responsable del proyecto" required><PersonaSelect id="responsable-datos" personas={personas} value={b.responsableId} onChange={(v) => cambiar("responsableId", v)} vacio="Elige responsable" /></Field>
+    </FieldGrid>;
   }
 
   function pasoFechas() {
     const importe = leerImporte(b.budget);
     return (
       <FieldGrid>
-        <Field label="Inicio planeado" hint="Opcional. Se puede anotar después, en el proyecto.">
+        <Field label="Inicio planeado" hint="Obligatorio para la ficha del proyecto.">
           <DateInput id="inicio" value={b.startDate} onChange={(e) => cambiar("startDate", e.target.value)} />
         </Field>
         <Field label="Fin planeado" hint="Sin fin planeado no se puede saber si el proyecto va a tiempo.">
@@ -537,7 +550,7 @@ export default function NuevoProyectoPage() {
           fullWidth
           hint={
             <>
-              Opcional. Si lo dejas vacío, el proyecto queda a nombre de quien lo crea.
+              Elige quién responde por el proyecto. Por omisión es quien lo crea.
               {avisoPersonas ? <span className={styles.avisoLinea}>{avisoPersonas}</span> : null}
             </>
           }

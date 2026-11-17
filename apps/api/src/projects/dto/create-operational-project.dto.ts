@@ -31,16 +31,18 @@ export class CreateOperationalProjectDto {
   @IsNumber()
   vendorId?: number;
 
+  /** Dueño del proyecto. Obligatorio en alta manual. */
+  @IsInt({ message: 'Elige al responsable del proyecto.' })
+  responsableId!: number;
+
   @IsNumber()
   clientId!: number;
 
-  @IsOptional()
-  @IsDateString()
-  startDate?: string;
+  @IsDateString({}, { message: 'Pon una fecha de inicio planeada válida.' })
+  startDate!: string;
 
-  @IsOptional()
-  @IsDateString()
-  endDate?: string;
+  @IsDateString({}, { message: 'Pon una fecha de fin planeada válida.' })
+  endDate!: string;
 }
 
 export class UpdateOperationalProjectDto {
@@ -103,7 +105,7 @@ export class CreateProjectActivityDto {
   @IsString()
   descripcion?: string;
 
-  @IsNumber()
+  @IsInt({ message: 'Elige al responsable del proyecto.' })
   responsableId!: number;
 
   @IsOptional()
@@ -150,4 +152,16 @@ export class QuickCreateOperationalProjectDto {
   @IsOptional()
   @IsDateString()
   startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsInt()
+  responsableId?: number;
+
+  @IsOptional()
+  @IsEnum(ServiceProjectType)
+  projectType?: ServiceProjectType;
 }

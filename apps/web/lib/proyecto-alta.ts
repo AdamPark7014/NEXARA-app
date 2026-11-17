@@ -94,6 +94,10 @@ export function erroresDelPaso(paso: PasoAlta, b: BorradorProyecto): string[] {
     case "datos": {
       if (b.title.trim().length < 3) errores.push("Escribe el nombre del proyecto (al menos 3 letras).");
       if (!b.clienteId) errores.push("Elige el cliente.");
+      if (!b.responsableId) errores.push("Elige el responsable del proyecto.");
+      if (!b.startDate) errores.push("Pon el inicio planeado.");
+      if (!b.endDate) errores.push("Pon el fin planeado.");
+      if (b.projectType === "OTRO" && !b.description.trim()) errores.push("Describe el tipo de proyecto o elige otro tipo.");
       if (b.siteCount.trim()) {
         const n = Number(b.siteCount);
         if (!Number.isInteger(n) || n < 0) errores.push("El número de sitios debe ser un número entero.");

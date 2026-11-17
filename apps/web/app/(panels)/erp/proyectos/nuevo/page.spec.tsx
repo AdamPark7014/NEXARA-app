@@ -86,9 +86,12 @@ describe("asistente de nuevo proyecto", () => {
     const user = userEvent.setup();
     render(<NuevoProyectoPage />);
 
-    await user.type(screen.getByLabelText(/Nombre del proyecto/), "CCTV Hotel Centro");
+    await user.type(screen.getByLabelText(/Nombre del proyecto/), "Instalación de cámaras Hotel Centro");
     await waitFor(() => expect(screen.getByRole("option", { name: "Hotel Centro" })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText("Cliente"), "21");
+    await user.selectOptions(screen.getByLabelText(/Tipo de proyecto/), "INSTALACION_CCTV");
+    await user.type(screen.getByLabelText(/Inicio planeado/), "2026-11-17");
+    await user.type(screen.getByLabelText(/Fin planeado/), "2026-12-15");
     await user.click(screen.getByRole("button", { name: "Siguiente →" }));
 
     // Fechas: el responsable ya viene con quien crea.
@@ -112,7 +115,7 @@ describe("asistente de nuevo proyecto", () => {
     expect(llamadas.filter((l) => /\/proyectos$/.test(l.url))).toHaveLength(1);
     const cuerpo = llamadas[alta].body as Record<string, unknown>;
     expect(cuerpo).toMatchObject({
-      title: "CCTV Hotel Centro",
+      title: "Instalación de cámaras Hotel Centro",
       clientId: 321,
       responsableId: 1,
       budgetAmount: 120000,

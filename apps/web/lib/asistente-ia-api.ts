@@ -189,6 +189,9 @@ export type Ajustes = {
   projectId?: number | null;
   /** Nombre del proyecto a crear al confirmar; `""` = no crear (se elige uno existente). */
   proyectoNuevo?: string;
+  proyectoResponsableId?: number;
+  proyectoInicio?: string;
+  proyectoFin?: string;
   /** Campos por elemento ya corregidos en la tarjeta. */
   campos?: CampoPropuesto[];
   titulo?: string;
@@ -272,7 +275,7 @@ export function camposEfectivos(p: PropuestaActividad, aj: Ajustes): CampoPropue
 }
 
 export function proyectoEfectivo(p: PropuestaActividad, aj: Ajustes): number | null {
-  if (!conProyecto(tipoEfectivo(p, aj))) return null;
+  if (!conProyecto(tipoEfectivo(p, aj)) && tipoEfectivo(p, aj) !== "servicio") return null;
   if (aj.projectId !== undefined) return aj.projectId || null;
   const ia = Number(p.payload.projectId ?? p.proyecto?.id ?? 0);
   return ia || null;

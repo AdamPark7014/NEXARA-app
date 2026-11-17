@@ -16,5 +16,5 @@ export type SeccionProps = {
   mutar: (accion: () => Promise<ProyectoDetalle>, exito?: string) => Promise<boolean>;
   confirmar: (estado: ConfirmState) => void;
   /** Abre otra pestaña del proyecto. */
-  irA?: (pestana: "alcance") => void;
+  irA?: (pestana: "resumen" | "alcance" | "cronograma" | "actividades" | "documentos" | "equipo" | "requerimientos" | "costos") => void;
 };

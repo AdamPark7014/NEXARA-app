@@ -1,4 +1,5 @@
 import {
+  aplicarTopeAvance,
   calcularAvance,
   calcularSalud,
   diasEntre,
@@ -72,7 +73,7 @@ describe('salud del proyecto', () => {
       HOY,
     );
     expect(salud.salud).toBe('EN_RIESGO');
-    expect(salud.motivo).toContain('falta darlo por terminado');
+    expect(salud.motivo).toMatch(/Listo para cerrar|falta darlo por terminado/);
   });
 
   it('dentro del plazo y con margen: en tiempo', () => {
@@ -247,5 +248,66 @@ describe('siguiente etapa del cronograma', () => {
   it('si ya no queda ninguna abierta devuelve null', () => {
     expect(siguienteHito([{ id: 1, status: 'CUMPLIDO' }])).toBeNull();
     expect(siguienteHito([])).toBeNull();
+  });
+});
+
+
+describe('avance honesto y ficha incompleta', () => {
+  it('con hitos y actividades pondera por hitos', () => {
+    const avance = calcularAvance(
+      [{ estatus: 'Finalizada' }, { estatus: 'Pendiente' }],
+      [{ status: 'CUMPLIDO' }, { status: 'PENDIENTE' }],
+    );
+    expect(avance.origen).toBe('hitos');
+    expect(avance.porcentaje).toBe(50);
+    expect(avance.total).toBe(2);
+  });
+
+  it('100% solo si COMPLETED; si no, tope 99', () => {
+    const lleno = { total: 1, cerradas: 1, finalizadas: 1, abiertas: 0, porcentaje: 100, origen: 'actividades' as const };
+    expect(aplicarTopeAvance(lleno, 'ACTIVE').porcentaje).toBe(99);
+    expect(aplicarTopeAvance(lleno, 'COMPLETED').porcentaje).toBe(100);
+  });
+
+  it('sin FICHA: INCOMPLETO y sin porcentaje', () => {
+    const salud = calcularSalud(
+      {
+        status: 'ACTIVE',
+        endDate: '2026-12-01T00:00:00.000Z',
+        fichaCompleta: false,
+        faltantesFicha: 3,
+        actividades: [{ estatus: 'Finalizada' }],
+      },
+      HOY,
+    );
+    expect(salud.salud).toBe('INCOMPLETO');
+    expect(salud.avance.porcentaje).toBeNull();
+    expect(salud.motivo).toContain('faltan 3');
+  });
+
+  it('todo cerrado pero abierto: Listo para cerrar y max 99%', () => {
+    const salud = calcularSalud(
+      {
+        status: 'ACTIVE',
+        endDate: '2026-12-01T00:00:00.000Z',
+        actividades: [{ estatus: 'Finalizada' }, { estatus: 'Finalizada' }],
+      },
+      HOY,
+    );
+    expect(salud.motivo).toMatch(/Listo para cerrar/);
+    expect(salud.avance.porcentaje).toBeLessThanOrEqual(99);
+  });
+});
+
+describe('cierre honesto frente a fechas reales y hitos abiertos', () => {
+  it('una fecha de entrega por sí sola no termina el proyecto', () => {
+    const r = calcularSalud({ status: 'ACTIVE', endDate: '2026-12-01', actualEndDate: '2026-11-15', actividades: [{ estatus: 'Finalizada' }] }, new Date('2026-11-16'));
+    expect(r.salud).not.toBe('TERMINADO');
+    expect(r.avance.porcentaje).toBe(99);
+  });
+  it('actividades cerradas con un hito pendiente no dicen Listo para cerrar', () => {
+    const r = calcularSalud({ status: 'ACTIVE', endDate: '2026-12-01', actividades: [{ estatus: 'Finalizada' }], hitos: [{ status: 'PENDIENTE', plannedDate: '2026-11-30' }] }, new Date('2026-11-16'));
+    expect(r.motivo).not.toContain('Listo para cerrar');
+    expect(r.avance.porcentaje).toBe(0);
   });
 });

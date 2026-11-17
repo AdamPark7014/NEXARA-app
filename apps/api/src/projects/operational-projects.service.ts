@@ -1,4 +1,8 @@
+import { ProyectosIncompletosService } from '../projects/proyectos-incompletos.service.js';
+import { Optional as ProyectoOptional } from '@nestjs/common';
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { esNombreDeRelleno, sectoresDelCliente } from '../ventas/client-sectors.js';
+import { evaluarCompletitud, mensajeFaltantes } from './proyecto-completitud.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
@@ -7,7 +11,6 @@ import { salesPatchFromOps, opsStatusToSales } from '../common/project-handoff.j
 import { resolveRequiredCompanyId, companyWhere, requireCompanyId, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
 import { canDeleteOrDeactivateClient, type ClientActor } from '../ventas/client-permissions.js';
 import { assertPuedeVerCliente, porQueNoSumaTipo, type ActorDelPadron } from '../ventas/client-access.js';
-import { sectoresDelCliente } from '../ventas/client-sectors.js';
 import { marcarClienteDeProyectoSinFallar } from './cliente-de-proyecto.js';
 import {
   esEstadoProyecto,
@@ -31,6 +34,7 @@ export class OperationalProjectsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activitiesService: ActivitiesService,
+    @ProyectoOptional() private readonly avisosProyecto?: ProyectosIncompletosService,
   ) {}
 
   private get projectRepo() {
@@ -171,7 +175,7 @@ export class OperationalProjectsService {
    * `actor` es `req.user` de quien crea: con él se decide si al cliente del padrón se le
    * suma «Proyecto» (misma regla que la ficha). Sin actor, solo el id: no se le suma a nadie.
    */
-  async create(createDto: CreateOperationalProjectDto, userId: number, actor?: ActorDelPadron) {
+  async create(createDto: CreateOperationalProjectDto, userId: number, actor?: ActorDelPadron, opts?: { permitirIncompleto?: boolean }) {
     // Si no eligen vendedor, el proyecto queda a nombre de quien lo crea.
     const vendor = await this.prisma.user.findUnique({
       where: { id: createDto.vendorId ?? userId },
@@ -190,6 +194,28 @@ export class OperationalProjectsService {
       throw new NotFoundException('Client not found');
     }
 
+    const ficha = evaluarCompletitud({
+      title: createDto.title,
+      clientName: client.name,
+      clientDeletedAt: (client as any).deletedAt,
+      clientId: client.id,
+      clientEsRelleno: esNombreDeRelleno(client.name),
+      projectType: createDto.projectType ?? 'OTRO',
+      description: createDto.description,
+      responsableId: opts?.permitirIncompleto ? (createDto.responsableId ?? userId) : createDto.responsableId,
+      startDate: createDto.startDate,
+      endDate: createDto.endDate,
+    });
+    if (!opts?.permitirIncompleto && !ficha.fichaOk) {
+      throw new BadRequestException(
+        `El proyecto no tiene la ficha mínima: ${mensajeFaltantes(
+          ficha.faltantes.filter((f) =>
+            ['nombre_descriptivo', 'cliente_valido', 'tipo', 'responsable', 'fecha_inicio', 'fecha_fin'].includes(f.clave),
+          ),
+        )}.`,
+      );
+    }
+
     // Create the operational project
     const companyId = await resolveRequiredCompanyId(this.prisma, (client as any).companyId);
     const vendorId = createDto.vendorId ?? userId;
@@ -203,6 +229,8 @@ export class OperationalProjectsService {
         salesProjectId: createDto.salesProjectId ?? null,
         status: 'ACTIVE',
         vendorId,
+        createdById: userId,
+        responsableId: createDto.responsableId ?? userId,
         clientId: createDto.clientId,
         startDate: createDto.startDate ? new Date(createDto.startDate) : null,
         endDate: createDto.endDate ? new Date(createDto.endDate) : null,
@@ -233,6 +261,8 @@ export class OperationalProjectsService {
         },
       },
     });
+
+    if (opts?.permitirIncompleto) await this.avisosProyecto?.avisarAlNacer(created.id);
 
     // El cliente queda en el padrón como cliente de proyecto (sin perder sus otros tipos),
     // si quien crea puede sumarle el tipo; si no, lo suma coordinación desde la ficha.
@@ -279,11 +309,14 @@ export class OperationalProjectsService {
           title: dto.title.trim(),
           clientId: operacion.id,
           vendorId: Number(user.id),
-          projectType: 'OTRO',
-          ...(dto.startDate ? { startDate: dto.startDate } : {}),
-        },
+          responsableId: dto.responsableId ?? Number(user.id),
+          projectType: dto.projectType ?? 'OTRO',
+          startDate: dto.startDate,
+          endDate: dto.endDate,
+        } as any,
         Number(user.id),
         user,
+        { permitirIncompleto: true },
       );
     }
     if (!dto.salesClientId) throw new BadRequestException('Falta el cliente del proyecto.');
@@ -305,11 +338,14 @@ export class OperationalProjectsService {
         title: dto.title.trim(),
         clientId: serviceClientId,
         vendorId: Number(user.id),
-        projectType: 'OTRO',
-        ...(dto.startDate ? { startDate: dto.startDate } : {}),
-      },
+        responsableId: dto.responsableId ?? Number(user.id),
+        projectType: dto.projectType ?? 'OTRO',
+        startDate: dto.startDate,
+        endDate: dto.endDate,
+      } as any,
       Number(user.id),
       user,
+      { permitirIncompleto: true },
     );
   }
 
@@ -509,15 +545,62 @@ export class OperationalProjectsService {
       throw new BadRequestException('Para cancelar un proyecto hay que decir por qué');
     }
 
+    if (statusDto.status === 'ACTIVE' || statusDto.status === 'COMPLETED') {
+      const full = await this.prisma.operationalProject.findFirst({
+        where: { id },
+        include: {
+          client: { select: { id: true, name: true } },
+          scopeItems: { select: { kind: true } },
+          milestones: { select: { plannedDate: true, status: true } },
+          activities: { select: { estatus: true } },
+          documents: { select: { kind: true, nombre: true } },
+        },
+      });
+      if (!full) throw new NotFoundException("Proyecto no encontrado");
+      if (full) {
+        const f = full as any;
+        const c = evaluarCompletitud({
+          title: f.title,
+          clientName: f.client?.name,
+          clientId: f.clientId,
+          clientEsRelleno: esNombreDeRelleno(f.client?.name),
+          projectType: f.projectType,
+          description: f.description,
+          responsableId: f.responsableId,
+          startDate: f.startDate,
+          endDate: f.endDate,
+          objective: f.objective,
+          scopeSummary: f.scopeSummary,
+          scopeItems: f.scopeItems,
+          milestones: f.milestones,
+          activities: f.activities,
+          documents: (f.documents ?? []).map((d: any) => ({ kind: d.kind, nombre: d.nombre, titulo: d.nombre })),
+        });
+        if (statusDto.status === 'ACTIVE' && !c.planOk) {
+          throw new BadRequestException(
+            `No se puede poner En curso: ${mensajeFaltantes(c.faltantes)}. `,
+          );
+        }
+        if (statusDto.status === 'COMPLETED' && !c.listoOk) {
+          throw new BadRequestException(
+            `No se puede dar por terminado: ${mensajeFaltantes(c.faltantes)}.`,
+          );
+        }
+      }
+    }
+
     const updated = await this.projectRepo.update({
       where: { id },
       data: {
         status: statusDto.status as any,
         // Terminar es fijar el fin **real**; si se reabre, esa fecha deja de ser cierta.
         ...(statusDto.status === 'COMPLETED' && {
-          actualEndDate: statusDto.actualEndDate ? new Date(statusDto.actualEndDate) : new Date(),
+          actualEndDate: statusDto.actualEndDate ? new Date(statusDto.actualEndDate) : actual.actualEndDate ?? new Date(),
         }),
-        ...(statusDto.status === 'ACTIVE' && { actualEndDate: null }),
+        ...(statusDto.status === 'ACTIVE' && {
+          actualEndDate: null,
+          ...(!(actual as any)?.actualStartDate ? { actualStartDate: new Date() } : {}),
+        }),
         ...(statusDto.status === 'CANCELLED' && { cancelReason: statusDto.cancelReason?.trim() || null }),
       },
       include: {

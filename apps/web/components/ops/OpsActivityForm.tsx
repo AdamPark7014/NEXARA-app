@@ -278,7 +278,7 @@ export default function OpsActivityForm({
     : tareaPreset?.id ?? (form.ticketType === "OTRO" && form.ticketTypeCustom.trim() ? "otro" : "");
 
   const activeProjects = useMemo(() => {
-    const active = projects.filter((p) => p.status === "ACTIVE");
+    const active = projects.filter((p) => p.status !== "COMPLETED" && p.status !== "CANCELLED");
     if (!filtersProjectsBySector || sectorClients.length === 0) return active;
     const ok = new Set(sectorClients.map((c) => c.serviceClientId));
     return active.filter((p) => ok.has(p.client.id));
@@ -446,6 +446,13 @@ export default function OpsActivityForm({
   }, [token, isEdit, activityId]);
 
   // Etapas y ventana del proyecto elegido: de ahí sale el periodo por omisión.
+  const [sinProyectoExplicito, setSinProyectoExplicito] = useState(false);
+  const proyectosDelCliente = activeProjects.filter((p) => String(p.client.id) === form.clientId);
+  useEffect(() => { setSinProyectoExplicito(false); }, [form.clientId]);
+  useEffect(() => {
+    if (isEdit || sinProyectoExplicito || !form.clientId || form.projectId || proyectosDelCliente.length !== 1) return;
+    setForm((prev) => ({ ...prev, projectId: String(proyectosDelCliente[0].id), projectMode: "with_project" }));
+  }, [isEdit, sinProyectoExplicito, form.clientId, form.projectId, projects]);
   const proyectoElegido = form.projectMode === "with_project" ? form.projectId : "";
   useEffect(() => {
     if (!token || !proyectoElegido) {
@@ -665,6 +672,9 @@ export default function OpsActivityForm({
     }
 
     const project = activeProjects.find((p) => String(p.id) === form.projectId);
+    if (form.clientId && proyectosDelCliente.length && !form.projectId && (!sinProyectoExplicito || form.ticketType === "INSTALACION")) {
+      setError("Elige de qué proyecto es. Una instalación no puede quedar sin proyecto."); return;
+    }
     const payload = buildActivityPayload(form, project, {
       userId: user.id,
       isEdit,
@@ -1329,10 +1339,18 @@ export default function OpsActivityForm({
             description={form.projectMode === "with_project" ? "El cliente sale del proyecto." : textoSinProyecto}
           >
             <div className={s.cuerpo}>
+              {proyectosDelCliente.length ? <Field label="¿De qué proyecto es?">
+                <Select aria-label="¿De qué proyecto es?" value={form.projectId || (sinProyectoExplicito ? "ninguno" : "")} onChange={(e) => { const ninguno = e.target.value === "ninguno"; setSinProyectoExplicito(ninguno); setForm((prev) => ({ ...prev, projectId: ninguno ? "" : e.target.value, projectMode: ninguno ? "without_project" : "with_project", projectMilestoneId: "" })); }}>
+                  <option value="">Elige el proyecto</option>
+                  {proyectosDelCliente.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+                  {["CORRECTIVO", "PREVENTIVO", "GARANTIA", "SERVICIO"].includes(form.ticketType) ? <option value="ninguno">No es de un proyecto</option> : null}
+                </Select>
+              </Field> : null}
+              {ventanaProyecto && ((form.fecha && ventanaProyecto.inicio && form.fecha < ventanaProyecto.inicio) || ((form.periodoFin || form.fecha) && ventanaProyecto.fin && (form.periodoFin || form.fecha) > ventanaProyecto.fin)) ? <Alert tone="warning">La actividad queda fuera de las fechas planeadas del proyecto. Puedes continuar.</Alert> : null}
               {form.projectMode === "with_project" ? (
                 <>
                   <FieldGrid>
-                    <Field label="Proyecto" required error={intentado && !proyectoOk ? "Selecciona un proyecto" : null}>
+                    <Field label="¿De qué proyecto es?" required error={intentado && !proyectoOk ? "Selecciona un proyecto" : null}>
                       <Select
                         id="oaf-proyecto"
                         value={form.projectId}

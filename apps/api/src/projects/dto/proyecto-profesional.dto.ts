@@ -20,6 +20,13 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class LigarActividadesProyectoDto {
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  activityIds!: number[];
+}
 import {
   ProjectDocumentKind,
   ProjectMemberRole,
@@ -248,9 +255,8 @@ export class CrearProyectoProfesionalDto {
   @IsInt()
   vendorId?: number;
 
-  @IsOptional()
-  @IsInt()
-  responsableId?: number;
+  @IsInt({ message: 'Elige al responsable del proyecto.' })
+  responsableId!: number;
 
   @IsOptional()
   @IsEnum(ServiceProjectType)
@@ -273,14 +279,12 @@ export class CrearProyectoProfesionalDto {
   @Min(0)
   siteCount?: number;
 
-  // --- Fechas (opcionales: se completan después en el proyecto) ---
-  @IsOptional()
-  @IsDateString()
-  startDate?: string | null;
+  // --- Fechas planeadas (obligatorias en alta manual) ---
+  @IsDateString({}, { message: 'Pon una fecha de inicio planeada válida.' })
+  startDate!: string;
 
-  @IsOptional()
-  @IsDateString()
-  endDate?: string;
+  @IsDateString({}, { message: 'Pon una fecha de fin planeada válida.' })
+  endDate!: string;
 
   @IsOptional()
   @IsDateString()

@@ -1,3 +1,4 @@
+import { ProyectosAvisosModule } from '../projects/proyectos-avisos.module.js';
 import { Module, forwardRef } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
@@ -20,7 +21,7 @@ import { AiModule } from '../ai/ai.module.js';
 import { ClientesParecidosService } from './clientes-parecidos.service.js';
 
 @Module({
-  imports: [
+  imports: [ProyectosAvisosModule, 
     PrismaModule,
     AuthModule,
     forwardRef(() => CotizacionesModule),

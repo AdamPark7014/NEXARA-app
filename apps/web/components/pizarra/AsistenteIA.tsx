@@ -1,5 +1,6 @@
 "use client";
 
+import { nombreProyectoValido, sugerirNombreProyecto } from "@/lib/proyecto-nombre";
 import PreguntaProyecto from "@/components/costos/PreguntaProyecto";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
@@ -90,7 +91,7 @@ const ALTA_CLIENTE = "__alta__";
 const OTRO_CLIENTE = "__otro__";
 
 /** Etapa del proyecto que se propuso para una tarjeta (como «Asignar»). */
-type EtapaPropuesta = { nombre: string | null };
+type EtapaPropuesta = { nombre: string | null; inicio?: string | null; fin?: string | null };
 
 /**
  * Un dato de la tarjeta: se lee de un vistazo y el lápiz lo abre ahí mismo para cambiarlo. Lo que la
@@ -396,11 +397,20 @@ function Contenido({
     const destinoEmail = destino ? destino.email ?? null : undefined;
     // Sin hora dicha, empieza a la entrada de quien ejecuta (10:00 la oficina, 08:00 la cuadrilla).
     const entrada = destino?.horaEntrada ?? null;
-    const payload = payloadFinal(p, aj, { destinoEmail, proyectos: opciones?.proyectos, sucursales: opciones?.sucursales, entrada });
+    const proyectosCliente = (opciones?.proyectos || []).filter((x) => x.clientId === Number(aj.clientId ?? p.payload.clientId ?? p.cliente?.id));
+    const efectivos = aj.projectId === undefined && !proyectoNuevoEfectivo(p, aj) && proyectosCliente.length === 1 && (tipoEfectivo(p, aj) === "servicio" || conProyecto(tipoEfectivo(p, aj))) ? { ...aj, projectId: proyectosCliente[0].id } : aj;
+    const payload = payloadFinal(p, efectivos, { destinoEmail, proyectos: opciones?.proyectos, sucursales: opciones?.sucursales, entrada });
     const agenda = agendaFinal(p, aj, entrada);
     const pendiente = clientePendiente(p, aj);
     const proyectoNuevo = proyectoNuevoEfectivo(p, aj);
     const motivos = bloqueos(p, payload, { creadorEmail, destinoEmail, v2Role: v2, isSuperAdmin, agenda, clienteNuevo: pendiente, proyectoNuevo });
+    if (proyectoNuevo && !payload.projectId) {
+      const clienteNombre = (opciones?.clientes || []).find((x) => x.id === Number(payload.clientId))?.nombre || p.cliente?.nombre || pendiente || "";
+      if (!nombreProyectoValido(proyectoNuevo, clienteNombre)) motivos.push("El nombre del proyecto debe describir qué se hace y dónde.");
+      if (!(aj.proyectoResponsableId ?? payload.responsableId)) motivos.push("Elige responsable del proyecto.");
+      if (!(aj.proyectoInicio ?? agenda.dia) || !(aj.proyectoFin ?? agenda.hasta ?? agenda.dia)) motivos.push("Pon inicio y fin del proyecto.");
+    }
+    if (proyectosCliente.length && !payload.projectId && !proyectoNuevo && (tipoEfectivo(p, aj) === "servicio" || conProyecto(tipoEfectivo(p, aj))) && (aj.projectId !== null || !["CORRECTIVO", "PREVENTIVO", "GARANTIA", "SERVICIO"].includes(String(payload.ticketType)))) motivos.push("Elige de qué proyecto es esta actividad.");
     const parecidosCliente = pendiente && !aj.clienteNuevoConfirmado ? parecidos[nombreComparable(pendiente)] ?? [] : [];
     if (pendiente && esNombreDeRelleno(pendiente)) motivos.push(mensajeAlertaClienteRelleno(pendiente));
     if (parecidosCliente.length) motivos.push(`«${pendiente}» se parece a un cliente que ya existe: elige si es el mismo.`);
@@ -425,9 +435,9 @@ function Contenido({
   const proyectosPorTarjeta = propuestas
     .map((p, i) => {
       const aj = ajustes[i] || {};
-      const id = proyectoEfectivo(p, aj);
+      const id = Number(armar(p, i).payload.projectId) || proyectoEfectivo(p, aj);
       const sinFechaDicha = !agendaFinal(p, aj).dia || p.agenda?.diaDicho === false;
-      return id && sinFechaDicha && aj.dia === undefined && !etapas[i] ? `${i}:${id}` : null;
+      return id && !etapas[i] ? `${i}:${id}` : null;
     })
     .filter(Boolean)
     .join(",");
@@ -444,7 +454,7 @@ function Contenido({
           const propuesta = periodoPorOmision(prog.etapas, { inicio: prog.proyecto.inicio, fin: prog.proyecto.fin }, hoyISO());
           if (!propuesta) return;
           const etapa = prog.etapas.find((e) => e.hitoId === propuesta.hitoId);
-          setEtapas((prev) => ({ ...prev, [i]: { nombre: etapa?.nombre ?? "Todo el proyecto" } }));
+          setEtapas((prev) => ({ ...prev, [i]: { nombre: etapa?.nombre ?? "Todo el proyecto", inicio: prog.proyecto.inicio, fin: prog.proyecto.fin } }));
           setAjustes((prev) => ({
             ...prev,
             [i]: { ...prev[i], dia: propuesta.inicio, hasta: propuesta.fin, etapaId: propuesta.hitoId },
@@ -471,7 +481,8 @@ function Contenido({
       // Proyecto que no existía («instalar 4 cámaras en IPADE»): se crea con el cliente de la tarjeta.
       if (proyectoNuevo && !payload.projectId) {
         try {
-          const proyecto = await quickCreateOperationalProject(token, { title: proyectoNuevo, serviceClientId: Number(payload.clientId) });
+          const ag = agendaFinal(p, aj);
+          const proyecto = await quickCreateOperationalProject(token, { title: proyectoNuevo, serviceClientId: Number(payload.clientId), responsableId: aj.proyectoResponsableId ?? Number(payload.responsableId), startDate: aj.proyectoInicio ?? ag.dia ?? undefined, endDate: aj.proyectoFin ?? ag.hasta ?? ag.dia ?? undefined });
           payload.projectId = proyecto.id;
           ajustar(i, { projectId: proyecto.id });
         } catch (e) {
@@ -686,7 +697,7 @@ function Contenido({
           const otrosClientes = todosLosClientes.filter((x) => !clientesSugeridos.some((o) => o.id === x.id));
           const altaNombre = clienteId || pendiente ? null : nombreParaAlta(p, aj, todosLosClientes);
           const clienteNuevo = clienteId ? clientesNuevos.find((x) => x.id === clienteId) : undefined;
-          const proyectoId = proyectoEfectivo(p, aj);
+          const proyectoId = Number(payload.projectId) || proyectoEfectivo(p, aj);
           const proyectosLista = [
             ...(p.proyecto ? [p.proyecto] : []),
             ...p.proyectoCandidatos,
@@ -869,9 +880,23 @@ function Contenido({
                   <Renglon etiqueta="Encargo" valor={regla.valor === "despacho" ? "La reparte a su equipo" : "La hace en persona"} />
                 ) : null}
 
+                {etapas[i] && ((agenda.dia && etapas[i].inicio && agenda.dia < etapas[i].inicio!) || ((agenda.hasta || agenda.dia) && etapas[i].fin && (agenda.hasta || agenda.dia)! > etapas[i].fin!)) ? <Alert tone="warning">La actividad queda fuera de las fechas planeadas del proyecto. Puedes continuar.</Alert> : null}
+                {proyectoNuevo && !proyectoId ? <div className={s.editor}>
+                  <Field label="Nombre descriptivo del proyecto"><Input value={proyectoNuevo} onChange={(e) => ajustar(i, { proyectoNuevo: e.target.value })} /></Field>
+                  {nombreCliente ? <Button variant="tertiary" onClick={() => ajustar(i, { proyectoNuevo: sugerirNombreProyecto(titulo, nombreCliente) })}>Usar sugerencia: {sugerirNombreProyecto(titulo, nombreCliente)}</Button> : null}
+                  <Field label="Responsable del proyecto"><Select value={String(aj.proyectoResponsableId ?? responsableId ?? "")} onChange={(e) => ajustar(i, { proyectoResponsableId: Number(e.target.value) })}><option value="">Elige responsable</option>{personas.map((u) => <option key={u.id} value={u.id}>{u.nombre}</option>)}</Select></Field>
+                  <Field label="Inicio planeado del proyecto"><DateInput value={aj.proyectoInicio ?? agenda.dia ?? ""} onChange={(e) => ajustar(i, { proyectoInicio: e.target.value })} /></Field>
+                  <Field label="Fin planeado del proyecto"><DateInput min={aj.proyectoInicio ?? agenda.dia ?? undefined} value={aj.proyectoFin ?? agenda.hasta ?? agenda.dia ?? ""} onChange={(e) => ajustar(i, { proyectoFin: e.target.value })} /></Field>
+                </div> : null}
+                {tipo === "servicio" && (opciones?.proyectos || []).some((x) => x.clientId === clienteId) ? <Field label="¿De qué proyecto es?">
+                  <Select aria-label="¿De qué proyecto es?" value={proyectoId ? String(proyectoId) : ""} onChange={(e) => ajustar(i, { projectId: Number(e.target.value) || null })}>
+                    <option value="">{["CORRECTIVO", "PREVENTIVO", "GARANTIA", "SERVICIO"].includes(String(payload.ticketType)) ? "No es de un proyecto" : "Elige el proyecto"}</option>
+                    {(opciones?.proyectos || []).filter((x) => x.clientId === clienteId).map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+                  </Select>
+                </Field> : null}
                 {conProyecto(tipo) ? (
                   <Renglon
-                    etiqueta="Proyecto"
+                    etiqueta="¿De qué proyecto es?"
                     valor={
                       nombreProyecto ??
                       (proyectoNuevo ? (
@@ -910,7 +935,7 @@ function Contenido({
                       }}
                     >
                       <option value="">Elige el proyecto</option>
-                      {proyectosLista.map((o) => (
+                      {proyectosLista.filter((o) => !("clientId" in o) || !clienteId || o.clientId === clienteId).map((o) => (
                         <option key={o.id} value={o.id}>
                           {o.nombre}
                         </option>

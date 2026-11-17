@@ -51,6 +51,7 @@ import NuevaActividad from "../_componentes/NuevaActividad";
 import { aceptoEnPalabras, diaDelHecho, faltaDeProyecto, pasosDeFacturaYCobro, siguientePasoDeProyecto } from "@/lib/hilo-negocio";
 import { toneDe } from "../_componentes/tono";
 import type { SeccionProps } from "../_componentes/tipos";
+import CompletarFicha from "../_componentes/CompletarFicha";
 import SeccionResumen from "../_componentes/SeccionResumen";
 import SeccionCronograma from "../_componentes/SeccionCronograma";
 import SeccionAlcance from "../_componentes/SeccionAlcance";
@@ -365,6 +366,15 @@ export default function ProyectoDetallePage() {
     : null;
 
   function pedirCambio(accion: AccionDeEstado) {
+    const c = p.resumen.completitud;
+    if (accion.hacia === "COMPLETED" && c && !c.listoOk) {
+      setError(`No se puede dar por terminado: faltan ${c.faltantes.map((f) => f.etiqueta.toLowerCase()).join(", ")}.`);
+      return;
+    }
+    if (accion.hacia === "ACTIVE" && c && !c.planOk) {
+      setError(`No se puede poner En curso: faltan ${c.faltantes.map((f) => f.etiqueta.toLowerCase()).join(", ")}.`);
+      return;
+    }
     setError(null);
     setErrorCambio(null);
     if (accion.pide) {
@@ -419,6 +429,17 @@ export default function ProyectoDetallePage() {
     p.resumen.requerimientos.pendientes ? `${p.resumen.requerimientos.pendientes} requerimiento(s) pendiente(s)` : null,
     etapasSinCumplir ? `${etapasSinCumplir} etapa(s) sin cumplir` : null,
   ].filter(Boolean);
+
+  const completitud = p.resumen.completitud;
+  const faltantesFicha = (completitud?.faltantes ?? []).filter((f) =>
+    ["nombre_descriptivo", "cliente_valido", "tipo", "responsable", "fecha_inicio", "fecha_fin"].includes(f.clave),
+  );
+  const bannerCompletar =
+    completitud && !completitud.fichaOk
+      ? `Para que este proyecto cuente le faltan ${faltantesFicha.length || completitud.faltantes.length} datos`
+      : completitud && !completitud.planOk && p.status === "ACTIVE"
+        ? `Para seguir en curso le faltan datos de plan`
+        : null;
 
   const avance = p.resumen.avance.porcentaje;
   const r = p.resumen;
@@ -509,7 +530,8 @@ export default function ProyectoDetallePage() {
                 <Button
                   key={a.hacia}
                   variant={a.peligro ? "danger-ghost" : esPrincipal(p, a) ? "primary" : "secondary"}
-                  disabled={ocupado}
+                  disabled={ocupado || (a.hacia === "COMPLETED" && completitud?.listoOk === false) || (a.hacia === "ACTIVE" && completitud?.planOk === false)}
+                  title={(a.hacia === "COMPLETED" && !completitud?.listoOk) || (a.hacia === "ACTIVE" && !completitud?.planOk) ? "Completa primero: " + completitud?.faltantes.map((f) => f.etiqueta).join(", ") : undefined}
                   onClick={() => pedirCambio(a)}
                 >
                   {a.etiqueta}
@@ -648,6 +670,7 @@ export default function ProyectoDetallePage() {
             No se pudo actualizar el proyecto; ves la última versión cargada.
           </Alert>
         ) : null}
+        {seccion ? <CompletarFicha key={p.id} {...seccion} /> : null}
         {error ? (
           <Alert tone="danger" role="alert" onDismiss={() => setError(null)}>
             {error}

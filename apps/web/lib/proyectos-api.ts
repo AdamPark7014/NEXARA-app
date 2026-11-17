@@ -38,7 +38,8 @@ export type SaludProyecto =
   | "EN_RIESGO"
   | "RETRASADO"
   | "TERMINADO"
-  | "CANCELADO";
+  | "CANCELADO"
+  | "INCOMPLETO";
 
 export type Tono = "neutral" | "info" | "ok" | "alerta" | "peligro";
 
@@ -50,6 +51,7 @@ export const SALUD_TONO: Record<SaludProyecto, Tono> = {
   RETRASADO: "peligro",
   TERMINADO: "ok",
   CANCELADO: "neutral",
+  INCOMPLETO: "peligro",
 };
 
 export const ESTADO_TONO: Record<EstadoProyecto, Tono> = {
@@ -151,10 +153,18 @@ export type ResumenProyecto = {
     finalizadas: number;
     abiertas: number;
     porcentaje: number | null;
-    origen: "actividades" | "hitos" | "ninguno";
+    origen: "actividades" | "hitos" | "ninguno" | "incompleto";
   };
   requerimientos: { total: number; cumplidos: number; pendientes: number; porcentaje: number | null };
   estadoEtiqueta: string;
+  completitud?: {
+    completo: boolean;
+    nivel: "FICHA" | "PLAN" | "LISTO";
+    fichaOk: boolean;
+    planOk: boolean;
+    listoOk: boolean;
+    faltantes: Array<{ clave: string; etiqueta: string; ayuda: string }>;
+  };
 };
 
 /** Campos de cabecera que comparten la fila de la lista y el detalle. */
@@ -419,6 +429,14 @@ export function listarProyectos(token: string, filtros?: { incluirCancelados?: b
 
 export function obtenerProyecto(token: string, id: number) {
   return pedir<ProyectoDetalle>(`proyectos/${id}`, token);
+}
+
+export type ActividadSinProyecto = { id: number; anNumber: string; titulo: string; fechaInicio: string | null; fechaEntregaEsperada: string | null };
+export function actividadesSinProyecto(token: string, id: number) {
+  return pedir<ActividadSinProyecto[]>(`proyectos/${id}/actividades-sin-proyecto`, token);
+}
+export function ligarActividades(token: string, id: number, activityIds: number[]) {
+  return pedir<ProyectoDetalle>(`proyectos/${id}/ligar-actividades`, token, json("POST", { activityIds }));
 }
 
 export type NuevoHito = {

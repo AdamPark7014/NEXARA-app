@@ -10,7 +10,7 @@ describe('OperationalProjectsService: desactivar y eliminar', () => {
       operationalProject: { findFirst: jest.fn().mockResolvedValue(proyecto), update },
     };
     const service = new OperationalProjectsService(prisma, {} as any);
-    return { service, update };
+    return { service, update, prisma };
   };
   const christian = { id: 1, email: 'gerencia@nexara.com.mx' };
   const jefe = { id: 9, email: 'jefe@nexara.com.mx', roleKey: 'dir_operaciones' };
@@ -31,8 +31,30 @@ describe('OperationalProjectsService: desactivar y eliminar', () => {
     expect(update.mock.calls[1][0].data.deletedAt).toBeInstanceOf(Date);
   });
 
-  it('un jefe sigue pudiendo marcar un proyecto como completado', async () => {
-    const { service, update } = nuevo();
+  it('un jefe sigue pudiendo marcar un proyecto como completado si está LISTO', async () => {
+    const { service, update, prisma } = nuevo();
+    prisma.operationalProject.findFirst = jest.fn().mockResolvedValue({
+      id: 7,
+      title: 'Instalación de cámaras Anfora',
+      projectType: 'INSTALACION_CCTV',
+      description: null,
+      responsableId: 2,
+      clientId: 1,
+      startDate: new Date('2026-09-01'),
+      endDate: new Date('2026-09-30'),
+      objective: 'Cubrir accesos',
+      scopeSummary: 'Cámaras',
+      status: 'ACTIVE',
+      companyId: 1,
+      client: { id: 1, name: 'Anfora' },
+      scopeItems: [{ kind: 'ENTREGABLE' }],
+      milestones: [
+        { plannedDate: new Date('2026-09-10'), status: 'CUMPLIDO' },
+        { plannedDate: new Date('2026-09-25'), status: 'CUMPLIDO' },
+      ],
+      activities: [{ estatus: 'Finalizada' }],
+      documents: [{ kind: 'ACTA', nombre: 'Acta de entrega' }],
+    });
     await service.changeStatus(7, { status: 'COMPLETED' }, 1, jefe);
     expect(update.mock.calls[0][0].data.status).toBe('COMPLETED');
   });

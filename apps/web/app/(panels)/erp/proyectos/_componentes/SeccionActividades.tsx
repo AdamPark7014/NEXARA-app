@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import { Button, ButtonLink, RecordSection, StatusBadge } from "@/components/base";
+import { Alert, Checkbox, Button, ButtonLink, RecordSection, StatusBadge } from "@/components/base";
 import { isActivityCompleted, isActivityInProgress } from "@/lib/activity-status";
 import { evaluarSemaforoActividad, textoChipSemaforo } from "@/lib/actividad-tiempos";
-import { formatoFecha, type Tono } from "@/lib/proyectos-api";
+import { actividadesSinProyecto, ligarActividades, type ActividadSinProyecto, formatoFecha, type Tono } from "@/lib/proyectos-api";
 import NuevaActividad from "./NuevaActividad";
 import ProgramarActividades from "./ProgramarActividades";
 import { toneDe } from "./tono";
@@ -26,10 +26,22 @@ export default function SeccionActividades(props: SeccionProps) {
   const { proyecto: p, hoy } = props;
   const avance = p.resumen.avance;
   const [nueva, setNueva] = useState(false);
+  const [sinProyecto, setSinProyecto] = useState<ActividadSinProyecto[]>([]);
+  const [elegidas, setElegidas] = useState<number[]>([]);
+  const [errorSinProyecto, setErrorSinProyecto] = useState<string | null>(null);
+  const [cargandoSinProyecto, setCargandoSinProyecto] = useState(true);
+  const cargarSinProyecto = () => { setCargandoSinProyecto(true); actividadesSinProyecto(props.token, p.id).then((rows) => { setSinProyecto(rows); setErrorSinProyecto(null); }).catch((e) => setErrorSinProyecto(e instanceof Error ? e.message : "No se pudieron cargar las actividades sin proyecto.")).finally(() => setCargandoSinProyecto(false)); };
+  useEffect(() => { cargarSinProyecto(); }, [props.token, p.id, p.activities.length]);
   const cerrado = p.status === "CANCELLED" || p.status === "COMPLETED";
   const etapaDe = (id?: number | null) => (id ? (p.milestones.find((h) => h.id === id)?.name ?? null) : null);
   return (
     <div className={styles.pila}>
+      <RecordSection title="Actividades del cliente sin proyecto" subtitle="Del mismo cliente, dentro de las fechas planeadas del proyecto.">
+        {errorSinProyecto ? <Alert tone="danger">{errorSinProyecto}<Button onClick={cargarSinProyecto}>Reintentar</Button></Alert> : cargandoSinProyecto ? <p role="status">Cargando actividades…</p> : !p.startDate || !p.endDate ? <p>Completa las fechas planeadas para buscar actividades.</p> : !sinProyecto.length ? <p>No hay actividades sin proyecto dentro de estas fechas.</p> : <>
+          <ul className={styles.lista}>{sinProyecto.map((a) => <li key={a.id}><Checkbox label={a.anNumber + " · " + a.titulo} checked={elegidas.includes(a.id)} onChange={(e) => setElegidas((ids) => e.target.checked ? [...ids, a.id] : ids.filter((i) => i !== a.id))} /></li>)}</ul>
+          <Button disabled={cerrado || props.ocupado || !elegidas.length} onClick={() => void props.mutar(() => ligarActividades(props.token, p.id, elegidas), "Actividades ligadas.").then((ok) => { if (ok) { setElegidas([]); cargarSinProyecto(); } })}>Ligar {elegidas.length || ""}</Button>
+        </>}
+      </RecordSection>
       <ProgramarActividades {...props} />
       <NuevaActividad {...props} abierto={nueva} onCerrar={() => setNueva(false)} />
       <RecordSection
@@ -96,6 +108,7 @@ export default function SeccionActividades(props: SeccionProps) {
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
+                    {(a.fechaInicio && p.startDate && a.fechaInicio.slice(0, 10) < p.startDate.slice(0, 10)) || (a.fechaEntregaEsperada && p.endDate && a.fechaEntregaEsperada.slice(0, 10) > p.endDate.slice(0, 10)) ? <Alert tone="warning" dense>Actividad fuera de las fechas planeadas del proyecto.</Alert> : null}
                     {atrasada || luz.semaforo === "amarillo" ? (
                       <span className={`${styles.meta} ${atrasada ? styles.vencido : ""}`}>
                         {textoChipSemaforo(luz.semaforo, luz.minutosAtraso, luz.minutosParaVencer, luz.motivo)}

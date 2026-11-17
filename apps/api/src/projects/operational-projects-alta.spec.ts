@@ -63,6 +63,7 @@ describe('OperationalProjectsService: alta rápida desde una actividad', () => {
     );
     expect(prisma.salesClient.findFirst.mock.calls[0][0].where.companyId).toBe(7);
     expect(prisma.operationalProject.create.mock.calls[0][0].data.startDate).toBeNull();
+    expect(prisma.operationalProject.create.mock.calls[0][0].data.endDate).toBeNull();
   });
 
   it('provisiona el cliente de operación si el padrón todavía no lo tiene', async () => {
@@ -151,12 +152,12 @@ describe('OperationalProjectsService: abrir un proyecto no destapa clientes del 
 
   it('alta completa: el proyecto se crea igual, pero PROYECTO solo se le suma si quien crea administra el padrón', async () => {
     const porTecnico = servicio(comercialAjeno);
-    await porTecnico.service.create({ title: 'Obra norte', clientId: 8 } as any, usuario.id, usuario);
+    await porTecnico.service.create({ title: 'Obra norte', clientId: 8 } as any, usuario.id, usuario, { permitirIncompleto: true });
     expect(porTecnico.prisma.operationalProject.create).toHaveBeenCalledTimes(1);
     expect(porTecnico.prisma.salesClientSector.create).not.toHaveBeenCalled();
 
     const porCoordinador = servicio(comercialAjeno);
-    await porCoordinador.service.create({ title: 'Obra norte', clientId: 8 } as any, coordinador.id, coordinador);
+    await porCoordinador.service.create({ title: 'Obra norte', clientId: 8 } as any, coordinador.id, coordinador, { permitirIncompleto: true });
     expect(porCoordinador.prisma.operationalProject.create).toHaveBeenCalledTimes(1);
     expect(porCoordinador.prisma.salesClientSector.create).toHaveBeenCalledWith({
       data: { salesClientId: 4, sector: 'PROYECTO', companyId: 7 },
@@ -165,7 +166,7 @@ describe('OperationalProjectsService: abrir un proyecto no destapa clientes del 
 
   it('alta completa sin actor (solo el id): no se le suma el tipo a nadie', async () => {
     const { service, prisma } = servicio(comercialAjeno);
-    await service.create({ title: 'Obra norte', clientId: 8 } as any, coordinador.id);
+    await service.create({ title: 'Obra norte', clientId: 8 } as any, coordinador.id, undefined, { permitirIncompleto: true });
     expect(prisma.operationalProject.create).toHaveBeenCalledTimes(1);
     expect(prisma.salesClientSector.create).not.toHaveBeenCalled();
   });
