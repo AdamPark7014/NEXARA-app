@@ -345,7 +345,9 @@ describe('asistente de actividades', () => {
     expect(sinPalabrasInformales('Revisar compuerta y cotización')).toBe('Revisar compuerta y cotización');
     const p = construirPropuesta({ ...base, titulo: 'Revisar compu', indicaciones: 'La compu de la gerente no prende' }, catalogos, ctx);
     expect(p.titulo).toBe('Revisar computadora');
-    expect(p.payload.indicaciones).toBe('La computadora de la gerente no prende');
+    expect(p.payload.indicaciones).toBe(
+      'La computadora de la gerente no prende\nAlcance: junta. Evidencia: foto o captura durante la reunión y minuta o acuerdos al final.',
+    );
   });
 
   it('fechas en hora de CDMX', () => {
@@ -403,7 +405,9 @@ describe('asistente de actividades', () => {
       expect(p.payload.fechaInicio).toBe('2026-10-12T16:00:00.000Z');
       expect(p.payload.fechaMaxima).toBe('2026-10-13T00:00:00.000Z');
       expect(p.payload.fechaEntregaEsperada).toBe('2026-10-13T00:00:00.000Z');
-      expect(p.payload.indicaciones).toBe('Mandarlo por correo al gerente.');
+      expect(p.payload.indicaciones).toBe(
+        'Mandarlo por correo al gerente.\nAlcance: junta. Evidencia: foto o captura durante la reunión y minuta o acuerdos al final.',
+      );
       expect(p.resumen).toContain('a más tardar 18:00');
     });
 
@@ -414,7 +418,9 @@ describe('asistente de actividades', () => {
         ctx,
       );
       expect(p.agenda.compromiso).toBeNull();
-      expect(p.payload.indicaciones).toBe('Mandarlo por correo al gerente. Entregar a más tardar el miércoles 14 de octubre a las 18:00.');
+      expect(p.payload.indicaciones).toBe(
+        'Mandarlo por correo al gerente. Entregar a más tardar el miércoles 14 de octubre a las 18:00.\nAlcance: junta. Evidencia: foto o captura durante la reunión y minuta o acuerdos al final.',
+      );
     });
 
     it('una hora límite antes del inicio no es compromiso', () => {
