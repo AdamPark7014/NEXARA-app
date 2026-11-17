@@ -603,9 +603,11 @@ describe("AsistenteIA", () => {
 });
 
 
-describe("Asignar con IA: proyecto nuevo con evidencia por elemento (15-11)", () => {
-  it("«instalar 4 cámaras en IPADE» crea el proyecto, la actividad y los 4 campos editados", async () => {
-    const proyecto: PropuestaActividad = {
+describe("Asignar con IA: evidencia agrupada en la tarjeta (16-11)", () => {
+  const notaCam = "Antes: punto de montaje. · Durante: fijada. · Después: en vivo.";
+
+  function proyecto4Camaras(): PropuestaActividad {
+    return {
       ...servicio,
       tipo: "proyecto",
       tipoEtiqueta: "Proyecto",
@@ -616,39 +618,103 @@ describe("Asignar con IA: proyecto nuevo con evidencia por elemento (15-11)", ()
       camposEvidencia: [1, 2, 3, 4].map((n) => ({
         nombre: `Cámara ${n}`,
         momentos: ["ANTES", "EN_PROGRESO", "DESPUES"],
-        notas: "Antes: punto de montaje. · Durante: fijada. · Después: en vivo.",
+        notas: notaCam,
       })),
       payload: { ...servicio.payload, titulo: "Instalar 4 cámaras en IPADE", coreKind: "proyecto", clientId: 26, indicaciones: undefined },
     };
+  }
+
+  async function preparar(usuario: ReturnType<typeof userEvent.setup>, propuesta: PropuestaActividad = proyecto4Camaras()) {
     buscarClientesParecidos.mockResolvedValue([]);
     api.estadoAsistente.mockResolvedValue({ disponible: true, modelo: "claude-haiku-5-5" });
     api.personasAsignables.mockResolvedValue([{ id: 8, nombre: "Carolina Pérez", email: "soporte@nexara.com.mx" }]);
-    api.interpretar.mockResolvedValue({ propuestas: [proyecto], aclaracion: null, uso: null, opciones: { clientes: [{ id: 26, nombre: "IPADE" }], proyectos: [] } });
+    api.interpretar.mockResolvedValue({ propuestas: [propuesta], aclaracion: null, uso: null, opciones: { clientes: [{ id: 26, nombre: "IPADE" }], proyectos: [] } });
     api.crearActividad.mockResolvedValue({ id: 501, anNumber: "AN-0501" });
     api.sumarAlEquipo.mockResolvedValue({});
     extra.quickCreateOperationalProject.mockResolvedValue({ id: 900 });
     extra.definirCamposEvidencia.mockResolvedValue([]);
-    const usuario = userEvent.setup();
     render(<AsistenteIA />);
     await usuario.type(await screen.findByLabelText("Instrucción para la IA"), "instalar 4 cámaras en IPADE");
     await usuario.click(screen.getByRole("button", { name: /Preparar actividades/ }));
     expect(await screen.findByText("Nuevo: se crea al confirmar")).toBeInTheDocument();
-    expect(screen.getByText(/4 elementos: Cámara 1, Cámara 2, Cámara 3/)).toBeInTheDocument();
+  }
+
+  it("muestra 4 cámaras como un grupo Cámara con cantidad 4", async () => {
+    const usuario = userEvent.setup();
+    await preparar(usuario);
+    expect(screen.getByText(/Cámara 1–4/)).toBeInTheDocument();
     await abrir(usuario, "Evidencia");
-    const foto1 = screen.getByLabelText("Foto que se pide para Cámara 1");
-    expect(foto1).toHaveValue("Antes: punto de montaje. · Durante: fijada. · Después: en vivo.");
-    await usuario.clear(foto1);
-    await usuario.type(foto1, "Foto del acceso principal");
-    await usuario.clear(screen.getByLabelText("Elemento 1"));
-    await usuario.type(screen.getByLabelText("Elemento 1"), "Cámara acceso");
+    expect(screen.getByLabelText("Cantidad de Cámara")).toHaveValue(4);
+    expect(screen.getByLabelText("Foto que se pide para Cámara")).toHaveValue(notaCam);
+    expect(screen.getByRole("button", { name: "Separar" })).toBeInTheDocument();
+  });
+
+  it("cambiar la cantidad a 6 manda Cámara 1–6 al guardar", async () => {
+    const usuario = userEvent.setup();
+    await preparar(usuario);
+    await abrir(usuario, "Evidencia");
+    const cantidad = screen.getByLabelText("Cantidad de Cámara");
+    fireEvent.change(cantidad, { target: { value: "6" } });
+    expect(cantidad).toHaveValue(6);
+    await usuario.click(screen.getByRole("button", { name: /Confirmar/ }));
+    await waitFor(() => expect(extra.definirCamposEvidencia).toHaveBeenCalled());
+    const campos = extra.definirCamposEvidencia.mock.calls[0][2];
+    expect(campos.map((c: { nombre: string }) => c.nombre)).toEqual([
+      "Cámara 1",
+      "Cámara 2",
+      "Cámara 3",
+      "Cámara 4",
+      "Cámara 5",
+      "Cámara 6",
+    ]);
+  });
+
+  it("editar la nota del grupo cambia la de todas al guardar", async () => {
+    const usuario = userEvent.setup();
+    await preparar(usuario);
+    await abrir(usuario, "Evidencia");
+    const foto = screen.getByLabelText("Foto que se pide para Cámara");
+    await usuario.clear(foto);
+    await usuario.type(foto, "Foto del acceso principal");
+    await usuario.click(screen.getByRole("button", { name: /Confirmar/ }));
+    await waitFor(() => expect(extra.definirCamposEvidencia).toHaveBeenCalled());
+    const campos = extra.definirCamposEvidencia.mock.calls[0][2];
+    expect(campos).toHaveLength(4);
+    expect(campos.every((c: { notas: string }) => c.notas === "Foto del acceso principal")).toBe(true);
+  });
+
+  it("Separar deja 4 renglones individuales para renombrar uno", async () => {
+    const usuario = userEvent.setup();
+    await preparar(usuario);
+    await abrir(usuario, "Evidencia");
+    await usuario.click(screen.getByRole("button", { name: "Separar" }));
+    expect(screen.getByLabelText("Elemento 1")).toHaveValue("Cámara 1");
+    expect(screen.getByLabelText("Elemento 2")).toHaveValue("Cámara 2");
+    expect(screen.getByLabelText("Elemento 3")).toHaveValue("Cámara 3");
+    expect(screen.getByLabelText("Elemento 4")).toHaveValue("Cámara 4");
+    expect(screen.queryByRole("button", { name: "Separar" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Elemento 3"), { target: { value: "Cámara 3 · Acceso" } });
+    expect(screen.getByLabelText("Elemento 3")).toHaveValue("Cámara 3 · Acceso");
+    await usuario.click(screen.getByRole("button", { name: /Confirmar/ }));
+    await waitFor(() => expect(extra.definirCamposEvidencia).toHaveBeenCalled());
+    const campos = extra.definirCamposEvidencia.mock.calls[0][2];
+    expect(campos.map((c: { nombre: string }) => c.nombre)).toEqual([
+      "Cámara 1",
+      "Cámara 2",
+      "Cámara 3 · Acceso",
+      "Cámara 4",
+    ]);
+  });
+
+  it("sigue creando el proyecto y la actividad al confirmar", async () => {
+    const usuario = userEvent.setup();
+    await preparar(usuario);
     await usuario.click(screen.getByRole("button", { name: /Confirmar/ }));
     await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
     expect(extra.quickCreateOperationalProject).toHaveBeenCalledWith("tok", { title: "Instalar 4 cámaras en IPADE", serviceClientId: 26 });
     expect(api.crearActividad.mock.calls[0][1]).toMatchObject({ projectId: 900, clientId: 26, coreKind: "proyecto" });
     const campos = extra.definirCamposEvidencia.mock.calls[0][2];
-    expect(campos.map((c: { nombre: string }) => c.nombre)).toEqual(["Cámara acceso", "Cámara 2", "Cámara 3", "Cámara 4"]);
+    expect(campos.map((c: { nombre: string }) => c.nombre)).toEqual(["Cámara 1", "Cámara 2", "Cámara 3", "Cámara 4"]);
     expect(campos[0].momentos).toEqual(["ANTES", "EN_PROGRESO", "DESPUES"]);
-    expect(campos[0].notas).toBe("Foto del acceso principal");
-    expect(campos[1].notas).toMatch(/montaje/);
   });
 });

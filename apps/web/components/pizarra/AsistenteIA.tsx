@@ -25,6 +25,7 @@ import { hoyISO } from "@/lib/proyecto-plan";
 import { obtenerProgramacion } from "@/lib/proyectos-api";
 import { quickCreateOperationalProject } from "@/lib/ops-operational-api";
 import { campoVacio, definirCamposEvidencia, MOMENTOS, MOMENTO_LABEL, type Momento } from "@/lib/evidencia-campos";
+import { agruparCampos, desagrupar, nombreBase, resumenGrupos } from "@/lib/evidencia-grupos";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
 import {
@@ -236,10 +237,13 @@ function Contenido({
   const revisados = useRef(new Set<string>());
   /** Lo que se está escribiendo en «+ Escribir otro cliente…», por tarjeta. */
   const [escribiendo, setEscribiendo] = useState<Record<number, string | undefined>>({});
+  /** Índices de evidencia que «Separar» dejó como renglones sueltos (por tarjeta). */
+  const [evidenciaSueltos, setEvidenciaSueltos] = useState<Record<number, number[]>>({});
   const personasOrdenadas = useMemo(() => [...personas].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")), [personas]);
   /** Lo que ya estaba escrito cuando empezó el dictado: lo dicho se agrega después. */
   const base = useRef("");
   const pensandoRef = useRef(false);
+  const confirmarRefs = useRef<Record<number, HTMLButtonElement | null>>({});
   /** Cada interpretación nueva invalida las etapas que se estaban pidiendo para la anterior. */
   const generacion = useRef(0);
   /** Proyecto del que se pidió la etapa, por tarjeta (si cambia, la respuesta vieja se ignora). */
@@ -266,6 +270,7 @@ function Contenido({
         setAbiertos({});
         setEstados({});
         setEtapas({});
+        setEvidenciaSueltos({});
       } catch (e) {
         // Lo escrito o dictado no se borra: basta volver a intentar.
         setError(`${formatApiError(e, "La IA no respondió.")} Tu instrucción sigue aquí: vuelve a tocar «Preparar actividades».`);
@@ -399,6 +404,20 @@ function Contenido({
     if (parecidosCliente.length) motivos.push(`«${pendiente}» se parece a un cliente que ya existe: elige si es el mismo.`);
     return { aj, payload, agenda, destinoEmail, motivos, pendiente, parecidosCliente, proyectoNuevo, campos: camposEfectivos(p, aj) };
   };
+
+  // Sin bloqueos: foco en Confirmar para confirmar con Enter al terminar de interpretar.
+  useEffect(() => {
+    if (!respuesta || pensando) return;
+    const idx = (respuesta.propuestas ?? []).findIndex((p, i) => {
+      if (estados[i]?.descartada || estados[i]?.creada) return false;
+      return armar(p, i).motivos.length === 0;
+    });
+    if (idx < 0) return;
+    const t = window.setTimeout(() => confirmarRefs.current[idx]?.focus(), 0);
+    return () => window.clearTimeout(t);
+    // Solo al terminar de interpretar (listoEnMs); armar usa el estado actual.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [respuesta, listoEnMs, pensando]);
 
   // Obra o proyecto sin fechas dichas: el periodo de la etapa vigente, como propone «Asignar».
   const proyectosPorTarjeta = propuestas
@@ -1028,50 +1047,112 @@ function Contenido({
                 {campos.length || aj.campos ? (
                   <Renglon
                     etiqueta="Evidencia"
-                    valor={campos.length ? `${campos.length} ${campos.length === 1 ? "elemento" : "elementos"}: ${campos.slice(0, 3).map((c) => c.nombre).join(", ")}${campos.length > 3 ? "…" : ""}` : <span className={s.vacio}>Sin campos</span>}
+                    valor={(() => {
+                      const lista = aj.campos ?? p.camposEvidencia ?? [];
+                      const grupos = agruparCampos(lista, new Set(evidenciaSueltos[i] ?? []));
+                      return grupos.length ? resumenGrupos(grupos) : <span className={s.vacio}>Sin campos</span>;
+                    })()}
                     nota="Fotos por elemento: edítalas antes de confirmar"
                     abierto={abierto("evidencia")}
                     onAlternar={() => alternar("evidencia")}
                   >
                     <div className={s.campos}>
-                      {(aj.campos ?? p.camposEvidencia ?? []).map((c, k, lista) => (
-                        <div key={k} className={s.campoElemento}>
-                          <Input
-                            aria-label={`Elemento ${k + 1}`}
-                            value={c.nombre}
-                            onChange={(e) => ajustar(i, { campos: lista.map((x, j) => (j === k ? { ...x, nombre: e.target.value } : x)) })}
-                          />
-                          <Textarea
-                            rows={2}
-                            aria-label={`Foto que se pide para ${c.nombre || "elemento"}`}
-                            value={c.notas ?? ""}
-                            onChange={(e) =>
-                              ajustar(i, {
-                                campos: lista.map((x, j) => (j === k ? { ...x, notas: e.target.value } : x)),
-                              })
-                            }
-                          />
-                          {MOMENTOS.map((m) => (
-                            <label key={m} className={s.momento}>
-                              <input
-                                type="checkbox"
-                                checked={c.momentos.includes(m)}
-                                onChange={(e) =>
-                                  ajustar(i, {
-                                    campos: lista.map((x, j) =>
-                                      j === k ? { ...x, momentos: e.target.checked ? MOMENTOS.filter((y) => y === m || x.momentos.includes(y)) : x.momentos.filter((y) => y !== m) } : x,
-                                    ),
-                                  })
-                                }
+                      {(() => {
+                        const lista = aj.campos ?? p.camposEvidencia ?? [];
+                        const sueltos = new Set(evidenciaSueltos[i] ?? []);
+                        const grupos = agruparCampos(lista, sueltos);
+                        const aplicarGrupos = (nuevos: typeof grupos, limpiarSueltos = true) => {
+                          ajustar(i, {
+                            campos: desagrupar(nuevos).map((c) => ({
+                              nombre: c.nombre,
+                              momentos: c.momentos as Momento[],
+                              notas: c.notas ?? "",
+                            })),
+                          });
+                          if (limpiarSueltos) setEvidenciaSueltos((prev) => ({ ...prev, [i]: [] }));
+                        };
+                        return grupos.map((g, gi) => (
+                          <div key={g.indices.join("-") || `g-${gi}`} className={s.campoGrupo}>
+                            {g.cantidad === 1 ? (
+                              <Input
+                                aria-label={`Elemento ${g.indices[0] + 1}`}
+                                value={g.base}
+                                onChange={(e) => {
+                                  const copia = grupos.map((x, j) => (j === gi ? { ...x, base: e.target.value } : x));
+                                  aplicarGrupos(copia, false);
+                                }}
                               />
-                              {MOMENTO_LABEL[m]}
-                            </label>
-                          ))}
-                          <Button size="sm" variant="ghost" aria-label={`Quitar ${c.nombre || "elemento"}`} onClick={() => ajustar(i, { campos: lista.filter((_, j) => j !== k) })}>
-                            Quitar
-                          </Button>
-                        </div>
-                      ))}
+                            ) : (
+                              <span className={s.grupoBase}>{g.base}</span>
+                            )}
+                            <Input
+                              type="number"
+                              min={1}
+                              max={40}
+                              className={s.cantidad}
+                              aria-label={`Cantidad de ${nombreBase(g.base) || g.base}`}
+                              value={g.cantidad}
+                              onChange={(e) => {
+                                const raw = e.target.value.trim();
+                                if (raw === "") return;
+                                const n = Math.max(1, Math.min(40, Number(raw)));
+                                if (!Number.isFinite(n)) return;
+                                const base = n > 1 ? nombreBase(g.base) || g.base : g.base;
+                                const copia = grupos.map((x, j) => (j === gi ? { ...x, base, cantidad: n } : x));
+                                aplicarGrupos(copia);
+                              }}
+                            />
+                            <Textarea
+                              rows={2}
+                              aria-label={`Foto que se pide para ${g.base}`}
+                              value={g.notas}
+                              onChange={(e) => {
+                                const copia = grupos.map((x, j) => (j === gi ? { ...x, notas: e.target.value } : x));
+                                aplicarGrupos(copia, false);
+                              }}
+                            />
+                            {MOMENTOS.map((m) => (
+                              <label key={m} className={s.momento}>
+                                <input
+                                  type="checkbox"
+                                  checked={g.momentos.includes(m)}
+                                  onChange={(e) => {
+                                    const momentos = e.target.checked
+                                      ? MOMENTOS.filter((y) => y === m || g.momentos.includes(y))
+                                      : g.momentos.filter((y) => y !== m);
+                                    const copia = grupos.map((x, j) => (j === gi ? { ...x, momentos } : x));
+                                    aplicarGrupos(copia, false);
+                                  }}
+                                />
+                                {MOMENTO_LABEL[m]}
+                              </label>
+                            ))}
+                            {g.cantidad >= 2 ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setEvidenciaSueltos((prev) => ({ ...prev, [i]: [...(prev[i] ?? []), ...g.indices] }));
+                                  if (!aj.campos) ajustar(i, { campos: lista.map((c) => ({ ...c })) });
+                                }}
+                              >
+                                Separar
+                              </Button>
+                            ) : null}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              aria-label={`Quitar ${g.base || "elemento"}`}
+                              onClick={() => {
+                                const copia = grupos.filter((_, j) => j !== gi);
+                                aplicarGrupos(copia);
+                              }}
+                            >
+                              Quitar
+                            </Button>
+                          </div>
+                        ));
+                      })()}
                       <Button
                         size="sm"
                         variant="secondary"
@@ -1192,6 +1273,9 @@ function Contenido({
                   <span />
                 )}
                 <Button
+                  ref={(el) => {
+                    confirmarRefs.current[i] = el;
+                  }}
                   variant="primary"
                   className={c.tap}
                   disabled={motivos.length > 0 || est.creando || creandoTodas}
