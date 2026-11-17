@@ -23,6 +23,10 @@ export interface CfdiLeido {
   iva: number;
   /** IEPS y otros traslados que no son IVA. */
   otrosTraslados: number;
+  /** IVA retenido (002). */
+  ivaRetenido: number;
+  /** ISR retenido (001). */
+  isrRetenido: number;
   retenciones: number;
   metodoPago: string | null;
   formaPago: string | null;
@@ -77,7 +81,7 @@ function importe(valor: string | undefined): number {
 const RFC = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
 
 export function leerCfdi(xmlCrudo: string): CfdiLeido {
-  const xml = String(xmlCrudo ?? '').replace(/^﻿/, '');
+  const xml = String(xmlCrudo ?? '').replace(/^\uFEFF/, '');
   if (!xml.trim()) throw new CfdiInvalidoError('El archivo está vacío.');
 
   const comprobante = etiqueta(xml, 'Comprobante');
@@ -103,6 +107,8 @@ export function leerCfdi(xmlCrudo: string): CfdiLeido {
   const finConceptos = xml.search(/<\/(?:[\w.-]+:)?Conceptos>/);
   let iva = 0;
   let otrosTraslados = 0;
+  let ivaRetenido = 0;
+  let isrRetenido = 0;
   let retenciones = 0;
   if (finConceptos >= 0) {
     const resto = xml.slice(finConceptos);
@@ -111,14 +117,25 @@ export function leerCfdi(xmlCrudo: string): CfdiLeido {
       retenciones = importe(impuestos.attrs['TotalImpuestosRetenidos']);
       const cierre = resto.search(/<\/(?:[\w.-]+:)?Impuestos>/);
       const bloque = resto.slice(impuestos.fin, cierre >= 0 ? cierre : undefined);
-      const re = /<(?:[\w.-]+:)?Traslado(?=[\s/>])([^>]*)>/g;
+      const reTraslado = /<(?:[\w.-]+:)?Traslado(?=[\s/>])([^>]*)>/g;
       let m: RegExpExecArray | null;
-      while ((m = re.exec(bloque))) {
+      while ((m = reTraslado.exec(bloque))) {
         const t = atributos(m[1]);
         if (t['Impuesto'] === '002') iva += importe(t['Importe']);
         else otrosTraslados += importe(t['Importe']);
       }
+      const reRetencion = /<(?:[\w.-]+:)?Retencion(?=[\s/>])([^>]*)>/g;
+      while ((m = reRetencion.exec(bloque))) {
+        const r = atributos(m[1]);
+        if (r['Impuesto'] === '002') ivaRetenido += importe(r['Importe']);
+        else if (r['Impuesto'] === '001') isrRetenido += importe(r['Importe']);
+      }
     }
+  }
+  ivaRetenido = Math.round(ivaRetenido * 100) / 100;
+  isrRetenido = Math.round(isrRetenido * 100) / 100;
+  if (!retenciones && (ivaRetenido || isrRetenido)) {
+    retenciones = Math.round((ivaRetenido + isrRetenido) * 100) / 100;
   }
 
   return {
@@ -134,6 +151,8 @@ export function leerCfdi(xmlCrudo: string): CfdiLeido {
     total: importe(c['Total']),
     iva: Math.round(iva * 100) / 100,
     otrosTraslados: Math.round(otrosTraslados * 100) / 100,
+    ivaRetenido,
+    isrRetenido,
     retenciones,
     metodoPago: c['MetodoPago'] ?? null,
     formaPago: c['FormaPago'] ?? null,

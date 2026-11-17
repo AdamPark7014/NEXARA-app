@@ -286,6 +286,8 @@ model OperationalProject {
   vendorId       Int
   /// Dueño del proyecto (a quién se le pregunta). Puede no ser quien lo vendió.
   responsableId  Int?
+  /// Quién creó el proyecto (aviso diario si queda incompleto). Fallback: vendorId.
+  createdById    Int?
   clientId       Int
   companyId      Int
   /// Inicio **planeado**. Vacío hasta que se capture: al crear basta el nombre y el cliente.
@@ -309,6 +311,7 @@ model OperationalProject {
 
   vendor              User                 @relation("ProjectVendor", fields: [vendorId], references: [id])
   responsable         User?                @relation("ProjectResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+  createdBy           User?                @relation("ProjectCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   client              ServiceClient        @relation(fields: [clientId], references: [id])
   company             CompanyProfile       @relation(fields: [companyId], references: [id], onDelete: Restrict)
   salesProject        SalesProject?        @relation("SalesOperationalHandoff", fields: [salesProjectId], references: [id], onDelete: SetNull)
@@ -324,6 +327,7 @@ model OperationalProject {
 
   @@index([vendorId])
   @@index([responsableId])
+  @@index([createdById])
   @@index([clientId])
   @@index([companyId])
   @@index([status])
@@ -617,6 +621,9 @@ model Supplier {
   isActive    Boolean @default(true)
   /// RFC del proveedor — requerido para DIOT y Contabilidad Electrónica.
   rfc         String? @db.VarChar(13)
+  /// Lista 69-B del SAT: PRESUNTO | DEFINITIVO | null.
+  lista69B              String?   @db.VarChar(20)
+  lista69BActualizadoAt DateTime?
 
   // === Condiciones de mayorista ===
   // El organigrama nombra "Compras con Mayorista" como función propia de
@@ -765,6 +772,11 @@ model User {
   planesDiariosAutor PlanDiario[] @relation("PlanesDiariosAutor")
   planesDiariosSupervisor PlanDiario[] @relation("PlanesDiariosSupervisor")
   cierresDiarios CierreDiario[] @relation("CierresDiariosSupervisor")
+  medidasDisciplinariasSujeto MedidaDisciplinaria[] @relation("MedidaDisciplinariaSujeto")
+  medidasDisciplinariasAutor  MedidaDisciplinaria[] @relation("MedidaDisciplinariaAutor")
+  cargosPorPerdidaSujeto CargoPorPerdida[] @relation("CargoPorPerdidaSujeto")
+  cargosPorPerdidaAutor  CargoPorPerdida[] @relation("CargoPorPerdidaAutor")
+  cargosPorPerdidaAprobador CargoPorPerdida[] @relation("CargoPorPerdidaAprobador")
   id                        Int                        @id @default(autoincrement())
   nombre                    String                     @db.VarChar(100)
   email                     String                     @unique @db.VarChar(150)
@@ -977,6 +989,7 @@ model User {
   // === Operational Project Relations ===
   projectsAsVendor      OperationalProject[] @relation("ProjectVendor")
   projectsAsResponsable OperationalProject[] @relation("ProjectResponsable")
+  projectsCreated       OperationalProject[] @relation("ProjectCreatedBy")
   projectEngineers      ProjectEngineer[]    @relation("ProjectEngineers")
   projectMemberships    ProjectMember[]      @relation("ProjectMembers")
   projectMilestones     ProjectMilestone[]   @relation("ProjectMilestoneResponsable")
@@ -1970,6 +1983,15 @@ model ViaticoTicket {
   facturaXmlUrl          String?   @db.VarChar(500)
   facturaPdfUrl          String?   @db.VarChar(500)
   notas                  String?   @db.VarChar(400)
+  litros                 Decimal?  @db.Decimal(10, 3)
+  precioLitro            Decimal?  @db.Decimal(10, 4)
+  combustible            String?   @db.VarChar(40)
+  folioTicket            String?   @db.VarChar(80)
+  webFacturacion         String?   @db.VarChar(500)
+  horaTicket             String?   @db.VarChar(8)
+  ivaMonto               Decimal?  @db.Decimal(10, 2)
+  /// CFDI del buzón SAT ligado a este ticket.
+  invoiceId              Int?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
   viatico                Viatico   @relation(fields: [viaticoId], references: [id], onDelete: Cascade)
@@ -1977,6 +1999,7 @@ model ViaticoTicket {
   @@index([companyId, estado, fechaLimiteFacturacion])
   @@index([viaticoId])
   @@index([usuarioId, estado])
+  @@index([invoiceId])
   @@map("viatico_tickets")
 }
 
@@ -4198,8 +4221,15 @@ model Invoice {
   /// CFDI de anticipo (SAT: «Anticipo del bien o servicio», 84111506). La factura final lo
   /// relaciona con tipo 07 y descuenta lo ya cobrado.
   esAnticipo          Boolean            @default(false)
+  ivaRetenido         Decimal?           @db.Decimal(14, 2)
+  isrRetenido         Decimal?           @db.Decimal(14, 2)
+  /// Entró por el buzón SAT automático (no por captura manual).
+  origenSat           Boolean            @default(false)
+  /// vigente | cancelado (espejo del SAT / isCancelled).
+  satEstatus          String?            @db.VarChar(20)
   /// Pagos y gastos que este CFDI (recibido) respalda.
   vinculos            MovimientoVinculo[]
+  polizaPropuesta     PolizaPropuesta?
 
   @@unique([cfdiUuid])
   @@unique([companyId, invoiceNumber])
@@ -4211,7 +4241,59 @@ model Invoice {
   @@index([matchStatus])
   @@index([activityId])
   @@index([cotizacionId])
+  @@index([origenSat, type])
   @@map("invoices")
+}
+
+/// Copia local de la lista 69-B (EFOS) del SAT.
+model SatLista69B {
+  rfc           String   @id @db.VarChar(13)
+  nombre        String?  @db.VarChar(300)
+  tipo          String   @db.VarChar(20)
+  actualizadoAt DateTime @default(now())
+
+  @@map("sat_lista_69b")
+}
+
+/// Cuenta de gasto aprendida por RFC de proveedor (corrección de la contadora).
+model ProveedorContabilizacionRegla {
+  id           Int      @id @default(autoincrement())
+  companyId    Int
+  supplierRfc  String   @db.VarChar(13)
+  cuentaCodigo String   @db.VarChar(40)
+  centroCosto  String?  @db.VarChar(80)
+  explicacion  String?  @db.VarChar(400)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([companyId, supplierRfc])
+  @@map("proveedor_contabilizacion_reglas")
+}
+
+/// Propuesta de póliza de un CFDI recibido: no entra a JournalEntry sin aceptar.
+model PolizaPropuesta {
+  id                Int       @id @default(autoincrement())
+  companyId         Int
+  invoiceId         Int       @unique
+  /// PENDIENTE | ACEPTADA | CORREGIDA | DESCARTADA
+  estado            String    @default("PENDIENTE") @db.VarChar(20)
+  /// alta | media | baja
+  confianza         String    @default("media") @db.VarChar(10)
+  explicacion       String?   @db.VarChar(500)
+  renglones         Json
+  ligas             Json?
+  cuentaGastoCodigo String?   @db.VarChar(40)
+  centroCosto       String?   @db.VarChar(80)
+  activityId        Int?
+  aceptadaPorId     Int?
+  aceptadaAt        DateTime?
+  journalEntryId    Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  invoice           Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, estado])
+  @@map("poliza_propuestas")
 }
 
 model InvoiceItem {
@@ -6214,6 +6296,8 @@ model KbArticle {
 
 model CompanyProfile {
   planesDiarios PlanDiario[]
+  medidasDisciplinarias MedidaDisciplinaria[]
+  cargosPorPerdida CargoPorPerdida[]
   cierresDiarios CierreDiario[]
   id                   Int       @id @default(autoincrement())
   slug                 String?   @unique @db.VarChar(80)
@@ -8867,6 +8951,8 @@ model PlanDiario {
   /// Día planeado (mañana laboral).
   fecha         DateTime         @db.Date
   texto         String           @db.Text
+  /// Renglones estructurados del plan (JSON validado en API). Documentado en supervision/plan-renglones.ts
+  renglonesJson Json?
   estado        EstadoPlanDiario @default(ENVIADO)
   notaSupervisor String?         @db.Text
   createdAt     DateTime         @default(now())
@@ -8994,3 +9080,83 @@ model SolicitudAprobacionRh {
   @@map("solicitudes_aprobacion_rh")
 }
 
+enum TipoMedidaDisciplinaria {
+  AMONESTACION_VERBAL
+  AMONESTACION_ESCRITA
+  ACTA_ADMINISTRATIVA
+  SUSPENSION
+}
+
+enum EstadoMedidaDisciplinaria {
+  BORRADOR
+  NOTIFICADA
+  FIRMADA
+  CERRADA
+  ANULADA
+}
+
+/// Medidas disciplinarias LFT (sin multas al trabajador: art. 107).
+model MedidaDisciplinaria {
+  id              Int                       @id @default(autoincrement())
+  companyId       Int
+  userId          Int
+  registradaPorId Int
+  tipo            TipoMedidaDisciplinaria
+  estado          EstadoMedidaDisciplinaria @default(BORRADOR)
+  hechos          String                    @db.Text
+  testigos        String?                   @db.Text
+  descargo        String?                   @db.Text
+  diasSuspension  Int?
+  avisoReglamento String?                   @db.Text
+  pdfUrl          String?                   @db.VarChar(500)
+  notas           String?                   @db.Text
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user          User           @relation("MedidaDisciplinariaSujeto", fields: [userId], references: [id], onDelete: Restrict)
+  registradaPor User           @relation("MedidaDisciplinariaAutor", fields: [registradaPorId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, userId])
+  @@index([companyId, estado])
+  @@map("medidas_disciplinarias")
+}
+
+enum EstadoCargoPorPerdida {
+  BORRADOR
+  PENDIENTE_DIRECCION
+  APROBADO
+  RECHAZADO
+  EN_COBRO
+  CERRADO
+}
+
+/// Cargo por pérdida o daño (Adam: «multa interna»). Art. 110 fr. I LFT — nunca castigo sin pérdida.
+model CargoPorPerdida {
+  id                 Int                   @id @default(autoincrement())
+  companyId          Int
+  userId             Int
+  registradaPorId    Int
+  aprobadoPorId      Int?
+  actividadId        Int?
+  incidenciaId       Int?
+  montoTotal         Decimal               @db.Decimal(12, 2)
+  hechos             String                @db.Text
+  evidenciaUrl       String?               @db.VarChar(500)
+  descargo           String?               @db.Text
+  conformidadPdfUrl  String?               @db.VarChar(500)
+  estado             EstadoCargoPorPerdida @default(BORRADOR)
+  planCuotasJson     Json?
+  motivoRechazo      String?               @db.Text
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user          User           @relation("CargoPorPerdidaSujeto", fields: [userId], references: [id], onDelete: Restrict)
+  registradaPor User           @relation("CargoPorPerdidaAutor", fields: [registradaPorId], references: [id], onDelete: Restrict)
+  aprobadoPor   User?          @relation("CargoPorPerdidaAprobador", fields: [aprobadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, userId])
+  @@index([companyId, estado])
+  @@map("cargos_por_perdida")
+}

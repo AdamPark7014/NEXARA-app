@@ -1,5 +1,13 @@
 # RELEVO
 
+- **17-11 ~20:45 México (cursor) — Contadora ola 1 (puntos 1–5). NO desplegar: espera OK de Adam.**
+  - Buzón SAT (src/accounting/buzon-sat/): cron 06:00 MX (BUZON_SAT_AUTO), ingest idempotente por UUID, 69-B, UI /erp/contabilidad/buzon-sat.
+  - Pólizas IA + bandeja /erp/contabilidad/por-contabilizar (aceptar/corregir/aprender por RFC); nada a JournalEntry sin clic.
+  - «Armar con IA» en Facturas y Por facturar (POST …/armar-factura); tickets viáticos con más campos + portal gasolinera + liga CFDI.
+  - Presets de fecha + Excel (contabilidad-fechas, contabilidad-excel, RangoFechasContabilidad).
+  - Migración 20261117060000_contadora_ola1. Pruebas unitarias buzón/cfdi/póliza/fechas en verde.
+  - Nota: schema.prisma dirty compartía modelos de otro hilo (medidas/cargos); van en este commit porque Prisma es un solo archivo.
+  - No tocado: projects/supervision/hr medidas ni otros sucios ajenos.
 - **17-11 ~20:20 México (claude-code, código de Cursor) — Clientes sin relleno ni «A quien corresponda». Sin desplegar.**
   - `esNombreDeRelleno` rechaza AQC/variantes en altas nuevas; mensaje pide «Administración de <empresa>».
     Reutilizar el cliente histórico A QUIEN CORRESPONDA sigue si ya existe.
@@ -214,3 +222,4 @@
 
 
 _Turnos anteriores recortados el 2026-11-14 (limpieza de documentación). Historial completo: `git log -p -- .ai/RELEVO.md`._
+
