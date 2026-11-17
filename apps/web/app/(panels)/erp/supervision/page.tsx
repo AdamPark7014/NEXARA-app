@@ -1,23 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import Link from "next/link";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
+import ExcelExportadorDinamico from "@/components/excel/ExcelExportadorDinamico";
+import BuscadorCliente from "@/components/supervision/BuscadorCliente";
+import BuscadorProyecto from "@/components/supervision/BuscadorProyecto";
 import {
   devolverPlan,
   entregarCierre,
   enviarPlan,
   fetchCierre,
+  fetchEquipoSupervision,
   fetchPlanes,
   hoyLocal,
   mananaLocal,
   marcarProgramado,
+  nuevoRenglonLocal,
+  programarRenglon,
+  programarTodo,
+  renglonesDesdeTextoLibreLocal,
   type CierreResponse,
+  type PlanRenglon,
   type PlanesResponse,
   type PersonaCierre,
 } from "@/lib/supervision-api";
-
 import styles from "./supervision.module.css";
 
 type Tab = "plan" | "cierre";
@@ -41,10 +49,14 @@ const btnPrimary: CSSProperties = {
 };
 
 export default function SupervisionPage() {
-  const { token } = useUser();
-  const [tab, setTab] = useState<Tab>("plan");
+  const { token, user } = useUser();
+  const roleKey = String((user as { roleKey?: string } | null)?.roleKey ?? "");
+  const esDireccion = roleKey === "ceo";
+  const [tab, setTab] = useState<Tab>(esDireccion ? "cierre" : "plan");
   const [fechaPlan, setFechaPlan] = useState(mananaLocal);
-  const [texto, setTexto] = useState("");
+  const [renglones, setRenglones] = useState<PlanRenglon[]>([nuevoRenglonLocal()]);
+  const [pegar, setPegar] = useState("");
+  const [equipo, setEquipo] = useState<Array<{ id: number; nombre: string }>>([]);
   const [planes, setPlanes] = useState<PlanesResponse | null>(null);
   const [fechaCierre, setFechaCierre] = useState(hoyLocal);
   const [cierre, setCierre] = useState<CierreResponse | null>(null);
@@ -54,6 +66,11 @@ export default function SupervisionPage() {
   const requestId = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [expandido, setExpandido] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    if (esDireccion) setTab("cierre");
+  }, [esDireccion]);
 
   const cargarPlan = useCallback(async () => {
     if (!token) return;
@@ -61,8 +78,14 @@ export default function SupervisionPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchPlanes(token, fechaPlan);
-      if (request === requestId.current) setPlanes(data);
+      const [data, eq] = await Promise.all([
+        fetchPlanes(token, fechaPlan),
+        fetchEquipoSupervision(token).catch(() => ({ equipo: [] })),
+      ]);
+      if (request === requestId.current) {
+        setPlanes(data);
+        setEquipo(eq.equipo ?? []);
+      }
     } catch (e) {
       if (request === requestId.current) setError(formatApiError(e, "No se pudieron cargar los planes."));
     } finally {
@@ -90,27 +113,48 @@ export default function SupervisionPage() {
     else void cargarCierre();
   }, [tab, cargarPlan, cargarCierre]);
 
-  const actuar = async (action: () => Promise<unknown>, success?: string) => {
-    if (busy) return;
-    setBusy(true); setError(null); setOk(null);
-    try { await action(); if (success) setOk(success); }
-    catch (e) { setError(formatApiError(e)); }
-    finally { setBusy(false); }
+  const actualizarRenglon = (id: string, patch: Partial<PlanRenglon>) => {
+    setRenglones((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   };
 
   const onEnviar = async () => {
     if (!token) return;
     setError(null);
     setOk(null);
+    setBusy(true);
     try {
-      await enviarPlan(token, { fecha: fechaPlan, texto });
-      setTexto("");
-      setOk("Plan enviado.");
+      await enviarPlan(token, { fecha: fechaPlan, renglones });
+      setOk("Plan estructurado enviado.");
+      setRenglones([nuevoRenglonLocal()]);
       await cargarPlan();
     } catch (e) {
       setError(formatApiError(e, "No se pudo enviar el plan."));
+    } finally {
+      setBusy(false);
     }
   };
+
+  const vacioPlan = !loading && !error && planes && planes.planes.length === 0;
+  const ind = planes?.indicadores;
+
+  const filasExcel = useMemo(() => {
+    if (!planes) return [];
+    return planes.planes.flatMap((p) =>
+      (p.renglones?.length ? p.renglones : [{ id: "t", actividad: p.texto, personaNombre: p.autor?.nombre ?? "", como: "", porque: "", clienteNombre: "", proyectoNombre: "", horarioEstimado: "", prioridad: "media", actividadCreadaId: null, personaId: null, clienteId: null, proyectoId: null, actividadId: null }]).map((r) => ({
+        fecha: planes.fecha,
+        coordinador: p.autor?.nombre ?? "",
+        estado: p.estado,
+        persona: r.personaNombre,
+        actividad: r.actividad,
+        como: r.como,
+        porque: r.porque,
+        cliente: r.clienteNombre,
+        proyecto: r.proyectoNombre,
+        horario: r.horarioEstimado,
+        prioridad: r.prioridad,
+      })),
+    );
+  }, [planes]);
 
   return (
     <main
@@ -118,127 +162,317 @@ export default function SupervisionPage() {
         padding: 16,
         minWidth: 0,
         overflowWrap: "anywhere",
-        maxWidth: 1100,
+        maxWidth: 1200,
         margin: "0 auto",
         color: "var(--ui-fg)",
         background: "var(--ui-bg)",
       }}
     >
-      <h1 style={{ fontSize: 28, margin: "0 0 12px" }}>Supervisión</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div>
+          <h1 style={{ fontSize: 28, margin: "0 0 4px" }}>Supervisión</h1>
+          <p style={{ margin: 0, color: "var(--ui-fg-2)", fontSize: 14 }}>
+            Plan de mañana por renglones y cierre del día con KPIs — menos movimientos, más información.
+          </p>
+        </div>
+        {filasExcel.length ? (
+          <ExcelExportadorDinamico
+            preferenciaKey="nx-excel-cols-supervision"
+            titulo="Supervisión — planes"
+            filename={`supervision-planes-${fechaPlan}`}
+            rows={filasExcel}
+            getFecha={(r) => r.fecha}
+            generadoPor={(user as { nombre?: string } | null)?.nombre}
+            columns={[
+              { key: "fecha", label: "Fecha" },
+              { key: "coordinador", label: "Coordinador" },
+              { key: "persona", label: "Persona" },
+              { key: "actividad", label: "Actividad" },
+              { key: "cliente", label: "Cliente" },
+              { key: "proyecto", label: "Proyecto" },
+              { key: "horario", label: "Horario" },
+              { key: "prioridad", label: "Prioridad" },
+              { key: "estado", label: "Estado" },
+            ]}
+          />
+        ) : null}
+      </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, margin: "16px 0", flexWrap: "wrap" }}>
         <button type="button" style={tab === "plan" ? btnPrimary : btn} onClick={() => { requestId.current++; setError(null); setOk(null); setTab("plan"); }}>
           Plan de mañana
         </button>
         <button type="button" style={tab === "cierre" ? btnPrimary : btn} onClick={() => { requestId.current++; setError(null); setOk(null); setTab("cierre"); }}>
-          Cierre del día
+          {esDireccion ? "Cierres recibidos" : "Cierre del día"}
         </button>
       </div>
 
-      {error ? (
-        <p role="alert" style={{ color: "var(--ui-danger, #b42318)", marginBottom: 12 }}>
-          {error}
-        </p>
-      ) : null}
-      {ok ? (
-        <p style={{ color: "var(--ui-success, #067647)", marginBottom: 12 }}>
-          {ok}
-        </p>
-      ) : null}
+      {error ? <p role="alert" style={{ color: "var(--ui-danger, #b42318)" }}>{error}</p> : null}
+      {ok ? <p style={{ color: "var(--ui-success, #067647)" }}>{ok}</p> : null}
+
       <label style={{ display: "grid", gap: 4, marginBottom: 16, maxWidth: 220 }}>
         Fecha
-        <input type="date" value={tab === "plan" ? fechaPlan : fechaCierre} style={{ minHeight: 44, fontSize: 16, padding: 8, width: "100%", boxSizing: "border-box" }}
-          onChange={(e) => { if (tab === "plan") setFechaPlan(e.target.value); else setFechaCierre(e.target.value); }} />
+        <input
+          type="date"
+          value={tab === "plan" ? fechaPlan : fechaCierre}
+          style={{ minHeight: 44, fontSize: 16, padding: 8, width: "100%", boxSizing: "border-box" }}
+          onChange={(e) => {
+            if (tab === "plan") setFechaPlan(e.target.value);
+            else setFechaCierre(e.target.value);
+          }}
+        />
       </label>
+
       {loading ? <p role="status">Cargando…</p> : null}
 
       {tab === "plan" && !loading && !error ? (
         <section>
-          {planes?.puedeEnviar !== false ? <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
-            <label style={{ display: "grid", gap: 4 }}>
-              Qué hará tu gente
-              <textarea
-                value={texto}
-                onChange={(e) => setTexto(e.target.value)}
-                rows={4}
-                style={{ fontSize: 16, padding: 10, resize: "vertical" }}
-                placeholder="Describe el plan de mañana de tu equipo"
-              />
-            </label>
-            <button type="button" style={btnPrimary} disabled={busy || texto.trim().length < 3} onClick={() => void actuar(onEnviar)}>
-              Enviar plan
-            </button>
-          </div> : <p>Consulta los planes recibidos y el cierre que corresponde a tu rol.</p>}
+          {planes?.puedeEnviar !== false ? (
+            <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
+              <label style={{ display: "grid", gap: 4 }}>
+                Pegar texto libre (se parte en renglones)
+                <textarea
+                  value={pegar}
+                  onChange={(e) => setPegar(e.target.value)}
+                  rows={3}
+                  placeholder={"Ana: Instalar 4 cámaras en IPADE\nLuis - Revisar NVR cliente X"}
+                  style={{ fontSize: 16, padding: 10 }}
+                />
+              </label>
+              <button
+                type="button"
+                style={btn}
+                onClick={() => {
+                  const rows = renglonesDesdeTextoLibreLocal(pegar);
+                  if (rows.length) setRenglones(rows);
+                }}
+              >
+                Separar en renglones
+              </button>
+
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                  <thead>
+                    <tr style={{ textAlign: "left", borderBottom: "1px solid var(--ui-border)" }}>
+                      {["Persona", "Qué (actividad)", "Cómo / alcance", "Por qué", "Horario", "Cliente", "Proyecto", "Prioridad", ""].map((h) => (
+                        <th key={h} style={{ padding: "8px 6px", position: "sticky", top: 0, background: "var(--ui-bg)" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {renglones.map((r) => (
+                      <tr key={r.id} style={{ borderBottom: "1px solid var(--ui-border)" }}>
+                        <td style={{ padding: 6 }}>
+                          <select
+                            value={r.personaId ?? ""}
+                            onChange={(e) => {
+                              const id = e.target.value ? Number(e.target.value) : null;
+                              const nom = equipo.find((x) => x.id === id)?.nombre ?? "";
+                              actualizarRenglon(r.id, { personaId: id, personaNombre: nom });
+                            }}
+                            style={{ minHeight: 40, fontSize: 16, width: "100%" }}
+                          >
+                            <option value="">—</option>
+                            {equipo.map((p) => (
+                              <option key={p.id} value={p.id}>{p.nombre}</option>
+                            ))}
+                          </select>
+                        </td>
+                        {([
+                          ["actividad", "actividad"],
+                          ["como", "cómo"],
+                          ["porque", "por qué"],
+                          ["horarioEstimado", "09:00"],
+                        ] as const).map(([key, ph]) => (
+                          <td key={key} style={{ padding: 6 }}>
+                            <input
+                              value={String(r[key] ?? "")}
+                              placeholder={ph}
+                              onChange={(e) => actualizarRenglon(r.id, { [key]: e.target.value } as Partial<PlanRenglon>)}
+                              style={{ minHeight: 40, fontSize: 16, width: "100%", boxSizing: "border-box" }}
+                            />
+                          </td>
+                        ))}
+                        <td style={{ padding: 6 }}>
+                          {token ? (
+                            <BuscadorCliente
+                              token={token}
+                              valueId={r.clienteId}
+                              valueNombre={r.clienteNombre}
+                              onPick={(id, nombre) => actualizarRenglon(r.id, { clienteId: id, clienteNombre: nombre })}
+                            />
+                          ) : null}
+                        </td>
+                        <td style={{ padding: 6 }}>
+                          {token ? (
+                            <BuscadorProyecto
+                              token={token}
+                              valueId={r.proyectoId}
+                              valueNombre={r.proyectoNombre}
+                              onPick={(id, nombre) => actualizarRenglon(r.id, { proyectoId: id, proyectoNombre: nombre })}
+                            />
+                          ) : null}
+                        </td>
+                        <td style={{ padding: 6 }}>
+                          <select
+                            value={r.prioridad}
+                            onChange={(e) => actualizarRenglon(r.id, { prioridad: e.target.value as PlanRenglon["prioridad"] })}
+                            style={{ minHeight: 40, fontSize: 16 }}
+                          >
+                            <option value="alta">Alta</option>
+                            <option value="media">Media</option>
+                            <option value="baja">Baja</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: 6 }}>
+                          <button type="button" style={btn} aria-label="Quitar renglón" onClick={() => setRenglones((prev) => prev.filter((x) => x.id !== r.id))}>
+                            Quitar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" style={btn} onClick={() => setRenglones((prev) => [...prev, nuevoRenglonLocal()])}>
+                  Agregar renglón
+                </button>
+                <button
+                  type="button"
+                  style={btnPrimary}
+                  disabled={busy || !renglones.some((r) => r.actividad.trim().length >= 3)}
+                  onClick={() => void onEnviar()}
+                >
+                  Enviar plan
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p>Consulta los planes recibidos y el cierre que corresponde a tu rol.</p>
+          )}
 
           {planes?.rol === "supervisor" ? (
             <>
-              <div style={{ marginBottom: 12 }}>
-                <Link
-                  href="/erp/pizarra"
-                  style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", textDecoration: "none" }}
-                >
-                  Programar actividades
-                </Link>
-              </div>
-              {planes.faltantes.length ? (
+              {ind ? (
+                <div className={styles.totales} style={{ marginBottom: 16 }}>
+                  {[
+                    ["Planes recibidos", ind.planesRecibidos],
+                    ["Faltantes", planes.faltantes.length],
+                    ["Actividades en plan", ind.actividadesProgramadas],
+                    ["Personas sin asignación", ind.personasSinAsignacion],
+                    ["Conflictos de horario", ind.conflictosHorario.length],
+                  ].map(([label, val]) => (
+                    <div key={String(label)}>
+                      <dt>{label}</dt>
+                      <dd>{val}</dd>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {vacioPlan ? (
+                <div style={{ border: "1px dashed var(--ui-border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                  <h2 style={{ fontSize: 18, marginTop: 0 }}>Aún no hay planes para esta fecha</h2>
+                  <p style={{ color: "var(--ui-fg-2)" }}>
+                    Quienes deben mandar el plan hoy (o para la fecha elegida) aparecen abajo. Pídeles un plan por renglones: persona, qué, cómo, por qué, cliente/proyecto y horario.
+                  </p>
+                  {planes.faltantes.length ? (
+                    <ul>
+                      {planes.faltantes.map((f) => (
+                        <li key={f.id}>{f.nombre} · {f.email}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No hay coordinadores esperados configurados para tu árbol.</p>
+                  )}
+                </div>
+              ) : null}
+
+              {planes.faltantes.length && !vacioPlan ? (
                 <div style={{ marginBottom: 16 }}>
                   <h2 style={{ fontSize: 18 }}>Faltan por mandar</h2>
-                  <ul>
-                    {planes.faltantes.map((f) => (
-                      <li key={f.id}>{f.nombre}</li>
-                    ))}
-                  </ul>
+                  <ul>{planes.faltantes.map((f) => <li key={f.id}>{f.nombre}</li>)}</ul>
                 </div>
-              ) : (
-                <p style={{ opacity: 0.7 }}>Todos los coordinadores ya mandaron su plan.</p>
-              )}
+              ) : null}
+
               <div style={{ display: "grid", gap: 12 }}>
-                {planes.planes.length === 0 ? (
-                  <p>Aún no hay planes para esta fecha.</p>
-                ) : (
-                  planes.planes.map((p) => (
-                    <article
-                      key={p.id}
-                      style={{
-                        border: "1px solid var(--ui-border)",
-                        borderRadius: 12,
-                        padding: 14,
-                        background: "var(--ui-elev-1)",
-                      }}
-                    >
+                {planes.planes.map((p) => (
+                  <article key={p.id} style={{ border: "1px solid var(--ui-border)", borderRadius: 12, padding: 14, background: "var(--ui-elev-1)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                       <strong>{p.autor?.nombre ?? "Coordinador"}</strong>
-                      <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 8 }}>{p.estado}</div>
+                      <span style={{ fontSize: 13, opacity: 0.75 }}>{p.estado}</span>
+                    </div>
+                    {(p.renglones?.length ? p.renglones : []).length === 0 ? (
                       <p style={{ whiteSpace: "pre-wrap" }}>{p.texto}</p>
-                      {p.notaSupervisor ? <p style={{ fontSize: 13 }}>Nota: {p.notaSupervisor}</p> : null}
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-                        <button
-                          type="button"
-                          style={btn}
-                          onClick={() =>
-                            void marcarProgramado(token!, p.id)
-                              .then(cargarPlan)
-                              .catch((e) => setError(formatApiError(e)))
-                          }
-                        >
-                          Programado
-                        </button>
-                        <button
-                          type="button"
-                          style={btn}
-                          onClick={() => {
-                            const nota = window.prompt("Nota para devolver el plan (opcional)");
-                            if (nota === null) return;
-                            void devolverPlan(token!, p.id, nota || undefined)
-                              .then(cargarPlan)
-                              .catch((e) => setError(formatApiError(e)));
-                          }}
-                        >
-                          Devolver
-                        </button>
+                    ) : (
+                      <div style={{ overflowX: "auto", marginTop: 8 }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                          <thead>
+                            <tr style={{ textAlign: "left" }}>
+                              {["Persona", "Qué", "Cómo", "Por qué", "Cliente", "Proyecto", "Horario", ""].map((h) => (
+                                <th key={h} style={{ padding: "4px 6px" }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {p.renglones!.map((r) => (
+                              <tr key={r.id} style={{ borderTop: "1px solid var(--ui-border)" }}>
+                                <td style={{ padding: 6 }}>{r.personaNombre || "—"}</td>
+                                <td style={{ padding: 6 }}>{r.actividad}</td>
+                                <td style={{ padding: 6 }}>{r.como || "—"}</td>
+                                <td style={{ padding: 6 }}>{r.porque || "—"}</td>
+                                <td style={{ padding: 6 }}>{r.clienteNombre || "—"}</td>
+                                <td style={{ padding: 6 }}>{r.proyectoNombre || "—"}</td>
+                                <td style={{ padding: 6 }}>{r.horarioEstimado || "—"}</td>
+                                <td style={{ padding: 6 }}>
+                                  {r.actividadCreadaId ? (
+                                    <Link href={`/erp/actividades/${r.actividadCreadaId}`}>Actividad #{r.actividadCreadaId}</Link>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      style={btnPrimary}
+                                      disabled={busy}
+                                      onClick={() =>
+                                        void programarRenglon(token!, p.id, r.id)
+                                          .then(() => { setOk("Actividad creada."); return cargarPlan(); })
+                                          .catch((e) => setError(formatApiError(e)))
+                                      }
+                                    >
+                                      Programar
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    </article>
-                  ))
-                )}
+                    )}
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                      <button type="button" style={btn} onClick={() => void programarTodo(token!, p.id).then(cargarPlan).catch((e) => setError(formatApiError(e)))}>
+                        Programar todo
+                      </button>
+                      <button type="button" style={btn} onClick={() => void marcarProgramado(token!, p.id).then(cargarPlan).catch((e) => setError(formatApiError(e)))}>
+                        Marcar plan programado
+                      </button>
+                      <button
+                        type="button"
+                        style={btn}
+                        onClick={() => {
+                          const nota = window.prompt("Nota para devolver el plan (opcional)");
+                          if (nota === null) return;
+                          void devolverPlan(token!, p.id, nota || undefined).then(cargarPlan).catch((e) => setError(formatApiError(e)));
+                        }}
+                      >
+                        Devolver
+                      </button>
+                      <Link href="/erp/pizarra" style={{ ...btn, display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
+                        Ir a pizarra
+                      </Link>
+                    </div>
+                  </article>
+                ))}
               </div>
             </>
           ) : null}
@@ -247,23 +481,14 @@ export default function SupervisionPage() {
             <div>
               <h2 style={{ fontSize: 18 }}>Tu historial</h2>
               {planes.planes.length === 0 ? (
-                <p>Todavía no has mandado plan para esta fecha.</p>
+                <p>Todavía no has mandado plan para esta fecha. Usa la tabla de renglones arriba.</p>
               ) : (
                 <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 10 }}>
                   {planes.planes.map((p) => (
-                    <li
-                      key={p.id}
-                      style={{
-                        border: "1px solid var(--ui-border)",
-                        borderRadius: 12,
-                        padding: 12,
-                      }}
-                    >
+                    <li key={p.id} style={{ border: "1px solid var(--ui-border)", borderRadius: 12, padding: 12 }}>
                       <div style={{ fontSize: 13, opacity: 0.7 }}>{p.estado}</div>
                       <p style={{ whiteSpace: "pre-wrap" }}>{p.texto}</p>
-                      {p.notaSupervisor ? (
-                        <p style={{ fontSize: 13 }}>Nota del supervisor: {p.notaSupervisor}</p>
-                      ) : null}
+                      {p.notaSupervisor ? <p style={{ fontSize: 13 }}>Nota del supervisor: {p.notaSupervisor}</p> : null}
                     </li>
                   ))}
                 </ul>
@@ -275,59 +500,52 @@ export default function SupervisionPage() {
 
       {tab === "cierre" && !loading && !error && cierre ? (
         <section>
-
           {cierre.rol === "direccion" ? (
             cierre.cierres.length === 0 ? (
-              <p>No hay cierres entregados para esta fecha.</p>
+              <div style={{ border: "1px dashed var(--ui-border)", borderRadius: 12, padding: 16 }}>
+                <h2 style={{ fontSize: 18, marginTop: 0 }}>Sin cierres recibidos</h2>
+                <p>Cuando el supervisor general entregue el cierre del día, aparecerá aquí con KPIs y detalle por persona.</p>
+              </div>
             ) : (
               <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 10 }}>
                 {cierre.cierres.map((c) => (
-                  <li
-                    key={c.id}
-                    style={{ border: "1px solid var(--ui-border)", borderRadius: 12, padding: 12 }}
-                  >
+                  <li key={c.id} style={{ border: "1px solid var(--ui-border)", borderRadius: 12, padding: 12 }}>
                     <strong>{c.supervisor?.nombre ?? "Supervisor"}</strong>
                     <p>{c.comentario || "Sin comentario"}</p>
-                    {c.resumenJson ? <Resumen personas={c.resumenJson.personas} totales={c.resumenJson.totales} /> : <p>Este cierre no tiene resumen guardado.</p>}
+                    {c.resumenJson ? <Resumen personas={c.resumenJson.personas} totales={c.resumenJson.totales} expandido={expandido} setExpandido={setExpandido} /> : <p>Este cierre no tiene resumen guardado.</p>}
                   </li>
                 ))}
               </ul>
             )
           ) : (
             <>
-              <Resumen personas={cierre.personas} totales={cierre.totales} />
-
+              {cierre.planVsReal ? (
+                <p style={{ fontSize: 14 }}>
+                  Plan vs real: {cierre.planVsReal.cumplidos}/{cierre.planVsReal.planificados} cumplidos ·{" "}
+                  {cierre.planVsReal.sinProgramar} sin programar · {cierre.planVsReal.conActividad} con actividad creada
+                </p>
+              ) : null}
+              <Resumen personas={cierre.personas} totales={cierre.totales} expandido={expandido} setExpandido={setExpandido} />
               {cierre.puedeEntregar ? (
                 <div style={{ display: "grid", gap: 10, maxWidth: 640 }}>
                   <label style={{ display: "grid", gap: 4 }}>
                     Comentario para dirección
-                    <textarea
-                      value={comentario}
-                      onChange={(e) => setComentario(e.target.value)}
-                      rows={3}
-                      style={{ fontSize: 16, padding: 10 }}
-                    />
+                    <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={3} style={{ fontSize: 16, padding: 10 }} />
                   </label>
                   <button
                     type="button"
                     style={btnPrimary}
                     onClick={() =>
-                      void actuar(() => entregarCierre(token!, { fecha: fechaCierre, comentario })
-                        .then(() => {
-                          setOk("Cierre entregado a dirección.");
-                          return cargarCierre();
-                        })
-                        .catch((e) => { throw e; }))
+                      void entregarCierre(token!, { fecha: fechaCierre, comentario })
+                        .then(() => { setOk("Cierre entregado a dirección."); return cargarCierre(); })
+                        .catch((e) => setError(formatApiError(e)))
                     }
                   >
                     Entregar a dirección
                   </button>
                 </div>
               ) : (
-                <p>
-                  Ya entregaste el cierre de este día
-                  {cierre.cierre?.comentario ? `: ${cierre.cierre.comentario}` : "."}
-                </p>
+                <p>Ya entregaste el cierre de este día{cierre.cierre?.comentario ? `: ${cierre.cierre.comentario}` : "."}</p>
               )}
             </>
           )}
@@ -338,18 +556,83 @@ export default function SupervisionPage() {
 }
 
 const columnas = [
-  ['programadas', 'Programadas'], ['terminadas', 'Terminadas'], ['en_revision', 'En revisión'],
-  ['no_cumplidas', 'No cumplidas'], ['sin_empezar', 'Sin empezar'], ['en_curso', 'En curso'],
+  ["programadas", "Programadas"],
+  ["terminadas", "Cumplidas"],
+  ["en_revision", "En revisión"],
+  ["no_cumplidas", "No cumplidas"],
+  ["sin_empezar", "Sin empezar"],
+  ["en_curso", "En curso"],
 ] as const;
-function Resumen({ personas, totales }: { personas: PersonaCierre[]; totales: Record<string, number> }) {
-  return <>
-    <dl className={styles.totales}>{[...columnas, ['checadas', 'Checadas'], ['retardos', 'Retardos'], ['faltas', 'Faltas']].map(([key, label]) =>
-      <div key={key}><dt>{label}</dt><dd>{totales[key] ?? 0}</dd></div>)}</dl>
-    {!personas.length ? <p>No hay personas en este equipo para la fecha elegida.</p> :
-      <div className={styles.personas}>{personas.map((p) => <article key={p.userId}>
-        <h3>{p.nombre}</h3>
-        <dl>{columnas.map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{p[key]}</dd></div>)}</dl>
-        <p>Checó: {p.checo ? 'Sí' : 'No'} · Retardo: {p.retardo ? p.minutosTarde + ' min' : '—'} · Falta: {p.falta ? 'Sí' : '—'}</p>
-      </article>)}</div>}
-  </>;
+
+function Resumen({
+  personas,
+  totales,
+  expandido,
+  setExpandido,
+}: {
+  personas: PersonaCierre[];
+  totales: Record<string, number>;
+  expandido: Record<number, boolean>;
+  setExpandido: Dispatch<SetStateAction<Record<number, boolean>>>;
+}) {
+  return (
+    <>
+      <dl className={styles.totales}>
+        {[...columnas, ["checadas", "Asistencia"], ["retardos", "Retardos"], ["faltas", "Faltas"]].map(([key, label]) => (
+          <div key={key}>
+            <dt>{label}</dt>
+            <dd>{totales[key] ?? 0}</dd>
+          </div>
+        ))}
+      </dl>
+      {!personas.length ? (
+        <p>No hay personas en este equipo para la fecha elegida.</p>
+      ) : (
+        <div className={styles.personas}>
+          {personas.map((p) => (
+            <article key={p.userId}>
+              <button
+                type="button"
+                onClick={() => setExpandido((prev) => ({ ...prev, [p.userId]: !prev[p.userId] }))}
+                style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }}
+              >
+                <h3 style={{ margin: "0 0 6px" }}>{p.nombre}</h3>
+              </button>
+              <dl>
+                {columnas.map(([key, label]) => (
+                  <div key={key}>
+                    <dt>{label}</dt>
+                    <dd>{p[key]}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p>
+                Checó: {p.checo ? "Sí" : "No"} · Retardo: {p.retardo ? `${p.minutosTarde} min` : "—"} · Falta: {p.falta ? "Sí" : "—"}
+              </p>
+              {expandido[p.userId] ? (
+                <div style={{ fontSize: 13, color: "var(--ui-fg-2)" }}>
+                  <p style={{ margin: "0 0 6px" }}>
+                    Detalle expandido · <Link href={`/erp/hr/${p.userId}`}>Ver ficha</Link>
+                    {" · "}
+                    <Link href="/erp/pizarra">Pizarra</Link>
+                  </p>
+                  {(p.actividades ?? []).length ? (
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {p.actividades!.map((a) => (
+                        <li key={a.id}>
+                          <Link href={`/erp/actividades/${a.id}`}>{a.titulo}</Link> · {a.bucket} · {a.estatus}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p style={{ margin: 0 }}>Sin actividades del día.</p>
+                  )}
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      )}
+    </>
+  );
 }

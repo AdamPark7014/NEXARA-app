@@ -1,5 +1,15 @@
 # RELEVO
 
+- **17-11 ~09:00 México (claude-code; código de Cursor, sin pasada de Codex aún) — Encargo 06: Supervisión por renglones, medidas disciplinarias y cargo por pérdida, Excel por rangos, scroll del menú, mockup corporativo.**
+  - Sube las migraciones `20261117194500_plan_renglones_medidas` y `20261117203000_cargos_por_perdida` cuyos modelos ya
+    estaban en `schema.prisma` desde ac5afdbf4 (los arrastró el commit de contabilidad).
+  - `src/supervision/plan-renglones.ts` (renglones con cliente/proyecto, pegar texto, programar uno/todo); `src/hr/
+    medidas-disciplinarias` (sin multas, art. 107/423 LFT) y `src/hr/cargos-perdida` (art. 110 fr. I, cuotas a
+    prenómina); web `/erp/hr/medidas`, `/erp/hr/cargos-perdida`, `components/excel/ExcelExportadorDinamico`,
+    `lib/excel-rangos.ts`; `AppShell` con scroll propio del menú; `public/mockups/corporativo-2026-11/` (solo mockup).
+  - Fallos ajenos al cerrar: `role-modules.spec` (vendedor, contabilidad, `/erp/almacen`) y `tsc` api en `warehouse`
+    (StockMovementType readonly) vienen de cambios sin commitear de otra sesión (almacén/proyectos).
+
 - **17-11 ~22:00 México (cursor) — Contadora ampliación E2–E4. NO desplegar: espera OK de Adam.**
   - E2: tabla `SatCfdi` (+ migración `20261117210000_contadora_e2_e4`); ingest escribe SatCfdi además de Invoice;
     job diario vía BullMQ (`buzon-sat.diario`) + `runScheduledJob`; UI Buzón en `/erp/contabilidad/cfdi`;

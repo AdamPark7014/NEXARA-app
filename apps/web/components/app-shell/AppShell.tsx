@@ -198,6 +198,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const switcherRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLElement>(null);
+  const SIDEBAR_SCROLL_KEY = "nx-shell-menu-scroll-v1";
 
   useEffect(() => {
     if (paletteOpen) setPaletteMounted(true);
@@ -584,6 +585,14 @@ export default function AppShell({ panel, children }: AppShellProps) {
 
   // Al entrar a un módulo que está al fondo del menú, el renglón activo queda a la vista.
   useEffect(() => {
+    const el = menuRef.current;
+    if (el) {
+      try {
+        const raw = window.sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
+        const y = raw != null ? Number(raw) : NaN;
+        if (Number.isFinite(y) && y > 0) el.scrollTop = y;
+      } catch { /* sin storage */ }
+    }
     const active = menuRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
     active?.scrollIntoView({ block: "nearest" });
   }, [activeMenuTarget]);
@@ -954,7 +963,12 @@ export default function AppShell({ panel, children }: AppShellProps) {
           </button>
         </div>
 
-        <nav ref={menuRef} className={styles.menu} aria-label="Menú principal" onScroll={hideRailTip}>
+        <nav ref={menuRef} className={styles.menu} aria-label="Menú principal" onScroll={(e) => {
+            hideRailTip();
+            try {
+              window.sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(e.currentTarget.scrollTop));
+            } catch { /* sin storage */ }
+          }}>
           {navGroups.length === 0 ? (
             <p className={styles.menuEmpty}>Sin módulos disponibles para tu rol.</p>
           ) : (

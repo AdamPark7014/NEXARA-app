@@ -16,8 +16,9 @@ import {
   type TicketViatico,
 } from "@/lib/gestion-viaticos-api";
 import styles from "./gestion-viaticos.module.css";
+import ExcelExportadorDinamico from "@/components/excel/ExcelExportadorDinamico";
 
-type Vista = "bandeja" | "tickets" | "por-facturar";
+type Vista = "bandeja" | "tickets" | "por-facturar" | "asignar";
 
 const ETIQUETA: Record<string, string> = {
   ticket_hoy: "Vence hoy",
@@ -114,7 +115,43 @@ export default function GestionViaticosPage() {
 
   return (
     <main className={styles.page}>
+      <p style={{ marginBottom: 8 }}>
+        <a href="/erp/finance/viatics" style={{ fontWeight: 600 }}>
+          Asignar anticipo / lote →
+        </a>{" "}
+        (Lizeth y dirección) · historial por persona/vehículo en finanzas.
+      </p>
       <h1 className={styles.title}>Mesa de viáticos y vehículos</h1>
+      {filas.length ? (
+        <div style={{ marginBottom: 12 }}>
+          <ExcelExportadorDinamico
+            preferenciaKey="nx-excel-cols-gestion-viaticos"
+            titulo="Mesa de viáticos"
+            filename="gestion-viaticos"
+            rows={filas.map((f) => ({
+              fecha: String(f.createdAt ?? "").slice(0, 10),
+              tipo: ETIQUETA[f.urgencia] ?? f.urgencia,
+              titulo: f.titulo,
+              resumen: f.resumen,
+              monto: Number(f.monto ?? 0),
+              urgencia: f.urgencia,
+            }))}
+            getFecha={(r) => r.fecha || null}
+            getPersonaArea={(r) => `${r.titulo} ${r.resumen}`}
+            estadoKey="urgencia"
+            estados={Object.entries(ETIQUETA).map(([value, label]) => ({ value, label }))}
+            columns={[
+              { key: "fecha", label: "Fecha" },
+              { key: "tipo", label: "Tipo" },
+              { key: "titulo", label: "Título" },
+              { key: "resumen", label: "Resumen" },
+              { key: "monto", label: "Monto", tipo: "dinero" as const, total: "suma" as const },
+              { key: "urgencia", label: "Urgencia" },
+            ]}
+            generadoPor={user?.nombre}
+          />
+        </div>
+      ) : null}
       <p className={styles.lead}>
         Todo lo que llega a la gestora, ordenado por urgencia. Hola
         {user?.nombre ? `, ${user.nombre}` : ""}.

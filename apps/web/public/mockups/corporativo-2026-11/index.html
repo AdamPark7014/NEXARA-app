@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NEXARA · Mockup corporativo 2026-11</title>
+<style>
+  :root {
+    --bg: #f3f5f9;
+    --surface: #ffffff;
+    --ink: #0f172a;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --teal: #1f9e84;
+    --navy: #0b1320;
+    --danger: #b42318;
+    --ok: #067647;
+    --shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.04);
+    --font: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--ink); }
+  .shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  aside { background: var(--navy); color: #e2e8f0; padding: 20px 14px; }
+  aside .brand { font-weight: 700; letter-spacing: .04em; font-size: 13px; color: #94a3b8; margin-bottom: 18px; }
+  aside a { display: block; color: inherit; text-decoration: none; padding: 10px 12px; border-radius: 8px; margin-bottom: 4px; font-size: 14px; }
+  aside a[aria-current="page"], aside a:hover { background: rgba(255,255,255,.08); color: #fff; }
+  main { padding: 24px 28px 48px; }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+  .kpis { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .kpi span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .kpi strong { font-size: 26px; font-variant-numeric: tabular-nums; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+  .panel h2 { margin: 0; padding: 14px 16px; font-size: 15px; border-bottom: 1px solid var(--line); background: #f8fafc; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { position: sticky; top: 0; background: #f8fafc; color: var(--muted); font-weight: 600; font-size: 12px; }
+  .table-wrap { max-height: 420px; overflow: auto; }
+  .btn { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font: inherit; cursor: pointer; }
+  .btn.primary { background: var(--teal); border-color: transparent; color: #fff; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 12px; }
+  .tag.warn { background: #fff7ed; color: #9a3412; }
+  .tag.ok { background: #ecfdf5; color: var(--ok); }
+  .empty { padding: 28px 16px; color: var(--muted); }
+  .screens { display: none; }
+  .screens.active { display: block; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    aside { display: flex; gap: 8px; overflow-x: auto; }
+    .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside>
+    <div class="brand">NEXARA · MOCKUP</div>
+    <a href="#supervision" data-screen="supervision" aria-current="page">Supervisión</a>
+    <a href="#rh" data-screen="rh">Expediente RH</a>
+    <a href="#viaticos" data-screen="viaticos">Mesa de viáticos</a>
+  </aside>
+  <main>
+    <section id="supervision" class="screens active">
+      <h1>Supervisión</h1>
+      <p class="sub">Tablero del supervisor · plan de mañana estructurado · densidád corporativa</p>
+      <div class="kpis">
+        <div class="kpi"><span>Planes recibidos</span><strong>4</strong></div>
+        <div class="kpi"><span>Faltantes</span><strong>2</strong></div>
+        <div class="kpi"><span>Actividades</span><strong>18</strong></div>
+        <div class="kpi"><span>Sin asignación</span><strong>3</strong></div>
+        <div class="kpi"><span>Conflictos horario</span><strong>1</strong></div>
+      </div>
+      <div class="panel">
+        <h2>Planes por coordinador · martes 17 nov</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Coordinador</th><th>Persona</th><th>Qué</th><th>Cómo</th><th>Por qué</th><th>Cliente</th><th>Horario</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr><td>José Antonio</td><td>Erick</td><td>Instalar 4 cámaras</td><td>PoE + NVR</td><td>Alcance cotizado</td><td>IPADE</td><td>09:00</td><td><button class="btn primary">Programar</button></td></tr>
+              <tr><td>José Antonio</td><td>Ricardo</td><td>Mantenimiento lector</td><td>Limpieza + prueba</td><td>Falla reportada</td><td>BUAP</td><td>09:00</td><td><span class="tag warn">Conflicto</span></td></tr>
+              <tr><td>David</td><td>Genaro</td><td>Revisión CCTV</td><td>Recorrido planta</td><td>Visita preventiva</td><td>Volkswagen</td><td>11:30</td><td><button class="btn primary">Programar</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="rh" class="screens">
+      <h1>Expediente de RH</h1>
+      <p class="sub">Directorio, medidas disciplinarias (sin multas) y desempeño</p>
+      <div class="toolbar">
+        <button class="btn primary">Alta de perfil</button>
+        <button class="btn">Medida disciplinaria</button>
+        <button class="btn">Evaluación</button>
+        <button class="btn">Exportar Excel</button>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><span>Plantilla activa</span><strong>42</strong></div>
+        <div class="kpi"><span>Medidas abiertas</span><strong>3</strong></div>
+        <div class="kpi"><span>Evaluaciones mes</span><strong>7</strong></div>
+        <div class="kpi"><span>Calif. evidencias</span><strong>4.6</strong></div>
+        <div class="kpi"><span>Incidencias</span><strong>2</strong></div>
+      </div>
+      <div class="panel">
+        <h2>Ficha · Tere García · RH</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Hechos</th><th>Estado</th><th>LFT</th></tr></thead>
+            <tbody>
+              <tr><td>10 nov</td><td>Amonestación escrita</td><td>Retraso reiterado en entrega de expediente</td><td><span class="tag">Notificada</span></td><td>Sin multa (art. 107)</td></tr>
+              <tr><td>03 nov</td><td>Acta administrativa</td><td>Uso indebido de vehículo · testigos anexos</td><td><span class="tag ok">Firmada</span></td><td>Descargo capturado</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="viaticos" class="screens">
+      <h1>Mesa de viáticos</h1>
+      <p class="sub">Asignación, aprobación con motivo y tickets · historial por persona/vehículo</p>
+      <div class="toolbar">
+        <button class="btn primary">Asignar anticipo</button>
+        <button class="btn">Por facturar</button>
+        <button class="btn">Historial persona</button>
+        <button class="btn">Exportar Excel</button>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><span>Por aprobar</span><strong>5</strong></div>
+        <div class="kpi"><span>Tickets hoy</span><strong>8</strong></div>
+        <div class="kpi"><span>Por facturar</span><strong>12</strong></div>
+        <div class="kpi"><span>Asignado mes</span><strong>$48,200</strong></div>
+        <div class="kpi"><span>Sin responsable</span><strong>1</strong></div>
+      </div>
+      <div class="panel">
+        <h2>Bandeja Lizeth</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Tipo</th><th>Persona</th><th>Monto</th><th>Actividad</th><th>Estado</th><th></th></tr></thead>
+            <tbody>
+              <tr><td>Anticipo</td><td>Erick Morales</td><td>$1,200.00</td><td>AN-1042 IPADE</td><td><span class="tag warn">Pendiente</span></td><td><button class="btn primary">Aprobar</button></td></tr>
+              <tr><td>Ticket gasolina</td><td>Ricardo</td><td>$680.00</td><td>Vehículo NX-03</td><td><span class="tag">Ticket hoy</span></td><td><button class="btn">Ver foto</button></td></tr>
+              <tr><td>Comprobación</td><td>Genaro</td><td>$450.00</td><td>AN-1038</td><td><span class="tag ok">Aprobado</span></td><td><button class="btn">Historial</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+  const links = document.querySelectorAll('aside a[data-screen]');
+  const screens = document.querySelectorAll('.screens');
+  function show(id) {
+    screens.forEach((s) => s.classList.toggle('active', s.id === id));
+    links.forEach((a) => a.setAttribute('aria-current', a.dataset.screen === id ? 'page' : 'false'));
+  }
+  links.forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); show(a.dataset.screen); history.replaceState(null, '', '#' + a.dataset.screen); }));
+  const hash = location.hash.replace('#', '');
+  if (hash) show(hash);
+</script>
+</body>
+</html>

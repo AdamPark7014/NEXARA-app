@@ -42,6 +42,7 @@ import {
   type FlotillaMes,
 } from "@/lib/vehiculos-ficha";
 import styles from "./vehiculos-core.module.css";
+import ExcelExportadorDinamico from "@/components/excel/ExcelExportadorDinamico";
 
 type Filtro = "todos" | "disponibles" | "uso" | "fuera";
 
@@ -267,6 +268,32 @@ export default function VehiculosPage() {
 
   return (
     <div className={styles.wrap}>
+      {vehiculos.length ? (
+        <div style={{ marginBottom: 12 }}>
+          <ExcelExportadorDinamico
+            preferenciaKey="nx-excel-cols-vehiculos"
+            titulo="Flotilla"
+            filename="vehiculos"
+            rows={vehiculos.map((v) => ({
+              fecha: String(v.desde ?? "").slice(0, 10),
+              placas: v.placas ?? "",
+              nombre: v.nombre ?? "",
+              estado: v.estatus ?? "",
+              responsable: v.conductor?.nombre ?? "",
+            }))}
+            getFecha={(r) => r.fecha || null}
+            getPersonaArea={(r) => `${r.responsable} ${r.nombre}`}
+            estadoKey="estado"
+            columns={[
+              { key: "placas", label: "Placas" },
+              { key: "nombre", label: "Vehículo" },
+              { key: "estado", label: "Estado" },
+              { key: "responsable", label: "Conductor" },
+              { key: "fecha", label: "Desde" },
+            ]}
+          />
+        </div>
+      ) : null}
       <header className={c.band}>
         <div className={c.bandHead}>
           <div>

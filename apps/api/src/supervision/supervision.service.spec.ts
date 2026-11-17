@@ -111,7 +111,7 @@ function armar() {
       const autorId = where?.autorId_fecha?.autorId ?? create.autorId;
       const fecha = where?.autorId_fecha?.fecha ?? create.fecha;
       const prev = planStore.find((p) => p.autorId === autorId && +p.fecha === +fecha);
-      if (prev && where.companyId !== prev.companyId) throw new Error("Conflicto de empresa");
+      if (prev && where?.companyId != null && where.companyId !== prev.companyId) throw new Error("Conflicto de empresa");
       if (prev) {
         Object.assign(prev, update, { updatedAt: new Date() });
         return prev;
@@ -182,7 +182,8 @@ function armar() {
     cierreDiario,
   };
   const notifications = { createNotification: jest.fn().mockResolvedValue({ id: 1 }) };
-  const service = new SupervisionService(prisma, notifications as never);
+  const activities = { create: jest.fn(async () => ({ id: 9001 })) };
+  const service = new SupervisionService(prisma, notifications as never, activities as never);
   return { service, prisma, notifications, planStore, cierreStore, org };
 }
 

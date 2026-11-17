@@ -309,6 +309,10 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     // incidencias y KPIs de personas ya se le muestran, faltaba dejarla entrar.
     '/erp/hr',
     '/erp/hr/fines',
+    '/erp/hr/medidas',
+    '/erp/hr/medidas/**',
+    '/erp/hr/cargos-perdida',
+    '/erp/hr/cargos-perdida/**',
     '/erp/hr/kpis',
     '/erp/hr/orgchart',
     '/erp/kb',

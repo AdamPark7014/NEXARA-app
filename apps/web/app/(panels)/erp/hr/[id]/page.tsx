@@ -21,6 +21,7 @@ import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import ExpedienteEmpleado from "@/components/hr/ExpedienteEmpleado";
+import ExcelExportadorDinamico from "@/components/excel/ExcelExportadorDinamico";
 import { withTenantHeaders } from "@/lib/tenant";
 
 interface EmployeeDetail {
@@ -305,6 +306,15 @@ export default function EmployeeDetailPage() {
         </dl>
       </Section>
 
+      <Section title="Desempeño y medidas">
+        <DesempenoPanel token={token!} userId={employee.id} nombre={employee.nombre} />
+        <p style={{ marginTop: 8 }}>
+          <Link href="/erp/hr/medidas">Medidas disciplinarias</Link>
+          {" · "}
+          <Link href="/erp/hr/cargos-perdida">Cargos por pérdida</Link>
+        </p>
+      </Section>
+
       {token ? <ExpedienteEmpleado token={token} userId={id} /> : null}
 
       <Section
@@ -425,5 +435,61 @@ export default function EmployeeDetailPage() {
         {saveErr && <InlineAlert message={saveErr} style={{ marginTop: 14 }} />}
       </Modal>
     </>
+  );
+}
+
+function DesempenoPanel({ token, userId, nombre }: { token: string; userId: number; nombre: string }) {
+  const [data, setData] = useState<any>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void apiFetch(`hr/medidas-disciplinarias/desempeno/${userId}`, token)
+      .then((d) => { if (!cancelled) setData(d); })
+      .catch((e) => { if (!cancelled) setErr(formatApiError(e)); });
+    return () => { cancelled = true; };
+  }, [token, userId]);
+  if (err) return <InlineAlert variant="danger" title="Desempeño" message={err} />;
+  if (!data) return <SkeletonList rows={3} />;
+  const k = data.kpis ?? {};
+  return (
+    <div style={{ display: "grid", gap: 12 }}>
+      <MetricStrip
+        metrics={[
+          { label: "Evaluaciones", value: String(k.evaluaciones ?? 0) },
+          { label: "Calif. evidencias", value: k.calificacionPromedio != null ? String(k.calificacionPromedio) : "—" },
+          { label: "Medidas activas", value: String(k.medidasActivas ?? 0) },
+          { label: "Evidencias calificadas", value: String(k.evidenciasCalificadas ?? 0) },
+        ]}
+      />
+      <ExcelExportadorDinamico
+        preferenciaKey={`nx-excel-cols-hr-desempeno-${userId}`}
+        titulo={`Desempeño · ${nombre}`}
+        filename={`desempeno-${userId}`}
+        rows={(data.reviews ?? []).map((r: any) => ({
+          fecha: String(r.reviewDate ?? "").slice(0, 10),
+          periodo: r.period ?? "",
+          calificacion: r.overallRating,
+          estado: r.status ?? "",
+          fortalezas: r.strengths ?? "",
+        }))}
+        getFecha={(r: any) => r.fecha}
+        columns={[
+          { key: "fecha", label: "Fecha" },
+          { key: "periodo", label: "Periodo" },
+          { key: "calificacion", label: "Calificación", tipo: "numero" as const },
+          { key: "estado", label: "Estado" },
+          { key: "fortalezas", label: "Fortalezas" },
+        ]}
+      />
+      {(data.medidas ?? []).length ? (
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          {data.medidas.slice(0, 8).map((m: any) => (
+            <li key={m.id}>{m.tipo} · {m.estado} · {String(m.createdAt).slice(0, 10)}</li>
+          ))}
+        </ul>
+      ) : (
+        <p style={{ color: "var(--ui-fg-2)", margin: 0 }}>Sin medidas disciplinarias registradas.</p>
+      )}
+    </div>
   );
 }
