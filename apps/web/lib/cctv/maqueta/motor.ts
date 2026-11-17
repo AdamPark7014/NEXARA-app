@@ -787,6 +787,48 @@ export class MotorMaqueta {
     this.volar(this.ctrl.target.clone().addScaledVector(d, 1 / factor), this.ctrl.target.clone(), true, 260);
   }
 
+  leerVistaHolograma() {
+    const t = this.ctrl.target;
+    const d = this.camara.position.clone().sub(t);
+    const dist = d.length() || 1;
+    const elevacionDeg = (Math.asin(Math.min(1, Math.max(-1, d.y / dist))) * 180) / Math.PI;
+    const azimutDeg = (((Math.atan2(d.x, -d.z) * 180) / Math.PI) + 360) % 360;
+    return { azimutDeg, elevacionDeg, distancia: dist, target: { x: t.x, y: t.y, z: t.z } };
+  }
+
+    girarVista(grados: number) {
+    this.vuelo = null;
+    this.ctrl.girar(grados);
+    this.invalidar();
+  }
+
+  inclinarVista(grados: number) {
+    this.vuelo = null;
+    this.ctrl.inclinar(grados);
+    this.invalidar();
+  }
+
+  desplazarVista(dx: number, dy: number) {
+    this.vuelo = null;
+    this.ctrl.desplazar(dx, dy);
+    this.invalidar();
+  }
+
+  aplicarVistaHolograma(v: { azimutDeg: number; elevacionDeg: number; distancia: number; target: { x: number; y: number; z: number } }) {
+    const elev = (Math.min(89, Math.max(1, v.elevacionDeg)) * Math.PI) / 180;
+    const az = (v.azimutDeg * Math.PI) / 180;
+    const m = new THREE.Vector3(v.target.x, v.target.y, v.target.z);
+    const dir = new THREE.Vector3(Math.sin(az) * Math.cos(elev), Math.sin(elev), -Math.cos(az) * Math.cos(elev));
+    const p = m.clone().addScaledVector(dir, v.distancia);
+    this.volar(p, m, true, 300);
+  }
+
+  /** Órbita automática lenta (grados por cuadro aprox.). */
+  girarOrbitaAuto(grados = 0.35) {
+    this.ctrl.girar(grados);
+    this.invalidar();
+  }
+
   /** Arrastrar la brújula: gira e inclina igual que arrastrar la maqueta. */
   tomarPuntero(e: PointerEvent) {
     this.ctrl.tomarPuntero(e);

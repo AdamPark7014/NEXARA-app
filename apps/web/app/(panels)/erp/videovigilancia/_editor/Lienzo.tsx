@@ -26,10 +26,21 @@ import {
   muroMasCercano,
   type Seleccion,
   type TipoElemento,
+  actualizarCamara,
 } from "@/lib/cctv/editor";
+import {
+  CAPAS_INICIALES,
+  alternarEnGrupo,
+  estaBloqueado,
+  estaVisible,
+  moverVarios,
+  rumboConManija,
+  seleccionEnRect,
+  type CapasEditor,
+} from "@/lib/cctv/seleccionMultiple";
 import { etiquetaCono, hfovDeg, distanciaInclinadaM, ppm } from "@/lib/cctv/optica";
 import { lugarParaCamara, moverCamaraPegada, moverEquipoPegado, pegarAMuros, RADIO_PEGADO_M, type Pegado } from "@/lib/cctv/pegado";
-import { dirRumbo, hojasPuerta, type MaterialPiso, type Plano, type Punto, type Tapa, type TipoMueble } from "@/lib/cctv/plano";
+import { dirRumbo, hojasPuerta, rumboEntre, type MaterialPiso, type Plano, type Punto, type Tapa, type TipoMueble } from "@/lib/cctv/plano";
 import { claveEquipo } from "@/lib/cctv/medidas";
 import { reescalar } from "@/lib/cctv/niveles";
 import { COLOR_CABLE, type Conexion } from "@/lib/cctv/sistema";
@@ -59,9 +70,11 @@ type Vista = { x: number; y: number; w: number; h: number };
 
 type Arrastre =
   | { modo: "pan"; inicio: { x: number; y: number }; vista: Vista }
-  | { modo: "mover"; sel: Seleccion; ultimo: Punto; fusion: string; movido: boolean; agarre?: Punto }
+  | { modo: "mover"; sel: Seleccion; sels: Seleccion[]; ultimo: Punto; fusion: string; movido: boolean; agarre?: Punto }
+  | { modo: "rect"; inicio: Punto }
   | { modo: "extremo"; muroId: string; extremo: "a" | "b"; fusion: string }
   | { modo: "apuntar"; camaraId: string; fusion: string }
+  | { modo: "rotar"; camaraId: string; fusion: string }
   | { modo: "obstaculo"; inicio: Punto }
   | { modo: "area"; inicio: Punto };
 
@@ -131,8 +144,10 @@ function acercarAlCentro(v: Vista, f: number): Vista {
 export default function Lienzo({
   plano,
   seleccion,
+  seleccionGrupo = [],
   herramienta,
   capas,
+  capasBloqueo = CAPAS_INICIALES,
   tapas,
   coberturas,
   modeloNuevo,
@@ -144,6 +159,7 @@ export default function Lienzo({
   nivelId,
   onAplicar,
   onSeleccionar,
+  onSeleccionGrupo,
   onAviso,
   onPedirMedida,
   onPedirTexto,
@@ -153,8 +169,11 @@ export default function Lienzo({
 }: {
   plano: Plano;
   seleccion: Seleccion | null;
+  /** Selección múltiple (Shift+clic / rectángulo). */
+  seleccionGrupo?: Seleccion[];
   herramienta: Herramienta;
   capas: { croquis: boolean; etiquetas: boolean; calor: boolean; cableado?: boolean; medidas?: boolean; conos?: boolean };
+  capasBloqueo?: CapasEditor;
   tapas: readonly Tapa[];
   coberturas: ReadonlyMap<string, PoligonoCobertura[]>;
   modeloNuevo: ModeloCamara;
@@ -167,6 +186,7 @@ export default function Lienzo({
   nivelId?: string;
   onAplicar: (plano: Plano, opciones?: { seleccion?: Seleccion | null; fusion?: string }) => void;
   onSeleccionar: (s: Seleccion | null) => void;
+  onSeleccionGrupo?: (sels: Seleccion[]) => void;
   onAviso: (texto: string) => void;
   onPedirMedida: (a: Punto, b: Punto) => void;
   onPedirTexto: (pos: Punto) => void;
@@ -336,24 +356,38 @@ export default function Lienzo({
       case "seleccionar": {
         const { sel, manija } = objetivo(e);
         if (manija && sel) {
+          if (estaBloqueado(sel, actual, capasBloqueo) || !estaVisible(sel, actual, capasBloqueo)) return;
           const fusion = `${manija}-${sel.id}-${Date.now()}`;
           if (manija === "apuntar") arrastre.current = { modo: "apuntar", camaraId: sel.id, fusion };
+          else if (manija === "rotar") arrastre.current = { modo: "rotar", camaraId: sel.id, fusion };
           else arrastre.current = { modo: "extremo", muroId: sel.id, extremo: manija === "extremo-a" ? "a" : "b", fusion };
           setArrastrando(arrastre.current.modo);
           capturar();
           return;
         }
         if (sel) {
+          if (estaBloqueado(sel, actual, capasBloqueo) || !estaVisible(sel, actual, capasBloqueo)) return;
+          if (e.shiftKey) {
+            const grupo = alternarEnGrupo(seleccionGrupo, sel);
+            onSeleccionGrupo?.(grupo);
+            onSeleccionar(grupo.find((s) => s.tipo === sel.tipo && s.id === sel.id) ?? grupo[0] ?? null);
+            return;
+          }
+          const yaEnGrupo = seleccionGrupo.some((s) => s.tipo === sel.tipo && s.id === sel.id);
+          const grupo = yaEnGrupo && seleccionGrupo.length > 1 ? [...seleccionGrupo] : [sel];
           onSeleccionar(sel);
+          onSeleccionGrupo?.(grupo);
           if (MOVIBLES.has(sel.tipo)) {
             const pieza = sel.tipo === "camara" ? actual.camaras.find((c) => c.id === sel.id) : sel.tipo === "equipo" ? actual.equipos?.find((c) => c.id === sel.id && !c.gabineteId) : null;
+            const movibles = grupo.filter((s) => MOVIBLES.has(s.tipo) && !estaBloqueado(s, actual, capasBloqueo));
             arrastre.current = {
               modo: "mover",
               sel,
+              sels: movibles.length ? movibles : [sel],
               ultimo: p,
               fusion: `mover-${sel.id}-${Date.now()}`,
               movido: false,
-              ...(pieza ? { agarre: { x: pieza.pos.x - p.x, y: pieza.pos.y - p.y } } : {}),
+              ...(pieza && movibles.length <= 1 ? { agarre: { x: pieza.pos.x - p.x, y: pieza.pos.y - p.y } } : {}),
             };
             setArrastrando("mover");
             capturar();
@@ -361,8 +395,9 @@ export default function Lienzo({
           return;
         }
         onSeleccionar(null);
-        arrastre.current = { modo: "pan", inicio: { x: e.clientX, y: e.clientY }, vista };
-        setArrastrando("pan");
+        onSeleccionGrupo?.([]);
+        arrastre.current = { modo: "rect", inicio: p };
+        setArrastrando("rect");
         capturar();
         return;
       }
@@ -461,10 +496,18 @@ export default function Lienzo({
     altKey.current = e.altKey;
     if (!a) return;
     const actual = planoRef.current;
+    if (a.modo === "rect") {
+      return;
+    }
     if (a.modo === "mover") {
       const delta = { x: p.x - a.ultimo.x, y: p.y - a.ultimo.y };
       if (!a.movido && Math.hypot(delta.x, delta.y) < 3 * u) return;
       a.movido = true;
+      if (a.sels.length > 1) {
+        a.ultimo = p;
+        onAplicar(moverVarios(actual, a.sels, delta, capasBloqueo), { fusion: a.fusion });
+        return;
+      }
       if (a.agarre && (a.sel.tipo === "camara" || a.sel.tipo === "equipo")) {
         const destino = { x: p.x + a.agarre.x, y: p.y + a.agarre.y };
         const r = a.sel.tipo === "camara" ? moverCamaraPegada(actual, a.sel.id, destino, { radioM: radioIman, libre: e.altKey }) : moverEquipoPegado(actual, a.sel.id, destino, { radioM: radioIman, libre: e.altKey });
@@ -477,6 +520,12 @@ export default function Lienzo({
     } else if (a.modo === "extremo") {
       const q = ajustar(p, null, e.altKey, a.muroId);
       onAplicar(moverExtremo(actual, a.muroId, a.extremo, q), { fusion: a.fusion });
+    } else if (a.modo === "rotar") {
+      const cam = actual.camaras.find((c) => c.id === a.camaraId);
+      if (cam) {
+        const libre = rumboEntre(cam.pos, p);
+        onAplicar(actualizarCamara(actual, a.camaraId, { rumboDeg: rumboConManija(cam.rumboDeg, libre, e.shiftKey) }), { fusion: a.fusion });
+      }
     } else if (a.modo === "apuntar") {
       onAplicar(apuntarCamara(actual, a.camaraId, p), { fusion: a.fusion });
     }
@@ -495,6 +544,13 @@ export default function Lienzo({
     arrastre.current = null;
     setArrastrando(null);
     setPegadoAhora(null);
+    if (a?.modo === "rect") {
+      const p = aPlano(e.clientX, e.clientY);
+      const en = seleccionEnRect(planoRef.current, a.inicio, p, capasBloqueo);
+      onSeleccionGrupo?.(en);
+      onSeleccionar(en[0] ?? null);
+      return;
+    }
     if (a?.modo === "obstaculo") {
       const p = aPlano(e.clientX, e.clientY);
       const r = agregarObstaculo(planoRef.current, a.inicio, p);
@@ -578,9 +634,19 @@ export default function Lienzo({
   }, [capas.calor, plano, camarasM, tapas]);
 
   const selId = seleccion?.id;
-  const esSel = (tipo: TipoElemento, id: string) => seleccion?.tipo === tipo && selId === id;
+  const enGrupo = (tipo: TipoElemento, id: string) => seleccionGrupo.some((s) => s.tipo === tipo && s.id === id);
+  const esSel = (tipo: TipoElemento, id: string) => enGrupo(tipo, id) || (seleccion?.tipo === tipo && selId === id);
   const camaraSel = seleccion?.tipo === "camara" ? plano.camaras.find((c) => c.id === selId) : undefined;
   const muroSel = seleccion?.tipo === "muro" ? muroDe.get(selId ?? "") : undefined;
+  const rectPreview =
+    arrastrando === "rect" && arrastre.current?.modo === "rect" && cursor
+      ? {
+          x: Math.min(arrastre.current.inicio.x, cursor.x),
+          y: Math.min(arrastre.current.inicio.y, cursor.y),
+          w: Math.abs(cursor.x - arrastre.current.inicio.x),
+          h: Math.abs(cursor.y - arrastre.current.inicio.y),
+        }
+      : null;
 
   // Paso de la retícula: 1 m, o 5 m cuando 1 m queda en menos de 8 px de pantalla.
   const pasoGrid = (1 / k) / u < 8 ? 5 / k : 1 / k;
@@ -590,7 +656,15 @@ export default function Lienzo({
   const ob = (arrastrando === "obstaculo" || arrastrando === "area") && (arrastre.current?.modo === "obstaculo" || arrastre.current?.modo === "area") && cursor ? arrastre.current.inicio : null;
 
   const cursorCss =
-    arrastrando === "pan" ? "grabbing" : herramienta === "seleccionar" ? "default" : herramienta === "camara" || herramienta === "persona" || herramienta === "etiqueta" || herramienta === "mueble" ? "copy" : "crosshair";
+    arrastrando === "pan"
+      ? "grabbing"
+      : arrastrando === "rect"
+        ? "crosshair"
+        : herramienta === "seleccionar"
+          ? "default"
+          : herramienta === "camara" || herramienta === "persona" || herramienta === "etiqueta" || herramienta === "mueble"
+            ? "copy"
+            : "crosshair";
 
   // Barra de escala: el largo «redondo» (1, 2, 5, 10, 20, 50 m…) que ocupa entre 70 y 170 px de pantalla.
   const metrosPorPantalla = u * k;
@@ -621,6 +695,8 @@ export default function Lienzo({
     />
     <svg
       ref={svgRef}
+      data-lienzo-foco
+      tabIndex={0}
       className={styles.lienzo}
       viewBox={`${vista.x} ${vista.y} ${vista.w} ${vista.h}`}
       preserveAspectRatio="xMidYMid meet"
@@ -982,6 +1058,9 @@ export default function Lienzo({
               <circle r={7} fill="var(--ui-surface)" stroke="var(--ui-brand)" strokeWidth={2.5} />
               <title>Arrastra para apuntar la cámara y cambiar el largo del cono</title>
             </g>
+            <g data-sel={`camara:${camaraSel.id}`} data-manija="rotar" transform={`translate(${camaraSel.pos.x} ${camaraSel.pos.y}) rotate(${camaraSel.rumboDeg - 90}) translate(0 -36)`} style={{ cursor: "grab" }}>
+              <circle className={styles.manijaRotacion} r={8} />
+            </g>
           </g>
         );
       })() : null}
@@ -1048,6 +1127,16 @@ export default function Lienzo({
           stroke="var(--ui-brand)"
           strokeWidth={1.5 * u}
           style={{ pointerEvents: "none" }}
+        />
+      ) : null}
+      {rectPreview ? (
+        <rect
+          className={styles.rectSeleccion}
+          x={rectPreview.x}
+          y={rectPreview.y}
+          width={rectPreview.w}
+          height={rectPreview.h}
+          strokeWidth={1.25 * u}
         />
       ) : null}
     </svg>

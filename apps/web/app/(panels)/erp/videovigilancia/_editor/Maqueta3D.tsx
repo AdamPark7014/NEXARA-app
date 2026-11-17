@@ -40,8 +40,18 @@ import { camaraEnMetros, coberturaCamara, tapado, type PoligonoCobertura } from 
 import { COLOR_NIVEL } from "./colores";
 import type { Herramienta } from "./Lienzo";
 import MiniMapa from "./MiniMapa";
+import ControlesHolograma from "./ControlesHolograma";
 import Navegacion, { ICONO } from "./Navegacion";
 import { TIPO_ARRASTRE, leerArrastre } from "./PanelEquipos";
+import { LEYENDA_ATAJOS } from "@/lib/cctv/tecladoLienzo";
+import {
+  encuadrar as encuadrarVista,
+  vistaArriba,
+  vistaDesdeCara,
+  vistaFrente,
+  vistaIsometrica,
+  type CaraCubo,
+} from "@/lib/cctv/maqueta/vistaHolograma";
 import styles from "./editor.module.css";
 
 export type CapasDeMaqueta = {
@@ -159,6 +169,7 @@ export default function Maqueta3D({
   const [apuntando, setApuntando] = useState<string | null>(null);
   const [aqui, setAqui] = useState<{ area: string | null; teVen: TeVe[] }>({ area: null, teVen: [] });
   // La ayuda sale hasta que usa dos gestos distintos; después, con el botón «?».
+  const [orbitaAuto, setOrbitaAuto] = useState(false);
   const [pistaVista, setPistaVista] = useState(() => {
     try {
       return localStorage.getItem(PISTA_APRENDIDA) !== "1";
@@ -268,6 +279,22 @@ export default function Maqueta3D({
     if (brujula.current) brujula.current.style.transform = `rotate(${m.rumboNorte(norteRef.current).toFixed(1)}deg)`;
   }, []);
 
+  const limitesHolo = useMemo(() => {
+    const lim = limitesSitio(plano) ?? { min: { x: 0, y: 0 }, max: { x: 10, y: 10 } };
+    return { min: { x: lim.min.x, z: lim.min.y }, max: { x: lim.max.x, z: lim.max.y } };
+  }, [plano]);
+
+  useEffect(() => {
+    if (!orbitaAuto) return;
+    let id = 0;
+    const tick = () => {
+      motor.current?.girarOrbitaAuto(0.25);
+      id = requestAnimationFrame(tick);
+    };
+    id = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(id);
+  }, [orbitaAuto]);
+
   useEffect(() => {
     const el = lienzo.current;
     const contenedor = caja.current;
@@ -284,6 +311,7 @@ export default function Maqueta3D({
         alTerminarGuiado: () => setGuiando(false),
         alArrastrarVista: (activo) => setCursor(activo ? "grabbing" : "grab"),
         alUsarGesto: (g) => {
+          setOrbitaAuto(false);
           const usados = gestosUsados.current;
           if (usados.has(g)) return;
           usados.add(g);
@@ -858,7 +886,7 @@ export default function Maqueta3D({
   return (
     <div
       ref={caja}
-      className={styles.maqueta}
+      data-lienzo-foco tabIndex={0} className={`${styles.maqueta} ${styles.maquetaHolograma}${recorriendo ? ` ${styles.recorriendo}` : ""}${completa ? ` ${styles.completa}` : ""}`}
       style={{ background: capas.noche ? "#0c0f15" : "#c8d6e2" }}
       onPointerDownCapture={alPresionar}
       onPointerMove={alMover}
@@ -1147,6 +1175,35 @@ export default function Maqueta3D({
               </span>
             </p>
           ) : null}
+          <ControlesHolograma
+            acciones={{
+              girar: (g) => { setOrbitaAuto(false); motor.current?.girarVista(g); },
+              inclinar: (g) => { setOrbitaAuto(false); motor.current?.inclinarVista(g); },
+              desplazar: (dx, dy) => { setOrbitaAuto(false); motor.current?.desplazarVista(dx, dy); },
+              acercar: (f) => { setOrbitaAuto(false); motor.current?.acercar(f); },
+              encuadrar: () => {
+                setOrbitaAuto(false);
+                const base = motor.current?.leerVistaHolograma();
+                if (!base) return;
+                motor.current?.aplicarVistaHolograma(encuadrarVista(base, limitesHolo));
+              },
+              cara: (c: CaraCubo) => {
+                setOrbitaAuto(false);
+                const base = motor.current?.leerVistaHolograma();
+                if (!base) return;
+                motor.current?.aplicarVistaHolograma(vistaDesdeCara(base, c, limitesHolo));
+              },
+              orbita: setOrbitaAuto,
+              orbitaActiva: orbitaAuto,
+            }}
+          />
+          <div className={styles.vistasRapidas} role="group" aria-label="Vistas rápidas">
+            <button type="button" onClick={() => { setOrbitaAuto(false); const b = motor.current?.leerVistaHolograma(); if (b) motor.current?.aplicarVistaHolograma(vistaIsometrica(b, limitesHolo)); }}>Isométrica</button>
+            <button type="button" onClick={() => { setOrbitaAuto(false); const b = motor.current?.leerVistaHolograma(); if (b) motor.current?.aplicarVistaHolograma(vistaArriba(b, limitesHolo)); }}>Arriba</button>
+            <button type="button" onClick={() => { setOrbitaAuto(false); const b = motor.current?.leerVistaHolograma(); if (b) motor.current?.aplicarVistaHolograma(vistaFrente(b, limitesHolo)); }}>Frente</button>
+            <button type="button" onClick={() => seleccion?.tipo === "camara" && onVerDesde(seleccion.id)}>Ver lo que ve la cámara</button>
+          </div>
+          <p className={styles.leyendaAtajos}>{LEYENDA_ATAJOS}</p>
           <div className={styles.controles3d}>
             <button
               type="button"

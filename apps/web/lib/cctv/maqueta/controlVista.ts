@@ -458,4 +458,40 @@ export class ControlVista {
       this.avisos.alCambiar();
     }
   }
+
+  /** Gira azimut en grados (positivo = derecha). Transición suave via update(). */
+  girar(grados: number) {
+    this.pivote = null;
+    this.tauGiro = TAU_ENDEREZAR;
+    this.inercia = { az: 0, pol: 0, px: 0, pz: 0 };
+    this.porGirar.az += (grados * Math.PI) / 180;
+  }
+
+  /** Inclina en grados (positivo = más desde arriba). */
+  inclinar(grados: number) {
+    this.pivote = null;
+    this.tauGiro = TAU_ENDEREZAR;
+    this.inercia = { az: 0, pol: 0, px: 0, pz: 0 };
+    this.porGirar.pol -= (grados * Math.PI) / 180;
+  }
+
+  /** Desplaza la vista en metros de pantalla aprox. */
+  desplazar(dx: number, dy: number) {
+    this.deslizarPx(-dx * 40, dy * 40);
+  }
 }
+
+export {
+  girar as girarVista,
+  inclinar as inclinarVista,
+  desplazar as desplazarVista,
+  acercar as acercarVista,
+  encuadrar as encuadrarVista,
+  vistaDesdeCara,
+  vistaIsometrica,
+  vistaArriba,
+  vistaFrente,
+  type VistaHolograma,
+  type CaraCubo,
+  type LimitesPiso,
+} from "./vistaHolograma";
