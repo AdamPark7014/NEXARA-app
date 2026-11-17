@@ -424,3 +424,30 @@
   font-size: var(--ui-fs-meta, 13px);
   color: var(--ui-fg-2);
 }
+
+/* Evidencia agrupada: un renglón por familia (Cámara ×N) */
+.campoGrupo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.campoGrupo > :first-child {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.grupoBase {
+  flex: 1 1 120px;
+  min-width: 0;
+  font-weight: 600;
+  font-size: var(--ui-fs-body, 15px);
+  color: var(--ui-fg-1);
+}
+
+.cantidad {
+  flex: 0 0 4.5rem;
+  width: 4.5rem;
+  max-width: 4.5rem;
+}
