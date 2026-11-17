@@ -243,6 +243,37 @@ describe("CotizarConIA", () => {
     expect(screen.getByText("Revísala antes de usarla")).toBeInTheDocument();
   });
 
+
+  it("con cliente relleno avisa y no deja usar", async () => {
+    armar();
+    await pedir();
+    const cliente = screen.getByLabelText("Cliente");
+    await userEvent.clear(cliente);
+    await userEvent.type(cliente, "no aplica");
+    expect(screen.getByRole("alert")).toHaveTextContent(/No se puede poner "no aplica"/);
+    expect(screen.getByRole("button", { name: "Usar en la cotización" })).toBeDisabled();
+  });
+
+  it("propone Atención por omisión y la manda al usar", async () => {
+    const { onUsar } = armar();
+    await pedir();
+    expect(screen.getByLabelText("Atención")).toHaveValue("Administración de Materiales Pronto");
+    await userEvent.click(screen.getByRole("button", { name: "Usar en la cotización" }));
+    expect(onUsar.mock.calls[0]![0].atencion).toBe("Administración de Materiales Pronto");
+  });
+
+  it("sin cliente en la propuesta: botón deshabilitado y aviso de falta", async () => {
+    interpretar.mockResolvedValue({
+      ...PROPUESTA,
+      cliente: { salesClientId: null, nombre: "", seguridad: "falta", parecidos: [] },
+      avisos: ["Falta el cliente: escríbelo antes de usar la cotización."],
+    });
+    armar();
+    await pedir();
+    expect(screen.getAllByText(/Falta el cliente/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Usar en la cotización" })).toBeDisabled();
+  });
+
   describe("costo de hoy en CT", () => {
     const HOY = { costo: 3400, diferencia: 0.1333, piezas: 9, clave: "SWT1", alDia: true, fecha: "2026-11-02T17:00:00.000Z" };
     const SWITCH = fila({

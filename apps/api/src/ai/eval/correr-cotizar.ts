@@ -48,8 +48,10 @@ type Marcador = {
 };
 
 function calificar(caso: CasoCotizar, p: PropuestaCotizacion) {
-  const esperado = caso.cliente ?? CLIENTE_GENERICO;
-  const clienteBien = normalizarTexto(p.cliente.nombre).includes(normalizarTexto(esperado)) || normalizarTexto(esperado).includes(normalizarTexto(p.cliente.nombre));
+  const esperado = caso.cliente ?? '';
+  const clienteBien = !esperado
+    ? !String(p.cliente.nombre ?? '').trim()
+    : normalizarTexto(p.cliente.nombre).includes(normalizarTexto(esperado)) || normalizarTexto(esperado).includes(normalizarTexto(p.cliente.nombre));
   const libres = [...p.partidas];
   let bien = 0;
   let modelosEsperados = 0;

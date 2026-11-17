@@ -143,8 +143,8 @@ describe('lo que se dice aparte de las partidas', () => {
 describe('resolverCliente', () => {
   const conocidos = padronDeCotizar(PADRON, [{ nombre: 'Materiales Pronto', salesClientId: 5 }]);
 
-  it('sin decir cliente queda el genérico, como 19 de 56', () => {
-    expect(resolverCliente(null, conocidos, { id: 1 })).toMatchObject({ salesClientId: 1, nombre: CLIENTE_GENERICO, seguridad: 'generico' });
+  it('sin decir cliente queda falta', () => {
+    expect(resolverCliente(null, conocidos, { id: 1 })).toMatchObject({ salesClientId: null, nombre: '', seguridad: 'falta' });
   });
 
   it('reconoce el nombre dentro de lo dicho, con el que ya se cotizó', () => {
@@ -211,10 +211,11 @@ describe('armarPropuesta', () => {
     expect(r.avisos[0]).toContain('La IA no respondió');
   });
 
-  it('sin saber a quién: el genérico', async () => {
+  it('sin saber a quién: falta el cliente', async () => {
     const r = await armarPropuesta('4 NVR 32 canales, 8 discos duros de 6 TB', deps());
     expect(r.via).toBe('codigo');
-    expect(r.cliente).toMatchObject({ salesClientId: 1, nombre: CLIENTE_GENERICO });
+    expect(r.cliente).toMatchObject({ salesClientId: null, nombre: '', seguridad: 'falta' });
+    expect(r.avisos.join(' ')).toContain('Falta el cliente');
   });
 
   it('lo del mayorista lleva el margen dicho; lo que no es seguro no mete su precio', async () => {

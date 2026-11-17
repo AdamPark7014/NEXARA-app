@@ -117,14 +117,14 @@ export function nombreClienteLimpio(nombre?: string | null): string {
 }
 
 /**
- * Nombres que no son un cliente sino un hueco («N/a», «Varios», «Sin cliente»): en producción
- * entraron así al padrón y luego no se pueden empatar con nada. «A QUIEN CORRESPONDA» se queda
- * a propósito (Adam, 01-11): es el destinatario genérico de cotizaciones.
+ * Nombres que no son un cliente sino un hueco («N/a», «Varios», «Sin cliente», «A quien
+ * corresponda»): en producción entraron así al padrón. Las altas nuevas los rechazan; si el
+ * cliente ya existe (historial «A QUIEN CORRESPONDA»), createClient lo reutiliza.
  */
 const RELLENO = new Set([
   'na', 'n a', 'no aplica', 'ninguno', 'ninguna', 'nada', 'varios', 'varias', 'general', 'otro', 'otros',
   'cliente', 'cliente nuevo', 'sin cliente', 'sin nombre', 'pendiente', 'por definir', 'por confirmar',
-  'desconocido', 'prueba', 'test', 'x', 'xx', 'xxx', 'nn', 's n', 'sn',
+  'desconocido', 'prueba', 'test', 'x', 'xx', 'xxx', 'nn', 's n', 'sn', 'a quien corresponda', 'quien corresponda', 'aqc', 'publico en general', 'cliente general'
 ]);
 
 export function esNombreDeRelleno(nombre?: string | null): boolean {

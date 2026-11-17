@@ -237,7 +237,7 @@ export function segmentoDeFrase(texto: string): SegmentoFrase {
 
 // ─── Cliente ─────────────────────────────────────────────────────────────────────────────────────
 
-/** El cliente que usa la empresa cuando todavía no hay a quién (19 de 56 cotizaciones). */
+/** Nombre histórico genérico: se excluye del padrón de cotizar; ya no se elige por omisión. */
 export const CLIENTE_GENERICO = 'A QUIEN CORRESPONDA';
 
 export type ClienteConocido = FichaComparable & { salesClientId: number | null };
@@ -245,8 +245,8 @@ export type ClienteConocido = FichaComparable & { salesClientId: number | null }
 export type ClienteResuelto = {
   salesClientId: number | null;
   nombre: string;
-  /** alta = es este; media = parece (la tarjeta lo pregunta); nuevo = no está; generico = no lo dijeron. */
-  seguridad: 'alta' | 'media' | 'nuevo' | 'generico';
+  /** alta = es este; media = parece (la tarjeta lo pregunta); nuevo = no está; falta = no lo dijeron. */
+  seguridad: 'alta' | 'media' | 'nuevo' | 'falta';
   parecidos: Array<{ id: number; nombre: string }>;
 };
 
@@ -274,11 +274,11 @@ export function padronDeCotizar(
 export function resolverCliente(
   dicho: string | null,
   conocidos: ClienteConocido[],
-  generico: { id: number } | null,
+  _generico: { id: number } | null,
 ): ClienteResuelto {
   const nombre = String(dicho ?? '').trim();
   if (!nombre) {
-    return { salesClientId: generico?.id ?? null, nombre: CLIENTE_GENERICO, seguridad: 'generico', parecidos: [] };
+    return { salesClientId: null, nombre: '', seguridad: 'falta', parecidos: [] };
   }
   const parecidos = clientesParecidos({ nombre }, conocidos, 3);
   const alta = parecidos.find((p) => p.confianza === 'alta');
@@ -526,6 +526,7 @@ export async function armarPropuesta<U>(
   const faltaPrecio = partidas.filter((p) => !p.unitPrice).length;
   if (!partidas.length) avisos.push('No encontré qué cotizar: di cuántas piezas y de qué, o pega la lista.');
   if (faltaPrecio) avisos.push(faltaPrecio === 1 ? 'Una partida no tiene precio: escríbelo aquí o después.' : `${faltaPrecio} partidas no tienen precio: escríbelos aquí o después.`);
+  if (cliente.seguridad === 'falta') avisos.push('Falta el cliente: escríbelo antes de usar la cotización.');
 
   return {
     via,

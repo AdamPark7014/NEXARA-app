@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ManageSearchRoundedIcon from "@mui/icons-material/ManageSearchRounded";
-import { Badge, Button, Input } from "@/components/base";
+import { Alert, Badge, Button, Input } from "@/components/base";
 import { formatApiError } from "@/lib/erp-api";
 import {
   buscarClientesParecidos,
@@ -11,6 +11,7 @@ import {
   type ClienteParecido,
   type SalesClient,
 } from "@/lib/sales-api";
+import { esNombreDeRelleno, mensajeAlertaClienteRelleno } from "@/lib/cliente-relleno";
 import styles from "./ClienteRapido.module.css";
 
 type PayloadAlta = Parameters<typeof createSalesClient>[1];
@@ -80,7 +81,7 @@ export function useAltaCliente({
   const pedir = useCallback(
     async (nombre: string) => {
       const limpio = nombre.trim();
-      if (!token || limpio.length < 2) return;
+      if (!token || limpio.length < 2 || esNombreDeRelleno(limpio)) return;
       setOcupado(true);
       setError(null);
       setAviso(null);
@@ -290,7 +291,7 @@ export function ClienteRapido({
         cliente: c,
       })),
     ];
-    if (puedeCrear && conTexto && consulta.length >= 2 && !hayExacto) {
+    if (puedeCrear && conTexto && consulta.length >= 2 && !hayExacto && !esNombreDeRelleno(texto)) {
       salida.push({ tipo: "crear", id: "crear", nombre: texto.trim() });
     }
     return salida;
@@ -394,6 +395,11 @@ export function ClienteRapido({
           </ul>
         ) : null}
       </div>
+      {conTexto && esNombreDeRelleno(texto) ? (
+        <Alert tone="danger" role="alert">
+          {mensajeAlertaClienteRelleno(texto)}
+        </Alert>
+      ) : null}
       {alta.ocupado && !alta.aviso ? (
         <p className={styles.nota} role="status">
           Revisando si ya existe…

@@ -64,8 +64,8 @@ describe("ClienteRapido", () => {
     await usuario.type(campo, "Toks");
     await usuario.click(await screen.findByRole("option", { name: /Crear «Toks»/ }));
     await waitFor(() => expect(createSalesClient).toHaveBeenCalled());
-    const ultima = buscarClientesParecidos.mock.calls.at(-1)!;
-    expect(ultima[1]).toEqual({ nombre: "Toks", razonSocial: undefined, rfc: undefined });
+    const deAlta = buscarClientesParecidos.mock.calls.map((c) => c[1]).find((q) => q && !q.soloCodigo);
+    expect(deAlta).toEqual({ nombre: "Toks", razonSocial: undefined, rfc: undefined });
   });
 
   it("si se parece a otro avisa, y no crea nada hasta que decidas", async () => {
@@ -192,6 +192,14 @@ describe("ClienteRapido", () => {
     await usuario.click(await screen.findByRole("option", { name: /Crear «Toks»/ }));
     expect(await screen.findByText("Cliente nuevo · sin RFC")).toBeInTheDocument();
   });
+
+  it("con nombre de relleno avisa y no ofrece crear", async () => {
+    const { campo, usuario } = montar();
+    await usuario.type(campo, "no aplica");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/No se puede poner "no aplica"/);
+    expect(screen.queryByRole("option", { name: /Crear/ })).toBeNull();
+    expect(createSalesClient).not.toHaveBeenCalled();
+  });
 });
 
 describe("ClienteTipoPicker: qué alta pide cada tipo", () => {
@@ -234,4 +242,5 @@ describe("ClienteTipoPicker: qué alta pide cada tipo", () => {
   it("de proyecto con permiso de padrón: alta normal", async () => {
     expect(await altaCon({ tipo: "PROYECTO" })).toEqual({ name: "Toks", status: "Activo", tipo: "PROYECTO", sectors: ["PROYECTO"] });
   });
+
 });

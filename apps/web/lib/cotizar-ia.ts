@@ -155,6 +155,8 @@ export type DatosDePropuesta = {
   segmento: Segmento;
   conIva: boolean;
   filas: FilaPropuesta[];
+  /** Persona de atención; si viene, se escribe en el documento. */
+  atencion?: string;
 };
 
 /**
@@ -170,6 +172,7 @@ export function documentoConPropuesta(doc: DocumentoCotizacion, datos: DatosDePr
     segmento: datos.segmento,
     conIva: datos.conIva,
     marginPercent: 0,
+    atencion: datos.atencion?.trim() || doc.atencion,
     partidas: [...doc.partidas.filter((p) => p.name.trim()), ...partidasDeFilas(datos.filas)],
   };
 }
