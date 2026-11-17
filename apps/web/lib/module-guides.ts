@@ -304,6 +304,18 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `accounting, invoicing, employee-payments`,
   },
+  'gestion-viaticos': {
+    id: 'gestion-viaticos',
+    summary: `Bandeja de la gestora: solicitudes, tickets con foto, facturación del día y flotilla.`,
+    audience: `Coordinación administrativa (Liz), dirección y contadora.`,
+    how: `Liz revisa lo pendiente, manda a Christian, aprueba tickets y la contadora factura desde «Por facturar». Los técnicos suben la foto del ticket ligado al viático. API /api/gestion-viaticos.`,
+    steps: [
+      `Gestora: entra a /erp/gestion-viaticos y atiende por urgencia (tickets que vencen hoy primero).`,
+      `Técnico: con el viático entregado, sube la foto del ticket desde la web o la app.`,
+      `Contadora: en «Por facturar» adjunta XML/PDF o marca no facturable.`,
+    ],
+    connects: `viatics-admin, erp-vehiculos, expenses-admin`,
+  },
   'viatics-admin': {
     id: 'viatics-admin',
     summary: `Vista financiera de viáticos: comprobar y autorizar gastos de campo.`,

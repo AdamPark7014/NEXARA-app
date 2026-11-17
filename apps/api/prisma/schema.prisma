@@ -1005,6 +1005,13 @@ model User {
   incidenciasPersonal     IncidenciaPersonal[]      @relation("IncidenciaPersonalUser")
   incidenciasAutorizadas  IncidenciaPersonal[]      @relation("IncidenciaAutorizadaPor")
   incidenciasCreadas      IncidenciaPersonal[]      @relation("IncidenciaCreadaPor")
+  empleadoPerfil          EmpleadoPerfil?
+  empleadoEventos         EmpleadoEvento[]          @relation("EmpleadoEventoUser")
+  empleadoEventosActor    EmpleadoEvento[]          @relation("EmpleadoEventoActor")
+  solicitudesAprobacionRh SolicitudAprobacionRh[]   @relation("SolicitudRhSujeto")
+  solicitudesRhPedidas    SolicitudAprobacionRh[]   @relation("SolicitudRhSolicitante")
+  solicitudesRhAprobador  SolicitudAprobacionRh[]   @relation("SolicitudRhAprobador")
+  solicitudesRhDecididas  SolicitudAprobacionRh[]   @relation("SolicitudRhDecisor")
   activityAttachments     ActivityAttachment[]  @relation("ActivityAttachmentUploader")
 
   // === Asistencia confiable, herramientas de la OT, kits y horas extra ===
@@ -1166,6 +1173,8 @@ model UserDocument {
   archivoUrl    String
   estatus       String    @default("Pendiente") @db.VarChar(30)
   observaciones String?
+  /// Vencimiento opcional del documento del expediente (INE, CSF, contrato, etc.).
+  expiresAt     DateTime?
   aprobadoPorId Int?
   revisadoEn    DateTime?
   createdAt     DateTime  @default(now())
@@ -1898,6 +1907,8 @@ model Viatico {
   /// Reparto del costo entre varias actividades. Vacío = el viático es de una
   /// sola actividad y sigue valiendo `actividadId`.
   repartos           ViaticoReparto[]
+  /// Tickets (gasolina, caseta, comida…) que comprueban el anticipo entregado.
+  tickets            ViaticoTicket[]
 
   @@index([projectId, fechaSolicitud])
   @@index([categoria, fechaSolicitud])
@@ -1929,6 +1940,44 @@ model ViaticoReparto {
   @@index([actividadId])
   @@index([companyId])
   @@map("viatico_repartos")
+}
+
+/// Foto de un ticket que comprueba un viático ya entregado. Liz lo revisa; la
+/// contadora lo factura (gasolineras a menudo solo el mismo día).
+model ViaticoTicket {
+  id                     Int       @id @default(autoincrement())
+  companyId              Int
+  viaticoId              Int
+  /// Si el gasto es de una actividad concreta (además o en vez del viático).
+  actividadId            Int?
+  usuarioId              Int
+  /// GASOLINA | CASETA | COMIDA | HOSPEDAJE | ESTACIONAMIENTO | OTRO
+  tipo                   String    @db.VarChar(20)
+  monto                  Decimal   @db.Decimal(10, 2)
+  fechaHora              DateTime
+  estacionComercio       String?   @db.VarChar(160)
+  rfcEmisor              String?   @db.VarChar(13)
+  puedeFacturar          Boolean   @default(true)
+  fechaLimiteFacturacion DateTime? @db.Date
+  fotoUrl                String    @db.VarChar(500)
+  /// PENDIENTE | APROBADO | RECHAZADO | FACTURADO | NO_FACTURABLE
+  estado                 String    @default("PENDIENTE") @db.VarChar(20)
+  motivoRechazo          String?   @db.VarChar(400)
+  revisadoPorId          Int?
+  revisadoAt             DateTime?
+  facturadoPorId         Int?
+  facturadoAt            DateTime?
+  facturaXmlUrl          String?   @db.VarChar(500)
+  facturaPdfUrl          String?   @db.VarChar(500)
+  notas                  String?   @db.VarChar(400)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  viatico                Viatico   @relation(fields: [viaticoId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, estado, fechaLimiteFacturacion])
+  @@index([viaticoId])
+  @@index([usuarioId, estado])
+  @@map("viatico_tickets")
 }
 
 enum OrderStatus {
@@ -6364,6 +6413,9 @@ model CompanyProfile {
   nominaDescuentos        NominaDescuento[]
   userDeactivationRequests UserDeactivationRequest[]
   incidenciasPersonal      IncidenciaPersonal[]
+  empleadoPerfiles         EmpleadoPerfil[]
+  empleadoEventos          EmpleadoEvento[]
+  solicitudesAprobacionRh  SolicitudAprobacionRh[]
   activityAttachments     ActivityAttachment[]
   activityEvidenceFields  ActivityEvidenceField[]
   activityEvidenceFieldPhotos ActivityEvidenceFieldPhoto[]
@@ -8847,5 +8899,98 @@ model CierreDiario {
   @@unique([supervisorId, fecha])
   @@index([companyId, fecha])
   @@map("cierres_diarios")
+}
+
+/// Campos RH 1:1 que no viven en User ni UserProfile (área del Excel, fin de contrato temporal).
+model EmpleadoPerfil {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @unique
+  companyId       Int
+  area            String?   @db.VarChar(120)
+  contratoVenceAt DateTime? @db.Date
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@map("empleado_perfiles")
+}
+
+enum TipoEmpleadoEvento {
+  ALTA
+  CAMBIO_PUESTO
+  CAMBIO_JEFE
+  AJUSTE_SUELDO
+  BAJA
+  DOCUMENTO
+  OTRO
+}
+
+/// Línea de tiempo del expediente (alta, cambios de puesto/jefe, baja, documentos).
+model EmpleadoEvento {
+  id        Int                @id @default(autoincrement())
+  companyId Int
+  userId    Int
+  tipo      TipoEmpleadoEvento
+  detalle   Json?
+  actorId   Int?
+  createdAt DateTime           @default(now())
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user    User           @relation("EmpleadoEventoUser", fields: [userId], references: [id], onDelete: Cascade)
+  actor   User?          @relation("EmpleadoEventoActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, userId, createdAt])
+  @@map("empleado_eventos")
+}
+
+enum TipoSolicitudRh {
+  CAMBIO_PUESTO
+  CAMBIO_JEFE
+  AJUSTE_SUELDO
+  VACACIONES
+  PERMISO
+}
+
+enum EstadoSolicitudRh {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  CANCELADA
+}
+
+/// Patrón único: alguien solicita → quien corresponde aprueba → aviso → se ejecuta.
+model SolicitudAprobacionRh {
+  id                Int               @id @default(autoincrement())
+  companyId         Int
+  tipo              TipoSolicitudRh
+  userId            Int
+  solicitadoPorId   Int
+  aprobadorActualId Int?
+  estado            EstadoSolicitudRh @default(PENDIENTE)
+  payload           Json
+  leaveRequestId    Int?
+  /// 0 = jefe directo, 1 = supervisor general (Luis), 2 = dirección.
+  escaladoNivel     Int               @default(0)
+  escaladoAt        DateTime?
+  decididoPorId     Int?
+  decididoAt        DateTime?
+  motivoRechazo     String?           @db.Text
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  company         CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user            User           @relation("SolicitudRhSujeto", fields: [userId], references: [id])
+  solicitadoPor   User           @relation("SolicitudRhSolicitante", fields: [solicitadoPorId], references: [id])
+  aprobadorActual User?          @relation("SolicitudRhAprobador", fields: [aprobadorActualId], references: [id], onDelete: SetNull)
+  decididoPor     User?          @relation("SolicitudRhDecisor", fields: [decididoPorId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, estado])
+  @@index([aprobadorActualId, estado])
+  @@index([userId, estado])
+  @@index([leaveRequestId])
+  @@map("solicitudes_aprobacion_rh")
 }
 

@@ -305,8 +305,22 @@ export class UsersService {
     companyId?: number | null,
   ) {
     await this.assertUserInCompany(id, companyId);
+    const input = body as Record<string, unknown>;
+    if (['managerId', 'sueldoSemanal', 'salary', 'sueldo'].some((campo) => input[campo] !== undefined)) {
+      throw new BadRequestException('Los cambios de jefe y sueldo requieren una solicitud y aprobación de dirección desde el expediente.');
+    }
+    if (body.puesto !== undefined) {
+      if (typeof body.puesto !== 'string') throw new BadRequestException('El puesto debe ser un texto.');
+      const actual = await this.prisma.user.findFirst({
+        where: { id, companyMemberships: { some: { companyId: requireCompanyId(companyId) } } },
+        select: { puesto: true },
+      });
+      if (!actual) throw new NotFoundException('Usuario no encontrado');
+      if ((body.puesto.trim() || null) !== actual.puesto) {
+        throw new BadRequestException('El cambio de puesto requiere una solicitud y aprobación de dirección desde el expediente.');
+      }
+    }
     const data: any = {};
-    if (body.puesto !== undefined) data.puesto = body.puesto.trim() || null;
     if (body.tipoContrato !== undefined) data.tipoContrato = body.tipoContrato || null;
     if (body.estadoRRHH !== undefined) data.estadoRRHH = body.estadoRRHH;
     if (body.isActive !== undefined) data.isActive = body.isActive;

@@ -73,6 +73,12 @@ export const SUPERVISION_PAGE_PATHS: PageRule[] = [
   '/erp/supervision/**',
 ];
 
+/** Mesa de Liz (viáticos/vehículos) y «Por facturar» de la contadora. */
+export const GESTION_VIATICOS_PAGE_PATHS: PageRule[] = [
+  '/erp/gestion-viaticos',
+  '/erp/gestion-viaticos/**',
+];
+
 /**
  * Cotizaciones en Core (contrato del viernes, D): dirección, administración y coordinadores.
  *
@@ -114,6 +120,8 @@ export const CLIENTES_CORE_PATHS: PageRule[] = ['/erp/clientes', '/erp/clientes/
  * página a Dirección General.
  */
 export const CORE_RECURSOS_PATHS: PageRule[] = [
+  // Solo la ficha numérica; la API limita lectura al propio empleado y a su jefe. No abre la plantilla.
+  '/erp/hr/:id',
   '/erp/almacen/herramientas',
   '/erp/almacen/herramientas/**',
   '/erp/vehiculos',
@@ -265,6 +273,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── COORD ADMIN — segundo nivel administrativo ───────────────────────
   [ROLES.COORD_ADMIN]: [
     ...SUPERVISION_PAGE_PATHS,
+    ...GESTION_VIATICOS_PAGE_PATHS,
     // 07-11: tablero de asistencias de su gente (espejo de url-matrix).
     '/erp/asistencias',
     '/erp/asistencias/**',
@@ -331,6 +340,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── ADMINISTRATIVO — operación día a día ─────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
     ...SUPERVISION_PAGE_PATHS,
+    ...GESTION_VIATICOS_PAGE_PATHS,
     ...COSTOS_CORE_PATHS,
     ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
@@ -619,6 +629,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── CONTABILIDAD ─────────────────────────────────────────────────────
   [ROLES.CONTABILIDAD]: [
+    ...GESTION_VIATICOS_PAGE_PATHS,
     ...COSTOS_CORE_PATHS,
     ...ACTIVIDAD_PROPIA_PAGE_PATHS,
     ...CORE_RECURSOS_PATHS,

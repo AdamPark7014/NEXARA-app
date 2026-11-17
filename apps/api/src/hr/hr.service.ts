@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
@@ -6,10 +6,14 @@ import { NON_EMPLOYEE_EMAILS } from '../common/platform-accounts.js';
 import { expectedStartHm, isLateVsSchedule } from '../attendance/attendance-hybrid.match.js';
 import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { buildAccessScheduleAssignment } from '../integra/access-schedule-defaults.js';
+import { SolicitudAprobacionService } from '../common/aprobaciones/solicitud-aprobacion.service.js';
 
 @Injectable()
 export class HrService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly aprobaciones?: SolicitudAprobacionService,
+  ) {}
 
   // ── Leave Requests ────────────────────────────────────────────────
 
@@ -30,18 +34,36 @@ export class HrService {
     const diffMs = end.getTime() - start.getTime();
     const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
 
-    return this.prisma.leaveRequest.create({
-      data: {
-        userId,
-        type: dto.type as any,
-        startDate: start,
-        endDate: end,
-        days,
-        reason: dto.reason?.trim() || null,
-        companyId: tenantId,
-      },
-      include: { user: { select: { id: true, nombre: true } } },
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) throw new BadRequestException('Indica fechas válidas.');
+    if (!['VACATION', 'SICK', 'PERSONAL', 'MATERNITY', 'PATERNITY', 'BEREAVEMENT', 'UNPAID'].includes(dto.type)) throw new BadRequestException('Tipo de permiso no válido.');
+    if (!this.aprobaciones) throw new BadRequestException('El servicio de aprobaciones no está disponible. Intenta de nuevo.');
+    const aprobaciones = this.aprobaciones;
+    const tipoSolicitud = dto.type === 'VACATION' ? 'VACACIONES' : 'PERMISO';
+    const { leave, solicitud } = await this.prisma.$transaction(async (tx) => {
+      const persona = await tx.user.findFirst({
+        where: { id: userId, isActive: true, companyMemberships: { some: { companyId: tenantId } } },
+        select: { id: true, managerId: true },
+      });
+      if (!persona) throw new BadRequestException('La persona no está activa en esta empresa.');
+      const leave = await tx.leaveRequest.create({
+        data: { userId, type: dto.type as any, startDate: start, endDate: end, days, reason: dto.reason?.trim() || null, companyId: tenantId },
+        include: { user: { select: { id: true, nombre: true, managerId: true } } },
+      });
+      const solicitud = await aprobaciones.crear({
+        companyId: tenantId, tipo: tipoSolicitud, userId, solicitadoPorId: userId,
+        aprobadorActualId: persona.managerId, leaveRequestId: leave.id,
+        payload: { leaveRequestId: leave.id, type: dto.type, startDate: dto.startDate, endDate: dto.endDate, days, reason: dto.reason?.trim() || null },
+      }, tx);
+      return { leave, solicitud };
     });
+    const destinos = solicitud.aprobadorActualId ? [solicitud.aprobadorActualId] : await aprobaciones.idsDireccion(tenantId, userId);
+    await aprobaciones.avisar(destinos, {
+      companyId: tenantId, triggerUserId: userId, relatedEntityId: solicitud.id,
+      type: 'RH_' + tipoSolicitud + '_PENDIENTE', title: (tipoSolicitud === 'VACACIONES' ? 'Vacaciones: ' : 'Permiso: ') + leave.user.nombre,
+      message: 'Del ' + dto.startDate + ' al ' + dto.endDate + '. Revisa la solicitud en el expediente.', relatedUrl: '/erp/hr/' + userId,
+    });
+
+    return leave;
   }
 
   async listLeaves(
@@ -101,29 +123,37 @@ export class HrService {
   }
 
   async approveLeave(id: number, approverId: number, companyId?: number | null) {
-    const leave = await this.getLeave(id, companyId);
-    if (leave.status !== 'PENDING') throw new BadRequestException('Solo se pueden aprobar solicitudes pendientes');
-
-    return this.prisma.leaveRequest.update({
-      where: { id },
-      data: { status: 'APPROVED', approvedById: approverId, approvedAt: new Date() },
-      include: { user: { select: { id: true, nombre: true } }, approvedBy: { select: { id: true, nombre: true } } },
-    });
+    const tenantId = requireCompanyId(companyId);
+    if (!this.aprobaciones) throw new BadRequestException('El servicio de aprobaciones no está disponible.');
+    const solicitud = await this.solicitudParaPermiso(id, tenantId);
+    await this.aprobaciones.decidir(solicitud.id, tenantId, approverId, 'APROBADA');
+    return this.getLeave(id, tenantId);
   }
 
   async rejectLeave(id: number, approverId: number, rejectionReason?: string, companyId?: number | null) {
-    const leave = await this.getLeave(id, companyId);
-    if (leave.status !== 'PENDING') throw new BadRequestException('Solo se pueden rechazar solicitudes pendientes');
+    const tenantId = requireCompanyId(companyId);
+    if (!this.aprobaciones) throw new BadRequestException('El servicio de aprobaciones no está disponible.');
+    const solicitud = await this.solicitudParaPermiso(id, tenantId);
+    await this.aprobaciones.decidir(solicitud.id, tenantId, approverId, 'RECHAZADA', rejectionReason);
+    return this.getLeave(id, tenantId);
+  }
 
-    return this.prisma.leaveRequest.update({
-      where: { id },
-      data: {
-        status: 'REJECTED',
-        approvedById: approverId,
-        approvedAt: new Date(),
-        rejectionReason: rejectionReason?.trim() || null,
-      },
-      include: { user: { select: { id: true, nombre: true } } },
+  /** Incorpora permisos previos al patrón sin dejar una ruta alternativa de aprobación. */
+  private async solicitudParaPermiso(id: number, companyId: number) {
+    const existente = await this.prisma.solicitudAprobacionRh.findFirst({ where: { companyId, leaveRequestId: id } });
+    if (existente) return existente;
+    const leave = await this.getLeave(id, companyId);
+    if (leave.status !== 'PENDING') throw new BadRequestException('Solo se pueden decidir permisos pendientes.');
+    const persona = await this.prisma.user.findFirst({
+      where: { id: leave.userId, companyMemberships: { some: { companyId } } },
+      select: { managerId: true },
+    });
+    if (!persona || !this.aprobaciones) throw new BadRequestException('No se encontró a la persona en esta empresa.');
+    return this.aprobaciones.crear({
+      companyId, userId: leave.userId, solicitadoPorId: leave.userId,
+      tipo: leave.type === 'VACATION' ? 'VACACIONES' : 'PERMISO',
+      aprobadorActualId: persona.managerId, leaveRequestId: id,
+      payload: { leaveRequestId: id, via: 'permiso_previo' },
     });
   }
 
@@ -132,9 +162,18 @@ export class HrService {
     if (leave.userId !== userId) throw new BadRequestException('Solo el solicitante puede cancelar');
     if (leave.status !== 'PENDING') throw new BadRequestException('Solo se pueden cancelar solicitudes pendientes');
 
-    return this.prisma.leaveRequest.update({
-      where: { id },
-      data: { status: 'CANCELLED' },
+    const tenantId = requireCompanyId(companyId);
+    return this.prisma.$transaction(async (tx) => {
+      // Mismo orden que al decidir para evitar carreras entre aprobar y cancelar.
+      const vinculada = await tx.solicitudAprobacionRh.findFirst({ where: { companyId: tenantId, leaveRequestId: id } });
+      const solicitud = await tx.solicitudAprobacionRh.updateMany({
+        where: { companyId: tenantId, leaveRequestId: id, estado: 'PENDIENTE' },
+        data: { estado: 'CANCELADA', decididoPorId: userId, decididoAt: new Date() },
+      });
+      if (vinculada && solicitud.count !== 1) throw new BadRequestException('La solicitud ya cambió de estado. Actualiza la lista.');
+      const cambio = await tx.leaveRequest.updateMany({ where: { id, companyId: tenantId, userId, status: 'PENDING' }, data: { status: 'CANCELLED' } });
+      if (cambio.count !== 1) throw new BadRequestException('El permiso ya cambió de estado. Actualiza la lista.');
+      return tx.leaveRequest.findFirstOrThrow({ where: { id, companyId: tenantId } });
     });
   }
 
