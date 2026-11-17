@@ -46,6 +46,7 @@ function panelWildcardBase(path: string): string | null {
 
 export const PATH_MODULE_HINTS: PathModuleHint[] = [
   { match: /^\/erp\/supervision(\/|$)/, android: [], web: ['supervision'] },
+  { match: /^\/erp\/gestion-viaticos(\/|$)/, android: [], web: ['gestion-viaticos'] },
   // Core «Más». Anclados a /erp: `/erp/actividades/proyectos` no es Proyectos, y
   // `/erp/almacen/herramientas` (todo el personal) no abre el Almacén.
   { match: /^\/erp\/cotizaciones(\/|$)/, android: ['erp-cotizaciones'], web: ['erp-cotizaciones'] },

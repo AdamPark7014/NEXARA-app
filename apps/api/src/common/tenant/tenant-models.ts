@@ -16,6 +16,7 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'VehicleAsset',
   'Expense',
   'Viatico',
+  'ViaticoTicket',
   'EmployeePayment',
   'Cotizacion',
   'SalesClient',
@@ -159,6 +160,11 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'RevisorEvidencia',
   'PendientePersonal',
   'CotizacionAcceso',
+  'UserDeactivationRequest',
+  'IncidenciaPersonal',
+  'EmpleadoPerfil',
+  'EmpleadoEvento',
+  'SolicitudAprobacionRh',
 ]);
 
 /** Models where missing companyId on create is a hard error (not soft-injected). */

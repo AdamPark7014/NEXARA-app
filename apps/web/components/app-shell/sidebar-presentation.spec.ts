@@ -71,7 +71,7 @@ describe("el menú de cada persona", () => {
       Hoy: ["Actividades", "Supervisión", "Asistencias", "Chat", "Reuniones", "Aprobaciones"],
       Vender: ["Clientes", "Cotizaciones", "Diseños de cámaras"],
       Hacer: ["Proyectos", "Almacén"],
-      "Cobrar y pagar": ["Facturación", "Viáticos", "Gastos"],
+      "Cobrar y pagar": ["Facturación", "Viáticos", "Mesa de viáticos", "Gastos"],
       Saber: ["Costos"],
       Empresa: ["Organigrama", "Mi perfil"],
     });
@@ -96,7 +96,7 @@ describe("el menú de cada persona", () => {
       Hoy: ["Hoy", "Actividades", "Supervisión", "Asistencias", "Chat", "Reuniones", "Aprobaciones"],
       Vender: ["Clientes", "Cotizaciones", "Diseños de cámaras"],
       Hacer: ["Proyectos", "Almacén", "Herramientas", "Vehículos"],
-      "Cobrar y pagar": ["Mesa contable", "Viáticos", "Gastos", "Nómina"],
+      "Cobrar y pagar": ["Mesa contable", "Viáticos", "Mesa de viáticos", "Gastos", "Nómina"],
       Personas: ["Plantilla RRHH", "Multas e incidencias"],
       Saber: ["Costos", "Desempeño"],
       Empresa: ["Organigrama", "Mi perfil"],

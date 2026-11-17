@@ -37,6 +37,7 @@ export const CORE_OLA1_MODULE_IDS: readonly string[] = [
   'exports',
   'expenses-admin',
   'viatics-admin',
+  'gestion-viaticos',
   // 07-11: Aprobaciones (permisos, vacaciones, gastos, OT) y el área de RH vivían en Core solo
   // por URL. Quién los ve lo sigue decidiendo `shouldShowModuleInSidebar`.
   'approvals',

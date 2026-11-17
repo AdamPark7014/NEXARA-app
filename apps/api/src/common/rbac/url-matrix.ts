@@ -44,6 +44,26 @@ export const SUPERVISION_URL_RULES: UrlRule[] = [
   { path: '/api/supervision/**', methods: ['GET', 'POST'], scope: 'write' },
 ];
 
+/**
+ * Mesa de la gestora de viáticos/vehículos (Liz) y lista «Por facturar» de la contadora.
+ * Quién ve o muta cada ticket lo decide el servicio (`esGestora` / `esContadora`).
+ */
+export const GESTION_VIATICOS_URL_RULES: UrlRule[] = [
+  { path: '/erp/gestion-viaticos', scope: 'write' },
+  { path: '/erp/gestion-viaticos/**', scope: 'write' },
+  { path: '/api/gestion-viaticos/**', methods: ['GET', 'POST'], scope: 'write' },
+];
+
+/**
+ * Subir y ver tickets propios: todo el personal interno. Autorizar / facturar sigue
+ * en `GESTION_VIATICOS_URL_RULES` y en el servicio.
+ */
+export const GESTION_VIATICOS_SELF_URL_RULES: UrlRule[] = [
+  { path: '/api/gestion-viaticos/tickets', methods: ['POST'], scope: 'write' },
+  { path: '/api/gestion-viaticos/mis-tickets', methods: ['GET'], scope: 'read' },
+  { path: '/api/gestion-viaticos/leer-ticket', methods: ['POST'], scope: 'write' },
+];
+
 /** API + páginas de asistencia personal (check-in propio). Alineado con `SELF_ATTENDANCE_PATHS` web. */
 export const SELF_ATTENDANCE_URL_RULES: UrlRule[] = [
   { path: '/erp/hr/attendance', scope: 'write' },
@@ -263,6 +283,7 @@ export const CORE_RECURSOS_URL_RULES: UrlRule[] = [
   { path: '/api/viatics/*', methods: ['GET'], scope: 'read' },
   { path: '/api/viatics/*/comprobar', methods: ['PATCH'], scope: 'write' },
   { path: '/api/viatics/*/reparto', methods: ['PUT'], scope: 'write' },
+  ...GESTION_VIATICOS_SELF_URL_RULES,
 ];
 
 /**
@@ -432,6 +453,11 @@ export const OPS_OPERATIONAL_PROJECTS_URL_RULES: UrlRule[] = [
 
 /** APIs de sesión propias — todo rol autenticado (deny-by-default no las bloquea). */
 export const SHARED_SESSION_URL_RULES: UrlRule[] = [
+  // Expediente propio/equipo y decisiones: el servicio valida empresa, jerarquía y aprobador.
+  { path: '/api/hr/expediente/*', methods: ['GET'], scope: 'read' },
+  { path: '/api/hr/expediente/documentos', methods: ['POST'], scope: 'write' },
+  { path: '/api/hr/expediente/solicitudes/*/decidir', methods: ['POST'], scope: 'approve' },
+  { path: '/api/hr/solicitudes-aprobacion/mis-pendientes', methods: ['GET'], scope: 'read' },
   // Todos preguntan si les toca «Asignar con IA»; a quien no, le responde que no está disponible.
   { path: '/api/ai/asistente/estado', methods: ['GET'], scope: 'read' },
   { path: '/api/notifications/**', scope: 'write' },
@@ -479,7 +505,13 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CEO — ve TODO (lectura) + aprobaciones de tope
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
+    // Dirección también opera el expediente y la importación de RH.
+    { path: '/api/hr/expediente/cambios', methods: ['POST'], scope: 'write' },
+    { path: '/api/hr/expediente/*/perfil', methods: ['PATCH'], scope: 'write' },
+    { path: '/api/hr/expediente/*/sensibles', methods: ['PATCH'], scope: 'write' },
+    { path: '/api/hr/personal-import/**', methods: ['POST'], scope: 'write' },
     ...SUPERVISION_URL_RULES,
+    ...GESTION_VIATICOS_URL_RULES,
     ...SALIDA_DE_OTRO_URL_RULES,
     ...COSTOS_URL_RULES,
     // «Asignar con IA» es solo del CEO (Adam, 12-10). Trae el selector de personas.
@@ -645,6 +677,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_ADMIN]: [
     ...SUPERVISION_URL_RULES,
+    ...GESTION_VIATICOS_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...SALIDA_DE_OTRO_URL_RULES,
     ...COSTOS_URL_RULES,
@@ -692,6 +725,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
     ...SUPERVISION_URL_RULES,
+    ...GESTION_VIATICOS_URL_RULES,
     // 07-11: el tablero de asistencias de su gente (su modo en `section-views` es gestionar).
     { path: '/erp/asistencias', scope: 'write' },
     { path: '/erp/asistencias/**', scope: 'write' },
@@ -778,6 +812,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
     ...SUPERVISION_URL_RULES,
+    ...GESTION_VIATICOS_URL_RULES,
     ...FORMATOS_ACTIVIDAD_URL_RULES,
     ...COSTOS_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_URL_RULES,
@@ -1269,6 +1304,10 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/users', methods: ['GET'], scope: 'read' },
     { path: '/api/users/bajas', methods: ['GET', 'POST'], scope: 'write' },
     { path: '/api/users/bajas/*', methods: ['GET', 'POST'], scope: 'write' },
+    // Expediente digital, import Base_Personal y solicitudes RH (cola-03).
+    { path: '/api/hr/expediente/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    { path: '/api/hr/personal-import/**', methods: ['POST'], scope: 'write' },
+    { path: '/api/hr/solicitudes-aprobacion/**', methods: ['GET'], scope: 'write' },
     { path: '/api/documents/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     ...CLIENT_ADMIN_WRITE_URL_RULES,
   ],
@@ -1277,6 +1316,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CONTABILIDAD
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CONTABILIDAD]: [
+    ...GESTION_VIATICOS_URL_RULES,
     ...COSTOS_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,

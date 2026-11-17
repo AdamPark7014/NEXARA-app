@@ -14,7 +14,7 @@ import { lunesDe, sumarDias } from "@/lib/control-nomina";
 export type ElementoBandeja = { titulo: string; detalle?: string };
 
 export type GrupoBandeja = {
-  clave: "evidencias" | "viaticos" | "extras" | "descuentos" | "solicitudes" | "firmas" | "bajas" | "bajasRevisar";
+  clave: "evidencias" | "viaticos" | "extras" | "descuentos" | "solicitudes" | "firmas" | "bajas" | "bajasRevisar" | "rhSolicitudes";
   titulo: string;
   cantidad: number;
   /** Una frase con lo que importa: importe, horas, desde cuándo. */
@@ -42,6 +42,7 @@ export function armarBandeja(d: {
   firmas?: Array<{ titulo?: string; title?: string; definitionName?: string }> | null;
   bajasPendientes?: Array<{ id: number; user?: { nombre?: string }; motivo?: string; fechaBaja?: string }> | null;
   bajasVoBo?: Array<{ id: number; user?: { nombre?: string }; justificacion?: string | null }> | null;
+  rhSolicitudes?: Array<{ id: number; tipo?: string; user?: { nombre?: string } }> | null;
 }): GrupoBandeja[] {
   const grupos: GrupoBandeja[] = [];
 
@@ -146,6 +147,24 @@ export function armarBandeja(d: {
     });
   }
 
+  const rhSolicitudes = d.rhSolicitudes ?? [];
+  if (rhSolicitudes.length) {
+    grupos.push({
+      clave: "rhSolicitudes",
+      titulo: "Cambios de personal",
+      cantidad: rhSolicitudes.length,
+      resumen: rhSolicitudes.length === 1
+        ? "Una solicitud de RH espera tu autorización."
+        : `${rhSolicitudes.length} solicitudes de RH esperan tu autorización.`,
+      accion: "Revisar cambios",
+      href: "/erp/approvals#personal",
+      ejemplos: rhSolicitudes.slice(0, 3).map((x) => ({
+        titulo: x.user?.nombre || "Persona",
+        detalle: x.tipo ? x.tipo.replace(/_/g, " ").toLowerCase() : undefined,
+      })),
+    });
+  }
+
   const firmas = d.firmas ?? [];
   if (firmas.length) {
     grupos.push({
@@ -164,12 +183,13 @@ export function armarBandeja(d: {
 
 /** Lo ligero, para el número del menú: sin el cálculo de nómina, que es pesado. */
 export async function contarBandeja(token: string): Promise<number> {
-  const [revisiones, solicitudes, viaticos, firmas, bajasPendientes] = await Promise.all([
+  const [revisiones, solicitudes, viaticos, firmas, bajasPendientes, rhSolicitudes] = await Promise.all([
     callado(erpFetch<{ pendientes?: Revision[] }>("me/revisiones", token)),
     callado(erpFetch<{ received?: Solicitud[] }>("me/activity-requests", token)),
     callado(financeFetch("viatics", token).then((r) => sinEnvoltura(r) as Viatico[])),
     callado(erpFetch<unknown[]>("workflow/my-pending", token)),
     callado(erpFetch<unknown[]>("users/bajas?estado=PENDIENTE", token)),
+    callado(erpFetch<unknown[]>("hr/solicitudes-aprobacion/mis-pendientes", token)),
   ]);
   return armarBandeja({
     revisiones,
@@ -177,6 +197,7 @@ export async function contarBandeja(token: string): Promise<number> {
     viaticos: Array.isArray(viaticos) ? viaticos : null,
     firmas: Array.isArray(firmas) ? (firmas as never[]) : null,
     bajasPendientes: Array.isArray(bajasPendientes) ? (bajasPendientes as never[]) : null,
+    rhSolicitudes: Array.isArray(rhSolicitudes) ? (rhSolicitudes as never[]) : null,
   })
     .filter((g) => g.clave !== "extras" && g.clave !== "descuentos")
     .reduce((a, g) => a + g.cantidad, 0);
@@ -185,7 +206,7 @@ export async function contarBandeja(token: string): Promise<number> {
 /** Todo lo de la bandeja, con la semana de nómina que se paga (la anterior a la de hoy). */
 export async function cargarBandeja(token: string): Promise<GrupoBandeja[]> {
   const lunes = sumarDias(lunesDe(new Date()), -7);
-  const [revisiones, solicitudes, viaticos, semana, firmas, bajasPendientes, bajasAprobadas] = await Promise.all([
+  const [revisiones, solicitudes, viaticos, semana, firmas, bajasPendientes, bajasAprobadas, rhSolicitudes] = await Promise.all([
     callado(erpFetch<{ pendientes?: Revision[] }>("me/revisiones", token)),
     callado(erpFetch<{ received?: Solicitud[] }>("me/activity-requests", token)),
     callado(financeFetch("viatics", token).then((r) => sinEnvoltura(r) as Viatico[])),
@@ -193,6 +214,7 @@ export async function cargarBandeja(token: string): Promise<GrupoBandeja[]> {
     callado(erpFetch<unknown[]>("workflow/my-pending", token)),
     callado(erpFetch<unknown[]>("users/bajas?estado=PENDIENTE", token)),
     callado(erpFetch<unknown[]>("users/bajas?estado=APROBADA", token)),
+    callado(erpFetch<unknown[]>("hr/solicitudes-aprobacion/mis-pendientes", token)),
   ]);
   const vobo = Array.isArray(bajasAprobadas)
     ? (bajasAprobadas as Array<{ modo?: string }>).filter((x) => x.modo === "APLICADA_CON_VOBO")
@@ -205,5 +227,6 @@ export async function cargarBandeja(token: string): Promise<GrupoBandeja[]> {
     firmas: Array.isArray(firmas) ? (firmas as never[]) : null,
     bajasPendientes: Array.isArray(bajasPendientes) ? (bajasPendientes as never[]) : null,
     bajasVoBo: vobo as never[],
+    rhSolicitudes: Array.isArray(rhSolicitudes) ? (rhSolicitudes as never[]) : null,
   });
 }

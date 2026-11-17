@@ -20,6 +20,8 @@ import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 import { resolveAssetUrl } from "@/lib/evidence-display";
+import ExpedienteEmpleado from "@/components/hr/ExpedienteEmpleado";
+import { withTenantHeaders } from "@/lib/tenant";
 
 interface EmployeeDetail {
   id: number;
@@ -50,15 +52,20 @@ const HTTP_FALLBACK: Record<number, string> = {
   404: "No encontramos a esta persona. Puede que se haya eliminado.",
 };
 
+class FichaHttpError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
+
 async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   const res = await fetch(buildApiUrl(path), {
     ...init,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers as Record<string, string> ?? {}) },
+    credentials: "include",
+    headers: withTenantHeaders({ Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers as Record<string, string> ?? {}) }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     const readable = text.trim().startsWith("<") ? "" : text;
-    throw new Error(readable || HTTP_FALLBACK[res.status] || "El servidor no respondió. Intenta de nuevo en unos minutos.");
+    throw new FichaHttpError(readable || HTTP_FALLBACK[res.status] || "El servidor no respondió. Intenta de nuevo en unos minutos.", res.status);
   }
   if (res.status === 204) return null;
   return res.json();
@@ -82,6 +89,8 @@ export default function EmployeeDetailPage() {
   const { user } = useUser();
   const regreso = useRegreso({ href: "/erp/hr", label: "Plantilla" });
   const token = user?.token ?? "";
+  const puedeEditar = ["rh", "ceo", "super_admin"].includes(user?.roleKey ?? "");
+  const [fichaDenegada, setFichaDenegada] = useState(false);
 
   const [employee, setEmployee] = useState<EmployeeDetail | null>(null);
   const [punches, setPunches] = useState<AttendancePunch[]>([]);
@@ -96,6 +105,8 @@ export default function EmployeeDetailPage() {
 
   const load = useCallback(async () => {
     if (!token || !id) return;
+    // El expediente valida persona propia y jefe en el servidor. No exige acceso a la administración de usuarios.
+    if (!puedeEditar) { setLoading(false); return; }
     setLoading(true);
     try {
       const [empData, attData] = await Promise.allSettled([
@@ -116,16 +127,22 @@ export default function EmployeeDetailPage() {
       }
       setError(null);
     } catch (e) {
+      if (e instanceof FichaHttpError && e.status === 403) {
+        setFichaDenegada(true);
+        setEmployee(null);
+        setError(null);
+        return;
+      }
       setError(formatApiError(e, "No se pudo cargar la ficha de esta persona."));
     } finally {
       setLoading(false);
     }
-  }, [token, id]);
+  }, [token, id, puedeEditar]);
 
   useEffect(() => { void load(); }, [load]);
 
   const openEdit = () => {
-    if (!employee) return;
+    if (!employee || !puedeEditar) return;
     setForm({
       puesto: employee.puesto ?? "",
       tipoContrato: employee.tipoContrato ?? "Planta",
@@ -143,13 +160,13 @@ export default function EmployeeDetailPage() {
   };
 
   const saveEdit = async () => {
-    if (!token || !id) return;
+    if (!token || !id || !puedeEditar) return;
     setSaving(true);
     setSaveErr(null);
     try {
       const updated = await apiFetch(`users/${id}/hr`, token, {
         method: "PATCH",
-        body: JSON.stringify({ puesto: form.puesto || undefined, tipoContrato: form.tipoContrato, estadoRRHH: form.estadoRRHH, fechaIngreso: form.fechaIngreso || undefined }),
+        body: JSON.stringify({ tipoContrato: form.tipoContrato, estadoRRHH: form.estadoRRHH, fechaIngreso: form.fechaIngreso || undefined }),
       });
       if (updated) setEmployee((prev) => prev ? { ...prev, ...updated } : prev);
       else setEmployee((prev) => prev ? { ...prev, ...form } : prev);
@@ -184,6 +201,13 @@ export default function EmployeeDetailPage() {
     return { entradas, salidas, conFoto, total: punches.length };
   }, [punches]);
 
+  if (!token) return <EmptyState title="Inicia sesión" description="Inicia sesión para consultar el expediente." />;
+  if (!puedeEditar || fichaDenegada) {
+    return <>
+      <PageHeader eyebrow="Recursos Humanos" title="Expediente laboral" />
+      <ExpedienteEmpleado token={token} userId={id} />
+    </>;
+  }
   if (loading && !employee) {
     return (
       <div aria-busy="true" aria-label="Cargando ficha">
@@ -243,7 +267,7 @@ export default function EmployeeDetailPage() {
         actions={
           <>
             <Button variant="ghost" onClick={() => router.push(regreso.href)}>← {regreso.label}</Button>
-            <Button variant="primary" onClick={openEdit}>Editar ficha</Button>
+            {puedeEditar && <Button variant="primary" onClick={openEdit}>Editar ficha</Button>}
           </>
         }
       />
@@ -270,7 +294,7 @@ export default function EmployeeDetailPage() {
         />
       </div>
 
-      <Section title="Datos laborales" actions={<Button size="sm" variant="ghost" onClick={openEdit}>Editar</Button>}>
+      <Section title="Datos laborales" actions={puedeEditar ? <Button size="sm" variant="ghost" onClick={openEdit}>Editar</Button> : undefined}>
         <dl style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 16, margin: 0 }}>
           {infoRows.map(({ label, value }) => (
             <div key={label}>
@@ -280,6 +304,8 @@ export default function EmployeeDetailPage() {
           ))}
         </dl>
       </Section>
+
+      {token ? <ExpedienteEmpleado token={token} userId={id} /> : null}
 
       <Section
         eyebrow="Asistencia"
@@ -379,7 +405,8 @@ export default function EmployeeDetailPage() {
       >
         <FormGrid>
           <FormField label="Puesto" fullWidth optional>
-            <input value={form.puesto} onChange={(e) => patchForm({ puesto: e.target.value })} placeholder="Ej. Ingeniero de campo" style={inp} />
+            <input value={form.puesto} readOnly style={inp} />
+            <p>Para cambiar el puesto, envía una solicitud desde el expediente. Dirección debe aprobarla.</p>
           </FormField>
           <FormField label="Tipo de contrato">
             <select value={form.tipoContrato} onChange={(e) => patchForm({ tipoContrato: e.target.value })} style={inp}>

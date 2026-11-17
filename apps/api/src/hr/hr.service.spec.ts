@@ -1,5 +1,73 @@
 import { HrService } from './hr.service.js';
 
+describe('HrService aprobaciones de permisos', () => {
+  function crear() {
+    const prisma: any = {
+      user: { findFirst: jest.fn().mockResolvedValue({ id: 5, managerId: 8 }) },
+      leaveRequest: {
+        create: jest.fn().mockResolvedValue({ id: 12, user: { nombre: 'Persona ficticia' } }),
+        findFirst: jest.fn().mockResolvedValue({ id: 12, companyId: 7, userId: 5, status: 'PENDING' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findFirstOrThrow: jest.fn().mockResolvedValue({ id: 12, status: 'CANCELLED' }),
+      },
+      solicitudAprobacionRh: {
+        findFirst: jest.fn().mockResolvedValue({ id: 30 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    prisma.$transaction = jest.fn((fn) => fn(prisma));
+    const aprobaciones: any = {
+      crear: jest.fn().mockResolvedValue({ id: 30, aprobadorActualId: 8 }),
+      avisar: jest.fn(), decidir: jest.fn(), idsDireccion: jest.fn().mockResolvedValue([9]),
+    };
+    return { prisma, aprobaciones, svc: new HrService(prisma, aprobaciones) };
+  }
+
+  it('crea permiso y aprobación dentro de la misma transacción, avisa después', async () => {
+    const { svc, prisma, aprobaciones } = crear();
+    await svc.createLeave({ type: 'VACATION', startDate: '2026-12-01', endDate: '2026-12-02' }, 5, 7);
+    expect(aprobaciones.crear).toHaveBeenCalledWith(expect.objectContaining({ leaveRequestId: 12, companyId: 7, aprobadorActualId: 8 }), prisma);
+    expect(aprobaciones.avisar).toHaveBeenCalledWith([8], expect.objectContaining({ relatedEntityId: 30, companyId: 7 }));
+  });
+
+  it('no oculta un fallo creando la aprobación ni avisa', async () => {
+    const { svc, aprobaciones } = crear();
+    aprobaciones.crear.mockRejectedValue(new Error('No se pudo guardar'));
+    await expect(svc.createLeave({ type: 'VACATION', startDate: '2026-12-01', endDate: '2026-12-02' }, 5, 7)).rejects.toThrow('No se pudo guardar');
+    expect(aprobaciones.avisar).not.toHaveBeenCalled();
+  });
+
+  it('la ruta anterior de aprobar usa los permisos del patrón único', async () => {
+    const { svc, aprobaciones } = crear();
+    aprobaciones.decidir.mockRejectedValue(new Error('No te corresponde decidir'));
+    await expect(svc.approveLeave(12, 99, 7)).rejects.toThrow('No te corresponde');
+    expect(aprobaciones.decidir).toHaveBeenCalledWith(30, 7, 99, 'APROBADA');
+  });
+
+  it('cancelar sincroniza ambos estados y no cancela un permiso ya decidido', async () => {
+    const { svc, prisma } = crear();
+    prisma.solicitudAprobacionRh.updateMany.mockResolvedValue({ count: 0 });
+    await expect(svc.cancelLeave(12, 5, 7)).rejects.toThrow('ya cambió');
+    expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('incorpora permisos antiguos al patrón antes de decidirlos', async () => {
+    const { svc, prisma, aprobaciones } = crear();
+    prisma.solicitudAprobacionRh.findFirst.mockResolvedValue(null);
+    await svc.approveLeave(12, 8, 7);
+    expect(aprobaciones.crear).toHaveBeenCalledWith(expect.objectContaining({ companyId: 7, userId: 5, leaveRequestId: 12, aprobadorActualId: 8 }));
+    expect(aprobaciones.decidir).toHaveBeenCalledWith(30, 7, 8, 'APROBADA');
+  });
+
+  it('permite cancelar un permiso antiguo sin solicitud vinculada', async () => {
+    const { svc, prisma } = crear();
+    prisma.solicitudAprobacionRh.findFirst.mockResolvedValue(null);
+    prisma.solicitudAprobacionRh.updateMany.mockResolvedValue({ count: 0 });
+    await expect(svc.cancelLeave(12, 5, 7)).resolves.toEqual({ id: 12, status: 'CANCELLED' });
+    expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 12, companyId: 7, userId: 5, status: 'PENDING' } }));
+  });
+});
+
 describe('HrService performance reviews tenant IDOR', () => {
   const prisma = {
     performanceReview: {

@@ -334,6 +334,12 @@ export function shouldShowModuleInSidebar(
       return canOpenPage(v2, '/erp/hr/lunch-breaks');
     case 'viatics-admin':
       return resolveViaticsSidebarHome(user) === 'erp-finance';
+    case 'gestion-viaticos':
+      return (
+        FINANCE_ROLES.has(v2) ||
+        v2 === ROLES.ADMINISTRATIVO ||
+        v2 === ROLES.COORD_ADMIN
+      );
     case 'expenses-admin':
       return FINANCE_ROLES.has(v2) || v2 === ROLES.ADMINISTRATIVO;
     // ERP — tablero ejecutivo y resumen corporativo solo dirección
@@ -560,6 +566,10 @@ export function adaptModulePresentation(
     'viatics-admin': {
       label: 'Viáticos',
       description: 'Solicitudes, aprobación y pago de viáticos de campo.',
+    },
+    'gestion-viaticos': {
+      label: 'Mesa de viáticos',
+      description: 'Bandeja de la gestora: solicitudes, tickets y facturación.',
     },
     warehouse: {
       label: 'Almacén',

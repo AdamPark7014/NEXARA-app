@@ -14,6 +14,7 @@ import {
   isDeveloperSuperAdminEmail,
   isPlatformOwnerEmail,
 } from '../../common/platform-accounts.js';
+import { esCuentaAvisoRh } from '../../common/aprobaciones/cuenta-aviso.js';
 import { esDireccion } from '../user-creation-policy.js';
 import { ROLES } from '../../common/rbac/roles.v2.js';
 import type { MotivoBaja, ModoBaja, EstadoBaja } from '@prisma/client';
@@ -31,21 +32,8 @@ export type SolicitarBajaDto = {
 
 const MOTIVOS: ReadonlySet<string> = new Set(['RENUNCIA', 'ABANDONO', 'DESPIDO', 'FIN_CONTRATO', 'OTRO']);
 
-function esCuentaDireccionAviso(u: {
-  email: string;
-  puesto?: string | null;
-}): boolean {
-  const email = String(u.email ?? '').trim().toLowerCase();
-  if (email.endsWith('.invalid')) return false;
-  // La cuenta de desarrollo (Adam) tiene rol ceo, pero las bajas las decide Christian.
-  if (isDeveloperSuperAdminEmail(email)) return false;
-  if (email.startsWith('play.review@') || /^(demo|test|tester|review)[+@.]/.test(email) || /@example\.(com|org)$/.test(email)) return false;
-  const puesto = String(u.puesto ?? '').toLowerCase();
-  if (puesto.includes('tester') || puesto.includes('demostración') || puesto.includes('demostracion')) {
-    return false;
-  }
-  return true;
-}
+/** Misma regla que el servicio reutilizable de aprobaciones RH. */
+const esCuentaDireccionAviso = esCuentaAvisoRh;
 
 @Injectable()
 export class BajasService {

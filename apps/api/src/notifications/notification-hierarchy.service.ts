@@ -15,6 +15,7 @@ import {
 import { fechaAviso, horaAviso, nombreCorto } from './notification-push-meta.js';
 import { CEO_EQUIVALENT_EMAILS, PLATFORM_OWNER_EMAIL } from '../common/platform-accounts.js';
 import { RADIO_ACTIVIDAD_M } from '../activities/geofence/geocerca.js';
+import { esDestinatarioFinanzas } from '../common/finance-notification-recipient.js';
 
 /**
  * Nombre de la actividad para el aviso. El folio (AN-0001) nunca es el identificador principal:
@@ -1802,6 +1803,15 @@ export class NotificationHierarchyService {
   /**
    * Notificar solicitud de viático
    */
+  private async destinatariosFinanzas(companyId: number | null | undefined, filtro: Record<string, unknown>) {
+    if (!Number.isSafeInteger(companyId) || !companyId || companyId <= 0) return [];
+    const rows = await this.prisma.user.findMany({
+      where: { ...filtro, isActive: true, companyMemberships: { some: { companyId } } },
+      select: { id: true, email: true, puesto: true },
+    });
+    return rows.filter(esDestinatarioFinanzas);
+  }
+
   async notifyViaticRequested(
     userId: number,
     viaticId: number,
@@ -1809,7 +1819,8 @@ export class NotificationHierarchyService {
     amount: number,
   ) {
     try {
-      const supervisors = await this.getSupervisors(userId);
+      const viatico = await this.prisma.viatico.findFirst({ where: { id: viaticId }, select: { companyId: true } });
+      const supervisors = await this.destinatariosFinanzas(viatico?.companyId, { roleKey: 'coord_admin' });
 
       for (const supervisor of supervisors) {
         await this.notificationsService.createNotification({
@@ -1817,6 +1828,7 @@ export class NotificationHierarchyService {
           type: 'VIATICO_ASSIGNED',
           category: 'viatics',
           title: 'Solicitud de viático',
+          companyId: viatico?.companyId ?? undefined,
           message: `${requesterName} solicitó un viático de $${amount.toFixed(2)}`,
           relatedEntityId: viaticId,
           entityType: 'Viatico',
@@ -1845,14 +1857,9 @@ export class NotificationHierarchyService {
   }): Promise<number> {
     try {
       const porCorreo = p.role === 'ceo' ? [{ email: PLATFORM_OWNER_EMAIL }] : [];
-      const destinatarios = await this.prisma.user.findMany({
-        where: {
-          isActive: true,
-          OR: [{ roleKey: p.role }, ...porCorreo],
-          ...(p.companyId != null ? { companyMemberships: { some: { companyId: Number(p.companyId) } } } : {}),
-        },
-        select: { id: true },
-      });
+      const viatico = await this.prisma.viatico.findFirst({ where: { id: p.viaticId }, select: { companyId: true } });
+      if (p.companyId != null && p.companyId !== viatico?.companyId) return 0;
+      const destinatarios = await this.destinatariosFinanzas(viatico?.companyId, { OR: [{ roleKey: p.role }, ...porCorreo] });
       for (const u of destinatarios) {
         await this.notificationsService.createNotification({
           userId: u.id,
@@ -1864,7 +1871,7 @@ export class NotificationHierarchyService {
           entityType: 'Viatico',
           relatedUrl: appUrls.erpFinanceViatics(p.viaticId),
           priority: 'high',
-          companyId: p.companyId ?? undefined,
+          companyId: viatico?.companyId ?? undefined,
         });
       }
       return destinatarios.length;
@@ -1883,12 +1890,15 @@ export class NotificationHierarchyService {
     motivo?: string | null,
   ) {
     try {
+      const viatico = await this.prisma.viatico.findFirst({ where: { id: viaticId }, select: { companyId: true } });
+      if (!(await this.destinatariosFinanzas(viatico?.companyId, { id: userId })).length) return;
       const detail = motivo ? ` · ${motivo}` : '';
       await this.notificationsService.createNotification({
         userId,
         type: 'VIATICO_ASSIGNED',
         category: 'viatics',
         title: 'Viático asignado',
+        companyId: viatico?.companyId ?? undefined,
         message: `${assignerName} te asignó un viático de $${amount.toFixed(2)}${detail}`,
         relatedEntityId: viaticId,
         entityType: 'Viatico',
@@ -1910,6 +1920,8 @@ export class NotificationHierarchyService {
     amount: number,
   ) {
     try {
+      const viatico = await this.prisma.viatico.findFirst({ where: { id: viaticId }, select: { companyId: true } });
+      if (!(await this.destinatariosFinanzas(viatico?.companyId, { id: userId })).length) return;
       const type = status === 'approved' ? 'VIATICO_APPROVED' : 'VIATICO_REJECTED';
       const title = status === 'approved' ? 'Viático aprobado' : 'Viático rechazado';
       const message = status === 'approved'
@@ -1920,6 +1932,7 @@ export class NotificationHierarchyService {
         userId,
         type,
         category: 'viatics',
+        companyId: viatico?.companyId ?? undefined,
         title,
         message,
         relatedEntityId: viaticId,
@@ -2278,7 +2291,8 @@ export class NotificationHierarchyService {
     vehicleName: string,
   ) {
     try {
-      const supervisors = await this.getSupervisors(userId);
+      const solicitud = await this.prisma.vehicleControl.findFirst({ where: { id: vehicleRequestId }, select: { companyId: true } });
+      const supervisors = await this.destinatariosFinanzas(solicitud?.companyId, { roleKey: 'coord_admin' });
 
       for (const supervisor of supervisors) {
         await this.notificationsService.createNotification({
@@ -2286,6 +2300,7 @@ export class NotificationHierarchyService {
           type: 'VEHICLE_DELIVERY_REQUESTED',
           category: 'vehicles',
           title: 'Solicitud de vehículo',
+          companyId: solicitud?.companyId ?? undefined,
           message: `${requesterName} solicitó: "${vehicleName}"`,
           relatedEntityId: vehicleRequestId,
           entityType: 'VehicleControl',
@@ -2307,11 +2322,14 @@ export class NotificationHierarchyService {
     vehicleName: string,
   ) {
     try {
+      const solicitud = await this.prisma.vehicleControl.findFirst({ where: { id: vehicleRequestId }, select: { companyId: true } });
+      if (!(await this.destinatariosFinanzas(solicitud?.companyId, { id: userId })).length) return;
       await this.notificationsService.createNotification({
         userId,
         type: 'VEHICLE_DELIVERY_APPROVED',
         category: 'vehicles',
         title: 'Vehículo aprobado',
+        companyId: solicitud?.companyId ?? undefined,
         message: `Tu solicitud para "${vehicleName}" ha sido aprobada`,
         relatedEntityId: vehicleRequestId,
         entityType: 'VehicleControl',
@@ -2332,11 +2350,14 @@ export class NotificationHierarchyService {
     vehicleName: string,
   ) {
     try {
+      const solicitud = await this.prisma.vehicleControl.findFirst({ where: { id: vehicleRequestId }, select: { companyId: true } });
+      if (!(await this.destinatariosFinanzas(solicitud?.companyId, { id: userId })).length) return;
       await this.notificationsService.createNotification({
         userId,
         type: 'VEHICLE_DELIVERY_REJECTED',
         category: 'vehicles',
         title: 'Vehículo rechazado',
+        companyId: solicitud?.companyId ?? undefined,
         message: `Tu solicitud para "${vehicleName}" ha sido rechazada`,
         relatedEntityId: vehicleRequestId,
         entityType: 'VehicleControl',

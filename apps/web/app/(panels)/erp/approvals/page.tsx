@@ -1,5 +1,7 @@
 "use client";
 
+import SolicitudesRhPendientes from "@/components/hr/SolicitudesRhPendientes";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import PageChrome from "@/components/ui/PageChrome";
@@ -354,6 +356,7 @@ export default function ApprovalsPage() {
       {notice && <InlineAlert variant="success" message={notice} onDismiss={() => setNotice(null)} />}
 
       {token ? <BandejaUnica token={token} onGrupos={setGruposBandeja} /> : null}
+      {token ? <SolicitudesRhPendientes token={token} /> : null}
 
       {hayFirmas ? <h2 id="firmas" className={s.subtitulo}>Firmas de flujo</h2> : null}
 

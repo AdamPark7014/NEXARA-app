@@ -1,5 +1,19 @@
 # RELEVO
 
+- **16-11 ~18:45 México (claude-code; Cursor codifica, Codex pule) — Mesa de Lizeth y RH completo de Tere. Pendiente de desplegar.**
+  - `src/gestion-viaticos/` + `/erp/gestion-viaticos` (tabla `viatico_tickets`, migración `20261116195000_viatico_tickets`):
+    bandeja de la gestora (coord_admin), ticket con foto ligado a viático/actividad, aprobación de Lizeth, lista «Por
+    facturar» de la contadora con fecha límite (gasolina = mismo día), recordatorio 15:00, costo por actividad.
+  - RH (`src/hr/expediente`, `personal-import`, `alertas`, `rh-solicitudes.*`, `src/common/aprobaciones/`; migración
+    `20261116234500_rh_expediente_aprobaciones`): expediente con datos sensibles solo rh/dirección, importar
+    Base_Personal con vista previa, solicitudes de cambio de puesto/jefe/sueldo (dirección) y permisos (jefe; a las 24 h
+    sube a Luis y luego a dirección) en la bandeja de Aprobaciones. Bajas siguen en su tabla propia.
+  - Prod 16-11 (fuera de git): revisiones de evidencia de los 10 técnicos → Luis (`revisores_evidencia`); Lizeth
+    renombrada (`lizeth.antonio@`); cuenta CEO de Getzemani Del Valle (id 70); bandeja de Christian limpiada (129
+    evidencias aprobadas cal. 5, faltas sem. 9-15 justificadas, viático 1 borrado lógico, 40 horas extra rechazadas).
+  - Siguiente en cola: `.ai/encargos/2026-11-16-cola-04-*` (autos solo Lizeth con fotos, reembolso, aviso a Luis,
+    menú de rh/técnicos, nómina: rh ve todo, contadora por alcance).
+
 - **16-11 ~18:30 México (claude-code, código de Cursor) — Asignar con IA: evidencia hiper profesional y reglas del grupo
   de WhatsApp (rigen 17-11). NO desplegado: espera OK de Adam.**
   - `ai/asistente/elementos.ts`: cada campo trae la foto pedida por momento (`notas`, por equipo; mantenimiento con su

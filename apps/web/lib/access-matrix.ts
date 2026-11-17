@@ -190,6 +190,7 @@ export type ModuleId =
   | "invoicing"
   | "banking"
   | "viatics-admin"
+  | "gestion-viaticos"
   | "expenses-admin"
   | "employee-payments"
   | "hr"
@@ -631,6 +632,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "viatics-admin", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/finance/viatics",
     label: "Viáticos", description: "Comprobación y autorización de viáticos",
     icon: "💸", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.ACCOUNTANT, R.PROJECT_MANAGER, R.ADMIN_STAFF],
+    group: "Finanzas", visible: true,
+  },
+  "gestion-viaticos": {
+    id: "gestion-viaticos", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/gestion-viaticos",
+    label: "Mesa de viáticos", description: "Bandeja de Liz: solicitudes, tickets y facturación",
+    icon: "🧾", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.ACCOUNTANT, R.ADMIN_STAFF],
     group: "Finanzas", visible: true,
   },
   "expenses-admin": {

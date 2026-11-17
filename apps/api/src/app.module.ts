@@ -29,6 +29,7 @@ import { NotificationsModule } from './notifications/notifications.module.js';
 import { AlertsModule } from './alerts/alerts.module.js';
 import { DevicesModule } from './devices/devices.module.js';
 import { ViaticosModule } from './viaticos/viaticos.module';
+import { GestionViaticosModule } from './gestion-viaticos/gestion-viaticos.module.js';
 import { AttendanceModule } from './attendance/attendance.module';
 import { GuardiasModule } from './guardias/guardias.module.js';
 import { FestivosModule } from './festivos/festivos.module.js';
@@ -140,6 +141,7 @@ import { CctvDisenosModule } from './cctv-disenos/cctv-disenos.module.js';
     NotificationsModule,
     AlertsModule,
     ViaticosModule,
+    GestionViaticosModule,
     AttendanceModule,
     GuardiasModule,
     FestivosModule,

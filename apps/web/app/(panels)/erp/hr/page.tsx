@@ -15,6 +15,7 @@ import { FormField, FormGrid } from "@/components/ui/FormField";
 import FilterToolbar from "@/components/FilterToolbar";
 import PanelTabs from "@/components/ui/PanelTabs";
 import HrModuleRail from "@/components/hr/HrModuleRail";
+import ImportarPersonalExcel from "@/components/hr/ImportarPersonalExcel";
 import { SkeletonList } from "@/components/PageState";
 import { Avatar } from "@/components/base";
 import { MenuFila } from "@/components/mesa-contable/piezas";
@@ -819,6 +820,7 @@ export default function HrPage() {
         actions={
           <>
             <Button variant="ghost" onClick={() => void fetchStaff()} loading={loading && loaded}>Actualizar</Button>
+            {user?.token ? <ImportarPersonalExcel token={user.token} /> : null}
             {cfg.canCreate && (
               <Button variant="primary" onClick={openCreate}>Alta de personal</Button>
             )}
