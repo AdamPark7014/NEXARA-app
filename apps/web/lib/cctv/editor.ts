@@ -623,6 +623,8 @@ export type EstadoEditor = {
   seleccion: Seleccion | null;
   pasado: Plano[];
   futuro: Plano[];
+  /** Etiqueta de cada entrada de `pasado` (mismo índice). */
+  etiquetasPasado: (string | null)[];
   /** Clave de la última edición: los pasos de un mismo arrastre no llenan el historial. */
   ultimaFusion: string | null;
   /** Cambios sin guardar. */
@@ -630,7 +632,7 @@ export type EstadoEditor = {
 };
 
 export type AccionEditor =
-  | { tipo: "aplicar"; plano: Plano; seleccion?: Seleccion | null; fusion?: string }
+  | { tipo: "aplicar"; plano: Plano; seleccion?: Seleccion | null; fusion?: string; etiqueta?: string }
   | { tipo: "seleccionar"; seleccion: Seleccion | null }
   | { tipo: "deshacer" }
   | { tipo: "rehacer" }
@@ -640,7 +642,7 @@ export type AccionEditor =
 export const LIMITE_HISTORIAL = 100;
 
 export function estadoInicial(plano: Plano): EstadoEditor {
-  return { plano, seleccion: null, pasado: [], futuro: [], ultimaFusion: null, sucio: false };
+  return { plano, seleccion: null, pasado: [], futuro: [], etiquetasPasado: [], ultimaFusion: null, sucio: false };
 }
 
 export function reducirEditor(estado: EstadoEditor, accion: AccionEditor): EstadoEditor {
@@ -651,11 +653,15 @@ export function reducirEditor(estado: EstadoEditor, accion: AccionEditor): Estad
       }
       const fusiona = accion.fusion != null && accion.fusion === estado.ultimaFusion;
       const pasado = fusiona ? estado.pasado : [...estado.pasado, estado.plano].slice(-LIMITE_HISTORIAL);
+      const etiquetasPasado = fusiona
+        ? estado.etiquetasPasado
+        : [...estado.etiquetasPasado, accion.etiqueta ?? null].slice(-LIMITE_HISTORIAL);
       const seleccion = accion.seleccion !== undefined ? accion.seleccion : estado.seleccion;
       return {
         plano: accion.plano,
         seleccion: existe(accion.plano, seleccion) ? seleccion : null,
         pasado,
+        etiquetasPasado,
         futuro: [],
         ultimaFusion: accion.fusion ?? null,
         sucio: true,
@@ -670,6 +676,7 @@ export function reducirEditor(estado: EstadoEditor, accion: AccionEditor): Estad
         ...estado,
         plano: previo,
         pasado: estado.pasado.slice(0, -1),
+        etiquetasPasado: estado.etiquetasPasado.slice(0, -1),
         futuro: [estado.plano, ...estado.futuro],
         seleccion: existe(previo, estado.seleccion) ? estado.seleccion : null,
         ultimaFusion: null,
@@ -683,6 +690,7 @@ export function reducirEditor(estado: EstadoEditor, accion: AccionEditor): Estad
         ...estado,
         plano: siguiente,
         pasado: [...estado.pasado, estado.plano],
+        etiquetasPasado: [...estado.etiquetasPasado, null],
         futuro: estado.futuro.slice(1),
         seleccion: existe(siguiente, estado.seleccion) ? estado.seleccion : null,
         ultimaFusion: null,

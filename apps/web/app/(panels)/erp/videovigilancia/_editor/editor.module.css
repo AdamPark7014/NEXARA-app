@@ -2638,3 +2638,162 @@
 .guiaPasos > ol {
   margin-top: var(--ui-s2);
 }
+
+/* Modo holograma: panel translúcido sobre la maqueta (tema oscuro solo en el lienzo). */
+.maquetaHolograma {
+  --hg-bg: #0a1218;
+  --hg-cyan: #5eead4;
+  --hg-glass: rgba(14, 28, 36, 0.72);
+  --hg-border: rgba(94, 234, 212, 0.35);
+  background: radial-gradient(120% 80% at 50% 0%, #13202b 0%, var(--hg-bg) 55%) !important;
+}
+.maquetaHolograma :global(canvas) {
+  background: transparent;
+}
+.panelHolograma {
+  position: absolute;
+  top: var(--ui-s3);
+  right: var(--ui-s3);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--hg-glass, color-mix(in srgb, var(--ui-surface) 76%, transparent));
+  border: 1px solid var(--hg-border, var(--ui-border));
+  backdrop-filter: blur(16px) saturate(1.4);
+  color: #e8f7f4;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+.cuboOrientacion {
+  display: grid;
+  grid-template-columns: repeat(3, 28px);
+  grid-template-rows: repeat(4, 28px);
+  gap: 2px;
+  justify-content: center;
+}
+.caraCubo {
+  border: 1px solid var(--hg-border, var(--ui-border));
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.caraCubo:hover {
+  border-color: var(--hg-cyan, var(--ui-brand));
+  color: var(--hg-cyan, var(--ui-brand));
+}
+.rejillaVista {
+  display: grid;
+  grid-template-columns: repeat(4, 30px);
+  gap: 4px;
+}
+.rejillaVista button,
+.orbitaAuto {
+  border: 1px solid var(--hg-border, var(--ui-border));
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+.rejillaVista button:hover,
+.orbitaAuto:hover {
+  border-color: var(--hg-cyan, var(--ui-brand));
+}
+.orbitaAuto[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--hg-cyan, var(--ui-brand)) 28%, transparent);
+  border-color: var(--hg-cyan, var(--ui-brand));
+}
+.vistasRapidas {
+  position: absolute;
+  left: var(--ui-s3);
+  bottom: var(--ui-s3);
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.vistasRapidas button {
+  border: 1px solid var(--hg-border, var(--ui-border));
+  border-radius: 999px;
+  background: var(--hg-glass, color-mix(in srgb, var(--ui-surface) 80%, transparent));
+  color: #e8f7f4;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+.vistasRapidas button:hover {
+  border-color: var(--hg-cyan, var(--ui-brand));
+}
+.leyendaAtajos {
+  position: absolute;
+  right: var(--ui-s3);
+  bottom: 52px;
+  z-index: 2;
+  margin: 0;
+  max-width: 280px;
+  text-align: right;
+  font-size: 11px;
+  line-height: 1.35;
+  color: color-mix(in srgb, #e8f7f4 70%, transparent);
+  pointer-events: none;
+}
+.historialVisible {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--ui-s3);
+}
+.historialVisible button {
+  text-align: left;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--ui-fg-2);
+  cursor: pointer;
+}
+.historialVisible button:hover {
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+}
+.capasBloqueo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.capasBloqueo label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ui-fg-2);
+}
+.manijaRotacion {
+  fill: var(--ui-brand);
+  stroke: var(--ui-surface);
+  stroke-width: 1.5;
+  cursor: grab;
+}
+.rectSeleccion {
+  fill: color-mix(in srgb, var(--ui-brand) 18%, transparent);
+  stroke: var(--ui-brand);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}

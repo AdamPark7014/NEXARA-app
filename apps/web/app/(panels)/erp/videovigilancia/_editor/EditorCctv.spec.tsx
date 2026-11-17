@@ -152,6 +152,36 @@ describe("editor del diseñador de videovigilancia", () => {
     expect(screen.getByText("hasta 4.3 m")).toBeInTheDocument();
   });
 
+  it("con foco en el lienzo, flechas mueven, Ctrl+C/V copia y Supr quita; capa bloqueada no borra", () => {
+    const dos = agregarCamara(bodega(), { x: 80, y: 80 }, MODELOS_CAMARA[0], { nombre: "Torre B", rumboDeg: 0 }).plano;
+    render(<EditorCctv diseno={diseno(dos)} token="t" onRecargar={() => {}} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Cámaras · 2" }));
+    fireEvent.click(screen.getByRole("button", { name: /Torre B/ }));
+    const lienzo = document.querySelector("[data-lienzo-foco]") as HTMLElement;
+    expect(lienzo).toBeTruthy();
+    lienzo.focus();
+    fireEvent.focusIn(lienzo);
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+    expect(screen.getByRole("tab", { name: "Cámaras · 3" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Bloquear Cámaras" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Cámaras · 3" }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Torre B/ })[0]!);
+    lienzo.focus();
+    fireEvent.focusIn(lienzo);
+    fireEvent.keyDown(window, { key: "Delete" });
+    expect(screen.getByRole("tab", { name: "Cámaras · 3" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Desbloquear Cámaras" }));
+    // Tras bloquear/desbloquear la ficha sigue abierta: se reabre la lista para elegir.
+    fireEvent.click(screen.getByRole("tab", { name: "Cámaras · 3" }));
+    fireEvent.click(screen.getAllByRole("button", { name: /Torre B/ })[0]!);
+    lienzo.focus();
+    fireEvent.focusIn(lienzo);
+    fireEvent.keyDown(window, { key: "Delete" });
+    expect(screen.getByRole("tab", { name: "Cámaras · 2" })).toBeInTheDocument();
+  });
+
   it("sin nada elegido guía los pasos y cada botón activa su herramienta", () => {
     const sinCamaras = { ...bodega(), camaras: [] };
     render(<EditorCctv diseno={{ ...diseno(sinCamaras), resumen: resumenDelPlano(bodega()) }} token="t" onRecargar={() => {}} />);

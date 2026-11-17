@@ -23,12 +23,13 @@ import { acomodoDelEditor } from "@/lib/cctv/acomodo";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { MODELOS_CAMARA, TIPOS_DE_RACK, etiquetaModelo, modeloPorId, type ModeloCamara, type ModeloEquipo, type TipoEquipo } from "@/lib/cctv/catalogo";
 import {
+  actualizarCamara,
   agregarEquipo,
   agregarEtiqueta,
   avisoDeEquipo,
-  borrar,
   calibrarPlano,
   estadoInicial,
+  existe,
   nuevoId,
   reducirEditor,
   resumenDelPlano,
@@ -80,6 +81,18 @@ import VistaCamara from "./VistaCamara";
 import DigitalizarConIA from "./DigitalizarConIA";
 import ExpedienteProyecto from "./ExpedienteProyecto";
 import { expedienteDe, queFalta, type DocumentoExpediente } from "@/lib/cctv/expediente";
+import { CapasBloqueoPanel, HistorialVisible } from "./HistorialYCapas";
+import {
+  CAPAS_INICIALES,
+  borrarVarios,
+  copiarSeleccion,
+  moverVarios,
+  pegarPortapapeles,
+  type CapasEditor,
+  type PortapapelesCctv,
+} from "@/lib/cctv/seleccionMultiple";
+import { etiquetaDeCambio } from "@/lib/cctv/historialEtiquetas";
+import { interpretarTecla } from "@/lib/cctv/tecladoLienzo";
 import styles from "./editor.module.css";
 
 /** three.js pesa: la maqueta se baja solo al abrirla. */
@@ -108,7 +121,7 @@ const ICONO_DIBUJAR = "M4 20l1-4L16 5l3 3L8 19zM14 7l3 3";
 const ICONO_EQUIPOS = "M4 5h7v7H4zM13 5h7v7h-7zM4 14h7v5H4zM13 14h7v5h-7z";
 
 const AYUDA_HERRAMIENTA: Record<Herramienta, string> = {
-  seleccionar: "Clic para elegir y arrastrar para mover. Arrastra el fondo para mover la vista; la rueda acerca. Supr borra y Ctrl+Z deshace.",
+  seleccionar: "Clic para elegir; Mayús+clic suma; arrastra vacío para rectángulo. Arrastra para mover el grupo. Rueda acerca; clic medio mueve la vista. Supr quita; Ctrl+C/V copia; Ctrl+Z deshace.",
   muro: "Clic para empezar y clic para terminar; sigue encadenando. Doble clic o Esc corta. Alt suelta el imán.",
   puerta: "Clic sobre un muro para poner una puerta de 0.9 m.",
   ventana: "Clic sobre un muro para poner una ventana de 1.2 m.",
@@ -238,6 +251,10 @@ export default function EditorCctv({
   const [aviso, setAviso] = useState<string | null>(null);
   const [resumen, setResumen] = useState<ResumenDiseno | null>(diseno.resumen);
   const [herramienta, setHerramienta] = useState<Herramienta>("seleccionar");
+  const [capasBloqueo, setCapasBloqueo] = useState<CapasEditor>(CAPAS_INICIALES);
+  const [seleccionGrupo, setSeleccionGrupo] = useState<Seleccion[]>([]);
+  const [clipCctv, setClipCctv] = useState<PortapapelesCctv | null>(null);
+  const focoLienzo = useRef(false);
   const [capas, setCapas] = useState({ croquis: true, etiquetas: true, calor: false, translucidos: false, humanoides: true, abajo: true, cobertura: false, claves: true, noche: false, tamanoReal: false, cableado: true, cableado3d: false, medidas: false, conos: true });
   // Pisos de abajo para la vista apilada (en gris). La raíz cambia con cada edición de cualquier
   // piso; si los de abajo no cambiaron se reutiliza la lista para no recalcular su cobertura.
@@ -314,9 +331,14 @@ export default function EditorCctv({
 
   /** Aplica un cambio al nivel activo (todo lo del editor trabaja sobre un solo piso). */
   const aplicar = useCallback(
-    (p: Plano, opciones?: { seleccion?: Seleccion | null; fusion?: string }) => {
-      despachar({ tipo: "aplicar", plano: reemplazarNivel(raizRef.current, nivelRef.current, p), seleccion: opciones?.seleccion, fusion: opciones?.fusion });
-      if (opciones?.seleccion) setPestana("seleccion");
+    (p: Plano, opciones?: { seleccion?: Seleccion | null; fusion?: string; etiqueta?: string }) => {
+      const planoNuevo = reemplazarNivel(raizRef.current, nivelRef.current, p);
+      const etiqueta = opciones?.etiqueta ?? etiquetaDeCambio(raizRef.current, planoNuevo, opciones?.fusion);
+      despachar({ tipo: "aplicar", plano: planoNuevo, seleccion: opciones?.seleccion, fusion: opciones?.fusion, etiqueta });
+      if (opciones?.seleccion !== undefined) {
+        setSeleccionGrupo(opciones.seleccion ? [opciones.seleccion] : []);
+        if (opciones.seleccion) setPestana("seleccion");
+      }
     },
     [],
   );
@@ -325,11 +347,18 @@ export default function EditorCctv({
   const cambiarNivel = (id: string) => {
     setNivelId(id);
     despachar({ tipo: "seleccionar", seleccion: null });
+    setSeleccionGrupo([]);
     setHerramienta("seleccionar");
   };
   const seleccionar = useCallback((s: Seleccion | null) => {
     despachar({ tipo: "seleccionar", seleccion: s });
+    setSeleccionGrupo(s ? [s] : []);
     if (s) setPestana("seleccion");
+  }, []);
+  const seleccionarGrupo = useCallback((sels: Seleccion[]) => {
+    setSeleccionGrupo(sels);
+    despachar({ tipo: "seleccionar", seleccion: sels[0] ?? null });
+    if (sels[0]) setPestana("seleccion");
   }, []);
 
   const numeroEquipo = useCallback((t: TipoEquipo) => siguienteNumeroEquipo(raizRef.current, t), []);
@@ -463,32 +492,65 @@ export default function EditorCctv({
     return () => clearTimeout(t);
   }, [aviso]);
 
+  useEffect(() => {
+    const on = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      focoLienzo.current = Boolean(t?.closest?.("[data-lienzo-foco]"));
+    };
+    window.addEventListener("focusin", on);
+    return () => window.removeEventListener("focusin", on);
+  }, []);
+
   /* ── Teclado ── */
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
-      const ctrl = e.ctrlKey || e.metaKey;
-      if (ctrl && e.key.toLowerCase() === "z") {
+      const grupo = seleccionGrupo.length ? seleccionGrupo : seleccion ? [seleccion] : [];
+      const accion = interpretarTecla({
+        key: e.key,
+        ctrl: e.ctrlKey,
+        meta: e.metaKey,
+        shift: e.shiftKey,
+        focoEnLienzo: focoLienzo.current,
+        haySeleccion: grupo.length > 0,
+      });
+      if (accion) {
         e.preventDefault();
-        despachar({ tipo: e.shiftKey ? "rehacer" : "deshacer" });
+        if (accion.tipo === "deshacer") despachar({ tipo: "deshacer" });
+        else if (accion.tipo === "rehacer") despachar({ tipo: "rehacer" });
+        else if (accion.tipo === "borrar" && grupo.length) {
+          const nuevo = borrarVarios(plano, grupo, capasBloqueo);
+          const quedan = grupo.filter((s) => existe(nuevo, s));
+          aplicar(nuevo, {
+            seleccion: quedan[0] ?? null,
+            etiqueta: quedan.length === grupo.length ? undefined : "Quité selección",
+          });
+          setSeleccionGrupo(quedan);
+        } else if (accion.tipo === "copiar" && grupo.length) setClipCctv(copiarSeleccion(plano, grupo));
+        else if (accion.tipo === "pegar" && clipCctv) {
+          const r = pegarPortapapeles(plano, clipCctv);
+          aplicar(r.plano, { seleccion: r.seleccion[0] ?? null, etiqueta: "Pegué selección" });
+          setSeleccionGrupo(r.seleccion);
+        } else if (accion.tipo === "mover-seleccion" && grupo.length) {
+          const dx = accion.dx / plano.escala.metrosPorPx;
+          const dy = accion.dy / plano.escala.metrosPorPx;
+          aplicar(moverVarios(plano, grupo, { x: dx, y: dy }, capasBloqueo), {
+            fusion: `tecla-mover-${grupo.map((s) => s.id).join("-")}`,
+          });
+        } else if (accion.tipo === "rotar-camara" && seleccion?.tipo === "camara") {
+          const c = plano.camaras.find((x) => x.id === seleccion.id);
+          if (c) aplicar(actualizarCamara(plano, c.id, { rumboDeg: (c.rumboDeg + accion.grados) % 360 }), { fusion: `tecla-rotar-${c.id}` });
+        }
         return;
       }
-      if (ctrl && e.key.toLowerCase() === "y") {
-        e.preventDefault();
-        despachar({ tipo: "rehacer" });
-        return;
-      }
-      if (ctrl) return;
-      if ((e.key === "Delete" || e.key === "Backspace") && seleccion) {
-        e.preventDefault();
-        aplicar(borrar(plano, seleccion), { seleccion: null });
-        return;
-      }
+      if (e.ctrlKey || e.metaKey) return;
       if (e.key === "Escape") {
         setHerramienta("seleccionar");
         setMedida(null);
         setTextoEn(null);
+        setSeleccionGrupo([]);
+        despachar({ tipo: "seleccionar", seleccion: null });
         return;
       }
       const h = HERRAMIENTAS.find((x) => x.tecla?.toLowerCase() === e.key.toLowerCase());
@@ -496,7 +558,7 @@ export default function EditorCctv({
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [plano, seleccion, aplicar]);
+  }, [plano, seleccion, seleccionGrupo, capasBloqueo, aplicar, clipCctv]);
 
   /* ── Croquis ── */
   /** Un documento del expediente (PDF o imagen) pasa a croquis del nivel abierto y la IA lo digitaliza. */
@@ -830,8 +892,10 @@ export default function EditorCctv({
                   key={nivelActivo.nivel.id}
                   plano={plano}
                   seleccion={seleccion}
+                  seleccionGrupo={seleccionGrupo}
                   herramienta={herramienta}
                   capas={capas}
+                  capasBloqueo={capasBloqueo}
                   tapas={tapas}
                   coberturas={coberturas}
                   modeloNuevo={modeloNuevo}
@@ -843,6 +907,7 @@ export default function EditorCctv({
                   nivelId={nivelActivo.nivel.id}
                   onAplicar={aplicar}
                   onSeleccionar={seleccionar}
+                  onSeleccionGrupo={seleccionarGrupo}
                   onAviso={setAviso}
                   onPedirMedida={(a, b) => setMedida({ a, b })}
                   onPedirTexto={setTextoEn}
@@ -1061,7 +1126,17 @@ export default function EditorCctv({
                 </div>
               ) : null}
             </div>
-            <Inspector
+            <HistorialVisible
+                pasado={estado.pasado}
+                actual={estado.plano}
+                etiquetasPasado={estado.etiquetasPasado}
+                onVolver={(indicePasado) => {
+                  const n = estado.pasado.length - indicePasado;
+                  for (let i = 0; i < n; i++) despachar({ tipo: "deshacer" });
+                }}
+              />
+              <CapasBloqueoPanel capas={capasBloqueo} onChange={setCapasBloqueo} />
+              <Inspector
               plano={plano}
               seleccion={seleccion}
               pestana={pestana}
