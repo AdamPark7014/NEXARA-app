@@ -4,6 +4,8 @@ export const PLATFORM_OWNER_EMAIL = 'gerencia@nexara.com.mx';
 export const PLATFORM_DEVELOPER_EMAIL = 'developer@nexara.com.mx';
 export const CLAUDIA_TESTER_EMAIL = 'claudia.bernal@nexara.com.mx';
 export const PLAY_REVIEW_EMAIL = 'play.review@nexara.com.mx';
+/** Getzemani Del Valle (Dirección General, 17-11-2026): hace todo lo del CEO y no es personal operativo. */
+export const DIRECCION_GENERAL_EMAIL = 'getzemani.delvalle@nexara.com.mx';
 
 export function normalizePlatformEmail(email?: string | null): string {
   return email?.trim().toLowerCase() ?? '';
@@ -17,6 +19,7 @@ export function normalizePlatformEmail(email?: string | null): string {
  */
 export const CEO_EQUIVALENT_EMAILS: ReadonlySet<string> = new Set([
   PLATFORM_OWNER_EMAIL,
+  DIRECCION_GENERAL_EMAIL,
   CLAUDIA_TESTER_EMAIL,
 ]);
 
@@ -40,6 +43,7 @@ export function isDeveloperSuperAdminEmail(email?: string | null): boolean {
  */
 export const NON_EMPLOYEE_EMAILS: ReadonlySet<string> = new Set([
   PLATFORM_OWNER_EMAIL,
+  DIRECCION_GENERAL_EMAIL,
   PLATFORM_DEVELOPER_EMAIL,
   CLAUDIA_TESTER_EMAIL,
   PLAY_REVIEW_EMAIL,
