@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { presentSidebarGroups } from "@/components/app-shell/sidebar-presentation";
 import { filtrarGruposContabilidad } from "@/components/erp/ContabilidadSidebar";
-import { canUsarMesaContable, esRutaDeMesaPorCorreo } from "@/lib/mesa-por-correo";
+import {
+  canUsarMesaContable,
+  canUsarNominaPorCorreo,
+  esRutaDeMesaPorCorreo,
+  esRutaDeNominaPorCorreo,
+} from "@/lib/mesa-por-correo";
 import { PERMISSIONS } from "@/lib/permissions";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildUserSidebar, canUserAccessPath } from "@/lib/user-access";
@@ -41,9 +46,12 @@ describe("Mesa contable por persona", () => {
     }
   });
 
-  it("no le abre Nómina por ninguna de sus dos páginas", () => {
+  it("no le abre la prenómina del hub Contabilidad; sí la Nómina de finanzas (cola-04)", () => {
     expect(canUserAccessPath(contadora, "/erp/contabilidad/pre-nomina")).toBe(false);
-    expect(canUserAccessPath(contadora, "/erp/finance/employee-payments")).toBe(false);
+    expect(canUsarNominaPorCorreo(contadora.email)).toBe(true);
+    expect(esRutaDeNominaPorCorreo("/erp/finance/employee-payments")).toBe(true);
+    expect(canUserAccessPath(contadora, "/erp/finance/employee-payments")).toBe(true);
+    expect(canUserAccessPath(otraPersona, "/erp/finance/employee-payments")).toBe(false);
   });
 
   it("no le quita lo que ya usa", () => {
@@ -58,13 +66,14 @@ describe("Mesa contable por persona", () => {
     expect(riel(otraPersona)).not.toContain("bancos");
   });
 
-  it("su menú trae Mesa contable, y Facturación y Bancos pasan adentro", () => {
+  it("su menú trae Mesa contable y Nómina; Facturación y Bancos pasan adentro", () => {
     const menu = idsDelMenu(contadora);
     const antes = idsDelMenu(otraPersona);
     expect(menu).toContain("erp-contabilidad");
+    expect(menu).toContain("employee-payments");
     expect(menu).not.toContain("banking");
     expect(menu).not.toContain("invoicing");
-    expect(menu).not.toContain("employee-payments");
+    expect(antes).not.toContain("employee-payments");
     // Frente a su rol sin la concesión, lo único que sale del menú es Facturación, que pasa adentro.
     expect(antes.filter((id) => !menu.includes(id))).toEqual(["invoicing"]);
   });
@@ -78,7 +87,7 @@ describe("Mesa contable por persona", () => {
     expect(ids).not.toContain("auditoria");
   });
 
-  it("en Bancos puede trabajar como contabilidad; en Nómina, no", () => {
+  it("en Bancos puede trabajar como contabilidad; en Nómina ve la sección de pagos", () => {
     expect(getErpFinanceSectionConfig(contadora, "banking")).toMatchObject({ viewMode: "manage", canCreate: true });
     expect(getErpFinanceSectionConfig(contadora, "employee-payments")).toMatchObject({
       viewMode: "execute",

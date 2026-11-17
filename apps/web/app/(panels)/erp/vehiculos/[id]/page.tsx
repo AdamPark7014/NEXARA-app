@@ -361,9 +361,75 @@ function Viaje({
         <Dato label="Origen" valor={viaje.origen === "solicitud" ? "Solicitud" : "Inventario"} />
       </div>
 
-      <Tira titulo="Salida" fotos={viaje.fotosSalida} onFoto={onFoto} />
-      <Tira titulo="Devolución" fotos={viaje.fotosDevolucion} onFoto={onFoto} />
+      <AntesYDespues salida={viaje.fotosSalida} devolucion={viaje.fotosDevolucion} onFoto={onFoto} />
     </article>
+  );
+}
+
+/** Antes (salida) y después (devolución) del mismo ángulo, lado a lado. */
+function AntesYDespues({
+  salida,
+  devolucion,
+  onFoto,
+}: {
+  salida: FotoChecklist[];
+  devolucion: FotoChecklist[];
+  onFoto: (foto: FotoChecklist) => void;
+}) {
+  const porSlot = (fotos: FotoChecklist[]) => {
+    const m = new Map<string, FotoChecklist>();
+    for (const f of fotos ?? []) m.set(f.slot, f);
+    return m;
+  };
+  const sal = porSlot(salida);
+  const dev = porSlot(devolucion);
+  const slots = [...new Set([...sal.keys(), ...dev.keys()])].sort((a, b) =>
+    a === "tablero" ? -1 : b === "tablero" ? 1 : a.localeCompare(b),
+  );
+  if (!slots.length) {
+    return (
+      <div>
+        <div className={styles.tiraTitulo}>Antes y después</div>
+        <span className={styles.mini}>Sin fotos</span>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div className={styles.tiraTitulo}>Antes y después</div>
+      <div style={{ display: "grid", gap: 12 }}>
+        {slots.map((slot) => {
+          const a = sal.get(slot);
+          const b = dev.get(slot);
+          const etiqueta = ETIQUETA_SLOT[slot as SlotChecklist] || slot;
+          return (
+            <div
+              key={slot}
+              style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, alignItems: "start" }}
+            >
+              {a ? (
+                <button type="button" className={styles.foto} onClick={() => onFoto(a)} title={`Salida · ${etiqueta}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={urlFoto(a.url)} alt={`Salida · ${etiqueta}`} />
+                  <span className={styles.fotoPie}>Salida · {etiqueta}</span>
+                </button>
+              ) : (
+                <span className={styles.mini}>Salida · {etiqueta}: sin foto</span>
+              )}
+              {b ? (
+                <button type="button" className={styles.foto} onClick={() => onFoto(b)} title={`Devolución · ${etiqueta}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={urlFoto(b.url)} alt={`Devolución · ${etiqueta}`} />
+                  <span className={styles.fotoPie}>Devolución · {etiqueta}</span>
+                </button>
+              ) : (
+                <span className={styles.mini}>Devolución · {etiqueta}: sin foto</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

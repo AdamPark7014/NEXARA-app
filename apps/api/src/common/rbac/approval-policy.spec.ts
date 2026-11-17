@@ -11,11 +11,11 @@ describe('approval-policy (viaticos y vehicles 15-11-2026)', () => {
     expect(APPROVAL_CHAINS.viaticos).toHaveLength(2);
   });
 
-  it('vehicles: solo coord_admin y luego ceo', () => {
+  it('vehicles: solo coord_admin y luego ceo, final directo', () => {
     const steps = getRequiredApprovers('vehicles', 0);
-    expect(steps.map((s) => s.role)).toEqual([ROLES.COORD_ADMIN, ROLES.CEO]);
-    expect(steps[0].label).toBe('Gestión de vehículos');
-    expect(steps[1].isFinal).toBe(true);
+    expect(steps.map((s) => s.role)).toEqual([ROLES.COORD_ADMIN]);
+    expect(steps[0].label).toBe('Gestión de vehículos (Liz)');
+    expect(steps[0].isFinal).toBe(true);
   });
 
   it('evidencias sigue con tres pasos e incluye coord_operaciones', () => {

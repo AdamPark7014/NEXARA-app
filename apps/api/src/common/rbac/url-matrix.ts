@@ -830,6 +830,10 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/erp/documents/**', scope: 'write' },
     { path: '/erp/finance/viatics/**', scope: 'write' },
     { path: '/erp/finance/expenses/**', scope: 'write' },
+    // Nómina: la web solo la muestra a finanzas@ (section-views); el controlador afina alcance.
+    { path: '/erp/finance/employee-payments/**', scope: 'write' },
+    { path: '/erp/finance/prenomina/**', scope: 'write' },
+    { path: '/erp/finance/prenomina', methods: ['GET'], scope: 'write' },
     { path: '/erp/invoicing/**', scope: 'write' },
     { path: '/erp/procurement/**', scope: 'write' },
     { path: '/erp/warehouse/**', scope: 'write' },
@@ -853,6 +857,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/workflow/**', methods: ['GET', 'POST'], scope: 'read' },
     { path: '/api/viaticos/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/viatics/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    // Solo el control semanal: el servicio deja ver a la contadora (finanzas@) su alcance y a nadie más
+    // del rol administrativo. Pagos (`/api/employee-payments`) siguen siendo de dirección y RH.
+    CONTROL_NOMINA_URL_RULE,
     { path: '/api/documents/**', scope: 'write' },
     { path: '/api/internal-comunicados/**', scope: 'write' },
     { path: '/api/chat/**', scope: 'write' },

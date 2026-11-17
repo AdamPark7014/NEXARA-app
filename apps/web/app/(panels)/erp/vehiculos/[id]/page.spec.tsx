@@ -84,11 +84,12 @@ describe("ficha del vehículo", () => {
     expect(screen.getByText("120,345 km")).toBeInTheDocument();
     expect(screen.getByText(/AN-2026-014/)).toBeInTheDocument();
 
-    const salida = screen.getByText("Salida").parentElement!;
-    const botones = within(salida).getAllByRole("button");
+    // Antes (salida) y después (devolución) del mismo ángulo, lado a lado.
+    const comparacion = screen.getByText("Antes y después").parentElement!;
+    const botones = within(comparacion).getAllByRole("button");
     // El tablero va primero: es la foto que prueba kilometraje y gasolina.
     expect(botones[0]).toHaveTextContent("Tablero");
-    expect(within(salida).getByAltText("Frente")).toBeInTheDocument();
-    expect(screen.getByText("Devolución").parentElement).toHaveTextContent("Sin fotos");
+    expect(within(comparacion).getByAltText("Salida · Frente")).toBeInTheDocument();
+    expect(within(comparacion).getByText("Devolución · Frente: sin foto")).toBeInTheDocument();
   });
 });

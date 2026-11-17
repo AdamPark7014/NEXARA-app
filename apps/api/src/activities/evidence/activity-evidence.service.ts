@@ -27,7 +27,7 @@ import {
 import { distanciaAlSitio, sitioDeActividad, type PrismaSitio } from '../sitio-actividad.js';
 import { esNoCumplida } from '../incumplimiento.js';
 import { ChatService } from '../../chat/chat.service.js';
-import { avisoRevision } from '../../chat/avisos-chat.js';
+import { avisoEvidenciaPorRevisar, avisoRevision } from '../../chat/avisos-chat.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import {
   clampEvidencePhotoRequired,
@@ -172,6 +172,10 @@ export class ActivityEvidenceService {
       const revisor = submitter
         ? (await leerRevisores(this.prisma as never, activity.companyId)).find((r) => r.userId === submitter.id)?.revisorId
         : undefined;
+      const revisoresChat = [
+        ...leads.map((l) => l.userId),
+        ...(revisor ? [revisor] : jefe?.managerId ? [jefe.managerId] : []),
+      ];
       await this.notificationHierarchy.notifyEvidenceSubmitted(
         submitter?.id ?? activity.responsableId,
         activityId,
@@ -179,9 +183,20 @@ export class ActivityEvidenceService {
         submitter?.nombre || activity.responsable.nombre || 'Usuario',
         activity.anNumber,
         activity.responsableId,
-        [...leads.map((l) => l.userId), ...(revisor ? [revisor] : jefe?.managerId ? [jefe.managerId] : [])],
+        revisoresChat,
         correccion,
       );
+      if (this.chat) {
+        const texto = avisoEvidenciaPorRevisar(
+          { id: activity.id, anNumber: activity.anNumber, titulo: activity.titulo || 'Actividad' },
+          submitter?.nombre || activity.responsable.nombre || 'Usuario',
+        );
+        const de = submitter?.id ?? activity.responsableId;
+        for (const para of new Set(revisoresChat)) {
+          if (!para || para === de) continue;
+          void this.chat.avisoDirecto(de, para, texto, activity.companyId).catch(() => undefined);
+        }
+      }
     } catch {
       /* no bloquear flujo de evidencias */
     }

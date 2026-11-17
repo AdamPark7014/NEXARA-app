@@ -5,7 +5,12 @@
  * las mismas reglas — evita el bug "veo el menú pero la ruta parpadea".
  */
 import { canManageAlmacen, esRutaDeAlmacen } from "@/lib/almacen-access";
-import { canUsarMesaContable, esRutaDeMesaPorCorreo } from "@/lib/mesa-por-correo";
+import {
+  canUsarMesaContable,
+  canUsarNominaPorCorreo,
+  esRutaDeMesaPorCorreo,
+  esRutaDeNominaPorCorreo,
+} from "@/lib/mesa-por-correo";
 import {
   MODULES,
   PANEL_META,
@@ -108,6 +113,8 @@ export function canUserAccessPath(user: UserAccessInput | null | undefined, path
   if (esRutaDeAlmacen(pathname) && canManageAlmacen(user.email)) return true;
   // Mesa contable concedida por persona (Contadora General), sin cambiarle el rol (`lib/mesa-por-correo.ts`).
   if (esRutaDeMesaPorCorreo(pathname) && canUsarMesaContable(user.email)) return true;
+  // Nómina por correo: Paulina (finanzas@); Mónica/Daniela no.
+  if (esRutaDeNominaPorCorreo(pathname) && canUsarNominaPorCorreo(user.email)) return true;
 
   const v2 = resolveV2RoleKey(user);
   if (v2) return canOpenPage(v2, pathname);

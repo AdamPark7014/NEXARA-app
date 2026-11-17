@@ -1,5 +1,16 @@
 # RELEVO
 
+- **17-11 ~19:50 México (claude-code; Cursor codifica, Codex pule) — Reglas del grupo de WhatsApp: autos, reembolso, aviso a Luis, nómina por perfil.**
+  - `approval-policy`: vehículos = solo coord_admin (Lizeth). Entrega/devolución de auto exige fotos panorámicas +
+    tablero; ficha muestra antes/después lado a lado; aviso si km de regreso < salida.
+  - Reembolso: desde 17-11 solo tickets aprobados con foto y razón entran a la nómina.
+  - `activities/aviso-luis.ts`: actividad autoasignada o del mismo día → push + chat al Supervisor General
+    (dir_operaciones; si no hay, al jefe). Evidencia enviada → chat al revisor.
+  - `employee-payments/nomina-alcance.ts`: rh ve toda la nómina; administrativo solo si es `finanzas@` (modo totales:
+    neto, descuentos y reembolso); Mónica/Daniela sin nómina. administrativo solo tiene el control semanal en
+    url-matrix (no `/api/employee-pagos`). Pendiente: UI para configurar el alcance de la contadora.
+  - No es mío: `apps/web/lib/contabilidad-fechas.ts` (hilo de contabilidad, hoy rompe el typecheck web).
+
 - **16-11 ~18:45 México (claude-code; Cursor codifica, Codex pule) — Mesa de Lizeth y RH completo de Tere. Pendiente de desplegar.**
   - `src/gestion-viaticos/` + `/erp/gestion-viaticos` (tabla `viatico_tickets`, migración `20261116195000_viatico_tickets`):
     bandeja de la gestora (coord_admin), ticket con foto ligado a viático/actividad, aprobación de Lizeth, lista «Por

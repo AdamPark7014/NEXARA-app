@@ -6,7 +6,7 @@
  */
 import type { ModuleEntry, ModuleId } from '@/lib/access-matrix';
 import { canOpenPage } from '@/lib/rbac/page-matrix';
-import { canUsarMesaContable } from '@/lib/mesa-por-correo';
+import { canUsarMesaContable, canUsarNominaPorCorreo } from '@/lib/mesa-por-correo';
 import { ROLES, ROLE_TIER, type RoleKey } from '@/lib/rbac/roles';
 import { resolveV2RoleKey, type UserAccessInput } from '@/lib/rbac/role-mapping';
 import { isAdvancedOnlyModuleId, isNavAdvanced } from '@/lib/nav-mode';
@@ -368,9 +368,12 @@ export function shouldShowModuleInSidebar(
       return false;
     case 'invoicing':
     case 'banking':
-    case 'employee-payments':
     case 'erp-contabilidad':
       return FINANCE_ROLES.has(v2) || v2 === ROLES.RH || v2 === ROLES.ADMINISTRATIVO;
+    case 'employee-payments':
+      // Paulina (finanzas@) sí; Mónica/Daniela (administrativo genérico) no.
+      if (v2 === ROLES.ADMINISTRATIVO) return canUsarNominaPorCorreo(user?.email);
+      return FINANCE_ROLES.has(v2) || v2 === ROLES.RH;
     case 'supervision':
       return SUPERVISION_ROLES.has(v2);
     case 'pizarra':

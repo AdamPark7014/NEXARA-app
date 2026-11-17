@@ -20,6 +20,14 @@ import { diaDeLaSemana } from '../me/kpis-equipo.js';
 import { EmployeePaymentsService } from './employee-payments.service.js';
 import { roundMoney } from './prenomina-amount.js';
 import {
+  SETTING_KEY_NOMINA_ALCANCE,
+  configDeViewer,
+  esContadoraNomina,
+  filtrarPersonasNomina,
+  parsearMapaAlcance,
+  modoAlcanceContadora,
+} from './nomina-alcance.js';
+import {
   LUGARES,
   MOTIVO_MIN,
   areaDe,
@@ -147,7 +155,28 @@ export class ControlNominaService {
       scope = calc.scope;
     }
 
+    // El alcance también se aplica a las fotos de semanas cerradas y a Excel.
+    let soloTotales = false;
+    if (esContadoraNomina(viewer)) {
+      const setting = await this.prisma.systemSetting.findFirst({
+        where: { key: SETTING_KEY_NOMINA_ALCANCE, companyId: tenantId }, select: { value: true },
+      });
+      const config = configDeViewer(parsearMapaAlcance(setting?.value), viewer);
+      const usuarios = await this.prisma.user.findMany({
+        where: { id: { in: filas.map((f) => f.userId) }, companyMemberships: { some: { companyId: tenantId } } },
+        select: { id: true, roleKey: true, email: true },
+      });
+      const permitidos = new Set(filtrarPersonasNomina(usuarios, viewer, config).map((u) => u.id));
+      filas = filas.filter((f) => permitidos.has(f.userId));
+      soloTotales = modoAlcanceContadora(config) === 'totales';
+      if (soloTotales) filas = filas.map((f) => ({
+        ...ocultarMontos(f), dias: [], horario: '', notaFila: null, avisos: [],
+        sueldoPeriodoExplicacion: 'Detalle reservado a RH y dirección.',
+        total: f.total, descuentosTotal: f.descuentosTotal, viaticos: f.viaticos, pago: null,
+      }));
+    }
     const totales = totalesControl(filas);
+    if (soloTotales) totales.sueldo = totales.sueldoPeriodo = totales.extrasMonto = totales.subtotal = null;
     return {
       semana: this.semanaDto(lunes, fila),
       dias: diasDeLaSemana(lunes),
@@ -157,7 +186,7 @@ export class ControlNominaService {
       lugares: LUGARES,
       congelada,
       montosOcultos: !opciones.verMontos,
-      puedeEditar: opciones.puedeEditar && !congelada,
+      puedeEditar: opciones.puedeEditar && !congelada && !esContadoraNomina(viewer),
       scope,
       generadoAt: new Date().toISOString(),
     };
@@ -789,9 +818,20 @@ export class ControlNominaService {
   ): Promise<{ filas: FilaRespuesta[]; scope: 'company' | 'subtree' }> {
     const fin = domingoDe(lunes);
     const dias = diasDeLaSemana(lunes).map((d) => d.fecha);
-    const datos = await this.kpis.getEquipo(viewer, tenantId, { desde: lunes, hasta: fin }, soloUserId, { conDias: true });
-    const ids = datos.personas.map((p) => p.persona.id);
-    if (!ids.length) return { filas: [], scope: datos.scope };
+    // Contadora: necesita plantilla completa y luego filtrar; RH ya es company-wide.
+    const viewerKpi = esContadoraNomina(viewer)
+      ? { ...viewer, roleKey: 'rh' as const }
+      : viewer;
+    const datos = await this.kpis.getEquipo(viewerKpi, tenantId, { desde: lunes, hasta: fin }, soloUserId, { conDias: true });
+
+    const alcanceRaw = await this.prisma.systemSetting.findFirst({
+      where: { key: SETTING_KEY_NOMINA_ALCANCE, companyId: tenantId },
+      select: { value: true },
+    });
+    const configAlcance = configDeViewer(parsearMapaAlcance(alcanceRaw?.value), viewer);
+
+    const idsBrutos = datos.personas.map((p) => p.persona.id);
+    if (!idsBrutos.length) return { filas: [], scope: datos.scope };
 
     const hoy = workDateKey(new Date(datos.generadoAt));
     const inicioSemana = workDayStart(parseWorkDate(lunes));
@@ -800,21 +840,31 @@ export class ControlNominaService {
     const enSemana = { gte: inicioSemana, lte: finSemana };
     const colLunes = fechaColumna(lunes);
     const colFin = fechaColumna(fin);
-    const inIds = { in: ids };
+    const inIdsBrutos = { in: idsBrutos };
 
-    const [usuarios, checadas, guardias, justificaciones, permisos, viaticos, hospedajes, actividades, pagos] =
+    const usuariosPrevios = await this.prisma.user.findMany({
+      where: { id: inIdsBrutos, companyMemberships: { some: { companyId: tenantId } } },
+      select: {
+        id: true,
+        employeeNumber: true,
+        fechaIngreso: true,
+        roleKey: true,
+        email: true,
+        department: { select: { nombre: true } },
+        perfil: { select: { sueldoSemanal: true } },
+      },
+    });
+    const permitidos = new Set(
+      filtrarPersonasNomina(usuariosPrevios, viewer, configAlcance).map((p) => p.id),
+    );
+    const personas = datos.personas.filter((p) => permitidos.has(p.persona.id));
+    const ids = personas.map((p) => p.persona.id);
+    if (!ids.length) return { filas: [], scope: datos.scope };
+    const inIds = { in: ids };
+    const usuarios = usuariosPrevios.filter((u) => permitidos.has(u.id));
+
+    const [checadas, guardias, justificaciones, permisos, viaticos, ticketsReembolso, hospedajes, actividades, pagos] =
       await Promise.all([
-        this.prisma.user.findMany({
-          where: { id: inIds },
-          select: {
-            id: true,
-            employeeNumber: true,
-            fechaIngreso: true,
-            roleKey: true,
-            department: { select: { nombre: true } },
-            perfil: { select: { sueldoSemanal: true } },
-          },
-        }),
         this.prisma.attendance.findMany({
           where: { userId: inIds, timestamp: ventana, companyId: tenantId },
           select: { userId: true, type: true, timestamp: true, sitioNombre: true, fueraDeSitio: true },
@@ -844,7 +894,8 @@ export class ControlNominaService {
             companyId: tenantId,
             deletedAt: null,
             estatus: { in: ['Aprobado', 'Pagado'] },
-            fechaSolicitud: enSemana,
+            fechaSolicitud: { ...enSemana, lt: workDayStart(parseWorkDate('2026-11-17')) },
+            tickets: { none: {} },
           },
           select: {
             id: true,
@@ -857,6 +908,29 @@ export class ControlNominaService {
             fechaSolicitud: true,
           },
           orderBy: { fechaSolicitud: 'asc' },
+        }),
+        // Reembolsos: solo tickets ya aprobados (o facturados) en la semana.
+        this.prisma.viaticoTicket.findMany({
+          where: {
+            usuarioId: inIds,
+            companyId: tenantId,
+            estado: { in: ['APROBADO', 'FACTURADO', 'NO_FACTURABLE'] },
+            fotoUrl: { not: '' },
+            revisadoPorId: { not: null },
+            revisadoAt: { not: null },
+            viatico: { companyId: tenantId, deletedAt: null, motivo: { not: '' } },
+            fechaHora: enSemana,
+          },
+          select: {
+            id: true,
+            usuarioId: true,
+            tipo: true,
+            monto: true,
+            estado: true,
+            fechaHora: true,
+            notas: true,
+          },
+          orderBy: { fechaHora: 'asc' },
         }),
         // Hospedaje que pueda cubrir algún día de la semana (se pide antes de viajar).
         this.prisma.viatico.findMany({
@@ -1010,6 +1084,18 @@ export class ControlNominaService {
       });
       viaticosPor.set(v.usuarioId, lista);
     }
+    for (const t of ticketsReembolso) {
+      const lista = viaticosPor.get(t.usuarioId) ?? [];
+      lista.push({
+        id: t.id,
+        concepto: [`Reembolso · ${t.tipo}`, t.notas?.trim()].filter(Boolean).join(' · '),
+        monto: roundMoney(Number(t.monto) || 0),
+        estatus: 'Por reembolsar',
+        categoria: t.tipo,
+        fecha: workDateKey(t.fechaHora),
+      });
+      viaticosPor.set(t.usuarioId, lista);
+    }
     const pagoPor = new Map<number, PagoDeFila>();
     for (const p of pagos) {
       if (!pagoPor.has(p.userId)) pagoPor.set(p.userId, { id: p.id, estatus: p.status, monto: roundMoney(Number(p.amount) || 0) });
@@ -1024,7 +1110,7 @@ export class ControlNominaService {
       descuentosPor.set(d.userId, lista);
     }
 
-    const filas = datos.personas.map((p): FilaRespuesta => {
+    const filas = personas.map((p): FilaRespuesta => {
       const id = p.persona.id;
       const u = usuarioPor.get(id);
       const ingreso = u?.fechaIngreso ? workDateKey(u.fechaIngreso) : null;

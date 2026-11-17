@@ -262,3 +262,20 @@ describe('Pagos a empleados · la política del módulo también en preview-peri
     expect(service.createBorradorBatch).not.toHaveBeenCalled();
   });
 });
+
+describe('alcance en semanas cerradas', () => {
+  it('contadora recibe solo su alcance y totales, RH conserva los sueldos', async () => {
+    const { service, prisma } = crear({ estado: 'CERRADA' });
+    prisma.nominaSemana.findFirst.mockResolvedValue({ estado: 'CERRADA', filas: [1,2,3].map(userId => ({ snapshot: fila(userId) })) });
+    prisma.systemSetting = { findFirst: jest.fn().mockResolvedValue({ value: JSON.stringify({ 'finanzas@nexara.com.mx': { userIds: [3] } }) }) };
+    prisma.user.findMany = jest.fn().mockResolvedValue([{ id: 1, roleKey: 'ceo' }, { id: 2, roleKey: 'rh' }, { id: 3, roleKey: 'ing_campo' }]);
+    const r = await service.consultar({ id: 9, roleKey: 'administrativo', email: 'finanzas@nexara.com.mx' }, 7, LUNES, { verMontos: true, puedeEditar: false });
+    expect(r.filas.map(f => f.userId)).toEqual([3]);
+    expect(r.filas[0]).toMatchObject({ sueldo: null, sueldoPeriodo: null, total: 2800, pago: null, dias: [] });
+    expect(r.totales.sueldo).toBeNull();
+    expect(prisma.user.findMany.mock.calls[0][0].where.companyMemberships).toEqual({ some: { companyId: 7 } });
+    const rh = await service.consultar({ id: 2, roleKey: 'rh' }, 7, LUNES, { verMontos: true, puedeEditar: true });
+    expect(rh.filas).toHaveLength(3);
+    expect(rh.filas[0].sueldo).toBe(2800);
+  });
+});
