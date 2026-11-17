@@ -24,7 +24,7 @@ class AttendanceViewModeTest {
         // Christian aparecía con botones de Entrada/Salida que la web no le da.
         assertEquals(AttendanceViewMode.MANAGE, mode(email = "gerencia@nexara.com.mx", isSuperAdmin = true))
         assertEquals(AttendanceViewMode.MANAGE, mode(roleKey = "ceo"))
-        assertEquals(AttendanceViewMode.MANAGE, mode(roleKey = "dir_operaciones"))
+        assertEquals(AttendanceViewMode.MANAGE_REGISTER, mode(roleKey = "dir_operaciones"))
         assertFalse(mode(roleKey = "ceo").canRegisterSelf)
         assertTrue(mode(roleKey = "ceo").canManageTeam)
     }
