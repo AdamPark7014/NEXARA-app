@@ -165,6 +165,13 @@ describe("documentoConPropuesta", () => {
     expect(documentoConPropuesta(previo, datos).partidas.map((p) => p.name)).toEqual(["Ya estaba", "Cámara domo"]);
   });
 
+
+  it("escribe la atención si viene en la propuesta", () => {
+    expect(documentoConPropuesta(documentoVacio(), { ...datos, atencion: "Administración de Materiales Pronto" }).atencion).toBe(
+      "Administración de Materiales Pronto",
+    );
+  });
+
   it("sin factura se respeta", () => {
     expect(documentoConPropuesta(documentoVacio(), { ...datos, conIva: false }).conIva).toBe(false);
   });

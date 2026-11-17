@@ -691,8 +691,8 @@ export type PartidaPropuesta = Omit<OpcionPropuesta, "unit"> & {
 export type ClientePropuesta = {
   salesClientId: number | null;
   nombre: string;
-  /** alta = es este; media = parece; nuevo = no está; generico = no lo dijeron. */
-  seguridad: "alta" | "media" | "nuevo" | "generico";
+  /** alta = es este; media = parece; nuevo = no está; falta = no lo dijeron. */
+  seguridad: "alta" | "media" | "nuevo" | "falta";
   parecidos: Array<{ id: number; nombre: string }>;
 };
 

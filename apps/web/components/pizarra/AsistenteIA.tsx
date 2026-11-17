@@ -17,6 +17,7 @@ import { useUser } from "@/components/UserContext";
 import { useCronometroProceso } from "@/lib/cronometro-proceso";
 import { formatApiError } from "@/lib/erp-api";
 import { AvisoParecidos } from "@/components/erp/ClienteRapido";
+import { esNombreDeRelleno, mensajeAlertaClienteRelleno } from "@/lib/cliente-relleno";
 import { buscarClientesParecidos, type ClienteParecido } from "@/lib/sales-api";
 import { formatMinutes } from "@/lib/activity-labels";
 import { kindsForAssignment } from "@/lib/activity-kinds";
@@ -337,7 +338,7 @@ function Contenido({
   /** «+ Escribir otro cliente…»: lo escrito queda como cliente a dar de alta al confirmar. */
   const usarEscrito = (i: number) => {
     const nombre = escribiendo[i]?.trim();
-    if (!nombre) return;
+    if (!nombre || esNombreDeRelleno(nombre)) return;
     agregarCliente(i, nombre);
     setEscribiendo((prev) => ({ ...prev, [i]: undefined }));
   };
@@ -401,6 +402,7 @@ function Contenido({
     const proyectoNuevo = proyectoNuevoEfectivo(p, aj);
     const motivos = bloqueos(p, payload, { creadorEmail, destinoEmail, v2Role: v2, isSuperAdmin, agenda, clienteNuevo: pendiente, proyectoNuevo });
     const parecidosCliente = pendiente && !aj.clienteNuevoConfirmado ? parecidos[nombreComparable(pendiente)] ?? [] : [];
+    if (pendiente && esNombreDeRelleno(pendiente)) motivos.push(mensajeAlertaClienteRelleno(pendiente));
     if (parecidosCliente.length) motivos.push(`«${pendiente}» se parece a un cliente que ya existe: elige si es el mismo.`);
     return { aj, payload, agenda, destinoEmail, motivos, pendiente, parecidosCliente, proyectoNuevo, campos: camposEfectivos(p, aj) };
   };
@@ -1007,13 +1009,23 @@ function Contenido({
                             <Button
                               variant="tonal"
                               size="sm"
-                              disabled={(escribiendo[i]?.trim().length ?? 0) < 2}
+                              disabled={(escribiendo[i]?.trim().length ?? 0) < 2 || esNombreDeRelleno(escribiendo[i])}
                               onClick={() => usarEscrito(i)}
                             >
                               Usar
                             </Button>
                           </div>
+                          {esNombreDeRelleno(escribiendo[i]) ? (
+                            <Alert tone="danger" role="alert">
+                              {mensajeAlertaClienteRelleno(escribiendo[i] ?? "")}
+                            </Alert>
+                          ) : null}
                         </Field>
+                      ) : null}
+                      {pendiente && esNombreDeRelleno(pendiente) ? (
+                        <Alert tone="danger" role="alert">
+                          {mensajeAlertaClienteRelleno(pendiente)}
+                        </Alert>
                       ) : null}
                       {parecidosCliente.length && pendiente ? (
                         <AvisoParecidos

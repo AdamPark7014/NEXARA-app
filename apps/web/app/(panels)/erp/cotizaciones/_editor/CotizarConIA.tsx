@@ -32,6 +32,7 @@ import {
   type FilaPropuesta,
 } from "@/lib/cotizar-ia";
 import { porcentajeMargen, textoDePorcentaje } from "@/lib/cotizacion-documento";
+import { atencionPorOmision, esNombreDeRelleno, mensajeAlertaClienteRelleno } from "@/lib/cliente-relleno";
 import AvisoCosto from "./AvisoCosto";
 import { TextoAuto } from "./campos";
 import s from "./CotizarConIA.module.css";
@@ -112,7 +113,7 @@ const cuantas = (n: number, unidad: string) => `${n} ${unidad.toLowerCase()}${n 
 
 function notaDeCliente(c: ClientePropuesta): string {
   if (c.seguridad === "alta") return "Ya le has cotizado";
-  if (c.seguridad === "generico") return "No lo dijiste: cámbialo cuando lo sepas";
+  if (c.seguridad === "falta") return "Falta el cliente: escríbelo antes de usar la cotización";
   if (c.seguridad === "media") return "¿Es alguno de estos?";
   return "Cliente nuevo: se guarda como texto";
 }
@@ -148,6 +149,7 @@ export default function CotizarConIA({
   /** Lo demás que la IA leyó de la frase: se ve y se corrige antes de usarla (caso de las 1000 tarjetas). */
   const [segmento, setSegmento] = useState<Segmento>("COMERCIAL");
   const [conIva, setConIva] = useState(true);
+  const [atencion, setAtencion] = useState("");
   const [filas, setFilas] = useState<FilaPropuesta[]>([]);
   const [extras, setExtras] = useState<FilaPropuesta[]>([]);
   const [copiando, setCopiando] = useState(false);
@@ -166,6 +168,7 @@ export default function CotizarConIA({
       const m = r.margen ?? r.margenPorOmision;
       setPropuesta(r);
       setCliente(r.cliente);
+      setAtencion(atencionPorOmision(r.cliente.nombre));
       setProyecto(r.proyecto);
       setSegmento(r.segmento as Segmento);
       setConIva(r.conIva);
@@ -182,6 +185,7 @@ export default function CotizarConIA({
   function descartar() {
     setPropuesta(null);
     setCliente(null);
+    setAtencion("");
     setFilas([]);
     setExtras([]);
     setError(null);
@@ -205,6 +209,7 @@ export default function CotizarConIA({
       segmento,
       conIva,
       filas: [...filas, ...extras],
+      atencion,
     });
   }
 
@@ -212,7 +217,7 @@ export default function CotizarConIA({
     setCopiando(true);
     setError(null);
     try {
-      const dicho = cliente && cliente.seguridad !== "generico" ? { salesClientId: cliente.salesClientId, nombre: cliente.nombre } : null;
+      const dicho = cliente && cliente.seguridad !== "falta" && cliente.nombre.trim() ? { salesClientId: cliente.salesClientId, nombre: cliente.nombre } : null;
       await onPartirDe(id, dicho);
     } catch (e) {
       setError(formatApiError(e, "No se pudo abrir esa cotización"));
@@ -297,7 +302,7 @@ export default function CotizarConIA({
                 <Input
                   id="cotizar-ia-cliente"
                   value={cliente.nombre}
-                  onChange={(e) => setCliente({ ...cliente, nombre: e.target.value, salesClientId: null, seguridad: "nuevo", parecidos: [] })}
+                  onChange={(e) => { const nombre = e.target.value; setCliente({ ...cliente, nombre, salesClientId: null, seguridad: nombre.trim() ? "nuevo" : "falta", parecidos: [] }); setAtencion((prev) => (!prev.trim() || prev === atencionPorOmision(cliente.nombre) ? atencionPorOmision(nombre) : prev)); }}
                 />
                 <span className={cliente.seguridad === "alta" ? s.bien : s.pista}>{notaDeCliente(cliente)}</span>
                 {cliente.seguridad === "media" ? (
@@ -307,13 +312,25 @@ export default function CotizarConIA({
                         key={p.id}
                         type="button"
                         className={s.opcion}
-                        onClick={() => setCliente({ salesClientId: p.id, nombre: p.nombre, seguridad: "alta", parecidos: [] })}
+                        onClick={() => { setCliente({ salesClientId: p.id, nombre: p.nombre, seguridad: "alta", parecidos: [] }); setAtencion((prev) => (!prev.trim() || prev === atencionPorOmision(cliente.nombre) ? atencionPorOmision(p.nombre) : prev)); }}
                       >
                         {p.nombre}
                       </button>
                     ))}
                   </span>
                 ) : null}
+              </div>
+              {cliente.nombre.trim() && esNombreDeRelleno(cliente.nombre) ? (
+                <Alert tone="danger" role="alert">
+                  {mensajeAlertaClienteRelleno(cliente.nombre)}
+                </Alert>
+              ) : null}
+              <div className={s.campo}>
+                <label htmlFor="cotizar-ia-atencion" className={s.etiqueta}>
+                  Atención
+                </label>
+                <Input id="cotizar-ia-atencion" value={atencion} onChange={(e) => setAtencion(e.target.value)} placeholder="Administración de …" />
+                <span className={s.pista}>Si no hay contacto, Administración de la empresa</span>
               </div>
               <div className={s.campo}>
                 <label htmlFor="cotizar-ia-proyecto" className={s.etiqueta}>
@@ -503,7 +520,7 @@ export default function CotizarConIA({
             <Button variant="ghost" className={s.empuja} onClick={descartar}>
               Descartar
             </Button>
-            <Button variant="primary" onClick={usar} disabled={!resumen.partidas || !cliente.nombre.trim()}>
+            <Button variant="primary" onClick={usar} disabled={!resumen.partidas || !cliente.nombre.trim() || esNombreDeRelleno(cliente.nombre)}>
               Usar en la cotización
             </Button>
           </div>

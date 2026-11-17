@@ -486,6 +486,15 @@ describe("AsistenteIA", () => {
       await waitFor(() => expect(api.crearActividad).toHaveBeenCalledTimes(1));
       expect(api.altaRapidaCliente).toHaveBeenCalledWith("tok", "Toks", { tipo: "servicio", confirmarNuevo: false });
     });
+
+    it("con nombre de relleno avisa y no deja usar ni confirmar", async () => {
+      const usuario = await preparar({ ...servicio, cliente: null, textoCliente: null, payload: { ...servicio.payload, clientId: undefined } });
+      await usuario.selectOptions(await screen.findByLabelText(/^Cliente/), "+ Escribir otro cliente…");
+      await usuario.type(await screen.findByPlaceholderText("Nombre del cliente"), "no aplica");
+      expect(await screen.findByRole("alert")).toHaveTextContent(/No se puede poner "no aplica"/);
+      expect(screen.getByRole("button", { name: "Usar" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Confirmar y asignar" })).toBeDisabled();
+    });
   });
 
   it("si el alta del cliente falla al confirmar, lo dice, no crea la actividad y deja reintentar", async () => {

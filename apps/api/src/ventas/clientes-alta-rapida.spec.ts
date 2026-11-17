@@ -199,7 +199,9 @@ describe('«usar este»', () => {
 describe('esNombreDeRelleno', () => {
   it('rechaza huecos que no son clientes', () => {
     const { esNombreDeRelleno } = jest.requireActual('./client-sectors.js');
-    for (const n of ['N/a', 'n/a', 'Varios', ' sin cliente ', 'Pendiente', 'X', '-', '']) expect(esNombreDeRelleno(n)).toBe(true);
-    for (const n of ['A QUIEN CORRESPONDA', 'BUAP', 'IPADE', 'SE', 'La Comer', 'N10']) expect(esNombreDeRelleno(n)).toBe(false);
+    for (const n of ['N/a', 'n/a', 'Varios', ' sin cliente ', 'Pendiente', 'X', '-', '', 'A QUIEN CORRESPONDA', 'a quién corresponda', 'AQC', 'quien corresponda', 'público en general', 'cliente general', 'no aplica', 'na']) {
+      expect(esNombreDeRelleno(n)).toBe(true);
+    }
+    for (const n of ['BUAP', 'IPADE', 'SE', 'La Comer', 'N10', 'Administración de BUAP']) expect(esNombreDeRelleno(n)).toBe(false);
   });
 });

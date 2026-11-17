@@ -13,7 +13,7 @@ export type LineaEsperada = { cant: number; busca: string[]; modelo?: string };
 export type CasoCotizar = {
   id: string;
   frase: string;
-  /** Nombre del cliente que debe quedar. `null` = no lo dijeron: «A QUIEN CORRESPONDA». */
+  /** Nombre del cliente que debe quedar. `null` = no lo dijeron: nombre vacío. */
   cliente: string | null;
   lineas: LineaEsperada[];
   /** Debe resolverse sin llamar a la IA. */

@@ -555,7 +555,7 @@ export class VentasService {
 
     // «N/a», «Varios»: no es un cliente, es un hueco que después nadie puede empatar.
     if (esNombreDeRelleno(nombre)) {
-      throw new BadRequestException(`«${nombre}» no es el nombre de un cliente. Escribe su nombre real, o usa A QUIEN CORRESPONDA.`);
+      throw new BadRequestException(`"${nombre}" no es un cliente. Escribe el nombre de la empresa o persona; si no sabes el contacto, usa "Administración de <empresa>".`);
     }
 
     // Casi seguro repetido («Benemérita Universidad Autónoma de Puebla» y BUAP): no entra sin que

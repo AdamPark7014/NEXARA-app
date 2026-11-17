@@ -1,5 +1,15 @@
 # RELEVO
 
+- **17-11 ~20:20 México (claude-code, código de Cursor) — Clientes sin relleno ni «A quien corresponda». Sin desplegar.**
+  - `esNombreDeRelleno` rechaza AQC/variantes en altas nuevas; mensaje pide «Administración de <empresa>».
+    Reutilizar el cliente histórico A QUIEN CORRESPONDA sigue si ya existe.
+  - Cotizar con IA: sin cliente → `seguridad: 'falta'`, nombre vacío, aviso; ya no elige el genérico.
+  - Web: `lib/cliente-relleno.ts`; alerta danger + botón deshabilitado en ClienteRapido, CotizarConIA y AsistenteIA.
+  - CotizarConIA: Atención por omisión «Administración de <cliente>» viaja en `DatosDePropuesta.atencion`.
+  - Pruebas: API ventas+cotizaciones 731 ok; web cliente-relleno/cotizar-ia/ClienteRapido/CotizarConIA/AsistenteIA(relleno) ok;
+    `tsc` web limpio. API `tsc` sigue rojo por trabajo ajeno (buzón SAT / supervisión / medidas).
+  - No tocado: contabilidad, schema, integra-shared ni otros sucios ajenos.
+
 - **17-11 ~19:50 México (claude-code; Cursor codifica, Codex pule) — Reglas del grupo de WhatsApp: autos, reembolso, aviso a Luis, nómina por perfil.**
   - `approval-policy`: vehículos = solo coord_admin (Lizeth). Entrega/devolución de auto exige fotos panorámicas +
     tablero; ficha muestra antes/después lado a lado; aviso si km de regreso < salida.
