@@ -222,6 +222,14 @@ describe('foto del ticket', () => {
       fecha: '2026-10-28',
       legible: true,
       revisar: false,
+      // Campos que agregó la lectura de tickets de la contadora (ola 1): sin dato en la foto, quedan en null.
+      comercio: null,
+      rfc: null,
+      hora: null,
+      iva: null,
+      combustible: null,
+      folio: null,
+      webFacturacion: null,
     });
   });
 
