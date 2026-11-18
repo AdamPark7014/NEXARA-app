@@ -1320,9 +1320,6 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/hr/personal-import/**', methods: ['POST'], scope: 'write' },
     { path: '/api/hr/solicitudes-aprobacion/**', methods: ['GET'], scope: 'write' },
     { path: '/api/documents/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
-    ...CLIENT_ADMIN_WRITE_URL_RULES,
-  ],
-
     // 18-11 (Tere): Plantilla RRHH, ficha y KPIs. Lee personas, roles y áreas; solo escribe campos de RRHH
     // (PATCH :id/hr). No administra cuentas: PATCH/DELETE /api/users/:id siguen cerrados.
     { path: '/api/users/hr-staff', methods: ['GET'], scope: 'read' },
@@ -1331,6 +1328,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/users/*', methods: ['GET'], scope: 'read' },
     { path: '/api/users/*/hr', methods: ['GET', 'PATCH'], scope: 'write' },
     { path: '/api/analytics/bi/engineers', methods: ['GET'], scope: 'read' },
+    ...CLIENT_ADMIN_WRITE_URL_RULES,
+  ],
+
   // ─────────────────────────────────────────────────────────────────
   // CONTABILIDAD
   // ─────────────────────────────────────────────────────────────────
