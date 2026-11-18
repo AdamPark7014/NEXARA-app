@@ -1,4 +1,5 @@
 export type ExcelFechaPreset =
+  | 'todos'
   | 'hoy'
   | 'ayer'
   | 'esta_semana'
@@ -12,6 +13,7 @@ export type ExcelFechaPreset =
 export type RangoExcel = { desde: string; hasta: string };
 
 export const EXCEL_FECHA_PRESETS: { id: ExcelFechaPreset; label: string }[] = [
+  { id: 'todos', label: 'Todos los registros filtrados' },
   { id: 'hoy', label: 'Hoy' },
   { id: 'ayer', label: 'Ayer' },
   { id: 'esta_semana', label: 'Esta semana' },
@@ -52,6 +54,7 @@ export function rangoDePresetExcel(
   preset: ExcelFechaPreset,
   hoy: string = fechaMx(),
 ): RangoExcel {
+  if (preset === 'todos') return { desde: '', hasta: '' };
   if (preset === 'hoy') return { desde: hoy, hasta: hoy };
   if (preset === 'ayer') {
     const a = suma(hoy, -1);
@@ -80,10 +83,13 @@ export function filtrarPorRangoFecha<T>(
   const desde = rango.desde.slice(0, 10);
   const hasta = rango.hasta.slice(0, 10);
   return rows.filter((row) => {
+    if (!desde && !hasta) return true;
     const raw = getFecha(row);
     if (!raw) return false;
-    const f = String(raw).slice(0, 10);
-    return f >= desde && f <= hasta;
+    const texto = String(raw);
+    const d = new Date(texto);
+    const f = /^\d{4}-\d{2}-\d{2}$/.test(texto) ? texto : Number.isFinite(d.getTime()) ? fechaMx(d) : '';
+    return Boolean(f) && (!desde || f >= desde) && (!hasta || f <= hasta);
   });
 }
 

@@ -15,19 +15,29 @@ export default function BuscadorProyecto({ token, valueNombre, valueId, onPick }
   const [all, setAll] = useState<OperationalProject[]>([]);
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setQ(valueNombre);
   }, [valueNombre]);
 
   useEffect(() => {
+    setAll([]);
+    setLoaded(false);
+  }, [token]);
+
+  useEffect(() => {
     if (!token || loaded) return;
+    let vigente = true;
+    setError(null);
     void listOperationalProjects(token)
       .then((rows) => {
+        if (!vigente) return;
         setAll(Array.isArray(rows) ? rows : []);
         setLoaded(true);
       })
-      .catch(() => setLoaded(true));
+      .catch(() => { if (vigente) { setLoaded(true); setError('No se pudieron cargar los proyectos.'); } });
+    return () => { vigente = false; };
   }, [token, loaded]);
 
   const ops = useMemo(() => {
@@ -48,11 +58,14 @@ export default function BuscadorProyecto({ token, valueNombre, valueId, onPick }
         onChange={(e) => {
           setQ(e.target.value);
           setOpen(true);
-          if (valueId != null) onPick(null, e.target.value);
+          onPick(null, e.target.value);
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
+      {open && !loaded ? <p role="status">Cargando proyectos…</p> : null}
+      {open && error ? <p role="alert">{error} <button type="button" onClick={() => setLoaded(false)}>Reintentar</button></p> : null}
+      {open && loaded && !error && ops.length === 0 ? <p>No hay proyectos que coincidan.</p> : null}
       {open && ops.length > 0 ? (
         <ul
           role="listbox"

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@/components/UserContext";
-import { buildApiUrl } from "@/lib/api-base";
+import { apiRequest } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
+import { ETIQUETAS_RH } from "@/lib/hr-etiquetas";
 import ExcelExportadorDinamico from "@/components/excel/ExcelExportadorDinamico";
 
 type Cargo = {
@@ -22,10 +23,14 @@ type Persona = { id: number; nombre: string };
 
 export default function CargosPerdidaPage() {
   const { token, user } = useUser();
+  const requestId = useRef(0);
   const [items, setItems] = useState<Cargo[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const permitido = ["rh", "ceo", "dir_admin", "super_admin"].includes(String(user?.roleKey ?? ""));
+  const direccion = ["ceo", "dir_admin", "super_admin"].includes(String(user?.roleKey ?? ""));
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     userId: "",
@@ -38,7 +43,7 @@ export default function CargosPerdidaPage() {
 
   const auth = useCallback(
     (path: string, init?: RequestInit) =>
-      fetch(buildApiUrl(path), {
+      apiRequest(path, {
         ...init,
         credentials: "include",
         headers: {
@@ -51,34 +56,42 @@ export default function CargosPerdidaPage() {
   );
 
   const cargar = useCallback(async () => {
-    if (!token) return;
+    if (!token || !permitido) { setItems([]); setLoading(false); return; }
+    const request = ++requestId.current;
+    setItems([]); setPersonas([]);
     setLoading(true);
     setError(null);
     try {
       const [rCargos, rUsers] = await Promise.all([
         auth("hr/cargos-perdida"),
-        auth("users?limit=100"),
+        auth("users/hr-staff"),
       ]);
       if (!rCargos.ok) throw new Error(await rCargos.text());
-      setItems(await rCargos.json());
+      const data = await rCargos.json();
+      if (request !== requestId.current) return;
+      setItems(data);
+      if (!rUsers.ok) throw new Error("No se pudo cargar el personal. Reintenta la carga.");
       if (rUsers.ok) {
         const raw = await rUsers.json();
         const list = Array.isArray(raw) ? raw : raw?.data ?? raw?.items ?? [];
+        if (request !== requestId.current) return;
         setPersonas(list.map((u: any) => ({ id: u.id, nombre: u.nombre })).filter((u: Persona) => u.id && u.nombre));
       }
     } catch (e) {
-      setError(formatApiError(e, "No se pudieron cargar los cargos."));
+      if (request === requestId.current) setError(formatApiError(e, "No se pudieron cargar los cargos."));
     } finally {
-      setLoading(false);
+      if (request === requestId.current) setLoading(false);
     }
-  }, [token, auth]);
+  }, [token, auth, permitido]);
 
   useEffect(() => {
     void cargar();
+    return () => { requestId.current++; };
   }, [cargar]);
 
   const crear = async () => {
-    if (!token) return;
+    if (!token || !permitido || saving) return;
+    setSaving(true);
     setError(null);
     setOk(null);
     try {
@@ -99,9 +112,11 @@ export default function CargosPerdidaPage() {
       await cargar();
     } catch (e) {
       setError(formatApiError(e));
-    }
+    } finally { setSaving(false); }
   };
 
+  if (!token) return <main><h1>Recursos Humanos</h1><p>Inicia sesión para continuar.</p></main>;
+  if (!permitido) return <main><h1>Recursos Humanos</h1><p role="alert">Solo RH o dirección pueden consultar esta información.</p></main>;
   return (
     <main style={{ padding: 16, maxWidth: 960, margin: "0 auto" }}>
       <p><Link href="/erp/hr">← RH</Link> · <Link href="/erp/hr/medidas">Medidas</Link></p>
@@ -110,27 +125,31 @@ export default function CargosPerdidaPage() {
         No es castigo: es la deuda del art. 110 fr. I cuando hubo pérdida o daño a la empresa.
         Tope: un mes de salario; cada semana ≤ 30 % del excedente del mínimo. Requiere PDF de conformidad.
       </p>
-      {error ? <p role="alert" style={{ color: "var(--ui-danger)" }}>{error}</p> : null}
+      {error ? <p role="alert" style={{ color: "var(--ui-danger)" }}>{error} <button type="button" onClick={() => void cargar()}>Reintentar</button></p> : null}
       {ok ? <p style={{ color: "var(--ui-success)" }}>{ok}</p> : null}
 
       <ExcelExportadorDinamico
+        disabled={loading || Boolean(error)}
         preferenciaKey="nx-excel-cols-hr-cargos"
         titulo="Cargos por pérdida"
         filename="cargos-por-perdida"
         rows={items.map((c) => ({
-          fecha: String(c.createdAt).slice(0, 10),
+          fecha: String(c.createdAt),
           persona: c.user?.nombre ?? "",
           monto: Number(c.montoTotal),
           estado: c.estado,
           hechos: c.hechos,
         }))}
+        estadoKey="estado"
+        estados={["BORRADOR","PENDIENTE_DIRECCION","APROBADO","RECHAZADO","EN_COBRO","CERRADO"].map(value => ({value, label: ETIQUETAS_RH[value]}))}
+        getPersonaArea={r => r.persona}
         getFecha={(r) => r.fecha}
         generadoPor={(user as { nombre?: string } | null)?.nombre}
         columns={[
           { key: "fecha", label: "Fecha" },
           { key: "persona", label: "Persona" },
           { key: "monto", label: "Monto", tipo: "dinero" as const, total: "suma" as const },
-          { key: "estado", label: "Estado" },
+          { key: "estado", label: "Estado", etiquetas: ETIQUETAS_RH },
           { key: "hechos", label: "Hechos" },
         ]}
       />
@@ -145,10 +164,10 @@ export default function CargosPerdidaPage() {
         <label>Monto de la pérdida (MXN)
           <input type="number" min={1} step="0.01" value={form.montoTotal} onChange={(e) => setForm({ ...form, montoTotal: e.target.value })} style={{ minHeight: 44, fontSize: 16, width: "100%" }} />
         </label>
-        <label>Hechos / vínculo con incidencia o actividad
+        <label>Describe la pérdida o daño y cómo ocurrió
           <textarea value={form.hechos} onChange={(e) => setForm({ ...form, hechos: e.target.value })} rows={4} style={{ fontSize: 16, width: "100%" }} />
         </label>
-        <label>ID actividad (opcional)
+        <label>ID de la actividad que causó la pérdida
           <input value={form.actividadId} onChange={(e) => setForm({ ...form, actividadId: e.target.value })} style={{ minHeight: 44, fontSize: 16, width: "100%" }} />
         </label>
         <label>URL evidencia
@@ -157,16 +176,18 @@ export default function CargosPerdidaPage() {
         <label>Descargo del trabajador
           <textarea value={form.descargo} onChange={(e) => setForm({ ...form, descargo: e.target.value })} rows={2} style={{ fontSize: 16, width: "100%" }} />
         </label>
-        <button type="button" onClick={() => void crear()} style={{ minHeight: 44, background: "var(--ui-primary)", color: "#fff", border: 0, borderRadius: 8 }}>
-          Registrar cargo
+        <button type="button" disabled={saving || loading || !form.userId || form.hechos.trim().length < 10 || !form.actividadId || !form.evidenciaUrl.trim() || !form.descargo.trim() || Number(form.montoTotal) <= 0} onClick={() => void crear()} style={{ minHeight: 44, background: "var(--ui-primary)", color: "#fff", border: 0, borderRadius: 8 }}>
+          {saving ? "Guardando…" : "Registrar cargo"}
         </button>
       </section>
 
       {loading ? <p role="status">Cargando…</p> : null}
+      {!loading && !error && items.length === 0 ? <p>No hay cargos registrados. Completa la evidencia y el descargo para registrar uno.</p> : null}
+      {!loading && items.length >= 200 ? <p>Se muestran los 200 registros más recientes; el Excel incluye esta lista.</p> : null}
       <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 10 }}>
         {items.map((c) => (
           <li key={c.id} style={{ border: "1px solid var(--ui-border)", borderRadius: 12, padding: 12 }}>
-            <strong>{c.user?.nombre ?? "Persona"}</strong> · ${Number(c.montoTotal).toLocaleString("es-MX", { minimumFractionDigits: 2 })} · {c.estado}
+            <strong>{c.user?.nombre ?? "Persona"}</strong> · ${Number(c.montoTotal).toLocaleString("es-MX", { minimumFractionDigits: 2 })} · {ETIQUETAS_RH[c.estado] ?? c.estado}
             <p style={{ whiteSpace: "pre-wrap" }}>{c.hechos}</p>
             {c.planCuotasJson?.topeSemanal != null ? (
               <p style={{ fontSize: 13, color: "var(--ui-fg-2)" }}>
@@ -201,11 +222,12 @@ export default function CargosPerdidaPage() {
                 </button>
               </div>
             ) : null}
-            {c.estado === "PENDIENTE_DIRECCION" ? (
+            {direccion && c.estado === "PENDIENTE_DIRECCION" ? (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button type="button" style={{ minHeight: 40 }} onClick={() => void auth(`hr/cargos-perdida/${c.id}/decidir`, { method: "POST", body: JSON.stringify({ accion: "aprobar" }) }).then(cargar).catch((e) => setError(formatApiError(e)))}>Aprobar</button>
+                <button type="button" style={{ minHeight: 40 }} onClick={() => void auth(`hr/cargos-perdida/${c.id}/decidir`, { method: "POST", body: JSON.stringify({ accion: "aprobar" }) }).then(async r => { if (!r.ok) throw new Error(await r.text()); await cargar(); }).catch((e) => setError(formatApiError(e)))}>Aprobar</button>
                 <button type="button" style={{ minHeight: 40 }} onClick={() => {
-                  const motivo = window.prompt("Motivo del rechazo") || "";
+                  const motivo = window.prompt("Motivo del rechazo");
+                  if (!motivo?.trim()) return;
                   void auth(`hr/cargos-perdida/${c.id}/decidir`, { method: "POST", body: JSON.stringify({ accion: "rechazar", motivo }) }).then(cargar).catch((e) => setError(formatApiError(e)));
                 }}>Rechazar</button>
               </div>

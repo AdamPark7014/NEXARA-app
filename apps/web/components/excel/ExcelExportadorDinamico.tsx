@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useUser } from "@/components/UserContext";
 import Button from "@/components/ui/Button";
 import {
   EXCEL_FECHA_PRESETS,
@@ -13,7 +14,8 @@ import {
   type ExcelFechaPreset,
   type RangoExcel,
 } from "@/lib/excel-rangos";
-import { exportToExcel, type ExcelColumn } from "@/lib/export-excel";
+import { exportToExcelAsync as exportToExcel, type ExcelColumn } from "@/lib/export-excel";
+import { formatApiError } from "@/lib/erp-api";
 
 type Props<T extends object> = {
   /** Clave de preferencias de columnas (localStorage). */
@@ -46,20 +48,29 @@ export default function ExcelExportadorDinamico<T extends object>({
   generadoPor,
   disabled,
 }: Props<T>) {
+  const { user } = useUser();
+  const storageKey = `${preferenciaKey}:usuario-${user?.id ?? 'anonimo'}`;
   const elegibles: ExcelColumnaElegible[] = columns.map((c) => ({
     key: String(c.key),
     label: c.label,
     defaultOn: c.defaultOn,
   }));
   const [abierto, setAbierto] = useState(false);
-  const [preset, setPreset] = useState<ExcelFechaPreset>("este_mes");
-  const [rango, setRango] = useState<RangoExcel>(() => rangoDePresetExcel("este_mes"));
+  const [preset, setPreset] = useState<ExcelFechaPreset>("todos");
+  const [rango, setRango] = useState<RangoExcel>(() => rangoDePresetExcel("todos"));
   const [estado, setEstado] = useState("");
   const [persona, setPersona] = useState("");
   const [colsOn, setColsOn] = useState<string[]>(() =>
-    leerColumnasPreferidas(preferenciaKey, elegibles),
+    leerColumnasPreferidas(storageKey, elegibles),
   );
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const rangoInvalido = Boolean(rango.desde && rango.hasta && rango.desde > rango.hasta);
+  useEffect(() => {
+    setColsOn(leerColumnasPreferidas(storageKey, elegibles));
+    // Los cambios de sesión deben recuperar sus propias columnas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
 
   const filtradas = useMemo(() => {
     let list = filtrarPorRangoFecha(rows, getFecha, rango);
@@ -81,30 +92,34 @@ export default function ExcelExportadorDinamico<T extends object>({
   const toggleCol = (key: string) => {
     setColsOn((prev) => {
       const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
-      guardarColumnasPreferidas(preferenciaKey, next);
+      if (!next.length) return prev;
+      guardarColumnasPreferidas(storageKey, next);
       return next.length ? next : prev;
     });
   };
 
-  const descargar = () => {
-    if (busy || disabled) return;
+  const descargar = async () => {
+    if (busy || disabled || rangoInvalido) return;
     setBusy(true);
+    setError(null);
     try {
       const cols = columns.filter((c) => colsOn.includes(String(c.key)));
       if (!cols.length) return;
       const labelPreset =
         EXCEL_FECHA_PRESETS.find((p) => p.id === preset)?.label ?? preset;
-      exportToExcel(filtradas, cols, filename, {
+      await exportToExcel(filtradas, cols, filename, {
         title: titulo,
-        subtitle: `${labelPreset}: ${rango.desde} → ${rango.hasta}`,
+        subtitle: preset === 'todos' ? labelPreset : `${labelPreset}: ${rango.desde} → ${rango.hasta}`,
         filtros: [
-          { etiqueta: "Periodo", valor: `${rango.desde} – ${rango.hasta}` },
+          { etiqueta: "Periodo", valor: preset === 'todos' ? 'Todos los registros filtrados' : `${rango.desde} – ${rango.hasta}` },
           ...(estado ? [{ etiqueta: "Estado", valor: estado }] : []),
           ...(persona.trim() ? [{ etiqueta: "Persona/área", valor: persona.trim() }] : []),
         ],
         generadoPor: generadoPor ?? null,
       });
       setAbierto(false);
+    } catch (e) {
+      setError(formatApiError(e, 'No se pudo generar el Excel. Vuelve a intentarlo.'));
     } finally {
       setBusy(false);
     }
@@ -229,7 +244,9 @@ export default function ExcelExportadorDinamico<T extends object>({
           <p style={{ margin: 0, fontSize: 13, color: "var(--ui-fg-2)" }}>
             {filtradas.length} fila{filtradas.length === 1 ? "" : "s"} con los filtros actuales
           </p>
-          <Button type="button" variant="primary" size="sm" disabled={busy || !filtradas.length || !colsOn.length} onClick={descargar}>
+          {rangoInvalido ? <p role="alert">La fecha de inicio debe ser anterior o igual a la fecha final.</p> : null}
+          {error ? <p role="alert">{error}</p> : null}
+          <Button type="button" variant="primary" size="sm" disabled={disabled || busy || rangoInvalido || !filtradas.length || !colsOn.length} onClick={() => void descargar()}>
             {busy ? "Generando…" : "Descargar .xlsx"}
           </Button>
         </div>

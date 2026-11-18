@@ -112,6 +112,7 @@ function armar() {
       const fecha = where?.autorId_fecha?.fecha ?? create.fecha;
       const prev = planStore.find((p) => p.autorId === autorId && +p.fecha === +fecha);
       if (prev && where?.companyId != null && where.companyId !== prev.companyId) throw new Error("Conflicto de empresa");
+      if (prev && where.estado?.not === prev.estado) throw new Error('El plan ya fue programado');
       if (prev) {
         Object.assign(prev, update, { updatedAt: new Date() });
         return prev;
@@ -133,7 +134,14 @@ function armar() {
         supervisor: org.find((u) => u.id === p.supervisorId),
       }));
     }),
-    findFirst: jest.fn(async ({ where }: any) => planStore.find((p) => p.id === where.id && p.companyId === where.companyId) ?? null),
+    findFirst: jest.fn(async ({ where }: any) => planStore.find((p) =>
+      (where.id == null || p.id === where.id) && p.companyId === where.companyId &&
+      (where.autorId == null || p.autorId === where.autorId) &&
+      (where.fecha == null || +p.fecha === +where.fecha)) ?? null),
+    updateMany: jest.fn(async ({where, data}: any) => {
+      const row=planStore.find(p=>p.id===where.id && p.companyId===where.companyId && p.supervisorId===where.supervisorId && p.estado!==where.estado?.not);
+      if(!row) return {count:0}; Object.assign(row,data); return {count:1};
+    }),
     update: jest.fn(async ({ where, data }: any) => {
       const row = planStore.find((p) => p.id === where.id);
       Object.assign(row, data);
@@ -182,9 +190,13 @@ function armar() {
     cierreDiario,
   };
   const notifications = { createNotification: jest.fn().mockResolvedValue({ id: 1 }) };
-  const activities = { create: jest.fn(async () => ({ id: 9001 })) };
+  let cola=Promise.resolve();
+  prisma.$transaction=jest.fn((fn: any) => {
+    const p=cola.then(()=>fn(prisma)); cola=p.catch(()=>undefined); return p;
+  });
+  const activities = { create: jest.fn(async () => ({ id: 9001 })), publicarActividadCreada: jest.fn().mockResolvedValue(undefined) };
   const service = new SupervisionService(prisma, notifications as never, activities as never);
-  return { service, prisma, notifications, planStore, cierreStore, org };
+  return { service, prisma, notifications, planStore, cierreStore, org, activities };
 }
 
 describe('SupervisionService', () => {
@@ -299,6 +311,31 @@ describe('SupervisionService', () => {
 });
 
 describe('regresiones de integración', () => {
+  it('ignora actividadCreadaId enviado por el autor y valida el equipo', async () => {
+    const {service}=armar();
+    const p=await service.enviarPlan({id:20},COMPANY,{fecha:FECHA,renglones:[{id:'r1',personaId:30,actividad:'Revisar equipo',actividadCreadaId:777}]});
+    expect(p.renglones[0].actividadCreadaId).toBeNull();
+    await expect(service.enviarPlan({id:20},COMPANY,{fecha:FECHA,renglones:[{personaId:1,actividad:'Revisar equipo'}]})).rejects.toThrow('equipo');
+  });
+  it('programación simultánea crea una actividad y conserva el vínculo al reenviar', async () => {
+    const {service,activities}=armar();
+    const p=await service.enviarPlan({id:20},COMPANY,{fecha:FECHA,renglones:[{id:'r1',personaId:30,actividad:'Revisar equipo'}]});
+    const r=await Promise.all([service.programarRenglon({id:7},COMPANY,p.id,'r1'),service.programarRenglon({id:7},COMPANY,p.id,'r1')]);
+    expect(r.map(x=>x.actividadId)).toEqual([9001,9001]);
+    expect(activities.create).toHaveBeenCalledTimes(1);
+    expect(activities.publicarActividadCreada).toHaveBeenCalledTimes(1);
+    expect(activities.create).toHaveBeenCalledWith(expect.objectContaining({periodoInicio:FECHA,periodoFin:FECHA,fechaInicio:`${FECHA}T09:00:00-06:00`}),COMPANY,expect.objectContaining({tx:expect.anything()}));
+    await expect(service.enviarPlan({id:20},COMPANY,{fecha:FECHA,texto:'Intento de sustituir'})).rejects.toThrow('programación');
+    await expect(service.devolverPlan({id:7},COMPANY,p.id,'Cambiar')).rejects.toThrow('actividades programadas');
+  });
+  it('solo el supervisor programa y un plan devuelto no se programa', async () => {
+    const {service,activities}=armar();
+    const p=await service.enviarPlan({id:20},COMPANY,{fecha:FECHA,renglones:[{id:'r1',personaId:30,actividad:'Revisar equipo'}]});
+    await expect(service.programarRenglon({id:20},COMPANY,p.id,'r1')).rejects.toThrow('No puedes');
+    await service.devolverPlan({id:7},COMPANY,p.id,'Faltan detalles');
+    await expect(service.programarRenglon({id:7},COMPANY,p.id,'r1')).rejects.toThrow('devuelto');
+    expect(activities.create).not.toHaveBeenCalled();
+  });
   it('conserva la fecha civil exacta en Prisma', async () => {
     const { service, prisma } = armar();
     await service.enviarPlan({ id: 20 }, COMPANY, { fecha: FECHA, texto: 'Plan de mañana' });

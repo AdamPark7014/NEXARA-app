@@ -15,6 +15,8 @@ export default function BuscadorCliente({ token, valueNombre, valueId, onPick }:
   const [q, setQ] = useState(valueNombre);
   const [ops, setOps] = useState<ClienteParecido[]>([]);
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const tRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -22,6 +24,10 @@ export default function BuscadorCliente({ token, valueNombre, valueId, onPick }:
   }, [valueNombre]);
 
   useEffect(() => {
+    let vigente = true;
+    setError(null);
+    setLoading(false);
+    setOps([]);
     if (tRef.current) clearTimeout(tRef.current);
     const texto = q.trim();
     if (texto.length < 2) {
@@ -29,11 +35,14 @@ export default function BuscadorCliente({ token, valueNombre, valueId, onPick }:
       return;
     }
     tRef.current = setTimeout(() => {
+      setLoading(true);
       void buscarClientesParecidos(token, { nombre: texto, soloCodigo: true })
-        .then((rows) => setOps(rows.filter((r) => r.puedeUsar)))
-        .catch(() => setOps([]));
+        .then((rows) => { if (vigente) setOps(rows.filter((r) => r.puedeUsar)); })
+        .catch(() => { if (vigente) { setOps([]); setError('No se pudo buscar. Cambia el texto para reintentar.'); } })
+        .finally(() => { if (vigente) setLoading(false); });
     }, 250);
     return () => {
+      vigente = false;
       if (tRef.current) clearTimeout(tRef.current);
     };
   }, [q, token]);
@@ -48,11 +57,14 @@ export default function BuscadorCliente({ token, valueNombre, valueId, onPick }:
         onChange={(e) => {
           setQ(e.target.value);
           setOpen(true);
-          if (valueId != null) onPick(null, e.target.value);
+          onPick(null, e.target.value);
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
+      {open && loading ? <p role="status">Buscando clientes…</p> : null}
+      {open && error ? <p role="alert">{error}</p> : null}
+      {open && q.trim().length >= 2 && !loading && !error && ops.length === 0 ? <p>No hay clientes que coincidan. Prueba otro nombre.</p> : null}
       {open && ops.length > 0 ? (
         <ul
           role="listbox"
