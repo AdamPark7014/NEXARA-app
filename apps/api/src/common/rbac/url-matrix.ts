@@ -398,6 +398,16 @@ export const ASISTENTE_IA_URL_RULES: UrlRule[] = [
  * para roles de dirección y administración que no tienen escritura general sobre actividades. El
  * servicio exige ser superior de quien la ejecuta.
  */
+/**
+ * Escrituras de actividades para quien tiene ACTIVITIES_MANAGE por ser gerente de operación (18-11-2026:
+ * Luis y Liz creaban la actividad pero el PUT de «qué fotografiar», herramientas, adjuntos, editar y
+ * ejecutar daban 403 en la matriz). Igual que coord_operaciones: el controlador y el servicio deciden.
+ */
+export const ACTIVIDADES_GESTION_URL_RULES: UrlRule[] = [
+  { path: '/api/activities/**', scope: 'approve' },
+  { path: '/api/evidences/**', scope: 'approve' },
+];
+
 export const ACTIVITY_SUPERIOR_URL_RULES: UrlRule[] = [
   { path: '/api/activities/*/acciones', methods: ['GET'], scope: 'read' },
   { path: '/api/activities/*/cancelar', methods: ['POST'], scope: 'approve' },
@@ -505,6 +515,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CEO — ve TODO (lectura) + aprobaciones de tope
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
+    ...ACTIVIDADES_GESTION_URL_RULES,
     // Dirección también opera el expediente y la importación de RH.
     { path: '/api/hr/expediente/cambios', methods: ['POST'], scope: 'write' },
     { path: '/api/hr/expediente/*/perfil', methods: ['PATCH'], scope: 'write' },
@@ -615,6 +626,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR DE OPERACIONES — aprueba viáticos/proyectos nivel alto
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_OPERACIONES]: [
+    ...ACTIVIDADES_GESTION_URL_RULES,
     ...SUPERVISION_URL_RULES,
     // 07-11: el tablero de asistencias de su gente (su modo en `section-views` es gestionar).
     { path: '/erp/asistencias', scope: 'write' },
@@ -676,6 +688,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR ADMINISTRATIVO — finanzas, compras, RH (alto nivel)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_ADMIN]: [
+    ...ACTIVIDADES_GESTION_URL_RULES,
     ...SUPERVISION_URL_RULES,
     ...GESTION_VIATICOS_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
@@ -724,6 +737,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD ADMINISTRATIVO — segundo nivel de aprobación
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
+    ...ACTIVIDADES_GESTION_URL_RULES,
     ...SUPERVISION_URL_RULES,
     ...GESTION_VIATICOS_URL_RULES,
     // 07-11: el tablero de asistencias de su gente (su modo en `section-views` es gestionar).
