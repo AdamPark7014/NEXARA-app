@@ -19,7 +19,7 @@ import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { toast } from "@/components/Toast";
 import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
-import { evaluarSemaforoActividad, textoChipSemaforo } from "@/lib/actividad-tiempos";
+import { evaluarSemaforoActividad, semaforoDeLaApi, textoChipSemaforo } from "@/lib/actividad-tiempos";
 
 type ActivityRow = {
   id: number;
@@ -42,6 +42,15 @@ type ActivityRow = {
   fechaMaxima?: string | null;
   fechaEntregaEsperada?: string | null;
   activityEvidences?: ActivityRow["activityEvidence"][];
+  /** Semáforo ya calculado por la API (si la fila lo trae, gana). */
+  semaforo?: string | null;
+  minutosAtraso?: number | null;
+  minutosParaVencer?: number | null;
+  motivoSemaforo?: string | null;
+  inicioRealAt?: string | null;
+  periodoInicio?: string | null;
+  periodoFin?: string | null;
+  periodo?: { estado?: string | null } | null;
 };
 
 function evidenceLabel(row: ActivityRow): string {
@@ -69,12 +78,20 @@ function statusVariant(estatus: string): "positive" | "warning" | "danger" | "ac
 function plazoDe(row: ActivityRow) {
   const ev = row.activityEvidence ?? row.activityEvidences?.[0] ?? null;
   const iniciada = Boolean(ev?.status);
-  return evaluarSemaforoActividad({
-    fechaInicio: row.fechaInicio,
-    fechaMaxima: row.fechaMaxima,
-    fechaEntregaEsperada: row.fechaEntregaEsperada,
-    estatus: iniciada && !/proceso|validar/i.test(row.estatus) ? "En Proceso" : row.estatus,
-  });
+  // Lo que calculó la API manda; el cálculo local es su espejo para filas que no lo traen.
+  return (
+    semaforoDeLaApi(row) ??
+    evaluarSemaforoActividad({
+      fechaInicio: row.fechaInicio,
+      fechaMaxima: row.fechaMaxima,
+      fechaEntregaEsperada: row.fechaEntregaEsperada,
+      inicioRealAt: row.inicioRealAt,
+      periodoInicio: row.periodoInicio,
+      periodoFin: row.periodoFin,
+      periodoEstado: row.periodo?.estado,
+      estatus: iniciada && !/proceso|validar/i.test(row.estatus) ? "En Proceso" : row.estatus,
+    })
+  );
 }
 
 export type ActivityBucket = "daily" | "projects" | "services";
