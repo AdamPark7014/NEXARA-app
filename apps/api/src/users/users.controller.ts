@@ -499,7 +499,8 @@ export class UsersController {
   /** Plantilla RRHH — devuelve todos los usuarios con campos de RRHH */
   @Get('hr-staff')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  // RH (Tere) lee la plantilla con HR_VIEW; no administra cuentas (18-11-2026).
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_VIEW, PERMISSIONS.HR_MANAGE] })
   async findHrStaff(
     @CurrentUser() user: any,
     @Query() query: PaginationQueryDto,
@@ -511,7 +512,8 @@ export class UsersController {
   /** PATCH usuarios/:id/hr — actualiza campos RRHH de un empleado */
   @Patch(':id/hr')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  // Solo campos de RRHH (contrato, estado, alta, fecha de ingreso); jefe, sueldo y puesto van por solicitud.
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_MANAGE] })
   async updateHrFields(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { puesto?: string; tipoContrato?: string; estadoRRHH?: string; isActive?: boolean; fechaIngreso?: string },
@@ -665,7 +667,8 @@ export class UsersController {
 
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
+  // Ficha de RRHH (`/erp/hr/[id]`): RH la lee con HR_VIEW. Editar la cuenta (PATCH :id) sigue en USERS_MANAGE.
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.HR_VIEW] })
   findOne(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
     return this.usersService.findOne(+id, companyId);
   }

@@ -71,7 +71,8 @@ export class AnalyticsController {
   }
 
   @Get('bi/engineers')
-  @RBAC({ anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  // También RH: la pantalla `/erp/hr/kpis` muestra el ranking del personal.
+  @RBAC({ anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_VIEW] })
   engineerRanking(@CurrentCompanyId() companyId: number | null, @Query('limit') limit?: string) {
     return this.svc.getEngineerPerformanceRanking(companyId, limit ? +limit : 20);
   }

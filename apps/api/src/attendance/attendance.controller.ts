@@ -290,7 +290,8 @@ export class AttendanceController {
    * Solo usuarios nivel 40+ pueden acceder
    */
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.ATTENDANCE_MANAGE] })
+  // RH (HR_VIEW) lo lee para el tablero de asistencias de toda la empresa (18-11-2026).
+  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.HR_VIEW] })
   @Get('hierarchy/range')
   async hierarchyRange(
     @Req() req: any,

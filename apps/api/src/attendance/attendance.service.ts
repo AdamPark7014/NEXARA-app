@@ -2393,6 +2393,8 @@ export class AttendanceService {
   }): boolean {
     if (viewer.isSuperAdmin) return true;
     if (viewer.roleKey === 'ceo') return true;
+    // RH (Tere) supervisa al personal de toda la empresa, no solo su rama.
+    if (viewer.roleKey === 'rh') return true;
     if (viewer.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) return true;
     const email = (viewer.email || '').toLowerCase();
     return isCeoEquivalentEmail(email) || email === 'developer@nexara.com.mx';
@@ -2452,7 +2454,11 @@ export class AttendanceService {
     };
     const isSuperAdmin = Boolean(currentUser.isSuperAdmin);
     const isConsoleAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
-    const canManageAttendance = Boolean(currentUser.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE));
+    // RH lee asistencias del personal (HR_VIEW) aunque no las gestione.
+    const canManageAttendance = Boolean(
+      currentUser.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE) ||
+        currentUser.permissions?.includes(PERMISSIONS.HR_VIEW),
+    );
 
     if (!isSuperAdmin && !isConsoleAdmin && !canManageAttendance) {
       throw new ForbiddenException(
@@ -2522,7 +2528,8 @@ export class AttendanceService {
       );
     } else if (
       currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
-      currentUser.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE)
+      currentUser.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE) ||
+      currentUser.permissions?.includes(PERMISSIONS.HR_VIEW)
     ) {
       // Admin consola o manager: sin otros admins de consola / plataforma
       accessibleUsers = accessibleUsers.filter(
