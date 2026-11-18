@@ -1,5 +1,15 @@
 # RELEVO
 
+- **18-11 ~13:10 México (claude-code) — Lote T2: «IP temporarily blocked» del 17-11. NO desplegado (espera OK).**
+  - Causa (access log de Traefik): 17-11 13:49–14:49 MX la IP 187.191.42.145 (oficina) quedó bloqueada; la
+    disparó PUT/POST de la cotización 83 con «..» → 400 «Suspicious input detected» 3+3 puntos; 607 rechazos.
+  - `security.utils`: sin `..`/`%2e%2e` en el patrón del CUERPO (siguen en la URL); puntos con caducidad
+    (`IP_BAN_STRIKE_WINDOW_MS`, 10 min); bloqueo 15 min (`IP_BAN_WINDOW_MS`); `IP_BAN_EXEMPT` (coma separada);
+    `onEvent` → `[ip-ban] punto|bloqueo ip motivo ruta` en el log de la API (ruta sin querystring).
+  - `main.ts`: solo suman puntos honeypot, método no permitido, host inválido y ruta sospechosa; content-type,
+    origen, prototype pollution e input sospechoso se rechazan sin puntos. Prueba `common/security/ip-ban.spec.ts`.
+  - Pendiente: poner `IP_BAN_EXEMPT=187.191.42.145` en el servidor cuando Adam confirme que es la oficina.
+
 - **18-11 ~12:45 México (claude-code; Cursor/Codex no usados por urgencia) — Lote T: Tere (rol rh) no veía nada.**
   - Causa: la matriz y los @RBAC le cerraban `GET /api/users/hr-staff|roles|departments|:id`, `PATCH /api/users/:id/hr`,
     `GET /api/attendance/hierarchy/range` y `GET /api/analytics/bi/engineers`; la Plantilla hace Promise.all y
