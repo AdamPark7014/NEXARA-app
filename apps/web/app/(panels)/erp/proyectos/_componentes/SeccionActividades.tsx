@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { Alert, Checkbox, Button, ButtonLink, RecordSection, StatusBadge } from "@/components/base";
 import { isActivityCompleted, isActivityInProgress } from "@/lib/activity-status";
-import { evaluarSemaforoActividad, textoChipSemaforo } from "@/lib/actividad-tiempos";
+import { evaluarSemaforoActividad, semaforoDeLaApi, textoChipSemaforo } from "@/lib/actividad-tiempos";
 import { actividadesSinProyecto, ligarActividades, type ActividadSinProyecto, formatoFecha, type Tono } from "@/lib/proyectos-api";
 import NuevaActividad from "./NuevaActividad";
 import ProgramarActividades from "./ProgramarActividades";
@@ -75,13 +75,18 @@ export default function SeccionActividades(props: SeccionProps) {
           <ul className={styles.lista}>
             {p.activities.map((a) => {
               const abierta = !isActivityCompleted(a.estatus) && !/cancel/i.test(a.estatus ?? "");
-              const luz = evaluarSemaforoActividad({
-                fechaInicio: a.fechaInicio,
-                fechaEntregaEsperada: a.fechaEntregaEsperada,
-                estatus: a.estatus,
-                periodoEstado: a.periodo?.estado,
-                ahora: new Date(`${hoy}T12:00:00`),
-              });
+              const luz =
+                semaforoDeLaApi(a) ??
+                evaluarSemaforoActividad({
+                  fechaInicio: a.fechaInicio,
+                  fechaMaxima: a.fechaMaxima,
+                  fechaEntregaEsperada: a.fechaEntregaEsperada,
+                  estatus: a.estatus,
+                  periodoInicio: a.periodoInicio,
+                  periodoFin: a.periodoFin,
+                  periodoEstado: a.periodo?.estado,
+                  ahora: new Date(`${hoy}T12:00:00`),
+                });
               const atrasada = abierta && luz.semaforo === "rojo";
               const etapa = etapaDe(a.projectMilestoneId);
               // Misma lectura que el borde de la pizarra: rojo/ámbar por tiempo; azul si aún no arranca.

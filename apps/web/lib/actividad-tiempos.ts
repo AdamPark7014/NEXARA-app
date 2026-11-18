@@ -53,9 +53,33 @@ const EN_TIEMPO: SemaforoTiempo = {
   motivo: null,
 };
 
+/** Día de México (UTC-6, sin horario de verano desde 2022) en `AAAA-MM-DD`. */
+const MX_OFFSET_MS = -6 * 3_600_000;
+function claveDiaMx(instante: Date): string {
+  return new Date(instante.getTime() + MX_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** Último instante (23:59:59.999, hora de México) del día `AAAA-MM-DD`. */
+function finDelDiaClave(clave: string): Date {
+  return new Date(Date.parse(`${clave}T23:59:59.999Z`) - MX_OFFSET_MS);
+}
+
+/** Último instante del día laboral (hora de México) en que cae `instante`. Espejo de `workDayEnd` de la API. */
+export function finDelDiaMx(instante: Date): Date {
+  return finDelDiaClave(claveDiaMx(instante));
+}
+
+function claveDe(valor?: string | null): string | null {
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(valor ?? ""));
+  return m ? m[1]! : null;
+}
+
 /**
- * El mismo reloj que la API, para listados que traen fechas y no el semáforo ya calculado.
- * Con periodo, `programada` no se pinta tarde y `vencida` es el tope pasado.
+ * El mismo reloj que la API (`evaluarSemaforo` + `topeDe` de `semaforo-actividad.ts`), para listados
+ * que traen fechas y no el semáforo ya calculado:
+ * - con periodo, uno que aún no empieza es verde y el tope es el fin de su último día;
+ * - sin periodo, el tope es el más temprano de fecha máxima y entrega; si cae antes o igual que el
+ *   inicio, el tope es el fin de ese día (18-11-2026: la web daba atrasos que la API no).
  */
 export function evaluarSemaforoActividad(params: {
   fechaInicio?: string | null;
@@ -65,6 +89,9 @@ export function evaluarSemaforoActividad(params: {
   finRealAt?: string | null;
   estatus?: string | null;
   cerrada?: boolean;
+  /** Columnas del periodo (`AAAA-MM-DD`), si la fila las trae. */
+  periodoInicio?: string | null;
+  periodoFin?: string | null;
   /** `programada` | `en_curso` | `vencida` | `cerrada`, si la API ya lo mandó. */
   periodoEstado?: string | null;
   ahora?: Date;
@@ -76,20 +103,33 @@ export function evaluarSemaforoActividad(params: {
     /finalizada|completada|cancelada|aprobada|no cumplida|incumplida/i.test(params.estatus ?? "");
   if (cerrada || params.periodoEstado === "programada" || params.periodoEstado === "cerrada") return EN_TIEMPO;
 
+  const pInicio = claveDe(params.periodoInicio);
+  const pFin = claveDe(params.periodoFin);
+  const periodo = pInicio && pFin && pFin >= pInicio ? { inicio: pInicio, fin: pFin } : null;
+  if (periodo && periodo.inicio > claveDiaMx(ahora)) return EN_TIEMPO;
+
   const iniciada = Boolean(aFecha(params.inicioRealAt)) || /proceso|validar/i.test(params.estatus ?? "");
   const inicio = aFecha(params.fechaInicio);
-  const topeExplicito = masTemprana(aFecha(params.fechaMaxima), aFecha(params.fechaEntregaEsperada));
-  const tope = params.periodoEstado === "en_curso" && topeExplicito && topeExplicito.getTime() < ahora.getTime()
-    ? null
-    : topeExplicito;
-  const topeVencido = params.periodoEstado === "vencida" ? (topeExplicito ?? ahora) : tope;
+  let tope: Date | null;
+  if (periodo) {
+    tope = finDelDiaClave(periodo.fin);
+  } else {
+    tope = masTemprana(aFecha(params.fechaMaxima), aFecha(params.fechaEntregaEsperada));
+    if (tope && inicio && tope.getTime() <= inicio.getTime()) tope = finDelDiaMx(inicio);
+  }
+  // Sin columnas de periodo pero con el estado que mandó la API (filas viejas).
+  if (!periodo && params.periodoEstado === "en_curso" && tope && tope.getTime() < ahora.getTime()) tope = null;
+  // Sin columnas de periodo pero la API dice que el periodo ya venció: el tope ya pasó.
+  if (!periodo && params.periodoEstado === "vencida" && (!tope || tope.getTime() >= ahora.getTime())) {
+    tope = tope && tope.getTime() < ahora.getTime() ? tope : ahora;
+  }
 
   const atrasos: Array<{ motivo: MotivoSemaforo; minutos: number }> = [];
   if (!iniciada && inicio && inicio.getTime() < ahora.getTime()) {
     atrasos.push({ motivo: "inicio", minutos: minutosEntre(inicio, ahora) });
   }
-  if (topeVencido && topeVencido.getTime() < ahora.getTime()) {
-    atrasos.push({ motivo: "tope", minutos: minutosEntre(topeVencido, ahora) });
+  if (tope && tope.getTime() < ahora.getTime()) {
+    atrasos.push({ motivo: "tope", minutos: minutosEntre(tope, ahora) });
   }
   if (atrasos.length) {
     const peor = atrasos.reduce((a, b) => (b.minutos > a.minutos ? b : a));
@@ -110,6 +150,24 @@ export function evaluarSemaforoActividad(params: {
     return { semaforo: "amarillo", minutosAtraso: null, minutosParaVencer: pronto.minutos, motivo: pronto.motivo };
   }
   return EN_TIEMPO;
+}
+
+/** La fila ya trae el semáforo calculado por la API: se usa tal cual. */
+export function semaforoDeLaApi(row: {
+  semaforo?: Semaforo | string | null;
+  minutosAtraso?: number | null;
+  minutosParaVencer?: number | null;
+  motivoSemaforo?: MotivoSemaforo | string | null;
+}): SemaforoTiempo | null {
+  const s = row.semaforo;
+  if (s !== "rojo" && s !== "amarillo" && s !== "verde") return null;
+  const m = row.motivoSemaforo;
+  return {
+    semaforo: s,
+    minutosAtraso: row.minutosAtraso ?? null,
+    minutosParaVencer: row.minutosParaVencer ?? null,
+    motivo: m === "inicio" || m === "tope" || m === "plan" ? m : null,
+  };
 }
 
 /** Chip: «Atrasada · 2 h», «Por vencer · 12 min», «Atención · 8 min», «En tiempo». */

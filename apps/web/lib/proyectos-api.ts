@@ -275,6 +275,12 @@ export type ActividadDeProyecto = {
   periodoFin?: string | null;
   projectMilestoneId?: number | null;
   periodo?: PeriodoActividad | null;
+  fechaMaxima?: string | null;
+  /** Semáforo de la API, si lo trae la fila (gana sobre el cálculo local). */
+  semaforo?: string | null;
+  minutosAtraso?: number | null;
+  minutosParaVencer?: number | null;
+  motivoSemaforo?: string | null;
 };
 
 // ---------------------------------------------------------------------------
