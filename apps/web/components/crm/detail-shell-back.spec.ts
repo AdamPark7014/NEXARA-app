@@ -20,7 +20,7 @@ const fichas = [
     href: 'href="/crm/clients"',
   },
   {
-    archivo: "ProjectDetailShell.tsx",
+    archivo: "../proyectos/ProjectDetailShell.tsx",
     viejo: "← Proyectos comerciales",
     nuevo: "‹ Proyectos",
     href: 'href="/erp/proyectos"',
