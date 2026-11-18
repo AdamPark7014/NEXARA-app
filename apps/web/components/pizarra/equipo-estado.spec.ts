@@ -130,9 +130,10 @@ describe("filtrarCentroOperativo", () => {
     expect(filtrarCentroOperativo(equipo).map((u) => u.id)).toEqual([1]);
   });
 
-  it("los dos correos excluidos están declarados y son los que se filtran", () => {
+  it("los correos excluidos están declarados y son los que se filtran", () => {
     expect([...CENTRO_OPERATIVO_EMAILS_EXCLUIDOS]).toEqual([
       "gerencia@nexara.com.mx",
+      "getzemani.delvalle@nexara.com.mx",
       "claudia.bernal@nexara.com.mx",
     ]);
   });
