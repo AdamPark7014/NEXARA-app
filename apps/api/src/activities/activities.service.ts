@@ -218,7 +218,8 @@ export class ActivitiesService {
   }
 
   /** `sinAviso`: quien crea varias de un jalón (formatos) manda un solo aviso al terminar. */
-  async create(dtoRecibido: CreateActivityDto, companyId?: number | null, opciones: { sinAviso?: boolean; tiempoFijoMin?: number } = {}) {
+  async create(dtoRecibido: CreateActivityDto, companyId?: number | null, opciones: { sinAviso?: boolean; tiempoFijoMin?: number; tx?: Prisma.TransactionClient } = {}) {
+    const db = opciones.tx ?? this.prisma;
     await this.assertResponsableActivo(dtoRecibido.responsableId);
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
     // Misma puerta para web, apps y Asignar con IA: una instalación del cliente
@@ -266,7 +267,7 @@ export class ActivitiesService {
     if (leido.error) throw new BadRequestException(leido.error);
     const conPeriodo = leido.periodo ? camposDePeriodo(leido.periodo, rest.fechaInicio ?? null) : {};
 
-    const activity = await this.prisma['activity'].create({
+    const activity = await db.activity.create({
       data: {
         ...conJsonNulo(rest),
         ...conPeriodo,
@@ -288,7 +289,7 @@ export class ActivitiesService {
     });
 
     // Responsable = LEAD en equipo (+ su evidencia personal si la ejecuta él)
-    await this.prisma.activityAssignee.upsert({
+    await db.activityAssignee.upsert({
       where: { activityId_userId: { activityId: activity.id, userId: activity.responsableId } },
       create: {
         activityId: activity.id,
@@ -301,7 +302,7 @@ export class ActivitiesService {
     });
     // En despacho el responsable solo reparte: la evidencia la sube quien la ejecuta.
     if (activity.assignmentCharge !== 'despacho') {
-      await this.prisma.activityEvidence.upsert({
+      await db.activityEvidence.upsert({
         where: { activityId_userId: { activityId: activity.id, userId: activity.responsableId } },
         create: {
           activityId: activity.id,
@@ -313,8 +314,15 @@ export class ActivitiesService {
       });
     }
 
+    // Las notificaciones y eventos se publican después del commit del llamador.
+    if (opciones.tx) return activity;
+    await this.publicarActividadCreada(activity, resolvedCompanyId, opciones.sinAviso);
+    return activity;
+  }
+
+  async publicarActividadCreada(activity: { id: number; responsableId: number; creadoPorId: number; titulo: string; estatus: string; anNumber: string; responsable?: { id: number; nombre: string } | null; creador?: { nombre: string } | null }, resolvedCompanyId: number, sinAviso = false) {
     // Notify the assigned user about new activity
-    if (!opciones.sinAviso && activity.responsableId && activity.responsable) {
+    if (!sinAviso && activity.responsableId && activity.responsable) {
       await this.notificationHierarchy.notifyActivityAssigned(
         activity.responsableId,
         activity.id,
@@ -325,7 +333,7 @@ export class ActivitiesService {
       );
     }
 
-    if (!opciones.sinAviso) {
+    if (!sinAviso) {
       void this.avisarLuisSiNoProgramada(activity, resolvedCompanyId);
     }
 
@@ -333,7 +341,7 @@ export class ActivitiesService {
       entityType: 'ACTIVITY',
       entityId: activity.id,
       companyId: resolvedCompanyId,
-      userId: createActivityDto.responsableId ?? undefined,
+      userId: activity.responsableId ?? undefined,
       payload: {
         estatus: activity.estatus,
         anNumber: activity.anNumber,
@@ -342,7 +350,6 @@ export class ActivitiesService {
       },
     });
 
-    return activity;
   }
 
   async findAll(query?: PaginationQueryDto, companyId?: number | null) {
