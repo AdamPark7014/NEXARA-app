@@ -3,7 +3,7 @@
  * sueldos no los ve.
  */
 import React from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -287,22 +287,22 @@ describe("Por proyecto", () => {
     manoDeObra: { horas: 100, importe: 10000, horasSinLigar: 80, importeSinLigar: 8000, horasInternas: 5, importeInterno: 500 },
   };
 
-  it("pinta proyectos y ofrece crear el proyecto de la cotización ganada", async () => {
+  it("manda al listado único de Proyectos y ofrece crear el proyecto de la cotización ganada", async () => {
     servir(ACCESO_TODO, { incluye: "/costos/proyectos", body: LISTA });
     render(<CostosPorProyecto />);
-    const fila = (await screen.findByText("CCTV Bodega Norte")).closest("tr")!;
-    expect(within(fila).getByText("6.9 %")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "CCTV Bodega Norte" })).toHaveAttribute("href", "/erp/proyectos/9?tab=costos");
-    expect(screen.getByRole("link", { name: /crear proyecto/ })).toHaveAttribute(
+    // Ola 2: el margen por proyecto vive en el listado único /erp/proyectos, no en una tabla aparte.
+    expect(await screen.findByRole("link", { name: /crear proyecto/ })).toHaveAttribute(
       "href",
       "/erp/proyectos/nuevo?cotizacionId=42&clienteId=7",
     );
+    expect(screen.getByRole("link", { name: "Ver proyectos y margen real" })).toHaveAttribute("href", "/erp/proyectos");
+    expect(screen.queryByText("CCTV Bodega Norte")).not.toBeInTheDocument();
   });
 
   it("ninguna pestaña de Costos la desvía el mapa de rutas heredadas", async () => {
     servir(ACCESO_TODO, { incluye: "/costos/proyectos", body: LISTA });
     render(<CostosPorProyecto />);
-    await screen.findByText("CCTV Bodega Norte");
+    await screen.findByRole("link", { name: /crear proyecto/ });
     for (const nombre of ["Horas sin proyecto", "Por proyecto", "Tarifas de costo"]) {
       const href = screen.getByRole("link", { name: nombre }).getAttribute("href")!;
       expect(normalizeLegacyPath(href)).toBe(href);
@@ -322,6 +322,7 @@ describe("Pestaña Costos del proyecto", () => {
   const DETALLE = {
     proyecto: { id: 9, titulo: "CCTV", cotizacion: "NEX-0042", cotizacionId: 42 },
     venta: 275000,
+    avance: 92,
     rubros: [
       { rubro: "MATERIAL", etiqueta: "Equipos y material", cotizado: 142000, real: 146300 },
       { rubro: "MANO_OBRA", etiqueta: "Mano de obra", cotizado: 38400, real: 52100 },
@@ -348,9 +349,9 @@ describe("Pestaña Costos del proyecto", () => {
     servir({ incluye: "/costos/proyectos/9", body: DETALLE });
     render(<SeccionCostos proyecto={PROYECTO} token="jwt" />);
     expect(await screen.findByText("Equipos y material")).toBeInTheDocument();
-    expect(screen.getByText("136")).toBeInTheDocument();
-    expect(screen.getByText("25.2 %")).toBeInTheDocument();
-    expect(screen.getByText("17.8 %")).toBeInTheDocument();
+    expect(screen.getByText("136 %")).toBeInTheDocument();
+    expect(screen.getByText("$69,344 · 25.2 %")).toBeInTheDocument();
+    expect(screen.getByText("$48,824 · 17.8 %")).toBeInTheDocument();
     expect(screen.getByText("92 %")).toBeInTheDocument();
     expect(screen.getByText(/Instalador · 312 h/)).toBeInTheDocument();
     expect(screen.getByText(/2 de 10 partidas no traen costo/)).toBeInTheDocument();
