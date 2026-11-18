@@ -68,6 +68,9 @@ services:
       REDIS_URL: redis://redis:6379
       # 1 = API also runs BullMQ workers (default). Set 0 when `worker` profile is up.
       JOBS_RUN_WORKERS: ${JOBS_RUN_WORKERS:-1}
+      # IPs separadas por coma que el castigo por IP nunca bloquea (p. ej. la salida de la oficina).
+      # El valor vive solo en deploy/.env.nexara del servidor.
+      IP_BAN_EXEMPT: ${IP_BAN_EXEMPT:-}
       # Transcriptor propio (perfil `transcriptor`). Vacío = sin voz propia.
       TRANSCRIPTOR_URL: ${TRANSCRIPTOR_URL:-}
       # Whisper `small` solo para dictado; vacío = el dictado usa TRANSCRIPTOR_URL.
