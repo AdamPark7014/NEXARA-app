@@ -104,6 +104,9 @@ export function exportToExcel<T extends object>(
   });
 }
 
+/** Variante esperable: permite mostrar progreso y errores de generación en el formulario. */
+export { buildAndDownload as exportToExcelAsync };
+
 // ─────────────────────────────────────────────────────────── formato de valores
 
 /** `EN_PROCESO` → «En proceso». Red de seguridad cuando no se pasa `etiquetas`. */
@@ -554,7 +557,7 @@ async function buildAndDownload<T extends object>(
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
-  void triggerBlobDownload(blob, `${filename}.xlsx`, {
+  await triggerBlobDownload(blob, `${filename}.xlsx`, {
     preferOpenOnMobile: false,
     mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
