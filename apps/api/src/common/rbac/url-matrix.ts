@@ -1323,6 +1323,14 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...CLIENT_ADMIN_WRITE_URL_RULES,
   ],
 
+    // 18-11 (Tere): Plantilla RRHH, ficha y KPIs. Lee personas, roles y áreas; solo escribe campos de RRHH
+    // (PATCH :id/hr). No administra cuentas: PATCH/DELETE /api/users/:id siguen cerrados.
+    { path: '/api/users/hr-staff', methods: ['GET'], scope: 'read' },
+    { path: '/api/users/roles', methods: ['GET'], scope: 'read' },
+    { path: '/api/users/departments', methods: ['GET'], scope: 'read' },
+    { path: '/api/users/*', methods: ['GET'], scope: 'read' },
+    { path: '/api/users/*/hr', methods: ['GET', 'PATCH'], scope: 'write' },
+    { path: '/api/analytics/bi/engineers', methods: ['GET'], scope: 'read' },
   // ─────────────────────────────────────────────────────────────────
   // CONTABILIDAD
   // ─────────────────────────────────────────────────────────────────

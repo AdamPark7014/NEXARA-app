@@ -1,5 +1,16 @@
 # RELEVO
 
+- **18-11 ~12:45 México (claude-code; Cursor/Codex no usados por urgencia) — Lote T: Tere (rol rh) no veía nada.**
+  - Causa: la matriz y los @RBAC le cerraban `GET /api/users/hr-staff|roles|departments|:id`, `PATCH /api/users/:id/hr`,
+    `GET /api/attendance/hierarchy/range` y `GET /api/analytics/bi/engineers`; la Plantilla hace Promise.all y
+    caía entera en «No se pudo actualizar», igual que Asistencias («No tienes permisos para esta acción»).
+  - Arreglo: reglas nuevas solo en el bloque `ROLES.RH` de `url-matrix.ts`; HR_VIEW en GET (hr-staff, :id,
+    hierarchy/range, bi/engineers), HR_MANAGE en PATCH :id/hr; `getAccessibleUsers` acepta HR_VIEW y
+    `isCompanyWideAttendanceViewer` cuenta `rh`. PATCH/DELETE /api/users/:id, sesiones, jefe y roles siguen cerrados.
+  - Prueba: `common/rbac/rh-plantilla-tere.spec.ts` (9). Rojo ajeno sin commitear al cerrar: `tsc` en
+    `costos/libro-costos.service.ts` (VehicleControl.actividadId opcional) y 8 casos rh de `actividad-propia-rbac`/
+    `festivos-rbac` (la otra sesión quitó ACTIVIDAD_PROPIA a rh en url-matrix).
+
 - **17-11 ~09:00 México (claude-code; código de Cursor, sin pasada de Codex aún) — Encargo 06: Supervisión por renglones, medidas disciplinarias y cargo por pérdida, Excel por rangos, scroll del menú, mockup corporativo.**
   - Sube las migraciones `20261117194500_plan_renglones_medidas` y `20261117203000_cargos_por_perdida` cuyos modelos ya
     estaban en `schema.prisma` desde ac5afdbf4 (los arrastró el commit de contabilidad).
