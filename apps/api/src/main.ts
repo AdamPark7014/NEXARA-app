@@ -24,6 +24,7 @@ import {
   isPathSuspicious,
   isRateLimitExemptPath,
   isSafeFetchSite,
+  parseIpList,
   resolveCorsOrigin,
 } from './common/security/security.utils';
 import { isPrivateUploadPath, isPublicUploadPath, readUploadToken } from './common/security/uploads-access';
@@ -188,9 +189,19 @@ async function bootstrap() {
     next();
   });
 
+  // 17-11-2026 la oficina entera (una IP pública) quedó fuera una hora por puntos suspensivos en una
+  // cotización. Ahora solo suman puntos los rastreos claros, caducan a los 10 min, el bloqueo dura 15 min,
+  // `IP_BAN_EXEMPT` exenta IP (coma separada) y cada punto/bloqueo queda en el log.
   const ipPenaltyBox = createInMemoryIpBanList({
     maxStrikes: readPositiveIntEnv('IP_BAN_MAX_STRIKES', 6),
-    banWindowMs: readPositiveIntEnv('IP_BAN_WINDOW_MS', 60 * 60_000),
+    banWindowMs: readPositiveIntEnv('IP_BAN_WINDOW_MS', 15 * 60_000),
+    strikeWindowMs: readPositiveIntEnv('IP_BAN_STRIKE_WINDOW_MS', 10 * 60_000),
+    exempt: parseIpList(process.env['IP_BAN_EXEMPT']),
+    onEvent: (e) =>
+      console.warn(
+        `[ip-ban] ${e.tipo} ip=${e.ip} motivo="${e.motivo}" ruta=${e.ruta} puntos=${e.puntos}` +
+          (e.hastaIso ? ` hasta=${e.hastaIso}` : ''),
+      ),
   });
 
   // En desarrollo, la web, el emulador de Android y curl salen todos por loopback:
@@ -223,7 +234,7 @@ async function bootstrap() {
     }
 
     if (!isMethodAllowed(request.method)) {
-      ipPenaltyBox.addStrike(ip, 2);
+      ipPenaltyBox.addStrike(ip, 2, 'método no permitido', request.originalUrl || request.url);
       response.status(405).json({
         statusCode: 405,
         message: 'Method not allowed',
@@ -233,7 +244,7 @@ async function bootstrap() {
 
     const host = request.headers.host;
     if (!isHostAllowed(host)) {
-      ipPenaltyBox.addStrike(ip, 2);
+      ipPenaltyBox.addStrike(ip, 2, 'host inválido', request.originalUrl || request.url);
       response.status(400).json({
         statusCode: 400,
         message: 'Invalid host header',
@@ -243,7 +254,7 @@ async function bootstrap() {
 
     const fullPath = `${request.originalUrl || request.url || ''}`;
     if (isHoneypotPath(fullPath)) {
-      ipPenaltyBox.addStrike(ip, 5);
+      ipPenaltyBox.addStrike(ip, 5, 'honeypot', fullPath);
       response.status(404).json({
         statusCode: 404,
         message: 'Not found',
@@ -252,7 +263,7 @@ async function bootstrap() {
     }
 
     if (isPathSuspicious(fullPath)) {
-      ipPenaltyBox.addStrike(ip, 3);
+      ipPenaltyBox.addStrike(ip, 3, 'ruta sospechosa', fullPath);
       response.status(400).json({
         statusCode: 400,
         message: 'Suspicious request path',
@@ -288,7 +299,7 @@ async function bootstrap() {
       !isAllowedContentType(request.headers['content-type']) &&
       !(isDevicePush && isDevicePushContentType(request.headers['content-type']))
     ) {
-      ipPenaltyBox.addStrike(ip, 1);
+      // Se rechaza sin sumar puntos: es contenido u origen, no un rastreo (17-11-2026).
       response.status(415).json({
         statusCode: 415,
         message: 'Unsupported content type',
@@ -302,7 +313,7 @@ async function bootstrap() {
       const originAllowed = !origin || isOriginAllowed(origin);
 
       if (!isSafeFetchSite(fetchSite) && !originAllowed) {
-        ipPenaltyBox.addStrike(ip, 3);
+        // Se rechaza sin sumar puntos: es contenido u origen, no un rastreo (17-11-2026).
         response.status(403).json({
           statusCode: 403,
           message: 'Cross-site request blocked',
@@ -311,7 +322,7 @@ async function bootstrap() {
       }
 
       if (origin && !isOriginAllowed(origin)) {
-        ipPenaltyBox.addStrike(ip, 2);
+        // Se rechaza sin sumar puntos: es contenido u origen, no un rastreo (17-11-2026).
         response.status(403).json({
           statusCode: 403,
           message: 'Invalid origin',
@@ -321,7 +332,7 @@ async function bootstrap() {
     }
 
     if (hasPrototypePollutionPayload(request.body, request.query, request.params)) {
-      ipPenaltyBox.addStrike(ip, 4);
+      // Se rechaza sin sumar puntos: es contenido u origen, no un rastreo (17-11-2026).
       response.status(400).json({
         statusCode: 400,
         message: 'Malformed payload',
@@ -330,7 +341,7 @@ async function bootstrap() {
     }
 
     if (hasSuspiciousInputPayload(request.body, request.query, request.params, request.headers['user-agent'])) {
-      ipPenaltyBox.addStrike(ip, 3);
+      // Se rechaza sin sumar puntos: es contenido u origen, no un rastreo (17-11-2026).
       response.status(400).json({
         statusCode: 400,
         message: 'Suspicious input detected',

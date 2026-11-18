@@ -4,8 +4,19 @@ type RateLimitEntry = {
 };
 
 type BanEntry = {
-  strikes: number;
+  /** Puntos recientes; solo cuentan los de la ventana `strikeWindowMs`. */
+  hits: Array<{ at: number; weight: number }>;
   bannedUntil: number;
+};
+
+export type IpBanEvent = {
+  tipo: 'punto' | 'bloqueo';
+  ip: string;
+  motivo: string;
+  /** Ruta sin querystring (puede traer tokens). */
+  ruta: string;
+  puntos: number;
+  hastaIso?: string;
 };
 
 type ConnectionEntry = {
@@ -65,7 +76,9 @@ const DEFAULT_ALLOWED_HOST_PATTERNS: RegExp[] = [
 const DEFAULT_ALLOWED_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
 const SUSPICIOUS_PATH_PATTERN = /\.\.|%2e%2e|%00|<|>|\\/i;
 const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
-const SUSPICIOUS_INPUT_PATTERN = /<script|javascript:|onerror\s*=|onload\s*=|union\s+select|or\s+1\s*=\s*1|drop\s+table|information_schema|\.\.|%2e%2e|\$\{jndi:|\/etc\/passwd|\\x00|%00/i;
+// Sin `..` ni `%2e%2e`: en el cuerpo son puntos suspensivos («Listo...»), no recorrido de rutas;
+// el recorrido se revisa en la URL con SUSPICIOUS_PATH_PATTERN (17-11-2026: bloqueó a la oficina).
+const SUSPICIOUS_INPUT_PATTERN = /<script|javascript:|onerror\s*=|onload\s*=|union\s+select|or\s+1\s*=\s*1|drop\s+table|information_schema|\$\{jndi:|\/etc\/passwd|\\x00|%00/i;
 const HONEYPOT_PATH_PATTERN = /\/(wp-admin|wp-login|phpmyadmin|\.git|\.env|\.aws|server-status|\.well-known\/acme-challenge(?!\/))/i;
 
 const PARSED_ALLOWED_SUBDOMAINS = (() => {
@@ -348,58 +361,87 @@ export const isSafeFetchSite = (fetchSite?: string | null): boolean => {
   return normalized === 'same-origin' || normalized === 'same-site' || normalized === 'none';
 };
 
+/** Lista de IP separada por comas (p. ej. `IP_BAN_EXEMPT`). */
+export const parseIpList = (value?: string | null): Set<string> =>
+  new Set(
+    String(value || '')
+      .split(',')
+      .map((ip) => ip.trim().replace(/^::ffff:/, ''))
+      .filter(Boolean),
+  );
+
+/**
+ * Castigo por IP en memoria. Los puntos caducan: solo cuentan los de los últimos `strikeWindowMs`
+ * (antes se acumulaban para siempre y tropiezos sueltos terminaban bloqueando una hora).
+ */
 export const createInMemoryIpBanList = (options: {
   maxStrikes: number;
   banWindowMs: number;
+  strikeWindowMs?: number;
+  exempt?: Set<string>;
+  onEvent?: (event: IpBanEvent) => void;
 }) => {
   const store = new Map<string, BanEntry>();
+  const strikeWindowMs = options.strikeWindowMs ?? 10 * 60_000;
+  const exempt = options.exempt ?? new Set<string>();
 
   const now = () => Date.now();
+  const isExempt = (ip: string) => exempt.has((ip || '').replace(/^::ffff:/, ''));
+  const recent = (entry: BanEntry, currentTime: number) =>
+    entry.hits.filter((hit) => currentTime - hit.at < strikeWindowMs);
 
-  const cleanup = (ip: string) => {
+  const cleanup = (ip: string, currentTime = now()) => {
     const current = store.get(ip);
     if (!current) {
       return;
     }
-
-    if (current.bannedUntil <= now() && current.strikes <= 0) {
+    current.hits = recent(current, currentTime);
+    if (current.bannedUntil <= currentTime && current.hits.length === 0) {
       store.delete(ip);
     }
   };
 
-  // Periodic sweep to prevent unbounded Map growth
+  // Barrido periódico para que el mapa no crezca sin límite.
   setInterval(() => {
     const currentTime = Date.now();
-    for (const [ip, entry] of store) {
-      if (entry.bannedUntil <= currentTime && entry.strikes <= 0) {
-        store.delete(ip);
-      }
+    for (const ip of [...store.keys()]) {
+      cleanup(ip, currentTime);
     }
   }, 5 * 60_000).unref();
 
-  const addStrike = (ip: string, weight = 1) => {
+  const addStrike = (ip: string, weight = 1, motivo = 'sin motivo', ruta = '') => {
     const currentTime = now();
-    const current = store.get(ip) || { strikes: 0, bannedUntil: 0 };
-
-    if (current.bannedUntil > currentTime) {
-      current.strikes += Math.max(1, weight);
-      current.bannedUntil = Math.max(current.bannedUntil, currentTime + options.banWindowMs);
-      store.set(ip, current);
+    const current = store.get(ip) || { hits: [], bannedUntil: 0 };
+    if (isExempt(ip)) {
       return current;
     }
+    const rutaLimpia = String(ruta || '').split('?')[0].slice(0, 200);
+    current.hits = recent(current, currentTime);
+    current.hits.push({ at: currentTime, weight: Math.max(1, weight) });
+    const puntos = current.hits.reduce((sum, hit) => sum + hit.weight, 0);
+    options.onEvent?.({ tipo: 'punto', ip, motivo, ruta: rutaLimpia, puntos });
 
-    current.strikes += Math.max(1, weight);
-    if (current.strikes >= options.maxStrikes) {
+    if (current.bannedUntil <= currentTime && puntos >= options.maxStrikes) {
       current.bannedUntil = currentTime + options.banWindowMs;
-      current.strikes = 0;
+      current.hits = [];
+      options.onEvent?.({
+        tipo: 'bloqueo',
+        ip,
+        motivo,
+        ruta: rutaLimpia,
+        puntos,
+        hastaIso: new Date(current.bannedUntil).toISOString(),
+      });
     }
 
     store.set(ip, current);
-    cleanup(ip);
     return current;
   };
 
   const isBanned = (ip: string) => {
+    if (isExempt(ip)) {
+      return false;
+    }
     const current = store.get(ip);
     if (!current) {
       return false;
@@ -407,7 +449,6 @@ export const createInMemoryIpBanList = (options: {
 
     if (current.bannedUntil <= now()) {
       current.bannedUntil = 0;
-      store.set(ip, current);
       cleanup(ip);
       return false;
     }
