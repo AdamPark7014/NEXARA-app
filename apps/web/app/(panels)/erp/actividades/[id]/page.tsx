@@ -437,8 +437,8 @@ export default function ActivityDetailPage() {
         </Alert>
       ) : null}
 
-      {/* Una comercial no es de un proyecto: va con su cotización. */}
-      {String(activity.coreKind ?? "").toLowerCase() === "comercial" ? null : <PreguntaProyecto activityId={activity.id} />}
+      {/* Comercial va con cotización; administrativa tampoco liga proyecto. */}
+      {["comercial", "administrativa"].includes(String(activity.coreKind ?? "").toLowerCase()) ? null : <PreguntaProyecto activityId={activity.id} />}
 
       <RecordSection
         title="Evidencias"

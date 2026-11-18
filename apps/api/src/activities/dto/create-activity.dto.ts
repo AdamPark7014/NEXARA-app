@@ -203,7 +203,7 @@ export class CreateActivityDto {
   @IsInt()
   projectMilestoneId?: number | null;
 
-  /** Tipo Core: tarea|proyecto|obra|servicio|comercial */
+  /** Tipo Core: tarea|proyecto|obra|servicio|comercial|administrativa */
   @IsOptional()
   @IsString()
   @MaxLength(20, { message: 'El tipo de actividad no puede pasar de 20 caracteres' })

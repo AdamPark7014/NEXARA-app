@@ -177,6 +177,7 @@ describe("asistente IA en la pizarra", () => {
     expect(bloqueos(lista, payloadFinal(lista, { tipo: "obra" }), {})).toContain("Elige el proyecto.");
     // Comercial y de vuelta a servicio: el subtipo por omisión de cada uno.
     expect(payloadFinal(lista, { tipo: "comercial" })).toMatchObject({ ticketType: "OTRO", ticketTypeCustom: "COMERCIAL" });
+    expect(payloadFinal(lista, { tipo: "administrativa" })).toMatchObject({ ticketType: "OTRO", ticketTypeCustom: "ADMINISTRATIVA", coreKind: "administrativa" });
     expect(subtipoEfectivo({ ...lista, tipo: "tarea", payload: { ...lista.payload, ticketTypeCustom: "Entrega" } }, { tipo: "servicio" })).toBe("PREVENTIVO");
     expect(subtipoEfectivo(lista, { tipo: "tarea" })).toBe("Otro");
   });
@@ -263,6 +264,7 @@ describe("asistente IA en la pizarra", () => {
     expect(textoTipo("servicio", "CORRECTIVO")).toBe("Servicio · Correctivo");
     expect(textoTipo("tarea", "Instalación")).toBe("Tarea · Instalación");
     expect(textoTipo("comercial", null)).toBe("Comercial");
+    expect(textoTipo("administrativa", null)).toBe("Administrativa");
   });
 
   it("el cliente nuevo cuenta para el servicio y se cancela al elegir otro", () => {
@@ -288,6 +290,7 @@ describe("asistente IA en la pizarra", () => {
     expect(tareaEquivalente("servicio", "INSTALACION")).toEqual({ tipo: "tarea", subtipo: "Instalación" });
     expect(tareaEquivalente("obra", null)).toEqual({ tipo: "tarea", subtipo: "Instalación" });
     expect(tareaEquivalente("comercial", null)).toEqual({ tipo: "tarea", subtipo: "Reporte / documentación" });
+    expect(tareaEquivalente("administrativa", null)).toEqual({ tipo: "tarea", subtipo: "Reporte / documentación" });
   });
 
   it("alta rápida de cliente: con el nombre entendido y nunca si ya hay uno igual o la IA lo encontró", () => {

@@ -28,6 +28,7 @@ object CoreActivityKinds {
     const val OBRA = "obra"
     const val SERVICIO = "servicio"
     const val COMERCIAL = "comercial"
+    const val ADMINISTRATIVA = "administrativa"
 
     const val EJECUCION = "ejecucion"
     const val DESPACHO = "despacho"
@@ -59,7 +60,7 @@ object CoreActivityKinds {
         val requiresSchedule: Boolean = false,
     )
 
-    val ALL: List<String> = listOf(TAREA, PROYECTO, OBRA, SERVICIO, COMERCIAL)
+    val ALL: List<String> = listOf(TAREA, PROYECTO, OBRA, SERVICIO, COMERCIAL, ADMINISTRATIVA)
 
     private val KINDS: Map<String, KindMeta> = mapOf(
         TAREA to KindMeta(
@@ -80,6 +81,12 @@ object CoreActivityKinds {
         COMERCIAL to KindMeta(
             COMERCIAL, "Comercial", "Solo encargados de área.", NxGlyph.COMMERCIAL, WITHOUT_PROJECT,
             ticketType = "OTRO", ticketTypeCustom = "COMERCIAL",
+        ),
+        ADMINISTRATIVA to KindMeta(
+            ADMINISTRATIVA, "Administrativa",
+            "Facturación, contabilidad, trámites, compras, reportes. Se entrega con capturas y archivo.",
+            NxGlyph.COMMERCIAL, WITHOUT_PROJECT,
+            ticketType = "OTRO", ticketTypeCustom = "ADMINISTRATIVA",
         ),
     )
 
@@ -162,28 +169,28 @@ object CoreActivityKinds {
     private val CREATE_BY_EMAIL: Map<String, List<String>> = mapOf(
         OrgEmails.CEO to ALL,
         OrgEmails.DEVELOPER to ALL,
-        OrgEmails.DAVID to listOf(TAREA, PROYECTO, OBRA, COMERCIAL),
-        OrgEmails.LUIS to listOf(TAREA, PROYECTO, SERVICIO, COMERCIAL),
-        OrgEmails.ANTONIO to listOf(TAREA, PROYECTO, SERVICIO, COMERCIAL),
-        OrgEmails.DANIELA to listOf(TAREA, COMERCIAL),
-        OrgEmails.MONICA to listOf(TAREA, COMERCIAL),
+        OrgEmails.DAVID to listOf(TAREA, PROYECTO, OBRA, COMERCIAL, ADMINISTRATIVA),
+        OrgEmails.LUIS to listOf(TAREA, PROYECTO, SERVICIO, COMERCIAL, ADMINISTRATIVA),
+        OrgEmails.ANTONIO to listOf(TAREA, PROYECTO, SERVICIO, COMERCIAL, ADMINISTRATIVA),
+        OrgEmails.DANIELA to listOf(TAREA, COMERCIAL, ADMINISTRATIVA),
+        OrgEmails.MONICA to listOf(TAREA, COMERCIAL, ADMINISTRATIVA),
         // Paulina (contadora): lo comercial es parte de su trabajo; sin estar aquí solo veía Tarea.
-        OrgEmails.PAULINA to listOf(TAREA, COMERCIAL),
+        OrgEmails.PAULINA to listOf(TAREA, COMERCIAL, ADMINISTRATIVA),
         OrgEmails.JOAN to listOf(TAREA),
         OrgEmails.ISRAEL to listOf(TAREA),
         OrgEmails.JUAN to listOf(TAREA),
         OrgEmails.CAROLINA to listOf(TAREA),
         OrgEmails.ALEJANDRO to listOf(TAREA),
         OrgEmails.ROBERTO to emptyList(),
-        OrgEmails.JOSUE to listOf(TAREA, PROYECTO, OBRA, COMERCIAL),
+        OrgEmails.JOSUE to listOf(TAREA, PROYECTO, OBRA, COMERCIAL, ADMINISTRATIVA),
     )
 
     private val RECEIVE_BY_EMAIL: Map<String, List<String>> = mapOf(
         OrgEmails.CEO to ALL,
         OrgEmails.DEVELOPER to ALL,
-        OrgEmails.DAVID to listOf(TAREA, PROYECTO, OBRA, COMERCIAL),
-        OrgEmails.LUIS to listOf(TAREA, PROYECTO, SERVICIO, COMERCIAL),
-        OrgEmails.ANTONIO to listOf(TAREA, PROYECTO, SERVICIO, COMERCIAL),
+        OrgEmails.DAVID to listOf(TAREA, PROYECTO, OBRA, COMERCIAL, ADMINISTRATIVA),
+        OrgEmails.LUIS to listOf(TAREA, PROYECTO, SERVICIO, COMERCIAL, ADMINISTRATIVA),
+        OrgEmails.ANTONIO to listOf(TAREA, PROYECTO, SERVICIO, COMERCIAL, ADMINISTRATIVA),
         // Campo de David
         OrgEmails.JOAN to listOf(TAREA, PROYECTO, OBRA),
         OrgEmails.ISRAEL to listOf(TAREA, PROYECTO, OBRA),
@@ -193,11 +200,11 @@ object CoreActivityKinds {
         OrgEmails.ALEJANDRO to listOf(TAREA, PROYECTO, SERVICIO),
         OrgEmails.ROBERTO to listOf(TAREA, PROYECTO, SERVICIO),
         // Comercial / admin
-        OrgEmails.DANIELA to listOf(TAREA, COMERCIAL),
-        OrgEmails.MONICA to listOf(TAREA, COMERCIAL),
-        OrgEmails.PAULINA to listOf(TAREA, COMERCIAL),
+        OrgEmails.DANIELA to listOf(TAREA, COMERCIAL, ADMINISTRATIVA),
+        OrgEmails.MONICA to listOf(TAREA, COMERCIAL, ADMINISTRATIVA),
+        OrgEmails.PAULINA to listOf(TAREA, COMERCIAL, ADMINISTRATIVA),
         // Josué, encargado de obra: todo menos servicio
-        OrgEmails.JOSUE to listOf(TAREA, PROYECTO, OBRA, COMERCIAL),
+        OrgEmails.JOSUE to listOf(TAREA, PROYECTO, OBRA, COMERCIAL, ADMINISTRATIVA),
     )
 
     /** Encargados a quienes se les elige ejecución o despacho. */
@@ -226,7 +233,7 @@ object CoreActivityKinds {
 
     /** Solo Luis + Tarea / Proyecto / Comercial: ejecución directa, sin equipo. */
     fun forcesEjecucionOnly(email: String?, kind: String?): Boolean =
-        norm(email) == OrgEmails.LUIS && (kind == TAREA || kind == PROYECTO || kind == COMERCIAL)
+        norm(email) == OrgEmails.LUIS && (kind == TAREA || kind == PROYECTO || kind == COMERCIAL || kind == ADMINISTRATIVA)
 
     fun clampHeadcount(n: Int): Int = n.coerceIn(1, 50)
 
@@ -246,7 +253,7 @@ object CoreActivityKinds {
     fun kindsForTarget(email: String?): List<String> {
         val e = norm(email)
         if (e.isEmpty()) return listOf(TAREA)
-        return RECEIVE_BY_EMAIL[e] ?: listOf(TAREA)
+        return RECEIVE_BY_EMAIL[e] ?: listOf(TAREA, ADMINISTRATIVA)
     }
 
     /** Tipos visibles = lo que el creador puede crear × lo que el destinatario puede recibir. */
@@ -344,7 +351,7 @@ object CoreActivityKinds {
             SERVICIO -> allowed.filter { it == ClientSector.CORPORATIVO }
             // Quien crea comercial sin estar en la matriz de Clientes (Paulina) usa el padrón
             // comercial: sin él, el cliente obligatorio salía vacío y no podía guardar.
-            COMERCIAL -> allowed.ifEmpty { listOf(ClientSector.COMERCIAL) }
+            COMERCIAL, ADMINISTRATIVA -> allowed.ifEmpty { listOf(ClientSector.COMERCIAL) }
             else -> emptyList()
         }
     }

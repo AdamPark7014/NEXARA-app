@@ -215,6 +215,7 @@ enum ActivityDetailRules {
         case "obra": return "hammer"
         case "servicio": return "wrench.and.screwdriver"
         case "comercial": return "briefcase"
+        case "administrativa": return "briefcase.fill"
         default: return "pin"
         }
     }

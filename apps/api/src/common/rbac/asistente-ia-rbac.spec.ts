@@ -36,12 +36,12 @@ describe('matriz: asistente de actividades con IA', () => {
   );
 
   it('David no reparte servicios: lo demás, sí; dirección, todo', () => {
-    expect(tiposQueCrea('operaciones@nexara.com.mx')).toEqual(['tarea', 'proyecto', 'obra', 'comercial']);
+    expect(tiposQueCrea('operaciones@nexara.com.mx')).toEqual(['tarea', 'proyecto', 'obra', 'comercial', 'administrativa']);
     expect(tiposQueCrea('gerencia@nexara.com.mx')).toContain('servicio');
   });
 
   it('José Antonio y Luis reparten servicios; el mando sin renglón, tareas', () => {
-    expect(tiposQueCrea('jose.ramirez@nexara.com.mx')).toEqual(['tarea', 'proyecto', 'servicio', 'comercial']);
+    expect(tiposQueCrea('jose.ramirez@nexara.com.mx')).toEqual(['tarea', 'proyecto', 'servicio', 'comercial', 'administrativa']);
     expect(tiposQueCrea('direccion.operaciones@nexara.com.mx')).toContain('servicio');
     expect(tiposQueCrea('infraestructura@nexara.com.mx')).not.toContain('servicio');
     expect(tiposQueCrea('nuevo.mando@nexara.com.mx')).toEqual(['tarea']);

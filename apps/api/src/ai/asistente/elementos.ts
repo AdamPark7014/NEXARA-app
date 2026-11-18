@@ -297,7 +297,7 @@ function agregarCierreProfesional(salida: CampoEvidenciaPropuesto[], tipo: strin
 /** Secuencia mínima cuando no hay equipos: admin, junta, campo o instalación/mantenimiento sin elementos. */
 export function camposPorDefecto(tipo: string, subtipo?: string | null): CampoEvidenciaPropuesto[] {
   const s = subtipo ?? '';
-  if (tipo === 'comercial' || (tipo === 'tarea' && ADMIN_SUBTIPOS.has(s))) {
+  if (tipo === 'comercial' || tipo === 'administrativa' || (tipo === 'tarea' && ADMIN_SUBTIPOS.has(s))) {
     return [campo('Capturas de pantalla', TODOS, NOTA_CAPTURAS), campo('Archivo entregable', ['DESPUES'], NOTA_ARCHIVO)];
   }
   if (tipo === 'tarea' && s === 'Junta') {

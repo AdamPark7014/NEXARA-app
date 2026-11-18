@@ -1,4 +1,4 @@
-export type CoreActivityKind = 'tarea' | 'proyecto' | 'obra' | 'servicio' | 'comercial';
+export type CoreActivityKind = 'tarea' | 'proyecto' | 'obra' | 'servicio' | 'comercial' | 'administrativa';
 
 export type EvidenceStep =
   | 'ENTRY_PHOTO'

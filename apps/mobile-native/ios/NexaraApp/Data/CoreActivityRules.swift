@@ -100,7 +100,7 @@ enum ClientSector: String, CaseIterable, Identifiable, Hashable {
         case .servicio: return allowed.filter { $0 == .corporativo }
         // Quien crea comercial sin estar en la matriz de Clientes (Paulina) usa el padrón
         // comercial: sin él, el cliente obligatorio salía vacío y no podía guardar.
-        case .comercial: return allowed.isEmpty ? [.comercial] : allowed
+        case .comercial, .administrativa: return allowed.isEmpty ? [.comercial] : allowed
         case .tarea: return []
         }
     }
@@ -109,7 +109,7 @@ enum ClientSector: String, CaseIterable, Identifiable, Hashable {
 // MARK: - Tipos de actividad
 
 enum CoreActivityKind: String, CaseIterable, Identifiable, Hashable {
-    case tarea, proyecto, obra, servicio, comercial
+    case tarea, proyecto, obra, servicio, comercial, administrativa
 
     var id: String { rawValue }
 
@@ -120,6 +120,7 @@ enum CoreActivityKind: String, CaseIterable, Identifiable, Hashable {
         case .obra: return "Obra"
         case .servicio: return "Servicio"
         case .comercial: return "Comercial"
+        case .administrativa: return "Administrativa"
         }
     }
 
@@ -130,6 +131,7 @@ enum CoreActivityKind: String, CaseIterable, Identifiable, Hashable {
         case .obra: return "Instalación / obra en sitio, ligada a proyecto."
         case .servicio: return "Cliente de servicio. Luis → Antonio → soporte."
         case .comercial: return "Solo encargados de área."
+        case .administrativa: return "Facturación, contabilidad, trámites, compras, reportes. Se entrega con capturas y archivo."
         }
     }
 
@@ -141,6 +143,7 @@ enum CoreActivityKind: String, CaseIterable, Identifiable, Hashable {
         case .obra: return "hammer"
         case .servicio: return "wrench.and.screwdriver"
         case .comercial: return "briefcase"
+        case .administrativa: return "briefcase.fill"
         }
     }
 
@@ -149,13 +152,19 @@ enum CoreActivityKind: String, CaseIterable, Identifiable, Hashable {
 
     var ticketType: String? {
         switch self {
-        case .tarea, .comercial: return "OTRO"
+        case .tarea, .comercial, .administrativa: return "OTRO"
         case .obra: return "INSTALACION"
         case .proyecto, .servicio: return nil
         }
     }
 
-    var ticketTypeCustom: String? { self == .comercial ? "COMERCIAL" : nil }
+    var ticketTypeCustom: String? {
+        switch self {
+        case .comercial: return "COMERCIAL"
+        case .administrativa: return "ADMINISTRATIVA"
+        default: return nil
+        }
+    }
     var needsServiceClient: Bool { self == .servicio }
     var requiresSchedule: Bool { self == .obra || self == .servicio }
 }
@@ -452,38 +461,38 @@ enum CoreActivityRules {
     private static let createByEmail: [String: [CoreActivityKind]] = [
         CoreOrg.ceoEmail: CoreActivityKind.allCases,
         CoreOrg.developerEmail: CoreActivityKind.allCases,
-        CoreOrg.davidEmail: [.tarea, .proyecto, .obra, .comercial],
-        CoreOrg.luisEmail: [.tarea, .proyecto, .servicio, .comercial],
-        CoreOrg.antonioEmail: [.tarea, .proyecto, .servicio, .comercial],
-        CoreOrg.danielaEmail: [.tarea, .comercial],
-        CoreOrg.monicaEmail: [.tarea, .comercial],
+        CoreOrg.davidEmail: [.tarea, .proyecto, .obra, .comercial, .administrativa],
+        CoreOrg.luisEmail: [.tarea, .proyecto, .servicio, .comercial, .administrativa],
+        CoreOrg.antonioEmail: [.tarea, .proyecto, .servicio, .comercial, .administrativa],
+        CoreOrg.danielaEmail: [.tarea, .comercial, .administrativa],
+        CoreOrg.monicaEmail: [.tarea, .comercial, .administrativa],
         // Paulina (contadora): lo comercial es parte de su trabajo; sin estar aquí solo veía Tarea.
-        CoreOrg.paulinaEmail: [.tarea, .comercial],
+        CoreOrg.paulinaEmail: [.tarea, .comercial, .administrativa],
         CoreOrg.joanEmail: [.tarea],
         CoreOrg.israelEmail: [.tarea],
         CoreOrg.juanEmail: [.tarea],
         CoreOrg.carolinaEmail: [.tarea],
         CoreOrg.alejandroEmail: [.tarea],
         CoreOrg.robertoEmail: [],
-        CoreOrg.josueEmail: [.tarea, .proyecto, .obra, .comercial],
+        CoreOrg.josueEmail: [.tarea, .proyecto, .obra, .comercial, .administrativa],
     ]
 
     private static let receiveByEmail: [String: [CoreActivityKind]] = [
         CoreOrg.ceoEmail: CoreActivityKind.allCases,
         CoreOrg.developerEmail: CoreActivityKind.allCases,
-        CoreOrg.davidEmail: [.tarea, .proyecto, .obra, .comercial],
-        CoreOrg.luisEmail: [.tarea, .proyecto, .servicio, .comercial],
-        CoreOrg.antonioEmail: [.tarea, .proyecto, .servicio, .comercial],
+        CoreOrg.davidEmail: [.tarea, .proyecto, .obra, .comercial, .administrativa],
+        CoreOrg.luisEmail: [.tarea, .proyecto, .servicio, .comercial, .administrativa],
+        CoreOrg.antonioEmail: [.tarea, .proyecto, .servicio, .comercial, .administrativa],
         CoreOrg.joanEmail: [.tarea, .proyecto, .obra],
         CoreOrg.israelEmail: [.tarea, .proyecto, .obra],
         CoreOrg.juanEmail: [.tarea, .proyecto, .obra],
         CoreOrg.carolinaEmail: [.tarea, .proyecto, .servicio],
         CoreOrg.alejandroEmail: [.tarea, .proyecto, .servicio],
         CoreOrg.robertoEmail: [.tarea, .proyecto, .servicio],
-        CoreOrg.danielaEmail: [.tarea, .comercial],
-        CoreOrg.monicaEmail: [.tarea, .comercial],
-        CoreOrg.paulinaEmail: [.tarea, .comercial],
-        CoreOrg.josueEmail: [.tarea, .proyecto, .obra, .comercial],
+        CoreOrg.danielaEmail: [.tarea, .comercial, .administrativa],
+        CoreOrg.monicaEmail: [.tarea, .comercial, .administrativa],
+        CoreOrg.paulinaEmail: [.tarea, .comercial, .administrativa],
+        CoreOrg.josueEmail: [.tarea, .proyecto, .obra, .comercial, .administrativa],
     ]
 
     private static let chargeManagerEmails: Set<String> = [
@@ -516,7 +525,7 @@ enum CoreActivityRules {
         let normalized = CoreOrg.normalized(email)
         guard !normalized.isEmpty else { return [.tarea] }
         if CoreOrg.isCeo(email) { return all }
-        return receiveByEmail[normalized] ?? [.tarea]
+        return receiveByEmail[normalized] ?? [.tarea, .administrativa]
     }
 
     /// Creador × destinatario, en el orden fijo de los tipos.
@@ -552,7 +561,7 @@ enum CoreActivityRules {
     /// Luis + Tarea / Proyecto / Comercial: ejecución directa.
     static func forcesEjecucionOnly(_ email: String?, kind: CoreActivityKind?) -> Bool {
         guard CoreOrg.normalized(email) == CoreOrg.luisEmail, let kind else { return false }
-        return kind == .tarea || kind == .proyecto || kind == .comercial
+        return kind == .tarea || kind == .proyecto || kind == .comercial || kind == .administrativa
     }
 
     /// Prefijo del cupo en las indicaciones del LEAD (`formatDispatchHeadcountNote`).
@@ -702,7 +711,7 @@ enum CoreActivityRules {
         switch kind {
         case .tarea: return tareaTipo?.label
         case .servicio: return ticketType
-        case .proyecto, .obra, .comercial: return nil
+        case .proyecto, .obra, .comercial, .administrativa: return nil
         }
     }
 
@@ -717,7 +726,7 @@ enum CoreActivityRules {
         switch kind {
         case .tarea: return limpio.isEmpty ? kind.title : limpio
         case .servicio: return servicioLabel[limpio.isEmpty ? "PREVENTIVO" : limpio] ?? "Servicio"
-        case .proyecto, .obra, .comercial: return kind.title
+        case .proyecto, .obra, .comercial, .administrativa: return kind.title
         }
     }
 }

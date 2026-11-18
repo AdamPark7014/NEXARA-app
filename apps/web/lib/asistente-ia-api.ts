@@ -208,7 +208,7 @@ export type Ajustes = {
   encargo?: Encargo | null;
 };
 
-export const TIPOS: ActivityKind[] = ["tarea", "servicio", "obra", "proyecto", "comercial"];
+export const TIPOS: ActivityKind[] = ["tarea", "servicio", "obra", "proyecto", "comercial", "administrativa"];
 export const ETIQUETA_TIPO: Record<ActivityKind, string> = Object.fromEntries(
   TIPOS.map((t) => [t, ACTIVITY_KINDS[t].title]),
 ) as Record<ActivityKind, string>;
@@ -470,8 +470,9 @@ export function payloadFinal(
   const subtipo = subtipoEfectivo(p, aj);
   out.coreKind = tipo;
   out.activityType = conProyecto(tipo) ? "CLIENT" : "INTERNAL";
-  out.ticketType = tipo === "obra" ? "INSTALACION" : tipo === "tarea" || tipo === "comercial" ? "OTRO" : tipo === "servicio" ? subtipo : p.tipo === "proyecto" ? (p.payload.ticketType ?? "PREVENTIVO") : "PREVENTIVO";
+  out.ticketType = tipo === "obra" ? "INSTALACION" : tipo === "tarea" || tipo === "comercial" || tipo === "administrativa" ? "OTRO" : tipo === "servicio" ? subtipo : p.tipo === "proyecto" ? (p.payload.ticketType ?? "PREVENTIVO") : "PREVENTIVO";
   if (tipo === "comercial") out.ticketTypeCustom = "COMERCIAL";
+  else if (tipo === "administrativa") out.ticketTypeCustom = "ADMINISTRATIVA";
   else if (tipo === "tarea") out.ticketTypeCustom = subtipo;
   else delete out.ticketTypeCustom;
   if (aj.clientId !== undefined) {

@@ -37,6 +37,7 @@ const PUESTO_POR_TRABAJO: Array<[RegExp, RegExp]> = [
   [/^(obra|tarea:(instalacion|cableado|preparacion|mantenimiento|recoleccion|entrega|levantamiento))/, /instala|campo|obra/],
   [/^(servicio:|tarea:(correctivo|configuracion))/, /soporte|servicio|campo|redes/],
   [/^comercial/, /comercial|ventas/],
+  [/^administrativa/, /contador|finanzas|administra|compras|rh|recursos/],
   [/^tarea:facturacion/, /contador|finanzas|administra/],
   [/^tarea:(tramite|compra)/, /administra|compras|almacen/],
   [/^(proyecto|tarea:diseno)/, /obra|proyecto|disen/],
@@ -48,6 +49,7 @@ const ETIQUETA_PLURAL: Record<TipoActividad, string> = {
   obra: 'obras',
   servicio: 'servicios',
   comercial: 'actividades comerciales',
+  administrativa: 'actividades administrativas',
 };
 
 export function puestoEncaja(puesto: string | null | undefined, t: Trabajo): boolean {
