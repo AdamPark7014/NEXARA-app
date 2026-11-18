@@ -131,7 +131,7 @@ type Props = {
   forcedTicketTypeCustom?: string;
   /** Exige día + hora (servicio / obra). */
   requireSchedule?: boolean;
-  /** Tipo Core (tarea|proyecto|obra|servicio|comercial). */
+  /** Tipo Core (tarea|proyecto|obra|servicio|comercial|administrativa). */
   coreKind?: string;
   /** Encargo: ejecucion | despacho */
   assignmentCharge?: string;
@@ -267,7 +267,7 @@ export default function OpsActivityForm({
 
   const periodoId = useId();
 
-  const needsClientPicker = coreKind === "servicio" || coreKind === "comercial";
+  const needsClientPicker = coreKind === "servicio" || coreKind === "comercial" || coreKind === "administrativa";
   const filtersProjectsBySector = coreKind === "proyecto" || coreKind === "obra";
 
   // Tarea Core: subtipo obligatorio (Levantamiento, Junta… u Otro con texto libre).
@@ -321,13 +321,13 @@ export default function OpsActivityForm({
         setClientesCorporativos(rows);
       }
 
-      if (coreKind && ["proyecto", "obra", "servicio", "comercial"].includes(coreKind)) {
+      if (coreKind && ["proyecto", "obra", "servicio", "comercial", "administrativa"].includes(coreKind)) {
         const sectors = clientSectorsForActivityKind(coreKind as ActivityKind, user?.email);
         if (sectors.length) {
           const batches = await Promise.all(
             sectors.map((s: ClientSector) => listSalesClients(token, { sector: s })),
           );
-          if (coreKind === "comercial") {
+          if (coreKind === "comercial" || coreKind === "administrativa") {
             const unicos = new Map(batches.flat().map((c) => [c.id, c]));
             setClientesComerciales([...unicos.values()].sort((a, b) => a.name.localeCompare(b.name, "es")));
           }
@@ -356,7 +356,7 @@ export default function OpsActivityForm({
 
   useEffect(() => {
     if (!form.clientId) return;
-    const lista = coreKind === "servicio" ? clientesCorporativos : coreKind === "comercial" ? clientesComerciales : [];
+    const lista = coreKind === "servicio" ? clientesCorporativos : coreKind === "comercial" || coreKind === "administrativa" ? clientesComerciales : [];
     const hit = lista.find((c) => String(c.serviceClientId) === form.clientId);
     if (hit) setSalesServicioId(hit.id);
   }, [coreKind, form.clientId, clientesCorporativos, clientesComerciales]);
@@ -909,6 +909,7 @@ export default function OpsActivityForm({
     !isTareaCore || (Boolean(tareaTipo) && (tareaTipo !== "otro" || Boolean(form.ticketTypeCustom.trim())));
   const proyectoOk = form.projectMode !== "with_project" || Boolean(form.projectId);
   const pideClienteServicio = (coreKind === "servicio" || coreKind === "comercial") && form.projectMode !== "with_project";
+  // administrativa: cliente opcional (se ofrece picker pero no bloquea el alta)
   const clienteServicioOk = !pideClienteServicio || Boolean(form.clientId);
   const agendaOk = !requireSchedule || (Boolean(form.fecha) && Boolean(form.hora));
   const periodoMal = Boolean(form.periodoFin && form.fecha && form.periodoFin < form.fecha);

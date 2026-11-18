@@ -152,7 +152,7 @@ export function slugFromSector(sector: ClientSector): string {
 
 /** Sectores de clientes disponibles al asignar un tipo de actividad. */
 export function clientSectorsForActivityKind(
-  kind: "tarea" | "proyecto" | "obra" | "servicio" | "comercial",
+  kind: "tarea" | "proyecto" | "obra" | "servicio" | "comercial" | "administrativa",
   email?: string | null,
 ): ClientSector[] {
   const allowed = clientSectorsForEmail(email);
@@ -162,9 +162,9 @@ export function clientSectorsForActivityKind(
   if (kind === "servicio") {
     return allowed.filter((s) => s === "CORPORATIVO");
   }
-  if (kind === "comercial") {
-    // Quien puede crear comercial sin estar en la matriz de Clientes (Paulina) usa el padrón
-    // comercial: sin él, el cliente obligatorio salía vacío y no podía guardar la actividad.
+  if (kind === "comercial" || kind === "administrativa") {
+    // Quien puede crear comercial/administrativa sin estar en la matriz de Clientes (Paulina)
+    // usa el padrón comercial: sin él, el cliente salía vacío al elegir uno.
     return allowed.length ? allowed : ["COMERCIAL"];
   }
   return [];

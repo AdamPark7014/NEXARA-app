@@ -742,7 +742,7 @@ function Contenido({
                     Abrir
                   </ButtonLink>
                 </div>
-                {tipo === "comercial" ? null : <PreguntaProyecto activityId={est.creada.id} />}
+                {tipo === "comercial" || tipo === "administrativa" ? null : <PreguntaProyecto activityId={est.creada.id} />}
               </div>
             );
           }

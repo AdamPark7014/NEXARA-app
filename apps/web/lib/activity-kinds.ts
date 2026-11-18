@@ -8,14 +8,14 @@
  * Campo David (Joan/Israel/Juan): solo reciben tarea/proyecto/obra.
  * Soporte Antonio (Carolina/Alejandro/Roberto): solo reciben tarea/proyecto/servicio.
  * Josué Encargado de Obra: todo menos servicio
- * Paulina (contadora): tarea y comercial, igual que Daniela y Mónica.
- * Quien no está en los mapas: solo tarea.
+ * Paulina (contadora): tarea, comercial y administrativa, igual que Daniela y Mónica.
+ * Quien no está en los mapas: crea solo tarea; recibe tarea y administrativa.
  */
 import { ROLES, type RoleKey } from '@/lib/rbac/roles';
 import type { ActivityProjectMode } from '@/lib/ops-activity-form';
 import { isCeoEquivalentEmail } from '@/lib/platform-accounts';
 
-export type ActivityKind = 'tarea' | 'proyecto' | 'obra' | 'servicio' | 'comercial';
+export type ActivityKind = 'tarea' | 'proyecto' | 'obra' | 'servicio' | 'comercial' | 'administrativa';
 
 /**
  * Clave de icono (sin emojis). La UI la traduce a un icono de @mui/icons-material
@@ -97,6 +97,15 @@ export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
     ticketType: 'OTRO',
     ticketTypeCustom: 'COMERCIAL',
   },
+  administrativa: {
+    id: 'administrativa',
+    title: 'Administrativa',
+    help: 'Facturación, contabilidad, trámites, compras, reportes. Se entrega con capturas y archivo.',
+    icon: 'administrativa',
+    projectMode: 'without_project',
+    ticketType: 'OTRO',
+    ticketTypeCustom: 'ADMINISTRATIVA',
+  },
 };
 
 /**
@@ -158,7 +167,7 @@ export const TAREA_TIPOS: ReadonlyArray<{ id: TareaTipoId; label: string; icon: 
   { id: 'evento', label: 'Evento o guardia', icon: 'evento', familia: 'transversal' },
 ];
 
-const ALL: ActivityKind[] = ['tarea', 'proyecto', 'obra', 'servicio', 'comercial'];
+const ALL: ActivityKind[] = ['tarea', 'proyecto', 'obra', 'servicio', 'comercial', 'administrativa'];
 const ORDER = ALL;
 
 function norm(email?: string | null): string {
@@ -174,30 +183,30 @@ function intersect(a: ActivityKind[], b: ActivityKind[]): ActivityKind[] {
 const CREATE_BY_EMAIL: Record<string, ActivityKind[]> = {
   [ORG_EMAILS.ceo]: ALL,
   [ORG_EMAILS.developer]: ALL,
-  [ORG_EMAILS.david]: ['tarea', 'proyecto', 'obra', 'comercial'],
-  [ORG_EMAILS.luis]: ['tarea', 'proyecto', 'servicio', 'comercial'],
-  [ORG_EMAILS.antonio]: ['tarea', 'proyecto', 'servicio', 'comercial'],
-  [ORG_EMAILS.daniela]: ['tarea', 'comercial'],
-  [ORG_EMAILS.monica]: ['tarea', 'comercial'],
+  [ORG_EMAILS.david]: ['tarea', 'proyecto', 'obra', 'comercial', 'administrativa'],
+  [ORG_EMAILS.luis]: ['tarea', 'proyecto', 'servicio', 'comercial', 'administrativa'],
+  [ORG_EMAILS.antonio]: ['tarea', 'proyecto', 'servicio', 'comercial', 'administrativa'],
+  [ORG_EMAILS.daniela]: ['tarea', 'comercial', 'administrativa'],
+  [ORG_EMAILS.monica]: ['tarea', 'comercial', 'administrativa'],
   // Paulina (contadora): lo comercial es parte de su trabajo. Sin estar aquí caía en el
   // respaldo de «solo tarea» y en Auto-asignarme no veía otro tipo.
-  [ORG_EMAILS.paulina]: ['tarea', 'comercial'],
+  [ORG_EMAILS.paulina]: ['tarea', 'comercial', 'administrativa'],
   [ORG_EMAILS.joan]: ['tarea'],
   [ORG_EMAILS.israel]: ['tarea'],
   [ORG_EMAILS.juan]: ['tarea'],
   [ORG_EMAILS.carolina]: ['tarea'],
   [ORG_EMAILS.alejandro]: ['tarea'],
   [ORG_EMAILS.roberto]: [],
-  [ORG_EMAILS.josue]: ['tarea', 'proyecto', 'obra', 'comercial'],
+  [ORG_EMAILS.josue]: ['tarea', 'proyecto', 'obra', 'comercial', 'administrativa'],
 };
 
 /** Qué se le puede asignar a esa persona. */
 const RECEIVE_BY_EMAIL: Record<string, ActivityKind[]> = {
   [ORG_EMAILS.ceo]: ALL,
   [ORG_EMAILS.developer]: ALL,
-  [ORG_EMAILS.david]: ['tarea', 'proyecto', 'obra', 'comercial'],
-  [ORG_EMAILS.luis]: ['tarea', 'proyecto', 'servicio', 'comercial'],
-  [ORG_EMAILS.antonio]: ['tarea', 'proyecto', 'servicio', 'comercial'],
+  [ORG_EMAILS.david]: ['tarea', 'proyecto', 'obra', 'comercial', 'administrativa'],
+  [ORG_EMAILS.luis]: ['tarea', 'proyecto', 'servicio', 'comercial', 'administrativa'],
+  [ORG_EMAILS.antonio]: ['tarea', 'proyecto', 'servicio', 'comercial', 'administrativa'],
   // Campo de David
   [ORG_EMAILS.joan]: ['tarea', 'proyecto', 'obra'],
   [ORG_EMAILS.israel]: ['tarea', 'proyecto', 'obra'],
@@ -212,11 +221,11 @@ const RECEIVE_BY_EMAIL: Record<string, ActivityKind[]> = {
   'ricardo.flores@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
   'genaro.salazar@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
   // Comercial / admin
-  [ORG_EMAILS.daniela]: ['tarea', 'comercial'],
-  [ORG_EMAILS.monica]: ['tarea', 'comercial'],
-  [ORG_EMAILS.paulina]: ['tarea', 'comercial'],
+  [ORG_EMAILS.daniela]: ['tarea', 'comercial', 'administrativa'],
+  [ORG_EMAILS.monica]: ['tarea', 'comercial', 'administrativa'],
+  [ORG_EMAILS.paulina]: ['tarea', 'comercial', 'administrativa'],
   // Josué Encargado de Obra
-  [ORG_EMAILS.josue]: ['tarea', 'proyecto', 'obra', 'comercial'], // Encargado de obra (Josué): todo menos servicio
+  [ORG_EMAILS.josue]: ['tarea', 'proyecto', 'obra', 'comercial', 'administrativa'], // Encargado de obra (Josué): todo menos servicio
 };
 
 export function servicioBridgeEmail(): string {
@@ -324,7 +333,7 @@ export function forcesEjecucionOnly(
   kind?: ActivityKind | null,
 ): boolean {
   if (norm(email) !== ORG_EMAILS.luis || !kind) return false;
-  return kind === 'tarea' || kind === 'proyecto' || kind === 'comercial';
+  return kind === 'tarea' || kind === 'proyecto' || kind === 'comercial' || kind === 'administrativa';
 }
 
 /** Prefijo en indicaciones LEAD para el cupo de personas del despacho. */
@@ -425,7 +434,7 @@ export function extrasEmailsForKind(kind: ActivityKind | null | undefined): stri
   if (kind === 'servicio') return [...soporteTeamEmails(), ORG_EMAILS.roberto];
   if (kind === 'obra') return fieldInstallerEmails();
   if (kind === 'proyecto') return [...fieldInstallerEmails(), ...soporteTeamEmails()];
-  if (kind === 'tarea' || kind === 'comercial' || kind === null || kind === undefined) return null;
+  if (kind === 'tarea' || kind === 'comercial' || kind === 'administrativa' || kind === null || kind === undefined) return null;
   return null;
 }
 
@@ -460,7 +469,7 @@ export function kindsForTarget(email?: string | null): ActivityKind[] {
   if (!e) return ['tarea'];
   if (isCeoEquivalentEmail(e)) return ALL;
   if (RECEIVE_BY_EMAIL[e]) return RECEIVE_BY_EMAIL[e];
-  return ['tarea'];
+  return ['tarea', 'administrativa'];
 }
 
 /**

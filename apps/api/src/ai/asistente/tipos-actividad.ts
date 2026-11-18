@@ -6,7 +6,7 @@
  */
 import { isCeoEquivalentEmail, isDeveloperSuperAdminEmail } from '../../common/platform-accounts.js';
 
-export const TIPOS_ACTIVIDAD = ['tarea', 'proyecto', 'obra', 'servicio', 'comercial'] as const;
+export const TIPOS_ACTIVIDAD = ['tarea', 'proyecto', 'obra', 'servicio', 'comercial', 'administrativa'] as const;
 export type TipoActividad = (typeof TIPOS_ACTIVIDAD)[number];
 
 /**
@@ -38,14 +38,14 @@ export const TIPOS_SERVICIO = ['PREVENTIVO', 'CORRECTIVO', 'EMERGENCIA', 'INSTAL
 
 /**
  * Qué recibe cada persona: espejo de `RECEIVE_BY_EMAIL` en `apps/web/lib/activity-kinds.ts`, que es
- * lo que la tarjeta exige al confirmar. Quien no está aquí solo recibe tarea (toda la cuadrilla
- * nueva). Sin esto el asistente proponía un servicio a quien no lo puede recibir y la tarjeta
+ * lo que la tarjeta exige al confirmar. Quien no está aquí recibe tarea y administrativa.
+ * Sin esto el asistente proponía un servicio a quien no lo puede recibir y la tarjeta
  * quedaba bloqueada.
  */
 const RECIBE_POR_CORREO: Record<string, readonly TipoActividad[]> = {
-  'operaciones@nexara.com.mx': ['tarea', 'proyecto', 'obra', 'comercial'],
-  'direccion.operaciones@nexara.com.mx': ['tarea', 'proyecto', 'servicio', 'comercial'],
-  'jose.ramirez@nexara.com.mx': ['tarea', 'proyecto', 'servicio', 'comercial'],
+  'operaciones@nexara.com.mx': ['tarea', 'proyecto', 'obra', 'comercial', 'administrativa'],
+  'direccion.operaciones@nexara.com.mx': ['tarea', 'proyecto', 'servicio', 'comercial', 'administrativa'],
+  'jose.ramirez@nexara.com.mx': ['tarea', 'proyecto', 'servicio', 'comercial', 'administrativa'],
   'joan.sanchez@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
   'israel.ramos@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
   'juan.gonzalez@nexara.com.mx': ['tarea', 'proyecto', 'obra'],
@@ -56,14 +56,14 @@ const RECIBE_POR_CORREO: Record<string, readonly TipoActividad[]> = {
   'soporte@nexara.com.mx': ['tarea', 'proyecto', 'servicio'],
   'alejandro.gonzalez@nexara.com.mx': ['tarea', 'proyecto', 'servicio'],
   'roberto.vivanco@nexara.com.mx': ['tarea', 'proyecto', 'servicio'],
-  'daniela.hernandez@nexara.com.mx': ['tarea', 'comercial'],
-  'soluciones@nexara.com.mx': ['tarea', 'comercial'],
-  'finanzas@nexara.com.mx': ['tarea', 'comercial'],
-  'infraestructura@nexara.com.mx': ['tarea', 'proyecto', 'obra', 'comercial'],
+  'daniela.hernandez@nexara.com.mx': ['tarea', 'comercial', 'administrativa'],
+  'soluciones@nexara.com.mx': ['tarea', 'comercial', 'administrativa'],
+  'finanzas@nexara.com.mx': ['tarea', 'comercial', 'administrativa'],
+  'infraestructura@nexara.com.mx': ['tarea', 'proyecto', 'obra', 'comercial', 'administrativa'],
 };
 
 export function tiposQueRecibe(email: string | null | undefined, rolDeQuienAsigna?: string | null): TipoActividad[] {
-  const recibe = [...(RECIBE_POR_CORREO[(email ?? '').trim().toLowerCase()] ?? ['tarea'])];
+  const recibe = [...(RECIBE_POR_CORREO[(email ?? '').trim().toLowerCase()] ?? ['tarea', 'administrativa'])];
   // A quien llega el arquitecto (las cuadrillas de David y José Antonio) le puede dejar obra (10-11).
   if ((rolDeQuienAsigna || '').trim() === 'arquitecto' && !recibe.includes('obra')) recibe.push('obra');
   return recibe;
@@ -74,13 +74,13 @@ export function tiposQueRecibe(email: string | null | undefined, rolDeQuienAsign
  * entra a «Asignar con IA» no se decide aquí, sino en `quien-asigna.ts`, por su gente a cargo.
  */
 const CREA_POR_CORREO: Record<string, readonly TipoActividad[]> = {
-  'operaciones@nexara.com.mx': ['tarea', 'proyecto', 'obra', 'comercial'],
-  'direccion.operaciones@nexara.com.mx': ['tarea', 'proyecto', 'servicio', 'comercial'],
-  'jose.ramirez@nexara.com.mx': ['tarea', 'proyecto', 'servicio', 'comercial'],
-  'daniela.hernandez@nexara.com.mx': ['tarea', 'comercial'],
-  'soluciones@nexara.com.mx': ['tarea', 'comercial'],
-  'finanzas@nexara.com.mx': ['tarea', 'comercial'],
-  'infraestructura@nexara.com.mx': ['tarea', 'proyecto', 'obra', 'comercial'],
+  'operaciones@nexara.com.mx': ['tarea', 'proyecto', 'obra', 'comercial', 'administrativa'],
+  'direccion.operaciones@nexara.com.mx': ['tarea', 'proyecto', 'servicio', 'comercial', 'administrativa'],
+  'jose.ramirez@nexara.com.mx': ['tarea', 'proyecto', 'servicio', 'comercial', 'administrativa'],
+  'daniela.hernandez@nexara.com.mx': ['tarea', 'comercial', 'administrativa'],
+  'soluciones@nexara.com.mx': ['tarea', 'comercial', 'administrativa'],
+  'finanzas@nexara.com.mx': ['tarea', 'comercial', 'administrativa'],
+  'infraestructura@nexara.com.mx': ['tarea', 'proyecto', 'obra', 'comercial', 'administrativa'],
 };
 
 /** Lo que puede asignar quien escribe. Dirección, todo; un mando sin renglón aquí, tareas, como en la web. */

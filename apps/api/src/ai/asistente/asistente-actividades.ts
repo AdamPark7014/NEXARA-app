@@ -42,6 +42,7 @@ export const ETIQUETA_TIPO: Record<TipoActividad, string> = {
   obra: 'Obra',
   servicio: 'Servicio',
   comercial: 'Comercial',
+  administrativa: 'Administrativa',
 };
 
 const SUBTIPO_RESPALDO = 'Otro';
@@ -222,7 +223,8 @@ Tipos:
 - servicio: trabajo técnico sobre los equipos de un cliente en su sitio. sub: PREVENTIVO (mantenimiento), CORRECTIVO (falla o cambio de una pieza), EMERGENCIA (sistema caído o urgente), INSTALACION (equipo nuevo de pocas horas). Una falla o revisión técnica en un cliente es servicio, no tarea Correctivo: esa es para equipo propio o sin cliente. Llevar o recoger cosas, preparar equipo, levantar, cablear o tirar nodos son tareas aunque sean para un cliente.
 - obra: instalación grande de un proyecto. proyecto: ingeniería, planos, pruebas o puesta en marcha de un proyecto; también la instalación de un sistema o de varios equipos para un cliente («instalar 4 cámaras en IPADE», «poner control de acceso en BUAP»), aunque no digan la palabra proyecto. Una sola pieza de pocas horas sigue siendo servicio INSTALACION o tarea Instalación. Si mencionan obra o puesta en marcha, usa obra/proyecto.
 - comercial: solo para vender: cotizar, hacer o enviar una cotización o propuesta, seguimiento de venta, visita de venta. Una junta con un cliente para revisar algo es tarea Junta.
-- obra, proyecto y comercial: sub null.
+- administrativa: trabajo de oficina sin vender (facturar, pólizas, nómina, trámites, compras, reportes, conciliar); sub null.
+- obra, proyecto, comercial y administrativa: sub null.
 
 Campos:
 - Una actividad por persona y por trabajo: «Diana y Luis» son dos actividades iguales, cada una con una sola persona en quien. Con «y» o «y que» entre trabajos, cada trabajo es otra actividad con sus propias fechas.
@@ -1111,7 +1113,7 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
   // cotización también es para alguien: se propone darlo de alta al confirmar con el nombre ya
   // corregido; nada se crea antes. En una tarea (302 de 302 sin cliente) queda como lugar.
   const nombreNuevo =
-    !cliente && !clienteCandidatos.length && nombreDicho && (tipo === 'servicio' || tipo === 'comercial' || tipo === 'proyecto' || tipo === 'obra')
+    !cliente && !clienteCandidatos.length && nombreDicho && (tipo === 'servicio' || tipo === 'comercial' || tipo === 'administrativa' || tipo === 'proyecto' || tipo === 'obra')
       ? corregirEnTexto(nombreDicho, pares, { primera: true }).trim().slice(0, 200)
       : null;
   const clienteNuevo = nombreNuevo || null;
@@ -1172,11 +1174,17 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
   const ticketType =
     tipo === 'obra'
       ? 'INSTALACION'
-      : tipo === 'tarea' || tipo === 'comercial'
+      : tipo === 'tarea' || tipo === 'comercial' || tipo === 'administrativa'
         ? 'OTRO'
         : tipoServicio || 'PREVENTIVO';
   const ticketTypeCustom =
-    tipo === 'comercial' ? 'COMERCIAL' : tipo === 'tarea' ? subtipoTarea || SUBTIPO_RESPALDO : undefined;
+    tipo === 'comercial'
+      ? 'COMERCIAL'
+      : tipo === 'administrativa'
+        ? 'ADMINISTRATIVA'
+        : tipo === 'tarea'
+          ? subtipoTarea || SUBTIPO_RESPALDO
+          : undefined;
 
   // Duración: la que dijeron o, si no, la misma cuenta del alta (tabla de tarifas de Adam con lo que
   // se lee del título, o la mediana real del tipo). Los minutos nunca salen de la IA.

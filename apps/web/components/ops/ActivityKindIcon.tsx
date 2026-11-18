@@ -6,6 +6,7 @@ import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
 import ConstructionOutlinedIcon from "@mui/icons-material/ConstructionOutlined";
 import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
+import BusinessCenterOutlinedIcon from "@mui/icons-material/BusinessCenterOutlined";
 import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
@@ -35,6 +36,7 @@ export const ACTIVITY_KIND_ICONS: Record<ActivityIconKey, SvgIconComponent> = {
   obra: ConstructionOutlinedIcon,
   servicio: BuildOutlinedIcon,
   comercial: WorkOutlineIcon,
+  administrativa: BusinessCenterOutlinedIcon,
   levantamiento: StraightenOutlinedIcon,
   recoleccion: Inventory2OutlinedIcon,
   entrega: LocalShippingOutlinedIcon,

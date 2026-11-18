@@ -102,6 +102,11 @@ describe('camposDeElementos', () => {
     expect(c.map((x) => x.nombre)).toEqual(['Capturas de pantalla', 'Archivo entregable']);
   });
 
+  it('administrativa: capturas y archivo como comercial', () => {
+    const c = camposDeElementos({ titulo: 'Factura anticipo BUAP' }, 'administrativa', null);
+    expect(c.map((x) => x.nombre)).toEqual(['Capturas de pantalla', 'Archivo entregable']);
+  });
+
   it('entrega: Trabajo realizado con texto de entrega', () => {
     const c = camposDeElementos({ titulo: 'Entregar material' }, 'tarea', 'Entrega');
     expect(c).toHaveLength(1);
@@ -130,6 +135,7 @@ describe('camposDeElementos', () => {
       ['tarea', 'Entrega'],
       ['tarea', 'Otro'],
       ['comercial', null],
+      ['administrativa', null],
       ['proyecto', null],
       ['servicio', 'CORRECTIVO'],
       ['servicio', 'INSTALACION'],

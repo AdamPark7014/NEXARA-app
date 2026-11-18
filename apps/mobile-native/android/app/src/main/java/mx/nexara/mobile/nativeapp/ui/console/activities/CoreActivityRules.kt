@@ -415,6 +415,7 @@ object CoreActivityRules {
             "obra" -> "Obra"
             "servicio" -> "Servicio"
             "comercial" -> "Comercial"
+            "administrativa" -> "Administrativa"
             else -> "Actividad"
         }
         return if (coreKind.equals("tarea", ignoreCase = true) && !ticketTypeCustom.isNullOrBlank()) {
@@ -431,6 +432,7 @@ object CoreActivityRules {
         "obra" -> NxGlyph.WORKSITE
         "servicio" -> NxGlyph.SERVICE
         "comercial" -> NxGlyph.COMMERCIAL
+        "administrativa" -> NxGlyph.COMMERCIAL
         else -> NxGlyph.ACTIVITY
     }
 

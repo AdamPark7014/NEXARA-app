@@ -193,6 +193,34 @@ describe('asistente de actividades', () => {
     expect(p.payload).toMatchObject({ ticketType: 'OTRO', ticketTypeCustom: 'COMERCIAL', tiempoEstimadoMin: 720 });
   });
 
+  it('administrativa (plan simulado): factura a BUAP por Paulina con capturas y archivo', () => {
+    const conPaulina: CatalogosNexara = {
+      ...catalogos,
+      personas: [
+        ...catalogos.personas,
+        { id: 70, nombre: 'Paulina Contadora', puesto: 'Contadora', recibe: ['tarea', 'comercial', 'administrativa'] },
+      ],
+      clientes: [...catalogos.clientes, { id: 90, name: 'BUAP' }],
+    };
+    const p = construirPropuesta(
+      {
+        ...base,
+        tipo: 'administrativa',
+        subtipo: null,
+        titulo: 'Facturar anticipo a BUAP',
+        responsable: 'Paulina',
+        cliente: 'BUAP',
+      },
+      conPaulina,
+      { ...ctx, instruccion: 'factura a BUAP el anticipo, que lo haga Paulina' },
+    );
+    expect(p.tipo).toBe('administrativa');
+    expect(p.payload).toMatchObject({ coreKind: 'administrativa', ticketType: 'OTRO', ticketTypeCustom: 'ADMINISTRATIVA' });
+    expect(p.camposEvidencia.map((c) => c.nombre)).toEqual(['Capturas de pantalla', 'Archivo entregable']);
+    expect(p.responsable?.id).toBe(70);
+    expect(p.cliente?.id).toBe(90);
+  });
+
   it('avisa si la hora ya pasó', () => {
     const p = construirPropuesta({ ...base, hora: '08:00' }, catalogos, ctx);
     expect(p.avisos.join(' ')).toMatch(/pasado/);
@@ -306,7 +334,7 @@ describe('asistente de actividades', () => {
   });
 
   it('lo que quien escribe no puede asignar pasa a la tarea equivalente y se dice (David no reparte servicios)', () => {
-    const p = construirPropuesta({ ...base, tipo: 'servicio', subtipo: 'CORRECTIVO' }, catalogos, { ...ctx, tiposPermitidos: ['tarea', 'proyecto', 'obra', 'comercial'] });
+    const p = construirPropuesta({ ...base, tipo: 'servicio', subtipo: 'CORRECTIVO' }, catalogos, { ...ctx, tiposPermitidos: ['tarea', 'proyecto', 'obra', 'comercial', 'administrativa'] });
     expect(p.tipo).toBe('tarea');
     expect(p.payload.ticketTypeCustom).toBe('Correctivo y diagnóstico');
     expect(p.avisos.join(' ')).toContain('No puedes asignar servicio: quedó como tarea.');
@@ -322,11 +350,11 @@ describe('asistente de actividades', () => {
     expect(indicacionesSinEco('Son 6 nodos.', 'Tirar nodos', [], 'que tire nodos, son 6')).toBe('Son 6 nodos.');
   });
 
-  it('qué recibe cada quien: el mapa de la web; quien no está, solo tarea', () => {
+  it('qué recibe cada quien: el mapa de la web; quien no está, tarea y administrativa', () => {
     expect(tiposQueRecibe('jose.ramirez@nexara.com.mx')).toContain('servicio');
     expect(tiposQueRecibe('JOSE.RAMIREZ@nexara.com.mx ')).toContain('servicio');
-    expect(tiposQueRecibe('alguien.nuevo@nexara.com.mx')).toEqual(['tarea']);
-    expect(tiposQueRecibe(null)).toEqual(['tarea']);
+    expect(tiposQueRecibe('alguien.nuevo@nexara.com.mx')).toEqual(['tarea', 'administrativa']);
+    expect(tiposQueRecibe(null)).toEqual(['tarea', 'administrativa']);
   });
 
   it('«Salvador y Erick» en una sola acción son dos actividades; un nombre con «y» que no son dos personas no se parte', () => {

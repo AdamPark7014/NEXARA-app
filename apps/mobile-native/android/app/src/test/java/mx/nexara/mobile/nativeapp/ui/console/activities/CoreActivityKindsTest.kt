@@ -44,20 +44,20 @@ class CoreActivityKindsTest {
 
     @Test
     fun selfAssignUsesOwnEmailBothSides() {
-        assertEquals(listOf("tarea", "comercial"), k.kindsForAssignment(OrgEmails.DANIELA, OrgEmails.DANIELA, null, false))
+        assertEquals(listOf("tarea", "comercial", "administrativa"), k.kindsForAssignment(OrgEmails.DANIELA, OrgEmails.DANIELA, null, false))
         assertEquals(listOf("tarea"), k.kindsForAssignment(OrgEmails.ROBERTO, OrgEmails.ROBERTO, null, false))
-        assertEquals(listOf("tarea", "proyecto", "obra", "comercial"), k.kindsForAssignment(OrgEmails.JOSUE, OrgEmails.JOSUE, null, false))
+        assertEquals(listOf("tarea", "proyecto", "obra", "comercial", "administrativa"), k.kindsForAssignment(OrgEmails.JOSUE, OrgEmails.JOSUE, null, false))
     }
 
     @Test
     fun paulinaCreatesAndReceivesTareaAndComercial() {
         assertEquals("finanzas@nexara.com.mx", OrgEmails.PAULINA)
         // Auto-asignarme: antes solo veía Tarea (caía en el respaldo de quien no está en los mapas).
-        assertEquals(listOf("tarea", "comercial"), k.kindsForAssignment(OrgEmails.PAULINA, OrgEmails.PAULINA, null, false))
-        assertEquals(listOf("tarea", "comercial"), k.kindsForCreator(null, " Finanzas@Nexara.com.mx ", false))
-        assertEquals(listOf("tarea", "comercial"), k.kindsForTarget(OrgEmails.PAULINA))
-        assertEquals(listOf("tarea", "comercial"), k.kindsForAssignment(OrgEmails.CEO, OrgEmails.PAULINA, RoleKeys.CEO, false))
-        assertEquals(listOf("tarea", "comercial"), k.kindsForAssignment(OrgEmails.DAVID, OrgEmails.PAULINA, null, false))
+        assertEquals(listOf("tarea", "comercial", "administrativa"), k.kindsForAssignment(OrgEmails.PAULINA, OrgEmails.PAULINA, null, false))
+        assertEquals(listOf("tarea", "comercial", "administrativa"), k.kindsForCreator(null, " Finanzas@Nexara.com.mx ", false))
+        assertEquals(listOf("tarea", "comercial", "administrativa"), k.kindsForTarget(OrgEmails.PAULINA))
+        assertEquals(listOf("tarea", "comercial", "administrativa"), k.kindsForAssignment(OrgEmails.CEO, OrgEmails.PAULINA, RoleKeys.CEO, false))
+        assertEquals(listOf("tarea", "comercial", "administrativa"), k.kindsForAssignment(OrgEmails.DAVID, OrgEmails.PAULINA, null, false))
     }
 
     @Test
