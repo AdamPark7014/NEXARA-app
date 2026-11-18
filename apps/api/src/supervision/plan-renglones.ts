@@ -31,7 +31,8 @@ export function nuevoIdRenglon(): string {
 function asIntOrNull(v: unknown): number | null {
   if (v == null || v === '') return null;
   const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
+  if (!Number.isSafeInteger(n) || n <= 0) throw new BadRequestException('Las referencias del renglón deben ser números enteros positivos.');
+  return n;
 }
 
 function asStr(v: unknown, max = 500): string {
@@ -93,13 +94,15 @@ export function normalizarRenglones(raw: unknown): PlanRenglon[] {
   if (!Array.isArray(lista)) {
     throw new BadRequestException('Los renglones del plan deben ser una lista.');
   }
+  if (lista.length > 200) throw new BadRequestException('El plan admite hasta 200 renglones.');
   const out: PlanRenglon[] = [];
   for (const item of lista) {
-    if (!item || typeof item !== 'object') continue;
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new BadRequestException('Cada renglón debe ser un objeto.');
     const r = renglonVacio(item as Partial<PlanRenglon>);
     if (!r.actividad && !r.personaNombre) continue;
     out.push(r);
   }
+  if (new Set(out.map(r => r.id)).size !== out.length) throw new BadRequestException('Los renglones deben tener identificadores distintos.');
   return out;
 }
 

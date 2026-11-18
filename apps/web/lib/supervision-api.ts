@@ -133,7 +133,7 @@ export function programarRenglon(token: string, planId: number, renglonId: strin
 }
 
 export function programarTodo(token: string, planId: number) {
-  return erpFetch(`supervision/plan/${planId}/programar-todo`, token, { method: 'POST', body: '{}' });
+  return erpFetch<{ resultados: Array<{ renglonId: string; actividadId?: number; error?: string }> }>(`supervision/plan/${planId}/programar-todo`, token, { method: 'POST', body: '{}' });
 }
 
 export function fetchEquipoSupervision(token: string) {

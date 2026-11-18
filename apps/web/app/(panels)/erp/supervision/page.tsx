@@ -80,7 +80,7 @@ export default function SupervisionPage() {
     try {
       const [data, eq] = await Promise.all([
         fetchPlanes(token, fechaPlan),
-        fetchEquipoSupervision(token).catch(() => ({ equipo: [] })),
+        fetchEquipoSupervision(token),
       ]);
       if (request === requestId.current) {
         setPlanes(data);
@@ -118,7 +118,7 @@ export default function SupervisionPage() {
   };
 
   const onEnviar = async () => {
-    if (!token) return;
+    if (!token || busy) return;
     setError(null);
     setOk(null);
     setBusy(true);
@@ -136,6 +136,22 @@ export default function SupervisionPage() {
 
   const vacioPlan = !loading && !error && planes && planes.planes.length === 0;
   const ind = planes?.indicadores;
+  const actuar = async (fn: () => Promise<unknown>, mensaje: string) => {
+    if (busy) return;
+    setBusy(true); setError(null); setOk(null);
+    try { await fn(); setOk(mensaje); await (tab === 'plan' ? cargarPlan() : cargarCierre()); }
+    catch (e) { setError(formatApiError(e)); }
+    finally { setBusy(false); }
+  };
+  const filasCierreExcel = useMemo(() => {
+    if (!cierre) return [];
+    const grupos = cierre.rol === 'supervisor'
+      ? [{ nombre: user?.nombre ?? 'Supervisor', personas: cierre.personas }]
+      : cierre.cierres.map(c => ({nombre: c.supervisor?.nombre ?? 'Supervisor', personas: c.resumenJson?.personas ?? []}));
+    return grupos.flatMap(g => g.personas.map(p => ({fecha: cierre.fecha, supervisor: g.nombre, persona: p.nombre,
+      programadas: p.programadas, cumplidas: p.terminadas, revision: p.en_revision, incumplidas: p.no_cumplidas,
+      asistencia: p.checo, retardo: p.retardo, falta: p.falta})));
+  }, [cierre, user?.nombre]);
 
   const filasExcel = useMemo(() => {
     if (!planes) return [];
@@ -156,6 +172,7 @@ export default function SupervisionPage() {
     );
   }, [planes]);
 
+  if (!token) return <main><h1>Supervisión</h1><p>Inicia sesión para consultar los planes y cierres.</p></main>;
   return (
     <main
       style={{
@@ -172,10 +189,10 @@ export default function SupervisionPage() {
         <div>
           <h1 style={{ fontSize: 28, margin: "0 0 4px" }}>Supervisión</h1>
           <p style={{ margin: 0, color: "var(--ui-fg-2)", fontSize: 14 }}>
-            Plan de mañana por renglones y cierre del día con KPIs — menos movimientos, más información.
+            Organiza las actividades del equipo y compara lo planeado con lo realizado.
           </p>
         </div>
-        {filasExcel.length ? (
+        {tab === 'plan' && !loading && !error && filasExcel.length ? (
           <ExcelExportadorDinamico
             preferenciaKey="nx-excel-cols-supervision"
             titulo="Supervisión — planes"
@@ -196,6 +213,17 @@ export default function SupervisionPage() {
             ]}
           />
         ) : null}
+        {tab === 'cierre' && !loading && !error && filasCierreExcel.length ? (
+          <ExcelExportadorDinamico preferenciaKey="nx-excel-cols-supervision-cierres" titulo="Supervisión — cierre diario"
+            filename={`supervision-cierre-${fechaCierre}`} rows={filasCierreExcel} getFecha={r => r.fecha}
+            getPersonaArea={r => `${r.persona} ${r.supervisor}`} generadoPor={user?.nombre}
+            columns={[
+              {key:'fecha',label:'Fecha'}, {key:'supervisor',label:'Supervisor'}, {key:'persona',label:'Persona'},
+              {key:'programadas',label:'Programadas',tipo:'entero',total:'suma'}, {key:'cumplidas',label:'Cumplidas',tipo:'entero',total:'suma'},
+              {key:'revision',label:'En revisión',tipo:'entero',total:'suma'}, {key:'incumplidas',label:'No cumplidas',tipo:'entero',total:'suma'},
+              {key:'asistencia',label:'Registró asistencia',tipo:'booleano'}, {key:'retardo',label:'Retardo',tipo:'booleano'}, {key:'falta',label:'Falta',tipo:'booleano'},
+            ]}/>
+        ) : null}
       </div>
 
       <div style={{ display: "flex", gap: 8, margin: "16px 0", flexWrap: "wrap" }}>
@@ -207,7 +235,7 @@ export default function SupervisionPage() {
         </button>
       </div>
 
-      {error ? <p role="alert" style={{ color: "var(--ui-danger, #b42318)" }}>{error}</p> : null}
+      {error ? <p role="alert" style={{ color: "var(--ui-danger, #b42318)" }}>{error} <button type="button" onClick={() => void (tab === 'plan' ? cargarPlan() : cargarCierre())}>Reintentar</button></p> : null}
       {ok ? <p style={{ color: "var(--ui-success, #067647)" }}>{ok}</p> : null}
 
       <label style={{ display: "grid", gap: 4, marginBottom: 16, maxWidth: 220 }}>
@@ -434,9 +462,7 @@ export default function SupervisionPage() {
                                       style={btnPrimary}
                                       disabled={busy}
                                       onClick={() =>
-                                        void programarRenglon(token!, p.id, r.id)
-                                          .then(() => { setOk("Actividad creada."); return cargarPlan(); })
-                                          .catch((e) => setError(formatApiError(e)))
+                                        void actuar(() => programarRenglon(token!, p.id, r.id), 'Actividad programada.')
                                       }
                                     >
                                       Programar
@@ -450,19 +476,24 @@ export default function SupervisionPage() {
                       </div>
                     )}
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-                      <button type="button" style={btn} onClick={() => void programarTodo(token!, p.id).then(cargarPlan).catch((e) => setError(formatApiError(e)))}>
+                      <button type="button" style={btn} disabled={busy} onClick={() => void actuar(async () => {
+                        const resultado = await programarTodo(token!, p.id);
+                        const errores = resultado.resultados.filter(r => r.error);
+                        if (errores.length) throw new Error(`${errores.length} renglones no se programaron: ${errores.map(r => r.error).join('; ')}. Actualiza para revisar los que sí se programaron.`);
+                      }, 'Se programaron todos los renglones.')}>
                         Programar todo
                       </button>
-                      <button type="button" style={btn} onClick={() => void marcarProgramado(token!, p.id).then(cargarPlan).catch((e) => setError(formatApiError(e)))}>
+                      <button type="button" style={btn} disabled={busy} onClick={() => void actuar(() => marcarProgramado(token!, p.id), 'Plan marcado como programado.')}>
                         Marcar plan programado
                       </button>
                       <button
                         type="button"
                         style={btn}
+                        disabled={busy}
                         onClick={() => {
                           const nota = window.prompt("Nota para devolver el plan (opcional)");
                           if (nota === null) return;
-                          void devolverPlan(token!, p.id, nota || undefined).then(cargarPlan).catch((e) => setError(formatApiError(e)));
+                          void actuar(() => devolverPlan(token!, p.id, nota || undefined), 'Plan devuelto al autor.');
                         }}
                       >
                         Devolver
@@ -535,10 +566,9 @@ export default function SupervisionPage() {
                   <button
                     type="button"
                     style={btnPrimary}
+                    disabled={busy}
                     onClick={() =>
-                      void entregarCierre(token!, { fecha: fechaCierre, comentario })
-                        .then(() => { setOk("Cierre entregado a dirección."); return cargarCierre(); })
-                        .catch((e) => setError(formatApiError(e)))
+                      void actuar(() => entregarCierre(token!, { fecha: fechaCierre, comentario }), 'Cierre entregado a dirección.')
                     }
                   >
                     Entregar a dirección
@@ -620,7 +650,7 @@ function Resumen({
                     <ul style={{ margin: 0, paddingLeft: 18 }}>
                       {p.actividades!.map((a) => (
                         <li key={a.id}>
-                          <Link href={`/erp/actividades/${a.id}`}>{a.titulo}</Link> · {a.bucket} · {a.estatus}
+                          <Link href={`/erp/actividades/${a.id}`}>{a.titulo}</Link> · {a.estatus}
                         </li>
                       ))}
                     </ul>

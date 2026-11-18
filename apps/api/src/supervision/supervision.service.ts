@@ -30,6 +30,7 @@ import {
   type PlanRenglon,
 } from './plan-renglones.js';
 import { ActivitiesService } from '../activities/activities.service.js';
+import type { Prisma } from '@prisma/client';
 
 export type SupervisionActor = {
   id: number;
@@ -223,6 +224,7 @@ export class SupervisionService {
     if (!renglones.length && textoLibre) {
       renglones = renglonesDesdeTextoLibre(textoLibre);
     }
+    renglones = normalizarRenglones(renglones);
     const texto = renglones.length ? textoResumenDeRenglones(renglones) : textoLibre;
     if (texto.length < 3) {
       throw new BadRequestException('Agrega al menos un renglón con qué hará tu gente (mínimo 3 caracteres).');
@@ -236,8 +238,13 @@ export class SupervisionService {
       );
     }
     const supervisorId = await this.resolverSupervisorId(actor, tenantId);
+    await this.validarReferenciasRenglones(renglones, actor.id, tenantId);
+    // El vínculo se origina en el servidor, nunca en la petición del autor.
+    renglones = renglones.map(r => ({ ...r, actividadCreadaId: null }));
+    const previo = await this.prisma.planDiario.findFirst({ where: { autorId: actor.id, fecha: fechaCol, companyId: tenantId } });
+    if (previo && (previo.estado === 'PROGRAMADO' || normalizarRenglones(previo.renglonesJson).some(r => r.actividadCreadaId))) throw new BadRequestException('El plan ya tiene programación. Solicita al supervisor los cambios para conservar las actividades ligadas.');
     const plan = await this.prisma.planDiario.upsert({
-      where: { autorId_fecha: { autorId: actor.id, fecha: fechaCol } },
+      where: { autorId_fecha: { autorId: actor.id, fecha: fechaCol }, companyId: tenantId, estado: { not: 'PROGRAMADO' } },
       create: {
         companyId: tenantId,
         autorId: actor.id,
@@ -255,6 +262,9 @@ export class SupervisionService {
         notaSupervisor: null,
         supervisorId,
       },
+    }).catch(error => {
+      if (error?.code === 'P2002' || error?.code === 'P2025') throw new BadRequestException('El plan ya fue programado o pertenece a otra empresa. Actualiza la pantalla.');
+      throw error;
     });
     await this.avisar(supervisorId, {
       type: 'WORKFLOW_PENDING',
@@ -296,7 +306,7 @@ export class SupervisionService {
         ...p,
         renglones: normalizarRenglones(p.renglonesJson),
       }));
-      const equipoIds = users.filter((u) => u.managerId === actor.id).map((u) => u.id);
+      const equipoIds = [...subarbolIds(actor.id, users)].filter(id => id !== actor.id);
       const indicadores = indicadoresDeRenglones(
         planesConRenglones.map((p) => ({
           renglones: p.renglones,
@@ -345,7 +355,10 @@ export class SupervisionService {
   async programarPlan(sesion: Sesion, companyId: number | null, id: number) {
     const tenantId = requireCompanyId(companyId);
     const actor = await this.resolveActor(sesion, tenantId);
-    await this.planDelSupervisor(id, actor.id, tenantId);
+    const plan = await this.planDelSupervisor(id, actor.id, tenantId);
+    if (normalizarRenglones(plan.renglonesJson).some(r => !r.actividadCreadaId)) {
+      throw new BadRequestException('Usa Programar o Programar todo para crear las actividades antes de marcar el plan como programado.');
+    }
     return this.prisma.planDiario.update({
       where: { id, companyId: tenantId },
       data: { estado: 'PROGRAMADO', notaSupervisor: null },
@@ -356,9 +369,12 @@ export class SupervisionService {
     const tenantId = requireCompanyId(companyId);
     const actor = await this.resolveActor(sesion, tenantId);
     const plan = await this.planDelSupervisor(id, actor.id, tenantId);
+    if (normalizarRenglones(plan.renglonesJson).some(r => r.actividadCreadaId)) {
+      throw new BadRequestException('El plan tiene actividades programadas. Ajusta esas actividades antes de devolverlo.');
+    }
     const notaSupervisor = String(nota ?? '').trim() || null;
     const updated = await this.prisma.planDiario.update({
-      where: { id, companyId: tenantId },
+      where: { id, companyId: tenantId, estado: plan.estado, updatedAt: plan.updatedAt },
       data: { estado: 'DEVUELTO', notaSupervisor },
     });
     await this.avisar(plan.autorId, {
@@ -725,9 +741,9 @@ export class SupervisionService {
       where: { companyId, fecha: fechaCol, autorId: { in: [...arbol] } },
       select: { id: true, autorId: true, renglonesJson: true, estado: true },
     });
-    const porActividad = new Map<number, string>();
+    const porActividad = new Map<string, string>();
     for (const p of personas) {
-      for (const a of p.actividades ?? []) porActividad.set(a.id, a.bucket);
+      for (const a of p.actividades ?? []) porActividad.set(`${p.userId}:${a.id}`, a.bucket);
     }
     let planificados = 0;
     let conActividad = 0;
@@ -744,7 +760,7 @@ export class SupervisionService {
       for (const r of normalizarRenglones(plan.renglonesJson)) {
         planificados += 1;
         const actId = r.actividadCreadaId ?? null;
-        const bucket = actId != null ? porActividad.get(actId) ?? null : null;
+        const bucket = actId != null ? porActividad.get(`${r.personaId}:${actId}`) ?? null : null;
         if (actId) conActividad += 1;
         if (bucket === 'terminada') cumplidos += 1;
         detalle.push({
@@ -774,55 +790,85 @@ export class SupervisionService {
   ) {
     const tenantId = requireCompanyId(companyId);
     const actor = await this.resolveActor(sesion, tenantId);
-    const plan = await this.planDelSupervisor(planId, actor.id, tenantId);
-    const renglones = this.renglonesDePlan(plan);
-    const idx = renglones.findIndex((r) => r.id === renglonId);
-    if (idx < 0) throw new NotFoundException('No encontré ese renglón.');
-    const r = renglones[idx];
-    if (!r.actividad.trim()) throw new BadRequestException('El renglón no tiene actividad.');
-    if (!r.personaId) throw new BadRequestException('Asigna una persona al renglón antes de programar.');
-    if (r.actividadCreadaId) {
-      return { actividadId: r.actividadCreadaId, renglon: r, yaExistia: true };
+    const resultado = await this.prisma.$transaction(async tx => {
+      // Bloquea la fila y vuelve a leer: dos solicitudes no pueden crear la misma actividad.
+      const bloqueado = await tx.planDiario.updateMany({
+        where: { id: planId, companyId: tenantId, supervisorId: actor.id, estado: { not: 'DEVUELTO' } },
+        data: { supervisorId: actor.id },
+      });
+      if (bloqueado.count !== 1) throw new ForbiddenException('No puedes programar este plan o fue devuelto.');
+      const plan = await tx.planDiario.findFirst({ where: { id: planId, companyId: tenantId, supervisorId: actor.id } });
+      if (!plan) throw new NotFoundException('No encontré ese plan.');
+      const renglones = this.renglonesDePlan(plan);
+      const idx = renglones.findIndex((r) => r.id === renglonId);
+      if (idx < 0) throw new NotFoundException('No encontré ese renglón.');
+      const r = renglones[idx];
+      if (!r.actividad.trim()) throw new BadRequestException('El renglón no tiene actividad.');
+      if (!r.personaId) throw new BadRequestException('Asigna una persona al renglón antes de programar.');
+      if (r.actividadCreadaId) {
+        return { actividadId: r.actividadCreadaId, renglon: r, yaExistia: true };
+      }
+      await this.validarReferenciasRenglones([r], plan.autorId, tenantId, tx);
+      const fechaIso = plan.fecha.toISOString().slice(0, 10);
+      const indicaciones = [
+        r.como ? `Cómo/alcance: ${r.como}` : '',
+        r.porque ? `Por qué/objetivo: ${r.porque}` : '',
+        r.horarioEstimado ? `Horario estimado: ${r.horarioEstimado}` : '',
+        r.clienteNombre ? `Cliente: ${r.clienteNombre}` : '',
+        r.proyectoNombre ? `Proyecto: ${r.proyectoNombre}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
+      const prioridad =
+        r.prioridad === 'alta' ? 'ALTA' : r.prioridad === 'baja' ? 'BAJA' : 'MEDIA';
+      const creada = await this.activities.create(
+        {
+          titulo: r.actividad.slice(0, 200),
+          indicaciones: indicaciones || undefined,
+          descripcion: r.porque || undefined,
+          responsableId: r.personaId,
+          creadoPorId: actor.id,
+          clientId: r.clienteId ?? undefined,
+          projectId: r.proyectoId ?? undefined,
+          fechaInicio: `${fechaIso}T09:00:00-06:00`,
+          periodoInicio: fechaIso,
+          periodoFin: fechaIso,
+          prioridad,
+          estatus: 'Pendiente',
+        } as any,
+        tenantId,
+        { sinAviso: true, tx },
+      );
+      renglones[idx] = { ...r, actividadCreadaId: creada.id };
+      await tx.planDiario.update({
+        where: { id: plan.id, companyId: tenantId },
+        data: {
+          renglonesJson: renglones,
+          texto: textoResumenDeRenglones(renglones),
+          estado: 'PROGRAMADO',
+        },
+      });
+      return { actividadId: creada.id, renglon: renglones[idx], yaExistia: false, creada };
+    }, { timeout: 30000 });
+    if ('creada' in resultado && resultado.creada) {
+      await this.activities.publicarActividadCreada(resultado.creada, tenantId).catch(e => this.logger.warn(`No se pudo avisar la actividad: ${String(e)}`));
     }
-    const fechaIso = plan.fecha.toISOString().slice(0, 10);
-    const indicaciones = [
-      r.como ? `Cómo/alcance: ${r.como}` : '',
-      r.porque ? `Por qué/objetivo: ${r.porque}` : '',
-      r.horarioEstimado ? `Horario estimado: ${r.horarioEstimado}` : '',
-      r.clienteNombre ? `Cliente: ${r.clienteNombre}` : '',
-      r.proyectoNombre ? `Proyecto: ${r.proyectoNombre}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n');
-    const prioridad =
-      r.prioridad === 'alta' ? 'ALTA' : r.prioridad === 'baja' ? 'BAJA' : 'MEDIA';
-    const creada = await this.activities.create(
-      {
-        titulo: r.actividad.slice(0, 200),
-        indicaciones: indicaciones || undefined,
-        descripcion: r.porque || undefined,
-        responsableId: r.personaId,
-        creadoPorId: actor.id,
-        clientId: r.clienteId ?? undefined,
-        projectId: r.proyectoId ?? undefined,
-        fechaInicio: fechaIso,
-        fechaMaxima: fechaIso,
-        prioridad,
-        estatus: 'Pendiente',
-      } as any,
-      tenantId,
-      { sinAviso: false },
-    );
-    renglones[idx] = { ...r, actividadCreadaId: creada.id };
-    await this.prisma.planDiario.update({
-      where: { id: plan.id },
-      data: {
-        renglonesJson: renglones,
-        texto: textoResumenDeRenglones(renglones),
-        estado: 'PROGRAMADO',
-      },
-    });
-    return { actividadId: creada.id, renglon: renglones[idx], yaExistia: false };
+    return { actividadId: resultado.actividadId, renglon: resultado.renglon, yaExistia: resultado.yaExistia };
+  }
+
+  private async validarReferenciasRenglones(rows: PlanRenglon[], autorId: number, companyId: number, db: Prisma.TransactionClient | PrismaService = this.prisma) {
+    const users = await this.usuariosEmpresa(companyId);
+    const equipo = subarbolIds(autorId, users);
+    equipo.add(autorId);
+    for (const r of rows) {
+      if (r.personaId && !equipo.has(r.personaId)) throw new BadRequestException('La persona del renglón debe estar activa en el equipo del autor y en esta empresa.');
+      if (r.clienteId && !await db.serviceClient.findFirst({ where: { id: r.clienteId, companyId }, select: { id: true } })) throw new BadRequestException('El cliente no está disponible en esta empresa.');
+      if (r.proyectoId) {
+        const proyecto = await db.operationalProject.findFirst({ where: { id: r.proyectoId, companyId, deletedAt: null }, select: { clientId: true } });
+        if (!proyecto || (r.clienteId && proyecto.clientId !== r.clienteId)) throw new BadRequestException('El proyecto debe pertenecer a este cliente y empresa.');
+      }
+      if (r.actividadId && !await db.activity.findFirst({ where: { id: r.actividadId, companyId, deletedAt: null }, select: { id: true } })) throw new BadRequestException('La actividad no está disponible en esta empresa.');
+    }
   }
 
   async programarTodo(sesion: Sesion, companyId: number | null, planId: number) {

@@ -1,8 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ROLES } from '../../common/rbac/roles.v2.js';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { validarCreacion } from './medidas-disciplinarias.helpers.js';
+import { assertRhActor } from '../rh-actor.js';
 
 type Actor = { id: number; roleKey?: string | null; isSuperAdmin?: boolean };
 
@@ -10,13 +10,6 @@ type Actor = { id: number; roleKey?: string | null; isSuperAdmin?: boolean };
 export class MedidasDisciplinariasService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private assertRh(actor: Actor) {
-    const rk = String(actor.roleKey ?? '');
-    if (actor.isSuperAdmin) return;
-    if (![ROLES.RH, ROLES.CEO, ROLES.DIR_ADMIN].includes(rk as any)) {
-      throw new ForbiddenException('Solo RH o dirección registran medidas disciplinarias.');
-    }
-  }
 
   private async reglamentoCargado(companyId: number): Promise<boolean> {
     // Documentos de expediente van por persona; buscamos tipo «reglamento» en la empresa.
@@ -35,8 +28,8 @@ export class MedidasDisciplinariasService {
   }
 
   async listar(actor: Actor, companyId: number | null, userId?: number) {
-    this.assertRh(actor);
     const tenantId = requireCompanyId(companyId);
+    await assertRhActor(this.prisma, actor, tenantId);
     return this.prisma.medidaDisciplinaria.findMany({
       where: { companyId: tenantId, ...(userId ? { userId } : {}) },
       include: {
@@ -61,10 +54,10 @@ export class MedidasDisciplinariasService {
       notas?: string;
     },
   ) {
-    this.assertRh(actor);
     const tenantId = requireCompanyId(companyId);
+    await assertRhActor(this.prisma, actor, tenantId);
     const userId = Number(body?.userId);
-    if (!Number.isFinite(userId) || userId <= 0) throw new ForbiddenException('Elige a la persona.');
+    if (!Number.isSafeInteger(userId) || userId <= 0) throw new BadRequestException('Elige a la persona.');
     const sujeto = await this.prisma.user.findFirst({
       where: { id: userId, companyMemberships: { some: { companyId: tenantId } } },
       select: { id: true },
@@ -106,27 +99,36 @@ export class MedidasDisciplinariasService {
     id: number,
     estado: string,
   ) {
-    this.assertRh(actor);
     const tenantId = requireCompanyId(companyId);
+    await assertRhActor(this.prisma, actor, tenantId);
     const row = await this.prisma.medidaDisciplinaria.findFirst({ where: { id, companyId: tenantId } });
     if (!row) throw new NotFoundException('No encontré esa medida.');
-    const ok = ['BORRADOR', 'NOTIFICADA', 'FIRMADA', 'CERRADA', 'ANULADA'];
-    if (!ok.includes(estado)) throw new ForbiddenException('Estado no válido.');
+    const siguientes: Record<string, string[]> = {
+      BORRADOR: ['NOTIFICADA', 'ANULADA'], NOTIFICADA: ['FIRMADA', 'ANULADA'],
+      FIRMADA: ['CERRADA', 'ANULADA'], CERRADA: [], ANULADA: [],
+    };
+    if (estado === row.estado) return row;
+    if (!siguientes[row.estado]?.includes(estado)) throw new BadRequestException('Ese cambio de estado no está permitido.');
+    if (row.tipo === 'SUSPENSION' && estado !== 'ANULADA' &&
+        (row.avisoReglamento || !await this.reglamentoCargado(tenantId))) {
+      throw new BadRequestException('La suspensión permanece en borrador hasta acreditar que el reglamento interior la prevé y que se escuchó al trabajador.');
+    }
+    if (estado === 'FIRMADA' && !row.pdfUrl) throw new BadRequestException('Falta el documento firmado de la medida.');
     return this.prisma.medidaDisciplinaria.update({
-      where: { id },
+      where: { id, companyId: tenantId, estado: row.estado },
       data: { estado: estado as any },
     });
   }
 
   async tableroDesempeno(actor: Actor, companyId: number | null, userId: number) {
-    this.assertRh(actor);
     const tenantId = requireCompanyId(companyId);
+    await assertRhActor(this.prisma, actor, tenantId);
     const user = await this.prisma.user.findFirst({
       where: { id: userId, companyMemberships: { some: { companyId: tenantId } } },
       select: { id: true, nombre: true, email: true, puesto: true },
     });
     if (!user) throw new NotFoundException('Persona no encontrada.');
-    const [reviews, medidas, evidencias] = await Promise.all([
+    const [reviews, medidas, calificaciones, evaluaciones, medidasActivas] = await Promise.all([
       this.prisma.performanceReview.findMany({
         where: { companyId: tenantId, userId },
         orderBy: { reviewDate: 'desc' },
@@ -137,25 +139,24 @@ export class MedidasDisciplinariasService {
         orderBy: { createdAt: 'desc' },
         take: 50,
       }),
-      this.prisma.activityEvidence.findMany({
-        where: { companyId: tenantId, userId, reviewStatus: 'APPROVED' },
-        select: { eficienciaScore: true },
-        take: 200,
-        orderBy: { id: 'desc' },
+      this.prisma.activityEvidence.aggregate({
+        where: { companyId: tenantId, userId, reviewStatus: 'APPROVED', eficienciaScore: { gt: 0 } },
+        _avg: { eficienciaScore: true }, _count: { eficienciaScore: true },
       }),
+      this.prisma.performanceReview.count({ where: { companyId: tenantId, userId } }),
+      this.prisma.medidaDisciplinaria.count({ where: { companyId: tenantId, userId, estado: { notIn: ['CERRADA', 'ANULADA'] } } }),
     ]);
-    const ratings = evidencias.map((e) => Number(e.eficienciaScore)).filter((n) => Number.isFinite(n) && n > 0);
     const calificacionPromedio =
-      ratings.length > 0 ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10 : null;
+      calificaciones._avg.eficienciaScore != null ? Math.round(Number(calificaciones._avg.eficienciaScore) * 10) / 10 : null;
     return {
       user,
       reviews,
       medidas,
       kpis: {
-        evaluaciones: reviews.length,
+        evaluaciones,
         calificacionPromedio,
-        medidasActivas: medidas.filter((m) => m.estado !== 'CERRADA').length,
-        evidenciasCalificadas: ratings.length,
+        medidasActivas,
+        evidenciasCalificadas: calificaciones._count.eficienciaScore,
       },
     };
   }
