@@ -1420,10 +1420,12 @@ export class AuthService {
     if (session.expiresAt.getTime() < Date.now()) {
       throw new UnauthorizedException('Sesión expirada');
     }
-    // Touch lastSeen (fire-and-forget)
-    void this.prisma.userSession
-      .update({ where: { id: session.id }, data: { lastSeenAt: new Date() } })
-      .catch(() => undefined);
+    // Touch lastSeen (fire-and-forget), como mucho cada 5 min: antes era una escritura por cada petición.
+    if (debeTocarLastSeen(session.lastSeenAt)) {
+      void this.prisma.userSession
+        .update({ where: { id: session.id }, data: { lastSeenAt: new Date() } })
+        .catch(() => undefined);
+    }
   }
 
   async getProfile(userId: number) {
@@ -1444,4 +1446,10 @@ export class AuthService {
     const permissions = this.resolveUserPermissions(user, isSuperAdmin);
     return this.mapSessionUser(user, permissions, isSuperAdmin);
   }
+}
+
+/** «Visto por última vez» se guarda como mucho cada 5 min (Programa Velocidad, 18-11-2026). */
+export const LAST_SEEN_CADA_MS = 5 * 60_000;
+export function debeTocarLastSeen(lastSeenAt: Date | null | undefined, ahora = Date.now()): boolean {
+  return !lastSeenAt || ahora - new Date(lastSeenAt).getTime() >= LAST_SEEN_CADA_MS;
 }

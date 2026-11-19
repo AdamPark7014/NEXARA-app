@@ -181,14 +181,30 @@ export function armarBandeja(d: {
   return grupos;
 }
 
+/**
+ * Quién puede ver bajas (`GET /api/users/bajas`, mismo criterio que la matriz). A los demás no se les
+ * pide: finanzas@ recibía un 403 cada vez que se recontaba el menú (1,225 el 18-11-2026).
+ * Sin rol conocido se pide como antes.
+ */
+export const ROLES_CON_BAJAS = new Set(["super_admin", "ceo", "dir_operaciones", "dir_admin", "rh"]);
+export function veBajas(roleKey?: string | null, isSuperAdmin?: boolean): boolean {
+  if (isSuperAdmin) return true;
+  if (!roleKey) return true;
+  return ROLES_CON_BAJAS.has(roleKey);
+}
+
 /** Lo ligero, para el número del menú: sin el cálculo de nómina, que es pesado. */
-export async function contarBandeja(token: string): Promise<number> {
+export async function contarBandeja(
+  token: string,
+  quien: { roleKey?: string | null; isSuperAdmin?: boolean } = {},
+): Promise<number> {
+  const bajas = veBajas(quien.roleKey, quien.isSuperAdmin);
   const [revisiones, solicitudes, viaticos, firmas, bajasPendientes, rhSolicitudes] = await Promise.all([
     callado(erpFetch<{ pendientes?: Revision[] }>("me/revisiones", token)),
     callado(erpFetch<{ received?: Solicitud[] }>("me/activity-requests", token)),
     callado(financeFetch("viatics", token).then((r) => sinEnvoltura(r) as Viatico[])),
     callado(erpFetch<unknown[]>("workflow/my-pending", token)),
-    callado(erpFetch<unknown[]>("users/bajas?estado=PENDIENTE", token)),
+    bajas ? callado(erpFetch<unknown[]>("users/bajas?estado=PENDIENTE", token)) : Promise.resolve(null),
     callado(erpFetch<unknown[]>("hr/solicitudes-aprobacion/mis-pendientes", token)),
   ]);
   return armarBandeja({
@@ -204,16 +220,20 @@ export async function contarBandeja(token: string): Promise<number> {
 }
 
 /** Todo lo de la bandeja, con la semana de nómina que se paga (la anterior a la de hoy). */
-export async function cargarBandeja(token: string): Promise<GrupoBandeja[]> {
+export async function cargarBandeja(
+  token: string,
+  quien: { roleKey?: string | null; isSuperAdmin?: boolean } = {},
+): Promise<GrupoBandeja[]> {
   const lunes = sumarDias(lunesDe(new Date()), -7);
+  const bajas = veBajas(quien.roleKey, quien.isSuperAdmin);
   const [revisiones, solicitudes, viaticos, semana, firmas, bajasPendientes, bajasAprobadas, rhSolicitudes] = await Promise.all([
     callado(erpFetch<{ pendientes?: Revision[] }>("me/revisiones", token)),
     callado(erpFetch<{ received?: Solicitud[] }>("me/activity-requests", token)),
     callado(financeFetch("viatics", token).then((r) => sinEnvoltura(r) as Viatico[])),
     callado(financeFetch(rutaControlSemanal(lunes), token).then((r) => sinEnvoltura(r) as { totales?: Record<string, unknown> })),
     callado(erpFetch<unknown[]>("workflow/my-pending", token)),
-    callado(erpFetch<unknown[]>("users/bajas?estado=PENDIENTE", token)),
-    callado(erpFetch<unknown[]>("users/bajas?estado=APROBADA", token)),
+    bajas ? callado(erpFetch<unknown[]>("users/bajas?estado=PENDIENTE", token)) : Promise.resolve(null),
+    bajas ? callado(erpFetch<unknown[]>("users/bajas?estado=APROBADA", token)) : Promise.resolve(null),
     callado(erpFetch<unknown[]>("hr/solicitudes-aprobacion/mis-pendientes", token)),
   ]);
   const vobo = Array.isArray(bajasAprobadas)

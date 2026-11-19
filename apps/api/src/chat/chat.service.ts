@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ChatChannelKind, ChatMessageKind, Prisma } from '@prisma/client';
+import { Cron } from '@nestjs/schedule';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -70,6 +72,80 @@ export class ChatService {
     private readonly realtime: RealtimeGateway,
     private readonly notifications: NotificationsService,
   ) {}
+
+  /**
+   * `ensureDefaults` escribe en la base (archiva, crea canales y membresías). Antes corría en CADA
+   * GET chat/channels; ahora como mucho cada 6 h por persona y empresa en este proceso, más la
+   * reparación diaria (Programa Velocidad, 18-11-2026).
+   */
+  private readonly defaultsRevisadosAt = new Map<string, number>();
+  static readonly DEFAULTS_CADA_MS = 6 * 60 * 60_000;
+
+  private async ensureDefaultsSiToca(userId: number, companyId: number) {
+    const clave = `${companyId}:${userId}`;
+    const antes = this.defaultsRevisadosAt.get(clave);
+    if (antes != null && Date.now() - antes < ChatService.DEFAULTS_CADA_MS) return;
+    await this.ensureDefaults(userId, companyId);
+    this.defaultsRevisadosAt.set(clave, Date.now());
+  }
+
+  /** Reparación diaria de canales por omisión y membresías (lo que antes hacía cada lectura). */
+  @Cron('20 4 * * *', { name: 'chat-reparar-canales', timeZone: 'America/Mexico_City' })
+  async repararCanalesDiario() {
+    await runScheduledJob('chat:reparar-canales', this.logger, async () => {
+      const miembros = await this.prisma.userCompany.findMany({
+        where: { user: { isActive: true } },
+        select: { userId: true, companyId: true },
+      });
+      for (const m of miembros) {
+        await this.ensureDefaults(m.userId, m.companyId).catch((e) =>
+          this.logger.warn(`No se repararon los canales de ${m.userId}: ${String(e?.message ?? e)}`),
+        );
+        this.defaultsRevisadosAt.set(`${m.companyId}:${m.userId}`, Date.now());
+      }
+    });
+  }
+
+  /**
+   * No leídos de varios canales en UNA consulta (antes era un COUNT por canal).
+   * Cada canal cuenta lo posterior a su `lastReadAt` (o `joinedAt`), sin lo propio ni respuestas.
+   */
+  private async contarNoLeidos(userId: number, desde: Array<{ channelId: number; since: Date }>): Promise<Map<number, number>> {
+    const mapa = new Map<number, number>();
+    if (!desde.length) return mapa;
+    const filas = await this.prisma.chatMessage.groupBy({
+      by: ['channelId'],
+      where: {
+        deletedAt: null,
+        parentId: null,
+        authorId: { not: userId },
+        OR: desde.map((d) => ({ channelId: d.channelId, createdAt: { gt: d.since } })),
+      },
+      _count: { _all: true },
+    });
+    for (const f of filas as Array<{ channelId: number; _count: { _all: number } }>) mapa.set(f.channelId, f._count._all);
+    return mapa;
+  }
+
+  /** Total de no leídos para la insignia del menú, sin armar la lista de canales. Sin silenciados. */
+  async unreadCount(userId: number, companyId?: number | null): Promise<{ total: number }> {
+    const cid = await this.resolveUserCompanyId(userId, companyId);
+    const ahora = Date.now();
+    const miembros = await this.prisma.chatChannelMember.findMany({
+      where: {
+        userId,
+        channel: { isArchived: false, kind: { not: ChatChannelKind.DOCUMENT }, ...companyWhere(cid) },
+      },
+      select: { channelId: true, lastReadAt: true, joinedAt: true, mutedUntil: true },
+    });
+    const desde = miembros
+      .filter((m) => !(m.mutedUntil && m.mutedUntil.getTime() > ahora))
+      .map((m) => ({ channelId: m.channelId, since: m.lastReadAt ?? m.joinedAt }));
+    const mapa = await this.contarNoLeidos(userId, desde);
+    let total = 0;
+    for (const n of mapa.values()) total += n;
+    return { total };
+  }
 
   private async resolveUserCompanyId(userId: number, explicit?: number | null): Promise<number> {
     if (explicit != null && Number.isFinite(Number(explicit))) return Number(explicit);
@@ -341,7 +417,7 @@ export class ChatService {
 
   async listChannels(userId: number, companyId?: number | null) {
     const cid = await this.resolveUserCompanyId(userId, companyId);
-    await this.ensureDefaults(userId, cid);
+    await this.ensureDefaultsSiToca(userId, cid);
     const scope = await this.resolveChatScope(userId, cid);
 
     const where: Prisma.ChatChannelWhereInput = {
@@ -381,23 +457,19 @@ export class ChatService {
       orderBy: [{ kind: 'asc' }, { lastMessageAt: 'desc' }, { name: 'asc' }],
     });
 
+    const desde: Array<{ channelId: number; since: Date }> = [];
+    for (const ch of channels) {
+      const membership = ch.members.find((m) => m.userId === userId) ?? null;
+      const since = membership?.lastReadAt ?? membership?.joinedAt ?? null;
+      if (since && membership) desde.push({ channelId: ch.id, since });
+    }
+    const noLeidos = await this.contarNoLeidos(userId, desde);
+
     const withCounts = await Promise.all(
       channels.map(async (ch) => {
         const membership = ch.members.find((m) => m.userId === userId) ?? null;
         const supervised = !membership && ch.kind !== ChatChannelKind.PUBLIC;
-        const since = membership?.lastReadAt ?? membership?.joinedAt ?? null;
-        const unreadCount =
-          since && !supervised
-            ? await this.prisma.chatMessage.count({
-                where: {
-                  channelId: ch.id,
-                  deletedAt: null,
-                  parentId: null,
-                  authorId: { not: userId },
-                  createdAt: { gt: since },
-                },
-              })
-            : 0;
+        const unreadCount = supervised ? 0 : noLeidos.get(ch.id) ?? 0;
 
         let displayName = ch.name;
         let peer: { id: number; nombre: string; email: string } | null = null;

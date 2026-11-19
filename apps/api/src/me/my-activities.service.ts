@@ -969,7 +969,8 @@ export class MyActivitiesService {
   async pendingReviews(viewer: TeamEvidenceViewer, companyId: number | null): Promise<RevisionesResponse> {
     const todo = revisaTodo(viewer);
     const usuarios = conRevisores(
-      await this.prisma.user.findMany({ select: { id: true, managerId: true, nombre: true } }),
+      // Solo la gente de esta empresa (antes leía todos los usuarios de todas las empresas en cada consulta).
+      await this.prisma.user.findMany({ where: deLaEmpresa(companyId), select: { id: true, managerId: true, nombre: true } }),
       await leerRevisores(this.prisma as never, companyId),
     );
     const jefesDe = cadenasDeMando(
@@ -1122,7 +1123,7 @@ export class MyActivitiesService {
   private async managerChains(userIds: number[], companyId?: number | null): Promise<Map<number, Set<number>>> {
     if (!userIds.length) return new Map();
     const users = conRevisores(
-      await this.prisma.user.findMany({ select: { id: true, managerId: true } }),
+      await this.prisma.user.findMany({ where: deLaEmpresa(companyId), select: { id: true, managerId: true } }),
       await leerRevisores(this.prisma as never, companyId),
     );
     return cadenasDeMando(users, userIds);
@@ -1518,4 +1519,9 @@ export class MyActivitiesService {
 
     return this.list(viewer, companyId);
   }
+}
+
+/** Filtro de usuarios de una empresa (membresía); sin empresa no se recorta (super admin de plataforma). */
+export function deLaEmpresa(companyId?: number | null) {
+  return companyId != null ? { companyMemberships: { some: { companyId } } } : {};
 }

@@ -33,3 +33,16 @@ describe("bandeja única de Aprobaciones (15-11)", () => {
     expect(g[1].titulo).toBe("Bajas para revisar");
   });
 });
+
+describe("bajas solo a quien puede verlas (C3, 18-11-2026)", () => {
+  it("administrativo (finanzas@) no las pide; rh y dirección sí", async () => {
+    const { veBajas } = await import("./bandeja");
+    expect(veBajas("administrativo")).toBe(false);
+    expect(veBajas("contabilidad")).toBe(false);
+    expect(veBajas("rh")).toBe(true);
+    expect(veBajas("ceo")).toBe(true);
+    expect(veBajas("dir_operaciones")).toBe(true);
+    expect(veBajas("vendedor", true)).toBe(true);
+    expect(veBajas(undefined)).toBe(true);
+  });
+});

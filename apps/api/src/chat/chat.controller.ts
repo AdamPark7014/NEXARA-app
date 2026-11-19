@@ -43,6 +43,12 @@ export class ChatController {
     return this.chat.listChannels(user.id, companyId);
   }
 
+  /** Insignia del menú: solo el total de no leídos (antes la web bajaba la lista entera cada minuto). */
+  @Get('unread-count')
+  unreadCount(@CurrentUser() user: { id: number }, @CurrentCompanyId() companyId: number | null) {
+    return this.chat.unreadCount(user.id, companyId);
+  }
+
   @Post('channels')
   createChannel(
     @CurrentUser() user: { id: number },
