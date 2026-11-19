@@ -64,7 +64,9 @@ function fila(act: ReturnType<typeof actividad>, over: Record<string, unknown> =
 
 function build(filas: unknown[], huerfanas: unknown[] = [], asistencias: unknown[] = []) {
   const prisma = {
-    user: { findMany: jest.fn().mockResolvedValue([LUIS, CAROLINA]) },
+    user: { findMany: jest.fn().mockResolvedValue([LUIS, CAROLINA, {
+      ...CAROLINA, id: 69, nombre: 'Tere', email: 'tere.garcia@nexara.com.mx', roleKey: 'rh',
+    }]) },
     activityAssignee: { findMany: jest.fn().mockResolvedValue(filas) },
     activity: { findMany: jest.fn().mockResolvedValue(huerfanas) },
     attendance: { findMany: jest.fn().mockResolvedValue(asistencias) },
@@ -108,6 +110,7 @@ describe('tarjetas de Mi equipo', () => {
       1,
     );
     const luis = board.users.find((u) => u.id === 7)!;
+    expect(board.users.map((u) => u.id)).not.toContain(69);
     expect(luis.openActivities.map((a) => a.anNumber)).toEqual(['AN-0001', 'AN-0002']);
     expect(luis.openActivities[0]).toEqual(
       expect.objectContaining({ titulo: 'Actualizar archivo SLA', atrasada: true, estatus: 'Pendiente' }),

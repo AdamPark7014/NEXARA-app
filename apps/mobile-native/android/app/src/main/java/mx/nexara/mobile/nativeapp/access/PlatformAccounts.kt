@@ -14,16 +14,18 @@ object PlatformAccounts {
     const val DEVELOPER_EMAIL = "developer@nexara.com.mx"
     const val CLAUDIA_TESTER_EMAIL = "claudia.bernal@nexara.com.mx"
     const val PLAY_REVIEW_EMAIL = "play.review@nexara.com.mx"
+    /** Getzemani Del Valle (Dirección General): equivale al CEO y no es personal operativo. */
+    const val DIRECCION_GENERAL_EMAIL = "getzemani.delvalle@nexara.com.mx"
 
     fun norm(email: String?): String = email?.trim()?.lowercase().orEmpty()
 
-    /** Christian y su equivalente de permisos (Claudia). */
-    private val CEO_EQUIVALENT_EMAILS = setOf(CEO_EMAIL, CLAUDIA_TESTER_EMAIL)
+    /** Christian, Getzemani y Claudia (tester). */
+    private val CEO_EQUIVALENT_EMAILS = setOf(CEO_EMAIL, DIRECCION_GENERAL_EMAIL, CLAUDIA_TESTER_EMAIL)
 
     fun isCeoEquivalentEmail(email: String?): Boolean = norm(email) in CEO_EQUIVALENT_EMAILS
 
     /**
-     * Dirección: el rol CEO, además de Christian y Claudia por correo. Adam (04-11-2026) prueba con su
+     * Dirección: el rol CEO, además de Christian/Getzemani/Claudia por correo. Adam (04-11-2026) prueba con su
      * cuenta, que es CEO, y veía otra app: lo que decide por correo no sale para quien tiene el rol.
      */
     fun esDireccion(email: String?, roleKey: String?): Boolean =
@@ -35,7 +37,22 @@ object PlatformAccounts {
      * Cuentas de plataforma / pruebas que NUNCA deben listarse como empleados
      * (equipo, pizarra, pickers de "asignar a", listas de asistencia/comida).
      */
-    private val NON_EMPLOYEE_EMAILS = setOf(CEO_EMAIL, DEVELOPER_EMAIL, CLAUDIA_TESTER_EMAIL, PLAY_REVIEW_EMAIL)
+    private val NON_EMPLOYEE_EMAILS = setOf(
+        CEO_EMAIL,
+        DIRECCION_GENERAL_EMAIL,
+        DEVELOPER_EMAIL,
+        CLAUDIA_TESTER_EMAIL,
+        PLAY_REVIEW_EMAIL,
+    )
 
     fun isNonEmployeeEmail(email: String?): Boolean = norm(email) in NON_EMPLOYEE_EMAILS
+
+    /**
+     * Supervisa sin actividades propias: dirección/plataforma o rol RH (Tere).
+     * Sigue en asistencia/nómina; no ve «Mis actividades» ni sale como asignable.
+     */
+    fun sinActividades(email: String?, roleKey: String?): Boolean {
+        if (isNonEmployeeEmail(email)) return true
+        return roleKey?.trim()?.lowercase() == "rh"
+    }
 }

@@ -1,5 +1,5 @@
 import { erpFetch } from "@/lib/erp-api";
-import { isNonEmployeeEmail } from "@/lib/platform-accounts";
+import { sinActividades } from "@/lib/platform-accounts";
 import type { PeriodoActividad } from "@/lib/actividad-periodo";
 import type { PausaTipo } from "@/lib/sesion-actividad";
 
@@ -92,6 +92,7 @@ export type TeamBoardUser = {
   id: number;
   nombre: string;
   email: string;
+  roleKey?: string | null;
   avatarUrl: string | null;
   puesto: string | null;
   status: BoardUserStatus;
@@ -381,8 +382,8 @@ export function rangeQuery(rango?: BoardRange): string {
 
 export async function fetchTeamBoard(token: string, rango?: BoardRange): Promise<TeamBoardResponse> {
   const board = await erpFetch<TeamBoardResponse>(`me/board${rangeQuery(rango)}`, token);
-  // Safety net: Christian/Adam/Claudia/cuenta demo no deben verse como equipo/empleados.
-  return { ...board, users: (board.users ?? []).filter((u) => !isNonEmployeeEmail(u.email)) };
+  // Safety net: dirección/plataforma y RH no llevan actividades en la pizarra.
+  return { ...board, users: (board.users ?? []).filter((u) => !sinActividades(u)) };
 }
 
 export function fetchTeamBoardUser(

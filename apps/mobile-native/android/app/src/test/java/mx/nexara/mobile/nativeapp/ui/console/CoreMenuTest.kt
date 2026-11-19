@@ -92,7 +92,9 @@ class CoreMenuTest {
         assertEquals(sinClientes, CoreMenu.modulesFor(user(roleKey = "ing_campo")))
         assertEquals(sinClientes, CoreMenu.modulesFor(user(roleKey = "coord_operaciones")))
         assertEquals(listOf(CoreModule.CHAT, CoreModule.MI_PERFIL), CoreMenu.modulesFor(user(roleKey = "vendedor")))
-        assertEquals(listOf(CoreModule.CHAT, CoreModule.MI_PERFIL), CoreMenu.modulesFor(user(roleKey = "dir_operaciones")))
+        assertEquals(sinClientes, CoreMenu.modulesFor(user(roleKey = "dir_operaciones")))
+        assertEquals(sinClientes, CoreMenu.modulesFor(user(roleKey = "coord_admin")))
+        assertEquals(sinClientes, CoreMenu.modulesFor(user(roleKey = "rh")))
         assertEquals(listOf(CoreModule.CHAT, CoreModule.MI_PERFIL), CoreMenu.modulesFor(user()))
     }
 

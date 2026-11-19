@@ -1,5 +1,5 @@
 import { buildApiUrl } from "@/lib/api-base";
-import { isNonEmployeeEmail } from "@/lib/platform-accounts";
+import { sinActividades } from "@/lib/platform-accounts";
 
 import type { ActivityEvidenceDetail } from "@/lib/evidence-display";
 import type { Aceptacion, Semaforo } from "@/lib/actividad-tiempos";
@@ -424,14 +424,15 @@ export function listOperationalProjects(token: string) {
 
 export async function listAssignableUsers(token: string) {
   const users = await apiFetch<AssignableUserOption[]>("users/assignable", token);
-  // Safety net: Christian/Adam/Claudia/cuenta demo no deben aparecer como responsable asignable.
-  return users.filter((u) => !isNonEmployeeEmail(u.email));
+  // Safety net: dirección/plataforma y RH no reciben actividades.
+  return users.filter((u) => !sinActividades(u));
 }
 
 export type AssignableUserOption = {
   id: number;
   nombre: string;
   email?: string;
+  roleKey?: string | null;
   role?: { nombre: string };
   /** `HH:MM` de su entrada (10:00 la oficina, 08:00 la cuadrilla); null = sin horario. */
   horaEntrada?: string | null;

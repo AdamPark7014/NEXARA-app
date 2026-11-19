@@ -8,7 +8,7 @@ import {
   workDayBounds,
   workDayEnd,
 } from '../common/time/workday.js';
-import { isNonEmployeeEmail } from '../common/platform-accounts.js';
+import { isNonEmployeeEmail, sinActividades } from '../common/platform-accounts.js';
 import {
   limiteDeActividad,
   periodoDeActividad,
@@ -289,6 +289,7 @@ type ScopedUser = {
   id: number;
   nombre: string;
   email: string;
+  roleKey: string | null;
   avatarUrl: string | null;
   puesto: string | null;
   managerId: number | null;
@@ -352,7 +353,9 @@ export class TeamBoardService {
     companyId: number | null,
     rango?: BoardRange,
   ): Promise<TeamBoardResponse> {
-    const { companyWide, scoped, now } = await this.resolveScope(viewer, companyId);
+    const { companyWide, scoped: scopedAll, now } = await this.resolveScope(viewer, companyId);
+    // RH (Tere) y dirección no llevan actividades: no salen en la pizarra.
+    const scoped = scopedAll.filter((u) => !sinActividades(u));
     const rangoFinal = rango ?? this.resolveRange(null, null, now);
     const userIds = scoped.map((u) => u.id);
     const base = {
@@ -393,7 +396,7 @@ export class TeamBoardService {
   }> {
     const { companyWide, scoped, now } = await this.resolveScope(viewer, companyId);
     const rangoFinal = rango ?? this.resolveRange(null, null, now);
-    const userIds = scoped.map((u) => u.id);
+    const userIds = scoped.filter((u) => !sinActividades(u)).map((u) => u.id);
     const workflow = await this.buildWorkflowPipeline(userIds, companyId, rangoFinal, now);
     return {
       scope: companyWide ? 'company' : 'subtree',
@@ -416,7 +419,7 @@ export class TeamBoardService {
   ): Promise<WorkflowBucketResponse> {
     const { companyWide, scoped, now } = await this.resolveScope(viewer, companyId);
     const rangoFinal = rango ?? this.resolveRange(null, null, now);
-    const userIds = scoped.map((u) => u.id);
+    const userIds = scoped.filter((u) => !sinActividades(u)).map((u) => u.id);
     const base = {
       scope: (companyWide ? 'company' : 'subtree') as 'company' | 'subtree',
       desde: workDateKey(rangoFinal.desde),
@@ -632,7 +635,8 @@ export class TeamBoardService {
     userId: number,
     rango?: BoardRange,
   ): Promise<TeamBoardUser> {
-    const { scoped, now } = await this.resolveScope(viewer, companyId);
+    const { scoped: scopedAll, now } = await this.resolveScope(viewer, companyId);
+    const scoped = scopedAll.filter((u) => !sinActividades(u));
     const target = scoped.find((u) => u.id === userId);
     if (!target) throw new NotFoundException('Usuario fuera de tu alcance');
     const [card] = await this.buildCards(
@@ -975,6 +979,7 @@ export class TeamBoardService {
         id: true,
         nombre: true,
         email: true,
+        roleKey: true,
         avatarUrl: true,
         puesto: true,
         managerId: true,
@@ -1556,6 +1561,7 @@ export class TeamBoardService {
         id: u.id,
         nombre: u.nombre,
         email: u.email,
+        roleKey: u.roleKey ?? null,
         avatarUrl: u.avatarUrl,
         puesto: u.puesto,
         status,

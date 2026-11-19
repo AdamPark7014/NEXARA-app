@@ -22,6 +22,8 @@ describe('supervision-helpers', () => {
     expect(esCuentaRealParaAviso({ email: 'ceo@demo.invalid' })).toBe(false);
     expect(esCuentaRealParaAviso({ email: 'play.review@nexara.com.mx' })).toBe(false);
     expect(esCuentaRealParaAviso({ email: 'developer@nexara.com.mx' })).toBe(false);
+    expect(esCuentaRealParaAviso({ email: ' CLAUDIA.BERNAL@nexara.com.mx ', puesto: 'Dirección' })).toBe(false);
+    expect(esCuentaRealParaAviso({ email: 'getzemani.delvalle@nexara.com.mx' })).toBe(true);
     expect(esCuentaRealParaAviso({ email: 'otro@nexara.com.mx', puesto: 'Tester QA' })).toBe(false);
     expect(esCuentaRealParaAviso({ email: 'otro@nexara.com.mx', puesto: 'Cuenta de demostración' })).toBe(false);
   });

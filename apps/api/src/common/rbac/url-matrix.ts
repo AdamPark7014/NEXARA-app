@@ -631,6 +631,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     // 07-11: el tablero de asistencias de su gente (su modo en `section-views` es gestionar).
     { path: '/erp/asistencias', scope: 'write' },
     { path: '/erp/asistencias/**', scope: 'write' },
+    ...KPIS_EQUIPO_URL_RULES,
     ...COSTOS_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
     ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES,
@@ -743,6 +744,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     // 07-11: el tablero de asistencias de su gente (su modo en `section-views` es gestionar).
     { path: '/erp/asistencias', scope: 'write' },
     { path: '/erp/asistencias/**', scope: 'write' },
+    ...KPIS_EQUIPO_URL_RULES,
     ...COSTOS_URL_RULES,
     ...USERS_ASSIGNABLE_URL_RULES,
     ...ACTIVIDAD_PROPIA_URL_RULES,
@@ -1294,7 +1296,13 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     // 07-11: el tablero de asistencias de su gente (su modo en `section-views` es gestionar).
     { path: '/erp/asistencias', scope: 'write' },
     { path: '/erp/asistencias/**', scope: 'write' },
-    ...ACTIVIDAD_PROPIA_URL_RULES,
+    ...KPIS_EQUIPO_URL_RULES,
+    // Tere supervisa sin actividades propias: pizarra sí, «Mis actividades» no.
+    { path: '/erp/pizarra', scope: 'write' },
+    { path: '/erp/pizarra/**', scope: 'write' },
+    { path: '/api/activities/**', methods: ['GET'], scope: 'read' },
+    { path: '/api/me/**', methods: ['GET'], scope: 'read' },
+    ...USERS_ASSIGNABLE_URL_RULES,
     ...CORE_RECURSOS_URL_RULES,
     ...CCTV_DISENOS_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,

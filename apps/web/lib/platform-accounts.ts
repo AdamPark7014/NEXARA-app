@@ -53,6 +53,20 @@ export function isNonEmployeeEmail(email?: string | null): boolean {
   return NON_EMPLOYEE_EMAILS.has(normalizePlatformEmail(email));
 }
 
+/**
+ * Quien supervisa sin llevar actividades propias: dirección/plataforma
+ * (`isNonEmployeeEmail`) o el rol de RH (Tere). Siguen en asistencia, nómina
+ * y expediente; no salen en pizarra, asignables ni KPIs de actividades.
+ */
+export function sinActividades(user: {
+  email?: string | null;
+  roleKey?: string | null;
+} | null | undefined): boolean {
+  if (!user) return false;
+  if (isNonEmployeeEmail(user.email)) return true;
+  return String(user.roleKey ?? "").trim().toLowerCase() === "rh";
+}
+
 export type PlatformAccountUser = {
   isSuperAdmin?: boolean;
   isPlatformOwner?: boolean;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { createPortal } from "react-dom";
 import Modal from "@/components/ui/Modal";
 import { Alert, Button, Field, Input, Select, Textarea } from "@/components/base";
-import { isNonEmployeeEmail } from "@/lib/platform-accounts";
+import { sinActividades } from "@/lib/platform-accounts";
 import { fetchTeamBoard } from "@/lib/team-board-api";
 import {
   apiErrorMessage,
@@ -79,6 +79,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
   const [aUsuarioId, setAUsuarioId] = useState<number | "">("");
   const [companeros, setCompaneros] = useState<Companero[]>([]);
   const [cargandoCompaneros, setCargandoCompaneros] = useState(false);
+  const [errorCompaneros, setErrorCompaneros] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -102,6 +103,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
   /** Compañeros: la lista de asignables; si el rol no la tiene, su equipo de la pizarra. */
   const cargarCompaneros = useCallback(async () => {
     setCargandoCompaneros(true);
+    setErrorCompaneros(null);
     try {
       let lista: Companero[] = [];
       try {
@@ -110,12 +112,15 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
         lista = [];
       }
       if (lista.length === 0) {
-        const board = await fetchTeamBoard(token).catch(() => null);
+        const board = await fetchTeamBoard(token);
         lista = (board?.users ?? [])
-          .filter((u) => !isNonEmployeeEmail(u.email))
+          .filter((u) => !sinActividades(u))
           .map((u) => ({ id: u.id, nombre: u.nombre }));
       }
       setCompaneros(lista.sort((a, b) => a.nombre.localeCompare(b.nombre, "es")));
+    } catch (e) {
+      setCompaneros([]);
+      setErrorCompaneros(apiErrorMessage(e, "No se pudieron cargar los compañeros."));
     } finally {
       setCargandoCompaneros(false);
     }
@@ -452,7 +457,7 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
           <Field
             label="Compañero que la continúa"
             required
-            hint={!cargandoCompaneros && opciones.length === 0 ? "No encontramos compañeros disponibles para ti." : undefined}
+            hint={!cargandoCompaneros && !errorCompaneros && opciones.length === 0 ? "No encontramos compañeros disponibles para ti." : undefined}
           >
             <Select
               value={aUsuarioId}
@@ -467,6 +472,14 @@ export default function ActivitySuperiorActions({ activityId, token, onDone, ext
               ))}
             </Select>
           </Field>
+          {errorCompaneros ? (
+            <Alert tone="danger" role="alert">
+              {errorCompaneros}
+              <Button variant="tertiary" onClick={() => void cargarCompaneros()} disabled={cargandoCompaneros}>
+                Reintentar
+              </Button>
+            </Alert>
+          ) : null}
           <Field label="Motivo" required hint={contador}>
             <Textarea
               value={motivo}

@@ -11,6 +11,7 @@ import { ROLES, ROLES_ENCARGADOS_DE_AREA, type RoleKey } from '../common/rbac/ro
 import { requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { WORKDAY_TIMEZONE, workClock, workDateKey } from '../common/time/workday.js';
 import { resolveAccessScheduleKey } from '../integra/access-schedule-defaults.js';
+import { sinActividades } from '../common/platform-accounts.js';
 import { esJefe, subarbolIds } from '../me/equipo-alcance.js';
 import { horarioDePersona, retardoDeEntrada } from '../me/kpis-equipo.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -166,6 +167,7 @@ export class SupervisionService {
     return users.filter(
       (u) =>
         u.managerId === supervisorId &&
+        !sinActividades(u) &&
         this.puedeMandarPlan(u, users),
     );
   }
@@ -396,6 +398,10 @@ export class SupervisionService {
     const users = await this.usuariosEmpresa(companyId);
     const arbol = subarbolIds(supervisorId, users);
     arbol.delete(supervisorId);
+    // Sin actividades (RH/dirección): no entran al cierre por cumplimiento de actividades.
+    for (const u of users) {
+      if (sinActividades(u)) arbol.delete(u.id);
+    }
     const ids = [...arbol];
     if (!ids.length) {
       return {
@@ -860,6 +866,9 @@ export class SupervisionService {
     const users = await this.usuariosEmpresa(companyId);
     const equipo = subarbolIds(autorId, users);
     equipo.add(autorId);
+    for (const user of users) {
+      if (sinActividades(user)) equipo.delete(user.id);
+    }
     for (const r of rows) {
       if (r.personaId && !equipo.has(r.personaId)) throw new BadRequestException('La persona del renglón debe estar activa en el equipo del autor y en esta empresa.');
       if (r.clienteId && !await db.serviceClient.findFirst({ where: { id: r.clienteId, companyId }, select: { id: true } })) throw new BadRequestException('El cliente no está disponible en esta empresa.');
@@ -900,8 +909,8 @@ export class SupervisionService {
     const actor = await this.resolveActor(sesion, tenantId);
     const users = await this.usuariosEmpresa(tenantId);
     const equipo = users
-      .filter((u) => u.managerId === actor.id || u.id === actor.id)
-      .map((u) => ({ id: u.id, nombre: u.nombre, email: u.email, puesto: u.puesto }));
+      .filter((u) => (u.managerId === actor.id || u.id === actor.id) && !sinActividades(u))
+      .map((u) => ({ id: u.id, nombre: u.nombre, email: u.email, roleKey: u.roleKey, puesto: u.puesto }));
     return { equipo };
   }
 

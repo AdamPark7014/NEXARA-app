@@ -11,7 +11,7 @@ import { ChatService } from '../chat/chat.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { IntegraAcsFanoutService } from '../integra/integra-acs-fanout.service.js';
 import { CredentialVaultService } from '../credential-vault/credential-vault.service.js';
-import { NON_EMPLOYEE_EMAILS, PLATFORM_DEVELOPER_EMAIL, STORE_REVIEWER_EMAIL, TESTER_CEO_EMAIL } from '../common/platform-accounts.js';
+import { NON_EMPLOYEE_EMAILS, PLATFORM_DEVELOPER_EMAIL, STORE_REVIEWER_EMAIL, TESTER_CEO_EMAIL, sinActividades } from '../common/platform-accounts.js';
 import { asignablesDe, esJefe } from '../me/equipo-alcance.js';
 import { horarioDePersona } from '../me/kpis-equipo.js';
 import { resolveAccessScheduleKey } from '../integra/access-schedule-defaults.js';
@@ -827,8 +827,8 @@ export class UsersService {
         },
         orderBy: { nombre: 'asc' },
       });
-      // Christian, Adam, Claudia y la cuenta demo nunca reciben trabajo.
-      const candidatos = activos.filter((u: any) => !NON_EMPLOYEE_EMAILS.includes(String(u.email || '').toLowerCase()));
+      // Dirección/plataforma y RH (Tere) no reciben actividades.
+      const candidatos = activos.filter((u: any) => !sinActividades({ email: u.email, roleKey: u.roleKey }));
       const orden = asignablesDe(
         {
           id: currentUser.id,
@@ -851,6 +851,7 @@ export class UsersService {
             id: u.id,
             nombre: u.nombre,
             email: u.email,
+            roleKey: u.roleKey ?? null,
             role: u.role,
             avatarUrl: u.avatarUrl,
             puesto: u.puesto ?? null,

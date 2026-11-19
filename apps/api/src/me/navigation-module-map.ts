@@ -32,6 +32,10 @@ export const CORE_EXTRA_MODULES: ReadonlyArray<{ key: string; url: string }> = [
   { key: 'erp-aprobaciones', url: '/erp/approvals' },
   { key: 'erp-pagos-empleados', url: '/erp/finance/employee-payments' },
   { key: 'erp-documentos', url: '/erp/documents' },
+  // Perfiles nuevos (Luis / Liz / Tere): menú móvil.
+  { key: 'supervision', url: '/erp/supervision' },
+  { key: 'gestion-viaticos', url: '/erp/gestion-viaticos' },
+  { key: 'hr', url: '/erp/hr' },
   // Diseñador de videovigilancia («Clientes y obra»). Quien no puede diseñar (soporte sin gente a
   // cargo) lo recibe en `hiddenModuleIds` (`me.service.ts` con `puedeDisenarCctv`).
   { key: 'erp-videovigilancia', url: '/erp/videovigilancia' },
@@ -45,8 +49,8 @@ function panelWildcardBase(path: string): string | null {
 }
 
 export const PATH_MODULE_HINTS: PathModuleHint[] = [
-  { match: /^\/erp\/supervision(\/|$)/, android: [], web: ['supervision'] },
-  { match: /^\/erp\/gestion-viaticos(\/|$)/, android: [], web: ['gestion-viaticos'] },
+  { match: /^\/erp\/supervision(\/|$)/, android: ['supervision'], web: ['supervision'] },
+  { match: /^\/erp\/gestion-viaticos(\/|$)/, android: ['gestion-viaticos'], web: ['gestion-viaticos'] },
   // Core «Más». Anclados a /erp: `/erp/actividades/proyectos` no es Proyectos, y
   // `/erp/almacen/herramientas` (todo el personal) no abre el Almacén.
   { match: /^\/erp\/cotizaciones(\/|$)/, android: ['erp-cotizaciones'], web: ['erp-cotizaciones'] },
@@ -70,7 +74,7 @@ export const PATH_MODULE_HINTS: PathModuleHint[] = [
   { match: /\/my-profile|\/users\/profile/, android: ['my-profile'], web: ['my-profile'] },
   { match: /user-preferences|my-preferences/, android: ['my-preferences'], web: ['my-preferences'] },
   { match: /\/calendar/, android: ['calendar'], web: ['calendar'] },
-  { match: /\/mis-actividades/, android: ['mis-actividades'], web: ['mis-actividades'] },
+  { match: /^\/erp\/mis-actividades(\/|$)/, android: ['mis-actividades'], web: ['mis-actividades'] },
   { match: /\/pizarra/, android: ['pizarra'], web: ['pizarra'] },
   { match: /\/asistencias/, android: ['asistencias'], web: ['asistencias'] },
   { match: /\/clientes/, android: ['erp-clients'], web: ['erp-clients'] },
