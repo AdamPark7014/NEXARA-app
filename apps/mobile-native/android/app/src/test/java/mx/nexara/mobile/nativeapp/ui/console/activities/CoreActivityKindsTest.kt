@@ -37,9 +37,10 @@ class CoreActivityKindsTest {
     }
 
     @Test
-    fun unknownPeopleOnlyGetTarea() {
+    fun unknownPeopleGetTareaAndAdministrativa() {
         assertEquals(listOf("tarea"), k.kindsForAssignment("x@y.com", OrgEmails.DAVID, null, false))
-        assertEquals(listOf("tarea"), k.kindsForAssignment(OrgEmails.CEO, "nuevo@nexara.com.mx", null, false))
+        // Desde el 18-11 quien no está en la tabla recibe tarea y administrativa (trabajo de oficina).
+        assertEquals(listOf("tarea", "administrativa"), k.kindsForAssignment(OrgEmails.CEO, "nuevo@nexara.com.mx", null, false))
     }
 
     @Test
