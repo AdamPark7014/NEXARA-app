@@ -1343,6 +1343,10 @@ model Activity {
   /// Solicitudes entre pares que, al aceptarse, crearon esta actividad.
   peerRequestsOriginated  ActivityPeerRequest[]
   @@unique([companyId, anNumber])
+  /// Programa Velocidad (18-11-2026): «mis actividades», pizarra, atrasadas y listados por fecha.
+  @@index([companyId, responsableId, estatus])
+  @@index([estatus, fechaEntregaEsperada])
+  @@index([companyId, fechaAsignacion])
   @@index([cotizacionId])
   @@index([projectId])
   @@index([projectMilestoneId])
@@ -1880,6 +1884,8 @@ model LocationTracking {
   company             CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([companyId])
+  /// Recorrido de una persona por fecha (pizarra, GPS de la jornada). Programa Velocidad 18-11-2026.
+  @@index([usuarioId, ultimaActualizacion])
 }
 
 model Viatico {

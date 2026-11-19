@@ -617,19 +617,16 @@ export default function AppShell({ panel, children }: AppShellProps) {
     const load = async () => {
       if (document.hidden) return;
       try {
-        const res = await fetch(buildApiUrl("chat/channels"), {
+        // Solo el total (C1): antes bajaba la lista entera de canales cada minuto para sumarla.
+        const res = await fetch(buildApiUrl("chat/unread-count"), {
           credentials: "include",
           headers: { Authorization: `Bearer ${token}` },
           cache: "no-store",
         });
         if (!res.ok) return;
-        const data: unknown = await res.json();
-        if (cancelled || !Array.isArray(data)) return;
-        const total = (data as Array<{ unreadCount?: number; muted?: boolean }>).reduce(
-          (sum, c) => sum + (c?.muted ? 0 : Number(c?.unreadCount ?? 0) || 0),
-          0,
-        );
-        setChatUnread(total);
+        const data = (await res.json()) as { total?: number } | null;
+        if (cancelled) return;
+        setChatUnread(Number(data?.total ?? 0) || 0);
       } catch {
         /* non-critical */
       }
@@ -654,7 +651,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
       if (document.hidden) return;
       try {
         // Todo lo que espera su firma (evidencias, viáticos, solicitudes y firmas), como la bandeja (15-11).
-        const total = await contarBandeja(token);
+        const total = await contarBandeja(token, { roleKey: v2RoleKey, isSuperAdmin });
         if (!cancelled) setPendingApprovals(total);
       } catch {
         /* non-critical */
@@ -666,7 +663,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [user?.token, showsApprovals, activeMenuTarget]);
+    // Sin `activeMenuTarget`: antes recontaba (6 listas completas) en cada cambio de menú.
+  }, [user?.token, showsApprovals, v2RoleKey, isSuperAdmin]);
 
   const navCounts = useMemo(() => {
     const counts: Record<string, NavCount> = {};

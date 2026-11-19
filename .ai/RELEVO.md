@@ -1,5 +1,26 @@
 # RELEVO
 
+- **18-11 ~19:30 México (claude-code; Cursor cayó por conexión, Codex no usado) — Olas 0 y 1: resumen y pendientes.**
+  - Producción: 922db7b8 (Tere/rh, castigo por IP con `IP_BAN_EXEMPT=187.191.42.145` en `deploy/.env.nexara` del
+    servidor, Luis/Liz/dirección con `ACTIVIDADES_GESTION_URL_RULES`) y luego 2d1c0a6c (semáforo web = API,
+    hora en 24 h con «¿Quisiste decir p. m.?»). Datos: 14 actividades autoasignadas a. m.→p. m. corregidas con el OK
+    escrito de Adam; respaldo en la tabla `respaldo_ampm_20261118`. Quedan AN-0410/0411/0412 (4-11) sin corregir.
+  - En main SIN desplegar: bae7fbc1b Android (TimeInput + pregunta p. m., sin publicar), 8d6b2a69d lote A (20 tipos
+    nuevos en NotificationType + migración `20261118132000_avisos_rh_bajas_viaticos`; aviso al CEO en autos),
+    984c62c93 lote B (Editar por permiso, Entregar con código, Ctrl+V por puntos), y el lote C (C1 chat sin
+    escritura por lectura + no leídos en un GROUP BY + `GET chat/unread-count`; C2 lastSeenAt cada 5 min; C3 bajas
+    solo a quien puede y sin recontar por menú, usuarios por empresa en revisiones; C4 una renovación en vuelo y
+    solo si faltan < 2 h; C5 índices `20261118190000_indices_velocidad`; C6 `runScheduledJob` salta la vuelta si la anterior sigue corriendo; `waitForCompletion` no existe en
+    @nestjs/schedule 4.1.2 de la API).
+  - Pendiente: chat «Supervisión» hecho en el clon y SIN subir (espera visto bueno de Adam, capturas en un artifact
+    privado). C6 sin `pg_try_advisory_lock`: con el pool de Prisma el candado de sesión se toma y suelta en
+    conexiones distintas; hace falta un candado por tabla con vencimiento o `xact_lock` dentro de una transacción.
+    C3 sin endpoint de conteo en servidor (habría que replicar `armarBandeja`). C7 Android ciclo de vida: no hecho.
+    `CoreActivityKindsTest.unknownPeopleOnlyGetTarea` falla desde a671f6754 (tipo Administrativa), ajeno.
+  - Método: el checkout compartido tiene sucios ajenos (schema, url-matrix, me.service…); trabajé en un clon fuera del
+    repo (`%TEMP%
+x-verif`, node_modules por junction y su propio `prisma generate`) y subí desde ahí.
+
 - **18-11 ~13:10 México (claude-code) — Lote T2: «IP temporarily blocked» del 17-11. NO desplegado (espera OK).**
   - Causa (access log de Traefik): 17-11 13:49–14:49 MX la IP 187.191.42.145 (oficina) quedó bloqueada; la
     disparó PUT/POST de la cotización 83 con «..» → 400 «Suspicious input detected» 3+3 puntos; 607 rechazos.

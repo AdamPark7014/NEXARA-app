@@ -32,7 +32,7 @@ export default function BandejaUnica({
     let vivo = true;
     setFalloCarga(false);
     Promise.all([
-      cargarBandeja(token),
+      cargarBandeja(token, { roleKey: user?.roleKey, isSuperAdmin: Boolean(user?.isSuperAdmin) }),
       puedeDecidirBajas ? listarBajas(token, "PENDIENTE") : Promise.resolve([] as BajaRequest[]),
       puedeDecidirBajas ? listarBajas(token, "APROBADA") : Promise.resolve([] as BajaRequest[]),
     ]).then(([g, pend, apr]) => {

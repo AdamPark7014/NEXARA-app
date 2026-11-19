@@ -1,7 +1,8 @@
 "use client";
 import { consumeHandoffParam } from '@/lib/cross-panel-handoff';
 import { consumeFreshLoginIntent, isBrowserLoginPath } from '@/lib/tab-session';
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { debeRenovarSesion } from '@/lib/sesion-renovar';
 import { clearActivePanel } from '@/lib/panel-routing';
 import { isCapacitorNative } from '@/lib/capacitor-env';
 import { buildApiUrl } from '@/lib/api-base';
@@ -391,7 +392,17 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		setUser(null);
 	};
 
-	const extendSession = async (): Promise<boolean> => {
+	// Una sola renovación en vuelo: focus + visibilitychange + intervalo pedían 2-3 a la vez (429 en el servidor).
+	const extendEnVueloRef = useRef<Promise<boolean> | null>(null);
+	const extendSession = (): Promise<boolean> => {
+		if (extendEnVueloRef.current) return extendEnVueloRef.current;
+		const p = extendSessionAhora().finally(() => {
+			extendEnVueloRef.current = null;
+		});
+		extendEnVueloRef.current = p;
+		return p;
+	};
+	const extendSessionAhora = async (): Promise<boolean> => {
 		if (!user?.token || user.offlineDegraded) return false;
 		try {
 			const response = await fetch(buildApiUrl('auth/session/extend'), {
@@ -555,25 +566,25 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		return () => window.clearInterval(id);
 	}, [user?.expiresAt, user?.token]);
 
-	// Sliding session: renovar JWT cada ~15 min y al volver el foco/visibility.
+	// Sliding session: al volver a la pestaña (visibilitychange) y cada 15 min, pero solo si al JWT le
+	// faltan menos de 2 h. Antes renovaba en cada focus y visibilitychange (Programa Velocidad, 18-11-2026).
 	useEffect(() => {
 		if (!user?.token || user.offlineDegraded) return;
 
-		const onFocusOrVisible = () => {
+		const tal = () => {
 			if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+			if (!debeRenovarSesion(user?.expiresAt)) return;
 			void extendSession();
 		};
 
-		const intervalId = window.setInterval(() => void extendSession(), 15 * 60_000);
-		window.addEventListener('focus', onFocusOrVisible);
-		document.addEventListener('visibilitychange', onFocusOrVisible);
+		const intervalId = window.setInterval(tal, 15 * 60_000);
+		document.addEventListener('visibilitychange', tal);
 
 		return () => {
 			window.clearInterval(intervalId);
-			window.removeEventListener('focus', onFocusOrVisible);
-			document.removeEventListener('visibilitychange', onFocusOrVisible);
+			document.removeEventListener('visibilitychange', tal);
 		};
-	}, [user?.token, user?.offlineDegraded]);
+	}, [user?.token, user?.offlineDegraded, user?.expiresAt]);
 
 
 
