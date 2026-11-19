@@ -39,6 +39,27 @@ const RESCATADOS = [
   'ACTIVITY_VALIDATION_REJECTED',
 ];
 
+/**
+ * 18-11-2026: otros quince (bajas, solicitudes de RH, tickets de viáticos) se emitían desde los
+ * `avisar()` de cada servicio, que no llevan `category:` junto al `type:`; la versión anterior de esta
+ * prueba no los veía. Más el aviso nuevo del paso intermedio de autos (Liz → CEO).
+ */
+const RESCATADOS_18_11 = [
+  'BAJA_PENDIENTE',
+  'BAJA_APLICADA_VOBO',
+  'BAJA_APROBADA',
+  'BAJA_RECHAZADA',
+  'BAJA_REVERTIDA',
+  'RH_SOLICITUD_ESCALADA',
+  'RH_ALERTAS_DIARIAS',
+  'VIATICO_TICKET_NUEVO',
+  'VIATICO_TICKET_RECHAZADO',
+  'VIATICO_TICKET_POR_FACTURAR',
+  'VIATICO_TICKET_APROBADO',
+  'VIATICO_TICKET_VENCE_HOY',
+  'VEHICLE_REQUEST_NEXT_STEP',
+];
+
 /** Valores declarados en `enum NotificationType` de schema.prisma. */
 function valoresDelEnum(): string[] {
   const esquema = readFileSync(SCHEMA, 'utf8');
@@ -78,7 +99,12 @@ function tiposEmitidos(): Map<string, string[]> {
     EMISION.lastIndex = 0;
     while ((m = EMISION.exec(contenido)) !== null) {
       const contexto = contenido.slice(m.index, m.index + 400);
-      if (!/\bcategory:\s*'/.test(contexto)) continue;
+      // Un aviso: `category:` cerca, o el `title` y `message` que llevan los payloads de `avisar()`.
+      const alrededor = contenido.slice(Math.max(0, m.index - 300), m.index + 400);
+      const esAviso =
+        /\bcategory:\s*'/.test(contexto) ||
+        (/\btitle\s*[:,]/.test(alrededor) && /\bmessage\s*[:,]/.test(alrededor));
+      if (!esAviso) continue;
       const previos = encontrados.get(m[1]) ?? [];
       if (!previos.includes(relativo)) previos.push(relativo);
       encontrados.set(m[1], previos);
@@ -108,6 +134,42 @@ describe('los tipos de aviso que emite la API existen en la base', () => {
     expect(huerfanos).toEqual([]);
   });
 
+  it('ningún aviso arma su tipo con plantilla o concatenación (TypeScript no puede revisarlo)', () => {
+    const ARMADO = /type:\s*(`[A-Z][^`]*\$\{[^`]*`|'[A-Z_]+'\s*\+)/g;
+    const armados: string[] = [];
+    for (const ruta of listarTs(SRC)) {
+      const contenido = readFileSync(ruta, 'utf8');
+      let m: RegExpExecArray | null;
+      ARMADO.lastIndex = 0;
+      while ((m = ARMADO.exec(contenido)) !== null) {
+        const alrededor = contenido.slice(Math.max(0, m.index - 300), m.index + 400);
+        if (/\btitle\s*[:,]/.test(alrededor) && /\bmessage\s*[:,]/.test(alrededor)) {
+          armados.push(`${ruta.slice(SRC.length + 1)}: ${m[1]}`);
+        }
+      }
+    }
+    expect(armados).toEqual([]);
+  });
+
+  it('los tipos de solicitudes de RH (por tabla) existen en el enum', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { AVISO_RH_PENDIENTE, AVISO_RH_DECISION } = require('../common/aprobaciones/avisos-rh');
+    const esquema = readFileSync(SCHEMA, 'utf8');
+    const tipos = esquema.match(/enum TipoSolicitudRh \{([\s\S]*?)\n\}/)![1]
+      .split('\n').map((l) => l.trim()).filter((l) => /^[A-Z][A-Z0-9_]*$/.test(l));
+    expect(Object.keys(AVISO_RH_PENDIENTE).sort()).toEqual([...tipos].sort());
+    for (const tipo of [...Object.values(AVISO_RH_PENDIENTE), ...Object.values(AVISO_RH_DECISION)] as string[]) {
+      expect(declarados).toContain(tipo);
+    }
+  });
+
+  it('los quince del 18-11 y el de autos ya están declarados y se emiten', () => {
+    for (const tipo of RESCATADOS_18_11) {
+      expect([tipo, declarados.includes(tipo)]).toEqual([tipo, true]);
+      expect([tipo, emitidos.has(tipo)]).toEqual([tipo, true]);
+    }
+  });
+
   it('los doce avisos que morían en silencio ya están declarados', () => {
     for (const tipo of RESCATADOS) {
       expect(declarados).toContain(tipo);
@@ -133,6 +195,9 @@ describe('los tipos de aviso que emite la API existen en la base', () => {
     expect(sql).toContain('ALTER TYPE "NotificationType"');
 
     for (const tipo of RESCATADOS) {
+      expect(sql).toContain(`ADD VALUE IF NOT EXISTS '${tipo}'`);
+    }
+    for (const tipo of RESCATADOS_18_11) {
       expect(sql).toContain(`ADD VALUE IF NOT EXISTS '${tipo}'`);
     }
   });

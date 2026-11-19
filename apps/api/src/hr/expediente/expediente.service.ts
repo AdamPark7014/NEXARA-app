@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { SolicitudAprobacionService } from '../../common/aprobaciones/solicitud-aprobacion.service.js';
+import { AVISO_RH_PENDIENTE } from '../../common/aprobaciones/avisos-rh.js';
 import { PLATFORM_OWNER_EMAIL } from '../../common/platform-accounts.js';
 import { esDireccion } from '../../users/user-creation-policy.js';
 import { ROLES } from '../../common/rbac/roles.v2.js';
@@ -300,7 +301,7 @@ export class ExpedienteService {
       solicitadoPorId: actor.id,
       aprobadorActualId: dirs[0] ?? null,
       payload,
-      aviso: { title, message, type: `RH_${dto.tipo}_PENDIENTE` },
+      aviso: { title, message, type: AVISO_RH_PENDIENTE[dto.tipo as keyof typeof AVISO_RH_PENDIENTE] },
     });
   }
 

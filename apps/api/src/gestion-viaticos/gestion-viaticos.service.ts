@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { Prisma } from '@prisma/client';
+import { Prisma, type NotificationType } from '@prisma/client';
 import { esDestinatarioFinanzas } from '../common/finance-notification-recipient.js';
 import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -115,7 +115,7 @@ export class GestionViaticosService {
   private async avisar(
     userIds: number[],
     payload: {
-      type: string;
+      type: NotificationType;
       title: string;
       message: string;
       triggerUserId?: number;
@@ -150,7 +150,9 @@ export class GestionViaticosService {
           dedupeSeconds: payload.type === 'VIATICO_TICKET_VENCE_HOY' ? 86400 : 120,
           excludeActor: false,
         })
-        .catch(() => this.logger.warn(`Aviso falló para user=${userId}`));
+        .catch((error) =>
+          this.logger.warn(`Aviso ${payload.type} falló para user=${userId}: ${String(error?.message ?? error)}`),
+        );
     }
   }
 

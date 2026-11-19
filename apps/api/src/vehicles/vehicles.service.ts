@@ -303,11 +303,23 @@ export class VehiclesService {
       return updated;
     }
 
-    return this.prisma['vehicleControl'].update({
+    const pendiente = await this.prisma['vehicleControl'].update({
       where: { id },
       data: { approvalStep: nextStep, approvalTrail: trail, estatusAprobacion: 'Pendiente' },
       include: { solicitante: { select: { id: true, nombre: true } } },
     });
+    // Paso intermedio (Liz → CEO): el siguiente aprobador se entera, con la nota de quien aprobó.
+    const siguienteRol = stepRoleAt(chain, nextStep);
+    if (siguienteRol) {
+      await this.notificationHierarchy.notifyVehicleNextStep(
+        id,
+        siguienteRol,
+        actor?.nombre || 'Quien autorizó',
+        record.nombreVehiculo || 'Vehículo',
+        body?.note,
+      );
+    }
+    return pendiente;
   }
 
   /**
