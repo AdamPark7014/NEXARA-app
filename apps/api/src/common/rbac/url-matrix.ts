@@ -1298,6 +1298,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/erp/asistencias/**', scope: 'write' },
     ...KPIS_EQUIPO_URL_RULES,
     // Tere supervisa sin actividades propias: pizarra sí, «Mis actividades» no.
+    // Sus festivos en «Mi día» (antes llegaban por FORMATOS_ACTIVIDAD_URL_RULES, que RH ya no tiene).
+    { path: '/api/festivos/mio', methods: ['GET'], scope: 'read' },
     { path: '/erp/pizarra', scope: 'write' },
     { path: '/erp/pizarra/**', scope: 'write' },
     { path: '/api/activities/**', methods: ['GET'], scope: 'read' },

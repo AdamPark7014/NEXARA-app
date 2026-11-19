@@ -7,7 +7,8 @@ import { checkUrlAccess } from './url-matrix';
  * El alta de una actividad y la autoasignación no pueden responder 403 por la
  * matriz de URLs. Asignar a otra persona lo sigue decidiendo el controlador.
  */
-const PERSONAL = (Object.values(ROLES) as RoleKey[]).filter((role) => role !== ROLES.CLIENTE);
+// RH (Tere) supervisa sin actividades propias desde el 18-11: no crea ni se autoasigna.
+const PERSONAL = (Object.values(ROLES) as RoleKey[]).filter((role) => role !== ROLES.CLIENTE && role !== ROLES.RH);
 
 describe('matriz: alta y autoasignación de actividades', () => {
   it.each(PERSONAL)('%s puede crear, autoasignarse, pedir el folio y leer proyectos del formulario', (role) => {
