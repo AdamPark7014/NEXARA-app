@@ -18,6 +18,7 @@ import { cantidadDelTitulo, estandarDeLectura, tipoDelTitulo } from '../../activ
 import { elegirCliente, mencionaAlCliente, mismoNombreDeCliente } from './elegir-cliente.js';
 import { avisoCantidadPorConfirmar, camposDeElementos, lineaAlcanceEvidencia } from './elementos.js';
 import { motivoDe, ordenarPorProbabilidad, tieneRespaldo, type ActividadPasada } from './elegir-persona.js';
+import { inferirAyudantes, inferirCupo, inferirHerramientas } from './inferencias-asignacion.js';
 import {
   PALABRAS_GIRO,
   PALABRAS_RELLENO,
@@ -704,6 +705,14 @@ export type PropuestaActividad = {
   proyectoNuevo: string | null;
   /** Campos de evidencia por elemento (Cámara 1 × ANTES/EN_PROGRESO/DESPUES, …). */
   camposEvidencia: { nombre: string; momentos: string[]; notas: string }[];
+  /** Complejidad que leyó la IA (`comp`); viaja en el alta si está. */
+  complejidad: Complejidad | null;
+  /** Personas del catálogo que acompañan al responsable («con Juan y Pedro»). */
+  ayudantes: { id: number; nombre: string }[];
+  /** Checklist inferido del texto («lleva la escalera y el taladro»). */
+  herramientas: { descripcion: string; cantidad: number }[];
+  /** Cupo de personas del despacho, si lo dijeron. */
+  cupo: number | null;
   /** Por qué se propuso a esa persona o ese cliente (también va en `avisos`): se lee en su renglón. */
   notaResponsable: string | null;
   notaCliente: string | null;
@@ -1267,6 +1276,24 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
     : indicaciones;
   if (alcance) payload.indicaciones = recortar(indicacionesConAlcance, 4000);
 
+  const complejidad =
+    accion.complejidad === 'BASICA' ||
+    accion.complejidad === 'ESTANDAR' ||
+    accion.complejidad === 'COMPLEJA' ||
+    accion.complejidad === 'CRITICA'
+      ? accion.complejidad
+      : null;
+  if (complejidad) {
+    payload.complejidad = complejidad;
+    payload.complejidadSugerida = complejidad;
+  }
+  const ayudantes = inferirAyudantes(contexto.instruccion ?? '', catalogos.personas, responsable?.id ?? null);
+  const herramientas = inferirHerramientas(contexto.instruccion ?? '');
+  const cupo = inferirCupo(contexto.instruccion ?? '');
+  if (ayudantes.length) {
+    avisos.push(`Van también: ${ayudantes.map((a) => a.nombre).join(', ')}.`);
+  }
+
   return {
     tipo,
     tipoEtiqueta: ETIQUETA_TIPO[tipo],
@@ -1281,6 +1308,10 @@ export function construirPropuesta(accion: AccionPlan, catalogos: CatalogosNexar
     clienteNuevo,
     proyectoNuevo,
     camposEvidencia,
+    complejidad,
+    ayudantes,
+    herramientas,
+    cupo,
     notaCliente,
     textoCliente: textoCliente ?? null,
     cliente,

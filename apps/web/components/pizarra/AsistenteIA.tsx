@@ -28,6 +28,8 @@ import { obtenerProgramacion } from "@/lib/proyectos-api";
 import { quickCreateOperationalProject } from "@/lib/ops-operational-api";
 import { campoVacio, definirCamposEvidencia, MOMENTOS, MOMENTO_LABEL, type Momento } from "@/lib/evidencia-campos";
 import { agruparCampos, desagrupar, nombreBase, resumenGrupos } from "@/lib/evidencia-grupos";
+import { definirRequisitos } from "@/lib/herramientas-checklist";
+import { COMPLEJIDADES, COMPLEJIDAD_UI, type Complejidad } from "@/lib/complejidad";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
 import {
@@ -38,24 +40,28 @@ import {
   TIPOS,
   TIPOS_SERVICIO,
   agendaFinal,
+  ayudantesEfectivos,
   bloqueos,
   camposEfectivos,
   clientePendiente,
+  complejidadEfectiva,
   compromisoValido,
   conProyecto,
   correccionDe,
   crearActividad,
+  cupoEfectivo,
   encargoElegido,
   estadoAsistente,
+  herramientasEfectivas,
   interpretar,
   lugarEfectivo,
   nombreComparable,
   nombreParaAlta,
-  pasoEquipo,
   payloadFinal,
   personasAsignables,
   proyectoEfectivo,
   proyectoNuevoEfectivo,
+  pasosEquipo,
   reglaEncargo,
   subtipoEfectivo,
   sumarAlEquipo,
@@ -72,6 +78,7 @@ import {
   type Referencia,
   type RespuestaAsistente,
 } from "@/lib/asistente-ia-api";
+import { forcesDespachoOnly } from "@/lib/activity-kinds";
 import type { ActivityKind } from "@/lib/activity-kinds";
 import c from "./comun.module.css";
 import s from "./AsistenteIA.module.css";
@@ -91,7 +98,12 @@ const ALTA_CLIENTE = "__alta__";
 const OTRO_CLIENTE = "__otro__";
 
 /** Etapa del proyecto que se propuso para una tarjeta (como «Asignar»). */
-type EtapaPropuesta = { nombre: string | null; inicio?: string | null; fin?: string | null };
+type EtapaPropuesta = {
+  nombre: string | null;
+  inicio?: string | null;
+  fin?: string | null;
+  opciones?: Array<{ hitoId: number | null; nombre: string }>;
+};
 
 /**
  * Un dato de la tarjeta: se lee de un vistazo y el lápiz lo abre ahí mismo para cambiarlo. Lo que la
@@ -414,7 +426,21 @@ function Contenido({
     const parecidosCliente = pendiente && !aj.clienteNuevoConfirmado ? parecidos[nombreComparable(pendiente)] ?? [] : [];
     if (pendiente && esNombreDeRelleno(pendiente)) motivos.push(mensajeAlertaClienteRelleno(pendiente));
     if (parecidosCliente.length) motivos.push(`«${pendiente}» se parece a un cliente que ya existe: elige si es el mismo.`);
-    return { aj, payload, agenda, destinoEmail, motivos, pendiente, parecidosCliente, proyectoNuevo, campos: camposEfectivos(p, aj) };
+    return {
+      aj,
+      payload,
+      agenda,
+      destinoEmail,
+      motivos,
+      pendiente,
+      parecidosCliente,
+      proyectoNuevo,
+      campos: camposEfectivos(p, aj),
+      ayudantes: ayudantesEfectivos(p, aj),
+      herramientas: herramientasEfectivas(p, aj),
+      cupo: cupoEfectivo(p, aj),
+      complejidad: complejidadEfectiva(p, aj),
+    };
   };
 
   // Sin bloqueos: foco en Confirmar para confirmar con Enter al terminar de interpretar.
@@ -454,7 +480,18 @@ function Contenido({
           const propuesta = periodoPorOmision(prog.etapas, { inicio: prog.proyecto.inicio, fin: prog.proyecto.fin }, hoyISO());
           if (!propuesta) return;
           const etapa = prog.etapas.find((e) => e.hitoId === propuesta.hitoId);
-          setEtapas((prev) => ({ ...prev, [i]: { nombre: etapa?.nombre ?? "Todo el proyecto", inicio: prog.proyecto.inicio, fin: prog.proyecto.fin } }));
+          setEtapas((prev) => ({
+            ...prev,
+            [i]: {
+              nombre: etapa?.nombre ?? "Todo el proyecto",
+              inicio: prog.proyecto.inicio,
+              fin: prog.proyecto.fin,
+              opciones: [
+                { hitoId: null, nombre: "Todo el proyecto" },
+                ...prog.etapas.map((e) => ({ hitoId: e.hitoId, nombre: e.nombre })),
+              ],
+            },
+          }));
           setAjustes((prev) => ({
             ...prev,
             [i]: { ...prev[i], dia: propuesta.inicio, hasta: propuesta.fin, etapaId: propuesta.hitoId },
@@ -465,7 +502,7 @@ function Contenido({
   }, [proyectosPorTarjeta, token]);
 
   const crear = async (i: number, p: PropuestaActividad) => {
-    const { aj, payload, destinoEmail, motivos, pendiente, proyectoNuevo, campos } = armar(p, i);
+    const { aj, payload, destinoEmail, motivos, pendiente, proyectoNuevo, campos, ayudantes, herramientas, cupo } = armar(p, i);
     if (motivos.length || estados[i]?.creando || estados[i]?.creada) return false;
     setEstados((prev) => ({ ...prev, [i]: { creando: true } }));
     let creada: { id: number; anNumber?: string };
@@ -511,17 +548,41 @@ function Contenido({
         avisoCampos = `La actividad se creó, pero no se guardaron los campos de evidencia: ${formatApiError(e, "error de conexión")}. Agrégalos desde la actividad.`;
       }
     }
-    // Como «Asignar»: el responsable queda en el equipo con su tiempo estimado.
+    let avisoHerramientas: string | undefined;
+    if (herramientas.length) {
+      try {
+        await definirRequisitos(
+          token,
+          creada.id,
+          herramientas.map((h) => ({
+            descripcion: h.descripcion.trim(),
+            cantidad: h.cantidad,
+          })),
+          [Number(payload.responsableId), ...ayudantes.map((a) => a.id)].filter((id) => id > 0),
+          false,
+        );
+      } catch (e) {
+        avisoHerramientas = `No se guardaron las herramientas: ${formatApiError(e, "error de conexión")}. Agrégalas desde la actividad.`;
+      }
+    }
+    // Como «Asignar»: LEAD + ayudantes con el tiempo estimado (y cupo en despacho a Luis/Antonio).
     let avisoEquipo: string | undefined;
-    const paso = pasoEquipo(p, payload, destinoEmail);
-    if (paso) {
+    const pasos = pasosEquipo(p, payload, destinoEmail, { cupo, ayudantes });
+    for (const paso of pasos) {
       try {
         await sumarAlEquipo(token, creada.id, paso);
       } catch (e) {
-        avisoEquipo = `No se guardó el tiempo estimado del responsable: ${formatApiError(e, "error de conexión")}. Ponlo desde la actividad.`;
+        avisoEquipo = `No se guardó el equipo: ${formatApiError(e, "error de conexión")}. Ponlo desde la actividad.`;
+        break;
       }
     }
-    setEstados((prev) => ({ ...prev, [i]: { creada: { id: creada.id, folio: creada.anNumber }, avisoEquipo: [avisoEquipo, avisoCampos].filter(Boolean).join(" ") || undefined } }));
+    setEstados((prev) => ({
+      ...prev,
+      [i]: {
+        creada: { id: creada.id, folio: creada.anNumber },
+        avisoEquipo: [avisoEquipo, avisoCampos, avisoHerramientas].filter(Boolean).join(" ") || undefined,
+      },
+    }));
     cronometro.terminar(creada.id, tipoEfectivo(p, aj));
     // Lo que sigue en la misma instrucción cuenta desde aquí; con la última, el reloj se queda parado.
     if (pendientes.length > 1) cronometro.arrancar();
@@ -675,7 +736,7 @@ function Contenido({
         {propuestas.map((p, i) => {
           const est = estados[i] || {};
           if (est.descartada) return null;
-          const { aj, payload, agenda, destinoEmail, motivos, pendiente, parecidosCliente, proyectoNuevo, campos } = armar(p, i);
+          const { aj, payload, agenda, destinoEmail, motivos, pendiente, parecidosCliente, proyectoNuevo, campos, ayudantes, herramientas, cupo, complejidad } = armar(p, i);
           const tipo = tipoEfectivo(p, aj);
           const subtipo = subtipoEfectivo(p, aj);
           const regla = reglaEncargo(tipo, destinoEmail, encargoElegido(p, aj));
@@ -684,6 +745,8 @@ function Contenido({
           const lugar = lugarEfectivo(p, aj);
           const sucursalesLista = (opciones?.sucursales ?? []).filter((x) => !payload.clientId || x.clientId === Number(payload.clientId));
           const duracion = Number(payload.tiempoEstimadoMin) || 0;
+          const tiempoCambiado = p.duracionOrigen === "estimada" && p.duracionMin != null && duracion > 0 && duracion !== Number(p.duracionMin);
+          const verCupo = forcesDespachoOnly(destinoEmail, tipo);
           const opcionesDuracion = duracion && !DURACIONES_MIN.includes(duracion) ? [...DURACIONES_MIN, duracion].sort((a, b) => a - b) : DURACIONES_MIN;
           const responsableId = aj.responsableId ?? p.responsable?.id;
           const sugeridas = p.responsableCandidatos;
@@ -1257,7 +1320,15 @@ function Contenido({
                   obligado={sinTiempo}
                   onAlternar={() => alternar("tiempo")}
                 >
-                  <Select aria-label="Tiempo" value={duracion ? String(duracion) : ""} onChange={(e) => ajustar(i, { duracionMin: Number(e.target.value) || null })}>
+                  <Select
+                    aria-label="Tiempo"
+                    value={duracion ? String(duracion) : ""}
+                    onChange={(e) => {
+                      const mins = Number(e.target.value) || null;
+                      const vuelve = mins != null && p.duracionMin != null && mins === Number(p.duracionMin);
+                      ajustar(i, { duracionMin: mins, ...(vuelve ? { estandarCambiadoMotivo: "" } : {}) });
+                    }}
+                  >
                     <option value="">Elige</option>
                     {opcionesDuracion.map((m) => (
                       <option key={m} value={m}>
@@ -1266,6 +1337,164 @@ function Contenido({
                     ))}
                   </Select>
                 </Renglon>
+
+                {tiempoCambiado || aj.estandarCambiadoMotivo || abierto("motivoTiempo") ? (
+                  <Renglon
+                    etiqueta="Motivo del tiempo"
+                    valor={(aj.estandarCambiadoMotivo || "").trim() || <span className={s.vacio}>¿Por qué otro tiempo?</span>}
+                    abierto={abierto("motivoTiempo") || (tiempoCambiado && !(aj.estandarCambiadoMotivo || "").trim())}
+                    obligado={tiempoCambiado && !(aj.estandarCambiadoMotivo || "").trim()}
+                    onAlternar={() => alternar("motivoTiempo")}
+                  >
+                    <Textarea
+                      aria-label="Motivo del tiempo"
+                      rows={2}
+                      value={aj.estandarCambiadoMotivo ?? ""}
+                      maxLength={500}
+                      placeholder="Ej.: el cliente pidió revisar también el DVR"
+                      onChange={(e) => ajustar(i, { estandarCambiadoMotivo: e.target.value })}
+                    />
+                  </Renglon>
+                ) : null}
+
+                <Renglon
+                  etiqueta="Complejidad"
+                  valor={complejidad ? COMPLEJIDAD_UI[complejidad].label : <span className={s.vacio}>Sin elegir</span>}
+                  abierto={abierto("complejidad")}
+                  onAlternar={() => alternar("complejidad")}
+                >
+                  <Select
+                    aria-label="Complejidad"
+                    value={complejidad ?? ""}
+                    onChange={(e) => ajustar(i, { complejidad: (e.target.value || null) as Complejidad | null })}
+                  >
+                    <option value="">Sin elegir</option>
+                    {COMPLEJIDADES.map((nivel) => (
+                      <option key={nivel} value={nivel}>
+                        {COMPLEJIDAD_UI[nivel].label}
+                      </option>
+                    ))}
+                  </Select>
+                </Renglon>
+
+                {verCupo ? (
+                  <Renglon
+                    etiqueta="Cupo"
+                    valor={`${Math.max(1, cupo ?? 1)} persona${Math.max(1, cupo ?? 1) === 1 ? "" : "s"}`}
+                    abierto={abierto("cupo")}
+                    onAlternar={() => alternar("cupo")}
+                  >
+                    <Input
+                      type="number"
+                      min={1}
+                      max={50}
+                      aria-label="Cupo de personas"
+                      value={String(Math.max(1, cupo ?? 1))}
+                      onChange={(e) => ajustar(i, { cupo: Math.max(1, Math.min(50, Number(e.target.value) || 1)) })}
+                    />
+                  </Renglon>
+                ) : null}
+
+                <Renglon
+                  etiqueta="Ayudantes"
+                  valor={ayudantes.length ? ayudantes.map((a) => a.nombre).join(", ") : <span className={s.vacio}>Ninguno</span>}
+                  abierto={abierto("ayudantes")}
+                  onAlternar={() => alternar("ayudantes")}
+                >
+                  <Select
+                    aria-label="Agregar ayudante"
+                    value=""
+                    onChange={(e) => {
+                      const id = Number(e.target.value);
+                      const persona = personas.find((x) => x.id === id);
+                      if (!persona || ayudantes.some((a) => a.id === id) || id === Number(payload.responsableId)) return;
+                      ajustar(i, { ayudantes: [...ayudantes, { id: persona.id, nombre: persona.nombre }] });
+                    }}
+                  >
+                    <option value="">Sumar persona…</option>
+                    {personasOrdenadas
+                      .filter((x) => x.id !== Number(payload.responsableId) && !ayudantes.some((a) => a.id === x.id))
+                      .map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.nombre}
+                        </option>
+                      ))}
+                  </Select>
+                  {ayudantes.length ? (
+                    <ul className={s.campos}>
+                      {ayudantes.map((a) => (
+                        <li key={a.id}>
+                          {a.nombre}{" "}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => ajustar(i, { ayudantes: ayudantes.filter((x) => x.id !== a.id) })}
+                          >
+                            Quitar
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </Renglon>
+
+                <Renglon
+                  etiqueta="Herramientas"
+                  valor={
+                    herramientas.length
+                      ? herramientas.map((h) => `${h.descripcion}${h.cantidad > 1 ? ` ×${h.cantidad}` : ""}`).join(", ")
+                      : <span className={s.vacio}>Ninguna</span>
+                  }
+                  abierto={abierto("herramientas")}
+                  onAlternar={() => alternar("herramientas")}
+                >
+                  <Textarea
+                    aria-label="Herramientas a llevar"
+                    rows={3}
+                    value={herramientas.map((h) => (h.cantidad > 1 ? `${h.cantidad} ${h.descripcion}` : h.descripcion)).join("\n")}
+                    placeholder={"Una por renglón, ej.:\nEscalera\n2 Taladro con brocas"}
+                    onChange={(e) => {
+                      const filas = e.target.value
+                        .split("\n")
+                        .map((line) => line.trim())
+                        .filter(Boolean)
+                        .map((line) => {
+                          const m = line.match(/^(\d+)\s+(.+)$/);
+                          return m
+                            ? { descripcion: m[2].trim(), cantidad: Math.max(1, Number(m[1]) || 1) }
+                            : { descripcion: line, cantidad: 1 };
+                        });
+                      ajustar(i, { herramientas: filas });
+                    }}
+                  />
+                </Renglon>
+
+                {etapas[i]?.opciones?.length ? (
+                  <Renglon
+                    etiqueta="Etapa"
+                    valor={etapas[i]?.nombre || <span className={s.vacio}>Todo el proyecto</span>}
+                    abierto={abierto("etapa")}
+                    onAlternar={() => alternar("etapa")}
+                  >
+                    <Select
+                      aria-label="Etapa del proyecto"
+                      value={aj.etapaId != null ? String(aj.etapaId) : ""}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const hitoId = raw ? Number(raw) : null;
+                        const op = etapas[i]?.opciones?.find((o) => (o.hitoId == null && hitoId == null) || o.hitoId === hitoId);
+                        setEtapas((prev) => ({ ...prev, [i]: { ...prev[i], nombre: op?.nombre ?? "Todo el proyecto" } }));
+                        ajustar(i, { etapaId: hitoId });
+                      }}
+                    >
+                      {(etapas[i]?.opciones ?? []).map((o) => (
+                        <option key={o.hitoId ?? "todo"} value={o.hitoId ?? ""}>
+                          {o.nombre}
+                        </option>
+                      ))}
+                    </Select>
+                  </Renglon>
+                ) : null}
 
                 <Renglon etiqueta="Prioridad" valor={String(payload.prioridad ?? "Media")} abierto={abierto("prioridad")} onAlternar={() => alternar("prioridad")}>
                   <Select aria-label="Prioridad" value={String(payload.prioridad ?? "Media")} onChange={(e) => ajustar(i, { prioridad: e.target.value as Prioridad })}>

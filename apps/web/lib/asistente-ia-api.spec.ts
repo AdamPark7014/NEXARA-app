@@ -11,6 +11,7 @@ import {
   lugarEfectivo,
   nombreParaAlta,
   pasoEquipo,
+  pasosEquipo,
   payloadFinal,
   reglaEncargo,
   subtipoEfectivo,
@@ -324,5 +325,44 @@ describe("asistente IA en la pizarra", () => {
     expect(ventas.createSalesClient).toHaveBeenLastCalledWith("tok", { name: "Toks", status: "Activo", tipo: "COMERCIAL", altaRapida: true, confirmarNuevo: true });
     await altaRapidaCliente("tok", "BUAP", { tipo: "servicio", reutilizarId: 17 });
     expect(ventas.createSalesClient).toHaveBeenLastCalledWith("tok", { name: "BUAP", status: "Activo", tipo: "CORPORATIVO", altaRapida: true, reutilizarId: 17 });
+  });
+
+  it("la complejidad y el motivo del tiempo viajan en el payload", () => {
+    expect(payloadFinal({ ...lista, complejidad: "COMPLEJA" }, {})).toMatchObject({
+      complejidad: "COMPLEJA",
+      complejidadSugerida: "COMPLEJA",
+    });
+    expect(payloadFinal(lista, { complejidad: "CRITICA", estandarCambiadoMotivo: "  Hay que revisar el DVR  " })).toMatchObject({
+      complejidad: "CRITICA",
+      estandarCambiadoMotivo: "Hay que revisar el DVR",
+    });
+  });
+
+  it("si se cambia el tiempo estimado pide motivo", () => {
+    const payload = payloadFinal({ ...lista, duracionOrigen: "estimada", duracionMin: 120 }, { duracionMin: 180 });
+    expect(bloqueos({ ...lista, duracionOrigen: "estimada", duracionMin: 120 }, payload, {})).toContain(
+      "Indica por qué cambias el tiempo estimado.",
+    );
+    expect(
+      bloqueos(
+        { ...lista, duracionOrigen: "estimada", duracionMin: 120 },
+        payloadFinal({ ...lista, duracionOrigen: "estimada", duracionMin: 120 }, { duracionMin: 180, estandarCambiadoMotivo: "Sitio más lejos" }),
+        {},
+      ),
+    ).not.toContain("Indica por qué cambias el tiempo estimado.");
+  });
+
+  it("pasosEquipo suma ayudantes y respeta el cupo del despacho", () => {
+    const payload = payloadFinal(lista, {});
+    expect(pasosEquipo(lista, payload, "soporte@nexara.com.mx", { ayudantes: [{ id: 2, nombre: "Juan" }] })).toEqual([
+      { userId: 8, rol: "LEAD", horasPlan: 2 },
+      { userId: 2, rol: "TECNICO", horasPlan: 2 },
+    ]);
+    expect(pasoEquipo(lista, payload, "jose.ramirez@nexara.com.mx", 3)).toEqual({
+      userId: 8,
+      rol: "LEAD",
+      horasPlan: 2,
+      indicaciones: "Cupo: 3 personas.",
+    });
   });
 });

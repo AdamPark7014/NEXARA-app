@@ -20,10 +20,14 @@ import {
 import type { RoleKey } from "@/lib/rbac/roles";
 import { HORA_INICIO_POR_OMISION, horaDeEntrada } from "@/lib/ops-activity-form";
 import { createSalesClient, provisionSalesServiceClient } from "@/lib/sales-api";
+import { motivoValido } from "@/lib/tiempo-estandar";
+import type { Complejidad } from "@/lib/complejidad";
 
 export type Referencia = { id: number; nombre: string };
 export type Encargo = "ejecucion" | "despacho";
 export type Prioridad = "Alta" | "Media" | "Baja";
+export type AyudantePropuesto = { id: number; nombre: string };
+export type HerramientaPropuesta = { descripcion: string; cantidad: number };
 
 /**
  * Día (AAAA-MM-DD), hora (HH:MM) y último día, en hora de Ciudad de México. `compromiso` es
@@ -85,6 +89,14 @@ export type PropuestaActividad = {
   /** dicha = la dijeron; estimada = la tabla de tiempos. */
   duracionOrigen?: "dicha" | "estimada";
   duracionDetalle?: string | null;
+  /** Complejidad leída por la IA (`comp`). */
+  complejidad?: Complejidad | null;
+  /** Personas del catálogo que acompañan («con Juan y Pedro»). */
+  ayudantes?: AyudantePropuesto[];
+  /** Checklist inferido («lleva la escalera y el taladro»). */
+  herramientas?: HerramientaPropuesta[];
+  /** Cupo de personas del despacho, si lo dijeron. */
+  cupo?: number | null;
   /** Por qué se propuso a esa persona o ese cliente: se lee al abrir su renglón (también va en `avisos`). */
   notaResponsable?: string | null;
   notaCliente?: string | null;
@@ -206,6 +218,12 @@ export type Ajustes = {
   duracionMin?: number | null;
   prioridad?: Prioridad;
   encargo?: Encargo | null;
+  complejidad?: Complejidad | null;
+  ayudantes?: AyudantePropuesto[] | null;
+  herramientas?: HerramientaPropuesta[] | null;
+  cupo?: number | null;
+  /** Motivo si se cambió el tiempo estimado respecto al estándar/estimado. */
+  estandarCambiadoMotivo?: string | null;
 };
 
 export const TIPOS: ActivityKind[] = ["tarea", "servicio", "obra", "proyecto", "comercial", "administrativa"];
@@ -526,6 +544,19 @@ export function payloadFinal(
     if (aj.duracionMin && aj.duracionMin > 0) out.tiempoEstimadoMin = Math.min(720, Math.round(aj.duracionMin));
     else delete out.tiempoEstimadoMin;
   }
+  const complejidad = complejidadEfectiva(p, aj);
+  if (complejidad) {
+    out.complejidad = complejidad;
+    out.complejidadSugerida = p.complejidad ?? complejidad;
+  } else if (aj.complejidad === null) {
+    delete out.complejidad;
+    delete out.complejidadSugerida;
+  }
+  if (aj.estandarCambiadoMotivo !== undefined) {
+    const motivo = (aj.estandarCambiadoMotivo ?? "").trim();
+    if (motivo) out.estandarCambiadoMotivo = motivo.slice(0, 500);
+    else delete out.estandarCambiadoMotivo;
+  }
   // Fechas como el formulario: inicio = entrega = máxima (a la hora compromiso si la hay); con
   // último día, el periodo (la API pone la máxima y la entrega al fin de ese día).
   // La hora por omisión es la entrada de quien ejecuta: si se eligió a otra persona, también cambia.
@@ -584,6 +615,15 @@ export function bloqueos(
     out.push(tipo === "servicio" ? "Indica el día del servicio." : "Indica el día de la obra.");
   }
   if (!payload.tiempoEstimadoMin) out.push("Indica cuánto tiempo toma.");
+  if (
+    p.duracionOrigen === "estimada" &&
+    p.duracionMin != null &&
+    Number(payload.tiempoEstimadoMin) > 0 &&
+    Number(payload.tiempoEstimadoMin) !== Number(p.duracionMin) &&
+    !motivoValido((payload.estandarCambiadoMotivo as string | undefined) ?? null)
+  ) {
+    out.push("Indica por qué cambias el tiempo estimado.");
+  }
   if (ctx.agenda?.dia && ctx.agenda.hasta && ctx.agenda.hasta < ctx.agenda.dia) {
     out.push("El último día no puede ser antes del primero.");
   }
@@ -608,6 +648,33 @@ export function bloqueos(
   return out;
 }
 
+export function complejidadEfectiva(p: PropuestaActividad, aj: Ajustes): Complejidad | null {
+  if (aj.complejidad !== undefined) return aj.complejidad;
+  return p.complejidad ?? null;
+}
+
+export function ayudantesEfectivos(p: PropuestaActividad, aj: Ajustes): AyudantePropuesto[] {
+  if (aj.ayudantes !== undefined) return aj.ayudantes ?? [];
+  return p.ayudantes ?? [];
+}
+
+export function herramientasEfectivas(p: PropuestaActividad, aj: Ajustes): HerramientaPropuesta[] {
+  if (aj.herramientas !== undefined) return aj.herramientas ?? [];
+  return p.herramientas ?? [];
+}
+
+export function cupoEfectivo(p: PropuestaActividad, aj: Ajustes): number | null {
+  if (aj.cupo !== undefined) return aj.cupo;
+  return p.cupo ?? null;
+}
+
+export type PasoEquipoAsistente = {
+  userId: number;
+  rol: "LEAD" | "TECNICO";
+  horasPlan: number;
+  indicaciones?: string;
+};
+
 /**
  * Lo que «Asignar» hace después de crear: el responsable queda como LEAD con su tiempo
  * estimado (`horasPlan`, con el que se avisa si se excede), y en el despacho de servicio a
@@ -617,20 +684,45 @@ export function pasoEquipo(
   p: PropuestaActividad,
   payload: Record<string, unknown>,
   destinoEmail?: string | null,
+  cupo?: number | null,
 ): { userId: number; rol: "LEAD"; horasPlan: number; indicaciones?: string } | null {
   const userId = Number(payload.responsableId);
   const minutos = Number(payload.tiempoEstimadoMin);
   if (!userId || !minutos) return null;
   const horasPlan = Math.round((minutos / 60) * 100) / 100;
+  const personas = Math.max(1, Math.min(50, Math.round(Number(cupo) || 1)));
   return {
     userId,
     rol: "LEAD",
     horasPlan,
-    ...(forcesDespachoOnly(destinoEmail, (payload.coreKind as ActivityKind | undefined) ?? p.tipo) ? { indicaciones: formatDispatchHeadcountNote(1) } : {}),
+    ...(forcesDespachoOnly(destinoEmail, (payload.coreKind as ActivityKind | undefined) ?? p.tipo)
+      ? { indicaciones: formatDispatchHeadcountNote(personas) }
+      : {}),
   };
 }
 
-export function sumarAlEquipo(token: string, activityId: number, paso: NonNullable<ReturnType<typeof pasoEquipo>>) {
+/** LEAD + ayudantes (TECNICO) con el mismo tiempo estimado, como el formulario «Asignar». */
+export function pasosEquipo(
+  p: PropuestaActividad,
+  payload: Record<string, unknown>,
+  destinoEmail?: string | null,
+  extras?: { cupo?: number | null; ayudantes?: AyudantePropuesto[] | null },
+): PasoEquipoAsistente[] {
+  const lead = pasoEquipo(p, payload, destinoEmail, extras?.cupo ?? cupoEfectivo(p, {}));
+  const out: PasoEquipoAsistente[] = [];
+  if (lead) out.push(lead);
+  const minutos = Number(payload.tiempoEstimadoMin);
+  const horasPlan = minutos > 0 ? Math.round((minutos / 60) * 100) / 100 : 0;
+  const leadId = lead?.userId;
+  for (const a of extras?.ayudantes ?? []) {
+    if (!a?.id || a.id === leadId || !horasPlan) continue;
+    if (out.some((x) => x.userId === a.id)) continue;
+    out.push({ userId: a.id, rol: "TECNICO", horasPlan });
+  }
+  return out;
+}
+
+export function sumarAlEquipo(token: string, activityId: number, paso: PasoEquipoAsistente) {
   return pedir<unknown>(token, `activities/${activityId}/team`, {
     method: "POST",
     body: JSON.stringify(paso),
