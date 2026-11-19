@@ -136,6 +136,16 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
       fn: (adminNotes) => void runAction(r.id, () => rejectToolRequest(token, r.id, adminNotes)),
     });
 
+  const entregar = (r: ToolRequestRow) =>
+    setPedir({
+      titulo: `Entregar ${r.toolName}`,
+      descripcion: "Pide el código de recolección a quien la recoge.",
+      etiqueta: "Código de recolección",
+      confirmar: "Entregar",
+      minimo: 1,
+      fn: (codigo) => void runAction(r.id, () => deliverToolRequest(token, r.id, codigo)),
+    });
+
   const recibir = (r: ToolRequestRow) =>
     setPedir({
       titulo: `Recibir ${r.toolName}`,
@@ -260,7 +270,7 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
           </>
         )}
         {r.status === "APPROVED" && (
-          <Button size="sm" variant="tonal" loading={busy} onClick={() => runAction(r.id, () => deliverToolRequest(token, r.id))}>
+          <Button size="sm" variant="tonal" loading={busy} onClick={() => entregar(r)}>
             Entregar
           </Button>
         )}

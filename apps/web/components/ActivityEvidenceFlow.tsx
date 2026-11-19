@@ -1159,6 +1159,8 @@ const ActivityEvidenceFlow = () => {
       });
       setCamposEvidencia(lista);
       setSuccessMsg(`${MOMENTO_LABEL[campoTarget.momento]} guardada`);
+      // Sin esto, el siguiente Ctrl+V volvía a este mismo punto y pisaba la foto recién guardada.
+      adjuntoCampoRef.current = null;
       setCampoTarget(null);
       return true;
     } catch (err) {
@@ -1765,6 +1767,7 @@ const ActivityEvidenceFlow = () => {
                 className={styles.tap}
                 onClick={() => {
                   setPendingPhoto(null);
+                  adjuntoCampoRef.current = null;
                   setError(null);
                 }}
                 disabled={loading}

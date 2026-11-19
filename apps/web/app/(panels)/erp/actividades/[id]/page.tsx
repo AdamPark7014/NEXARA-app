@@ -24,11 +24,11 @@ import AvisoIncumplimiento from "@/components/ops/AvisoIncumplimiento";
 import { quienMira, useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
-import { ROLES } from "@/lib/rbac";
 import { formatosVisibles, puedeVerFormatos } from "@/lib/formatos-actividad";
 import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missing-evidence";
 import { formatApiError } from "@/lib/erp-api";
 import { esCeoChristian } from "@/lib/ceo-user";
+import { puedeEditarActividad } from "@/lib/actividad-edicion";
 import { deleteActivity } from "@/lib/ops-activities-api";
 import { evidenceStepsForKind, textosDeInicioYCierre } from "@/lib/evidence-flow-helpers";
 import { resolveAssetUrl } from "@/lib/evidence-display";
@@ -116,12 +116,9 @@ export default function ActivityDetailPage() {
   const puedeEliminar = esCeoChristian(user?.id);
   const v2 = resolveV2RoleKey(user);
 
-  const canEdit =
-    user?.isSuperAdmin ||
-    v2 === ROLES.COORD_OPERACIONES ||
-    v2 === ROLES.DIR_OPERACIONES ||
-    v2 === ROLES.COORD_ADMIN ||
-    v2 === ROLES.ING_CAMPO;
+  // Editar va con el permiso que exige el PATCH (activities.manage), no con el rol: antes ing_campo veía
+  // «Editar» y el guardado daba 403. El responsable sigue ejecutando con «Iniciar»/«Terminar».
+  const canEdit = puedeEditarActividad(user);
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<EditForm>({

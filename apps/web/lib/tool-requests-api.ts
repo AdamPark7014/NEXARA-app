@@ -140,8 +140,13 @@ export async function rejectToolRequest(token: string, id: number, adminNotes: s
   });
 }
 
-export async function deliverToolRequest(token: string, id: number) {
-  return apiJson(token, `tool-requests/${id}/deliver`, { method: "POST" });
+/** Entregar exige el código de recolección que trae quien recoge (el servidor lo valida). */
+export async function deliverToolRequest(token: string, id: number, pickupCode: string) {
+  return apiJson(token, `tool-requests/${id}/deliver`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pickupCode: pickupCode.trim() }),
+  });
 }
 
 export async function returnToolRequest(token: string, id: number, damageDescription?: string) {
