@@ -39,6 +39,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
@@ -620,6 +621,9 @@ internal fun ActivityFormPanel(
     var saving by remember { mutableStateOf(false) }
     var done by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    /** «¿Quisiste decir p. m.?»: (inicio corregido, entrega corregida), y si ya dijo que es de madrugada. */
+    var preguntaPm by remember { mutableStateOf<Pair<String?, String?>?>(null) }
+    var madrugadaConfirmada by remember { mutableStateOf(false) }
     var success by remember { mutableStateOf<String?>(null) }
     var showOtroDialog by remember { mutableStateOf(false) }
     var otroInput by remember { mutableStateOf("") }
@@ -691,6 +695,14 @@ internal fun ActivityFormPanel(
             error = it
             return
         }
+        if (!madrugadaConfirmada) {
+            val inicioPm = k.horaQuizaPm(current.hora, current.fecha)
+            val entregaPm = k.horaQuizaPm(current.horaCompromiso, current.fecha)
+            if (inicioPm != null || entregaPm != null) {
+                preguntaPm = inicioPm to entregaPm
+                return
+            }
+        }
         val project = activeProjects.firstOrNull { it.id == current.projectId }
         if (proyectosCliente.isNotEmpty() && current.projectId == null && (!sinProyectoExplicito || current.ticketType == "INSTALACION")) {
             error = "Elige de qué proyecto es. Una instalación no puede quedar sin proyecto."
@@ -714,6 +726,29 @@ internal fun ActivityFormPanel(
                 saving = false
             }
         }
+    }
+
+    preguntaPm?.let { (inicioPm, entregaPm) ->
+        val partes = listOfNotNull(inicioPm?.let { k.hora12Texto(it) }, entregaPm?.let { "entrega ${k.hora12Texto(it)}" })
+        AlertDialog(
+            onDismissRequest = { preguntaPm = null },
+            title = { Text("¿Quisiste decir ${partes.joinToString(" y ")}?") },
+            text = { Text("La hora quedó de madrugada para hoy. Si es de la tarde, la corrijo.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    form = form.copy(hora = inicioPm ?: form.hora, horaCompromiso = entregaPm ?: form.horaCompromiso)
+                    preguntaPm = null
+                    success = "Hora corregida a la tarde. Revisa y guarda."
+                }) { Text("Sí, corregir") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    madrugadaConfirmada = true
+                    preguntaPm = null
+                    submit()
+                }) { Text("No, es de madrugada") }
+            },
+        )
     }
 
     NxPanelShell {
@@ -1283,7 +1318,7 @@ private fun HourField(label: String, value: String, onChange: (String) -> Unit, 
         AlertDialog(
             onDismissRequest = { open = false },
             title = { Text("Hora") },
-            text = { TimePicker(state = state) },
+            text = { TimeInput(state = state) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1342,7 +1377,7 @@ private fun CompromisoField(value: String, inicio: String, onChange: (String) ->
         AlertDialog(
             onDismissRequest = { open = false },
             title = { Text("Entregar a más tardar") },
-            text = { TimePicker(state = state) },
+            text = { TimeInput(state = state) },
             confirmButton = {
                 TextButton(
                     onClick = {

@@ -5,6 +5,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import mx.nexara.mobile.nativeapp.access.ClientSector
 import mx.nexara.mobile.nativeapp.access.ClientSectors
@@ -541,6 +542,32 @@ object CoreActivityKinds {
 
     fun formatHora(hour: Int, minute: Int): String =
         "${hour.coerceIn(0, 23).toString().padStart(2, '0')}:${minute.coerceIn(0, 59).toString().padStart(2, '0')}"
+
+    private val HORA_24 = Regex("^([01]\\d|2[0-3]):[0-5]\\d$")
+
+    /**
+     * ¿Quiso decir p. m.? (18-11-2026). En el reloj de 24 h de Material las 13–23 van en el anillo
+     * de adentro: se tocaba «1» afuera y quedaba la 1 de la madrugada. Una hora entre 00:00 y 05:59
+     * para una actividad de HOY, capturada de día (desde las 7:00), devuelve la hora +12 h para
+     * ofrecerla; si no, `null`. El turno nocturno existe: solo se pregunta.
+     */
+    fun horaQuizaPm(hora: String?, fecha: String?, ahora: ZonedDateTime = ZonedDateTime.now(MEXICO)): String? {
+        val h = hora?.trim().orEmpty()
+        if (!HORA_24.matches(h) || fecha.isNullOrBlank()) return null
+        val hh = h.substring(0, 2).toInt()
+        if (hh >= 6) return null
+        val local = ahora.withZoneSameInstant(MEXICO)
+        if (fecha != local.toLocalDate().toString() || local.hour < 7) return null
+        return formatHora(hh + 12, h.substring(3).toInt())
+    }
+
+    /** «12:11 p. m.» */
+    fun hora12Texto(hora: String): String {
+        if (!HORA_24.matches(hora)) return hora
+        val hh = hora.substring(0, 2).toInt()
+        val h12 = if (hh % 12 == 0) 12 else hh % 12
+        return "$h12:${hora.substring(3)} ${if (hh < 12) "a. m." else "p. m."}"
+    }
 
     private val ISO_UTC_MILLIS: DateTimeFormatter =
         DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC)

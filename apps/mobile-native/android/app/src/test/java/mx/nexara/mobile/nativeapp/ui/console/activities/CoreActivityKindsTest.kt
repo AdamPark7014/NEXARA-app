@@ -410,4 +410,20 @@ class CoreActivityKindsTest {
         assertEquals("10:00", k.horaDeEntrada("mañana"))
         assertEquals("10:00", k.initialForm("tarea", 7L, null).hora)
     }
+
+    /** 18-11-2026: en el reloj de 24 h se tocaba «1» afuera y quedaba la 1 de la madrugada. */
+    @Test
+    fun horaDeMadrugadaParaHoyCapturadaDeDiaPreguntaPm() {
+        val mx = java.time.ZoneId.of("America/Mexico_City")
+        val mediodia = java.time.ZonedDateTime.of(2026, 11, 18, 12, 12, 0, 0, mx)
+        assertEquals("13:00", k.horaQuizaPm("01:00", "2026-11-18", mediodia))
+        assertEquals("16:46", k.horaQuizaPm("04:46", "2026-11-18", mediodia))
+        assertNull(k.horaQuizaPm("13:00", "2026-11-18", mediodia))
+        assertNull(k.horaQuizaPm("06:30", "2026-11-18", mediodia))
+        assertNull(k.horaQuizaPm("02:00", "2026-11-19", mediodia))
+        assertNull(k.horaQuizaPm("02:00", "2026-11-18", java.time.ZonedDateTime.of(2026, 11, 18, 1, 30, 0, 0, mx)))
+        assertNull(k.horaQuizaPm("", "2026-11-18", mediodia))
+        assertEquals("1:00 p. m.", k.hora12Texto("13:00"))
+        assertEquals("12:11 a. m.", k.hora12Texto("00:11"))
+    }
 }
