@@ -14,6 +14,60 @@ export function horaDeEntrada(valor?: string | null): string {
   return valor && /^([01]\d|2[0-3]):[0-5]\d$/.test(valor) ? valor : HORA_INICIO_POR_OMISION;
 }
 
+const HORA_24 = /^([01]\d|2[0-3]):[0-5]\d$/;
+const dos = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * Mientras se escribe la hora en 24 h: solo dígitos y los dos puntos después de la hora
+ * («1211» → «12:11»). El selector de 12 h dejaba «a. m.» y se guardaba la madrugada (18-11-2026).
+ */
+export function teclearHora24(texto: string): string {
+  const d = texto.replace(/\D/g, "").slice(0, 4);
+  return d.length <= 2 ? d : `${d.slice(0, 2)}:${d.slice(2)}`;
+}
+
+/** Al salir del campo: «9» → «09:00», «930» → «09:30», «1211» → «12:11». Lo que no es hora queda igual. */
+export function completarHora24(texto: string): string {
+  const d = texto.replace(/\D/g, "");
+  let h: number;
+  let m: number;
+  if (d.length === 0) return "";
+  if (d.length <= 2) {
+    h = Number(d);
+    m = 0;
+  } else if (d.length === 3) {
+    h = Number(d.slice(0, 1));
+    m = Number(d.slice(1));
+  } else {
+    h = Number(d.slice(0, 2));
+    m = Number(d.slice(2, 4));
+  }
+  if (h > 23 || m > 59) return texto;
+  return `${dos(h)}:${dos(m)}`;
+}
+
+/** «12:11 p. m.», para preguntar en palabras de todos los días. */
+export function hora12Texto(hora: string): string {
+  if (!HORA_24.test(hora)) return hora;
+  const h = Number(hora.slice(0, 2));
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${hora.slice(3)} ${h < 12 ? "a. m." : "p. m."}`;
+}
+
+/**
+ * ¿Quiso decir p. m.? Una hora entre 00:00 y 05:59 para una actividad de HOY, capturada de día
+ * (a partir de las 7:00), casi siempre es la tarde con «a. m.». Devuelve la hora corregida
+ * (+12 h) para ofrecerla, o `null`. El turno nocturno existe: solo se pregunta, no se bloquea.
+ */
+export function horaQuizaPm(hora: string, fecha: string, ahora: Date = new Date()): string | null {
+  if (!HORA_24.test(hora) || !fecha) return null;
+  const h = Number(hora.slice(0, 2));
+  if (h >= 6) return null;
+  const hoy = `${ahora.getFullYear()}-${dos(ahora.getMonth() + 1)}-${dos(ahora.getDate())}`;
+  if (fecha !== hoy || ahora.getHours() < 7) return null;
+  return `${dos(h + 12)}:${hora.slice(3)}`;
+}
+
 export const EMPTY_ACTIVITY_FORM = {
   titulo: "",
   indicaciones: "",
