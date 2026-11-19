@@ -6,7 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import type { EstadoSolicitudRh, TipoSolicitudRh, Prisma } from '@prisma/client';
+import type { EstadoSolicitudRh, NotificationType, TipoSolicitudRh, Prisma } from '@prisma/client';
+import { AVISO_RH_DECISION, AVISO_RH_PENDIENTE } from './avisos-rh.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { NotificationsService } from '../../notifications/notifications.service.js';
@@ -26,7 +27,7 @@ export type CrearSolicitudRhInput = {
   aviso?: {
     title: string;
     message: string;
-    type?: string;
+    type?: NotificationType;
     relatedUrl?: string;
   };
 };
@@ -83,7 +84,7 @@ export class SolicitudAprobacionService {
   async avisar(
     userIds: number[],
     payload: {
-      type: string;
+      type: NotificationType;
       title: string;
       message: string;
       triggerUserId: number;
@@ -119,7 +120,9 @@ export class SolicitudAprobacionService {
           companyId: payload.companyId,
           dedupeSeconds: payload.dedupeSeconds ?? 0,
         })
-        .catch(() => this.logger.warn('No se pudo completar un aviso de aprobación RH.'));
+        .catch((error) =>
+          this.logger.warn(`No se pudo completar un aviso de aprobación RH (${payload.type}): ${String(error?.message ?? error)}`),
+        );
     }
   }
 
@@ -199,7 +202,7 @@ export class SolicitudAprobacionService {
       : await this.idsDireccion(companyId, solicitadoPorId);
     if (input.aviso) {
       await this.avisar(destinatarios.filter((id) => id !== solicitadoPorId), {
-        type: input.aviso.type ?? `RH_${input.tipo}_PENDIENTE`,
+        type: input.aviso.type ?? AVISO_RH_PENDIENTE[input.tipo],
         title: input.aviso.title,
         message: input.aviso.message,
         triggerUserId: solicitadoPorId,
@@ -310,7 +313,7 @@ export class SolicitudAprobacionService {
       .catch(() => this.logger.warn('No se pudo registrar la decisión de la solicitud RH.'));
 
     await this.avisar([actual.solicitadoPorId].filter((x) => x !== actorId), {
-      type: `RH_SOLICITUD_${estado}`,
+      type: AVISO_RH_DECISION[estado],
       title: estado === 'APROBADA'
         ? `Solicitud aprobada: ${actual.user.nombre}`
         : `Solicitud rechazada: ${actual.user.nombre}`,

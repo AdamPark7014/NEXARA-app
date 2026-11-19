@@ -17,7 +17,7 @@ import {
 import { esCuentaAvisoRh } from '../../common/aprobaciones/cuenta-aviso.js';
 import { esDireccion } from '../user-creation-policy.js';
 import { ROLES } from '../../common/rbac/roles.v2.js';
-import type { MotivoBaja, ModoBaja, EstadoBaja } from '@prisma/client';
+import type { MotivoBaja, ModoBaja, EstadoBaja, NotificationType } from '@prisma/client';
 
 type Sesion = { id?: number | string | null; isClient?: boolean; isBranchUser?: boolean };
 
@@ -80,7 +80,7 @@ export class BajasService {
   private async avisar(
     userIds: number[],
     payload: {
-      type: string;
+      type: NotificationType;
       title: string;
       message: string;
       triggerUserId: number;
@@ -110,7 +110,9 @@ export class BajasService {
           companyId: payload.companyId,
           dedupeSeconds: 0,
         })
-        .catch(() => this.logger.warn('No se pudo completar un aviso o registro auxiliar de baja.'));
+        .catch((error) =>
+          this.logger.warn(`No se pudo completar un aviso de baja (${payload.type}): ${String(error?.message ?? error)}`),
+        );
     }
   }
 

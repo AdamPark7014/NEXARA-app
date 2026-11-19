@@ -2314,6 +2314,44 @@ export class NotificationHierarchyService {
   }
 
   /**
+   * La solicitud de auto avanzó a un paso que no es el final (Liz → CEO): avisa al siguiente aprobador.
+   * Antes solo cambiaba `approvalStep` y la solicitud se quedaba esperando sin que nadie supiera.
+   */
+  async notifyVehicleNextStep(
+    vehicleRequestId: number,
+    siguienteRol: string,
+    aprobadoPor: string,
+    vehicleName: string,
+    nota?: string,
+  ) {
+    try {
+      const solicitud = await this.prisma.vehicleControl.findFirst({
+        where: { id: vehicleRequestId },
+        select: { companyId: true, solicitante: { select: { nombre: true } } },
+      });
+      const aprobadores = await this.destinatariosFinanzas(solicitud?.companyId, { roleKey: siguienteRol });
+      const quien = solicitud?.solicitante?.nombre ? ` de ${solicitud.solicitante.nombre}` : '';
+      const textoNota = nota?.trim() ? ` · ${nota.trim()}` : '';
+      for (const aprobador of aprobadores) {
+        await this.notificationsService.createNotification({
+          userId: aprobador.id,
+          type: 'VEHICLE_REQUEST_NEXT_STEP',
+          category: 'vehicles',
+          title: 'Vehículo por autorizar',
+          companyId: solicitud?.companyId ?? undefined,
+          message: `${aprobadoPor} aprobó${textoNota}. Falta tu autorización: "${vehicleName}"${quien}`,
+          relatedEntityId: vehicleRequestId,
+          entityType: 'VehicleControl',
+          relatedUrl: appUrls.erpVehiculos(vehicleRequestId, 'requests'),
+          priority: 'high',
+        });
+      }
+    } catch (error) {
+      this.logger.error(`Error notifying vehicle next step:`, error);
+    }
+  }
+
+  /**
    * Notificar aprobación de vehículo
    */
   async notifyVehicleApproved(

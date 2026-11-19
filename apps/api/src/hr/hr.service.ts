@@ -7,6 +7,7 @@ import { expectedStartHm, isLateVsSchedule } from '../attendance/attendance-hybr
 import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { buildAccessScheduleAssignment } from '../integra/access-schedule-defaults.js';
 import { SolicitudAprobacionService } from '../common/aprobaciones/solicitud-aprobacion.service.js';
+import { AVISO_RH_PENDIENTE } from '../common/aprobaciones/avisos-rh.js';
 
 @Injectable()
 export class HrService {
@@ -59,7 +60,7 @@ export class HrService {
     const destinos = solicitud.aprobadorActualId ? [solicitud.aprobadorActualId] : await aprobaciones.idsDireccion(tenantId, userId);
     await aprobaciones.avisar(destinos, {
       companyId: tenantId, triggerUserId: userId, relatedEntityId: solicitud.id,
-      type: 'RH_' + tipoSolicitud + '_PENDIENTE', title: (tipoSolicitud === 'VACACIONES' ? 'Vacaciones: ' : 'Permiso: ') + leave.user.nombre,
+      type: AVISO_RH_PENDIENTE[tipoSolicitud], title: (tipoSolicitud === 'VACACIONES' ? 'Vacaciones: ' : 'Permiso: ') + leave.user.nombre,
       message: 'Del ' + dto.startDate + ' al ' + dto.endDate + '. Revisa la solicitud en el expediente.', relatedUrl: '/erp/hr/' + userId,
     });
 
