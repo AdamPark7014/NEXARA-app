@@ -142,8 +142,11 @@ object CoreMenu {
         val keys = user.navModuleKeys?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
         if (keys.isNullOrEmpty()) return EVERYONE_EXTRAS
         return CoreExtraModule.entries.filter { modulo ->
-            // Pagos a empleados es solo de dirección, aunque `me/navigation` lo nombre (Adam, 04-11-2026).
-            if (modulo == CoreExtraModule.PAGOS_EMPLEADOS && !PorRol.esDireccion(user)) return@filter false
+            // Pagos / prenómina: dirección o RH (Tere).
+            if (modulo == CoreExtraModule.PAGOS_EMPLEADOS &&
+                !PorRol.esDireccion(user) &&
+                canonicalRole(user) != RoleKeys.RH
+            ) return@filter false
             modulo.paraTodoElPersonal || modulo.claves.any { it in keys } ||
                 (modulo == CoreExtraModule.APROBACIONES && canonicalRole(user) in REVISAN_EVIDENCIAS)
         }
@@ -160,6 +163,7 @@ object CoreMenu {
     /** Roles con todo Core en url-matrix (todo /erp o `CORE_OLA1_URL_RULES`). */
     private val FULL_CORE_ROLES = setOf(
         RoleKeys.SUPER_ADMIN, RoleKeys.CEO, RoleKeys.ARQUITECTO, RoleKeys.DIR_ADMIN,
+        RoleKeys.DIR_OPERACIONES, RoleKeys.COORD_ADMIN, RoleKeys.RH,
         RoleKeys.ADMINISTRATIVO, RoleKeys.COORD_OPERACIONES, RoleKeys.ING_CAMPO, RoleKeys.ING_SOPORTE,
     )
 

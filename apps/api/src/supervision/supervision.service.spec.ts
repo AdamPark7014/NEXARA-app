@@ -311,6 +311,17 @@ describe('SupervisionService', () => {
 });
 
 describe('regresiones de integración', () => {
+  it('RH sigue en personal pero no es asignable en planes ni mediante una petición directa', async () => {
+    const { service, org } = armar();
+    org.push({ ...org[1], id: 69, nombre: 'Tere', email: 'tere.garcia@nexara.com.mx', roleKey: ROLES.RH, managerId: 20 });
+    const { equipo } = await service.equipoParaPlan({ id: 20 }, COMPANY);
+    expect(org.some((u) => u.id === 69)).toBe(true);
+    expect(equipo.map((u) => u.id)).not.toContain(69);
+    expect(equipo.map((u) => u.id)).toContain(20);
+    await expect(service.enviarPlan({ id: 20 }, COMPANY, {
+      fecha: FECHA, renglones: [{ id: 'rh', personaId: 69, actividad: 'Revisar expediente' }],
+    })).rejects.toThrow('equipo');
+  });
   it('ignora actividadCreadaId enviado por el autor y valida el equipo', async () => {
     const {service}=armar();
     const p=await service.enviarPlan({id:20},COMPANY,{fecha:FECHA,renglones:[{id:'r1',personaId:30,actividad:'Revisar equipo',actividadCreadaId:777}]});

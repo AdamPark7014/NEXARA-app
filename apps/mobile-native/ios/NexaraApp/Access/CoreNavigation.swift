@@ -245,15 +245,16 @@ enum CoreNavigation {
     ///   Vehículos y Viáticos, los tres que tiene todo el personal. (El
     ///   organigrama se quedó en la web: es una pantalla de escritorio.)
     ///
-    /// Pagos a empleados solo le sale a dirección, aunque `me/navigation` lo nombre.
+    /// Pagos a empleados: dirección o RH (Tere / prenómina).
     static func extraModules(for user: SessionUser?) -> [CoreExtraModule] {
         guard let user, !isExternal(user) else { return [] }
         let esDireccion = CoreOrg.esDireccion(email: user.email, roleKey: user.roleKey) || user.isSuperAdmin
+        let esRh = (user.roleKey ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "rh"
         // Modo demostración: solo los módulos con pantalla propia y datos de muestra.
         // Los demás todavía no tienen pantalla y harían parecer la app incompleta.
         if DemoMode.isActive {
             return CoreExtraModule.allCases.filter {
-                CoreExtraDestination.tienePantallaNativa($0) && permitePorRol($0, esDireccion: esDireccion)
+                CoreExtraDestination.tienePantallaNativa($0) && permitePorRol($0, esDireccion: esDireccion, esRh: esRh)
             }
         }
         if user.isSuperAdmin { return CoreExtraModule.allCases }
@@ -262,14 +263,13 @@ enum CoreNavigation {
         return CoreExtraModule.allCases.filter { modulo in
             let concedido = modulo.paraTodoElPersonal || !modulo.claves.isDisjoint(with: nav)
                 || (modulo == .aprobaciones && revisanEvidencias.contains((user.roleKey ?? "").lowercased()))
-            return concedido && permitePorRol(modulo, esDireccion: esDireccion)
+            return concedido && permitePorRol(modulo, esDireccion: esDireccion, esRh: esRh)
         }
     }
 
-    /// Lo que el rol le quita aunque la navegación se lo conceda. Hoy, solo los pagos: mueven
-    /// dinero y son de dirección (Adam, 04-11-2026).
-    static func permitePorRol(_ modulo: CoreExtraModule, esDireccion: Bool) -> Bool {
-        modulo != .pagosEmpleados || esDireccion
+    /// Lo que el rol le quita aunque la navegación se lo conceda. Pagos: dirección o RH.
+    static func permitePorRol(_ modulo: CoreExtraModule, esDireccion: Bool, esRh: Bool = false) -> Bool {
+        modulo != .pagosEmpleados || esDireccion || esRh
     }
 
     /// Revisan a su gente aunque `me/navigation` no les dé la bandeja de firmas.

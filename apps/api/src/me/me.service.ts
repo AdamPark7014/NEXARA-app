@@ -9,6 +9,7 @@ import {
 import { canManageAlmacen } from '../warehouse/almacen-access.js';
 import { canUsarMesaContable } from '../accounting/mesa-contable/mesa-por-correo.js';
 import { ALL_ROLES, ROLES_ENCARGADOS_DE_AREA, type RoleKey } from '../common/rbac/roles.v2.js';
+import { sinActividades } from '../common/platform-accounts.js';
 import { deriveModuleKeysFromPaths } from './navigation-module-map.js';
 import { applyModuleAccessOverrides, parseModuleAccess } from './module-access-merge.js';
 import { ModulePolicyService } from '../common/tenant/module-policy.service.js';
@@ -112,6 +113,13 @@ export class MeService {
         recortada.moduleKeys = recortada.moduleKeys.filter((m) => m !== 'supervision');
         recortada.hiddenModuleIds = [...new Set([...recortada.hiddenModuleIds, 'supervision'])];
       }
+    }
+    // Tere / dirección: supervisan sin «Mis actividades».
+    if (sinActividades({ email: profile?.email, roleKey: roleKeyRaw })) {
+      const quitar = new Set(['mis-actividades', 'my-activities']);
+      recortada.webModuleIds = recortada.webModuleIds.filter((m) => !quitar.has(m));
+      recortada.moduleKeys = recortada.moduleKeys.filter((m) => !quitar.has(m));
+      recortada.hiddenModuleIds = [...new Set([...recortada.hiddenModuleIds, ...quitar])].sort();
     }
     const webModuleIds = recortada.webModuleIds;
     const moduleKeys = recortada.moduleKeys;

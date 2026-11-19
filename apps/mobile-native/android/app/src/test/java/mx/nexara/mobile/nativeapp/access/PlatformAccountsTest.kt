@@ -25,11 +25,22 @@ class PlatformAccountsTest {
     @Test
     fun nonEmployeeAccountsAreNeverListedAsStaff() {
         assertTrue(PlatformAccounts.isNonEmployeeEmail("gerencia@nexara.com.mx"))
+        assertTrue(PlatformAccounts.isNonEmployeeEmail("getzemani.delvalle@nexara.com.mx"))
         assertTrue(PlatformAccounts.isNonEmployeeEmail("developer@nexara.com.mx"))
         assertTrue(PlatformAccounts.isNonEmployeeEmail("claudia.bernal@nexara.com.mx"))
         assertTrue(PlatformAccounts.isNonEmployeeEmail("play.review@nexara.com.mx"))
         assertFalse(PlatformAccounts.isNonEmployeeEmail("joan.sanchez@nexara.com.mx"))
+        assertFalse(PlatformAccounts.isNonEmployeeEmail("tere.garcia@nexara.com.mx"))
         assertFalse(PlatformAccounts.isNonEmployeeEmail(null))
+    }
+
+    @Test
+    fun sinActividadesCubreDireccionYRh() {
+        assertTrue(PlatformAccounts.sinActividades("gerencia@nexara.com.mx", "ceo"))
+        assertTrue(PlatformAccounts.sinActividades("getzemani.delvalle@nexara.com.mx", "ceo"))
+        assertTrue(PlatformAccounts.sinActividades("tere.garcia@nexara.com.mx", "rh"))
+        assertFalse(PlatformAccounts.sinActividades("direccion.operaciones@nexara.com.mx", "dir_operaciones"))
+        assertFalse(PlatformAccounts.sinActividades("lizeth.antonio@nexara.com.mx", "coord_admin"))
     }
 
     @Test

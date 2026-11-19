@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { workDateKey } from '../common/time/workday.js';
 import { estatusCerrado, estatusNoCumplida } from '../me/pizarra-kpi.js';
+import { PLATFORM_DEVELOPER_EMAIL, STORE_REVIEWER_EMAIL, TESTER_CEO_EMAIL } from '../common/platform-accounts.js';
 
 export type EstadoPlanDiario = 'ENVIADO' | 'PROGRAMADO' | 'DEVUELTO';
 
@@ -29,7 +30,7 @@ export function esCuentaRealParaAviso(u: { email?: string | null; puesto?: strin
   if (!email) return false;
   if (email.endsWith('.invalid')) return false;
   if (email.startsWith('play.review@')) return false;
-  if (email === 'developer@nexara.com.mx') return false;
+  if ([PLATFORM_DEVELOPER_EMAIL, STORE_REVIEWER_EMAIL, TESTER_CEO_EMAIL].includes(email)) return false;
   const puesto = String(u?.puesto ?? '').toLowerCase();
   if (puesto.includes('tester') || puesto.includes('demostracion') || puesto.includes('demostración')) return false;
   return true;

@@ -35,6 +35,9 @@ describe('deriveModuleKeysFromPaths', () => {
       '/erp/finance/employee-payments/**',
       '/erp/documents',
       '/erp/videovigilancia/**',
+      '/erp/supervision/**',
+      '/erp/gestion-viaticos/**',
+      '/erp/hr/**',
     ]);
     for (const key of CORE_EXTRA_MODULES.map((m) => m.key)) {
       expect(moduleKeys).toContain(key);
