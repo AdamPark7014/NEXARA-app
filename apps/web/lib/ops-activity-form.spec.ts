@@ -247,3 +247,38 @@ describe('periodo de la actividad', () => {
     expect(form.projectMilestoneId).toBe('101');
   });
 });
+
+describe("hora en 24 h y «¿Quisiste decir p. m.?» (18-11-2026)", () => {
+  it("se teclea en 24 h y se completa al salir", async () => {
+    const { teclearHora24, completarHora24 } = await import("./ops-activity-form");
+    expect(teclearHora24("1211")).toBe("12:11");
+    expect(teclearHora24("12:1")).toBe("12:1");
+    expect(teclearHora24("9a")).toBe("9");
+    expect(completarHora24("9")).toBe("09:00");
+    expect(completarHora24("930")).toBe("09:30");
+    expect(completarHora24("1646")).toBe("16:46");
+    expect(completarHora24("25:00")).toBe("25:00");
+    expect(completarHora24("")).toBe("");
+  });
+
+  it("dice la hora como se dice en la calle", async () => {
+    const { hora12Texto } = await import("./ops-activity-form");
+    expect(hora12Texto("12:11")).toBe("12:11 p. m.");
+    expect(hora12Texto("16:46")).toBe("4:46 p. m.");
+    expect(hora12Texto("00:11")).toBe("12:11 a. m.");
+  });
+
+  it("pregunta solo con madrugada, para hoy y capturando de día (casos reales AN-0590 y AN-0586)", async () => {
+    const { horaQuizaPm } = await import("./ops-activity-form");
+    const mediodia = new Date(2026, 10, 18, 12, 12);
+    expect(horaQuizaPm("00:11", "2026-11-18", mediodia)).toBe("12:11");
+    expect(horaQuizaPm("04:46", "2026-11-18", mediodia)).toBe("16:46");
+    expect(horaQuizaPm("00:00", "2026-11-18", new Date(2026, 10, 18, 11, 30))).toBe("12:00");
+    // Tarde o mañana normal: nada que preguntar.
+    expect(horaQuizaPm("12:11", "2026-11-18", mediodia)).toBeNull();
+    expect(horaQuizaPm("06:30", "2026-11-18", mediodia)).toBeNull();
+    // Otro día, o capturando de noche (turno nocturno): no se pregunta.
+    expect(horaQuizaPm("02:00", "2026-11-19", mediodia)).toBeNull();
+    expect(horaQuizaPm("02:00", "2026-11-18", new Date(2026, 10, 18, 1, 30))).toBeNull();
+  });
+});

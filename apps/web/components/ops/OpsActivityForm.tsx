@@ -47,11 +47,14 @@ import {
   EMPTY_ACTIVITY_FORM,
   formFromActivityRecord,
   HORA_INICIO_POR_OMISION,
+  hora12Texto,
   horaDeEntrada,
+  horaQuizaPm,
   type ActivityFormState,
   type ActivityProjectMode,
 } from "@/lib/ops-activity-form";
 import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
+import HoraInput24 from "@/components/ops/HoraInput24";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
 import { DurationWheelPicker, joinMinutes, splitMinutes } from "@/components/ui/DurationWheelPicker";
 import {
@@ -211,6 +214,9 @@ export default function OpsActivityForm({
   const [saving, setSaving] = useState(false);
   /** Doble clic: el segundo llega antes de que `saving` deshabilite el botón. */
   const enviandoRef = useRef(false);
+  /** «¿Quisiste decir p. m.?»: horas sospechosas por corregir, y si ya dijo que sí es de madrugada. */
+  const [preguntaPm, setPreguntaPm] = useState<{ inicio: string | null; compromiso: string | null } | null>(null);
+  const madrugadaConfirmadaRef = useRef(false);
   /** Quien llena eligió la hora: ya no se mueve sola al cambiar de responsable. */
   const horaElegidaRef = useRef(false);
   /**
@@ -656,6 +662,15 @@ export default function OpsActivityForm({
       setError("El último día del periodo no puede ser anterior al primero");
       return;
     }
+    // Una hora de madrugada para hoy, capturada de día, casi siempre era p. m. Se pregunta (no se bloquea).
+    if (!madrugadaConfirmadaRef.current) {
+      const inicioPm = horaQuizaPm(form.hora || HORA_INICIO_POR_OMISION, form.fecha);
+      const compromisoPm = form.horaCompromiso ? horaQuizaPm(form.horaCompromiso, form.fecha) : null;
+      if (inicioPm || compromisoPm) {
+        setPreguntaPm({ inicio: inicioPm, compromiso: compromisoPm });
+        return;
+      }
+    }
     if (puedeDefinirCampos && campos.length > 0) {
       setCamposIntentado(true);
       if (hayErrores(erroresCampos)) {
@@ -1037,7 +1052,43 @@ export default function OpsActivityForm({
         footer={
           <FormFooter
             start={
-              error ? (
+              preguntaPm ? (
+                <span role="alert" className={s.statusError}>
+                  ¿Quisiste decir{" "}
+                  {[
+                    preguntaPm.inicio ? hora12Texto(preguntaPm.inicio) : null,
+                    preguntaPm.compromiso ? `entrega ${hora12Texto(preguntaPm.compromiso)}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" y ")}
+                  ?{" "}
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setForm((f) => ({
+                        ...f,
+                        hora: preguntaPm.inicio ?? f.hora,
+                        horaCompromiso: preguntaPm.compromiso ?? f.horaCompromiso,
+                      }));
+                      setPreguntaPm(null);
+                      setSuccess("Hora corregida a la tarde. Revisa y guarda.");
+                    }}
+                  >
+                    Sí, corregir
+                  </Button>{" "}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      madrugadaConfirmadaRef.current = true;
+                      setPreguntaPm(null);
+                      void handleSubmit();
+                    }}
+                  >
+                    No, es de madrugada
+                  </Button>
+                </span>
+              ) : error ? (
                 <span role="alert" className={s.statusError}>
                   {error}
                 </span>
@@ -1582,13 +1633,14 @@ export default function OpsActivityForm({
                   required={requireSchedule}
                   error={intentado && requireSchedule && !form.hora ? "Indica la hora" : null}
                 >
-                  <Input
+                  <HoraInput24
                     id="oaf-hora"
-                    type="time"
                     value={form.hora || HORA_INICIO_POR_OMISION}
-                    onChange={(e) => {
+                    onChange={(hora) => {
                       horaElegidaRef.current = true;
-                      setForm({ ...form, hora: e.target.value });
+                      madrugadaConfirmadaRef.current = false;
+                      setPreguntaPm(null);
+                      setForm((f) => ({ ...f, hora }));
                     }}
                     required={requireSchedule}
                   />
@@ -1607,11 +1659,14 @@ export default function OpsActivityForm({
                       : null
                   }
                 >
-                  <Input
+                  <HoraInput24
                     id="oaf-compromiso"
-                    type="time"
                     value={form.horaCompromiso}
-                    onChange={(e) => setForm({ ...form, horaCompromiso: e.target.value })}
+                    onChange={(horaCompromiso) => {
+                      madrugadaConfirmadaRef.current = false;
+                      setPreguntaPm(null);
+                      setForm((f) => ({ ...f, horaCompromiso }));
+                    }}
                   />
                 </Field>
               </div>
