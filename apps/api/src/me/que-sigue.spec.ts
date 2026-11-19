@@ -207,7 +207,7 @@ describe('tiempo de lo que sale de una lista', () => {
 });
 
 describe('permisos', () => {
-  const PERSONAL = [ROLES.ING_CAMPO, ROLES.ING_SOPORTE, ROLES.ENC_SOPORTE, ROLES.COORD_OPERACIONES, ROLES.ADMINISTRATIVO, ROLES.ARQUITECTO, ROLES.RH];
+  const PERSONAL = [ROLES.ING_CAMPO, ROLES.ING_SOPORTE, ROLES.ENC_SOPORTE, ROLES.COORD_OPERACIONES, ROLES.ADMINISTRATIVO, ROLES.ARQUITECTO]; // RH supervisa sin actividades (18-11)
 
   it.each(PERSONAL)('%s llega a lo suyo', (rol) => {
     expect(checkUrlAccess(rol, '/api/me/que-sigue', 'GET').allowed).toBe(true);
