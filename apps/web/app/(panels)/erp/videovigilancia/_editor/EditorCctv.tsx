@@ -1126,16 +1126,7 @@ export default function EditorCctv({
                 </div>
               ) : null}
             </div>
-            <HistorialVisible
-                pasado={estado.pasado}
-                actual={estado.plano}
-                etiquetasPasado={estado.etiquetasPasado}
-                onVolver={(indicePasado) => {
-                  const n = estado.pasado.length - indicePasado;
-                  for (let i = 0; i < n; i++) despachar({ tipo: "deshacer" });
-                }}
-              />
-              <CapasBloqueoPanel capas={capasBloqueo} onChange={setCapasBloqueo} />
+            <div className={styles.columnaDerecha}>
               <Inspector
               plano={plano}
               seleccion={seleccion}
@@ -1186,6 +1177,20 @@ export default function EditorCctv({
                 },
               }}
             />
+              <details className={styles.extraDerecha}>
+                <summary>Capas e historial</summary>
+                <CapasBloqueoPanel capas={capasBloqueo} onChange={setCapasBloqueo} />
+                <HistorialVisible
+                pasado={estado.pasado}
+                actual={estado.plano}
+                etiquetasPasado={estado.etiquetasPasado}
+                onVolver={(indicePasado) => {
+                  const n = estado.pasado.length - indicePasado;
+                  for (let i = 0; i < n; i++) despachar({ tipo: "deshacer" });
+                }}
+              />
+              </details>
+            </div>
           </div>
         )}
 
