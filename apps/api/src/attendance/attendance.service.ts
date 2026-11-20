@@ -26,7 +26,7 @@ import {
 import { NotificationType, Prisma } from '@prisma/client';
 import { saveBase64Photo } from '../common/file-upload.util';
 import { horaAviso } from '../notifications/notification-push-meta.js';
-import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
+import { isCeoEquivalentEmail, sinChecador } from '../common/platform-accounts.js';
 import { alcanzaA, esDeTodaLaEmpresa } from '../me/equipo-alcance.js';
 import { cerrarSesionesDeUsuario } from '../activities/sessions/activity-sessions.service.js';
 import { mensajeFrenoSalida, salidaConfirmada, VENTANA_CONFIRMAR_SALIDA_MS } from './freno-salida.js';
@@ -1907,6 +1907,11 @@ export class AttendanceService {
 
   async register(dto: CreateAttendanceDto, userId: number, req?: any, companyId?: number | null) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
+    // Quien no checa (dirección y RH) no registra asistencia. El perfil ya viene en la petición.
+    const quien = req?.user?.email ? { email: req.user.email, roleKey: req.user.roleKey } : null;
+    if (sinChecador(quien)) {
+      throw new ForbiddenException('Tu perfil no registra checada de asistencia');
+    }
     if (!dto.photoBase64 || !String(dto.photoBase64).trim()) {
       throw new BadRequestException('La foto es obligatoria para registrar asistencia');
     }
@@ -2571,6 +2576,10 @@ export class AttendanceService {
 
     // Obtener usuarios accesibles (solo miembros del tenant)
     let accessibleUsers = await this.getAccessibleUsers(currentUser, companyId);
+    // Dirección y RH (Tere) no checan: no salen en el listado ni como «Sin checada».
+    accessibleUsers = accessibleUsers.filter(
+      (u) => !sinChecador({ email: u.email, roleKey: u.roleKey }),
+    );
 
     // Filtrar según el tipo de usuario:
     // - Superadmin: Ve todos EXCEPTO otros superadmins (y a sí mismo vía email plataforma)

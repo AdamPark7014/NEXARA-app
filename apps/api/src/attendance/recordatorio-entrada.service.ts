@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PushDispatchService } from '../devices/push-dispatch.service.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
-import { isNonEmployeeEmail } from '../common/platform-accounts.js';
+import { isNonEmployeeEmail, sinChecador } from '../common/platform-accounts.js';
 import { workDateColumn, workDateKey, workDayBounds } from '../common/time/workday.js';
 import { horaAviso } from '../notifications/notification-push-meta.js';
 import { resolveAccessScheduleKey } from '../integra/access-schedule-defaults.js';
@@ -95,7 +95,7 @@ export class RecordatorioEntradaService {
     const candidatos: Candidato[] = [];
     for (const u of usuarios) {
       // Cuentas de plataforma y el equipo ficticio del tenant de demo de las tiendas (`@demo.invalid`).
-      if (isNonEmployeeEmail(u.email) || /\.invalid$/i.test(u.email.trim())) continue;
+      if (isNonEmployeeEmail(u.email) || sinChecador(u) || /\.invalid$/i.test(u.email.trim())) continue;
       const plantilla = resolveAccessScheduleKey({
         isActive: true,
         roleKey: u.roleKey,

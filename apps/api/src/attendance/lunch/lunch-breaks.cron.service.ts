@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { NotificationsService } from '../../notifications/notifications.service.js';
 import { WORKDAY_TIMEZONE, workDateColumn, workDayStart } from '../../common/time/workday.js';
 import { horaAviso, nombreCorto } from '../../notifications/notification-push-meta.js';
-import { isNonEmployeeEmail } from '../../common/platform-accounts.js';
+import { isNonEmployeeEmail, sinChecador } from '../../common/platform-accounts.js';
 import { runScheduledJob } from '../../common/cron/run-scheduled-job.js';
 import { resolveAccessScheduleKey } from '../../integra/access-schedule-defaults.js';
 import { horarioDePersona } from '../../me/kpis-equipo.js';
@@ -82,7 +82,7 @@ export class LunchBreaksCronService {
     const minuto = minutoDelDia(ahora);
 
     for (const u of usuarios) {
-      if (isNonEmployeeEmail(u.email) || /\.invalid$/i.test(String(u.email ?? '').trim())) continue;
+      if (isNonEmployeeEmail(u.email) || sinChecador(u) || /\.invalid$/i.test(String(u.email ?? '').trim())) continue;
       const horario = horarioDePersona(
         resolveAccessScheduleKey({ isActive: true, roleKey: u.roleKey, orgRoleKey: u.role?.orgRoleKey ?? null, tipoContrato: u.tipoContrato }),
         u.horario ?? null,

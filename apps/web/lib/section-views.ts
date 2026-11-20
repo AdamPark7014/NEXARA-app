@@ -917,10 +917,11 @@ export function getAttendanceViewMode(
   const v2 = resolveV2RoleKey(user);
   if (!user || user.isSuperAdmin) return 'manage';
   if (!v2) return 'register';
-  // Dirección (Christian y super admin): solo tablero, sin checador propio en Core.
-  if (EXECUTIVE.has(v2)) return 'manage';
+  // Dirección (Christian y super admin) y RH (Tere): solo tablero, sin checador propio.
+  if (EXECUTIVE.has(v2) || v2 === ROLES.RH) return 'manage';
   // Encargados de gente: ven equipo (entrada/salida / en sitio) + checan ellos.
   // GPS en vivo sigue siendo GPS_MANAGE (API), no este viewMode.
+  // Liz (coord_admin) sí checa; Tere ya salió arriba.
   if (
     HR_MANAGERS.has(v2) ||
     // Supervisor general (Luis): ve a todo su equipo y también checa su jornada.

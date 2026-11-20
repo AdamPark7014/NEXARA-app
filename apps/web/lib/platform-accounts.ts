@@ -67,6 +67,37 @@ export function sinActividades(user: {
   return String(user.roleKey ?? "").trim().toLowerCase() === "rh";
 }
 
+/** Liz: tiene actividades y checa, pero no se mide en KPIs / Desempeño. */
+export const COORD_ADMIN_KPI_EMAIL = "lizeth.antonio@nexara.com.mx";
+
+/**
+ * Externos y dirección: no salen en KPIs / Desempeño.
+ * Tere (rh) y Liz (coord_admin). Liz sí tiene actividades; solo no se mide.
+ */
+export function noSeMide(user: {
+  email?: string | null;
+  roleKey?: string | null;
+} | null | undefined): boolean {
+  if (!user) return false;
+  if (isNonEmployeeEmail(user.email)) return true;
+  const rol = String(user.roleKey ?? "").trim().toLowerCase();
+  if (rol === "rh" || rol === "coord_admin") return true;
+  return normalizePlatformEmail(user.email) === COORD_ADMIN_KPI_EMAIL;
+}
+
+/**
+ * Quién no registra checada: dirección/plataforma y RH (Tere).
+ * Liz (coord_admin) sí checa.
+ */
+export function sinChecador(user: {
+  email?: string | null;
+  roleKey?: string | null;
+} | null | undefined): boolean {
+  if (!user) return false;
+  if (isNonEmployeeEmail(user.email)) return true;
+  return String(user.roleKey ?? "").trim().toLowerCase() === "rh";
+}
+
 export type PlatformAccountUser = {
   isSuperAdmin?: boolean;
   isPlatformOwner?: boolean;

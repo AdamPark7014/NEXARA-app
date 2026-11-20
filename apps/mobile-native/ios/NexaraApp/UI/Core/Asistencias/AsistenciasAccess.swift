@@ -20,8 +20,8 @@ enum AttendanceViewMode {
 
 enum AsistenciasAccess {
     /// Encargados de gente: ven a su equipo **y** registran su jornada.
+    /// Tere (rh) no checa: va con dirección en `.manage`.
     private static let manageAndRegister: Set<String> = [
-        RolePanelMatrix.rh,
         RolePanelMatrix.dirAdmin,
         RolePanelMatrix.coordAdmin,
         RolePanelMatrix.coordOperaciones,
@@ -51,7 +51,8 @@ enum AsistenciasAccess {
         if user.isSuperAdmin { return .manage }
         guard let role = role(user) else { return .register }
         if role == RolePanelMatrix.ceo
-            || role == RolePanelMatrix.superAdmin {
+            || role == RolePanelMatrix.superAdmin
+            || role == RolePanelMatrix.rh {
             return .manage
         }
         return manageAndRegister.contains(role) ? .manageRegister : .register
