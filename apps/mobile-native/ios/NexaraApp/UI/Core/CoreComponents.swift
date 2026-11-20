@@ -57,7 +57,13 @@ enum CoreStatusUI {
     static func kind(_ coreKind: String?, ticketTypeCustom: String? = nil) -> String {
         let base = CoreActivityKind(rawValue: (coreKind ?? "").lowercased())?.title ?? "Actividad"
         if (coreKind ?? "").lowercased() == "tarea", let custom = ticketTypeCustom, !custom.isEmpty {
-            return "\(base) · \(custom)"
+            // «Otro: Pintar rack» → «Tarea · Pintar rack» (el prefijo es solo de guardado).
+            let trimmed = custom.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.lowercased().hasPrefix("otro:") {
+                let nombre = trimmed.dropFirst(5).trimmingCharacters(in: .whitespacesAndNewlines)
+                return "\(base) · \(nombre.isEmpty ? "Otro" : nombre)"
+            }
+            return "\(base) · \(trimmed)"
         }
         return base
     }

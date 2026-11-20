@@ -180,7 +180,10 @@ describe("asistente IA en la pizarra", () => {
     expect(payloadFinal(lista, { tipo: "comercial" })).toMatchObject({ ticketType: "OTRO", ticketTypeCustom: "COMERCIAL" });
     expect(payloadFinal(lista, { tipo: "administrativa" })).toMatchObject({ ticketType: "OTRO", ticketTypeCustom: "ADMINISTRATIVA", coreKind: "administrativa" });
     expect(subtipoEfectivo({ ...lista, tipo: "tarea", payload: { ...lista.payload, ticketTypeCustom: "Entrega" } }, { tipo: "servicio" })).toBe("PREVENTIVO");
-    expect(subtipoEfectivo(lista, { tipo: "tarea" })).toBe("Otro");
+    expect(subtipoEfectivo(lista, { tipo: "tarea" })).toBe("Otro…");
+    expect(
+      payloadFinal(lista, { tipo: "tarea", subtipo: "Otro…", otroNombre: "Pintar rack" }),
+    ).toMatchObject({ ticketType: "OTRO", ticketTypeCustom: "Otro: Pintar rack" });
   });
 
   it("«Entregar a más tardar» deja la fecha máxima y la entrega a esa hora (sin periodo)", () => {

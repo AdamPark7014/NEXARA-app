@@ -112,11 +112,10 @@ export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
  * Subtipos de Tarea. Se guardan como ticketType OTRO + ticketTypeCustom = label.
  * Servicio, proyecto, obra y comercial no van aquí: ya tienen su propio tipo.
  *
- * 28-10: catálogo cerrado en cuatro familias. El análisis de producción encontró 100 valores
- * distintos escritos a mano en «Otro» y «Reporte / documentación» usado de comodín; sin un
- * tipo confiable no se puede medir cuánto tarda cada trabajo
- * (`.ai/CUMPLIMIENTO-EVALUADOR-SPEC.md` §7). Los nombres que ya existían se conservan para que
- * el historial siga cuadrando. `otro` queda solo para leer actividades viejas.
+ * 28-10: catálogo cerrado en cuatro familias (sin texto libre en el array). El 18-11 Adam
+ * pidió de vuelta «Otro…» con nombre libre: se ofrece aparte al final de la lista y se
+ * guarda como `ticketTypeCustom = "Otro: <nombre>"` para que KPIs y tiempos agrupen en
+ * «Otro» y la ficha muestre el nombre. `otro` en el tipo sirve para leer eso y textos viejos.
  */
 export type TareaTipoId =
   | 'instalacion'
@@ -166,6 +165,67 @@ export const TAREA_TIPOS: ReadonlyArray<{ id: TareaTipoId; label: string; icon: 
   { id: 'junta', label: 'Junta', icon: 'junta', familia: 'transversal' },
   { id: 'evento', label: 'Evento o guardia', icon: 'evento', familia: 'transversal' },
 ];
+
+/** Chip «Otro…» fuera del catálogo medible; el id `otro` no va en `TAREA_TIPOS`. */
+export const TAREA_OTRO_ID = 'otro' as const;
+export const TAREA_OTRO_CHIP = 'Otro…';
+export const TAREA_OTRO_PREFIX = 'Otro: ';
+export const TAREA_OTRO_NOMBRE_MIN = 3;
+export const TAREA_OTRO_NOMBRE_MAX = 60;
+
+/** Sin acentos ni mayúsculas, espacios colapsados. */
+export function normalizarTextoTarea(valor: string | null | undefined): string {
+  return (valor ?? '')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/** `ticketTypeCustom` es «Otro» o «Otro: …». */
+export function esOtroLibre(ticketTypeCustom?: string | null): boolean {
+  const n = normalizarTextoTarea(ticketTypeCustom);
+  return n === 'otro' || n.startsWith('otro:');
+}
+
+/** Nombre libre sin el prefijo «Otro:»; vacío si solo decía Otro. */
+export function nombreOtroLibre(ticketTypeCustom?: string | null): string {
+  const raw = (ticketTypeCustom ?? '').trim();
+  const m = /^otro\s*:\s*(.*)$/i.exec(raw);
+  if (m) return m[1].trim();
+  return '';
+}
+
+export function ticketTypeCustomDeOtro(nombre: string): string {
+  return `${TAREA_OTRO_PREFIX}${nombre.trim()}`;
+}
+
+/** `null` si vale; mensaje si no (3–60 caracteres). */
+export function validarNombreOtro(nombre: string): string | null {
+  const t = nombre.trim();
+  if (t.length < TAREA_OTRO_NOMBRE_MIN) return 'Escribe al menos 3 caracteres';
+  if (t.length > TAREA_OTRO_NOMBRE_MAX) return 'Máximo 60 caracteres';
+  return null;
+}
+
+/** Si el nombre libre coincide con un subtipo del catálogo (sin acentos/mayúsculas). */
+export function subtipoExistentePorNombre(nombre: string): (typeof TAREA_TIPOS)[number] | null {
+  const n = normalizarTextoTarea(nombre.replace(/^otro\s*:\s*/i, ''));
+  if (!n) return null;
+  return TAREA_TIPOS.find((t) => normalizarTextoTarea(t.label) === n) ?? null;
+}
+
+/** Para ficha/lista: nombre visible y si lleva etiqueta discreta «Otro». */
+export function subtipoTareaVista(ticketTypeCustom?: string | null): { label: string; badgeOtro: boolean } {
+  const raw = (ticketTypeCustom ?? '').trim();
+  if (!raw) return { label: '', badgeOtro: false };
+  if (esOtroLibre(raw)) {
+    const nombre = nombreOtroLibre(raw);
+    return { label: nombre || 'Otro', badgeOtro: true };
+  }
+  return { label: raw, badgeOtro: false };
+}
 
 const ALL: ActivityKind[] = ['tarea', 'proyecto', 'obra', 'servicio', 'comercial', 'administrativa'];
 const ORDER = ALL;

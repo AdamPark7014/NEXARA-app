@@ -210,7 +210,7 @@ class CoreActivityKindsTest {
     }
 
     @Test
-    fun catalogIsClosedInFourFamiliesLikeTheWeb() {
+    fun catalogHasSeventeenTypesAndOtroIsOutsideTheList() {
         assertEquals(17, k.TAREA_TIPOS.size)
         assertEquals(listOf("En campo", "Oficina técnica", "Administración", "Para todos"), k.FAMILIAS_TAREA.map { it.label })
         assertEquals(17, k.FAMILIAS_TAREA.sumOf { k.tiposDeFamilia(it.id).size })
@@ -219,9 +219,27 @@ class CoreActivityKindsTest {
             listOf("Diseño, CAD y memoria técnica", "Configuración y soporte remoto"),
             k.tiposDeFamilia("oficina").map { it.label },
         )
-        // Un id que no está en el catálogo no cambia el formulario.
         val base = k.initialForm("tarea", 3L, null)
         assertEquals(base, k.pickTareaTipo(base, "otro"))
+    }
+
+    @Test
+    fun otroLibreGuardaConPrefijoYValidaNombre() {
+        val base = k.initialForm("tarea", 3L, null).copy(titulo = "Algo")
+        val abierto = k.pickTareaOtro(base)
+        assertEquals(k.TAREA_OTRO, k.tareaTipo(abierto))
+        assertEquals("Escribe al menos 3 caracteres", k.validationError(abierto, false))
+
+        val corto = k.setNombreOtro(abierto, "ab")
+        assertEquals("Escribe al menos 3 caracteres", k.validationError(corto, false))
+
+        val coincide = k.setNombreOtro(abierto, "instalacion")
+        assertTrue(k.validationError(coincide, false)!!.contains("Instalación"))
+
+        val ok = k.setNombreOtro(abierto, "Pintar rack")
+        assertEquals("Otro: Pintar rack", ok.ticketTypeCustom)
+        assertNull(k.validationError(ok, false))
+        assertEquals("Otro: Pintar rack", k.buildRequest(ok, null, 1L).ticketTypeCustom)
     }
 
     @Test

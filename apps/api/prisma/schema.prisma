@@ -306,6 +306,12 @@ model OperationalProject {
   cotizacionId   Int?
   /// Por qué se canceló (solo con `status = CANCELLED`).
   cancelReason   String?                  @db.VarChar(500)
+  /// De dónde vino el proyecto cuando no nació en la plataforma (ej. «NAS»). Con `fuenteRef`
+  /// es la llave de la carga: repetirla actualiza, no duplica.
+  fuente         String?                  @db.VarChar(40)
+  /// Referencia en la fuente: para la NAS, la ruta relativa de la carpeta del proyecto
+  /// (ej. «INFRAESTRUCTURA/Proyecto IPADE/Migracion Centro de monitoreo»).
+  fuenteRef      String?                  @db.VarChar(500)
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
   deletedAt      DateTime?
@@ -334,6 +340,7 @@ model OperationalProject {
   @@index([companyId])
   @@index([status])
   @@index([cotizacionId])
+  @@unique([companyId, fuente, fuenteRef])
   @@map("operational_projects")
 }
 
