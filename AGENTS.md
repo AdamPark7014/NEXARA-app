@@ -40,6 +40,22 @@ todas**: lo que una prepara, otra lo puede commitear sin querer. Para que ningú
 9. **Al cerrar**, reporta los hashes y confirma que ya están arriba: `git branch -r --contains <hash>` debe mostrar
    `origin/main`.
 
+## Paridad móvil: todo cambio también en Android e iOS (Adam, 20-11-2026)
+
+Este producto tiene apps (`apps/mobile-native/android` y `apps/mobile-native/ios`) y van atrasadas respecto a la web.
+Ningún cambio de web o API está terminado hasta que **las dos apps** lo reflejan, o queda escrito por qué no aplica.
+
+- La regla de negocio vive en la API; la app la consume, no la recalcula.
+- En móvil se diseña para el uso real en el teléfono (en sitio, una mano, mala señal, pocos toques; cámara, GPS, dictado):
+  no se copia la pantalla de escritorio. Sistema de diseño de la app, estados completos (cargando, vacío, error, sin
+  conexión, sin permiso), tema claro y oscuro, mismos textos y permisos por rol que la web.
+- Casos robustos: sin señal a la mitad, doble toque, sesión vencida, permiso negado, versión vieja de la app contra API nueva.
+- Pruebas unitarias en cada plataforma y compilación en verde; si iOS no se puede compilar en esa máquina, se dice.
+- Cierre con una línea por plataforma: Web, API, Android, iOS → hecho / no aplica (por qué) / pendiente (qué falta).
+- Publicar en tiendas es aparte y pide el OK de Adam.
+
+Guía completa: `C:\dev\scripts\ai-os\PARIDAD-MOVIL.md`.
+
 # Antes de nada: protocolo de relevo
 
 Este repo se trabaja con **Claude Code y Cursor sobre la misma rama**, en turnos
