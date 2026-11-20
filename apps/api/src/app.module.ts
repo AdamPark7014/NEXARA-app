@@ -84,6 +84,7 @@ import { SearchModule } from './search/search.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
 import { AccessControlModule } from './access-control/access-control.module.js';
 import { IntegraModule } from './integra/integra.module.js';
+import { NasPortalModule } from './nas-portal/nas-portal.module.js';
 import { PacModule } from './pac/pac.module.js';
 import { MaintenanceContractsModule } from './maintenance-contracts/maintenance-contracts.module.js';
 import { MeetingsModule } from './meetings/meetings.module.js';
@@ -202,6 +203,7 @@ import { CctvDisenosModule } from './cctv-disenos/cctv-disenos.module.js';
     CatalogModule,
     AccessControlModule,
     IntegraModule,
+    NasPortalModule,
     PacModule,
     MaintenanceContractsModule,
     MeetingsModule,
