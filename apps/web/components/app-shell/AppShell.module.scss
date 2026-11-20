@@ -442,24 +442,27 @@
   flex-direction: column;
   gap: var(--nav-group-gap);
 
+  /* La barra usa la tinta del propio menú (--sb-fg): con --ui-fg-3 casi no se veía sobre el riel
+     oscuro y parecía que el menú no tenía scroll (Adam, 20-11). */
   @supports not selector(::-webkit-scrollbar) {
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, var(--ui-fg-3) 45%, transparent) transparent;
+    scrollbar-color: color-mix(in srgb, var(--sb-fg) 55%, transparent) transparent;
   }
 }
 
 .menu::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 .menu::-webkit-scrollbar-track {
-  background: transparent;
+  background: color-mix(in srgb, var(--sb-fg) 6%, transparent);
 }
 .menu::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--ui-fg-3) 30%, transparent);
+  background: color-mix(in srgb, var(--sb-fg) 45%, transparent);
   border-radius: 999px;
 }
-.menu:hover::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--ui-fg-3) 55%, transparent);
+.menu:hover::-webkit-scrollbar-thumb,
+.menu::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--sb-fg) 70%, transparent);
 }
 
 .menuEmpty {
