@@ -95,6 +95,8 @@ const compra: PropuestaActividad = {
   payload: {
     titulo: "Comprar 20 conectores RJ45",
     coreKind: "tarea",
+    ticketType: "OTRO",
+    ticketTypeCustom: "Compra de material",
     creadoPorId: 1,
     responsableId: 7,
     prioridad: "Media",
@@ -157,7 +159,7 @@ describe("AsistenteIA", () => {
     expect(screen.getByText(/24 oct, 9:00 a\. m\./)).toBeInTheDocument();
     expect(screen.getByText("2 h", { selector: "div" })).toBeInTheDocument();
     expect(screen.getByText("Servicio · Preventivo")).toBeInTheDocument();
-    expect(screen.getByText("Tarea · Otro")).toBeInTheDocument();
+    expect(screen.getByText("Tarea · Compra de material")).toBeInTheDocument();
     // Y se abren con el lápiz para cambiarlas.
     await abrir(usuario, "Cuándo", 1);
     expect(screen.getByLabelText(/^Último día/)).toHaveValue("2026-10-23");
