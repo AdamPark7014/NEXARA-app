@@ -7,6 +7,7 @@ import { tiposVisibles } from './equipo-alcance.js';
 import { estatusCerrado, estatusNoCumplida, estimadoParaKpi, minutosPlanDeHoras, tiemposReales } from './pizarra-kpi.js';
 import { minutosTrabajados } from '../activities/sessions/sesiones-trabajo.js';
 import { TeamBoardService } from './team-board.service.js';
+import { noSeMide } from '../common/platform-accounts.js';
 import { cerrarSesionesVencidas, leerSesiones } from '../activities/sessions/activity-sessions.service.js';
 import { limiteDeEntrega } from '../activities/semaforo-actividad.js';
 import { claveDeTipo, mediana, MUESTRAS_MINIMAS } from '../ai/complejidad/tiempos-tipicos.js';
@@ -234,8 +235,16 @@ export class KpisEquipoService {
     opciones: { conDias?: boolean } = {},
   ): Promise<KpisEquipoResponse> {
     const { companyWide, scoped, now } = await this.teamBoard.resolveScope(viewer, companyId);
-    const gente = soloUserId ? scoped.filter((u) => u.id === soloUserId) : scoped;
-    if (soloUserId && !gente.length) throw new NotFoundException('Usuario fuera de tu alcance');
+    // Tere (rh) y Liz (coord_admin) son externas: no se miden en KPIs/Desempeño.
+    const medibles = scoped.filter((u) => !noSeMide(u));
+    const gente = soloUserId ? medibles.filter((u) => u.id === soloUserId) : medibles;
+    if (soloUserId && !gente.length) {
+      const pedida = scoped.find((u) => u.id === soloUserId);
+      if (pedida && noSeMide(pedida)) {
+        throw new NotFoundException('Esta persona no se mide en KPIs ni Desempeño');
+      }
+      throw new NotFoundException('Usuario fuera de tu alcance');
+    }
 
     const datos = await this.cargar(gente.map((u) => u.id), companyId, rango, null);
     const calculadas = await this.calcularTodos(gente, datos, rango, now, companyId);
@@ -827,6 +836,7 @@ export class KpisEquipoService {
                 userId: true,
                 status: true,
                 reviewStatus: true,
+                reviewNotes: true,
                 completedAt: true,
                 entryPhotoUploadedAt: true,
                 exitPhotoUploadedAt: true,
@@ -910,9 +920,13 @@ export class KpisEquipoService {
     for (const f of propias) {
       const a = f.activity;
       const ev = (a.activityEvidences ?? []).find((e) => e.userId === f.userId) ?? null;
-      // Una no cumplida está cerrada pero nadie la entregó: cuenta como «sin entregar».
-      const cerrada = estatusCerrado(a.estatus) && !estatusNoCumplida(a.estatus);
-      const envio = ev?.status === 'COMPLETED';
+      // Una no cumplida / cierre administrativo o de jornada: cerrada sin entrega real.
+      const noCumplida = estatusNoCumplida(a.estatus);
+      const cierreAdmin =
+        /cerrada por/i.test(String(ev?.reviewNotes ?? '')) ||
+        /cierre de jornada|fin de jornada|CIERRE_JORNADA/i.test(String(ev?.reviewNotes ?? ''));
+      const cerrada = estatusCerrado(a.estatus) && !noCumplida && !cierreAdmin;
+      const envio = ev?.status === 'COMPLETED' && !cierreAdmin;
       const tiempos = tiemposReales({
         inicioRealAt: f.inicioRealAt ?? null,
         finRealAt: f.finRealAt ?? null,
@@ -922,11 +936,16 @@ export class KpisEquipoService {
         fechaFinalizacion: a.fechaFinalizacion,
         cerrada,
       });
-      const entregadaAt = envio
-        ? (tiempos.fin ?? ev?.completedAt ?? a.fechaFinalizacion ?? null)
-        : cerrada
-          ? (tiempos.fin ?? a.fechaFinalizacion ?? null)
-          : null;
+      // Entrega = evidencia de la persona (finRealAt / COMPLETED), no la aprobación ni el cierre admin.
+      const entregadaAt =
+        noCumplida || cierreAdmin
+          ? null
+          : envio
+            ? (tiempos.fin ?? ev?.completedAt ?? null)
+            : cerrada
+              ? // Cerrada normal sin evidencia (tipos que no la piden): sigue contando con su fin real.
+                (tiempos.fin ?? a.fechaFinalizacion ?? null)
+              : null;
       const decisiones = revisionesPor.get(`${f.userId}:${f.activityId}`) ?? [];
       const devuelta = (d: string) => /^DEVUELTA/i.test(d);
       const visible = !tipos || (a.coreKind != null && tipos.includes(a.coreKind));

@@ -45,8 +45,16 @@ class AttendanceViewModeTest {
     }
 
     @Test
-    fun `rrhh y coordinadores administran y checan`() {
-        listOf("rh", "dir_admin", "coord_admin", "coord_operaciones", "arquitecto", "ing_soporte")
+    fun `tere rh administra sin checador`() {
+        val m = mode(roleKey = "rh")
+        assertEquals(AttendanceViewMode.MANAGE, m)
+        assertFalse(m.canRegisterSelf)
+        assertTrue(m.canManageTeam)
+    }
+
+    @Test
+    fun `coordinadores administran y checan`() {
+        listOf("dir_admin", "coord_admin", "coord_operaciones", "arquitecto", "ing_soporte")
             .forEach { key ->
                 val m = mode(roleKey = key)
                 assertEquals("rol $key", AttendanceViewMode.MANAGE_REGISTER, m)

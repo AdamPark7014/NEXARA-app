@@ -72,10 +72,11 @@ fun attendanceViewMode(
 ): AttendanceViewMode {
     val v2 = resolveAttendanceRoleKey(email, roleKey, orgRoleKey, isSuperAdmin)
         ?: return AttendanceViewMode.REGISTER
-    if (v2 in AttendanceRoles.EXECUTIVE) {
+    if (v2 in AttendanceRoles.EXECUTIVE || v2 == AttendanceRoles.RH) {
         return AttendanceViewMode.MANAGE
     }
     // Supervisor general (Luis) ve a su equipo y también checa su jornada.
+    // Liz (coord_admin) sí checa; Tere (rh) ya salió arriba sin checador.
     if (v2 in AttendanceRoles.HR_MANAGERS ||
         v2 == AttendanceRoles.DIR_OPERACIONES ||
         v2 == AttendanceRoles.COORD_OPERACIONES ||
