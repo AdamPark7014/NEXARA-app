@@ -1,0 +1,208 @@
+/* Cómo se hace + Ligado a + Lo último. Solo tokens --ui-*. */
+
+.layout {
+  display: grid;
+  gap: var(--ui-s4);
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.lado {
+  display: grid;
+  gap: var(--ui-s4);
+  min-width: 0;
+}
+
+.avance {
+  min-width: 140px;
+}
+
+.tablaWrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--ui-radius-md);
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ui-text-sm);
+  min-width: 420px;
+}
+
+.tabla th,
+.tabla td {
+  padding: var(--ui-s2) var(--ui-s3);
+  text-align: left;
+  border-bottom: 1px solid var(--ui-border-subtle);
+  vertical-align: top;
+}
+
+.tabla th {
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+  background: var(--ui-bg-subtle, var(--ui-neutral-bg));
+  white-space: nowrap;
+}
+
+.tabla tr:last-child td {
+  border-bottom: none;
+}
+
+.elemento {
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.nota {
+  margin-top: 2px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  line-height: 1.4;
+}
+
+.celda {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.vacio {
+  color: var(--ui-fg-3);
+}
+
+.ok {
+  color: var(--ui-success-text, var(--ui-fg));
+  font-weight: var(--ui-fw-semibold);
+}
+
+.pendiente {
+  color: var(--ui-warning-text, var(--ui-fg-2));
+  font-weight: var(--ui-fw-semibold);
+}
+
+.pasos {
+  margin: var(--ui-s4) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--ui-s2);
+}
+
+.pasos li {
+  display: flex;
+  gap: var(--ui-s2);
+  align-items: flex-start;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg);
+  line-height: 1.45;
+}
+
+.pasoN {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-neutral-bg);
+  color: var(--ui-fg-2);
+  font-size: var(--ui-text-xs);
+  font-weight: var(--ui-fw-semibold);
+}
+
+.pasoNota {
+  color: var(--ui-fg-3);
+}
+
+.indicaciones {
+  margin-top: var(--ui-s4);
+  padding-top: var(--ui-s3);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+.indicacionesT {
+  margin: 0 0 var(--ui-s1);
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.indicacionesP {
+  margin: 0;
+  font-size: var(--ui-fs-body);
+  line-height: 1.55;
+  color: var(--ui-fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--ui-s3);
+}
+
+.listaItem {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.listaEtiqueta {
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.listaLink {
+  color: var(--ui-brand-text, var(--ui-fg));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.eventoTitulo {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg);
+  line-height: 1.4;
+}
+
+.eventoMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+  align-items: center;
+  margin-top: 4px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.vacioTexto {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-3);
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 390px) {
+  .avance {
+    min-width: 0;
+    width: 100%;
+  }
+}
