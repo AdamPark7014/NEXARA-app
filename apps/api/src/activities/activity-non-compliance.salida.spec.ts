@@ -35,6 +35,7 @@ function armar(filas: any[], salidas: Array<{ userId: number; timestamp: Date }>
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     attendance: { findMany: jest.fn().mockResolvedValue(salidas) },
+    attendanceDay: { findMany: jest.fn().mockResolvedValue([]) },
     activityNonCompliance: { create: jest.fn(async ({ data }: any) => registros.push(data)) },
     activityWorkSession: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
   };
@@ -46,10 +47,9 @@ function armar(filas: any[], salidas: Array<{ userId: number; timestamp: Date }>
   return { service, prisma, registros, avisos, bus };
 }
 
-describe('cierre de jornada al checar salida (regla de Adam, 28-10)', () => {
-  it('no hay cron: la actividad solo se cierra cuando quien la tiene checa su salida', async () => {
+describe('cierre de jornada al checar salida (regla de Adam, 20-11)', () => {
+  it('la actividad se cierra cuando quien la tiene checa su salida', async () => {
     const { service, prisma, registros } = armar([actividad()]);
-    expect(typeof (service as any).revisarCierres).toBe('undefined');
 
     const r = await service.alChecarSalida({ userId: 15, companyId: 1, at: MX('2026-10-28T18:02:00') });
     expect(r.cerradas).toBe(1);
@@ -92,12 +92,14 @@ describe('cierre de jornada al checar salida (regla de Adam, 28-10)', () => {
     const ambos = armar([equipo], [{ userId: 58, timestamp: MX('2026-10-28T18:05:00') }]);
     await ambos.service.alChecarSalida({ userId: 15, companyId: 1, at: MX('2026-10-28T18:07:00') });
     expect(ambos.registros[0]?.pendientesIds?.sort()).toEqual([15, 58]);
-    // Solo cuentan salidas propias: ni la automática de las 23:30 ni la de un jefe.
+    // Cuentan todas las salidas del día (propia, automática o de un jefe).
     expect(ambos.prisma.attendance.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ type: 'salida', cierreAutomatico: false, registradaPorId: null }),
+        where: expect.objectContaining({ type: 'salida' }),
       }),
     );
+    expect(ambos.prisma.attendance.findMany.mock.calls[0][0].where.cierreAutomatico).toBeUndefined();
+    expect(ambos.prisma.attendance.findMany.mock.calls[0][0].where.registradaPorId).toBeUndefined();
   });
 
   it('lo que vence mañana no se cierra con la salida de hoy', async () => {
@@ -107,5 +109,106 @@ describe('cierre de jornada al checar salida (regla de Adam, 28-10)', () => {
     ]);
     await service.alChecarSalida({ userId: 15, companyId: 1, at: MX('2026-10-28T18:02:00') });
     expect(prisma.activity.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('cierre automático (marca automatica) cierra lo vencido de esa persona', async () => {
+    const { service, prisma, registros } = armar([actividad()]);
+    const r = await service.alChecarSalida({
+      userId: 15,
+      companyId: 1,
+      at: MX('2026-10-28T23:30:00'),
+      automatica: true,
+    });
+    expect(r.cerradas).toBe(1);
+    expect(registros[0]).toMatchObject({ origen: 'CIERRE_JORNADA', activityId: 375 });
+    expect(prisma.activity.updateMany).toHaveBeenCalled();
+  });
+
+  it('salida registrada por un jefe (porJefe) también cierra', async () => {
+    const { service, registros } = armar([actividad()]);
+    const r = await service.alChecarSalida({
+      userId: 15,
+      companyId: 1,
+      at: MX('2026-10-28T18:10:00'),
+      porJefe: true,
+    });
+    expect(r.cerradas).toBe(1);
+    expect(registros[0]?.origen).toBe('CIERRE_JORNADA');
+  });
+
+  it('pausada que vence hoy + salida → No cumplida', async () => {
+    const { service, registros } = armar([
+      actividad({ estatus: 'En Proceso' }), // pausa no cambia estatus
+    ]);
+    await service.alChecarSalida({ userId: 15, companyId: 1, at: MX('2026-10-28T18:02:00') });
+    expect(registros).toHaveLength(1);
+  });
+
+  it('pausada de periodo vigente + salida → sigue abierta', async () => {
+    const fin = MX('2026-10-30T18:00:00');
+    const { service, prisma } = armar([
+      actividad({
+        periodoInicio: MX('2026-10-27T00:00:00'),
+        periodoFin: fin,
+        fechaMaxima: fin,
+        fechaEntregaEsperada: fin,
+      }),
+    ]);
+    await service.alChecarSalida({ userId: 15, companyId: 1, at: MX('2026-10-28T18:02:00') });
+    expect(prisma.activity.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('barrido: sin checada con vencida ayer → No cumplida; con jornada abierta no; Por Validar no; idempotente', async () => {
+    const vencida = actividad({
+      id: 400,
+      fechaInicio: MX('2026-10-27T10:00:00'),
+      fechaMaxima: MX('2026-10-27T10:00:00'),
+      fechaEntregaEsperada: MX('2026-10-27T10:00:00'),
+      fechaAsignacion: MX('2026-10-27T08:00:00'),
+    });
+    const porValidar = actividad({ id: 401, estatus: 'Por Validar' });
+    const manana = MX('2026-10-29T10:00:00');
+    const vigente = actividad({
+      id: 402,
+      fechaInicio: manana,
+      fechaMaxima: manana,
+      fechaEntregaEsperada: manana,
+    });
+    const equipo = actividad({
+      id: 403,
+      assignmentCharge: 'TEAM',
+      assignees: [
+        { userId: 15, rol: 'EJECUTOR', asignadoAt: MX('2026-10-27T08:00:00'), inicioRealAt: null, finRealAt: null },
+        { userId: 58, rol: 'EJECUTOR', asignadoAt: MX('2026-10-27T08:00:00'), inicioRealAt: null, finRealAt: null },
+      ],
+      fechaInicio: MX('2026-10-27T10:00:00'),
+      fechaMaxima: MX('2026-10-27T10:00:00'),
+      fechaEntregaEsperada: MX('2026-10-27T10:00:00'),
+      fechaAsignacion: MX('2026-10-27T08:00:00'),
+    });
+
+    const base = armar([vencida, porValidar, vigente, equipo]);
+    base.prisma.attendanceDay.findMany.mockResolvedValue([]); // nadie con jornada abierta
+    const r1 = await base.service.barridoNocturno(MX('2026-10-28T23:40:00'));
+    expect(r1.cerradas).toBe(2);
+    expect(base.registros.map((x) => x.activityId).sort()).toEqual([400, 403]);
+
+    // Con jornada abierta del ejecutor: no cierra esa
+    const conAbierta = armar([vencida]);
+    conAbierta.prisma.attendanceDay.findMany.mockResolvedValue([{ userId: 15 }]);
+    const r2 = await conAbierta.service.barridoNocturno(MX('2026-10-28T23:40:00'));
+    expect(r2.cerradas).toBe(0);
+
+    // Equipo: uno aún con jornada abierta → no
+    const eq = armar([equipo]);
+    eq.prisma.attendanceDay.findMany.mockResolvedValue([{ userId: 58 }]);
+    expect((await eq.service.barridoNocturno(MX('2026-10-28T23:40:00'))).cerradas).toBe(0);
+
+    // Idempotente: segunda pasada no duplica (updateMany count 0)
+    const otra = armar([vencida]);
+    otra.prisma.activity.updateMany.mockResolvedValue({ count: 0 });
+    const r3 = await otra.service.barridoNocturno(MX('2026-10-28T23:40:00'));
+    expect(r3.cerradas).toBe(0);
+    expect(otra.registros).toHaveLength(0);
   });
 });

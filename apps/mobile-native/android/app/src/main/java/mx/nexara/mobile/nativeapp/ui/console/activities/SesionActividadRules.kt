@@ -28,7 +28,7 @@ object SesionActividadRules {
 
     const val TITULO_PAUSA_PROPIA = "Pausar actividad"
     const val TEXTO_PAUSA_PROPIA =
-        "Tu reloj se detiene en esta actividad; sigue «En Proceso» y la reanudas cuando vuelvas a ella."
+        "Tu reloj se detiene en esta actividad; sigue «En Proceso» y la reanudas cuando vuelvas a ella. La pausa dura solo hoy: al cerrar tu jornada, lo que venza hoy y no esté entregado queda como No cumplida."
     const val AYUDA_REANUDAR =
         "Tu reloj vuelve a correr y se detiene al pausar, al checar salida, a las 12 h o al terminar el día."
     const val PLACEHOLDER_MOTIVO_JEFE = "Ej. Salió una falla urgente en el cliente; que la atienda primero."

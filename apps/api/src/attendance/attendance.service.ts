@@ -788,6 +788,16 @@ export class AttendanceService {
 
     this.emitAttendanceUpdate(tenantId, targetId, type, at, checada.user);
 
+    if (type === 'salida') {
+      await cerrarSesionesDeUsuario(this.prisma, { userId: targetId, at, motivo: 'SALIDA', companyId: tenantId });
+      this.domainEvents?.publish<SalidaDeJornada>(DOMAIN_EVENTS.ATTENDANCE_CHECKOUT, {
+        userId: targetId,
+        companyId: tenantId,
+        at,
+        porJefe: true,
+      });
+    }
+
     await this.avisarChecadaMarcada({
       userId: targetId,
       titulo: `Tu jefe registró tu ${type}`,
@@ -1585,6 +1595,21 @@ export class AttendanceService {
       avisarPersona: true,
     });
 
+    await cerrarSesionesDeUsuario(this.prisma, {
+      userId: day.userId,
+      at: salidaAt,
+      motivo: 'SALIDA',
+      companyId: tenantId,
+    });
+
+    // Misma regla que la checada propia: lo vencido sin entregar pasa a «No cumplida».
+    this.domainEvents?.publish<SalidaDeJornada>(DOMAIN_EVENTS.ATTENDANCE_CHECKOUT, {
+      userId: day.userId,
+      companyId: tenantId,
+      at: salidaAt,
+      automatica: true,
+    });
+
     return salidaAt;
   }
 
@@ -2194,7 +2219,7 @@ export class AttendanceService {
     await cerrarSesionesDeUsuario(this.prisma, { userId, at: now, companyId: tenantId });
 
     // Su salida es el cierre de su jornada: lo que vencía hoy y no entregó pasa a «No cumplida»
-    // (`ActivityNonComplianceService.alChecarSalida`). Nada se cierra antes por la hora.
+    // (`ActivityNonComplianceService.alChecarSalida`). También el cierre automático y la salida del jefe.
     this.domainEvents?.publish<SalidaDeJornada>(DOMAIN_EVENTS.ATTENDANCE_CHECKOUT, {
       userId,
       companyId: tenantId,
