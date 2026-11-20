@@ -3,6 +3,7 @@ import { Optional as ProyectoOptional } from '@nestjs/common';
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { esNombreDeRelleno, sectoresDelCliente } from '../ventas/client-sectors.js';
 import { evaluarCompletitud, mensajeFaltantes } from './proyecto-completitud.js';
+import { normalizarFuenteRef } from './proyecto-nas.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
@@ -477,6 +478,8 @@ export class OperationalProjectsService {
         ...(updateDto.description && { description: updateDto.description }),
         ...(updateDto.endDate && { endDate: new Date(updateDto.endDate) }),
         ...(updateDto.actualEndDate && { actualEndDate: new Date(updateDto.actualEndDate) }),
+        ...(updateDto.fuente !== undefined && { fuente: updateDto.fuente.trim() || null }),
+        ...(updateDto.fuenteRef !== undefined && { fuenteRef: normalizarFuenteRef(updateDto.fuenteRef) || null }),
       },
       include: {
         vendor: {
