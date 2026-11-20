@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { ORG_EMAILS, kindsForAssignment, kindsForCreator, kindsForTarget } from "@/lib/activity-kinds";
+import {
+  ORG_EMAILS,
+  TAREA_OTRO_CHIP,
+  esOtroLibre,
+  kindsForAssignment,
+  kindsForCreator,
+  kindsForTarget,
+  nombreOtroLibre,
+  subtipoExistentePorNombre,
+  subtipoTareaVista,
+  ticketTypeCustomDeOtro,
+  validarNombreOtro,
+} from "@/lib/activity-kinds";
 import { clientSectorsForActivityKind } from "@/lib/client-sectors";
+import { kindLabel } from "@/lib/activity-labels";
 
 const PAULINA = "finanzas@nexara.com.mx";
 
@@ -77,5 +90,28 @@ describe("clientes que se ofrecen al crear una actividad comercial", () => {
     expect(clientSectorsForActivityKind("obra", PAULINA)).toEqual([]);
     expect(clientSectorsForActivityKind("tarea", PAULINA)).toEqual([]);
     expect(clientSectorsForActivityKind("obra", ORG_EMAILS.daniela)).toEqual([]);
+  });
+});
+
+describe("Otro… con nombre libre", () => {
+  it("guarda con prefijo Otro: y valida longitud 3–60", () => {
+    expect(TAREA_OTRO_CHIP).toBe("Otro…");
+    expect(ticketTypeCustomDeOtro("Pintar rack")).toBe("Otro: Pintar rack");
+    expect(esOtroLibre("Otro: Pintar rack")).toBe(true);
+    expect(nombreOtroLibre("Otro: Pintar rack")).toBe("Pintar rack");
+    expect(validarNombreOtro("ab")).toMatch(/3/);
+    expect(validarNombreOtro("x".repeat(61))).toMatch(/60/);
+    expect(validarNombreOtro("Pintar rack")).toBeNull();
+  });
+
+  it("avisa si el nombre ya es un subtipo del catálogo", () => {
+    expect(subtipoExistentePorNombre("instalacion")?.label).toBe("Instalación");
+    expect(subtipoExistentePorNombre("Pintar rack")).toBeNull();
+  });
+
+  it("la ficha muestra el nombre y quita el prefijo Otro:", () => {
+    expect(subtipoTareaVista("Otro: Pintar rack")).toEqual({ label: "Pintar rack", badgeOtro: true });
+    expect(kindLabel({ coreKind: "tarea", ticketTypeCustom: "Otro: Pintar rack" })).toBe("Tarea · Pintar rack");
+    expect(kindLabel({ coreKind: "tarea", ticketTypeCustom: "Junta" })).toBe("Tarea · Junta");
   });
 });

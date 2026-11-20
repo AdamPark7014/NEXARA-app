@@ -27,6 +27,12 @@ describe('tipo de trabajo', () => {
     expect(claveDeTipo({ coreKind: 'comercial', ticketType: 'OTRO' })).toBe('comercial');
     expect(claveDeTipo({ coreKind: null })).toBeNull();
   });
+
+  it('«Otro» y «Otro: …» agrupan en tarea:Otro', () => {
+    expect(subtipoDeTarea('Otro: Pintar rack')).toBe('Otro');
+    expect(subtipoDeTarea('Otro')).toBe('Otro');
+    expect(claveDeTipo({ coreKind: 'tarea', ticketTypeCustom: 'Otro: Pintar rack' })).toBe('tarea:Otro');
+  });
 });
 
 describe('agruparTiempos', () => {

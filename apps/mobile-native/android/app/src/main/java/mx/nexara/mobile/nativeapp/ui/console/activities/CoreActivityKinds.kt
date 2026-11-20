@@ -41,6 +41,10 @@ object CoreActivityKinds {
     const val ROL_TECNICO = "TECNICO"
 
     const val TAREA_OTRO = "otro"
+    const val TAREA_OTRO_CHIP = "Otro…"
+    const val TAREA_OTRO_PREFIX = "Otro: "
+    const val TAREA_OTRO_NOMBRE_MIN = 3
+    const val TAREA_OTRO_NOMBRE_MAX = 60
     /** Sin la entrada de quien ejecuta (dirección no tiene horario): la de la oficina. */
     const val DEFAULT_HORA = "10:00"
     const val DEFAULT_PRIORIDAD = "Media"
@@ -107,8 +111,8 @@ object CoreActivityKinds {
 
     /**
      * Subtipos de Tarea: viajan como ticketType OTRO + ticketTypeCustom = label.
-     * Catálogo cerrado de 17 tipos en 4 familias (web, 28-10): sin «Otro», cada tipo se puede
-     * medir. [TAREA_OTRO] queda solo para leer actividades viejas con texto libre.
+     * Catálogo de 17 tipos en 4 familias; «Otro…» se ofrece aparte y se guarda como
+     * `Otro: <nombre>` (18-11). [TAREA_OTRO] también lee textos libres viejos.
      */
     val TAREA_TIPOS: List<TareaTipo> = listOf(
         TareaTipo("instalacion", "Instalación", NxGlyph.INSTALLATION, "campo"),
@@ -430,17 +434,70 @@ object CoreActivityKinds {
         )
     }
 
-    /** Subtipo de tarea seleccionado ("" = ninguno; [TAREA_OTRO] = texto libre de antes del catálogo). */
+    fun normalizarTextoTarea(valor: String?): String {
+        if (valor.isNullOrBlank()) return ""
+        val nfd = java.text.Normalizer.normalize(valor, java.text.Normalizer.Form.NFD)
+        return nfd.replace("\\p{M}+".toRegex(), "").lowercase().trim().replace("\\s+".toRegex(), " ")
+    }
+
+    fun esOtroLibre(ticketTypeCustom: String?): Boolean {
+        val n = normalizarTextoTarea(ticketTypeCustom)
+        return n == "otro" || n.startsWith("otro:")
+    }
+
+    fun nombreOtroLibre(ticketTypeCustom: String?): String {
+        val raw = ticketTypeCustom?.trim().orEmpty()
+        val m = Regex("^otro\\s*:\\s*(.*)$", RegexOption.IGNORE_CASE).matchEntire(raw)
+        return m?.groupValues?.getOrNull(1)?.trim().orEmpty()
+    }
+
+    fun ticketTypeCustomDeOtro(nombre: String): String = "$TAREA_OTRO_PREFIX${nombre.trim()}"
+
+    fun validarNombreOtro(nombre: String): String? {
+        val t = nombre.trim()
+        if (t.length < TAREA_OTRO_NOMBRE_MIN) return "Escribe al menos 3 caracteres"
+        if (t.length > TAREA_OTRO_NOMBRE_MAX) return "Máximo 60 caracteres"
+        return null
+    }
+
+    fun subtipoExistentePorNombre(nombre: String): TareaTipo? {
+        val n = normalizarTextoTarea(nombre.replace(Regex("^otro\\s*:\\s*", RegexOption.IGNORE_CASE), ""))
+        if (n.isEmpty()) return null
+        return TAREA_TIPOS.firstOrNull { normalizarTextoTarea(it.label) == n }
+    }
+
+    /** Subtipo de tarea ("" = ninguno; [TAREA_OTRO] = «Otro…» / «Otro: …» / texto libre viejo). */
     fun tareaTipo(form: FormState): String {
         val preset = TAREA_TIPOS.firstOrNull { it.label == form.ticketTypeCustom }
         if (preset != null) return preset.id
-        return if (form.ticketType == "OTRO" && form.ticketTypeCustom.isNotBlank()) TAREA_OTRO else ""
+        if (esOtroLibre(form.ticketTypeCustom)) return TAREA_OTRO
+        if (form.ticketType == "OTRO" && form.ticketTypeCustom.isNotBlank()) return TAREA_OTRO
+        return ""
     }
 
     /** Tocar un chip de tipo de tarea (solo los del catálogo). */
     fun pickTareaTipo(form: FormState, id: String): FormState {
         val label = TAREA_TIPOS.firstOrNull { it.id == id }?.label ?: return form
         return form.copy(ticketType = "OTRO", ticketTypeCustom = label, workType = "ISSUE")
+    }
+
+    /** Chip «Otro…»: marca el flujo libre (`Otro:` vacío) o conserva un «Otro: …» previo. */
+    fun pickTareaOtro(form: FormState): FormState {
+        val custom = if (esOtroLibre(form.ticketTypeCustom) && nombreOtroLibre(form.ticketTypeCustom).isNotEmpty()) {
+            form.ticketTypeCustom
+        } else {
+            TAREA_OTRO_PREFIX.trimEnd()
+        }
+        return form.copy(ticketType = "OTRO", ticketTypeCustom = custom, workType = "ISSUE")
+    }
+
+    fun setNombreOtro(form: FormState, nombre: String): FormState {
+        val v = nombre.trim()
+        return form.copy(
+            ticketType = "OTRO",
+            ticketTypeCustom = if (v.isEmpty()) TAREA_OTRO_PREFIX.trimEnd() else ticketTypeCustomDeOtro(v),
+            workType = "ISSUE",
+        )
     }
 
     /** El compromiso vale solo si es después de la hora de inicio (`compromisoValido` de la web). */
@@ -488,9 +545,18 @@ object CoreActivityKinds {
     /** Mismo orden y textos que handleSubmit de OpsActivityForm; null = se puede guardar. */
     fun validationError(form: FormState, requireSchedule: Boolean): String? {
         if (form.titulo.isBlank() || form.responsableId == null) return "Título y responsable son obligatorios"
-        // El alta solo ofrece el catálogo cerrado: un texto libre viejo no basta.
-        if (form.coreKind == TAREA && tareaTipo(form).let { it.isEmpty() || it == TAREA_OTRO }) {
-            return "Elige el tipo de tarea"
+        if (form.coreKind == TAREA) {
+            when (val tipo = tareaTipo(form)) {
+                "" -> return "Elige el tipo de tarea"
+                TAREA_OTRO -> {
+                    if (!esOtroLibre(form.ticketTypeCustom)) return "Elige el tipo de tarea"
+                    val nombre = nombreOtroLibre(form.ticketTypeCustom)
+                    validarNombreOtro(nombre)?.let { return it }
+                    subtipoExistentePorNombre(nombre)?.let {
+                        return "Ya existe \"${it.label}\": elígela de la lista"
+                    }
+                }
+            }
         }
         if (!compromisoValido(form.hora, form.horaCompromiso)) {
             return "La hora de entrega tiene que ser después de la hora de inicio"

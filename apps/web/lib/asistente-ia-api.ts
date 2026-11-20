@@ -9,12 +9,19 @@
 import { buildApiUrl } from "@/lib/api-base";
 import {
   ACTIVITY_KINDS,
+  TAREA_OTRO_CHIP,
   TAREA_TIPOS,
   canOfferAssignmentCharge,
+  esOtroLibre,
   forcesDespachoOnly,
   forcesEjecucionOnly,
   formatDispatchHeadcountNote,
   kindsForAssignment,
+  nombreOtroLibre,
+  subtipoExistentePorNombre,
+  subtipoTareaVista,
+  ticketTypeCustomDeOtro,
+  validarNombreOtro,
   type ActivityKind,
 } from "@/lib/activity-kinds";
 import type { RoleKey } from "@/lib/rbac/roles";
@@ -188,8 +195,10 @@ export function crearActividad(token: string, payload: Record<string, unknown>) 
 /** Lo que la persona cambió en la tarjeta. `""` en día/último día = quitarlo. */
 export type Ajustes = {
   tipo?: ActivityKind;
-  /** Subtipo de tarea (etiqueta de `TAREA_TIPOS`) o tipo de servicio (`TIPOS_SERVICIO`). */
+  /** Subtipo de tarea (etiqueta de `TAREA_TIPOS`), `Otro…`, o tipo de servicio (`TIPOS_SERVICIO`). */
   subtipo?: string;
+  /** Nombre libre cuando el subtipo es «Otro…» (se guarda como `Otro: <nombre>`). */
+  otroNombre?: string;
   /** Etapa del cronograma del proyecto (la que propone «Asignar»). */
   etapaId?: number | null;
   responsableId?: number;
@@ -239,8 +248,11 @@ export const TIPOS_SERVICIO = [
   { id: "INSTALACION", label: "Instalación" },
 ] as const;
 
-/** Subtipos de tarea (los de «Asignar»: viajan en `ticketTypeCustom`). */
+/** Subtipos de tarea del catálogo (la IA no ofrece «Otro…»; la tarjeta sí). */
 export const SUBTIPOS_TAREA = TAREA_TIPOS.map((t) => t.label);
+
+/** Opciones del select de la tarjeta: catálogo + «Otro…». */
+export const SUBTIPOS_TAREA_UI = [...SUBTIPOS_TAREA, TAREA_OTRO_CHIP];
 
 export const conProyecto = (tipo: ActivityKind) => tipo === "obra" || tipo === "proyecto";
 
@@ -249,13 +261,30 @@ export function tipoEfectivo(p: PropuestaActividad, aj: Ajustes): ActivityKind {
   return aj.tipo ?? p.tipo;
 }
 
+function esOpcionOtroTarea(subtipo?: string | null): boolean {
+  if (!subtipo) return false;
+  if (subtipo === TAREA_OTRO_CHIP) return true;
+  return esOtroLibre(subtipo);
+}
+
 /** Subtipo vigente según el tipo: el elegido, el de la IA o el de omisión del API. */
 export function subtipoEfectivo(p: PropuestaActividad, aj: Ajustes): string | null {
   const tipo = tipoEfectivo(p, aj);
   if (tipo === "tarea") {
     const ia = p.tipo === "tarea" ? String(p.payload.ticketTypeCustom ?? "") : "";
-    const elegido = aj.subtipo && SUBTIPOS_TAREA.includes(aj.subtipo) ? aj.subtipo : null;
-    return elegido ?? (SUBTIPOS_TAREA.includes(ia) ? ia : "Otro");
+    if (aj.subtipo && SUBTIPOS_TAREA.includes(aj.subtipo)) return aj.subtipo;
+    if (aj.subtipo && esOpcionOtroTarea(aj.subtipo)) {
+      const nombre = (aj.otroNombre ?? nombreOtroLibre(aj.subtipo)).trim();
+      return nombre ? ticketTypeCustomDeOtro(nombre) : TAREA_OTRO_CHIP;
+    }
+    if (SUBTIPOS_TAREA.includes(ia)) return ia;
+    if (esOtroLibre(ia)) {
+      const nombre = (aj.otroNombre ?? nombreOtroLibre(ia)).trim();
+      return nombre ? ticketTypeCustomDeOtro(nombre) : TAREA_OTRO_CHIP;
+    }
+    // Sin catálogo de la IA: la tarjeta pide «Otro…» + nombre (el modelo no ofrece Otro).
+    if (aj.otroNombre?.trim()) return ticketTypeCustomDeOtro(aj.otroNombre);
+    return TAREA_OTRO_CHIP;
   }
   if (tipo === "servicio") {
     const validos: string[] = TIPOS_SERVICIO.map((t) => t.id);
@@ -366,10 +395,18 @@ export function textoCuando(ag: Agenda, hoy: string): string {
   return `${etiquetaDia(ag.dia, hoy)}${hora}${limite}`;
 }
 
-/** «Servicio · Correctivo», «Tarea · Instalación», «Comercial». */
+/** «Servicio · Correctivo», «Tarea · Instalación», «Comercial». «Otro: X» → «Tarea · X». */
 export function textoTipo(tipo: ActivityKind, subtipo: string | null): string {
-  const sub = tipo === "servicio" ? TIPOS_SERVICIO.find((t) => t.id === subtipo)?.label : tipo === "tarea" ? subtipo : null;
-  return sub ? `${ETIQUETA_TIPO[tipo]} · ${sub}` : ETIQUETA_TIPO[tipo];
+  if (tipo === "servicio") {
+    const sub = TIPOS_SERVICIO.find((t) => t.id === subtipo)?.label;
+    return sub ? `${ETIQUETA_TIPO[tipo]} · ${sub}` : ETIQUETA_TIPO[tipo];
+  }
+  if (tipo === "tarea" && subtipo) {
+    if (subtipo === TAREA_OTRO_CHIP) return `${ETIQUETA_TIPO[tipo]} · ${TAREA_OTRO_CHIP}`;
+    const vista = subtipoTareaVista(subtipo);
+    return `${ETIQUETA_TIPO[tipo]} · ${vista.label}`;
+  }
+  return ETIQUETA_TIPO[tipo];
 }
 
 /** La corrección de nombre de un campo («talks» → Grupo Tox), si la hubo. */
@@ -631,6 +668,20 @@ export function bloqueos(
     out.push("«Entregar a más tardar» tiene que ser después de la hora de inicio.");
   }
   if (!String(payload.titulo ?? "").trim()) out.push("Escribe el título.");
+  if (tipo === "tarea") {
+    const custom = String(payload.ticketTypeCustom ?? "").trim();
+    if (!custom || custom === TAREA_OTRO_CHIP || esOtroLibre(custom)) {
+      const nombre = nombreOtroLibre(custom);
+      if (!custom || custom === TAREA_OTRO_CHIP || !nombre) {
+        out.push(validarNombreOtro(nombre || "") ?? "Escribe qué tarea es (Otro…).");
+      } else {
+        const err = validarNombreOtro(nombre);
+        if (err) out.push(err);
+        const existe = subtipoExistentePorNombre(nombre);
+        if (existe) out.push(`Ya existe "${existe.label}": elígela de la lista`);
+      }
+    }
+  }
   if (payload.responsableId && ctx.destinoEmail !== undefined) {
     if (reglaEncargo(tipo, ctx.destinoEmail, null).ofrecer && !payload.assignmentCharge) {
       out.push("Elige si la hace en persona o la reparte a su equipo.");
