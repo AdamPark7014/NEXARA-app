@@ -303,10 +303,29 @@ export function evaluarUbicacion(params: {
 }
 
 /**
+ * Turno de noche (Adam, 20-11-2026: la cuadrilla entra 22:00 y sale 8:00): una entrada a partir de esta
+ * hora no se corta a las 23:30. Su jornada cruza la medianoche y sigue siendo la del día en que entró.
+ */
+export const TURNO_NOCHE_DESDE_H = 18;
+/** Una jornada de noche que nadie cerró se cierra sola pasadas estas horas desde la entrada. */
+export const JORNADA_NOCHE_TOPE_H = 14;
+
+export function horaLocal(fecha: Date, tz = WORKDAY_TIMEZONE): number {
+  const h = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', hourCycle: 'h23' }).format(fecha);
+  return Number(h) % 24;
+}
+
+export function esEntradaDeNoche(entrada: Date, tz = WORKDAY_TIMEZONE): boolean {
+  return horaLocal(entrada, tz) >= TURNO_NOCHE_DESDE_H;
+}
+
+/**
  * Salida que se inventa cuando alguien olvidó checarla: `min(entrada + 9 h, 23:30)`
  * del día de la entrada, en hora de México.
  */
 export function horaCierreAutomatico(entrada: Date, tz = WORKDAY_TIMEZONE): Date {
+  // De noche no hay tope de las 23:30: la salida olvidada es entrada + jornada máxima.
+  if (esEntradaDeNoche(entrada, tz)) return new Date(entrada.getTime() + JORNADA_MAXIMA_H * 60 * 60 * 1000);
   const tope = workDayAtClock(
     entrada,
     HORA_CIERRE_AUTOMATICO.hora,

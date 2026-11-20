@@ -80,6 +80,8 @@ import {
   type PuntoChecada,
   type SitioPermitido,
   type ValidacionChecada,
+  esEntradaDeNoche,
+  JORNADA_NOCHE_TOPE_H,
 } from './asistencia-confiable.js';
 import { estadoPorFalla, registrarEstadoUbicacion, tramosSinUbicacionDe } from './estado-ubicacion.js';
 import {
@@ -1624,6 +1626,8 @@ export class AttendanceService {
     });
     let cerradas = 0;
     for (const dia of dias) {
+      // Turno de noche: su jornada cruza la medianoche; la cierra su salida o `cerrarJornadasDeNocheOlvidadas`.
+      if (dia.lastEntryAt && esEntradaDeNoche(dia.lastEntryAt)) continue;
       try {
         await this.cerrarJornadaAutomatica(dia, dia.companyId);
         cerradas += 1;
@@ -1634,6 +1638,28 @@ export class AttendanceService {
       }
     }
     if (cerradas) this.logger.log(`Cierre automático de jornadas: ${cerradas}`);
+    return { cerradas };
+  }
+
+  /**
+   * Jornadas de noche que nadie cerró: pasadas `JORNADA_NOCHE_TOPE_H` desde la entrada reciben su salida
+   * automática (entrada + jornada máxima, a revisión). Corre cada hora; no toca las de día.
+   */
+  async cerrarJornadasDeNocheOlvidadas(ahora: Date = new Date()): Promise<{ cerradas: number }> {
+    const limite = new Date(ahora.getTime() - JORNADA_NOCHE_TOPE_H * 60 * 60 * 1000);
+    const dias = await this.prisma.attendanceDay.findMany({
+      where: { isOpen: true, lastEntryAt: { lte: limite } },
+      select: { id: true, userId: true, lastEntryAt: true, companyId: true },
+    });
+    let cerradas = 0;
+    for (const dia of dias) {
+      try {
+        await this.cerrarJornadaAutomatica(dia, dia.companyId);
+        cerradas += 1;
+      } catch (err) {
+        this.logger.error(`No se pudo cerrar la jornada de noche ${dia.id}: ${(err as Error).message}`);
+      }
+    }
     return { cerradas };
   }
 
@@ -2171,7 +2197,11 @@ export class AttendanceService {
     // actualiza, no se borra. Un cierre automático de las 23:30 también cae
     // aquí, y borrar la única prueba de que existió esa salida —en una tabla de
     // la que sale la nómina— no es limpiar, es perder el dato.
-    const orphanExit = await this.findAttendanceOnDate(userId, 'salida', now, tenantId);
+    const salidaDeHoy = await this.findAttendanceOnDate(userId, 'salida', now, tenantId);
+    // Solo es huérfana si es posterior a la entrada de esta jornada. La salida de la mañana de un turno
+    // de noche (entró ayer 22:00, salió hoy 8:00) es de otra jornada y no se pisa.
+    const orphanExit =
+      salidaDeHoy && salidaDeHoy.timestamp.getTime() >= openDay.lastEntryAt.getTime() ? salidaDeHoy : null;
     const datosSalida = {
       timestamp: now,
       workDate: today,
