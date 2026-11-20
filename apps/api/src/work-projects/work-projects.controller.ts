@@ -10,6 +10,7 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -17,9 +18,11 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { WorkProjectsService } from './work-projects.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
 
 /** @deprecated Use OperationalProject (/operational-projects). Read-only for legacy data. */
 @Controller('work-projects')
+@UseInterceptors(OcultarMontosInterceptor)
 export class WorkProjectsController {
   constructor(private readonly service: WorkProjectsService) {}
 

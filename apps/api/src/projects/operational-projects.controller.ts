@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
   BadRequestException,
+  UseInterceptors,
 } from '@nestjs/common';
 import { OperationalProjectsService } from './operational-projects.service.js';
 import { ProyectoNasService } from './proyecto-nas.service.js';
@@ -18,9 +19,11 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
 
 @Controller('operational-projects')
 @UseGuards(RbacGuard)
+@UseInterceptors(OcultarMontosInterceptor)
 export class OperationalProjectsController {
   constructor(
     private readonly operationalProjectsService: OperationalProjectsService,

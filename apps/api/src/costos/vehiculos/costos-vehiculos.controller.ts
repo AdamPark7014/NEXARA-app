@@ -45,6 +45,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import type { ActorCostos } from '../costos-acceso.js';
 import { CostosVehiculosService, TIPOS_DOCUMENTO } from './costos-vehiculos.service.js';
 import { LecturaVehiculoService } from './lectura-vehiculo.service.js';
+import { OcultarMontosInterceptor } from '../../common/visibilidad/ocultar-montos.interceptor.js';
 
 const TOPE_PDF = 120 * 1024 * 1024;
 const TOPE_FOTO = 15 * 1024 * 1024;
@@ -165,6 +166,7 @@ const aNumero = (v: unknown): number | null => {
  */
 @Controller('vehicles/ficha')
 @UseGuards(RbacGuard)
+@UseInterceptors(OcultarMontosInterceptor)
 export class CostosVehiculosController {
   constructor(
     private readonly prisma: PrismaService,

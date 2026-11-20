@@ -29,6 +29,7 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { SalesPaginationQueryDto } from './dto/sales-pagination-query.dto.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { SatService } from '../pac/sat.service.js';
+import { OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
 
 const SALES_VIEW_ACCESS = [
   PERMISSIONS.SALES_VIEW,
@@ -43,6 +44,7 @@ const SALES_MANAGE_ACCESS = [
 ];
 
 @Controller('ventas/clientes')
+@UseInterceptors(OcultarMontosInterceptor)
 export class VentasClientesController {
   constructor(
     private readonly ventasService: VentasService,

@@ -30,6 +30,9 @@ import {
 import { isPrivateUploadPath, isPublicUploadPath, readUploadToken } from './common/security/uploads-access';
 import { uploadHeadersFor } from './common/security/upload-content-type.js';
 import { PrismaService } from './prisma/prisma.service';
+import { VisibilidadService } from './common/visibilidad/visibilidad.service.js';
+import { reglasActivas } from './common/visibilidad/visibilidad.js';
+import { isCeoEquivalentEmail, isSuperAdminEmail } from './common/platform-accounts.js';
 
 const toPositiveInt = (rawValue: string | undefined, fallback: number): number => {
   const parsed = Number(rawValue);
@@ -511,6 +514,25 @@ async function bootstrap() {
     return Boolean(sesion && sesion.userId === userId && !sesion.revokedAt && sesion.expiresAt.getTime() > Date.now());
   };
 
+  const visibilidadUploads = app.get(VisibilidadService);
+  /** Mismo «superadmin» que la sesión (jwt.strategy): bandera del token, correo de plataforma o CEO equivalente. */
+  const archivoVisibleParaUploads = async (ruta: string, payload: { sub?: number | string; isSuperAdmin?: boolean }) => {
+    const userId = Number(payload.sub);
+    const user = await prismaUploads.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, roleKey: true, accesos: true },
+    });
+    if (!user) return false;
+    const actor = {
+      id: user.id,
+      roleKey: user.roleKey,
+      accesos: user.accesos ?? [],
+      isSuperAdmin: Boolean(payload.isSuperAdmin) || isSuperAdminEmail(user.email) || isCeoEquivalentEmail(user.email),
+    };
+    // La cadena de jefes no cruza empresas: basta con la de toda la base.
+    return visibilidadUploads.puedeAbrirArchivo(ruta, actor, null);
+  };
+
   // Proteger /uploads con autenticación JWT (lecturas incluidas)
   app.use('/uploads', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (req.method.toUpperCase() === 'OPTIONS') {
@@ -558,6 +580,15 @@ async function bootstrap() {
       if (!vigente) {
         res.status(401).json({ statusCode: 401, message: 'Invalid or expired token' });
         return;
+      }
+      // Quién ve qué (Entrega 2): el archivo sigue la regla de su registro (fotos de evidencia,
+      // contratos de proyecto). Apagado el interruptor, no se consulta nada.
+      if (reglasActivas()) {
+        const permitido = await archivoVisibleParaUploads(req.path || req.url || '', payload).catch(() => false);
+        if (!permitido) {
+          res.status(404).json({ statusCode: 404, message: 'Not found' });
+          return;
+        }
       }
     }
     next();

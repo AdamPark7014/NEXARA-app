@@ -1,4 +1,4 @@
-import { cotizacionVisible, whereCotizacionesVisibles } from '../../common/visibilidad/visibilidad.js';
+import { cotizacionVisible, puedeVerPrecios, whereCotizacionesVisibles } from '../../common/visibilidad/visibilidad.js';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -373,7 +373,9 @@ export class LigasService {
       if (!p) return tarjetaGenerica(ref, 'proyecto', href, NO_ENCONTRADA);
       if (!ve) return tarjetaGenerica(ref, 'proyecto', href, SIN_ACCESO);
       const fin = fechaCorta(p.endDate);
-      const total = numero(p.budgetAmount);
+      // Presupuesto del proyecto: solo con «Ver precios» (matriz «quién ve qué»).
+      const verMonto = puedeVerPrecios(user);
+      const total = verMonto ? numero(p.budgetAmount) : null;
       return {
         ref,
         tipo: 'proyecto',
@@ -385,6 +387,7 @@ export class LigasService {
           (x): x is string => Boolean(x),
         ),
         monto: total != null ? { total, moneda: p.currency || 'MXN' } : null,
+        ...(verMonto || p.budgetAmount == null ? {} : { montoOculto: true }),
         href,
       };
     });
