@@ -69,3 +69,21 @@
     flex: 1 1 auto;
   }
 }
+
+.masDetalle {
+  margin: var(--ui-s4) 0;
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: var(--ui-radius-md);
+  padding: 0 var(--ui-s3) var(--ui-s3);
+}
+.masDetalle > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: var(--ui-s3) 0;
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg-2);
+}
+.masDetalle > summary::-webkit-details-marker { display: none; }
+.masDetalle[open] > summary { border-bottom: 1px solid var(--ui-border-subtle); margin-bottom: var(--ui-s3); }
+.masDetalleCuerpo { display: grid; gap: var(--ui-s4); }
