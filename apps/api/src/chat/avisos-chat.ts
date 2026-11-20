@@ -17,12 +17,12 @@ export function avisoActividadNoProgramada(
     motivo === 'autoasignada'
       ? 'se autoasignó una actividad'
       : 'creó una actividad para ejecutar hoy';
-  return `📌 ${creadorNombre} ${que}: ${ligaActividad(a)}. Revísala y aprueba cuando corresponda.`;
+  return `${creadorNombre} ${que}: ${ligaActividad(a)}. Revísala y aprueba cuando corresponda.`;
 }
 
 /** Evidencia lista para revisión: aviso al revisor con liga directa. */
 export function avisoEvidenciaPorRevisar(a: ActividadAviso, quienNombre: string): string {
-  return `📷 ${quienNombre} envió evidencias de ${ligaActividad(a, '/evidencias')} listas para tu revisión.`;
+  return `Evidencia: ${quienNombre} envió evidencias de ${ligaActividad(a, '/evidencias')} listas para tu revisión.`;
 }
 
 export function avisoRevision(
@@ -34,19 +34,19 @@ export function avisoRevision(
   const nota = (notas || '').trim();
   const conNota = nota && nota !== 'Sin observaciones' ? ` Observaciones: ${nota.slice(0, 600)}` : '';
   if (decision === 'APROBADA') {
-    return `✅ Aprobé tu evidencia de ${ligaActividad(a)}${calificacion ? ` con ${calificacion} de 5` : ''}.${conNota}`;
+    return `Aprobada: Aprobé tu evidencia de ${ligaActividad(a)}${calificacion ? ` con ${calificacion} de 5` : ''}.${conNota}`;
   }
   const que = decision === 'DEVUELTA_TODO' ? 'para rehacerla completa' : 'para corregir algunos pasos';
-  return `↩️ Te devolví la evidencia de ${ligaActividad(a, '/evidencias')} ${que}.${conNota} Corrígela hoy para que cuente a tiempo.`;
+  return `Devuelta: Te devolví la evidencia de ${ligaActividad(a, '/evidencias')} ${que}.${conNota} Corrígela hoy para que cuente a tiempo.`;
 }
 
 export function avisoIncidencia(a: ActividadAviso, tipo: string, severidad: string, descripcion: string): string {
-  return `⚠️ Reporté una incidencia ${severidad.toLowerCase()} (${tipo.replace(/_/g, ' ').toLowerCase()}) en ${ligaActividad(a)}: ${descripcion.trim().slice(0, 600)}`;
+  return `Incidencia: Reporté una incidencia ${severidad.toLowerCase()} (${tipo.replace(/_/g, ' ').toLowerCase()}) en ${ligaActividad(a)}: ${descripcion.trim().slice(0, 600)}`;
 }
 
 export function avisoNoCumplida(a: ActividadAviso, causa: string, limite: Date | null): string {
   const cuando = limite
     ? ` El límite era el ${new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(limite)}.`
     : '';
-  return `⛔ ${ligaActividad(a)} quedó como «No cumplida»: ${causa}.${cuando} Si hubo un motivo, explícalo en la actividad.`;
+  return `No cumplida: ${ligaActividad(a)} quedó como «No cumplida»: ${causa}.${cuando} Si hubo un motivo, explícalo en la actividad.`;
 }

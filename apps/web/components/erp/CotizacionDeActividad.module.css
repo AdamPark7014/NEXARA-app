@@ -1,0 +1,62 @@
+/* Cotización ligada a la actividad — tokens --ui-* */
+.caja {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.texto {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-fg);
+}
+
+.liga {
+  font-weight: 700;
+  color: var(--ui-brand-text);
+  text-decoration: none;
+}
+
+.liga:focus-visible {
+  outline: 2px solid var(--ui-brand);
+  outline-offset: 2px;
+}
+
+.secundario {
+  color: var(--ui-fg-2);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+  align-items: center;
+}
+
+.ligarFila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+  align-items: center;
+  min-width: 0;
+}
+
+.selector {
+  min-width: min(100%, 260px);
+  flex: 1 1 220px;
+}
+
+@media (max-width: 390px) {
+  .acciones,
+  .ligarFila {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .acciones > *,
+  .ligarFila > * {
+    min-height: 44px;
+  }
+}

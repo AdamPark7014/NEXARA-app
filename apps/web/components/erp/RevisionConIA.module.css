@@ -1,0 +1,58 @@
+/* Revisión con IA — solo tokens --ui-* */
+.caja {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.veredicto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2);
+}
+
+.sugerida {
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-fg-2);
+}
+
+.hechos {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: var(--ui-s1);
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+}
+
+.hechoBien {
+  color: var(--ui-success-text, var(--ui-success));
+}
+
+.hechoMal {
+  color: var(--ui-danger-text, var(--ui-danger));
+}
+
+.hechoNeutro {
+  color: var(--ui-fg-3);
+}
+
+.bloque {
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-fg);
+  min-width: 0;
+}
+
+.lista {
+  margin: var(--ui-s1) 0 0;
+  padding-left: 1.15rem;
+}
+
+@media (max-width: 390px) {
+  .caja {
+    gap: var(--ui-s2);
+  }
+}

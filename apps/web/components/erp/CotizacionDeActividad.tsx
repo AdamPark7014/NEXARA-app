@@ -15,7 +15,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useUser } from "@/components/UserContext";
 import { canUserAccessPath } from "@/lib/user-access";
 import PropuestaEmbebida from "./PropuestaEmbebida";
-import { RecordSection } from "@/components/base";
+import { Alert, Button, ButtonLink, RecordSection, Select } from "@/components/base";
+import s from "./CotizacionDeActividad.module.css";
 import {
   ESTADO_LABEL,
   formatoMoneda,
@@ -92,16 +93,16 @@ export default function CotizacionDeActividad({
 
   if (cotizacion?.id) {
     return envolver(
-      <div>
-        <p style={{ margin: 0, fontSize: 13 }}>
+      <div className={s.caja}>
+        <p className={s.texto}>
           Cotización{" "}
-          <Link href={conRegreso(`/erp/cotizaciones/${cotizacion.id}`, aqui())} style={{ fontWeight: 700 }}>
+          <Link href={conRegreso(`/erp/cotizaciones/${cotizacion.id}`, aqui())} className={s.liga}>
             {cotizacion.quoteNumber}
           </Link>{" "}
           · {estadoEnEspanol(cotizacion.status)}
           {cotizacion.total != null ? ` · ${formatoMoneda(Number(cotizacion.total))}` : ""}
           <br />
-          <span style={{ color: "var(--text-secondary)" }}>
+          <span className={s.secundario}>
             Las fotos del levantamiento de esta actividad salen como anexos (03 Planos) de la propuesta.
           </span>
         </p>
@@ -119,67 +120,33 @@ export default function CotizacionDeActividad({
       setEligiendo(false);
       onLigada?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo ligar");
+      setError(e instanceof Error ? e.message : "No se pudo ligar. Elige otra cotización o inténtalo de nuevo.");
     } finally {
       setLigando(false);
     }
   }
 
   return envolver(
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+    <div className={s.caja}>
+      <p className={`${s.texto} ${s.secundario}`}>
         {esComercial
           ? "Esta actividad es comercial: su entregable es una cotización, no una hoja de servicio."
           : "Liga la cotización de este trabajo para tenerla a la mano. No cambia el avance de la actividad."}
       </p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        <Link
-          href={`/erp/cotizaciones/nueva?activityId=${activityId}`}
-          style={{
-            background: "var(--primary)",
-            color: "#fff",
-            borderRadius: 10,
-            padding: "0.5rem 0.85rem",
-            fontSize: 13,
-            fontWeight: 700,
-            textDecoration: "none",
-          }}
-        >
-          Hacer cotización
-        </Link>
-        <button
-          type="button"
-          onClick={() => setEligiendo((v) => !v)}
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            color: "inherit",
-            borderRadius: 10,
-            padding: "0.5rem 0.85rem",
-            fontSize: 13,
-            fontWeight: 650,
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
-        >
+      <div className={s.acciones}>
+        <ButtonLink href={`/erp/cotizaciones/nueva?activityId=${activityId}`}>Hacer cotización</ButtonLink>
+        <Button type="button" variant="secondary" onClick={() => setEligiendo((v) => !v)}>
           Ligar cotización
-        </button>
+        </Button>
       </div>
 
       {eligiendo ? (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-          <select
+        <div className={s.ligarFila}>
+          <Select
+            className={s.selector}
             value={elegida}
             onChange={(e) => setElegida(e.target.value)}
-            style={{
-              padding: "0.5rem 0.6rem",
-              borderRadius: 10,
-              border: "1px solid var(--border)",
-              background: "var(--bg)",
-              color: "inherit",
-              fontSize: 13,
-              minWidth: 260,
-            }}
+            aria-label="Elegir cotización para ligar"
           >
             <option value="">Elige una cotización…</option>
             {disponibles.map((row) => (
@@ -187,30 +154,14 @@ export default function CotizacionDeActividad({
                 {row.folio} · {row.clienteNombre ?? "sin cliente"} · {row.estadoEtiqueta}
               </option>
             ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => void ligar()}
-            disabled={!elegida || ligando}
-            style={{
-              background: "var(--primary)",
-              color: "#fff",
-              border: "none",
-              borderRadius: 10,
-              padding: "0.5rem 0.85rem",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: elegida ? "pointer" : "not-allowed",
-              opacity: elegida ? 1 : 0.6,
-              fontFamily: "inherit",
-            }}
-          >
+          </Select>
+          <Button type="button" onClick={() => void ligar()} disabled={!elegida || ligando} loading={ligando}>
             {ligando ? "Ligando…" : "Ligar"}
-          </button>
+          </Button>
         </div>
       ) : null}
 
-      {error ? <p style={{ margin: 0, color: "#dc2626", fontSize: 13 }}>{error}</p> : null}
+      {error ? <Alert tone="danger">{error}</Alert> : null}
     </div>,
   );
 }

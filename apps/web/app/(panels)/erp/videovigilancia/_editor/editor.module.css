@@ -2798,6 +2798,15 @@
   pointer-events: none;
 }
 
+.historialTitulo {
+  font-size: 12px;
+  color: var(--ui-fg-3);
+  padding: 0 8px;
+}
+.capaNombre {
+  flex: 1;
+}
+
 /* Columna derecha: el inspector y, plegadas debajo, capas e historial. Antes eran celdas sueltas de la
    rejilla del editor y desacomodaban todo (20-11: la maqueta desaparecía). */
 .columnaDerecha {

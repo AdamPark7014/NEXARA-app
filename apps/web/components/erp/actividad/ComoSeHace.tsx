@@ -31,6 +31,8 @@ type Props = {
   ligados?: LigadoItem[];
   /** Pasos del formato ya materializados como campos (nombre + nota). */
   mostrarPasosFormato?: boolean;
+  /** Si ya vienen de la ficha, no se vuelve a pedir a la API. */
+  camposEvidencia?: CampoEvidencia[] | null;
 };
 
 type CeldaMomento = {
@@ -48,11 +50,6 @@ type FilaGrupo = {
 };
 
 const COLUMNAS: Momento[] = ["ANTES", "EN_PROGRESO", "DESPUES"];
-const COL_LABEL: Record<Momento, string> = {
-  ANTES: "Antes",
-  EN_PROGRESO: "Durante",
-  DESPUES: "Después",
-};
 
 function filasDesdeCampos(campos: CampoEvidencia[]): FilaGrupo[] {
   const ordenados = [...campos].sort((a, b) => a.orden - b.orden || a.id - b.id);
@@ -99,31 +96,56 @@ export default function ComoSeHace({
   indicaciones,
   ligados = [],
   mostrarPasosFormato = true,
+  camposEvidencia,
 }: Props) {
-  const [campos, setCampos] = useState<CampoEvidencia[]>([]);
+  const [campos, setCampos] = useState<CampoEvidencia[]>(camposEvidencia ?? []);
   const [eventos, setEventos] = useState<ActivityTimelineEvent[]>([]);
-  const [cargandoCampos, setCargandoCampos] = useState(true);
+  const [cargandoCampos, setCargandoCampos] = useState(!camposEvidencia);
+  const [errorCampos, setErrorCampos] = useState<string | null>(null);
+  const [errorHistorial, setErrorHistorial] = useState<string | null>(null);
 
   useEffect(() => {
+    if (camposEvidencia) {
+      setCampos(camposEvidencia);
+      setCargandoCampos(false);
+      setErrorCampos(null);
+      return;
+    }
     if (!token || !activityId) return;
     let vivo = true;
     setCargandoCampos(true);
+    setErrorCampos(null);
     void obtenerCamposEvidencia(token, activityId)
       .then((rows) => {
         if (vivo) setCampos(rows);
       })
       .catch(() => {
-        if (vivo) setCampos([]);
+        if (vivo) {
+          setCampos([]);
+          setErrorCampos("No se pudieron cargar los puntos de evidencia. Revisa tu conexión e inténtalo de nuevo.");
+        }
       })
       .finally(() => {
         if (vivo) setCargandoCampos(false);
       });
+    return () => {
+      vivo = false;
+    };
+  }, [token, activityId, camposEvidencia]);
+
+  useEffect(() => {
+    if (!token || !activityId) return;
+    let vivo = true;
+    setErrorHistorial(null);
     void listActivityTimeline(token, activityId)
       .then((data) => {
         if (vivo) setEventos((data.events ?? []).slice(0, 5));
       })
       .catch(() => {
-        if (vivo) setEventos([]);
+        if (vivo) {
+          setEventos([]);
+          setErrorHistorial("No se pudo cargar el historial. Reinténtalo en un momento.");
+        }
       });
     return () => {
       vivo = false;
@@ -157,6 +179,10 @@ export default function ComoSeHace({
           ) : null
         }
       >
+        {errorCampos ? <p className={s.vacioTexto}>{errorCampos}</p> : null}
+        {!cargandoCampos && !errorCampos && filas.length === 0 ? (
+          <p className={s.vacioTexto}>Aún no hay puntos de evidencia. Defínelos al asignar o en «Evidencia».</p>
+        ) : null}
         {filas.length > 0 ? (
           <div className={s.tablaWrap}>
             <table className={s.tabla}>
@@ -165,7 +191,7 @@ export default function ComoSeHace({
                   <th scope="col">Elemento</th>
                   {COLUMNAS.map((m) => (
                     <th key={m} scope="col">
-                      {COL_LABEL[m]}
+                      {MOMENTO_LABEL[m]}
                     </th>
                   ))}
                 </tr>
@@ -241,7 +267,9 @@ export default function ComoSeHace({
         ) : null}
 
         <RecordSection title="Lo último" subtitle={eventos.length ? "Historial reciente" : undefined}>
-          {eventos.length === 0 ? (
+          {errorHistorial ? (
+            <p className={s.vacioTexto}>{errorHistorial}</p>
+          ) : eventos.length === 0 ? (
             <p className={s.vacioTexto}>Todavía no hay eventos.</p>
           ) : (
             <ul className={s.lista}>

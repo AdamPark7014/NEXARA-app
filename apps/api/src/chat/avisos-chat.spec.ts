@@ -15,8 +15,11 @@ describe('avisos por chat', () => {
   });
 
   it('aprobada con calificación; devuelta lleva a evidencias y las observaciones', () => {
-    expect(avisoRevision(a, 'APROBADA', 'Sin observaciones', 5)).toBe('✅ Aprobé tu evidencia de [AN-0020 · Instalar 4 cámaras Hotel Aurora](/erp/actividades/20) con 5 de 5.');
+    expect(avisoRevision(a, 'APROBADA', 'Sin observaciones', 5)).toBe(
+      'Aprobada: Aprobé tu evidencia de [AN-0020 · Instalar 4 cámaras Hotel Aurora](/erp/actividades/20) con 5 de 5.',
+    );
     const devuelta = avisoRevision(a, 'DEVUELTA_PASOS', 'Falta la foto de después de la cámara 2', null);
+    expect(devuelta.startsWith('Devuelta:')).toBe(true);
     expect(devuelta).toContain('(/erp/actividades/20/evidencias)');
     expect(devuelta).toContain('para corregir algunos pasos');
     expect(devuelta).toContain('Observaciones: Falta la foto de después de la cámara 2');
@@ -24,9 +27,11 @@ describe('avisos por chat', () => {
 
   it('incidencia y no cumplida', () => {
     expect(avisoIncidencia(a, 'FALTA_MATERIAL', 'ALTA', ' No llegó el cable ')).toBe(
-      '⚠️ Reporté una incidencia alta (falta material) en [AN-0020 · Instalar 4 cámaras Hotel Aurora](/erp/actividades/20): No llegó el cable',
+      'Incidencia: Reporté una incidencia alta (falta material) en [AN-0020 · Instalar 4 cámaras Hotel Aurora](/erp/actividades/20): No llegó el cable',
     );
-    expect(avisoNoCumplida(a, 'venció sin entrega', null)).toContain('quedó como «No cumplida»: venció sin entrega.');
+    const noCumplida = avisoNoCumplida(a, 'venció sin entrega', null);
+    expect(noCumplida.startsWith('No cumplida:')).toBe(true);
+    expect(noCumplida).toContain('quedó como «No cumplida»: venció sin entrega.');
   });
 
   it('actividad no programada y evidencia por revisar llevan liga', () => {
