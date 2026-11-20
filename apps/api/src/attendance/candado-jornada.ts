@@ -8,7 +8,7 @@
  *
  * Puro: la consulta de la jornada vive en `candado-jornada.interceptor.ts`.
  */
-import { sinChecador } from '../common/platform-accounts.js';
+import { sinActividades } from '../common/platform-accounts.js';
 
 export const CODIGO_JORNADA_NO_ABIERTA = 'JORNADA_NO_ABIERTA';
 export const MENSAJE_JORNADA_NO_ABIERTA = 'Registra tu entrada para empezar a trabajar';
@@ -104,6 +104,7 @@ export function pideJornadaAbierta(p: {
   const u = p.usuario;
   // Sin usuario (público, webhooks, llaves de integración) o portales de cliente/sucursal: no aplica.
   if (!u || !u.id || u.isClient || u.isBranchUser) return false;
-  if (sinChecador(u)) return false;
+  // Dirección/plataforma y RH no checan (mismo criterio que `sinActividades`).
+  if (sinActividades(u)) return false;
   return !rutaExenta(rutaNormalizada(p.url));
 }
