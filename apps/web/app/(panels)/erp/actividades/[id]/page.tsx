@@ -16,6 +16,8 @@ import { puedeSubirFotoDePunto } from "@/lib/evidencia-campos";
 import HerramientasChecklist from "@/components/ops/HerramientasChecklist";
 import CotizacionDeActividad, { type CotizacionLigada } from "@/components/erp/CotizacionDeActividad";
 import ArchivosDeActividad from "@/components/erp/ArchivosDeActividad";
+import ResumenActividad from "@/components/erp/actividad/ResumenActividad";
+import ComoSeHace, { type LigadoItem } from "@/components/erp/actividad/ComoSeHace";
 import RevisionConIA from "@/components/erp/RevisionConIA";
 import CotizacionAbiertaTarjeta from "@/components/erp/CotizacionAbiertaTarjeta";
 import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
@@ -437,6 +439,42 @@ export default function ActivityDetailPage() {
       {/* Comercial va con cotización; administrativa tampoco liga proyecto. */}
       {["comercial", "administrativa"].includes(String(activity.coreKind ?? "").toLowerCase()) ? null : <PreguntaProyecto activityId={activity.id} />}
 
+      <ResumenActividad
+        activity={{
+          ...activity,
+          cotizacion: (activity as { cotizacion?: CotizacionLigada | null }).cotizacion ?? null,
+        }}
+        token={token}
+        activityId={activity.id}
+      />
+
+      <ComoSeHace
+        activityId={activity.id}
+        token={token}
+        indicaciones={activity.indicaciones}
+        ligados={(() => {
+          const items: LigadoItem[] = [];
+          const cot = (activity as { cotizacion?: CotizacionLigada | null }).cotizacion;
+          if (cot?.id) {
+            items.push({
+              id: `cot-${cot.id}`,
+              etiqueta: "Cotización",
+              texto: cot.quoteNumber,
+              href: `/erp/cotizaciones/${cot.id}`,
+            });
+          }
+          if (activity.project?.id) {
+            items.push({
+              id: `proy-${activity.project.id}`,
+              etiqueta: "Proyecto",
+              texto: activity.project.title,
+              href: `/erp/proyectos/${activity.project.id}`,
+            });
+          }
+          return items;
+        })()}
+      />
+
       <RecordSection
         title="Evidencias"
         subtitle={
@@ -521,38 +559,45 @@ export default function ActivityDetailPage() {
             </div>
           </div>
         </RecordSection>
-      ) : activity.descripcion || activity.indicaciones ? (
-        <RecordSection title="Qué hay que hacer">
-          <div className={s.textos}>
-            {activity.descripcion ? (
-              <div>
-                <h3 className={s.textoT}>Descripción</h3>
-                <p className={s.texto}>{activity.descripcion}</p>
-              </div>
-            ) : null}
-            {activity.indicaciones ? (
-              <div>
-                <h3 className={s.textoT}>Indicaciones</h3>
-                <p className={s.texto}>{activity.indicaciones}</p>
-              </div>
-            ) : null}
-          </div>
-        </RecordSection>
       ) : null}
 
       {token ? <CotizacionAbiertaTarjeta activityId={activity.id} token={token} /> : null}
 
-      {/* Cotización ligada en cualquier tipo; el componente se oculta solo si no hay nada que ver ni hacer. */}
-      <CotizacionDeActividad
-        activityId={activity.id}
-        coreKind={activity.coreKind}
-        cotizacion={(activity as { cotizacion?: CotizacionLigada | null }).cotizacion ?? null}
-        onLigada={() => void reload()}
-        enSeccion
-      />
+      <details className={s.masDetalle}>
+        <summary>Más detalle</summary>
+        <div className={s.masDetalleCuerpo}>
+          {!editing && (activity.descripcion || activity.indicaciones) ? (
+            <RecordSection title="Qué hay que hacer">
+              <div className={s.textos}>
+                {activity.descripcion ? (
+                  <div>
+                    <h3 className={s.textoT}>Descripción</h3>
+                    <p className={s.texto}>{activity.descripcion}</p>
+                  </div>
+                ) : null}
+                {activity.indicaciones ? (
+                  <div>
+                    <h3 className={s.textoT}>Indicaciones</h3>
+                    <p className={s.texto}>{activity.indicaciones}</p>
+                  </div>
+                ) : null}
+              </div>
+            </RecordSection>
+          ) : null}
 
-      {/* Documentos opcionales en cualquier actividad (PowerPoint, Excel, Word, PDF): se ven sin salir de la ficha. */}
-      <ArchivosDeActividad activityId={activity.id} />
+          {/* Cotización ligada en cualquier tipo; el componente se oculta solo si no hay nada que ver ni hacer. */}
+          <CotizacionDeActividad
+            activityId={activity.id}
+            coreKind={activity.coreKind}
+            cotizacion={(activity as { cotizacion?: CotizacionLigada | null }).cotizacion ?? null}
+            onLigada={() => void reload()}
+            enSeccion
+          />
+
+          {/* Documentos opcionales en cualquier actividad (PowerPoint, Excel, Word, PDF). */}
+          <ArchivosDeActividad activityId={activity.id} />
+        </div>
+      </details>
 
       {/* El checklist va antes de la evidencia: se revisa lo que se lleva y luego se trabaja. */}
       <HerramientasChecklist activityId={activity.id} />
