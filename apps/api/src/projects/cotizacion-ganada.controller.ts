@@ -1,4 +1,4 @@
-import { Body, Controller, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, ParseIntPipe, Post, UseGuards, UseInterceptors } from '@nestjs/common';
 import { IsDateString, IsIn, IsInt, IsOptional, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -7,6 +7,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { MEDIOS_ACEPTACION, type MedioAceptacion } from '../cotizaciones/hilo-negocio.js';
 import { CotizacionGanadaService } from './cotizacion-ganada.service.js';
+import { OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
 
 class GanarCotizacionDto {
   @IsOptional() @IsIn(MEDIOS_ACEPTACION as unknown as string[]) via?: MedioAceptacion;
@@ -17,6 +18,7 @@ class GanarCotizacionDto {
 /** Vive aquí y no en cotizaciones porque crea un proyecto: `projects` conoce a `cotizaciones`, no al revés. */
 @Controller('cotizaciones')
 @UseGuards(RbacGuard)
+@UseInterceptors(OcultarMontosInterceptor)
 export class CotizacionGanadaController {
   constructor(private readonly ganada: CotizacionGanadaService) {}
 

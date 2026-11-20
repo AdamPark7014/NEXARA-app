@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import { VendorProjectFinanceService, type ProjectKind } from './vendor-project-finance.service.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -7,6 +7,7 @@ import type { UsuarioDePolitica } from '../common/tenant/module-policy.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { MontosParaContadora, OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
 
 /**
  * Proveedores y Proyectos del workspace de Contabilidad.
@@ -39,6 +40,8 @@ const asKind = (value: string | undefined): ProjectKind => {
 
 @Controller('accounting/workspace')
 @UseGuards(UrlAccessGuard)
+@UseInterceptors(OcultarMontosInterceptor)
+@MontosParaContadora()
 export class VendorProjectFinanceController {
   constructor(
     private readonly service: VendorProjectFinanceService,

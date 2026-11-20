@@ -158,6 +158,8 @@ export type TarjetaLiga = {
   /** Renglones cortos: responsable, fecha, cliente… (ya en español). */
   detalle: string[];
   monto: { total: number; moneda: string } | null;
+  /** Hay monto pero quien mira no tiene «Ver precios»: la tarjeta dice «Confidencial». */
+  montoOculto?: true;
   href: string;
   /** Por qué la tarjeta va compacta («Sin acceso», «No se encontró»). */
   motivo?: string;

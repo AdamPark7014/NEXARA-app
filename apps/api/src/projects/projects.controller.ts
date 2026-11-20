@@ -26,6 +26,7 @@ import { CreateProjectDto } from './dto/create-project.dto.js';
 import { UpdateProjectDto } from './dto/update-project.dto.js';
 import { RbacGuard } from '../common/rbac.guard.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
 
 interface MulterFile {
   fieldname: string;
@@ -42,6 +43,7 @@ interface ProjectFiles {
 }
 
 @Controller('projects')
+@UseInterceptors(OcultarMontosInterceptor)
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 

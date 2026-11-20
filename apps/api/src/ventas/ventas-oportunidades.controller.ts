@@ -27,11 +27,13 @@ import { getUploadSubdir } from '../common/upload-paths.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { SalesPaginationQueryDto } from './dto/sales-pagination-query.dto.js';
+import { OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
 
 const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
 const SALES_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
 
 @Controller('ventas/oportunidades')
+@UseInterceptors(OcultarMontosInterceptor)
 export class VentasOportunidadesController {
   constructor(private readonly ventasService: VentasService) {}
 

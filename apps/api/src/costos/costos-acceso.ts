@@ -10,6 +10,7 @@
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 import { esSuperAdmin } from '../common/tenant/module-policy.js';
 import { ROLES } from '../common/rbac/roles.v2.js';
+import { reglasActivas } from '../common/visibilidad/visibilidad.js';
 
 export type ActorCostos = {
   id?: number | null;
@@ -41,6 +42,9 @@ export function esContadora(actor: ActorCostos | null | undefined): boolean {
 
 export function veTodoCostos(actor: ActorCostos | null | undefined): boolean {
   if (!actor) return false;
+  // Matriz «quién ve qué» (20-11-2026): con el interruptor prendido, sueldos y costo por hora solo
+  // superadmin; la contadora ve montos únicamente dentro de Contabilidad.
+  if (reglasActivas()) return esSuperAdmin(actor);
   return esSuperAdmin(actor) || actor.roleKey === ROLES.CEO || isCeoEquivalentEmail(actor.email) || esContadora(actor);
 }
 

@@ -2,12 +2,14 @@ import { Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } 
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { companyWhere } from '../tenant/tenant-scope.js';
+import { DOCUMENTOS_CON_PRECIOS } from './montos.js';
 import {
   CLAVE_INTERRUPTOR,
   fijarCompartimentada,
   reglasActivas,
   esSuperAdmin,
   puedeVerDeAutor,
+  puedeVerPrecios,
   usuariosBajoMiMando,
   whereCotizacionesVisibles,
   type Actor,
@@ -140,5 +142,68 @@ export class VisibilidadService implements OnModuleInit, OnModuleDestroy {
       select: { id: true },
     });
     return filas.map((f) => f.id);
+  }
+
+  /**
+   * Archivos de `/uploads` (Entrega 2): el archivo sigue la regla de su registro. `ruta` es lo que va
+   * después de `/uploads` (p. ej. `/activities/123.jpg`). Fotos de evidencia: solo quien la subió, sus
+   * jefes y superadmin. Contratos de proyecto: solo con «Ver precios». Un archivo que no pertenece a
+   * ningún registro de esos sigue como antes (lo controla la sesión). Apagado: siempre true, sin consultas.
+   */
+  async puedeAbrirArchivo(ruta: string, actor: Actor, companyId?: number | null): Promise<boolean> {
+    if (!(await this.activas())) return true;
+    if (esSuperAdmin(actor)) return true;
+    let limpia = ruta.split('?')[0] || '';
+    try {
+      limpia = decodeURIComponent(limpia);
+    } catch {
+      return false;
+    }
+    limpia = '/' + limpia.replace(/\\/g, '/').replace(/^\/+/, '');
+    // Una travesía (`/activities/../project-docs/…`) haría que la carpeta mintiera: no se abre.
+    if (limpia.split('/').some((seg) => seg === '..' || seg === '.')) return false;
+    const carpeta = limpia.split('/')[1]?.toLowerCase() ?? '';
+    const variantes = [limpia, `/uploads${limpia}`, `/api/uploads${limpia}`];
+
+    if (carpeta === 'project-docs') {
+      const doc = await this.prisma.projectDocument.findFirst({
+        where: { fileUrl: { in: variantes }, kind: { in: DOCUMENTOS_CON_PRECIOS as any } },
+        select: { id: true },
+      });
+      return !doc || puedeVerPrecios(actor);
+    }
+
+    if (carpeta === 'activities' || carpeta === 'evidences') {
+      const autores = new Set<number>();
+      const [flujos, campos, viejas] = await Promise.all([
+        this.prisma.activityEvidence.findMany({
+          where: {
+            OR: [
+              { entryPhotoUrl: { in: variantes } },
+              { exitPhotoUrl: { in: variantes } },
+              { evidencePhotos: { hasSome: variantes } },
+            ],
+          },
+          select: { userId: true },
+          take: 20,
+        }),
+        this.prisma.activityEvidenceFieldPhoto.findMany({
+          where: { photoUrl: { in: variantes } },
+          select: { userId: true },
+          take: 20,
+        }),
+        this.prisma.evidence.findMany({
+          where: { archivoUrl: { in: variantes } },
+          select: { userId: true },
+          take: 20,
+        }),
+      ]);
+      for (const f of [...flujos, ...campos, ...viejas]) if (f.userId != null) autores.add(f.userId);
+      if (!autores.size) return true;
+      const bajo = await this.bajoMiMando(actor, companyId);
+      return [...autores].some((a) => puedeVerDeAutor(actor, a, bajo));
+    }
+
+    return true;
   }
 }

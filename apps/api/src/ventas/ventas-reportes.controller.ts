@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Body, Res, UseGuards, Patch, Delete, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, Res, UseGuards, Patch, Delete, Param, ParseIntPipe, UseInterceptors } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -7,6 +7,8 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { VentasService } from './ventas.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
+import { SoloConPreciosGuard } from '../common/visibilidad/solo-con-precios.guard.js';
 
 const SALES_REPORT_VIEW_ACCESS = [PERMISSIONS.SALES_REPORTS_VIEW, PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
 const SALES_REPORT_EXPORT_ACCESS = [PERMISSIONS.SALES_REPORTS_EXPORT, PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
@@ -14,6 +16,7 @@ const SALES_AUDIT_ACCESS = [PERMISSIONS.SALES_AUDIT_VIEW, PERMISSIONS.SALES_REPO
 const SALES_QUOTA_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
 
 @Controller('ventas/reportes')
+@UseInterceptors(OcultarMontosInterceptor)
 export class VentasReportesController {
   constructor(
     private readonly ventasService: VentasService,
@@ -167,7 +170,7 @@ export class VentasReportesController {
   }
 
   @Get('pdf')
-  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @UseGuards(AuthGuard('jwt'), RbacGuard, SoloConPreciosGuard)
   @RBAC({ anyPermissions: SALES_REPORT_EXPORT_ACCESS })
   async pdf(
     @Query('start') start: string,
@@ -188,7 +191,7 @@ export class VentasReportesController {
   }
 
   @Post('generar-pdf')
-  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @UseGuards(AuthGuard('jwt'), RbacGuard, SoloConPreciosGuard)
   @RBAC({ anyPermissions: SALES_REPORT_EXPORT_ACCESS })
   async generatePdf(
     @Body() dto: { period: 'week' | 'month' | 'year'; includeVendorStats?: boolean; logoUrl?: string },

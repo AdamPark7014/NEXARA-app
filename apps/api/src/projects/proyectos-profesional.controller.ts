@@ -47,6 +47,7 @@ import {
   UpdateProjectRequirementDto,
   UpdateProjectScopeItemDto,
 } from './dto/proyecto-profesional.dto.js';
+import { OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
 
 const DOCS_SUBDIR = 'project-docs';
 const MAX_DOC_BYTES = 25 * 1024 * 1024;
@@ -59,6 +60,7 @@ function nombreEnDisco(original: string): string {
 
 @Controller('proyectos')
 @UseGuards(RbacGuard)
+@UseInterceptors(OcultarMontosInterceptor)
 export class ProyectosProfesionalController {
   constructor(
     private readonly proyectos: ProyectosProfesionalService,

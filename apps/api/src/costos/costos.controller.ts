@@ -12,6 +12,7 @@ import {
   Put,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import {
@@ -40,6 +41,7 @@ import { CostosLigaService, PERIODOS, type Periodo } from './costos-liga.service
 import { CostosProyectoService } from './costos-proyecto.service.js';
 import { CostosTarifasService } from './costos-tarifas.service.js';
 import { LibroCostosService } from './libro-costos.service.js';
+import { OcultarMontosInterceptor } from '../common/visibilidad/ocultar-montos.interceptor.js';
 
 class ParametrosDto {
   /** Fracción: 0.25 = 25 %. */
@@ -108,6 +110,7 @@ class SugerirDto {
  */
 @Controller('costos')
 @UseGuards(UrlAccessGuard, RbacGuard)
+@UseInterceptors(OcultarMontosInterceptor)
 export class CostosController {
   constructor(
     private readonly prisma: PrismaService,
