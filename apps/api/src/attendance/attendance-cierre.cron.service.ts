@@ -33,4 +33,16 @@ export class AttendanceCierreCronService {
       this.logger.error('Cierre automático de jornadas falló', error as Error);
     }
   }
+
+  /** Turnos de noche sin salida: cada hora, las que ya pasaron su tope desde la entrada. */
+  @Cron('5 * * * *', { name: 'attendance-cierre-noche', timeZone: WORKDAY_TIMEZONE })
+  async cerrarJornadasDeNocheOlvidadas() {
+    if (process.env.NEXARA_RELEVO === '1') return;
+    try {
+      const { cerradas } = await this.attendance.cerrarJornadasDeNocheOlvidadas();
+      if (cerradas) this.logger.log(`Jornadas de noche cerradas automáticamente: ${cerradas}`);
+    } catch (error) {
+      this.logger.error('Cierre automático de jornadas de noche falló', error as Error);
+    }
+  }
 }

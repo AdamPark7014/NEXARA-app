@@ -83,6 +83,31 @@ describe('cierre automático de las 23:30', () => {
     );
   });
 
+  it('turno de noche: a las 23:30 no se cierra la jornada de quien entró a las 22:00', async () => {
+    const entrada = new Date('2026-09-18T04:00:00Z'); // 22:00 mx del 17
+    const { service, prisma } = build({
+      attendanceDay: {
+        findMany: jest.fn().mockResolvedValue([{ id: 3, userId: 7, lastEntryAt: entrada, companyId: 1 }]),
+        update: jest.fn().mockResolvedValue({}),
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+    });
+    await expect(service.cerrarJornadasOlvidadas(new Date('2026-09-18T05:30:00Z'))).resolves.toEqual({ cerradas: 0 });
+    expect(prisma.attendance.create).not.toHaveBeenCalled();
+  });
+
+  it('turno de noche olvidado: pasadas 14 h se cierra con salida a entrada + 9 h', async () => {
+    const entrada = new Date('2026-09-18T04:00:00Z'); // 22:00 mx del 17
+    const findMany = jest.fn().mockResolvedValue([{ id: 3, userId: 7, lastEntryAt: entrada, companyId: 1 }]);
+    const { service, prisma } = build({
+      attendanceDay: { findMany, update: jest.fn().mockResolvedValue({}), upsert: jest.fn().mockResolvedValue({}) },
+    });
+    const ahora = new Date('2026-09-18T18:05:00Z');
+    await expect(service.cerrarJornadasDeNocheOlvidadas(ahora)).resolves.toEqual({ cerradas: 1 });
+    expect(findMany.mock.calls[0][0].where.lastEntryAt.lte.toISOString()).toBe('2026-09-18T04:05:00.000Z');
+    expect(prisma.attendance.create.mock.calls[0][0].data.timestamp.toISOString()).toBe('2026-09-18T13:00:00.000Z');
+  });
+
   it('sin jornadas abiertas no inventa nada', async () => {
     const { service, prisma } = build();
     await expect(service.cerrarJornadasOlvidadas()).resolves.toEqual({ cerradas: 0 });

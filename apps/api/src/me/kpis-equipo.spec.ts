@@ -158,8 +158,11 @@ describe('armaJornadas', () => {
     const [temprano] = armaJornadas([entrada('14', '09:00')], ahora);
     expect(temprano).toMatchObject({ abierta: false, sinSalida: true });
     expect(temprano.fin).toEqual(M('14', '18:00'));
+    const [tarde] = armaJornadas([entrada('14', '16:00')], ahora);
+    expect(tarde.fin).toEqual(M('14', '23:30'));
+    // Turno de noche: sin tope de 23:30, entrada + 9 h.
     const [noche] = armaJornadas([entrada('14', '20:00')], ahora);
-    expect(noche.fin).toEqual(M('14', '23:30'));
+    expect(noche.fin).toEqual(M('15', '05:00'));
   });
 
   it('cruza medianoche: la jornada es del día de la entrada', () => {

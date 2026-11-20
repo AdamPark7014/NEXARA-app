@@ -9,6 +9,7 @@ import {
   motivoSinUbicacion,
   origenChecada,
   horaCierreAutomatico,
+  esEntradaDeNoche,
   motivoCorreccionValido,
   puedeVerGpsDireccion,
   resolverHoraChecada,
@@ -260,9 +261,16 @@ describe('cierre automático de la salida olvidada', () => {
   });
 
   it('entrada de la tarde: el tope son las 23:30 de México, no entrada + 9 h', () => {
-    const entrada = new Date('2026-09-18T01:00:00Z'); // 19:00 mx del 17
+    const entrada = new Date('2026-09-17T21:00:00Z'); // 15:00 mx del 17
     // 23:30 mx del 17 = 05:30 UTC del 18.
     expect(horaCierreAutomatico(entrada).toISOString()).toBe('2026-09-18T05:30:00.000Z');
+  });
+
+  it('turno de noche (entra 22:00): no se corta a las 23:30, la salida olvidada es entrada + 9 h', () => {
+    const entrada = new Date('2026-09-18T04:00:00Z'); // 22:00 mx del 17
+    expect(esEntradaDeNoche(entrada)).toBe(true);
+    expect(horaCierreAutomatico(entrada).toISOString()).toBe('2026-09-18T13:00:00.000Z'); // 07:00 mx del 18
+    expect(esEntradaDeNoche(new Date('2026-09-17T16:00:00Z'))).toBe(false); // 10:00 mx
   });
 
   it('una entrada pasadas las 23:30 no cierra antes de empezar', () => {
