@@ -1,3 +1,4 @@
+import { whereCotizacionesVisibles, type Actor } from '../common/visibilidad/visibilidad.js';
 import {
   BadRequestException,
   ConflictException,
@@ -480,9 +481,12 @@ export class CotizacionesService {
     return created;
   }
 
-  async findAll(query?: PaginationQueryDto, companyId?: number | null) {
+  async findAll(query?: PaginationQueryDto, companyId?: number | null, actor?: Actor) {
     const include = { items: true, createdBy: true };
-    const tenant = companyWhere(companyId ?? null);
+    // Quién ve qué: con actor (petición HTTP), solo sus cotizaciones visibles, filtrado en la consulta.
+    const tenant = actor
+      ? { AND: [companyWhere(companyId ?? null), whereCotizacionesVisibles(actor)] }
+      : companyWhere(companyId ?? null);
     if (query?.limit) {
       const where = {
         ...tenant,
@@ -685,9 +689,10 @@ export class CotizacionesService {
   }
 
   /** Lista para Core: folio, cliente, segmento, estado, total y quién intervino. */
-  async listaCore(query: PaginationQueryDto | undefined, companyId?: number | null) {
+  async listaCore(query: PaginationQueryDto | undefined, companyId?: number | null, actor?: Actor) {
     const where = {
       ...companyWhere(companyId ?? null),
+      ...(actor ? { AND: [whereCotizacionesVisibles(actor)] } : {}),
       ...(query?.search
         ? {
             OR: [
@@ -1565,6 +1570,25 @@ export class CotizacionesService {
    * `cotizaciones.access`—, no de nombres ni correos escritos a mano. Fuera los inactivos: pasarle
    * el trabajo a alguien que ya no entra es perderlo en silencio.
    */
+  /** «Pedir revisión»: cualquier persona activa de la empresa (menos quien pide y cuentas de cliente). */
+  async revisoresPosibles(excluirUserId?: number | null, companyId?: number | null) {
+    const filas = await this.db.user.findMany({
+      where: {
+        isActive: true,
+        roleKey: { notIn: ['cliente'] },
+        ...(excluirUserId ? { id: { not: excluirUserId } } : {}),
+        ...(companyId != null ? { companyMemberships: { some: { companyId } } } : {}),
+      },
+      orderBy: [{ nombre: 'asc' }],
+      select: { id: true, nombre: true, puesto: true, roleKey: true },
+    });
+    return filas.map((u) => ({
+      id: u.id,
+      nombre: u.nombre,
+      puesto: u.puesto?.trim() || ROLE_LABELS[u.roleKey as RoleKey]?.es || null,
+    }));
+  }
+
   async companerosQueCotizan(excluirUserId?: number | null) {
     const filas = await this.db.user.findMany({
       where: {
@@ -1658,6 +1682,54 @@ export class CotizacionesService {
     return this.detalleCore(id, companyId);
   }
 
+  /**
+   * «Pedir revisión» (quién ve qué, 20-11-2026): suma a otra persona de la empresa como participante
+   * con rol REVISION_PEDIDA para que pueda ver y revisar la cotización. No cambia el autor ni
+   * «Mandar a» (asignadoA). Quien la pide ya la ve (lo comprueba el interceptor de visibilidad).
+   */
+  async pedirRevision(
+    id: number,
+    revisorId: number,
+    nota: string | undefined,
+    actor: { id?: number | null; nombre?: string | null } | undefined,
+    companyId?: number | null,
+  ) {
+    const quote = await this.findOne(id, companyId);
+    if (!Number.isSafeInteger(revisorId) || revisorId <= 0) throw new BadRequestException('Elige a quién pedirle la revisión.');
+    if (actor?.id && revisorId === actor.id) throw new BadRequestException('No puedes pedirte la revisión a ti mismo.');
+    const revisor = await this.db.user.findFirst({
+      where: {
+        id: revisorId,
+        isActive: true,
+        ...(quote.companyId != null ? { companyMemberships: { some: { companyId: quote.companyId } } } : {}),
+      },
+      select: { id: true, nombre: true },
+    });
+    if (!revisor) throw new BadRequestException('Esa persona no está activa en la empresa.');
+
+    const registrado = await this.core.registrarParticipante(id, revisor.id, 'REVISION_PEDIDA');
+    if (!registrado) throw new BadRequestException('No se pudo registrar la revisión. Intenta de nuevo.');
+
+    const notaLimpia = limpiarNota(nota);
+    const folio = quote.quoteNumber ?? `#${id}`;
+    await this.notificationsService
+      .createNotification({
+        userId: revisor.id,
+        type: 'QUOTE_ASSIGNED',
+        category: 'sales',
+        title: `Revisa la cotización ${folio}`,
+        message: `${actor?.nombre ?? 'Alguien'} te pidió revisarla${notaLimpia ? `: ${notaLimpia}` : '.'}`,
+        entityType: 'COTIZACION',
+        relatedEntityId: id,
+        relatedUrl: appUrls.erpCotizaciones(id),
+        triggerUserId: actor?.id ?? undefined,
+        companyId: quote.companyId ?? undefined,
+      } as any)
+      .catch(() => undefined);
+
+    return this.detalleCore(id, companyId);
+  }
+
   /** Catálogo de paquetes («Cámara bala instalada» = cámara + balún + adaptador + caja + instalación). */
   paquetes() {
     return PAQUETES.map((paquete) => ({
@@ -1680,7 +1752,7 @@ export class CotizacionesService {
   async partidasFrecuentes(
     q: string | undefined,
     companyId?: number | null,
-    opciones: { moneda?: string | null; excluir?: number | null } = {},
+    opciones: { moneda?: string | null; excluir?: number | null; actor?: Actor } = {},
   ) {
     const filtro = filtroDePartidas(q);
     if (!filtro) return [];
@@ -1693,6 +1765,8 @@ export class CotizacionesService {
           deletedAt: null,
           ...(moneda === 'MXN' || moneda === 'USD' ? { currency: { equals: moneda, mode: 'insensitive' as const } } : {}),
           ...(Number.isInteger(excluir) && excluir > 0 ? { id: { not: excluir } } : {}),
+          // Solo partidas de cotizaciones que quien pregunta puede ver.
+          ...(opciones.actor ? { AND: [whereCotizacionesVisibles(opciones.actor)] } : {}),
         },
         AND: filtro,
       },

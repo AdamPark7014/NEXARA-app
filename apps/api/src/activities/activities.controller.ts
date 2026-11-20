@@ -1,3 +1,4 @@
+import { VisibilidadService } from '../common/visibilidad/visibilidad.service.js';
 import {
   Controller,
   Get,
@@ -47,6 +48,7 @@ export class ActivitiesController {
     private readonly usersService: UsersService,
     private readonly excelExport: ExcelExportService,
     private readonly excelImport: ExcelImportService,
+    private readonly visibilidad: VisibilidadService,
   ) {}
 
   /**
@@ -264,18 +266,20 @@ export class ActivitiesController {
     @Query() query: GetActivitiesQueryDto,
   ) {
     const { scope } = query;
+    // Quién ve qué: dentro de cada actividad solo van las evidencias de quien mira y su gente.
+    const autores = await this.visibilidad.autoresVisibles(user, companyId);
 
     if (scope === 'mine') {
-      return this.activitiesService.findByResponsible(user.id, companyId);
+      return this.activitiesService.findByResponsible(user.id, companyId, autores);
     }
 
     if (user.isSuperAdmin) {
-      return this.activitiesService.findAll(query, companyId);
+      return this.activitiesService.findAll(query, companyId, autores);
     } else if (this.hasTeamActivitiesScope(user)) {
       // CEO / plataforma: company-wide; managers: subtree por managerId
-      return this.activitiesService.findAllScoped(user, companyId, query);
+      return this.activitiesService.findAllScoped(user, companyId, query, autores);
     } else {
-      return this.activitiesService.findByResponsible(user.id, companyId);
+      return this.activitiesService.findByResponsible(user.id, companyId, autores);
     }
   }
 
@@ -287,7 +291,8 @@ export class ActivitiesController {
     @CurrentCompanyId() companyId: number | null,
     @CurrentUser() user?: any,
   ) {
-    const actividad = await this.activitiesService.findOne(+id, companyId);
+    const autores = await this.visibilidad.autoresVisibles(user, companyId);
+    const actividad = await this.activitiesService.findOne(+id, companyId, autores);
     if (!puedeVerDetalleActividad(user, actividad as any)) {
       throw new ForbiddenException('Esta actividad no es tuya ni estás en su equipo');
     }

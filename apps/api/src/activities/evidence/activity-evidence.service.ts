@@ -1,3 +1,4 @@
+import { VisibilidadService } from '../../common/visibilidad/visibilidad.service.js';
 import {
   Injectable,
   BadRequestException,
@@ -139,6 +140,7 @@ export class ActivityEvidenceService {
     @Optional() private campos?: ActivityEvidenceFieldsService,
     @Optional() private sesiones?: ActivitySessionsService,
     @Optional() private chat?: ChatService,
+    @Optional() private visibilidad?: VisibilidadService,
   ) {}
 
   private async notifyEvidenceReadyForReview(
@@ -1332,14 +1334,19 @@ export class ActivityEvidenceService {
       throw new BadRequestException('Usuario no autenticado');
     }
 
-    const responsibleIds = await this.getAccessibleResponsibleIds(currentUser);
+    // Quién ve qué (20-11-2026): evidencias de quien mira y de su gente hacia abajo (cadena managerId);
+    // superadmin, todas. Antes: los responsables de todo el departamento.
+    let where: Record<string, unknown>;
+    if (this.visibilidad) {
+      const autores = await this.visibilidad.autoresVisibles(currentUser);
+      where = autores === null ? {} : { userId: { in: autores } };
+    } else {
+      const responsibleIds = await this.getAccessibleResponsibleIds(currentUser);
+      where = { activity: { responsableId: { in: responsibleIds } } };
+    }
 
     const evidences = await this.prisma.activityEvidence.findMany({
-      where: {
-        activity: {
-          responsableId: { in: responsibleIds },
-        },
-      },
+      where,
       include: {
         activity: {
           include: {

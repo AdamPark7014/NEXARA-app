@@ -1,3 +1,4 @@
+import { CotizacionVisibleInterceptor } from '../common/visibilidad/cotizacion-visible.interceptor.js';
 import {
   Body,
   Controller,
@@ -9,6 +10,7 @@ import {
   Put,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
@@ -207,6 +209,7 @@ export class SmartQuoteController {
   }
 
   // ── Versioning (Fase 2) ───────────────────────────────────────
+  @UseInterceptors(CotizacionVisibleInterceptor)
   @Get('quotes/:id/versions')
   @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })
   listVersions(
@@ -216,6 +219,7 @@ export class SmartQuoteController {
     return this.versions.list(id, companyId);
   }
 
+  @UseInterceptors(CotizacionVisibleInterceptor)
   @Post('quotes/:id/versions')
   @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_MANAGE] })
   createVersion(
@@ -227,6 +231,7 @@ export class SmartQuoteController {
     return this.versions.snapshot(id, companyId, user?.id, body?.note);
   }
 
+  @UseInterceptors(CotizacionVisibleInterceptor)
   @Get('quotes/:id/versions/:version')
   @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })
   getVersion(
@@ -238,6 +243,7 @@ export class SmartQuoteController {
   }
 
   // ── CT Online — pedidos (solo partidas CT, post-aprobación) ───
+  @UseInterceptors(CotizacionVisibleInterceptor)
   @Get('ct/orders/preview/:cotizacionId')
   @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_MANAGE] })
   previewCtOrder(
@@ -247,6 +253,7 @@ export class SmartQuoteController {
     return this.ctOrders.previewCtLines(cotizacionId, companyId!);
   }
 
+  @UseInterceptors(CotizacionVisibleInterceptor)
   @Get('ct/orders/:cotizacionId')
   @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })
   listCtOrders(
@@ -256,6 +263,7 @@ export class SmartQuoteController {
     return this.ctOrders.listForQuote(cotizacionId, companyId!);
   }
 
+  @UseInterceptors(CotizacionVisibleInterceptor)
   @Post('ct/orders/:cotizacionId')
   @RBAC({ permissions: [PERMISSIONS.SALES_MANAGE] })
   submitCtOrder(

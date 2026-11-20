@@ -172,6 +172,15 @@ const inp: React.CSSProperties = {
   boxSizing: "border-box", minHeight: 40,
 };
 
+/** Quién ve qué: accesos que se prenden por persona (claves de `User.accesos`). */
+const ACCESOS_PERSONA = [
+  { clave: "precios.ver", etiqueta: "Ver precios" },
+  { clave: "cotizaciones.ver_todas", etiqueta: "Ver todas las cotizaciones" },
+] as const;
+function accesosCambiaron(a: string[], b: string[]): boolean {
+  return a.length !== b.length || a.some((x) => !b.includes(x));
+}
+
 const checkRow: React.CSSProperties = {
   display: "flex", alignItems: "center", gap: 10, minHeight: 40, fontSize: 13.5, cursor: "pointer",
 };
@@ -405,6 +414,9 @@ export default function UsersPage() {
   const [modal, setModal] = useState<ModalMode>(null);
   const [target, setTarget] = useState<ApiUser | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  /** Quién ve qué (20-11-2026): accesos por persona; solo superadmin los ve y cambia. */
+  const [accesos, setAccesos] = useState<string[] | null>(null);
+  const [accesosOriginales, setAccesosOriginales] = useState<string[]>([]);
   const [roleDefaultModes, setRoleDefaultModes] = useState<ModuleAccessMap>(() => defaultModesFromWebModuleIds([]));
   const [pwForm, setPwForm] = useState({ newPassword: "", confirm: "" });
   const [createdCreds, setCreatedCreds] = useState<{
@@ -630,6 +642,16 @@ export default function UsersPage() {
   };
   const openEdit = (u: ApiUser) => {
     setTarget(u);
+    setAccesos(null);
+    if (currentUser?.isSuperAdmin) {
+      void (apiFetch(`users/${u.id}`, token) as Promise<{ accesos?: string[] } | null>)
+        .then((full) => {
+          const lista = Array.isArray(full?.accesos) ? full!.accesos! : [];
+          setAccesos(lista);
+          setAccesosOriginales(lista);
+        })
+        .catch(() => setAccesos(null));
+    }
     const roleId = userRoleId(u);
     setForm({
       nombre: u.nombre,
@@ -725,6 +747,9 @@ export default function UsersPage() {
           body.employeeNumber = form.employeeNumber.trim();
         }
         await apiFetch(`users/${target.id}`, token, { method: "PATCH", body: JSON.stringify(body) });
+        if (currentUser?.isSuperAdmin && accesos && accesosCambiaron(accesos, accesosOriginales)) {
+          await apiFetch(`users/${target.id}/accesos`, token, { method: "PATCH", body: JSON.stringify({ accesos }) });
+        }
         toast.success("Cambios guardados");
       }
       closeModal(); void load();
@@ -1657,6 +1682,26 @@ export default function UsersPage() {
               ))}
             </select>
           </FormField>
+          {modal === "edit" && currentUser?.isSuperAdmin && accesos ? (
+            <FormField label="Accesos" optional fullWidth hint="Solo dirección general los cambia.">
+              {ACCESOS_PERSONA.map((a) => (
+                <label key={a.clave} style={checkRow}>
+                  <input
+                    type="checkbox"
+                    style={{ width: 18, height: 18 }}
+                    checked={accesos.includes(a.clave)}
+                    onChange={(e) =>
+                      setAccesos((prev) => {
+                        const actual = prev ?? [];
+                        return e.target.checked ? [...new Set([...actual, a.clave])] : actual.filter((x) => x !== a.clave);
+                      })
+                    }
+                  />
+                  {a.etiqueta}
+                </label>
+              ))}
+            </FormField>
+          ) : null}
           {modal === "edit" && (
             <FormField label="Reporta a" optional fullWidth>
               <select

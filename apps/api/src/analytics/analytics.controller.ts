@@ -1,3 +1,4 @@
+import { SoloSuperAdminGuard } from '../common/visibilidad/solo-superadmin.guard.js';
 import { Controller, Get, Post, Query, Body, UseGuards } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -27,6 +28,7 @@ export class AnalyticsController {
     return this.svc.getKpiTimeSeries(name, companyId, from, to);
   }
 
+  @UseGuards(SoloSuperAdminGuard)
   @Get('kpi/computed')
   @RBAC({ anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
   getComputedKpis(@CurrentCompanyId() companyId: number | null) {
@@ -39,6 +41,7 @@ export class AnalyticsController {
     return this.svc.listKpiNames(companyId);
   }
 
+  @UseGuards(SoloSuperAdminGuard)
   @Get('dashboard')
   @RBAC({ permissions: [PERMISSIONS.BI_VIEW] })
   executiveDashboard(@CurrentCompanyId() companyId: number | null) {
@@ -51,6 +54,7 @@ export class AnalyticsController {
     return this.svc.getSalesTrend(companyId, months ? +months : undefined);
   }
 
+  @UseGuards(SoloSuperAdminGuard)
   @Get('intelligence')
   @RBAC({ anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
   intelligence(@CurrentCompanyId() companyId: number | null) {
@@ -58,6 +62,7 @@ export class AnalyticsController {
   }
 
   // ── BI Ejecutivo (Fase 10) ────────────────────────────────────────
+  @UseGuards(SoloSuperAdminGuard)
   @Get('bi/executive')
   @RBAC({ anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
   executiveBi(@CurrentCompanyId() companyId: number | null) {

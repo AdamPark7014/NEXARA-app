@@ -27,6 +27,7 @@ export class ActivityFeedController {
       companyId,
       permissions,
       limit ? Number(limit) : undefined,
+      user,
     );
   }
 }

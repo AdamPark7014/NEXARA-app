@@ -46,6 +46,10 @@ describe('LigasService.resolver — permisos de quien ve, no de quien escribió'
     clientCompany: 'Grupo Tox',
     projectName: 'CCTV CEDIS',
     issueDate: new Date('2026-10-20T18:00:00Z'),
+    // Quién ve qué: la elaboró la persona 1, así que ella la ve.
+    createdById: 1,
+    asignadoAId: null,
+    participantes: [] as Array<{ userId: number }>,
   };
   const actividad = {
     id: 20,
@@ -84,6 +88,15 @@ describe('LigasService.resolver — permisos de quien ve, no de quien escribió'
       estado: 'Enviada',
       monto: { total: 15000, moneda: 'MXN' },
     });
+  });
+
+  it('cotización: con permiso pero sin ser suya ni mandada, solo el título genérico (quién ve qué)', async () => {
+    const { svc } = servicio();
+    const r = await svc.resolver({ id: 3, roleKey: 'vendedor', permissions: ['cotizaciones.access'] }, 1, ['/erp/cotizaciones/12']);
+    const t = r['/erp/cotizaciones/12']!;
+    expect(t.acceso).toBe(false);
+    expect(t.monto).toBeNull();
+    expect(JSON.stringify(t)).not.toContain('Grupo Tox');
   });
 
   it('cotización: sin permiso solo el título genérico (ni cliente ni monto)', async () => {

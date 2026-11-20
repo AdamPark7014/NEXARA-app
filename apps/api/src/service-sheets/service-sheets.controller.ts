@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Res, UseGuards } from '@nestjs/common';
+import { VisibilidadService } from '../common/visibilidad/visibilidad.service.js';
 import { Response } from 'express';
 import { ServiceSheetsService } from './service-sheets.service.js';
 import { UpsertServiceSheetDto } from './dto/upsert-service-sheet.dto.js';
@@ -9,7 +10,10 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 
 @Controller('service-sheets')
 export class ServiceSheetsController {
-  constructor(private readonly serviceSheetsService: ServiceSheetsService) {}
+  constructor(
+    private readonly serviceSheetsService: ServiceSheetsService,
+    private readonly visibilidad: VisibilidadService,
+  ) {}
 
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
@@ -32,10 +36,12 @@ export class ServiceSheetsController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
   @Get(':activityId')
-  findOne(
+  async findOne(
     @Param('activityId', ParseIntPipe) activityId: number,
     @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
   ) {
+    await this.visibilidad.assertEvidenciaDeActividadVisible(activityId, user, companyId);
     return this.serviceSheetsService.findByActivity(activityId, companyId);
   }
 
@@ -45,8 +51,10 @@ export class ServiceSheetsController {
   async pdf(
     @Param('activityId', ParseIntPipe) activityId: number,
     @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
     @Res() res: Response,
   ) {
+    await this.visibilidad.assertEvidenciaDeActividadVisible(activityId, user, companyId);
     const pdf = await this.serviceSheetsService.getPdf(activityId, companyId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=hoja-servicio-${activityId}.pdf`);

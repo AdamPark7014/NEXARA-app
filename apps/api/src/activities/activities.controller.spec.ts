@@ -1,3 +1,4 @@
+import { VisibilidadService } from '../common/visibilidad/visibilidad.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ActivitiesController } from './activities.controller.js';
 import { ActivitiesService } from './activities.service.js';
@@ -62,6 +63,8 @@ describe('ActivitiesController', () => {
         { provide: ExcelExportService, useValue: { exportToExcel: jest.fn() } },
         { provide: ExcelImportService, useValue: { importExcel: jest.fn() } },
         { provide: DomainEventBusService, useValue: { publish: jest.fn() } },
+        // Quién ve qué: el simulacro deja ver todo (null = sin recorte de evidencias).
+        { provide: VisibilidadService, useValue: { autoresVisibles: jest.fn().mockResolvedValue(null) } },
       ],
     })
       .overrideGuard(RbacGuard)
@@ -86,7 +89,7 @@ describe('ActivitiesController', () => {
     const result = await controller.findAll({ isSuperAdmin: true } as any, COMPANY_ID, query);
 
     expect(result).toEqual(expected);
-    expect(spy).toHaveBeenCalledWith(query, COMPANY_ID);
+    expect(spy).toHaveBeenCalledWith(query, COMPANY_ID, null);
   });
 
   it('a un encargado lo acota a su equipo, y con la empresa activa', async () => {
@@ -101,7 +104,7 @@ describe('ActivitiesController', () => {
     const result = await controller.findAll(user as any, COMPANY_ID, query);
 
     expect(result).toEqual(expected);
-    expect(spy).toHaveBeenCalledWith(user, COMPANY_ID, query);
+    expect(spy).toHaveBeenCalledWith(user, COMPANY_ID, query, null);
   });
 
   it('falls back to own activities for regular staff', async () => {
@@ -112,7 +115,7 @@ describe('ActivitiesController', () => {
     const result = await controller.findAll(user as any, COMPANY_ID, {} as any);
 
     expect(result).toEqual(expected);
-    expect(spy).toHaveBeenCalledWith(3, COMPANY_ID);
+    expect(spy).toHaveBeenCalledWith(3, COMPANY_ID, null);
   });
 
   it('honours scope=mine even for a super admin', async () => {
@@ -123,7 +126,7 @@ describe('ActivitiesController', () => {
     const result = await controller.findAll(user as any, COMPANY_ID, { scope: 'mine' } as any);
 
     expect(result).toEqual(expected);
-    expect(spy).toHaveBeenCalledWith(9, COMPANY_ID);
+    expect(spy).toHaveBeenCalledWith(9, COMPANY_ID, null);
   });
 
   it('un coordinador asigna a Antonio aunque sea de otro departamento', async () => {

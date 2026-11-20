@@ -14,6 +14,7 @@ import { ExcelImportController } from './common/excel-import.controller';
 import { ExcelModule } from './common/excel.module';
 import { ClientsModule } from './clients/clients.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { VisibilidadModule } from './common/visibilidad/visibilidad.module.js';
 import { FolioModule } from './common/folio/folio.module.js';
 import { UsersModule } from './users/users.module';
 import { AccountAccessModule } from './account-access/account-access.module.js';
@@ -125,6 +126,7 @@ import { CctvDisenosModule } from './cctv-disenos/cctv-disenos.module.js';
     JobsModule,
     RealtimeModule, // @Global() — inyectable desde cualquier módulo
     PrismaModule,
+    VisibilidadModule,
     ClientsModule,
     UsersModule,
     AccountAccessModule,

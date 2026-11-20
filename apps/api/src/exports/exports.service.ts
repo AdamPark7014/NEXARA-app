@@ -1,3 +1,4 @@
+import { whereCotizacionesVisibles, type Actor } from '../common/visibilidad/visibilidad.js';
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
@@ -60,6 +61,7 @@ export class ExportsService {
     entity: ExportEntity,
     filters?: { from?: string; to?: string },
     companyId?: number | null,
+    actor?: Actor,
   ): Promise<{ rows: any[]; filename: string; rowCount: number }> {
     const tenantId = requireCompanyId(companyId);
     const dateWhere = buildDateWhere(entity, filters);
@@ -300,7 +302,8 @@ export class ExportsService {
       case 'cotizaciones':
         rows = (
           await this.prisma.cotizacion.findMany({
-            where: { ...where, deletedAt: null },
+            // Quién ve qué: el Excel solo trae las cotizaciones que quien exporta puede ver.
+            where: { ...where, deletedAt: null, ...(actor ? { AND: [whereCotizacionesVisibles(actor)] } : {}) },
             select: {
               quoteNumber: true,
               folioEnviado: true,
