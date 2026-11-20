@@ -3,7 +3,7 @@
  * tipo, encargo, fechas, duraciones y nombres. Una sola fuente para Mis
  * actividades, la pizarra, la ficha de la persona y asignar.
  */
-import { ACTIVITY_KINDS, type ActivityIconKey, type ActivityKind } from "@/lib/activity-kinds";
+import { ACTIVITY_KINDS, subtipoTareaVista, type ActivityIconKey, type ActivityKind } from "@/lib/activity-kinds";
 import { normalizarPrioridad } from "@/lib/actividad-tiempos";
 
 /** Tono de insignia del sistema visual (mismo nombre que `Tone` de `components/base`). */
@@ -40,11 +40,13 @@ export function estatusUi(estatus?: string | null): LabelUi {
 
 type ConTipo = { coreKind?: string | null; ticketTypeCustom?: string | null };
 
-/** «Tarea · Levantamiento», «Servicio»… (sin tipo: «Actividad»). */
+/** «Tarea · Levantamiento», «Servicio»… (sin tipo: «Actividad»). «Otro: X» → «Tarea · X». */
 export function kindLabel(item: ConTipo): string {
   const meta = item.coreKind ? ACTIVITY_KINDS[item.coreKind as ActivityKind] : null;
   const base = meta ? meta.title : "Actividad";
-  return item.coreKind === "tarea" && item.ticketTypeCustom ? `${base} · ${item.ticketTypeCustom}` : base;
+  if (item.coreKind !== "tarea" || !item.ticketTypeCustom) return base;
+  const vista = subtipoTareaVista(item.ticketTypeCustom);
+  return `${base} · ${vista.label}`;
 }
 
 /** Clave de icono del tipo (sin tipo → icono genérico en ActivityKindIcon). */

@@ -117,6 +117,8 @@ export const TABLA_ESTANDAR: ReglaEstandar[] = [
   { clave: 'tarea:Junta', nombre: 'Junta', baseMin: 0, unidades: [], destino: false, enLugarMin: 0, agenda: true },
   { clave: 'tarea:Capacitación', nombre: 'Capacitación', baseMin: 0, unidades: [], destino: false, enLugarMin: 0, agenda: true },
   { clave: 'tarea:Evento o guardia', nombre: 'Evento o guardia', baseMin: 0, unidades: [], destino: false, enLugarMin: 0, agenda: true },
+  // «Otro: <nombre>» → clave tarea:Otro; base 60 min (genérico de tarea), sin tarifa por unidad.
+  { clave: 'tarea:Otro', nombre: 'Otro', baseMin: 60, unidades: [], destino: false, enLugarMin: 0 },
   { clave: 'servicio:PREVENTIVO', nombre: 'Servicio preventivo', baseMin: 20, unidades: [u('equipos', 'equipo', 'equipos', 15)], destino: true, enLugarMin: 0 },
   { clave: 'servicio:CORRECTIVO', nombre: 'Servicio correctivo', baseMin: 0, unidades: [], porComplejidad: POR_COMPLEJIDAD_CORRECTIVO, destino: true, enLugarMin: 0 },
   { clave: 'servicio:EMERGENCIA', nombre: 'Servicio de emergencia', baseMin: 0, unidades: [], porComplejidad: POR_COMPLEJIDAD_CORRECTIVO, destino: true, enLugarMin: 0 },

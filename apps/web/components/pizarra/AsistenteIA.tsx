@@ -21,7 +21,14 @@ import { AvisoParecidos } from "@/components/erp/ClienteRapido";
 import { esNombreDeRelleno, mensajeAlertaClienteRelleno } from "@/lib/cliente-relleno";
 import { buscarClientesParecidos, type ClienteParecido } from "@/lib/sales-api";
 import { formatMinutes } from "@/lib/activity-labels";
-import { kindsForAssignment } from "@/lib/activity-kinds";
+import {
+  TAREA_OTRO_CHIP,
+  TAREA_OTRO_NOMBRE_MAX,
+  esOtroLibre,
+  kindsForAssignment,
+  nombreOtroLibre,
+  subtipoExistentePorNombre,
+} from "@/lib/activity-kinds";
 import { periodoPorOmision } from "@/lib/actividad-periodo";
 import { hoyISO } from "@/lib/proyecto-plan";
 import { obtenerProgramacion } from "@/lib/proyectos-api";
@@ -36,7 +43,7 @@ import {
   DURACIONES_MIN,
   ETIQUETA_TIPO,
   altaRapidaCliente,
-  SUBTIPOS_TAREA,
+  SUBTIPOS_TAREA_UI,
   TIPOS,
   TIPOS_SERVICIO,
   agendaFinal,
@@ -854,9 +861,21 @@ function Contenido({
                     </Field>
                     {tipo === "tarea" || tipo === "servicio" ? (
                       <Field label={tipo === "tarea" ? "Tipo de tarea" : "Tipo de servicio"} required>
-                        <Select value={subtipo ?? ""} onChange={(e) => ajustar(i, { subtipo: e.target.value })}>
+                        <Select
+                          value={
+                            tipo === "tarea" && (subtipo === TAREA_OTRO_CHIP || esOtroLibre(subtipo))
+                              ? TAREA_OTRO_CHIP
+                              : (subtipo ?? "")
+                          }
+                          onChange={(e) =>
+                            ajustar(i, {
+                              subtipo: e.target.value,
+                              ...(e.target.value === TAREA_OTRO_CHIP ? {} : { otroNombre: undefined }),
+                            })
+                          }
+                        >
                           {tipo === "tarea"
-                            ? SUBTIPOS_TAREA.map((t) => (
+                            ? SUBTIPOS_TAREA_UI.map((t) => (
                                 <option key={t} value={t}>
                                   {t}
                                 </option>
@@ -869,6 +888,48 @@ function Contenido({
                         </Select>
                       </Field>
                     ) : null}
+                    {tipo === "tarea" && (subtipo === TAREA_OTRO_CHIP || esOtroLibre(subtipo)) ? (
+                      <Field
+                        label="¿Qué tarea es?"
+                        required
+                        error={
+                          (() => {
+                            const nombre = (aj.otroNombre ?? nombreOtroLibre(subtipo)).trim();
+                            const existe = subtipoExistentePorNombre(nombre);
+                            if (existe) return `Ya existe "${existe.label}": elígela de la lista`;
+                            if (nombre && nombre.length < 3) return "Escribe al menos 3 caracteres";
+                            return undefined;
+                          })()
+                        }
+                      >
+                        <Input
+                          aria-label="¿Qué tarea es?"
+                          maxLength={TAREA_OTRO_NOMBRE_MAX}
+                          placeholder="Ej. Pintar rack"
+                          value={aj.otroNombre ?? nombreOtroLibre(subtipo)}
+                          onChange={(e) => ajustar(i, { subtipo: TAREA_OTRO_CHIP, otroNombre: e.target.value })}
+                        />
+                      </Field>
+                    ) : null}
+                    {tipo === "tarea" && (subtipo === TAREA_OTRO_CHIP || esOtroLibre(subtipo))
+                      ? (() => {
+                          const nombre = (aj.otroNombre ?? nombreOtroLibre(subtipo)).trim();
+                          const existe = subtipoExistentePorNombre(nombre);
+                          if (!existe) return null;
+                          return (
+                            <div role="status">
+                              Ya existe &quot;{existe.label}&quot;: elígela de la lista.{" "}
+                              <Button
+                                size="sm"
+                                variant="tertiary"
+                                onClick={() => ajustar(i, { subtipo: existe.label, otroNombre: undefined })}
+                              >
+                                Usar {existe.label}
+                              </Button>
+                            </div>
+                          );
+                        })()
+                      : null}
                   </div>
                 </Renglon>
 

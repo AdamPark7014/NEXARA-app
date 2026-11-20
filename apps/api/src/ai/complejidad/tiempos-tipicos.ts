@@ -68,10 +68,14 @@ const SINONIMOS_TAREA: Array<[string, (typeof SUBTIPOS_TAREA)[number]]> = [
   ['elaboracion de facturas', 'Facturación y contabilidad'],
 ];
 
-/** El tipo de tarea del catálogo para un texto (etiqueta del chip o texto libre viejo); null si no es ninguno. */
+/**
+ * Tipo de tarea del catálogo (etiqueta del chip o texto libre viejo). «Otro» y «Otro: …»
+ * se agrupan bajo la clave única «Otro» para KPIs y tiempos; null si no es ninguno.
+ */
 export function subtipoDeTarea(texto: string | null | undefined): string | null {
   const n = normalizar(texto);
   if (!n) return null;
+  if (n === 'otro' || n.startsWith('otro:')) return 'Otro';
   const exacto = SUBTIPO_POR_NORMA.get(n);
   if (exacto) return exacto;
   for (const [inicio, subtipo] of SINONIMOS_TAREA) if (n === inicio || n.startsWith(`${inicio} `)) return subtipo;
@@ -80,8 +84,8 @@ export function subtipoDeTarea(texto: string | null | undefined): string | null 
 
 /**
  * Clave del «tipo de trabajo»: en tarea, su subtipo del catálogo; en servicio, el tipo de
- * ticket; en las demás, el tipo Core solo. null si no se puede saber (tarea con texto libre
- * que no es del catálogo).
+ * ticket; en las demás, el tipo Core solo. «Otro» / «Otro: …» → `tarea:Otro`; null si el
+ * texto libre no es del catálogo ni Otro.
  */
 export function claveDeTipo(a: {
   coreKind?: string | null;
