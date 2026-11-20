@@ -476,7 +476,13 @@ export default function ProyectoDetallePage() {
     { label: "Cliente", value: p.client?.name ?? <span className={styles.tenue}>Sin cliente</span> },
     {
       label: "Presupuesto",
-      value: p.budgetAmount == null ? <span className={styles.tenue}>Sin capturar</span> : formatoMoneda(p.budgetAmount, p.currency ?? "MXN"),
+      value: p.montosOcultos ? (
+        <span className={styles.tenue}>Confidencial</span>
+      ) : p.budgetAmount == null ? (
+        <span className={styles.tenue}>Sin capturar</span>
+      ) : (
+        formatoMoneda(p.budgetAmount, p.currency ?? "MXN")
+      ),
       hint: p.cotizacion ? `Cotización ${p.cotizacion.folioEnviado || p.cotizacion.quoteNumber}` : undefined,
     },
     { label: "Equipo", value: `${p.members.length} persona${p.members.length === 1 ? "" : "s"}` },

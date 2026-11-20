@@ -185,6 +185,8 @@ type CabeceraProyecto = {
   actualStartDate?: string | null;
   actualEndDate?: string | null;
   budgetAmount?: number | null;
+  /** El servidor quitó los montos: quien mira no tiene «Ver precios». Se muestra «Confidencial». */
+  montosOcultos?: boolean;
   currency?: string | null;
   cotizacionId?: number | null;
   cancelReason?: string | null;

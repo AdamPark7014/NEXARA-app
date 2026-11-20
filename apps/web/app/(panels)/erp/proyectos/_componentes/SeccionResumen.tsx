@@ -234,7 +234,7 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
         />
         <Stat
           label="Presupuesto"
-          value={p.budgetAmount == null ? "Sin capturar" : formatoMoneda(p.budgetAmount, p.currency ?? "MXN")}
+          value={p.montosOcultos ? "Confidencial" : p.budgetAmount == null ? "Sin capturar" : formatoMoneda(p.budgetAmount, p.currency ?? "MXN")}
           hint={
             p.cotizacion ? (
               <>
@@ -434,7 +434,13 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
           </FieldGrid>
           <FieldGrid columns={3}>
             <Field label="Presupuesto">
-              <Input id="ed-presupuesto" inputMode="decimal" value={f.budget} onChange={(e) => cambiar("budget", e.target.value)} />
+              <Input
+                id="ed-presupuesto"
+                inputMode="decimal"
+                value={p.montosOcultos ? "Confidencial" : f.budget}
+                disabled={Boolean(p.montosOcultos)}
+                onChange={(e) => cambiar("budget", e.target.value)}
+              />
             </Field>
             <Field label="Moneda">
               <Select id="ed-moneda" value={f.currency} onChange={(e) => cambiar("currency", e.target.value)}>
