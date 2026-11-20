@@ -74,6 +74,16 @@ export class UpdateOperationalProjectDto {
   @IsOptional()
   @IsDateString()
   actualEndDate?: string;
+
+  /** Origen externo (ej. «NAS»). Solo para cargas revisadas. */
+  @IsOptional()
+  @IsString()
+  fuente?: string;
+
+  /** Ruta de la carpeta en la fuente; se normaliza con barras «/». */
+  @IsOptional()
+  @IsString()
+  fuenteRef?: string;
 }
 
 export class ProjectStatusChangeDto {

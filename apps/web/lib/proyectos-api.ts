@@ -188,6 +188,9 @@ type CabeceraProyecto = {
   currency?: string | null;
   cotizacionId?: number | null;
   cancelReason?: string | null;
+  /** Origen externo (ej. «NAS») y ruta de la carpeta en esa fuente. */
+  fuente?: string | null;
+  fuenteRef?: string | null;
   createdAt?: string;
   updatedAt?: string;
   vendor?: Persona | null;

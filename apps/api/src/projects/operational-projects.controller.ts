@@ -12,6 +12,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { OperationalProjectsService } from './operational-projects.service.js';
+import { ProyectoNasService } from './proyecto-nas.service.js';
 import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto, QuickCreateOperationalProjectDto } from './dto/create-operational-project.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -21,7 +22,10 @@ import { PERMISSIONS } from '../common/permissions.js';
 @Controller('operational-projects')
 @UseGuards(RbacGuard)
 export class OperationalProjectsController {
-  constructor(private readonly operationalProjectsService: OperationalProjectsService) {}
+  constructor(
+    private readonly operationalProjectsService: OperationalProjectsService,
+    private readonly proyectoNas: ProyectoNasService,
+  ) {}
 
   private parseOptionalNumber(value?: string): number | undefined {
     if (value === undefined || value === null || value === '') return undefined;
@@ -97,6 +101,21 @@ export class OperationalProjectsController {
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.operationalProjectsService.ensureCommercialMirror(id, user.id, companyId);
+  }
+
+  /** Conector de la NAS: el proyecto que corresponde a una carpeta (`?ref=INFRAESTRUCTURA/Proyecto X`). */
+  @Get('nas/por-ref')
+  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  nasPorRef(@Query('ref') ref: string, @Query('fuente') fuente: string | undefined, @CurrentCompanyId() companyId: number | null) {
+    if (!ref?.trim()) throw new BadRequestException('Falta ?ref con la ruta de la carpeta');
+    return this.proyectoNas.porFuenteRef(ref, companyId, fuente?.trim() || undefined);
+  }
+
+  /** Conector de la NAS: cotizaciones y evidencia aprobada del proyecto, con la carpeta destino de cada cosa. */
+  @Get(':id/nas')
+  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  nasExport(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.proyectoNas.exportar(id, companyId);
   }
 
   @Get(':id')
