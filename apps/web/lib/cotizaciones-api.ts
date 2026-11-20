@@ -54,7 +54,7 @@ export type ParticipanteCotizacion = {
   avatarUrl?: string | null;
   clave: string;
   siglas: string;
-  rol: "ELABORO" | "LEVANTAMIENTO" | "REVISO" | "APROBO" | "ENVIO";
+  rol: "ELABORO" | "LEVANTAMIENTO" | "REVISO" | "APROBO" | "ENVIO" | "REVISION_PEDIDA";
   rolEtiqueta: string;
   at: string;
 };
@@ -520,6 +520,19 @@ export function asignarCotizacion(token: string, id: number, destinatarioId: num
   return cotFetch<CotizacionDetalle>(`cotizaciones/${id}/asignar`, token, {
     method: "POST",
     body: JSON.stringify({ destinatarioId, nota: nota?.trim() || undefined }),
+  });
+}
+
+/** Personas a quienes se puede pedir revisión (personal activo de la empresa, sin ti). */
+export function revisoresPosibles(token: string) {
+  return cotFetch<Array<{ id: number; nombre: string; puesto: string | null }>>(`cotizaciones/revisores`, token);
+}
+
+/** «Pedir revisión»: suma a esa persona como revisora; la cotización sigue con quien la tiene. */
+export function pedirRevision(token: string, id: number, userId: number, nota?: string) {
+  return cotFetch<CotizacionDetalle>(`cotizaciones/${id}/pedir-revision`, token, {
+    method: "POST",
+    body: JSON.stringify({ userId, nota: nota?.trim() || undefined }),
   });
 }
 

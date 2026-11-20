@@ -1,9 +1,11 @@
+import { VisibilidadService } from '../common/visibilidad/visibilidad.service.js';
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ChatChannelKind, ChatMessageKind, Prisma } from '@prisma/client';
 import { Cron } from '@nestjs/schedule';
@@ -71,6 +73,7 @@ export class ChatService {
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeGateway,
     private readonly notifications: NotificationsService,
+    @Optional() private readonly visibilidad?: VisibilidadService,
   ) {}
 
   /**
@@ -1214,6 +1217,11 @@ export class ChatService {
           ],
         };
 
+    // Quién ve qué (20-11-2026): las evidencias, solo de quien busca y su gente hacia abajo
+    // (dirección general, todas).
+    const autoresEvidencia =
+      scope.isOmniscient || !this.visibilidad ? null : [userId, ...(await this.visibilidad.bajoMiMando({ id: userId }, tenantId))];
+
     const [users, activities, evidences] = await Promise.all([
       !kind || kind === 'USER'
         ? this.prisma.user.findMany({
@@ -1262,6 +1270,7 @@ export class ChatService {
         ? this.prisma.evidence.findMany({
             where: {
               actividad: activityScope,
+              ...(autoresEvidencia ? { userId: { in: autoresEvidencia } } : {}),
               ...(query
                 ? {
                     OR: [

@@ -352,7 +352,7 @@ export class ActivitiesService {
 
   }
 
-  async findAll(query?: PaginationQueryDto, companyId?: number | null) {
+  async findAll(query?: PaginationQueryDto, companyId?: number | null, autores?: number[] | null) {
     const where: any = { deletedAt: null, ...companyWhere(companyId ?? null) };
     if (query?.search) {
       where.OR = [
@@ -367,6 +367,7 @@ export class ActivitiesService {
       project: { select: { id: true, title: true } },
       serviceSheet: true,
       activityEvidences: {
+        ...evidenciasDe(autores),
         include: {
           reviewedBy: {
             select: {
@@ -473,7 +474,7 @@ export class ActivitiesService {
     });
   }
 
-  async findByResponsible(userId: number, companyId?: number | null) {
+  async findByResponsible(userId: number, companyId?: number | null, autores?: number[] | null) {
     return this.prisma['activity'].findMany({
       where: { responsableId: userId, deletedAt: null, ...companyWhere(companyId ?? null) },
       include: {
@@ -482,6 +483,7 @@ export class ActivitiesService {
         client: true,
         serviceSheet: true,
         activityEvidences: {
+          ...evidenciasDe(autores),
           include: {
             reviewedBy: {
               select: {
@@ -497,7 +499,7 @@ export class ActivitiesService {
     });
   }
 
-  async findByAllowedUsers(userIds: number[], companyId?: number | null) {
+  async findByAllowedUsers(userIds: number[], companyId?: number | null, autores?: number[] | null) {
     // Actividades cuyo responsable está en la lista (p. ej. alcance de consola para admin)
     if (!userIds || userIds.length === 0) return [];
     return this.prisma['activity'].findMany({
@@ -509,6 +511,7 @@ export class ActivitiesService {
         project: { select: { id: true, title: true } },
         serviceSheet: true,
         activityEvidences: {
+          ...evidenciasDe(autores),
           include: {
             reviewedBy: {
               select: {
@@ -529,12 +532,13 @@ export class ActivitiesService {
     viewer: { id: number; roleKey?: string | null; email?: string | null; isSuperAdmin?: boolean },
     companyId?: number | null,
     query?: PaginationQueryDto,
+    autores?: number[] | null,
   ) {
     if (this.isCompanyWideViewer(viewer)) {
-      return this.findAll(query, companyId);
+      return this.findAll(query, companyId, autores);
     }
     const ids = await this.getSubtreeUserIds(viewer.id, companyId);
-    return this.findByAllowedUsers(ids, companyId);
+    return this.findByAllowedUsers(ids, companyId, autores);
   }
 
   private isCompanyWideViewer(viewer: {
@@ -581,7 +585,7 @@ export class ActivitiesService {
     return Array.from(out);
   }
 
-  async findOne(id: number, companyId?: number | null) {
+  async findOne(id: number, companyId?: number | null, autores?: number[] | null) {
     const activity = await this.prisma['activity'].findFirst({
       where: { id, deletedAt: null, ...companyWhere(companyId ?? null) },
       include: {
@@ -610,6 +614,7 @@ export class ActivitiesService {
           },
         },
         activityEvidences: {
+          ...evidenciasDe(autores),
           include: {
             reviewedBy: {
               select: {
@@ -1548,4 +1553,12 @@ export class ActivitiesService {
     }
     return payload;
   }
+}
+
+/**
+ * Quién ve qué (20-11-2026): dentro de una actividad solo van las evidencias de quien mira y de su gente
+ * hacia abajo. `autores` = ids visibles; `null`/`undefined` = sin recorte (superadmin o uso interno).
+ */
+function evidenciasDe(autores?: number[] | null) {
+  return autores ? { where: { userId: { in: autores } } } : {};
 }

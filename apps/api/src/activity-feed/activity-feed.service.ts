@@ -1,3 +1,4 @@
+import { whereCotizacionesVisibles, type Actor } from '../common/visibilidad/visibilidad.js';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
@@ -27,6 +28,7 @@ export class ActivityFeedService {
     companyId: number | null | undefined,
     permissions: string[] = [],
     limit = 40,
+    actor?: Actor,
   ): Promise<{ items: ActivityFeedItem[]; total: number }> {
     const tenantId = requireCompanyId(companyId);
     const take = Math.min(limit, 80);
@@ -214,6 +216,8 @@ export class ActivityFeedService {
               ...scope,
               deletedAt: null,
               status: 'SENT',
+              // Solo las cotizaciones que quien mira puede ver (quién ve qué).
+              AND: [whereCotizacionesVisibles(actor ?? { id: userId })],
               // El último día todavía se puede firmar: es el que más urge avisar.
               validUntil: { gte: workDateColumn(now), lte: threeDays },
             },

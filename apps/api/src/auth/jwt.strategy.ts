@@ -106,6 +106,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jti: payload.jti ?? null,
       // "Recordarme": se conserva al renovar la sesión.
       rem: payload.rem === true,
+      // Quién ve qué (20-11-2026): accesos por persona, se leen en cada petición.
+      accesos: Array.isArray((user as any).accesos) ? ((user as any).accesos as string[]) : [],
     };
   }
 }

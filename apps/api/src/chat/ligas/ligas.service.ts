@@ -1,3 +1,4 @@
+import { cotizacionVisible, whereCotizacionesVisibles } from '../../common/visibilidad/visibilidad.js';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -36,6 +37,8 @@ export type ActorLiga = {
   isSuperAdmin?: boolean;
   departmentId?: number | null;
   email?: string | null;
+  /** Accesos por persona (quién ve qué). */
+  accesos?: string[] | null;
 };
 
 /** Resultado del selector «Ligar» (mismo formato que `chat/mentions`). */
@@ -267,6 +270,9 @@ export class LigasService {
       where: { id: { in: items.map((i) => i.liga.id) }, companyId: tenantId },
       select: {
         id: true,
+        createdById: true,
+        asignadoAId: true,
+        participantes: { select: { userId: true } },
         quoteNumber: true,
         status: true,
         total: true,
@@ -281,7 +287,8 @@ export class LigasService {
       const c = filas.find((x) => x.id === liga.id);
       const href = rutaDeLiga.cotizacion(liga.id);
       if (!c) return tarjetaGenerica(ref, 'cotizacion', href, NO_ENCONTRADA, folio ?? null);
-      if (!ve) return tarjetaGenerica(ref, 'cotizacion', href, SIN_ACCESO, c.quoteNumber);
+      // Quién ve qué: la tarjeta solo muestra datos a quien puede ver esa cotización.
+      if (!ve || !cotizacionVisible(user, c)) return tarjetaGenerica(ref, 'cotizacion', href, SIN_ACCESO, c.quoteNumber);
       const cliente = c.clientCompany || c.clientName || null;
       const total = numero(c.total);
       return {
@@ -564,6 +571,7 @@ export class LigasService {
         const filas = await this.prisma.cotizacion.findMany({
           where: {
             companyId: tenantId,
+            AND: [whereCotizacionesVisibles(user)],
             ...(query
               ? { OR: [{ quoteNumber: ci(query) }, { clientName: ci(query) }, { clientCompany: ci(query) }, { projectName: ci(query) }] }
               : {}),

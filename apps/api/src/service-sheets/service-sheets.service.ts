@@ -1,4 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { VisibilidadService } from '../common/visibilidad/visibilidad.service.js';
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
@@ -21,6 +22,7 @@ export class ServiceSheetsService {
     private readonly serviceClientsService: ServiceClientsService,
     private readonly activityLifecycle: ActivityLifecycleService,
     private readonly domainEvents: DomainEventBusService,
+    @Optional() private readonly visibilidad?: VisibilidadService,
   ) {}
 
   private async loadActivityForTenant(activityId: number, companyId?: number | null) {
@@ -79,6 +81,11 @@ export class ServiceSheetsService {
     let where: Prisma.ServiceSheetWhereInput;
     if (isSuperAdmin) {
       where = tenantScope;
+    } else if (isOpsManager && this.visibilidad && userId) {
+      // Quién ve qué (20-11-2026): hojas de las actividades de su gente hacia abajo (cadena managerId),
+      // no de todo el departamento.
+      const autores = (await this.visibilidad.autoresVisibles(user, tenantId)) ?? [userId];
+      where = { AND: [tenantScope, { activity: { responsableId: { in: autores } } }] };
     } else if (isOpsManager && departmentId) {
       where = {
         AND: [

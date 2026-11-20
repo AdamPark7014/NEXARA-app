@@ -1,3 +1,4 @@
+import { whereCotizacionesVisibles } from '../common/visibilidad/visibilidad.js';
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ACTIVITY_STATUS, statusVariants } from '../activities/activity-status.js';
@@ -163,14 +164,16 @@ export class DireccionService {
     const contar = (fn: () => Promise<number>) => this.seguro<number | null>(null, fn);
     const hoyInicio = workDateColumn(now);
     const porVencerHasta = new Date(now.getTime() + DIAS_COTIZACION_POR_VENCER * 86_400_000);
+    // Quién ve qué: los conteos de cotizaciones solo cuentan las que quien mira puede ver.
+    const twc = { ...tw, AND: [whereCotizacionesVisibles(viewer as never)] };
     const [cotBorrador, cotEnviadas, cotPorVencer, cotTotal] = await Promise.all([
-      contar(() => this.prisma.cotizacion.count({ where: { ...tw, deletedAt: null, status: 'DRAFT' } as never })),
-      contar(() => this.prisma.cotizacion.count({ where: { ...tw, deletedAt: null, status: 'SENT' } as never })),
+      contar(() => this.prisma.cotizacion.count({ where: { ...twc, deletedAt: null, status: 'DRAFT' } as never })),
+      contar(() => this.prisma.cotizacion.count({ where: { ...twc, deletedAt: null, status: 'SENT' } as never })),
       contar(() =>
-        this.prisma.cotizacion.count({ where: { ...tw, deletedAt: null, status: { in: ['DRAFT', 'SENT'] }, validUntil: { gte: hoyInicio, lt: porVencerHasta } } as never }),
+        this.prisma.cotizacion.count({ where: { ...twc, deletedAt: null, status: { in: ['DRAFT', 'SENT'] }, validUntil: { gte: hoyInicio, lt: porVencerHasta } } as never }),
       ),
       this.seguro<number | null>(null, async () => {
-        const r = await this.prisma.cotizacion.aggregate({ where: { ...tw, deletedAt: null, status: { in: ['DRAFT', 'SENT'] } } as never, _sum: { total: true } });
+        const r = await this.prisma.cotizacion.aggregate({ where: { ...twc, deletedAt: null, status: { in: ['DRAFT', 'SENT'] } } as never, _sum: { total: true } });
         return Number(r._sum.total ?? 0);
       }),
     ]);

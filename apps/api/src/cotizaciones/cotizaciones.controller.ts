@@ -14,6 +14,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { CotizacionVisibleInterceptor } from '../common/visibilidad/cotizacion-visible.interceptor.js';
 import { FileInterceptor } from '../common/files/interceptores-subida.js';
 import { Request, Response } from 'express';
 import { CotizacionesService } from './cotizaciones.service.js';
@@ -23,6 +24,7 @@ import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { MarcarEnviadaDto } from './dto/marcar-enviada.dto.js';
 import { AgregarPaqueteDto, LigarActividadDto, RechazarCotizacionDto } from './dto/rechazar-cotizacion.dto.js';
 import { AsignarCotizacionDto } from './dto/asignar-cotizacion.dto.js';
+import { PedirRevisionDto } from './dto/pedir-revision.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -38,6 +40,8 @@ import { RedactarTextosService } from './redactar-textos.service.js';
 
 @Controller('cotizaciones')
 @UseGuards(UrlAccessGuard)
+// Quién ve qué: toda ruta con `:id` responde 404 si quien pregunta no ve esa cotización.
+@UseInterceptors(CotizacionVisibleInterceptor)
 export class CotizacionesController {
   constructor(
     private readonly cotizacionesService: CotizacionesService,
@@ -59,8 +63,8 @@ export class CotizacionesController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
   @Get()
-  findAll(@Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
-    return this.cotizacionesService.findAll(query, companyId);
+  findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
+    return this.cotizacionesService.findAll(query, companyId, user);
   }
 
   /**
@@ -70,8 +74,16 @@ export class CotizacionesController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
   @Get('core')
-  listaCore(@Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
-    return this.cotizacionesService.listaCore(query, companyId);
+  listaCore(@CurrentUser() user: any, @Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
+    return this.cotizacionesService.listaCore(query, companyId, user);
+  }
+
+  /** A quién se le puede pedir revisión: personal activo de la empresa. Va antes de `:id`. */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Get('revisores')
+  revisores(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    return this.cotizacionesService.revisoresPosibles(user?.id, companyId);
   }
 
   /**
@@ -98,10 +110,12 @@ export class CotizacionesController {
     @Query('moneda') moneda: string | undefined,
     @Query('excluir') excluir: string | undefined,
     @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
   ) {
     return this.cotizacionesService.partidasFrecuentes(typeof q === 'string' ? q : undefined, companyId, {
       moneda: typeof moneda === 'string' ? moneda : null,
       excluir: excluir ? Number(excluir) : null,
+      actor: user,
     });
   }
 
@@ -112,8 +126,8 @@ export class CotizacionesController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
   @Post('interpretar')
-  interpretar(@Body() dto: InterpretarCotizacionDto, @CurrentCompanyId() companyId: number | null) {
-    return this.cotizarFrase.interpretar(dto.texto, companyId, { excluir: dto.excluir ?? null, moneda: dto.moneda ?? null });
+  interpretar(@CurrentUser() user: any, @Body() dto: InterpretarCotizacionDto, @CurrentCompanyId() companyId: number | null) {
+    return this.cotizarFrase.interpretar(dto.texto, companyId, { excluir: dto.excluir ?? null, moneda: dto.moneda ?? null, actor: user });
   }
 
   /** «Redactar con IA»: los textos de la cotización con las partidas del borrador. No guarda nada. */
@@ -402,6 +416,19 @@ export class CotizacionesController {
       { id: user?.id, nombre: user?.nombre },
       companyId,
     );
+  }
+
+  /** «Pedir revisión»: suma a otra persona como revisora sin quitar la cotización a quien la tiene. */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post(':id/pedir-revision')
+  pedirRevision(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: PedirRevisionDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.pedirRevision(id, dto.userId, dto.nota, { id: user?.id, nombre: user?.nombre }, companyId);
   }
 
   /** 03 Planos: sube un plano o anexo propio de la cotización. */

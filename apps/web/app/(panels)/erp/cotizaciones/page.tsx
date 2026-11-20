@@ -63,6 +63,7 @@ const ROL: Record<string, string> = {
   REVISO: "Revisó",
   APROBO: "Aprobó",
   ENVIO: "Envió",
+  REVISION_PEDIDA: "Revisión pedida",
 };
 
 const DIA = 24 * 60 * 60 * 1000;

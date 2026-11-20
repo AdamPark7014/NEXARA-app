@@ -1,3 +1,4 @@
+import { whereCotizacionesVisibles, type Actor } from '../common/visibilidad/visibilidad.js';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireCompanyId } from '../common/tenant/tenant-scope.js';
@@ -36,8 +37,14 @@ export class CotizarFraseService {
     private readonly productos: ProductSearchService,
   ) {}
 
-  async interpretar(texto: string, companyId: number | null, opciones: { excluir?: number | null; moneda?: string | null } = {}): Promise<RespuestaCotizar> {
+  async interpretar(
+    texto: string,
+    companyId: number | null,
+    opciones: { excluir?: number | null; moneda?: string | null; actor?: Actor } = {},
+  ): Promise<RespuestaCotizar> {
     const tenantId = requireCompanyId(companyId);
+    // La IA solo recibe cotizaciones que quien pregunta puede ver (quién ve qué, 20-11-2026).
+    const visibles = opciones.actor ? { AND: [whereCotizacionesVisibles(opciones.actor)] } : {};
     const pedido = String(texto ?? '').trim().slice(0, MAX_TEXTO);
     if (!pedido) throw new BadRequestException('Escribe qué hay que cotizar.');
     const moneda = String(opciones.moneda ?? '').trim().toUpperCase();
@@ -45,7 +52,7 @@ export class CotizarFraseService {
     const [padron, recientes, filas] = await Promise.all([
       padronParaComparar(this.prisma, tenantId),
       this.prisma.cotizacion.findMany({
-        where: { companyId: tenantId, deletedAt: null },
+        where: { companyId: tenantId, deletedAt: null, ...visibles },
         orderBy: { id: 'desc' },
         take: COTIZACIONES_RECIENTES,
         select: { clientName: true, salesClientId: true },
@@ -58,6 +65,7 @@ export class CotizarFraseService {
             // Un costo en dólares no se ofrece en una cotización en pesos.
             ...(moneda === 'MXN' || moneda === 'USD' ? { currency: { equals: moneda, mode: 'insensitive' as const } } : {}),
             ...(opciones.excluir ? { id: { not: opciones.excluir } } : {}),
+            ...visibles,
           },
         },
         orderBy: { id: 'desc' },

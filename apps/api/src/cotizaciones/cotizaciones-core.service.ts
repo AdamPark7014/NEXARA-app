@@ -15,7 +15,7 @@ import {
 } from './folio-core.js';
 import { ESTADO, ETIQUETA_ESTADO, debeVencer, estadoDesdeDb } from './estado-cotizacion.js';
 
-export type RolParticipante = 'ELABORO' | 'LEVANTAMIENTO' | 'REVISO' | 'APROBO' | 'ENVIO';
+export type RolParticipante = 'ELABORO' | 'LEVANTAMIENTO' | 'REVISO' | 'APROBO' | 'ENVIO' | 'REVISION_PEDIDA';
 
 export const ETIQUETA_ROL: Record<RolParticipante, string> = {
   ELABORO: 'Elaboró',
@@ -23,6 +23,7 @@ export const ETIQUETA_ROL: Record<RolParticipante, string> = {
   REVISO: 'Revisó',
   APROBO: 'Aprobó',
   ENVIO: 'Envió',
+  REVISION_PEDIDA: 'Revisión pedida',
 };
 
 export type ClaveDePersona = {

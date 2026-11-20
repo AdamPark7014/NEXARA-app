@@ -969,6 +969,10 @@ model User {
   performanceReviews      PerformanceReview[] @relation("ReviewedUser")
   performanceReviewsGiven PerformanceReview[] @relation("Reviewer")
 
+  /// Accesos por persona (quién ve qué, 20-11-2026): `precios.ver`, `cotizaciones.ver_todas`.
+  /// Solo superadmin los cambia desde Usuarios.
+  accesos   String[] @default([])
+
   // === Jerarquía (organigrama) ===
   managerId Int?
   manager   User?  @relation("UserReportsTo", fields: [managerId], references: [id])
@@ -2646,6 +2650,8 @@ enum CotizacionParticipanteRol {
   REVISO
   APROBO
   ENVIO
+  /// «Pedir revisión»: alguien que ve la cotización la pidió revisar a otra persona (20-11-2026).
+  REVISION_PEDIDA
 }
 
 model Cotizacion {

@@ -62,7 +62,7 @@ export class ExportsController {
     }
 
     const definicion = REPORTES_POR_ENTIDAD[entity];
-    const result = await this.service.exportEntity(entity as any, { from, to }, companyId);
+    const result = await this.service.exportEntity(entity as any, { from, to }, companyId, user);
     const buffer = await this.excelExport.exportarReporte({
       titulo: definicion.titulo,
       subtitulo: periodo(from, to),

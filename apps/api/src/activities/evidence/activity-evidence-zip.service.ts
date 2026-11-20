@@ -128,12 +128,13 @@ export class ActivityEvidenceZipService {
    * Arma el ZIP. Devuelve el generador para mandarlo al navegador por partes: la
    * evidencia de una actividad grande no tiene por qué caber entera en memoria.
    */
-  async construir(activityId: number, companyId?: number | null) {
+  async construir(activityId: number, companyId?: number | null, autores?: number[] | null) {
     const activity = await this.datosDeActividad(activityId, companyId);
 
     const [evidencias, campos] = await Promise.all([
       this.prisma.activityEvidence.findMany({
-        where: { activityId, ...companyWhere(activity.companyId) },
+        // Quién ve qué: solo la evidencia de quien pide el ZIP y de su gente (null = superadmin, toda).
+        where: { activityId, ...companyWhere(activity.companyId), ...(autores ? { userId: { in: autores } } : {}) },
         orderBy: { id: 'asc' },
         include: { user: { select: { id: true, nombre: true } } },
       }),

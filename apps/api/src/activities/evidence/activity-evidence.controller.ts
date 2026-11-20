@@ -1,3 +1,4 @@
+import { VisibilidadService } from '../../common/visibilidad/visibilidad.service.js';
 import {
   Controller,
   Get,
@@ -32,6 +33,7 @@ export class ActivityEvidenceController {
     private geofence: ActivityGeofenceService,
     private campos: ActivityEvidenceFieldsService,
     private zip: ActivityEvidenceZipService,
+    private visibilidad: VisibilidadService,
   ) {}
 
   @Get('history')
@@ -90,6 +92,7 @@ export class ActivityEvidenceController {
   async descargarEvidencia(
     @Param('activityId') activityId: string,
     @CurrentCompanyId() companyId: number | null,
+    @Req() req: any,
     @Res() res: Response,
   ) {
     const parsedId = parseInt(activityId, 10);
@@ -97,7 +100,8 @@ export class ActivityEvidenceController {
       throw new BadRequestException('ID de actividad inválido');
     }
 
-    const { generador, nombreArchivo } = await this.zip.construir(parsedId, companyId);
+    const autores = await this.visibilidad.assertEvidenciaDeActividadVisible(parsedId, req.user, companyId);
+    const { generador, nombreArchivo } = await this.zip.construir(parsedId, companyId, autores);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader(
       'Content-Disposition',
@@ -120,8 +124,12 @@ export class ActivityEvidenceController {
   async listarCampos(
     @Param('activityId') activityId: string,
     @CurrentCompanyId() companyId: number | null,
+    @Req() req: any,
   ) {
-    return this.campos.listarCampos(parseInt(activityId, 10), companyId);
+    const id = parseInt(activityId, 10);
+    // Quién ve qué: las fotos de los puntos, solo quien participa, sus jefes y superadmin.
+    await this.visibilidad.assertEvidenciaDeActividadVisible(id, req.user, companyId);
+    return this.campos.listarCampos(id, companyId);
   }
 
   /** La foto de un campo en un momento. Volver a mandarla reemplaza la anterior. */

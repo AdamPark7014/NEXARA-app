@@ -1,3 +1,4 @@
+import { VisibilidadService } from '../common/visibilidad/visibilidad.service.js';
 import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -14,6 +15,7 @@ export class EvidencesService {
     private readonly prisma: PrismaService,
     private readonly serviceSheetsService: ServiceSheetsService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly visibilidad: VisibilidadService,
   ) {}
 
   // Exportar a CSV
@@ -178,9 +180,12 @@ export class EvidencesService {
     permissions?: string[];
     isSuperAdmin?: boolean;
     roleKey?: string;
+    accesos?: string[];
   }, query?: PaginationQueryDto, companyId?: number | null) {
-    const userIds = await this.getAccessibleUserIds(currentUser);
-    const where = { userId: { in: userIds }, ...companyWhere(companyId ?? null) };
+    // Quién ve qué (20-11-2026): quien la subió, sus jefes hacia arriba (cadena managerId) y superadmin.
+    // Antes era «todo tu departamento».
+    const autores = await this.visibilidad.autoresVisibles(currentUser, companyId);
+    const where = { ...(autores === null ? {} : { userId: { in: autores } }), ...companyWhere(companyId ?? null) };
     const include = this.buildInclude();
     const orderBy = { subidoEn: 'desc' as const };
     if (query?.limit) {

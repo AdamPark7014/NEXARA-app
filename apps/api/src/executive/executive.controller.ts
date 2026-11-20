@@ -1,3 +1,4 @@
+import { SoloSuperAdminGuard } from '../common/visibilidad/solo-superadmin.guard.js';
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ExecutiveService } from './executive.service.js';
@@ -8,7 +9,8 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 @Controller('executive')
-@UseGuards(AuthGuard('jwt'), RbacGuard)
+// Resumen de toda la empresa con montos: solo superadmin (quién ve qué, 20-11-2026).
+@UseGuards(AuthGuard('jwt'), RbacGuard, SoloSuperAdminGuard)
 export class ExecutiveController {
   constructor(
     private readonly service: ExecutiveService,

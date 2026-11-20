@@ -1,5 +1,20 @@
 # RELEVO
 
+- **20-11 ~15:30 México (claude-code; Cursor/Codex no usados) — Quién ve qué, Entrega 1 (registros). NO desplegado.**
+  - Política central `apps/api/src/common/visibilidad/` (pura + servicio + interceptor + guard + `PATCH users/:id/accesos`).
+    `User.accesos` (migración `20261120180734_accesos_persona`): `precios.ver`, `cotizaciones.ver_todas`; sale en
+    `auth/profile` (`accesos`, `capacidades`) y en `req.user`. Casillas en la ficha de Usuarios (solo superadmin).
+  - Cotizaciones: ve quien la creó, `asignadoA`, participantes, superadmin o `cotizaciones.ver_todas`. Interceptor
+    `CotizacionVisibleInterceptor` en todo `/cotizaciones/:id` y en smart-quote (versiones, pedidos CT) → 404.
+    Filtro en consulta en lista, core, partidas frecuentes, cotizar con IA, chat/ligas, exportes, actividad reciente,
+    «Dirección» y cotización abierta. BI agregado y ejecutivo: solo superadmin (`SoloSuperAdminGuard`).
+  - «Pedir revisión»: `POST cotizaciones/:id/pedir-revision` + `GET cotizaciones/revisores`, rol `REVISION_PEDIDA`
+    (migración `20261120180800_revision_pedida`). Botón web hecho en el clon, SIN subir (espera captura/OK).
+  - Evidencias: quien la subió + su cadena de jefes (`managerId`, sin jefe → cuelga de dir_operaciones) + superadmin,
+    en `/evidences`, review-history, ZIP, campos, detalle/listas de actividades, chat (búsqueda) y hojas de servicio.
+  - Pendiente / no tocado: kpis-equipo (usa el alcance de team-board, congelado), timeline de actividad (solo fechas),
+    evidencias-escaladas (cron), workflow; montos y archivos van en la Entrega 2.
+
 - **18-11 ~19:30 México (claude-code; Cursor cayó por conexión, Codex no usado) — Olas 0 y 1: resumen y pendientes.**
   - Producción: 922db7b8 (Tere/rh, castigo por IP con `IP_BAN_EXEMPT=187.191.42.145` en `deploy/.env.nexara` del
     servidor, Luis/Liz/dirección con `ACTIVIDADES_GESTION_URL_RULES`) y luego 2d1c0a6c (semáforo web = API,

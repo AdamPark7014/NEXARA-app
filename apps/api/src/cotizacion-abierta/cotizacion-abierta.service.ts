@@ -1,3 +1,4 @@
+import { whereCotizacionesVisibles } from '../common/visibilidad/visibilidad.js';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { mensajeAsignacionDenegada, puedeDejarActividadA, type ActorAsignacion } from '../activities/asignacion-departamento.js';
@@ -34,7 +35,8 @@ export class CotizacionAbiertaService {
     if (!Number.isInteger(destinoId) || destinoId <= 0) throw new BadRequestException('Elige a quién pedirle apoyo');
     if (destinoId === actor.id) throw new BadRequestException('Elige a otra persona');
     const cotizacion = await this.prisma.cotizacion.findFirst({
-      where: { id: cotizacionId, companyId, deletedAt: null },
+      // Solo quien ve la cotización puede abrirla a otra persona (quién ve qué).
+      where: { id: cotizacionId, companyId, deletedAt: null, AND: [whereCotizacionesVisibles(actor as never)] },
       select: { id: true, quoteNumber: true, projectName: true, status: true },
     });
     if (!cotizacion) throw new NotFoundException('Esa cotización no existe');

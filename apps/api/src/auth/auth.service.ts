@@ -1,3 +1,4 @@
+import { puedeVerPrecios, veTodasLasCotizaciones } from '../common/visibilidad/visibilidad.js';
 import { canManageAlmacen } from '../warehouse/almacen-access.js';
 import { canUsarMesaContable } from '../accounting/mesa-contable/mesa-por-correo.js';
 import { rememberExpiresIn, rememberMaxMs } from '../common/security/session-cookie.js';
@@ -910,6 +911,12 @@ export class AuthService {
       isPlatformOwner: this.isPlatformOwner(user.email),
       avatarUrl: user.avatarUrl,
       moduleAccess: user.moduleAccess ?? null,
+      // Quién ve qué (20-11-2026): accesos por persona y lo que habilitan, para que web y apps decidan.
+      accesos: Array.isArray(user.accesos) ? user.accesos : [],
+      capacidades: {
+        verPrecios: puedeVerPrecios({ id: user.id, isSuperAdmin, accesos: user.accesos }),
+        verTodasCotizaciones: veTodasLasCotizaciones({ id: user.id, isSuperAdmin, accesos: user.accesos }),
+      },
       ...(loginDevice ? { loginDevice } : {}),
     };
   }
