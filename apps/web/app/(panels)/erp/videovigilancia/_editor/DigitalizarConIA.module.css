@@ -1,0 +1,26 @@
+/* Digitalizar croquis con IA — tokens --ui-* */
+.pie { display: flex; gap: var(--ui-s2); justify-content: flex-end; flex-wrap: wrap; }
+.cuerpo { display: flex; flex-wrap: wrap; gap: var(--ui-s4); min-width: 0; }
+.colPlano, .colLista { flex: 1 1 280px; min-width: 0; display: grid; gap: var(--ui-s2); align-content: start; }
+.marco { position: relative; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); overflow: hidden; background: var(--ui-surface-2, var(--ui-bg)); }
+.vacioPlano { padding: var(--ui-s4); margin: 0; color: var(--ui-fg-2); font-size: var(--ui-fs-meta); }
+.controles { display: flex; flex-wrap: wrap; gap: var(--ui-s3); align-items: center; font-size: var(--ui-fs-meta); }
+.etiqueta { display: flex; align-items: center; gap: var(--ui-s2); min-height: 44px; }
+.campoNota { display: grid; gap: var(--ui-s1); font-size: var(--ui-fs-meta); }
+.ayuda { font-size: var(--ui-fs-caption); color: var(--ui-fg-3); }
+.tituloLista { font-size: var(--ui-fs-meta); font-weight: 700; }
+.listaCamaras { display: grid; gap: var(--ui-s2); max-height: min(360px, 50vh); overflow-y: auto; min-width: 0; }
+.filaCamara { display: flex; flex-wrap: wrap; gap: var(--ui-s2); align-items: center; padding: var(--ui-s2); border-radius: var(--ui-radius-sm); border: 1px solid var(--ui-border); min-width: 0; }
+.filaCamara[data-dudosa="true"] { border-color: var(--ui-warning); }
+.numero { width: 1.5rem; font-weight: 700; }
+.numero[data-dudosa="true"] { color: var(--ui-warning-text, var(--ui-warning)); }
+.dudas { display: grid; gap: var(--ui-s1); padding: var(--ui-s3); border-radius: var(--ui-radius-sm); background: var(--ui-warning-bg); border: 1px solid var(--ui-warning); color: var(--ui-warning-text); font-size: var(--ui-fs-meta); }
+.dudas strong { color: var(--ui-warning-text); }
+.marca { color: var(--ui-brand); }
+.aviso { color: var(--ui-warning); }
+.muro { color: var(--ui-fg); }
+@media (max-width: 390px) {
+  .cuerpo { gap: var(--ui-s3); }
+  .pie { flex-direction: column-reverse; align-items: stretch; }
+  .pie > * { min-height: 44px; }
+}

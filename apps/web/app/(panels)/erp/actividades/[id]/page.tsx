@@ -5,14 +5,14 @@
 // pasos, pestañas y datos clave) la pinta `ActivityDetailShell`; aquí va el contenido.
 
 import PreguntaProyecto from "@/components/costos/PreguntaProyecto";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatDateTime } from "@/components/detail/DetailFrame";
 import EquipoEvidencias, { Visor, type Foto } from "@/components/ops/EquipoEvidencias";
 import EvidenciaPorCampos from "@/components/ops/EvidenciaPorCampos";
-import { puedeSubirFotoDePunto } from "@/lib/evidencia-campos";
+import { obtenerCamposEvidencia, puedeSubirFotoDePunto, type CampoEvidencia } from "@/lib/evidencia-campos";
 import HerramientasChecklist from "@/components/ops/HerramientasChecklist";
 import CotizacionDeActividad, { type CotizacionLigada } from "@/components/erp/CotizacionDeActividad";
 import ArchivosDeActividad from "@/components/erp/ArchivosDeActividad";
@@ -137,6 +137,22 @@ export default function ActivityDetailPage() {
   const [missingEvidence, setMissingEvidence] = useState<string[] | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ConfirmState | null>(null);
   const [visor, setVisor] = useState<number | null>(null);
+  const [camposEvidenciaFicha, setCamposEvidenciaFicha] = useState<CampoEvidencia[] | null>(null);
+
+  useEffect(() => {
+    if (!token || !activity?.id) return;
+    let vivo = true;
+    void obtenerCamposEvidencia(token, activity.id)
+      .then((rows) => {
+        if (vivo) setCamposEvidenciaFicha(rows);
+      })
+      .catch(() => {
+        if (vivo) setCamposEvidenciaFicha([]);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [token, activity?.id]);
 
   const toDateLocal = (iso?: string | null) => {
     if (!iso) return "";
@@ -446,12 +462,14 @@ export default function ActivityDetailPage() {
         }}
         token={token}
         activityId={activity.id}
+        camposEvidencia={camposEvidenciaFicha}
       />
 
       <ComoSeHace
         activityId={activity.id}
         token={token}
         indicaciones={activity.indicaciones}
+        camposEvidencia={camposEvidenciaFicha}
         ligados={(() => {
           const items: LigadoItem[] = [];
           const cot = (activity as { cotizacion?: CotizacionLigada | null }).cotizacion;

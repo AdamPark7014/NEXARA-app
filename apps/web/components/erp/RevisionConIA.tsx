@@ -9,6 +9,7 @@ import { useState } from "react";
 import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import { useUser } from "@/components/UserContext";
 import { Alert, Badge, Button, RecordSection } from "@/components/base";
+import s from "./RevisionConIA.module.css";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions";
 
@@ -29,12 +30,6 @@ const VEREDICTO: Record<NonNullable<ResultadoRevision["ia"]>["veredicto"], { tex
   correcta: { texto: "La calificación corresponde", tono: "success" },
   revisar: { texto: "Hay que revisarla", tono: "warning" },
   incorrecta: { texto: "La calificación no corresponde", tono: "danger" },
-};
-
-const COLOR: Record<HechoRevision["tono"], string> = {
-  bien: "var(--ui-success, #15803d)",
-  mal: "var(--ui-danger, #b91c1c)",
-  neutro: "var(--ui-fg-3, #6b7280)",
 };
 
 export default function RevisionConIA({ activityId }: { activityId: number }) {
@@ -59,9 +54,10 @@ export default function RevisionConIA({ activityId }: { activityId: number }) {
   }
 
   const ia = resultado?.ia ?? null;
+  const tonoHecho = { bien: s.hechoBien, mal: s.hechoMal, neutro: s.hechoNeutro } as const;
   return (
     <RecordSection title="Revisión con IA" subtitle="Si la calificación corresponde a lo que pasó: tiempo, fotos e incidencias.">
-      <div style={{ display: "grid", gap: 10 }} data-testid="revision-ia">
+      <div className={s.caja} data-testid="revision-ia">
         {!resultado ? (
           <div>
             <Button variant="secondary" onClick={() => void revisar()} loading={cargando} iconStart={<AutoAwesomeOutlinedIcon fontSize="small" />}>
@@ -73,36 +69,43 @@ export default function RevisionConIA({ activityId }: { activityId: number }) {
         {resultado ? (
           <>
             {ia ? (
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+              <div className={s.veredicto}>
                 <Badge tone={VEREDICTO[ia.veredicto].tono}>{VEREDICTO[ia.veredicto].texto}</Badge>
-                {ia.calificacionSugerida != null ? <span style={{ fontSize: 13 }}>Calificación sugerida: {ia.calificacionSugerida} de 5</span> : null}
+                {ia.calificacionSugerida != null ? (
+                  <span className={s.sugerida}>Calificación sugerida: {ia.calificacionSugerida} de 5</span>
+                ) : null}
               </div>
             ) : null}
             {resultado.avisoIa ? <Alert tone="warning">{resultado.avisoIa}</Alert> : null}
-            <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4, fontSize: 13 }} aria-label="Hechos">
+            <ul className={s.hechos} aria-label="Hechos">
               {resultado.hechos.map((h) => (
-                <li key={h.texto} style={{ color: COLOR[h.tono] }}>
+                <li key={h.texto} className={tonoHecho[h.tono]}>
                   {h.texto}
                 </li>
               ))}
             </ul>
             {ia?.porque.length ? (
-              <div style={{ fontSize: 13 }}>
+              <div className={s.bloque}>
                 <strong>Por qué: </strong>
                 {ia.porque.join(" ")}
               </div>
             ) : null}
             {ia?.incidencias.length ? (
-              <div style={{ fontSize: 13 }}>
+              <div className={s.bloque}>
                 <strong>A atender:</strong>
-                <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                <ul className={s.lista}>
                   {ia.incidencias.map((t) => (
                     <li key={t}>{t}</li>
                   ))}
                 </ul>
               </div>
             ) : null}
-            {ia?.recomendacion ? <div style={{ fontSize: 13 }}><strong>Qué hacer: </strong>{ia.recomendacion}</div> : null}
+            {ia?.recomendacion ? (
+              <div className={s.bloque}>
+                <strong>Qué hacer: </strong>
+                {ia.recomendacion}
+              </div>
+            ) : null}
             <div>
               <Button size="sm" variant="ghost" onClick={() => void revisar()} loading={cargando}>
                 Volver a revisar

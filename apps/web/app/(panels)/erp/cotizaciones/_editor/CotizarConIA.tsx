@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import { Alert, Button, Input, Textarea } from "@/components/base";
+import { Alert, Button, Input, Select, Textarea } from "@/components/base";
 import DictadoBoton from "@/components/DictadoBoton";
 import { formatApiError } from "@/lib/erp-api";
 import { unirDictado } from "@/lib/use-dictado";
@@ -349,13 +349,13 @@ export default function CotizarConIA({
                 <label htmlFor="cotizar-ia-segmento" className={s.etiqueta}>
                   Tipo
                 </label>
-                <select id="cotizar-ia-segmento" className={s.selector} value={segmento} onChange={(e) => setSegmento(e.target.value as Segmento)}>
+                <Select id="cotizar-ia-segmento" className={s.selector} value={segmento} onChange={(e) => setSegmento(e.target.value as Segmento)} aria-label="Segmento de la cotización">
                   {SEGMENTOS.map((x) => (
                     <option key={x} value={x}>
                       {SEGMENTO_LABEL[x]}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               <label className={`${s.campo} ${s.marca}`}>
                 <span className={s.etiqueta}>Factura</span>
