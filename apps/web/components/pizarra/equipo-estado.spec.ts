@@ -111,11 +111,11 @@ describe("desgloseRetraso", () => {
   const base = resumenEquipo([]);
 
   it("dice cada grupo y omite los ceros", () => {
-    expect(desgloseRetraso({ ...base, atrasados: 2, sinNada: 9, sinEntrada: 3 })).toBe(
-      "2 atrasados · 9 sin nada asignado · 3 sin entrada",
+    expect(desgloseRetraso({ ...base, atrasados: 2, actividadesAtrasadas: 3, sinNada: 9, sinEntrada: 3 })).toBe(
+      "2 personas · 3 actividades · 9 sin nada asignado · 3 sin entrada",
     );
     expect(desgloseRetraso({ ...base, sinNada: 12 })).toBe("12 sin nada asignado");
-    expect(desgloseRetraso({ ...base, atrasados: 1, yaSalieron: 1 })).toBe("1 atrasado · 1 ya salió");
+    expect(desgloseRetraso({ ...base, atrasados: 1, yaSalieron: 1 })).toBe("1 persona · 1 actividad · 1 ya salió");
   });
 
   it("todo en cero no dice «0 atrasados»", () => {
@@ -376,6 +376,7 @@ describe("atencionEquipo", () => {
       minutosAtraso: 135,
       motivo: "no la ha iniciado",
       detalle: "Atrasada · 2 h 15 min · no la ha iniciado",
+      actividades: [expect.objectContaining({ folio: "AN-0012", minutosAtraso: 135 })],
     });
     expect(a.atrasados[1].motivo).toBe("pasó su hora límite");
     expect(a.atrasados[2].motivo).toBe("pasó su tiempo planeado");
@@ -409,7 +410,12 @@ describe("atencionEquipo", () => {
       minutosAtraso: 90,
       motivo: null,
       detalle: "Atrasada · 1 h 30 min",
+      actividades: [
+        expect.objectContaining({ folio: "AN-0003", minutosAtraso: 90 }),
+        expect.objectContaining({ folio: "AN-0002", minutosAtraso: 10 }),
+      ],
     });
+    expect(a.atrasados[0].actividades).toHaveLength(2);
   });
 
   it("sin nada asignado: más tiempo sin nada primero, «desde que entró» y su última actividad", () => {
@@ -669,6 +675,56 @@ describe("invariante de conteo pizarra (una sola regla de atraso)", () => {
     expect(tarjetaEnRojo(israel)).toBe(true);
     expect(actividadesDeTarjeta(israel).some((l) => l.estado.startsWith("Atrasada"))).toBe(true);
     expect(invarianteConteoPizarra([israel], { ahora: AHORA }).ok).toBe(true);
+  });
+
+  it("Iván con 2 atrasadas: una persona arriba con sus 2 renglones; totales coinciden", () => {
+    const ivan = persona({
+      id: 20,
+      nombre: "Iván Camargo",
+      status: "atrasado",
+      currentLateMinutes: 262,
+      currentLateReason: "plan",
+      openActivities: [
+        {
+          ...abiertaBase,
+          id: 669,
+          anNumber: "AN-0669",
+          titulo: "Levantamiento CCTV",
+          estatus: "En Proceso",
+          atrasada: true,
+          minutosAtraso: 262,
+          semaforo: "rojo",
+        },
+        {
+          ...abiertaBase,
+          id: 665,
+          anNumber: "AN-0665",
+          titulo: "Visita",
+          estatus: "Pendiente",
+          atrasada: true,
+          minutosAtraso: 24,
+          semaforo: "rojo",
+        },
+        {
+          ...abiertaBase,
+          id: 638,
+          anNumber: "AN-0638",
+          titulo: "Sin iniciar",
+          estatus: "Pendiente",
+          atrasada: false,
+          semaforo: "verde",
+        },
+      ],
+    });
+    const a = atencionEquipo([ivan], AHORA);
+    expect(a.atrasados).toHaveLength(1);
+    expect(a.atrasados[0].actividades.map((x) => x.folio)).toEqual(["AN-0669", "AN-0665"]);
+    expect(a.atrasados[0].actividades[0].detalle).toMatch(/Atrasada · 4 h 22 min/);
+    const r = resumenEquipo([ivan]);
+    expect(r).toMatchObject({ atrasados: 1, actividadesAtrasadas: 2 });
+    expect(desgloseRetraso(r)).toBe("1 persona · 2 actividades");
+    expect(invarianteConteoPizarra([ivan], { ahora: AHORA }).ok).toBe(true);
+    expect(tarjetaEnRojo(ivan)).toBe(true);
   });
 
   it("cierre administrativo no cuenta como libre; varios tableros cumplen la invariante", () => {

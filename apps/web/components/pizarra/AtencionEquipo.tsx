@@ -11,6 +11,15 @@ import layout from "./EquipoPersonaCard.module.css";
 
 /** Renglones por columna antes de «Ver N más»: que la lista de gente no quede hasta abajo. */
 const VISIBLES = 5;
+/** Actividades visibles bajo cada persona atrasada. */
+const ACTS_VISIBLES = 3;
+
+type ActAtrasadaVista = {
+  id?: number;
+  folio: string | null;
+  titulo: string | null;
+  detalle: string;
+};
 
 type Renglon = {
   persona: TeamBoardUser;
@@ -23,7 +32,53 @@ type Renglon = {
   asignarHref?: string;
 };
 
-function Columna({ titulo, punto, renglones }: { titulo: string; punto: string; renglones: Renglon[] }) {
+/** Hasta 3 actividades; el resto detrás de «+N más». */
+function ListaAtrasadas({ acts }: { acts: ActAtrasadaVista[] }) {
+  const [todos, setTodos] = useState(false);
+  const vista = todos ? acts : acts.slice(0, ACTS_VISIBLES);
+  const resto = acts.length - ACTS_VISIBLES;
+  return (
+    <span className={s.acts}>
+      {vista.map((act, i) => (
+        <span key={act.id ?? `${act.folio}-${i}`} className={s.act}>
+          <span className={[layout.apilar, s.actTitulo].join(" ")}>
+            {act.folio ? <span className={s.folio}>{act.folio}</span> : null}
+            {act.folio && act.titulo ? <span className={layout.sep}> · </span> : null}
+            {act.titulo ? <span>{act.titulo}</span> : !act.folio ? <span>Actividad sin datos</span> : null}
+          </span>
+          <span className={s.peligro}>{act.detalle}</span>
+        </span>
+      ))}
+      {resto > 0 ? (
+        <button
+          type="button"
+          className={s.masActs}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setTodos((v) => !v);
+          }}
+          aria-expanded={todos}
+        >
+          {todos ? "Ver menos" : `+${resto} más`}
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
+function Columna({
+  titulo,
+  punto,
+  renglones,
+  cuentaExtra,
+}: {
+  titulo: string;
+  punto: string;
+  renglones: Renglon[];
+  /** Texto chico junto al número de personas, p. ej. «3 actividades». */
+  cuentaExtra?: string | null;
+}) {
   const [todos, setTodos] = useState(false);
   const id = useId();
   if (renglones.length === 0) return null;
@@ -35,6 +90,7 @@ function Columna({ titulo, punto, renglones }: { titulo: string; punto: string; 
         <span className={[s.punto, punto].join(" ")} aria-hidden="true" />
         {titulo}
         <span className={s.cuenta}>{renglones.length}</span>
+        {cuentaExtra ? <span className={s.cuentaExtra}>{cuentaExtra}</span> : null}
       </h3>
       <ul className={s.lista}>
         {vista.map((r) => {
@@ -86,8 +142,8 @@ function Columna({ titulo, punto, renglones }: { titulo: string; punto: string; 
 /**
  * Actividades · «Mi equipo», debajo de la franja de KPI: a quién hay que ir a
  * ver hoy y por qué. Tres columnas (se apilan en pantallas angostas):
- * atrasados con su actividad y el motivo, a quién dejaron sin nada asignado y
- * desde cuándo (con lo último que terminó), y quién no ha checado entrada.
+ * atrasados con todas sus actividades y el motivo, a quién dejaron sin nada
+ * asignado y desde cuándo (con lo último que terminó), y quién no ha checado.
  *
  * Columnas vacías no se pintan; si nadie pide atención, el componente tampoco.
  * Solo tiene sentido con el rango «Hoy»: «desde hace cuánto» es de hoy.
@@ -106,20 +162,22 @@ export default function AtencionEquipo({
   const a = atencionEquipo(users, ahora, { finDeSemana: esFinDeSemanaMx(ahora) });
   if (a.atrasados.length === 0 && a.sinNada.length === 0 && a.sinEntrada.length === 0) return null;
 
-  const atrasados: Renglon[] = a.atrasados.map((x) => ({
-    persona: x.persona,
-    principal:
-      x.folio || x.titulo ? (
-        <span className={layout.apilar}>
-          {x.folio ? <span className={s.folio}>{x.folio}</span> : null}
-          {x.folio && x.titulo ? <span className={layout.sep}> · </span> : null}
-          {x.titulo ? <span>{x.titulo}</span> : null}
-        </span>
-      ) : (
-        "Actividad sin datos"
-      ),
-    secundaria: <span className={s.peligro}>{x.detalle}</span>,
-  }));
+  const totalActs = a.atrasados.reduce((n, x) => n + Math.max(1, x.actividades?.length ?? 1), 0);
+
+  const atrasados: Renglon[] = a.atrasados.map((x) => {
+    const acts: ActAtrasadaVista[] = x.actividades?.length
+      ? x.actividades.map((act) => ({
+          id: act.id,
+          folio: act.folio,
+          titulo: act.titulo,
+          detalle: act.detalle,
+        }))
+      : [{ folio: x.folio, titulo: x.titulo, detalle: x.detalle }];
+    return {
+      persona: x.persona,
+      principal: <ListaAtrasadas acts={acts} />,
+    };
+  });
 
   const sinNada: Renglon[] = a.sinNada.map((x) => {
     const jornada = [x.entrada, x.sinNadaDesde].filter(Boolean);
@@ -157,7 +215,12 @@ export default function AtencionEquipo({
     <Card className={s.tarjeta} aria-label="Quién necesita atención hoy">
       <CardHead title="Para atender hoy" />
       <div className={s.columnas}>
-        <Columna titulo="Atrasados" punto={s.puntoAtrasado} renglones={atrasados} />
+        <Columna
+          titulo="Atrasados"
+          punto={s.puntoAtrasado}
+          renglones={atrasados}
+          cuentaExtra={totalActs > 0 ? `${totalActs} ${totalActs === 1 ? "actividad" : "actividades"}` : null}
+        />
         <Columna titulo="Sin nada asignado" punto={s.puntoSinNada} renglones={sinNada} />
         <Columna titulo="Sin entrada hoy" punto={s.puntoSinEntrada} renglones={sinEntrada} />
       </div>

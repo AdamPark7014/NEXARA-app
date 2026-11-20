@@ -4,13 +4,12 @@
  * Regla de Adam (22-10-2026): «cualquier actividad que no se acabe después de la jornada laboral
  * se toma como incumplida», y un superior debe poder registrar que una actividad no se cumplió.
  *
- * - **Cierre de jornada = la checada de salida.** Regla de Adam (28-10-2026): nada se cierra a una
- *   hora fija ni por un cron. Cuando la persona checa su salida de asistencia ella misma (no la
- *   salida automática de las 23:30 ni la que registra un jefe), lo que vencía ese día o antes
- *   (`limiteDeEntrega`, el mismo límite del semáforo) y no entregó pasa a «No cumplida», con
- *   registro formal (`activity_non_compliances`). En equipo, cuando ya salieron todos los que no la
- *   entregaron. Entregada = mandó su evidencia; por eso «Por Validar» nunca se cierra: ya se
- *   entregó y lo que falta es el visto bueno del jefe.
+ * - **Cierre de jornada (20-11-2026):** se cierra lo vencido sin entregar al checar la salida
+ *   propia, al cierre automático de las 23:30, cuando un jefe registra la salida, y en un
+ *   barrido nocturno (quien no checó o lo de días anteriores). Origen `CIERRE_JORNADA`, causa
+ *   `SIN_ENTREGA`. Sustituye la del 28-10 («nada se cierra por reloj»). En equipo, cuando ya
+ *   salieron todos los que no la entregaron; en el barrido, sin jornada abierta = ya salió.
+ *   «Por Validar» nunca se toca (ya entregó). La pausa no protege: solo vale durante el día.
  * - **Pasarse de la hora** el mismo día no la cierra: la actividad sigue abierta y el semáforo la
  *   marca atrasada con cuánto se pasó.
  * - **Registro manual**: los mismos superiores que pueden cancelarla, con causa y observaciones.

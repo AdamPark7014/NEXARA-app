@@ -43,6 +43,14 @@
 .puntoSinNada { background: var(--ui-warning); }
 .puntoSinEntrada { background: var(--ui-border-strong); }
 
+.cuentaExtra {
+  font-size: var(--ui-fs-caption);
+  line-height: 1.2;
+  font-weight: 500;
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
 .cuenta {
   font-size: var(--ui-fs-caption);
   line-height: 1.2;
@@ -237,4 +245,40 @@
   .enlace {
     transition: none;
   }
+}
+
+.acts {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.act {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.actTitulo {
+  color: var(--ui-fg);
+}
+
+.masActs {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  font-weight: 600;
+  color: var(--ui-brand-text);
+  cursor: pointer;
+}
+
+.masActs:hover { text-decoration: underline; }
+.masActs:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+  border-radius: var(--ui-radius-sm);
 }

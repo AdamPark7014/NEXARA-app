@@ -54,6 +54,8 @@ export type ResumenEquipo = {
   total: number;
   /** Desglose del ámbar, para el hint y el `title` de la celda. */
   atrasados: number;
+  /** Actividades atrasadas de esas personas (puede ser > atrasados). */
+  actividadesAtrasadas: number;
   /** Checó hoy, sigue en jornada y no tiene nada abierto. */
   sinNada: number;
   /** Hoy no ha checado entrada. */
@@ -91,6 +93,13 @@ export function esFinDeSemanaMx(ahora: number = Date.now()): boolean {
   return dia === "Sat" || dia === "Sun";
 }
 
+/** Cuántas actividades atrasadas tiene la persona (misma regla que la tarjeta). */
+export function contarActividadesAtrasadas(u: TeamBoardUser): number {
+  const abiertas = (u.openActivities ?? []).filter((a) => a.atrasada || a.semaforo === "rojo");
+  if (abiertas.length > 0) return abiertas.length;
+  return u.status === "atrasado" ? 1 : 0;
+}
+
 export function resumenEquipo(users: readonly TeamBoardUser[], opciones: { finDeSemana?: boolean } = {}): ResumenEquipo {
   const r: ResumenEquipo = {
     trabajando: 0,
@@ -98,6 +107,7 @@ export function resumenEquipo(users: readonly TeamBoardUser[], opciones: { finDe
     libres: 0,
     total: users.length,
     atrasados: 0,
+    actividadesAtrasadas: 0,
     sinNada: 0,
     sinEntrada: 0,
     yaSalieron: 0,
@@ -115,7 +125,10 @@ export function resumenEquipo(users: readonly TeamBoardUser[], opciones: { finDe
     if (aro === "trabajando") r.trabajando += 1;
     else if (aro === "libre") r.libres += 1;
     else r.retraso += 1;
-    if (u.status === "atrasado") r.atrasados += 1;
+    if (u.status === "atrasado") {
+      r.atrasados += 1;
+      r.actividadesAtrasadas += contarActividadesAtrasadas(u);
+    }
     const motivo = motivoSinActividad(u);
     if (motivo) r.sinActividad += 1;
     if (motivo === "sinNada") r.sinNada += 1;
@@ -131,7 +144,12 @@ export function resumenEquipo(users: readonly TeamBoardUser[], opciones: { finDe
  */
 export function desgloseRetraso(r: ResumenEquipo): string {
   const partes: string[] = [];
-  if (r.atrasados > 0) partes.push(`${r.atrasados} ${r.atrasados === 1 ? "atrasado" : "atrasados"}`);
+  if (r.atrasados > 0) {
+    const nAct = r.actividadesAtrasadas > 0 ? r.actividadesAtrasadas : r.atrasados;
+    partes.push(
+      `${r.atrasados} ${r.atrasados === 1 ? "persona" : "personas"} · ${nAct} ${nAct === 1 ? "actividad" : "actividades"}`,
+    );
+  }
   if (r.sinNada > 0) partes.push(`${r.sinNada} sin nada asignado`);
   if (r.sinEntrada > 0) partes.push(`${r.sinEntrada} sin entrada`);
   if (r.yaSalieron > 0) partes.push(`${r.yaSalieron} ${r.yaSalieron === 1 ? "ya salió" : "ya salieron"}`);
@@ -218,7 +236,7 @@ function recortar(texto: string, max = 40): string {
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 }
 
-/* ─── Última actividad terminada ───────────────────────────────────────── */
+/* ─── Última actividad terminada ─────────────────────────────���─────────── */
 
 /** Sin límite cuenta a tiempo (lo mismo que los KPI de entregas). */
 function comoEntrego(lateMinutes: number | null | undefined): string {
@@ -254,6 +272,16 @@ export const MOTIVO_ATRASO: Record<BoardLateReason, string> = {
   plan: "pasó su tiempo planeado",
 };
 
+/** Una actividad atrasada bajo la persona en «Para atender hoy». */
+export type ActividadAtrasadaEnAtencion = {
+  id: number;
+  folio: string | null;
+  titulo: string | null;
+  minutosAtraso: number | null;
+  motivo: string | null;
+  detalle: string;
+};
+
 export type AtrasadoEnAtencion = {
   persona: TeamBoardUser;
   folio: string | null;
@@ -263,6 +291,8 @@ export type AtrasadoEnAtencion = {
   motivo: string | null;
   /** «Atrasada · 2 h 15 min · no la ha iniciado». */
   detalle: string;
+  /** Todas las atrasadas, de más a menos atraso. */
+  actividades: ActividadAtrasadaEnAtencion[];
 };
 
 export type SinNadaEnAtencion = {
@@ -307,37 +337,61 @@ function mayorPrimero(a: number | null, b: number | null): number {
 const porNombre = (a: { persona: TeamBoardUser }, b: { persona: TeamBoardUser }) =>
   a.persona.nombre.localeCompare(b.persona.nombre, "es");
 
+function detalleAtraso(minutos: number | null, motivo: string | null): string {
+  return [minutos != null && minutos > 0 ? `Atrasada · ${formatMinutes(minutos)}` : "Atrasada", motivo]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /**
- * La actividad por la que va tarde. La API manda la que está haciendo en
- * `currentActivity` (y su atraso en `currentLateMinutes`); si solo vienen las
- * abiertas, la más atrasada de ellas.
+ * Todas las actividades atrasadas de la persona (misma regla que la tarjeta),
+ * ordenadas de más a menos atraso. El nivel raíz guarda la peor.
  */
 function atrasadoEnAtencion(u: TeamBoardUser): AtrasadoEnAtencion {
   const abiertas = u.openActivities ?? [];
-  let folio: string | null = null;
-  let titulo: string | null = null;
-  let minutos: number | null = u.currentLateMinutes ?? null;
-  if (u.currentActivity) {
-    folio = u.currentActivity.anNumber || null;
-    titulo = u.currentActivity.titulo || null;
-    const misma = abiertas.find((a) => a.id === u.currentActivity?.id);
-    if (minutos == null) minutos = misma?.minutosAtraso ?? null;
-  } else {
-    const tarde =
-      [...abiertas]
-        .filter((a) => a.atrasada)
-        .sort((a, b) => mayorPrimero(a.minutosAtraso ?? null, b.minutosAtraso ?? null))[0] ?? abiertas[0];
-    if (tarde) {
-      folio = tarde.anNumber || null;
-      titulo = tarde.titulo || null;
-      if (minutos == null) minutos = tarde.minutosAtraso ?? null;
-    }
+  const atrasadas = [...abiertas]
+    .filter((a) => a.atrasada || a.semaforo === "rojo")
+    .sort((a, b) => mayorPrimero(a.minutosAtraso ?? null, b.minutosAtraso ?? null));
+
+  const motivoPeor = u.currentLateReason ? (MOTIVO_ATRASO[u.currentLateReason] ?? null) : null;
+
+  let actividades: ActividadAtrasadaEnAtencion[] = atrasadas.map((a, i) => {
+    const minutos = a.minutosAtraso ?? (i === 0 ? u.currentLateMinutes ?? null : null);
+    const motivo = i === 0 ? motivoPeor : null;
+    return {
+      id: a.id,
+      folio: a.anNumber || null,
+      titulo: a.titulo || null,
+      minutosAtraso: minutos,
+      motivo,
+      detalle: detalleAtraso(minutos, motivo),
+    };
+  });
+
+  if (actividades.length === 0 && u.currentActivity) {
+    const minutos = u.currentLateMinutes ?? null;
+    actividades = [
+      {
+        id: u.currentActivity.id,
+        folio: u.currentActivity.anNumber || null,
+        titulo: u.currentActivity.titulo || null,
+        minutosAtraso: minutos,
+        motivo: motivoPeor,
+        detalle: detalleAtraso(minutos, motivoPeor),
+      },
+    ];
   }
-  const motivo = u.currentLateReason ? (MOTIVO_ATRASO[u.currentLateReason] ?? null) : null;
-  const detalle = [minutos != null && minutos > 0 ? `Atrasada · ${formatMinutes(minutos)}` : "Atrasada", motivo]
-    .filter(Boolean)
-    .join(" · ");
-  return { persona: u, folio, titulo, minutosAtraso: minutos, motivo, detalle };
+
+  const peor = actividades[0];
+  return {
+    persona: u,
+    folio: peor?.folio ?? null,
+    titulo: peor?.titulo ?? null,
+    minutosAtraso: peor?.minutosAtraso ?? null,
+    motivo: peor?.motivo ?? null,
+    detalle: peor?.detalle ?? "Atrasada",
+    actividades,
+  };
 }
 
 function sinNadaEnAtencion(u: TeamBoardUser, ahora: number): SinNadaEnAtencion {

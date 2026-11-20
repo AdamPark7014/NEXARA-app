@@ -1,12 +1,13 @@
 import { ChatService } from '../chat/chat.service.js';
 import { avisoNoCumplida } from '../chat/avisos-chat.js';
 import { BadRequestException, ForbiddenException, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { DOMAIN_EVENTS, type SalidaDeJornada } from '../domain-events/domain-event.types.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
-import { workDateColumn, workDateKey, workDayEnd } from '../common/time/workday.js';
+import { WORKDAY_TIMEZONE, workDateColumn, workDateKey, workDayEnd } from '../common/time/workday.js';
 import { limiteDeEntrega } from './semaforo-actividad.js';
 import { ACTIVITY_STATUS, isFinishedStatus, statusVariants } from './activity-status.js';
 import {
@@ -24,7 +25,9 @@ import {
   CAUSA_CIERRE_JORNADA,
   CAUSAS_INCUMPLIMIENTO,
   cierreDeJornada,
+  NO_CUMPLIDA_VIGENTE_DESDE,
   decidirCierrePorSalida,
+  esCandidataAlCierre,
   esCausaValida,
   esNoCumplida,
   estatusAlReprogramar,
@@ -196,7 +199,92 @@ export class ActivityNonComplianceService implements OnModuleInit {
     return { cerradas };
   }
 
-  /** Salida propia de cada quien ese día: ni la automática de las 23:30 ni la que registra un jefe. */
+  /**
+   * Barrido de las 00:10 (ya terminó el día y pasó el cierre automático): actividades sin entregar cuyo
+   * `cierreDeJornada` ya pasó y cuyos ejecutores pendientes no tienen jornada abierta.
+   * Cubre a quien no checó y lo que quedó de días anteriores. Idempotente.
+   */
+  @Cron('10 0 * * *', { name: 'actividades-barrido-no-cumplida', timeZone: WORKDAY_TIMEZONE })
+  async barridoNocturnoCron() {
+    if (process.env.NEXARA_RELEVO === '1') return;
+    try {
+      const r = await this.barridoNocturno();
+      if (r.cerradas) this.logger.log(`Barrido nocturno: ${r.cerradas} actividad(es) no cumplida(s)`);
+    } catch (error) {
+      this.logger.error('Barrido nocturno de no cumplidas falló', error as Error);
+    }
+  }
+
+  async barridoNocturno(ahora: Date = new Date()): Promise<{ cerradas: number }> {
+    const filas = (await this.prisma.activity.findMany({
+      where: {
+        deletedAt: null,
+        estatus: {
+          in: [
+            ACTIVITY_STATUS.PENDIENTE,
+            ACTIVITY_STATUS.ASIGNADA,
+            ACTIVITY_STATUS.EN_PROCESO,
+            ACTIVITY_STATUS.RECHAZADA,
+          ].flatMap((st) => statusVariants(st)),
+        },
+        OR: [
+          { periodoFin: { lte: ahora } },
+          { periodoFin: null, fechaMaxima: { lte: ahora } },
+          { periodoFin: null, fechaEntregaEsperada: { lte: ahora } },
+        ],
+      },
+      select: SELECT_CIERRE,
+      orderBy: { id: 'asc' },
+      take: LOTE,
+    })) as FilaCierre[];
+    if (!filas.length) return { cerradas: 0 };
+
+    const abiertas = await this.prisma.attendanceDay.findMany({
+      where: { isOpen: true },
+      select: { userId: true },
+    });
+    const conJornadaAbierta = new Set(abiertas.map((d) => d.userId));
+
+    let cerradas = 0;
+    for (const fila of filas) {
+      if (!esCandidataAlCierre(fila.estatus)) continue;
+      const horas = await this.horasDeSalida(this.ejecutoresDe(fila));
+      const cierre = cierreDeJornada({
+        ...fila,
+        horasSalida: this.ejecutoresDe(fila).map((id) => horas.get(id) ?? null),
+      });
+      if (!cierre || cierre.getTime() > ahora.getTime()) continue;
+      if (cierre.getTime() < NO_CUMPLIDA_VIGENTE_DESDE.getTime()) continue;
+
+      const ejecutores = this.ejecutoresDe(fila);
+      const entregas = this.entregas(fila, ejecutores);
+      const sinEntregar = entregas.filter((e) => !e.entregadaAt);
+      if (!sinEntregar.length) continue;
+      // Quien no tiene jornada abierta cuenta como que ya salió (Adam 20-11).
+      if (sinEntregar.some((e) => conJornadaAbierta.has(e.userId))) continue;
+
+      try {
+        const ok = await this.cerrar(fila, {
+          origen: 'CIERRE_JORNADA',
+          causa: CAUSA_CIERRE_JORNADA,
+          observaciones: null,
+          limite: cierre,
+          pendientesIds: sinEntregar.map((e) => e.userId),
+          actorId: null,
+          ahora,
+        });
+        if (ok) cerradas += 1;
+      } catch (error) {
+        this.logger.warn(`Barrido ${fila.id}: ${error instanceof Error ? error.message : error}`);
+      }
+    }
+    return { cerradas };
+  }
+
+  /**
+   * Salida del día (propia, automática 23:30 o de un jefe). Adam 20-11: todas cierran
+   * actividades vencidas; en equipo, quien ya no tiene jornada abierta cuenta como salido.
+   */
   private async salidasPropias(userIds: number[], at: Date): Promise<Map<number, Date>> {
     const ids = [...new Set(userIds)].filter((id) => id > 0);
     if (!ids.length) return new Map();
@@ -205,13 +293,16 @@ export class ActivityNonComplianceService implements OnModuleInit {
         userId: { in: ids },
         type: 'salida',
         workDate: workDateColumn(at),
-        cierreAutomatico: false,
-        registradaPorId: null,
         timestamp: { lte: at },
       },
       select: { userId: true, timestamp: true },
+      orderBy: { timestamp: 'desc' },
     });
-    return new Map(filas.map((f) => [f.userId, f.timestamp]));
+    const map = new Map<number, Date>();
+    for (const f of filas) {
+      if (!map.has(f.userId)) map.set(f.userId, f.timestamp);
+    }
+    return map;
   }
 
   /**

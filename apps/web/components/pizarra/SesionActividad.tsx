@@ -114,7 +114,7 @@ export function SesionPropia({
             setConfirm({
               title: "Pausar actividad",
               message:
-                "Tu reloj se detiene en esta actividad; sigue «En Proceso» y la reanudas cuando vuelvas a ella.",
+                "Tu reloj se detiene en esta actividad; sigue «En Proceso» y la reanudas cuando vuelvas a ella. La pausa dura solo hoy: al cerrar tu jornada, lo que venza hoy y no esté entregado queda como No cumplida.",
               confirmLabel: "Pausar",
               danger: false,
               fn: () => correr(() => pausarMiActividad(token, activityId), "No se pudo pausar la actividad"),

@@ -5,7 +5,7 @@ export const DOMAIN_EVENTS = {
   AUTO_APPROVAL_EVALUATE: 'workflow.auto_approval.evaluate',
   ENTITY_CREATED: 'entity.created',
   ENTITY_UPDATED: 'entity.updated',
-  /** Alguien checó su salida de jornada él mismo (no la automática ni la de un jefe). */
+  /** Alguien checó su salida de jornada él mismo, incluyendo salidas por cierre automático a las 23:30 o registradas por un jefe. */
   ATTENDANCE_CHECKOUT: 'attendance.checkout',
 } as const;
 
@@ -25,6 +25,8 @@ export type SalidaDeJornada = {
   companyId: number;
   /** Hora de la salida registrada. */
   at: Date;
+  automatica?: boolean;
+  porJefe?: boolean;
 };
 
 export type DomainEventPayloads = {
