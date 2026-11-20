@@ -252,6 +252,12 @@ export default function SeccionResumen({ proyecto: p, token, hoy, ocupado, perso
         />
       </StatRow>
 
+      {p.fuente && p.fuenteRef ? (
+        <p className={styles.ayuda} data-testid="proyecto-origen">
+          Origen: {p.fuente} · <span title={p.fuenteRef}>{p.fuenteRef}</span>
+        </p>
+      ) : null}
+
       {deLaCotizacion.length ? (
         <RecordSection title="Alcance, tomado de la cotización">
           <ul className={styles.alcanceCorto}>

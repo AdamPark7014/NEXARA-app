@@ -82,6 +82,8 @@ struct CoreActivityFormView: View {
     @State private var ticketType = "PREVENTIVO"
     @State private var ticketTypeCustom = ""
     @State private var tareaTipoId: String?
+    /** Nombre libre cuando el subtipo es «Otro…» (se guarda como `Otro: <nombre>`). */
+    @State private var tareaOtroNombre = ""
     @State private var withSchedule = true
     @State private var fecha = CoreSchedule.defaultStart()
     /// La hora que se puso sola (la de la oficina o la entrada de quien ejecuta): si la de `fecha`
@@ -170,8 +172,22 @@ struct CoreActivityFormView: View {
         return false
     }
     private var tareaTipo: CoreTareaTipo? {
-        guard let tareaTipoId else { return nil }
+        guard let tareaTipoId, tareaTipoId != "otro" else { return nil }
         return CoreTareaTipo.all.first(where: { $0.id == tareaTipoId })
+    }
+
+    private var esTareaOtro: Bool { tareaTipoId == "otro" }
+
+    private func normalizarTextoTarea(_ valor: String) -> String {
+        valor.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "es_MX"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
+
+    private func subtipoExistente(nombre: String) -> CoreTareaTipo? {
+        let n = normalizarTextoTarea(nombre)
+        guard !n.isEmpty else { return nil }
+        return CoreTareaTipo.all.first { normalizarTextoTarea($0.label) == n }
     }
 
     // Entregar a más tardar: solo con día; las horas se comparan como «HH:mm» de México.
@@ -197,9 +213,16 @@ struct CoreActivityFormView: View {
         var type = kind.ticketType ?? ticketType
         var custom = kind.ticketTypeCustom
         if kind == .tarea {
-            guard let tipo = tareaTipo else { return nil }
-            custom = tipo.label
-            type = "OTRO"
+            if esTareaOtro {
+                let nombre = coreClean(tareaOtroNombre)
+                guard nombre.count >= 3 else { return nil }
+                custom = "Otro: \(nombre)"
+                type = "OTRO"
+            } else {
+                guard let tipo = tareaTipo else { return nil }
+                custom = tipo.label
+                type = "OTRO"
+            }
         } else if kind.ticketType == nil && ticketType == "OTRO" {
             let text = coreClean(ticketTypeCustom)
             custom = text.isEmpty ? nil : text
@@ -311,7 +334,7 @@ struct CoreActivityFormView: View {
             }
 
             if kind == .tarea {
-                // Catálogo cerrado por familia (28-10): sin texto libre, cada tipo se puede medir.
+                // Catálogo por familia + «Otro…» con nombre libre (18-11).
                 Section {
                     ForEach(CoreFamiliaTarea.allCases) { familia in
                         VStack(alignment: .leading, spacing: 6) {
@@ -326,7 +349,41 @@ struct CoreActivityFormView: View {
                         }
                         .padding(.vertical, 4)
                     }
-                    if intentado && tareaTipo == nil {
+                    CoreFlowLayout(spacing: 8) {
+                        let on = esTareaOtro
+                        Button {
+                            tareaTipoId = "otro"
+                        } label: {
+                            Text("Otro…")
+                                .font(.subheadline.weight(on ? .semibold : .regular))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(on ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.08), in: Capsule())
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(on ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: on ? 2 : 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Otro…")
+                    }
+                    if esTareaOtro {
+                        TextField("¿Qué tarea es?", text: $tareaOtroNombre)
+                            .textInputAutocapitalization(.sentences)
+                            .accessibilityLabel("¿Qué tarea es?")
+                        if let existe = subtipoExistente(nombre: tareaOtroNombre) {
+                            Text("Ya existe \"\(existe.label)\": elígela de la lista")
+                                .font(.footnote)
+                                .foregroundStyle(CorePalette.red)
+                            Button("Usar \(existe.label)") {
+                                tareaTipoId = existe.id
+                                tareaOtroNombre = ""
+                            }
+                        } else if intentado && coreClean(tareaOtroNombre).count < 3 {
+                            Text("Escribe al menos 3 caracteres")
+                                .font(.footnote)
+                                .foregroundStyle(CorePalette.red)
+                        }
+                    }
+                    if intentado && tareaTipo == nil && !esTareaOtro {
                         Text("Elige el tipo de tarea")
                             .font(.footnote)
                             .foregroundStyle(CorePalette.red)
@@ -551,6 +608,7 @@ struct CoreActivityFormView: View {
         let on = tareaTipoId == tipo.id
         return Button {
             tareaTipoId = tipo.id
+            tareaOtroNombre = ""
             refrescarComplejidad()
         } label: {
             Label(tipo.label, systemImage: tipo.symbol)
@@ -972,12 +1030,30 @@ struct CoreActivityFormView: View {
         var type = kind.ticketType ?? ticketType
         var custom = kind.ticketTypeCustom
         if kind == .tarea {
-            guard let tipo = tareaTipo else {
-                error = "Elige el tipo de tarea"
-                return
+            if esTareaOtro {
+                let nombre = coreClean(tareaOtroNombre)
+                if nombre.count < 3 {
+                    error = "Escribe al menos 3 caracteres"
+                    return
+                }
+                if nombre.count > 60 {
+                    error = "Máximo 60 caracteres"
+                    return
+                }
+                if let existe = subtipoExistente(nombre: nombre) {
+                    error = "Ya existe \"\(existe.label)\": elígela de la lista"
+                    return
+                }
+                custom = "Otro: \(nombre)"
+                type = "OTRO"
+            } else {
+                guard let tipo = tareaTipo else {
+                    error = "Elige el tipo de tarea"
+                    return
+                }
+                custom = tipo.label
+                type = "OTRO"
             }
-            custom = tipo.label
-            type = "OTRO"
         } else if kind.ticketType == nil && ticketType == "OTRO" {
             let text = coreClean(ticketTypeCustom)
             guard !text.isEmpty else {

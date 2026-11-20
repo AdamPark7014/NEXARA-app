@@ -71,6 +71,25 @@ describe('tiempo y entrega de toda actividad', () => {
     expect(estandarDeLectura({ coreKind: null }, {}).totalMin).toBe(60);
   });
 
+  it('«Otro: …» usa el estándar de Otro (1 h) y no da 0', () => {
+    expect(reglaDe({ coreKind: 'tarea', ticketTypeCustom: 'Otro: Pintar rack' })?.clave).toBe('tarea:Otro');
+    expect(estandarDeLectura({ coreKind: 'tarea', ticketTypeCustom: 'Otro: Pintar rack' }, {}).totalMin).toBe(60);
+    const alta = completarTiempos(
+      {
+        coreKind: 'tarea',
+        ticketTypeCustom: 'Otro: Pintar rack',
+        titulo: 'Pintar rack',
+        creadoPorId: 1,
+        responsableId: 1,
+        fechaInicio: cdmx('10:00').toISOString(),
+      },
+      { lectura: {}, ahora: cdmx('09:00') },
+    );
+    expect(alta.error).toBeUndefined();
+    expect(alta.cambios.tiempoEstandarMin).toBe(60);
+    expect(alta.cambios.tiempoEstimadoMin).toBe(60);
+  });
+
   it('la entrega es el inicio más el tiempo, cuenta la comida y no pasa de la salida', () => {
     expect(hora(entregaCalculada(cdmx('10:00'), 90))).toBe('11:30');
     // Cruza la comida de 15 a 16: una hora más.

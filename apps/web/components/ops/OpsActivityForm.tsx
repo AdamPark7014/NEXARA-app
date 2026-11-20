@@ -84,7 +84,18 @@ import {
   clientSectorsForUser,
   type ClientSector,
 } from "@/lib/client-sectors";
-import { FAMILIAS_TAREA, TAREA_TIPOS, type ActivityKind } from "@/lib/activity-kinds";
+import {
+  FAMILIAS_TAREA,
+  TAREA_OTRO_CHIP,
+  TAREA_OTRO_NOMBRE_MAX,
+  TAREA_TIPOS,
+  esOtroLibre,
+  nombreOtroLibre,
+  subtipoExistentePorNombre,
+  ticketTypeCustomDeOtro,
+  validarNombreOtro,
+  type ActivityKind,
+} from "@/lib/activity-kinds";
 import { createMyActivity } from "@/lib/my-activities-api";
 import { quickCreateOperationalProject } from "@/lib/ops-operational-api";
 import { obtenerProgramacion, type EtapaPropuesta } from "@/lib/proyectos-api";
@@ -276,12 +287,20 @@ export default function OpsActivityForm({
   const needsClientPicker = coreKind === "servicio" || coreKind === "comercial" || coreKind === "administrativa";
   const filtersProjectsBySector = coreKind === "proyecto" || coreKind === "obra";
 
-  // Tarea Core: subtipo obligatorio (Levantamiento, Junta… u Otro con texto libre).
+  // Tarea Core: subtipo obligatorio (catálogo o «Otro…» con nombre libre «Otro: …»).
   const isTareaCore = tone === "core" && coreKind === "tarea";
-  const tareaPreset = TAREA_TIPOS.find((t) => t.id !== "otro" && t.label === form.ticketTypeCustom);
-  const tareaTipo = tareaOtroOpen
+  const tareaPreset = TAREA_TIPOS.find((t) => t.label === form.ticketTypeCustom);
+  const tareaTipo = tareaOtroOpen || esOtroLibre(form.ticketTypeCustom)
     ? "otro"
     : tareaPreset?.id ?? (form.ticketType === "OTRO" && form.ticketTypeCustom.trim() ? "otro" : "");
+  const nombreOtro =
+    esOtroLibre(form.ticketTypeCustom)
+      ? nombreOtroLibre(form.ticketTypeCustom)
+      : tareaTipo === "otro"
+        ? form.ticketTypeCustom.trim()
+        : "";
+  const errorNombreOtro = tareaTipo === "otro" ? validarNombreOtro(nombreOtro) : null;
+  const coincidenciaOtro = tareaTipo === "otro" ? subtipoExistentePorNombre(nombreOtro) : null;
 
   const activeProjects = useMemo(() => {
     const active = projects.filter((p) => p.status !== "COMPLETED" && p.status !== "CANCELLED");
@@ -630,9 +649,15 @@ export default function OpsActivityForm({
       setError("Elige el tipo de tarea");
       return;
     }
-    if (isTareaCore && tareaTipo === "otro" && !form.ticketTypeCustom.trim()) {
-      setError("Especifica el tipo de tarea");
-      return;
+    if (isTareaCore && tareaTipo === "otro") {
+      if (errorNombreOtro) {
+        setError(errorNombreOtro);
+        return;
+      }
+      if (coincidenciaOtro) {
+        setError(`Ya existe "${coincidenciaOtro.label}": elígela de la lista`);
+        return;
+      }
     }
     if (!form.periodoFin && !compromisoValido(form.hora, form.horaCompromiso)) {
       setError("La hora de entrega tiene que ser después de la hora de inicio");
@@ -921,7 +946,8 @@ export default function OpsActivityForm({
   const tituloOk = Boolean(form.titulo.trim());
   const responsableOk = Boolean(form.responsableId);
   const tipoTareaOk =
-    !isTareaCore || (Boolean(tareaTipo) && (tareaTipo !== "otro" || Boolean(form.ticketTypeCustom.trim())));
+    !isTareaCore ||
+    (Boolean(tareaTipo) && (tareaTipo !== "otro" || (!errorNombreOtro && !coincidenciaOtro)));
   const proyectoOk = form.projectMode !== "with_project" || Boolean(form.projectId);
   const pideClienteServicio = (coreKind === "servicio" || coreKind === "comercial") && form.projectMode !== "with_project";
   // administrativa: cliente opcional (se ofrece picker pero no bloquea el alta)
@@ -1008,9 +1034,13 @@ export default function OpsActivityForm({
   const kindActual = form.coreKind || coreKind || "";
   const tipoParaComplejidad =
     kindActual === "tarea"
-      ? tareaTipo && tareaTipo !== "otro"
-        ? form.ticketTypeCustom
-        : null
+      ? tareaTipo === "otro"
+        ? errorNombreOtro || coincidenciaOtro
+          ? null
+          : "Otro"
+        : tareaTipo
+          ? form.ticketTypeCustom
+          : null
       : kindActual === "servicio"
         ? form.ticketType
         : null;
@@ -1197,7 +1227,7 @@ export default function OpsActivityForm({
                 <span className={s.etiqueta}>
                   Tipo de tarea <b className={s.req}>*</b>
                 </span>
-                {/* Catálogo cerrado por familia (28-10): sin texto libre, cada tipo se puede medir. */}
+                {/* Catálogo por familia + «Otro…» con nombre libre (18-11): se guarda como «Otro: …». */}
                 {FAMILIAS_TAREA.map((familia, fi) => (
                   <div key={familia.id} className={s.familiaTipos}>
                     <span className={s.familiaEtiqueta}>{familia.label}</span>
@@ -1224,6 +1254,26 @@ export default function OpsActivityForm({
                     </div>
                   </div>
                 ))}
+                <div className={s.chips} role="group" aria-label="Tipo de tarea · Otro">
+                  <Button
+                    size="sm"
+                    className={s.chip}
+                    aria-pressed={tareaTipo === "otro"}
+                    onClick={() => {
+                      setTareaOtroOpen(true);
+                      setForm((prev) => ({
+                        ...prev,
+                        ticketType: "OTRO",
+                        ticketTypeCustom: esOtroLibre(prev.ticketTypeCustom)
+                          ? prev.ticketTypeCustom
+                          : "",
+                        workType: "ISSUE",
+                      }));
+                    }}
+                  >
+                    {TAREA_OTRO_CHIP}
+                  </Button>
+                </div>
                 {intentado && isTareaCore && !tareaTipo ? (
                   <span className={s.errorCampo} role="alert">
                     Elige el tipo de tarea
@@ -1231,21 +1281,55 @@ export default function OpsActivityForm({
                 ) : null}
                 {tareaTipo === "otro" ? (
                   <Field
-                    label="Tipo anterior (texto libre)"
-                    hint="Esta actividad se creó antes del catálogo. Si puedes, elige arriba el tipo que le corresponde."
+                    label="¿Qué tarea es?"
+                    hint="Se guarda como Otro y el nombre queda en la ficha."
                     required
-                    error={intentado && !form.ticketTypeCustom.trim() ? "Especifica el tipo de tarea" : null}
+                    error={
+                      intentado && errorNombreOtro
+                        ? errorNombreOtro
+                        : intentado && coincidenciaOtro
+                          ? `Ya existe "${coincidenciaOtro.label}": elígela de la lista`
+                          : null
+                    }
                   >
                     <Input
                       autoFocus
-                      maxLength={120}
-                      placeholder="Especifica el tipo (ej. Visita a proveedor)"
-                      value={form.ticketTypeCustom}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, ticketType: "OTRO", ticketTypeCustom: e.target.value }))
-                      }
+                      aria-label="¿Qué tarea es?"
+                      maxLength={TAREA_OTRO_NOMBRE_MAX}
+                      placeholder="Ej. Pintar rack"
+                      value={nombreOtro}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setTareaOtroOpen(true);
+                        setForm((prev) => ({
+                          ...prev,
+                          ticketType: "OTRO",
+                          ticketTypeCustom: v.trim() ? ticketTypeCustomDeOtro(v) : "",
+                          workType: "ISSUE",
+                        }));
+                      }}
                     />
                   </Field>
+                ) : null}
+                {tareaTipo === "otro" && coincidenciaOtro ? (
+                  <div className={s.errorCampo} role="status">
+                    Ya existe &quot;{coincidenciaOtro.label}&quot;: elígela de la lista.{" "}
+                    <Button
+                      size="sm"
+                      variant="tertiary"
+                      onClick={() => {
+                        setTareaOtroOpen(false);
+                        setForm((prev) => ({
+                          ...prev,
+                          ticketType: "OTRO",
+                          ticketTypeCustom: coincidenciaOtro.label,
+                          workType: "ISSUE",
+                        }));
+                      }}
+                    >
+                      Usar {coincidenciaOtro.label}
+                    </Button>
+                  </div>
                 ) : null}
               </div>
             ) : null}

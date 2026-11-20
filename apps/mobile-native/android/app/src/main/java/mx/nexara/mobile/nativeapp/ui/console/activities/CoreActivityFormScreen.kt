@@ -58,6 +58,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -803,7 +805,7 @@ internal fun ActivityFormPanel(
             if (isTarea) {
                 Spacer(Modifier.height(8.dp))
                 Text("Tipo de tarea *", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
-                // Catálogo cerrado por familia (28-10): sin texto libre, cada tipo se puede medir.
+                // Catálogo por familia + «Otro…» con nombre libre (18-11).
                 k.FAMILIAS_TAREA.forEach { familia ->
                     Spacer(Modifier.height(8.dp))
                     Text(familia.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted)
@@ -819,6 +821,43 @@ internal fun ActivityFormPanel(
                                 selected = tareaTipo == t.id,
                                 onClick = { form = k.pickTareaTipo(form, t.id) },
                             )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Pill(
+                        text = k.TAREA_OTRO_CHIP,
+                        selected = tareaTipo == k.TAREA_OTRO,
+                        onClick = { form = k.pickTareaOtro(form) },
+                    )
+                }
+                if (tareaTipo == k.TAREA_OTRO) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = k.nombreOtroLibre(form.ticketTypeCustom),
+                        onValueChange = { form = k.setNombreOtro(form, it.take(k.TAREA_OTRO_NOMBRE_MAX)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics { contentDescription = "¿Qué tarea es?" },
+                        label = { Text("¿Qué tarea es?") },
+                        placeholder = { Text("Ej. Pintar rack") },
+                        singleLine = true,
+                        isError = k.validarNombreOtro(k.nombreOtroLibre(form.ticketTypeCustom)) != null ||
+                            k.subtipoExistentePorNombre(k.nombreOtroLibre(form.ticketTypeCustom)) != null,
+                    )
+                    k.subtipoExistentePorNombre(k.nombreOtroLibre(form.ticketTypeCustom))?.let { existe ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Ya existe \"${existe.label}\": elígela de la lista",
+                            fontSize = 12.sp,
+                            color = NxColors.Danger,
+                        )
+                        TextButton(onClick = { form = k.pickTareaTipo(form, existe.id) }) {
+                            Text("Usar ${existe.label}")
                         }
                     }
                 }
