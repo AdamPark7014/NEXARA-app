@@ -8,6 +8,7 @@ import { MapsModule } from './common/maps/maps.module';
 import { tareasProgramadas } from './common/relevo';
 import { AppController } from './app.controller';
 import { StripSecretsInterceptor } from './common/security/strip-secrets.interceptor';
+import { JornadaAbiertaInterceptor } from './attendance/candado-jornada.interceptor.js';
 import { AppService } from './app.service';
 import { ExcelExportController } from './common/excel-export.controller';
 import { ExcelImportController } from './common/excel-import.controller';
@@ -243,6 +244,11 @@ import { CctvDisenosModule } from './cctv-disenos/cctv-disenos.module.js';
     {
       provide: APP_INTERCEPTOR,
       useClass: StripSecretsInterceptor,
+    },
+    // Sin entrada registrada no se trabaja: las escrituras piden jornada abierta (Adam, 20-11-2026).
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: JornadaAbiertaInterceptor,
     },
   ],
 })
