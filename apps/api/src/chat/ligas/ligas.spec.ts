@@ -1,3 +1,4 @@
+import { fijarCompartimentada } from '../../common/visibilidad/visibilidad';
 import { parsearLiga, rutaDeLiga, tipoDeFolio, TIPOS_LIGA } from './ligas.js';
 import { LigasService } from './ligas.service.js';
 
@@ -91,12 +92,17 @@ describe('LigasService.resolver — permisos de quien ve, no de quien escribió'
   });
 
   it('cotización: con permiso pero sin ser suya ni mandada, solo el título genérico (quién ve qué)', async () => {
+    fijarCompartimentada(true);
     const { svc } = servicio();
-    const r = await svc.resolver({ id: 3, roleKey: 'vendedor', permissions: ['cotizaciones.access'] }, 1, ['/erp/cotizaciones/12']);
-    const t = r['/erp/cotizaciones/12']!;
-    expect(t.acceso).toBe(false);
-    expect(t.monto).toBeNull();
-    expect(JSON.stringify(t)).not.toContain('Grupo Tox');
+    try {
+      const r = await svc.resolver({ id: 3, roleKey: 'vendedor', permissions: ['cotizaciones.access'] }, 1, ['/erp/cotizaciones/12']);
+      const t = r['/erp/cotizaciones/12']!;
+      expect(t.acceso).toBe(false);
+      expect(t.monto).toBeNull();
+      expect(JSON.stringify(t)).not.toContain('Grupo Tox');
+    } finally {
+      fijarCompartimentada(false);
+    }
   });
 
   it('cotización: sin permiso solo el título genérico (ni cliente ni monto)', async () => {

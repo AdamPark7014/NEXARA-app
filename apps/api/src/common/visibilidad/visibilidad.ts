@@ -11,6 +11,21 @@
  */
 import type { Prisma } from '@prisma/client';
 
+/**
+ * Interruptor general (system_settings `visibilidad.compartimentada`, apagado por omisión). Apagado =
+ * todo como antes: nadie pierde nada al desplegar hasta que Adam dé el OK y se prenda con un script.
+ * Lo refresca `VisibilidadService` cada 30 s; las funciones puras lo leen de aquí.
+ */
+export const CLAVE_INTERRUPTOR = 'visibilidad.compartimentada';
+let compartimentada = false;
+export function reglasActivas(): boolean {
+  return compartimentada;
+}
+/** Solo para el servicio que lo lee de la base y para pruebas. */
+export function fijarCompartimentada(valor: boolean): void {
+  compartimentada = Boolean(valor);
+}
+
 /** Claves de acceso por persona (`User.accesos`). */
 export const ACCESOS = {
   PRECIOS_VER: 'precios.ver',
@@ -37,10 +52,12 @@ export function tieneAcceso(actor: Actor | null | undefined, clave: ClaveAcceso)
 }
 
 export function puedeVerPrecios(actor: Actor | null | undefined): boolean {
+  if (!reglasActivas()) return true;
   return esSuperAdmin(actor) || tieneAcceso(actor, ACCESOS.PRECIOS_VER);
 }
 
 export function veTodasLasCotizaciones(actor: Actor | null | undefined): boolean {
+  if (!reglasActivas()) return true;
   return esSuperAdmin(actor) || tieneAcceso(actor, ACCESOS.COTIZACIONES_VER_TODAS);
 }
 
@@ -52,6 +69,7 @@ const NADA = { id: -1 } as const;
  * empresa: `where: { AND: [companyWhere(cid), whereCotizacionesVisibles(actor)] }`.
  */
 export function whereCotizacionesVisibles(actor: Actor | null | undefined): Prisma.CotizacionWhereInput {
+  if (!reglasActivas()) return {};
   if (!actor?.id) return NADA;
   if (veTodasLasCotizaciones(actor)) return {};
   return {
@@ -68,6 +86,7 @@ export function cotizacionVisible(
   actor: Actor | null | undefined,
   c: { createdById?: number | null; asignadoAId?: number | null; participantes?: Array<{ userId: number }> | null },
 ): boolean {
+  if (!reglasActivas()) return true;
   if (!actor?.id) return false;
   if (veTodasLasCotizaciones(actor)) return true;
   return (
@@ -123,6 +142,7 @@ export function usuariosBajoMiMando(actorId: number, personas: readonly PersonaO
 
 /** ¿Puede el actor ver lo que subió `autorId`? Él mismo, sus jefes hacia arriba y superadmin. */
 export function puedeVerDeAutor(actor: Actor | null | undefined, autorId: number, bajoMiMando: ReadonlySet<number>): boolean {
+  if (!reglasActivas()) return true;
   if (!actor?.id) return false;
   if (esSuperAdmin(actor)) return true;
   return autorId === actor.id || bajoMiMando.has(autorId);

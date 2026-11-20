@@ -184,7 +184,10 @@ export class EvidencesService {
   }, query?: PaginationQueryDto, companyId?: number | null) {
     // Quién ve qué (20-11-2026): quien la subió, sus jefes hacia arriba (cadena managerId) y superadmin.
     // Antes era «todo tu departamento».
-    const autores = await this.visibilidad.autoresVisibles(currentUser, companyId);
+    // Con el interruptor apagado, como antes (por departamento).
+    const autores = (await this.visibilidad.activas())
+      ? await this.visibilidad.autoresVisibles(currentUser, companyId)
+      : await this.getAccessibleUserIds(currentUser);
     const where = { ...(autores === null ? {} : { userId: { in: autores } }), ...companyWhere(companyId ?? null) };
     const include = this.buildInclude();
     const orderBy = { subidoEn: 'desc' as const };
