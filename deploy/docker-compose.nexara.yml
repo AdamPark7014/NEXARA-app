@@ -74,6 +74,9 @@ services:
       # Portal del NAS (nas.nexara.com.mx): ids de usuario que pasan la puerta, separados por coma.
       # Vacío = solo super_admin. El valor vive solo en deploy/.env.nexara del servidor.
       NAS_PORTAL_USER_IDS: ${NAS_PORTAL_USER_IDS:-}
+      # Exportación de cotizaciones al NAS: token (≥32 caracteres) del job que las copia.
+      # Vacío = el endpoint de exportables responde 401. El valor vive solo en deploy/.env.nexara.
+      NAS_EXPORT_TOKEN: ${NAS_EXPORT_TOKEN:-}
       # Transcriptor propio (perfil `transcriptor`). Vacío = sin voz propia.
       TRANSCRIPTOR_URL: ${TRANSCRIPTOR_URL:-}
       # Whisper `small` solo para dictado; vacío = el dictado usa TRANSCRIPTOR_URL.
