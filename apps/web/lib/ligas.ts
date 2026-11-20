@@ -128,6 +128,8 @@ export type TarjetaLiga = {
   estado: string | null;
   detalle: string[];
   monto: { total: number; moneda: string } | null;
+  /** Hay monto pero quien mira no tiene «Ver precios». */
+  montoOculto?: true;
   href: string;
   motivo?: string;
 };

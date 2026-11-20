@@ -236,6 +236,10 @@ export function LigaCard({ liga, token }: { liga: RefLiga; token: string }) {
               <b className={styles.ecardNum}>{formatoMoneda(datos.monto.total, datos.monto.moneda)}</b>
               <small>{datos.monto.moneda}</small>
             </span>
+          ) : datos.montoOculto ? (
+            <span>
+              <b className={styles.ecardNum}>Confidencial</b>
+            </span>
           ) : null}
           <Abrir href={datos.href} tipo={tipo} nombre={nombre} />
         </div>
