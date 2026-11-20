@@ -313,7 +313,7 @@ describe('actividad con periodo de varios días', () => {
     expect(c.semaforo).toBe('verde');
   });
 
-  it('antes de su primer día está programada; la prioridad no la pone roja al empezar el periodo', () => {
+  it('antes de su primer día está programada; dentro del periodo vigente no arrancar no la pone roja', () => {
     const c = calculaActividad({ prioridad: 'ALTA', periodo: { inicio: '2026-09-21', fin: '2026-09-30' } }, ahora);
     expect(c.semaforo).toBe('verde');
     const yaEmpezo = calculaActividad(
@@ -330,7 +330,7 @@ describe('actividad con periodo de varios días', () => {
       },
       ahora,
     );
-    expect(sinArrancar.semaforo).toBe('rojo');
+    expect(sinArrancar.semaforo).toBe('verde');
   });
 
   it('cerrada antes de su fin cuenta a tiempo', () => {

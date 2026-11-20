@@ -57,14 +57,18 @@ import {
 
 export type BoardActivityBucket = 'daily' | 'projects' | 'services';
 /**
- * activo/atrasado: tiene algo abierto (atrasado = pasó la fecha máxima).
- * libre: terminó su actividad hace 15 min o menos y no tiene otra abierta.
- * sin_actividad: no tiene nada abierto (nada hoy, o terminó hace más de 15 min).
+ * activo/atrasado: tiene algo abierto (atrasado = alguna abierta con semáforo rojo).
+ * libre: hoy entregó al menos una (evidencia / finReal) y no tiene nada abierto para hoy.
+ * sin_actividad: no tiene nada abierto para hoy y no entregó nada hoy (un cierre o
+ * aprobación administrativa de días anteriores no la vuelve libre).
  * inactivo: ya no se asigna (clientes viejos).
  */
 export type BoardUserStatus = 'activo' | 'inactivo' | 'atrasado' | 'libre' | 'sin_actividad';
 
-/** Cuánto dura «libre» después de terminar; luego pasa a «sin nada asignado». */
+/**
+ * Antes «libre» duraba 15 min. Ahora libre = entregó hoy y no tiene más para hoy
+ * (Adam, 20-11). Se conserva el export por si algo externo lo importaba.
+ */
 export const LIBRE_TRAS_TERMINAR_MS = 15 * 60_000;
 
 /** Rango de la pizarra, ya resuelto a instantes de la jornada mexicana. */
@@ -1441,6 +1445,11 @@ export class TeamBoardService {
           const envio = ev?.status === 'COMPLETED';
           const cerrada = closed(a.estatus);
           const calculo = calculoPorFila.get(clave(u.id, a.id)) ?? null;
+          // Solo la entrega de la persona (evidencia COMPLETED / finReal) mueve «Libre» y «Última».
+          // Un cierre o aprobación administrativa (fechaFinalizacion, «Cerrada por dirección…») no.
+          const terminoAt = envio
+            ? (calculo?.fin ?? ev?.completedAt ?? null)
+            : null;
           return {
             a,
             calculo,
@@ -1449,11 +1458,7 @@ export class TeamBoardService {
             devuelta: ev?.reviewStatus === 'REJECTED',
             terminada: envio || cerrada,
             cancelada: /cancel/i.test(a.estatus || ''),
-            terminoAt: envio
-              ? (calculo?.fin ?? ev?.completedAt ?? a.fechaFinalizacion)
-              : cerrada
-                ? (calculo?.fin ?? a.fechaFinalizacion)
-                : null,
+            terminoAt,
           };
         });
       const enElRango = propias.filter((p) => p.calculo?.dentroDelRango);
@@ -1471,7 +1476,16 @@ export class TeamBoardService {
               Number(Boolean(x.calculo?.enPausa)) - Number(Boolean(y.calculo?.enPausa)) ||
               vence(x.a) - vence(y.a),
           )[0] ?? null;
-      const act = enCurso?.a ?? null;
+      // Atrasado si CUALQUIER abierta está en rojo (no solo la «principal»). Así el resumen
+      // coincide con las líneas de la tarjeta (Israel + varias abiertas; José Antonio + periodo).
+      const atrasadaPeor =
+        [...openActivities]
+          .filter((a) => a.atrasada)
+          .sort((a, b) => (b.minutosAtraso ?? 0) - (a.minutosAtraso ?? 0))[0] ?? null;
+      const filaAtrasada = atrasadaPeor
+        ? (enElRango.find((p) => p.a.id === atrasadaPeor.id) ?? null)
+        : null;
+      const act = (filaAtrasada ?? enCurso)?.a ?? null;
       // Entregó y nadie ha aprobado todavía / le devolvieron evidencia y la está corrigiendo.
       const enEsperaAprobacion = enElRango.filter((p) => p.envio && !p.aprobada && !p.cancelada).length;
       const enCorreccion = enElRango.filter((p) => p.devuelta && !p.terminada && !p.cancelada).length;
@@ -1496,13 +1510,20 @@ export class TeamBoardService {
           lateMinutes: limite ? minutos(terminoAt.getTime() - limite.getTime()) : null,
         };
       };
+      // Entregas reales (no cierres administrativos), de cualquier día.
+      const entregas = propias
+        .filter((p) => p.envio && !p.cancelada && p.terminoAt != null && p.terminoAt.getTime() <= now.getTime())
+        .sort((x, y) => (y.terminoAt?.getTime() ?? 0) - (x.terminoAt?.getTime() ?? 0));
+      const entregasHoy = entregas.filter((p) => (p.terminoAt?.getTime() ?? 0) >= dayStart.getTime());
 
       if (act) {
-        // Con periodo, «atrasado» es pasar el fin de su último día, no la hora citada del primero.
-        const overdue = enCurso?.calculo?.calc.semaforo === 'rojo';
+        const overdue = Boolean(atrasadaPeor);
+        const fuente = filaAtrasada ?? enCurso;
         status = overdue ? 'atrasado' : 'activo';
-        currentLateMinutes = overdue ? (enCurso?.calculo?.calc.minutosAtraso ?? null) : null;
-        currentLateReason = overdue ? (enCurso?.calculo?.calc.motivoAtraso ?? null) : null;
+        currentLateMinutes = overdue
+          ? (atrasadaPeor?.minutosAtraso ?? fuente?.calculo?.calc.minutosAtraso ?? null)
+          : null;
+        currentLateReason = overdue ? (fuente?.calculo?.calc.motivoAtraso ?? null) : null;
         currentActivity = {
           id: act.id,
           anNumber: act.anNumber,
@@ -1511,29 +1532,22 @@ export class TeamBoardService {
           fechaMaxima: act.fechaMaxima,
           bucket: act.projectId ? 'projects' : act.clientId ? 'services' : 'daily',
           periodo: periodoDto(act, now, false),
-          enPausa: Boolean(enCurso?.calculo?.enPausa),
+          enPausa: Boolean(fuente?.calculo?.enPausa),
         };
         // El inicio es el real (foto de entrada / `inicioRealAt`), no la hora a la que la citaron.
-        activityStartedAt = enCurso?.calculo?.inicio ?? null;
-        activityElapsedMinutes = enCurso?.calculo?.calc.minutosReales ?? null;
+        activityStartedAt = fuente?.calculo?.inicio ?? null;
+        activityElapsedMinutes = fuente?.calculo?.calc.minutosReales ?? null;
       } else {
-        // Terminó algo hace ≤ LIBRE_TRAS_TERMINAR_MS y no tiene nada abierto: «libre» y con cuánto
-        // atraso. Pasado ese margen ya no está libre: queda «sin nada asignado» (Adam, 05-10).
-        const ultima = enElRango
-          .filter(
-            (p) => p.terminada && !p.cancelada && p.terminoAt != null && p.terminoAt.getTime() >= dayStart.getTime(),
-          )
-          .sort((x, y) => (y.terminoAt?.getTime() ?? 0) - (x.terminoAt?.getTime() ?? 0))[0];
-        if (ultima?.terminoAt && now.getTime() - ultima.terminoAt.getTime() <= LIBRE_TRAS_TERMINAR_MS) {
+        // Libre: hoy entregó al menos una y no tiene nada abierto para hoy (Adam, 20-11).
+        const ultimaHoy = entregasHoy[0];
+        if (ultimaHoy?.terminoAt) {
           status = 'libre';
-          idleSinceAt = ultima.terminoAt;
-          lastFinished = terminadaDatos(ultima, ultima.terminoAt);
+          idleSinceAt = ultimaHoy.terminoAt;
+          lastFinished = terminadaDatos(ultimaHoy, ultimaHoy.terminoAt);
         } else {
-          // Sin nada asignado: su última actividad (de cualquier día, no solo del rango) y,
-          // si hoy checó y no ha salido, desde cuándo está sin nada.
-          const previa = propias
-            .filter((p) => p.terminada && !p.cancelada && p.terminoAt != null && p.terminoAt.getTime() <= now.getTime())
-            .sort((x, y) => (y.terminoAt?.getTime() ?? 0) - (x.terminoAt?.getTime() ?? 0))[0];
+          // Sin nada asignado: última entrega real (si la hay) y, si hoy checó y no ha salido,
+          // desde cuándo está sin nada. Un cierre administrativo no llena lastFinished.
+          const previa = entregas[0];
           if (previa?.terminoAt) lastFinished = terminadaDatos(previa, previa.terminoAt);
           if (hoy && !salioHoy) {
             const termino = previa?.terminoAt ?? null;
