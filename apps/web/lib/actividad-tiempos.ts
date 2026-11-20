@@ -124,8 +124,15 @@ export function evaluarSemaforoActividad(params: {
     tope = tope && tope.getTime() < ahora.getTime() ? tope : ahora;
   }
 
+  // Periodo vigente (`en_curso`): el plazo es el fin del periodo; no se marca roja
+  // por pasar la hora citada del primer día sin arrancar (espejo API).
   const atrasos: Array<{ motivo: MotivoSemaforo; minutos: number }> = [];
-  if (!iniciada && inicio && inicio.getTime() < ahora.getTime()) {
+  if (
+    params.periodoEstado !== "en_curso" &&
+    !iniciada &&
+    inicio &&
+    inicio.getTime() < ahora.getTime()
+  ) {
     atrasos.push({ motivo: "inicio", minutos: minutosEntre(inicio, ahora) });
   }
   if (tope && tope.getTime() < ahora.getTime()) {

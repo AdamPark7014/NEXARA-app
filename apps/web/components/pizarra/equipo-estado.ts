@@ -442,7 +442,11 @@ export function estadoDeActividad(a: {
   atrasada?: boolean | null;
   minutosAtraso?: number | null;
   semaforo?: "rojo" | "amarillo" | "verde" | null;
-  periodo?: { etiqueta?: string | null } | null;
+  periodo?: {
+    etiqueta?: string | null;
+    multiDia?: boolean | null;
+    estado?: string | null;
+  } | null;
   /** Sesiones de trabajo: ya la inició y su reloj está detenido. */
   enPausa?: boolean | null;
 }): string {
@@ -450,11 +454,20 @@ export function estadoDeActividad(a: {
   if (/cancel/.test(est)) return "Cancelada";
   if (/no cumplida|incumplida/.test(est)) return "No cumplida";
   if (/finaliz|complet|aprob/.test(est)) return "Terminada";
-  if (a.atrasada || a.semaforo === "rojo" || /atraso/i.test(a.periodo?.etiqueta || "")) {
+  // Solo el semáforo / flag de la API. La etiqueta del periodo puede decir «días de
+  // atraso» cuando ya venció; no se usa como atajo (pisaba periodos vigentes).
+  if (a.atrasada || a.semaforo === "rojo") {
     const t = formatMinutes(a.minutosAtraso);
     return t && t !== "—" ? `Atrasada · ${t}` : "Atrasada";
   }
   if (a.semaforo === "amarillo") return "Por vencer";
+  if (a.periodo?.multiDia && (a.periodo.estado === "en_curso" || a.periodo.etiqueta)) {
+    const et = (a.periodo.etiqueta || "").trim();
+    if (et) {
+      const vence = et.includes(" · ") ? et.slice(et.indexOf(" · ") + 3) : et;
+      return `En periodo · ${vence}`;
+    }
+  }
   if (a.enPausa) return "En pausa";
   if (a.inicioRealAt || /proceso|validar/.test(est)) return "En curso";
   return "Sin iniciar";
@@ -602,4 +615,39 @@ export function iniciales(nombre: string): string {
   if (partes.length === 0) return "?";
   if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
   return `${partes[0][0]}${partes[1][0]}`.toUpperCase();
+}
+
+/** La tarjeta va en rojo sii el status de la API es atrasado (misma regla que el resumen). */
+export function tarjetaEnRojo(u: TeamBoardUser): boolean {
+  return u.status === "atrasado";
+}
+
+/**
+ * Invariante de la pizarra: tarjetas en rojo = «atrasados» del resumen = renglones
+ * de «Atrasados»; y Libres del resumen = tarjetas «Libre».
+ */
+export function invarianteConteoPizarra(
+  users: readonly TeamBoardUser[],
+  opciones: { finDeSemana?: boolean; ahora?: number } = {},
+): {
+  ok: boolean;
+  atrasadosResumen: number;
+  atrasadosLista: number;
+  tarjetasRojas: number;
+  libresResumen: number;
+  tarjetasLibres: number;
+} {
+  const ahora = opciones.ahora ?? Date.now();
+  const r = resumenEquipo(users, { finDeSemana: opciones.finDeSemana });
+  const a = atencionEquipo(users, ahora, { finDeSemana: opciones.finDeSemana });
+  const tarjetasRojas = users.filter(tarjetaEnRojo).length;
+  const tarjetasLibres = users.filter((u) => u.status === "libre").length;
+  return {
+    ok: r.atrasados === tarjetasRojas && a.atrasados.length === tarjetasRojas && r.libres === tarjetasLibres,
+    atrasadosResumen: r.atrasados,
+    atrasadosLista: a.atrasados.length,
+    tarjetasRojas,
+    libresResumen: r.libres,
+    tarjetasLibres,
+  };
 }

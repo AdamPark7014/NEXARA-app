@@ -7,13 +7,16 @@ import {
   contextoActividad,
   cuandoMx,
   desgloseRetraso,
+  estadoDeActividad,
   filtrarCentroOperativo,
   hayFlujo,
   iniciales,
+  invarianteConteoPizarra,
   motivoSinActividad,
   partesContextoActividad,
   queHace,
   resumenEquipo,
+  tarjetaEnRojo,
   ultimaActividad,
   ultimaActividadCorta,
 } from "./equipo-estado";
@@ -533,5 +536,163 @@ describe("iniciales", () => {
     expect(iniciales("Ana Ruiz")).toBe("AR");
     expect(iniciales("Luis")).toBe("LU");
     expect(iniciales("   ")).toBe("?");
+  });
+});
+
+describe("invariante de conteo pizarra (una sola regla de atraso)", () => {
+  const abiertaBase = {
+    evidenceStatus: "ENTRY_PHOTO",
+    progressPct: 0,
+    coreKind: "tarea",
+    fechaFinalizacion: null,
+    minutosAtraso: null as number | null,
+  };
+
+  it("periodo vigente no es Atrasada; el conteo de atrasados/libres coincide", () => {
+    const jose = persona({
+      id: 1,
+      nombre: "José Antonio",
+      status: "activo",
+      openActivities: [
+        {
+          ...abiertaBase,
+          id: 639,
+          anNumber: "AN-0639",
+          titulo: "Migración de Site",
+          estatus: "Pendiente",
+          atrasada: false,
+          semaforo: "verde",
+          periodo: {
+            inicio: "2026-11-19",
+            fin: "2026-11-23",
+            dias: 5,
+            dia: 2,
+            estado: "en_curso",
+            etiqueta: "Día 2 de 5 · termina lun 23 nov",
+            multiDia: true,
+          },
+        },
+      ],
+    });
+    const ivan = persona({
+      id: 2,
+      nombre: "Iván",
+      status: "atrasado",
+      currentLateMinutes: 21,
+      currentLateReason: "inicio",
+      currentActivity: {
+        id: 665,
+        anNumber: "AN-0665",
+        titulo: "Visita",
+        estatus: "Pendiente",
+        fechaMaxima: null,
+        bucket: "daily",
+      },
+      openActivities: [
+        {
+          ...abiertaBase,
+          id: 665,
+          anNumber: "AN-0665",
+          titulo: "Visita",
+          estatus: "Pendiente",
+          atrasada: true,
+          minutosAtraso: 21,
+          semaforo: "rojo",
+        },
+      ],
+    });
+    const ana = persona({ id: 3, status: "activo" });
+    const libre = persona({
+      id: 4,
+      status: "libre",
+      lastFinished: {
+        id: 1,
+        anNumber: "AN-0001",
+        titulo: "Entregó hoy",
+        finishedAt: "2026-10-07T17:00:00.000Z",
+        lateMinutes: 0,
+      },
+    });
+    expect(estadoDeActividad(jose.openActivities![0])).toMatch(/^En periodo · /);
+    expect(estadoDeActividad(ivan.openActivities![0])).toBe("Atrasada · 21 min");
+    const board = [jose, ivan, ana, libre];
+    expect(invarianteConteoPizarra(board, { ahora: AHORA })).toEqual(
+      expect.objectContaining({
+        ok: true,
+        atrasadosResumen: 1,
+        atrasadosLista: 1,
+        tarjetasRojas: 1,
+        libresResumen: 1,
+        tarjetasLibres: 1,
+      }),
+    );
+  });
+
+  it("varias abiertas: status atrasado coincide con tarjeta en rojo (Israel)", () => {
+    const israel = persona({
+      id: 10,
+      status: "atrasado",
+      currentLateMinutes: 379,
+      openActivities: [
+        {
+          ...abiertaBase,
+          id: 668,
+          anNumber: "AN-0668",
+          titulo: "Levantamiento",
+          estatus: "Pendiente",
+          atrasada: true,
+          minutosAtraso: 379,
+          semaforo: "rojo",
+        },
+        {
+          ...abiertaBase,
+          id: 637,
+          anNumber: "AN-0637",
+          titulo: "En curso A",
+          estatus: "En Proceso",
+          atrasada: false,
+          semaforo: "verde",
+          inicioRealAt: "2026-10-07T15:00:00.000Z",
+        },
+        {
+          ...abiertaBase,
+          id: 664,
+          anNumber: "AN-0664",
+          titulo: "En curso B",
+          estatus: "En Proceso",
+          atrasada: false,
+          semaforo: "verde",
+          inicioRealAt: "2026-10-07T16:00:00.000Z",
+        },
+      ],
+    });
+    expect(tarjetaEnRojo(israel)).toBe(true);
+    expect(actividadesDeTarjeta(israel).some((l) => l.estado.startsWith("Atrasada"))).toBe(true);
+    expect(invarianteConteoPizarra([israel], { ahora: AHORA }).ok).toBe(true);
+  });
+
+  it("cierre administrativo no cuenta como libre; varios tableros cumplen la invariante", () => {
+    const cierreAdmin = persona({ id: 1, status: "sin_actividad", lastFinished: null });
+    const libreDeVerdad = persona({
+      id: 2,
+      status: "libre",
+      lastFinished: {
+        id: 9,
+        anNumber: "AN-0009",
+        titulo: "Entrega real",
+        finishedAt: "2026-10-07T17:05:00.000Z",
+        lateMinutes: 0,
+      },
+    });
+    const atrasado = persona({ id: 3, status: "atrasado", currentLateMinutes: 40 });
+    const tableros = [
+      [cierreAdmin, libreDeVerdad, atrasado],
+      [persona({ id: 1, status: "activo" }), persona({ id: 2, status: "libre" })],
+      [persona({ id: 1, status: "atrasado" }), persona({ id: 2, status: "atrasado" }), persona({ id: 3, status: "libre" })],
+    ];
+    for (const t of tableros) {
+      expect(invarianteConteoPizarra(t, { ahora: AHORA }).ok).toBe(true);
+    }
+    expect(resumenEquipo([cierreAdmin, libreDeVerdad]).libres).toBe(1);
   });
 });

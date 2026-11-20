@@ -133,7 +133,8 @@ describe('semáforo por el reloj', () => {
     expect(vencida.motivo).toBe('tope');
   });
 
-  it('en un periodo ya empezado, pasar la hora de inicio sin arrancar es rojo', () => {
+  it('en un periodo vigente, pasar la hora de inicio sin arrancar sigue en tiempo', () => {
+    // AN-0639 y hermanas: periodo de varios días; la hora citada del primer día no atrasa.
     const luz = evaluarSemaforo({
       periodoInicio: '2026-09-16',
       periodoFin: '2026-09-25',
@@ -141,8 +142,23 @@ describe('semáforo por el reloj', () => {
       estatus: 'Pendiente',
       ahora: AHORA,
     });
-    expect(luz.semaforo).toBe('rojo');
-    expect(luz.motivo).toBe('inicio');
+    expect(luz.semaforo).toBe('verde');
+    expect(luz.motivo).toBeNull();
+  });
+
+  it('caso AN-0639: periodo 19–23, inicio ayer, 60 min de plan, pendiente → no atrasada', () => {
+    const ahora = new Date('2026-11-20T20:00:00.000Z');
+    const luz = evaluarSemaforo({
+      periodoInicio: '2026-11-19',
+      periodoFin: '2026-11-23',
+      fechaInicio: new Date('2026-11-19T16:00:00.000Z'),
+      fechaMaxima: new Date('2026-11-24T05:59:59.999Z'),
+      minutosPlan: 60,
+      minutosReales: 0,
+      estatus: 'Pendiente',
+      ahora,
+    });
+    expect(luz.semaforo).toBe('verde');
   });
 
   it('rojo si ya lleva más tiempo real del planeado, aunque siga dentro del tope', () => {

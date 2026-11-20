@@ -3,18 +3,20 @@
  *
  * Umbrales (los mismos en la pizarra, Mi equipo, los listados y el aviso):
  * - Rojo («Atrasada»): ya pasó la hora de inicio programada (`fechaInicio`) y
- *   nadie la ha iniciado, o ya pasó el tope (`fechaMaxima` o `fechaEntregaEsperada`,
- *   el que llegue primero; con periodo, el fin de su último día) y no está terminada,
- *   o ya lleva más tiempo real trabajado del que se planeó (`minutosPlan`/`minutosReales`;
- *   en una actividad de varios días el plan es de una jornada y no cuenta para esto).
+ *   nadie la ha iniciado (solo si NO hay periodo vigente), o ya pasó el tope
+ *   (`fechaMaxima` o `fechaEntregaEsperada`, el que llegue primero; con periodo,
+ *   el fin de su último día) y no está terminada, o ya lleva más tiempo real
+ *   trabajado del que se planeó (`minutosPlan`/`minutosReales`; en una actividad
+ *   de varios días el plan es de una jornada y no cuenta para esto).
  * - Naranja («Por vencer» si falta el tope, «Atención» si falta la hora de inicio):
  *   faltan `UMBRAL_POR_VENCER_MIN` minutos o menos para ese instante, y todavía no es roja.
  * - Verde («En tiempo»): el resto. Sin fecha no hay con qué atrasarse. Lo cerrado
  *   o cancelado no se queda en rojo. La prioridad no pinta el color. Pasar el plan
  *   sigue avisándose aparte también, en `alertaExcesoAt` (ese aviso no cambia).
  *
- * Un periodo que todavía no empieza está programado: verde, aunque la prioridad
- * sea alta. Pasada la hora de inicio de su primer día, sí es roja si no arrancó.
+ * Un periodo que todavía no empieza está programado: verde. Dentro del periodo
+ * vigente no se marca roja por no haber arrancado a la hora citada del primer día;
+ * roja al pasar el fin del último día.
  */
 import { workDateKey, workDayEnd } from '../common/time/workday.js';
 import { esMultiDia, finDelPeriodo, periodoDeActividad, periodoFuturo, type Periodo } from './actividad-periodo.js';
@@ -81,8 +83,12 @@ export function evaluarSemaforo(params: {
   const inicio = aFecha(params.fechaInicio);
   const tope = topeDe(params, periodo);
 
+  // Periodo vigente: el plazo es el fin del último día. La hora citada del primer
+  // día no cuenta como atraso (AN-0639 y hermanas: periodo 19–23 no es «28 h tarde»).
+  const periodoVigente = Boolean(periodo && tope && tope.getTime() >= ahora.getTime());
+
   const atrasos: Array<{ motivo: MotivoSemaforo; minutos: number }> = [];
-  if (!iniciada && inicio && inicio.getTime() < ahora.getTime()) {
+  if (!periodoVigente && !iniciada && inicio && inicio.getTime() < ahora.getTime()) {
     atrasos.push({ motivo: 'inicio', minutos: minutosEntre(inicio, ahora) });
   }
   if (tope && tope.getTime() < ahora.getTime()) {
