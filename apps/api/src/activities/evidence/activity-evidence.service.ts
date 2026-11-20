@@ -1337,7 +1337,7 @@ export class ActivityEvidenceService {
     // Quién ve qué (20-11-2026): evidencias de quien mira y de su gente hacia abajo (cadena managerId);
     // superadmin, todas. Antes: los responsables de todo el departamento.
     let where: Record<string, unknown>;
-    if (this.visibilidad) {
+    if (this.visibilidad && (await this.visibilidad.activas())) {
       const autores = await this.visibilidad.autoresVisibles(currentUser);
       where = autores === null ? {} : { userId: { in: autores } };
     } else {

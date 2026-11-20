@@ -81,7 +81,7 @@ export class ServiceSheetsService {
     let where: Prisma.ServiceSheetWhereInput;
     if (isSuperAdmin) {
       where = tenantScope;
-    } else if (isOpsManager && this.visibilidad && userId) {
+    } else if (isOpsManager && this.visibilidad && userId && (await this.visibilidad.activas())) {
       // Quién ve qué (20-11-2026): hojas de las actividades de su gente hacia abajo (cadena managerId),
       // no de todo el departamento.
       const autores = (await this.visibilidad.autoresVisibles(user, tenantId)) ?? [userId];

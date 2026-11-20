@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { lastValueFrom, of } from 'rxjs';
 import {
   ACCESOS,
+  fijarCompartimentada,
   cotizacionVisible,
   normalizarAccesos,
   puedeVerDeAutor,
@@ -11,6 +12,7 @@ import {
   type Actor,
   type PersonaOrganigrama,
 } from './visibilidad';
+import { VisibilidadService } from './visibilidad.service';
 import { CotizacionVisibleInterceptor } from './cotizacion-visible.interceptor';
 import { CotizacionesController } from '../../cotizaciones/cotizaciones.controller';
 
@@ -30,6 +32,10 @@ const ORG: Array<PersonaOrganigrama & { nombre: string; actor: Actor }> = [
   { id: 50, nombre: 'Sin jefe', roleKey: 'ing_campo', managerId: null, actor: { id: 50, roleKey: 'ing_campo' } },
 ];
 const actor = (id: number) => ORG.find((p) => p.id === id)!.actor;
+
+// La matriz describe las reglas con el interruptor PRENDIDO; al final se prueba apagado.
+beforeAll(() => fijarCompartimentada(true));
+afterAll(() => fijarCompartimentada(false));
 
 // Cotizaciones de ejemplo.
 const COT = {
@@ -110,6 +116,44 @@ describe('quién ve qué · precios y accesos', () => {
       'cotizaciones.ver_todas',
     ]);
     expect(normalizarAccesos('precios.ver')).toEqual([]);
+  });
+});
+
+describe('quién ve qué · interruptor APAGADO = todo como antes', () => {
+  beforeEach(() => fijarCompartimentada(false));
+  afterEach(() => fijarCompartimentada(true));
+
+  it('cotizaciones: todos ven todas y el filtro de consulta no agrega nada', () => {
+    for (const p of ORG) {
+      for (const c of Object.values(COT)) expect(cotizacionVisible(p.actor, c)).toBe(true);
+      expect(whereCotizacionesVisibles(p.actor)).toEqual({});
+    }
+  });
+
+  it('evidencias y precios: sin recorte', () => {
+    expect(puedeVerDeAutor(actor(20), 30, new Set())).toBe(true);
+    for (const p of ORG) expect(puedeVerPrecios(p.actor)).toBe(true);
+  });
+
+  it('el servicio no consulta nada para cotizaciones ni recorta autores', async () => {
+    const prisma: any = {
+      systemSetting: { findFirst: jest.fn().mockResolvedValue(null) },
+      cotizacion: { findFirst: jest.fn() },
+      user: { findMany: jest.fn() },
+    };
+    const svc = new VisibilidadService(prisma);
+    await expect(svc.assertCotizacionVisible(99, actor(20), 1)).resolves.toBeUndefined();
+    await expect(svc.autoresVisibles(actor(20), 1)).resolves.toBeNull();
+    expect(prisma.cotizacion.findFirst).not.toHaveBeenCalled();
+    expect(prisma.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('se prende solo con el renglón system_settings en «true»', async () => {
+    const prisma: any = { systemSetting: { findFirst: jest.fn().mockResolvedValue({ id: 1 }) } };
+    await expect(new VisibilidadService(prisma).refrescarInterruptor()).resolves.toBe(true);
+    expect(prisma.systemSetting.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ key: 'visibilidad.compartimentada' }) }),
+    );
   });
 });
 

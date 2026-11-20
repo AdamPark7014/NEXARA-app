@@ -1220,7 +1220,9 @@ export class ChatService {
     // Quién ve qué (20-11-2026): las evidencias, solo de quien busca y su gente hacia abajo
     // (dirección general, todas).
     const autoresEvidencia =
-      scope.isOmniscient || !this.visibilidad ? null : [userId, ...(await this.visibilidad.bajoMiMando({ id: userId }, tenantId))];
+      scope.isOmniscient || !this.visibilidad || !(await this.visibilidad.activas())
+        ? null
+        : [userId, ...(await this.visibilidad.bajoMiMando({ id: userId }, tenantId))];
 
     const [users, activities, evidences] = await Promise.all([
       !kind || kind === 'USER'
