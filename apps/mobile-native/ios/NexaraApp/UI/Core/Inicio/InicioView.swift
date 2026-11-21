@@ -731,7 +731,7 @@ private struct InicioActualCard: View {
     let onDetalle: () -> Void
 
     private static let radio: CGFloat = 26
-    private static let fondo = NxColors.rgb(0x0D0F12)
+    private static let fondo = NxSpectrum.night
     /// Texto secundario sobre la banda (#C9CED8).
     private static let tenue = NxColors.rgb(0xC9CED8)
 
@@ -889,6 +889,11 @@ private struct InicioBandaResplandor: View {
                     startRadius: 0,
                     endRadius: ancho * 0.55
                 )
+                // Firma v3: hilo del espectro arriba de la banda (Android `dibujarResplandor`).
+                VStack(spacing: 0) {
+                    NxSpectrumLine(height: 3)
+                    Spacer(minLength: 0)
+                }
             }
         }
         .allowsHitTesting(false)

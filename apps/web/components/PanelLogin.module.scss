@@ -717,3 +717,67 @@
     transition: none;
   }
 }
+
+/* ── Firma NEXARA v3 (21-11-2026): el panel de marca toma el lenguaje de la NAS ──
+   Marino profundo, rejilla hexagonal, hilo del espectro arriba, escuadras en las
+   esquinas, haces de luz en diagonal y la palabra NEXARA con el degradado del logo. */
+.marca {
+  background:
+    radial-gradient(620px 420px at 22% 18%, rgba(31, 184, 154, 0.16), transparent 70%),
+    radial-gradient(520px 380px at 100% 100%, rgba(238, 138, 42, 0.12), transparent 70%),
+    var(--ui-hex-grid) 0 0 / 48px 86px,
+    linear-gradient(180deg, #08101a 0%, #060b12 100%);
+}
+
+/* Hilo del espectro arriba y escuadra superior izquierda. */
+.marca::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--ui-spectrum);
+  z-index: 0;
+}
+
+/* Haces de luz en diagonal abajo a la derecha, como el fondo de la NAS. */
+.marca::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  right: -20%;
+  bottom: 6%;
+  width: 120%;
+  height: 120px;
+  background:
+    linear-gradient(90deg, transparent, rgba(238, 138, 42, 0.75)) 0 0 / 100% 3px no-repeat,
+    linear-gradient(90deg, transparent, rgba(220, 70, 50, 0.55)) 0 22px / 100% 2px no-repeat,
+    linear-gradient(90deg, transparent, rgba(58, 169, 204, 0.6)) 0 48px / 100% 2px no-repeat,
+    linear-gradient(90deg, transparent, rgba(166, 76, 166, 0.45)) 0 70px / 100% 2px no-repeat;
+  filter: drop-shadow(0 0 6px rgba(238, 138, 42, 0.45));
+  transform: rotate(-16deg);
+  transform-origin: right bottom;
+  pointer-events: none;
+}
+
+.marcaLogo img {
+  filter: drop-shadow(0 0 14px rgba(45, 212, 172, 0.45));
+}
+
+.marcaNombre {
+  background: linear-gradient(90deg, #2bb5a0 0%, #6ec6da 30%, #f5f7fa 52%, #f4c07a 74%, #ee8a2a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+}
+
+.marcaEtiqueta {
+  letter-spacing: 0.32em;
+}
+
+@media (max-width: 960px) {
+  .marca::after {
+    height: 70px;
+    bottom: -10%;
+  }
+}

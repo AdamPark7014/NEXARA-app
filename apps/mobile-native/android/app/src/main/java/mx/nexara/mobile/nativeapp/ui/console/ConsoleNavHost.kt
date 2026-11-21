@@ -1,5 +1,7 @@
 package mx.nexara.mobile.nativeapp.ui.console
 
+import androidx.compose.foundation.layout.Column
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpectrumLine
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -509,53 +511,57 @@ fun ConsoleNavHost(
     // estado se quedan oscuros en todas las pestañas.
     Scaffold(
         topBar = {
-            if (!enInicio) TopAppBar(
-                title = {
-                    Text(
-                        currentTitle,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 17.sp),
-                        color = NxColors.Slate,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    )
-                },
-                colors = NxCoreTopAppBarColors(),
-                navigationIcon = {
-                    if (showBack) {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Volver",
-                                tint = NxColors.Slate,
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    // «Más» ya es la quinta pestaña de abajo (v2): aquí solo queda la campana.
-                    // Sin «Salir» aquí: cerrar sesión vive al final de Mi perfil, con confirmación.
-                    // En la bandeja no hace falta la campana: abrirla ya da todo por visto.
-                    if (currentRoute != ConsoleRoutes.Notifications) {
-                        IconButton(
-                            onClick = { navController.navigate(ConsoleRoutes.Notifications) { launchSingleTop = true } },
-                        ) {
-                            BadgedBox(
-                                badge = {
-                                    if (unreadCount > 0) {
-                                        Badge { Text(if (unreadCount > 99) "99+" else "$unreadCount") }
-                                    }
-                                },
-                            ) {
+            if (!enInicio) Column {
+                TopAppBar(
+                    title = {
+                        Text(
+                            currentTitle,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 17.sp),
+                            color = NxColors.Slate,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                    },
+                    colors = NxCoreTopAppBarColors(),
+                    navigationIcon = {
+                        if (showBack) {
+                            IconButton(onClick = { navController.popBackStack() }) {
                                 Icon(
-                                    Icons.Default.Notifications,
-                                    contentDescription = if (unreadCount > 0) "Notificaciones, $unreadCount sin leer" else "Notificaciones",
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Volver",
                                     tint = NxColors.Slate,
                                 )
                             }
                         }
-                    }
-                },
-            )
+                    },
+                    actions = {
+                        // «Más» ya es la quinta pestaña de abajo (v2): aquí solo queda la campana.
+                        // Sin «Salir» aquí: cerrar sesión vive al final de Mi perfil, con confirmación.
+                        // En la bandeja no hace falta la campana: abrirla ya da todo por visto.
+                        if (currentRoute != ConsoleRoutes.Notifications) {
+                            IconButton(
+                                onClick = { navController.navigate(ConsoleRoutes.Notifications) { launchSingleTop = true } },
+                            ) {
+                                BadgedBox(
+                                    badge = {
+                                        if (unreadCount > 0) {
+                                            Badge { Text(if (unreadCount > 99) "99+" else "$unreadCount") }
+                                        }
+                                    },
+                                ) {
+                                    Icon(
+                                        Icons.Default.Notifications,
+                                        contentDescription = if (unreadCount > 0) "Notificaciones, $unreadCount sin leer" else "Notificaciones",
+                                        tint = NxColors.Slate,
+                                    )
+                                }
+                            }
+                        }
+                    },
+                )
+                // Firma v3: hilo del espectro de la marca bajo la barra.
+                NxSpectrumLine()
+            }
         },
         bottomBar = {
             if (conBarraInferior) {

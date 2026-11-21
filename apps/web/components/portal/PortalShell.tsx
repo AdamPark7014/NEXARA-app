@@ -81,7 +81,10 @@ export default function PortalShell({ children }: { children: React.ReactNode })
   const pathname = usePathname() ?? "";
   const searchParams = useSearchParams();
   const navHref = `${pathname}${searchParams?.toString() ? `?${searchParams.toString()}` : ""}`;
-  const { darkMode, toggleDarkMode } = useTheme();
+  const { darkMode, toggleDarkMode, adoptPanelTheme } = useTheme();
+  useEffect(() => {
+    adoptPanelTheme();
+  }, [adoptPanelTheme]);
   const [mounted, setMounted] = useState(false);
   const [client, setClient] = useState<ClientPortalSession | null>(null);
   const [branch, setBranch] = useState<BranchPortalSession | null>(null);

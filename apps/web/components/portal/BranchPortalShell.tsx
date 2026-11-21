@@ -52,7 +52,10 @@ function getAssetUrl(url?: string | null) {
 }
 
 export default function BranchPortalShell({ children }: { children: React.ReactNode }) {
-  const { darkMode, toggleDarkMode } = useTheme();
+  const { darkMode, toggleDarkMode, adoptPanelTheme } = useTheme();
+  useEffect(() => {
+    adoptPanelTheme();
+  }, [adoptPanelTheme]);
   const [mounted, setMounted] = useState(false);
   const [session, setSession] = useState<BranchPortalSession | null>(null);
   const [isMobile, setIsMobile] = useState(false);
