@@ -31,6 +31,8 @@ struct AttendanceDayRow: Identifiable {
     /// Correcciones de sus checadas del día.
     let correcciones: [AttendanceCorreccion]
     let isMe: Bool
+    /// Sin checada pero con actividad en curso (pizarra).
+    var trabajandoSinEntrada: Bool = false
 
     var id: Int { member.userId }
 
@@ -54,6 +56,8 @@ final class AttendanceVM: ObservableObject {
     @Published var members: [AttendanceTeamMember] = []
     @Published var teamLoading = false
     @Published var teamError: String?
+    /// Sin checada + actividad en curso (desde me/board).
+    @Published private(set) var sinEntradaIds: Set<Int> = []
 
     // Mi jornada
     @Published var current: AttendanceCurrent?
@@ -159,7 +163,12 @@ final class AttendanceVM: ObservableObject {
                 justification: estado == .justificada ? falta : nil,
                 avisos: avisos,
                 correcciones: member.punches.flatMap { $0.correcciones },
-                isMe: me != nil && me == member.userId
+                isMe: me != nil && me == member.userId,
+                trabajandoSinEntrada: TrabajandoSinEntrada.etiqueta(
+                    userId: member.userId,
+                    estadoAusente: estado == .ausente,
+                    ids: sinEntradaIds
+                ) != nil
             )
         }
         .sorted { a, b in
@@ -276,6 +285,19 @@ final class AttendanceVM: ObservableObject {
             guard fecha == dateString else { return }
             members = lista
             teamError = nil
+            if let board = try? await CoreRepository.shared.teamBoard(desde: fecha, hasta: fecha) {
+                sinEntradaIds = TrabajandoSinEntrada.ids(
+                    board.users.map {
+                        TrabajandoSinEntrada.BoardHint(
+                            id: $0.id,
+                            entradaHoyAt: $0.entradaHoyAt,
+                            currentActivity: $0.currentActivity,
+                            openActivities: $0.openActivities,
+                            status: $0.status
+                        )
+                    }
+                )
+            }
         } catch {
             guard fecha == dateString else { return }
             if initial || members.isEmpty {

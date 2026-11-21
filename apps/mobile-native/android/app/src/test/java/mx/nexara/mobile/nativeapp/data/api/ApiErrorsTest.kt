@@ -150,4 +150,24 @@ class ApiErrorsTest {
 
     private fun http(code: Int, body: String = ""): HttpException =
         HttpException(Response.error<Any>(code, body.toResponseBody("application/json".toMediaType())))
+
+    @Test
+    fun `409 JORNADA_NO_ABIERTA usa el mensaje de checada`() {
+        val body = """{"statusCode":409,"code":"JORNADA_NO_ABIERTA","message":"Registra tu entrada para empezar a trabajar"}"""
+        var notified = false
+        JornadaCandadoEvents.setListener { notified = true }
+        try {
+            val paraMensaje = HttpException(
+                Response.error<Unit>(409, body.toResponseBody("application/json".toMediaType())),
+            )
+            assertEquals(MENSAJE_JORNADA_NO_ABIERTA, paraMensaje.toUserMessage())
+            assertEquals(true, notified)
+            val paraCodigo = HttpException(
+                Response.error<Unit>(409, body.toResponseBody("application/json".toMediaType())),
+            )
+            assertEquals(true, paraCodigo.isJornadaNoAbierta())
+        } finally {
+            JornadaCandadoEvents.setListener(null)
+        }
+    }
 }

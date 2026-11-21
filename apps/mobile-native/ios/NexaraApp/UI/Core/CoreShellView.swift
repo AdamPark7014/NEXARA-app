@@ -110,6 +110,8 @@ struct CoreShellView: View {
     @State private var chatUnread = 0
     /// Con el teclado arriba la barra inferior se esconde (no sube pegada al teclado).
     @State private var tecladoVisible = false
+    /// 409 JORNADA_NO_ABIERTA: barrera para ir a checar entrada.
+    @State private var barreraJornada = false
 
     private var modules: [CoreModule] { CoreNavigation.modules(for: session.currentUser) }
     /// Módulos del hub «Más» (ver `CoreNavigation.extraModules`).
@@ -155,9 +157,22 @@ struct CoreShellView: View {
         .task { await refreshNavigationIfNeeded() }
         .task { await pollUnread() }
         .onAppear {
+            JornadaCandado.onBlocked = { barreraJornada = true }
             syncSelection()
             applyDeepLink()
             actualizarBarraDeEstado()
+        }
+        .onDisappear { JornadaCandado.onBlocked = nil }
+        .alert("Registra tu entrada para empezar", isPresented: $barreraJornada) {
+            if modules.contains(.asistencias) {
+                Button("Ir a checar entrada") {
+                    barreraJornada = false
+                    selected = .asistencias
+                }
+            }
+            Button("Seguir consultando", role: .cancel) { barreraJornada = false }
+        } message: {
+            Text(JornadaCandado.mensaje + ". Puedes consultar, pero no operar hasta checar.")
         }
         .onChange(of: selected) { _, _ in actualizarBarraDeEstado() }
         .onChange(of: overlay?.id) { _, _ in actualizarBarraDeEstado() }

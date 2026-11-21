@@ -56,6 +56,7 @@ import { attendanceMapUrl, googleMapsPointUrl, toCoord } from "@/lib/gps-map-lin
 import { getAttendanceSectionConfig } from "@/lib/user-access";
 import { isCeoEquivalentEmail, isDeveloperSuperAdminEmail, isNonEmployeeEmail } from "@/lib/platform-accounts";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
+import { idsTrabajandoSinEntrada, etiquetaTrabajandoSinEntrada } from "@/lib/trabajando-sin-entrada";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
 import {
   avisoUbicacion,
@@ -314,6 +315,7 @@ export default function ErpAsistenciasPage() {
   const [registrandoPara, setRegistrandoPara] = useState<{ id: number; nombre: string } | null>(null);
   // Ficha del día de una persona (fotos, uniforme, mapas y correcciones).
   const [detalleId, setDetalleId] = useState<number | null>(null);
+  const [sinEntradaIds, setSinEntradaIds] = useState<Set<number>>(() => new Set());
 
   // CEO / plataforma (Christian, Claudia equivalente, Adam): toda la empresa.
   // Encargados: solo su gente (árbol de managerId).
@@ -346,6 +348,15 @@ export default function ErpAsistenciasPage() {
         // Christian/Adam/Claudia/cuenta demo no son empleados: no deben verse como "sin checada".
         const equipo = list.filter((u) => !isNonEmployeeEmail(u.email));
         setMembers(equipo);
+        try {
+          const board = await erpFetch<{ users?: { id: number; entradaHoyAt?: string | null; currentActivity?: unknown; openActivities?: unknown[]; status?: string | null }[] }>(
+            `me/board?desde=${dateFilter}&hasta=${dateFilter}${companyWideViewer ? "" : "&scope=subtree"}`,
+            token,
+          );
+          setSinEntradaIds(idsTrabajandoSinEntrada(board?.users ?? []));
+        } catch {
+          /* la marca es auxiliar; la lista de asistencia ya cargó */
+        }
         cargadoParaRef.current = dateFilter;
         setCargadoPara(dateFilter);
         setRefreshError(null);
@@ -757,10 +768,10 @@ export default function ErpAsistenciasPage() {
         return (
           <>
             <StatusBadge
-              label={ESTADO_META[m.estado].label}
-              tone={ESTADO_META[m.estado].tone}
+              label={etiquetaTrabajandoSinEntrada(m, sinEntradaIds) ?? ESTADO_META[m.estado].label}
+              tone={etiquetaTrabajandoSinEntrada(m, sinEntradaIds) ? "danger" : ESTADO_META[m.estado].tone}
               size="sm"
-              title={m.falta ? `Falta justificada · ${m.falta.motivo}` : undefined}
+              title={etiquetaTrabajandoSinEntrada(m, sinEntradaIds) ?? (m.falta ? `Falta justificada · ${m.falta.motivo}` : undefined)}
             />
             {aviso ? (
               <span className={styles.insignias}>

@@ -187,9 +187,9 @@ private struct PersonaRow: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(NxColors.fg)
                             .lineLimit(1)
-                        Text("\(row.estado.label) · \(subtitulo)")
+                        Text("\(row.trabajandoSinEntrada ? TrabajandoSinEntrada.etiqueta : row.estado.label) · \(subtitulo)")
                             .font(.system(size: 11.5))
-                            .foregroundStyle(NxColors.muted)
+                            .foregroundStyle(row.trabajandoSinEntrada ? NxColors.danger : NxColors.muted)
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

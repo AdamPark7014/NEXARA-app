@@ -132,6 +132,8 @@ data class AttendancePersona(
     val avisosSalida: List<AttendanceBadge> = emptyList(),
     /** Correcciones de sus checadas del día (antes → después, con motivo). */
     val correcciones: List<AttendanceCorreccionDto> = emptyList(),
+    /** Sin checada pero con actividad en curso (pizarra). */
+    val trabajandoSinEntrada: Boolean = false,
 )
 
 data class AttendanceUiState(
@@ -336,7 +338,7 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                 null
             }
 
-            val personas = if (viewMode.canManageTeam) {
+            var personas = if (viewMode.canManageTeam) {
                 try {
                     val rango = withContext(Dispatchers.IO) {
                         repo.attendanceRange(from = fecha, to = fecha, scope = scope)
@@ -350,6 +352,35 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } else {
                 emptyList()
+            }
+            if (personas.isNotEmpty()) {
+                val idsSinEntrada = runCatching {
+                    withContext(Dispatchers.IO) {
+                        val board = mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository(getApplication()).board(desde = fecha, hasta = fecha)
+                        TrabajandoSinEntrada.ids(
+                            board.users.orEmpty().map { u ->
+                                TrabajandoSinEntrada.BoardHint(
+                                    id = u.id,
+                                    entradaHoyAt = u.entradaHoyAt,
+                                    currentActivity = u.currentActivity,
+                                    openActivities = u.openActivities,
+                                    status = u.status,
+                                )
+                            },
+                        )
+                    }
+                }.getOrDefault(emptySet())
+                if (idsSinEntrada.isNotEmpty()) {
+                    personas = personas.map { p ->
+                        p.copy(
+                            trabajandoSinEntrada = TrabajandoSinEntrada.etiqueta(
+                                p.userId,
+                                p.estado == AttendanceEstado.AUSENTE,
+                                idsSinEntrada,
+                            ) != null,
+                        )
+                    }
+                }
             }
 
             _state.update {
@@ -1382,9 +1413,13 @@ private fun PersonaRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "${persona.estado.etiqueta} · ${persona.subtitulo}",
+                    if (persona.trabajandoSinEntrada) {
+                        "${TrabajandoSinEntrada.ETIQUETA} · ${persona.subtitulo}"
+                    } else {
+                        "${persona.estado.etiqueta} · ${persona.subtitulo}"
+                    },
                     fontSize = 11.5.sp,
-                    color = NxColors.Muted,
+                    color = if (persona.trabajandoSinEntrada) NxColors.Danger else NxColors.Muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

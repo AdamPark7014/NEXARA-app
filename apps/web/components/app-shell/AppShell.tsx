@@ -79,6 +79,7 @@ import {
 } from "@/lib/nav-mode";
 import styles from "./AppShell.module.scss";
 import ShellConnectionStatus from "./ShellConnectionStatus";
+import BarreraJornada from "@/components/jornada/BarreraJornada";
 import CelebracionesBanner from "./CelebracionesBanner";
 import { ModuleIcon, ShellIcon } from "./ShellIcons";
 import {
@@ -1331,6 +1332,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
           onLogout={handleLogout}
         />
       ) : null}
+      <BarreraJornada />
     </div>
   );
 }

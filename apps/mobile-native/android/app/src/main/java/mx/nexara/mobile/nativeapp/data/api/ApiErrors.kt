@@ -26,9 +26,13 @@ fun Throwable.toUserMessage(fallback: String = "No se pudo completar la operaci�
                 404 -> return serverMessage() ?: "Recurso no encontrado."
                 in 500..599 -> return "Error del servidor, intenta más tarde."
             }
-            // 400 / 409 / 422 y demás: el servidor sabe mejor que nosotros qué
-            // salió mal, y ya lo dice en español.
-            serverMessage()?.let { return it }
+            // Un solo read del cuerpo: isJornadaNoAbierta también lo consume si se llama aparte.
+            val body = runCatching { response()?.errorBody()?.string() }.getOrNull().orEmpty()
+            if (code() == 409 && body.contains(CODIGO_JORNADA_NO_ABIERTA)) {
+                JornadaCandadoEvents.notifyBlocked()
+                return parseServerErrorBody(body) ?: MENSAJE_JORNADA_NO_ABIERTA
+            }
+            parseServerErrorBody(body)?.let { return it }
             if (code() == 400) return "Datos inválidos, revisa el formulario."
             if (code() == 409) return "El registro cambió mientras lo editabas, vuelve a intentarlo."
             return fallback
@@ -157,4 +161,21 @@ private fun readJsonString(json: String, start: Int): String? {
         i++
     }
     return null
+}
+
+const val CODIGO_JORNADA_NO_ABIERTA = "JORNADA_NO_ABIERTA"
+const val MENSAJE_JORNADA_NO_ABIERTA = "Registra tu entrada para empezar a trabajar"
+
+fun Throwable.isJornadaNoAbierta(): Boolean {
+    val http = this as? HttpException ?: return false
+    if (http.code() != 409) return false
+    val body = runCatching { http.response()?.errorBody()?.string() }.getOrNull().orEmpty()
+    return body.contains(CODIGO_JORNADA_NO_ABIERTA)
+}
+
+/** Un solo sitio: la UI de checada escucha y muestra la barrera de entrada. */
+object JornadaCandadoEvents {
+    @Volatile private var listener: (() -> Unit)? = null
+    fun setListener(l: (() -> Unit)?) { listener = l }
+    fun notifyBlocked() { listener?.invoke() }
 }

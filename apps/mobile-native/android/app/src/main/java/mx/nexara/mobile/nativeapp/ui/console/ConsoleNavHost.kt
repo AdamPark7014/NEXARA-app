@@ -353,6 +353,12 @@ fun ConsoleNavHost(
     var unreadCount by remember { mutableIntStateOf(0) }
     /** Mensajes de chat sin leer (suma de `unreadCount` de `chat/channels`), para la insignia. */
     var chatUnread by remember { mutableIntStateOf(0) }
+    /** 409 JORNADA_NO_ABIERTA: barrera para ir a checar entrada. */
+    var barreraJornada by remember { mutableStateOf(false) }
+    DisposableEffect(Unit) {
+        mx.nexara.mobile.nativeapp.data.api.JornadaCandadoEvents.setListener { barreraJornada = true }
+        onDispose { mx.nexara.mobile.nativeapp.data.api.JornadaCandadoEvents.setListener(null) }
+    }
 
     val modules = remember(userAlDia) { CoreMenu.modulesFor(userAlDia) }
     /** «Más»: el resto de Core (cotizaciones, proyectos, KPIs, almacén, herramientas, vehículos). */
@@ -958,6 +964,28 @@ fun ConsoleNavHost(
                 )
             }
         }
+    }
+    if (barreraJornada) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { barreraJornada = false },
+            title = { Text("Registra tu entrada para empezar") },
+            text = {
+                Text(mx.nexara.mobile.nativeapp.data.api.MENSAJE_JORNADA_NO_ABIERTA + ". Puedes consultar, pero no operar hasta checar.")
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        barreraJornada = false
+                        if (tieneAsistencia) selectTab(ConsoleRoutes.Attendance)
+                    },
+                ) { Text("Ir a checar entrada") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { barreraJornada = false }) {
+                    Text("Seguir consultando")
+                }
+            },
+        )
     }
 }
 

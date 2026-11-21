@@ -2,6 +2,7 @@
  * Utilidades compartidas para formularios ERP — fetch, listas y mensajes de error.
  */
 import { buildApiUrl } from "@/lib/api-base";
+import { manejarErrorJornada } from "@/lib/jornada-candado";
 import { withTenantHeaders } from "@/lib/tenant";
 
 // La ruta interna o el «Tu rol (x) no puede acceder a GET /api/…» nunca se le enseñan a nadie (11-11).
@@ -61,7 +62,10 @@ export async function erpFetch<T = unknown>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(text || `HTTP ${res.status}`);
+    const err = new Error(text || `HTTP ${res.status}`);
+    // Un solo sitio: 409 JORNADA_NO_ABIERTA abre la barrera de checada.
+    manejarErrorJornada(err);
+    throw err;
   }
 
   if (res.status === 204) return null as T;

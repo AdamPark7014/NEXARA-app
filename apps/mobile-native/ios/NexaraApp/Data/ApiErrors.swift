@@ -32,6 +32,10 @@ extension ApiError {
             case 400:
                 return server ?? "Datos inválidos, revisa el formulario."
             case 409:
+                if let body, body.contains(JornadaCandado.codigo) {
+                    JornadaCandado.notifyBlocked()
+                    return server ?? JornadaCandado.mensaje
+                }
                 return server ?? "El registro cambió mientras lo editabas, vuelve a intentarlo."
             default:
                 return server ?? fallback
@@ -85,5 +89,27 @@ extension Error {
         }
         let msg = localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         return msg.isEmpty ? fallback : msg
+    }
+}
+// MARK: - Candado de jornada
+
+enum JornadaCandado {
+    static let codigo = "JORNADA_NO_ABIERTA"
+    static let mensaje = "Registra tu entrada para empezar a trabajar"
+    static var onBlocked: (() -> Void)?
+    static func notifyBlocked() { onBlocked?() }
+}
+
+extension ApiError {
+    var isJornadaNoAbierta: Bool {
+        guard case let .http(code, body) = self, code == 409 else { return false }
+        return (body ?? "").contains(JornadaCandado.codigo)
+    }
+}
+
+extension Error {
+    var isJornadaNoAbierta: Bool {
+        if let api = self as? ApiError { return api.isJornadaNoAbierta }
+        return false
     }
 }
