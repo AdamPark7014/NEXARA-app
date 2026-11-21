@@ -387,3 +387,22 @@ _Turnos anteriores recortados el 2026-11-14 (limpieza de documentación). Histor
   - A medias: integración con BD y avisos reales no ejecutados por alcance; migración 20261117083034_stock_proyecto_maestro creada sin aplicar. Suite amplia costos tiene una aserción ajena previa en vehiculos/lectura-ia sobre campos de ticket; foco propio92/92 verde.
   - Siguiente: revisar .ai/OLAS23-RESULTADO.md; inventario completo C:\dev\encargos\olas23-rutas.txt. Aplicar migración y validar integración en entorno autorizado posteriormente. Pull --rebase no puede ejecutarse con cambios ajenos sin commit; se preservan sin stash.
   - No tocar: contabilidad ajena, RH, supervisión, CCTV, viáticos, vehículos, prenómina, AppShell, integra-shared, page-matrix y migraciones ajenas. No se hizo commit, push, reset, stash ni despliegue.
+
+## 21-11-2026 15:45 · claude-code · asistencia, cierre de jornada y candado (hilo «mejoras de código de NEXARA Core»)
+
+En producción (origin/main `ac75ed7c9`):
+- Pizarra con una sola regla de atraso (`semaforo-actividad.ts`), todas las atrasadas por persona, «Libre» solo por entregas de hoy.
+- Cierre de jornada siempre: salida propia, automática, de jefe, barrido 00:10 y **al checar entrada** (`alChecarEntrada`, evento `ATTENDANCE_CHECKIN`). La pausa no protege.
+- Turno de noche: entrada ≥ 18:00 no se corta a las 23:30 (`esEntradaDeNoche`, cron horario `cerrarJornadasDeNocheOlvidadas`); segundo turno el mismo día = jornada del día siguiente (`diaDeJornadaParaEntrada`); la salida toma el día de su jornada.
+- Candado «sin entrada no se trabaja»: `attendance/candado-jornada*.ts`, interceptor global, 409 `JORNADA_NO_ABIERTA`; se apaga con `JORNADA_OBLIGATORIA=0`; exentos por id en `JORNADA_EXENTOS` (esa variable aún no está en el compose). Web: `BarreraJornada` + `lib/jornada-candado.ts`; apps: código listo, llega con la próxima versión publicada.
+- Checada web por persona: `attendance.web_checkin_until.user.<id>` en `system_settings`. Luis (id 7) abierta hasta 2026-12-01.
+- KPIs: `noSeMide` (RH y coord_admin fuera), `sinChecador` (RH no checa), entrega real.
+- Resumen diario a dirección 8:30 (`activities/resumen-diario*.ts`), se apaga con `RESUMEN_DIARIO=0`.
+- `scripts/verificar-commit.sh <commit> api|web`: tsc sobre el commit exportado. Úsalo antes de publicar: el checkout local va atrás de origin/main y un `tsc` local engaña (así falló un build el 20-11).
+
+En disco SIN publicar, esperando el visto bueno de Adam para sus migraciones (no subir a main antes: el despliegue aplica toda migración que encuentre):
+- Actividades de un solo día + desglose por día: `activities/actividad-un-solo-dia.ts`, `ai/asistente/asistente-desglose-dias.ts`, `OpsActivityForm.tsx`, formularios Android/iOS, migración `20261120214500_actividad_serie_diaria`.
+- Horarios, horas extra (fuera de 10–18), productividad en tres ejes y pago de nómina (API): `attendance/horario/*`, `cierre-con-horario.ts`, `employee-payments/pago-semanal.ts`, `nomina-pago.service.ts`, migraciones `20261121140500_horario_dia_productividad` y `20261121162000_nomina_pago_semanal`. 1,509 pruebas en verde en local. Faltan pantallas web y apps.
+- Ojo: Cursor tocó `common/rbac/url-matrix.ts` (archivo sucio de otra sesión) para restaurar `FORMATOS_ACTIVIDAD` a RH; no lo publiqué.
+
+Encargos escritos sin empezar: `.ai/encargos/2026-11-20-ia-aprendizaje-recurrente.md`. Regla nueva para todos los agentes: `C:\dev\scripts\ai-os\PARIDAD-MOVIL.md`.
