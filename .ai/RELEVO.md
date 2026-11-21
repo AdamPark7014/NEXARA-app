@@ -1,5 +1,28 @@
 # RELEVO
 
+- **21-11 ~15:40 México (claude-code, nube; Cursor/Codex no alcanzables) — Vehículos: captura guiada de 5 pasos, daños con IA, incidencias y avisos de retraso. Solo API. En main, NO desplegado.**
+  - Todo detrás de `vehiculos.captura_guiada` (system_settings, apagado por omisión; en prod NO existe la fila). Apagado:
+    se acepta el checklist de 7 fotos, el km menor al último registro entra con alerta `KM_MENOR` (no bloquea), no se
+    avisa a Liz de alertas de km, no corre la comparación con IA ni los avisos de retraso. Prendido: salida solo con la
+    captura guiada (la devolución acepta las dos), salida de inventario pide actividad, no se pide unidad para actividad
+    cerrada, km menor = 400 salvo `forzarKm` de quien tiene `vehicles.review`, avisos cada 10 min (8–20 h).
+  - Migración `20261121205244_vehiculos_captura_guiada` (aditiva): columnas en VehicleControl (encargadoId,
+    capturaVersion, video*, firmas, lecturasKm, kmEsperados, alertasKm, avisosRetraso, analisisDanos*), tablas
+    `vehicle_damage_findings` y `vehicle_incidents`, 3 valores nuevos de NotificationType.
+  - Reglas puras: `vehicles/captura-guiada.ts`, `kilometraje.ts`, `avisos-retraso.ts`, `danos-ia.ts`; servicio
+    `danos-vehiculo.service.ts` (Sonnet 5.5, 6 pares por llamada a 768 px), cron `avisos-retraso.service.ts`,
+    interruptor `interruptor-vehiculos.ts`. Rutas nuevas: GET `vehicles/captura-guiada`, GET
+    `vehicles/por-actividad/:id`, POST `vehicles/:id/firmas`, GET/PATCH `vehicles/danos`, POST
+    `vehicles/:id/analizar-danos`, GET/POST/PATCH `vehicles/incidencias` y PATCH `incidencias/:id/cobro` (solo superadmin).
+    `checkout` de inventario con `actividadId` crea un uso ligado a la actividad; `end-use` libera la unidad del inventario.
+  - url-matrix: COORD_ADMIN con `/api/vehicles/**` approve (Liz no podía ni aprobar aunque tiene `vehicles.review`) y
+    3 rutas nuevas en CORE_RECURSOS. Avisado al hilo de roles.
+  - Pendiente: web (captura, bandeja de daños de Liz, bloque en la actividad), Android/iOS (video de la vuelta con
+    extracción de 8 cuadros, firma), tras el visto bueno de Adam a la maqueta https://claude.ai/artifact/7qbmJfGA3WopSJPr86bAjS.
+    Revisar `client_max_body_size` de nginx/Traefik para el video (tope en la API: 80 MB por archivo).
+  - Verificación: tsc API 0; jest 6500/6504, las 4 fallas son `accounting/qa-adversarial.spec.ts` por zona horaria del
+    contenedor (UTC); con `TZ=America/Mexico_City` pasan 23/23, archivo sin tocar.
+
 - **20-11 ~14:20 México (claude-code) — NAS_EXPORT_TOKEN.** El compose ya pasa `NAS_EXPORT_TOKEN` a nexara-api (desde `deploy/.env.nexara`, donde quedó un valor aleatorio de 64 hex con respaldo `.env.nexara.bak-20261120-nasexport`). Toma efecto en el próximo deploy autorizado. Antes, en esta sesión: puerta `nas-portal` (acacfd9) y `nas.nexara.com.mx` activo en Traefik (`/opt/traefik/config/nas.yml`); prod sigue en da83c772.
 - **20-11 ~14:15 México (claude-code) — Quién ve qué, Entrega 2 (montos, contratos, archivos). En main (b68c91dc5 API, bf57ef14e web), NO desplegado.** Todo va detrás de `visibilidad.compartimentada` (system_settings; apagado = como antes; en prod NO existe la fila). `common/visibilidad/montos.ts` tiene `ocultarMontos` (montos en null con `montosOcultos: true`), `limpiarEntradaSinPrecios` (un PATCH con el monto vacío no borra el guardado) y `ocultarContratos`. `OcultarMontosInterceptor` va en proyectos, projects, operational, work-projects, cotización ganada, costos, ficha de vehículos, ventas/* y accounting/workspace; en este último, `@MontosParaContadora` deja ver a la contadora por su puesto. `veTodoCostos` es solo superadmin con el interruptor prendido. `SoloConPreciosGuard` protege los PDF de ventas/reportes. En el chat, la tarjeta de proyecto trae `montoOculto`. En main.ts, /uploads usa `VisibilidadService.puedeAbrirArchivo`: fotos de evidencia para autor, jefes y superadmin; project-docs CONTRATO solo con Ver precios; un archivo sin registro sigue como antes. La web dice «Confidencial»; las apps no muestran presupuestos. Verificación en e518a7504: gen/tsc 0, jest 6375/6375, vitest 2328/2329; la única falla, OpsProjectDetailShell, es inestable bajo carga (sola pasa 4/4, archivo sin cambios). Despliegue a prod pedido vía coordinador: respaldo hecho (`/root/respaldos-predeploy/nexara-20261120-antes-visibilidad.dump`), pero el lanzamiento quedó bloqueado por permisos en espera del OK directo de Adam. El compose no pasa NAS_EXPORT_TOKEN. El botón «Pedir revisión» (Seguimiento.tsx) sigue fuera de main; el parche está en el scratchpad de la sesión.
 - **20-11 ~15:30 México (claude-code; Cursor/Codex no usados) — Quién ve qué, Entrega 1 (registros). NO desplegado.**

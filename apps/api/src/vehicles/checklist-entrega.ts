@@ -108,7 +108,7 @@ export type MetaEntrada = {
   lng?: unknown;
 };
 
-function aCoordenada(valor: unknown): number | null {
+export function aCoordenada(valor: unknown): number | null {
   if (valor == null || valor === '') return null;
   const num = typeof valor === 'number' ? valor : Number(valor);
   if (!Number.isFinite(num)) return null;
@@ -117,7 +117,7 @@ function aCoordenada(valor: unknown): number | null {
   return num;
 }
 
-function aInstante(valor: unknown): string | null {
+export function aInstante(valor: unknown): string | null {
   if (valor instanceof Date) return Number.isNaN(valor.getTime()) ? null : valor.toISOString();
   if (typeof valor === 'number' && Number.isFinite(valor)) {
     const d = new Date(valor);

@@ -106,6 +106,8 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'MaintenanceSchedule',
   'Payment',
   'VehicleControl',
+  'VehicleDamageFinding',
+  'VehicleIncident',
   'MaintenanceContractVisit',
   'InventorySnapshot',
   'ServiceClientBranch',

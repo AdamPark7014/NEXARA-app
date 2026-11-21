@@ -277,6 +277,11 @@ export const CORE_RECURSOS_URL_RULES: UrlRule[] = [
   { path: '/api/vehicles/inventory/*/return', methods: ['POST'], scope: 'write' },
   { path: '/api/vehicles/ficha/leer-foto', methods: ['POST'], scope: 'write' },
   { path: '/api/vehicles/ficha/*/cargas', methods: ['POST'], scope: 'write' },
+  // Captura guiada (21-11-2026): pasos y último km, bloque «Vehículo» de la actividad y firmas en
+  // pantalla. Cada servicio revisa que sea lo propio (o de su actividad).
+  { path: '/api/vehicles/captura-guiada', methods: ['GET'], scope: 'read' },
+  { path: '/api/vehicles/por-actividad/*', methods: ['GET'], scope: 'read' },
+  { path: '/api/vehicles/*/firmas', methods: ['POST'], scope: 'write' },
   // Viáticos: todo el personal pide, reparte y comprueba lo suyo (el servicio lo revisa). Autorizar y
   // asignar siguen aparte. El arquitecto no podía ni abrirlos, y nadie de campo podía repartir.
   { path: '/api/viatics', methods: ['GET', 'POST'], scope: 'write' },
@@ -738,6 +743,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD ADMINISTRATIVO — segundo nivel de aprobación
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
+    // Liz es la gestora de vehículos: aprueba solicitudes, revisa daños e incidencias. Su rol ya trae
+    // `vehicles.review` y la cadena de aprobación pasa por ella, pero la matriz le negaba `/api/vehicles`.
+    { path: '/api/vehicles/**', scope: 'approve' },
     ...ACTIVIDADES_GESTION_URL_RULES,
     ...SUPERVISION_URL_RULES,
     ...GESTION_VIATICOS_URL_RULES,

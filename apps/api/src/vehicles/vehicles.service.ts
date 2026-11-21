@@ -1,5 +1,5 @@
 import { esDestinatarioFinanzas } from '../common/finance-notification-recipient.js';
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
@@ -18,8 +18,70 @@ import {
   revisarChecklist,
   type ChecklistNormalizado,
   type EntradaChecklist,
+  type ErrorChecklist,
   type FotoChecklist,
 } from './checklist-entrega.js';
+import {
+  CAMPO_VIDEO_VUELTA,
+  DURACION_VUELTA_SEG,
+  FOTOS_GUIADAS,
+  PASOS_CAPTURA,
+  VISTAS_VUELTA,
+  revisarCapturaGuiada,
+  type EntradaGuiada,
+  type GuiadaNormalizada,
+} from './captura-guiada.js';
+import {
+  alertaLecturaCorregida,
+  kmEsperadosIdaVuelta,
+  revisarKmContraUltimo,
+  revisarKmRecorridos,
+  ultimoRegistroKm,
+  type AlertaKm,
+  type RegistroKm,
+} from './kilometraje.js';
+import { capturaGuiadaPrendida } from './interruptor-vehiculos.js';
+import { DanosVehiculoService } from './danos-vehiculo.service.js';
+import { sitioOficina } from '../attendance/asistencia-confiable.js';
+import { ESTATUS_CERRADOS } from '../activities/rellenar-tiempos.js';
+import { veTodoCostos, type ActorCostos } from '../costos/costos-acceso.js';
+
+/** Lo que llega del controlador: el checklist de 7 fotos (v1) o la captura guiada de 5 pasos (v2). */
+export type EntradaCaptura =
+  | (EntradaChecklist & { version?: 1; forzarKm?: boolean })
+  | (EntradaGuiada & { version: 2; forzarKm?: boolean });
+
+/** Quién registra. Un número es solo el id (así llaman las rutas viejas y las pruebas). */
+export type ActorVehiculo = {
+  id: number;
+  nombre?: string | null;
+  isSuperAdmin?: boolean;
+  /** Liz y los mandos con `vehicles.review`: pueden registrar la entrega en persona y firmar. */
+  puedeRevisar?: boolean;
+  puedeInventario?: boolean;
+};
+
+type Captura = (ChecklistNormalizado & { version: 1 }) | GuiadaNormalizada;
+
+const MENSAJE_ACTUALIZA_APP =
+  'Actualiza la app: la salida de una unidad ahora se registra con los 5 pasos (vuelta en video, asientos, tablero y kilometraje).';
+
+const MENSAJE_ACTIVIDAD_CERRADA = 'La actividad ya está cerrada: la unidad se pide para una actividad abierta.';
+
+const objeto = (v: unknown): Record<string, any> =>
+  v && typeof v === 'object' && !Array.isArray(v) ? { ...(v as Record<string, any>) } : {};
+
+const arreglo = (v: unknown): any[] => (Array.isArray(v) ? v : []);
+
+const registradoEn = (payload: unknown): string | null => {
+  const v = objeto(payload)['registradoEn'];
+  return typeof v === 'string' && v ? v : null;
+};
+
+const dinero = (v: unknown): number => {
+  const n = Number(v ?? 0);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+};
 
 @Injectable()
 export class VehiclesService {
@@ -52,10 +114,60 @@ export class VehiclesService {
     throw new Error('Modelo vehiculo no existe en Prisma.');
   }
 
+  private readonly logger = new Logger(VehiclesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    @Optional() private readonly danos?: DanosVehiculoService,
   ) {}
+
+  private aActor(quien: number | ActorVehiculo): ActorVehiculo {
+    return typeof quien === 'number' ? { id: quien } : quien;
+  }
+
+  /** Registra salida o devolución: quien pidió, el encargado de la unidad, o Liz en persona. */
+  private puedeRegistrar(record: { solicitanteId?: number | null; encargadoId?: number | null }, actor: ActorVehiculo) {
+    return Boolean(
+      actor.isSuperAdmin ||
+        actor.puedeRevisar ||
+        (record.solicitanteId != null && record.solicitanteId === actor.id) ||
+        (record.encargadoId != null && record.encargadoId === actor.id),
+    );
+  }
+
+  /** De la oficina a donde va la actividad: el origen para estimar los km de ida y vuelta. */
+  private origenOficina() {
+    const s = sitioOficina();
+    return { lat: s.latitude, lng: s.longitude };
+  }
+
+  /** El encargado: una persona activa de la empresa. Sin dato, quien pide. */
+  private async encargadoValido(crudo: unknown, porOmision: number, companyId?: number | null): Promise<number> {
+    const n = Number(crudo);
+    if (crudo == null || crudo === '' || !Number.isInteger(n) || n <= 0 || n === porOmision) return porOmision;
+    const persona = await this.prisma.user.findFirst({
+      where: { id: n, isActive: true, ...(companyId ? { companyMemberships: { some: { companyId } } } : {}) },
+      select: { id: true },
+    });
+    if (!persona) throw new BadRequestException('El encargado debe ser una persona activa de la empresa');
+    return persona.id;
+  }
+
+  /** La actividad a la que va una salida de inventario: abierta, con su fin y los km que pide. */
+  private async actividadParaUso(actividadId: number, companyId?: number | null) {
+    const act = await this.prisma.activity.findFirst({
+      where: { id: actividadId, ...companyWhere(companyId ?? null) },
+      select: { id: true, estatus: true, destino: true, fechaEntregaEsperada: true, fechaMaxima: true },
+    });
+    if (!act) throw new BadRequestException('Actividad no encontrada');
+    if (ESTATUS_CERRADOS.includes(act.estatus)) throw new BadRequestException(MENSAJE_ACTIVIDAD_CERRADA);
+    return {
+      id: act.id,
+      fin: (act.fechaEntregaEsperada ?? act.fechaMaxima ?? null) as Date | null,
+      kmEsperados: kmEsperadosIdaVuelta(this.origenOficina(), act.destino),
+    };
+  }
 
   private resolveActorRole(actor: any): RoleKey | null {
     if (actor?.isSuperAdmin) return ROLES.SUPER_ADMIN;
@@ -68,13 +180,21 @@ export class VehiclesService {
 
   async create(createVehicleDto: any, companyId?: number | null) {
     const cid = await resolveRequiredCompanyId(this.prisma, companyId);
-    const { companyId: _ignored, ...rest } = createVehicleDto ?? {};
+    const { companyId: _ignored, encargadoId: encargadoCrudo, ...rest } = createVehicleDto ?? {};
 
     const activity = await this.prisma.activity.findFirst({
       where: { id: rest.actividadId, ...companyWhere(cid) },
-      select: { id: true },
+      select: { id: true, estatus: true, destino: true },
     });
     if (!activity) throw new BadRequestException('Actividad no encontrada');
+    if (ESTATUS_CERRADOS.includes(activity.estatus) && (await capturaGuiadaPrendida(this.prisma))) {
+      throw new BadRequestException(MENSAJE_ACTIVIDAD_CERRADA);
+    }
+    // Usar una unidad pide actividad y encargado: sin dato, el encargado es quien la pide.
+    const encargadoId = rest.solicitanteId
+      ? await this.encargadoValido(encargadoCrudo, Number(rest.solicitanteId), cid)
+      : null;
+    const kmEsperados = kmEsperadosIdaVuelta(this.origenOficina(), activity.destino);
 
     if (rest.vehicleId != null) {
       const asset = await this.prisma['vehicleAsset'].findFirst({
@@ -87,6 +207,8 @@ export class VehiclesService {
     const vehicleControl = await this.prisma['vehicleControl'].create({
       data: {
         ...rest,
+        encargadoId,
+        kmEsperados,
         companyId: cid,
         approvalStep: 0,
         approvalTrail: [],
@@ -323,13 +445,33 @@ export class VehiclesService {
   }
 
   /**
-   * El check list de entrega/recepción, idéntico en las cuatro rutas que abren
-   * o cierran una asignación. Si falta una foto, el kilometraje o la gasolina,
-   * el 400 dice todo lo que falta de una vez.
+   * La evidencia de salida o devolución, idéntica en las cuatro rutas que abren o cierran una
+   * asignación: el checklist de 7 fotos (v1) o la captura guiada de 5 pasos (v2). Si falta algo, el
+   * 400 dice todo de una vez. Con el interruptor prendido, una salida solo entra con la captura
+   * guiada; la devolución acepta las dos para que nadie se quede con la unidad por traer la app vieja.
    */
-  private revisarOFallar(entrada: EntradaChecklist): ChecklistNormalizado {
-    const revision = revisarChecklist(entrada);
-    if (!revision.ok) throw new BadRequestException(mensajeErrores(revision.errores));
+  private async revisarCaptura(
+    entrada: EntradaCaptura,
+    momento: 'salida' | 'devolucion',
+    ctx?: { companyId?: number | null; relatedId: number; etiqueta: string },
+  ): Promise<Captura> {
+    let revision: { ok: true; datos: Captura } | { ok: false; errores: ErrorChecklist[] };
+    if (entrada.version === 2) {
+      revision = revisarCapturaGuiada(entrada);
+    } else {
+      if (momento === 'salida' && (await capturaGuiadaPrendida(this.prisma))) {
+        throw new BadRequestException(MENSAJE_ACTUALIZA_APP);
+      }
+      const r = revisarChecklist(entrada);
+      revision = r.ok ? { ok: true, datos: { ...r.datos, version: 1 } } : r;
+    }
+    if (!revision.ok) {
+      const msg = mensajeErrores(revision.errores);
+      if (momento === 'devolucion' && ctx) {
+        await this.avisarLizChecklist(ctx.companyId, `Checklist de vehículo: ${ctx.etiqueta}`, msg, ctx.relatedId);
+      }
+      throw new BadRequestException(msg);
+    }
     return revision.datos;
   }
 
@@ -371,57 +513,224 @@ export class VehiclesService {
     }
   }
 
-  private async revisarDevolucionOFallar(
-    entrada: EntradaChecklist,
-    ctx: { companyId?: number | null; relatedId: number; etiqueta: string },
-  ): Promise<ChecklistNormalizado> {
-    const revision = revisarChecklist(entrada);
-    if (!revision.ok) {
-      const msg = mensajeErrores(revision.errores);
-      await this.avisarLizChecklist(
-        ctx.companyId,
-        `Checklist de vehículo: ${ctx.etiqueta}`,
-        msg,
-        ctx.relatedId,
-      );
-      throw new BadRequestException(msg);
-    }
-    return revision.datos;
-  }
-
   /** Lo que se guarda en `fotosSalida` / `fotosDevolucion`. */
-  private payloadFotos(datos: ChecklistNormalizado) {
+  private payloadFotos(datos: Captura) {
     return {
       fotos: datos.fotos,
       fotoTableroUrl: datos.fotoTableroUrl,
       odometroKm: datos.odometroKm,
       combustiblePct: datos.combustiblePct,
       registradoEn: new Date().toISOString(),
+      ...(datos.version === 2
+        ? { version: 2, videoUrl: datos.videoUrl, duracionVideoSeg: datos.duracionVideoSeg }
+        : {}),
     };
   }
 
   /** `fotosMeta` guarda el cuándo y el dónde de cada foto, de los dos momentos. */
-  private mezclarMeta(
-    previo: unknown,
-    momento: 'salida' | 'devolucion',
-    fotos: ChecklistNormalizado['fotos'],
-  ): any {
-    const base =
-      previo && typeof previo === 'object' && !Array.isArray(previo)
-        ? (previo as Record<string, unknown>)
-        : {};
-    return { ...base, [momento]: fotos };
+  private mezclarMeta(previo: unknown, momento: 'salida' | 'devolucion', fotos: Captura['fotos']): any {
+    return { ...objeto(previo), [momento]: fotos };
   }
 
-  async startUse(id: number, userId: number, entrada: EntradaChecklist, companyId?: number | null) {
+  /** Video, lectura de la IA, versión de la captura y alertas: lo nuevo de la captura guiada. */
+  private extrasCaptura(
+    record: { capturaVersion?: number | null; lecturasKm?: unknown; alertasKm?: unknown },
+    datos: Captura,
+    momento: 'salida' | 'devolucion',
+    alertas: AlertaKm[],
+  ): Record<string, unknown> {
+    const extras: Record<string, unknown> = {};
+    const actual = record.capturaVersion ?? 1;
+    // Al devolver con la app vieja una unidad que salió con la guiada, solo se comparan vistas que sí coinciden.
+    const version = momento === 'salida' ? datos.version : Math.min(actual, datos.version);
+    if (version !== actual) extras.capturaVersion = version;
+    if (datos.version === 2) {
+      extras[momento === 'salida' ? 'videoSalidaUrl' : 'videoDevolucionUrl'] = datos.videoUrl;
+      extras.lecturasKm = {
+        ...objeto(record.lecturasKm),
+        [momento]: { ...datos.lectura, en: new Date().toISOString() },
+      };
+    }
+    if (alertas.length) extras.alertasKm = [...arreglo(record.alertasKm), ...alertas];
+    return extras;
+  }
+
+  /**
+   * El kilometraje más reciente que se conoce de la unidad: solicitudes, salidas de inventario y
+   * cargas de gasolina. Si la base falla, no se bloquea a nadie: se sigue sin comparar.
+   */
+  private async ultimoKmDeUnidad(
+    vehicleId: number | null | undefined,
+    companyId?: number | null,
+    excluirControlId?: number,
+  ): Promise<RegistroKm | null> {
+    if (!vehicleId) return null;
+    try {
+      const where = companyWhere(companyId ?? null);
+      const [controles, asset, carga] = await Promise.all([
+        this.prisma.vehicleControl.findMany({
+          where: {
+            vehicleId,
+            ...where,
+            ...(excluirControlId ? { id: { not: excluirControlId } } : {}),
+            OR: [{ odometroFin: { not: null } }, { odometroInicio: { not: null } }],
+          },
+          orderBy: { id: 'desc' },
+          take: 5,
+          select: {
+            odometroInicio: true,
+            odometroFin: true,
+            fechaInicio: true,
+            fechaFin: true,
+            fotosSalida: true,
+            fotosDevolucion: true,
+          },
+        }),
+        this.prisma.vehicleAsset.findFirst({
+          where: { id: vehicleId, ...where },
+          select: { salidaFotos: true, devolucionFotos: true },
+        }),
+        this.prisma.vehiculoCarga.findFirst({
+          where: { vehicleId, ...where },
+          orderBy: { fecha: 'desc' },
+          select: { odometro: true, fecha: true },
+        }),
+      ]);
+      const registros: RegistroKm[] = [];
+      for (const c of controles) {
+        if (c.odometroFin != null) {
+          registros.push({ km: c.odometroFin, at: registradoEn(c.fotosDevolucion) ?? c.fechaFin, origen: 'devolucion' });
+        }
+        if (c.odometroInicio != null) {
+          registros.push({ km: c.odometroInicio, at: registradoEn(c.fotosSalida) ?? c.fechaInicio, origen: 'salida' });
+        }
+      }
+      for (const [payload, origen] of [
+        [asset?.salidaFotos, 'inventario-salida'],
+        [asset?.devolucionFotos, 'inventario-devolucion'],
+      ] as const) {
+        const km = this.numeroDe(payload, 'odometroKm');
+        if (km != null) registros.push({ km, at: registradoEn(payload), origen });
+      }
+      if (carga?.odometro != null) registros.push({ km: carga.odometro, at: carga.fecha, origen: 'carga' });
+      return ultimoRegistroKm(registros);
+    } catch (e) {
+      this.logger.warn(`No se pudo leer el último km de la unidad ${vehicleId}: ${String((e as Error)?.message ?? e)}`);
+      return null;
+    }
+  }
+
+  /**
+   * Una salida contra el último kilometraje de la unidad. Con el interruptor prendido, retroceder es
+   * error, salvo que Liz lo autorice (`forzarKm`) porque el registro anterior estaba mal: queda la
+   * alerta con su nombre. Apagado, no se bloquea a nadie: solo queda la alerta.
+   */
+  private async revisarKmSalida(
+    datos: Captura,
+    vehicleId: number | null | undefined,
+    companyId: number | null | undefined,
+    actor: ActorVehiculo,
+    forzar: boolean | undefined,
+    excluirControlId?: number,
+  ): Promise<AlertaKm[]> {
+    const alertas: AlertaKm[] = [];
+    if (datos.version === 2) {
+      const corregida = alertaLecturaCorregida(datos.lectura.ia, datos.lectura.confirmado);
+      if (corregida) alertas.push(corregida);
+    }
+    const ultimo = await this.ultimoKmDeUnidad(vehicleId, companyId, excluirControlId);
+    const revision = revisarKmContraUltimo(datos.odometroKm, ultimo);
+    if (revision.error) {
+      const autorizado = Boolean(forzar && (actor.isSuperAdmin || actor.puedeRevisar));
+      const exigida = await capturaGuiadaPrendida(this.prisma);
+      if (exigida && !autorizado) throw new BadRequestException(revision.error);
+      const anterior = `${ultimo!.km.toLocaleString('es-MX')} km`;
+      alertas.push({
+        tipo: 'KM_MENOR',
+        km: datos.odometroKm,
+        mensaje: autorizado
+          ? `Kilometraje menor al último registro (${anterior}), registrado con autorización de ${actor.nombre ?? 'quien revisa vehículos'}.`
+          : `Kilometraje menor al último registro (${anterior}). Revisa cuál de los dos está mal.`,
+        en: new Date().toISOString(),
+      });
+    }
+    alertas.push(...revision.alertas);
+    return alertas;
+  }
+
+  /** Al devolver: lectura corregida a mano y km de más contra lo que pide la actividad. */
+  private alertasDevolucion(
+    record: { odometroInicio?: number | null; kmEsperados?: number | null },
+    datos: Captura,
+  ): AlertaKm[] {
+    const alertas: AlertaKm[] = [];
+    if (datos.version === 2) {
+      const corregida = alertaLecturaCorregida(datos.lectura.ia, datos.lectura.confirmado);
+      if (corregida) alertas.push(corregida);
+    }
+    if (record.odometroInicio != null) {
+      const deMas = revisarKmRecorridos(datos.odometroKm - record.odometroInicio, record.kmEsperados);
+      if (deMas) alertas.push(deMas);
+    }
+    return alertas;
+  }
+
+  /** Las alertas siempre se guardan; a Liz se le avisa solo con el interruptor prendido. */
+  private async avisarAlertasKm(companyId: number | null | undefined, etiqueta: string, alertas: AlertaKm[], relatedId: number) {
+    if (!alertas.length || !(await capturaGuiadaPrendida(this.prisma))) return;
+    await this.avisarLizChecklist(companyId, `Kilometraje: ${etiqueta}`, alertas.map((a) => a.mensaje).join('\n'), relatedId);
+  }
+
+  /** Lo que se guarda al cerrar un uso, venga de la solicitud o del inventario. */
+  private datosDevolucion(record: any, datos: Captura, alertas: AlertaKm[]) {
+    return {
+      fotosDevolucion: this.payloadFotos(datos),
+      fotosMeta: this.mezclarMeta(record.fotosMeta, 'devolucion', datos.fotos),
+      fotoTableroDevolucionUrl: datos.fotoTableroUrl,
+      odometroFin: datos.odometroKm,
+      combustibleFinPct: datos.combustiblePct,
+      entregaEstatus: 'Devuelto',
+      fechaFin: new Date(),
+      ...this.extrasCaptura(record, datos, 'devolucion', alertas),
+    };
+  }
+
+  /**
+   * Después de devolver: Liz se entera de las alertas y la IA compara antes y después, sin detener a
+   * nadie. La comparación cuesta (Sonnet, unos centavos por devolución): solo con el interruptor prendido.
+   */
+  private async despuesDeDevolver(controlId: number, companyId: number | null | undefined, etiqueta: string, alertas: AlertaKm[]) {
+    await this.avisarAlertasKm(companyId, etiqueta, alertas, controlId);
+    if (await capturaGuiadaPrendida(this.prisma)) this.danos?.analizarEnSegundoPlano(controlId);
+  }
+
+  /** Si la unidad quedó marcada como asignada a esta persona en el inventario, vuelve a estar disponible. */
+  private async liberarUnidad(record: any, datos: Captura) {
+    if (!record.vehicleId) return;
+    const personas = [record.solicitanteId, record.encargadoId].filter((v): v is number => typeof v === 'number');
+    try {
+      await this.prisma.vehicleAsset.updateMany({
+        where: { id: record.vehicleId, estatus: 'Asignado', assignedToId: { in: personas } },
+        data: { estatus: 'Disponible', assignedToId: null, assignedAt: null, devolucionFotos: this.payloadFotos(datos) },
+      });
+    } catch (e) {
+      this.logger.warn(`No se pudo liberar la unidad ${record.vehicleId}: ${String((e as Error)?.message ?? e)}`);
+    }
+  }
+
+  async startUse(id: number, quien: number | ActorVehiculo, entrada: EntradaCaptura, companyId?: number | null) {
+    const actor = this.aActor(quien);
     const record = await this.findOne(id, companyId);
     if (record.estatusAprobacion !== 'Aprobado') throw new BadRequestException('La solicitud debe estar aprobada');
-    if (record.solicitanteId !== userId) throw new ForbiddenException('Solo el solicitante puede registrar la salida');
+    if (!this.puedeRegistrar(record, actor)) {
+      throw new ForbiddenException('Solo quien pidió la unidad o su encargado puede registrar la salida');
+    }
     if (record.fotosSalida) throw new BadRequestException('Ya registraste la salida del vehículo');
 
-    const datos = this.revisarOFallar(entrada);
+    const datos = await this.revisarCaptura(entrada, 'salida');
+    const alertas = await this.revisarKmSalida(datos, record.vehicleId, companyId, actor, entrada.forzarKm, id);
 
-    return this.prisma['vehicleControl'].update({
+    const actualizado = await this.prisma['vehicleControl'].update({
       where: { id },
       data: {
         fotosSalida: this.payloadFotos(datos),
@@ -431,92 +740,158 @@ export class VehiclesService {
         combustibleInicioPct: datos.combustiblePct,
         entregaEstatus: 'En uso',
         fechaInicio: record.fechaInicioAprobada ?? new Date(),
+        ...this.extrasCaptura(record, datos, 'salida', alertas),
       },
     });
+    await this.avisarAlertasKm(companyId ?? record.companyId, record.nombreVehiculo || `solicitud #${id}`, alertas, id);
+    return actualizado;
   }
 
-  async endUse(id: number, userId: number, entrada: EntradaChecklist, companyId?: number | null) {
+  async endUse(id: number, quien: number | ActorVehiculo, entrada: EntradaCaptura, companyId?: number | null) {
+    const actor = this.aActor(quien);
     const record = await this.findOne(id, companyId);
-    if (record.solicitanteId !== userId) throw new ForbiddenException('Solo el solicitante puede registrar la devolución');
+    if (!this.puedeRegistrar(record, actor)) {
+      throw new ForbiddenException('Solo quien pidió la unidad o su encargado puede registrar la devolución');
+    }
     if (!record.fotosSalida) throw new BadRequestException('Primero registra la salida del vehículo');
     if (record.fotosDevolucion || record.entregaEstatus === 'Devuelto') throw new BadRequestException('Ya registraste la devolución del vehículo');
 
-    const datos = await this.revisarDevolucionOFallar(
-      { ...entrada, odometroInicio: record.odometroInicio },
-      { companyId, relatedId: id, etiqueta: record.nombreVehiculo || `solicitud #${id}` },
+    const etiqueta = record.nombreVehiculo || `solicitud #${id}`;
+    const datos = await this.revisarCaptura(
+      { ...entrada, odometroInicio: record.odometroInicio } as EntradaCaptura,
+      'devolucion',
+      { companyId, relatedId: id, etiqueta },
     );
+    const alertas = this.alertasDevolucion(record, datos);
 
-    return this.prisma['vehicleControl'].update({
+    const actualizado = await this.prisma['vehicleControl'].update({
       where: { id },
-      data: {
-        fotosDevolucion: this.payloadFotos(datos),
-        fotosMeta: this.mezclarMeta(record.fotosMeta, 'devolucion', datos.fotos),
-        fotoTableroDevolucionUrl: datos.fotoTableroUrl,
-        odometroFin: datos.odometroKm,
-        combustibleFinPct: datos.combustiblePct,
-        entregaEstatus: 'Devuelto',
-        fechaFin: new Date(),
-      },
+      data: this.datosDevolucion(record, datos, alertas),
     });
+    await this.liberarUnidad(record, datos);
+    await this.despuesDeDevolver(id, companyId ?? record.companyId, etiqueta, alertas);
+    return actualizado;
   }
 
   /**
-   * Salida directa desde el inventario, sin solicitud previa. Hasta ahora esta
-   * ruta aceptaba de 0 a 10 fotos sueltas y ni kilometraje ni gasolina: era la
-   * puerta de atrás del check list. Ahora pide exactamente lo mismo.
+   * Salida directa desde el inventario, sin solicitud previa. Pide la misma evidencia que una
+   * solicitud. Con actividad, además deja un uso (`VehicleControl`) ligado a ella: así la actividad
+   * enseña su bloque «Vehículo», corren los avisos de retraso y la IA compara al devolver. Con el
+   * interruptor prendido, la actividad es obligatoria.
    */
-  async checkoutAsset(id: number, userId: number, entrada: EntradaChecklist, companyId?: number | null) {
+  async checkoutAsset(
+    id: number,
+    quien: number | ActorVehiculo,
+    entrada: EntradaCaptura,
+    companyId?: number | null,
+    opciones: { actividadId?: unknown; encargadoId?: unknown } = {},
+  ) {
+    const actor = this.aActor(quien);
     const asset = await this.getAsset(id, companyId);
     if (!asset) throw new BadRequestException('Vehículo no encontrado');
     if (asset.estatus === 'Asignado') throw new BadRequestException('El vehículo ya está asignado');
     if (asset.activo === false) throw new BadRequestException('El vehículo está dado de baja');
 
-    const datos = this.revisarOFallar(entrada);
+    const actividadId = Number(opciones.actividadId);
+    const conActividad = Number.isInteger(actividadId) && actividadId > 0;
+    if (!conActividad && (await capturaGuiadaPrendida(this.prisma))) {
+      throw new BadRequestException('Para sacar una unidad elige la actividad a la que va.');
+    }
+    const actividad = conActividad ? await this.actividadParaUso(actividadId, companyId) : null;
+    const encargadoId = await this.encargadoValido(opciones.encargadoId, actor.id, companyId);
 
-    return this.prisma['vehicleAsset'].update({
+    const datos = await this.revisarCaptura(entrada, 'salida');
+    const alertas = await this.revisarKmSalida(datos, id, companyId, actor, entrada.forzarKm);
+    const payload = this.payloadFotos(datos);
+
+    const actualizado = await this.prisma['vehicleAsset'].update({
       where: { id },
       data: {
         estatus: 'Asignado',
-        assignedToId: userId,
+        assignedToId: encargadoId,
         assignedAt: new Date(),
-        salidaFotos: this.payloadFotos(datos),
+        salidaFotos: payload,
         devolucionFotos: undefined,
         tiempoUsoMinutos: null,
       },
     });
+
+    let controlId: number | null = null;
+    if (actividad) {
+      const ahora = new Date();
+      const control = await this.prisma['vehicleControl'].create({
+        data: {
+          actividadId: actividad.id,
+          vehicleId: id,
+          solicitanteId: actor.id,
+          encargadoId,
+          nombreVehiculo: asset.nombre ?? null,
+          placasVehiculo: asset.placas ?? null,
+          motivoUso: 'Salida directa de inventario',
+          estatusAprobacion: 'Aprobado',
+          approvalStep: 0,
+          approvalTrail: [
+            { role: 'inventario', userId: actor.id, userName: actor.nombre ?? null, action: 'approve', at: ahora.toISOString(), note: 'Salida directa de inventario' },
+          ],
+          fechaSolicitud: ahora,
+          fechaInicioSolicitada: ahora,
+          fechaInicioAprobada: ahora,
+          fechaInicio: ahora,
+          fechaFinSolicitada: actividad.fin,
+          fechaFinAprobada: actividad.fin,
+          fotosSalida: payload,
+          fotosMeta: { salida: datos.fotos },
+          fotoTableroSalidaUrl: datos.fotoTableroUrl,
+          odometroInicio: datos.odometroKm,
+          combustibleInicioPct: datos.combustiblePct,
+          entregaEstatus: 'En uso',
+          kmEsperados: actividad.kmEsperados,
+          ...this.extrasCaptura({}, datos, 'salida', alertas),
+          companyId: asset.companyId,
+        },
+        select: { id: true },
+      });
+      controlId = control.id;
+    }
+    await this.avisarAlertasKm(companyId ?? asset.companyId, asset.nombre || `inventario #${id}`, alertas, controlId ?? id);
+    return controlId ? { ...actualizado, usoId: controlId } : actualizado;
+  }
+
+  /** El uso abierto de una unidad, si salió del inventario con actividad. */
+  private async usoAbiertoDeUnidad(vehicleId: number, companyId?: number | null) {
+    const uso = await this.prisma['vehicleControl'].findFirst({
+      where: { vehicleId, entregaEstatus: 'En uso', estatusAprobacion: 'Aprobado', ...companyWhere(companyId ?? null) },
+      orderBy: { id: 'desc' },
+    });
+    return uso && uso.vehicleId === vehicleId && uso.entregaEstatus === 'En uso' && !uso.fotosDevolucion ? uso : null;
   }
 
   /** Devolución directa al inventario. Mismas reglas, y el km final no retrocede. */
-  async returnAsset(
-    id: number,
-    actor: { id: number; isSuperAdmin?: boolean; puedeInventario?: boolean },
-    entrada: EntradaChecklist,
-    companyId?: number | null,
-  ) {
+  async returnAsset(id: number, actor: ActorVehiculo, entrada: EntradaCaptura, companyId?: number | null) {
     const asset = await this.getAsset(id, companyId);
     if (!asset) throw new BadRequestException('Vehículo no encontrado');
-    if (!actor.isSuperAdmin && !actor.puedeInventario && asset.assignedToId !== actor.id) {
+    const uso = await this.usoAbiertoDeUnidad(id, companyId);
+    const esSuyo = asset.assignedToId === actor.id || Boolean(uso && this.puedeRegistrar(uso, { id: actor.id }));
+    if (!actor.isSuperAdmin && !actor.puedeInventario && !actor.puedeRevisar && !esSuyo) {
       throw new ForbiddenException('Solo el asignatario puede devolver el vehículo');
     }
     if (asset.estatus !== 'Asignado') throw new BadRequestException('El vehículo no está asignado');
 
     const salida = asset.salidaFotos as { odometroKm?: number } | null;
-    const datos = await this.revisarDevolucionOFallar(
-      { ...entrada, odometroInicio: salida?.odometroKm ?? null },
-      {
-        companyId,
-        relatedId: id,
-        etiqueta: (asset as { alias?: string; placa?: string }).alias
-          || (asset as { placa?: string }).placa
-          || `inventario #${id}`,
-      },
+    const etiqueta =
+      (asset as { alias?: string; placa?: string }).alias || (asset as { placa?: string }).placa || asset.nombre || `inventario #${id}`;
+    const datos = await this.revisarCaptura(
+      { ...entrada, odometroInicio: uso?.odometroInicio ?? salida?.odometroKm ?? null } as EntradaCaptura,
+      'devolucion',
+      { companyId, relatedId: uso?.id ?? id, etiqueta },
     );
+    const alertas = this.alertasDevolucion(uso ?? { odometroInicio: salida?.odometroKm ?? null, kmEsperados: null }, datos);
 
     const minutosUso = asset.assignedAt
       ? Math.round((Date.now() - new Date(asset.assignedAt).getTime()) / 60000)
       : null;
 
-    return this.prisma['vehicleAsset'].update({
+    const actualizado = await this.prisma['vehicleAsset'].update({
       where: { id },
       data: {
         estatus: 'Disponible',
@@ -526,6 +901,201 @@ export class VehiclesService {
         tiempoUsoMinutos: minutosUso,
       },
     });
+
+    if (uso) {
+      await this.prisma['vehicleControl'].update({ where: { id: uso.id }, data: this.datosDevolucion(uso, datos, alertas) });
+      await this.despuesDeDevolver(uso.id, companyId ?? asset.companyId, etiqueta, alertas);
+    } else {
+      await this.avisarAlertasKm(companyId ?? asset.companyId, etiqueta, alertas, id);
+    }
+    return actualizado;
+  }
+
+  // ─── Captura guiada: pasos, firmas y bloque «Vehículo» de la actividad ─────
+
+  /** Lo que la web y las apps necesitan para guiar la captura: pasos, vistas y el último km de la unidad. */
+  async capturaGuiada(vehicleId: number | null, companyId?: number | null) {
+    const ultimo = vehicleId ? await this.ultimoKmDeUnidad(vehicleId, companyId) : null;
+    return {
+      exigida: await capturaGuiadaPrendida(this.prisma),
+      pasos: PASOS_CAPTURA,
+      vistasVuelta: VISTAS_VUELTA,
+      fotos: FOTOS_GUIADAS,
+      campoVideo: CAMPO_VIDEO_VUELTA,
+      duracionVueltaSeg: { min: DURACION_VUELTA_SEG.min, max: DURACION_VUELTA_SEG.max },
+      ultimoRegistro: ultimo ? { km: ultimo.km, en: ultimo.at, origen: ultimo.origen } : null,
+    };
+  }
+
+  /**
+   * Firma en pantalla de quien entrega y de quien recibe, cuando Liz interviene en persona. Las dos
+   * se toman en el mismo teléfono; cada una guarda el nombre, quién la registró y cuándo.
+   */
+  async registrarFirma(
+    id: number,
+    actor: ActorVehiculo,
+    d: { momento: unknown; rol: unknown; url: string; nombre?: unknown; userId?: unknown },
+    companyId?: number | null,
+  ) {
+    const momento = String(d.momento ?? '');
+    const rol = String(d.rol ?? '');
+    if (momento !== 'salida' && momento !== 'devolucion') throw new BadRequestException('momento debe ser «salida» o «devolucion»');
+    if (rol !== 'entrega' && rol !== 'recibe') throw new BadRequestException('rol debe ser «entrega» o «recibe»');
+    const nombre = String(d.nombre ?? '').trim().slice(0, 120);
+    if (!nombre) throw new BadRequestException('Escribe el nombre de quien firma');
+
+    const record = await this.findOne(id, companyId);
+    if (!this.puedeRegistrar(record, actor)) throw new ForbiddenException('No puedes firmar este uso de vehículo');
+    if (record.estatusAprobacion !== 'Aprobado') throw new BadRequestException('La solicitud debe estar aprobada');
+    if (momento === 'devolucion' && !record.fotosSalida) throw new BadRequestException('Primero registra la salida del vehículo');
+
+    // Solo se liga a una persona del uso; cualquier otro id se ignora.
+    const posible = Number(d.userId);
+    const conocidos = [record.solicitanteId, record.encargadoId, actor.id].filter((v) => typeof v === 'number');
+    const userId = conocidos.includes(posible) ? posible : null;
+
+    const firmas = objeto(record.firmas);
+    const delMomento = objeto(firmas[momento]);
+    delMomento[rol] = { url: d.url, nombre, userId, firmadoEn: new Date().toISOString(), registradoPorId: actor.id };
+    return this.prisma['vehicleControl'].update({
+      where: { id },
+      data: { firmas: { ...firmas, [momento]: delMomento } },
+      select: { id: true, firmas: true },
+    });
+  }
+
+  /** Lo que el libro de costos ya cargó a cada uso (`VEHICULO:<id>`). Solo para quien ve costos. */
+  private async costoViajes(companyId: number | null | undefined, ids: number[]): Promise<Map<number, number>> {
+    const mapa = new Map<number, number>();
+    if (!ids.length || !companyId) return mapa;
+    try {
+      const filas = await this.prisma.costoMovimiento.findMany({
+        where: { companyId, origen: { in: ids.map((id) => `VEHICULO:${id}`) } },
+        select: { origen: true, importe: true },
+      });
+      for (const f of filas) {
+        const id = Number(String(f.origen).split(':')[1]);
+        mapa.set(id, dinero((mapa.get(id) ?? 0) + dinero(f.importe)));
+      }
+    } catch (e) {
+      this.logger.warn(`No se pudo leer el costo de los viajes: ${String((e as Error)?.message ?? e)}`);
+    }
+    return mapa;
+  }
+
+  /**
+   * Bloque «Vehículo» de una actividad: unidad, encargado, km, fotos, gasolina y costo. Lo ve quien
+   * gestiona vehículos y quien está en la actividad (responsable, equipo, quien la creó, su jefe o quien
+   * trae la unidad). Los montos, solo Liz y mandos; el costo del viaje, solo quien ve costos.
+   */
+  async porActividad(
+    activityId: number,
+    usuario: ActorCostos & { id: number; esGestor?: boolean },
+    companyId?: number | null,
+  ) {
+    const where = companyWhere(companyId ?? null);
+    const actividad = await this.prisma.activity.findFirst({
+      where: { id: activityId, ...where },
+      select: {
+        id: true,
+        anNumber: true,
+        titulo: true,
+        estatus: true,
+        responsableId: true,
+        creadoPorId: true,
+        responsable: { select: { managerId: true } },
+        assignees: { select: { userId: true } },
+      },
+    });
+    if (!actividad) throw new NotFoundException('Actividad no encontrada');
+
+    const usos = await this.prisma['vehicleControl'].findMany({
+      where: { actividadId: activityId, ...where },
+      orderBy: { fechaSolicitud: 'desc' },
+      include: {
+        vehiculo: { select: { id: true, nombre: true, placas: true } },
+        solicitante: { select: { id: true, nombre: true } },
+        encargado: { select: { id: true, nombre: true } },
+        hallazgos: { select: { estatus: true } },
+        incidencias: {
+          select: { id: true, tipo: true, estatus: true, descripcion: true, quienPaga: true, costoEstimado: true, costoReal: true },
+        },
+      },
+    });
+
+    const esGestor = Boolean(usuario.esGestor || usuario.isSuperAdmin);
+    const involucrado =
+      actividad.responsableId === usuario.id ||
+      actividad.creadoPorId === usuario.id ||
+      actividad.responsable?.managerId === usuario.id ||
+      actividad.assignees.some((a: { userId: number }) => a.userId === usuario.id) ||
+      usos.some((u: any) => u.solicitanteId === usuario.id || u.encargadoId === usuario.id);
+    if (!esGestor && !involucrado) throw new ForbiddenException('No puedes ver los vehículos de esta actividad');
+
+    const veMontos = esGestor || veTodoCostos(usuario);
+    const costos = veTodoCostos(usuario) ? await this.costoViajes(companyId ?? null, usos.map((u: any) => u.id)) : null;
+
+    return {
+      actividad: { id: actividad.id, folio: actividad.anNumber, titulo: actividad.titulo, estatus: actividad.estatus },
+      usos: usos.map((u: any) => {
+        const salida = u.fotosSalida
+          ? {
+              en: registradoEn(u.fotosSalida) ?? u.fechaInicio ?? null,
+              km: u.odometroInicio ?? null,
+              combustiblePct: u.combustibleInicioPct ?? null,
+              fotos: this.fotosDe(u.fotosSalida),
+              videoUrl: u.videoSalidaUrl ?? null,
+            }
+          : null;
+        const devolucion = u.fotosDevolucion
+          ? {
+              en: registradoEn(u.fotosDevolucion) ?? u.fechaFin ?? null,
+              km: u.odometroFin ?? null,
+              combustiblePct: u.combustibleFinPct ?? null,
+              fotos: this.fotosDe(u.fotosDevolucion),
+              videoUrl: u.videoDevolucionUrl ?? null,
+            }
+          : null;
+        const incidencias = (u.incidencias ?? []).map((i: any) => ({
+          id: i.id,
+          tipo: i.tipo,
+          estatus: i.estatus,
+          descripcion: i.descripcion,
+          quienPaga: i.quienPaga,
+          ...(veMontos ? { costo: i.costoReal != null ? dinero(i.costoReal) : i.costoEstimado != null ? dinero(i.costoEstimado) : null } : {}),
+        }));
+        return {
+          id: u.id,
+          estatus: u.entregaEstatus,
+          aprobacion: u.estatusAprobacion,
+          capturaVersion: u.capturaVersion ?? 1,
+          unidad: u.vehiculo
+            ? { id: u.vehiculo.id, nombre: u.vehiculo.nombre, placas: u.vehiculo.placas ?? null }
+            : { id: null, nombre: u.nombreVehiculo ?? 'Vehículo', placas: u.placasVehiculo ?? null },
+          solicitante: u.solicitante ? { id: u.solicitante.id, nombre: u.solicitante.nombre } : null,
+          encargado: u.encargado
+            ? { id: u.encargado.id, nombre: u.encargado.nombre }
+            : u.solicitante
+              ? { id: u.solicitante.id, nombre: u.solicitante.nombre }
+              : null,
+          regresoPrevisto: u.fechaFinAprobada ?? u.fechaFinSolicitada ?? null,
+          salida,
+          devolucion,
+          kmRecorridos: u.odometroInicio != null && u.odometroFin != null ? u.odometroFin - u.odometroInicio : null,
+          kmEsperados: u.kmEsperados ?? null,
+          alertasKm: arreglo(u.alertasKm),
+          firmas: u.firmas ?? null,
+          danos: {
+            estatus: u.analisisDanosEstatus ?? null,
+            propuestos: (u.hallazgos ?? []).filter((h: any) => h.estatus === 'PROPUESTO').length,
+            confirmados: (u.hallazgos ?? []).filter((h: any) => h.estatus === 'CONFIRMADO').length,
+          },
+          incidencias,
+          costoIncidencias: veMontos ? dinero(incidencias.reduce((s: number, i: any) => s + (i.costo ?? 0), 0)) : null,
+          costoViaje: costos ? (costos.get(u.id) ?? null) : null,
+        };
+      }),
+    };
   }
 
   async getUsageAnalytics() {
