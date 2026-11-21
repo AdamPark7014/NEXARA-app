@@ -1,6 +1,6 @@
 # RELEVO
 
-- **21-11 ~15:40 México (claude-code, nube; Cursor/Codex no alcanzables) — Vehículos: captura guiada de 5 pasos, daños con IA, incidencias y avisos de retraso. Solo API. En main, NO desplegado.**
+- **21-11 ~15:40 México (claude-code, nube; Cursor/Codex no alcanzables) — Vehículos: captura guiada de 5 pasos, daños con IA, incidencias y avisos de retraso. Solo API. En main 8c207c1; llegó a producción con el despliegue de otro hilo (21-11 21:31 UTC), migración aplicada, interruptor apagado.**
   - Todo detrás de `vehiculos.captura_guiada` (system_settings, apagado por omisión; en prod NO existe la fila). Apagado:
     se acepta el checklist de 7 fotos, el km menor al último registro entra con alerta `KM_MENOR` (no bloquea), no se
     avisa a Liz de alertas de km, no corre la comparación con IA ni los avisos de retraso. Prendido: salida solo con la
