@@ -389,7 +389,7 @@ describe('sueldo del periodo', () => {
       ),
     });
     expect(r.sueldoPeriodo).toBe(2800);
-    expect(r.explicacion).toMatch(/se descuentan aparte/);
+    expect(r.explicacion).toMatch(/1 falta injustificada no baja este monto: se descuenta aparte/);
   });
 
   it('semana en curso: devengado a la fecha (miércoles → 2/7)', () => {

@@ -83,7 +83,7 @@ export function EnSitioStrip({
           </span>
         </header>
         <p className={styles.hint}>
-          Presencia por control de acceso. Pulsa a alguien para ver puertas de hoy, actividades y CRM.
+          Quién está en la oficina según las puertas. Elige a alguien para ver por dónde pasó hoy y en qué anda.
         </p>
         {error && (
           <p className={styles.hint} data-tone="error">
@@ -91,7 +91,7 @@ export function EnSitioStrip({
           </p>
         )}
         {items.length === 0 && !error && (
-          <p className={styles.empty}>Nadie con acceso concedido en sitio ahora.</p>
+          <p className={styles.empty}>Las puertas no registran a nadie en la oficina ahora.</p>
         )}
         {items.length > 0 && (
           <ul className={styles.list}>

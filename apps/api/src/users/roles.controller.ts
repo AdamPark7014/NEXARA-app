@@ -190,7 +190,7 @@ export class RolesController {
     const assigned = await this.prisma.user.count({ where: { roleId } });
     if (assigned > 0) {
       throw new ConflictException(
-        `No se puede eliminar: ${assigned} usuario(s) tienen este rol asignado. ` +
+        `No se puede eliminar: ${assigned === 1 ? '1 usuario tiene' : `${assigned} usuarios tienen`} este rol asignado. ` +
           'Reasígnalos a otro rol antes de borrarlo.',
       );
     }

@@ -229,7 +229,7 @@ function userManagerId(u: ApiUser): string {
 function formatWhen(iso?: string | null) {
   if (!iso) return "Nunca";
   return new Date(iso).toLocaleString("es-MX", {
-    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+    day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
   });
 }
 

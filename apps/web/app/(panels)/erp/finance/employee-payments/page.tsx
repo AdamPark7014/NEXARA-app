@@ -179,7 +179,7 @@ function formatFechaHora(value?: string | null) {
     day: "2-digit",
     month: "short",
     year: "numeric",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
   });
 }

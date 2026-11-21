@@ -1,3 +1,4 @@
+import { contarEs } from '../common/contar-es.js';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AccountingService } from './accounting.service.js';
@@ -286,7 +287,7 @@ export class PeriodCloseService {
 
     if (forzado && !justificacion) {
       throw new BadRequestException(
-        `No se puede cerrar: ${pendientes.length} punto(s) bloqueante(s) sin resolver ` +
+        `No se puede cerrar: ${contarEs(pendientes.length, 'punto bloqueante', 'puntos bloqueantes')} sin resolver ` +
           `(${pendientes.map((p) => `${p.etiqueta}: ${p.conteo}`).join('; ')}). ` +
           'Resuélvelos o escribe una justificación para cerrar de todos modos.',
       );

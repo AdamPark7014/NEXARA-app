@@ -71,10 +71,10 @@ describe('factura · cotejo y timbre en una frase', () => {
     const service = servicio(prisma);
 
     await expect(service.exportBalanzaXml(10, 2026, EMPRESA)).rejects.toThrow(
-      'Faltan 2 cuenta(s) sin agrupador SAT asignado: complétalas antes de exportar la Balanza.',
+      'Faltan 2 cuentas sin agrupador SAT asignado: complétalas antes de exportar la Balanza.',
     );
     await expect(service.exportCatalogoCuentasXml(EMPRESA)).rejects.toThrow(
-      'Faltan 2 cuenta(s) sin agrupador SAT asignado: complétalas antes de exportar el Catálogo de cuentas.',
+      'Faltan 2 cuentas sin agrupador SAT asignado: complétalas antes de exportar el Catálogo de cuentas.',
     );
 
     const una = servicio({
@@ -83,7 +83,7 @@ describe('factura · cotejo y timbre en una frase', () => {
       },
     });
     await expect(una.exportBalanzaXml(10, 2026, EMPRESA)).rejects.toThrow(
-      'Faltan 1 cuenta(s) sin agrupador SAT asignado: complétalas antes de exportar la Balanza.',
+      'Falta 1 cuenta sin agrupador SAT asignado: complétala antes de exportar la Balanza.',
     );
 
     const previo = process.env.NODE_ENV;

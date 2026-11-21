@@ -587,9 +587,9 @@ export function adaptModulePresentation(
       description: 'SKUs y precios para cotizar. El stock físico está en ERP › Inventario.',
     },
     attendance: EXECUTIVE.has(v2)
-      ? { label: 'Asistencia · Gestión', description: 'Supervisión de jornadas del equipo' }
+      ? { label: 'Asistencia del equipo', description: 'Supervisión de jornadas del equipo' }
       : HR_MANAGERS.has(v2)
-        ? { label: 'Asistencia · Gestión', description: 'Registrar y gestionar jornadas' }
+        ? { label: 'Asistencia del equipo', description: 'Registrar y gestionar jornadas' }
         : { label: 'Mi asistencia', description: 'Registrar tu entrada y salida' },
     'crm-pipeline': SALES_REP.has(v2)
       ? { label: 'Pipeline', description: 'Tus oportunidades activas por etapa' }
@@ -743,7 +743,7 @@ export function adaptModulePresentation(
   }
 
   if (module.id === 'fines') {
-    return { ...module, label: 'Multas e incidencias', description: 'Sanciones administrativas del personal.' };
+    return { ...module, label: 'Multas y sanciones', description: 'Sanciones administrativas del personal.' };
   }
 
   if (module.id === 'kpis-hr') {
@@ -956,9 +956,9 @@ export function getAttendanceSectionConfig(
       viewMode,
       canRegisterSelf: false,
       canManageTeam: true,
-      title: 'Asistencia · Gestión',
-      subtitle: 'Checador del equipo y contraste ACS.',
-      visibilityHint: 'Dirección y RRHH ven todo el equipo; el panel contrasta app vs puertas.',
+      title: 'Asistencia del equipo',
+      subtitle: 'Entradas y salidas de todos, comparadas con sus pasos por las puertas.',
+      visibilityHint: 'Dirección y Recursos Humanos ven a todo el equipo. Abajo se compara el checador con las puertas.',
     };
   }
   if (viewMode === 'manage_register') {
@@ -967,8 +967,8 @@ export function getAttendanceSectionConfig(
       canRegisterSelf: true,
       canManageTeam: true,
       title: 'Asistencia',
-      subtitle: 'Tu jornada, el equipo y ACS.',
-      visibilityHint: 'Coordinadores y RRHH ven su equipo y registran su propia jornada.',
+      subtitle: 'Tu jornada, la de tu equipo y sus pasos por las puertas.',
+      visibilityHint: 'Coordinadores y Recursos Humanos ven a su equipo y registran su propia jornada.',
     };
   }
   return {
@@ -976,8 +976,8 @@ export function getAttendanceSectionConfig(
     canRegisterSelf: true,
     canManageTeam: false,
     title: 'Mi asistencia',
-    subtitle: 'Registra entrada/salida y contraste ACS.',
-    visibilityHint: 'Solo puedes ver y registrar tu propia asistencia. El ACS aparece si tu employeeNumber coincide con el personId del terminal.',
+    subtitle: 'Registra tu entrada y tu salida.',
+    visibilityHint: 'Solo ves y registras tu propia asistencia. Tus pasos por las puertas aparecen cuando tu número de empleado es el mismo en el lector.',
   };
 }
 
@@ -1562,7 +1562,7 @@ type HrSubmodule = 'fines' | 'kpis' | 'orgchart';
 
 const HR_SUB_COPY: Record<HrSubmodule, { title: string; subtitle: string }> = {
   fines: {
-    title: 'Multas e incidencias',
+    title: 'Multas y sanciones',
     subtitle: 'Sanciones administrativas: faltas, daños y comportamiento.',
   },
   kpis: {

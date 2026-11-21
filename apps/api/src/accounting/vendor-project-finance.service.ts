@@ -1,3 +1,4 @@
+import { contarEs } from '../common/contar-es.js';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
@@ -567,7 +568,7 @@ export class VendorProjectFinanceService {
         tipo: 'orden' as const,
         fecha: toIsoDate(o.orderDate),
         titulo: `Orden de compra ${o.poNumber}`,
-        detalle: `${o._count.items} partida(s)`,
+        detalle: contarEs(o._count.items, 'partida'),
         monto: money(toNumber(o.totalAmount)),
         estatus: String(o.status),
       })),

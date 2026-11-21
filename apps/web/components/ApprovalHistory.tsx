@@ -89,7 +89,7 @@ function formatDate(iso: string | null | undefined): string {
   return d.toLocaleString("es-MX", {
     day: "2-digit",
     month: "short",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
   });
 }

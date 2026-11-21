@@ -1,3 +1,4 @@
+import { contarEs } from '../common/contar-es.js';
 import { Injectable, Logger, Inject, Optional, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationType } from '@prisma/client';
@@ -627,7 +628,7 @@ export class NotificationsService {
               type: 'QUOTE_EXPIRING',
               category: 'quotes',
               title: `Cotización por expirar - ${quote.quoteNumber}`,
-              message: `La cotización ${quote.quoteNumber} para ${quote.clientCompany || quote.clientName || 'cliente'} expirará en ${daysUntilExpiry} día(s).`,
+              message: `La cotización ${quote.quoteNumber} para ${quote.clientCompany || quote.clientName || 'cliente'} expirará en ${contarEs(daysUntilExpiry, 'día')}.`,
               relatedEntityId: quote.id,
               entityType: 'Cotizacion',
               relatedUrl: appUrls.erpCotizaciones(quote.id),
@@ -642,7 +643,7 @@ export class NotificationsService {
                 type: 'QUOTE_EXPIRING',
                 category: 'quotes',
                 title: `Cotización por expirar - ${quote.quoteNumber}`,
-                message: `${quote.quoteNumber} de ${quote.createdBy?.nombre ?? 'tu equipo'} para ${quote.clientCompany || quote.clientName || 'cliente'} expirará en ${daysUntilExpiry} día(s).`,
+                message: `${quote.quoteNumber} de ${quote.createdBy?.nombre ?? 'tu equipo'} para ${quote.clientCompany || quote.clientName || 'cliente'} expirará en ${contarEs(daysUntilExpiry, 'día')}.`,
                 relatedEntityId: quote.id,
                 entityType: 'Cotizacion',
                 relatedUrl: appUrls.erpCotizaciones(quote.id),
@@ -659,7 +660,7 @@ export class NotificationsService {
                 type: 'QUOTE_EXPIRING',
                 category: 'quotes',
                 title: `Cotización por expirar - ${quote.quoteNumber}`,
-                message: `La cotización ${quote.quoteNumber} expirará en ${daysUntilExpiry} día(s).`,
+                message: `La cotización ${quote.quoteNumber} expirará en ${contarEs(daysUntilExpiry, 'día')}.`,
                 relatedEntityId: quote.id,
                 entityType: 'Cotizacion',
                 relatedUrl: appUrls.erpCotizaciones(quote.id),

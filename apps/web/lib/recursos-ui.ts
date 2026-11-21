@@ -46,7 +46,7 @@ export function fechaCorta(valor: string | Date | null | undefined): string {
 export function fechaHoraCorta(valor: string | Date | null | undefined): string {
   const fecha = aFecha(valor);
   if (!fecha) return FALTA;
-  return fecha.toLocaleString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return fecha.toLocaleString("es-MX", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
 /** Días enteros de hoy a la fecha (negativo = ya pasó). `null` sin fecha. */

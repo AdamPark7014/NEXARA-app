@@ -1,5 +1,49 @@
 # RELEVO
 
+- **21-11 ~17:15 México (claude-code, nube; Cursor/Codex no alcanzables) — Cuarta vuelta de pulido: capas a pantalla completa recortadas en teléfono, horas y fechas parejas, avisos del servidor sin «(s)» ni jerga, asistencia contra puertas en lenguaje llano. Sin migraciones. En main, NO desplegado.**
+  - **Franja de 16 px en teléfono y tableta (web):** `globals.scss` limita toda ventana a `100vw - 16px` por debajo de
+    900 px con `:where([role="dialog"], [class*="modal"], [class*="Modal"], [class*="drawer"]…)`. Esa red de seguridad
+    también alcanzaba a las capas a pantalla completa (el fondo lleva el `role="dialog"` o su clase dice «modal»), que
+    quedaban 16 px cortas: se veía una franja de la página a la derecha. Eran 17: menú del sitio público, cámara y
+    «Revisa tu foto» de evidencias, ventana de checada, revisión de evidencia, vista previa de Excel, Centro operativo
+    y «Mis actividades» de la pizarra, visores de comidas y de evidencias del equipo, historial de producto en almacén,
+    reportes de ventas, chat y las del editor de videovigilancia. Cada una declara ahora `max-width: none`; la regla
+    global quedó comentada para que las siguientes no caigan en lo mismo. Comprobado midiendo en 390, 820 y 1280 px.
+  - **Candado de desplazamiento:** el menú y el buscador del sitio público y los dos portales (`components/sitio`,
+    `components/portal`) ya usan `useScrollLock` (bloquea en `<html>`); era el pendiente de la vuelta de las 16:40.
+  - **Horas y fechas (web):** 49 formatos de 45 archivos escribían «08:02 a.m.»; ahora «8:02 a.m.», como ya lo hacían
+    `hora12Texto` y el asistente. Los de 24 h (`hour12: false`, `h23`, `en-GB`), los relojes que corren y el Excel no
+    se tocaron. 11 formatos sin año escribían «21-nov» (así sale `day: "2-digit"` + `month: "short"` en es-MX); ahora
+    «21 nov». Las fechas con año de contabilidad («01 sep 2026», con prueba) quedan igual.
+  - **Avisos del servidor:** fuera «usuario(s)», «día(s)», «falta(s)», «factura(s)»… en cuentas y roles, RH, tickets,
+    ventas, compras, avisos de cotización por vencer, correo de atraso, contrato de mantenimiento, prenómina y control
+    de nómina, contabilidad (cierre, balanza, catálogo, alertas) y preparación de timbrado, con `contarEs` o la frase
+    completa en singular y plural. De paso, sin jerga: «5 cuentas activas nunca han entrado» (antes «usuario(s)
+    activo(s) sin primer login»), «por demasiados intentos fallidos» (antes «por force brute»), «en riesgo de irse: sin
+    una venta ganada en 180 días» (antes «riesgo de churn (sin win 180d)»). Solo cambian textos; 5 pruebas que fijaban
+    el texto viejo se actualizaron (`pre-nomina`, `sugerencia-nomina`, `control-nomina`, `period-close`,
+    `factura-cotejo`). Hilos de nómina y contabilidad: son líneas sueltas, si traen cambios sin publicar en esos
+    archivos la fusión es de texto.
+  - **Asistencia contra puertas:** el panel decía «Híbrido Integra ↔ ERP», «Solo ACS», «Checador sin ACS» y explicaba
+    cómo ligar con «User.employeeNumber» y «personCode». Ahora «Checador frente a puertas», «En ambos / Solo checador /
+    Solo puerta», «Checada sin puerta», y la explicación (viene de `attendance-hybrid.service.ts`) en lenguaje llano.
+    Título «Asistencia del equipo» (antes «Asistencia · Gestión»), «En la oficina ahora», Excel con las mismas columnas
+    renombradas.
+  - **RH:** la sección de multas se llama «Multas y sanciones» en el menú, la pestaña, el título y las migas (antes
+    «Multas e incidencias» en el menú e «Incidencias» en la pestaña), y la bitácora «Bitácora de incidencias»; así
+    «incidencias» ya no nombra dos pantallas distintas.
+  - **Hallazgos sin tocar:** `useMotorGrabacion` confirma «detener sin concluir» con `window.confirm` (se deja: también
+    se usa desde la ventana flotante de la grabación); en la pizarra conviven «Por empezar» y «Sin iniciar», igual en
+    Android e iOS y con pruebas en las tres (es del hilo de actividades); el riel de RH no filtra pestañas por rol y
+    por eso no se le sumaron Medidas ni Cargos por pérdida; con datos de demostración una salida futura suma dos veces
+    las horas en la tarjeta de asistencia (no pasa con datos reales: la salida nunca es futura).
+  - **Paridad:** Web hecho · API hecho (textos) · Android no aplica: las apps tienen sus propias ventanas y formatos de
+    hora, y los avisos del servidor que muestran les llegan ya corregidos · iOS no aplica, por lo mismo.
+  - **Verificación:** `npm run typecheck` en 0 (API y web); jest 6580/6580 con `TZ=America/Mexico_City`; vitest 2390/2391, la
+    falla es `ComoSeHace.spec.tsx`, de antes y sin tocar. Después se trajo 37dc578 (solo Android e iOS de vehículos,
+    sin archivos en común). `scripts/ios-static-check.py` sin problemas. En navegador: menú del sitio a 390 px
+    (cubre la pantalla, la página no se mueve y se suelta al cerrar), asistencia del equipo y cuentas.
+
 - **21-11 ~16:55 México (claude-code, nube; Cursor/Codex no alcanzables) — Tercera vuelta de pulido: pantallas de RH que eran formularios sin estilo, tabla de préstamos, ventanas propias en vez de `window.prompt` y avisos de herramienta vencida una vez al día. Sin migraciones. En main, NO desplegado.**
   - **RH (web):** Bitácora de incidencias (`hr/incidencias`), Medidas disciplinarias (`hr/medidas`) y Cargos por
     pérdida (`hr/cargos-perdida`) eran HTML sin estilo (inputs y botones del navegador). Rehechas con `PageHeader`,

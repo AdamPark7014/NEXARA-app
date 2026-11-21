@@ -248,7 +248,7 @@ export default function ExportsPage() {
           format: format === "pdf" ? "PDF" : "Excel",
           from,
           to,
-          ts: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+          ts: new Date().toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" }),
         },
         ...prev.slice(0, 4),
       ]);

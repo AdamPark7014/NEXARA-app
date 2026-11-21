@@ -343,6 +343,8 @@
 .hoja {
   position: fixed;
   inset: 64px 0 0;
+  /* La regla global de ventanas (`[role="dialog"]`, 100vw - 16px) le dejaba una franja de la página a la derecha. */
+  max-width: none;
   z-index: 49;
   padding: 12px var(--gutter) 48px;
   background: var(--bg);

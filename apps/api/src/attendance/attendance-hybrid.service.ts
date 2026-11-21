@@ -351,11 +351,11 @@ export class AttendanceHybridService {
     return {
       date: dayKey,
       sources: {
-        erp: 'Checador app (foto + GPS). Fuente de nómina y pagos por minutos.',
-        acs: 'Accesos concedidos en puertas Integra. No es fichaje biométrico ni AttendanceMode.',
+        erp: 'Lo que cada persona registra en la app, con foto y ubicación. De aquí salen la nómina y los pagos por minuto.',
+        acs: 'Pasos concedidos por los lectores de las puertas. Sirven para comparar: no cuentan como checada.',
       },
       howToLink:
-        'Para vincular, pon el mismo código en User.employeeNumber (o el de la empresa) y en el employeeNo / personCode del terminal Integra. No se sincroniza biometría.',
+        'Para que una persona aparezca en ambos, su número de empleado debe ser el mismo en su ficha de Recursos Humanos y en el lector de la puerta. Las huellas y los rostros no se copian.',
       summary,
       items,
     };

@@ -100,7 +100,7 @@ function franja(a: MyActivityItem): "rojo" | "amarillo" | "sinIniciar" | "verde"
 }
 
 function horaCorta(iso: string): string {
-  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
 }
 
 type PendingMove = { item: MyActivityItem; from: number; to: number };

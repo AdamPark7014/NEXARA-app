@@ -10,8 +10,8 @@ const HR_LINKS = [
   { id: "plantilla", label: "Plantilla", href: "/erp/hr" },
   { id: "org", label: "Organigrama", href: "/erp/hr/orgchart" },
   { id: "kpis", label: "Indicadores", href: "/erp/hr/kpis" },
-  { id: "multas", label: "Incidencias", href: "/erp/hr/fines" },
-  { id: "bitacora", label: "Bitácora", href: "/erp/hr/incidencias" },
+  { id: "multas", label: "Multas y sanciones", href: "/erp/hr/fines" },
+  { id: "bitacora", label: "Bitácora de incidencias", href: "/erp/hr/incidencias" },
   { id: "prenomina", label: "Prenómina", href: "/erp/hr/prenomina" },
 ] as const;
 

@@ -117,7 +117,7 @@ function formatMinutes(m: number) {
 function formatDay(iso: string) {
   const d = new Date(`${String(iso).slice(0, 10)}T12:00:00`);
   if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
-  return d.toLocaleDateString("es-MX", { weekday: "short", day: "2-digit", month: "short" });
+  return d.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
 }
 
 function formatRange(from: string, to: string) {

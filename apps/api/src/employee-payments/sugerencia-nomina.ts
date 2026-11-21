@@ -353,7 +353,7 @@ export function filaSugerencia(e: EntradaSugerencia): FilaSugerencia {
 
   const avisos = avisosDeFila(t);
   if (t.faltasJustificadas > 0) {
-    avisos.push(`${t.faltasJustificadas} falta(s) justificada(s): decide si se pagan`);
+    avisos.push(t.faltasJustificadas === 1 ? '1 falta justificada: decide si se paga' : `${t.faltasJustificadas} faltas justificadas: decide si se pagan`);
   }
   if (e.fechaIngreso && e.fechaIngreso > e.periodo.desde && e.fechaIngreso <= e.periodo.hasta) {
     avisos.push(`Ingresó el ${e.fechaIngreso}: lo esperado se cuenta desde ese día`);

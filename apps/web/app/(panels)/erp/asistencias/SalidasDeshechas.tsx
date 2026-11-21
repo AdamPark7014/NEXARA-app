@@ -14,7 +14,7 @@ type SalidaDeshecha = {
 };
 
 const hora = (iso: string) =>
-  new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", timeZone: "America/Mexico_City" });
+  new Date(iso).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit", timeZone: "America/Mexico_City" });
 
 /** La bitácora en la ficha: la checada ya no existe, pero se ve que hubo una y quién la deshizo. */
 export default function SalidasDeshechas({ token, userId, fecha }: { token: string; userId: number; fecha: string }) {

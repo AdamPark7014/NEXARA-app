@@ -46,7 +46,7 @@ export default function UniformeControl({
   const [error, setError] = useState<string | null>(null);
   const estado = uniformeOk ?? null;
   const cuando = revisadoAt
-    ? new Date(revisadoAt).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    ? new Date(revisadoAt).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })
     : null;
 
   if (!attendanceId) return null;

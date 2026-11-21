@@ -42,13 +42,13 @@ function esBucketValido(v: string | string[] | undefined): v is WorkflowBucket {
 function fecha(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+  return d.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
 }
 
 function hora(iso: string): string | undefined {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return undefined;
-  return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
 }
 
 function normalizar(texto: string): string {

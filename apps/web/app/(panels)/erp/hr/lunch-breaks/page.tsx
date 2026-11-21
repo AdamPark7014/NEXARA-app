@@ -64,7 +64,7 @@ function durationMinutes(start: string, end?: string | null): number | null {
 }
 
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
 }
 
 function fmtDate(iso: string) {

@@ -1,3 +1,4 @@
+import { contarEs } from '../common/contar-es.js';
 import ExcelJS from 'exceljs';
 import { EXCEL_COLORES, altoParaLineas, lineasDeTexto } from '../common/excel/reporte-excel.js';
 import { loadNexaraLogo } from '../common/pdf/nexara-pdf-theme.js';
@@ -441,7 +442,7 @@ function hojaNomina(wb: ExcelJS.Workbook, d: DatosExcelControl, subtitulo: strin
       f.notaFila,
       f.extrasMinutosPendientes > 0 ? `Extras pendientes: ${horas(f.extrasMinutosPendientes)} h sin aprobar` : null,
       d.verMontos && f.descuentosSugeridos.length
-        ? `${f.descuentosSugeridos.length} falta(s) con descuento sugerido sin aceptar`
+        ? `${contarEs(f.descuentosSugeridos.length, 'falta')} con descuento sugerido sin aceptar`
         : null,
     ]
       .filter(Boolean)

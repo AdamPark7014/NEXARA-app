@@ -810,6 +810,9 @@ textarea:disabled {
     white-space: nowrap;
   }
 
+  /* Red de seguridad para que ninguna ventana se salga de la pantalla. Ojo: también alcanza a las capas
+     a pantalla completa (fondo con `role="dialog"` o con «modal»/«drawer» en el nombre de la clase);
+     esas deben declarar `max-width: none` o les queda una franja de 16 px a la derecha. */
   :where(.modal, [class*="modal"], [class*="Modal"], [class*="drawer"], [class*="Drawer"], [role="dialog"]) {
     max-width: calc(100vw - 16px);
   }

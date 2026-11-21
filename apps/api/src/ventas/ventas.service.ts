@@ -1,3 +1,4 @@
+import { contarEs } from '../common/contar-es.js';
 import { ProyectosIncompletosService } from '../projects/proyectos-incompletos.service.js';
 import { Optional as ProyectoOptional } from '@nestjs/common';
 import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException, Inject, forwardRef, Optional } from '@nestjs/common';
@@ -3454,7 +3455,7 @@ export class VentasService {
       riskAlerts: [
         ...riskAlerts,
         ...(churnRisk.length
-          ? [{ level: 'medium' as const, message: `${churnRisk.length} cliente(s) con riesgo de churn (sin win 180d)` }]
+          ? [{ level: 'medium' as const, message: `${contarEs(churnRisk.length, 'cliente')} en riesgo de irse: sin una venta ganada en 180 días` }]
           : []),
       ],
       topActions: auditEvents

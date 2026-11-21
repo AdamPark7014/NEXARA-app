@@ -158,7 +158,7 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
   const formatDate = (iso: string) => {
     const date = new Date(iso);
     if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+    return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
   };
 
   const stopCameraStream = () => {

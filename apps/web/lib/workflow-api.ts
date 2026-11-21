@@ -179,10 +179,10 @@ const formatDateShort = (iso?: string | null): string | undefined => {
       d.getFullYear() === yesterday.getFullYear() &&
       d.getMonth() === yesterday.getMonth() &&
       d.getDate() === yesterday.getDate();
-    const time = d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+    const time = d.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
     if (isSameDay) return `Hoy ${time}`;
     if (isYesterday) return `Ayer ${time}`;
-    return d.toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleString("es-MX", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
   } catch {
     return undefined;
   }

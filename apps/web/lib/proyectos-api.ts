@@ -693,7 +693,7 @@ export function formatoFechaHora(valor?: string | null): string {
   if (!valor) return "—";
   const fecha = new Date(valor);
   if (Number.isNaN(fecha.getTime())) return "—";
-  return fecha.toLocaleString("es-MX", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return fecha.toLocaleString("es-MX", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 export function formatoTamano(bytes?: number | null): string {

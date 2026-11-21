@@ -50,7 +50,7 @@ function fecha(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+  return d.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
 }
 
 type SemaforoFilter = "todos" | Semaforo;

@@ -57,7 +57,7 @@ const PRIORIDAD_VARIANT: Record<string, "neutral" | "warning" | "danger"> = {
 };
 
 const dateFmt = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" });
-const dateTimeFmt = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const dateTimeFmt = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 const fmt = (f: Intl.DateTimeFormat, iso?: string | null) => {
   if (!iso) return "—";
   const d = new Date(iso);

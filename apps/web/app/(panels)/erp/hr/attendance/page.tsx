@@ -100,7 +100,7 @@ async function apiFetch<T = unknown>(path: string, token: string): Promise<T | n
 
 function fmtTime(iso?: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
 }
 
 function fmtMinutes(m?: number): string {
@@ -885,7 +885,7 @@ export default function AttendancePage() {
 
       {(viewMode === "manage" || viewMode === "manage_register") && (
         <div style={{ marginBottom: 16 }}>
-          <EnSitioStrip variant="compact" title="En sitio · asistencia" />
+          <EnSitioStrip variant="compact" title="En la oficina ahora" />
         </div>
       )}
 

@@ -69,7 +69,7 @@ export function initials(name: string) {
 
 export function formatClock(iso: string) {
   return new Date(iso).toLocaleTimeString("es-MX", {
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
     timeZone: "America/Mexico_City",
   });
@@ -81,7 +81,7 @@ export function formatMexicoDateTime(iso: string) {
     day: "numeric",
     month: "short",
     year: "numeric",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
   });
 }

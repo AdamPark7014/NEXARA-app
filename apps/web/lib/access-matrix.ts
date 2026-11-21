@@ -674,7 +674,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   fines: {
     id: "fines", panel: PANELS.HR, routePanel: PANELS.ERP, path: "/hr/fines",
-    label: "Multas e incidencias", description: "Sanciones administrativas del personal",
+    label: "Multas y sanciones", description: "Sanciones administrativas del personal",
     icon: "⚠️", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.HR_SPECIALIST],
     group: "Personas", visible: true,
   },

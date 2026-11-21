@@ -226,7 +226,7 @@ export default function ExecutivePage() {
         title={`${greetingFor(new Date().getHours())}, ${firstName}`}
         subtitle={
           data
-            ? `Así va la empresa · actualizado a las ${new Date(data.generatedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
+            ? `Así va la empresa · actualizado a las ${new Date(data.generatedAt).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" })}`
             : "Reuniendo los indicadores de la empresa…"
         }
         actions={

@@ -941,6 +941,8 @@
 } /* Modal de noticias */
 .newsModalOverlay {
   position: fixed;
+  /* Capa a pantalla completa: sin el tope global de ventanas (100vw - 16px) que dejaba una franja a la derecha en teléfono. */
+  max-width: none;
   inset: 0;
   background: color-mix(in srgb, var(--background) 18%, transparent);
   backdrop-filter: blur(18px) saturate(140%);

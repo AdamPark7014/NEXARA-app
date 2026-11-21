@@ -368,7 +368,7 @@ export function formatClock(iso: string | null | undefined): string {
   if (!iso) return "Sin entrada";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "Sin entrada";
-  return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
 }
 
 /** `?desde=&hasta=` solo cuando hay rango: sin nada, la API responde hoy. */

@@ -1,3 +1,4 @@
+import { contarEs } from '../common/contar-es.js';
 import { Injectable, BadRequestException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -596,16 +597,16 @@ export class HrService {
       })),
       alerts: [
         ...(pendingLeaves
-          ? [{ severity: 'warning' as const, message: `${pendingLeaves} permiso(s) pendiente(s) de aprobación` }]
+          ? [{ severity: 'warning' as const, message: `${contarEs(pendingLeaves, 'permiso pendiente', 'permisos pendientes')} de aprobación` }]
           : []),
         ...(totalLateEvents > active.length
           ? [{ severity: 'warning' as const, message: `${totalLateEvents} llegadas tarde en 30d` }]
           : []),
         ...(lunchLate30
-          ? [{ severity: 'warning' as const, message: `${lunchLate30} comida(s) fuera de horario en 30d` }]
+          ? [{ severity: 'warning' as const, message: `${contarEs(lunchLate30, 'comida')} fuera de horario en los últimos 30 días` }]
           : []),
         ...(openDays > 5
-          ? [{ severity: 'warning' as const, message: `${openDays} jornada(s) de asistencia aún abiertas` }]
+          ? [{ severity: 'warning' as const, message: openDays === 1 ? '1 jornada de asistencia sigue abierta' : `${openDays} jornadas de asistencia siguen abiertas` }]
           : []),
       ],
     };

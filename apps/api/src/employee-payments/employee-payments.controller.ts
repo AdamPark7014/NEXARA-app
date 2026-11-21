@@ -1,3 +1,4 @@
+import { contarEs } from '../common/contar-es.js';
 import type { Response } from 'express';
 import {
   BadRequestException,
@@ -122,7 +123,7 @@ export class EmployeePaymentsController {
         { etiqueta: 'Alcance', valor: datos.scope === 'company' ? 'Toda la empresa' : 'Mi organigrama' },
       ],
       notas: [
-        `${r.personas} persona(s) · ${r.conAvisos} con algo que revisar antes de pagar.`,
+        `${contarEs(r.personas, 'persona')} · ${r.conAvisos} con algo que revisar antes de pagar.`,
         'Las horas son netas de comida y salen de los mismos registros que los indicadores.',
         'El tiempo extra solo se paga si un jefe lo aprobó: «Extra sin aprobar» no está incluido en ningún total pagable.',
         '«Horas por día» y «Detalle diario» desglosan cada jornada del periodo con las mismas horas.',

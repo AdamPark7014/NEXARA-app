@@ -97,7 +97,7 @@ describe("el menú de cada persona", () => {
       Vender: ["Clientes", "Cotizaciones", "Diseños de cámaras"],
       Hacer: ["Proyectos", "Almacén", "Herramientas", "Vehículos"],
       "Cobrar y pagar": ["Mesa contable", "Viáticos", "Mesa de viáticos", "Gastos", "Nómina"],
-      Personas: ["Plantilla RRHH", "Multas e incidencias"],
+      Personas: ["Plantilla RRHH", "Multas y sanciones"],
       Saber: ["Costos", "Desempeño"],
       Empresa: ["Organigrama", "Mi perfil"],
       Gobierno: ["Usuarios y roles"],

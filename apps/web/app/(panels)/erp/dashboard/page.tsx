@@ -424,7 +424,7 @@ export default function ErpDashboardPage() {
               title="Salud por área"
               subtitle={
                 exec
-                  ? `Índice estimado · actualizado a las ${new Date(exec.generatedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
+                  ? `Índice estimado · actualizado a las ${new Date(exec.generatedAt).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" })}`
                   : "Índice estimado de 0 a 100"
               }
             >

@@ -297,7 +297,7 @@ export default function ClientTicketsPage() {
       year: "2-digit",
       month: "2-digit",
       day: "2-digit",
-      hour: "2-digit",
+      hour: "numeric",
       minute: "2-digit",
     });
   };

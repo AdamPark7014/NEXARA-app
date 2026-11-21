@@ -193,7 +193,7 @@ describe('la sugerencia por persona', () => {
     expect(f.montoSugerido).toBeNull();
     expect(f.sueldoPeriodo).toBe(8571.43);
     expect(f.sugerencia).toContain('Sin jornadas');
-    expect(f.avisos).toContain('11 día(s) laborable(s) sin checar');
+    expect(f.avisos).toContain('11 días laborables sin checar');
   });
 
   it('sin horario fijo: pago por hora con 48 h', () => {

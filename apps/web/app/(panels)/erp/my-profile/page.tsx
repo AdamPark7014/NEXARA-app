@@ -90,7 +90,7 @@ const emptyForm: Profile = {
   curp: "", rfc: "", ineNumero: "", nss: "", contactoEmergenciaNombre: "", contactoEmergenciaTelefono: "",
 };
 
-const timeFmt = new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit" });
+const timeFmt = new Intl.DateTimeFormat("es-MX", { hour: "numeric", minute: "2-digit" });
 const hhmm = (iso?: string | null) => {
   if (!iso) return null;
   const d = new Date(iso);

@@ -245,7 +245,7 @@ describe('cierre del periodo', () => {
 
     await expect(service.closePeriod(3, 42, {}, EMPRESA)).rejects.toThrow(BadRequestException);
     await expect(service.closePeriod(3, 42, {}, EMPRESA)).rejects.toThrow(
-      /bloqueante\(s\) sin resolver/,
+      /2 puntos bloqueantes sin resolver/,
     );
     expect(accounting.closeFiscalPeriod).not.toHaveBeenCalled();
   });

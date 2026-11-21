@@ -472,6 +472,8 @@
 /* ── PDF Modal ───────────────────────────────────── */
 .pdfModal {
   position: fixed;
+  /* Capa a pantalla completa: sin el tope global de ventanas (100vw - 16px) que dejaba una franja a la derecha en teléfono. */
+  max-width: none;
   inset: 0;
   background: rgba(0, 0, 0, 0.65);
   display: flex;

@@ -219,7 +219,7 @@ export default function HrKpisPage() {
         subtitle={viewCfg.subtitle || "Asistencia, puntualidad, carga de trabajo, rotación, permisos y productividad en campo."}
         meta={insights?.generatedAt ? (
           <Tag variant="default" size="sm">
-            Actualizado {new Date(insights.generatedAt).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+            Actualizado {new Date(insights.generatedAt).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
           </Tag>
         ) : undefined}
         actions={

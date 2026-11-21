@@ -648,7 +648,7 @@ export default function InvoicingPage() {
         return (
           <div className={s.celda}>
             <span className={s.fecha}>
-              {formatoFechaLocal(f.issueDate, { day: "2-digit", month: "short" })}
+              {formatoFechaLocal(f.issueDate, { day: "numeric", month: "short" })}
             </span>
             {isPending && days > 0 && (
               <span className={antiguedad} title="Días desde la emisión">

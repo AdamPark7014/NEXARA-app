@@ -27,7 +27,7 @@ import { ETIQUETA_ESTADO_DISENO, consultarAcceso, crearDiseno, listarDisenos, ty
 import { listSalesClients, type SalesClient } from "@/lib/sales-api";
 import styles from "./videovigilancia.module.css";
 
-const fecha = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fecha = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 export default function VideovigilanciaPage() {
   const { token } = useUser();

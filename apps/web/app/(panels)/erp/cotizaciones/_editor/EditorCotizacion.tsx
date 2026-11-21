@@ -166,7 +166,7 @@ function textoGuardado(estado: EstadoGuardado, guardadoEn: Date | null, pausa: s
   if (estado === "error") return `No se guardó${error ? `: ${error}` : ""}`;
   if (estado === "pendiente") return pausa ?? "Cambios sin guardar…";
   if (estado === "guardado" && guardadoEn) {
-    const hora = guardadoEn.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+    const hora = guardadoEn.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
     return `Guardado · ${hora}`;
   }
   return pausa ?? "Todo guardado";

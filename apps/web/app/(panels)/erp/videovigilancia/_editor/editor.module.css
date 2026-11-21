@@ -1992,6 +1992,8 @@
 
 .modalFondo {
   position: fixed;
+  /* Capa a pantalla completa: sin el tope global de ventanas (100vw - 16px) que dejaba una franja a la derecha en teléfono. */
+  max-width: none;
   inset: 0;
   z-index: 60;
   display: grid;
@@ -2441,6 +2443,8 @@
 
 .asistenteFondo {
   position: fixed;
+  /* Capa a pantalla completa: sin el tope global de ventanas (100vw - 16px) que dejaba una franja a la derecha en teléfono. */
+  max-width: none;
   inset: 0;
   display: grid;
   place-items: center;

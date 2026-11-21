@@ -34,7 +34,7 @@ type Props = {
 
 function fmtTime(iso?: string): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
 }
 
 export default function GpsTrajectoryPreview({ trajectory, attendances, compact }: Props) {

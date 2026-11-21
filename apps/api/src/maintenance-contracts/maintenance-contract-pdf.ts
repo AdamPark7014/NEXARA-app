@@ -161,7 +161,7 @@ export async function generateContractPdf(payload: ContractPdfPayload): Promise<
           ['Monto mensual', pdfMoney(payload.monthlyAmount)],
           [
             'Frecuencia',
-            payload.frequencyMonths ? `Cada ${payload.frequencyMonths} mes(es)` : 'A demanda',
+            payload.frequencyMonths ? (payload.frequencyMonths === 1 ? 'Cada mes' : `Cada ${payload.frequencyMonths} meses`) : 'A demanda',
           ],
           ['Vigencia', `${fmtDate(payload.startDate)} — ${fmtDate(payload.endDate)}`],
         ],

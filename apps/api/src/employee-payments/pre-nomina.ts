@@ -11,6 +11,8 @@
  * poder probarse sin base de datos.
  */
 
+import { contarEs } from '../common/contar-es.js';
+
 /** Minutos a horas con dos decimales. El redondeo ocurre una sola vez, al final. */
 export function horas(minutos: number): number {
   return Math.round((minutos / 60) * 100) / 100;
@@ -101,12 +103,12 @@ export function avisosDeFila(t: EntradaPreNomina['totales']): string[] {
   const out: string[] = [];
   if (t.diasExtraPendientes > 0) {
     out.push(
-      `${t.diasExtraPendientes} día(s) con tiempo extra sin aprobar (${horas(t.minutosExtraPendientes)} h no se pagan)`,
+      `${contarEs(t.diasExtraPendientes, 'día')} con tiempo extra sin aprobar (${horas(t.minutosExtraPendientes)} h no se pagan)`,
     );
   }
-  if (t.jornadasSinSalida > 0) out.push(`${t.jornadasSinSalida} jornada(s) sin salida registrada`);
-  if (t.cierresAutomaticos > 0) out.push(`${t.cierresAutomaticos} salida(s) puestas por el cierre automático`);
-  if (t.diasSinChecada > 0) out.push(`${t.diasSinChecada} día(s) laborable(s) sin checar`);
+  if (t.jornadasSinSalida > 0) out.push(`${contarEs(t.jornadasSinSalida, 'jornada')} sin salida registrada`);
+  if (t.cierresAutomaticos > 0) out.push(t.cierresAutomaticos === 1 ? '1 salida puesta por el cierre automático' : `${t.cierresAutomaticos} salidas puestas por el cierre automático`);
+  if (t.diasSinChecada > 0) out.push(`${contarEs(t.diasSinChecada, 'día laborable', 'días laborables')} sin checar`);
   return out;
 }
 

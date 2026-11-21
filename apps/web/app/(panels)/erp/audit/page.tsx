@@ -112,7 +112,7 @@ function dayLabel(iso: string): string {
   yesterday.setDate(today.getDate() - 1);
   if (d.toDateString() === today.toDateString()) return "Hoy";
   if (d.toDateString() === yesterday.toDateString()) return "Ayer";
-  return d.toLocaleDateString("es-MX", { weekday: "long", day: "2-digit", month: "short" });
+  return d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "short" });
 }
 
 const SEVERITY_META: Record<Severity, { label: string; tag: "default" | "warning" | "danger"; color: string; border: string }> = {
@@ -402,7 +402,7 @@ export default function AuditPage() {
                       </span>
                       <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                         <time dateTime={e.createdAt} style={{ fontSize: 12, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
-                          {new Date(e.createdAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                          {new Date(e.createdAt).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" })}
                         </time>
                         <span aria-hidden="true" style={{ color: "var(--text-tertiary)", fontSize: 11, transform: isExpanded ? "rotate(180deg)" : undefined, transition: "transform 0.15s" }}>▾</span>
                       </span>

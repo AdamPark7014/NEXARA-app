@@ -35,7 +35,7 @@ const INFO =
 
 function fechaCorta(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+  return new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short" });
 }
 
 type TonoCobertura = "danger" | "warning" | "success" | "neutral";
@@ -228,7 +228,7 @@ export default function ReabastecimientoPanel() {
     ? `Último cálculo: ${new Date(ultimoCalculo).toLocaleString("es-MX", {
         day: "numeric",
         month: "short",
-        hour: "2-digit",
+        hour: "numeric",
         minute: "2-digit",
       })}`
     : undefined;

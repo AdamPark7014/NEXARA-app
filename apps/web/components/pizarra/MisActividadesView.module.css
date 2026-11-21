@@ -292,6 +292,8 @@
 
 .velo {
   position: fixed;
+  /* Capa a pantalla completa: sin el tope global de ventanas (100vw - 16px) que dejaba una franja a la derecha en teléfono. */
+  max-width: none;
   inset: 0;
   z-index: var(--ui-z-modal, 1000);
   display: grid;

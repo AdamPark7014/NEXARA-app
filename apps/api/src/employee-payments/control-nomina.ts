@@ -13,6 +13,7 @@
  * nómina), el sueldo devengado es el mismo «semanal ÷ 7 × días», el extra se paga ×2 como en
  * `prenomina-amount.ts`, y las horas netas llegan de los KPI.
  */
+import { contarEs } from '../common/contar-es.js';
 import { WORKDAY_TIMEZONE, workDateKey } from '../common/time/workday.js';
 import { diaDeLaSemana, diasDelRango, horaValida, pct, sumaDias } from '../me/kpis-equipo.js';
 import { horas } from './pre-nomina.js';
@@ -594,7 +595,9 @@ export function sueldoDelPeriodo(e: {
   const cumplimientoPct = pct(laborados, esperados);
   const notaFaltas =
     faltas > 0
-      ? ` ${faltas} falta(s) injustificada(s) no bajan este monto: se descuentan aparte (descuento sugerido).`
+      ? faltas === 1
+        ? ' 1 falta injustificada no baja este monto: se descuenta aparte (descuento sugerido).'
+        : ` ${faltas} faltas injustificadas no bajan este monto: se descuentan aparte (descuento sugerido).`
       : '';
 
   if (sueldo == null) {
@@ -946,9 +949,9 @@ export function filaControl(e: EntradaFila): FilaControl {
     avisos.push(`${horas(e.extrasMinutosPendientes)} h de tiempo extra sin aprobar: no se pagan hasta que un jefe las apruebe.`);
   }
   if (sugeridos.length) {
-    avisos.push(`${sugeridos.length} falta(s) injustificada(s) con descuento sugerido por aceptar.`);
+    avisos.push(`${contarEs(sugeridos.length, 'falta injustificada', 'faltas injustificadas')} con descuento sugerido por aceptar.`);
   } else if (injustificadas > 0 && sueldo == null) {
-    avisos.push(`${injustificadas} falta(s) injustificada(s): sin sueldo no se puede sugerir el descuento.`);
+    avisos.push(`${contarEs(injustificadas, 'falta injustificada', 'faltas injustificadas')}: sin sueldo no se puede sugerir el descuento.`);
   }
   const sinSalida = dias.filter((d) => d.sinSalida).length;
   if (sinSalida) avisos.push(`${sinSalida} día(s) sin salida registrada: sus horas quedan en 0.00.`);

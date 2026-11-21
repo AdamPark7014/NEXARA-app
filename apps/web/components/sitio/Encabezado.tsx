@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
+import { useScrollLock } from "@/components/ui/useScrollLock";
 import s from "./encabezado.module.css";
 import base from "./sitio.module.css";
 import { ruta } from "./rutas";
@@ -78,14 +79,7 @@ export default function Encabezado() {
   }, []);
 
   // Con la hoja abierta la página de atrás no se mueve.
-  useEffect(() => {
-    if (!hoja) return;
-    const previo = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previo;
-    };
-  }, [hoja]);
+  useScrollLock(hoja);
 
   useEffect(() => {
     setHoja(false);

@@ -349,7 +349,7 @@ export function formatoFecha(valor: string | null | undefined): string {
     day: "2-digit",
     month: "short",
     year: "numeric",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
   });
 }
@@ -359,7 +359,7 @@ export function formatoHora(valor: string | null | undefined): string {
   if (!valor) return FALTA;
   const fecha = new Date(valor);
   if (Number.isNaN(fecha.getTime())) return FALTA;
-  return fecha.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return fecha.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
 }
 
 /** `YYYY-MM-DD` de hoy en local — el valor inicial del selector de día del GPS. */

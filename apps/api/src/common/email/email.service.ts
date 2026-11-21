@@ -84,7 +84,7 @@ export class EmailService {
         <h2>Factura Vencida</h2>
         <p>La factura <strong>${this.esc(invoiceNumber)}</strong> del cliente <strong>${this.esc(clientName)}</strong> 
         por <strong>$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong> 
-        tiene <strong>${daysOverdue}</strong> día(s) de atraso.</p>
+        tiene <strong>${daysOverdue}</strong> ${daysOverdue === 1 ? 'día' : 'días'} de atraso.</p>
       `),
     });
   }

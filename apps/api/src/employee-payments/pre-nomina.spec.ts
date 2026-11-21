@@ -155,7 +155,7 @@ describe('la fila de pre-nómina', () => {
       }),
     );
     expect(f.avisos).toHaveLength(4);
-    expect(f.avisos[0]).toBe('2 día(s) con tiempo extra sin aprobar (2 h no se pagan)');
+    expect(f.avisos[0]).toBe('2 días con tiempo extra sin aprobar (2 h no se pagan)');
     expect(f.avisos[1]).toMatch(/sin salida registrada/);
     expect(f.avisos[2]).toMatch(/cierre automático/);
     expect(f.avisos[3]).toMatch(/sin checar/);

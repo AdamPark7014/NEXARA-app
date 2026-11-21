@@ -77,7 +77,7 @@ export function formatWhen(iso?: string | null): string | null {
     weekday: "short",
     day: "numeric",
     month: "short",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
   });
 }
@@ -87,7 +87,7 @@ export function formatHourMinute(value?: string | number | Date | null): string 
   if (value == null) return "";
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
 }
 
 export function formatMinutes(min?: number | null): string | null {

@@ -12,7 +12,7 @@ import { cerrarCotizacionAbierta, leerCotizacionAbierta, type CotizacionAbierta 
 import { formatApiError } from "@/lib/erp-api";
 
 const cuando = (iso: string) =>
-  new Date(iso).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  new Date(iso).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", hour: "numeric", minute: "2-digit" });
 
 export default function CotizacionAbiertaTarjeta({ activityId, token }: { activityId: number; token: string }) {
   const [a, setA] = useState<CotizacionAbierta | null>(null);

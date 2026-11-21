@@ -1,3 +1,4 @@
+import { contarEs } from '../common/contar-es.js';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { OPEN_ACTIVITY_WHERE, isClosedStatus } from '../activities/activity-status.js';
@@ -407,10 +408,10 @@ export class SlaTrackerService {
           ? [{ severity: 'danger' as const, message: `Cumplimiento de resolución en ${base.resolutionSla.compliancePct}%` }]
           : []),
         ...(aging.d7_plus
-          ? [{ severity: 'warning' as const, message: `${aging.d7_plus} ticket(s) abiertos >7 días` }]
+          ? [{ severity: 'warning' as const, message: aging.d7_plus === 1 ? '1 ticket lleva más de 7 días abierto' : `${aging.d7_plus} tickets llevan más de 7 días abiertos` }]
           : []),
         ...((inboxByStatus['NEW'] ?? 0) > 0
-          ? [{ severity: 'warning' as const, message: `${inboxByStatus['NEW']} solicitud(es) portal sin asignar` }]
+          ? [{ severity: 'warning' as const, message: `${contarEs(inboxByStatus['NEW'], 'solicitud del portal', 'solicitudes del portal')} sin asignar` }]
           : []),
       ],
     };

@@ -1,3 +1,4 @@
+import { contarEs } from '../common/contar-es.js';
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, Optional, forwardRef } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -1307,7 +1308,7 @@ export class UsersService {
     if (fails > 0) {
       const add = Math.min(30, fails * 8);
       score += add;
-      factors.push(`${fails} intento(s) fallido(s) reciente(s)`);
+      factors.push(contarEs(fails, 'intento fallido reciente', 'intentos fallidos recientes'));
     }
     if (!u.mfaEnabled) {
       score += 8;
@@ -1562,16 +1563,16 @@ export class UsersService {
       riskTop,
       alerts: [
         ...(locked.length
-          ? [{ severity: 'danger' as const, message: `${locked.length} cuenta(s) bloqueada(s) por force brute` }]
+          ? [{ severity: 'danger' as const, message: `${contarEs(locked.length, 'cuenta bloqueada', 'cuentas bloqueadas')} por demasiados intentos fallidos` }]
           : []),
         ...(neverLogin.length
-          ? [{ severity: 'warning' as const, message: `${neverLogin.length} usuario(s) activo(s) sin primer login` }]
+          ? [{ severity: 'warning' as const, message: neverLogin.length === 1 ? '1 cuenta activa nunca ha entrado' : `${neverLogin.length} cuentas activas nunca han entrado` }]
           : []),
         ...(stale30.length
-          ? [{ severity: 'warning' as const, message: `${stale30.length} usuario(s) sin acceso en 30+ días` }]
+          ? [{ severity: 'warning' as const, message: `${contarEs(stale30.length, 'cuenta')} sin entrar en más de 30 días` }]
           : []),
         ...(highRisk.length
-          ? [{ severity: 'danger' as const, message: `${highRisk.length} usuario(s) en riesgo alto` }]
+          ? [{ severity: 'danger' as const, message: `${contarEs(highRisk.length, 'cuenta')} en riesgo alto` }]
           : []),
       ],
     };

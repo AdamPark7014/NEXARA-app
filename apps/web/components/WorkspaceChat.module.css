@@ -1639,6 +1639,8 @@
 
 .modalBackdrop {
   position: fixed;
+  /* Capa a pantalla completa: sin el tope global de ventanas (100vw - 16px) que dejaba una franja a la derecha en teléfono. */
+  max-width: none;
   inset: 0;
   background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(4px);

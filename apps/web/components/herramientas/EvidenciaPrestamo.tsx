@@ -40,7 +40,7 @@ function fechaHora(valor: string | null | undefined): string {
   if (!valor) return "";
   const d = new Date(valor);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString("es-MX", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
 /** Fotos elegidas con su vista previa. En el teléfono abre la cámara: la evidencia se toma en vivo. */

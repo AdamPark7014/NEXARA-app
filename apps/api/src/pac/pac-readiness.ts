@@ -1,3 +1,4 @@
+import { contarEs } from '../common/contar-es.js';
 import { digitoRfcCorrecto } from './rfc-checksum.js';
 import { SAT_FISCAL_REGIMES } from './sat.service.js';
 
@@ -538,7 +539,7 @@ export function buildPacReadinessReport(input: PacReadinessInput): PacReadinessR
     gravedadCsd(
       csdRequerido ? 'csd_vencido' : 'csd_local_vencido',
       `El certificado de sello digital (CSD) cargado en el servidor está vencido${
-        diasRestantes !== null ? ` desde hace ${Math.abs(diasRestantes)} día(s)` : ''
+        diasRestantes !== null ? ` desde hace ${contarEs(Math.abs(diasRestantes), 'día')}` : ''
       }: el SAT rechaza facturas selladas con un CSD vencido.${sufijoNoUsado}` +
         (csdRequerido ? '' : ' Si es el mismo que subiste a Facturama, allá también estará vencido.'),
       'Tramitar un CSD nuevo en el portal del SAT (Certisat Web) y cargarlo.',
@@ -552,7 +553,7 @@ export function buildPacReadinessReport(input: PacReadinessInput): PacReadinessR
   } else if (csdEstado === 'por_vencer') {
     avisa(
       'csd_por_vencer',
-      `El certificado de sello digital (CSD) cargado vence en ${diasRestantes} día(s). Cuando venza, no se podrá facturar.${sufijoNoUsado}`,
+      `El certificado de sello digital (CSD) cargado vence en ${diasRestantes === 1 ? '1 día' : `${diasRestantes} días`}. Cuando venza, no se podrá facturar.${sufijoNoUsado}`,
       'Tramitar la renovación del CSD en el portal del SAT con tiempo y cargar el nuevo.',
     );
   }
@@ -679,14 +680,16 @@ export function buildPacReadinessReport(input: PacReadinessInput): PacReadinessR
   if (facturas && facturas.conSelloDePrueba > 0) {
     avisa(
       'facturas_con_sello_de_prueba',
-      `Hay ${facturas.conSelloDePrueba} factura(s) «timbradas» en modo de prueba, con un UUID inventado. No son válidas ante el SAT.`,
+      facturas.conSelloDePrueba === 1
+        ? 'Hay 1 factura «timbrada» en modo de prueba, con un UUID inventado. No es válida ante el SAT.'
+        : `Hay ${facturas.conSelloDePrueba} facturas «timbradas» en modo de prueba, con un UUID inventado. No son válidas ante el SAT.`,
       'No enviarlas como facturas reales a clientes; con el contador, decidir si se reemiten ya con timbrado real.',
     );
   }
   if (facturas && facturas.timbradasSinPoliza > 0) {
     avisa(
       'facturas_sin_poliza',
-      `Hay ${facturas.timbradasSinPoliza} factura(s) timbrada(s) sin su póliza contable automática. Los libros no cuadran con lo facturado.`,
+      `Hay ${contarEs(facturas.timbradasSinPoliza, 'factura timbrada', 'facturas timbradas')} sin su póliza contable automática. Los libros no cuadran con lo facturado.`,
       'Generar la póliza a mano en Contabilidad (referencia INV-STAMP-<id de la factura>).',
     );
   }
@@ -715,7 +718,7 @@ export function buildPacReadinessReport(input: PacReadinessInput): PacReadinessR
           `${NOMBRE_PROVEEDOR[proveedor]}. Sirve para ensayar; todavía no factura de verdad.`
         : etapa === 'listo_para_produccion'
           ? 'Todo lo que se puede comprobar automáticamente está en orden para timbrar en producción. Falta la confirmación manual de los puntos de «verificación manual» y la decisión de encender.'
-          : `Todavía no se puede facturar en producción: ${bloqueos.length} pendiente(s) que bloquean.`;
+          : `Todavía no se puede facturar en producción: ${bloqueos.length === 1 ? '1 pendiente que bloquea' : `${bloqueos.length} pendientes que bloquean`}.`;
 
   return {
     generadoEn: now.toISOString(),

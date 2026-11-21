@@ -1,3 +1,4 @@
+import { contarEs } from '../common/contar-es.js';
 import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
@@ -377,7 +378,7 @@ export class AccountingService {
     const status = await this.getSatAgrupadorStatus(companyId);
     if (!status.readyForBalanzaExport) {
       throw new BadRequestException(
-        `Faltan ${status.missingAccounts.length} cuenta(s) sin agrupador SAT asignado: complétalas antes de exportar el Catálogo de cuentas.`,
+        `${status.missingAccounts.length === 1 ? 'Falta 1 cuenta sin agrupador SAT asignado: complétala' : `Faltan ${status.missingAccounts.length} cuentas sin agrupador SAT asignado: complétalas`} antes de exportar el Catálogo de cuentas.`,
       );
     }
     const company = companyId ? await this.prisma.companyProfile.findUnique({ where: { id: companyId }, select: { rfc: true } }) : null;
@@ -426,7 +427,7 @@ export class AccountingService {
     const status = await this.getSatAgrupadorStatus(companyId);
     if (!status.readyForBalanzaExport) {
       throw new BadRequestException(
-        `Faltan ${status.missingAccounts.length} cuenta(s) sin agrupador SAT asignado: complétalas antes de exportar la Balanza.`,
+        `${status.missingAccounts.length === 1 ? 'Falta 1 cuenta sin agrupador SAT asignado: complétala' : `Faltan ${status.missingAccounts.length} cuentas sin agrupador SAT asignado: complétalas`} antes de exportar la Balanza.`,
       );
     }
     const company = companyId ? await this.prisma.companyProfile.findUnique({ where: { id: companyId }, select: { rfc: true } }) : null;
@@ -2012,7 +2013,7 @@ export class AccountingService {
       (it) => !it.satProductKey || !it.satUnitKey,
     ) || [];
     if (itemsWithoutSatKey.length > 0) {
-      cfdiErrors.push(`claves SAT (ClaveProdServ + ClaveUnidad) en ${itemsWithoutSatKey.length} concepto(s)`);
+      cfdiErrors.push(`claves SAT (ClaveProdServ + ClaveUnidad) en ${contarEs(itemsWithoutSatKey.length, 'concepto')}`);
     }
     if (cfdiErrors.length > 0) {
       throw new BadRequestException(
@@ -3651,7 +3652,7 @@ export class AccountingService {
       },
       alerts: [
         ...(base.overdueInvoices
-          ? [{ severity: 'danger' as const, message: `${base.overdueInvoices} factura(s) vencida(s)` }]
+          ? [{ severity: 'danger' as const, message: contarEs(base.overdueInvoices, 'factura vencida', 'facturas vencidas') }]
           : []),
         ...(arAging.d90_plus > 0
           ? [{ severity: 'warning' as const, message: `CXC >90d: $${Math.round(arAging.d90_plus).toLocaleString('es-MX')}` }]
@@ -3950,7 +3951,7 @@ export class AccountingService {
       alerts.push({
         id: 'missing-xml',
         severity: 'warning',
-        message: `${missingXml} factura(s) emitida(s) sin XML CFDI`,
+        message: `${contarEs(missingXml, 'factura emitida', 'facturas emitidas')} sin XML CFDI`,
         href: '/erp/contabilidad/facturas',
       });
     }
@@ -3974,7 +3975,7 @@ export class AccountingService {
       alerts.push({
         id: 'bank-pending',
         severity: 'info',
-        message: `${pendingRecon} movimiento(s) bancario(s) por conciliar`,
+        message: `${contarEs(pendingRecon, 'movimiento bancario', 'movimientos bancarios')} por conciliar`,
         href: '/erp/contabilidad/conciliacion',
       });
     }

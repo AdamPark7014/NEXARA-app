@@ -57,18 +57,18 @@ type HybridResponse = {
 };
 
 const FLAG_LABEL: Record<string, string> = {
-  sin_numero_empleado: "Sin nº empleado",
-  acs_sin_checador: "ACS sin checador",
-  checador_sin_acs: "Checador sin ACS",
-  acs_sin_salida: "ACS sin salida",
-  erp_sin_salida: "ERP sin salida",
-  desfase_entrada: "Desfase entrada",
-  desfase_salida: "Desfase salida",
+  sin_numero_empleado: "Sin número de empleado",
+  acs_sin_checador: "Puerta sin checada",
+  checador_sin_acs: "Checada sin puerta",
+  acs_sin_salida: "Puerta sin salida",
+  erp_sin_salida: "Checada sin salida",
+  desfase_entrada: "Entrada a otra hora",
+  desfase_salida: "Salida a otra hora",
 };
 
 function fmtTime(iso?: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
 }
 
 function fmtMinutes(m?: number | null): string {
@@ -80,9 +80,9 @@ function fmtMinutes(m?: number | null): string {
 }
 
 function statusLabel(s: LinkStatus): string {
-  if (s === "linked") return "Vinculado";
-  if (s === "erp_only") return "Solo ERP";
-  return "Solo ACS";
+  if (s === "linked") return "En ambos";
+  if (s === "erp_only") return "Solo checador";
+  return "Solo puerta";
 }
 
 export default function HybridAttendancePanel({
@@ -138,7 +138,7 @@ export default function HybridAttendancePanel({
           r.user?.employeeNumber ||
           r.user?.companyEmployeeNumber ||
           r.acs?.personId ||
-          "sin código";
+          "sin número";
         return (
           <div>
             {r.user ? (
@@ -161,7 +161,7 @@ export default function HybridAttendancePanel({
     },
     {
       key: "link",
-      label: "Vínculo",
+      label: "Dónde aparece",
       width: 110,
       render: (r) => (
         <Tag variant={r.linkStatus === "linked" ? "positive" : r.linkStatus === "erp_only" ? "accent" : "warning"}>
@@ -171,7 +171,7 @@ export default function HybridAttendancePanel({
     },
     {
       key: "erp",
-      label: "Checador ERP",
+      label: "Checador",
       render: (r) =>
         r.erp ? (
           <div style={{ fontSize: 12 }}>
@@ -184,12 +184,12 @@ export default function HybridAttendancePanel({
             </div>
           </div>
         ) : (
-          <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>Sin fichaje</span>
+          <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>Sin checada</span>
         ),
     },
     {
       key: "acs",
-      label: "Puerta ACS",
+      label: "Puerta",
       render: (r) =>
         r.acs ? (
           <div style={{ fontSize: 12 }}>
@@ -203,7 +203,7 @@ export default function HybridAttendancePanel({
             </div>
           </div>
         ) : (
-          <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>Sin acceso</span>
+          <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>No pasó</span>
         ),
     },
     {
@@ -239,8 +239,8 @@ export default function HybridAttendancePanel({
     <>
     <style>{HYB_QUIET}</style>
     <Section
-      title="Híbrido Integra ↔ ERP"
-      subtitle="Checador de nómina frente a las puertas."
+      title="Checador frente a puertas"
+      subtitle="Lo que cada persona checó en la app, junto a sus pasos por las puertas de la oficina."
       actions={
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <ListExportActions
@@ -270,24 +270,24 @@ export default function HybridAttendancePanel({
                         { key: "persona", label: "Persona" },
                         { key: "codigo", label: "Código" },
                         { key: "departamento", label: "Departamento" },
-                        { key: "vinculo", label: "Vínculo" },
-                        { key: "erpEntrada", label: "ERP entrada" },
-                        { key: "erpSalida", label: "ERP salida" },
-                        { key: "erpMinutos", label: "ERP min" },
-                        { key: "acsEntrada", label: "ACS entrada" },
-                        { key: "acsSalida", label: "ACS salida" },
-                        { key: "acsMinutos", label: "ACS min" },
+                        { key: "vinculo", label: "Dónde aparece" },
+                        { key: "erpEntrada", label: "Checador: entrada" },
+                        { key: "erpSalida", label: "Checador: salida" },
+                        { key: "erpMinutos", label: "Checador: minutos" },
+                        { key: "acsEntrada", label: "Puerta: primer paso" },
+                        { key: "acsSalida", label: "Puerta: último paso" },
+                        { key: "acsMinutos", label: "Puerta: minutos" },
                         { key: "puerta", label: "Puerta" },
                         { key: "alertas", label: "Alertas" },
                       ],
                       `asistencia-hibrida-${date}`,
                       {
-                        title: "Asistencia híbrida Integra ↔ ERP",
+                        title: "Checador frente a puertas",
                         subtitle: `Día ${date}`,
                         summaryRows: [
-                          { label: "Vinculados", value: data?.summary.linked ?? 0 },
-                          { label: "Solo ERP", value: data?.summary.erpOnly ?? 0 },
-                          { label: "Solo ACS", value: data?.summary.acsOnly ?? 0 },
+                          { label: "En ambos", value: data?.summary.linked ?? 0 },
+                          { label: "Solo checador", value: data?.summary.erpOnly ?? 0 },
+                          { label: "Solo puerta", value: data?.summary.acsOnly ?? 0 },
                           { label: "Con alertas", value: data?.summary.withFlags ?? 0 },
                         ],
                       },
@@ -296,7 +296,7 @@ export default function HybridAttendancePanel({
             }
           />
           <Link href="/integra/attendance" style={{ fontSize: 12, color: "var(--primary)" }}>
-            Ver ACS Integra
+            Ver accesos por puerta
           </Link>
           <Button variant="ghost" size="sm" onClick={() => void load()}>
             Actualizar
@@ -326,19 +326,19 @@ export default function HybridAttendancePanel({
           }}
         >
           <div>
-            <strong style={{ color: "var(--foreground)" }}>ERP:</strong> {data.sources.erp}
+            <strong style={{ color: "var(--foreground)" }}>Checador:</strong> {data.sources.erp}
           </div>
           <div style={{ marginTop: 4 }}>
-            <strong style={{ color: "var(--foreground)" }}>ACS:</strong> {data.sources.acs}
+            <strong style={{ color: "var(--foreground)" }}>Puertas:</strong> {data.sources.acs}
           </div>
           <div style={{ marginTop: 8, color: "var(--text-tertiary)" }}>{data.howToLink}</div>
         </div>
       ) : null}
 
       <div className="nx-hyb-kpis">
-        <KpiCard label="Vinculados" value={data?.summary.linked ?? 0} variant="positive" icon="🔗" />
-        <KpiCard label="Solo ERP" value={data?.summary.erpOnly ?? 0} variant="accent" icon="⏰" />
-        <KpiCard label="Solo ACS" value={data?.summary.acsOnly ?? 0} variant="warning" icon="🚪" />
+        <KpiCard label="En ambos" value={data?.summary.linked ?? 0} variant="positive" icon="🔗" />
+        <KpiCard label="Solo checador" value={data?.summary.erpOnly ?? 0} variant="accent" icon="⏰" />
+        <KpiCard label="Solo puerta" value={data?.summary.acsOnly ?? 0} variant="warning" icon="🚪" />
         <KpiCard label="Con alertas" value={data?.summary.withFlags ?? 0} variant={data?.summary.withFlags ? "danger" : "default"} icon="⚠️" />
       </div>
 
@@ -347,13 +347,13 @@ export default function HybridAttendancePanel({
           Todos
         </button>
         <button type="button" style={chip(filter === "linked")} onClick={() => setFilter("linked")}>
-          Vinculados
+          En ambos
         </button>
         <button type="button" style={chip(filter === "erp_only")} onClick={() => setFilter("erp_only")}>
-          Solo ERP
+          Solo checador
         </button>
         <button type="button" style={chip(filter === "acs_only")} onClick={() => setFilter("acs_only")}>
-          Solo ACS
+          Solo puerta
         </button>
         <button type="button" style={chip(onlyFlags)} onClick={() => setOnlyFlags((v) => !v)}>
           Solo alertas
@@ -376,13 +376,13 @@ export default function HybridAttendancePanel({
                   : `a-${r.acs?.personId ?? r.matchKey ?? "x"}`
               }
               density="compact"
-              emptyTitle="No hay fichajes ni accesos este día."
+              emptyTitle="Nadie checó ni pasó por las puertas este día."
               emptyDescription=""
             />
           </div>
           <div className="nx-hyb-stack">
             {rows.length === 0 ? (
-              <EmptyState title="No hay fichajes ni accesos este día." />
+              <EmptyState title="Nadie checó ni pasó por las puertas este día." />
             ) : (
               rows.map((r) => <HybridStackCard key={r.user ? `u-${r.user.id}` : `a-${r.acs?.personId ?? r.matchKey ?? "x"}`} item={r} />)
             )}
@@ -432,7 +432,7 @@ function HybridStackCard({ item }: { item: HybridItem }) {
         <span style={{ fontWeight: 700, fontSize: 14 }}>{name}</span>
       )}
       <dl className="nx-hyb-rows">
-        <div><dt>Vínculo</dt><dd>{statusLabel(item.linkStatus)}</dd></div>
+        <div><dt>Dónde aparece</dt><dd>{statusLabel(item.linkStatus)}</dd></div>
         {item.erp ? (
           <>
             <div><dt>Entrada</dt><dd>{fmtTime(item.erp.checkIn)}</dd></div>
@@ -440,7 +440,7 @@ function HybridStackCard({ item }: { item: HybridItem }) {
             <div><dt>Horas</dt><dd>{fmtMinutes(item.erp.totalMinutes)}{item.erp.isOpen ? " · abierta" : ""}</dd></div>
           </>
         ) : (
-          <div><dt>Checador</dt><dd>Sin fichaje</dd></div>
+          <div><dt>Checador</dt><dd>Sin checada</dd></div>
         )}
         {item.acs ? (
           <>
@@ -450,7 +450,7 @@ function HybridStackCard({ item }: { item: HybridItem }) {
             {item.acs.firstDoor ? <div><dt>Puerta</dt><dd>{item.acs.firstDoor}</dd></div> : null}
           </>
         ) : (
-          <div><dt>Acceso</dt><dd>Sin acceso</dd></div>
+          <div><dt>Puerta</dt><dd>No pasó</dd></div>
         )}
         {item.flags.map((f) => (
           <div key={f}><dt>Alerta</dt><dd>{FLAG_LABEL[f] || f}</dd></div>

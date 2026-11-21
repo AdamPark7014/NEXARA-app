@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PanelLogin from "@/components/PanelLogin";
+import { useScrollLock } from "@/components/ui/useScrollLock";
 import { useTheme } from "@/components/ThemeContext";
 import { getApiAssetOrigin } from "@/lib/api-base";
 import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
@@ -85,15 +86,9 @@ export default function BranchPortalShell({ children }: { children: React.ReactN
   }, []);
 
   useEffect(() => {
-    if (!isMobile) {
-      setMobileMenuOpen(false);
-      return;
-    }
-    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isMobile, mobileMenuOpen]);
+    if (!isMobile) setMobileMenuOpen(false);
+  }, [isMobile]);
+  useScrollLock(isMobile && mobileMenuOpen);
 
   useEffect(() => {
     const sync = () => {

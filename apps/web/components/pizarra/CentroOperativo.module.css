@@ -33,6 +33,8 @@
   --ui-info-text: #7dd3fc;
 
   position: fixed;
+  /* Capa a pantalla completa: sin el tope global de ventanas (100vw - 16px) que dejaba una franja a la derecha en teléfono. */
+  max-width: none;
   inset: 0;
   z-index: 9000;
   display: flex;

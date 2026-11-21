@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PublicIcon, { type PublicIconName } from "@/app/components/PublicIcon";
+import { useScrollLock } from "@/components/ui/useScrollLock";
 import { applyPublicTheme } from "@/components/PublicThemeToggle";
 import { GEO_CITIES } from "@/lib/seo/geo-cities";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
@@ -154,14 +155,9 @@ export default function Paleta() {
     };
   }, [abierta, abrir, cerrar]);
 
+  useScrollLock(abierta);
   useEffect(() => {
-    if (!abierta) return;
-    entrada.current?.focus();
-    const previoOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previoOverflow;
-    };
+    if (abierta) entrada.current?.focus();
   }, [abierta]);
 
   useEffect(() => setActivo(0), [consulta]);

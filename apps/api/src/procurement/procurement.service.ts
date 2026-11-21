@@ -1232,7 +1232,7 @@ export class ProcurementService {
     if (!lines.length) throw new BadRequestException('El proveedor no tiene líneas en esta RFQ');
     const missing = lines.filter((l) => l.unitPrice == null);
     if (missing.length) {
-      throw new BadRequestException(`Faltan ${missing.length} precio(s) por capturar para este proveedor antes de adjudicar`);
+      throw new BadRequestException(`${missing.length === 1 ? 'Falta 1 precio' : `Faltan ${missing.length} precios`} por capturar para este proveedor antes de adjudicar`);
     }
 
     const po = await this.createPurchaseOrder(
