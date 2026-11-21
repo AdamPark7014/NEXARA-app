@@ -193,8 +193,9 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
     {
       key: "tool",
       label: "Herramienta",
+      width: 240,
       render: (r) => (
-        <span className={s.doble}>
+        <span className={`${s.doble} ${s.herramienta}`}>
           <span className={s.fuerte}>{r.toolName}</span>
           <span className={s.tenue}>
             {r.model} / {r.serialNumber.slice(0, 20)}
@@ -207,7 +208,7 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
     },
     {
       key: "status",
-      label: "Estado / timeline",
+      label: "Estado y avance",
       render: (r) => {
         const vencida = r.status === "IN_USE" && diaPactadoVencido(r.expectedReturnDate, ahora);
         return (
@@ -223,11 +224,13 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
               pickedUpAt={r.pickedUpAt}
               deliveryDate={r.deliveryDate}
               returnDate={r.returnDate}
+              compact
             />
+            {r.approvedByName ? <span className={s.tenue}>Aprobó {r.approvedByName}</span> : null}
           </div>
         );
       },
-      width: 260,
+      width: 220,
     },
     {
       key: "evidencia",
@@ -250,18 +253,17 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
       },
       width: 170,
     },
-    { key: "requestDate", label: "Solicitado", render: (r) => <span className={s.fecha}>{fmtDate(r.requestDate)}</span>, width: 116 },
     {
       key: "expectedReturnDate",
       label: "Devolución",
-      render: (r) => <span className={s.fecha}>{textoDiaPactado(r.expectedReturnDate)}</span>,
-      width: 116,
-    },
-    {
-      key: "approvedBy",
-      label: "Aprobado por",
-      accessor: (r) => r.approvedByName ?? "—",
-      width: 130,
+      // Cuándo vuelve es lo que se busca; cuándo se pidió va debajo, y quién aprobó, junto al estado.
+      render: (r) => (
+        <span className={s.doble}>
+          <span className={s.fecha}>{textoDiaPactado(r.expectedReturnDate)}</span>
+          <span className={`${s.tenue} ${s.sinCorte}`}>Pedida el {fmtDate(r.requestDate)}</span>
+        </span>
+      ),
+      width: 150,
     },
   ];
 
@@ -471,6 +473,7 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
             ariaLabel="Solicitudes de herramientas"
             rowActions={canManage ? acciones : undefined}
             rowActionsLabel="Acciones"
+            rowActionsAlwaysVisible
             emptyTitle="Sin solicitudes"
             emptyDescription="No hay solicitudes con los filtros actuales"
             emptyAction={

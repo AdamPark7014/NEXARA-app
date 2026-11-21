@@ -69,3 +69,23 @@ export function nuevaDevolucion(valor: unknown): Date {
   if (!fecha) throw new BadRequestException('Indica hasta qué día necesitas la herramienta');
   return fecha;
 }
+
+/** Vencido es que el día pactado ya pasó: durante todo ese día el préstamo sigue en plazo. */
+export function prestamoVencido(devolucion: unknown, ahora: Date = new Date()): boolean {
+  const dia = diaDePrestamo(devolucion);
+  return dia !== null && dia < diaEnMexico.format(ahora);
+}
+
+/** «24 nov»: el día pactado como se le dice a la persona. Vacío si no hay fecha. */
+export function textoDiaDePrestamo(valor: unknown): string {
+  const dia = diaDePrestamo(valor);
+  if (!dia) return '';
+  return new Date(`${dia}T12:00:00.000Z`)
+    .toLocaleDateString('es-MX', { timeZone: 'UTC', day: 'numeric', month: 'short' })
+    .replace('.', '');
+}
+
+/** Primer instante de hoy en México: sirve para no repetir el aviso del día. */
+export function inicioDeHoyEnMexico(ahora: Date = new Date()): Date {
+  return new Date(`${diaEnMexico.format(ahora)}T00:00:00-06:00`);
+}

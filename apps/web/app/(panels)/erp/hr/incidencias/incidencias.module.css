@@ -1,0 +1,79 @@
+/* Bitácora de incidencias de RH. Solo acomodo: las piezas y sus colores son las compartidas. */
+
+.page {
+  display: grid;
+  align-content: start;
+  gap: var(--ui-s4);
+  min-width: 0;
+  color: var(--ui-fg);
+}
+
+.semana {
+  max-width: 260px;
+}
+
+.alta {
+  display: grid;
+  gap: var(--ui-s4);
+  padding: var(--ui-s4) var(--ui-s5) var(--ui-s5);
+}
+
+.campos {
+  display: grid;
+  gap: var(--ui-s3) var(--ui-s4);
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+}
+
+.ancho {
+  grid-column: 1 / -1;
+}
+
+.pie {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.fecha {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg-2);
+}
+
+.fuerte {
+  font-weight: var(--ui-fw-semibold, 600);
+  color: var(--ui-fg);
+}
+
+.tenue {
+  color: var(--ui-fg-2);
+  font-size: var(--ui-fs-label);
+}
+
+.totales {
+  display: grid;
+  gap: var(--ui-s2);
+  margin: 0;
+  padding: var(--ui-s3) var(--ui-s5) var(--ui-s5);
+  list-style: none;
+}
+
+.totales li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--ui-s1) var(--ui-s3);
+}
+
+@media (max-width: 640px) {
+  .alta {
+    padding: var(--ui-s3) var(--ui-s4) var(--ui-s4);
+  }
+
+  .pie > * {
+    width: 100%;
+  }
+
+  .totales {
+    padding: var(--ui-s3) var(--ui-s4) var(--ui-s4);
+  }
+}

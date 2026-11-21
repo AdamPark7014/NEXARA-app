@@ -1455,6 +1455,17 @@ function Breadcrumbs({
     );
   }
 
+  // «Hoy > Hoy»: cuando la página se llama igual que su grupo del menú, basta decirlo una vez.
+  if (groupTitle && segments.length === 1 && mismoTexto(tituloPestana, groupTitle)) {
+    return (
+      <nav className={styles.breadcrumbs} aria-label="Estás en">
+        <span className={styles.crumbCurrent} aria-current="page">
+          {tituloPestana}
+        </span>
+      </nav>
+    );
+  }
+
   const accumulated: string[] = [];
   return (
     <nav className={styles.breadcrumbs} aria-label="Estás en">
@@ -1494,6 +1505,10 @@ function Breadcrumbs({
 }
 
 const SEGMENTOS_SIN_MIGA: ReadonlySet<string> = new Set(["finance"]);
+
+function mismoTexto(a: string, b: string): boolean {
+  return a.trim().toLocaleLowerCase("es-MX") === b.trim().toLocaleLowerCase("es-MX");
+}
 
 const SLUG_DICTIONARY: Record<string, string> = {
   area: "Área",
@@ -1545,6 +1560,8 @@ const SLUG_DICTIONARY: Record<string, string> = {
 
 /** Rutas cuyo nombre es una frase y no se lee palabra por palabra («Pagos y gastos», no «Pagos Y Gastos»). */
 const SLUG_FRASES: Record<string, string> = {
+  "cargos-perdida": "Cargos por pérdida",
+  medidas: "Medidas disciplinarias",
   "por-facturar": "Por facturar",
   "pagos-y-gastos": "Pagos y gastos",
   estados: "Estados financieros",

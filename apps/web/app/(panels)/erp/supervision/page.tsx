@@ -30,6 +30,7 @@ import styles from "./supervision.module.css";
 import PageChrome from "@/components/ui/PageChrome";
 import PanelTabs from "@/components/ui/PanelTabs";
 import EmptyState from "@/components/ui/EmptyState";
+import PedirTexto, { type PedirTextoEstado } from "@/components/ui/PedirTexto";
 
 type Tab = "plan" | "cierre";
 
@@ -156,6 +157,7 @@ export default function SupervisionPage() {
 
   const vacioPlan = !loading && !error && planes && planes.planes.length === 0;
   const ind = planes?.indicadores;
+  const [pedir, setPedir] = useState<PedirTextoEstado | null>(null);
   const actuar = async (fn: () => Promise<unknown>, mensaje: string) => {
     if (busy) return;
     setBusy(true); setError(null); setOk(null);
@@ -502,11 +504,19 @@ export default function SupervisionPage() {
                         type="button"
                         style={btn}
                         disabled={busy}
-                        onClick={() => {
-                          const nota = window.prompt("Nota para devolver el plan (opcional)");
-                          if (nota === null) return;
-                          void actuar(() => devolverPlan(token!, p.id, nota || undefined), 'Plan devuelto al autor.');
-                        }}
+                        onClick={() =>
+                          setPedir({
+                            titulo: "Devolver el plan",
+                            etiqueta: "Nota para quien lo mandó",
+                            descripcion: "Dile qué cambiar. Puedes devolverlo sin nota.",
+                            confirmar: "Devolver",
+                            fn: async (nota) => {
+                              await devolverPlan(token!, p.id, nota || undefined);
+                              setOk("Plan devuelto al autor.");
+                              await cargarPlan();
+                            },
+                          })
+                        }
                       >
                         Devolver
                       </button>
@@ -596,6 +606,7 @@ export default function SupervisionPage() {
           )}
         </section>
       ) : null}
+      <PedirTexto estado={pedir} onCerrar={() => setPedir(null)} />
     </main>
   );
 }

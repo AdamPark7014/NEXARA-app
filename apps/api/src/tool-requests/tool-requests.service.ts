@@ -33,7 +33,13 @@ import {
 } from './tool-nomenclature.js';
 import { buildToolLabelPdf, buildToolLabelZpl } from './tool-label.js';
 import { normalizarFotosEvidencia, resolverDevolucion } from './evidencia-prestamo.js';
-import { nuevaDevolucion, plazoDePrestamo } from './plazo-prestamo.js';
+import {
+  inicioDeHoyEnMexico,
+  nuevaDevolucion,
+  plazoDePrestamo,
+  prestamoVencido,
+  textoDiaDePrestamo,
+} from './plazo-prestamo.js';
 
 const FIELD_KIT_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
 const BROAD_KIT_ASSIGN_SCOPE = new Set(['ceo', 'dir_operaciones', 'arquitecto', 'super_admin']);
@@ -2284,6 +2290,43 @@ export class ToolRequestsService {
     });
   }
 
+  /**
+   * Un aviso al día por préstamo cuyo día de devolución ya pasó. Antes corría cada hora y creaba
+   * un aviso «URGENTE» nuevo cada vez (24 al día por herramienta), contando como vencido desde la
+   * hora exacta y no desde que pasa el día. Devuelve cuántos avisó.
+   */
+  async avisarPrestamosVencidos(ahora: Date = new Date()): Promise<number> {
+    const enUso = await this.prisma.toolRequest.findMany({
+      where: { status: 'IN_USE' },
+      select: { id: true, usuarioId: true, toolName: true, expectedReturnDate: true },
+    });
+    const vencidos = enUso.filter((p) => prestamoVencido(p.expectedReturnDate, ahora));
+    if (!vencidos.length) return 0;
+
+    const deHoy = await this.prisma.toolRequestNotification.findMany({
+      where: {
+        toolRequestId: { in: vencidos.map((p) => p.id) },
+        type: 'TOOL_EXPIRATION_DUE',
+        sentAt: { gte: inicioDeHoyEnMexico(ahora) },
+      },
+      select: { toolRequestId: true },
+    });
+    const yaAvisados = new Set(deHoy.map((n) => n.toolRequestId));
+
+    let total = 0;
+    for (const p of vencidos) {
+      if (yaAvisados.has(p.id)) continue;
+      await this.createNotification(
+        p.id,
+        p.usuarioId,
+        'TOOL_EXPIRATION_DUE',
+        `La herramienta «${p.toolName}» debía regresar el ${textoDiaDePrestamo(p.expectedReturnDate)}. Devuélvela o pide más plazo.`,
+      );
+      total += 1;
+    }
+    return total;
+  }
+
   // Verificar y enviar alertas de vencimiento próximo (debe ejecutarse via cron)
   async checkExpiringTools() {
     const now = new Date();
@@ -2306,7 +2349,7 @@ export class ToolRequestsService {
         tool.id,
         tool.usuarioId,
         'TOOL_EXPIRATION_WARNING',
-        `La herramienta "${tool.toolName}" vence el ${tool.expectedReturnDate.toLocaleDateString()}. Por favor, devuélvela o solicita una renovación.`
+        `La herramienta «${tool.toolName}» se devuelve el ${textoDiaDePrestamo(tool.expectedReturnDate)}. Devuélvela ese día o pide más plazo.`,
       );
 
       // Marcar como notificado

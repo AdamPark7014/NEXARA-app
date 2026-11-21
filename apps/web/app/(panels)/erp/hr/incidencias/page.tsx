@@ -1,10 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import HrModuleRail from "@/components/hr/HrModuleRail";
+import PageHeader from "@/components/ui/PageHeader";
+import DataTable, { type Column } from "@/components/ui/DataTable";
+import { Alert, Button, Card, CardHead, DateInput, Field, Input, Select, StatusBadge } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { lunesDe } from "@/lib/control-nomina";
+import { contar } from "@/lib/plural";
+import s from "./incidencias.module.css";
 
 type Incidencia = {
   id: number;
@@ -34,6 +39,42 @@ const TIPOS = [
   "OTRO",
 ] as const;
 
+/** Como se lee en pantalla; el valor que viaja al servidor no cambia. */
+const TIPO_TEXTO: Record<string, string> = {
+  FALTA_JUSTIFICADA: "Falta justificada",
+  FALTA_INJUSTIFICADA: "Falta injustificada",
+  RETARDO: "Retardo",
+  PERMISO_CON_GOCE: "Permiso con goce",
+  PERMISO_SIN_GOCE: "Permiso sin goce",
+  INCAPACIDAD: "Incapacidad",
+  VACACIONES: "Vacaciones",
+  HORAS_EXTRA: "Horas extra",
+  BONO: "Bono",
+  DESCUENTO: "Descuento",
+  PRESTAMO: "Préstamo",
+  OTRO: "Otro",
+};
+
+export function textoTipo(tipo: string): string {
+  if (TIPO_TEXTO[tipo]) return TIPO_TEXTO[tipo];
+  const limpio = tipo.toLowerCase().replace(/_/g, " ");
+  return limpio.charAt(0).toUpperCase() + limpio.slice(1);
+}
+
+const ESTADO: Record<string, { texto: string; tono: "neutral" | "success" | "danger" }> = {
+  REGISTRADA: { texto: "Registrada", tono: "neutral" },
+  APLICADA: { texto: "En prenómina", tono: "success" },
+  CANCELADA: { texto: "Cancelada", tono: "danger" },
+};
+
+/** «21 nov 2026» a partir del día guardado, sin que la zona horaria lo recorra. */
+function textoDia(fecha: string): string {
+  const dia = String(fecha).slice(0, 10);
+  const d = new Date(`${dia}T12:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) return dia;
+  return d.toLocaleDateString("es-MX", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
+}
+
 function isoLocal(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -48,6 +89,7 @@ export default function HrIncidenciasPage() {
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const archivo = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     userId: "",
     fecha: isoLocal(),
@@ -177,133 +219,163 @@ export default function HrIncidenciasPage() {
     await cargar();
   };
 
-  return (
-    <div style={{ display: "grid", gap: 16, padding: "16px 20px", width: "100%", boxSizing: "border-box", minWidth: 0, maxWidth: 1200, margin: "0 auto" }}>
-      <HrModuleRail />
-      <header>
-        <p style={{ margin: 0, color: "var(--ds-muted, var(--text-secondary))", fontSize: 13 }}>RR. HH. · Bitácora</p>
-        <h1 style={{ margin: "4px 0 0", fontSize: 28 }}>Incidencias de personal</h1>
-        <p style={{ marginTop: 6, color: "var(--ds-muted, var(--text-secondary))" }}>
-          Entrada única para faltas, permisos, descuentos y extras. Alimenta la prenómina semanal.
-        </p>
-      </header>
+  const columnas: Column<Incidencia>[] = [
+    { key: "fecha", label: "Fecha", width: 120, render: (r) => <span className={s.fecha}>{textoDia(r.fecha)}</span> },
+    { key: "persona", label: "Persona", render: (r) => <span className={s.fuerte}>{r.user?.nombre || `Persona ${r.userId}`}</span> },
+    { key: "tipo", label: "Tipo", width: 170, render: (r) => textoTipo(r.tipo) },
+    { key: "concepto", label: "Concepto", render: (r) => r.concepto },
+    { key: "cantidad", label: "Cantidad", width: 96, align: "right", numeric: true, render: (r) => r.cantidad ?? "—" },
+    { key: "monto", label: "Monto", width: 110, align: "right", numeric: true, render: (r) => r.monto ?? "—" },
+    {
+      key: "estado",
+      label: "Estado",
+      width: 130,
+      render: (r) => {
+        const e = ESTADO[r.estado] ?? { texto: textoTipo(r.estado), tono: "neutral" as const };
+        return <StatusBadge label={e.texto} tone={e.tono} size="sm" dot />;
+      },
+    },
+  ];
+  const faltaParaRegistrar = !form.userId || !form.fecha || form.concepto.trim().length < 2;
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "end", minWidth: 0 }}>
-        <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
-          Semana (lunes)
-          <input type="date" disabled={loading || ocupado} value={semana} onChange={(e) => setSemana(lunesDe(e.target.value || isoLocal()))} />
-        </label>
-        <button type="button" disabled={!puedeEscribir || ocupado || loading} onClick={() => void ejecutar(aplicar)}>
-          Aplicar a prenómina
-        </button>
-        <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
-          Importar Excel
-          <input
-            style={{ maxWidth: "100%", minWidth: 0 }}
-            type="file"
-            accept=".xlsx"
-            disabled={!puedeEscribir || ocupado}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void ejecutar(() => importar(f));
-              e.target.value = "";
-            }}
+  return (
+    <div className={s.page}>
+      <PageHeader
+        title="Incidencias de personal"
+        subtitle="Entrada única para faltas, permisos, descuentos y extras. Alimenta la prenómina semanal."
+        density="ops"
+        actions={
+          <>
+            <input
+              ref={archivo}
+              className="ui-sr-only"
+              type="file"
+              accept=".xlsx"
+              aria-label="Archivo de Excel con incidencias"
+              tabIndex={-1}
+              disabled={!puedeEscribir || ocupado}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void ejecutar(() => importar(f));
+                e.target.value = "";
+              }}
+            />
+            <Button variant="secondary" disabled={!puedeEscribir || ocupado} onClick={() => archivo.current?.click()}>
+              Importar Excel
+            </Button>
+            <Button variant="primary" disabled={!puedeEscribir || ocupado || loading} onClick={() => void ejecutar(aplicar)}>
+              Aplicar a prenómina
+            </Button>
+          </>
+        }
+      />
+
+      <HrModuleRail />
+
+      <div className={s.semana}>
+        <Field label="Semana" hint="Se toma el lunes de la semana que elijas.">
+          <DateInput
+            disabled={loading || ocupado}
+            value={semana}
+            onChange={(e) => setSemana(lunesDe(e.target.value || isoLocal()))}
           />
-        </label>
+        </Field>
       </div>
 
-      {error ? <div role="alert" style={{ color: "var(--ds-danger, var(--danger))" }}>{error} <button type="button" disabled={loading} onClick={() => cargar().catch((e) => setError(e.message))}>Reintentar</button></div> : null}
-      {ok ? <p role="status" style={{ color: "var(--ds-success, var(--success))" }}>{ok}</p> : null}
+      {error ? (
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" variant="secondary" disabled={loading} onClick={() => cargar().catch((e) => setError(e.message))}>
+              Reintentar
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
+      ) : null}
+      {ok ? (
+        <Alert tone="success" role="status" onDismiss={() => setOk(null)}>
+          {ok}
+        </Alert>
+      ) : null}
+      {!puedeEscribir ? <Alert tone="info">Solo RH o dirección pueden registrar y aplicar incidencias.</Alert> : null}
 
-      {!puedeEscribir ? <p>Solo RH o dirección pueden registrar y aplicar incidencias.</p> : null}
-      <section style={{ display: "grid", minWidth: 0, gap: 8, padding: 16, border: "1px solid var(--ds-border, var(--border))", borderRadius: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>Alta rápida</h2>
-        <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))" }}>
-          <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
-            Persona
-            <select value={form.userId} onChange={(e) => setForm({ ...form, userId: e.target.value })}>
-              <option value="">Elige…</option>
-              {personas.map((p) => (
-                <option key={p.id} value={p.id}>{p.nombre}</option>
-              ))}
-            </select>
-          </label>
-          <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
-            Fecha
-            <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
-          </label>
-          <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
-            Tipo
-            <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
-              {TIPOS.map((t) => (
-                <option key={t} value={t}>{t.toLowerCase().replace(/_/g, " ")}</option>
-              ))}
-            </select>
-          </label>
-          <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
-            Cantidad
-            <input value={form.cantidad} onChange={(e) => setForm({ ...form, cantidad: e.target.value })} />
-          </label>
-          <label style={{ display: "grid", gap: 4, fontSize: 13 }}>
-            Monto
-            <input value={form.monto} onChange={(e) => setForm({ ...form, monto: e.target.value })} />
-          </label>
-          <label style={{ display: "grid", gap: 4, fontSize: 13, gridColumn: "1 / -1" }}>
-            Concepto
-            <input value={form.concepto} onChange={(e) => setForm({ ...form, concepto: e.target.value })} />
-          </label>
+      <Card>
+        <CardHead title="Alta rápida" subtitle="Queda en la semana elegida arriba." />
+        <div className={s.alta}>
+          <div className={s.campos}>
+            <Field label="Persona" required>
+              <Select value={form.userId} onChange={(e) => setForm({ ...form, userId: e.target.value })}>
+                <option value="">Elige…</option>
+                {personas.map((p) => (
+                  <option key={p.id} value={p.id}>{p.nombre}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Fecha" required>
+              <DateInput value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
+            </Field>
+            <Field label="Tipo" required>
+              <Select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}>
+                {TIPOS.map((t) => (
+                  <option key={t} value={t}>{textoTipo(t)}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Cantidad" hint="Días u horas, si aplica.">
+              <Input inputMode="decimal" value={form.cantidad} onChange={(e) => setForm({ ...form, cantidad: e.target.value })} />
+            </Field>
+            <Field label="Monto" hint="En pesos, si aplica.">
+              <Input inputMode="decimal" value={form.monto} onChange={(e) => setForm({ ...form, monto: e.target.value })} />
+            </Field>
+            <div className={s.ancho}>
+              <Field label="Concepto" required>
+                <Input value={form.concepto} onChange={(e) => setForm({ ...form, concepto: e.target.value })} />
+              </Field>
+            </div>
+          </div>
+          <div className={s.pie}>
+            <Button variant="primary" disabled={!puedeEscribir || ocupado || faltaParaRegistrar} onClick={() => void ejecutar(alta)}>
+              Registrar
+            </Button>
+          </div>
         </div>
-        <button type="button" disabled={!puedeEscribir || ocupado || !form.userId || !form.fecha || form.concepto.trim().length < 2} onClick={() => void ejecutar(alta)}>
-          Registrar
-        </button>
-      </section>
+      </Card>
 
-      {loading ? <p role="status">Cargando incidencias…</p> : null}
-      <section aria-busy={loading} style={{ overflowX: "auto", maxWidth: "100%" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-          <thead>
-            <tr>
-              <th align="left">Fecha</th>
-              <th align="left">Persona</th>
-              <th align="left">Tipo</th>
-              <th align="left">Concepto</th>
-              <th align="right">Cant.</th>
-              <th align="right">Monto</th>
-              <th align="left">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>{String(r.fecha).slice(0, 10)}</td>
-                <td>{r.user?.nombre || r.userId}</td>
-                <td>{r.tipo}</td>
-                <td>{r.concepto}</td>
-                <td align="right">{r.cantidad ?? "—"}</td>
-                <td align="right">{r.monto ?? "—"}</td>
-                <td>{r.estado}</td>
-              </tr>
-            ))}
-            {!loading && !error && !rows.length ? (
-              <tr>
-                <td colSpan={7}>Sin incidencias en esta semana.</td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </section>
+      <Card>
+        <CardHead
+          title="Incidencias de la semana"
+          subtitle={loading ? "Cargando incidencias…" : rows.length ? contar(rows.length, "incidencia") : undefined}
+        />
+        <DataTable
+          columns={columnas}
+          rows={rows}
+          rowKey={(r) => r.id}
+          loading={loading}
+          density="compact"
+          flush
+          ariaLabel="Incidencias de la semana"
+          emptyTitle="Sin incidencias en esta semana"
+          emptyDescription="Lo que registres o importes para esta semana aparece aquí."
+        />
+      </Card>
 
       {totales.length ? (
-        <section>
-          <h2 style={{ fontSize: 18 }}>Totales por persona</h2>
-          <ul>
+        <Card>
+          <CardHead title="Totales por persona" />
+          <ul className={s.totales}>
             {totales.map(([nombre, tipos]) => (
               <li key={nombre}>
-                <strong>{nombre}</strong>: {Object.entries(tipos).map(([t, n]) => `${t} ×${n}`).join(", ")}
+                <span className={s.fuerte}>{nombre}</span>
+                <span className={s.tenue}>
+                  {Object.entries(tipos).map(([t, n]) => `${textoTipo(t)} × ${n}`).join(" · ")}
+                </span>
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       ) : null}
     </div>
   );

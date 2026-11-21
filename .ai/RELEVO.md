@@ -1,7 +1,40 @@
 # RELEVO
 
-- **21-11 ~16:50 México (claude-code, nube; Cursor/Codex no alcanzables) — Repaso de procesos con la plataforma montada en local (Postgres + Redis + API + web, datos de demostración): errores reales corregidos y pantallas alineadas. Sin migraciones. En main, NO desplegado (se va con el siguiente despliegue de cualquier hilo).**
-  - **Candado de jornada (hilo «mejoras de código de NEXARA Core», aviso enviado):** el 409 `JORNADA_NO_ABIERTA` salía del
+- **21-11 ~16:55 México (claude-code, nube; Cursor/Codex no alcanzables) — Tercera vuelta de pulido: pantallas de RH que eran formularios sin estilo, tabla de préstamos, ventanas propias en vez de `window.prompt` y avisos de herramienta vencida una vez al día. Sin migraciones. En main, NO desplegado.**
+  - **RH (web):** Bitácora de incidencias (`hr/incidencias`), Medidas disciplinarias (`hr/medidas`) y Cargos por
+    pérdida (`hr/cargos-perdida`) eran HTML sin estilo (inputs y botones del navegador). Rehechas con `PageHeader`,
+    `HrModuleRail`, `Card`, `Field`, `DataTable`, `StatusBadge` y `EmptyState`; estilos en `incidencias.module.css` y
+    `components/hr/rh-legal.module.css`. Misma lógica, mismas llamadas y mismos permisos. En Cargos por pérdida la
+    conformidad firmada y el rechazo se piden con `PedirTexto`. Pendiente de fondo ahí: sigue pidiendo el número de la
+    actividad y enlaces a evidencia/PDF en vez de un selector y un cargador de archivos (pide soporte de subida en la API).
+  - **Sin `window.prompt`:** rechazar una baja en Aprobaciones (`BandejaUnica`) y devolver el plan en Supervisión ya usan
+    `PedirTexto` (ventana de la plataforma, con motivo mínimo en el rechazo).
+  - **Préstamos de herramienta (web):** en la tabla de solicitudes el nombre ya no se parte letra por letra (ancho
+    mínimo en la celda; `width` de `DataTable` es solo una pista), el avance va compacto con «Aprobó X» debajo, «Pedida
+    el…» pasó bajo la devolución (el Excel conserva todas las columnas) y aprobar, entregar y recibir quedan siempre a
+    la vista (`rowActionsAlwaysVisible`, también en prórrogas y en recolección de almacén). La línea de tiempo escribe
+    «21 nov, 4:34 p.m.».
+  - **Avisos de vencido (API):** `checkOverdueTools` corría cada hora y creaba un aviso «URGENTE» por préstamo vencido
+    cada vez. Ahora corre a las 9:00 de México y `avisarPrestamosVencidos()` avisa una sola vez al día por préstamo,
+    con el día pactado bien leído (`prestamoVencido`, `textoDiaDePrestamo`, `inicioDeHoyEnMexico` en
+    `plazo-prestamo.ts`): «La herramienta «X» debía regresar el 24 nov. Devuélvela o pide más plazo.» Prueba:
+    `avisos-vencidos.spec.ts`. Ojo: esa tabla (`toolRequestNotification`) todavía no la lee ningún cliente; mostrarla y
+    mandarla por push va con la ola de avisos.
+  - **Navegación:** RH ya no repite «Plantilla» en dos filas (la de adentro dice «Personas»); las migas no repiten el
+    grupo cuando se llama igual que la página («Hoy > Hoy»); rótulos de «Cargos por pérdida» y «Medidas disciplinarias».
+  - **Corrección a la sección de 16:40:** el aviso del candado de jornada no llegó directo al hilo de Core (no recibe
+    mensajes de otros hilos); se le pasó al coordinador.
+  - **Hallazgos sin tocar:** sitio público y portales bloquean el desplazamiento en `body`; en la pizarra conviven «Por
+    empezar» y «Sin iniciar»; «actualizado a las 04:42 p.m.» en Dirección; en el riel de RH «Incidencias» lleva a multas
+    y «Bitácora» a incidencias; aviso en almacén cuando una serie ya salió (ola de ciclo de vida por serie).
+  - **Paridad:** Web hecho · API hecho (avisos de vencido) · Android no aplica: estas pantallas de RH y la tabla de
+    préstamos de escritorio no existen en la app, y los avisos los arma el servidor · iOS no aplica, por lo mismo.
+  - **Verificación:** `npm run typecheck` en 0 (API y web); jest 6580/6580 con `TZ=America/Mexico_City`; vitest 2380/2381, la
+    falla es `ComoSeHace.spec.tsx`, de antes y sin tocar. Después se trajo 457b41a (capa de datos de vehículos, solo
+    archivos nuevos): tipos de web en 0 y su prueba nueva 10/10. `scripts/ios-static-check.py` sin problemas.
+
+- **21-11 ~16:40 México (claude-code, nube; Cursor/Codex no alcanzables) — Repaso de procesos con la plataforma montada en local (Postgres + Redis + API + web, datos de demostración): errores reales corregidos y pantallas alineadas. Sin migraciones. En main, NO desplegado (se va con el siguiente despliegue de cualquier hilo).**
+  - **Candado de jornada (hilo «mejoras de código de NEXARA Core», avisado por medio del coordinador):** el 409 `JORNADA_NO_ABIERTA` salía del
     servidor SIN su código: `AllExceptionsFilter` solo copiaba `error`, y el candado manda `code`. Ningún cliente abría
     «Registra tu entrada»; la persona veía el texto suelto dentro del formulario. Ahora el filtro pasa el código propio
     (`codigoPropio`, solo `MAYUSCULAS_CON_GUION`) en `code` y `errorCode`, sin sugerencias genéricas. En la web la barrera

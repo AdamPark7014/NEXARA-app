@@ -292,6 +292,7 @@ export default function RecoleccionAlmacenPanel() {
             flush
             ariaLabel="Herramientas esperando a que las recojan"
             rowActionsLabel="Entregar"
+            rowActionsAlwaysVisible
             rowActions={(p) => (
               <Button
                 size="sm"

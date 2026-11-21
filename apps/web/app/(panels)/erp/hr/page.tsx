@@ -52,7 +52,8 @@ const TIPO_CONTRATO = ["Planta", "Honorarios", "Contratista"] as const;
 const ESTADOS_RRHH = ["Activo", "Vacaciones", "Incidencia", "Baja"] as const;
 
 const TABS = [
-  { key: "plantilla", label: "Plantilla" },
+  // «Personas», no «Plantilla»: así se llama ya la pestaña del módulo que está justo arriba.
+  { key: "plantilla", label: "Personas" },
   { key: "permisos", label: "Permisos" },
   { key: "evaluaciones", label: "Evaluaciones" },
   { key: "dashboard", label: "Resumen" },
@@ -1003,7 +1004,7 @@ export default function HrPage() {
             ) : undefined}
           />
 
-          <Section title="Plantilla">
+          <Section>
             {initialLoading && <SkeletonList rows={6} tableLike />}
             {!loaded && !loading && loadError && (
               <InlineAlert

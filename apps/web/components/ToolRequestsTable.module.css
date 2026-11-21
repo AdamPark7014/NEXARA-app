@@ -42,10 +42,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* El nombre parte palabras largas (`overflow-wrap: anywhere`), así que sin un mínimo la columna
+   se encogía a una palabra por renglón. */
+.herramienta {
+  min-width: 200px;
+}
+
+.sinCorte {
+  white-space: nowrap;
+}
+
 .estado {
   display: grid;
   gap: var(--ui-s2);
-  min-width: 220px;
+  min-width: 200px;
 }
 
 .insignias {

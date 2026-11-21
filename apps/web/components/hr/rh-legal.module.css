@@ -1,0 +1,103 @@
+/* Medidas disciplinarias y cargos por pérdida. Solo acomodo: piezas y colores son los compartidos. */
+
+.page {
+  display: grid;
+  align-content: start;
+  gap: var(--ui-s4);
+  min-width: 0;
+  color: var(--ui-fg);
+}
+
+.form {
+  display: grid;
+  gap: var(--ui-s3) var(--ui-s4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: var(--ui-s4) var(--ui-s5) var(--ui-s5);
+}
+
+.ancho {
+  grid-column: 1 / -1;
+}
+
+.pie {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lista {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fila {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s4) var(--ui-s5);
+  border-top: 1px solid var(--ui-border);
+}
+
+.cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s2) var(--ui-s3);
+}
+
+.nombre {
+  font-weight: var(--ui-fw-semibold, 600);
+  color: var(--ui-fg);
+}
+
+.monto {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--ui-fw-semibold, 600);
+}
+
+.hechos {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ui-fg-2);
+  font-size: var(--ui-fs-label);
+  line-height: 1.5;
+}
+
+.nota {
+  margin: 0;
+  color: var(--ui-fg-3);
+  font-size: var(--ui-fs-caption);
+}
+
+.aviso {
+  margin: 0;
+  color: var(--ui-danger-text);
+  font-size: var(--ui-fs-caption);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+}
+
+.vacio {
+  padding: var(--ui-s2) var(--ui-s5) var(--ui-s5);
+}
+
+@media (max-width: 640px) {
+  .form {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--ui-s3) var(--ui-s4) var(--ui-s4);
+  }
+
+  .fila {
+    padding: var(--ui-s3) var(--ui-s4);
+  }
+
+  .pie > * {
+    width: 100%;
+  }
+}

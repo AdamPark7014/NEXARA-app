@@ -48,12 +48,12 @@ function stepIndex(status: ToolRequestStatus): number {
 function fmt(iso?: string | null) {
   if (!iso) return null;
   try {
-    return new Date(iso).toLocaleString("es-MX", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    // «21 nov, 4:34 p.m.»: con `2-digit` salía «21-nov, 04:34 p.m.».
+    const dia = d.toLocaleDateString("es-MX", { day: "numeric", month: "short" }).replace(".", "");
+    const hora = d.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
+    return `${dia}, ${hora}`;
   } catch {
     return null;
   }

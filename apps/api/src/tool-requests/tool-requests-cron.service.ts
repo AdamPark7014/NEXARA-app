@@ -41,26 +41,14 @@ export class ToolRequestsCronService {
   }
 
   /**
-   * Se ejecuta cada hora
-   * Verifica herramientas que vencieron hace más de 1 hora
+   * Cada mañana, un aviso por préstamo cuyo día de devolución ya pasó. Corría cada hora y
+   * repetía el mismo aviso; ahora es uno al día (el servicio además no repite si ya avisó hoy).
    */
-  @Cron(CronExpression.EVERY_HOUR)
+  @Cron('0 9 * * *', { timeZone: WORKDAY_TIMEZONE })
   async checkOverdueTools() {
-    console.log('⏰ Verificando herramientas vencidas...');
     try {
-      const overdueTools = await this.toolRequestsService.findByStatus('IN_USE');
-      const now = new Date();
-      
-      for (const tool of overdueTools) {
-        if (tool.expectedReturnDate < now) {
-          await this.toolRequestsService.createNotification(
-            tool.id,
-            tool.usuarioId,
-            'TOOL_EXPIRATION_DUE',
-            `⚠️ URGENTE: La herramienta "${tool.toolName}" venció el ${tool.expectedReturnDate.toLocaleDateString()}. Por favor devuélvela inmediatamente.`
-          );
-        }
-      }
+      const total = await this.toolRequestsService.avisarPrestamosVencidos();
+      if (total > 0) console.log(`⏰ ${total} préstamos de herramienta vencidos avisados`);
     } catch (error) {
       console.error('❌ Error al verificar herramientas vencidas:', error);
     }

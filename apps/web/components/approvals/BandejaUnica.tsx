@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { cargarBandeja, type GrupoBandeja } from "@/lib/bandeja";
 import { decidirBaja, listarBajas, type BajaRequest } from "@/lib/delegated-users-api";
+import PedirTexto, { type PedirTextoEstado } from "@/components/ui/PedirTexto";
 import s from "./BandejaUnica.module.css";
 
 export default function BandejaUnica({
@@ -26,6 +27,7 @@ export default function BandejaUnica({
   const [busy, setBusy] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [pedir, setPedir] = useState<PedirTextoEstado | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -54,17 +56,27 @@ export default function BandejaUnica({
 
   const actuar = async (id: number, accion: "aprobar" | "rechazar" | "revertir") => {
     if (busy !== null) return;
+    if (accion === "rechazar") {
+      // El motivo se pide en un diálogo de Core; si el servidor lo rechaza, lo escrito no se pierde.
+      setAviso(null);
+      setPedir({
+        titulo: "Rechazar la baja",
+        etiqueta: "Motivo del rechazo",
+        descripcion: "Quien la pidió verá este motivo.",
+        confirmar: "Rechazar",
+        minimo: 3,
+        peligro: true,
+        fn: async (motivo) => {
+          await decidirBaja(token, id, "rechazar", motivo);
+          setTick((n) => n + 1);
+        },
+      });
+      return;
+    }
     setBusy(id);
     setAviso(null);
     try {
-      let motivo: string | undefined;
-      if (accion === "rechazar") {
-        const respuesta = window.prompt("Motivo del rechazo");
-        if (respuesta === null) return;
-        motivo = respuesta;
-        if (motivo.trim().length < 3) throw new Error("Escribe un motivo de al menos 3 caracteres.");
-      }
-      await decidirBaja(token, id, accion, motivo);
+      await decidirBaja(token, id, accion);
       setTick((n) => n + 1);
     } catch (err) {
       setAviso(err instanceof Error ? err.message : "No se pudo completar la acción.");
@@ -138,6 +150,7 @@ export default function BandejaUnica({
           ) : null}
         </article>
       ))}
+      <PedirTexto estado={pedir} onCerrar={() => setPedir(null)} />
     </section>
   );
 }

@@ -316,6 +316,7 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
             ariaLabel="Renovaciones de herramientas"
             rowActions={acciones}
             rowActionsLabel="Acciones"
+            rowActionsAlwaysVisible
             emptyTitle="Sin renovaciones"
             emptyDescription="No hay renovaciones con los filtros actuales"
             emptyAction={
