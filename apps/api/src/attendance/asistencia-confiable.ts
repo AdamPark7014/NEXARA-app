@@ -79,6 +79,8 @@ export function motivoSinUbicacion(params: {
  * («desde el navegador») para que se pueda revisar.
  */
 export const WEB_CHECKIN_SETTING_KEY = 'attendance.web_checkin_until';
+/** La misma ventana, abierta solo para una persona (p. ej. mientras su app no trae el botón de entrada). */
+export const claveWebCheckinPersona = (userId: number) => `${WEB_CHECKIN_SETTING_KEY}.user.${userId}`;
 
 export type VentanaWebCheckin = { abierta: boolean; hasta: Date | null };
 

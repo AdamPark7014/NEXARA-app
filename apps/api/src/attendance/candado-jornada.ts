@@ -92,6 +92,18 @@ export function candadoEncendido(env: NodeJS.ProcessEnv = process.env): boolean 
   return !(v === '0' || v === 'false' || v === 'no' || v === 'off');
 }
 
+/**
+ * Personas exentas por un tiempo (ids separados por coma en `JORNADA_EXENTOS`). Para quien todavía no
+ * puede checar por causas nuestras: p. ej. su app instalada aún no trae el botón de entrada.
+ */
+export function exentoTemporal(userId: number | null | undefined, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (!userId) return false;
+  return String(env.JORNADA_EXENTOS ?? '')
+    .split(',')
+    .map((x) => Number(x.trim()))
+    .some((id) => id > 0 && id === Number(userId));
+}
+
 /** ¿Esta petición necesita que quien la hace tenga su jornada abierta? */
 export function pideJornadaAbierta(p: {
   metodo: string | null | undefined;
@@ -104,6 +116,7 @@ export function pideJornadaAbierta(p: {
   const u = p.usuario;
   // Sin usuario (público, webhooks, llaves de integración) o portales de cliente/sucursal: no aplica.
   if (!u || !u.id || u.isClient || u.isBranchUser) return false;
+  if (exentoTemporal(u.id, p.env)) return false;
   // Dirección/plataforma y RH no checan (mismo criterio que `sinActividades`).
   if (sinActividades(u)) return false;
   return !rutaExenta(rutaNormalizada(p.url));

@@ -93,6 +93,20 @@ describe('checar desde el navegador', () => {
     expect(notifyAttendanceFlagged).not.toHaveBeenCalled();
   });
 
+  it('ventana abierta solo para una persona: ella checa desde la web, sus compañeros no', async () => {
+    const { service, prisma } = build(null);
+    prisma.systemSetting.findMany.mockImplementation(async (a: any) => {
+      const claves: string[] = a.where.key?.in ?? [a.where.key];
+      return claves.includes('attendance.web_checkin_until.user.4')
+        ? [{ companyId: 7, key: 'attendance.web_checkin_until.user.4', value: enUnaHora() }]
+        : [];
+    });
+    await expect(service.register(entrada() as any, 3, WEB, 7)).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(service.register(entrada() as any, 4, WEB, 7)).resolves.toBeTruthy();
+    await expect(service.ventanaWeb(7, new Date(), 4)).resolves.toMatchObject({ abierta: true });
+    await expect(service.ventanaWeb(7, new Date(), 3)).resolves.toMatchObject({ abierta: false });
+  });
+
   it('la ventana es de una empresa: otra empresa sigue sin poder checar desde la web', async () => {
     const { service, prisma } = build(enUnaHora());
     prisma.systemSetting.findMany.mockImplementation(async (a: any) =>

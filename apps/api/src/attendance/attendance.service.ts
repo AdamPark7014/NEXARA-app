@@ -54,6 +54,7 @@ import {
   MENSAJE_SOLO_APP,
   WEB_CHECKIN_SETTING_KEY,
   ventanaWebCheckin,
+  claveWebCheckinPersona,
   type VentanaWebCheckin,
   MENSAJE_UBICACION_SIMULADA,
   MENSAJE_SIN_CONEXION_FUERA_DE_VENTANA,
@@ -1893,14 +1894,27 @@ export class AttendanceService {
   }
 
   /** ¿Está abierta la ventana temporal para checar desde la web en esta empresa? Ante cualquier duda, cerrada. */
-  async ventanaWeb(companyId: number, ahora: Date = new Date()): Promise<VentanaWebCheckin> {
+  /**
+   * Ventana para checar desde el navegador: la de la empresa o, si se pasa `userId`, también la que
+   * dirección le abrió a esa persona (`attendance.web_checkin_until.user.<id>`). Vale la que siga abierta.
+   */
+  async ventanaWeb(companyId: number, ahora: Date = new Date(), userId?: number | null): Promise<VentanaWebCheckin> {
     try {
+      const clavePersona = userId ? claveWebCheckinPersona(userId) : null;
       const filas = await this.prisma.systemSetting.findMany({
-        where: { key: WEB_CHECKIN_SETTING_KEY, OR: [{ companyId: null }, { companyId }] },
-        select: { companyId: true, value: true },
+        where: {
+          key: clavePersona ? { in: [WEB_CHECKIN_SETTING_KEY, clavePersona] } : WEB_CHECKIN_SETTING_KEY,
+          OR: [{ companyId: null }, { companyId }],
+        },
+        select: { companyId: true, value: true, key: true },
       });
-      const propia = filas.find((f) => f.companyId === companyId) ?? filas.find((f) => f.companyId == null);
-      return ventanaWebCheckin(propia?.value, ahora);
+      const deEmpresa = filas.filter((f) => f.key == null || f.key === WEB_CHECKIN_SETTING_KEY);
+      const propia = deEmpresa.find((f) => f.companyId === companyId) ?? deEmpresa.find((f) => f.companyId == null);
+      const general = ventanaWebCheckin(propia?.value, ahora);
+      if (general.abierta || !clavePersona) return general;
+      const dePersona = filas.find((f) => f.key === clavePersona && f.companyId === companyId);
+      const personal = ventanaWebCheckin(dePersona?.value, ahora);
+      return personal.abierta ? personal : general;
     } catch {
       return { abierta: false, hasta: null };
     }
@@ -1951,7 +1965,7 @@ export class AttendanceService {
     // queda marcada como hecha desde el navegador.
     let checadaWeb = false;
     if (origen === 'WEB') {
-      const ventana = await this.ventanaWeb(tenantId);
+      const ventana = await this.ventanaWeb(tenantId, new Date(), userId);
       if (!ventana.abierta) {
         await this.rechazar(contexto, MOTIVO_RECHAZO.desdeNavegador, MENSAJE_SOLO_APP);
       }
