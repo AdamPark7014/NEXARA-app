@@ -311,13 +311,11 @@ final class CapturaGuiadaRepository {
             guard let jpeg = envio.imagenes[slot] else { continue }
             files.append((field: slot, data: jpeg, fileName: "\(slot).jpg", mimeType: "image/jpeg"))
         }
-        let esMov = envio.video.pathExtension.lowercased() == "mov"
-        files.append((
-            field: CapturaGuiadaRules.campoVideo,
-            data: videoData,
-            fileName: "\(CapturaGuiadaRules.campoVideo).\(esMov ? "mov" : "mp4")",
-            mimeType: esMov ? "video/quicktime" : "video/mp4"
-        ))
+        let esMov: Bool = envio.video.pathExtension.lowercased() == "mov"
+        let extensionVideo: String = esMov ? "mov" : "mp4"
+        let tipoVideo: String = esMov ? "video/quicktime" : "video/mp4"
+        let nombreVideo: String = CapturaGuiadaRules.campoVideo + "." + extensionVideo
+        files.append((field: CapturaGuiadaRules.campoVideo, data: videoData, fileName: nombreVideo, mimeType: tipoVideo))
 
         let data = try await api.uploadMultipartFiles(
             accion.path,

@@ -86,9 +86,15 @@ enum CapturaGuiadaRules {
     /// primer ni el último instante (suelen salir movidos). Mismo cálculo en web y Android.
     static func tiemposCuadros(_ duracionSeg: Double, cuadros: Int = 8) -> [Double] {
         guard duracionSeg.isFinite, duracionSeg > 0, cuadros > 0 else { return [] }
-        return (0..<cuadros).map { i in
-            (duracionSeg * (Double(i) + 0.5) / Double(cuadros) * 1000).rounded() / 1000
+        let total = Double(cuadros)
+        var tiempos: [Double] = []
+        for i in 0..<cuadros {
+            let centro: Double = Double(i) + 0.5
+            let segundo: Double = duracionSeg * centro / total
+            let milesimas: Double = (segundo * 1000).rounded()
+            tiempos.append(milesimas / 1000)
         }
+        return tiempos
     }
 
     /// La hora de cada cuadro: la hora en que empezó la grabación más su segundo dentro del video.
@@ -97,9 +103,10 @@ enum CapturaGuiadaRules {
     }
 
     static func duracionValida(_ duracionSeg: Double) -> Bool {
-        duracionSeg.isFinite
-            && duracionSeg >= Double(duracionMinSeg) - graciaSeg
-            && duracionSeg <= Double(duracionMaxSeg) + graciaSeg
+        guard duracionSeg.isFinite else { return false }
+        let minimo: Double = Double(duracionMinSeg) - graciaSeg
+        let maximo: Double = Double(duracionMaxSeg) + graciaSeg
+        return duracionSeg >= minimo && duracionSeg <= maximo
     }
 
     /// Un decimal, como lo manda la web: 14.26 → 14.3.
@@ -193,16 +200,17 @@ enum CapturaGuiadaRules {
         var campos: [String] = []
         for slot in slots {
             guard let toma = tomas[slot], let hora = toma.capturedAt else { continue }
-            campos.append(
-                "\(jsonString(slot)):{\"capturedAt\":\(jsonString(horaIso(hora))),"
-                    + "\"lat\":\(numero(coordenada(toma.lat))),\"lng\":\(numero(coordenada(toma.lng)))}"
-            )
+            let clave: String = jsonString(slot)
+            let horaTexto: String = jsonString(horaIso(hora))
+            let lat: String = numero(coordenada(toma.lat))
+            let lng: String = numero(coordenada(toma.lng))
+            campos.append("\(clave):{\"capturedAt\":\(horaTexto),\"lat\":\(lat),\"lng\":\(lng)}")
         }
         if let hora = video.capturedAt {
-            campos.append(
-                "\(jsonString(campoVideo)):{\"capturedAt\":\(jsonString(horaIso(hora))),"
-                    + "\"duracionSeg\":\(duracionRedondeada(video.duracionSeg))}"
-            )
+            let clave: String = jsonString(campoVideo)
+            let horaTexto: String = jsonString(horaIso(hora))
+            let duracion: Double = duracionRedondeada(video.duracionSeg)
+            campos.append("\(clave):{\"capturedAt\":\(horaTexto),\"duracionSeg\":\(duracion)}")
         }
         return "{" + campos.joined(separator: ",") + "}"
     }
@@ -263,13 +271,17 @@ enum CapturaGuiadaRules {
             if i > 0, (digitos.count - i) % 3 == 0 { salida.append(",") }
             salida.append(c)
         }
-        return (km < 0 ? "-" : "") + salida + " km"
+        let signo: String = km < 0 ? "-" : ""
+        return signo + salida + " km"
     }
 
     /// Segundos grabados → «0:14» para el contador de la vuelta.
     static func reloj(_ segundos: Double) -> String {
-        let s = Int(max(0, segundos).rounded())
-        return "\(s / 60):" + String(format: "%02d", s % 60)
+        let positivos: Double = max(0.0, segundos)
+        let s: Int = Int(positivos.rounded())
+        let minutos: Int = s / 60
+        let resto: String = String(format: "%02d", s % 60)
+        return "\(minutos):\(resto)"
     }
 
     private static func coordenada(_ v: Double?) -> Double? {

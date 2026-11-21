@@ -145,7 +145,7 @@ data class UsoDeActividadDto(
         get() = estatus == "En uso" || (salida != null && devolucion == null)
 }
 
-data class ActividadRefDto(
+data class ActividadDelBloqueDto(
     val id: Long? = null,
     val folio: String? = null,
     val titulo: String? = null,
@@ -153,7 +153,7 @@ data class ActividadRefDto(
 )
 
 data class VehiculosDeActividadDto(
-    val actividad: ActividadRefDto? = null,
+    val actividad: ActividadDelBloqueDto? = null,
     val usos: List<UsoDeActividadDto>? = null,
 )
 

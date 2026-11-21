@@ -16,8 +16,9 @@ enum CuadrosVuelta {
     static func duracionSeg(_ video: URL) async -> Double? {
         let asset = AVURLAsset(url: video)
         guard let duracion = try? await asset.load(.duration) else { return nil }
-        let segundos = CMTimeGetSeconds(duracion)
-        return segundos.isFinite && segundos > 0 ? segundos : nil
+        let segundos: Double = CMTimeGetSeconds(duracion)
+        guard segundos.isFinite, segundos > 0 else { return nil }
+        return segundos
     }
 
     /// - Parameter ladoMax: el lado largo del cuadro; 1280 basta para ver un rayón y no infla la subida.
