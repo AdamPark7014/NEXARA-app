@@ -2,6 +2,7 @@ import "./globals.scss";
 import "./utilities.scss";
 import "./ecosystem.scss";
 import "./ui-tokens.scss";
+import "./ui-firma.scss";
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter, Inter_Tight } from "next/font/google";
 import ClientLayout from "./ClientLayout";

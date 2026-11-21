@@ -1,0 +1,100 @@
+/* ============================================================
+   NEXARA · Firma visual v3 (rediseño del 21-11-2026)
+   ------------------------------------------------------------
+   Capa final sobre `ui-tokens.scss`: no cambia nombres de tokens ni
+   lógica, solo valores y detalles de marca. Se importa la última en
+   `app/layout.tsx`. Quitar este archivo regresa a la v2 tal cual.
+
+   1. Espectro del logotipo (teal → cielo → magenta → naranja) como
+      firma: línea superior del panel, indicador del menú, acentos de cifra.
+   2. «Noche NEXARA»: el modo oscuro toma el marino profundo de la NAS
+      (#070B12) con bordes finos y relieve interior en tarjetas.
+   3. Detalles globales: selección, barras de scroll, foco y entrada suave.
+   ============================================================ */
+
+:root {
+  --ui-spectrum: linear-gradient(90deg, #1fb89a 0%, #3aa9cc 34%, #a64ca6 67%, #ee8a2a 100%);
+  --ui-spectrum-v: linear-gradient(180deg, #1fb89a 0%, #3aa9cc 34%, #a64ca6 67%, #ee8a2a 100%);
+  /* Rejilla hexagonal de la NAS, en blanco al 5 %: solo sobre fondos de noche. */
+  --ui-hex-grid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50L0 16L28 0L56 16L56 50L28 66L28 100' fill='none' stroke='%23ffffff' stroke-opacity='0.05'/%3E%3Cpath d='M28 0L28 34L0 50L0 84L28 100L56 84L56 50L28 34' fill='none' stroke='%23ffffff' stroke-opacity='0.05'/%3E%3C/svg%3E");
+  --ui-glow-brand: 0 0 0 1px color-mix(in srgb, #2dd4ac 22%, transparent), 0 8px 24px -10px color-mix(in srgb, #1fb89a 55%, transparent);
+}
+
+/* ── Noche NEXARA (modo oscuro de los paneles) ─────────────────────────── */
+body.dark {
+  --ui-bg: #070b12;
+  --ui-surface: #0d1420;
+  --ui-surface-2: #0a1019;
+  --ui-surface-3: #131c2a;
+  --ui-hover: #131d2b;
+  --ui-active: #182435;
+  --ui-track: #1a2636;
+
+  --ui-fg: #e8edf4;
+  --ui-fg-2: #a9b5c5;
+  --ui-fg-3: #8592a6;
+
+  --ui-border-subtle: #111a26;
+  --ui-border: #18222f;
+  --ui-border-strong: #273446;
+
+  --ui-brand-text: #4fe3bf;
+  --ui-brand-soft: rgba(45, 212, 172, 0.12);
+  --ui-brand-soft-2: rgba(45, 212, 172, 0.22);
+
+  --ui-elev-1: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 1px 2px rgba(0, 0, 0, 0.5), 0 18px 40px -28px rgba(0, 0, 0, 0.85);
+  --ui-elev-2: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.5), 0 26px 52px -26px rgba(0, 0, 0, 0.9);
+  --ui-elev-pop: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 6px rgba(0, 0, 0, 0.5), 0 24px 56px -18px rgba(0, 0, 0, 0.85);
+  --ui-shadow-sm: var(--ui-elev-1);
+  --ui-shadow-md: var(--ui-elev-2);
+  --ui-shadow-pop: var(--ui-elev-pop);
+  --ui-card-shadow: var(--ui-elev-1);
+
+  --ui-scrim: rgba(2, 5, 10, 0.68);
+  color-scheme: dark;
+}
+
+body.light {
+  color-scheme: light;
+}
+
+/* ── Detalles globales dentro de los paneles ───────────────────────────── */
+.nx-app-shell {
+  ::selection {
+    background: color-mix(in srgb, var(--ui-brand) 26%, transparent);
+    color: inherit;
+  }
+
+  /* Barras de scroll finas en el contenido (el menú lateral tiene las suyas). */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ui-fg-3) 38%, transparent) transparent;
+  }
+}
+
+/* Cifras siempre tabulares en tablas: las columnas de importes alinean. */
+.nx-app-shell table td,
+.nx-app-shell table th {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Entrada suave de cada pantalla (solo opacidad: no crea contenedor para
+   los `position: fixed` de modales y cajones). */
+@keyframes nx-entrada {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+#nx-main > * {
+  animation: nx-entrada var(--ui-duration-slow, 260ms) var(--ui-ease-out, ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #nx-main > * {
+    animation: none;
+  }
+}

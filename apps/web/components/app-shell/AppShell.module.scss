@@ -2279,3 +2279,111 @@
     0 1px 2px rgba(16, 24, 40, 0.2),
     0 8px 18px -8px rgba(19, 122, 101, 0.65);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Firma NEXARA v3 (21-11-2026). El espectro del logotipo como hilo superior,
+   menú de noche con la rejilla hexagonal de la NAS e indicador de color en el
+   módulo activo. Solo forma y color: ningún comportamiento cambia.
+   ───────────────────────────────────────────────────────────────────────── */
+.shell::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--ui-spectrum);
+  z-index: 45;
+  pointer-events: none;
+}
+
+.shell[data-console="true"]::before {
+  display: none;
+}
+
+.shell,
+:global(body.dark) .shell {
+  --sb-bg:
+    radial-gradient(420px 260px at 0% 100%, rgba(31, 184, 154, 0.1), transparent 70%),
+    linear-gradient(180deg, #0c1822 0%, #08111a 55%, #060c13 100%);
+  --sb-tip-bg: #10202c;
+}
+
+.sidebar {
+  isolation: isolate;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.045);
+}
+
+/* Rejilla hexagonal tenue en el fondo del menú, que se desvanece hacia arriba. */
+.sidebar::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 46%;
+  background-image: var(--ui-hex-grid);
+  background-size: 42px 75px;
+  -webkit-mask-image: linear-gradient(0deg, rgba(0, 0, 0, 0.9), transparent);
+  mask-image: linear-gradient(0deg, rgba(0, 0, 0, 0.9), transparent);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.brandLogoMark {
+  filter: drop-shadow(0 0 10px rgba(45, 212, 172, 0.35));
+}
+
+.brandName {
+  letter-spacing: 0.14em;
+  font-weight: 700;
+}
+
+/* Módulo activo: pastilla de cristal teal con hilo del espectro a la izquierda. */
+.menuItem {
+  position: relative;
+}
+
+.menuItem.active::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--ui-spectrum-v);
+  box-shadow: 0 0 10px rgba(45, 212, 172, 0.45);
+}
+
+.shell[data-collapsed="true"] .menuItem.active::before {
+  left: -6px;
+}
+
+.avatar {
+  box-shadow: 0 0 0 1px rgba(79, 227, 191, 0.28);
+}
+
+/* Noche: fondo marino con brillo teal arriba y rejilla casi invisible. */
+:global(body.dark) .shell {
+  background:
+    radial-gradient(1100px 520px at 85% -12%, rgba(31, 184, 154, 0.11), transparent 62%),
+    radial-gradient(900px 480px at 0% -6%, rgba(58, 169, 204, 0.06), transparent 60%),
+    var(--ui-bg);
+}
+
+:global(body.dark) .topbar {
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.primaryAction {
+  background: linear-gradient(180deg, #1ea488, #137a65);
+  transition:
+    transform var(--ui-duration-fast) ease,
+    box-shadow var(--ui-duration-fast) ease,
+    filter var(--ui-duration-fast) ease;
+
+  &:hover {
+    filter: brightness(1.06);
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+}

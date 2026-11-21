@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console.inicio
 
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSpectrum
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -961,7 +962,7 @@ internal fun ActualCard(
 }
 
 /** Fondo casi negro de la banda; el resplandor se dibuja encima. */
-private val BandaFondo = Color(0xFF0D0F12)
+private val BandaFondo = NxSpectrum.Night
 
 /** Aurora de la banda: verde arriba a la derecha, azul abajo a la izquierda, magenta abajo. */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.dibujarResplandor() {
@@ -988,6 +989,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.dibujarResplandor()
             radius = w * 0.55f,
         ),
     )
+    // Firma v3: hilo del espectro arriba de la banda, como el login de la NAS.
+    drawRect(NxSpectrum.horizontal, size = androidx.compose.ui.geometry.Size(w, 3.dp.toPx()))
 }
 
 @Composable

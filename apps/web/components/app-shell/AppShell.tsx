@@ -137,7 +137,11 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout, isContextReady, sessionExpiringSoon, extendSession, sessionEndedMessage, clearSessionEndedMessage } = useUser();
-  const { darkMode, toggleDarkMode } = useTheme();
+  const { darkMode, toggleDarkMode, adoptPanelTheme } = useTheme();
+  // Tema guardado en este equipo (o el del sistema) al entrar a un panel.
+  useEffect(() => {
+    adoptPanelTheme();
+  }, [adoptPanelTheme]);
   const [extendingSession, setExtendingSession] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifPreview, setNotifPreview] = useState<NotifPreviewItem[]>([]);

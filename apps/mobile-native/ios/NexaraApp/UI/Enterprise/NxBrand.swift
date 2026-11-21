@@ -99,6 +99,33 @@ enum NxColors {
     }
 }
 
+// MARK: - Firma NEXARA v3 (espectro del logotipo)
+
+/// Espectro del logotipo (teal → cielo → magenta → naranja), el mismo `--ui-spectrum` de la
+/// web y `NxSpectrum` de Android. Adorno de marca: nunca lleva significado de estado.
+enum NxSpectrum {
+    static let teal = NxColors.rgb(0x1FB89A)
+    static let sky = NxColors.rgb(0x3AA9CC)
+    static let magenta = NxColors.rgb(0xA64CA6)
+    static let orange = NxColors.rgb(0xEE8A2A)
+    static let colors: [Color] = [teal, sky, magenta, orange]
+    static let horizontal = LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing)
+    /// Marino de la NAS para bandas de noche (antes #0D0F12).
+    static let night = NxColors.rgb(0x070B12)
+}
+
+/// Hilo del espectro a todo lo ancho (2 pt por omisión).
+struct NxSpectrumLine: View {
+    var height: CGFloat = 2
+
+    var body: some View {
+        NxSpectrum.horizontal
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Marca NEXARA (nombres de siempre, valores de Android)
 
 /// Paleta de marca. Única fuente de los tonos de marca de la app: nada de

@@ -133,6 +133,14 @@ private struct NxBrandNavBarModifier: ViewModifier {
                 }
             }
         }
+        // Firma v3 (21-11-2026): hilo del espectro de la marca bajo la barra clara de Core
+        // (Android `NxSpectrumLine` bajo la `TopAppBar`). Si otra pantalla de adentro aplica
+        // la barra, la pinta ella y aquí no se duplica.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if estilo == .core && !hayOtraDentro {
+                NxSpectrumLine()
+            }
+        }
         .preference(key: NxBrandNavBarInteriorKey.self, value: true)
     }
 

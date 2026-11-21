@@ -576,3 +576,38 @@
   font-weight: 600;
   letter-spacing: -0.02em;
 }
+
+/* Firma v3 (21-11): hilo de color arriba de cada cifra. Espectro de la marca en
+   las neutras y el tono de la cifra en las de estado; nunca sustituye al texto. */
+.statAccent {
+  position: absolute;
+  top: 0;
+  left: 16px;
+  width: 28px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--ui-spectrum, var(--ui-brand));
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.statAccent[data-tone="brand"] {
+  background: var(--ui-brand);
+}
+
+.statAccent[data-tone="success"] {
+  background: var(--ui-success);
+}
+
+.statAccent[data-tone="warning"] {
+  background: var(--ui-warning);
+}
+
+.statAccent[data-tone="danger"] {
+  background: var(--ui-danger);
+}
+
+.statCompact .statAccent {
+  left: 12px;
+  width: 20px;
+}

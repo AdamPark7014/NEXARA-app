@@ -319,6 +319,7 @@ export function Stat({
 
   const contenido = (
     <>
+      <span className={s.statAccent} data-tone={tone} aria-hidden="true" />
       <span className={s.statTop}>
         {icon ? (
           <span className={[s.statIco, TONO[tonoIcono]].filter(Boolean).join(" ")} aria-hidden="true">
