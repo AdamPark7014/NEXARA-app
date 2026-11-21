@@ -180,12 +180,21 @@ struct PrestamoHerramienta: Decodable, Hashable, Identifiable {
     var inventoryItemId: Int? = nil
     /// Quien lo pidió. Solo en las listas de toda la empresa (`GET tool-requests`).
     var usuario: HerramientaAprobador? = nil
+    /// Evidencia (21-11-2026): cómo salió y cómo volvió, con quién entregó y quién recibió.
+    var deliveryPhotos: [FotoDeEvidencia]? = nil
+    var returnPhotos: [FotoDeEvidencia]? = nil
+    /// BIEN | DESGASTE | DANADA | INCOMPLETA | EXTRAVIADA. `nil` en lo recibido antes de la evidencia.
+    var returnCondition: String? = nil
+    var returnNotes: String? = nil
+    var deliveredBy: HerramientaAprobador? = nil
+    var receivedBy: HerramientaAprobador? = nil
 
     private enum CodingKeys: String, CodingKey {
         case id, usuarioId, toolName, model, serialNumber, reason, status, startDate
         case expectedReturnDate, requestDate, approvalDate, deliveryDate, returnDate
         case damageDescription, adminNotes, renewalCount, activityId
         case pickupCode, pickupExpiresAt, pickedUpAt, approver, inventoryItemId, usuario
+        case deliveryPhotos, returnPhotos, returnCondition, returnNotes, deliveredBy, receivedBy
     }
 
     init(from decoder: Decoder) throws {
@@ -214,6 +223,12 @@ struct PrestamoHerramienta: Decodable, Hashable, Identifiable {
         approver = try? c.decode(HerramientaAprobador.self, forKey: .approver)
         inventoryItemId = try? c.decode(Int.self, forKey: .inventoryItemId)
         usuario = try? c.decode(HerramientaAprobador.self, forKey: .usuario)
+        deliveryPhotos = try? c.decode([FotoDeEvidencia].self, forKey: .deliveryPhotos)
+        returnPhotos = try? c.decode([FotoDeEvidencia].self, forKey: .returnPhotos)
+        returnCondition = texto(.returnCondition)
+        returnNotes = texto(.returnNotes)
+        deliveredBy = try? c.decode(HerramientaAprobador.self, forKey: .deliveredBy)
+        receivedBy = try? c.decode(HerramientaAprobador.self, forKey: .receivedBy)
     }
 }
 

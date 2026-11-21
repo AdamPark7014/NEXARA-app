@@ -67,84 +67,104 @@ struct HerramientaEscaneadaVista: View {
     }
 }
 
-/// Registrar la salida (préstamo aprobado, con el código de recolección) o la entrada
-/// (préstamo en uso, con daño opcional) de la herramienta escaneada.
+/// Registrar la salida (préstamo aprobado: código de recolección y fotos de cómo sale) o la
+/// entrada (préstamo en uso: cómo volvió y fotos de después) de la herramienta escaneada.
 struct AccionDeHerramienta: View {
     let r: HerramientaPorCodigo
     let accion: EscaneoReglas.AccionHerramienta
     let prestamoId: Int
     let onHecho: (String) -> Void
 
-    @State private var codigoRecogida = ""
-    @State private var danio = ""
+    @State private var abierta = false
     @State private var guardando = false
     @State private var error: String?
+
+    private var nombre: String { EscaneoReglas.nombreHerramienta(r) }
+    private var persona: String { r.prestamo?.usuario?.nombre?.nilSiVacio ?? "quien la pidió" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HerrDivisor()
-            switch accion {
-            case .entregar:
-                Text("Para entregarla, teclea el código de recolección que enseña quien la recoge.")
-                    .font(NxType.labelMedium)
-                    .foregroundStyle(NxColors.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                if r.prestamo?.vencido == true {
-                    // Mismo texto que Android (`HerramientasEscaneo.kt`): generar otro
-                    // código es de quien aprueba, y eso no se hace desde el teléfono.
-                    Text("El código de recolección ya venció: hay que generar otro en la web.")
-                        .font(NxType.bodyMedium)
-                        .foregroundStyle(NxColors.danger)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                HerrCampoContorno(
-                    etiqueta: "Código de recolección",
-                    texto: $codigoRecogida,
-                    mayusculas: true,
-                    limite: 12
-                )
-            case .recibir:
-                HerrCampoContorno(
-                    etiqueta: "¿Llegó con daño? Descríbelo (opcional)",
-                    texto: $danio,
-                    soporte: "Con daño queda en reparación.",
-                    multilinea: true,
-                    limite: 500
-                )
-            }
-            if let error {
-                Text(error)
+            Text(accion == .entregar
+                 ? "Para entregarla se pide el código de quien la recoge y una foto de cómo sale."
+                 : "Para recibirla se dice cómo volvió y se toma una foto.")
+                .font(NxType.labelMedium)
+                .foregroundStyle(NxColors.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            if accion == .entregar, r.prestamo?.vencido == true {
+                // Mismo texto que Android (`HerramientasEscaneo.kt`): generar otro
+                // código es de quien aprueba, y eso no se hace desde el teléfono.
+                Text("El código de recolección ya venció: hay que generar otro en la web.")
                     .font(NxType.bodyMedium)
                     .foregroundStyle(NxColors.danger)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Button(guardando ? "Registrando…" : accion.etiqueta) {
-                Task { await registrar() }
+            Button(accion.etiqueta) {
+                error = nil
+                abierta = true
             }
             .buttonStyle(HerrBotonLlenoStyle(alto: 52, anchoCompleto: true))
             .disabled(guardando)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .sheet(isPresented: $abierta) {
+            switch accion {
+            case .entregar:
+                HojaDeEntrega(
+                    titulo: nombre,
+                    persona: persona,
+                    // El campo sale siempre: el código prueba que quien la recoge es quien la pidió.
+                    pideCodigo: true,
+                    codigoObligatorio: r.prestamo?.pickupCode?.nilSiVacio != nil,
+                    codigoVencido: r.prestamo?.vencido == true,
+                    enviando: guardando,
+                    error: error,
+                    onCerrar: { abierta = false },
+                    onEntregar: { codigo, fotos in
+                        Task {
+                            await registrar(mensaje: "Salida registrada: \(nombre).") {
+                                try await EscaneoRepository.shared.entregarHerramienta(
+                                    prestamoId: prestamoId, pickupCode: codigo, fotos: fotos
+                                )
+                            }
+                        }
+                    }
+                )
+            case .recibir:
+                HojaDeEntrada(
+                    titulo: nombre,
+                    persona: persona,
+                    fotosDeSalida: EvidenciaPrestamoReglas.urls(r.prestamo?.deliveryPhotos),
+                    enviando: guardando,
+                    error: error,
+                    onCerrar: { abierta = false },
+                    onRecibir: { condicion, descripcion, fotos in
+                        Task {
+                            await registrar(mensaje: EvidenciaPrestamoReglas.avisoEntrada(condicion)) {
+                                try await EscaneoRepository.shared.recibirHerramienta(
+                                    prestamoId: prestamoId,
+                                    condicion: condicion.rawValue,
+                                    descripcion: descripcion,
+                                    fotos: fotos
+                                )
+                            }
+                        }
+                    }
+                )
+            }
+        }
     }
 
+    /// Corre la entrega o la entrada; mientras falle, la hoja se queda abierta con el motivo.
     @MainActor
-    private func registrar() async {
+    private func registrar(mensaje: String, _ enviar: () async throws -> Void) async {
+        guard !guardando else { return }
         guardando = true
         error = nil
         defer { guardando = false }
-        let nombre = EscaneoReglas.nombreHerramienta(r)
         do {
-            let mensaje: String
-            switch accion {
-            case .entregar:
-                try await EscaneoRepository.shared.entregarHerramienta(prestamoId: prestamoId, pickupCode: codigoRecogida)
-                mensaje = "Salida registrada: \(nombre)."
-            case .recibir:
-                try await EscaneoRepository.shared.recibirHerramienta(prestamoId: prestamoId, damageDescription: danio)
-                mensaje = danio.nilSiVacio == nil
-                    ? "Entrada registrada: \(nombre)."
-                    : "Entrada registrada con daño: queda en reparación."
-            }
+            try await enviar()
+            abierta = false
             onHecho(mensaje)
         } catch {
             self.error = EscaneoReglas.mensaje(

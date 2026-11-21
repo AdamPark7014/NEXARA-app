@@ -1,8 +1,13 @@
 package mx.nexara.mobile.nativeapp.data.api
 
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -39,6 +44,25 @@ interface EscaneoApi {
     @POST("stock/movements/por-codigo")
     suspend fun movimientoPorCodigo(@Body body: MovimientoPorCodigoRequest): MovimientoPorCodigoDto
 
+    /** `GET stock/receptores` (`stock.manage`): personal activo que puede recibir material. */
+    @GET("stock/receptores")
+    suspend fun receptores(): List<ReceptorMaterialDto>
+
+    /** `GET stock/receptores/:id/actividades` (`stock.manage`): actividades abiertas de quien recibe. */
+    @GET("stock/receptores/{id}/actividades")
+    suspend fun actividadesDeReceptor(@Path("id") userId: Long): List<HerramientaActividadDto>
+
+    /**
+     * `POST stock/movements/:id/evidencia` (`stock.manage`): fotos de lo que salió, sobre el
+     * movimiento ya hecho. Campo `fotos`, hasta 8 por subida.
+     */
+    @Multipart
+    @POST("stock/movements/{id}/evidencia")
+    suspend fun evidenciaDeMovimiento(
+        @Path("id") movimientoId: Long,
+        @Part fotos: List<MultipartBody.Part>,
+    ): ResponseBody
+
     /** `GET warehouse` (`warehouse.view`): almacenes de la empresa, para elegir destino. */
     @GET("warehouse")
     suspend fun almacenes(): List<StockAlmacenDto>
@@ -54,6 +78,32 @@ interface EscaneoApi {
     /** `POST tool-requests/:id/return` (`tools.manage`): entrada a almacén; con daño queda en reparación. */
     @POST("tool-requests/{id}/return")
     suspend fun recibirHerramienta(@Path("id") prestamoId: Long, @Body body: RecibirHerramientaRequest): PrestamoHerramientaDto
+
+    /**
+     * La misma entrega, con las fotos de cómo sale (evidencia, 21-11-2026). Campo `fotos`, hasta 6.
+     * El servidor sigue aceptando la entrega sin fotos de las versiones viejas de la app.
+     */
+    @Multipart
+    @POST("tool-requests/{id}/deliver")
+    suspend fun entregarHerramientaConFotos(
+        @Path("id") prestamoId: Long,
+        @Part("pickupCode") pickupCode: RequestBody?,
+        @Part fotos: List<MultipartBody.Part>,
+    ): PrestamoHerramientaDto
+
+    /**
+     * La misma entrada, diciendo cómo volvió (`condicion`: BIEN | DESGASTE | DANADA | INCOMPLETA |
+     * EXTRAVIADA), qué le pasó y las fotos de después. Al mandar `condicion` el servidor exige
+     * la foto (salvo extraviada) y la explicación (salvo bien o desgaste).
+     */
+    @Multipart
+    @POST("tool-requests/{id}/return")
+    suspend fun recibirHerramientaConEvidencia(
+        @Path("id") prestamoId: Long,
+        @Part("condicion") condicion: RequestBody,
+        @Part("damageDescription") descripcion: RequestBody?,
+        @Part fotos: List<MultipartBody.Part>,
+    ): PrestamoHerramientaDto
 }
 
 // ── Almacén ──────────────────────────────────────────────────────────────────
@@ -133,6 +183,16 @@ data class MovimientoPorCodigoRequest(
     val fromWarehouseId: Long? = null,
     val toWarehouseId: Long? = null,
     val notes: String? = null,
+    /** Evidencia de la salida (21-11-2026): a qué actividad se carga, series y quién recibe. */
+    val activityId: Long? = null,
+    val series: List<String>? = null,
+    val recibidoPorId: Long? = null,
+)
+
+/** Alguien que puede recibir material de almacén. */
+data class ReceptorMaterialDto(
+    val id: Long? = null,
+    val nombre: String? = null,
 )
 
 data class MovimientoCreadoDto(
@@ -187,6 +247,15 @@ data class PrestamoEscaneadoDto(
     val pickupCode: String? = null,
     val pickupExpiresAt: String? = null,
     val vencido: Boolean? = null,
+    /** Cómo salió: se enseña al recibirla para comparar. */
+    val deliveryDate: String? = null,
+    val deliveryPhotos: List<FotoEvidenciaDto>? = null,
+)
+
+/** Una foto de evidencia guardada en el servidor (`/uploads/...`, pide sesión). */
+data class FotoEvidenciaDto(
+    val url: String? = null,
+    val capturedAt: String? = null,
 )
 
 data class KitEscaneadoDto(

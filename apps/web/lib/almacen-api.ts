@@ -208,19 +208,6 @@ export function buscarPorCodigoDeRecoleccion(token: string, codigo: string) {
   );
 }
 
-export function entregarConCodigo(
-  token: string,
-  toolRequestId: number,
-  payload: { pickupCode?: string; recogidaPorId?: number },
-) {
-  return pedir<unknown>(
-    `tool-requests/${toolRequestId}/deliver`,
-    token,
-    { method: "POST", body: JSON.stringify(payload) },
-    "No se pudo entregar la herramienta",
-  );
-}
-
 // ── Revisión periódica de kits ──────────────────────────────────────
 
 export type EstadoInspeccion = "OK" | "OBSERVADO" | "DANADO";
@@ -467,6 +454,9 @@ export type HallazgoDeHerramienta = {
     pickupCode: string | null;
     pickupExpiresAt: string | null;
     vencido: boolean;
+    /** Cómo salió: fotos de la entrega, para compararla al recibirla. */
+    deliveryDate?: string | null;
+    deliveryPhotos?: Array<{ url: string }>;
   } | null;
   kit: {
     id: number;
@@ -483,19 +473,6 @@ export function buscarHerramientaPorCodigo(token: string, codigo: string) {
     `tool-requests/inventory/por-codigo?code=${encodeURIComponent(codigo)}`,
     token,
     "No se pudo buscar la herramienta",
-  );
-}
-
-/** Devolución de un préstamo. Con `damageDescription` la herramienta pasa a reparación. */
-export function devolverHerramienta(token: string, toolRequestId: number, damageDescription?: string) {
-  return pedir<unknown>(
-    `tool-requests/${toolRequestId}/return`,
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify({ damageDescription: damageDescription?.trim() || undefined }),
-    },
-    "No se pudo registrar la devolución",
   );
 }
 

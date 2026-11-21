@@ -137,6 +137,14 @@ data class PrestamoHerramientaDto(
     val pickupExpiresAt: String? = null,
     val pickedUpAt: String? = null,
     val approver: HerramientaAprobadorDto? = null,
+    /** Evidencia (21-11-2026): cómo salió y cómo volvió, con quién entregó y quién recibió. */
+    val deliveryPhotos: List<FotoEvidenciaDto>? = null,
+    val returnPhotos: List<FotoEvidenciaDto>? = null,
+    /** BIEN | DESGASTE | DANADA | INCOMPLETA | EXTRAVIADA. `null` en lo recibido antes de la evidencia. */
+    val returnCondition: String? = null,
+    val returnNotes: String? = null,
+    val deliveredBy: HerramientaPersonaDto? = null,
+    val receivedBy: HerramientaPersonaDto? = null,
 )
 
 /**

@@ -34,9 +34,18 @@ import {
 } from './tool-requests.service.js';
 import { assertCanCreateToolLoan, assertCanManageTools, hasToolsManageAccess } from './tools-access.js';
 import { BusquedaRapidaService } from './busqueda-rapida.service.js';
+import { MAX_FOTOS_EVIDENCIA, fotosDelCuerpo } from './evidencia-prestamo.js';
 
 interface MulterFile {
   filename: string;
+}
+
+/** Los archivos que multer ya guardó en `uploads/tools`, como fotos de evidencia. */
+function fotosSubidas(archivos?: MulterFile[]): Array<{ url: string }> {
+  return (archivos ?? [])
+    .map((f) => f?.filename)
+    .filter(Boolean)
+    .map((filename) => ({ url: `/uploads/tools/${filename}` }));
 }
 
 @Controller('tool-requests')
@@ -560,36 +569,58 @@ export class ToolRequestsController {
     return this.toolRequestsService.approve(parseInt(id, 10), user.id, companyId, user?.email);
   }
 
-  // Entregar herramienta. Con código de recolección hay que teclearlo.
+  /**
+   * Entregar herramienta. Con código de recolección hay que teclearlo.
+   *
+   * Lleva las fotos de cómo sale («antes») como archivos (`multipart/form-data`, campo `fotos`)
+   * o como lista de URLs ya subidas. Las apps anteriores al 21-11 mandan JSON sin fotos y siguen
+   * entregando: el préstamo queda marcado «sin foto de entrega».
+   */
   @Post(':id/deliver')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  @UseInterceptors(FilesInterceptor('fotos', MAX_FOTOS_EVIDENCIA, { dest: 'uploads/tools' }))
   async deliver(
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body() data: { pickupCode?: string; recogidaPorId?: number } | undefined,
+    @Body() data: { pickupCode?: string; recogidaPorId?: number | string; fotos?: unknown } | undefined,
     @CurrentCompanyId() companyId: number | null,
+    @UploadedFiles() archivos?: MulterFile[],
   ) {
     assertCanManageTools(user?.email);
+    const recogidaPorId = Number(data?.recogidaPorId);
     return this.toolRequestsService.deliver(parseInt(id, 10), companyId, {
       pickupCode: data?.pickupCode,
-      recogidaPorId: data?.recogidaPorId ? Number(data.recogidaPorId) : undefined,
+      recogidaPorId: Number.isInteger(recogidaPorId) && recogidaPorId > 0 ? recogidaPorId : undefined,
       managerEmail: user?.email,
+      entregadoPorId: user?.id ?? null,
+      fotos: [...fotosDelCuerpo(data?.fotos), ...fotosSubidas(archivos)],
     });
   }
 
-  // Devolver herramienta
+  /**
+   * Recibir la herramienta de vuelta: en qué estado llega (`condicion`), qué le pasó y las fotos
+   * de «después» (campo `fotos`, igual que al entregar).
+   */
   @Post(':id/return')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  @UseInterceptors(FilesInterceptor('fotos', MAX_FOTOS_EVIDENCIA, { dest: 'uploads/tools' }))
   async return(
+    @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body() data: { damageDescription?: string; damagePhotoUrl?: string },
+    @Body() data: { damageDescription?: string; damagePhotoUrl?: string; condicion?: string; fotos?: unknown } | undefined,
     @CurrentCompanyId() companyId: number | null,
+    @UploadedFiles() archivos?: MulterFile[],
   ) {
     return this.toolRequestsService.return(
       parseInt(id, 10),
-      data.damageDescription,
-      data.damagePhotoUrl,
+      data?.damageDescription,
+      data?.damagePhotoUrl,
       companyId,
+      {
+        condicion: data?.condicion,
+        fotos: [...fotosDelCuerpo(data?.fotos), ...fotosSubidas(archivos)],
+        recibidoPorId: user?.id ?? null,
+      },
     );
   }
 

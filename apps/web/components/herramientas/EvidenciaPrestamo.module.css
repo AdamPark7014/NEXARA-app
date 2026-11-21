@@ -1,0 +1,181 @@
+/* Evidencia de un préstamo: fotos de antes y después. Solo tokens `--ui-*`: claro y oscuro. */
+
+.dialogo {
+  display: grid;
+  gap: var(--ui-s4);
+}
+
+.quien {
+  margin: 0;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+}
+
+.rotulo {
+  margin: 0 0 var(--ui-s2);
+  font-size: var(--ui-fs-caption);
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-fg-3);
+}
+
+.pista {
+  margin: var(--ui-s2) 0 0;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+.oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Miniatura elegida, con su botón de quitar. */
+.mini {
+  position: relative;
+}
+
+.quitar {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-scrim, rgba(10, 14, 20, 0.6));
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.quitar:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+/* Estado de la devolución: una tarjeta por opción. */
+.condiciones {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-s2);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.condicion {
+  display: grid;
+  gap: 2px;
+  padding: var(--ui-s3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.condicion:hover {
+  border-color: var(--ui-border-strong);
+}
+
+.condicion:has(input:checked) {
+  border-color: var(--ui-brand);
+  background: var(--ui-brand-soft);
+}
+
+.condicion:has(input:focus-visible) {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
+.condicion input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.condicionTitulo {
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.condicionAyuda {
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+}
+
+/* Antes y después, lado a lado. */
+.comparar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-s5);
+}
+
+.lado {
+  display: grid;
+  align-content: start;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.ladoCabeza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+}
+
+.ladoTitulo {
+  margin: 0;
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.dato {
+  margin: 0;
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+  overflow-wrap: anywhere;
+}
+
+.nota {
+  margin: 0;
+  padding: var(--ui-s2) var(--ui-s3);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-2);
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+  overflow-wrap: anywhere;
+}
+
+.sinFoto {
+  display: grid;
+  place-items: center;
+  min-height: 96px;
+  padding: var(--ui-s3);
+  border: 1.5px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .condiciones,
+  .comparar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

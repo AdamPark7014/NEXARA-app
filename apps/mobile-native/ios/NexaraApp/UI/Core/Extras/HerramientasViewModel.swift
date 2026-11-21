@@ -259,25 +259,32 @@ final class HerramientasViewModel: ObservableObject {
         ) { try await HerramientasRepository.shared.rechazarRenovacion(id: id, motivo: motivo) }
     }
 
-    /// Registra la salida con el código que enseña quien la recoge.
-    func entregar(_ prestamo: PrestamoHerramienta, codigo: String) async -> Bool {
+    /// Registra la salida con el código que enseña quien la recoge y las fotos de cómo sale.
+    func entregar(_ prestamo: PrestamoHerramienta, codigo: String, fotos: [CapturedGeoPhoto]) async -> Bool {
         let id = prestamo.id
         return await ejecutar(
             hecho: "Salida registrada: \(HerramientasReglas.tituloPrestamo(prestamo)).",
             fallo: "No se pudo registrar la salida"
-        ) { try await EscaneoRepository.shared.entregarHerramienta(prestamoId: id, pickupCode: codigo) }
+        ) { try await EscaneoRepository.shared.entregarHerramienta(prestamoId: id, pickupCode: codigo, fotos: fotos) }
     }
 
-    /// Registra la entrada. Con daño, la pieza queda en reparación.
-    func recibir(_ prestamo: PrestamoHerramienta, danio: String) async -> Bool {
+    /// Registra la entrada diciendo cómo volvió. Dañada o incompleta queda en reparación;
+    /// extraviada se da de baja.
+    func recibir(
+        _ prestamo: PrestamoHerramienta,
+        condicion: CondicionDeDevolucion,
+        descripcion: String,
+        fotos: [CapturedGeoPhoto]
+    ) async -> Bool {
         let id = prestamo.id
-        let hecho = danio.nilSiVacio == nil
-            ? "Entrada registrada: \(HerramientasReglas.tituloPrestamo(prestamo))."
-            : "Entrada registrada con daño: queda en reparación."
         return await ejecutar(
-            hecho: hecho,
+            hecho: EvidenciaPrestamoReglas.avisoEntrada(condicion),
             fallo: "No se pudo registrar la entrada"
-        ) { try await EscaneoRepository.shared.recibirHerramienta(prestamoId: id, damageDescription: danio) }
+        ) {
+            try await EscaneoRepository.shared.recibirHerramienta(
+                prestamoId: id, condicion: condicion.rawValue, descripcion: descripcion, fotos: fotos
+            )
+        }
     }
 
     /// Reporta un daño de una pieza de mi kit. Es lo único de aquí que puede esperar en la cola.

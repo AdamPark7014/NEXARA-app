@@ -343,12 +343,13 @@ class HerramientasViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun entregar(prestamo: PrestamoHerramientaDto, codigo: String?, onListo: () -> Unit) = accion(
+    /** Entrega con las fotos de cómo sale: son las que después dicen si volvió igual. */
+    fun entregar(prestamo: PrestamoHerramientaDto, codigo: String?, fotos: List<GeoPhoto>, onListo: () -> Unit) = accion(
         fallo = "No se pudo registrar la entrega",
         enDialogo = true,
         onListo = onListo,
     ) {
-        escaneo.entregarHerramienta(prestamo.id, codigo)
+        escaneo.entregarHerramienta(prestamo.id, codigo, fotos)
         "Entrega registrada."
     }
 
@@ -362,13 +363,20 @@ class HerramientasViewModel(app: Application) : AndroidViewModel(app) {
         "Código nuevo generado: ya le llegó a quien la pidió."
     }
 
-    fun recibir(prestamo: PrestamoHerramientaDto, danio: String?, onListo: () -> Unit) = accion(
+    /** Entrada diciendo cómo volvió, qué le pasó y las fotos de después. */
+    fun recibir(
+        prestamo: PrestamoHerramientaDto,
+        condicion: EvidenciaPrestamoRules.Condicion,
+        descripcion: String?,
+        fotos: List<GeoPhoto>,
+        onListo: () -> Unit,
+    ) = accion(
         fallo = "No se pudo registrar la entrada",
         enDialogo = true,
         onListo = onListo,
     ) {
-        escaneo.recibirHerramienta(prestamo.id, danio)
-        if (danio.isNullOrBlank()) "Entrada registrada." else "Entrada registrada con daño: queda en reparación."
+        escaneo.recibirHerramienta(prestamo.id, condicion.api, descripcion, fotos)
+        EvidenciaPrestamoRules.avisoEntrada(condicion)
     }
 
     fun nuevaHerramienta(

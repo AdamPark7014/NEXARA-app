@@ -1048,6 +1048,9 @@ model User {
   checadasRechazadas    AttendanceRejection[] @relation("AttendanceRejectionUser")
   estadosUbicacion      LocationStatusEvent[] @relation("LocationStatusEventUser")
   toolRequestsRecogidas ToolRequest[]         @relation("ToolRequestPickedUpBy")
+  toolRequestsEntregadas ToolRequest[]        @relation("ToolRequestDeliveredBy")
+  toolRequestsRecibidas ToolRequest[]         @relation("ToolRequestReceivedBy")
+  stockMovementsRecibidos StockMovement[]     @relation("StockMovementReceiver")
   activityToolChecks    ActivityToolCheck[]   @relation("ActivityToolCheckUser")
   toolKitInspections    ToolKitInspection[]   @relation("ToolKitInspectionInspector")
   horasExtra            OvertimeApproval[]    @relation("OvertimeApprovalUser")
@@ -3792,6 +3795,15 @@ model ToolRequest {
   /// Recogida física en almacén: cuándo y quién la recogió.
   pickedUpAt             DateTime?
   pickedUpById           Int?
+  /// Evidencia de la entrega («antes»): [{ url, capturedAt?, lat?, lng? }] y quién la entregó.
+  deliveryPhotos         Json?
+  deliveredById          Int?
+  /// Devolución («después»): BIEN | DESGASTE | DANADA | INCOMPLETA | EXTRAVIADA, sus fotos y quién la recibió.
+  returnCondition        String?           @db.VarChar(20)
+  returnPhotos           Json?
+  /// Nota de quien recibe cuando no hubo daño (p. ej. desgaste normal).
+  returnNotes            String?           @db.Text
+  receivedById           Int?
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 
@@ -3800,6 +3812,8 @@ model ToolRequest {
   approver      User?                     @relation("AdminApprovals", fields: [approvedBy], references: [id])
   activity      Activity?                 @relation("ActivityToolRequests", fields: [activityId], references: [id], onDelete: SetNull)
   pickedUpBy    User?                     @relation("ToolRequestPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  deliveredBy   User?                     @relation("ToolRequestDeliveredBy", fields: [deliveredById], references: [id], onDelete: SetNull)
+  receivedBy    User?                     @relation("ToolRequestReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
   renewals      ToolRenewal[]             @relation("ToolRequestRenewals")
   notifications ToolRequestNotification[] @relation("ToolRequestNotifications")
   companyId     Int
@@ -4886,6 +4900,12 @@ model StockMovement {
   projectId         Int?
   project           OperationalProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   createdBy         User?             @relation("StockMovementCreator", fields: [createdById], references: [id])
+  /// Evidencia de la salida: fotos de lo que se lleva [{ url, capturedAt?, lat?, lng? }],
+  /// número de serie de cada pieza (["DS-2CD...", ...]) y quién recibe el material.
+  fotos             Json?
+  series            Json?
+  recibidoPorId     Int?
+  recibidoPor       User?             @relation("StockMovementReceiver", fields: [recibidoPorId], references: [id], onDelete: SetNull)
   company           CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([companyId, movementNumber])
@@ -4893,6 +4913,7 @@ model StockMovement {
   @@index([productId, type])
   @@index([createdAt])
   @@index([companyId])
+  @@index([recibidoPorId])
   @@map("stock_movements")
 }
 

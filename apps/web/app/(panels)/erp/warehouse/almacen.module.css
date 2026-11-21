@@ -627,3 +627,71 @@
   margin-right: 4px;
   vertical-align: -3px;
 }
+
+/* ─── Evidencia de las salidas (21-11): quién se lo llevó, fotos y series ── */
+
+.evidencia {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  justify-items: start;
+}
+
+.faltantes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s1);
+}
+
+.faltante {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--ui-radius-pill);
+}
+
+.faltante:focus-visible {
+  outline: var(--ui-focus-outline);
+}
+
+.fichaEvidencia {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ui-s3) var(--ui-s4);
+  margin: 0;
+}
+
+.fichaEvidencia dt {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+}
+
+.fichaEvidencia dd {
+  margin: 0;
+  font-size: var(--ui-fs-label);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.tituloSeries {
+  margin: 0 0 var(--ui-s2);
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+}
+
+.series {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 640px) {
+  .fichaEvidencia {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

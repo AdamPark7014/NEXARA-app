@@ -207,6 +207,8 @@ export class CodigosBarrasService {
         toWarehouseId: dto.toWarehouseId ? Number(dto.toWarehouseId) : undefined,
         unitCost: dto.unitCost,
         activityId: dto.activityId ? Number(dto.activityId) : undefined,
+        series: dto.series,
+        recibidoPorId: dto.recibidoPorId ? Number(dto.recibidoPorId) : undefined,
         packagingId: esEmpaque ? hallazgo.packaging.id : undefined,
         cantidadCapturada: esEmpaque ? cantidad : undefined,
         unidadCaptura: esEmpaque ? hallazgo.packaging.nombre : undefined,

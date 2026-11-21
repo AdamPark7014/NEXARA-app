@@ -19,6 +19,7 @@ import ToolInventoryPanel from "@/components/ToolInventoryPanel";
 import ToolUserKitPanel from "@/components/ToolUserKitPanel";
 import ToolMyKitPanel from "@/components/ToolMyKitPanel";
 import ToolRequestsTable from "@/components/ToolRequestsTable";
+import MisPrestamos from "@/components/herramientas/MisPrestamos";
 import ToolRenewalsTable from "@/components/ToolRenewalsTable";
 import ToolRequestForm from "@/components/ToolRequestForm";
 import HerramientasPorEtiquetaPanel from "@/components/almacen/HerramientasPorEtiquetaPanel";
@@ -27,7 +28,7 @@ import { esMismaPagina, type ResultadoBusqueda } from "@/lib/busqueda-inventario
 import s from "../almacen-portada.module.css";
 
 type ManagerTab = "inventory" | "kits" | "requests" | "renewals" | "approvals";
-type LoanTab = "mykit" | "myrequests";
+type LoanTab = "mykit" | "myloans" | "myrequests";
 
 export default function ToolsPage() {
   const { user } = useUser();
@@ -73,7 +74,7 @@ export default function ToolsPage() {
       setPane("manage");
       return;
     }
-    if (tab === "mykit" || tab === "myrequests") {
+    if (tab === "mykit" || tab === "myloans" || tab === "myrequests") {
       setLoanTab(tab);
       setPane("loan");
       return;
@@ -83,7 +84,8 @@ export default function ToolsPage() {
       setManagerTab("approvals");
       setPane("manage");
     } else if (canRequest) {
-      setLoanTab("myrequests");
+      // Un aviso sobre mi solicitud lleva a verla, no al formulario para pedir otra.
+      setLoanTab("myloans");
       setPane("loan");
     }
   }, [highlightId, canManage, canRequest, urlTab]);
@@ -112,6 +114,7 @@ export default function ToolsPage() {
     ...(canRequest
       ? ([
           { key: "loan:mykit", label: "Mi kit" },
+          { key: "loan:myloans", label: "Mis préstamos" },
           { key: "loan:myrequests", label: "Pedir prestado" },
         ] as const)
       : []),
@@ -206,6 +209,7 @@ export default function ToolsPage() {
         {showManagePane && managerTab === "renewals" && <ToolRenewalsTable highlightId={highlightId} />}
 
         {showLoanPane && loanTab === "mykit" && <ToolMyKitPanel />}
+        {showLoanPane && loanTab === "myloans" && <MisPrestamos />}
         {showLoanPane && loanTab === "myrequests" && <ToolRequestForm />}
         {!canManage && !canRequest && <ToolMyKitPanel />}
       </div>

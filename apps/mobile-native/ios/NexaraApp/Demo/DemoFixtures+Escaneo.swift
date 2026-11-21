@@ -206,6 +206,19 @@ extension DemoStore {
                     "marca": "Volteck", "modelo": "CDP-15", "categoria": "Material eléctrico",
                 ]),
             ]))
+        case ("GET", "receptores"):
+            // Evidencia de la salida (21-11-2026): quién puede llevarse material y sus actividades abiertas.
+            if parts.count >= 4, parts[3] == "actividades" {
+                return (200, [
+                    dj(["id": 9101, "anNumber": "AN-0412", "titulo": "Instalación día 1: 10 cámaras", "projectId": 1]),
+                    dj(["id": 9102, "anNumber": "AN-0415", "titulo": "Mantenimiento de control de acceso", "projectId": 2]),
+                ])
+            }
+            return (200, [
+                dj(["id": 9001, "nombre": "Ana López"]),
+                dj(["id": 9002, "nombre": "Carlos Méndez"]),
+                dj(["id": 9003, "nombre": "Sofía Ramírez"]),
+            ])
         case ("POST", "products") where parts.count > 2 && parts[2] == "por-codigo":
             return altaPorCodigoDemo(json)
         case ("POST", "movements") where parts.count > 2 && parts[2] == "por-codigo":

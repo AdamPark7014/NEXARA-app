@@ -1,4 +1,18 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Res, UseGuards, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  Res,
+  UseGuards,
+  UseInterceptors,
+  UploadedFiles,
+  ParseIntPipe,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { WarehouseService } from './warehouse.service.js';
 import { ReabastecimientoService } from './reabastecimiento.service.js';
@@ -10,6 +24,8 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { FilesInterceptor } from '../common/files/interceptores-subida.js';
+import { MAX_FOTOS_POR_SUBIDA } from './evidencia-salida.js';
 
 @Controller('stock')
 @UseGuards(UrlAccessGuard)
@@ -193,6 +209,50 @@ export class StockController {
     @Body() dto: MovimientoPorCodigoDto,
   ) {
     return this.codigos.movimientoPorCodigo(dto, user.id, companyId);
+  }
+
+  /** Quién puede recibir el material de una salida: personal activo de la empresa. */
+  @Get('receptores')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })
+  receptores(@CurrentCompanyId() companyId: number | null) {
+    return this.service.receptoresDeMaterial(companyId);
+  }
+
+  /** Actividades abiertas de quien recibe, para ligar la salida al trabajo. */
+  @Get('receptores/:id/actividades')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })
+  actividadesDeReceptor(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.service.actividadesAbiertasDe(id, companyId);
+  }
+
+  /**
+   * Evidencia de un movimiento ya registrado: fotos de lo que sale y de cada etiqueta de serie
+   * (`multipart/form-data`, campo `fotos`) y números de serie (`series`, uno por renglón o lista).
+   * Suma a lo que había.
+   */
+  @Post('movements/:id/evidencia')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })
+  @UseInterceptors(FilesInterceptor('fotos', MAX_FOTOS_POR_SUBIDA, { dest: 'uploads/almacen' }))
+  agregarEvidencia(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() data: { series?: unknown; fotos?: unknown } | undefined,
+    @UploadedFiles() archivos?: Array<{ filename: string }>,
+  ) {
+    const subidas = (archivos ?? [])
+      .map((f) => f?.filename)
+      .filter(Boolean)
+      .map((filename) => ({ url: `/uploads/almacen/${filename}` }));
+    // Con multipart, `fotos` del body llega como texto: solo cuenta si es una lista (JSON).
+    const delBody = Array.isArray(data?.fotos) ? data.fotos : [];
+    return this.service.agregarEvidenciaMovimiento(
+      id,
+      { fotos: [...delBody, ...subidas], series: data?.series },
+      companyId,
+    );
   }
 
   /** Kardex PDF — debe ir antes de movements/:id */

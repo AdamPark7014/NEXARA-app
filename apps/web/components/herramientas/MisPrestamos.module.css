@@ -1,0 +1,73 @@
+/* Mis préstamos de herramienta. Solo tokens `--ui-*`: claro y oscuro. */
+
+.pila {
+  display: grid;
+  gap: var(--ui-s5);
+  min-width: 0;
+}
+
+.avisos {
+  display: grid;
+  gap: var(--ui-s2);
+  padding: var(--ui-s3) var(--ui-s5) 0;
+}
+
+.carga {
+  padding: var(--ui-s3) var(--ui-s5) var(--ui-s4);
+}
+
+.doble {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fuerte {
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-semibold);
+  color: var(--ui-fg);
+  overflow-wrap: anywhere;
+}
+
+.tenue {
+  font-size: var(--ui-fs-caption);
+  color: var(--ui-fg-3);
+  overflow-wrap: anywhere;
+}
+
+.estado {
+  display: grid;
+  gap: var(--ui-s2);
+  min-width: 200px;
+}
+
+.insignias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s1);
+}
+
+.fecha {
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* El código que se le dicta al almacén: grande y legible parado en la ventanilla. */
+.codigo {
+  display: inline-block;
+  padding: 2px var(--ui-s2);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-brand-soft);
+  color: var(--ui-brand-text);
+  font-family: var(--ui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 18px;
+  font-weight: var(--ui-fw-semibold);
+  letter-spacing: 0.12em;
+}
+
+.dialogo {
+  display: grid;
+  gap: var(--ui-s4);
+}

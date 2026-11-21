@@ -10,7 +10,18 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUser } from "@/components/UserContext";
-import { createStockMovement, listWarehouses } from "@/lib/stock-api";
+import {
+  MAX_FOTOS_MOVIMIENTO,
+  agregarEvidenciaMovimiento,
+  createStockMovement,
+  listWarehouses,
+  listarActividadesDeReceptor,
+  listarReceptores,
+  seriesDeTexto,
+  type ActividadDeReceptor,
+  type ReceptorDeMaterial,
+} from "@/lib/stock-api";
+import { SelectorFotos } from "@/components/herramientas/EvidenciaPrestamo";
 import { listCatalogProducts, type CatalogProduct } from "@/lib/catalog-api";
 import { formatApiError } from "@/lib/erp-api";
 import {
@@ -106,6 +117,14 @@ export default function ScannerAlmacenPanel() {
   const [fromWarehouseId, setFromWarehouseId] = useState<number | "">("");
   const [toWarehouseId, setToWarehouseId] = useState<number | "">("");
   const [qty, setQty] = useState("1");
+  // Evidencia de la salida (21-11): quién se lo lleva, a qué actividad, fotos y series.
+  const [receptores, setReceptores] = useState<ReceptorDeMaterial[]>([]);
+  const [recibidoPorId, setRecibidoPorId] = useState<number | "">("");
+  const [actividades, setActividades] = useState<ActividadDeReceptor[]>([]);
+  const [activityId, setActivityId] = useState<number | "">("");
+  const [motivo, setMotivo] = useState("");
+  const [fotos, setFotos] = useState<File[]>([]);
+  const [seriesTexto, setSeriesTexto] = useState("");
 
   // Código que el almacén no conoce: alta o liga.
   const [desconocido, setDesconocido] = useState<Desconocido | null>(null);
@@ -144,6 +163,43 @@ export default function ScannerAlmacenPanel() {
       .catch(() => setWarehouses([]));
   }, [token]);
 
+  const esSalida = opType === "DISPATCH";
+  /** Series al recibir, devolver o sacar: es cuando una pieza cambia de manos. */
+  const admiteSeries = opType === "DISPATCH" || opType === "RECEIPT" || opType === "RETURN";
+
+  useEffect(() => {
+    if (!token || !esSalida || receptores.length > 0) return;
+    let vigente = true;
+    void listarReceptores(token)
+      .then((res) => {
+        if (vigente) setReceptores(res);
+      })
+      .catch(() => {
+        if (vigente) setReceptores([]);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [token, esSalida, receptores.length]);
+
+  useEffect(() => {
+    if (!token || recibidoPorId === "") {
+      setActividades([]);
+      return;
+    }
+    let vigente = true;
+    void listarActividadesDeReceptor(token, recibidoPorId)
+      .then((res) => {
+        if (vigente) setActividades(res);
+      })
+      .catch(() => {
+        if (vigente) setActividades([]);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [token, recibidoPorId]);
+
   const needsFrom =
     opType === "DISPATCH" || opType === "TRANSFER" || opType === "ADJUSTMENT_OUT";
   const needsTo =
@@ -174,6 +230,10 @@ export default function ScannerAlmacenPanel() {
       // Cada código empieza en una unidad: lo que hubiera en «Cantidad» era del anterior
       // (o lo que el lector tecleó ahí si el foco estaba en ese campo).
       setQty("1");
+      // La evidencia es de cada cosa que sale: fotos y series empiezan en blanco. Quién
+      // se lo lleva y la actividad se quedan, porque una persona suele llevarse varias cosas.
+      setFotos([]);
+      setSeriesTexto("");
       try {
         const hallazgo = await buscarPorCodigoDeBarras(token, q);
         if (hallazgo) setHit(hallazgo);
@@ -224,6 +284,26 @@ export default function ScannerAlmacenPanel() {
       mostrarError("Origen y destino deben ser distintos");
       return;
     }
+    const series = admiteSeries ? seriesDeTexto(seriesTexto) : [];
+    const piezas = hit.match === "empaque" ? quantity * Number(hit.packaging.piezasPorUnidad) : quantity;
+    if (series.length > Math.ceil(piezas)) {
+      mostrarError(`Hay ${series.length} números de serie y el movimiento es de ${piezas} pieza(s)`);
+      return;
+    }
+    if (esSalida) {
+      if (recibidoPorId === "") {
+        mostrarError("Elige quién se lleva el material");
+        return;
+      }
+      if (fotos.length === 0) {
+        mostrarError("Toma al menos una foto de lo que sale");
+        return;
+      }
+      if (activityId === "" && !motivo.trim()) {
+        mostrarError("Liga la salida a una actividad o escribe para qué es");
+        return;
+      }
+    }
 
     setSaving(true);
     mostrarError(null);
@@ -237,16 +317,37 @@ export default function ScannerAlmacenPanel() {
         packagingId: hit.match === "empaque" ? hit.packaging.id : undefined,
         cantidadCapturada: hit.match === "empaque" ? quantity : undefined,
         unidadCaptura: hit.match === "empaque" ? hit.packaging.nombre : undefined,
-        notes: `Escáner HID · ${hit.codigoBarras} · ${OP_LABELS[opType]}`,
+        notes:
+          `Escáner HID · ${hit.codigoBarras} · ${OP_LABELS[opType]}` +
+          (esSalida && activityId === "" && motivo.trim() ? ` · Motivo: ${motivo.trim()}` : ""),
         reference: hit.codigoBarras,
+        series: series.length ? series : undefined,
+        recibidoPorId: esSalida && recibidoPorId !== "" ? recibidoPorId : undefined,
+        activityId: esSalida && activityId !== "" ? activityId : undefined,
       };
       if (needsFrom) payload.fromWarehouseId = Number(fromWarehouseId);
       if (needsTo) payload.toWarehouseId = Number(toWarehouseId);
 
-      await createStockMovement(token, payload);
-      setOkMsg(`${OP_UI[opType]}: ${hit.product.name}`);
+      const creado = await createStockMovement(token, payload);
+      // Las fotos van sobre el movimiento ya hecho: si no suben, la salida queda registrada
+      // y marcada «Sin foto» en Movimientos, donde se pueden agregar.
+      let fotosPendientes = false;
+      if (esSalida && fotos.length > 0 && creado?.id) {
+        try {
+          await agregarEvidenciaMovimiento(token, creado.id, { fotos });
+        } catch {
+          fotosPendientes = true;
+        }
+      }
+      setOkMsg(
+        fotosPendientes
+          ? `${OP_UI[opType]}: ${hit.product.name}. Las fotos no se subieron; agrégalas en Movimientos.`
+          : `${OP_UI[opType]}: ${hit.product.name}`,
+      );
       setHit(null);
       setQty("1");
+      setFotos([]);
+      setSeriesTexto("");
     } catch (e) {
       mostrarError(formatApiError(e, "No se pudo registrar el movimiento"));
     } finally {
@@ -363,6 +464,8 @@ export default function ScannerAlmacenPanel() {
       setSaving(false);
     }
   };
+
+  const seriesLeidas = seriesDeTexto(seriesTexto);
 
   const confirmDisabled =
     saving ||
@@ -672,7 +775,90 @@ export default function ScannerAlmacenPanel() {
                   onChange={(e) => setQty(e.target.value)}
                 />
               </Field>
+
+              {esSalida && (
+                <>
+                  <Field label="Quién se lo lleva" required>
+                    <Select
+                      controlSize={TACTIL}
+                      value={recibidoPorId}
+                      onChange={(e) => {
+                        setRecibidoPorId(e.target.value ? Number(e.target.value) : "");
+                        setActivityId("");
+                      }}
+                    >
+                      <option value="">{receptores.length ? "Elige a la persona…" : "Cargando personal…"}</option>
+                      {receptores.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.nombre}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field
+                    label="Para qué actividad"
+                    hint={
+                      recibidoPorId !== "" && actividades.length === 0
+                        ? "No tiene actividades abiertas: escribe para qué es."
+                        : undefined
+                    }
+                  >
+                    <Select
+                      controlSize={TACTIL}
+                      value={activityId}
+                      onChange={(e) => setActivityId(e.target.value ? Number(e.target.value) : "")}
+                      disabled={recibidoPorId === "" || actividades.length === 0}
+                    >
+                      <option value="">Sin actividad</option>
+                      {actividades.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {[a.anNumber, a.titulo].filter(Boolean).join(" · ") || `Actividad ${a.id}`}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  {activityId === "" && (
+                    <Field label="Para qué es" required fullWidth>
+                      <Input
+                        controlSize={TACTIL}
+                        value={motivo}
+                        onChange={(e) => setMotivo(e.target.value)}
+                        placeholder="Reposición de camioneta, garantía, muestra…"
+                        maxLength={160}
+                      />
+                    </Field>
+                  )}
+                </>
+              )}
+
+              {admiteSeries && (
+                <Field
+                  label="Números de serie"
+                  optional
+                  fullWidth
+                  hint={
+                    seriesLeidas.length > 0
+                      ? `${seriesLeidas.length} serie(s) leída(s)`
+                      : "Con el cursor aquí, cada disparo del lector agrega un renglón."
+                  }
+                >
+                  <Textarea rows={2} value={seriesTexto} onChange={(e) => setSeriesTexto(e.target.value)} />
+                </Field>
+              )}
             </FieldGrid>
+
+            {esSalida && (
+              <div className={s.bloque}>
+                <p className={s.nota}>Foto de lo que sale, antes de entregarlo.</p>
+                <SelectorFotos
+                  fotos={fotos}
+                  onCambio={setFotos}
+                  maximo={MAX_FOTOS_MOVIMIENTO}
+                  etiqueta="Foto de lo que se lleva"
+                  deshabilitado={saving}
+                />
+              </div>
+            )}
           </TarjetaHallazgo>
         ) : okMsg ? null : (
           // Tras registrar un movimiento manda el aviso de «listo», no este hueco.
