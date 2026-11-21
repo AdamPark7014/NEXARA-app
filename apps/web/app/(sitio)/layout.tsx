@@ -1,4 +1,4 @@
-import { Inter_Tight } from "next/font/google";
+import localFont from "next/font/local";
 import "@/components/sitio/sitio-documento.css";
 import s from "@/components/sitio/sitio.module.css";
 import Encabezado from "@/components/sitio/Encabezado";
@@ -8,9 +8,7 @@ import ExtrasSitio from "@/components/sitio/ExtrasSitio";
 import Paleta from "@/components/sitio/Paleta";
 
 /** Letra de exhibición para titulares y cifras; el texto corrido sigue en Inter. */
-const display = Inter_Tight({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+const display = localFont({ src: "../fonts/inter-tight-var-latin.woff2", weight: "100 900",
   display: "swap",
   variable: "--sitio-display",
   preload: false,

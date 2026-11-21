@@ -4,7 +4,11 @@ import "./ecosystem.scss";
 import "./ui-tokens.scss";
 import "./ui-firma.scss";
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, Inter, Inter_Tight } from "next/font/google";
+import localFont from "next/font/local";
+
+// Tipografía en el repo (21-11): next/font/google truena a veces en el build de producción cuando Google
+// devuelve URLs sin extensión ("Cannot read properties of null (reading '1')"). Mismas familias,
+// archivos variables (latín) de Fontsource, licencia OFL en `app/fonts/`.
 import ClientLayout from "./ClientLayout";
 import Providers from "./providers";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
@@ -21,19 +25,19 @@ import {
   NEXARA_PERFILES_OFICIALES,
 } from "@/lib/brand";
 
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
+const spaceGrotesk = localFont({
+  src: "./fonts/space-grotesk-var-latin.woff2",
+  weight: "300 700",
   display: "swap",
-  weight: ["400", "500", "600", "700"],
   variable: "--nx-font-display",
   preload: false,
 });
 
 // Fallback estable para UI: Inter como variable de UI (en lugar de Inter Tight)
-const interTight = Inter({
-  subsets: ["latin"],
+const interTight = localFont({
+  src: "./fonts/inter-var-latin.woff2",
+  weight: "100 900",
   display: "swap",
-  weight: ["400", "500", "600", "700"],
   variable: "--nx-font-ui",
   preload: false,
 });
@@ -41,28 +45,28 @@ const interTight = Inter({
 // Ninguna fuente lleva preload: dos instancias de la misma familia generan archivos distintos y el navegador bajaba
 // el precargado y además el que gana en la hoja de estilos (205 KB en la portada, 90 KB sin los avisos).
 // Paneles (ERP y demás): Inter a 14 px.
-const inter = Inter({
-  subsets: ["latin"],
+const inter = localFont({
+  src: "./fonts/inter-var-latin.woff2",
+  weight: "100 900",
   display: "swap",
-  weight: ["400", "500", "600"],
   variable: "--nx-font-app",
   preload: false,
 });
 
 // Paneles: títulos y cifras en Inter Tight, la letra de exhibición del sitio público (28-10).
-const display = Inter_Tight({
-  subsets: ["latin"],
+const display = localFont({
+  src: "./fonts/inter-tight-var-latin.woff2",
+  weight: "100 900",
   display: "swap",
-  weight: ["500", "600", "700"],
   variable: "--ui-font-display-face",
   preload: false,
 });
 
 // Body fallback: Inter como cuerpo (variable mantiene nombre de marca)
-const manrope = Inter({
-  subsets: ["latin"],
+const manrope = localFont({
+  src: "./fonts/inter-var-latin.woff2",
+  weight: "100 900",
   display: "swap",
-  weight: ["300", "400", "500", "600", "700"],
   variable: "--nx-font-body",
   preload: false,
 });
@@ -70,10 +74,10 @@ const manrope = Inter({
 // Serif y mono: usarán fallbacks de sistema; no cargamos fuentes extra para robustez de build
 
 // Sans redondeada para headings públicos (look amable) — fallback a Space Grotesk variable
-const plusJakarta = Space_Grotesk({
-  subsets: ["latin"],
+const plusJakarta = localFont({
+  src: "./fonts/space-grotesk-var-latin.woff2",
+  weight: "300 700",
   display: "swap",
-  weight: ["400", "600", "700"],
   variable: "--nx-font-rounded",
   preload: false,
 });

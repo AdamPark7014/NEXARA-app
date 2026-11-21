@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { Inter_Tight } from "next/font/google";
+import localFont from "next/font/local";
 import styles from "@/components/ui/PanelState.module.scss";
 import "@/components/sitio/sitio-documento.css";
 import s from "@/components/sitio/sitio.module.css";
@@ -8,7 +8,7 @@ import Encabezado from "@/components/sitio/Encabezado";
 import Pie from "@/components/sitio/Pie";
 import NoEncontrado from "@/components/sitio/NoEncontrado";
 
-const display = Inter_Tight({ subsets: ["latin"], weight: ["500", "600", "700"], display: "swap", variable: "--sitio-display" });
+const display = localFont({ src: "./fonts/inter-tight-var-latin.woff2", weight: "100 900", display: "swap", variable: "--sitio-display" });
 
 /** El dominio público (y el servidor local) ven el 404 del sitio; los paneles, el suyo. */
 const esSitioPublico = (host: string) => /^(www\.)?nexara\.com\.mx$/.test(host) || /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host);
