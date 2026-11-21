@@ -318,8 +318,10 @@ fun HerramientasScreen(vm: HerramientasViewModel = viewModel()) {
             enviando = state.enviando,
             error = state.accionError,
             onCerrar = cerrar,
-            onEntregar = { p, codigo -> vm.entregar(p, codigo) { dialogoAlmacen = null } },
-            onRecibir = { p, danio -> vm.recibir(p, danio) { dialogoAlmacen = null } },
+            onEntregar = { p, codigo, fotos -> vm.entregar(p, codigo, fotos) { dialogoAlmacen = null } },
+            onRecibir = { p, condicion, descripcion, fotos ->
+                vm.recibir(p, condicion, descripcion, fotos) { dialogoAlmacen = null }
+            },
             onRechazarPrestamo = { p, motivo -> vm.rechazarPrestamo(p, motivo) { dialogoAlmacen = null } },
             onRechazarRenovacion = { r, motivo -> vm.rechazarRenovacion(r, motivo) { dialogoAlmacen = null } },
         )

@@ -131,136 +131,49 @@ struct HojaDeHerramientaConMotivo: View {
 
 // MARK: - Entregar y recibir
 
-/// Registrar la salida: quien la recoge enseña su código y aquí se teclea.
+/// Registrar la salida: el código de quien la recoge y las fotos de cómo sale.
 struct HojaEntregarHerramienta: View {
     @ObservedObject var vm: HerramientasViewModel
     let prestamo: PrestamoHerramienta
     let onCerrar: () -> Void
 
-    @State private var codigo = ""
-
-    private var pideCodigo: Bool { HerramientasReglas.pideCodigoAlEntregar(prestamo) }
-    private var listo: Bool { !pideCodigo || codigo.nilSiVacio != nil }
-
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("ENTREGAR")
-                        .font(.system(size: 11, weight: .heavy))
-                        .foregroundStyle(NxColors.muted)
-                    Text(HerramientasReglas.tituloPrestamo(prestamo))
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(NxColors.fg)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("A \(HerramientasReglas.nombreDe(prestamo))")
-                        .font(NxType.bodySmall)
-                        .foregroundStyle(NxColors.muted)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isHeader)
-
-                if pideCodigo {
-                    Text("Teclea el código de recolección que enseña quien la recoge.")
-                        .font(NxType.bodySmall)
-                        .foregroundStyle(NxColors.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                    CampoDelineado(
-                        etiqueta: "Código de recolección",
-                        texto: $codigo,
-                        mayusculas: true,
-                        habilitado: !vm.estado.enviando,
-                        maxLargo: 12
-                    )
-                }
-
-                if let error = vm.estado.accionError {
-                    Text(error)
-                        .font(NxType.bodySmall)
-                        .foregroundStyle(NxColors.danger)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                HStack(spacing: 8) {
-                    Spacer(minLength: 0)
-                    Button("Cancelar", action: onCerrar)
-                        .buttonStyle(BotonMaterialStyle(tipo: .texto(NxColors.brand)))
-                        .disabled(vm.estado.enviando)
-                    Button(vm.estado.enviando ? "Registrando…" : "Registrar salida") {
-                        Task { if await vm.entregar(prestamo, codigo: codigo) { onCerrar() } }
-                    }
-                    .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.brand), alto: 48))
-                    .disabled(vm.estado.enviando || !listo)
-                }
+        HojaDeEntrega(
+            titulo: HerramientasReglas.tituloPrestamo(prestamo),
+            persona: HerramientasReglas.nombreDe(prestamo),
+            pideCodigo: HerramientasReglas.pideCodigoAlEntregar(prestamo),
+            enviando: vm.estado.enviando,
+            error: vm.estado.accionError,
+            onCerrar: onCerrar,
+            onEntregar: { codigo, fotos in
+                Task { if await vm.entregar(prestamo, codigo: codigo, fotos: fotos) { onCerrar() } }
             }
-            .padding(NxSpacing.xl)
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .interactiveDismissDisabled(vm.estado.enviando)
-        .hojaMaterial(detents: [.medium, .large])
+        )
     }
 }
 
-/// Registrar la entrada, con el daño si llegó con alguno.
+/// Registrar la entrada: cómo volvió, qué le pasó y las fotos de después.
 struct HojaRecibirHerramienta: View {
     @ObservedObject var vm: HerramientasViewModel
     let prestamo: PrestamoHerramienta
     let onCerrar: () -> Void
 
-    @State private var danio = ""
-
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("RECIBIR")
-                        .font(.system(size: 11, weight: .heavy))
-                        .foregroundStyle(NxColors.muted)
-                    Text(HerramientasReglas.tituloPrestamo(prestamo))
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(NxColors.fg)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("La trae \(HerramientasReglas.nombreDe(prestamo))")
-                        .font(NxType.bodySmall)
-                        .foregroundStyle(NxColors.muted)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isHeader)
-
-                CampoDelineado(
-                    etiqueta: "¿Llegó con daño? Descríbelo (opcional)",
-                    texto: $danio,
-                    ayuda: "Con daño queda en reparación.",
-                    multilinea: true,
-                    minLineas: 2,
-                    habilitado: !vm.estado.enviando,
-                    maxLargo: 500
-                )
-
-                if let error = vm.estado.accionError {
-                    Text(error)
-                        .font(NxType.bodySmall)
-                        .foregroundStyle(NxColors.danger)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                HStack(spacing: 8) {
-                    Spacer(minLength: 0)
-                    Button("Cancelar", action: onCerrar)
-                        .buttonStyle(BotonMaterialStyle(tipo: .texto(NxColors.brand)))
-                        .disabled(vm.estado.enviando)
-                    Button(vm.estado.enviando ? "Registrando…" : "Registrar entrada") {
-                        Task { if await vm.recibir(prestamo, danio: danio) { onCerrar() } }
+        HojaDeEntrada(
+            titulo: HerramientasReglas.tituloPrestamo(prestamo),
+            persona: HerramientasReglas.nombreDe(prestamo),
+            fotosDeSalida: EvidenciaPrestamoReglas.urls(prestamo.deliveryPhotos),
+            enviando: vm.estado.enviando,
+            error: vm.estado.accionError,
+            onCerrar: onCerrar,
+            onRecibir: { condicion, descripcion, fotos in
+                Task {
+                    if await vm.recibir(prestamo, condicion: condicion, descripcion: descripcion, fotos: fotos) {
+                        onCerrar()
                     }
-                    .buttonStyle(BotonMaterialStyle(tipo: .lleno(NxColors.brand), alto: 48))
-                    .disabled(vm.estado.enviando)
                 }
             }
-            .padding(NxSpacing.xl)
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .interactiveDismissDisabled(vm.estado.enviando)
-        .hojaMaterial(detents: [.medium, .large])
+        )
     }
 }
 

@@ -20,11 +20,11 @@ import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
 import {
   buscarPorCodigoDeRecoleccion,
-  entregarConCodigo,
   listarPendientesDeRecoleccion,
   type BusquedaPickup,
   type PendienteDeRecoleccion,
 } from "@/lib/almacen-api";
+import { DialogoEntrega } from "@/components/herramientas/EvidenciaPrestamo";
 import InfoBreve from "./InfoBreve";
 import s from "./RecoleccionAlmacenPanel.module.css";
 
@@ -67,7 +67,15 @@ export default function RecoleccionAlmacenPanel() {
   const [codigo, setCodigo] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [hallazgo, setHallazgo] = useState<BusquedaPickup | null>(null);
-  const [entregando, setEntregando] = useState(false);
+  /** La entrega pide fotos de cómo sale la herramienta: abre su diálogo. */
+  const [entregando, setEntregando] = useState<{
+    id: number;
+    toolName: string;
+    detalle: string;
+    persona: string | null;
+    pickupCode: string;
+    recogidaPorId?: number;
+  } | null>(null);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -100,20 +108,24 @@ export default function RecoleccionAlmacenPanel() {
     }
   };
 
-  const entregar = async (toolRequestId: number, pickupCode: string, recogidaPorId?: number) => {
-    if (!token) return;
-    setEntregando(true);
-    try {
-      await entregarConCodigo(token, toolRequestId, { pickupCode, recogidaPorId });
-      toast.success("Herramienta entregada");
-      setHallazgo(null);
-      setCodigo("");
-      await cargar();
-    } catch (e) {
-      toast.error(formatApiError(e, "No se pudo entregar la herramienta"));
-    } finally {
-      setEntregando(false);
-    }
+  const entregar = (
+    solicitud: Pick<PendienteDeRecoleccion, "id" | "toolName" | "model" | "serialNumber" | "usuario">,
+    pickupCode: string,
+  ) =>
+    setEntregando({
+      id: solicitud.id,
+      toolName: solicitud.toolName,
+      detalle: `${solicitud.model} · Serie ${solicitud.serialNumber}`,
+      persona: solicitud.usuario?.nombre ?? null,
+      pickupCode,
+      recogidaPorId: solicitud.usuario?.id,
+    });
+
+  const alEntregar = (mensaje: string) => {
+    toast.success(mensaje);
+    setHallazgo(null);
+    setCodigo("");
+    void cargar();
   };
 
   const columnas: Column<PendienteDeRecoleccion>[] = [
@@ -232,14 +244,7 @@ export default function RecoleccionAlmacenPanel() {
                     variant="primary"
                     size="lg"
                     iconStart={<HandshakeOutlinedIcon />}
-                    loading={entregando}
-                    onClick={() =>
-                      void entregar(
-                        hallazgo.solicitud.id,
-                        hallazgo.solicitud.pickupCode ?? codigo,
-                        hallazgo.solicitud.usuario?.id,
-                      )
-                    }
+                    onClick={() => entregar(hallazgo.solicitud, hallazgo.solicitud.pickupCode ?? codigo)}
                   >
                     Entregar herramienta
                   </Button>
@@ -292,8 +297,8 @@ export default function RecoleccionAlmacenPanel() {
                 size="sm"
                 variant="ghost"
                 aria-label={`Entregar ${p.toolName} a ${p.usuario?.nombre ?? "quien la pidió"}`}
-                disabled={p.vencido || !p.pickupCode || entregando}
-                onClick={() => void entregar(p.id, p.pickupCode ?? "", p.usuario?.id)}
+                disabled={p.vencido || !p.pickupCode}
+                onClick={() => entregar(p, p.pickupCode ?? "")}
               >
                 Entregar
               </Button>
@@ -303,6 +308,8 @@ export default function RecoleccionAlmacenPanel() {
           />
         )}
       </Card>
+
+      <DialogoEntrega token={token} prestamo={entregando} onCerrar={() => setEntregando(null)} onListo={alEntregar} />
     </div>
   );
 }

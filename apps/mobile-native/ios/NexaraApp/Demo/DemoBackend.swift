@@ -135,15 +135,21 @@ extension DemoStore {
         case "warehouse":
             return isGet ? reply(fxAlmacenes()) : empty()
         case "tool-requests":
+            // Entregar y recibir viajan como multipart desde la evidencia (21-11-2026): sus campos
+            // de texto (`pickupCode`, `condicion`, `damageDescription`) se leen como el JSON de antes.
+            var cuerpo = json
+            if cuerpo.isEmpty {
+                for (clave, valor) in multipartFields(body) { cuerpo[clave] = valor }
+            }
             // Lo de toda la empresa, pedir y dar de alta (`DemoFixtures+PorRol`).
-            if let porRol = routeHerramientasPorRol(method: method, parts: parts, query: query, json: json, body: body) {
+            if let porRol = routeHerramientasPorRol(method: method, parts: parts, query: query, json: cuerpo, body: body) {
                 return reply(porRol.payload, status: porRol.status)
             }
             // Mi kit, mis préstamos y prórrogas (`DemoFixtures+Herramientas`); lo demás, el escáner.
-            if let mio = routeMisHerramientas(method: method, parts: parts, json: json) {
+            if let mio = routeMisHerramientas(method: method, parts: parts, json: cuerpo) {
                 return reply(mio.payload, status: mio.status)
             }
-            let respuesta = routeHerramientas(method: method, parts: parts, query: query, json: json)
+            let respuesta = routeHerramientas(method: method, parts: parts, query: query, json: cuerpo)
             return reply(respuesta.payload, status: respuesta.status)
         case "users":
             return routeUsers(method: method, parts: parts, json: json)

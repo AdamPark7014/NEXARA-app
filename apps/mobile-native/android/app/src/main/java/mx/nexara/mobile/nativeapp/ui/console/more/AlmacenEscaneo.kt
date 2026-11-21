@@ -2,6 +2,7 @@ package mx.nexara.mobile.nativeapp.ui.console.more
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,6 +10,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -17,6 +20,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,13 +33,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import mx.nexara.mobile.nativeapp.data.api.AltaPorCodigoRequest
+import mx.nexara.mobile.nativeapp.data.api.HerramientaActividadDto
 import mx.nexara.mobile.nativeapp.data.api.MovimientoPorCodigoRequest
 import mx.nexara.mobile.nativeapp.data.api.ProductoPorCodigoDto
+import mx.nexara.mobile.nativeapp.data.api.ReceptorMaterialDto
 import mx.nexara.mobile.nativeapp.data.api.StockAlmacenDto
 import mx.nexara.mobile.nativeapp.data.api.isForbidden
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.EscaneoRepository
 import mx.nexara.mobile.nativeapp.ui.common.CodigoBarrasRules
+import mx.nexara.mobile.nativeapp.ui.common.GeoPhoto
+import mx.nexara.mobile.nativeapp.ui.common.LiveCameraCaptureDialog
+import mx.nexara.mobile.nativeapp.ui.console.herramientas.FotosDeEvidencia
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 
 private fun Throwable.mensajeAlmacen(accion: String, fallback: String): String =
@@ -149,6 +158,47 @@ internal fun MovimientoPorCodigo(
     var guardando by remember { mutableStateOf(false) }
     var error by remember(r.codigoBarras) { mutableStateOf<String?>(null) }
 
+    // Evidencia de la salida (21-11-2026). Quién se lo lleva y la actividad no dependen del
+    // código: una persona suele llevarse varias cosas y no hay que elegirla en cada una.
+    var receptores by remember { mutableStateOf<List<ReceptorMaterialDto>>(emptyList()) }
+    var errorReceptores by remember { mutableStateOf<String?>(null) }
+    var recibe by remember { mutableStateOf<ReceptorMaterialDto?>(null) }
+    var actividades by remember { mutableStateOf<List<HerramientaActividadDto>>(emptyList()) }
+    var actividad by remember { mutableStateOf<HerramientaActividadDto?>(null) }
+    var menuRecibe by remember { mutableStateOf(false) }
+    var menuActividad by remember { mutableStateOf(false) }
+    var fotos by remember(r.codigoBarras) { mutableStateOf<List<GeoPhoto>>(emptyList()) }
+    var seriesTexto by remember(r.codigoBarras) { mutableStateOf("") }
+    var camara by remember { mutableStateOf(false) }
+
+    val esSalida = movimiento == EscaneoRules.Movimiento.SALIDA
+    LaunchedEffect(esSalida) {
+        if (!esSalida || receptores.isNotEmpty()) return@LaunchedEffect
+        try {
+            receptores = repo.receptores()
+            errorReceptores = null
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            errorReceptores = e.mensajeAlmacen("registrar salidas de almacén", "No se pudo cargar al personal")
+        }
+    }
+    LaunchedEffect(recibe?.id) {
+        actividad = null
+        val id = recibe?.id
+        actividades = if (id == null) {
+            emptyList()
+        } else {
+            try {
+                repo.actividadesDeReceptor(id)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+    }
+
     val opciones = EscaneoRules.almacenesPara(movimiento, r.existencias, almacenes)
     // Lo elegido deja de valer si cambia el tipo de movimiento; con una sola opción no hay que elegir.
     val elegido = almacenId?.takeIf { id -> opciones.any { it.id == id } } ?: opciones.singleOrNull()?.id
@@ -206,10 +256,94 @@ internal fun MovimientoPorCodigo(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         modifier = Modifier.fillMaxWidth(),
     )
+    if (esSalida) {
+        Text("¿Quién se lo lleva?", style = MaterialTheme.typography.labelMedium, color = NxColors.Muted)
+        errorReceptores?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = NxColors.Danger) }
+        Box {
+            OutlinedButton(
+                onClick = { menuRecibe = true },
+                enabled = !guardando && receptores.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) {
+                Text(
+                    recibe?.nombre?.takeIf { it.isNotBlank() }
+                        ?: if (receptores.isEmpty() && errorReceptores == null) "Cargando personal…" else "Elige a la persona",
+                )
+            }
+            DropdownMenu(expanded = menuRecibe, onDismissRequest = { menuRecibe = false }) {
+                receptores.forEach { opcion ->
+                    DropdownMenuItem(
+                        text = { Text(opcion.nombre?.takeIf { it.isNotBlank() } ?: "Sin nombre") },
+                        onClick = {
+                            recibe = opcion
+                            menuRecibe = false
+                            error = null
+                        },
+                    )
+                }
+            }
+        }
+        if (recibe != null) {
+            if (actividades.isEmpty()) {
+                Text(
+                    "No tiene actividades abiertas: escribe abajo para qué es.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = NxColors.Muted,
+                )
+            } else {
+                Box {
+                    OutlinedButton(
+                        onClick = { menuActividad = true },
+                        enabled = !guardando,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) { Text(actividad?.let(EvidenciaSalidaRules::textoActividad) ?: "¿Para qué actividad?") }
+                    DropdownMenu(expanded = menuActividad, onDismissRequest = { menuActividad = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Sin actividad") },
+                            onClick = {
+                                actividad = null
+                                menuActividad = false
+                            },
+                        )
+                        actividades.forEach { opcion ->
+                            DropdownMenuItem(
+                                text = { Text(EvidenciaSalidaRules.textoActividad(opcion)) },
+                                onClick = {
+                                    actividad = opcion
+                                    menuActividad = false
+                                    error = null
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        FotosDeEvidencia(
+            titulo = "Foto de lo que sale",
+            hint = "Lo que se lleva, antes de entregarlo.",
+            fotos = fotos,
+            maximo = EvidenciaSalidaRules.MAX_FOTOS,
+            enabled = !guardando,
+            onTomar = { camara = true },
+            onQuitar = { quitada -> fotos = fotos.filter { it !== quitada } },
+        )
+    }
+    OutlinedTextField(
+        value = seriesTexto,
+        onValueChange = { seriesTexto = it.take(4000) },
+        label = { Text("Números de serie (opcional, uno por renglón)") },
+        supportingText = {
+            val leidas = EvidenciaSalidaRules.series(seriesTexto).size
+            if (leidas > 0) Text(if (leidas == 1) "1 serie" else "$leidas series")
+        },
+        minLines = 2,
+        modifier = Modifier.fillMaxWidth(),
+    )
     OutlinedTextField(
         value = notas,
         onValueChange = { notas = it.take(300) },
-        label = { Text("Nota (opcional)") },
+        label = { Text(if (esSalida && actividad == null) "¿Para qué es?" else "Nota (opcional)") },
         modifier = Modifier.fillMaxWidth(),
     )
     error?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = NxColors.Danger) }
@@ -228,12 +362,20 @@ internal fun MovimientoPorCodigo(
                 error = invalido
                 return@Button
             }
+            val series = EvidenciaSalidaRules.series(seriesTexto)
+            val piezas = EvidenciaSalidaRules.piezas(cantidad, r.packaging?.piezasPorUnidad.takeIf { r.match == "empaque" })
+            val faltaEvidencia = EvidenciaSalidaRules.errorSeries(series.size, piezas)
+                ?: if (esSalida) EvidenciaSalidaRules.errorSalida(recibe?.id, fotos.size, actividad?.id, notas) else null
+            if (faltaEvidencia != null) {
+                error = faltaEvidencia
+                return@Button
+            }
             scope.launch {
                 guardando = true
                 error = null
                 try {
                     val codigo = r.codigoBarras ?: r.product?.sku.orEmpty()
-                    repo.movimientoPorCodigo(
+                    val hecho = repo.movimientoPorCodigo(
                         MovimientoPorCodigoRequest(
                             codigo = codigo,
                             type = movimiento.api,
@@ -241,9 +383,30 @@ internal fun MovimientoPorCodigo(
                             fromWarehouseId = elegido.takeIf { movimiento == EscaneoRules.Movimiento.SALIDA },
                             toWarehouseId = elegido.takeIf { movimiento == EscaneoRules.Movimiento.ENTRADA },
                             notes = notas.trim().takeIf { it.isNotEmpty() },
+                            activityId = actividad?.id.takeIf { esSalida },
+                            series = series.takeIf { it.isNotEmpty() },
+                            recibidoPorId = recibe?.id.takeIf { esSalida },
                         ),
                     )
-                    onHecho(EscaneoRules.avisoMovimiento(movimiento, cantidad, unidad, r.product?.name))
+                    val aviso = EscaneoRules.avisoMovimiento(movimiento, cantidad, unidad, r.product?.name)
+                    // Las fotos van sobre el movimiento ya hecho: si no suben, la salida queda
+                    // registrada y se dice que faltan (en la web salen marcadas «Sin foto»).
+                    val movimientoId = hecho.movement?.id
+                    val fotosSubidas = if (!esSalida || fotos.isEmpty()) {
+                        true
+                    } else if (movimientoId == null) {
+                        false
+                    } else {
+                        try {
+                            repo.evidenciaDeMovimiento(movimientoId, fotos)
+                            true
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            false
+                        }
+                    }
+                    onHecho(if (fotosSubidas) aviso else EvidenciaSalidaRules.avisoFotosPendientes(aviso))
                 } catch (e: Exception) {
                     error = e.mensajeAlmacen("registrar movimientos de almacén", "No se pudo registrar el movimiento")
                 } finally {
@@ -258,6 +421,20 @@ internal fun MovimientoPorCodigo(
         Text(
             if (guardando) "Registrando…" else "Registrar ${movimiento.etiqueta.lowercase()}",
             fontWeight = FontWeight.Bold,
+        )
+    }
+
+    if (camara) {
+        LiveCameraCaptureDialog(
+            title = "Lo que sale",
+            requireLocation = false,
+            captureLocation = false,
+            subtitle = "Que se vea el material y, si se puede, su etiqueta o número de serie.",
+            onCaptured = { foto ->
+                fotos = (fotos + foto).take(EvidenciaSalidaRules.MAX_FOTOS)
+                camara = false
+            },
+            onDismiss = { camara = false },
         )
     }
 }

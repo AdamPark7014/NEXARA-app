@@ -288,6 +288,9 @@ internal fun TarjetaPrestamo(
             }
         }
 
+        // Fuera de la columna de arriba: esa se lee de corrido y aquí cada foto se abre con un toque.
+        EvidenciaDelPrestamo(prestamo)
+
         if (HerramientasRules.sePuedeRenovar(prestamo)) {
             OutlinedButton(
                 onClick = onRenovar,

@@ -8,7 +8,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -100,77 +99,88 @@ internal fun AccionDeHerramienta(
     val accion = EscaneoRules.accion(r) ?: return
     val prestamoId = r.prestamo?.id ?: return
     val scope = rememberCoroutineScope()
-    var codigoRecogida by remember(prestamoId) { mutableStateOf("") }
-    var danio by remember(prestamoId) { mutableStateOf("") }
+    var abierta by remember(prestamoId) { mutableStateOf(false) }
     var guardando by remember { mutableStateOf(false) }
     var error by remember(prestamoId) { mutableStateOf<String?>(null) }
 
-    HorizontalDivider()
-    when (accion) {
-        EscaneoRules.AccionHerramienta.ENTREGAR -> {
-            Text(
-                "Para entregarla, teclea el código de recolección que enseña quien la recoge.",
-                style = MaterialTheme.typography.labelMedium,
-                color = NxColors.Muted,
-            )
-            if (r.prestamo.vencido == true) {
-                Text(
-                    "El código de recolección ya venció: genera otro en la pestaña Préstamos.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = NxColors.Danger,
-                )
+    val nombre = EscaneoRules.nombreHerramienta(r)
+    val persona = r.prestamo.usuario?.nombre?.trim()?.takeIf { it.isNotEmpty() } ?: "quien la pidió"
+
+    /** Corre la entrega o la entrada; mientras falle, la hoja se queda abierta con el motivo. */
+    fun registrar(mensaje: String, enviar: suspend () -> Unit) {
+        scope.launch {
+            guardando = true
+            error = null
+            try {
+                enviar()
+                abierta = false
+                onHecho(mensaje)
+            } catch (e: Exception) {
+                error = e.mensajeHerramienta("entregar o recibir herramientas", "No se pudo registrar")
+            } finally {
+                guardando = false
             }
-            OutlinedTextField(
-                value = codigoRecogida,
-                onValueChange = { codigoRecogida = it.take(12) },
-                label = { Text("Código de recolección") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        EscaneoRules.AccionHerramienta.RECIBIR -> {
-            OutlinedTextField(
-                value = danio,
-                onValueChange = { danio = it.take(500) },
-                label = { Text("¿Llegó con daño? Descríbelo (opcional)") },
-                supportingText = { Text("Con daño queda en reparación.") },
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
     }
-    error?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = NxColors.Danger) }
+
+    HorizontalDivider()
+    Text(
+        when (accion) {
+            EscaneoRules.AccionHerramienta.ENTREGAR ->
+                "Para entregarla se pide el código de quien la recoge y una foto de cómo sale."
+            EscaneoRules.AccionHerramienta.RECIBIR ->
+                "Para recibirla se dice cómo volvió y se toma una foto."
+        },
+        style = MaterialTheme.typography.labelMedium,
+        color = NxColors.Muted,
+    )
+    if (accion == EscaneoRules.AccionHerramienta.ENTREGAR && r.prestamo.vencido == true) {
+        Text(
+            "El código de recolección ya venció: genera otro en la pestaña Préstamos.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = NxColors.Danger,
+        )
+    }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = {
-                scope.launch {
-                    guardando = true
-                    error = null
-                    try {
-                        val mensaje = when (accion) {
-                            EscaneoRules.AccionHerramienta.ENTREGAR -> {
-                                repo.entregarHerramienta(prestamoId, codigoRecogida)
-                                "Salida registrada: ${EscaneoRules.nombreHerramienta(r)}."
-                            }
-                            EscaneoRules.AccionHerramienta.RECIBIR -> {
-                                repo.recibirHerramienta(prestamoId, danio)
-                                if (danio.isBlank()) {
-                                    "Entrada registrada: ${EscaneoRules.nombreHerramienta(r)}."
-                                } else {
-                                    "Entrada registrada con daño: queda en reparación."
-                                }
-                            }
-                        }
-                        onHecho(mensaje)
-                    } catch (e: Exception) {
-                        error = e.mensajeHerramienta("entregar o recibir herramientas", "No se pudo registrar")
-                    } finally {
-                        guardando = false
-                    }
-                }
+                error = null
+                abierta = true
             },
             enabled = !guardando,
             colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
             modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-        ) { Text(if (guardando) "Registrando…" else accion.etiqueta, fontWeight = FontWeight.Bold) }
+        ) { Text(accion.etiqueta, fontWeight = FontWeight.Bold) }
+    }
+
+    if (!abierta) return
+    when (accion) {
+        EscaneoRules.AccionHerramienta.ENTREGAR -> HojaEntregarHerramienta(
+            titulo = nombre,
+            persona = persona,
+            // El campo sale siempre: el código prueba que quien la recoge es quien la pidió.
+            pideCodigo = true,
+            codigoObligatorio = !r.prestamo.pickupCode.isNullOrBlank(),
+            codigoVencido = r.prestamo.vencido == true,
+            enviando = guardando,
+            error = error,
+            onEntregar = { codigo, fotos ->
+                registrar("Salida registrada: $nombre.") { repo.entregarHerramienta(prestamoId, codigo, fotos) }
+            },
+            onCerrar = { abierta = false },
+        )
+        EscaneoRules.AccionHerramienta.RECIBIR -> HojaRecibirHerramienta(
+            titulo = nombre,
+            persona = persona,
+            fotosDeSalida = EvidenciaPrestamoRules.urls(r.prestamo.deliveryPhotos),
+            enviando = guardando,
+            error = error,
+            onRecibir = { condicion, descripcion, fotos ->
+                registrar(EvidenciaPrestamoRules.avisoEntrada(condicion)) {
+                    repo.recibirHerramienta(prestamoId, condicion.api, descripcion, fotos)
+                }
+            },
+            onCerrar = { abierta = false },
+        )
     }
 }

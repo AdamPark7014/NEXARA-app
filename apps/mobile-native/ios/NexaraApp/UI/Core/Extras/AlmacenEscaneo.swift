@@ -160,7 +160,9 @@ struct ProductoEscaneadoVista: View {
 // MARK: - Movimiento
 
 /// Android `MovimientoPorCodigo`: entrada o salida, el almacén (en salida solo donde hay
-/// existencia), la cantidad en la unidad de lo escaneado y una nota opcional.
+/// existencia), la cantidad en la unidad de lo escaneado y una nota opcional. La salida pide
+/// además su evidencia (21-11-2026): quién se lo lleva, para qué actividad y la foto de lo
+/// que sale; los números de serie son opcionales en entradas y salidas.
 struct MovimientoPorCodigoVista: View {
     let r: ProductoPorCodigo
     let almacenes: [StockAlmacenRef]?
@@ -172,6 +174,17 @@ struct MovimientoPorCodigoVista: View {
     @State private var notas = ""
     @State private var guardando = false
     @State private var error: String?
+
+    @State private var receptores: [ReceptorDeMaterial] = []
+    @State private var errorReceptores: String?
+    @State private var recibe: ReceptorDeMaterial?
+    @State private var actividades: [HerramientaActividad] = []
+    @State private var actividad: HerramientaActividad?
+    @State private var fotos: [CapturedGeoPhoto] = []
+    @State private var seriesTexto = ""
+    @State private var camara = false
+
+    private var esSalida: Bool { movimiento == .salida }
 
     private var opciones: [EscaneoReglas.OpcionAlmacen] {
         EscaneoReglas.almacenesPara(movimiento, existencias: r.existencias, almacenes: almacenes)
@@ -247,8 +260,9 @@ struct MovimientoPorCodigoVista: View {
                 maxLargo: 12,
                 teclado: .decimalPad
             )
+            camposDeEvidencia
             CampoDelineadoDeEscaneo(
-                etiqueta: "Nota (opcional)",
+                etiqueta: esSalida && actividad == nil ? "¿Para qué es?" : "Nota (opcional)",
                 texto: $notas,
                 maxLargo: 300,
                 mayusculas: .sentences,
@@ -266,6 +280,132 @@ struct MovimientoPorCodigoVista: View {
             .disabled(guardando)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .task(id: esSalida) { await cargarReceptores() }
+        .task(id: recibe?.id) { await cargarActividades() }
+        .fullScreenCover(isPresented: $camara) {
+            GeoPhotoCaptureView(
+                title: "Lo que sale",
+                confirmLabel: "Usar esta foto",
+                // Se toma dentro del almacén, a veces sin GPS: la ubicación no bloquea la salida.
+                requireLocation: false,
+                onConfirm: { foto in
+                    if fotos.count < EvidenciaSalidaReglas.maxFotos { fotos.append(foto) }
+                    camara = false
+                    return nil
+                },
+                onCancel: { camara = false }
+            )
+        }
+    }
+
+    /// Lo que pide la evidencia: en salida, quién se lo lleva y la foto; siempre, las series.
+    /// Va aparte del `body` para que el compilador no tenga que resolverlo todo de una vez.
+    @ViewBuilder
+    private var camposDeEvidencia: some View {
+        if esSalida {
+            quienSeLoLleva
+            FotosDeEvidencia(
+                titulo: "Foto de lo que sale",
+                pista: "Lo que se lleva, antes de entregarlo.",
+                fotos: fotos,
+                maximo: EvidenciaSalidaReglas.maxFotos,
+                habilitado: !guardando,
+                onTomar: { camara = true },
+                onQuitar: { quitada in fotos.removeAll { $0.id == quitada.id } }
+            )
+        }
+        CampoDelineadoDeEscaneo(
+            etiqueta: "Números de serie (opcional, uno por renglón)",
+            texto: $seriesTexto,
+            maxLargo: 4000,
+            mayusculas: .characters,
+            multilinea: true
+        )
+        let seriesLeidas = EvidenciaSalidaReglas.series(seriesTexto).count
+        if seriesLeidas > 0 {
+            Text(seriesLeidas == 1 ? "1 serie" : "\(seriesLeidas) series")
+                .font(NxType.labelMedium)
+                .foregroundStyle(NxColors.muted)
+        }
+    }
+
+    /// Quién se lleva el material y, si tiene actividades abiertas, a cuál se carga.
+    @ViewBuilder
+    private var quienSeLoLleva: some View {
+        Text("¿Quién se lo lleva?")
+            .font(NxType.labelMedium)
+            .foregroundStyle(NxColors.muted)
+        if let errorReceptores {
+            TextoDeError(texto: errorReceptores)
+        }
+        Menu {
+            ForEach(receptores) { opcion in
+                Button(opcion.nombre?.nilSiVacio ?? "Sin nombre") {
+                    recibe = opcion
+                    error = nil
+                }
+            }
+        } label: {
+            Text(recibe?.nombre?.nilSiVacio
+                 ?? (receptores.isEmpty && errorReceptores == nil ? "Cargando personal…" : "Elige a la persona"))
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(2)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(BotonMaterialStyle(tipo: .contorno(NxColors.brand), alto: 48, llenaAncho: true))
+        .disabled(guardando || receptores.isEmpty)
+        if recibe != nil {
+            if actividades.isEmpty {
+                Text("No tiene actividades abiertas: escribe abajo para qué es.")
+                    .font(NxType.labelMedium)
+                    .foregroundStyle(NxColors.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Menu {
+                    Button("Sin actividad") { actividad = nil }
+                    ForEach(Array(actividades.enumerated()), id: \.offset) { _, opcion in
+                        Button(EvidenciaSalidaReglas.textoActividad(opcion)) {
+                            actividad = opcion
+                            error = nil
+                        }
+                    }
+                } label: {
+                    Text(actividad.map { EvidenciaSalidaReglas.textoActividad($0) } ?? "¿Para qué actividad?")
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(BotonMaterialStyle(tipo: .contorno(NxColors.brand), alto: 48, llenaAncho: true))
+                .disabled(guardando)
+            }
+        }
+    }
+
+    /// El personal se pide hasta que se elige «Salida», y una sola vez.
+    @MainActor
+    private func cargarReceptores() async {
+        guard esSalida, receptores.isEmpty else { return }
+        do {
+            receptores = try await EscaneoRepository.shared.receptores()
+            errorReceptores = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            errorReceptores = EscaneoReglas.mensaje(
+                error, accion: "registrar salidas de almacén", fallback: "No se pudo cargar al personal"
+            )
+        }
+    }
+
+    /// Las actividades abiertas de quien recibe; si no se pueden leer, queda el motivo escrito.
+    @MainActor
+    private func cargarActividades() async {
+        actividad = nil
+        guard let id = recibe?.id else {
+            actividades = []
+            return
+        }
+        actividades = (try? await EscaneoRepository.shared.actividadesDeReceptor(id)) ?? []
     }
 
     @MainActor
@@ -284,20 +424,54 @@ struct MovimientoPorCodigoVista: View {
             return
         }
         guard let cantidad = cantidadLeida, let almacen = almacenElegido else { return }
+        let series = EvidenciaSalidaReglas.series(seriesTexto)
+        let piezas = EvidenciaSalidaReglas.piezas(
+            cantidad: cantidad, piezasPorCaja: r.esCaja ? r.packaging?.piezasPorUnidad : nil
+        )
+        let faltaEvidencia = EvidenciaSalidaReglas.errorSeries(series: series.count, piezas: piezas)
+            ?? (esSalida
+                ? EvidenciaSalidaReglas.errorSalida(
+                    recibeId: recibe?.id, fotos: fotos.count, actividadId: actividad?.id, motivo: notas
+                )
+                : nil)
+        if let faltaEvidencia {
+            error = faltaEvidencia
+            return
+        }
         guardando = true
         error = nil
         defer { guardando = false }
         let nota = notas.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
-            try await EscaneoRepository.shared.movimientoPorCodigo(MovimientoPorCodigoBody(
+            let movimientoId = try await EscaneoRepository.shared.movimientoPorCodigo(MovimientoPorCodigoBody(
                 codigo: r.codigoBarras ?? r.product?.sku ?? "",
                 type: movimiento.api,
                 quantity: cantidad,
                 fromWarehouseId: movimiento == .salida ? almacen : nil,
                 toWarehouseId: movimiento == .entrada ? almacen : nil,
-                notes: nota.isEmpty ? nil : nota
+                notes: nota.isEmpty ? nil : nota,
+                activityId: esSalida ? actividad?.id : nil,
+                series: series.isEmpty ? nil : series,
+                recibidoPorId: esSalida ? recibe?.id : nil
             ))
-            onHecho(EscaneoReglas.avisoMovimiento(movimiento, cantidad: cantidad, unidad: unidad, producto: r.product?.name))
+            let aviso = EscaneoReglas.avisoMovimiento(
+                movimiento, cantidad: cantidad, unidad: unidad, producto: r.product?.name
+            )
+            // Las fotos van sobre el movimiento ya hecho: si no suben, la salida queda registrada
+            // y se dice que faltan (en la web salen marcadas «Sin foto»).
+            var fotosSubidas = true
+            if esSalida, !fotos.isEmpty {
+                if let movimientoId {
+                    do {
+                        try await EscaneoRepository.shared.evidenciaDeMovimiento(id: movimientoId, fotos: fotos)
+                    } catch {
+                        fotosSubidas = false
+                    }
+                } else {
+                    fotosSubidas = false
+                }
+            }
+            onHecho(fotosSubidas ? aviso : EvidenciaSalidaReglas.avisoFotosPendientes(aviso))
         } catch {
             self.error = EscaneoReglas.mensaje(
                 error, accion: "registrar movimientos de almacén", fallback: "No se pudo registrar el movimiento"

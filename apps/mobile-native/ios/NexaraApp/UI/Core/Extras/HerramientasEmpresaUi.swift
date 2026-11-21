@@ -150,6 +150,8 @@ struct TarjetaPrestamoEmpresa: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
 
+            EvidenciaDelPrestamo(prestamo: prestamo)
+
             if let accion {
                 Button(accion.etiqueta) { onAccion(accion) }
                     .buttonStyle(HerrBotonContornoStyle(alto: 48))

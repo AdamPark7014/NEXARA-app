@@ -31,6 +31,7 @@ import mx.nexara.mobile.nativeapp.data.api.KitAsignacionDto
 import mx.nexara.mobile.nativeapp.data.api.KitPiezaDto
 import mx.nexara.mobile.nativeapp.data.api.PrestamoHerramientaDto
 import mx.nexara.mobile.nativeapp.data.api.RenovacionPendienteDto
+import mx.nexara.mobile.nativeapp.ui.common.GeoPhoto
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreCabecera
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreFilaDePastillas
 import mx.nexara.mobile.nativeapp.ui.console.more.MorePastilla
@@ -268,6 +269,7 @@ private fun TarjetaPrestamoEmpresa(
         if (devolver.isNotEmpty()) {
             Text("Devolver el $devolver", style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
         }
+        EvidenciaDelPrestamo(prestamo)
         accion?.let { hecha ->
             if (hecha == HerramientasRules.AccionAlmacen.NUEVO_CODIGO) {
                 Text(
@@ -372,42 +374,30 @@ internal fun DialogoAlmacen(
     enviando: Boolean,
     error: String?,
     onCerrar: () -> Unit,
-    onEntregar: (PrestamoHerramientaDto, String?) -> Unit,
-    onRecibir: (PrestamoHerramientaDto, String?) -> Unit,
+    onEntregar: (PrestamoHerramientaDto, String?, List<GeoPhoto>) -> Unit,
+    onRecibir: (PrestamoHerramientaDto, EvidenciaPrestamoRules.Condicion, String?, List<GeoPhoto>) -> Unit,
     onRechazarPrestamo: (PrestamoHerramientaDto, String) -> Unit,
     onRechazarRenovacion: (RenovacionPendienteDto, String) -> Unit,
 ) {
     when (dialogo) {
-        is DialogoDeAlmacen.Entregar -> {
-            val pideCodigo = HerramientasRules.pideCodigo(dialogo.prestamo)
-            DialogoConTexto(
-                titulo = HerramientasRules.tituloPrestamo(dialogo.prestamo),
-                explicacion = if (pideCodigo) {
-                    "Teclea el código que te enseña ${HerramientasRules.personaDe(dialogo.prestamo)}."
-                } else {
-                    "Se la entregas a ${HerramientasRules.personaDe(dialogo.prestamo)}."
-                },
-                etiquetaCampo = if (pideCodigo) "Código para recoger" else null,
-                maximo = 12,
-                confirmar = "Entregar",
-                listo = { texto -> !pideCodigo || texto.isNotBlank() },
-                enviando = enviando,
-                error = error,
-                onCerrar = onCerrar,
-                onConfirmar = { texto -> onEntregar(dialogo.prestamo, texto.trim().takeIf { pideCodigo }) },
-            )
-        }
-        is DialogoDeAlmacen.Recibir -> DialogoConTexto(
+        // Entregar y recibir llevan evidencia (21-11-2026): fotos de cómo sale y de cómo vuelve.
+        is DialogoDeAlmacen.Entregar -> HojaEntregarHerramienta(
             titulo = HerramientasRules.tituloPrestamo(dialogo.prestamo),
-            explicacion = "La regresa ${HerramientasRules.personaDe(dialogo.prestamo)}. " +
-                "Con daño, queda en reparación.",
-            etiquetaCampo = "¿Llegó con daño? Descríbelo (opcional)",
-            confirmar = "Recibir",
-            listo = { true },
+            persona = HerramientasRules.personaDe(dialogo.prestamo),
+            pideCodigo = HerramientasRules.pideCodigo(dialogo.prestamo),
             enviando = enviando,
             error = error,
+            onEntregar = { codigo, fotos -> onEntregar(dialogo.prestamo, codigo, fotos) },
             onCerrar = onCerrar,
-            onConfirmar = { texto -> onRecibir(dialogo.prestamo, texto.trim().takeIf { it.isNotEmpty() }) },
+        )
+        is DialogoDeAlmacen.Recibir -> HojaRecibirHerramienta(
+            titulo = HerramientasRules.tituloPrestamo(dialogo.prestamo),
+            persona = HerramientasRules.personaDe(dialogo.prestamo),
+            fotosDeSalida = EvidenciaPrestamoRules.urls(dialogo.prestamo.deliveryPhotos),
+            enviando = enviando,
+            error = error,
+            onRecibir = { condicion, descripcion, fotos -> onRecibir(dialogo.prestamo, condicion, descripcion, fotos) },
+            onCerrar = onCerrar,
         )
         is DialogoDeAlmacen.RechazarPrestamo -> DialogoConTexto(
             titulo = "Rechazar préstamo",

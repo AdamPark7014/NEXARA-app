@@ -13,6 +13,12 @@ import {
   type StockMovementPdfRow,
 } from './stock-movement-pdf.js';
 import { EmpaqueInvalidoError, convertirCaptura, type Empaque } from './empaque.js';
+import {
+  normalizarFotosMovimiento,
+  normalizarSeries,
+  sumarEvidencia,
+  validarSeriesContraCantidad,
+} from './evidencia-salida.js';
 import { clasificarCodigo, variantesDeBusqueda } from './codigo-barras.js';
 
 const COGS_MOVEMENT_TYPES = new Set(['DISPATCH', 'SCRAP', 'PRODUCTION_OUT']);
@@ -414,6 +420,10 @@ export class WarehouseService {
     packagingId?: number;
     unidadCaptura?: string;
     cantidadCapturada?: number;
+    /** Evidencia de la salida: serie de cada pieza, quién recibe y fotos ya subidas. */
+    series?: unknown;
+    recibidoPorId?: number | null;
+    fotos?: unknown;
   }, userId: number, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     const normalizedType = dto.type === 'IN' ? 'RECEIPT'
@@ -446,6 +456,23 @@ export class WarehouseService {
       throw err;
     }
     const quantity = captura.quantity;
+
+    // Evidencia (Adam 21-11): una serie es una pieza, y quien recibe es personal activo de la empresa.
+    const series = normalizarSeries(dto.series);
+    validarSeriesContraCantidad(series, quantity);
+    const fotos = normalizarFotosMovimiento(dto.fotos);
+    let recibidoPorId: number | null = null;
+    if (dto.recibidoPorId != null && String(dto.recibidoPorId) !== '') {
+      recibidoPorId = Number(dto.recibidoPorId);
+      if (!Number.isInteger(recibidoPorId) || recibidoPorId <= 0) {
+        throw new BadRequestException('Elige quién recibe el material');
+      }
+      const receptor = await this.prisma.user.findFirst({
+        where: { id: recibidoPorId, isActive: true, companyMemberships: { some: { companyId: tenantId } } },
+        select: { id: true },
+      });
+      if (!receptor) throw new BadRequestException('Quien recibe el material no es personal activo de la empresa');
+    }
 
     if (dto.fromWarehouseId) {
       const fromWh = await this.prisma.warehouse.findFirst({
@@ -556,6 +583,9 @@ export class WarehouseService {
           projectId,
           createdById: userId,
           companyId: tenantId,
+          recibidoPorId,
+          ...(series.length ? { series } : {}),
+          ...(fotos.length ? { fotos } : {}),
         },
         include: {
           product: true,
@@ -565,6 +595,7 @@ export class WarehouseService {
           productionOrder: { select: { id: true, orderNumber: true } },
           activity: { select: { id: true, anNumber: true, titulo: true } },
           createdBy: { select: { id: true, nombre: true } },
+          recibidoPor: { select: { id: true, nombre: true } },
         },
       });
     });
@@ -810,9 +841,74 @@ export class WarehouseService {
         purchaseOrder: { select: { id: true, poNumber: true } },
         productionOrder: { select: { id: true, orderNumber: true } },
         activity: { select: { id: true, anNumber: true, titulo: true } },
+        recibidoPor: { select: { id: true, nombre: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 500,
+    });
+  }
+
+  /** Personal activo de la empresa, para elegir quién recibe el material de una salida. */
+  async receptoresDeMaterial(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    return this.prisma.user.findMany({
+      where: { isActive: true, companyMemberships: { some: { companyId: tenantId } } },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: 'asc' },
+      take: 500,
+    });
+  }
+
+  /**
+   * Actividades abiertas de quien recibe: la salida se liga a una de ellas para que el material
+   * quede cargado al trabajo (y a su proyecto).
+   */
+  async actividadesAbiertasDe(userId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const filas = await this.prisma.activityAssignee.findMany({
+      where: { userId, retiradoAt: null, ...companyWhere(tenantId), activity: { deletedAt: null } },
+      select: {
+        activity: { select: { id: true, anNumber: true, titulo: true, estatus: true, projectId: true } },
+      },
+      orderBy: { id: 'desc' },
+      take: 100,
+    });
+    return filas
+      .map((f) => f.activity)
+      .filter((a): a is NonNullable<typeof a> => Boolean(a))
+      .filter((a) => !/^(finalizada|completada|cancelada|cerrada|no cumplida)/i.test(a.estatus || ''))
+      .map((a) => ({ id: a.id, anNumber: a.anNumber, titulo: a.titulo, projectId: a.projectId ?? null }));
+  }
+
+  /**
+   * Agrega fotos y números de serie a un movimiento ya registrado (la foto de lo que sale y la
+   * de cada etiqueta de serie). Suma a lo que había; no borra evidencia ni cambia existencias.
+   */
+  async agregarEvidenciaMovimiento(
+    id: number,
+    evidencia: { fotos?: unknown; series?: unknown },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const movimiento = await this.prisma.stockMovement.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+      select: { id: true, quantity: true, fotos: true, series: true },
+    });
+    if (!movimiento) throw new NotFoundException('Movimiento no encontrado');
+
+    const suma = sumarEvidencia({ fotos: movimiento.fotos, series: movimiento.series }, evidencia);
+    validarSeriesContraCantidad(suma.series, Number(movimiento.quantity));
+    if (!suma.fotos.length && !suma.series.length) {
+      throw new BadRequestException('Agrega al menos una foto o un número de serie');
+    }
+
+    return this.prisma.stockMovement.update({
+      where: { id: movimiento.id },
+      data: {
+        ...(suma.fotos.length ? { fotos: suma.fotos } : {}),
+        ...(suma.series.length ? { series: suma.series } : {}),
+      },
+      select: { id: true, movementNumber: true, fotos: true, series: true },
     });
   }
 

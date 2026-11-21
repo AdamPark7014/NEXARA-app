@@ -1,5 +1,40 @@
 # RELEVO
 
+- **21-11 ~15:45 México (claude-code, nube; Cursor/Codex no alcanzables) — Evidencia en cada entrega: herramientas y almacén (API, web, Android, iOS). En main, NO desplegado. Antes, en la misma sesión: 295c1a8 (capa visual «Firma NEXARA v3») y d17bf58 (fuentes con `next/font/local`), tampoco desplegados.**
+  - Ola 1 del plan https://claude.ai/artifact/8mmmcCKxyzWUbQ7xv2VcDn (NEXARA contra los líderes de flotilla, herramienta,
+    almacén e ingeniería). Vehículos lo lleva el hilo de perfiles; el acceso con rostro al área restringida, el de la VPN.
+  - Migración `20261121204500_evidencia_prestamos_y_salidas` (aditiva, columnas anulables): `tool_requests`
+    (deliveryPhotos, deliveredById, returnCondition, returnPhotos, returnNotes, receivedById) y `stock_movements`
+    (fotos, series, recibidoPorId). Fotos en `uploads/tools` y `uploads/almacen`, servidas tras sesión.
+  - Herramientas: `POST tool-requests/:id/deliver` y `/return` aceptan JSON (como antes) o multipart con `fotos`.
+    `return` con `condicion` (BIEN | DESGASTE | DANADA | INCOMPLETA | EXTRAVIADA) exige foto (salvo extraviada) y
+    explicación (salvo bien o desgaste); dañada o incompleta → pieza IN_REPAIR, extraviada → RETIRED. Sin `condicion`
+    vale la regla vieja (con `damageDescription` = dañada), para las apps publicadas. Reglas puras en
+    `tool-requests/evidencia-prestamo.ts`. La entrega sin foto NO se rechaza en el servidor todavía: las apps
+    publicadas no mandan fotos; la web y las apps nuevas la exigen y las listas marcan «Salió sin foto».
+    Cuando las tiendas tengan la versión nueva se puede volver obligatoria en la API.
+  - Almacén: `POST stock/movements` y `/por-codigo` aceptan `series`, `recibidoPorId`, `activityId`;
+    `GET stock/receptores`, `GET stock/receptores/:id/actividades`, `POST stock/movements/:id/evidencia`
+    (8 fotos por subida, 12 por movimiento). Reglas en `warehouse/evidencia-salida.ts`. Igual: el servidor acepta la
+    salida sin evidencia (apps viejas) y Movimientos la marca «Sin foto», «Sin responsable», «Sin actividad».
+  - Web: `components/herramientas/EvidenciaPrestamo.tsx` (hojas de entregar y recibir, antes y después) y
+    `MisPrestamos.tsx`; `ToolRequestsTable` leía mal a quien pidió y quien aprobó (salía «N/A»), corregido en
+    `lib/tool-requests-api.ts`. Almacén: `VistaAlmacen.tsx` (diálogo de movimiento y visor de evidencia) y
+    `ScannerAlmacenPanel.tsx`; las series entran con el lector USB, una por renglón.
+  - Android: `ui/console/herramientas/HerramientasEvidencia.kt` + `EvidenciaPrestamoRules.kt`,
+    `ui/console/more/EvidenciaSalidaRules.kt` y `AlmacenEscaneo.kt`. iOS: `UI/Core/Extras/HerramientasEvidencia.swift`,
+    `EvidenciaReglas.swift`, `AlmacenEscaneo.swift`; el modo demostración lee los campos del multipart en
+    `tool-requests` y tiene `stock/receptores`. Las fotos se toman con la cámara en vivo, no de la galería.
+  - Pendiente (olas siguientes, ver el plan): tablero y suplente de Iván, carrito de varias herramientas, devolución
+    de kit con faltantes, avisos push, bloque de vehículo/herramienta/material en la actividad, IA que lea series y
+    compare antes/después, ciclo de vida por número de serie, devolución contra salida. Publicar las apps pide el
+    OK de Adam.
+  - Verificación: sobre lo último de main (con 8c207c1): prisma generate y tsc de API y web en 0; jest 6535/6539, las 4 fallas
+    son `accounting/qa-adversarial.spec.ts` por la zona horaria del contenedor (UTC; con `TZ=America/Mexico_City`
+    pasan 23/23, archivo sin tocar); vitest 2364/2365, la falla es `ComoSeHace.spec.tsx` («Durante»), del hilo de
+    actividades y sin tocar. Android e iOS no se pueden compilar en la nube: los compila el CI al subir. iOS no
+    tiene objetivo de pruebas unitarias; `scripts/ios-static-check.py` sin problemas.
+
 - **21-11 ~15:40 México (claude-code, nube; Cursor/Codex no alcanzables) — Vehículos: captura guiada de 5 pasos, daños con IA, incidencias y avisos de retraso. Solo API. En main 8c207c1; llegó a producción con el despliegue de otro hilo (21-11 21:31 UTC), migración aplicada, interruptor apagado.**
   - Todo detrás de `vehiculos.captura_guiada` (system_settings, apagado por omisión; en prod NO existe la fila). Apagado:
     se acepta el checklist de 7 fotos, el km menor al último registro entra con alerta `KM_MENOR` (no bloquea), no se

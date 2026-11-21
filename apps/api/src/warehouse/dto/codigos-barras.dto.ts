@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -125,4 +127,18 @@ export class MovimientoPorCodigoDto {
   @IsInt()
   @Min(1)
   activityId?: number;
+
+  /** Número de serie de cada pieza que sale o entra (una serie por pieza). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200, { message: 'Son demasiados números de serie para un solo movimiento' })
+  @IsString({ each: true })
+  @MaxLength(80, { each: true, message: 'Un número de serie no puede pasar de 80 caracteres' })
+  series?: string[];
+
+  /** Quién recibe el material en una salida. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  recibidoPorId?: number;
 }

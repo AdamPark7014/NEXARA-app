@@ -517,6 +517,9 @@ struct TarjetaPrestamo: View {
                 devolver: devolver, plazo: plazo, codigo: codigoVigente ? codigo : nil
             ))
 
+            // Fuera del bloque de arriba: ese se lee de corrido y aquí cada foto se abre con un toque.
+            EvidenciaDelPrestamo(prestamo: prestamo)
+
             if HerramientasReglas.sePuedeRenovar(prestamo) {
                 Button("Pedir más plazo", action: onRenovar)
                     .buttonStyle(HerrBotonContornoStyle(alto: 48))

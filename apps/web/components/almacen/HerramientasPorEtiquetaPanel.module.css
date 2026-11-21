@@ -13,16 +13,8 @@
   color: var(--ui-fg-2);
 }
 
-.campoDano {
-  max-width: 520px;
-}
-
 @media (max-width: 640px) {
   .cuerpo {
     padding: var(--ui-s3) var(--ui-s4) var(--ui-s4);
-  }
-
-  .campoDano {
-    max-width: none;
   }
 }

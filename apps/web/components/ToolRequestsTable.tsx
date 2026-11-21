@@ -13,13 +13,13 @@ import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
 import { exportToExcel } from "@/lib/export-excel";
 import {
+  CONDICION_DEVOLUCION,
   approveToolRequest,
-  deliverToolRequest,
   listToolRequests,
   rejectToolRequest,
-  returnToolRequest,
   toolRequestStatusLabel,
   toolRequestStatusVariant,
+  type CondicionDevolucion,
   type ToolRequestRow,
 } from "@/lib/tool-requests-api";
 import FinesTable from "./FinesTable";
@@ -44,6 +44,8 @@ import {
 import { tonoDeVariante } from "./almacen/PiezasAlmacen";
 import { useUser } from "./UserContext";
 import ToolLoanTimeline from "./ToolLoanTimeline";
+import { DialogoDevolucion, DialogoEntrega, VisorEvidencia, faltaEvidencia } from "./herramientas/EvidenciaPrestamo";
+import { toast } from "./Toast";
 import s from "./ToolRequestsTable.module.css";
 
 const STATUS_OPTIONS = [
@@ -136,24 +138,16 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
       fn: (adminNotes) => void runAction(r.id, () => rejectToolRequest(token, r.id, adminNotes)),
     });
 
-  const entregar = (r: ToolRequestRow) =>
-    setPedir({
-      titulo: `Entregar ${r.toolName}`,
-      descripcion: "Pide el código de recolección a quien la recoge.",
-      etiqueta: "Código de recolección",
-      confirmar: "Entregar",
-      minimo: 1,
-      fn: (codigo) => void runAction(r.id, () => deliverToolRequest(token, r.id, codigo)),
-    });
-
-  const recibir = (r: ToolRequestRow) =>
-    setPedir({
-      titulo: `Recibir ${r.toolName}`,
-      descripcion: "Déjalo vacío si llegó en buen estado.",
-      etiqueta: "Descripción del daño",
-      confirmar: "Recibir",
-      fn: (damageDescription) => void runAction(r.id, () => returnToolRequest(token, r.id, damageDescription)),
-    });
+  // Entregar y recibir piden evidencia (fotos de antes y después): cada uno abre su diálogo.
+  const [entregando, setEntregando] = useState<ToolRequestRow | null>(null);
+  const [recibiendo, setRecibiendo] = useState<ToolRequestRow | null>(null);
+  const [viendo, setViendo] = useState<ToolRequestRow | null>(null);
+  const entregar = (r: ToolRequestRow) => setEntregando(r);
+  const recibir = (r: ToolRequestRow) => setRecibiendo(r);
+  const alTerminar = (mensaje: string) => {
+    toast.success(mensaje);
+    void load();
+  };
 
   /** Lo que queda tras la búsqueda: sobre esto cuentan los chips de estado. */
   const buscadas = useMemo(() => {
@@ -239,6 +233,27 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
         );
       },
       width: 260,
+    },
+    {
+      key: "evidencia",
+      label: "Evidencia",
+      render: (r) => {
+        const falta = faltaEvidencia(r);
+        const fotos = r.deliveryPhotos.length + r.returnPhotos.length;
+        if (!falta.hay && !falta.entrega && !falta.devolucion) return <span className={s.tenue}>—</span>;
+        return (
+          <span className={s.insignias}>
+            {falta.hay ? (
+              <Button size="sm" variant="ghost" onClick={() => setViendo(r)}>
+                Ver {fotos} {fotos === 1 ? "foto" : "fotos"}
+              </Button>
+            ) : null}
+            {falta.entrega ? <StatusBadge label="Salió sin foto" tone="warning" size="sm" /> : null}
+            {falta.devolucion ? <StatusBadge label="Volvió sin foto" tone="warning" size="sm" /> : null}
+          </span>
+        );
+      },
+      width: 170,
     },
     { key: "requestDate", label: "Solicitado", render: (r) => <span className={s.fecha}>{fmtDate(r.requestDate)}</span>, width: 116 },
     {
@@ -428,6 +443,15 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
                       label: "Devolución",
                       format: (v) => fmtDate(v ? String(v) : null),
                     },
+                    { key: "deliveredByName", label: "Entregó", format: (v) => String(v ?? "") },
+                    { key: "receivedByName", label: "Recibió", format: (v) => String(v ?? "") },
+                    {
+                      key: "returnCondition",
+                      label: "Cómo volvió",
+                      format: (v) => (v ? (CONDICION_DEVOLUCION[v as CondicionDevolucion]?.etiqueta ?? String(v)) : ""),
+                    },
+                    { key: "deliveryPhotos", label: "Fotos de antes", format: (v) => String((v as string[] | null)?.length ?? 0) },
+                    { key: "returnPhotos", label: "Fotos de después", format: (v) => String((v as string[] | null)?.length ?? 0) },
                   ],
                   "solicitudes-herramientas",
                   "Solicitudes de herramientas",
@@ -475,6 +499,41 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
 
       <FinesTable tipo="herramienta" showUser={true} />
       <PedirTexto estado={pedir} onCerrar={() => setPedir(null)} />
+      <DialogoEntrega
+        token={token}
+        prestamo={
+          entregando
+            ? {
+                id: entregando.id,
+                toolName: entregando.toolName,
+                detalle: `${entregando.model} · Serie ${entregando.serialNumber}`,
+                persona: entregando.requestedByName === "N/A" ? null : entregando.requestedByName,
+                // Solo se pide teclearlo si la solicitud tiene código (las anteriores a los códigos no).
+                pideCodigo: Boolean(entregando.pickupCode),
+              }
+            : null
+        }
+        onCerrar={() => setEntregando(null)}
+        onListo={alTerminar}
+      />
+      <DialogoDevolucion
+        token={token}
+        prestamo={
+          recibiendo
+            ? {
+                id: recibiendo.id,
+                toolName: recibiendo.toolName,
+                detalle: `${recibiendo.model} · Serie ${recibiendo.serialNumber}`,
+                persona: recibiendo.requestedByName === "N/A" ? null : recibiendo.requestedByName,
+                fotosEntrega: recibiendo.deliveryPhotos,
+                entregadaEl: recibiendo.deliveryDate,
+              }
+            : null
+        }
+        onCerrar={() => setRecibiendo(null)}
+        onListo={alTerminar}
+      />
+      <VisorEvidencia prestamo={viendo} onCerrar={() => setViendo(null)} />
     </div>
   );
 };

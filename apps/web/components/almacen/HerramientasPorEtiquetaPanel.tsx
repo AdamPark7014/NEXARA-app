@@ -1,16 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Button, Card, CardHead, Field, Input, StatusBadge, type Tone } from "@/components/base";
+import { Alert, Button, Card, CardHead, StatusBadge, type Tone } from "@/components/base";
+import { DialogoDevolucion, DialogoEntrega } from "@/components/herramientas/EvidenciaPrestamo";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
-import {
-  buscarHerramientaPorCodigo,
-  devolverHerramienta,
-  entregarConCodigo,
-  type HallazgoDeHerramienta,
-} from "@/lib/almacen-api";
+import { buscarHerramientaPorCodigo, type HallazgoDeHerramienta } from "@/lib/almacen-api";
 import { ATRIBUTO_CAMPO_LECTOR, useLectorDeCodigos } from "@/lib/lector-codigos";
 import { CampoEscaneo, TarjetaHallazgo, claseMono } from "./PiezasAlmacen";
 import s from "./HerramientasPorEtiquetaPanel.module.css";
@@ -46,14 +42,15 @@ export default function HerramientasPorEtiquetaPanel({ onCambio, activo = true }
 
   const [codigo, setCodigo] = useState("");
   const [buscando, setBuscando] = useState(false);
-  const [guardando, setGuardando] = useState(false);
   const [hallazgo, setHallazgo] = useState<HallazgoDeHerramienta | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [dano, setDano] = useState("");
+  // Entregar y recibir piden fotos de antes y después: cada uno abre su diálogo.
+  const [dialogo, setDialogo] = useState<"entregar" | "recibir" | null>(null);
 
   useEffect(() => {
-    ocupadoRef.current = buscando || guardando;
-  }, [buscando, guardando]);
+    // Con un diálogo abierto, un disparo del lector no debe cambiar la herramienta de fondo.
+    ocupadoRef.current = buscando || dialogo !== null;
+  }, [buscando, dialogo]);
 
   const buscar = useCallback(
     async (crudo: string) => {
@@ -62,7 +59,6 @@ export default function HerramientasPorEtiquetaPanel({ onCambio, activo = true }
       setBuscando(true);
       setAviso(null);
       setHallazgo(null);
-      setDano("");
       try {
         const r = await buscarHerramientaPorCodigo(token, limpio);
         if (r) setHallazgo(r);
@@ -82,44 +78,8 @@ export default function HerramientasPorEtiquetaPanel({ onCambio, activo = true }
   const terminar = (mensaje: string) => {
     toast.success(mensaje);
     setHallazgo(null);
-    setDano("");
     onCambio?.();
     campoRef.current?.focus();
-  };
-
-  const entregar = async () => {
-    const prestamo = hallazgo?.prestamo;
-    if (!token || !hallazgo || !prestamo) return;
-    setGuardando(true);
-    try {
-      await entregarConCodigo(token, prestamo.id, {
-        pickupCode: prestamo.pickupCode ?? undefined,
-        recogidaPorId: prestamo.usuario?.id,
-      });
-      terminar(`${hallazgo.item.toolName} entregada a ${prestamo.usuario?.nombre ?? "quien la pidió"}`);
-    } catch (e) {
-      setAviso(formatApiError(e, "No se pudo entregar la herramienta"));
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  const recibir = async () => {
-    const prestamo = hallazgo?.prestamo;
-    if (!token || !hallazgo || !prestamo) return;
-    setGuardando(true);
-    try {
-      await devolverHerramienta(token, prestamo.id, dano);
-      terminar(
-        dano.trim()
-          ? `${hallazgo.item.toolName} recibida con daño: pasa a reparación`
-          : `${hallazgo.item.toolName} recibida y de vuelta en almacén`,
-      );
-    } catch (e) {
-      setAviso(formatApiError(e, "No se pudo registrar la devolución"));
-    } finally {
-      setGuardando(false);
-    }
   };
 
   const item = hallazgo?.item;
@@ -176,17 +136,12 @@ export default function HerramientasPorEtiquetaPanel({ onCambio, activo = true }
             insignias={<StatusBadge label={estado.etiqueta} tone={estado.tono} dot />}
             acciones={
               prestamo?.status === "APPROVED" && !prestamo.vencido ? (
-                <Button variant="primary" size="lg" loading={guardando} onClick={() => void entregar()}>
+                <Button variant="primary" size="lg" onClick={() => setDialogo("entregar")}>
                   Entregar a {prestamo.usuario?.nombre ?? "quien la pidió"}
                 </Button>
               ) : prestamo?.status === "IN_USE" ? (
-                <Button
-                  variant="primary"
-                  size="lg"
-                  loading={guardando}
-                  onClick={() => void recibir()}
-                >
-                  {dano.trim() ? "Recibir y mandar a reparación" : "Recibir devolución"}
+                <Button variant="primary" size="lg" onClick={() => setDialogo("recibir")}>
+                  Recibir devolución
                 </Button>
               ) : undefined
             }
@@ -209,10 +164,9 @@ export default function HerramientasPorEtiquetaPanel({ onCambio, activo = true }
                 <p className={s.linea}>
                   La tiene {prestamo.usuario?.nombre ?? "—"} · {paraQue}
                 </p>
-                {/* Sin <form>: el Enter de un lector con el foco aquí no debe registrar la devolución. */}
-                <Field label="¿Llegó dañada? Describe el daño (si está bien, déjalo vacío)" className={s.campoDano}>
-                  <Input controlSize="lg" value={dano} onChange={(e) => setDano(e.target.value)} maxLength={500} />
-                </Field>
+                <p className={s.linea}>
+                  Al recibirla se registra en qué estado vuelve y sus fotos, junto a las de cuando salió.
+                </p>
               </>
             )}
 
@@ -243,6 +197,41 @@ export default function HerramientasPorEtiquetaPanel({ onCambio, activo = true }
           </TarjetaHallazgo>
         )}
       </div>
+
+      <DialogoEntrega
+        token={token}
+        prestamo={
+          dialogo === "entregar" && item && prestamo
+            ? {
+                id: prestamo.id,
+                toolName: item.toolName,
+                detalle: `${item.model} · Serie ${item.serialNumber}`,
+                persona: prestamo.usuario?.nombre ?? null,
+                pickupCode: prestamo.pickupCode,
+                recogidaPorId: prestamo.usuario?.id,
+              }
+            : null
+        }
+        onCerrar={() => setDialogo(null)}
+        onListo={terminar}
+      />
+      <DialogoDevolucion
+        token={token}
+        prestamo={
+          dialogo === "recibir" && item && prestamo
+            ? {
+                id: prestamo.id,
+                toolName: item.toolName,
+                detalle: `${item.model} · Serie ${item.serialNumber}`,
+                persona: prestamo.usuario?.nombre ?? null,
+                fotosEntrega: (prestamo.deliveryPhotos ?? []).map((f) => f.url),
+                entregadaEl: prestamo.deliveryDate ?? null,
+              }
+            : null
+        }
+        onCerrar={() => setDialogo(null)}
+        onListo={terminar}
+      />
     </Card>
   );
 }

@@ -412,10 +412,17 @@ extension DemoStore {
             estado.prestamos[indice]["status"] = "IN_USE"
             porRolAjustarPieza(pieza, estado: "ASSIGNED")
         default:
-            let danio = (json["damageDescription"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            estado.prestamos[indice]["status"] = danio.isEmpty ? "RETURNED" : "DAMAGED"
-            estado.prestamos[indice]["damageDescription"] = danio.isEmpty ? NSNull() as Any : danio as Any
-            porRolAjustarPieza(pieza, estado: danio.isEmpty ? "AVAILABLE" : "IN_REPAIR")
+            // Con `condicion` (evidencia, 21-11-2026) manda ella; sin ella, la regla de antes:
+            // con descripción quedó dañada.
+            let texto = (json["damageDescription"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let condicion = CondicionDeDevolucion.deApi(json["condicion"] as? String)
+            let conDanio = condicion.map { $0.pideExplicacion } ?? !texto.isEmpty
+            estado.prestamos[indice]["status"] = conDanio ? "DAMAGED" : "RETURNED"
+            estado.prestamos[indice]["damageDescription"] = conDanio && !texto.isEmpty ? texto as Any : NSNull() as Any
+            estado.prestamos[indice]["returnCondition"] = condicion.map { $0.rawValue as Any } ?? NSNull() as Any
+            estado.prestamos[indice]["returnNotes"] = !conDanio && !texto.isEmpty ? texto as Any : NSNull() as Any
+            let piezaQueda = condicion == .extraviada ? "RETIRED" : (conDanio ? "IN_REPAIR" : "AVAILABLE")
+            porRolAjustarPieza(pieza, estado: piezaQueda)
         }
         return (200, estado.prestamos[indice])
     }

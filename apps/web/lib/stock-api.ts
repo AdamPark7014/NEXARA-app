@@ -25,11 +25,13 @@ export type StockLevelRow = {
 };
 
 async function stockRequest<T>(path: string, token: string, init: RequestInit = {}, fallbackError: string): Promise<T> {
+  // Con FormData (fotos) el navegador pone el Content-Type con su boundary.
+  const esFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
   const res = await fetch(buildApiUrl(path), {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+      ...(esFormData ? {} : { "Content-Type": "application/json" }),
       ...(init.headers as Record<string, string> | undefined),
     },
   });
@@ -119,9 +121,84 @@ export async function createStockMovement(
     packagingId?: number;
     unidadCaptura?: string;
     cantidadCapturada?: number;
+    /** Evidencia de la salida: serie de cada pieza y quién recibe el material. */
+    series?: string[];
+    recibidoPorId?: number;
   },
 ) {
-  return stockRequest<unknown>("stock/movements", token, { method: "POST", body: JSON.stringify(payload) }, "No se pudo registrar el movimiento");
+  return stockRequest<{ id: number; movementNumber?: string } | null>(
+    "stock/movements",
+    token,
+    { method: "POST", body: JSON.stringify(payload) },
+    "No se pudo registrar el movimiento",
+  );
+}
+
+/** Fotos que acepta el servidor por subida de evidencia de un movimiento. */
+export const MAX_FOTOS_MOVIMIENTO = 8;
+
+/** Agrega fotos (y series) a un movimiento ya registrado. Suma a lo que había. */
+export function agregarEvidenciaMovimiento(token: string, id: number, evidencia: { fotos?: File[]; series?: string[] }) {
+  const form = new FormData();
+  for (const foto of (evidencia.fotos ?? []).slice(0, MAX_FOTOS_MOVIMIENTO)) form.append("fotos", foto);
+  if (evidencia.series?.length) form.append("series", evidencia.series.join("\n"));
+  return stockRequest<{ id: number; fotos?: Array<{ url: string }>; series?: string[] }>(
+    `stock/movements/${id}/evidencia`,
+    token,
+    { method: "POST", body: form },
+    "No se pudo guardar la evidencia del movimiento",
+  );
+}
+
+export type ReceptorDeMaterial = { id: number; nombre: string };
+export type ActividadDeReceptor = { id: number; anNumber: string | null; titulo: string | null; projectId: number | null };
+
+/** Personal que puede recibir el material de una salida. */
+export async function listarReceptores(token: string) {
+  const raw = await stockRequest<ReceptorDeMaterial[]>("stock/receptores", token, {}, "No se pudo cargar al personal");
+  return Array.isArray(raw) ? raw : [];
+}
+
+/** Actividades abiertas de quien recibe, para ligar la salida al trabajo. */
+export async function listarActividadesDeReceptor(token: string, userId: number) {
+  const raw = await stockRequest<ActividadDeReceptor[]>(
+    `stock/receptores/${userId}/actividades`,
+    token,
+    {},
+    "No se pudieron cargar las actividades de esa persona",
+  );
+  return Array.isArray(raw) ? raw : [];
+}
+
+/**
+ * Números de serie como se teclean o se leen con el lector: uno por renglón (también coma o
+ * punto y coma), en mayúsculas y sin repetir. Misma regla que el servidor.
+ */
+export function seriesDeTexto(texto: string): string[] {
+  const vistas = new Set<string>();
+  const salida: string[] = [];
+  for (const cruda of texto.split(/[\n\r,;]+/)) {
+    const serie = cruda.replace(/\s+/g, " ").trim().toUpperCase();
+    if (!serie || serie.length > 80 || vistas.has(serie)) continue;
+    vistas.add(serie);
+    salida.push(serie);
+  }
+  return salida;
+}
+
+/** Qué le falta de evidencia a una salida, para la lista de movimientos. */
+export function evidenciaDeSalida(m: Pick<StockMovementRow, "type" | "fotos" | "series" | "recibidoPor" | "activity" | "projectId">) {
+  const esSalida = m.type === "DISPATCH";
+  const fotos = Array.isArray(m.fotos) ? m.fotos.length : 0;
+  const series = Array.isArray(m.series) ? m.series.length : 0;
+  return {
+    esSalida,
+    fotos,
+    series,
+    sinFoto: esSalida && fotos === 0,
+    sinResponsable: esSalida && !m.recibidoPor,
+    sinLigar: esSalida && !m.activity && !m.projectId,
+  };
 }
 
 export type StockMovementRow = {
@@ -147,6 +224,11 @@ export type StockMovementRow = {
   toWarehouse?: { id: number; name: string; code?: string } | null;
   lot?: { id: number; lotNumber: string } | null;
   createdBy?: { id: number; nombre: string } | null;
+  /** Evidencia de la salida: fotos, serie de cada pieza y quién recibió el material. */
+  fotos?: Array<{ url: string }> | null;
+  series?: string[] | null;
+  recibidoPor?: { id: number; nombre: string } | null;
+  projectId?: number | null;
   purchaseOrder?: { id: number; poNumber: string } | null;
   productionOrder?: { id: number; orderNumber: string } | null;
   activity?: { id: number; anNumber: string; titulo?: string | null } | null;

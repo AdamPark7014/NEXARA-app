@@ -32,6 +32,8 @@ import {
   CardHead,
   DataTable,
   DateInput,
+  EvidenceGallery,
+  EvidencePhoto,
   Field,
   FieldGrid,
   FilterChip,
@@ -51,6 +53,7 @@ import {
   Stat,
   StatRow,
   Tabs,
+  Textarea,
   type Column,
   type TabItem,
 } from "@/components/base";
@@ -97,6 +100,14 @@ import {
   releaseReservation,
   stockMovementDocumentLabel,
   stockMovementBalanceLabel,
+  agregarEvidenciaMovimiento,
+  evidenciaDeSalida,
+  listarActividadesDeReceptor,
+  listarReceptores,
+  seriesDeTexto,
+  MAX_FOTOS_MOVIMIENTO,
+  type ActividadDeReceptor,
+  type ReceptorDeMaterial,
   type StockMovementRow,
   type LotRow,
   type ValuationRow,
@@ -109,6 +120,8 @@ import { formatApiError } from "@/lib/erp-api";
 import { crearEmpaque, listarEmpaques, type Empaque } from "@/lib/almacen-api";
 import { etiquetaCantidad, previsualizarConversion } from "@/lib/empaque";
 import { toast } from "@/components/Toast";
+import { SelectorFotos } from "@/components/herramientas/EvidenciaPrestamo";
+import { resolveAssetUrl } from "@/lib/evidence-display";
 import { exportToExcel } from "@/lib/export-excel";
 import { cantidad, fechaCorta, fechaHoraCorta } from "@/lib/recursos-ui";
 import {
@@ -180,6 +193,10 @@ const MOVIMIENTO_VACIO = {
   notes: "",
   /** Presentación en que se captura («Caja»). Vacío = unidad base. */
   packagingId: "",
+  /** Salida: quién recibe el material, a qué actividad se carga y la serie de cada pieza. */
+  recibidoPorId: "",
+  activityId: "",
+  series: "",
 };
 
 const TITULO_MOVIMIENTO: Record<TipoMovimiento, string> = {
@@ -271,6 +288,13 @@ export function VistaAlmacen({
   const [guardandoEmpaque, setGuardandoEmpaque] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [savingMovement, setSavingMovement] = useState(false);
+  // Evidencia de la salida (Adam 21-11): fotos, quién recibe y a qué actividad se carga.
+  const [movFotos, setMovFotos] = useState<File[]>([]);
+  const [receptores, setReceptores] = useState<ReceptorDeMaterial[]>([]);
+  const [actividadesReceptor, setActividadesReceptor] = useState<ActividadDeReceptor[]>([]);
+  const [verEvidencia, setVerEvidencia] = useState<StockMovementRow | null>(null);
+  const [fotosNuevas, setFotosNuevas] = useState<File[]>([]);
+  const [subiendoEvidencia, setSubiendoEvidencia] = useState(false);
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({ name: "", code: "", address: "", city: "" });
   const [savingWarehouse, setSavingWarehouse] = useState(false);
@@ -439,6 +463,7 @@ export function VistaAlmacen({
     void load();
     if (modo === "alta" && cfg.canCreate) {
       setMovement({ ...MOVIMIENTO_VACIO, productId: String(guardado.id) });
+      setMovFotos([]);
       setShowMovementForm(true);
     }
   };
@@ -564,6 +589,29 @@ export function VistaAlmacen({
 
   const saveMovement = async () => {
     if (!token || !movement.productId || movement.quantity <= 0) return;
+    const esSalida = movement.type === "DISPATCH";
+    const series = seriesDeTexto(movement.series);
+    const empaqueElegido = empaques.find((e) => String(e.id) === movement.packagingId);
+    const piezasDelMovimiento = empaqueElegido ? movement.quantity * Number(empaqueElegido.piezasPorUnidad) : movement.quantity;
+    if (esSalida) {
+      // Lo que sale del almacén lleva responsable, foto y a qué trabajo se carga (o por qué no).
+      if (!movement.recibidoPorId) {
+        toast.error("Elige quién recibe el material");
+        return;
+      }
+      if (movFotos.length === 0) {
+        toast.error("Toma al menos una foto de lo que sale");
+        return;
+      }
+      if (!movement.activityId && !movement.notes.trim()) {
+        toast.error("Liga la salida a una actividad o escribe el motivo");
+        return;
+      }
+    }
+    if (series.length > 0 && series.length > Math.ceil(piezasDelMovimiento)) {
+      toast.error(`Hay ${series.length} números de serie y el movimiento es de ${cantidad(piezasDelMovimiento)} pieza(s)`);
+      return;
+    }
     if (movement.type === "TRANSFER") {
       if (!movement.warehouseId || !movement.toWarehouseId) return;
       if (movement.warehouseId === movement.toWarehouseId) {
@@ -586,6 +634,9 @@ export function VistaAlmacen({
         cantidadCapturada: movement.packagingId ? movement.quantity : undefined,
         reference: movement.reference.trim() || undefined,
         notes: movement.notes.trim() || undefined,
+        series: series.length ? series : undefined,
+        recibidoPorId: esSalida && movement.recibidoPorId ? Number(movement.recibidoPorId) : undefined,
+        activityId: esSalida && movement.activityId ? Number(movement.activityId) : undefined,
       };
       if (movement.type === "RECEIPT" || movement.type === "ADJUSTMENT" || movement.type === "RETURN") {
         payload.toWarehouseId = Number(movement.warehouseId);
@@ -595,20 +646,86 @@ export function VistaAlmacen({
         payload.fromWarehouseId = Number(movement.warehouseId);
         payload.toWarehouseId = Number(movement.toWarehouseId);
       }
-      await createStockMovement(token, payload);
+      const creado = await createStockMovement(token, payload);
+      // Las fotos van aparte, sobre el movimiento ya registrado: si la subida falla, la salida
+      // queda hecha y marcada «Sin foto» para agregarlas desde la lista.
+      let fotosPendientes = false;
+      if (movFotos.length > 0 && creado?.id) {
+        try {
+          await agregarEvidenciaMovimiento(token, creado.id, { fotos: movFotos });
+        } catch {
+          fotosPendientes = true;
+        }
+      }
       const movedProductId = Number(movement.productId);
       setShowMovementForm(false);
       setMovement({ ...MOVIMIENTO_VACIO });
+      setMovFotos([]);
       void load();
       if (tab === "movimientos") void loadMovements();
       if (productTrace?.productId === movedProductId) {
         void openProductTrace(movedProductId, productTrace.sku, productTrace.name);
       }
-      toast.success("Movimiento registrado");
+      if (fotosPendientes) {
+        toast.warning("Movimiento registrado, pero las fotos no se subieron. Agrégalas desde la lista de movimientos.");
+      } else {
+        toast.success("Movimiento registrado");
+      }
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo registrar el movimiento"));
     } finally {
       setSavingMovement(false);
+    }
+  };
+
+  // Quién puede recibir: se pide la primera vez que se abre una salida.
+  useEffect(() => {
+    if (!token || !showMovementForm || movement.type !== "DISPATCH" || receptores.length > 0) return;
+    let vigente = true;
+    void listarReceptores(token)
+      .then((res) => {
+        if (vigente) setReceptores(res);
+      })
+      .catch((e) => toast.error(formatApiError(e, "No se pudo cargar al personal")));
+    return () => {
+      vigente = false;
+    };
+  }, [token, showMovementForm, movement.type, receptores.length]);
+
+  // Actividades abiertas de quien recibe: la salida se carga a un trabajo, no «a nadie».
+  useEffect(() => {
+    const userId = Number(movement.recibidoPorId);
+    if (!token || !showMovementForm || !Number.isFinite(userId) || userId <= 0) {
+      setActividadesReceptor([]);
+      return;
+    }
+    let vigente = true;
+    void listarActividadesDeReceptor(token, userId)
+      .then((res) => {
+        if (vigente) setActividadesReceptor(res);
+      })
+      .catch(() => {
+        if (vigente) setActividadesReceptor([]);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [token, showMovementForm, movement.recibidoPorId]);
+
+  const subirEvidenciaPendiente = async () => {
+    if (!token || !verEvidencia || fotosNuevas.length === 0) return;
+    setSubiendoEvidencia(true);
+    try {
+      const res = await agregarEvidenciaMovimiento(token, verEvidencia.id, { fotos: fotosNuevas });
+      const fotos = res?.fotos ?? verEvidencia.fotos ?? [];
+      setMovements((lista) => lista.map((m) => (m.id === verEvidencia.id ? { ...m, fotos } : m)));
+      setVerEvidencia((m) => (m ? { ...m, fotos } : m));
+      setFotosNuevas([]);
+      toast.success("Fotos agregadas al movimiento");
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudieron subir las fotos"));
+    } finally {
+      setSubiendoEvidencia(false);
     }
   };
 
@@ -1171,6 +1288,43 @@ export function VistaAlmacen({
       width: 130,
     },
     {
+      // Evidencia de la salida (21-11): quién se lo llevó, fotos y series; lo que falta, a la vista.
+      key: "evidencia",
+      label: "Evidencia",
+      render: (m) => {
+        const ev = evidenciaDeSalida(m);
+        if (!ev.esSalida && ev.fotos === 0 && ev.series === 0) return sinDato;
+        const cuenta = [
+          ev.fotos > 0 ? `${ev.fotos} foto${ev.fotos === 1 ? "" : "s"}` : null,
+          ev.series > 0 ? `${ev.series} serie${ev.series === 1 ? "" : "s"}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        return (
+          <span className={s.evidencia}>
+            {m.recibidoPor?.nombre ? <span className={s.fuerte}>{m.recibidoPor.nombre}</span> : null}
+            {cuenta ? (
+              <LinkButton className={s.enlace} onClick={() => { setFotosNuevas([]); setVerEvidencia(m); }}>
+                Ver {cuenta}
+              </LinkButton>
+            ) : null}
+            {ev.sinFoto || ev.sinResponsable || ev.sinLigar ? (
+              <span className={s.faltantes}>
+                {ev.sinFoto ? (
+                  <button type="button" className={s.faltante} onClick={() => { setFotosNuevas([]); setVerEvidencia(m); }}>
+                    <Badge tone="warning" size="sm">Sin foto</Badge>
+                  </button>
+                ) : null}
+                {ev.sinResponsable ? <Badge tone="warning" size="sm">Sin responsable</Badge> : null}
+                {ev.sinLigar ? <Badge tone="neutral" size="sm">Sin actividad</Badge> : null}
+              </span>
+            ) : null}
+          </span>
+        );
+      },
+      width: 190,
+    },
+    {
       key: "createdAt",
       label: "Fecha",
       render: (m) => (
@@ -1348,6 +1502,9 @@ export function VistaAlmacen({
     elegido ? { ...elegido, piezasPorUnidad: Number(elegido.piezasPorUnidad) } : null,
   );
   const esEntrada = movement.type === "RECEIPT" || movement.type === "ADJUSTMENT" || movement.type === "RETURN";
+  const esSalidaDeAlmacen = movement.type === "DISPATCH";
+  const seriesCapturadas = seriesDeTexto(movement.series);
+  const piezasEnPantalla = elegido ? movement.quantity * Number(elegido.piezasPorUnidad) : movement.quantity;
   const movimientoIncompleto =
     !movement.productId || !movement.warehouseId || movement.quantity <= 0 || (movement.type === "TRANSFER" && !movement.toWarehouseId);
 
@@ -1553,18 +1710,183 @@ export function VistaAlmacen({
             )}
           </Grupo>
 
-          <Grupo paso={3} titulo="Documento">
+          {esSalidaDeAlmacen && (
+            <Grupo paso={3} titulo="Quién se lo lleva">
+              <Field label="Recibe el material" required>
+                <Select
+                  value={movement.recibidoPorId}
+                  onChange={(e) => setMovement((m) => ({ ...m, recibidoPorId: e.target.value, activityId: "" }))}
+                >
+                  <option value="">{receptores.length ? "Elige a la persona" : "Cargando personal…"}</option>
+                  {receptores.map((r) => (
+                    <option key={r.id} value={r.id}>{r.nombre}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field
+                label="Actividad a la que se carga"
+                hint={
+                  !movement.recibidoPorId
+                    ? "Primero elige quién recibe."
+                    : actividadesReceptor.length === 0
+                      ? "No tiene actividades abiertas: escribe el motivo de la salida abajo."
+                      : "Sin actividad hay que escribir el motivo abajo."
+                }
+              >
+                <Select
+                  value={movement.activityId}
+                  onChange={(e) => setMovement((m) => ({ ...m, activityId: e.target.value }))}
+                  disabled={!movement.recibidoPorId || actividadesReceptor.length === 0}
+                >
+                  <option value="">Sin actividad</option>
+                  {actividadesReceptor.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {[a.anNumber, a.titulo].filter(Boolean).join(" · ") || `Actividad ${a.id}`}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </Grupo>
+          )}
+
+          {(esSalidaDeAlmacen || esEntrada) && (
+            <fieldset className={s.grupo}>
+              <legend className={s.grupoTitulo}>
+                <span className={s.grupoPaso} aria-hidden="true">{esSalidaDeAlmacen ? 4 : 3}</span>
+                {esSalidaDeAlmacen ? "Evidencia de lo que sale" : "Números de serie"}
+              </legend>
+              {esSalidaDeAlmacen && (
+                <SelectorFotos
+                  fotos={movFotos}
+                  onCambio={setMovFotos}
+                  maximo={MAX_FOTOS_MOVIMIENTO}
+                  etiqueta="Foto de lo que se lleva"
+                  deshabilitado={savingMovement}
+                />
+              )}
+              <Field
+                label="Números de serie"
+                optional
+                hint={
+                  seriesCapturadas.length > 0
+                    ? `${seriesCapturadas.length} de ${cantidad(piezasEnPantalla)} pieza(s) con serie`
+                    : "Uno por renglón. Con el lector, cada lectura cae en un renglón."
+                }
+                error={
+                  seriesCapturadas.length > Math.ceil(piezasEnPantalla)
+                    ? "Hay más números de serie que piezas en el movimiento."
+                    : undefined
+                }
+              >
+                <Textarea
+                  rows={3}
+                  value={movement.series}
+                  onChange={(e) => setMovement((m) => ({ ...m, series: e.target.value }))}
+                  placeholder={"DS2CD2143G2-0001\nDS2CD2143G2-0002"}
+                />
+              </Field>
+            </fieldset>
+          )}
+
+          <Grupo paso={esSalidaDeAlmacen ? 5 : esEntrada ? 4 : 3} titulo="Documento">
             <Field label="Costo unitario" optional>
               <Input className={s.num} type="number" inputMode="decimal" min={0} step="0.01" value={movement.unitCost} onChange={(e) => setMovement((m) => ({ ...m, unitCost: e.target.value }))} placeholder="$0.00" />
             </Field>
             <Field label="Referencia o documento" optional>
               <Input value={movement.reference} onChange={(e) => setMovement((m) => ({ ...m, reference: e.target.value }))} placeholder="OC-000123, venta, ajuste inicial…" />
             </Field>
-            <Field label="Motivo o notas" optional fullWidth>
+            <Field
+              label="Motivo o notas"
+              optional={!(esSalidaDeAlmacen && !movement.activityId)}
+              required={esSalidaDeAlmacen && !movement.activityId}
+              fullWidth
+            >
               <Input value={movement.notes} onChange={(e) => setMovement((m) => ({ ...m, notes: e.target.value }))} placeholder="Por qué se mueve el stock…" />
             </Field>
           </Grupo>
         </form>
+      </Modal>
+
+      {/* ── Evidencia de un movimiento: quién se lo llevó, fotos y series ── */}
+      <Modal
+        open={Boolean(verEvidencia)}
+        onClose={() => setVerEvidencia(null)}
+        title={verEvidencia ? `Evidencia de ${verEvidencia.movementNumber}` : "Evidencia"}
+        maxWidth={640}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setVerEvidencia(null)}>Cerrar</Button>
+            {cfg.canCreate && fotosNuevas.length > 0 ? (
+              <Button variant="primary" onClick={() => void subirEvidenciaPendiente()} loading={subiendoEvidencia}>
+                Guardar fotos
+              </Button>
+            ) : null}
+          </>
+        }
+      >
+        {verEvidencia && (
+          <div className={s.formDialogo}>
+            <dl className={s.fichaEvidencia}>
+              <div>
+                <dt>Producto</dt>
+                <dd>{verEvidencia.product?.name ?? "—"} · {etiquetaCantidad(verEvidencia)}</dd>
+              </div>
+              <div>
+                <dt>Se lo llevó</dt>
+                <dd>{verEvidencia.recibidoPor?.nombre ?? "Sin responsable registrado"}</dd>
+              </div>
+              <div>
+                <dt>Se cargó a</dt>
+                <dd>
+                  {verEvidencia.activity?.anNumber
+                    ? [verEvidencia.activity.anNumber, verEvidencia.activity.titulo].filter(Boolean).join(" · ")
+                    : verEvidencia.notes?.trim() || "Sin actividad ni motivo"}
+                </dd>
+              </div>
+              <div>
+                <dt>Entregó</dt>
+                <dd>{verEvidencia.createdBy?.nombre ?? "—"} · {fechaHoraCorta(verEvidencia.createdAt)}</dd>
+              </div>
+            </dl>
+            {(verEvidencia.fotos ?? []).length > 0 ? (
+              <EvidenceGallery cols={3}>
+                {(verEvidencia.fotos ?? []).map((f, i) => (
+                  <EvidencePhoto
+                    key={f.url}
+                    src={resolveAssetUrl(f.url)}
+                    href={resolveAssetUrl(f.url)}
+                    alt={`Foto ${i + 1} de lo que salió`}
+                    caption={`Foto ${i + 1}`}
+                  />
+                ))}
+              </EvidenceGallery>
+            ) : (
+              <Alert tone="warning" dense>Este movimiento no tiene fotos.</Alert>
+            )}
+            {(verEvidencia.series ?? []).length > 0 ? (
+              <div>
+                <p className={s.tituloSeries}>Números de serie ({(verEvidencia.series ?? []).length})</p>
+                <ul className={s.series}>
+                  {(verEvidencia.series ?? []).map((serie) => (
+                    <li key={serie}><code className={claseMono}>{serie}</code></li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {cfg.canCreate && (verEvidencia.fotos ?? []).length < MAX_FOTOS_MOVIMIENTO ? (
+              <div>
+                <p className={s.tituloSeries}>Agregar fotos</p>
+                <SelectorFotos
+                  fotos={fotosNuevas}
+                  onCambio={setFotosNuevas}
+                  maximo={MAX_FOTOS_MOVIMIENTO - (verEvidencia.fotos ?? []).length}
+                  etiqueta="Foto de lo que salió"
+                  deshabilitado={subiendoEvidencia}
+                />
+              </div>
+            ) : null}
+          </div>
+        )}
       </Modal>
 
       {/* ── Mínimo de stock ── */}

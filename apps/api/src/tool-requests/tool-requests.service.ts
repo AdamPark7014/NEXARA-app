@@ -32,6 +32,7 @@ import {
   pistaDeSerie,
 } from './tool-nomenclature.js';
 import { buildToolLabelPdf, buildToolLabelZpl } from './tool-label.js';
+import { normalizarFotosEvidencia, resolverDevolucion } from './evidencia-prestamo.js';
 
 const FIELD_KIT_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
 const BROAD_KIT_ASSIGN_SCOPE = new Set(['ceo', 'dir_operaciones', 'arquitecto', 'super_admin']);
@@ -334,6 +335,10 @@ export class ToolRequestsService {
         select: { id: true, nombre: true, email: true, departmentId: true, department: { select: { id: true, nombre: true } }, role: { select: { id: true, nombre: true, accesoConsoleAdmin: true } } },
       },
       approver: { select: { id: true, nombre: true, email: true } },
+      activity: { select: { id: true, anNumber: true, titulo: true } },
+      deliveredBy: { select: { id: true, nombre: true } },
+      receivedBy: { select: { id: true, nombre: true } },
+      pickedUpBy: { select: { id: true, nombre: true } },
     };
 
     let where: any = { ...companyWhere(tenantId) };
@@ -376,6 +381,10 @@ export class ToolRequestsService {
             email: true,
           },
         },
+        activity: { select: { id: true, anNumber: true, titulo: true } },
+        deliveredBy: { select: { id: true, nombre: true } },
+        receivedBy: { select: { id: true, nombre: true } },
+        pickedUpBy: { select: { id: true, nombre: true } },
       },
       orderBy: {
         requestDate: 'desc',
@@ -405,6 +414,9 @@ export class ToolRequestsService {
             email: true,
           },
         },
+        deliveredBy: { select: { id: true, nombre: true } },
+        receivedBy: { select: { id: true, nombre: true } },
+        pickedUpBy: { select: { id: true, nombre: true } },
       },
       orderBy: {
         requestDate: 'desc',
@@ -432,6 +444,9 @@ export class ToolRequestsService {
             email: true,
           },
         },
+        deliveredBy: { select: { id: true, nombre: true } },
+        receivedBy: { select: { id: true, nombre: true } },
+        pickedUpBy: { select: { id: true, nombre: true } },
       },
       orderBy: {
         requestDate: 'desc',
@@ -467,6 +482,9 @@ export class ToolRequestsService {
             email: true,
           },
         },
+        deliveredBy: { select: { id: true, nombre: true } },
+        receivedBy: { select: { id: true, nombre: true } },
+        pickedUpBy: { select: { id: true, nombre: true } },
       },
     });
     if (companyId != null && Number(companyId) > 0) {
@@ -514,6 +532,9 @@ export class ToolRequestsService {
             email: true,
           },
         },
+        deliveredBy: { select: { id: true, nombre: true } },
+        receivedBy: { select: { id: true, nombre: true } },
+        pickedUpBy: { select: { id: true, nombre: true } },
       },
     });
 
@@ -668,7 +689,15 @@ export class ToolRequestsService {
   async deliver(
     id: number,
     companyId?: number | null,
-    opciones?: { pickupCode?: unknown; recogidaPorId?: number; managerEmail?: string | null },
+    opciones?: {
+      pickupCode?: unknown;
+      recogidaPorId?: number;
+      managerEmail?: string | null;
+      /** Quien entrega en almacén (la sesión). */
+      entregadoPorId?: number | null;
+      /** Fotos de cómo sale la herramienta («antes»). */
+      fotos?: unknown;
+    },
   ) {
     assertCanManageTools(opciones?.managerEmail);
     const request = await this.findById(id, companyId);
@@ -681,6 +710,7 @@ export class ToolRequestsService {
       const estado = validarPickup(request, opciones?.pickupCode, ahora);
       if (!estado.valido) throw new BadRequestException(estado.mensaje);
     }
+    const fotosEntrega = normalizarFotosEvidencia(opciones?.fotos);
 
     return (this.prisma as any).$transaction(async (tx: any) => {
       if (request.inventoryItemId) {
@@ -704,6 +734,8 @@ export class ToolRequestsService {
           deliveryDate: ahora,
           pickedUpAt: ahora,
           pickedUpById: opciones?.recogidaPorId ?? request.usuarioId,
+          deliveredById: opciones?.entregadoPorId ?? null,
+          ...(fotosEntrega.length ? { deliveryPhotos: fotosEntrega } : {}),
         },
         include: {
           usuario: {
@@ -736,26 +768,49 @@ export class ToolRequestsService {
     });
   }
 
+  /**
+   * Recibe la herramienta de vuelta. `evidencia` trae en qué estado llegó, las fotos de
+   * «después» y quién la recibió; las apps anteriores al 21-11 solo mandan la descripción del
+   * daño y siguen funcionando (`resolverDevolucion`).
+   */
   async return(
     id: number,
     damageDescription?: string,
     damagePhotoUrl?: string,
     companyId?: number | null,
+    evidencia?: { condicion?: unknown; fotos?: unknown; recibidoPorId?: number | null },
   ) {
-    const status = damageDescription ? 'DAMAGED' : 'RETURNED';
     const request = await this.findById(id, companyId);
     if (!request) {
       throw new Error('Solicitud no encontrada');
     }
+    // Doble toque o dos ventanillas: lo recibido no se recibe otra vez (pisaría fecha y evidencia).
+    if (request.status === 'RETURNED' || request.status === 'DAMAGED') {
+      throw new BadRequestException('Este préstamo ya se recibió');
+    }
+
+    const fotos = normalizarFotosEvidencia(evidencia?.fotos);
+    const devolucion = resolverDevolucion({
+      condicion: evidencia?.condicion,
+      descripcion: damageDescription,
+      fotos,
+    });
+    const conDanio = devolucion.estatusPrestamo === 'DAMAGED';
 
     return (this.prisma as any).$transaction(async (tx: any) => {
       const updatedRequest = await tx.toolRequest.update({
         where: { id },
         data: {
-          status,
+          status: devolucion.estatusPrestamo,
           returnDate: new Date(),
-          damageDescription,
-          damagePhotoUrl,
+          damageDescription: conDanio ? devolucion.descripcion : null,
+          // La primera foto de un daño sigue llenando la columna que ya leían las pantallas.
+          damagePhotoUrl: damagePhotoUrl || (conDanio ? fotos[0]?.url : undefined) || null,
+          returnCondition: devolucion.condicion,
+          returnPhotos: fotos.length ? fotos : undefined,
+          receivedById: evidencia?.recibidoPorId ?? null,
+          // Una nota sin daño (desgaste normal) no es un daño: va en su propia columna.
+          returnNotes: !conDanio ? devolucion.descripcion : null,
         },
         include: {
           usuario: {
@@ -772,7 +827,8 @@ export class ToolRequestsService {
         await tx.toolInventoryItem.update({
           where: { id: request.inventoryItemId },
           data: {
-            status: damageDescription ? 'IN_REPAIR' : 'AVAILABLE',
+            status: devolucion.estatusPieza,
+            ...(devolucion.motivoBaja ? { retiredReason: devolucion.motivoBaja } : {}),
           },
         });
       }
@@ -1096,6 +1152,9 @@ export class ToolRequestsService {
             vencido: Boolean(
               prestamo.pickupExpiresAt && prestamo.pickupExpiresAt.getTime() < ahora.getTime(),
             ),
+            // Cómo salió: quien recibe la devolución la compara contra estas fotos.
+            deliveryDate: prestamo.deliveryDate ?? null,
+            deliveryPhotos: normalizarFotosEvidencia(prestamo.deliveryPhotos),
           }
         : null,
       kit: kit

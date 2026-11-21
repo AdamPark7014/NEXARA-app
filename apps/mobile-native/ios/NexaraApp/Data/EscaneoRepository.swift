@@ -128,6 +128,40 @@ struct MovimientoPorCodigoBody: Encodable {
     var fromWarehouseId: Int?
     var toWarehouseId: Int?
     var notes: String?
+    /// Evidencia de la salida (21-11-2026): a qué actividad se carga, series y quién recibe.
+    var activityId: Int?
+    var series: [String]?
+    var recibidoPorId: Int?
+}
+
+/// Alguien que puede recibir material de almacén (`GET stock/receptores`).
+struct ReceptorDeMaterial: Decodable, Hashable, Identifiable {
+    var id: Int = 0
+    var nombre: String?
+
+    private enum CodingKeys: String, CodingKey { case id, nombre }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(Int.self, forKey: .id)) ?? 0
+        nombre = try? c.decode(String.self, forKey: .nombre)
+    }
+}
+
+/// Una foto de evidencia guardada en el servidor (`/uploads/...`, pide sesión). El servidor
+/// manda `{ url }`; se tolera también la dirección suelta.
+struct FotoDeEvidencia: Decodable, Hashable {
+    var url: String?
+
+    private enum CodingKeys: String, CodingKey { case url }
+
+    init(from decoder: Decoder) throws {
+        if let c = try? decoder.container(keyedBy: CodingKeys.self) {
+            url = try? c.decode(String.self, forKey: .url)
+        } else {
+            url = try? decoder.singleValueContainer().decode(String.self)
+        }
+    }
 }
 
 // MARK: - Herramientas
@@ -166,6 +200,9 @@ struct PrestamoEscaneado: Decodable, Hashable {
     let pickupCode: String?
     let pickupExpiresAt: String?
     let vencido: Bool?
+    /// Cómo salió: se enseña al recibirla para comparar.
+    let deliveryDate: String?
+    let deliveryPhotos: [FotoDeEvidencia]?
 }
 
 struct KitEscaneado: Decodable, Hashable {
@@ -236,9 +273,49 @@ final class EscaneoRepository {
     }
 
     /// `POST stock/movements/por-codigo` (`stock.manage`): entrada o salida con solo el código.
-    func movimientoPorCodigo(_ body: MovimientoPorCodigoBody) async throws {
+    /// Devuelve el id del movimiento creado, para colgarle las fotos de lo que salió.
+    @discardableResult
+    func movimientoPorCodigo(_ body: MovimientoPorCodigoBody) async throws -> Int? {
+        struct Creado: Decodable {
+            struct Movimiento: Decodable { let id: Int? }
+            let movement: Movimiento?
+        }
         try await CoreRepository.requireOnline()
-        try mutar(try await api.postJSON("stock/movements/por-codigo", body: body))
+        let data = try await api.postJSON("stock/movements/por-codigo", body: body)
+        try mutar(data)
+        return (try? JSONDecoder().decode(Creado.self, from: data))?.movement?.id
+    }
+
+    /// `GET stock/receptores` (`stock.manage`): personal activo que puede recibir material.
+    func receptores() async throws -> [ReceptorDeMaterial] {
+        let data = try await api.get("stock/receptores")
+        return try ApiClient.decodeList(data)
+    }
+
+    /// `GET stock/receptores/:id/actividades` (`stock.manage`): actividades abiertas de quien recibe.
+    func actividadesDeReceptor(_ userId: Int) async throws -> [HerramientaActividad] {
+        let data = try await api.get("stock/receptores/\(userId)/actividades")
+        return try ApiClient.decodeList(data)
+    }
+
+    /// `POST stock/movements/:id/evidencia` (`stock.manage`): fotos de lo que salió, sobre el
+    /// movimiento ya hecho. Sin señal se quedan en la cola y suben cuando regrese.
+    func evidenciaDeMovimiento(id: Int, fotos: [CapturedGeoPhoto]) async throws {
+        guard !fotos.isEmpty else { return }
+        _ = try await api.uploadMultipartFiles(
+            "stock/movements/\(id)/evidencia",
+            fields: [:],
+            files: EscaneoRepository.archivos(de: fotos, prefijo: "material")
+        )
+    }
+
+    /// Las fotos como archivos del campo `fotos`, con un nombre que diga qué son.
+    private static func archivos(
+        de fotos: [CapturedGeoPhoto], prefijo: String
+    ) -> [(field: String, data: Data, fileName: String, mimeType: String)] {
+        fotos.enumerated().map { i, foto in
+            (field: "fotos", data: foto.jpeg, fileName: "\(prefijo)-\(i + 1).jpg", mimeType: "image/jpeg")
+        }
     }
 
     /// `GET warehouse` (`warehouse.view`): almacenes de la empresa, para elegir destino.
@@ -274,14 +351,36 @@ final class EscaneoRepository {
         ))
     }
 
-    /// `POST tool-requests/:id/return` (`tools.manage`): entrada a almacén; con daño queda en reparación.
-    func recibirHerramienta(prestamoId: Int, damageDescription: String?) async throws {
-        struct Body: Encodable { let damageDescription: String? }
-        let dano = (damageDescription ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    /// La misma entrega, con las fotos de cómo sale (evidencia, 21-11-2026). Campo `fotos`,
+    /// hasta 6. Sin fotos cae a la entrega de siempre.
+    func entregarHerramienta(prestamoId: Int, pickupCode: String?, fotos: [CapturedGeoPhoto]) async throws {
+        guard !fotos.isEmpty else {
+            try await entregarHerramienta(prestamoId: prestamoId, pickupCode: pickupCode)
+            return
+        }
+        let codigo = (pickupCode ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         try await CoreRepository.requireOnline()
-        try mutar(try await api.postJSON(
+        try mutar(try await api.uploadMultipartFiles(
+            "tool-requests/\(prestamoId)/deliver",
+            fields: codigo.isEmpty ? [:] : ["pickupCode": codigo],
+            files: EscaneoRepository.archivos(de: fotos, prefijo: "salida")
+        ))
+    }
+
+    /// `POST tool-requests/:id/return` (`tools.manage`): entrada diciendo cómo volvió
+    /// (`condicion`: BIEN | DESGASTE | DANADA | INCOMPLETA | EXTRAVIADA), qué le pasó y las
+    /// fotos de después. Dañada o incompleta queda en reparación; extraviada se da de baja.
+    func recibirHerramienta(
+        prestamoId: Int, condicion: String, descripcion: String?, fotos: [CapturedGeoPhoto]
+    ) async throws {
+        let texto = (descripcion ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        var campos = ["condicion": condicion]
+        if !texto.isEmpty { campos["damageDescription"] = texto }
+        try await CoreRepository.requireOnline()
+        try mutar(try await api.uploadMultipartFiles(
             "tool-requests/\(prestamoId)/return",
-            body: Body(damageDescription: dano.isEmpty ? nil : dano)
+            fields: campos,
+            files: EscaneoRepository.archivos(de: fotos, prefijo: "entrada")
         ))
     }
 }
