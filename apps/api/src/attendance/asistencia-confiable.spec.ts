@@ -10,6 +10,7 @@ import {
   origenChecada,
   horaCierreAutomatico,
   esEntradaDeNoche,
+  diaDeJornadaParaEntrada,
   motivoCorreccionValido,
   puedeVerGpsDireccion,
   resolverHoraChecada,
@@ -372,5 +373,29 @@ describe('cliente nativo sin identidad (cola sin conexión de las apps viejas)',
     expect(clienteNativoSinIdentidad(chrome)).toBeNull();
     expect(origenChecada(chrome, {})).toBe('WEB');
     expect(clienteNativoSinIdentidad('')).toBeNull();
+  });
+});
+
+describe('a qué día laboral pertenece una entrada', () => {
+  const hoy = new Date('2026-11-20T00:00:00.000Z');
+  const manana = new Date('2026-11-21T00:00:00.000Z');
+  const deNoche = new Date('2026-11-21T05:43:00Z'); // 23:43 mx del 20
+  const deDia = new Date('2026-11-20T21:00:00Z'); // 15:00 mx del 20
+
+  it('sin jornada hoy: es la de hoy, de día o de noche', () => {
+    expect(diaDeJornadaParaEntrada({ ahora: deDia, hoy, manana, hoyOcupado: false, mananaOcupado: false })).toEqual({ dia: hoy, segundoTurno: false });
+    expect(diaDeJornadaParaEntrada({ ahora: deNoche, hoy, manana, hoyOcupado: false, mananaOcupado: false })).toEqual({ dia: hoy, segundoTurno: false });
+  });
+
+  it('cerró su turno de día y vuelve de noche: segundo turno, cuenta como la jornada de mañana', () => {
+    expect(diaDeJornadaParaEntrada({ ahora: deNoche, hoy, manana, hoyOcupado: true, mananaOcupado: false })).toEqual({ dia: manana, segundoTurno: true });
+  });
+
+  it('de día con jornada ya registrada hoy: no hay segunda entrada', () => {
+    expect(diaDeJornadaParaEntrada({ ahora: deDia, hoy, manana, hoyOcupado: true, mananaOcupado: false })).toBeNull();
+  });
+
+  it('si mañana ya tiene entrada tampoco se duplica', () => {
+    expect(diaDeJornadaParaEntrada({ ahora: deNoche, hoy, manana, hoyOcupado: true, mananaOcupado: true })).toBeNull();
   });
 });

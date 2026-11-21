@@ -7,7 +7,7 @@ import { NotificationHierarchyService } from '../notifications/notification-hier
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { DOMAIN_EVENTS, type SalidaDeJornada } from '../domain-events/domain-event.types.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
-import { WORKDAY_TIMEZONE, workDateColumn, workDateKey, workDayEnd } from '../common/time/workday.js';
+import { WORKDAY_TIMEZONE, workDateKey, workDayEnd, workDayStart } from '../common/time/workday.js';
 import { limiteDeEntrega } from './semaforo-actividad.js';
 import { ACTIVITY_STATUS, isFinishedStatus, statusVariants } from './activity-status.js';
 import {
@@ -292,8 +292,8 @@ export class ActivityNonComplianceService implements OnModuleInit {
       where: {
         userId: { in: ids },
         type: 'salida',
-        workDate: workDateColumn(at),
-        timestamp: { lte: at },
+        // Por hora y no por `workDate`: la salida de un turno de noche pertenece a la jornada de ayer.
+        timestamp: { gte: workDayStart(at), lte: at },
       },
       select: { userId: true, timestamp: true },
       orderBy: { timestamp: 'desc' },

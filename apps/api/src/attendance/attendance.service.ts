@@ -81,6 +81,7 @@ import {
   type SitioPermitido,
   type ValidacionChecada,
   esEntradaDeNoche,
+  diaDeJornadaParaEntrada,
   JORNADA_NOCHE_TOPE_H,
 } from './asistencia-confiable.js';
 import { estadoPorFalla, registrarEstadoUbicacion, tramosSinUbicacionDe } from './estado-ubicacion.js';
@@ -1548,7 +1549,7 @@ export class AttendanceService {
    * jornada abierta de ayer ya no puede dejar a nadie sin poder checar hoy.
    */
   private async cerrarJornadaAutomatica(
-    day: { id: number; userId: number; lastEntryAt: Date | null },
+    day: { id: number; userId: number; lastEntryAt: Date | null; date?: Date | null },
     tenantId: number,
   ): Promise<Date | null> {
     if (!day.lastEntryAt) {
@@ -1568,7 +1569,7 @@ export class AttendanceService {
           userId: day.userId,
           type: 'salida',
           timestamp: salidaAt,
-          workDate: workDateColumn(day.lastEntryAt),
+          workDate: day.date instanceof Date ? day.date : workDateColumn(day.lastEntryAt),
           deviceInfo: 'Cierre automático del sistema',
           cierreAutomatico: true,
           validacion: 'REVISAR',
@@ -1622,7 +1623,7 @@ export class AttendanceService {
   async cerrarJornadasOlvidadas(ahora: Date = new Date()): Promise<{ cerradas: number }> {
     const dias = await this.prisma.attendanceDay.findMany({
       where: { isOpen: true, date: workDateColumn(ahora) },
-      select: { id: true, userId: true, lastEntryAt: true, companyId: true },
+      select: { id: true, userId: true, lastEntryAt: true, companyId: true, date: true },
     });
     let cerradas = 0;
     for (const dia of dias) {
@@ -1649,7 +1650,7 @@ export class AttendanceService {
     const limite = new Date(ahora.getTime() - JORNADA_NOCHE_TOPE_H * 60 * 60 * 1000);
     const dias = await this.prisma.attendanceDay.findMany({
       where: { isOpen: true, lastEntryAt: { lte: limite } },
-      select: { id: true, userId: true, lastEntryAt: true, companyId: true },
+      select: { id: true, userId: true, lastEntryAt: true, companyId: true, date: true },
     });
     let cerradas = 0;
     for (const dia of dias) {
@@ -2079,20 +2080,16 @@ export class AttendanceService {
     const isEntry = dto.type === 'entrada';
 
     if (isEntry) {
-      const existingEntry = await this.findAttendanceOnDate(userId, 'entrada', now, tenantId);
-      if (existingEntry) {
-        throw new BadRequestException('Ya existe una entrada registrada para hoy');
-      }
-
       const openDay = await this.prisma.attendanceDay.findFirst({
         where: { userId, isOpen: true, ...companyWhere(tenantId) },
       });
+      const manana = new Date(today.getTime() + 24 * 60 * 60 * 1000);
       if (openDay) {
         // Una jornada abierta de un día anterior ya no bloquea la entrada de
         // hoy: se cierra sola (a revisión) y la persona puede checar.
-        const esDeHoy =
-          openDay.date instanceof Date && openDay.date.getTime() === today.getTime();
-        if (esDeHoy) {
+        const fechaAbierta = openDay.date instanceof Date ? openDay.date.getTime() : null;
+        const esVigente = fechaAbierta != null && fechaAbierta >= today.getTime();
+        if (esVigente) {
           throw new BadRequestException(
             'Tienes una jornada abierta sin salida. Registra salida antes de una nueva entrada.',
           );
@@ -2100,12 +2097,36 @@ export class AttendanceService {
         await this.cerrarJornadaAutomatica(openDay, tenantId);
       }
 
+      // ¿A qué día laboral pertenece esta entrada? Hoy, o mañana si es un segundo turno de noche.
+      const [entradaConHoraDeHoy, entradaDelDiaDeHoy, entradaDelDiaSiguiente] = await Promise.all([
+        this.findAttendanceOnDate(userId, 'entrada', now, tenantId),
+        this.prisma.attendance.findFirst({
+          where: { userId, type: 'entrada', workDate: today, ...companyWhere(tenantId) },
+          select: { id: true },
+        }),
+        this.prisma.attendance.findFirst({
+          where: { userId, type: 'entrada', workDate: manana, ...companyWhere(tenantId) },
+          select: { id: true },
+        }),
+      ]);
+      const jornada = diaDeJornadaParaEntrada({
+        ahora: now,
+        hoy: today,
+        manana,
+        hoyOcupado: Boolean(entradaConHoraDeHoy || entradaDelDiaDeHoy),
+        mananaOcupado: Boolean(entradaDelDiaSiguiente),
+      });
+      if (!jornada) {
+        throw new BadRequestException('Ya existe una entrada registrada para hoy');
+      }
+      const diaJornada = jornada.dia;
+
       const attendance = await this.createAttendanceRecord({
         data: {
           userId,
           type: dto.type,
           timestamp: now,
-          workDate: today,
+          workDate: diaJornada,
           deviceInfo,
           photoUrl: this.persistAttendancePhoto(dto.photoBase64),
           entryLatitude: coords?.latitude ?? null,
@@ -2118,10 +2139,10 @@ export class AttendanceService {
       await this.usarFotoComoAvatarSiFalta(userId, attendance.photoUrl, attendance.user?.avatarUrl);
 
       const day = await this.prisma.attendanceDay.upsert({
-        where: { companyId_userId_date: { companyId: tenantId, userId, date: today } },
+        where: { companyId_userId_date: { companyId: tenantId, userId, date: diaJornada } },
         create: {
           userId,
-          date: today,
+          date: diaJornada,
           totalMinutes: 0,
           lastEntryAt: now,
           isOpen: true,
@@ -2209,7 +2230,8 @@ export class AttendanceService {
       salidaDeHoy && salidaDeHoy.timestamp.getTime() >= openDay.lastEntryAt.getTime() ? salidaDeHoy : null;
     const datosSalida = {
       timestamp: now,
-      workDate: today,
+      // La salida es del día de su jornada (turno de noche: la de ayer; segundo turno: la de mañana).
+      workDate: openDay.date instanceof Date ? openDay.date : today,
       deviceInfo,
       photoUrl: this.persistAttendancePhoto(dto.photoBase64),
       exitLatitude: coords?.latitude ?? null,

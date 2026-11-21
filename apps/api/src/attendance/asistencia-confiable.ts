@@ -315,6 +315,32 @@ export function horaLocal(fecha: Date, tz = WORKDAY_TIMEZONE): number {
   return Number(h) % 24;
 }
 
+/**
+ * A qué día laboral pertenece una entrada nueva (Adam, 21-11-2026: quien cerró su turno de día y vuelve
+ * de noche no podía checar porque «ya existe una entrada registrada para hoy»).
+ *
+ * - Si hoy no tiene jornada, es la de hoy.
+ * - Si hoy ya tiene una jornada cerrada y la entrada es de noche (desde `TURNO_NOCHE_DESDE_H`), es un
+ *   segundo turno: se registra como la jornada del día siguiente, que es donde cae casi todo ese turno.
+ * - De día, con jornada ya registrada hoy: no hay segunda entrada.
+ *
+ * La jornada abierta se revisa antes de llamar aquí.
+ */
+export function diaDeJornadaParaEntrada(p: {
+  ahora: Date;
+  hoy: Date;
+  manana: Date;
+  /** Ya hay una entrada con hora de hoy, o una entrada asignada al día laboral de hoy. */
+  hoyOcupado: boolean;
+  /** El día siguiente ya tiene una entrada asignada. */
+  mananaOcupado: boolean;
+  tz?: string;
+}): { dia: Date; segundoTurno: boolean } | null {
+  if (!p.hoyOcupado) return { dia: p.hoy, segundoTurno: false };
+  if (esEntradaDeNoche(p.ahora, p.tz) && !p.mananaOcupado) return { dia: p.manana, segundoTurno: true };
+  return null;
+}
+
 export function esEntradaDeNoche(entrada: Date, tz = WORKDAY_TIMEZONE): boolean {
   return horaLocal(entrada, tz) >= TURNO_NOCHE_DESDE_H;
 }
