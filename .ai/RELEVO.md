@@ -86,6 +86,21 @@
     actividades y sin tocar. Android e iOS no se pueden compilar en la nube: los compila el CI al subir. iOS no
     tiene objetivo de pruebas unitarias; `scripts/ios-static-check.py` sin problemas.
 
+- **21-11 ~16:55 México (claude-code, nube) — Vehículos: capa de datos de web, Android e iOS para la captura guiada. Sin pantallas, sin migraciones.**
+  - Las pantallas esperan el visto bueno de Adam a la maqueta https://claude.ai/artifact/7qbmJfGA3WopSJPr86bAjS. Esto deja
+    lista la conexión con las rutas de 8c207c1 para que las pantallas solo consuman.
+  - Web: `lib/vehiculos-captura.ts` (pasos, tiempos de los 8 cuadros, multipart con `capturaVersion=2`, firmas, bloque de
+    la actividad, daños, incidencias, cuadros del video en el navegador) + spec 10/10.
+  - Android: `ui/console/vehiculos/CapturaGuiadaRules.kt` (puro, mismos textos que la web) + `CapturaGuiadaRulesTest.kt`
+    (11 pruebas; corridas en un proyecto Gradle aparte junto con `ChecklistVehiculoRulesTest`, 24/24),
+    `data/api/VehiculosCapturaApi.kt`, `data/vehicles/CapturaGuiadaRepository.kt` (la salida/devolución viaja con la cola
+    sin señal, igual que el checklist; tope de video 60 MB) y `data/vehicles/CuadrosVuelta.kt` (MediaMetadataRetriever,
+    endereza cuadros sin rotar).
+  - iOS: `UI/Core/CapturaGuiadaRules.swift`, `Data/CapturaGuiadaRepository.swift` (sin cola, como el checklist; usa
+    `ChecklistVehiculoAccion.path`), `Util/CuadrosVuelta.swift` (AVAssetImageGenerator, `.mov` → `.mp4` sin recomprimir).
+  - Verificación: vitest del archivo 10/10, tsc web 0, `ios-static-check` sin problemas. El código Android de datos y todo
+    iOS los compila el CI (no hay SDK de Android ni Swift en la nube).
+
 - **21-11 ~15:40 México (claude-code, nube; Cursor/Codex no alcanzables) — Vehículos: captura guiada de 5 pasos, daños con IA, incidencias y avisos de retraso. Solo API. En main 8c207c1; llegó a producción con el despliegue de otro hilo (21-11 21:31 UTC), migración aplicada, interruptor apagado.**
   - Todo detrás de `vehiculos.captura_guiada` (system_settings, apagado por omisión; en prod NO existe la fila). Apagado:
     se acepta el checklist de 7 fotos, el km menor al último registro entra con alerta `KM_MENOR` (no bloquea), no se
