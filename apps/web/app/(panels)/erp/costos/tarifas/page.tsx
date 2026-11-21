@@ -13,7 +13,7 @@ import { useUser } from "@/components/UserContext";
 import { Button, EmptyState, SkeletonRows } from "@/components/base";
 import { Aviso, Dialogo } from "@/components/mesa-contable/piezas";
 import EstandarVehiculos from "@/components/vehiculos/EstandarVehiculos";
-import { Banda, Kpi, c, useAccesoCostos } from "@/components/costos/piezas";
+import { Banda, CostosSinRespuesta, Kpi, c, useAccesoCostos } from "@/components/costos/piezas";
 import { formatApiError } from "@/lib/erp-api";
 import {
   asignarPersona,
@@ -213,6 +213,8 @@ export default function TarifasDeCosto() {
       setError(formatApiError(err, "No se pudo guardar el equipo."));
     }
   }
+
+  if (acceso?.sinRespuesta) return <CostosSinRespuesta acceso={acceso} titulo="Tarifas de costo" />;
 
   if (acceso && !acceso.veTodo) {
     return (

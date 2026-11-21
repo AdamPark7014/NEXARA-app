@@ -47,6 +47,7 @@ import {
   zoomQueCabe,
 } from "./radial-layout";
 import s from "./organigrama.module.css";
+import { errorSeguidoDe } from "@/lib/erp-api";
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
   const res = await fetch(buildApiUrl(path), {
@@ -728,7 +729,7 @@ export default function OrgChartView({ canEditOrg, showHrRail = false }: OrgChar
       {error && (
         <InlineAlert
           variant={hayGente ? "warning" : "danger"}
-          message={hayGente ? `${error}. Se muestra lo último que cargó.` : error}
+          message={hayGente ? errorSeguidoDe(error, "Se muestra lo último que cargó.") : error}
           action={
             <Button size="sm" variant="secondary" onClick={() => void reintentar()} loading={reintentando}>
               Reintentar

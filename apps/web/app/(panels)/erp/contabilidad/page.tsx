@@ -25,7 +25,9 @@ import {
 } from "@/components/base";
 import { MesaPagina } from "@/components/mesa-contable/MesaPagina";
 import { useUser } from "@/components/UserContext";
-import { erpFetch, formatApiError } from "@/lib/erp-api";
+import { erpFetch, errorSeguidoDe, formatApiError } from "@/lib/erp-api";
+import { fechaMedia } from "@/lib/mesa-contable";
+import { MENSAJE_SIN_CONEXION } from "@/lib/red-caida";
 import { canUserAccessPath } from "@/lib/user-access";
 import { Money } from "@/components/ui/DataTable";
 import {
@@ -364,12 +366,17 @@ export default function ContabilidadDashboardPage() {
    */
   const periodoVigente = data?.period ?? range;
 
+  /** «del 1 nov 2026 al 21 nov 2026»: el rango como se dice, no como lo guarda el sistema. */
+  const rangoLlano = `del ${fechaMedia(periodoVigente.from)} al ${fechaMedia(periodoVigente.to)}`;
+
+  const rangoConMayuscula = `D${rangoLlano.slice(1)}`;
+
+  /** El mes con nombre cuando el rango cabe en uno; si no, `null` y se usa `rangoLlano`. */
   const monthLabel = useMemo(() => {
     const { from, to } = periodoVigente;
     const d = new Date(`${from}T12:00:00`);
-    if (Number.isNaN(d.getTime())) return `${from} → ${to}`;
-    const mismoMes = from.slice(0, 7) === to.slice(0, 7);
-    if (!mismoMes) return `${from} → ${to}`;
+    if (Number.isNaN(d.getTime())) return null;
+    if (from.slice(0, 7) !== to.slice(0, 7)) return null;
     return d.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
   }, [periodoVigente]);
 
@@ -446,7 +453,7 @@ export default function ContabilidadDashboardPage() {
             ? "Cargando…"
             : modoArranque
               ? "Todavía falta preparar lo básico. Empieza por el primer paso."
-              : `Resumen de ${monthLabel} — toca una cifra para entrar.`
+              : `Resumen ${monthLabel ? `de ${monthLabel}` : rangoLlano}: toca una cifra para entrar.`
       }
       secundarias={
         <Button onClick={abrirPeriodo} aria-expanded={showPeriod} aria-controls={periodoId}>
@@ -527,7 +534,12 @@ export default function ContabilidadDashboardPage() {
             </Button>
           }
         >
-          {`No se pudo cargar el resumen del ${periodoVigente.from} al ${periodoVigente.to}. ${error} Reintenta; si vuelve a fallar, prueba con un rango más corto.`}
+          {error === MENSAJE_SIN_CONEXION
+            ? `No se pudo cargar el resumen ${rangoLlano}. ${error}`
+            : errorSeguidoDe(
+                `No se pudo cargar el resumen ${rangoLlano}. ${error}`,
+                "Si vuelve a fallar, prueba con un rango más corto.",
+              )}
         </Alert>
       )}
 
@@ -539,7 +551,7 @@ export default function ContabilidadDashboardPage() {
             title={modoArranque ? "Para empezar" : "Aún no hay movimiento"}
             subtitle={
               modoArranque
-                ? `En ${monthLabel} todavía no hay dinero registrado. Antes de ver cifras hay que dejar listo lo básico, en este orden.`
+                ? `${monthLabel ? `En ${monthLabel}` : rangoConMayuscula} todavía no hay dinero registrado. Antes de ver cifras hay que dejar listo lo básico, en este orden.`
                 : undefined
             }
             actions={
@@ -572,8 +584,8 @@ export default function ContabilidadDashboardPage() {
               }
               description={
                 configVerificada
-                  ? `La contabilidad ya está configurada, pero del ${periodoVigente.from} al ${periodoVigente.to} no hay facturas, cobros, pagos ni saldo en bancos. Emite la primera factura: aparecerá aquí, en Por cobrar y en el libro de movimientos.`
-                  : `Del ${periodoVigente.from} al ${periodoVigente.to} no hay facturas, cobros, pagos ni saldo en bancos. Si falta configurar algo no se pudo comprobar desde tu cuenta, así que empieza por lo que sí es tuyo: la primera factura.`
+                  ? `La contabilidad ya está configurada, pero ${rangoLlano} no hay facturas, cobros, pagos ni saldo en bancos. Emite la primera factura: aparecerá aquí, en Por cobrar y en el libro de movimientos.`
+                  : `${rangoConMayuscula} no hay facturas, cobros, pagos ni saldo en bancos. Si falta configurar algo no se pudo comprobar desde tu cuenta, así que empieza por lo que sí es tuyo: la primera factura.`
               }
               destino={DESTINOS.factura}
               extra={
@@ -604,6 +616,14 @@ export default function ContabilidadDashboardPage() {
                   <div className={s.revisando} aria-busy="true">
                     <SkeletonRows rows={2} label="Revisando pendientes" />
                   </div>
+                ) : !data ? (
+                  // Sin cifras no se puede prometer que no hay nada urgente.
+                  <EmptyState
+                    size="compact"
+                    tone="neutral"
+                    title="No se pudo revisar"
+                    description="Sin la respuesta del servidor no se sabe si hay algo urgente. Vuelve a intentarlo con el botón de arriba."
+                  />
                 ) : attention.length === 0 ? (
                   <EmptyState
                     size="compact"

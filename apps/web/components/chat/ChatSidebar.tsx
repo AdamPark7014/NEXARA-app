@@ -22,6 +22,8 @@ type Props = {
   dms: Channel[];
   activeId: number | null;
   loading: boolean;
+  /** La lista no llegó: se dice aquí también, que en teléfono es lo único que se ve. */
+  falla?: { mensaje: string; reintentar: () => void } | null;
   presence: Record<number, "online" | "away">;
   starredIds: number[];
   totalUnread: number;
@@ -118,6 +120,7 @@ export default function ChatSidebar({
   dms,
   activeId,
   loading,
+  falla = null,
   presence,
   starredIds,
   totalUnread,
@@ -264,6 +267,15 @@ export default function ChatSidebar({
       </div>
 
       <nav className={styles.sidebarScroll} aria-label="Conversaciones">
+        {falla ? (
+          <div className={styles.sidebarFalla}>
+            <strong>No se pudo cargar la lista</strong>
+            <span>{falla.mensaje}</span>
+            <button type="button" className={styles.sidebarFallaBoton} onClick={falla.reintentar}>
+              Reintentar
+            </button>
+          </div>
+        ) : null}
         {starred.length > 0 && (
           <Section
             title="Favoritos"

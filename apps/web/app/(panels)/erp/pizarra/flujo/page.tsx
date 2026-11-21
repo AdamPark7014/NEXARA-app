@@ -23,7 +23,7 @@ import {
 import { useUser } from "@/components/UserContext";
 import { RangoSelector } from "@/components/pizarra/PizarraKpi";
 import { semaforoATiempo } from "@/components/pizarra/FlujoKpiStrip";
-import { formatApiError } from "@/lib/erp-api";
+import { formatApiError, errorSeguidoDe } from "@/lib/erp-api";
 import { erpFetch } from "@/lib/erp-api";
 import {
   formatPct,
@@ -114,7 +114,7 @@ export default function FlujoActividadesPage() {
                 </Button>
               }
             >
-              {data ? `${error}. Se muestra lo último que cargó.` : error}
+              {data ? errorSeguidoDe(error, "Se muestra lo último que cargó.") : error}
             </Alert>
           ) : null
         }

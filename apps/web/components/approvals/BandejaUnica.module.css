@@ -129,3 +129,8 @@
     opacity: 1;
   }
 }
+
+/* El aviso de una acción fallida ocupa todo el ancho, no una columna de tarjeta. */
+.aviso {
+  grid-column: 1 / -1;
+}

@@ -50,7 +50,7 @@ import { useUser } from "@/components/UserContext";
 import { useHiddenModuleIds } from "@/lib/use-hidden-modules";
 import { toast } from "@/components/Toast";
 import { getApiAssetOrigin } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
+import { formatApiError, errorSeguidoDe } from "@/lib/erp-api";
 import { exportToExcel } from "@/lib/export-excel";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import {
@@ -1101,7 +1101,7 @@ function EmployeePaymentsContent() {
                   </Button>
                 }
               >
-                {`${usersErr}. El filtro por empleado saldrá vacío y no podrás registrar un pago nuevo hasta que cargue.`}
+                {errorSeguidoDe(usersErr, "El filtro por empleado saldrá vacío y no podrás registrar un pago nuevo hasta que cargue.")}
               </Alert>
             )}
             {error && (

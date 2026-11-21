@@ -3,14 +3,32 @@
  */
 import { buildApiUrl } from "@/lib/api-base";
 import { manejarErrorJornada } from "@/lib/jornada-candado";
+import { MENSAJE_SIN_CONEXION, esTextoDeRedCaida } from "@/lib/red-caida";
 import { withTenantHeaders } from "@/lib/tenant";
 
 // La ruta interna o el «Tu rol (x) no puede acceder a GET /api/…» nunca se le enseñan a nadie (11-11).
 const INTERNAL_ROUTE_ERROR = /\bCannot (GET|POST|PUT|PATCH|DELETE) \/|no puede acceder a (GET|POST|PUT|PATCH|DELETE) \//;
 
+// Un 500 sin mensaje propio llega con el texto genérico del marco, en inglés.
+const SERVIDOR_GENERICO = /^internal server error$/i;
+export const MENSAJE_SERVIDOR_CON_PROBLEMA = "El servidor tuvo un problema. Vuelve a intentarlo en un momento.";
+// Lo que deja `erpFetch` cuando el servidor falla sin cuerpo: «HTTP 502».
+const SOLO_CODIGO_DE_SERVIDOR = /^HTTP 5\d\d$/;
+
+/**
+ * Une el texto de un error con la frase que le sigue. El error puede traer ya su
+ * punto («…vuelve a intentarlo.») y pegarle otro dejaba «intentarlo.. Se muestra…».
+ */
+export function errorSeguidoDe(error: string, frase: string): string {
+  const base = error.trim();
+  return /[.!?…]$/.test(base) ? `${base} ${frase}` : `${base}. ${frase}`;
+}
+
 export function formatApiError(err: unknown, fallback = "Error desconocido"): string {
   const raw = (err instanceof Error ? err.message : typeof err === "string" ? err : "").trim();
   if (!raw) return fallback;
+  // «Failed to fetch», «Load failed»: el texto del navegador cuando no hubo red.
+  if (esTextoDeRedCaida(raw)) return MENSAJE_SIN_CONEXION;
   try {
     const parsed = JSON.parse(raw) as { message?: unknown; error?: unknown };
     const msg = Array.isArray(parsed.message)
@@ -20,11 +38,13 @@ export function formatApiError(err: unknown, fallback = "Error desconocido"): st
         : typeof parsed.error === "string"
           ? parsed.error
           : "";
+    if (SERVIDOR_GENERICO.test(msg.trim())) return MENSAJE_SERVIDOR_CON_PROBLEMA;
     return msg.trim() && !INTERNAL_ROUTE_ERROR.test(msg) ? msg.trim() : fallback;
   } catch {
     /* plain text */
   }
   // HTML de un proxy caído, JSON truncado, un volcado de pila o la ruta interna del API: nada de eso se enseña.
+  if (SERVIDOR_GENERICO.test(raw) || SOLO_CODIGO_DE_SERVIDOR.test(raw)) return MENSAJE_SERVIDOR_CON_PROBLEMA;
   if (/^\s*[{[<]/.test(raw) || /\n\s+at\s/.test(raw) || INTERNAL_ROUTE_ERROR.test(raw)) return fallback;
   return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
 }

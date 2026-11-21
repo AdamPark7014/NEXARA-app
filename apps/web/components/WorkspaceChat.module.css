@@ -3780,3 +3780,58 @@
   font-size: var(--ui-fs-caption, 11px);
   color: var(--ui-fg-4, var(--ui-fg-3));
 }
+
+/* ── La lista de conversaciones no llegó ──
+   En escritorio lo dice el panel central; en teléfono solo se ve la lista, así
+   que el aviso vive ahí con su propio «Reintentar». */
+.emptyMarkFalla {
+  background: var(--ui-danger-bg);
+  color: var(--ui-danger-text);
+  border: 1px solid var(--ui-danger-border);
+  box-shadow: none;
+}
+
+.emptyAccion {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.sidebarFalla {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .sidebarFalla {
+    display: grid;
+    gap: 4px;
+    margin: 4px 8px 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--ui-danger-border);
+    background: var(--ui-danger-bg);
+    color: var(--text-primary, #0f1c2e);
+    font: 500 13px/1.45 var(--nx-font);
+  }
+
+  .sidebarFalla strong {
+    font-weight: 700;
+  }
+
+  .sidebarFalla span {
+    color: var(--text-secondary, #445668);
+  }
+
+  .sidebarFallaBoton {
+    justify-self: start;
+    margin-top: 6px;
+    min-height: 40px;
+    padding: 0 16px;
+    border-radius: 10px;
+    border: 1px solid var(--nx-line);
+    background: var(--surface, #fff);
+    color: var(--text-primary, #0f1c2e);
+    font: 600 13.5px/1 var(--nx-font);
+    cursor: pointer;
+  }
+}

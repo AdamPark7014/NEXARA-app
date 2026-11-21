@@ -11,6 +11,7 @@ import PedirTexto, { type PedirTextoEstado } from '@/components/ui/PedirTexto';
 import styles from './ToolMyKitPanel.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { formatApiError } from '@/lib/erp-api';
 import {
   Alert,
   Badge,
@@ -74,7 +75,8 @@ const ToolMyKitPanel: React.FC = () => {
   const [items, setItems] = useState<KitAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  // Mientras la lista no haya llegado ni una vez, no se puede decir «no tienes».
+  const [cargado, setCargado] = useState(false);
 
   const fetchKit = useCallback(async () => {
     if (!user?.token) return;
@@ -84,12 +86,17 @@ const ToolMyKitPanel: React.FC = () => {
         headers: { Authorization: `Bearer ${user.token}` },
       });
 
-      if (!response.ok) throw new Error('No se pudo cargar tu kit');
+      if (!response.ok) {
+        // El motivo que dé el servidor; el título del aviso ya dice qué no cargó.
+        const texto = await response.text().catch(() => '');
+        throw new Error(texto || `HTTP ${response.status}`);
+      }
       const payload = await response.json();
       setItems(Array.isArray(payload) ? payload : []);
+      setCargado(true);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(formatApiError(err, 'El servidor no contestó como se esperaba. Vuelve a intentarlo en un momento.'));
     } finally {
       setLoading(false);
     }
@@ -158,7 +165,7 @@ const ToolMyKitPanel: React.FC = () => {
 
       await fetchKit();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(formatApiError(err, 'No se pudo reportar el incidente'));
     }
   };
 
@@ -182,7 +189,7 @@ const ToolMyKitPanel: React.FC = () => {
     <Card>
       <CardHead title={TITLE} subtitle={SUBTITLE} />
       <div className={styles.body}>
-        {error && (
+        {error && cargado && (
           <Alert tone="danger" role="alert">
             {error}
           </Alert>
@@ -208,7 +215,15 @@ const ToolMyKitPanel: React.FC = () => {
           </StatRow>
         )}
 
-        {items.length === 0 ? (
+        {!cargado ? (
+          <EmptyState
+            icon={<ReportProblemOutlinedIcon fontSize="inherit" />}
+            title="No se pudo cargar tu kit"
+            description={error ?? 'No llegó la respuesta del servidor.'}
+            tone="danger"
+            action={<Button onClick={() => void fetchKit()}>Reintentar</Button>}
+          />
+        ) : items.length === 0 ? (
           <EmptyState
             icon={<HandymanOutlinedIcon fontSize="inherit" />}
             title="No tienes herramientas de kit asignadas."

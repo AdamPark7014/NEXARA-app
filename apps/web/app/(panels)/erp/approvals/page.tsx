@@ -15,6 +15,7 @@ import { getApprovalsSectionConfig } from "@/lib/section-views";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { formatApiError } from "@/lib/erp-api";
+import { MENSAJE_SIN_CONEXION } from "@/lib/red-caida";
 import {
   listMyPendingApprovals,
   decideApproval,
@@ -166,6 +167,8 @@ export default function ApprovalsPage() {
   const [data, setData] = useState<ApprovalRow[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Sin conexión fallan los tres bloques por lo mismo: se dice una sola vez.
+  const [sinRed, setSinRed] = useState(false);
   const [decidingId, setDecidingId] = useState<number | null>(null);
   const [decideError, setDecideError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -190,8 +193,11 @@ export default function ApprovalsPage() {
     try {
       const list = await listMyPendingApprovals(token);
       setData(list.map(toApprovalRow));
+      setSinRed(false);
     } catch (e: unknown) {
-      setError(formatApiError(e, "No pudimos cargar tus aprobaciones."));
+      const texto = formatApiError(e, "No pudimos cargar tus aprobaciones.");
+      setError(texto);
+      setSinRed(texto === MENSAJE_SIN_CONEXION);
     } finally {
       setLoading(false);
     }
@@ -294,6 +300,7 @@ export default function ApprovalsPage() {
 
   const [gruposBandeja, setGruposBandeja] = useState<GrupoBandeja[] | null>(null);
   const showSkeleton = loading && data === null;
+  const todoCaido = sinRed && data === null;
   const hasFilters = filter !== "all" || searchQ.trim() !== "";
   // Firmas de flujo: sus cifras, filtros y buscador solo cuando hay alguna (15-11: «módulos sin info»).
   const hayFirmas = counts.all > 0 || hasFilters;
@@ -343,10 +350,11 @@ export default function ApprovalsPage() {
         />
       }
     >
-      {error && (
+      {/* Sin datos previos el fallo lo cuenta el estado de abajo, una sola vez. */}
+      {error && data && (
         <InlineAlert
-          variant={data ? "warning" : "danger"}
-          message={data ? `No pudimos actualizar la bandeja; mostramos la última versión. ${error}` : error}
+          variant="warning"
+          message={`No pudimos actualizar la bandeja; mostramos la última versión. ${error}`}
           action={<Button size="sm" variant="secondary" onClick={() => void fetchPending()}>Reintentar</Button>}
         />
       )}
@@ -355,8 +363,8 @@ export default function ApprovalsPage() {
       )}
       {notice && <InlineAlert variant="success" message={notice} onDismiss={() => setNotice(null)} />}
 
-      {token ? <BandejaUnica token={token} onGrupos={setGruposBandeja} /> : null}
-      {token ? <SolicitudesRhPendientes token={token} /> : null}
+      {token && !todoCaido ? <BandejaUnica token={token} onGrupos={setGruposBandeja} /> : null}
+      {token && !todoCaido ? <SolicitudesRhPendientes token={token} /> : null}
 
       {hayFirmas ? <h2 id="firmas" className={s.subtitulo}>Firmas de flujo</h2> : null}
 
@@ -402,7 +410,7 @@ export default function ApprovalsPage() {
           <EmptyState
             icon="⚠️"
             title="No pudimos cargar la bandeja"
-            description="Revisa tu conexión e intenta de nuevo."
+            description={error ?? "Revisa tu conexión e intenta de nuevo."}
             action={<Button variant="primary" onClick={() => void fetchPending()}>Reintentar</Button>}
           />
         ) : hasFilters ? (

@@ -116,7 +116,7 @@ import {
   type StockReservationRow,
   type ProductoDeCatalogo,
 } from "@/lib/stock-api";
-import { formatApiError } from "@/lib/erp-api";
+import { formatApiError, errorSeguidoDe } from "@/lib/erp-api";
 import { crearEmpaque, listarEmpaques, type Empaque } from "@/lib/almacen-api";
 import { etiquetaCantidad, previsualizarConversion } from "@/lib/empaque";
 import { toast } from "@/components/Toast";
@@ -1977,7 +1977,7 @@ export function VistaAlmacen({
                     role="alert"
                     action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
                   >
-                    {`${loadError}. Se muestra lo último que cargó.`}
+                    {errorSeguidoDe(loadError, "Se muestra lo último que cargó.")}
                   </Alert>
                 )}
                 {resumen.categorias.length > 0 && (

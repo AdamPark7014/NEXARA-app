@@ -23,6 +23,7 @@ import {
   type Column,
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
+import { formatApiError } from "@/lib/erp-api";
 import { ETIQUETA_ESTADO_DISENO, consultarAcceso, crearDiseno, listarDisenos, type DisenoFila } from "@/lib/cctv/api";
 import { listSalesClients, type SalesClient } from "@/lib/sales-api";
 import styles from "./videovigilancia.module.css";
@@ -47,11 +48,13 @@ export default function VideovigilanciaPage() {
       setAcceso(puede);
       if (puede) setDisenos(await listarDisenos(token));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudieron cargar los diseños.");
+      setError(formatApiError(e, "No se pudieron cargar los diseños."));
     } finally {
       setCargando(false);
     }
   }, [token]);
+
+  const sinLista = Boolean(error) && !disenos.length;
 
   useEffect(() => {
     void cargar();
@@ -138,7 +141,7 @@ export default function VideovigilanciaPage() {
         }
         before={
           <>
-            {error ? (
+            {error && !sinLista ? (
               <Alert tone="danger" action={<Button size="sm" onClick={() => void cargar()}>Reintentar</Button>}>
                 {error}
               </Alert>
@@ -155,16 +158,26 @@ export default function VideovigilanciaPage() {
         listLabel="Diseños de videovigilancia"
         loading={cargando && !disenos.length}
         empty={!cargando && !disenos.length}
-        emptyState={{
-          title: "Todavía no hay diseños",
-          description: "Descríbele el sitio a la IA y te arma un primer diseño, o parte del croquis o de cero.",
-          tone: "brand",
-          action: (
-            <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={() => setAlta(true)}>
-              Nuevo diseño
-            </Button>
-          ),
-        }}
+        emptyState={
+          sinLista
+            ? {
+                // La lista no llegó: no se puede decir que no hay diseños.
+                title: "No se pudieron cargar los diseños",
+                description: error,
+                tone: "danger",
+                action: <Button onClick={() => void cargar()}>Reintentar</Button>,
+              }
+            : {
+                title: "Todavía no hay diseños",
+                description: "Descríbele el sitio a la IA y te arma un primer diseño, o parte del croquis o de cero.",
+                tone: "brand",
+                action: (
+                  <Button variant="primary" iconStart={<AddRoundedIcon />} onClick={() => setAlta(true)}>
+                    Nuevo diseño
+                  </Button>
+                ),
+              }
+        }
       >
         <DataTable
           flush

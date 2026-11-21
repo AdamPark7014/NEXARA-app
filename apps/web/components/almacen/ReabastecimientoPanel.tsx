@@ -20,7 +20,7 @@ import {
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
-import { formatApiError } from "@/lib/erp-api";
+import { formatApiError, errorSeguidoDe } from "@/lib/erp-api";
 import {
   listarReabastecimiento,
   recalcularReabastecimiento,
@@ -301,7 +301,7 @@ export default function ReabastecimientoPanel() {
                 </Button>
               }
             >
-              {filas.length > 0 ? `${error}. Se muestra lo último que cargó.` : error}
+              {filas.length > 0 ? errorSeguidoDe(error, "Se muestra lo último que cargó.") : error}
             </Alert>
           </div>
         )}

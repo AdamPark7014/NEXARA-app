@@ -44,7 +44,7 @@ import {
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { isCeoEmail } from "@/lib/activity-kinds";
-import { formatApiError } from "@/lib/erp-api";
+import { formatApiError, errorSeguidoDe } from "@/lib/erp-api";
 import ReprogramarDespacho from "@/components/pizarra/ReprogramarDespacho";
 import IniciarActividad from "@/components/pizarra/IniciarActividad";
 import { SesionPropia } from "@/components/pizarra/SesionActividad";
@@ -298,7 +298,7 @@ export default function MisActividadesPage() {
             </Button>
           }
         >
-          {data ? `${error}. Sigues viendo lo último que cargó.` : error}
+          {data ? errorSeguidoDe(error, "Sigues viendo lo último que cargó.") : error}
         </Alert>
       ) : null}
 

@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useUser } from "@/components/UserContext";
 import { Button, ButtonLink, EmptyState, SkeletonRows } from "@/components/base";
 import { Aviso, Dialogo, Segmentos } from "@/components/mesa-contable/piezas";
-import { Banda, Kpi, c, useAccesoCostos } from "@/components/costos/piezas";
+import { Banda, CostosSinRespuesta, Kpi, c, useAccesoCostos } from "@/components/costos/piezas";
 import { formatApiError } from "@/lib/erp-api";
 import {
   deshacerLiga,
@@ -109,6 +109,8 @@ export default function HorasSinProyecto() {
       setSugiriendo(false);
     }
   }
+
+  if (acceso?.sinRespuesta) return <CostosSinRespuesta acceso={acceso} titulo="Costos" />;
 
   if (acceso && !acceso.puedeLigar) {
     return (

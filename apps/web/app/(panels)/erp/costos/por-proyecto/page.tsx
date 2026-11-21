@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { ButtonLink, EmptyState } from "@/components/base";
 import { Aviso } from "@/components/mesa-contable/piezas";
-import { Banda, Kpi, c, useAccesoCostos } from "@/components/costos/piezas";
+import { Banda, CostosSinRespuesta, Kpi, c, useAccesoCostos } from "@/components/costos/piezas";
 import { formatApiError } from "@/lib/erp-api";
 import {
   getListaProyectos,
@@ -32,6 +32,8 @@ export default function CostosPorProyecto() {
       .then(setDatos)
       .catch((e) => setError(formatApiError(e, "No se pudieron leer los costos.")));
   }, [token, acceso?.veTodo]);
+
+  if (acceso?.sinRespuesta) return <CostosSinRespuesta acceso={acceso} titulo="Por proyecto" />;
 
   if (acceso && !acceso.veTodo) {
     return (

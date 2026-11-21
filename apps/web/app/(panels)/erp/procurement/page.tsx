@@ -57,6 +57,7 @@ import {
   type Warehouse,
 } from "./compras-datos";
 import s from "./compras.module.css";
+import { errorSeguidoDe } from "@/lib/erp-api";
 
 const WholesalePanel = dynamic(() => import("@/components/WholesalePanel"), {
   ssr: false,
@@ -1304,7 +1305,7 @@ export default function ProcurementPage() {
             <div style={{ marginBottom: 12 }}>
               <InlineAlert
                 variant={cargado[tab] ? "warning" : "danger"}
-                message={cargado[tab] ? `${errorCarga}. Se muestra lo último que cargó.` : errorCarga}
+                message={cargado[tab] ? errorSeguidoDe(errorCarga, "Se muestra lo último que cargó.") : errorCarga}
                 action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
               />
             </div>

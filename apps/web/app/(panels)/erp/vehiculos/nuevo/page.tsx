@@ -16,7 +16,7 @@ import { Aviso } from "@/components/mesa-contable/piezas";
 import { useUser } from "@/components/UserContext";
 import { FilaPrograma, IconoManual, Pastilla, PastillaFuente, c, v } from "@/components/vehiculos/piezas";
 import { pesos2 } from "@/lib/costos";
-import { formatApiError } from "@/lib/erp-api";
+import { formatApiError, errorSeguidoDe } from "@/lib/erp-api";
 import { VEHICULOS_PATH } from "@/lib/recursos-core";
 import {
   aNumero,
@@ -288,7 +288,7 @@ function AltaVehiculo() {
         actuales = llenos;
         if (r.servicios.length) setPlan((p) => combinarPlan(p, r.servicios));
       } catch (e) {
-        setAviso(`${formatApiError(e, "No se pudo leer el manual")}. Puedes llenarlo a mano.`);
+        setAviso(errorSeguidoDe(formatApiError(e, "No se pudo leer el manual"), "Puedes llenarlo a mano."));
       }
     }
     setLeyendo("Buscando el rendimiento oficial…");

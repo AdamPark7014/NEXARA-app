@@ -168,7 +168,15 @@ export default function KpisEquipoPage() {
       />
 
       {error ? (
-        <Alert tone="danger" role="alert">
+        <Alert
+          tone="danger"
+          role="alert"
+          action={
+            <Button size="sm" onClick={() => void cargar()} disabled={cargando}>
+              Reintentar
+            </Button>
+          }
+        >
           {error}
         </Alert>
       ) : null}

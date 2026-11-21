@@ -7,6 +7,9 @@ import { useUser } from "@/components/UserContext";
 import { cargarBandeja, type GrupoBandeja } from "@/lib/bandeja";
 import { decidirBaja, listarBajas, type BajaRequest } from "@/lib/delegated-users-api";
 import PedirTexto, { type PedirTextoEstado } from "@/components/ui/PedirTexto";
+import InlineAlert from "@/components/ui/InlineAlert";
+import Button from "@/components/ui/Button";
+import { formatApiError } from "@/lib/erp-api";
 import s from "./BandejaUnica.module.css";
 
 export default function BandejaUnica({
@@ -47,7 +50,7 @@ export default function BandejaUnica({
     }).catch((err) => {
       if (!vivo) return;
       setFalloCarga(true);
-      setAviso(err instanceof Error ? err.message : "No se pudo cargar la bandeja.");
+      setAviso(formatApiError(err, "No se pudo cargar la bandeja."));
     });
     return () => {
       vivo = false;
@@ -79,13 +82,22 @@ export default function BandejaUnica({
       await decidirBaja(token, id, accion);
       setTick((n) => n + 1);
     } catch (err) {
-      setAviso(err instanceof Error ? err.message : "No se pudo completar la acción.");
+      setAviso(formatApiError(err, "No se pudo completar la acción."));
     } finally {
       setBusy(null);
     }
   };
 
-  if (falloCarga) return <div role="alert">{aviso} <button type="button" onClick={() => setTick((n) => n + 1)}>Reintentar</button></div>;
+  if (falloCarga) {
+    return (
+      <InlineAlert
+        variant="danger"
+        title="No se pudo cargar lo que espera tu firma"
+        message={aviso ?? "No se pudo cargar la bandeja."}
+        action={<Button size="sm" variant="secondary" onClick={() => setTick((n) => n + 1)}>Reintentar</Button>}
+      />
+    );
+  }
   if (grupos === null) {
     return (
       <div className={s.rejilla} aria-busy="true" aria-label="Juntando lo que espera tu firma">
@@ -98,7 +110,11 @@ export default function BandejaUnica({
 
   return (
     <section className={s.rejilla} aria-label="Lo que espera tu firma">
-      {aviso ? <p role="alert">{aviso}</p> : null}
+      {aviso ? (
+        <div className={s.aviso}>
+          <InlineAlert variant="danger" dense message={aviso} onDismiss={() => setAviso(null)} />
+        </div>
+      ) : null}
       {grupos.map((g) => (
         <article key={g.clave} className={s.tarjeta} data-clave={g.clave}>
           <header className={s.cabeza}>

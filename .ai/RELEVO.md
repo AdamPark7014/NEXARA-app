@@ -1,5 +1,42 @@
 # RELEVO
 
+- **21-11 ~17:50 México (claude-code, nube; Cursor/Codex no alcanzables) — Quinta vuelta de pulido: que nada se vea roto ni engañe cuando el servidor no contesta. Sin migraciones; sin desplegar.**
+  - **Cómo se probó:** un navegador recorre las 26 pantallas del menú con la cuenta de demostración mientras se corta
+    `/api/**` (sin red) y, en otra pasada, se contesta 500 a todo (como en medio de un despliegue). Antes: casi todas
+    enseñaban «Failed to fetch», el texto del navegador en inglés, y ocho dejaban además un estado que no era cierto.
+    Después: las 26 avisan en español y las 26 ofrecen «Reintentar»; ninguna enseña texto crudo.
+  - **Aviso de red en un solo lugar (web):** `lib/red-caida.ts` envuelve `fetch` una vez (`app/providers.tsx`) y, solo
+    para llamadas a la API propia, cambia el `TypeError` del navegador por «No se pudo conectar con el servidor. Revisa
+    tu internet y vuelve a intentarlo.». Sigue siendo `TypeError` y guarda el original en `cause`; `AbortError`, las
+    llamadas a terceros y las respuestas del servidor pasan intactas. `formatApiError` hace lo mismo con textos que le
+    lleguen ya como cadena, y traduce el «Internal server error» genérico y el «HTTP 502» pelón a «El servidor tuvo un
+    problema. Vuelve a intentarlo en un momento.». Un mensaje propio del servidor se sigue mostrando tal cual.
+  - **Estados que engañaban, corregidos:**
+    - Costos (resumen, por proyecto y tarifas): sin respuesta del servidor decía «Esta sección es de dirección,
+      contabilidad y coordinación» a quien sí tiene acceso. Sigue cerrado por defecto (no da acceso si no contestó),
+      pero dice «No se pudo abrir Costos» con el motivo y «Reintentar». Un 401/403 real sigue mostrando el «no es tuya».
+    - Chat: sin lista de conversaciones se veía vacío y en calma («Elige un canal…»). Ahora «No se pudo abrir el chat»
+      con «Reintentar»; en teléfono, donde solo se ve la lista, el aviso sale ahí.
+    - Mesa contable: «Nada urgente, puedes cobrar, pagar o cuadrar el banco» con palomita verde aunque el resumen no
+      hubiera cargado. Ahora «No se pudo revisar». De paso el periodo se lee «del 1 nov 2026 al 21 nov 2026» (antes
+      «2026-11-01 → 2026-11-21») en el subtítulo, el aviso de error y los vacíos.
+    - Aprobaciones: tres avisos apilados más un «Failed to fetch [Reintentar]» sin estilo. Sin red se dice una sola
+      vez; si falla solo un bloque, cada uno lo dice con su aviso normal (la bandeja única ya usa `InlineAlert`).
+    - Diseños de cámaras, Reuniones y Mi kit de herramientas: mostraban «Todavía no hay…» o «No tienes…» debajo del
+      error. Ahora dicen que no se pudo cargar. En Reuniones la tarjeta del micrófono ya no se adelanta mientras la
+      página no cargó (tapaba el «Reintentar» en teléfono).
+    - Desempeño del equipo: el error no traía «Reintentar». Usuarios: decía «0 resultados» y «0 cuentas» junto al error.
+  - **«..» en avisos:** diez avisos pegaban «. Se muestra lo último que cargó.» a un error que ya traía su punto.
+    `errorSeguidoDe(error, frase)` en `lib/erp-api.ts` los une bien (almacén, pizarra, compras, organigrama, viáticos,
+    pagos a empleados, alta de vehículo, reabastecimiento).
+  - **Accesibilidad:** auditoría de las 27 pantallas del menú: ningún botón sin nombre, campo sin etiqueta ni imagen
+    sin descripción. No hubo que corregir nada.
+  - **Paridad:** Web hecho · API no aplica (no se tocó) · Android no aplica: ya traduce el fallo de red en un solo
+    lugar (`data/api/ApiErrors.kt`, «Sin conexión, revisa tu red e intenta de nuevo.») y tiene cola sin conexión ·
+    iOS no aplica: igual (`NxParityComponents.swift`, «Sin conexión a internet. Revisa tus datos o Wi‑Fi.»).
+  - **Verificado:** `npm run typecheck` 0; vitest web 2396/2397 (solo falla
+    `ComoSeHace.spec.tsx`, que ya fallaba antes y no es de esta vuelta); la API no cambió desde la corrida en verde de
+    la cuarta vuelta (jest 6580/6580) y arriba solo entraron capturas de iOS, así que no se volvió a correr.
 - **21-11 ~17:15 México (claude-code, nube; Cursor/Codex no alcanzables) — Cuarta vuelta de pulido: capas a pantalla completa recortadas en teléfono, horas y fechas parejas, avisos del servidor sin «(s)» ni jerga, asistencia contra puertas en lenguaje llano. Sin migraciones. En main, NO desplegado.**
   - **Franja de 16 px en teléfono y tableta (web):** `globals.scss` limita toda ventana a `100vw - 16px` por debajo de
     900 px con `:where([role="dialog"], [class*="modal"], [class*="Modal"], [class*="drawer"]…)`. Esa red de seguridad

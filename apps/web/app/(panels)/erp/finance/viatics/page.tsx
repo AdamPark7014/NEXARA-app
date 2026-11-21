@@ -68,7 +68,7 @@ import {
 } from "@/lib/viatics-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
-import { formatApiError } from "@/lib/erp-api";
+import { formatApiError, errorSeguidoDe } from "@/lib/erp-api";
 import {
   centavosViatico as centavos,
   pesosViatico as dinero,
@@ -1299,7 +1299,7 @@ export default function ViaticosPage() {
         )}
         {catalogErr && (
           <Alert tone="warning" role="alert" onDismiss={() => setCatalogErr(null)}>
-            {`${catalogErr}. El desplegable de proyectos saldrá vacío; puedes ligar la solicitud con el ID de actividad.`}
+            {errorSeguidoDe(catalogErr, "El desplegable de proyectos saldrá vacío; puedes ligar la solicitud con el ID de actividad.")}
           </Alert>
         )}
         {truncated && !error && (
@@ -1618,7 +1618,7 @@ export default function ViaticosPage() {
           {assignCatalogErr && (
             <div className={s.completo}>
               <Alert tone="warning" role="alert" onDismiss={() => setAssignCatalogErr(null)}>
-                {`${assignCatalogErr}. Puedes seguir con lo que sí cargó.`}
+                {errorSeguidoDe(assignCatalogErr, "Puedes seguir con lo que sí cargó.")}
               </Alert>
             </div>
           )}

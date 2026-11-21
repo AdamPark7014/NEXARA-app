@@ -380,9 +380,10 @@ export default function ReunionesPage() {
   const [tarjetaMic, setTarjetaMic] = useState<{ pendiente: Existente | null; grabar: boolean } | null>(null);
   const [micPospuesto, setMicPospuesto] = useState(false);
   useEffect(() => {
-    if (!puedeConvocar || micPospuesto || tarjetaMic || sesion) return;
+    // Sin la página cargada la tarjeta solo taparía el «Reintentar».
+    if (!loaded || !puedeConvocar || micPospuesto || tarjetaMic || sesion) return;
     if (permisoMic.estado === "prompt" || permisoMic.estado === "denied") setTarjetaMic({ pendiente: null, grabar: false });
-  }, [permisoMic.estado, puedeConvocar, micPospuesto, tarjetaMic, sesion]);
+  }, [loaded, permisoMic.estado, puedeConvocar, micPospuesto, tarjetaMic, sesion]);
   useEffect(() => {
     // Se permitió (desde la tarjeta o desde el candado del navegador): la tarjeta sobra.
     if (permisoMic.estado === "granted" && tarjetaMic && !tarjetaMic.grabar) setTarjetaMic(null);
@@ -549,6 +550,17 @@ export default function ReunionesPage() {
   }
 
   const primeraCarga = !loaded && loading;
+  // La primera carga falló: no se sabe si hay reuniones o acuerdos, así que no
+  // se pinta «Todavía no hay» ni «Nada pendiente».
+  const noCargo = !loaded && !loading && Boolean(token);
+  const estadoSinCarga = (
+    <EmptyState
+      icon="⚠️"
+      title="No se pudo cargar"
+      description={error ?? "No llegó la respuesta del servidor."}
+      action={<Button variant="primary" onClick={() => void cargar()}>Reintentar</Button>}
+    />
+  );
 
   return (
     <>
@@ -568,7 +580,7 @@ export default function ReunionesPage() {
         }
       />
 
-      {error && (
+      {error && (loaded || tab === "agenda") && (
         <InlineAlert
           variant={loaded ? "warning" : "danger"}
           message={error}
@@ -648,6 +660,8 @@ export default function ReunionesPage() {
             )
           ) : primeraCarga ? (
             <SkeletonList />
+          ) : noCargo ? (
+            estadoSinCarga
           ) : miosVisibles.length === 0 ? (
             <EmptyState
               icon="✅"
@@ -709,6 +723,8 @@ export default function ReunionesPage() {
         >
           {primeraCarga ? (
             <SkeletonList />
+          ) : noCargo ? (
+            estadoSinCarga
           ) : reuniones.length === 0 ? (
             <EmptyState
               icon="📅"

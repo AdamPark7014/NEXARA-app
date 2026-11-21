@@ -9,6 +9,7 @@ import { type MentionTextareaHandle } from "./chat/MentionTextarea";
 import { esCeoChristian } from "@/lib/ceo-user";
 import { formatApiError } from "@/lib/erp-api";
 import InlineAlert from "@/components/ui/InlineAlert";
+import { Button } from "@/components/base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import {
   entityMentionToken,
@@ -79,6 +80,9 @@ export default function WorkspaceChat({
   const [loadingChannels, setLoadingChannels] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // La lista de conversaciones no llegó. Sin esto el chat se veía vacío y en
+  // calma, como si nadie hubiera escrito nunca.
+  const [fallaCanales, setFallaCanales] = useState<string | null>(null);
   const [threadRoot, setThreadRoot] = useState<Message | null>(null);
   const [threadReplies, setThreadReplies] = useState<Message[]>([]);
   const [threadDraft, setThreadDraft] = useState("");
@@ -522,6 +526,7 @@ export default function WorkspaceChat({
     if (!token) return;
     setLoadingChannels(true);
     setError(null);
+    setFallaCanales(null);
     try {
       const data = await apiFetch("chat/channels", token);
       const list: Channel[] = (Array.isArray(data) ? data : []).filter(
@@ -543,7 +548,9 @@ export default function WorkspaceChat({
         return next;
       });
     } catch (e) {
-      setError(formatApiError(e, "No se pudo cargar el chat"));
+      const texto = formatApiError(e, "No se pudo cargar el chat");
+      setError(texto);
+      setFallaCanales(texto);
     } finally {
       setLoadingChannels(false);
     }
@@ -1639,6 +1646,7 @@ export default function WorkspaceChat({
     setShowNewChannel(true);
   };
 
+  const sinConversaciones = Boolean(fallaCanales) && channels.length === 0 && !loadingChannels;
   const channelLabel = `Mensaje a ${channelPrefix(detail?.kind ?? "PUBLIC")}${detail?.name ?? "canal"}`;
   const channelPlaceholder = esGeneral ? `${channelLabel} · escribe @asistente para preguntarle a NEXARA` : channelLabel;
 
@@ -1662,10 +1670,22 @@ export default function WorkspaceChat({
           onNewChannel={openNewChannelDialog}
           onNewDm={openDmDialog}
           onOpenSwitcher={() => setSwitcherOpen(true)}
+          falla={sinConversaciones ? { mensaje: fallaCanales ?? "", reintentar: () => void loadChannels() } : null}
         />
 
         <section className={styles.main} aria-label="Conversación">
-          {!activeId ? (
+          {sinConversaciones ? (
+            <div className={styles.emptyMain} role="alert">
+              <div>
+                <div className={`${styles.emptyMark} ${styles.emptyMarkFalla}`} aria-hidden="true">!</div>
+                <h3>No se pudo abrir el chat</h3>
+                <p>{fallaCanales}</p>
+                <div className={styles.emptyAccion}>
+                  <Button onClick={() => void loadChannels()}>Reintentar</Button>
+                </div>
+              </div>
+            </div>
+          ) : !activeId ? (
             <div className={styles.emptyMain}>
               <div>
                 <div className={styles.emptyMark}>N</div>

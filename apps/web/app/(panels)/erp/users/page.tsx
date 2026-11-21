@@ -1353,7 +1353,7 @@ export default function UsersPage() {
             },
           ]}
           onClear={clearFilters}
-          resultCount={initialLoading ? null : visibleUsers.length}
+          resultCount={loaded ? visibleUsers.length : null}
           rightActions={users.length > 0 ? (
             <Button
               variant="ghost"
@@ -1380,7 +1380,7 @@ export default function UsersPage() {
         />
       </div>
 
-      <Section title={initialLoading ? "Cargando cuentas" : `${visibleUsers.length.toLocaleString("es-MX")} ${visibleUsers.length === 1 ? "cuenta" : "cuentas"}`}>
+      <Section title={initialLoading ? "Cargando cuentas" : !loaded ? "Cuentas" : `${visibleUsers.length.toLocaleString("es-MX")} ${visibleUsers.length === 1 ? "cuenta" : "cuentas"}`}>
         {highlightId && loaded && (
           <p style={{ fontSize: 12.5, color: "var(--text-secondary)", margin: "0 0 12px" }}>
             La cuenta solicitada aparece al inicio de la lista.

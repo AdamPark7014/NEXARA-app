@@ -19,7 +19,7 @@ import {
 } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { RangoSelector } from "@/components/pizarra/PizarraKpi";
-import { formatApiError } from "@/lib/erp-api";
+import { formatApiError, errorSeguidoDe } from "@/lib/erp-api";
 import {
   WORKFLOW_BUCKET_LABELS,
   fetchWorkflowBucket,
@@ -185,7 +185,7 @@ export default function FlujoBucketPage() {
                 </Button>
               }
             >
-              {data ? `${error}. Se muestra lo último que cargó.` : error}
+              {data ? errorSeguidoDe(error, "Se muestra lo último que cargó.") : error}
             </Alert>
           ) : null
         }
