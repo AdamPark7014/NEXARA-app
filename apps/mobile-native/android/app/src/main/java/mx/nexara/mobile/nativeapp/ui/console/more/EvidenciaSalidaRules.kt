@@ -35,7 +35,8 @@ object EvidenciaSalidaRules {
     /** No puede haber más series que piezas; `null` si cuadra. */
     fun errorSeries(series: Int, piezas: Double): String? =
         if (series > Math.ceil(piezas).toInt()) {
-            "Hay $series números de serie y el movimiento es de ${AlmacenRules.formato(piezas)} pieza(s)."
+            "Hay $series ${if (series == 1) "número de serie" else "números de serie"} y el movimiento es de " +
+                "${AlmacenRules.formato(piezas)} ${if (piezas == 1.0) "pieza" else "piezas"}."
         } else {
             null
         }

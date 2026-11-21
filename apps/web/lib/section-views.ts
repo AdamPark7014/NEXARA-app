@@ -1407,8 +1407,8 @@ export function getErpViaticsAdminSectionConfig(user: UserAccessInput | null | u
       canDelete: Boolean(user?.isSuperAdmin) || v2 === ROLES.SUPER_ADMIN,
       canAssign: true,
       canApprove: true,
-      title: 'Viáticos · Aprobación',
-      subtitle: 'Autoriza y asigna viáticos del equipo — el CEO no solicita viáticos.',
+      title: 'Viáticos',
+      subtitle: 'Autoriza y asigna los viáticos del equipo.',
     };
   }
   if (ERP_VIATICS_APPROVERS.has(v2)) {
@@ -1421,10 +1421,10 @@ export function getErpViaticsAdminSectionConfig(user: UserAccessInput | null | u
       canDelete: tier(v2) >= 70,
       canAssign: true,
       canApprove: true,
-      title: canCreate ? 'Viáticos · Gestión' : 'Viáticos · Aprobación',
+      title: 'Viáticos',
       subtitle: canCreate
         ? 'Asigna viáticos al equipo, preaprueba solicitudes y, si lo necesitas, solicita los tuyos.'
-        : 'Asigna, gestiona y autoriza viáticos — flujo admin → coordinación → dirección → CEO.',
+        : 'Asigna y autoriza los viáticos del equipo. Cada solicitud pasa por administración, coordinación y dirección.',
     };
   }
   return {
@@ -1473,7 +1473,7 @@ export function getErpExpensesSectionConfig(user: UserAccessInput | null | undef
       canDelete: tier(v2) >= 60,
       canAssign: false,
       canApprove: true,
-      title: 'Gastos · Gestión',
+      title: 'Gastos',
       subtitle: 'Autoriza gastos del equipo: renta, servicios, suscripciones y recurrentes.',
     };
   }
@@ -1526,7 +1526,7 @@ export function getHrSectionConfig(user: UserAccessInput | null | undefined): Se
       canAssign: true,
       canApprove: true,
       canAccess: true,
-      title: 'Recursos Humanos · Gestión',
+      title: 'Recursos Humanos',
       subtitle: 'Supervisión de plantilla, altas y organigrama corporativo.',
     };
   }

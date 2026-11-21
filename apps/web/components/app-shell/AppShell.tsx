@@ -95,6 +95,7 @@ import NotificationKindIcon from "@/components/ui/NotificationKindIcon";
 import { stripLeadingEmoji } from "@/lib/notification-kind";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
 import { contarBandeja } from "@/lib/bandeja";
+import { useScrollLock } from "@/components/ui/useScrollLock";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 
@@ -280,15 +281,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const hideRailTip = useCallback(() => setRailTip(null), []);
 
   // Con el cajón abierto la página de atrás no se desplaza (iOS arrastraba el fondo).
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const { body } = document;
-    const prevOverflow = body.style.overflow;
-    body.style.overflow = "hidden";
-    return () => {
-      body.style.overflow = prevOverflow;
-    };
-  }, [mobileOpen]);
+  useScrollLock(mobileOpen);
 
   useEffect(() => {
     if (!user?.token) return;

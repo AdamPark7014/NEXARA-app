@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildApiUrl } from "@/lib/api-base";
+import { contar } from "@/lib/plural";
 
 /**
  * Qué alcanza realmente cada rol.
@@ -171,7 +172,7 @@ export default function RoleAccessMatrix({ token }: { token?: string | null }) {
           }}
         >
           <strong>
-            {orphanRoles.length} rol(es) sin plantilla reconocida:{" "}
+            {contar(orphanRoles.length, "rol", "roles")} sin plantilla reconocida:{" "}
             {orphanRoles.map((r) => r.nombre).join(", ")}.
           </strong>{" "}
           No tienen línea base de permisos; quien los use no podrá entrar a casi nada.

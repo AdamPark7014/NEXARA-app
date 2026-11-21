@@ -34,6 +34,7 @@ import {
   type ToolRequestRow,
 } from "@/lib/tool-requests-api";
 import { VisorEvidencia, faltaEvidencia } from "./EvidenciaPrestamo";
+import { diaEnMexico, diaPactado, diaPactadoVencido, diaParaApi, textoDiaPactado } from "@/lib/dia-pactado";
 import s from "./MisPrestamos.module.css";
 
 /**
@@ -49,19 +50,14 @@ function fmtFecha(valor: string | null) {
   return d.toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
 }
 
-/** `AAAA-MM-DD` del día local, para el `min` del selector de fecha. */
-function diaLocal(d: Date): string {
-  const mes = String(d.getMonth() + 1).padStart(2, "0");
-  const dia = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mes}-${dia}`;
-}
-
 /** Desde cuándo se puede pedir el nuevo plazo: el día siguiente a la devolución pactada o a hoy. */
 export function primerDiaDePlazo(devolucionPactada: string | null, ahora: Date = new Date()): string {
-  const pactada = devolucionPactada ? new Date(devolucionPactada) : null;
-  const base = pactada && !Number.isNaN(pactada.getTime()) && pactada.getTime() > ahora.getTime() ? pactada : ahora;
-  const siguiente = new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1);
-  return diaLocal(siguiente);
+  const hoy = diaEnMexico(ahora);
+  const pactado = diaPactado(devolucionPactada);
+  const base = pactado && pactado > hoy ? pactado : hoy;
+  const siguiente = new Date(`${base}T12:00:00.000Z`);
+  siguiente.setUTCDate(siguiente.getUTCDate() + 1);
+  return siguiente.toISOString().slice(0, 10);
 }
 
 export function codigoVigente(p: Pick<ToolRequestRow, "status" | "pickupCode" | "pickupExpiresAt">, ahora = Date.now()) {
@@ -106,8 +102,7 @@ export default function MisPrestamos() {
 
   const ahora = Date.now();
   const vencida = useCallback(
-    (r: ToolRequestRow) =>
-      r.status === "IN_USE" && Boolean(r.expectedReturnDate) && new Date(r.expectedReturnDate as string).getTime() < ahora,
+    (r: ToolRequestRow) => r.status === "IN_USE" && diaPactadoVencido(r.expectedReturnDate, new Date(ahora)),
     [ahora],
   );
   const cuentas = useMemo(
@@ -142,9 +137,8 @@ export default function MisPrestamos() {
     setGuardando(true);
     setAvisoPlazo(null);
     try {
-      // Fin del día elegido, en hora local: el plazo cubre ese día completo.
-      const hasta = new Date(`${nuevaFecha}T23:59:00`);
-      await requestToolRenewal(token, plazo.id, hasta.toISOString(), motivo);
+      // El día elegido cuenta completo: se da por vencido hasta que ese día pasa.
+      await requestToolRenewal(token, plazo.id, diaParaApi(nuevaFecha), motivo);
       toast.success("Pediste más plazo. Te avisamos cuando lo aprueben.");
       setPlazo(null);
       void cargar();
@@ -212,7 +206,10 @@ export default function MisPrestamos() {
       key: "devolucion",
       label: "Devolución",
       width: 120,
-      render: (r) => <span className={s.fecha}>{fmtFecha(r.returnDate ?? r.expectedReturnDate)}</span>,
+      // La devolución real es un instante; la pactada, un día.
+      render: (r) => (
+        <span className={s.fecha}>{r.returnDate ? fmtFecha(r.returnDate) : textoDiaPactado(r.expectedReturnDate)}</span>
+      ),
     },
   ];
 
@@ -298,7 +295,7 @@ export default function MisPrestamos() {
           open
           size="sm"
           title={`Más plazo para ${plazo.toolName}`}
-          description={`Hoy la devuelves el ${fmtFecha(plazo.expectedReturnDate)}.`}
+          description={`Hoy la devuelves el ${textoDiaPactado(plazo.expectedReturnDate)}.`}
           onClose={() => {
             if (!guardando) setPlazo(null);
           }}

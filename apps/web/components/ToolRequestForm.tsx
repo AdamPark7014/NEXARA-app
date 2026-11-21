@@ -8,6 +8,7 @@ import { useUser } from './UserContext';
 import styles from './ToolRequestForm.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { diaParaApi } from '@/lib/dia-pactado';
 import {
   listarMisActividadesParaHerramienta,
   type ActividadSolicitable,
@@ -185,8 +186,9 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
     if (!expectedReturnDate) {
       return fail('expectedReturnDate', 'La fecha de devolución esperada es requerida');
     }
-    if (new Date(expectedReturnDate) <= new Date(startDate)) {
-      return fail('expectedReturnDate', 'La fecha de devolución debe ser posterior a la fecha de inicio');
+    // Son días (`AAAA-MM-DD`): el mismo día sí vale, como en las apps y en el servidor.
+    if (expectedReturnDate < startDate) {
+      return fail('expectedReturnDate', 'La devolución no puede ser antes del día en que la recoges');
     }
     setError(null);
     setErrorField(null);
@@ -232,8 +234,10 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
           inventoryItemId: selectedInventoryItem.id,
           activityId: activityId ? Number(activityId) : undefined,
           reason,
-          startDate: new Date(startDate).toISOString(),
-          expectedReturnDate: new Date(expectedReturnDate).toISOString(),
+          // El día elegido a mediodía de México: `new Date("AAAA-MM-DD")` es medianoche UTC, que
+          // aquí es la tarde anterior, y la lista mostraba un día menos.
+          startDate: diaParaApi(startDate),
+          expectedReturnDate: diaParaApi(expectedReturnDate),
         }),
       });
 
@@ -478,7 +482,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             label="Devolución esperada"
             required
             error={errorDe('expectedReturnDate')}
-            hint="Debe ser después del inicio."
+            hint="El mismo día o después."
           >
             <DateInput
               id={ids.expectedReturnDate}

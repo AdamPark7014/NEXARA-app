@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { contarEs } from '../common/contar-es.js';
 
 /**
  * Evidencia de un movimiento de almacén (Adam, 21-11-2026): foto de lo que sale, número de serie
@@ -63,7 +64,7 @@ export function validarSeriesContraCantidad(series: string[], piezas: number): v
   if (!series.length) return;
   if (!Number.isFinite(piezas) || series.length > Math.ceil(piezas)) {
     throw new BadRequestException(
-      `Hay ${series.length} números de serie y el movimiento es de ${Number.isFinite(piezas) ? piezas : 0} pieza(s)`,
+      `Hay ${contarEs(series.length, 'número de serie', 'números de serie')} y el movimiento es de ${contarEs(Number.isFinite(piezas) ? piezas : 0, 'pieza')}`,
     );
   }
 }

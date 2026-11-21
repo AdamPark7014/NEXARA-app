@@ -1,4 +1,5 @@
 import { buildApiUrl } from "@/lib/api-base";
+import { diasDeAtraso } from "@/lib/dia-pactado";
 
 export type ToolRequestStatus =
   | "PENDING"
@@ -285,9 +286,8 @@ export function normalizeToolRenewalRow(raw: Record<string, unknown>): ToolRenew
   const toolRequest = (raw.toolRequest as Record<string, unknown>) ?? {};
   const usuario = (toolRequest.usuario as Record<string, unknown>) ?? {};
   const approver = (raw.approver as Record<string, unknown>) ?? null;
-  const prev = new Date(String(raw.previousReturnDate ?? ""));
-  const now = Date.now();
-  const daysOverdue = Math.max(0, Math.floor((now - prev.getTime()) / (1000 * 60 * 60 * 24)));
+  // Por día de calendario: el día pactado completo todavía no cuenta como atraso.
+  const daysOverdue = diasDeAtraso(String(raw.previousReturnDate ?? ""));
 
   return {
     id: Number(raw.id),

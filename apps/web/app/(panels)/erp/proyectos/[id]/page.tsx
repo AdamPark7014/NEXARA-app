@@ -62,6 +62,7 @@ import SeccionActividades from "../_componentes/SeccionActividades";
 import SeccionCostos from "../_componentes/SeccionCostos";
 import { useAccesoCostos } from "@/components/costos/piezas";
 import styles from "../ficha.module.css";
+import { contar } from "@/lib/plural";
 
 const PESTANAS = [
   { id: "resumen", titulo: "Resumen" },
@@ -425,9 +426,9 @@ export default function ProyectoDetallePage() {
     (h) => h.status !== "CUMPLIDO" && h.status !== "CANCELADO" && !h.actualDate,
   ).length;
   const pendientesAlTerminar = [
-    p.resumen.avance.abiertas ? `${p.resumen.avance.abiertas} actividad(es) abierta(s)` : null,
-    p.resumen.requerimientos.pendientes ? `${p.resumen.requerimientos.pendientes} requerimiento(s) pendiente(s)` : null,
-    etapasSinCumplir ? `${etapasSinCumplir} etapa(s) sin cumplir` : null,
+    p.resumen.avance.abiertas ? contar(p.resumen.avance.abiertas, "actividad abierta", "actividades abiertas") : null,
+    p.resumen.requerimientos.pendientes ? contar(p.resumen.requerimientos.pendientes, "requerimiento pendiente", "requerimientos pendientes") : null,
+    etapasSinCumplir ? `${contar(etapasSinCumplir, "etapa")} sin cumplir` : null,
   ].filter(Boolean);
 
   const completitud = p.resumen.completitud;

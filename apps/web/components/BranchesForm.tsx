@@ -661,7 +661,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
             />
             {searchTerm && (
               <div className={styles.searchResultHint}>
-                Se encontraron {sortedBranches.length} resultado(s)
+                {sortedBranches.length === 1 ? "Se encontró 1 resultado" : `Se encontraron ${sortedBranches.length} resultados`}
               </div>
             )}
           </div>

@@ -40,6 +40,7 @@ import { formatApiError } from "@/lib/erp-api";
 import { fetchPrenominaPreview, type PrenominaPreviewRow } from "@/lib/finance-api";
 import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
 import s from "./pre-nomina.module.css";
+import { contar } from "@/lib/plural";
 
 const MODULO_COMPLETO = "/erp/finance/prenomina";
 
@@ -530,7 +531,7 @@ export default function ContabilidadPrenominaPage() {
             </h2>
             <p className={s.bloqueSub}>
               {periodoCargado
-                ? `${periodoCargado.from} → ${periodoCargado.to} · ${resumen.empleados} persona(s)`
+                ? `${periodoCargado.from} → ${periodoCargado.to} · ${contar(resumen.empleados, "persona")}`
                 : `${desde} → ${hasta}`}
             </p>
             <StatRow variant="strip" ariaLabel="Resumen de la pre-nómina">

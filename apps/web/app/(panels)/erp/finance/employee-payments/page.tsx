@@ -70,6 +70,7 @@ import {
   needsDraftApprovalConfirm,
 } from "@/lib/prenomina-draft-gate";
 import s from "./employee-payments.module.css";
+import { contar } from "@/lib/plural";
 
 /** El control semanal es pesado (dos tablas anchas, menús, panel lateral): se carga al abrir su pestaña. */
 const ControlNominaSemanal = dynamic(() => import("@/components/finance/ControlNominaSemanal"), {
@@ -515,7 +516,7 @@ function EmployeePaymentsContent() {
       const totalMinutes = Number((result as { totalMinutes?: number })?.totalMinutes ?? 0);
       setForm((f) => ({ ...f, totalMinutes }));
       const hrs = Math.round((totalMinutes / 60) * 100) / 100;
-      toast.success(`Asistencia: ${hrs}h en el periodo (${(result as { daysWithAttendance?: number })?.daysWithAttendance ?? 0} día(s) con registro).`);
+      toast.success(`Asistencia: ${hrs}h en el periodo (${contar((result as { daysWithAttendance?: number })?.daysWithAttendance ?? 0, "día")} con registro).`);
     } catch (e) {
       setSaveErr(formatApiError(e, "No se pudo calcular desde asistencia"));
     } finally {

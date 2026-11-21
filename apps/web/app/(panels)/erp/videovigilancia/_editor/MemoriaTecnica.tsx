@@ -32,6 +32,7 @@ import {
 } from "@/lib/cctv/ficha";
 import { hayWebGL } from "@/lib/cctv/medidas";
 import { fotoDeTipo } from "@/lib/cctv/sistema";
+import { useScrollLock } from "@/components/ui/useScrollLock";
 import type { RefVisor } from "./VisorModelo";
 import styles from "./memoria.module.css";
 
@@ -108,13 +109,7 @@ export default function MemoriaTecnica({
   };
 
   // Lo de atrás no se mueve mientras esta pantalla está abierta.
-  useEffect(() => {
-    const antes = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = antes;
-    };
-  }, []);
+  useScrollLock(true);
 
   // Una sola vez: el archivo que ya venía de un arrastre.
   const inicial = useRef(archivoInicial);

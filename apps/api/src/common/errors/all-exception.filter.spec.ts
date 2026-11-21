@@ -212,3 +212,46 @@ describe('AllExceptionsFilter · nivel del log', () => {
     expect(error).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('AllExceptionsFilter · código propio del error', () => {
+  function responder(excepcion: unknown) {
+    const json = jest.fn();
+    const res = { status: jest.fn().mockReturnThis(), json };
+    const req = { url: '/api/tool-requests', method: 'POST', headers: {}, body: {}, query: {}, params: {} };
+    const host = { switchToHttp: () => ({ getResponse: () => res, getRequest: () => req }) } as any;
+    const filter = new AllExceptionsFilter({ warn: jest.fn(), error: jest.fn(), log: jest.fn() }) as any;
+    filter.catch(excepcion, host);
+    return json.mock.calls[0]![0] as Record<string, unknown>;
+  }
+
+  it('el candado de jornada llega con su código: web y apps lo buscan para mandar a checar', () => {
+    const { ConflictException } = jest.requireActual('@nestjs/common');
+    const cuerpo = responder(
+      new ConflictException({
+        statusCode: 409,
+        code: 'JORNADA_NO_ABIERTA',
+        message: 'Registra tu entrada para empezar a trabajar',
+      }),
+    );
+    expect(cuerpo['statusCode']).toBe(409);
+    expect(cuerpo['code']).toBe('JORNADA_NO_ABIERTA');
+    expect(cuerpo['errorCode']).toBe('JORNADA_NO_ABIERTA');
+    expect(cuerpo['message']).toBe('Registra tu entrada para empezar a trabajar');
+    // Un consejo de «duplicados» junto a «registra tu entrada» confunde: ya trae su causa.
+    expect(cuerpo['suggestions']).toEqual([]);
+  });
+
+  it('un conflicto sin código propio queda como antes', () => {
+    const { ConflictException } = jest.requireActual('@nestjs/common');
+    const cuerpo = responder(new ConflictException('Ya existe un registro con esos datos'));
+    expect(cuerpo['code']).toBeUndefined();
+    expect(cuerpo['errorCode']).toBe('Conflict');
+    expect(cuerpo['suggestions']).toEqual(['Conflicto de datos. Verifica duplicados o integridad.']);
+  });
+
+  it('solo pasa códigos con forma de código, no cualquier texto ni objetos', () => {
+    const { BadRequestException } = jest.requireActual('@nestjs/common');
+    expect(responder(new BadRequestException({ message: 'x', code: { a: 1 } }))['code']).toBeUndefined();
+    expect(responder(new BadRequestException({ message: 'x', code: 'select * from "User"' }))['code']).toBeUndefined();
+  });
+});

@@ -1,6 +1,57 @@
 # RELEVO
 
-- **21-11 ~15:45 México (claude-code, nube; Cursor/Codex no alcanzables) — Evidencia en cada entrega: herramientas y almacén (API, web, Android, iOS). En main, NO desplegado. Antes, en la misma sesión: 295c1a8 (capa visual «Firma NEXARA v3») y d17bf58 (fuentes con `next/font/local`), tampoco desplegados.**
+- **21-11 ~16:50 México (claude-code, nube; Cursor/Codex no alcanzables) — Repaso de procesos con la plataforma montada en local (Postgres + Redis + API + web, datos de demostración): errores reales corregidos y pantallas alineadas. Sin migraciones. En main, NO desplegado (se va con el siguiente despliegue de cualquier hilo).**
+  - **Candado de jornada (hilo «mejoras de código de NEXARA Core», aviso enviado):** el 409 `JORNADA_NO_ABIERTA` salía del
+    servidor SIN su código: `AllExceptionsFilter` solo copiaba `error`, y el candado manda `code`. Ningún cliente abría
+    «Registra tu entrada»; la persona veía el texto suelto dentro del formulario. Ahora el filtro pasa el código propio
+    (`codigoPropio`, solo `MAYUSCULAS_CON_GUION`) en `code` y `errorCode`, sin sugerencias genéricas. En la web la barrera
+    solo se abría si la llamada pasaba por `erpFetch` y ~140 archivos usan `fetch` directo: `vigilarRespuestasDeJornada()`
+    (`lib/jornada-candado.ts`, montado en `BarreraJornada`) vigila todos los 409. Android e iOS buscan el código en el
+    cuerpo (ese código de las apps llega con la próxima versión publicada): con esto sí lo van a encontrar, sin más
+    cambio. Comprobado en navegador con un técnico sin entrada.
+  - **Préstamos de herramienta, fechas:** lo que se pacta es un día y cada cliente lo mandaba distinto (web: medianoche
+    UTC, que en México es la tarde anterior; prórroga web: 23:59 local; apps: mediodía UTC). La web mostraba la devolución
+    un día antes y la daba por vencida desde las 18:00 del día anterior. Servidor: `tool-requests/plazo-prestamo.ts`
+    (`diaDePrestamo`, `plazoDePrestamo`, `nuevaDevolucion`) lee el día que la persona quiso decir y guarda siempre el
+    mediodía de México, en alta y en prórroga; mensajes claros en vez de «Parámetros de la petición inválidos». Web:
+    `lib/dia-pactado.ts` (misma regla) en `ToolRequestsTable`, `MisPrestamos`, `ToolRenewalsTable`; vencido = el día
+    pactado ya pasó (como Android/iOS). Se puede pedir y regresar el mismo día en la web, igual que en las apps (el
+    selector ya lo dejaba elegir y la validación lo rechazaba). Las filas viejas se leen bien en la web sin tocar la
+    base; las apps leen los 10 primeros caracteres de la fecha, así que una prórroga vieja pedida en la web (23:59
+    local) les sale un día después: solo las ya guardadas, las nuevas quedan parejas.
+  - **Chat:** `url-matrix` daba a CEO y DIR_ADMIN la pantalla del chat pero no escribir (403 al mandar mensaje o marcar
+    leído; los `ceo` reales no lo notaban por ser superadmin por correo). Regla nueva con prueba: quien ve `/erp/chat`
+    puede escribir (`chat-escribe-quien-lo-ve.spec.ts`). Ojo, hilo de roles: `url-matrix.ts` tiene además cambios sin
+    publicar en el checkout de la laptop (ver la sección de 15:45 de más abajo); al traer main puede pedir fusión a mano.
+  - **Ventanas (web):** `useScrollLock` bloqueaba en `<body>`, pero quien desplaza es `<html>`: la página de atrás seguía
+    moviéndose y, peor, `body` pasaba a ser el contenedor de lo `sticky`, así que el menú lateral y la barra de arriba
+    se iban de su lugar al abrir cualquier ventana con la página desplazada. Ahora bloquea en `<html>` (`lockScroll`),
+    y la paleta Ctrl+K, el cajón móvil del menú y la memoria técnica usan la misma pieza. Sitio público y portales
+    (`components/sitio`, `components/portal`) siguen con su bloqueo propio en `body`: no se tocaron.
+  - **Piezas compartidas:** Mesa de viáticos y Supervisión ya usan `PageChrome` + `PanelTabs` + `EmptyState` y tokens
+    `--ui-*` (eran las dos pantallas con encabezado, pestañas y botones propios); sin cambio de lógica ni de permisos.
+    Avisos de tope de la mesa solo cuando de verdad se llegó al tope. Almacén sin la segunda fila de filtros en vacío.
+    Desempeño: la columna Persona ya no corta los nombres. Títulos sin «· Gestión» / «· Aprobación» (`section-views.ts`).
+  - **Textos:** fuera los «día(s)», «producto(s)», «persona(s)» en web (`lib/plural.ts`), API (`common/contar-es.ts`),
+    Android e iOS; «Tu desempeño» habla de tú; resumen de dirección «1 evidencia sin revisar: es tuya» (antes «1 tuyas»);
+    vacío de Cotizaciones sin jerga («el servidor emite el folio con tu nomenclatura»).
+  - **Hallazgos sin tocar (siguientes vueltas):** el cron `checkOverdueTools` crea cada hora un aviso «URGENTE» por
+    préstamo vencido en `toolRequestNotification`, tabla que ni la web ni las apps leen (va con la ola de avisos push);
+    una serie ya despachada en almacén se puede volver a despachar (ola de ciclo de vida por serie); la tabla de
+    préstamos queda apretada a 1440 px; RH muestra dos filas de pestañas que empiezan con «Plantilla»; migas «Hoy > Hoy».
+  - **Paridad:** Web hecho · API hecho · Android: textos hechos; candado y fechas no piden cambio (ya leen el código y el
+    día igual) · iOS: igual que Android. Pantallas alineadas (viáticos, supervisión, ventanas): solo web, las apps
+    tienen su propio sistema de diseño. Publicar las apps sigue pidiendo el OK de Adam.
+  - **Verificación:** sobre lo último de main (c72b099): `npm run typecheck` en 0 (API y web); jest 6576/6576 con
+    `TZ=America/Mexico_City` (sin ella fallan las 4 de `accounting/qa-adversarial.spec.ts`, de antes y sin tocar);
+    vitest 2380/2381, la falla es `ComoSeHace.spec.tsx` («Durante»), del hilo de actividades y sin tocar.
+    `scripts/ios-static-check.py` sin problemas. Android e iOS no se compilan en la nube: los compila el CI al subir.
+  - Para repetir la plataforma en local (nube, sin Docker): `service postgresql start`, base vacía + `prisma migrate
+    deploy` + semillas de demostración, `redis-server`, API con `nest start` (`DATABASE_URL`, `JWT_SECRET`, `REDIS_URL`,
+    `TZ=America/Mexico_City`) y `next dev --turbopack`. Para escribir como un usuario hace falta su `AttendanceDay`
+    abierto (candado) y su fila en `user_companies`.
+
+- **21-11 ~15:45 México (claude-code, nube; Cursor/Codex no alcanzables) — Evidencia en cada entrega: herramientas y almacén (API, web, Android, iOS). En main 3a83af3; API y web llegaron a producción con el despliegue de otro hilo (21-11 21:31 UTC, `ac75ed7`), migración aplicada; las apps siguen sin publicarse. En ese mismo despliegue entraron 295c1a8 (capa visual «Firma NEXARA v3») y d17bf58 (fuentes con `next/font/local`).**
   - Ola 1 del plan https://claude.ai/artifact/8mmmcCKxyzWUbQ7xv2VcDn (NEXARA contra los líderes de flotilla, herramienta,
     almacén e ingeniería). Vehículos lo lleva el hilo de perfiles; el acceso con rostro al área restringida, el de la VPN.
   - Migración `20261121204500_evidencia_prestamos_y_salidas` (aditiva, columnas anulables): `tool_requests`

@@ -1023,7 +1023,7 @@ fun EvidenceCaptureFlow(
                     }
                     if (drafts.size < photoRequired) {
                         Text(
-                            "Faltan ${photoRequired - drafts.size} foto(s).",
+                            if (photoRequired - drafts.size == 1) "Falta 1 foto." else "Faltan ${photoRequired - drafts.size} fotos.",
                             fontSize = 12.5.sp,
                             color = NxColors.Muted,
                         )

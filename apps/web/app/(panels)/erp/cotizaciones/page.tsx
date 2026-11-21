@@ -695,7 +695,7 @@ export default function CotizacionesPage() {
         icon: <RequestQuoteOutlinedIcon />,
         title: "Todavía no hay cotizaciones",
         description:
-          "Una cotización nace del editor: eliges cliente y proyecto, capturas las partidas y el servidor emite el folio con tu nomenclatura. Desde ahí se envía por correo.",
+          "Elige el cliente y el proyecto, captura las partidas y la cotización toma su folio sola. Desde ahí la mandas por correo.",
         action: (
           <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
             Crear la primera

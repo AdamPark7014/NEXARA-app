@@ -792,7 +792,7 @@ struct EvidenceCaptureFlowView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(confirmedPhotoURLs.count >= photoRequired ? CorePalette.green : Color.secondary)
             if confirmedPhotoURLs.count > pendingPhotos.count {
-                Text("Ya tienes \(confirmedPhotoURLs.count - pendingPhotos.count) guardada(s) de antes: puedes seguir agregando o quitarlas.")
+                Text("Ya tienes \(confirmedPhotoURLs.count - pendingPhotos.count) \(confirmedPhotoURLs.count - pendingPhotos.count == 1 ? "guardada" : "guardadas") de antes: puedes seguir agregando o quitarlas.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

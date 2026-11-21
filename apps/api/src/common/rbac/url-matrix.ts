@@ -550,6 +550,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     // Corregir la hora de una checada: dirección y RH (el servicio lo vuelve a exigir).
     { path: '/api/attendance/*/correccion', methods: ['PATCH'], scope: 'approve' },
     ...ATTENDANCE_UNIFORME_URL_RULES,
+    // Quien ve el chat lo usa: sin esto dirección lo abría pero no podía escribir ni marcar leído.
+    { path: '/api/chat/**', scope: 'write' },
     // Rutas específicas primero (first-match-wins)
     { path: '/erp/approvals/**', scope: 'approve' },
     { path: '/api/workflow/**', methods: ['POST'], scope: 'approve' },
@@ -708,6 +710,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...ACTIVITY_SUPERIOR_URL_RULES,
     // Revisa el uniforme en la entrada de su gente (el servicio decide a quién).
     ...ATTENDANCE_UNIFORME_URL_RULES,
+    // Quien ve el chat lo usa (escribir y marcar leído), igual que dirección.
+    { path: '/api/chat/**', scope: 'write' },
     { path: '/erp/**', scope: 'admin' },
     { path: '/crm/dashboard', scope: 'read' },
     { path: '/crm/quotes/**', scope: 'approve' },

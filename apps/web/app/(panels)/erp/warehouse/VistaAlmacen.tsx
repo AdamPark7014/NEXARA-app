@@ -138,6 +138,7 @@ import {
 } from "./almacen-etiquetas";
 import type { TrazaProducto } from "./HistorialProducto";
 import s from "./almacen.module.css";
+import { contar } from "@/lib/plural";
 
 // Se bajan solo cuando se abren: el resumen trae gráficas y el historial es un panel aparte.
 const InteligenciaInventario = dynamic(() => import("./InteligenciaInventario"), {
@@ -609,7 +610,7 @@ export function VistaAlmacen({
       }
     }
     if (series.length > 0 && series.length > Math.ceil(piezasDelMovimiento)) {
-      toast.error(`Hay ${series.length} números de serie y el movimiento es de ${cantidad(piezasDelMovimiento)} pieza(s)`);
+      toast.error(`Hay ${contar(series.length, "número de serie", "números de serie")} y el movimiento es de ${contar(cantidad(piezasDelMovimiento), "pieza")}`);
       return;
     }
     if (movement.type === "TRANSFER") {
@@ -1769,7 +1770,7 @@ export function VistaAlmacen({
                 optional
                 hint={
                   seriesCapturadas.length > 0
-                    ? `${seriesCapturadas.length} de ${cantidad(piezasEnPantalla)} pieza(s) con serie`
+                    ? `${seriesCapturadas.length} de ${contar(cantidad(piezasEnPantalla), "pieza")} con serie`
                     : "Uno por renglón. Con el lector, cada lectura cae en un renglón."
                 }
                 error={
@@ -1997,6 +1998,9 @@ export function VistaAlmacen({
             ) : undefined
           }
           toolbar={
+            // Sin nada en existencia no hay qué buscar ni filtrar: el renglón solo repetía «Todos 0»
+            // debajo del buscador general. Aparece con el primer producto.
+            cargadoUnaVez && items.length === 0 ? undefined : (
             <ModuleToolbar
               search={
                 embedded?.busqueda === undefined ? (
@@ -2045,6 +2049,7 @@ export function VistaAlmacen({
                 ) : undefined
               }
             />
+            )
           }
           loading={!cargadoUnaVez && !loadError}
           empty={cargadoUnaVez ? visibleItems.length === 0 : Boolean(loadError)}

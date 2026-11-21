@@ -42,6 +42,7 @@ import {
 import { CORE_SURFACE_ONLY } from "@/lib/core-surface";
 import SearchIcon from "@mui/icons-material/Search";
 import { PaletteActionIcon } from "./ShellIcons";
+import { lockScroll } from "@/components/ui/useScrollLock";
 import styles from "./CommandPalette.module.scss";
 import {
   buildLegacyCreateActions,
@@ -231,13 +232,11 @@ export default function CommandPalette({
     setEntityResults([]);
     setEntityHint(null);
     const prevFocus = document.activeElement as HTMLElement | null;
-    const { body } = document;
-    const prevOverflow = body.style.overflow;
-    body.style.overflow = "hidden";
+    const soltarScroll = lockScroll();
     const raf = window.requestAnimationFrame(() => inputRef.current?.focus());
     return () => {
       window.cancelAnimationFrame(raf);
-      body.style.overflow = prevOverflow;
+      soltarScroll();
       prevFocus?.focus?.();
     };
   }, [open]);

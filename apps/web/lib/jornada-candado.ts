@@ -49,3 +49,37 @@ export function manejarErrorJornada(err: unknown): boolean {
   abrirBarreraJornada();
   return true;
 }
+const MARCA_VIGIA = "__nxVigiaJornada";
+
+/**
+ * Vigila todas las respuestas del navegador, no solo las de `erpFetch`: más de cien pantallas llaman
+ * a la API con `fetch` directo (solicitar herramienta, viáticos, almacén…) y ahí la barrera nunca se
+ * abría: solo salía el renglón de error. Con el 409 `JORNADA_NO_ABIERTA` abre la barrera y deja la
+ * respuesta intacta para quien la pidió. Se instala una sola vez; devuelve cómo quitarla.
+ */
+export function vigilarRespuestasDeJornada(): () => void {
+  if (typeof window === "undefined" || typeof window.fetch !== "function") return () => undefined;
+  const ventana = window as typeof window & { [MARCA_VIGIA]?: boolean };
+  if (ventana[MARCA_VIGIA]) return () => undefined;
+  const original = window.fetch;
+  const vigilado = async function (this: unknown, ...args: Parameters<typeof fetch>): Promise<Response> {
+    const res = await original.apply(this === undefined ? window : (this as typeof window), args);
+    if (res.status === 409) {
+      // Se lee una copia: el cuerpo original queda sin tocar para la pantalla que hizo la petición.
+      void res
+        .clone()
+        .text()
+        .then((texto) => {
+          if (texto.includes(CODIGO_JORNADA_NO_ABIERTA)) abrirBarreraJornada();
+        })
+        .catch(() => undefined);
+    }
+    return res;
+  } as typeof fetch;
+  window.fetch = vigilado;
+  ventana[MARCA_VIGIA] = true;
+  return () => {
+    if (window.fetch === vigilado) window.fetch = original;
+    ventana[MARCA_VIGIA] = false;
+  };
+}

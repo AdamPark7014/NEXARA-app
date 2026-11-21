@@ -14,6 +14,7 @@ import {
   type EvidenceReviewRow,
 } from "@/lib/activity-evidence-api";
 import { formatDateTime } from "@/components/detail/DetailFrame";
+import { contar } from "@/lib/plural";
 
 export default function EvidenceReviewQueue() {
   const { user } = useUser();
@@ -142,7 +143,7 @@ export default function EvidenceReviewQueue() {
       >
         <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
           {pendingCount > 0
-            ? `${pendingCount} paquete(s) pendientes de revisión`
+            ? `${contar(pendingCount, "paquete pendiente", "paquetes pendientes")} de revisión`
             : "Sin evidencias pendientes"}
         </div>
         <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>

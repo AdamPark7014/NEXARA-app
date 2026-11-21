@@ -40,7 +40,7 @@ export default function TuDesempeno() {
       <div className={s.indice}>
         <span className={s.eyebrow}>Tu desempeño · esta semana</span>
         <strong className={s.valor}>{indice == null ? "—" : Math.round(indice)}</strong>
-        <span className={s.resumen}>{resumenDesempeno(t)}</span>
+        <span className={s.resumen}>{resumenDesempeno(t, { propio: true })}</span>
       </div>
       <dl className={s.cifras}>
         <div>

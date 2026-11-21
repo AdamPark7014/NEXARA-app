@@ -33,6 +33,7 @@ import {
 } from './tool-nomenclature.js';
 import { buildToolLabelPdf, buildToolLabelZpl } from './tool-label.js';
 import { normalizarFotosEvidencia, resolverDevolucion } from './evidencia-prestamo.js';
+import { nuevaDevolucion, plazoDePrestamo } from './plazo-prestamo.js';
 
 const FIELD_KIT_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
 const BROAD_KIT_ASSIGN_SCOPE = new Set(['ceo', 'dir_operaciones', 'arquitecto', 'super_admin']);
@@ -166,6 +167,8 @@ export class ToolRequestsService {
     if (!Number.isFinite(inventoryItemId) || inventoryItemId <= 0) {
       throw new BadRequestException('Debes seleccionar una herramienta del inventario');
     }
+    // Motivo y fechas se revisan aquí: la app o una integración pueden mandar solo el día.
+    const plazo = plazoDePrestamo(data);
 
     const inventoryScope =
       companyId != null && Number(companyId) > 0
@@ -229,9 +232,9 @@ export class ToolRequestsService {
         toolName,
         model,
         serialNumber,
-        reason: data.reason,
-        startDate: data.startDate,
-        expectedReturnDate: data.expectedReturnDate,
+        reason: plazo.reason,
+        startDate: plazo.startDate,
+        expectedReturnDate: plazo.expectedReturnDate,
         generalPhotoUrl,
         specificationsPhotoUrl,
         status: 'PENDING',
@@ -2027,11 +2030,14 @@ export class ToolRequestsService {
       throw new Error('No tienes permiso para renovar esta solicitud');
     }
 
+    // El día pedido, a mediodía de México (ver `plazo-prestamo.ts`).
+    const newReturnDate = nuevaDevolucion(data.newReturnDate);
+
     const renewal = await this.prisma.toolRenewal.create({
       data: {
         toolRequestId: data.toolRequestId,
         previousReturnDate: toolRequest.expectedReturnDate,
-        newReturnDate: data.newReturnDate,
+        newReturnDate,
         renewalReason: data.renewalReason,
         status: 'PENDING',
         companyId: requireCompanyId(companyId ?? toolRequest.companyId),

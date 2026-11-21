@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { OFFLINE_QUEUE_STORAGE_KEY } from "@/lib/offline-queue";
+import { contar } from "@/lib/plural";
 
 function countQueued(): number {
   try {
@@ -72,7 +73,7 @@ export default function ShellConnectionStatus() {
         offline
           ? "Modo offline o sesión degradada — los cambios se encolarán"
           : syncing
-            ? `${queued} operación(es) pendiente(s) de sincronizar`
+            ? `${contar(queued, "cambio pendiente", "cambios pendientes")} de sincronizar`
             : "Conectado a NEXARA"
       }
       style={{

@@ -158,7 +158,8 @@ export default function AlmacenPage() {
         */}
         {tab !== "scanner" && (
           <BusquedaRapidaInventario
-            key={vueltasBusqueda}
+            // Hermana de <VistaAlmacen>: las dos llaves cuentan desde 0, así que llevan prefijo para no chocar.
+            key={`busqueda-${vueltasBusqueda}`}
             tipoInicial="TODOS"
             qInicial={textoBusqueda}
             autoFocus={tab === "inventario" || tab === "movimientos" || tab === "reabastecimiento"}
@@ -169,7 +170,7 @@ export default function AlmacenPage() {
         )}
 
         {/* Inventario y sus vistas hermanas: la pantalla de almacén, sin su encabezado. */}
-        {vistaStock && <VistaAlmacen key={vueltasInventario} embedded={embebida} />}
+        {vistaStock && <VistaAlmacen key={`inventario-${vueltasInventario}`} embedded={embebida} />}
 
         {tab === "scanner" && <ScannerAlmacenPanel />}
 

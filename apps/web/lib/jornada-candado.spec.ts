@@ -1,5 +1,5 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import { CODIGO_JORNADA_NO_ABIERTA, errorDeJornada, manejarErrorJornada, barreraJornadaActiva, cerrarBarreraJornada, abrirBarreraJornada } from "./jornada-candado";
+import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
+import { CODIGO_JORNADA_NO_ABIERTA, errorDeJornada, manejarErrorJornada, barreraJornadaActiva, cerrarBarreraJornada, abrirBarreraJornada, vigilarRespuestasDeJornada } from "./jornada-candado";
 
 beforeEach(() => cerrarBarreraJornada());
 
@@ -22,5 +22,47 @@ describe("manejarErrorJornada", () => {
     expect(barreraJornadaActiva()).toBe(true);
     abrirBarreraJornada(); // idempotente
     expect(barreraJornadaActiva()).toBe(true);
+  });
+});
+describe("vigilarRespuestasDeJornada", () => {
+  let quitar: () => void = () => undefined;
+  afterEach(() => {
+    quitar();
+    vi.unstubAllGlobals();
+  });
+
+  const cuerpoCandado = JSON.stringify({ statusCode: 409, errorCode: CODIGO_JORNADA_NO_ABIERTA, code: CODIGO_JORNADA_NO_ABIERTA, message: "Registra tu entrada para empezar a trabajar" });
+
+  it("abre la barrera con un fetch directo (sin erpFetch) y deja la respuesta intacta", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(cuerpoCandado, { status: 409 })));
+    quitar = vigilarRespuestasDeJornada();
+    const res = await fetch("/api/tool-requests", { method: "POST" });
+    // Quien llamó todavía puede leer el cuerpo para enseñar su mensaje.
+    expect((await res.json()).message).toBe("Registra tu entrada para empezar a trabajar");
+    await vi.waitFor(() => expect(barreraJornadaActiva()).toBe(true));
+  });
+
+  it("otro 409 (un duplicado) y las respuestas buenas no la abren", async () => {
+    const simulada = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ statusCode: 409, errorCode: "DUPLICATE", message: "Ya existe" }), { status: 409 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", simulada);
+    quitar = vigilarRespuestasDeJornada();
+    await fetch("/api/x", { method: "POST" });
+    await fetch("/api/y");
+    await new Promise((r) => setTimeout(r, 10));
+    expect(barreraJornadaActiva()).toBe(false);
+  });
+
+  it("se instala una sola vez y se puede quitar", async () => {
+    const simulada = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", simulada);
+    quitar = vigilarRespuestasDeJornada();
+    const vigilado = window.fetch;
+    vigilarRespuestasDeJornada()();
+    expect(window.fetch).toBe(vigilado);
+    quitar();
+    expect(window.fetch).toBe(simulada);
   });
 });

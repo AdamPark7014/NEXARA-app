@@ -51,6 +51,12 @@ describe("lectura", () => {
     expect(resumenDesempeno(base)).toBe("No tuvo entregas que medir en estas fechas. Tuvo una actividad corriendo 7 h de 10 h en jornada.");
   });
 
+  it("en el inicio de la persona le habla a ella, no de ella", () => {
+    const t = { ...base, entregas: { medidas: 10, aTiempo: 8, sinEntregar: 2 } } as typeof base;
+    expect(resumenDesempeno(t, { propio: true })).toBe("Entregaste 8 de 10 a tiempo y 2 quedaron sin entregar. Tuviste una actividad corriendo 7 h de 10 h en jornada.");
+    expect(resumenDesempeno({ ...base, minutosLaborados: 0 }, { propio: true })).toBe("Todavía no tienes entregas que medir esta semana.");
+  });
+
   it("disciplina en una línea, con la falta por retardos que no se descuenta sola", () => {
     const disciplina = { esperados: 5, puntos: 1.3, retardos: 3, faltasPorRetardos: 1, jornadasRevisables: 4, registroCompleto: 4, pct: 26 };
     expect(disciplinaTexto({ disciplina })).toBe(

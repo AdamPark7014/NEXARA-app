@@ -69,6 +69,7 @@ import { SERVICE_PROJECT_TYPE_OPTIONS, getServiceProjectTypeLabel } from "@/lib/
 import LineaDeTiempo from "../_componentes/LineaDeTiempo";
 import { PersonaSelect, usePersonasAsignables } from "../_componentes/personas";
 import styles from "../alta.module.css";
+import { contar } from "@/lib/plural";
 
 let secuencia = 0;
 const nuevaClave = () => `r${Date.now().toString(36)}${(secuencia++).toString(36)}`;
@@ -1005,7 +1006,7 @@ export default function NuevoProyectoPage() {
               <dt>Requerimientos</dt>
               <dd>{b.requerimientos.filter((r) => r.titulo.trim()).length}</dd>
               <dt>Equipo</dt>
-              <dd>responsable + {b.equipo.filter((m) => m.userId).length} persona(s)</dd>
+              <dd>responsable + {contar(b.equipo.filter((m) => m.userId).length, "persona")}</dd>
             </dl>
           </div>
         </div>

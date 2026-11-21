@@ -123,7 +123,7 @@
 }
 
 .tabla thead th {
-  padding: 12px 14px;
+  padding: 12px 10px;
   text-align: left;
   font-size: var(--ui-fs-caption);
   font-weight: 600;
@@ -134,7 +134,7 @@
 
 .tabla tbody th,
 .tabla tbody td {
-  padding: 10px 14px;
+  padding: 10px 10px;
   border-bottom: 1px solid var(--ui-border);
   vertical-align: middle;
   text-align: left;
@@ -144,6 +144,14 @@
 .tabla tbody tr:last-child th,
 .tabla tbody tr:last-child td {
   border-bottom: none;
+}
+
+.tabla tr > :first-child {
+  padding-left: 16px;
+}
+
+.tabla tr > :last-child {
+  padding-right: 16px;
 }
 
 .tabla tbody tr[data-on="true"] {
@@ -160,6 +168,8 @@
   align-items: center;
   gap: var(--ui-s2);
   min-height: 44px;
+  /* Sin un mínimo, la tabla le quitaba el ancho al nombre y solo quedaba «R…»: no se sabía quién era. */
+  min-width: 184px;
   max-width: 240px;
   padding: 0;
   border: none;
@@ -238,7 +248,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 96px;
+  min-width: 78px;
 }
 
 .pilarPista {

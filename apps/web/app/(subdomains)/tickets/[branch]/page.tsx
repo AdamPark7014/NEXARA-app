@@ -1,3 +1,5 @@
+import { contar } from "@/lib/plural";
+
 ﻿"use client";
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
@@ -811,7 +813,7 @@ export default function BranchTicketsPage() {
                     <span className={styles.mutedText}>o arrastra tus archivos directamente a esta área</span>
                   </div>
                   <div className={styles.mutedText}>
-                    {files.length > 0 ? `${files.length} archivo(s) seleccionados` : "Ningún archivo seleccionado"}
+                    {files.length > 0 ? contar(files.length, "archivo seleccionado", "archivos seleccionados") : "Ningún archivo seleccionado"}
                   </div>
                 </div>
               </div>

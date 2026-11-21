@@ -172,8 +172,11 @@ describe("mis préstamos", () => {
 
   it("más plazo se pide desde el día siguiente a la devolución pactada, o a hoy si ya venció", () => {
     const ahora = new Date(2026, 10, 21, 12, 0, 0);
-    expect(primerDiaDePlazo(new Date(2026, 10, 25, 18, 0, 0).toISOString(), ahora)).toBe("2026-11-26");
-    expect(primerDiaDePlazo(new Date(2026, 10, 10, 18, 0, 0).toISOString(), ahora)).toBe("2026-11-22");
+    // Como lo guarda el servidor (mediodía de México), como lo mandaba la web (medianoche UTC) y las apps.
+    expect(primerDiaDePlazo("2026-11-25T18:00:00.000Z", ahora)).toBe("2026-11-26");
+    expect(primerDiaDePlazo("2026-11-25T00:00:00.000Z", ahora)).toBe("2026-11-26");
+    expect(primerDiaDePlazo("2026-11-25T12:00:00.000Z", ahora)).toBe("2026-11-26");
+    expect(primerDiaDePlazo("2026-11-10T18:00:00.000Z", ahora)).toBe("2026-11-22");
     expect(primerDiaDePlazo(null, ahora)).toBe("2026-11-22");
   });
 });

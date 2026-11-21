@@ -168,7 +168,7 @@ describe('SupervisionPage', () => {
     const user = userEvent.setup();
     render(<SupervisionPage />);
     await screen.findByRole('heading', { name: 'Supervisión' });
-    await user.click(screen.getByRole('button', { name: 'Cierre del día' }));
+    await user.click(screen.getByRole('tab', { name: 'Cierre del día' }));
     expect(await screen.findByText('Técnico')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Entregar a dirección' })).toBeTruthy();
   });

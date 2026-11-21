@@ -20,6 +20,7 @@ import {
   validarSeriesContraCantidad,
 } from './evidencia-salida.js';
 import { clasificarCodigo, variantesDeBusqueda } from './codigo-barras.js';
+import { contarEs } from '../common/contar-es.js';
 
 const COGS_MOVEMENT_TYPES = new Set(['DISPATCH', 'SCRAP', 'PRODUCTION_OUT']);
 
@@ -1396,10 +1397,10 @@ export class WarehouseService {
       reorderSuggestions,
       expiringLots,
       alerts: [
-        ...(low.length ? [{ severity: 'warning' as const, message: `${low.length} SKU(s) bajo punto de reorden` }] : []),
-        ...(zero.length ? [{ severity: 'danger' as const, message: `${zero.length} SKU(s) sin existencia` }] : []),
-        ...(dead.length ? [{ severity: 'warning' as const, message: `${dead.length} SKU(s) sin movimiento 90d (dead stock)` }] : []),
-        ...(expiringLots.length ? [{ severity: 'warning' as const, message: `${expiringLots.length} lote(s) caducan en ≤60 días` }] : []),
+        ...(low.length ? [{ severity: 'warning' as const, message: `${contarEs(low.length, 'producto')} bajo el punto de reorden` }] : []),
+        ...(zero.length ? [{ severity: 'danger' as const, message: `${contarEs(zero.length, 'producto')} sin existencia` }] : []),
+        ...(dead.length ? [{ severity: 'warning' as const, message: `${contarEs(dead.length, 'producto')} sin movimiento en 90 días` }] : []),
+        ...(expiringLots.length ? [{ severity: 'warning' as const, message: `${contarEs(expiringLots.length, 'lote')} ${expiringLots.length === 1 ? 'caduca' : 'caducan'} en 60 días o menos` }] : []),
       ],
     };
   }
@@ -1548,7 +1549,7 @@ export class WarehouseService {
     const pending = cc.items.filter((i) => i.countedQty === null);
     if (pending.length) {
       throw new BadRequestException(
-        `Faltan ${pending.length} producto(s) por contar antes de cerrar (o repórtalos con la misma cantidad esperada)`,
+        `${pending.length === 1 ? 'Falta' : 'Faltan'} ${contarEs(pending.length, 'producto')} por contar antes de cerrar (o repórtalos con la misma cantidad esperada)`,
       );
     }
 

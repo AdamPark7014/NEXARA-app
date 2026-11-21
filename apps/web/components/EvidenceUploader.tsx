@@ -5,6 +5,7 @@ import { useUser } from './UserContext';
 import styles from './EvidenceUploader.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { contar } from "@/lib/plural";
 
 interface ActivityOption {
   id: number;
@@ -229,7 +230,7 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
           Seleccionar archivo
         </label>
         <div className={`${styles.helperText} ${styles.helperBottom}`}>
-          {files.length > 0 ? `${files.length} archivo(s) seleccionados` : 'Ningún archivo seleccionado'}
+          {files.length > 0 ? contar(files.length, "archivo seleccionado", "archivos seleccionados") : 'Ningún archivo seleccionado'}
         </div>
       </div>
       {files.length > 0 && (

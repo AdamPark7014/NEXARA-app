@@ -27,24 +27,44 @@ import {
   type PersonaCierre,
 } from "@/lib/supervision-api";
 import styles from "./supervision.module.css";
+import PageChrome from "@/components/ui/PageChrome";
+import PanelTabs from "@/components/ui/PanelTabs";
+import EmptyState from "@/components/ui/EmptyState";
 
 type Tab = "plan" | "cierre";
 
+// Los botones de la página salen de los tokens del sistema: mismo borde, radio y color que el resto.
 const btn: CSSProperties = {
-  minHeight: 44,
-  padding: "8px 14px",
-  borderRadius: 8,
-  border: "1px solid var(--ui-border)",
-  background: "var(--ui-elev-1)",
+  minHeight: 40,
+  padding: "0 14px",
+  borderRadius: "var(--ui-radius-md)",
+  border: "1px solid var(--ui-border-strong)",
+  background: "var(--ui-surface)",
   color: "var(--ui-fg)",
   cursor: "pointer",
+  font: "inherit",
   fontSize: 14,
+  fontWeight: 600,
+};
+
+/** Campo de captura con los tokens del sistema (fecha, textos del plan). */
+const campo: CSSProperties = {
+  minHeight: 40,
+  width: "100%",
+  padding: "0 12px",
+  boxSizing: "border-box",
+  border: "1px solid var(--ui-border-strong)",
+  borderRadius: "var(--ui-radius-md)",
+  background: "var(--ui-surface)",
+  color: "var(--ui-fg)",
+  font: "inherit",
+  fontSize: 15,
 };
 
 const btnPrimary: CSSProperties = {
   ...btn,
-  background: "var(--ui-primary, #168570)",
-  color: "#fff",
+  background: "var(--ui-brand)",
+  color: "var(--ui-fg-on-brand, #fff)",
   border: "1px solid transparent",
 };
 
@@ -174,76 +194,68 @@ export default function SupervisionPage() {
 
   if (!token) return <main><h1>Supervisión</h1><p>Inicia sesión para consultar los planes y cierres.</p></main>;
   return (
-    <main
-      style={{
-        padding: 16,
-        minWidth: 0,
-        overflowWrap: "anywhere",
-        maxWidth: 1200,
-        margin: "0 auto",
-        color: "var(--ui-fg)",
-        background: "var(--ui-bg)",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
-        <div>
-          <h1 style={{ fontSize: 28, margin: "0 0 4px" }}>Supervisión</h1>
-          <p style={{ margin: 0, color: "var(--ui-fg-2)", fontSize: 14 }}>
-            Organiza las actividades del equipo y compara lo planeado con lo realizado.
-          </p>
-        </div>
-        {tab === 'plan' && !loading && !error && filasExcel.length ? (
-          <ExcelExportadorDinamico
-            preferenciaKey="nx-excel-cols-supervision"
-            titulo="Supervisión — planes"
-            filename={`supervision-planes-${fechaPlan}`}
-            rows={filasExcel}
-            getFecha={(r) => r.fecha}
-            generadoPor={(user as { nombre?: string } | null)?.nombre}
-            columns={[
-              { key: "fecha", label: "Fecha" },
-              { key: "coordinador", label: "Coordinador" },
-              { key: "persona", label: "Persona" },
-              { key: "actividad", label: "Actividad" },
-              { key: "cliente", label: "Cliente" },
-              { key: "proyecto", label: "Proyecto" },
-              { key: "horario", label: "Horario" },
-              { key: "prioridad", label: "Prioridad" },
-              { key: "estado", label: "Estado" },
+    <main style={{ minWidth: 0, overflowWrap: "anywhere", color: "var(--ui-fg)" }}>
+      <PageChrome
+        title="Supervisión"
+        subtitle="Organiza las actividades del equipo y compara lo planeado con lo realizado."
+        secondaryActions={
+          <>
+            {tab === 'plan' && !loading && !error && filasExcel.length ? (
+              <ExcelExportadorDinamico
+                preferenciaKey="nx-excel-cols-supervision"
+                titulo="Supervisión — planes"
+                filename={`supervision-planes-${fechaPlan}`}
+                rows={filasExcel}
+                getFecha={(r) => r.fecha}
+                generadoPor={(user as { nombre?: string } | null)?.nombre}
+                columns={[
+                  { key: "fecha", label: "Fecha" },
+                  { key: "coordinador", label: "Coordinador" },
+                  { key: "persona", label: "Persona" },
+                  { key: "actividad", label: "Actividad" },
+                  { key: "cliente", label: "Cliente" },
+                  { key: "proyecto", label: "Proyecto" },
+                  { key: "horario", label: "Horario" },
+                  { key: "prioridad", label: "Prioridad" },
+                  { key: "estado", label: "Estado" },
+                ]}
+              />
+            ) : null}
+            {tab === 'cierre' && !loading && !error && filasCierreExcel.length ? (
+              <ExcelExportadorDinamico preferenciaKey="nx-excel-cols-supervision-cierres" titulo="Supervisión — cierre diario"
+                filename={`supervision-cierre-${fechaCierre}`} rows={filasCierreExcel} getFecha={r => r.fecha}
+                getPersonaArea={r => `${r.persona} ${r.supervisor}`} generadoPor={user?.nombre}
+                columns={[
+                  {key:'fecha',label:'Fecha'}, {key:'supervisor',label:'Supervisor'}, {key:'persona',label:'Persona'},
+                  {key:'programadas',label:'Programadas',tipo:'entero',total:'suma'}, {key:'cumplidas',label:'Cumplidas',tipo:'entero',total:'suma'},
+                  {key:'revision',label:'En revisión',tipo:'entero',total:'suma'}, {key:'incumplidas',label:'No cumplidas',tipo:'entero',total:'suma'},
+                  {key:'asistencia',label:'Registró asistencia',tipo:'booleano'}, {key:'retardo',label:'Retardo',tipo:'booleano'}, {key:'falta',label:'Falta',tipo:'booleano'},
+                ]}/>
+            ) : null}
+          </>
+        }
+        context={
+          <PanelTabs
+            ariaLabel="Plan y cierre"
+            value={tab}
+            onChange={(id) => { requestId.current++; setError(null); setOk(null); setTab(id); }}
+            tabs={[
+              { key: "plan", label: "Plan de mañana" },
+              { key: "cierre", label: esDireccion ? "Cierres recibidos" : "Cierre del día" },
             ]}
           />
-        ) : null}
-        {tab === 'cierre' && !loading && !error && filasCierreExcel.length ? (
-          <ExcelExportadorDinamico preferenciaKey="nx-excel-cols-supervision-cierres" titulo="Supervisión — cierre diario"
-            filename={`supervision-cierre-${fechaCierre}`} rows={filasCierreExcel} getFecha={r => r.fecha}
-            getPersonaArea={r => `${r.persona} ${r.supervisor}`} generadoPor={user?.nombre}
-            columns={[
-              {key:'fecha',label:'Fecha'}, {key:'supervisor',label:'Supervisor'}, {key:'persona',label:'Persona'},
-              {key:'programadas',label:'Programadas',tipo:'entero',total:'suma'}, {key:'cumplidas',label:'Cumplidas',tipo:'entero',total:'suma'},
-              {key:'revision',label:'En revisión',tipo:'entero',total:'suma'}, {key:'incumplidas',label:'No cumplidas',tipo:'entero',total:'suma'},
-              {key:'asistencia',label:'Registró asistencia',tipo:'booleano'}, {key:'retardo',label:'Retardo',tipo:'booleano'}, {key:'falta',label:'Falta',tipo:'booleano'},
-            ]}/>
-        ) : null}
-      </div>
-
-      <div style={{ display: "flex", gap: 8, margin: "16px 0", flexWrap: "wrap" }}>
-        <button type="button" style={tab === "plan" ? btnPrimary : btn} onClick={() => { requestId.current++; setError(null); setOk(null); setTab("plan"); }}>
-          Plan de mañana
-        </button>
-        <button type="button" style={tab === "cierre" ? btnPrimary : btn} onClick={() => { requestId.current++; setError(null); setOk(null); setTab("cierre"); }}>
-          {esDireccion ? "Cierres recibidos" : "Cierre del día"}
-        </button>
-      </div>
+        }
+      />
 
       {error ? <p role="alert" style={{ color: "var(--ui-danger, #b42318)" }}>{error} <button type="button" onClick={() => void (tab === 'plan' ? cargarPlan() : cargarCierre())}>Reintentar</button></p> : null}
       {ok ? <p style={{ color: "var(--ui-success, #067647)" }}>{ok}</p> : null}
 
-      <label style={{ display: "grid", gap: 4, marginBottom: 16, maxWidth: 220 }}>
+      <label style={{ display: "grid", gap: 6, marginBottom: 16, maxWidth: 220, fontSize: 13, fontWeight: 600, color: "var(--ui-fg-2)" }}>
         Fecha
         <input
           type="date"
           value={tab === "plan" ? fechaPlan : fechaCierre}
-          style={{ minHeight: 44, fontSize: 16, padding: 8, width: "100%", boxSizing: "border-box" }}
+          style={campo}
           onChange={(e) => {
             if (tab === "plan") setFechaPlan(e.target.value);
             else setFechaCierre(e.target.value);
@@ -377,7 +389,7 @@ export default function SupervisionPage() {
               </div>
             </div>
           ) : (
-            <p>Consulta los planes recibidos y el cierre que corresponde a tu rol.</p>
+            <p style={{ margin: "0 0 16px", color: "var(--ui-fg-2)", fontSize: 14 }}>Aquí ves los planes que te mandan. El cierre del día está en la otra pestaña.</p>
           )}
 
           {planes?.rol === "supervisor" ? (
@@ -510,9 +522,12 @@ export default function SupervisionPage() {
 
           {planes?.rol === "autor" ? (
             <div>
-              <h2 style={{ fontSize: 18 }}>Tu historial</h2>
+              <h2 style={{ fontSize: 18 }}>{planes.puedeEnviar !== false ? "Tu historial" : "Planes de esta fecha"}</h2>
               {planes.planes.length === 0 ? (
-                <p>Todavía no has mandado plan para esta fecha. Usa la tabla de renglones arriba.</p>
+                <EmptyState
+                  title={planes.puedeEnviar !== false ? "Todavía no has mandado plan para esta fecha" : "No hay planes para esta fecha"}
+                  description={planes.puedeEnviar !== false ? "Llena los renglones de arriba y envíalo." : "Cambia la fecha para ver otro día."}
+                />
               ) : (
                 <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 10 }}>
                   {planes.planes.map((p) => (
@@ -533,10 +548,10 @@ export default function SupervisionPage() {
         <section>
           {cierre.rol === "direccion" ? (
             cierre.cierres.length === 0 ? (
-              <div style={{ border: "1px dashed var(--ui-border)", borderRadius: 12, padding: 16 }}>
-                <h2 style={{ fontSize: 18, marginTop: 0 }}>Sin cierres recibidos</h2>
-                <p>Cuando el supervisor general entregue el cierre del día, aparecerá aquí con KPIs y detalle por persona.</p>
-              </div>
+              <EmptyState
+                title="Sin cierres recibidos"
+                description="Cuando el supervisor general entregue el cierre del día, aparecerá aquí con sus indicadores y el detalle por persona."
+              />
             ) : (
               <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 10 }}>
                 {cierre.cierres.map((c) => (

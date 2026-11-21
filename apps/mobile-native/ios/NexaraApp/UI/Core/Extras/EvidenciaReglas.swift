@@ -165,7 +165,9 @@ enum EvidenciaSalidaReglas {
     /// No puede haber más series que piezas; `nil` si cuadra.
     static func errorSeries(series: Int, piezas: Double) -> String? {
         guard Double(series) > piezas.rounded(.up) else { return nil }
-        return "Hay \(series) números de serie y el movimiento es de \(CoreExtrasFormato.numero(piezas)) pieza(s)."
+        let deSerie = series == 1 ? "número de serie" : "números de serie"
+        let dePiezas = piezas == 1 ? "pieza" : "piezas"
+        return "Hay \(series) \(deSerie) y el movimiento es de \(CoreExtrasFormato.numero(piezas)) \(dePiezas)."
     }
 
     /// Qué le falta a una salida para registrarse; `nil` si ya está completa.

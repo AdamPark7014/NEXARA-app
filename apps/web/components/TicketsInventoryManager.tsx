@@ -4,6 +4,7 @@ import { Socket } from 'socket.io-client';
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { contar } from "@/lib/plural";
 
 type BranchOption = { id: number; name: string; branchNumber?: string | null };
 
@@ -969,7 +970,7 @@ export default function TicketsInventoryManager({ token, mode, fixedBranch, bran
             />
           )}
           <div className="inventory-summary">
-            Mostrando {visibleItems.length} de {items.length} equipo(s)
+            Mostrando {visibleItems.length} de {contar(items.length, "equipo")}
           </div>
         </div>
         <div className="chip-row">

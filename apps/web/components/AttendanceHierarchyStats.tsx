@@ -6,6 +6,7 @@ import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import styles from './AttendanceHierarchyStats.module.css';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { contar } from "@/lib/plural";
 
 interface UserAttendanceStats {
   userId: number;
@@ -556,7 +557,7 @@ const AttendanceHierarchyStats: React.FC = () => {
                                 </label>
                                 <div className={styles.fileSummary}>
                                   {(paymentDrafts[userStat.userId]?.files || []).length > 0
-                                    ? `${paymentDrafts[userStat.userId].files.length} archivo(s) seleccionados`
+                                    ? contar(paymentDrafts[userStat.userId].files.length, "archivo seleccionado", "archivos seleccionados")
                                     : 'Ningún archivo seleccionado'}
                                 </div>
                                 {(paymentDrafts[userStat.userId]?.files || []).length > 0 && (

@@ -327,7 +327,7 @@ internal fun DespachoPendingPanel(
                                                     horasPlan = ActivityPlanTime.horas(horasPlan),
                                                 )
                                             }
-                                            msg = "Asignado a ${ids.size} persona(s)" to true
+                                            msg = "Asignado a ${ids.size} ${if (ids.size == 1) "persona" else "personas"}" to true
                                             activeId = null
                                             selected = emptySet()
                                             horasPlan = ""

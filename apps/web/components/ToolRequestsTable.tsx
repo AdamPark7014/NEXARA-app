@@ -46,6 +46,7 @@ import { useUser } from "./UserContext";
 import ToolLoanTimeline from "./ToolLoanTimeline";
 import { DialogoDevolucion, DialogoEntrega, VisorEvidencia, faltaEvidencia } from "./herramientas/EvidenciaPrestamo";
 import { toast } from "./Toast";
+import { diaPactadoVencido, textoDiaPactado } from "@/lib/dia-pactado";
 import s from "./ToolRequestsTable.module.css";
 
 const STATUS_OPTIONS = [
@@ -173,17 +174,12 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
     return rows;
   }, [buscadas, filterStatus, highlightId]);
 
-  const now = Date.now();
+  const ahora = new Date();
   const counts = {
     total: items.length,
     pending: items.filter((t) => t.status === "PENDING").length,
     inUse: items.filter((t) => t.status === "IN_USE").length,
-    overdue: items.filter(
-      (t) =>
-        t.status === "IN_USE" &&
-        t.expectedReturnDate &&
-        new Date(t.expectedReturnDate).getTime() < now,
-    ).length,
+    overdue: items.filter((t) => t.status === "IN_USE" && diaPactadoVencido(t.expectedReturnDate, ahora)).length,
   };
   const alternarEstado = (valor: string) => setFilterStatus((f) => (f === valor ? "" : valor));
 
@@ -213,8 +209,7 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
       key: "status",
       label: "Estado / timeline",
       render: (r) => {
-        const vencida =
-          r.status === "IN_USE" && r.expectedReturnDate && new Date(r.expectedReturnDate).getTime() < now;
+        const vencida = r.status === "IN_USE" && diaPactadoVencido(r.expectedReturnDate, ahora);
         return (
           <div className={s.estado}>
             <span className={s.insignias}>
@@ -259,7 +254,7 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
     {
       key: "expectedReturnDate",
       label: "Devolución",
-      render: (r) => <span className={s.fecha}>{fmtDate(r.expectedReturnDate)}</span>,
+      render: (r) => <span className={s.fecha}>{textoDiaPactado(r.expectedReturnDate)}</span>,
       width: 116,
     },
     {
@@ -441,7 +436,7 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
                     {
                       key: "expectedReturnDate",
                       label: "Devolución",
-                      format: (v) => fmtDate(v ? String(v) : null),
+                      format: (v) => textoDiaPactado(v ? String(v) : null),
                     },
                     { key: "deliveredByName", label: "Entregó", format: (v) => String(v ?? "") },
                     { key: "receivedByName", label: "Recibió", format: (v) => String(v ?? "") },

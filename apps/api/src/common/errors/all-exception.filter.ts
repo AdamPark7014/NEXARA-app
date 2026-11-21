@@ -62,6 +62,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
     let errorCode = 'INTERNAL_ERROR';
+    // Código propio del error (`JORNADA_NO_ABIERTA`…): web y apps lo buscan para saber qué hacer.
+    let code: string | undefined;
     let details: any = {};
 
     if (exception instanceof HttpException) {
@@ -71,7 +73,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = res;
       } else if (typeof res === 'object' && res !== null) {
         message = (res as any).message || message;
-        errorCode = (res as any).error || errorCode;
+        code = codigoPropio((res as any).code);
+        errorCode = (res as any).error || code || errorCode;
         details = res;
       }
     } else if (exception instanceof Error) {
@@ -116,17 +119,27 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     // Suggest possible solutions for common errors
-    const suggestions = suggestErrorSolutions(status, errorCode, message, details);
+    // Un error que ya dice su causa con un código no lleva el consejo genérico de su estado.
+    const suggestions = code ? [] : suggestErrorSolutions(status, errorCode, message, details);
 
     response.status(status).json({
       statusCode: status,
       errorCode,
+      ...(code ? { code } : {}),
       message,
       suggestions,
       timestamp: new Date().toISOString(),
       path: request.url,
     });
   }
+}
+
+/**
+ * El `code` que un servicio pone en su excepción (`{ code: 'JORNADA_NO_ABIERTA', message }`).
+ * Solo pasa si tiene forma de código (mayúsculas, dígitos y guion bajo): nunca un texto libre.
+ */
+export function codigoPropio(valor: unknown): string | undefined {
+  return typeof valor === 'string' && /^[A-Z][A-Z0-9_]{2,63}$/.test(valor) ? valor : undefined;
 }
 
 /**

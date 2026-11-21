@@ -37,6 +37,8 @@ import {
 } from "./base";
 import { tonoDeVariante } from "./almacen/PiezasAlmacen";
 import { useUser } from "./UserContext";
+import { textoDiaPactado } from "@/lib/dia-pactado";
+import { contar } from "@/lib/plural";
 import s from "./ToolRequestsTable.module.css";
 
 const FILTROS = [
@@ -49,15 +51,6 @@ const FILTROS = [
 interface ToolRenewalsTableProps {
   refreshTrigger?: number;
   highlightId?: string | null;
-}
-
-function fmtDate(value: string) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString("es-MX", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function renewalStatusVariant(status: string): "warning" | "positive" | "danger" | "default" {
@@ -180,17 +173,17 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
       width: 200,
     },
     { key: "tool", label: "Herramienta", render: (r) => <span className={s.fuerte}>{r.toolName}</span> },
-    { key: "prev", label: "Fecha actual", render: (r) => <span className={s.fecha}>{fmtDate(r.previousReturnDate)}</span>, width: 116 },
-    { key: "new", label: "Nueva fecha", render: (r) => <span className={s.fecha}>{fmtDate(r.newReturnDate)}</span>, width: 116 },
+    { key: "prev", label: "Fecha actual", render: (r) => <span className={s.fecha}>{textoDiaPactado(r.previousReturnDate)}</span>, width: 116 },
+    { key: "new", label: "Nueva fecha", render: (r) => <span className={s.fecha}>{textoDiaPactado(r.newReturnDate)}</span>, width: 116 },
     {
       key: "overdue",
       label: "Vencimiento",
       render: (r) => (
         <span className={s.doble}>
           {r.daysOverdue >= 1 ? (
-            <StatusBadge label={`${r.daysOverdue} días`} tone="danger" size="sm" dot />
+            <StatusBadge label={contar(r.daysOverdue, "día")} tone="danger" size="sm" dot />
           ) : (
-            <span className={s.fecha}>{r.daysOverdue} días</span>
+            <span className={s.fecha}>{contar(r.daysOverdue, "día")}</span>
           )}
           {r.renewalReason && <span className={s.tenue}>{r.renewalReason}</span>}
         </span>

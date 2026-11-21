@@ -304,7 +304,7 @@ struct DespachoPendingPanel: View {
                 indicaciones: a.indicaciones,
                 horasPlan: ActividadesHorasPlan.horas(horasPlan)
             )
-            mensaje = ("Asignado a \(ids.count) persona(s)", true)
+            mensaje = ("Asignado a \(ids.count) \(ids.count == 1 ? "persona" : "personas")", true)
             activeId = nil
             selected = []
             horasPlan = ""
@@ -624,7 +624,7 @@ struct DespachoSheet: View {
                 horasPlan: ActividadesHorasPlan.horas(horasPlan)
             )
             let count = assigned > 0 ? assigned : selected.count
-            onDone("Asignado a \(count) persona(s)")
+            onDone("Asignado a \(count) \(count == 1 ? "persona" : "personas")")
             dismiss()
         } catch {
             message = error.toUserMessage(fallback: "No se pudo asignar")

@@ -55,6 +55,7 @@ import {
 } from "@/components/base";
 import { CampoEscaneo, TarjetaHallazgo, claseMono } from "./PiezasAlmacen";
 import s from "./ScannerAlmacenPanel.module.css";
+import { contar } from "@/lib/plural";
 
 type OpType = "RECEIPT" | "DISPATCH" | "TRANSFER" | "ADJUSTMENT" | "ADJUSTMENT_OUT" | "RETURN";
 
@@ -287,7 +288,7 @@ export default function ScannerAlmacenPanel() {
     const series = admiteSeries ? seriesDeTexto(seriesTexto) : [];
     const piezas = hit.match === "empaque" ? quantity * Number(hit.packaging.piezasPorUnidad) : quantity;
     if (series.length > Math.ceil(piezas)) {
-      mostrarError(`Hay ${series.length} números de serie y el movimiento es de ${piezas} pieza(s)`);
+      mostrarError(`Hay ${contar(series.length, "número de serie", "números de serie")} y el movimiento es de ${contar(piezas, "pieza")}`);
       return;
     }
     if (esSalida) {
@@ -838,7 +839,7 @@ export default function ScannerAlmacenPanel() {
                   fullWidth
                   hint={
                     seriesLeidas.length > 0
-                      ? `${seriesLeidas.length} serie(s) leída(s)`
+                      ? contar(seriesLeidas.length, "serie leída", "series leídas")
                       : "Con el cursor aquí, cada disparo del lector agrega un renglón."
                   }
                 >

@@ -13,6 +13,7 @@ import { rangoDePreset, type BoardRange, type RangoPreset } from "@/lib/team-boa
 import { KPIS_PATH, fetchKpisEquipo, rangoDesdeUrl, type KpiPersonaFila, type KpisEquipoResponse } from "@/lib/kpis-equipo";
 import { horasEnPalabras, ordenaRanking, type OrdenRanking } from "@/lib/kpis-lectura";
 import { descargarPreNominaExcel } from "@/lib/asistencia-confiable-api";
+import { contar } from "@/lib/plural";
 
 // `productividad` conserva su id; en pantalla es lo que mide: tiempo con una actividad corriendo.
 const ORDENES: ReadonlyArray<{ id: OrdenRanking; label: string }> = [
@@ -111,9 +112,9 @@ export default function KpisEquipoPage() {
     const t = data.equipo.totales;
     if (t.jornadasAbiertas) notas.push(`${t.jornadasAbiertas} en jornada ahora (cuentan hasta este momento)`);
     if (t.jornadasSinSalida) notas.push(`${t.jornadasSinSalida} sin salida (se cerraron como el cierre automático)`);
-    if (t.cierresAutomaticos) notas.push(`${t.cierresAutomaticos} salida(s) automática(s) de las 23:30`);
-    if (t.uniforme.sinRevisar) notas.push(`${t.uniforme.sinRevisar} entrada(s) sin revisar uniforme — márcalas en Asistencias`);
-    if (t.actividadesFueraDeJornada) notas.push(`${t.actividadesFueraDeJornada} actividad(es) sin checar entrada: no cuentan`);
+    if (t.cierresAutomaticos) notas.push(`${contar(t.cierresAutomaticos, "salida automática", "salidas automáticas")} de las 23:30`);
+    if (t.uniforme.sinRevisar) notas.push(`${contar(t.uniforme.sinRevisar, "entrada")} sin revisar uniforme: ${t.uniforme.sinRevisar === 1 ? "márcala" : "márcalas"} en Asistencias`);
+    if (t.actividadesFueraDeJornada) notas.push(`${contar(t.actividadesFueraDeJornada, "actividad", "actividades")} sin checar entrada: ${t.actividadesFueraDeJornada === 1 ? "no cuenta" : "no cuentan"}`);
   }
 
   const t = data?.equipo.totales;
@@ -180,7 +181,7 @@ export default function KpisEquipoPage() {
 
       {t && t.diasExtraPendientes > 0 ? (
         <Alert tone="warning">
-          {t.diasExtraPendientes} día(s) con tiempo extra sin aprobar ({horasEnPalabras(t.minutosExtraPendientes)}).
+          {contar(t.diasExtraPendientes, "día")} con tiempo extra sin aprobar ({horasEnPalabras(t.minutosExtraPendientes)}).
           Solo lo aprobado llega a la pre-nómina: entra a la persona para decidirlo.
         </Alert>
       ) : null}

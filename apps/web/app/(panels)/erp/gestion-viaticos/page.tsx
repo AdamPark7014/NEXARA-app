@@ -17,6 +17,9 @@ import {
 } from "@/lib/gestion-viaticos-api";
 import styles from "./gestion-viaticos.module.css";
 import ExcelExportadorDinamico from "@/components/excel/ExcelExportadorDinamico";
+import PageChrome from "@/components/ui/PageChrome";
+import PanelTabs from "@/components/ui/PanelTabs";
+import EmptyState from "@/components/ui/EmptyState";
 
 type Vista = "bandeja" | "tickets" | "por-facturar" | "asignar";
 
@@ -107,80 +110,71 @@ export default function GestionViaticosPage() {
   if (!token) {
     return (
       <main className={styles.page}>
-        <h1 className={styles.title}>Mesa de viáticos y vehículos</h1>
-        <p className={styles.vacio}>Inicia sesión para ver tu bandeja.</p>
+        <PageChrome title="Mesa de viáticos y vehículos" />
+        <EmptyState title="Inicia sesión para ver tu bandeja." />
       </main>
     );
   }
 
   return (
     <main className={styles.page}>
-      <p style={{ marginBottom: 8 }}>
-        <a href="/erp/finance/viatics" style={{ fontWeight: 600 }}>
-          Asignar anticipo / lote →
-        </a>{" "}
-        (Lizeth y dirección) · historial por persona/vehículo en finanzas.
-      </p>
-      <h1 className={styles.title}>Mesa de viáticos y vehículos</h1>
-      {filas.length ? (
-        <div style={{ marginBottom: 12 }}>
-          <ExcelExportadorDinamico
-            preferenciaKey="nx-excel-cols-gestion-viaticos"
-            titulo="Mesa de viáticos"
-            filename="gestion-viaticos"
-            rows={filas.map((f) => ({
-              fecha: String(f.createdAt ?? "").slice(0, 10),
-              tipo: ETIQUETA[f.urgencia] ?? f.urgencia,
-              titulo: f.titulo,
-              resumen: f.resumen,
-              monto: Number(f.monto ?? 0),
-              urgencia: f.urgencia,
-            }))}
-            getFecha={(r) => r.fecha || null}
-            getPersonaArea={(r) => `${r.titulo} ${r.resumen}`}
-            estadoKey="urgencia"
-            estados={Object.entries(ETIQUETA).map(([value, label]) => ({ value, label }))}
-            columns={[
-              { key: "fecha", label: "Fecha" },
-              { key: "tipo", label: "Tipo" },
-              { key: "titulo", label: "Título" },
-              { key: "resumen", label: "Resumen" },
-              { key: "monto", label: "Monto", tipo: "dinero" as const, total: "suma" as const },
-              { key: "urgencia", label: "Urgencia" },
-            ]}
-            generadoPor={user?.nombre}
-          />
-        </div>
-      ) : null}
-      <p className={styles.lead}>
-        Todo lo que llega a la gestora, ordenado por urgencia. Hola
-        {user?.nombre ? `, ${user.nombre}` : ""}.
-      </p>
-
-      <div className={styles.tabs}>
-        {(
-          [
-            ["bandeja", "Bandeja"],
-            ["tickets", "Tickets por revisar"],
-            ["por-facturar", "Por facturar"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={vista === id ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-            onClick={() => {
+      <PageChrome
+        title="Mesa de viáticos y vehículos"
+        subtitle="Todo lo que espera a la gestora, ordenado por urgencia."
+        secondaryActions={
+          <>
+            {filas.length ? (
+              <ExcelExportadorDinamico
+                preferenciaKey="nx-excel-cols-gestion-viaticos"
+                titulo="Mesa de viáticos"
+                filename="gestion-viaticos"
+                rows={filas.map((f) => ({
+                  fecha: String(f.createdAt ?? "").slice(0, 10),
+                  tipo: ETIQUETA[f.urgencia] ?? f.urgencia,
+                  titulo: f.titulo,
+                  resumen: f.resumen,
+                  monto: Number(f.monto ?? 0),
+                  urgencia: f.urgencia,
+                }))}
+                getFecha={(r) => r.fecha || null}
+                getPersonaArea={(r) => `${r.titulo} ${r.resumen}`}
+                estadoKey="urgencia"
+                estados={Object.entries(ETIQUETA).map(([value, label]) => ({ value, label }))}
+                columns={[
+                  { key: "fecha", label: "Fecha" },
+                  { key: "tipo", label: "Tipo" },
+                  { key: "titulo", label: "Título" },
+                  { key: "resumen", label: "Resumen" },
+                  { key: "monto", label: "Monto", tipo: "dinero" as const, total: "suma" as const },
+                  { key: "urgencia", label: "Urgencia" },
+                ]}
+                generadoPor={user?.nombre}
+              />
+            ) : null}
+            {/* Los anticipos y lotes se asignan en Viáticos; aquí solo se atiende lo que llega. */}
+            <Link className={styles.btn} href="/erp/finance/viatics">
+              Asignar anticipo
+            </Link>
+          </>
+        }
+        context={
+          <PanelTabs
+            ariaLabel="Vistas de la mesa"
+            value={vista === "asignar" ? "bandeja" : vista}
+            onChange={(id) => {
               requestId.current++;
               setError(null);
               setOk(null);
               setVista(id);
             }}
-          >
-            {label}
-            {id === "bandeja" && bandeja?.conteo?.total ? ` (${bandeja.conteo.total})` : ""}
-          </button>
-        ))}
-      </div>
+            tabs={[
+              { key: "bandeja", label: "Bandeja", badge: bandeja?.conteo?.total || undefined },
+              { key: "tickets", label: "Tickets por revisar" },
+              { key: "por-facturar", label: "Por facturar" },
+            ]}
+          />
+        }
+      />
 
       {error ? (
         <p role="alert" className={styles.alert}>
@@ -191,11 +185,16 @@ export default function GestionViaticosPage() {
       {ok ? <p className={styles.ok}>{ok}</p> : null}
 
       {loading ? <p className={styles.resumen}>Cargando…</p> : null}
-      {!loading && !error && vista !== "por-facturar" && bandeja?.avisoLimite ? <p className={styles.resumen}>{bandeja.avisoLimite}</p> : null}
-      {!loading && !error && vista === "por-facturar" ? <p className={styles.resumen}>Se muestran hasta 200 tickets, empezando por los de vencimiento más próximo.</p> : null}
+      {/* El aviso de «se muestran hasta N» solo sirve cuando la lista es tan larga que pudo cortarse (el tope más chico es 40). */}
+      {!loading && !error && vista !== "por-facturar" && bandeja?.avisoLimite && (bandeja.items?.length ?? 0) >= 40 ? (
+        <p className={styles.resumen}>{bandeja.avisoLimite}</p>
+      ) : null}
+      {!loading && !error && vista === "por-facturar" && porFacturar.length >= 200 ? (
+        <p className={styles.resumen}>Se muestran hasta 200 tickets, empezando por los de vencimiento más próximo.</p>
+      ) : null}
 
       {!loading && !error && vista !== "por-facturar" && filas.length === 0 ? (
-        <div className={styles.vacio}>No hay nada pendiente en esta vista.</div>
+        <EmptyState tone="success" title="No hay nada pendiente en esta vista." description="Lo que llegue aparecerá aquí, primero lo que vence hoy." />
       ) : null}
 
       {!loading && !error && vista !== "por-facturar" ? (
@@ -310,7 +309,7 @@ export default function GestionViaticosPage() {
       ) : null}
 
       {!loading && !error && vista === "por-facturar" && porFacturar.length === 0 ? (
-        <div className={styles.vacio}>No hay tickets por facturar.</div>
+        <EmptyState tone="success" title="No hay tickets por facturar." />
       ) : null}
 
       {!loading && !error && vista === "por-facturar" ? (

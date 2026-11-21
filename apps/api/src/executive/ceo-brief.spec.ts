@@ -111,6 +111,18 @@ describe('armarResumenCeo', () => {
     expect(r.items[0].texto).toBe('38 evidencias sin revisar: 20 tuyas, 10 de José Antonio, 8 de David Morales');
   });
 
+  it('evidencias: si todas son suyas no repite el número ni dice «1 tuyas»', () => {
+    const una = armarResumenCeo(con({ operacion: { actividadesAtrasadas: 0, porValidar: 1 }, evidencias: { tuyas: 1, deOtros: [] } }), FECHA);
+    expect(una.items[0].texto).toBe('1 evidencia sin revisar: es tuya');
+    const varias = armarResumenCeo(con({ operacion: { actividadesAtrasadas: 0, porValidar: 3 }, evidencias: { tuyas: 3, deOtros: [] } }), FECHA);
+    expect(varias.items[0].texto).toBe('3 evidencias sin revisar: son tuyas');
+    const mezcla = armarResumenCeo(
+      con({ operacion: { actividadesAtrasadas: 0, porValidar: 3 }, evidencias: { tuyas: 1, deOtros: [{ jefe: 'David Morales', n: 2 }] } }),
+      FECHA,
+    );
+    expect(mezcla.items[0].texto).toBe('3 evidencias sin revisar: 1 tuya, 2 de David Morales');
+  });
+
   it('sin evidencias pendientes no menciona «por validar» aunque haya actividades en ese estado', () => {
     const r = armarResumenCeo(con({ operacion: { actividadesAtrasadas: 0, porValidar: 5 }, evidencias: { tuyas: 0, deOtros: [] } }), FECHA);
     expect(r.items).toHaveLength(0);

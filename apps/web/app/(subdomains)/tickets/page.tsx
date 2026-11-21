@@ -18,6 +18,7 @@ import styles from "./tickets.module.css";
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 import { getIntegraUrl } from "@/lib/panel-urls";
 import PhoneField from "@/components/PhoneField";
+import { contar } from "@/lib/plural";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -1085,7 +1086,7 @@ export default function ClientTicketsPage() {
                         </div>
                         <div className={styles.mutedText}>
                           {p.completedActivities}/{p.activityCount} OT completadas
-                          {p.siteCount ? ` · ${p.siteCount} sitio(s)` : ""}
+                          {p.siteCount ? ` · ${contar(p.siteCount, "sitio")}` : ""}
                         </div>
                         {p.scopeSummary && <div className={styles.mutedText}>{p.scopeSummary}</div>}
                       </div>
@@ -1168,7 +1169,7 @@ export default function ClientTicketsPage() {
                 <div key={branchLabel} className={styles.sectionStack}>
                   <div className={`card ${styles.cardSoft}`}>
                     <p className={styles.sectionTitle} style={{ marginBottom: 0 }}>{branchLabel}</p>
-                    <p className={styles.mutedText} style={{ margin: 0 }}>{branchTickets.length} ticket(s) en este rango</p>
+                    <p className={styles.mutedText} style={{ margin: 0 }}>{contar(branchTickets.length, "ticket")} en este rango</p>
                   </div>
                   {branchTickets.map((ticket) => (
                 <div key={ticket.id} className={`card ${styles.itemCard}`}>

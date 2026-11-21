@@ -1,3 +1,5 @@
+import { contar } from "@/lib/plural";
+
 /** Normaliza filas de viáticos desde la API Prisma. */
 export interface ViaticoRow {
   id: number;
@@ -63,8 +65,8 @@ export function isViaticoInApproval(e?: string | null): boolean {
 
 export function formatApprovalProgress(step?: number, trail?: ViaticoRow["approvalTrail"]): string {
   const done = trail?.filter((t) => t.action === "approve").length ?? 0;
-  if (step != null && step > 0) return `Paso ${step + 1} · ${done} aprobación(es)`;
-  return done > 0 ? `${done} pre-aprobación(es)` : "En revisión";
+  if (step != null && step > 0) return `Paso ${step + 1} · ${contar(done, "aprobación", "aprobaciones")}`;
+  return done > 0 ? contar(done, "pre-aprobación", "pre-aprobaciones") : "En revisión";
 }
 
 /** Importe → centavos enteros: el cuadre del reparto no puede depender de la coma flotante. */

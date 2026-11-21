@@ -129,10 +129,14 @@ export function armarResumenCeo(d: DatosCeo, fecha: string): ResumenCeo {
     if (d.evidencias) {
       const totalEvidencias = d.evidencias.tuyas + deOtros.reduce((s, o) => s + o.n, 0);
       if (totalEvidencias > 0) {
-        const quien = [
-          ...(d.evidencias.tuyas > 0 ? [`${d.evidencias.tuyas} tuyas`] : []),
-          ...deOtros.map((o) => `${o.n} de ${o.jefe}`),
-        ].join(', ');
+        const { tuyas } = d.evidencias;
+        // Si todas son suyas no se repite el número: «1 evidencia sin revisar: es tuya».
+        const quien =
+          deOtros.length === 0
+            ? tuyas === 1
+              ? 'es tuya'
+              : 'son tuyas'
+            : [...(tuyas > 0 ? [`${tuyas} ${tuyas === 1 ? 'tuya' : 'tuyas'}`] : []), ...deOtros.map((o) => `${o.n} de ${o.jefe}`)].join(', ');
         partes.push(`${plural(totalEvidencias, 'evidencia sin revisar', 'evidencias sin revisar')}: ${quien}`);
       }
     } else if (porValidar > 0) {

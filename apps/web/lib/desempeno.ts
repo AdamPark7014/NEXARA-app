@@ -80,20 +80,24 @@ export function disciplinaTexto(t: Pick<TotalesKpi, "disciplina">): string | nul
   return partes.join(" · ");
 }
 
-/** «Entregó 31 de 33 a tiempo. Tuvo una actividad corriendo 128 h de 212 h en jornada.» */
-export function resumenDesempeno(t: TotalesKpi): string {
+/**
+ * «Entregó 31 de 33 a tiempo. Tuvo una actividad corriendo 128 h de 212 h en jornada.»
+ * Con `propio`, la misma frase le habla a la persona en su inicio: «Entregaste 31 de 33 a tiempo.»
+ */
+export function resumenDesempeno(t: TotalesKpi, opciones: { propio?: boolean } = {}): string {
+  const propio = Boolean(opciones.propio);
   const frases: string[] = [];
   const e = t.entregas;
   if (e && e.medidas > 0) {
     frases.push(
-      `Entregó ${e.aTiempo} de ${e.medidas} a tiempo${e.sinEntregar ? ` y ${e.sinEntregar} ${e.sinEntregar === 1 ? "quedó" : "quedaron"} sin entregar` : ""}.`,
+      `${propio ? "Entregaste" : "Entregó"} ${e.aTiempo} de ${e.medidas} a tiempo${e.sinEntregar ? ` y ${e.sinEntregar} ${e.sinEntregar === 1 ? "quedó" : "quedaron"} sin entregar` : ""}.`,
     );
   } else {
-    frases.push("No tuvo entregas que medir en estas fechas.");
+    frases.push(propio ? "Todavía no tienes entregas que medir esta semana." : "No tuvo entregas que medir en estas fechas.");
   }
   if (t.minutosLaborados > 0) {
     frases.push(
-      `Tuvo una actividad corriendo ${horasEnPalabras(t.minutosProductivos)} de ${horasEnPalabras(t.minutosLaborados)} en jornada.`,
+      `${propio ? "Tuviste" : "Tuvo"} una actividad corriendo ${horasEnPalabras(t.minutosProductivos)} de ${horasEnPalabras(t.minutosLaborados)} en jornada.`,
     );
   }
   return frases.join(" ");

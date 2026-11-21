@@ -2,14 +2,15 @@
 
 /**
  * «Registra tu entrada para empezar» (Adam, 20-11-2026: sin entrada no se trabaja).
- * Se abre sola cuando la API responde 409 `JORNADA_NO_ABIERTA` (un solo sitio: `erp-api`).
+ * Se abre sola cuando la API responde 409 `JORNADA_NO_ABIERTA`, venga de `erpFetch` o de un `fetch`
+ * directo: al montarse vigila todas las respuestas del navegador (`vigilarRespuestasDeJornada`).
  * La persona puede seguir consultando; operar pide su jornada abierta.
  */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
 import { Button } from "@/components/base";
-import { barreraJornadaActiva, cerrarBarreraJornada, suscribirBarreraJornada } from "@/lib/jornada-candado";
+import { barreraJornadaActiva, cerrarBarreraJornada, suscribirBarreraJornada, vigilarRespuestasDeJornada } from "@/lib/jornada-candado";
 
 export default function BarreraJornada() {
   const router = useRouter();
@@ -19,6 +20,8 @@ export default function BarreraJornada() {
     setVisible(barreraJornadaActiva());
     return suscribirBarreraJornada(() => setVisible(barreraJornadaActiva()));
   }, []);
+
+  useEffect(() => vigilarRespuestasDeJornada(), []);
 
   return (
     <Modal
